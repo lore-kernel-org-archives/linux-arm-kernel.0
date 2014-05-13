@@ -1,45 +1,21 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 13 May 2014 10:59:05 +0900
-Subject: [PATCH v6 0/2] clk: shmobile: r8a7779: Add clocks support
-In-Reply-To: <1397775951-30992-1-git-send-email-horms+renesas@verge.net.au>
-References: <1397775951-30992-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20140513015905.GB29336@verge.net.au>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 13 May 2014 10:10:26 +0800
+Subject: [PATCH 1/7] ARM: imx: fix function type for CLK_OF_DECLARE
+In-Reply-To: <1399940993-1773-2-git-send-email-robherring2@gmail.com>
+References: <1399940993-1773-1-git-send-email-robherring2@gmail.com>
+ <1399940993-1773-2-git-send-email-robherring2@gmail.com>
+Message-ID: <20140513021024.GJ8330@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Mon, May 12, 2014 at 07:29:47PM -0500, Rob Herring wrote:
+> From: Rob Herring <robh@kernel.org>
+> 
+> Adding function type checking to CLK_OF_DECLARE found a type mismatch with
+> mx35_clocks_init_dt. The function should return void.
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Shawn Guo <shawn.guo@freescale.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
 
-I'm wondering if you would consider this series.
-I'm happy to take it through my tree and then arm-soc is
-that works best for you.
-
-On Fri, Apr 18, 2014 at 08:05:49AM +0900, Simon Horman wrote:
-> Hi Mike,
-> 
-> please consider applying this series.
-> 
-> It is the first step on the way towards using the common clock framework
-> and in turn multi-platform on the r8a7779 (R-Car H1) SoC.
-> 
-> It has been acked by Laurent Pinchart who did similar work
-> for the R-Car Gen-2 family of SoCs. This work is based on that work.
-> 
-> The bindings added in this series have not been changed since
-> v4 was posted with devicetree at vger.kernel.org CCed on the 13th of March.
-> 
-> Simon Horman (2):
->   clk: shmobile: r8a7779: Add clocks support
->   clk: shmobile: r8a7779: Add MSTP clock support
-> 
->  .../bindings/clock/renesas,cpg-mstp-clocks.txt     |   1 +
->  .../bindings/clock/renesas,r8a7779-cpg-clocks.txt  |  27 ++++
->  drivers/clk/shmobile/Makefile                      |   1 +
->  drivers/clk/shmobile/clk-r8a7779.c                 | 180 +++++++++++++++++++++
->  include/linux/clk/shmobile.h                       |   3 +
->  5 files changed, 212 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/renesas,r8a7779-cpg-clocks.txt
->  create mode 100644 drivers/clk/shmobile/clk-r8a7779.c
-> 
-> -- 
-> 1.8.4
-> 
+Acked-by: Shawn Guo <shawn.guo@freescale.com>
