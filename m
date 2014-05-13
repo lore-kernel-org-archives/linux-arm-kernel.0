@@ -1,103 +1,249 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 13 May 2014 16:12:58 +0200
-Subject: [PATCH] ARM: exynos4212: hotplug: Fix CPU idle clock down after CPU1
- off
-Message-ID: <1399990378-7023-1-git-send-email-k.kozlowski@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 13 May 2014 22:12:19 +0800
+Subject: [PATCH 6/6] ARM: dts: imx: add initial imx6sx-sdb board support
+In-Reply-To: <1399990339-12677-1-git-send-email-shawn.guo@freescale.com>
+References: <1399990339-12677-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1399990339-12677-7-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Exynos4212 USE_DELAYED_RESET_ASSERTION must be set in
-ARM_CORE1_OPTION register during CPU power down. This is the proper way
-of powering down CPU. Additionally without this the CPU clock down won't
-work after powering down CPU1 and CPU will work at full frequency chosen
-by CPUfreq governor.
+Add initial imx6sx-sdb board support with limited devices enabled.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Anson Huang <b20788@freescale.com>
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-exynos/hotplug.c  | 28 +++++++++++++++++++++++++---
- arch/arm/mach-exynos/regs-pmu.h |  2 ++
- 2 files changed, 27 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/Makefile       |   1 +
+ arch/arm/boot/dts/imx6sx-sdb.dts | 210 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 211 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6sx-sdb.dts
 
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index 5eead530c6f8..59b813e74558 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -74,7 +74,7 @@ static inline void cpu_enter_lowpower_a15(void)
- 	dsb();
- }
- 
--static inline void cpu_leave_lowpower(void)
-+static inline void cpu_leave_lowpower(unsigned int cpu)
- {
- 	unsigned int v;
- 
-@@ -88,6 +88,14 @@ static inline void cpu_leave_lowpower(void)
- 	  : "=&r" (v)
- 	  : "Ir" (CR_C), "Ir" (0x40)
- 	  : "cc");
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 917ff44..b7cc0dd 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -206,6 +206,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx6q-udoo.dtb \
+ 	imx6q-wandboard.dtb \
+ 	imx6sl-evk.dtb \
++	imx6sx-sdb.dtb \
+ 	vf610-colibri.dtb \
+ 	vf610-cosmic.dtb \
+ 	vf610-twr.dtb
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+new file mode 100644
+index 0000000..9906f65
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+@@ -0,0 +1,210 @@
++/*
++ * Copyright (C) 2014 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+	if (cpu == 1 && soc_is_exynos4212()) {
-+		unsigned int tmp;
++/dts-v1/;
 +
-+		tmp = __raw_readl(S5P_ARM_CORE1_OPTION);
-+		tmp &= ~(S5P_USE_DELAYED_RESET_ASSERTION);
-+		__raw_writel(tmp, S5P_ARM_CORE1_OPTION);
-+	}
- }
- 
- static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
-@@ -95,8 +103,22 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
- 	for (;;) {
- 
- 		/* make cpu1 to be turned off at next WFI command */
--		if (cpu == 1)
-+		if (cpu == 1) {
-+			if (soc_is_exynos4212()) {
-+				unsigned int tmp;
++#include "imx6sx.dtsi"
 +
-+				/*
-+				 * Exynos 4212 requires setting
-+				 * USE_DELAYED_RESET_ASSERTION so the CPU idle
-+				 * clock down feature could properly detect
-+				 * global idle state when CPU1 is off.
-+				 */
-+				tmp = __raw_readl(S5P_ARM_CORE1_OPTION);
-+				tmp |= S5P_USE_DELAYED_RESET_ASSERTION;
-+				__raw_writel(tmp, S5P_ARM_CORE1_OPTION);
-+			}
- 			__raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
-+		}
- 
- 		/*
- 		 * here's the WFI
-@@ -152,7 +174,7 @@ void __ref exynos_cpu_die(unsigned int cpu)
- 	 * bring this CPU back into the world of cache
- 	 * coherency, and then restore interrupts
- 	 */
--	cpu_leave_lowpower();
-+	cpu_leave_lowpower(cpu);
- 
- 	if (spurious)
- 		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
-diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-index 4f6a2560d022..1a3da4ef0e22 100644
---- a/arch/arm/mach-exynos/regs-pmu.h
-+++ b/arch/arm/mach-exynos/regs-pmu.h
-@@ -25,6 +25,7 @@
- 
- #define S5P_USE_STANDBY_WFI0			(1 << 16)
- #define S5P_USE_STANDBY_WFE0			(1 << 24)
-+#define S5P_USE_DELAYED_RESET_ASSERTION		BIT(12)
- 
- #define EXYNOS_SWRESET				S5P_PMUREG(0x0400)
- #define EXYNOS5440_SWRESET			S5P_PMUREG(0x00C4)
-@@ -107,6 +108,7 @@
- 
- #define S5P_ARM_CORE1_CONFIGURATION		S5P_PMUREG(0x2080)
- #define S5P_ARM_CORE1_STATUS			S5P_PMUREG(0x2084)
-+#define S5P_ARM_CORE1_OPTION			S5P_PMUREG(0x2088)
- 
- #define S5P_PAD_RET_MAUDIO_OPTION		S5P_PMUREG(0x3028)
- #define S5P_PAD_RET_GPIO_OPTION			S5P_PMUREG(0x3108)
++/ {
++	model = "Freescale i.MX6 SoloX SDB Board";
++	compatible = "fsl,imx6sx-sdb", "fsl,imx6sx";
++
++	chosen {
++		stdout-path = &uart1;
++	};
++
++	memory {
++		reg = <0x80000000 0x40000000>;
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		vcc_sd3: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_vcc_sd3>;
++			regulator-name = "VCC_SD3";
++			regulator-min-microvolt = <3000000>;
++			regulator-max-microvolt = <3000000>;
++			gpio = <&gpio2 11 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++		};
++	};
++};
++
++&fec1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet1>;
++	phy-mode = "rgmii";
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	status = "okay";
++};
++
++&uart5 { /* for bluetooth */
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart5>;
++	fsl,uart-has-rtscts;
++	status = "okay";
++};
++
++&usdhc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc2>;
++	non-removable;
++	no-1-8-v;
++	keep-power-in-suspend;
++	enable-sdio-wakeup;
++	status = "okay";
++};
++
++&usdhc3 {
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc3>;
++	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
++	bus-width = <8>;
++	cd-gpios = <&gpio2 10 GPIO_ACTIVE_HIGH>;
++	wp-gpios = <&gpio2 15 GPIO_ACTIVE_HIGH>;
++	keep-power-in-suspend;
++	enable-sdio-wakeup;
++	vmmc-supply = <&vcc_sd3>;
++	status = "okay";
++};
++
++&usdhc4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc4>;
++	cd-gpios = <&gpio6 21 GPIO_ACTIVE_HIGH>;
++	wp-gpios = <&gpio6 20 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
++
++&iomuxc {
++	imx6x-sdb {
++		pinctrl_enet1: enet1grp {
++			fsl,pins = <
++				MX6SX_PAD_ENET1_MDIO__ENET1_MDIO	0xa0b1
++				MX6SX_PAD_ENET1_MDC__ENET1_MDC		0xa0b1
++				MX6SX_PAD_RGMII1_TXC__ENET1_RGMII_TXC	0xa0b1
++				MX6SX_PAD_RGMII1_TD0__ENET1_TX_DATA_0	0xa0b1
++				MX6SX_PAD_RGMII1_TD1__ENET1_TX_DATA_1	0xa0b1
++				MX6SX_PAD_RGMII1_TD2__ENET1_TX_DATA_2	0xa0b1
++				MX6SX_PAD_RGMII1_TD3__ENET1_TX_DATA_3	0xa0b1
++				MX6SX_PAD_RGMII1_TX_CTL__ENET1_TX_EN	0xa0b1
++				MX6SX_PAD_RGMII1_RXC__ENET1_RX_CLK	0x3081
++				MX6SX_PAD_RGMII1_RD0__ENET1_RX_DATA_0	0x3081
++				MX6SX_PAD_RGMII1_RD1__ENET1_RX_DATA_1	0x3081
++				MX6SX_PAD_RGMII1_RD2__ENET1_RX_DATA_2	0x3081
++				MX6SX_PAD_RGMII1_RD3__ENET1_RX_DATA_3	0x3081
++				MX6SX_PAD_RGMII1_RX_CTL__ENET1_RX_EN	0x3081
++			>;
++		};
++
++		pinctrl_vcc_sd3: vccsd3grp {
++			fsl,pins = <
++				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
++			>;
++		};
++
++		pinctrl_uart1: uart1grp {
++			fsl,pins = <
++				MX6SX_PAD_GPIO1_IO04__UART1_TX		0x1b0b1
++				MX6SX_PAD_GPIO1_IO05__UART1_RX		0x1b0b1
++			>;
++		};
++
++		pinctrl_uart5: uart5grp {
++			fsl,pins = <
++				MX6SX_PAD_KEY_ROW3__UART5_RX		0x1b0b1
++				MX6SX_PAD_KEY_COL3__UART5_TX		0x1b0b1
++				MX6SX_PAD_KEY_ROW2__UART5_CTS_B		0x1b0b1
++				MX6SX_PAD_KEY_COL2__UART5_RTS_B		0x1b0b1
++			>;
++		};
++
++		pinctrl_usdhc2: usdhc2grp {
++			fsl,pins = <
++				MX6SX_PAD_SD2_CMD__USDHC2_CMD		0x17059
++				MX6SX_PAD_SD2_CLK__USDHC2_CLK		0x10059
++				MX6SX_PAD_SD2_DATA0__USDHC2_DATA0	0x17059
++				MX6SX_PAD_SD2_DATA1__USDHC2_DATA1	0x17059
++				MX6SX_PAD_SD2_DATA2__USDHC2_DATA2	0x17059
++				MX6SX_PAD_SD2_DATA3__USDHC2_DATA3	0x17059
++			>;
++		};
++
++		pinctrl_usdhc3: usdhc3grp {
++			fsl,pins = <
++				MX6SX_PAD_SD3_CMD__USDHC3_CMD		0x17059
++				MX6SX_PAD_SD3_CLK__USDHC3_CLK		0x10059
++				MX6SX_PAD_SD3_DATA0__USDHC3_DATA0	0x17059
++				MX6SX_PAD_SD3_DATA1__USDHC3_DATA1	0x17059
++				MX6SX_PAD_SD3_DATA2__USDHC3_DATA2	0x17059
++				MX6SX_PAD_SD3_DATA3__USDHC3_DATA3	0x17059
++				MX6SX_PAD_SD3_DATA4__USDHC3_DATA4	0x17059
++				MX6SX_PAD_SD3_DATA5__USDHC3_DATA5	0x17059
++				MX6SX_PAD_SD3_DATA6__USDHC3_DATA6	0x17059
++				MX6SX_PAD_SD3_DATA7__USDHC3_DATA7	0x17059
++				MX6SX_PAD_KEY_COL0__GPIO2_IO_10		0x17059 /* CD */
++				MX6SX_PAD_KEY_ROW0__GPIO2_IO_15		0x17059 /* WP */
++			>;
++		};
++
++		pinctrl_usdhc3_100mhz: usdhc3grp-100mhz {
++			fsl,pins = <
++				MX6SX_PAD_SD3_CMD__USDHC3_CMD		0x170b9
++				MX6SX_PAD_SD3_CLK__USDHC3_CLK		0x100b9
++				MX6SX_PAD_SD3_DATA0__USDHC3_DATA0	0x170b9
++				MX6SX_PAD_SD3_DATA1__USDHC3_DATA1	0x170b9
++				MX6SX_PAD_SD3_DATA2__USDHC3_DATA2	0x170b9
++				MX6SX_PAD_SD3_DATA3__USDHC3_DATA3	0x170b9
++				MX6SX_PAD_SD3_DATA4__USDHC3_DATA4	0x170b9
++				MX6SX_PAD_SD3_DATA5__USDHC3_DATA5	0x170b9
++				MX6SX_PAD_SD3_DATA6__USDHC3_DATA6	0x170b9
++				MX6SX_PAD_SD3_DATA7__USDHC3_DATA7	0x170b9
++			>;
++		};
++
++		pinctrl_usdhc3_200mhz: usdhc3grp-200mhz {
++			fsl,pins = <
++				MX6SX_PAD_SD3_CMD__USDHC3_CMD		0x170f9
++				MX6SX_PAD_SD3_CLK__USDHC3_CLK		0x100f9
++				MX6SX_PAD_SD3_DATA0__USDHC3_DATA0	0x170f9
++				MX6SX_PAD_SD3_DATA1__USDHC3_DATA1	0x170f9
++				MX6SX_PAD_SD3_DATA2__USDHC3_DATA2	0x170f9
++				MX6SX_PAD_SD3_DATA3__USDHC3_DATA3	0x170f9
++				MX6SX_PAD_SD3_DATA4__USDHC3_DATA4	0x170f9
++				MX6SX_PAD_SD3_DATA5__USDHC3_DATA5	0x170f9
++				MX6SX_PAD_SD3_DATA6__USDHC3_DATA6	0x170f9
++				MX6SX_PAD_SD3_DATA7__USDHC3_DATA7	0x170f9
++			>;
++		};
++
++		pinctrl_usdhc4: usdhc4grp {
++			fsl,pins = <
++				MX6SX_PAD_SD4_CMD__USDHC4_CMD		0x17059
++				MX6SX_PAD_SD4_CLK__USDHC4_CLK		0x10059
++				MX6SX_PAD_SD4_DATA0__USDHC4_DATA0	0x17059
++				MX6SX_PAD_SD4_DATA1__USDHC4_DATA1	0x17059
++				MX6SX_PAD_SD4_DATA2__USDHC4_DATA2	0x17059
++				MX6SX_PAD_SD4_DATA3__USDHC4_DATA3	0x17059
++				MX6SX_PAD_SD4_DATA7__GPIO6_IO_21	0x17059 /* CD */
++				MX6SX_PAD_SD4_DATA6__GPIO6_IO_20	0x17059 /* WP */
++			>;
++		};
++	};
++};
 -- 
-1.9.1
+1.8.3.2
