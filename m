@@ -1,92 +1,49 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Tue, 13 May 2014 21:27:17 +0200
-Subject: [RFC PATCH 11/9] dt: deps: dtc: introduce new (virtual) property
- no-dependencies
-In-Reply-To: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
-References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
-Message-ID: <1400009237-5012-1-git-send-email-holler@ahsoftware.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 May 2014 21:46:52 +0200
+Subject: [PATCH v2] usb: phy: msm: reset controller is mandatory now
+Message-ID: <4319810.IibMxJ0Qvk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some rare cases it might make sense for not wanting an automatic
-dependency for some used phandles.
+Commit a27345434134 "usb: phy: msm: Use reset framework for LINK
+and PHY resets" introduced a mandatory call to reset_control_get
+into the msm usb phy driver, which means we have to add a Kconfig
+dependency on the API to avoid this build error:
 
-E.g. if a cpu depends on a regulator which depends on i2c which depends
-on some bus and you want that the bus depends on the cpu. That would
-end up in a cycle. Usually such doesn't make sense because the hw doesn't
-support such circular dependencies too (you always have to start somewhere
-with initializing things). But e.g. in the case of the regulator the cpu
-depends on, it's very likely that the regulator was initialized
-automatically (otherwise the cpu won't run), so there is no real need to
-initialize the regulator before the cpu. But that's just an example for
-one of such rare cases where it might make sense to avoid an otherwise
-automatically added dependency.
+phy/phy-msm-usb.c: In function 'msm_otg_read_dt':
+phy/phy-msm-usb.c:1461:2: error: implicit declaration of function 'devm_reset_control_get' [-Werror=implicit-function-declaration]
+  motg->link_rst = devm_reset_control_get(&pdev->dev, "link");
+  ^
 
-The syntax is like
+Since the usb-ehci-msm driver currently selects the OTG driver,
+we could still get a broken dependency here. To solve that,
+this patch also removes the 'select', which turns out to be
+unnecessary.
 
-	bar: whatever {
-		...
-	};
-	foo {
-		my-option = <&bar 1 2 3>;
-		no-dependencies = <&bar>;
-	};
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: "Ivan T. Ivanov" <iivanov@mm-sol.com>
 
-Without that 'no-dependencies' property dtc would automatically add a
-dependency to bar to the property 'dependencies' of the node foo.
-But with that 'no-dependencies' it will not automatically add the
-listed dependencies.
-
-The property 'no-dependencies' is virtual property and will not be added
-to any output file.
-
-Signed-off-by: Alexander Holler <holler@ahsoftware.de>
----
- scripts/dtc/dependencies.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
-
-diff --git a/scripts/dtc/dependencies.c b/scripts/dtc/dependencies.c
-index 4579f6f..06f447b 100644
---- a/scripts/dtc/dependencies.c
-+++ b/scripts/dtc/dependencies.c
-@@ -73,6 +73,16 @@ static void add_deps(struct node *dt, struct node *node, struct property *prop)
- 				is_parent_of(target, source))
- 			continue;
- 		phandle = get_node_phandle(dt, target);
-+		prop_deps = get_property(node, "no-dependencies");
-+		if (prop_deps) {
-+			/* avoid adding non-dependencies */
-+			cell = (cell_t *)prop_deps->val.val;
-+			for (i = 0; i < prop_deps->val.len/4; ++i)
-+				if (*cell++ == cpu_to_fdt32(phandle))
-+					break;
-+			if (i < prop_deps->val.len/4)
-+				continue;
-+		}
- 		prop_deps = get_property(source, "dependencies");
- 		if (!prop_deps) {
- 			add_property(source,
-@@ -102,9 +112,21 @@ static void process_nodes_props(struct node *dt, struct node *node)
- 		process_nodes_props(dt, child);
- }
- 
-+static void del_prop_no_dependencies(struct node *node)
-+{
-+	struct node *child;
-+
-+	if (!node)
-+		return;
-+	delete_property_by_name(node, "no-dependencies");
-+	for_each_child(node, child)
-+		del_prop_no_dependencies(child);
-+}
-+
- void add_dependencies(struct boot_info *bi)
- {
- 	process_nodes_props(bi->dt, bi->dt);
-+	del_prop_no_dependencies(bi->dt);
- }
- 
- /*
--- 
-1.8.3.1
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index 3d9e540..7a39ae8 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -170,7 +170,6 @@ config USB_EHCI_MSM
+ 	tristate "Support for Qualcomm QSD/MSM on-chip EHCI USB controller"
+ 	depends on ARCH_MSM
+ 	select USB_EHCI_ROOT_HUB_TT
+-	select USB_MSM_OTG
+ 	---help---
+ 	  Enables support for the USB Host controller present on the
+ 	  Qualcomm chipsets. Root Hub has inbuilt TT.
+diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
+index 359a6c1..65bec8f 100644
+--- a/drivers/usb/phy/Kconfig
++++ b/drivers/usb/phy/Kconfig
+@@ -165,6 +165,7 @@ config USB_ISP1301
+ config USB_MSM_OTG
+ 	tristate "Qualcomm on-chip USB OTG controller support"
+ 	depends on (USB || USB_GADGET) && (ARCH_MSM || ARCH_QCOM)
++	depends on RESET_CONTROLLER
+ 	select USB_PHY
+ 	help
+ 	  Enable this to support the USB OTG transceiver on Qualcomm chips. It
