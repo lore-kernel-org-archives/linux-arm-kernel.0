@@ -1,98 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 May 2014 08:26:26 -0700
-Subject: [PATCH 1/4] OMAPDSS: Fix DSS clock multiplier issue on 3703 and
- probably 3630
-In-Reply-To: <5370DE42.2060607@ti.com>
-References: <1398815562-24113-1-git-send-email-tony@atomide.com>
- <1398815562-24113-2-git-send-email-tony@atomide.com>
- <536C860E.1000501@ti.com> <20140509143703.GA17814@atomide.com>
- <5370B222.7050702@ti.com> <20140512143934.GC31772@atomide.com>
- <5370DE42.2060607@ti.com>
-Message-ID: <20140513152626.GB16837@atomide.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 13 May 2014 10:26:31 -0500
+Subject: [PATCH 4/8] usb: phy: fix isp1301-omap dependency on tps65010
+In-Reply-To: <1399557141-1346645-5-git-send-email-arnd@arndb.de>
+References: <1399557141-1346645-1-git-send-email-arnd@arndb.de>
+ <1399557141-1346645-5-git-send-email-arnd@arndb.de>
+Message-ID: <20140513152631.GI1151@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [140512 07:45]:
-> On 12/05/14 17:39, Tony Lindgren wrote:
-> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [140512 04:36]:
-> >> On 09/05/14 17:37, Tony Lindgren wrote:
-> >>>
-> >>> This is just the 3730-evm with the Sharp VGA panel mentioned in
-> >>> this series.
-> >>
-> >> Hmm, well, those both look fine. The fck is well below the maximum,
-> >> which is somewhere around 170MHz-180MHz. The lck/pck ratio is higher
-> >> with this patch, but that should affect the GFX overlay.
-> >>
-> >> So you're just booting, and there are no applications that use the
-> >> framebuffer? And there is no rotation or such configured?
-> > 
-> > Right. The rotation is set to 3 though.
+On Thu, May 08, 2014 at 03:52:17PM +0200, Arnd Bergmann wrote:
+> The isp1301-omap driver cannot be built-in if the tps65010 driver
+> is a module, otherwise we get a link error from the reference to
+> the tps65010_set_vbus_draw function.
 > 
-> Hmm, that's probably the issue then. VRFB rotation is very heavy on the
-> memory bandwidth, and is generally a very easy way to get sync lost errors.
+> There is already a hack in the driver to work around the problem
+> of tps65010 being not available at all. This patch extends that
+> hack to ensure that the real tps65010_set_vbus_draw() function
+> is only called when it's avaiable.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: linux-omap at vger.kernel.org
+> ---
+>  drivers/usb/phy/phy-isp1301-omap.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/phy/phy-isp1301-omap.c b/drivers/usb/phy/phy-isp1301-omap.c
+> index 6e146d7..35a0dd2 100644
+> --- a/drivers/usb/phy/phy-isp1301-omap.c
+> +++ b/drivers/usb/phy/phy-isp1301-omap.c
+> @@ -94,7 +94,7 @@ struct isp1301 {
+>  
+>  #if defined(CONFIG_MACH_OMAP_H2) || defined(CONFIG_MACH_OMAP_H3)
+>  
+> -#if	defined(CONFIG_TPS65010) || defined(CONFIG_TPS65010_MODULE)
+> +#if	defined(CONFIG_TPS65010) || (defined(CONFIG_TPS65010_MODULE) && defined(MODULE))
 
-I found another case without rotation where the error always triggers.
-By forcing 3730-evm LCD panel to QVGA mode it always seems to happen
-even without rotation.
+nack, I would rather see a real fix, possibly also fixing the original
+hack.
 
-Without this patch with errors and no image:
-
-# cat /sys/kernel/debug/omapdss/clk 
-[   55.185729] DSS: dss_runtime_get
-[   55.189422] DSS: dss_runtime_put
-[   55.192810] DISPC: dispc_runtime_get
-[   55.196685] DISPC: dispc_runtime_put
-- DSS -
-DSS_FCK (DSS1_ALWON_FCLK) = 27000000
-- DISPC -
-dispc fclk source = DSS_FCK (DSS1_ALWON_FCLK)
-fck             27000000        
-- LCD -
-LCD clk source = DSS_FCK (DSS1_ALWON_FCLK)
-lck             27000000        lck div 1
-pck             5400000         pck div 5
-
-With this patch without errors and penguin showing:
-
-# cat /sys/kernel/debug/omapdss/clk
-[   19.905792] DSS: dss_runtime_get
-[   19.909545] DSS: dss_runtime_put
-[   19.912933] DISPC: dispc_runtime_get
-[   19.916778] DISPC: dispc_runtime_put
-- DSS -
-DSS_FCK (DSS1_ALWON_FCLK) = 108000000
-- DISPC -
-dispc fclk source = DSS_FCK (DSS1_ALWON_FCLK)
-fck             108000000       
-- LCD -
-LCD clk source = DSS_FCK (DSS1_ALWON_FCLK)
-lck             108000000       lck div 1
-pck             5400000         pck div 20
-
-In this case the errors are different too:
-
-DISPC: channel 0 xres 240 yres 320
-DISPC: pck 5400000
-DISPC: hsw 3 hfp 3 hbp 39 vsw 1 vfp 2 vbp 7
-DISPC: vsync_level 1 hsync_level 1 data_pclk_edge 1 de_level 0 sync_pclk_edge 0
-DISPC: hsync 18947Hz, vsync 57Hz
-DISPC: lck = 27000000 (1)
-DISPC: pck = 5400000 (5)
-APPLY: DISPC IRQ: 0x60: GFX_FIFO_UNDERFLOW 
-APPLY: DISPC IRQ: 0x4062: GFX_FIFO_UNDERFLOW SYNC_LOST 
-DISPC: dispc_runtime_get
-omapdss APPLY error: FIFO UNDERFLOW on gfx, disabling the overlay
-
-Regarding rotation, it does look like that with VGA mode enabling
-rotation makes the error trigger quite often on 3730.
- 
-> will handle it fine with the clock rates and bandwidth usage you have
-> for your use cases.
-
-I don't think it's all because of rotation. And rotating my head
-makes my neck hurt!
-
-Regards,
-
-Tony
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140513/9a08488d/attachment.sig>
