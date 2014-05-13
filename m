@@ -1,138 +1,104 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Tue, 13 May 2014 22:42:10 +0100
-Subject: [PATCH v6 2/3] ARM: sunxi: Add driver for sunxi IR controller
-In-Reply-To: <1400006342-2968-3-git-send-email-bay@hackerdom.ru>
-References: <1400006342-2968-1-git-send-email-bay@hackerdom.ru>
- <1400006342-2968-3-git-send-email-bay@hackerdom.ru>
-Message-ID: <537291B2.4070700@imgtec.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 13 May 2014 14:50:02 -0700
+Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems#
+In-Reply-To: <CAD=FV=UJK1nSPjH-au-KtbnOZk2nC7usLD8L9neMedj6WHUp8g@mail.gmail.com>
+References: <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
+ <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
+ <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
+ <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
+ <20140508192209.GH3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405081600260.980@knanqh.ubzr>
+ <20140508205223.GI3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405082058130.980@knanqh.ubzr>
+ <20140509091824.GL3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405091245070.980@knanqh.ubzr>
+ <20140509182245.GM3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405091640090.980@knanqh.ubzr>
+ <CAD=FV=UJK1nSPjH-au-KtbnOZk2nC7usLD8L9neMedj6WHUp8g@mail.gmail.com>
+Message-ID: <CAD=FV=XM2URyJjV9gaE=mrp7LAEGtvi9wQGhGJi3_HYp_XzYWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
+Hi,
 
-Just a few probe error handling suggestions...
+On Mon, May 12, 2014 at 4:51 PM, Doug Anderson <dianders@chromium.org> wrote:
+> Hi,
+>
+> On Fri, May 9, 2014 at 2:05 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> On Fri, 9 May 2014, Russell King - ARM Linux wrote:
+>>
+>>> I'd much prefer just printing a warning at kernel boot time to report
+>>> that the kernel is running with features which would make udelay() less
+>>> than accurate.
+>>
+>> What if there is simply no timer to rely upon, as in those cases where
+>> interrupts are needed for time keeping to make progress?  We should do
+>> better than simply saying "sorry your kernel should irradicate every
+>> udelay() usage to be reliable".
+>>
+>> And I mean "reliable" which is not exactly the same as "accurate".
+>> Reliable means "never *significantly* shorter".
+>>
+>>> Remember, it should be usable for _short_ delays on slow machines as
+>>> well as other stuff, and if we're going to start throwing stuff like
+>>> the above at it, it's going to become very inefficient.
+>>
+>> You said that udelay can be much longer than expected due to various
+>> reasons.
+>>
+>> You also said that the IRQ handler overhead during udelay calibration
+>> makes actual delays slightli shorter than expected.
+>>
+>> I'm suggesting the addition of a slight overhead that is much smaller
+>> than the IRQ handler here.  That shouldn't impact things masurably.
+>> I'd certainly like Doug to run his udelay timing test with the following
+>> patch to see if it solves the problem.
+>
+> ...so I spent a whole chunk of time debugging this problem today.  I'm
+> out of time today (more tomorrow), but it looks like the theory I
+> proposed about why udelay() is giving bad results _might_ have more to
+> do with bugs in the exynos cpufreq driver and less to do with the
+> theoretical race we've been talking about.  It looks possible that the
+> driver is not setting the "old" frequency properly, which would
+> certainly cause problems.
 
-On 13/05/14 19:39, Alexander Bersenev wrote:
-> +static int sunxi_ir_probe(struct platform_device *pdev)
-> +{
-> +	int ret = 0;
-> +	unsigned long tmp = 0;
-> +
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *dn = dev->of_node;
-> +	struct resource *res;
-> +	struct sunxi_ir *ir;
-> +
-> +	ir = devm_kzalloc(dev, sizeof(struct sunxi_ir), GFP_KERNEL);
-> +	if (!ir)
-> +		return -ENOMEM;
-> +
-> +	/* Clock */
-> +	ir->apb_clk = devm_clk_get(dev, "apb");
-> +	if (IS_ERR(ir->apb_clk)) {
-> +		dev_err(dev, "failed to get a apb clock.\n");
-> +		return -EINVAL;
+Argh.  It turns out that I spent a whole lot of time tracking down the
+fact that cpufreq_out_of_sync() running.  As part of debugging this
+problem I added a cpufreq_get(0).  That would periodically notice that
+the driver's reported frequency didn't match "policy->cur" and call
+cpufreq_out_of_sync().  cpufreq_out_of_sync() would "thoughtfully"
+send out its own CPUFREQ_PRECHANGE / CPUFREQ_POSTCHANGE but without
+any sort of mutexes (at least in our tree).  Ugh.
 
-Does it make sense to return PTR_ERR(ir->apb_clk) here?
+Overall cpufreq_out_of_sync() seems incredibly racy since there will
+inevitably be some period of time where the cpufreq driver has changed
+the real CPU frequency but hasn't yet sent out the
+cpufreq_notify_transition().  ...and there is no locking between the
+two that I see.  ...but that's getting pretty far afield from my
+original bug and it's been that way forever, so I guess I'll ignore
+it.
 
-> +	}
-> +	ir->clk = devm_clk_get(dev, "ir");
-> +	if (IS_ERR(ir->clk)) {
-> +		dev_err(dev, "failed to get a ir clock.\n");
-> +		return -EINVAL;
+--
 
-and here
+...but then I found the true problem shows up when we transition
+between very low frequencies on exynos, like between 200MHz and
+300MHz.  While transitioning between frequencies the system
+temporarily bumps over to the "switcher" PLL running at 800MHz while
+waiting for the main PLL to stabilize.  No CPUFREQ notification is
+sent for that.  That means there's a period of time when we're running
+at 800MHz but loops_per_jiffy is calibrated at between 200MHz and
+300MHz.
 
-> +	}
-> +
-> +	ret = clk_set_rate(ir->clk, SUNXI_IR_BASE_CLK);
-> +	if (ret) {
-> +		dev_err(dev, "set ir base clock failed!\n");
-> +		return -EINVAL;
 
-return ret?
+I'm welcome to any suggestions for how to address this.  It sorta
+feels like it would be a common thing to have a temporary PLL during
+the transition, so my inclination would be to add a "temp" field to
+"struct cpufreq_freqs".  Anyone who cared about the fact that cpufreq
+might transition through a different frequency on its way from old to
+new could look at this field.
 
-> +	}
-> +
-> +	if (clk_prepare_enable(ir->apb_clk)) {
-> +		dev_err(dev, "try to enable apb_ir_clk failed\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (clk_prepare_enable(ir->clk)) {
-> +		dev_err(dev, "try to enable ir_clk failed\n");
-> +		ret = -EINVAL;
-> +		goto exit_clkdisable_apb_clk;
-> +	}
-> +
-> +	/* IO */
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +
-> +	ir->base = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(ir->base)) {
-> +		dev_err(dev, "failed to map registers\n");
-> +		ret = -ENOMEM;
 
-PTR_ERR again?
+What do people think?
 
-> +		goto exit_clkdisable_clk;
-> +	}
-> +
-> +	/* IRQ */
-> +	ir->irq = platform_get_irq(pdev, 0);
-> +	if (ir->irq < 0) {
-> +		dev_err(dev, "no irq resource\n");
-> +		ret = -EINVAL;
 
-ret = ir->irq?
-
-> +		goto exit_clkdisable_clk;
-> +	}
-> +
-> +	ret = devm_request_irq(dev, ir->irq, sunxi_ir_irq, 0, SUNXI_IR_DEV, ir);
-> +	if (ret) {
-> +		dev_err(dev, "failed request irq\n");
-> +		ret = -EINVAL;
-
-necessary?
-
-> +		goto exit_clkdisable_clk;
-> +	}
-> +
-> +	ir->rc = rc_allocate_device();
-> +
-> +	if (!ir->rc) {
-> +		dev_err(dev, "failed to allocate device\n");
-> +		ret = -ENOMEM;
-> +		goto exit_clkdisable_clk;
-> +	}
-> +
-> +	ir->rc->priv = ir;
-> +	ir->rc->input_name = SUNXI_IR_DEV;
-> +	ir->rc->input_phys = "sunxi-ir/input0";
-> +	ir->rc->input_id.bustype = BUS_HOST;
-> +	ir->rc->input_id.vendor = 0x0001;
-> +	ir->rc->input_id.product = 0x0001;
-> +	ir->rc->input_id.version = 0x0100;
-> +	ir->map_name = of_get_property(dn, "linux,rc-map-name", NULL);
-> +	ir->rc->map_name = ir->map_name ?: RC_MAP_EMPTY;
-> +	ir->rc->dev.parent = dev;
-> +	ir->rc->driver_type = RC_DRIVER_IR_RAW;
-> +	rc_set_allowed_protocols(ir->rc, RC_BIT_ALL);
-> +	ir->rc->rx_resolution = SUNXI_IR_SAMPLE;
-> +	ir->rc->timeout = MS_TO_NS(SUNXI_IR_TIMEOUT);
-> +	ir->rc->driver_name = SUNXI_IR_DEV;
-> +
-> +	ret = rc_register_device(ir->rc);
-> +	if (ret) {
-> +		dev_err(dev, "failed to register rc device\n");
-> +		ret = -EINVAL;
-
-same again
-
-> +		goto exit_free_dev;
-> +	}
-> +
-
-Cheers
-James
+-Doug
