@@ -1,85 +1,41 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Tue, 13 May 2014 13:05:04 +0530
-Subject: [PATCH v8 1/2] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <5371BEFD.6000407@ti.com>
-References: <1399643877-14528-1-git-send-email-gautam.vivek@samsung.com>
- <5370C689.2090402@ti.com>
- <CAFp+6iH-bLd9WUYyK8d8i=UNUm4DHpEYz=Am_qzPyX6gDovyKA@mail.gmail.com>
- <5371BEFD.6000407@ti.com>
-Message-ID: <CAFp+6iGHQBCSdCPSdVVFcKp_MbUTU-2u_PusWsKzRVPyhGd2NA@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 13 May 2014 10:43:44 +0300
+Subject: [PATCH 0/4] ARM/DT: edma: Get IP configuration from hardware
+Message-ID: <1399967028-24757-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 12:13 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi,
->
-> On Tuesday 13 May 2014 11:37 AM, Vivek Gautam wrote:
->> Hi Kishon,
->>
->>
->> On Mon, May 12, 2014 at 6:33 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>> Hi Gautam,
->>>
->>> On Friday 09 May 2014 07:27 PM, Vivek Gautam wrote:
->>>> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
->>>> The new driver uses the generic PHY framework and will interact
->>>> with DWC3 controller present on Exynos5 series of SoCs.
->>>>
->>>> Also, created a new header file in linux/mfd/syscon/ for
->>>> Exynos5 SoCs and put the required PMU offset definitions
->>>> for the basic available PHYs.
->>>>
->>>
->>>
->>> I get the following checkpatch warnings
->>>
->>> WARNING: please write a paragraph that describes the config symbol fully
->>> #163: FILE: drivers/phy/Kconfig:163:
->>> +config PHY_EXYNOS5_USBDRD
->>>
->>> WARNING: DT compatible string "samsung,exynos5250-usbdrd-phy" appears
->>> un-documented -- check ./Documentation/devicetree/bindings/
->>> #708: FILE: drivers/phy/phy-exynos5-usbdrd.c:516:
->>> +               .compatible = "samsung,exynos5250-usbdrd-phy",
->>>
->>> WARNING: DT compatible string "samsung,exynos5420-usbdrd-phy" appears
->>> un-documented -- check ./Documentation/devicetree/bindings/
->>> #711: FILE: drivers/phy/phy-exynos5-usbdrd.c:519:
->>> +               .compatible = "samsung,exynos5420-usbdrd-phy",.
->>>
->>>
->>> I think you just need to separate the Documentation into a separate patch
->>> before applying the driver patch.
->>>
->>
->> I somehow don't see the Documentation warning. Below is the checkpatch
->> output which i ran on this v8 patch version.
->>   linux-phy$ ./scripts/checkpatch.pl phy.patch
->>   WARNING: please write a paragraph that describes the config symbol fully
->>   #127: FILE: drivers/phy/Kconfig:163:
->>   +config PHY_EXYNOS5_USBDRD
->>
->>   total: 0 errors, 1 warnings, 760 lines checked
->>
->>   phy.patch has style problems, please review.
->>
->>   If any of these errors are false positives, please report
->>   them to the maintainer, see CHECKPATCH in MAINTAINERS.
->>
->> am i missing something ?
->
-> Yeah.. the checkpatch.pl has got updated recently. If you use the latest kernel
-> you should see it.
->
+Hi,
 
-right, i can see it now with Torvald's tree. Thanks for pointing out :-)
-I will move out the Documentation in a separate patch and resubmit.
+We are requesting redundant information via DT for the driver since the very same
+data is available in the HW: by reading and decoding the content of CCCFG
+register we can get:
+Number of channels: NUM_DMACH
+Number of regions: NUM_REGN
+Number of slots (PaRAM sets): NUM_PAENTRY
+Number of TC/EQ: NUM_EVQUE
 
+So these does not need to be provided by the DT binding.
 
+The driver will no longer look for these properties from DT and they can be
+removed from the binding documentation and from the dtsi files as well.
+The change will not introduce regression when new kernel is booted using older
+DTB (since we just ignore the mentioned properties).
 
+Regards,
+Peter
+---
+Peter Ujfalusi (4):
+  ARM: edma: Get IP information from HW when booting with DT
+  dt/bindings: ti,edma: Remove redundant properties from documentation
+  ARM: dts: am33xx: Remove obsolete properties from edma node
+  ARM: dts: am4372: Remove obsolete properties from edma node
+
+ Documentation/devicetree/bindings/dma/ti-edma.txt |   6 -
+ arch/arm/boot/dts/am33xx.dtsi                     |   3 -
+ arch/arm/boot/dts/am4372.dtsi                     |   3 -
+ arch/arm/common/edma.c                            | 128 +++++++++++++---------
+ 4 files changed, 79 insertions(+), 61 deletions(-)
 
 -- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+1.9.3
