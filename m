@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 13 May 2014 17:03:31 +0900
-Subject: [PATCH 04/15] ARM: shmobile: r8a73a4: Switch to new style CMT device
+Date: Tue, 13 May 2014 17:03:30 +0900
+Subject: [PATCH 03/15] ARM: shmobile: sh73a0: Switch to new style CMT device
 In-Reply-To: <cover.1399967755.git.horms+renesas@verge.net.au>
 References: <cover.1399967755.git.horms+renesas@verge.net.au>
-Message-ID: <52065ef71e2c4da9e9661da68915741afc72ec1d.1399967755.git.horms+renesas@verge.net.au>
+Message-ID: <652256fd475053f7fd8c2cd3e85f37be96d594db.1399967755.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,62 +16,89 @@ Switch from the old-style platform data to the new-style platform data.
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a73a4.c |  2 +-
- arch/arm/mach-shmobile/setup-r8a73a4.c | 17 +++++++----------
- 2 files changed, 8 insertions(+), 11 deletions(-)
+ arch/arm/mach-shmobile/clock-sh73a0.c |  2 +-
+ arch/arm/mach-shmobile/setup-sh73a0.c | 36 ++++++++++++-----------------------
+ 2 files changed, 13 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
-index 7348d58..b5bc22c 100644
---- a/arch/arm/mach-shmobile/clock-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
-@@ -597,7 +597,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("e6560000.i2c", &mstp_clks[MSTP317]),
- 	CLKDEV_DEV_ID("e6500000.i2c", &mstp_clks[MSTP318]),
- 	CLKDEV_DEV_ID("e6510000.i2c", &mstp_clks[MSTP323]),
--	CLKDEV_DEV_ID("sh_cmt.10", &mstp_clks[MSTP329]),
-+	CLKDEV_ICK_ID("fck", "sh-cmt-48-gen2.1", &mstp_clks[MSTP329]),
- 	CLKDEV_DEV_ID("e60b0000.i2c", &mstp_clks[MSTP409]),
- 	CLKDEV_DEV_ID("e6540000.i2c", &mstp_clks[MSTP410]),
- 	CLKDEV_DEV_ID("e6530000.i2c", &mstp_clks[MSTP411]),
-diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
-index cd36f80..9333770 100644
---- a/arch/arm/mach-shmobile/setup-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
-@@ -169,20 +169,17 @@ static const struct resource thermal0_resources[] = {
- 					thermal0_resources,		\
- 					ARRAY_SIZE(thermal0_resources))
+diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+index 23edf83..ca03989 100644
+--- a/arch/arm/mach-shmobile/clock-sh73a0.c
++++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+@@ -650,7 +650,6 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP201]), /* SCIFA3 */
+ 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP200]), /* SCIFA4 */
+ 	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[MSTP331]), /* SCIFA6 */
+-	CLKDEV_DEV_ID("sh_cmt.10", &mstp_clks[MSTP329]), /* CMT10 */
+ 	CLKDEV_DEV_ID("sh_fsi2", &mstp_clks[MSTP328]), /* FSI */
+ 	CLKDEV_DEV_ID("ec230000.sound", &mstp_clks[MSTP328]), /* FSI */
+ 	CLKDEV_DEV_ID("sh_irda.0", &mstp_clks[MSTP325]), /* IrDA */
+@@ -683,6 +682,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_ICK_ID("dsip_clk", "sh-mipi-dsi.1", &div6_clks[DIV6_DSI1P]),
+ 	CLKDEV_ICK_ID("dsiphy_clk", "sh-mipi-dsi.0", &dsi0phy_clk),
+ 	CLKDEV_ICK_ID("dsiphy_clk", "sh-mipi-dsi.1", &dsi1phy_clk),
++	CLKDEV_ICK_ID("fck", "sh-cmt-48.1", &mstp_clks[MSTP329]), /* CMT1 */
+ };
+ 
+ void __init sh73a0_clock_init(void)
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index f74ab53..71d0e44 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -104,35 +104,23 @@ SH73A0_SCIF(PORT_SCIFA, 6, 0xe6cc0000, gic_spi(156));
+ SH73A0_SCIF(PORT_SCIFA, 7, 0xe6cd0000, gic_spi(143));
+ SH73A0_SCIF(PORT_SCIFB, 8, 0xe6c30000, gic_spi(80));
  
 -static struct sh_timer_config cmt10_platform_data = {
 -	.name = "CMT10",
+-	.channel_offset = 0x10,
 -	.timer_bit = 0,
 -	.clockevent_rating = 80,
+-	.clocksource_rating = 125,
 +static struct sh_timer_config cmt1_platform_data = {
-+	.channels_mask = 0xff,
++	.channels_mask = 0x3f,
  };
  
 -static struct resource cmt10_resources[] = {
--	DEFINE_RES_MEM(0xe6130010, 0x0c),
--	DEFINE_RES_MEM(0xe6130000, 0x04),
--	DEFINE_RES_IRQ(gic_spi(120)), /* CMT1_0 */
+-	[0] = {
+-		.name	= "CMT10",
+-		.start	= 0xe6138010,
+-		.end	= 0xe613801b,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= gic_spi(65),
+-		.flags	= IORESOURCE_IRQ,
+-	},
 +static struct resource cmt1_resources[] = {
-+	DEFINE_RES_MEM(0xe6130000, 0x1004),
-+	DEFINE_RES_IRQ(gic_spi(120)),
++	DEFINE_RES_MEM(0xe6138000, 0x200),
++	DEFINE_RES_IRQ(gic_spi(65)),
  };
  
- #define r8a7790_register_cmt(idx)					\
--	platform_device_register_resndata(&platform_bus, "sh_cmt",	\
-+	platform_device_register_resndata(&platform_bus, "sh-cmt-48-gen2", \
- 					  idx, cmt##idx##_resources,	\
- 					  ARRAY_SIZE(cmt##idx##_resources), \
- 					  &cmt##idx##_platform_data,	\
-@@ -196,7 +193,7 @@ void __init r8a73a4_add_dt_devices(void)
- 	r8a73a4_register_scif(3);
- 	r8a73a4_register_scif(4);
- 	r8a73a4_register_scif(5);
--	r8a7790_register_cmt(10);
-+	r8a7790_register_cmt(1);
- }
+-static struct platform_device cmt10_device = {
+-	.name		= "sh_cmt",
+-	.id		= 10,
++static struct platform_device cmt1_device = {
++	.name		= "sh-cmt-48",
++	.id		= 1,
+ 	.dev = {
+-		.platform_data	= &cmt10_platform_data,
++		.platform_data	= &cmt1_platform_data,
+ 	},
+-	.resource	= cmt10_resources,
+-	.num_resources	= ARRAY_SIZE(cmt10_resources),
++	.resource	= cmt1_resources,
++	.num_resources	= ARRAY_SIZE(cmt1_resources),
+ };
  
- /* DMA */
+ /* TMU */
+@@ -746,7 +734,7 @@ static struct platform_device *sh73a0_devices_dt[] __initdata = {
+ 	&scif6_device,
+ 	&scif7_device,
+ 	&scif8_device,
+-	&cmt10_device,
++	&cmt1_device,
+ };
+ 
+ static struct platform_device *sh73a0_early_devices[] __initdata = {
 -- 
 1.8.5.2
