@@ -1,65 +1,98 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 13 May 2014 17:54:04 +0200
-Subject: [PATCHv2 1/4] of: make of_update_property() usable earlier in
- the boot process
-In-Reply-To: <20140513153006.GC27822@titan.lakedaemon.net>
-References: <1399975839-5311-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1399975839-5311-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAL_JsqLNnLjeo2tM=z5bcn4DJD_5-uFRGkk6wAWnvGZyo9Y7pg@mail.gmail.com>
- <20140513163026.18a0fa61@free-electrons.com>
- <20140513153006.GC27822@titan.lakedaemon.net>
-Message-ID: <20140513175404.319d067d@free-electrons.com>
+Date: Tue, 13 May 2014 17:54:41 +0200
+Subject: [PATCH] ARM: mvebu: use hardware I/O coherency also for PCI devices
+Message-ID: <1399996481-11242-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+Since the beginning of the introduction of hardware I/O coherency
+support for Armada 370 and Armada XP, the special DMA operations
+should have applied to all DMA capable devices. Unfortunately, while
+the original code properly took into account platform devices, it
+didn't take into account PCI devices, which can also be DMA masters.
 
-On Tue, 13 May 2014 11:30:06 -0400, Jason Cooper wrote:
+This commit fixes that by registering a bus notifier on pci_bus_type,
+to register our custom DMA operations, like is already done for
+platform devices. While doing this, we also rename
+mvebu_hwcc_platform_notifier() to mvebu_hwcc_notifier() and
+mvebu_hwcc_platform_nb to mvebu_hwcc_nb because they are no longer
+specific to platform devices.
 
-> > Well, I guess it's a per-maintainer choice:
-> > 
-> > git log | grep "^Fixes:"
-> > 
-> >     Fixes: 54fe26a900bc528f3df1e4235cb6b9ca5c6d4dc2 ('ARM: mvebu: Add thermal quirk for the Armada 375 DB board')
-> 
-> Well, just because the maintainer is an idiot and didn't catch it isn't
-> an excuse to continue the behavior. ;-)
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Fixes: e60304f8cb7b ("arm: mvebu: Add hardware I/O Coherency support")
+Cc: <stable@vger.kernel.org> # v3.8+
+---
+Applies to mvebu/soc.
 
-Yes, no problem :)
+Whether this commit qualifies as stable material can be
+discussed. Technically, it was a mistake from the original I/O
+coherency implementation. But in practice, besides not using the I/O
+coherency, I don't think it's causing any specific problem other than
+DMA transactions on PCI devices triggering unneeded cache maintenance
+operations. So I'll leave it to the mvebu maintainers to decide
+whether this qualifies as stable material or not. I've included the
+relevant Fixes: and Cc: fields, but don't hesitate to rip them out if
+you don't think this should go to stable.
 
-> >     Fixes: 54397d85349f ("ARM: kirkwood: Relocate PCIe device tree nodes")
-> >     Fixes: a7d4f81821f7 ('ARM: mvebu: Add support for NOR flash device on Openblocks AX3 board')
-> >     Fixes: b484ff42df47 ('ARM: mvebu: Add support for NOR flash device on Armada XP-DB board')
-> >     Fixes: c971ff185f64 ("leds: leds-pwm: Defer led_pwm_set() if PWM can sleep")
-> >     Fixes: abccd00f8af2 ('btrfs: Fix 32/64-bit problem with BTRFS_SET_RECEIVED_SUBVOL ioctl')
-> >     Fixes: ee1e0994ab1bd (regulator: s5m8767: Use GPIO for controlling Buck9/eMMC)
-> >     Fixes: 652ed95d5fa6 (cpufreq: introduce cpufreq_generic_get() routine)
-> > 
-> > Somewhat inconsistent :-)
-> 
-> Yeah, I can go either way on the single quotes/double quotes.  The
-> 12-character hash definitely increases readability, though.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/coherency.c | 21 ++++++++++++++++-----
+ 1 file changed, 16 insertions(+), 5 deletions(-)
 
-I must say I never understood the logic here. We used to use 8 digit
-hashes, and then we had collisions. So it means that if we look at the
-Git history now, some of these 8 digit hashes no longer uniquely
-identify a commit.
-
-To fix this up, we moved to use 12 digit hashes. But that's just
-pushing the problem a bit further away, no? There will be some
-collision at some point, and therefore in the future 652ed95d5fa6 may
-no longer be a unique identifier for the "cpufreq: introduce
-cpufreq_generic_get() routine" commit, and therefore people reading the
-Git history 3 or 5 years from now will see non-unique identifiers in
-'Fixes:' fields.
-
-To me, it would make a lot more sense to use full hashes. I don't
-really see how it decreases readability, and it's the most future proof
-solution we have (knowing that of course, collisions are still
-theoretically possible).
-
-Thomas
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index d5a975b..177c5ff 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -29,6 +29,7 @@
+ #include <linux/slab.h>
+ #include <linux/mbus.h>
+ #include <linux/clk.h>
++#include <linux/pci.h>
+ #include <asm/smp_plat.h>
+ #include <asm/cacheflush.h>
+ #include "armada-370-xp.h"
+@@ -274,8 +275,8 @@ static struct dma_map_ops mvebu_hwcc_dma_ops = {
+ 	.set_dma_mask		= arm_dma_set_mask,
+ };
+ 
+-static int mvebu_hwcc_platform_notifier(struct notifier_block *nb,
+-				       unsigned long event, void *__dev)
++static int mvebu_hwcc_notifier(struct notifier_block *nb,
++			       unsigned long event, void *__dev)
+ {
+ 	struct device *dev = __dev;
+ 
+@@ -286,8 +287,8 @@ static int mvebu_hwcc_platform_notifier(struct notifier_block *nb,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block mvebu_hwcc_platform_nb = {
+-	.notifier_call = mvebu_hwcc_platform_notifier,
++static struct notifier_block mvebu_hwcc_nb = {
++	.notifier_call = mvebu_hwcc_notifier,
+ };
+ 
+ static void __init armada_370_coherency_init(struct device_node *np)
+@@ -375,9 +376,19 @@ static int __init coherency_late_init(void)
+ 	}
+ 
+ 	bus_register_notifier(&platform_bus_type,
+-			      &mvebu_hwcc_platform_nb);
++			      &mvebu_hwcc_nb);
+ 
+ 	return 0;
+ }
+ 
+ postcore_initcall(coherency_late_init);
++
++static int __init coherency_pci_init(void)
++{
++        if (coherency_available())
++                bus_register_notifier(&pci_bus_type,
++                                       &mvebu_hwcc_nb);
++        return 0;
++}
++
++arch_initcall(coherency_pci_init);
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.9.2
