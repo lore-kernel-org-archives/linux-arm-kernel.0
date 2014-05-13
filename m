@@ -1,47 +1,123 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Tue, 13 May 2014 13:09:00 -0400
-Subject: [PATCH v9 1/3] PSCI: Add initial support for PSCIv0.2 functions
-In-Reply-To: <CAJ5Y-eadEXyabW2r_gSsnNyT2zQr3=Dwtq-_oDeryk-h4d6kUw@mail.gmail.com>
-References: <1399472847-14377-1-git-send-email-ashwin.chaugule@linaro.org>
- <1399472847-14377-2-git-send-email-ashwin.chaugule@linaro.org>
- <20140512091047.GB3006@e106331-lin.cambridge.arm.com>
- <CAJ5Y-eadEXyabW2r_gSsnNyT2zQr3=Dwtq-_oDeryk-h4d6kUw@mail.gmail.com>
-Message-ID: <CAJ5Y-eZ1gaSPz7n44e+WuVyc=8sjyOUGNw9hDEqH1KKOP3yQRw@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 13 May 2014 18:14:52 +0100
+Subject: [Patch v4 5/5] mcpm: exynos: populate suspend and powered_up
+ callbacks
+In-Reply-To: <CANuQgHG9tGzi2rSOwREAxVu4BQoprDg9om62AybgW5v31fpbTQ@mail.gmail.com>
+References: <1399278444-8312-3-git-send-email-chander.kashyap@linaro.org>
+ <1399282040-8995-1-git-send-email-chander.kashyap@linaro.org>
+ <1399282040-8995-6-git-send-email-chander.kashyap@linaro.org>
+ <20140509153206.GB5040@e102568-lin.cambridge.arm.com>
+ <CANuQgHG9tGzi2rSOwREAxVu4BQoprDg9om62AybgW5v31fpbTQ@mail.gmail.com>
+Message-ID: <20140513171452.GB10210@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+On Tue, May 13, 2014 at 12:43:31PM +0100, Chander Kashyap wrote:
 
-On 12 May 2014 10:02, Ashwin Chaugule <ashwin.chaugule@linaro.org> wrote:
->>
->> Which tree are you planning on merging this through? Do we need to split
->> the arm and arm64 parts?
->
-> IIRC all this PSCI work originally came via Catalins tree(?). But now,
-> these patches depend on a header introduced by Anups KVM patchset
-> which is merged in -
-> https://git.kernel.org/cgit/linux/kernel/git/kvmarm/kvmarm.git/log/?h=next
->
-> In a previous discussion (everyone here is CC'd) with Christoffer and
-> Paolo the 2nd option of the following was chosen:
->
-> 1) Catalin can apply "Add common header for PSCI related defines", or
-> Ashwin can resend his series with the patch at the beginning.
-> Duplicate commits are fine, especially for seldom-modified files where
-> they do not cause conflicts.
->
-> 2) Send Anup's patchset as a pull request to both me and Catalin,
-> relative to v3.16-rc1, both of us can apply it and Ashwin's series can
-> be commit on top.
->
->
-> To keep it simple it'd be better if it all goes via one tree, but if
-> there are objections or other suggestions, I'm happy to split this up.
+[...]
 
-What is the preferred method to upstream this patchset? Would you
-recommend this be split into ARM and ARM64 variants, or can it all go
-via the ARM64 tree? I will then respin these accordingly, along with
-the feedback from Anup and Mark.
+> >> +static void exynos_suspend(u64 residency)
+> >> +{
+> >> +     unsigned int mpidr, cpunr;
+> >> +
+> >> +     mpidr = read_cpuid_mpidr();
+> >> +     cpunr = exynos_pmu_cpunr(mpidr);
+> >
+> > If I were to be picky, I would compute these values only if they
+> > are needed, ie move the computation after exynos_power_down().
+> 
+> Yes thats make sense. I will realign it.
+> 
+> >
+> > There is another quite horrible issue here. We know this code works
+> > because the processors A15/A7 hit the caches with C bit in SCTLR cleared.
+> >
+> > On processors where this is not true, this sequence would explode
+> > if power down fails (in case core is gated but L2 is still powered on,
+> > the stack is stuck in L2) since it is going to read stack data that is
+> > in L2 but can't be read.
+> >
+> > It is not related to this sequence only, but it is an issue in general
+> > and wanted to mention that on the lists for public awareness.
+> >
+> 
+> Can you please elaborate. I didn't understand.
 
-Thanks,
-Ashwin
+It is not related to this patch only. This function carries out writes to the
+stack (which might end up in eg L2) and then disables the C bit in SCTLR
+through MCPM.
+
+A15 and A7 processors hit the cache with the C bit clear in the SCTLR
+so the processor still "hits" the stack values if the power down fails.
+On processors where caches are not hit with the C bit clear (eg A9) this code
+would fail since the stack values that sit in the caches cannot be read with
+the C bit clear in SCTLR until the SCTLR is restored, so it will have to
+be implemented in assembly with no stack usage (or better, no cacheable data
+usage).
+
+So, all I am saying is, to avoid copy'n'paste havoc and to avoid running
+this code on Exynos platforms where it must not be run as-is, please add
+a comment along the line:
+
+"This function requires the stack data to be visible through power down
+and can only be executed on processors like A15 and A7 that hit the cache
+with the C bit clear in the SCTLR register."
+
+Please let me know if that's clear.
+
+Lorenzo
+
+> 
+> > The gist of what I am saying is, please add a comment to that extent,
+> > here and it should be added in exynos_power_down() too.
+> >
+> >> +     __raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 0x1c);
+> >
+> > No magic numbers please (0x1c). You can add a macro/wrapper, as TC2 does.
+> 
+> Yes i will remove it.
+> 
+> >
+> >> +     exynos_power_down();
+> >> +
+> >> +     /*
+> >> +      * Execution reaches here only if cpu did not power down.
+> >> +      * Hence roll back the changes done in exynos_power_down function.
+> >> +     */
+> >> +     exynos_cpu_powerup(cpunr);
+> >
+> > Please be aware that if this function returns MCPM will soft reboot, and
+> > the CPUidle driver will have no way to detect a state entry failure.
+> >
+> > I am just flagging this up, since fixing this behaviour is not easy, and
+> > honestly, since power down failure should be the exception not the rule,
+> > the idle stats should not be affected much.
+> >
+> > I think this is the proper way of implementing the sequence but please
+> > all keep in mind what I wrote above.
+> >
+> > Lorenzo
+> >
+> >> +}
+> >> +
+> >>  static const struct mcpm_platform_ops exynos_power_ops = {
+> >>       .power_up               = exynos_power_up,
+> >>       .power_down             = exynos_power_down,
+> >>       .power_down_finish      = exynos_power_down_finish,
+> >> +     .suspend                = exynos_suspend,
+> >> +     .powered_up             = exynos_powered_up,
+> >>  };
+> >>
+> >>  static void __init exynos_mcpm_usage_count_init(void)
+> >> --
+> >> 1.7.9.5
+> >>
+> >>
+> >
+> 
+> 
+> 
+> -- 
+> with warm regards,
+> Chander Kashyap
+> 
