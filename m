@@ -1,44 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 May 2014 08:32:20 -0700
-Subject: RCU stall on panda
-In-Reply-To: <5371BD69.8010600@linaro.org>
-References: <53675C5F.10509@linaro.org>
- <20140505180617.GM8754@linux.vnet.ibm.com>
- <20140512212102.GF5668@atomide.com> <5371BD69.8010600@linaro.org>
-Message-ID: <20140513153220.GC16837@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 13 May 2014 09:39:02 -0600
+Subject: [PATCH 1/2] ARM: tegra: joystick input in tegra_defconfig
+In-Reply-To: <CAAVeFuLZ_wrxipYn2pfNzuyDiTvAPWH4aSWfonrG+YQsm4tM_g@mail.gmail.com>
+References: <1399883209-31169-1-git-send-email-acourbot@nvidia.com>
+ <1399883209-31169-2-git-send-email-acourbot@nvidia.com>
+ <5370F794.2020800@wwwdotorg.org>
+ <CAAVeFuLZ_wrxipYn2pfNzuyDiTvAPWH4aSWfonrG+YQsm4tM_g@mail.gmail.com>
+Message-ID: <53723C96.5020203@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alex Shi <alex.shi@linaro.org> [140512 23:37]:
-> On 05/13/2014 05:21 AM, Tony Lindgren wrote:
-> > * Paul E. McKenney <paulmck@linux.vnet.ibm.com> [140505 11:11]:
-> >> On Mon, May 05, 2014 at 05:39:43PM +0800, Alex Shi wrote:
-> >>> I keep seeing the RCU stall problem on panda board from 3.10 kernel to latest upstream kernel
-> >>> and google find some one report it before: https://lkml.org/lkml/2012/9/20/519
-> >>>
-> >>> Is it the hardware issue or a real software problem?
-> >>
-> >> I cannot distinguish between hardware and software from the trace below,
-> >> but given that you are also seeing a soft lockup, either way you do
-> >> appear to have a real problem as opposed to an RCU CPU stall warning
-> >> false positive.
-> > 
-> > Looks like you have CPU_IDLE enabled on panda. Hangs with current linux
-> > next with CPU_IDLE are currently being discussed on the linux-omap list
-> > in thread "omap4-panda-es boot issues with v3.15-rc4"
-> > 
-> > I've seen occasional system hangs, and I've also noticed that doing
-> > ctrl-a-f h or ctrl-a-f l for sysrq backtrace can unlock the system
-> > producing similar errors to the below.
-> > 
+On 05/12/2014 09:45 PM, Alexandre Courbot wrote:
+> On Tue, May 13, 2014 at 1:32 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 05/12/2014 02:26 AM, Alexandre Courbot wrote:
+>>> NVIDIA SHIELD embeds a USB controller. Compile the corresponding support
+>>> as a module in tegra_defconfig.
+>>
+>> Why make this a module rather than built-in. Almost everything else in
+>> tegra_defconfig is built-in, except brcmfmac since it doesn't handle
+>> lack of firmware availability at probe time.
 > 
-> Thanks a lot for the info.
-> In fact, the oops keeps in upstream kernel from 3.10 to latest.
+> Goal is to minimize the image size, especially since this is not a
+> feature I expect to be used much outside of SHIELD. If you prefer it
+> built-in, I'm fine with it too.
 
-Care to test if the revert of commit cb7094 Santosh posted as
-"[PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled"
-solves the problem for you?
-
-Regards,
-
-Tony
+Yes, built-in for everything makes most sense to me, except for code
+that doesn't actually work unless it's a module.
