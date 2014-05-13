@@ -1,46 +1,102 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 13 May 2014 19:38:25 +0200
-Subject: [PATCHv2] ARM: mvebu: use hardware I/O coherency also for PCI
- devices
-In-Reply-To: <20140513163504.GF27822@titan.lakedaemon.net>
-References: <1399997070-11434-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140513163504.GF27822@titan.lakedaemon.net>
-Message-ID: <20140513193825.4196afe8@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 13 May 2014 18:43:48 +0100
+Subject: [PATCH v3 11/19] KVM: ARM: vgic: abstract VMCR access
+In-Reply-To: <20140509140633.GL3362@lvm> (Christoffer Dall's message of "Fri,
+ 9 May 2014 15:06:33 +0100")
+References: <1397655591-2761-1-git-send-email-marc.zyngier@arm.com>
+ <1397655591-2761-12-git-send-email-marc.zyngier@arm.com>
+ <20140509140633.GL3362@lvm>
+Message-ID: <87ppjhh8vf.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+On Fri, May 09 2014 at  3:06:33 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Wed, Apr 16, 2014 at 02:39:43PM +0100, Marc Zyngier wrote:
+>> Instead of directly messing with with the GICH_VMCR bits for the CPU
+>> interface save/restore code, add accessors that encode/decode the
+>> entire set of registers exposed by VMCR.
+>> 
+>> Not the most efficient thing, but given that this code is only used
+>> by the save/restore code, performance is far from being critical.
+>> 
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  include/kvm/arm_vgic.h |  9 +++++++
+>>  virt/kvm/arm/vgic.c    | 69 ++++++++++++++++++++++++++++++++++++++------------
+>>  2 files changed, 62 insertions(+), 16 deletions(-)
+>> 
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index 831b9f5..0017253 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -81,6 +81,13 @@ struct vgic_lr {
+>>  	u8	state;
+>>  };
+>>  
+>> +struct vgic_vmcr {
+>> +	u32	ctlr;
+>> +	u32	abpr;
+>> +	u32	bpr;
+>> +	u32	pmr;
+>> +};
+>> +
+>>  struct vgic_ops {
+>>  	struct vgic_lr	(*get_lr)(const struct kvm_vcpu *, int);
+>>  	void	(*set_lr)(struct kvm_vcpu *, int, struct vgic_lr);
+>> @@ -89,6 +96,8 @@ struct vgic_ops {
+>>  	u32	(*get_interrupt_status)(const struct kvm_vcpu *vcpu);
+>>  	void	(*set_underflow)(struct kvm_vcpu *vcpu);
+>>  	void	(*clear_underflow)(struct kvm_vcpu *vcpu);
+>> +	void	(*get_vmcr)(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>> +	void	(*set_vmcr)(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>>  };
+>>  
+>>  struct vgic_dist {
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index 13dad1f..574ca47 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -100,8 +100,10 @@ static void vgic_kick_vcpus(struct kvm *kvm);
+>>  static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg);
+>>  static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr);
+>>  static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr, struct vgic_lr lr_desc);
+>> -static u32 vgic_nr_lr;
+>> +static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>> +static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>>  
+>> +static u32 vgic_nr_lr;
+>>  static unsigned int vgic_maint_irq;
+>>  
+>>  static u32 *vgic_bitmap_get_reg(struct vgic_bitmap *x,
+>> @@ -1057,6 +1059,28 @@ static void vgic_v2_clear_underflow(struct kvm_vcpu *vcpu)
+>>  	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
+>>  }
+>>  
+>> +static void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+>> +{
+>> +	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr;
+>> +
+>> +	vmcrp->ctlr = (vmcr & GICH_VMCR_CTRL_MASK) >> GICH_VMCR_CTRL_SHIFT;
+>> +	vmcrp->abpr = (vmcr & GICH_VMCR_ALIAS_BINPOINT_MASK) >> GICH_VMCR_ALIAS_BINPOINT_SHIFT;
+>> +	vmcrp->bpr  = (vmcr & GICH_VMCR_BINPOINT_MASK) >> GICH_VMCR_BINPOINT_SHIFT;
+>> +	vmcrp->pmr  = (vmcr & GICH_VMCR_PRIMASK_MASK) >> GICH_VMCR_PRIMASK_SHIFT;
+>> +}
+>> +
+>> +static void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+>> +{
+>> +	u32 vmcr;
+>> +
+>> +	vmcr  = (vmcrp->ctlr << GICH_VMCR_CTRL_SHIFT) & GICH_VMCR_CTRL_MASK;
+>> +	vmcr |= (vmcrp->abpr << GICH_VMCR_ALIAS_BINPOINT_SHIFT) & GICH_VMCR_ALIAS_BINPOINT_MASK;
+>> +	vmcr |= (vmcrp->bpr << GICH_VMCR_BINPOINT_SHIFT) & GICH_VMCR_BINPOINT_MASK;
+>> +	vmcr |= (vmcrp->pmr << GICH_VMCR_PRIMASK_SHIFT) & GICH_VMCR_PRIMASK_MASK;
+>> +
+>> +	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
+>
+> did you forget to add this field to the vgic_v2 struct as part of this patch?
 
-On Tue, 13 May 2014 12:35:04 -0400, Jason Cooper wrote:
+I don't think so, I believe it appears in patch #5.
 
-> > Whether this commit qualifies as stable material can be
-> > discussed. Technically, it was a mistake from the original I/O
-> > coherency implementation. But in practice, besides not using the I/O
-> > coherency, I don't think it's causing any specific problem other than
-> > DMA transactions on PCI devices triggering unneeded cache maintenance
-> > operations. So I'll leave it to the mvebu maintainers to decide
-> > whether this qualifies as stable material or not. I've included the
-> > relevant Fixes: and Cc: fields, but don't hesitate to rip them out if
-> > you don't think this should go to stable.
-> 
-> If nothing is broken for users, I see no point backporting it.  Feel
-> free to convince me otherwise...
-
-As far as I can remember, it isn't broken, it's just sub-optimal. The
-only situation where it would cause problem is on Armada 375/Armada 38x
-with SMP support, due to the SMP/PCIe/PL310 deadlock for which I've
-sent a v2 of the patches today on LAKML. In this case, not using our
-specific DMA operations would cause many PL310 cache maintenance
-operations, and therefore a high chance of hitting the deadlock.
-However, this is only a new problem in 3.16, which has the SMP support
-for Armada 375/Armada 38x.
-
-So, as I said, feel free to drop the stable tags :)
-
-Thanks!
-
-Thomas
+	M.
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny.
