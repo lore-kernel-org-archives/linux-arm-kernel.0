@@ -1,130 +1,73 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 13 May 2014 11:24:22 +0900
-Subject: [PATCH v5 1/5] ARM: EXYNOS: Add generic cpu power control
- functions for all exynos based SoCs
-In-Reply-To: <1399307221-8659-2-git-send-email-a.kesavan@samsung.com>
-References: <1399307221-8659-1-git-send-email-a.kesavan@samsung.com>
- <1399307221-8659-2-git-send-email-a.kesavan@samsung.com>
-Message-ID: <019b01cf6e52$75e1a710$61a4f530$@samsung.com>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Tue, 13 May 2014 02:40:09 +0000
+Subject: i.MX6 USB OTG support is broken on linux-next
+In-Reply-To: <20140513014247.GH8330@dragon>
+References: <20140509130046.GP2794@dragon>
+ <20140510111003.GA1593@shlinux1.ap.freescale.net>
+ <20140510131815.GT2794@dragon>
+ <4285b0d55d2545b99c4ba6b703e65a12@BL2PR03MB226.namprd03.prod.outlook.com>
+ <20140511014027.GV2794@dragon>
+ <71b1887d2f014021b084df703b15dc6a@BL2PR03MB226.namprd03.prod.outlook.com>
+ <20140512135437.GA8330@dragon>
+ <04dad7ad8f0247b9bef4fea1db8a8bc8@BL2PR03MB226.namprd03.prod.outlook.com>
+ <20140513014247.GH8330@dragon>
+Message-ID: <d7270923af3841ab9d25ba9c53fe7ddc@BL2PR03MB226.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash Kesavan wrote:
+ 
+> >
+> > > > >
+> > > >
+> > > > In your case, you should not set CONFIG_USB_OTG no matter at
+> > > > defconfig and at menuconfig.
+> > >
+> > > Hmm, at least in my testing (USB mouse/keyboard connected to OTG
+> > > port), it works as before even I enable CONFIG_USB_OTG, as long as I
+> > > do *not* enable CONFIG_USB_OTG_FSM.
+> > >
+> > > Since it works for my case, I'm wondering why you think I shouldn't
+> > > enable CONFIG_USB_OTG at all.
+> > >
+> >
+> > If your device is not OTG device, there is no reason you need to
+> > enable CONFIG_USB_OTG.
 > 
-+ Jonghwan Choi, Seungkon Hwang
-
-> From: Leela Krishna Amudala <leela.krishna@linaro.org>
+> Whether I should enable CONFIG_USB_OTG depends on what devices I will use?
+> This is insane to me.
 > 
-> Add generic cpu power control functions for exynos based SoCS
-> for cpu power up/down and to know the cpu status.
+
+Sorry, here, your device = your board
+
+> Look, there is an USB OTG port on my board, and it should just be the
+> reason that's good enough for me to build a kernel with CONFIG_USB_OTG,
+> shouldn't it?  I do not even know what type of devices will be plugged
+> into this USB OTG port when I was building the kernel.
 > 
-> Signed-off-by: Leela Krishna Amudala <leela.krishna@linaro.org>
 
-In this case, Abhilash's signed-off-by should be added here.
+There is NO term for "OTG port" at USB spec, it only has a term of "OTG device",
+which means " Device that provides both host and peripheral capabilities
+over a single Micro-AB receptacle". If your device is an "OTG device",
+and supports role switch without disconnect your usb cable (HNP),
+you should set CONFIG_USB_OTG.
 
-> ---
->  arch/arm/mach-exynos/common.h   |    3 +++
->  arch/arm/mach-exynos/pm.c       |   36
-++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-exynos/regs-pmu.h |    6 ++++++
->  3 files changed, 45 insertions(+)
+Taking imx6 sabreSD board as an example, it is a Micro-B port.
+>From what kinds of port (A or B), we don't know which capabilities your
+device has, with different cables, you will get different functions.
+Currently, the capabilities are decided by: controller capabilities (otg,
+host/device-only, etc) and can be override by dts due to board design.
+otg has special protocol and TPL requirements, it is decided by
+kernel configuration.
+
+The Kconfig description for USB_OTG is not very accurate, it should mention
+the HNP and SRP supported are needed for that config, not just dual-role
+switch through ID pin, I will submit a patch for that
+
+Peter
+
+> Shawn
 > 
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-> index 47cbab0..a7dbb5f 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -63,5 +63,8 @@ struct exynos_pmu_conf {
->  };
-> 
->  extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
-> +extern void exynos_cpu_powerdown(int cpu);
-
-IMO, using 'xxx_power_down' would be better.
-
-> +extern void exynos_cpu_powerup(int cpu);
-> +extern int  exynos_cpu_power_state(int cpu);
-
-Hmm...is it really 'cpu' related? Or 'core' related? As I know, when the
-function is called, ARM core and L1 cache will be power_up/down except L2
-cache...But I have no strong objection to use 'cpu' here
-
-> 
->  #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index 15af0ce..6651028 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -100,6 +100,42 @@ static int exynos_irq_set_wake(struct irq_data *data,
-> unsigned int state)
->  	return -ENOENT;
->  }
-> 
-> +/**
-> + * exynos_cpu_powerdown : power down the specified cpu
-> + * @cpu : the cpu to power down
-> + *
-> + * Power downs the specified cpu. The sequence must be finished by a
-> + * call to cpu_do_idle()
-> + *
-> + */
-> +void exynos_cpu_powerdown(int cpu)
-> +{
-> +	__raw_writel(0, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
-> +}
-> +
-> +/**
-> + * exynos_cpu_powerup : power up the specified cpu
-> + * @cpu : the cpu to power up
-> + *
-> + * Power up the specified cpu
-> + */
-> +void exynos_cpu_powerup(int cpu)
-> +{
-> +	__raw_writel(S5P_CORE_LOCAL_PWR_EN,
-> +		     EXYNOS_ARM_CORE_CONFIGURATION(cpu));
-> +}
-> +
-> +/**
-> + * exynos_cpu_power_state : returns the power state of the cpu
-> + * @cpu : the cpu to retrieve the power state from
-> + *
-> + */
-> +int exynos_cpu_power_state(int cpu)
-> +{
-> +	return (__raw_readl(EXYNOS_ARM_CORE_STATUS(cpu)) &
-> +			S5P_CORE_LOCAL_PWR_EN);
-> +}
-> +
->  /* For Cortex-A9 Diagnostic and Power control register */
->  static unsigned int save_arm_register[2];
-> 
-> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-
-> pmu.h
-> index 4f6a256..0bdfcbc 100644
-> --- a/arch/arm/mach-exynos/regs-pmu.h
-> +++ b/arch/arm/mach-exynos/regs-pmu.h
-> @@ -121,6 +121,12 @@
-> 
->  #define S5P_CHECK_SLEEP				0x00000BAD
-> 
-> +#define EXYNOS_ARM_CORE0_CONFIGURATION		S5P_PMUREG(0x2000)
-
-This can be put in order of address.
-
-> +#define EXYNOS_ARM_CORE_CONFIGURATION(_nr)	\
-> +			(EXYNOS_ARM_CORE0_CONFIGURATION + (0x80 * (_nr)))
-> +#define EXYNOS_ARM_CORE_STATUS(_nr)		\
-> +			(EXYNOS_ARM_CORE_CONFIGURATION(_nr) + 0x4)
-
-Can you please cleanup codes following definitions are used with using above
-definitions?
-
-S5P_ARM_CORE1_CONFIGURATION and S5P_ARM_CORE1_STATUS in hotplug.c and
-platsmp.c 
-
-> +
->  /* Only for EXYNOS4210 */
->  #define S5P_CMU_CLKSTOP_LCD1_LOWPWR	S5P_PMUREG(0x1154)
->  #define S5P_CMU_RESET_LCD1_LOWPWR	S5P_PMUREG(0x1174)
-> --
-> 1.7.9.5
+> > Yes, it may work for some devices when enable CONFIG_USB_OTG, but it
+> > will confuse other host or device which is connected with you, eg,
+> > your device will report your have supported some otg capabilities, eg,
+> > SRP or HNP.
