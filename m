@@ -1,73 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 May 2014 14:47:25 +0200
-Subject: [PATCH 06/17] pci: host: pcie-designware: Use *base-mask* for
- configuring the iATU
-In-Reply-To: <537210BF.2050100@ti.com>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>
- <6882241.amuhzvbd8n@wuerfel> <537210BF.2050100@ti.com>
-Message-ID: <10531498.kYV5eO1J1m@wuerfel>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 13 May 2014 14:52:05 +0200
+Subject: [PATCHv2 4/4] ARM: mvebu: implement L2/PCIe deadlock workaround
+In-Reply-To: <11503675.BOHdnE4xD3@wuerfel>
+References: <1399975839-5311-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1399975839-5311-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <11503675.BOHdnE4xD3@wuerfel>
+Message-ID: <20140513145205.1dad280f@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 May 2014 18:01:59 Kishon Vijay Abraham I wrote:
-> On Thursday 08 May 2014 02:48 PM, Arnd Bergmann wrote:
-> > On Thursday 08 May 2014 18:05:11 Jingoo Han wrote:
-> >> On Tuesday, May 06, 2014 10:59 PM, Arnd Bergmann wrote:
-> >>> On Tuesday 06 May 2014 19:03:52 Kishon Vijay Abraham I wrote:
-> >>>> In DRA7, the cpu sees 32bit address, but the pcie controller can see only 28bit
-> >>>> address. So whenever the cpu issues a read/write request, the 4 most
-> >>>> significant bits are used by L3 to determine the target controller.
-> >>>> For example, the cpu reserves 0x2000_0000 - 0x2FFF_FFFF for PCIe controller but
-> >>>> the PCIe controller will see only (0x000_0000 - 0xFFF_FFF). So for programming
-> >>>> the outbound translation window the *base* should be programmed as 0x000_0000.
-> >>>> Whenever we try to write to say 0x2000_0000, it will be translated to whatever
-> >>>> we have programmed in the translation window with base as 0x000_0000.
-> >>>>
-> >>>> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> >>>> Cc: Marek Vasut <marex@denx.de>
-> >>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> >>>> Acked-by: Jingoo Han <jg1.han@samsung.com>
-> >>>> Acked-by: Mohit Kumar <mohit.kumar@st.com>
-> >>>
-> >>> Sorry, but NAK.
-> >>>
-> >>> We have a standard 'dma-ranges' property to handle this, so use it.
-> >>>
-> >>> See the x-gene PCIe driver patches for an example. Please also talk
-> >>> to Santosh about it, as he is implementing generic support for
-> >>> parsing dma-ranges in platform devices at the moment.
-> >>
-> >> Hi Arnd,
-> >>
-> >> Do you mean the following patch?
-> >> http://www.spinics.net/lists/kernel/msg1737725.html
-> >>
-> > 
-> > That is the patch Santosh did for platform devices, which is related but not
-> > what I meant here. For the PCI inbound window setup, please have a look
-> > at https://lkml.org/lkml/2014/3/19/607
+Dear Arnd Bergmann,
+
+On Tue, 13 May 2014 13:13:39 +0200, Arnd Bergmann wrote:
+
+> Hmm, I think this needs some more explanation about which flags
+> you are actually interested in. 
 > 
-> Do you think it can be used for *outbound* window setup too? The problem is the
-> *ranges* property defines both the pci address and cpu address which should
-> have been enough to program the ob translation window, but the hw is designed
-> so that the controller sees only the 28 bits. (The most significant 4 bits is
-> for the l3 to address the controller).
+> These are the three common mem types for ioremap:
+> 
+> #define PROT_PTE_DEVICE         L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_XN
+> #define PROT_SECT_DEVICE        PMD_TYPE_SECT|PMD_SECT_AP_WRITE
+> 
+>         [MT_DEVICE] = {           /* Strongly ordered / ARMv6 shared device */
+>                 .prot_pte       = PROT_PTE_DEVICE | L_PTE_MT_DEV_SHARED |
+>                                   L_PTE_SHARED,
+>                 .prot_pte_s2    = s2_policy(PROT_PTE_S2_DEVICE) |
+>                                   s2_policy(L_PTE_S2_MT_DEV_SHARED) |
+>                                   L_PTE_SHARED,
+>                 .prot_sect      = PROT_SECT_DEVICE | PMD_SECT_S,
+>                 .domain         = DOMAIN_IO, 
+>         },                      
+>         [MT_DEVICE_CACHED] = {    /* ioremap_cached */
+>                 .prot_pte       = PROT_PTE_DEVICE | L_PTE_MT_DEV_CACHED,
+>                 .prot_sect      = PROT_SECT_DEVICE | PMD_SECT_WB,
+>                 .domain         = DOMAIN_IO,
+>         },
+>         [MT_DEVICE_WC] = {      /* ioremap_wc */
+>                 .prot_pte       = PROT_PTE_DEVICE | L_PTE_MT_DEV_WC,
+>                 .prot_sect      = PROT_SECT_DEVICE,
+>                 .domain         = DOMAIN_IO,
+>         },
+> 
+> and this is the one you enforce here:
+> 
+>         [MT_MEMORY_RW_SO] = {
+>                 .prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+>                                 L_PTE_MT_UNCACHED | L_PTE_XN,
+>                 .prot_l1   = PMD_TYPE_TABLE,
+>                 .prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_S |
+>                                 PMD_SECT_UNCACHED | PMD_SECT_XN,
+>                 .domain    = DOMAIN_KERNEL,
+>         },
+> 
+> So you set a different domain, and turn write-combined and cached mappings
+> into uncached mappings, and for uncached mappings you remove the "shared"
+> flag. Which of these changes is the one you actually need?
 
-I'm not following what the problem is. You should always be able to describe
-in the inbound window (that is from the CPU perspective) using dma-ranges
-and the outbound window using ranges.
+I *believe* the important part is the change from L_PTE_MT_DEV_SHARED
+to L_PTE_MT_UNCACHED, because:
 
-If you have a case where the outbound translation is a 256MB (i.e. 28bit)
-section of the CPU address space, that could be represented as
+#define L_PTE_MT_UNCACHED       (_AT(pteval_t, 0x00) << 2)
+#define L_PTE_MT_DEV_SHARED     (_AT(pteval_t, 0x04) << 2)
 
-	ranges = <0x82000000 0 0  0xb0000000  0 0x10000000>;
+So the former is "Strongly-Ordered" according to the ARM ARM, while the
+latter is "Device Shareable".
 
-or 
+The only detail I have access to is that the workaround is "Reads
+targeting PCIe End Point must be marked Strongly Ordered", so it's
+pretty limited in details.
 
-	ranges = <0x82000000 0 0xb0000000  0xb0000000  0 0x10000000>;
+Do you think I should create a different memory type MT_DEVICE_SO, that
+remains in the DOMAIN_IO domain, but uses L_PTE_MT_UNCACHED instead of
+L_PTE_MT_DEV_SHARED ?
 
-depending on whether you want the BARs to be programmed using a low
-address 0x0-0x0fffffff or an address matching the window
-0xb0000000-0xbfffffff.
+Thanks,
 
-	Arnd
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
