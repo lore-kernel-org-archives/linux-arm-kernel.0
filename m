@@ -1,37 +1,38 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 12 May 2014 19:29:48 -0500
-Subject: [PATCH 2/7] clk: rockchip: fix function type for CLK_OF_DECLARE
+Date: Mon, 12 May 2014 19:29:50 -0500
+Subject: [PATCH 4/7] clk: sunxi: fix function type for CLK_OF_DECLARE
 In-Reply-To: <1399940993-1773-1-git-send-email-robherring2@gmail.com>
 References: <1399940993-1773-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1399940993-1773-3-git-send-email-robherring2@gmail.com>
+Message-ID: <1399940993-1773-5-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <robh@kernel.org>
 
 Adding function type checking to CLK_OF_DECLARE found a type mismatch with
-rk2928_gate_clk_init. The function only takes a single struct device_node
+sunxi_init_clocks. The function takes a single struct device_node
 parameter.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
 Cc: Mike Turquette <mturquette@linaro.org>
+Cc: "Emilio L?pez" <emilio@elopez.com.ar>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/rockchip/clk-rockchip.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/clk/sunxi/clk-sunxi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/rockchip/clk-rockchip.c b/drivers/clk/rockchip/clk-rockchip.c
-index 967c141..4cf838d5 100644
---- a/drivers/clk/rockchip/clk-rockchip.c
-+++ b/drivers/clk/rockchip/clk-rockchip.c
-@@ -24,8 +24,7 @@ static DEFINE_SPINLOCK(clk_lock);
-  * Gate clocks
-  */
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 7977106..792773d 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -1309,7 +1309,7 @@ static void __init sunxi_clock_protect(void)
+ 	}
+ }
  
--static void __init rk2928_gate_clk_init(struct device_node *node,
--					 void *data)
-+static void __init rk2928_gate_clk_init(struct device_node *node)
+-static void __init sunxi_init_clocks(void)
++static void __init sunxi_init_clocks(struct device_node *np)
  {
- 	struct clk_onecell_data *clk_data;
- 	const char *clk_parent;
+ 	/* Register factor clocks */
+ 	of_sunxi_table_clock_setup(clk_factors_match, sunxi_factors_clk_setup);
 -- 
 1.9.1
