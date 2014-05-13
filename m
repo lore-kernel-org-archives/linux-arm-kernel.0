@@ -1,51 +1,62 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 13 May 2014 09:04:58 +0900
-Subject: [PATCH v4] drivers: sh: compile drivers/sh/pm_runtime.c if
- ARCH_SHMOBILE_MULTI
-In-Reply-To: <CAMuHMdVMCcDK4Y403G26S27oATzLN74iCSM7U+K_ktE-c3uweQ@mail.gmail.com>
-References: <1399411579-10681-1-git-send-email-geert+renesas@glider.be>
- <CAMuHMdWwenyU1RS4c8spFcb7M0oCXP9z8zbGQ0VACKj7EbvvkA@mail.gmail.com>
- <20140511004626.GW31760@verge.net.au>
- <CANqRtoQzxdjwU+BLyccrSzfBx3UMKm6=MAw9dUHSEBWm5_Vspg@mail.gmail.com>
- <20140512070700.GA20505@verge.net.au>
- <CAMuHMdVMCcDK4Y403G26S27oATzLN74iCSM7U+K_ktE-c3uweQ@mail.gmail.com>
-Message-ID: <20140513000455.GA18157@verge.net.au>
+Date: Tue, 13 May 2014 09:07:13 +0900
+Subject: [PATCH V2 2/2] ARM: shmobile: r8a7791: add i2c2 bus to koelsch dt
+In-Reply-To: <CAMuHMdX_19vLyO7fqaBO7=WpdoZ8fYm9BU9Zmj6cXSNDNYE+Kw@mail.gmail.com>
+References: <1392633882-12142-1-git-send-email-wsa@the-dreams.de>
+ <1392633882-12142-2-git-send-email-wsa@the-dreams.de>
+ <536C1945.1000601@cogentembedded.com>
+ <20140509050610.GB2624@katana>
+ <536D5DC3.3070409@cogentembedded.com>
+ <20140511000834.GM31760@verge.net.au>
+ <CAMuHMdX_19vLyO7fqaBO7=WpdoZ8fYm9BU9Zmj6cXSNDNYE+Kw@mail.gmail.com>
+Message-ID: <20140513000713.GB18157@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 12, 2014 at 09:25:21AM +0200, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Mon, May 12, 2014 at 9:07 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Mon, May 12, 2014 at 08:24:03AM +0900, Magnus Damm wrote:
-> >> On Sun, May 11, 2014 at 9:46 AM, Simon Horman <horms@verge.net.au> wrote:
-> >> > On Thu, May 08, 2014 at 12:12:29PM +0200, Geert Uytterhoeven wrote:
-> >> >> On Tue, May 6, 2014 at 11:26 PM, Geert Uytterhoeven
-> >> >> <geert+renesas@glider.be> wrote:
-> >> >> > Tested on Koelsch (legacy, reference, shmobile, and shmobile+bbb kernels)
-> >> >> > and BeagleBone Black (shmobile+bbb). Will test on more hardware tomorrow.
-> >> >>
-> >> >> Tested on genmai with Wolfram's CCF support.
-> >> >
-> >> > Thanks, shall I go ahead and queue this up?
+On Mon, May 12, 2014 at 09:35:46AM +0200, Geert Uytterhoeven wrote:
+> On Sun, May 11, 2014 at 2:08 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Sat, May 10, 2014 at 02:59:15AM +0400, Sergei Shtylyov wrote:
+> >> Hello.
 > >>
-> >> Yes please, at least from my side everything looks perfect.
+> >> On 05/09/2014 09:06 AM, Wolfram Sang wrote:
+> >>
+> >> >>>+  eeprom at 50 {
+> >> >>>+          compatible = "renesas,24c02";
+> >>
+> >> >>    This is not quite right: Renesas' part is called differently, and
+> >> >>you're carrying the other vendor's naming onto Renesas parts. I'd
+> >> >>just say "24c02" (which I'll do in the Henninger board patch).
+> >>
+> >> >What about "generic"?
+> >>
+> >>    I don't know, really. However, you're right in that there should
+> >> be some vendor prefix -- I've just seen
+> >> Documentation/devicetree/bindings/eeprom.txt.
 > >
-> > Thanks, will do.
+> > A quick survey of arch/arm/boot/dts/ yields:
 > >
-> > I currently plan to send this on to Linus when the merge window
-> > opens for v3.16.
+> > "atmel,24c02" (22 times)
+> > "microchip,24c02" (once)
+> > "mcp,24c02" (once)
+> >
+> > So it seems to me that precedence is in favour of using "renesas,24c02".
 > 
-> Actually we had hoped this could land in v3.15, so we can fix the regression
-> introduced in v3.14 by bf98c1eac1d4a6bcf00532e4fa41d8126cd6c187 as
-> soon as possible.
-
-Ok, so I should/can treat this as a fix?
-
-> > This differs from other patches I have queued up (until now) which
-> > I have or intend to send via the ARM SoC tree.
+> Except that the Renesas part is called differently (as Sergei already pointed
+> out), unlike the Atmel and Microchip parts.
 > 
-> Yep ;-)
+> So it should be:
+> 
+>         compatible = "renesas,r1ex24002", "<something>,24c02";
+> 
+> Unfortunately the datasheet doesn't mention compatibility with parts from
+> other manufacturers.
+> 
+> So let's <something> be "atmel"?
+
+If <something> isn't documented as being compatible then
+I feel that we should not add it to the list.
+
+> BTW, we have a similar issue with Genmai, which has an R1EX24128.
 > 
 > Gr{oetje,eeting}s,
 > 
