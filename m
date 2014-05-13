@@ -1,67 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 13 May 2014 09:51:33 +0200
-Subject: [PATCH v3 5/8] usb: ehci-platform: add optional reset controller
- retrieval
-In-Reply-To: <Pine.LNX.4.44L0.1405121604140.1202-100000@iolanthe.rowland.org>
-References: <1399923274-6017-6-git-send-email-maxime.ripard@free-electrons.com>
- <Pine.LNX.4.44L0.1405121604140.1202-100000@iolanthe.rowland.org>
-Message-ID: <20140513075133.GA16873@lukather>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 13 May 2014 17:03:28 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Clock Updates for
+ v3.16
+Message-ID: <cover.1399967342.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 12, 2014 at 04:06:16PM -0400, Alan Stern wrote:
-> On Mon, 12 May 2014, Maxime Ripard wrote:
-> 
-> > From: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > 
-> > On the Allwinner's A31 SoC the reset line connected to the EHCI IP has to
-> > be deasserted for the EHCI block to be usable.
-> > 
-> > Add support for an optional reset controller that will be deasserted on
-> > power off and asserted on power on.
-> > 
-> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Reviewed-by: Hans de Goede <hdegoede@redhat.com>
-> 
-> ...
-> 
-> > @@ -208,6 +210,18 @@ static int ehci_platform_probe(struct platform_device *dev)
-> >  		}
-> >  	}
-> >  
-> > +	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
-> > +	if (IS_ERR(priv->rst)) {
-> > +		err = PTR_ERR(priv->rst);
-> > +		if (err == -EPROBE_DEFER)
-> > +			goto err_put_clks;
-> > +		priv->rst = NULL;
-> > +	} else {
-> > +		err = reset_control_deassert(priv->rst);
-> > +		if (err)
-> > +			goto err_put_clks;
-> > +	}
-> > +
-> >  	if (pdata->big_endian_desc)
-> >  		ehci->big_endian_desc = 1;
-> >  	if (pdata->big_endian_mmio)
-> 
-> You don't re-assert the reset control if an error happens later on 
-> during probe.  Was that intentional?
+Hi Olof, Hi Kevin, Hi Arnd,
 
-No, it wasn't. I'll resubmit another version.
+Please consider these second round of
+Renesas ARM based SoC clock updates for v3.16.
 
-Thanks,
-Maxime
+This pull request is based on the previous round of
+such requests, tagged as renesas-clock-for-v3.16,
+which you have already pulled.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140513/397a9394/attachment.sig>
+
+The following changes since commit 932616eed0308cbebbb20a079e4bed3674bf1117:
+
+  ARM: shmobile: r8a7790: remove old style audio clock (2014-04-14 12:49:43 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clock2-for-v3.16
+
+for you to fetch changes up to a505daa501dc3f02b08d0b48b049bce719299b74:
+
+  ARM: shmobile: r8a7791: Correct SYS-DMAC clock defines (2014-05-13 10:16:42 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Clock Updates for v3.16
+
+r8a7791 (R-Car M2) SoC
+* Correct SYS-DMAC clock defines
+
+r8a7740 (R-Mobile A1) SoC
+* Correct name of DT Ethernet clock
+
+----------------------------------------------------------------
+Geert Uytterhoeven (2):
+      ARM: shmobile: r8a7740: Correct name of DT Ethernet clock
+      ARM: shmobile: r8a7791: Correct SYS-DMAC clock defines
+
+ arch/arm/mach-shmobile/clock-r8a7740.c    | 2 +-
+ include/dt-bindings/clock/r8a7791-clock.h | 3 ++-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
