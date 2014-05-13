@@ -1,46 +1,69 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Tue, 13 May 2014 23:59:01 +0530
-Subject: [PATCH 0/2] PM / OPP: move cpufreq specific helpers out of OPP
- layer
-In-Reply-To: <1399296830-13056-1-git-send-email-nm@ti.com>
-References: <1399296830-13056-1-git-send-email-nm@ti.com>
-Message-ID: <CAJuA9agOJyQ_2KOoyn=ohVOeO199aVqm_YXtpUVfETQiPk+ZTw@mail.gmail.com>
+From: bay@hackerdom.ru (Alexander Bersenev)
+Date: Wed, 14 May 2014 00:38:59 +0600
+Subject: [PATCH v6 0/3] ARM: sunxi: Add support for consumer infrared devices
+Message-ID: <1400006342-2968-1-git-send-email-bay@hackerdom.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 5, 2014 at 7:03 PM, Nishanth Menon <nm@ti.com> wrote:
-> CPUFreq usage of OPP should be independent of the ordering of type of
-> data storage inside OPP layer. The current operations can equally be
-> performed by generic operations.
->
-> [RFC]: https://patchwork.kernel.org/patch/4100811/
->
-> Series based on: v3.15-rc1
->
-> Nishanth Menon (2):
->   PM / OPP: Remove cpufreq wrapper dependency on internal data
->     organization
->   PM / OPP: Move cpufreq specific OPP functions out of generic OPP
->     library
->
->  Documentation/cpu-freq/core.txt |   29 +++++++++++
->  Documentation/power/opp.txt     |   40 ++------------
->  drivers/base/power/opp.c        |   91 --------------------------------
->  drivers/cpufreq/Makefile        |    2 +
->  drivers/cpufreq/cpufreq_opp.c   |  110 +++++++++++++++++++++++++++++++++++++++
->  include/linux/cpufreq.h         |   21 ++++++++
->  include/linux/pm_opp.h          |   20 -------
->  7 files changed, 167 insertions(+), 146 deletions(-)
->  create mode 100644 drivers/cpufreq/cpufreq_opp.c
+This patch introduces Consumer IR(CIR) support for sunxi boards.
 
-Works fine on Exynos.
-Tested-by: Thomas Abraham <thomas.ab@samsung.com>
+This is based on Alexsey Shestacov's work based on the original driver 
+supplied by Allwinner.
 
->
-> --
-> 1.7.9.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Signed-off-by: Alexander Bersenev <bay@hackerdom.ru>
+Signed-off-by: Alexsey Shestacov <wingrime@linux-sunxi.org>
+
+---
+Changes since version 1: 
+ - Fix timer memory leaks 
+ - Fix race condition when driver unloads while interrupt handler is active
+ - Support Cubieboard 2(need testing)
+
+Changes since version 2:
+- More reliable keydown events
+- Documentation fixes
+- Rename registers accurding to A20 user manual
+- Remove some includes, order includes alphabetically
+- Use BIT macro
+- Typo fixes
+
+Changes since version 3:
+- Split the patch on smaller parts
+- More documentation fixes
+- Add clock-names in DT
+- Use devm_clk_get function to get the clocks
+- Removed gpios property from ir's DT
+- Changed compatible from allwinner,sunxi-ir to allwinner,sun7i-a20-ir in DT
+- Use spin_lock_irq instead spin_lock_irqsave in interrupt handler
+- Add myself in the copyright ;)
+- Coding style and indentation fixes
+
+Changes since version 4:
+- Try to fix indentation errors by sending patches with git send-mail
+
+Changes since version 5:
+- More indentation fixes
+- Make patches pass checkpatch with --strict option
+- Replaced magic numbers with defines(patch by Priit Laes)
+- Fixed oops on loading(patch by Hans de Goede)
+
+
+
+Alexander Bersenev (3):
+  ARM: sunxi: Add documentation for sunxi consumer infrared devices
+  ARM: sunxi: Add driver for sunxi IR controller
+  ARM: sunxi: Add IR controller support in DT on A20
+
+ .../devicetree/bindings/media/sunxi-ir.txt         |  23 ++
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        |   6 +
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |   6 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |  31 +++
+ drivers/media/rc/Kconfig                           |  10 +
+ drivers/media/rc/Makefile                          |   1 +
+ drivers/media/rc/sunxi-ir.c                        | 309 +++++++++++++++++++++
+ 7 files changed, 386 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/sunxi-ir.txt
+ create mode 100644 drivers/media/rc/sunxi-ir.c
+
+-- 
+1.9.3
