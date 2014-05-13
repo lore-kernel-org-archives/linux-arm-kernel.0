@@ -1,46 +1,73 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Tue, 13 May 2014 13:53:14 +0800
-Subject: [PATCH 1/2] ARM: hip04: set ARCH_NR_GPIO to 128
-In-Reply-To: <5366266A.9050704@hisilicon.com>
-References: <5357A941.6080809@hisilicon.com> <5366266A.9050704@hisilicon.com>
-Message-ID: <5371B34A.5030405@hisilicon.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Tue, 13 May 2014 11:37:04 +0530
+Subject: [PATCH v8 1/2] phy: Add new Exynos5 USB 3.0 PHY driver
+In-Reply-To: <5370C689.2090402@ti.com>
+References: <1399643877-14528-1-git-send-email-gautam.vivek@samsung.com>
+ <5370C689.2090402@ti.com>
+Message-ID: <CAFp+6iH-bLd9WUYyK8d8i=UNUm4DHpEYz=Am_qzPyX6gDovyKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/5/4 19:37, Zhou Wang wrote:
-> On 2014/4/23 19:51, Zhou Wang wrote:
->> set ARCH_NR_GPIO for Hisilicon Soc hip04, which has 4 GPIO
->> controllers with 32 GPIOs each.
->>
->> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
->> ---
->>  arch/arm/Kconfig |    1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 2961627..bb00e65 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -1664,6 +1664,7 @@ config ARCH_NR_GPIO
->>  	default 352 if ARCH_VT8500
->>  	default 288 if ARCH_SUNXI
->>  	default 264 if MACH_H4700
->> +	default 128 if ARCH_HIP04
->>  	default 0
->>  	help
->>  	  Maximum number of GPIOs in the system.
->> -- 1.7.9.5
->>
-> Hi Russell
-> 
->  Is there anything I should pay attention to about this patch?
-> 
-> Best regards
-> Zhou Wang
-> 
-Hi Russell,
+Hi Kishon,
 
-  Would you like to apply this patch? if there is some problem ,please tell me.
 
-Best regards,
-Zhou Wang
+On Mon, May 12, 2014 at 6:33 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi Gautam,
+>
+> On Friday 09 May 2014 07:27 PM, Vivek Gautam wrote:
+>> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
+>> The new driver uses the generic PHY framework and will interact
+>> with DWC3 controller present on Exynos5 series of SoCs.
+>>
+>> Also, created a new header file in linux/mfd/syscon/ for
+>> Exynos5 SoCs and put the required PMU offset definitions
+>> for the basic available PHYs.
+>>
+>
+>
+> I get the following checkpatch warnings
+>
+> WARNING: please write a paragraph that describes the config symbol fully
+> #163: FILE: drivers/phy/Kconfig:163:
+> +config PHY_EXYNOS5_USBDRD
+>
+> WARNING: DT compatible string "samsung,exynos5250-usbdrd-phy" appears
+> un-documented -- check ./Documentation/devicetree/bindings/
+> #708: FILE: drivers/phy/phy-exynos5-usbdrd.c:516:
+> +               .compatible = "samsung,exynos5250-usbdrd-phy",
+>
+> WARNING: DT compatible string "samsung,exynos5420-usbdrd-phy" appears
+> un-documented -- check ./Documentation/devicetree/bindings/
+> #711: FILE: drivers/phy/phy-exynos5-usbdrd.c:519:
+> +               .compatible = "samsung,exynos5420-usbdrd-phy",.
+>
+>
+> I think you just need to separate the Documentation into a separate patch
+> before applying the driver patch.
+>
+
+I somehow don't see the Documentation warning. Below is the checkpatch
+output which i ran on this v8 patch version.
+  linux-phy$ ./scripts/checkpatch.pl phy.patch
+  WARNING: please write a paragraph that describes the config symbol fully
+  #127: FILE: drivers/phy/Kconfig:163:
+  +config PHY_EXYNOS5_USBDRD
+
+  total: 0 errors, 1 warnings, 760 lines checked
+
+  phy.patch has style problems, please review.
+
+  If any of these errors are false positives, please report
+  them to the maintainer, see CHECKPATCH in MAINTAINERS.
+
+am i missing something ?
+
+[snip]
+
+
+
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
