@@ -1,56 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 May 2014 00:36:45 +0100
-Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems#
-In-Reply-To: <alpine.LFD.2.11.1405131922580.980@knanqh.ubzr>
-References: <alpine.LFD.2.11.1405082058130.980@knanqh.ubzr>
- <20140509091824.GL3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405091245070.980@knanqh.ubzr>
- <20140509182245.GM3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405091640090.980@knanqh.ubzr>
- <CAD=FV=UJK1nSPjH-au-KtbnOZk2nC7usLD8L9neMedj6WHUp8g@mail.gmail.com>
- <CAD=FV=XM2URyJjV9gaE=mrp7LAEGtvi9wQGhGJi3_HYp_XzYWg@mail.gmail.com>
- <5372998F.6020502@wwwdotorg.org>
- <alpine.LFD.2.11.1405131908260.980@knanqh.ubzr>
- <alpine.LFD.2.11.1405131922580.980@knanqh.ubzr>
-Message-ID: <20140513233645.GN3693@n2100.arm.linux.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 14 May 2014 08:53:35 +0900
+Subject: [PATCH v5 01/11] ARM: shmobile: r7s72100: document MSTP clock
+ support
+In-Reply-To: <20140513215929.GA3967@katana>
+References: <1398765822-2314-1-git-send-email-wsa@the-dreams.de>
+ <1398765822-2314-2-git-send-email-wsa@the-dreams.de>
+ <20140513000513.5943.68810@quantum>
+ <20140513015708.GA29336@verge.net.au>
+ <20140513215929.GA3967@katana>
+Message-ID: <20140513235335.GF6784@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 07:29:52PM -0400, Nicolas Pitre wrote:
-> On Tue, 13 May 2014, Nicolas Pitre wrote:
+On Tue, May 13, 2014 at 11:59:29PM +0200, Wolfram Sang wrote:
+> Simon,
 > 
-> > On Tue, 13 May 2014, Stephen Warren wrote:
+> > Its a getting a little to close to rc6 for me to take this series for v3.16,
+> > especially considering some bits seem to need tweaking (I am thinking of sci).
 > > 
-> > > On 05/13/2014 03:50 PM, Doug Anderson wrote:
-> > > ...
-> > > > ...but then I found the true problem shows up when we transition
-> > > > between very low frequencies on exynos, like between 200MHz and
-> > > > 300MHz.  While transitioning between frequencies the system
-> > > > temporarily bumps over to the "switcher" PLL running at 800MHz while
-> > > > waiting for the main PLL to stabilize.  No CPUFREQ notification is
-> > > > sent for that.  That means there's a period of time when we're running
-> > > > at 800MHz but loops_per_jiffy is calibrated at between 200MHz and
-> > > > 300MHz.
-> > > > 
-> > > > 
-> > > > I'm welcome to any suggestions for how to address this.  It sorta
-> > > > feels like it would be a common thing to have a temporary PLL during
-> > > > the transition, ...
-> > > 
-> > > We definitely do that on Tegra for some cpufreq transitions.
+> > Could you either:
 > > 
-> > Ouch...  If this is a common strategy to use a third frequency during a 
-> > transition phase, especially if that frequency is way off (800MHz vs 
-> > 200-300MHz) then it is something the cpufreq layer must capture and 
-> > advertise.
+> > * Re-post it without the sci changes and
+> >   I'll look at queuing it up for v3.17 or;
 > 
-> Of course if only the loops_per_jiffy scaling does care about frequency 
-> changes these days, and if in those cases udelay() can instead be moved 
-> to a timer source on those hick-up prone platforms, then all this is 
-> fairly theoretical and may not be worth pursuing.
+> If it is possible and does not cause too much burden for you, I'd prefer
+> to include it soonish and handle the fixups incrementally. Since it
+> touches a few files which change a lot, rebasing and retesting is extra
+> work (done twice for this series IIRC) and thus I'd prefer to do the
+> clenaups as seperate patches.
+> 
+> So, if no one objects, I'll resend tomorrow with Geerts fixup folded
+> into my series and retested against latest renesas/devel.
 
-As I've been saying... use a bloody timer. :)
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+I will do my best. But I need to have pull-requests sent off
+to the arm-soc maintainers before rc6 appears. And ideally patches
+should have been present in next for a day before I send such a request.
+So by my calculations I need to push things to my next tree very
+soon (i.e. today) in order to reach the above mentioned criteria.
