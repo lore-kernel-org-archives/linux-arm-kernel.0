@@ -1,58 +1,50 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 13 May 2014 16:01:00 -0700
-Subject: [PATCH] clocksource: qcom: Implement read_current_timer for udelay
-Message-ID: <1400022060-30118-1-git-send-email-sboyd@codeaurora.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 13 May 2014 19:15:05 -0400 (EDT)
+Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems#
+In-Reply-To: <5372998F.6020502@wwwdotorg.org>
+References: <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
+ <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
+ <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
+ <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
+ <20140508192209.GH3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405081600260.980@knanqh.ubzr>
+ <20140508205223.GI3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405082058130.980@knanqh.ubzr>
+ <20140509091824.GL3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405091245070.980@knanqh.ubzr>
+ <20140509182245.GM3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405091640090.980@knanqh.ubzr>
+ <CAD=FV=UJK1nSPjH-au-KtbnOZk2nC7usLD8L9neMedj6WHUp8g@mail.gmail.com>
+ <CAD=FV=XM2URyJjV9gaE=mrp7LAEGtvi9wQGhGJi3_HYp_XzYWg@mail.gmail.com>
+ <5372998F.6020502@wwwdotorg.org>
+Message-ID: <alpine.LFD.2.11.1405131908260.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setup the same timer used as the clocksource to be used as the
-read_current_timer implementation. This allows us to support a
-stable udelay implementation on MSMs where it's possible for the
-CPUs to scale speeds independently of one another.
+On Tue, 13 May 2014, Stephen Warren wrote:
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clocksource/qcom-timer.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+> On 05/13/2014 03:50 PM, Doug Anderson wrote:
+> ...
+> > ...but then I found the true problem shows up when we transition
+> > between very low frequencies on exynos, like between 200MHz and
+> > 300MHz.  While transitioning between frequencies the system
+> > temporarily bumps over to the "switcher" PLL running at 800MHz while
+> > waiting for the main PLL to stabilize.  No CPUFREQ notification is
+> > sent for that.  That means there's a period of time when we're running
+> > at 800MHz but loops_per_jiffy is calibrated at between 200MHz and
+> > 300MHz.
+> > 
+> > 
+> > I'm welcome to any suggestions for how to address this.  It sorta
+> > feels like it would be a common thing to have a temporary PLL during
+> > the transition, ...
+> 
+> We definitely do that on Tegra for some cpufreq transitions.
 
-diff --git a/drivers/clocksource/qcom-timer.c b/drivers/clocksource/qcom-timer.c
-index e807acf4c665..8d115db1e651 100644
---- a/drivers/clocksource/qcom-timer.c
-+++ b/drivers/clocksource/qcom-timer.c
-@@ -26,6 +26,8 @@
- #include <linux/of_irq.h>
- #include <linux/sched_clock.h>
- 
-+#include <asm/delay.h>
-+
- #define TIMER_MATCH_VAL			0x0000
- #define TIMER_COUNT_VAL			0x0004
- #define TIMER_ENABLE			0x0008
-@@ -179,6 +181,15 @@ static u64 notrace msm_sched_clock_read(void)
- 	return msm_clocksource.read(&msm_clocksource);
- }
- 
-+static unsigned long msm_read_current_timer(void)
-+{
-+	return msm_clocksource.read(&msm_clocksource);
-+}
-+
-+static struct delay_timer msm_delay_timer = {
-+	.read_current_timer = msm_read_current_timer,
-+};
-+
- static void __init msm_timer_init(u32 dgt_hz, int sched_bits, int irq,
- 				  bool percpu)
- {
-@@ -217,6 +228,8 @@ err:
- 	if (res)
- 		pr_err("clocksource_register failed\n");
- 	sched_clock_register(msm_sched_clock_read, sched_bits, dgt_hz);
-+	msm_delay_timer.freq = dgt_hz;
-+	register_current_timer_delay(&msm_delay_timer);
- }
- 
- #ifdef CONFIG_ARCH_QCOM
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Ouch...  If this is a common strategy to use a third frequency during a 
+transition phase, especially if that frequency is way off (800MHz vs 
+200-300MHz) then it is something the cpufreq layer must capture and 
+advertise.
+
+
+Nicolas
