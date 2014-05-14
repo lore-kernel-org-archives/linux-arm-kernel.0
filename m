@@ -1,62 +1,65 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Wed, 14 May 2014 16:58:30 +0200
-Subject: [RFC PATCH 5/9] dt: deps: register drivers based on the
- initialization order based on DT
-In-Reply-To: <20140514141300.67206C4153D@trevor.secretlab.ca>
-References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>	<1399913280-6915-6-git-send-email-holler@ahsoftware.de>
- <20140514141300.67206C4153D@trevor.secretlab.ca>
-Message-ID: <53738496.2070800@ahsoftware.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 14 May 2014 15:58:54 +0100
+Subject: [PATCHv2 4/4] ARM: mvebu: implement L2/PCIe deadlock workaround
+In-Reply-To: <1399975839-5311-5-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1399975839-5311-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1399975839-5311-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140514145853.GE19866@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 14.05.2014 16:13, schrieb Grant Likely:
-> On Mon, 12 May 2014 18:47:56 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
->> The init system currently calls unknown functions with almost unknown
->> functionality in an almost random order.
->
-> Correct, we've got a module system. Some would say that is a strength!
-> :-) That said, I don't object to optimizing to the optimal order when
-> possible.
+On Tue, May 13, 2014 at 11:10:39AM +0100, Thomas Petazzoni wrote:
+> --- a/arch/arm/mach-mvebu/board-v7.c
+> +++ b/arch/arm/mach-mvebu/board-v7.c
+[...]
+> +static void __init mvebu_l2x0_pl310_coherent(void)
+> +{
+> +	struct device_node *np;
+> +
+> +	if (!coherency_available())
+> +		return;
+> +
+> +	for_each_compatible_node(np, NULL, "arm,pl310-cache") {
+> +		struct property *new_compat;
+> +
+> +		new_compat = kzalloc(sizeof(*new_compat), GFP_KERNEL);
+> +		new_compat->name = kstrdup("compatible", GFP_KERNEL);
+> +		new_compat->value = kstrdup("arm,pl310-coherent-cache",
+> +					    GFP_KERNEL);
+> +		new_compat->length = strlen(new_compat->value) + 1;
+> +		of_update_property(np, new_compat);
+> +	}
+> +}
 
-Modules do work after init happened, that isn't what this feature is about.
+I got it know, you update the DT property on the fly.
 
->
->> Fixing this is on a short-term basis is a bit tricky.
->>
->> In order to register drivers with a deterministic order, a list of all
->> available in-kernel drivers is needed. Unfortunately such a list doesn't
->> exist, just a list of initcalls does exist.
->>
->> The trick now is to first call special annotated initcalls (I call those
->> "well done") for platform drivers, but not actualy starting those drivers
->> by calling their probe function, but just collectiong their meta datas
->> (struct platform_driver). After all those informations were collected,
->> available the drivers will be started according to the previously
->> determined order.
->
-> Why does the initcall level matter? Why not just let the initcalls
-> happen, capture the calls that register a driver, and then use that list
-> later?
+> +
+>  static void __init mvebu_timer_and_clk_init(void)
+>  {
+>  	of_clk_init(NULL);
+> @@ -78,6 +125,14 @@ static void __init mvebu_timer_and_clk_init(void)
+>  	mvebu_scu_enable();
+>  	coherency_init();
+>  	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
+> +
+> +	if (of_machine_is_compatible("marvell,armada375") ||
+> +	    of_machine_is_compatible("marvell,armada38x")) {
+> +		arch_ioremap_caller = armada_pcie_wa_ioremap_caller;
+> +		pci_ioremap_set_mem_type(MT_MEMORY_RW_SO);
+> +		mvebu_l2x0_pl310_coherent();
+> +	}
+> +
+>  	l2x0_of_init(0, ~0UL);
+>  
+>  	if (of_machine_is_compatible("marvell,armada375"))
 
-Some initcalls assume that stuff is present when they called probe or 
-register and do further action based on the rc code.
+A more "hackish" way would be to simply set outer_cache.sync to NULL
+after l2x0_of_init, less code ;) but not nice either. With the .fixup in
+Russell's L2C patches you could have added an mvebu specific callback to
+check for coherency before setting .sync to NULL.
 
->> The long range target to fix the problem should be to include a list (array)
->> of struct platform_driver in the kernel for all in-kernel platform drivers,
->> instead of just initcalls. This will be easy if all platform drivers have
->> become "well done".
->
-> How will that list be constructed? How will it account for multiple
-> platforms, each requiring a different init order?
+Anyway, your approach is fine by me but I would prefer a specific
+property rather than "compatible".
 
-The list could be build just like the list of initcalls, but containing 
-structs platform instead of function pointers.
-
-The order is in now way part of this list, after all that's what this 
-feature is about. The order is determined by metadatas in the DT, to get 
-rid of a lot of otherwise necessary hardcoded stuff to fix the order in 
-drivers.
-
-Regards,
-
-Alexander Holler
+-- 
+Catalin
