@@ -1,40 +1,46 @@
-From: kyle@redhat.com (Kyle McMartin)
-Date: Wed, 14 May 2014 14:57:21 -0400
-Subject: [PATCH] arm64: don't set READ_IMPLIES_EXEC for EM_AARCH64
-Message-ID: <20140514185720.GI26038@redacted.bos.redhat.com>
+From: richard@nod.at (Richard Weinberger)
+Date: Wed, 14 May 2014 20:59:33 +0200
+Subject: [PATCH 01/27] arm64: Override defaults from generic/tlb.h
+In-Reply-To: <1400093999-18703-1-git-send-email-richard@nod.at>
+References: <1400093999-18703-1-git-send-email-richard@nod.at>
+Message-ID: <1400093999-18703-2-git-send-email-richard@nod.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-current->personality & READ_IMPLIES_EXEC is currently being set for
-AArch64 binaries, resulting in an executable stack, when no explicit
-PT_GNU_STACK header is present.
+Make sure to not conflict with the defaults provided
+by generic/tlb.h.
 
-[kmcmarti at sedition ~]$ uname -p
-aarch64
-[kmcmarti at sedition ~]$ cat /proc/$$/personality 
-00400000
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Steve Capper <steve.capper@linaro.org>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Richard Weinberger <richard@nod.at>
+Cc: Michal Hocko <mhocko@suse.cz>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Richard Weinberger <richard@nod.at>
+---
+ arch/arm64/include/asm/tlb.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-The reason for this is, without an explicit PT_GNU_STACK entry in the
-binary, stk is still set to EXSTACK_DEFAULT (which should be
-non-executable on AArch64.) As a result, elf_read_implies_exec is true,
-and we set READ_IMPLIES_EXEC in binfmt_elf.c:load_elf_binary.
-
-Fix this to return 0 in the native case, and parrot the logic from
-arch/arm/kernel/elf.c otherwise. With this patch, binaries correctly
-don't have READ_IMPLIES_EXEC set, and we can let PT_GNU_STACK change
-things if it's explicitly requested.
-
-Signed-off-by: Kyle McMartin <kyle@redhat.com>
-
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -114,7 +114,8 @@ typedef struct user_fpsimd_state elf_fpregset_t;
-  */
- #define elf_check_arch(x)		((x)->e_machine == EM_AARCH64)
+diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+index 80e2c08..65a474d 100644
+--- a/arch/arm64/include/asm/tlb.h
++++ b/arch/arm64/include/asm/tlb.h
+@@ -19,7 +19,14 @@
+ #ifndef __ASM_TLB_H
+ #define __ASM_TLB_H
  
--#define elf_read_implies_exec(ex,stk)	(stk != EXSTACK_DISABLE_X)
-+#define elf_read_implies_exec(ex,stk)	(test_thread_flag(TIF_32BIT) \
-+					 ? (stk == EXSTACK_ENABLE_X) : 0)
++/* These defines are needed to override the defaults from asm-generic/tlb.h */
+ #define  __tlb_remove_pmd_tlb_entry __tlb_remove_pmd_tlb_entry
++#define tlb_start_vma tlb_start_vma
++#define tlb_end_vma tlb_end_vma
++#define __tlb_remove_tlb_entry __tlb_remove_tlb_entry
++#define tlb_flush tlb_flush
++#define __pte_free_tlb __pte_free_tlb
++#define __pmd_free_tlb __pmd_free_tlb
  
- #define CORE_DUMP_USE_REGSET
- #define ELF_EXEC_PAGESIZE	PAGE_SIZE
+ #include <asm-generic/tlb.h>
+ 
+-- 
+1.8.4.2
