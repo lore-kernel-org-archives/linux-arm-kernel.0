@@ -1,79 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 May 2014 09:45:37 +0100
-Subject: [PATCH v3 13/14] ARM64: KVM: set and get of sys registers in BE
- case
-In-Reply-To: <1399997646-4716-14-git-send-email-victor.kamensky@linaro.org>
- (Victor Kamensky's message of "Tue, 13 May 2014 17:14:05 +0100")
-References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
- <1399997646-4716-14-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <87lhu4hhou.fsf@approximate.cambridge.arm.com>
+From: peter@peter-b.co.uk (Peter TB Brett)
+Date: Wed, 14 May 2014 09:46:47 +0100
+Subject: Accessing GPIOs from userspace using recent kernels
+Message-ID: <3385f19f3e1427613732f6d5c9f8513d@net2air.co>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Victor,
+Hi all,
 
-On Tue, May 13 2014 at  5:14:05 pm BST, Victor Kamensky <victor.kamensky@linaro.org> wrote:
-> This patch addresses issue of reading and writing V8 sys registers in
-> BE case. Since only register size function deals with is 8 bytes,
-> existing code works in both little and big endian cases.
-> Removed comment about little endian. Added BUG_ON that register
-> size should be always 8 bytes.
->
-> If these functions would ever need to support both 8 bytes and 4 bytes
-> register sizes to deals with them in endian agnostic way code should
-> do something along these lines:
->
->        unsigned long regsize = KVM_REG_SIZE(id);
->        union {
->                u32     word;
->                u64     dword;
->        } tmp = {0};
->
->        if (copy_from_user(&tmp, uaddr, regsize) != 0)
->                return -EFAULT;
->        switch (regsize) {
->        case 4:
->                *val = tmp.word;
->                break;
->        case 8:
->                *val = tmp.dword;
->                break;
->        }
->
-> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 19 +++++++++++++------
->  1 file changed, 13 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 0324458..060c3a9 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -776,18 +776,25 @@ static struct sys_reg_desc invariant_sys_regs[] = {
->  	  NULL, get_ctr_el0 },
->  };
->  
-> -static int reg_from_user(void *val, const void __user *uaddr, u64 id)
-> +static int reg_from_user(u64 *val, const void __user *uaddr, u64 id)
->  {
-> -	/* This Just Works because we are little endian. */
-> -	if (copy_from_user(val, uaddr, KVM_REG_SIZE(id)) != 0)
-> +	unsigned long regsize = KVM_REG_SIZE(id);
-> +
-> +	BUG_ON(regsize != 8);
+We have several pieces of software that make use of the /sys/class/gpio 
+userspace interface to the GPIO subsystem.
 
-I haven't had time to review this series just yet, but this bit just
-sends chivers down my spine.
+One important prerequisite to being able to use the userspace GPIO 
+interface is to be able to put the corresponding package pins into GPIO 
+mode, by modifying the chip's mux settings.
 
-regsize is derived from id, which comes from a struct one_reg, which is
-directly provided by userspace. Here, you're trusting the luser to give
-you 8 as a size, and panic the kernel if not.
+With Fedora 19 on the Pandaboard, we were able to achieve this by poking 
+around in /sys/kernel/debug/omap_mux.  However, when running Fedora 20, 
+this directory is empty.  My assumption is that this functionality has 
+been subsumed by the pinctrl subsystem in recent kernels.  
+Unfortunately, there doesn't seem to be any documented userspace API.
 
-As much as I'd like to qualify this as only being a slightly undesirable
-effect, I think it deserves a NAK.
+If there is no longer a userspace API for these settings, is there any 
+way  that I can simply amend the device tree in order to change a couple 
+of mux settings?
 
-Thanks,
+I've figured out that I would need a stanza that looks something like:
 
-	M.
+&omap4_pmx_core
+{
+  foo_pins: pinmux_foo_pins {
+    pinctrl-single,pins = <
+      0x5e (PIN_INPUT | MUX_MODE3)  /* gpmc_ad15.gpio_39 */ /* IRQ */
+      0x12e (PIN_INPUT | MUX_MODE3) /* i2c4_scl.gpio_132 */ /* RST */
+  };
+};
+
+But I can't work out what else I need to modify in order for these mux 
+settings to take effect.
+
+Thanks for any pointers!
+
+                                                    Peter
+
+
+
 -- 
-Jazz is not dead. It just smells funny.
+Dr Peter Brett <peter@peter-b.co.uk>
