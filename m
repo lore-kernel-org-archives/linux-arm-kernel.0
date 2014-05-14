@@ -1,77 +1,103 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Wed, 14 May 2014 19:31:28 +0800
-Subject: [PATCH] arm: mm: fix lowmem virtual address range check
-In-Reply-To: <20140514103924.GD10145@arm.com>
-References: <1400047439-23961-1-git-send-email-wangnan0@huawei.com>
- <20140514101137.GC10145@arm.com> <5373444C.3010805@huawei.com>
- <20140514103924.GD10145@arm.com>
-Message-ID: <53735410.1030401@huawei.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 14 May 2014 13:36:36 +0200
+Subject: [PATCHv2] of: make of_update_property() usable earlier in the boot
+ process
+Message-ID: <1400067396-21228-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/5/14 18:39, Will Deacon wrote:
-> On Wed, May 14, 2014 at 11:24:12AM +0100, Wang Nan wrote:
->> On 2014/5/14 18:11, Will Deacon wrote:
->>> On Wed, May 14, 2014 at 07:03:59AM +0100, Wang Nan wrote:
->>>> This patch makes sure the argument of __phys_to_virt is a valid physical
->>>> address when clear lowmem memory maps.
->>>>
->>>> The last few lines prepare_page_table() clear page mapping in the gap
->>>> between largest low physical memory and the upper bound of lowmem. It
->>>> uses __phys_to_virt(end) to calculate virtual address from where the
->>>> clearing start.
->>>>
->>>> However, if the platform uses private nonliner __phys_to_virt(), 'end'
->>>> may goes into another mapping region.
->>>>
->>>> This patch uses __phys_to_virt(end - 1) + 1 for insurance purposes.
->>>>
->>>> Signed-off-by: Wang Nan <wangnan0@huawei.com>
->>>> Cc: Geng Hui <hui.geng@huawei.com>
->>>> Cc: Will Deacon <will.deacon@arm.com>
->>>> ---
->>>>  arch/arm/mm/mmu.c | 2 +-
->>>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
->>>> index b68c6b2..87340ee 100644
->>>> --- a/arch/arm/mm/mmu.c
->>>> +++ b/arch/arm/mm/mmu.c
->>>> @@ -1217,7 +1217,7 @@ static inline void prepare_page_table(void)
->>>>  	 * Clear out all the kernel space mappings, except for the first
->>>>  	 * memory bank, up to the vmalloc region.
->>>>  	 */
->>>> -	for (addr = __phys_to_virt(end);
->>>> +	for (addr = __phys_to_virt(end - 1) + 1;
->>>>  	     addr < VMALLOC_START; addr += PMD_SIZE)
->>>>  		pmd_clear(pmd_off_k(addr));
->>>
->>> This looks correct to me, but I'd be interested to know which platform this
->>> is falling over on. Only realview seems to override __phys_to_virt and I
->>> don't think we want to add more of that if we can help it.
->>>
->>> Will
->>>
->>
->> I'm working on realview code now, trying to make it support CONFIG_ARM_PATCH_PHYS_VIRT,
->> and found this problem when working on its private __phys_to_virt. Realview is the only
->> in-kernel arm board which uses sparse memory. I think it is a good example when testing
->> sparse memory support of tools such as kexec-tools, kdump and crash.
-> 
-> Ok, but there's been recent talk of getting rid of that by the looks of it:
-> 
->   http://www.spinics.net/lists/arm-kernel/msg318362.html
-> 
-> So, whilst I still think your fix is valid, we should probably discourage
-> any new users from overriding these macros.
-> 
+Commit 75b57ecf9d1d1e17d099ab13b8f48e6e038676be ('of: Make device
+nodes kobjects so they show up in sysfs') has turned Device Tree nodes
+in kobjects and added a sysfs based representation for Device Tree
+nodes. Since the sysfs logic is only available after the execution of
+a core_initcall(), the patch took precautions in of_add_property() and
+of_remove_property() to not do any sysfs related manipulation early in
+the boot process.
 
-The patch in your link seems not been accepted?
+However, it forgot to do the same for of_update_property(), which if
+used early in the boot process (before core_initcalls have been
+called), tries to call sysfs_remove_bin_file(), and crashes:
 
-The root problem this patch trying to deal with is the nonliner mapping of some boards
-(currently only realview does it and fortunately not cause problem). Do you mean we are
-going to eliminate such nonliner mapping in realview and prevent further boards to do
-nonliner mapping?
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 0 at /home/thomas/projets/linux-2.6/fs/kernfs/dir.c:1216 kernfs_remove_by_name_ns+0x80/0x88()
+kernfs: can not remove '(null)', no directory
+Modules linked in:
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.15.0-rc1-00127-g1d7e7b2-dirty #423
+[<c0014910>] (unwind_backtrace) from [<c00110ec>] (show_stack+0x10/0x14)
+[<c00110ec>] (show_stack) from [<c04c84b8>] (dump_stack+0x84/0x94)
+[<c04c84b8>] (dump_stack) from [<c001d8c0>] (warn_slowpath_common+0x6c/0x88)
+[<c001d8c0>] (warn_slowpath_common) from [<c001d90c>] (warn_slowpath_fmt+0x30/0x40)
+[<c001d90c>] (warn_slowpath_fmt) from [<c0104468>] (kernfs_remove_by_name_ns+0x80/0x88)
+[<c0104468>] (kernfs_remove_by_name_ns) from [<c0394d98>] (of_update_property+0xc0/0xf0)
+[<c0394d98>] (of_update_property) from [<c0647248>] (mvebu_timer_and_clk_init+0xfc/0x194)
+[<c0647248>] (mvebu_timer_and_clk_init) from [<c0640934>] (start_kernel+0x218/0x350)
+[<c0640934>] (start_kernel) from [<00008070>] (0x8070)
+---[ end trace 3406ff24bd97382e ]---
+Unable to handle kernel NULL pointer dereference at virtual address 0000003c
+pgd = c0004000
+[0000003c] *pgd=00000000
+Internal error: Oops: 5 [#1] SMP ARM
+Modules linked in:
+CPU: 0 PID: 0 Comm: swapper/0 Tainted: G        W     3.15.0-rc1-00127-g1d7e7b2-dirty #423
+task: c10ad4d8 ti: c10a2000 task.ti: c10a2000
+PC is at kernfs_find_ns+0x8/0xf0
+LR is at kernfs_find_and_get_ns+0x30/0x48
+pc : [<c0103834>]    lr : [<c010394c>]    psr: 600001d3
+sp : c10a3f34  ip : 00000073  fp : 00000000
+r10: 00000000  r9 : cfffc240  r8 : cfdf2980
+r7 : cf812c00  r6 : 00000000  r5 : 00000000  r4 : c10b45e0
+r3 : c10ad4d8  r2 : 00000000  r1 : cf812c00  r0 : 00000000
+Flags: nZCv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
+Control: 10c53c7d  Table: 0000404a  DAC: 00000015
+Process swapper/0 (pid: 0, stack limit = 0xc10a2240)
+Stack: (0xc10a3f34 to 0xc10a4000)
+3f20:                                              c10b45e0 00000000 00000000
+3f40: cf812c00 c010394c 00000063 cf812c00 00000001 cf812c00 cfdf29ac c03932cc
+3f60: 00000063 cf812bc0 cfdf29ac cf812c00 ffffffff c03943f8 cfdf2980 c0104468
+3f80: cfdf2a04 cfdf2980 cf812bc0 c06634b0 c10aa3c0 c0394da4 c10f74dc cfdf2980
+3fa0: cf812bc0 c0647248 c10aa3c0 ffffffff c10de940 c10aa3c0 ffffffff c0640934
+3fc0: ffffffff ffffffff c06404ec 00000000 00000000 c06634b0 00000000 10c53c7d
+3fe0: c10aa434 c06634ac c10ae4c8 0000406a 414fc091 00008070 00000000 00000000
+[<c0103834>] (kernfs_find_ns) from [<00000001>] (0x1)
+Code: e5c89001 eaffffcf e92d40f0 e1a06002 (e1d023bc)
+---[ end trace 3406ff24bd97382f ]---
+Kernel panic - not syncing: Attempted to kill the idle task!
+---[ end Kernel panic - not syncing: Attempted to kill the idle task!
 
-> Will
-> 
+To fix this problem, we simply skip the sysfs related calls in
+of_update_property(), and rely on of_init() to fix up things when it
+will be called, exactly as is done in of_add_property() and
+of_remove_property().
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Fixes: 75b57ecf9d1d ("of: Make device nodes kobjects so they show up in sysfs")
+---
+Changes since previous version:
+ - Use a ternary operator to bail out with the proper return value
+   instead of a goto. Requested by Rob Herring.
+ - Use a 12 digits hash and double quotes in the "Fixes:"
+   tag. Requested by Rob Herring.
+ - Rebased on top of 3.15-rc5
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/of/base.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 6d4ee22..32e969d 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -1831,6 +1831,10 @@ int of_update_property(struct device_node *np, struct property *newprop)
+ 	if (!found)
+ 		return -ENODEV;
+ 
++	/* At early boot, bail out and defer setup to of_init() */
++	if (!of_kset)
++		return found ? 0 : -ENODEV;
++
+ 	/* Update the sysfs attribute */
+ 	sysfs_remove_bin_file(&np->kobj, &oldprop->attr);
+ 	__of_add_property_sysfs(np, newprop);
+-- 
+1.9.3
