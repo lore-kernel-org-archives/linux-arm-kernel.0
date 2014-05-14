@@ -1,55 +1,48 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 14 May 2014 14:06:34 +0200
-Subject: [PATCH v13 2/2] ARM: sunxi: Add driver for SD/MMC hosts found
- on Allwinner sunxi SoCs
-In-Reply-To: <CAPDyKFrq=v1SU0+rC5_tCJ1D5jUOd3vwLXpxgpzB9X5NQd-deg@mail.gmail.com>
-References: <1399896288-5826-1-git-send-email-hdegoede@redhat.com>	<1399896288-5826-3-git-send-email-hdegoede@redhat.com>	<5370C5D1.2070901@broadcom.com>
- <CAPDyKFrq=v1SU0+rC5_tCJ1D5jUOd3vwLXpxgpzB9X5NQd-deg@mail.gmail.com>
-Message-ID: <53735C4A.70502@redhat.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 14 May 2014 22:21:26 +1000
+Subject: [PATCH v5 01/11] ARM: shmobile: r7s72100: document MSTP clock
+ support
+In-Reply-To: <CAMuHMdWK1WAePx3N_ybPkWcoTtP_6PdcEPNEyBv02A9zOZSWOg@mail.gmail.com>
+References: <1398765822-2314-1-git-send-email-wsa@the-dreams.de>
+ <1398765822-2314-2-git-send-email-wsa@the-dreams.de>
+ <20140513000513.5943.68810@quantum>
+ <CAMuHMdWK1WAePx3N_ybPkWcoTtP_6PdcEPNEyBv02A9zOZSWOg@mail.gmail.com>
+Message-ID: <20140514222126.5d10212f@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Geert,
 
-On 05/14/2014 02:03 PM, Ulf Hansson wrote:
-> On 12 May 2014 15:00, Arend van Spriel <arend@broadcom.com> wrote:
->> On 05/12/2014 02:04 PM, Hans de Goede wrote:
->>>
->>> From: David Lanzend?rfer<david.lanzendoerfer@o2s.ch>
->>>
->>> The Allwinner sunxi mmc host uses dma in bus-master mode using a built-in
->>> designware idmac controller, which is identical to the one found in the
->>> mmc-dw
->>> hosts. However the rest of the host is not identical to mmc-dw, it deals
->>> with
->>> sending stop commands in hardware which makes it significantly different
->>> from the mmc-dw devices.
->>>
->>> HdG: Various cleanups and fixes.
->>
->>
->> Just nitpicking, but usually the above line should be added below the
->> original signoff, so:
->>
->>> Signed-off-by: David Lanzend?rfer<david.lanzendoerfer@o2s.ch>
->>
->> [hdegoede at redhat.com: various cleanups and fixes]
->>
->>> Signed-off-by: Hans de Goede<hdegoede@redhat.com>
->>
->>
->> As is documented in SubmittingPatches.
->>
->> Gr. AvS
+On Wed, 14 May 2014 12:26:38 +0200 Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>
+> On Tue, May 13, 2014 at 2:05 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> > Quoting Wolfram Sang (2014-04-29 03:03:32)
+> >> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> >>
+> >> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> >
+> > Acked-by: Mike Turquette <mturquette@linaro.org>
+> >
+> > No need to take this through the clk tree. Feel free to send it with the
+> > rest through arm-soc.
 > 
+> (merging in clk/clk-next)
 > 
-> This looks good to me, thanks Hans!
+> Note that this will cause a conflict for you, as Mike applied commit
+> 5483bf698f42a6f0467463b064084eb888298232 ("clk: shmobile: r8a7779:
+> Add MSTP clock support"), which adds a line at the exact same spot.
 > 
-> I will include this in the next PR I send to Chris, I will also take
-> the liberty to fixup the commit msg as pointed out by Arend.
+> Resolution: both lines should be kept.
 
-Great, thanks!
+Thanks.
 
-Regards,
-
-Hans
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140514/8a7768c7/attachment.sig>
