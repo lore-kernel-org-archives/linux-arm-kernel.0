@@ -1,93 +1,117 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 14 May 2014 13:13:13 -0700
-Subject: [GIT PULL 1/4] Samsung clock Exynos5260 support for v3.16
-In-Reply-To: <5373CB1A.1040801@samsung.com>
-References: <1400090591-5064-1-git-send-email-t.figa@samsung.com>
- <5373CB1A.1040801@samsung.com>
-Message-ID: <20140514201313.19795.35617@quantum>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 14 May 2014 22:15:13 +0200
+Subject: [PATCH v2 02/10] clk: berlin: add binding include for BG2/BG2CD clock
+ ids
+In-Reply-To: <1400098522-14770-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1400098522-14770-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1400098522-14770-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kukjin Kim (2014-05-14 12:59:22)
-> On 05/15/14 03:03, Tomasz Figa wrote:
-> 
-> Hi Mike,
-> 
-> I've talked to Tomasz about current samsung related clock stuff. Since 
-> they are mostly having dependency on samsung tree now not clock core 
-> stuff, so would be better if it could be sent to upstream via samsung 
-> tree. And as you know, updating arch/arm/ and clock stuff are usually 
-> required for adding new SoC or supporting CCF newly...
+This adds a dt-binding include for Marvell Berlin BG2/BG2CD and BG2Q
+core clock IDs.
 
-The Samsung clk pull requests only touch two arch/arm Kconfig files and
-one dtsi file. That's not a lot of arch/arm churn. Is there a strong
-reason that this needs to go through the samsung/arm-soc trees?
-Otherwise it should continue to go through the clk tree.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+Changelog:
+v1->v2:
+- separate patch to make it usable in the driver (Suggested by Alexandre
+  Belloni)
 
-> 
-> How do you think? Basically I need your agreement for it.
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Jisheng Zhang <jszhang@marvell.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ include/dt-bindings/clock/berlin2.h  | 35 +++++++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/berlin2q.h | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 63 insertions(+)
+ create mode 100644 include/dt-bindings/clock/berlin2.h
+ create mode 100644 include/dt-bindings/clock/berlin2q.h
 
-Based on the above pull requests I do not see the need for changing how
-code gets merged.
-
-Regards,
-Mike
-
-> 
-> Thanks,
-> Kukjin
-> 
-> 
-> > The following changes since commit 2916f9a2c6d9200b4c840a613cd1fa1dad04240f:
-> >
-> >    ARM: S3C24XX: remove SAMSUNG_CLOCK remnants after ccf conversion (2014-05-13 08:00:46 +0900)
-> >
-> > are available in the git repository at:
-> >
-> >    git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git for_3.16/exynos5260
-> >
-> > for you to fetch changes up to d39e55e06371c1ba9d11f4a17a56a0f925d12415:
-> >
-> >    clk/exynos5260: add clock file for exynos5260 (2014-05-14 19:16:55 +0200)
-> >
-> > ----------------------------------------------------------------
-> >
-> > Samsung clock Exynos5260 support for v3.16.
-> >
-> > This pull request contains patches preparing Samsung Common Clock Framework
-> > helpers to support Exynos5260 by adding support for multiple clock providers
-> > and then adding clock driver for Exynos5260.
-> >
-> > ----------------------------------------------------------------
-> > Pankaj Dubey (1):
-> >        clk/samsung: add support for pll2550xx
-> >
-> > Rahul Sharma (4):
-> >        clk/samsung: add support for multiple clock providers
-> >        clk/samsung: add support for pll2650xx
-> >        clk/exynos5260: add macros and documentation for exynos5260
-> >        clk/exynos5260: add clock file for exynos5260
-> >
-> >   .../devicetree/bindings/clock/exynos5260-clock.txt |  190 ++
-> >   drivers/clk/samsung/Makefile                       |    1 +
-> >   drivers/clk/samsung/clk-exynos4.c                  |   47 +-
-> >   drivers/clk/samsung/clk-exynos5250.c               |   25 +-
-> >   drivers/clk/samsung/clk-exynos5260.c               | 1980 ++++++++++++++++++++
-> >   drivers/clk/samsung/clk-exynos5260.h               |  459 +++++
-> >   drivers/clk/samsung/clk-exynos5420.c               |   24 +-
-> >   drivers/clk/samsung/clk-exynos5440.c               |   18 +-
-> >   drivers/clk/samsung/clk-pll.c                      |  223 ++-
-> >   drivers/clk/samsung/clk-pll.h                      |    2 +
-> >   drivers/clk/samsung/clk-s3c2410.c                  |   51 +-
-> >   drivers/clk/samsung/clk-s3c2412.c                  |   29 +-
-> >   drivers/clk/samsung/clk-s3c2443.c                  |   46 +-
-> >   drivers/clk/samsung/clk-s3c64xx.c                  |   44 +-
-> >   drivers/clk/samsung/clk.c                          |  114 +-
-> >   drivers/clk/samsung/clk.h                          |   72 +-
-> >   include/dt-bindings/clock/exynos5260-clk.h         |  469 +++++
-> >   17 files changed, 3589 insertions(+), 205 deletions(-)
-> >   create mode 100644 Documentation/devicetree/bindings/clock/exynos5260-clock.txt
-> >   create mode 100644 drivers/clk/samsung/clk-exynos5260.c
-> >   create mode 100644 drivers/clk/samsung/clk-exynos5260.h
-> >   create mode 100644 include/dt-bindings/clock/exynos5260-clk.h
-> > --
+diff --git a/include/dt-bindings/clock/berlin2.h b/include/dt-bindings/clock/berlin2.h
+new file mode 100644
+index 000000000000..dacf7edec4d3
+--- /dev/null
++++ b/include/dt-bindings/clock/berlin2.h
+@@ -0,0 +1,35 @@
++/*
++ * Berlin2 BG2/BG2CD clock tree IDs
++ */
++
++#define CLKID_SYS		0
++#define CLKID_CPU		1
++#define CLKID_DRMFIGO		2
++#define CLKID_CFG		3
++#define CLKID_GFX		4
++#define CLKID_ZSP		5
++#define CLKID_PERIF		6
++#define CLKID_PCUBE		7
++#define CLKID_VSCOPE		8
++#define CLKID_NFC_ECC		9
++#define CLKID_VPP		10
++#define CLKID_APP		11
++#define CLKID_AUDIO0		12
++#define CLKID_AUDIO2		23
++#define CLKID_AUDIO3		14
++#define CLKID_AUDIO1		15
++#define CLKID_GETH0		16
++#define CLKID_GETH1		17
++#define CLKID_SATA		18
++#define CLKID_AHBAPB		19
++#define CLKID_USB0		20
++#define CLKID_USB1		21
++#define CLKID_PBRIDGE		22
++#define CLKID_SDIO0		23
++#define CLKID_SDIO1		24
++#define CLKID_NFC		25
++#define CLKID_SMEMC		26
++#define CLKID_AUDIOHD		27
++#define CLKID_VIDEO0		28
++#define CLKID_VIDEO1		29
++#define CLKID_VIDEO2		30
+diff --git a/include/dt-bindings/clock/berlin2q.h b/include/dt-bindings/clock/berlin2q.h
+new file mode 100644
+index 000000000000..069d6516ea9c
+--- /dev/null
++++ b/include/dt-bindings/clock/berlin2q.h
+@@ -0,0 +1,28 @@
++/*
++ * Berlin2 BG2Q clock tree IDs
++ */
++
++#define CLKID_SYS		0
++#define CLKID_DRMFIGO		1
++#define CLKID_CFG		2
++#define CLKID_GFX2D		3
++#define CLKID_ZSP		4
++#define CLKID_PERIF		5
++#define CLKID_PCUBE		6
++#define CLKID_VSCOPE		7
++#define CLKID_NFC_ECC		8
++#define CLKID_VPP		9
++#define CLKID_APP		10
++#define CLKID_GFX2DAXI		11
++#define CLKID_GETH0		12
++#define CLKID_SATA		13
++#define CLKID_AHBAPB		14
++#define CLKID_USB0		15
++#define CLKID_USB1		16
++#define CLKID_USB2		17
++#define CLKID_USB3		18
++#define CLKID_PBRIDGE		19
++#define CLKID_SDIO		20
++#define CLKID_NFC		21
++#define CLKID_SMEMC		22
++#define CLKID_PCIE		23
+-- 
+1.9.1
