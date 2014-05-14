@@ -1,34 +1,93 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 14 May 2014 09:31:49 -0500
-Subject: [PATCH v3 1/2] cpufreq / OPP: Allow boost frequency to be looked
- up from device tree
-In-Reply-To: <CAKohponG9PNse4cHkvfLfaRouW-jxjToBXUCHyOCgx8-Pc=2Xw@mail.gmail.com>
-References: <1400029380-5372-1-git-send-email-thomas.ab@samsung.com>	<1400029380-5372-2-git-send-email-thomas.ab@samsung.com>	<CAKohponnPSRAotJUu+5a9y8j97QF8Jqgc5DA5WQnwGWCnVY-aA@mail.gmail.com>	<CAGo_u6p-uqw82ewDciDEhAt0=Nswfw33-gf8Aa+-6_k3eCcTzw@mail.gmail.com>	<20140514080930.781e0557@amdc2363>
- <CAKohponG9PNse4cHkvfLfaRouW-jxjToBXUCHyOCgx8-Pc=2Xw@mail.gmail.com>
-Message-ID: <53737E55.9070704@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 14 May 2014 15:33:17 +0100
+Subject: [PATCH v3 17/19] arm64: KVM: move hcr_el2 setting into
+ vgic-v2-switch.S
+In-Reply-To: <20140509140723.GR3362@lvm> (Christoffer Dall's message of "Fri,
+ 9 May 2014 15:07:23 +0100")
+References: <1397655591-2761-1-git-send-email-marc.zyngier@arm.com>
+ <1397655591-2761-18-git-send-email-marc.zyngier@arm.com>
+ <20140509140723.GR3362@lvm>
+Message-ID: <87ha4sh1le.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2014 01:24 AM, Viresh Kumar wrote:
-> On 14 May 2014 11:39, Lukasz Majewski <l.majewski@samsung.com> wrote:
->> I agree with Nishanth here, that point 1 (as described by Viresh at
->> [*]) is a more scalable approach.
-> 
-> The only reason why I wanted all that to be done at OPP level was to
-> ensure if somebody else also needs it apart from cpufreq, they don't have
-> to duplicate code and find it.. As it is present at a central place..
-> 
-> But if no other code is going to look for that, it may just be fine as is..
-> 
-If we eventually have a need beyond cpufreq (say devfreq) with similar
-instances, then it makes sense to move it out to a generic place.
-Either way, code implementation/duplication is a OS problem - and
-should be looked at independent of the description in dts. If we feel
-the description is valid hardware description (which, personally, I
-do), then lets go to the next discussion point of where to put it -
-generic or cpufreq specific (here, I have no preference), and finally
-decide the implementation as necessary as a result of the description.
+On Fri, May 09 2014 at  3:07:23 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Wed, Apr 16, 2014 at 02:39:49PM +0100, Marc Zyngier wrote:
+>> GICv3 requires the hcr_el2 switch to be tightly coupled with some
+>> of the interrupt controller's register switch.
+>
+> can you be more specific, this feels a bit odd, enabling Stage-2
+> translation and configuring all traps from within the vgic code...
 
+The IMO and FMO bits must be set before restoring the various system
+registers in GICv3. But I agreee that this looks pretty horrible.
+
+The alternative is to split the bits we set in HCR_EL2 into two sets (VM
+and trap control on one side, interrupt control on the other). This
+would translate into two accesses to HCR_EL2, but it would look
+nicer. I'll have a look.
+
+>> In order to have similar code paths, start moving the hcr_el2
+>> manipulation code to the GICv2 switch code.
+>> 
+>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/hyp.S            | 7 -------
+>>  arch/arm64/kvm/vgic-v2-switch.S | 8 ++++++++
+>>  2 files changed, 8 insertions(+), 7 deletions(-)
+>> 
+>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+>> index aed72d0..92b9120 100644
+>> --- a/arch/arm64/kvm/hyp.S
+>> +++ b/arch/arm64/kvm/hyp.S
+>> @@ -335,11 +335,6 @@
+>>  .endm
+>>  
+>>  .macro activate_traps
+>> -	ldr	x2, [x0, #VCPU_IRQ_LINES]
+>> -	ldr	x1, [x0, #VCPU_HCR_EL2]
+>> -	orr	x2, x2, x1
+>> -	msr	hcr_el2, x2
+>> -
+>>  	ldr	x2, =(CPTR_EL2_TTA)
+>>  	msr	cptr_el2, x2
+>>  
+>> @@ -353,8 +348,6 @@
+>>  .endm
+>>  
+>>  .macro deactivate_traps
+>> -	mov	x2, #HCR_RW
+>> -	msr	hcr_el2, x2
+>>  	msr	cptr_el2, xzr
+>>  	msr	hstr_el2, xzr
+>>  
+>> diff --git a/arch/arm64/kvm/vgic-v2-switch.S b/arch/arm64/kvm/vgic-v2-switch.S
+>> index c5dc777..d36cd7a 100644
+>> --- a/arch/arm64/kvm/vgic-v2-switch.S
+>> +++ b/arch/arm64/kvm/vgic-v2-switch.S
+>> @@ -85,6 +85,9 @@ CPU_BE(	rev	w5, w5 )
+>>  	sub	w4, w4, #1
+>>  	cbnz	w4, 1b
+>>  2:
+>> +	mov	x2, #HCR_RW
+>> +	msr	hcr_el2, x2
+>> +	isb
+>>  .endm
+>>  
+>>  /*
+>> @@ -92,6 +95,11 @@ CPU_BE(	rev	w5, w5 )
+>>   * x0: Register pointing to VCPU struct
+>>   */
+>>  .macro restore_vgic_v2_state
+>> +	ldr	x2, [x0, #VCPU_IRQ_LINES]
+>
+> will this ever have any values on aarch64?  Don't we mandate vgic
+> support and bail out during hyp init if we cannot init a vgic?
+
+Yes. But that doesn't mean we don't support the feature either. The case
+is fairly slim, I agree, but it has been there since Day-1...
+
+	M.
 -- 
-Regards,
-Nishanth Menon
+Jazz is not dead. It just smells funny.
