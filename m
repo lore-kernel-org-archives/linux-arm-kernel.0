@@ -1,17 +1,24 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 14 May 2014 18:37:13 +0530
-Subject: [PATCH v4 0/8] cpufreq: use cpufreq-cpu0 driver for exynos based
- platforms
-In-Reply-To: <7170433.Ah6fefFrHR@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 14 May 2014 15:11:50 +0200
+Subject: [PATCH v4 7/8] ARM: Exynos: switch to using generic cpufreq-cpu0
+ driver
+In-Reply-To: <CAKohpom_zuQoJ9xABJ2nJGbrubR=_iuE7_EtY6b41mhuhEtMsg@mail.gmail.com>
 References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
- <7170433.Ah6fefFrHR@wuerfel>
-Message-ID: <CAKohponDr4YPvmYShL_OBychgUfFDDAnZxGuEoQpanPs62ABNw@mail.gmail.com>
+ <6835645.2kTGeWTa9p@wuerfel>
+ <CAKohpom_zuQoJ9xABJ2nJGbrubR=_iuE7_EtY6b41mhuhEtMsg@mail.gmail.com>
+Message-ID: <1480209.xTrtNKOy7N@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 May 2014 18:21, Arnd Bergmann <arnd@arndb.de> wrote:
-> Thanks a lot for your continued effort. Looks great overall, but I have one
-> comment about the general way the cpu0 cpufreq driver works, not specific
-> to the exynos implementation. See my reply to patch 4.
+Am Mittwoch, 14. Mai 2014, 18:35:29 schrieb Viresh Kumar:
+> On 14 May 2014 18:20, Arnd Bergmann <arnd@arndb.de> wrote:
+> > Could we please come up with a way to probe this from DT in the
+> > cpufreq-cpu0 driver itself, so we don't have to add a device in every
+> > platform using it?
+> Its followed that way because DT Maintainers had strong objections
+> to creating virtual device nodes and haven't allowed creation of nodes
+> for cpufreq drivers.. For which there is no physical device, as CPU already
+> has a separate node..
 
-I hope you meant 7 here instead of 4 ?
+as we already have the "enable-method" property for enabling/disabling cpus, 
+would something like a "scaling-method" be feasible?
