@@ -1,67 +1,33 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 13 May 2014 21:02:23 -0500
-Subject: [PATCH v3 2/2] Documentation: devicetree: Add boost-frequency
- binding to list boost mode frequency
-In-Reply-To: <1400029380-5372-3-git-send-email-thomas.ab@samsung.com>
-References: <1400029380-5372-1-git-send-email-thomas.ab@samsung.com>
- <1400029380-5372-3-git-send-email-thomas.ab@samsung.com>
-Message-ID: <CAGo_u6ozaKjzVQsJjzi5g13ysBT6UDwsgW3O1=K3RD4Y-ODtDA@mail.gmail.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Wed, 14 May 2014 11:09:13 +0900
+Subject: [PATCH v2] ARM: tegra: enable joystick in tegra_defconfig
+Message-ID: <1400033353-25673-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 8:03 PM, Thomas Abraham <ta.omasab@gmail.com> wrote:
-> From: Thomas Abraham <thomas.ab@samsung.com>
->
-> Add a new optional boost-frequency binding for specifying the frequencies
-> usable in boost mode.
->
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Lukasz Majewski <l.majewski@samsung.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  .../devicetree/bindings/cpufreq/cpufreq-boost.txt  |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
->
-> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
-> new file mode 100644
-> index 0000000..d925e38
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
-> @@ -0,0 +1,11 @@
-> +* Device tree binding for CPU boost frequency (aka over-clocking)
-> +
-> +Certain CPU's can be operated in optional 'boost' mode (or sometimes referred as
-> +overclocking) in which the CPU can operate in frequencies beyond the normal
+NVIDIA SHIELD embeds a USB joystick device. Enable the corresponding
+support in tegra_defconfig.
 
-"operate at"?
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+---
+Changes since v1:
+- Have support built-in instead of as a module
+- Fixed wording in commit message
 
-> +operating conditions.
+ arch/arm/configs/tegra_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-"normal operating conditions" probably need a little bit of an
-expansion here perhaps?
-
-> +
-> +Optional Properties:
-> +- boost-frequency: list of frequencies in KHz to be used only in boost mode.
-
-probably boost-frequencies?
-
-> +  This list should be a subset of frequencies listed in "operating-points"
-> +  property. Refer to Documentation/devicetree/bindings/power/opp.txt for
-> +  details about "operating-points" property.
-
-
-an example is expected here.
-
-personally, I think I understand the intent here, but as a hardware
-description, will let folks comment if it is acceptable.
-
---
-Regards,
-Nishanth Menon
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index 8c1625b78034..1faa68f8988b 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -114,6 +114,7 @@ CONFIG_USB_NET_SMSC95XX=y
+ CONFIG_BRCMFMAC=m
+ CONFIG_RT2X00=y
+ CONFIG_RT2800USB=m
++CONFIG_INPUT_JOYDEV=y
+ CONFIG_INPUT_EVDEV=y
+ CONFIG_KEYBOARD_GPIO=y
+ CONFIG_KEYBOARD_TEGRA=y
+-- 
+1.9.2
