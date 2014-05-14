@@ -1,47 +1,123 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 13 May 2014 23:34:16 -0400 (EDT)
-Subject: [PATCH v6 5/5] arm: exynos: Add MCPM call-back functions
-In-Reply-To: <CANuQgHFPUhcB+GmjqixajMPguDCuiWzHNZ00RUQSg6YaJdnz_A@mail.gmail.com>
-References: <1399982324-27879-1-git-send-email-a.kesavan@samsung.com>
- <1399982324-27879-6-git-send-email-a.kesavan@samsung.com>
- <20140513164845.GA10210@red-moon>
- <CAM4voamY+nM3eoJWfR=0VBDtbf6wan-2awRaALN=ym9gGC_DYg@mail.gmail.com>
- <CANuQgHES4O=mWjVVY5=6KwSee-TzL8HdTFhfr-VGu=d9GS-ZWQ@mail.gmail.com>
- <alpine.LFD.2.11.1405132301360.980@knanqh.ubzr>
- <CANuQgHFPUhcB+GmjqixajMPguDCuiWzHNZ00RUQSg6YaJdnz_A@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1405132328030.980@knanqh.ubzr>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 14 May 2014 09:10:10 +0530
+Subject: [PATCH v3 1/2] cpufreq / OPP: Allow boost frequency to be looked
+ up from device tree
+In-Reply-To: <1400029380-5372-2-git-send-email-thomas.ab@samsung.com>
+References: <1400029380-5372-1-git-send-email-thomas.ab@samsung.com>
+ <1400029380-5372-2-git-send-email-thomas.ab@samsung.com>
+Message-ID: <CAKohponnPSRAotJUu+5a9y8j97QF8Jqgc5DA5WQnwGWCnVY-aA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 May 2014, Chander Kashyap wrote:
-> On 14 May 2014 08:32, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Wed, 14 May 2014, Chander Kashyap wrote:
-> >> On 14 May 2014 08:14, Abhilash Kesavan <kesavan.abhilash@gmail.com> wrote:
-> >> > On Tue, May 13, 2014 at 10:18 PM, Lorenzo Pieralisi
-> >> > <lorenzo.pieralisi@arm.com> wrote:
-> >> >> On Tue, May 13, 2014 at 12:58:44PM +0100, Abhilash Kesavan wrote:
-> >> >>
-> >> >>> +       /*
-> >> >>> +        * Future entries into the kernel can now go
-> >> >>> +        * through the cluster entry vectors.
-> >> >>> +        */
-> >> >>> +       __raw_writel(virt_to_phys(mcpm_entry_point),
-> >> >>> +                       ns_sram_base_addr + MCPM_BOOT_ADDR_OFFSET);
-> >> >>> +
-> >> >>
-> >> >> ns_sram_base_addr must be unmapped, since it is unused after the write.
-> >> > Will unmap.
-> >>
-> >> This mapping is required in for cpuilde (suspend) to program
-> >> mcpm_entry before going to suspend.
-> >
-> > Why?
-> 
-> This is required to program the mcpm_entry point address (resume
-> address) after cpuidle exit/fail.
+On 14 May 2014 06:32, Thomas Abraham <ta.omasab@gmail.com> wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
+>
+> Commit 6f19efc0 ("cpufreq: Add boost frequency support in core") adds
+> support for CPU boost mode. This patch adds support for finding available
+> boost frequencies from device tree and marking them as usable in boost mode.
+>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Lukasz Majewski <l.majewski@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> ---
+>  drivers/cpufreq/cpufreq_opp.c |   39 +++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 39 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/cpufreq/cpufreq_opp.c b/drivers/cpufreq/cpufreq_opp.c
+> index c0c6f4a..e3c97f3 100644
+> --- a/drivers/cpufreq/cpufreq_opp.c
+> +++ b/drivers/cpufreq/cpufreq_opp.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/pm_opp.h>
+>  #include <linux/rcupdate.h>
+>  #include <linux/slab.h>
+> +#include <linux/of.h>
+>
+>  /**
+>   * dev_pm_opp_init_cpufreq_table() - create a cpufreq table for a device
+> @@ -51,6 +52,10 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+>         struct cpufreq_frequency_table *freq_table = NULL;
+>         int i, max_opps, ret = 0;
+>         unsigned long rate;
+> +#ifdef CONFIG_CPU_FREQ_BOOST_SW
+> +       int j, len;
+> +       u32 *boost_freqs = NULL;
+> +#endif
+>
+>         rcu_read_lock();
+>
+> @@ -82,6 +87,40 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+>
+>         *table = &freq_table[0];
+>
+> +#ifdef CONFIG_CPU_FREQ_BOOST_SW
+> +       if (of_find_property(dev->of_node, "boost-frequency", &len)) {
 
-You should be using mcpm_set_entry_vector() for that.  Once 
-mcpm_entry_point is set, it shouldn't need to be changed.
+Does this mean another block inside the cpu node ? Like this: ?
 
+cpu at 0 {
+        compatible = "arm,cortex-a9";
+        reg = <0>;
+        next-level-cache = <&L2>;
+        operating-points = <
+                /* kHz    uV */
+                792000  1100000
+                396000  950000
+                198000  850000
+        >;
+        boost-frequency = <
+                792000
+                198000
+        >;
+};
 
-Nicolas
+I think it we might better add another field in the opp block as these
+OPPs are rather boost one..
+
+@Rob/Rafael: Opinion please ..
+
+> +               if (len == 0 || (len & (sizeof(u32) - 1)) != 0) {
+> +                       dev_err(dev, "%s: invalid boost frequency\n", __func__);
+> +                       ret = -EINVAL;
+> +                       goto out;
+> +               }
+> +
+> +               boost_freqs = kzalloc(len, GFP_KERNEL);
+> +               if (!boost_freqs) {
+> +                       dev_warn(dev, "%s: no memory for boost freq table\n",
+> +                                       __func__);
+> +                       ret = -ENOMEM;
+> +                       goto out;
+> +               }
+> +               of_property_read_u32_array(dev->of_node, "boost-frequency",
+> +                       boost_freqs, len / sizeof(u32));
+> +       }
+> +
+> +       for (j = 0; j < len / sizeof(u32) && boost_freqs; j++) {
+
+Why is this present outside of above if {} ? as boost_freqs is guaranteed to
+be NULL without that.
+
+> +               for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++) {
+> +                       if (boost_freqs[j] == freq_table[i].frequency) {
+
+Use cpufreq_frequency_table_get_index() instead.
+
+> +                               freq_table[i].flags |= CPUFREQ_BOOST_FREQ;
+> +                               break;
+> +                       }
+> +               }
+> +               if (freq_table[i].frequency == CPUFREQ_TABLE_END)
+> +                       pr_err("%s: invalid boost frequency %d\n",
+> +                               __func__, boost_freqs[j]);
+> +       }
+> +
+> +       kfree(boost_freqs);
+> +#endif
+> +
+>  out:
+>         rcu_read_unlock();
+>         if (ret)
+> --
+> 1.7.4.4
+>
