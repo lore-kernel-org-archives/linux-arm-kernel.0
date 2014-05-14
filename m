@@ -1,109 +1,61 @@
-From: bay@hackerdom.ru (Alexander Bersenev)
-Date: Thu, 15 May 2014 03:56:42 +0600
-Subject: [PATCH v7 3/3] ARM: sunxi: Add IR controller support in DT on A20
-In-Reply-To: <1400104602-16431-1-git-send-email-bay@hackerdom.ru>
-References: <1400104602-16431-1-git-send-email-bay@hackerdom.ru>
-Message-ID: <1400104602-16431-4-git-send-email-bay@hackerdom.ru>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 14 May 2014 15:07:44 -0700
+Subject: [GIT PULL 1/4] Samsung clock Exynos5260 support for v3.16
+In-Reply-To: <5373CFFE.1000209@gmail.com>
+References: <1400090591-5064-1-git-send-email-t.figa@samsung.com>
+ <5373CB1A.1040801@samsung.com> <20140514201313.19795.35617@quantum>
+ <5373CFFE.1000209@gmail.com>
+Message-ID: <20140514220744.19795.64527@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds IR controller in A20 Device-Tree:
-- Two IR devices found in A20 user manual
-- Pins for two devices
-- One IR device physically found on Cubieboard 2
-- One IR device physically found on Cubietruck
+Quoting Tomasz Figa (2014-05-14 13:20:14)
+> Hi Mike,
+> 
+> On 14.05.2014 22:13, Mike Turquette wrote:
+> > Quoting Kukjin Kim (2014-05-14 12:59:22)
+> >> On 05/15/14 03:03, Tomasz Figa wrote:
+> >>
+> >> Hi Mike,
+> >>
+> >> I've talked to Tomasz about current samsung related clock stuff. Since 
+> >> they are mostly having dependency on samsung tree now not clock core 
+> >> stuff, so would be better if it could be sent to upstream via samsung 
+> >> tree. And as you know, updating arch/arm/ and clock stuff are usually 
+> >> required for adding new SoC or supporting CCF newly...
+> > 
+> > The Samsung clk pull requests only touch two arch/arm Kconfig files and
+> > one dtsi file. That's not a lot of arch/arm churn. Is there a strong
+> > reason that this needs to go through the samsung/arm-soc trees?
+> > Otherwise it should continue to go through the clk tree.
+> 
+> Obviously they are patches for Samsung clock drivers. ;)
+> 
+> The issue here is that there is a number of patches already merged in
+> Samsung tree on which the patches discussed here depend.
 
-Signed-off-by: Alexander Bersenev <bay@hackerdom.ru>
-Signed-off-by: Alexsey Shestacov <wingrime@linux-sunxi.org>
----
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts |  6 ++++++
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts  |  6 ++++++
- arch/arm/boot/dts/sun7i-a20.dtsi            | 32 +++++++++++++++++++++++++++++
- 3 files changed, 44 insertions(+)
+OK, I think I misread the original email. I thought you were asking for
+future pull requests to go through the samsung tree, but you only mean
+the ones in this thread. No problem there.
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-index feeff64..b44d61b 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-@@ -65,6 +65,12 @@
- 			};
- 		};
- 
-+		ir0: ir at 01c21800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&ir0_pins_a>;
-+			status = "okay";
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index e288562..5f5c31d 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -121,6 +121,12 @@
- 			};
- 		};
- 
-+		ir0: ir at 01c21800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&ir0_pins_a>;
-+			status = "okay";
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 0ae2b77..fe1f8ff 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -724,6 +724,20 @@
- 				allwinner,drive = <2>;
- 				allwinner,pull = <0>;
- 			};
-+
-+			ir0_pins_a: ir0 at 0 {
-+				    allwinner,pins = "PB3","PB4";
-+				    allwinner,function = "ir0";
-+				    allwinner,drive = <0>;
-+				    allwinner,pull = <0>;
-+			};
-+
-+			ir1_pins_a: ir1 at 0 {
-+				    allwinner,pins = "PB22","PB23";
-+				    allwinner,function = "ir1";
-+				    allwinner,drive = <0>;
-+				    allwinner,pull = <0>;
-+			};
- 		};
- 
- 		timer at 01c20c00 {
-@@ -749,6 +763,24 @@
- 			interrupts = <0 24 4>;
- 		};
- 
-+		ir0: ir at 01c21800 {
-+			compatible = "allwinner,sun7i-a20-ir";
-+			clocks = <&apb0_gates 6>, <&ir0_clk>;
-+			clock-names = "apb", "ir";
-+			interrupts = <0 5 4>;
-+			reg = <0x01c21800 0x40>;
-+			status = "disabled";
-+		};
-+
-+		ir1: ir at 01c21c00 {
-+			compatible = "allwinner,sun7i-a20-ir";
-+			clocks = <&apb0_gates 7>, <&ir1_clk>;
-+			clock-names = "apb", "ir";
-+			interrupts = <0 6 4>;
-+			reg = <0x01c21c00 0x40>;
-+			status = "disabled";
-+		};
-+
- 		lradc: lradc at 01c22800 {
- 			compatible = "allwinner,sun4i-lradc-keys";
- 			reg = <0x01c22800 0x100>;
--- 
-1.9.3
+Acked-by: Mike Turquette <mturquette@linaro.org>
+
+Regards,
+Mike
+
+> 
+> > 
+> >>
+> >> How do you think? Basically I need your agreement for it.
+> > 
+> > Based on the above pull requests I do not see the need for changing how
+> > code gets merged.
+> 
+> As long as there are no dependencies on arch code and series being
+> applied do not touch arch code, this is perfectly fine. Unfortunately
+> this is rarely the case, at least for Samsung platforms and at least for
+> now. After we finish with arch clean-up and move all code to appropriate
+> subsystems, it should become easier, though.
+> 
+> Best regards,
+> Tomasz
