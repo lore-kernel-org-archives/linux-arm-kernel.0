@@ -1,96 +1,105 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 14 May 2014 21:41:11 +0200
-Subject: [PATCH v4 1/5] ARM: dts: enable hdmi for exynos5250 based snow
- board
-In-Reply-To: <1400035562-16832-2-git-send-email-rahul.sharma@samsung.com>
-References: <1400035562-16832-1-git-send-email-rahul.sharma@samsung.com>
- <1400035562-16832-2-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <5373C6D7.8010802@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 14 May 2014 21:44:14 +0200
+Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
+In-Reply-To: <1399991966-14582-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1399991966-14582-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <5373C78E.7040301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
-
-On 14.05.2014 04:45, Rahul Sharma wrote:
-> From: Rahul Sharma <Rahul.Sharma@samsung.com>
-> 
-> Enable support for HDMI for exynos5250 based Snow board.
-> 
-> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
+On 05/13/2014 04:39 PM, Santosh Shilimkar wrote:
+> On OMAP4 panda board, there have been several bug reports about boot
+> hang and lock-ups with CPU_IDLE enabled. The root cause of the issue
+> is missing interrupts while in idle state. Commit cb7094e8 {cpuidle / omap4 :
+> use CPUIDLE_FLAG_TIMER_STOP flag} moved the broadcast notifiers to common
+> code for right reasons but on OMAP4 which suffers from a nasty ROM code
+> bug with GIC, commit ff999b8a {ARM: OMAP4460: Workaround for ROM bug ..},
+> we loose interrupts which leads to issues like lock-up, hangs etc.
+>
+> Patch reverts commit cb7094 {cpuidle / omap4 : use CPUIDLE_FLAG_TIMER_STOP
+> flag} to avoid the issue. With this change, OMAP4 panda boards, the mentioned
+> issues are getting fixed. We no longer loose interrupts which was the cause
+> of the regression.
+>
+> Cc: Roger Quadros <rogerq@ti.com>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Reported-tested-by: Roger Quadros <rogerq@ti.com>
+> Reported-tested-by: Kevin Hilman <khilman@linaro.org>
+> Tested-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > ---
->  arch/arm/boot/dts/exynos5250-cros-common.dtsi |    6 +++++-
->  arch/arm/boot/dts/exynos5250-pinctrl.dtsi     |    7 +++++++
->  arch/arm/boot/dts/exynos5250-snow.dts         |    7 +++++++
->  3 files changed, 19 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250-cros-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
-> index 2c1560d..89ac90f 100644
-> --- a/arch/arm/boot/dts/exynos5250-cros-common.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
-> @@ -240,7 +240,7 @@
->  		samsung,i2c-sda-delay = <100>;
->  		samsung,i2c-max-bus-freq = <378000>;
->  
-> -		hdmiphy at 38 {
-> +		hdmiphy: hdmiphy at 38 {
->  			compatible = "samsung,exynos4212-hdmiphy";
->  			reg = <0x38>;
->  		};
-> @@ -304,6 +304,10 @@
->  
->  	hdmi {
->  		hpd-gpio = <&gpx3 7 0>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&hdmi_hpd_irq>;
-> +		phy = <&hdmiphy>;
-> +		ddc = <&i2c_2>;
->  	};
->  
->  	gpio-keys {
-> diff --git a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-> index 9a49e68..da3ae66 100644
-> --- a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-> @@ -560,6 +560,13 @@
->  			samsung,pin-pud = <0>;
->  			samsung,pin-drv = <0>;
->  		};
+>   arch/arm/mach-omap2/cpuidle44xx.c |   12 ++++++++----
+>   1 file changed, 8 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+> index 01fc710..3e169d9 100644
+> --- a/arch/arm/mach-omap2/cpuidle44xx.c
+> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
+> @@ -14,6 +14,7 @@
+>   #include <linux/cpuidle.h>
+>   #include <linux/cpu_pm.h>
+>   #include <linux/export.h>
+> +#include <linux/clockchips.h>
+>
+>   #include <asm/cpuidle.h>
+>   #include <asm/proc-fns.h>
+> @@ -83,6 +84,7 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+>   {
+>   	struct idle_statedata *cx = state_ptr + index;
+>   	u32 mpuss_can_lose_context = 0;
+> +	int cpu_id = smp_processor_id();
+>
+>   	/*
+>   	 * CPU0 has to wait and stay ON until CPU1 is OFF state.
+> @@ -110,6 +112,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+>   	mpuss_can_lose_context = (cx->mpu_state == PWRDM_POWER_RET) &&
+>   				 (cx->mpu_logic_state == PWRDM_POWER_OFF);
+>
+> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
 > +
-> +		hdmi_hpd_irq: hdmi-hpd-irq {
-> +			samsung,pins = "gpx3-7";
-> +			samsung,pin-function = <0>;
-> +			samsung,pin-pud = <1>;
-> +			samsung,pin-drv = <0>;
-> +		};
-
-Based on the fact that this is just being configured as input, I don't
-think this is a generic special function, but rather a board-specific
-GPIO, which should be defined in dts of respective board.
-
->  	};
->  
->  	pinctrl at 13400000 {
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-> index 1ce1088..696850a 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -206,4 +206,11 @@
->  			clock-frequency = <24000000>;
->  		};
->  	};
+>   	/*
+>   	 * Call idle CPU PM enter notifier chain so that
+>   	 * VFP and per CPU interrupt context is saved.
+> @@ -165,6 +169,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+>   	if (dev->cpu == 0 && mpuss_can_lose_context)
+>   		cpu_cluster_pm_exit();
+>
+> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
 > +
-> +	hdmi {
-> +		hdmi-en-supply = <&tps65090_fet7>;
-> +		vdd-supply = <&ldo8_reg>;
-> +		vdd_osc-supply = <&ldo10_reg>;
-> +		vdd_pll-supply = <&ldo8_reg>;
+>   fail:
+>   	cpuidle_coupled_parallel_barrier(dev, &abort_barrier);
+>   	cpu_done[dev->cpu] = false;
+> @@ -189,8 +195,7 @@ static struct cpuidle_driver omap4_idle_driver = {
+>   			/* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR */
+>   			.exit_latency = 328 + 440,
+>   			.target_residency = 960,
+> -			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED |
+> -			         CPUIDLE_FLAG_TIMER_STOP,
+> +			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
+>   			.enter = omap_enter_idle_coupled,
+>   			.name = "C2",
+>   			.desc = "CPUx OFF, MPUSS CSWR",
+> @@ -199,8 +204,7 @@ static struct cpuidle_driver omap4_idle_driver = {
+>   			/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
+>   			.exit_latency = 460 + 518,
+>   			.target_residency = 1100,
+> -			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED |
+> -			         CPUIDLE_FLAG_TIMER_STOP,
+> +			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
+>   			.enter = omap_enter_idle_coupled,
+>   			.name = "C3",
+>   			.desc = "CPUx OFF, MPUSS OSWR",
 
-Hmm, those regulators don't seem to be listed in
-Documentation/devicetree/bindings/video/exynos_hdmi.txt, at least in
-today's linux-next. The driver seems to use them, though.
+Shouldn't the broadcast timer to be setup with 
+CLOCK_EVT_NOTIFY_BROADCAST_ON also ?
 
-This isn't a problem with this patch, but if you're working on this,
-could you also fix the documentation in separate patch?
 
-Best regards,
-Tomasz
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
