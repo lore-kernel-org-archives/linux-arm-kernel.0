@@ -1,64 +1,76 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 May 2014 14:50:35 -0700
-Subject: [RFC PATCH] ARM: dts: am33xx: Re-arrange the USB dt to reflect
- the h/w configuration
-In-Reply-To: <1399617068-19826-1-git-send-email-george.cherian@ti.com>
-References: <1399617068-19826-1-git-send-email-george.cherian@ti.com>
-Message-ID: <20140514215034.GL27426@atomide.com>
+From: bay@hackerdom.ru (Alexander Bersenev)
+Date: Thu, 15 May 2014 03:56:39 +0600
+Subject: [PATCH v7 0/3] ARM: sunxi: Add support for consumer infrared devices
+Message-ID: <1400104602-16431-1-git-send-email-bay@hackerdom.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* George Cherian <george.cherian@ti.com> [140508 23:34]:
-> Re arrange the USB dt for AM33xx to take it a bit closer
-> to the hardware configuration.
-> 
-> The USBSS is designed as follows
-> 
-> USB control Module	0x44e10_0620
-> 
-> USBSS			0x4740_0000
-> 
-> USB0			0x4740_1000
-> USB0_PHY		0x4740_1300
-> USB0_CORE		0x4740_1400
-> 
-> USB1			0x4740_1800
-> USB1_PHY		0x4740_1b00
-> USB1_CORE		0x4740_1c00
-> 
-> CPPI DMA Controller	0x4740_2000
-> CPPI DMA Scheduler	0x4740_3000
-> Queue Manager		0x4740_4000
-> 
-> So model the DT as follows
-> USBSS {
->     usb_ctrl_mod: {
->         0x44e10_0620
->     }
->     usb0: {
->     0x4740_1000
->     0x4740_1400
->     }
->     usb0_phy:{
->     0x4740_1300
->     }
->     usb1:{
->     0x4740_1800
->     0x4740_1c00
->     }
->     usb1_phy: {
->     0x4740_1b00
->     }
->     cppi41dma: {
->     0x4740_2000
->     0x4740_3000
->     0x4740_4000
->     }
-> }
+This patch introduces Consumer IR(CIR) support for sunxi boards.
 
-Is this just a cosmetic change or is this trying to workaround
-some edma related init order issue?
+This is based on Alexsey Shestacov's work based on the original driver 
+supplied by Allwinner.
 
-Regards,
+Signed-off-by: Alexander Bersenev <bay@hackerdom.ru>
+Signed-off-by: Alexsey Shestacov <wingrime@linux-sunxi.org>
 
-Tony
+---
+Changes since version 1: 
+ - Fix timer memory leaks 
+ - Fix race condition when driver unloads while interrupt handler is active
+ - Support Cubieboard 2(need testing)
+
+Changes since version 2:
+- More reliable keydown events
+- Documentation fixes
+- Rename registers accurding to A20 user manual
+- Remove some includes, order includes alphabetically
+- Use BIT macro
+- Typo fixes
+
+Changes since version 3:
+- Split the patch on smaller parts
+- More documentation fixes
+- Add clock-names in DT
+- Use devm_clk_get function to get the clocks
+- Removed gpios property from ir's DT
+- Changed compatible from allwinner,sunxi-ir to allwinner,sun7i-a20-ir in DT
+- Use spin_lock_irq instead spin_lock_irqsave in interrupt handler
+- Add myself in the copyright ;)
+- Coding style and indentation fixes
+
+Changes since version 4:
+- Try to fix indentation errors by sending patches with git send-mail
+
+Changes since version 5:
+- More indentation fixes
+- Make patches pass checkpatch with --strict option
+- Replaced magic numbers with defines(patch by Priit Laes)
+- Fixed oops on loading(patch by Hans de Goede)
+
+Changes since version 6:
+- Removed constants from code
+- Better errrors handling on loading
+- Renamed sunxi-ir.c to sunxi-cir.c
+- Changed description of second commit
+- Order entries in dts and dtsi by register address
+- Code style fixes
+
+
+Alexander Bersenev (3):
+  ARM: sunxi: Add documentation for sunxi consumer infrared devices
+  [media] rc: add sunxi-ir driver
+  ARM: sunxi: Add IR controller support in DT on A20
+
+ .../devicetree/bindings/media/sunxi-ir.txt         |  23 ++
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        |   6 +
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |   6 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |  32 ++
+ drivers/media/rc/Kconfig                           |  10 +
+ drivers/media/rc/Makefile                          |   1 +
+ drivers/media/rc/sunxi-cir.c                       | 334 +++++++++++++++++++++
+ 7 files changed, 412 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/sunxi-ir.txt
+ create mode 100644 drivers/media/rc/sunxi-cir.c
+
+-- 
+1.9.3
