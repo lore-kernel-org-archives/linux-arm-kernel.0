@@ -1,63 +1,150 @@
-From: anders.berg@avagotech.com (Anders Berg)
-Date: Thu, 15 May 2014 00:22:16 +0200
-Subject: [PATCH v3 2/6] clk: Add clock driver for AXM55xx SoC
-In-Reply-To: <20140514200845.19795.80794@quantum>
-References: <cover.1400072260.git.anders.berg@avagotech.com>
- <a83c5e1272d7a3242701504f238789592c2ec80f.1400072260.git.anders.berg@avagotech.com>
- <20140514200845.19795.80794@quantum>
-Message-ID: <CAE0=X_3WA5ZzEE1NespeScmnMkr9oxNMc1=+X86i5NpSffiUnA@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 14 May 2014 15:32:30 -0700
+Subject: [PATCH 2/8] clk: berlin: add clock binding docs for Marvell
+ Berlin2 SoCs
+In-Reply-To: <1399839881-29895-3-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1399839881-29895-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140514223230.19795.63328@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 14, 2014 at 10:08 PM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Anders Berg (2014-05-14 11:37:57)
->> +Example:
->> +
->> +       clk_ref0: clk_ref0 {
->> +               compatible = "fixed-clock";
->> +               #clock-cells = <0>;
->> +               clock-frequency = <125000000>;
->> +       };
->
-> Hi Anders,
->
-> The driver looks good. As for the DT binding, I am starting to request
-> that bindings for new hardware move away from the one-clock-per-node
-> method. I am not forcing anyone with stable bindings to migrate that
-> way, but it tends to make maintenance easier in the long run (e.g.
-> setting per-clock flags, etc).
->
-> Your clk_ref0 example looks good, assuming that it is an off-chip clock
-> that feeds into the rest of the clock generator.
->
->> +
->> +       clk_cpu_pll: clk_cpu_pll at 2010022000 {
->> +               compatible = "lsi,axxia-pll-clock";
->> +               #clock-cells = <0>;
->> +               clocks = <&clk_ref0>;
->> +               clock-output-names = "clk_cpu_pll";
->> +               reg = <0x20 0x10022000 0 0x2c>;
->> +       };
->
-> I assume the rest of your clocks are part of a clock generator IP block
-> inside of your chip. Have you looked at the QCOM binding? It is my
-> favorite binding these days. Here are some highlights:
->
-[...]
->
-> Using this type of binding you only need to declare your clock generator
-> IP node in dts, and then define a mapping in the DT include chroot. Then
-> you can define your per-clock data inside of your clock driver instead
-> of putting all of the details inside of DT.
->
-> If you have a strong reason to do it the way that you originally posted
-> then let me know.
->
+Quoting Sebastian Hesselbarth (2014-05-11 13:24:35)
+> This adds mandatory device tree binding documentation for the clock related
+> IP found on Marvell Berlin2 (BG2, BG2CD, and BG2Q) SoCs.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Randy Dunlap <rdunlap@infradead.org>
+> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Cc: Antoine Tenart <antoine.tenart@free-electrons.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-doc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  .../devicetree/bindings/clock/berlin2-clock.txt    | 169 +++++++++++++++++++++
+>  1 file changed, 169 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/berlin2-clock.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/berlin2-clock.txt b/Documentation/devicetree/bindings/clock/berlin2-clock.txt
+> new file mode 100644
+> index 000000000000..3da87a488402
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/berlin2-clock.txt
+> @@ -0,0 +1,169 @@
+> +* Marvell Berlin2 clock bindings
+> +
+> +Marvell Berlin2 (BG2, BG2CD, BG2Q) share the same IP for PLLs and clocks,
+> +with some minor differences in features and register layout. The below
+> +describes the individual clock related IP:
+> +
+> +* Audio/Video PLL
+> +
+> +The Audio/Video PLL (AVPLL) is a dual-VCO PLL with 8 channels each. Each
+> +of the VCOs can sythesize a single VCO frequency based on a single input
+> +reference clock. Each of the 8 channels then, can derive an output clock
+> +from that VCO frequency by various dividers/multipliers.
+> +
+> +Required properties:
+> +- compatible: shall be "marvell,berlin2-avpll"
+> +- reg: address and length of the corresponding AVPLL registers
+> +- #clock-cells: shall be set to 2
+> +- clocks: single clock specifier referencing the AVPLL input clock
+> +
+> +To ease match-up with the desired AVPLL output clock, clock specifiers
+> +referencing AVPLL clocks shall contain two cells. The first refers to
+> +the VCO (0=AVPLL_A, 1=AVPLL_B) while the second refers to the corresponding
+> +channel starting with 1. For example, to reference AVPLL_B3 the clock
+> +specifier shall be: <&avpll 1 3>.
+> +
+> +Example:
+> +
+> +avpll: pll at ea0040 {
+> +       compatible = "marvell,berlin2-avpll";
+> +       #clock-cells = <2>;
+> +       reg = <0xea0050 0x100>;
+> +       clocks = <&refclk>;
+> +};
 
-No strong reason... I just happened to pick the keystone-clocks.dtsi
-as an example when I wrote this. But I can rework this according to
-your suggestions. I'll post it as a separate patch (thus dropping the
-clk patch from this series). Ok?
+Hi Sebastian,
 
-Thanks,
-Anders
+Thanks for submitting the series. It looks good. I do have some comments
+about the DT bindings though. I'm encouraging new bindings (and
+especially new platforms or existing platforms that are only now
+converting over to CCF) to not put their per-clock data into DTS. This
+has scalability problems, is unpopular with the DT crowd and sometimes
+makes it hard to do things like set CLK_SET_RATE_PARENT flags for
+individual clocks.
+
+The following is a copy/paste from an email I sent earlier today[1]. Of
+course per-clock data makes great sense if you have an off-SoC clock
+such as a fixed-rate oscillator (e.g. the fixed-clock binding). Let me
+know what you think:
+
+I assume the rest of your clocks are part of a clock generator IP block
+inside of your chip. Have you looked at the QCOM binding? It is my
+favorite binding these days. Here are some highlights:
+
+See Documentation/devicetree/bindings/clock/qcom,gcc.txt.
+
+
+
+>From arch/arm/boot/dts/qcom-msm8974.dtsi:
+
+gcc: clock-controller at fc400000 {
+        compatible = "qcom,gcc-msm8974";
+        #clock-cells = <1>;
+        #reset-cells = <1>;
+        reg = <0xfc400000 0x4000>;
+};
+
+...
+
+serial at f991e000 {
+        compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
+        reg = <0xf991e000 0x1000>;
+        interrupts = <0 108 0x0>;
+        clocks = <&gcc GCC_BLSP1_UART2_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
+        clock-names = "core", "iface";
+};
+
+
+
+>From drivers/clk/qcom/gcc-msm8974.c:
+
+static struct clk_branch gcc_blsp1_uart2_apps_clk = {
+        .halt_reg = 0x0704,
+        .clkr = {
+                .enable_reg = 0x0704,
+                .enable_mask = BIT(0),
+                .hw.init = &(struct clk_init_data){
+                        .name = "gcc_blsp1_uart2_apps_clk",
+                        .parent_names = (const char *[]){
+                                "blsp1_uart2_apps_clk_src",
+                        },
+                        .num_parents = 1,
+                        .flags = CLK_SET_RATE_PARENT,
+                        .ops = &clk_branch2_ops,
+                },
+        },
+};
+
+Using this type of binding you only need to declare your clock generator
+IP node in dts, and then define a mapping in the DT include chroot. Then
+you can define your per-clock data inside of your clock driver instead
+of putting all of the details inside of DT.
+
+If you have a strong reason to do it the way that you originally posted
+then let me know.
+
+Regards,
+Mike
+
+[1] https://lkml.org/lkml/2014/5/14/598
