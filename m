@@ -1,54 +1,56 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 14 May 2014 17:50:35 +0200
-Subject: [RFC PATCHv1 1/7] ARM: extend machine_desc with additional flags
+Date: Wed, 14 May 2014 17:50:38 +0200
+Subject: [RFC PATCHv1 4/7] ARM: kernel: allow the SCU to be enabled even on
+ !SMP
 In-Reply-To: <1400082641-23871-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1400082641-23871-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1400082641-23871-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1400082641-23871-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Processors implementing hardware I/O coherency rely on certain
-SMP-related features to be enabled even on UP configurations: the
-write allocate cache policy or the shareable attribute. These
-decisions are made very early by the ARM core code, in
-build_mem_type_table(), even before the machine specific
-->init_early() function has been called.
-
-In order to allow these machines to tell the ARM core code about these
-specificities, while still preserving multiplatform support, this
-commit extends the machine_desc structure with an additional 'flags'
-field, and defines two flags: one that allows the machine to tell the
-ARM core code that the cache policy should be write allocate, and
-another that tells the ARM core code that the shareable attribute
-should be set on page tables.
+Certain non-SMP platforms rely on the SCU being enabled to provide
+hardware I/O coherency between DMA masters and the CPU. Therefore, the
+scu_enable() hook should not be reduced to a no-op when CONFIG_SMP is
+disabled.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/include/asm/mach/arch.h | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/include/asm/smp_scu.h | 2 +-
+ arch/arm/kernel/smp_scu.c      | 2 --
+ 2 files changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index 17a3fa2..f2a9b39 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -25,6 +25,10 @@ struct smp_operations;
- #define smp_init_ops(ops) (bool (*)(void))NULL
+diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
+index 0393fba..e78f72d 100644
+--- a/arch/arm/include/asm/smp_scu.h
++++ b/arch/arm/include/asm/smp_scu.h
+@@ -37,7 +37,7 @@ static inline int scu_power_mode(void __iomem *scu_base, unsigned int mode)
+ }
  #endif
  
-+/* Possible flags in struct machine_desc */
-+#define MACHINE_NEEDS_CPOLICY_WRITEALLOC BIT(0)
-+#define MACHINE_NEEDS_SHAREABLE_PAGES    BIT(1)
-+
- struct machine_desc {
- 	unsigned int		nr;		/* architecture number	*/
- 	const char		*name;		/* architecture name	*/
-@@ -46,6 +50,7 @@ struct machine_desc {
- 	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
- 	enum reboot_mode	reboot_mode;	/* default restart mode	*/
- 	struct smp_operations	*smp;		/* SMP operations	*/
-+	unsigned long		flags;
- 	bool			(*smp_init)(void);
- 	void			(*fixup)(struct tag *, char **,
- 					 struct meminfo *);
+-#if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
++#if defined(CONFIG_HAVE_ARM_SCU)
+ void scu_enable(void __iomem *scu_base);
+ #else
+ static inline void scu_enable(void __iomem *scu_base) {}
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 1aafa0d..09d21b0 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -22,7 +22,6 @@
+ #define SCU_INVALIDATE		0x0c
+ #define SCU_FPGA_REVISION	0x10
+ 
+-#ifdef CONFIG_SMP
+ /*
+  * Get the number of CPU cores from the SCU configuration
+  */
+@@ -62,7 +61,6 @@ void scu_enable(void __iomem *scu_base)
+ 	 */
+ 	flush_cache_all();
+ }
+-#endif
+ 
+ /*
+  * Set the executing CPUs power mode as defined.  This will be in
 -- 
 1.9.3
