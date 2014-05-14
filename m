@@ -1,41 +1,48 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 14 May 2014 10:24:25 +0200
-Subject: [PATCH] [RESEND] ARM: remove last use of CONFIG_CPU_ARM710
-In-Reply-To: <1364507176.1345.45.camel@x61.thuisdomein>
-References: <1364507176.1345.45.camel@x61.thuisdomein>
-Message-ID: <1400055865.31197.4.camel@x220>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed, 14 May 2014 09:34:16 +0100
+Subject: [RFC PATCH V5 4/6] arm: mm: Enable RCU fast_gup
+In-Reply-To: <53723ACC.7020500@codeaurora.org>
+References: <1399390209-1756-1-git-send-email-steve.capper@linaro.org>
+ <1399390209-1756-5-git-send-email-steve.capper@linaro.org>
+ <53723ACC.7020500@codeaurora.org>
+Message-ID: <CAPvkgC1ORGyfKf5AEUfHeHrvZtNt5bWT1B5XvrBFbZmSNtBFWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support for ARM710 CPUs was removed in v3.5. Now remove the last code
-depending on its Kconfig macro.
+On 13 May 2014 16:31, Christopher Covington <cov@codeaurora.org> wrote:
+> Hi Steve,
+>
+> On 05/06/2014 11:30 AM, Steve Capper wrote:
+>> Activate the RCU fast_gup for ARM. We also need to force THP splits to
+>> broadcast an IPI s.t. we block in the fast_gup page walker. As THP
+>> splits are comparatively rare, this should not lead to a noticeable
+>> performance degradation.
+>
+>> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+>> index 3387e60..91a2b59 100644
+>> --- a/arch/arm/mm/flush.c
+>> +++ b/arch/arm/mm/flush.c
+>> @@ -377,3 +377,22 @@ void __flush_anon_page(struct vm_area_struct *vma, struct page *page, unsigned l
+>>        */
+>>       __cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
+>>  }
+>> +
+>> +#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+>> +#ifdef CONFIG_HAVE_RCU_TABLE_FREE
+>
+> This is trivia, but I for one find the form #if defined(a) && defined(b)
+> easier to read. (Applies to the A64 version as well).
+>
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-First submitted in March 2103. Still untested. Please note that
-cpu_arm7_data_abort was also removed in v3.5.
+Thank you Christopher, I agree that looks nicer.
 
- arch/arm/include/asm/glue-df.h | 8 --------
- 1 file changed, 8 deletions(-)
-
-diff --git a/arch/arm/include/asm/glue-df.h b/arch/arm/include/asm/glue-df.h
-index 6b70f1b46a6e..04e18b656659 100644
---- a/arch/arm/include/asm/glue-df.h
-+++ b/arch/arm/include/asm/glue-df.h
-@@ -31,14 +31,6 @@
- #undef CPU_DABORT_HANDLER
- #undef MULTI_DABORT
- 
--#if defined(CONFIG_CPU_ARM710)
--# ifdef CPU_DABORT_HANDLER
--#  define MULTI_DABORT 1
--# else
--#  define CPU_DABORT_HANDLER cpu_arm7_data_abort
--# endif
--#endif
--
- #ifdef CONFIG_CPU_ABRT_EV4
- # ifdef CPU_DABORT_HANDLER
- #  define MULTI_DABORT 1
+Cheers,
 -- 
-1.9.0
+Steve
+
+> Christopher
+>
+> --
+> Employee of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by the Linux Foundation.
