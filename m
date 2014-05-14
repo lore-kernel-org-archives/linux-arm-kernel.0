@@ -1,49 +1,319 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 14 May 2014 22:20:14 +0200
-Subject: [GIT PULL 1/4] Samsung clock Exynos5260 support for v3.16
-In-Reply-To: <20140514201313.19795.35617@quantum>
-References: <1400090591-5064-1-git-send-email-t.figa@samsung.com>
- <5373CB1A.1040801@samsung.com> <20140514201313.19795.35617@quantum>
-Message-ID: <5373CFFE.1000209@gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 14 May 2014 22:15:18 +0200
+Subject: [PATCH v2 07/10] clk: berlin: add core clock driver for BG2Q
+In-Reply-To: <1400098522-14770-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1400098522-14770-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1400098522-14770-8-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-On 14.05.2014 22:13, Mike Turquette wrote:
-> Quoting Kukjin Kim (2014-05-14 12:59:22)
->> On 05/15/14 03:03, Tomasz Figa wrote:
->>
->> Hi Mike,
->>
->> I've talked to Tomasz about current samsung related clock stuff. Since 
->> they are mostly having dependency on samsung tree now not clock core 
->> stuff, so would be better if it could be sent to upstream via samsung 
->> tree. And as you know, updating arch/arm/ and clock stuff are usually 
->> required for adding new SoC or supporting CCF newly...
-> 
-> The Samsung clk pull requests only touch two arch/arm Kconfig files and
-> one dtsi file. That's not a lot of arch/arm churn. Is there a strong
-> reason that this needs to go through the samsung/arm-soc trees?
-> Otherwise it should continue to go through the clk tree.
+This driver deals with the core clocks found on Marvell Berlin BG2Q. For the
+shared register dividers, make use of the corresponding driver and add some
+single clock muxes and gates for the rest.
 
-Obviously they are patches for Samsung clock drivers. ;)
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+Changelog:
+v1->v2:
+- initial version
 
-The issue here is that there is a number of patches already merged in
-Samsung tree on which the patches discussed here depend.
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Jisheng Zhang <jszhang@marvell.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/clk/berlin/Makefile |   1 +
+ drivers/clk/berlin/bg2q.c   | 269 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 270 insertions(+)
+ create mode 100644 drivers/clk/berlin/bg2q.c
 
-> 
->>
->> How do you think? Basically I need your agreement for it.
-> 
-> Based on the above pull requests I do not see the need for changing how
-> code gets merged.
-
-As long as there are no dependencies on arch code and series being
-applied do not touch arch code, this is perfectly fine. Unfortunately
-this is rarely the case, at least for Samsung platforms and at least for
-now. After we finish with arch clean-up and move all code to appropriate
-subsystems, it should become easier, though.
-
-Best regards,
-Tomasz
+diff --git a/drivers/clk/berlin/Makefile b/drivers/clk/berlin/Makefile
+index 2b33e1e74503..2a36ab710a07 100644
+--- a/drivers/clk/berlin/Makefile
++++ b/drivers/clk/berlin/Makefile
+@@ -1,3 +1,4 @@
+ obj-y += berlin2-avpll.o berlin2-pll.o berlin2-div.o
+ obj-$(CONFIG_MACH_BERLIN_BG2)	+= bg2.o
+ obj-$(CONFIG_MACH_BERLIN_BG2CD)	+= bg2.o
++obj-$(CONFIG_MACH_BERLIN_BG2Q)	+= bg2q.o
+diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
+new file mode 100644
+index 000000000000..df5a4ce5eb87
+--- /dev/null
++++ b/drivers/clk/berlin/bg2q.c
+@@ -0,0 +1,269 @@
++/*
++ * Copyright (c) 2014 Marvell Technology Group Ltd.
++ *
++ * Alexandre Belloni <alexandre.belloni@free-electrons.com>
++ * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++
++#include "berlin2-div.h"
++
++struct bg2_gate_data {
++	const char *name;
++	const char *parent_name;
++	u8 bit_idx;
++	unsigned long flags;
++};
++
++#define REG_CLKENABLE		0x00
++#define REG_CLKSELECT0		0x04
++#define REG_CLKSELECT1		0x08
++#define REG_CLKSELECT2		0x0c
++#define REG_CLKSWITCH0		0x10
++#define REG_CLKSWITCH1		0x14
++
++#define MAX_CLKS		24
++
++static DEFINE_SPINLOCK(lock);
++static struct clk *clks[MAX_CLKS];
++static struct clk_onecell_data clk_data;
++
++static const struct berlin2_div_data bg2q_divs[] __initconst = {
++	{
++		.name = "sys",
++		.flags = CLK_IGNORE_UNUSED,
++		.map = {
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 0),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT0, 0),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT0, 3),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 3),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 4),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 5),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++	},
++	{
++		.name = "drmfigo",
++		.flags = 0,
++		.map = {
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 17),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT0, 6),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT0, 9),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 6),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 7),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 8),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++	},
++	{
++		.name = "cfg",
++		.flags = 0,
++		.map = {
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 1),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT0, 12),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT0, 15),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 9),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 10),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 11),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++	},
++	{
++		.name = "gfx2d",
++		.flags = 0,
++		.map = {
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 4),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT0, 18),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT0, 21),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 12),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 13),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 14),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++	},
++	{
++		.name = "zsp",
++		.flags = 0,
++		.map = {
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 6),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT0, 24),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT0, 27),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 15),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 16),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 17),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++	},
++	{
++		.name = "perif",
++		.flags = CLK_IGNORE_UNUSED,
++		.map = {
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 7),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 0),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 3),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 18),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 19),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 20),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++	},
++	{
++		.name = "pcube",
++		.flags = 0,
++		.map = {
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 2),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 6),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 9),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 21),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 22),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 23),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++	},
++	{
++		.name = "vscope",
++		.flags = 0,
++		.map = {
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 3),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 12),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 15),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 24),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 25),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 26),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++	},
++	{
++		.name = "nfc_ecc",
++		.flags = 0,
++		.map = {
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 19),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 18),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 21),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 27),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 28),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 29),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++	},
++	{
++		.name = "vpp",
++		.flags = 0,
++		.map = {
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 21),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 24),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 27),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 30),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 31),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH1, 0),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++	},
++	{
++		.name = "app",
++		.flags = 0,
++		.map = {
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 20),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT2, 0),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT2, 3),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH1, 1),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH1, 2),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH1, 3),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++	},
++};
++
++static const struct bg2_gate_data bg2q_gates[] __initconst = {
++	{ "gfx2daxi",	"perif",	5 },
++	{ "geth0",	"perif",	8 },
++	{ "sata",	"perif",	9 },
++	{ "ahbapb",	"perif",	10, CLK_IGNORE_UNUSED },
++	{ "usb0",	"perif",	11 },
++	{ "usb1",	"perif",	12 },
++	{ "usb2",	"perif",	13 },
++	{ "usb3",	"perif",	14 },
++	{ "pbridge",	"perif",	15, CLK_IGNORE_UNUSED },
++	{ "sdio",	"perif",	16 },
++	{ "nfc",	"perif",	18 },
++	{ "smemc",	"perif",	19 },
++	{ "pcie",	"perif",	22 },
++};
++
++static void __init berlin2q_core_clock_of_setup(struct device_node *np)
++{
++	const struct berlin2_div_data *data;
++	const char *parent_names[9];
++	void __iomem *base;
++	int n, nclk = 0;
++
++	base = of_iomap(np, 0);
++	if (!base) {
++		pr_err("%s: Unable to map register base\n", np->full_name);
++		return;
++	}
++
++	/*
++	 * TODO: reference clock bypass switches: memPLLSWBypass, cpuPLLSWBypass
++	 * and sysPLLSWBypass are missing
++	 */
++
++	/* TODO: Once BG2Q AVPLL are added, add AVPLLB[4-7] as parents*/
++	parent_names[0] = "syspll";
++	for (n = 0; n < ARRAY_SIZE(bg2q_divs); n++) {
++		data = &bg2q_divs[n];
++		clks[n] = berlin2_div_register(&data->map, base, data->name,
++			 data->div_flags, parent_names, 5, data->flags, &lock);
++	}
++	nclk += n;
++
++	/* clock gate cells */
++	for (n = 0; n < ARRAY_SIZE(bg2q_gates); n++) {
++		const struct bg2_gate_data *gd = &bg2q_gates[n];
++
++		clks[nclk + n] = clk_register_gate(NULL, gd->name,
++			    gd->parent_name, gd->flags, base + REG_CLKENABLE,
++			    gd->bit_idx, 0, &lock);
++	}
++	nclk += n;
++
++	/* check for errors on leaf clocks */
++	for (n = 0; n < nclk; n++) {
++		if (!IS_ERR(clks[n]))
++			continue;
++
++		pr_err("%s: Unable to register leaf clock %d\n",
++		       np->full_name, n);
++		goto core_clock_fail;
++	}
++
++	/* register clk-provider */
++	clk_data.clks = clks;
++	clk_data.clk_num = MAX_CLKS;
++	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
++	return;
++
++core_clock_fail:
++	iounmap(base);
++}
++CLK_OF_DECLARE(berlin2q_coreclk, "marvell,berlin2q-core-clocks",
++	       berlin2q_core_clock_of_setup);
+-- 
+1.9.1
