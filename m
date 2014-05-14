@@ -1,144 +1,165 @@
 From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Wed, 14 May 2014 06:41:12 +0530
-Subject: [PATCH v4 4/8] Documentation: devicetree: add cpu clock configuration
- data binding for Exynos4/5
+Date: Wed, 14 May 2014 06:41:13 +0530
+Subject: [PATCH v4 5/8] clk: exynos: use cpu-clock provider type to represent
+ arm clock.
 In-Reply-To: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
 References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <1400029876-5830-5-git-send-email-thomas.ab@samsung.com>
+Message-ID: <1400029876-5830-6-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From; Thomas Abraham <thomas.ab@samsung.com>
+From: Thomas Abraham <thomas.ab@samsung.com>
 
-The clock blocks within the CMU_CPU clock domain are put together into a
-new composite clock type called the cpu clock. This clock type requires
-configuration data that will be atomically programmed in the multiple
-clock blocks encapsulated within the cpu clock type when the parent clock
-frequency is changed. This configuration data is held in the clock controller
-node. Update clock binding documentation about this configuration data format
-for Samsung Exynos4 and Exynos5 platforms.
+With the addition of the new Samsung specific cpu-clock type, the
+arm clock can be represented as a cpu-clock type and the independent
+clock blocks that made up the arm clock can be removed.
 
 Cc: Tomasz Figa <t.figa@samsung.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 ---
- .../devicetree/bindings/clock/exynos4-clock.txt    |   37 ++++++++++++++++++++
- .../devicetree/bindings/clock/exynos5250-clock.txt |   36 +++++++++++++++++++
- 2 files changed, 73 insertions(+), 0 deletions(-)
+ drivers/clk/samsung/clk-exynos4.c      |   25 +++++++++----------------
+ drivers/clk/samsung/clk-exynos5250.c   |   12 ++++++------
+ include/dt-bindings/clock/exynos5250.h |    1 +
+ 3 files changed, 16 insertions(+), 22 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/exynos4-clock.txt b/Documentation/devicetree/bindings/clock/exynos4-clock.txt
-index f5a5b19..0934e02 100644
---- a/Documentation/devicetree/bindings/clock/exynos4-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/exynos4-clock.txt
-@@ -15,6 +15,35 @@ Required Properties:
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index b4f9672..7e3bb16c 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -471,7 +471,6 @@ static struct samsung_mux_clock exynos4210_mux_clks[] __initdata = {
+ 	MUX(0, "mout_fimd1", group1_p4210, E4210_SRC_LCD1, 0, 4),
+ 	MUX(0, "mout_mipi1", group1_p4210, E4210_SRC_LCD1, 12, 4),
+ 	MUX(CLK_SCLK_MPLL, "sclk_mpll", mout_mpll_p, SRC_CPU, 8, 1),
+-	MUX(CLK_MOUT_CORE, "mout_core", mout_core_p4210, SRC_CPU, 16, 1),
+ 	MUX(CLK_SCLK_VPLL, "sclk_vpll", sclk_vpll_p4210, SRC_TOP0, 8, 1),
+ 	MUX(CLK_MOUT_FIMC0, "mout_fimc0", group1_p4210, SRC_CAM, 0, 4),
+ 	MUX(CLK_MOUT_FIMC1, "mout_fimc1", group1_p4210, SRC_CAM, 4, 4),
+@@ -530,7 +529,6 @@ static struct samsung_mux_clock exynos4x12_mux_clks[] __initdata = {
+ 	MUX(0, "mout_jpeg", mout_jpeg_p, E4X12_SRC_CAM1, 8, 1),
+ 	MUX(CLK_SCLK_MPLL, "sclk_mpll", mout_mpll_p, SRC_DMC, 12, 1),
+ 	MUX(CLK_SCLK_VPLL, "sclk_vpll", mout_vpll_p, SRC_TOP0, 8, 1),
+-	MUX(CLK_MOUT_CORE, "mout_core", mout_core_p4x12, SRC_CPU, 16, 1),
+ 	MUX(CLK_MOUT_FIMC0, "mout_fimc0", group1_p4x12, SRC_CAM, 0, 4),
+ 	MUX(CLK_MOUT_FIMC1, "mout_fimc1", group1_p4x12, SRC_CAM, 4, 4),
+ 	MUX(CLK_MOUT_FIMC2, "mout_fimc2", group1_p4x12, SRC_CAM, 8, 4),
+@@ -572,8 +570,6 @@ static struct samsung_mux_clock exynos4x12_mux_clks[] __initdata = {
  
- - #clock-cells: should be 1.
+ /* list of divider clocks supported in all exynos4 soc's */
+ static struct samsung_div_clock exynos4_div_clks[] __initdata = {
+-	DIV(0, "div_core", "mout_core", DIV_CPU0, 0, 3),
+-	DIV(0, "div_core2", "div_core", DIV_CPU0, 28, 3),
+ 	DIV(0, "div_fimc0", "mout_fimc0", DIV_CAM, 0, 4),
+ 	DIV(0, "div_fimc1", "mout_fimc1", DIV_CAM, 4, 4),
+ 	DIV(0, "div_fimc2", "mout_fimc2", DIV_CAM, 8, 4),
+@@ -619,8 +615,8 @@ static struct samsung_div_clock exynos4_div_clks[] __initdata = {
+ 	DIV(0, "div_spi_pre2", "div_spi2", DIV_PERIL2, 8, 8),
+ 	DIV(0, "div_audio1", "mout_audio1", DIV_PERIL4, 0, 4),
+ 	DIV(0, "div_audio2", "mout_audio2", DIV_PERIL4, 16, 4),
+-	DIV(CLK_ARM_CLK, "arm_clk", "div_core2", DIV_CPU0, 28, 3),
+-	DIV(CLK_SCLK_APLL, "sclk_apll", "mout_apll", DIV_CPU0, 24, 3),
++	DIV_F(CLK_SCLK_APLL, "sclk_apll", "mout_apll", DIV_CPU0, 24, 3,
++			CLK_GET_RATE_NOCACHE, 0),
+ 	DIV_F(0, "div_mipi_pre0", "div_mipi0", DIV_LCD0, 20, 4,
+ 			CLK_SET_RATE_PARENT, 0),
+ 	DIV_F(0, "div_mmc_pre0", "div_mmc0", DIV_FSYS1, 8, 8,
+@@ -1003,12 +999,6 @@ static struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
+ 		0),
+ };
  
-+- samsung,armclk-divider-table: when the frequency of the APLL is changed
-+  the divider clocks in CMU_CPU clock domain also need to be updated. These
-+  divider clocks have SoC specific divider clock output requirements for a
-+  specific APLL clock speeds. When APLL clock rate is changed, these divider
-+  clocks are reprogrammed with pre-determined values in order to maintain the
-+  SoC specific divider clock outputs. This property lists the divider values
-+  for divider clocks in the CMU_CPU block for supported APLL clock speeds.
-+  The format of each entry included in the arm-frequency-table should be
-+  as defined below
-+
-+  - for Exynos4210 and Exynos4212 based platforms:
-+      cell #1: arm clock parent frequency
-+      cell #2 ~ cell 9#: value of clock divider in the following order
-+	        corem0_ratio, corem1_ratio, periph_ratio, atb_ratio,
-+		pclk_dbg_ratio, apll_ratio, copy_ratio, hpm_ratio.
-+
-+  - for Exynos4412 based platforms:
-+      cell #1: expected arm clock parent frequency
-+      cell #2 ~ cell #10: value of clock divider in the following order
-+	       corem0_ratio, corem1_ratio, periph_ratio, atb_ratio,
-+               pclk_dbg_ratio, apll_ratio, copy_ratio, hpm_ratio, cores_ratio
-+
-+- samsung,armclk-cells: defines the number of cells in
-+  samsung,armclk-divider-table property. The value of this property depends on
-+  the SoC type.
-+
-+  - for Exynos4210 and Exynos4212: the value should be 9.
-+  - for Exynos4412: the value should be 10.
-+
- Each clock is assigned an identifier and client nodes can use this identifier
- to specify the clock which they consume.
+-static struct samsung_clock_alias exynos4_aliases[] __initdata = {
+-	ALIAS(CLK_MOUT_CORE, NULL, "moutcore"),
+-	ALIAS(CLK_ARM_CLK, NULL, "armclk"),
+-	ALIAS(CLK_SCLK_APLL, NULL, "mout_apll"),
+-};
+-
+ static struct samsung_clock_alias exynos4210_aliases[] __initdata = {
+ 	ALIAS(CLK_SCLK_MPLL, NULL, "mout_mpll"),
+ };
+@@ -1241,6 +1231,9 @@ static void __init exynos4_clk_init(struct device_node *np,
+ 			ARRAY_SIZE(exynos4210_gate_clks));
+ 		samsung_clk_register_alias(exynos4210_aliases,
+ 			ARRAY_SIZE(exynos4210_aliases));
++		exynos_register_arm_clock(CLK_ARM_CLK, mout_core_p4210,
++			ARRAY_SIZE(mout_core_p4210), reg_base, np, NULL,
++			&samsung_clk_lock);
+ 	} else {
+ 		samsung_clk_register_mux(exynos4x12_mux_clks,
+ 			ARRAY_SIZE(exynos4x12_mux_clks));
+@@ -1250,11 +1243,11 @@ static void __init exynos4_clk_init(struct device_node *np,
+ 			ARRAY_SIZE(exynos4x12_gate_clks));
+ 		samsung_clk_register_alias(exynos4x12_aliases,
+ 			ARRAY_SIZE(exynos4x12_aliases));
++		exynos_register_arm_clock(CLK_ARM_CLK, mout_core_p4x12,
++			ARRAY_SIZE(mout_core_p4x12), reg_base, np, NULL,
++			&samsung_clk_lock);
+ 	}
  
-@@ -28,6 +57,14 @@ Example 1: An example of a clock controller node is listed below.
- 		compatible = "samsung,exynos4210-clock";
- 		reg = <0x10030000 0x20000>;
- 		#clock-cells = <1>;
-+
-+		samsung,armclk-cells = <9>;
-+		samsung,armclk-divider-table = <1200000 3 7 3 4 1 7 5 0>,
-+					       <1000000 3 7 3 4 1 7 4 0>,
-+					       < 800000 3 7 3 3 1 7 3 0>,
-+					       < 500000 3 7 3 3 1 7 3 0>,
-+					       < 400000 3 7 3 3 1 7 3 0>,
-+					       < 200000 1 3 1 1 1 0 3 0>;
- 	};
+-	samsung_clk_register_alias(exynos4_aliases,
+-			ARRAY_SIZE(exynos4_aliases));
+-
+ 	exynos4_clk_sleep_init();
  
- Example 2: UART controller node that consumes the clock generated by the clock
-diff --git a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-index 536eacd..3d63d09 100644
---- a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-@@ -13,6 +13,24 @@ Required Properties:
+ 	pr_info("%s clocks: sclk_apll = %ld, sclk_mpll = %ld\n"
+@@ -1262,7 +1255,7 @@ static void __init exynos4_clk_init(struct device_node *np,
+ 		exynos4_soc == EXYNOS4210 ? "Exynos4210" : "Exynos4x12",
+ 		_get_rate("sclk_apll"),	_get_rate("sclk_mpll"),
+ 		_get_rate("sclk_epll"), _get_rate("sclk_vpll"),
+-		_get_rate("arm_clk"));
++		_get_rate("armclk"));
+ }
  
- - #clock-cells: should be 1.
  
-+- samsung,armclk-divider-table: when the frequency of the APLL is changed
-+  the divider clocks in CMU_CPU clock domain also need to be updated. These
-+  divider clocks have SoC specific divider clock output requirements for a
-+  specific APLL clock speeds. When APLL clock rate is changed, these divider
-+  clocks are reprogrammed with pre-determined values in order to maintain the
-+  SoC specific divider clock outputs. This property lists the divider values
-+  for divider clocks in the CMU_CPU block for supported APLL clock speeds.
-+  The format of each entry included in the arm-frequency-table should be
-+  as defined below
-+
-+      cell #1: expected arm clock parent frequency
-+      cell #2 ~ cell #9: value of clock divider in the following order
-+	       cpud_ratio, acp_ratio, periph_ratio, atb_ratio,
-+               pclk_dbg_ratio, apll_ratio, copy_ratio, hpm_ratio
-+
-+- samsung,armclk-cells: defines the number of cells in
-+  samsung,armclk-divider-table property. The value of this property should be 9.
-+
- Each clock is assigned an identifier and client nodes can use this identifier
- to specify the clock which they consume.
+diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+index e7ee442..3fe1ca0 100644
+--- a/drivers/clk/samsung/clk-exynos5250.c
++++ b/drivers/clk/samsung/clk-exynos5250.c
+@@ -260,8 +260,6 @@ static struct samsung_mux_clock exynos5250_mux_clks[] __initdata = {
+ 	 */
+ 	MUX_FA(0, "mout_apll", mout_apll_p, SRC_CPU, 0, 1,
+ 					CLK_SET_RATE_PARENT, 0, "mout_apll"),
+-	MUX_A(0, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1, "mout_cpu"),
+-
+ 	/*
+ 	 * CMU_CORE
+ 	 */
+@@ -339,9 +337,8 @@ static struct samsung_div_clock exynos5250_div_clks[] __initdata = {
+ 	/*
+ 	 * CMU_CPU
+ 	 */
+-	DIV(0, "div_arm", "mout_cpu", DIV_CPU0, 0, 3),
+-	DIV(0, "div_apll", "mout_apll", DIV_CPU0, 24, 3),
+-	DIV_A(0, "div_arm2", "div_arm", DIV_CPU0, 28, 3, "armclk"),
++	DIV_F(0, "div_apll", "mout_apll", DIV_CPU0, 24, 3,
++			CLK_GET_RATE_NOCACHE, 0),
  
-@@ -26,6 +44,24 @@ Example 1: An example of a clock controller node is listed below.
- 		compatible = "samsung,exynos5250-clock";
- 		reg = <0x10010000 0x30000>;
- 		#clock-cells = <1>;
-+
-+		samsung,armclk-cells = <9>;
-+		samsung,armclk-divider-table = <1700000 3 7 7 7 3 5 0 2>,
-+					       <1600000 3 7 7 7 1 4 0 2>,
-+					       <1500000 2 7 7 7 1 4 0 2>,
-+					       <1400000 2 7 7 6 1 4 0 2>,
-+					       <1300000 2 7 7 6 1 3 0 2>,
-+					       <1200000 2 7 7 5 1 3 0 2>,
-+					       <1100000 3 7 7 5 1 3 0 2>,
-+					       <1000000 1 7 7 4 1 2 0 2>,
-+					       < 900000 1 7 7 4 1 2 0 2>,
-+					       < 800000 1 7 7 4 1 2 0 2>,
-+					       < 700000 1 7 7 3 1 1 0 2>,
-+					       < 600000 1 7 7 3 1 1 0 2>,
-+					       < 500000 1 7 7 2 1 1 0 2>,
-+					       < 400000 1 7 7 2 1 1 0 2>,
-+					       < 300000 1 7 7 1 1 1 0 2>,
-+					       < 200000 1 7 7 1 1 1 0 2>;
- 	};
+ 	/*
+ 	 * CMU_TOP
+@@ -721,10 +718,13 @@ static void __init exynos5250_clk_init(struct device_node *np)
+ 			ARRAY_SIZE(exynos5250_div_clks));
+ 	samsung_clk_register_gate(exynos5250_gate_clks,
+ 			ARRAY_SIZE(exynos5250_gate_clks));
++	exynos_register_arm_clock(CLK_ARM_CLK, mout_cpu_p,
++			ARRAY_SIZE(mout_cpu_p), reg_base, np, NULL,
++			&samsung_clk_lock);
  
- Example 2: UART controller node that consumes the clock generated by the clock
+ 	exynos5250_clk_sleep_init();
+ 
+ 	pr_info("Exynos5250: clock setup completed, armclk=%ld\n",
+-			_get_rate("div_arm2"));
++			_get_rate("armclk"));
+ }
+ CLK_OF_DECLARE(exynos5250_clk, "samsung,exynos5250-clock", exynos5250_clk_init);
+diff --git a/include/dt-bindings/clock/exynos5250.h b/include/dt-bindings/clock/exynos5250.h
+index 922f2dc..59a10fb 100644
+--- a/include/dt-bindings/clock/exynos5250.h
++++ b/include/dt-bindings/clock/exynos5250.h
+@@ -21,6 +21,7 @@
+ #define CLK_FOUT_CPLL		6
+ #define CLK_FOUT_EPLL		7
+ #define CLK_FOUT_VPLL		8
++#define CLK_ARM_CLK		12
+ 
+ /* gate for special clocks (sclk) */
+ #define CLK_SCLK_CAM_BAYER	128
 -- 
 1.7.4.4
