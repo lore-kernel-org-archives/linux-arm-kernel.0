@@ -1,61 +1,54 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Wed, 14 May 2014 11:48:58 +0200
-Subject: [PATCH v3 2/6] Documentation: bindings: add the Berlin SATA PHY
-In-Reply-To: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1400060942-10588-3-git-send-email-antoine.tenart@free-electrons.com>
+Date: Wed, 14 May 2014 11:48:56 +0200
+Subject: [PATCH v3 0/6] ARM: berlin: add AHCI support
+Message-ID: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Berlin SATA PHY drives the PHY related to the SATA interface and
-allows to power up/down each PHY independently. Add the corresponding
-documentation.
+This series adds the support for Berlin SoCs AHCI controllers. The
+controller allows to use the SATA host interface and, for example, the
+eSATA port on the BG2Q.
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
----
- .../devicetree/bindings/phy/berlin-sata-phy.txt    | 34 ++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+The series adds a PHY driver to control the two SATA ports available.
+
+Also enable the eSATA interface on the BG2Q DMP.
+
+Changes since v2:
+	- modeled each PHY as a sub-node
+	- cosmetic fixups
+
+Changes since v1:
+        - added a PHY driver, allowing to enable each port
+          individually and removed the 'force-port-map' property
+        - made the drivers a bit less magic :)
+        - wrote a function to select and configure registers in the
+          AHCI driver
+        - removed BG2 / BG2CD nodes
+
+Antoine T?nart (6):
+  phy: add a driver for the Berlin SATA PHY
+  Documentation: bindings: add the Berlin SATA PHY
+  ata: ahci: add AHCI support for the Berlin BG2Q
+  Documentation: bindings: add the berlin-ahci compatible to the ahci
+    platform
+  ARM: berlin: add the AHCI node for the BG2Q
+  ARM: berlin: enable the eSATA interface on the BG2Q DMP
+
+ .../devicetree/bindings/ata/ahci-berlin.txt        |  18 ++
+ .../devicetree/bindings/phy/berlin-sata-phy.txt    |  34 ++++
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |  10 +
+ arch/arm/boot/dts/berlin2q.dtsi                    |  25 +++
+ drivers/ata/Kconfig                                |  10 +
+ drivers/ata/Makefile                               |   1 +
+ drivers/ata/ahci_berlin.c                          | 202 +++++++++++++++++++++
+ drivers/phy/Kconfig                                |   5 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-berlin-sata.c                      | 180 ++++++++++++++++++
+ 10 files changed, 486 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/ata/ahci-berlin.txt
  create mode 100644 Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
+ create mode 100644 drivers/ata/ahci_berlin.c
+ create mode 100644 drivers/phy/phy-berlin-sata.c
 
-diff --git a/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt b/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
-new file mode 100644
-index 000000000000..b1e11a25775a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
-@@ -0,0 +1,34 @@
-+Berlin SATA PHY
-+---------------
-+
-+Required properties:
-+- compatible: "marvell,berlin-sata-phy"
-+- #address-cells: number of cells to encode an address, must be 1
-+- #size-cells: number of cells representing the size of an address, must be 0
-+- reg: address and length of the register
-+
-+The SATA PHY node is a provider and should contain sub-nodes representing the
-+PHYs it handles, one per PHY.
-+
-+Required sub-node properties:
-+- reg: the PHY described. 0 or 1.
-+- #phy-cells: from the generic PHY bindings, must be 0
-+
-+Example:
-+	sata_phy: phy at f7e900a0 {
-+		compatible = "marvell,berlin-sata-phy";
-+		reg = <0xf7e900a0 0x10>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "okay";
-+
-+		sata_phy0: phy at 0 {
-+			reg = <0>;
-+			#phy-cells = <0>;
-+		};
-+
-+		sata_phy1: phy at 1 {
-+			reg = <1>;
-+			#phy-cells = <0>;
-+		};
-+	};
 -- 
 1.9.1
