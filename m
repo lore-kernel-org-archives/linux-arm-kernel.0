@@ -1,123 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 May 2014 20:12:17 +0200
-Subject: [PATCH v3 1/6] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <5373AE9A.3050008@gmail.com>
-References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
- <20140514165722.GA18495@kwain> <5373AE9A.3050008@gmail.com>
-Message-ID: <5764751.ffUj9rhnMd@wuerfel>
+Date: Wed, 14 May 2014 20:14:23 +0200
+Subject: [PATCH] i2c/nuc900: fix ancient build error
+In-Reply-To: <20140514162725.GG12911@katana>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-11-git-send-email-arnd@arndb.de>
+ <20140514162725.GG12911@katana>
+Message-ID: <4944869.eRrWyMmW4d@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 May 2014 19:57:46 Sebastian Hesselbarth wrote:
-> On 05/14/2014 06:57 PM, Antoine T?nart wrote:
-> > On Wed, May 14, 2014 at 06:11:24PM +0200, Arnd Bergmann wrote:
-> >> On Wednesday 14 May 2014 17:49:29 Antoine T?nart wrote:
-> >>> On Wed, May 14, 2014 at 05:31:24PM +0200, Arnd Bergmann wrote:
+On Wednesday 14 May 2014 18:27:25 Wolfram Sang wrote:
+> On Thu, May 08, 2014 at 04:56:22PM +0200, Arnd Bergmann wrote:
+> > As far as I can tell, this driver must have produced this error
+> > for as long as it has been merged into the mainline kernel, but
+> > it was never part of the normal build tests:
+> > 
+> > drivers/i2c/busses/i2c-nuc900.c: In function 'nuc900_i2c_probe':
+> > drivers/i2c/busses/i2c-nuc900.c:601:17: error: request for member 'apbfreq' in something not a structure or union
+> >   ret = (i2c->clk.apbfreq)/(pdata->bus_freq * 5) - 1;
+> >                  ^
+> > 
+> > This is an attempt to get the driver to build and possibly
+> > work correctly, although I do wonder whether we should just
+> > remove it, as it has clearly never worked.
 > 
-> From what I understand from the conversation, we have a single PHY
-> register set dealing with both SATA ports available on the SoC.
-> Also, from the name of the PHY bits we assume the PHY may be able
-> to work in different modes than just SATA. And we currently have
-> an AHCI-compatible SATA IP that supports up to two ports, with one
-> actually connected to a SATA plug on the DMP board.
-> 
-> Now, thinking about the PHY binding and the (possible) multi-protocol
-> support, it can be possible that on BG2Q there is a generic 2-lane
-> LVDS PHY that can be configured to support SATA or PCIe. Both are
-> electrically and bit-level compatible, so they could be internally
-> wired-up with AHCI and PCIe controller.
+> I'd go for removing. For this platform, the last patch which was not a
+> generic cleanup seems to be from late 2011?
 
-Sounds like a reasonable guess. We have other PHY drivers doing the
-same thing already.
+Ah, you mean removing the entire platform? I guess we could do that
+as well, but I was really thinking of just removing the i2c driver.
 
-> From a DT point-of-view, we need a way to (a) link each SATA or PCIe
-> port to the PHY, (b) specify the PHY lane to be used, and (c) specify
-> the protocol to be used on that lane. If I got it right, Arnd already
-> mentioned to use the phy-specifier to deal with it:
-> 
-> e.g. phy = <&genphy 0 MODE_SATA> or phy = <&genphy 1 MODE_PCIE>
-
-Right.
-
-> Let's assume we have one dual-port SATA controller and one PCIe
-> controller with either x1 or x2 support. The only sane DT binding,
-> I can think of then would be:
-> 
-> berlin2q.dtsi:
-> 
-> genphy: lvds at ea00ff {
-> 	compatible = "marvell,berlin-lvds-phy";
-> 	reg = <0xea00ff 0x100>;
-> 	#phy-cells = <2>;
-> };
-> 
-> sata: sata at ab00ff {
-> 	compatible = "ahci-platform";
-> 	reg = <0xab00ff 0x100>;
-> 	
-> 	sata0: sata-port at 0 {
-> 		reg = <0>;
-> 		phy = <&genphy 0 MODE_SATA>;
-> 		status = "disabled";
-> 	};
-> 
-> 	sata1: sata-port at 1 {
-> 		reg = <1>;
-> 		phy = <&genphy 1 MODE_SATA>;
-> 		status = "disabled";
-> 	};
-> };
-> 
-> pcie: pcie at ab01ff {
-> 	compatible = "marvell,berlin-pcie";
-> 	reg = <0xab01ff 0x100>;
-> 
-> 	pcie0: pcie-port at 0 {
-> 		reg = <0>;
-> 		/* set phy on a per-board basis */
-> 		/* PCIe x1 on Lane 0 : phy = <&genphy 0 MODE_PCIE>; */
-> 		/* PCIe x2 on Lane 0 and 1 : phy = <&genphy 0 MODE_PCIE>, <&genphy 1
-> MODE_PCIE>; */
-> 		status = "disabled";
-> 	};
-> };
-> 
-> berlin2q-dmp.dts:
-> 
-> &sata1 {
-> 	status = "okay";
-> };
-> 
-> &pcie0 {
-> 	phy = <&genphy 1 MODE_PCIE>;
-> };
-> 
-> berlin2q-foo.dts:
-> 
-> &pcie0 {
-> 	phy = <&genphy 0 MODE_PCIE>, <&genphy 1 MODE_PCIE>;
-> };
-
-Exactly. I would also be fine with keeping the sub-nodes of the
-phy device as in v3 and using #phy-cells=<1> instead of #phy-cells.
-The result would be pretty much the same, it just depends on how
-closely connected the two logical phys are.
-
-IIRC for the ST microelectronics PHY we recently reviewed, the
-same PHY could be driving multiple SATA ports, or a single
-multi-lane PCIe. In that case, it makes more sense to have
-#phy-cells=<2>, like your example.
- 
-> For the driver, Antoine then would have to squeeze all PHY register
-> mangling in phy-berlin2.c and see how to make ahci-platform aware of
-> individual port nodes (I haven't looked up if it already exists, sorry)
-> and announce only enabled port child nodes, right?
-
-I've been thinking some more about this aspect. I don't actually have
-a strong opinion on whether it's better to use the generic ahci-platform
-driver, or to keep the multi-phy support as a special variant for
-berlin. If we do the latter, it would however be good to define the
-binding in a way that lets us later merge things into the generic phy
-driver in case we get more of the same.
+For the moment, I'd leave this up to Wan ZongShun. He has in the past
+at least replied to emails about the platform, even though there hasn't
+been any new development.
 
 	Arnd
