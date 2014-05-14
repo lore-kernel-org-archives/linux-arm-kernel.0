@@ -1,23 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 May 2014 15:16:54 +0200
-Subject: [PATCH v4 0/8] cpufreq: use cpufreq-cpu0 driver for exynos based
- platforms
-In-Reply-To: <CAKohponDr4YPvmYShL_OBychgUfFDDAnZxGuEoQpanPs62ABNw@mail.gmail.com>
-References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
- <7170433.Ah6fefFrHR@wuerfel>
- <CAKohponDr4YPvmYShL_OBychgUfFDDAnZxGuEoQpanPs62ABNw@mail.gmail.com>
-Message-ID: <10846712.xUGXxPFO6W@wuerfel>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Wed, 14 May 2014 18:47:44 +0530
+Subject: [PATCH v3 2/2] Documentation: devicetree: Add boost-frequency
+ binding to list boost mode frequency
+In-Reply-To: <CAGo_u6ozaKjzVQsJjzi5g13ysBT6UDwsgW3O1=K3RD4Y-ODtDA@mail.gmail.com>
+References: <1400029380-5372-1-git-send-email-thomas.ab@samsung.com>
+ <1400029380-5372-3-git-send-email-thomas.ab@samsung.com>
+ <CAGo_u6ozaKjzVQsJjzi5g13ysBT6UDwsgW3O1=K3RD4Y-ODtDA@mail.gmail.com>
+Message-ID: <CAJuA9ai7ycUOfFZfcshBk=XWCiWV82RAruaz_KTF4Cg2xtgaow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 May 2014 18:37:13 Viresh Kumar wrote:
-> On 14 May 2014 18:21, Arnd Bergmann <arnd@arndb.de> wrote:
-> > Thanks a lot for your continued effort. Looks great overall, but I have one
-> > comment about the general way the cpu0 cpufreq driver works, not specific
-> > to the exynos implementation. See my reply to patch 4.
-> 
-> I hope you meant 7 here instead of 4 ?
+On Wed, May 14, 2014 at 7:32 AM, Nishanth Menon <nm@ti.com> wrote:
+> On Tue, May 13, 2014 at 8:03 PM, Thomas Abraham <ta.omasab@gmail.com> wrote:
+>> From: Thomas Abraham <thomas.ab@samsung.com>
+>>
+>> Add a new optional boost-frequency binding for specifying the frequencies
+>> usable in boost mode.
+>>
+>> Cc: Nishanth Menon <nm@ti.com>
+>> Cc: Lukasz Majewski <l.majewski@samsung.com>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Pawel Moll <pawel.moll@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>> Cc: Kumar Gala <galak@codeaurora.org>
+>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+>> ---
+>>  .../devicetree/bindings/cpufreq/cpufreq-boost.txt  |   11 +++++++++++
+>>  1 files changed, 11 insertions(+), 0 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+>> new file mode 100644
+>> index 0000000..d925e38
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+>> @@ -0,0 +1,11 @@
+>> +* Device tree binding for CPU boost frequency (aka over-clocking)
+>> +
+>> +Certain CPU's can be operated in optional 'boost' mode (or sometimes referred as
+>> +overclocking) in which the CPU can operate in frequencies beyond the normal
+>
+> "operate at"?
+>
+>> +operating conditions.
+>
+> "normal operating conditions" probably need a little bit of an
+> expansion here perhaps?
+>
+>> +
+>> +Optional Properties:
+>> +- boost-frequency: list of frequencies in KHz to be used only in boost mode.
+>
+> probably boost-frequencies?
+>
+>> +  This list should be a subset of frequencies listed in "operating-points"
+>> +  property. Refer to Documentation/devicetree/bindings/power/opp.txt for
+>> +  details about "operating-points" property.
+>
+>
+> an example is expected here.
+>
+> personally, I think I understand the intent here, but as a hardware
+> description, will let folks comment if it is acceptable.
 
-Yes, that's right, sorry for the confusion.
+Thanks for your review Nishanth. I will do the changes you have suggested.
 
-	Arnd
+Regards,
+Thomas.
+
+>
+> --
+> Regards,
+> Nishanth Menon
