@@ -1,43 +1,130 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 14 May 2014 12:05:47 +0100
-Subject: [PATCH v3] of: Keep track of populated platform devices
-In-Reply-To: <CAL_Jsq+8xZO0LEhVa4tmOfq6CD2a0O+0CaGCnZLqDguz=yN_zg@mail.gmail.com>
-References: <1399473437.3706.25.camel@hornet>
- <1399981716-24618-1-git-send-email-pawel.moll@arm.com>
- <CAL_Jsq+8xZO0LEhVa4tmOfq6CD2a0O+0CaGCnZLqDguz=yN_zg@mail.gmail.com>
-Message-ID: <20140514110547.295CEC4153D@trevor.secretlab.ca>
+Date: Wed, 14 May 2014 12:08:14 +0100
+Subject: [PATCH v2] of/platform: Add of_platform_depopulate() helper
+In-Reply-To: <1399998294-24447-1-git-send-email-pawel.moll@arm.com>
+References: <1399997324.3657.35.camel@hornet>
+ <1399998294-24447-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <20140514110814.120BEC4153D@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 May 2014 07:24:50 -0500, Rob Herring <robherring2@gmail.com> wrote:
-> On Tue, May 13, 2014 at 6:48 AM, Pawel Moll <pawel.moll@arm.com> wrote:
-> > In "Device Tree powered" systems, platform devices are usually
-> > massively populated with of_platform_populate() call, executed
-> > at some level of initcalls, either by generic architecture
-> > or by platform-specific code.
-> >
-> > There are situations though where certain devices must be
-> > created (and bound with drivers) before all the others.
-> > This presents a challenge, as devices created explicitly
-> > would be created again by of_platform_populate().
-> >
-> > This patch tries to solve that issue in a generic way,
-> > adding a "populated" flag for a DT node description.
-> > Once set, this device will never be created again via
-> > of_* API, so of_platform_populate() will skip such nodes
-> > (and its children) in a similar way to the non-available
-> > ones.
-> >
-> > The flag is cleared when a device is being removed and
-> > returns the DT node by calling of_device_node_put() (it
-> > was missing from the amba device release function, added).
-> >
-> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+On Tue, 13 May 2014 17:24:54 +0100, Pawel Moll <pawel.moll@arm.com> wrote:
+> Drivers can us of_platform_populate() to create
+> platform devices for children of the device
+> main node (this can particularly happen in case
+> of MFD devices). Unfortunately, there was no
+> standard way of removing such sub-devices when
+> the main one is being removed.
 > 
-> A few formatting nits, but otherwise:
-> 
-> Reviewed-by: Rob Herring <robh@kernel.org>
+> This patch adds of_platform_depopulate() as
+> a complementary operation for the _populate()
+> one. It removes all platform and amba devices
+> that have been created from the Device Tree,
+> but leaves all other ones untouched (returning
+> -EBUSY in such case).
+
+Nit: What's with the 50-column word wrap? 72 is the norm for commit
+text.
 
 Acked-by: Grant Likely <grant.likely@linaro.org>
 
-g.
+If you like you can merge this with your other series since it is
+dependent.
+
+> 
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+> Changes since v1:
+> 
+> - using bool rather than int to signal remaining children
+> - recursing using of_platform_depopulate() itself
+> 
+>  drivers/of/platform.c       | 50 +++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of_platform.h |  5 +++++
+>  2 files changed, 55 insertions(+)
+> 
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 236f47e..3b51e04 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -495,4 +495,54 @@ int of_platform_populate(struct device_node *root,
+>  	return rc;
+>  }
+>  EXPORT_SYMBOL_GPL(of_platform_populate);
+> +
+> +static int of_platform_device_destroy(struct device *dev, void *data)
+> +{
+> +	bool *children_left = data;
+> +
+> +	/* Do not touch devices not populated from the device tree */
+> +	if (!dev->of_node || !of_node_check_flag(dev->of_node, OF_POPULATED)) {
+> +		*children_left = true;
+> +		return 0;
+> +	}
+> +
+> +	/* Recurse, but don't touch this device if it has any children left */
+> +	if (of_platform_depopulate(dev) != 0) {
+> +		*children_left = true;
+> +		return 0;
+> +	}
+> +
+> +	if (dev->bus == &platform_bus_type)
+> +		platform_device_unregister(to_platform_device(dev));
+> +	else if (dev->bus == &amba_bustype)
+> +		amba_device_unregister(to_amba_device(dev));
+> +	else
+> +		*children_left = true;
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * of_platform_depopulate() - Remove devices populated from device tree
+> + * @parent: device which childred will be removed
+> + *
+> + * Complementary to of_platform_populate(), this function removes children
+> + * of the given device (and, recurrently, their children) that have been
+> + * created from their respective device tree nodes (and only those,
+> + * leaving others - eg. manually created - unharmed).
+> + *
+> + * Returns 0 when all children devices have been removed or
+> + * -EBUSY when some children remained.
+> + */
+> +int of_platform_depopulate(struct device *parent)
+> +{
+> +	bool children_left = false;
+> +
+> +	device_for_each_child(parent, &children_left,
+> +			of_platform_device_destroy);
+> +
+> +	return children_left ? -EBUSY : 0;
+> +}
+> +EXPORT_SYMBOL_GPL(of_platform_depopulate);
+> +
+>  #endif /* CONFIG_OF_ADDRESS */
+> diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
+> index 05cb4a9..b1010ee 100644
+> --- a/include/linux/of_platform.h
+> +++ b/include/linux/of_platform.h
+> @@ -72,6 +72,7 @@ extern int of_platform_populate(struct device_node *root,
+>  				const struct of_device_id *matches,
+>  				const struct of_dev_auxdata *lookup,
+>  				struct device *parent);
+> +extern int of_platform_depopulate(struct device *parent);
+>  #else
+>  static inline int of_platform_populate(struct device_node *root,
+>  					const struct of_device_id *matches,
+> @@ -80,6 +81,10 @@ static inline int of_platform_populate(struct device_node *root,
+>  {
+>  	return -ENODEV;
+>  }
+> +static inline int of_platform_depopulate(struct device *parent)
+> +{
+> +	return -ENODEV;
+> +}
+>  #endif
+>  
+>  #endif	/* _LINUX_OF_PLATFORM_H */
+> -- 
+> 1.9.1
+> 
