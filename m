@@ -1,49 +1,175 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 14 May 2014 12:16:47 +0100
-Subject: [PATCH v6 05/11] drivers: of: add automated assignment of
- reserved regions to client devices
-In-Reply-To: <1400058938.3395.13.camel@linaro1.home>
-References: <1393594976-16728-1-git-send-email-m.szyprowski@samsung.com>
- <1393594976-16728-6-git-send-email-m.szyprowski@samsung.com>
- <20140302054043.4F48AC414EF@trevor.secretlab.ca>
- <1400058938.3395.13.camel@linaro1.home>
-Message-ID: <20140514111647.BA6F6C4153D@trevor.secretlab.ca>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 14 May 2014 13:26:29 +0200
+Subject: [PATCH 1/2] clk: Fix double free due to devm_clk_register()
+In-Reply-To: <1397863783-10728-2-git-send-email-sboyd@codeaurora.org>
+References: <1397863783-10728-1-git-send-email-sboyd@codeaurora.org>
+ <1397863783-10728-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <537352E5.20901@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 May 2014 10:15:38 +0100, "Jon Medhurst (Tixy)" <tixy@linaro.org> wrote:
-> On Sun, 2014-03-02 at 13:40 +0800, Grant Likely wrote:
-> > On Fri, 28 Feb 2014 14:42:50 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> > > This patch adds code for automated assignment of reserved memory regions
-> > > to struct device. reserved_mem->ops->device_init()/device_cleanup()
-> > > callbacks are called to perform reserved memory driver specific
-> > > initialization and cleanup
-> > > 
-> > > Based on previous code provided by Josh Cartwright <joshc@codeaurora.org>
-> > > 
-> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > 
-> > Hi Marek,
-> > 
-> > I've not applied this one yet, only because there is still the open
-> > issue of whether or not these functions should be called from drivers or
-> > from core code. I don't actually have any problems with the content of
-> > this patch. Once the user is sorted out I'll merge it.
+On 19/04/14 01:29, Stephen Boyd wrote:
+> Now that clk_unregister() frees the struct clk we're
+> unregistering we'll free memory twice: first we'll call kfree()
+> in __clk_release() with an address kmalloc doesn't know about and
+> second we'll call kfree() in the devres layer. Remove the
+> allocation of struct clk in devm_clk_register() and let
+> clk_release() handle it. This fixes slab errors like:
 > 
-> Has anything more come of these patches? I see some of the series is now
-> in Linux 3.15, but the actual patches to let people use the feature
-> aren't there yet, namely patches 5 though 8.
+> =============================================================================
+> BUG kmalloc-128 (Not tainted): Invalid object pointer 0xed08e8d0
+> -----------------------------------------------------------------------------
 > 
-> My personal immediate interest in these is as a mechanism on arm64 to
-> limit CMA to a region of memory that is actually DMA-able devices (e.g.
-> below 4GB for 32-bit devices without an iommu).
+> Disabling lock debugging due to kernel taint
+> INFO: Slab 0xeec503f8 objects=25 used=15 fp=0xed08ea00 flags=0x4081
+> CPU: 2 PID: 73 Comm: rmmod Tainted: G    B         3.14.0-11032-g526e9c764381 #34
+> [<c0014be0>] (unwind_backtrace) from [<c0012240>] (show_stack+0x10/0x14)
+> [<c0012240>] (show_stack) from [<c04b74dc>] (dump_stack+0x70/0xbc)
+> [<c04b74dc>] (dump_stack) from [<c00f6778>] (slab_err+0x74/0x84)
+> [<c00f6778>] (slab_err) from [<c04b6278>] (free_debug_processing+0x2cc/0x31c)
+> [<c04b6278>] (free_debug_processing) from [<c04b6300>] (__slab_free+0x38/0x41c)
+> [<c04b6300>] (__slab_free) from [<c03931bc>] (clk_unregister+0xd4/0x140)
+> [<c03931bc>] (clk_unregister) from [<c02fb774>] (release_nodes+0x164/0x1d8)
+> [<c02fb774>] (release_nodes) from [<c02f8698>] (__device_release_driver+0x60/0xb0)
+> [<c02f8698>] (__device_release_driver) from [<c02f9080>] (driver_detach+0xb4/0xb8)
+> [<c02f9080>] (driver_detach) from [<c02f8480>] (bus_remove_driver+0x5c/0xc4)
+> [<c02f8480>] (bus_remove_driver) from [<c008c9b8>] (SyS_delete_module+0x148/0x1d8)
+> [<c008c9b8>] (SyS_delete_module) from [<c000ef80>] (ret_fast_syscall+0x0/0x48)
+> FIX kmalloc-128: Object at 0xed08e8d0 not freed
 > 
-> For reference, the mail archives for this series is at
-> http://lkml.org/lkml/2014/2/28/237
+> Fixes: fcb0ee6a3d33 (clk: Implement clk_unregister)
+> Cc: Jiada Wang <jiada_wang@mentor.com>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-IIRC, the issue I have with patch 5-8 is that I don't like the driver core
-going off and doing automagical things to attach regions to devices.
-I've not seen any more discussion on this topic since I merged the
-patches I was okay with, but I may have missed something.
+Thank you for correcting this, and my apologies for introducing this bug.
 
-g.
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+
+> ---
+>  drivers/clk/clk.c | 71 +++++++++++++++++++++++--------------------------------
+>  1 file changed, 30 insertions(+), 41 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index dff0373f53c1..f71093bf83ab 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1984,9 +1984,28 @@ struct clk *__clk_register(struct device *dev, struct clk_hw *hw)
+>  }
+>  EXPORT_SYMBOL_GPL(__clk_register);
+>  
+> -static int _clk_register(struct device *dev, struct clk_hw *hw, struct clk *clk)
+> +/**
+> + * clk_register - allocate a new clock, register it and return an opaque cookie
+> + * @dev: device that is registering this clock
+> + * @hw: link to hardware-specific clock data
+> + *
+> + * clk_register is the primary interface for populating the clock tree with new
+> + * clock nodes.  It returns a pointer to the newly allocated struct clk which
+> + * cannot be dereferenced by driver code but may be used in conjuction with the
+> + * rest of the clock API.  In the event of an error clk_register will return an
+> + * error code; drivers must test for an error code after calling clk_register.
+> + */
+> +struct clk *clk_register(struct device *dev, struct clk_hw *hw)
+>  {
+>  	int i, ret;
+> +	struct clk *clk;
+> +
+> +	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
+> +	if (!clk) {
+> +		pr_err("%s: could not allocate clk\n", __func__);
+> +		ret = -ENOMEM;
+> +		goto fail_out;
+> +	}
+>  
+>  	clk->name = kstrdup(hw->init->name, GFP_KERNEL);
+>  	if (!clk->name) {
+> @@ -2026,7 +2045,7 @@ static int _clk_register(struct device *dev, struct clk_hw *hw, struct clk *clk)
+>  
+>  	ret = __clk_init(dev, clk);
+>  	if (!ret)
+> -		return 0;
+> +		return clk;
+>  
+>  fail_parent_names_copy:
+>  	while (--i >= 0)
+> @@ -2035,36 +2054,6 @@ fail_parent_names_copy:
+>  fail_parent_names:
+>  	kfree(clk->name);
+>  fail_name:
+> -	return ret;
+> -}
+> -
+> -/**
+> - * clk_register - allocate a new clock, register it and return an opaque cookie
+> - * @dev: device that is registering this clock
+> - * @hw: link to hardware-specific clock data
+> - *
+> - * clk_register is the primary interface for populating the clock tree with new
+> - * clock nodes.  It returns a pointer to the newly allocated struct clk which
+> - * cannot be dereferenced by driver code but may be used in conjuction with the
+> - * rest of the clock API.  In the event of an error clk_register will return an
+> - * error code; drivers must test for an error code after calling clk_register.
+> - */
+> -struct clk *clk_register(struct device *dev, struct clk_hw *hw)
+> -{
+> -	int ret;
+> -	struct clk *clk;
+> -
+> -	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
+> -	if (!clk) {
+> -		pr_err("%s: could not allocate clk\n", __func__);
+> -		ret = -ENOMEM;
+> -		goto fail_out;
+> -	}
+> -
+> -	ret = _clk_register(dev, hw, clk);
+> -	if (!ret)
+> -		return clk;
+> -
+>  	kfree(clk);
+>  fail_out:
+>  	return ERR_PTR(ret);
+> @@ -2173,7 +2162,7 @@ EXPORT_SYMBOL_GPL(clk_unregister);
+>  
+>  static void devm_clk_release(struct device *dev, void *res)
+>  {
+> -	clk_unregister(res);
+> +	clk_unregister(*(struct clk **)res);
+>  }
+>  
+>  /**
+> @@ -2188,18 +2177,18 @@ static void devm_clk_release(struct device *dev, void *res)
+>  struct clk *devm_clk_register(struct device *dev, struct clk_hw *hw)
+>  {
+>  	struct clk *clk;
+> -	int ret;
+> +	struct clk **clkp;
+>  
+> -	clk = devres_alloc(devm_clk_release, sizeof(*clk), GFP_KERNEL);
+> -	if (!clk)
+> +	clkp = devres_alloc(devm_clk_release, sizeof(*clkp), GFP_KERNEL);
+> +	if (!clkp)
+>  		return ERR_PTR(-ENOMEM);
+>  
+> -	ret = _clk_register(dev, hw, clk);
+> -	if (!ret) {
+> -		devres_add(dev, clk);
+> +	clk = clk_register(dev, hw);
+> +	if (!IS_ERR(clk)) {
+> +		*clkp = clk;
+> +		devres_add(dev, clkp);
+>  	} else {
+> -		devres_free(clk);
+> -		clk = ERR_PTR(ret);
+> +		devres_free(clkp);
+>  	}
+>  
+>  	return clk;
+> 
+
+
+-- 
+Sylwester Nawrocki
+Samsung R&D Institute Poland
