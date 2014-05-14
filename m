@@ -1,87 +1,245 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 14 May 2014 09:35:22 -0500
-Subject: [PATCH 1/1] usb: core: Kconfig: refine the description for
- CONFIG_USB_OTG
-In-Reply-To: <20140514140830.GA16307@kroah.com>
-References: <1399947567-18958-1-git-send-email-peter.chen@freescale.com>
- <20140513111144.GA29360@kroah.com>
- <20140513154647.GM1151@saruman.home>
- <dc4c63c13058468db8ad8ec4a22204e8@BN1PR03MB235.namprd03.prod.outlook.com>
- <20140514140830.GA16307@kroah.com>
-Message-ID: <20140514143522.GD2960@saruman.home>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Wed, 14 May 2014 16:49:05 +0200
+Subject: [RFC PATCH 2/9] dt: deps: dependency based device creation
+In-Reply-To: <20140514140534.897F8C4153D@trevor.secretlab.ca>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>	<1399913280-6915-3-git-send-email-holler@ahsoftware.de>
+ <20140514140534.897F8C4153D@trevor.secretlab.ca>
+Message-ID: <53738261.4000000@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 14, 2014 at 04:08:30PM +0200, Greg KH wrote:
-> On Wed, May 14, 2014 at 06:24:51AM +0000, Peter Chen wrote:
-> >  
-> > > 
-> > > On Tue, May 13, 2014 at 01:11:44PM +0200, Greg KH wrote:
-> > > > On Tue, May 13, 2014 at 10:19:27AM +0800, Peter Chen wrote:
-> > > > > the user should only select it when the board supports HNP and SRP,
-> > > > > it should NOT be selected if the board only supports dual-role
-> > > > > switch through ID pin.
-> > > > >
-> > > > > There is a discussion for it:
-> > > > > http://marc.info/?l=linux-arm-kernel&m=139994896101516&w=2
-> > > > > http://marc.info/?l=linux-usb&m=139994881701504&w=2
-> > > > >
-> > > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > > > > ---
-> > > > >  drivers/usb/core/Kconfig |   12 +++++++-----
-> > > > >  1 files changed, 7 insertions(+), 5 deletions(-)
-> > > > >
-> > > > > diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
-> > > > > index cb8e991..158048b 100644
-> > > > > --- a/drivers/usb/core/Kconfig
-> > > > > +++ b/drivers/usb/core/Kconfig
-> > > > > @@ -54,13 +54,15 @@ config USB_OTG
-> > > > >  	default n
-> > > > >  	help
-> > > > >  	  The most notable feature of USB OTG is support for a
-> > > > > -	  "Dual-Role" device, which can act as either a device
-> > > > > -	  or a host. The initial role is decided by the type of
-> > > > > -	  plug inserted and can be changed later when two dual
-> > > > > -	  role devices talk to each other.
-> > > > > +	  otg device, which can act as either a device or a host.
-> > > > > +	  The initial role is decided by the type of plug inserted
-> > > > > +	  and can be changed using HNP (Host Negotiation Protocol)
-> > > > > +	  later when two otg devices talk to each other.
-> > > > >
-> > > > >  	  Select this only if your board has Mini-AB/Micro-AB
-> > > > > -	  connector.
-> > > > > +	  connector and supports HNP and SRP (Session Request Protocol).
-> > > > > +	  If the board only supports dual-role switch through ID
-> > > > > +	  pin, this configuration should not be selected.
-> > > >
-> > > > That's really lame.  What happened to our "all modconfig should work"
-> > > > goal?  Why can't you dynamically detect that this is not a config that
-> > > > works and handle it?
-> > > >
-> > 
-> > If CONFIG_USB_OTG and CONFIG_USB_OTG_WHITELIST are set, most of usb devices
-> > will not work when connect to host for current code.
-> > 
-> > So, we need a feature flag for hcd and gadget, and set this OTG feature flag
-> > if the platform supports it (using dtb or platform data).
-> 
-> Sounds reasonable, and much nicer than just trying to point to a help
-> configuration file that no one will ever read :)
+Am 14.05.2014 16:05, schrieb Grant Likely:
+> On Mon, 12 May 2014 18:47:53 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
+>> Use the properties named 'dependencies' in binary device tree blobs to build
+>> a dependency based initialization order for platform devices and drivers.
+>>
+>> This is done by building a directed acyclic graph using an adjacency list
+>> and doing a topological sort to retrieve the order in which devices/drivers
+>> should be created/initialized.
+>>
+>> Signed-off-by: Alexander Holler <holler@ahsoftware.de>
+>
+> Hi Alexander,
+>
+> Thanks for looking at this. It is a difficult problem. I've made
+> comments below, but first I've got some general comments...
+>
+> First, I'm going to be very cautious about this. It is a complicated
+> piece of code making the device initialization process a lot more
+> complicated than it already is. I'm the first one to admit that deferred
+> probe handles the problem in quite a naive manner, but it is simple,
+> correct (when drivers support deferred probe) and easy to audit. This
+> series digs deep into the registration order of *both* devices and
+> drivers which gives me the heebee jeebees.
 
-yeah, the way OTG Whitelist was implemented is pretty brain dead
-because it prevents anybody from e.g. making an accessory to a
-smartphone and shipping a driver together with an app.
+Sure, but the approach I present is deterministic. The deferred stuff, 
+while it's simple and works, is imho just a workaround. Besides that 
+this series isn't about pro or cons of the deferred probe, the deferred 
+probes I have seen where just the reason why I had a look at what 
+happens. To conclude, I like the deferred probe because it fixes 
+problems, but trying to do things right is much better. And there are 
+already many workarounds trying fix the initialization order (e.g. 
+drivers which classify themself as a subsys), so starting do it right 
+makes imho sense.
 
-That part of the code needs a complete rewrite, what we need is to use
-the bus match to notify that a device is compatible, then everytime a
-new driver is installed, that new device will just work.
+So, I'm sorry if you see this feature as an attack on the deferred probe 
+stuff, it isn't meant as such, no offense here or there.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140514/2ca59049/attachment.sig>
+> Personally, I think the parts of this patch that manipulate the device registration
+> order is entirely the wrong way to handle it. If anything, I would say
+> continue to register the devices, even if the dependencies are unmet.
+
+That would just be a removal of 2 lines. I've no problem with that. ;)
+
+> Instead, I would focus on the driver core (drivers/base) to catch
+> device probe attempts when a known dependency is not met, remember it,
+> and perform the probe after the other driver shows up. That is also
+> going to be a complicated bit of code, but it works for every kind of
+> device, not just platform_devices, and has far less impact on the
+> platform setup code.
+>
+> BTW, this has to be able to work at the level of struct device instead
+> of struct platform_device. There are far more kinds of devices than just
+> platform_device, and they all have the same problem.
+
+Changing to care for devices instead of just drivers is easy to do.
+
+> Also, may I suggest that the more pieces that you can break this series
+> up into, the greater chance you'll have of getting a smaller subset
+> merged earlier if it can be proven to be useful on its own.
+
+Hmm, I don't really care if that will be merged. I have no motivation to 
+fight with Linux kernel maintainers and I don't know if I will spend the 
+necessary time to do so.
+
+
+>> +#ifdef CONFIG_OF_DEPENDENCIES
+>> +		if (!of_init_build_order(NULL, NULL))
+>> +			of_init_create_devices(NULL, NULL);
+>> +		else
+>> +			of_init_free_order();
+>
+> What happens when of_init_build_order() fails? Does the whole system
+> fall over?
+
+Yes. The only reason it can fail is when there is a cycle, and dtc 
+checks (and fails) for that when building the blob (dtb).
+
+>
+>> +#else
+>>   		of_platform_populate(NULL, of_default_bus_match_table,
+>>   					NULL, NULL);
+>>   #endif
+>> +	}
+>> +#endif
+>> +
+>>   	return 0;
+>>   }
+>>   arch_initcall(customize_machine);
+>> @@ -914,7 +924,13 @@ void __init setup_arch(char **cmdline_p)
+>>   		arm_pm_restart = mdesc->restart;
+>>
+>>   	unflatten_device_tree();
+>> -
+>> +#ifdef CONFIG_OF_DEPENDENCIES
+>> +	/*
+>> +	 * No alloc used in of_init_build_order(), therefor it would work
+>> +	 * already here too.
+>> +	 */
+>> +	/* of_init_build_order(NULL, NULL); */
+>> +#endif
+>
+> Stale hunk left in patch?
+
+See here: https://lkml.org/lkml/2014/5/14/102
+
+This are NOT patches meant for final merging!
+
+
+> I would suggest splitting the core graph support into a separate patch
+> to keep things smaller and to keep the behaviour changes separate from
+> the support function additions.
+
+Could be done.
+
+>
+>> +
+>> +
+>> +/* Copied from drivers/of/base.c (because it's lockless). */
+>
+> Copying isn't a good idea. The function will need to be made accessible
+> to other files in the drivers/of directory.
+
+See above.
+
+
+>> +int __init of_init_build_order(struct device_node *root,
+>> +			const struct of_device_id *matches)
+>> +{
+>> +	struct device_node *child;
+>> +	int rc = 0;
+>> +
+>> +	root = root ? of_node_get(root) : of_find_node_by_path("/");
+>> +	if (unlikely(!root))
+>> +		return -EINVAL;
+>> +
+>> +	calc_max_phandle();
+>> +	order.old_max_phandle = order.max_phandle;
+>> +
+>> +	for_each_child_of_node(root, child) {
+>> +		rc = add_deps(root, child, matches);
+>> +		if (unlikely(rc))
+>> +			break;
+>> +	}
+>> +
+>> +	of_node_put(root);
+>> +	topological_sort();
+>
+> Can the sort be performed incrementally? The DT is a dynamic structure
+> on some platforms. Search for OF_RECONFIG_. There is work in progress to
+> add overlay support to the device tree so that batches of new nodes can
+> be added to the tree after userspace has started. The dependency code
+> will need to handle that situation gracefully.
+
+The stuff I present is only about what happens before userspace starts 
+and is all gone away when userspace start. I know about the overlay 
+support (e.g. for bbb-capes), but I don't care. So there is no need to 
+think about what happens if such happens.
+
+> I don't like that of_init_create_devices() has a completely different
+> calling convention from of_platform_populate(). of_platform_populate()
+> is passed a match table for devices that are to act as buses (which
+> means register the children also). This function is passed a blacklist
+> instead which is a completely different semantic.
+
+Acting on buses is a workaround.
+
+>
+> That means it cannot be used by device drivers that register their own
+> children and it has to make a lot of assumptions about what should and
+> should not be registered as platform_devices.
+>
+> How does the dependency code decide which devices can be
+> platform_devices? It's not clear to me from what I've read so far.
+
+Dependencies currently are only considered on stuff which has a 
+"compatibility" property, thus drivers. I wanted to get the drivers 
+loaded in order, not really caring for devices. Let me quote from 
+(outdated) ldd3:
+
+"For the most part, the Linux device model code takes care of all these 
+considerations without imposing itself upon driver authors. It sits 
+mostly in the background; direct interaction with the device model is 
+generally handled by bus-level logic and various other kernel 
+subsystems. As a result, many driver authors can ignore the device model 
+entirely, and trust it to take care of itself."
+
+So do I. ;)
+
+>
+>> +
+>> +	for (i = 0; i < order.count; ++i) {
+>> +		struct device_node *node = order.order[i];
+>> +		uint32_t parent_ph = order.parent_by_phandle[node->phandle];
+>> +
+>> +		if (unlikely(blacklist &&
+>> +				of_match_node(blacklist, node))) {
+>> +			of_node_put(node);
+>> +			continue;
+>> +		}
+>> +		if (unlikely(parent_ph &&
+>> +			!order.device_by_phandle[parent_ph])) {
+>> +			/* init of parent failed */
+>> +			of_node_put(node);
+>> +			continue;
+>> +		}
+>> +		dev = of_dependencies_device_create(node, lookup,
+>> +			order.device_by_phandle[parent_ph]);
+>> +		if (dev)
+>> +			order.device_by_phandle[node->phandle] = &dev->dev;
+>> +		of_node_put(node);
+>> +	}
+>> +	/* remove_new_phandles(); */
+>> +}
+>
+> I could use some help understanding what is being done here. It looks
+> like it is going through and only registering devices that have a
+> dependency parent already created, or don't have a parent at all. Am I
+> correct?
+
+Yes, that part assumes that if a parent is present, the parent is needed 
+and it doesn't make sense to create a device if the parent already 
+failed. That are those two lines I mentioned above.
+
+>
+> It looks like this patch alone will break the kernel because it depends
+> also on the functionality in patch 5. The patches would need to be
+> reordered to handle that situation.
+
+I currently don't care if this feature breaks something. Therefor it is 
+marked in big letters as experimental. But I already see you don't want 
+it and you see it all as an offense.
+
+Regards,
+
+Alexander Holler
