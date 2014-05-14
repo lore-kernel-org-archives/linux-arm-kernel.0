@@ -1,93 +1,64 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 May 2014 15:33:17 +0100
-Subject: [PATCH v3 17/19] arm64: KVM: move hcr_el2 setting into
- vgic-v2-switch.S
-In-Reply-To: <20140509140723.GR3362@lvm> (Christoffer Dall's message of "Fri,
- 9 May 2014 15:07:23 +0100")
-References: <1397655591-2761-1-git-send-email-marc.zyngier@arm.com>
- <1397655591-2761-18-git-send-email-marc.zyngier@arm.com>
- <20140509140723.GR3362@lvm>
-Message-ID: <87ha4sh1le.fsf@approximate.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 May 2014 16:33:46 +0200
+Subject: [PATCH v4 7/8] ARM: Exynos: switch to using generic cpufreq-cpu0
+ driver
+In-Reply-To: <CAL_JsqL0Yi=SjAm0BtS_2SO2xg8kOaLsydo9m6qcZgb+Pcpa8Q@mail.gmail.com>
+References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
+ <61090198.zodNL4xIig@wuerfel>
+ <CAL_JsqL0Yi=SjAm0BtS_2SO2xg8kOaLsydo9m6qcZgb+Pcpa8Q@mail.gmail.com>
+Message-ID: <11343238.VgTHVsC3iv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09 2014 at  3:07:23 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Wed, Apr 16, 2014 at 02:39:49PM +0100, Marc Zyngier wrote:
->> GICv3 requires the hcr_el2 switch to be tightly coupled with some
->> of the interrupt controller's register switch.
->
-> can you be more specific, this feels a bit odd, enabling Stage-2
-> translation and configuring all traps from within the vgic code...
+On Wednesday 14 May 2014 08:45:23 Rob Herring wrote:
+> On Wed, May 14, 2014 at 8:18 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 14 May 2014 18:44:46 Viresh Kumar wrote:
+> >> On 14 May 2014 18:41, Heiko St?bner <heiko@sntech.de> wrote:
+> >> > Am Mittwoch, 14. Mai 2014, 18:35:29 schrieb Viresh Kumar:
+> >> >> On 14 May 2014 18:20, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> >> > Could we please come up with a way to probe this from DT in the
+> >> >> > cpufreq-cpu0 driver itself, so we don't have to add a device in every
+> >> >> > platform using it?
+> >>
+> >> >> Its followed that way because DT Maintainers had strong objections
+> >> >> to creating virtual device nodes and haven't allowed creation of nodes
+> >> >> for cpufreq drivers.. For which there is no physical device, as CPU already
+> >> >> has a separate node..
+> >> >
+> >> > as we already have the "enable-method" property for enabling/disabling cpus,
+> >> > would something like a "scaling-method" be feasible?
+> >
+> > Good idea to put it as a property into the CPU node.
+> 
+> We already have properties which indicate this driver can be used by a
+> platform: opp table and a clock for the cpu. If this information is
+> not sufficient to determine whether you can use this driver or not,
+> then you simply need to match against the platform. Perhaps the match
+> list should be a blacklist rather than a whitelist, so new platforms
+> work without a kernel change.
 
-The IMO and FMO bits must be set before restoring the various system
-registers in GICv3. But I agreee that this looks pretty horrible.
+We'd not only need a blacklist, but also a way to tell whether we
+want to use the cpu0 or the big/little implementation, which currently
+have indistinguishable bindings.
 
-The alternative is to split the bits we set in HCR_EL2 into two sets (VM
-and trap control on one side, interrupt control on the other). This
-would translate into two accesses to HCR_EL2, but it would look
-nicer. I'll have a look.
+> Alternatively, create a new OPP binding that addresses this and all
+> the other limitations in the current OPP binding.
 
->> In order to have similar code paths, start moving the hcr_el2
->> manipulation code to the GICv2 switch code.
->> 
->> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/kvm/hyp.S            | 7 -------
->>  arch/arm64/kvm/vgic-v2-switch.S | 8 ++++++++
->>  2 files changed, 8 insertions(+), 7 deletions(-)
->> 
->> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
->> index aed72d0..92b9120 100644
->> --- a/arch/arm64/kvm/hyp.S
->> +++ b/arch/arm64/kvm/hyp.S
->> @@ -335,11 +335,6 @@
->>  .endm
->>  
->>  .macro activate_traps
->> -	ldr	x2, [x0, #VCPU_IRQ_LINES]
->> -	ldr	x1, [x0, #VCPU_HCR_EL2]
->> -	orr	x2, x2, x1
->> -	msr	hcr_el2, x2
->> -
->>  	ldr	x2, =(CPTR_EL2_TTA)
->>  	msr	cptr_el2, x2
->>  
->> @@ -353,8 +348,6 @@
->>  .endm
->>  
->>  .macro deactivate_traps
->> -	mov	x2, #HCR_RW
->> -	msr	hcr_el2, x2
->>  	msr	cptr_el2, xzr
->>  	msr	hstr_el2, xzr
->>  
->> diff --git a/arch/arm64/kvm/vgic-v2-switch.S b/arch/arm64/kvm/vgic-v2-switch.S
->> index c5dc777..d36cd7a 100644
->> --- a/arch/arm64/kvm/vgic-v2-switch.S
->> +++ b/arch/arm64/kvm/vgic-v2-switch.S
->> @@ -85,6 +85,9 @@ CPU_BE(	rev	w5, w5 )
->>  	sub	w4, w4, #1
->>  	cbnz	w4, 1b
->>  2:
->> +	mov	x2, #HCR_RW
->> +	msr	hcr_el2, x2
->> +	isb
->>  .endm
->>  
->>  /*
->> @@ -92,6 +95,11 @@ CPU_BE(	rev	w5, w5 )
->>   * x0: Register pointing to VCPU struct
->>   */
->>  .macro restore_vgic_v2_state
->> +	ldr	x2, [x0, #VCPU_IRQ_LINES]
->
-> will this ever have any values on aarch64?  Don't we mandate vgic
-> support and bail out during hyp init if we cannot init a vgic?
+Yes.
 
-Yes. But that doesn't mean we don't support the feature either. The case
-is fairly slim, I agree, but it has been there since Day-1...
+> >> Lets see what DT maintainers have to say on this, I would rather go for a
+> >> more straight forward name: "scaling-driver"  ..
+> >
+> > Both sound fine to me.
+> 
+> The fact that linux needs a way to create a platform device to enable
+> a certain driver is not a DT problem. I proposed a solution for how to
+> get this out of the platform code [1], but evidently we want people to
+> open code the exceptions and adding boilerplate helpers will just
+> encourage the exceptions.
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+I think the only benefit we have from using platform devices at all
+for cpufreq (not for cpuidle, which has a similar problem) is module
+autoloading. I think your patch doesn't actually help with that.
+
+	Arnd
