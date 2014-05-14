@@ -1,66 +1,87 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 14 May 2014 16:58:44 +0100
-Subject: [RFC 7/8] ARM: VIC: Add vic_set_fiq function to select if an
- interrupt should generate an IRQ or FIQ
+Date: Wed, 14 May 2014 16:58:43 +0100
+Subject: [RFC 6/8] serial: asc: Add support for KGDB's FIQ/NMI mode
 In-Reply-To: <1400083125-1464-1-git-send-email-daniel.thompson@linaro.org>
 References: <1400083125-1464-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1400083125-1464-8-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1400083125-1464-7-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arve Hj?nnev?g <arve@android.com>
+For a serial driver to support FIQ/NMI debugging it must enable the RX
+interrupt when a polling client attaches itself (otherwise the FIQ signal
+will never be asserted). This concept is copied from similar code in
+amba-pl011.c .
 
-Signed-off-by: Arve Hj?nnev?g <arve@android.com>
+It must also register the appropriate FIQ number with kgdb. kgdb will use
+this to make calls to enable_fiq/disable_fiq/eoi_fiq. The FIQ number must
+be supplied via the devices bus (in this case platform bus).
+
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 ---
- drivers/irqchip/irq-vic.c       | 23 +++++++++++++++++++++++
- include/linux/irqchip/arm-vic.h |  1 +
- 2 files changed, 24 insertions(+)
+ drivers/tty/serial/st-asc.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
-index 7d35287..3eaa2e4 100644
---- a/drivers/irqchip/irq-vic.c
-+++ b/drivers/irqchip/irq-vic.c
-@@ -337,6 +337,29 @@ static void vic_unmask_irq(struct irq_data *d)
- 	writel(1 << irq, base + VIC_INT_ENABLE);
+diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
+index c7f61ac..e93803f 100644
+--- a/drivers/tty/serial/st-asc.c
++++ b/drivers/tty/serial/st-asc.c
+@@ -30,6 +30,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/serial_core.h>
+ #include <linux/clk.h>
++#include <linux/kgdb.h>
+ 
+ #define DRIVER_NAME "st-asc"
+ #define ASC_SERIAL_NAME "ttyAS"
+@@ -613,6 +614,14 @@ asc_verify_port(struct uart_port *port, struct serial_struct *ser)
  }
  
-+static DEFINE_SPINLOCK(vic_intselect_lock);
-+int vic_set_fiq(unsigned int irq, bool enable)
+ #ifdef CONFIG_CONSOLE_POLL
++static int asc_poll_init(struct uart_port *port)
 +{
-+	u32 int_select;
-+	u32 mask;
-+	unsigned long irq_flags;
-+	void __iomem *base = irq_get_chip_data(irq);
-+	irq &= 31;
-+	mask = 1 << irq;
-+
-+	spin_lock_irqsave(&vic_intselect_lock, irq_flags);
-+	int_select = readl(base + VIC_INT_SELECT);
-+	if (enable)
-+		int_select |= mask;
-+	else
-+		int_select &= ~mask;
-+	writel(int_select, base + VIC_INT_SELECT);
-+	spin_unlock_irqrestore(&vic_intselect_lock, irq_flags);
++	/* enable RX interrupts in case the interrupt is used for NMI entry. */
++	asc_enable_rx_interrupts(port);
 +
 +	return 0;
 +}
-+EXPORT_SYMBOL(vic_set_fiq);
 +
- #if defined(CONFIG_PM)
- static struct vic_device *vic_from_irq(unsigned int irq)
- {
-diff --git a/include/linux/irqchip/arm-vic.h b/include/linux/irqchip/arm-vic.h
-index ba46c79..61ee4c9 100644
---- a/include/linux/irqchip/arm-vic.h
-+++ b/include/linux/irqchip/arm-vic.h
-@@ -34,5 +34,6 @@ void __vic_init(void __iomem *base, int parent_irq, int irq_start,
- void vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources, u32 resume_sources);
- int vic_init_cascaded(void __iomem *base, unsigned int parent_irq,
- 		      u32 vic_sources, u32 resume_sources);
-+int vic_set_fiq(unsigned int irq, bool enable);
+ /*
+  * Console polling routines for writing and reading from the uart while
+  * in an interrupt or debug context (i.e. kgdb).
+@@ -656,11 +665,25 @@ static struct uart_ops asc_uart_ops = {
+ 	.verify_port	= asc_verify_port,
+ 	.pm		= asc_pm,
+ #ifdef CONFIG_CONSOLE_POLL
++	.poll_init     = asc_poll_init,
+ 	.poll_get_char = asc_get_poll_char,
+ 	.poll_put_char = asc_put_poll_char,
+ #endif /* CONFIG_CONSOLE_POLL */
+ };
  
- #endif
++#ifdef CONFIG_KGDB_FIQ
++/* Register with KGDB if there is a FIQ linked to this device */
++static void asc_register_fiq(struct platform_device *pdev)
++{
++	int fiq = platform_get_irq(pdev, 1);
++	if (fiq >= 0)
++		kgdb_register_fiq(fiq);
++}
++#else
++static void asc_register_fiq(struct platform_device *pdev) {}
++#endif
++
++
+ static int asc_init_port(struct asc_port *ascport,
+ 			  struct platform_device *pdev)
+ {
+@@ -692,6 +715,8 @@ static int asc_init_port(struct asc_port *ascport,
+ 	WARN_ON(ascport->port.uartclk == 0);
+ 	clk_disable_unprepare(ascport->clk);
+ 
++	asc_register_fiq(pdev);
++
+ 	return 0;
+ }
+ 
 -- 
 1.9.0
