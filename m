@@ -1,116 +1,47 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 14 May 2014 13:48:14 +0200
-Subject: [PATCH 6/8] clk: berlin: add core clock driver for BG2/BG2CD
-In-Reply-To: <20140514114315.GJ29318@piout.net>
-References: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1399839881-29895-7-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140514114315.GJ29318@piout.net>
-Message-ID: <537357FE.2050803@gmail.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 14 May 2014 13:50:02 +0200
+Subject: [PATCH 1/9] ARM: STi: DT: STiH416: 416 DT Entry for clockgen
+ A0/1/10/11/12
+In-Reply-To: <20140508080344.GE5307@lee--X1>
+References: <1399305223-18703-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1399305223-18703-2-git-send-email-gabriel.fernandez@linaro.org>
+ <20140506071843.GD5206@lee--X1>
+ <CAG374jD+msPPbPtFS+ji=8jS9+D-YHu31k7zzzC7Ty7jw9n7jQ@mail.gmail.com>
+ <20140508080344.GE5307@lee--X1>
+Message-ID: <5373586A.5000302@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2014 01:43 PM, Alexandre Belloni wrote:
-> On 11/05/2014 at 22:24:39 +0200, Sebastian Hesselbarth wrote :
->> This driver deals with the core clocks found on Marvell Berlin
->> BG2 and BG2CD. For the shared register dividers, make use of the
->> corresponding driver and add some single clock muxes and gates for
->> the rest.
->>
->> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-[...]
->> diff --git a/drivers/clk/berlin/bg2.c b/drivers/clk/berlin/bg2.c
->> new file mode 100644
->> index 000000000000..7fe04e11861b
->> --- /dev/null
->> +++ b/drivers/clk/berlin/bg2.c
->> @@ -0,0 +1,509 @@
->> +/*
->> + * Copyright (c) 2014 Marvell Technology Group Ltd.
->> + *
->> + * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> + * Alexandre Belloni <alexandre.belloni@free-electrons.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->> + * more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along with
->> + * this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/clk-provider.h>
->> +#include <linux/io.h>
->> +#include <linux/kernel.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/slab.h>
->> +
->> +#include "berlin2-div.h"
->> +
->> +/*
->> + * BG2/BG2CD SoCs have the following audio/video I/O units:
->> + *
->> + * audiohd: HDMI TX audio
->> + * audio0:  7.1ch TX
->> + * audio1:  2ch TX
->> + * audio2:  2ch RX
->> + * audio3:  SPDIF TX
->> + * video0:  HDMI video
->> + * video1:  Secondary video
->> + * video2:  SD auxiliary video
->> + *
->> + * There are no external audio clocks (ACLKI0, ACLKI1) and
->> + * only one external video clock (VCLKI0).
->> + *
->> + * Currently missing bits and pieces:
->> + * - audio_fast_pll is unknown
->> + * - audiohd_pll is unknown
->> + * - video0_pll is unknown
->> + * - audio[023], audiohd parent pll is assumed to be audio_fast_pll
->> + *
->> + */
->> +
->> +struct bg2_gate_data {
->> +	const char *name;
->> +	const char *parent_name;
->> +	u8 bit_idx;
->> +	unsigned long flags;
->> +};
->> +
->> +#define REG_CLKENABLE		0x00
->> +#define REG_CLKSELECT0		0x04
->> +#define REG_CLKSELECT1		0x08
->> +#define REG_CLKSELECT2		0x0c
->> +#define REG_CLKSELECT3		0x10
->> +#define REG_CLKSWITCH0		0x14
->> +#define REG_CLKSWITCH1		0x18
->> +
->> +enum {
->> +	/* clock divider cells */
->> +	SYS, CPU, DRMFIGO, CFG, GFX, ZSP, PERIF, PCUBE, VSCOPE, NFC_ECC,
->> +	VPP, APP, AUDIO0, AUDIO2, AUDIO3, AUDIO1,
->> +	/* clock gates */
->> +	GETH0, GETH1, SATA, AHBAPB, USB0, USB1, PBRIDGE, SDIO0, SDIO1,
->> +	NFC, SMEMC, AUDIOHD, VIDEO0, VIDEO1, VIDEO2,
->> +	MAX_CLKS
->> +};
->> +
+Hi Lee,
+
+On 05/08/2014 10:03 AM, Lee Jones wrote:
+>>>> Patch adds DT entries for clockgen A0/1/10/11/12
+>>>>
+>>>> Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
+>>>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+>>>> ---
+>>>>   arch/arm/boot/dts/stih416-clks.h     |  15 ++
+>>>
+>>> This should live in include/dt-bindings/clk
+>>>
+>> include/dt-bindings/clk or  include/dt-bindings/clock ?
 >
-> Shouldn't you reuse the CLKID_* that you are introducing in
-> dt-bindings/clock/berlin2.h in a following patch there ?
-> That would prevent inconsistencies.
+> I have no idea what the difference between the two are.  I guess you
+> are in a better position to answer that.  My point was just that the
+> includes should be in the include directory, rather than being held
+> locally in the 'dts' directory.
 
-I didn't follow the discussion of whether it is reasonable to
-include dt-bindings/foo.h into driver code. But a quick git grep
-reveals at least some drivers do it.
+Even if these .h files are only used by the DTS files??
 
-So, yes, if that is still valid, I fix it up to reuse the dt-binding
-include here.
+There are some .h files for pincfg related stuff, shouldn't we do the 
+same in this case?
 
-Sebastian
+Regards,
+Maxime
+
+>
+>>>>   arch/arm/boot/dts/stih416-clock.dtsi | 477 ++++++++++++++++++++++++++++++++++
+>>>>   arch/arm/boot/dts/stih416.dtsi       |  10 +-
+>>>>   3 files changed, 497 insertions(+), 5 deletions(-)
+>>>>   create mode 100644 arch/arm/boot/dts/stih416-clks.h
+>
