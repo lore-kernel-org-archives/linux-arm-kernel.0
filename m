@@ -1,100 +1,65 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Wed, 14 May 2014 19:45:54 +0200
-Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
- initialization order based on the DT)
-In-Reply-To: <CAL_JsqJB4CAO60m1HTGQGHQRYVWcARxm_roOhn-PJh+ZR7OONg@mail.gmail.com>
-References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>	<20140514141914.446F7C4153D@trevor.secretlab.ca>	<53738580.7000902@ahsoftware.de>	<CACxGe6s4px_9CNk3bkc1OF1KGZGYdyh4gE_VufCKU5dLFBG48g@mail.gmail.com>	<53739871.9070407@ahsoftware.de>
- <CAL_JsqJB4CAO60m1HTGQGHQRYVWcARxm_roOhn-PJh+ZR7OONg@mail.gmail.com>
-Message-ID: <5373ABD2.9010508@ahsoftware.de>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 14 May 2014 10:44:42 -0700
+Subject: [PATCH v4 2/6] dt-bindings: add mtk-timer bindings
+In-Reply-To: <1400087579-4250-3-git-send-email-matthias.bgg@gmail.com>
+References: <1400087579-4250-1-git-send-email-matthias.bgg@gmail.com>
+ <1400087579-4250-3-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <cebe44ba-c543-4f4a-9aeb-810156fe8250@BN1AFFO11FD036.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 14.05.2014 19:30, schrieb Rob Herring:
-> On Wed, May 14, 2014 at 11:23 AM, Alexander Holler <holler@ahsoftware.de> wrote:
->> Am 14.05.2014 18:05, schrieb Grant Likely:
->>
->>> On Wed, May 14, 2014 at 4:02 PM, Alexander Holler <holler@ahsoftware.de>
->>> wrote:
->>>>
->>>> Am 14.05.2014 16:19, schrieb Grant Likely:
->>>>
->>>>
->>>>> Rather than a dtb schema change, for the most common properties (irqs,
->>>>> clocks, gpios), we could extract dependencies at boot time. I don't like
->>>>> the idea of adding a separate depends-on property because it is very
->>>>> easy to get it out of sync with the actual binding data (dtc is not the
->>>>> only tool that manipulates .dtbs. Firmware will fiddle with it too).
->>>>
->>>>
->>>>
->>>> Then that stuff has to fiddle correct. Sorry, but trying to solve all
->>>> problems right from the beginning just leads to endless talks with no end
->>>> and nothing will happen at all because nobody aggrees how to start.
->>>
->>>
->>> I appreciate the problem that you're trying to solve and why you're
->>> using the dtc approach. My job is to poke at the solution and make
->>> sure it is going to be reliable. Making sure all users know how to
->>> fiddle with the new property correctly is not a trivial problem,
->>> especially when it is firmware that will not necessarily be updated.
->>
->>
->> The answer is just that they don't have to use this feature.
->
-> It's not just about users, but maintainers have to carry the code and
-> anything tied to DT is difficult to change or remove.
->
-> Lots of inter-dependencies are already described in DT. We should
-> leverage those first and then look at how to add dependencies that are
-> not described.
+Hi Matthias,
 
-Again, that's what this feature is about. One of the problems it solves 
-is that those dependencies which are described in the DT source in form 
-of phandle reference, do disappear in the blobs because the init-system 
-would have to know all bindings in order to identify phandle references 
-(the dependencies) again.
+On Wed, 2014-05-14 at 07:12PM +0200, Matthias Brugger wrote:
+> Add binding documentation for the General Porpose Timer driver of
+> the Mediatek SoCs.
+> 
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
+>  .../devicetree/bindings/timer/mediatek,mtk-timer.txt   | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+> new file mode 100644
+> index 0000000..938adf6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+> @@ -0,0 +1,18 @@
+> +Mediatek MT6589, MT6577 and MT6572 Timers
+> +---------------------------------------
+> +
+> +Required properties:
+> +- compatible: Should be "mediatek,mtk6589-timer"
 
->> It is more meant as a long-term solution to fix for the problem of
->> increasing hard-coded workarounds which all are trying to fix the
->> initialization order of drivers. Hardware has become a lot more complicated
->> than it was in the good old days, and I think the time is right trying to
->> adopt the init-system to this new century instead of still adding
->> workarounds here and there.
->
-> I don't know when the good old days were, but this has been a problem
-> in embedded systems for as long as I have worked on Linux.
+Don't you want compatible strings for the other supported SOCs too?
 
-Yes, but stuff wasn't as complicated as today, which means it was 
-relatively easy to manualy solve dependency problems. But if you look at 
-complicated SOCs like the OMAP, it's much better to let the machine 
-solve the dependencies to get the initialization order instead of still 
-trying to do this manually.
+> +- reg: Should contain location and length for timers register.
+> +- clocks: Clocks driving the timer hardware. This list shoud include two
+> +	clocks. The order is system clock and as second clock the RTC clock.
 
->>> I'm not saying flat out 'no' here, but before I merge anything, I have
->>> to be reasonably certain that the feature is not going to represent a
->>> maintenance nightmare over the long term.
->>
->>
->> The maintenance nightmare is already present in form of all the workarounds
->> which are trying to fix the initialzation order necessary for modern
->> hardware.
->
-> Do you have concrete examples or cases where deferred probe does not work?
+Sorry for being pedantic, but we had so many ugly bindings in our vendor
+tree. I'm still getting caught up on the clocks. I have the feeling the SOC
+has two clocks (system and rtc) which are used to drive this timer,
+while the timer probably refers differently to its clock inputs.
+If this was the case, the names 'rtc' and 'system' clock are SOC specific
+names/implementation details. From the timer perspective it is probably
+just important that it receives two clock inputs. Since the timer is
+described here and not the SOC, these SOC specific names should
+disappear and be replaced with the names the timer IP uses for its input
+clocks.
 
-Why do people come back to the deferred probe stuff?
+The clock-names should be listed too, probably as optional properties.
 
-One of the biggest problem of the deferred probe stuff is the problem 
-how to identify real problems if everything ends up with a deferred 
-probe when an error occurs? That means if you display an error whenever 
-something is deferred, the log becomes almost unreadable. If you don't 
-display an error, you never will see an error. And how do you display 
-the real error when deferred probes finally do fail? The deferred probe 
-stuff doesn't has any information about the underlying error, so it 
-can't display it.
+> +
+> +Examples:
+> +
+> +	timer {
+> +		compatible = "mediatek,mtk6589-timer";
+> +		reg = <0x10008000 0x80>;
+> +		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&system_clk>, <&rtc_clk>;
+> +		clock-names = "system-clk", "rtc-clk";
 
-Anyway, this feature is totally independ of the deferred probe stuff and 
-both can friendly live together.
 
-Regards,
-
-Alexander Holler
+	S?ren
