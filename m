@@ -1,146 +1,53 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 14 May 2014 23:09:25 +0200
-Subject: [PATCH] arm: msm: remove board file for the HTC Sapphire device
-Message-ID: <1400101765.9826.6.camel@x220>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Wed, 14 May 2014 23:10:39 +0200
+Subject: [RFC PATCH 2/9] dt: deps: dependency based device creation
+In-Reply-To: <20140514200645.15984C4095B@trevor.secretlab.ca>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>	<1399913280-6915-3-git-send-email-holler@ahsoftware.de>	<20140514140534.897F8C4153D@trevor.secretlab.ca>	<53738261.4000000@ahsoftware.de>
+ <20140514200645.15984C4095B@trevor.secretlab.ca>
+Message-ID: <5373DBCF.1080503@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 614ad9814850 ("arm: msm: add board file for the HTC Sapphire
-device") added just board-sapphire.c. It did not add board-sapphire.h,
-Makefile changes or Kconfig changes.
+Am 14.05.2014 22:06, schrieb Grant Likely:
+> On Wed, 14 May 2014 16:49:05 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
+>> Am 14.05.2014 16:05, schrieb Grant Likely:
+>>> On Mon, 12 May 2014 18:47:53 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
 
-Four years have passed and this file is still dangling. Remove it.
+>> Hmm, I don't really care if that will be merged. I have no motivation to 
+>> fight with Linux kernel maintainers and I don't know if I will spend the 
+>> necessary time to do so.
+> 
+> The people you need to convince are Rob, Greg, and me, and you've got my
+> attention. If I'm convinced, then I can probably convince Greg also.
+> You've got an interesting approach, and I hope you won't give up on it.
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Also untested.
+Sorry, but that point of the view is already a problem. Why do I have to
+convince you people?
 
- arch/arm/mach-msm/board-sapphire.c | 117 -------------------------------------
- 1 file changed, 117 deletions(-)
- delete mode 100644 arch/arm/mach-msm/board-sapphire.c
+To summarize:
 
-diff --git a/arch/arm/mach-msm/board-sapphire.c b/arch/arm/mach-msm/board-sapphire.c
-deleted file mode 100644
-index 327605174d63..000000000000
---- a/arch/arm/mach-msm/board-sapphire.c
-+++ /dev/null
-@@ -1,117 +0,0 @@
--/* linux/arch/arm/mach-msm/board-sapphire.c
-- * Copyright (C) 2007-2009 HTC Corporation.
-- * Author: Thomas Tsai <thomas_tsai@htc.com>
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
--*/
--#include <linux/gpio.h>
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/input.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
--#include <linux/device.h>
--
--#include <linux/delay.h>
--
--#include <mach/hardware.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/map.h>
--#include <asm/mach/flash.h>
--#include <mach/vreg.h>
--
--#include <asm/io.h>
--#include <asm/delay.h>
--#include <asm/setup.h>
--
--#include <linux/mtd/nand.h>
--#include <linux/mtd/partitions.h>
--
--#include "gpio_chip.h"
--#include "board-sapphire.h"
--#include "proc_comm.h"
--#include "devices.h"
--#include "common.h"
--
--void msm_init_irq(void);
--void msm_init_gpio(void);
--
--static struct platform_device *devices[] __initdata = {
--	&msm_device_smd,
--	&msm_device_dmov,
--	&msm_device_nand,
--	&msm_device_uart1,
--	&msm_device_uart3,
--};
--
--void msm_timer_init(void);
--
--static void __init sapphire_init_irq(void)
--{
--	msm_init_irq();
--}
--
--static void __init sapphire_init(void)
--{
--	platform_add_devices(devices, ARRAY_SIZE(devices));
--}
--
--static struct map_desc sapphire_io_desc[] __initdata = {
--	{
--		.virtual = SAPPHIRE_CPLD_BASE,
--		.pfn     = __phys_to_pfn(SAPPHIRE_CPLD_START),
--		.length  = SAPPHIRE_CPLD_SIZE,
--		.type    = MT_DEVICE_NONSHARED
--	}
--};
--
--static void __init sapphire_fixup(struct tag *tags, char **cmdline,
--				  struct meminfo *mi)
--{
--	int smi_sz = parse_tag_smi((const struct tag *)tags);
--
--	mi->nr_banks = 1;
--	mi->bank[0].start = PHYS_OFFSET;
--	mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
--	if (smi_sz == 32) {
--		mi->bank[0].size = (84*1024*1024);
--	} else if (smi_sz == 64) {
--		mi->bank[0].size = (101*1024*1024);
--	} else {
--		/* Give a default value when not get smi size */
--		smi_sz = 64;
--		mi->bank[0].size = (101*1024*1024);
--	}
--}
--
--static void __init sapphire_map_io(void)
--{
--	msm_map_common_io();
--	iotable_init(sapphire_io_desc, ARRAY_SIZE(sapphire_io_desc));
--	msm_clock_init();
--}
--
--static void __init sapphire_init_late(void)
--{
--	smd_debugfs_init();
--}
--
--MACHINE_START(SAPPHIRE, "sapphire")
--/* Maintainer: Brian Swetland <swetland@google.com> */
--	.atag_offset    = 0x100,
--	.fixup          = sapphire_fixup,
--	.map_io         = sapphire_map_io,
--	.init_irq       = sapphire_init_irq,
--	.init_machine   = sapphire_init,
--	.init_late      = sapphire_init_late,
--	.init_time	= msm_timer_init,
--MACHINE_END
--- 
-1.9.0
+Linux kernel maintainers
+
+- don't like code they haven't written theirself,
+- don't like code which doesn't look like they have written it theirself,
+- don't like ideas they haven't had themself,
+- do feel good in their closed group they have formed,
+...
+
+You see, I long have given up. The reason I still posted these patches
+is just because I don't care anymore about Linux kernel maintainers at
+all. I was prepared that I do that just for the fun of annoying some
+Linux kernel maintainers. I've already decided some time ago that I just
+will post my patches once to the LKML (so that other poor Linux kernel
+users may find them) and will ignore Linux kernel maintainers.
+
+Sorry, but I have a long and very unpleasant history in dealing with
+Linux kernel maintainers, and they already have called me almost
+anything like "ugly code writer", "frustrated" and such things more.
+
+Fortunately I'm too old to care about such, that's why I still post
+patches (besides that I like to solve problems and help other people). ;)
+
+Regards,
+
+Alexander Holler
