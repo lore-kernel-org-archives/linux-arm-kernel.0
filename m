@@ -1,10 +1,10 @@
 From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Wed, 14 May 2014 19:31:08 +0530
-Subject: [PATCH v6 6/8] ARM: dts: exynos5420-peach-pit: Add Vbus regulator for
+Date: Wed, 14 May 2014 19:31:09 +0530
+Subject: [PATCH v6 7/8] ARM: dts: exynos5420-smdk5420: Add Vbus regulator for
  USB 3.0
 In-Reply-To: <1400076070-12456-1-git-send-email-gautam.vivek@samsung.com>
 References: <1400076070-12456-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1400076070-12456-7-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1400076070-12456-8-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,24 +13,46 @@ controller phy.
 
 Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
 ---
- arch/arm/boot/dts/exynos5420-peach-pit.dts |   46 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5420-smdk5420.dts |   46 +++++++++++++++++++++++++++++
  1 file changed, 46 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index fae33dd..8402ec3 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -58,6 +58,28 @@
- 		pinctrl-0 = <&pwm0_out>;
- 		pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+index 6910485..6053c9f 100644
+--- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
++++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+@@ -140,6 +140,22 @@
+ 		};
  	};
+ 
++	pinctrl at 14000000 {
++		usb300_vbus_en: usb300-vbus-en {
++			samsung,pins = "gpg0-5";
++			samsung,pin-function = <1>;
++			samsung,pin-pud = <0>;
++			samsung,pin-drv = <0>;
++		};
 +
++		usb301_vbus_en: usb301-vbus-en {
++			samsung,pins = "gpg1-4";
++			samsung,pin-function = <1>;
++			samsung,pin-pud = <0>;
++			samsung,pin-drv = <0>;
++		};
++	};
++
+ 	hdmi at 14530000 {
+ 		status = "okay";
+ 		hpd-gpio = <&gpx3 7 0>;
+@@ -147,6 +163,36 @@
+ 		pinctrl-0 = <&hdmi_hpd_irq>;
+ 	};
+ 
 +	usb300_vbus_reg: regulator-usb300 {
 +		compatible = "regulator-fixed";
-+		regulator-name = "P5.0V_USB3CON0";
++		regulator-name = "VBUS0";
 +		regulator-min-microvolt = <5000000>;
 +		regulator-max-microvolt = <5000000>;
-+		gpio = <&gph0 0 0>;
++		gpio = <&gpg0 5 0>;
 +		pinctrl-names = "default";
 +		pinctrl-0 = <&usb300_vbus_en>;
 +		enable-active-high;
@@ -38,54 +60,25 @@ index fae33dd..8402ec3 100644
 +
 +	usb301_vbus_reg: regulator-usb301 {
 +		compatible = "regulator-fixed";
-+		regulator-name = "P5.0V_USB3CON1";
++		regulator-name = "VBUS1";
 +		regulator-min-microvolt = <5000000>;
 +		regulator-max-microvolt = <5000000>;
-+		gpio = <&gph0 1 0>;
++		gpio = <&gpg1 4 0>;
 +		pinctrl-names = "default";
 +		pinctrl-0 = <&usb301_vbus_en>;
 +		enable-active-high;
 +	};
- };
- 
- &pinctrl_0 {
-@@ -76,6 +98,22 @@
- 	};
- };
- 
-+&pinctrl_3 {
-+	usb300_vbus_en: usb300-vbus-en {
-+		samsung,pins = "gph0-0";
-+		samsung,pin-function = <1>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
++
++	phy at 12100000 {
++		vbus-supply = <&usb300_vbus_reg>;
 +	};
 +
-+	usb301_vbus_en: usb301-vbus-en {
-+		samsung,pins = "gph0-1";
-+		samsung,pin-function = <1>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
++	phy at 12500000 {
++		vbus-supply = <&usb301_vbus_reg>;
 +	};
-+};
 +
- &rtc {
- 	status = "okay";
- };
-@@ -137,6 +175,14 @@
- 	};
- };
- 
-+&usbdrd3_0 {
-+	vbus-supply = <&usb300_vbus_reg>;
-+};
-+
-+&usbdrd3_1 {
-+	vbus-supply = <&usb301_vbus_reg>;
-+};
-+
- /*
-  * Use longest HW watchdog in SoC (32 seconds) since the hardware
-  * watchdog provides no debugging information (compared to soft/hard
+ 	i2c_2: i2c at 12C80000 {
+ 		samsung,i2c-sda-delay = <100>;
+ 		samsung,i2c-max-bus-freq = <66000>;
 -- 
 1.7.10.4
