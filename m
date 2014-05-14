@@ -1,54 +1,78 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 14 May 2014 13:08:52 +0900
-Subject: [PATCH v3 1/2] ARM: EXYNOS: Map SYSRAM through generic SRAM
- bindings
-In-Reply-To: <5372DF9B.4000700@linaro.org>
-References: <1399522592-23618-1-git-send-email-sachin.kamat@linaro.org>
- <536BAE39.70504@samsung.com> <034b01cf6b2c$5b5d06b0$12171410$@samsung.com>
- <536C5E40.90405@gmail.com> <029b01cf6e59$35a452e0$a0ecf8a0$@samsung.com>
- <1399975674.24871.19.camel@x220> <5372DF9B.4000700@linaro.org>
-Message-ID: <01c101cf6f2a$3970d840$ac5288c0$@samsung.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Wed, 14 May 2014 09:45:44 +0530
+Subject: [PATCH v6 0/5] MCPM backend for Exynos5420
+In-Reply-To: <alpine.LFD.2.11.1405131325060.980@knanqh.ubzr>
+References: <1399982324-27879-1-git-send-email-a.kesavan@samsung.com>
+ <alpine.LFD.2.11.1405131325060.980@knanqh.ubzr>
+Message-ID: <CAM4voanvVwj+FuWazTGMHMnM64Cw_qK03D3o=raS43f_zWFfog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tushar Behera wrote:
-> 
-> On 05/13/2014 03:37 PM, Paul Bolle wrote:
-> > Kukjin,
-> >
-> > On Tue, 2014-05-13 at 12:12 +0900, Kukjin Kim wrote:
-> >> Tomasz Figa wrote:
-> >>> You mean s/sram/sysram/ in compatible strings of Exynos-specific
-> >>> reserved areas? If yes, I'm fine, it might be even better. Just
-> remember
-> >>> to update documentation in patch 2/2 as well.
-> >>>
-> >> Done. If any problems in my tree, please let me know.
-> >
-> > It seems this one just hit linux-next (in next-20140513) as "ARM:
-> > EXYNOS: Map SYSRAM through generic DT bindings". Its commit now contains
-> > this hunk:
-> >     --- a/arch/arm/Kconfig
-> >     +++ b/arch/arm/Kconfig
-> >     @@ -843,6 +843,7 @@ config ARCH_EXYNOS
-> >             select HAVE_S3C_RTC if RTC_CLASS
-> >             select NEED_MACH_MEMORY_H
-> >             select SPARSE_IRQ
-> >     +       select SYSRAM
-> >             select USE_OF
-> >             help
-> >               Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
-> >
-> > But there's no Kconfig symbol SYSRAM. However, there is a Kconfig symbol
-> > SRAM. Did you perhaps do one s/sram/sysram/ too many on the original
-> > patch?
-> >
-> 
-> Also the compatible string name should be 'mmio-sram' on the DTS files.
-> 
-Paul and Tushar,
+Hi Nicolas,
 
-Thanks for the pointing out.
-Let me fix them, config name and compatible string.
+On Tue, May 13, 2014 at 11:25 PM, Nicolas Pitre
+<nicolas.pitre@linaro.org> wrote:
+> On Tue, 13 May 2014, Abhilash Kesavan wrote:
+>
+>> This is v6 of the series adding MCPM backend support for SMP secondary boot
+>> and core switching on Samsung's Exynos5420. The patches are based on the mcpm
+>> support added for Exynos5420 in the Chromium kernel repository here:
+>> https://chromium.googlesource.com/chromiumos/third_party/kernel-next/+/chromeos-3.8
+>>
+>> The patches have been prepared on Kukjin Kim's for-next branch and tested on
+>> SMDK5420 EVT1 as well as an exynos5420 based chromebook (peach-pit) using the
+>> "/dev/b.L_switcher" user interface. Secondary core boot-up has also been tested
+>> on both the boards.
+>
+> OK... Now it is time for real testing.  :-)
+>
+> The /dev/b.L_switcher interface tests the switcher.  Here you really
+> want to hammer the MCPM functionalities and especially your backend code
+> as hard as possible.  I therefore recommend the following test script:
+>
+> ---------- >8
+> #!/bin/bash
+>
+> echo 0 >/sys/kernel/bL_switcher/active
+> sleep 1
+>
+> pids=
+> for cpu in /sys/devices/system/cpu/cpu?/online; do
+>   { cpu_nr=${cpu:27:1}
+>     while true; do
+>       echo 1 > $cpu 2> /dev/null
+>       sleep .00$RANDOM
+>       val1=$(cat $cpu)
+>       echo 0 > $cpu 2> /dev/null
+>       sleep .00$RANDOM
+>       val0=$(cat $cpu)
+>       [ "$val1" = "1" -a "$val0" = "0" ] && echo -n $cpu_nr
+>     done
+>   } &
+>   pids="$pids $!"
+> done
+>
+> trap "kill $pids; echo" 0 15
+> wait $pids
+> ---------- >8
+>
+> Leave this running for a couple hours making sure you see all CPU
+> numbers being printed.  The printing order will be random, but each CPU
+> number should continuously appear.
+I tried this script and I get two errors:
 
-- Kukjin
+1) can't create /sys/devices/system/cpu/cpu//online: nonexistent directory
+2) sleep: invalid number '.0026736'
+
+
+For 1) the cpu number is not being appended. if I give a particular
+cpu in the script then hotplug in/out works fine.
+For 2) a constant msleep 10 works.
+
+Is it OK for me to modify the script to hotplug in/off a randomly chosed core ?
+
+Regards,
+Abhilash
+>
+>
+> Nicolas
