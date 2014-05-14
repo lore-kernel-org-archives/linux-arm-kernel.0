@@ -1,69 +1,34 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 14 May 2014 16:08:30 +0200
-Subject: [PATCH 1/1] usb: core: Kconfig: refine the description for
- CONFIG_USB_OTG
-In-Reply-To: <dc4c63c13058468db8ad8ec4a22204e8@BN1PR03MB235.namprd03.prod.outlook.com>
-References: <1399947567-18958-1-git-send-email-peter.chen@freescale.com>
- <20140513111144.GA29360@kroah.com>
- <20140513154647.GM1151@saruman.home>
- <dc4c63c13058468db8ad8ec4a22204e8@BN1PR03MB235.namprd03.prod.outlook.com>
-Message-ID: <20140514140830.GA16307@kroah.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 14 May 2014 09:31:49 -0500
+Subject: [PATCH v3 1/2] cpufreq / OPP: Allow boost frequency to be looked
+ up from device tree
+In-Reply-To: <CAKohponG9PNse4cHkvfLfaRouW-jxjToBXUCHyOCgx8-Pc=2Xw@mail.gmail.com>
+References: <1400029380-5372-1-git-send-email-thomas.ab@samsung.com>	<1400029380-5372-2-git-send-email-thomas.ab@samsung.com>	<CAKohponnPSRAotJUu+5a9y8j97QF8Jqgc5DA5WQnwGWCnVY-aA@mail.gmail.com>	<CAGo_u6p-uqw82ewDciDEhAt0=Nswfw33-gf8Aa+-6_k3eCcTzw@mail.gmail.com>	<20140514080930.781e0557@amdc2363>
+ <CAKohponG9PNse4cHkvfLfaRouW-jxjToBXUCHyOCgx8-Pc=2Xw@mail.gmail.com>
+Message-ID: <53737E55.9070704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 14, 2014 at 06:24:51AM +0000, Peter Chen wrote:
->  
-> > 
-> > On Tue, May 13, 2014 at 01:11:44PM +0200, Greg KH wrote:
-> > > On Tue, May 13, 2014 at 10:19:27AM +0800, Peter Chen wrote:
-> > > > the user should only select it when the board supports HNP and SRP,
-> > > > it should NOT be selected if the board only supports dual-role
-> > > > switch through ID pin.
-> > > >
-> > > > There is a discussion for it:
-> > > > http://marc.info/?l=linux-arm-kernel&m=139994896101516&w=2
-> > > > http://marc.info/?l=linux-usb&m=139994881701504&w=2
-> > > >
-> > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > > > ---
-> > > >  drivers/usb/core/Kconfig |   12 +++++++-----
-> > > >  1 files changed, 7 insertions(+), 5 deletions(-)
-> > > >
-> > > > diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
-> > > > index cb8e991..158048b 100644
-> > > > --- a/drivers/usb/core/Kconfig
-> > > > +++ b/drivers/usb/core/Kconfig
-> > > > @@ -54,13 +54,15 @@ config USB_OTG
-> > > >  	default n
-> > > >  	help
-> > > >  	  The most notable feature of USB OTG is support for a
-> > > > -	  "Dual-Role" device, which can act as either a device
-> > > > -	  or a host. The initial role is decided by the type of
-> > > > -	  plug inserted and can be changed later when two dual
-> > > > -	  role devices talk to each other.
-> > > > +	  otg device, which can act as either a device or a host.
-> > > > +	  The initial role is decided by the type of plug inserted
-> > > > +	  and can be changed using HNP (Host Negotiation Protocol)
-> > > > +	  later when two otg devices talk to each other.
-> > > >
-> > > >  	  Select this only if your board has Mini-AB/Micro-AB
-> > > > -	  connector.
-> > > > +	  connector and supports HNP and SRP (Session Request Protocol).
-> > > > +	  If the board only supports dual-role switch through ID
-> > > > +	  pin, this configuration should not be selected.
-> > >
-> > > That's really lame.  What happened to our "all modconfig should work"
-> > > goal?  Why can't you dynamically detect that this is not a config that
-> > > works and handle it?
-> > >
+On 05/14/2014 01:24 AM, Viresh Kumar wrote:
+> On 14 May 2014 11:39, Lukasz Majewski <l.majewski@samsung.com> wrote:
+>> I agree with Nishanth here, that point 1 (as described by Viresh at
+>> [*]) is a more scalable approach.
 > 
-> If CONFIG_USB_OTG and CONFIG_USB_OTG_WHITELIST are set, most of usb devices
-> will not work when connect to host for current code.
+> The only reason why I wanted all that to be done at OPP level was to
+> ensure if somebody else also needs it apart from cpufreq, they don't have
+> to duplicate code and find it.. As it is present at a central place..
 > 
-> So, we need a feature flag for hcd and gadget, and set this OTG feature flag
-> if the platform supports it (using dtb or platform data).
+> But if no other code is going to look for that, it may just be fine as is..
+> 
+If we eventually have a need beyond cpufreq (say devfreq) with similar
+instances, then it makes sense to move it out to a generic place.
+Either way, code implementation/duplication is a OS problem - and
+should be looked at independent of the description in dts. If we feel
+the description is valid hardware description (which, personally, I
+do), then lets go to the next discussion point of where to put it -
+generic or cpufreq specific (here, I have no preference), and finally
+decide the implementation as necessary as a result of the description.
 
-Sounds reasonable, and much nicer than just trying to point to a help
-configuration file that no one will ever read :)
-
-greg k-h
+-- 
+Regards,
+Nishanth Menon
