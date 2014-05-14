@@ -1,92 +1,58 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 14 May 2014 11:53:35 +0200
-Subject: [PATCH RFC] mmc: add slot argument to mmc_of_parse
-In-Reply-To: <1399457217-22846-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1399457217-22846-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <CAPDyKFqeunnWmguTH89byNc5Yy+CBY4avMeeon3ZSfNMmGJa9Q@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 14 May 2014 11:56:24 +0200
+Subject: [PATCH v5 0/6] add cpuidle support for Exynos5420
+In-Reply-To: <1400054637-21505-1-git-send-email-chander.kashyap@linaro.org>
+References: <ANuQgHGSPJ45tbrVppAVpOqF0OfHacPWfX=S5mOVxTPr66f7vg@mail.gmail.com>
+ <1400054637-21505-1-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <53733DC8.1020608@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 May 2014 12:06, Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
-> Some hosts manage several slots. In these case information such as the bus
-> width, chip detect and others are into the slot node. So we have to parse
-> child nodes. If not NULL, slot node will be used instead of the device
-> node.
+On 05/14/2014 10:03 AM, Chander Kashyap wrote:
+> Exynos5420 is a big-little Soc from Samsung. It has 4 A15 and 4 A7 cores.
 >
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->
-> Hi,
->
-> Since this patch is only a RFC, I have not yet updated drivers using this
-> function.
->
-> I would like to use mmc_of_parse to reduce code duplication. My issue is that
-> atmel mci is a bit different from others mci host since it can provide
-> several slots, so it allocates several mmc hosts. By the way, it is not the
-> only one.
->
-> When calling mmc_alloc_host, host->parent is set to &pdev->dev. mmc_of_parse
-> uses host->parent->of_node but in my case settings are in the slot nodes so in
-> the child nodes. That's why I would like to have a way to tell which node I
-> want to use.
+> This patchset adds cpuidle support for Exynos5420 SoC based on
+> generic big.little cpuidle driver.
 
-Seems reasonable, thanks for working on this!
+Hi Chander,
 
+just a side question. I am not succeeding to have both cluster A7/A15 
+with the upstream kernel.
+
+How can I test your driver ?
+
+Did I miss something ?
+
+Thanks
+   -- Daniel
+
+> Tested on SMDK5420.
 >
+> This patch set depends on:
+> 	1. [PATCH 0/5] MCPM backend for Exynos5420
+> 	   http://www.spinics.net/lists/arm-kernel/msg331100.html
+> Changelog is in respective patches.
+> Chander Kashyap (5):
+>    driver: cpuidle-big-little: add of_device_id structure
+>    arm: exynos: add generic function to calculate cpu number
+>    cpuidle: config: Add ARCH_EXYNOS entry to select cpuidle-big-little
+>      driver
+>    driver: cpuidle: cpuidle-big-little: init driver for Exynos5420
+>    exynos: cpuidle: do not allow cpuidle registration for Exynos5420
+>    mcpm: exynos: populate suspend and powered_up callbacks
 >
-> Regards
->
-> Ludovic
->
->
->
->  drivers/mmc/core/host.c |    9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-> index fdea825..ed6cea5 100644
-> --- a/drivers/mmc/core/host.c
-> +++ b/drivers/mmc/core/host.c
-> @@ -300,13 +300,15 @@ static inline void mmc_host_clk_sysfs_init(struct mmc_host *host)
->  /**
->   *     mmc_of_parse() - parse host's device-tree node
->   *     @host: host whose node should be parsed.
-> + *     @slot: some devices provide several slots so the node to parse
-> + *     is not the host one.
->   *
->   * To keep the rest of the MMC subsystem unaware of whether DT has been
->   * used to to instantiate and configure this host instance or not, we
->   * parse the properties and set respective generic mmc-host flags and
->   * parameters.
->   */
-> -int mmc_of_parse(struct mmc_host *host)
-> +int mmc_of_parse(struct mmc_host *host, struct device_node *slot)
->  {
->         struct device_node *np;
->         u32 bus_width;
-> @@ -317,7 +319,10 @@ int mmc_of_parse(struct mmc_host *host)
->         if (!host->parent || !host->parent->of_node)
->                 return 0;
->
-> -       np = host->parent->of_node;
-> +       if (slot)
-> +               np = slot;
-> +       else
-> +               np = host->parent->of_node;
->
->         /* "bus-width" is translated to MMC_CAP_*_BIT_DATA flags */
->         if (of_property_read_u32(np, "bus-width", &bus_width) < 0) {
-> --
-> 1.7.9.5
+>   arch/arm/mach-exynos/cpuidle.c       |    3 +++
+>   arch/arm/mach-exynos/mcpm-exynos.c   |   36 ++++++++++++++++++++++++++++++++++
+>   arch/arm/mach-exynos/regs-pmu.h      |    9 +++++++++
+>   drivers/cpuidle/Kconfig.arm          |    2 +-
+>   drivers/cpuidle/cpuidle-big_little.c |   12 +++++++++++-
+>   5 files changed, 60 insertions(+), 2 deletions(-)
 >
 
-How about adding a new API, __mmc_of_parse((struct mmc_host *host,
-struct device_node *slot)
-Then let the old API mmc_of_parse() remain as is, but let it call the
-new API with slot == NULL.
 
-Atmel can then use the new API, but the other drivers can remain as is.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Kind regards
-Ulf Hansson
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
