@@ -1,48 +1,52 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 14 May 2014 10:29:38 -0700
-Subject: [PATCH v4 1/6] clocksource: Add support for the Mediatek SoCs
-In-Reply-To: <1400087579-4250-2-git-send-email-matthias.bgg@gmail.com>
-References: <1400087579-4250-1-git-send-email-matthias.bgg@gmail.com>
- <1400087579-4250-2-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <2fe960fd-b145-42a8-ace2-e2cd3aaf0cdc@BN1AFFO11FD010.protection.gbl>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 14 May 2014 10:39:31 -0700
+Subject: [PATCH] bus/omap_l3: avoid sync initcall for modules
+In-Reply-To: <20140513162731.GD16837@atomide.com>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-6-git-send-email-arnd@arndb.de>
+ <20140512222006.GI5668@atomide.com> <177753046.dmVvfiu3Rn@wuerfel>
+ <20140513162731.GD16837@atomide.com>
+Message-ID: <20140514173931.GA14003@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
-
-just a few suggestions below. Nothing serious.
-
-On Wed, 2014-05-14 at 07:12PM +0200, Matthias Brugger wrote:
-> This patch adds a clock source and clock event for the timer found
-> on the Mediatek SoCs.
+On Tue, May 13, 2014 at 09:27:33AM -0700, Tony Lindgren wrote:
+> * Arnd Bergmann <arnd@arndb.de> [140513 08:13]:
+> > On Monday 12 May 2014 15:20:07 Tony Lindgren wrote:
+> > > 
+> > > How about instead let's add this into include/linux/module.h
+> > > like we have for other initcalls:
 > 
-> The Mediatek General Porpose Timer block provides five 32 bit timers and
-> one 64 bit timer.
+> I mean include/linux/init.h naturally..
+>  
+> > > #define postcore_initcall(fn)           module_init(fn)
+> > > 
+> > > There may be others missing too from there. BTW, this driver
+> > > might be few of the drivers that actually might need to be
+> > > initialized early for debugging to catch bad access from
+> > > other drivers.
+> > 
+> > There is a comment above those defines saying:
+> > 
+> > /* Don't use these in loadable modules, but some people do... */
+> > 
+> > so I'm not sure if adding more would be appreciated.
+> > 
+> > 	Arnd
 > 
-> Two 32 bit timers are used:
-> TIMER1: clock events supporting periodic and oneshot events
-> TIMER2: clock source configured as a free running counter
+> Well "some" in that comment is probably an understatement :)
+> 
+> $ git grep _initcall drivers/ | wc -l
+> 737
+> 
+> I did not look what percentage has tristate in the Kconfig,
+> but that might keep some people from making loadable drivers.
+> 
+> Greg, is the following patch something you may want to
+> consider picking up?
 
-It is pretty common, I think, to use the free running counter also as
-sched_clock. You probably want to look into this, but that's just a
-possible enhancement.
+Sure, is this needed to fix issues in 3.15-final, or is 3.16-rc1 ok?
 
-[...]
-> +static void __init mtk_timer_init(struct device_node *node)
-> +{
-> +	struct mtk_clock_event_device *evt;
-> +	struct resource res;
-> +	unsigned long rate = 0;
-> +	struct clk *clk;
-> +	int ret;
-> +	u32 val;
-> +
-> +	evt = kzalloc(sizeof(*evt), GFP_KERNEL);
-> +	if (!evt)
-> +		panic("Can't allocate mtk clock event driver struct");
+thanks,
 
-I'm not that sure about the A7s, but on Cortex-A9 there is also a global
-timer which can be used for timing. And there might be other timing
-options for this SOC too. Do you really want to panic?
-
-	S?ren
+greg k-h
