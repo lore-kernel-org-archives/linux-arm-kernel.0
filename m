@@ -1,39 +1,69 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 14 May 2014 14:38:20 +0200
-Subject: [PATCH v4 6/7] clk: sunxi: document PRCM clock compatible strings
+Date: Wed, 14 May 2014 14:38:21 +0200
+Subject: [PATCH v4 7/7] ARM: sunxi: dt: add PRCM clk and reset controller
+ subdevices
 In-Reply-To: <1400071101-30553-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1400071101-30553-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1400071101-30553-7-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1400071101-30553-8-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document new compatible strings for clock provided by the PRCM
-(Power/Reset/Clock Management) unit.
+Add DT definitions for PRCM (Power/Reset/Clock Management) clock and reset
+controller subdevices.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index a5160d8..ffa1ab1 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -20,12 +20,15 @@ Required properties:
- 	"allwinner,sun5i-a13-ahb-gates-clk" - for the AHB gates on A13
- 	"allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
- 	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
-+	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
- 	"allwinner,sun6i-a31-ahb1-mux-clk" - for the AHB1 multiplexer on A31
- 	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
- 	"allwinner,sun4i-a10-apb0-clk" - for the APB0 clock
-+	"allwinner,sun6i-a31-apb0-clk" - for the APB0 clock on A31
- 	"allwinner,sun4i-a10-apb0-gates-clk" - for the APB0 gates on A10
- 	"allwinner,sun5i-a13-apb0-gates-clk" - for the APB0 gates on A13
- 	"allwinner,sun5i-a10s-apb0-gates-clk" - for the APB0 gates on A10s
-+	"allwinner,sun6i-a31-apb0-gates-clk" - for the APB0 gates on A31
- 	"allwinner,sun7i-a20-apb0-gates-clk" - for the APB0 gates on A20
- 	"allwinner,sun4i-a10-apb1-clk" - for the APB1 clock
- 	"allwinner,sun4i-a10-apb1-mux-clk" - for the APB1 clock muxing
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index eec1afa..730ffd99 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -602,6 +602,44 @@
+ 		prcm at 01f01400 {
+ 			compatible = "allwinner,sun6i-a31-prcm";
+ 			reg = <0x01f01400 0x200>;
++
++			ar100: ar100_clk {
++				compatible = "allwinner,sun6i-a31-ar100-clk";
++				#clock-cells = <0>;
++				clocks = <&osc32k>, <&osc24M>, <&pll6>, <&pll6>;
++				clock-output-names = "ar100";
++			};
++
++			ahb0: ahb0_clk {
++				compatible = "fixed-factor-clock";
++				#clock-cells = <0>;
++				clock-div = <1>;
++				clock-mult = <1>;
++				clocks = <&ar100>;
++				clock-output-names = "ahb0";
++			};
++
++			apb0: apb0_clk {
++				compatible = "allwinner,sun6i-a31-apb0-clk";
++				#clock-cells = <0>;
++				clocks = <&ahb0>;
++				clock-output-names = "apb0";
++			};
++
++			apb0_gates: apb0_gates_clk {
++				compatible = "allwinner,sun6i-a31-apb0-gates-clk";
++				#clock-cells = <1>;
++				clocks = <&apb0>;
++				clock-output-names = "apb0_pio", "apb0_ir",
++						"apb0_timer", "apb0_p2wi",
++						"apb0_uart", "apb0_1wire",
++						"apb0_i2c";
++			};
++
++			apb0_rst: apb0_rst {
++				compatible = "allwinner,sun6i-a31-clock-reset";
++				#reset-cells = <1>;
++			};
+ 		};
+ 
+ 		cpucfg at 01f01c00 {
 -- 
 1.8.3.2
