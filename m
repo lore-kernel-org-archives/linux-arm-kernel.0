@@ -1,32 +1,43 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Wed, 14 May 2014 19:01:36 +0800
-Subject: [PATCH] mmc: wmt-sdmmc: Use GFP_KERNEL instead of hard-coded value
-In-Reply-To: <1398646711.10750.0.camel@phoenix>
-References: <1398646711.10750.0.camel@phoenix>
-Message-ID: <CAFRkauBCjiePz-Nj46JmDoTmgOM7ch7BoA0s5SxQ2pn29F5aNg@mail.gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 14 May 2014 12:05:47 +0100
+Subject: [PATCH v3] of: Keep track of populated platform devices
+In-Reply-To: <CAL_Jsq+8xZO0LEhVa4tmOfq6CD2a0O+0CaGCnZLqDguz=yN_zg@mail.gmail.com>
+References: <1399473437.3706.25.camel@hornet>
+ <1399981716-24618-1-git-send-email-pawel.moll@arm.com>
+ <CAL_Jsq+8xZO0LEhVa4tmOfq6CD2a0O+0CaGCnZLqDguz=yN_zg@mail.gmail.com>
+Message-ID: <20140514110547.295CEC4153D@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-04-28 8:58 GMT+08:00 Axel Lin <axel.lin@ingics.com>:
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
-> ---
->  drivers/mmc/host/wmt-sdmmc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
-> index 34231d5..3605c37 100644
-> --- a/drivers/mmc/host/wmt-sdmmc.c
-> +++ b/drivers/mmc/host/wmt-sdmmc.c
-> @@ -852,7 +852,7 @@ static int wmt_mci_probe(struct platform_device *pdev)
->         priv->dma_desc_buffer = dma_alloc_coherent(&pdev->dev,
->                                                    mmc->max_blk_count * 16,
->                                                    &priv->dma_desc_device_addr,
-> -                                                  208);
-> +                                                  GFP_KERNEL);
+On Tue, 13 May 2014 07:24:50 -0500, Rob Herring <robherring2@gmail.com> wrote:
+> On Tue, May 13, 2014 at 6:48 AM, Pawel Moll <pawel.moll@arm.com> wrote:
+> > In "Device Tree powered" systems, platform devices are usually
+> > massively populated with of_platform_populate() call, executed
+> > at some level of initcalls, either by generic architecture
+> > or by platform-specific code.
+> >
+> > There are situations though where certain devices must be
+> > created (and bound with drivers) before all the others.
+> > This presents a challenge, as devices created explicitly
+> > would be created again by of_platform_populate().
+> >
+> > This patch tries to solve that issue in a generic way,
+> > adding a "populated" flag for a DT node description.
+> > Once set, this device will never be created again via
+> > of_* API, so of_platform_populate() will skip such nodes
+> > (and its children) in a similar way to the non-available
+> > ones.
+> >
+> > The flag is cleared when a device is being removed and
+> > returns the DT node by calling of_device_node_put() (it
+> > was missing from the amba device release function, added).
+> >
+> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> 
+> A few formatting nits, but otherwise:
+> 
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
-Hi Ulf,
-This is a pretty trivial patch.
-Would you pick up this patch?
+Acked-by: Grant Likely <grant.likely@linaro.org>
 
-Regards,
-Axel
+g.
