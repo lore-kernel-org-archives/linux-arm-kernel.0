@@ -1,27 +1,42 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 14 May 2014 09:46:53 +0200
-Subject: [PATCH v6 00/12] CCF support for Renesas r7s72100
-In-Reply-To: <20140514050801.GE3502@verge.net.au>
-References: <1400029816-24028-1-git-send-email-wsa@the-dreams.de>
- <20140514050801.GE3502@verge.net.au>
-Message-ID: <20140514074652.GA2648@katana>
+From: zhangwm@marvell.com (Neil Zhang)
+Date: Wed, 14 May 2014 00:51:34 -0700
+Subject: [PATCH] ARM: remove redundant code in machine_halt
+In-Reply-To: <1399441823-9907-1-git-send-email-zhangwm@marvell.com>
+References: <1399441823-9907-1-git-send-email-zhangwm@marvell.com>
+Message-ID: <9034CBD80F070943B59700D7F8149ED9A0875745@SC-VEXCH4.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> -----Original Message-----
+> From: Neil Zhang [mailto:zhangwm at marvell.com]
+> Sent: 2014?5?7? 13:50
+> To: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Cc: rmk+kernel at arm.linux.org.uk; Neil Zhang
+> Subject: [PATCH] ARM: remove redundant code in machine_halt
+> 
+> There is no need to call local_irq_disable twice.
+> 
+> Signed-off-by: Neil Zhang <zhangwm@marvell.com>
+> ---
+>  arch/arm/kernel/process.c |    1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c index
+> 81ef686..18cfce4 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -195,7 +195,6 @@ void machine_halt(void)
+>  	local_irq_disable();
+>  	smp_send_stop();
+> 
+> -	local_irq_disable();
+>  	while (1);
+>  }
+> 
+> --
+> 1.7.9.5
 
-> > This series has been tested with the renesas-devel-v3.15-rc2-20140428 tag. If
+Any comments?
 
-Just for completeness: The above mentioned tag was outdated. It was
-tested against "renesas-devel-v3.15-rc5-20140513v2"
-
-> Thanks, I have queued up this series.
-
-Thanks a ton!
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140514/258524b7/attachment-0001.sig>
+Best Regards,
+Neil Zhang
