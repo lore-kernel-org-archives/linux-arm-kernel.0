@@ -1,41 +1,41 @@
 From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Wed, 14 May 2014 13:33:53 +0530
-Subject: [PATCH v5 2/6] arm: exynos: add generic function to calculate cpu
- number
+Date: Wed, 14 May 2014 13:33:54 +0530
+Subject: [PATCH v5 3/6] cpuidle: config: Add ARCH_EXYNOS entry to select
+ cpuidle-big-little driver
 In-Reply-To: <1400054637-21505-1-git-send-email-chander.kashyap@linaro.org>
 References: <ANuQgHGSPJ45tbrVppAVpOqF0OfHacPWfX=S5mOVxTPr66f7vg@mail.gmail.com>
  <1400054637-21505-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <1400054637-21505-3-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <1400054637-21505-4-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The address of cpu power registers in pmu is based on cpu number
-offsets. This function calculate the same. This is essentially
-required in case of multi-cluster SoC's e.g Exynos5420.
+Add support to select generic big-little cpuidle driver for Samsung Exynos
+series SoC's. This is required for Exynos big-little SoC's eg, Exynos5420.
 
 Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
 Signed-off-by: Chander Kashyap <k.chander@samsung.com>
 ---
- arch/arm/mach-exynos/regs-pmu.h |    9 +++++++++
- 1 file changed, 9 insertions(+)
+Changes in v4:
+	1. Typo fixed from SOC_EXYNOS5420 to ARCH_EXYNOS
+	2. Commit message updated
+Changes in v3: None
+Changes in v2:
+	1. Changed config macro from SOC_EXYNOS5420 to ARCH_EXYNOS
+ drivers/cpuidle/Kconfig.arm |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-index 4179f6a..485aefd 100644
---- a/arch/arm/mach-exynos/regs-pmu.h
-+++ b/arch/arm/mach-exynos/regs-pmu.h
-@@ -325,4 +325,13 @@
+diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+index 97ccc31..d9596e7 100644
+--- a/drivers/cpuidle/Kconfig.arm
++++ b/drivers/cpuidle/Kconfig.arm
+@@ -4,7 +4,7 @@
  
- #define EXYNOS5420_SWRESET_KFC_SEL				0x3
- 
-+#include <asm/cputype.h>
-+#define MAX_CPUS_IN_CLUSTER	4
-+
-+static inline unsigned int exynos_pmu_cpunr(unsigned int mpidr)
-+{
-+	return ((MPIDR_AFFINITY_LEVEL(mpidr, 1) * MAX_CPUS_IN_CLUSTER)
-+		 + MPIDR_AFFINITY_LEVEL(mpidr, 0));
-+}
-+
- #endif /* __ASM_ARCH_REGS_PMU_H */
+ config ARM_BIG_LITTLE_CPUIDLE
+ 	bool "Support for ARM big.LITTLE processors"
+-	depends on ARCH_VEXPRESS_TC2_PM
++	depends on ARCH_VEXPRESS_TC2_PM || ARCH_EXYNOS
+ 	select ARM_CPU_SUSPEND
+ 	select CPU_IDLE_MULTIPLE_DRIVERS
+ 	help
 -- 
 1.7.9.5
