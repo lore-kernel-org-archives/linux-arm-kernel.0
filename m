@@ -1,42 +1,33 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Wed, 14 May 2014 14:03:59 +0800
-Subject: [PATCH] arm: mm: fix lowmem virtual address range check
-Message-ID: <1400047439-23961-1-git-send-email-wangnan0@huawei.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 13 May 2014 23:12:05 -0700
+Subject: [PATCH] input: pxa27x-keypad: bug fix of getting scan code
+In-Reply-To: <1390797697-29217-1-git-send-email-chao.xie@marvell.com>
+References: <1390797697-29217-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <20140514061205.GA13621@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes sure the argument of __phys_to_virt is a valid physical
-address when clear lowmem memory maps.
+On Mon, Jan 27, 2014 at 12:41:37PM +0800, Chao Xie wrote:
+> From: Chao Xie <chao.xie@marvell.com>
+> 
+> The rows of pxa27x-keypad used by each boards are not fixed.
+> So in the driver, it will get the rows from DT and register
+> the keymap as:
+> matrix_keypad_build_keymap(keymap_data, NULL,
+>                            pdata->matrix_key_rows,
+>                            pdata->matrix_key_cols,
+>                            keypad->keycodes, input_dev);
+> 
+> But the scan code is gotten as
+> MATRIX_SCAN_CODE(row, col, MATRIX_ROW_SHIFT);
+> It is not correct. Fix it as
+> MATRIX_SCAN_CODE(row, col, keypad->row_shift);
+> 
+> row_shift is calculated from pdata->matrix_key_rows.
+> 
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
 
-The last few lines prepare_page_table() clear page mapping in the gap
-between largest low physical memory and the upper bound of lowmem. It
-uses __phys_to_virt(end) to calculate virtual address from where the
-clearing start.
+Applied with minor edits, thank you.
 
-However, if the platform uses private nonliner __phys_to_virt(), 'end'
-may goes into another mapping region.
-
-This patch uses __phys_to_virt(end - 1) + 1 for insurance purposes.
-
-Signed-off-by: Wang Nan <wangnan0@huawei.com>
-Cc: Geng Hui <hui.geng@huawei.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mm/mmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index b68c6b2..87340ee 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1217,7 +1217,7 @@ static inline void prepare_page_table(void)
- 	 * Clear out all the kernel space mappings, except for the first
- 	 * memory bank, up to the vmalloc region.
- 	 */
--	for (addr = __phys_to_virt(end);
-+	for (addr = __phys_to_virt(end - 1) + 1;
- 	     addr < VMALLOC_START; addr += PMD_SIZE)
- 		pmd_clear(pmd_off_k(addr));
- }
 -- 
-1.8.4
+Dmitry
