@@ -1,58 +1,17 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 14 May 2014 10:51:55 +0200
-Subject: [STLinux Kernel] [PATCH v4 2/7] driver: reset: sti: add keyscan
- for stih415
-In-Reply-To: <1397228856-9218-3-git-send-email-gabriel.fernandez@linaro.org>
-References: <1397228856-9218-1-git-send-email-gabriel.fernandez@linaro.org>
- <1397228856-9218-3-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <53732EAB.1050709@st.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 14 May 2014 10:03:25 +0100
+Subject: [PATCH v2] ARM64: kernel: add compatible cpuinfo
+In-Reply-To: <1400036894-16667-1-git-send-email-zhangwm@marvell.com>
+References: <1400036894-16667-1-git-send-email-zhangwm@marvell.com>
+Message-ID: <20140514090325.GB9910@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+On Wed, May 14, 2014 at 04:08:14AM +0100, Neil Zhang wrote:
+> Print the necessary features in order to be backwards compatible with
+> ARMv7 and earlier version.
 
-	I am preparing the arm_soc pull request for STi platforms.
+NAK. The compat hwcaps are already advertised in auxv, and I don't have any
+plans to align our /proc/cpuinfo format.
 
-	In this series, there are DT patches depending on this reset patch 
-(same for patch 3).
-
-	Can I queue theses two reset patches in my pull request for arm_soc to 
-avoid compilation breakage?
-
-Best regards,
-Maxime
-
-On 04/11/2014 05:07 PM, Gabriel FERNANDEZ wrote:
-> Add keyscan reset on stih415 reset controller.
->
-> Signed-off-by: Giuseppe Condorelli <giuseppe.condorelli@st.com>
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-> ---
->   drivers/reset/sti/reset-stih415.c                     | 1 +
->   include/dt-bindings/reset-controller/stih415-resets.h | 1 +
->   2 files changed, 2 insertions(+)
->
-> diff --git a/drivers/reset/sti/reset-stih415.c b/drivers/reset/sti/reset-stih415.c
-> index e6f6c41..c93fd26 100644
-> --- a/drivers/reset/sti/reset-stih415.c
-> +++ b/drivers/reset/sti/reset-stih415.c
-> @@ -73,6 +73,7 @@ static const struct syscfg_reset_channel_data stih415_softresets[] = {
->   	[STIH415_USB0_SOFTRESET] = STIH415_SRST_REAR(SYSCFG_376, 9),
->   	[STIH415_USB1_SOFTRESET] = STIH415_SRST_REAR(SYSCFG_376, 10),
->   	[STIH415_USB2_SOFTRESET] = STIH415_SRST_REAR(SYSCFG_376, 11),
-> +	[STIH415_KEYSCAN_SOFTRESET] = STIH415_SRST_LPM(LPM_SYSCFG_1, 8),
->   };
->
->   static struct syscfg_reset_controller_data stih415_powerdown_controller = {
-> diff --git a/include/dt-bindings/reset-controller/stih415-resets.h b/include/dt-bindings/reset-controller/stih415-resets.h
-> index c2f8a66..c2329fe 100644
-> --- a/include/dt-bindings/reset-controller/stih415-resets.h
-> +++ b/include/dt-bindings/reset-controller/stih415-resets.h
-> @@ -22,5 +22,6 @@
->   #define STIH415_USB0_SOFTRESET		3
->   #define STIH415_USB1_SOFTRESET		4
->   #define STIH415_USB2_SOFTRESET		5
-> +#define STIH415_KEYSCAN_SOFTRESET	6
->
->   #endif /* _DT_BINDINGS_RESET_CONTROLLER_STIH415 */
->
+Will
