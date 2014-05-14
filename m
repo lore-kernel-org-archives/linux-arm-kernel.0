@@ -1,52 +1,100 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 14 May 2014 10:39:31 -0700
-Subject: [PATCH] bus/omap_l3: avoid sync initcall for modules
-In-Reply-To: <20140513162731.GD16837@atomide.com>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-6-git-send-email-arnd@arndb.de>
- <20140512222006.GI5668@atomide.com> <177753046.dmVvfiu3Rn@wuerfel>
- <20140513162731.GD16837@atomide.com>
-Message-ID: <20140514173931.GA14003@kroah.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Wed, 14 May 2014 19:45:54 +0200
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <CAL_JsqJB4CAO60m1HTGQGHQRYVWcARxm_roOhn-PJh+ZR7OONg@mail.gmail.com>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>	<20140514141914.446F7C4153D@trevor.secretlab.ca>	<53738580.7000902@ahsoftware.de>	<CACxGe6s4px_9CNk3bkc1OF1KGZGYdyh4gE_VufCKU5dLFBG48g@mail.gmail.com>	<53739871.9070407@ahsoftware.de>
+ <CAL_JsqJB4CAO60m1HTGQGHQRYVWcARxm_roOhn-PJh+ZR7OONg@mail.gmail.com>
+Message-ID: <5373ABD2.9010508@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 09:27:33AM -0700, Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [140513 08:13]:
-> > On Monday 12 May 2014 15:20:07 Tony Lindgren wrote:
-> > > 
-> > > How about instead let's add this into include/linux/module.h
-> > > like we have for other initcalls:
-> 
-> I mean include/linux/init.h naturally..
->  
-> > > #define postcore_initcall(fn)           module_init(fn)
-> > > 
-> > > There may be others missing too from there. BTW, this driver
-> > > might be few of the drivers that actually might need to be
-> > > initialized early for debugging to catch bad access from
-> > > other drivers.
-> > 
-> > There is a comment above those defines saying:
-> > 
-> > /* Don't use these in loadable modules, but some people do... */
-> > 
-> > so I'm not sure if adding more would be appreciated.
-> > 
-> > 	Arnd
-> 
-> Well "some" in that comment is probably an understatement :)
-> 
-> $ git grep _initcall drivers/ | wc -l
-> 737
-> 
-> I did not look what percentage has tristate in the Kconfig,
-> but that might keep some people from making loadable drivers.
-> 
-> Greg, is the following patch something you may want to
-> consider picking up?
+Am 14.05.2014 19:30, schrieb Rob Herring:
+> On Wed, May 14, 2014 at 11:23 AM, Alexander Holler <holler@ahsoftware.de> wrote:
+>> Am 14.05.2014 18:05, schrieb Grant Likely:
+>>
+>>> On Wed, May 14, 2014 at 4:02 PM, Alexander Holler <holler@ahsoftware.de>
+>>> wrote:
+>>>>
+>>>> Am 14.05.2014 16:19, schrieb Grant Likely:
+>>>>
+>>>>
+>>>>> Rather than a dtb schema change, for the most common properties (irqs,
+>>>>> clocks, gpios), we could extract dependencies at boot time. I don't like
+>>>>> the idea of adding a separate depends-on property because it is very
+>>>>> easy to get it out of sync with the actual binding data (dtc is not the
+>>>>> only tool that manipulates .dtbs. Firmware will fiddle with it too).
+>>>>
+>>>>
+>>>>
+>>>> Then that stuff has to fiddle correct. Sorry, but trying to solve all
+>>>> problems right from the beginning just leads to endless talks with no end
+>>>> and nothing will happen at all because nobody aggrees how to start.
+>>>
+>>>
+>>> I appreciate the problem that you're trying to solve and why you're
+>>> using the dtc approach. My job is to poke at the solution and make
+>>> sure it is going to be reliable. Making sure all users know how to
+>>> fiddle with the new property correctly is not a trivial problem,
+>>> especially when it is firmware that will not necessarily be updated.
+>>
+>>
+>> The answer is just that they don't have to use this feature.
+>
+> It's not just about users, but maintainers have to carry the code and
+> anything tied to DT is difficult to change or remove.
+>
+> Lots of inter-dependencies are already described in DT. We should
+> leverage those first and then look at how to add dependencies that are
+> not described.
 
-Sure, is this needed to fix issues in 3.15-final, or is 3.16-rc1 ok?
+Again, that's what this feature is about. One of the problems it solves 
+is that those dependencies which are described in the DT source in form 
+of phandle reference, do disappear in the blobs because the init-system 
+would have to know all bindings in order to identify phandle references 
+(the dependencies) again.
 
-thanks,
+>> It is more meant as a long-term solution to fix for the problem of
+>> increasing hard-coded workarounds which all are trying to fix the
+>> initialization order of drivers. Hardware has become a lot more complicated
+>> than it was in the good old days, and I think the time is right trying to
+>> adopt the init-system to this new century instead of still adding
+>> workarounds here and there.
+>
+> I don't know when the good old days were, but this has been a problem
+> in embedded systems for as long as I have worked on Linux.
 
-greg k-h
+Yes, but stuff wasn't as complicated as today, which means it was 
+relatively easy to manualy solve dependency problems. But if you look at 
+complicated SOCs like the OMAP, it's much better to let the machine 
+solve the dependencies to get the initialization order instead of still 
+trying to do this manually.
+
+>>> I'm not saying flat out 'no' here, but before I merge anything, I have
+>>> to be reasonably certain that the feature is not going to represent a
+>>> maintenance nightmare over the long term.
+>>
+>>
+>> The maintenance nightmare is already present in form of all the workarounds
+>> which are trying to fix the initialzation order necessary for modern
+>> hardware.
+>
+> Do you have concrete examples or cases where deferred probe does not work?
+
+Why do people come back to the deferred probe stuff?
+
+One of the biggest problem of the deferred probe stuff is the problem 
+how to identify real problems if everything ends up with a deferred 
+probe when an error occurs? That means if you display an error whenever 
+something is deferred, the log becomes almost unreadable. If you don't 
+display an error, you never will see an error. And how do you display 
+the real error when deferred probes finally do fail? The deferred probe 
+stuff doesn't has any information about the underlying error, so it 
+can't display it.
+
+Anyway, this feature is totally independ of the deferred probe stuff and 
+both can friendly live together.
+
+Regards,
+
+Alexander Holler
