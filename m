@@ -1,47 +1,29 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 14 May 2014 13:50:02 +0200
-Subject: [PATCH 1/9] ARM: STi: DT: STiH416: 416 DT Entry for clockgen
- A0/1/10/11/12
-In-Reply-To: <20140508080344.GE5307@lee--X1>
-References: <1399305223-18703-1-git-send-email-gabriel.fernandez@linaro.org>
- <1399305223-18703-2-git-send-email-gabriel.fernandez@linaro.org>
- <20140506071843.GD5206@lee--X1>
- <CAG374jD+msPPbPtFS+ji=8jS9+D-YHu31k7zzzC7Ty7jw9n7jQ@mail.gmail.com>
- <20140508080344.GE5307@lee--X1>
-Message-ID: <5373586A.5000302@st.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 14 May 2014 13:55:29 +0200
+Subject: [PATCH] of: Add of_device_destroy_children() function
+In-Reply-To: <20140514102754.BC60BC4153D@trevor.secretlab.ca>
+References: <1399567069-3174-1-git-send-email-s.nawrocki@samsung.com>
+ <20140514102754.BC60BC4153D@trevor.secretlab.ca>
+Message-ID: <537359B1.1060908@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On 05/08/2014 10:03 AM, Lee Jones wrote:
->>>> Patch adds DT entries for clockgen A0/1/10/11/12
->>>>
->>>> Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
->>>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
->>>> ---
->>>>   arch/arm/boot/dts/stih416-clks.h     |  15 ++
->>>
->>> This should live in include/dt-bindings/clk
->>>
->> include/dt-bindings/clk or  include/dt-bindings/clock ?
+On 14/05/14 12:27, Grant Likely wrote:
+> On Thu, 08 May 2014 18:37:49 +0200, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
+>> > This patch adds a helper function to unregister devices which
+>> > were created by an of_platform_populate() call. The pattern
+>> > used here can already be found in multiple drivers. This helper
+>> > can now be used instead of repeating similar code in drivers.
+>> > 
+>> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> > ---
 >
-> I have no idea what the difference between the two are.  I guess you
-> are in a better position to answer that.  My point was just that the
-> includes should be in the include directory, rather than being held
-> locally in the 'dts' directory.
+> Pawel has also submitted a patch for this. That patch is a little more
+> careful about how it removes nodes, so I'll be going with that one.
 
-Even if these .h files are only used by the DTS files??
+OK, it's good to know we have already a good solution. I'll give a try
+Pawel's patch then.
 
-There are some .h files for pincfg related stuff, shouldn't we do the 
-same in this case?
-
-Regards,
-Maxime
-
->
->>>>   arch/arm/boot/dts/stih416-clock.dtsi | 477 ++++++++++++++++++++++++++++++++++
->>>>   arch/arm/boot/dts/stih416.dtsi       |  10 +-
->>>>   3 files changed, 497 insertions(+), 5 deletions(-)
->>>>   create mode 100644 arch/arm/boot/dts/stih416-clks.h
->
+Thanks,
+Sylwester
