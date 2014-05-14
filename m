@@ -1,69 +1,49 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 14 May 2014 15:55:03 -0300
-Subject: [PATCH] serial: imx: Disable new features of autobaud detection 
-Message-ID: <1400093703-10128-1-git-send-email-festevam@gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 14 May 2014 20:56:29 +0200
+Subject: [PATCH v3 1/6] phy: add a driver for the Berlin SATA PHY
+In-Reply-To: <17808571.N5ZGjXFEVP@wuerfel>
+References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
+ <5764751.ffUj9rhnMd@wuerfel> <5373B908.5090904@gmail.com>
+ <17808571.N5ZGjXFEVP@wuerfel>
+Message-ID: <5373BC5D.7010300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On 05/14/2014 08:51 PM, Arnd Bergmann wrote:
+> On Wednesday 14 May 2014 20:42:16 Sebastian Hesselbarth wrote:
+>>>> For the driver, Antoine then would have to squeeze all PHY register
+>>>> mangling in phy-berlin2.c and see how to make ahci-platform aware of
+>>>> individual port nodes (I haven't looked up if it already exists, sorry)
+>>>> and announce only enabled port child nodes, right?
+>>>
+>>> I've been thinking some more about this aspect. I don't actually have
+>>> a strong opinion on whether it's better to use the generic ahci-platform
+>>> driver, or to keep the multi-phy support as a special variant for
+>>> berlin. If we do the latter, it would however be good to define the
+>>> binding in a way that lets us later merge things into the generic phy
+>>> driver in case we get more of the same.
+>>
+>> Hmm, IMHO multi-phy support is orthogonal to ahci-platform, isn't it?
+>> ahci-platform needs to know about the phy property and calls some
+>> helper that deals with the phy-specifier?
+>>
+>> About a generic _phy_ driver, I am not so sure if berlin is the best
+>> template right now 
+>>
+>> So, my call would be:
+>> - make ahci-platform aware of port sub-nodes and phy properties
+>> - have a berlin specific PHY driver
+> 
+> I'm not sure if we need sub-nodes per port, it should be enough
+> to have an array of phys, plus a way to match them up with the
+> ports.
 
-Bit 7 of UCR3 is described in the i.MX reference manuals (with the exception
-of i.MX1) as follows:
+Actually, I'd love to see sub-nodes per port as it will allow to
+disabled unused ports on a per-board basis.
 
-ADNIMP: Autobaud Detection Not Improved-. Disables new features of
-	autobaud detection (See Baud Rate Automatic Detection
-	Protocol, for more details).
+I have this in mind for a long time for Kirkwood's SATA node already:
+Consider a board where you have the one available SATA plug connected
+to port 1. How would that work out with status = "disabled"/"okay" that
+doesn't allow array of strings obviously?
 
-	0 Autobaud detection new features selected
-	1 Keep old autobaud detection mechanism
-
-The "new features" mechanism occasionally cause the receiver to get out of sync 
-and continuously produce received characters of '\xff'.
-
-In order to reproduce the problem:
-
-$ stty -F /dev/ttymxc0 19200
-
-- Change the terminal baudrate to 19200
-
-- Type in the console and it should look good
-
-- Change the terminal baudrate back to 115200
-
-- Type 'b' in the console, then a stream of garbage characters is seen.
-
-Also rename the bit definition as per the reference manual.
-
-Tested on mx6q, mx6dl, mx6solo and mx53.
-
-Based on a patch from Eric Nelson for U-boot.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- drivers/tty/serial/imx.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 3b6c1a2..392154d 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -116,7 +116,7 @@
- #define UCR3_DSR	(1<<10) /* Data set ready */
- #define UCR3_DCD	(1<<9)	/* Data carrier detect */
- #define UCR3_RI		(1<<8)	/* Ring indicator */
--#define UCR3_TIMEOUTEN	(1<<7)	/* Timeout interrupt enable */
-+#define UCR3_ADNIMP	(1<<7)	/* Autobaud Detection Not Improved */
- #define UCR3_RXDSEN	(1<<6)	/* Receive status interrupt enable */
- #define UCR3_AIRINTEN	(1<<5)	/* Async IR wake interrupt enable */
- #define UCR3_AWAKEN	(1<<4)	/* Async wake interrupt enable */
-@@ -1174,7 +1174,7 @@ static int imx_startup(struct uart_port *port)
- 
- 	if (!is_imx1_uart(sport)) {
- 		temp = readl(sport->port.membase + UCR3);
--		temp |= IMX21_UCR3_RXDMUXSEL;
-+		temp |= IMX21_UCR3_RXDMUXSEL | UCR3_ADNIMP;
- 		writel(temp, sport->port.membase + UCR3);
- 	}
- 
--- 
-1.8.3.2
+Sebastian
