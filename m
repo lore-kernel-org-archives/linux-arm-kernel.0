@@ -1,51 +1,121 @@
 From: stefan@agner.ch (stefan at agner.ch)
-Date: Wed, 14 May 2014 23:45:56 +0200
-Subject: [PATCH v2 1/3] ARM: tegra: enable MCP251x CAN controller and DS1307
- RTC
+Date: Wed, 14 May 2014 23:45:57 +0200
+Subject: [PATCH v2 2/3] drm/panel: add support for EDT panels
 In-Reply-To: <cover.1400103181.git.stefan@agner.ch>
 References: <cover.1400103181.git.stefan@agner.ch>
-Message-ID: <4cc13e0aba03a5b2d3e5f4049d252956342b1dad.1400103181.git.stefan@agner.ch>
+Message-ID: <35c081171a3d9a9401767601c02a12e266b37dd0.1400103181.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stefan Agner <stefan@agner.ch>
 
-Toradex Colibri Evaluation Board uses the DS1307 RTC and the
-MCP251x CAN controller. The NVIDIA Tegra 3 based Colibri T30
-module can be used on this carrier board, hence enable those
-drivers in tegra_defonfig.
-
-Furthermore the NVIDIA Tegra 3 based Apalis T30 module too
-contains two MCP251x CAN controller.
+This panels are sold by Toradex for Colibri T20/T30 and Apalis T30
+evaluation kits.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/configs/tegra_defconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+ .../devicetree/bindings/panel/edt,et057090dhu.txt  |  7 +++
+ .../devicetree/bindings/panel/edt,et070080dh6.txt  |  7 +++
+ drivers/gpu/drm/panel/panel-simple.c               | 52 ++++++++++++++++++++++
+ 3 files changed, 66 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/panel/edt,et057090dhu.txt
+ create mode 100644 Documentation/devicetree/bindings/panel/edt,et070080dh6.txt
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index 2926281..6329632 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -73,6 +73,11 @@ CONFIG_INET6_IPCOMP=y
- CONFIG_IPV6_MIP6=y
- CONFIG_IPV6_TUNNEL=y
- CONFIG_IPV6_MULTIPLE_TABLES=y
-+CONFIG_CAN=y
-+CONFIG_CAN_RAW=y
-+CONFIG_CAN_BCM=y
-+CONFIG_CAN_DEV=y
-+CONFIG_CAN_MCP251X=y
- CONFIG_BT=y
- CONFIG_BT_RFCOMM=y
- CONFIG_BT_BNEP=y
-@@ -222,6 +227,7 @@ CONFIG_LEDS_TRIGGER_TRANSIENT=y
- CONFIG_LEDS_TRIGGER_CAMERA=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_AS3722=y
-+CONFIG_RTC_DRV_DS1307=y
- CONFIG_RTC_DRV_MAX8907=y
- CONFIG_RTC_DRV_PALMAS=y
- CONFIG_RTC_DRV_TPS6586X=y
+diff --git a/Documentation/devicetree/bindings/panel/edt,et057090dhu.txt b/Documentation/devicetree/bindings/panel/edt,et057090dhu.txt
+new file mode 100644
+index 0000000..4903d7b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/panel/edt,et057090dhu.txt
+@@ -0,0 +1,7 @@
++Emerging Display Technology Corp. 5.7" VGA TFT LCD panel
++
++Required properties:
++- compatible: should be "edt,et057090dhu"
++
++This binding is compatible with the simple-panel binding, which is specified
++in simple-panel.txt in this directory.
+diff --git a/Documentation/devicetree/bindings/panel/edt,et070080dh6.txt b/Documentation/devicetree/bindings/panel/edt,et070080dh6.txt
+new file mode 100644
+index 0000000..64986b1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/panel/edt,et070080dh6.txt
+@@ -0,0 +1,7 @@
++Emerging Display Technology Corp. 7.0" WVGA TFT LCD panel
++
++Required properties:
++- compatible: should be "edt,et070080dh6"
++
++This binding is compatible with the simple-panel binding, which is specified
++in simple-panel.txt in this directory.
+diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+index 309f29e..7e4103f 100644
+--- a/drivers/gpu/drm/panel/panel-simple.c
++++ b/drivers/gpu/drm/panel/panel-simple.c
+@@ -306,6 +306,52 @@ static const struct panel_desc chunghwa_claa101wa01a = {
+ 	},
+ };
+ 
++static const struct drm_display_mode edt_et057090dhu_mode = {
++	.clock = 25175,
++	.hdisplay = 640,
++	.hsync_start = 640 + 16,
++	.hsync_end = 640 + 16 + 30,
++	.htotal = 640 + 16 + 30 + 114,
++	.vdisplay = 480,
++	.vsync_start = 480 + 10,
++	.vsync_end = 480 + 10 + 3,
++	.vtotal = 480 + 10 + 3 + 32,
++	.vrefresh = 60,
++	.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
++};
++
++static const struct panel_desc edt_et057090dhu = {
++	.modes = &edt_et057090dhu_mode,
++	.num_modes = 1,
++	.size = {
++		.width = 115,
++		.height = 86,
++	},
++};
++
++static const struct drm_display_mode edt_et070080dh6_mode = {
++	.clock = 33260,
++	.hdisplay = 800,
++	.hsync_start = 800 + 40,
++	.hsync_end = 800 + 40 + 128,
++	.htotal = 800 + 40 + 128 + 88,
++	.vdisplay = 480,
++	.vsync_start = 480 + 8,
++	.vsync_end = 480 + 8 + 2,
++	.vtotal = 480 + 8 + 2 + 35,
++	.vrefresh = 60,
++	.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
++};
++
++static const struct panel_desc edt_et070080dh6 = {
++	.modes = &edt_et070080dh6_mode,
++	.num_modes = 1,
++	.size = {
++		.width = 152,
++		.height = 91,
++	},
++};
++
+ static const struct drm_display_mode chunghwa_claa101wb01_mode = {
+ 	.clock = 69300,
+ 	.hdisplay = 1366,
+@@ -383,6 +429,12 @@ static const struct of_device_id platform_of_match[] = {
+ 		.compatible = "chunghwa,claa101wb01",
+ 		.data = &chunghwa_claa101wb01
+ 	}, {
++		.compatible = "edt,et057090dhu",
++		.data = &edt_et057090dhu,
++	}, {
++		.compatible = "edt,et070080dh6",
++		.data = &edt_et070080dh6,
++	}, {
+ 		.compatible = "lg,lp129qe",
+ 		.data = &lg_lp129qe,
+ 	}, {
 -- 
 1.9.2
