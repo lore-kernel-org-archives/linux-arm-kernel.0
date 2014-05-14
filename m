@@ -1,122 +1,154 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 14 May 2014 09:38:23 -0600
-Subject: [PATCH 2/2] ARM: tegra: initial add of Colibri T30
-In-Reply-To: <537319CE.7020101@ziswiler.com>
-References: <cover.1400001937.git.stefan@agner.ch>
- <d45ec5351ce8ef03256061bdc4b0ba673bd40c66.1400001937.git.stefan@agner.ch>
- <53727738.4080901@wwwdotorg.org> <537319CE.7020101@ziswiler.com>
-Message-ID: <53738DEF.70108@wwwdotorg.org>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Wed, 14 May 2014 17:49:29 +0200
+Subject: [PATCH v3 1/6] phy: add a driver for the Berlin SATA PHY
+In-Reply-To: <31922167.uMVzxsQNIT@wuerfel>
+References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
+ <16480004.aaDhzlOZgi@wuerfel> <20140514145002.GA18392@kwain>
+ <31922167.uMVzxsQNIT@wuerfel>
+Message-ID: <20140514154929.GA8016@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2014 01:22 AM, Marcel Ziswiler wrote:
-> On 05/13/2014 09:49 PM, Stephen Warren wrote:
->> On 05/13/2014 11:27 AM, stefan at agner.ch wrote:
->>> This patch adds the device tree to support Toradex Colibri T30, a
->>> computer on module which can be used on different carrier boards.
->>>
->>> The module consists of a Tegra 30 SoC, two PMIC, DDR3L RAM, eMMC,
->>> a LM95245 temperature sensor and an AX88772B USB Ethernet
->>> Controller. Furthermore, there is a STMPE811 and SGTL5000 audio
->>> codec which are not yet supported. Anything that is not self
->>> contained on the module is disabled by default.
->>>
->>> The device tree for the Evaluation Board includes the modules
->>> device tree and enables the supported pheripherials of the carrier
->>> board (the Evaluation Board supports almost all of them).
->>
->>> diff --git a/arch/arm/boot/dts/tegra30-colibri-eval-v3.dts
-
->>> +    aliases {
->>> +        rtc0 = "/i2c at 7000c000/rtc at 68";
->>> +        rtc1 = "/i2c at 7000d000/tps65911 at 2d";
->>> +        rtc2 = "/rtc at 7000e000";
->>> +    };
->>
->> Wow, no shortage of RTCs!
+On Wed, May 14, 2014 at 05:31:24PM +0200, Arnd Bergmann wrote:
+> On Wednesday 14 May 2014 16:50:02 Antoine T?nart wrote:
+> > On Wed, May 14, 2014 at 03:02:34PM +0200, Arnd Bergmann wrote:
+> > > On Wednesday 14 May 2014 11:48:57 Antoine T?nart wrote:
+> > > > +static int phy_berlin_sata_power_on(struct phy *phy)
+> > > > +{
+> > > > +       struct phy_berlin_desc *desc = phy_get_drvdata(phy);
+> > > > +       struct phy_berlin_priv *priv = to_berlin_sata_phy_priv(desc);
+> > > > +       u32 regval;
+> > > > +
+> > > > +       spin_lock(&priv->lock);
+> > > > +
+> > > > +       /* Power up PHY */
+> > > > +       writel(CONTROL_REGISTER, priv->base + HOST_VSA_ADDR);
+> > > > +       regval = readl(priv->base + HOST_VSA_DATA);
+> > > > +       regval &= ~(desc->val);
+> > > > +       writel(regval, priv->base + HOST_VSA_DATA);
+> > > > +
+> > > > +       /* Configure MBus */
+> > > > +       writel(MBUS_SIZE_CONTROL, priv->base + HOST_VSA_ADDR);
+> > > > +       regval = readl(priv->base + HOST_VSA_DATA);
+> > > > +       regval |= MBUS_WRITE_REQUEST_SIZE_128 | MBUS_READ_REQUEST_SIZE_128;
+> > > > +       writel(regval, priv->base + HOST_VSA_DATA);
+> > > > +
+> > > > +       spin_unlock(&priv->lock);
+> > > > +
+> > > > +       return 0;
+> > > > +}
+> > > > +
+> > > > +static int phy_berlin_sata_power_off(struct phy *phy)
+> > > > +{
+> > > > +       struct phy_berlin_desc *desc = phy_get_drvdata(phy);
+> > > > +       struct phy_berlin_priv *priv = to_berlin_sata_phy_priv(desc);
+> > > > +       u32 regval;
+> > > > +
+> > > > +       spin_lock(&priv->lock);
+> > > > +
+> > > > +       /* Power down PHY */
+> > > > +       writel(CONTROL_REGISTER, priv->base + HOST_VSA_ADDR);
+> > > > +       regval = readl(priv->base + HOST_VSA_DATA);
+> > > > +       regval |= desc->val;
+> > > > +       writel(regval, priv->base + HOST_VSA_DATA);
+> > > > +
+> > > > +       spin_unlock(&priv->lock);
+> > > > +
+> > > > +       return 0;
+> > > 
+> > > I don't get this part: you have a reference to the phy here,
+> > > but then you go poking the phy registers from the SATA driver
+> > > rather than calling a PHY API function.
+> > 
+> > The v1 only introduced an AHCI driver. I somewhat agree the PHY
+> > operations done in the AHCI driver could be in there.
+> > 
+> > I can move the initialization done in the AHCI driver here, but I'll
+> > still need the driver: the Berlin AHCI needs to call the framework
+> > generic functions with a custom mask and has custom pm_ops. So I'll
+> > end up with a nearly empty AHCI driver, not able to control the port
+> > parameters.
+> > 
+> > Or I can put all this in the AHCI driver, but then we'll need to
+> > describe the PHYs there (to be able to enable each PHY independently)
+> > and add bindings to the SATA ones.
+> > 
+> > What do you think? I prefer the first solution, but we'll have SATA
+> > port related configuration in the PHY and a very tiny AHCI driver
+> > because I can't really use the default behaviour of the ahci_platform.
 > 
-> Yes (;-p). Please understand however that there are certain limitation
-> if it comes to real-time clocks: The first one is the ultra low-power
-> RTC available on the carrier board. The second one is PMIC integrated
-> usually drawing much more current that the first dedicated one. The
-> third one is Tegra SoC internal and won't keep the time across
-> power-cycles in our design.
-
-Sure, I understand this is just representing the HW. It was just
-surprising to see so many.
-
->>> +    /* SPI1: Colibri SSP */
->>> +    spi at 7000d400 {
->>> +        status = "okay";
->>> +        spi-max-frequency = <25000000>;
->>> +        can0: can at 0 {
->>> +            compatible = "microchip,mcp2515";
->>> +            reg = <0>;
->>> +            clocks = <&clk16m>;
->>> +            interrupt-parent = <&gpio>;
->>> +            interrupts = <TEGRA_GPIO(S, 0) GPIO_ACTIVE_LOW>;
->>> +            spi-max-frequency = <10000000>;
->>
->> So this chip doesn't get confused by a faster clock frequency when its
->> chip-select line isn't asserted? I would have expected spi-max-frequency
->> for the bus to be the minimum value that any device on the bus would
->> tolerate.
+> I just noticed I quoted the wrong driver with my comment, but I think
+> you got what I meant.
 > 
-> No SPI chip should ever get confused like that as long as they are chip
-> select gated. At least by the traditional chip select meaning as opposed
-> to NVIDIA's designers taking the term chip select a little too personal:
-> they indeed only select a chip otherwise all the chip select pins are
-> just left floating!
+> Why do you need a custom mask? Is that something you could pass
+> as the argument in the phy descriptor using #phy-cells=<1>?
 
-I'm not convinced about this. The clock signal still reaches all the
-chips, and hence still reaches some logic inside those chips. If the
-setup/hold timings aren't met (for internal parts of the chip's SPI
-state machine), then presumably all bets are off re: performance of the
-chip, irrespective of whether the CS line happens to gate how much of
-the chip actually does anything.
+I meant a custom mask in the AHCI driver, when calling the
+ahci_platform_init_host() function. Otherwise we'll have problems on the
+BG2Q DMP (it only has one PHY available, and not initializing it is not
+enough).
 
->> The dr_mode property is only for the PHY node.
->>
->>> +    panel: panel {
->>> +        compatible = "edt,et057090dhu", "simple-panel";
->>
->> The panel-simple driver doesn't seem to know about that EDT panel. How
->> will it work out the display timings?
 > 
-> Good question and me and Stefan actually even talked about that
-> yesterday. I am actually using KMS right now as follows:
+> > > > +                * By default the PHY node is used to request and match a PHY.
+> > > > +                * We describe one PHY per sub-node here. Use the right node.
+> > > > +                */
+> > > > +               phy->dev.of_node = child;
+> > > > +
+> > > > +               priv->phys[phy_id].phy = phy;
+> > > > +               priv->phys[phy_id].val = desc[phy_id].val;
+> > > > +               priv->phys[phy_id].index = phy_id;
+> > > > +               phy_set_drvdata(phy, &priv->phys[phy_id]);
+> > > 
+> > > And here, you set a driver specific value into a structure used by the
+> > > PHY.
+> > 
+> > Values in priv->phys[] are related to the PHYs. phy_set_drvdata() allows
+> > to store PHY related data, which is what I'm doing there. Nearly all PHY
+> > drivers are doing this.
+> > 
+> > Or am I missing something?
 > 
-> video=HDMI-A-1:1280x720-16 at 60 video=LVDS-1:640x480-16 at 60'
+> This part is really ok, I got confused when I replied to the wrong email.
+> Sorry about this.
 > 
-> So the panel node is purely used to hook up the back light part right now.
+> > > Both of these are layering violations. You should either use the PHY
+> > > interfaces correctly so the SATA driver doesn't have to know about the
+> > > specific, or not use a PHY device node at all and do everything in
+> > > the SATA front-end.
+> > 
+> > To be sure: you mean using the PHY init() interface in the AHCI driver?
 > 
-> From our point of view for our completely generic module approach where
-> each customer potentially hooks up his own display make/model it would
-> be desirable to have some way of defining such timings directly through
-> the device tree.
+> If this PHY is specific to the ahci-berlin hardware and not shared with
+> anything else, you don't really need to split out a phy driver. That
+> would somewhat simplify what you ahve here.
 
-Like Thierry, I think the DT needs to represent the actual HW.
+I don't have lots of info about that, but we set the PHY to
+PHY_MODE_SATA in the AHCI driver. So I guess there are other modes.
 
-If there's no panel on the carrier board itself, then it probably
-shouldn't even be in the base DT. If a user adds a panel, then they will
-modify their own DT to correctly represent it.
+Maybe Jisheng can help us with this?
 
->>     compatible = "toradex,colibri_t30", "nvidia,tegra30";
->>
->>> +    aliases {
->>> +        serial0 = &uarta;
->>> +        serial1 = &uartd;
->>> +        serial2 = &uartb;
->>> +    };
->>
->> tegra20.dtsi already sets the alias names for the serial ports. Previous
->> discussions settled on giving each on-chip UART a static name, rather
->> than renaming them per board.
 > 
-> Understood, however our Colibri standard defines a completely different
-> order of the UARTs which is what we attempted to indicate by this aliases.
+> The alternative is to make it as generic as you can. If you can manage
+> to move all the phy code into phy-berlin-sata driver, it should be
+> possible to just extend the ahci-platform driver resume function to
+> reinitialize the phy if there is one.
 
-I'd prefer that all Tegra boards use serial aliases consistently. If
-there's a real issue with this, please talk to Laxman (CC'd) and see if
-we can move all the UART alias entries into individual board files, so
-that this board isn't the odd one out.
+It is possible to move all the PHY code the phy-berlin-sata. Then I'll
+need to hack a bit the AHCI framework so it can handle more than one
+PHY. But as I said, I'll still need to set a custom mask, and adding a
+quirk to the AHCI platform or framework does not seem to be a very good
+idea, imho.
+
+Or I can add a computed mask to the ahci-platform driver, like I did in
+the Berlin one, but I don't know what would be the consequences. For
+each PHY I have:
+
++	mask |= 1 << i;
+
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
