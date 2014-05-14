@@ -1,36 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 May 2014 15:18:01 +0200
-Subject: [PATCH v4 7/8] ARM: Exynos: switch to using generic cpufreq-cpu0
- driver
-In-Reply-To: <CAKohpo=mL4Wd3wajXQHnYW463-L1=QX=5krpPhOJ=NYet3xXoA@mail.gmail.com>
-References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
- <1480209.xTrtNKOy7N@phil>
- <CAKohpo=mL4Wd3wajXQHnYW463-L1=QX=5krpPhOJ=NYet3xXoA@mail.gmail.com>
-Message-ID: <61090198.zodNL4xIig@wuerfel>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 14 May 2014 15:18:03 +0200
+Subject: [PATCH v6 3/3] ARM: sunxi: Add IR controller support in DT on A20
+In-Reply-To: <1400006342-2968-4-git-send-email-bay@hackerdom.ru>
+References: <1400006342-2968-1-git-send-email-bay@hackerdom.ru>
+ <1400006342-2968-4-git-send-email-bay@hackerdom.ru>
+Message-ID: <53736D0B.5070600@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 May 2014 18:44:46 Viresh Kumar wrote:
-> On 14 May 2014 18:41, Heiko St?bner <heiko@sntech.de> wrote:
-> > Am Mittwoch, 14. Mai 2014, 18:35:29 schrieb Viresh Kumar:
-> >> On 14 May 2014 18:20, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> > Could we please come up with a way to probe this from DT in the
-> >> > cpufreq-cpu0 driver itself, so we don't have to add a device in every
-> >> > platform using it?
+Hi,
+
+<snip>
+
+On 05/13/2014 08:39 PM, Alexander Bersenev wrote:
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index 0ae2b77..40ded74 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -724,6 +724,19 @@
+>  				allwinner,drive = <2>;
+>  				allwinner,pull = <0>;
+>  			};
+> +
+> +			ir0_pins_a: ir0 at 0 {
+> +				    allwinner,pins = "PB3","PB4";
+> +				    allwinner,function = "ir0";
+> +				    allwinner,drive = <0>;
+> +				    allwinner,pull = <0>;
+> +			};
+> +			ir1_pins_a: ir1 at 0 {
+> +				    allwinner,pins = "PB22","PB23";
+> +				    allwinner,function = "ir1";
+> +				    allwinner,drive = <0>;
+> +				    allwinner,pull = <0>;
+> +			};
+>  		};
+>  
+>  		timer at 01c20c00 {
+> @@ -937,5 +950,23 @@
+>  			#interrupt-cells = <3>;
+>  			interrupts = <1 9 0xf04>;
+>  		};
+> +
+> +		ir0: ir at 01c21800 {
+> +			compatible = "allwinner,sun7i-a20-ir";
+> +			clocks = <&apb0_gates 6>, <&ir0_clk>;
+> +			clock-names = "apb", "ir";
+> +			interrupts = <0 5 4>;
+> +			reg = <0x01c21800 0x40>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ir1: ir at 01c21c00 {
+> +			compatible = "allwinner,sun7i-a20-ir";
+> +			clocks = <&apb0_gates 7>, <&ir1_clk>;
+> +			clock-names = "apb", "ir";
+> +			interrupts = <0 6 4>;
+> +			reg = <0x01C21c00 0x40>;
+> +			status = "disabled";
+> +		};
+>  	};
+>  };
 > 
-> >> Its followed that way because DT Maintainers had strong objections
-> >> to creating virtual device nodes and haven't allowed creation of nodes
-> >> for cpufreq drivers.. For which there is no physical device, as CPU already
-> >> has a separate node..
-> >
-> > as we already have the "enable-method" property for enabling/disabling cpus,
-> > would something like a "scaling-method" be feasible?
 
-Good idea to put it as a property into the CPU node.
+The entries in the soc block are sorted by register address, so please
+don't add these at the end, instead keep things sorted.
 
-> Lets see what DT maintainers have to say on this, I would rather go for a
-> more straight forward name: "scaling-driver"  ..
+Regards,
 
-Both sound fine to me.
-
-	Arnd
+Hans
