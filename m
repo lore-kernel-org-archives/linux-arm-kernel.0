@@ -1,90 +1,60 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 14 May 2014 03:10:11 +0200
-Subject: [PATCH v6 07/12] ARM: shmobile: r7s72100: add i2c clocks to dtsi
+Date: Wed, 14 May 2014 03:10:15 +0200
+Subject: [PATCH v6 11/12] ARM: shmobile: r7s72100: use workaround for non
+ DT-clocks
 In-Reply-To: <1400029816-24028-1-git-send-email-wsa@the-dreams.de>
 References: <1400029816-24028-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1400029816-24028-8-git-send-email-wsa@the-dreams.de>
+Message-ID: <1400029816-24028-12-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
+MTU2 is not yet prepared for DT usage, so use the common workaround via
+clkdev for now.
+
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Acked-by: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- arch/arm/boot/dts/r7s72100.dtsi            | 15 +++++++++++++++
- include/dt-bindings/clock/r7s72100-clock.h |  6 ++++++
- 2 files changed, 21 insertions(+)
+ arch/arm/mach-shmobile/board-genmai-reference.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index a4a67380b0a2..afce2e344c7a 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -110,6 +110,17 @@
- 			>;
- 			clock-output-names = "scif0", "scif1", "scif2", "scif3", "scif4", "scif5", "scif6", "scif7";
- 		};
-+
-+		mstp9_clks: mstp9_clks at fcfe0438 {
-+			#clock-cells = <1>;
-+			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
-+			reg = <0xfcfe0438 4>;
-+			clocks = <&p0_clk>, <&p0_clk>, <&p0_clk>, <&p0_clk>;
-+			clock-indices = <
-+				R7S72100_CLK_I2C0 R7S72100_CLK_I2C1 R7S72100_CLK_I2C2 R7S72100_CLK_I2C3
-+			>;
-+			clock-output-names = "i2c0", "i2c1", "i2c2", "i2c3";
-+		};
- 	};
+diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c b/arch/arm/mach-shmobile/board-genmai-reference.c
+index 7630c1053e32..33015e5ed52a 100644
+--- a/arch/arm/mach-shmobile/board-genmai-reference.c
++++ b/arch/arm/mach-shmobile/board-genmai-reference.c
+@@ -18,18 +18,28 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
  
- 	cpus {
-@@ -145,6 +156,7 @@
- 			     <0 162 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 163 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 164 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R7S72100_CLK_I2C0>;
- 		clock-frequency = <100000>;
- 		status = "disabled";
- 	};
-@@ -162,6 +174,7 @@
- 			     <0 170 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 171 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 172 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R7S72100_CLK_I2C1>;
- 		clock-frequency = <100000>;
- 		status = "disabled";
- 	};
-@@ -179,6 +192,7 @@
- 			     <0 178 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 179 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 180 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R7S72100_CLK_I2C2>;
- 		clock-frequency = <100000>;
- 		status = "disabled";
- 	};
-@@ -196,6 +210,7 @@
- 			     <0 186 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 187 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 188 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R7S72100_CLK_I2C3>;
- 		clock-frequency = <100000>;
- 		status = "disabled";
- 	};
-diff --git a/include/dt-bindings/clock/r7s72100-clock.h b/include/dt-bindings/clock/r7s72100-clock.h
-index c756f1cf0d52..ff84e0bafd7b 100644
---- a/include/dt-bindings/clock/r7s72100-clock.h
-+++ b/include/dt-bindings/clock/r7s72100-clock.h
-@@ -25,4 +25,10 @@
- #define R7S72100_CLK_SCIF6	1
- #define R7S72100_CLK_SCIF7	0
+-#include <linux/clk-provider.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
++#include <mach/clock.h>
+ #include <mach/common.h>
+ #include <mach/r7s72100.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
  
-+/* MSTP9 */
-+#define R7S72100_CLK_I2C0	7
-+#define R7S72100_CLK_I2C1	6
-+#define R7S72100_CLK_I2C2	5
-+#define R7S72100_CLK_I2C3	4
++#ifdef CONFIG_COMMON_CLK
++/*
++ * This is a really crude hack to provide clkdev support to platform
++ * devices until they get moved to DT.
++ */
++static const struct clk_name clk_names[] = {
++	{ "mtu2", "fck", "sh-mtu2" },
++};
++#endif
 +
- #endif /* __DT_BINDINGS_CLOCK_R7S72100_H__ */
+ static void __init genmai_add_standard_devices(void)
+ {
+ #ifdef CONFIG_COMMON_CLK
+-	of_clk_init(NULL);
++	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), true);
+ #else
+ 	r7s72100_clock_init();
+ #endif
 -- 
 1.9.2
