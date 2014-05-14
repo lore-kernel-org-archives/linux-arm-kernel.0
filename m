@@ -1,37 +1,39 @@
-From: anders.berg@avagotech.com (Anders Berg)
-Date: Wed, 14 May 2014 20:38:01 +0200
-Subject: [PATCH v3 6/6] ARM: dts: axxia: Add reset controller
-In-Reply-To: <cover.1400072260.git.anders.berg@avagotech.com>
-References: <cover.1400072260.git.anders.berg@avagotech.com>
-Message-ID: <b4860db76b5af89cef4246ce73a00293b7fe912b.1400072260.git.anders.berg@avagotech.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 14 May 2014 11:41:42 -0700
+Subject: [linux-sunxi] [PATCH v4 2/2] input: sun4i-ts: Add support for
+ temperature sensor
+In-Reply-To: <CAGb2v66EiYy3XbLqBXmOhOfHF=2DC_tOyQpdM8Q05iR6+X66zg@mail.gmail.com>
+References: <1399795586-18919-1-git-send-email-hdegoede@redhat.com>
+ <1399795586-18919-3-git-send-email-hdegoede@redhat.com>
+ <CAGb2v66EiYy3XbLqBXmOhOfHF=2DC_tOyQpdM8Q05iR6+X66zg@mail.gmail.com>
+Message-ID: <20140514184142.GG30089@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anders Berg <anders.berg@lsi.com>
+On Mon, May 12, 2014 at 04:44:51PM +0800, Chen-Yu Tsai wrote:
+> Hi,
+> 
+> On Sun, May 11, 2014 at 4:06 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> > @@ -232,14 +284,39 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+> >         writel(STYLUS_UP_DEBOUN(5) | STYLUS_UP_DEBOUN_EN(1) | TP_MODE_EN(1),
+> >                ts->base + TP_CTRL1);
+> >
+> > -       ret = input_register_device(ts->input);
+> > -       if (ret)
+> > -               return ret;
+> > +       hwmon = devm_hwmon_device_register_with_groups(ts->dev, "sun4i_ts",
+> > +                                                      ts, sun4i_ts_groups);
+> 
+> This fails to compile when HWMON is not selected:
+> 
+> drivers/built-in.o: In function `sun4i_ts_probe':
+> /home/wens/cubieboard/linux/drivers/input/touchscreen/sun4i-ts.c:287:
+> undefined reference to `devm_hwmon_device_register_with_groups'
+> 
+> Best do a wrapper around the hwmon related code.
+> drivers/input/touchscreen/ads7846.c has something similar, albeit for voltage.
 
-Add the reset controller to the AXM5xx device tree.
+I added dependency on HWMON and applied, thank you.
 
-Signed-off-by: Anders Berg <anders.berg@lsi.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/axm55xx.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/boot/dts/axm55xx.dtsi b/arch/arm/boot/dts/axm55xx.dtsi
-index 5d63887..bd1e07d 100644
---- a/arch/arm/boot/dts/axm55xx.dtsi
-+++ b/arch/arm/boot/dts/axm55xx.dtsi
-@@ -208,6 +208,11 @@
- 			reg = <0x20 0x10030000 0 0x2000>;
- 		};
- 
-+		reset: reset at 2010031000 {
-+			compatible = "lsi,axm55xx-reset";
-+			syscon = <&syscon>;
-+		};
-+
- 		amba {
- 			compatible = "arm,amba-bus";
- 			#address-cells = <2>;
 -- 
-1.8.3.2
+Dmitry
