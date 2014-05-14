@@ -1,36 +1,101 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 14 May 2014 18:42:24 -0300
-Subject: [PATCH] dma: imx: correct sdmac->status for cyclic dma tx
-In-Reply-To: <1386913966-20595-1-git-send-email-jiada_wang@mentor.com>
-References: <1386913966-20595-1-git-send-email-jiada_wang@mentor.com>
-Message-ID: <CAOMZO5Ad5ZvpozNtR+i9FZvKpgcsxOoCp5mDx9WbBnc1Qtu8Aw@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 14 May 2014 14:42:55 -0700
+Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems#
+In-Reply-To: <alpine.LFD.2.11.1405131922580.980@knanqh.ubzr>
+References: <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
+ <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
+ <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
+ <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
+ <20140508192209.GH3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405081600260.980@knanqh.ubzr>
+ <20140508205223.GI3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405082058130.980@knanqh.ubzr>
+ <20140509091824.GL3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405091245070.980@knanqh.ubzr>
+ <20140509182245.GM3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405091640090.980@knanqh.ubzr>
+ <CAD=FV=UJK1nSPjH-au-KtbnOZk2nC7usLD8L9neMedj6WHUp8g@mail.gmail.com>
+ <CAD=FV=XM2URyJjV9gaE=mrp7LAEGtvi9wQGhGJi3_HYp_XzYWg@mail.gmail.com>
+ <5372998F.6020502@wwwdotorg.org>
+ <alpine.LFD.2.11.1405131908260.980@knanqh.ubzr>
+ <alpine.LFD.2.11.1405131922580.980@knanqh.ubzr>
+Message-ID: <CAD=FV=U+Uxd9d726-1mBY=MmL1bKfGQosvLmvttJavf3y4VftQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jiada,
+Hi,
 
-On Fri, Dec 13, 2013 at 3:52 AM,  <jiada_wang@mentor.com> wrote:
-> From: Jiada Wang <jiada_wang@mentor.com>
+On Tue, May 13, 2014 at 4:29 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Tue, 13 May 2014, Nicolas Pitre wrote:
 >
-> In cyclic dma tx's handler sdma_handle_channel_loop(),
-> SDMA channel statue is set to either DMA_ERROR or DMA_IN_PROGRESS
-> based on each period's status. This has the following issues:
+>> On Tue, 13 May 2014, Stephen Warren wrote:
+>>
+>> > On 05/13/2014 03:50 PM, Doug Anderson wrote:
+>> > ...
+>> > > ...but then I found the true problem shows up when we transition
+>> > > between very low frequencies on exynos, like between 200MHz and
+>> > > 300MHz.  While transitioning between frequencies the system
+>> > > temporarily bumps over to the "switcher" PLL running at 800MHz while
+>> > > waiting for the main PLL to stabilize.  No CPUFREQ notification is
+>> > > sent for that.  That means there's a period of time when we're running
+>> > > at 800MHz but loops_per_jiffy is calibrated at between 200MHz and
+>> > > 300MHz.
+>> > >
+>> > >
+>> > > I'm welcome to any suggestions for how to address this.  It sorta
+>> > > feels like it would be a common thing to have a temporary PLL during
+>> > > the transition, ...
+>> >
+>> > We definitely do that on Tegra for some cpufreq transitions.
+>>
+>> Ouch...  If this is a common strategy to use a third frequency during a
+>> transition phase, especially if that frequency is way off (800MHz vs
+>> 200-300MHz) then it is something the cpufreq layer must capture and
+>> advertise.
 >
-> 1) If one period's status is BD_RROR, then channel status
->    will be set to DMA_ERROR, but it will be overwritten to DMA_IN_PROGRESS
->    if the following periods are OK.
-> 2) DMA client may call sdma_control(DMA_TERMINATE_ALL) to stop the cyclic dma
->    operation, sdma channel status will be set to DMA_ERROR,
->    but if after this handler is called, then again the channel status will be overwritten
->    to DMA_IN_PROGRESS. Then the following dmaengine_prep_dma_cyclic() will always fail,
->    as channel status is DMA_IN_PROGRESS.
->
-> As in cyclic dma tx, channel status will be initially set to DMA_IN_PROGRESS,
-> driver only needs to change it to DMA_ERROR, when something wrong happens
-> (one period status is wrong, or stoped by client explicitly).
->
-> Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+> Of course if only the loops_per_jiffy scaling does care about frequency
+> changes these days, and if in those cases udelay() can instead be moved
+> to a timer source on those hick-up prone platforms, then all this is
+> fairly theoretical and may not be worth pursuing.
 
-It seems this one got lost as you did not put the dma maintainer on Cc.
+Yup, I think I'm going to abandon this.  If anyone ever runs into this
+problem later and can't use a bloody timer, hopefully they'll stumble
+on this thread and at least end up with a good starting point.
 
-Please run ./scripts/get_maintainer.pl and re-submit it.
+For the record, the fix I made locally (which actually worked) was:
+
+1. Add a new "temp" field to cpufreq_freqs:
+
+--- a/include/linux/cpufreq.h
++++ b/include/linux/cpufreq.h
+@@ -133,6 +133,7 @@ struct cpufreq_freqs {
+        unsigned int cpu;       /* cpu nr */
+        unsigned int old;
+        unsigned int new;
++       unsigned int temp;
+        u8 flags;               /* flags of cpufreq_driver, see below. */
+ };
+
+...depending on whether all users of this structure zero-initialize it
+(I didn't check) you might also need to add a flag to say whether the
+temp field is actually valid.
+
+
+2. Set the "temp" to the switching PLL frequency in the cpufreq driver.
+
+
+3. Change the ARM cpufreq_callback() to take the temp freq into account:
+
++       if (val == CPUFREQ_PRECHANGE) {
++               old_freq = freq->old;
++               new_freq = max(freq->new, freq->temp);
++       } else if (val == CPUFREQ_POSTCHANGE) {
++               old_freq = max(freq->old, freq->temp);
++               new_freq = freq->new;
++       }
+
+...then use old_freq and new_freq in the place of freq->old and freq->new
+
+
+
+-Doug
