@@ -1,100 +1,218 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 14 May 2014 22:15:11 +0200
-Subject: [PATCH v2 00/10] Marvell Berlin full clock support
-In-Reply-To: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Wed, 14 May 2014 22:15:15 +0200
+Subject: [PATCH v2 04/10] clk: berlin: add driver for BG2x simple PLLs
+In-Reply-To: <1400098522-14770-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1400098522-14770-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1400098522-14770-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1400098522-14770-5-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is version 2 of a patch set to bring proper DT based clocks to
-Marvell Berlin SoCs.
+From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-The overall changes are:
+This is a clock driver for the simple PLLs found on Berlin SoCs.
+With repect to PLL registers and features, BG2/BG2CD and BG2Q are
+slightly different, e.g. different allowed VCO dividers and bit
+shifts.
 
-* Dropped of_clk_create_name() helper
-Booting into an initramfs rootfs revealed that the unique clock names
-created with that helper clash with the way of_clk_get_parent_name()
-resolves the clock specifier to get the correct clock name. Anyway,
-I still consider the helper a good idea and postpone it to the next
-cycle when I have more time to look at the details.
-
-* Added BG2Q core clock driver and dtsi changes
-Alexandre just provided them, so I added them to this patch set.
-
-The single patch overview now is:
-
-Patch 1 adds the whole binding documentation for all clock related IP
-found on BG2, BG2CD, and BG2Q.
-
-Patch 2 adds corresponding dt-binding includes for the core clock
-indices to be used in both DT and the driver.
-
-Patches 3, 4, and 5 add clock drivers for the Audio/Video PLL, simple
-PLLs, and complex clock divider cells found on Berlin SoCs. Where
-required, currently known differences between BG2/BG2CD and BG2Q are
-taken care of.
-
-Patches 6 and 7 add core clock drivers for the remaining clocks of
-BG2/BG2CD and BG2Q. The register set dealing with it, is shared among
-input and bypass muxes, clock dividers and clock gates.
-
-Patches 8, 9, and 10 finally convert the DT SoC includes for BG2,
-BG2CD, and BG2Q to make use of the new clock related DT nodes.
-
-Alexandre Belloni (4):
-  clk: berlin: add driver for BG2x simple PLLs
-  clk: berlin: add driver for BG2x complex divider cells
-  clk: berlin: add core clock driver for BG2Q
-  ARM: dts: berlin: convert BG2Q to DT clock nodes
-
-Sebastian Hesselbarth (6):
-  dt-binding: clk: add clock binding docs for Marvell Berlin2 SoCs
-  clk: berlin: add binding include for BG2/BG2CD clock ids
-  clk: berlin: add driver for BG2x audio/video PLL
-  clk: berlin: add core clock driver for BG2/BG2CD
-  ARM: dts: berlin: convert BG2CD to DT clock nodes
-  ARM: dts: berlin: convert BG2 to DT clock nodes
-
- .../devicetree/bindings/clock/berlin2-clock.txt    | 195 ++++++++
- arch/arm/boot/dts/berlin2.dtsi                     | 207 +++++++--
- arch/arm/boot/dts/berlin2cd.dtsi                   | 205 +++++++--
- arch/arm/boot/dts/berlin2q.dtsi                    |  80 +++-
- drivers/clk/Makefile                               |   1 +
- drivers/clk/berlin/Makefile                        |   4 +
- drivers/clk/berlin/berlin2-avpll.c                 | 368 +++++++++++++++
- drivers/clk/berlin/berlin2-div.c                   | 324 +++++++++++++
- drivers/clk/berlin/berlin2-div.h                   |  80 ++++
- drivers/clk/berlin/berlin2-pll.c                   | 168 +++++++
- drivers/clk/berlin/bg2.c                           | 502 +++++++++++++++++++++
- drivers/clk/berlin/bg2q.c                          | 269 +++++++++++
- include/dt-bindings/clock/berlin2.h                |  35 ++
- include/dt-bindings/clock/berlin2q.h               |  28 ++
- 14 files changed, 2385 insertions(+), 81 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/berlin2-clock.txt
- create mode 100644 drivers/clk/berlin/Makefile
- create mode 100644 drivers/clk/berlin/berlin2-avpll.c
- create mode 100644 drivers/clk/berlin/berlin2-div.c
- create mode 100644 drivers/clk/berlin/berlin2-div.h
- create mode 100644 drivers/clk/berlin/berlin2-pll.c
- create mode 100644 drivers/clk/berlin/bg2.c
- create mode 100644 drivers/clk/berlin/bg2q.c
- create mode 100644 include/dt-bindings/clock/berlin2.h
- create mode 100644 include/dt-bindings/clock/berlin2q.h
-
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Randy Dunlap <rdunlap@infradead.org>
+Changelog:
+v1->v2:
+- dropped usage of postponed of_clk_create_name()       
+
 Cc: Mike Turquette <mturquette@linaro.org>
 Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Cc: Jisheng Zhang <jszhang@marvell.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
+---
+ drivers/clk/berlin/Makefile      |   2 +-
+ drivers/clk/berlin/berlin2-pll.c | 168 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 169 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/berlin/berlin2-pll.c
+
+diff --git a/drivers/clk/berlin/Makefile b/drivers/clk/berlin/Makefile
+index 5905733fc7c7..9d3490e9782f 100644
+--- a/drivers/clk/berlin/Makefile
++++ b/drivers/clk/berlin/Makefile
+@@ -1 +1 @@
+-obj-y += berlin2-avpll.o
++obj-y += berlin2-avpll.o berlin2-pll.o
+diff --git a/drivers/clk/berlin/berlin2-pll.c b/drivers/clk/berlin/berlin2-pll.c
+new file mode 100644
+index 000000000000..f8ef8989ead2
+--- /dev/null
++++ b/drivers/clk/berlin/berlin2-pll.c
+@@ -0,0 +1,168 @@
++/*
++ * Copyright (c) 2014 Marvell Technology Group Ltd.
++ *
++ * Alexandre Belloni <alexandre.belloni@free-electrons.com>
++ * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#include <linux/clk-provider.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++#include <asm/div64.h>
++
++struct berlin2_pll_map {
++	const u8 vcodiv[16];
++	u8 mult;
++	u8 fbdiv_shift;
++	u8 rfdiv_shift;
++	u8 divsel_shift;
++};
++
++struct berlin2_pll {
++	struct clk_hw hw;
++	void __iomem *base;
++	struct berlin2_pll_map map;
++};
++
++#define to_berlin2_pll(hw) container_of(hw, struct berlin2_pll, hw)
++
++#define SPLL_CTRL0	0x00
++#define SPLL_CTRL1	0x04
++#define SPLL_CTRL2	0x08
++#define SPLL_CTRL3	0x0c
++#define SPLL_CTRL4	0x10
++
++#define FBDIV_MASK	0x1ff
++#define RFDIV_MASK	0x1f
++#define DIVSEL_MASK	0xf
++
++/*
++ * The output frequency formula for the pll is:
++ * clkout = fbdiv / refdiv * parent / vcodiv
++ */
++static unsigned long
++berlin2_pll_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++{
++	struct berlin2_pll *pll = to_berlin2_pll(hw);
++	struct berlin2_pll_map *map = &pll->map;
++	u32 val, fbdiv, rfdiv, vcodivsel, vcodiv;
++	u64 rate = parent_rate;
++
++	val = readl_relaxed(pll->base + SPLL_CTRL0);
++	fbdiv = (val >> map->fbdiv_shift) & FBDIV_MASK;
++	rfdiv = (val >> map->rfdiv_shift) & RFDIV_MASK;
++	if (rfdiv == 0) {
++		pr_warn("%s has zero rfdiv\n", __clk_get_name(hw->clk));
++		rfdiv = 1;
++	}
++
++	val = readl_relaxed(pll->base + SPLL_CTRL1);
++	vcodivsel = (val >> map->divsel_shift) & DIVSEL_MASK;
++	vcodiv = map->vcodiv[vcodivsel];
++	if (vcodiv == 0) {
++		pr_warn("%s has zero vcodiv (index %d)\n",
++			__clk_get_name(hw->clk), vcodivsel);
++		vcodiv = 1;
++	}
++
++	rate *= fbdiv * map->mult;
++	do_div(rate, rfdiv * vcodiv);
++
++	return (unsigned long)rate;
++}
++
++static const struct clk_ops berlin2_pll_ops = {
++	.recalc_rate	= berlin2_pll_recalc_rate,
++};
++
++static struct clk * __init
++berlin2_pll_register(const struct berlin2_pll_map *map,
++		     void __iomem *base, const char *name,
++		     const char *parent_name, unsigned long flags)
++{
++	struct clk_init_data init;
++	struct berlin2_pll *pll;
++
++	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
++	if (!pll)
++		return ERR_PTR(-ENOMEM);
++
++	/* copy pll_map to allow __initconst */
++	memcpy(&pll->map, map, sizeof(*map));
++	pll->base = base;
++	pll->hw.init = &init;
++	init.name = name;
++	init.ops = &berlin2_pll_ops;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++	init.flags = flags;
++
++	return clk_register(NULL, &pll->hw);
++}
++
++static const struct berlin2_pll_map bg2_pll_map __initconst = {
++	.vcodiv		= {10, 15, 20, 25, 30, 40, 50, 60, 80},
++	.mult		= 10,
++	.fbdiv_shift	= 6,
++	.rfdiv_shift	= 1,
++	.divsel_shift	= 7,
++};
++
++static const struct berlin2_pll_map bg2q_pll_map __initconst = {
++	.vcodiv		= {1, 0, 2, 0, 3, 4, 0, 6, 8},
++	.mult		= 1,
++	.fbdiv_shift	= 7,
++	.rfdiv_shift	= 2,
++	.divsel_shift	= 9,
++};
++
++static const struct of_device_id pll_matches[] __initconst = {
++	{ .compatible = "marvell,berlin2-pll", .data = &bg2_pll_map },
++	{ .compatible = "marvell,berlin2q-pll", .data = &bg2q_pll_map },
++	{ }
++};
++
++static void __init berlin2_pll_of_setup(struct device_node *np)
++{
++	const struct of_device_id *match = of_match_node(pll_matches, np);
++	const struct berlin2_pll_map *map = match->data;
++	void __iomem *base;
++	struct clk *refclk;
++	struct clk *pll;
++
++	base = of_iomap(np, 0);
++	if (!base) {
++		pr_err("%s: Unable to map pll register\n", np->full_name);
++		return;
++	}
++
++	refclk = of_clk_get(np, 0);
++	if (IS_ERR(refclk)) {
++		pr_err("%s: Missing reference clock\n", np->full_name);
++		iounmap(base);
++		return;
++	}
++
++	pll = berlin2_pll_register(map, base, np->name,
++				   __clk_get_name(refclk), 0);
++	if (!IS_ERR(pll))
++		of_clk_add_provider(np, of_clk_src_simple_get, pll);
++
++	clk_put(refclk);
++}
++CLK_OF_DECLARE(berlin2_pll, "marvell,berlin2-pll", berlin2_pll_of_setup);
++CLK_OF_DECLARE(berlin2q_pll, "marvell,berlin2q-pll", berlin2_pll_of_setup);
 -- 
 1.9.1
