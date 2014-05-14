@@ -1,40 +1,36 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 14 May 2014 03:10:14 +0200
-Subject: [PATCH v6 10/12] ARM: shmobile: r7s72100: remove SPI DT clocks from
- legacy clock support
+Date: Wed, 14 May 2014 03:10:16 +0200
+Subject: [PATCH v6 12/12] ARM: shmobile: Add forward declaration of struct clk
+ to silence warning
 In-Reply-To: <1400029816-24028-1-git-send-email-wsa@the-dreams.de>
 References: <1400029816-24028-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1400029816-24028-11-git-send-email-wsa@the-dreams.de>
+Message-ID: <1400029816-24028-13-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Not used anymore since we switched to CCF.
+arch/arm/mach-shmobile/board-genmai-reference.c:23:0:
+arch/arm/mach-shmobile/include/mach/clock.h:19:54: warning: 'struct clk' declared inside parameter list [enabled by default]
+arch/arm/mach-shmobile/include/mach/clock.h:19:54: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Acked-by: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 ---
- arch/arm/mach-shmobile/clock-r7s72100.c | 5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/mach-shmobile/include/mach/clock.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
-index 1a797fe9e42f..df187484de5d 100644
---- a/arch/arm/mach-shmobile/clock-r7s72100.c
-+++ b/arch/arm/mach-shmobile/clock-r7s72100.c
-@@ -194,11 +194,6 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("rspi-rz.2", &mstp_clks[MSTP105]),
- 	CLKDEV_DEV_ID("rspi-rz.3", &mstp_clks[MSTP104]),
- 	CLKDEV_DEV_ID("rspi-rz.4", &mstp_clks[MSTP103]),
--	CLKDEV_DEV_ID("e800c800.spi", &mstp_clks[MSTP107]),
--	CLKDEV_DEV_ID("e800d000.spi", &mstp_clks[MSTP106]),
--	CLKDEV_DEV_ID("e800d800.spi", &mstp_clks[MSTP105]),
--	CLKDEV_DEV_ID("e800e000.spi", &mstp_clks[MSTP104]),
--	CLKDEV_DEV_ID("e800e800.spi", &mstp_clks[MSTP103]),
- 	CLKDEV_DEV_ID("r7s72100-ether", &mstp_clks[MSTP74]),
+diff --git a/arch/arm/mach-shmobile/include/mach/clock.h b/arch/arm/mach-shmobile/include/mach/clock.h
+index 9a93cf924b9c..31b6417463e6 100644
+--- a/arch/arm/mach-shmobile/include/mach/clock.h
++++ b/arch/arm/mach-shmobile/include/mach/clock.h
+@@ -16,6 +16,7 @@ void shmobile_clk_workaround(const struct clk_name *clks, int nr_clks,
+ #else /* CONFIG_COMMON_CLK */
+ /* legacy clock implementation */
  
- 	/* ICK */
++struct clk;
+ unsigned long shmobile_fixed_ratio_clk_recalc(struct clk *clk);
+ extern struct sh_clk_ops shmobile_fixed_ratio_clk_ops;
+ 
 -- 
 1.9.2
