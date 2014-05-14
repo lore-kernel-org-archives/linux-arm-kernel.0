@@ -1,46 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 14 May 2014 14:56:00 +0200
-Subject: [PATCH RESEND v4 1/8] clk: sunxi: Implement A31 USB clock
-In-Reply-To: <1400072167-29631-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1400072167-29631-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1400072167-29631-2-git-send-email-maxime.ripard@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 14 May 2014 13:57:36 +0100
+Subject: maxcpus behavior in arm64
+In-Reply-To: <5372B469.6020109@codeaurora.org>
+References: <53726AC1.9030207@codeaurora.org> <20140513210226.GB31201@arm.com>
+ <5372B469.6020109@codeaurora.org>
+Message-ID: <20140514125736.GB19866@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31 USB clock slightly differ from its older counterparts, mostly because
-it has a different gate for each PHY, while the older one had a single gate for
-all the phy.
+On Wed, May 14, 2014 at 01:10:17AM +0100, Rohit Vaswani wrote:
+> On 5/13/2014 2:02 PM, Catalin Marinas wrote:
+> > On Tue, May 13, 2014 at 07:56:01PM +0100, Rohit Vaswani wrote:
+> >> I notice that the maxcpus behavior is different in arm64 than from how
+> >> arm uses it.
+> >> in arm64/kernel/smp.c - in smp_prepare_cpus, maxcpus is used to limit
+> >> the cpu_present_mask.
+> >> However in arm/kernel/smp.c - maxcpus is not used as a decision maker to
+> >> set the cpu_preset_mask.
+> >>
+> >> Is this behavior expected and intentionally different in arm and arm64 ?
+> >> This also means that in arm64 (unlike arm)- maxcpus cannot be used to
+> >> boot a subset of total cpus with the
+> >> option of getting the secondary cores online at a later point from
+> >> userspace using hotplug.
+> >> It seems like maxcpus is being treated like nr_cpus in arm64 ?
+> > I don't think there is any particular reason, only that the code has
+> > been derived from arm long time ago and it probably inherited the
+> > original behaviour. In the meantime, arm got commit 7fa22bd5460 (ARM:
+> > 6993/1: platsmp: Allow secondary cpu hotplug with maxcpus=1).
+> >
+> > I'm happy to change the behaviour for arm64. Basically we still call
+> > cpu_prepare() for max_cpus but we initialise the present mask with
+> > init_cpu_present(cpu_possible_mask) as we don't have physical hotplug
+> > for the time being.
+> 
+> Thanks. Initializing the present mask with possible mask is good.
+> But, how would one call cpu_prepare on the other CPUS then ?
+> Currently cpu_prepare is called only from smp_prepare_cpus. I was going 
+> to suggest calling cpu_prepare for each possible CPU.
+> We could have the for_each_possible_cpu loop in smp_prepare_cpus not 
+> depend on max_cpus and call cpu_prepare for the possible cpus.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Reviewed-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Mike Turquette <mturquette@linaro.org>
----
- drivers/clk/sunxi/clk-sunxi.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+For PSCI this would be fine since cpu_prepare() does not bring the CPU
+into the kernel. With spin-table, cpu_prepare brings the CPU up to the
+holding_pen loop. But I don't see a reason why we couldn't do all steps
+in smp_spin_table_cpu_boot() and simply ignore prepare (and we could get
+rid of cpu_prepare altogether).
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index bd7dc733c1ca..d9bab75f128b 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -972,6 +972,11 @@ static const struct gates_data sun5i_a13_usb_gates_data __initconst = {
- 	.reset_mask = 0x03,
- };
- 
-+static const struct gates_data sun6i_a31_usb_gates_data __initconst = {
-+	.mask = { BIT(18) | BIT(17) | BIT(16) | BIT(10) | BIT(9) | BIT(8) },
-+	.reset_mask = BIT(2) | BIT(1) | BIT(0),
-+};
-+
- static void __init sunxi_gates_clk_setup(struct device_node *node,
- 					 struct gates_data *data)
- {
-@@ -1267,6 +1272,7 @@ static const struct of_device_id clk_gates_match[] __initconst = {
- 	{.compatible = "allwinner,sun6i-a31-apb2-gates-clk", .data = &sun6i_a31_apb2_gates_data,},
- 	{.compatible = "allwinner,sun4i-a10-usb-clk", .data = &sun4i_a10_usb_gates_data,},
- 	{.compatible = "allwinner,sun5i-a13-usb-clk", .data = &sun5i_a13_usb_gates_data,},
-+	{.compatible = "allwinner,sun6i-a31-usb-clk", .data = &sun6i_a31_usb_gates_data,},
- 	{}
- };
- 
+> I didn't really understand the part of physical hotplug - we have 
+> config_hotplug enabled
+
+What I meant is that possible != present in case of physical hotplug.
+
 -- 
-1.9.3
+Catalin
