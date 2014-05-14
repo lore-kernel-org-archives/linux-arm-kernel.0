@@ -1,47 +1,40 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Wed, 14 May 2014 06:33:00 +0530
-Subject: [PATCH v3 2/2] Documentation: devicetree: Add boost-frequency binding
- to list boost mode frequency
-In-Reply-To: <1400029380-5372-1-git-send-email-thomas.ab@samsung.com>
-References: <1400029380-5372-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <1400029380-5372-3-git-send-email-thomas.ab@samsung.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 14 May 2014 03:10:07 +0200
+Subject: [PATCH v6 03/12] ARM: shmobile: r7s72100: genmai: populate nodes for
+ external clocks
+In-Reply-To: <1400029816-24028-1-git-send-email-wsa@the-dreams.de>
+References: <1400029816-24028-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <1400029816-24028-4-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Abraham <thomas.ab@samsung.com>
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Add a new optional boost-frequency binding for specifying the frequencies
-usable in boost mode.
-
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Lukasz Majewski <l.majewski@samsung.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- .../devicetree/bindings/cpufreq/cpufreq-boost.txt  |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+ arch/arm/boot/dts/r7s72100-genmai-reference.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
-new file mode 100644
-index 0000000..d925e38
---- /dev/null
-+++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
-@@ -0,0 +1,11 @@
-+* Device tree binding for CPU boost frequency (aka over-clocking)
+diff --git a/arch/arm/boot/dts/r7s72100-genmai-reference.dts b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+index e664611a47c8..941e72ce7c82 100644
+--- a/arch/arm/boot/dts/r7s72100-genmai-reference.dts
++++ b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+@@ -30,6 +30,14 @@
+ 	};
+ };
+ 
++&extal_clk {
++	clock-frequency = <13330000>;
++};
 +
-+Certain CPU's can be operated in optional 'boost' mode (or sometimes referred as
-+overclocking) in which the CPU can operate in frequencies beyond the normal
-+operating conditions.
++&usb_x1_clk {
++	clock-frequency = <48000000>;
++};
 +
-+Optional Properties:
-+- boost-frequency: list of frequencies in KHz to be used only in boost mode.
-+  This list should be a subset of frequencies listed in "operating-points"
-+  property. Refer to Documentation/devicetree/bindings/power/opp.txt for
-+  details about "operating-points" property.
+ &i2c2 {
+ 	status = "okay";
+ 	clock-frequency = <400000>;
 -- 
-1.7.4.4
+1.9.2
