@@ -1,65 +1,109 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 14 May 2014 11:14:45 +0530
-Subject: [PATCH 06/17] pci: host: pcie-designware: Use *base-mask* for
- configuring the iATU
-In-Reply-To: <4528185.oZbgyuuFKX@wuerfel>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>
- <53721D7F.9070200@ti.com> <202752041.rgamje4etj@wuerfel>
- <4528185.oZbgyuuFKX@wuerfel>
-Message-ID: <537302CD.7000701@ti.com>
+Date: Wed, 14 May 2014 11:18:51 +0530
+Subject: [PATCH RESEND v4 3/8] phy: sunxi: Rework phy initialization
+In-Reply-To: <1399995862-17788-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1399995862-17788-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399995862-17788-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <537303C3.8040503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Arnd,
+Hi,
 
-On Tuesday 13 May 2014 07:04 PM, Arnd Bergmann wrote:
-> On Tuesday 13 May 2014 15:27:46 Arnd Bergmann wrote:
->> On Tuesday 13 May 2014 18:56:23 Kishon Vijay Abraham I wrote:
->>>> If you have a case where the outbound translation is a 256MB (i.e. 28bit)
->>>> section of the CPU address space, that could be represented as
->>>>
->>>>       ranges = <0x82000000 0 0  0xb0000000  0 0x10000000>;
->>>>
->>>> or 
->>>>
->>>>       ranges = <0x82000000 0 0xb0000000  0xb0000000  0 0x10000000>;
->>>>
->>>> depending on whether you want the BARs to be programmed using a low
->>>> address 0x0-0x0fffffff or an address matching the window
->>>> 0xb0000000-0xbfffffff.
->>>
->>> The problem is, for configuring the window starting at 0xb0000000, the ATU
->>> should be programmed 0x0000000 (the cpu address for it will be 0xb0000000 though).
->>>
->>
->> Then use the first of the two?
->>
+On Tuesday 13 May 2014 09:14 PM, Maxime Ripard wrote:
+> Move the phy initialization and variables declaration to the loop itself, since
+> it is where it really belongs. Also remove all the temporary variables, we can
+> use the structure members directly.
 > 
-> To clarify: using <0x82000000 0 0  0xb0000000  0 0x10000000> will give you 
-> a mem_offset of 0xb0000000, which should work just fine for this case.
-> 
-> What I don't understand is why the ATU cares about whether the outbound
-> address is 0x0000000 or 0xb0000000 if it just decodes the lower 28 bit
-> anyway. Did you mean that we have to program the BARs using low addresses
-> regardless of what is programmed in the ATU? That would make more sense,
-> and it also matches what I suggested.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 
-No, It's not like it decodes only the lower 28bits. The BARs is programmed with
-32 bit value.
+let me know if I have to queue this and the next patch in my PHY tree.
 
-My pcie dt node has
- ranges = <0x00000800 0 0x20001000 0x20001000 0 0x00002000  /* CONFIG */
-           0x81000000 0 0          0x20003000 0 0x00010000  /* IO */
-           0x82000000 0 0x20013000 0x20013000 0 0xffed000>; /* MEM */
-
-Consider MEM address space..
-
-Here both PCI address and CPU address is 0x20013000. So when there is a write
-to cpu addr 0x20013000 [writel(virt_addr(0x20013000)], we want it to be
-translated to PCI addr 0x20013000. So in 'ATU', we would expect *base* to be
-programmed to *0x20013000* and target to be programmed to *0x20013000*. But
-that's not the case for DRA7xx. For DRA7xx *base* should be programmed to
-*0x0013000* and target should be programmed to *0x20013000*.
-
-Thanks
+Cheers
 Kishon
+
+> ---
+>  drivers/phy/phy-sun4i-usb.c | 42 ++++++++++++++++++------------------------
+>  1 file changed, 18 insertions(+), 24 deletions(-)
+> 
+> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+> index e6e6c4ba7145..66a87d50512b 100644
+> --- a/drivers/phy/phy-sun4i-usb.c
+> +++ b/drivers/phy/phy-sun4i-usb.c
+> @@ -224,13 +224,8 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>  	struct sun4i_usb_phy_data *data;
+>  	struct device *dev = &pdev->dev;
+>  	struct device_node *np = dev->of_node;
+> -	void __iomem *pmu = NULL;
+>  	struct phy_provider *phy_provider;
+> -	struct reset_control *reset;
+> -	struct regulator *vbus;
+>  	struct resource *res;
+> -	struct phy *phy;
+> -	char name[16];
+>  	int i;
+>  
+>  	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+> @@ -262,42 +257,41 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>  
+>  	/* Skip 0, 0 is the phy for otg which is not yet supported. */
+>  	for (i = 1; i < data->num_phys; i++) {
+> +		struct sun4i_usb_phy *phy = data->phys + i;
+> +		char name[16];
+> +
+>  		snprintf(name, sizeof(name), "usb%d_vbus", i);
+> -		vbus = devm_regulator_get_optional(dev, name);
+> -		if (IS_ERR(vbus)) {
+> -			if (PTR_ERR(vbus) == -EPROBE_DEFER)
+> +		phy->vbus = devm_regulator_get_optional(dev, name);
+> +		if (IS_ERR(phy->vbus)) {
+> +			if (PTR_ERR(phy->vbus) == -EPROBE_DEFER)
+>  				return -EPROBE_DEFER;
+> -			vbus = NULL;
+> +			phy->vbus = NULL;
+>  		}
+>  
+>  		snprintf(name, sizeof(name), "usb%d_reset", i);
+> -		reset = devm_reset_control_get(dev, name);
+> -		if (IS_ERR(reset)) {
+> +		phy->reset = devm_reset_control_get(dev, name);
+> +		if (IS_ERR(phy->reset)) {
+>  			dev_err(dev, "failed to get reset %s\n", name);
+> -			return PTR_ERR(reset);
+> +			return PTR_ERR(phy->reset);
+>  		}
+>  
+>  		if (i) { /* No pmu for usbc0 */
+>  			snprintf(name, sizeof(name), "pmu%d", i);
+>  			res = platform_get_resource_byname(pdev,
+>  							IORESOURCE_MEM, name);
+> -			pmu = devm_ioremap_resource(dev, res);
+> -			if (IS_ERR(pmu))
+> -				return PTR_ERR(pmu);
+> +			phy->pmu = devm_ioremap_resource(dev, res);
+> +			if (IS_ERR(phy->pmu))
+> +				return PTR_ERR(phy->pmu);
+>  		}
+>  
+> -		phy = devm_phy_create(dev, &sun4i_usb_phy_ops, NULL);
+> -		if (IS_ERR(phy)) {
+> +		phy->phy = devm_phy_create(dev, &sun4i_usb_phy_ops, NULL);
+> +		if (IS_ERR(phy->phy)) {
+>  			dev_err(dev, "failed to create PHY %d\n", i);
+> -			return PTR_ERR(phy);
+> +			return PTR_ERR(phy->phy);
+>  		}
+>  
+> -		data->phys[i].phy = phy;
+> -		data->phys[i].pmu = pmu;
+> -		data->phys[i].vbus = vbus;
+> -		data->phys[i].reset = reset;
+> -		data->phys[i].index = i;
+> -		phy_set_drvdata(phy, &data->phys[i]);
+> +		phy->index = i;
+> +		phy_set_drvdata(phy->phy, &data->phys[i]);
+>  	}
+>  
+>  	dev_set_drvdata(dev, data);
+> 
