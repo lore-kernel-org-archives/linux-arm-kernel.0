@@ -1,51 +1,81 @@
-From: zhangwm@marvell.com (Neil Zhang)
-Date: Tue, 13 May 2014 19:28:02 -0700
-Subject: [PATCH v4] ARM: perf: save/restore pmu registers in pm notifier
-In-Reply-To: <20140513184503.GF16388@arm.com>
-References: <1398133596-29170-1-git-send-email-zhangwm@marvell.com>
- <20140422103642.GF7484@arm.com>
- <175CCF5F49938B4D99B2E3EF7F558EBE5507A3B59B@SC-VEXCH4.marvell.com>
- <20140423170821.GJ5649@arm.com>
- <175CCF5F49938B4D99B2E3EF7F558EBE5507A3C1F1@SC-VEXCH4.marvell.com>
- <5360FB07.5030407@arm.com>
- <6106CAF835F351419ADA79E4836E6EC71B6A53C826@SC-VEXCH4.marvell.com>
- <9034CBD80F070943B59700D7F8149ED9A0875730@SC-VEXCH4.marvell.com>
- <20140513184503.GF16388@arm.com>
-Message-ID: <9034CBD80F070943B59700D7F8149ED9A087573F@SC-VEXCH4.marvell.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Wed, 14 May 2014 08:14:06 +0530
+Subject: [PATCH v6 5/5] arm: exynos: Add MCPM call-back functions
+In-Reply-To: <20140513164845.GA10210@red-moon>
+References: <1399982324-27879-1-git-send-email-a.kesavan@samsung.com>
+ <1399982324-27879-6-git-send-email-a.kesavan@samsung.com>
+ <20140513164845.GA10210@red-moon>
+Message-ID: <CAM4voamY+nM3eoJWfR=0VBDtbf6wan-2awRaALN=ym9gGC_DYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: 2014?5?14? 2:45
-> To: Neil Zhang
-> Cc: Sudeep Holla; 'linux at arm.linux.org.uk';
-> 'linux-arm-kernel at lists.infradead.org'; 'linux-kernel at vger.kernel.org';
-> 'devicetree at vger.kernel.org'
-> Subject: Re: [PATCH v4] ARM: perf: save/restore pmu registers in pm notifier
-> 
-> On Mon, May 12, 2014 at 11:22:09AM +0100, Neil Zhang wrote:
-> > > > The device tree bindings for power domains is under discussion [1]
-> > >
-> > > Thanks for the information.
-> > > But it currently for device only, core related stuff are not supported.
-> > > And is it really good to register power provider for core and let
-> > > vfp / pmu etc to get it?
-> > >
-> >
-> > What's your suggestion about it?
-> > Is it OK that I add it under the PMU node?
-> 
-> I don't really mind. I just want to avoid re-inventing the wheel in a
-> PMU-specific way and having to maintain that code forever because it ended
-> up in our DT description.
-> 
-> Will
+Hi Lorenzo,
 
-I will prepare another patch to add DT description under PMU since there is 
-no generic power domain support for pm notifier if no other concerns.
-We can change the manner if there is generic power domain support for pm notifier later.
-Thanks.
+On Tue, May 13, 2014 at 10:18 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Tue, May 13, 2014 at 12:58:44PM +0100, Abhilash Kesavan wrote:
+>
+> [...]
+>
+>> +static int __init exynos_mcpm_init(void)
+>> +{
+>> +       struct device_node *node;
+>> +       int ret = 0;
+>
+> There is no point in initializing it to 0.
+OK.
+>
+>> +
+>> +       node = of_find_compatible_node(NULL, NULL, "samsung,exynos5420");
+>> +       if (!node)
+>> +               return -ENODEV;
+>> +       of_node_put(node);
+>> +
+>> +       if (!cci_probed())
+>> +               return -ENODEV;
+>> +
+>> +       node = of_find_compatible_node(NULL, NULL,
+>> +                       "samsung,exynos4210-sysram-ns");
+>> +       if (!node)
+>> +               return -ENODEV;
+>> +
+>> +       ns_sram_base_addr = of_iomap(node, 0);
+>> +       of_node_put(node);
+>> +       if (!ns_sram_base_addr) {
+>> +               pr_err("failed to map non-secure iRAM base address\n");
+>> +               return -ENOMEM;
+>> +       }
+>> +
+>> +       /*
+>> +        * To increase the stability of KFC reset we need to program
+>> +        * the PMU SPARE3 register
+>> +        */
+>> +       __raw_writel(EXYNOS5420_SWRESET_KFC_SEL, S5P_PMU_SPARE3);
+>> +
+>> +       exynos_mcpm_usage_count_init();
+>> +
+>> +       ret = mcpm_platform_register(&exynos_power_ops);
+>> +       if (!ret)
+>> +               ret = mcpm_sync_init(exynos_pm_power_up_setup);
+>> +       if (ret) {
+>> +               iounmap(ns_sram_base_addr);
+>> +               return ret;
+>> +       }
+>> +
+>> +       mcpm_smp_set_ops();
+>> +
+>> +       pr_info("Exynos MCPM support installed\n");
+>> +
+>> +       /*
+>> +        * Future entries into the kernel can now go
+>> +        * through the cluster entry vectors.
+>> +        */
+>> +       __raw_writel(virt_to_phys(mcpm_entry_point),
+>> +                       ns_sram_base_addr + MCPM_BOOT_ADDR_OFFSET);
+>> +
+>
+> ns_sram_base_addr must be unmapped, since it is unused after the write.
+Will unmap.
 
-Best Regards,
-Neil Zhang
+Regards,
+Abhilash
