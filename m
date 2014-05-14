@@ -1,33 +1,106 @@
-From: zhangwm@marvell.com (Neil Zhang)
-Date: Wed, 14 May 2014 10:59:58 +0800
-Subject: [PATCH] ARM64: kernel: add compatable cpuinfo
-Message-ID: <1400036398-16591-1-git-send-email-zhangwm@marvell.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Wed, 14 May 2014 08:32:17 +0530
+Subject: [PATCH v6 5/5] arm: exynos: Add MCPM call-back functions
+In-Reply-To: <CANuQgHES4O=mWjVVY5=6KwSee-TzL8HdTFhfr-VGu=d9GS-ZWQ@mail.gmail.com>
+References: <1399982324-27879-1-git-send-email-a.kesavan@samsung.com>
+ <1399982324-27879-6-git-send-email-a.kesavan@samsung.com>
+ <20140513164845.GA10210@red-moon>
+ <CAM4voamY+nM3eoJWfR=0VBDtbf6wan-2awRaALN=ym9gGC_DYg@mail.gmail.com>
+ <CANuQgHES4O=mWjVVY5=6KwSee-TzL8HdTFhfr-VGu=d9GS-ZWQ@mail.gmail.com>
+Message-ID: <CAM4voa=iSM3oORn1z5UZAQh1L=ODCdBy8Sdp3mOLid1ie+GhBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Print the necessary features in order to be backwards compatable with
-ARMv7 and earlier version.
+Hi Chander,
 
-Signed-off-by: Neil Zhang <zhangwm@marvell.com>
----
- arch/arm64/kernel/setup.c |    5 +++++
- 1 file changed, 5 insertions(+)
+On Wed, May 14, 2014 at 8:24 AM, Chander Kashyap
+<chander.kashyap@linaro.org> wrote:
+> On 14 May 2014 08:14, Abhilash Kesavan <kesavan.abhilash@gmail.com> wrote:
+>> Hi Lorenzo,
+>>
+>> On Tue, May 13, 2014 at 10:18 PM, Lorenzo Pieralisi
+>> <lorenzo.pieralisi@arm.com> wrote:
+>>> On Tue, May 13, 2014 at 12:58:44PM +0100, Abhilash Kesavan wrote:
+>>>
+>>> [...]
+>>>
+>>>> +static int __init exynos_mcpm_init(void)
+>>>> +{
+>>>> +       struct device_node *node;
+>>>> +       int ret = 0;
+>>>
+>>> There is no point in initializing it to 0.
+>> OK.
+>>>
+>>>> +
+>>>> +       node = of_find_compatible_node(NULL, NULL, "samsung,exynos5420");
+>>>> +       if (!node)
+>>>> +               return -ENODEV;
+>>>> +       of_node_put(node);
+>>>> +
+>>>> +       if (!cci_probed())
+>>>> +               return -ENODEV;
+>>>> +
+>>>> +       node = of_find_compatible_node(NULL, NULL,
+>>>> +                       "samsung,exynos4210-sysram-ns");
+>>>> +       if (!node)
+>>>> +               return -ENODEV;
+>>>> +
+>>>> +       ns_sram_base_addr = of_iomap(node, 0);
+>>>> +       of_node_put(node);
+>>>> +       if (!ns_sram_base_addr) {
+>>>> +               pr_err("failed to map non-secure iRAM base address\n");
+>>>> +               return -ENOMEM;
+>>>> +       }
+>>>> +
+>>>> +       /*
+>>>> +        * To increase the stability of KFC reset we need to program
+>>>> +        * the PMU SPARE3 register
+>>>> +        */
+>>>> +       __raw_writel(EXYNOS5420_SWRESET_KFC_SEL, S5P_PMU_SPARE3);
+>>>> +
+>>>> +       exynos_mcpm_usage_count_init();
+>>>> +
+>>>> +       ret = mcpm_platform_register(&exynos_power_ops);
+>>>> +       if (!ret)
+>>>> +               ret = mcpm_sync_init(exynos_pm_power_up_setup);
+>>>> +       if (ret) {
+>>>> +               iounmap(ns_sram_base_addr);
+>>>> +               return ret;
+>>>> +       }
+>>>> +
+>>>> +       mcpm_smp_set_ops();
+>>>> +
+>>>> +       pr_info("Exynos MCPM support installed\n");
+>>>> +
+>>>> +       /*
+>>>> +        * Future entries into the kernel can now go
+>>>> +        * through the cluster entry vectors.
+>>>> +        */
+>>>> +       __raw_writel(virt_to_phys(mcpm_entry_point),
+>>>> +                       ns_sram_base_addr + MCPM_BOOT_ADDR_OFFSET);
+>>>> +
+>>>
+>>> ns_sram_base_addr must be unmapped, since it is unused after the write.
+>> Will unmap.
+>
+> This mapping is required in for cpuilde (suspend) to program
+> mcpm_entry before going to suspend.
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 7ec7846..a09ecfe 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -451,6 +451,11 @@ static int c_show(struct seq_file *m, void *v)
- 		if (elf_hwcap & (1 << i))
- 			seq_printf(m, "%s ", hwcap_str[i]);
- 
-+#ifdef CONFIG_COMPAT
-+	seq_puts(m, "half thumb fastmult edsp tls vfp vfpv3 vfpv4 neon ");
-+	seq_puts(m, "idiva idivt ");
-+#endif
-+
- 	seq_printf(m, "\nCPU implementer\t: 0x%02x\n", read_cpuid_id() >> 24);
- 	seq_printf(m, "CPU architecture: AArch64\n");
- 	seq_printf(m, "CPU variant\t: 0x%x\n", (read_cpuid_id() >> 20) & 15);
--- 
-1.7.9.5
+I forgot about your cpuidle patches. I need to retain the mapping then.
+
+Abhilash
+>
+>>
+>> Regards,
+>> Abhilash
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>
+>
+> --
+> with warm regards,
+> Chander Kashyap
