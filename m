@@ -1,52 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 May 2014 21:10:09 +0200
-Subject: [PATCH v3 1/6] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <5373BC5D.7010300@gmail.com>
-References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
- <17808571.N5ZGjXFEVP@wuerfel> <5373BC5D.7010300@gmail.com>
-Message-ID: <5701370.bQb4QoHk6c@wuerfel>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 14 May 2014 21:17:49 +0200
+Subject: [PATCH] i2c/nuc900: fix ancient build error
+In-Reply-To: <4944869.eRrWyMmW4d@wuerfel>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-11-git-send-email-arnd@arndb.de>
+ <20140514162725.GG12911@katana> <4944869.eRrWyMmW4d@wuerfel>
+Message-ID: <20140514191749.GA25709@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 May 2014 20:56:29 Sebastian Hesselbarth wrote:
-> On 05/14/2014 08:51 PM, Arnd Bergmann wrote:
-> > On Wednesday 14 May 2014 20:42:16 Sebastian Hesselbarth wrote:
-> >>>> For the driver, Antoine then would have to squeeze all PHY register
-> >>>> mangling in phy-berlin2.c and see how to make ahci-platform aware of
-> >>>> individual port nodes (I haven't looked up if it already exists, sorry)
-> >>>> and announce only enabled port child nodes, right?
-> >>>
-> >>> I've been thinking some more about this aspect. I don't actually have
-> >>> a strong opinion on whether it's better to use the generic ahci-platform
-> >>> driver, or to keep the multi-phy support as a special variant for
-> >>> berlin. If we do the latter, it would however be good to define the
-> >>> binding in a way that lets us later merge things into the generic phy
-> >>> driver in case we get more of the same.
-> >>
-> >> Hmm, IMHO multi-phy support is orthogonal to ahci-platform, isn't it?
-> >> ahci-platform needs to know about the phy property and calls some
-> >> helper that deals with the phy-specifier?
-> >>
-> >> About a generic _phy_ driver, I am not so sure if berlin is the best
-> >> template right now 
-> >>
-> >> So, my call would be:
-> >> - make ahci-platform aware of port sub-nodes and phy properties
-> >> - have a berlin specific PHY driver
-> > 
-> > I'm not sure if we need sub-nodes per port, it should be enough
-> > to have an array of phys, plus a way to match them up with the
-> > ports.
-> 
-> Actually, I'd love to see sub-nodes per port as it will allow to
-> disabled unused ports on a per-board basis.
-> 
-> I have this in mind for a long time for Kirkwood's SATA node already:
-> Consider a board where you have the one available SATA plug connected
-> to port 1. How would that work out with status = "disabled"/"okay" that
-> doesn't allow array of strings obviously?
 
-A simple bit mask would work fine, but I see your point. Doing
-status="disabled" per port sounds nice.
+> For the moment, I'd leave this up to Wan ZongShun. He has in the past
+> at least replied to emails about the platform, even though there hasn't
+> been any new development.
 
-	Arnd
+Agreed. Let's wait for his response. If there is none, I'll think about
+removing the driver.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140514/6c685e81/attachment.sig>
