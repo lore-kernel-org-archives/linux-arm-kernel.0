@@ -1,32 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 May 2014 11:28:50 +0200
-Subject: [PATCH] [RESEND] ARM: remove last use of CONFIG_CPU_ARM710
-In-Reply-To: <1400059550.31197.12.camel@x220>
-References: <1364507176.1345.45.camel@x61.thuisdomein>
- <8309592.drxAj71PnZ@wuerfel> <1400059550.31197.12.camel@x220>
-Message-ID: <4305975.PvMXZQ020k@wuerfel>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 14 May 2014 10:31:31 +0100
+Subject: [PATCH v4] ARM: perf: save/restore pmu registers in pm notifier
+In-Reply-To: <9034CBD80F070943B59700D7F8149ED9A087573F@SC-VEXCH4.marvell.com>
+References: <1398133596-29170-1-git-send-email-zhangwm@marvell.com>
+ <20140422103642.GF7484@arm.com>
+ <175CCF5F49938B4D99B2E3EF7F558EBE5507A3B59B@SC-VEXCH4.marvell.com>
+ <20140423170821.GJ5649@arm.com>
+ <175CCF5F49938B4D99B2E3EF7F558EBE5507A3C1F1@SC-VEXCH4.marvell.com>
+ <5360FB07.5030407@arm.com>
+ <6106CAF835F351419ADA79E4836E6EC71B6A53C826@SC-VEXCH4.marvell.com>
+ <9034CBD80F070943B59700D7F8149ED9A0875730@SC-VEXCH4.marvell.com>
+ <20140513184503.GF16388@arm.com>
+ <9034CBD80F070943B59700D7F8149ED9A087573F@SC-VEXCH4.marvell.com>
+Message-ID: <537337F3.4080300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 May 2014 11:25:50 Paul Bolle wrote:
-> On Wed, 2014-05-14 at 11:17 +0200, Arnd Bergmann wrote:
-> > 'git grep -i arm710' tells me that there is also some arm710
-> > specific code in  arch/arm/mm/proc-arm720.S that we may want to
-> > remove along with this.
-> > 
-> > The DT binding should probably remain untouched though, I think it's
-> > correct to document the string.
-> 
-> That seems to be cpu_arm710_name, __arm710_setup, and everything called
-> by __arm710_setup. Cleaning that up (as a separate patch) appears to be
-> trivial. If I do that it would be (sort of educated) guesswork. But I
-> don't mind doing it. What do you prefer?
 
-I think that would be great. For the first patch, please add 
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+On 14/05/14 03:28, Neil Zhang wrote:
+>> -----Original Message-----
+>> From: Will Deacon [mailto:will.deacon at arm.com]
+>> Sent: 2014?5?14? 2:45
+>> To: Neil Zhang
+>> Cc: Sudeep Holla; 'linux at arm.linux.org.uk';
+>> 'linux-arm-kernel at lists.infradead.org'; 'linux-kernel at vger.kernel.org';
+>> 'devicetree at vger.kernel.org'
+>> Subject: Re: [PATCH v4] ARM: perf: save/restore pmu registers in pm notifier
+>>
+>> On Mon, May 12, 2014 at 11:22:09AM +0100, Neil Zhang wrote:
+>>>>> The device tree bindings for power domains is under discussion [1]
+>>>>
+>>>> Thanks for the information.
+>>>> But it currently for device only, core related stuff are not supported.
+>>>> And is it really good to register power provider for core and let
+>>>> vfp / pmu etc to get it?
+>>>>
+>>>
+>>> What's your suggestion about it?
+>>> Is it OK that I add it under the PMU node?
+>>
+>> I don't really mind. I just want to avoid re-inventing the wheel in a
+>> PMU-specific way and having to maintain that code forever because it ended
+>> up in our DT description.
+>>
+>> Will
+>
+> I will prepare another patch to add DT description under PMU since there is
+> no generic power domain support for pm notifier if no other concerns.
+> We can change the manner if there is generic power domain support for pm notifier later.
+> Thanks.
 
-Once the second patch is reviewed, please add them both to Russell's
-patch tracker.
+No, please don't add any DT bindings for power domains specific to PMU node.
+We can't change the DT bindings once added.
 
-	Arnd
+As I pointed out the DT bindings for generic power domains are under discussion.
+See if you can reuse it, if not help in extending it so that it can be used.
+
+Regards,
+Sudeep
