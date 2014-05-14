@@ -1,25 +1,25 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 14 May 2014 22:15:19 +0200
-Subject: [PATCH v2 08/10] ARM: dts: berlin: convert BG2CD to DT clock nodes
+Date: Wed, 14 May 2014 22:15:20 +0200
+Subject: [PATCH v2 09/10] ARM: dts: berlin: convert BG2 to DT clock nodes
 In-Reply-To: <1400098522-14770-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1400098522-14770-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1400098522-14770-9-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1400098522-14770-10-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This converts Berlin BG2CD SoC dtsi to make use of the new DT clock
-nodes for Berlin SoCs. Also add a binding include to ease core clock
-references.
+This converts Berlin BG2 SoC dtsi to make use of the new DT clock
+nodes for Berlin SoCs. While at it, also fix up twdclk which is
+running at cpuclk/3 instead of sysclk.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Changelog:
 v1->v2:
 - dropped of_clk_create_name() usage required unique node names for
-  clocks and plls
-- added clock-output-names to allow fixed-factor-clock to find its
-  parent name
+  clocks and plls 
+- added clock-output-names to allow fixed-factor-clock to find its 
+  parent name 
 
 Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Pawel Moll <pawel.moll@arm.com>
@@ -33,13 +33,13 @@ Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/berlin2cd.dtsi | 205 +++++++++++++++++++++++++++++++++------
- 1 file changed, 177 insertions(+), 28 deletions(-)
+ arch/arm/boot/dts/berlin2.dtsi | 207 +++++++++++++++++++++++++++++++++++------
+ 1 file changed, 178 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-index 6eb1bdae23ac..818c7557bad5 100644
---- a/arch/arm/boot/dts/berlin2cd.dtsi
-+++ b/arch/arm/boot/dts/berlin2cd.dtsi
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index 57cadd31f4e1..edeecb711e97 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
 @@ -12,6 +12,7 @@
   */
  
@@ -48,7 +48,7 @@ index 6eb1bdae23ac..818c7557bad5 100644
  #include <dt-bindings/interrupt-controller/arm-gic.h>
  
  / {
-@@ -30,24 +31,18 @@
+@@ -37,24 +38,18 @@
  		};
  	};
  
@@ -62,7 +62,7 @@ index 6eb1bdae23ac..818c7557bad5 100644
 -		cfgclk: cfg-clock {
 -			compatible = "fixed-clock";
 -			#clock-cells = <0>;
--			clock-frequency = <75000000>;
+-			clock-frequency = <100000000>;
 -		};
 +	refclk: oscillator {
 +		compatible = "fixed-clock";
@@ -73,7 +73,7 @@ index 6eb1bdae23ac..818c7557bad5 100644
 -		sysclk: system-clock {
 -			compatible = "fixed-clock";
 -			#clock-cells = <0>;
--			clock-frequency = <300000000>;
+-			clock-frequency = <400000000>;
 -		};
 +	twdclk: twdclk {
 +		compatible = "fixed-factor-clock";
@@ -84,7 +84,7 @@ index 6eb1bdae23ac..818c7557bad5 100644
  	};
  
  	soc {
-@@ -76,7 +71,7 @@
+@@ -88,7 +83,7 @@
  			compatible = "arm,cortex-a9-twd-timer";
  			reg = <0xad0600 0x20>;
  			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
@@ -93,7 +93,7 @@ index 6eb1bdae23ac..818c7557bad5 100644
  		};
  
  		apb at e80000 {
-@@ -163,7 +158,7 @@
+@@ -175,7 +170,7 @@
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c00 0x14>;
  				interrupts = <8>;
@@ -102,7 +102,7 @@ index 6eb1bdae23ac..818c7557bad5 100644
  				clock-names = "timer";
  				status = "okay";
  			};
-@@ -172,7 +167,7 @@
+@@ -184,7 +179,7 @@
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c14 0x14>;
  				interrupts = <9>;
@@ -111,7 +111,7 @@ index 6eb1bdae23ac..818c7557bad5 100644
  				clock-names = "timer";
  				status = "okay";
  			};
-@@ -181,7 +176,7 @@
+@@ -193,7 +188,7 @@
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c28 0x14>;
  				interrupts = <10>;
@@ -120,7 +120,7 @@ index 6eb1bdae23ac..818c7557bad5 100644
  				clock-names = "timer";
  				status = "disabled";
  			};
-@@ -190,7 +185,7 @@
+@@ -202,7 +197,7 @@
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c3c 0x14>;
  				interrupts = <11>;
@@ -129,7 +129,7 @@ index 6eb1bdae23ac..818c7557bad5 100644
  				clock-names = "timer";
  				status = "disabled";
  			};
-@@ -199,7 +194,7 @@
+@@ -211,7 +206,7 @@
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c50 0x14>;
  				interrupts = <12>;
@@ -138,7 +138,7 @@ index 6eb1bdae23ac..818c7557bad5 100644
  				clock-names = "timer";
  				status = "disabled";
  			};
-@@ -208,7 +203,7 @@
+@@ -220,7 +215,7 @@
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c64 0x14>;
  				interrupts = <13>;
@@ -147,7 +147,7 @@ index 6eb1bdae23ac..818c7557bad5 100644
  				clock-names = "timer";
  				status = "disabled";
  			};
-@@ -217,7 +212,7 @@
+@@ -229,7 +224,7 @@
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c78 0x14>;
  				interrupts = <14>;
@@ -156,7 +156,7 @@ index 6eb1bdae23ac..818c7557bad5 100644
  				clock-names = "timer";
  				status = "disabled";
  			};
-@@ -226,7 +221,7 @@
+@@ -238,7 +233,7 @@
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c8c 0x14>;
  				interrupts = <15>;
@@ -165,7 +165,7 @@ index 6eb1bdae23ac..818c7557bad5 100644
  				clock-names = "timer";
  				status = "disabled";
  			};
-@@ -241,6 +236,160 @@
+@@ -253,11 +248,165 @@
  			};
  		};
  
@@ -224,6 +224,11 @@ index 6eb1bdae23ac..818c7557bad5 100644
 +				"video1", "video2";
 +		};
 +
+ 		generic-regs at ea0184 {
+ 			compatible = "marvell,berlin-generic-regs", "syscon";
+ 			reg = <0xea0184 0x10>;
+ 		};
+ 
 +		gfx3dcore_clk: gfx3dcore at ea022c {
 +			compatible = "marvell,berlin2-clk-div";
 +			#clock-cells = <0>;
@@ -326,7 +331,7 @@ index 6eb1bdae23ac..818c7557bad5 100644
  		apb at fc0000 {
  			compatible = "simple-bus";
  			#address-cells = <1>;
-@@ -285,7 +434,7 @@
+@@ -305,7 +454,7 @@
  				reg-shift = <2>;
  				reg-io-width = <1>;
  				interrupts = <8>;
@@ -335,10 +340,19 @@ index 6eb1bdae23ac..818c7557bad5 100644
  				status = "disabled";
  			};
  
-@@ -295,7 +444,7 @@
+@@ -315,7 +464,7 @@
  				reg-shift = <2>;
  				reg-io-width = <1>;
  				interrupts = <9>;
+-				clocks = <&smclk>;
++				clocks = <&refclk>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -325,7 +474,7 @@
+ 				reg-shift = <2>;
+ 				reg-io-width = <1>;
+ 				interrupts = <10>;
 -				clocks = <&smclk>;
 +				clocks = <&refclk>;
  				status = "disabled";
