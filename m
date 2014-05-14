@@ -1,84 +1,194 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 May 2014 18:34:09 -0700
-Subject: [PATCH 6/7] mfd: twl4030power: Add a configuration to turn off
- oscillator during off-idle
+Date: Tue, 13 May 2014 18:34:07 -0700
+Subject: [PATCH 4/7] mfd: twl4030-power: Add recommended idle configuration
 In-Reply-To: <1400031250-29542-1-git-send-email-tony@atomide.com>
 References: <1400031250-29542-1-git-send-email-tony@atomide.com>
-Message-ID: <1400031250-29542-7-git-send-email-tony@atomide.com>
+Message-ID: <1400031250-29542-5-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some oscillators can be turned off during off-idle saving few
-a little bit power at the cost of the oscillator start up
-latency.
+These settings are based on the "Recommended Sleep Sequences for
+the Zoom Platform" pdf at:
 
-If you board can do this, you can now enable it by using the
-ti,twl4030-power-idle-osc-off compatible flag.
+http://omappedia.com/wiki/File:Recommended_Sleep_Sequences_Zoom.pdf
+
+These settings assume most of the regulators are under control of
+Linux, and twl4030 only cuts off VDD1 and VDD2 during off-idle as
+Linux cannot do it.
+
+For any board specific changes to these, let's patch them in as
+changes to the generic data in the follow-up patches. This keeps
+the board specific changes small.
+
+Note that this does not consider the twl5030 errata 27 and 28.
+That can be added later on after it has been tested. For more
+information about errata 27 and 28, please see:
+
+https://github.com/openembedded/openembedded/blob/master/recipes/linux/linux-omap-2.6.39/mfd/0012-MFD-TWL4030-workaround-changes-for-Erratum-27.patch
 
 Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
 Cc: Samuel Ortiz <sameo@linux.intel.com>
 Acked-by: Lee Jones <lee.jones@linaro.org>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- Documentation/devicetree/bindings/mfd/twl4030-power.txt |  6 ++++++
- drivers/mfd/twl4030-power.c                             | 17 +++++++++++++++++
- 2 files changed, 23 insertions(+)
+ .../devicetree/bindings/mfd/twl4030-power.txt      |   4 +
+ drivers/mfd/twl4030-power.c                        | 103 +++++++++++++++++++++
+ 2 files changed, 107 insertions(+)
 
 diff --git a/Documentation/devicetree/bindings/mfd/twl4030-power.txt b/Documentation/devicetree/bindings/mfd/twl4030-power.txt
-index bbd6603..b9ee7b9 100644
+index b906116..bbd6603 100644
 --- a/Documentation/devicetree/bindings/mfd/twl4030-power.txt
 +++ b/Documentation/devicetree/bindings/mfd/twl4030-power.txt
-@@ -9,6 +9,7 @@ Required properties:
+@@ -8,10 +8,14 @@ Required properties:
+ - compatible : must be one of the following
  	"ti,twl4030-power"
  	"ti,twl4030-power-reset"
- 	"ti,twl4030-power-idle"
-+	"ti,twl4030-power-idle-osc-off"
++	"ti,twl4030-power-idle"
  
  The use of ti,twl4030-power-reset is recommended at least on
  3530 that needs a special configuration for warm reset to work.
-@@ -16,6 +17,11 @@ The use of ti,twl4030-power-reset is recommended at least on
- When using ti,twl4030-power-idle, the TI recommended configuration
- for idle modes is loaded to the tlw4030 PMIC.
  
-+When using ti,twl4030-power-idle-osc-off, the TI recommended
-+configuration is used with the external oscillator being shut
-+down during off-idle. Note that this does not work on all boards
-+depending on how the external oscillator is wired.
++When using ti,twl4030-power-idle, the TI recommended configuration
++for idle modes is loaded to the tlw4030 PMIC.
 +
  Optional properties:
  - ti,use_poweroff: With this flag, the chip will initiates an ACTIVE-to-OFF or
  		   SLEEP-to-OFF transition when the system poweroffs.
 diff --git a/drivers/mfd/twl4030-power.c b/drivers/mfd/twl4030-power.c
-index 4b3f192..4341961 100644
+index b61b725..39eeee2 100644
 --- a/drivers/mfd/twl4030-power.c
 +++ b/drivers/mfd/twl4030-power.c
-@@ -748,6 +748,19 @@ static struct twl4030_power_data omap3_idle = {
- 	.resource_config	= omap3_idle_rconfig,
+@@ -139,19 +139,32 @@ enum {
+ 	TWL_REMAP_ACTIVE = 9,
  };
  
-+/* Disable 32 KiHz oscillator during idle */
-+static struct twl4030_resconfig osc_off_rconfig[] = {
-+	TWL_REMAP_OFF(RES_CLKEN, DEV_GRP_P1 | DEV_GRP_P3, 3, 2),
++#define TWL_DEV_GRP_P123	(DEV_GRP_P1 | DEV_GRP_P2 | DEV_GRP_P3)
+ #define TWL_RESOURCE_ON(res)						\
+ 	{ MSG_SINGULAR(DEV_GRP_NULL, (res), RES_STATE_ACTIVE), 0x02 }
+ #define TWL_RESOURCE_OFF(res)						\
+ 	{ MSG_SINGULAR(DEV_GRP_NULL, (res), RES_STATE_OFF), 0x02 }
+ #define TWL_RESOURCE_RESET(res)						\
+ 	{ MSG_SINGULAR(DEV_GRP_NULL, (res), RES_STATE_WRST), 0x02 }
++#define TWL_RESOURCE_SET_ACTIVE(res, state)			       	\
++	{ MSG_SINGULAR(DEV_GRP_NULL, (res), RES_STATE_ACTIVE), (state) }
+ #define TWL_RESOURCE_GROUP_RESET(group, type1, type2)			\
+ 	{ MSG_BROADCAST(DEV_GRP_NULL, (group), (type1), (type2),	\
+ 		RES_STATE_WRST), 0x02 }
++#define TWL_RESOURCE_GROUP_SLEEP(group, type, type2)			\
++	{ MSG_BROADCAST(DEV_GRP_NULL, (group), (type), (type2),		\
++		RES_STATE_SLEEP), 0x02 }
++#define TWL_RESOURCE_GROUP_ACTIVE(group, type, type2)			\
++	{ MSG_BROADCAST(DEV_GRP_NULL, (group), (type), (type2),		\
++		RES_STATE_ACTIVE), 0x02 }
+ #define TWL_REMAP_SLEEP(res, devgrp, typ, typ2)				\
+ 	{ .resource = (res), .devgroup = (devgrp),			\
+ 	  .type = (typ), .type2 = (typ2),				\
+ 	  .remap_off = TWL_REMAP_OFF, .remap_sleep = TWL_REMAP_SLEEP, }
++#define TWL_REMAP_OFF(res, devgrp, typ, typ2)				\
++	{ .resource = (res), .devgroup = (devgrp),			\
++	  .type = (typ), .type2 = (typ2),				\
++	  .remap_off = TWL_REMAP_OFF, .remap_sleep = TWL_REMAP_OFF, }
+ 
+ static int twl4030_write_script_byte(u8 address, u8 byte)
+ {
+@@ -628,11 +641,101 @@ static struct twl4030_power_data omap3_reset = {
+ 	.resource_config	= omap3_rconfig,
+ };
+ 
++/* Recommended generic default idle configuration for off-idle */
++
++/* Broadcast message to put res to sleep */
++static struct twl4030_ins omap3_idle_sleep_on_seq[] = {
++	TWL_RESOURCE_GROUP_SLEEP(RES_GRP_ALL, RES_TYPE_ALL, 0),
++};
++
++static struct twl4030_script omap3_idle_sleep_on_script = {
++	.script	= omap3_idle_sleep_on_seq,
++	.size	= ARRAY_SIZE(omap3_idle_sleep_on_seq),
++	.flags	= TWL4030_SLEEP_SCRIPT,
++};
++
++/* Broadcast message to put res to active */
++static struct twl4030_ins omap3_idle_wakeup_p12_seq[] = {
++	TWL_RESOURCE_GROUP_ACTIVE(RES_GRP_ALL, RES_TYPE_ALL, 0),
++};
++
++static struct twl4030_script omap3_idle_wakeup_p12_script = {
++	.script	= omap3_idle_wakeup_p12_seq,
++	.size	= ARRAY_SIZE(omap3_idle_wakeup_p12_seq),
++	.flags	= TWL4030_WAKEUP12_SCRIPT,
++};
++
++/* Broadcast message to put res to active */
++static struct twl4030_ins omap3_idle_wakeup_p3_seq[] = {
++	TWL_RESOURCE_SET_ACTIVE(RES_CLKEN, 0x37),
++	TWL_RESOURCE_GROUP_ACTIVE(RES_GRP_ALL, RES_TYPE_ALL, 0),
++};
++
++static struct twl4030_script omap3_idle_wakeup_p3_script = {
++	.script	= omap3_idle_wakeup_p3_seq,
++	.size	= ARRAY_SIZE(omap3_idle_wakeup_p3_seq),
++	.flags	= TWL4030_WAKEUP3_SCRIPT,
++};
++
++static struct twl4030_script *omap3_idle_scripts[] = {
++	&omap3_idle_wakeup_p12_script,
++	&omap3_idle_wakeup_p3_script,
++	&omap3_wrst_script,
++	&omap3_idle_sleep_on_script,
++};
++
++/*
++ * Recommended configuration based on "Recommended Sleep
++ * Sequences for the Zoom Platform":
++ * http://omappedia.com/wiki/File:Recommended_Sleep_Sequences_Zoom.pdf
++ */
++static struct twl4030_resconfig omap3_idle_rconfig[] = {
++	TWL_REMAP_SLEEP(RES_VAUX1, DEV_GRP_NULL, 0, 0),
++	TWL_REMAP_SLEEP(RES_VAUX2, DEV_GRP_NULL, 0, 0),
++	TWL_REMAP_SLEEP(RES_VAUX3, DEV_GRP_NULL, 0, 0),
++	TWL_REMAP_SLEEP(RES_VAUX4, DEV_GRP_NULL, 0, 0),
++	TWL_REMAP_SLEEP(RES_VMMC1, DEV_GRP_NULL, 0, 0),
++	TWL_REMAP_SLEEP(RES_VMMC2, DEV_GRP_NULL, 0, 0),
++	TWL_REMAP_OFF(RES_VPLL1, DEV_GRP_P1, 3, 1),
++	TWL_REMAP_SLEEP(RES_VPLL2, DEV_GRP_P1, 0, 0),
++	TWL_REMAP_SLEEP(RES_VSIM, DEV_GRP_NULL, 0, 0),
++	TWL_REMAP_SLEEP(RES_VDAC, DEV_GRP_NULL, 0, 0),
++	TWL_REMAP_SLEEP(RES_VINTANA1, TWL_DEV_GRP_P123, 1, 2),
++	TWL_REMAP_SLEEP(RES_VINTANA2, TWL_DEV_GRP_P123, 0, 2),
++	TWL_REMAP_SLEEP(RES_VINTDIG, TWL_DEV_GRP_P123, 1, 2),
++	TWL_REMAP_SLEEP(RES_VIO, TWL_DEV_GRP_P123, 2, 2),
++	TWL_REMAP_OFF(RES_VDD1, DEV_GRP_P1, 4, 1),
++	TWL_REMAP_OFF(RES_VDD2, DEV_GRP_P1, 3, 1),
++	TWL_REMAP_SLEEP(RES_VUSB_1V5, DEV_GRP_NULL, 0, 0),
++	TWL_REMAP_SLEEP(RES_VUSB_1V8, DEV_GRP_NULL, 0, 0),
++	TWL_REMAP_SLEEP(RES_VUSB_3V1, TWL_DEV_GRP_P123, 0, 0),
++	/* Resource #20 USB charge pump skipped */
++	TWL_REMAP_SLEEP(RES_REGEN, TWL_DEV_GRP_P123, 2, 1),
++	TWL_REMAP_SLEEP(RES_NRES_PWRON, TWL_DEV_GRP_P123, 0, 1),
++	TWL_REMAP_SLEEP(RES_CLKEN, TWL_DEV_GRP_P123, 3, 2),
++	TWL_REMAP_SLEEP(RES_SYSEN, TWL_DEV_GRP_P123, 6, 1),
++	TWL_REMAP_SLEEP(RES_HFCLKOUT, DEV_GRP_P3, 0, 2),
++	TWL_REMAP_SLEEP(RES_32KCLKOUT, TWL_DEV_GRP_P123, 0, 0),
++	TWL_REMAP_SLEEP(RES_RESET, TWL_DEV_GRP_P123, 6, 0),
++	TWL_REMAP_SLEEP(RES_MAIN_REF, TWL_DEV_GRP_P123, 0, 0),
 +	{ /* Terminator */ },
 +};
 +
-+static struct twl4030_power_data osc_off_idle = {
++static struct twl4030_power_data omap3_idle = {
 +	.scripts		= omap3_idle_scripts,
 +	.num			= ARRAY_SIZE(omap3_idle_scripts),
 +	.resource_config	= omap3_idle_rconfig,
-+	.board_config		= osc_off_rconfig,
 +};
 +
  static struct of_device_id twl4030_power_of_match[] = {
  	{
  		.compatible = "ti,twl4030-power-reset",
-@@ -757,6 +770,10 @@ static struct of_device_id twl4030_power_of_match[] = {
- 		.compatible = "ti,twl4030-power-idle",
- 		.data = &omap3_idle,
+ 		.data = &omap3_reset,
  	},
 +	{
-+		.compatible = "ti,twl4030-power-idle-osc-off",
-+		.data = &osc_off_idle,
++		.compatible = "ti,twl4030-power-idle",
++		.data = &omap3_idle,
 +	},
  	{ },
  };
