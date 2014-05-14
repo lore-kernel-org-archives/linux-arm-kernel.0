@@ -1,23 +1,71 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 14 May 2014 11:54:40 +0530
-Subject: [PATCH v3 1/2] cpufreq / OPP: Allow boost frequency to be looked
- up from device tree
-In-Reply-To: <20140514080930.781e0557@amdc2363>
-References: <1400029380-5372-1-git-send-email-thomas.ab@samsung.com>
- <1400029380-5372-2-git-send-email-thomas.ab@samsung.com>
- <CAKohponnPSRAotJUu+5a9y8j97QF8Jqgc5DA5WQnwGWCnVY-aA@mail.gmail.com>
- <CAGo_u6p-uqw82ewDciDEhAt0=Nswfw33-gf8Aa+-6_k3eCcTzw@mail.gmail.com>
- <20140514080930.781e0557@amdc2363>
-Message-ID: <CAKohponG9PNse4cHkvfLfaRouW-jxjToBXUCHyOCgx8-Pc=2Xw@mail.gmail.com>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Wed, 14 May 2014 06:24:51 +0000
+Subject: [PATCH 1/1] usb: core: Kconfig: refine the description for
+ CONFIG_USB_OTG
+In-Reply-To: <20140513154647.GM1151@saruman.home>
+References: <1399947567-18958-1-git-send-email-peter.chen@freescale.com>
+ <20140513111144.GA29360@kroah.com> <20140513154647.GM1151@saruman.home>
+Message-ID: <dc4c63c13058468db8ad8ec4a22204e8@BN1PR03MB235.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 May 2014 11:39, Lukasz Majewski <l.majewski@samsung.com> wrote:
-> I agree with Nishanth here, that point 1 (as described by Viresh at
-> [*]) is a more scalable approach.
+ 
+> 
+> On Tue, May 13, 2014 at 01:11:44PM +0200, Greg KH wrote:
+> > On Tue, May 13, 2014 at 10:19:27AM +0800, Peter Chen wrote:
+> > > the user should only select it when the board supports HNP and SRP,
+> > > it should NOT be selected if the board only supports dual-role
+> > > switch through ID pin.
+> > >
+> > > There is a discussion for it:
+> > > http://marc.info/?l=linux-arm-kernel&m=139994896101516&w=2
+> > > http://marc.info/?l=linux-usb&m=139994881701504&w=2
+> > >
+> > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > > ---
+> > >  drivers/usb/core/Kconfig |   12 +++++++-----
+> > >  1 files changed, 7 insertions(+), 5 deletions(-)
+> > >
+> > > diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
+> > > index cb8e991..158048b 100644
+> > > --- a/drivers/usb/core/Kconfig
+> > > +++ b/drivers/usb/core/Kconfig
+> > > @@ -54,13 +54,15 @@ config USB_OTG
+> > >  	default n
+> > >  	help
+> > >  	  The most notable feature of USB OTG is support for a
+> > > -	  "Dual-Role" device, which can act as either a device
+> > > -	  or a host. The initial role is decided by the type of
+> > > -	  plug inserted and can be changed later when two dual
+> > > -	  role devices talk to each other.
+> > > +	  otg device, which can act as either a device or a host.
+> > > +	  The initial role is decided by the type of plug inserted
+> > > +	  and can be changed using HNP (Host Negotiation Protocol)
+> > > +	  later when two otg devices talk to each other.
+> > >
+> > >  	  Select this only if your board has Mini-AB/Micro-AB
+> > > -	  connector.
+> > > +	  connector and supports HNP and SRP (Session Request Protocol).
+> > > +	  If the board only supports dual-role switch through ID
+> > > +	  pin, this configuration should not be selected.
+> >
+> > That's really lame.  What happened to our "all modconfig should work"
+> > goal?  Why can't you dynamically detect that this is not a config that
+> > works and handle it?
+> >
 
-The only reason why I wanted all that to be done at OPP level was to
-ensure if somebody else also needs it apart from cpufreq, they don't have
-to duplicate code and find it.. As it is present at a central place..
+If CONFIG_USB_OTG and CONFIG_USB_OTG_WHITELIST are set, most of usb devices
+will not work when connect to host for current code.
 
-But if no other code is going to look for that, it may just be fine as is..
+So, we need a feature flag for hcd and gadget, and set this OTG feature flag
+if the platform supports it (using dtb or platform data).
+
+Peter
+
+> > And this is just the OTG "core", not any specific hardware, so why
+> > should it matter?
+> 
+> yeah, I'm with Greg here... we should find a better way to sort this out.
+> 
+> --
+> balbi
