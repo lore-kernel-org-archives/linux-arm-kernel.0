@@ -1,48 +1,56 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 14 May 2014 22:21:26 +1000
-Subject: [PATCH v5 01/11] ARM: shmobile: r7s72100: document MSTP clock
- support
-In-Reply-To: <CAMuHMdWK1WAePx3N_ybPkWcoTtP_6PdcEPNEyBv02A9zOZSWOg@mail.gmail.com>
-References: <1398765822-2314-1-git-send-email-wsa@the-dreams.de>
- <1398765822-2314-2-git-send-email-wsa@the-dreams.de>
- <20140513000513.5943.68810@quantum>
- <CAMuHMdWK1WAePx3N_ybPkWcoTtP_6PdcEPNEyBv02A9zOZSWOg@mail.gmail.com>
-Message-ID: <20140514222126.5d10212f@canb.auug.org.au>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 14 May 2014 14:23:37 +0200
+Subject: [PATCH v13 1/2] clk: sunxi: Fixup clk_sunxi_mmc_phase_control to
+ take a clk rather then a hw_clk
+In-Reply-To: <1399896288-5826-2-git-send-email-hdegoede@redhat.com>
+References: <1399896288-5826-1-git-send-email-hdegoede@redhat.com>
+ <1399896288-5826-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAPDyKFquQ9bQB0w=wZySw54SMqi4OB+b3CrwQ0TrgSqw_mQLKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-
-On Wed, 14 May 2014 12:26:38 +0200 Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+On 12 May 2014 14:04, Hans de Goede <hdegoede@redhat.com> wrote:
+> __clk_get_hw is supposed to be used by clk providers, not clk consumers.
 >
-> On Tue, May 13, 2014 at 2:05 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> > Quoting Wolfram Sang (2014-04-29 03:03:32)
-> >> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> >>
-> >> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> >
-> > Acked-by: Mike Turquette <mturquette@linaro.org>
-> >
-> > No need to take this through the clk tree. Feel free to send it with the
-> > rest through arm-soc.
-> 
-> (merging in clk/clk-next)
-> 
-> Note that this will cause a conflict for you, as Mike applied commit
-> 5483bf698f42a6f0467463b064084eb888298232 ("clk: shmobile: r8a7779:
-> Add MSTP clock support"), which adds a line at the exact same spot.
-> 
-> Resolution: both lines should be kept.
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Thanks.
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140514/8a7768c7/attachment.sig>
+> ---
+>  drivers/clk/sunxi/clk-sunxi.c | 3 ++-
+>  include/linux/clk/sunxi.h     | 2 +-
+>  2 files changed, 3 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index 59f9040..4cc2b2a 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -510,11 +510,12 @@ CLK_OF_DECLARE(sun7i_a20_gmac, "allwinner,sun7i-a20-gmac-clk",
+>   * clk_sunxi_mmc_phase_control() - configures MMC clock phase control
+>   */
+>
+> -void clk_sunxi_mmc_phase_control(struct clk_hw *hw, u8 sample, u8 output)
+> +void clk_sunxi_mmc_phase_control(struct clk *clk, u8 sample, u8 output)
+>  {
+>         #define to_clk_composite(_hw) container_of(_hw, struct clk_composite, hw)
+>         #define to_clk_factors(_hw) container_of(_hw, struct clk_factors, hw)
+>
+> +       struct clk_hw *hw = __clk_get_hw(clk);
+>         struct clk_composite *composite = to_clk_composite(hw);
+>         struct clk_hw *rate_hw = composite->rate_hw;
+>         struct clk_factors *factors = to_clk_factors(rate_hw);
+> diff --git a/include/linux/clk/sunxi.h b/include/linux/clk/sunxi.h
+> index 1ef5c89..aed28c4 100644
+> --- a/include/linux/clk/sunxi.h
+> +++ b/include/linux/clk/sunxi.h
+> @@ -17,6 +17,6 @@
+>
+>  #include <linux/clk.h>
+>
+> -void clk_sunxi_mmc_phase_control(struct clk_hw *hw, u8 sample, u8 output);
+> +void clk_sunxi_mmc_phase_control(struct clk *clk, u8 sample, u8 output);
+>
+>  #endif
+> --
+> 1.9.0
+>
