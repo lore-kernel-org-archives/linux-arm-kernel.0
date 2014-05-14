@@ -1,243 +1,467 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 14 May 2014 22:15:12 +0200
-Subject: [PATCH v2 01/10] dt-binding: clk: add clock binding docs for Marvell
- Berlin2 SoCs
+Date: Wed, 14 May 2014 22:15:16 +0200
+Subject: [PATCH v2 05/10] clk: berlin: add driver for BG2x complex divider
+ cells
 In-Reply-To: <1400098522-14770-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1400098522-14770-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1400098522-14770-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1400098522-14770-6-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds mandatory device tree binding documentation for the clock related
-IP found on Marvell Berlin2 (BG2, BG2CD, and BG2Q) SoCs.
+From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+This is a driver for the complex divider cells found on Marvell Berlin2
+SoCs. The cells come in two flavors: single register cells and shared
+register cells. The single register cells are registered by using a DT
+node, while the shared ones will be taken care of in a SoC-specific
+core clock driver.
+
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Changelog:
 v1->v2:
-- typo fixed (Reported by Alexandre Belloni)
-- added BG2Q core clock indices
+- dropped usage of postponed of_clk_create_name()       
+- fixed divide-by-3 check (!= 0 instead of == 1)
+- fixed CLK_OF_DECLARE compatible to "marvell,berlin2-clk-div"
+- fixed missing num_parents increment
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Randy Dunlap <rdunlap@infradead.org>
 Cc: Mike Turquette <mturquette@linaro.org>
 Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Cc: Jisheng Zhang <jszhang@marvell.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- .../devicetree/bindings/clock/berlin2-clock.txt    | 195 +++++++++++++++++++++
- 1 file changed, 195 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/berlin2-clock.txt
+ drivers/clk/berlin/Makefile      |   2 +-
+ drivers/clk/berlin/berlin2-div.c | 324 +++++++++++++++++++++++++++++++++++++++
+ drivers/clk/berlin/berlin2-div.h |  80 ++++++++++
+ 3 files changed, 405 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/berlin/berlin2-div.c
+ create mode 100644 drivers/clk/berlin/berlin2-div.h
 
-diff --git a/Documentation/devicetree/bindings/clock/berlin2-clock.txt b/Documentation/devicetree/bindings/clock/berlin2-clock.txt
+diff --git a/drivers/clk/berlin/Makefile b/drivers/clk/berlin/Makefile
+index 9d3490e9782f..f0a7dc8b5e30 100644
+--- a/drivers/clk/berlin/Makefile
++++ b/drivers/clk/berlin/Makefile
+@@ -1 +1 @@
+-obj-y += berlin2-avpll.o berlin2-pll.o
++obj-y += berlin2-avpll.o berlin2-pll.o berlin2-div.o
+diff --git a/drivers/clk/berlin/berlin2-div.c b/drivers/clk/berlin/berlin2-div.c
 new file mode 100644
-index 000000000000..6ca380cf6e4f
+index 000000000000..7e5d97b170ea
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/berlin2-clock.txt
-@@ -0,0 +1,195 @@
-+* Marvell Berlin2 clock bindings
++++ b/drivers/clk/berlin/berlin2-div.c
+@@ -0,0 +1,324 @@
++/*
++ * Copyright (c) 2014 Marvell Technology Group Ltd.
++ *
++ * Alexandre Belloni <alexandre.belloni@free-electrons.com>
++ * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#include <linux/bitops.h>
++#include <linux/clk-provider.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
 +
-+Marvell Berlin2 (BG2, BG2CD, BG2Q) share the same IP for PLLs and clocks,
-+with some minor differences in features and register layout. The below
-+describes the individual clock related IP:
++#include "berlin2-div.h"
 +
-+* Audio/Video PLL
++/*
++ * Clock dividers in Berlin2 SoCs comprise a complex cell to select
++ * input pll and divider. The virtual structure as it is used in Marvell
++ * BSP code can be seen as:
++ *
++ *                      +---+
++ * pll0 --------------->| 0 |                   +---+
++ *           +---+      |(B)|--+--------------->| 0 |      +---+
++ * pll1.0 -->| 0 |  +-->| 1 |  |   +--------+   |(E)|----->| 0 |   +---+
++ * pll1.1 -->| 1 |  |   +---+  +-->|(C) 1:M |-->| 1 |      |(F)|-->|(G)|->
++ * ...    -->|(A)|--+          |   +--------+   +---+  +-->| 1 |   +---+
++ * ...    -->|   |             +-->|(D) 1:3 |----------+   +---+
++ * pll1.N -->| N |                 +---------
++ *           +---+
++ *
++ * (A) input pll clock mux controlled by               <PllSelect[1:n]>
++ * (B) input pll bypass mux controlled by              <PllSwitch>
++ * (C) programmable clock divider controlled by        <Select[1:n]>
++ * (D) constant div-by-3 clock divider
++ * (E) programmable clock divider bypass controlled by <Switch>
++ * (F) constant div-by-3 clock mux controlled by       <D3Switch>
++ * (G) clock gate controlled by                        <Enable>
++ *
++ * For whatever reason, above control signals come in two flavors:
++ * - single register dividers with all bits in one register
++ * - shared register dividers with bits spread over multiple registers
++ *   (including signals for the same cell spread over consecutive registers)
++ *
++ * Also, clock gate and pll mux is not available on every div cell, so
++ * we have to deal with those, too. We reuse common clock composite driver
++ * for it.
++ */
 +
-+The Audio/Video PLL (AVPLL) is a dual-VCO PLL with 8 channels each. Each
-+of the VCOs can sythesize a single VCO frequency based on a single input
-+reference clock. Each of the 8 channels then, can derive an output clock
-+from that VCO frequency by various dividers/multipliers.
++#define PLL_SELECT_MASK	0x7
++#define DIV_SELECT_MASK	0x7
 +
-+Required properties:
-+- compatible: shall be "marvell,berlin2-avpll"
-+- reg: address and length of the corresponding AVPLL registers
-+- #clock-cells: shall be set to 2
-+- clocks: single clock specifier referencing the AVPLL input clock
-+
-+To ease match-up with the desired AVPLL output clock, clock specifiers
-+referencing AVPLL clocks shall contain two cells. The first refers to
-+the VCO (0=AVPLL_A, 1=AVPLL_B) while the second refers to the corresponding
-+channel starting with 1. For example, to reference AVPLL_B3 the clock
-+specifier shall be: <&avpll 1 3>.
-+
-+Example:
-+
-+avpll: pll at ea0040 {
-+	compatible = "marvell,berlin2-avpll";
-+	#clock-cells = <2>;
-+	reg = <0xea0050 0x100>;
-+	clocks = <&refclk>;
++struct berlin2_div {
++	struct clk_hw hw;
++	void __iomem *base;
++	struct berlin2_div_map map;
++	spinlock_t *lock;
 +};
 +
-+* Simple PLLs
++#define to_berlin2_div(hw) container_of(hw, struct berlin2_div, hw)
 +
-+Simple PLLs are memory mapped PLLs that can sythesize a single output clock
-+based on a single input reference clock.
++static u8 clk_div[] = { 1, 2, 4, 6, 8, 12, 1, 1 };
 +
-+Required properties:
-+- compatible: shall be one of the following:
-+	"marvell,berlin2-pll" for Berlin BG2/BG2CD PLLs
-+	"marvell,berlin2q-pll" for Berlin BG2Q PLLs
-+- reg: address and length of the corresponding PLL registers
-+- #clock-cells: shall be set to 0
-+- clocks: single clock specifier referencing the PLL input clock
++static int berlin2_div_is_enabled(struct clk_hw *hw)
++{
++	struct berlin2_div *div = to_berlin2_div(hw);
++	struct berlin2_div_map *map = &div->map;
++	u32 reg;
 +
-+Example:
++	if (div->lock)
++		spin_lock(div->lock);
 +
-+cpupll: pll at ea003c {
-+	compatible = "marvell,berlin2-pll";
-+	#clock-cells = <0>;
-+	reg = <0xea003c 0x14>;
-+	clocks = <&refclk>;
++	reg = readl_relaxed(div->base + map->gate_offs);
++	reg >>= map->gate_shift;
++
++	if (div->lock)
++		spin_unlock(div->lock);
++
++	return (reg & 0x1);
++}
++
++static int berlin2_div_enable(struct clk_hw *hw)
++{
++	struct berlin2_div *div = to_berlin2_div(hw);
++	struct berlin2_div_map *map = &div->map;
++	u32 reg;
++
++	if (div->lock)
++		spin_lock(div->lock);
++
++	reg = readl_relaxed(div->base + map->gate_offs);
++	reg |= BIT(map->gate_shift);
++	writel_relaxed(reg, div->base + map->gate_offs);
++
++	if (div->lock)
++		spin_unlock(div->lock);
++
++	return 0;
++}
++
++static void berlin2_div_disable(struct clk_hw *hw)
++{
++	struct berlin2_div *div = to_berlin2_div(hw);
++	struct berlin2_div_map *map = &div->map;
++	u32 reg;
++
++	if (div->lock)
++		spin_lock(div->lock);
++
++	reg = readl_relaxed(div->base + map->gate_offs);
++	reg &= ~BIT(map->gate_shift);
++	writel_relaxed(reg, div->base + map->gate_offs);
++
++	if (div->lock)
++		spin_unlock(div->lock);
++}
++
++static int berlin2_div_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct berlin2_div *div = to_berlin2_div(hw);
++	struct berlin2_div_map *map = &div->map;
++	u32 reg;
++
++	if (div->lock)
++		spin_lock(div->lock);
++
++	/* index == 0 is PLL_SWITCH */
++	reg = readl_relaxed(div->base + map->pll_switch_offs);
++	if (index == 0)
++		reg &= ~BIT(map->pll_switch_shift);
++	else
++		reg |= BIT(map->pll_switch_shift);
++	writel_relaxed(reg, div->base + map->pll_switch_offs);
++
++	/* index > 0 is PLL_SELECT */
++	if (index > 0) {
++		reg = readl_relaxed(div->base + map->pll_select_offs);
++		reg &= ~(PLL_SELECT_MASK << map->pll_select_shift);
++		reg |= (index - 1) << map->pll_select_shift;
++		writel_relaxed(reg, div->base + map->pll_select_offs);
++	}
++
++	if (div->lock)
++		spin_unlock(div->lock);
++
++	return 0;
++}
++
++static u8 berlin2_div_get_parent(struct clk_hw *hw)
++{
++	struct berlin2_div *div = to_berlin2_div(hw);
++	struct berlin2_div_map *map = &div->map;
++	u32 reg;
++	u8 index = 0;
++
++	if (div->lock)
++		spin_lock(div->lock);
++
++	/* PLL_SWITCH == 0 is index 0 */
++	reg = readl_relaxed(div->base + map->pll_switch_offs);
++	reg &= BIT(map->pll_switch_shift);
++	if (reg) {
++		reg = readl_relaxed(div->base + map->pll_select_offs);
++		reg >>= map->pll_select_shift;
++		reg &= PLL_SELECT_MASK;
++		index = 1 + reg;
++	}
++
++	if (div->lock)
++		spin_unlock(div->lock);
++
++	return index;
++}
++
++static unsigned long berlin2_div_recalc_rate(struct clk_hw *hw,
++					     unsigned long parent_rate)
++{
++	struct berlin2_div *div = to_berlin2_div(hw);
++	struct berlin2_div_map *map = &div->map;
++	u32 divsw, div3sw, divider = 1;
++
++	if (div->lock)
++		spin_lock(div->lock);
++
++	divsw = readl_relaxed(div->base + map->div_switch_offs) &
++		(1 << map->div_switch_shift);
++	div3sw = readl_relaxed(div->base + map->div3_switch_offs) &
++		(1 << map->div3_switch_shift);
++
++	/* constant divide-by-3 (dominant) */
++	if (div3sw != 0) {
++		divider = 3;
++	/* divider can be bypassed with DIV_SWITCH == 0 */
++	} else if (divsw == 0) {
++		divider = 1;
++	/* clock divider determined by DIV_SELECT */
++	} else {
++		u32 reg;
++		reg = readl_relaxed(div->base + map->div_select_offs);
++		reg >>= map->div_select_shift;
++		reg &= DIV_SELECT_MASK;
++		divider = clk_div[reg];
++	}
++
++	if (div->lock)
++		spin_unlock(div->lock);
++
++	return parent_rate / divider;
++}
++
++static const struct clk_ops berlin2_div_rate_ops = {
++	.recalc_rate	= berlin2_div_recalc_rate,
 +};
 +
-+* Single-register clock dividers
-+
-+Single-register clock dividers are complex divider cells, allowing
-+to divide a reference clock with a set of fixed dividers. Also they
-+comprise an input clock mux with bypass and an ouput clock gate.
-+
-+Required properties:
-+- compatible: shall be "marvell,berlin2-clk-div"
-+- reg: address and length of the corresponding DIV registers
-+- #clock-cells: shall be set to 0
-+- clocks: clock specifiers referencing the DIV input clocks
-+- clock-names: array of strings describing the clock specifiers above.
-+    Allowed clock-names are "mux_bypass" for the clock mux bypass selection
-+    and "muxN" (N=0..7) for each of the 8 possible clock mux inputs.
-+
-+Example:
-+
-+gfx3dcore_clk: clock at ea022c {
-+	compatible = "marvell,berlin2-clk-div";
-+	#clock-cells = <0>;
-+	reg = <0xea0022c 0x4>;
-+	clocks = <&syspll>,
-+		<&avpll AVPLL_B 4>, <&avpll AVPLL_B 5>,
-+		<&avpll AVPLL_B 6>, <&avpll AVPLL_B 7>;
-+	clock-names = "mux_bypass",
-+		"mux0", "mux1", "mux2", "mux3";
++static const struct clk_ops berlin2_div_gate_ops = {
++	.is_enabled	= berlin2_div_is_enabled,
++	.enable		= berlin2_div_enable,
++	.disable	= berlin2_div_disable,
 +};
 +
-+* SoC-specific core clocks
-+
-+In addition to the above, there is a register set dealing with SoC
-+specific clock dividers, muxes, and gates. There is also the complex
-+divider cell used above, but instead of independent registers, they
-+share a common set of registers. The core clocks are represented by
-+a single DT node providing access to the remaining clocks.
-+
-+Required properties:
-+- compatible: shall be one of
-+	"marvell,berlin2-core-clocks" for BG2/BG2CD SoCs
-+	"marvell,berlin2q-core-clocks" for BG2Q SoCs
-+- reg: address and length of the corresponding clock registers
-+- #clock-cells: shall be set to 1
-+- clocks: clock specifiers referencing the core clock input clocks
-+- clock-names: array of strings describing the clock specifiers above.
-+    Allowed clock-names for the reference clocks are
-+      "refclk", "syspll", "mempll", "cpupll"
-+    also Audio/Video PLL clocks shall be named with
-+      "avpll_VN" (V=0...1 for AVPLL_A and AVPLL_B, N=1..8 for the
-+      corresponding reference input from AVPLL).
-+
-+Optional properties for BG2/BG2CD SoCs:
-+- clocks/clock-names: in addition to the allowed clock names above,
-+    there is an external video clock input that shall be named "video_ext0".
-+
-+Clocks provided by core clocks shall be referenced by a clock specifier
-+indexing one of the provided clocks. A SoC-specific list of available clocks
-+is below the example.
-+
-+Example:
-+coreclk: clock at ea0150 {
-+	compatible = "marvell,berlin2-core-clocks";
-+	#clock-cells = <1>;
-+	reg = <0xea0150 0x1c>;
-+	clocks = <&refclk>, <&syspll>, <&mempll>, <&cpupll>,
-+		<&avpll 0 1>, <&avpll 0 2>,
-+		<&avpll 0 3>, <&avpll 0 4>,
-+		<&avpll 0 5>, <&avpll 0 6>,
-+		<&avpll 0 7>, <&avpll 0 8>,
-+		<&avpll 1 1>, <&avpll 1 2>,
-+		<&avpll 1 3>, <&avpll 1 4>,
-+		<&avpll 1 5>, <&avpll 1 6>,
-+		<&avpll 1 7>, <&avpll 1 8>,
-+		<&externalvideoclk>;
-+	clock-names = "refclk", "syspll", "mempll", "cpupll",
-+		"avpll_a1", "avpll_a2", "avpll_a3", "avpll_a4",
-+		"avpll_a5", "avpll_a6", "avpll_a7", "avpll_a8",
-+		"avpll_b1", "avpll_b2", "avpll_b3", "avpll_b4",
-+		"avpll_b5", "avpll_b6", "avpll_b7", "avpll_b8",
-+		"video_ext0";
++static const struct clk_ops berlin2_div_mux_ops = {
++	.set_parent	= berlin2_div_set_parent,
++	.get_parent	= berlin2_div_get_parent,
 +};
 +
-+* BG2/BG2CD core clock indicies:
-+0  - SYS
-+1  - CPU
-+2  - DRMFIGO
-+3  - CFG
-+4  - GFX
-+5  - ZSP
-+6  - PERIF
-+7  - PCUBE
-+8  - VSCOPE
-+9  - NFC_ECC
-+10 - VPP
-+11 - APP
-+12 - AUDIO0
-+23 - AUDIO2
-+14 - AUDIO3
-+15 - AUDIO1
-+16 - GETH0
-+17 - GETH1
-+18 - SATA
-+19 - AHBAPB
-+20 - USB0
-+21 - USB1
-+22 - PBRIDGE
-+23 - SDIO0
-+24 - SDIO1
-+25 - NFC
-+26 - SMEMC
-+27 - AUDIOHD
-+28 - VIDEO0
-+29 - VIDEO1
-+30 - VIDEO2
++struct clk * __init
++berlin2_div_register(const struct berlin2_div_map *map,
++		     void __iomem *base, const char *name, u8 div_flags,
++		     const char **parent_names, int num_parents,
++		     unsigned long flags, spinlock_t *lock)
++{
++	const struct clk_ops *mux_ops = &berlin2_div_mux_ops;
++	const struct clk_ops *rate_ops = &berlin2_div_rate_ops;
++	const struct clk_ops *gate_ops = &berlin2_div_gate_ops;
++	struct berlin2_div *div;
 +
-+* BG2Q core clock indicies:
-+0  - SYS
-+1  - DRMFIGO
-+2  - CFG
-+3  - GFX2D
-+4  - ZSP
-+5  - PERIF
-+6  - PCUBE
-+7  - VSCOPE
-+8  - NFC_ECC
-+9  - VPP
-+10 - APP
-+11 - GFX2DAXI
-+12 - GETH0
-+13 - SATA
-+14 - AHBAPB
-+15 - USB0
-+16 - USB1
-+17 - USB2
-+18 - USB3
-+19 - PBRIDGE
-+20 - SDIO
-+21 - NFC
-+22 - SMEMC
-+23 - PCIE
++	div = kzalloc(sizeof(*div), GFP_KERNEL);
++	if (!div)
++		return ERR_PTR(-ENOMEM);
++
++	/* copy div_map to allow __initconst */
++	memcpy(&div->map, map, sizeof(*map));
++	div->base = base;
++	div->lock = lock;
++
++	if ((div_flags & BERLIN2_DIV_HAS_GATE) == 0)
++		gate_ops = NULL;
++	if ((div_flags & BERLIN2_DIV_HAS_MUX) == 0)
++		mux_ops = NULL;
++
++	return clk_register_composite(NULL, name, parent_names, num_parents,
++				      &div->hw, mux_ops, &div->hw, rate_ops,
++				      &div->hw, gate_ops, flags);
++}
++
++static const struct berlin2_div_map berlin2_single_div_map __initconst = {
++	.gate_offs = 0,
++	.gate_shift = 0,
++	.pll_select_offs = 0,
++	.pll_select_shift = 1,
++	.pll_switch_offs = 0,
++	.pll_switch_shift = 4,
++	.div_switch_offs = 0,
++	.div_switch_shift = 5,
++	.div3_switch_offs = 0,
++	.div3_switch_shift = 6,
++	.div_select_offs = 0,
++	.div_select_shift = 7,
++};
++
++static void __init berlin2_div_of_setup(struct device_node *np)
++{
++	const char *parent_names[9] = {};
++	char *mux_name = "mux0";
++	int num_parents = 0;
++	void __iomem *base;
++	struct clk *iclk;
++	struct clk *div;
++	int n;
++
++	iclk = of_clk_get_by_name(np, "mux_bypass");
++	if (IS_ERR(iclk)) {
++		pr_err("%s: Missing mux bypass clock\n", np->full_name);
++		return;
++	}
++	parent_names[0] = __clk_get_name(iclk);
++	num_parents++;
++	clk_put(iclk);
++
++	/* collect mux input clock names */
++	for (n = 0; n < 8; n++) {
++		sprintf(mux_name, "mux%d", n);
++		iclk = of_clk_get_by_name(np, mux_name);
++		if (IS_ERR(iclk))
++			continue;
++		parent_names[1 + n] = __clk_get_name(iclk);
++		num_parents++;
++		clk_put(iclk);
++	}
++
++	base = of_iomap(np, 0);
++	if (!base) {
++		pr_err("%s: Unable to map div register\n", np->full_name);
++		return;
++	}
++
++	div = berlin2_div_register(&berlin2_single_div_map, base, np->name,
++				   BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++				   parent_names, num_parents, 0, NULL);
++	if (!IS_ERR(div))
++		of_clk_add_provider(np, of_clk_src_simple_get, div);
++}
++CLK_OF_DECLARE(berlin2_div, "marvell,berlin2-clk-div", berlin2_div_of_setup);
+diff --git a/drivers/clk/berlin/berlin2-div.h b/drivers/clk/berlin/berlin2-div.h
+new file mode 100644
+index 000000000000..344865181712
+--- /dev/null
++++ b/drivers/clk/berlin/berlin2-div.h
+@@ -0,0 +1,80 @@
++/*
++ * Copyright (c) 2014 Marvell Technology Group Ltd.
++ *
++ * Alexandre Belloni <alexandre.belloni@free-electrons.com>
++ * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __BERLIN2_DIV_H
++#define __BERLIN2_DIV_H
++
++#include <linux/clk.h>
++#include <linux/spinlock.h>
++
++#define BERLIN2_DIV_HAS_GATE	BIT(0)
++#define BERLIN2_DIV_HAS_MUX	BIT(1)
++
++#define BERLIN2_PLL_SELECT(_off, _sh)	\
++	.pll_select_offs = _off,	\
++	.pll_select_shift = _sh
++
++#define BERLIN2_PLL_SWITCH(_off, _sh)	\
++	.pll_switch_offs = _off,	\
++	.pll_switch_shift = _sh
++
++#define BERLIN2_DIV_SELECT(_off, _sh)	\
++	.div_select_offs = _off,	\
++	.div_select_shift = _sh
++
++#define BERLIN2_DIV_SWITCH(_off, _sh)	\
++	.div_switch_offs = _off,	\
++	.div_switch_shift = _sh
++
++#define BERLIN2_DIV_D3SWITCH(_off, _sh)	\
++	.div3_switch_offs = _off,	\
++	.div3_switch_shift = _sh
++
++#define BERLIN2_DIV_GATE(_off, _sh)	\
++	.gate_offs = _off,		\
++	.gate_shift = _sh
++
++struct berlin2_div_map {
++	u16 pll_select_offs;
++	u16 pll_switch_offs;
++	u16 div_select_offs;
++	u16 div_switch_offs;
++	u16 div3_switch_offs;
++	u16 gate_offs;
++	u8 pll_select_shift;
++	u8 pll_switch_shift;
++	u8 div_select_shift;
++	u8 div_switch_shift;
++	u8 div3_switch_shift;
++	u8 gate_shift;
++};
++
++struct berlin2_div_data {
++	const char *name;
++	unsigned long flags;
++	struct berlin2_div_map map;
++	u8 div_flags;
++};
++
++struct clk * __init
++berlin2_div_register(const struct berlin2_div_map *map,
++	     void __iomem *base,  const char *name, u8 div_flags,
++	     const char **parent_names, int num_parents,
++	     unsigned long flags,  spinlock_t *lock);
++
++#endif /* BERLIN2_DIV_H */
 -- 
 1.9.1
