@@ -1,82 +1,23 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Wed, 14 May 2014 13:33:57 +0530
-Subject: [PATCH v5 6/6] mcpm: exynos: populate suspend and powered_up callbacks
-In-Reply-To: <1400054637-21505-1-git-send-email-chander.kashyap@linaro.org>
-References: <ANuQgHGSPJ45tbrVppAVpOqF0OfHacPWfX=S5mOVxTPr66f7vg@mail.gmail.com>
- <1400054637-21505-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <1400054637-21505-7-git-send-email-chander.kashyap@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 14 May 2014 17:09:49 +0900
+Subject: [PATCH v6 00/12] CCF support for Renesas r7s72100
+In-Reply-To: <20140514074652.GA2648@katana>
+References: <1400029816-24028-1-git-send-email-wsa@the-dreams.de>
+ <20140514050801.GE3502@verge.net.au> <20140514074652.GA2648@katana>
+Message-ID: <20140514080949.GA26823@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support cpuidle through mcpm, suspend and powered-up
-callbacks are required in mcpm platform code.
-Hence populate the same callbacks.
+On Wed, May 14, 2014 at 09:46:53AM +0200, Wolfram Sang wrote:
+> 
+> > > This series has been tested with the renesas-devel-v3.15-rc2-20140428 tag. If
+> 
+> Just for completeness: The above mentioned tag was outdated. It was
+> tested against "renesas-devel-v3.15-rc5-20140513v2"
 
-Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-Signed-off-by: Chander Kashyap <k.chander@samsung.com>
----
-Changes in v5:
-	1. Add comment to address cache access while c-bit is cleared in SCLTR
-	2. Make exynos_powered_up static
-Changes in v4: None
-Changes in v3:
-	1. Removed coherency enablement after suspend failure.
-	2. Use generic function to poweron cpu.
-changes in v2:
-	1. Fixed typo: enynos_pmu_cpunr to exynos_pmu_cpunr
- arch/arm/mach-exynos/mcpm-exynos.c |   34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+Thanks.
 
-diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
-index c6bb3a4..623dfa7 100644
---- a/arch/arm/mach-exynos/mcpm-exynos.c
-+++ b/arch/arm/mach-exynos/mcpm-exynos.c
-@@ -253,10 +253,46 @@ static int exynos_power_down_finish(unsigned int cpu, unsigned int cluster)
- 	return -ETIMEDOUT; /* timeout */
- }
- 
-+static void exynos_powered_up(void)
-+{
-+	unsigned int mpidr, cpu, cluster;
-+
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+
-+	arch_spin_lock(&exynos_mcpm_lock);
-+	if (cpu_use_count[cpu][cluster] == 0)
-+		cpu_use_count[cpu][cluster] = 1;
-+	arch_spin_unlock(&exynos_mcpm_lock);
-+}
-+
-+static void exynos_suspend(u64 residency)
-+{
-+	unsigned int mpidr, cpunr;
-+
-+	exynos_power_down();
-+
-+	/*
-+	 * Execution reaches here only if cpu did not power down.
-+	 * Hence roll back the changes done in exynos_power_down function.
-+	 *
-+	 * CAUTION: "This function requires the stack data to be visible through
-+	 * power down and can only be executed on processors like A15 and A7
-+	 * that hit the cache with the C bit clear in the SCTLR register."
-+	*/
-+	mpidr = read_cpuid_mpidr();
-+	cpunr = exynos_pmu_cpunr(mpidr);
-+
-+	exynos_cpu_power_up(cpunr);
-+}
-+
- static const struct mcpm_platform_ops exynos_power_ops = {
- 	.power_up		= exynos_power_up,
- 	.power_down		= exynos_power_down,
- 	.power_down_finish	= exynos_power_down_finish,
-+	.suspend		= exynos_suspend,
-+	.powered_up		= exynos_powered_up,
- };
- 
- static void __init exynos_mcpm_usage_count_init(void)
--- 
-1.7.9.5
+> > Thanks, I have queued up this series.
+> 
+> Thanks a ton!
+> 
