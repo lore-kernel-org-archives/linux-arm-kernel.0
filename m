@@ -1,54 +1,37 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Wed, 14 May 2014 21:13:50 +0200
-Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
- initialization order based on the DT)
-In-Reply-To: <5373B315.3020909@ahsoftware.de>
-References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>	<20140514141914.446F7C4153D@trevor.secretlab.ca>	<53738580.7000902@ahsoftware.de>	<CACxGe6s4px_9CNk3bkc1OF1KGZGYdyh4gE_VufCKU5dLFBG48g@mail.gmail.com>	<53739871.9070407@ahsoftware.de>
- <CAL_JsqJB4CAO60m1HTGQGHQRYVWcARxm_roOhn-PJh+ZR7OONg@mail.gmail.com>
- <5373ABD2.9010508@ahsoftware.de> <5373ADB6.1070702@ahsoftware.de>
- <5373B315.3020909@ahsoftware.de>
-Message-ID: <5373C06E.2050502@ahsoftware.de>
+From: anders.berg@avagotech.com (Anders Berg)
+Date: Wed, 14 May 2014 21:21:53 +0200
+Subject: [PATCH v3 0/6] Add platform support for LSI AXM55xx
+In-Reply-To: <6334605.NlytHCzYVP@wuerfel>
+References: <cover.1400072260.git.anders.berg@avagotech.com>
+ <6334605.NlytHCzYVP@wuerfel>
+Message-ID: <CAE0=X_2Fcf=mcx2zKtCqKzFH+Fgwz5C6SEm-DQi_mVAWzh=Zdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 14.05.2014 20:16, schrieb Alexander Holler:
-> Am 14.05.2014 19:53, schrieb Alexander Holler:
->> Am 14.05.2014 19:45, schrieb Alexander Holler:
+On Wed, May 14, 2014 at 8:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 14 May 2014 20:37:55 Anders Berg wrote:
 >>
->>> One of the biggest problem of the deferred probe stuff is the problem
->>> how to identify real problems if everything ends up with a deferred
->>> probe when an error occurs? That means if you display an error whenever
->>> something is deferred, the log becomes almost unreadable. If you don't
->>> display an error, you never will see an error. And how do you display
->>> the real error when deferred probes finally do fail? The deferred probe
->>> stuff doesn't has any information about the underlying error, so it
->>> can't display it.
+>> This is version 3 of this series to introduces basic platform support for the LSI
+>> AXM5516 SoC.
 >>
->> And that is a real problem. I've recently tried to identify why a driver
->> failed and it was a nightmare because nothing offered any message (debug
->> or not) when a probe was deferred. So I had to insert tons of printks to
->> walk upwards to find the finally place where the probe failed.
->> Everything afterwards just has forwarded the -EPROBE_DEFER without
->> printing any message.
+>> No major changes since v2. Ready to be applied to the arm-soc tree?
 >
-> To add some numbers, I had to insert around 20-30 printks in around 10
-> or more files to find the underlying problem. Having to do such whenever
-> an error happens because everything assumes the error will disappear in
-> a later try, which doesn't happen for real errors, is just a nightmare.
+> I think it's good, but I'm not sure if we should put them all into arm-soc.
+> There are no dependencies between the drivers that I can see, so why not
+> merge the clock and reset drivers through the individual subsystem maintainers?
+>
+> We can take patches 1/3/4/6, and the others if there is a good reason
+> not to have the regular maintainers pick them up.
 
-And to give other people an idea how such a nightmare which has become 
-reality does look like:
+Sure, that'll work to take 1,3,4,6.
 
-You see a driver fails (through the deferred stuff). You look at that 
-the driver and see around 5-10 places which return or forward an 
--EPROBE_DEFER. You add printks (to all or just some of them, hopefully 
-the right ones, but Murphy ...). Then you go to the underlying 
-functions. You see again several places which do the same, you add again 
-printks. You go to the underlying functions ...
+>
+> The hip04 platform series is also adding a multi_v7_lpae_defconfig file.
+> it would be good to add axxia to that config and also to the regular
+> multi_v7_defconfig, but that can be an add-on patch once we have merged
+> hip04.
 
-Finally you've created a tree full with nodes of printks, searching for 
-the one leaf which is the origin of the -EPROBE_DEFER for your problem.
+Ok.
 
-Regards,
-
-Alexander Holler
+Thanks,
+Anders
