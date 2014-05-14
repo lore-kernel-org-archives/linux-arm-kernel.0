@@ -1,55 +1,35 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 14 May 2014 15:30:50 -0700
-Subject: [RFC PATCH 0/5] Frequency resolution in CCF vs. cpufreq
-Message-ID: <1400106655-22465-1-git-send-email-soren.brinkmann@xilinx.com>
+Date: Wed, 14 May 2014 15:30:51 -0700
+Subject: [RFC PATCH 1/5] cpufreq: stats: Allow small rounding errors
+In-Reply-To: <1400106655-22465-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1400106655-22465-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1400106655-22465-2-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When matching a frequency against the freq_table, allow small deviances to
+allow rounding errors. Rounding errors are likely to occur due to the
+differenct frequency resolutions used in the common clock vs cpufreq
+frameworks.
 
-I have one or two problems with cpufreq and the CCF, which are caused by
-rounding/different frequency resolutions.
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
 
-cpufreq works with kHz, while the CCF uses Hz. On Zynq our default frequency is
-666666666 Hz which the CCF, due to rounding, reports as 666666660. And for
-cpufreq, which simply divides values it obtains through clk_round_rate() by
-1000, 666666.
-Since passing 666666 to clk_round_rate() does not result in 666666660
-(clk_round_rate() always rounds down!), we chose to put 666667 in the OPP. This
-causes issue 1: cpufreq stats are broken.
-The OPP is 666667 but clk_get_rate(CPU)/1000 is 666666. Hence the stats module
-cannot match the frequency to an OPP.
-This is what I address in patch 1, by allowing small deviations when matching a
-frequency to an OPP.
+ drivers/cpufreq/cpufreq_stats.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Then when looking at our second OPP: 333334. Similar, due to rounding problems
-the frequency ends on 4 instead of 3. I think it would be nice if I could
-specify the 333333 directly (the 4 there does not really make sense).
-That is addressed in patches 2 and 3. Those introduce a new API call for the
-CCF (I revived some really old code) which rounds to the closest possible
-frequency, as opposed to the closest possible one that does not exceed the
-requested. And then we use this function in the cpufreq-cpu0 driver instead.
-
-And finally patch 5, another case where the new API call makes sense.
-
-	Thanks,
-	S?ren
-
-
-Soren Brinkmann (5):
-  cpufreq: stats: Allow small rounding errors
-  clk: Introduce 'clk_round_rate_nearest()'
-  cpufreq: cpu0: Use clk_round_rate_nearest()
-  ARM: zynq: dt: Use properly rounded frequencies in OPPs
-  net: macb: Use clk_round_rate_nearest() API
-
- arch/arm/boot/dts/zynq-7000.dtsi    |  4 ++--
- drivers/clk/clk.c                   | 26 ++++++++++++++++++++++++--
- drivers/cpufreq/cpufreq-cpu0.c      |  3 ++-
- drivers/cpufreq/cpufreq_stats.c     |  2 +-
- drivers/net/ethernet/cadence/macb.c |  2 +-
- include/linux/clk.h                 | 14 ++++++++++++--
- 6 files changed, 42 insertions(+), 9 deletions(-)
-
+diff --git a/drivers/cpufreq/cpufreq_stats.c b/drivers/cpufreq/cpufreq_stats.c
+index ecaaebf969fc..37a34178ab3a 100644
+--- a/drivers/cpufreq/cpufreq_stats.c
++++ b/drivers/cpufreq/cpufreq_stats.c
+@@ -146,7 +146,7 @@ static int freq_table_get_index(struct cpufreq_stats *stat, unsigned int freq)
+ {
+ 	int index;
+ 	for (index = 0; index < stat->max_state; index++)
+-		if (stat->freq_table[index] == freq)
++		if (abs(stat->freq_table[index] - freq) < 2)
+ 			return index;
+ 	return -1;
+ }
 -- 
 1.9.3.1.ga73a6ad
