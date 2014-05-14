@@ -1,46 +1,49 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 14 May 2014 21:51:55 +0200
-Subject: [PATCH v4 4/5] ARM: dts: remove chip specific hdmi hpd pin from
- board
-In-Reply-To: <1400035562-16832-5-git-send-email-rahul.sharma@samsung.com>
-References: <1400035562-16832-1-git-send-email-rahul.sharma@samsung.com>
- <1400035562-16832-5-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <5373C95B.5080601@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 May 2014 12:52:27 -0700
+Subject: [GIT PULL] ARM: OMAP2+: a few more clock/hwmod fixes for v3.15-rc
+In-Reply-To: <alpine.DEB.2.02.1405141850410.21921@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1405141850410.21921@utopia.booyaka.com>
+Message-ID: <20140514195227.GB27426@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
-
-On 14.05.2014 04:46, Rahul Sharma wrote:
-> From: Rahul Sharma <Rahul.Sharma@samsung.com>
+* Paul Walmsley <paul@pwsan.com> [140514 11:52]:
+> Hi Tony,
 > 
-> "gpx3-7" is chip specific pin in Exynos5420 for hdmi
-> hotplug. This pin is moved to exynos5420-pinctrl.dts
-> and removed from the board file.
+> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 > 
-> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5420-smdk5420.dts |    9 ---------
->  1 file changed, 9 deletions(-)
+>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
 > 
-> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> index 6910485..11cd9bf 100644
-> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> @@ -131,15 +131,6 @@
->  		};
->  	};
->  
-> -	pinctrl at 13400000 {
-> -		hdmi_hpd_irq: hdmi-hpd-irq {
-> -			samsung,pins = "gpx3-7";
-> -			samsung,pin-function = <0>;
-> -			samsung,pin-pud = <1>;
-> -			samsung,pin-drv = <0>;
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git for-v3.15-rc/omap-fixes-b
+> 
+> for you to fetch changes up to 0f9e19ad88eee820f517b85531b555a0fa73e7e4:
+> 
+>   ARM: omap5: hwmod_data: Correct IDLEMODE for McPDM (2014-05-14 11:25:58 -0600)
+> 
+> ----------------------------------------------------------------
+> Two small OMAP fixes for v3.15-rc.  One fixes "slow motion" or
+> "choppy" audio playback on OMAP5.  The other applies an OMAP3630 fix
+> for clock rate setting for camera to other OMAP3 chips.
 
-Again, the same comment as for patch 1/5. This pin is being configured
-as input, which doesn't look like a dedicated special function pin.
-Shouldn't this node rather stay here?
+Thanks pulling into fixes.
 
-Best regards,
-Tomasz
+Regards,
+
+Tony
+ 
+> Basic build, boot, and PM test results are available here:
+> 
+> http://www.pwsan.com/omap/testlogs/prcm-fixes-b-v3.15-rc/20140514112639/
+> 
+> ----------------------------------------------------------------
+> Laurent Pinchart (1):
+>       ARM: OMAP3: clock: Back-propagate rate change from cam_mclk to dpll4_m5 on all OMAP3 platforms
+> 
+> Peter Ujfalusi (1):
+>       ARM: omap5: hwmod_data: Correct IDLEMODE for McPDM
+> 
+>  arch/arm/mach-omap2/cclock3xxx_data.c      | 3 ++-
+>  arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 2 +-
+>  2 files changed, 3 insertions(+), 2 deletions(-)
