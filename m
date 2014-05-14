@@ -1,38 +1,90 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 14 May 2014 03:10:12 +0200
-Subject: [PATCH v6 08/12] ARM: shmobile: r7s72100: remove I2C DT clocks from
- legacy clock support
+Date: Wed, 14 May 2014 03:10:11 +0200
+Subject: [PATCH v6 07/12] ARM: shmobile: r7s72100: add i2c clocks to dtsi
 In-Reply-To: <1400029816-24028-1-git-send-email-wsa@the-dreams.de>
 References: <1400029816-24028-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1400029816-24028-9-git-send-email-wsa@the-dreams.de>
+Message-ID: <1400029816-24028-8-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Not used anymore since we switched to CCF.
-
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Acked-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- arch/arm/mach-shmobile/clock-r7s72100.c | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm/boot/dts/r7s72100.dtsi            | 15 +++++++++++++++
+ include/dt-bindings/clock/r7s72100-clock.h |  6 ++++++
+ 2 files changed, 21 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
-index 644f1c2a96c7..1a797fe9e42f 100644
---- a/arch/arm/mach-shmobile/clock-r7s72100.c
-+++ b/arch/arm/mach-shmobile/clock-r7s72100.c
-@@ -199,10 +199,6 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("e800d800.spi", &mstp_clks[MSTP105]),
- 	CLKDEV_DEV_ID("e800e000.spi", &mstp_clks[MSTP104]),
- 	CLKDEV_DEV_ID("e800e800.spi", &mstp_clks[MSTP103]),
--	CLKDEV_DEV_ID("fcfee000.i2c", &mstp_clks[MSTP97]),
--	CLKDEV_DEV_ID("fcfee400.i2c", &mstp_clks[MSTP96]),
--	CLKDEV_DEV_ID("fcfee800.i2c", &mstp_clks[MSTP95]),
--	CLKDEV_DEV_ID("fcfeec00.i2c", &mstp_clks[MSTP94]),
- 	CLKDEV_DEV_ID("r7s72100-ether", &mstp_clks[MSTP74]),
+diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
+index a4a67380b0a2..afce2e344c7a 100644
+--- a/arch/arm/boot/dts/r7s72100.dtsi
++++ b/arch/arm/boot/dts/r7s72100.dtsi
+@@ -110,6 +110,17 @@
+ 			>;
+ 			clock-output-names = "scif0", "scif1", "scif2", "scif3", "scif4", "scif5", "scif6", "scif7";
+ 		};
++
++		mstp9_clks: mstp9_clks at fcfe0438 {
++			#clock-cells = <1>;
++			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0xfcfe0438 4>;
++			clocks = <&p0_clk>, <&p0_clk>, <&p0_clk>, <&p0_clk>;
++			clock-indices = <
++				R7S72100_CLK_I2C0 R7S72100_CLK_I2C1 R7S72100_CLK_I2C2 R7S72100_CLK_I2C3
++			>;
++			clock-output-names = "i2c0", "i2c1", "i2c2", "i2c3";
++		};
+ 	};
  
- 	/* ICK */
+ 	cpus {
+@@ -145,6 +156,7 @@
+ 			     <0 162 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 163 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 164 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R7S72100_CLK_I2C0>;
+ 		clock-frequency = <100000>;
+ 		status = "disabled";
+ 	};
+@@ -162,6 +174,7 @@
+ 			     <0 170 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 171 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 172 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R7S72100_CLK_I2C1>;
+ 		clock-frequency = <100000>;
+ 		status = "disabled";
+ 	};
+@@ -179,6 +192,7 @@
+ 			     <0 178 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 179 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 180 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R7S72100_CLK_I2C2>;
+ 		clock-frequency = <100000>;
+ 		status = "disabled";
+ 	};
+@@ -196,6 +210,7 @@
+ 			     <0 186 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 187 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 188 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R7S72100_CLK_I2C3>;
+ 		clock-frequency = <100000>;
+ 		status = "disabled";
+ 	};
+diff --git a/include/dt-bindings/clock/r7s72100-clock.h b/include/dt-bindings/clock/r7s72100-clock.h
+index c756f1cf0d52..ff84e0bafd7b 100644
+--- a/include/dt-bindings/clock/r7s72100-clock.h
++++ b/include/dt-bindings/clock/r7s72100-clock.h
+@@ -25,4 +25,10 @@
+ #define R7S72100_CLK_SCIF6	1
+ #define R7S72100_CLK_SCIF7	0
+ 
++/* MSTP9 */
++#define R7S72100_CLK_I2C0	7
++#define R7S72100_CLK_I2C1	6
++#define R7S72100_CLK_I2C2	5
++#define R7S72100_CLK_I2C3	4
++
+ #endif /* __DT_BINDINGS_CLOCK_R7S72100_H__ */
 -- 
 1.9.2
