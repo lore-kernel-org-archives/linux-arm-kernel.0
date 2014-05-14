@@ -1,82 +1,63 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 14 May 2014 17:04:30 +0200
-Subject: [PATCHv2 4/4] ARM: mvebu: implement L2/PCIe deadlock workaround
-In-Reply-To: <20140514145853.GE19866@localhost>
-References: <1399975839-5311-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1399975839-5311-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140514145853.GE19866@localhost>
-Message-ID: <20140514170430.57cbeb23@free-electrons.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 14 May 2014 16:06:03 +0100
+Subject: [PATCH v3 2/2] Documentation: devicetree: Add boost-frequency
+ binding to list boost mode frequency
+In-Reply-To: <1400029380-5372-3-git-send-email-thomas.ab@samsung.com>
+References: <1400029380-5372-1-git-send-email-thomas.ab@samsung.com>
+ <1400029380-5372-3-git-send-email-thomas.ab@samsung.com>
+Message-ID: <5373865B.2040205@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Catalin Marinas,
 
-On Wed, 14 May 2014 15:58:54 +0100, Catalin Marinas wrote:
 
-> > +	for_each_compatible_node(np, NULL, "arm,pl310-cache") {
-> > +		struct property *new_compat;
-> > +
-> > +		new_compat = kzalloc(sizeof(*new_compat), GFP_KERNEL);
-> > +		new_compat->name = kstrdup("compatible", GFP_KERNEL);
-> > +		new_compat->value = kstrdup("arm,pl310-coherent-cache",
-> > +					    GFP_KERNEL);
-> > +		new_compat->length = strlen(new_compat->value) + 1;
-> > +		of_update_property(np, new_compat);
-> > +	}
-> > +}
-> 
-> I got it know, you update the DT property on the fly.
+On 14/05/14 02:03, Thomas Abraham wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
+>
+> Add a new optional boost-frequency binding for specifying the frequencies
+> usable in boost mode.
+>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Lukasz Majewski <l.majewski@samsung.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> ---
+>   .../devicetree/bindings/cpufreq/cpufreq-boost.txt  |   11 +++++++++++
+>   1 files changed, 11 insertions(+), 0 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+>
+> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+> new file mode 100644
+> index 0000000..d925e38
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+> @@ -0,0 +1,11 @@
+> +* Device tree binding for CPU boost frequency (aka over-clocking)
+> +
+> +Certain CPU's can be operated in optional 'boost' mode (or sometimes referred as
+> +overclocking) in which the CPU can operate in frequencies beyond the normal
+> +operating conditions.
+> +
+> +Optional Properties:
+> +- boost-frequency: list of frequencies in KHz to be used only in boost mode.
+> +  This list should be a subset of frequencies listed in "operating-points"
+> +  property. Refer to Documentation/devicetree/bindings/power/opp.txt for
+> +  details about "operating-points" property.
+>
 
-Correct.
+Though I understand the need of it, I think the binding is designed to suffice
+the need of the boost frequency support in cpufreq.
 
-> >  static void __init mvebu_timer_and_clk_init(void)
-> >  {
-> >  	of_clk_init(NULL);
-> > @@ -78,6 +125,14 @@ static void __init mvebu_timer_and_clk_init(void)
-> >  	mvebu_scu_enable();
-> >  	coherency_init();
-> >  	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
-> > +
-> > +	if (of_machine_is_compatible("marvell,armada375") ||
-> > +	    of_machine_is_compatible("marvell,armada38x")) {
-> > +		arch_ioremap_caller = armada_pcie_wa_ioremap_caller;
-> > +		pci_ioremap_set_mem_type(MT_MEMORY_RW_SO);
-> > +		mvebu_l2x0_pl310_coherent();
-> > +	}
-> > +
-> >  	l2x0_of_init(0, ~0UL);
-> >  
-> >  	if (of_machine_is_compatible("marvell,armada375"))
-> 
-> A more "hackish" way would be to simply set outer_cache.sync to NULL
-> after l2x0_of_init, less code ;) but not nice either.
+Typically SoC would provide characteristics like under-drive(hits performance
+but most energy efficient), nominal(highest sustained performance w/o any
+external constraint like power, thermal) and over-drive(maximum performance but
+not sustainable for long periods)
 
-How could this be done? All the outer_cache structures are 'static' in
-mm/cache-l2x0.c, so the mvebu code cannot hack them after calling
-l2x0_of_init().
+IMO the binding could represent these unique points on the curve instead.
 
-> With the .fixup in
-> Russell's L2C patches you could have added an mvebu specific callback to
-> check for coherency before setting .sync to NULL.
-
-I had a look at the ->fixup thing from Russell, but it's only meant to
-call fixup operations *inside* the L2C driver. Not external fixup
-operations, like operations defined by the platform. Therefore I don't
-see how the ->fixup mechanism proposed by Russell would have solved
-the particular problem we're discussing.
-
-> Anyway, your approach is fine by me but I would prefer a specific
-> property rather than "compatible".
-
-Ok, thanks, I'll repost. For now, I'll repost a series without the
-strongly-ordered thing, since we don't have the confirmation it's
-absolutely needed for the workaround of the PCIe/SMP/PL310 deadlock
-problem.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Regards,
+Sudeep
