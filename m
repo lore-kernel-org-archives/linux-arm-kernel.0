@@ -1,44 +1,23 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 14 May 2014 11:06:57 -0500
-Subject: [PATCHv2 1/2] mm/vmalloc: Add IO mapping space reused interface
- support.
-In-Reply-To: <1400055532-13134-2-git-send-email-superlibj8301@gmail.com>
-References: <1400055532-13134-1-git-send-email-superlibj8301@gmail.com>
- <1400055532-13134-2-git-send-email-superlibj8301@gmail.com>
-Message-ID: <CAL_JsqLncBaJ=uceovX80U1JPU8SW3KWKXW3PiVR8Kbnykcvpg@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 14 May 2014 18:07:14 +0200
+Subject: [PATCH] i2c: qup: Fix pm_runtime_get_sync usage
+In-Reply-To: <1399082069-6666-1-git-send-email-agross@codeaurora.org>
+References: <1399082069-6666-1-git-send-email-agross@codeaurora.org>
+Message-ID: <20140514160714.GE12911@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding Nico...
+On Fri, May 02, 2014 at 08:54:29PM -0500, Andy Gross wrote:
+> This patch corrects the error check on the call to pm_runtime_get_sync.
+> 
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
 
-On Wed, May 14, 2014 at 3:18 AM, Richard Lee <superlibj8301@gmail.com> wrote:
-> For the IO mapping, the same physical address space maybe
-> mapped more than one time, for example, in some SoCs:
->   - 0x20001000 ~ 0x20001400 --> 1KB for Dev1
->   - 0x20001400 ~ 0x20001800 --> 1KB for Dev2
->   and the page size is 4KB.
->
-> Then both Dev1 and Dev2 will do ioremap operations, and the IO
-> vmalloc area's virtual address will be aligned down to 4KB, and
-> the size will be aligned up to 4KB. That's to say, only one
-> 4KB size's vmalloc area could contain Dev1 and Dev2 IO mapping area
-> at the same time.
->
-> For this case, we can ioremap only one time, and the later ioremap
-> operation will just return the exist vmalloc area.
+Applied to for-current, thanks!
 
-We already have similar reuse tracking for the static mappings on ARM.
-I'm wondering if either that can be reused for ioremap as well or this
-can replace the static mapping tracking. It seems silly to have 2
-lists to search for finding an existing mapping.
-
-But there is a fundamental problem with your approach. You do not and
-cannot check the memory type of the mapping. If you look at the static
-mapping code, it only reuses mappings if the memory type match. While
-having aliases with different memory types is bad on ARMv6+, I assume
-there are some cases that do that given the static mapping code
-handles that case. We would at least want to detect and warn if we
-didn't want to allow different attributes rather than just return a
-mapping with whatever attributes the first mapping used.
-
-Rob
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140514/aaec0090/attachment.sig>
