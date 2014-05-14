@@ -1,76 +1,29 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Wed, 14 May 2014 16:13:21 +0530
-Subject: [PATCH v5 0/6] add cpuidle support for Exynos5420
-In-Reply-To: <53733DC8.1020608@linaro.org>
-References: <ANuQgHGSPJ45tbrVppAVpOqF0OfHacPWfX=S5mOVxTPr66f7vg@mail.gmail.com>
- <1400054637-21505-1-git-send-email-chander.kashyap@linaro.org>
- <53733DC8.1020608@linaro.org>
-Message-ID: <CANuQgHErThcauKun624kibia70wDa2Tyhj0kDwpWV92zpUrJ0w@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 14 May 2014 11:54:01 +0100
+Subject: [PATCH 7/8] arm64/kexec: Add core kexec support
+In-Reply-To: <64ef27888fa70b3e27ddcf4ca594fa71ab7f7777.1399594544.git.geoff@infradead.org>
+References: <cover.1399594544.git.geoff@infradead.org>
+ <64ef27888fa70b3e27ddcf4ca594fa71ab7f7777.1399594544.git.geoff@infradead.org>
+Message-ID: <20140514105401.GF2848@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Fri, May 09, 2014 at 01:48:17AM +0100, Geoff Levand wrote:
+> +KEXEC FOR ARM64
+> +M:     Geoff Levand <geoff@infradead.org>
+> +W:     http://kernel.org/pub/linux/utils/kernel/kexec/
+> +L:     kexec at lists.infradead.org
+> +L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S:     Maintained
+> +F:     arch/arm64/machine_kexec.c
+> +F:     arch/arm64/relocate_kernel.S
 
-On 14 May 2014 15:26, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> On 05/14/2014 10:03 AM, Chander Kashyap wrote:
->>
->> Exynos5420 is a big-little Soc from Samsung. It has 4 A15 and 4 A7 cores.
->>
->> This patchset adds cpuidle support for Exynos5420 SoC based on
->> generic big.little cpuidle driver.
->
->
-> Hi Chander,
->
-> just a side question. I am not succeeding to have both cluster A7/A15 with
-> the upstream kernel.
->
-> How can I test your driver ?
+These entries missed the full directory name.
 
-Hmm on octa can be tested only for 4 cores. as cci is disabled.
-
->
-> Did I miss something ?
->
-> Thanks
->   -- Daniel
->
->
->> Tested on SMDK5420.
->>
->> This patch set depends on:
->>         1. [PATCH 0/5] MCPM backend for Exynos5420
->>            http://www.spinics.net/lists/arm-kernel/msg331100.html
->> Changelog is in respective patches.
->> Chander Kashyap (5):
->>    driver: cpuidle-big-little: add of_device_id structure
->>    arm: exynos: add generic function to calculate cpu number
->>    cpuidle: config: Add ARCH_EXYNOS entry to select cpuidle-big-little
->>      driver
->>    driver: cpuidle: cpuidle-big-little: init driver for Exynos5420
->>    exynos: cpuidle: do not allow cpuidle registration for Exynos5420
->>    mcpm: exynos: populate suspend and powered_up callbacks
->>
->>   arch/arm/mach-exynos/cpuidle.c       |    3 +++
->>   arch/arm/mach-exynos/mcpm-exynos.c   |   36
->> ++++++++++++++++++++++++++++++++++
->>   arch/arm/mach-exynos/regs-pmu.h      |    9 +++++++++
->>   drivers/cpuidle/Kconfig.arm          |    2 +-
->>   drivers/cpuidle/cpuidle-big_little.c |   12 +++++++++++-
->>   5 files changed, 60 insertions(+), 2 deletions(-)
->>
->
->
-> --
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
->
-
-
+Anyway, this code already comes under the core arm64 MAINTAINERS entry
+and it doesn't make sense to have a special kexec case. Please add a
+proper header to the new files you introduce, including copyright and
+author information.
 
 -- 
-with warm regards,
-Chander Kashyap
+Catalin
