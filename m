@@ -1,319 +1,101 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 14 May 2014 22:15:18 +0200
-Subject: [PATCH v2 07/10] clk: berlin: add core clock driver for BG2Q
-In-Reply-To: <1400098522-14770-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1400098522-14770-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1400098522-14770-8-git-send-email-sebastian.hesselbarth@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 May 2014 13:56:49 -0700
+Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
+In-Reply-To: <5373CBB9.40506@linaro.org>
+References: <1399991966-14582-1-git-send-email-santosh.shilimkar@ti.com>
+ <5373C78E.7040301@linaro.org> <5373C8E8.6040208@ti.com>
+ <5373CBB9.40506@linaro.org>
+Message-ID: <20140514205649.GC27426@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+* Daniel Lezcano <daniel.lezcano@linaro.org> [140514 13:02]:
+> On 05/14/2014 09:50 PM, Santosh Shilimkar wrote:
+> >On Wednesday 14 May 2014 03:44 PM, Daniel Lezcano wrote:
+> >>On 05/13/2014 04:39 PM, Santosh Shilimkar wrote:
+> >>>On OMAP4 panda board, there have been several bug reports about boot
+> >>>hang and lock-ups with CPU_IDLE enabled. The root cause of the issue
+> >>>is missing interrupts while in idle state. Commit cb7094e8 {cpuidle / omap4 :
+> >>>use CPUIDLE_FLAG_TIMER_STOP flag} moved the broadcast notifiers to common
+> >>>code for right reasons but on OMAP4 which suffers from a nasty ROM code
+> >>>bug with GIC, commit ff999b8a {ARM: OMAP4460: Workaround for ROM bug ..},
+> >>>we loose interrupts which leads to issues like lock-up, hangs etc.
+> >>>
+> >>>Patch reverts commit cb7094 {cpuidle / omap4 : use CPUIDLE_FLAG_TIMER_STOP
+> >>>flag} to avoid the issue. With this change, OMAP4 panda boards, the mentioned
+> >>>issues are getting fixed. We no longer loose interrupts which was the cause
+> >>>of the regression.
+> >>>
+> >>>Cc: Roger Quadros <rogerq@ti.com>
+> >>>Cc: Kevin Hilman <khilman@linaro.org>
+> >>>Cc: Tony Lindgren <tony@atomide.com>
+> >>>Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> >>>Reported-tested-by: Roger Quadros <rogerq@ti.com>
+> >>>Reported-tested-by: Kevin Hilman <khilman@linaro.org>
+> >>>Tested-by: Tony Lindgren <tony@atomide.com>
+> >>>Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >>>---
+> 
+> [ ... ]
+> 
+> >>>
+> >>>+    clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
+> >>>+
+> >>>       /*
+> >>>        * Call idle CPU PM enter notifier chain so that
+> >>>        * VFP and per CPU interrupt context is saved.
+> >>>@@ -165,6 +169,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+> >>>       if (dev->cpu == 0 && mpuss_can_lose_context)
+> >>>           cpu_cluster_pm_exit();
+> >>>
+> >>>+    clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
+> 
+> [ ... ]
+> 
+> >>
+> >>Shouldn't the broadcast timer to be setup with CLOCK_EVT_NOTIFY_BROADCAST_ON also ?
+> >>
+> >Which is already taken care by __cpuidle_register_driver(). Note that setup code
+> >is still used from generic code...
+> 
+> Nope, if the flag CPUIDLE_FLAG_TIMER_STOP is not set, the cpuidle framework
+> won't setup the timer.
+> 
+> static void __cpuidle_driver_init(struct cpuidle_driver *drv)
+> {
+> 
+> 	...
+> 
+> 	for (i = drv->state_count - 1; i >= 0 ; i--) {
+> 		if (drv->states[i].flags & CPUIDLE_FLAG_TIMER_STOP) {
+> 			drv->bctimer = 1;
+> 			break;
+> 		}
+> 	}
+> 
+> 	...
+> 
+> }
+> 
+> static int __cpuidle_register_driver(struct cpuidle_driver *drv)
+> {
+> 	...
+> 
+> 	if (drv->bctimer)
+> 		on_each_cpu_mask(drv->cpumask,
+> 		cpuidle_setup_broadcast_timer,
+> 		 (void *)CLOCK_EVT_NOTIFY_BROADCAST_ON, 1);
+> 
+> 	...
+> }
+> 
+> So the broadcast timer does not operate with this revert. Moreover, I am not
+> sure reverting this patch is the right solution.
 
-This driver deals with the core clocks found on Marvell Berlin BG2Q. For the
-shared register dividers, make use of the corresponding driver and add some
-single clock muxes and gates for the rest.
+OK I'll hold on sending anything until there's some conclusion.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
-Changelog:
-v1->v2:
-- initial version
+Are you able to reproduce the problem with current Linux next?
 
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Jisheng Zhang <jszhang@marvell.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/clk/berlin/Makefile |   1 +
- drivers/clk/berlin/bg2q.c   | 269 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 270 insertions(+)
- create mode 100644 drivers/clk/berlin/bg2q.c
+Regards,
 
-diff --git a/drivers/clk/berlin/Makefile b/drivers/clk/berlin/Makefile
-index 2b33e1e74503..2a36ab710a07 100644
---- a/drivers/clk/berlin/Makefile
-+++ b/drivers/clk/berlin/Makefile
-@@ -1,3 +1,4 @@
- obj-y += berlin2-avpll.o berlin2-pll.o berlin2-div.o
- obj-$(CONFIG_MACH_BERLIN_BG2)	+= bg2.o
- obj-$(CONFIG_MACH_BERLIN_BG2CD)	+= bg2.o
-+obj-$(CONFIG_MACH_BERLIN_BG2Q)	+= bg2q.o
-diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
-new file mode 100644
-index 000000000000..df5a4ce5eb87
---- /dev/null
-+++ b/drivers/clk/berlin/bg2q.c
-@@ -0,0 +1,269 @@
-+/*
-+ * Copyright (c) 2014 Marvell Technology Group Ltd.
-+ *
-+ * Alexandre Belloni <alexandre.belloni@free-electrons.com>
-+ * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+
-+#include "berlin2-div.h"
-+
-+struct bg2_gate_data {
-+	const char *name;
-+	const char *parent_name;
-+	u8 bit_idx;
-+	unsigned long flags;
-+};
-+
-+#define REG_CLKENABLE		0x00
-+#define REG_CLKSELECT0		0x04
-+#define REG_CLKSELECT1		0x08
-+#define REG_CLKSELECT2		0x0c
-+#define REG_CLKSWITCH0		0x10
-+#define REG_CLKSWITCH1		0x14
-+
-+#define MAX_CLKS		24
-+
-+static DEFINE_SPINLOCK(lock);
-+static struct clk *clks[MAX_CLKS];
-+static struct clk_onecell_data clk_data;
-+
-+static const struct berlin2_div_data bg2q_divs[] __initconst = {
-+	{
-+		.name = "sys",
-+		.flags = CLK_IGNORE_UNUSED,
-+		.map = {
-+			BERLIN2_DIV_GATE(REG_CLKENABLE, 0),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT0, 0),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT0, 3),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 3),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 4),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 5),
-+		},
-+		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
-+	},
-+	{
-+		.name = "drmfigo",
-+		.flags = 0,
-+		.map = {
-+			BERLIN2_DIV_GATE(REG_CLKENABLE, 17),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT0, 6),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT0, 9),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 6),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 7),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 8),
-+		},
-+		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
-+	},
-+	{
-+		.name = "cfg",
-+		.flags = 0,
-+		.map = {
-+			BERLIN2_DIV_GATE(REG_CLKENABLE, 1),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT0, 12),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT0, 15),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 9),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 10),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 11),
-+		},
-+		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
-+	},
-+	{
-+		.name = "gfx2d",
-+		.flags = 0,
-+		.map = {
-+			BERLIN2_DIV_GATE(REG_CLKENABLE, 4),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT0, 18),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT0, 21),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 12),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 13),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 14),
-+		},
-+		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
-+	},
-+	{
-+		.name = "zsp",
-+		.flags = 0,
-+		.map = {
-+			BERLIN2_DIV_GATE(REG_CLKENABLE, 6),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT0, 24),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT0, 27),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 15),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 16),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 17),
-+		},
-+		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
-+	},
-+	{
-+		.name = "perif",
-+		.flags = CLK_IGNORE_UNUSED,
-+		.map = {
-+			BERLIN2_DIV_GATE(REG_CLKENABLE, 7),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 0),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 3),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 18),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 19),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 20),
-+		},
-+		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
-+	},
-+	{
-+		.name = "pcube",
-+		.flags = 0,
-+		.map = {
-+			BERLIN2_DIV_GATE(REG_CLKENABLE, 2),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 6),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 9),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 21),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 22),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 23),
-+		},
-+		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
-+	},
-+	{
-+		.name = "vscope",
-+		.flags = 0,
-+		.map = {
-+			BERLIN2_DIV_GATE(REG_CLKENABLE, 3),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 12),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 15),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 24),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 25),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 26),
-+		},
-+		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
-+	},
-+	{
-+		.name = "nfc_ecc",
-+		.flags = 0,
-+		.map = {
-+			BERLIN2_DIV_GATE(REG_CLKENABLE, 19),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 18),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 21),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 27),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 28),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 29),
-+		},
-+		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
-+	},
-+	{
-+		.name = "vpp",
-+		.flags = 0,
-+		.map = {
-+			BERLIN2_DIV_GATE(REG_CLKENABLE, 21),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 24),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 27),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 30),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 31),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH1, 0),
-+		},
-+		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
-+	},
-+	{
-+		.name = "app",
-+		.flags = 0,
-+		.map = {
-+			BERLIN2_DIV_GATE(REG_CLKENABLE, 20),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT2, 0),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT2, 3),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH1, 1),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH1, 2),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH1, 3),
-+		},
-+		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
-+	},
-+};
-+
-+static const struct bg2_gate_data bg2q_gates[] __initconst = {
-+	{ "gfx2daxi",	"perif",	5 },
-+	{ "geth0",	"perif",	8 },
-+	{ "sata",	"perif",	9 },
-+	{ "ahbapb",	"perif",	10, CLK_IGNORE_UNUSED },
-+	{ "usb0",	"perif",	11 },
-+	{ "usb1",	"perif",	12 },
-+	{ "usb2",	"perif",	13 },
-+	{ "usb3",	"perif",	14 },
-+	{ "pbridge",	"perif",	15, CLK_IGNORE_UNUSED },
-+	{ "sdio",	"perif",	16 },
-+	{ "nfc",	"perif",	18 },
-+	{ "smemc",	"perif",	19 },
-+	{ "pcie",	"perif",	22 },
-+};
-+
-+static void __init berlin2q_core_clock_of_setup(struct device_node *np)
-+{
-+	const struct berlin2_div_data *data;
-+	const char *parent_names[9];
-+	void __iomem *base;
-+	int n, nclk = 0;
-+
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		pr_err("%s: Unable to map register base\n", np->full_name);
-+		return;
-+	}
-+
-+	/*
-+	 * TODO: reference clock bypass switches: memPLLSWBypass, cpuPLLSWBypass
-+	 * and sysPLLSWBypass are missing
-+	 */
-+
-+	/* TODO: Once BG2Q AVPLL are added, add AVPLLB[4-7] as parents*/
-+	parent_names[0] = "syspll";
-+	for (n = 0; n < ARRAY_SIZE(bg2q_divs); n++) {
-+		data = &bg2q_divs[n];
-+		clks[n] = berlin2_div_register(&data->map, base, data->name,
-+			 data->div_flags, parent_names, 5, data->flags, &lock);
-+	}
-+	nclk += n;
-+
-+	/* clock gate cells */
-+	for (n = 0; n < ARRAY_SIZE(bg2q_gates); n++) {
-+		const struct bg2_gate_data *gd = &bg2q_gates[n];
-+
-+		clks[nclk + n] = clk_register_gate(NULL, gd->name,
-+			    gd->parent_name, gd->flags, base + REG_CLKENABLE,
-+			    gd->bit_idx, 0, &lock);
-+	}
-+	nclk += n;
-+
-+	/* check for errors on leaf clocks */
-+	for (n = 0; n < nclk; n++) {
-+		if (!IS_ERR(clks[n]))
-+			continue;
-+
-+		pr_err("%s: Unable to register leaf clock %d\n",
-+		       np->full_name, n);
-+		goto core_clock_fail;
-+	}
-+
-+	/* register clk-provider */
-+	clk_data.clks = clks;
-+	clk_data.clk_num = MAX_CLKS;
-+	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-+	return;
-+
-+core_clock_fail:
-+	iounmap(base);
-+}
-+CLK_OF_DECLARE(berlin2q_coreclk, "marvell,berlin2q-core-clocks",
-+	       berlin2q_core_clock_of_setup);
--- 
-1.9.1
+Tony
