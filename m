@@ -1,102 +1,95 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 14 May 2014 03:10:13 +0200
-Subject: [PATCH v6 09/12] ARM: shmobile: r7s72100: add spi clocks to dtsi
-In-Reply-To: <1400029816-24028-1-git-send-email-wsa@the-dreams.de>
-References: <1400029816-24028-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1400029816-24028-10-git-send-email-wsa@the-dreams.de>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Wed, 14 May 2014 06:41:08 +0530
+Subject: [PATCH v4 0/8] cpufreq: use cpufreq-cpu0 driver for exynos based
+ platforms
+Message-ID: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Changes since v3:
+- Addressed comments from Tomasz Figa <t.figa@samsung.com>
+  [http://www.spinics.net/lists/cpufreq/msg09290.html]
+- Rebased to v3.15-rc4
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Acked-by: Magnus Damm <damm+renesas@opensource.se>
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
----
- arch/arm/boot/dts/r7s72100.dtsi            | 18 ++++++++++++++++++
- include/dt-bindings/clock/r7s72100-clock.h |  7 +++++++
- 2 files changed, 25 insertions(+)
+Changes since v2:
+- Safe operating voltage is not required while switching APLL frequency
+  since the temporary parent's clock is divided down to keep armclk within
+  permissible limits. Thanks to Heiko St?bner <heiko@sntech.de> for this
+  suggesting this.
+- Rob had suggested to use max frequency for each of the divider clock
+  outputs instead of divider values. But due to certain SoC specific
+  characteristics, the divider values corresponding to the input clock
+  frequency for the CMU_CPU clock blocks have to be used.
 
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index afce2e344c7a..f50fbc8f3bd9 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -121,6 +121,19 @@
- 			>;
- 			clock-output-names = "i2c0", "i2c1", "i2c2", "i2c3";
- 		};
-+
-+		mstp10_clks: mstp10_clks at fcfe043c {
-+			#clock-cells = <1>;
-+			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
-+			reg = <0xfcfe043c 4>;
-+			clocks = <&p1_clk>, <&p1_clk>, <&p1_clk>, <&p1_clk>,
-+				 <&p1_clk>;
-+			clock-indices = <
-+				R7S72100_CLK_SPI0 R7S72100_CLK_SPI1 R7S72100_CLK_SPI2 R7S72100_CLK_SPI3
-+				R7S72100_CLK_SPI4
-+			>;
-+			clock-output-names = "spi0", "spi1", "spi2", "spi3", "spi4";
-+		};
- 	};
- 
- 	cpus {
-@@ -318,6 +331,7 @@
- 			     <0 239 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 240 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "error", "rx", "tx";
-+		clocks = <&mstp10_clks R7S72100_CLK_SPI0>;
- 		num-cs = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -331,6 +345,7 @@
- 			     <0 242 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 243 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "error", "rx", "tx";
-+		clocks = <&mstp10_clks R7S72100_CLK_SPI1>;
- 		num-cs = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -344,6 +359,7 @@
- 			     <0 245 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 246 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "error", "rx", "tx";
-+		clocks = <&mstp10_clks R7S72100_CLK_SPI2>;
- 		num-cs = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -357,6 +373,7 @@
- 			     <0 248 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 249 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "error", "rx", "tx";
-+		clocks = <&mstp10_clks R7S72100_CLK_SPI3>;
- 		num-cs = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -370,6 +387,7 @@
- 			     <0 251 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 252 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "error", "rx", "tx";
-+		clocks = <&mstp10_clks R7S72100_CLK_SPI4>;
- 		num-cs = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/include/dt-bindings/clock/r7s72100-clock.h b/include/dt-bindings/clock/r7s72100-clock.h
-index ff84e0bafd7b..5128f4d94f44 100644
---- a/include/dt-bindings/clock/r7s72100-clock.h
-+++ b/include/dt-bindings/clock/r7s72100-clock.h
-@@ -31,4 +31,11 @@
- #define R7S72100_CLK_I2C2	5
- #define R7S72100_CLK_I2C3	4
- 
-+/* MSTP10 */
-+#define R7S72100_CLK_SPI0	7
-+#define R7S72100_CLK_SPI1	6
-+#define R7S72100_CLK_SPI2	5
-+#define R7S72100_CLK_SPI3	4
-+#define R7S72100_CLK_SPI4	3
-+
- #endif /* __DT_BINDINGS_CLOCK_R7S72100_H__ */
+Changes since v1:
+- Removes Exynos4x12 and Exynos5250 cpufreq driver also.
+- Device tree based clock configuration lookup as suggested by Lukasz
+  Majewski and Tomasz Figa.
+- safe operating point binding reworked as suggested by Shawn Guo.
+
+The patch series removes the use of Exynos specific cpufreq driver and enables
+the use of cpufreq-cpu0 driver for Exynos4210, Exynos4x12 and Exynos5250 based
+platforms. This is being done for few reasons.
+
+(a) The Exynos cpufreq driver reads/writes clock controller registers
+    bypassing the Exynos CCF driver which is sort of problematic.
+(b) Removes the need for having clock controller register definitions
+    in the cpufreq driver and also removes the need for statically
+    io-remapping clock controller address space (helps in moving towards
+    multiplatform kernel).
+
+Thomas Abraham (8):
+  cpufreq: cpufreq-cpu0: allow use of optional boost mode frequencies
+  clk: samsung: change scope of samsung clock lock to global
+  clk: samsung: add infrastructure to register cpu clocks
+  Documentation: devicetree: add cpu clock configuration data binding for Exynos4/5
+  clk: exynos: use cpu-clock provider type to represent arm clock
+  ARM: dts: Exynos: add cpu nodes, opp and cpu clock configuration data
+  ARM: Exynos: switch to using generic cpufreq-cpu0 driver
+  cpufreq: exynos: remove all exynos specific cpufreq driver support
+
+
+ .../devicetree/bindings/clock/exynos4-clock.txt    |   37 ++
+ .../devicetree/bindings/clock/exynos5250-clock.txt |   36 ++
+ .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |    2 +
+ arch/arm/boot/dts/exynos4210-origen.dts            |    6 +
+ arch/arm/boot/dts/exynos4210-trats.dts             |    6 +
+ arch/arm/boot/dts/exynos4210-universal_c210.dts    |    6 +
+ arch/arm/boot/dts/exynos4210.dtsi                  |   35 ++
+ arch/arm/boot/dts/exynos4212.dtsi                  |   18 +
+ arch/arm/boot/dts/exynos4412-odroidx.dts           |    6 +
+ arch/arm/boot/dts/exynos4412-origen.dts            |    6 +
+ arch/arm/boot/dts/exynos4412-trats2.dts            |    6 +
+ arch/arm/boot/dts/exynos4412.dtsi                  |   31 ++
+ arch/arm/boot/dts/exynos4x12.dtsi                  |   36 ++
+ arch/arm/boot/dts/exynos5250-arndale.dts           |    6 +
+ arch/arm/boot/dts/exynos5250-cros-common.dtsi      |    6 +
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |    6 +
+ arch/arm/boot/dts/exynos5250.dtsi                  |   41 ++
+ arch/arm/mach-exynos/exynos.c                      |    4 +-
+ drivers/clk/samsung/Makefile                       |    2 +-
+ drivers/clk/samsung/clk-cpu.c                      |  458 ++++++++++++++++++++
+ drivers/clk/samsung/clk-exynos4.c                  |   25 +-
+ drivers/clk/samsung/clk-exynos5250.c               |   12 +-
+ drivers/clk/samsung/clk.c                          |   13 +-
+ drivers/clk/samsung/clk.h                          |    7 +
+ drivers/cpufreq/Kconfig                            |   11 +
+ drivers/cpufreq/Kconfig.arm                        |   52 ---
+ drivers/cpufreq/Makefile                           |    4 -
+ drivers/cpufreq/cpufreq-cpu0.c                     |    5 +
+ drivers/cpufreq/exynos-cpufreq.c                   |  209 ---------
+ drivers/cpufreq/exynos-cpufreq.h                   |   91 ----
+ drivers/cpufreq/exynos4210-cpufreq.c               |  157 -------
+ drivers/cpufreq/exynos4x12-cpufreq.c               |  211 ---------
+ drivers/cpufreq/exynos5250-cpufreq.c               |  183 --------
+ include/dt-bindings/clock/exynos5250.h             |    1 +
+ 34 files changed, 799 insertions(+), 936 deletions(-)
+ create mode 100644 drivers/clk/samsung/clk-cpu.c
+ delete mode 100644 drivers/cpufreq/exynos-cpufreq.c
+ delete mode 100644 drivers/cpufreq/exynos-cpufreq.h
+ delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
+ delete mode 100644 drivers/cpufreq/exynos4x12-cpufreq.c
+ delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
+
 -- 
-1.9.2
+1.7.4.4
