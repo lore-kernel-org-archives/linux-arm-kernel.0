@@ -1,43 +1,30 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 14 May 2014 10:15:38 +0100
-Subject: [PATCH v6 05/11] drivers: of: add automated assignment of
- reserved regions to client devices
-In-Reply-To: <20140302054043.4F48AC414EF@trevor.secretlab.ca>
-References: <1393594976-16728-1-git-send-email-m.szyprowski@samsung.com>
- < 1393594976-16728-6-git-send-email-m.szyprowski@samsung.com>
- <20140302054043.4F48AC414EF@trevor.secretlab.ca>
-Message-ID: <1400058938.3395.13.camel@linaro1.home>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 14 May 2014 11:15:53 +0200
+Subject: [STLinux Kernel] [PATCH v4 2/7] driver: reset: sti: add keyscan
+ for stih415
+In-Reply-To: <53732EAB.1050709@st.com>
+References: <1397228856-9218-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1397228856-9218-3-git-send-email-gabriel.fernandez@linaro.org>
+ <53732EAB.1050709@st.com>
+Message-ID: <1400058953.13056.2.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2014-03-02 at 13:40 +0800, Grant Likely wrote:
-> On Fri, 28 Feb 2014 14:42:50 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> > This patch adds code for automated assignment of reserved memory regions
-> > to struct device. reserved_mem->ops->device_init()/device_cleanup()
-> > callbacks are called to perform reserved memory driver specific
-> > initialization and cleanup
-> > 
-> > Based on previous code provided by Josh Cartwright <joshc@codeaurora.org>
-> > 
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Hi Maxime,
+
+Am Mittwoch, den 14.05.2014, 10:51 +0200 schrieb Maxime Coquelin:
+> Hi Philipp,
 > 
-> Hi Marek,
+> 	I am preparing the arm_soc pull request for STi platforms.
 > 
-> I've not applied this one yet, only because there is still the open
-> issue of whether or not these functions should be called from drivers or
-> from core code. I don't actually have any problems with the content of
-> this patch. Once the user is sorted out I'll merge it.
+> 	In this series, there are DT patches depending on this reset patch 
+> (same for patch 3).
+> 
+> 	Can I queue theses two reset patches in my pull request for arm_soc to 
+> avoid compilation breakage?
 
-Has anything more come of these patches? I see some of the series is now
-in Linux 3.15, but the actual patches to let people use the feature
-aren't there yet, namely patches 5 though 8.
+Yes, please do. For both of them, feel free to add my
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-My personal immediate interest in these is as a mechanism on arm64 to
-limit CMA to a region of memory that is actually DMA-able devices (e.g.
-below 4GB for 32-bit devices without an iommu).
-
-For reference, the mail archives for this series is at
-http://lkml.org/lkml/2014/2/28/237
-
--- 
-Tixy
+best regards
+Philipp
