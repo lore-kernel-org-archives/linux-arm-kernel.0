@@ -1,49 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 May 2014 12:52:27 -0700
-Subject: [GIT PULL] ARM: OMAP2+: a few more clock/hwmod fixes for v3.15-rc
-In-Reply-To: <alpine.DEB.2.02.1405141850410.21921@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1405141850410.21921@utopia.booyaka.com>
-Message-ID: <20140514195227.GB27426@atomide.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 14 May 2014 16:53:55 -0300
+Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Configure the ECSPI1 chip select
+ pin
+Message-ID: <1400097235-23025-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [140514 11:52]:
-> Hi Tony,
-> 
-> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-> 
->   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git for-v3.15-rc/omap-fixes-b
-> 
-> for you to fetch changes up to 0f9e19ad88eee820f517b85531b555a0fa73e7e4:
-> 
->   ARM: omap5: hwmod_data: Correct IDLEMODE for McPDM (2014-05-14 11:25:58 -0600)
-> 
-> ----------------------------------------------------------------
-> Two small OMAP fixes for v3.15-rc.  One fixes "slow motion" or
-> "choppy" audio playback on OMAP5.  The other applies an OMAP3630 fix
-> for clock rate setting for camera to other OMAP3 chips.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Thanks pulling into fixes.
+GPIO4_9 is used as ECSPI1 chip select and it needs to be configured as GPIO.
 
-Regards,
+Configure the pin functionality explicitly in the dts file instead of relying
+on the fact that it comes configured as GPIO from POR or from the bootloader.
 
-Tony
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index 40ea365..56482b4 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -340,6 +340,7 @@
+ 				MX6QDL_PAD_KEY_COL1__ECSPI1_MISO	0x100b1
+ 				MX6QDL_PAD_KEY_ROW0__ECSPI1_MOSI	0x100b1
+ 				MX6QDL_PAD_KEY_COL0__ECSPI1_SCLK	0x100b1
++				MX6QDL_PAD_KEY_ROW1__GPIO4_IO09		0x1b0b0
+ 			>;
+ 		};
  
-> Basic build, boot, and PM test results are available here:
-> 
-> http://www.pwsan.com/omap/testlogs/prcm-fixes-b-v3.15-rc/20140514112639/
-> 
-> ----------------------------------------------------------------
-> Laurent Pinchart (1):
->       ARM: OMAP3: clock: Back-propagate rate change from cam_mclk to dpll4_m5 on all OMAP3 platforms
-> 
-> Peter Ujfalusi (1):
->       ARM: omap5: hwmod_data: Correct IDLEMODE for McPDM
-> 
->  arch/arm/mach-omap2/cclock3xxx_data.c      | 3 ++-
->  arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 2 +-
->  2 files changed, 3 insertions(+), 2 deletions(-)
+-- 
+1.8.3.2
