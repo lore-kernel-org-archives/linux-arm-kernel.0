@@ -1,133 +1,79 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 14 May 2014 14:09:37 +0530
-Subject: [PATCH RESEND v4 4/8] phy: usb: sunxi: Introduce Allwinner A31
- USB PHY support
-In-Reply-To: <1399995862-17788-5-git-send-email-maxime.ripard@free-electrons.com>
-References: <1399995862-17788-1-git-send-email-maxime.ripard@free-electrons.com>
- <1399995862-17788-5-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <53732BC9.3020507@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 14 May 2014 09:45:37 +0100
+Subject: [PATCH v3 13/14] ARM64: KVM: set and get of sys registers in BE
+ case
+In-Reply-To: <1399997646-4716-14-git-send-email-victor.kamensky@linaro.org>
+ (Victor Kamensky's message of "Tue, 13 May 2014 17:14:05 +0100")
+References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
+ <1399997646-4716-14-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <87lhu4hhou.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Victor,
 
-On Tuesday 13 May 2014 09:14 PM, Maxime Ripard wrote:
-> The USB phy controller in the A31 differs mostly from the older controllers
-> because it has a clock dedicated for each phy, while the older ones were having
-> a single clock for all the phys.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+On Tue, May 13 2014 at  5:14:05 pm BST, Victor Kamensky <victor.kamensky@linaro.org> wrote:
+> This patch addresses issue of reading and writing V8 sys registers in
+> BE case. Since only register size function deals with is 8 bytes,
+> existing code works in both little and big endian cases.
+> Removed comment about little endian. Added BUG_ON that register
+> size should be always 8 bytes.
+>
+> If these functions would ever need to support both 8 bytes and 4 bytes
+> register sizes to deals with them in endian agnostic way code should
+> do something along these lines:
+>
+>        unsigned long regsize = KVM_REG_SIZE(id);
+>        union {
+>                u32     word;
+>                u64     dword;
+>        } tmp = {0};
+>
+>        if (copy_from_user(&tmp, uaddr, regsize) != 0)
+>                return -EFAULT;
+>        switch (regsize) {
+>        case 4:
+>                *val = tmp.word;
+>                break;
+>        case 8:
+>                *val = tmp.dword;
+>                break;
+>        }
+>
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
 > ---
->  drivers/phy/phy-sun4i-usb.c | 33 ++++++++++++++++++++++-----------
->  1 file changed, 22 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index 66a87d50512b..115d8d5190d5 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -61,7 +61,6 @@
->  #define MAX_PHYS			3
->  
->  struct sun4i_usb_phy_data {
-> -	struct clk *clk;
->  	void __iomem *base;
->  	struct mutex mutex;
->  	int num_phys;
-> @@ -71,6 +70,7 @@ struct sun4i_usb_phy_data {
->  		void __iomem *pmu;
->  		struct regulator *vbus;
->  		struct reset_control *reset;
-> +		struct clk *clk;
->  		int index;
->  	} phys[MAX_PHYS];
+>  arch/arm64/kvm/sys_regs.c | 19 +++++++++++++------
+>  1 file changed, 13 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 0324458..060c3a9 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -776,18 +776,25 @@ static struct sys_reg_desc invariant_sys_regs[] = {
+>  	  NULL, get_ctr_el0 },
 >  };
-> @@ -146,13 +146,13 @@ static int sun4i_usb_phy_init(struct phy *_phy)
->  	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
->  	int ret;
 >  
-> -	ret = clk_prepare_enable(data->clk);
-> +	ret = clk_prepare_enable(phy->clk);
->  	if (ret)
->  		return ret;
->  
->  	ret = reset_control_deassert(phy->reset);
->  	if (ret) {
-> -		clk_disable_unprepare(data->clk);
-> +		clk_disable_unprepare(phy->clk);
->  		return ret;
->  	}
->  
-> @@ -170,11 +170,10 @@ static int sun4i_usb_phy_init(struct phy *_phy)
->  static int sun4i_usb_phy_exit(struct phy *_phy)
+> -static int reg_from_user(void *val, const void __user *uaddr, u64 id)
+> +static int reg_from_user(u64 *val, const void __user *uaddr, u64 id)
 >  {
->  	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
-> -	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
->  
->  	sun4i_usb_phy_passby(phy, 0);
->  	reset_control_assert(phy->reset);
-> -	clk_disable_unprepare(data->clk);
-> +	clk_disable_unprepare(phy->clk);
->  
->  	return 0;
->  }
-> @@ -225,6 +224,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->  	struct device *dev = &pdev->dev;
->  	struct device_node *np = dev->of_node;
->  	struct phy_provider *phy_provider;
-> +	bool dedicated_clocks;
->  	struct resource *res;
->  	int i;
->  
-> @@ -244,17 +244,16 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->  	else
->  		data->disc_thresh = 2;
->  
-> +	if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy"))
-> +		dedicated_clocks = true;
-> +	else
-> +		dedicated_clocks = false;
+> -	/* This Just Works because we are little endian. */
+> -	if (copy_from_user(val, uaddr, KVM_REG_SIZE(id)) != 0)
+> +	unsigned long regsize = KVM_REG_SIZE(id);
 > +
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy_ctrl");
->  	data->base = devm_ioremap_resource(dev, res);
->  	if (IS_ERR(data->base))
->  		return PTR_ERR(data->base);
->  
-> -	data->clk = devm_clk_get(dev, "usb_phy");
-> -	if (IS_ERR(data->clk)) {
-> -		dev_err(dev, "could not get usb_phy clock\n");
-> -		return PTR_ERR(data->clk);
-> -	}
-> -
->  	/* Skip 0, 0 is the phy for otg which is not yet supported. */
->  	for (i = 1; i < data->num_phys; i++) {
->  		struct sun4i_usb_phy *phy = data->phys + i;
-> @@ -268,6 +267,17 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->  			phy->vbus = NULL;
->  		}
->  
-> +		if (dedicated_clocks)
-> +			snprintf(name, sizeof(name), "usb%d_phy", i);
-> +		else
-> +			strlcpy(name, "usb_phy", sizeof(name));
-> +
-> +		phy->clk = devm_clk_get(dev, name);
-> +		if (IS_ERR(phy->clk)) {
-> +			dev_err(dev, "failed to get clock %s\n", name);
-> +			return PTR_ERR(phy->clk);
-> +		}
-> +
->  		snprintf(name, sizeof(name), "usb%d_reset", i);
->  		phy->reset = devm_reset_control_get(dev, name);
->  		if (IS_ERR(phy->reset)) {
-> @@ -305,6 +315,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->  static const struct of_device_id sun4i_usb_phy_of_match[] = {
->  	{ .compatible = "allwinner,sun4i-a10-usb-phy" },
->  	{ .compatible = "allwinner,sun5i-a13-usb-phy" },
-> +	{ .compatible = "allwinner,sun6i-a31-usb-phy" },
+> +	BUG_ON(regsize != 8);
 
-Do you have Documentation for this comptible binding? Would be good to mention
-that in the commit log.
+I haven't had time to review this series just yet, but this bit just
+sends chivers down my spine.
 
-Thanks
-Kishon
+regsize is derived from id, which comes from a struct one_reg, which is
+directly provided by userspace. Here, you're trusting the luser to give
+you 8 as a size, and panic the kernel if not.
+
+As much as I'd like to qualify this as only being a slightly undesirable
+effect, I think it deserves a NAK.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
