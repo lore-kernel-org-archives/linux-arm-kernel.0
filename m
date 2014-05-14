@@ -1,51 +1,35 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 14 May 2014 14:00:43 +0900
-Subject: [PATCH 00/03] ARM: shmobile: Use shmobile_init_delay() on r8a7791
-In-Reply-To: <CANqRtoRvB9o2AwU1X2OFGpsmBoRtZDnKD+jz0SRhjSn-Ye6mug@mail.gmail.com>
-References: <20140511232508.20177.11556.sendpatchset@w520>
- <1509906.x9u0HJ6AbJ@avalon> <20140513005936.GB30252@verge.net.au>
- <20140513071224.GC27611@verge.net.au>
- <CAMuHMdWBAkh_Jkfsok-Nws56z0ZsU0LmxV2nob_LKrMY_tFF6A@mail.gmail.com>
- <20140514032837.GB22813@verge.net.au>
- <CANqRtoRvB9o2AwU1X2OFGpsmBoRtZDnKD+jz0SRhjSn-Ye6mug@mail.gmail.com>
-Message-ID: <20140514050040.GB3502@verge.net.au>
+Date: Wed, 14 May 2014 14:08:02 +0900
+Subject: [PATCH v6 00/12] CCF support for Renesas r7s72100
+In-Reply-To: <1400029816-24028-1-git-send-email-wsa@the-dreams.de>
+References: <1400029816-24028-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <20140514050801.GE3502@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 14, 2014 at 12:46:27PM +0900, Magnus Damm wrote:
-> On Wed, May 14, 2014 at 12:28 PM, Simon Horman <horms@verge.net.au> wrote:
-> > I wonder if the following is any good.
-> >
-> > From: Simon Horman <horms+renesas@verge.net.au>
-> >
-> > [PATCH] ARM: shmobile: Set clock frequency in HZ from OF nodes
-> >
-> > shmobile_init_delay() looks for OF "clock-frequency" to determine
-> > the delay which is set by calling shmobile_setup_delay().
-> >
-> > Unfortunately this seems to be incorrect in detail as
-> > "clock-frequency" node values are in HZ whereas the frequency
-> > argument to shmobile_setup_delay() is in MHz.
-> >
-> > Provide a variant of shmobile_setup_delay() that accepts HZ to
-> > correct this problem.
-> >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >
-> > ---
-> > v2
-> > * As suggested by Geert Uytterhoeven
-> >   - Don't ignore the potential for integer overflow.
-> >     To this end I have taken Geert's suggestion of dividing by
-> >     a large "value" in the HZ case.
-> >     And I have let the original function unchanged for the MHz case:
-> >     it should eventually be removed anyway.
+On Wed, May 14, 2014 at 03:10:04AM +0200, Wolfram Sang wrote:
+> This series moves the r7s72100 platfrom from the legacy clock implementation to
+> the common clock framework.
 > 
-> Hi Simon and Geert,
+> This series has been tested with the renesas-devel-v3.15-rc2-20140428 tag. If
+> you want to boot into a console, you have a runtime dependency [1] which is
+> expected to go away in 3.15-rc6.
 > 
-> Thanks for dealing with the fallout of my cosmetic changes. Nice to
-> see that you managed to track it down!
+> Changes since V5:
 > 
-> I think this patch looks perfect, please merge unless anyone objects.
+> * rebased and tested against latest renesas/devel-tag
+>   (with and without CCF)
+> * added acks
+> * added the patch from Geert, and folded another into the series
+> 
+> PS: A tree can be found here with this series and the dependency patch:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git renesas/r7s-ccf
+> 
+> [1] http://www.spinics.net/lists/linux-sh/msg30918.html (clk: shmobile: clk-mstp: change to using clock-indices)
+> 
+> Geert Uytterhoeven (1):
+>   ARM: shmobile: Add forward declaration of struct clk to silence
+>     warning
 
-Thanks, I will go ahead and merge it.
+Thanks, I have queued up this series.
