@@ -1,43 +1,43 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 14 May 2014 11:25:49 +0100
-Subject: [PATCH] of: Add of_device_destroy_children() function
-In-Reply-To: <20140508203339.GA542@obsidianresearch.com>
-References: <1399567069-3174-1-git-send-email-s.nawrocki@samsung.com>
- <20140508203339.GA542@obsidianresearch.com>
-Message-ID: <20140514102549.EEEF9C4153D@trevor.secretlab.ca>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 14 May 2014 12:26:38 +0200
+Subject: [PATCH v5 01/11] ARM: shmobile: r7s72100: document MSTP clock
+ support
+In-Reply-To: <20140513000513.5943.68810@quantum>
+References: <1398765822-2314-1-git-send-email-wsa@the-dreams.de>
+ <1398765822-2314-2-git-send-email-wsa@the-dreams.de>
+ <20140513000513.5943.68810@quantum>
+Message-ID: <CAMuHMdWK1WAePx3N_ybPkWcoTtP_6PdcEPNEyBv02A9zOZSWOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 May 2014 14:33:39 -0600, Jason Gunthorpe <jgunthorpe@obsidianresearch.com> wrote:
-> On Thu, May 08, 2014 at 06:37:49PM +0200, Sylwester Nawrocki wrote:
-> > This patch adds a helper function to unregister devices which
-> > were created by an of_platform_populate() call. The pattern
-> > used here can already be found in multiple drivers. This helper
-> > can now be used instead of repeating similar code in drivers.
-> 
-> I have a driver that does this as well, and what I found is that the
-> remove must be in reverse order from the create or things explode, and
-> that assumes the DT is topologically sorted according to dependency
-> (so no deferred probe).
+Hi Mike, Stephen,
 
-That is the tip of a much larger problem that we don't have any good way
-to solve. There is no dependency tracking beyond the nature Linux driver
-model tree. For example, the removal of a GPIO driver has no way to
-tell users that it is going away, and so there is no way to force a
-driver remove when it happens.
+On Tue, May 13, 2014 at 2:05 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Wolfram Sang (2014-04-29 03:03:32)
+>> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+>>
+>> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+>
+> Acked-by: Mike Turquette <mturquette@linaro.org>
+>
+> No need to take this through the clk tree. Feel free to send it with the
+> rest through arm-soc.
 
-If we created a managed api for requesting resource (ie.
-devm_request_gpio()), then it would be possible for the gpio core to
-force a remove event on any driver that doesn't have the ability to
-gracefully handle a remove.
+(merging in clk/clk-next)
 
-The exact same problem exists for IRQs, clocks, regulators, or pretty
-much any cross-tree dependency.  :-(
+Note that this will cause a conflict for you, as Mike applied commit
+5483bf698f42a6f0467463b064084eb888298232 ("clk: shmobile: r8a7779:
+Add MSTP clock support"), which adds a line at the exact same spot.
 
-> AFAIK, there is no analog to deferred probe for removal, and
-> attempting to remove, say, a GPIO driver while an I2C bit bang is using
-> it just fails.
+Resolution: both lines should be kept.
 
-Indeed, it is a completely different operation.
+Gr{oetje,eeting}s,
 
-g.
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
