@@ -1,165 +1,420 @@
 From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Wed, 14 May 2014 06:41:13 +0530
-Subject: [PATCH v4 5/8] clk: exynos: use cpu-clock provider type to represent
- arm clock.
+Date: Wed, 14 May 2014 06:41:14 +0530
+Subject: [PATCH v4 6/8] ARM: dts: Exynos: add cpu nodes,
+ opp and cpu clock configuration data
 In-Reply-To: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
 References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <1400029876-5830-6-git-send-email-thomas.ab@samsung.com>
+Message-ID: <1400029876-5830-7-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Abraham <thomas.ab@samsung.com>
 
-With the addition of the new Samsung specific cpu-clock type, the
-arm clock can be represented as a cpu-clock type and the independent
-clock blocks that made up the arm clock can be removed.
+For all Exynos based platforms, add CPU nodes, operating points and cpu
+clock data for migrating from Exynos specific cpufreq driver to using
+generic cpufreq-cpu0 driver.
 
 Cc: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 ---
- drivers/clk/samsung/clk-exynos4.c      |   25 +++++++++----------------
- drivers/clk/samsung/clk-exynos5250.c   |   12 ++++++------
- include/dt-bindings/clock/exynos5250.h |    1 +
- 3 files changed, 16 insertions(+), 22 deletions(-)
+ arch/arm/boot/dts/exynos4210-origen.dts         |    6 +++
+ arch/arm/boot/dts/exynos4210-trats.dts          |    6 +++
+ arch/arm/boot/dts/exynos4210-universal_c210.dts |    6 +++
+ arch/arm/boot/dts/exynos4210.dtsi               |   35 +++++++++++++++++++
+ arch/arm/boot/dts/exynos4212.dtsi               |   18 ++++++++++
+ arch/arm/boot/dts/exynos4412-odroidx.dts        |    6 +++
+ arch/arm/boot/dts/exynos4412-origen.dts         |    6 +++
+ arch/arm/boot/dts/exynos4412-trats2.dts         |    6 +++
+ arch/arm/boot/dts/exynos4412.dtsi               |   31 +++++++++++++++++
+ arch/arm/boot/dts/exynos4x12.dtsi               |   36 ++++++++++++++++++++
+ arch/arm/boot/dts/exynos5250-arndale.dts        |    6 +++
+ arch/arm/boot/dts/exynos5250-cros-common.dtsi   |    6 +++
+ arch/arm/boot/dts/exynos5250-smdk5250.dts       |    6 +++
+ arch/arm/boot/dts/exynos5250.dtsi               |   41 +++++++++++++++++++++++
+ 14 files changed, 215 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-index b4f9672..7e3bb16c 100644
---- a/drivers/clk/samsung/clk-exynos4.c
-+++ b/drivers/clk/samsung/clk-exynos4.c
-@@ -471,7 +471,6 @@ static struct samsung_mux_clock exynos4210_mux_clks[] __initdata = {
- 	MUX(0, "mout_fimd1", group1_p4210, E4210_SRC_LCD1, 0, 4),
- 	MUX(0, "mout_mipi1", group1_p4210, E4210_SRC_LCD1, 12, 4),
- 	MUX(CLK_SCLK_MPLL, "sclk_mpll", mout_mpll_p, SRC_CPU, 8, 1),
--	MUX(CLK_MOUT_CORE, "mout_core", mout_core_p4210, SRC_CPU, 16, 1),
- 	MUX(CLK_SCLK_VPLL, "sclk_vpll", sclk_vpll_p4210, SRC_TOP0, 8, 1),
- 	MUX(CLK_MOUT_FIMC0, "mout_fimc0", group1_p4210, SRC_CAM, 0, 4),
- 	MUX(CLK_MOUT_FIMC1, "mout_fimc1", group1_p4210, SRC_CAM, 4, 4),
-@@ -530,7 +529,6 @@ static struct samsung_mux_clock exynos4x12_mux_clks[] __initdata = {
- 	MUX(0, "mout_jpeg", mout_jpeg_p, E4X12_SRC_CAM1, 8, 1),
- 	MUX(CLK_SCLK_MPLL, "sclk_mpll", mout_mpll_p, SRC_DMC, 12, 1),
- 	MUX(CLK_SCLK_VPLL, "sclk_vpll", mout_vpll_p, SRC_TOP0, 8, 1),
--	MUX(CLK_MOUT_CORE, "mout_core", mout_core_p4x12, SRC_CPU, 16, 1),
- 	MUX(CLK_MOUT_FIMC0, "mout_fimc0", group1_p4x12, SRC_CAM, 0, 4),
- 	MUX(CLK_MOUT_FIMC1, "mout_fimc1", group1_p4x12, SRC_CAM, 4, 4),
- 	MUX(CLK_MOUT_FIMC2, "mout_fimc2", group1_p4x12, SRC_CAM, 8, 4),
-@@ -572,8 +570,6 @@ static struct samsung_mux_clock exynos4x12_mux_clks[] __initdata = {
+diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
+index 72fb11f..4324b25 100644
+--- a/arch/arm/boot/dts/exynos4210-origen.dts
++++ b/arch/arm/boot/dts/exynos4210-origen.dts
+@@ -32,6 +32,12 @@
+ 		bootargs ="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
+ 	};
  
- /* list of divider clocks supported in all exynos4 soc's */
- static struct samsung_div_clock exynos4_div_clks[] __initdata = {
--	DIV(0, "div_core", "mout_core", DIV_CPU0, 0, 3),
--	DIV(0, "div_core2", "div_core", DIV_CPU0, 28, 3),
- 	DIV(0, "div_fimc0", "mout_fimc0", DIV_CAM, 0, 4),
- 	DIV(0, "div_fimc1", "mout_fimc1", DIV_CAM, 4, 4),
- 	DIV(0, "div_fimc2", "mout_fimc2", DIV_CAM, 8, 4),
-@@ -619,8 +615,8 @@ static struct samsung_div_clock exynos4_div_clks[] __initdata = {
- 	DIV(0, "div_spi_pre2", "div_spi2", DIV_PERIL2, 8, 8),
- 	DIV(0, "div_audio1", "mout_audio1", DIV_PERIL4, 0, 4),
- 	DIV(0, "div_audio2", "mout_audio2", DIV_PERIL4, 16, 4),
--	DIV(CLK_ARM_CLK, "arm_clk", "div_core2", DIV_CPU0, 28, 3),
--	DIV(CLK_SCLK_APLL, "sclk_apll", "mout_apll", DIV_CPU0, 24, 3),
-+	DIV_F(CLK_SCLK_APLL, "sclk_apll", "mout_apll", DIV_CPU0, 24, 3,
-+			CLK_GET_RATE_NOCACHE, 0),
- 	DIV_F(0, "div_mipi_pre0", "div_mipi0", DIV_LCD0, 20, 4,
- 			CLK_SET_RATE_PARENT, 0),
- 	DIV_F(0, "div_mmc_pre0", "div_mmc0", DIV_FSYS1, 8, 8,
-@@ -1003,12 +999,6 @@ static struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
- 		0),
- };
++	cpus {
++		cpu at 0 {
++			cpu0-supply = <&buck1_reg>;
++		};
++	};
++
+ 	regulators {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
+index 63aa2bb..7cc0a57 100644
+--- a/arch/arm/boot/dts/exynos4210-trats.dts
++++ b/arch/arm/boot/dts/exynos4210-trats.dts
+@@ -30,6 +30,12 @@
+ 		bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 rootwait earlyprintk panic=5";
+ 	};
  
--static struct samsung_clock_alias exynos4_aliases[] __initdata = {
--	ALIAS(CLK_MOUT_CORE, NULL, "moutcore"),
--	ALIAS(CLK_ARM_CLK, NULL, "armclk"),
--	ALIAS(CLK_SCLK_APLL, NULL, "mout_apll"),
--};
--
- static struct samsung_clock_alias exynos4210_aliases[] __initdata = {
- 	ALIAS(CLK_SCLK_MPLL, NULL, "mout_mpll"),
- };
-@@ -1241,6 +1231,9 @@ static void __init exynos4_clk_init(struct device_node *np,
- 			ARRAY_SIZE(exynos4210_gate_clks));
- 		samsung_clk_register_alias(exynos4210_aliases,
- 			ARRAY_SIZE(exynos4210_aliases));
-+		exynos_register_arm_clock(CLK_ARM_CLK, mout_core_p4210,
-+			ARRAY_SIZE(mout_core_p4210), reg_base, np, NULL,
-+			&samsung_clk_lock);
- 	} else {
- 		samsung_clk_register_mux(exynos4x12_mux_clks,
- 			ARRAY_SIZE(exynos4x12_mux_clks));
-@@ -1250,11 +1243,11 @@ static void __init exynos4_clk_init(struct device_node *np,
- 			ARRAY_SIZE(exynos4x12_gate_clks));
- 		samsung_clk_register_alias(exynos4x12_aliases,
- 			ARRAY_SIZE(exynos4x12_aliases));
-+		exynos_register_arm_clock(CLK_ARM_CLK, mout_core_p4x12,
-+			ARRAY_SIZE(mout_core_p4x12), reg_base, np, NULL,
-+			&samsung_clk_lock);
- 	}
++	cpus {
++		cpu: cpu at 0 {
++			cpu0-supply = <&varm_breg>;
++		};
++	};
++
+ 	regulators {
+ 		compatible = "simple-bus";
  
--	samsung_clk_register_alias(exynos4_aliases,
--			ARRAY_SIZE(exynos4_aliases));
--
- 	exynos4_clk_sleep_init();
+diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+index 63e34b2..844f3fb 100644
+--- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
++++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+@@ -28,6 +28,12 @@
+ 		bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 rw rootwait earlyprintk panic=5 maxcpus=1";
+ 	};
  
- 	pr_info("%s clocks: sclk_apll = %ld, sclk_mpll = %ld\n"
-@@ -1262,7 +1255,7 @@ static void __init exynos4_clk_init(struct device_node *np,
- 		exynos4_soc == EXYNOS4210 ? "Exynos4210" : "Exynos4x12",
- 		_get_rate("sclk_apll"),	_get_rate("sclk_mpll"),
- 		_get_rate("sclk_epll"), _get_rate("sclk_vpll"),
--		_get_rate("arm_clk"));
-+		_get_rate("armclk"));
- }
++	cpus {
++		cpu: cpu at 0 {
++			cpu0-supply = <&vdd_arm_reg>;
++		};
++	};
++
+ 	mct at 10050000 {
+ 		compatible = "none";
+ 	};
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index cacf614..22b967d 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -36,6 +36,33 @@
+ 		reg = <0x10023CA0 0x20>;
+ 	};
  
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0>;
++			clocks = <&clock CLK_ARM_CLK>;
++			clock-names = "cpu";
++
++			operating-points = <
++				1200000 1250000
++				1000000 1150000
++				800000	1075000
++				500000	975000
++				400000	975000
++				200000	950000
++			>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <1>;
++		};
++	};
++
+ 	gic: interrupt-controller at 10490000 {
+ 		cpu-offset = <0x8000>;
+ 	};
+@@ -73,6 +100,14 @@
+ 		compatible = "samsung,exynos4210-clock";
+ 		reg = <0x10030000 0x20000>;
+ 		#clock-cells = <1>;
++
++		samsung,armclk-cells = <9>;
++		samsung,armclk-divider-table = <1200000 3 7 3 4 1 7 5 0>,
++					       <1000000 3 7 3 4 1 7 4 0>,
++					       < 800000 3 7 3 3 1 7 3 0>,
++					       < 500000 3 7 3 3 1 7 3 0>,
++					       < 400000 3 7 3 3 1 7 3 0>,
++					       < 200000 1 3 1 1 1 0 3 0>;
+ 	};
  
-diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index e7ee442..3fe1ca0 100644
---- a/drivers/clk/samsung/clk-exynos5250.c
-+++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -260,8 +260,6 @@ static struct samsung_mux_clock exynos5250_mux_clks[] __initdata = {
- 	 */
- 	MUX_FA(0, "mout_apll", mout_apll_p, SRC_CPU, 0, 1,
- 					CLK_SET_RATE_PARENT, 0, "mout_apll"),
--	MUX_A(0, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1, "mout_cpu"),
--
- 	/*
- 	 * CMU_CORE
- 	 */
-@@ -339,9 +337,8 @@ static struct samsung_div_clock exynos5250_div_clks[] __initdata = {
- 	/*
- 	 * CMU_CPU
- 	 */
--	DIV(0, "div_arm", "mout_cpu", DIV_CPU0, 0, 3),
--	DIV(0, "div_apll", "mout_apll", DIV_CPU0, 24, 3),
--	DIV_A(0, "div_arm2", "div_arm", DIV_CPU0, 28, 3, "armclk"),
-+	DIV_F(0, "div_apll", "mout_apll", DIV_CPU0, 24, 3,
-+			CLK_GET_RATE_NOCACHE, 0),
+ 	pmu {
+diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
+index 3c00e6e..87847d5 100644
+--- a/arch/arm/boot/dts/exynos4212.dtsi
++++ b/arch/arm/boot/dts/exynos4212.dtsi
+@@ -22,6 +22,24 @@
+ / {
+ 	compatible = "samsung,exynos4212", "samsung,exynos4";
  
- 	/*
- 	 * CMU_TOP
-@@ -721,10 +718,13 @@ static void __init exynos5250_clk_init(struct device_node *np)
- 			ARRAY_SIZE(exynos5250_div_clks));
- 	samsung_clk_register_gate(exynos5250_gate_clks,
- 			ARRAY_SIZE(exynos5250_gate_clks));
-+	exynos_register_arm_clock(CLK_ARM_CLK, mout_cpu_p,
-+			ARRAY_SIZE(mout_cpu_p), reg_base, np, NULL,
-+			&samsung_clk_lock);
++	clock: clock-controller at 10030000 {
++		samsung,armclk-cells = <9>;
++		samsung,armclk-divider-table = <1500000 3 7 0 6 1 2 6 0>,
++					       <1400000 3 7 0 6 1 2 6 0>,
++					       <1300000 3 7 0 5 1 2 5 0>,
++					       <1200000 3 7 0 5 1 2 5 0>,
++					       <1100000 3 6 0 4 1 2 4 0>,
++					       <1000000 2 5 0 4 1 1 4 0>,
++					       < 900000 2 5 0 3 1 1 3 0>,
++					       < 800000 2 5 0 3 1 1 3 0>,
++					       < 700000 2 4 0 3 1 1 3 0>,
++					       < 600000 2 4 0 3 1 1 3 0>,
++					       < 500000 2 4 0 3 1 1 3 0>,
++					       < 400000 2 4 0 3 1 1 3 0>,
++					       < 300000 2 4 0 2 1 1 3 0>,
++					       < 200000 1 3 0 1 1 1 3 0>;
++	};
++
+ 	combiner: interrupt-controller at 10440000 {
+ 		samsung,combiner-nr = <18>;
+ 	};
+diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
+index 31db28a..4671714 100644
+--- a/arch/arm/boot/dts/exynos4412-odroidx.dts
++++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
+@@ -22,6 +22,12 @@
+ 		reg = <0x40000000 0x40000000>;
+ 	};
  
- 	exynos5250_clk_sleep_init();
++	cpus {
++		cpu at 0 {
++			cpu0-supply = <&buck2_reg>;
++		};
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		led1 {
+diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
+index e2c0dca..442bf90 100644
+--- a/arch/arm/boot/dts/exynos4412-origen.dts
++++ b/arch/arm/boot/dts/exynos4412-origen.dts
+@@ -27,6 +27,12 @@
+ 		bootargs ="console=ttySAC2,115200";
+ 	};
  
- 	pr_info("Exynos5250: clock setup completed, armclk=%ld\n",
--			_get_rate("div_arm2"));
-+			_get_rate("armclk"));
- }
- CLK_OF_DECLARE(exynos5250_clk, "samsung,exynos5250-clock", exynos5250_clk_init);
-diff --git a/include/dt-bindings/clock/exynos5250.h b/include/dt-bindings/clock/exynos5250.h
-index 922f2dc..59a10fb 100644
---- a/include/dt-bindings/clock/exynos5250.h
-+++ b/include/dt-bindings/clock/exynos5250.h
-@@ -21,6 +21,7 @@
- #define CLK_FOUT_CPLL		6
- #define CLK_FOUT_EPLL		7
- #define CLK_FOUT_VPLL		8
-+#define CLK_ARM_CLK		12
++	cpus {
++		cpu at 0 {
++			cpu0-supply = <&buck2_reg>;
++		};
++	};
++
+ 	firmware at 0203F000 {
+ 		compatible = "samsung,secure-firmware";
+ 		reg = <0x0203F000 0x1000>;
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index 9583563..6567c9d 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -31,6 +31,12 @@
+ 		bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 rootwait earlyprintk panic=5";
+ 	};
  
- /* gate for special clocks (sclk) */
- #define CLK_SCLK_CAM_BAYER	128
++	cpus {
++		cpu at 0 {
++			cpu0-supply = <&buck2_reg>;
++		};
++	};
++
+ 	firmware at 0204F000 {
+ 		compatible = "samsung,secure-firmware";
+ 		reg = <0x0204F000 0x1000>;
+diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+index 15d3c0a..85005d1 100644
+--- a/arch/arm/boot/dts/exynos4412.dtsi
++++ b/arch/arm/boot/dts/exynos4412.dtsi
+@@ -22,6 +22,37 @@
+ / {
+ 	compatible = "samsung,exynos4412", "samsung,exynos4";
+ 
++	cpus {
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <2>;
++		};
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <3>;
++		};
++	};
++
++	clock: clock-controller at 10030000 {
++		samsung,armclk-cells = <10>;
++		samsung,armclk-divider-table = <1500000 3 7 0 6 1 2 6 0 7>,
++					       <1400000 3 7 0 6 1 2 6 0 6>,
++					       <1300000 3 7 0 5 1 2 5 0 6>,
++					       <1200000 3 7 0 5 1 2 5 0 5>,
++					       <1100000 3 6 0 4 1 2 4 0 5>,
++					       <1000000 2 5 0 4 1 1 4 0 4>,
++					       < 900000 2 5 0 3 1 1 3 0 4>,
++					       < 800000 2 5 0 3 1 1 3 0 3>,
++					       < 700000 2 4 0 3 1 1 3 0 3>,
++					       < 600000 2 4 0 3 1 1 3 0 2>,
++					       < 500000 2 4 0 3 1 1 3 0 2>,
++					       < 400000 2 4 0 3 1 1 3 0 1>,
++					       < 300000 2 4 0 2 1 1 3 0 1>,
++					       < 200000 1 3 0 1 1 1 3 0 0>;
++	};
++
+ 	combiner: interrupt-controller at 10440000 {
+ 		samsung,combiner-nr = <20>;
+ 	};
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index c4a9306..09a86e7 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -31,6 +31,42 @@
+ 		mshc0 = &mshc_0;
+ 	};
+ 
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0>;
++			clocks = <&clock CLK_ARM_CLK>;
++			clock-names = "cpu";
++
++			operating-points = <
++				1500000 1350000
++				1400000 1287500
++				1300000 1250000
++				1200000 1187500
++				1100000 1137500
++				1000000 1087500
++				 900000 1037500
++				 800000 1000000
++				 700000  987500
++				 600000  975000
++				 500000  950000
++				 400000  925000
++				 300000  900000
++				 200000  900000
++			>;
++			clock-latency = <200000>;
++			boost-frequency = <1500000>;
++		};
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <1>;
++		};
++	};
++
+ 	pmu {
+ 		compatible = "arm,cortex-a9-pmu";
+ 		interrupt-parent = <&combiner>;
+diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+index 090f983..443c0d3 100644
+--- a/arch/arm/boot/dts/exynos5250-arndale.dts
++++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+@@ -25,6 +25,12 @@
+ 		bootargs = "console=ttySAC2,115200";
+ 	};
+ 
++	cpus {
++		cpu at 0 {
++			cpu0-supply = <&buck2_reg>;
++		};
++	};
++
+ 	rtc at 101E0000 {
+ 		status = "okay";
+ 	};
+diff --git a/arch/arm/boot/dts/exynos5250-cros-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+index 2c1560d..4bde756 100644
+--- a/arch/arm/boot/dts/exynos5250-cros-common.dtsi
++++ b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+@@ -19,6 +19,12 @@
+ 	chosen {
+ 	};
+ 
++	cpus {
++		cpu at 0 {
++			cpu0-supply = <&buck2_reg>;
++		};
++	};
++
+ 	pinctrl at 11400000 {
+ 		/*
+ 		 * Disabled pullups since external part has its own pullups and
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index a794a70..3632f7a 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -27,6 +27,12 @@
+ 		bootargs = "root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
+ 	};
+ 
++	cpus {
++		cpu at 0 {
++			cpu0-supply = <&buck2_reg>;
++		};
++	};
++
+ 	rtc at 101E0000 {
+ 		status = "okay";
+ 	};
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 3742331..f59f8a9 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -63,6 +63,29 @@
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0>;
+ 			clock-frequency = <1700000000>;
++
++			clocks = <&clock CLK_ARM_CLK>;
++			clock-names = "cpu";
++
++			operating-points = <
++				1700000 1300000
++				1600000 1250000
++				1500000 1225000
++				1400000 1200000
++				1300000 1150000
++				1200000 1125000
++				1100000 1100000
++				1000000 1075000
++				 900000 1050000
++				 800000 1025000
++				 700000 1012500
++				 600000 1000000
++				 500000  975000
++				 400000  950000
++				 300000  937500
++				 200000  925000
++			>;
++			clock-latency = <200000>;
+ 		};
+ 		cpu at 1 {
+ 			device_type = "cpu";
+@@ -86,6 +109,24 @@
+ 		compatible = "samsung,exynos5250-clock";
+ 		reg = <0x10010000 0x30000>;
+ 		#clock-cells = <1>;
++
++		samsung,armclk-cells = <9>;
++		samsung,armclk-divider-table = <1700000 3 7 7 7 3 5 0 2>,
++					       <1600000 3 7 7 7 1 4 0 2>,
++					       <1500000 2 7 7 7 1 4 0 2>,
++					       <1400000 2 7 7 6 1 4 0 2>,
++					       <1300000 2 7 7 6 1 3 0 2>,
++					       <1200000 2 7 7 5 1 3 0 2>,
++					       <1100000 3 7 7 5 1 3 0 2>,
++					       <1000000 1 7 7 4 1 2 0 2>,
++					       < 900000 1 7 7 4 1 2 0 2>,
++					       < 800000 1 7 7 4 1 2 0 2>,
++					       < 700000 1 7 7 3 1 1 0 2>,
++					       < 600000 1 7 7 3 1 1 0 2>,
++					       < 500000 1 7 7 2 1 1 0 2>,
++					       < 400000 1 7 7 2 1 1 0 2>,
++					       < 300000 1 7 7 1 1 1 0 2>,
++					       < 200000 1 7 7 1 1 1 0 2>;
+ 	};
+ 
+ 	clock_audss: audss-clock-controller at 3810000 {
 -- 
 1.7.4.4
