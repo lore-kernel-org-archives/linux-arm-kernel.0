@@ -1,47 +1,30 @@
-From: rvaswani@codeaurora.org (Rohit Vaswani)
-Date: Tue, 13 May 2014 17:10:17 -0700
-Subject: maxcpus behavior in arm64
-In-Reply-To: <20140513210226.GB31201@arm.com>
-References: <53726AC1.9030207@codeaurora.org> <20140513210226.GB31201@arm.com>
-Message-ID: <5372B469.6020109@codeaurora.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 14 May 2014 02:11:36 +0200
+Subject: [PATCH v5 01/11] ARM: shmobile: r7s72100: document MSTP clock
+ support
+In-Reply-To: <20140513235335.GF6784@verge.net.au>
+References: <1398765822-2314-1-git-send-email-wsa@the-dreams.de>
+ <1398765822-2314-2-git-send-email-wsa@the-dreams.de>
+ <20140513000513.5943.68810@quantum>
+ <20140513015708.GA29336@verge.net.au>
+ <20140513215929.GA3967@katana> <20140513235335.GF6784@verge.net.au>
+Message-ID: <20140514001136.GA2596@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/13/2014 2:02 PM, Catalin Marinas wrote:
-> On Tue, May 13, 2014 at 07:56:01PM +0100, Rohit Vaswani wrote:
->> I notice that the maxcpus behavior is different in arm64 than from how
->> arm uses it.
->> in arm64/kernel/smp.c - in smp_prepare_cpus, maxcpus is used to limit
->> the cpu_present_mask.
->> However in arm/kernel/smp.c - maxcpus is not used as a decision maker to
->> set the cpu_preset_mask.
->>
->> Is this behavior expected and intentionally different in arm and arm64 ?
->> This also means that in arm64 (unlike arm)- maxcpus cannot be used to
->> boot a subset of total cpus with the
->> option of getting the secondary cores online at a later point from
->> userspace using hotplug.
->> It seems like maxcpus is being treated like nr_cpus in arm64 ?
-> I don't think there is any particular reason, only that the code has
-> been derived from arm long time ago and it probably inherited the
-> original behaviour. In the meantime, arm got commit 7fa22bd5460 (ARM:
-> 6993/1: platsmp: Allow secondary cpu hotplug with maxcpus=1).
->
-> I'm happy to change the behaviour for arm64. Basically we still call
-> cpu_prepare() for max_cpus but we initialise the present mask with
-> init_cpu_present(cpu_possible_mask) as we don't have physical hotplug
-> for the time being.
-Thanks. Initializing the present mask with possible mask is good.
-But, how would one call cpu_prepare on the other CPUS then ?
-Currently cpu_prepare is called only from smp_prepare_cpus. I was going 
-to suggest calling cpu_prepare for each possible CPU.
-We could have the for_each_possible_cpu loop in smp_prepare_cpus not 
-depend on max_cpus and call cpu_prepare for the possible cpus.
-I didn't really understand the part of physical hotplug - we have 
-config_hotplug enabled
+> I will do my best. But I need to have pull-requests sent off
+> to the arm-soc maintainers before rc6 appears. And ideally patches
+> should have been present in next for a day before I send such a request.
+> So by my calculations I need to push things to my next tree very
+> soon (i.e. today) in order to reach the above mentioned criteria.
 
-Thanks,
-Rohit Vaswani
+Thank you very much! Luckily(?) I can't sleep today, so I'll send the
+patches tested against renesas/devel in a few minutes.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, hosted by The Linux Foundation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140514/67dc00b0/attachment.sig>
