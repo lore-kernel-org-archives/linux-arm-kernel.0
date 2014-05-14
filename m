@@ -1,48 +1,90 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 14 May 2014 11:11:37 +0100
-Subject: [PATCH] arm: mm: fix lowmem virtual address range check
-In-Reply-To: <1400047439-23961-1-git-send-email-wangnan0@huawei.com>
-References: <1400047439-23961-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <20140514101137.GC10145@arm.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 14 May 2014 11:12:23 +0100
+Subject: [PATCH v3 0/7] of: setup dma parameters using dma-ranges and
+ dma-coherent
+In-Reply-To: <20140501132516.GG26756@n2100.arm.linux.org.uk>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+ <536249D6.3020008@ti.com> <20140501132516.GG26756@n2100.arm.linux.org.uk>
+Message-ID: <20140514101223.518A6C4153D@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 14, 2014 at 07:03:59AM +0100, Wang Nan wrote:
-> This patch makes sure the argument of __phys_to_virt is a valid physical
-> address when clear lowmem memory maps.
+On Thu, 1 May 2014 14:25:16 +0100, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Thu, May 01, 2014 at 09:19:18AM -0400, Santosh Shilimkar wrote:
+> > Rob, Russell,
+> > 
+> > On Thursday 24 April 2014 11:30 AM, Santosh Shilimkar wrote:
+> > > Here is an updated v3 of the series. Series introduces support for setting up
+> > > dma parameters based on device tree properties like 'dma-ranges' and
+> > > 'dma-coherent' and also update to ARM 32 bit port. Earlier version of the
+> > > series can be found here [3], [2] and [1].
+> > > 
+> > > The 'dma-ranges' helps to take care of few DMAable system memory restrictions
+> > > by use of dma_pfn_offset which we maintain now per device. Arch code then
+> > > uses it for dma address translations for such cases. We update the
+> > > dma_pfn_offset accordingly during DT the device creation process.The
+> > > 'dma-coherent' property is used to setup arch's coherent dma_ops.
+> > > 
+> > > Hopefully with acks, tested-by this version can get into 3.16 queue. I will
+> > > post a followup series for Keystone SOC which will use this infrastructure.
+> > > Linus W also wants to use this for ARM integrator platform dma offset issue.
+> > > 
+> > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > > Cc: Russell King <linux@arm.linux.org.uk>
+> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > Cc: Olof Johansson <olof@lixom.net>
+> > > Cc: Grant Likely <grant.likely@linaro.org>
+> > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > > Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+> > > 
+> > > Grygorii Strashko (2):
+> > >   of: introduce of_dma_get_range() helper
+> > >   ARM: dma: Use dma_pfn_offset for dma address translation
+> > > 
+> > > Santosh Shilimkar (5):
+> > >   device: introduce per device dma_pfn_offset
+> > >   of: introduce of_dma_is_coherent() helper
+> > >   of: configure the platform device dma parameters
+> > >   ARM: dma: implement set_arch_dma_coherent_ops()
+> > >   ARM: dma: use phys_addr_t in __dma_page_[cpu_to_dev/dev_to_cpu]
+> > > 
+> > >  arch/arm/include/asm/dma-mapping.h |   28 ++++++++++--
+> > >  arch/arm/mm/dma-mapping.c          |    4 +-
+> > >  drivers/of/address.c               |   87 ++++++++++++++++++++++++++++++++++++
+> > >  drivers/of/platform.c              |   71 +++++++++++++++++++++++++++--
+> > >  include/linux/device.h             |    2 +
+> > >  include/linux/dma-mapping.h        |    7 +++
+> > >  include/linux/of_address.h         |    8 ++++
+> > >  include/linux/of_platform.h        |    6 +++
+> > >  8 files changed, 204 insertions(+), 9 deletions(-)
+> > > 
+> > How do we go about merging this series ? There is a dependency
+> > between the patches and hence the question.
 > 
-> The last few lines prepare_page_table() clear page mapping in the gap
-> between largest low physical memory and the upper bound of lowmem. It
-> uses __phys_to_virt(end) to calculate virtual address from where the
-> clearing start.
-> 
-> However, if the platform uses private nonliner __phys_to_virt(), 'end'
-> may goes into another mapping region.
-> 
-> This patch uses __phys_to_virt(end - 1) + 1 for insurance purposes.
-> 
-> Signed-off-by: Wang Nan <wangnan0@huawei.com>
-> Cc: Geng Hui <hui.geng@huawei.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/mm/mmu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index b68c6b2..87340ee 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -1217,7 +1217,7 @@ static inline void prepare_page_table(void)
->  	 * Clear out all the kernel space mappings, except for the first
->  	 * memory bank, up to the vmalloc region.
->  	 */
-> -	for (addr = __phys_to_virt(end);
-> +	for (addr = __phys_to_virt(end - 1) + 1;
->  	     addr < VMALLOC_START; addr += PMD_SIZE)
->  		pmd_clear(pmd_off_k(addr));
+> I don't know anymore.  People today want to assert exclusive rights over
+> parts of the kernel tree, which makes this kind of cross-patching rather
+> impossible.
 
-This looks correct to me, but I'd be interested to know which platform this
-is falling over on. Only realview seems to override __phys_to_virt and I
-don't think we want to add more of that if we can help it.
+And you can tell those people to go-perch. (I have no idea what that
+actually means. something my mother always says).
 
-Will
+If everyone is okay then I would be fine with taking the whole series
+through my tree, or you can put my ack on it and send it through the ARM tree.
+
+g.
+> 
+> The only workable solution I can see is the long winded way to split the
+> series up, merge the first set of dependencies in one merge window, and
+> hold the rest back for the following merge window.  Not ideal, but it
+> stops the arguments.
+> 
+> -- 
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
