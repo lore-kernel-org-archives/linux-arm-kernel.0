@@ -1,105 +1,82 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 14 May 2014 20:34:10 +0530
-Subject: [PATCH 06/17] pci: host: pcie-designware: Use *base-mask* for
- configuring the iATU
-In-Reply-To: <5281007.CFRjW0Yeu2@wuerfel>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>
- <4528185.oZbgyuuFKX@wuerfel> <537302CD.7000701@ti.com>
- <5281007.CFRjW0Yeu2@wuerfel>
-Message-ID: <537385EA.2070302@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 14 May 2014 17:04:30 +0200
+Subject: [PATCHv2 4/4] ARM: mvebu: implement L2/PCIe deadlock workaround
+In-Reply-To: <20140514145853.GE19866@localhost>
+References: <1399975839-5311-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1399975839-5311-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140514145853.GE19866@localhost>
+Message-ID: <20140514170430.57cbeb23@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Dear Catalin Marinas,
 
-On Wednesday 14 May 2014 06:15 PM, Arnd Bergmann wrote:
-> On Wednesday 14 May 2014 11:14:45 Kishon Vijay Abraham I wrote:
->> hi Arnd,
->>
->> On Tuesday 13 May 2014 07:04 PM, Arnd Bergmann wrote:
->>> On Tuesday 13 May 2014 15:27:46 Arnd Bergmann wrote:
->>>> On Tuesday 13 May 2014 18:56:23 Kishon Vijay Abraham I wrote:
->>>>>> If you have a case where the outbound translation is a 256MB (i.e. 28bit)
->>>>>> section of the CPU address space, that could be represented as
->>>>>>
->>>>>>       ranges = <0x82000000 0 0  0xb0000000  0 0x10000000>;
->>>>>>
->>>>>> or 
->>>>>>
->>>>>>       ranges = <0x82000000 0 0xb0000000  0xb0000000  0 0x10000000>;
->>>>>>
->>>>>> depending on whether you want the BARs to be programmed using a low
->>>>>> address 0x0-0x0fffffff or an address matching the window
->>>>>> 0xb0000000-0xbfffffff.
->>>>>
->>>>> The problem is, for configuring the window starting at 0xb0000000, the ATU
->>>>> should be programmed 0x0000000 (the cpu address for it will be 0xb0000000 though).
->>>>>
->>>>
->>>> Then use the first of the two?
->>>>
->>>
->>> To clarify: using <0x82000000 0 0  0xb0000000  0 0x10000000> will give you 
->>> a mem_offset of 0xb0000000, which should work just fine for this case.
->>>
->>> What I don't understand is why the ATU cares about whether the outbound
->>> address is 0x0000000 or 0xb0000000 if it just decodes the lower 28 bit
->>> anyway. Did you mean that we have to program the BARs using low addresses
->>> regardless of what is programmed in the ATU? That would make more sense,
->>> and it also matches what I suggested.
->>
->> No, It's not like it decodes only the lower 28bits. The BARs is programmed with
->> 32 bit value.
->>
->> My pcie dt node has
->>  ranges = <0x00000800 0 0x20001000 0x20001000 0 0x00002000  /* CONFIG */
->>            0x81000000 0 0          0x20003000 0 0x00010000  /* IO */
->>            0x82000000 0 0x20013000 0x20013000 0 0xffed000>; /* MEM */
->>
->> Consider MEM address space..
->>
->> Here both PCI address and CPU address is 0x20013000. So when there is a write
->> to cpu addr 0x20013000 [writel(virt_addr(0x20013000)], we want it to be
->> translated to PCI addr 0x20013000. So in 'ATU', we would expect *base* to be
->> programmed to *0x20013000* and target to be programmed to *0x20013000*. But
->> that's not the case for DRA7xx. For DRA7xx *base* should be programmed to
->> *0x0013000* and target should be programmed to *0x20013000*.
-> 
-> Ok, got it, thanks for your patience.
-> 
-> I think this would best be modeled as a separate bus node that contains the
-> restriction, like this:
-> 
-> / {
-> 	#address-cells = <1>; // or <2> if you support > 4GB address space
-> 	#size-cells = <1>;
-> 
-> 	soc {
-> 		#address-cells <1>;
-> 		#size-cells = <1>;
-> 		ranges;
-> 		dma-ranges;
-> 
-> 		... // all normal devices
-> 
-> 		axi at 20000000 {
-> 			#size-cells = <1>;
-> 			#address-cells = <1>;
-> 			dma-ranges; // can access all 4GB outbound
-> 			ranges = <0 0x20000000 0x10000000>; // 28-bit bus
-> 
-> 			pci at 0 {
-> 				reg = <0x0    0x1000>, // internal regs
-> 				      <0x1000 0x2000>; // config space
-> 				dma-ranges; // 32-bit outbound
-> 				ranges = <0x81000000 0 0           0x3000 0 0x00010000  /* IO */
-> 					  0x82000000 0 0x20013000 0x13000 0 0xffed000>; /* MEM */
-> 			};
-> 		};
-> 	};
-> };
+On Wed, 14 May 2014 15:58:54 +0100, Catalin Marinas wrote:
 
-Nice :-)
+> > +	for_each_compatible_node(np, NULL, "arm,pl310-cache") {
+> > +		struct property *new_compat;
+> > +
+> > +		new_compat = kzalloc(sizeof(*new_compat), GFP_KERNEL);
+> > +		new_compat->name = kstrdup("compatible", GFP_KERNEL);
+> > +		new_compat->value = kstrdup("arm,pl310-coherent-cache",
+> > +					    GFP_KERNEL);
+> > +		new_compat->length = strlen(new_compat->value) + 1;
+> > +		of_update_property(np, new_compat);
+> > +	}
+> > +}
+> 
+> I got it know, you update the DT property on the fly.
 
-Thanks
-Kishon
+Correct.
+
+> >  static void __init mvebu_timer_and_clk_init(void)
+> >  {
+> >  	of_clk_init(NULL);
+> > @@ -78,6 +125,14 @@ static void __init mvebu_timer_and_clk_init(void)
+> >  	mvebu_scu_enable();
+> >  	coherency_init();
+> >  	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
+> > +
+> > +	if (of_machine_is_compatible("marvell,armada375") ||
+> > +	    of_machine_is_compatible("marvell,armada38x")) {
+> > +		arch_ioremap_caller = armada_pcie_wa_ioremap_caller;
+> > +		pci_ioremap_set_mem_type(MT_MEMORY_RW_SO);
+> > +		mvebu_l2x0_pl310_coherent();
+> > +	}
+> > +
+> >  	l2x0_of_init(0, ~0UL);
+> >  
+> >  	if (of_machine_is_compatible("marvell,armada375"))
+> 
+> A more "hackish" way would be to simply set outer_cache.sync to NULL
+> after l2x0_of_init, less code ;) but not nice either.
+
+How could this be done? All the outer_cache structures are 'static' in
+mm/cache-l2x0.c, so the mvebu code cannot hack them after calling
+l2x0_of_init().
+
+> With the .fixup in
+> Russell's L2C patches you could have added an mvebu specific callback to
+> check for coherency before setting .sync to NULL.
+
+I had a look at the ->fixup thing from Russell, but it's only meant to
+call fixup operations *inside* the L2C driver. Not external fixup
+operations, like operations defined by the platform. Therefore I don't
+see how the ->fixup mechanism proposed by Russell would have solved
+the particular problem we're discussing.
+
+> Anyway, your approach is fine by me but I would prefer a specific
+> property rather than "compatible".
+
+Ok, thanks, I'll repost. For now, I'll repost a series without the
+strongly-ordered thing, since we don't have the confirmation it's
+absolutely needed for the workaround of the PCIe/SMP/PL310 deadlock
+problem.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
