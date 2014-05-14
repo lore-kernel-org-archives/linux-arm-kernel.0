@@ -1,100 +1,48 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 14 May 2014 19:44:26 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP5: DSS hwmod data
-In-Reply-To: <536C777C.8000600@ti.com>
-References: <1394619996-3525-1-git-send-email-tomi.valkeinen@ti.com>
- <alpine.DEB.2.02.1405080432570.23579@utopia.booyaka.com>
- <536B1A9C.7050006@ti.com>
- <alpine.DEB.2.02.1405081558570.23579@utopia.booyaka.com>
- <536C777C.8000600@ti.com>
-Message-ID: <alpine.DEB.2.02.1405141939030.21921@utopia.booyaka.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 14 May 2014 21:44:55 +0200
+Subject: [PATCH v4 2/5] ARM: dts: change to correct compatible string
+ for exynos5420 hdmi
+In-Reply-To: <1400035562-16832-3-git-send-email-rahul.sharma@samsung.com>
+References: <1400035562-16832-1-git-send-email-rahul.sharma@samsung.com>
+ <1400035562-16832-3-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <5373C7B7.5000300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 May 2014, Tomi Valkeinen wrote:
+Hi Rahul,
 
-> On 08/05/14 19:01, Paul Walmsley wrote:
-> > Hi Archit,
-> > 
-> > On Thu, 8 May 2014, Archit Taneja wrote:
-> > 
-> >> Hi Paul,
-> >>
-> >> On Thursday 08 May 2014 10:07 AM, Paul Walmsley wrote:
-> >>> Hi,
-> >>>
-> >>> On Wed, 12 Mar 2014, Tomi Valkeinen wrote:
-> >>>
-> >>>> This patch adds hwmod data for omap5 display subsystem. I have tested this
-> >>>> on
-> >>>> omap5-uevm with a DSI panel. I cannot test omap5-uevm's hdmi output yet,
-> >>>> as the
-> >>>> mainline is missing omap5 HDMI driver.
-> >>>>
-> >>>> I do see this when booting:
-> >>>>
-> >>>>    omap_hwmod: dss_dispc: cannot be enabled for reset (3)
-> >>>>    omap_hwmod: dss_dsi1: cannot be enabled for reset (3)
-> >>>>    omap_hwmod: dss_dsi2: cannot be enabled for reset (3)
-> >>>>    omap_hwmod: dss_hdmi: cannot be enabled for reset (3)
-> >>>>    omap_hwmod: dss_rfbi: cannot be enabled for reset (3)
-> >>>>
-> >>>> But at least DSI works just fine.
-> >>>
-> >>> Am looking at this for v3.16.  But I think someone needs to take a look at
-> >>> those warnings and figure out why they are happening.
-> >>
-> >> We associate DSS clock domain's MODULEMODE bits only with the dss_core hwmod.
-> >> The rest of the dss hwmods don't touch MODULEMODE.
-> >>
-> >> Therefore, these hwmods cannot be enabled independently, and reset.
-> >>
-> >> We don't face this issue in the omapdss driver since the platform devices
-> >> corresponding to these hwmods have their parent as the platform device
-> >> corresponding to 'dss_core'. This parent child-relation ensures that
-> >> 'dss_core' is enabled when the a child calls a pm_runtime_get function.
-> >>
-> >> The problem is that we have multiple hwmods which use the same MODULEMODE bit.
-> >> There is no use-counting done when it comes to enabling/disabling modulemode.
-> >> If there was such a thing, we could have provided MODULEMODE flags even for
-> >> the children hwmods.
-> > 
-> > Thanks for the summary.  This is indeed a long-overdue item for the hwmod 
-> > core code.  Can you please patch the hwmod core code to add this?  I'd 
-> > suggest making the use-counting functionality conditional on a hwmod flag 
-> > that you can set for all of the DSS hwmods.  (Ideally, the core code would 
-> > detect that several modules share the same MODULEMODE bits, and 
-> > automatically set it for those cases, but that seems a bit too complex for 
-> > a first cut.)
+On 14.05.2014 04:45, Rahul Sharma wrote:
+> From: Rahul Sharma <Rahul.Sharma@samsung.com>
 > 
-> Can we still go forward with this patch as it is? As far as I
-> understand, the warnings are harmless (more or less), but without this
-> patch we won't have OMAP5 display support.
+> Replace compatible string for HDMI node in Exynos5420. Since
+> latest restructring in Drm hdmi driver, it is agreed to use
+> a seperate compatible string for Exynos5420 HDMI IP siince it
+> uses APB mapped Phy.
+> 
+> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5420.dtsi |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+> index a802f74..016992c 100644
+> --- a/arch/arm/boot/dts/exynos5420.dtsi
+> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+> @@ -640,7 +640,7 @@
+>  	};
+>  
+>  	hdmi: hdmi at 14530000 {
+> -		compatible = "samsung,exynos4212-hdmi";
+> +		compatible = "samsung,exynos5420-hdmi";
+>  		reg = <0x14530000 0x70000>;
+>  		interrupts = <0 95 0>;
+>  		clocks = <&clock CLK_HDMI>, <&clock CLK_SCLK_HDMI>,
+> 
 
-Generally speaking, we try to avoid queuing patches that add warnings, for 
-a few different reasons:
+Acked-by: Tomasz Figa <t.figa@samsung.com>
 
-1. end users don't know whether they are serious or not, and could waste 
-time trying to determine whether those warnings are causing other, 
-unrelated problems for them
+The compatible string doesn't seem to be documented in linux-next,
+though. Are the necessary patches adding it already merged?
 
-2. once patches with warnings are merged, even if folks promise to fix 
-them, usually people tend to deprioritize 'closing the loop' on the fixes 
-- so they often never make it back upstream
-
-3. some maintainers search for warnings in their test logs and push back 
-on patches that generate them
-
-
-All that said, you and Archit are pretty good in my experience about 
-following up on issues.  And Archit has mentioned that he will be 
-patching the hwmod core code to fix the underlying issue:
-
-http://www.spinics.net/lists/arm-kernel/msg329614.html
-
-So, at least speaking for myself, I'm willing to queue this patch for 
-3.16, with the understanding that you all will be patching the hwmod core 
-code to fix the root cause.
-
-
-- Paul
+Best regards,
+Tomasz
