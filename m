@@ -1,50 +1,96 @@
-From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Wed, 14 May 2014 12:38:11 -0700
-Subject: [PATCH] serial: imx: Disable new features of autobaud detection
-In-Reply-To: <1400093703-10128-1-git-send-email-festevam@gmail.com>
-References: <1400093703-10128-1-git-send-email-festevam@gmail.com>
-Message-ID: <5373C623.4030203@boundarydevices.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 14 May 2014 21:41:11 +0200
+Subject: [PATCH v4 1/5] ARM: dts: enable hdmi for exynos5250 based snow
+ board
+In-Reply-To: <1400035562-16832-2-git-send-email-rahul.sharma@samsung.com>
+References: <1400035562-16832-1-git-send-email-rahul.sharma@samsung.com>
+ <1400035562-16832-2-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <5373C6D7.8010802@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2014 11:55 AM, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
->
-> Bit 7 of UCR3 is described in the i.MX reference manuals (with the exception
-> of i.MX1) as follows:
->
-> ADNIMP: Autobaud Detection Not Improved-. Disables new features of
-> 	autobaud detection (See Baud Rate Automatic Detection
-> 	Protocol, for more details).
->
-> 	0 Autobaud detection new features selected
-> 	1 Keep old autobaud detection mechanism
->
-> The "new features" mechanism occasionally cause the receiver to get out of sync
-> and continuously produce received characters of '\xff'.
->
-> In order to reproduce the problem:
->
-> $ stty -F /dev/ttymxc0 19200
->
-> - Change the terminal baudrate to 19200
->
-> - Type in the console and it should look good
->
-> - Change the terminal baudrate back to 115200
->
-> - Type 'b' in the console, then a stream of garbage characters is seen.
->
-> Also rename the bit definition as per the reference manual.
->
-> Tested on mx6q, mx6dl, mx6solo and mx53.
->
-> Based on a patch from Eric Nelson for U-boot.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->   drivers/tty/serial/imx.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
->
+Hi Rahul,
 
-Tested-by: Eric Nelson <eric.nelson@boundarydevices.com>
+On 14.05.2014 04:45, Rahul Sharma wrote:
+> From: Rahul Sharma <Rahul.Sharma@samsung.com>
+> 
+> Enable support for HDMI for exynos5250 based Snow board.
+> 
+> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5250-cros-common.dtsi |    6 +++++-
+>  arch/arm/boot/dts/exynos5250-pinctrl.dtsi     |    7 +++++++
+>  arch/arm/boot/dts/exynos5250-snow.dts         |    7 +++++++
+>  3 files changed, 19 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5250-cros-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+> index 2c1560d..89ac90f 100644
+> --- a/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+> @@ -240,7 +240,7 @@
+>  		samsung,i2c-sda-delay = <100>;
+>  		samsung,i2c-max-bus-freq = <378000>;
+>  
+> -		hdmiphy at 38 {
+> +		hdmiphy: hdmiphy at 38 {
+>  			compatible = "samsung,exynos4212-hdmiphy";
+>  			reg = <0x38>;
+>  		};
+> @@ -304,6 +304,10 @@
+>  
+>  	hdmi {
+>  		hpd-gpio = <&gpx3 7 0>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&hdmi_hpd_irq>;
+> +		phy = <&hdmiphy>;
+> +		ddc = <&i2c_2>;
+>  	};
+>  
+>  	gpio-keys {
+> diff --git a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+> index 9a49e68..da3ae66 100644
+> --- a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+> @@ -560,6 +560,13 @@
+>  			samsung,pin-pud = <0>;
+>  			samsung,pin-drv = <0>;
+>  		};
+> +
+> +		hdmi_hpd_irq: hdmi-hpd-irq {
+> +			samsung,pins = "gpx3-7";
+> +			samsung,pin-function = <0>;
+> +			samsung,pin-pud = <1>;
+> +			samsung,pin-drv = <0>;
+> +		};
+
+Based on the fact that this is just being configured as input, I don't
+think this is a generic special function, but rather a board-specific
+GPIO, which should be defined in dts of respective board.
+
+>  	};
+>  
+>  	pinctrl at 13400000 {
+> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+> index 1ce1088..696850a 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> @@ -206,4 +206,11 @@
+>  			clock-frequency = <24000000>;
+>  		};
+>  	};
+> +
+> +	hdmi {
+> +		hdmi-en-supply = <&tps65090_fet7>;
+> +		vdd-supply = <&ldo8_reg>;
+> +		vdd_osc-supply = <&ldo10_reg>;
+> +		vdd_pll-supply = <&ldo8_reg>;
+
+Hmm, those regulators don't seem to be listed in
+Documentation/devicetree/bindings/video/exynos_hdmi.txt, at least in
+today's linux-next. The driver seems to use them, though.
+
+This isn't a problem with this patch, but if you're working on this,
+could you also fix the documentation in separate patch?
+
+Best regards,
+Tomasz
