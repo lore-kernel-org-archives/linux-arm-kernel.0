@@ -1,82 +1,70 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 14 May 2014 16:58:37 +0100
-Subject: [RFC 0/8] kgdb: NMI/FIQ support for ARM
-Message-ID: <1400083125-1464-1-git-send-email-daniel.thompson@linaro.org>
+Date: Wed, 14 May 2014 16:58:38 +0100
+Subject: [RFC 1/8] arm: fiq: Allow EOI to be communicated to the intc
+In-Reply-To: <1400083125-1464-1-git-send-email-daniel.thompson@linaro.org>
+References: <1400083125-1464-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1400083125-1464-2-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset makes it possible to use the kgdb NMI infrastructure
-on ARM platforms.
+Modern ARM systems require an EOI to be sent to the interrupt controller
+on completion of both IRQ and FIQ. The FIQ code currently does not permit
+this requiring nasty register poke hacks from the FIQ handler. This patch
+provides a simple interface for C based handlers to complete a FIQ.
 
-The kgdb NMI infrastructure works by re-routing an UARTs interrupt
-signal from IRQ to FIQ. The UART will no longer function normally
-and will instead be managed by kgdb using the polled I/O functions.
-Any character delivered to the UART causes the kgdb handler function
-to be called. Each serial driver explicitly consents (or not) to this
-abuse by calling the appropriate registration functions.
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+---
+ arch/arm/include/asm/fiq.h |  1 +
+ arch/arm/kernel/fiq.c      | 11 +++++++++++
+ 2 files changed, 12 insertions(+)
 
-[PATCH 1/8] arm: fiq: Allow EOI to be communicated to the intc
-[PATCH 2/8] irqchip: gic: Provide support for interrupt grouping
-    Both these patches lay the ground work to allow modern ARM
-    interrupt controllers to support FIQ correctly.
-
-[PATCH 3/8] ARM: Move some macros from entry-armv to entry-header
-[PATCH 4/8] ARM: Add KGDB/KDB FIQ debugger generic code
-    This is the heart of the patch series, allowing FIQs to be
-    registered with KGDB and handled by KGDB.
-
-[PATCH 5/8] serial: amba-pl011: Pass on FIQ information to KGDB.
-[PATCH 6/8] serial: asc: Add support for KGDB's FIQ/NMI mode
-    Extend to UART drivers to allow the register the appropriate FIQ
-    (implicitly promising to behave properly when their own IRQ handler 
-    is cut off).
-
-
-[PATCH 7/8] ARM: VIC: Add vic_set_fiq function to select if an...
-[PATCH 8/8] arm: fiq: Hack FIQ routing backdoors into GIC and VIC
-    Here we hit the serious request-for-comment section. It is not 
-    clear what the best way to get the interrupt controller to re-route 
-    an interrupt source from the IRQ signal to the FIQ signal.
-    
-    Clearly the approach here is wrong but it has been enough for me
-    to test my work so far.
-
-Anton Vorontsov (2):
-  ARM: Move some macros from entry-armv to entry-header
-  ARM: Add KGDB/KDB FIQ debugger generic code
-
-Arve Hj?nnev?g (1):
-  ARM: VIC: Add vic_set_fiq function to select if an interrupt should
-    generate an IRQ or FIQ
-
-Daniel Thompson (5):
-  arm: fiq: Allow EOI to be communicated to the intc
-  irqchip: gic: Provide support for interrupt grouping
-  serial: amba-pl011: Pass on FIQ information to KGDB.
-  serial: asc: Add support for KGDB's FIQ/NMI mode
-  arm: fiq: Hack FIQ routing backdoors into GIC and VIC
-
- arch/arm/Kconfig                        |   2 +
- arch/arm/Kconfig.debug                  |  18 ++++
- arch/arm/boot/dts/stih416.dtsi          |   2 +-
- arch/arm/boot/dts/vexpress-v2m-rs1.dtsi |   2 +-
- arch/arm/include/asm/fiq.h              |   1 +
- arch/arm/include/asm/kgdb.h             |   7 ++
- arch/arm/kernel/Makefile                |   1 +
- arch/arm/kernel/entry-armv.S            | 151 +----------------------------
- arch/arm/kernel/entry-header.S          | 164 ++++++++++++++++++++++++++++++++
- arch/arm/kernel/fiq.c                   |  50 ++++++++++
- arch/arm/kernel/kgdb_fiq.c              | 117 +++++++++++++++++++++++
- arch/arm/kernel/kgdb_fiq_entry.S        |  87 +++++++++++++++++
- drivers/irqchip/irq-gic.c               |  62 +++++++++++-
- drivers/irqchip/irq-vic.c               |  23 +++++
- drivers/tty/serial/amba-pl011.c         |  18 +++-
- drivers/tty/serial/st-asc.c             |  25 +++++
- include/linux/irqchip/arm-gic.h         |   3 +
- include/linux/irqchip/arm-vic.h         |   1 +
- 18 files changed, 576 insertions(+), 158 deletions(-)
- create mode 100644 arch/arm/kernel/kgdb_fiq.c
- create mode 100644 arch/arm/kernel/kgdb_fiq_entry.S
-
+diff --git a/arch/arm/include/asm/fiq.h b/arch/arm/include/asm/fiq.h
+index d493d0b..5a2a9b9 100644
+--- a/arch/arm/include/asm/fiq.h
++++ b/arch/arm/include/asm/fiq.h
+@@ -38,6 +38,7 @@ extern void release_fiq(struct fiq_handler *f);
+ extern void set_fiq_handler(void *start, unsigned int length);
+ extern void enable_fiq(int fiq);
+ extern void disable_fiq(int fiq);
++extern void eoi_fiq(int fiq);
+ 
+ /* helpers defined in fiqasm.S: */
+ extern void __set_fiq_regs(unsigned long const *regs);
+diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
+index 918875d..defbe85 100644
+--- a/arch/arm/kernel/fiq.c
++++ b/arch/arm/kernel/fiq.c
+@@ -40,6 +40,7 @@
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/seq_file.h>
++#include <linux/irq.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
+@@ -139,6 +140,15 @@ void disable_fiq(int fiq)
+ 	disable_irq(fiq + fiq_start);
+ }
+ 
++void eoi_fiq(int fiq)
++{
++	struct irq_data *irq_data = irq_get_irq_data(fiq + fiq_start);
++	struct irq_chip *chip = irq_data_get_irq_chip(irq_data);
++
++	if (chip->irq_eoi)
++			chip->irq_eoi(irq_data);
++}
++
+ EXPORT_SYMBOL(set_fiq_handler);
+ EXPORT_SYMBOL(__set_fiq_regs);	/* defined in fiqasm.S */
+ EXPORT_SYMBOL(__get_fiq_regs);	/* defined in fiqasm.S */
+@@ -146,6 +156,7 @@ EXPORT_SYMBOL(claim_fiq);
+ EXPORT_SYMBOL(release_fiq);
+ EXPORT_SYMBOL(enable_fiq);
+ EXPORT_SYMBOL(disable_fiq);
++EXPORT_SYMBOL(eoi_fiq);
+ 
+ void __init init_FIQ(int start)
+ {
 -- 
 1.9.0
