@@ -1,126 +1,87 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 14 May 2014 19:57:46 +0200
-Subject: [PATCH v3 1/6] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <20140514165722.GA18495@kwain>
-References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
- <31922167.uMVzxsQNIT@wuerfel> <20140514154929.GA8016@kwain>
- <4414637.rKolGB14Rm@wuerfel> <20140514165722.GA18495@kwain>
-Message-ID: <5373AE9A.3050008@gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 14 May 2014 20:03:09 +0200
+Subject: [GIT PULL 2/4] Samsung clock non-critical fixes for v3.16
+In-Reply-To: <1400090591-5064-1-git-send-email-t.figa@samsung.com>
+References: <1400090591-5064-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1400090591-5064-2-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2014 06:57 PM, Antoine T?nart wrote:
-> On Wed, May 14, 2014 at 06:11:24PM +0200, Arnd Bergmann wrote:
->> On Wednesday 14 May 2014 17:49:29 Antoine T?nart wrote:
->>> On Wed, May 14, 2014 at 05:31:24PM +0200, Arnd Bergmann wrote:
->>>> Why do you need a custom mask? Is that something you could pass
->>>> as the argument in the phy descriptor using #phy-cells=<1>?
->>>
->>> I meant a custom mask in the AHCI driver, when calling the
->>> ahci_platform_init_host() function. Otherwise we'll have problems on the
->>> BG2Q DMP (it only has one PHY available, and not initializing it is not
->>> enough).
->>
->> Ah, I see what you mean now. Of course, this could also be an optional
->> property in the generic AHCI binding, which would require that you
->> specify the available ports in DT for nonstandard masks.
->>
->> Just to confirm: The HOST_PORTS_IMPL register on BG2Q DMP has an
->> value that we can't use here to determine the available ports, right?
-> 
-> Right. The register is here but saying there are 2 available ports,
-> which is true for the BG2Q SoC but not true for the BG2Q DMP board. So
-> the AHCI framework reads the register and performs a misconfiguration of
-> the SATA.
+The following changes since commit d39e55e06371c1ba9d11f4a17a56a0f925d12415:
 
-*Disclaimer:* All PHY IP related comments below are *pure* guessing. I
-have no clue how that PHY really looks like or how it is wired up.
+  clk/exynos5260: add clock file for exynos5260 (2014-05-14 19:16:55 +0200)
 
-I think it is time to sum this up a little bit and help Antoine carry
-on this patches.
+are available in the git repository at:
 
->From what I understand from the conversation, we have a single PHY
-register set dealing with both SATA ports available on the SoC.
-Also, from the name of the PHY bits we assume the PHY may be able
-to work in different modes than just SATA. And we currently have
-an AHCI-compatible SATA IP that supports up to two ports, with one
-actually connected to a SATA plug on the DMP board.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git for_3.16/clk_fixes_non_critical
 
-Now, thinking about the PHY binding and the (possible) multi-protocol
-support, it can be possible that on BG2Q there is a generic 2-lane
-LVDS PHY that can be configured to support SATA or PCIe. Both are
-electrically and bit-level compatible, so they could be internally
-wired-up with AHCI and PCIe controller.
+for you to fetch changes up to 773424326b51cc851b6e28ff22447ba5fcc5f429:
 
->From a DT point-of-view, we need a way to (a) link each SATA or PCIe
-port to the PHY, (b) specify the PHY lane to be used, and (c) specify
-the protocol to be used on that lane. If I got it right, Arnd already
-mentioned to use the phy-specifier to deal with it:
+  clk: samsung: exynos5420: add more registers to restore list (2014-05-14 19:40:24 +0200)
 
-e.g. phy = <&genphy 0 MODE_SATA> or phy = <&genphy 1 MODE_PCIE>
+----------------------------------------------------------------
 
-Let's assume we have one dual-port SATA controller and one PCIe
-controller with either x1 or x2 support. The only sane DT binding,
-I can think of then would be:
+Samsung clock non-critical fixes for v3.16.
 
-berlin2q.dtsi:
+This pull requests contains a number of non-critical fixes for Samsung clock
+framework and drivers, including:
 
-genphy: lvds at ea00ff {
-	compatible = "marvell,berlin-lvds-phy";
-	reg = <0xea00ff 0x100>;
-	#phy-cells = <2>;
-};
+1) a series of fixes for Exynos5420 to correct clock definitions and make the
+driver closer to the documentation,
 
-sata: sata at ab00ff {
-	compatible = "ahci-platform";
-	reg = <0xab00ff 0x100>;
-	
-	sata0: sata-port at 0 {
-		reg = <0>;
-		phy = <&genphy 0 MODE_SATA>;
-		status = "disabled";
-	};
+2) several missing clocks and clock IDs added to Exynos4, Exynos5250 and
+Exynos5420 drivers,
 
-	sata1: sata-port at 1 {
-		reg = <1>;
-		phy = <&genphy 1 MODE_SATA>;
-		status = "disabled";
-	};
-};
+3) fix for incorrect initialization of clock table with NULL,
 
-pcie: pcie at ab01ff {
-	compatible = "marvell,berlin-pcie";
-	reg = <0xab01ff 0x100>;
+4) compiler warning fix.
 
-	pcie0: pcie-port at 0 {
-		reg = <0>;
-		/* set phy on a per-board basis */
-		/* PCIe x1 on Lane 0 : phy = <&genphy 0 MODE_PCIE>; */
-		/* PCIe x2 on Lane 0 and 1 : phy = <&genphy 0 MODE_PCIE>, <&genphy 1
-MODE_PCIE>; */
-		status = "disabled";
-	};
-};
+----------------------------------------------------------------
+Arun Kumar K (2):
+      clk: samsung: exynos5250: Add clocks for G3D
+      clk: samsung: exynos5420: Add clock IDs needed by GPU
 
-berlin2q-dmp.dts:
+Naveen Krishna Chatradhi (1):
+      clk: samsung: exynos5250/5420: Add gate clock for SSS module
 
-&sata1 {
-	status = "okay";
-};
+Pankaj Dubey (1):
+      clk: samsung: fixed compiler warning [-Wpointer-to-int-cast]
 
-&pcie0 {
-	phy = <&genphy 1 MODE_PCIE>;
-};
+Sachin Kamat (1):
+      clk: samsung: exynos5420: Fix VPLL lock offset
 
-berlin2q-foo.dts:
+Shaik Ameer Basha (15):
+      clk: samsung: exynos5420: Rename mux parent arrays
+      clk: samsung: exynos5420: add clocks for ISP block
+      clk: samsung: exynos5420: update clocks for GSCL and MSCL blocks
+      clk: samsung: exynos5420: fix parent clocks for mscl sysmmu
+      clk: samsung: exynos5420: update clocks for G2D and G3D blocks
+      clk: samsung: exynos5420: update clocks for DISP1 block
+      clk: samsung: exynos5420: update clocks for PERIC block
+      clk: samsung: exynos5420: update clocks for PERIS and GEN blocks
+      clk: samsung: exynos5420: update clocks for WCORE block
+      clk: samsung: exynos5420: update clocks for FSYS and FSYS2 blocks
+      clk: samsung: exynos5420: correct sysmmu-mfc parent clocks
+      clk: samsung: exynos5420: fix register offset for sclk_bpll
+      clk: samsung: exynos5420: update clocks for MAU Block
+      clk: samsung: exynos5420: add misc clocks
+      clk: samsung: exynos5420: add more registers to restore list
 
-&pcie0 {
-	phy = <&genphy 0 MODE_PCIE>, <&genphy 1 MODE_PCIE>;
-};
+Sylwester Nawrocki (1):
+      clk: samsung: exynos4: Use single clock ID for CLK_MDMA gate clocks
 
-For the driver, Antoine then would have to squeeze all PHY register
-mangling in phy-berlin2.c and see how to make ahci-platform aware of
-individual port nodes (I haven't looked up if it already exists, sorry)
-and announce only enabled port child nodes, right?
+Tomasz Figa (1):
+      clk: samsung: Initialize clock table with error pointers
 
-Sebastian
+Tomasz Stanislawski (1):
+      clk: samsung: exynos4: export sclk_hdmiphy clock
+
+ arch/arm/boot/dts/exynos5420.dtsi      |  14 +-
+ drivers/clk/samsung/clk-exynos4.c      |   4 +-
+ drivers/clk/samsung/clk-exynos5250.c   |  16 +-
+ drivers/clk/samsung/clk-exynos5420.c   | 854 +++++++++++++++++++++------------
+ drivers/clk/samsung/clk.c              |   9 +-
+ include/dt-bindings/clock/exynos4.h    |   2 +-
+ include/dt-bindings/clock/exynos5250.h |   5 +-
+ include/dt-bindings/clock/exynos5420.h |  39 +-
+ 8 files changed, 608 insertions(+), 335 deletions(-)
