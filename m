@@ -1,41 +1,43 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 14 May 2014 16:09:46 +0900
-Subject: [PATCH 00/03] ARM: shmobile: Use shmobile_init_delay() on r8a7791
-In-Reply-To: <1509906.x9u0HJ6AbJ@avalon>
-References: <20140511232508.20177.11556.sendpatchset@w520>
- <1509906.x9u0HJ6AbJ@avalon>
-Message-ID: <CANqRtoQxGcTUvU1qAcJTy8ONPNmcx5CBNcrXASoMCVpAyOAfqw@mail.gmail.com>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Wed, 14 May 2014 09:20:10 +0200
+Subject: [PATCH v4 8/8] cpufreq: exynos: remove all exynos specific cpufreq
+ driver support
+In-Reply-To: <1400029876-5830-9-git-send-email-thomas.ab@samsung.com>
+References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
+ <1400029876-5830-9-git-send-email-thomas.ab@samsung.com>
+Message-ID: <20140514092010.02e16520@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Hi Thomas,
 
-On Tue, May 13, 2014 at 5:00 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> Hi Magnus,
->
-> On Monday 12 May 2014 08:25:08 Magnus Damm wrote:
->> ARM: shmobile: Use shmobile_init_delay() on r8a7791
->>
->> [PATCH 01/03] ARM: shmobile: Use r8a7791 DT CPU Frequency in common case
->> [PATCH 02/03] ARM: shmobile: Use r8a7791 DT CPU Frequency for Koelsch
->> [PATCH 03/03] ARM: shmobile: Remove unused r8a7791_init_early()
->>
->> Convert r8a7791 to rely on shmobile_init_delay() instead of using a per-SoC
->> delay setup function.
->
-> I'm afraid this patch set causes a boot time and CPU load regression on
-> Koelsch. With Simon's latest devel branch which has the patches applied, the
-> kernel boot time (using koelsch_defconfig) up to the point where the kernel
-> tries to connect to the DHCP server is 17.898437s. The CPU load (as reported
-> by top) on an idle system is then around 33%, spent in [kworker/0:1]. If I
-> revert the patches the same time goes down to 1.921875s and the CPU load on an
-> idle system is close to 0.
+> -config ARM_EXYNOS_CPU_FREQ_BOOST_SW
+> -	bool "EXYNOS Frequency Overclocking - Software"
+> -	depends on ARM_EXYNOS_CPUFREQ
+> -	select CPU_FREQ_BOOST_SW
+> -	select EXYNOS_THERMAL
+> -	help
+> -	  This driver supports software managed overclocking (BOOST).
+> -	  It allows usage of special frequencies for Samsung Exynos
+> -	  processors if thermal conditions are appropriate.
+> -
+> -	  It reguires, for safe operation, thermal framework with
+> properly
+> -	  defined trip points.
+> -
+> -	  If in doubt, say N.
+> -
 
-Thanks for testing and reporting this! I believe Simon has posted a
-fix for this issue which is related to MHz vs Hz bug introduced by me
-in function shmobile_init_delay(). Things should be in order now.
+If I might ask, where this switch,to enable BOOST, will be moved? All
+in all, I would like to be able to enable boost :-).
 
-Cheers,
+In my opinion we should have the Kconfig option to enable/disable the
+CPU_FREQ_BOOST_SW and this may be used with cpufreq-cpu0 driver as I've
+pointed out in the other patch.
 
-/ magnus
+-- 
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
