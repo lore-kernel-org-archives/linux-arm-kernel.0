@@ -1,276 +1,422 @@
 From: anders.berg@avagotech.com (Anders Berg)
-Date: Wed, 14 May 2014 20:37:59 +0200
-Subject: [PATCH v3 4/6] ARM: axxia: Adding defconfig for AXM55xx
+Date: Wed, 14 May 2014 20:37:57 +0200
+Subject: [PATCH v3 2/6] clk: Add clock driver for AXM55xx SoC
 In-Reply-To: <cover.1400072260.git.anders.berg@avagotech.com>
 References: <cover.1400072260.git.anders.berg@avagotech.com>
-Message-ID: <90c2e69bf5d99a98aa5fc7b063455bc681e2e320.1400072260.git.anders.berg@avagotech.com>
+Message-ID: <a83c5e1272d7a3242701504f238789592c2ec80f.1400072260.git.anders.berg@avagotech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Anders Berg <anders.berg@lsi.com>
 
-Add a defconfig file for the LSI Axxia family of devices (CONFIG_ARCH_AXXIA).
+Add clk driver to support clock blocks found on the AXM55xx devices. The driver
+provides clock implementations for three different types of clock devices on
+the AXM55xx device: PLL clock, a clock divider and a clock mux.
 
 Signed-off-by: Anders Berg <anders.berg@lsi.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/configs/axm55xx_defconfig | 248 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 248 insertions(+)
- create mode 100644 arch/arm/configs/axm55xx_defconfig
+ .../devicetree/bindings/clock/clk-axxia.txt        |  88 +++++++
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-axxia.c                            | 281 +++++++++++++++++++++
+ 3 files changed, 370 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/clk-axxia.txt
+ create mode 100644 drivers/clk/clk-axxia.c
 
-diff --git a/arch/arm/configs/axm55xx_defconfig b/arch/arm/configs/axm55xx_defconfig
+diff --git a/Documentation/devicetree/bindings/clock/clk-axxia.txt b/Documentation/devicetree/bindings/clock/clk-axxia.txt
 new file mode 100644
-index 0000000..d3260d7
+index 0000000..94eb840
 --- /dev/null
-+++ b/arch/arm/configs/axm55xx_defconfig
-@@ -0,0 +1,248 @@
-+CONFIG_SYSVIPC=y
-+CONFIG_POSIX_MQUEUE=y
-+CONFIG_FHANDLE=y
-+CONFIG_AUDIT=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+CONFIG_BSD_PROCESS_ACCT_V3=y
-+CONFIG_TASKSTATS=y
-+CONFIG_TASK_DELAY_ACCT=y
-+CONFIG_TASK_XACCT=y
-+CONFIG_TASK_IO_ACCOUNTING=y
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_LOG_BUF_SHIFT=16
-+CONFIG_NAMESPACES=y
-+# CONFIG_UTS_NS is not set
-+# CONFIG_IPC_NS is not set
-+# CONFIG_PID_NS is not set
-+# CONFIG_NET_NS is not set
-+CONFIG_SCHED_AUTOGROUP=y
-+CONFIG_RELAY=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_EMBEDDED=y
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_PROFILING=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_IOSCHED_DEADLINE is not set
-+CONFIG_ARCH_AXXIA=y
-+CONFIG_GPIO_PCA953X=y
-+CONFIG_ARM_LPAE=y
-+CONFIG_ARM_THUMBEE=y
-+CONFIG_ARM_ERRATA_430973=y
-+CONFIG_ARM_ERRATA_643719=y
-+CONFIG_ARM_ERRATA_720789=y
-+CONFIG_ARM_ERRATA_754322=y
-+CONFIG_ARM_ERRATA_754327=y
-+CONFIG_ARM_ERRATA_764369=y
-+CONFIG_ARM_ERRATA_775420=y
-+CONFIG_ARM_ERRATA_798181=y
-+CONFIG_PCI=y
-+CONFIG_PCI_MSI=y
-+CONFIG_PCIE_AXXIA=y
-+CONFIG_SMP=y
-+CONFIG_NR_CPUS=16
-+CONFIG_HOTPLUG_CPU=y
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+CONFIG_OABI_COMPAT=y
-+CONFIG_HIGHMEM=y
-+CONFIG_KSM=y
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_VFP=y
-+CONFIG_NEON=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_BINFMT_MISC=y
-+# CONFIG_SUSPEND is not set
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_XFRM_USER=y
-+CONFIG_XFRM_SUB_POLICY=y
-+CONFIG_XFRM_MIGRATE=y
-+CONFIG_XFRM_STATISTICS=y
-+CONFIG_NET_KEY=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_IP_PNP_BOOTP=y
-+CONFIG_INET_AH=y
-+CONFIG_INET_ESP=y
-+CONFIG_INET_IPCOMP=y
-+# CONFIG_INET_LRO is not set
-+# CONFIG_IPV6 is not set
-+CONFIG_NETWORK_PHY_TIMESTAMPING=y
-+CONFIG_BRIDGE=y
-+# CONFIG_WIRELESS is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_MTD=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_AFS_PARTS=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_CFI_INTELEXT=y
-+CONFIG_MTD_CFI_AMDSTD=y
-+CONFIG_MTD_CFI_STAA=y
-+CONFIG_MTD_PHYSMAP=y
-+CONFIG_MTD_PHYSMAP_OF=y
-+CONFIG_MTD_M25P80=y
-+CONFIG_PROC_DEVICETREE=y
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_EEPROM_AT24=y
-+CONFIG_EEPROM_AT25=y
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_CHR_DEV_SG=y
-+CONFIG_ATA=y
-+CONFIG_PATA_PLATFORM=y
-+CONFIG_PATA_OF_PLATFORM=y
-+CONFIG_MD=y
-+CONFIG_BLK_DEV_DM=y
-+CONFIG_DM_UEVENT=y
-+CONFIG_NETDEVICES=y
-+CONFIG_TUN=y
-+CONFIG_VETH=y
-+CONFIG_VIRTIO_NET=y
-+# CONFIG_NET_CADENCE is not set
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_CIRRUS is not set
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+# CONFIG_NET_VENDOR_MARVELL is not set
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+# CONFIG_NET_VENDOR_SMSC is not set
-+# CONFIG_NET_VENDOR_STMICRO is not set
-+# CONFIG_NET_VENDOR_VIA is not set
-+# CONFIG_NET_VENDOR_WIZNET is not set
-+CONFIG_BROADCOM_PHY=y
-+# CONFIG_WLAN is not set
-+# CONFIG_MOUSE_PS2_ALPS is not set
-+# CONFIG_MOUSE_PS2_LOGIPS2PP is not set
-+# CONFIG_MOUSE_PS2_SYNAPTICS is not set
-+# CONFIG_MOUSE_PS2_TRACKPOINT is not set
-+# CONFIG_SERIO_SERPORT is not set
-+CONFIG_SERIO_AMBAKMI=y
-+CONFIG_LEGACY_PTY_COUNT=16
-+CONFIG_SERIAL_AMBA_PL011=y
-+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-+CONFIG_VIRTIO_CONSOLE=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_I2C=y
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_MUX=y
-+CONFIG_I2C_AXXIA=y
-+CONFIG_SPI=y
-+CONFIG_SPI_PL022=y
-+CONFIG_DP83640_PHY=y
-+CONFIG_GPIOLIB=y
-+CONFIG_GPIO_SYSFS=y
-+CONFIG_GPIO_PL061=y
-+CONFIG_POWER_SUPPLY=y
-+CONFIG_POWER_RESET=y
-+CONFIG_POWER_RESET_AXXIA=y
-+CONFIG_SENSORS_ADT7475=y
-+CONFIG_SENSORS_JC42=y
-+CONFIG_SENSORS_LM75=y
-+CONFIG_PMBUS=y
-+CONFIG_SENSORS_LTC2978=y
-+CONFIG_WATCHDOG=y
-+CONFIG_ARM_SP805_WATCHDOG=y
-+CONFIG_FB=y
-+CONFIG_FB_ARMCLCD=y
-+CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_LOGO=y
-+# CONFIG_LOGO_LINUX_MONO is not set
-+# CONFIG_LOGO_LINUX_VGA16 is not set
-+CONFIG_HID_A4TECH=y
-+CONFIG_HID_APPLE=y
-+CONFIG_HID_BELKIN=y
-+CONFIG_HID_CHERRY=y
-+CONFIG_HID_CHICONY=y
-+CONFIG_HID_CYPRESS=y
-+CONFIG_HID_DRAGONRISE=y
-+CONFIG_HID_EZKEY=y
-+CONFIG_HID_KYE=y
-+CONFIG_HID_GYRATION=y
-+CONFIG_HID_TWINHAN=y
-+CONFIG_HID_KENSINGTON=y
-+CONFIG_HID_LOGITECH=y
-+CONFIG_HID_MICROSOFT=y
-+CONFIG_HID_MONTEREY=y
-+CONFIG_HID_NTRIG=y
-+CONFIG_HID_ORTEK=y
-+CONFIG_HID_PANTHERLORD=y
-+CONFIG_HID_PETALYNX=y
-+CONFIG_HID_SAMSUNG=y
-+CONFIG_HID_SUNPLUS=y
-+CONFIG_HID_GREENASIA=y
-+CONFIG_HID_SMARTJOYPLUS=y
-+CONFIG_HID_TOPSEED=y
-+CONFIG_HID_THRUSTMASTER=y
-+CONFIG_HID_ZEROPLUS=y
-+CONFIG_USB=y
-+CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
-+CONFIG_USB_EHCI_HCD=y
-+# CONFIG_USB_EHCI_TT_NEWSCHED is not set
-+CONFIG_USB_EHCI_HCD_AXXIA=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_MMC=y
-+CONFIG_MMC_ARMMMCI=y
-+CONFIG_DMADEVICES=y
-+CONFIG_PL330_DMA=y
-+CONFIG_VIRT_DRIVERS=y
-+CONFIG_VIRTIO_MMIO=y
-+CONFIG_MAILBOX=y
-+CONFIG_PL320_MBOX=y
-+# CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
-+CONFIG_EXT4_FS=y
-+CONFIG_AUTOFS4_FS=y
-+CONFIG_FUSE_FS=y
-+CONFIG_CUSE=y
-+CONFIG_FSCACHE=y
-+CONFIG_FSCACHE_STATS=y
-+CONFIG_FSCACHE_HISTOGRAM=y
-+CONFIG_FSCACHE_DEBUG=y
-+CONFIG_FSCACHE_OBJECT_LIST=y
-+CONFIG_CACHEFILES=y
-+CONFIG_CACHEFILES_HISTOGRAM=y
-+CONFIG_ISO9660_FS=y
-+CONFIG_UDF_FS=y
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_NTFS_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_JFFS2_FS=y
-+CONFIG_CRAMFS=y
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V4=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_NFS_FSCACHE=y
-+CONFIG_SUNRPC_DEBUG=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_PRINTK_TIME=y
-+CONFIG_DEBUG_INFO=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_MAGIC_SYSRQ=y
-+# CONFIG_SCHED_DEBUG is not set
-+CONFIG_RCU_CPU_STALL_TIMEOUT=60
-+# CONFIG_FTRACE is not set
-+CONFIG_DEBUG_USER=y
-+CONFIG_CRYPTO_GCM=y
-+CONFIG_CRYPTO_XCBC=y
-+CONFIG_CRYPTO_SHA256=y
-+# CONFIG_CRYPTO_ANSI_CPRNG is not set
-+CONFIG_VIRTUALIZATION=y
-+CONFIG_KVM=y
++++ b/Documentation/devicetree/bindings/clock/clk-axxia.txt
+@@ -0,0 +1,88 @@
++* Axxia clock driver bindings
++
++This document contains bindings for the Axxia PLL, clock divider and mux. The
++binding uses the common clock binding found in:
++
++	Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++* Axxia PLL
++
++Required properties:
++- #clock-cells : shall be set to 0.
++- compatible : shall be "lsi,axxia-pll-clock"
++- clocks : parent clock phandle
++- reg - specifies PLL control registers
++
++Optional properties:
++- clock-output-names : From common clock binding.
++
++Example:
++
++	clk_ref0: clk_ref0 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <125000000>;
++	};
++
++	clk_cpu_pll: clk_cpu_pll at 2010022000 {
++		compatible = "lsi,axxia-pll-clock";
++		#clock-cells = <0>;
++		clocks = <&clk_ref0>;
++		clock-output-names = "clk_cpu_pll";
++		reg = <0x20 0x10022000 0 0x2c>;
++	};
++
++
++* Axxia clock divider
++
++Required properties:
++- #clock-cells : shall be set to 0.
++- compatible : shall be "lsi,axxia-div-clock"
++- clocks : parent clock phandle
++- reg - clock divider control register
++- lsi,bit-shift : bit position of the divider control field.
++- lsi,bit-mask : width of the divider control field.
++
++Optional properties:
++- clock-output-names : From common clock binding.
++
++Example:
++
++	clk_cpu_div: cpu {
++		compatible = "lsi,axxia-div-clock";
++		#clock-cells = <0>;
++		clocks = <&clk_cpu_pll>;
++		clock-output-names = "clk_cpu_div";
++		reg = <0x20 0x10030008 0 0x4>;
++		lsi,bit-shift = <0>;
++		lsi,bit-width = <4>;
++	};
++
++
++* Axxia clock mux
++
++Required properties:
++- #clock-cells : shall be set to 0.
++- compatible : shall be "lsi,axxia-mux-clock"
++- clocks : phandle of parent clocks (max 4)
++- reg - clock divider control register
++- lsi,bit-shift : bit position of the divider control field.
++- lsi,bit-mask : width of the divider control field.
++
++Optional properties:
++- clock-output-names : From common clock binding.
++
++Example:
++
++	clk_cpu: clk_cpu0 at 2010030000 {
++		compatible = "lsi,axxia-mux-clock";
++		#clock-cells = <0>;
++		clocks = <&clk_ref0>,
++			 <&clk_cpu_pll>,
++			 <&clk_cpu_div>,
++			 <&clk_cpu_div>;
++		clock-output-names = "clk_cpu";
++		reg = <0x20 0x10030000 0 0x4>;
++		lsi,bit-shift = <0>;
++		lsi,bit-width = <2>;
++	};
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 5f8a287..ff28168 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -12,6 +12,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
+ # hardware specific clock types
+ # please keep this section sorted lexicographically by file/directory path name
+ obj-$(CONFIG_COMMON_CLK_AXI_CLKGEN)	+= clk-axi-clkgen.o
++obj-$(CONFIG_ARCH_AXXIA)		+= clk-axxia.o
+ obj-$(CONFIG_ARCH_BCM2835)		+= clk-bcm2835.o
+ obj-$(CONFIG_ARCH_EFM32)		+= clk-efm32gg.o
+ obj-$(CONFIG_ARCH_HIGHBANK)		+= clk-highbank.o
+diff --git a/drivers/clk/clk-axxia.c b/drivers/clk/clk-axxia.c
+new file mode 100644
+index 0000000..996b8f2
+--- /dev/null
++++ b/drivers/clk/clk-axxia.c
+@@ -0,0 +1,281 @@
++/*
++ * arch/arm/mach-axxia/clock.c
++ *
++ * Provides clock implementations for three different types of clock devices on
++ * the Axxia device: PLL clock, a clock divider and a clock mux.
++ *
++ * Copyright (C) 2012 LSI
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ */
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/slab.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/clk-provider.h>
++
++
++static void __iomem *
++parse_and_map_reg(struct device_node *node, u32 *shift, u32 *width)
++{
++	void __iomem *reg;
++
++	if (of_property_read_u32(node, "lsi,bit-shift", shift)) {
++		pr_err("%s: no 'lsi,bit-shift' property\n", node->name);
++		return NULL;
++	}
++
++	if (of_property_read_u32(node, "lsi,bit-width", width)) {
++		pr_err("%s: no 'lsi,bit-width' property\n", node->name);
++		return NULL;
++	}
++
++	reg = of_iomap(node, 0);
++	if (!reg)
++		pr_err("%s: failed to map register\n", node->name);
++
++	return reg;
++}
++
++/**
++ * struct axxia_pllclk - Axxia PLL generated clock.
++ * @hw: clk_hw for the PLL
++ * @regs: Pointer to control registers
++ */
++struct axxia_pllclk {
++	struct clk_hw hw;
++	void __iomem *regs;
++};
++
++#define to_axxia_pll(_hw) container_of(_hw, struct axxia_pllclk, hw)
++
++static unsigned long
++axxia_pllclk_recalc(struct clk_hw *hw, unsigned long parent_rate)
++{
++	struct axxia_pllclk *pll = to_axxia_pll(hw);
++	unsigned long rate, fbdiv, refdiv, postdiv;
++	u32 control;
++
++	control = readl(pll->regs);
++	postdiv = ((control >> 0) & 0xf) + 1;
++	fbdiv   = ((control >> 4) & 0xfff) + 3;
++	refdiv  = ((control >> 16) & 0x1f) + 1;
++	rate = (parent_rate / (refdiv * postdiv)) * fbdiv;
++
++	return rate;
++}
++
++static const struct clk_ops clk_pll_ops = {
++	.recalc_rate = axxia_pllclk_recalc,
++};
++
++static struct clk *
++register_axxia_pllclk(struct device *dev, const char *name,
++		      const char *parent_name, void __iomem *regs)
++{
++	struct clk_init_data init;
++	struct axxia_pllclk *pll;
++	struct clk *clk;
++
++	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
++	if (!pll)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = name;
++	init.ops = &clk_pll_ops;
++	init.flags = 0;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++
++	pll->regs = regs;
++	pll->hw.init = &init;
++
++	clk = clk_register(NULL, &pll->hw);
++	if (IS_ERR(clk))
++		kfree(pll);
++
++	return clk;
++}
++
++
++/**
++ * struct axxia_divclk - Axxia clock divider
++ * @hw: clk_hw for the divider
++ * @regs: Pointer to control registers
++ */
++struct axxia_divclk {
++	struct clk_hw hw;
++	void __iomem *regs;
++	int shift;
++	int width;
++};
++
++#define to_axxia_divclk(_hw) container_of(_hw, struct axxia_divclk, hw)
++
++static unsigned long
++axxia_divclk_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++{
++	struct axxia_divclk *divclk = to_axxia_divclk(hw);
++	u32 ctrl, div;
++
++	ctrl = readl(divclk->regs);
++	div = 1 + ((ctrl >> divclk->shift) & GENMASK(divclk->width-1, 0));
++
++	return parent_rate / div;
++}
++
++const struct clk_ops axxia_divclk_ops = {
++	.recalc_rate = axxia_divclk_recalc_rate,
++};
++
++static struct clk *
++register_axxia_divclk(struct device *dev, const char *name,
++		      const char *parent_name, void __iomem *regs,
++		      int shift, int width)
++{
++	struct axxia_divclk *div;
++	struct clk *clk;
++	struct clk_init_data init;
++
++	div = kzalloc(sizeof(struct axxia_divclk), GFP_KERNEL);
++	if (!div)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = name;
++	init.ops = &axxia_divclk_ops;
++	init.flags = CLK_IS_BASIC;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++
++	div->regs = regs;
++	div->shift = shift;
++	div->width = width;
++	div->hw.init = &init;
++
++	/* register the clock */
++	clk = clk_register(dev, &div->hw);
++	if (IS_ERR(clk))
++		kfree(div);
++
++	return clk;
++}
++
++/**
++ * axxia_pll_clk_init - Axxia PLL clock setup function
++ * @node: pointer to device tree node
++ */
++static void __init
++axxia_pll_clk_init(struct device_node *node)
++{
++	struct clk *clk;
++	const char *parent_name;
++	void __iomem *regs;
++	const char *clk_name = node->name;
++
++	of_property_read_string(node, "clock-output-names", &clk_name);
++
++	parent_name = of_clk_get_parent_name(node, 0);
++	if (!parent_name) {
++		pr_err("%s: no parent clock\n", node->name);
++		return;
++	}
++
++	regs = of_iomap(node, 0);
++	if (!regs) {
++		pr_err("%s: failed to map register\n", node->name);
++		return;
++	}
++
++	clk = register_axxia_pllclk(NULL, clk_name, parent_name, regs);
++	if (IS_ERR(clk)) {
++		pr_err("%s: register failed (%ld)\n", clk_name, PTR_ERR(clk));
++		iounmap(regs);
++		return;
++	}
++
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(axxia_pll_clk, "lsi,axxia-pll-clock", axxia_pll_clk_init);
++
++
++/**
++ * axxia_div_clk_init - Axxia clock divider setup function
++ * @node: device tree node for this clock
++ */
++static void __init
++axxia_div_clk_init(struct device_node *node)
++{
++	const char *parent_name;
++	void __iomem *reg;
++	u32 shift, width;
++	struct clk *clk;
++	const char *clk_name = node->name;
++
++	of_property_read_string(node, "clock-output-names", &clk_name);
++
++	parent_name = of_clk_get_parent_name(node, 0);
++	if (!parent_name) {
++		pr_err("%s: no parent clock\n", node->name);
++		return;
++	}
++
++	reg = parse_and_map_reg(node, &shift, &width);
++	if (!reg)
++		return;
++
++	clk = register_axxia_divclk(NULL, clk_name, parent_name, reg,
++				    shift, width);
++	if (IS_ERR(clk)) {
++		pr_err("%s: register failed (%ld)\n", clk_name, PTR_ERR(clk));
++		iounmap(reg);
++		return;
++	}
++
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(axxia_div_clk, "lsi,axxia-div-clock", axxia_div_clk_init);
++
++
++/**
++ * axxia_mux_clk_init - Clock mux setup function
++ * @node: device tree node for this clock
++ */
++static void __init
++axxia_mux_clk_init(struct device_node *node)
++{
++	void __iomem *reg;
++	struct clk *clk;
++	const char *parents[4];
++	int num_parents;
++	const char *clk_name = node->name;
++	u32 shift, width;
++	int i;
++
++	of_property_read_string(node, "clock-output-names", &clk_name);
++
++	for (i = 0; i < ARRAY_SIZE(parents); ++i) {
++		parents[i] = of_clk_get_parent_name(node, i);
++		if (!parents[i])
++			break;
++	}
++	num_parents = i;
++
++	reg = parse_and_map_reg(node, &shift, &width);
++	if (!reg)
++		return;
++
++	clk = clk_register_mux(NULL, clk_name, parents,
++			       num_parents, 0, reg, shift, width,
++			       CLK_MUX_READ_ONLY, NULL);
++	if (IS_ERR(clk)) {
++		pr_err("%s: register failed (%ld)\n", clk_name, PTR_ERR(clk));
++		iounmap(reg);
++		return;
++	}
++
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(pll_mux_clock, "lsi,axxia-mux-clock", axxia_mux_clk_init);
 -- 
 1.8.3.2
