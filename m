@@ -1,56 +1,44 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 14 May 2014 16:23:19 +0300
-Subject: [PATCH 11/17] ARM: dts: dra7xx-clocks: Add missing 32khz clocks
- used for PHY
-In-Reply-To: <1399383244-14556-12-git-send-email-kishon@ti.com>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>
- <1399383244-14556-12-git-send-email-kishon@ti.com>
-Message-ID: <53736E47.4070402@ti.com>
+From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
+Date: Wed, 14 May 2014 15:24:08 +0200
+Subject: [PATCH v2 00/10] ARM: STi: Add Clock driver support STiH415 & STiH416
+Message-ID: <1400073858-28912-1-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+Changes in v2:
+ - move stih415-clks.h & stih416-clks.h to include/dt-bindings/clock/
+ - add clk_ignore_unused to bootargs. Interconnect clocks are not yet
+   managed at the init, then we have to start the kernel with 
+   clk_ignore_unused.
 
+The goal of this series is to add DT definition for STiH415 
+and STiH416 SoCs on B2000 and B2020 boards.
 
-On 05/06/2014 04:33 PM, Kishon Vijay Abraham I wrote:
-> Added missing 32khz clock used by PCIe PHY.
-> The documention for this node can be found @ ../bindings/clock/ti/gate.txt.
+Gabriel Fernandez (10):
+  ARM: STi: DT: STiH416: 416 DT Entry for clockgen A0/1/10/11/12
+  ARM: STi: DT: STiH416: Remove unused CLK_S_ICN_REG_0 fixed clock
+  ARM: STi: DT: STiH416: Remove unused CLK_S_GMAC0_PHY & CLK_S_ETH1_PHY
+    fixed clocks
+  ARM: STi: DT: STiH416: 416 DT Entry for clockgen B/C/D/E/F
+  ARM: STi: DT: STiH416: 416 DT Entry for clockgen A9/DDR/GPU
+  ARM: STi: DT: STiH415: 415 DT Entry for clockgen A0/1/10/11/12
+  ARM: STi: DT: STiH415: Remove unused CLK_S_ICN_REG_0 fixed clock
+  ARM: STi: DT: STiH415: Remove unused CLK_S_GMAC0_PHY & CLK_S_ETH1_PHY
+    fixed clocks
+  ARM: STi: DT: STiH415: 415 DT Entry for clockgen A9
+  ARM: STi: DT: STiH41x Add clk_ignore_unused to bootargs
 
-Typo in $subject
-s/clocks/clock
+ arch/arm/boot/dts/stih415-clock.dtsi     | 517 +++++++++++++++++++++-
+ arch/arm/boot/dts/stih415.dtsi           |  10 +-
+ arch/arm/boot/dts/stih416-clock.dtsi     | 732 ++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/stih416.dtsi           |  10 +-
+ arch/arm/boot/dts/stih41x-b2000.dtsi     |   2 +-
+ arch/arm/boot/dts/stih41x-b2020.dtsi     |   2 +-
+ include/dt-bindings/clock/stih415-clks.h |  15 +
+ include/dt-bindings/clock/stih416-clks.h |  15 +
+ 8 files changed, 1258 insertions(+), 45 deletions(-)
+ create mode 100644 include/dt-bindings/clock/stih415-clks.h
+ create mode 100644 include/dt-bindings/clock/stih416-clks.h
 
---
-cheers,
--roger
-
-> 
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  arch/arm/boot/dts/dra7xx-clocks.dtsi |    8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> index 44993ec..e1bd052 100644
-> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> @@ -1165,6 +1165,14 @@
->  		reg = <0x021c>, <0x0220>;
->  	};
->  
-> +	optfclk_pciephy_32khz: optfclk_pciephy_32khz at 4a0093b0 {
-> +		compatible = "ti,gate-clock";
-> +		clocks = <&sys_32k_ck>;
-> +		#clock-cells = <0>;
-> +		reg = <0x13b0>;
-> +		ti,bit-shift = <8>;
-> +	};
-> +
->  	optfclk_pciephy_div: optfclk_pciephy_div at 4a00821c {
->  		compatible = "ti,divider-clock";
->  		clocks = <&apll_pcie_ck>;
-> 
+-- 
+1.9.1
