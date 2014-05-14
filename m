@@ -1,48 +1,133 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 14 May 2014 09:34:16 +0100
-Subject: [RFC PATCH V5 4/6] arm: mm: Enable RCU fast_gup
-In-Reply-To: <53723ACC.7020500@codeaurora.org>
-References: <1399390209-1756-1-git-send-email-steve.capper@linaro.org>
- <1399390209-1756-5-git-send-email-steve.capper@linaro.org>
- <53723ACC.7020500@codeaurora.org>
-Message-ID: <CAPvkgC1ORGyfKf5AEUfHeHrvZtNt5bWT1B5XvrBFbZmSNtBFWg@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 14 May 2014 14:09:37 +0530
+Subject: [PATCH RESEND v4 4/8] phy: usb: sunxi: Introduce Allwinner A31
+ USB PHY support
+In-Reply-To: <1399995862-17788-5-git-send-email-maxime.ripard@free-electrons.com>
+References: <1399995862-17788-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399995862-17788-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <53732BC9.3020507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 May 2014 16:31, Christopher Covington <cov@codeaurora.org> wrote:
-> Hi Steve,
->
-> On 05/06/2014 11:30 AM, Steve Capper wrote:
->> Activate the RCU fast_gup for ARM. We also need to force THP splits to
->> broadcast an IPI s.t. we block in the fast_gup page walker. As THP
->> splits are comparatively rare, this should not lead to a noticeable
->> performance degradation.
->
->> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
->> index 3387e60..91a2b59 100644
->> --- a/arch/arm/mm/flush.c
->> +++ b/arch/arm/mm/flush.c
->> @@ -377,3 +377,22 @@ void __flush_anon_page(struct vm_area_struct *vma, struct page *page, unsigned l
->>        */
->>       __cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
->>  }
->> +
->> +#ifdef CONFIG_TRANSPARENT_HUGEPAGE
->> +#ifdef CONFIG_HAVE_RCU_TABLE_FREE
->
-> This is trivia, but I for one find the form #if defined(a) && defined(b)
-> easier to read. (Applies to the A64 version as well).
->
+Hi,
 
-Thank you Christopher, I agree that looks nicer.
+On Tuesday 13 May 2014 09:14 PM, Maxime Ripard wrote:
+> The USB phy controller in the A31 differs mostly from the older controllers
+> because it has a clock dedicated for each phy, while the older ones were having
+> a single clock for all the phys.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  drivers/phy/phy-sun4i-usb.c | 33 ++++++++++++++++++++++-----------
+>  1 file changed, 22 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+> index 66a87d50512b..115d8d5190d5 100644
+> --- a/drivers/phy/phy-sun4i-usb.c
+> +++ b/drivers/phy/phy-sun4i-usb.c
+> @@ -61,7 +61,6 @@
+>  #define MAX_PHYS			3
+>  
+>  struct sun4i_usb_phy_data {
+> -	struct clk *clk;
+>  	void __iomem *base;
+>  	struct mutex mutex;
+>  	int num_phys;
+> @@ -71,6 +70,7 @@ struct sun4i_usb_phy_data {
+>  		void __iomem *pmu;
+>  		struct regulator *vbus;
+>  		struct reset_control *reset;
+> +		struct clk *clk;
+>  		int index;
+>  	} phys[MAX_PHYS];
+>  };
+> @@ -146,13 +146,13 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+>  	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+>  	int ret;
+>  
+> -	ret = clk_prepare_enable(data->clk);
+> +	ret = clk_prepare_enable(phy->clk);
+>  	if (ret)
+>  		return ret;
+>  
+>  	ret = reset_control_deassert(phy->reset);
+>  	if (ret) {
+> -		clk_disable_unprepare(data->clk);
+> +		clk_disable_unprepare(phy->clk);
+>  		return ret;
+>  	}
+>  
+> @@ -170,11 +170,10 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+>  static int sun4i_usb_phy_exit(struct phy *_phy)
+>  {
+>  	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+> -	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+>  
+>  	sun4i_usb_phy_passby(phy, 0);
+>  	reset_control_assert(phy->reset);
+> -	clk_disable_unprepare(data->clk);
+> +	clk_disable_unprepare(phy->clk);
+>  
+>  	return 0;
+>  }
+> @@ -225,6 +224,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>  	struct device *dev = &pdev->dev;
+>  	struct device_node *np = dev->of_node;
+>  	struct phy_provider *phy_provider;
+> +	bool dedicated_clocks;
+>  	struct resource *res;
+>  	int i;
+>  
+> @@ -244,17 +244,16 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>  	else
+>  		data->disc_thresh = 2;
+>  
+> +	if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy"))
+> +		dedicated_clocks = true;
+> +	else
+> +		dedicated_clocks = false;
+> +
+>  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy_ctrl");
+>  	data->base = devm_ioremap_resource(dev, res);
+>  	if (IS_ERR(data->base))
+>  		return PTR_ERR(data->base);
+>  
+> -	data->clk = devm_clk_get(dev, "usb_phy");
+> -	if (IS_ERR(data->clk)) {
+> -		dev_err(dev, "could not get usb_phy clock\n");
+> -		return PTR_ERR(data->clk);
+> -	}
+> -
+>  	/* Skip 0, 0 is the phy for otg which is not yet supported. */
+>  	for (i = 1; i < data->num_phys; i++) {
+>  		struct sun4i_usb_phy *phy = data->phys + i;
+> @@ -268,6 +267,17 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>  			phy->vbus = NULL;
+>  		}
+>  
+> +		if (dedicated_clocks)
+> +			snprintf(name, sizeof(name), "usb%d_phy", i);
+> +		else
+> +			strlcpy(name, "usb_phy", sizeof(name));
+> +
+> +		phy->clk = devm_clk_get(dev, name);
+> +		if (IS_ERR(phy->clk)) {
+> +			dev_err(dev, "failed to get clock %s\n", name);
+> +			return PTR_ERR(phy->clk);
+> +		}
+> +
+>  		snprintf(name, sizeof(name), "usb%d_reset", i);
+>  		phy->reset = devm_reset_control_get(dev, name);
+>  		if (IS_ERR(phy->reset)) {
+> @@ -305,6 +315,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>  static const struct of_device_id sun4i_usb_phy_of_match[] = {
+>  	{ .compatible = "allwinner,sun4i-a10-usb-phy" },
+>  	{ .compatible = "allwinner,sun5i-a13-usb-phy" },
+> +	{ .compatible = "allwinner,sun6i-a31-usb-phy" },
 
-Cheers,
--- 
-Steve
+Do you have Documentation for this comptible binding? Would be good to mention
+that in the commit log.
 
-> Christopher
->
-> --
-> Employee of Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by the Linux Foundation.
+Thanks
+Kishon
