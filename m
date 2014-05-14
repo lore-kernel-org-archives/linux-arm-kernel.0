@@ -1,53 +1,101 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Wed, 14 May 2014 23:10:39 +0200
-Subject: [RFC PATCH 2/9] dt: deps: dependency based device creation
-In-Reply-To: <20140514200645.15984C4095B@trevor.secretlab.ca>
-References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>	<1399913280-6915-3-git-send-email-holler@ahsoftware.de>	<20140514140534.897F8C4153D@trevor.secretlab.ca>	<53738261.4000000@ahsoftware.de>
- <20140514200645.15984C4095B@trevor.secretlab.ca>
-Message-ID: <5373DBCF.1080503@ahsoftware.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 14 May 2014 17:18:12 -0400
+Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
+In-Reply-To: <5373CBB9.40506@linaro.org>
+References: <1399991966-14582-1-git-send-email-santosh.shilimkar@ti.com>
+ <5373C78E.7040301@linaro.org> <5373C8E8.6040208@ti.com>
+ <5373CBB9.40506@linaro.org>
+Message-ID: <5373DD94.8030208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 14.05.2014 22:06, schrieb Grant Likely:
-> On Wed, 14 May 2014 16:49:05 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
->> Am 14.05.2014 16:05, schrieb Grant Likely:
->>> On Mon, 12 May 2014 18:47:53 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
-
->> Hmm, I don't really care if that will be merged. I have no motivation to 
->> fight with Linux kernel maintainers and I don't know if I will spend the 
->> necessary time to do so.
+On Wednesday 14 May 2014 04:02 PM, Daniel Lezcano wrote:
+> On 05/14/2014 09:50 PM, Santosh Shilimkar wrote:
+>> On Wednesday 14 May 2014 03:44 PM, Daniel Lezcano wrote:
+>>> On 05/13/2014 04:39 PM, Santosh Shilimkar wrote:
+>>>> On OMAP4 panda board, there have been several bug reports about boot
+>>>> hang and lock-ups with CPU_IDLE enabled. The root cause of the issue
+>>>> is missing interrupts while in idle state. Commit cb7094e8 {cpuidle / omap4 :
+>>>> use CPUIDLE_FLAG_TIMER_STOP flag} moved the broadcast notifiers to common
+>>>> code for right reasons but on OMAP4 which suffers from a nasty ROM code
+>>>> bug with GIC, commit ff999b8a {ARM: OMAP4460: Workaround for ROM bug ..},
+>>>> we loose interrupts which leads to issues like lock-up, hangs etc.
+>>>>
+>>>> Patch reverts commit cb7094 {cpuidle / omap4 : use CPUIDLE_FLAG_TIMER_STOP
+>>>> flag} to avoid the issue. With this change, OMAP4 panda boards, the mentioned
+>>>> issues are getting fixed. We no longer loose interrupts which was the cause
+>>>> of the regression.
+>>>>
+>>>> Cc: Roger Quadros <rogerq@ti.com>
+>>>> Cc: Kevin Hilman <khilman@linaro.org>
+>>>> Cc: Tony Lindgren <tony@atomide.com>
+>>>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>> Reported-tested-by: Roger Quadros <rogerq@ti.com>
+>>>> Reported-tested-by: Kevin Hilman <khilman@linaro.org>
+>>>> Tested-by: Tony Lindgren <tony@atomide.com>
+>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>> ---
 > 
-> The people you need to convince are Rob, Greg, and me, and you've got my
-> attention. If I'm convinced, then I can probably convince Greg also.
-> You've got an interesting approach, and I hope you won't give up on it.
+> [ ... ]
+> 
+>>>>
+>>>> +    clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
+>>>> +
+>>>>        /*
+>>>>         * Call idle CPU PM enter notifier chain so that
+>>>>         * VFP and per CPU interrupt context is saved.
+>>>> @@ -165,6 +169,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+>>>>        if (dev->cpu == 0 && mpuss_can_lose_context)
+>>>>            cpu_cluster_pm_exit();
+>>>>
+>>>> +    clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
+> 
+> [ ... ]
+> 
+>>>
+>>> Shouldn't the broadcast timer to be setup with CLOCK_EVT_NOTIFY_BROADCAST_ON also ?
+>>>
+>> Which is already taken care by __cpuidle_register_driver(). Note that setup code
+>> is still used from generic code...
+> 
+> Nope, if the flag CPUIDLE_FLAG_TIMER_STOP is not set, the cpuidle framework won't setup the timer.
+> 
+I see. I assumed it was taken care. So we might have setup the timer too.
 
-Sorry, but that point of the view is already a problem. Why do I have to
-convince you people?
+> static void __cpuidle_driver_init(struct cpuidle_driver *drv)
+> {
+> 
+>     ...
+> 
+>     for (i = drv->state_count - 1; i >= 0 ; i--) {
+>         if (drv->states[i].flags & CPUIDLE_FLAG_TIMER_STOP) {
+May be you should start the bc timer in case 'CPUIDLE_FLAG_TIMER_STOP'
+or 'CPUIDLE_FLAG_COUPLED'
+>             drv->bctimer = 1;
+>             break;
+>         }
+>     }
+> 
+>     ...
+> 
+> }
+> 
+> static int __cpuidle_register_driver(struct cpuidle_driver *drv)
+> {
+>     ...
+> 
+>     if (drv->bctimer)
+>         on_each_cpu_mask(drv->cpumask,
+>         cpuidle_setup_broadcast_timer,
+>          (void *)CLOCK_EVT_NOTIFY_BROADCAST_ON, 1);
+> 
+>     ...
+> }
+> 
+> So the broadcast timer does not operate with this revert. Moreover, I am not sure reverting this patch is the right solution.
+> 
+With above mentioned change, it should work. Other alternatives is OMAP4 driver does
+its won registration where it can start the timer. The way it was before the
+consolidation.
 
-To summarize:
-
-Linux kernel maintainers
-
-- don't like code they haven't written theirself,
-- don't like code which doesn't look like they have written it theirself,
-- don't like ideas they haven't had themself,
-- do feel good in their closed group they have formed,
-...
-
-You see, I long have given up. The reason I still posted these patches
-is just because I don't care anymore about Linux kernel maintainers at
-all. I was prepared that I do that just for the fun of annoying some
-Linux kernel maintainers. I've already decided some time ago that I just
-will post my patches once to the LKML (so that other poor Linux kernel
-users may find them) and will ignore Linux kernel maintainers.
-
-Sorry, but I have a long and very unpleasant history in dealing with
-Linux kernel maintainers, and they already have called me almost
-anything like "ugly code writer", "frustrated" and such things more.
-
-Fortunately I'm too old to care about such, that's why I still post
-patches (besides that I like to solve problems and help other people). ;)
-
-Regards,
-
-Alexander Holler
+Ofcourse if you have better fix, then great. 
