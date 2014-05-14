@@ -1,97 +1,51 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 14 May 2014 00:45:01 -0400 (EDT)
-Subject: [PATCH v6 0/5] MCPM backend for Exynos5420
-In-Reply-To: <CAM4voanvVwj+FuWazTGMHMnM64Cw_qK03D3o=raS43f_zWFfog@mail.gmail.com>
-References: <1399982324-27879-1-git-send-email-a.kesavan@samsung.com>
- <alpine.LFD.2.11.1405131325060.980@knanqh.ubzr>
- <CAM4voanvVwj+FuWazTGMHMnM64Cw_qK03D3o=raS43f_zWFfog@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1405140031490.980@knanqh.ubzr>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 14 May 2014 14:00:43 +0900
+Subject: [PATCH 00/03] ARM: shmobile: Use shmobile_init_delay() on r8a7791
+In-Reply-To: <CANqRtoRvB9o2AwU1X2OFGpsmBoRtZDnKD+jz0SRhjSn-Ye6mug@mail.gmail.com>
+References: <20140511232508.20177.11556.sendpatchset@w520>
+ <1509906.x9u0HJ6AbJ@avalon> <20140513005936.GB30252@verge.net.au>
+ <20140513071224.GC27611@verge.net.au>
+ <CAMuHMdWBAkh_Jkfsok-Nws56z0ZsU0LmxV2nob_LKrMY_tFF6A@mail.gmail.com>
+ <20140514032837.GB22813@verge.net.au>
+ <CANqRtoRvB9o2AwU1X2OFGpsmBoRtZDnKD+jz0SRhjSn-Ye6mug@mail.gmail.com>
+Message-ID: <20140514050040.GB3502@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 May 2014, Abhilash Kesavan wrote:
-
-> Hi Nicolas,
+On Wed, May 14, 2014 at 12:46:27PM +0900, Magnus Damm wrote:
+> On Wed, May 14, 2014 at 12:28 PM, Simon Horman <horms@verge.net.au> wrote:
+> > I wonder if the following is any good.
+> >
+> > From: Simon Horman <horms+renesas@verge.net.au>
+> >
+> > [PATCH] ARM: shmobile: Set clock frequency in HZ from OF nodes
+> >
+> > shmobile_init_delay() looks for OF "clock-frequency" to determine
+> > the delay which is set by calling shmobile_setup_delay().
+> >
+> > Unfortunately this seems to be incorrect in detail as
+> > "clock-frequency" node values are in HZ whereas the frequency
+> > argument to shmobile_setup_delay() is in MHz.
+> >
+> > Provide a variant of shmobile_setup_delay() that accepts HZ to
+> > correct this problem.
+> >
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >
+> > ---
+> > v2
+> > * As suggested by Geert Uytterhoeven
+> >   - Don't ignore the potential for integer overflow.
+> >     To this end I have taken Geert's suggestion of dividing by
+> >     a large "value" in the HZ case.
+> >     And I have let the original function unchanged for the MHz case:
+> >     it should eventually be removed anyway.
 > 
-> On Tue, May 13, 2014 at 11:25 PM, Nicolas Pitre
-> <nicolas.pitre@linaro.org> wrote:
-> > On Tue, 13 May 2014, Abhilash Kesavan wrote:
-> >
-> >> This is v6 of the series adding MCPM backend support for SMP secondary boot
-> >> and core switching on Samsung's Exynos5420. The patches are based on the mcpm
-> >> support added for Exynos5420 in the Chromium kernel repository here:
-> >> https://chromium.googlesource.com/chromiumos/third_party/kernel-next/+/chromeos-3.8
-> >>
-> >> The patches have been prepared on Kukjin Kim's for-next branch and tested on
-> >> SMDK5420 EVT1 as well as an exynos5420 based chromebook (peach-pit) using the
-> >> "/dev/b.L_switcher" user interface. Secondary core boot-up has also been tested
-> >> on both the boards.
-> >
-> > OK... Now it is time for real testing.  :-)
-> >
-> > The /dev/b.L_switcher interface tests the switcher.  Here you really
-> > want to hammer the MCPM functionalities and especially your backend code
-> > as hard as possible.  I therefore recommend the following test script:
-> >
-> > ---------- >8
-> > #!/bin/bash
-> >
-> > echo 0 >/sys/kernel/bL_switcher/active
-> > sleep 1
-> >
-> > pids=
-> > for cpu in /sys/devices/system/cpu/cpu?/online; do
-> >   { cpu_nr=${cpu:27:1}
-> >     while true; do
-> >       echo 1 > $cpu 2> /dev/null
-> >       sleep .00$RANDOM
-> >       val1=$(cat $cpu)
-> >       echo 0 > $cpu 2> /dev/null
-> >       sleep .00$RANDOM
-> >       val0=$(cat $cpu)
-> >       [ "$val1" = "1" -a "$val0" = "0" ] && echo -n $cpu_nr
-> >     done
-> >   } &
-> >   pids="$pids $!"
-> > done
-> >
-> > trap "kill $pids; echo" 0 15
-> > wait $pids
-> > ---------- >8
-> >
-> > Leave this running for a couple hours making sure you see all CPU
-> > numbers being printed.  The printing order will be random, but each CPU
-> > number should continuously appear.
-> I tried this script and I get two errors:
+> Hi Simon and Geert,
 > 
-> 1) can't create /sys/devices/system/cpu/cpu//online: nonexistent directory
+> Thanks for dealing with the fallout of my cosmetic changes. Nice to
+> see that you managed to track it down!
+> 
+> I think this patch looks perfect, please merge unless anyone objects.
 
-What do you get if you do:
-
-$ ls -d /sys/devices/system/cpu/cpu?/online
-
-?
-
-> 2) sleep: invalid number '.0026736'
-
-A sufficiently recent coreutils package should have a sleep command that 
-accepts fractional values.  Alternatively you may replace it with 
-usleep:
-
-	usleep $RANDOM
-
-> For 1) the cpu number is not being appended. if I give a particular
-> cpu in the script then hotplug in/out works fine.
-> For 2) a constant msleep 10 works.
-
-If you have msleep but not usleep then try:
-
-		msleep $(($RANDOM / 1000))
-
-> Is it OK for me to modify the script to hotplug in/off a randomly chosed core ?
-
-No.  They must *all* be hotplugged simultaneously with some random 
-timing.
-
-
-Nicolas
+Thanks, I will go ahead and merge it.
