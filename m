@@ -1,105 +1,115 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 14 May 2014 16:47:19 +0000 (UTC)
-Subject: OMAP baseline test results for v3.15-rc5
-Message-ID: <alpine.DEB.2.02.1405141645530.21921@utopia.booyaka.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 14 May 2014 17:47:28 +0100
+Subject: [PATCH v5 1/4] add ARMv7 HYP API to flush VM TLBs without address
+ param
+In-Reply-To: <1399509616-4632-2-git-send-email-m.smarduch@samsung.com>
+References: <1399509616-4632-1-git-send-email-m.smarduch@samsung.com>
+ <1399509616-4632-2-git-send-email-m.smarduch@samsung.com>
+Message-ID: <CAMJs5B_2N0FchTKFA_DtfCboJ0uRWCVtwzSJUPcezH78A7kC6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, May 07, 2014 at 05:40:13PM -0700, Mario Smarduch wrote:
+> Patch adds HYP interface for global VM TLB invalidation without address
+> parameter.
+>
+> - Added ARM version of kvm_flush_remote_tlbs()
+>
+>
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> ---
+>  arch/arm/include/asm/kvm_asm.h  |    1 +
+>  arch/arm/include/asm/kvm_host.h |    2 ++
+>  arch/arm/kvm/interrupts.S       |    5 +++++
+>  arch/arm/kvm/mmu.c              |   10 ++++++++++
+>  4 files changed, 18 insertions(+)
+>
+> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+> index 53b3c4a..21bc519 100644
+> --- a/arch/arm/include/asm/kvm_asm.h
+> +++ b/arch/arm/include/asm/kvm_asm.h
+> @@ -78,6 +78,7 @@ extern char __kvm_hyp_code_end[];
+>
+>  extern void __kvm_flush_vm_context(void);
+>  extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+> +extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+>
+>  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+>  #endif
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 193ceaf..ac3bb65 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -231,4 +231,6 @@ int kvm_perf_teardown(void);
+>  u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
+>  int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
+>
+> +void kvm_tlb_flush_vmid(struct kvm *kvm);
+> +
+>  #endif /* __ARM_KVM_HOST_H__ */
+> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+> index 0d68d40..8620280 100644
+> --- a/arch/arm/kvm/interrupts.S
+> +++ b/arch/arm/kvm/interrupts.S
+> @@ -45,8 +45,12 @@ __kvm_hyp_code_start:
+>   *
+>   * As v7 does not support flushing per IPA, just nuke the whole TLB
+>   * instead, ignoring the ipa value.
+> + *
+> + * void __kvm_tlb_flush_vm(struct kvm *kvm) - alias on ARMv7 for global VM TLB
+> + * flush with no address parameters.
+>   */
+>  ENTRY(__kvm_tlb_flush_vmid_ipa)
+> +ENTRY(__kvm_tlb_flush_vmid)
+>   push {r2, r3}
+>
+>   dsb ishst
+> @@ -65,6 +69,7 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+>   pop {r2, r3}
+>   bx lr
+>  ENDPROC(__kvm_tlb_flush_vmid_ipa)
+> +ENDPROC(__kvm_tlb_flush_vmid)
 
-Here are some basic OMAP test results for Linux v3.15-rc5.
-Logs and other details at:
+yikes, can you please make this a separate function that calls the other
+one?
 
-    http://www.pwsan.com/omap/testlogs/test_v3.15-rc5/20140511121007/
+>
+>  /********************************************************************
+>   * Flush TLBs and instruction caches of all CPUs inside the inner-shareable
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 80bb1e6..95c172a 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -56,6 +56,16 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>   kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
+>  }
+>
+> +/* Function reuses __kvm_tlb_flush_vmid_ipa() HYP interface without additional
+> + * address argument to flush entire VM TLBs.
+> + */
 
+This is not proper kernel commenting formatting, please see
+Documentation/CodingStyle.
 
-Test summary
-------------
+For new exported functions in the KVM/ARM code, please add kdocs style
+documentation to the functions.
 
-Build: uImage+dtb:
-    Pass ( 9/ 9): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig/omap4-var-som
+> +void kvm_flush_remote_tlbs(struct kvm *kvm)
 
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
+This doesn't build?:
 
-Build: zImage:
-    Pass (14/14): multi_v7_defconfig, omap2plus_defconfig,
-		  omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig
+arch/arm/kvm/mmu.o: In function `kvm_flush_remote_tlbs':
+mmu.c:(.text+0xc7c): multiple definition of `kvm_flush_remote_tlbs'
 
-Boot to userspace:
-    FAIL ( 1/12): 2430sdp
-    skip ( 3/12): 5912osk, cmt3517, 4460varsomom
-    Pass ( 8/12): 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
-		  4430es2panda, 4460pandaes, am335xbone, am335xbonelt
-
-PM: chip retention via suspend:
-    skip ( 1/ 7): 4460varsomom
-    FAIL ( 2/ 7): 2430sdp, 4430es2panda
-    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
-
-PM: chip retention via dynamic idle:
-    skip ( 1/ 7): 4460varsomom
-    FAIL ( 6/ 7): 2430sdp, 3530es3beagle, 3730beaglexm, 37xxevm,
-		  4430es2panda, 4460pandaes
-
-PM: chip off except CORE via suspend:
-    FAIL ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    FAIL ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    skip ( 1/ 5): 4460varsomom
-    FAIL ( 4/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes
-
-PM: chip off via dynamic idle:
-    skip ( 1/ 5): 4460varsomom
-    FAIL ( 4/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes
-
-
-vmlinux object size
-(delta in bytes from test_v3.15-rc4 (89ca3b881987f5a4be4c5dbaa7f0df12bbdde2fd)):
-   text     data      bss    total  kernel
-   +303      +64        0     +367  omap1_defconfig
-   +335      +96        0     +431  omap1_defconfig_1510innovator_only
-   +303      +64        0     +367  omap1_defconfig_5912osk_only
-   +363     +120        0     +483  multi_v7_defconfig
-   +179      +64      -64     +179  omap2plus_defconfig
-    +79      +96        0     +175  omap2plus_defconfig_2430sdp_only
-   +179      +64      -64     +179  omap2plus_defconfig_am33xx_only
-   +175      +64        0     +239  omap2plus_defconfig_am43xx_only
-   +179      +64      -64     +179  omap2plus_defconfig_cpupm
-  +4271      +64        0    +4335  omap2plus_defconfig_dra7xx_only
-   -369        0      -32     -401  omap2plus_defconfig_n800_multi_omap2xxx
-   -305        0      -32     -337  omap2plus_defconfig_n800_only_a
-   +115      +64      -64     +115  omap2plus_defconfig_no_pm
-   +239      +64      -64     +239  omap2plus_defconfig_omap2_4_only
-   +175      +64      -64     +175  omap2plus_defconfig_omap3_4_only
-   +111      +64        0     +175  omap2plus_defconfig_omap5_only
-    -68        0      -68     -136  rmk_omap3430_ldp_allnoconfig
-    +95        0        0      +95  rmk_omap3430_ldp_oldconfig
-    +12        0     -148     -136  rmk_omap4430_sdp_allnoconfig
-    +95        0        0      +95  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.15-rc4 (89ca3b881987f5a4be4c5dbaa7f0df12bbdde2fd))
-  avail  rsrvd   high  freed  board          kconfig
-    -4k     4k      .      .  2420n800       omap2plus_defconfig_n800_only_a
+> +{
+> + if (kvm)
+> + kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
+> +}
+> +
+> +
+>  static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
+>    int min, int max)
+>  {
+> --
+> 1.7.9.5
+>
