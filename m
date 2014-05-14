@@ -1,108 +1,131 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Wed, 14 May 2014 09:53:58 +0200
-Subject: [PATCH 1/2] clk: of: helper for determining flags properties
-In-Reply-To: <20140513204924.5943.24086@quantum>
-References: <1399982253-21079-1-git-send-email-gabriel.fernandez@linaro.org>
- <1399982253-21079-2-git-send-email-gabriel.fernandez@linaro.org>
- <20140513122054.GA2419@e106331-lin.cambridge.arm.com>
- <5372363B.4080608@gmail.com> <20140513204924.5943.24086@quantum>
-Message-ID: <CAG374jAgMbLvw8Qm2Eg6R9vVXL7gTv4Pqy7oE0hxw2zTPFHOOw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 14 May 2014 09:50:17 +0200
+Subject: [PATCH v6 3/3] ARM: sunxi: Add IR controller support in DT on A20
+In-Reply-To: <1400006342-2968-4-git-send-email-bay@hackerdom.ru>
+References: <1400006342-2968-1-git-send-email-bay@hackerdom.ru>
+ <1400006342-2968-4-git-send-email-bay@hackerdom.ru>
+Message-ID: <20140514075017.GH29258@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, May 14, 2014 at 12:39:02AM +0600, Alexander Bersenev wrote:
+> This patch adds IR controller in A20 Device-Tree:
+> - Two IR devices found in A20 user manual
+> - Pins for two devices
+> - One IR device physically found on Cubieboard 2
+> - One IR device physically found on Cubietruck
+> 
+> Signed-off-by: Alexander Bersenev <bay@hackerdom.ru>
+> Signed-off-by: Alexsey Shestacov <wingrime@linux-sunxi.org>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts |  6 ++++++
+>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts  |  6 ++++++
+>  arch/arm/boot/dts/sun7i-a20.dtsi            | 31 +++++++++++++++++++++++++++++
+>  3 files changed, 43 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+> index feeff64..2564e8c 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+> @@ -164,6 +164,12 @@
+>  				reg = <1>;
+>  			};
+>  		};
+> +
+> +		ir0: ir at 01c21800 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&ir0_pins_a>;
+> +			status = "okay";
+> +		};
+>  	};
+>  
+>  	leds {
+> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> index e288562..e375e89 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> @@ -232,6 +232,12 @@
+>  				reg = <1>;
+>  			};
+>  		};
+> +
+> +		ir0: ir at 01c21800 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&ir0_pins_a>;
+> +			status = "okay";
+> +		};
+>  	};
+>  
+>  	leds {
 
-On 13 May 2014 22:49, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Sebastian Hesselbarth (2014-05-13 08:11:55)
->> On 05/13/2014 02:20 PM, Mark Rutland wrote:
->> > On Tue, May 13, 2014 at 12:57:32PM +0100, Gabriel FERNANDEZ wrote:
->> >> The patch provides a helper to get flags properties of
->> >> a clock node.
->> >>
->> >> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
->> >> ---
->> >>   drivers/clk/clk.c            | 11 +++++++++++
->> >>   include/linux/clk-provider.h |  6 ++++++
->> >>   2 files changed, 17 insertions(+)
->> >>
->> >> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> >> index 4d56220..cae8985 100644
->> >> --- a/drivers/clk/clk.c
->> >> +++ b/drivers/clk/clk.c
->> >> @@ -2528,6 +2528,17 @@ const char *of_clk_get_parent_name(struct device_node *np, int index)
->> >>   }
->> >>   EXPORT_SYMBOL_GPL(of_clk_get_parent_name);
->> >>
->> >> +unsigned long of_clk_get_flags(struct device_node *np)
->> >> +{
->> >> +    unsigned long flags = 0;
->> >> +
->> >> +    if (of_property_read_bool(np, "set-rate-parent"))
->> >> +            flags |= CLK_SET_RATE_PARENT;
->> >
->> > NAK.
->> >
->> > This is _not_ a hardware property. This flag describes internals of the
->> > Linux clock framework, and is thus not suitable for DT.
->>
->> Mark,
->>
->> while I agree above property is not a hardware property, it is at least
->> some kind of use-case property. If not by DT, we will have to allow some
->> way to describe master-slave relationships between clocks in a driver
->> independent way.
->
-> I agree with Mark.
->
-> Generally this stuff belongs in a clock driver. Of course there are the
-> integration issues you pointed out. More on that below.
->
-> As an aside, CLK_SET_RATE_PARENT is a headache, since propagation of the
-> operation up to the parent clock really should be the default behavior
-> for .set_rate (and in fact this is the case for the new-ish
-> .determine_rate op). Some history on those decisions can be found at [1]
-> and [2].
->
+Please make these two changes a separate patch.
 
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index 0ae2b77..40ded74 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -724,6 +724,19 @@
+>  				allwinner,drive = <2>;
+>  				allwinner,pull = <0>;
+>  			};
+> +
+> +			ir0_pins_a: ir0 at 0 {
+> +				    allwinner,pins = "PB3","PB4";
+> +				    allwinner,function = "ir0";
+> +				    allwinner,drive = <0>;
+> +				    allwinner,pull = <0>;
+> +			};
 
-My issue is exactly the same as Marc, it's for solve some case with
-PCM and HDMI clocks.
+Extra line
 
->>
->> > You've also failed to document the property.
->> >
->> > What are you trying to achieve here, and why do you think this is the
->> > best way of achieving that?
->>
->> I cannot tell from the commit msgs, but consider clk-si5351 which is a
->> driver for an external programmable clock with N PLLs and M outputs. Now
->> connect a video clock consumer and an audio clock consumer to two
->> different outputs and those to one PLL (as you want audio clock derived
->> from video clock, typical HDMI scenario).
->>
->> Now, there should be a way to tell the generic driver which outputs are
->> allowed to change the PLLs rate and which don't. Otherwise, the clock
->> chip would be pretty useless as e.g. your audio clock consumer will
->> overwrite the rate the video clock consumer has chosen.
->
-> This is really a job for the "coordinated clock rate changes" that are
-> currently in development. These specify clock sub-tree snapshots of
-> parent and rate configurations that are predefined. These combinations
-> can be specified in DT. That helps a lot with clock configurations that
-> change per board, or for cases where many combinations of parents and
-> dividers can yield the same output rate, but only a subset of those were
-> validated by the silicon validation team or had proper timing closure so
-> we don't want to rely on the "walk up the tree" algorithm.
->
-> Regards,
-> Mike
+> +			ir1_pins_a: ir1 at 0 {
+> +				    allwinner,pins = "PB22","PB23";
+> +				    allwinner,function = "ir1";
+> +				    allwinner,drive = <0>;
+> +				    allwinner,pull = <0>;
+> +			};
+>  		};
 
-Ok i think this work will be the best solutions for my issue.
+Do you use ir1_pins_a at all?
 
-Where i can find some threads about that ?
+I also prefer whenever such additions are in a patch of their own.
 
-Thanks a lot.
+>  		timer at 01c20c00 {
+> @@ -937,5 +950,23 @@
+>  			#interrupt-cells = <3>;
+>  			interrupts = <1 9 0xf04>;
+>  		};
+> +
+> +		ir0: ir at 01c21800 {
+> +			compatible = "allwinner,sun7i-a20-ir";
+> +			clocks = <&apb0_gates 6>, <&ir0_clk>;
+> +			clock-names = "apb", "ir";
+> +			interrupts = <0 5 4>;
+> +			reg = <0x01c21800 0x40>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ir1: ir at 01c21c00 {
+> +			compatible = "allwinner,sun7i-a20-ir";
+> +			clocks = <&apb0_gates 7>, <&ir1_clk>;
+> +			clock-names = "apb", "ir";
+> +			interrupts = <0 6 4>;
+> +			reg = <0x01C21c00 0x40>;
 
-Best Regards.
+You're mixing upper and lower case letters here, please make it lower
+case.
 
-Gabriel.
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140514/b6ddd821/attachment.sig>
