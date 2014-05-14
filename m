@@ -1,142 +1,114 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 14 May 2014 20:42:16 +0200
-Subject: [PATCH v3 1/6] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <5764751.ffUj9rhnMd@wuerfel>
-References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
- <20140514165722.GA18495@kwain> <5373AE9A.3050008@gmail.com>
- <5764751.ffUj9rhnMd@wuerfel>
-Message-ID: <5373B908.5090904@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 14 May 2014 20:42:17 +0200
+Subject: [RFC PATCH 0/8] component helper improvements
+In-Reply-To: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
+References: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
+Message-ID: <20140514184212.GA14232@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2014 08:12 PM, Arnd Bergmann wrote:
-> On Wednesday 14 May 2014 19:57:46 Sebastian Hesselbarth wrote:
->> On 05/14/2014 06:57 PM, Antoine T?nart wrote:
->>> On Wed, May 14, 2014 at 06:11:24PM +0200, Arnd Bergmann wrote:
->>>> On Wednesday 14 May 2014 17:49:29 Antoine T?nart wrote:
->>>>> On Wed, May 14, 2014 at 05:31:24PM +0200, Arnd Bergmann wrote:
->>
->> From what I understand from the conversation, we have a single PHY
->> register set dealing with both SATA ports available on the SoC.
->> Also, from the name of the PHY bits we assume the PHY may be able
->> to work in different modes than just SATA. And we currently have
->> an AHCI-compatible SATA IP that supports up to two ports, with one
->> actually connected to a SATA plug on the DMP board.
->>
->> Now, thinking about the PHY binding and the (possible) multi-protocol
->> support, it can be possible that on BG2Q there is a generic 2-lane
->> LVDS PHY that can be configured to support SATA or PCIe. Both are
->> electrically and bit-level compatible, so they could be internally
->> wired-up with AHCI and PCIe controller.
+On Sun, Apr 27, 2014 at 12:00:25AM +0100, Russell King - ARM Linux wrote:
+> A while back, Laurent raised some comments about the component helper,
+> which this patch set starts to address.
 > 
-> Sounds like a reasonable guess. We have other PHY drivers doing the
-> same thing already.
-
-Well, I based that on what I know about FPGA LVDS transceivers, so
-I wasn't guessing out of the blue ;)
-
->> From a DT point-of-view, we need a way to (a) link each SATA or PCIe
->> port to the PHY, (b) specify the PHY lane to be used, and (c) specify
->> the protocol to be used on that lane. If I got it right, Arnd already
->> mentioned to use the phy-specifier to deal with it:
->>
->> e.g. phy = <&genphy 0 MODE_SATA> or phy = <&genphy 1 MODE_PCIE>
+> The first point it addresses is the repeated parsing inefficiency when
+> deferred probing occurs.  When DT is used, the structure of the
+> component helper today means that masters end up parsing the device
+> tree for each attempt to re-bind the driver.
 > 
-> Right.
+> We remove this inefficiency by creating an array of matching data and
+> functions, which the component helper can use internally to match up
+> components to their master.
 > 
->> Let's assume we have one dual-port SATA controller and one PCIe
->> controller with either x1 or x2 support. The only sane DT binding,
->> I can think of then would be:
->>
->> berlin2q.dtsi:
->>
->> genphy: lvds at ea00ff {
->> 	compatible = "marvell,berlin-lvds-phy";
->> 	reg = <0xea00ff 0x100>;
->> 	#phy-cells = <2>;
->> };
->>
->> sata: sata at ab00ff {
->> 	compatible = "ahci-platform";
->> 	reg = <0xab00ff 0x100>;
->> 	
->> 	sata0: sata-port at 0 {
->> 		reg = <0>;
->> 		phy = <&genphy 0 MODE_SATA>;
->> 		status = "disabled";
->> 	};
->>
->> 	sata1: sata-port at 1 {
->> 		reg = <1>;
->> 		phy = <&genphy 1 MODE_SATA>;
->> 		status = "disabled";
->> 	};
->> };
->>
->> pcie: pcie at ab01ff {
->> 	compatible = "marvell,berlin-pcie";
->> 	reg = <0xab01ff 0x100>;
->>
->> 	pcie0: pcie-port at 0 {
->> 		reg = <0>;
->> 		/* set phy on a per-board basis */
->> 		/* PCIe x1 on Lane 0 : phy = <&genphy 0 MODE_PCIE>; */
->> 		/* PCIe x2 on Lane 0 and 1 : phy = <&genphy 0 MODE_PCIE>, <&genphy 1
->> MODE_PCIE>; */
->> 		status = "disabled";
->> 	};
->> };
->>
->> berlin2q-dmp.dts:
->>
->> &sata1 {
->> 	status = "okay";
->> };
->>
->> &pcie0 {
->> 	phy = <&genphy 1 MODE_PCIE>;
->> };
->>
->> berlin2q-foo.dts:
->>
->> &pcie0 {
->> 	phy = <&genphy 0 MODE_PCIE>, <&genphy 1 MODE_PCIE>;
->> };
-> 
-> Exactly. I would also be fine with keeping the sub-nodes of the
-> phy device as in v3 and using #phy-cells=<1> instead of #phy-cells.
-> The result would be pretty much the same, it just depends on how
-> closely connected the two logical phys are.
-> 
-> IIRC for the ST microelectronics PHY we recently reviewed, the
-> same PHY could be driving multiple SATA ports, or a single
-> multi-lane PCIe. In that case, it makes more sense to have
-> #phy-cells=<2>, like your example.
+> The second point was the inefficiency of destroying the list of
+> components each time we saw a failure.  We did this to ensure that
+> we kept things correctly ordered: component bind order matters.
+> As we have an array instead, the array is already ordered, so we
+> use this array to store the component pointers instead of a list,
+> and remember which are duplicates (and thus should be avoided.)
+> Avoiding the right duplicates matters as we walk the array in the
+> opposite direction at tear down.
 
-I guess the final call is up to Kishon, but I personally prefer
-#phy-cells = <2>. It makes no functional difference though.
+I've been looking at converting the Tegra DRM driver to the component
+helpers for a while now and had to make some changes to make it work for
+that particular use-case. While updating the imx-drm and msm DRM drivers
+for those changes I noticed an oddity. Both of the existing drivers use
+the following pattern:
 
->> For the driver, Antoine then would have to squeeze all PHY register
->> mangling in phy-berlin2.c and see how to make ahci-platform aware of
->> individual port nodes (I haven't looked up if it already exists, sorry)
->> and announce only enabled port child nodes, right?
-> 
-> I've been thinking some more about this aspect. I don't actually have
-> a strong opinion on whether it's better to use the generic ahci-platform
-> driver, or to keep the multi-phy support as a special variant for
-> berlin. If we do the latter, it would however be good to define the
-> binding in a way that lets us later merge things into the generic phy
-> driver in case we get more of the same.
+	static int driver_component_bind(struct device *dev,
+					 struct device *master,
+					 void *data)
+	{
+		allocate memory
+		request resources
+		...
+		hook up to subsystem
+		...
+		enable hardware
+	}
 
-Hmm, IMHO multi-phy support is orthogonal to ahci-platform, isn't it?
-ahci-platform needs to know about the phy property and calls some
-helper that deals with the phy-specifier?
+	static const struct component_ops driver_component_ops = {
+		.bind = driver_component_bind,
+	};
 
-About a generic _phy_ driver, I am not so sure if berlin is the best
-template right now ;)
+	static int driver_probe(struct platform_device *pdev)
+	{
+		return component_add(&pdev->dev, &driver_component_ops);
+	}
 
-So, my call would be:
-- make ahci-platform aware of port sub-nodes and phy properties
-- have a berlin specific PHY driver
+While converting Tegra DRM, what I intuitively did (I didn't actually
+look at the other drivers for inspiration) was something more along the
+lines of the following:
 
-Sebastian
+	static int driver_component_bind(struct device *dev,
+					 struct device *master,
+					 void *data)
+	{
+		hook up to subsystem
+		...
+		enable hardware
+	}
+
+	static const struct component_ops driver_component_ops = {
+		.bind = driver_component_bind,
+	};
+
+	static int driver_probe(struct platform_device *pdev)
+	{
+		allocate memory
+		request resources
+		...
+		return component_add(&pdev->dev, &driver_component_ops);
+	}
+
+Since usually deferred probing is caused by resource allocations failing
+this has the side-effect of handling deferred probing before the master
+device is even bound (the component_add() happens as the very last step)
+and therefore there is less risk for component_bind_all() to fail. I've
+actually never seen it fail at all. Failure at that point is almost
+certainly irrecoverable anyway.
+
+It would seem to me that if other drivers followed the same pattern, the
+second point above is solved by moving deferred probe handling one level
+up and reduce the work of the component helpers to gluing together the
+components on a subsystem level.
+
+Another advantage to that pattern is that probe failure happens on a
+much more granular level. It's handled by each component device rather
+than all at once when the master is bound. By that time all components
+will be ready and the heavy work of building the subsystem device will
+usually not have to be undone as opposed to the former pattern where
+that process is bound to be interrupted possibly many times be deferred
+probing.
+
+But perhaps I'm missing something. Was there another reason for choosing
+this particular pattern?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140514/2cd86462/attachment.sig>
