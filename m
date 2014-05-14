@@ -1,25 +1,14 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 14 May 2014 17:57:04 +0200
-Subject: [PATCH] i2c: nomadik: Don't use IS_ERR for devm_ioremap
-In-Reply-To: <1397139569-3906-1-git-send-email-ulf.hansson@linaro.org>
-References: <1397139569-3906-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20140514155703.GC12911@katana>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 14 May 2014 09:57:23 -0600
+Subject: [PATCH v2] ARM: tegra: enable joystick in tegra_defconfig
+In-Reply-To: <1400033353-25673-1-git-send-email-acourbot@nvidia.com>
+References: <1400033353-25673-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <53739263.6080706@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 04:19:29PM +0200, Ulf Hansson wrote:
-> devm_ioremap() returns NULL on error, not an error.
-> 
-> Cc: Alessandro Rubini <rubini@unipv.it>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+On 05/13/2014 08:09 PM, Alexandre Courbot wrote:
+> NVIDIA SHIELD embeds a USB joystick device. Enable the corresponding
+> support in tegra_defconfig.
 
-Applied to for-current, thanks!
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140514/7cdedf9b/attachment.sig>
+I've squashed this into Tegra's for-3.16/defconfig branch.
