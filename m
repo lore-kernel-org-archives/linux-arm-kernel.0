@@ -1,33 +1,50 @@
 From: zhangwm@marvell.com (Neil Zhang)
-Date: Wed, 14 May 2014 11:08:14 +0800
-Subject: [PATCH v2] ARM64: kernel: add compatible cpuinfo
-Message-ID: <1400036894-16667-1-git-send-email-zhangwm@marvell.com>
+Date: Tue, 13 May 2014 20:09:10 -0700
+Subject: [PATCH] ARM64: kernel: add compatable cpuinfo
+In-Reply-To: <1400036398-16591-1-git-send-email-zhangwm@marvell.com>
+References: <1400036398-16591-1-git-send-email-zhangwm@marvell.com>
+Message-ID: <9034CBD80F070943B59700D7F8149ED9A0875740@SC-VEXCH4.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Print the necessary features in order to be backwards compatible with
-ARMv7 and earlier version.
 
-Signed-off-by: Neil Zhang <zhangwm@marvell.com>
----
- arch/arm64/kernel/setup.c |    5 +++++
- 1 file changed, 5 insertions(+)
+> -----Original Message-----
+> From: Neil Zhang [mailto:zhangwm at marvell.com]
+> Sent: 2014?5?14? 11:00
+> To: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Cc: catalin.marinas at arm.com; will.deacon at arm.com; Neil Zhang
+> Subject: [PATCH] ARM64: kernel: add compatable cpuinfo
+> 
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 7ec7846..a09ecfe 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -451,6 +451,11 @@ static int c_show(struct seq_file *m, void *v)
- 		if (elf_hwcap & (1 << i))
- 			seq_printf(m, "%s ", hwcap_str[i]);
- 
-+#ifdef CONFIG_COMPAT
-+	seq_puts(m, "half thumb fastmult edsp tls vfp vfpv3 vfpv4 neon ");
-+	seq_puts(m, "idiva idivt ");
-+#endif
-+
- 	seq_printf(m, "\nCPU implementer\t: 0x%02x\n", read_cpuid_id() >> 24);
- 	seq_printf(m, "CPU architecture: AArch64\n");
- 	seq_printf(m, "CPU variant\t: 0x%x\n", (read_cpuid_id() >> 20) & 15);
--- 
-1.7.9.5
+Fix typo in version 2.
+
+> Print the necessary features in order to be backwards compatable with
+> ARMv7 and earlier version.
+> 
+> Signed-off-by: Neil Zhang <zhangwm@marvell.com>
+> ---
+>  arch/arm64/kernel/setup.c |    5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c index
+> 7ec7846..a09ecfe 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -451,6 +451,11 @@ static int c_show(struct seq_file *m, void *v)
+>  		if (elf_hwcap & (1 << i))
+>  			seq_printf(m, "%s ", hwcap_str[i]);
+> 
+> +#ifdef CONFIG_COMPAT
+> +	seq_puts(m, "half thumb fastmult edsp tls vfp vfpv3 vfpv4 neon ");
+> +	seq_puts(m, "idiva idivt ");
+> +#endif
+> +
+>  	seq_printf(m, "\nCPU implementer\t: 0x%02x\n", read_cpuid_id() >>
+> 24);
+>  	seq_printf(m, "CPU architecture: AArch64\n");
+>  	seq_printf(m, "CPU variant\t: 0x%x\n", (read_cpuid_id() >> 20) & 15);
+> --
+> 1.7.9.5
+
+Best Regards,
+Neil Zhang
