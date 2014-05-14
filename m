@@ -1,36 +1,41 @@
 From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 14 May 2014 10:12:07 +0200
-Subject: [PATCH] ARM: remove check for CONFIG_DEBUG_LL_SER3
-Message-ID: <1400055127.31197.1.camel@x220>
+Date: Wed, 14 May 2014 10:24:25 +0200
+Subject: [PATCH] [RESEND] ARM: remove last use of CONFIG_CPU_ARM710
+In-Reply-To: <1364507176.1345.45.camel@x61.thuisdomein>
+References: <1364507176.1345.45.camel@x61.thuisdomein>
+Message-ID: <1400055865.31197.4.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A check for CONFIG_DEBUG_LL_SER3 was added in v2.5.43. But the related
-symbol DEBUG_LL_SER3 was already removed in v2.5.8. This check has
-always evaluated to false. Remove it.
+Support for ARM710 CPUs was removed in v3.5. Now remove the last code
+depending on its Kconfig macro.
 
 Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 ---
-Untested.
+First submitted in March 2103. Still untested. Please note that
+cpu_arm7_data_abort was also removed in v3.5.
 
- arch/arm/boot/compressed/head.S | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm/include/asm/glue-df.h | 8 --------
+ 1 file changed, 8 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 066b03480b63..c16e8bf31e0b 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -54,11 +54,7 @@
- #if defined(CONFIG_ARCH_SA1100)
- 		.macro	loadsp, rb, tmp
- 		mov	\rb, #0x80000000	@ physical base address
--#ifdef CONFIG_DEBUG_LL_SER3
--		add	\rb, \rb, #0x00050000	@ Ser3
--#else
- 		add	\rb, \rb, #0x00010000	@ Ser1
+diff --git a/arch/arm/include/asm/glue-df.h b/arch/arm/include/asm/glue-df.h
+index 6b70f1b46a6e..04e18b656659 100644
+--- a/arch/arm/include/asm/glue-df.h
++++ b/arch/arm/include/asm/glue-df.h
+@@ -31,14 +31,6 @@
+ #undef CPU_DABORT_HANDLER
+ #undef MULTI_DABORT
+ 
+-#if defined(CONFIG_CPU_ARM710)
+-# ifdef CPU_DABORT_HANDLER
+-#  define MULTI_DABORT 1
+-# else
+-#  define CPU_DABORT_HANDLER cpu_arm7_data_abort
+-# endif
 -#endif
- 		.endm
- #elif defined(CONFIG_ARCH_S3C24XX)
- 		.macro loadsp, rb, tmp
+-
+ #ifdef CONFIG_CPU_ABRT_EV4
+ # ifdef CPU_DABORT_HANDLER
+ #  define MULTI_DABORT 1
 -- 
 1.9.0
