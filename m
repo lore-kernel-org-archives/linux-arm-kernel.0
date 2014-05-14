@@ -1,71 +1,50 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 14 May 2014 15:36:57 -0700
-Subject: [PATCH v3 2/6] clk: Add clock driver for AXM55xx SoC
-In-Reply-To: <CAE0=X_3WA5ZzEE1NespeScmnMkr9oxNMc1=+X86i5NpSffiUnA@mail.gmail.com>
-References: <cover.1400072260.git.anders.berg@avagotech.com>
- <a83c5e1272d7a3242701504f238789592c2ec80f.1400072260.git.anders.berg@avagotech.com>
- <20140514200845.19795.80794@quantum>
- <CAE0=X_3WA5ZzEE1NespeScmnMkr9oxNMc1=+X86i5NpSffiUnA@mail.gmail.com>
-Message-ID: <20140514223657.19795.79741@quantum>
+Date: Wed, 14 May 2014 15:39:35 -0700
+Subject: [PATCH v3 5/7] clk: sunxi: add PRCM (Power/Reset/Clock
+ Management) clks support
+In-Reply-To: <53731BB3.4060504@free-electrons.com>
+References: <1399633911-7094-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1399633911-7094-6-git-send-email-boris.brezillon@free-electrons.com>
+ <20140514005119.16152.19787@quantum> <53731BB3.4060504@free-electrons.com>
+Message-ID: <20140514223935.19795.36960@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Anders Berg (2014-05-14 15:22:16)
-> On Wed, May 14, 2014 at 10:08 PM, Mike Turquette <mturquette@linaro.org> wrote:
-> > Quoting Anders Berg (2014-05-14 11:37:57)
-> >> +Example:
-> >> +
-> >> +       clk_ref0: clk_ref0 {
-> >> +               compatible = "fixed-clock";
-> >> +               #clock-cells = <0>;
-> >> +               clock-frequency = <125000000>;
-> >> +       };
-> >
-> > Hi Anders,
-> >
-> > The driver looks good. As for the DT binding, I am starting to request
-> > that bindings for new hardware move away from the one-clock-per-node
-> > method. I am not forcing anyone with stable bindings to migrate that
-> > way, but it tends to make maintenance easier in the long run (e.g.
-> > setting per-clock flags, etc).
-> >
-> > Your clk_ref0 example looks good, assuming that it is an off-chip clock
-> > that feeds into the rest of the clock generator.
-> >
-> >> +
-> >> +       clk_cpu_pll: clk_cpu_pll at 2010022000 {
-> >> +               compatible = "lsi,axxia-pll-clock";
-> >> +               #clock-cells = <0>;
-> >> +               clocks = <&clk_ref0>;
-> >> +               clock-output-names = "clk_cpu_pll";
-> >> +               reg = <0x20 0x10022000 0 0x2c>;
-> >> +       };
-> >
-> > I assume the rest of your clocks are part of a clock generator IP block
-> > inside of your chip. Have you looked at the QCOM binding? It is my
-> > favorite binding these days. Here are some highlights:
-> >
-> [...]
-> >
-> > Using this type of binding you only need to declare your clock generator
-> > IP node in dts, and then define a mapping in the DT include chroot. Then
-> > you can define your per-clock data inside of your clock driver instead
-> > of putting all of the details inside of DT.
-> >
-> > If you have a strong reason to do it the way that you originally posted
-> > then let me know.
-> >
+Quoting Boris BREZILLON (2014-05-14 00:30:59)
+> Hello Mike,
 > 
-> No strong reason... I just happened to pick the keystone-clocks.dtsi
-> as an example when I wrote this. But I can rework this according to
-> your suggestions. I'll post it as a separate patch (thus dropping the
-> clk patch from this series). Ok?
+> On 14/05/2014 02:51, Mike Turquette wrote:
+> > Quoting Boris BREZILLON (2014-05-09 04:11:49)
+> >> +struct clk_ops ar100_ops = {
+> >> +       .recalc_rate = ar100_recalc_rate,
+> >> +       .determine_rate = ar100_determine_rate,
+> >> +       .set_parent = ar100_set_parent,
+> >> +       .get_parent = ar100_get_parent,
+> >> +       .set_rate = ar100_set_rate,
+> >> +};
+> > I might be having a brain fart, but is there a valid case for having
+> > both a .recalc_rate and a .determine_rate? I believe that the former
+> > will never be used and the latter will always be used by the clock
+> > framework core.
+> 
+> I think you're mistaking recalc_rate for round_rate.
+> AFAIK, recalc_rate is mandatory for a clk that implement either
+> round_rate or determine_rate.
 
-Sounds great. Thanks for reworking it.
+I *was* having a brain fart. You're right of course. Too many .r*_rate()
+callbacks...
 
-Regards,
+Thanks,
 Mike
 
 > 
-> Thanks,
-> Anders
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> -- 
+> Boris Brezillon, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+> 
