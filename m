@@ -1,39 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 May 2014 20:51:44 +0200
-Subject: [PATCH v3 1/6] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <5373B908.5090904@gmail.com>
-References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
- <5764751.ffUj9rhnMd@wuerfel> <5373B908.5090904@gmail.com>
-Message-ID: <17808571.N5ZGjXFEVP@wuerfel>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 14 May 2014 18:52:04 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: a few more clock/hwmod fixes for v3.15-rc
+Message-ID: <alpine.DEB.2.02.1405141850410.21921@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 May 2014 20:42:16 Sebastian Hesselbarth wrote:
-> >> For the driver, Antoine then would have to squeeze all PHY register
-> >> mangling in phy-berlin2.c and see how to make ahci-platform aware of
-> >> individual port nodes (I haven't looked up if it already exists, sorry)
-> >> and announce only enabled port child nodes, right?
-> > 
-> > I've been thinking some more about this aspect. I don't actually have
-> > a strong opinion on whether it's better to use the generic ahci-platform
-> > driver, or to keep the multi-phy support as a special variant for
-> > berlin. If we do the latter, it would however be good to define the
-> > binding in a way that lets us later merge things into the generic phy
-> > driver in case we get more of the same.
-> 
-> Hmm, IMHO multi-phy support is orthogonal to ahci-platform, isn't it?
-> ahci-platform needs to know about the phy property and calls some
-> helper that deals with the phy-specifier?
-> 
-> About a generic _phy_ driver, I am not so sure if berlin is the best
-> template right now 
-> 
-> So, my call would be:
-> - make ahci-platform aware of port sub-nodes and phy properties
-> - have a berlin specific PHY driver
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-I'm not sure if we need sub-nodes per port, it should be enough
-to have an array of phys, plus a way to match them up with the
-ports.
+Hi Tony,
 
-	Arnd
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git for-v3.15-rc/omap-fixes-b
+
+for you to fetch changes up to 0f9e19ad88eee820f517b85531b555a0fa73e7e4:
+
+  ARM: omap5: hwmod_data: Correct IDLEMODE for McPDM (2014-05-14 11:25:58 -0600)
+
+- ----------------------------------------------------------------
+Two small OMAP fixes for v3.15-rc.  One fixes "slow motion" or
+"choppy" audio playback on OMAP5.  The other applies an OMAP3630 fix
+for clock rate setting for camera to other OMAP3 chips.
+
+Basic build, boot, and PM test results are available here:
+
+http://www.pwsan.com/omap/testlogs/prcm-fixes-b-v3.15-rc/20140514112639/
+
+- ----------------------------------------------------------------
+Laurent Pinchart (1):
+      ARM: OMAP3: clock: Back-propagate rate change from cam_mclk to dpll4_m5 on all OMAP3 platforms
+
+Peter Ujfalusi (1):
+      ARM: omap5: hwmod_data: Correct IDLEMODE for McPDM
+
+ arch/arm/mach-omap2/cclock3xxx_data.c      | 3 ++-
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 2 +-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+
+iQIcBAEBAgAGBQJTc7rpAAoJEMePsQ0LvSpLG6wP/RK72RBnYUULa1IgNoF9FIN6
+UzNDio1EgVbXI0kbKZ9XyFvJ9l6rGHP0PZU4qPbeq+XTefCyGyxJkZR9+XV6CkI2
+VhVyyvE+bPuxpgwQ4WwXTsbLgq3ZieEGN3CKvTzwq90qSa3rGkxYconMySFgItgK
+242KtbTBwXGDlYtqV8/jsFXwPkVU2DSRunv/5Lb6bMlc2iHjx774wwsvnoIWMC5U
+I8pH8tzUTl1qJPIYdbrqCAsbIyCZL2HcaiRQk3/DgRBOdz0n/RQOxVpM52FD44zT
+ZF1BTKxdSciRfb4qd2csGQHMBejTO6hWpnKnd63tssSMQfAk5Vznwgc33IymP5P8
+J5Y8Yan3hzDb9Jprl6bDqCaQUZ7S3SnpTT/RsM4AneeFRvd5xSnPwIYMuv9x6B1t
+Y1Y3zUNdyey5QEkagiz0ORYYGD9+H37mGaqKrml9xLRBm5G6GAXFW1NnpBOrng5x
+VvIHcTvjzZJurTxK+kM/bGZp2GFVlwYgQ3FCHpLYYvK5Ekr/iQe17iM9NjS8uKIB
+RhrzdZs8fON1IVVQJU3epy4D+qdnhHZubkKgVKMwt9hTF1I0MfLhsII+R5HDdClV
+FUgq3FT2mavJ+fmCXLpsOa1TWbQ/JDkHaiU8XoE/XQR77xuueHAMCTb/PkfDD+bK
+e8eSwKv50t/WrbpPYqIr
+=8LDA
+-----END PGP SIGNATURE-----
