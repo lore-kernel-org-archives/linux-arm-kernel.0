@@ -1,53 +1,122 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 14 May 2014 16:24:13 +0100
-Subject: [PATCHv2 4/4] ARM: mvebu: implement L2/PCIe deadlock workaround
-In-Reply-To: <20140513145205.1dad280f@free-electrons.com>
-References: <1399975839-5311-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1399975839-5311-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <11503675.BOHdnE4xD3@wuerfel>
- <20140513145205.1dad280f@free-electrons.com>
-Message-ID: <20140514152413.GH19866@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 May 2014 17:31:24 +0200
+Subject: [PATCH v3 1/6] phy: add a driver for the Berlin SATA PHY
+In-Reply-To: <20140514145002.GA18392@kwain>
+References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
+ <16480004.aaDhzlOZgi@wuerfel> <20140514145002.GA18392@kwain>
+Message-ID: <31922167.uMVzxsQNIT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 01:52:05PM +0100, Thomas Petazzoni wrote:
-> On Tue, 13 May 2014 13:13:39 +0200, Arnd Bergmann wrote:
-> > and this is the one you enforce here:
+On Wednesday 14 May 2014 16:50:02 Antoine T?nart wrote:
+> On Wed, May 14, 2014 at 03:02:34PM +0200, Arnd Bergmann wrote:
+> > On Wednesday 14 May 2014 11:48:57 Antoine T?nart wrote:
+> > > +static int phy_berlin_sata_power_on(struct phy *phy)
+> > > +{
+> > > +       struct phy_berlin_desc *desc = phy_get_drvdata(phy);
+> > > +       struct phy_berlin_priv *priv = to_berlin_sata_phy_priv(desc);
+> > > +       u32 regval;
+> > > +
+> > > +       spin_lock(&priv->lock);
+> > > +
+> > > +       /* Power up PHY */
+> > > +       writel(CONTROL_REGISTER, priv->base + HOST_VSA_ADDR);
+> > > +       regval = readl(priv->base + HOST_VSA_DATA);
+> > > +       regval &= ~(desc->val);
+> > > +       writel(regval, priv->base + HOST_VSA_DATA);
+> > > +
+> > > +       /* Configure MBus */
+> > > +       writel(MBUS_SIZE_CONTROL, priv->base + HOST_VSA_ADDR);
+> > > +       regval = readl(priv->base + HOST_VSA_DATA);
+> > > +       regval |= MBUS_WRITE_REQUEST_SIZE_128 | MBUS_READ_REQUEST_SIZE_128;
+> > > +       writel(regval, priv->base + HOST_VSA_DATA);
+> > > +
+> > > +       spin_unlock(&priv->lock);
+> > > +
+> > > +       return 0;
+> > > +}
+> > > +
+> > > +static int phy_berlin_sata_power_off(struct phy *phy)
+> > > +{
+> > > +       struct phy_berlin_desc *desc = phy_get_drvdata(phy);
+> > > +       struct phy_berlin_priv *priv = to_berlin_sata_phy_priv(desc);
+> > > +       u32 regval;
+> > > +
+> > > +       spin_lock(&priv->lock);
+> > > +
+> > > +       /* Power down PHY */
+> > > +       writel(CONTROL_REGISTER, priv->base + HOST_VSA_ADDR);
+> > > +       regval = readl(priv->base + HOST_VSA_DATA);
+> > > +       regval |= desc->val;
+> > > +       writel(regval, priv->base + HOST_VSA_DATA);
+> > > +
+> > > +       spin_unlock(&priv->lock);
+> > > +
+> > > +       return 0;
 > > 
-> >         [MT_MEMORY_RW_SO] = {
-> >                 .prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
-> >                                 L_PTE_MT_UNCACHED | L_PTE_XN,
-> >                 .prot_l1   = PMD_TYPE_TABLE,
-> >                 .prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_S |
-> >                                 PMD_SECT_UNCACHED | PMD_SECT_XN,
-> >                 .domain    = DOMAIN_KERNEL,
-> >         },
+> > I don't get this part: you have a reference to the phy here,
+> > but then you go poking the phy registers from the SATA driver
+> > rather than calling a PHY API function.
+> 
+> The v1 only introduced an AHCI driver. I somewhat agree the PHY
+> operations done in the AHCI driver could be in there.
+> 
+> I can move the initialization done in the AHCI driver here, but I'll
+> still need the driver: the Berlin AHCI needs to call the framework
+> generic functions with a custom mask and has custom pm_ops. So I'll
+> end up with a nearly empty AHCI driver, not able to control the port
+> parameters.
+> 
+> Or I can put all this in the AHCI driver, but then we'll need to
+> describe the PHYs there (to be able to enable each PHY independently)
+> and add bindings to the SATA ones.
+> 
+> What do you think? I prefer the first solution, but we'll have SATA
+> port related configuration in the PHY and a very tiny AHCI driver
+> because I can't really use the default behaviour of the ahci_platform.
+
+I just noticed I quoted the wrong driver with my comment, but I think
+you got what I meant.
+
+Why do you need a custom mask? Is that something you could pass
+as the argument in the phy descriptor using #phy-cells=<1>?
+
+> > > +                * By default the PHY node is used to request and match a PHY.
+> > > +                * We describe one PHY per sub-node here. Use the right node.
+> > > +                */
+> > > +               phy->dev.of_node = child;
+> > > +
+> > > +               priv->phys[phy_id].phy = phy;
+> > > +               priv->phys[phy_id].val = desc[phy_id].val;
+> > > +               priv->phys[phy_id].index = phy_id;
+> > > +               phy_set_drvdata(phy, &priv->phys[phy_id]);
 > > 
-> > So you set a different domain, and turn write-combined and cached mappings
-> > into uncached mappings, and for uncached mappings you remove the "shared"
-> > flag. Which of these changes is the one you actually need?
+> > And here, you set a driver specific value into a structure used by the
+> > PHY.
 > 
-> I *believe* the important part is the change from L_PTE_MT_DEV_SHARED
-> to L_PTE_MT_UNCACHED, because:
+> Values in priv->phys[] are related to the PHYs. phy_set_drvdata() allows
+> to store PHY related data, which is what I'm doing there. Nearly all PHY
+> drivers are doing this.
 > 
-> #define L_PTE_MT_UNCACHED       (_AT(pteval_t, 0x00) << 2)
-> #define L_PTE_MT_DEV_SHARED     (_AT(pteval_t, 0x04) << 2)
-> 
-> So the former is "Strongly-Ordered" according to the ARM ARM, while the
-> latter is "Device Shareable".
-> 
-> The only detail I have access to is that the workaround is "Reads
-> targeting PCIe End Point must be marked Strongly Ordered", so it's
-> pretty limited in details.
-> 
-> Do you think I should create a different memory type MT_DEVICE_SO, that
-> remains in the DOMAIN_IO domain, but uses L_PTE_MT_UNCACHED instead of
-> L_PTE_MT_DEV_SHARED ?
+> Or am I missing something?
 
-I don't think it's worth, we no longer use domains on ARMv7. You could
-even change the domain to IO here (it seems to be used only by omap for
-a workaround) or collapse both into MT_UNCACHED which seems to have
-similar needs (and used by iop3xx only).
+This part is really ok, I got confused when I replied to the wrong email.
+Sorry about this.
 
--- 
-Catalin
+> > Both of these are layering violations. You should either use the PHY
+> > interfaces correctly so the SATA driver doesn't have to know about the
+> > specific, or not use a PHY device node at all and do everything in
+> > the SATA front-end.
+> 
+> To be sure: you mean using the PHY init() interface in the AHCI driver?
+
+If this PHY is specific to the ahci-berlin hardware and not shared with
+anything else, you don't really need to split out a phy driver. That
+would somewhat simplify what you ahve here.
+
+The alternative is to make it as generic as you can. If you can manage
+to move all the phy code into phy-berlin-sata driver, it should be
+possible to just extend the ahci-platform driver resume function to
+reinitialize the phy if there is one.
+
+	Arnd
