@@ -1,101 +1,117 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 May 2014 13:56:49 -0700
-Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
-In-Reply-To: <5373CBB9.40506@linaro.org>
-References: <1399991966-14582-1-git-send-email-santosh.shilimkar@ti.com>
- <5373C78E.7040301@linaro.org> <5373C8E8.6040208@ti.com>
- <5373CBB9.40506@linaro.org>
-Message-ID: <20140514205649.GC27426@atomide.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 14 May 2014 23:07:36 +0200
+Subject: [PATCH] arm: msm: remove board file for Nexus One (ie. mahimahi)
+Message-ID: <1400101656.9826.4.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Daniel Lezcano <daniel.lezcano@linaro.org> [140514 13:02]:
-> On 05/14/2014 09:50 PM, Santosh Shilimkar wrote:
-> >On Wednesday 14 May 2014 03:44 PM, Daniel Lezcano wrote:
-> >>On 05/13/2014 04:39 PM, Santosh Shilimkar wrote:
-> >>>On OMAP4 panda board, there have been several bug reports about boot
-> >>>hang and lock-ups with CPU_IDLE enabled. The root cause of the issue
-> >>>is missing interrupts while in idle state. Commit cb7094e8 {cpuidle / omap4 :
-> >>>use CPUIDLE_FLAG_TIMER_STOP flag} moved the broadcast notifiers to common
-> >>>code for right reasons but on OMAP4 which suffers from a nasty ROM code
-> >>>bug with GIC, commit ff999b8a {ARM: OMAP4460: Workaround for ROM bug ..},
-> >>>we loose interrupts which leads to issues like lock-up, hangs etc.
-> >>>
-> >>>Patch reverts commit cb7094 {cpuidle / omap4 : use CPUIDLE_FLAG_TIMER_STOP
-> >>>flag} to avoid the issue. With this change, OMAP4 panda boards, the mentioned
-> >>>issues are getting fixed. We no longer loose interrupts which was the cause
-> >>>of the regression.
-> >>>
-> >>>Cc: Roger Quadros <rogerq@ti.com>
-> >>>Cc: Kevin Hilman <khilman@linaro.org>
-> >>>Cc: Tony Lindgren <tony@atomide.com>
-> >>>Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> >>>Reported-tested-by: Roger Quadros <rogerq@ti.com>
-> >>>Reported-tested-by: Kevin Hilman <khilman@linaro.org>
-> >>>Tested-by: Tony Lindgren <tony@atomide.com>
-> >>>Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >>>---
-> 
-> [ ... ]
-> 
-> >>>
-> >>>+    clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
-> >>>+
-> >>>       /*
-> >>>        * Call idle CPU PM enter notifier chain so that
-> >>>        * VFP and per CPU interrupt context is saved.
-> >>>@@ -165,6 +169,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
-> >>>       if (dev->cpu == 0 && mpuss_can_lose_context)
-> >>>           cpu_cluster_pm_exit();
-> >>>
-> >>>+    clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
-> 
-> [ ... ]
-> 
-> >>
-> >>Shouldn't the broadcast timer to be setup with CLOCK_EVT_NOTIFY_BROADCAST_ON also ?
-> >>
-> >Which is already taken care by __cpuidle_register_driver(). Note that setup code
-> >is still used from generic code...
-> 
-> Nope, if the flag CPUIDLE_FLAG_TIMER_STOP is not set, the cpuidle framework
-> won't setup the timer.
-> 
-> static void __cpuidle_driver_init(struct cpuidle_driver *drv)
-> {
-> 
-> 	...
-> 
-> 	for (i = drv->state_count - 1; i >= 0 ; i--) {
-> 		if (drv->states[i].flags & CPUIDLE_FLAG_TIMER_STOP) {
-> 			drv->bctimer = 1;
-> 			break;
-> 		}
-> 	}
-> 
-> 	...
-> 
-> }
-> 
-> static int __cpuidle_register_driver(struct cpuidle_driver *drv)
-> {
-> 	...
-> 
-> 	if (drv->bctimer)
-> 		on_each_cpu_mask(drv->cpumask,
-> 		cpuidle_setup_broadcast_timer,
-> 		 (void *)CLOCK_EVT_NOTIFY_BROADCAST_ON, 1);
-> 
-> 	...
-> }
-> 
-> So the broadcast timer does not operate with this revert. Moreover, I am not
-> sure reverting this patch is the right solution.
+Commit 1b802ff79f03 ("arm: msm: add board file for Nexus One (ie.
+mahimahi)") added just board-mahimahi.c. It did not add
+board-mahimahi.h, Makefile changes or Kconfig changes.
 
-OK I'll hold on sending anything until there's some conclusion.
+Four years have passed and this file is still dangling. Remove it.
 
-Are you able to reproduce the problem with current Linux next?
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Untested. But what to test here?
 
-Regards,
+ arch/arm/mach-msm/board-mahimahi.c | 88 --------------------------------------
+ 1 file changed, 88 deletions(-)
+ delete mode 100644 arch/arm/mach-msm/board-mahimahi.c
 
-Tony
+diff --git a/arch/arm/mach-msm/board-mahimahi.c b/arch/arm/mach-msm/board-mahimahi.c
+deleted file mode 100644
+index 7d9981cb400e..000000000000
+--- a/arch/arm/mach-msm/board-mahimahi.c
++++ /dev/null
+@@ -1,88 +0,0 @@
+-/* linux/arch/arm/mach-msm/board-mahimahi.c
+- *
+- * Copyright (C) 2009 Google, Inc.
+- * Copyright (C) 2009 HTC Corporation.
+- * Author: Dima Zavin <dima@android.com>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-#include <linux/delay.h>
+-#include <linux/gpio.h>
+-#include <linux/init.h>
+-#include <linux/input.h>
+-#include <linux/io.h>
+-#include <linux/kernel.h>
+-#include <linux/platform_device.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/map.h>
+-#include <asm/setup.h>
+-
+-#include <mach/hardware.h>
+-
+-#include "board-mahimahi.h"
+-#include "devices.h"
+-#include "proc_comm.h"
+-#include "common.h"
+-
+-static uint debug_uart;
+-
+-module_param_named(debug_uart, debug_uart, uint, 0);
+-
+-static struct platform_device *devices[] __initdata = {
+-#if !defined(CONFIG_MSM_SERIAL_DEBUGGER)
+-	&msm_device_uart1,
+-#endif
+-	&msm_device_uart_dm1,
+-	&msm_device_nand,
+-};
+-
+-static void __init mahimahi_init(void)
+-{
+-	platform_add_devices(devices, ARRAY_SIZE(devices));
+-}
+-
+-static void __init mahimahi_fixup(struct tag *tags, char **cmdline,
+-				  struct meminfo *mi)
+-{
+-	mi->nr_banks = 2;
+-	mi->bank[0].start = PHYS_OFFSET;
+-	mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
+-	mi->bank[0].size = (219*1024*1024);
+-	mi->bank[1].start = MSM_HIGHMEM_BASE;
+-	mi->bank[1].node = PHYS_TO_NID(MSM_HIGHMEM_BASE);
+-	mi->bank[1].size = MSM_HIGHMEM_SIZE;
+-}
+-
+-static void __init mahimahi_map_io(void)
+-{
+-	msm_map_common_io();
+-	msm_clock_init();
+-}
+-
+-static void __init mahimahi_init_late(void)
+-{
+-	smd_debugfs_init();
+-}
+-
+-void msm_timer_init(void);
+-
+-MACHINE_START(MAHIMAHI, "mahimahi")
+-	.atag_offset	= 0x100,
+-	.fixup		= mahimahi_fixup,
+-	.map_io		= mahimahi_map_io,
+-	.init_irq	= msm_init_irq,
+-	.init_machine	= mahimahi_init,
+-	.init_late	= mahimahi_init_late,
+-	.init_time	= msm_timer_init,
+-MACHINE_END
+-- 
+1.9.0
