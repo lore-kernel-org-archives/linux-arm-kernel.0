@@ -1,63 +1,35 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 14 May 2014 17:50:40 +0200
-Subject: [RFC PATCHv1 6/7] ARM: mvebu: define the Armada 370/375/38x/XP
- machine_desc flags
-In-Reply-To: <1400082641-23871-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1400082641-23871-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1400082641-23871-7-git-send-email-thomas.petazzoni@free-electrons.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Wed, 14 May 2014 17:51:36 +0200
+Subject: [RFC PATCH 2/9] dt: deps: dependency based device creation
+In-Reply-To: <20140514140534.897F8C4153D@trevor.secretlab.ca>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>	<1399913280-6915-3-git-send-email-holler@ahsoftware.de>
+ <20140514140534.897F8C4153D@trevor.secretlab.ca>
+Message-ID: <53739108.40209@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 370 is a purely non-SMP processor, so it does not need the
-MACHINE_NEEDS_SHAREABLE_PAGES flag, and more importantly this flag
-cannot be set with this CPU core.
+Am 14.05.2014 16:05, schrieb Grant Likely:
 
-For all other processors, they are SMP-capable, but have cut-down
-variants that only have one core. And for these variants, we need both
-the cache policy to be write-allocate, and the shareable attribute to
-be set on page tables in order for I/O coherency to work properly.
+>> +
+>> +	if (graph.finished)
+>> +		return -EINVAL; /* cycle found */
+>> +
+>> +	/* of_init_print_order(); */
+>
+> If you wrap of_init_print_order with a #ifdef DEBUG/#else/#endif, then
+> you don't need to comment out the call to of_init_print_order().
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-mvebu/board-v7.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+To explain why I didn't use DEBUG here: DEBUG enables a lot of 
+distracting messages. which is true for CONFIG_DEBUG_DRIVER too. 
+Therefor I often prefer to use just pr_info("AHO: ..."); with which I 
+print only stuff I want (and can easily grep for).
 
-diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-index 8b4b44b..d1f348e 100644
---- a/arch/arm/mach-mvebu/board-v7.c
-+++ b/arch/arm/mach-mvebu/board-v7.c
-@@ -186,6 +186,7 @@ DT_MACHINE_START(ARMADA_370_DT, "Marvell Armada 370 (Device Tree)")
- 	.init_time	= mvebu_timer_and_clk_init,
- 	.restart	= mvebu_restart,
- 	.dt_compat	= armada_370_dt_compat,
-+	.flags          = MACHINE_NEEDS_CPOLICY_WRITEALLOC,
- MACHINE_END
- 
- static const char * const armada_xp_dt_compat[] = {
-@@ -198,6 +199,8 @@ DT_MACHINE_START(ARMADA_XP_DT, "Marvell Armada XP (Device Tree)")
- 	.init_time	= mvebu_timer_and_clk_init,
- 	.restart	= mvebu_restart,
- 	.dt_compat	= armada_xp_dt_compat,
-+	.flags          = (MACHINE_NEEDS_CPOLICY_WRITEALLOC |
-+			   MACHINE_NEEDS_SHAREABLE_PAGES),
- MACHINE_END
- 
- static const char * const armada_375_dt_compat[] = {
-@@ -210,6 +213,8 @@ DT_MACHINE_START(ARMADA_375_DT, "Marvell Armada 375 (Device Tree)")
- 	.init_machine	= mvebu_dt_init,
- 	.restart	= mvebu_restart,
- 	.dt_compat	= armada_375_dt_compat,
-+	.flags          = (MACHINE_NEEDS_CPOLICY_WRITEALLOC |
-+			   MACHINE_NEEDS_SHAREABLE_PAGES),
- MACHINE_END
- 
- static const char * const armada_38x_dt_compat[] = {
-@@ -222,4 +227,6 @@ DT_MACHINE_START(ARMADA_38X_DT, "Marvell Armada 380/385 (Device Tree)")
- 	.init_time	= mvebu_timer_and_clk_init,
- 	.restart	= mvebu_restart,
- 	.dt_compat	= armada_38x_dt_compat,
-+	.flags          = (MACHINE_NEEDS_CPOLICY_WRITEALLOC |
-+			   MACHINE_NEEDS_SHAREABLE_PAGES),
- MACHINE_END
--- 
-1.9.3
+And as said, the patches I presented are meant for evaluation. I did 
+patches without discussing them before in order to avoid endless 
+discussion which likely never would have found an end and therfor would 
+have prevented a start. So now you already have some to play and test 
+with, without anyone had to discuss stuff before. ;)
+
+Regards,
+
+Alexander Holler
