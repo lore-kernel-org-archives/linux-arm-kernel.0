@@ -1,65 +1,29 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 14 May 2014 20:49:47 +0530
-Subject: [PATCH 11/17] ARM: dts: dra7xx-clocks: Add missing 32khz clocks
- used for PHY
-In-Reply-To: <53736E47.4070402@ti.com>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>
- <1399383244-14556-12-git-send-email-kishon@ti.com> <53736E47.4070402@ti.com>
-Message-ID: <53738993.8070708@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 May 2014 08:22:07 -0700
+Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
+In-Reply-To: <1399991966-14582-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1399991966-14582-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20140514152206.GB18463@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [140513 07:40]:
+> On OMAP4 panda board, there have been several bug reports about boot
+> hang and lock-ups with CPU_IDLE enabled. The root cause of the issue
+> is missing interrupts while in idle state. Commit cb7094e8 {cpuidle / omap4 :
+> use CPUIDLE_FLAG_TIMER_STOP flag} moved the broadcast notifiers to common
+> code for right reasons but on OMAP4 which suffers from a nasty ROM code
+> bug with GIC, commit ff999b8a {ARM: OMAP4460: Workaround for ROM bug ..},
+> we loose interrupts which leads to issues like lock-up, hangs etc.
+> 
+> Patch reverts commit cb7094 {cpuidle / omap4 : use CPUIDLE_FLAG_TIMER_STOP
+> flag} to avoid the issue. With this change, OMAP4 panda boards, the mentioned
+> issues are getting fixed. We no longer loose interrupts which was the cause
+> of the regression.
 
+Thanks for figuring this regression out. Applying into fixes with Cc
+stable.
 
-On Wednesday 14 May 2014 06:53 PM, Roger Quadros wrote:
-> Hi Kishon,
-> 
-> 
-> On 05/06/2014 04:33 PM, Kishon Vijay Abraham I wrote:
->> Added missing 32khz clock used by PCIe PHY.
->> The documention for this node can be found @ ../bindings/clock/ti/gate.txt.
-> 
-> Typo in $subject
-> s/clocks/clock
+Regards,
 
-Will fix it.
-
-Thanks
-Kishon
-> 
-> --
-> cheers,
-> -roger
-> 
->>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Rajendra Nayak <rnayak@ti.com>
->> Cc: Tero Kristo <t-kristo@ti.com>
->> Cc: Paul Walmsley <paul@pwsan.com>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  arch/arm/boot/dts/dra7xx-clocks.dtsi |    8 ++++++++
->>  1 file changed, 8 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
->> index 44993ec..e1bd052 100644
->> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
->> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
->> @@ -1165,6 +1165,14 @@
->>  		reg = <0x021c>, <0x0220>;
->>  	};
->>  
->> +	optfclk_pciephy_32khz: optfclk_pciephy_32khz at 4a0093b0 {
->> +		compatible = "ti,gate-clock";
->> +		clocks = <&sys_32k_ck>;
->> +		#clock-cells = <0>;
->> +		reg = <0x13b0>;
->> +		ti,bit-shift = <8>;
->> +	};
->> +
->>  	optfclk_pciephy_div: optfclk_pciephy_div at 4a00821c {
->>  		compatible = "ti,divider-clock";
->>  		clocks = <&apll_pcie_ck>;
->>
-> 
+Tony
