@@ -1,27 +1,40 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 13 May 2014 17:51:19 -0700
-Subject: [PATCH v3 5/7] clk: sunxi: add PRCM (Power/Reset/Clock
- Management) clks support
-In-Reply-To: <1399633911-7094-6-git-send-email-boris.brezillon@free-electrons.com>
-References: <1399633911-7094-1-git-send-email-boris.brezillon@free-electrons.com>
- <1399633911-7094-6-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140514005119.16152.19787@quantum>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Wed, 14 May 2014 06:32:58 +0530
+Subject: [PATCH v3 0/2] cpufreq: opp: Add device tree based lookup of boost
+ mode frequency
+Message-ID: <1400029380-5372-1-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Boris BREZILLON (2014-05-09 04:11:49)
-> +struct clk_ops ar100_ops = {
-> +       .recalc_rate = ar100_recalc_rate,
-> +       .determine_rate = ar100_determine_rate,
-> +       .set_parent = ar100_set_parent,
-> +       .get_parent = ar100_get_parent,
-> +       .set_rate = ar100_set_rate,
-> +};
+Changes since v2:
+- Reworked based on the "PM / OPP: move cpufreq specific helpers out of OPP layer"
+  patch series posted by Nishanth Menon <nm@ti.com>.
 
-I might be having a brain fart, but is there a valid case for having
-both a .recalc_rate and a .determine_rate? I believe that the former
-will never be used and the latter will always be used by the clock
-framework core.
+Changes since v1:
+- Boost mode frequencies are specfied as a set of frequencies instead of
+  specifying them as OPPs. Thanks to Nishanth, Lukasz and Rob for the
+  feedback.
 
-Regards,
-Mike
+Commit 6f19efc0 ("cpufreq: Add boost frequency support in core") adds
+support for CPU boost mode for CPUfreq drivers. To use the new boost
+mode, CPUfreq drivers have to specify the boost mode frequency and
+voltage within the CPUfreq driver, which is the case for Exynos4x12
+CPUfreq driver.
+
+But for CPUfreq drivers which obtain the OPPs from cpus node, this
+patch series adds support to specify boost mode frequencies in the
+cpu device tree node. This requirement came up when Lukasz pointed
+out the regression caused by the Exynos CPUfreq driver consolidation
+patches.
+
+Thomas Abraham (2):
+  cpufreq / OPP: Allow boost frequency to be looked up from device tree
+  Documentation: devicetree: Add boost-frequency binding to list boost mode frequency
+
+ .../devicetree/bindings/cpufreq/cpufreq-boost.txt  |   11 ++++++
+ drivers/cpufreq/cpufreq_opp.c                      |   39 ++++++++++++++++++++
+ 2 files changed, 50 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+
+-- 
+1.7.4.4
