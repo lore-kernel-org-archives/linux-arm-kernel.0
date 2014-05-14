@@ -1,37 +1,51 @@
 From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Wed, 14 May 2014 08:15:59 +0530
-Subject: [PATCH v4 2/5] ARM: dts: change to correct compatible string for
- exynos5420 hdmi
+Date: Wed, 14 May 2014 08:16:02 +0530
+Subject: [PATCH v4 5/5] ARM: dts: enable hdmi for exynos5800 based peach-pi
+ board
 In-Reply-To: <1400035562-16832-1-git-send-email-rahul.sharma@samsung.com>
 References: <1400035562-16832-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1400035562-16832-3-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1400035562-16832-6-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rahul Sharma <Rahul.Sharma@samsung.com>
 
-Replace compatible string for HDMI node in Exynos5420. Since
-latest restructring in Drm hdmi driver, it is agreed to use
-a seperate compatible string for Exynos5420 HDMI IP siince it
-uses APB mapped Phy.
+Enable hdmi for peach-pi board.
 
 Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
 ---
- arch/arm/boot/dts/exynos5420.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos5800-peach-pi.dts |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index a802f74..016992c 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -640,7 +640,7 @@
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index 742655b..2a6f23b8 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -134,6 +134,25 @@
  	};
+ };
  
- 	hdmi: hdmi at 14530000 {
--		compatible = "samsung,exynos4212-hdmi";
-+		compatible = "samsung,exynos5420-hdmi";
- 		reg = <0x14530000 0x70000>;
- 		interrupts = <0 95 0>;
- 		clocks = <&clock CLK_HDMI>, <&clock CLK_SCLK_HDMI>,
++&i2c_2 {
++	status = "okay";
++	samsung,i2c-sda-delay = <100>;
++	samsung,i2c-max-bus-freq = <66000>;
++	samsung,i2c-slave-addr = <0x50>;
++
++	hdmiddc at 50 {
++		reg = <0x50>;
++	};
++};
++
++&hdmi {
++	status = "okay";
++	hpd-gpio = <&gpx3 7 2>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&hdmi_hpd_irq>;
++	ddc = <&i2c_2>;
++};
++
+ /*
+  * Use longest HW watchdog in SoC (32 seconds) since the hardware
+  * watchdog provides no debugging information (compared to soft/hard
 -- 
 1.7.9.5
