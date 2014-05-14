@@ -1,81 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 14 May 2014 09:00:38 +0200
-Subject: [PATCH v3 4/6] arm: add basic support for Mediatek MT6589 boards
-In-Reply-To: <20140513224732.GJ20486@codeaurora.org>
-References: <1399938570-11356-1-git-send-email-matthias.bgg@gmail.com>
- <1399938570-11356-5-git-send-email-matthias.bgg@gmail.com>
- <20140513224732.GJ20486@codeaurora.org>
-Message-ID: <20140514070038.GG29258@lukather>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 14 May 2014 16:09:46 +0900
+Subject: [PATCH 00/03] ARM: shmobile: Use shmobile_init_delay() on r8a7791
+In-Reply-To: <1509906.x9u0HJ6AbJ@avalon>
+References: <20140511232508.20177.11556.sendpatchset@w520>
+ <1509906.x9u0HJ6AbJ@avalon>
+Message-ID: <CANqRtoQxGcTUvU1qAcJTy8ONPNmcx5CBNcrXASoMCVpAyOAfqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Laurent,
 
-On Tue, May 13, 2014 at 03:47:32PM -0700, Stephen Boyd wrote:
-> On 05/13, Matthias Brugger wrote:
-> > diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
-> > new file mode 100644
-> > index 0000000..73dfb05
-> > --- /dev/null
-> > +++ b/arch/arm/mach-mediatek/mediatek.c
-> > @@ -0,0 +1,32 @@
-> > +/*
-> > + * Device Tree support for Mediatek SoCs
-> > + *
-> > + * Copyright (c) 2014 MundoReader S.L.
-> > + * Author: Matthias Brugger <matthias.bgg@gmail.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#include <linux/kernel.h>
-> > +#include <linux/init.h>
-> > +#include <linux/of_platform.h>
-> > +#include <linux/irqchip.h>
-> > +#include <asm/mach/arch.h>
-> > +#include <asm/mach/map.h>
-> > +
-> > +static const char * const mediatek_board_dt_compat[] = {
-> 
-> __initconst?
-> 
-> > +	"mediatek,mt6589",
-> > +	NULL,
-> > +};
-> > +
-> > +DT_MACHINE_START(MEDIATEK_DT, "Mediatek Cortex-A7 (Device Tree)")
-> > +	.dt_compat	= mediatek_board_dt_compat,
-> > +MACHINE_END
-> 
-> You shouldn't need this file at all if the platform is part of
-> the multi-platform kernel.
+On Tue, May 13, 2014 at 5:00 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Magnus,
+>
+> On Monday 12 May 2014 08:25:08 Magnus Damm wrote:
+>> ARM: shmobile: Use shmobile_init_delay() on r8a7791
+>>
+>> [PATCH 01/03] ARM: shmobile: Use r8a7791 DT CPU Frequency in common case
+>> [PATCH 02/03] ARM: shmobile: Use r8a7791 DT CPU Frequency for Koelsch
+>> [PATCH 03/03] ARM: shmobile: Remove unused r8a7791_init_early()
+>>
+>> Convert r8a7791 to rely on shmobile_init_delay() instead of using a per-SoC
+>> delay setup function.
+>
+> I'm afraid this patch set causes a boot time and CPU load regression on
+> Koelsch. With Simon's latest devel branch which has the patches applied, the
+> kernel boot time (using koelsch_defconfig) up to the point where the kernel
+> tries to connect to the DHCP server is 17.898437s. The CPU load (as reported
+> by top) on an idle system is then around 33%, spent in [kworker/0:1]. If I
+> revert the patches the same time goes down to 1.921875s and the CPU load on an
+> idle system is close to 0.
 
->From a technical point of view, you don't. But it's interesting to
-keep it mostly for two things:
-  - You get to see the platform name in /proc/cpuinfo
-  - If you ever need to add platform quirks, it's already there
+Thanks for testing and reporting this! I believe Simon has posted a
+fix for this issue which is related to MHz vs Hz bug introduced by me
+in function shmobile_init_delay(). Things should be in order now.
 
-We had a similar discussion two weeks ago for mach-sunxi with Olof and
-Arnd, and ended up keeping this minimal machine.
+Cheers,
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140514/ff66f4e5/attachment.sig>
+/ magnus
