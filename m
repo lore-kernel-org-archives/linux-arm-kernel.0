@@ -1,152 +1,105 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Wed, 14 May 2014 18:57:22 +0200
-Subject: [PATCH v3 1/6] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <4414637.rKolGB14Rm@wuerfel>
-References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
- <31922167.uMVzxsQNIT@wuerfel> <20140514154929.GA8016@kwain>
- <4414637.rKolGB14Rm@wuerfel>
-Message-ID: <20140514165722.GA18495@kwain>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 14 May 2014 17:58:04 +0100
+Subject: [PATCH v3 17/19] arm64: KVM: move hcr_el2 setting into
+ vgic-v2-switch.S
+In-Reply-To: <CAMJs5B9RwaeZhxoWnz1FzmX9swsA32Gqz9NwLZSQiFuGJ-v5Lg@mail.gmail.com>
+References: <1397655591-2761-1-git-send-email-marc.zyngier@arm.com>
+ <1397655591-2761-18-git-send-email-marc.zyngier@arm.com>
+ <20140509140723.GR3362@lvm>	<87ha4sh1le.fsf@approximate.cambridge.arm.com>
+ <CAMJs5B9RwaeZhxoWnz1FzmX9swsA32Gqz9NwLZSQiFuGJ-v5Lg@mail.gmail.com>
+Message-ID: <5373A09C.9020306@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 14, 2014 at 06:11:24PM +0200, Arnd Bergmann wrote:
-> On Wednesday 14 May 2014 17:49:29 Antoine T?nart wrote:
-> > On Wed, May 14, 2014 at 05:31:24PM +0200, Arnd Bergmann wrote:
-> > > On Wednesday 14 May 2014 16:50:02 Antoine T?nart wrote:
-> > > > On Wed, May 14, 2014 at 03:02:34PM +0200, Arnd Bergmann wrote:
-> > > > > On Wednesday 14 May 2014 11:48:57 Antoine T?nart wrote:
-> > > > > I don't get this part: you have a reference to the phy here,
-> > > > > but then you go poking the phy registers from the SATA driver
-> > > > > rather than calling a PHY API function.
-> > > > 
-> > > > The v1 only introduced an AHCI driver. I somewhat agree the PHY
-> > > > operations done in the AHCI driver could be in there.
-> > > > 
-> > > > I can move the initialization done in the AHCI driver here, but I'll
-> > > > still need the driver: the Berlin AHCI needs to call the framework
-> > > > generic functions with a custom mask and has custom pm_ops. So I'll
-> > > > end up with a nearly empty AHCI driver, not able to control the port
-> > > > parameters.
-> > > > 
-> > > > Or I can put all this in the AHCI driver, but then we'll need to
-> > > > describe the PHYs there (to be able to enable each PHY independently)
-> > > > and add bindings to the SATA ones.
-> > > > 
-> > > > What do you think? I prefer the first solution, but we'll have SATA
-> > > > port related configuration in the PHY and a very tiny AHCI driver
-> > > > because I can't really use the default behaviour of the ahci_platform.
-> > > 
-> > > I just noticed I quoted the wrong driver with my comment, but I think
-> > > you got what I meant.
-> > > 
-> > > Why do you need a custom mask? Is that something you could pass
-> > > as the argument in the phy descriptor using #phy-cells=<1>?
-> > 
-> > I meant a custom mask in the AHCI driver, when calling the
-> > ahci_platform_init_host() function. Otherwise we'll have problems on the
-> > BG2Q DMP (it only has one PHY available, and not initializing it is not
-> > enough).
+On 14/05/14 17:34, Christoffer Dall wrote:
+> On 14 May 2014 15:33, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On Fri, May 09 2014 at  3:07:23 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+>>> On Wed, Apr 16, 2014 at 02:39:49PM +0100, Marc Zyngier wrote:
+>>>> GICv3 requires the hcr_el2 switch to be tightly coupled with some
+>>>> of the interrupt controller's register switch.
+>>>
+>>> can you be more specific, this feels a bit odd, enabling Stage-2
+>>> translation and configuring all traps from within the vgic code...
+>>
+>> The IMO and FMO bits must be set before restoring the various system
+>> registers in GICv3. But I agreee that this looks pretty horrible.
+>>
+>> The alternative is to split the bits we set in HCR_EL2 into two sets (VM
+>> and trap control on one side, interrupt control on the other). This
+>> would translate into two accesses to HCR_EL2, but it would look
+>> nicer. I'll have a look.
+>>
+>>>> In order to have similar code paths, start moving the hcr_el2
+>>>> manipulation code to the GICv2 switch code.
+>>>>
+>>>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>  arch/arm64/kvm/hyp.S            | 7 -------
+>>>>  arch/arm64/kvm/vgic-v2-switch.S | 8 ++++++++
+>>>>  2 files changed, 8 insertions(+), 7 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+>>>> index aed72d0..92b9120 100644
+>>>> --- a/arch/arm64/kvm/hyp.S
+>>>> +++ b/arch/arm64/kvm/hyp.S
+>>>> @@ -335,11 +335,6 @@
+>>>>  .endm
+>>>>
+>>>>  .macro activate_traps
+>>>> -    ldr     x2, [x0, #VCPU_IRQ_LINES]
+>>>> -    ldr     x1, [x0, #VCPU_HCR_EL2]
+>>>> -    orr     x2, x2, x1
+>>>> -    msr     hcr_el2, x2
+>>>> -
+>>>>      ldr     x2, =(CPTR_EL2_TTA)
+>>>>      msr     cptr_el2, x2
+>>>>
+>>>> @@ -353,8 +348,6 @@
+>>>>  .endm
+>>>>
+>>>>  .macro deactivate_traps
+>>>> -    mov     x2, #HCR_RW
+>>>> -    msr     hcr_el2, x2
+>>>>      msr     cptr_el2, xzr
+>>>>      msr     hstr_el2, xzr
+>>>>
+>>>> diff --git a/arch/arm64/kvm/vgic-v2-switch.S b/arch/arm64/kvm/vgic-v2-switch.S
+>>>> index c5dc777..d36cd7a 100644
+>>>> --- a/arch/arm64/kvm/vgic-v2-switch.S
+>>>> +++ b/arch/arm64/kvm/vgic-v2-switch.S
+>>>> @@ -85,6 +85,9 @@ CPU_BE(    rev     w5, w5 )
+>>>>      sub     w4, w4, #1
+>>>>      cbnz    w4, 1b
+>>>>  2:
+>>>> +    mov     x2, #HCR_RW
+>>>> +    msr     hcr_el2, x2
+>>>> +    isb
+>>>>  .endm
+>>>>
+>>>>  /*
+>>>> @@ -92,6 +95,11 @@ CPU_BE(   rev     w5, w5 )
+>>>>   * x0: Register pointing to VCPU struct
+>>>>   */
+>>>>  .macro restore_vgic_v2_state
+>>>> +    ldr     x2, [x0, #VCPU_IRQ_LINES]
+>>>
+>>> will this ever have any values on aarch64?  Don't we mandate vgic
+>>> support and bail out during hyp init if we cannot init a vgic?
+>>
+>> Yes. But that doesn't mean we don't support the feature either. The case
+>> is fairly slim, I agree, but it has been there since Day-1...
+>>
+> See kvm_vm_ioctl_irq_line() in arch/arm/kvm/arm.c:
 > 
-> Ah, I see what you mean now. Of course, this could also be an optional
-> property in the generic AHCI binding, which would require that you
-> specify the available ports in DT for nonstandard masks.
-> 
-> Just to confirm: The HOST_PORTS_IMPL register on BG2Q DMP has an
-> value that we can't use here to determine the available ports, right?
+> case KVM_ARM_IRQ_TYPE_CPU:
+>     if (irqchip_in_kernel(kvm))
+>         return -ENXIO;
 
-Right. The register is here but saying there are 2 available ports,
-which is true for the BG2Q SoC but not true for the BG2Q DMP board. So
-the AHCI framework reads the register and performs a misconfiguration of
-the SATA.
+Unfortunately, this only checks if the VM has a vgic instantiated. It is
+always possible to create a VM without the in-kernel GIC, and use the
+pins to inject IRQs. As I said, unlikely to happen, but nonetheless...
 
-> 
-> > > > > > +                * By default the PHY node is used to request and match a PHY.
-> > > > > > +                * We describe one PHY per sub-node here. Use the right node.
-> > > > > > +                */
-> > > > > > +               phy->dev.of_node = child;
-> > > > > > +
-> > > > > > +               priv->phys[phy_id].phy = phy;
-> > > > > > +               priv->phys[phy_id].val = desc[phy_id].val;
-> > > > > > +               priv->phys[phy_id].index = phy_id;
-> > > > > > +               phy_set_drvdata(phy, &priv->phys[phy_id]);
-> > > > > 
-> > > > > And here, you set a driver specific value into a structure used by the
-> > > > > PHY.
-> > > > 
-> > > > Values in priv->phys[] are related to the PHYs. phy_set_drvdata() allows
-> > > > to store PHY related data, which is what I'm doing there. Nearly all PHY
-> > > > drivers are doing this.
-> > > > 
-> > > > Or am I missing something?
-> > > 
-> > > This part is really ok, I got confused when I replied to the wrong email.
-> > > Sorry about this.
-> > > 
-> > > > > Both of these are layering violations. You should either use the PHY
-> > > > > interfaces correctly so the SATA driver doesn't have to know about the
-> > > > > specific, or not use a PHY device node at all and do everything in
-> > > > > the SATA front-end.
-> > > > 
-> > > > To be sure: you mean using the PHY init() interface in the AHCI driver?
-> > > 
-> > > If this PHY is specific to the ahci-berlin hardware and not shared with
-> > > anything else, you don't really need to split out a phy driver. That
-> > > would somewhat simplify what you ahve here.
-> > 
-> > I don't have lots of info about that, but we set the PHY to
-> > PHY_MODE_SATA in the AHCI driver. So I guess there are other modes.
-> 
-> Ok, good point. This does sound a lot like there are multiple modes.
-> 
-> This would also imply that the "compatible" string should not have
-> "sata" in it either, but describe a generic PHY. You can pass the mode
-> as part of the phy descriptor from DT then.
-
-Yes sure, with something like:
-
-	phys = <&foo_phy0 FOO_SATA>;
-
-> 
-> > > The alternative is to make it as generic as you can. If you can manage
-> > > to move all the phy code into phy-berlin-sata driver, it should be
-> > > possible to just extend the ahci-platform driver resume function to
-> > > reinitialize the phy if there is one.
-> > 
-> > It is possible to move all the PHY code the phy-berlin-sata. Then I'll
-> > need to hack a bit the AHCI framework so it can handle more than one
-> > PHY. But as I said, I'll still need to set a custom mask, and adding a
-> > quirk to the AHCI platform or framework does not seem to be a very good
-> > idea, imho.
-> > 
-> > Or I can add a computed mask to the ahci-platform driver, like I did in
-> > the Berlin one, but I don't know what would be the consequences. For
-> > each PHY I have:
-> > 
-> > +	mask |= 1 << i;
-> 
-> It does sound generic enough that the same would be done on other
-> ahci-platform variants with a generic phy attached, even though
-> currently each one has only one phy.
-> 
-> We can probably define this as an extension in some form.
-> Do you think we need to handle the case where the first port is
-> unavailable but some of the other ports should be used?
-
-The Berlin AHCI driver handles the case. I don't know if we'll come
-across a use case for this but supporting it should'nt be difficult. So
-why not ... :)
-
-I think we can either add a binding enabling an automatic mask computation
-in the framework or match the compatible and do this in the ahci-platform
-driver. Or we can make this the default behaviour when multiple PHYs are
-used in an AHCI node, but I'll have to check if that's possible.
-
-Maybe the SATA subsystem maintainer has an opinion on the matter?
-
-
-Antoine
-
+	M.
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
