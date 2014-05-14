@@ -1,57 +1,79 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 14 May 2014 16:53:29 +0200
-Subject: [PATCH] ARM: zynq: Fix uart0 early console virtual address
-Message-ID: <c2e5957287cc60655ac4cdd754bb34e874865d2a.1400079202.git.michal.simek@xilinx.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 14 May 2014 16:58:25 +0200
+Subject: [PATCHv2 3/4] ARM: mm: add support for HW coherent systems in
+ PL310
+In-Reply-To: <20140514143448.GD19866@localhost>
+References: <1399975839-5311-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1399975839-5311-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140514143448.GD19866@localhost>
+Message-ID: <20140514165825.58d3bb20@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Virtual address have to have the same offset within
-a 2MB aligned section of virtual/phycial address space.
+Dear Catalin Marinas,
 
-Fix uart0 virtual address to be align with physical one.
-Also remove UART_SIZE which is completely unused.
+On Wed, 14 May 2014 15:34:48 +0100, Catalin Marinas wrote:
+> On Tue, May 13, 2014 at 11:10:38AM +0100, Thomas Petazzoni wrote:
+> > --- a/Documentation/devicetree/bindings/arm/l2cc.txt
+> > +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+> > @@ -8,6 +8,8 @@ Required properties:
+> >  
+> >  - compatible : should be one of:
+> >    "arm,pl310-cache"
+> > +  "arm,pl310-coherent-cache", used for I/O coherent platforms using
+> > +     the PL310 cache
+> >    "arm,l220-cache"
+> >    "arm,l210-cache"
+> >    "bcm,bcm11351-a2-pl310-cache": DEPRECATED by "brcm,bcm11351-a2-pl310-cache"
+> 
+> The binding name kind of implies that we have a transparent PL310 cache
+> (at least to me), which is not the case. I would rather have a specific
+> dma-coherent property or something similar since it's not another type
+> of PL310 but rather a different SoC topology.
 
-Reported-by: Russ Smith <russells@google.com>
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+Fine with me. A separate property or a different compatible string is
+the same.
 
- arch/arm/include/debug/zynq.S | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+> But I recall you mentioned that you can't make this decision at the DT
+> level since you don't know before whether the SoC is I/O coherent or
+> not.
 
-diff --git a/arch/arm/include/debug/zynq.S b/arch/arm/include/debug/zynq.S
-index 0b762fafa758..3edfef7b34ae 100644
---- a/arch/arm/include/debug/zynq.S
-+++ b/arch/arm/include/debug/zynq.S
-@@ -20,18 +20,18 @@
- #define UART_SR_TXEMPTY		0x00000008	/* TX FIFO empty */
+As of today, hardware I/O coherency can only be enabled if CONFIG_SMP
+is enabled *and* the SoC is actually multi-core, due to limitations in
+the ARM core code. So if you look at my PATCH 4/4 in this series, you
+will see that I adjust the compatible string of the cache controller at
+run time, depending on whether hardware I/O coherency is enabled or not:
 
- #define UART0_PHYS		0xE0000000
-+#define UART0_VIRT		0xF0000000
- #define UART1_PHYS		0xE0001000
--#define UART_SIZE		SZ_4K
--#define UART_VIRT		0xF0001000
-+#define UART1_VIRT		0xF0001000
++static void __init mvebu_l2x0_pl310_coherent(void)
++{
++	struct device_node *np;
++
++	if (!coherency_available())
++		return;
++
++	for_each_compatible_node(np, NULL, "arm,pl310-cache") {
++		struct property *new_compat;
++
++		new_compat = kzalloc(sizeof(*new_compat), GFP_KERNEL);
++		new_compat->name = kstrdup("compatible", GFP_KERNEL);
++		new_compat->value = kstrdup("arm,pl310-coherent-cache",
++					    GFP_KERNEL);
++		new_compat->length = strlen(new_compat->value) + 1;
++		of_update_property(np, new_compat);
++	}
++}
 
- #if IS_ENABLED(CONFIG_DEBUG_ZYNQ_UART1)
- # define LL_UART_PADDR		UART1_PHYS
-+# define LL_UART_VADDR		UART1_VIRT
- #else
- # define LL_UART_PADDR		UART0_PHYS
-+# define LL_UART_VADDR		UART0_VIRT
- #endif
+So, this code can just as well be changed to add a property instead of
+adjusting the compatible property. It's the same thing for me.
 
--#define LL_UART_VADDR		UART_VIRT
--
- 		.macro	addruart, rp, rv, tmp
- 		ldr	\rp, =LL_UART_PADDR	@ physical
- 		ldr	\rv, =LL_UART_VADDR	@ virtual
---
-1.8.2.3
+Also, I will send (hopefully today) a series that allows to enable
+hardware I/O coherency even on !SMP configurations. But I believe it
+might take a while to get merged.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140514/6dfcd305/attachment-0001.sig>
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
