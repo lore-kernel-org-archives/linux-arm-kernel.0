@@ -1,32 +1,26 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 14 May 2014 16:01:31 +0100
-Subject: [PATCHv2 2/4] ARM: mm: allow sub-architectures to override PCI
- I/O memory type
-In-Reply-To: <1399975839-5311-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1399975839-5311-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1399975839-5311-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140514150130.GF19866@localhost>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Wed, 14 May 2014 17:02:24 +0200
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <20140514141914.446F7C4153D@trevor.secretlab.ca>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
+ <20140514141914.446F7C4153D@trevor.secretlab.ca>
+Message-ID: <53738580.7000902@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 11:10:37AM +0100, Thomas Petazzoni wrote:
-> Due to a design incompatibility between the PCIe Marvell controller
-> and the Cortex-A9, stressing PCIe devices with a lot of traffic
-> quickly causes a deadlock.
-> 
-> One part of the workaround for this is to have all PCIe regions mapped
-> as MT_MEMORY_SO instead of MT_DEVICE. While the arch_ioremap_caller()
-> mechanism allows sub-architecture code to override ioremap(), used to
-> map PCIe memory regions, there isn't such a mechanism to override the
-> behavior of pci_ioremap_io().
-> 
-> This commit adds the arch_pci_ioremap_mem_type variable, initialized
-> to MT_DEVICE by default, and that sub-architecture code can
-> override. We have chosen to expose a single variable rather than
-> offering the possibility of overriding the entire pci_ioremap_io(),
-> because implementing pci_ioremap_io() requires calling functions
-> (get_mem_type()) that are private to the arch/arm/mm/ code.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Am 14.05.2014 16:19, schrieb Grant Likely:
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Rather than a dtb schema change, for the most common properties (irqs,
+> clocks, gpios), we could extract dependencies at boot time. I don't like
+> the idea of adding a separate depends-on property because it is very
+> easy to get it out of sync with the actual binding data (dtc is not the
+> only tool that manipulates .dtbs. Firmware will fiddle with it too).
+
+Then that stuff has to fiddle correct. Sorry, but trying to solve all 
+problems right from the beginning just leads to endless talks with no 
+end and nothing will happen at all because nobody aggrees how to start.
+
+Regards,
+
+Alexander Holler
