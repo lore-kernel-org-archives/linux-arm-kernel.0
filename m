@@ -1,35 +1,87 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 14 May 2014 15:34:48 +0100
-Subject: [PATCHv2 3/4] ARM: mm: add support for HW coherent systems in
- PL310
-In-Reply-To: <1399975839-5311-4-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1399975839-5311-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1399975839-5311-4-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140514143448.GD19866@localhost>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 14 May 2014 09:35:22 -0500
+Subject: [PATCH 1/1] usb: core: Kconfig: refine the description for
+ CONFIG_USB_OTG
+In-Reply-To: <20140514140830.GA16307@kroah.com>
+References: <1399947567-18958-1-git-send-email-peter.chen@freescale.com>
+ <20140513111144.GA29360@kroah.com>
+ <20140513154647.GM1151@saruman.home>
+ <dc4c63c13058468db8ad8ec4a22204e8@BN1PR03MB235.namprd03.prod.outlook.com>
+ <20140514140830.GA16307@kroah.com>
+Message-ID: <20140514143522.GD2960@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 11:10:38AM +0100, Thomas Petazzoni wrote:
-> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
-> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-> @@ -8,6 +8,8 @@ Required properties:
->  
->  - compatible : should be one of:
->    "arm,pl310-cache"
-> +  "arm,pl310-coherent-cache", used for I/O coherent platforms using
-> +     the PL310 cache
->    "arm,l220-cache"
->    "arm,l210-cache"
->    "bcm,bcm11351-a2-pl310-cache": DEPRECATED by "brcm,bcm11351-a2-pl310-cache"
+On Wed, May 14, 2014 at 04:08:30PM +0200, Greg KH wrote:
+> On Wed, May 14, 2014 at 06:24:51AM +0000, Peter Chen wrote:
+> >  
+> > > 
+> > > On Tue, May 13, 2014 at 01:11:44PM +0200, Greg KH wrote:
+> > > > On Tue, May 13, 2014 at 10:19:27AM +0800, Peter Chen wrote:
+> > > > > the user should only select it when the board supports HNP and SRP,
+> > > > > it should NOT be selected if the board only supports dual-role
+> > > > > switch through ID pin.
+> > > > >
+> > > > > There is a discussion for it:
+> > > > > http://marc.info/?l=linux-arm-kernel&m=139994896101516&w=2
+> > > > > http://marc.info/?l=linux-usb&m=139994881701504&w=2
+> > > > >
+> > > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > > > > ---
+> > > > >  drivers/usb/core/Kconfig |   12 +++++++-----
+> > > > >  1 files changed, 7 insertions(+), 5 deletions(-)
+> > > > >
+> > > > > diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
+> > > > > index cb8e991..158048b 100644
+> > > > > --- a/drivers/usb/core/Kconfig
+> > > > > +++ b/drivers/usb/core/Kconfig
+> > > > > @@ -54,13 +54,15 @@ config USB_OTG
+> > > > >  	default n
+> > > > >  	help
+> > > > >  	  The most notable feature of USB OTG is support for a
+> > > > > -	  "Dual-Role" device, which can act as either a device
+> > > > > -	  or a host. The initial role is decided by the type of
+> > > > > -	  plug inserted and can be changed later when two dual
+> > > > > -	  role devices talk to each other.
+> > > > > +	  otg device, which can act as either a device or a host.
+> > > > > +	  The initial role is decided by the type of plug inserted
+> > > > > +	  and can be changed using HNP (Host Negotiation Protocol)
+> > > > > +	  later when two otg devices talk to each other.
+> > > > >
+> > > > >  	  Select this only if your board has Mini-AB/Micro-AB
+> > > > > -	  connector.
+> > > > > +	  connector and supports HNP and SRP (Session Request Protocol).
+> > > > > +	  If the board only supports dual-role switch through ID
+> > > > > +	  pin, this configuration should not be selected.
+> > > >
+> > > > That's really lame.  What happened to our "all modconfig should work"
+> > > > goal?  Why can't you dynamically detect that this is not a config that
+> > > > works and handle it?
+> > > >
+> > 
+> > If CONFIG_USB_OTG and CONFIG_USB_OTG_WHITELIST are set, most of usb devices
+> > will not work when connect to host for current code.
+> > 
+> > So, we need a feature flag for hcd and gadget, and set this OTG feature flag
+> > if the platform supports it (using dtb or platform data).
+> 
+> Sounds reasonable, and much nicer than just trying to point to a help
+> configuration file that no one will ever read :)
 
-The binding name kind of implies that we have a transparent PL310 cache
-(at least to me), which is not the case. I would rather have a specific
-dma-coherent property or something similar since it's not another type
-of PL310 but rather a different SoC topology.
+yeah, the way OTG Whitelist was implemented is pretty brain dead
+because it prevents anybody from e.g. making an accessory to a
+smartphone and shipping a driver together with an app.
 
-But I recall you mentioned that you can't make this decision at the DT
-level since you don't know before whether the SoC is I/O coherent or
-not.
+That part of the code needs a complete rewrite, what we need is to use
+the bus match to notify that a device is compatible, then everytime a
+new driver is installed, that new device will just work.
 
 -- 
-Catalin
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140514/2ca59049/attachment.sig>
