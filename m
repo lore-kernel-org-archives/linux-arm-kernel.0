@@ -1,112 +1,57 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Wed, 14 May 2014 16:50:02 +0200
-Subject: [PATCH v3 1/6] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <16480004.aaDhzlOZgi@wuerfel>
-References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
- <1400060942-10588-2-git-send-email-antoine.tenart@free-electrons.com>
- <16480004.aaDhzlOZgi@wuerfel>
-Message-ID: <20140514145002.GA18392@kwain>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 14 May 2014 16:53:29 +0200
+Subject: [PATCH] ARM: zynq: Fix uart0 early console virtual address
+Message-ID: <c2e5957287cc60655ac4cdd754bb34e874865d2a.1400079202.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+Virtual address have to have the same offset within
+a 2MB aligned section of virtual/phycial address space.
 
-On Wed, May 14, 2014 at 03:02:34PM +0200, Arnd Bergmann wrote:
-> On Wednesday 14 May 2014 11:48:57 Antoine T?nart wrote:
-> > +static int phy_berlin_sata_power_on(struct phy *phy)
-> > +{
-> > +       struct phy_berlin_desc *desc = phy_get_drvdata(phy);
-> > +       struct phy_berlin_priv *priv = to_berlin_sata_phy_priv(desc);
-> > +       u32 regval;
-> > +
-> > +       spin_lock(&priv->lock);
-> > +
-> > +       /* Power up PHY */
-> > +       writel(CONTROL_REGISTER, priv->base + HOST_VSA_ADDR);
-> > +       regval = readl(priv->base + HOST_VSA_DATA);
-> > +       regval &= ~(desc->val);
-> > +       writel(regval, priv->base + HOST_VSA_DATA);
-> > +
-> > +       /* Configure MBus */
-> > +       writel(MBUS_SIZE_CONTROL, priv->base + HOST_VSA_ADDR);
-> > +       regval = readl(priv->base + HOST_VSA_DATA);
-> > +       regval |= MBUS_WRITE_REQUEST_SIZE_128 | MBUS_READ_REQUEST_SIZE_128;
-> > +       writel(regval, priv->base + HOST_VSA_DATA);
-> > +
-> > +       spin_unlock(&priv->lock);
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static int phy_berlin_sata_power_off(struct phy *phy)
-> > +{
-> > +       struct phy_berlin_desc *desc = phy_get_drvdata(phy);
-> > +       struct phy_berlin_priv *priv = to_berlin_sata_phy_priv(desc);
-> > +       u32 regval;
-> > +
-> > +       spin_lock(&priv->lock);
-> > +
-> > +       /* Power down PHY */
-> > +       writel(CONTROL_REGISTER, priv->base + HOST_VSA_ADDR);
-> > +       regval = readl(priv->base + HOST_VSA_DATA);
-> > +       regval |= desc->val;
-> > +       writel(regval, priv->base + HOST_VSA_DATA);
-> > +
-> > +       spin_unlock(&priv->lock);
-> > +
-> > +       return 0;
-> 
-> I don't get this part: you have a reference to the phy here,
-> but then you go poking the phy registers from the SATA driver
-> rather than calling a PHY API function.
+Fix uart0 virtual address to be align with physical one.
+Also remove UART_SIZE which is completely unused.
 
-The v1 only introduced an AHCI driver. I somewhat agree the PHY
-operations done in the AHCI driver could be in there.
+Reported-by: Russ Smith <russells@google.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-I can move the initialization done in the AHCI driver here, but I'll
-still need the driver: the Berlin AHCI needs to call the framework
-generic functions with a custom mask and has custom pm_ops. So I'll
-end up with a nearly empty AHCI driver, not able to control the port
-parameters.
+ arch/arm/include/debug/zynq.S | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Or I can put all this in the AHCI driver, but then we'll need to
-describe the PHYs there (to be able to enable each PHY independently)
-and add bindings to the SATA ones.
+diff --git a/arch/arm/include/debug/zynq.S b/arch/arm/include/debug/zynq.S
+index 0b762fafa758..3edfef7b34ae 100644
+--- a/arch/arm/include/debug/zynq.S
++++ b/arch/arm/include/debug/zynq.S
+@@ -20,18 +20,18 @@
+ #define UART_SR_TXEMPTY		0x00000008	/* TX FIFO empty */
 
-What do you think? I prefer the first solution, but we'll have SATA
-port related configuration in the PHY and a very tiny AHCI driver
-because I can't really use the default behaviour of the ahci_platform.
+ #define UART0_PHYS		0xE0000000
++#define UART0_VIRT		0xF0000000
+ #define UART1_PHYS		0xE0001000
+-#define UART_SIZE		SZ_4K
+-#define UART_VIRT		0xF0001000
++#define UART1_VIRT		0xF0001000
 
-> > +                * By default the PHY node is used to request and match a PHY.
-> > +                * We describe one PHY per sub-node here. Use the right node.
-> > +                */
-> > +               phy->dev.of_node = child;
-> > +
-> > +               priv->phys[phy_id].phy = phy;
-> > +               priv->phys[phy_id].val = desc[phy_id].val;
-> > +               priv->phys[phy_id].index = phy_id;
-> > +               phy_set_drvdata(phy, &priv->phys[phy_id]);
-> 
-> And here, you set a driver specific value into a structure used by the
-> PHY.
+ #if IS_ENABLED(CONFIG_DEBUG_ZYNQ_UART1)
+ # define LL_UART_PADDR		UART1_PHYS
++# define LL_UART_VADDR		UART1_VIRT
+ #else
+ # define LL_UART_PADDR		UART0_PHYS
++# define LL_UART_VADDR		UART0_VIRT
+ #endif
 
-Values in priv->phys[] are related to the PHYs. phy_set_drvdata() allows
-to store PHY related data, which is what I'm doing there. Nearly all PHY
-drivers are doing this.
+-#define LL_UART_VADDR		UART_VIRT
+-
+ 		.macro	addruart, rp, rv, tmp
+ 		ldr	\rp, =LL_UART_PADDR	@ physical
+ 		ldr	\rv, =LL_UART_VADDR	@ virtual
+--
+1.8.2.3
 
-Or am I missing something?
-
-> 
-> Both of these are layering violations. You should either use the PHY
-> interfaces correctly so the SATA driver doesn't have to know about the
-> specific, or not use a PHY device node at all and do everything in
-> the SATA front-end.
-
-To be sure: you mean using the PHY init() interface in the AHCI driver?
-
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140514/6dfcd305/attachment-0001.sig>
