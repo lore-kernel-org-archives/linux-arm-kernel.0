@@ -1,29 +1,27 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 14 May 2014 13:55:29 +0200
-Subject: [PATCH] of: Add of_device_destroy_children() function
-In-Reply-To: <20140514102754.BC60BC4153D@trevor.secretlab.ca>
-References: <1399567069-3174-1-git-send-email-s.nawrocki@samsung.com>
- <20140514102754.BC60BC4153D@trevor.secretlab.ca>
-Message-ID: <537359B1.1060908@samsung.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Wed, 14 May 2014 14:01:46 +0200
+Subject: [PATCH 2/4] Documentation: Add documentation for the APM X-Gene
+ SoC EDAC DTS binding
+In-Reply-To: <1399590199-12256-3-git-send-email-lho@apm.com>
+References: <1399590199-12256-1-git-send-email-lho@apm.com>
+ <1399590199-12256-2-git-send-email-lho@apm.com>
+ <1399590199-12256-3-git-send-email-lho@apm.com>
+Message-ID: <20140514120146.GE5231@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/05/14 12:27, Grant Likely wrote:
-> On Thu, 08 May 2014 18:37:49 +0200, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
->> > This patch adds a helper function to unregister devices which
->> > were created by an of_platform_populate() call. The pattern
->> > used here can already be found in multiple drivers. This helper
->> > can now be used instead of repeating similar code in drivers.
->> > 
->> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->> > ---
->
-> Pawel has also submitted a patch for this. That patch is a little more
-> careful about how it removes nodes, so I'll be going with that one.
+On Thu, May 08, 2014 at 05:03:17PM -0600, Loc Ho wrote:
+> This patch adds documentation for the APM X-Gene SoC EDAC DTS binding.
+> 
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> Signed-off-by: Loc Ho <lho@apm.com>
 
-OK, it's good to know we have already a good solution. I'll give a try
-Pawel's patch then.
+I guess I'm going to need an ack from a device tree maintainer if I'm
+going to pick up the whole series through the edac tree.
 
-Thanks,
-Sylwester
+-- 
+Regards/Gruss,
+    Boris.
+
+Sent from a fat crate under my desk. Formatting is fine.
+--
