@@ -1,20 +1,16 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 May 2014 14:43:59 -0700
-Subject: [PATCHv2 4/5] arm: dts: am4372: Add hdq device tree data.
-In-Reply-To: <1399528808-6920-5-git-send-email-sourav.poddar@ti.com>
-References: <1399528808-6920-1-git-send-email-sourav.poddar@ti.com>
- <1399528808-6920-5-git-send-email-sourav.poddar@ti.com>
-Message-ID: <20140514214359.GJ27426@atomide.com>
+Date: Wed, 14 May 2014 14:45:35 -0700
+Subject: [PATCH] ARM: dts: AM33XX: fix ethernet and mdio default state
+In-Reply-To: <1399539456-555-1-git-send-email-jhovold@gmail.com>
+References: <1399539456-555-1-git-send-email-jhovold@gmail.com>
+Message-ID: <20140514214534.GK27426@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sourav Poddar <sourav.poddar@ti.com> [140507 23:01]:
-> Add device tree nodes and pinmux for hdq/1wire on
-> am43x epos evm.
+* Johan Hovold <jhovold@gmail.com> [140508 01:59]:
+> Make sure ethernet and mdio nodes are disabled by default and enable
+> them explicitly only on boards that actually use them.
 
-Picking this too. The hwmod changes should go through Paul,
-and the driver changes through the driver list.
-
-Regards,
+Thanks applying into omap-for-v3.16/dt.
 
 Tony
