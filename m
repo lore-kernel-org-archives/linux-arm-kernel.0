@@ -1,88 +1,42 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Wed, 14 May 2014 08:09:30 +0200
-Subject: [PATCH v3 1/2] cpufreq / OPP: Allow boost frequency to be looked
- up from device tree
-In-Reply-To: <CAGo_u6p-uqw82ewDciDEhAt0=Nswfw33-gf8Aa+-6_k3eCcTzw@mail.gmail.com>
-References: <1400029380-5372-1-git-send-email-thomas.ab@samsung.com>
- <1400029380-5372-2-git-send-email-thomas.ab@samsung.com>
- <CAKohponnPSRAotJUu+5a9y8j97QF8Jqgc5DA5WQnwGWCnVY-aA@mail.gmail.com>
- <CAGo_u6p-uqw82ewDciDEhAt0=Nswfw33-gf8Aa+-6_k3eCcTzw@mail.gmail.com>
-Message-ID: <20140514080930.781e0557@amdc2363>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Wed, 14 May 2014 14:03:59 +0800
+Subject: [PATCH] arm: mm: fix lowmem virtual address range check
+Message-ID: <1400047439-23961-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth, Viresh
+This patch makes sure the argument of __phys_to_virt is a valid physical
+address when clear lowmem memory maps.
 
-If I may add my 2 cents.
+The last few lines prepare_page_table() clear page mapping in the gap
+between largest low physical memory and the upper bound of lowmem. It
+uses __phys_to_virt(end) to calculate virtual address from where the
+clearing start.
 
-> On Tue, May 13, 2014 at 10:40 PM, Viresh Kumar
-> <viresh.kumar@linaro.org> wrote:
-> > On 14 May 2014 06:32, Thomas Abraham <ta.omasab@gmail.com> wrote:
-> [...]
-> >> +#ifdef CONFIG_CPU_FREQ_BOOST_SW
-> >> +       if (of_find_property(dev->of_node, "boost-frequency",
-> >> &len)) {
-> >
-> > Does this mean another block inside the cpu node ? Like this: ?
-> >
-> > cpu at 0 {
-> >         compatible = "arm,cortex-a9";
-> >         reg = <0>;
-> >         next-level-cache = <&L2>;
-> >         operating-points = <
-> >                 /* kHz    uV */
-> >                 792000  1100000
-> >                 396000  950000
-> >                 198000  850000
-> >         >;
-> >         boost-frequency = <
-> >                 792000
-> >                 198000
-> >         >;
+However, if the platform uses private nonliner __phys_to_virt(), 'end'
+may goes into another mapping region.
 
-I think that the above approach is more appealing [*].
+This patch uses __phys_to_virt(end - 1) + 1 for insurance purposes.
 
-> > };
-> >
-> > I think it we might better add another field in the opp block as
-> > these OPPs are rather boost one..
-> 
-> If we change the meaning to be:
->          operating-points = <
->                  /* kHz    uV          boost? */
->                  792000  1100000  1
->                  396000  950000    0
-> 
-> We are adding a modifier to the OPP definition here and does imply
-> every platform which may or maynot require "boost" need to indicate
-> that - basically fails at least my "least common" description for a
-> generic definition. As I had indicated in other threads -> we are back
-> to the discussion of "additional properties" to an OPP..
-> Option 1:
->   - describe modifiers separately (as in boost-frequencies) - that
-> operate based on data from opp table.
-> Option 2:
->   - keep adding to the description of opp as time goes by - every SoC
-> has it's own set of quirks that are needed for an OPP - I know that at
-> TI, we have certain OPPs that can only be enabled *if* "custom
-> hardware driver" is enabled, and similar stories. - yet another
-> example is enable the OPP if efuse X, bit Y is set.
-> 
-> Personally, looking at the various descriptions and bL, cpu-idle
-> states dependencies on OPPs, etc.. Option 2 is a non-scalable
-> approach.
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+Cc: Geng Hui <hui.geng@huawei.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mm/mmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I agree with Nishanth here, that point 1 (as described by Viresh at
-[*]) is a more scalable approach.
-
-> 
-> [...]
-
-
-
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index b68c6b2..87340ee 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1217,7 +1217,7 @@ static inline void prepare_page_table(void)
+ 	 * Clear out all the kernel space mappings, except for the first
+ 	 * memory bank, up to the vmalloc region.
+ 	 */
+-	for (addr = __phys_to_virt(end);
++	for (addr = __phys_to_virt(end - 1) + 1;
+ 	     addr < VMALLOC_START; addr += PMD_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+ }
 -- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+1.8.4
