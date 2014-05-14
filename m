@@ -1,35 +1,33 @@
 From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 14 May 2014 23:07:36 +0200
-Subject: [PATCH] arm: msm: remove board file for Nexus One (ie. mahimahi)
-Message-ID: <1400101656.9826.4.camel@x220>
+Date: Wed, 14 May 2014 23:09:25 +0200
+Subject: [PATCH] arm: msm: remove board file for the HTC Sapphire device
+Message-ID: <1400101765.9826.6.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 1b802ff79f03 ("arm: msm: add board file for Nexus One (ie.
-mahimahi)") added just board-mahimahi.c. It did not add
-board-mahimahi.h, Makefile changes or Kconfig changes.
+Commit 614ad9814850 ("arm: msm: add board file for the HTC Sapphire
+device") added just board-sapphire.c. It did not add board-sapphire.h,
+Makefile changes or Kconfig changes.
 
 Four years have passed and this file is still dangling. Remove it.
 
 Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 ---
-Untested. But what to test here?
+Also untested.
 
- arch/arm/mach-msm/board-mahimahi.c | 88 --------------------------------------
- 1 file changed, 88 deletions(-)
- delete mode 100644 arch/arm/mach-msm/board-mahimahi.c
+ arch/arm/mach-msm/board-sapphire.c | 117 -------------------------------------
+ 1 file changed, 117 deletions(-)
+ delete mode 100644 arch/arm/mach-msm/board-sapphire.c
 
-diff --git a/arch/arm/mach-msm/board-mahimahi.c b/arch/arm/mach-msm/board-mahimahi.c
+diff --git a/arch/arm/mach-msm/board-sapphire.c b/arch/arm/mach-msm/board-sapphire.c
 deleted file mode 100644
-index 7d9981cb400e..000000000000
---- a/arch/arm/mach-msm/board-mahimahi.c
+index 327605174d63..000000000000
+--- a/arch/arm/mach-msm/board-sapphire.c
 +++ /dev/null
-@@ -1,88 +0,0 @@
--/* linux/arch/arm/mach-msm/board-mahimahi.c
-- *
-- * Copyright (C) 2009 Google, Inc.
-- * Copyright (C) 2009 HTC Corporation.
-- * Author: Dima Zavin <dima@android.com>
+@@ -1,117 +0,0 @@
+-/* linux/arch/arm/mach-msm/board-sapphire.c
+- * Copyright (C) 2007-2009 HTC Corporation.
+- * Author: Thomas Tsai <thomas_tsai@htc.com>
 - *
 - * This software is licensed under the terms of the GNU General Public
 - * License version 2, as published by the Free Software Foundation, and
@@ -39,78 +37,109 @@ index 7d9981cb400e..000000000000
 - * but WITHOUT ANY WARRANTY; without even the implied warranty of
 - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 - * GNU General Public License for more details.
-- *
-- */
+-*/
+-#include <linux/gpio.h>
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/input.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/device.h>
 -
 -#include <linux/delay.h>
--#include <linux/gpio.h>
--#include <linux/init.h>
--#include <linux/input.h>
--#include <linux/io.h>
--#include <linux/kernel.h>
--#include <linux/platform_device.h>
 -
+-#include <mach/hardware.h>
 -#include <asm/mach-types.h>
 -#include <asm/mach/arch.h>
 -#include <asm/mach/map.h>
+-#include <asm/mach/flash.h>
+-#include <mach/vreg.h>
+-
+-#include <asm/io.h>
+-#include <asm/delay.h>
 -#include <asm/setup.h>
 -
--#include <mach/hardware.h>
+-#include <linux/mtd/nand.h>
+-#include <linux/mtd/partitions.h>
 -
--#include "board-mahimahi.h"
--#include "devices.h"
+-#include "gpio_chip.h"
+-#include "board-sapphire.h"
 -#include "proc_comm.h"
+-#include "devices.h"
 -#include "common.h"
 -
--static uint debug_uart;
--
--module_param_named(debug_uart, debug_uart, uint, 0);
+-void msm_init_irq(void);
+-void msm_init_gpio(void);
 -
 -static struct platform_device *devices[] __initdata = {
--#if !defined(CONFIG_MSM_SERIAL_DEBUGGER)
--	&msm_device_uart1,
--#endif
--	&msm_device_uart_dm1,
+-	&msm_device_smd,
+-	&msm_device_dmov,
 -	&msm_device_nand,
+-	&msm_device_uart1,
+-	&msm_device_uart3,
 -};
 -
--static void __init mahimahi_init(void)
+-void msm_timer_init(void);
+-
+-static void __init sapphire_init_irq(void)
+-{
+-	msm_init_irq();
+-}
+-
+-static void __init sapphire_init(void)
 -{
 -	platform_add_devices(devices, ARRAY_SIZE(devices));
 -}
 -
--static void __init mahimahi_fixup(struct tag *tags, char **cmdline,
+-static struct map_desc sapphire_io_desc[] __initdata = {
+-	{
+-		.virtual = SAPPHIRE_CPLD_BASE,
+-		.pfn     = __phys_to_pfn(SAPPHIRE_CPLD_START),
+-		.length  = SAPPHIRE_CPLD_SIZE,
+-		.type    = MT_DEVICE_NONSHARED
+-	}
+-};
+-
+-static void __init sapphire_fixup(struct tag *tags, char **cmdline,
 -				  struct meminfo *mi)
 -{
--	mi->nr_banks = 2;
+-	int smi_sz = parse_tag_smi((const struct tag *)tags);
+-
+-	mi->nr_banks = 1;
 -	mi->bank[0].start = PHYS_OFFSET;
 -	mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
--	mi->bank[0].size = (219*1024*1024);
--	mi->bank[1].start = MSM_HIGHMEM_BASE;
--	mi->bank[1].node = PHYS_TO_NID(MSM_HIGHMEM_BASE);
--	mi->bank[1].size = MSM_HIGHMEM_SIZE;
+-	if (smi_sz == 32) {
+-		mi->bank[0].size = (84*1024*1024);
+-	} else if (smi_sz == 64) {
+-		mi->bank[0].size = (101*1024*1024);
+-	} else {
+-		/* Give a default value when not get smi size */
+-		smi_sz = 64;
+-		mi->bank[0].size = (101*1024*1024);
+-	}
 -}
 -
--static void __init mahimahi_map_io(void)
+-static void __init sapphire_map_io(void)
 -{
 -	msm_map_common_io();
+-	iotable_init(sapphire_io_desc, ARRAY_SIZE(sapphire_io_desc));
 -	msm_clock_init();
 -}
 -
--static void __init mahimahi_init_late(void)
+-static void __init sapphire_init_late(void)
 -{
 -	smd_debugfs_init();
 -}
 -
--void msm_timer_init(void);
--
--MACHINE_START(MAHIMAHI, "mahimahi")
--	.atag_offset	= 0x100,
--	.fixup		= mahimahi_fixup,
--	.map_io		= mahimahi_map_io,
--	.init_irq	= msm_init_irq,
--	.init_machine	= mahimahi_init,
--	.init_late	= mahimahi_init_late,
+-MACHINE_START(SAPPHIRE, "sapphire")
+-/* Maintainer: Brian Swetland <swetland@google.com> */
+-	.atag_offset    = 0x100,
+-	.fixup          = sapphire_fixup,
+-	.map_io         = sapphire_map_io,
+-	.init_irq       = sapphire_init_irq,
+-	.init_machine   = sapphire_init,
+-	.init_late      = sapphire_init_late,
 -	.init_time	= msm_timer_init,
 -MACHINE_END
 -- 
