@@ -1,98 +1,105 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 14 May 2014 17:34:27 +0100
-Subject: [PATCH v3 17/19] arm64: KVM: move hcr_el2 setting into
- vgic-v2-switch.S
-In-Reply-To: <87ha4sh1le.fsf@approximate.cambridge.arm.com>
-References: <1397655591-2761-1-git-send-email-marc.zyngier@arm.com>
- <1397655591-2761-18-git-send-email-marc.zyngier@arm.com>
- <20140509140723.GR3362@lvm>
- <87ha4sh1le.fsf@approximate.cambridge.arm.com>
-Message-ID: <CAMJs5B9RwaeZhxoWnz1FzmX9swsA32Gqz9NwLZSQiFuGJ-v5Lg@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 14 May 2014 16:47:19 +0000 (UTC)
+Subject: OMAP baseline test results for v3.15-rc5
+Message-ID: <alpine.DEB.2.02.1405141645530.21921@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 May 2014 15:33, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Fri, May 09 2014 at  3:07:23 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
->> On Wed, Apr 16, 2014 at 02:39:49PM +0100, Marc Zyngier wrote:
->>> GICv3 requires the hcr_el2 switch to be tightly coupled with some
->>> of the interrupt controller's register switch.
->>
->> can you be more specific, this feels a bit odd, enabling Stage-2
->> translation and configuring all traps from within the vgic code...
->
-> The IMO and FMO bits must be set before restoring the various system
-> registers in GICv3. But I agreee that this looks pretty horrible.
->
-> The alternative is to split the bits we set in HCR_EL2 into two sets (VM
-> and trap control on one side, interrupt control on the other). This
-> would translate into two accesses to HCR_EL2, but it would look
-> nicer. I'll have a look.
->
->>> In order to have similar code paths, start moving the hcr_el2
->>> manipulation code to the GICv2 switch code.
->>>
->>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>  arch/arm64/kvm/hyp.S            | 7 -------
->>>  arch/arm64/kvm/vgic-v2-switch.S | 8 ++++++++
->>>  2 files changed, 8 insertions(+), 7 deletions(-)
->>>
->>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
->>> index aed72d0..92b9120 100644
->>> --- a/arch/arm64/kvm/hyp.S
->>> +++ b/arch/arm64/kvm/hyp.S
->>> @@ -335,11 +335,6 @@
->>>  .endm
->>>
->>>  .macro activate_traps
->>> -    ldr     x2, [x0, #VCPU_IRQ_LINES]
->>> -    ldr     x1, [x0, #VCPU_HCR_EL2]
->>> -    orr     x2, x2, x1
->>> -    msr     hcr_el2, x2
->>> -
->>>      ldr     x2, =(CPTR_EL2_TTA)
->>>      msr     cptr_el2, x2
->>>
->>> @@ -353,8 +348,6 @@
->>>  .endm
->>>
->>>  .macro deactivate_traps
->>> -    mov     x2, #HCR_RW
->>> -    msr     hcr_el2, x2
->>>      msr     cptr_el2, xzr
->>>      msr     hstr_el2, xzr
->>>
->>> diff --git a/arch/arm64/kvm/vgic-v2-switch.S b/arch/arm64/kvm/vgic-v2-switch.S
->>> index c5dc777..d36cd7a 100644
->>> --- a/arch/arm64/kvm/vgic-v2-switch.S
->>> +++ b/arch/arm64/kvm/vgic-v2-switch.S
->>> @@ -85,6 +85,9 @@ CPU_BE(    rev     w5, w5 )
->>>      sub     w4, w4, #1
->>>      cbnz    w4, 1b
->>>  2:
->>> +    mov     x2, #HCR_RW
->>> +    msr     hcr_el2, x2
->>> +    isb
->>>  .endm
->>>
->>>  /*
->>> @@ -92,6 +95,11 @@ CPU_BE(   rev     w5, w5 )
->>>   * x0: Register pointing to VCPU struct
->>>   */
->>>  .macro restore_vgic_v2_state
->>> +    ldr     x2, [x0, #VCPU_IRQ_LINES]
->>
->> will this ever have any values on aarch64?  Don't we mandate vgic
->> support and bail out during hyp init if we cannot init a vgic?
->
-> Yes. But that doesn't mean we don't support the feature either. The case
-> is fairly slim, I agree, but it has been there since Day-1...
->
-See kvm_vm_ioctl_irq_line() in arch/arm/kvm/arm.c:
 
-case KVM_ARM_IRQ_TYPE_CPU:
-    if (irqchip_in_kernel(kvm))
-        return -ENXIO;
+Here are some basic OMAP test results for Linux v3.15-rc5.
+Logs and other details at:
 
--Christoffer
+    http://www.pwsan.com/omap/testlogs/test_v3.15-rc5/20140511121007/
+
+
+Test summary
+------------
+
+Build: uImage+dtb:
+    Pass ( 9/ 9): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig/omap4-var-som
+
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Build: zImage:
+    Pass (14/14): multi_v7_defconfig, omap2plus_defconfig,
+		  omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig
+
+Boot to userspace:
+    FAIL ( 1/12): 2430sdp
+    skip ( 3/12): 5912osk, cmt3517, 4460varsomom
+    Pass ( 8/12): 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
+		  4430es2panda, 4460pandaes, am335xbone, am335xbonelt
+
+PM: chip retention via suspend:
+    skip ( 1/ 7): 4460varsomom
+    FAIL ( 2/ 7): 2430sdp, 4430es2panda
+    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
+
+PM: chip retention via dynamic idle:
+    skip ( 1/ 7): 4460varsomom
+    FAIL ( 6/ 7): 2430sdp, 3530es3beagle, 3730beaglexm, 37xxevm,
+		  4430es2panda, 4460pandaes
+
+PM: chip off except CORE via suspend:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    skip ( 1/ 5): 4460varsomom
+    FAIL ( 4/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes
+
+PM: chip off via dynamic idle:
+    skip ( 1/ 5): 4460varsomom
+    FAIL ( 4/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes
+
+
+vmlinux object size
+(delta in bytes from test_v3.15-rc4 (89ca3b881987f5a4be4c5dbaa7f0df12bbdde2fd)):
+   text     data      bss    total  kernel
+   +303      +64        0     +367  omap1_defconfig
+   +335      +96        0     +431  omap1_defconfig_1510innovator_only
+   +303      +64        0     +367  omap1_defconfig_5912osk_only
+   +363     +120        0     +483  multi_v7_defconfig
+   +179      +64      -64     +179  omap2plus_defconfig
+    +79      +96        0     +175  omap2plus_defconfig_2430sdp_only
+   +179      +64      -64     +179  omap2plus_defconfig_am33xx_only
+   +175      +64        0     +239  omap2plus_defconfig_am43xx_only
+   +179      +64      -64     +179  omap2plus_defconfig_cpupm
+  +4271      +64        0    +4335  omap2plus_defconfig_dra7xx_only
+   -369        0      -32     -401  omap2plus_defconfig_n800_multi_omap2xxx
+   -305        0      -32     -337  omap2plus_defconfig_n800_only_a
+   +115      +64      -64     +115  omap2plus_defconfig_no_pm
+   +239      +64      -64     +239  omap2plus_defconfig_omap2_4_only
+   +175      +64      -64     +175  omap2plus_defconfig_omap3_4_only
+   +111      +64        0     +175  omap2plus_defconfig_omap5_only
+    -68        0      -68     -136  rmk_omap3430_ldp_allnoconfig
+    +95        0        0      +95  rmk_omap3430_ldp_oldconfig
+    +12        0     -148     -136  rmk_omap4430_sdp_allnoconfig
+    +95        0        0      +95  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.15-rc4 (89ca3b881987f5a4be4c5dbaa7f0df12bbdde2fd))
+  avail  rsrvd   high  freed  board          kconfig
+    -4k     4k      .      .  2420n800       omap2plus_defconfig_n800_only_a
