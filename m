@@ -1,63 +1,22 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 14 May 2014 16:06:03 +0100
-Subject: [PATCH v3 2/2] Documentation: devicetree: Add boost-frequency
- binding to list boost mode frequency
-In-Reply-To: <1400029380-5372-3-git-send-email-thomas.ab@samsung.com>
-References: <1400029380-5372-1-git-send-email-thomas.ab@samsung.com>
- <1400029380-5372-3-git-send-email-thomas.ab@samsung.com>
-Message-ID: <5373865B.2040205@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 14 May 2014 16:17:09 +0100
+Subject: [PATCH 2/4] spi: qup: Correct selection of FIFO/Block mode
+In-Reply-To: <1400016884-9568-3-git-send-email-agross@codeaurora.org>
+References: <1400016884-9568-1-git-send-email-agross@codeaurora.org>
+ <1400016884-9568-3-git-send-email-agross@codeaurora.org>
+Message-ID: <20140514151709.GF12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, May 13, 2014 at 04:34:42PM -0500, Andy Gross wrote:
+> This patch fixes the calculation for determining whether to use FIFO or BLOCK
+> mode.
 
-
-On 14/05/14 02:03, Thomas Abraham wrote:
-> From: Thomas Abraham <thomas.ab@samsung.com>
->
-> Add a new optional boost-frequency binding for specifying the frequencies
-> usable in boost mode.
->
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Lukasz Majewski <l.majewski@samsung.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->   .../devicetree/bindings/cpufreq/cpufreq-boost.txt  |   11 +++++++++++
->   1 files changed, 11 insertions(+), 0 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
->
-> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
-> new file mode 100644
-> index 0000000..d925e38
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
-> @@ -0,0 +1,11 @@
-> +* Device tree binding for CPU boost frequency (aka over-clocking)
-> +
-> +Certain CPU's can be operated in optional 'boost' mode (or sometimes referred as
-> +overclocking) in which the CPU can operate in frequencies beyond the normal
-> +operating conditions.
-> +
-> +Optional Properties:
-> +- boost-frequency: list of frequencies in KHz to be used only in boost mode.
-> +  This list should be a subset of frequencies listed in "operating-points"
-> +  property. Refer to Documentation/devicetree/bindings/power/opp.txt for
-> +  details about "operating-points" property.
->
-
-Though I understand the need of it, I think the binding is designed to suffice
-the need of the boost frequency support in cpufreq.
-
-Typically SoC would provide characteristics like under-drive(hits performance
-but most energy efficient), nominal(highest sustained performance w/o any
-external constraint like power, thermal) and over-drive(maximum performance but
-not sustainable for long periods)
-
-IMO the binding could represent these unique points on the curve instead.
-
-Regards,
-Sudeep
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140514/ea7dfec3/attachment.sig>
