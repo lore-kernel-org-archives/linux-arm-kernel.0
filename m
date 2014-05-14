@@ -1,34 +1,37 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 14 May 2014 15:30:53 -0700
-Subject: [RFC PATCH 3/5] cpufreq: cpu0: Use clk_round_rate_nearest()
+Date: Wed, 14 May 2014 15:30:54 -0700
+Subject: [RFC PATCH 4/5] ARM: zynq: dt: Use properly rounded frequencies in
+ OPPs
 In-Reply-To: <1400106655-22465-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1400106655-22465-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1400106655-22465-4-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1400106655-22465-5-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Round clock frequencies to the nearest possible frequency. As opposed to
-the nearest that does not exceed the requested one.
+Some issues in regards to rounding and different frequency resolution in
+the cpufreq and common clock frameworks have been resolved and allow
+specifying Zynq's OPPs with properly rounded values.
 
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
 
- drivers/cpufreq/cpufreq-cpu0.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/zynq-7000.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
-index 1bf6bbac3e03..e1de9dc46542 100644
---- a/drivers/cpufreq/cpufreq-cpu0.c
-+++ b/drivers/cpufreq/cpufreq-cpu0.c
-@@ -42,7 +42,8 @@ static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
- 	long freq_Hz, freq_exact;
- 	int ret;
- 
--	freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
-+	freq_Hz = clk_round_rate_nearest(cpu_clk,
-+			freq_table[index].frequency * 1000);
- 	if (freq_Hz <= 0)
- 		freq_Hz = freq_table[index].frequency * 1000;
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index c1176abc34d9..06de3068ab21 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -28,8 +28,8 @@
+ 			operating-points = <
+ 				/* kHz    uV */
+ 				666667  1000000
+-				333334  1000000
+-				222223  1000000
++				333333  1000000
++				222222  1000000
+ 			>;
+ 		};
  
 -- 
 1.9.3.1.ga73a6ad
