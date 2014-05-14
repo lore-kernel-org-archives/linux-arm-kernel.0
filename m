@@ -1,71 +1,129 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Wed, 14 May 2014 06:24:51 +0000
-Subject: [PATCH 1/1] usb: core: Kconfig: refine the description for
- CONFIG_USB_OTG
-In-Reply-To: <20140513154647.GM1151@saruman.home>
-References: <1399947567-18958-1-git-send-email-peter.chen@freescale.com>
- <20140513111144.GA29360@kroah.com> <20140513154647.GM1151@saruman.home>
-Message-ID: <dc4c63c13058468db8ad8ec4a22204e8@BN1PR03MB235.namprd03.prod.outlook.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 14 May 2014 09:41:26 +0300
+Subject: [PATCH 1/4] OMAPDSS: Fix DSS clock multiplier issue on 3703 and
+ probably 3630
+In-Reply-To: <20140513152626.GB16837@atomide.com>
+References: <1398815562-24113-1-git-send-email-tony@atomide.com>
+ <1398815562-24113-2-git-send-email-tony@atomide.com>
+ <536C860E.1000501@ti.com> <20140509143703.GA17814@atomide.com>
+ <5370B222.7050702@ti.com> <20140512143934.GC31772@atomide.com>
+ <5370DE42.2060607@ti.com> <20140513152626.GB16837@atomide.com>
+Message-ID: <53731016.8020103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
+On 13/05/14 18:26, Tony Lindgren wrote:
+> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140512 07:45]:
+>> On 12/05/14 17:39, Tony Lindgren wrote:
+>>> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140512 04:36]:
+>>>> On 09/05/14 17:37, Tony Lindgren wrote:
+>>>>>
+>>>>> This is just the 3730-evm with the Sharp VGA panel mentioned in
+>>>>> this series.
+>>>>
+>>>> Hmm, well, those both look fine. The fck is well below the maximum,
+>>>> which is somewhere around 170MHz-180MHz. The lck/pck ratio is higher
+>>>> with this patch, but that should affect the GFX overlay.
+>>>>
+>>>> So you're just booting, and there are no applications that use the
+>>>> framebuffer? And there is no rotation or such configured?
+>>>
+>>> Right. The rotation is set to 3 though.
+>>
+>> Hmm, that's probably the issue then. VRFB rotation is very heavy on the
+>> memory bandwidth, and is generally a very easy way to get sync lost errors.
 > 
-> On Tue, May 13, 2014 at 01:11:44PM +0200, Greg KH wrote:
-> > On Tue, May 13, 2014 at 10:19:27AM +0800, Peter Chen wrote:
-> > > the user should only select it when the board supports HNP and SRP,
-> > > it should NOT be selected if the board only supports dual-role
-> > > switch through ID pin.
-> > >
-> > > There is a discussion for it:
-> > > http://marc.info/?l=linux-arm-kernel&m=139994896101516&w=2
-> > > http://marc.info/?l=linux-usb&m=139994881701504&w=2
-> > >
-> > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > > ---
-> > >  drivers/usb/core/Kconfig |   12 +++++++-----
-> > >  1 files changed, 7 insertions(+), 5 deletions(-)
-> > >
-> > > diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
-> > > index cb8e991..158048b 100644
-> > > --- a/drivers/usb/core/Kconfig
-> > > +++ b/drivers/usb/core/Kconfig
-> > > @@ -54,13 +54,15 @@ config USB_OTG
-> > >  	default n
-> > >  	help
-> > >  	  The most notable feature of USB OTG is support for a
-> > > -	  "Dual-Role" device, which can act as either a device
-> > > -	  or a host. The initial role is decided by the type of
-> > > -	  plug inserted and can be changed later when two dual
-> > > -	  role devices talk to each other.
-> > > +	  otg device, which can act as either a device or a host.
-> > > +	  The initial role is decided by the type of plug inserted
-> > > +	  and can be changed using HNP (Host Negotiation Protocol)
-> > > +	  later when two otg devices talk to each other.
-> > >
-> > >  	  Select this only if your board has Mini-AB/Micro-AB
-> > > -	  connector.
-> > > +	  connector and supports HNP and SRP (Session Request Protocol).
-> > > +	  If the board only supports dual-role switch through ID
-> > > +	  pin, this configuration should not be selected.
-> >
-> > That's really lame.  What happened to our "all modconfig should work"
-> > goal?  Why can't you dynamically detect that this is not a config that
-> > works and handle it?
-> >
-
-If CONFIG_USB_OTG and CONFIG_USB_OTG_WHITELIST are set, most of usb devices
-will not work when connect to host for current code.
-
-So, we need a feature flag for hcd and gadget, and set this OTG feature flag
-if the platform supports it (using dtb or platform data).
-
-Peter
-
-> > And this is just the OTG "core", not any specific hardware, so why
-> > should it matter?
+> I found another case without rotation where the error always triggers.
+> By forcing 3730-evm LCD panel to QVGA mode it always seems to happen
+> even without rotation.
 > 
-> yeah, I'm with Greg here... we should find a better way to sort this out.
+> Without this patch with errors and no image:
 > 
-> --
-> balbi
+> # cat /sys/kernel/debug/omapdss/clk 
+> [   55.185729] DSS: dss_runtime_get
+> [   55.189422] DSS: dss_runtime_put
+> [   55.192810] DISPC: dispc_runtime_get
+> [   55.196685] DISPC: dispc_runtime_put
+> - DSS -
+> DSS_FCK (DSS1_ALWON_FCLK) = 27000000
+> - DISPC -
+> dispc fclk source = DSS_FCK (DSS1_ALWON_FCLK)
+> fck             27000000        
+> - LCD -
+> LCD clk source = DSS_FCK (DSS1_ALWON_FCLK)
+> lck             27000000        lck div 1
+> pck             5400000         pck div 5
+> 
+> With this patch without errors and penguin showing:
+> 
+> # cat /sys/kernel/debug/omapdss/clk
+> [   19.905792] DSS: dss_runtime_get
+> [   19.909545] DSS: dss_runtime_put
+> [   19.912933] DISPC: dispc_runtime_get
+> [   19.916778] DISPC: dispc_runtime_put
+> - DSS -
+> DSS_FCK (DSS1_ALWON_FCLK) = 108000000
+> - DISPC -
+> dispc fclk source = DSS_FCK (DSS1_ALWON_FCLK)
+> fck             108000000       
+> - LCD -
+> LCD clk source = DSS_FCK (DSS1_ALWON_FCLK)
+> lck             108000000       lck div 1
+> pck             5400000         pck div 20
+> 
+> In this case the errors are different too:
+> 
+> DISPC: channel 0 xres 240 yres 320
+> DISPC: pck 5400000
+> DISPC: hsw 3 hfp 3 hbp 39 vsw 1 vfp 2 vbp 7
+> DISPC: vsync_level 1 hsync_level 1 data_pclk_edge 1 de_level 0 sync_pclk_edge 0
+> DISPC: hsync 18947Hz, vsync 57Hz
+> DISPC: lck = 27000000 (1)
+> DISPC: pck = 5400000 (5)
+> APPLY: DISPC IRQ: 0x60: GFX_FIFO_UNDERFLOW 
+> APPLY: DISPC IRQ: 0x4062: GFX_FIFO_UNDERFLOW SYNC_LOST 
+> DISPC: dispc_runtime_get
+> omapdss APPLY error: FIFO UNDERFLOW on gfx, disabling the overlay
+
+I'm quite out of ideas... The pixel clock is so low that underflow
+shouldn't really happen. I was trying to find 3730 documentation that
+would describe the PRCM's multipliers and dividers for DSS (i.e. the
+ones you change in this patch), but I didn't find anything.
+
+Maybe the DSS clock's fixed multiplier has been changed for 3730. But in
+that case our .dts files related to the clocks are wrong too. The clock
+nodes related to this are dpll4_m4x2_mul_ck, which is corresponds to the
+"dss_fck_multiplier" value in omapdss, and dpll4_m4_ck, which
+corresponds to the "fck_div_max" value.
+
+One thing to try out is, without this patch, change
+CONFIG_OMAP2_DSS_MIN_FCK_PER_PCK to force the dss func clock higher.
+With QVGA mode, you could try, say, value of 19, which should make sure
+the fck is at least 19 times higher than pck.
+
+> Regarding rotation, it does look like that with VGA mode enabling
+> rotation makes the error trigger quite often on 3730.
+>  
+>> will handle it fine with the clock rates and bandwidth usage you have
+>> for your use cases.
+> 
+> I don't think it's all because of rotation. And rotating my head
+
+No, probably not. The pixel clocks are so low that the rotation should
+work fine. Except if there's something wrong the the VRFB or the memory
+bus, which make the VRFB rotation not work even with low pixel clocks.
+
+> makes my neck hurt!
+
+You need to learn to hold the device a bit differently!
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140514/7846b469/attachment.sig>
