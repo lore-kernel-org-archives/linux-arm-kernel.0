@@ -1,79 +1,87 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 May 2014 18:34:08 -0700
-Subject: [PATCH 5/7] mfd: twl4030-power: Add support for board specific
- configuration
+Date: Tue, 13 May 2014 18:34:09 -0700
+Subject: [PATCH 6/7] mfd: twl4030power: Add a configuration to turn off
+ oscillator during off-idle
 In-Reply-To: <1400031250-29542-1-git-send-email-tony@atomide.com>
 References: <1400031250-29542-1-git-send-email-tony@atomide.com>
-Message-ID: <1400031250-29542-6-git-send-email-tony@atomide.com>
+Message-ID: <1400031250-29542-7-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the recommended twl4030 configuration added, we can now add
-board specific changes as modifications to the recommended
-configuration.
+Some oscillators can be turned off during off-idle saving few
+a little bit power at the cost of the oscillator start up
+latency.
 
-Note that the data is private to this driver, and the data must
-always have a NULL resource in the sentinel.
+If you board can do this, you can now enable it by using the
+ti,twl4030-power-idle-osc-off compatible flag.
 
 Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
 Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Lee Jones <lee.jones@linaro.org>
+Acked-by: Lee Jones <lee.jones@linaro.org>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- drivers/mfd/twl4030-power.c | 21 +++++++++++++++++++++
- include/linux/i2c/twl.h     |  1 +
- 2 files changed, 22 insertions(+)
+ Documentation/devicetree/bindings/mfd/twl4030-power.txt |  6 ++++++
+ drivers/mfd/twl4030-power.c                             | 17 +++++++++++++++++
+ 2 files changed, 23 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/mfd/twl4030-power.txt b/Documentation/devicetree/bindings/mfd/twl4030-power.txt
+index bbd6603..b9ee7b9 100644
+--- a/Documentation/devicetree/bindings/mfd/twl4030-power.txt
++++ b/Documentation/devicetree/bindings/mfd/twl4030-power.txt
+@@ -9,6 +9,7 @@ Required properties:
+ 	"ti,twl4030-power"
+ 	"ti,twl4030-power-reset"
+ 	"ti,twl4030-power-idle"
++	"ti,twl4030-power-idle-osc-off"
+ 
+ The use of ti,twl4030-power-reset is recommended at least on
+ 3530 that needs a special configuration for warm reset to work.
+@@ -16,6 +17,11 @@ The use of ti,twl4030-power-reset is recommended at least on
+ When using ti,twl4030-power-idle, the TI recommended configuration
+ for idle modes is loaded to the tlw4030 PMIC.
+ 
++When using ti,twl4030-power-idle-osc-off, the TI recommended
++configuration is used with the external oscillator being shut
++down during off-idle. Note that this does not work on all boards
++depending on how the external oscillator is wired.
++
+ Optional properties:
+ - ti,use_poweroff: With this flag, the chip will initiates an ACTIVE-to-OFF or
+ 		   SLEEP-to-OFF transition when the system poweroffs.
 diff --git a/drivers/mfd/twl4030-power.c b/drivers/mfd/twl4030-power.c
-index 39eeee2..4b3f192 100644
+index 4b3f192..4341961 100644
 --- a/drivers/mfd/twl4030-power.c
 +++ b/drivers/mfd/twl4030-power.c
-@@ -557,13 +557,34 @@ twl4030_power_configure_scripts(const struct twl4030_power_data *pdata)
- 	return 0;
- }
- 
-+static void twl4030_patch_rconfig(struct twl4030_resconfig *common,
-+				  struct twl4030_resconfig *board)
-+{
-+	while (common->resource) {
-+		struct twl4030_resconfig *b = board;
-+
-+		while (b->resource) {
-+			if (b->resource == common->resource) {
-+				*common = *b;
-+				break;
-+			}
-+			b++;
-+		}
-+		common++;
-+	}
-+}
-+
- static int
- twl4030_power_configure_resources(const struct twl4030_power_data *pdata)
- {
- 	struct twl4030_resconfig *resconfig = pdata->resource_config;
-+	struct twl4030_resconfig *boardconf = pdata->board_config;
- 	int err;
- 
- 	if (resconfig) {
-+		if (boardconf)
-+			twl4030_patch_rconfig(resconfig, boardconf);
-+
- 		while (resconfig->resource) {
- 			err = twl4030_configure_resource(resconfig);
- 			if (err)
-diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
-index 5fe0313..57fe782 100644
---- a/include/linux/i2c/twl.h
-+++ b/include/linux/i2c/twl.h
-@@ -662,6 +662,7 @@ struct twl4030_power_data {
- 	struct twl4030_script **scripts;
- 	unsigned num;
- 	struct twl4030_resconfig *resource_config;
-+	struct twl4030_resconfig *board_config;
- #define TWL4030_RESCONFIG_UNDEF	((u8)-1)
- 	bool use_poweroff;	/* Board is wired for TWL poweroff */
+@@ -748,6 +748,19 @@ static struct twl4030_power_data omap3_idle = {
+ 	.resource_config	= omap3_idle_rconfig,
  };
+ 
++/* Disable 32 KiHz oscillator during idle */
++static struct twl4030_resconfig osc_off_rconfig[] = {
++	TWL_REMAP_OFF(RES_CLKEN, DEV_GRP_P1 | DEV_GRP_P3, 3, 2),
++	{ /* Terminator */ },
++};
++
++static struct twl4030_power_data osc_off_idle = {
++	.scripts		= omap3_idle_scripts,
++	.num			= ARRAY_SIZE(omap3_idle_scripts),
++	.resource_config	= omap3_idle_rconfig,
++	.board_config		= osc_off_rconfig,
++};
++
+ static struct of_device_id twl4030_power_of_match[] = {
+ 	{
+ 		.compatible = "ti,twl4030-power-reset",
+@@ -757,6 +770,10 @@ static struct of_device_id twl4030_power_of_match[] = {
+ 		.compatible = "ti,twl4030-power-idle",
+ 		.data = &omap3_idle,
+ 	},
++	{
++		.compatible = "ti,twl4030-power-idle-osc-off",
++		.data = &osc_off_idle,
++	},
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, twl4030_power_of_match);
 -- 
 1.8.1.1
