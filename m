@@ -1,112 +1,69 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 14 May 2014 15:28:16 +0100
-Subject: [PATCHv2] of: make of_update_property() usable earlier in the
- boot process
-In-Reply-To: <1400067396-21228-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1400067396-21228-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140514142816.7B310C4153D@trevor.secretlab.ca>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 14 May 2014 16:08:30 +0200
+Subject: [PATCH 1/1] usb: core: Kconfig: refine the description for
+ CONFIG_USB_OTG
+In-Reply-To: <dc4c63c13058468db8ad8ec4a22204e8@BN1PR03MB235.namprd03.prod.outlook.com>
+References: <1399947567-18958-1-git-send-email-peter.chen@freescale.com>
+ <20140513111144.GA29360@kroah.com>
+ <20140513154647.GM1151@saruman.home>
+ <dc4c63c13058468db8ad8ec4a22204e8@BN1PR03MB235.namprd03.prod.outlook.com>
+Message-ID: <20140514140830.GA16307@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 May 2014 13:36:36 +0200, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
-> Commit 75b57ecf9d1d1e17d099ab13b8f48e6e038676be ('of: Make device
-> nodes kobjects so they show up in sysfs') has turned Device Tree nodes
-> in kobjects and added a sysfs based representation for Device Tree
-> nodes. Since the sysfs logic is only available after the execution of
-> a core_initcall(), the patch took precautions in of_add_property() and
-> of_remove_property() to not do any sysfs related manipulation early in
-> the boot process.
-> 
-> However, it forgot to do the same for of_update_property(), which if
-> used early in the boot process (before core_initcalls have been
-> called), tries to call sysfs_remove_bin_file(), and crashes:
-
-Applied, thanks.
-
-g.
-
-> 
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 0 at /home/thomas/projets/linux-2.6/fs/kernfs/dir.c:1216 kernfs_remove_by_name_ns+0x80/0x88()
-> kernfs: can not remove '(null)', no directory
-> Modules linked in:
-> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.15.0-rc1-00127-g1d7e7b2-dirty #423
-> [<c0014910>] (unwind_backtrace) from [<c00110ec>] (show_stack+0x10/0x14)
-> [<c00110ec>] (show_stack) from [<c04c84b8>] (dump_stack+0x84/0x94)
-> [<c04c84b8>] (dump_stack) from [<c001d8c0>] (warn_slowpath_common+0x6c/0x88)
-> [<c001d8c0>] (warn_slowpath_common) from [<c001d90c>] (warn_slowpath_fmt+0x30/0x40)
-> [<c001d90c>] (warn_slowpath_fmt) from [<c0104468>] (kernfs_remove_by_name_ns+0x80/0x88)
-> [<c0104468>] (kernfs_remove_by_name_ns) from [<c0394d98>] (of_update_property+0xc0/0xf0)
-> [<c0394d98>] (of_update_property) from [<c0647248>] (mvebu_timer_and_clk_init+0xfc/0x194)
-> [<c0647248>] (mvebu_timer_and_clk_init) from [<c0640934>] (start_kernel+0x218/0x350)
-> [<c0640934>] (start_kernel) from [<00008070>] (0x8070)
-> ---[ end trace 3406ff24bd97382e ]---
-> Unable to handle kernel NULL pointer dereference at virtual address 0000003c
-> pgd = c0004000
-> [0000003c] *pgd=00000000
-> Internal error: Oops: 5 [#1] SMP ARM
-> Modules linked in:
-> CPU: 0 PID: 0 Comm: swapper/0 Tainted: G        W     3.15.0-rc1-00127-g1d7e7b2-dirty #423
-> task: c10ad4d8 ti: c10a2000 task.ti: c10a2000
-> PC is at kernfs_find_ns+0x8/0xf0
-> LR is at kernfs_find_and_get_ns+0x30/0x48
-> pc : [<c0103834>]    lr : [<c010394c>]    psr: 600001d3
-> sp : c10a3f34  ip : 00000073  fp : 00000000
-> r10: 00000000  r9 : cfffc240  r8 : cfdf2980
-> r7 : cf812c00  r6 : 00000000  r5 : 00000000  r4 : c10b45e0
-> r3 : c10ad4d8  r2 : 00000000  r1 : cf812c00  r0 : 00000000
-> Flags: nZCv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
-> Control: 10c53c7d  Table: 0000404a  DAC: 00000015
-> Process swapper/0 (pid: 0, stack limit = 0xc10a2240)
-> Stack: (0xc10a3f34 to 0xc10a4000)
-> 3f20:                                              c10b45e0 00000000 00000000
-> 3f40: cf812c00 c010394c 00000063 cf812c00 00000001 cf812c00 cfdf29ac c03932cc
-> 3f60: 00000063 cf812bc0 cfdf29ac cf812c00 ffffffff c03943f8 cfdf2980 c0104468
-> 3f80: cfdf2a04 cfdf2980 cf812bc0 c06634b0 c10aa3c0 c0394da4 c10f74dc cfdf2980
-> 3fa0: cf812bc0 c0647248 c10aa3c0 ffffffff c10de940 c10aa3c0 ffffffff c0640934
-> 3fc0: ffffffff ffffffff c06404ec 00000000 00000000 c06634b0 00000000 10c53c7d
-> 3fe0: c10aa434 c06634ac c10ae4c8 0000406a 414fc091 00008070 00000000 00000000
-> [<c0103834>] (kernfs_find_ns) from [<00000001>] (0x1)
-> Code: e5c89001 eaffffcf e92d40f0 e1a06002 (e1d023bc)
-> ---[ end trace 3406ff24bd97382f ]---
-> Kernel panic - not syncing: Attempted to kill the idle task!
-> ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
-> 
-> To fix this problem, we simply skip the sysfs related calls in
-> of_update_property(), and rely on of_init() to fix up things when it
-> will be called, exactly as is done in of_add_property() and
-> of_remove_property().
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Fixes: 75b57ecf9d1d ("of: Make device nodes kobjects so they show up in sysfs")
-> ---
-> Changes since previous version:
->  - Use a ternary operator to bail out with the proper return value
->    instead of a goto. Requested by Rob Herring.
->  - Use a 12 digits hash and double quotes in the "Fixes:"
->    tag. Requested by Rob Herring.
->  - Rebased on top of 3.15-rc5
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/of/base.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index 6d4ee22..32e969d 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -1831,6 +1831,10 @@ int of_update_property(struct device_node *np, struct property *newprop)
->  	if (!found)
->  		return -ENODEV;
+On Wed, May 14, 2014 at 06:24:51AM +0000, Peter Chen wrote:
 >  
-> +	/* At early boot, bail out and defer setup to of_init() */
-> +	if (!of_kset)
-> +		return found ? 0 : -ENODEV;
-> +
->  	/* Update the sysfs attribute */
->  	sysfs_remove_bin_file(&np->kobj, &oldprop->attr);
->  	__of_add_property_sysfs(np, newprop);
-> -- 
-> 1.9.3
+> > 
+> > On Tue, May 13, 2014 at 01:11:44PM +0200, Greg KH wrote:
+> > > On Tue, May 13, 2014 at 10:19:27AM +0800, Peter Chen wrote:
+> > > > the user should only select it when the board supports HNP and SRP,
+> > > > it should NOT be selected if the board only supports dual-role
+> > > > switch through ID pin.
+> > > >
+> > > > There is a discussion for it:
+> > > > http://marc.info/?l=linux-arm-kernel&m=139994896101516&w=2
+> > > > http://marc.info/?l=linux-usb&m=139994881701504&w=2
+> > > >
+> > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > > > ---
+> > > >  drivers/usb/core/Kconfig |   12 +++++++-----
+> > > >  1 files changed, 7 insertions(+), 5 deletions(-)
+> > > >
+> > > > diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
+> > > > index cb8e991..158048b 100644
+> > > > --- a/drivers/usb/core/Kconfig
+> > > > +++ b/drivers/usb/core/Kconfig
+> > > > @@ -54,13 +54,15 @@ config USB_OTG
+> > > >  	default n
+> > > >  	help
+> > > >  	  The most notable feature of USB OTG is support for a
+> > > > -	  "Dual-Role" device, which can act as either a device
+> > > > -	  or a host. The initial role is decided by the type of
+> > > > -	  plug inserted and can be changed later when two dual
+> > > > -	  role devices talk to each other.
+> > > > +	  otg device, which can act as either a device or a host.
+> > > > +	  The initial role is decided by the type of plug inserted
+> > > > +	  and can be changed using HNP (Host Negotiation Protocol)
+> > > > +	  later when two otg devices talk to each other.
+> > > >
+> > > >  	  Select this only if your board has Mini-AB/Micro-AB
+> > > > -	  connector.
+> > > > +	  connector and supports HNP and SRP (Session Request Protocol).
+> > > > +	  If the board only supports dual-role switch through ID
+> > > > +	  pin, this configuration should not be selected.
+> > >
+> > > That's really lame.  What happened to our "all modconfig should work"
+> > > goal?  Why can't you dynamically detect that this is not a config that
+> > > works and handle it?
+> > >
 > 
+> If CONFIG_USB_OTG and CONFIG_USB_OTG_WHITELIST are set, most of usb devices
+> will not work when connect to host for current code.
+> 
+> So, we need a feature flag for hcd and gadget, and set this OTG feature flag
+> if the platform supports it (using dtb or platform data).
+
+Sounds reasonable, and much nicer than just trying to point to a help
+configuration file that no one will ever read :)
+
+greg k-h
