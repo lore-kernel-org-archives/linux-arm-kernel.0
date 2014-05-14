@@ -1,81 +1,56 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Wed, 14 May 2014 08:14:06 +0530
-Subject: [PATCH v6 5/5] arm: exynos: Add MCPM call-back functions
-In-Reply-To: <20140513164845.GA10210@red-moon>
-References: <1399982324-27879-1-git-send-email-a.kesavan@samsung.com>
- <1399982324-27879-6-git-send-email-a.kesavan@samsung.com>
- <20140513164845.GA10210@red-moon>
-Message-ID: <CAM4voamY+nM3eoJWfR=0VBDtbf6wan-2awRaALN=ym9gGC_DYg@mail.gmail.com>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Wed, 14 May 2014 08:15:57 +0530
+Subject: [PATCH v4 0/5] ARM: dts: enable hdmi for exynos5 based peach and snow
+ boards
+Message-ID: <1400035562-16832-1-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+From: Rahul Sharma <Rahul.Sharma@samsung.com>
 
-On Tue, May 13, 2014 at 10:18 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Tue, May 13, 2014 at 12:58:44PM +0100, Abhilash Kesavan wrote:
->
-> [...]
->
->> +static int __init exynos_mcpm_init(void)
->> +{
->> +       struct device_node *node;
->> +       int ret = 0;
->
-> There is no point in initializing it to 0.
-OK.
->
->> +
->> +       node = of_find_compatible_node(NULL, NULL, "samsung,exynos5420");
->> +       if (!node)
->> +               return -ENODEV;
->> +       of_node_put(node);
->> +
->> +       if (!cci_probed())
->> +               return -ENODEV;
->> +
->> +       node = of_find_compatible_node(NULL, NULL,
->> +                       "samsung,exynos4210-sysram-ns");
->> +       if (!node)
->> +               return -ENODEV;
->> +
->> +       ns_sram_base_addr = of_iomap(node, 0);
->> +       of_node_put(node);
->> +       if (!ns_sram_base_addr) {
->> +               pr_err("failed to map non-secure iRAM base address\n");
->> +               return -ENOMEM;
->> +       }
->> +
->> +       /*
->> +        * To increase the stability of KFC reset we need to program
->> +        * the PMU SPARE3 register
->> +        */
->> +       __raw_writel(EXYNOS5420_SWRESET_KFC_SEL, S5P_PMU_SPARE3);
->> +
->> +       exynos_mcpm_usage_count_init();
->> +
->> +       ret = mcpm_platform_register(&exynos_power_ops);
->> +       if (!ret)
->> +               ret = mcpm_sync_init(exynos_pm_power_up_setup);
->> +       if (ret) {
->> +               iounmap(ns_sram_base_addr);
->> +               return ret;
->> +       }
->> +
->> +       mcpm_smp_set_ops();
->> +
->> +       pr_info("Exynos MCPM support installed\n");
->> +
->> +       /*
->> +        * Future entries into the kernel can now go
->> +        * through the cluster entry vectors.
->> +        */
->> +       __raw_writel(virt_to_phys(mcpm_entry_point),
->> +                       ns_sram_base_addr + MCPM_BOOT_ADDR_OFFSET);
->> +
->
-> ns_sram_base_addr must be unmapped, since it is unused after the write.
-Will unmap.
+Enable hdmi for exynos5250 based snow board, exynos5420
+based peach pit board and 5800 based peach-pi board.
+V4:
+1) Removed hdmi_hpd_irq pin from peach-pi board as it already
+present in exynos5420-pinctrl.dtsi.
 
-Regards,
-Abhilash
+V3:
+1) Re-spin on dependent patches.
+2) Added patch to enable hdmi for Peach-pi board.
+
+V2:
+1) Re-spin on dependent patches.
+2) Added patch to remove chip specific hdmi hpd gpio from
+board file top SoC file.
+
+This series is based on Kukjin Kims, for-next branch.
+
+It is dependent on
+
+1) Sachin's patch: "ARM: dts: exynos5250-snow: add tps65090 power regulator"
+at https://patches.linaro.org/28325/ : [Reviewed-by: Doug Anderson]
+
+All other dependent patches are already landed in maintainers
+tree.
+
+
+
+Rahul Sharma (5):
+  ARM: dts: enable hdmi for exynos5250 based snow board
+  ARM: dts: change to correct compatible string for exynos5420 hdmi
+  ARM: dts: enable hdmi for exynos5420 based peach-pit board
+  ARM: dts: remove chip specific hdmi hpd pin from board
+  ARM: dts: enable hdmi for exynos5800 based peach-pi board
+
+ arch/arm/boot/dts/exynos5250-cros-common.dtsi |    6 +++++-
+ arch/arm/boot/dts/exynos5250-pinctrl.dtsi     |    7 +++++++
+ arch/arm/boot/dts/exynos5250-snow.dts         |    7 +++++++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts    |   19 +++++++++++++++++++
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi     |    7 +++++++
+ arch/arm/boot/dts/exynos5420-smdk5420.dts     |    9 ---------
+ arch/arm/boot/dts/exynos5420.dtsi             |    7 ++++++-
+ arch/arm/boot/dts/exynos5800-peach-pi.dts     |   19 +++++++++++++++++++
+ 8 files changed, 70 insertions(+), 11 deletions(-)
+
+-- 
+1.7.9.5
