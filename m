@@ -1,48 +1,51 @@
-From: superlibj8301@gmail.com (Richard Lee)
-Date: Wed, 14 May 2014 10:13:22 +0800
-Subject: [RFC][PATCH 2/2] ARM: ioremap: Add IO mapping space reused
- support.
-In-Reply-To: <5026482.P9PDy29y2Y@wuerfel>
-References: <1399861195-21087-1-git-send-email-superlibj8301@gmail.com>
- <5146762.jba3IJe7xt@wuerfel>
- <CAHPCO9FRfR5p1N5v7mUk4hUYdPvqfLN6nW1LcnC83sU86ZFbZA@mail.gmail.com>
- <5026482.P9PDy29y2Y@wuerfel>
-Message-ID: <CAHPCO9GkEHpyr=_nMxKPzPZZ6FaT3-h3n1eZ_-iRbXNiyEea4Q@mail.gmail.com>
+From: zhangwm@marvell.com (Neil Zhang)
+Date: Tue, 13 May 2014 19:28:02 -0700
+Subject: [PATCH v4] ARM: perf: save/restore pmu registers in pm notifier
+In-Reply-To: <20140513184503.GF16388@arm.com>
+References: <1398133596-29170-1-git-send-email-zhangwm@marvell.com>
+ <20140422103642.GF7484@arm.com>
+ <175CCF5F49938B4D99B2E3EF7F558EBE5507A3B59B@SC-VEXCH4.marvell.com>
+ <20140423170821.GJ5649@arm.com>
+ <175CCF5F49938B4D99B2E3EF7F558EBE5507A3C1F1@SC-VEXCH4.marvell.com>
+ <5360FB07.5030407@arm.com>
+ <6106CAF835F351419ADA79E4836E6EC71B6A53C826@SC-VEXCH4.marvell.com>
+ <9034CBD80F070943B59700D7F8149ED9A0875730@SC-VEXCH4.marvell.com>
+ <20140513184503.GF16388@arm.com>
+Message-ID: <9034CBD80F070943B59700D7F8149ED9A087573F@SC-VEXCH4.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 4:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 13 May 2014 09:45:08 Richard Lee wrote:
->> > On Mon, May 12, 2014 at 3:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Monday 12 May 2014 10:19:55 Richard Lee wrote:
->> >> For the IO mapping, for the same physical address space maybe
->> >> mapped more than one time, for example, in some SoCs:
->> >> 0x20000000 ~ 0x20001000: are global control IO physical map,
->> >> and this range space will be used by many drivers.
->> >> And then if each driver will do the same ioremap operation, we
->> >> will waste to much malloc virtual spaces.
->> >>
->> >> This patch add IO mapping space reused support.
->> >>
->> >> Signed-off-by: Richard Lee <superlibj@gmail.com>
->> >
->> > What happens if the first driver then unmaps the area?
->> >
->>
->> If the first driver will unmap the area, it shouldn't do any thing
->> except decreasing the 'used' counter.
->
-> Ah, for some reason I didn't see your first patch that introduces
-> that counter.
->
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: 2014?5?14? 2:45
+> To: Neil Zhang
+> Cc: Sudeep Holla; 'linux at arm.linux.org.uk';
+> 'linux-arm-kernel at lists.infradead.org'; 'linux-kernel at vger.kernel.org';
+> 'devicetree at vger.kernel.org'
+> Subject: Re: [PATCH v4] ARM: perf: save/restore pmu registers in pm notifier
+> 
+> On Mon, May 12, 2014 at 11:22:09AM +0100, Neil Zhang wrote:
+> > > > The device tree bindings for power domains is under discussion [1]
+> > >
+> > > Thanks for the information.
+> > > But it currently for device only, core related stuff are not supported.
+> > > And is it really good to register power provider for core and let
+> > > vfp / pmu etc to get it?
+> > >
+> >
+> > What's your suggestion about it?
+> > Is it OK that I add it under the PMU node?
+> 
+> I don't really mind. I just want to avoid re-inventing the wheel in a
+> PMU-specific way and having to maintain that code forever because it ended
+> up in our DT description.
+> 
+> Will
 
-It's "[PATCH 1/2] mm/vmalloc: Add IO mapping space reused".
+I will prepare another patch to add DT description under PMU since there is 
+no generic power domain support for pm notifier if no other concerns.
+We can change the manner if there is generic power domain support for pm notifier later.
+Thanks.
 
-Thanks,
-
-BRs
-Richard
-
-
-
->         Arnd
+Best Regards,
+Neil Zhang
