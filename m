@@ -1,29 +1,28 @@
-From: till.klocke@yetu.com (Till Klocke)
-Date: Wed, 14 May 2014 11:17:32 +0200
-Subject: USB with 3.14.3 not working on Freescale i.mx6
-Message-ID: <CACWLcfv6akXuM59m_hX-xB=iQYA4iAx7fZ0T5ZB3-7ik-1GZMw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 May 2014 11:17:24 +0200
+Subject: [PATCH] [RESEND] ARM: remove last use of CONFIG_CPU_ARM710
+In-Reply-To: <1400055865.31197.4.camel@x220>
+References: <1364507176.1345.45.camel@x61.thuisdomein>
+ <1400055865.31197.4.camel@x220>
+Message-ID: <8309592.drxAj71PnZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wednesday 14 May 2014 10:24:25 Paul Bolle wrote:
+> Support for ARM710 CPUs was removed in v3.5. Now remove the last code
+> depending on its Kconfig macro.
+> 
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> ---
+> First submitted in March 2103. Still untested. Please note that
+> cpu_arm7_data_abort was also removed in v3.5.
+> 
 
-Currently I am trying to get a recent and stable Linux kernel running
-on a Phytec PhyFlex board based on the i.mx6 processor from Freescale.
-I saw that this processor is supported by the Linux kernel and
-compiled it. It boots successfull and everything I tested so far seems
-to be working except for USB. When I activate debugging for the LibUSB
-and do a 'lsusb' I get the following:
+'git grep -i arm710' tells me that there is also some arm710
+specific code in  arch/arm/mm/proc-arm720.S that we may want to
+remove along with this.
 
-[timestamp] [threadID] facility level [function call] <message>
---------------------------------------------------------------------------------
-[ 0.000000] [0000073a] libusbx: error [op_init] could not find usbfs
-unable to initialize libusb: -99
+The DT binding should probably remain untouched though, I think it's
+correct to document the string.
 
-I am basically using the default configuration delivered with the
-kernel. Did anyone has successfully ran a recent Linux kernel on a
-i.mx6 based board and give me some advice on how to solve my USB
-problem?
-
-Thanks in advance,
-
-Greetings
+	Arnd
