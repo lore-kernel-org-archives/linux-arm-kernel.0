@@ -1,38 +1,53 @@
 From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Wed, 14 May 2014 13:33:51 +0530
-Subject: [PATCH v5 0/6] add cpuidle support for Exynos5420
-In-Reply-To: <ANuQgHGSPJ45tbrVppAVpOqF0OfHacPWfX=S5mOVxTPr66f7vg@mail.gmail.com>
+Date: Wed, 14 May 2014 13:33:52 +0530
+Subject: [PATCH v5 1/6] driver: cpuidle-big-little: add of_device_id structure
+In-Reply-To: <1400054637-21505-1-git-send-email-chander.kashyap@linaro.org>
 References: <ANuQgHGSPJ45tbrVppAVpOqF0OfHacPWfX=S5mOVxTPr66f7vg@mail.gmail.com>
-Message-ID: <1400054637-21505-1-git-send-email-chander.kashyap@linaro.org>
+ <1400054637-21505-1-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <1400054637-21505-2-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos5420 is a big-little Soc from Samsung. It has 4 A15 and 4 A7 cores.
+This driver will be used by many big.Little Soc's. As of now it does
+string matching of hardcoded compatible string to init the driver. This
+comparison list will keep on growing with addition of new SoC's.
+Hence add of_device_id structure to collect the compatible strings of
+SoC's using this driver.
 
-This patchset adds cpuidle support for Exynos5420 SoC based on
-generic big.little cpuidle driver.
+Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+---
+ drivers/cpuidle/cpuidle-big_little.c |   11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-Tested on SMDK5420.
-
-This patch set depends on:
-	1. [PATCH 0/5] MCPM backend for Exynos5420
-	   http://www.spinics.net/lists/arm-kernel/msg331100.html
-Changelog is in respective patches.
-Chander Kashyap (5):
-  driver: cpuidle-big-little: add of_device_id structure
-  arm: exynos: add generic function to calculate cpu number
-  cpuidle: config: Add ARCH_EXYNOS entry to select cpuidle-big-little
-    driver
-  driver: cpuidle: cpuidle-big-little: init driver for Exynos5420
-  exynos: cpuidle: do not allow cpuidle registration for Exynos5420
-  mcpm: exynos: populate suspend and powered_up callbacks
-
- arch/arm/mach-exynos/cpuidle.c       |    3 +++
- arch/arm/mach-exynos/mcpm-exynos.c   |   36 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-exynos/regs-pmu.h      |    9 +++++++++
- drivers/cpuidle/Kconfig.arm          |    2 +-
- drivers/cpuidle/cpuidle-big_little.c |   12 +++++++++++-
- 5 files changed, 60 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
+index b45fc62..4cd02bd 100644
+--- a/drivers/cpuidle/cpuidle-big_little.c
++++ b/drivers/cpuidle/cpuidle-big_little.c
+@@ -163,14 +163,23 @@ static int __init bl_idle_driver_init(struct cpuidle_driver *drv, int cpu_id)
+ 	return 0;
+ }
+ 
++static const struct of_device_id compatible_machine_match[] = {
++	{ .compatible = "arm,vexpress,v2p-ca15_a7" },
++	{},
++};
++
+ static int __init bl_idle_init(void)
+ {
+ 	int ret;
++	struct device_node *root = of_find_node_by_path("/");
++
++	if (!root)
++		return -ENODEV;
+ 
+ 	/*
+ 	 * Initialize the driver just for a compliant set of machines
+ 	 */
+-	if (!of_machine_is_compatible("arm,vexpress,v2p-ca15_a7"))
++	if (!of_match_node(compatible_machine_match, root))
+ 		return -ENODEV;
+ 	/*
+ 	 * For now the differentiation between little and big cores
 -- 
 1.7.9.5
