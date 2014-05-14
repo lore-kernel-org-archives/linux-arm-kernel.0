@@ -1,32 +1,51 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 13 May 2014 21:45:52 -0600
-Subject: [PATCH] ARM: tegra: enable console framebuffer rotation
-In-Reply-To: <5372CE37.1080601@nvidia.com>
-References: <1399432682-677-1-git-send-email-acourbot@nvidia.com>
- <536A57FA.2090608@wwwdotorg.org> <536AC45F.6080608@nvidia.com>
- <536CE414.5030406@suse.de> <536CF33A.3020906@wwwdotorg.org>
- <53727D9E.9050800@suse.de> <5372CE37.1080601@nvidia.com>
-Message-ID: <5372E6F0.1050604@wwwdotorg.org>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 14 May 2014 12:46:27 +0900
+Subject: [PATCH 00/03] ARM: shmobile: Use shmobile_init_delay() on r8a7791
+In-Reply-To: <20140514032837.GB22813@verge.net.au>
+References: <20140511232508.20177.11556.sendpatchset@w520>
+ <1509906.x9u0HJ6AbJ@avalon> <20140513005936.GB30252@verge.net.au>
+ <20140513071224.GC27611@verge.net.au>
+ <CAMuHMdWBAkh_Jkfsok-Nws56z0ZsU0LmxV2nob_LKrMY_tFF6A@mail.gmail.com>
+ <20140514032837.GB22813@verge.net.au>
+Message-ID: <CANqRtoRvB9o2AwU1X2OFGpsmBoRtZDnKD+jz0SRhjSn-Ye6mug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2014 08:00 PM, Alexandre Courbot wrote:
-...
-> Both SHIELD and TN7 come with a locked bootloader and cannot use U-boot.
-> The bootloader can only boot a kernel from a dedicated, raw boot
-> partition (Android style), can only pass a device tree from another raw
-> "dtb" partition, and will fill it with plenty of dirty command-line
-> options that make mainline unusable. That seems to be a lot for distros
-> to handle, so at this stage we'd rather advise users to use a root FS
-> image of their favorite distro along with a self-compiled kernel.
+On Wed, May 14, 2014 at 12:28 PM, Simon Horman <horms@verge.net.au> wrote:
+> I wonder if the following is any good.
+>
+> From: Simon Horman <horms+renesas@verge.net.au>
+>
+> [PATCH] ARM: shmobile: Set clock frequency in HZ from OF nodes
+>
+> shmobile_init_delay() looks for OF "clock-frequency" to determine
+> the delay which is set by calling shmobile_setup_delay().
+>
+> Unfortunately this seems to be incorrect in detail as
+> "clock-frequency" node values are in HZ whereas the frequency
+> argument to shmobile_setup_delay() is in MHz.
+>
+> Provide a variant of shmobile_setup_delay() that accepts HZ to
+> correct this problem.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>
+> ---
+> v2
+> * As suggested by Geert Uytterhoeven
+>   - Don't ignore the potential for integer overflow.
+>     To this end I have taken Geert's suggestion of dividing by
+>     a large "value" in the HZ case.
+>     And I have let the original function unchanged for the MHz case:
+>     it should eventually be removed anyway.
 
-I don't know how much effort it's worth putting into this, but it
-/might/ be possible to port U-Boot to the devices, and use that as the
-"kernel" image that the binary bootloader boots, and then have U-Boot
-boot a kernel from a filesystem in the "normal" way. That's kind what I
-did by porting U-Boot to the Raspberry Pi. It would certainly increase
-the possibility of a distro supporting these devices in a generic way,
-as well as avoiding the need for hard-coded command-lines, memory
-layout, etc. in the DT files. We'd have to make sure that any installer
-didn't change the GPT layout, since then it'd get out of sync with the
-tegrapt partitions, which could cause the bootloader to fail.
+Hi Simon and Geert,
+
+Thanks for dealing with the fallout of my cosmetic changes. Nice to
+see that you managed to track it down!
+
+I think this patch looks perfect, please merge unless anyone objects.
+
+Cheers,
+
+/ magnus
