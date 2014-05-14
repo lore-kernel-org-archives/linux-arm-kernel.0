@@ -1,85 +1,100 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 14 May 2014 12:49:52 -0700
-Subject: [GIT PULL] arm64: crypto patches
-Message-ID: <CAKv+Gu_yP8p77S8LiZ3RBetCtUcZqw3k3CGK05dvCZG_naF_Ng@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 14 May 2014 15:50:00 -0400
+Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
+In-Reply-To: <5373C78E.7040301@linaro.org>
+References: <1399991966-14582-1-git-send-email-santosh.shilimkar@ti.com>
+ <5373C78E.7040301@linaro.org>
+Message-ID: <5373C8E8.6040208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-
-  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/ard.biesheuvel/linux-arm.git arm64-crypto
-
-for you to fetch changes up to 4b000d55804baf07b26a14d7bf0df85947a253ee:
-
-  arm64/crypto: add voluntary preemption to Crypto Extensions GHASH
-(2014-05-14 10:51:24 -0700)
-
-----------------------------------------------------------------
-Ard Biesheuvel (15):
-      asm-generic: allow generic unaligned access if the arch supports it
-      arm64: add abstractions for FPSIMD state manipulation
-      arm64: defer reloading a task's FPSIMD state to userland resume
-      arm64: add support for kernel mode NEON in interrupt context
-      arm64/crypto: SHA-1 using ARMv8 Crypto Extensions
-      arm64/crypto: SHA-224/SHA-256 using ARMv8 Crypto Extensions
-      arm64/crypto: GHASH secure hash using ARMv8 Crypto Extensions
-      arm64/crypto: AES using ARMv8 Crypto Extensions
-      arm64/crypto: AES in CCM mode using ARMv8 Crypto Extensions
-      arm64: pull in <asm/simd.h> from asm-generic
-      arm64/crypto: AES-ECB/CBC/CTR/XTS using ARMv8 NEON and Crypto Extensions
-      arm64/crypto: add shared macro to test for NEED_RESCHED
-      arm64/crypto: add voluntary preemption to Crypto Extensions SHA1
-      arm64/crypto: add voluntary preemption to Crypto Extensions SHA2
-      arm64/crypto: add voluntary preemption to Crypto Extensions GHASH
-
- arch/arm64/Kconfig                    |   3 +
- arch/arm64/Makefile                   |   1 +
- arch/arm64/crypto/Kconfig             |  53 ++++
- arch/arm64/crypto/Makefile            |  38 +++
- arch/arm64/crypto/aes-ce-ccm-core.S   | 222 ++++++++++++++
- arch/arm64/crypto/aes-ce-ccm-glue.c   | 297 +++++++++++++++++++
- arch/arm64/crypto/aes-ce-cipher.c     | 155 ++++++++++
- arch/arm64/crypto/aes-ce.S            | 133 +++++++++
- arch/arm64/crypto/aes-glue.c          | 446 ++++++++++++++++++++++++++++
- arch/arm64/crypto/aes-modes.S         | 532 ++++++++++++++++++++++++++++++++++
- arch/arm64/crypto/aes-neon.S          | 382 ++++++++++++++++++++++++
- arch/arm64/crypto/ghash-ce-core.S     |  97 +++++++
- arch/arm64/crypto/ghash-ce-glue.c     | 173 +++++++++++
- arch/arm64/crypto/sha1-ce-core.S      | 154 ++++++++++
- arch/arm64/crypto/sha1-ce-glue.c      | 190 ++++++++++++
- arch/arm64/crypto/sha2-ce-core.S      | 159 ++++++++++
- arch/arm64/crypto/sha2-ce-glue.c      | 270 +++++++++++++++++
- arch/arm64/include/asm/Kbuild         |   1 +
- arch/arm64/include/asm/assembler.h    |  21 ++
- arch/arm64/include/asm/fpsimd.h       |  23 ++
- arch/arm64/include/asm/fpsimdmacros.h |  35 +++
- arch/arm64/include/asm/neon.h         |   6 +-
- arch/arm64/include/asm/thread_info.h  |   4 +-
- arch/arm64/kernel/entry-fpsimd.S      |  24 ++
- arch/arm64/kernel/entry.S             |   2 +-
- arch/arm64/kernel/fpsimd.c            | 186 ++++++++++--
- arch/arm64/kernel/process.c           |   2 +-
- arch/arm64/kernel/ptrace.c            |   2 +
- arch/arm64/kernel/signal.c            |  13 +-
- arch/arm64/kernel/signal32.c          |   9 +-
- include/asm-generic/unaligned.h       |  21 +-
- 31 files changed, 3611 insertions(+), 43 deletions(-)
- create mode 100644 arch/arm64/crypto/Kconfig
- create mode 100644 arch/arm64/crypto/Makefile
- create mode 100644 arch/arm64/crypto/aes-ce-ccm-core.S
- create mode 100644 arch/arm64/crypto/aes-ce-ccm-glue.c
- create mode 100644 arch/arm64/crypto/aes-ce-cipher.c
- create mode 100644 arch/arm64/crypto/aes-ce.S
- create mode 100644 arch/arm64/crypto/aes-glue.c
- create mode 100644 arch/arm64/crypto/aes-modes.S
- create mode 100644 arch/arm64/crypto/aes-neon.S
- create mode 100644 arch/arm64/crypto/ghash-ce-core.S
- create mode 100644 arch/arm64/crypto/ghash-ce-glue.c
- create mode 100644 arch/arm64/crypto/sha1-ce-core.S
- create mode 100644 arch/arm64/crypto/sha1-ce-glue.c
- create mode 100644 arch/arm64/crypto/sha2-ce-core.S
- create mode 100644 arch/arm64/crypto/sha2-ce-glue.c
+On Wednesday 14 May 2014 03:44 PM, Daniel Lezcano wrote:
+> On 05/13/2014 04:39 PM, Santosh Shilimkar wrote:
+>> On OMAP4 panda board, there have been several bug reports about boot
+>> hang and lock-ups with CPU_IDLE enabled. The root cause of the issue
+>> is missing interrupts while in idle state. Commit cb7094e8 {cpuidle / omap4 :
+>> use CPUIDLE_FLAG_TIMER_STOP flag} moved the broadcast notifiers to common
+>> code for right reasons but on OMAP4 which suffers from a nasty ROM code
+>> bug with GIC, commit ff999b8a {ARM: OMAP4460: Workaround for ROM bug ..},
+>> we loose interrupts which leads to issues like lock-up, hangs etc.
+>>
+>> Patch reverts commit cb7094 {cpuidle / omap4 : use CPUIDLE_FLAG_TIMER_STOP
+>> flag} to avoid the issue. With this change, OMAP4 panda boards, the mentioned
+>> issues are getting fixed. We no longer loose interrupts which was the cause
+>> of the regression.
+>>
+>> Cc: Roger Quadros <rogerq@ti.com>
+>> Cc: Kevin Hilman <khilman@linaro.org>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Reported-tested-by: Roger Quadros <rogerq@ti.com>
+>> Reported-tested-by: Kevin Hilman <khilman@linaro.org>
+>> Tested-by: Tony Lindgren <tony@atomide.com>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/cpuidle44xx.c |   12 ++++++++----
+>>   1 file changed, 8 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+>> index 01fc710..3e169d9 100644
+>> --- a/arch/arm/mach-omap2/cpuidle44xx.c
+>> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
+>> @@ -14,6 +14,7 @@
+>>   #include <linux/cpuidle.h>
+>>   #include <linux/cpu_pm.h>
+>>   #include <linux/export.h>
+>> +#include <linux/clockchips.h>
+>>
+>>   #include <asm/cpuidle.h>
+>>   #include <asm/proc-fns.h>
+>> @@ -83,6 +84,7 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+>>   {
+>>       struct idle_statedata *cx = state_ptr + index;
+>>       u32 mpuss_can_lose_context = 0;
+>> +    int cpu_id = smp_processor_id();
+>>
+>>       /*
+>>        * CPU0 has to wait and stay ON until CPU1 is OFF state.
+>> @@ -110,6 +112,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+>>       mpuss_can_lose_context = (cx->mpu_state == PWRDM_POWER_RET) &&
+>>                    (cx->mpu_logic_state == PWRDM_POWER_OFF);
+>>
+>> +    clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
+>> +
+>>       /*
+>>        * Call idle CPU PM enter notifier chain so that
+>>        * VFP and per CPU interrupt context is saved.
+>> @@ -165,6 +169,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+>>       if (dev->cpu == 0 && mpuss_can_lose_context)
+>>           cpu_cluster_pm_exit();
+>>
+>> +    clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
+>> +
+>>   fail:
+>>       cpuidle_coupled_parallel_barrier(dev, &abort_barrier);
+>>       cpu_done[dev->cpu] = false;
+>> @@ -189,8 +195,7 @@ static struct cpuidle_driver omap4_idle_driver = {
+>>               /* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR */
+>>               .exit_latency = 328 + 440,
+>>               .target_residency = 960,
+>> -            .flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED |
+>> -                     CPUIDLE_FLAG_TIMER_STOP,
+>> +            .flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
+>>               .enter = omap_enter_idle_coupled,
+>>               .name = "C2",
+>>               .desc = "CPUx OFF, MPUSS CSWR",
+>> @@ -199,8 +204,7 @@ static struct cpuidle_driver omap4_idle_driver = {
+>>               /* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
+>>               .exit_latency = 460 + 518,
+>>               .target_residency = 1100,
+>> -            .flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED |
+>> -                     CPUIDLE_FLAG_TIMER_STOP,
+>> +            .flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
+>>               .enter = omap_enter_idle_coupled,
+>>               .name = "C3",
+>>               .desc = "CPUx OFF, MPUSS OSWR",
+> 
+> Shouldn't the broadcast timer to be setup with CLOCK_EVT_NOTIFY_BROADCAST_ON also ?
+> 
+Which is already taken care by __cpuidle_register_driver(). Note that setup code
+is still used from generic code...
