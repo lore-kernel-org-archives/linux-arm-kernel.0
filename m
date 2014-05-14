@@ -1,55 +1,45 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 14 May 2014 17:06:37 +0530
-Subject: [PATCH] ARM: dts: AM4372: clk: efuse based crystal frequency detect
-Message-ID: <062e8a534b1e372db7ed3daa3df7e3c5b885ffab.1400062517.git.nsekhar@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 14 May 2014 13:37:45 +0200
+Subject: [PATCH] mmc: card: restrict access to RPMB partition
+In-Reply-To: <1399642762-11149-1-git-send-email-yuvaraj.cd@samsung.com>
+References: <1399642762-11149-1-git-send-email-yuvaraj.cd@samsung.com>
+Message-ID: <CAPDyKFpBzz5xDfnNGsiH6tb8G5+nRFg5fgPssJt3DU3dSFuuug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Afzal Mohammed <afzal@ti.com>
+On 9 May 2014 15:39, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+> From: Andrew Bresticker <abrestic@chromium.org>
+>
+> The RPMB partition should only be accessed through the RPMB ioctls
+> and not through read()/write().  This patch makes mmc_blk_open()
+> reject open attempts to the RPMB partition in read or write mode.
+>
+> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+> ---
+>  drivers/mmc/card/block.c |   10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+> index 452782b..fd59090 100644
+> --- a/drivers/mmc/card/block.c
+> +++ b/drivers/mmc/card/block.c
+> @@ -297,7 +297,15 @@ static int mmc_blk_open(struct block_device *bdev, fmode_t mode)
+>                         check_disk_change(bdev);
+>                 ret = 0;
+>
+> -               if ((mode & FMODE_WRITE) && md->read_only) {
+> +               /*
+> +                * Reject read/write access to the RPMB partition.  It should
+> +                * only be accessed through ioctls.
+> +                */
+> +               if ((mode & (FMODE_READ | FMODE_WRITE)) &&
+> +                   md->area_type & MMC_BLK_DATA_AREA_RPMB) {
+> +                       mmc_blk_put(md);
+> +                       ret = -EACCES;
 
-Currently oscillator frequency is determined based on sysboot settings,
-it may not be the case always. To determine it properly, efuse settings
-also has to be read. CONTROL_STATUS register holds this information.
-Bit 31:	if 0, frequency to be determined based on sysboot
-	if 1, frequency to be determined based on efuse
-Bit 29,30 - for efuse detection of frequency
-Bit 22,23 - for sysboot detection of frequency
+How shall user space be able to receive a file descriptor, unless it's
+allowed to open the device?
 
-Add clock nodes (mux) to determine oscillator frequency as above.
-
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
-Acked-by: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/boot/dts/am43xx-clocks.dtsi |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi b/arch/arm/boot/dts/am43xx-clocks.dtsi
-index 142009c..71b029c 100644
---- a/arch/arm/boot/dts/am43xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
-@@ -11,6 +11,22 @@
- 	sys_clkin_ck: sys_clkin_ck {
- 		#clock-cells = <0>;
- 		compatible = "ti,mux-clock";
-+		clocks = <&sysboot_freq_sel_ck>, <&crystal_freq_sel_ck>;
-+		ti,bit-shift = <31>;
-+		reg = <0x0040>;
-+	};
-+
-+	crystal_freq_sel_ck: crystal_freq_sel_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,mux-clock";
-+		clocks = <&virt_19200000_ck>, <&virt_24000000_ck>, <&virt_25000000_ck>, <&virt_26000000_ck>;
-+		ti,bit-shift = <29>;
-+		reg = <0x0040>;
-+	};
-+
-+	sysboot_freq_sel_ck: sysboot_freq_sel_ck at 44e10040 {
-+		#clock-cells = <0>;
-+		compatible = "ti,mux-clock";
- 		clocks = <&virt_19200000_ck>, <&virt_24000000_ck>, <&virt_25000000_ck>, <&virt_26000000_ck>;
- 		ti,bit-shift = <22>;
- 		reg = <0x0040>;
--- 
-1.7.10.1
+Kind regards
+Ulf Hansson
