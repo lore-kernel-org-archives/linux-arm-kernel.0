@@ -1,55 +1,92 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Wed, 14 May 2014 11:49:01 +0200
-Subject: [PATCH v3 5/6] ARM: berlin: add the AHCI node for the BG2Q
-In-Reply-To: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1400060942-10588-6-git-send-email-antoine.tenart@free-electrons.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 14 May 2014 11:53:35 +0200
+Subject: [PATCH RFC] mmc: add slot argument to mmc_of_parse
+In-Reply-To: <1399457217-22846-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1399457217-22846-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <CAPDyKFqeunnWmguTH89byNc5Yy+CBY4avMeeon3ZSfNMmGJa9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BG2Q has an AHCI SATA controller. Add the corresponding nodes
-(AHCI, SATA PHYs) in its device tree.
+On 7 May 2014 12:06, Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
+> Some hosts manage several slots. In these case information such as the bus
+> width, chip detect and others are into the slot node. So we have to parse
+> child nodes. If not NULL, slot node will be used instead of the device
+> node.
+>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+>
+> Hi,
+>
+> Since this patch is only a RFC, I have not yet updated drivers using this
+> function.
+>
+> I would like to use mmc_of_parse to reduce code duplication. My issue is that
+> atmel mci is a bit different from others mci host since it can provide
+> several slots, so it allocates several mmc hosts. By the way, it is not the
+> only one.
+>
+> When calling mmc_alloc_host, host->parent is set to &pdev->dev. mmc_of_parse
+> uses host->parent->of_node but in my case settings are in the slot nodes so in
+> the child nodes. That's why I would like to have a way to tell which node I
+> want to use.
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/berlin2q.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+Seems reasonable, thanks for working on this!
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 07452a7483fa..53f8d9763589 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -183,6 +183,31 @@
- 			};
- 		};
- 
-+		ahci: sata at e90000 {
-+			compatible = "marvell,berlin-ahci";
-+			reg = <0xe90000 0x1000>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		sata_phy: phy at e900a0 {
-+			compatible = "marvell,berlin-sata-phy";
-+			reg = <0xe900a0 0x10>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+
-+			sata_phy0: phy at 0 {
-+				#phy-cells = <0>;
-+				reg = <0>;
-+			};
-+
-+			sata_phy1: phy at 1 {
-+				#phy-cells = <0>;
-+				reg = <1>;
-+			};
-+		};
-+
- 		apb at fc0000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
--- 
-1.9.1
+>
+>
+> Regards
+>
+> Ludovic
+>
+>
+>
+>  drivers/mmc/core/host.c |    9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+> index fdea825..ed6cea5 100644
+> --- a/drivers/mmc/core/host.c
+> +++ b/drivers/mmc/core/host.c
+> @@ -300,13 +300,15 @@ static inline void mmc_host_clk_sysfs_init(struct mmc_host *host)
+>  /**
+>   *     mmc_of_parse() - parse host's device-tree node
+>   *     @host: host whose node should be parsed.
+> + *     @slot: some devices provide several slots so the node to parse
+> + *     is not the host one.
+>   *
+>   * To keep the rest of the MMC subsystem unaware of whether DT has been
+>   * used to to instantiate and configure this host instance or not, we
+>   * parse the properties and set respective generic mmc-host flags and
+>   * parameters.
+>   */
+> -int mmc_of_parse(struct mmc_host *host)
+> +int mmc_of_parse(struct mmc_host *host, struct device_node *slot)
+>  {
+>         struct device_node *np;
+>         u32 bus_width;
+> @@ -317,7 +319,10 @@ int mmc_of_parse(struct mmc_host *host)
+>         if (!host->parent || !host->parent->of_node)
+>                 return 0;
+>
+> -       np = host->parent->of_node;
+> +       if (slot)
+> +               np = slot;
+> +       else
+> +               np = host->parent->of_node;
+>
+>         /* "bus-width" is translated to MMC_CAP_*_BIT_DATA flags */
+>         if (of_property_read_u32(np, "bus-width", &bus_width) < 0) {
+> --
+> 1.7.9.5
+>
+
+How about adding a new API, __mmc_of_parse((struct mmc_host *host,
+struct device_node *slot)
+Then let the old API mmc_of_parse() remain as is, but let it call the
+new API with slot == NULL.
+
+Atmel can then use the new API, but the other drivers can remain as is.
+
+Kind regards
+Ulf Hansson
