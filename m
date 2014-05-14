@@ -1,29 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 May 2014 14:51:22 +0200
-Subject: [PATCH v4 0/8] cpufreq: use cpufreq-cpu0 driver for exynos based
- platforms
-In-Reply-To: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
-References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <7170433.Ah6fefFrHR@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 14 May 2014 14:56:00 +0200
+Subject: [PATCH RESEND v4 1/8] clk: sunxi: Implement A31 USB clock
+In-Reply-To: <1400072167-29631-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1400072167-29631-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1400072167-29631-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 May 2014 06:41:08 Thomas Abraham wrote:
-> 
-> The patch series removes the use of Exynos specific cpufreq driver and enables
-> the use of cpufreq-cpu0 driver for Exynos4210, Exynos4x12 and Exynos5250 based
-> platforms. This is being done for few reasons.
-> 
-> (a) The Exynos cpufreq driver reads/writes clock controller registers
->     bypassing the Exynos CCF driver which is sort of problematic.
-> (b) Removes the need for having clock controller register definitions
->     in the cpufreq driver and also removes the need for statically
->     io-remapping clock controller address space (helps in moving towards
->     multiplatform kernel).
-> 
+The A31 USB clock slightly differ from its older counterparts, mostly because
+it has a different gate for each PHY, while the older one had a single gate for
+all the phy.
 
-Thanks a lot for your continued effort. Looks great overall, but I have one
-comment about the general way the cpu0 cpufreq driver works, not specific
-to the exynos implementation. See my reply to patch 4.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+Acked-by: Mike Turquette <mturquette@linaro.org>
+---
+ drivers/clk/sunxi/clk-sunxi.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-	Arnd
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index bd7dc733c1ca..d9bab75f128b 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -972,6 +972,11 @@ static const struct gates_data sun5i_a13_usb_gates_data __initconst = {
+ 	.reset_mask = 0x03,
+ };
+ 
++static const struct gates_data sun6i_a31_usb_gates_data __initconst = {
++	.mask = { BIT(18) | BIT(17) | BIT(16) | BIT(10) | BIT(9) | BIT(8) },
++	.reset_mask = BIT(2) | BIT(1) | BIT(0),
++};
++
+ static void __init sunxi_gates_clk_setup(struct device_node *node,
+ 					 struct gates_data *data)
+ {
+@@ -1267,6 +1272,7 @@ static const struct of_device_id clk_gates_match[] __initconst = {
+ 	{.compatible = "allwinner,sun6i-a31-apb2-gates-clk", .data = &sun6i_a31_apb2_gates_data,},
+ 	{.compatible = "allwinner,sun4i-a10-usb-clk", .data = &sun4i_a10_usb_gates_data,},
+ 	{.compatible = "allwinner,sun5i-a13-usb-clk", .data = &sun5i_a13_usb_gates_data,},
++	{.compatible = "allwinner,sun6i-a31-usb-clk", .data = &sun6i_a31_usb_gates_data,},
+ 	{}
+ };
+ 
+-- 
+1.9.3
