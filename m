@@ -1,58 +1,40 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 14 May 2014 11:56:24 +0200
-Subject: [PATCH v5 0/6] add cpuidle support for Exynos5420
-In-Reply-To: <1400054637-21505-1-git-send-email-chander.kashyap@linaro.org>
-References: <ANuQgHGSPJ45tbrVppAVpOqF0OfHacPWfX=S5mOVxTPr66f7vg@mail.gmail.com>
- <1400054637-21505-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <53733DC8.1020608@linaro.org>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 14 May 2014 11:59:47 +0200
+Subject: [PATCH] ARM: nommu: remove unused KTHREAD_SIZE #define
+Message-ID: <1400061587.31197.18.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2014 10:03 AM, Chander Kashyap wrote:
-> Exynos5420 is a big-little Soc from Samsung. It has 4 A15 and 4 A7 cores.
->
-> This patchset adds cpuidle support for Exynos5420 SoC based on
-> generic big.little cpuidle driver.
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+0) Untested.
 
-Hi Chander,
+1) A very similar commit is 10b5aabddd1e ("[PATCH]
+include/asm-h8300/page.h: remove unused KTHREAD_SIZE #define"). I found
+that commit by looking into the history of the unloved
+CONFIG_SMALL_TASKS macro. References to it were added to (a few places
+in) the tree, starting with v2.5.46. But I haven't found evidence that
+it was ever defined.
 
-just a side question. I am not succeeding to have both cluster A7/A15 
-with the upstream kernel.
+ arch/arm/include/asm/page-nommu.h | 6 ------
+ 1 file changed, 6 deletions(-)
 
-How can I test your driver ?
-
-Did I miss something ?
-
-Thanks
-   -- Daniel
-
-> Tested on SMDK5420.
->
-> This patch set depends on:
-> 	1. [PATCH 0/5] MCPM backend for Exynos5420
-> 	   http://www.spinics.net/lists/arm-kernel/msg331100.html
-> Changelog is in respective patches.
-> Chander Kashyap (5):
->    driver: cpuidle-big-little: add of_device_id structure
->    arm: exynos: add generic function to calculate cpu number
->    cpuidle: config: Add ARCH_EXYNOS entry to select cpuidle-big-little
->      driver
->    driver: cpuidle: cpuidle-big-little: init driver for Exynos5420
->    exynos: cpuidle: do not allow cpuidle registration for Exynos5420
->    mcpm: exynos: populate suspend and powered_up callbacks
->
->   arch/arm/mach-exynos/cpuidle.c       |    3 +++
->   arch/arm/mach-exynos/mcpm-exynos.c   |   36 ++++++++++++++++++++++++++++++++++
->   arch/arm/mach-exynos/regs-pmu.h      |    9 +++++++++
->   drivers/cpuidle/Kconfig.arm          |    2 +-
->   drivers/cpuidle/cpuidle-big_little.c |   12 +++++++++++-
->   5 files changed, 60 insertions(+), 2 deletions(-)
->
-
-
+diff --git a/arch/arm/include/asm/page-nommu.h b/arch/arm/include/asm/page-nommu.h
+index d1b162a18dcb..58da8b22cf10 100644
+--- a/arch/arm/include/asm/page-nommu.h
++++ b/arch/arm/include/asm/page-nommu.h
+@@ -11,12 +11,6 @@
+ #ifndef _ASMARM_PAGE_NOMMU_H
+ #define _ASMARM_PAGE_NOMMU_H
+ 
+-#if !defined(CONFIG_SMALL_TASKS) && PAGE_SHIFT < 13
+-#define KTHREAD_SIZE (8192)
+-#else
+-#define KTHREAD_SIZE PAGE_SIZE
+-#endif
+- 
+ #define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
+ #define free_user_page(page, addr)	free_page(addr)
+ 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.9.0
