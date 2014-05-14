@@ -1,79 +1,62 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 14 May 2014 16:58:25 +0200
-Subject: [PATCHv2 3/4] ARM: mm: add support for HW coherent systems in
- PL310
-In-Reply-To: <20140514143448.GD19866@localhost>
-References: <1399975839-5311-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1399975839-5311-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140514143448.GD19866@localhost>
-Message-ID: <20140514165825.58d3bb20@free-electrons.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Wed, 14 May 2014 16:58:30 +0200
+Subject: [RFC PATCH 5/9] dt: deps: register drivers based on the
+ initialization order based on DT
+In-Reply-To: <20140514141300.67206C4153D@trevor.secretlab.ca>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>	<1399913280-6915-6-git-send-email-holler@ahsoftware.de>
+ <20140514141300.67206C4153D@trevor.secretlab.ca>
+Message-ID: <53738496.2070800@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Catalin Marinas,
+Am 14.05.2014 16:13, schrieb Grant Likely:
+> On Mon, 12 May 2014 18:47:56 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
+>> The init system currently calls unknown functions with almost unknown
+>> functionality in an almost random order.
+>
+> Correct, we've got a module system. Some would say that is a strength!
+> :-) That said, I don't object to optimizing to the optimal order when
+> possible.
 
-On Wed, 14 May 2014 15:34:48 +0100, Catalin Marinas wrote:
-> On Tue, May 13, 2014 at 11:10:38AM +0100, Thomas Petazzoni wrote:
-> > --- a/Documentation/devicetree/bindings/arm/l2cc.txt
-> > +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-> > @@ -8,6 +8,8 @@ Required properties:
-> >  
-> >  - compatible : should be one of:
-> >    "arm,pl310-cache"
-> > +  "arm,pl310-coherent-cache", used for I/O coherent platforms using
-> > +     the PL310 cache
-> >    "arm,l220-cache"
-> >    "arm,l210-cache"
-> >    "bcm,bcm11351-a2-pl310-cache": DEPRECATED by "brcm,bcm11351-a2-pl310-cache"
-> 
-> The binding name kind of implies that we have a transparent PL310 cache
-> (at least to me), which is not the case. I would rather have a specific
-> dma-coherent property or something similar since it's not another type
-> of PL310 but rather a different SoC topology.
+Modules do work after init happened, that isn't what this feature is about.
 
-Fine with me. A separate property or a different compatible string is
-the same.
+>
+>> Fixing this is on a short-term basis is a bit tricky.
+>>
+>> In order to register drivers with a deterministic order, a list of all
+>> available in-kernel drivers is needed. Unfortunately such a list doesn't
+>> exist, just a list of initcalls does exist.
+>>
+>> The trick now is to first call special annotated initcalls (I call those
+>> "well done") for platform drivers, but not actualy starting those drivers
+>> by calling their probe function, but just collectiong their meta datas
+>> (struct platform_driver). After all those informations were collected,
+>> available the drivers will be started according to the previously
+>> determined order.
+>
+> Why does the initcall level matter? Why not just let the initcalls
+> happen, capture the calls that register a driver, and then use that list
+> later?
 
-> But I recall you mentioned that you can't make this decision at the DT
-> level since you don't know before whether the SoC is I/O coherent or
-> not.
+Some initcalls assume that stuff is present when they called probe or 
+register and do further action based on the rc code.
 
-As of today, hardware I/O coherency can only be enabled if CONFIG_SMP
-is enabled *and* the SoC is actually multi-core, due to limitations in
-the ARM core code. So if you look at my PATCH 4/4 in this series, you
-will see that I adjust the compatible string of the cache controller at
-run time, depending on whether hardware I/O coherency is enabled or not:
+>> The long range target to fix the problem should be to include a list (array)
+>> of struct platform_driver in the kernel for all in-kernel platform drivers,
+>> instead of just initcalls. This will be easy if all platform drivers have
+>> become "well done".
+>
+> How will that list be constructed? How will it account for multiple
+> platforms, each requiring a different init order?
 
-+static void __init mvebu_l2x0_pl310_coherent(void)
-+{
-+	struct device_node *np;
-+
-+	if (!coherency_available())
-+		return;
-+
-+	for_each_compatible_node(np, NULL, "arm,pl310-cache") {
-+		struct property *new_compat;
-+
-+		new_compat = kzalloc(sizeof(*new_compat), GFP_KERNEL);
-+		new_compat->name = kstrdup("compatible", GFP_KERNEL);
-+		new_compat->value = kstrdup("arm,pl310-coherent-cache",
-+					    GFP_KERNEL);
-+		new_compat->length = strlen(new_compat->value) + 1;
-+		of_update_property(np, new_compat);
-+	}
-+}
+The list could be build just like the list of initcalls, but containing 
+structs platform instead of function pointers.
 
-So, this code can just as well be changed to add a property instead of
-adjusting the compatible property. It's the same thing for me.
+The order is in now way part of this list, after all that's what this 
+feature is about. The order is determined by metadatas in the DT, to get 
+rid of a lot of otherwise necessary hardcoded stuff to fix the order in 
+drivers.
 
-Also, I will send (hopefully today) a series that allows to enable
-hardware I/O coherency even on !SMP configurations. But I believe it
-might take a while to get merged.
+Regards,
 
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Alexander Holler
