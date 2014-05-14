@@ -1,29 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 May 2014 20:56:24 +0200
-Subject: [PATCH v3 0/6] Add platform support for LSI AXM55xx
-In-Reply-To: <cover.1400072260.git.anders.berg@avagotech.com>
-References: <cover.1400072260.git.anders.berg@avagotech.com>
-Message-ID: <6334605.NlytHCzYVP@wuerfel>
+From: kyle@redhat.com (Kyle McMartin)
+Date: Wed, 14 May 2014 14:57:21 -0400
+Subject: [PATCH] arm64: don't set READ_IMPLIES_EXEC for EM_AARCH64
+Message-ID: <20140514185720.GI26038@redacted.bos.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 May 2014 20:37:55 Anders Berg wrote:
-> 
-> This is version 3 of this series to introduces basic platform support for the LSI
-> AXM5516 SoC.
-> 
-> No major changes since v2. Ready to be applied to the arm-soc tree?
+current->personality & READ_IMPLIES_EXEC is currently being set for
+AArch64 binaries, resulting in an executable stack, when no explicit
+PT_GNU_STACK header is present.
 
-I think it's good, but I'm not sure if we should put them all into arm-soc.
-There are no dependencies between the drivers that I can see, so why not
-merge the clock and reset drivers through the individual subsystem maintainers?
+[kmcmarti at sedition ~]$ uname -p
+aarch64
+[kmcmarti at sedition ~]$ cat /proc/$$/personality 
+00400000
 
-We can take patches 1/3/4/6, and the others if there is a good reason
-not to have the regular maintainers pick them up.
+The reason for this is, without an explicit PT_GNU_STACK entry in the
+binary, stk is still set to EXSTACK_DEFAULT (which should be
+non-executable on AArch64.) As a result, elf_read_implies_exec is true,
+and we set READ_IMPLIES_EXEC in binfmt_elf.c:load_elf_binary.
 
-The hip04 platform series is also adding a multi_v7_lpae_defconfig file.
-it would be good to add axxia to that config and also to the regular
-multi_v7_defconfig, but that can be an add-on patch once we have merged
-hip04.
+Fix this to return 0 in the native case, and parrot the logic from
+arch/arm/kernel/elf.c otherwise. With this patch, binaries correctly
+don't have READ_IMPLIES_EXEC set, and we can let PT_GNU_STACK change
+things if it's explicitly requested.
 
-	Arnd
+Signed-off-by: Kyle McMartin <kyle@redhat.com>
+
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -114,7 +114,8 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+  */
+ #define elf_check_arch(x)		((x)->e_machine == EM_AARCH64)
+ 
+-#define elf_read_implies_exec(ex,stk)	(stk != EXSTACK_DISABLE_X)
++#define elf_read_implies_exec(ex,stk)	(test_thread_flag(TIF_32BIT) \
++					 ? (stk == EXSTACK_ENABLE_X) : 0)
+ 
+ #define CORE_DUMP_USE_REGSET
+ #define ELF_EXEC_PAGESIZE	PAGE_SIZE
