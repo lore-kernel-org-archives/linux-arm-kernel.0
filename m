@@ -1,157 +1,31 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 14 May 2014 16:58:45 +0100
-Subject: [RFC 8/8] arm: fiq: Hack FIQ routing backdoors into GIC and VIC
-In-Reply-To: <1400083125-1464-1-git-send-email-daniel.thompson@linaro.org>
-References: <1400083125-1464-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1400083125-1464-9-git-send-email-daniel.thompson@linaro.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 14 May 2014 17:59:56 +0200
+Subject: [PATCH] i2c: s3c2410: resume race fix
+In-Reply-To: <1397254781-23833-1-git-send-email-dianders@chromium.org>
+References: <1397254781-23833-1-git-send-email-dianders@chromium.org>
+Message-ID: <20140514155956.GD12911@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a hack to make it easy to check that the other interfaces in the
-patchset make sense. It needs to be replaced by code to get the
-interrupt controllers to expose FIQs.
+On Fri, Apr 11, 2014 at 03:19:41PM -0700, Doug Anderson wrote:
+> From: Olof Johansson <olof@lixom.net>
+> 
+> Don't unmark the device as suspended until after it's been re-setup.
+> 
+> The main race would be w.r.t. an i2c driver that gets resumed at the same
+> time (asyncronously), that is allowed to do a transfer since suspended
+> is set to 0 before reinit, but really should have seen the -EIO return
+> instead.
+> 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 
-Unless a better option presents itself I plan to double up each
-interrupt source (so we get two virqs, one for regular interrupt and
-one for FIQ). This is what most of the prior art around FIQ in Linux
-has done in the past.
+Applied to for-current, thanks!
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm/boot/dts/stih416.dtsi          |  2 +-
- arch/arm/boot/dts/vexpress-v2m-rs1.dtsi |  2 +-
- arch/arm/kernel/fiq.c                   | 39 +++++++++++++++++++++++++++++++++
- drivers/irqchip/irq-gic.c               | 27 +++++++++++++++++++++++
- 4 files changed, 68 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index 78746d2..a288898 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -99,7 +99,7 @@
- 			compatible	= "st,asc";
- 			status 		= "disabled";
- 			reg		= <0xfe531000 0x2c>;
--			interrupts	= <0 210 0>;
-+			interrupts	= <0 210 0>, <0 210 0>;
- 			pinctrl-names 	= "default";
- 			pinctrl-0 	= <&pinctrl_sbc_serial1>;
- 			clocks          = <&CLK_SYSIN>;
-diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-index ac870fb..fab2a40 100644
---- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-+++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-@@ -140,7 +140,7 @@
- 			v2m_serial0: uart at 090000 {
- 				compatible = "arm,pl011", "arm,primecell";
- 				reg = <0x090000 0x1000>;
--				interrupts = <5>;
-+				interrupts = <5>, <5>;
- 				clocks = <&v2m_oscclk2>, <&smbclk>;
- 				clock-names = "uartclk", "apb_pclk";
- 			};
-diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-index defbe85..efce321 100644
---- a/arch/arm/kernel/fiq.c
-+++ b/arch/arm/kernel/fiq.c
-@@ -41,6 +41,7 @@
- #include <linux/interrupt.h>
- #include <linux/seq_file.h>
- #include <linux/irq.h>
-+#include <linux/irqchip/arm-vic.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/cp15.h>
-@@ -130,14 +131,52 @@ void release_fiq(struct fiq_handler *f)
- 
- static int fiq_start;
- 
-+/* These hacks use backdoors into the interrupt controller to perform FIQ/IRQ
-+ * routing. These hacks are nasty and completely incompatible with (working)
-+ * multiarch kernels. Additionally these hacks don't count enable/disable
-+ * properly...
-+ *
-+ * This should probably all be replaced with virtual interrupt numbers
-+ * that the intc already knows to bind to FIQ.
-+ */
-+#ifdef CONFIG_ARCH_VERSATILE
-+#define USE_VIC_HACK
-+#else
-+#define USE_GIC_HACK
-+#endif
-+
- void enable_fiq(int fiq)
- {
-+#ifdef USE_VIC_HACK
-+	vic_set_fiq(fiq, true);
-+#endif
-+#ifdef USE_GIC_HACK
-+{
-+	struct irq_data *irq_data = irq_get_irq_data(fiq);
-+
-+	extern void gic_set_group_irq(struct irq_data *d, int group);
-+	gic_set_group_irq(irq_data, 0);
-+}
-+#endif
-+
- 	enable_irq(fiq + fiq_start);
- }
- 
- void disable_fiq(int fiq)
- {
- 	disable_irq(fiq + fiq_start);
-+
-+#ifdef USE_VIC_HACK
-+	vic_set_fiq(fiq, false);
-+#endif
-+#ifdef USE_GIC_HACK
-+{
-+	struct irq_data *irq_data = irq_get_irq_data(fiq);
-+
-+	extern void gic_set_group_irq(struct irq_data *d, int group);
-+	gic_set_group_irq(irq_data, 1);
-+}
-+#endif
- }
- 
- void eoi_fiq(int fiq)
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index aa8efe4..c25632b 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -173,6 +173,33 @@ static void gic_unmask_irq(struct irq_data *d)
- 	raw_spin_unlock(&irq_controller_lock);
- }
- 
-+/*static*/ void gic_set_group_irq(struct irq_data *d, int group)
-+{
-+	unsigned long flags;
-+	unsigned int reg = gic_irq(d) / 32 * 4;
-+	u32 mask = 1 << (gic_irq(d) % 32);
-+	u32 val;
-+
-+	raw_spin_lock_irqsave(&irq_controller_lock, flags);
-+	val = readl_relaxed(gic_dist_base(d) + GIC_DIST_IGROUP + reg);
-+	if (group)
-+		val |= mask;
-+	else
-+		val &= ~mask;
-+	writel_relaxed(val, gic_dist_base(d) + GIC_DIST_IGROUP + reg);
-+	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
-+}
-+
-+/*static*/ int gic_get_group_irq(struct irq_data *d)
-+{
-+	unsigned int reg = gic_irq(d) / 32 * 4;
-+	u32 mask = 1 << (gic_irq(d) % 32);
-+	u32 val;
-+
-+	val = readl_relaxed(gic_dist_base(d) + GIC_DIST_IGROUP + reg);
-+	return !!(val & mask);
-+}
-+
- static void gic_eoi_irq(struct irq_data *d)
- {
- 	if (gic_arch_extn.irq_eoi) {
--- 
-1.9.0
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140514/6da26b28/attachment.sig>
