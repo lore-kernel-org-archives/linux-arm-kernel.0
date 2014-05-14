@@ -1,38 +1,44 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 14 May 2014 17:05:26 +0100
-Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
- initialization order based on the DT)
-In-Reply-To: <53738580.7000902@ahsoftware.de>
-References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
- <20140514141914.446F7C4153D@trevor.secretlab.ca>
- <53738580.7000902@ahsoftware.de>
-Message-ID: <CACxGe6s4px_9CNk3bkc1OF1KGZGYdyh4gE_VufCKU5dLFBG48g@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 14 May 2014 11:06:57 -0500
+Subject: [PATCHv2 1/2] mm/vmalloc: Add IO mapping space reused interface
+ support.
+In-Reply-To: <1400055532-13134-2-git-send-email-superlibj8301@gmail.com>
+References: <1400055532-13134-1-git-send-email-superlibj8301@gmail.com>
+ <1400055532-13134-2-git-send-email-superlibj8301@gmail.com>
+Message-ID: <CAL_JsqLncBaJ=uceovX80U1JPU8SW3KWKXW3PiVR8Kbnykcvpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 14, 2014 at 4:02 PM, Alexander Holler <holler@ahsoftware.de> wrote:
-> Am 14.05.2014 16:19, schrieb Grant Likely:
->
->
->> Rather than a dtb schema change, for the most common properties (irqs,
->> clocks, gpios), we could extract dependencies at boot time. I don't like
->> the idea of adding a separate depends-on property because it is very
->> easy to get it out of sync with the actual binding data (dtc is not the
->> only tool that manipulates .dtbs. Firmware will fiddle with it too).
->
->
-> Then that stuff has to fiddle correct. Sorry, but trying to solve all
-> problems right from the beginning just leads to endless talks with no end
-> and nothing will happen at all because nobody aggrees how to start.
+Adding Nico...
 
-I appreciate the problem that you're trying to solve and why you're
-using the dtc approach. My job is to poke at the solution and make
-sure it is going to be reliable. Making sure all users know how to
-fiddle with the new property correctly is not a trivial problem,
-especially when it is firmware that will not necessarily be updated.
+On Wed, May 14, 2014 at 3:18 AM, Richard Lee <superlibj8301@gmail.com> wrote:
+> For the IO mapping, the same physical address space maybe
+> mapped more than one time, for example, in some SoCs:
+>   - 0x20001000 ~ 0x20001400 --> 1KB for Dev1
+>   - 0x20001400 ~ 0x20001800 --> 1KB for Dev2
+>   and the page size is 4KB.
+>
+> Then both Dev1 and Dev2 will do ioremap operations, and the IO
+> vmalloc area's virtual address will be aligned down to 4KB, and
+> the size will be aligned up to 4KB. That's to say, only one
+> 4KB size's vmalloc area could contain Dev1 and Dev2 IO mapping area
+> at the same time.
+>
+> For this case, we can ioremap only one time, and the later ioremap
+> operation will just return the exist vmalloc area.
 
-I'm not saying flat out 'no' here, but before I merge anything, I have
-to be reasonably certain that the feature is not going to represent a
-maintenance nightmare over the long term.
+We already have similar reuse tracking for the static mappings on ARM.
+I'm wondering if either that can be reused for ioremap as well or this
+can replace the static mapping tracking. It seems silly to have 2
+lists to search for finding an existing mapping.
 
-g.
+But there is a fundamental problem with your approach. You do not and
+cannot check the memory type of the mapping. If you look at the static
+mapping code, it only reuses mappings if the memory type match. While
+having aliases with different memory types is bad on ARMv6+, I assume
+there are some cases that do that given the static mapping code
+handles that case. We would at least want to detect and warn if we
+didn't want to allow different attributes rather than just return a
+mapping with whatever attributes the first mapping used.
+
+Rob
