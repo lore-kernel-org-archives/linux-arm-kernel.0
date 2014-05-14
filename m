@@ -1,130 +1,40 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 14 May 2014 12:08:14 +0100
-Subject: [PATCH v2] of/platform: Add of_platform_depopulate() helper
-In-Reply-To: <1399998294-24447-1-git-send-email-pawel.moll@arm.com>
-References: <1399997324.3657.35.camel@hornet>
- <1399998294-24447-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <20140514110814.120BEC4153D@trevor.secretlab.ca>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 14 May 2014 13:13:45 +0200
+Subject: [PATCH] mmc: wmt-sdmmc: Use GFP_KERNEL instead of hard-coded value
+In-Reply-To: <CAFRkauBCjiePz-Nj46JmDoTmgOM7ch7BoA0s5SxQ2pn29F5aNg@mail.gmail.com>
+References: <1398646711.10750.0.camel@phoenix>
+ <CAFRkauBCjiePz-Nj46JmDoTmgOM7ch7BoA0s5SxQ2pn29F5aNg@mail.gmail.com>
+Message-ID: <CAPDyKFq9Nz99WBLmYdz3Tar1LuXmfiyoF=QhaM3JNr4-v-DAJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 May 2014 17:24:54 +0100, Pawel Moll <pawel.moll@arm.com> wrote:
-> Drivers can us of_platform_populate() to create
-> platform devices for children of the device
-> main node (this can particularly happen in case
-> of MFD devices). Unfortunately, there was no
-> standard way of removing such sub-devices when
-> the main one is being removed.
-> 
-> This patch adds of_platform_depopulate() as
-> a complementary operation for the _populate()
-> one. It removes all platform and amba devices
-> that have been created from the Device Tree,
-> but leaves all other ones untouched (returning
-> -EBUSY in such case).
+On 14 May 2014 13:01, Axel Lin <axel.lin@ingics.com> wrote:
+> 2014-04-28 8:58 GMT+08:00 Axel Lin <axel.lin@ingics.com>:
+>> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+>> ---
+>>  drivers/mmc/host/wmt-sdmmc.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
+>> index 34231d5..3605c37 100644
+>> --- a/drivers/mmc/host/wmt-sdmmc.c
+>> +++ b/drivers/mmc/host/wmt-sdmmc.c
+>> @@ -852,7 +852,7 @@ static int wmt_mci_probe(struct platform_device *pdev)
+>>         priv->dma_desc_buffer = dma_alloc_coherent(&pdev->dev,
+>>                                                    mmc->max_blk_count * 16,
+>>                                                    &priv->dma_desc_device_addr,
+>> -                                                  208);
+>> +                                                  GFP_KERNEL);
+>
+> Hi Ulf,
+> This is a pretty trivial patch.
+> Would you pick up this patch?
 
-Nit: What's with the 50-column word wrap? 72 is the norm for commit
-text.
+Done.
 
-Acked-by: Grant Likely <grant.likely@linaro.org>
+Kind regards
+Ulf Hansson
 
-If you like you can merge this with your other series since it is
-dependent.
-
-> 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
-> Changes since v1:
-> 
-> - using bool rather than int to signal remaining children
-> - recursing using of_platform_depopulate() itself
-> 
->  drivers/of/platform.c       | 50 +++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of_platform.h |  5 +++++
->  2 files changed, 55 insertions(+)
-> 
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 236f47e..3b51e04 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -495,4 +495,54 @@ int of_platform_populate(struct device_node *root,
->  	return rc;
->  }
->  EXPORT_SYMBOL_GPL(of_platform_populate);
-> +
-> +static int of_platform_device_destroy(struct device *dev, void *data)
-> +{
-> +	bool *children_left = data;
-> +
-> +	/* Do not touch devices not populated from the device tree */
-> +	if (!dev->of_node || !of_node_check_flag(dev->of_node, OF_POPULATED)) {
-> +		*children_left = true;
-> +		return 0;
-> +	}
-> +
-> +	/* Recurse, but don't touch this device if it has any children left */
-> +	if (of_platform_depopulate(dev) != 0) {
-> +		*children_left = true;
-> +		return 0;
-> +	}
-> +
-> +	if (dev->bus == &platform_bus_type)
-> +		platform_device_unregister(to_platform_device(dev));
-> +	else if (dev->bus == &amba_bustype)
-> +		amba_device_unregister(to_amba_device(dev));
-> +	else
-> +		*children_left = true;
-> +
-> +	return 0;
-> +}
-> +
-> +/**
-> + * of_platform_depopulate() - Remove devices populated from device tree
-> + * @parent: device which childred will be removed
-> + *
-> + * Complementary to of_platform_populate(), this function removes children
-> + * of the given device (and, recurrently, their children) that have been
-> + * created from their respective device tree nodes (and only those,
-> + * leaving others - eg. manually created - unharmed).
-> + *
-> + * Returns 0 when all children devices have been removed or
-> + * -EBUSY when some children remained.
-> + */
-> +int of_platform_depopulate(struct device *parent)
-> +{
-> +	bool children_left = false;
-> +
-> +	device_for_each_child(parent, &children_left,
-> +			of_platform_device_destroy);
-> +
-> +	return children_left ? -EBUSY : 0;
-> +}
-> +EXPORT_SYMBOL_GPL(of_platform_depopulate);
-> +
->  #endif /* CONFIG_OF_ADDRESS */
-> diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
-> index 05cb4a9..b1010ee 100644
-> --- a/include/linux/of_platform.h
-> +++ b/include/linux/of_platform.h
-> @@ -72,6 +72,7 @@ extern int of_platform_populate(struct device_node *root,
->  				const struct of_device_id *matches,
->  				const struct of_dev_auxdata *lookup,
->  				struct device *parent);
-> +extern int of_platform_depopulate(struct device *parent);
->  #else
->  static inline int of_platform_populate(struct device_node *root,
->  					const struct of_device_id *matches,
-> @@ -80,6 +81,10 @@ static inline int of_platform_populate(struct device_node *root,
->  {
->  	return -ENODEV;
->  }
-> +static inline int of_platform_depopulate(struct device *parent)
-> +{
-> +	return -ENODEV;
-> +}
->  #endif
->  
->  #endif	/* _LINUX_OF_PLATFORM_H */
-> -- 
-> 1.9.1
-> 
+>
+> Regards,
+> Axel
