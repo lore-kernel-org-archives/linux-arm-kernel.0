@@ -1,85 +1,28 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 15 May 2014 13:38:23 -0700
-Subject: [PATCH v3 5/6] watchdog: moxart: Register reboot handler with
- watchdog subsystem
-In-Reply-To: <1400186304-1691-1-git-send-email-linux@roeck-us.net>
-References: <1400186304-1691-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1400186304-1691-6-git-send-email-linux@roeck-us.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 15 May 2014 14:39:07 -0600
+Subject: [RFC PATCH 05/10] ARM: tegra: Export function to read USB
+ calibration data
+In-Reply-To: <1400113986-339-6-git-send-email-abrestic@chromium.org>
+References: <1400113986-339-1-git-send-email-abrestic@chromium.org>
+ <1400113986-339-6-git-send-email-abrestic@chromium.org>
+Message-ID: <537525EB.9090704@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The watchdog subsystem now provides an API to trigger a system reboot.
-Register with it.
+On 05/14/2014 06:33 PM, Andrew Bresticker wrote:
+> Board-specific USB configuration data is stored in FUSE_SKU_CALIB_0.
+> Export a function to read it so the PHY can be properly configured.
 
-Tested-by: Jonas Jensen <jonas.jensen@gmail.com>
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
-v3: Drop reboot mode and cmd string parameters from API
-v2: No change
+This patch seems conceptually fine to me. Presumably once Peter's fuse
+driver is fleshed out, it can expose the exact same semantic interface
+to drivers.
 
- drivers/watchdog/moxart_wdt.c | 19 +++++++------------
- 1 file changed, 7 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/watchdog/moxart_wdt.c b/drivers/watchdog/moxart_wdt.c
-index 4aa3a8a..9698c83 100644
---- a/drivers/watchdog/moxart_wdt.c
-+++ b/drivers/watchdog/moxart_wdt.c
-@@ -19,8 +19,6 @@
- #include <linux/watchdog.h>
- #include <linux/moduleparam.h>
- 
--#include <asm/system_misc.h>
--
- #define REG_COUNT			0x4
- #define REG_MODE			0x8
- #define REG_ENABLE			0xC
-@@ -31,15 +29,15 @@ struct moxart_wdt_dev {
- 	unsigned int clock_frequency;
- };
- 
--static struct moxart_wdt_dev *moxart_restart_ctx;
--
- static int heartbeat;
- 
--static void moxart_wdt_restart(enum reboot_mode reboot_mode, const char *cmd)
-+static void moxart_wdt_reboot(struct watchdog_device *wdt_dev)
- {
--	writel(1, moxart_restart_ctx->base + REG_COUNT);
--	writel(0x5ab9, moxart_restart_ctx->base + REG_MODE);
--	writel(0x03, moxart_restart_ctx->base + REG_ENABLE);
-+	struct moxart_wdt_dev *moxart_wdt = watchdog_get_drvdata(wdt_dev);
-+
-+	writel(1, moxart_wdt->base + REG_COUNT);
-+	writel(0x5ab9, moxart_wdt->base + REG_MODE);
-+	writel(0x03, moxart_wdt->base + REG_ENABLE);
- }
- 
- static int moxart_wdt_stop(struct watchdog_device *wdt_dev)
-@@ -81,6 +79,7 @@ static const struct watchdog_ops moxart_wdt_ops = {
- 	.owner          = THIS_MODULE,
- 	.start          = moxart_wdt_start,
- 	.stop           = moxart_wdt_stop,
-+	.reboot		= moxart_wdt_reboot,
- 	.set_timeout    = moxart_wdt_set_timeout,
- };
- 
-@@ -136,9 +135,6 @@ static int moxart_wdt_probe(struct platform_device *pdev)
- 	if (err)
- 		return err;
- 
--	moxart_restart_ctx = moxart_wdt;
--	arm_pm_restart = moxart_wdt_restart;
--
- 	dev_dbg(dev, "Watchdog enabled (heartbeat=%d sec, nowayout=%d)\n",
- 		moxart_wdt->dev.timeout, nowayout);
- 
-@@ -149,7 +145,6 @@ static int moxart_wdt_remove(struct platform_device *pdev)
- {
- 	struct moxart_wdt_dev *moxart_wdt = platform_get_drvdata(pdev);
- 
--	arm_pm_restart = NULL;
- 	moxart_wdt_stop(&moxart_wdt->dev);
- 	watchdog_unregister_device(&moxart_wdt->dev);
- 
--- 
-1.9.1
+I suppose one could argue that we should create/use an explicit fuse
+subsystem with a standard API that drivers can call into, rather than a
+custom API. We can get the appropriate handle to use for that API from a
+phandle (plus fuse IDs?) in a DT property (in the XHCI device node,
+pointing at the fuse device node) much like any other cross-device
+resource reference. I'm not too bothered whether the code actually does
+that in the first instance, although we should make sure we add that DT
+property (containing all required fuse ID information) so that the code
+/can/ work that way if we want it to in the future.
