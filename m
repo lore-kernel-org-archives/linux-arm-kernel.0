@@ -1,130 +1,83 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 15 May 2014 07:33:13 -0500
-Subject: [PATCH 03/17] phy: ti-pipe3: add external clock support for PCIe
- PHY
-In-Reply-To: <5374B09F.2080803@ti.com>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>	<1399383244-14556-4-git-send-email-kishon@ti.com>	<53736CBC.2060702@ti.com>	<5373897C.6080504@ti.com>	<CAGo_u6qw1OomEw_ueb3x+xT+qZLAfGv7Se1K=o725aOoD3ankQ@mail.gmail.com>	<5374859F.5080902@ti.com>	<53748819.8060705@ti.com>	<CAGo_u6qbbdAbdvrB3AFXSH1qD5MaBkJbi6oJJvvTWW4xfbmd_Q@mail.gmail.com>	<5374AC0A.7070709@ti.com>
- <CAGo_u6r8XtGHOvsfJKQMZ2ghFRz8x8_UhzyKE9jnwO6mJ2HYpQ@mail.gmail.com>
- <5374B09F.2080803@ti.com>
-Message-ID: <5374B409.3000607@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 15 May 2014 07:37:05 -0500
+Subject: [PATCH v3 4/6] arm: add basic support for Mediatek MT6589 boards
+In-Reply-To: <20140514070038.GG29258@lukather>
+References: <1399938570-11356-1-git-send-email-matthias.bgg@gmail.com>
+ <1399938570-11356-5-git-send-email-matthias.bgg@gmail.com>
+ <20140513224732.GJ20486@codeaurora.org>
+ <20140514070038.GG29258@lukather>
+Message-ID: <CAL_JsqJdSPtU83xgL-aH4E_-ieFJde5aiVA7vb30Z_ir9CkXEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2014 07:18 AM, Kishon Vijay Abraham I wrote:
-> Hi,
-> 
-> On Thursday 15 May 2014 05:42 PM, Nishanth Menon wrote:
->> On Thu, May 15, 2014 at 6:59 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>> Hi Nishant,
->>>
->>> On Thursday 15 May 2014 05:16 PM, Nishanth Menon wrote:
->>>> On Thu, May 15, 2014 at 4:25 AM, Roger Quadros <rogerq@ti.com> wrote:
->>>>> On 05/15/2014 12:15 PM, Kishon Vijay Abraham I wrote:
->>>>>> Hi Nishanth,
->>>>>>
->>>>>> On Wednesday 14 May 2014 09:04 PM, Nishanth Menon wrote:
->>>>>>> On Wed, May 14, 2014 at 10:19 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>>>>>>> Hi Roger,
->>>>>>>>
->>>>>>>> On Wednesday 14 May 2014 06:46 PM, Roger Quadros wrote:
->>>>>>>>> Hi Kishon,
->>>>>>>>>
->>>>>>>>> On 05/06/2014 04:33 PM, Kishon Vijay Abraham I wrote:
->>>>>>>>>> APLL used by PCIE phy can either use external clock as input or the clock
->>>>>>>>>> from DPLL. Added support for the APLL to use external clock as input here.
->>>>>>>>>>
->>>>>>>>>> Cc: Rajendra Nayak <rnayak@ti.com>
->>>>>>>>>> Cc: Tero Kristo <t-kristo@ti.com>
->>>>>>>>>> Cc: Paul Walmsley <paul@pwsan.com>
->>>>>>>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>>>>>>>> ---
->>>>>>>>>>  Documentation/devicetree/bindings/phy/ti-phy.txt |    4 ++
->>>>>>>>>>  drivers/phy/phy-ti-pipe3.c                       |   75 ++++++++++++++--------
->>>>>>>>>>  2 files changed, 52 insertions(+), 27 deletions(-)
->>>>>>>>>>
->>>>>>>>>> diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
->>>>>>>>>> index bc9afb5..d50f8ee 100644
->>>>>>>>>> --- a/Documentation/devicetree/bindings/phy/ti-phy.txt
->>>>>>>>>> +++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
->>>>>>>>>> @@ -76,6 +76,10 @@ Required properties:
->>>>>>>>>>     * "dpll_ref_m2" - external dpll ref clk
->>>>>>>>>>     * "phy-div" - divider for apll
->>>>>>>>>>     * "div-clk" - apll clock
->>>>>>>>>> +   * "apll_mux" - mux for pcie apll
->>>>>>>>>> +   * "refclk_ext" - external reference clock for pcie apll
->>>>>>>>>> + - ti,ext-clk: To specifiy if PCIE apll should use external clock. Applicable
->>>>>>>>>> +   only to PCIE PHY.
->>>>>>>>>
->>>>>>>>> Instead of specifying both clock sources "dpll_ref_clock", "refclk_ext" and then specifying a 3rd control option "ti,ext-clk" to select one of the 2 sources, why can't the DT just supply one clock source, i.e. the one that is being used in the board instance? The driver should then just configure the clock rate that is needed at that node. Shouldn't the clock framework automatically take care of muxing and parent rates?
->>>>>>>>
->>>>>>>> Want the dt to have all the clocks used by the controller. "ti,ext-clk" should
->>>>>>>> go in the board dt file (suggested by Nishanth).
->>>>>>>> The point is at some point later if some one wants to change the clock source,
->>>>>>>> it should be a simple enabling "ti,ext-clk" flag instead of finding the clock
->>>>>>>> phandle etc..
->>>>>>>
->>>>>>> Wonder if that is implicit by the presence of  "refclk_ext" in the
->>>>>>> clocks provided?
->>>>>>
->>>>>> IMO the presence of "refclk_ext" is useless unless the board indicates it
->>>>>> provides the clock source.
->>>>>>
->>>>>> refclk_ext holds phandle for *fixed-clock*, so irrespective of whether the
->>>>>> board provides a clock or not, it can have that handle for configuring in PRCM.
->>>>>> However if the board does not provide the clock source, configuring refclk_ext
->>>>>> in PRCM is useless.
->>>>>
->>>>> I think what Nishant meant is that if "refclk_ext" is provided it means that the driver
->>>>> should use that over "dpll_ref_clock" so no need of a separate "ti,ext-clk" flag.
->>>>
->>>> yes, thank you for clarifying - it does indeed redundant to have
->>>> "ti,ext-clk". and apologies on being a little obscure in the comment.
->>>
->>> Irrespective of whether external reference clock is used or not, all DRA7
->>> (apll) has an input for external reference clock (and also a PRCM register for
->>> programming it) and it has to be specified in dt no?
+On Wed, May 14, 2014 at 2:00 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Stephen,
+>
+> On Tue, May 13, 2014 at 03:47:32PM -0700, Stephen Boyd wrote:
+>> On 05/13, Matthias Brugger wrote:
+>> > diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+>> > new file mode 100644
+>> > index 0000000..73dfb05
+>> > --- /dev/null
+>> > +++ b/arch/arm/mach-mediatek/mediatek.c
+>> > @@ -0,0 +1,32 @@
+>> > +/*
+>> > + * Device Tree support for Mediatek SoCs
+>> > + *
+>> > + * Copyright (c) 2014 MundoReader S.L.
+>> > + * Author: Matthias Brugger <matthias.bgg@gmail.com>
+>> > + *
+>> > + * This program is free software; you can redistribute it and/or modify
+>> > + * it under the terms of the GNU General Public License as published by
+>> > + * the Free Software Foundation; either version 2 of the License, or
+>> > + * (at your option) any later version.
+>> > + *
+>> > + * This program is distributed in the hope that it will be useful,
+>> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> > + * GNU General Public License for more details.
+>> > + */
+>> > +
+>> > +#include <linux/kernel.h>
+>> > +#include <linux/init.h>
+>> > +#include <linux/of_platform.h>
+>> > +#include <linux/irqchip.h>
+>> > +#include <asm/mach/arch.h>
+>> > +#include <asm/mach/map.h>
+>> > +
+>> > +static const char * const mediatek_board_dt_compat[] = {
 >>
->> Why is that a binding for ti-phy? that is a problem for the APLL clock
->> driver (selecting it's own source). PHY properties should describe
->> itself -> let the bindings of the APLL describe itself. please dont
->> mix the two up.
-> 
-> The apll clock node is like this
-> 
-> apll_pcie_in_clk_mux: apll_pcie_in_clk_mux at 4ae06118 {
->         compatible = "mux-clock";
->         clocks = <&dpll_pcie_ref_m2ldo_ck>, <&pciesref_acs_clk_ck>;
->         #clock-cells = <0>;
->         reg = <0x4a00821c 0x4>;
->         bit-mask = <0x80>;
-> };
-> 
-> The external reference clock is denoted by *pciesref_acs_clk_ck*.
-> 
-> refclk_ext holds the phandle to *pciesref_acs_clk_ck* and is used in
-> "clk_set_parent" to set the parent of apll mux.
+>> __initconst?
+>>
+>> > +   "mediatek,mt6589",
+>> > +   NULL,
+>> > +};
+>> > +
+>> > +DT_MACHINE_START(MEDIATEK_DT, "Mediatek Cortex-A7 (Device Tree)")
+>> > +   .dt_compat      = mediatek_board_dt_compat,
+>> > +MACHINE_END
+>>
+>> You shouldn't need this file at all if the platform is part of
+>> the multi-platform kernel.
+>
+> From a technical point of view, you don't. But it's interesting to
+> keep it mostly for two things:
+>   - You get to see the platform name in /proc/cpuinfo
 
-So, How about this: if refclk_ext is not defined, dont do setparent,
-if it is defined, do setparent.
-in short:
-Optional Properties:
-* "refclk_ext" - external reference clock for pcie apll - if defined,
-used as the parent to "apll_mux"
+We should be getting this string from model or top-level compatible
+string in the dtb. I did a patch to do just this [1], but people did
+not like removing this string. We should really decide if getting rid
+of machine descriptors is a goal or not.
 
-That said, my problem in general with this approach(which many folks
-have taken of describing parent of clock X in hardware block binding
-for Y) is the following:
+We should at least make things such that the cpuinfo string does not
+change on new platforms based on whether they have a machine desc or
+not.
 
-The binding now has dependency on clock tree hierarchy. What if
-towmorrow, we have a tree where refclk_ext parent of muxZ parent of
-apll_mux? the binding breaks down. Lets not forget that we consider DT
-as an ABI - we dont want to change the binding in the future.
+>   - If you ever need to add platform quirks, it's already there
 
-I had always preferred describing parent-child relationship of clocks
-by the approach Tero posted: https://patchwork.kernel.org/patch/3871551/
+That is a weak argument when usually we add things as they are needed.
 
-Maybe Mike and Tero could help here?
+Rob
 
--- 
-Regards,
-Nishanth Menon
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/208878.html
