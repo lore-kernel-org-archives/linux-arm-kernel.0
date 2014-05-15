@@ -1,87 +1,30 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 16 May 2014 00:13:43 +0200
-Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
-In-Reply-To: <CAD=FV=V8UZoeOqEwfx_E015pLM+amTt51LrUa+dk7mTdn=vKgA@mail.gmail.com>
-References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>	<53752E25.9060604@gmail.com>	<CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>	<53753443.8010303@gmail.com>
- <CAD=FV=V8UZoeOqEwfx_E015pLM+amTt51LrUa+dk7mTdn=vKgA@mail.gmail.com>
-Message-ID: <53753C17.1090002@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 16 May 2014 00:17:34 +0200
+Subject: [PATCH RFC 03/11] sound: ASoC: kirkwood: Remove ARCH_KIRKWOOD
+ dependency
+In-Reply-To: <5375392A.60905@baker-net.org.uk>
+References: <1400163836-9831-1-git-send-email-andrew@lunn.ch>
+ <1400163836-9831-7-git-send-email-andrew@lunn.ch>
+ <5375392A.60905@baker-net.org.uk>
+Message-ID: <20140515221734.GE10407@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.05.2014 23:54, Doug Anderson wrote:
-> Tomasz,
+On Thu, May 15, 2014 at 11:01:14PM +0100, Adam Baker wrote:
+> On 15/05/14 15:23, Andrew Lunn wrote:
+> >mach-kirkwood has been removed, now that kirkwood lives in mach-mvebu.
 > 
-> 
-> 
-> On Thu, May 15, 2014 at 2:40 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> On 15.05.2014 23:33, Doug Anderson wrote:
->>> Tomasz,
->>>
->>> On Thu, May 15, 2014 at 2:14 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->>>> Hi Chirantan,
->>>>
->>>> On 15.05.2014 23:07, Chirantan Ekbote wrote:
->>>>> The multi core timer and the ARM architected timer are two different
->>>>> interfaces to the same underlying hardware timer.  This causes some
->>>>> strange timing issues when they are both enabled at the same time so
->>>>> remove the mct from the device tree and keep only the architected
->>>>> timer.
->>>>
->>>> Huh? I've always thought MCT is a completely separate hardware block
->>>> outside of ARM cores, while architected timers are embedded inside the
->>>> CPU block in which the ARM cores reside. Could you elaborate on this?
->>>
->>> Yup.  Our thoughts exactly.
->>>
->>> ...but it appears not to be the case.  Chirantan demonstrated this in
->>> U-Boot just to prove that it's not some strange kernel interaction in
->>> <https://chromium-review.googlesource.com/200035>.  I took his patch
->>> and tweaked it a little more myself in
->>> <https://chromium-review.googlesource.com/200098>.
->>>
->>> Specifically:
->>> * If you stop the MCT, the arch timer stops
->>> * If you reset the MCT, the arch timer resets
->>> * If you start the MCT again, the arch timer starts again
->>> * If you read the MCT and the arch timer, they give the same value.
->>>
->>>
->>> This is apparently the answer to my question at
->>> <http://www.spinics.net/lists/linux-samsung-soc/msg29085.html>.
->>> Specifically Chirantan found that the big jump in time happened when
->>> MCT reset to 0.  That made the arch timer code think that there was a
->>> wraparound and jump forward in time a lot.
->>>
->>>
->>> Please confirm if you have a system that has MCT and arch timer in front of you.
->>
->> Wow, this is so strange that I just can't believe it, but if you proved
->> it using such detailed test then I don't have any reasons to object anymore.
->>
->> One more thing, though, is whether the architected timer "interface" can
->> wake the system from lighter power states, such as AFTR or LPA. Could
->> you check this?
-> 
-> I've never used AFTR or LPA and so can't really comment on it.
-> Hopefully someone on the list can?
-> 
-> NOTE: if for some reason we need to keep the MCT around, we're
-> definitely going to need to account for the fact that tweaking it
-> affects the arch timer.  ...and having the arch timer is really nice
-> since:
+> Most of the descriptions in the series say remove mach-kirkwood and
+> most of the actual patches remove ARCH_KIRKWOOD and leave
+> MACH_KIRKWOOD untouched. Patch 01/11 hasn't turned up here so I'm
+> not certain which you meant but consistency would be good.
 
-[Let me reorder the points below to make it easier to comment:]
+01/11 is big, since it is an rm -fr arch/arm/mach-kirkwood. It is
+bigger than the list message size limit and so has been put to one
+side for the list moderator to approve.
 
-> * it's faster to access.
-> * it is accessible from userspace for really fast access.
+The comment is consistent with the code, the code is however somewhat
+confusing. arch/arm/mach-kirkwood uses ARCH_KIRKWOOD. kirkwood in its
+new home inside arch/arm/mach-mvebu uses MACH_KIRKWOOD.
 
-Do you have some data on whether it is a significant difference,
-especially considering real use cases?
-
-> * it implements the bits needed for udelay() to use it.
-
-Hmm, do you know what bits are those? On Exynos4 MCT is the only option
-and it would be nice to let udelay() use it.
-
-Best regards,
-Tomasz
+    Andrew
