@@ -1,28 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 15 May 2014 14:39:07 -0600
-Subject: [RFC PATCH 05/10] ARM: tegra: Export function to read USB
- calibration data
-In-Reply-To: <1400113986-339-6-git-send-email-abrestic@chromium.org>
-References: <1400113986-339-1-git-send-email-abrestic@chromium.org>
- <1400113986-339-6-git-send-email-abrestic@chromium.org>
-Message-ID: <537525EB.9090704@wwwdotorg.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 15 May 2014 22:36:12 +0200
+Subject: [PATCH v3 1/4] ARM: Kirkwood: Add board file for netxbig LEDs
+In-Reply-To: <9089389.h3psAgEGtm@wuerfel>
+References: <1400163836-9831-1-git-send-email-andrew@lunn.ch>
+ <1400163836-9831-2-git-send-email-andrew@lunn.ch>
+ <9089389.h3psAgEGtm@wuerfel>
+Message-ID: <20140515203612.GC10407@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2014 06:33 PM, Andrew Bresticker wrote:
-> Board-specific USB configuration data is stored in FUSE_SKU_CALIB_0.
-> Export a function to read it so the PHY can be properly configured.
+On Thu, May 15, 2014 at 04:38:43PM +0200, Arnd Bergmann wrote:
+> On Thursday 15 May 2014 16:23:42 Andrew Lunn wrote:
+> > diff --git a/arch/arm/mach-mvebu/board-netxbig.c b/arch/arm/mach-mvebu/board-netxbig.c
+> > new file mode 100644
+> > index 000000000000..e6f2f547b1c7
+> > --- /dev/null
+> > +++ b/arch/arm/mach-mvebu/board-netxbig.c
+> > 
+> 
+> I'd rather see these tables as part of the netxbig led driver in a
+> separate file, but if we keep it here, can you rename the file to
+> kirkwood-netxbig-led.c? We are not really doing board files any
+> more, and this isn't one.
 
-This patch seems conceptually fine to me. Presumably once Peter's fuse
-driver is fleshed out, it can expose the exact same semantic interface
-to drivers.
+I will rename it. Simon has said he hopes to test on real hardware
+soon, so once i have the results i will respin the patch set.
 
-I suppose one could argue that we should create/use an explicit fuse
-subsystem with a standard API that drivers can call into, rather than a
-custom API. We can get the appropriate handle to use for that API from a
-phandle (plus fuse IDs?) in a DT property (in the XHCI device node,
-pointing at the fuse device node) much like any other cross-device
-resource reference. I'm not too bothered whether the code actually does
-that in the first instance, although we should make sure we add that DT
-property (containing all required fuse ID information) so that the code
-/can/ work that way if we want it to in the future.
+Adding a DT binding to the LED driver is probably a task for next
+cycle.
+
+	Andrew
