@@ -1,54 +1,39 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 15 May 2014 15:50:08 +0200
-Subject: [PATCHv3 3/3] ARM: mvebu: implement L2/PCIe deadlock workaround
-In-Reply-To: <20140515132118.GK27822@titan.lakedaemon.net>
+Date: Thu, 15 May 2014 15:51:30 +0200
+Subject: [PATCHv3 1/3] ARM: mm: allow sub-architectures to override PCI
+ I/O memory type
+In-Reply-To: <8288032.jL4bOz6qPT@wuerfel>
 References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1400145519-28530-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140515132118.GK27822@titan.lakedaemon.net>
-Message-ID: <20140515155008.1dcca042@free-electrons.com>
+ <1400145519-28530-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <8288032.jL4bOz6qPT@wuerfel>
+Message-ID: <20140515155130.193c3181@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+Dear Arnd Bergmann,
 
-On Thu, 15 May 2014 09:21:18 -0400, Jason Cooper wrote:
-
-> > +
-> > +	if (of_machine_is_compatible("marvell,armada375") ||
-> > +	    of_machine_is_compatible("marvell,armada38x")) {
-> > +		arch_ioremap_caller = armada_pcie_wa_ioremap_caller;
-> > +		pci_ioremap_set_mem_type(MT_UNCACHED);
+On Thu, 15 May 2014 15:21:25 +0200, Arnd Bergmann wrote:
+> On Thursday 15 May 2014 11:18:37 Thomas Petazzoni wrote:
+> > @@ -445,7 +452,7 @@ int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
+> >         return ioremap_page_range(PCI_IO_VIRT_BASE + offset,
+> >                                   PCI_IO_VIRT_BASE + offset + SZ_64K,
+> >                                   phys_addr,
+> > -                                 __pgprot(get_mem_type(MT_DEVICE)->prot_pte));
+> > +                                 __pgprot(get_mem_type(pci_ioremap_mem_type)->prot_pte));
+> >  }
+> >  EXPORT_SYMBOL_GPL(pci_ioremap_io);
+> > 
 > 
-> iiuc, this patch depends on 1/3.  So how would you like to handle it?
+> As discussed on IRC, I think we'd be better off making this a strong-ordered
+> mapping for all platforms unconditionally. The PCI I/O space semantics
+> require non-posted writes, which is the main difference between device
+> and SO mappings, so the same fix is required both for mvebu as a workaround
+> for the deadlock as well as for everyone else as a fix for an incorrect
+> PCI behavior.
 
-Seems like my long cover letters are not always read in their
-entirety :-)
+Ok, I'll take that into account when posting a v4.
 
->From my cover letter:
-
- * PATCH 3/3 uses both of the added infrastructures, as well as the
-   existing infrastructure to customize the behavior of ioremap() on a
-   per-platform basis, to implement the workaround for the Armada 375
-   and 38x SOCs. This patch should go through the mvebu maintainers
-   tree. However, it has a build dependency on PATCH 1/3 that needs to
-   be taken into account.
-
-The last two sentences are the most important ones here :-)
-
-Joke aside, I'm really open to your suggestions as to what the
-appropriate merging patch is. I know Russell prefers to have the ARM
-core code flow through his tree, which obviously make sense.
-
-However, routing PATCH 3/3 through Russell tree is going to be a mess
-of conflicts when things will get merged by Linus, due to the numerous
-other changes we've been doing in mach-mvebu/board-v7.c.
-
-So the only course of action I see right now is to work with Russell to
-have him pull patches 1 and 2, and then provide a stable branch/tag
-that you can merge as a dependency in whatever branch you decide to
-merge patch 3/3. Would that work?
-
-Thanks a lot!
+Thanks for the reminder,
 
 Thomas
 -- 
