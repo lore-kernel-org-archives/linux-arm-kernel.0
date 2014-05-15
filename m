@@ -1,60 +1,77 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 15 May 2014 13:30:11 +0200
-Subject: [PATCH] ARM: msm: rename two Kconfig macros
-Message-ID: <1400153411.9119.7.camel@x220>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 15 May 2014 20:31:55 +0900
+Subject: [PATCH v6 00/17] ARM: shmobile: r8a7779, marzen: CCF and multiplatform
+Message-ID: <1400153532-23675-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 650e3f0d66ad ("ARM: msm: Consolidate and move DEBUG_LL to
-DEBUG_LL choice") appears to have renamed
-    MSM_DEBUG_UART1
-    MSM_DEBUG_UART2
-    MSM_DEBUG_UART3
+The aim of this series is to add common clock framework and in turn
+multiplatform support to the r8a7779 SoC and marzen-reference.  It
+subsequently removes non-multiplatform support from marzen-reference.
 
-to
-    DEBUG_MSM_UART1
-    DEBUG_MSM_UART2
-    DEBUG_MSM_UART3
+This is based on work for R-Car Gen2 by Laurent Pinchart and Magnus Damm.
 
-It missed a check for CONFIG_MSM_DEBUG_UART1 and a check for
-CONFIG_MSM_DEBUG_UART3 in the code. Rename these too.
 
-Fixes: 650e3f0d66ad ("ARM: msm: Consolidate and move DEBUG_LL to DEBUG_LL choice")
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Untested.
+This series is a minor update to v5 to take into account:
+* An Ack
+* Request for caching of the pin mode
+* Patches that have been queued up for v3.16
 
-These few lines were, well, broken since v3.3. Did no one notice?
+I intend to merge this series unless there are objections.
 
- arch/arm/mach-msm/board-trout-gpio.c | 2 +-
- arch/arm/mach-msm/board-trout.c      | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-msm/board-trout-gpio.c b/arch/arm/mach-msm/board-trout-gpio.c
-index 87e1d01edecc..a92efc83cdb7 100644
---- a/arch/arm/mach-msm/board-trout-gpio.c
-+++ b/arch/arm/mach-msm/board-trout-gpio.c
-@@ -94,7 +94,7 @@ static int trout_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
- 	}
- 
- static struct msm_gpio_chip msm_gpio_banks[] = {
--#if defined(CONFIG_MSM_DEBUG_UART1)
-+#if defined(CONFIG_DEBUG_MSM_UART1)
- 	/* H2W pins <-> UART1 */
- 	TROUT_GPIO_BANK("MISC2", 0x00,   TROUT_GPIO_MISC2_BASE, 0x40),
- #else
-diff --git a/arch/arm/mach-msm/board-trout.c b/arch/arm/mach-msm/board-trout.c
-index 015d544aa017..27121b391275 100644
---- a/arch/arm/mach-msm/board-trout.c
-+++ b/arch/arm/mach-msm/board-trout.c
-@@ -90,7 +90,7 @@ static void __init trout_map_io(void)
- 	msm_map_common_io();
- 	iotable_init(trout_io_desc, ARRAY_SIZE(trout_io_desc));
- 
--#ifdef CONFIG_MSM_DEBUG_UART3
-+#ifdef CONFIG_DEBUG_MSM_UART3
- 	/* route UART3 to the "H2W" extended usb connector */
- 	writeb(0x80, TROUT_CPLD_BASE + 0x00);
- #endif
+Applied on top of a merge of:
+* The renesas-devel-v3.15-rc1-20140515 tag of my renesas tree.
+* The clk-next branch of Mike Turquettes's tree
+  This is to provide the following which were previously part of this series:
+  - clk: shmobile: r8a7779: Add MSTP clock support
+  - clk: shmobile: r8a7779: Add clocks support
+
+
+Caveats:
+
+* SMSC_PHY is known not to work with marzen though the reason for
+  this is not known. As this is selected in the shmobile_defconfig
+  it should be manually disabled before compiling that configuration
+  for use on Marzen.
+
+Simon Horman (17):
+  ARM: shmobile: r8a7779: Add clock index macros for DT sources
+  ARM: shmobile: r8a7779: Add clocks
+  ARM: shmobile: Sync Marzen DTS with Marzen reference DTS
+  ARM: shmobile: marzen: Specify external clock frequency in DT
+  ARM: shmobile: r8a7779: Reference clocks
+  ARM: shmobile: r8a7779: Add helper to read mode pins
+  ARM: shmobile: r8a7779: Move r8a7779_earlytimer_init to
+    clock-r8a7779.c
+  ARM: shmobile: marzen-reference: Move clock and OF device
+    initialisation into board code
+  ARM: shmobile: r8a7779: Do not include sh_clk.h in r8a7779.h
+  ARM: shmobile: r8a7779: Initial multiplatform support
+  ARM: shmobile: marzen-reference: Initialize CPG device
+  ARM: shmobile: marzen-reference: Instantiate clkdevs for SCIF and TMU
+  ARM: shmobile: marzen: Add to shmobile defconfig
+  ARM: shmobile: Remove non-multiplatform Marzen reference support
+  ARM: shmobile: Let Marzen multiplatform boot with Marzen DTB
+  ARM: shmobile: Remove Marzen reference DTS
+  ARM: shmobile: marzen-reference: Remove legacy clock support
+
+ arch/arm/boot/dts/Makefile                      |   4 +-
+ arch/arm/boot/dts/r8a7779-marzen-reference.dts  | 121 ------------------
+ arch/arm/boot/dts/r8a7779-marzen.dts            |  98 +++++++++++++++
+ arch/arm/boot/dts/r8a7779.dtsi                  | 156 ++++++++++++++++++++++++
+ arch/arm/configs/shmobile_defconfig             |   2 +
+ arch/arm/mach-shmobile/Kconfig                  |  23 ++--
+ arch/arm/mach-shmobile/Makefile                 |   2 +-
+ arch/arm/mach-shmobile/Makefile.boot            |   1 -
+ arch/arm/mach-shmobile/board-marzen-reference.c |  28 +++++
+ arch/arm/mach-shmobile/clock-r8a7779.c          |  22 ++--
+ arch/arm/mach-shmobile/include/mach/r8a7779.h   |   2 +-
+ arch/arm/mach-shmobile/setup-r8a7779.c          |  32 ++---
+ include/dt-bindings/clock/r8a7779-clock.h       |  64 ++++++++++
+ 13 files changed, 393 insertions(+), 162 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/r8a7779-marzen-reference.dts
+ create mode 100644 include/dt-bindings/clock/r8a7779-clock.h
+
 -- 
-1.9.0
+1.8.5.2
