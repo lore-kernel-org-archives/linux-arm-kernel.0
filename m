@@ -1,70 +1,38 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 15 May 2014 11:31:54 -0700
-Subject: [PATCH v3 RESEND 2/5] ARM: add SMP support for Broadcom mobile
- SoCs
-In-Reply-To: <20140515182620.GN32082@beef>
-References: <1400176691-26058-1-git-send-email-elder@linaro.org>
- <1400176691-26058-3-git-send-email-elder@linaro.org>
- <CAGVrzca20+3kmJjyGv8Pr-qNNV4n0hhADL6GWvcYVDUL4q28Hg@mail.gmail.com>
- <20140515182620.GN32082@beef>
-Message-ID: <CAGVrzcafQkOxOBLX_5AJDeX1yERndu60ogZJgeA407e20N9oMg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 15 May 2014 11:32:48 -0700
+Subject: RCU stall on panda
+In-Reply-To: <5374C07C.1070400@linaro.org>
+References: <53675C5F.10509@linaro.org>
+ <20140505180617.GM8754@linux.vnet.ibm.com>
+ <20140512212102.GF5668@atomide.com> <5371BD69.8010600@linaro.org>
+ <20140513153220.GC16837@atomide.com> <53747E6D.60500@linaro.org>
+ <53748371.5030704@linaro.org> <5374C07C.1070400@linaro.org>
+Message-ID: <20140515183247.GF23659@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-05-15 11:26 GMT-07:00 Matt Porter <mporter@linaro.org>:
-> On Thu, May 15, 2014 at 11:03:49AM -0700, Florian Fainelli wrote:
->> Hi Alex,
->>
->> 2014-05-15 10:58 GMT-07:00 Alex Elder <elder@linaro.org>:
->> > This patch adds SMP support for BCM281XX and BCM21664 family SoCs.
->> >
->> > This feature is controlled with a distinct config option such that a
->> > SMP-enabled multi-v7 binary can be configured to run these SoCs in
->> > uniprocessor mode.  Since this SMP functionality is used for
->> > multiple Broadcom mobile chip families the config option is called
->> > ARCH_BCM_MOBILE_SMP (for lack of a better name).
->> >
->> > On SoCs of this type, the secondary core is not held in reset on
->> > power-on.  Instead it loops in a ROM-based holding pen.  To release
->> > it, one must write into a special register a jump address whose
->> > low-order bits have been replaced with a secondary core's id, then
->> > trigger an event with SEV.  On receipt of an event, the ROM code
->> > will examine the register's contents, and if the low-order bits
->> > match its cpu id, it will clear them and write the value back to the
->> > register just prior to jumping to the address specified.
->> >
->> > The location of the special register is defined in the device tree
->> > using a "secondary-boot-reg" property in a node whose "enable-method"
->> > matches.
->> >
->> > Derived from code originally provided by Ray Jui <rjui@broadcom.com>
->> >
->> > Signed-off-by: Alex Elder <elder@linaro.org>
->> > ---
->> >  arch/arm/mach-bcm/Kconfig   |  18 +++-
->> >  arch/arm/mach-bcm/Makefile  |   3 +
->> >  arch/arm/mach-bcm/platsmp.c | 201 ++++++++++++++++++++++++++++++++++++++++++++
->>
->> Could we make that name a little bit more specific to the mobile SoCs?
->> There are other BCM SoCs either currently supported in this directory
->> (BCM5310X), or making their way to be supported (brcmstb, bcm63xx),
->> and those share nothing with the Mobile SoC SMP code.
->
-> Right.
->
->> Maybe we should create another level directory within mach-bcm...
->
-> Let's not go that far. The general direction we need to go is to work
-> toward removing this code from mach-bcm/ completely. I don't really want
-> to see us adding directories and encouraging burying a lot of new files
-> in them.
+* Alex Shi <alex.shi@linaro.org> [140515 06:27]:
+> On 05/15/2014 05:05 PM, Daniel Lezcano wrote:
+> >>>
+> >>
+> >> After enable this patch, system maybe hang in idle. :(
+> > 
+> > Hi Alex,
+> > 
+> > do you mean even with this revert applied, the board hangs in idle ?
+> > 
+> 
+> yes.
+> My board is panda ES. without this revert, it works.
 
-Ok, makes sense.
+Care to specify what linux version you are testing against?
 
->
-> A unique name will be enough and then we can work toward moving things
-> out to drivers/ over time.
+Does it hang in idle always immediately on booting?
 
-Sounds good, thanks!
--- 
-Florian
+Or does the serial console first hang with sysrq still
+working (ctrl-a h in minicom for help) with device
+eventually locking up hard?
+
+Regards,
+
+Tony
