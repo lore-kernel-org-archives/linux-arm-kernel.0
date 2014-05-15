@@ -1,78 +1,52 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 15 May 2014 06:46:19 -0500
-Subject: [PATCH 03/17] phy: ti-pipe3: add external clock support for PCIe
- PHY
-In-Reply-To: <53748819.8060705@ti.com>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>
- <1399383244-14556-4-git-send-email-kishon@ti.com>
- <53736CBC.2060702@ti.com> <5373897C.6080504@ti.com>
- <CAGo_u6qw1OomEw_ueb3x+xT+qZLAfGv7Se1K=o725aOoD3ankQ@mail.gmail.com>
- <5374859F.5080902@ti.com> <53748819.8060705@ti.com>
-Message-ID: <CAGo_u6qbbdAbdvrB3AFXSH1qD5MaBkJbi6oJJvvTWW4xfbmd_Q@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 15 May 2014 13:57:58 +0200
+Subject: [PATCH v6 13/17] ARM: shmobile: marzen: Add to shmobile defconfig
+In-Reply-To: <1400153532-23675-14-git-send-email-horms+renesas@verge.net.au>
+References: <1400153532-23675-1-git-send-email-horms+renesas@verge.net.au>
+ <1400153532-23675-14-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXPm_=ejkcnOFOgfnsz9MUc8KpAjkuMcHMKJeaEmVbhQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 4:25 AM, Roger Quadros <rogerq@ti.com> wrote:
-> On 05/15/2014 12:15 PM, Kishon Vijay Abraham I wrote:
->> Hi Nishanth,
->>
->> On Wednesday 14 May 2014 09:04 PM, Nishanth Menon wrote:
->>> On Wed, May 14, 2014 at 10:19 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>>> Hi Roger,
->>>>
->>>> On Wednesday 14 May 2014 06:46 PM, Roger Quadros wrote:
->>>>> Hi Kishon,
->>>>>
->>>>> On 05/06/2014 04:33 PM, Kishon Vijay Abraham I wrote:
->>>>>> APLL used by PCIE phy can either use external clock as input or the clock
->>>>>> from DPLL. Added support for the APLL to use external clock as input here.
->>>>>>
->>>>>> Cc: Rajendra Nayak <rnayak@ti.com>
->>>>>> Cc: Tero Kristo <t-kristo@ti.com>
->>>>>> Cc: Paul Walmsley <paul@pwsan.com>
->>>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>>>> ---
->>>>>>  Documentation/devicetree/bindings/phy/ti-phy.txt |    4 ++
->>>>>>  drivers/phy/phy-ti-pipe3.c                       |   75 ++++++++++++++--------
->>>>>>  2 files changed, 52 insertions(+), 27 deletions(-)
->>>>>>
->>>>>> diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
->>>>>> index bc9afb5..d50f8ee 100644
->>>>>> --- a/Documentation/devicetree/bindings/phy/ti-phy.txt
->>>>>> +++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
->>>>>> @@ -76,6 +76,10 @@ Required properties:
->>>>>>     * "dpll_ref_m2" - external dpll ref clk
->>>>>>     * "phy-div" - divider for apll
->>>>>>     * "div-clk" - apll clock
->>>>>> +   * "apll_mux" - mux for pcie apll
->>>>>> +   * "refclk_ext" - external reference clock for pcie apll
->>>>>> + - ti,ext-clk: To specifiy if PCIE apll should use external clock. Applicable
->>>>>> +   only to PCIE PHY.
->>>>>
->>>>> Instead of specifying both clock sources "dpll_ref_clock", "refclk_ext" and then specifying a 3rd control option "ti,ext-clk" to select one of the 2 sources, why can't the DT just supply one clock source, i.e. the one that is being used in the board instance? The driver should then just configure the clock rate that is needed at that node. Shouldn't the clock framework automatically take care of muxing and parent rates?
->>>>
->>>> Want the dt to have all the clocks used by the controller. "ti,ext-clk" should
->>>> go in the board dt file (suggested by Nishanth).
->>>> The point is at some point later if some one wants to change the clock source,
->>>> it should be a simple enabling "ti,ext-clk" flag instead of finding the clock
->>>> phandle etc..
->>>
->>> Wonder if that is implicit by the presence of  "refclk_ext" in the
->>> clocks provided?
->>
->> IMO the presence of "refclk_ext" is useless unless the board indicates it
->> provides the clock source.
->>
->> refclk_ext holds phandle for *fixed-clock*, so irrespective of whether the
->> board provides a clock or not, it can have that handle for configuring in PRCM.
->> However if the board does not provide the clock source, configuring refclk_ext
->> in PRCM is useless.
->
-> I think what Nishant meant is that if "refclk_ext" is provided it means that the driver
-> should use that over "dpll_ref_clock" so no need of a separate "ti,ext-clk" flag.
+Hi Simon,
 
-yes, thank you for clarifying - it does indeed redundant to have
-"ti,ext-clk". and apologies on being a little obscure in the comment.
+On Thu, May 15, 2014 at 1:32 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+> index 6d6437c..ea7673a 100644
+> --- a/arch/arm/configs/shmobile_defconfig
+> +++ b/arch/arm/configs/shmobile_defconfig
+> @@ -9,11 +9,13 @@ CONFIG_EMBEDDED=y
+>  CONFIG_PERF_EVENTS=y
+>  CONFIG_SLAB=y
+>  CONFIG_ARCH_SHMOBILE_MULTI=y
+> +CONFIG_ARCH_R8A7779=y
+>  CONFIG_ARCH_EMEV2=y
+>  CONFIG_ARCH_R8A7790=y
+>  CONFIG_ARCH_R8A7791=y
+>  CONFIG_MACH_KOELSCH=y
+>  CONFIG_MACH_LAGER=y
+> +CONFIG_MACH_MARZEN=y
+>  # CONFIG_SWP_EMULATE is not set
+>  CONFIG_CPU_BPREDICT_DISABLE=y
+>  CONFIG_PL310_ERRATA_588369=y
 
-Regards,
-Nishanth Menon
+I think you also need:
+    CONFIG_SPI_SH_HSPI=y
+    CONFIG_USB_RCAR_PHY=y
+    CONFIG_PM_RUNTIME=y
+
+(the last one is set in all shmobile defconfigs, except ape6evm and shmobile).
+
+The other differences seem to be cruft not really related to hardware support.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
