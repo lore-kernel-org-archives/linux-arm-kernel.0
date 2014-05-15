@@ -1,128 +1,178 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 15 May 2014 11:45:16 +0530
-Subject: [PATCH v3 1/6] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <20140514102122.GA11140@kwain>
-References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
- <1400060942-10588-2-git-send-email-antoine.tenart@free-electrons.com>
- <537341AF.5030105@ti.com> <20140514102122.GA11140@kwain>
-Message-ID: <53745B74.2040808@ti.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Thu, 15 May 2014 14:23:43 +0800
+Subject: [PATCH v7 06/15] ARM: hisi: enable MCPM implementation
+In-Reply-To: <alpine.LFD.2.11.1405131449270.980@knanqh.ubzr>
+References: <1399795571-17231-7-git-send-email-haojian.zhuang@linaro.org>
+ <1399981484-31628-1-git-send-email-haojian.zhuang@linaro.org>
+ <alpine.LFD.2.11.1405131449270.980@knanqh.ubzr>
+Message-ID: <CAD6h2NRMzgsZWkP8MYbCHqo4JkojbJxjj-kZwSj65A1SNBNRyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wednesday 14 May 2014 03:51 PM, Antoine T?nart wrote:
-> Hi,
-> 
-> On Wed, May 14, 2014 at 03:43:03PM +0530, Kishon Vijay Abraham I wrote:
->> Hi,
+On 14 May 2014 03:43, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Tue, 13 May 2014, Haojian Zhuang wrote:
+>
+>> Multiple CPU clusters are used in Hisilicon HiP04 SoC. Now use MCPM
+>> framework to manage power on HiP04 SoC.
 >>
->> On Wednesday 14 May 2014 03:18 PM, Antoine T?nart wrote:
-> 
-> [?]
-> 
->>> +#define to_berlin_sata_phy_priv(desc)	\
->>> +	container_of((desc), struct phy_berlin_priv, phys[(desc)->index])
->>> +
->>> +struct phy_berlin_desc {
->>> +	struct phy	*phy;
->>> +	u32		val;
->>> +	unsigned	index;
->>> +};
->>> +
->>> +struct phy_berlin_priv {
->>> +	void __iomem	*base;
->>> +	spinlock_t	lock;
->>> +	struct phy_berlin_desc	phys[BERLIN_SATA_PHY_NB];
->>
->> Can't we do away with hardcoding BERLIN_SATA_PHY_NB?
-> 
-> We can't if we want to be able to use the container_of macro in
-> to_berlin_sata_phy_priv(). And we want a common structure to store the
-> common spinlock and base address.
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>
+> Some more comments...
+>
+> [...]
+>> +static void hip04_set_snoop_filter(unsigned int cluster, unsigned int on)
+>> +{
+>> +     unsigned long data;
+>> +
+>> +     if (!fabric)
+>> +             return;
+>
+> How could this validly be NULL?
+>
+OK. I'll make it report BUG.
 
-to get phy_berlin_priv, you can use dev_get_drvdata(phy->dev->parent).
+>> +     data = readl_relaxed(fabric + FAB_SF_MODE);
+>> +     if (on)
+>> +             data |= 1 << cluster;
+>> +     else
+>> +             data &= ~(1 << cluster);
+>> +     writel_relaxed(data, fabric + FAB_SF_MODE);
+>> +     while (1) {
+>> +             if (data == readl_relaxed(fabric + FAB_SF_MODE))
+>> +                     break;
+>> +     }
+>> +}
+>
+> The above could be easily coded in assembly for the power_up_setup
+> callback thusly:
+>
+> hip04_power_up_setup:
+>
+>         cmp     r0, #0                  @ check affinity level
+>         bxeq    lr                      @ nothing to do at CPU level
+>
+>         mrc     p15, 0, r0, c0, c0, 5   @ get MPIDR
+>         ubfx    r0, r0, #8, #8          @ extract cluster number
+>
+>         adr     r1, .LC0
+>         ldmia   r1, {r2, r3}
+>         sub     r2, r2, r1              @ virt_addr - phys_addr
+>         ldr     r1, [r2, r3]            @ get fabric_phys_addr
+>         mov     r2, #1
+>         ldr     r3, [r1, #FAB_SF_MODE]  @ read "data"
+>         orr     r3, r3, r2, lsl r0      @ set cluster bit
+>         str     r3, [r1, #FAB_SF_MODE]  @ write it back
+>
+> 1:      ldr     r2, [r1, #FAB_SF_MODE]  @ read register content
+>         cmp     r2, r3                  @ make sure it matches
+>         bne     1b                      @ otherwise retry
+>
+>         bx      lr
+>
+> :LC0:   .word   .
+>         .word   fabric_phys_addr - .LC0
+>
+> That should be it.
+>
 
-> 
-> [?]
-> 
->>> +		/*
->>> +		 * By default the PHY node is used to request and match a PHY.
->>> +		 * We describe one PHY per sub-node here. Use the right node.
->>> +		 */
->>> +		phy->dev.of_node = child;
->>> +
->>> +		priv->phys[phy_id].phy = phy;
->>> +		priv->phys[phy_id].val = desc[phy_id].val;
->>> +		priv->phys[phy_id].index = phy_id;
->>> +		phy_set_drvdata(phy, &priv->phys[phy_id]);
->>> +
->>> +		/* Make sure the PHY is off */
->>> +		phy_berlin_sata_power_off(phy);
->>> +
->>> +		phy_provider = devm_of_phy_provider_register(&phy->dev,
->>> +							     of_phy_simple_xlate);
->>> +		if (IS_ERR(phy_provider))
->>> +			return PTR_ERR(phy_provider);
->>
->> was this intentional? registering multiple PHY providers?
-> 
-> Yes. Each sub-node describe a PHY and register as a PHY provider. This
-> allow to reference the PHY as <&sata_phy0> and not <&sata_phy 0>. It
-> would be confusing to have a sub-node sata_phy0 and to use its parent
-> to access it.
+No. These code should be executed before new CPU on. If I transfer
+them to assembler code, it means that code will be executed after
+new CPU on.
 
-It is still a single PHY provider, so you can't register multiple PHY
-providers. So in this case <&sata_phy 0> is not that bad.
+Then it results me failing to make new CPU online.
 
-However phy-core.c should be patched with the following (only compile tested)
+>> +static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
+>> +{
+>> +     unsigned long data, mask;
+>> +
+>> +     if (!relocation || !sysctrl)
+>> +             return -ENODEV;
+>> +     if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
+>> +             return -EINVAL;
+>> +
+>> +     spin_lock_irq(&boot_lock);
+>> +     writel_relaxed(hip04_boot.bootwrapper_phys, relocation);
+>> +     writel_relaxed(hip04_boot.bootwrapper_magic, relocation + 4);
+>> +     writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
+>> +     writel_relaxed(0, relocation + 12);
+>
+> Shouldn't you do the above writes only when
+> hip04_cpu_table[cluster][cpu] is zero?  Please see the comment in
+> mcpm_cpu_power_down() about unordered calls.
+>
+OK. I can add the check.
 
->From 2517d4c0ad7f13abc2613516ef2b222a1fbcb550 Mon Sep 17 00:00:00 2001
-From: Kishon Vijay Abraham I <kishon@ti.com>
-Date: Thu, 15 May 2014 11:32:57 +0530
-Subject: [PATCH] phy: phy-core: Support modelling multi-PHY PHY nodes as
- subnodes of PHY PROVIDER
+>> +     if (hip04_cluster_down(cluster)) {
+>> +             data = CLUSTER_DEBUG_RESET_BIT;
+>> +             writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
+>> +             do {
+>> +                     mask = CLUSTER_DEBUG_RESET_STATUS;
+>> +                     data = readl_relaxed(sysctrl + \
+>> +                                          SC_CPU_RESET_STATUS(cluster));
+>> +             } while (data & mask);
+>> +             hip04_set_snoop_filter(cluster, 1);
+>> +     }
+>> +
+>> +     hip04_cpu_table[cluster][cpu]++;
+>> +
+>> +     data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
+>> +            CORE_DEBUG_RESET_BIT(cpu);
+>> +     writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
+>> +     spin_unlock_irq(&boot_lock);
+>> +     msleep(POLL_MSEC);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static void hip04_mcpm_power_down(void)
+>> +{
+>> +     unsigned int mpidr, cpu, cluster, data = 0;
+>> +     bool skip_reset = false;
+>> +
+>> +     mpidr = read_cpuid_mpidr();
+>> +     cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+>> +     cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+>> +
+>> +     __mcpm_cpu_going_down(cpu, cluster);
+>> +
+>> +     spin_lock(&boot_lock);
+>> +     BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
+>> +     hip04_cpu_table[cluster][cpu]--;
+>> +     if (hip04_cpu_table[cluster][cpu] == 1) {
+>> +             /* A power_up request went ahead of us. */
+>> +             skip_reset = true;
+>> +     } else if (hip04_cpu_table[cluster][cpu] > 1) {
+>> +             pr_err("Cluster %d CPU%d is still running\n", cluster, cpu);
+>
+> This message is misleading.  If execution gets here, that means
+> mcpm_cpu_power_up() was called more than twice in a row for the same CPU
+> which should never happen.
+>
+OK. I'll replace the comments.
 
-When a single PHY provider implementing multiple PHYs is represented in dt,
-the PHYs should be modelled as sub nodes of the PHY PROVIDER node.
+>> +             BUG();
+>> +     }
+>> +
+>> +     spin_unlock(&boot_lock);
+>> +
+>> +     v7_exit_coherency_flush(louis);
+>> +
+>> +     __mcpm_cpu_down(cpu, cluster);
+>> +
+>> +     if (!skip_reset) {
+>> +             data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
+>> +                    CORE_DEBUG_RESET_BIT(cpu);
+>> +             writel_relaxed(data, sysctrl + SC_CPU_RESET_REQ(cluster));
+>
+> You should not perform this outside the lock protected region as this
+> could race with hip04_mcpm_power_up().  Instead, this should be done
+> above when hip04_cpu_table[cluster][cpu] == 0 after being decremented.
+>
 
-So the consumers using the PHY will have the phandle of the sub node rather
-than the phandle of the PHY PROVIDER. Amended *of_phy_provider_lookup* in
-PHY core to return the PHY PROVIDER even when the phandle of the PHY PROVIDERs
-sub node is provided.
+No. power_down() is executed on the specified CPU. If spin_unlock() is
+placed after reset operation, it means that there's no chance to
+execute
+the spin_unlock(). Because CPU is already in reset mode at this time.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- drivers/phy/phy-core.c |   10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-index 03cf8fb..124c6ec 100644
---- a/drivers/phy/phy-core.c
-+++ b/drivers/phy/phy-core.c
-@@ -83,10 +83,18 @@ static struct phy *phy_lookup(struct device *device, const
-char *port)
- static struct phy_provider *of_phy_provider_lookup(struct device_node *node)
- {
-        struct phy_provider *phy_provider;
-+       struct device_node *child;
-
-        list_for_each_entry(phy_provider, &phy_provider_list, list) {
--               if (phy_provider->dev->of_node == node)
-+               if (phy_provider->dev->of_node != node) {
-+                       for_each_child_of_node(phy_provider->dev->of_node,
-+                               child) {
-+                               if (child == node)
-+                                       return phy_provider;
-+                       }
-+               } else {
-                        return phy_provider;
-+               }
-        }
-
-        return ERR_PTR(-EPROBE_DEFER);
--- 
-1.7.9.5
-
-Thanks
-Kishon
+Regards
+Haojian
