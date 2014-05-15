@@ -1,237 +1,58 @@
-From: albuer@gmail.com (albuer)
-Date: Thu, 15 May 2014 15:19:28 +0800
-Subject: [review]  ARM: dma-mapping: Add support DMA allocate memory without
- mapping
-Message-ID: <53746A80.8070900@gmail.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Thu, 15 May 2014 15:14:30 +0800
+Subject: [PATCH] crash_dump: arm: crash dump kernel should use strict pfn_valid
+Message-ID: <1400138070-24046-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all:
+This patch makes crash dump kernel use arch pfn_valid defined in
+arch/arm/mm/init.c instead of the one in include/linux/mmzone.h.
+The goal of this patch is to remove some limitation when kexec loading
+crash kernel while SPARSEMEM is enabled.
 
-ARM: dma-mapping: Add support DMA allocate memory without mapping
+Before this patch, if second kernel selects both CRASH_DUMP and
+SPARSEMEM, the second kernel will recongnize memorys at the same section
+with itself as valid memory, and prevents ioremap (see arm ioremap code,
+arm doesn't allow valid memory to be ioremapped again). Which introduces
+some limitations on positioning the crash kernel. For example:
 
-reserved DMA(CMA) regions may be large than 512MB for devices, placed it
-in the highmem zone is appropriate, but according to the existing
-mechanism, memory allocation with mapping will cause vmalloc area not
-enough.
+  For a platform with SECTION_SIZE_BITS == 28 (256MiB) and
+  crashkernel=128M at 0x28000000 in kernel cmdline, the second
+  kernel is loaded at 0x28000000. Kexec puts elfcorehdr at
+  0x2ff00000, and passes 'elfcorehdr=0x2ff00000 mem=130048K' to
+  second kernel. When second kernel start, it tries to use
+  ioremap to retrive its elfcorehrd. In this case, elfcodehdr is at the
+  same section of the second kernel, pfn_valid will recongnize
+  the page as valid, so ioremap will refuse to map it.
 
-Now we don't do mapping if the DMA_ATTR_NO_KERNEL_MAPPING is set.
+Even if we put crash kernel at the boundary of two sections (such as
+129MB at 0x0x28000000 in the above situation), 0x20000000-0x28000000 used
+by old kernel is still unable to retrived by crash kernel because they
+are at the same section.
 
-the DMA(CMA) region used for VPU/VOP/Camera/RGA etc, my screen
-resolution: 2560*1600, we need CMA memory large than 768MB.
+This patch makes crash dump kernel use strict (and slow) version of
+pfn_valid(), which makes crash kernel recongnize memory correctly.
 
--------------- next part --------------
-commit 89e0808306853052a685125a58b6e2f074d16fb6
-Author: CMY <cmy@rock-chips.com>
-Date:   Thu May 15 14:59:41 2014 +0800
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+Cc: Geng Hui <hui.geng@huawei.com>
+Cc: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
+Cc: Simon Horman <horms@verge.net.au>
+---
+ arch/arm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-    ARM: dma-mapping: Add support DMA allocate memory without mapping
-    
-    reserved DMA(CMA) regions may be large than 512MB for devices, placed it
-    in the highmem zone is appropriate, but according to the existing
-    mechanism, memory allocation with mapping will cause vmalloc area not
-    enough.
-    
-    Now we don't do mapping if the DMA_ATTR_NO_KERNEL_MAPPING is set.
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 6b00be1..7e04452 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -286,13 +286,15 @@ static void __dma_free_buffer(struct page *page, size_t size)
- #ifdef CONFIG_MMU
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index db3c541..795b1d4 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1800,7 +1800,7 @@ config ARCH_SELECT_MEMORY_MODEL
+ 	def_bool ARCH_SPARSEMEM_ENABLE
  
- static void *__alloc_from_contiguous(struct device *dev, size_t size,
--				     pgprot_t prot, struct page **ret_page,
-+				     struct dma_attrs *attrs, struct page **ret_page,
- 				     const void *caller);
+ config HAVE_ARCH_PFN_VALID
+-	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
++	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM || CRASH_DUMP
  
- static void *__alloc_remap_buffer(struct device *dev, size_t size, gfp_t gfp,
--				 pgprot_t prot, struct page **ret_page,
-+				 struct dma_attrs *attrs, struct page **ret_page,
- 				 const void *caller);
- 
-+static inline pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot);
-+
- static void *
- __dma_alloc_remap(struct page *page, size_t size, gfp_t gfp, pgprot_t prot,
- 	const void *caller)
-@@ -373,7 +375,6 @@ void __init init_dma_coherent_pool_size(unsigned long size)
- static int __init atomic_pool_init(void)
- {
- 	struct dma_pool *pool = &atomic_pool;
--	pgprot_t prot = pgprot_dmacoherent(PAGE_KERNEL);
- 	gfp_t gfp = GFP_KERNEL | GFP_DMA;
- 	unsigned long nr_pages = pool->size >> PAGE_SHIFT;
- 	unsigned long *bitmap;
-@@ -391,10 +392,10 @@ static int __init atomic_pool_init(void)
- 		goto no_pages;
- 
- 	if (IS_ENABLED(CONFIG_DMA_CMA))
--		ptr = __alloc_from_contiguous(NULL, pool->size, prot, &page,
-+		ptr = __alloc_from_contiguous(NULL, pool->size, NULL, &page,
- 					      atomic_pool_init);
- 	else
--		ptr = __alloc_remap_buffer(NULL, pool->size, gfp, prot, &page,
-+		ptr = __alloc_remap_buffer(NULL, pool->size, gfp, NULL, &page,
- 					   atomic_pool_init);
- 	if (ptr) {
- 		int i;
-@@ -491,15 +492,19 @@ static void __dma_remap(struct page *page, size_t size, pgprot_t prot)
- }
- 
- static void *__alloc_remap_buffer(struct device *dev, size_t size, gfp_t gfp,
--				 pgprot_t prot, struct page **ret_page,
-+				 struct dma_attrs *attrs, struct page **ret_page,
- 				 const void *caller)
- {
- 	struct page *page;
- 	void *ptr;
-+	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
- 	page = __dma_alloc_buffer(dev, size, gfp);
- 	if (!page)
- 		return NULL;
- 
-+	if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs))
-+		return (*ret_page=page);
-+
- 	ptr = __dma_alloc_remap(page, size, gfp, prot, caller);
- 	if (!ptr) {
- 		__dma_free_buffer(page, size);
-@@ -587,13 +592,14 @@ static int __free_from_pool(void *start, size_t size)
- }
- 
- static void *__alloc_from_contiguous(struct device *dev, size_t size,
--				     pgprot_t prot, struct page **ret_page,
-+				     struct dma_attrs *attrs, struct page **ret_page,
- 				     const void *caller)
- {
- 	unsigned long order = get_order(size);
- 	size_t count = size >> PAGE_SHIFT;
- 	struct page *page;
- 	void *ptr;
-+	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
- 
- 	page = dma_alloc_from_contiguous(dev, count, order);
- 	if (!page)
-@@ -601,6 +607,9 @@ static void *__alloc_from_contiguous(struct device *dev, size_t size,
- 
- 	__dma_clear_buffer(page, size);
- 
-+	if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs))
-+		return (*ret_page=page);
-+
- 	if (PageHighMem(page)) {
- 		ptr = __dma_alloc_remap(page, size, GFP_KERNEL, prot, caller);
- 		if (!ptr) {
-@@ -616,12 +625,14 @@ static void *__alloc_from_contiguous(struct device *dev, size_t size,
- }
- 
- static void __free_from_contiguous(struct device *dev, struct page *page,
--				   void *cpu_addr, size_t size)
-+				   void *cpu_addr, size_t size, struct dma_attrs *attrs)
- {
--	if (PageHighMem(page))
--		__dma_free_remap(cpu_addr, size);
--	else
--		__dma_remap(page, size, PAGE_KERNEL);
-+	if (!dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs)) {
-+		if (PageHighMem(page))
-+			__dma_free_remap(cpu_addr, size);
-+		else
-+			__dma_remap(page, size, PAGE_KERNEL);
-+	}
- 	dma_release_from_contiguous(dev, page, size >> PAGE_SHIFT);
- }
- 
-@@ -640,11 +651,11 @@ static inline pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot)
- #define nommu() 1
- 
- #define __get_dma_pgprot(attrs, prot)	__pgprot(0)
--#define __alloc_remap_buffer(dev, size, gfp, prot, ret, c)	NULL
-+#define __alloc_remap_buffer(dev, size, gfp, attrs, ret, c)	NULL
- #define __alloc_from_pool(size, ret_page)			NULL
--#define __alloc_from_contiguous(dev, size, prot, ret, c)	NULL
-+#define __alloc_from_contiguous(dev, size, attrs, ret, c)	NULL
- #define __free_from_pool(cpu_addr, size)			0
--#define __free_from_contiguous(dev, page, cpu_addr, size)	do { } while (0)
-+#define __free_from_contiguous(dev, page, cpu_addr, size, attrs)	do { } while (0)
- #define __dma_free_remap(cpu_addr, size)			do { } while (0)
- 
- #endif	/* CONFIG_MMU */
-@@ -664,7 +675,8 @@ static void *__alloc_simple_buffer(struct device *dev, size_t size, gfp_t gfp,
- 
- 
- static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
--			 gfp_t gfp, pgprot_t prot, bool is_coherent, const void *caller)
-+			 gfp_t gfp, struct dma_attrs *attrs, bool is_coherent,
-+			 const void *caller)
- {
- 	u64 mask = get_coherent_dma_mask(dev);
- 	struct page *page = NULL;
-@@ -702,9 +714,9 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
- 	else if (!(gfp & __GFP_WAIT))
- 		addr = __alloc_from_pool(size, &page);
- 	else if (!IS_ENABLED(CONFIG_DMA_CMA))
--		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller);
-+		addr = __alloc_remap_buffer(dev, size, gfp, attrs, &page, caller);
- 	else
--		addr = __alloc_from_contiguous(dev, size, prot, &page, caller);
-+		addr = __alloc_from_contiguous(dev, size, attrs, &page, caller);
- 
- 	if (addr)
- 		*handle = pfn_to_dma(dev, page_to_pfn(page));
-@@ -715,30 +727,30 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
- /*
-  * Allocate DMA-coherent memory space and return both the kernel remapped
-  * virtual and bus address for that space.
-+ * If the DMA_ATTR_NO_KERNEL_MAPPING is set within attrs, return both
-+ * the 'struct page*' and bus address.
-  */
- void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
- 		    gfp_t gfp, struct dma_attrs *attrs)
- {
--	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
- 	void *memory;
- 
- 	if (dma_alloc_from_coherent(dev, size, handle, &memory))
- 		return memory;
- 
--	return __dma_alloc(dev, size, handle, gfp, prot, false,
-+	return __dma_alloc(dev, size, handle, gfp, attrs, false,
- 			   __builtin_return_address(0));
- }
- 
- static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
- 	dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
- {
--	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
- 	void *memory;
- 
- 	if (dma_alloc_from_coherent(dev, size, handle, &memory))
- 		return memory;
- 
--	return __dma_alloc(dev, size, handle, gfp, prot, true,
-+	return __dma_alloc(dev, size, handle, gfp, attrs, true,
- 			   __builtin_return_address(0));
- }
- 
-@@ -791,14 +803,16 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
- 	} else if (__free_from_pool(cpu_addr, size)) {
- 		return;
- 	} else if (!IS_ENABLED(CONFIG_DMA_CMA)) {
--		__dma_free_remap(cpu_addr, size);
-+		if (!dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs))
-+			__dma_free_remap(cpu_addr, size);
-+
- 		__dma_free_buffer(page, size);
- 	} else {
- 		/*
- 		 * Non-atomic allocations cannot be freed with IRQs disabled
- 		 */
- 		WARN_ON(irqs_disabled());
--		__free_from_contiguous(dev, page, cpu_addr, size);
-+		__free_from_contiguous(dev, page, cpu_addr, size, attrs);
- 	}
- }
- 
+ config HIGHMEM
+ 	bool "High Memory Support"
+-- 
+1.8.4
