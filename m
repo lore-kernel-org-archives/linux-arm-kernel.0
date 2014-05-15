@@ -1,178 +1,142 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu, 15 May 2014 14:23:43 +0800
-Subject: [PATCH v7 06/15] ARM: hisi: enable MCPM implementation
-In-Reply-To: <alpine.LFD.2.11.1405131449270.980@knanqh.ubzr>
-References: <1399795571-17231-7-git-send-email-haojian.zhuang@linaro.org>
- <1399981484-31628-1-git-send-email-haojian.zhuang@linaro.org>
- <alpine.LFD.2.11.1405131449270.980@knanqh.ubzr>
-Message-ID: <CAD6h2NRMzgsZWkP8MYbCHqo4JkojbJxjj-kZwSj65A1SNBNRyw@mail.gmail.com>
+Date: Thu, 15 May 2014 14:28:17 +0800
+Subject: [PATCH v5 08/14] ARM: hisi: add hip04 SoC support
+In-Reply-To: <alpine.LFD.2.11.1405131433580.980@knanqh.ubzr>
+References: <1399473888-12947-1-git-send-email-haojian.zhuang@linaro.org>
+ <1399473888-12947-9-git-send-email-haojian.zhuang@linaro.org>
+ <alpine.LFD.2.11.1405071259300.980@knanqh.ubzr>
+ <CAD6h2NQU0NR1PO=x6pz62B4QWqkPz7F+Fp65YeQJ62vumF8_Aw@mail.gmail.com>
+ <CAD6h2NTMJ5GNkUdcTvx_MoKnGSnmQ15vUWBoj7GcKdBTBf7MJw@mail.gmail.com>
+ <alpine.LFD.2.11.1405121510130.980@knanqh.ubzr>
+ <CAD6h2NTz6h+GSM7BKr_Om3VHjKOXebO6hRD0BHCjzyT57qHeLQ@mail.gmail.com>
+ <alpine.LFD.2.11.1405131433580.980@knanqh.ubzr>
+Message-ID: <CAD6h2NR3=uq7uQ3JMjGKo0-QjM18B-pdOoeGTsMtfkdf_uSQ=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 May 2014 03:43, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+On 14 May 2014 02:44, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
 > On Tue, 13 May 2014, Haojian Zhuang wrote:
 >
->> Multiple CPU clusters are used in Hisilicon HiP04 SoC. Now use MCPM
->> framework to manage power on HiP04 SoC.
+>> On 13 May 2014 03:39, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> > On Mon, 12 May 2014, Haojian Zhuang wrote:
+>> >
+>> >> On 11 May 2014 16:02, Haojian Zhuang <haojian.zhuang@linaro.org> wrote:
+>> >> >
+>> >> >
+>> >> > On 8 May 2014 01:44, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> >> >> On Wed, 7 May 2014, Haojian Zhuang wrote:
+>> >> >>
+>> >> >>> +
+>> >> >>> +static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
+>> >> >>> +{
+>> >> >>> +     unsigned long data, mask;
+>> >> >>> +
+>> >> >>> +     if (!relocation || !sysctrl)
+>> >> >>> +             return -ENODEV;
+>> >> >>> +     if (cluster >= HIP04_MAX_CLUSTERS || cpu >=
+>> >> >>> HIP04_MAX_CPUS_PER_CLUSTER)
+>> >> >>> +             return -EINVAL;
+>> >> >>> +
+>> >> >>> +     spin_lock_irq(&boot_lock);
+>> >> >>> +     writel_relaxed(hip04_boot.bootwrapper_phys, relocation);
+>> >> >>> +     writel_relaxed(hip04_boot.bootwrapper_magic, relocation + 4);
+>> >> >>> +     writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
+>> >> >>> +     writel_relaxed(0, relocation + 12);
+>> >> >>> +
+>> >> >>> +     if (hip04_cluster_down(cluster)) {
+>> >> >>> +             data = CLUSTER_DEBUG_RESET_BIT;
+>> >> >>> +             writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
+>> >> >>> +             do {
+>> >> >>> +                     mask = CLUSTER_DEBUG_RESET_STATUS;
+>> >> >>> +                     data = readl_relaxed(sysctrl + \
+>> >> >>> +                                          SC_CPU_RESET_STATUS(cluster));
+>> >> >>> +             } while (data & mask);
+>> >> >>> +             hip04_set_snoop_filter(cluster, 1);
+>> >> >>> +     }
+>> >> >>
+>> >> >> Isn't this racy?  What if the new CPU starts executing code before
+>> >> >> snoops are enabled for it?
+>> >> >>
+>> >> >> Normally we solve this race by letting the waking-up CPU turn on its
+>> >> >> snoops by itself from an assembly code callback provided as argument to
+>> >> >> mcpm_sync_init().  This is also the only way to eventually support deep
+>> >> >> C-states with cpuidle.
+>> >> >>
+>> >> >
+>> >> > There's no race. At here, I enable snoop without unreset new CPU.
+>> >> >
+>> >> >>> +
+>> >> >>> +     hip04_cpu_table[cluster][cpu]++;
+>> >> >>> +
+>> >> >>> +     data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
+>> >> >>> +            CORE_DEBUG_RESET_BIT(cpu);
+>> >> >>> +     writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
+>> >> >
+>> >> > At here, I make new CPU out of reset state.
+>> >
+>> > That's my point.  At least on systems with the CCI, you risk hanging the
+>> > system if you enable snoops for a CPU that is not yet running.
+>> >
+>> > Yet you cannot enable the CPU and then turn on snoops as you have the
+>> > opposite race in that case.
+>> >
+>> > So the only way to be absolutely safe is to let the waking-up CPU turn
+>> > on snoops for itself _before_ it starts using the cache.  That is what
+>> > the power_up_setup callback provided to mcpm_sync_init() is all about.
+>> >
+>> > It must be written all in assembly as there is no stack available yet
+>> > when it is called.  See arch/arm/mach-vexpress/dcscb_setup.S for an
+>> > example skeleton where cci_enable_port_for_self is called when the
+>> > affinity level is 1 (cluster level) and nothing special is done when the
+>> > affinity level is 0 (CPU level).  All the synchronization and race
+>> > avoidance is all handled for you in arch/arm/common/mcpm_head.S already.
+>> >
 >>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> There's no CCI in HiP04. Their own fabric is used instead.
 >
-> Some more comments...
->
-> [...]
->> +static void hip04_set_snoop_filter(unsigned int cluster, unsigned int on)
->> +{
->> +     unsigned long data;
->> +
->> +     if (!fabric)
->> +             return;
->
-> How could this validly be NULL?
->
-OK. I'll make it report BUG.
-
->> +     data = readl_relaxed(fabric + FAB_SF_MODE);
->> +     if (on)
->> +             data |= 1 << cluster;
->> +     else
->> +             data &= ~(1 << cluster);
->> +     writel_relaxed(data, fabric + FAB_SF_MODE);
->> +     while (1) {
->> +             if (data == readl_relaxed(fabric + FAB_SF_MODE))
->> +                     break;
->> +     }
->> +}
->
-> The above could be easily coded in assembly for the power_up_setup
-> callback thusly:
->
-> hip04_power_up_setup:
->
->         cmp     r0, #0                  @ check affinity level
->         bxeq    lr                      @ nothing to do at CPU level
->
->         mrc     p15, 0, r0, c0, c0, 5   @ get MPIDR
->         ubfx    r0, r0, #8, #8          @ extract cluster number
->
->         adr     r1, .LC0
->         ldmia   r1, {r2, r3}
->         sub     r2, r2, r1              @ virt_addr - phys_addr
->         ldr     r1, [r2, r3]            @ get fabric_phys_addr
->         mov     r2, #1
->         ldr     r3, [r1, #FAB_SF_MODE]  @ read "data"
->         orr     r3, r3, r2, lsl r0      @ set cluster bit
->         str     r3, [r1, #FAB_SF_MODE]  @ write it back
->
-> 1:      ldr     r2, [r1, #FAB_SF_MODE]  @ read register content
->         cmp     r2, r3                  @ make sure it matches
->         bne     1b                      @ otherwise retry
->
->         bx      lr
->
-> :LC0:   .word   .
->         .word   fabric_phys_addr - .LC0
->
-> That should be it.
+> OK.  Still, in order to support deep C-States with cpuidle, the
+> waking-up of CPUs must happen asynchronously, and in that case the CPU
+> being awaken must do snooping setup by itself.  So I'd be interested to
+> see if that can be down that way as well for HiP04, at least to be
+> similar in structure to other backend implementations, and possibly for
+> being cpuidle ready as well.
 >
 
-No. These code should be executed before new CPU on. If I transfer
-them to assembler code, it means that code will be executed after
-new CPU on.
+But it fails on my platform if I execute snooping setup on the new CPU.
 
-Then it results me failing to make new CPU online.
-
->> +static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
->> +{
->> +     unsigned long data, mask;
->> +
->> +     if (!relocation || !sysctrl)
->> +             return -ENODEV;
->> +     if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
->> +             return -EINVAL;
->> +
->> +     spin_lock_irq(&boot_lock);
->> +     writel_relaxed(hip04_boot.bootwrapper_phys, relocation);
->> +     writel_relaxed(hip04_boot.bootwrapper_magic, relocation + 4);
->> +     writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
->> +     writel_relaxed(0, relocation + 12);
+>> >> >
+>> >> >
+>> >> >>> +     spin_unlock_irq(&boot_lock);
+>> >> >>> +     msleep(POLL_MSEC);
+>> >> >>
+>> >> >> What is that msleep() for?
+>> >> >>
+>> >> > Without this delay, I'll meet hang.
+>> >> >
+>> >> > Since I'm using reset to wakeup CPU from wfi/wfe status, I don't need
+>> >> > IPI at here. If I remove the msleep() here, it seems that IPI caused my
+>> >> > system hang. So it's a workaround in my system.
+>> >
+>> > Could you confirm that the IPI is actually what causes you trouble?
+>> >
+>> > If so maybe you should make sure that the CPU is actually masking out
+>> > IRQs at all times before they're unmasked by the kernel.
+>> >
+>>
+>> I think so. But I don't have any hardware debugger to confirm it.
+>>
+>> I think that unnecessary interrupt causes new CPU in interrupt mode,
+>> then this CPU can't be online.
+>>
+>> If I remove the code to send IPI, the new CPU could be online right.
 >
-> Shouldn't you do the above writes only when
-> hip04_cpu_table[cluster][cpu] is zero?  Please see the comment in
-> mcpm_cpu_power_down() about unordered calls.
->
-OK. I can add the check.
-
->> +     if (hip04_cluster_down(cluster)) {
->> +             data = CLUSTER_DEBUG_RESET_BIT;
->> +             writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
->> +             do {
->> +                     mask = CLUSTER_DEBUG_RESET_STATUS;
->> +                     data = readl_relaxed(sysctrl + \
->> +                                          SC_CPU_RESET_STATUS(cluster));
->> +             } while (data & mask);
->> +             hip04_set_snoop_filter(cluster, 1);
->> +     }
->> +
->> +     hip04_cpu_table[cluster][cpu]++;
->> +
->> +     data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
->> +            CORE_DEBUG_RESET_BIT(cpu);
->> +     writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
->> +     spin_unlock_irq(&boot_lock);
->> +     msleep(POLL_MSEC);
->> +
->> +     return 0;
->> +}
->> +
->> +static void hip04_mcpm_power_down(void)
->> +{
->> +     unsigned int mpidr, cpu, cluster, data = 0;
->> +     bool skip_reset = false;
->> +
->> +     mpidr = read_cpuid_mpidr();
->> +     cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
->> +     cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
->> +
->> +     __mcpm_cpu_going_down(cpu, cluster);
->> +
->> +     spin_lock(&boot_lock);
->> +     BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
->> +     hip04_cpu_table[cluster][cpu]--;
->> +     if (hip04_cpu_table[cluster][cpu] == 1) {
->> +             /* A power_up request went ahead of us. */
->> +             skip_reset = true;
->> +     } else if (hip04_cpu_table[cluster][cpu] > 1) {
->> +             pr_err("Cluster %d CPU%d is still running\n", cluster, cpu);
->
-> This message is misleading.  If execution gets here, that means
-> mcpm_cpu_power_up() was called more than twice in a row for the same CPU
-> which should never happen.
->
-OK. I'll replace the comments.
-
->> +             BUG();
->> +     }
->> +
->> +     spin_unlock(&boot_lock);
->> +
->> +     v7_exit_coherency_flush(louis);
->> +
->> +     __mcpm_cpu_down(cpu, cluster);
->> +
->> +     if (!skip_reset) {
->> +             data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
->> +                    CORE_DEBUG_RESET_BIT(cpu);
->> +             writel_relaxed(data, sysctrl + SC_CPU_RESET_REQ(cluster));
->
-> You should not perform this outside the lock protected region as this
-> could race with hip04_mcpm_power_up().  Instead, this should be done
-> above when hip04_cpu_table[cluster][cpu] == 0 after being decremented.
+> If so that's a bug in the firmware/bootloader/whatever code that needs
+> to be fixed.  CPUs must never unmasq IRQs if they're not ready to cope
+> with them.
 >
 
-No. power_down() is executed on the specified CPU. If spin_unlock() is
-placed after reset operation, it means that there's no chance to
-execute
-the spin_unlock(). Because CPU is already in reset mode at this time.
+I agree that it should be fixed in firmware. But I need some time. So I
+want to keep the workaround until the bug is fixed in firmware.
 
 Regards
 Haojian
