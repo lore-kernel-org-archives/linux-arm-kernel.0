@@ -1,73 +1,81 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 15 May 2014 11:17:35 +0200
-Subject: [PATCH v3 1/6] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <53747F03.5030206@ti.com>
-References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
- <20140514165722.GA18495@kwain> <5373AE9A.3050008@gmail.com>
- <5764751.ffUj9rhnMd@wuerfel> <5373B908.5090904@gmail.com>
- <537462A2.5020607@ti.com> <5374668F.4060109@gmail.com>
- <53747F03.5030206@ti.com>
-Message-ID: <5374862F.2020205@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 15 May 2014 11:18:37 +0200
+Subject: [PATCHv3 1/3] ARM: mm: allow sub-architectures to override PCI I/O
+ memory type
+In-Reply-To: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1400145519-28530-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2014 10:46 AM, Kishon Vijay Abraham I wrote:
-> On Thursday 15 May 2014 12:32 PM, Sebastian Hesselbarth wrote:
->> On 05/15/2014 08:45 AM, Kishon Vijay Abraham I wrote:
->>> On Thursday 15 May 2014 12:12 AM, Sebastian Hesselbarth wrote:
->>>> On 05/14/2014 08:12 PM, Arnd Bergmann wrote:
->>>>> On Wednesday 14 May 2014 19:57:46 Sebastian Hesselbarth wrote:
->>>>>> Let's assume we have one dual-port SATA controller and one PCIe
->>>>>> controller with either x1 or x2 support. The only sane DT binding,
->>>>>> I can think of then would be:
->>>>>>
->>>>>> berlin2q.dtsi:
->>>>>>
->>>>>> genphy: lvds at ea00ff {
->>>>>> 	compatible = "marvell,berlin-lvds-phy";
->>>>>> 	reg = <0xea00ff 0x100>;
->>>>>> 	#phy-cells = <2>;
->>>>>> };
-[...]
->>
->> Depends on what you call PHY. In the example above the PHY is what
->> allows you to control both lanes.
->>
->> So you want sub-nodes for each individual lane given the nomenclature
->> of the example?
->>
->> Or like it is used in the example above, a single PHY node with an index
->> in the phy-specifier to pick an individual lane.
->>
->> IMHO, having both phy-specifier index _and_ PHY sub-node per lane
->> has no benefit at all. You cannot even use the PHY sub-nodes for any
->> setup properties, as they depend on the consumer claiming the lane.
->
-> IMO the dt data should completely describe the HW. So just by looking at the
-> PHY node, we won't be able to tell the no of PHYs implemented in the IP if we
-> have a single PHY node (In this case the lanes in the IP).
->
-> However if you think it's an overkill for having sub-nodes for each lane then
-> single PHY node is fine too.
+Due to a design incompatibility between the PCIe Marvell controller
+and the Cortex-A9, stressing PCIe devices with a lot of traffic
+quickly causes a deadlock.
 
-Yeah, I see your point. I just wonder how many Marvell PHYs we may hit
-that require the _same_ magic setup inside but have _different_ number
-of lanes. And even if, we can deal with it using a different compatible
-string.
+One part of the workaround for this is to have all PCIe regions mapped
+as strongly-ordered (MT_UNCACHED) instead of the default
+MT_DEVICE. While the arch_ioremap_caller() mechanism allows
+sub-architecture code to override ioremap(), used to map PCIe memory
+regions, there isn't such a mechanism to override the behavior of
+pci_ioremap_io().
 
-Currently, I feel a single PHY provider node and a set of compatibles
-will be most likely, i.e. no per-lane sub-nodes. OTOH, the per-lane
-sub-nodes is more generic as it allows us to deal PHYs that may
-suddenly skip one lane in the numbering scheme. The difference for the
-driver is marginal, i.e. some SoC-specific struct with a field for the
-number of lanes vs. of_count_child_nodes() and a reg = <n> property for
-the per-lane sub-nodes.
+This commit adds the arch_pci_ioremap_mem_type variable, initialized
+to MT_DEVICE by default, and that sub-architecture code can
+override. We have chosen to expose a single variable rather than
+offering the possibility of overriding the entire pci_ioremap_io(),
+because implementing pci_ioremap_io() requires calling functions
+(get_mem_type()) that are private to the arch/arm/mm/ code.
 
-I used to agree to "DT should descibe HW", but with no datasheet
-available, it quickly becomes fuzzy what it really looks like.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/include/asm/io.h | 6 ++++++
+ arch/arm/mm/ioremap.c     | 9 ++++++++-
+ 2 files changed, 14 insertions(+), 1 deletion(-)
 
-Anyway, I'll have some discussion with Antoine and Alexandre to sort out
-the differences and the things in common for the PHY and SoCs in
-question.
-
-Sebastian
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 8aa4cca..3d23418 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -179,6 +179,12 @@ static inline void __iomem *__typesafe_io(unsigned long addr)
+ /* PCI fixed i/o mapping */
+ #define PCI_IO_VIRT_BASE	0xfee00000
+ 
++#if defined(CONFIG_PCI)
++void pci_ioremap_set_mem_type(int mem_type);
++#else
++static inline void pci_ioremap_set_mem_type(int mem_type) {}
++#endif
++
+ extern int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr);
+ 
+ /*
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index f9c32ba..d1e5ad7 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -438,6 +438,13 @@ void __arm_iounmap(volatile void __iomem *io_addr)
+ EXPORT_SYMBOL(__arm_iounmap);
+ 
+ #ifdef CONFIG_PCI
++static int pci_ioremap_mem_type = MT_DEVICE;
++
++void pci_ioremap_set_mem_type(int mem_type)
++{
++	pci_ioremap_mem_type = mem_type;
++}
++
+ int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
+ {
+ 	BUG_ON(offset + SZ_64K > IO_SPACE_LIMIT);
+@@ -445,7 +452,7 @@ int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
+ 	return ioremap_page_range(PCI_IO_VIRT_BASE + offset,
+ 				  PCI_IO_VIRT_BASE + offset + SZ_64K,
+ 				  phys_addr,
+-				  __pgprot(get_mem_type(MT_DEVICE)->prot_pte));
++				  __pgprot(get_mem_type(pci_ioremap_mem_type)->prot_pte));
+ }
+ EXPORT_SYMBOL_GPL(pci_ioremap_io);
+ #endif
+-- 
+1.9.3
