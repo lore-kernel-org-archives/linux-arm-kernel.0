@@ -1,106 +1,109 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 15 May 2014 17:48:39 +0530
-Subject: [PATCH 03/17] phy: ti-pipe3: add external clock support for PCIe
- PHY
-In-Reply-To: <CAGo_u6r8XtGHOvsfJKQMZ2ghFRz8x8_UhzyKE9jnwO6mJ2HYpQ@mail.gmail.com>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>	<1399383244-14556-4-git-send-email-kishon@ti.com>	<53736CBC.2060702@ti.com>	<5373897C.6080504@ti.com>	<CAGo_u6qw1OomEw_ueb3x+xT+qZLAfGv7Se1K=o725aOoD3ankQ@mail.gmail.com>	<5374859F.5080902@ti.com>	<53748819.8060705@ti.com>	<CAGo_u6qbbdAbdvrB3AFXSH1qD5MaBkJbi6oJJvvTWW4xfbmd_Q@mail.gmail.com>	<5374AC0A.7070709@ti.com>
- <CAGo_u6r8XtGHOvsfJKQMZ2ghFRz8x8_UhzyKE9jnwO6mJ2HYpQ@mail.gmail.com>
-Message-ID: <5374B09F.2080803@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 15 May 2014 13:20:09 +0100
+Subject: [PATCH v3 17/19] arm64: KVM: move hcr_el2 setting into
+ vgic-v2-switch.S
+In-Reply-To: <5373A09C.9020306@arm.com>
+References: <1397655591-2761-1-git-send-email-marc.zyngier@arm.com>
+ <1397655591-2761-18-git-send-email-marc.zyngier@arm.com>
+ <20140509140723.GR3362@lvm>
+ <87ha4sh1le.fsf@approximate.cambridge.arm.com>
+ <CAMJs5B9RwaeZhxoWnz1FzmX9swsA32Gqz9NwLZSQiFuGJ-v5Lg@mail.gmail.com>
+ <5373A09C.9020306@arm.com>
+Message-ID: <20140515122009.GB4549@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thursday 15 May 2014 05:42 PM, Nishanth Menon wrote:
-> On Thu, May 15, 2014 at 6:59 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> Hi Nishant,
->>
->> On Thursday 15 May 2014 05:16 PM, Nishanth Menon wrote:
->>> On Thu, May 15, 2014 at 4:25 AM, Roger Quadros <rogerq@ti.com> wrote:
->>>> On 05/15/2014 12:15 PM, Kishon Vijay Abraham I wrote:
->>>>> Hi Nishanth,
->>>>>
->>>>> On Wednesday 14 May 2014 09:04 PM, Nishanth Menon wrote:
->>>>>> On Wed, May 14, 2014 at 10:19 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>>>>>> Hi Roger,
->>>>>>>
->>>>>>> On Wednesday 14 May 2014 06:46 PM, Roger Quadros wrote:
->>>>>>>> Hi Kishon,
->>>>>>>>
->>>>>>>> On 05/06/2014 04:33 PM, Kishon Vijay Abraham I wrote:
->>>>>>>>> APLL used by PCIE phy can either use external clock as input or the clock
->>>>>>>>> from DPLL. Added support for the APLL to use external clock as input here.
->>>>>>>>>
->>>>>>>>> Cc: Rajendra Nayak <rnayak@ti.com>
->>>>>>>>> Cc: Tero Kristo <t-kristo@ti.com>
->>>>>>>>> Cc: Paul Walmsley <paul@pwsan.com>
->>>>>>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>>>>>>> ---
->>>>>>>>>  Documentation/devicetree/bindings/phy/ti-phy.txt |    4 ++
->>>>>>>>>  drivers/phy/phy-ti-pipe3.c                       |   75 ++++++++++++++--------
->>>>>>>>>  2 files changed, 52 insertions(+), 27 deletions(-)
->>>>>>>>>
->>>>>>>>> diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
->>>>>>>>> index bc9afb5..d50f8ee 100644
->>>>>>>>> --- a/Documentation/devicetree/bindings/phy/ti-phy.txt
->>>>>>>>> +++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
->>>>>>>>> @@ -76,6 +76,10 @@ Required properties:
->>>>>>>>>     * "dpll_ref_m2" - external dpll ref clk
->>>>>>>>>     * "phy-div" - divider for apll
->>>>>>>>>     * "div-clk" - apll clock
->>>>>>>>> +   * "apll_mux" - mux for pcie apll
->>>>>>>>> +   * "refclk_ext" - external reference clock for pcie apll
->>>>>>>>> + - ti,ext-clk: To specifiy if PCIE apll should use external clock. Applicable
->>>>>>>>> +   only to PCIE PHY.
->>>>>>>>
->>>>>>>> Instead of specifying both clock sources "dpll_ref_clock", "refclk_ext" and then specifying a 3rd control option "ti,ext-clk" to select one of the 2 sources, why can't the DT just supply one clock source, i.e. the one that is being used in the board instance? The driver should then just configure the clock rate that is needed at that node. Shouldn't the clock framework automatically take care of muxing and parent rates?
->>>>>>>
->>>>>>> Want the dt to have all the clocks used by the controller. "ti,ext-clk" should
->>>>>>> go in the board dt file (suggested by Nishanth).
->>>>>>> The point is at some point later if some one wants to change the clock source,
->>>>>>> it should be a simple enabling "ti,ext-clk" flag instead of finding the clock
->>>>>>> phandle etc..
->>>>>>
->>>>>> Wonder if that is implicit by the presence of  "refclk_ext" in the
->>>>>> clocks provided?
->>>>>
->>>>> IMO the presence of "refclk_ext" is useless unless the board indicates it
->>>>> provides the clock source.
->>>>>
->>>>> refclk_ext holds phandle for *fixed-clock*, so irrespective of whether the
->>>>> board provides a clock or not, it can have that handle for configuring in PRCM.
->>>>> However if the board does not provide the clock source, configuring refclk_ext
->>>>> in PRCM is useless.
->>>>
->>>> I think what Nishant meant is that if "refclk_ext" is provided it means that the driver
->>>> should use that over "dpll_ref_clock" so no need of a separate "ti,ext-clk" flag.
->>>
->>> yes, thank you for clarifying - it does indeed redundant to have
->>> "ti,ext-clk". and apologies on being a little obscure in the comment.
->>
->> Irrespective of whether external reference clock is used or not, all DRA7
->> (apll) has an input for external reference clock (and also a PRCM register for
->> programming it) and it has to be specified in dt no?
+On Wed, May 14, 2014 at 05:58:04PM +0100, Marc Zyngier wrote:
+> On 14/05/14 17:34, Christoffer Dall wrote:
+> > On 14 May 2014 15:33, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >> On Fri, May 09 2014 at  3:07:23 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> >>> On Wed, Apr 16, 2014 at 02:39:49PM +0100, Marc Zyngier wrote:
+> >>>> GICv3 requires the hcr_el2 switch to be tightly coupled with some
+> >>>> of the interrupt controller's register switch.
+> >>>
+> >>> can you be more specific, this feels a bit odd, enabling Stage-2
+> >>> translation and configuring all traps from within the vgic code...
+> >>
+> >> The IMO and FMO bits must be set before restoring the various system
+> >> registers in GICv3. But I agreee that this looks pretty horrible.
+> >>
+> >> The alternative is to split the bits we set in HCR_EL2 into two sets (VM
+> >> and trap control on one side, interrupt control on the other). This
+> >> would translate into two accesses to HCR_EL2, but it would look
+> >> nicer. I'll have a look.
+> >>
+> >>>> In order to have similar code paths, start moving the hcr_el2
+> >>>> manipulation code to the GICv2 switch code.
+> >>>>
+> >>>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> >>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >>>> ---
+> >>>>  arch/arm64/kvm/hyp.S            | 7 -------
+> >>>>  arch/arm64/kvm/vgic-v2-switch.S | 8 ++++++++
+> >>>>  2 files changed, 8 insertions(+), 7 deletions(-)
+> >>>>
+> >>>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> >>>> index aed72d0..92b9120 100644
+> >>>> --- a/arch/arm64/kvm/hyp.S
+> >>>> +++ b/arch/arm64/kvm/hyp.S
+> >>>> @@ -335,11 +335,6 @@
+> >>>>  .endm
+> >>>>
+> >>>>  .macro activate_traps
+> >>>> -    ldr     x2, [x0, #VCPU_IRQ_LINES]
+> >>>> -    ldr     x1, [x0, #VCPU_HCR_EL2]
+> >>>> -    orr     x2, x2, x1
+> >>>> -    msr     hcr_el2, x2
+> >>>> -
+> >>>>      ldr     x2, =(CPTR_EL2_TTA)
+> >>>>      msr     cptr_el2, x2
+> >>>>
+> >>>> @@ -353,8 +348,6 @@
+> >>>>  .endm
+> >>>>
+> >>>>  .macro deactivate_traps
+> >>>> -    mov     x2, #HCR_RW
+> >>>> -    msr     hcr_el2, x2
+> >>>>      msr     cptr_el2, xzr
+> >>>>      msr     hstr_el2, xzr
+> >>>>
+> >>>> diff --git a/arch/arm64/kvm/vgic-v2-switch.S b/arch/arm64/kvm/vgic-v2-switch.S
+> >>>> index c5dc777..d36cd7a 100644
+> >>>> --- a/arch/arm64/kvm/vgic-v2-switch.S
+> >>>> +++ b/arch/arm64/kvm/vgic-v2-switch.S
+> >>>> @@ -85,6 +85,9 @@ CPU_BE(    rev     w5, w5 )
+> >>>>      sub     w4, w4, #1
+> >>>>      cbnz    w4, 1b
+> >>>>  2:
+> >>>> +    mov     x2, #HCR_RW
+> >>>> +    msr     hcr_el2, x2
+> >>>> +    isb
+> >>>>  .endm
+> >>>>
+> >>>>  /*
+> >>>> @@ -92,6 +95,11 @@ CPU_BE(   rev     w5, w5 )
+> >>>>   * x0: Register pointing to VCPU struct
+> >>>>   */
+> >>>>  .macro restore_vgic_v2_state
+> >>>> +    ldr     x2, [x0, #VCPU_IRQ_LINES]
+> >>>
+> >>> will this ever have any values on aarch64?  Don't we mandate vgic
+> >>> support and bail out during hyp init if we cannot init a vgic?
+> >>
+> >> Yes. But that doesn't mean we don't support the feature either. The case
+> >> is fairly slim, I agree, but it has been there since Day-1...
+> >>
+> > See kvm_vm_ioctl_irq_line() in arch/arm/kvm/arm.c:
+> > 
+> > case KVM_ARM_IRQ_TYPE_CPU:
+> >     if (irqchip_in_kernel(kvm))
+> >         return -ENXIO;
 > 
-> Why is that a binding for ti-phy? that is a problem for the APLL clock
-> driver (selecting it's own source). PHY properties should describe
-> itself -> let the bindings of the APLL describe itself. please dont
-> mix the two up.
+> Unfortunately, this only checks if the VM has a vgic instantiated. It is
+> always possible to create a VM without the in-kernel GIC, and use the
+> pins to inject IRQs. As I said, unlikely to happen, but nonetheless...
+> 
+Yeah, you're right, I'm an idiot. Sorry for the noise.
 
-The apll clock node is like this
-
-apll_pcie_in_clk_mux: apll_pcie_in_clk_mux at 4ae06118 {
-        compatible = "mux-clock";
-        clocks = <&dpll_pcie_ref_m2ldo_ck>, <&pciesref_acs_clk_ck>;
-        #clock-cells = <0>;
-        reg = <0x4a00821c 0x4>;
-        bit-mask = <0x80>;
-};
-
-The external reference clock is denoted by *pciesref_acs_clk_ck*.
-
-refclk_ext holds the phandle to *pciesref_acs_clk_ck* and is used in
-"clk_set_parent" to set the parent of apll mux.
-
-Thanks
-Kishon
+Thanks,
+-Christoffer
