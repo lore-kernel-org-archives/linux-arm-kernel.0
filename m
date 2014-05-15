@@ -1,54 +1,51 @@
-From: elder@linaro.org (Alex Elder)
-Date: Thu, 15 May 2014 12:58:06 -0500
-Subject: [PATCH v3 RESEND 0/5] ARM: SMP: support Broadcom mobile SoCs
-Message-ID: <1400176691-26058-1-git-send-email-elder@linaro.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 15 May 2014 11:03:49 -0700
+Subject: [PATCH v3 RESEND 2/5] ARM: add SMP support for Broadcom mobile
+ SoCs
+In-Reply-To: <1400176691-26058-3-git-send-email-elder@linaro.org>
+References: <1400176691-26058-1-git-send-email-elder@linaro.org>
+ <1400176691-26058-3-git-send-email-elder@linaro.org>
+Message-ID: <CAGVrzca20+3kmJjyGv8Pr-qNNV4n0hhADL6GWvcYVDUL4q28Hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds SMP support for two Broadcom mobile SoC families.
-It uses CPU_METHOD_OF_DECLARE() so that SMP operations are assigned
-using device tree rather than adding it to a machine definition in a
-board file.
+Hi Alex,
 
-The enable method starts a secondary core by writing to a register
-monitored by CPUs spinning in a ROM-based holding pen loop.  The
-address of this register is recorded as a property in the "cpus"
-node of the device tree.
+2014-05-15 10:58 GMT-07:00 Alex Elder <elder@linaro.org>:
+> This patch adds SMP support for BCM281XX and BCM21664 family SoCs.
+>
+> This feature is controlled with a distinct config option such that a
+> SMP-enabled multi-v7 binary can be configured to run these SoCs in
+> uniprocessor mode.  Since this SMP functionality is used for
+> multiple Broadcom mobile chip families the config option is called
+> ARCH_BCM_MOBILE_SMP (for lack of a better name).
+>
+> On SoCs of this type, the secondary core is not held in reset on
+> power-on.  Instead it loops in a ROM-based holding pen.  To release
+> it, one must write into a special register a jump address whose
+> low-order bits have been replaced with a secondary core's id, then
+> trigger an event with SEV.  On receipt of an event, the ROM code
+> will examine the register's contents, and if the low-order bits
+> match its cpu id, it will clear them and write the value back to the
+> register just prior to jumping to the address specified.
+>
+> The location of the special register is defined in the device tree
+> using a "secondary-boot-reg" property in a node whose "enable-method"
+> matches.
+>
+> Derived from code originally provided by Ray Jui <rjui@broadcom.com>
+>
+> Signed-off-by: Alex Elder <elder@linaro.org>
+> ---
+>  arch/arm/mach-bcm/Kconfig   |  18 +++-
+>  arch/arm/mach-bcm/Makefile  |   3 +
+>  arch/arm/mach-bcm/platsmp.c | 201 ++++++++++++++++++++++++++++++++++++++++++++
 
-					-Alex
+Could we make that name a little bit more specific to the mobile SoCs?
+There are other BCM SoCs either currently supported in this directory
+(BCM5310X), or making their way to be supported (brcmstb, bcm63xx),
+and those share nothing with the Mobile SoC SMP code.
 
-Note:
-This series is based on v3.15-rc4, plus one more recently-posted patch:
-    http://permalink.gmane.org/gmane.linux.kernel/1683693
-
-History
-v3: - Dropped definition and use of CPU_METHOD_OF_DECLARE_SETUP()
-    - Added documentation for "enable-method"
-    - Rebased onto v3.15-rc4
-v2: - Fixed a Makefile error (:= should have been +=)
-    - No longer set CONFIG_NR_CPUS in bcm_defconfig
-    - Rebased onto v3.15-rc1
-
-This series is available here:
-    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
-    Branch review/bcm-smp-v3
-
-Alex Elder (5):
-  devicetree: bindings: document Broadcom CPU enable method
-  ARM: add SMP support for Broadcom mobile SoCs
-  ARM: configs: enable SMP in bcm_defconfig
-  ARM: dts: enable SMP support for bcm28155
-  ARM: dts: enable SMP support for bcm21664
-
- Documentation/devicetree/bindings/arm/cpus.txt |  12 ++
- arch/arm/boot/dts/bcm11351.dtsi                |  19 +++
- arch/arm/boot/dts/bcm21664.dtsi                |  19 +++
- arch/arm/configs/bcm_defconfig                 |   1 +
- arch/arm/mach-bcm/Kconfig                      |  18 ++-
- arch/arm/mach-bcm/Makefile                     |   3 +
- arch/arm/mach-bcm/platsmp.c                    | 201 +++++++++++++++++++++++++
- 7 files changed, 270 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/mach-bcm/platsmp.c
-
+Maybe we should create another level directory within mach-bcm...
 -- 
-1.9.1
+Florian
