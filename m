@@ -1,44 +1,30 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 15 May 2014 08:53:23 +0900
-Subject: [PATCH] ARM: shmobile: Add DT and defconfigs to MAINTAINERS
-Message-ID: <1400111603-20149-1-git-send-email-horms+renesas@verge.net.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 May 2014 17:11:00 -0700
+Subject: [PATCH] bus/omap_l3: avoid sync initcall for modules
+In-Reply-To: <5640589.bzCk17dFyc@wuerfel>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <20140513162731.GD16837@atomide.com>
+ <20140514173931.GA14003@kroah.com> <5640589.bzCk17dFyc@wuerfel>
+Message-ID: <20140515001100.GB31594@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are a number of DT and defconfig files which
-are maintained as part of shmobile but have not been
-listed as such in the MAINTAINERS file. This creates
-confusion from time to time.
+* Arnd Bergmann <arnd@arndb.de> [140514 11:16]:
+> On Wednesday 14 May 2014 10:39:31 Greg KH wrote:
+> > On Tue, May 13, 2014 at 09:27:33AM -0700, Tony Lindgren wrote:
+> > > * Arnd Bergmann <arnd@arndb.de> [140513 08:13]:
+> > > 
+> > > I did not look what percentage has tristate in the Kconfig,
+> > > but that might keep some people from making loadable drivers.
+> > > 
+> > > Greg, is the following patch something you may want to
+> > > consider picking up?
+> > 
+> > Sure, is this needed to fix issues in 3.15-final, or is 3.16-rc1 ok?
+> 
+> I don't think anyone cares about it outside of randconfig builds,
+> so 3.16-rc1 is ok.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- MAINTAINERS | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+Yeah thanks.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 51ebb77..cded74e 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1277,6 +1277,20 @@ W:	http://oss.renesas.com
- Q:	http://patchwork.kernel.org/project/linux-sh/list/
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git next
- S:	Supported
-+F:	arch/arm/boot/dts/emev2*
-+F:	arch/arm/boot/dts/r7s*
-+F:	arch/arm/boot/dts/r8a*
-+F:	arch/arm/boot/dts/sh*
-+F:	arch/arm/configs/ape6evm_defconfig
-+F:	arch/arm/configs/armadillo800eva_defconfig
-+F:	arch/arm/configs/bockw_defconfig
-+F:	arch/arm/configs/genmai_defconfig
-+F:	arch/arm/configs/koelsch_defconfig
-+F:	arch/arm/configs/kzm9g_defconfig
-+F:	arch/arm/configs/lager_defconfig
-+F:	arch/arm/configs/mackerel_defconfig
-+F:	arch/arm/configs/marzen_defconfig
-+F:	arch/arm/configs/shmobile_defconfig
- F:	arch/arm/mach-shmobile/
- F:	drivers/sh/
- 
--- 
-1.8.5.2
+Tony
