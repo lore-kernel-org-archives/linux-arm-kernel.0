@@ -1,65 +1,77 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 16 May 2014 06:53:48 +0900
-Subject: [PATCH v6 0/8] Enable USB 3.0 support on Exynos5 systems
-In-Reply-To: <1400076070-12456-1-git-send-email-gautam.vivek@samsung.com>
-References: <1400076070-12456-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <5375376C.90306@samsung.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 15 May 2014 14:54:09 -0700
+Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
+In-Reply-To: <53753443.8010303@gmail.com>
+References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
+ <53752E25.9060604@gmail.com>
+ <CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>
+ <53753443.8010303@gmail.com>
+Message-ID: <CAD=FV=V8UZoeOqEwfx_E015pLM+amTt51LrUa+dk7mTdn=vKgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/14 23:01, Vivek Gautam wrote:
-> From: Vivek gautam<gautam.vivek@samsung.com>
->
-> Based on 'for-next' branch of Kgene's linux-samsung tree;
-> along with dts patches for USB 2.0 phy[1], and Exynos5800 [2].
-> Also based on the latest USB 3.0 DRD phy driver patches posted [3].
->
-> Changes from v5:
->   - Added node reference names for new boards.
->   - Removed 'samsung,pmu-offset' porperty from nodes, since with latest driver
->     bindings this is not required.
->   - Added aliase nodes in Exynos5420 to facilitate latest driver bindings.
->   - Added patch to add VBUS regulator for peach-pi board also.
->   - Dropped patches removing older usb-phy driver:
->     usb-phy: samsung-usb3: Remove older phy-samsung-usb3 driver
->     ARM: exynos_defconfig: Remove SAMSUNG_USB3PHY config
->     as appeared in V5 version of this series.
->     Will post them separately after the new driver is merged.
->
-> [1] http://www.spinics.net/lists/linux-samsung-soc/msg30494.html
-> [2] http://comments.gmane.org/gmane.linux.kernel.samsung-soc/31133
-> [3] https://lkml.org/lkml/2014/5/13/285
->
-> Vivek Gautam (7):
->    ARM: dts: exynos5420: Enable support for USB 3.0 PHY controller
->    ARM: dts: exynos5420: Enable support for DWC3 controller
->    ARM: dts: exynos5250: Enable support for generic USB DRD phy
->    ARM: dts: exynos5250: Update DWC3 usb controller to use new phy
->      driver
->    ARM: dts: exynos5250-snow: Add Vbus regulator for USB 3.0
->    ARM: dts: exynos5420-peach-pit: Add Vbus regulator for USB 3.0
->    ARM: dts: exynos5420-smdk5420: Add Vbus regulator for USB 3.0
->
-> Vivek gautam (1):
+Tomasz,
 
-should be same guy.
 
-Vivek Gautam ;-)
 
->    ARM: dts: exynos5800-peach-pi: Add Vbus regulator for USB 3.0
+On Thu, May 15, 2014 at 2:40 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> On 15.05.2014 23:33, Doug Anderson wrote:
+>> Tomasz,
+>>
+>> On Thu, May 15, 2014 at 2:14 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>>> Hi Chirantan,
+>>>
+>>> On 15.05.2014 23:07, Chirantan Ekbote wrote:
+>>>> The multi core timer and the ARM architected timer are two different
+>>>> interfaces to the same underlying hardware timer.  This causes some
+>>>> strange timing issues when they are both enabled at the same time so
+>>>> remove the mct from the device tree and keep only the architected
+>>>> timer.
+>>>
+>>> Huh? I've always thought MCT is a completely separate hardware block
+>>> outside of ARM cores, while architected timers are embedded inside the
+>>> CPU block in which the ARM cores reside. Could you elaborate on this?
+>>
+>> Yup.  Our thoughts exactly.
+>>
+>> ...but it appears not to be the case.  Chirantan demonstrated this in
+>> U-Boot just to prove that it's not some strange kernel interaction in
+>> <https://chromium-review.googlesource.com/200035>.  I took his patch
+>> and tweaked it a little more myself in
+>> <https://chromium-review.googlesource.com/200098>.
+>>
+>> Specifically:
+>> * If you stop the MCT, the arch timer stops
+>> * If you reset the MCT, the arch timer resets
+>> * If you start the MCT again, the arch timer starts again
+>> * If you read the MCT and the arch timer, they give the same value.
+>>
+>>
+>> This is apparently the answer to my question at
+>> <http://www.spinics.net/lists/linux-samsung-soc/msg29085.html>.
+>> Specifically Chirantan found that the big jump in time happened when
+>> MCT reset to 0.  That made the arch timer code think that there was a
+>> wraparound and jump forward in time a lot.
+>>
+>>
+>> Please confirm if you have a system that has MCT and arch timer in front of you.
 >
->   arch/arm/boot/dts/exynos5250-snow.dts      |   22 ++++++++++++
->   arch/arm/boot/dts/exynos5250.dtsi          |   20 +++++------
->   arch/arm/boot/dts/exynos5420-peach-pit.dts |   46 ++++++++++++++++++++++++
->   arch/arm/boot/dts/exynos5420-smdk5420.dts  |   46 ++++++++++++++++++++++++
->   arch/arm/boot/dts/exynos5420.dtsi          |   54 ++++++++++++++++++++++++++++
->   arch/arm/boot/dts/exynos5800-peach-pi.dts  |   46 ++++++++++++++++++++++++
->   6 files changed, 222 insertions(+), 12 deletions(-)
+> Wow, this is so strange that I just can't believe it, but if you proved
+> it using such detailed test then I don't have any reasons to object anymore.
 >
-Looks good to me.
+> One more thing, though, is whether the architected timer "interface" can
+> wake the system from lighter power states, such as AFTR or LPA. Could
+> you check this?
 
-Applied 1 to 4 patches, but for others 5 to 8 I need to get any review 
-or ack from dt guys.
+I've never used AFTR or LPA and so can't really comment on it.
+Hopefully someone on the list can?
 
-Thanks,
-Kukjin
+NOTE: if for some reason we need to keep the MCT around, we're
+definitely going to need to account for the fact that tweaking it
+affects the arch timer.  ...and having the arch timer is really nice
+since:
+* it's faster to access.
+* it implements the bits needed for udelay() to use it.
+* it is accessible from userspace for really fast access.
+
+-Doug
