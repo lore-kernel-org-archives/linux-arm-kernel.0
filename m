@@ -1,18 +1,20 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 15 May 2014 12:01:27 -0400
-Subject: [PATCH v1 0/5] Add Keystone PCIe controller driver
-Message-ID: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
+Date: Thu, 15 May 2014 12:05:31 -0400
+Subject: [RESEND: PATCH v1 0/5] Add Keystone PCIe controller driver
+Message-ID: <1400169931-9724-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a PCIe controller driver for Keystone SoCs. This
-is based on the origin RFC patch that I had sent earlier. I have
-incorporated following comments:-
+Resending with some typos fixed...
 
- - Add a interrupt controller node for Legacy irq chip and use
+This patch adds a PCIe controller driver for Keystone SoCs. This
+is based on the original RFC patch series that I had sent earlier. I have
+incorporated following comments against that series:-
+
+ - Add an interrupt controller node for Legacy irq chip and use
    interrupt map/map-mask property to map legacy IRQs A/B/C/D
  - Add a Phy driver to replace the original serdes driver
- - Move common applicaiton register handling code to a separate
+ - Move common application register handling code to a separate
    file to allow re-use across other platforms that use older
    DW PCIe h/w
  - PCI quirk for maximum read request size. Check and override only
