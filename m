@@ -1,42 +1,90 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 15 May 2014 13:16:26 +0100
-Subject: [PATCH v6 03/15] irq: gic: support hip04 gic
-In-Reply-To: <5771380.iAICUqpnKg@wuerfel>
-References: <1399795571-17231-1-git-send-email-haojian.zhuang@linaro.org>
- <4785954.cZxbGoHV0t@wuerfel>
- <CAMJs5B82awFv7SV9RBu__t4_42PhR95VGPjS3LzWa2saDQReZg@mail.gmail.com>
- <5771380.iAICUqpnKg@wuerfel>
-Message-ID: <CAMJs5B9_H4wtXTmf_Dj84PhAfziQzsFmLbwQDzOz1J89-uVZtA@mail.gmail.com>
+Date: Thu, 15 May 2014 13:18:04 +0100
+Subject: [PATCH v3 18/19] KVM: ARM: vgic: add the GICv3 backend
+In-Reply-To: <878uq3h33l.fsf@approximate.cambridge.arm.com>
+References: <1397655591-2761-1-git-send-email-marc.zyngier@arm.com>
+ <1397655591-2761-19-git-send-email-marc.zyngier@arm.com>
+ <20140509140731.GS3362@lvm>
+ <878uq3h33l.fsf@approximate.cambridge.arm.com>
+Message-ID: <20140515121804.GA4549@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 May 2014 13:13, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 15 May 2014 13:08:17 Christoffer Dall wrote:
->> On 15 May 2014 12:14, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Thursday 15 May 2014 10:34:35 Marc Zyngier wrote:
->> >> > +static inline bool gic_is_standard(struct gic_chip_data *gic)
->> >>
->> >> Please loose all of the inlines. The compiler can do this by itself.
->> >>
->> >> > +{
->> >> > +       return (gic->nr_cpu_if == 8);
->> >> > +}
->> >> > +
->> >
->> > I think it's actually the common style to spell out the 'inline'
->> > for trivial helpers like this. The compiler doesn't need it, but
->> > it also doesn't hurt and most people write it.
->> >
->> Only in header files, no?
->>
->> I've been chastised previously for putting this in .c files.
->
-> It's crazy to make it a hard rule for C files one way or the other,
-> given that the compiler doesn't care.
->
-> I normally spell out the the inline part in my code because I find
-> that clearer to read.
->
-if that's the general consensus, I'll stop caring about it then.
+On Thu, May 15, 2014 at 09:13:02AM +0100, Marc Zyngier wrote:
+> On Fri, May 09 2014 at  3:07:31 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> > On Wed, Apr 16, 2014 at 02:39:50PM +0100, Marc Zyngier wrote:
+> >> Introduce the support code for emulating a GICv2 on top of GICv3
+> >> hardware.
+> >>
+> >> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  include/kvm/arm_vgic.h |  26 ++++++
+> >>  virt/kvm/arm/vgic-v3.c | 220 +++++++++++++++++++++++++++++++++++++++++++++++++
+> >>  virt/kvm/arm/vgic.c    |   2 +
+> >>  3 files changed, 248 insertions(+)
+> >>  create mode 100644 virt/kvm/arm/vgic-v3.c
+> >>
+> 
+> [...]
+> 
+> >> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+> >> new file mode 100644
+> >> index 0000000..a804a73
+> >> --- /dev/null
+> >> +++ b/virt/kvm/arm/vgic-v3.c
+> >> @@ -0,0 +1,220 @@
+> >> +/*
+> >> + * Copyright (C) 2013 ARM Limited, All Rights Reserved.
+> >> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or modify
+> >> + * it under the terms of the GNU General Public License version 2 as
+> >> + * published by the Free Software Foundation.
+> >> + *
+> >> + * This program is distributed in the hope that it will be useful,
+> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> + * GNU General Public License for more details.
+> >> + *
+> >> + * You should have received a copy of the GNU General Public License
+> >> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> >> + */
+> >> +
+> >> +#include <linux/cpu.h>
+> >> +#include <linux/kvm.h>
+> >> +#include <linux/kvm_host.h>
+> >> +#include <linux/interrupt.h>
+> >> +#include <linux/io.h>
+> >> +#include <linux/of.h>
+> >> +#include <linux/of_address.h>
+> >> +#include <linux/of_irq.h>
+> >> +
+> >> +#include <linux/irqchip/arm-gic-v3.h>
+> >> +
+> >> +#include <asm/kvm_emulate.h>
+> >> +#include <asm/kvm_arm.h>
+> >> +#include <asm/kvm_mmu.h>
+> >> +
+> >> +/* These are for GICv2 emulation only */
+> >
+> > Is this really true, seems like you're using them to form the lr values
+> > for the hardware below.
+> >
+> >> +#define GICH_LR_VIRTUALID            (0x3ffUL << 0)
+> >> +#define GICH_LR_PHYSID_CPUID_SHIFT   (10)
+> >> +#define GICH_LR_PHYSID_CPUID         (7UL << GICH_LR_PHYSID_CPUID_SHIFT)
+> >
+> > can't we include them from the existing header file then?
+> 
+> I've given this some more thought, and I think they actually belong
+> here. The arm-gic-v3.h file is really relevant to GICv3 used in v3
+> mode. Here, we're using the GICv3 HW to inject GICv2-style interrupts
+> (ID limited to 1023, CPUID present in the LR...).
+> 
+> So I'd rather keep them here than expose it to the outside world, as I
+> fear this would be rather confusing.
+> 
+Fair enough.
 
 -Christoffer
