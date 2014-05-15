@@ -1,39 +1,31 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 15 May 2014 12:40:43 +0200
-Subject: [PATCH v2 02/10] iommu/ipmmu-vmsa: Cleanup failures of ARM mapping
- creation or attachment
+Date: Thu, 15 May 2014 12:40:44 +0200
+Subject: [PATCH v2 03/10] iommu/ipmmu-vmsa: Fix the supported page sizes
 In-Reply-To: <1400150451-13469-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1400150451-13469-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1400150451-13469-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1400150451-13469-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The hardware supports 2MB page sizes, not 1MB.
+
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/iommu/ipmmu-vmsa.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/iommu/ipmmu-vmsa.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
-index 49e00f7..49dbedd 100644
+index 49dbedd..313b5b9 100644
 --- a/drivers/iommu/ipmmu-vmsa.c
 +++ b/drivers/iommu/ipmmu-vmsa.c
-@@ -917,7 +917,8 @@ static int ipmmu_add_device(struct device *dev)
- 							SZ_1G, SZ_2G);
- 		if (IS_ERR(mapping)) {
- 			dev_err(mmu->dev, "failed to create ARM IOMMU mapping\n");
--			return PTR_ERR(mapping);
-+			ret = PTR_ERR(mapping);
-+			goto error;
- 		}
+@@ -959,7 +959,7 @@ static struct iommu_ops ipmmu_ops = {
+ 	.iova_to_phys = ipmmu_iova_to_phys,
+ 	.add_device = ipmmu_add_device,
+ 	.remove_device = ipmmu_remove_device,
+-	.pgsize_bitmap = SZ_1M | SZ_64K | SZ_4K,
++	.pgsize_bitmap = SZ_2M | SZ_64K | SZ_4K,
+ };
  
- 		mmu->mapping = mapping;
-@@ -933,6 +934,7 @@ static int ipmmu_add_device(struct device *dev)
- 	return 0;
- 
- error:
-+	arm_iommu_release_mapping(mmu->mapping);
- 	kfree(dev->archdata.iommu);
- 	dev->archdata.iommu = NULL;
- 	iommu_group_remove_device(dev);
+ /* -----------------------------------------------------------------------------
 -- 
 1.8.5.5
