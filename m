@@ -1,49 +1,99 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 May 2014 18:14:03 +0200
-Subject: [PATCH v1 3/5] phy: pci serdes phy driver for keystone
-In-Reply-To: <1400169692-9677-4-git-send-email-m-karicheri2@ti.com>
+Date: Thu, 15 May 2014 18:23:05 +0200
+Subject: [PATCH v1 5/5] pci: keystone: add pcie driver based on designware
+ core driver
+In-Reply-To: <1400169692-9677-6-git-send-email-m-karicheri2@ti.com>
 References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
- <1400169692-9677-4-git-send-email-m-karicheri2@ti.com>
-Message-ID: <9550746.D1ri3H0uvi@wuerfel>
+ <1400169692-9677-6-git-send-email-m-karicheri2@ti.com>
+Message-ID: <6048322.x3M3sdDEWO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 May 2014 12:01:30 Murali Karicheri wrote:
-> +static struct serdes_config ks_100mhz_pcie_5gbps_serdes[] = {
-> +       {0x0000, 0x00000800, 0x0000ff00},
-> +       {0x0060, 0x00041c5c, 0x00ffffff},
-> +       {0x0064, 0x0343c700, 0xffffff00},
-> +       {0x006c, 0x00000012, 0x000000ff},
-> +       {0x0068, 0x00070000, 0x00ff0000},
-> +       {0x0078, 0x0000c000, 0x0000ff00},
+On Thursday 15 May 2014 12:01:32 Murali Karicheri wrote:
 
-It looks like the PHY is generic, but the configuration above is
-PCI specific. If this is true, you should have #phy-cells=<1>
-and document the possible modes, adding a lookup table here to
-pick the configuration based on the argument. It's fine to just
-implement pcie-5ghz initially, but the binding should list all
-the modes that the PHY can support.
-
-Also, please list the exact name of the phy if you can find it
-out. You mention that you don't know the register descriptions,
-but you should at least be able to let us know what phy this
-is, in case some other SoC reuses the same thing.
-
-> +static int ks_phy_init(struct phy *phy)
+> +static int
+> +keystone_pcie_fault(unsigned long addr, unsigned int fsr,
+> +		struct pt_regs *regs)
 > +{
-> +       struct serdes_config *p;
-> +       struct phy_keystone *ks_phy = phy_get_drvdata(phy);
+> +	unsigned long instr = *(unsigned long *) instruction_pointer(regs);
 > +
-> +       int i;
+> +	if ((instr & 0x0e100090) == 0x00100090) {
+> +		int reg = (instr >> 12) & 15;
 > +
-> +       for (i = 0, p = &ks_100mhz_pcie_5gbps_serdes[0];
-> +               i < ARRAY_SIZE(ks_100mhz_pcie_5gbps_serdes);
-> +               i++, p++) {
-> +               reg_rmw((ks_phy->base + p->reg), p->val, p->mask);
-> +               reg_dump((ks_phy->base + p->reg), p->mask);
-> +       }
-> +       udelay(2000);
+> +		regs->uregs[reg] = -1;
+> +		regs->ARM_pc += 4;
+> +	}
+> +
+> +	return 0;
+> +}
 
-This should probably be msleep(2);
+This needs to check in the PCI host registers what happened and do
+some appropriate action. If the fault was not caused by PCIe, it
+should not be ignored here but get passed on to the next handler.
+
+> +static int __init ks_pcie_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct device *dev = &pdev->dev;
+> +	struct keystone_pcie *ks_pcie;
+> +	void __iomem *devstat;
+> +	struct pcie_port *pp;
+> +	struct resource *res;
+> +	struct phy *phy;
+> +	int ret = 0;
+> +	u32 val;
+> +
+> +	ks_pcie = devm_kzalloc(&pdev->dev, sizeof(*ks_pcie),
+> +				GFP_KERNEL);
+> +	if (!ks_pcie) {
+> +		dev_err(dev, "no memory for keystone pcie\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	/* check if serdes phy needs to be enabled */
+> +	if (of_get_property(np, "ti,init-phy", NULL) != NULL) {
+> +		phy = devm_phy_get(dev, "pcie-phy");
+> +			if (IS_ERR(phy))
+> +				return PTR_ERR(phy);
+> +
+> +		ret = phy_init(phy);
+> +		if (ret < 0)
+> +			return ret;
+> +	}
+
+I think you can just call devm_phy_get() unconditionally here and
+get rid of the ti,init-phy property. If there is no phy, don't
+initialize it.
+
+> +
+> +	ret = add_pcie_port(ks_pcie, pdev);
+> +	if (ret < 0)
+> +		goto fail_clk;
+> +
+> +	platform_set_drvdata(pdev, ks_pcie);
+
+Set the platform data first, then add the port.
+
+> +	dev_info(dev, "pcie rc probe success\n");
+
+Remove this.
+
+> +#ifdef CONFIG_PCI_KEYSTONE
+> +/*
+> + * The KeyStone PCIe controller has maximum read request size of 256 bytes.
+> + */
+> +static void quirk_limit_readrequest(struct pci_dev *dev)
+> +{
+> +	int readrq = pcie_get_readrq(dev);
+> +
+> +	if (readrq > 256)
+> +		pcie_set_readrq(dev, 256);
+> +}
+> +DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_readrequest);
+> +#endif /* CONFIG_PCI_KEYSTONE */
+
+This doesn't work: you can't just limit do this for all devices just based
+on PCI_KEYSTONE being enabled, you have to check if you are actually using
+this controller.
 
 	Arnd
