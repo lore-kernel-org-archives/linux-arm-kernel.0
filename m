@@ -1,39 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 15 May 2014 10:36:39 +0100
-Subject: [PATCHv3 2/3] ARM: mm: add support for HW coherent systems in
- PL310
-In-Reply-To: <1400145519-28530-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1400145519-28530-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140515093639.GF11117@localhost>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 15 May 2014 11:36:33 +0200
+Subject: [PATCH v2 2/3] drm/panel: add support for EDT panels
+In-Reply-To: <20140515090814.GB6434@ulmo>
+References: <cover.1400103181.git.stefan@agner.ch>
+ <35c081171a3d9a9401767601c02a12e266b37dd0.1400103181.git.stefan@agner.ch>
+ <20140515075102.GE5952@ulmo>
+ <1400142449.4102.16.camel@paszta.hi.pengutronix.de>
+ <20140515090814.GB6434@ulmo>
+Message-ID: <90bb509e9aa9c705790e2e0574d77b9f@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 10:18:38AM +0100, Thomas Petazzoni wrote:
-> When a PL310 cache is used on a system that provides hardware
-> coherency, the outer cache sync operation is useless, and can be
-> skipped. Moreover, on some systems, it is harmful as it causes
-> deadlocks between the Marvell coherency mechanism, the Marvell PCIe
-> controller and the Cortex-A9.
+Am 2014-05-15 11:08, schrieb Thierry Reding:
+> On Thu, May 15, 2014 at 10:27:29AM +0200, Philipp Zabel wrote:
+>> The ETM0700G0DH6 Datasheet lists 2 lines as the typical vsync pulse
+>> width, 525 lines as the vertical period, and 35 lines as the vsync -de
+>> time, which is vsync len + back porch.
+>> So vertical timings 480 + 10 + 2 + 33 = 525 should be valid for the
+>> ET0700G0DH6 panel:
 > 
-> To avoid this, this commit introduces a new Device Tree property
-> 'dma-coherent' for the L2 cache controller node, valid only for the
-> PL310 cache. It identifies the usage of the PL310 cache in an I/O
-> coherent configuration. Internally, it makes the driver use a
-> different set of l2x0_of_data, in which the ->sync operation is NULL.
-> 
-> Note that technically speaking, a fully coherent system wouldn't
-> require any of the other .outer_cache operations. However, in
-> practice, when booting secondary CPUs, these are not yet coherent, and
-> therefore a set of cache maintenance operations are necessary at this
-> point. This explains why we keep the other .outer_cache operations and
-> only ->sync is disabled.
-> 
-> While in theory any write to a PL310 register could cause the
-> deadlock, in practice, disabling ->sync is sufficient to workaround
-> the deadlock, since the other cache maintenance operations are only
-> used in very specific situations.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Shouldn't that work with 480 + 8 + 2 + 35 too? It seems to me that it
+> should still be safe for that panel. Similarily I'd expect your timings
+> to work on the ET070080DH6.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Am 2014-05-15 11:12, schrieb Thierry Reding:
+> Okay, so that means that the panel works for you with the same timings
+> that Philipp has in the ETM0700G0DH6 patch? If so then I definitely
+> think we should be sharing the timings in the driver by making the two
+> compatible entries point to the same driver data.
+
+FWIW, I checked and it works with both timings. And I bet it is really
+the same panel its just a different touch on top.
+
+> Irrespective of that they both seem to have different capabilities so
+> two compatible values should be fine. However for the purpose of the
+> simple panel driver they could be made to share the same timings if it
+> works for both panels and devices.
+> 
+> As for the touch panel on the ETM0700G0DH6, do you happen to know how
+> that's usually connected? I suspect it needs external hardware to
+> capture the YU, XL, YD and XR pins and turn that into raw coordinates
+> and pen down interrupts.
+
+For Colibri Evaluation Board, those pins are routed to the generic
+4-wire pins of the Colibri SO-DIMM. On the Colibri T30 module, those
+pins are connected to a STMPE811. I also added that to the device tree
+once, however it does not work properly atm, I need to debug this and
+will send a patch at a later time.
+
+--
+Stefan
