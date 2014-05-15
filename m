@@ -1,159 +1,50 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 15 May 2014 20:32:11 +0900
-Subject: [PATCH v6 16/17] ARM: shmobile: Remove Marzen reference DTS
-In-Reply-To: <1400153532-23675-1-git-send-email-horms+renesas@verge.net.au>
-References: <1400153532-23675-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1400153532-23675-17-git-send-email-horms+renesas@verge.net.au>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Thu, 15 May 2014 13:34:06 +0200
+Subject: [PATCH] FIX:cache:exynos: Execute the cache reconfiguration
+ unconditionally for Exynos4
+Message-ID: <1400153646-827-1-git-send-email-l.majewski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the DTS file r8a7779-marzen.dts can be used with
-board-marzen.c and board-marzen-reference.c, proceed with removing
-r8a7779-marzen-reference.dts.
+The commit 2bf73dd61a84cdf27e49f48e08739af6ba70ace1 has made the cache
+configuration depending on definition of CONFIG_S5P_SLEEP Kconfig flag.
+It is enabled on various S5PV210 incarnations and not available at Exynos4
+family of SoCs.
 
-Based on work for the Koelsch board by Laurent Pinchart.
+The problem emerges when one wants to disable/enable core via hotplug - e.g:
+echo 0 > /sys/devices/system/cpu/cpu1/online.
+When CONFIG_CPU_IDLE is enabled (it is not enabled at default exynos_defconfig).
 
-Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On Exynos4 based targets (Exynos4412 and Exynos4210, namely trats2 and
+trats) board locks up and consumes considerable power.
 
+This patch does nothing more than restoration of the state before the
+offending commit.
+
+Tested on top of next-20140514 at Trats board.
+
+Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
 ---
-v6
-* Rebase
+ arch/arm/mach-exynos/exynos.c |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-v5
-* As suggested by Magnus Damm
-  - Refer to r8a7779 instead of r8a7790 in the changelog
----
- arch/arm/boot/dts/r8a7779-marzen-reference.dts | 121 -------------------------
- 1 file changed, 121 deletions(-)
- delete mode 100644 arch/arm/boot/dts/r8a7779-marzen-reference.dts
-
-diff --git a/arch/arm/boot/dts/r8a7779-marzen-reference.dts b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-deleted file mode 100644
-index b27c637..0000000
---- a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-+++ /dev/null
-@@ -1,121 +0,0 @@
--/*
-- * Reference Device Tree Source for the Marzen board
-- *
-- * Copyright (C) 2013 Renesas Solutions Corp.
-- * Copyright (C) 2013 Simon Horman
-- *
-- * This file is licensed under the terms of the GNU General Public License
-- * version 2.  This program is licensed "as is" without any warranty of any
-- * kind, whether express or implied.
-- */
--
--/dts-v1/;
--#include "r8a7779.dtsi"
--#include <dt-bindings/gpio/gpio.h>
--#include <dt-bindings/interrupt-controller/irq.h>
--
--/ {
--	model = "marzen";
--	compatible = "renesas,marzen-reference", "renesas,r8a7779";
--
--	chosen {
--		bootargs = "console=ttySC2,115200 earlyprintk=sh-sci.2,115200 ignore_loglevel root=/dev/nfs ip=on rw";
--	};
--
--	memory {
--		device_type = "memory";
--		reg = <0x60000000 0x40000000>;
--	};
--
--	fixedregulator3v3: fixedregulator at 0 {
--		compatible = "regulator-fixed";
--		regulator-name = "fixed-3.3V";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--		regulator-boot-on;
--		regulator-always-on;
--	};
--
--	lan0 at 18000000 {
--		compatible = "smsc,lan9220", "smsc,lan9115";
--		reg = <0x18000000 0x100>;
--		pinctrl-0 = <&lan0_pins>;
--		pinctrl-names = "default";
--
--		phy-mode = "mii";
--		interrupt-parent = <&irqpin0>;
--		interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
--		smsc,irq-push-pull;
--		reg-io-width = <4>;
--		vddvario-supply = <&fixedregulator3v3>;
--		vdd33a-supply = <&fixedregulator3v3>;
--	};
--
--	leds {
--		compatible = "gpio-leds";
--		led2 {
--			gpios = <&gpio4 29 GPIO_ACTIVE_HIGH>;
--		};
--		led3 {
--			gpios = <&gpio4 30 GPIO_ACTIVE_HIGH>;
--		};
--		led4 {
--			gpios = <&gpio4 31 GPIO_ACTIVE_HIGH>;
--		};
--	};
--};
--
--&irqpin0 {
--	status = "okay";
--};
--
--&pfc {
--	pinctrl-0 = <&scif2_pins &scif4_pins>;
--	pinctrl-names = "default";
--
--	lan0_pins: lan0 {
--		intc {
--			renesas,groups = "intc_irq1_b";
--			renesas,function = "intc";
--		};
--		lbsc {
--			renesas,groups = "lbsc_ex_cs0";
--			renesas,function = "lbsc";
--		};
--	};
--
--	scif2_pins: serial2 {
--		renesas,groups = "scif2_data_c";
--		renesas,function = "scif2";
--	};
--
--	scif4_pins: serial4 {
--		renesas,groups = "scif4_data";
--		renesas,function = "scif4";
--	};
--
--	sdhi0_pins: sd0 {
--		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd";
--		renesas,function = "sdhi0";
--	};
--
--	hspi0_pins: hspi0 {
--		renesas,groups = "hspi0";
--		renesas,function = "hspi0";
--	};
--};
--
--&sdhi0 {
--	pinctrl-0 = <&sdhi0_pins>;
--	pinctrl-names = "default";
--
--	vmmc-supply = <&fixedregulator3v3>;
--	bus-width = <4>;
--	status = "okay";
--};
--
--&hspi0 {
--	pinctrl-0 = <&hspi0_pins>;
--	pinctrl-names = "default";
--	status = "okay";
--};
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 1b97b93..5c8b334 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -254,10 +254,9 @@ static int __init exynos4_l2x0_cache_init(void)
+ 	if (ret)
+ 		return ret;
+ 
+-	if (IS_ENABLED(CONFIG_S5P_SLEEP)) {
+-		l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
+-		clean_dcache_area(&l2x0_regs_phys, sizeof(unsigned long));
+-	}
++	l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
++	clean_dcache_area(&l2x0_regs_phys, sizeof(unsigned long));
++
+ 	return 0;
+ }
+ early_initcall(exynos4_l2x0_cache_init);
 -- 
-1.8.5.2
+1.7.10.4
