@@ -1,60 +1,59 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 14 May 2014 23:29:37 -0700
-Subject: [GIT PULL][for 3.16] pull request for clk-hisi
-In-Reply-To: <CAD6h2NTBdtEUEvcG9ZrquacRUjc3LAOiOQdR+09MGk=9w48GDQ@mail.gmail.com>
-References: <CAD6h2NTBdtEUEvcG9ZrquacRUjc3LAOiOQdR+09MGk=9w48GDQ@mail.gmail.com>
-Message-ID: <20140515062937.9521.55251@quantum>
+Date: Wed, 14 May 2014 23:41:28 -0700
+Subject: [PATCH] clk/versatile: export symbols for impd1
+In-Reply-To: <1399560990-1402858-5-git-send-email-arnd@arndb.de>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-5-git-send-email-arnd@arndb.de>
+Message-ID: <20140515064128.9521.73638@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Haojian Zhuang (2014-05-11 20:53:04)
-> Hi Mike,
+Quoting Arnd Bergmann (2014-05-08 07:56:16)
+> The impd1 code on mach-integrator can be a loadable module,
+> so we have to export icst_clk_register, integrator_impd1_clk_init
+> and integrator_impd1_clk_exit.
 > 
-> Please help to pull clk-hisi-for-v3.16 branch for the next release.
-> 
-> Regards
-> Haojian
-> 
-> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-> 
->   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
-> tags/clk-hisi-for-v3.16
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
 
-Pulled.
+Taken into clk-next.
 
-Thanks,
+Thanks!
 Mike
 
+> ---
+>  drivers/clk/versatile/clk-icst.c  | 1 +
+>  drivers/clk/versatile/clk-impd1.c | 2 ++
+>  2 files changed, 3 insertions(+)
 > 
-> for you to fetch changes up to 5efaf09021a5817e5a274aa2d2fad8d92d12ed92:
+> diff --git a/drivers/clk/versatile/clk-icst.c b/drivers/clk/versatile/clk-icst.c
+> index a820b0c..7f3868a 100644
+> --- a/drivers/clk/versatile/clk-icst.c
+> +++ b/drivers/clk/versatile/clk-icst.c
+> @@ -160,3 +160,4 @@ struct clk *icst_clk_register(struct device *dev,
+>  
+>         return clk;
+>  }
+> +EXPORT_SYMBOL_GPL(icst_clk_register);
+> diff --git a/drivers/clk/versatile/clk-impd1.c b/drivers/clk/versatile/clk-impd1.c
+> index 31b44f0..264d8d5 100644
+> --- a/drivers/clk/versatile/clk-impd1.c
+> +++ b/drivers/clk/versatile/clk-impd1.c
+> @@ -133,6 +133,7 @@ void integrator_impd1_clk_init(void __iomem *base, unsigned int id)
+>         for (i = 0; i < ARRAY_SIZE(imc->clks); i++)
+>                 clkdev_add(imc->clks[i]);
+>  }
+> +EXPORT_SYMBOL_GPL(integrator_impd1_clk_init);
+>  
+>  void integrator_impd1_clk_exit(unsigned int id)
+>  {
+> @@ -155,3 +156,4 @@ void integrator_impd1_clk_exit(unsigned int id)
+>         kfree(imc->vco2name);
+>         kfree(imc->vco1name);
+>  }
+> +EXPORT_SYMBOL_GPL(integrator_impd1_clk_exit);
+> -- 
+> 1.8.3.2
 > 
->   clk: hisi: add clk-hix5hd2.c (2014-05-12 11:30:32 +0800)
-> 
-> ----------------------------------------------------------------
-> enable hix5hd2 clock
-> 
-> ----------------------------------------------------------------
-> Zhangfei Gao (3):
->       clk: hisi: use clk_register_mux_table in hisi_clk_register_mux
->       clk: hisi: add hisi_clk_register_gate
->       clk: hisi: add clk-hix5hd2.c
-> 
->  Documentation/devicetree/bindings/clock/hix5hd2-clock.txt |  31
-> +++++++++++++++++++
->  drivers/clk/Makefile                                      |   1 +
->  drivers/clk/hisilicon/Makefile                            |   1 +
->  drivers/clk/hisilicon/clk-hix5hd2.c                       | 101
-> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/hisilicon/clk.c                               |  41
-> +++++++++++++++++++++---
->  drivers/clk/hisilicon/clk.h                               |   3 ++
->  include/dt-bindings/clock/hix5hd2-clock.h                 |  58
-> ++++++++++++++++++++++++++++++++++
->  7 files changed, 231 insertions(+), 5 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/hix5hd2-clock.txt
->  create mode 100644 drivers/clk/hisilicon/clk-hix5hd2.c
->  create mode 100644 include/dt-bindings/clock/hix5hd2-clock.h
