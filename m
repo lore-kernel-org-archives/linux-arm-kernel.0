@@ -1,149 +1,307 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 15 May 2014 11:50:10 +0200
-Subject: [RFC PATCHv1 0/7] ARM core support for hardware I/O coherency
- in non-SMP platforms
-In-Reply-To: <20140514170456.GC15946@arm.com>
-References: <1400082641-23871-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140514170456.GC15946@arm.com>
-Message-ID: <20140515115010.0d6a4d92@free-electrons.com>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Thu, 15 May 2014 15:29:56 +0530
+Subject: [PATCH v4 5/8] clk: exynos: use cpu-clock provider type to
+ represent arm clock.
+In-Reply-To: <20140515101039.2854bbbf@amdc2363>
+References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
+ <1400029876-5830-6-git-send-email-thomas.ab@samsung.com>
+ <20140514213729.19795.77753@quantum>
+ <CAJuA9aiq6zzsdwDhGBUdnFDvtX65V1K_L4KgXpFpWvua18bfBw@mail.gmail.com>
+ <20140515101039.2854bbbf@amdc2363>
+Message-ID: <CAJuA9ahnhb9+tukYaM_8gfThNBO5OO6eBcUzf5v+Lrf7w_PPuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin,
+On Thu, May 15, 2014 at 1:40 PM, Lukasz Majewski <l.majewski@samsung.com> wrote:
+> Hi Thomas,
+>
+>> On Thu, May 15, 2014 at 3:07 AM, Mike Turquette
+>> <mturquette@linaro.org> wrote:
+>> > Quoting Thomas Abraham (2014-05-13 18:11:13)
+>> >> From: Thomas Abraham <thomas.ab@samsung.com>
+>> >>
+>> >> With the addition of the new Samsung specific cpu-clock type, the
+>> >> arm clock can be represented as a cpu-clock type and the
+>> >> independent clock blocks that made up the arm clock can be removed.
+>> >
+>> > <rant>
+>> >
+>> > I am not a fan of this type of "clock hiding". Certainly the design
+>> > of the CCF allows for a clock provider to obfuscate it's internals;
+>> > there was never a requirement that every clock node be exposed to
+>> > Linux as a struct clk. A truly obfuscated system could only expose
+>> > leaf clocks that are consumed by Linux device drivers, and never
+>> > expose any of the intermediary clocks in between the input clock
+>> > signal (if it exists) and the leaf nodes.
+>> >
+>> > However I feel that this patch is more of a workaround to the fact
+>> > that the clock framework today does not make DVFS transitions (or
+>> > coordinated, multi-clock rate change transitions) easy to control.
+>> > The generic "walk up the tree" algorithm might give you the right
+>> > rate, but perhaps using a non-validated combination of PLL
+>> > frequency and adjustable-rate dividers, or a combination that his
+>> > higher jitter or is more likely to unlock at higher temperatures,
+>> > etc.
+>> >
+>> > Back in the pre-CCF days lots of folks implemented this with
+>> > "virtual" clock nodes that simply called "clk_set_rate" or whatever
+>> > on the affected clocks, or even worse just banged a bunch of
+>> > registers.
+>> >
+>> > The cbus clock series for Tegra is also looks a little like this.
+>> >
+>> > </rant>
+>> >
+>> > Thomas,
+>> >
+>> > Would a coordinated clock rate change method solve this problem for
+>> > you in place of the cpu-clock provider type? A poorly conceived
+>> > call graph for this might look something like:
+>> >
+>> > clk_set_rate(div_arm2, 1000000);
+>> > -> if (div_arm2->coordinated == true)
+>> >         clk_coordinate_rates(div_arm2, 1000000);
+>> >         -> clk->ops->coordinate(div_arm2->hw, 1000000);
+>> >            -> vendor_supplied_magic()
+>> >
+>> > The vendor_supplied_magic() would be a callback that essentially
+>> > calls clk_set_rate() on all of the affected (coordinated) clocks.
+>> > In your case that looks like mout_core, div_core, div_core2,
+>> > arm_clk and sclk_apll for Exynos4.
+>
+> I might misinterpret the idea here, but is clk_set_rate() function
+> ready to handle atomic change for several clocks? Especially setting
+> rate of dividers located in the same register, represented as different
+> clocks to CCF.
+>
+> As fair as I remember it was not possible to serialize operations on
+> clocks with calling clk_set_rate() several times. Those had to be done
+> instantly, otherwise platform hanged.
+>
+> Am I missing something, or a major improvement had I overlooked?
 
-Thanks for having quickly taken a look.
+Hi Lukasz,
 
-On Wed, 14 May 2014 18:04:56 +0100, Catalin Marinas wrote:
-> On Wed, May 14, 2014 at 04:50:34PM +0100, Thomas Petazzoni wrote:
-> > This hardware I/O coherency mechanism needs a set of ARM core
-> > requirements to operate properly:
-> > 
-> >  * On Armada 370 (a single core processor)
-> > 
-> >    - The cache policy of pages must be set to "write allocate".
-> 
-> Arguably, I would make this the default for ARMv6+ CPUs even if UP. It's
-> a hint that the CPU may or may not ignore but it shouldn't break
-> anything (well, maybe some artificial benchmarks designed to show
-> that write-allocate caches are bad).
+Not sure what Mike would suggest here, but probably the clk_set_rate()
+itself might not be called for coordinated clocks. It could be some
+internal clock framework function that takes care of setting rate of
+coordinated clocks. I don't have a good understanding of how the
+implementation for this will look like.
 
-So, something like:
+Thanks,
+Thomas.
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index b68c6b2..a1d6845 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -57,7 +57,7 @@ pmd_t *top_pmd;
- #define CPOLICY_WRITEBACK      3
- #define CPOLICY_WRITEALLOC     4
- 
--static unsigned int cachepolicy __initdata = CPOLICY_WRITEBACK;
-+static unsigned int cachepolicy __initdata = CPOLICY_WRITEALLOC;
- static unsigned int ecc_mask __initdata = 0;
- pgprot_t pgprot_user;
- pgprot_t pgprot_kernel;
-@@ -408,14 +408,14 @@ static void __init build_mem_type_table(void)
-                if (cachepolicy > CPOLICY_WRITETHROUGH)
-                        cachepolicy = CPOLICY_WRITETHROUGH;
- #endif
-+               if (cachepolicy > CPOLICY_WRITEBACK)
-+                       cachepolicy = CPOLICY_WRITEBACK;
-        }
-        if (cpu_arch < CPU_ARCH_ARMv5) {
-                if (cachepolicy >= CPOLICY_WRITEALLOC)
-                        cachepolicy = CPOLICY_WRITEBACK;
-                ecc_mask = 0;
-        }
--       if (is_smp())
--               cachepolicy = CPOLICY_WRITEALLOC;
- 
-        /*
-         * Strip out features not present on earlier architectures.
-
-
-> >  * On Armada 375/38x (which have single core and dual core variants)
-> > 
-> >    - The cache policy of pages must be set to "write allocate".
-> >    - The SMP and TLB broadcast bits must be set in the Auxiliary
-> >      Control Register (the core is a Cortex-A9)
-> 
-> What about setting this bit in the firmware/bootloader? It's a sane
-> initialisation firmware should do.
-
-I'm sorry, but I don't buy the "fix your bootloader" argument. For
-various reasons:
-
- - The Linux kernel policy has always been to do *more* things in the
-   kernel, to avoid relying on crappy vendor-specific bootloaders, and
-   avoid having bugs that cannot be fixed at the kernel level. Going in
-   the opposite direction looks completely backward.
-
- - Doing so means crazy complex dependencies of kernel versions against
-   bootloader versions, which are a nightmare for users. Recently for
-   example, Olof Johansson (which, you will admit, is not the least
-   experienced in ARM stuff) had to struggle a long time to get a
-   mainline kernel boot on Allwinner kernel, because it was mandatory
-   to upgrade the bootloader to do so. He was annoyed, so you can
-   imagine how normal users can be annoyed. For us, platform
-   maintainers, who support users of the mainline kernel, it is a
-   *complete* pain to have such dependencies of a kernel version
-   towards a given bootloader version. We already have enough of such
-   bootloader/kernel issues to not add more when there are sane
-   solutions that allow the kernel to do its own thing without having
-   to make crazy assumptions about what the bootloader has done.
-
- - The kernel is setting the SMP and TLB broadcast bit already in
-   proc-v7.s when the system is SMP. What would these actions have to
-   be done in the bootloader when the system is non-SMP, but I/O
-   coherent, and done in the kernel when the system is SMP? This
-   doesn't make sense.
-
- - Many platforms, including Marvell ones, use vendor-specific
-   bootloaders that are *very* difficult to get fixed. Of course, it
-   would be a lot nicer to have mainline U-Boot/Barebox support for
-   those platforms, but it's not the case today.
-
-So, really, I would like the kernel to do this.
-
-> >    - The pages must be set as shareable.
-> 
-> Here you may have some conflict between the initial page tables set in
-> __create_page_tables as non-shareable (that's unless MPIDR shows it as
-> SMP but I guess not since smp-on-up kicks in).
-
-For Armada 375/385/XP, MPIDR shows SMP, but not for Armada 370 (hence
-the issue even when booting CONFIG_SMP=y on Armada 370). As for Armada
-380 (which is a single core variant of the Armada 385), I haven't had
-access to such platforms, so I'm not sure what the MPIDR will look
-like. But since it's single core, most users will want to build
-CONFIG_SMP=n for this platform, but still have hardware I/O coherency.
-
-> I have to think a bit
-> more about the implications (the ARM ARM has a chapter on mismatched
-> memory attributes and I think it talks about shareable vs
-> non-shareable).
-
-Unfortunately, __create_page_tables is called so early that I don't
-know if it's possible to access 'struct machine_desc' at this point to
-know whether the platform needs shareable pages or not.
-
-Also, don't we have the same problem with the TTB_FLAGS_{SMP,UP) ?
-
-> >    - The SCU must be enabled
-> 
-> Again, could the firmware do this?
-
-See above. If the kernel does it for SMP cases, why wouldn't it do it
-also for !SMP I/O coherent cases? It's either it's *always* done by the
-bootloader and we completely remove the SCU enabling code in the
-kernel, and add to the ARM boot protocol that enabling the SCU is the
-responsibility of the bootloader, or the kernel does the SCU enabling
-in all situations.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>
+>> >
+>> > The trick is that calling clk_set_rate() from any driver would
+>> > initiate this coordinated rate change, and then the exynos clock
+>> > driver would set up the coordinated clocks itself. No new API is
+>> > introduced to drivers (since it still uses clk_set_rate) and now a
+>> > new clock provider doesn't have to be invented every time we have a
+>> > couple of clocks involved in a DVFS transition.
+>> >
+>> > Does this sound right to you or have I horribly misinterpreted the
+>> > point of these clock patches?
+>>
+>> Mike,
+>>
+>> Thanks for your comments. If I have understood the coordinated clock
+>> as described above, I believe this patch series also attempts to do
+>> almost the same thing. The advantage of using coordinated clock over
+>> the approach in this series is that each platform need not define a
+>> new clock type.
+>>
+>> In this patch series, for all exynos SoC's, a new cpu clock type was
+>> introduced which is reusable for multi-cluster exynos SoCs as well.
+>> The new clock type is part of the clock driver and all drivers can use
+>> standard clock API to access this clock type instance.
+>>
+>> So probably, all the logic for the new cpu_clk clock type introduced
+>> in this patch would go into the vendor_supplied_magic() callback. So
+>> it sounds like the coordinated clock approach would be helpful. Is
+>> this something that you are already working on?
+>>
+>> Thanks,
+>> Thomas.
+>>
+>> >
+>> > Thanks,
+>> > Mike
+>> >
+>> >>
+>> >> Cc: Tomasz Figa <t.figa@samsung.com>
+>> >> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+>> >> ---
+>> >>  drivers/clk/samsung/clk-exynos4.c      |   25
+>> >> +++++++++---------------- drivers/clk/samsung/clk-exynos5250.c
+>> >> |   12 ++++++------ include/dt-bindings/clock/exynos5250.h |    1 +
+>> >>  3 files changed, 16 insertions(+), 22 deletions(-)
+>> >>
+>> >> diff --git a/drivers/clk/samsung/clk-exynos4.c
+>> >> b/drivers/clk/samsung/clk-exynos4.c index b4f9672..7e3bb16c 100644
+>> >> --- a/drivers/clk/samsung/clk-exynos4.c
+>> >> +++ b/drivers/clk/samsung/clk-exynos4.c
+>> >> @@ -471,7 +471,6 @@ static struct samsung_mux_clock
+>> >> exynos4210_mux_clks[] __initdata = { MUX(0, "mout_fimd1",
+>> >> group1_p4210, E4210_SRC_LCD1, 0, 4), MUX(0, "mout_mipi1",
+>> >> group1_p4210, E4210_SRC_LCD1, 12, 4), MUX(CLK_SCLK_MPLL,
+>> >> "sclk_mpll", mout_mpll_p, SRC_CPU, 8, 1),
+>> >> -       MUX(CLK_MOUT_CORE, "mout_core", mout_core_p4210, SRC_CPU,
+>> >> 16, 1), MUX(CLK_SCLK_VPLL, "sclk_vpll", sclk_vpll_p4210, SRC_TOP0,
+>> >> 8, 1), MUX(CLK_MOUT_FIMC0, "mout_fimc0", group1_p4210, SRC_CAM, 0,
+>> >> 4), MUX(CLK_MOUT_FIMC1, "mout_fimc1", group1_p4210, SRC_CAM, 4, 4),
+>> >> @@ -530,7 +529,6 @@ static struct samsung_mux_clock
+>> >> exynos4x12_mux_clks[] __initdata = { MUX(0, "mout_jpeg",
+>> >> mout_jpeg_p, E4X12_SRC_CAM1, 8, 1), MUX(CLK_SCLK_MPLL,
+>> >> "sclk_mpll", mout_mpll_p, SRC_DMC, 12, 1), MUX(CLK_SCLK_VPLL,
+>> >> "sclk_vpll", mout_vpll_p, SRC_TOP0, 8, 1),
+>> >> -       MUX(CLK_MOUT_CORE, "mout_core", mout_core_p4x12, SRC_CPU,
+>> >> 16, 1), MUX(CLK_MOUT_FIMC0, "mout_fimc0", group1_p4x12, SRC_CAM,
+>> >> 0, 4), MUX(CLK_MOUT_FIMC1, "mout_fimc1", group1_p4x12, SRC_CAM, 4,
+>> >> 4), MUX(CLK_MOUT_FIMC2, "mout_fimc2", group1_p4x12, SRC_CAM, 8, 4),
+>> >> @@ -572,8 +570,6 @@ static struct samsung_mux_clock
+>> >> exynos4x12_mux_clks[] __initdata = {
+>> >>
+>> >>  /* list of divider clocks supported in all exynos4 soc's */
+>> >>  static struct samsung_div_clock exynos4_div_clks[] __initdata = {
+>> >> -       DIV(0, "div_core", "mout_core", DIV_CPU0, 0, 3),
+>> >> -       DIV(0, "div_core2", "div_core", DIV_CPU0, 28, 3),
+>> >>         DIV(0, "div_fimc0", "mout_fimc0", DIV_CAM, 0, 4),
+>> >>         DIV(0, "div_fimc1", "mout_fimc1", DIV_CAM, 4, 4),
+>> >>         DIV(0, "div_fimc2", "mout_fimc2", DIV_CAM, 8, 4),
+>> >> @@ -619,8 +615,8 @@ static struct samsung_div_clock
+>> >> exynos4_div_clks[] __initdata = { DIV(0, "div_spi_pre2",
+>> >> "div_spi2", DIV_PERIL2, 8, 8), DIV(0, "div_audio1", "mout_audio1",
+>> >> DIV_PERIL4, 0, 4), DIV(0, "div_audio2", "mout_audio2", DIV_PERIL4,
+>> >> 16, 4),
+>> >> -       DIV(CLK_ARM_CLK, "arm_clk", "div_core2", DIV_CPU0, 28, 3),
+>> >> -       DIV(CLK_SCLK_APLL, "sclk_apll", "mout_apll", DIV_CPU0, 24,
+>> >> 3),
+>> >> +       DIV_F(CLK_SCLK_APLL, "sclk_apll", "mout_apll", DIV_CPU0,
+>> >> 24, 3,
+>> >> +                       CLK_GET_RATE_NOCACHE, 0),
+>> >>         DIV_F(0, "div_mipi_pre0", "div_mipi0", DIV_LCD0, 20, 4,
+>> >>                         CLK_SET_RATE_PARENT, 0),
+>> >>         DIV_F(0, "div_mmc_pre0", "div_mmc0", DIV_FSYS1, 8, 8,
+>> >> @@ -1003,12 +999,6 @@ static struct samsung_gate_clock
+>> >> exynos4x12_gate_clks[] __initdata = { 0),
+>> >>  };
+>> >>
+>> >> -static struct samsung_clock_alias exynos4_aliases[] __initdata = {
+>> >> -       ALIAS(CLK_MOUT_CORE, NULL, "moutcore"),
+>> >> -       ALIAS(CLK_ARM_CLK, NULL, "armclk"),
+>> >> -       ALIAS(CLK_SCLK_APLL, NULL, "mout_apll"),
+>> >> -};
+>> >> -
+>> >>  static struct samsung_clock_alias exynos4210_aliases[] __initdata
+>> >> = { ALIAS(CLK_SCLK_MPLL, NULL, "mout_mpll"),
+>> >>  };
+>> >> @@ -1241,6 +1231,9 @@ static void __init exynos4_clk_init(struct
+>> >> device_node *np, ARRAY_SIZE(exynos4210_gate_clks));
+>> >>                 samsung_clk_register_alias(exynos4210_aliases,
+>> >>                         ARRAY_SIZE(exynos4210_aliases));
+>> >> +               exynos_register_arm_clock(CLK_ARM_CLK,
+>> >> mout_core_p4210,
+>> >> +                       ARRAY_SIZE(mout_core_p4210), reg_base, np,
+>> >> NULL,
+>> >> +                       &samsung_clk_lock);
+>> >>         } else {
+>> >>                 samsung_clk_register_mux(exynos4x12_mux_clks,
+>> >>                         ARRAY_SIZE(exynos4x12_mux_clks));
+>> >> @@ -1250,11 +1243,11 @@ static void __init exynos4_clk_init(struct
+>> >> device_node *np, ARRAY_SIZE(exynos4x12_gate_clks));
+>> >>                 samsung_clk_register_alias(exynos4x12_aliases,
+>> >>                         ARRAY_SIZE(exynos4x12_aliases));
+>> >> +               exynos_register_arm_clock(CLK_ARM_CLK,
+>> >> mout_core_p4x12,
+>> >> +                       ARRAY_SIZE(mout_core_p4x12), reg_base, np,
+>> >> NULL,
+>> >> +                       &samsung_clk_lock);
+>> >>         }
+>> >>
+>> >> -       samsung_clk_register_alias(exynos4_aliases,
+>> >> -                       ARRAY_SIZE(exynos4_aliases));
+>> >> -
+>> >>         exynos4_clk_sleep_init();
+>> >>
+>> >>         pr_info("%s clocks: sclk_apll = %ld, sclk_mpll = %ld\n"
+>> >> @@ -1262,7 +1255,7 @@ static void __init exynos4_clk_init(struct
+>> >> device_node *np, exynos4_soc == EXYNOS4210 ? "Exynos4210" :
+>> >> "Exynos4x12", _get_rate("sclk_apll"), _get_rate("sclk_mpll"),
+>> >>                 _get_rate("sclk_epll"), _get_rate("sclk_vpll"),
+>> >> -               _get_rate("arm_clk"));
+>> >> +               _get_rate("armclk"));
+>> >>  }
+>> >>
+>> >>
+>> >> diff --git a/drivers/clk/samsung/clk-exynos5250.c
+>> >> b/drivers/clk/samsung/clk-exynos5250.c index e7ee442..3fe1ca0
+>> >> 100644 --- a/drivers/clk/samsung/clk-exynos5250.c
+>> >> +++ b/drivers/clk/samsung/clk-exynos5250.c
+>> >> @@ -260,8 +260,6 @@ static struct samsung_mux_clock
+>> >> exynos5250_mux_clks[] __initdata = { */
+>> >>         MUX_FA(0, "mout_apll", mout_apll_p, SRC_CPU, 0, 1,
+>> >>                                         CLK_SET_RATE_PARENT, 0,
+>> >> "mout_apll"),
+>> >> -       MUX_A(0, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1,
+>> >> "mout_cpu"), -
+>> >>         /*
+>> >>          * CMU_CORE
+>> >>          */
+>> >> @@ -339,9 +337,8 @@ static struct samsung_div_clock
+>> >> exynos5250_div_clks[] __initdata = { /*
+>> >>          * CMU_CPU
+>> >>          */
+>> >> -       DIV(0, "div_arm", "mout_cpu", DIV_CPU0, 0, 3),
+>> >> -       DIV(0, "div_apll", "mout_apll", DIV_CPU0, 24, 3),
+>> >> -       DIV_A(0, "div_arm2", "div_arm", DIV_CPU0, 28, 3, "armclk"),
+>> >> +       DIV_F(0, "div_apll", "mout_apll", DIV_CPU0, 24, 3,
+>> >> +                       CLK_GET_RATE_NOCACHE, 0),
+>> >>
+>> >>         /*
+>> >>          * CMU_TOP
+>> >> @@ -721,10 +718,13 @@ static void __init
+>> >> exynos5250_clk_init(struct device_node *np)
+>> >> ARRAY_SIZE(exynos5250_div_clks));
+>> >> samsung_clk_register_gate(exynos5250_gate_clks,
+>> >> ARRAY_SIZE(exynos5250_gate_clks));
+>> >> +       exynos_register_arm_clock(CLK_ARM_CLK, mout_cpu_p,
+>> >> +                       ARRAY_SIZE(mout_cpu_p), reg_base, np, NULL,
+>> >> +                       &samsung_clk_lock);
+>> >>
+>> >>         exynos5250_clk_sleep_init();
+>> >>
+>> >>         pr_info("Exynos5250: clock setup completed, armclk=%ld\n",
+>> >> -                       _get_rate("div_arm2"));
+>> >> +                       _get_rate("armclk"));
+>> >>  }
+>> >>  CLK_OF_DECLARE(exynos5250_clk, "samsung,exynos5250-clock",
+>> >> exynos5250_clk_init); diff --git
+>> >> a/include/dt-bindings/clock/exynos5250.h
+>> >> b/include/dt-bindings/clock/exynos5250.h index 922f2dc..59a10fb
+>> >> 100644 --- a/include/dt-bindings/clock/exynos5250.h +++
+>> >> b/include/dt-bindings/clock/exynos5250.h @@ -21,6 +21,7 @@
+>> >>  #define CLK_FOUT_CPLL          6
+>> >>  #define CLK_FOUT_EPLL          7
+>> >>  #define CLK_FOUT_VPLL          8
+>> >> +#define CLK_ARM_CLK            12
+>> >>
+>> >>  /* gate for special clocks (sclk) */
+>> >>  #define CLK_SCLK_CAM_BAYER     128
+>> >> --
+>> >> 1.7.4.4
+>> >>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+>
+> --
+> Best regards,
+>
+> Lukasz Majewski
+>
+> Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
