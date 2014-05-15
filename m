@@ -1,61 +1,43 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 15 May 2014 17:26:36 +0400
-Subject: [PATCH v6 17/17] ARM: mvebu: add Device Tree description of the
- EHCI controller on Armada 375
-In-Reply-To: <1400149062-32661-18-git-send-email-gregory.clement@free-electrons.com>
-References: <1400149062-32661-1-git-send-email-gregory.clement@free-electrons.com>
- <1400149062-32661-18-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <5374C08C.7040700@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 May 2014 15:32:46 +0200
+Subject: [PATCH v6 1/3] ARM: kconfig: allow PCI support to be selected
+ with ARCH_MULTIPLATFORM
+In-Reply-To: <CAL_JsqLbWL136=dGZZfzPbPdF5HjhktYwLaVfbkOoo7Tr+g9Pg@mail.gmail.com>
+References: <1399478839-3564-1-git-send-email-will.deacon@arm.com>
+ <20140515123948.GD27594@arm.com>
+ <CAL_JsqLbWL136=dGZZfzPbPdF5HjhktYwLaVfbkOoo7Tr+g9Pg@mail.gmail.com>
+Message-ID: <10281549.JzWby2ApEY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thursday 15 May 2014 08:16:16 Rob Herring wrote:
+> On Thu, May 15, 2014 at 7:39 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, May 14, 2014 at 03:01:35PM +0100, Rob Herring wrote:
+> >> On Wed, May 7, 2014 at 11:07 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >> > When targetting ARCH_MULTIPLATFORM, we may include support for SoCs with
+> >> > PCI-capable devices (e.g. mach-virt with virtio-pci).
+> >> >
+> >> > This patch allows PCI support to be selected for these SoCs by selecting
+> >> > CONFIG_MIGHT_HAVE_PCI when CONFIG_ARCH_MULTIPLATFORM=y.
+> >>
+> >> I generally think we should select all options for multi-platform that
+> >> only serve to hide other options like this.
+> >>
+> >> You should remove the MIGHT_HAVE_PCI selections from all the
+> >> multi-platform enabled platforms as well.
+> >
+> > Something like the diff below?
+> 
+> Yes, but that raises another question as to what do we do with
+> PCI_DOMAINS? Probably should be a PCI host driver select, or given how
+> little code it controls it could just be removed. Anyway, that's a
+> problem for another day (or patch).
+> 
+> So with the below part added:
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
-On 05/15/2014 02:17 PM, Gregory CLEMENT wrote:
+I think we should also 'select PCI_DOMAINS if PCI' for multiplatform, but
+I agree it doesn't have to be in this patch.
 
-> The Marvell Armada 375 SoCs contains one EHCI controller. This commit
-
-    However, you're adding two. :-)
-
-> adds the Device Tree description of this interfaces at the SoC level,
-> and also enables the USB2 port on the Armada 375 DB platform.
-
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->   arch/arm/boot/dts/armada-375-db.dts |  4 ++++
->   arch/arm/boot/dts/armada-375.dtsi   | 16 ++++++++++++++++
->   2 files changed, 20 insertions(+)
-
-[...]
-
-> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-> index 7b303ecc2490..53baeb2f1fe8 100644
-> --- a/arch/arm/boot/dts/armada-375.dtsi
-> +++ b/arch/arm/boot/dts/armada-375.dtsi
-> @@ -320,6 +320,22 @@
->   				clocks = <&coreclk 0>;
->   			};
->
-> +			usb at 50000 {
-> +				compatible = "marvell,orion-ehci";
-> +				reg = <0x50000 0x500>;
-> +				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&gateclk 18>;
-> +				status = "disabled";
-> +			};
-> +
-> +			usb at 54000 {
-> +				compatible = "marvell,orion-ehci";
-> +				reg = <0x54000 0x500>;
-> +				interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&gateclk 26>;
-> +				status = "disabled";
-> +			};
-> +
->   			usb3 at 58000 {
->   				compatible = "marvell,armada-375-xhci";
->   				reg = <0x58000 0x20000>,<0x5b880 0x80>;
->
-
-WBR, Sergei
+	Arnd
