@@ -1,48 +1,55 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 15 May 2014 18:51:10 +0200
-Subject: [PATCH] clk: divider: Fix overflow in clk_divider_bestdiv
-In-Reply-To: <1399479850-25292-1-git-send-email-t.figa@samsung.com>
-References: <1399479850-25292-1-git-send-email-t.figa@samsung.com>
-Message-ID: <5374F07E.9070106@samsung.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 15 May 2014 12:52:31 -0400 (EDT)
+Subject: [PATCH v6 0/5] MCPM backend for Exynos5420
+In-Reply-To: <CAM4voakB57mgyQmtkpCUAF1BVW5z3BGsesvxvTuSg_JwBh-sxw@mail.gmail.com>
+References: <1399982324-27879-1-git-send-email-a.kesavan@samsung.com>
+ <alpine.LFD.2.11.1405131325060.980@knanqh.ubzr>
+ <CAM4voanvVwj+FuWazTGMHMnM64Cw_qK03D3o=raS43f_zWFfog@mail.gmail.com>
+ <alpine.LFD.2.11.1405140031490.980@knanqh.ubzr>
+ <CAM4voa=6osyXYg_XF=XuGRYmxLDUO+5=-i+cMrNW92fzBZJjfA@mail.gmail.com>
+ <alpine.LFD.2.11.1405140931380.980@knanqh.ubzr>
+ <CAM4voam29e7aK7n86_Mpj-wwvkchm-e68qA5=iUFou+sUMONig@mail.gmail.com>
+ <CAM4voakB57mgyQmtkpCUAF1BVW5z3BGsesvxvTuSg_JwBh-sxw@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1405151250070.17310@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Thu, 15 May 2014, Abhilash Kesavan wrote:
 
-On 07.05.2014 18:24, Tomasz Figa wrote:
-> Commit c686078 ("clk: divider: Add round to closest divider") introduced
-> a helper function to check whether given divisor is the best one instead
-> of direct check. However due to int type used instead of unsigned long
-> for passing calculated rates to this function in certain cases an
-> overflow could occur, for example when trying to obtain maximum possible
-> clock rate by calling clk_round_rate(..., UINT_MAX).
+> Hi Nicolas,
 > 
-> This patch fixes this issue by changing the type of rate, now and best
-> arguments of the function to unsigned long, which is the type that
-> should be used for clock rates.
+> On Wed, May 14, 2014 at 7:09 PM, Abhilash Kesavan
+> <kesavan.abhilash@gmail.com> wrote:
+> > Hi Nicolas,
+> >
+> > On Wed, May 14, 2014 at 7:03 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> >> On Wed, 14 May 2014, Abhilash Kesavan wrote:
+> >>
+> >>> Hi Nicolas,
+> >>>
+> >>> [...]
+> >>> >>
+> >>> >> 1) can't create /sys/devices/system/cpu/cpu//online: nonexistent directory
+> >>> >
+> >>> > What do you get if you do:
+> >>> >
+> >>> > $ ls -d /sys/devices/system/cpu/cpu?/online
+> >>> ls: /sys/devices/system/cpu/cpu//online: No such file or directory
+> >>
+> >> Somehow, you or your shell replaced the ? character into a / character.
+> >> You could try with a * instead.
+> > With a different RFS your script runs fine without any change. Will
+> > update with results once testing is done.
+> The script has been running for a few hours on my 5420 based
+> chromebook. I can see all the cores being hotplugged in/out. A snippet
+> of the prints, that I get on running the test, follows:
 > 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  drivers/clk/clk-divider.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index c572945..e0b360a 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -232,7 +232,7 @@ static int _div_round(struct clk_divider *divider, unsigned long parent_rate,
->  }
->  
->  static bool _is_best_div(struct clk_divider *divider,
-> -		int rate, int now, int best)
-> +		unsigned long rate, unsigned long now, unsigned long best)
->  {
->  	if (divider->flags & CLK_DIVIDER_ROUND_CLOSEST)
->  		return abs(rate - now) < abs(rate - best);
-> 
+[...]
 
-Ping. It's quite important fix as the issue makes all Exynos boards
-using sdhci-s3c almost unusable.
+Good, that looks pretty good.
 
-Best regards,
-Tomasz
+Once you implement full cluster shutdown I can provide you with another 
+script stressing that part.
+
+
+Nicolas
