@@ -1,59 +1,67 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 15 May 2014 14:11:13 -0500
-Subject: [RFC PATCHv1 0/7] ARM core support for hardware I/O coherency in
- non-SMP platforms
-In-Reply-To: <20140515152553.GA30423@localhost>
-References: <1400082641-23871-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140514170456.GC15946@arm.com>
- <20140515115010.0d6a4d92@free-electrons.com>
- <20140515142205.GC1499@arm.com>
- <CAL_JsqK80pFHQBgMxc1FGi998UYnbKxOK2gbm_ftqrTaxNq4rA@mail.gmail.com>
- <20140515152553.GA30423@localhost>
-Message-ID: <CAL_JsqKSzsyi-XmTKRK=87Z5wFzDjXaLNHj_irOM4V2-8ds1Tw@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 15 May 2014 21:17:20 +0200
+Subject: [PATCH v4 3/8] clk: samsung: add infrastructure to register cpu
+ clocks
+In-Reply-To: <CAD=FV=XmVNwwZY_LM6Za-p7gg6CPh1mGj=BoWvG0Q-Cx9L_A9Q@mail.gmail.com>
+References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
+ <1400029876-5830-4-git-send-email-thomas.ab@samsung.com>
+ <CAD=FV=XmVNwwZY_LM6Za-p7gg6CPh1mGj=BoWvG0Q-Cx9L_A9Q@mail.gmail.com>
+Message-ID: <12969374.fAYJcpG05n@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 10:25 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, May 15, 2014 at 03:59:31PM +0100, Rob Herring wrote:
->> On Thu, May 15, 2014 at 9:22 AM, Catalin Marinas
->> <catalin.marinas@arm.com> wrote:
->> > On Thu, May 15, 2014 at 10:50:10AM +0100, Thomas Petazzoni wrote:
->> >> On Wed, 14 May 2014 18:04:56 +0100, Catalin Marinas wrote:
->> >> > On Wed, May 14, 2014 at 04:50:34PM +0100, Thomas Petazzoni wrote:
->> >> > >    - The SCU must be enabled
->> >> >
->> >> > Again, could the firmware do this?
->> >>
->> >> See above. If the kernel does it for SMP cases, why wouldn't it do it
->> >> also for !SMP I/O coherent cases?
->> >
->> > The I/O coherency is an SoC property rather than an ARM architecture
->> > property. I want to separate the two so that the kernel can boot a
->> > significant part assuming sane architecture settings. Once you have DT
->> > available and start loading device drivers, you are in the SoC realm and
->> > you can do whatever initialisation for buses, interconnects, but not
->> > going back to change architected settings.
->>
->> The SCU has nothing to do with the architecture and really is part of
->> the SOC.
->
-> Indeed, it's not part of the architecture but I don't see it any
-> different than other early configuration like SDRAM controller.
->
->> Let's look at this another way. Are there any usecases where
->> you would not enable the SCU? If any cores are coherent or the ACP is
->> coherent, it must be on. So that leaves all core in AMP mode. In this
->> case, does it matter if the SCU is enabled or not?
->
-> I don't fully follow the question. You may not enable the SCU if you
-> don't care at all about the SMP mode or other coherency like ACP.
-> Otherwise it should be enabled, the latest before the secondaries start.
+Am Donnerstag, 15. Mai 2014, 11:18:44 schrieb Doug Anderson:
+> Thomas,
+> 
+> On Tue, May 13, 2014 at 6:11 PM, Thomas Abraham <ta.omasab@gmail.com> wrote:
+> > From: Thomas Abraham <thomas.ab@samsung.com>
+> > +static int exynos4210_armclk_pre_rate_change(struct clk_notifier_data
+> > *ndata, +                       struct exynos_cpuclk *armclk, void
+> > __iomem *base) +{
+> > +       struct exynos4210_armclk_data *armclk_data = armclk->data;
+> > +       unsigned long alt_prate = clk_get_rate(armclk->alt_parent);
+> > +       unsigned long alt_div, div0, div1, tdiv0, mux_reg;
+> > +       unsigned long cur_armclk_rate, timeout;
+> > +       unsigned long flags;
+> > +
+> > +       /* find out the divider values to use for clock data */
+> > +       while (armclk_data->prate != ndata->new_rate) {
+> > +               if (armclk_data->prate == 0)
+> > +                       return -EINVAL;
+> > +               armclk_data++;
+> > +       }
+> > +
+> > +       div0 = armclk_data->div0;
+> > +       div1 = armclk_data->div1;
+> > +       if (readl(base + SRC_CPU) & EXYNOS4210_MUX_HPM_MASK) {
+> > +               div1 = readl(base + DIV_CPU1) & EXYNOS4210_DIV1_HPM_MASK;
+> > +               div1 |= ((armclk_data->div1) & ~EXYNOS4210_DIV1_HPM_MASK);
+> > +       }
+> > +
+> > +       /*
+> > +        * if the new and old parent clock speed is less than the clock
+> > speed +        * of the alternate parent, then it should be ensured that
+> > at no point +        * the armclk speed is more than the old_prate until
+> > the dividers are +        * set.
+> > +        */
+> > +       tdiv0 = readl(base + DIV_CPU0);
+> > +       cur_armclk_rate = ndata->old_rate / EXYNOS4210_ARM_DIV1(tdiv0) /
+> > +                               EXYNOS4210_ARM_DIV2(tdiv0);
+> > +       if (alt_prate > cur_armclk_rate) {
+> > +               alt_div = _calc_div(alt_prate, cur_armclk_rate);
+> > +               _exynos4210_set_armclk_div(base, alt_div);
+> > +               div0 |= alt_div;
+> 
+> Don't you need to up the voltage here, too?  ...I haven't reviewed
+> this whole patch (so perhaps it's elsewhere in the patch or in the
+> series), but I stumbled upon this while trying to solve a different
+> problem and figured I'd check...
 
-My question is should the kernel unconditionally enable the SCU
-regardless of CONFIG_SMP or any other condition? Is there harm in
-enabling the SCU when in AMP mode? I'm just looking to simplify the
-kernel side since this probably can't be moved to the bootloader in
-all cases.
+setting the voltage should be done by the cpufreq driver like cpufreq-cpu0 - 
+whose usage this series intents to allow.
 
-Rob
+As I've hijacked Thomas' concept for my current rockchip clock work, I've 
+already seen this working nicely :-) .
+
+
+Heiko
