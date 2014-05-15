@@ -1,146 +1,223 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 15 May 2014 20:31:58 +0900
-Subject: [PATCH v6 03/17] ARM: shmobile: Sync Marzen DTS with Marzen reference
- DTS
+Date: Thu, 15 May 2014 20:31:57 +0900
+Subject: [PATCH v6 02/17] ARM: shmobile: r8a7779: Add clocks
 In-Reply-To: <1400153532-23675-1-git-send-email-horms+renesas@verge.net.au>
 References: <1400153532-23675-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1400153532-23675-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1400153532-23675-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Copy the device nodes from Marzen reference into the Marzen device tree
-file. This will allow us to use a single DTS file regardless of kernel
-configuration. In case of legacy C board code the device nodes may or
-may not be used, but in the multiplatform case all the DT device nodes
-will be used.
+Declare all core and MSTP clocks currently used by r8a7779-based boards.
 
-Based on a similar change for the Lager board by Laurent Pinchart.
+Based on work by Laurent Pinchart for the r8a7790 and r8a7791 SoCs.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Laurent Pinchart <laurent.pinchart at ideasonboard.com
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 ---
 v6
-* Updated for recent changes to Marzen reference DTS
+* Add Ack by Laurent Pinchart
 
-v4 - v5
-* No change
+v5
+* As suggested by Laurent Pinchart
+  - Do not add duplicate HSPI or USB clocks
+  - Add TMU1 and TMU2 clocks instead of duplicate TMU0 clocks
+
+v4
+* As suggested by Laurent Pinchart
+  - Do not duplicate clocks
+  - Use TMU2 and TMU1 instead of TMU0 three times.
+  - Correct order of tmu clock output names
+  - Use usb01 and usb2 as clock output names instead
+    of ehci0 and ehci1.
+* As suggested by Geert Uytterhoeven
+  - Wrap lines at < 80columns
+  - Beef-up short lines towards 80 columns
+* As suggested by Laurent Pinchart
+  - Add HSCIF clocks
+  - Correct many clock sources
+  - Correct reg of cpg_clocks
+* Add CPG clock "b" which is now part of the binding
 
 v3
-* Updated for recent changes to Marzen reference DTS
----
- arch/arm/boot/dts/r8a7779-marzen.dts | 94 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 94 insertions(+)
+* As suggested by Laurent Pinchart
+  - Add and use extal_clk
+  - Fix bogus status register use for MSTP clocks
+  - Fix bogus mstp3_cls to use its own entries rather than
+    that of mstp1_clks
 
-diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
-index a7af2c2..ddf9b9e 100644
---- a/arch/arm/boot/dts/r8a7779-marzen.dts
-+++ b/arch/arm/boot/dts/r8a7779-marzen.dts
-@@ -11,6 +11,8 @@
+* Update to use "main" in cpg_clocks as per updated
+  binding in previous patch
+* Update for new, consolidated and renamed index macros
+  - R8A7779_CLK_ETHER
+  - R8A7779_CLK_HSCIF
+  - R8A7779_CLK_HSPI
+  - R8A7779_CLK_MMC0,1
+  - R8A7779_CLK_PCIE
+  - R8A7779_CLK_USB01,2
+---
+ arch/arm/boot/dts/r8a7779.dtsi | 144 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 144 insertions(+)
+
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index b517c8e..5a62970 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -11,6 +11,7 @@
  
- /dts-v1/;
- #include "r8a7779.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
+ /include/ "skeleton.dtsi"
+ 
++#include <dt-bindings/clock/r8a7779-clock.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
  
  / {
- 	model = "marzen";
-@@ -24,4 +26,96 @@
- 		device_type = "memory";
- 		reg = <0x60000000 0x40000000>;
+@@ -265,4 +266,147 @@
+ 		#size-cells = <0>;
+ 		status = "disabled";
  	};
 +
-+	fixedregulator3v3: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "fixed-3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
++	clocks {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
 +
-+	lan0 at 18000000 {
-+		compatible = "smsc,lan9220", "smsc,lan9115";
-+		reg = <0x18000000 0x100>;
-+		pinctrl-0 = <&lan0_pins>;
-+		pinctrl-names = "default";
-+
-+		phy-mode = "mii";
-+		interrupt-parent = <&irqpin0>;
-+		interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
-+		smsc,irq-push-pull;
-+		reg-io-width = <4>;
-+		vddvario-supply = <&fixedregulator3v3>;
-+		vdd33a-supply = <&fixedregulator3v3>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		led2 {
-+			gpios = <&gpio4 29 GPIO_ACTIVE_HIGH>;
++		/* External root clock */
++		extal_clk: extal_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			/* This value must be overriden by the board. */
++			clock-frequency = <0>;
++			clock-output-names = "extal";
 +		};
-+		led3 {
-+			gpios = <&gpio4 30 GPIO_ACTIVE_HIGH>;
++
++		/* Special CPG clocks */
++		cpg_clocks: cpg_clocks at 0xe6150000 {
++			compatible = "renesas,r8a7779-cpg-clocks";
++			reg = <0 0xffc80000 0 0x30>;
++			clocks = <&extal_clk>;
++			#clock-cells = <1>;
++			clock-output-names = "plla", "z", "zs", "s",
++					     "s1", "p", "b", "out";
 +		};
-+		led4 {
-+			gpios = <&gpio4 31 GPIO_ACTIVE_HIGH>;
++
++		/* Fixed factor clocks */
++		i_clk: i_clk {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
++			#clock-cells = <0>;
++			clock-div = <2>;
++			clock-mult = <1>;
++			clock-output-names = "i";
++		};
++		s3_clk: s3_clk {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
++			#clock-cells = <0>;
++			clock-div = <8>;
++			clock-mult = <1>;
++			clock-output-names = "s3";
++		};
++		s4_clk: s4_clk {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
++			#clock-cells = <0>;
++			clock-div = <16>;
++			clock-mult = <1>;
++			clock-output-names = "s4";
++		};
++		g_clk: g_clk {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
++			#clock-cells = <0>;
++			clock-div = <24>;
++			clock-mult = <1>;
++			clock-output-names = "g";
++		};
++
++		/* Gate clocks */
++		mstp0_clks: mstp0_clks {
++			compatible = "renesas,r8a7779-mstp-clocks",
++			             "renesas,cpg-mstp-clocks";
++			reg = <0 0xffc80030 0 4>;
++			clocks = <&cpg_clocks R8A7779_CLK_S>,
++			         <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_S>,
++				 <&cpg_clocks R8A7779_CLK_S>,
++				 <&cpg_clocks R8A7779_CLK_S1>,
++				 <&cpg_clocks R8A7779_CLK_S1>,
++				 <&cpg_clocks R8A7779_CLK_S1>,
++				 <&cpg_clocks R8A7779_CLK_S1>,
++				 <&cpg_clocks R8A7779_CLK_S1>,
++				 <&cpg_clocks R8A7779_CLK_S1>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>;
++			#clock-cells = <1>;
++			renesas,clock-indices = <
++				R8A7779_CLK_HSPI R8A7779_CLK_TMU2
++				R8A7779_CLK_TMU1 R8A7779_CLK_TMU0
++				R8A7779_CLK_HSCIF1 R8A7779_CLK_HSCIF0
++				R8A7779_CLK_SCIF5 R8A7779_CLK_SCIF4
++				R8A7779_CLK_SCIF3 R8A7779_CLK_SCIF2
++				R8A7779_CLK_SCIF1 R8A7779_CLK_SCIF0
++				R8A7779_CLK_I2C3 R8A7779_CLK_I2C2
++				R8A7779_CLK_I2C1 R8A7779_CLK_I2C0
++			>;
++			clock-output-names =
++				"hspi", "tmu2", "tmu1", "tmu0", "hscif1",
++				"hscif0", "scif5", "scif4", "scif3", "scif2",
++				"scif1", "scif0", "i2c3", "i2c2", "i2c1",
++				"i2c0";
++		};
++		mstp1_clks: mstp1_clks {
++			compatible = "renesas,r8a7779-mstp-clocks",
++			             "renesas,cpg-mstp-clocks";
++			reg = <0 0xffc80034 0 4>, <0 0xffc80044 0 4>;
++			clocks = <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_S>,
++				 <&cpg_clocks R8A7779_CLK_S>,
++				 <&cpg_clocks R8A7779_CLK_S>,
++				 <&cpg_clocks R8A7779_CLK_S>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_S>;
++			#clock-cells = <1>;
++			renesas,clock-indices = <
++				R8A7779_CLK_USB01 R8A7779_CLK_USB2
++				R8A7779_CLK_DU R8A7779_CLK_VIN2
++				R8A7779_CLK_VIN1 R8A7779_CLK_VIN0
++				R8A7779_CLK_ETHER R8A7779_CLK_SATA
++				R8A7779_CLK_PCIE R8A7779_CLK_VIN3
++			>;
++			clock-output-names =
++				"usb01", "usb2",
++				"du", "vin2",
++				"vin1", "vin0",
++				"ether", "sata",
++				"pcie", "vin3";
++		};
++		mstp3_clks: mstp3_clks {
++			compatible = "renesas,r8a7779-mstp-clocks",
++			             "renesas,cpg-mstp-clocks";
++			reg = <0 0xffc8003c 0 4>;
++			clocks = <&s4_clk>, <&s4_clk>, <&s4_clk>, <&s4_clk>,
++				 <&s4_clk>, <&s4_clk>;
++			#clock-cells = <1>;
++			renesas,clock-indices = <
++				R8A7779_CLK_SDHI3 R8A7779_CLK_SDHI2
++				R8A7779_CLK_SDHI1 R8A7779_CLK_SDHI0
++				R8A7779_CLK_MMC1 R8A7779_CLK_MMC0
++			>;
++			clock-output-names =
++				"sdhi3", "sdhi2", "sdhi1", "sdhi0",
++				"mmc1", "mmc0";
 +		};
 +	};
-+};
-+
-+&irqpin0 {
-+	status = "okay";
-+};
-+
-+&pfc {
-+	pinctrl-0 = <&scif2_pins &scif4_pins>;
-+	pinctrl-names = "default";
-+
-+	lan0_pins: lan0 {
-+		intc {
-+			renesas,groups = "intc_irq1_b";
-+			renesas,function = "intc";
-+		};
-+		lbsc {
-+			renesas,groups = "lbsc_ex_cs0";
-+			renesas,function = "lbsc";
-+		};
-+	};
-+
-+	scif2_pins: serial2 {
-+		renesas,groups = "scif2_data_c";
-+		renesas,function = "scif2";
-+	};
-+
-+	scif4_pins: serial4 {
-+		renesas,groups = "scif4_data";
-+		renesas,function = "scif4";
-+	};
-+
-+	sdhi0_pins: sd0 {
-+		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd";
-+		renesas,function = "sdhi0";
-+	};
-+
-+	hspi0_pins: hspi0 {
-+		renesas,groups = "hspi0";
-+		renesas,function = "hspi0";
-+	};
-+};
-+
-+&sdhi0 {
-+	pinctrl-0 = <&sdhi0_pins>;
-+	pinctrl-names = "default";
-+
-+	vmmc-supply = <&fixedregulator3v3>;
-+	bus-width = <4>;
-+	status = "okay";
-+};
-+
-+&hspi0 {
-+	pinctrl-0 = <&hspi0_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
  };
 -- 
 1.8.5.2
