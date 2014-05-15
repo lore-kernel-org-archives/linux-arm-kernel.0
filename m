@@ -1,126 +1,113 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 15 May 2014 19:50:25 +0200
-Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
-In-Reply-To: <5374F35E.5040900@ti.com>
-References: <1399991966-14582-1-git-send-email-santosh.shilimkar@ti.com>
- <5373C78E.7040301@linaro.org> <5373C8E8.6040208@ti.com>
- <5373CBB9.40506@linaro.org> <5373DD94.8030208@ti.com>
- <5374F35E.5040900@ti.com>
-Message-ID: <5374FE61.50901@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 15 May 2014 19:51:45 +0200
+Subject: [RFC PATCH 3/3] ARM: sunxi: dt: define AXP221 pmic node available on
+ the APP4-EVB1 board
+In-Reply-To: <1400176305-22737-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1400176305-22737-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1400176305-22737-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2014 07:03 PM, Santosh Shilimkar wrote:
-> Daniel,
->
-> On Wednesday 14 May 2014 05:18 PM, Santosh Shilimkar wrote:
->> On Wednesday 14 May 2014 04:02 PM, Daniel Lezcano wrote:
->>> On 05/14/2014 09:50 PM, Santosh Shilimkar wrote:
->>>> On Wednesday 14 May 2014 03:44 PM, Daniel Lezcano wrote:
->>>>> On 05/13/2014 04:39 PM, Santosh Shilimkar wrote:
->>>>>> On OMAP4 panda board, there have been several bug reports about boot
->>>>>> hang and lock-ups with CPU_IDLE enabled. The root cause of the issue
->>>>>> is missing interrupts while in idle state. Commit cb7094e8 {cpuidle / omap4 :
->>>>>> use CPUIDLE_FLAG_TIMER_STOP flag} moved the broadcast notifiers to common
->>>>>> code for right reasons but on OMAP4 which suffers from a nasty ROM code
->>>>>> bug with GIC, commit ff999b8a {ARM: OMAP4460: Workaround for ROM bug ..},
->>>>>> we loose interrupts which leads to issues like lock-up, hangs etc.
->>>>>>
->>>>>> Patch reverts commit cb7094 {cpuidle / omap4 : use CPUIDLE_FLAG_TIMER_STOP
->>>>>> flag} to avoid the issue. With this change, OMAP4 panda boards, the mentioned
->>>>>> issues are getting fixed. We no longer loose interrupts which was the cause
->>>>>> of the regression.
->>>>>>
->>>>>> Cc: Roger Quadros <rogerq@ti.com>
->>>>>> Cc: Kevin Hilman <khilman@linaro.org>
->>>>>> Cc: Tony Lindgren <tony@atomide.com>
->>>>>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>>>> Reported-tested-by: Roger Quadros <rogerq@ti.com>
->>>>>> Reported-tested-by: Kevin Hilman <khilman@linaro.org>
->>>>>> Tested-by: Tony Lindgren <tony@atomide.com>
->>>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>>> ---
->>>
->>> [ ... ]
->>>
->>>>>>
->>>>>> +    clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
->>>>>> +
->>>>>>         /*
->>>>>>          * Call idle CPU PM enter notifier chain so that
->>>>>>          * VFP and per CPU interrupt context is saved.
->>>>>> @@ -165,6 +169,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
->>>>>>         if (dev->cpu == 0 && mpuss_can_lose_context)
->>>>>>             cpu_cluster_pm_exit();
->>>>>>
->>>>>> +    clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
->>>
->>> [ ... ]
->>>
->>>>>
->>>>> Shouldn't the broadcast timer to be setup with CLOCK_EVT_NOTIFY_BROADCAST_ON also ?
->>>>>
->>>> Which is already taken care by __cpuidle_register_driver(). Note that setup code
->>>> is still used from generic code...
->>>
->>> Nope, if the flag CPUIDLE_FLAG_TIMER_STOP is not set, the cpuidle framework won't setup the timer.
->>>
->> I see. I assumed it was taken care. So we might have setup the timer too.
->>
->>> static void __cpuidle_driver_init(struct cpuidle_driver *drv)
->>> {
->>>
->>>      ...
->>>
->>>      for (i = drv->state_count - 1; i >= 0 ; i--) {
->>>          if (drv->states[i].flags & CPUIDLE_FLAG_TIMER_STOP) {
->> May be you should start the bc timer in case 'CPUIDLE_FLAG_TIMER_STOP'
->> or 'CPUIDLE_FLAG_COUPLED'
->>>              drv->bctimer = 1;
->>>              break;
->>>          }
->>>      }
->>>
->>>      ...
->>>
->>> }
->>>
->>> static int __cpuidle_register_driver(struct cpuidle_driver *drv)
->>> {
->>>      ...
->>>
->>>      if (drv->bctimer)
->>>          on_each_cpu_mask(drv->cpumask,
->>>          cpuidle_setup_broadcast_timer,
->>>           (void *)CLOCK_EVT_NOTIFY_BROADCAST_ON, 1);
->>>
->>>      ...
->>> }
->>>
->>> So the broadcast timer does not operate with this revert. Moreover, I am not sure reverting this patch is the right solution.
->>>
->> With above mentioned change, it should work. Other alternatives is OMAP4 driver does
->> its won registration where it can start the timer. The way it was before the
->> consolidation.
->>
->> Ofcourse if you have better fix, then great.
->>
-> What is your suggestion. We *must* fix the regression asap. I think
-> $subject patch with an update to bctimer start under CPUIDLE_FLAG_COUPLED
-> seems a good way forward.
->
-> Do let me know.
+Define the AXP221 device node and its regulators for the APP4-EVB1 board.
 
-Did you see Alex Shi's email [cc'ed] ? Reverting this change makes the 
-panda ES to hang.
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+ arch/arm/boot/dts/sun6i-a31-app4-evb1.dts | 83 +++++++++++++++++++++++++++++++
+ 1 file changed, 83 insertions(+)
 
-I am not convinced the culprit is this code you are trying to revert.
-
-I will try to reproduce the bug on my board.
-
+diff --git a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
+index 76f068f..2f4e7ba 100644
+--- a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
++++ b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
+@@ -35,6 +35,89 @@
+ 			status = "okay";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++
++			axp221: pmic at 68 {
++				compatible = "x-powers,axp221";
++				reg = <0x68>;
++				interrupt-parent = <&nmi_intc>;
++				interrupts = <0 8>;
++
++				interrupt-controller;
++				#interrupt-cells = <1>;
++
++				vin1-supply = <&axp_ipsout_reg>;
++				vin2-supply = <&axp_ipsout_reg>;
++				vin3-supply = <&axp_ipsout_reg>;
++				vin4-supply = <&axp_ipsout_reg>;
++				vin5-supply = <&axp_ipsout_reg>;
++				aldoin-supply = <&axp_ipsout_reg>;
++				dldoin-supply = <&axp_ipsout_reg>;
++				eldoin-supply = <&axp_vcc3v0_reg>;
++				ldoioin-supply = <&axp_ipsout_reg>;
++				rtcldoin-supply = <&axp_ipsout_reg>;
++
++				regulators {
++					compatible = "x-powers,axp22x-reg";
++
++					x-powers,dcdc-freq = <1500>;
++
++					axp_vcc3v0_reg: dcdc1 {
++						regulator-always-on;
++					};
++
++					axp_vdd_gpu_reg: dcdc2 {
++						regulator-always-on;
++					};
++
++					axp_vdd_cpu_reg: dcdc3 {
++						regulator-always-on;
++					};
++
++					axp_vdd_sys_reg: dcdc4 {
++						regulator-always-on;
++					};
++
++					axp_vcc_dram_reg: dcdc5 {
++						regulator-always-on;
++					};
++
++					axp_cpus_vdd_reg: dc5ldo {
++						regulator-always-on;
++					};
++
++					axp_rtc_vcc_reg: rtc_ldo {
++						regulator-always-on;
++					};
++
++					axp_wifi_piog_vcc_reg: aldo1 {
++					};
++
++					axp_io_lpddr2_reg: aldo2 {
++						regulator-always-on;
++					};
++
++					axp_avcc_reg: aldo3 {
++						regulator-always-on;
++					};
++
++					axp_gps_vcc_reg: dldo2 {
++					};
++
++					axp_card_io_vdd_reg: eldo2 {
++					};
++
++					axp_csi_ts_vcc_reg: eldo3 {
++					};
++				};
++			};
+ 		};
+ 	};
++
++	axp_ipsout_reg: axp_ipsout {
++		compatible = "regulator-fixed";
++		regulator-name = "axp-ipsout";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
+ };
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.8.3.2
