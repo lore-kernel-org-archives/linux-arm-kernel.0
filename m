@@ -1,203 +1,102 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Thu, 15 May 2014 00:11:30 -0400
-Subject: [PATCH v10 3/3] ARM: Check if a CPU has gone offline
-In-Reply-To: <1400127090-1320-1-git-send-email-ashwin.chaugule@linaro.org>
-References: <1400127090-1320-1-git-send-email-ashwin.chaugule@linaro.org>
-Message-ID: <1400127090-1320-4-git-send-email-ashwin.chaugule@linaro.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 15 May 2014 13:28:27 +0900
+Subject: [PATCHv5 0/5] Support new Exynos3250 SoC based on Cortex-A7 dual
+ core
+In-Reply-To: <1399986308-23744-1-git-send-email-cw00.choi@samsung.com>
+References: <1399986308-23744-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <5374426B.6000505@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PSCIv0.2 adds a new function called AFFINITY_INFO, which
-can be used to query if a specified CPU has actually gone
-offline. Calling this function via cpu_kill ensures that
-a CPU has quiesced after a call to cpu_die. This helps
-prevent the CPU from doing arbitrary bad things when data
-or instructions are clobbered (as happens with kexec)
-in the window between a CPU announcing that it is dead
-and said CPU leaving the kernel.
+Dear Kukjin,
 
-Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
- arch/arm/kernel/psci_smp.c       | 33 +++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/cpu_ops.h |  2 ++
- arch/arm64/kernel/psci.c         | 31 +++++++++++++++++++++++++++++++
- arch/arm64/kernel/smp.c          | 22 ++++++++++++++++++++++
- 4 files changed, 88 insertions(+)
+Could you please pick following patches?
+- [PATCHv5 1/5] ARM: EXYNOS: Add Exynos3250 SoC ID
+- [PATCHv5 2/5] ARM: EXYNOS: Support secondary CPU boot of Exynos3250
 
-diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
-index 570a48c..28a1db4 100644
---- a/arch/arm/kernel/psci_smp.c
-+++ b/arch/arm/kernel/psci_smp.c
-@@ -16,6 +16,8 @@
- #include <linux/init.h>
- #include <linux/smp.h>
- #include <linux/of.h>
-+#include <linux/delay.h>
-+#include <uapi/linux/psci.h>
- 
- #include <asm/psci.h>
- #include <asm/smp_plat.h>
-@@ -66,6 +68,36 @@ void __ref psci_cpu_die(unsigned int cpu)
-        /* We should never return */
-        panic("psci: cpu %d failed to shutdown\n", cpu);
- }
-+
-+int __ref psci_cpu_kill(unsigned int cpu)
-+{
-+	int err, i;
-+
-+	if (!psci_ops.affinity_info)
-+		return 1;
-+	/*
-+	 * cpu_kill could race with cpu_die and we can
-+	 * potentially end up declaring this cpu undead
-+	 * while it is dying. So, try again a few times.
-+	 */
-+
-+	for (i = 0; i < 10; i++) {
-+		err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
-+		if (err == PSCI_0_2_AFFINITY_LEVEL_OFF) {
-+			pr_info("CPU%d killed.\n", cpu);
-+			return 1;
-+		}
-+
-+		msleep(10);
-+		pr_info("Retrying again to check for CPU kill\n");
-+	}
-+
-+	pr_warn("CPU%d may not have shut down cleanly (AFFINITY_INFO reports %d)\n",
-+			cpu, err);
-+	/* Make platform_cpu_kill() fail. */
-+	return 0;
-+}
-+
- #endif
- 
- bool __init psci_smp_available(void)
-@@ -78,5 +110,6 @@ struct smp_operations __initdata psci_smp_ops = {
- 	.smp_boot_secondary	= psci_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_die		= psci_cpu_die,
-+	.cpu_kill		= psci_cpu_kill,
- #endif
- };
-diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
-index 1524130..d7b4b38 100644
---- a/arch/arm64/include/asm/cpu_ops.h
-+++ b/arch/arm64/include/asm/cpu_ops.h
-@@ -39,6 +39,7 @@ struct device_node;
-  * 		from the cpu to be killed.
-  * @cpu_die:	Makes a cpu leave the kernel. Must not fail. Called from the
-  *		cpu being killed.
-+ * @cpu_kill:  Ensures a cpu has left the kernel. Called from another cpu.
-  * @cpu_suspend: Suspends a cpu and saves the required context. May fail owing
-  *               to wrong parameters or error conditions. Called from the
-  *               CPU being suspended. Must be called with IRQs disabled.
-@@ -52,6 +53,7 @@ struct cpu_operations {
- #ifdef CONFIG_HOTPLUG_CPU
- 	int		(*cpu_disable)(unsigned int cpu);
- 	void		(*cpu_die)(unsigned int cpu);
-+	int		(*cpu_kill)(unsigned int cpu);
- #endif
- #ifdef CONFIG_ARM64_CPU_SUSPEND
- 	int		(*cpu_suspend)(unsigned long);
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index 90df6e6..9e9798f 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -20,6 +20,7 @@
- #include <linux/smp.h>
- #include <linux/reboot.h>
- #include <linux/pm.h>
-+#include <linux/delay.h>
- #include <uapi/linux/psci.h>
- 
- #include <asm/compiler.h>
-@@ -403,6 +404,35 @@ static void cpu_psci_cpu_die(unsigned int cpu)
- 
- 	pr_crit("unable to power off CPU%u (%d)\n", cpu, ret);
- }
-+
-+static int cpu_psci_cpu_kill(unsigned int cpu)
-+{
-+	int err, i;
-+
-+	if (!psci_ops.affinity_info)
-+		return 1;
-+	/*
-+	 * cpu_kill could race with cpu_die and we can
-+	 * potentially end up declaring this cpu undead
-+	 * while it is dying. So, try again a few times.
-+	 */
-+
-+	for (i = 0; i < 10; i++) {
-+		err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
-+		if (err == PSCI_0_2_AFFINITY_LEVEL_OFF) {
-+			pr_info("CPU%d killed.\n", cpu);
-+			return 1;
-+		}
-+
-+		msleep(10);
-+		pr_info("Retrying again to check for CPU kill\n");
-+	}
-+
-+	pr_warn("CPU%d may not have shut down cleanly (AFFINITY_INFO reports %d)\n",
-+			cpu, err);
-+	/* Make op_cpu_kill() fail. */
-+	return 0;
-+}
- #endif
- 
- const struct cpu_operations cpu_psci_ops = {
-@@ -413,6 +443,7 @@ const struct cpu_operations cpu_psci_ops = {
- #ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_disable	= cpu_psci_cpu_disable,
- 	.cpu_die	= cpu_psci_cpu_die,
-+	.cpu_kill	= cpu_psci_cpu_kill,
- #endif
- };
- 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index f0a141d..c3cb160 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -228,6 +228,19 @@ int __cpu_disable(void)
- 	return 0;
- }
- 
-+static int op_cpu_kill(unsigned int cpu)
-+{
-+	/*
-+	 * If we have no means of synchronising with the dying CPU, then assume
-+	 * that it is really dead. We can only wait for an arbitrary length of
-+	 * time and hope that it's dead, so let's skip the wait and just hope.
-+	 */
-+	if (!cpu_ops[cpu]->cpu_kill)
-+		return 1;
-+
-+	return cpu_ops[cpu]->cpu_kill(cpu);
-+}
-+
- static DECLARE_COMPLETION(cpu_died);
- 
- /*
-@@ -241,6 +254,15 @@ void __cpu_die(unsigned int cpu)
- 		return;
- 	}
- 	pr_notice("CPU%u: shutdown\n", cpu);
-+
-+	/*
-+	 * Now that the dying CPU is beyond the point of no return w.r.t.
-+	 * in-kernel synchronisation, try to get the firwmare to help us to
-+	 * verify that it has really left the kernel before we consider
-+	 * clobbering anything it might still be using.
-+	 */
-+	if (!op_cpu_kill(cpu))
-+		pr_warn("CPU%d may not have shut down cleanly\n", cpu);
- }
- 
- /*
--- 
-1.8.3.2
+Best Regards,
+Chanwoo Choi
+
+On 05/13/2014 10:05 PM, Chanwoo Choi wrote:
+> This patchset support new Exynos3250 Samsung SoC based on Cortex-A7 dual core.
+> Exynos3250 is a System-On-Chip (SoC) that is based on 32-bit RISC processor
+> for Smartphone. It is desigend with the 28nm low-power high-K metal gate process
+> and provides the best performance features.
+> 
+> This patchset include some patches such as:
+> - Support booting of Exynos3250
+> - Supoort uart/mct/adc/gic/i2c/spi/power-domain/pmu/mshc/pwm/amba
+> - Support the clock control for Exynos3250 using common clk framework
+> 
+> This patchset is based on following git repo/branch.
+> - git repo : git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> - branch   : for-next (2ca8b247775d7c24fa8c2524a5562bad7e88f84b)
+> 
+> Changes from v4:
+> - Rebase this patch on latest for-next branch in linux-samsung.git
+> - Post separated secondary CPU boot patch for Exynos4212 and merged it
+>  : https://lkml.org/lkml/2014/5/8/745
+> - Drop following patch[1] and use alternative patch[2] to turn off Cortex-A7
+>   [1] ARM: EXYNOS: Enter a15 lowpower mode for Exynos3250 based on Cortex-a7
+>   [2] http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg29064.html
+> - Modify clock driver of exynos3250
+> - Add 'soc' dt node and move all dt nodes under 'soc' dt node in exynos3250.dtsi
+> - Add missing CPU1 dt node in exynos3250.dtsi
+> - Fix minor issue about coding style
+> 
+> Changes from v3:
+> - Remove all dependency about following patchset to remove static memory
+>   mapping for SYSRAM[1] / PMU ([2] or [3]). If following patchset merged,
+>   I'll send a further patches to support SYSRAM/PMU for secondary CPU.
+>   [1] http://www.spinics.net/lists/arm-kernel/msg323011.html
+>   [2] https://lkml.org/lkml/2014/4/2/48
+>   [3] http://www.spinics.net/lists/arm-kernel/msg316013.html
+> 
+> Changes from v2:
+> - Remove static memory mapping about SYSRAM/PMU such as following patches:
+>   ARM: EXYNOS: Add IO mapping for non-secure SYSRAM of Exynos3250
+>   ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
+> - Add description for secondary CPU boot of Exynos4212/Exynos3250
+> - Fix description in exynos_cpu_die() to remove particular SoC series
+> - Fix minor coding style
+> - Add documentation for Exynos3250 clock controller
+> 
+> Changes from v1:
+> - Add new "samsung,exynos3" compatible name
+> - Add comment about exynos_cpu_boot in Exynos4212
+> - Remove unnecessary 'goto' statement in firmware.c
+> - Use read_cpuid_part_number() function instead of assembler directly
+> - Post separated pinctrl patch from this patchset
+>   : https://lkml.org/lkml/2014/4/13/156
+> - Remove unused pmu interrupts due to Exynos3250 dual-core
+> - Cosolidate all the patches related to exynos3250.dtsi into one patch
+> - Fix gic compatible name to "cortex-a15-gic" because Cortex-A7 GIC is same
+> - Add sign-off of sender to all this patches
+> - Fix minor typo
+> 
+> Chanwoo Choi (3):
+>   ARM: EXYNOS: Add Exynos3250 SoC ID
+>   ARM: EXYNOS: Support secondary CPU boot of Exynos3250
+>   dt-bindings: add documentation for Exynos3250 clock controller
+> 
+> Tomasz Figa (2):
+>   clk: samsung: exynos3250: Add clocks using common clock framework
+>   ARM: dts: Add device tree sources for Exynos3250
+> 
+>  .../devicetree/bindings/clock/exynos3250-clock.txt |  41 ++
+>  arch/arm/boot/dts/exynos3250-pinctrl.dtsi          | 475 +++++++++++++
+>  arch/arm/boot/dts/exynos3250.dtsi                  | 439 ++++++++++++
+>  arch/arm/mach-exynos/Kconfig                       |  22 +
+>  arch/arm/mach-exynos/common.h                      |  10 +
+>  arch/arm/mach-exynos/exynos.c                      |   2 +
+>  arch/arm/mach-exynos/firmware.c                    |   9 +-
+>  drivers/clk/samsung/Makefile                       |   1 +
+>  drivers/clk/samsung/clk-exynos3250.c               | 782 +++++++++++++++++++++
+>  include/dt-bindings/clock/exynos3250.h             | 258 +++++++
+>  10 files changed, 2038 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/exynos3250-clock.txt
+>  create mode 100644 arch/arm/boot/dts/exynos3250-pinctrl.dtsi
+>  create mode 100644 arch/arm/boot/dts/exynos3250.dtsi
+>  create mode 100644 drivers/clk/samsung/clk-exynos3250.c
+>  create mode 100644 include/dt-bindings/clock/exynos3250.h
+> 
