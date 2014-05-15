@@ -1,38 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 May 2014 15:30:06 +0200
-Subject: [RFC PATCH 06/10] usb: xhci: Add Tegra XHCI host-controller driver
-In-Reply-To: <20140515091938.GD6434@ulmo>
-References: <1400113986-339-1-git-send-email-abrestic@chromium.org>
- <15599140.PsD4j7x3tZ@wuerfel> <20140515091938.GD6434@ulmo>
-Message-ID: <11038777.juA2AddEko@wuerfel>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 15 May 2014 17:26:36 +0400
+Subject: [PATCH v6 17/17] ARM: mvebu: add Device Tree description of the
+ EHCI controller on Armada 375
+In-Reply-To: <1400149062-32661-18-git-send-email-gregory.clement@free-electrons.com>
+References: <1400149062-32661-1-git-send-email-gregory.clement@free-electrons.com>
+ <1400149062-32661-18-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <5374C08C.7040700@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 May 2014 11:19:40 Thierry Reding wrote:
-> > > +
-> > > +   xhci = platform_device_alloc("xhci-hcd", PLATFORM_DEVID_AUTO);
-> > > +   if (!xhci) {
-> > > +           dev_err(dev, "Failed to allocate XHCI host\n");
-> > > +           ret = -ENOMEM;
-> > > +           goto out;
-> > > +   }
-> > 
-> > This does not feel appropriate at all: Rather than creating a child device,
-> > you should have a specific driver that hooks into functions exported
-> > by the xhci core. See Documentation/driver-model/design-patterns.txt
-> 
-> I don't think Documentation/driver-model/design-patterns.txt documents
-> this. Perhaps this is what you had in mind?
-> 
->         http://lwn.net/Articles/336262/
+Hello.
 
-No, I did mean Documentation/driver-model/design-patterns.txt.
+On 05/15/2014 02:17 PM, Gregory CLEMENT wrote:
 
-The pattern used in the proposed driver is to create the generic platform_device
-as the child of the more specific platform_device.
+> The Marvell Armada 375 SoCs contains one EHCI controller. This commit
 
-The normal pattern is to have only one device and embed the generic structure
-inside of the more specific structure and use container_of to cast between
-the two as needed.
+    However, you're adding two. :-)
 
-	Arnd
+> adds the Device Tree description of this interfaces at the SoC level,
+> and also enables the USB2 port on the Armada 375 DB platform.
+
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>   arch/arm/boot/dts/armada-375-db.dts |  4 ++++
+>   arch/arm/boot/dts/armada-375.dtsi   | 16 ++++++++++++++++
+>   2 files changed, 20 insertions(+)
+
+[...]
+
+> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+> index 7b303ecc2490..53baeb2f1fe8 100644
+> --- a/arch/arm/boot/dts/armada-375.dtsi
+> +++ b/arch/arm/boot/dts/armada-375.dtsi
+> @@ -320,6 +320,22 @@
+>   				clocks = <&coreclk 0>;
+>   			};
+>
+> +			usb at 50000 {
+> +				compatible = "marvell,orion-ehci";
+> +				reg = <0x50000 0x500>;
+> +				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&gateclk 18>;
+> +				status = "disabled";
+> +			};
+> +
+> +			usb at 54000 {
+> +				compatible = "marvell,orion-ehci";
+> +				reg = <0x54000 0x500>;
+> +				interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&gateclk 26>;
+> +				status = "disabled";
+> +			};
+> +
+>   			usb3 at 58000 {
+>   				compatible = "marvell,armada-375-xhci";
+>   				reg = <0x58000 0x20000>,<0x5b880 0x80>;
+>
+
+WBR, Sergei
