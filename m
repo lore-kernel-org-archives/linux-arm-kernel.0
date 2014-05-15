@@ -1,54 +1,45 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 15 May 2014 15:44:29 -0700
-Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
-In-Reply-To: <53753C17.1090002@gmail.com>
-References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
- <53752E25.9060604@gmail.com>
- <CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>
- <53753443.8010303@gmail.com>
- <CAD=FV=V8UZoeOqEwfx_E015pLM+amTt51LrUa+dk7mTdn=vKgA@mail.gmail.com>
- <53753C17.1090002@gmail.com>
-Message-ID: <CAD=FV=WGa7j_As_NpySxU7OEd_SzuGWK6oxU6UeiJ-4HsoWvvg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 16 May 2014 07:50:28 +0900
+Subject: [PATCH v6 13/17] ARM: shmobile: marzen: Add to shmobile defconfig
+In-Reply-To: <CAMuHMdXPm_=ejkcnOFOgfnsz9MUc8KpAjkuMcHMKJeaEmVbhQA@mail.gmail.com>
+References: <1400153532-23675-1-git-send-email-horms+renesas@verge.net.au>
+ <1400153532-23675-14-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdXPm_=ejkcnOFOgfnsz9MUc8KpAjkuMcHMKJeaEmVbhQA@mail.gmail.com>
+Message-ID: <20140515225027.GA29432@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz,
+On Thu, May 15, 2014 at 01:57:58PM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Thu, May 15, 2014 at 1:32 PM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+> > index 6d6437c..ea7673a 100644
+> > --- a/arch/arm/configs/shmobile_defconfig
+> > +++ b/arch/arm/configs/shmobile_defconfig
+> > @@ -9,11 +9,13 @@ CONFIG_EMBEDDED=y
+> >  CONFIG_PERF_EVENTS=y
+> >  CONFIG_SLAB=y
+> >  CONFIG_ARCH_SHMOBILE_MULTI=y
+> > +CONFIG_ARCH_R8A7779=y
+> >  CONFIG_ARCH_EMEV2=y
+> >  CONFIG_ARCH_R8A7790=y
+> >  CONFIG_ARCH_R8A7791=y
+> >  CONFIG_MACH_KOELSCH=y
+> >  CONFIG_MACH_LAGER=y
+> > +CONFIG_MACH_MARZEN=y
+> >  # CONFIG_SWP_EMULATE is not set
+> >  CONFIG_CPU_BPREDICT_DISABLE=y
+> >  CONFIG_PL310_ERRATA_588369=y
+> 
+> I think you also need:
+>     CONFIG_SPI_SH_HSPI=y
+>     CONFIG_USB_RCAR_PHY=y
+>     CONFIG_PM_RUNTIME=y
+> 
+> (the last one is set in all shmobile defconfigs, except ape6evm and shmobile).
+> 
+> The other differences seem to be cruft not really related to hardware support.
 
-On Thu, May 15, 2014 at 3:13 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> NOTE: if for some reason we need to keep the MCT around, we're
->> definitely going to need to account for the fact that tweaking it
->> affects the arch timer.  ...and having the arch timer is really nice
->> since:
->
-> [Let me reorder the points below to make it easier to comment:]
->
->> * it's faster to access.
->> * it is accessible from userspace for really fast access.
->
-> Do you have some data on whether it is a significant difference,
-> especially considering real use cases?
-
-I know that Chrome makes _a lot_ of calls to gettimeofday() for
-profiling purposes, enough that it showed up on benchmarks.  In fact,
-we made a change to the MCT to make accesses faster and there's a
-small mention of the benchmarking that was done at:
-
-https://chromium-review.googlesource.com/#/c/32190/
-
-...that change probably should be sent upstream, actually.
-
-I'll let Chirantan comment on how much faster arch timers were.
-...and I think David Riley (also CCed now) may be able to comment on
-the benefits of userspace timers.
-
-
->> * it implements the bits needed for udelay() to use it.
->
-> Hmm, do you know what bits are those? On Exynos4 MCT is the only option
-> and it would be nice to let udelay() use it.
-
-Look for register_current_timer_delay().  It seems like we could do
-this for MCT, but I've never done the investigation because we were
-always planning to move to arch timers.  ;)
-
--Doug
+Thanks, I'll verify that and make a follow-up patch.
