@@ -1,29 +1,31 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 15 May 2014 17:35:01 +0530
-Subject: [PATCH] ARM: edma: Clean up and simplify the code around irq
- request
-In-Reply-To: <1399965961-23739-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1399965961-23739-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <5374AD6D.8090002@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 15 May 2014 13:08:17 +0100
+Subject: [PATCH v6 03/15] irq: gic: support hip04 gic
+In-Reply-To: <4785954.cZxbGoHV0t@wuerfel>
+References: <1399795571-17231-1-git-send-email-haojian.zhuang@linaro.org>
+ <1399795571-17231-4-git-send-email-haojian.zhuang@linaro.org>
+ <53748A2B.9050304@arm.com> <4785954.cZxbGoHV0t@wuerfel>
+Message-ID: <CAMJs5B82awFv7SV9RBu__t4_42PhR95VGPjS3LzWa2saDQReZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ ARM SoC team
+On 15 May 2014 12:14, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 15 May 2014 10:34:35 Marc Zyngier wrote:
+>> > +static inline bool gic_is_standard(struct gic_chip_data *gic)
+>>
+>> Please loose all of the inlines. The compiler can do this by itself.
+>>
+>> > +{
+>> > +       return (gic->nr_cpu_if == 8);
+>> > +}
+>> > +
+>
+> I think it's actually the common style to spell out the 'inline'
+> for trivial helpers like this. The compiler doesn't need it, but
+> it also doesn't hurt and most people write it.
+>
+Only in header files, no?
 
-On Tuesday 13 May 2014 12:56 PM, Peter Ujfalusi wrote:
-> Get the two interrupt line number at the same time by merging the two
-> instance of if(node){}else{} places.
-> replace the &pdev->dev with the already existing dev which makes it possible
-> to collapse lines with devm_request_irq()
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+I've been chastised previously for putting this in .c files.
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
-
-Arnd, Olof, Kevin,
-
-Do you mind applying this directly for v3.16? I do not have anything
-else queued ATM so not sending a pull request.
-
-Thanks,
-Sekhar
+-Christoffer
