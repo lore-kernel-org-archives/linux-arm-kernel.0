@@ -1,47 +1,59 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 15 May 2014 11:18:19 +0300
-Subject: [PATCH v2 3/5] dt/bindings: ti, edma: Remove redundant properties
- from documentation
-In-Reply-To: <7468082.VY82PIo3ZY@wuerfel>
-References: <1399977032-26469-1-git-send-email-peter.ujfalusi@ti.com>
- <1399977032-26469-4-git-send-email-peter.ujfalusi@ti.com>
- <7468082.VY82PIo3ZY@wuerfel>
-Message-ID: <5374784B.7020608@ti.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 15 May 2014 10:24:39 +0200
+Subject: [PATCH v2 2/3] drm/panel: add support for EDT panels
+In-Reply-To: <20140515075102.GE5952@ulmo>
+References: <cover.1400103181.git.stefan@agner.ch>
+ <35c081171a3d9a9401767601c02a12e266b37dd0.1400103181.git.stefan@agner.ch>
+ <20140515075102.GE5952@ulmo>
+Message-ID: <4de1d09b7873e012e43525c1f8ab9c66@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2014 11:01 AM, Arnd Bergmann wrote:
-> On Tuesday 13 May 2014 13:30:30 Peter Ujfalusi wrote:
->> From CCCFG register of eDMA3 we can get all the needed information for the
->> driver about the IP:
->> Number of channels: NUM_DMACH
->> Number of regions: NUM_REGN
->> Number of slots (PaRAM sets): NUM_PAENTRY
->> Number of TC/EQ: NUM_EVQUE
->>
->> The ti,edma-regions; ti,edma-slots and dma-channels in DT are
->> redundant since the very same information can be obtained from the HW.
->> The mentioned properties can be removed from the binding document.
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> 
-> I wonder if we should keep them listed as "optional" properties so you
-> can have a dtb file that still works with older kernels which need them.
-> 
-> What you do is an incompatible change to the binding, which we shouldn't
-> do lightly. Any new dts files don't need this information of course, but
-> as a general rule, I'd rather keep things like this around unless we
-> already have to enforce an ABI break that is well documented.
+Hi Thierry, hi Philipp,
 
-We could keep them as optional, or to be precise: ignored properties since we
-are not going to even look at them in the future.
-But I do not really see the reason to do so. With this change new kernels will
-boot with old DTB - if it can not be changed which I have not seen yet. Sure
-old kernel would not boot with this change, but why would you downgrade the
-kernel and update the DTB on a board?
-Bisecting is not a good reason since the bug you might be hunting for could be
-in the DTS or in the kernel code so you need to update both of them to be sure
-you reach the commit you are looking for.
+Am 2014-05-15 09:51, schrieb Thierry Reding:
+> On Wed, May 14, 2014 at 11:45:57PM +0200, stefan at agner.ch wrote:
+>> From: Stefan Agner <stefan@agner.ch>
+>>
+>> This panels are sold by Toradex for Colibri T20/T30 and Apalis T30
+>> evaluation kits.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> 
+> Panel patches should go to the dri-devel mailing list as well.
+> 
+> Also a patch was posted only yesterday for a panel that seems to be the
+> exact same one as this, even though the name differs minimally, see:
+> 
+> 	https://patchwork.kernel.org/patch/4175251/
+> 
+> Adding Philipp on Cc so you guys can work together whether this is
+> indeed the same panel. The only differences seem to be in the vertical
+> front and back porches, but I suspect that either settings will work on
+> both Tegra and i.MX.
 
--- 
-P?ter
+Its etm0700g0dh6 vs. et070080dh6, Philipp's panel is with captive multi
+touch, (hence the M I guess). The panel itself really looks the same.
+
+I found this overview of EDT displays:
+http://www.dmbtechnics.com/scripts/passthru.php?id=7
+
+There seem to be quite a lot variants with the same panel...
+
+Regarding timings, I just checked the documentation, Philipp's timing
+really matches the documented ones, I miscalculated the vertical back
+porch.
+
+How do we resolve that?
+
+I would suggest that I split out that patch and remove the et070080dh6
+panel and send the other as a single patch to the dri-devel mailing list
+as well.
+
+Philipp, could you add my display type (et070080dh6) to the compatible
+list of your mode/panel entry?
+
+Does this sound reasonable?
+
+--
+Stefan
