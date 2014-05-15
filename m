@@ -1,60 +1,65 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 15 May 2014 14:47:43 -0700
-Subject: [PATCH v3 1/6] watchdog: Add API to trigger reboots
-In-Reply-To: <20140515215020.38f03ab1@alan.etchedpixels.co.uk>
-References: <1400186304-1691-1-git-send-email-linux@roeck-us.net>
- <1400186304-1691-2-git-send-email-linux@roeck-us.net>
- <20140515215020.38f03ab1@alan.etchedpixels.co.uk>
-Message-ID: <20140515214743.GA15577@roeck-us.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 16 May 2014 06:53:48 +0900
+Subject: [PATCH v6 0/8] Enable USB 3.0 support on Exynos5 systems
+In-Reply-To: <1400076070-12456-1-git-send-email-gautam.vivek@samsung.com>
+References: <1400076070-12456-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <5375376C.90306@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 09:50:20PM +0100, One Thousand Gnomes wrote:
-> > +void watchdog_do_reboot(void)
-> > +{
-> > +	if (wdd_reboot_dev)
-> > +		wdd_reboot_dev->ops->reboot(wdd_reboot_dev);
-> > +}
-> > +EXPORT_SYMBOL(watchdog_do_reboot);
-> 
-> Crashes and burns if you are unloading a watchdog just as you try to
-> reboot. Yes its wildly unlikely but it's still conceptually wrong.
-> 
-Possibly, but how is it different to the code it replaces ?
+On 05/14/14 23:01, Vivek Gautam wrote:
+> From: Vivek gautam<gautam.vivek@samsung.com>
+>
+> Based on 'for-next' branch of Kgene's linux-samsung tree;
+> along with dts patches for USB 2.0 phy[1], and Exynos5800 [2].
+> Also based on the latest USB 3.0 DRD phy driver patches posted [3].
+>
+> Changes from v5:
+>   - Added node reference names for new boards.
+>   - Removed 'samsung,pmu-offset' porperty from nodes, since with latest driver
+>     bindings this is not required.
+>   - Added aliase nodes in Exynos5420 to facilitate latest driver bindings.
+>   - Added patch to add VBUS regulator for peach-pi board also.
+>   - Dropped patches removing older usb-phy driver:
+>     usb-phy: samsung-usb3: Remove older phy-samsung-usb3 driver
+>     ARM: exynos_defconfig: Remove SAMSUNG_USB3PHY config
+>     as appeared in V5 version of this series.
+>     Will post them separately after the new driver is merged.
+>
+> [1] http://www.spinics.net/lists/linux-samsung-soc/msg30494.html
+> [2] http://comments.gmane.org/gmane.linux.kernel.samsung-soc/31133
+> [3] https://lkml.org/lkml/2014/5/13/285
+>
+> Vivek Gautam (7):
+>    ARM: dts: exynos5420: Enable support for USB 3.0 PHY controller
+>    ARM: dts: exynos5420: Enable support for DWC3 controller
+>    ARM: dts: exynos5250: Enable support for generic USB DRD phy
+>    ARM: dts: exynos5250: Update DWC3 usb controller to use new phy
+>      driver
+>    ARM: dts: exynos5250-snow: Add Vbus regulator for USB 3.0
+>    ARM: dts: exynos5420-peach-pit: Add Vbus regulator for USB 3.0
+>    ARM: dts: exynos5420-smdk5420: Add Vbus regulator for USB 3.0
+>
+> Vivek gautam (1):
 
-> >  
-> > +	if (wdd->ops->reboot)
-> > +		wdd_reboot_dev = wdd;
-> > +
-> 
-> Two parallel registers from different bus types, parallel
-> register/unregister ?
-> 
-Sorry, you lost me. What different bus types ?
+should be same guy.
 
-> This feels to me like a backward step. We've gone from various device
-> bits leaking into the core code (where they can work all the time) to
-> various core code leaking into the devices which is asking for init order
-> problems and other races.
-> 
-> Given we are talking about stuff of the order of 10-20 instructions I
-> think duplication is not only the lesser evil it's also smaller, more
-> reliable and easier to maintain.
-> 
-> IMHO this is a solution looking for a problem.
-> 
-Really ?  To me it seems to be much cleaner than setting the pointer to
-arm_pm_restart directly from individual watchdog drivers. Also, and I was
-told that other HW may benefit from it as well.
+Vivek Gautam ;-)
 
-Do I understand it correctly that you prefer watchdog drivers to set
-arm_pm_restart directly ? Maybe you can explain a bit why you believe
-that to be a superior solution.
+>    ARM: dts: exynos5800-peach-pi: Add Vbus regulator for USB 3.0
+>
+>   arch/arm/boot/dts/exynos5250-snow.dts      |   22 ++++++++++++
+>   arch/arm/boot/dts/exynos5250.dtsi          |   20 +++++------
+>   arch/arm/boot/dts/exynos5420-peach-pit.dts |   46 ++++++++++++++++++++++++
+>   arch/arm/boot/dts/exynos5420-smdk5420.dts  |   46 ++++++++++++++++++++++++
+>   arch/arm/boot/dts/exynos5420.dtsi          |   54 ++++++++++++++++++++++++++++
+>   arch/arm/boot/dts/exynos5800-peach-pi.dts  |   46 ++++++++++++++++++++++++
+>   6 files changed, 222 insertions(+), 12 deletions(-)
+>
+Looks good to me.
 
-In addition to that, while I could obviously add some locking around access to
-wdd_reboot_dev, existing code doesn't lock any changes to arm_pm_restart. I am
-somewhat at loss why setting or clearing arm_pm_restart is less of a problem
-that setting wdd_reboot_dev.
+Applied 1 to 4 patches, but for others 5 to 8 I need to get any review 
+or ack from dt guys.
 
 Thanks,
-Guenter
+Kukjin
