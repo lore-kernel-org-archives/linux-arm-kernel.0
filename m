@@ -1,51 +1,45 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 15 May 2014 11:03:49 -0700
-Subject: [PATCH v3 RESEND 2/5] ARM: add SMP support for Broadcom mobile
- SoCs
-In-Reply-To: <1400176691-26058-3-git-send-email-elder@linaro.org>
-References: <1400176691-26058-1-git-send-email-elder@linaro.org>
- <1400176691-26058-3-git-send-email-elder@linaro.org>
-Message-ID: <CAGVrzca20+3kmJjyGv8Pr-qNNV4n0hhADL6GWvcYVDUL4q28Hg@mail.gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 15 May 2014 20:10:13 +0200
+Subject: [PATCH] arm: msm: remove board file for Nexus One (ie. mahimahi)
+In-Reply-To: <20140515174448.GA31159@fifo99.com>
+References: <1400101656.9826.4.camel@x220> <20140515174448.GA31159@fifo99.com>
+Message-ID: <1400177413.11786.11.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+Daniel,
 
-2014-05-15 10:58 GMT-07:00 Alex Elder <elder@linaro.org>:
-> This patch adds SMP support for BCM281XX and BCM21664 family SoCs.
->
-> This feature is controlled with a distinct config option such that a
-> SMP-enabled multi-v7 binary can be configured to run these SoCs in
-> uniprocessor mode.  Since this SMP functionality is used for
-> multiple Broadcom mobile chip families the config option is called
-> ARCH_BCM_MOBILE_SMP (for lack of a better name).
->
-> On SoCs of this type, the secondary core is not held in reset on
-> power-on.  Instead it loops in a ROM-based holding pen.  To release
-> it, one must write into a special register a jump address whose
-> low-order bits have been replaced with a secondary core's id, then
-> trigger an event with SEV.  On receipt of an event, the ROM code
-> will examine the register's contents, and if the low-order bits
-> match its cpu id, it will clear them and write the value back to the
-> register just prior to jumping to the address specified.
->
-> The location of the special register is defined in the device tree
-> using a "secondary-boot-reg" property in a node whose "enable-method"
-> matches.
->
-> Derived from code originally provided by Ray Jui <rjui@broadcom.com>
->
-> Signed-off-by: Alex Elder <elder@linaro.org>
-> ---
->  arch/arm/mach-bcm/Kconfig   |  18 +++-
->  arch/arm/mach-bcm/Makefile  |   3 +
->  arch/arm/mach-bcm/platsmp.c | 201 ++++++++++++++++++++++++++++++++++++++++++++
+On Thu, 2014-05-15 at 17:44 +0000, dwalker at fifo99.com wrote:
+> On Wed, May 14, 2014 at 11:07:36PM +0200, Paul Bolle wrote:
+> > Commit 1b802ff79f03 ("arm: msm: add board file for Nexus One (ie.
+> > mahimahi)") added just board-mahimahi.c. It did not add
+> > board-mahimahi.h, Makefile changes or Kconfig changes.
+> > 
+> > Four years have passed and this file is still dangling. Remove it.
+> > 
+> > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> > ---
+> > Untested. But what to test here?
+> > 
+> I don't mine if Sapphire gets removed,
 
-Could we make that name a little bit more specific to the mobile SoCs?
-There are other BCM SoCs either currently supported in this directory
-(BCM5310X), or making their way to be supported (brcmstb, bcm63xx),
-and those share nothing with the Mobile SoC SMP code.
+Could you ACK that patch, please?
 
-Maybe we should create another level directory within mach-bcm...
--- 
-Florian
+>  but I'm working on this one now..
+
+That's good to hear.
+
+>  So I don't want it deleted.
+
+This is not something I get to decide. Nevertheless, given that this
+file shouldn't have been merged to begin with, I'd appreciate it if some
+deadline could be agreed upon.
+
+That being said, I'm not sure how having just this file in mainline
+helps your development efforts. It seems it did receive some updates
+for, well, treewide stuff. But it surely didn't get build coverage or
+runtime testing. So would you lose much if it only remains in your
+development tree?
+
+
+Paul Bolle
