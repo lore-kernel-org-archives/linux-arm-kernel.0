@@ -1,90 +1,53 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 15 May 2014 16:08:53 +0100
-Subject: [PATCH v2] of: Keep track of populated platform devices
-In-Reply-To: <20140514105657.CF966C4153D@trevor.secretlab.ca>
-References: <1398858529.24255.3.camel@hornet>
- <1398866717-20268-1-git-send-email-pawel.moll@arm.com>
- <CAL_JsqL=mxqEKpAsXm7Du0vEDpKk4n+dp5-DyvbuGhTA6bP5Lg@mail.gmail.com>
- <20140501092635.05011C409DA@trevor.secretlab.ca>
- <CACxGe6usWdey1qQT2JF=7LuE62H-_xtd1QkRT9z_Tj2pxdQEjQ@mail.gmail.com>
- <1399473437.3706.25.camel@hornet>
- <20140514105657.CF966C4153D@trevor.secretlab.ca>
-Message-ID: <1400166533.3672.3.camel@hornet>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Thu, 15 May 2014 12:10:29 -0300
+Subject: [linux-sunxi] [PATCH 0/6] sunxi: clk: Various cleanup and rework
+In-Reply-To: <20140513011232.5943.64136@quantum>
+References: <1399692821-20988-1-git-send-email-maxime.ripard@free-electrons.com>
+ <536E6047.8010004@elopez.com.ar> <20140513011232.5943.64136@quantum>
+Message-ID: <5374D8E5.8070300@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-05-14 at 11:56 +0100, Grant Likely wrote:
-> > Agreed, but, unless I'm missing some fundamental issue, I believe we can
-> > solve the flag clearing problem in a generic way:
-> > 
-> > --8<-----------
-> > diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-> > index 3cf61a1..0f489fb 100644
-> > --- a/drivers/amba/bus.c
-> > +++ b/drivers/amba/bus.c
-> > @@ -17,6 +17,7 @@
-> >  #include <linux/pm_runtime.h>
-> >  #include <linux/amba/bus.h>
-> >  #include <linux/sizes.h>
-> > +#include <linux/of_device.h>
-> >  
-> >  #include <asm/irq.h>
-> >  
-> > @@ -268,6 +269,7 @@ static void amba_device_release(struct device *dev)
-> >  {
-> >  	struct amba_device *d = to_amba_device(dev);
-> >  
-> > +	of_device_node_put(dev);
-> >  	if (d->res.parent)
-> >  		release_resource(&d->res);
-> >  	kfree(d);
-> > diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-> > index ef37021..fd14d46 100644
-> > --- a/include/linux/of_device.h
-> > +++ b/include/linux/of_device.h
-> > @@ -41,6 +41,8 @@ extern int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env
-> >  
-> >  static inline void of_device_node_put(struct device *dev)
-> >  {
-> > +	if (dev->of_node)
-> > +		of_node_clear_flag(dev->of_node, OF_POPULATED);
-> >  	of_node_put(dev->of_node);
-> >  }
-> > --8<-----------
-> > 
-> > This will work even if one manually unregisters a DT-originating device,
-> > because of_device_node_put() would be called in both amba and platform
-> > device (kobj) release path.
-> 
-> Doing it that way will also catch platform_devices that were created
-> apart from of_platform_populate() and manually attached to an of_node,
-> which is done some times. It will also break whenever multiple devices
-> reference the same node if they call of_device_node_put().
-> 
-> For example, a platform device providing an i2c bus will have a child
-> device that represents the i2c bus, and that i2c device will point to
-> the same node.
+El 12/05/14 22:12, Mike Turquette escribi?:
+> Quoting Emilio L?pez (2014-05-10 10:22:15)
+>> Hi Maxime,
+>>
+>> El 10/05/14 00:33, Maxime Ripard escribi?:
+>>> Hi everyone,
+>>>
+>>> This patchset fixes a few things that have been pending for quite a
+>>> while in the clock driver.
+>>>
+>>> First, it removes the clk_put calls in the clock protection
+>>> part. Since it's not really something that should be done, I guess
+>>> this patch is not very controversial.
+>>>
+>>> Then, it starts splitting the huge clock driver file into separate,
+>>> smaller drivers when it makes sense.
+>>>
+>>> Finally, it reworks the clock protection mechanism to handle
+>>> differences between SoC in a better way. This has been pretty
+>>> controversial because the first approach has been to move this to the
+>>> machine code. This is another attempt that leaves all the
+>>> modifications in the driver itself.
+>>>
+>>> Thanks,
+>>> Maxime
+>>
+>> Overall the series looks good to me, other than the comment about clkdev
+>> on patches 2 and 3.
+>>
+>> @Mike, do you want me to take them in a pull as usual after you have a
+>> look? Please let me know as we still haven't clarified the situation
+>> with the two patches Hans sent.
+>
+> A pull request would be great. Feel free to add my Acked-by to all of
+> the patches here (#1 already has it) since I looked at all of them and
+> the changes seem good.
 
-Yes, can I see it doing this. Without 
+Ok, I've taken them in sunxi-clk-for-mike with Mike's ack. I'll be 
+sending the pull request soon.
 
-> The flag clear really does need to be kept in the
-> platform_device_unpopulate path because it is only to be used internally
-> by of_platform_{populate,depopulate}
+Cheers,
 
-Ok, will move it there.
- 
-> > By the way, the fact that today amba_device_release() doesn't do
-> > of_device_node_put() seems like a bug to me? (node's reference counter
-> > won't be decremented)
-> 
-> Yes, that is a bug. I want to get some unittests added to the DT code to
-> verify that reference counts are being tracked correctly. Right now it
-> is an utter mess.
-
-Ok. If I move the flag, this bit is not longer an integral part of the
-patch so will split it into a separate one, but merge the _depopulate()
-one instead.
-
-Thanks!
-
-Pawe?
+Emilio
