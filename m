@@ -1,122 +1,54 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 15 May 2014 13:28:28 -0400 (EDT)
-Subject: [PATCHv2] ARM: ioremap: Fix static vm area boundary checking.
-In-Reply-To: <1400142562-9111-1-git-send-email-superlibj8301@gmail.com>
-References: <1400142562-9111-1-git-send-email-superlibj8301@gmail.com>
-Message-ID: <alpine.LFD.2.11.1405151325250.17310@knanqh.ubzr>
+From: agross@codeaurora.org (Andy Gross)
+Date: Thu, 15 May 2014 12:32:06 -0500
+Subject: [PATCH] dmaengine: qcom_bam_dma: Add descriptor flag APIs
+In-Reply-To: <20140502180827.GA9476@qualcomm.com>
+References: <1397772242-4048-1-git-send-email-agross@codeaurora.org>
+ <20140502162841.GZ32284@intel.com>
+ <20140502180827.GA9476@qualcomm.com>
+Message-ID: <20140515173206.GA16858@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 May 2014, Richard Lee wrote:
+On Fri, May 02, 2014 at 01:08:27PM -0500, Andy Gross wrote:
+> On Fri, May 02, 2014 at 09:58:41PM +0530, Vinod Koul wrote:
+> > On Thu, Apr 17, 2014 at 05:04:02PM -0500, Andy Gross wrote:
+> > > This patch adds APIs that allow for BAM hardware flags to be set per
+> > > descriptor.  Each one of the new flags informs the attached peripheral of a
+> > > special behavior that is required.
+> > > 
+> > > The EOT flag requests that the peripheral assert an end of transaction interrupt
+> > > when that descriptor is complete.  It also results in special signaling protocol
+> > > that is used between the attached peripheral and the core using the DMA
+> > > controller.
+> > DMA_PREP_INTERRUPT ??
+> 
+> I have 3 different IRQs that can be asserted based on the bit I set in the
+> hardware descriptor.  The normal IRQ is the INT bit.  However, in some cases the
+> peripheral protocol requires the use of the EOT or EOB interrupt instead.  The
+> DMA_PREP_INTERRUPT would only work if I had only 2 choices.
 
-> Static vm area boundary check:
-> 
->       paddr1 --->|       |
->                  |       |
->                  |-------| <-\--- svm->vm->addr(is page aligned)
->       paddr2 --->|       |    |
->                  |     --| <--|-- svm->vm->phys_addr
->                  |       |    |
->       paddr3 --->|       |    |
->                  |       |    |
->                  |-------| <--|-- next page boundary
->                  |       |    |
->       paddr4 --->|       |    | <----- svm->vm->size(including guard page)
->                  |       |    |
->                  |       |    |
-> max paddr_end -->|-------| <--|-- svm->vm's phys_addr_end
->                  | ///// |    |
->       paddr5 --->| guard |    |
->                  | page  |    |
->                  | ///// |    |
->                   -------  <-/--- svm->vm->addr + svm->vm_size
-> 
-> <1> If the paddr == paddr1, then continue;
-> <2> If the paddr == paddr2~paddr4 and paddr_end > phys_addr_end,
->     then continue;
-> <3> if the paddr >= paddr5 then continue;
-> 
-> Signed-off-by: Richard Lee <superlibj8301@gmail.com>
+Thinking about this more, I could use the DMA_PREP_INTERRUPT to cover the EOT
+flag.  However, I might get in a bind later if I need to support the EOB (end of
+block) interrupt.
 
-instead of doing this repeatedly, why not simply ensure the recorded 
-static vm information is already page aligned in the first place?
+> 
+> > 
+> > > 
+> > > The NWD flag requests that the peripheral wait until the data has been fully
+> > > processed before signaling an interrupt.
+> > interrupt for transaction complete or DMA request?
+> 
+> This is a special signaling mechanism that holds off the DMA interrupt until the
+> peripheral actually acks that the data has been processed completely.  This is
+> required in many cases by the peripheral.  One example is the SPI controller.
+> At the end of a transaction you are supposed to set the NWD so that the chip
+> select is de-asserted.
 
+I'm not sure what flag I could map this to... maybe DMA_CTRL_ACK?  or maybe the
+DMA_PREP_FENCE?  I don't generally like overloading the flags and slightly
+twisting their intent.  Could we add a flag to denote device ACK?
 
-
-> ---
-> 
-> 
-> Change in V2:
->  - PAGE_SIZE --> PAGE_MASK
->  - remove the 'size' page size align operation.
-> 
-> 
-> 
-> 
-> 
-> 
->  arch/arm/mm/ioremap.c | 40 ++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 38 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-> index be69333..f235ab7 100644
-> --- a/arch/arm/mm/ioremap.c
-> +++ b/arch/arm/mm/ioremap.c
-> @@ -47,16 +47,52 @@ static struct static_vm *find_static_vm_paddr(phys_addr_t paddr,
->  {
->  	struct static_vm *svm;
->  	struct vm_struct *vm;
-> +	size_t offset;
-> +
-> +	offset = paddr & ~PAGE_MASK;
->  
->  	list_for_each_entry(svm, &static_vmlist, list) {
-> +		phys_addr_t paddr_end, phys_addr_end;
-> +		size_t vmoff;
-> +
->  		vm = &svm->vm;
->  		if (!(vm->flags & VM_ARM_STATIC_MAPPING))
->  			continue;
->  		if ((vm->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
->  			continue;
->  
-> -		if (vm->phys_addr > paddr ||
-> -			paddr + size - 1 > vm->phys_addr + vm->size - 1)
-> +		/* Static vm area boundary check:
-> +		 *
-> +		 *       paddr1 --->|       |
-> +		 *                  |       |
-> +		 *                  |-------| <-\--- svm->vm->addr(page aligned)
-> +		 *       paddr2 --->|       |    |
-> +		 *                  |     --| <--|-- svm->vm->phys_addr
-> +		 *                  |       |    |
-> +		 *       paddr3 --->|       |    |
-> +		 *                  |       |    |
-> +		 *                  |-------| <--|-- next page boundary
-> +		 *                  |       |    |
-> +		 *       paddr4 --->|       |    | <----- svm->vm->size,
-> +		 *                  |       |    |         including guard page
-> +		 *                  |       |    |
-> +		 * max paddr_end -->|-------| <--|-- svm->vm's phys_addr_end
-> +		 *                  | ///// |    |
-> +		 *       paddr5 --->| guard |    |
-> +		 *                  | page  |    |
-> +		 *                  | ///// |    |
-> +		 *                   -------  <-/-- svm->vm->addr + svm->vm_size
-> +		 *
-> +		 * <1> If paddr == paddr1, then continue;
-> +		 * <2> If paddr == paddr2~paddr4 and paddr_end > phys_addr_end,
-> +		 *     then continue;
-> +		 * <3> if paddr >= paddr5 then continue;
-> +		 */
-> +		vmoff = vm->phys_addr & ~PAGE_MASK;
-> +		phys_addr_end = vm->phys_addr + vm->size - PAGE_SIZE - vmoff;
-> +		paddr_end = paddr + size - offset;
-> +		if (__phys_to_pfn(vm->phys_addr) > __phys_to_pfn(paddr) ||
-> +			paddr_end - 1 > phys_addr_end - 1)
->  			continue;
->  
->  		return svm;
-> -- 
-> 1.8.4
-> 
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
