@@ -1,90 +1,96 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 15 May 2014 19:51:45 +0100
-Subject: [PATCH v6 0/4] live migration dirty bitmap support for ARMv7
-In-Reply-To: <1400178451-4984-1-git-send-email-m.smarduch@samsung.com>
-References: <1400178451-4984-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <20140515185145.GB6164@lvm>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Thu, 15 May 2014 14:58:14 -0400
+Subject: [RFC PATCH 4/5] thermal: cpu_cooling: Release the upper cooling
+ limit checks
+In-Reply-To: <1399559880-20562-5-git-send-email-amit.daniel@samsung.com>
+References: <1399559880-20562-1-git-send-email-amit.daniel@samsung.com>
+ <1399559880-20562-5-git-send-email-amit.daniel@samsung.com>
+Message-ID: <20140515185814.GD3138@developer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 11:27:27AM -0700, Mario Smarduch wrote:
-> This is v6 patcheset of live mgiration support for ARMv7.
+Hello Amit,
 
-migration
+On Thu, May 08, 2014 at 08:07:59PM +0530, Amit Daniel Kachhap wrote:
+> This is required as with addition of cpufreq cooling notifiers
+> mechanism the client can enable some more cooling states at a later
+> point of time. Say when minimum p state is reached then ACPI specific
+> throttling is enabled which may add some more cooling states.
+> 
+> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> ---
+>  drivers/thermal/step_wise.c    |    2 +-
+>  drivers/thermal/thermal_core.c |    9 +++------
+>  include/linux/thermal.h        |    1 +
+>  3 files changed, 5 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/thermal/step_wise.c b/drivers/thermal/step_wise.c
+> index f251521..7d65617 100644
+> --- a/drivers/thermal/step_wise.c
+> +++ b/drivers/thermal/step_wise.c
+> @@ -72,7 +72,7 @@ static unsigned long get_target_state(struct thermal_instance *instance,
+>  		}
+>  		break;
+>  	case THERMAL_TREND_RAISE_FULL:
+> -		if (throttle)
+> +		if (instance->upper != THERMAL_CSTATE_MAX && throttle)
+>  			next_target = instance->upper;
+>  		break;
+>  	case THERMAL_TREND_DROPPING:
+> diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
+> index 71b0ec0..36bb107 100644
+> --- a/drivers/thermal/thermal_core.c
+> +++ b/drivers/thermal/thermal_core.c
+> @@ -921,7 +921,6 @@ int thermal_zone_bind_cooling_device(struct thermal_zone_device *tz,
+>  	struct thermal_instance *pos;
+>  	struct thermal_zone_device *pos1;
+>  	struct thermal_cooling_device *pos2;
+> -	unsigned long max_state;
+>  	int result;
+>  
+>  	if (trip >= tz->trips || (trip < 0 && trip != THERMAL_TRIPS_NONE))
+> @@ -939,13 +938,11 @@ int thermal_zone_bind_cooling_device(struct thermal_zone_device *tz,
+>  	if (tz != pos1 || cdev != pos2)
+>  		return -EINVAL;
+>  
+> -	cdev->ops->get_max_state(cdev, &max_state);
+> -
 
-This is an extremely terse cover letter.  It would have been nice with a
-few sentences of which existing features this leverages, which support
-was missing, what the preferred approach is, etc.  Also, links to a wiki
-page or just a few notes on how you did the testing below with which
-user space tools etc. would also have been great.
+I am not sure I follow why we need to release this check. Can't the user
+use the notifier infrastructure and change the max state?
 
-> 
-> - Tested on two 4-way A15 hardware, QEMU 2-way/4-way SMP guest upto 2GB
-> - Various dirty data rates tested - 2GB/1s ... 2048 pgs/5ms
-> - validated source/destination memory image integrity
-> 
-> Changes since v1:
-> - add unlock of VM mmu_lock to prevent a deadlock
-> - moved migratiion active inside mmu_lock acquire for visibility in 2nd stage
->   data abort handler
-> - Added comments
-> 
-> Changes since v2: 
-> - move initial VM write protect to memory region architecture prepare function
->   (needed to make dirty logging function generic) 
-> - added stage2_mark_pte_ro() - to mark ptes ro - Marc's comment
-> - optimized initial VM memory region write protect to do fewer table lookups -
->   applied Marc's comment for walking dirty bitmap mask
-> - added pud_addr_end() for stage2 tables, to make the walk 4-level
-> - added kvm_flush_remote_tlbs() to use ARM TLB invalidation, made the generic
->   one weak, Marc's comment to for generic dirty bitmap log function
-> - optimized walking dirty bit map mask to skip upper tables - Marc's comment
-> - deleted x86,arm kvm_vm_ioctl_get_dirty_log(), moved to kvm_main.c tagged 
->   the function weak - Marc's comment
-> - changed Data Abort handler pte index handling - Marc's comment
-> 
-> Changes since v3:
-> - changed pte updates to reset write bit instead of setting default 
->   value for existing pte's - Steve's comment
-> - In addition to PUD add 2nd stage >4GB range functions - Steves
->   suggestion
-> - Restructured initial memory slot write protect function for PGD, PUD, PMD
->   table walking - Steves suggestion
-> - Renamed variable types to resemble their use - Steves suggestions
-> - Added couple pte helpers for 2nd stage tables - Steves suggestion
-> - Updated unmap_range() that handles 2nd stage tables and identity mappings
->   to handle 2nd stage addresses >4GB. Left ARMv8 unchanged.
-> 
-> Changes since v4:
-> - rebased to 3.15.0-rc1 - 'next' to pickup p*addr_end patches - Gavins comment
-> - Update PUD address end function to support 4-level page table walk
-> - Elimiated 5th patch of the series that fixed unmap_range(), since it was
->   fixed by Marcs patches.
-> 
-> Changes since v5:
-> - Created seperate entry point for VMID TLB flush with no param - Christoffers
->   comment
-> - Update documentation for kvm_flush_remote_tlbs() - Christoffers comment
-> - Simplified splitting of huge pages - inittial WP and 2nd stage DABT handler
->   clear the huge page PMD, and use current code to fault in small pages.
->   Removed kvm_split_pmd().
-> 
-> Mario Smarduch (4):
->   add ARMv7 HYP API to flush VM TLBs without address param
->   live migration support for initial write protect of VM
->   live migration support for VM dirty log management
->   add 2nd stage page fault handling during live migration
-> 
->  arch/arm/include/asm/kvm_asm.h  |    1 +
->  arch/arm/include/asm/kvm_host.h |   11 ++
->  arch/arm/include/asm/kvm_mmu.h  |   10 ++
->  arch/arm/kvm/arm.c              |    8 +-
->  arch/arm/kvm/interrupts.S       |   11 ++
->  arch/arm/kvm/mmu.c              |  292 ++++++++++++++++++++++++++++++++++++++-
->  arch/x86/kvm/x86.c              |   86 ------------
->  virt/kvm/kvm_main.c             |   84 ++++++++++-
->  8 files changed, 409 insertions(+), 94 deletions(-)
-> 
+I think I need a better view of use cases where max state would change.
+
+
+
+> -	/* lower default 0, upper default max_state */
+> +	/* lower default 0, upper default THERMAL_CSTATE_MAX */
+>  	lower = lower == THERMAL_NO_LIMIT ? 0 : lower;
+> -	upper = upper == THERMAL_NO_LIMIT ? max_state : upper;
+> +	upper = upper == THERMAL_NO_LIMIT ? THERMAL_CSTATE_MAX : upper;
+>  
+> -	if (lower > upper || upper > max_state)
+> +	if (lower > upper)
+>  		return -EINVAL;
+>  
+>  	dev =
+> diff --git a/include/linux/thermal.h b/include/linux/thermal.h
+> index f7e11c7..3748e6d 100644
+> --- a/include/linux/thermal.h
+> +++ b/include/linux/thermal.h
+> @@ -36,6 +36,7 @@
+>  
+>  /* invalid cooling state */
+>  #define THERMAL_CSTATE_INVALID -1UL
+> +#define THERMAL_CSTATE_MAX 1UL
+>  
+>  /* No upper/lower limit requirement */
+>  #define THERMAL_NO_LIMIT	THERMAL_CSTATE_INVALID
 > -- 
-> 1.7.9.5
+> 1.7.1
 > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
