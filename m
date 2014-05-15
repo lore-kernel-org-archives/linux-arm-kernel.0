@@ -1,75 +1,60 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 15 May 2014 22:47:04 +0100
-Subject: [PATCH v2 09/11] arm64/crypto: add voluntary preemption to Crypto
- Extensions SHA1
-In-Reply-To: <CAKv+Gu-9P+vDPnvr2Cz4Bcw5=5SuEMw-xFxLM4=SoF65ESvhcQ@mail.gmail.com>
-References: <1400091451-9117-1-git-send-email-ard.biesheuvel@linaro.org>
- <1400091451-9117-10-git-send-email-ard.biesheuvel@linaro.org>
- <20140515172458.GE1499@arm.com>
- <CAKv+Gu-9P+vDPnvr2Cz4Bcw5=5SuEMw-xFxLM4=SoF65ESvhcQ@mail.gmail.com>
-Message-ID: <E28B9BA9-468D-45BD-A479-5D9289616798@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 15 May 2014 14:47:43 -0700
+Subject: [PATCH v3 1/6] watchdog: Add API to trigger reboots
+In-Reply-To: <20140515215020.38f03ab1@alan.etchedpixels.co.uk>
+References: <1400186304-1691-1-git-send-email-linux@roeck-us.net>
+ <1400186304-1691-2-git-send-email-linux@roeck-us.net>
+ <20140515215020.38f03ab1@alan.etchedpixels.co.uk>
+Message-ID: <20140515214743.GA15577@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 May 2014, at 22:35, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 15 May 2014 10:24, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> On Wed, May 14, 2014 at 07:17:29PM +0100, Ard Biesheuvel wrote:
->>> +static u8 const *sha1_do_update(struct shash_desc *desc, const u8 *data,
->>> +                             int blocks, u8 *head, unsigned int len)
->>> +{
->>> +     struct sha1_state *sctx = shash_desc_ctx(desc);
->>> +     struct thread_info *ti = NULL;
->>> +
->>> +     /*
->>> +      * Pass current's thread info pointer to sha1_ce_transform()
->>> +      * below if we want it to play nice under preemption.
->>> +      */
->>> +     if ((IS_ENABLED(CONFIG_PREEMPT_VOLUNTARY) || IS_ENABLED(CONFIG_PREEMPT))
->>> +         && (desc->flags & CRYPTO_TFM_REQ_MAY_SLEEP))
->>> +             ti = current_thread_info();
->>> +
->>> +     do {
->>> +             int rem;
->>> +
->>> +             kernel_neon_begin_partial(16);
->>> +             rem = sha1_ce_transform(blocks, data, sctx->state, head, 0, ti);
->>> +             kernel_neon_end();
->>> +
->>> +             data += (blocks - rem) * SHA1_BLOCK_SIZE;
->>> +             blocks = rem;
->>> +             head = NULL;
->>> +     } while (unlikely(ti && blocks > 0));
->>> +     return data;
->>> +}
->> 
->> What latencies are we talking about? Would it make sense to always
->> call cond_resched() even if preemption is disabled?
+On Thu, May 15, 2014 at 09:50:20PM +0100, One Thousand Gnomes wrote:
+> > +void watchdog_do_reboot(void)
+> > +{
+> > +	if (wdd_reboot_dev)
+> > +		wdd_reboot_dev->ops->reboot(wdd_reboot_dev);
+> > +}
+> > +EXPORT_SYMBOL(watchdog_do_reboot);
 > 
-> Calculating the SHA256 (which is the most striking example) hash of a
-> 4k buffer takes ~10 microseconds, so perhaps this is all a bit moot as
-> I don't think there will generally be many in-kernel users hashing
-> substantially larger quantities of data at a time.
-
-And what?s the maximum size? Could we do it in blocks of 4K?
-
->> But I think we should have this loop always rescheduling if
->> CRYPTO_TFM_REQ_MAY_SLEEP. I can see there is a crypto_yield() function
->> that conditionally reschedules. What's the overhead of calling
->> sha1_ce_transform() in a loop vs a single call for the entire data?
+> Crashes and burns if you are unloading a watchdog just as you try to
+> reboot. Yes its wildly unlikely but it's still conceptually wrong.
 > 
-> For SHA256 we lose at least 10% if we call into the core function for
-> each 64 byte block rather than letting it chew away at all the data
-> itself.
+Possibly, but how is it different to the code it replaces ?
 
-I was thinking more like calling it for bigger buffers (e.g. page) at
-once and a crypto_yield() in between.
+> >  
+> > +	if (wdd->ops->reboot)
+> > +		wdd_reboot_dev = wdd;
+> > +
+> 
+> Two parallel registers from different bus types, parallel
+> register/unregister ?
+> 
+Sorry, you lost me. What different bus types ?
 
-> (This is due to the fact that it needs to load 64 32-bit round
-> keys) But perhaps (considering the above) it is better to just shelve
-> the last 4 patches in this series until it becomes a problem for
-> anyone.
+> This feels to me like a backward step. We've gone from various device
+> bits leaking into the core code (where they can work all the time) to
+> various core code leaking into the devices which is asking for init order
+> problems and other races.
+> 
+> Given we are talking about stuff of the order of 10-20 instructions I
+> think duplication is not only the lesser evil it's also smaller, more
+> reliable and easier to maintain.
+> 
+> IMHO this is a solution looking for a problem.
+> 
+Really ?  To me it seems to be much cleaner than setting the pointer to
+arm_pm_restart directly from individual watchdog drivers. Also, and I was
+told that other HW may benefit from it as well.
 
-For the time being I would drop the last 4 patches. We can revisit them
-for the next kernel version.
+Do I understand it correctly that you prefer watchdog drivers to set
+arm_pm_restart directly ? Maybe you can explain a bit why you believe
+that to be a superior solution.
 
-Catalin
+In addition to that, while I could obviously add some locking around access to
+wdd_reboot_dev, existing code doesn't lock any changes to arm_pm_restart. I am
+somewhat at loss why setting or clearing arm_pm_restart is less of a problem
+that setting wdd_reboot_dev.
+
+Thanks,
+Guenter
