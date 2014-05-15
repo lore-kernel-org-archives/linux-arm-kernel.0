@@ -1,51 +1,79 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 15 May 2014 16:25:56 +0100
-Subject: [RFC PATCHv1 0/7] ARM core support for hardware I/O coherency in
- non-SMP platforms
-In-Reply-To: <CAL_JsqK80pFHQBgMxc1FGi998UYnbKxOK2gbm_ftqrTaxNq4rA@mail.gmail.com>
-References: <1400082641-23871-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140514170456.GC15946@arm.com>
- <20140515115010.0d6a4d92@free-electrons.com>
- <20140515142205.GC1499@arm.com>
- <CAL_JsqK80pFHQBgMxc1FGi998UYnbKxOK2gbm_ftqrTaxNq4rA@mail.gmail.com>
-Message-ID: <20140515152553.GA30423@localhost>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 15 May 2014 11:31:50 -0400
+Subject: [PATCHv3 3/3] ARM: mvebu: implement L2/PCIe deadlock workaround
+In-Reply-To: <20140515155008.1dcca042@free-electrons.com>
+References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1400145519-28530-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140515132118.GK27822@titan.lakedaemon.net>
+ <20140515155008.1dcca042@free-electrons.com>
+Message-ID: <20140515153150.GP27822@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 03:59:31PM +0100, Rob Herring wrote:
-> On Thu, May 15, 2014 at 9:22 AM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > On Thu, May 15, 2014 at 10:50:10AM +0100, Thomas Petazzoni wrote:
-> >> On Wed, 14 May 2014 18:04:56 +0100, Catalin Marinas wrote:
-> >> > On Wed, May 14, 2014 at 04:50:34PM +0100, Thomas Petazzoni wrote:
-> >> > >    - The SCU must be enabled
-> >> >
-> >> > Again, could the firmware do this?
-> >>
-> >> See above. If the kernel does it for SMP cases, why wouldn't it do it
-> >> also for !SMP I/O coherent cases?
-> >
-> > The I/O coherency is an SoC property rather than an ARM architecture
-> > property. I want to separate the two so that the kernel can boot a
-> > significant part assuming sane architecture settings. Once you have DT
-> > available and start loading device drivers, you are in the SoC realm and
-> > you can do whatever initialisation for buses, interconnects, but not
-> > going back to change architected settings.
+On Thu, May 15, 2014 at 03:50:08PM +0200, Thomas Petazzoni wrote:
+> Dear Jason Cooper,
 > 
-> The SCU has nothing to do with the architecture and really is part of
-> the SOC. 
+> On Thu, 15 May 2014 09:21:18 -0400, Jason Cooper wrote:
+> 
+> > > +
+> > > +	if (of_machine_is_compatible("marvell,armada375") ||
+> > > +	    of_machine_is_compatible("marvell,armada38x")) {
+> > > +		arch_ioremap_caller = armada_pcie_wa_ioremap_caller;
+> > > +		pci_ioremap_set_mem_type(MT_UNCACHED);
+> > 
+> > iiuc, this patch depends on 1/3.  So how would you like to handle it?
+> 
+> Seems like my long cover letters are not always read in their
+> entirety :-)
 
-Indeed, it's not part of the architecture but I don't see it any
-different than other early configuration like SDRAM controller.
+It was, the 'u' comes from 'u'nderstanding the coverletter _and_ the
+code. ;-)
 
-> Let's look at this another way. Are there any usecases where
-> you would not enable the SCU? If any cores are coherent or the ACP is
-> coherent, it must be on. So that leaves all core in AMP mode. In this
-> case, does it matter if the SCU is enabled or not?
+One a side note, I should mention I find your detailed coverletters
+extremely helpful for getting up to speed quickly on what the intention
+of a series is.  Even better, the Link tag that's added to the commit
+message allows future devs to be three clicks away from that
+information.  Thanks for setting that standard.
 
-I don't fully follow the question. You may not enable the SCU if you
-don't care at all about the SMP mode or other coherency like ACP.
-Otherwise it should be enabled, the latest before the secondaries start.
+Which makes me think, in a lot of cases, it's better to start at the top
+of the thread when researching a patch.  The Message-Id of the
+coverletter is always the first address in the References header.
+Perhaps I should link to that instead, or add both.
 
--- 
-Catalin
+> From my cover letter:
+> 
+>  * PATCH 3/3 uses both of the added infrastructures, as well as the
+>    existing infrastructure to customize the behavior of ioremap() on a
+>    per-platform basis, to implement the workaround for the Armada 375
+>    and 38x SOCs. This patch should go through the mvebu maintainers
+>    tree. However, it has a build dependency on PATCH 1/3 that needs to
+>    be taken into account.
+> 
+> The last two sentences are the most important ones here :-)
+> 
+> Joke aside, I'm really open to your suggestions as to what the
+> appropriate merging patch is. I know Russell prefers to have the ARM
+> core code flow through his tree, which obviously make sense.
+> 
+> However, routing PATCH 3/3 through Russell tree is going to be a mess
+> of conflicts when things will get merged by Linus, due to the numerous
+> other changes we've been doing in mach-mvebu/board-v7.c.
+
+Yep.
+
+> So the only course of action I see right now is to work with Russell to
+> have him pull patches 1 and 2, and then provide a stable branch/tag
+> that you can merge as a dependency in whatever branch you decide to
+> merge patch 3/3. Would that work?
+
+Dunno.  I have a 100% failure rate getting Russell to create a stable
+topic branch to resolve dependencies like these.  Unfortunately, I think
+the answer is going to be resubmit 3/3 once 3.16-rc1 lands with 1/3 and
+2/3.
+
+Not the answer I want to give, but unfortunately, it's the most
+realistic.
+
+thx,
+
+Jason.
