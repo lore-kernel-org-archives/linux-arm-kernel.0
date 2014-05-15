@@ -1,113 +1,68 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 15 May 2014 19:51:45 +0200
-Subject: [RFC PATCH 3/3] ARM: sunxi: dt: define AXP221 pmic node available on
- the APP4-EVB1 board
-In-Reply-To: <1400176305-22737-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1400176305-22737-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1400176305-22737-4-git-send-email-boris.brezillon@free-electrons.com>
+Date: Thu, 15 May 2014 19:51:42 +0200
+Subject: [RFC PATCH 0/3] mfd: AXP22x: add support for APX221 PMIC
+Message-ID: <1400176305-22737-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the AXP221 device node and its regulators for the APP4-EVB1 board.
+Hello,
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
----
- arch/arm/boot/dts/sun6i-a31-app4-evb1.dts | 83 +++++++++++++++++++++++++++++++
- 1 file changed, 83 insertions(+)
+This patch series adds basic support for the X-Powers' AXP221 PMIC.
+It's mainly based on Carlo's series [1], which is almost merged (at least
+the mfd and regulator drivers are merged).
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-index 76f068f..2f4e7ba 100644
---- a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-@@ -35,6 +35,89 @@
- 			status = "okay";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+
-+			axp221: pmic at 68 {
-+				compatible = "x-powers,axp221";
-+				reg = <0x68>;
-+				interrupt-parent = <&nmi_intc>;
-+				interrupts = <0 8>;
-+
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				vin1-supply = <&axp_ipsout_reg>;
-+				vin2-supply = <&axp_ipsout_reg>;
-+				vin3-supply = <&axp_ipsout_reg>;
-+				vin4-supply = <&axp_ipsout_reg>;
-+				vin5-supply = <&axp_ipsout_reg>;
-+				aldoin-supply = <&axp_ipsout_reg>;
-+				dldoin-supply = <&axp_ipsout_reg>;
-+				eldoin-supply = <&axp_vcc3v0_reg>;
-+				ldoioin-supply = <&axp_ipsout_reg>;
-+				rtcldoin-supply = <&axp_ipsout_reg>;
-+
-+				regulators {
-+					compatible = "x-powers,axp22x-reg";
-+
-+					x-powers,dcdc-freq = <1500>;
-+
-+					axp_vcc3v0_reg: dcdc1 {
-+						regulator-always-on;
-+					};
-+
-+					axp_vdd_gpu_reg: dcdc2 {
-+						regulator-always-on;
-+					};
-+
-+					axp_vdd_cpu_reg: dcdc3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_vdd_sys_reg: dcdc4 {
-+						regulator-always-on;
-+					};
-+
-+					axp_vcc_dram_reg: dcdc5 {
-+						regulator-always-on;
-+					};
-+
-+					axp_cpus_vdd_reg: dc5ldo {
-+						regulator-always-on;
-+					};
-+
-+					axp_rtc_vcc_reg: rtc_ldo {
-+						regulator-always-on;
-+					};
-+
-+					axp_wifi_piog_vcc_reg: aldo1 {
-+					};
-+
-+					axp_io_lpddr2_reg: aldo2 {
-+						regulator-always-on;
-+					};
-+
-+					axp_avcc_reg: aldo3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_gps_vcc_reg: dldo2 {
-+					};
-+
-+					axp_card_io_vdd_reg: eldo2 {
-+					};
-+
-+					axp_csi_ts_vcc_reg: eldo3 {
-+					};
-+				};
-+			};
- 		};
- 	};
-+
-+	axp_ipsout_reg: axp_ipsout {
-+		compatible = "regulator-fixed";
-+		regulator-name = "axp-ipsout";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
- };
+At the moment I only added support for the AXP221 regulators but other
+subdevices will be added later.
+
+But, before going any further in my developement I'd like to get feedback
+on some points:
+
+1) I'm pretty sure we can share some code between the axp20x and axp22x
+   drivers, but I'm not sure how it should be done:
+ a) defining an axp2xx-core.c driver and make the axp20x and axp22x driver
+    use this core implementation.
+ b) just share some macros (like the AXP_DESC one) and the keep drivers
+    separated
+ c) keep only one generic driver that support all PMICs revisions (axp2xx-
+    drivers).
+
+2) The ipsout regulator is currently represented as a fixed regulator
+   providing a 5v output, and this is not exactly the case.
+   AFAIU (here's is the datasheet traduction if you want to check [2]), the
+   ipsout output is a multiplexer that choose among vbus (5V), acin (12V
+   which is then converted to 5V) and the battery power supply (3,5 -> 4,2 V).
+   This means the output voltage of ipsout vary between 3,5V and 5V.
+   How can we express this kind of muxer in the regulator framework (is there
+   already something available ?) ?
+   Note that the power supply selection is automatic, though we could force
+   one power supply, but then we loose the ability to unplug one power supply
+   without impacting the system.
+
+Best Regards,
+
+Boris
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/252638.html
+[2] http://linux-sunxi.org/AXP221#Regulators
+
+Boris BREZILLON (3):
+  mfd: AXP22x: add support for APX221 PMIC
+  regulator: AXP22x: add support for AXP221 regulators
+  ARM: sunxi: dt: define AXP221 pmic node available on the APP4-EVB1
+    board
+
+ arch/arm/boot/dts/sun6i-a31-app4-evb1.dts |  83 ++++++++
+ drivers/mfd/Kconfig                       |  12 ++
+ drivers/mfd/Makefile                      |   1 +
+ drivers/mfd/axp22x.c                      | 237 +++++++++++++++++++++
+ drivers/regulator/Kconfig                 |   7 +
+ drivers/regulator/Makefile                |   1 +
+ drivers/regulator/axp22x-regulator.c      | 328 ++++++++++++++++++++++++++++++
+ include/linux/mfd/axp22x.h                | 149 ++++++++++++++
+ 8 files changed, 818 insertions(+)
+ create mode 100644 drivers/mfd/axp22x.c
+ create mode 100644 drivers/regulator/axp22x-regulator.c
+ create mode 100644 include/linux/mfd/axp22x.h
+
 -- 
 1.8.3.2
