@@ -1,34 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 May 2014 10:01:57 +0200
-Subject: [PATCH v2 3/5] dt/bindings: ti,
- edma: Remove redundant properties from documentation
-In-Reply-To: <1399977032-26469-4-git-send-email-peter.ujfalusi@ti.com>
-References: <1399977032-26469-1-git-send-email-peter.ujfalusi@ti.com>
- <1399977032-26469-4-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <7468082.VY82PIo3ZY@wuerfel>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 15 May 2014 10:09:21 +0200
+Subject: [PATCH v2 06/10] clk: berlin: add core clock driver for BG2/BG2CD
+In-Reply-To: <1400098522-14770-7-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1400098522-14770-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1400098522-14770-7-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140515080921.GQ29318@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 May 2014 13:30:30 Peter Ujfalusi wrote:
-> From CCCFG register of eDMA3 we can get all the needed information for the
-> driver about the IP:
-> Number of channels: NUM_DMACH
-> Number of regions: NUM_REGN
-> Number of slots (PaRAM sets): NUM_PAENTRY
-> Number of TC/EQ: NUM_EVQUE
-> 
-> The ti,edma-regions; ti,edma-slots and dma-channels in DT are
-> redundant since the very same information can be obtained from the HW.
-> The mentioned properties can be removed from the binding document.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+On 14/05/2014 at 22:15:17 +0200, Sebastian Hesselbarth wrote :
+> +	/* clock divider cells */
+> +	parent_names[1] = avpllb_names[CH4];
+> +	parent_names[2] = avpllb_names[CH5];
+> +	parent_names[3] = avpllb_names[CH6];
+> +	parent_names[4] = avpllb_names[CH7];
+> +
+> +	parent_names[0] = refclk_names[SYSPLL];
 
-I wonder if we should keep them listed as "optional" properties so you
-can have a dtb file that still works with older kernels which need them.
+It should actually be:
 
-What you do is an incompatible change to the binding, which we shouldn't
-do lightly. Any new dts files don't need this information of course, but
-as a general rule, I'd rather keep things like this around unless we
-already have to enforce an ABI break that is well documented.
+parent_names[0] = avpllb_names[CH4];
+parent_names[1] = avpllb_names[CH5];
+parent_names[2] = avpllb_names[CH6];
+parent_names[3] = avpllb_names[CH7];
+parent_names[4] = refclk_names[SYSPLL];
 
-	Arnd
+> +	data = &bg2_divs[CLKID_SYS];
+> +	clks[CLKID_SYS] = berlin2_div_register(&data->map, base, data->name,
+> +		       data->div_flags, parent_names, 5, data->flags, &lock);
+> +
+> +	parent_names[0] = refclk_names[CPUPLL];
+> +	parent_names[5] = refclk_names[MEMPLL];
+
+The only valid choice here should be (remember, we are not adding 1 to
+the index anymore):
+parent_names[4] = refclk_names[MEMPLL];
+
+> +	data = &bg2_divs[CLKID_CPU];
+> +	clks[CLKID_CPU] = berlin2_div_register(&data->map, base, data->name,
+> +			 data->div_flags, parent_names, 6, data->flags, &lock);
+> +
+
+This is where it gets tricky, now we should have:
+parent_names[0] = avpllb_names[CH4];
+parent_names[1] = avplla_names[CH5];
+parent_names[2] = avpllb_names[CH6];
+parent_names[3] = avpllb_names[CH7];
+parent_names[4] = refclk_names[SYSPLL];
+
+> +	parent_names[0] = refclk_names[SYSPLL];
+> +	for (n = CLKID_DRMFIGO; n <= CLKID_APP; n++) {
+> +		data = &bg2_divs[n];
+> +		clks[n] = berlin2_div_register(&data->map, base, data->name,
+> +			 data->div_flags, parent_names, 5, data->flags, &lock);
+> +	}
+> +
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
