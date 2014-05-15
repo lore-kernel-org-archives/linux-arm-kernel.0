@@ -1,103 +1,135 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 15 May 2014 09:44:55 +0100
-Subject: [PATCH v4 2/6] dt-bindings: add mtk-timer bindings
-In-Reply-To: <cebe44ba-c543-4f4a-9aeb-810156fe8250@BN1AFFO11FD036.protection.gbl>
-References: <1400087579-4250-1-git-send-email-matthias.bgg@gmail.com>
- <1400087579-4250-3-git-send-email-matthias.bgg@gmail.com>
- <cebe44ba-c543-4f4a-9aeb-810156fe8250@BN1AFFO11FD036.protection.gbl>
-Message-ID: <CABuKBeL7yeXbxmBE=+ar3dsHRNs1oscYDSPPs+RnGsM8eJs5PQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 15 May 2014 14:16:59 +0530
+Subject: [PATCH v3 1/6] phy: add a driver for the Berlin SATA PHY
+In-Reply-To: <5374668F.4060109@gmail.com>
+References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
+ <20140514165722.GA18495@kwain> <5373AE9A.3050008@gmail.com>
+ <5764751.ffUj9rhnMd@wuerfel> <5373B908.5090904@gmail.com>
+ <537462A2.5020607@ti.com> <5374668F.4060109@gmail.com>
+Message-ID: <53747F03.5030206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi,
 
-I did not realize that Android gmail app sends HTML mails.
-So I send the comments below accidentally as HTML mail yesterday.
-Sorry for that.
-
-2014-05-14 18:44 GMT+01:00 S?ren Brinkmann <soren.brinkmann@xilinx.com>:
-> Hi Matthias,
->
-> On Wed, 2014-05-14 at 07:12PM +0200, Matthias Brugger wrote:
->> Add binding documentation for the General Porpose Timer driver of
->> the Mediatek SoCs.
+On Thursday 15 May 2014 12:32 PM, Sebastian Hesselbarth wrote:
+> On 05/15/2014 08:45 AM, Kishon Vijay Abraham I wrote:
+>> On Thursday 15 May 2014 12:12 AM, Sebastian Hesselbarth wrote:
+>>> On 05/14/2014 08:12 PM, Arnd Bergmann wrote:
+>>>> On Wednesday 14 May 2014 19:57:46 Sebastian Hesselbarth wrote:
+>>>>> On 05/14/2014 06:57 PM, Antoine T?nart wrote:
+>>>>>> On Wed, May 14, 2014 at 06:11:24PM +0200, Arnd Bergmann wrote:
+>>>>>>> On Wednesday 14 May 2014 17:49:29 Antoine T?nart wrote:
+>>>>>>>> On Wed, May 14, 2014 at 05:31:24PM +0200, Arnd Bergmann wrote:
+> [...]
+>>>>> Now, thinking about the PHY binding and the (possible) multi-protocol
+>>>>> support, it can be possible that on BG2Q there is a generic 2-lane
+>>>>> LVDS PHY that can be configured to support SATA or PCIe. Both are
+>>>>> electrically and bit-level compatible, so they could be internally
+>>>>> wired-up with AHCI and PCIe controller.
+>>>>
+>>>> Sounds like a reasonable guess. We have other PHY drivers doing the
+>>>> same thing already.
+> [...]
+>>>>> From a DT point-of-view, we need a way to (a) link each SATA or PCIe
+>>>>> port to the PHY, (b) specify the PHY lane to be used, and (c) specify
+>>>>> the protocol to be used on that lane. If I got it right, Arnd already
+>>>>> mentioned to use the phy-specifier to deal with it:
+>>>>>
+>>>>> e.g. phy = <&genphy 0 MODE_SATA> or phy = <&genphy 1 MODE_PCIE>
+>>>>
+>>>> Right.
+>>>>
+>>>>> Let's assume we have one dual-port SATA controller and one PCIe
+>>>>> controller with either x1 or x2 support. The only sane DT binding,
+>>>>> I can think of then would be:
+>>>>>
+>>>>> berlin2q.dtsi:
+>>>>>
+>>>>> genphy: lvds at ea00ff {
+>>>>> 	compatible = "marvell,berlin-lvds-phy";
+>>>>> 	reg = <0xea00ff 0x100>;
+>>>>> 	#phy-cells = <2>;
+>>>>> };
+>>>>>
+>>>>> sata: sata at ab00ff {
+>>>>> 	compatible = "ahci-platform";
+>>>>> 	reg = <0xab00ff 0x100>;
+>>>>> 	
+>>>>> 	sata0: sata-port at 0 {
+>>>>> 		reg = <0>;
+>>>>> 		phy = <&genphy 0 MODE_SATA>;
+>>>>> 		status = "disabled";
+>>>>> 	};
+>>>>>
+>>>>> 	sata1: sata-port at 1 {
+>>>>> 		reg = <1>;
+>>>>> 		phy = <&genphy 1 MODE_SATA>;
+>>>>> 		status = "disabled";
+>>>>> 	};
+>>>>> };
+>>>>>
+>>>>> pcie: pcie at ab01ff {
+>>>>> 	compatible = "marvell,berlin-pcie";
+>>>>> 	reg = <0xab01ff 0x100>;
+>>>>>
+>>>>> 	pcie0: pcie-port at 0 {
+>>>>> 		reg = <0>;
+>>>>> 		/* set phy on a per-board basis */
+>>>>> 		/* PCIe x1 on Lane 0 : phy = <&genphy 0 MODE_PCIE>; */
+>>>>> 		/* PCIe x2 on Lane 0 and 1 : phy = <&genphy 0 MODE_PCIE>, <&genphy 1
+>>>>> MODE_PCIE>; */
+>>>>> 		status = "disabled";
+>>>>> 	};
+>>>>> };
+>>>>>
+>>>>> berlin2q-dmp.dts:
+>>>>>
+>>>>> &sata1 {
+>>>>> 	status = "okay";
+>>>>> };
+>>>>>
+>>>>> &pcie0 {
+>>>>> 	phy = <&genphy 1 MODE_PCIE>;
+>>>>> };
+>>>>>
+>>>>> berlin2q-foo.dts:
+>>>>>
+>>>>> &pcie0 {
+>>>>> 	phy = <&genphy 0 MODE_PCIE>, <&genphy 1 MODE_PCIE>;
+>>>>> };
+>>>>
+>>>> Exactly. I would also be fine with keeping the sub-nodes of the
+>>>> phy device as in v3 and using #phy-cells=<1> instead of #phy-cells.
+>>>> The result would be pretty much the same, it just depends on how
+>>>> closely connected the two logical phys are.
 >>
->> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->> ---
->>  .../devicetree/bindings/timer/mediatek,mtk-timer.txt   | 18 ++++++++++++++++++
->>  1 file changed, 18 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+>> huh.. even with sub-nodes you'll need #phy-cells=<2> if we use a single *PHY
+>> PROVIDER*. Because with just PHYs node pointer we won't be able to get the PHY.
+>> We'll need PHY providers node pointer.
 >>
->> diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
->> new file mode 100644
->> index 0000000..938adf6
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
->> @@ -0,0 +1,18 @@
->> +Mediatek MT6589, MT6577 and MT6572 Timers
->> +---------------------------------------
->> +
->> +Required properties:
->> +- compatible: Should be "mediatek,mtk6589-timer"
->
-> Don't you want compatible strings for the other supported SOCs too?
+>> However I'd prefer to have sub-nodes for each individual PHYs and register a
+>> single PHY PROVIDER.
+> 
+> Depends on what you call PHY. In the example above the PHY is what
+> allows you to control both lanes.
+> 
+> So you want sub-nodes for each individual lane given the nomenclature
+> of the example?
+> 
+> Or like it is used in the example above, a single PHY node with an index
+> in the phy-specifier to pick an individual lane.
+> 
+> IMHO, having both phy-specifier index _and_ PHY sub-node per lane
+> has no benefit at all. You cannot even use the PHY sub-nodes for any
+> setup properties, as they depend on the consumer claiming the lane.
 
-I'm not sure if it makes sense to define the compatible strings for
-all the SoCs that have this timer as it's actually totally the same
-IP.
+IMO the dt data should completely describe the HW. So just by looking at the
+PHY node, we won't be able to tell the no of PHYs implemented in the IP if we
+have a single PHY node (In this case the lanes in the IP).
 
-In other cases e.g. the arm gic, not all compatible strings are
-defined, that's why I use cortex-a15-gic in the dtsi although I'm
-using a cortex A7 SoC.
+However if you think it's an overkill for having sub-nodes for each lane then
+single PHY node is fine too.
 
-I would instead say, that the SoC version of the compatible string,
-mt6589, is something arbitrary. So I propose to use the first known
-SoC which uses the timer. That would be AFAIK mt6577.
-
->
->> +- reg: Should contain location and length for timers register.
->> +- clocks: Clocks driving the timer hardware. This list shoud include two
->> +     clocks. The order is system clock and as second clock the RTC clock.
->
-> Sorry for being pedantic, but we had so many ugly bindings in our vendor
-> tree. I'm still getting caught up on the clocks. I have the feeling the SOC
-> has two clocks (system and rtc) which are used to drive this timer,
-> while the timer probably refers differently to its clock inputs.
-> If this was the case, the names 'rtc' and 'system' clock are SOC specific
-> names/implementation details. From the timer perspective it is probably
-> just important that it receives two clock inputs. Since the timer is
-> described here and not the SOC, these SOC specific names should
-> disappear and be replaced with the names the timer IP uses for its input
-> clocks.
-
-The timer is exactly identically described in the three SoC
-datasheets. In the description the clocks are called system and RTC,
-so I think we are on the safe side here. :)
-
->
-> The clock-names should be listed too, probably as optional properties.
-
-This will lead to a problem, as the clock-names description includes
-the order of the clocks. If we make this property optional, it can be
-easily missunderstood. So I propose to do it the way other drivers in
-the kernel (e.g. arm,sp804) do it and leave the clock-names property
-as it is.
-
->
->> +
->> +Examples:
->> +
->> +     timer {
->> +             compatible = "mediatek,mtk6589-timer";
->> +             reg = <0x10008000 0x80>;
->> +             interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
->> +             clocks = <&system_clk>, <&rtc_clk>;
->> +             clock-names = "system-clk", "rtc-clk";
->
->
->         S?ren
-
-
-
--- 
-motzblog.wordpress.com
+Thanks
+Kishon
