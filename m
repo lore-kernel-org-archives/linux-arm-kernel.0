@@ -1,66 +1,63 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Wed, 14 May 2014 17:33:05 -0700
-Subject: [RFC PATCH 09/10] ARM: tegra124: Add XHCI controller and PHY
+Date: Wed, 14 May 2014 17:33:01 -0700
+Subject: [RFC PATCH 05/10] ARM: tegra: Export function to read USB calibration
+ data
 In-Reply-To: <1400113986-339-1-git-send-email-abrestic@chromium.org>
 References: <1400113986-339-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1400113986-339-10-git-send-email-abrestic@chromium.org>
+Message-ID: <1400113986-339-6-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-And nodes for the XHCI host controller and XUSB PHY present on Tegra124.
+Board-specific USB configuration data is stored in FUSE_SKU_CALIB_0.
+Export a function to read it so the PHY can be properly configured.
 
 Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 ---
- arch/arm/boot/dts/tegra124.dtsi | 37 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ arch/arm/mach-tegra/fuse.c | 13 +++++++++++++
+ include/linux/tegra-soc.h  |  1 +
+ 2 files changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 47fb61c..ee3209bc 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -462,6 +462,43 @@
- 		clock-names = "pclk", "clk32k_in";
- 	};
+diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
+index c9ac23b..e457ef7 100644
+--- a/arch/arm/mach-tegra/fuse.c
++++ b/arch/arm/mach-tegra/fuse.c
+@@ -34,6 +34,7 @@
+ #define FUSE_UID_HIGH		0x10c
  
-+	usb at 0,70090000 {
-+		compatible = "nvidia,tegra124-xhci";
-+		reg = <0x0 0x70090000 0x0 0x8000>,
-+		      <0x0 0x70098000 0x0 0x1000>,
-+		      <0x0 0x70099000 0x0 0x1000>;
-+		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&tegra_car TEGRA124_CLK_XUSB_HOST>,
-+			 <&tegra_car TEGRA124_CLK_XUSB_FALCON_SRC>;
-+		clock-names = "xusb_host", "xusb_falcon_src";
-+		resets = <&tegra_car 89>;
-+		reset-names = "xusb_host";
-+		phys = <&xusb_phy>;
-+		phy-names = "xusb";
-+		status = "disabled";
-+	};
+ /* Tegra30 and later */
++#define FUSE_USB_CALIB		0x1f0
+ #define FUSE_VENDOR_CODE	0x200
+ #define FUSE_FAB_CODE		0x204
+ #define FUSE_LOT_CODE_0		0x208
+@@ -154,6 +155,18 @@ u32 tegra_read_chipid(void)
+ 	return readl_relaxed(IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804);
+ }
+ 
++u32 tegra_read_usb_calibration_data(void)
++{
++	u32 reg;
 +
-+	xusb_phy: phy at 0,7009f000 {
-+		compatible = "nvidia,tegra124-xusb-phy";
-+		reg = <0x0 0x7009f000 0x0 0x1000>;
-+		#phy-cells = <0>;
-+		clocks = <&tegra_car TEGRA124_CLK_XUSB_SS>,
-+			 <&tegra_car TEGRA124_CLK_XUSB_SS_SRC>,
-+			 <&tegra_car TEGRA124_CLK_XUSB_HS_SRC>,
-+			 <&tegra_car TEGRA124_CLK_XUSB_FS_SRC>,
-+			 <&tegra_car TEGRA124_CLK_PLL_U_480M>,
-+			 <&tegra_car TEGRA124_CLK_CLK_M>,
-+			 <&tegra_car TEGRA124_CLK_PLL_E>;
-+		clock-names = "xusb_ss", "xusb_ss_src", "xusb_hs_src",
-+			      "xusb_fs_src", "pll_u_480M", "clk_m",
-+			      "pll_e";
-+		resets = <&tegra_car 156>;
-+		reset-names = "xusb_ss";
-+		nvidia,clkrst = <&tegra_car>;
-+		status = "disabled";
-+	};
++	tegra_fuse_enable_clk();
++	reg = tegra_fuse_readl(FUSE_USB_CALIB);
++	tegra_fuse_disable_clk();
 +
- 	sdhci at 0,700b0000 {
- 		compatible = "nvidia,tegra124-sdhci";
- 		reg = <0x0 0x700b0000 0x0 0x200>;
++	return reg;
++}
++EXPORT_SYMBOL(tegra_read_usb_calibration_data);
++
+ static void __init tegra20_fuse_init_randomness(void)
+ {
+ 	u32 randomness[2];
+diff --git a/include/linux/tegra-soc.h b/include/linux/tegra-soc.h
+index 95f611d..492dc95 100644
+--- a/include/linux/tegra-soc.h
++++ b/include/linux/tegra-soc.h
+@@ -18,5 +18,6 @@
+ #define __LINUX_TEGRA_SOC_H_
+ 
+ u32 tegra_read_chipid(void);
++u32 tegra_read_usb_calibration_data(void);
+ 
+ #endif /* __LINUX_TEGRA_SOC_H_ */
 -- 
 1.9.1.423.g4596e3a
