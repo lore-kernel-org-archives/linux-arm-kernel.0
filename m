@@ -1,99 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 May 2014 18:23:05 +0200
-Subject: [PATCH v1 5/5] pci: keystone: add pcie driver based on designware
- core driver
-In-Reply-To: <1400169692-9677-6-git-send-email-m-karicheri2@ti.com>
-References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
- <1400169692-9677-6-git-send-email-m-karicheri2@ti.com>
-Message-ID: <6048322.x3M3sdDEWO@wuerfel>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 15 May 2014 12:27:38 -0400
+Subject: [PATCH] arm64: fix pud_huge() for 2-level pagetables
+In-Reply-To: <20140515144424.GA23884@linaro.org>
+References: <1400163562-7481-1-git-send-email-msalter@redhat.com>
+ <20140515144424.GA23884@linaro.org>
+Message-ID: <1400171258.21547.136.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 May 2014 12:01:32 Murali Karicheri wrote:
+On Thu, 2014-05-15 at 15:44 +0100, Steve Capper wrote:
+> On Thu, May 15, 2014 at 10:19:22AM -0400, Mark Salter wrote:
+> > The following happens when trying to run a kvm guest on a kernel
+> > configured for 64k pages. This doesn't happen with 4k pages:
+> > 
+> >   BUG: failure at include/linux/mm.h:297/put_page_testzero()!
+> >   Kernel panic - not syncing: BUG!
+> >   CPU: 2 PID: 4228 Comm: qemu-system-aar Tainted: GF            3.13.0-0.rc7.31.sa2.k32v1.aarch64.debug #1
+> >   Call trace:
+> >   [<fffffe0000096034>] dump_backtrace+0x0/0x16c
+> >   [<fffffe00000961b4>] show_stack+0x14/0x1c
+> >   [<fffffe000066e648>] dump_stack+0x84/0xb0
+> >   [<fffffe0000668678>] panic+0xf4/0x220
+> >   [<fffffe000018ec78>] free_reserved_area+0x0/0x110
+> >   [<fffffe000018edd8>] free_pages+0x50/0x88
+> >   [<fffffe00000a759c>] kvm_free_stage2_pgd+0x30/0x40
+> >   [<fffffe00000a5354>] kvm_arch_destroy_vm+0x18/0x44
+> >   [<fffffe00000a1854>] kvm_put_kvm+0xf0/0x184
+> >   [<fffffe00000a1938>] kvm_vm_release+0x10/0x1c
+> >   [<fffffe00001edc1c>] __fput+0xb0/0x288
+> >   [<fffffe00001ede4c>] ____fput+0xc/0x14
+> >   [<fffffe00000d5a2c>] task_work_run+0xa8/0x11c
+> >   [<fffffe0000095c14>] do_notify_resume+0x54/0x58
+> > 
+> > In arch/arm/kvm/mmu.c:unmap_range(), we end up doing an extra put_page()
+> > on the stage2 pgd which leads to the BUG in put_page_testzero(). This
+> > happens because a pud_huge() test in unmap_range() returns true when it
+> > should always be false with 2-level pages tables used by 64k pages.
+> > This patch removes support for huge puds if 2-level pagetables are
+> > being used.
+> 
+> Hi Mark,
+> I'm still catching up with myself, sorry  (was off sick for a couple
+> of days)...
+> 
+> I thought unmap_range was going to be changed?
+> Does the following help things?
+> https://lists.cs.columbia.edu/pipermail/kvmarm/2014-May/009388.html
 
-> +static int
-> +keystone_pcie_fault(unsigned long addr, unsigned int fsr,
-> +		struct pt_regs *regs)
-> +{
-> +	unsigned long instr = *(unsigned long *) instruction_pointer(regs);
-> +
-> +	if ((instr & 0x0e100090) == 0x00100090) {
-> +		int reg = (instr >> 12) & 15;
-> +
-> +		regs->uregs[reg] = -1;
-> +		regs->ARM_pc += 4;
-> +	}
-> +
-> +	return 0;
-> +}
-
-This needs to check in the PCI host registers what happened and do
-some appropriate action. If the fault was not caused by PCIe, it
-should not be ignored here but get passed on to the next handler.
-
-> +static int __init ks_pcie_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct device *dev = &pdev->dev;
-> +	struct keystone_pcie *ks_pcie;
-> +	void __iomem *devstat;
-> +	struct pcie_port *pp;
-> +	struct resource *res;
-> +	struct phy *phy;
-> +	int ret = 0;
-> +	u32 val;
-> +
-> +	ks_pcie = devm_kzalloc(&pdev->dev, sizeof(*ks_pcie),
-> +				GFP_KERNEL);
-> +	if (!ks_pcie) {
-> +		dev_err(dev, "no memory for keystone pcie\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	/* check if serdes phy needs to be enabled */
-> +	if (of_get_property(np, "ti,init-phy", NULL) != NULL) {
-> +		phy = devm_phy_get(dev, "pcie-phy");
-> +			if (IS_ERR(phy))
-> +				return PTR_ERR(phy);
-> +
-> +		ret = phy_init(phy);
-> +		if (ret < 0)
-> +			return ret;
-> +	}
-
-I think you can just call devm_phy_get() unconditionally here and
-get rid of the ti,init-phy property. If there is no phy, don't
-initialize it.
-
-> +
-> +	ret = add_pcie_port(ks_pcie, pdev);
-> +	if (ret < 0)
-> +		goto fail_clk;
-> +
-> +	platform_set_drvdata(pdev, ks_pcie);
-
-Set the platform data first, then add the port.
-
-> +	dev_info(dev, "pcie rc probe success\n");
-
-Remove this.
-
-> +#ifdef CONFIG_PCI_KEYSTONE
-> +/*
-> + * The KeyStone PCIe controller has maximum read request size of 256 bytes.
-> + */
-> +static void quirk_limit_readrequest(struct pci_dev *dev)
-> +{
-> +	int readrq = pcie_get_readrq(dev);
-> +
-> +	if (readrq > 256)
-> +		pcie_set_readrq(dev, 256);
-> +}
-> +DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_readrequest);
-> +#endif /* CONFIG_PCI_KEYSTONE */
-
-This doesn't work: you can't just limit do this for all devices just based
-on PCI_KEYSTONE being enabled, you have to check if you are actually using
-this controller.
-
-	Arnd
+No, I get the same BUG. Regardless, pud_huge() should always return
+false for 2-level pagetables, right?
