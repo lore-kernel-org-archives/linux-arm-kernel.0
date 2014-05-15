@@ -1,40 +1,128 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 15 May 2014 11:42:44 +0530
-Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems#
-In-Reply-To: <CAD=FV=XM2URyJjV9gaE=mrp7LAEGtvi9wQGhGJi3_HYp_XzYWg@mail.gmail.com>
-References: <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
- <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
- <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
- <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
- <20140508192209.GH3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405081600260.980@knanqh.ubzr>
- <20140508205223.GI3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405082058130.980@knanqh.ubzr>
- <20140509091824.GL3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405091245070.980@knanqh.ubzr>
- <20140509182245.GM3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405091640090.980@knanqh.ubzr>
- <CAD=FV=UJK1nSPjH-au-KtbnOZk2nC7usLD8L9neMedj6WHUp8g@mail.gmail.com>
- <CAD=FV=XM2URyJjV9gaE=mrp7LAEGtvi9wQGhGJi3_HYp_XzYWg@mail.gmail.com>
-Message-ID: <CAKohpokoov4yr_oKW=Nv3gG1tfQMR2Wifr1=cD5s6MbvoFOUpQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 15 May 2014 11:45:16 +0530
+Subject: [PATCH v3 1/6] phy: add a driver for the Berlin SATA PHY
+In-Reply-To: <20140514102122.GA11140@kwain>
+References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1400060942-10588-2-git-send-email-antoine.tenart@free-electrons.com>
+ <537341AF.5030105@ti.com> <20140514102122.GA11140@kwain>
+Message-ID: <53745B74.2040808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 May 2014 03:20, Doug Anderson <dianders@chromium.org> wrote:
-> ...but then I found the true problem shows up when we transition
-> between very low frequencies on exynos, like between 200MHz and
-> 300MHz.  While transitioning between frequencies the system
-> temporarily bumps over to the "switcher" PLL running at 800MHz while
-> waiting for the main PLL to stabilize.  No CPUFREQ notification is
-> sent for that.  That means there's a period of time when we're running
-> at 800MHz but loops_per_jiffy is calibrated at between 200MHz and
-> 300MHz.
->
->
-> I'm welcome to any suggestions for how to address this.
+Hi,
 
-I have attempted to fix this in a generic way and sent an RFC patch for
-this. I have cc'd only few people from this list which I thought would be
-interested in cpufreq stuff, sorry if I missed anyone.
+On Wednesday 14 May 2014 03:51 PM, Antoine T?nart wrote:
+> Hi,
+> 
+> On Wed, May 14, 2014 at 03:43:03PM +0530, Kishon Vijay Abraham I wrote:
+>> Hi,
+>>
+>> On Wednesday 14 May 2014 03:18 PM, Antoine T?nart wrote:
+> 
+> [?]
+> 
+>>> +#define to_berlin_sata_phy_priv(desc)	\
+>>> +	container_of((desc), struct phy_berlin_priv, phys[(desc)->index])
+>>> +
+>>> +struct phy_berlin_desc {
+>>> +	struct phy	*phy;
+>>> +	u32		val;
+>>> +	unsigned	index;
+>>> +};
+>>> +
+>>> +struct phy_berlin_priv {
+>>> +	void __iomem	*base;
+>>> +	spinlock_t	lock;
+>>> +	struct phy_berlin_desc	phys[BERLIN_SATA_PHY_NB];
+>>
+>> Can't we do away with hardcoding BERLIN_SATA_PHY_NB?
+> 
+> We can't if we want to be able to use the container_of macro in
+> to_berlin_sata_phy_priv(). And we want a common structure to store the
+> common spinlock and base address.
 
-https://lkml.org/lkml/2014/5/15/40
+to get phy_berlin_priv, you can use dev_get_drvdata(phy->dev->parent).
+
+> 
+> [?]
+> 
+>>> +		/*
+>>> +		 * By default the PHY node is used to request and match a PHY.
+>>> +		 * We describe one PHY per sub-node here. Use the right node.
+>>> +		 */
+>>> +		phy->dev.of_node = child;
+>>> +
+>>> +		priv->phys[phy_id].phy = phy;
+>>> +		priv->phys[phy_id].val = desc[phy_id].val;
+>>> +		priv->phys[phy_id].index = phy_id;
+>>> +		phy_set_drvdata(phy, &priv->phys[phy_id]);
+>>> +
+>>> +		/* Make sure the PHY is off */
+>>> +		phy_berlin_sata_power_off(phy);
+>>> +
+>>> +		phy_provider = devm_of_phy_provider_register(&phy->dev,
+>>> +							     of_phy_simple_xlate);
+>>> +		if (IS_ERR(phy_provider))
+>>> +			return PTR_ERR(phy_provider);
+>>
+>> was this intentional? registering multiple PHY providers?
+> 
+> Yes. Each sub-node describe a PHY and register as a PHY provider. This
+> allow to reference the PHY as <&sata_phy0> and not <&sata_phy 0>. It
+> would be confusing to have a sub-node sata_phy0 and to use its parent
+> to access it.
+
+It is still a single PHY provider, so you can't register multiple PHY
+providers. So in this case <&sata_phy 0> is not that bad.
+
+However phy-core.c should be patched with the following (only compile tested)
+
+>From 2517d4c0ad7f13abc2613516ef2b222a1fbcb550 Mon Sep 17 00:00:00 2001
+From: Kishon Vijay Abraham I <kishon@ti.com>
+Date: Thu, 15 May 2014 11:32:57 +0530
+Subject: [PATCH] phy: phy-core: Support modelling multi-PHY PHY nodes as
+ subnodes of PHY PROVIDER
+
+When a single PHY provider implementing multiple PHYs is represented in dt,
+the PHYs should be modelled as sub nodes of the PHY PROVIDER node.
+
+So the consumers using the PHY will have the phandle of the sub node rather
+than the phandle of the PHY PROVIDER. Amended *of_phy_provider_lookup* in
+PHY core to return the PHY PROVIDER even when the phandle of the PHY PROVIDERs
+sub node is provided.
+
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/phy/phy-core.c |   10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+index 03cf8fb..124c6ec 100644
+--- a/drivers/phy/phy-core.c
++++ b/drivers/phy/phy-core.c
+@@ -83,10 +83,18 @@ static struct phy *phy_lookup(struct device *device, const
+char *port)
+ static struct phy_provider *of_phy_provider_lookup(struct device_node *node)
+ {
+        struct phy_provider *phy_provider;
++       struct device_node *child;
+
+        list_for_each_entry(phy_provider, &phy_provider_list, list) {
+-               if (phy_provider->dev->of_node == node)
++               if (phy_provider->dev->of_node != node) {
++                       for_each_child_of_node(phy_provider->dev->of_node,
++                               child) {
++                               if (child == node)
++                                       return phy_provider;
++                       }
++               } else {
+                        return phy_provider;
++               }
+        }
+
+        return ERR_PTR(-EPROBE_DEFER);
+-- 
+1.7.9.5
+
+Thanks
+Kishon
