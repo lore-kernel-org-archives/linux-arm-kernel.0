@@ -1,44 +1,54 @@
-From: linux@baker-net.org.uk (Adam Baker)
-Date: Thu, 15 May 2014 23:01:14 +0100
-Subject: [PATCH RFC 03/11] sound: ASoC: kirkwood: Remove ARCH_KIRKWOOD
- dependency
-In-Reply-To: <1400163836-9831-7-git-send-email-andrew@lunn.ch>
-References: <1400163836-9831-1-git-send-email-andrew@lunn.ch>
- <1400163836-9831-7-git-send-email-andrew@lunn.ch>
-Message-ID: <5375392A.60905@baker-net.org.uk>
+From: dwalker@fifo99.com (dwalker at fifo99.com)
+Date: Thu, 15 May 2014 21:57:26 +0000
+Subject: [PATCH] arm: msm: remove board file for Nexus One (ie. mahimahi)
+In-Reply-To: <1400177413.11786.11.camel@x220>
+References: <1400101656.9826.4.camel@x220> <20140515174448.GA31159@fifo99.com>
+ <1400177413.11786.11.camel@x220>
+Message-ID: <20140515215726.GA1171@fifo99.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/14 15:23, Andrew Lunn wrote:
-> mach-kirkwood has been removed, now that kirkwood lives in mach-mvebu.
+On Thu, May 15, 2014 at 08:10:13PM +0200, Paul Bolle wrote:
+> Daniel,
+> 
+> On Thu, 2014-05-15 at 17:44 +0000, dwalker at fifo99.com wrote:
+> > On Wed, May 14, 2014 at 11:07:36PM +0200, Paul Bolle wrote:
+> > > Commit 1b802ff79f03 ("arm: msm: add board file for Nexus One (ie.
+> > > mahimahi)") added just board-mahimahi.c. It did not add
+> > > board-mahimahi.h, Makefile changes or Kconfig changes.
+> > > 
+> > > Four years have passed and this file is still dangling. Remove it.
+> > > 
+> > > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> > > ---
+> > > Untested. But what to test here?
+> > > 
+> > I don't mine if Sapphire gets removed,
+> 
+> Could you ACK that patch, please?
 
-Most of the descriptions in the series say remove mach-kirkwood and most 
-of the actual patches remove ARCH_KIRKWOOD and leave MACH_KIRKWOOD 
-untouched. Patch 01/11 hasn't turned up here so I'm not certain which 
-you meant but consistency would be good.
+I don't mind if it gets removed, but I wouldn't ACK it's removal ..
+ 
+> >  but I'm working on this one now..
+> 
+> That's good to hear.
+> 
+> >  So I don't want it deleted.
+> 
+> This is not something I get to decide. Nevertheless, given that this
+> file shouldn't have been merged to begin with, I'd appreciate it if some
+> deadline could be agreed upon.
 
->
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: alsa-devel at alsa-project.org
-> ---
->   sound/soc/kirkwood/Kconfig | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/sound/soc/kirkwood/Kconfig b/sound/soc/kirkwood/Kconfig
-> index 1f7c7ee3527a..6a0f79d2bb33 100644
-> --- a/sound/soc/kirkwood/Kconfig
-> +++ b/sound/soc/kirkwood/Kconfig
-> @@ -1,6 +1,6 @@
->   config SND_KIRKWOOD_SOC
->   	tristate "SoC Audio for the Marvell Kirkwood and Dove chips"
-> -	depends on ARCH_KIRKWOOD || ARCH_DOVE || ARCH_MVEBU || MACH_KIRKWOOD || COMPILE_TEST
-> +	depends on ARCH_DOVE || ARCH_MVEBU || MACH_KIRKWOOD || COMPILE_TEST
->   	help
->   	  Say Y or M if you want to add support for codecs attached to
->   	  the Kirkwood I2S interface. You will also need to select the
->
+I think I merged it actually, but there's no rules about what gets merged. How when what order, etc.
+It's all free form.
 
-Regards
+> That being said, I'm not sure how having just this file in mainline
+> helps your development efforts. It seems it did receive some updates
+> for, well, treewide stuff. But it surely didn't get build coverage or
+> runtime testing. So would you lose much if it only remains in your
+> development tree?
 
-Adam Baker
+It's effort to remove it.. Your asking for it to get removed, then re-added.. That sounds
+like a fairly large amount of effort vs just leaving it in place.
+
+Daniel
