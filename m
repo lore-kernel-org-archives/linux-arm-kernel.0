@@ -1,75 +1,38 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 15 May 2014 11:12:21 +0200
-Subject: [PATCH v2 2/3] drm/panel: add support for EDT panels
-In-Reply-To: <4de1d09b7873e012e43525c1f8ab9c66@agner.ch>
-References: <cover.1400103181.git.stefan@agner.ch>
- <35c081171a3d9a9401767601c02a12e266b37dd0.1400103181.git.stefan@agner.ch>
- <20140515075102.GE5952@ulmo>
- <4de1d09b7873e012e43525c1f8ab9c66@agner.ch>
-Message-ID: <20140515091220.GC6434@ulmo>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 15 May 2014 11:11:23 +0200
+Subject: [PATCH v2 1/6] wdt: sunxi: Move restart code to the watchdog
+ driver
+In-Reply-To: <20140507213318.GA2105@roeck-us.net>
+References: <1399430664-29091-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399430664-29091-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20140507213318.GA2105@roeck-us.net>
+Message-ID: <20140515091123.GQ29258@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 10:24:39AM +0200, Stefan Agner wrote:
-> Hi Thierry, hi Philipp,
-> 
-> Am 2014-05-15 09:51, schrieb Thierry Reding:
-> > On Wed, May 14, 2014 at 11:45:57PM +0200, stefan at agner.ch wrote:
-> >> From: Stefan Agner <stefan@agner.ch>
-> >>
-> >> This panels are sold by Toradex for Colibri T20/T30 and Apalis T30
-> >> evaluation kits.
-> >>
-> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
+On Wed, May 07, 2014 at 02:33:18PM -0700, Guenter Roeck wrote:
+> On Tue, May 06, 2014 at 09:44:19PM -0500, Maxime Ripard wrote:
+> > Most of the watchdog code is duplicated between the machine restart code and
+> > the watchdog driver. Add the restart hook to the watchdog driver, to be able to
+> > remove it from the machine code eventually.
 > > 
-> > Panel patches should go to the dri-devel mailing list as well.
-> > 
-> > Also a patch was posted only yesterday for a panel that seems to be the
-> > exact same one as this, even though the name differs minimally, see:
-> > 
-> > 	https://patchwork.kernel.org/patch/4175251/
-> > 
-> > Adding Philipp on Cc so you guys can work together whether this is
-> > indeed the same panel. The only differences seem to be in the vertical
-> > front and back porches, but I suspect that either settings will work on
-> > both Tegra and i.MX.
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> Its etm0700g0dh6 vs. et070080dh6, Philipp's panel is with captive multi
-> touch, (hence the M I guess). The panel itself really looks the same.
-> 
-> I found this overview of EDT displays:
-> http://www.dmbtechnics.com/scripts/passthru.php?id=7
-> 
-> There seem to be quite a lot variants with the same panel...
-> 
-> Regarding timings, I just checked the documentation, Philipp's timing
-> really matches the documented ones, I miscalculated the vertical back
-> porch.
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-Okay, so that means that the panel works for you with the same timings
-that Philipp has in the ETM0700G0DH6 patch? If so then I definitely
-think we should be sharing the timings in the driver by making the two
-compatible entries point to the same driver data.
+Wim, do you have any comment on this one?
 
-> How do we resolve that?
-> 
-> I would suggest that I split out that patch and remove the et070080dh6
-> panel and send the other as a single patch to the dri-devel mailing list
-> as well.
+Maxime
 
-Yes, that would work.
-
-> Philipp, could you add my display type (et070080dh6) to the compatible
-> list of your mode/panel entry?
-
-I also noticed that Philipp's patch doesn't actually introduce the
-device tree bindings, so that will have to be added as well.
-
-Thierry
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140515/7d6f0d9b/attachment.sig>
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140515/9b5481c6/attachment.sig>
