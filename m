@@ -1,76 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 May 2014 18:28 +0200
-Subject: [PATCH v1 5/5] pci: keystone: add pcie driver based on designware
- core driver
-In-Reply-To: <1400169692-9677-6-git-send-email-m-karicheri2@ti.com>
-References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
- <1400169692-9677-6-git-send-email-m-karicheri2@ti.com>
-Message-ID: <4195791.GS9XG8RaXW@wuerfel>
+From: kmcmarti@redhat.com (Kyle McMartin)
+Date: Thu, 15 May 2014 12:45:52 -0400
+Subject: [PATCH] arm64: don't set READ_IMPLIES_EXEC for EM_AARCH64
+In-Reply-To: <20140515090535.GB27594@arm.com>
+References: <20140514185720.GI26038@redacted.bos.redhat.com>
+ <20140515090535.GB27594@arm.com>
+Message-ID: <20140515164552.GB15570@redacted.bos.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 May 2014 12:01:32 Murali Karicheri wrote:
-> +Sample bindings shown below:-
-> +
-> + - Remove ti,enable-linktrain if boot loader already does Link training and do EP
-> +   configuration.
-> + - Remove ti,init-phy if boot loader already initialize the phy and sets up pcie
-> +   link
+On Thu, May 15, 2014 at 10:05:35AM +0100, Will Deacon wrote:
+> Unfortunately, my understanding is that GCC currently requires this for
+> nested functions, so this is an effective ABI breakage. On the plus side,
+> the GCC guys are planning to fix that, so we should see PT_GNU_STACK getting
+> used more frequently in the future.
+> 
 
-You actually have to document all the properties. Have a look at the
-other bindings for what this means.
+nested functions are a GNU extension, and aside from grub, I don't
+think anyone really uses them. (At least, I certainly hope not.) Also,
+ld.so already has a different idea from the kernel:
+master at glibc:.% git grep DEFAULT_STACK_PERMS -- sysdeps/aarch64
+(kyle at dreadnought:~/src/glibc)
+sysdeps/aarch64/stackinfo.h:#define DEFAULT_STACK_PERMS (PF_R|PF_W)
 
-> +
-> +               pcie at 21800000 {
-> +                       compatible = "ti,keystone-pcie";
-> +                       device_type = "pci";
-> +                       clocks = <&clkpcie>;
-> +                       clock-names = "pcie";
+ppc64 also does similarly, where they use the EXSTACK_DEFAULT in the
+compat case, but their 64-bit ABI doesn't.
 
-The dw-pcie binding lists two clocks.
+108 # define elf_read_implies_exec(ex, exec_stk) (is_32bit_task() ? \
+109                 (exec_stk == EXSTACK_DEFAULT) : 0)
 
-> +                       #address-cells = >;
-> +                       #size-cells = <2>;
-> +                       reg =  <0x21800000 0x1000>, <0x0262014c 4>;
-> +                       reg-names = "reg_rc_app", "reg_devcfg";
+I've submitted a gcc patch to emit .note.GNU-stack on AArch64 (which I
+suspect was just an oversight initially.) Which will mean that anything
+that puts code on the stack will be annotated to require executable
+stacks.
 
-There should be standard names that are documented in the binding.
+And, frankly, I think it's kind of strange to have any of the personality
+bits set by default.
 
-> +                       interrupts = <GIC_SPI 30 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 31 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 32 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 33 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 34 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 36 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 37 IRQ_TYPE_EDGE_RISING>,
-> +                                       <GIC_SPI 38 IRQ_TYPE_EDGE_RISING>; /* Error IRQ */
-
-What are all these interrupts?
-
-> +                       ranges = <0x00000800 0 0x21801000 0x21801000 0 0x0002000    /* Configuration space */
-> +                                 0x81000000 0 0          0x24000000 0 0x4000       /* downstream I/O */
-> +                                 0x82000000 0 0x50000000 0x50000000 0 0x10000000>; /* non-prefetchable memory */
-
-Please move the config space into 'reg' now instead of 'ranges'.
-This was a mistake earlier, and there are already other front-ends
-doing the same thing.
-
-> +                       num-lanes = <2>;
-> +                       ti,enable-linktrain;
-> +                       ti,init-phy;
-> +
-> +                       /* PCIE phy */
-> +                       phys = <&pcie0_phy>;
-> +                       phy-names = "pcie-phy";
-> +
-> +                       #interrupt-cells = <1>;
-> +                       interrupt-map-mask = <0 0 0 0>;
-> +                       interrupt-map = <0 0 0 1 &pcie_intc 1>, // INT A
-> +                                       <0 0 0 2 &pcie_intc 2>, // INT B
-> +                                       <0 0 0 3 &pcie_intc 3>, // INT C
-> +                                       <0 0 0 4 &pcie_intc 4>; // INT D
-
-I think this is the wrong map-mask.
-
-	Arnd
+regards, Kyle
