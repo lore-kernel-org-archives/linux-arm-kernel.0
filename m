@@ -1,78 +1,64 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 15 May 2014 14:55:36 +0530
-Subject: [PATCH v3 1/6] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <5374862F.2020205@gmail.com>
-References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
- <20140514165722.GA18495@kwain> <5373AE9A.3050008@gmail.com>
- <5764751.ffUj9rhnMd@wuerfel> <5373B908.5090904@gmail.com>
- <537462A2.5020607@ti.com> <5374668F.4060109@gmail.com>
- <53747F03.5030206@ti.com> <5374862F.2020205@gmail.com>
-Message-ID: <53748810.1020705@ti.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 15 May 2014 11:30:29 +0200
+Subject: [PATCH v2 2/3] drm/panel: add support for EDT panels
+In-Reply-To: <20140515090814.GB6434@ulmo>
+References: <cover.1400103181.git.stefan@agner.ch>
+ <35c081171a3d9a9401767601c02a12e266b37dd0.1400103181.git.stefan@agner.ch>
+ <20140515075102.GE5952@ulmo>
+ <1400142449.4102.16.camel@paszta.hi.pengutronix.de>
+ <20140515090814.GB6434@ulmo>
+Message-ID: <1400146229.4102.26.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Thursday 15 May 2014 02:47 PM, Sebastian Hesselbarth wrote:
-> On 05/15/2014 10:46 AM, Kishon Vijay Abraham I wrote:
->> On Thursday 15 May 2014 12:32 PM, Sebastian Hesselbarth wrote:
->>> On 05/15/2014 08:45 AM, Kishon Vijay Abraham I wrote:
->>>> On Thursday 15 May 2014 12:12 AM, Sebastian Hesselbarth wrote:
->>>>> On 05/14/2014 08:12 PM, Arnd Bergmann wrote:
->>>>>> On Wednesday 14 May 2014 19:57:46 Sebastian Hesselbarth wrote:
->>>>>>> Let's assume we have one dual-port SATA controller and one PCIe
->>>>>>> controller with either x1 or x2 support. The only sane DT binding,
->>>>>>> I can think of then would be:
->>>>>>>
->>>>>>> berlin2q.dtsi:
->>>>>>>
->>>>>>> genphy: lvds at ea00ff {
->>>>>>>     compatible = "marvell,berlin-lvds-phy";
->>>>>>>     reg = <0xea00ff 0x100>;
->>>>>>>     #phy-cells = <2>;
->>>>>>> };
-> [...]
->>>
->>> Depends on what you call PHY. In the example above the PHY is what
->>> allows you to control both lanes.
->>>
->>> So you want sub-nodes for each individual lane given the nomenclature
->>> of the example?
->>>
->>> Or like it is used in the example above, a single PHY node with an index
->>> in the phy-specifier to pick an individual lane.
->>>
->>> IMHO, having both phy-specifier index _and_ PHY sub-node per lane
->>> has no benefit at all. You cannot even use the PHY sub-nodes for any
->>> setup properties, as they depend on the consumer claiming the lane.
->>
->> IMO the dt data should completely describe the HW. So just by looking at the
->> PHY node, we won't be able to tell the no of PHYs implemented in the IP if we
->> have a single PHY node (In this case the lanes in the IP).
->>
->> However if you think it's an overkill for having sub-nodes for each lane then
->> single PHY node is fine too.
+Am Donnerstag, den 15.05.2014, 11:08 +0200 schrieb Thierry Reding:
+> On Thu, May 15, 2014 at 10:27:29AM +0200, Philipp Zabel wrote:
+> > Am Donnerstag, den 15.05.2014, 09:51 +0200 schrieb Thierry Reding:
+> > > On Wed, May 14, 2014 at 11:45:57PM +0200, stefan at agner.ch wrote:
+> > > > From: Stefan Agner <stefan@agner.ch>
+> > > > 
+> > > > This panels are sold by Toradex for Colibri T20/T30 and Apalis T30
+> > > > evaluation kits.
+> > > > 
+> > > > Signed-off-by: Stefan Agner <stefan@agner.ch>
+> > > 
+> > > Panel patches should go to the dri-devel mailing list as well.
+> > > 
+> > > Also a patch was posted only yesterday for a panel that seems to be the
+> > > exact same one as this, even though the name differs minimally, see:
+> > > 
+> > > 	https://patchwork.kernel.org/patch/4175251/
+> > > 
+> > > Adding Philipp on Cc so you guys can work together whether this is
+> > > indeed the same panel. The only differences seem to be in the vertical
+> > > front and back porches, but I suspect that either settings will work on
+> > > both Tegra and i.MX.
+> > 
+> > The ETM0700G0DH6 Datasheet lists 2 lines as the typical vsync pulse
+> > width, 525 lines as the vertical period, and 35 lines as the vsync -de
+> > time, which is vsync len + back porch.
+> > So vertical timings 480 + 10 + 2 + 33 = 525 should be valid for the
+> > ET0700G0DH6 panel:
 > 
-> Yeah, I see your point. I just wonder how many Marvell PHYs we may hit
-> that require the _same_ magic setup inside but have _different_ number
-> of lanes. And even if, we can deal with it using a different compatible
-> string.
-> 
-> Currently, I feel a single PHY provider node and a set of compatibles
-> will be most likely, i.e. no per-lane sub-nodes. OTOH, the per-lane
-> sub-nodes is more generic as it allows us to deal PHYs that may
-> suddenly skip one lane in the numbering scheme. The difference for the
-> driver is marginal, i.e. some SoC-specific struct with a field for the
-> number of lanes vs. of_count_child_nodes() and a reg = <n> property for
-> the per-lane sub-nodes.
-> 
-> I used to agree to "DT should descibe HW", but with no datasheet
-> available, it quickly becomes fuzzy what it really looks like.
-> 
-> Anyway, I'll have some discussion with Antoine and Alexandre to sort out
-> the differences and the things in common for the PHY and SoCs in
-> question.
+> Shouldn't that work with 480 + 8 + 2 + 35 too? It seems to me that it
+> should still be safe for that panel. Similarily I'd expect your timings
+> to work on the ET070080DH6.
+>
+> Irrespective of that they both seem to have different capabilities so
+> two compatible values should be fine. However for the purpose of the
+> simple panel driver they could be made to share the same timings if it
+> works for both panels and devices.
 
-cool, thanks.
+Yes. As I understand, the 480 + 10 + 2 + 33 timing should be correct for
+both panels.
 
--Kishon
+> As for the touch panel on the ETM0700G0DH6, do you happen to know how
+> that's usually connected? I suspect it needs external hardware to
+> capture the YU, XL, YD and XR pins and turn that into raw coordinates
+> and pen down interrupts.
+
+The ETM0700G0DH6 has a capacitive touch screen with an EDT-FT5406
+controller connected via I2C, at least on the panels that I have seen.
+
+regards
+Philipp
