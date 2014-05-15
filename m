@@ -1,54 +1,55 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 15 May 2014 12:32:06 -0500
-Subject: [PATCH] dmaengine: qcom_bam_dma: Add descriptor flag APIs
-In-Reply-To: <20140502180827.GA9476@qualcomm.com>
-References: <1397772242-4048-1-git-send-email-agross@codeaurora.org>
- <20140502162841.GZ32284@intel.com>
- <20140502180827.GA9476@qualcomm.com>
-Message-ID: <20140515173206.GA16858@qualcomm.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 15 May 2014 19:32:27 +0200
+Subject: [PATCH RFC 0/4] Add support for Exynos clock output configuration
+Message-ID: <1400175151-27779-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 01:08:27PM -0500, Andy Gross wrote:
-> On Fri, May 02, 2014 at 09:58:41PM +0530, Vinod Koul wrote:
-> > On Thu, Apr 17, 2014 at 05:04:02PM -0500, Andy Gross wrote:
-> > > This patch adds APIs that allow for BAM hardware flags to be set per
-> > > descriptor.  Each one of the new flags informs the attached peripheral of a
-> > > special behavior that is required.
-> > > 
-> > > The EOT flag requests that the peripheral assert an end of transaction interrupt
-> > > when that descriptor is complete.  It also results in special signaling protocol
-> > > that is used between the attached peripheral and the core using the DMA
-> > > controller.
-> > DMA_PREP_INTERRUPT ??
-> 
-> I have 3 different IRQs that can be asserted based on the bit I set in the
-> hardware descriptor.  The normal IRQ is the INT bit.  However, in some cases the
-> peripheral protocol requires the use of the EOT or EOB interrupt instead.  The
-> DMA_PREP_INTERRUPT would only work if I had only 2 choices.
+On all Exynos SoCs there is a dedicated CLKOUT pin that allows many of
+internal SoC clocks to be output from the SoC. The hardware structure
+of CLKOUT related clocks looks as follows:
 
-Thinking about this more, I could use the DMA_PREP_INTERRUPT to cover the EOT
-flag.  However, I might get in a bind later if I need to support the EOB (end of
-block) interrupt.
+	CMU	|---> clock0 --------->	|	PMU	|
+		|			|		|
+    several	|---> clock1 ---------> |	mux	|
+    muxes	|			|	+	|---> CLKOUT
+    dividers	|       ...		|	gate	|
+    and gates	|			|		|
+		|---> clockN ---------> |		|
 
-> 
-> > 
-> > > 
-> > > The NWD flag requests that the peripheral wait until the data has been fully
-> > > processed before signaling an interrupt.
-> > interrupt for transaction complete or DMA request?
-> 
-> This is a special signaling mechanism that holds off the DMA interrupt until the
-> peripheral actually acks that the data has been processed completely.  This is
-> required in many cases by the peripheral.  One example is the SPI controller.
-> At the end of a transaction you are supposed to set the NWD so that the chip
-> select is de-asserted.
+Since the block responsible for handling the pin is PMU, not CMU,
+a separate driver, that binds to PMU node is required and acquires
+all input clocks by standard DT clock look-up. This way we don't need
+any cross-IP block drivers and cross-driver register sharing or
+nodes for fake devices.
 
-I'm not sure what flag I could map this to... maybe DMA_CTRL_ACK?  or maybe the
-DMA_PREP_FENCE?  I don't generally like overloading the flags and slightly
-twisting their intent.  Could we add a flag to denote device ACK?
+To represent the PMU mux/gate clock, generic composite clock is registered.
+
+Tested on Odroid U3, with HSIC/USB hub using CLKOUT as reference clock,
+with some additional patches.
+
+Depends on:
+[PATCHv4 0/4] Enable usbphy and hsotg for exynos4
+(http://thread.gmane.org/gmane.linux.kernel.samsung-soc/30631)
+for Exynos4210/4x12 PMU DT nodes.
+
+Tomasz Figa (4):
+  clk: samsung: exynos4: Add missing DMC clock hierarchy
+  clk: samsung: exynos4: Add CLKOUT clock hierarchy
+  clk: samsung: Add driver to control CLKOUT line on Exynos SoCs
+  ARM: dts: exynos: Update PMU node with CLKOUT related data
+
+ .../devicetree/bindings/arm/samsung/pmu.txt        |  18 +++
+ arch/arm/boot/dts/exynos4210.dtsi                  |  10 ++
+ arch/arm/boot/dts/exynos4x12.dtsi                  |   7 +
+ arch/arm/boot/dts/exynos5250.dtsi                  |   3 +
+ arch/arm/boot/dts/exynos5420.dtsi                  |   3 +
+ drivers/clk/samsung/Makefile                       |   1 +
+ drivers/clk/samsung/clk-exynos4.c                  | 156 +++++++++++++++++++++
+ drivers/clk/samsung/exynos-clkout.c                | 107 ++++++++++++++
+ include/dt-bindings/clock/exynos4.h                |   6 +
+ 9 files changed, 311 insertions(+)
+ create mode 100644 drivers/clk/samsung/exynos-clkout.c
 
 -- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.9.2
