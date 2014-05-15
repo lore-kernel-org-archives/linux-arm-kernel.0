@@ -1,30 +1,104 @@
-From: anders.berg@avagotech.com (Anders Berg)
-Date: Thu, 15 May 2014 14:37:26 +0200
-Subject: [PATCH v3 0/6] Add platform support for LSI AXM55xx
-In-Reply-To: <6334605.NlytHCzYVP@wuerfel>
-References: <cover.1400072260.git.anders.berg@avagotech.com>
- <6334605.NlytHCzYVP@wuerfel>
-Message-ID: <CAE0=X_15Yk3VhHTwG-piA_eYL1mKW9wu_Szp-yL0YyfL8m0ecA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 15 May 2014 13:39:48 +0100
+Subject: [PATCH v6 1/3] ARM: kconfig: allow PCI support to be selected
+ with ARCH_MULTIPLATFORM
+In-Reply-To: <CAL_JsqLUMQTd65xBRMx3XNa-7RcY93CcLdL=Z6wXsLXRpNcHGg@mail.gmail.com>
+References: <1399478839-3564-1-git-send-email-will.deacon@arm.com>
+ <1399478839-3564-2-git-send-email-will.deacon@arm.com>
+ <CAL_JsqLUMQTd65xBRMx3XNa-7RcY93CcLdL=Z6wXsLXRpNcHGg@mail.gmail.com>
+Message-ID: <20140515123948.GD27594@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 14, 2014 at 8:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 14 May 2014 20:37:55 Anders Berg wrote:
->>
->> This is version 3 of this series to introduces basic platform support for the LSI
->> AXM5516 SoC.
->>
->> No major changes since v2. Ready to be applied to the arm-soc tree?
->
-> I think it's good, but I'm not sure if we should put them all into arm-soc.
-> There are no dependencies between the drivers that I can see, so why not
-> merge the clock and reset drivers through the individual subsystem maintainers?
->
+On Wed, May 14, 2014 at 03:01:35PM +0100, Rob Herring wrote:
+> On Wed, May 7, 2014 at 11:07 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > When targetting ARCH_MULTIPLATFORM, we may include support for SoCs with
+> > PCI-capable devices (e.g. mach-virt with virtio-pci).
+> >
+> > This patch allows PCI support to be selected for these SoCs by selecting
+> > CONFIG_MIGHT_HAVE_PCI when CONFIG_ARCH_MULTIPLATFORM=y.
+> 
+> I generally think we should select all options for multi-platform that
+> only serve to hide other options like this.
+> 
+> You should remove the MIGHT_HAVE_PCI selections from all the
+> multi-platform enabled platforms as well.
 
-After suggestions from Mike on the clk driver (and it's dts binding)
-I've done an updated clock driver patch - and a dependency surfaced...
-The file <dt-bindings/clock/lsi,axm5516-clks.h>. Which way should this
-take, arm-soc or Mikes clk tree? Perhaps this is a reason to take it
-all through arm-soc?
+Something like the diff below?
 
-/Anders
+Will
+
+--->8
+
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 49c914cd9c7a..764c129b5eee 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -55,7 +55,6 @@ config ARCH_BCM_5301X
+ 	select GENERIC_CLOCKEVENTS
+ 	select ARM_GLOBAL_TIMER
+ 	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
+-	select MIGHT_HAVE_PCI
+ 	help
+ 	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
+ 
+diff --git a/arch/arm/mach-cns3xxx/Kconfig b/arch/arm/mach-cns3xxx/Kconfig
+index dce8decd5d46..66838f42037f 100644
+--- a/arch/arm/mach-cns3xxx/Kconfig
++++ b/arch/arm/mach-cns3xxx/Kconfig
+@@ -1,7 +1,6 @@
+ config ARCH_CNS3XXX
+ 	bool "Cavium Networks CNS3XXX family" if ARCH_MULTI_V6
+ 	select ARM_GIC
+-	select MIGHT_HAVE_PCI
+ 	select PCI_DOMAINS if PCI
+ 	help
+ 	  Support for Cavium Networks CNS3XXX platform.
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 5740296dc429..50bb546b893a 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -796,7 +796,6 @@ config SOC_IMX6Q
+ 	select ARM_ERRATA_764369 if SMP
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+-	select MIGHT_HAVE_PCI
+ 	select PCI_DOMAINS if PCI
+ 	select PINCTRL_IMX6Q
+ 	select SOC_IMX6
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 3f73eecbcfb0..120301ebd324 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -9,7 +9,6 @@ config ARCH_MVEBU
+ 	select MVEBU_MBUS
+ 	select ZONE_DMA if ARM_LPAE
+ 	select ARCH_REQUIRE_GPIOLIB
+-	select MIGHT_HAVE_PCI
+ 	select PCI_QUIRKS if PCI
+ 	select OF_ADDRESS_PCI
+ 
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 0f92ba8e7884..905003898913 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -8,7 +8,6 @@ config ARCH_SHMOBILE_MULTI
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+ 	select ARM_GIC
+-	select MIGHT_HAVE_PCI
+ 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+ 	select NO_IOPORT_MAP
+ 	select PINCTRL
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 55b305d51669..e16999e5b735 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -7,7 +7,6 @@ config ARCH_TEGRA
+ 	select CLKSRC_MMIO
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+-	select MIGHT_HAVE_PCI
+ 	select PINCTRL
+ 	select ARCH_HAS_RESET_CONTROLLER
+ 	select RESET_CONTROLLER
