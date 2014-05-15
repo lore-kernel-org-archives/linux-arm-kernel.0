@@ -1,26 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 15 May 2014 10:36:57 +0100
-Subject: [PATCHv3 3/3] ARM: mvebu: implement L2/PCIe deadlock workaround
-In-Reply-To: <1400145519-28530-4-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1400145519-28530-4-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140515093657.GG11117@localhost>
+From: richard@nod.at (Richard Weinberger)
+Date: Thu, 15 May 2014 11:37:07 +0200
+Subject: [PATCH 01/27] arm64: Override defaults from generic/tlb.h
+In-Reply-To: <20140515093430.GE11117@localhost>
+References: <1400093999-18703-1-git-send-email-richard@nod.at>
+ <1400093999-18703-2-git-send-email-richard@nod.at>
+ <20140515093430.GE11117@localhost>
+Message-ID: <53748AC3.9080709@nod.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 10:18:39AM +0100, Thomas Petazzoni wrote:
-> The Marvell Armada 375 and Armada 38x SOCs, which use the Cortex-A9
-> CPU core, the PL310 cache and the Marvell PCIe hardware block are
-> affected a L2/PCIe deadlock caused by a system erratum when hardware
-> I/O coherency is used.
+Am 15.05.2014 11:34, schrieb Catalin Marinas:
+> On Wed, May 14, 2014 at 07:59:33PM +0100, Richard Weinberger wrote:
+>> --- a/arch/arm64/include/asm/tlb.h
+>> +++ b/arch/arm64/include/asm/tlb.h
+>> @@ -19,7 +19,14 @@
+>>  #ifndef __ASM_TLB_H
+>>  #define __ASM_TLB_H
+>>  
+>> +/* These defines are needed to override the defaults from asm-generic/tlb.h */
+>>  #define  __tlb_remove_pmd_tlb_entry __tlb_remove_pmd_tlb_entry
+>> +#define tlb_start_vma tlb_start_vma
+>> +#define tlb_end_vma tlb_end_vma
+>> +#define __tlb_remove_tlb_entry __tlb_remove_tlb_entry
+>> +#define tlb_flush tlb_flush
+>> +#define __pte_free_tlb __pte_free_tlb
+>> +#define __pmd_free_tlb __pmd_free_tlb
+>>  
+>>  #include <asm-generic/tlb.h>
 > 
-> This deadlock can be avoided by mapping the PCIe memory areas as
-> strongly-ordered (note: MT_UNCACHED is strongly-ordered), and by
-> removing the outer cache sync done in software. This is done in this
-> patch, thanks to the new bits of infrastructure added in 'ARM: mm:
-> allow sub-architectures to override PCI I/O memory type' and 'ARM: mm:
-> add support for HW coherent systems in PL310' respectively.
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> I hope subsequent series would consolidate some more of the above (for
+> example tlb_start_vma() is not really arm64 specific.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Yes, peterz pointed me to a not jet merged series which consolidates
+much more.
+I'll revive it.
+
+Thanks,
+//richard
