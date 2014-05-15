@@ -1,126 +1,64 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Thu, 15 May 2014 08:55:52 +0000
-Subject: [PATCH] ARM: ioremap: Fix static vm area boundary checking.
-In-Reply-To: <1400133427-5653-1-git-send-email-superlibj8301@gmail.com>
-References: <1400133427-5653-1-git-send-email-superlibj8301@gmail.com>
-Message-ID: <623d49a4a07f4e5a956ccc8c2725e557@BY2PR03MB505.namprd03.prod.outlook.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 15 May 2014 11:57:38 +0300
+Subject: [PATCH 4/4] ARM: dts: Add LCD panel sharp ls037v7dw01 support
+ for omap3-evm and ldp
+In-Reply-To: <20140513213205.GB18001@atomide.com>
+References: <1398815562-24113-1-git-send-email-tony@atomide.com>
+ <1398815562-24113-5-git-send-email-tony@atomide.com>
+ <CAGhQ9Vwa8xXQEo5dNEKAvmaS9DoBjVSthtd8=owk+atVdFuiiA@mail.gmail.com>
+ <20140430174751.GA12362@atomide.com> <20140505183919.GA15463@atomide.com>
+ <20140508233628.GJ2198@atomide.com> <536C7EA7.5000306@ti.com>
+ <20140509153723.GD17814@atomide.com> <20140513213205.GB18001@atomide.com>
+Message-ID: <53748182.1080705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: [PATCH] ARM: ioremap: Fix static vm area boundary checking.
-> 
-> Static vm area boundary check:
-> 
->       paddr1 --->|       |
->                  |       |
->                  |-------| <-\--- svm->vm->addr(is page aligned)
->       paddr2 --->|       |    |
->                  |     --| <--|-- svm->vm->phys_addr
->                  |       |    |
->       paddr3 --->|       |    |
->                  |       |    |
->                  |-------| <--|-- next page boundary
->                  |       |    |
->       paddr4 --->|       |    | <----- svm->vm->size(including guard page)
->                  |       |    |
->                  |       |    |
-> max paddr_end -->|-------| <--|-- svm->vm's phys_addr_end
->                  | ///// |    |
->       paddr5 --->| guard |    |
->                  | page  |    |
->                  | ///// |    |
->                   -------  <-/--- svm->vm->addr + svm->vm_size
-> 
-> <1> If the paddr == paddr1, then continue;
-> <2> If the paddr == paddr2~paddr4 and paddr_end > phys_addr_end,
->     then continue;
-> <3> if the paddr >= paddr5 then continue;
-> 
-> Signed-off-by: Richard Lee <superlibj8301@gmail.com>
-> ---
->  arch/arm/mm/ioremap.c | 44 ++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 42 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-> index be69333..2fa41f4 100644
-> --- a/arch/arm/mm/ioremap.c
-> +++ b/arch/arm/mm/ioremap.c
-> @@ -47,16 +47,56 @@ static struct static_vm *find_static_vm_paddr(phys_addr_t
-> paddr,
->  {
->  	struct static_vm *svm;
->  	struct vm_struct *vm;
-> +	size_t offset;
-> +
+On 14/05/14 00:32, Tony Lindgren wrote:
+
+> +&lcd0 {
+> +	enable-gpios = <&gpio5 24 GPIO_ACTIVE_HIGH>;	/* gpio152, lcd INI */
+> +	reset-gpios = <&gpio5 27 GPIO_ACTIVE_HIGH>;	/* gpio155, lcd RESB */
 > +	/*
-> +	 * Make sure the size the mapping size is page aligned.
+> +	 * The LCD is sideways, so we want the VGA mode instead of
+> +	 * QVGA mode. Probably also want to have omapfb.rotate=3
+> +	 * in the kernel cmdline until there's a binding for that.
 > +	 */
-> +	size = PAGE_ALIGN((paddr & ~PAGE_SIZE) + size);
-> +	offset = paddr & ~PAGE_SIZE;
-> 
+> +	mode-gpios = <&gpio5 26 GPIO_ACTIVE_LOW		/* gpio154, lcd MO */
+> +		      &gpio1 2 GPIO_ACTIVE_HIGH		/* gpio2, lcd LR */
+> +		      &gpio1 3 GPIO_ACTIVE_HIGH>;	/* gpio3, lcd UD */
 
-Shouldn't it be PAGE_MASK ?
+I don't think that is correct. The panel bindings should define what the
+first mode-gpio means. Looking at the panel spec, I think the definition
+should be "enable QVGA mode". And in the board's dts above, the
+GPIO_ACTIVE_x should tell which is one is correct polarity for QVGA
+mode. Which is GPIO_ACTIVE_HIGH here.
+
+If we want to tell the panel driver to use QVGA mode, we should do that
+explicitly with a flag, not by hacking the GPIO polarities. It's the
+panel driver's job to set the GPIO.
+
+So in the previous mail I suggested the 'vga-mode' flag, but I think we
+need actually two flags for each GPIO: one that's used to tell the
+driver which mode we want, which is used if the panel driver has control
+for the GPIO, and the other that tells which is the hardwired setting.
+
+Then again, the two cases are exclusive, so maybe a single flag per mode
+pin is ok. So, for the MO pin, we could have 'qvga-mode' flag in the
+.dts, which means:
+
+"If there is MO gpio, set MO high. If there's no MO gpio, presume MO pin
+is pulled up"
+
+Of course, one could argue that, in case MO is controlled with GPIO, the
+'qvga-mode' flag is about SW level configuration, not hardware...
+
+ Tomi
 
 
->  	list_for_each_entry(svm, &static_vmlist, list) {
-> +		phys_addr_t paddr_end, phys_addr_end;
-> +		size_t vmoff;
-> +
->  		vm = &svm->vm;
->  		if (!(vm->flags & VM_ARM_STATIC_MAPPING))
->  			continue;
->  		if ((vm->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
->  			continue;
-> 
-> -		if (vm->phys_addr > paddr ||
-> -			paddr + size - 1 > vm->phys_addr + vm->size - 1)
-> +		/* Static vm area boundary check:
-> +		 *
-> +		 *       paddr1 --->|       |
-> +		 *                  |       |
-> +		 *                  |-------| <-\--- svm->vm->addr(page aligned)
-> +		 *       paddr2 --->|       |    |
-> +		 *                  |     --| <--|-- svm->vm->phys_addr
-> +		 *                  |       |    |
-> +		 *       paddr3 --->|       |    |
-> +		 *                  |       |    |
-> +		 *                  |-------| <--|-- next page boundary
-> +		 *                  |       |    |
-> +		 *       paddr4 --->|       |    | <----- svm->vm->size,
-> +		 *                  |       |    |         including guard page
-> +		 *                  |       |    |
-> +		 * max paddr_end -->|-------| <--|-- svm->vm's phys_addr_end
-> +		 *                  | ///// |    |
-> +		 *       paddr5 --->| guard |    |
-> +		 *                  | page  |    |
-> +		 *                  | ///// |    |
-> +		 *                   -------  <-/-- svm->vm->addr + svm->vm_size
-> +		 *
-> +		 * <1> If paddr == paddr1, then continue;
-> +		 * <2> If paddr == paddr2~paddr4 and paddr_end > phys_addr_end,
-> +		 *     then continue;
-> +		 * <3> if paddr >= paddr5 then continue;
-> +		 */
-> +		vmoff = vm->phys_addr & ~PAGE_SIZE;
-
-And here.
-
-Thanks,
-BRs
-Xiubo
-
-> +		phys_addr_end = vm->phys_addr + vm->size - PAGE_SIZE - vmoff;
-> +		paddr_end = paddr + size - offset;
-> +		if (__phys_to_pfn(vm->phys_addr) > __phys_to_pfn(paddr) ||
-> +			paddr_end - 1 > phys_addr_end - 1)
->  			continue;
-> 
->  		return svm;
-> --
-> 1.8.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140515/5136eb07/attachment.sig>
