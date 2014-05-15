@@ -1,155 +1,35 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 15 May 2014 16:10:58 -0400 (EDT)
-Subject: [PATCH v5 08/14] ARM: hisi: add hip04 SoC support
-In-Reply-To: <CAD6h2NR3=uq7uQ3JMjGKo0-QjM18B-pdOoeGTsMtfkdf_uSQ=A@mail.gmail.com>
-References: <1399473888-12947-1-git-send-email-haojian.zhuang@linaro.org>
- <1399473888-12947-9-git-send-email-haojian.zhuang@linaro.org>
- <alpine.LFD.2.11.1405071259300.980@knanqh.ubzr>
- <CAD6h2NQU0NR1PO=x6pz62B4QWqkPz7F+Fp65YeQJ62vumF8_Aw@mail.gmail.com>
- <CAD6h2NTMJ5GNkUdcTvx_MoKnGSnmQ15vUWBoj7GcKdBTBf7MJw@mail.gmail.com>
- <alpine.LFD.2.11.1405121510130.980@knanqh.ubzr>
- <CAD6h2NTz6h+GSM7BKr_Om3VHjKOXebO6hRD0BHCjzyT57qHeLQ@mail.gmail.com>
- <alpine.LFD.2.11.1405131433580.980@knanqh.ubzr>
- <CAD6h2NR3=uq7uQ3JMjGKo0-QjM18B-pdOoeGTsMtfkdf_uSQ=A@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1405151602140.17310@knanqh.ubzr>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 15 May 2014 13:12:44 -0700
+Subject: [PATCH 7/7] ARM: tegra: Add the EC i2c tunnel to tegra124-venice2
+In-Reply-To: <CAD=FV=Vj5M_yiYZOkjzB-QjYJa9WE2fcGcwwzAF1h8gcjc9jeA@mail.gmail.com>
+References: <1397757570-19750-1-git-send-email-dianders@chromium.org>
+ <1397757570-19750-8-git-send-email-dianders@chromium.org>
+ <53750A9A.8000808@wwwdotorg.org>
+ <CAD=FV=Vj5M_yiYZOkjzB-QjYJa9WE2fcGcwwzAF1h8gcjc9jeA@mail.gmail.com>
+Message-ID: <CAOesGMhe-STC3GUwAyC6qeEPWWmxdsWbXqdevy8b4MHDgM2v=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 May 2014, Haojian Zhuang wrote:
+On Thu, May 15, 2014 at 11:55 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Stephen,
+>
+> On Thu, May 15, 2014 at 11:42 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 04/17/2014 11:59 AM, Doug Anderson wrote:
+>>> This adds the EC i2c tunnel (and devices under it) to the
+>>> tegra124-venice2 device tree.
+>>
+>> Did the MFD patches at the start of this series get applied yet? I was
+>> hoping to apply this one patch to the Tegra tree for 3.16, and that
+>> needs to happen by tomorrow morning at the latest since -rc6 is looming
+>> fast. However, I'm holding off until the rest of the series is applied
+>> to the MFD tree so I can be sure the DT binding is accepted first...
+>
+> As far as I know, they didn't.  Lee was waiting on Wolfram's ack to
+> the i2c tunnel before landing them.  ...and I'm still eagerly awaiting
+> Wolfram's next i2c tunnel review.
 
-> On 14 May 2014 02:44, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Tue, 13 May 2014, Haojian Zhuang wrote:
-> >
-> >> On 13 May 2014 03:39, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> >> > On Mon, 12 May 2014, Haojian Zhuang wrote:
-> >> >
-> >> >> On 11 May 2014 16:02, Haojian Zhuang <haojian.zhuang@linaro.org> wrote:
-> >> >> >
-> >> >> >
-> >> >> > On 8 May 2014 01:44, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> >> >> >> On Wed, 7 May 2014, Haojian Zhuang wrote:
-> >> >> >>
-> >> >> >>> +
-> >> >> >>> +static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
-> >> >> >>> +{
-> >> >> >>> +     unsigned long data, mask;
-> >> >> >>> +
-> >> >> >>> +     if (!relocation || !sysctrl)
-> >> >> >>> +             return -ENODEV;
-> >> >> >>> +     if (cluster >= HIP04_MAX_CLUSTERS || cpu >=
-> >> >> >>> HIP04_MAX_CPUS_PER_CLUSTER)
-> >> >> >>> +             return -EINVAL;
-> >> >> >>> +
-> >> >> >>> +     spin_lock_irq(&boot_lock);
-> >> >> >>> +     writel_relaxed(hip04_boot.bootwrapper_phys, relocation);
-> >> >> >>> +     writel_relaxed(hip04_boot.bootwrapper_magic, relocation + 4);
-> >> >> >>> +     writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
-> >> >> >>> +     writel_relaxed(0, relocation + 12);
-> >> >> >>> +
-> >> >> >>> +     if (hip04_cluster_down(cluster)) {
-> >> >> >>> +             data = CLUSTER_DEBUG_RESET_BIT;
-> >> >> >>> +             writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
-> >> >> >>> +             do {
-> >> >> >>> +                     mask = CLUSTER_DEBUG_RESET_STATUS;
-> >> >> >>> +                     data = readl_relaxed(sysctrl + \
-> >> >> >>> +                                          SC_CPU_RESET_STATUS(cluster));
-> >> >> >>> +             } while (data & mask);
-> >> >> >>> +             hip04_set_snoop_filter(cluster, 1);
-> >> >> >>> +     }
-> >> >> >>
-> >> >> >> Isn't this racy?  What if the new CPU starts executing code before
-> >> >> >> snoops are enabled for it?
-> >> >> >>
-> >> >> >> Normally we solve this race by letting the waking-up CPU turn on its
-> >> >> >> snoops by itself from an assembly code callback provided as argument to
-> >> >> >> mcpm_sync_init().  This is also the only way to eventually support deep
-> >> >> >> C-states with cpuidle.
-> >> >> >>
-> >> >> >
-> >> >> > There's no race. At here, I enable snoop without unreset new CPU.
-> >> >> >
-> >> >> >>> +
-> >> >> >>> +     hip04_cpu_table[cluster][cpu]++;
-> >> >> >>> +
-> >> >> >>> +     data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
-> >> >> >>> +            CORE_DEBUG_RESET_BIT(cpu);
-> >> >> >>> +     writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
-> >> >> >
-> >> >> > At here, I make new CPU out of reset state.
-> >> >
-> >> > That's my point.  At least on systems with the CCI, you risk hanging the
-> >> > system if you enable snoops for a CPU that is not yet running.
-> >> >
-> >> > Yet you cannot enable the CPU and then turn on snoops as you have the
-> >> > opposite race in that case.
-> >> >
-> >> > So the only way to be absolutely safe is to let the waking-up CPU turn
-> >> > on snoops for itself _before_ it starts using the cache.  That is what
-> >> > the power_up_setup callback provided to mcpm_sync_init() is all about.
-> >> >
-> >> > It must be written all in assembly as there is no stack available yet
-> >> > when it is called.  See arch/arm/mach-vexpress/dcscb_setup.S for an
-> >> > example skeleton where cci_enable_port_for_self is called when the
-> >> > affinity level is 1 (cluster level) and nothing special is done when the
-> >> > affinity level is 0 (CPU level).  All the synchronization and race
-> >> > avoidance is all handled for you in arch/arm/common/mcpm_head.S already.
-> >> >
-> >>
-> >> There's no CCI in HiP04. Their own fabric is used instead.
-> >
-> > OK.  Still, in order to support deep C-States with cpuidle, the
-> > waking-up of CPUs must happen asynchronously, and in that case the CPU
-> > being awaken must do snooping setup by itself.  So I'd be interested to
-> > see if that can be down that way as well for HiP04, at least to be
-> > similar in structure to other backend implementations, and possibly for
-> > being cpuidle ready as well.
-> >
-> 
-> But it fails on my platform if I execute snooping setup on the new CPU.
-
-It fails how?  I want to make sure if the problem is with the hardware 
-design or the code.
-
-> >> >> >
-> >> >> >>> +     spin_unlock_irq(&boot_lock);
-> >> >> >>> +     msleep(POLL_MSEC);
-> >> >> >>
-> >> >> >> What is that msleep() for?
-> >> >> >>
-> >> >> > Without this delay, I'll meet hang.
-> >> >> >
-> >> >> > Since I'm using reset to wakeup CPU from wfi/wfe status, I don't need
-> >> >> > IPI at here. If I remove the msleep() here, it seems that IPI caused my
-> >> >> > system hang. So it's a workaround in my system.
-> >> >
-> >> > Could you confirm that the IPI is actually what causes you trouble?
-> >> >
-> >> > If so maybe you should make sure that the CPU is actually masking out
-> >> > IRQs at all times before they're unmasked by the kernel.
-> >> >
-> >>
-> >> I think so. But I don't have any hardware debugger to confirm it.
-> >>
-> >> I think that unnecessary interrupt causes new CPU in interrupt mode,
-> >> then this CPU can't be online.
-> >>
-> >> If I remove the code to send IPI, the new CPU could be online right.
-> >
-> > If so that's a bug in the firmware/bootloader/whatever code that needs
-> > to be fixed.  CPUs must never unmasq IRQs if they're not ready to cope
-> > with them.
-> >
-> 
-> I agree that it should be fixed in firmware. But I need some time. So I
-> want to keep the workaround until the bug is fixed in firmware.
-
-This is still a very bad workaround.  As an alternative, there might be 
-a way to simply mask the IPI at the GIC level and unmask it from the 
-powered_up method.
-
-Also... if this is going to be fixed in the firmware, maybe not 
-including such a workaround into the upstream submission will keep the 
-incentive alive for having it actually fixed.
+The i2c portion can be revisited if needed, the MFD piece should be
+possible to land sooner than that... Lee?
 
 
-Nicolas
+-Olof
