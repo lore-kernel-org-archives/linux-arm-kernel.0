@@ -1,50 +1,100 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Thu, 15 May 2014 13:44:30 -0700
-Subject: [RFC PATCH 00/10] Tegra XHCI support
-In-Reply-To: <5375169F.3060809@wwwdotorg.org>
-References: <1400113986-339-1-git-send-email-abrestic@chromium.org>
- <5375169F.3060809@wwwdotorg.org>
-Message-ID: <CAL1qeaHb7GK+zb9E2yWZ3aWH6yaMKWouRFScxmK_XpOvASSRgw@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 15 May 2014 13:38:24 -0700
+Subject: [PATCH v3 6/6] watchdog: sunxi: Register reboot handler with watchdog
+ subsystem
+In-Reply-To: <1400186304-1691-1-git-send-email-linux@roeck-us.net>
+References: <1400186304-1691-1-git-send-email-linux@roeck-us.net>
+Message-ID: <1400186304-1691-7-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 12:33 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 05/14/2014 06:32 PM, Andrew Bresticker wrote:
->> This is a first pass at the host and PHY drivers necessary for USB3.0
->> support on Tegra114 and Tegra124.  The Tegra XHCI host controller requires
->> external firmware [1] which must be loaded before using any USB ports owned
->> by the controller.  The XUSB PHY driver handles mapping and enabling of
->> the UTMI, HSIC, and SuperSpeed pads to the XHCI controller.
->>
->> Tested on a Venice2 with a variety of USB2.0 and USB3.0 memory sticks
->> and ethernet dongles.
->>
->> Notes:
->>  - I've included support for Tegra114, but since I don't have Tegra114-based
->>    hardware, it is completely untested.
->>  - The PCIe and SATA PHYs also are programmed using the XUSB_PADCTL space
->>    as well.  At least some of the code can be re-used, specifically with
->>    respect to lane programming.  I believe Thierry is working on the PCIe
->>    parts of this.
->
-> If I understand the HW correctly, there's a separate "pad control" HW
-> block that provides routing/sharing of signals from USB2(?), USB3, SATA,
-> and PCIe to the pads.
->
-> I believe Thierry is working on exposing this block as a pinctrl driver,
-> or at least something that the other drivers can call into in order to
-> configure that block. It'd be good if you can co-ordinate with him to
-> rebase this driver on top of that, rather than (I assume; haven't read
-> the code yet...) directly manipulating the padctrl registers inside each
-> of the different drivers.
+The watchdog subsystem now provides an API to trigger a system reboot.
+Register with it.
 
-Yes, ideally i'd like to rebase this on top of Theirry's series once
-it's ready.  It sounds like there will be a pinctrl driver which
-handles the lane muxing between XUSB, PCIe, and SATA and a generic PHY
-driver will deal wit the actual PHY programming.  I'm not sure what
-the PCIe and SATA PHY drivers will look like, but the XUSB one
-requires quite a bit of USB-specific programming of the padctl
-registers, so I'm not sure we'll be able to fit all three PHY types
-into a single PHY provider driver.  Either way, there's probably a
-good deal of PHY code that could be broken out and shared among the
-three.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+v3: Drop reboot mode and cmd string parameters from API
+v2: Rebased to v2 of Maxime's patch adding reboot support
+    to the sunxi watchdog driver.
+
+ drivers/watchdog/sunxi_wdt.c | 22 ++++++++--------------
+ 1 file changed, 8 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
+index 60deb9d..d8d4f8c 100644
+--- a/drivers/watchdog/sunxi_wdt.c
++++ b/drivers/watchdog/sunxi_wdt.c
+@@ -23,12 +23,9 @@
+ #include <linux/moduleparam.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
+-#include <linux/reboot.h>
+ #include <linux/types.h>
+ #include <linux/watchdog.h>
+ 
+-#include <asm/system_misc.h>
+-
+ #define WDT_MAX_TIMEOUT         16
+ #define WDT_MIN_TIMEOUT         1
+ #define WDT_MODE_TIMEOUT(n)     ((n) << 3)
+@@ -74,23 +71,24 @@ static const int wdt_timeout_map[] = {
+ 	[16] = 0xB, /* 16s */
+ };
+ 
+-static void __iomem *reboot_wdt_base;
+-
+-static void sun4i_wdt_restart(enum reboot_mode mode, const char *cmd)
++static void sunxi_wdt_reboot(struct watchdog_device *wdt_dev)
+ {
++	struct sunxi_wdt_dev *sunxi_wdt = watchdog_get_drvdata(wdt_dev);
++
+ 	/* Enable timer and set reset bit in the watchdog */
+-	writel(WDT_MODE_EN | WDT_MODE_RST_EN, reboot_wdt_base + WDT_MODE);
++	writel(WDT_MODE_EN | WDT_MODE_RST_EN,
++	       sunxi_wdt->wdt_base + WDT_MODE);
+ 
+ 	/*
+ 	 * Restart the watchdog. The default (and lowest) interval
+ 	 * value for the watchdog is 0.5s.
+ 	 */
+-	writel(WDT_CTRL_RELOAD, reboot_wdt_base + WDT_CTRL);
++	writel(WDT_CTRL_RELOAD, sunxi_wdt->wdt_base + WDT_CTRL);
+ 
+ 	while (1) {
+ 		mdelay(5);
+ 		writel(WDT_MODE_EN | WDT_MODE_RST_EN,
+-		       reboot_wdt_base + WDT_MODE);
++		       sunxi_wdt->wdt_base + WDT_MODE);
+ 	}
+ }
+ 
+@@ -167,6 +165,7 @@ static const struct watchdog_ops sunxi_wdt_ops = {
+ 	.start		= sunxi_wdt_start,
+ 	.stop		= sunxi_wdt_stop,
+ 	.ping		= sunxi_wdt_ping,
++	.reboot		= sunxi_wdt_reboot,
+ 	.set_timeout	= sunxi_wdt_set_timeout,
+ };
+ 
+@@ -205,9 +204,6 @@ static int sunxi_wdt_probe(struct platform_device *pdev)
+ 	if (unlikely(err))
+ 		return err;
+ 
+-	reboot_wdt_base = sunxi_wdt->wdt_base;
+-	arm_pm_restart = sun4i_wdt_restart;
+-
+ 	dev_info(&pdev->dev, "Watchdog enabled (timeout=%d sec, nowayout=%d)",
+ 			sunxi_wdt->wdt_dev.timeout, nowayout);
+ 
+@@ -218,8 +214,6 @@ static int sunxi_wdt_remove(struct platform_device *pdev)
+ {
+ 	struct sunxi_wdt_dev *sunxi_wdt = platform_get_drvdata(pdev);
+ 
+-	arm_pm_restart = NULL;
+-
+ 	watchdog_unregister_device(&sunxi_wdt->wdt_dev);
+ 	watchdog_set_drvdata(&sunxi_wdt->wdt_dev, NULL);
+ 
+-- 
+1.9.1
