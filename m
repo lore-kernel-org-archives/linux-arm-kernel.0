@@ -1,73 +1,66 @@
-From: gioh.kim@lge.com (Gioh Kim)
-Date: Thu, 15 May 2014 11:49:57 +0900
-Subject: [PATCH] [RFC] ARM: MM: remove phy_base field of struct
-Message-ID: <53742B55.1060507@lge.com>
+From: superlibj8301@gmail.com (Richard Lee)
+Date: Thu, 15 May 2014 11:46:24 +0800
+Subject: [PATCHv2 1/2] mm/vmalloc: Add IO mapping space reused interface
+ support.
+In-Reply-To: <CAL_JsqLncBaJ=uceovX80U1JPU8SW3KWKXW3PiVR8Kbnykcvpg@mail.gmail.com>
+References: <1400055532-13134-1-git-send-email-superlibj8301@gmail.com>
+ <1400055532-13134-2-git-send-email-superlibj8301@gmail.com>
+ <CAL_JsqLncBaJ=uceovX80U1JPU8SW3KWKXW3PiVR8Kbnykcvpg@mail.gmail.com>
+Message-ID: <CAHPCO9HALgpevhYVYQ5yS8JR66CBD5j=7uk5QQ-4n9ftsA2KTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, May 15, 2014 at 12:06 AM, Rob Herring <robherring2@gmail.com> wrote:
+> Adding Nico...
+>
+> On Wed, May 14, 2014 at 3:18 AM, Richard Lee <superlibj8301@gmail.com> wrote:
+>> For the IO mapping, the same physical address space maybe
+>> mapped more than one time, for example, in some SoCs:
+>>   - 0x20001000 ~ 0x20001400 --> 1KB for Dev1
+>>   - 0x20001400 ~ 0x20001800 --> 1KB for Dev2
+>>   and the page size is 4KB.
+>>
+>> Then both Dev1 and Dev2 will do ioremap operations, and the IO
+>> vmalloc area's virtual address will be aligned down to 4KB, and
+>> the size will be aligned up to 4KB. That's to say, only one
+>> 4KB size's vmalloc area could contain Dev1 and Dev2 IO mapping area
+>> at the same time.
+>>
+>> For this case, we can ioremap only one time, and the later ioremap
+>> operation will just return the exist vmalloc area.
+>
+> We already have similar reuse tracking for the static mappings on ARM.
+> I'm wondering if either that can be reused for ioremap as well or this
+> can replace the static mapping tracking. It seems silly to have 2
+> lists to search for finding an existing mapping.
+>
 
-It's not a big deal but I've found that phy_base field of struct
-l2x0_regs is not used anywhere.
-I've removed it on my board. It seems to be working fine.
+Yes, it is.
 
-Why do we need physical address of L2 cache controller?
-Is it removable?
+Maybe there is one way to reuse the ARM's static mapping tracking, or one
+new global way to replace it.
 
 
------------------------- 8< --------------------------
->From cc0d98f4ef8b6f8f139a7c6179ed0b03e9ad7d07 Mon Sep 17 00:00:00 2001
-From: Gioh Kim <gioh.kim@lge.com>
-Date: Thu, 15 May 2014 11:26:20 +0900
-Subject: [PATCH] [RFC] ARM: MM: remove phy_base field of struct l2x0_regs
 
-Remove unused field, phy_base of struct l2x0_regs
+> But there is a fundamental problem with your approach. You do not and
+> cannot check the memory type of the mapping. If you look at the static
+> mapping code, it only reuses mappings if the memory type match. While
+> having aliases with different memory types is bad on ARMv6+, I assume
+> there are some cases that do that given the static mapping code
+> handles that case. We would at least want to detect and warn if we
+> didn't want to allow different attributes rather than just return a
+> mapping with whatever attributes the first mapping used.
+>
 
-Signed-off-by: Gioh Kim <gioh.kim@lge.com>
----
- arch/arm/include/asm/hardware/cache-l2x0.h |    1 -
- arch/arm/kernel/asm-offsets.c              |    1 -
- arch/arm/mm/cache-l2x0.c                   |    2 --
- 3 files changed, 4 deletions(-)
+You are right, maybe an alternative is defining one call back for each
+individual
+ARCH or other ways.
 
-diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h
-b/arch/arm/include/asm/hardware/cache-l2x0.h
-index 6795ff7..6dec6da 100644
---- a/arch/arm/include/asm/hardware/cache-l2x0.h
-+++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-@@ -118,7 +118,6 @@ static inline int l2x0_of_init(u32 aux_val, u32
-aux_mask)
- #endif
 
- struct l2x0_regs {
--       unsigned long phy_base;
-        unsigned long aux_ctrl;
-        /*
-         * Whether the following registers need to be saved/restored
-diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-index 85598b5..9b0ff94 100644
---- a/arch/arm/kernel/asm-offsets.c
-+++ b/arch/arm/kernel/asm-offsets.c
-@@ -100,7 +100,6 @@ int main(void)
-   DEFINE(S_FRAME_SIZE,         sizeof(struct pt_regs));
-   BLANK();
- #ifdef CONFIG_CACHE_L2X0
--  DEFINE(L2X0_R_PHY_BASE,      offsetof(struct l2x0_regs, phy_base));
-   DEFINE(L2X0_R_AUX_CTRL,      offsetof(struct l2x0_regs, aux_ctrl));
-   DEFINE(L2X0_R_TAG_LATENCY,   offsetof(struct l2x0_regs, tag_latency));
-   DEFINE(L2X0_R_DATA_LATENCY,  offsetof(struct l2x0_regs, data_latency));
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 7abde2c..728d644 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -985,8 +985,6 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
-        if (!l2x0_base)
-                return -ENOMEM;
+Thanks very much for you comments, they are very important for me.
 
--       l2x0_saved_regs.phy_base = res.start;
--
-        data = of_match_node(l2x0_ids, np)->data;
+BRs,
+Richard Lee
 
-        /* L2 configuration can only be changed if the cache is disabled */
---
-1.7.9.5
+
+> Rob
