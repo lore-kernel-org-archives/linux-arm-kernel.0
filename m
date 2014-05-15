@@ -1,73 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 May 2014 10:17:10 +0200
-Subject: [RFC PATCH 06/10] usb: xhci: Add Tegra XHCI host-controller driver
-In-Reply-To: <1400113986-339-7-git-send-email-abrestic@chromium.org>
-References: <1400113986-339-1-git-send-email-abrestic@chromium.org>
- <1400113986-339-7-git-send-email-abrestic@chromium.org>
-Message-ID: <15599140.PsD4j7x3tZ@wuerfel>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 15 May 2014 11:18:19 +0300
+Subject: [PATCH v2 3/5] dt/bindings: ti, edma: Remove redundant properties
+ from documentation
+In-Reply-To: <7468082.VY82PIo3ZY@wuerfel>
+References: <1399977032-26469-1-git-send-email-peter.ujfalusi@ti.com>
+ <1399977032-26469-4-git-send-email-peter.ujfalusi@ti.com>
+ <7468082.VY82PIo3ZY@wuerfel>
+Message-ID: <5374784B.7020608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 May 2014 17:33:02 Andrew Bresticker wrote:
-> +
-> +int tegra_xhci_register_mbox_notifier(struct notifier_block *nb)
-> +{
-> +	int ret;
-> +
-> +	mutex_lock(&tegra_xhci_mbox_lock);
-> +	ret = raw_notifier_chain_register(&tegra_xhci_mbox_notifiers, nb);
-> +	mutex_unlock(&tegra_xhci_mbox_lock);
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL(tegra_xhci_register_mbox_notifier);
-> +
-> +void tegra_xhci_unregister_mbox_notifier(struct notifier_block *nb)
-> +{
-> +	mutex_lock(&tegra_xhci_mbox_lock);
-> +	raw_notifier_chain_unregister(&tegra_xhci_mbox_notifiers, nb);
-> +	mutex_unlock(&tegra_xhci_mbox_lock);
-> +}
-> +EXPORT_SYMBOL(tegra_xhci_unregister_mbox_notifier);
+On 05/15/2014 11:01 AM, Arnd Bergmann wrote:
+> On Tuesday 13 May 2014 13:30:30 Peter Ujfalusi wrote:
+>> From CCCFG register of eDMA3 we can get all the needed information for the
+>> driver about the IP:
+>> Number of channels: NUM_DMACH
+>> Number of regions: NUM_REGN
+>> Number of slots (PaRAM sets): NUM_PAENTRY
+>> Number of TC/EQ: NUM_EVQUE
+>>
+>> The ti,edma-regions; ti,edma-slots and dma-channels in DT are
+>> redundant since the very same information can be obtained from the HW.
+>> The mentioned properties can be removed from the binding document.
+>>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> 
+> I wonder if we should keep them listed as "optional" properties so you
+> can have a dtb file that still works with older kernels which need them.
+> 
+> What you do is an incompatible change to the binding, which we shouldn't
+> do lightly. Any new dts files don't need this information of course, but
+> as a general rule, I'd rather keep things like this around unless we
+> already have to enforce an ABI break that is well documented.
 
-What driver would use these?
+We could keep them as optional, or to be precise: ignored properties since we
+are not going to even look at them in the future.
+But I do not really see the reason to do so. With this change new kernels will
+boot with old DTB - if it can not be changed which I have not seen yet. Sure
+old kernel would not boot with this change, but why would you downgrade the
+kernel and update the DTB on a board?
+Bisecting is not a good reason since the bug you might be hunting for could be
+in the DTS or in the kernel code so you need to update both of them to be sure
+you reach the commit you are looking for.
 
-My feeling is that if you have a mailbox that is used by multiple
-drivers, you should use a proper mailbox driver to operate them,
-and have the drivers register with that API instead of a custom one.
-
-> +	/* Create child xhci-plat device */
-> +	memset(xhci_resources, 0, sizeof(xhci_resources));
-> +	res = platform_get_resource(to_platform_device(dev), IORESOURCE_IRQ, 0);
-> +	if (!res) {
-> +		dev_err(dev, "Missing XHCI IRQ\n");
-> +		ret = -ENODEV;
-> +		goto out;
-> +	}
-> +	xhci_resources[0].start = res->start;
-> +	xhci_resources[0].end = res->end;
-> +	xhci_resources[0].flags = res->flags;
-> +	xhci_resources[0].name = res->name;
-> +	res = platform_get_resource(to_platform_device(dev), IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(dev, "Missing XHCI registers\n");
-> +		ret = -ENODEV;
-> +		goto out;
-> +	}
-> +	xhci_resources[1].start = res->start;
-> +	xhci_resources[1].end = res->end;
-> +	xhci_resources[1].flags = res->flags;
-> +	xhci_resources[1].name = res->name;
-> +
-> +	xhci = platform_device_alloc("xhci-hcd", PLATFORM_DEVID_AUTO);
-> +	if (!xhci) {
-> +		dev_err(dev, "Failed to allocate XHCI host\n");
-> +		ret = -ENOMEM;
-> +		goto out;
-> +	}
-
-This does not feel appropriate at all: Rather than creating a child device,
-you should have a specific driver that hooks into functions exported
-by the xhci core. See Documentation/driver-model/design-patterns.txt
-
-	Arnd
+-- 
+P?ter
