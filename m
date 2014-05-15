@@ -1,49 +1,94 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 15 May 2014 20:32:10 +0900
-Subject: [PATCH v6 15/17] ARM: shmobile: Let Marzen multiplatform boot with
- Marzen DTB
+Date: Thu, 15 May 2014 20:32:09 +0900
+Subject: [PATCH v6 14/17] ARM: shmobile: Remove non-multiplatform Marzen
+ reference support
 In-Reply-To: <1400153532-23675-1-git-send-email-horms+renesas@verge.net.au>
 References: <1400153532-23675-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1400153532-23675-16-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1400153532-23675-15-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let the multiplatform Marzen support boot with the legacy DTS for
-Marzen as well as the Marzen reference DTS.
+Now that r8a7779 has CCF support remove the legacy Marzen reference
+Kconfig bits CONFIG_MACH_MARZEN_REFERENCE for the non-multiplatform
+case.
+
+Starting from this commit Marzen board support is always enabled via
+CONFIG_MACH_MARZEN, and CONFIG_ARCH_MULTIPLATFORM is used to select
+between board-marzen.c and board-marzen-reference.c
+
+The file board-marzen-reference.c can no longer be used together with
+the legacy sh-clk clock framework, instead CCF is used.
 
 Based on work for the Koelsch board by Laurent Pinchart.
 
 Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/Makefile                      | 2 +-
- arch/arm/mach-shmobile/board-marzen-reference.c | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/Makefile           |  1 -
+ arch/arm/mach-shmobile/Kconfig       | 13 -------------
+ arch/arm/mach-shmobile/Makefile      |  1 -
+ arch/arm/mach-shmobile/Makefile.boot |  1 -
+ 4 files changed, 16 deletions(-)
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 0d05589..840a922 100644
+index 4694dcb..0d05589 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -316,7 +316,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
- 	r8a7791-henninger.dtb \
+@@ -304,7 +304,6 @@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += r7s72100-genmai.dtb \
+ 	r8a7778-bockw-reference.dtb \
+ 	r8a7740-armadillo800eva-reference.dtb \
+ 	r8a7779-marzen.dtb \
+-	r8a7779-marzen-reference.dtb \
  	r8a7791-koelsch.dtb \
  	r8a7790-lager.dtb \
--	r8a7779-marzen-reference.dtb
-+	r8a7779-marzen.dtb
- dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
- 	socfpga_cyclone5_socdk.dtb \
- 	socfpga_cyclone5_sockit.dtb \
-diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
-index d09e850..21c8cee 100644
---- a/arch/arm/mach-shmobile/board-marzen-reference.c
-+++ b/arch/arm/mach-shmobile/board-marzen-reference.c
-@@ -66,6 +66,7 @@ static void __init marzen_init(void)
- }
+ 	sh73a0-kzm9g.dtb \
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 28d7e86..bcb83dd 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -257,19 +257,6 @@ config MACH_MARZEN
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 	select USE_OF
  
- static const char *marzen_boards_compat_dt[] __initdata = {
-+	"renesas,marzen",
- 	"renesas,marzen-reference",
- 	NULL,
- };
+-config MACH_MARZEN_REFERENCE
+-	bool "MARZEN board - Reference Device Tree Implementation"
+-	depends on ARCH_R8A7779
+-	select ARCH_REQUIRE_GPIOLIB
+-	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+-	select USE_OF
+-	---help---
+-	   Use reference implementation of Marzen board support
+-	   which makes use of device tree at the expense
+-	   of not supporting a number of devices.
+-
+-	   This is intended to aid developers
+-
+ config MACH_LAGER
+ 	bool "Lager board"
+ 	depends on ARCH_R8A7790
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index ed49315..591966e 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -69,7 +69,6 @@ obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
+ obj-$(CONFIG_MACH_GENMAI)	+= board-genmai.o
+ obj-$(CONFIG_MACH_GENMAI_REFERENCE)	+= board-genmai-reference.o
+ obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
+-obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
+ obj-$(CONFIG_MACH_LAGER)	+= board-lager.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE)	+= board-armadillo800eva-reference.o
+diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
+index 99455ec..4200b94 100644
+--- a/arch/arm/mach-shmobile/Makefile.boot
++++ b/arch/arm/mach-shmobile/Makefile.boot
+@@ -14,7 +14,6 @@ loadaddr-$(CONFIG_MACH_KZM9G_REFERENCE) += 0x41008000
+ loadaddr-$(CONFIG_MACH_LAGER) += 0x40008000
+ loadaddr-$(CONFIG_MACH_MACKEREL) += 0x40008000
+ loadaddr-$(CONFIG_MACH_MARZEN) += 0x60008000
+-loadaddr-$(CONFIG_MACH_MARZEN_REFERENCE) += 0x60008000
+ 
+ __ZRELADDR	:= $(sort $(loadaddr-y))
+    zreladdr-y   += $(__ZRELADDR)
 -- 
 1.8.5.2
