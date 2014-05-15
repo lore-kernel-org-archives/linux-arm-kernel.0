@@ -1,86 +1,154 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 15 May 2014 12:40:45 +0200
-Subject: [PATCH v2 04/10] iommu/ipmmu-vmsa: Define driver-specific page
- directory sizes
+Date: Thu, 15 May 2014 12:40:47 +0200
+Subject: [PATCH v2 06/10] iommu/ipmmu-vmsa: PMD is never folded, PUD always is
 In-Reply-To: <1400150451-13469-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1400150451-13469-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1400150451-13469-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1400150451-13469-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PTRS_PER_(PUD|PGD|PMD|PTE) macros evaluate to different values
-depending on whether LPAE is enabled. The IPMMU driver uses a long
-descriptor format regardless of LPAE, making those macros mismatch the
-IPMMU configuration on non-LPAE systems.
-
-Replace the macros by driver-specific versions that always evaluate to
-the right value.
+The driver only supports the 3-level long descriptor format that has no
+PUD and always has a PMD.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/iommu/ipmmu-vmsa.c | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+ drivers/iommu/ipmmu-vmsa.c | 66 +++++++---------------------------------------
+ 1 file changed, 9 insertions(+), 57 deletions(-)
 
 diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
-index 313b5b9..b34a4b7b 100644
+index 150e18e..d388749 100644
 --- a/drivers/iommu/ipmmu-vmsa.c
 +++ b/drivers/iommu/ipmmu-vmsa.c
-@@ -209,6 +209,11 @@ static LIST_HEAD(ipmmu_devices);
- #define ARM_VMSA_PTE_MEMATTR_NC		(((pteval_t)0x5) << 2)
- #define ARM_VMSA_PTE_MEMATTR_DEV	(((pteval_t)0x1) << 2)
+@@ -215,7 +215,6 @@ static LIST_HEAD(ipmmu_devices);
+ #define IPMMU_PTRS_PER_PTE		512
+ #define IPMMU_PTRS_PER_PMD		512
+ #define IPMMU_PTRS_PER_PGD		4
+-#define IPMMU_PTRS_PER_PUD		1
  
-+#define IPMMU_PTRS_PER_PTE		512
-+#define IPMMU_PTRS_PER_PMD		512
-+#define IPMMU_PTRS_PER_PGD		4
-+#define IPMMU_PTRS_PER_PUD		1
-+
  /* -----------------------------------------------------------------------------
   * Read/Write Access
+@@ -465,6 +464,8 @@ static irqreturn_t ipmmu_irq(int irq, void *dev)
+  * Page Table Management
   */
-@@ -327,7 +332,7 @@ static int ipmmu_domain_init_context(struct ipmmu_vmsa_domain *domain)
  
- 	/* TTBR0 */
- 	ipmmu_flush_pgtable(domain->mmu, domain->pgd,
--			    PTRS_PER_PGD * sizeof(*domain->pgd));
-+			    IPMMU_PTRS_PER_PGD * sizeof(*domain->pgd));
- 	ttbr = __pa(domain->pgd);
- 	ipmmu_ctx_write(domain, IMTTLBR0, ttbr);
- 	ipmmu_ctx_write(domain, IMTTUBR0, ttbr >> 32);
-@@ -469,7 +474,7 @@ static void ipmmu_free_pmds(pud_t *pud)
++#define pud_pgtable(pud) pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
++
+ static void ipmmu_free_ptes(pmd_t *pmd)
+ {
+ 	pgtable_t table = pmd_pgtable(*pmd);
+@@ -473,10 +474,10 @@ static void ipmmu_free_ptes(pmd_t *pmd)
+ 
+ static void ipmmu_free_pmds(pud_t *pud)
+ {
+-	pmd_t *pmd, *pmd_base = pmd_offset(pud, 0);
++	pmd_t *pmd = pmd_offset(pud, 0);
++	pgtable_t table;
  	unsigned int i;
  
- 	pmd = pmd_base;
--	for (i = 0; i < PTRS_PER_PMD; ++i) {
-+	for (i = 0; i < IPMMU_PTRS_PER_PMD; ++i) {
+-	pmd = pmd_base;
+ 	for (i = 0; i < IPMMU_PTRS_PER_PMD; ++i) {
  		if (pmd_none(*pmd))
  			continue;
+@@ -485,24 +486,8 @@ static void ipmmu_free_pmds(pud_t *pud)
+ 		pmd++;
+ 	}
  
-@@ -486,7 +491,7 @@ static void ipmmu_free_puds(pgd_t *pgd)
- 	unsigned int i;
+-	pmd_free(NULL, pmd_base);
+-}
+-
+-static void ipmmu_free_puds(pgd_t *pgd)
+-{
+-	pud_t *pud, *pud_base = pud_offset(pgd, 0);
+-	unsigned int i;
+-
+-	pud = pud_base;
+-	for (i = 0; i < IPMMU_PTRS_PER_PUD; ++i) {
+-		if (pud_none(*pud))
+-			continue;
+-
+-		ipmmu_free_pmds(pud);
+-		pud++;
+-	}
+-
+-	pud_free(NULL, pud_base);
++	table = pud_pgtable(*pud);
++	__free_page(table);
+ }
  
- 	pud = pud_base;
--	for (i = 0; i < PTRS_PER_PUD; ++i) {
-+	for (i = 0; i < IPMMU_PTRS_PER_PUD; ++i) {
- 		if (pud_none(*pud))
- 			continue;
- 
-@@ -509,7 +514,7 @@ static void ipmmu_free_pgtables(struct ipmmu_vmsa_domain *domain)
- 	 * tables.
- 	 */
- 	pgd = pgd_base;
--	for (i = 0; i < PTRS_PER_PGD; ++i) {
-+	for (i = 0; i < IPMMU_PTRS_PER_PGD; ++i) {
+ static void ipmmu_free_pgtables(struct ipmmu_vmsa_domain *domain)
+@@ -520,7 +505,7 @@ static void ipmmu_free_pgtables(struct ipmmu_vmsa_domain *domain)
+ 	for (i = 0; i < IPMMU_PTRS_PER_PGD; ++i) {
  		if (pgd_none(*pgd))
  			continue;
- 		ipmmu_free_puds(pgd);
-@@ -694,7 +699,7 @@ static int ipmmu_domain_init(struct iommu_domain *io_domain)
+-		ipmmu_free_puds(pgd);
++		ipmmu_free_pmds((pud_t *)pgd);
+ 		pgd++;
+ 	}
  
- 	spin_lock_init(&domain->lock);
+@@ -624,7 +609,6 @@ static int ipmmu_alloc_init_pmd(struct ipmmu_vmsa_device *mmu, pud_t *pud,
+ 	pmd_t *pmd;
+ 	int ret;
  
--	domain->pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
-+	domain->pgd = kzalloc(IPMMU_PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
- 	if (!domain->pgd) {
- 		kfree(domain);
- 		return -ENOMEM;
+-#ifndef __PAGETABLE_PMD_FOLDED
+ 	if (pud_none(*pud)) {
+ 		pmd = (pmd_t *)get_zeroed_page(GFP_ATOMIC);
+ 		if (!pmd)
+@@ -636,7 +620,6 @@ static int ipmmu_alloc_init_pmd(struct ipmmu_vmsa_device *mmu, pud_t *pud,
+ 
+ 		pmd += pmd_index(addr);
+ 	} else
+-#endif
+ 		pmd = pmd_offset(pud, addr);
+ 
+ 	do {
+@@ -648,38 +631,6 @@ static int ipmmu_alloc_init_pmd(struct ipmmu_vmsa_device *mmu, pud_t *pud,
+ 	return ret;
+ }
+ 
+-static int ipmmu_alloc_init_pud(struct ipmmu_vmsa_device *mmu, pgd_t *pgd,
+-				unsigned long addr, unsigned long end,
+-				phys_addr_t phys, int prot)
+-{
+-	unsigned long next;
+-	pud_t *pud;
+-	int ret;
+-
+-#ifndef __PAGETABLE_PUD_FOLDED
+-	if (pgd_none(*pgd)) {
+-		pud = (pud_t *)get_zeroed_page(GFP_ATOMIC);
+-		if (!pud)
+-			return -ENOMEM;
+-
+-		ipmmu_flush_pgtable(mmu, pud, PAGE_SIZE);
+-		*pgd = __pgd(__pa(pud) | PMD_NSTABLE | PMD_TYPE_TABLE);
+-		ipmmu_flush_pgtable(mmu, pgd, sizeof(*pgd));
+-
+-		pud += pud_index(addr);
+-	} else
+-#endif
+-		pud = pud_offset(pgd, addr);
+-
+-	do {
+-		next = pud_addr_end(addr, end);
+-		ret = ipmmu_alloc_init_pmd(mmu, pud, addr, next, phys, prot);
+-		phys += next - addr;
+-	} while (pud++, addr = next, addr < end);
+-
+-	return ret;
+-}
+-
+ static int ipmmu_handle_mapping(struct ipmmu_vmsa_domain *domain,
+ 				unsigned long iova, phys_addr_t paddr,
+ 				size_t size, int prot)
+@@ -707,7 +658,8 @@ static int ipmmu_handle_mapping(struct ipmmu_vmsa_domain *domain,
+ 	do {
+ 		unsigned long next = pgd_addr_end(iova, end);
+ 
+-		ret = ipmmu_alloc_init_pud(mmu, pgd, iova, next, paddr, prot);
++		ret = ipmmu_alloc_init_pmd(mmu, (pud_t *)pgd, iova, next, paddr,
++					   prot);
+ 		if (ret)
+ 			break;
+ 
 -- 
 1.8.5.5
