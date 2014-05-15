@@ -1,91 +1,168 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 15 May 2014 11:27:31 -0700
-Subject: [PATCH v6 4/4] add 2nd stage page fault handling during live migration
-In-Reply-To: <1400178451-4984-1-git-send-email-m.smarduch@samsung.com>
-References: <1400178451-4984-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <1400178451-4984-5-git-send-email-m.smarduch@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 15 May 2014 14:29:50 -0400
+Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
+In-Reply-To: <5374FF5B.8050702@ti.com>
+References: <1399991966-14582-1-git-send-email-santosh.shilimkar@ti.com>
+ <5373C78E.7040301@linaro.org> <5373C8E8.6040208@ti.com>
+ <5373CBB9.40506@linaro.org> <5373DD94.8030208@ti.com>
+ <5374F35E.5040900@ti.com> <5374FE61.50901@linaro.org>
+ <5374FF5B.8050702@ti.com>
+Message-ID: <5375079E.3060305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for handling 2nd stage page faults during migration,
-it disables faulting in huge pages, and splits up existing huge pages.
+On Thursday 15 May 2014 01:54 PM, Santosh Shilimkar wrote:
+> On Thursday 15 May 2014 01:50 PM, Daniel Lezcano wrote:
+>> On 05/15/2014 07:03 PM, Santosh Shilimkar wrote:
 
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+[..]
+
+>>>> With above mentioned change, it should work. Other alternatives is OMAP4 driver does
+>>>> its won registration where it can start the timer. The way it was before the
+>>>> consolidation.
+>>>>
+>>>> Ofcourse if you have better fix, then great.
+>>>>
+>>> What is your suggestion. We *must* fix the regression asap. I think
+>>> $subject patch with an update to bctimer start under CPUIDLE_FLAG_COUPLED
+>>> seems a good way forward.
+>>>
+>>> Do let me know.
+>>
+>> Did you see Alex Shi's email [cc'ed] ? Reverting this change makes the panda ES to hang.
+>>
+> The hang is definitely due to the bctimer not started. As I said, I assumed it was and
+> then you corrected saying it is under the flag.
+> 
+>> I am not convinced the culprit is this code you are trying to revert.
+>>
+> fair enough. Thats why I said if you have an alternative fix thats great.
+> 
+For record, below is updated patch with bctimer started which
+was missed in earlier version. I haven't tested it though.
+
+Alex,
+Please give a try with your test-case and see if you still see the hang.
+Am just curious about your issue and hence the request..
+
+Regards,
+Santosh
+
+
+>From bb3b82cc5645b83bedf1343d03cc956f27f6fc83 Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Mon, 12 May 2014 17:37:59 -0400
+Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
+
+On OMAP4 panda board, there have been several bug reports about boot
+hang and lock-ups with CPU_IDLE enabled. The root cause of the issue
+is missing interrupts while in idle state. Commit cb7094e8 {cpuidle / omap4 :
+use CPUIDLE_FLAG_TIMER_STOP flag} moved the broadcast notifiers to common
+code for right reasons but on OMAP4 which suffers from a nasty ROM code
+bug with GIC, commit ff999b8a {ARM: OMAP4460: Workaround for ROM bug ..},
+we loose interrupts which leads to issues like lock-up, hangs etc.
+
+Patch reverts commit cb7094 {cpuidle / omap4 : use CPUIDLE_FLAG_TIMER_STOP
+flag} and 54769d6 {cpuidle: OMAP4: remove timer broadcast initialization} to
+avoid the issue. With this change, OMAP4 panda boards, the mentioned
+issues are getting fixed. We no longer loose interrupts which was the cause
+of the regression.
+
+Cc: Roger Quadros <rogerq@ti.com>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Reported-tested-by: Roger Quadros <rogerq@ti.com>
+Reported-tested-by: Kevin Hilman <khilman@linaro.org>
+Tested-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/kvm/mmu.c |   36 ++++++++++++++++++++++++++++++++++--
- 1 file changed, 34 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/cpuidle44xx.c |   25 +++++++++++++++++++++----
+ 1 file changed, 21 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index b939312..10e7bf6 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1002,6 +1002,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
- 	struct vm_area_struct *vma;
- 	pfn_t pfn;
-+	bool migration_active;
+diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+index 01fc710..2498ab0 100644
+--- a/arch/arm/mach-omap2/cpuidle44xx.c
++++ b/arch/arm/mach-omap2/cpuidle44xx.c
+@@ -14,6 +14,7 @@
+ #include <linux/cpuidle.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/export.h>
++#include <linux/clockchips.h>
  
- 	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
- 	if (fault_status == FSC_PERM && !write_fault) {
-@@ -1053,12 +1054,23 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		return -EFAULT;
+ #include <asm/cpuidle.h>
+ #include <asm/proc-fns.h>
+@@ -83,6 +84,7 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+ {
+ 	struct idle_statedata *cx = state_ptr + index;
+ 	u32 mpuss_can_lose_context = 0;
++	int cpu_id = smp_processor_id();
  
- 	spin_lock(&kvm->mmu_lock);
-+
-+	/*
-+	 * Place inside lock to prevent race condition when whole VM is being
-+	 * write proteced. Prevent race of huge page install when migration is
-+	 * active.
-+	 */
-+	migration_active = vcpu->kvm->arch.migration_in_progress;
-+
- 	if (mmu_notifier_retry(kvm, mmu_seq))
- 		goto out_unlock;
--	if (!hugetlb && !force_pte)
-+
-+	/* When migrating don't spend cycles coalescing huge pages */
-+	if (!hugetlb && !force_pte && !migration_active)
- 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+ 	/*
+ 	 * CPU0 has to wait and stay ON until CPU1 is OFF state.
+@@ -110,6 +112,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+ 	mpuss_can_lose_context = (cx->mpu_state == PWRDM_POWER_RET) &&
+ 				 (cx->mpu_logic_state == PWRDM_POWER_OFF);
  
--	if (hugetlb) {
-+	/* During migration don't install huge pages */
-+	if (hugetlb && !migration_active) {
- 		pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
- 		new_pmd = pmd_mkhuge(new_pmd);
- 		if (writable) {
-@@ -1069,6 +1081,23 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
- 	} else {
- 		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
++	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
 +
-+		/*
-+		 * If pmd is  mapping a huge page then split it up into
-+		 * small pages, when doing live migration.
-+		 */
-+		if (migration_active) {
-+			pmd_t *pmd;
-+			if (hugetlb) {
-+				pfn += pte_index(fault_ipa);
-+				gfn = fault_ipa >> PAGE_SHIFT;
-+			}
-+			new_pte = pfn_pte(pfn, PAGE_S2);
-+			pmd = stage2_get_pmd(kvm, NULL, fault_ipa);
-+			if (pmd && kvm_pmd_huge(*pmd))
-+				clear_pmd_entry(kvm, pmd, fault_ipa);
-+		}
+ 	/*
+ 	 * Call idle CPU PM enter notifier chain so that
+ 	 * VFP and per CPU interrupt context is saved.
+@@ -165,6 +169,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+ 	if (dev->cpu == 0 && mpuss_can_lose_context)
+ 		cpu_cluster_pm_exit();
+ 
++	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
 +
- 		if (writable) {
- 			kvm_set_s2pte_writable(&new_pte);
- 			kvm_set_pfn_dirty(pfn);
-@@ -1077,6 +1106,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
- 	}
+ fail:
+ 	cpuidle_coupled_parallel_barrier(dev, &abort_barrier);
+ 	cpu_done[dev->cpu] = false;
+@@ -172,6 +178,16 @@ fail:
+ 	return index;
+ }
  
-+	/* Assuming 4k pages, set one bit/page in memslot dirty_bitmap[] */
-+	if (writable)
-+		mark_page_dirty(kvm, gfn);
++/*
++ * For each cpu, setup the broadcast timer because local timers
++ * stops for the states above C1.
++ */
++static void omap_setup_broadcast_timer(void *arg)
++{
++	int cpu = smp_processor_id();
++	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ON, &cpu);
++}
++
+ static struct cpuidle_driver omap4_idle_driver = {
+ 	.name				= "omap4_idle",
+ 	.owner				= THIS_MODULE,
+@@ -189,8 +205,7 @@ static struct cpuidle_driver omap4_idle_driver = {
+ 			/* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR */
+ 			.exit_latency = 328 + 440,
+ 			.target_residency = 960,
+-			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED |
+-			         CPUIDLE_FLAG_TIMER_STOP,
++			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
+ 			.enter = omap_enter_idle_coupled,
+ 			.name = "C2",
+ 			.desc = "CPUx OFF, MPUSS CSWR",
+@@ -199,8 +214,7 @@ static struct cpuidle_driver omap4_idle_driver = {
+ 			/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
+ 			.exit_latency = 460 + 518,
+ 			.target_residency = 1100,
+-			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED |
+-			         CPUIDLE_FLAG_TIMER_STOP,
++			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
+ 			.enter = omap_enter_idle_coupled,
+ 			.name = "C3",
+ 			.desc = "CPUx OFF, MPUSS OSWR",
+@@ -231,5 +245,8 @@ int __init omap4_idle_init(void)
+ 	if (!cpu_clkdm[0] || !cpu_clkdm[1])
+ 		return -ENODEV;
  
- out_unlock:
- 	spin_unlock(&kvm->mmu_lock);
++	/* Configure the broadcast timer on each cpu */
++	on_each_cpu(omap_setup_broadcast_timer, NULL, 1);
++
+ 	return cpuidle_register(&omap4_idle_driver, cpu_online_mask);
+ }
 -- 
 1.7.9.5
