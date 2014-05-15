@@ -1,77 +1,41 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 16 May 2014 05:28:44 +0900
-Subject: [PATCH v5 0/5] ARM: dts: enable hdmi for exynos5 based peach
- and snow boards
-In-Reply-To: <53751D5B.9040208@samsung.com>
-References: <1400166264-3428-1-git-send-email-rahul.sharma@samsung.com>
- <53751493.8050601@gmail.com> <53751D5B.9040208@samsung.com>
-Message-ID: <5375237C.20709@samsung.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Thu, 15 May 2014 23:32:13 +0300
+Subject: [PATCH] ARM: imx: clean up error handling
+In-Reply-To: <1400181871-10325-1-git-send-email-emilgoode@gmail.com>
+References: <1400181871-10325-1-git-send-email-emilgoode@gmail.com>
+Message-ID: <20140515203212.GD8897@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/14 05:02, Kukjin Kim wrote:
-> On 05/16/14 04:25, Tomasz Figa wrote:
->> Hi Rahul,
->>
->> On 15.05.2014 17:04, Rahul Sharma wrote:
->>> From: Rahul Sharma<Rahul.Sharma@samsung.com>
->>>
->>> Enable hdmi for exynos5250 based snow board, exynos5420
->>> based peach pit board and 5800 based peach-pi board.
->>>
->>> V5:
->>> 1) Moved hdmi_hpd_irq pin back to board files.
->>> 2) Replaced 0 with GPIO_ACTIVE_HIGH while adding gpio property
->>> to HDMI node.
->>>
->>> V4:
->>> 1) Removed hdmi_hpd_irq pin from peach-pi board as it already
->>> present in exynos5420-pinctrl.dtsi.
->>>
->>> V3:
->>> 1) Re-spin on dependent patches.
->>> 2) Added patch to enable hdmi for Peach-pi board.
->>>
->>> V2:
->>> 1) Re-spin on dependent patches.
->>> 2) Added patch to remove chip specific hdmi hpd gpio from
->>> board file top SoC file.
->>>
->>> This series is based on Kukjin Kims, for-next branch.
->>>
->>> It is dependent on
->>>
->>> 1) Sachin's patch: "ARM: dts: exynos5250-snow: add tps65090 power
->>> regulator"
->>> at https://patches.linaro.org/28325/ : [Reviewed-by: Doug Anderson]
->>>
->>> All other dependent patches are already landed in maintainers
->>> tree.
->>>
->>> Rahul Sharma (4):
->>> ARM: dts: enable hdmi for exynos5250 based snow board
->>> ARM: dts: change to correct compatible string for exynos5420 hdmi
->>> ARM: dts: enable hdmi for exynos5420 based peach-pit board
->>> ARM: dts: enable hdmi for exynos5800 based peach-pi board
->>>
->>> arch/arm/boot/dts/exynos5250-cros-common.dtsi | 6 +++++-
->>> arch/arm/boot/dts/exynos5250-snow.dts | 14 ++++++++++++++
->>> arch/arm/boot/dts/exynos5420-peach-pit.dts | 22 ++++++++++++++++++++++
->>> arch/arm/boot/dts/exynos5420.dtsi | 7 ++++++-
->>> arch/arm/boot/dts/exynos5800-peach-pi.dts | 22 ++++++++++++++++++++++
->>> 5 files changed, 69 insertions(+), 2 deletions(-)
->>>
->>
->> For the whole series:
->>
->> Acked-by: Tomasz Figa<t.figa@samsung.com>
->>
-> Looks good to me too.
->
-> Applied but not for-next yet because need to check the status of the
-> tps65090 related patches you mentioned...
->
-Done.
+On Thu, May 15, 2014 at 09:24:30PM +0200, Emil Goode wrote:
+> If we fail to allocate struct platform_device pdev we
+> dereference it after the goto label err.
+> 
+> I have rearranged the error handling a bit to fix the issue
+> and also make it more clear.
+> 
+> Signed-off-by: Emil Goode <emilgoode@gmail.com>
+> ---
+>  arch/arm/mach-imx/devices/platform-ipu-core.c |   22 +++++++++++++---------
+>  1 file changed, 13 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
+> index fc4dd7c..14d61d9 100644
+> --- a/arch/arm/mach-imx/devices/platform-ipu-core.c
+> +++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
+> @@ -77,34 +77,38 @@ struct platform_device *__init imx_alloc_mx3_camera(
+>  
+>  	pdev = platform_device_alloc("mx3-camera", 0);
+>  	if (!pdev)
+> -		goto err;
+> +		return ERR_PTR(ret);
 
-Thanks,
-Kukjin
+It's more readable to say "return ERR_PTR(-ENOMEM);".
+
+This patch is great but the subject should say "fix" and not "clean up"
+since it fixes a NULL dereference bug.  The people who call their
+checkpatch.pl clean ups "fixes" are also doing it wrong but those are
+newbies and not worth educating.
+
+regards,
+dan carpenter
