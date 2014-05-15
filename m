@@ -1,91 +1,73 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 May 2014 09:13:02 +0100
-Subject: [PATCH v3 18/19] KVM: ARM: vgic: add the GICv3 backend
-In-Reply-To: <20140509140731.GS3362@lvm> (Christoffer Dall's message of "Fri,
- 9 May 2014 15:07:31 +0100")
-References: <1397655591-2761-1-git-send-email-marc.zyngier@arm.com>
- <1397655591-2761-19-git-send-email-marc.zyngier@arm.com>
- <20140509140731.GS3362@lvm>
-Message-ID: <878uq3h33l.fsf@approximate.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 May 2014 10:17:10 +0200
+Subject: [RFC PATCH 06/10] usb: xhci: Add Tegra XHCI host-controller driver
+In-Reply-To: <1400113986-339-7-git-send-email-abrestic@chromium.org>
+References: <1400113986-339-1-git-send-email-abrestic@chromium.org>
+ <1400113986-339-7-git-send-email-abrestic@chromium.org>
+Message-ID: <15599140.PsD4j7x3tZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09 2014 at  3:07:31 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Wed, Apr 16, 2014 at 02:39:50PM +0100, Marc Zyngier wrote:
->> Introduce the support code for emulating a GICv2 on top of GICv3
->> hardware.
->>
->> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  include/kvm/arm_vgic.h |  26 ++++++
->>  virt/kvm/arm/vgic-v3.c | 220 +++++++++++++++++++++++++++++++++++++++++++++++++
->>  virt/kvm/arm/vgic.c    |   2 +
->>  3 files changed, 248 insertions(+)
->>  create mode 100644 virt/kvm/arm/vgic-v3.c
->>
+On Wednesday 14 May 2014 17:33:02 Andrew Bresticker wrote:
+> +
+> +int tegra_xhci_register_mbox_notifier(struct notifier_block *nb)
+> +{
+> +	int ret;
+> +
+> +	mutex_lock(&tegra_xhci_mbox_lock);
+> +	ret = raw_notifier_chain_register(&tegra_xhci_mbox_notifiers, nb);
+> +	mutex_unlock(&tegra_xhci_mbox_lock);
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL(tegra_xhci_register_mbox_notifier);
+> +
+> +void tegra_xhci_unregister_mbox_notifier(struct notifier_block *nb)
+> +{
+> +	mutex_lock(&tegra_xhci_mbox_lock);
+> +	raw_notifier_chain_unregister(&tegra_xhci_mbox_notifiers, nb);
+> +	mutex_unlock(&tegra_xhci_mbox_lock);
+> +}
+> +EXPORT_SYMBOL(tegra_xhci_unregister_mbox_notifier);
 
-[...]
+What driver would use these?
 
->> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
->> new file mode 100644
->> index 0000000..a804a73
->> --- /dev/null
->> +++ b/virt/kvm/arm/vgic-v3.c
->> @@ -0,0 +1,220 @@
->> +/*
->> + * Copyright (C) 2013 ARM Limited, All Rights Reserved.
->> + * Author: Marc Zyngier <marc.zyngier@arm.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <linux/cpu.h>
->> +#include <linux/kvm.h>
->> +#include <linux/kvm_host.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/io.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_irq.h>
->> +
->> +#include <linux/irqchip/arm-gic-v3.h>
->> +
->> +#include <asm/kvm_emulate.h>
->> +#include <asm/kvm_arm.h>
->> +#include <asm/kvm_mmu.h>
->> +
->> +/* These are for GICv2 emulation only */
->
-> Is this really true, seems like you're using them to form the lr values
-> for the hardware below.
->
->> +#define GICH_LR_VIRTUALID            (0x3ffUL << 0)
->> +#define GICH_LR_PHYSID_CPUID_SHIFT   (10)
->> +#define GICH_LR_PHYSID_CPUID         (7UL << GICH_LR_PHYSID_CPUID_SHIFT)
->
-> can't we include them from the existing header file then?
+My feeling is that if you have a mailbox that is used by multiple
+drivers, you should use a proper mailbox driver to operate them,
+and have the drivers register with that API instead of a custom one.
 
-I've given this some more thought, and I think they actually belong
-here. The arm-gic-v3.h file is really relevant to GICv3 used in v3
-mode. Here, we're using the GICv3 HW to inject GICv2-style interrupts
-(ID limited to 1023, CPUID present in the LR...).
+> +	/* Create child xhci-plat device */
+> +	memset(xhci_resources, 0, sizeof(xhci_resources));
+> +	res = platform_get_resource(to_platform_device(dev), IORESOURCE_IRQ, 0);
+> +	if (!res) {
+> +		dev_err(dev, "Missing XHCI IRQ\n");
+> +		ret = -ENODEV;
+> +		goto out;
+> +	}
+> +	xhci_resources[0].start = res->start;
+> +	xhci_resources[0].end = res->end;
+> +	xhci_resources[0].flags = res->flags;
+> +	xhci_resources[0].name = res->name;
+> +	res = platform_get_resource(to_platform_device(dev), IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(dev, "Missing XHCI registers\n");
+> +		ret = -ENODEV;
+> +		goto out;
+> +	}
+> +	xhci_resources[1].start = res->start;
+> +	xhci_resources[1].end = res->end;
+> +	xhci_resources[1].flags = res->flags;
+> +	xhci_resources[1].name = res->name;
+> +
+> +	xhci = platform_device_alloc("xhci-hcd", PLATFORM_DEVID_AUTO);
+> +	if (!xhci) {
+> +		dev_err(dev, "Failed to allocate XHCI host\n");
+> +		ret = -ENOMEM;
+> +		goto out;
+> +	}
 
-So I'd rather keep them here than expose it to the outside world, as I
-fear this would be rather confusing.
+This does not feel appropriate at all: Rather than creating a child device,
+you should have a specific driver that hooks into functions exported
+by the xhci core. See Documentation/driver-model/design-patterns.txt
 
-Thanks,
-
-        M.
--- 
-Jazz is not dead. It just smells funny.
+	Arnd
