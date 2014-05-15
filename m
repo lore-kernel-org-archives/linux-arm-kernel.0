@@ -1,37 +1,49 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 15 May 2014 12:39:55 +0200
-Subject: [PATCH] ARM: msm: remove check for CONFIG_MSM_SERIAL_DEBUGGER
-Message-ID: <1400150395.9119.3.camel@x220>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 15 May 2014 12:40:41 +0200
+Subject: [PATCH v2 00/10] Renesas ipmmu-vmsa: Miscellaneous cleanups and fixes
+Message-ID: <1400150451-13469-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An (optional) check for CONFIG_MSM_SERIAL_DEBUGGER was added in v2.6.35.
-But the related Kconfig symbol was never added to the tree. This check
-will always evaluate to false. Remove it.
+Hello,
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Untested.
+This patch set cleans up and fixes small issues in the ipmmu-vmsa driver. The
+patches are based on top of "[PATCH v3] iommu: Add driver for Renesas
+VMSA-compatible IPMMU" that adds the ipmmu-vmsa driver.
 
-There's another check for CONFIG_MSM_SERIAL_DEBUGGER in
-board-mahimahi.c. But I submitted a patch to drop that entire board file
-in https://lkml.org/lkml/2014/5/14/631 .
+The most interesting part of this series is the rewrite of the page table
+management code. The IOMMU core guarantees that the map and unmap operations
+will always be called only with page sizes advertised by the driver. We can
+use that assumption to remove loops of PGD and PMD entries, simplifying the
+code.
 
- arch/arm/mach-msm/board-msm7x30.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Joerg, is there still time to get this merged in v3.16 ? The patches have all
+been posted previously and the only comment I've received was about a missing
+#define in patch 04/10.
 
-diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
-index 46de789ad3ae..e3c646cc7765 100644
---- a/arch/arm/mach-msm/board-msm7x30.c
-+++ b/arch/arm/mach-msm/board-msm7x30.c
-@@ -125,7 +125,7 @@ struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS] = {
- static struct platform_device *devices[] __initdata = {
- 	&msm_clock_7x30,
- 	&msm_device_gpio_7x30,
--#if defined(CONFIG_SERIAL_MSM) || defined(CONFIG_MSM_SERIAL_DEBUGGER)
-+#if defined(CONFIG_SERIAL_MSM)
-         &msm_device_uart2,
- #endif
- 	&msm_device_smd,
+Cc: Joerg Roedel <joro@8bytes.org>
+
+Changes since v1:
+
+- Add missing IPMMU_PTRS_PER_PUD definition in patch 04/10
+
+Laurent Pinchart (10):
+  iommu/ipmmu-vmsa: Refactor micro-TLB lookup
+  iommu/ipmmu-vmsa: Cleanup failures of ARM mapping creation or
+    attachment
+  iommu/ipmmu-vmsa: Fix the supported page sizes
+  iommu/ipmmu-vmsa: Define driver-specific page directory sizes
+  iommu/ipmmu-vmsa: Set the PTE contiguous hint bit when possible
+  iommu/ipmmu-vmsa: PMD is never folded, PUD always is
+  iommu/ipmmu-vmsa: Rewrite page table management
+  iommu/ipmmu-vmsa: Support 2MB mappings
+  iommu/ipmmu-vmsa: Remove stage 2 PTE bits definitions
+  iommu/ipmmu-vmsa: Support clearing mappings
+
+ drivers/iommu/ipmmu-vmsa.c | 535 ++++++++++++++++++++++++++++++---------------
+ 1 file changed, 361 insertions(+), 174 deletions(-)
+
 -- 
-1.9.0
+Regards,
+
+Laurent Pinchart
