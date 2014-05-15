@@ -1,67 +1,111 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 15 May 2014 14:45:11 +0530
-Subject: [PATCH 03/17] phy: ti-pipe3: add external clock support for PCIe
- PHY
-In-Reply-To: <CAGo_u6qw1OomEw_ueb3x+xT+qZLAfGv7Se1K=o725aOoD3ankQ@mail.gmail.com>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>	<1399383244-14556-4-git-send-email-kishon@ti.com>	<53736CBC.2060702@ti.com>	<5373897C.6080504@ti.com>
- <CAGo_u6qw1OomEw_ueb3x+xT+qZLAfGv7Se1K=o725aOoD3ankQ@mail.gmail.com>
-Message-ID: <5374859F.5080902@ti.com>
+From: superlibj8301@gmail.com (Richard Lee)
+Date: Thu, 15 May 2014 16:29:22 +0800
+Subject: [PATCHv2] ARM: ioremap: Fix static vm area boundary checking.
+Message-ID: <1400142562-9111-1-git-send-email-superlibj8301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth,
+Static vm area boundary check:
 
-On Wednesday 14 May 2014 09:04 PM, Nishanth Menon wrote:
-> On Wed, May 14, 2014 at 10:19 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> Hi Roger,
->>
->> On Wednesday 14 May 2014 06:46 PM, Roger Quadros wrote:
->>> Hi Kishon,
->>>
->>> On 05/06/2014 04:33 PM, Kishon Vijay Abraham I wrote:
->>>> APLL used by PCIE phy can either use external clock as input or the clock
->>>> from DPLL. Added support for the APLL to use external clock as input here.
->>>>
->>>> Cc: Rajendra Nayak <rnayak@ti.com>
->>>> Cc: Tero Kristo <t-kristo@ti.com>
->>>> Cc: Paul Walmsley <paul@pwsan.com>
->>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>> ---
->>>>  Documentation/devicetree/bindings/phy/ti-phy.txt |    4 ++
->>>>  drivers/phy/phy-ti-pipe3.c                       |   75 ++++++++++++++--------
->>>>  2 files changed, 52 insertions(+), 27 deletions(-)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
->>>> index bc9afb5..d50f8ee 100644
->>>> --- a/Documentation/devicetree/bindings/phy/ti-phy.txt
->>>> +++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
->>>> @@ -76,6 +76,10 @@ Required properties:
->>>>     * "dpll_ref_m2" - external dpll ref clk
->>>>     * "phy-div" - divider for apll
->>>>     * "div-clk" - apll clock
->>>> +   * "apll_mux" - mux for pcie apll
->>>> +   * "refclk_ext" - external reference clock for pcie apll
->>>> + - ti,ext-clk: To specifiy if PCIE apll should use external clock. Applicable
->>>> +   only to PCIE PHY.
->>>
->>> Instead of specifying both clock sources "dpll_ref_clock", "refclk_ext" and then specifying a 3rd control option "ti,ext-clk" to select one of the 2 sources, why can't the DT just supply one clock source, i.e. the one that is being used in the board instance? The driver should then just configure the clock rate that is needed at that node. Shouldn't the clock framework automatically take care of muxing and parent rates?
->>
->> Want the dt to have all the clocks used by the controller. "ti,ext-clk" should
->> go in the board dt file (suggested by Nishanth).
->> The point is at some point later if some one wants to change the clock source,
->> it should be a simple enabling "ti,ext-clk" flag instead of finding the clock
->> phandle etc..
-> 
-> Wonder if that is implicit by the presence of  "refclk_ext" in the
-> clocks provided?
+      paddr1 --->|       |
+                 |       |
+                 |-------| <-\--- svm->vm->addr(is page aligned)
+      paddr2 --->|       |    |
+                 |     --| <--|-- svm->vm->phys_addr
+                 |       |    |
+      paddr3 --->|       |    |
+                 |       |    |
+                 |-------| <--|-- next page boundary
+                 |       |    |
+      paddr4 --->|       |    | <----- svm->vm->size(including guard page)
+                 |       |    |
+                 |       |    |
+max paddr_end -->|-------| <--|-- svm->vm's phys_addr_end
+                 | ///// |    |
+      paddr5 --->| guard |    |
+                 | page  |    |
+                 | ///// |    |
+                  -------  <-/--- svm->vm->addr + svm->vm_size
 
-IMO the presence of "refclk_ext" is useless unless the board indicates it
-provides the clock source.
+<1> If the paddr == paddr1, then continue;
+<2> If the paddr == paddr2~paddr4 and paddr_end > phys_addr_end,
+    then continue;
+<3> if the paddr >= paddr5 then continue;
 
-refclk_ext holds phandle for *fixed-clock*, so irrespective of whether the
-board provides a clock or not, it can have that handle for configuring in PRCM.
-However if the board does not provide the clock source, configuring refclk_ext
-in PRCM is useless.
+Signed-off-by: Richard Lee <superlibj8301@gmail.com>
+---
 
-Thanks
-Kishon
+
+Change in V2:
+ - PAGE_SIZE --> PAGE_MASK
+ - remove the 'size' page size align operation.
+
+
+
+
+
+
+ arch/arm/mm/ioremap.c | 40 ++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 38 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index be69333..f235ab7 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -47,16 +47,52 @@ static struct static_vm *find_static_vm_paddr(phys_addr_t paddr,
+ {
+ 	struct static_vm *svm;
+ 	struct vm_struct *vm;
++	size_t offset;
++
++	offset = paddr & ~PAGE_MASK;
+ 
+ 	list_for_each_entry(svm, &static_vmlist, list) {
++		phys_addr_t paddr_end, phys_addr_end;
++		size_t vmoff;
++
+ 		vm = &svm->vm;
+ 		if (!(vm->flags & VM_ARM_STATIC_MAPPING))
+ 			continue;
+ 		if ((vm->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
+ 			continue;
+ 
+-		if (vm->phys_addr > paddr ||
+-			paddr + size - 1 > vm->phys_addr + vm->size - 1)
++		/* Static vm area boundary check:
++		 *
++		 *       paddr1 --->|       |
++		 *                  |       |
++		 *                  |-------| <-\--- svm->vm->addr(page aligned)
++		 *       paddr2 --->|       |    |
++		 *                  |     --| <--|-- svm->vm->phys_addr
++		 *                  |       |    |
++		 *       paddr3 --->|       |    |
++		 *                  |       |    |
++		 *                  |-------| <--|-- next page boundary
++		 *                  |       |    |
++		 *       paddr4 --->|       |    | <----- svm->vm->size,
++		 *                  |       |    |         including guard page
++		 *                  |       |    |
++		 * max paddr_end -->|-------| <--|-- svm->vm's phys_addr_end
++		 *                  | ///// |    |
++		 *       paddr5 --->| guard |    |
++		 *                  | page  |    |
++		 *                  | ///// |    |
++		 *                   -------  <-/-- svm->vm->addr + svm->vm_size
++		 *
++		 * <1> If paddr == paddr1, then continue;
++		 * <2> If paddr == paddr2~paddr4 and paddr_end > phys_addr_end,
++		 *     then continue;
++		 * <3> if paddr >= paddr5 then continue;
++		 */
++		vmoff = vm->phys_addr & ~PAGE_MASK;
++		phys_addr_end = vm->phys_addr + vm->size - PAGE_SIZE - vmoff;
++		paddr_end = paddr + size - offset;
++		if (__phys_to_pfn(vm->phys_addr) > __phys_to_pfn(paddr) ||
++			paddr_end - 1 > phys_addr_end - 1)
+ 			continue;
+ 
+ 		return svm;
+-- 
+1.8.4
