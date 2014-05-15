@@ -1,45 +1,71 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 15 May 2014 20:10:13 +0200
-Subject: [PATCH] arm: msm: remove board file for Nexus One (ie. mahimahi)
-In-Reply-To: <20140515174448.GA31159@fifo99.com>
-References: <1400101656.9826.4.camel@x220> <20140515174448.GA31159@fifo99.com>
-Message-ID: <1400177413.11786.11.camel@x220>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 15 May 2014 12:13:55 -0600
+Subject: [PATCH 2/2] ARM: tegra: initial add of Colibri T30
+In-Reply-To: <107aeb48982529858267cb85c792b35e@agner.ch>
+References: <107aeb48982529858267cb85c792b35e@agner.ch>
+Message-ID: <537503E3.6050108@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
+On 05/14/2014 10:16 AM, Stefan Agner wrote:
+> Am 2014-05-13 21:49, schrieb Stephen Warren:
+>> On 05/13/2014 11:27 AM, stefan at agner.ch wrote:
+>>> +	/* SPI1: Colibri SSP */
+>>> +	spi at 7000d400 {
+>>> +		status = "okay";
+>>> +		spi-max-frequency = <25000000>;
+>>> +		can0: can at 0 {
+>>> +			compatible = "microchip,mcp2515";
+>>> +			reg = <0>;
+>>> +			clocks = <&clk16m>;
+>>> +			interrupt-parent = <&gpio>;
+>>> +			interrupts = <TEGRA_GPIO(S, 0) GPIO_ACTIVE_LOW>;
+>>> +			spi-max-frequency = <10000000>;
+>>
+>> So this chip doesn't get confused by a faster clock frequency when its
+>> chip-select line isn't asserted? I would have expected spi-max-frequency
+>> for the bus to be the minimum value that any device on the bus would
+>> tolerate.
+> 
+> And from the other mail:
+>> I'm not convinced about this. The clock signal still reaches all the
+>> chips, and hence still reaches some logic inside those chips. If the
+>> setup/hold timings aren't met (for internal parts of the chip's SPI
+>> state machine), then presumably all bets are off re: performance of the
+>> chip, irrespective of whether the CS line happens to gate how much of
+>> the chip actually does anything.
+> 
+> SPI is by default not a multi-master Bus, hence the slaves only have to
+> listen when the CS is asserted. 
 
-On Thu, 2014-05-15 at 17:44 +0000, dwalker at fifo99.com wrote:
-> On Wed, May 14, 2014 at 11:07:36PM +0200, Paul Bolle wrote:
-> > Commit 1b802ff79f03 ("arm: msm: add board file for Nexus One (ie.
-> > mahimahi)") added just board-mahimahi.c. It did not add
-> > board-mahimahi.h, Makefile changes or Kconfig changes.
-> > 
-> > Four years have passed and this file is still dangling. Remove it.
-> > 
-> > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> > ---
-> > Untested. But what to test here?
-> > 
-> I don't mine if Sapphire gets removed,
+That's got nothing to do with multi-master; it's got to do with the fact
+that an out-of-band /CS signal is what selects devices rather than
+in-band data on the bus.
 
-Could you ACK that patch, please?
+> I talked with our hardware expert, and
+> he told me that he would expect that the whole input stage (input
+> driver) is in reset/off logic when the CS line is not asserted. IMHO,
+> this makes sense, this would also save power. At least he would expect
+> that the communication state machine is resetted on CS assertion, so
+> that it doesn't matter what happend before. 
+> 
+> Wikipedia also states something similar. 
 
->  but I'm working on this one now..
+I find it much more likely that /CS would be a synchronous input to the
+SPI state machine in the HW. That way, the chip designers don't have to
+worry about issues with asynchronous resets.
 
-That's good to hear.
+Anyway, both our arguments are pure conjecture. The only way to tell for
+sure is for you to go read the datasheets for the individual devices and
+find out if they document any requirements for the clock signal when /CS
+isn't active. It'd be good if you could check that.
 
->  So I don't want it deleted.
+> But, since SPI is no real standard, devices which work differently and
+> claim to communicate through SPI could exist :-)
+> 
+> I have had not seen issues with this device when using faster clocks for
+> other devices on the same bus.
 
-This is not something I get to decide. Nevertheless, given that this
-file shouldn't have been merged to begin with, I'd appreciate it if some
-deadline could be agreed upon.
-
-That being said, I'm not sure how having just this file in mainline
-helps your development efforts. It seems it did receive some updates
-for, well, treewide stuff. But it surely didn't get build coverage or
-runtime testing. So would you lose much if it only remains in your
-development tree?
-
-
-Paul Bolle
+... but I suppose that since in practice you're not seeing any issues,
+the DT is fine for now. It's not like this can't be changed later if we
+find out there is an issue.
