@@ -1,43 +1,33 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 15 May 2014 16:23:52 +0200
-Subject: [PATCH RFC 07/11] leds: Remove ARCH_KIRKWOOD dependency
+Date: Thu, 15 May 2014 16:23:47 +0200
+Subject: [PATCH RFC 03/11] sound: ASoC: kirkwood: Remove ARCH_KIRKWOOD
+ dependency
 In-Reply-To: <1400163836-9831-1-git-send-email-andrew@lunn.ch>
 References: <1400163836-9831-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1400163836-9831-12-git-send-email-andrew@lunn.ch>
+Message-ID: <1400163836-9831-7-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 mach-kirkwood has been removed, now that kirkwood lives in mach-mvebu.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Cc: Bryan Wu <cooloney@gmail.com>
-Cc: Richard Purdie <rpurdie@rpsys.net>
-Cc: linux-leds at vger.kernel.org
+Cc: Mark Brown <broonie@kernel.org>
+Cc: alsa-devel at alsa-project.org
 ---
- drivers/leds/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ sound/soc/kirkwood/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-index 6de9dfbf61c1..01ebebfcc891 100644
---- a/drivers/leds/Kconfig
-+++ b/drivers/leds/Kconfig
-@@ -421,7 +421,7 @@ config LEDS_MC13783
- config LEDS_NS2
- 	tristate "LED support for Network Space v2 GPIO LEDs"
- 	depends on LEDS_CLASS
--	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
-+	depends on MACH_KIRKWOOD
- 	default y
+diff --git a/sound/soc/kirkwood/Kconfig b/sound/soc/kirkwood/Kconfig
+index 1f7c7ee3527a..6a0f79d2bb33 100644
+--- a/sound/soc/kirkwood/Kconfig
++++ b/sound/soc/kirkwood/Kconfig
+@@ -1,6 +1,6 @@
+ config SND_KIRKWOOD_SOC
+ 	tristate "SoC Audio for the Marvell Kirkwood and Dove chips"
+-	depends on ARCH_KIRKWOOD || ARCH_DOVE || ARCH_MVEBU || MACH_KIRKWOOD || COMPILE_TEST
++	depends on ARCH_DOVE || ARCH_MVEBU || MACH_KIRKWOOD || COMPILE_TEST
  	help
- 	  This option enable support for the dual-GPIO LED found on the
-@@ -431,7 +431,7 @@ config LEDS_NS2
- config LEDS_NETXBIG
- 	tristate "LED support for Big Network series LEDs"
- 	depends on LEDS_CLASS
--	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
-+	depends on MACH_KIRKWOOD
- 	default y
- 	help
- 	  This option enable support for LEDs found on the LaCie 2Big
+ 	  Say Y or M if you want to add support for codecs attached to
+ 	  the Kirkwood I2S interface. You will also need to select the
 -- 
 2.0.0.rc2
