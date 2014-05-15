@@ -1,113 +1,40 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 15 May 2014 13:03:26 -0400
-Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
-In-Reply-To: <5373DD94.8030208@ti.com>
-References: <1399991966-14582-1-git-send-email-santosh.shilimkar@ti.com>
- <5373C78E.7040301@linaro.org> <5373C8E8.6040208@ti.com>
- <5373CBB9.40506@linaro.org> <5373DD94.8030208@ti.com>
-Message-ID: <5374F35E.5040900@ti.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 15 May 2014 18:07:32 +0100
+Subject: [PATCH] amba: Put the device's of_node on its release
+Message-ID: <1400173652-30583-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
+An amba device created from Device Tree, when released, does not
+decrease of_node's reference counter.
 
-On Wednesday 14 May 2014 05:18 PM, Santosh Shilimkar wrote:
-> On Wednesday 14 May 2014 04:02 PM, Daniel Lezcano wrote:
->> On 05/14/2014 09:50 PM, Santosh Shilimkar wrote:
->>> On Wednesday 14 May 2014 03:44 PM, Daniel Lezcano wrote:
->>>> On 05/13/2014 04:39 PM, Santosh Shilimkar wrote:
->>>>> On OMAP4 panda board, there have been several bug reports about boot
->>>>> hang and lock-ups with CPU_IDLE enabled. The root cause of the issue
->>>>> is missing interrupts while in idle state. Commit cb7094e8 {cpuidle / omap4 :
->>>>> use CPUIDLE_FLAG_TIMER_STOP flag} moved the broadcast notifiers to common
->>>>> code for right reasons but on OMAP4 which suffers from a nasty ROM code
->>>>> bug with GIC, commit ff999b8a {ARM: OMAP4460: Workaround for ROM bug ..},
->>>>> we loose interrupts which leads to issues like lock-up, hangs etc.
->>>>>
->>>>> Patch reverts commit cb7094 {cpuidle / omap4 : use CPUIDLE_FLAG_TIMER_STOP
->>>>> flag} to avoid the issue. With this change, OMAP4 panda boards, the mentioned
->>>>> issues are getting fixed. We no longer loose interrupts which was the cause
->>>>> of the regression.
->>>>>
->>>>> Cc: Roger Quadros <rogerq@ti.com>
->>>>> Cc: Kevin Hilman <khilman@linaro.org>
->>>>> Cc: Tony Lindgren <tony@atomide.com>
->>>>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>>> Reported-tested-by: Roger Quadros <rogerq@ti.com>
->>>>> Reported-tested-by: Kevin Hilman <khilman@linaro.org>
->>>>> Tested-by: Tony Lindgren <tony@atomide.com>
->>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>> ---
->>
->> [ ... ]
->>
->>>>>
->>>>> +    clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
->>>>> +
->>>>>        /*
->>>>>         * Call idle CPU PM enter notifier chain so that
->>>>>         * VFP and per CPU interrupt context is saved.
->>>>> @@ -165,6 +169,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
->>>>>        if (dev->cpu == 0 && mpuss_can_lose_context)
->>>>>            cpu_cluster_pm_exit();
->>>>>
->>>>> +    clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
->>
->> [ ... ]
->>
->>>>
->>>> Shouldn't the broadcast timer to be setup with CLOCK_EVT_NOTIFY_BROADCAST_ON also ?
->>>>
->>> Which is already taken care by __cpuidle_register_driver(). Note that setup code
->>> is still used from generic code...
->>
->> Nope, if the flag CPUIDLE_FLAG_TIMER_STOP is not set, the cpuidle framework won't setup the timer.
->>
-> I see. I assumed it was taken care. So we might have setup the timer too.
-> 
->> static void __cpuidle_driver_init(struct cpuidle_driver *drv)
->> {
->>
->>     ...
->>
->>     for (i = drv->state_count - 1; i >= 0 ; i--) {
->>         if (drv->states[i].flags & CPUIDLE_FLAG_TIMER_STOP) {
-> May be you should start the bc timer in case 'CPUIDLE_FLAG_TIMER_STOP'
-> or 'CPUIDLE_FLAG_COUPLED'
->>             drv->bctimer = 1;
->>             break;
->>         }
->>     }
->>
->>     ...
->>
->> }
->>
->> static int __cpuidle_register_driver(struct cpuidle_driver *drv)
->> {
->>     ...
->>
->>     if (drv->bctimer)
->>         on_each_cpu_mask(drv->cpumask,
->>         cpuidle_setup_broadcast_timer,
->>          (void *)CLOCK_EVT_NOTIFY_BROADCAST_ON, 1);
->>
->>     ...
->> }
->>
->> So the broadcast timer does not operate with this revert. Moreover, I am not sure reverting this patch is the right solution.
->>
-> With above mentioned change, it should work. Other alternatives is OMAP4 driver does
-> its won registration where it can start the timer. The way it was before the
-> consolidation.
-> 
-> Ofcourse if you have better fix, then great. 
-> 
-What is your suggestion. We *must* fix the regression asap. I think 
-$subject patch with an update to bctimer start under CPUIDLE_FLAG_COUPLED
-seems a good way forward.
+Fixed by adding a call to of_device_node_put() on the release
+path, in a similar way to what platform_device_release() is doing.
 
-Do let me know.
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ drivers/amba/bus.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Regards,
-Santosh
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index 3cf61a1..0f489fb 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -17,6 +17,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/amba/bus.h>
+ #include <linux/sizes.h>
++#include <linux/of_device.h>
+ 
+ #include <asm/irq.h>
+ 
+@@ -268,6 +269,7 @@ static void amba_device_release(struct device *dev)
+ {
+ 	struct amba_device *d = to_amba_device(dev);
+ 
++	of_device_node_put(dev);
+ 	if (d->res.parent)
+ 		release_resource(&d->res);
+ 	kfree(d);
+-- 
+1.9.1
