@@ -1,69 +1,37 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 15 May 2014 20:03:46 +0100
-Subject: [PATCH] dmaengine: qcom_bam_dma: Add descriptor flag APIs
-In-Reply-To: <20140515173206.GA16858@qualcomm.com>
-References: <1397772242-4048-1-git-send-email-agross@codeaurora.org>
- <20140502162841.GZ32284@intel.com> <20140502180827.GA9476@qualcomm.com>
- <20140515173206.GA16858@qualcomm.com>
-Message-ID: <53750F92.8070403@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 15 May 2014 13:07:14 -0600
+Subject: [PATCH 9/9] cgroup: use cgroup->self.refcnt for cgroup refcnting
+In-Reply-To: <1399670015-23463-10-git-send-email-tj@kernel.org>
+References: <1399670015-23463-1-git-send-email-tj@kernel.org>
+ <1399670015-23463-10-git-send-email-tj@kernel.org>
+Message-ID: <53751062.2050401@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+On 05/09/2014 03:13 PM, Tejun Heo wrote:
+> Currently cgroup implements refcnting separately using atomic_t
+> cgroup->refcnt.  The destruction paths of cgroup and css are rather
+> complex and bear a lot of similiarities including the use of RCU and
+> bouncing to a work item.
+> 
+> This patch makes cgroup use the refcnt of self css for refcnting
+> instead of using its own.  This makes cgroup refcnting use css's
+> percpu refcnt and share the destruction mechanism.
+>...
 
-On 15/05/14 18:32, Andy Gross wrote:
-> On Fri, May 02, 2014 at 01:08:27PM -0500, Andy Gross wrote:
->> On Fri, May 02, 2014 at 09:58:41PM +0530, Vinod Koul wrote:
->>> On Thu, Apr 17, 2014 at 05:04:02PM -0500, Andy Gross wrote:
->>>> This patch adds APIs that allow for BAM hardware flags to be set per
->>>> descriptor.  Each one of the new flags informs the attached peripheral of a
->>>> special behavior that is required.
->>>>
->>>> The EOT flag requests that the peripheral assert an end of transaction interrupt
->>>> when that descriptor is complete.  It also results in special signaling protocol
->>>> that is used between the attached peripheral and the core using the DMA
->>>> controller.
->>> DMA_PREP_INTERRUPT ??
->>
->> I have 3 different IRQs that can be asserted based on the bit I set in the
->> hardware descriptor.  The normal IRQ is the INT bit.  However, in some cases the
->> peripheral protocol requires the use of the EOT or EOB interrupt instead.  The
->> DMA_PREP_INTERRUPT would only work if I had only 2 choices.
->
-> Thinking about this more, I could use the DMA_PREP_INTERRUPT to cover the EOT
-> flag.  However, I might get in a bind later if I need to support the EOB (end of
-> block) interrupt.
+In next-20150515, this patch causes silent boot failures on NVIDIA Tegra
+ARM systems. There isn't even any earlyprintk. Reverting this one patch
+solves this.
 
-This is good start, mapping EOT to DMA_PREP_INTERRUPT seems to be much 
-appropriate. This will also provide mmci driver with much more generic 
-interface than the bam specific function calls.
+I was a bit surprised that cgroups would cause such an issue, but
+looking at a normal kernel boot, I guess cgroup does get initialized
+very early:
 
-Only way forward is to tie up this descriptor specific flags to more 
-generic flags. Having specific callbacks would introduce limitations in 
-using generic device drivers.
+Uncompressing Linux... done, booting the kernel.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Initializing cgroup subsys cpu
+[    0.000000] Initializing cgroup subsys cpuacct
 
-Not really sure how we can map EOB/NWD flags without really defining new 
-flags. Mapping to other generic flags might be totally confusing to 
-people using/interpreting those flags. Needs more discussion on this.
-
-
-
---srini
->
->>
->>>
->>>>
->>>> The NWD flag requests that the peripheral wait until the data has been fully
->>>> processed before signaling an interrupt.
->>> interrupt for transaction complete or DMA request?
->>
->> This is a special signaling mechanism that holds off the DMA interrupt until the
->> peripheral actually acks that the data has been processed completely.  This is
->> required in many cases by the peripheral.  One example is the SPI controller.
->> At the end of a transaction you are supposed to set the NWD so that the chip
->> select is de-asserted.
->
-> I'm not sure what flag I could map this to... maybe DMA_CTRL_ACK?  or maybe the
-> DMA_PREP_FENCE?  I don't generally like overloading the flags and slightly
-> twisting their intent.  Could we add a flag to denote device ACK?
->
+Anyway, I'll try to track down what the problem is, but if someone
+familiar with this patch could give it a look, that'd be very useful,
+since I'm not at all familiar with this code or feature.
