@@ -1,45 +1,84 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 15 May 2014 10:52:14 +0200
-Subject: [PATCH] watchdog: sunxi: Fix compilation with C=2
-In-Reply-To: <536FD3B3.3030100@elopez.com.ar>
-References: <1396632265-16124-1-git-send-email-emilio@elopez.com.ar>
- <533EF39D.6090907@roeck-us.net> <536FD3B3.3030100@elopez.com.ar>
-Message-ID: <20140515085214.GP29258@lukather>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 15 May 2014 10:55:10 +0200
+Subject: [PATCH v5 2/5] mfd: sun6i-prcm: document DT bindings
+In-Reply-To: <1400144113-27659-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1400144113-27659-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1400144113-27659-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 11, 2014 at 04:46:59PM -0300, Emilio L?pez wrote:
-> El 04/04/14 15:02, Guenter Roeck escribi?:
-> >On 04/04/2014 10:24 AM, Emilio L?pez wrote:
-> >>When compiling sunxi_defconfig while using C=2, the following error
-> >>causes the compilation to fail:
-> >>
-> >>     drivers/watchdog/sunxi_wdt.c:60:15: error: constant 0b0001 is not
-> >>a valid number
-> >>
-> >>Fix it by using hex notation instead of the non-standard binary one
-> >>
-> >>Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> >
-> >Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> >
-> 
-> Wim, Maxime, any comments on this?
+Document DT bindings of the PRCM (Power/Reset/Clock Management) unit.
 
-I'm fine with this. Wim? Do you want to take this patch, or can we
-have an Acked-by?
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+ .../devicetree/bindings/mfd/sun6i-prcm.txt         | 59 ++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
 
-Thanks,
-Maxime
-
+diff --git a/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt b/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
+new file mode 100644
+index 0000000..1f5a31f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
+@@ -0,0 +1,59 @@
++* Allwinner PRCM (Power/Reset/Clock Management) Multi-Functional Device
++
++PRCM is an MFD device exposing several Power Management related devices
++(like clks and reset controllers).
++
++Required properties:
++ - compatible: "allwinner,sun6i-a31-prcm"
++ - reg: The PRCM registers range
++
++The prcm node may contain several subdevices definitions:
++ - see Documentation/devicetree/clk/sunxi.txt for clock devices
++ - see Documentation/devicetree/reset/allwinner,sunxi-clock-reset.txt for reset
++   controller devices
++
++
++Example:
++
++	prcm: prcm at 01f01400 {
++		compatible = "allwinner,sun6i-a31-prcm";
++		reg = <0x01f01400 0x200>;
++
++		/* Put subdevices here */
++		ar100: ar100_clk {
++			compatible = "allwinner,sun6i-a31-ar100-clk";
++			#clock-cells = <0>;
++			clocks = <&osc32k>, <&osc24M>, <&pll6>, <&pll6>;
++		};
++
++		ahb0: ahb0_clk {
++			compatible = "fixed-factor-clock";
++			#clock-cells = <0>;
++			clock-div = <1>;
++			clock-mult = <1>;
++			clocks = <&ar100_div>;
++			clock-output-names = "ahb0";
++		};
++
++		apb0: apb0_clk {
++			compatible = "allwinner,sun6i-a31-apb0-clk";
++			#clock-cells = <0>;
++			clocks = <&ahb0>;
++			clock-output-names = "apb0";
++		};
++
++		apb0_gates: apb0_gates_clk {
++			compatible = "allwinner,sun6i-a31-apb0-gates-clk";
++			#clock-cells = <1>;
++			clocks = <&apb0>;
++			clock-output-names = "apb0_pio", "apb0_ir",
++					"apb0_timer01", "apb0_p2wi",
++					"apb0_uart", "apb0_1wire",
++					"apb0_i2c";
++		};
++
++		apb0_rst: apb0_rst {
++			compatible = "allwinner,sun6i-a31-clock-reset";
++			#reset-cells = <1>;
++		};
++	};
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140515/1c5a5fa7/attachment.sig>
+1.8.3.2
