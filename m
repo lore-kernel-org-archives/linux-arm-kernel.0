@@ -1,68 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 15 May 2014 17:17:56 +0200
-Subject: [PATCH v3 3/7] mfd: add support for sun6i PRCM
- (Power/Reset/Clock Management) unit
-In-Reply-To: <20140509135251.GY5767@lee--X1>
-References: <1399633911-7094-1-git-send-email-boris.brezillon@free-electrons.com>
- <1399633911-7094-4-git-send-email-boris.brezillon@free-electrons.com>
- <20140509135251.GY5767@lee--X1>
-Message-ID: <20140515151756.GX29258@lukather>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 15 May 2014 16:25:56 +0100
+Subject: [RFC PATCHv1 0/7] ARM core support for hardware I/O coherency in
+ non-SMP platforms
+In-Reply-To: <CAL_JsqK80pFHQBgMxc1FGi998UYnbKxOK2gbm_ftqrTaxNq4rA@mail.gmail.com>
+References: <1400082641-23871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140514170456.GC15946@arm.com>
+ <20140515115010.0d6a4d92@free-electrons.com>
+ <20140515142205.GC1499@arm.com>
+ <CAL_JsqK80pFHQBgMxc1FGi998UYnbKxOK2gbm_ftqrTaxNq4rA@mail.gmail.com>
+Message-ID: <20140515152553.GA30423@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On Thu, May 15, 2014 at 03:59:31PM +0100, Rob Herring wrote:
+> On Thu, May 15, 2014 at 9:22 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Thu, May 15, 2014 at 10:50:10AM +0100, Thomas Petazzoni wrote:
+> >> On Wed, 14 May 2014 18:04:56 +0100, Catalin Marinas wrote:
+> >> > On Wed, May 14, 2014 at 04:50:34PM +0100, Thomas Petazzoni wrote:
+> >> > >    - The SCU must be enabled
+> >> >
+> >> > Again, could the firmware do this?
+> >>
+> >> See above. If the kernel does it for SMP cases, why wouldn't it do it
+> >> also for !SMP I/O coherent cases?
+> >
+> > The I/O coherency is an SoC property rather than an ARM architecture
+> > property. I want to separate the two so that the kernel can boot a
+> > significant part assuming sane architecture settings. Once you have DT
+> > available and start loading device drivers, you are in the SoC realm and
+> > you can do whatever initialisation for buses, interconnects, but not
+> > going back to change architected settings.
+> 
+> The SCU has nothing to do with the architecture and really is part of
+> the SOC. 
 
-On Fri, May 09, 2014 at 02:52:51PM +0100, Lee Jones wrote:
-> > The PRCM (Power/Reset/Clock Management) block exposes several subdevices
-> > in different subsystems (clk, reset ...)
-> > 
-> > Add basic support for the PRCM unit with clk (AR100, AHB0, and APB0 clks)
-> > and reset controller subdevices.
-> > 
-> > Other subdevices might be added later (if needed).
-> > 
-> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/mfd/Kconfig      |   8 +++
-> >  drivers/mfd/Makefile     |   1 +
-> >  drivers/mfd/sun6i-prcm.c | 134 +++++++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 143 insertions(+)
-> >  create mode 100644 drivers/mfd/sun6i-prcm.c
-> 
-> [...]
-> 
-> > +/*
-> > + * Copyright (C) 2014 Free Electrons
-> > + *
-> > + * License Terms: GNU General Public License v2
-> > + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > + *
-> > + * Allwinner PRCM (Power/Reset/Clock Management) driver
-> > + *
-> > + */
-> > +
-> > +#include <linux/mfd/core.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of.h>
-> 
-> Ah, now isn't that better?
-> 
-> Acked-by: Lee Jones <lee.jones@linaro.org>
+Indeed, it's not part of the architecture but I don't see it any
+different than other early configuration like SDRAM controller.
 
-How do you want to merge this? Do you want me to take it through
-mach-sunxi tree, or do you want to take it in your tree?
+> Let's look at this another way. Are there any usecases where
+> you would not enable the SCU? If any cores are coherent or the ACP is
+> coherent, it must be on. So that leaves all core in AMP mode. In this
+> case, does it matter if the SCU is enabled or not?
 
-Maxime
+I don't fully follow the question. You may not enable the SCU if you
+don't care at all about the SMP mode or other coherency like ACP.
+Otherwise it should be enabled, the latest before the secondaries start.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140515/695c1d6b/attachment.sig>
+Catalin
