@@ -1,37 +1,78 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Wed, 14 May 2014 17:32:58 -0700
-Subject: [RFC PATCH 02/10] clk: tegra: Fix xusb_fs_src mux
+Date: Wed, 14 May 2014 17:32:57 -0700
+Subject: [RFC PATCH 01/10] clk: tegra: Enable hardware control of PLLE
 In-Reply-To: <1400113986-339-1-git-send-email-abrestic@chromium.org>
 References: <1400113986-339-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1400113986-339-3-git-send-email-abrestic@chromium.org>
+Message-ID: <1400113986-339-2-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jim Lin <jilin@nvidia.com>
 
-The parent-to-index mapping for xusb_fs_src is incorrect.
-Fix it by adding a mux table.
+Enable hardware control of PLLE spread-spectrum, IDDQ, and enable
+controls when enabling PLLE.  The hardware (e.g. XUSB) using PLLE
+will use these controls for power-saving optimizations.
 
 Signed-off-by: Jim Lin <jilin@nvidia.com>
 Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 ---
- drivers/clk/tegra/clk-tegra-periph.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/clk/tegra/clk-pll.c | 33 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 32 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/tegra/clk-tegra-periph.c b/drivers/clk/tegra/clk-tegra-periph.c
-index 1fa5c3f..a4063bc 100644
---- a/drivers/clk/tegra/clk-tegra-periph.c
-+++ b/drivers/clk/tegra/clk-tegra-periph.c
-@@ -329,7 +329,9 @@ static u32 mux_clkm_pllp_pllc_pllre_idx[] = {
- static const char *mux_clkm_48M_pllp_480M[] = {
- 	"clk_m", "pll_u_48M", "pll_p", "pll_u_480M"
- };
--#define mux_clkm_48M_pllp_480M_idx NULL
-+static u32 mux_clkm_48M_pllp_480M_idx[] = {
-+	[0] = 0, [1] = 2, [2] = 4, [3] = 6,
-+};
+diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
+index 0d20241..84ca8b9 100644
+--- a/drivers/clk/tegra/clk-pll.c
++++ b/drivers/clk/tegra/clk-pll.c
+@@ -96,10 +96,20 @@
+ 	(PLLE_SS_MAX_VAL | PLLE_SS_INC_VAL | PLLE_SS_INCINTRV_VAL)
  
- static const char *mux_clkm_pllre_clk32_480M_pllc_ref[] = {
- 	"clk_m", "pll_re_out", "clk_32k", "pll_u_480M", "pll_c", "pll_ref"
+ #define PLLE_AUX_PLLP_SEL	BIT(2)
++#define PLLE_AUX_USE_LOCKDET	BIT(3)
+ #define PLLE_AUX_ENABLE_SWCTL	BIT(4)
++#define PLLE_AUX_SS_SWCTL	BIT(6)
+ #define PLLE_AUX_SEQ_ENABLE	BIT(24)
++#define PLLE_AUX_SEQ_START_STATE BIT(25)
+ #define PLLE_AUX_PLLRE_SEL	BIT(28)
+ 
++#define XUSBIO_PLL_CFG0		0x51c
++#define XUSBIO_PLL_CFG0_PADPLL_RESET_SWCTL	BIT(0)
++#define XUSBIO_PLL_CFG0_CLK_ENABLE_SWCTL	BIT(2)
++#define XUSBIO_PLL_CFG0_PADPLL_USE_LOCKDET	BIT(6)
++#define XUSBIO_PLL_CFG0_SEQ_ENABLE		BIT(24)
++#define XUSBIO_PLL_CFG0_SEQ_START_STATE		BIT(25)
++
+ #define PLLE_MISC_PLLE_PTS	BIT(8)
+ #define PLLE_MISC_IDDQ_SW_VALUE	BIT(13)
+ #define PLLE_MISC_IDDQ_SW_CTRL	BIT(14)
+@@ -1318,7 +1328,28 @@ static int clk_plle_tegra114_enable(struct clk_hw *hw)
+ 	pll_writel(val, PLLE_SS_CTRL, pll);
+ 	udelay(1);
+ 
+-	/* TODO: enable hw control of xusb brick pll */
++	/* Enable hw control of xusb brick pll */
++	val = pll_readl_misc(pll);
++	val &= ~PLLE_MISC_IDDQ_SW_CTRL;
++	pll_writel_misc(val, pll);
++
++	val = pll_readl(pll->params->aux_reg, pll);
++	val |= (PLLE_AUX_USE_LOCKDET | PLLE_AUX_SEQ_START_STATE);
++	val &= ~(PLLE_AUX_ENABLE_SWCTL | PLLE_AUX_SS_SWCTL);
++	pll_writel(val, pll->params->aux_reg, pll);
++	udelay(1);
++	val |= PLLE_AUX_SEQ_ENABLE;
++	pll_writel(val, pll->params->aux_reg, pll);
++
++	val = pll_readl(XUSBIO_PLL_CFG0, pll);
++	val |= (XUSBIO_PLL_CFG0_PADPLL_USE_LOCKDET |
++		XUSBIO_PLL_CFG0_SEQ_START_STATE);
++	val &= ~(XUSBIO_PLL_CFG0_CLK_ENABLE_SWCTL |
++		 XUSBIO_PLL_CFG0_PADPLL_RESET_SWCTL);
++	pll_writel(val, XUSBIO_PLL_CFG0, pll);
++	udelay(1);
++	val |= XUSBIO_PLL_CFG0_SEQ_ENABLE;
++	pll_writel(val, XUSBIO_PLL_CFG0, pll);
+ 
+ out:
+ 	if (pll->lock)
 -- 
 1.9.1.423.g4596e3a
