@@ -1,126 +1,69 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 15 May 2014 13:54:35 -0400
-Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
-In-Reply-To: <5374FE61.50901@linaro.org>
-References: <1399991966-14582-1-git-send-email-santosh.shilimkar@ti.com>
- <5373C78E.7040301@linaro.org> <5373C8E8.6040208@ti.com>
- <5373CBB9.40506@linaro.org> <5373DD94.8030208@ti.com>
- <5374F35E.5040900@ti.com> <5374FE61.50901@linaro.org>
-Message-ID: <5374FF5B.8050702@ti.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 15 May 2014 18:55:22 +0100
+Subject: [PATCH] arm64: fix pud_huge() for 2-level pagetables
+In-Reply-To: <1400171258.21547.136.camel@deneb.redhat.com>
+References: <1400163562-7481-1-git-send-email-msalter@redhat.com>
+ <20140515144424.GA23884@linaro.org>
+ <1400171258.21547.136.camel@deneb.redhat.com>
+Message-ID: <CAPvkgC2WQcvn5e01Y70cm5nzenYZ6tk_1BampHw66VoRFn7Jiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 May 2014 01:50 PM, Daniel Lezcano wrote:
-> On 05/15/2014 07:03 PM, Santosh Shilimkar wrote:
->> Daniel,
+On 15 May 2014 17:27, Mark Salter <msalter@redhat.com> wrote:
+> On Thu, 2014-05-15 at 15:44 +0100, Steve Capper wrote:
+>> On Thu, May 15, 2014 at 10:19:22AM -0400, Mark Salter wrote:
+>> > The following happens when trying to run a kvm guest on a kernel
+>> > configured for 64k pages. This doesn't happen with 4k pages:
+>> >
+>> >   BUG: failure at include/linux/mm.h:297/put_page_testzero()!
+>> >   Kernel panic - not syncing: BUG!
+>> >   CPU: 2 PID: 4228 Comm: qemu-system-aar Tainted: GF            3.13.0-0.rc7.31.sa2.k32v1.aarch64.debug #1
+>> >   Call trace:
+>> >   [<fffffe0000096034>] dump_backtrace+0x0/0x16c
+>> >   [<fffffe00000961b4>] show_stack+0x14/0x1c
+>> >   [<fffffe000066e648>] dump_stack+0x84/0xb0
+>> >   [<fffffe0000668678>] panic+0xf4/0x220
+>> >   [<fffffe000018ec78>] free_reserved_area+0x0/0x110
+>> >   [<fffffe000018edd8>] free_pages+0x50/0x88
+>> >   [<fffffe00000a759c>] kvm_free_stage2_pgd+0x30/0x40
+>> >   [<fffffe00000a5354>] kvm_arch_destroy_vm+0x18/0x44
+>> >   [<fffffe00000a1854>] kvm_put_kvm+0xf0/0x184
+>> >   [<fffffe00000a1938>] kvm_vm_release+0x10/0x1c
+>> >   [<fffffe00001edc1c>] __fput+0xb0/0x288
+>> >   [<fffffe00001ede4c>] ____fput+0xc/0x14
+>> >   [<fffffe00000d5a2c>] task_work_run+0xa8/0x11c
+>> >   [<fffffe0000095c14>] do_notify_resume+0x54/0x58
+>> >
+>> > In arch/arm/kvm/mmu.c:unmap_range(), we end up doing an extra put_page()
+>> > on the stage2 pgd which leads to the BUG in put_page_testzero(). This
+>> > happens because a pud_huge() test in unmap_range() returns true when it
+>> > should always be false with 2-level pages tables used by 64k pages.
+>> > This patch removes support for huge puds if 2-level pagetables are
+>> > being used.
 >>
->> On Wednesday 14 May 2014 05:18 PM, Santosh Shilimkar wrote:
->>> On Wednesday 14 May 2014 04:02 PM, Daniel Lezcano wrote:
->>>> On 05/14/2014 09:50 PM, Santosh Shilimkar wrote:
->>>>> On Wednesday 14 May 2014 03:44 PM, Daniel Lezcano wrote:
->>>>>> On 05/13/2014 04:39 PM, Santosh Shilimkar wrote:
->>>>>>> On OMAP4 panda board, there have been several bug reports about boot
->>>>>>> hang and lock-ups with CPU_IDLE enabled. The root cause of the issue
->>>>>>> is missing interrupts while in idle state. Commit cb7094e8 {cpuidle / omap4 :
->>>>>>> use CPUIDLE_FLAG_TIMER_STOP flag} moved the broadcast notifiers to common
->>>>>>> code for right reasons but on OMAP4 which suffers from a nasty ROM code
->>>>>>> bug with GIC, commit ff999b8a {ARM: OMAP4460: Workaround for ROM bug ..},
->>>>>>> we loose interrupts which leads to issues like lock-up, hangs etc.
->>>>>>>
->>>>>>> Patch reverts commit cb7094 {cpuidle / omap4 : use CPUIDLE_FLAG_TIMER_STOP
->>>>>>> flag} to avoid the issue. With this change, OMAP4 panda boards, the mentioned
->>>>>>> issues are getting fixed. We no longer loose interrupts which was the cause
->>>>>>> of the regression.
->>>>>>>
->>>>>>> Cc: Roger Quadros <rogerq@ti.com>
->>>>>>> Cc: Kevin Hilman <khilman@linaro.org>
->>>>>>> Cc: Tony Lindgren <tony@atomide.com>
->>>>>>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>>>>> Reported-tested-by: Roger Quadros <rogerq@ti.com>
->>>>>>> Reported-tested-by: Kevin Hilman <khilman@linaro.org>
->>>>>>> Tested-by: Tony Lindgren <tony@atomide.com>
->>>>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>>>> ---
->>>>
->>>> [ ... ]
->>>>
->>>>>>>
->>>>>>> +    clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
->>>>>>> +
->>>>>>>         /*
->>>>>>>          * Call idle CPU PM enter notifier chain so that
->>>>>>>          * VFP and per CPU interrupt context is saved.
->>>>>>> @@ -165,6 +169,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
->>>>>>>         if (dev->cpu == 0 && mpuss_can_lose_context)
->>>>>>>             cpu_cluster_pm_exit();
->>>>>>>
->>>>>>> +    clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
->>>>
->>>> [ ... ]
->>>>
->>>>>>
->>>>>> Shouldn't the broadcast timer to be setup with CLOCK_EVT_NOTIFY_BROADCAST_ON also ?
->>>>>>
->>>>> Which is already taken care by __cpuidle_register_driver(). Note that setup code
->>>>> is still used from generic code...
->>>>
->>>> Nope, if the flag CPUIDLE_FLAG_TIMER_STOP is not set, the cpuidle framework won't setup the timer.
->>>>
->>> I see. I assumed it was taken care. So we might have setup the timer too.
->>>
->>>> static void __cpuidle_driver_init(struct cpuidle_driver *drv)
->>>> {
->>>>
->>>>      ...
->>>>
->>>>      for (i = drv->state_count - 1; i >= 0 ; i--) {
->>>>          if (drv->states[i].flags & CPUIDLE_FLAG_TIMER_STOP) {
->>> May be you should start the bc timer in case 'CPUIDLE_FLAG_TIMER_STOP'
->>> or 'CPUIDLE_FLAG_COUPLED'
->>>>              drv->bctimer = 1;
->>>>              break;
->>>>          }
->>>>      }
->>>>
->>>>      ...
->>>>
->>>> }
->>>>
->>>> static int __cpuidle_register_driver(struct cpuidle_driver *drv)
->>>> {
->>>>      ...
->>>>
->>>>      if (drv->bctimer)
->>>>          on_each_cpu_mask(drv->cpumask,
->>>>          cpuidle_setup_broadcast_timer,
->>>>           (void *)CLOCK_EVT_NOTIFY_BROADCAST_ON, 1);
->>>>
->>>>      ...
->>>> }
->>>>
->>>> So the broadcast timer does not operate with this revert. Moreover, I am not sure reverting this patch is the right solution.
->>>>
->>> With above mentioned change, it should work. Other alternatives is OMAP4 driver does
->>> its won registration where it can start the timer. The way it was before the
->>> consolidation.
->>>
->>> Ofcourse if you have better fix, then great.
->>>
->> What is your suggestion. We *must* fix the regression asap. I think
->> $subject patch with an update to bctimer start under CPUIDLE_FLAG_COUPLED
->> seems a good way forward.
+>> Hi Mark,
+>> I'm still catching up with myself, sorry  (was off sick for a couple
+>> of days)...
 >>
->> Do let me know.
-> 
-> Did you see Alex Shi's email [cc'ed] ? Reverting this change makes the panda ES to hang.
-> 
-The hang is definitely due to the bctimer not started. As I said, I assumed it was and
-then you corrected saying it is under the flag.
+>> I thought unmap_range was going to be changed?
+>> Does the following help things?
+>> https://lists.cs.columbia.edu/pipermail/kvmarm/2014-May/009388.html
+>
+> No, I get the same BUG. Regardless, pud_huge() should always return
+> false for 2-level pagetables, right?
 
-> I am not convinced the culprit is this code you are trying to revert.
-> 
-fair enough. Thats why I said if you have an alternative fix thats great.
+Okay, thanks for giving that a go.
 
-> I will try to reproduce the bug on my board.
-> 
-Sure...
+Yeah I agree for 64K granule it doesn't make sense to have a huge_pud.
+The patch looks sound now, but checking for a folded pmd may run into
+problems if/when we get to 3-levels and 64K pages in future.
+
+Perhaps checking for PAGE_SHIFT==12 (or something similar) would be a
+bit more robust?
+
+Cheers,
+-- 
+Steve
+
+>
+>
