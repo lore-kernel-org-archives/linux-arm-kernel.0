@@ -1,44 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 15 May 2014 15:56:51 -0600
-Subject: [PATCH 9/9] cgroup: use cgroup->self.refcnt for cgroup refcnting
-In-Reply-To: <53751062.2050401@wwwdotorg.org>
-References: <1399670015-23463-1-git-send-email-tj@kernel.org>
- <1399670015-23463-10-git-send-email-tj@kernel.org>
- <53751062.2050401@wwwdotorg.org>
-Message-ID: <53753823.2090402@wwwdotorg.org>
+From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
+Date: Thu, 15 May 2014 23:57:56 +0200
+Subject: =?UTF-8?q?=5BPATCH=5D=20Fix=20for=20possible=20null=20pointer=20dereference=20in=20dma=2Ec?=
+Message-ID: <1400191076-28279-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2014 01:07 PM, Stephen Warren wrote:
-> On 05/09/2014 03:13 PM, Tejun Heo wrote:
->> Currently cgroup implements refcnting separately using atomic_t
->> cgroup->refcnt.  The destruction paths of cgroup and css are rather
->> complex and bear a lot of similiarities including the use of RCU and
->> bouncing to a work item.
->>
->> This patch makes cgroup use the refcnt of self css for refcnting
->> instead of using its own.  This makes cgroup refcnting use css's
->> percpu refcnt and share the destruction mechanism.
->> ...
-> 
-> In next-20150515, this patch causes silent boot failures on NVIDIA Tegra
-> ARM systems. There isn't even any earlyprintk. Reverting this one patch
-> solves this.
-> 
-> I was a bit surprised that cgroups would cause such an issue, but
-> looking at a normal kernel boot, I guess cgroup does get initialized
-> very early:
-> 
-> Uncompressing Linux... done, booting the kernel.
-> [    0.000000] Booting Linux on physical CPU 0x0
-> [    0.000000] Initializing cgroup subsys cpu
-> [    0.000000] Initializing cgroup subsys cpuacct
-> 
-> Anyway, I'll try to track down what the problem is, but if someone
-> familiar with this patch could give it a look, that'd be very useful,
-> since I'm not at all familiar with this code or feature.
+There is otherwise a risk of a possible null pointer dereference.
 
-It looks like this has something to do with the new code using percpu_
-functions from within cgroup_init_early, yet that function being called
-before init/main.c calls setup_per_cpu_areas() etc.? Unfortunately I
-have to run to some meetings now, so won't look at this until tomorrow.
+Was largely found by using a static code analysis program called cppcheck.
+
+Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
+---
+ sound/soc/samsung/dma.c |   10 ++++++----
+ 1 fil ?ndrad, 6 till?gg(+), 4 borttagningar(-)
+
+diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
+index dc09b71..b1f6757 100644
+--- a/sound/soc/samsung/dma.c
++++ b/sound/soc/samsung/dma.c
+@@ -115,17 +115,19 @@ static void dma_enqueue(struct snd_pcm_substream *substream)
+ static void audio_buffdone(void *data)
+ {
+ 	struct snd_pcm_substream *substream = data;
+-	struct runtime_data *prtd = substream->runtime->private_data;
++	struct runtime_data *prtd = NULL;
+ 
+ 	pr_debug("Entered %s\n", __func__);
+ 
+-	if (prtd->state & ST_RUNNING) {
++	if(substream)
++		prtd = substream->runtime->private_data;
++
++	if (prtd && prtd->state & ST_RUNNING) {
+ 		prtd->dma_pos += prtd->dma_period;
+ 		if (prtd->dma_pos >= prtd->dma_end)
+ 			prtd->dma_pos = prtd->dma_start;
+ 
+-		if (substream)
+-			snd_pcm_period_elapsed(substream);
++		snd_pcm_period_elapsed(substream);
+ 
+ 		spin_lock(&prtd->lock);
+ 		if (!samsung_dma_has_circular()) {
+-- 
+1.7.10.4
