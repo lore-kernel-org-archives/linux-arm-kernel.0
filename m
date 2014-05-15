@@ -1,53 +1,63 @@
-From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
-Date: Thu, 15 May 2014 12:10:29 -0300
-Subject: [linux-sunxi] [PATCH 0/6] sunxi: clk: Various cleanup and rework
-In-Reply-To: <20140513011232.5943.64136@quantum>
-References: <1399692821-20988-1-git-send-email-maxime.ripard@free-electrons.com>
- <536E6047.8010004@elopez.com.ar> <20140513011232.5943.64136@quantum>
-Message-ID: <5374D8E5.8070300@elopez.com.ar>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 15 May 2014 17:12:48 +0200
+Subject: [PATCH] ARM: dt: imx28-cfa10036: introduce a regulator for mmc0
+Message-ID: <1400166768-18801-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El 12/05/14 22:12, Mike Turquette escribi?:
-> Quoting Emilio L?pez (2014-05-10 10:22:15)
->> Hi Maxime,
->>
->> El 10/05/14 00:33, Maxime Ripard escribi?:
->>> Hi everyone,
->>>
->>> This patchset fixes a few things that have been pending for quite a
->>> while in the clock driver.
->>>
->>> First, it removes the clk_put calls in the clock protection
->>> part. Since it's not really something that should be done, I guess
->>> this patch is not very controversial.
->>>
->>> Then, it starts splitting the huge clock driver file into separate,
->>> smaller drivers when it makes sense.
->>>
->>> Finally, it reworks the clock protection mechanism to handle
->>> differences between SoC in a better way. This has been pretty
->>> controversial because the first approach has been to move this to the
->>> machine code. This is another attempt that leaves all the
->>> modifications in the driver itself.
->>>
->>> Thanks,
->>> Maxime
->>
->> Overall the series looks good to me, other than the comment about clkdev
->> on patches 2 and 3.
->>
->> @Mike, do you want me to take them in a pull as usual after you have a
->> look? Please let me know as we still haven't clarified the situation
->> with the two patches Hans sent.
->
-> A pull request would be great. Feel free to add my Acked-by to all of
-> the patches here (#1 already has it) since I looked at all of them and
-> the changes seem good.
+The PWM3 pinmux configuration conflicts with gpio 3.28. Introduce a regulator
+for mmc0 so that it conflicts with the pwm driver and fails gracefully. The
+kernel will then able to access mmc0 normally.
 
-Ok, I've taken them in sunxi-clk-for-mike with Mike's ack. I'll be 
-sending the pull request soon.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/imx28-cfa10036.dts | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-Cheers,
-
-Emilio
+diff --git a/arch/arm/boot/dts/imx28-cfa10036.dts b/arch/arm/boot/dts/imx28-cfa10036.dts
+index cabb6171a19d..cd5fab8efa76 100644
+--- a/arch/arm/boot/dts/imx28-cfa10036.dts
++++ b/arch/arm/boot/dts/imx28-cfa10036.dts
+@@ -53,6 +53,17 @@
+ 					fsl,pull-up = <MXS_PULL_DISABLE>;
+ 				};
+ 
++				mmc_pwr_cfa10036: mmc_pwr_cfa10036 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x31c3 /*
++						MX28_PAD_PWM3__GPIO_3_28 */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++
+ 			};
+ 
+ 			ssp0: ssp at 80010000 {
+@@ -60,6 +71,7 @@
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&mmc0_4bit_pins_a
+ 					&mmc0_cd_cfg &mmc0_sck_cfg>;
++				vmmc-supply = <&reg_vddio_sd0>;
+ 				bus-width = <4>;
+ 				status = "okay";
+ 			};
+@@ -114,4 +126,14 @@
+ 			default-state = "on";
+ 		};
+ 	};
++
++	reg_vddio_sd0: vddio-sd0 {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&mmc_pwr_cfa10036>;
++		regulator-name = "vddio-sd0";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio3 28 0>;
++	};
+ };
+-- 
+1.9.1
