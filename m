@@ -1,25 +1,14 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 15 May 2014 16:45:33 -0700
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 16 May 2014 01:46:04 +0200
 Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
 In-Reply-To: <CAOesGMizW3vrOWdwYNP1x2U0vdtnTe+8r22H7-6c76zT=7rM=A@mail.gmail.com>
-References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
- <53752E25.9060604@gmail.com>
- <CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>
- <53753443.8010303@gmail.com>
- <CAD=FV=V8UZoeOqEwfx_E015pLM+amTt51LrUa+dk7mTdn=vKgA@mail.gmail.com>
- <53753C17.1090002@gmail.com>
- <CAD=FV=WGa7j_As_NpySxU7OEd_SzuGWK6oxU6UeiJ-4HsoWvvg@mail.gmail.com>
- <CAJFHJrrgWGc4XGQB0ysLufAg3Wouz-aYXu97Sy2Kp=HzK+akVQ@mail.gmail.com>
- <CAASgrz2Nr69tpfC8ka9gbs2OvjLEGsvgAj4vBCFxhsamuFum7w@mail.gmail.com>
- <53754CE2.3000905@gmail.com>
+References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>	<53752E25.9060604@gmail.com>	<CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>	<53753443.8010303@gmail.com>	<CAD=FV=V8UZoeOqEwfx_E015pLM+amTt51LrUa+dk7mTdn=vKgA@mail.gmail.com>	<53753C17.1090002@gmail.com>	<CAD=FV=WGa7j_As_NpySxU7OEd_SzuGWK6oxU6UeiJ-4HsoWvvg@mail.gmail.com>	<CAJFHJrrgWGc4XGQB0ysLufAg3Wouz-aYXu97Sy2Kp=HzK+akVQ@mail.gmail.com>	<CAASgrz2Nr69tpfC8ka9gbs2OvjLEGsvgAj4vBCFxhsamuFum7w@mail.gmail.com>	<53754CE2.3000905@gmail.com>
  <CAOesGMizW3vrOWdwYNP1x2U0vdtnTe+8r22H7-6c76zT=7rM=A@mail.gmail.com>
-Message-ID: <CAD=FV=Uku66QSD0_11ND_7p5SzFojwACFWwzU7U+z0KOVNd+vg@mail.gmail.com>
+Message-ID: <537551BC.2080107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof,
-
-On Thu, May 15, 2014 at 4:39 PM, Olof Johansson <olof@lixom.net> wrote:
+On 16.05.2014 01:39, Olof Johansson wrote:
 > On Thu, May 15, 2014 at 4:25 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
 >> On 16.05.2014 01:18, David Riley wrote:
 >>> On Thu, May 15, 2014 at 4:03 PM, Chirantan Ekbote
@@ -74,28 +63,37 @@ On Thu, May 15, 2014 at 4:39 PM, Olof Johansson <olof@lixom.net> wrote:
 >> mentioned that this is for profiling purposes. Is performance of
 >> gettimeofday() really that crucial in this case? Are there any other use
 >> cases when this improvement is significant?
->
+> 
 > In general, yes. gettimeofday() is normally the prime candidate for
 > vDSO implementaiton (see Nathan Lynch's patch set in the last couple
 > of months for enabling this). Speeding up gettimeofday() does have
 > real benefit for some workloads.
->
+
+I'm just interested out of curiosity in an example of such workload, so
+I could play with this a bit, also on Exynos4, which can use just MCT.
+
+> 
 >> Anyway, I'm by no means opposed to switching to arch timers. They
 >> provide a well designed, generic interface and drivers shared by
 >> multiple platforms, which means more code sharing and possibly more eyes
 >> looking at the code, which is always good. However if they don't support
 >> low power states correctly, we can't just remove MCT.
->
+> 
 > Yeah, this will definitely need to be tested. Do the low power states
 > work on exynos5 upstream such that they can be tested? The snow
 > chromebook has a u-boot bug that makes AFTR not work, so it's not a
 > suitable platform to test on, unfortunately.
 
-As long as you don't have read-only firmware 90.0 then the known bug
-is fixed.  If you have 90.0 it's pretty easy to pull our your write
-protect screw and update your read-only firmware if you're doing
-development.
+I think Exynos5250-based Arndale is supposed to have working AFTR state
+in mainline, although it might depend on used bootloaders. To activate
+it you need to enable CONFIG_CPU_IDLE and unplug CPU1.
 
-...but of course it's never been tested, so there might be other bugs.
- The known bug that was fixed was found solely by code inspection (a
-missing break statement in a switch).
+> And if we need MCT for low power states, we'll need MCT to co-exist
+> with arch timers. Maybe by checking for the presence of those dt nodes
+> + CONFIG_ARM_ARCH_TIMER, or somesuch. But let's discuss that when we
+> know more.
+
+Agreed.
+
+Best regards,
+Tomasz
