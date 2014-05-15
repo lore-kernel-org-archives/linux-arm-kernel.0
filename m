@@ -1,36 +1,78 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 15 May 2014 15:50:17 +0100
-Subject: [PATCH 1/3] arm: dts: add device_type="memory" for ste-ccu8540
-In-Reply-To: <CACRpkda6+0LyHsqP5J-OTHaau1QPJaJRAup1d3KQq5zu2XC=HA@mail.gmail.com>
-References: <1397756521-29387-1-git-send-email-leif.lindholm@linaro.org>
- <1397756521-29387-2-git-send-email-leif.lindholm@linaro.org>
- <CACRpkda6+0LyHsqP5J-OTHaau1QPJaJRAup1d3KQq5zu2XC=HA@mail.gmail.com>
-Message-ID: <CACxGe6sfjZxCuOTHwRswWW2rMQ_gJyxS+R=+5HQHnzT-BNzekg@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 15 May 2014 09:53:56 -0500
+Subject: [PATCH] ARM: davinci: remove checks for CONFIG_USB_MUSB_PERIPHERAL
+In-Reply-To: <1400149025.20469.22.camel@x220>
+References: <1400149025.20469.22.camel@x220>
+Message-ID: <20140515145356.GA7360@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 2:26 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Apr 17, 2014 at 7:41 PM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
->
->> The current .dts for ste-ccu8540 lacks a 'device_type = "memory"' for
->> its memory node, relying on an old ppc quirk in order to discover its
->> memory. Add this, to permit that quirk to be made ppc only.
->>
->> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: devicetree at vger.kernel.org
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Lee Jones <lee.jones@linaro.org>
->
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->
-> There are no systems like this deployed so this patch set will not
-> affect anything in the wild.
+On Thu, May 15, 2014 at 12:17:05PM +0200, Paul Bolle wrote:
+> The Kconfig symbol USB_MUSB_PERIPHERAL was removed in v3.1. The last two
+> checks for its macro now always evaluate to false. So remove these
+> checks.
+> 
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 
-I may as well take all three of these patches through my tree (I've
-changed my mind on the last one). There are actually not a huge number
-of systems with ram starting at 0, so the impact is contained.
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-Applied, thanks.
+> ---
+> Eyeball tested only.
+> 
+> This is just a straightforward cleanup. It does remove a comment. Is
+> that comment still useful? Anyhow, I do wonder whether a proper fix is
+> possible here. Perhaps Greg or Felipe knows: it is their commit
+> 622859634a66 ("usb: musb: drop a gigantic amount of ifdeferry") that
+> removed USB_MUSB_PERIPHERAL. On the other hand I noticed that config
+> USB_MUSB_DAVINCI depends on BROKEN. So maybe properly fixing just this
+> small problem doesn't buy us much.
+> 
+>  arch/arm/mach-davinci/board-dm355-evm.c     | 4 ----
+>  arch/arm/mach-davinci/board-dm355-leopard.c | 4 ----
+>  2 files changed, 8 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
+> index ecdc7d44fa70..06d63d5651f3 100644
+> --- a/arch/arm/mach-davinci/board-dm355-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm355-evm.c
+> @@ -350,11 +350,7 @@ static struct davinci_mmc_config dm355evm_mmc_config = {
+>   * you have proper Mini-B or Mini-A cables (or Mini-A adapters)
+>   * the ID pin won't need any help.
+>   */
+> -#ifdef CONFIG_USB_MUSB_PERIPHERAL
+> -#define USB_ID_VALUE	0	/* ID pulled high; *should* float */
+> -#else
+>  #define USB_ID_VALUE	1	/* ID pulled low */
+> -#endif
+>  
+>  static struct spi_eeprom at25640a = {
+>  	.byte_len	= SZ_64K / 8,
+> diff --git a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-davinci/board-dm355-leopard.c
+> index 43bacbf15314..680a7a2d9102 100644
+> --- a/arch/arm/mach-davinci/board-dm355-leopard.c
+> +++ b/arch/arm/mach-davinci/board-dm355-leopard.c
+> @@ -208,11 +208,7 @@ static struct davinci_mmc_config dm355leopard_mmc_config = {
+>   * you have proper Mini-B or Mini-A cables (or Mini-A adapters)
+>   * the ID pin won't need any help.
+>   */
+> -#ifdef CONFIG_USB_MUSB_PERIPHERAL
+> -#define USB_ID_VALUE	0	/* ID pulled high; *should* float */
+> -#else
+>  #define USB_ID_VALUE	1	/* ID pulled low */
+> -#endif
+>  
+>  static struct spi_eeprom at25640a = {
+>  	.byte_len	= SZ_64K / 8,
+> -- 
+> 1.9.0
+> 
 
-g.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140515/6dd2fd70/attachment.sig>
