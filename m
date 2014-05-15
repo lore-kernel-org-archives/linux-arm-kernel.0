@@ -1,72 +1,20 @@
-From: emilgoode@gmail.com (Emil Goode)
-Date: Thu, 15 May 2014 21:24:30 +0200
-Subject: [PATCH] ARM: imx: clean up error handling
-Message-ID: <1400181871-10325-1-git-send-email-emilgoode@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 15 May 2014 13:25:02 -0600
+Subject: [RFC PATCH 08/10] ARM: tegra124: Bind CAR to syscon device
+In-Reply-To: <1400113986-339-9-git-send-email-abrestic@chromium.org>
+References: <1400113986-339-1-git-send-email-abrestic@chromium.org>
+ <1400113986-339-9-git-send-email-abrestic@chromium.org>
+Message-ID: <5375148E.6040905@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we fail to allocate struct platform_device pdev we
-dereference it after the goto label err.
+On 05/14/2014 06:33 PM, Andrew Bresticker wrote:
+> The XUSB PHY driver will be accessing the CAR registers through the
+> syscon interface.
 
-I have rearranged the error handling a bit to fix the issue
-and also make it more clear.
-
-Signed-off-by: Emil Goode <emilgoode@gmail.com>
----
- arch/arm/mach-imx/devices/platform-ipu-core.c |   22 +++++++++++++---------
- 1 file changed, 13 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
-index fc4dd7c..14d61d9 100644
---- a/arch/arm/mach-imx/devices/platform-ipu-core.c
-+++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
-@@ -77,34 +77,38 @@ struct platform_device *__init imx_alloc_mx3_camera(
- 
- 	pdev = platform_device_alloc("mx3-camera", 0);
- 	if (!pdev)
--		goto err;
-+		return ERR_PTR(ret);
- 
- 	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
- 	if (!pdev->dev.dma_mask)
--		goto err;
-+		goto put_pdev;
- 
- 	*pdev->dev.dma_mask = DMA_BIT_MASK(32);
- 	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
- 
- 	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
- 	if (ret)
--		goto err;
-+		goto free_dma_mask;
- 
- 	if (pdata) {
- 		struct mx3_camera_pdata *copied_pdata;
- 
- 		ret = platform_device_add_data(pdev, pdata, sizeof(*pdata));
--		if (ret) {
--err:
--			kfree(pdev->dev.dma_mask);
--			platform_device_put(pdev);
--			return ERR_PTR(-ENODEV);
--		}
-+		if (ret)
-+			goto free_dma_mask;
-+
- 		copied_pdata = dev_get_platdata(&pdev->dev);
- 		copied_pdata->dma_dev = &imx_ipu_coredev->dev;
- 	}
- 
- 	return pdev;
-+
-+free_dma_mask:
-+	kfree(pdev->dev.dma_mask);
-+put_pdev:
-+	platform_device_put(pdev);
-+
-+	return ERR_PTR(ret);
- }
- 
- struct platform_device *__init imx_add_mx3_sdc_fb(
--- 
-1.7.10.4
+I very strongly don't want to use the syscon concept on Tegra. Instead,
+I want only the CAR driver touching the CAR registers. If other drivers
+need some CAR registers manipulated, that should happen by that other
+driver calling some explicit semantic API in the CAR driver to do so.
+Take a look at how the Tegra SMMU and Tegra AHB driver communicate for
+an example.
