@@ -1,46 +1,51 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 15 May 2014 23:26:51 +0200
-Subject: [PATCH v5 5/6] exynos: cpuidle: do not allow cpuidle registration
- for Exynos5420
-In-Reply-To: <1400054637-21505-6-git-send-email-chander.kashyap@linaro.org>
-References: <ANuQgHGSPJ45tbrVppAVpOqF0OfHacPWfX=S5mOVxTPr66f7vg@mail.gmail.com>
- <1400054637-21505-1-git-send-email-chander.kashyap@linaro.org>
- <1400054637-21505-6-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <5375311B.2010202@gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 15 May 2014 14:33:08 -0700
+Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
+In-Reply-To: <53752E25.9060604@gmail.com>
+References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
+ <53752E25.9060604@gmail.com>
+Message-ID: <CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chander,
+Tomasz,
 
-On 14.05.2014 10:03, Chander Kashyap wrote:
-> Exynos5420 is big.Little Soc. It uses cpuidle-big-litle generic cpuidle driver.
-> Hence do not allow exynos cpuidle driver registration for Exynos5420.
-> 
-> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  arch/arm/mach-exynos/cpuidle.c |    3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-> index 3dd385e..807a386 100644
-> --- a/arch/arm/mach-exynos/cpuidle.c
-> +++ b/arch/arm/mach-exynos/cpuidle.c
-> @@ -218,6 +218,9 @@ static int exynos_cpuidle_probe(struct platform_device *pdev)
->  	int cpu_id, ret;
->  	struct cpuidle_device *device;
->  
-> +	if (soc_is_exynos5420())
-> +		return -ENODEV;
-> +
->  	if (soc_is_exynos5250())
->  		exynos5_core_down_clk();
->  
-> 
+On Thu, May 15, 2014 at 2:14 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Chirantan,
+>
+> On 15.05.2014 23:07, Chirantan Ekbote wrote:
+>> The multi core timer and the ARM architected timer are two different
+>> interfaces to the same underlying hardware timer.  This causes some
+>> strange timing issues when they are both enabled at the same time so
+>> remove the mct from the device tree and keep only the architected
+>> timer.
+>
+> Huh? I've always thought MCT is a completely separate hardware block
+> outside of ARM cores, while architected timers are embedded inside the
+> CPU block in which the ARM cores reside. Could you elaborate on this?
 
-Why not put this in exynos.c in exynos_dt_machine_init(), so
-exynos_cpuidle_init() is called only if not running on Exynos5420?
+Yup.  Our thoughts exactly.
 
-Best regards,
-Tomasz
+...but it appears not to be the case.  Chirantan demonstrated this in
+U-Boot just to prove that it's not some strange kernel interaction in
+<https://chromium-review.googlesource.com/200035>.  I took his patch
+and tweaked it a little more myself in
+<https://chromium-review.googlesource.com/200098>.
+
+Specifically:
+* If you stop the MCT, the arch timer stops
+* If you reset the MCT, the arch timer resets
+* If you start the MCT again, the arch timer starts again
+* If you read the MCT and the arch timer, they give the same value.
+
+
+This is apparently the answer to my question at
+<http://www.spinics.net/lists/linux-samsung-soc/msg29085.html>.
+Specifically Chirantan found that the big jump in time happened when
+MCT reset to 0.  That made the arch timer code think that there was a
+wraparound and jump forward in time a lot.
+
+
+Please confirm if you have a system that has MCT and arch timer in front of you.
+
+-Doug
