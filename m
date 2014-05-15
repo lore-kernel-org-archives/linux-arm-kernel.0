@@ -1,63 +1,34 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 May 2014 17:12:48 +0200
-Subject: [PATCH] ARM: dt: imx28-cfa10036: introduce a regulator for mmc0
-Message-ID: <1400166768-18801-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 15 May 2014 17:15:23 +0200
+Subject: [PATCH 1/2] ARM: at91/dt: add DMA controller node to at91sam9rl
+Message-ID: <47a342121566bca0025a20a57282fb72c990ce09.1400166895.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PWM3 pinmux configuration conflicts with gpio 3.28. Introduce a regulator
-for mmc0 so that it conflicts with the pwm driver and fails gracefully. The
-kernel will then able to access mmc0 normally.
-
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/boot/dts/imx28-cfa10036.dts | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/boot/dts/at91sam9rl.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx28-cfa10036.dts b/arch/arm/boot/dts/imx28-cfa10036.dts
-index cabb6171a19d..cd5fab8efa76 100644
---- a/arch/arm/boot/dts/imx28-cfa10036.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10036.dts
-@@ -53,6 +53,17 @@
- 					fsl,pull-up = <MXS_PULL_DISABLE>;
+diff --git a/arch/arm/boot/dts/at91sam9rl.dtsi b/arch/arm/boot/dts/at91sam9rl.dtsi
+index 6e6e87dd0c92..412617084cfd 100644
+--- a/arch/arm/boot/dts/at91sam9rl.dtsi
++++ b/arch/arm/boot/dts/at91sam9rl.dtsi
+@@ -348,6 +348,15 @@
  				};
- 
-+				mmc_pwr_cfa10036: mmc_pwr_cfa10036 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x31c3 /*
-+						MX28_PAD_PWM3__GPIO_3_28 */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <0>;
-+				};
-+
  			};
  
- 			ssp0: ssp at 80010000 {
-@@ -60,6 +71,7 @@
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&mmc0_4bit_pins_a
- 					&mmc0_cd_cfg &mmc0_sck_cfg>;
-+				vmmc-supply = <&reg_vddio_sd0>;
- 				bus-width = <4>;
- 				status = "okay";
- 			};
-@@ -114,4 +126,14 @@
- 			default-state = "on";
- 		};
- 	};
++			dma0: dma-controller at ffffe600 {
++				compatible = "atmel,at91sam9rl-dma";
++				reg = <0xffffe600 0x200>;
++				interrupts = <21 IRQ_TYPE_LEVEL_HIGH 0>;
++				#dma-cells = <2>;
++				clocks = <&dma0_clk>;
++				clock-names = "dma_clk";
++			};
 +
-+	reg_vddio_sd0: vddio-sd0 {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&mmc_pwr_cfa10036>;
-+		regulator-name = "vddio-sd0";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio3 28 0>;
-+	};
- };
+ 			ramc0: ramc at ffffea00 {
+ 				compatible = "atmel,at91sam9260-sdramc";
+ 				reg = <0xffffea00 0x200>;
 -- 
-1.9.1
+1.8.2.2
