@@ -1,39 +1,84 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 15 May 2014 13:33:51 -0600
-Subject: [RFC PATCH 00/10] Tegra XHCI support
-In-Reply-To: <1400113986-339-1-git-send-email-abrestic@chromium.org>
-References: <1400113986-339-1-git-send-email-abrestic@chromium.org>
-Message-ID: <5375169F.3060809@wwwdotorg.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 15 May 2014 12:36:45 -0700
+Subject: [PATCH v4 3/8] clk: samsung: add infrastructure to register cpu
+ clocks
+In-Reply-To: <12969374.fAYJcpG05n@phil>
+References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
+ <1400029876-5830-4-git-send-email-thomas.ab@samsung.com>
+ <CAD=FV=XmVNwwZY_LM6Za-p7gg6CPh1mGj=BoWvG0Q-Cx9L_A9Q@mail.gmail.com>
+ <12969374.fAYJcpG05n@phil>
+Message-ID: <CAD=FV=VGWxgy+snupOzmKQxNPbGb95vGL0KhQFaSL9m_dx84wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2014 06:32 PM, Andrew Bresticker wrote:
-> This is a first pass at the host and PHY drivers necessary for USB3.0
-> support on Tegra114 and Tegra124.  The Tegra XHCI host controller requires
-> external firmware [1] which must be loaded before using any USB ports owned
-> by the controller.  The XUSB PHY driver handles mapping and enabling of
-> the UTMI, HSIC, and SuperSpeed pads to the XHCI controller.
-> 
-> Tested on a Venice2 with a variety of USB2.0 and USB3.0 memory sticks
-> and ethernet dongles.  
-> 
-> Notes:
->  - I've included support for Tegra114, but since I don't have Tegra114-based
->    hardware, it is completely untested.
->  - The PCIe and SATA PHYs also are programmed using the XUSB_PADCTL space
->    as well.  At least some of the code can be re-used, specifically with
->    respect to lane programming.  I believe Thierry is working on the PCIe
->    parts of this.
+Heiko,
 
-If I understand the HW correctly, there's a separate "pad control" HW
-block that provides routing/sharing of signals from USB2(?), USB3, SATA,
-and PCIe to the pads.
+On Thu, May 15, 2014 at 12:17 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Donnerstag, 15. Mai 2014, 11:18:44 schrieb Doug Anderson:
+>> Thomas,
+>>
+>> On Tue, May 13, 2014 at 6:11 PM, Thomas Abraham <ta.omasab@gmail.com> wrote:
+>> > From: Thomas Abraham <thomas.ab@samsung.com>
+>> > +static int exynos4210_armclk_pre_rate_change(struct clk_notifier_data
+>> > *ndata, +                       struct exynos_cpuclk *armclk, void
+>> > __iomem *base) +{
+>> > +       struct exynos4210_armclk_data *armclk_data = armclk->data;
+>> > +       unsigned long alt_prate = clk_get_rate(armclk->alt_parent);
+>> > +       unsigned long alt_div, div0, div1, tdiv0, mux_reg;
+>> > +       unsigned long cur_armclk_rate, timeout;
+>> > +       unsigned long flags;
+>> > +
+>> > +       /* find out the divider values to use for clock data */
+>> > +       while (armclk_data->prate != ndata->new_rate) {
+>> > +               if (armclk_data->prate == 0)
+>> > +                       return -EINVAL;
+>> > +               armclk_data++;
+>> > +       }
+>> > +
+>> > +       div0 = armclk_data->div0;
+>> > +       div1 = armclk_data->div1;
+>> > +       if (readl(base + SRC_CPU) & EXYNOS4210_MUX_HPM_MASK) {
+>> > +               div1 = readl(base + DIV_CPU1) & EXYNOS4210_DIV1_HPM_MASK;
+>> > +               div1 |= ((armclk_data->div1) & ~EXYNOS4210_DIV1_HPM_MASK);
+>> > +       }
+>> > +
+>> > +       /*
+>> > +        * if the new and old parent clock speed is less than the clock
+>> > speed +        * of the alternate parent, then it should be ensured that
+>> > at no point +        * the armclk speed is more than the old_prate until
+>> > the dividers are +        * set.
+>> > +        */
+>> > +       tdiv0 = readl(base + DIV_CPU0);
+>> > +       cur_armclk_rate = ndata->old_rate / EXYNOS4210_ARM_DIV1(tdiv0) /
+>> > +                               EXYNOS4210_ARM_DIV2(tdiv0);
+>> > +       if (alt_prate > cur_armclk_rate) {
+>> > +               alt_div = _calc_div(alt_prate, cur_armclk_rate);
+>> > +               _exynos4210_set_armclk_div(base, alt_div);
+>> > +               div0 |= alt_div;
+>>
+>> Don't you need to up the voltage here, too?  ...I haven't reviewed
+>> this whole patch (so perhaps it's elsewhere in the patch or in the
+>> series), but I stumbled upon this while trying to solve a different
+>> problem and figured I'd check...
+>
+> setting the voltage should be done by the cpufreq driver like cpufreq-cpu0 -
+> whose usage this series intents to allow.
+>
+> As I've hijacked Thomas' concept for my current rockchip clock work, I've
+> already seen this working nicely :-) .
 
-I believe Thierry is working on exposing this block as a pinctrl driver,
-or at least something that the other drivers can call into in order to
-configure that block. It'd be good if you can co-ordinate with him to
-rebase this driver on top of that, rather than (I assume; haven't read
-the code yet...) directly manipulating the padctrl registers inside each
-of the different drivers. Co-ordinating that could turn out to be
-problematic, and presumably if each driver does its own thing, we end up
-duplicating defines, code, and DT bindings for configuring the padctrl HW.
+I guess I should have been more clear.  I was talking more
+specifically about upping the voltage as part of the mux switch in the
+case that alt_prate > cur_armclk_rate.
+
+...if you're switching from 200MHz to 300MHz and the alt_prate is
+800MHz, you need to account for that fact.  The code here accounts for
+the fact in setting the "armclk_div", but (I don't think) it accounts
+for the fact that 800MHz will need a higher voltage.
+
+As per a separate discussion, a clean solution might be to move the
+mux switching to the core of CPU_FREQ.  That would have the side
+effect of also making it very easy to send notifications.
+
+
+-Doug
