@@ -1,40 +1,38 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 May 2014 09:56:59 +0200
-Subject: [PATCH v2 05/10] clk: berlin: add driver for BG2x complex
- divider cells
-In-Reply-To: <1400098522-14770-6-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1400098522-14770-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1400098522-14770-6-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140515075659.GP29318@piout.net>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 15 May 2014 09:57:51 +0200
+Subject: [PATCH] ARM: imx: remove check for CONFIG_SDMA_IRAM
+Message-ID: <1400140671.20469.7.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/05/2014 at 22:15:16 +0200, Sebastian Hesselbarth wrote :
-> +static u8 berlin2_div_get_parent(struct clk_hw *hw)
-> +{
-> +	struct berlin2_div *div = to_berlin2_div(hw);
-> +	struct berlin2_div_map *map = &div->map;
-> +	u32 reg;
-> +	u8 index = 0;
-> +
-> +	if (div->lock)
-> +		spin_lock(div->lock);
-> +
-> +	/* PLL_SWITCH == 0 is index 0 */
-> +	reg = readl_relaxed(div->base + map->pll_switch_offs);
-> +	reg &= BIT(map->pll_switch_shift);
-> +	if (reg) {
-> +		reg = readl_relaxed(div->base + map->pll_select_offs);
-> +		reg >>= map->pll_select_shift;
-> +		reg &= PLL_SELECT_MASK;
-> +		index = 1 + reg;
+A check for CONFIG_SDMA_IRAM was added in v2.6.34. But the Kconfig
+symbol SDMA_IRAM was never added. Remove this check.
 
-After getting more insight, I think we don't need to add 1, see my
-comment on the next patchs.
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Untested.
 
+Note that none of the MX51_MXC_DMA_CHANNEL_* macros are actually used.
+Why are they needed?
 
+ arch/arm/mach-imx/mx51.h | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/arch/arm/mach-imx/mx51.h b/arch/arm/mach-imx/mx51.h
+index af844f76261a..f2604098fd06 100644
+--- a/arch/arm/mach-imx/mx51.h
++++ b/arch/arm/mach-imx/mx51.h
+@@ -160,11 +160,7 @@
+ #define MX51_MXC_DMA_CHANNEL_SSI1_RX	MXC_DMA_DYNAMIC_CHANNEL
+ #define MX51_MXC_DMA_CHANNEL_SSI1_TX	MXC_DMA_DYNAMIC_CHANNEL
+ #define MX51_MXC_DMA_CHANNEL_SSI2_RX	MXC_DMA_DYNAMIC_CHANNEL
+-#ifdef CONFIG_SDMA_IRAM
+-#define MX51_MXC_DMA_CHANNEL_SSI2_TX	(MX51_MXC_DMA_CHANNEL_IRAM + 1)
+-#else				/*CONFIG_SDMA_IRAM */
+ #define MX51_MXC_DMA_CHANNEL_SSI2_TX	MXC_DMA_DYNAMIC_CHANNEL
+-#endif				/*CONFIG_SDMA_IRAM */
+ #define MX51_MXC_DMA_CHANNEL_CSPI1_RX	MXC_DMA_DYNAMIC_CHANNEL
+ #define MX51_MXC_DMA_CHANNEL_CSPI1_TX	MXC_DMA_DYNAMIC_CHANNEL
+ #define MX51_MXC_DMA_CHANNEL_CSPI2_RX	MXC_DMA_DYNAMIC_CHANNEL
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.9.0
