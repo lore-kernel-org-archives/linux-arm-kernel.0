@@ -1,59 +1,55 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 15 May 2014 10:24:39 +0200
-Subject: [PATCH v2 2/3] drm/panel: add support for EDT panels
-In-Reply-To: <20140515075102.GE5952@ulmo>
-References: <cover.1400103181.git.stefan@agner.ch>
- <35c081171a3d9a9401767601c02a12e266b37dd0.1400103181.git.stefan@agner.ch>
- <20140515075102.GE5952@ulmo>
-Message-ID: <4de1d09b7873e012e43525c1f8ab9c66@agner.ch>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Thu, 15 May 2014 13:57:19 +0530
+Subject: [PATCH v4 5/5] ARM: dts: enable hdmi for exynos5800 based
+ peach-pi board
+In-Reply-To: <5373CAB7.3040002@gmail.com>
+References: <1400035562-16832-1-git-send-email-rahul.sharma@samsung.com>
+ <1400035562-16832-6-git-send-email-rahul.sharma@samsung.com>
+ <5373CA74.8080500@gmail.com> <5373CAB7.3040002@gmail.com>
+Message-ID: <CAPdUM4PxYqrt1xaZJ6vw5GXk8wFzRGG=ayscvs0x=n7=deJZKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry, hi Philipp,
-
-Am 2014-05-15 09:51, schrieb Thierry Reding:
-> On Wed, May 14, 2014 at 11:45:57PM +0200, stefan at agner.ch wrote:
->> From: Stefan Agner <stefan@agner.ch>
+On 15 May 2014 01:27, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>
+>
+> On 14.05.2014 21:56, Tomasz Figa wrote:
+>> Hi Rahul,
 >>
->> This panels are sold by Toradex for Colibri T20/T30 and Apalis T30
->> evaluation kits.
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> 
-> Panel patches should go to the dri-devel mailing list as well.
-> 
-> Also a patch was posted only yesterday for a panel that seems to be the
-> exact same one as this, even though the name differs minimally, see:
-> 
-> 	https://patchwork.kernel.org/patch/4175251/
-> 
-> Adding Philipp on Cc so you guys can work together whether this is
-> indeed the same panel. The only differences seem to be in the vertical
-> front and back porches, but I suspect that either settings will work on
-> both Tegra and i.MX.
+>> On 14.05.2014 04:46, Rahul Sharma wrote:
+>>> From: Rahul Sharma <Rahul.Sharma@samsung.com>
+>>>
+>>> Enable hdmi for peach-pi board.
+>>>
+>>> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
+>>> ---
+>>>  arch/arm/boot/dts/exynos5800-peach-pi.dts |   19 +++++++++++++++++++
+>>>  1 file changed, 19 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>>> index 742655b..2a6f23b8 100644
+>>> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>>> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>>> @@ -134,6 +134,25 @@
+>>>      };
+>>>  };
+>>>
+>>> +&i2c_2 {
+>>> +    status = "okay";
+>>> +    samsung,i2c-sda-delay = <100>;
+>>> +    samsung,i2c-max-bus-freq = <66000>;
+>>> +    samsung,i2c-slave-addr = <0x50>;
+>>> +
+>>> +    hdmiddc at 50 {
+>>> +            reg = <0x50>;
+>>> +    };
+>
+> Aha, also with the new Exynos HDMI bindings, I don't think the DDC
+> device node is necessary any longer.
 
-Its etm0700g0dh6 vs. et070080dh6, Philipp's panel is with captive multi
-touch, (hence the M I guess). The panel itself really looks the same.
+Yea it is not necessary now. I added it to list the i2c devices
+under controller node. Just for completion.
 
-I found this overview of EDT displays:
-http://www.dmbtechnics.com/scripts/passthru.php?id=7
-
-There seem to be quite a lot variants with the same panel...
-
-Regarding timings, I just checked the documentation, Philipp's timing
-really matches the documented ones, I miscalculated the vertical back
-porch.
-
-How do we resolve that?
-
-I would suggest that I split out that patch and remove the et070080dh6
-panel and send the other as a single patch to the dri-devel mailing list
-as well.
-
-Philipp, could you add my display type (et070080dh6) to the compatible
-list of your mode/panel entry?
-
-Does this sound reasonable?
-
---
-Stefan
+>
+> Best regards,
+> Tomasz
