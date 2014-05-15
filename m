@@ -1,72 +1,78 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 15 May 2014 12:25:45 +0300
-Subject: [PATCH 03/17] phy: ti-pipe3: add external clock support for PCIe
- PHY
-In-Reply-To: <5374859F.5080902@ti.com>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>	<1399383244-14556-4-git-send-email-kishon@ti.com>	<53736CBC.2060702@ti.com>	<5373897C.6080504@ti.com>
- <CAGo_u6qw1OomEw_ueb3x+xT+qZLAfGv7Se1K=o725aOoD3ankQ@mail.gmail.com>
- <5374859F.5080902@ti.com>
-Message-ID: <53748819.8060705@ti.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 15 May 2014 14:55:36 +0530
+Subject: [PATCH v3 1/6] phy: add a driver for the Berlin SATA PHY
+In-Reply-To: <5374862F.2020205@gmail.com>
+References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
+ <20140514165722.GA18495@kwain> <5373AE9A.3050008@gmail.com>
+ <5764751.ffUj9rhnMd@wuerfel> <5373B908.5090904@gmail.com>
+ <537462A2.5020607@ti.com> <5374668F.4060109@gmail.com>
+ <53747F03.5030206@ti.com> <5374862F.2020205@gmail.com>
+Message-ID: <53748810.1020705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2014 12:15 PM, Kishon Vijay Abraham I wrote:
-> Hi Nishanth,
-> 
-> On Wednesday 14 May 2014 09:04 PM, Nishanth Menon wrote:
->> On Wed, May 14, 2014 at 10:19 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>> Hi Roger,
+
+
+On Thursday 15 May 2014 02:47 PM, Sebastian Hesselbarth wrote:
+> On 05/15/2014 10:46 AM, Kishon Vijay Abraham I wrote:
+>> On Thursday 15 May 2014 12:32 PM, Sebastian Hesselbarth wrote:
+>>> On 05/15/2014 08:45 AM, Kishon Vijay Abraham I wrote:
+>>>> On Thursday 15 May 2014 12:12 AM, Sebastian Hesselbarth wrote:
+>>>>> On 05/14/2014 08:12 PM, Arnd Bergmann wrote:
+>>>>>> On Wednesday 14 May 2014 19:57:46 Sebastian Hesselbarth wrote:
+>>>>>>> Let's assume we have one dual-port SATA controller and one PCIe
+>>>>>>> controller with either x1 or x2 support. The only sane DT binding,
+>>>>>>> I can think of then would be:
+>>>>>>>
+>>>>>>> berlin2q.dtsi:
+>>>>>>>
+>>>>>>> genphy: lvds at ea00ff {
+>>>>>>>     compatible = "marvell,berlin-lvds-phy";
+>>>>>>>     reg = <0xea00ff 0x100>;
+>>>>>>>     #phy-cells = <2>;
+>>>>>>> };
+> [...]
 >>>
->>> On Wednesday 14 May 2014 06:46 PM, Roger Quadros wrote:
->>>> Hi Kishon,
->>>>
->>>> On 05/06/2014 04:33 PM, Kishon Vijay Abraham I wrote:
->>>>> APLL used by PCIE phy can either use external clock as input or the clock
->>>>> from DPLL. Added support for the APLL to use external clock as input here.
->>>>>
->>>>> Cc: Rajendra Nayak <rnayak@ti.com>
->>>>> Cc: Tero Kristo <t-kristo@ti.com>
->>>>> Cc: Paul Walmsley <paul@pwsan.com>
->>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>>> ---
->>>>>  Documentation/devicetree/bindings/phy/ti-phy.txt |    4 ++
->>>>>  drivers/phy/phy-ti-pipe3.c                       |   75 ++++++++++++++--------
->>>>>  2 files changed, 52 insertions(+), 27 deletions(-)
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
->>>>> index bc9afb5..d50f8ee 100644
->>>>> --- a/Documentation/devicetree/bindings/phy/ti-phy.txt
->>>>> +++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
->>>>> @@ -76,6 +76,10 @@ Required properties:
->>>>>     * "dpll_ref_m2" - external dpll ref clk
->>>>>     * "phy-div" - divider for apll
->>>>>     * "div-clk" - apll clock
->>>>> +   * "apll_mux" - mux for pcie apll
->>>>> +   * "refclk_ext" - external reference clock for pcie apll
->>>>> + - ti,ext-clk: To specifiy if PCIE apll should use external clock. Applicable
->>>>> +   only to PCIE PHY.
->>>>
->>>> Instead of specifying both clock sources "dpll_ref_clock", "refclk_ext" and then specifying a 3rd control option "ti,ext-clk" to select one of the 2 sources, why can't the DT just supply one clock source, i.e. the one that is being used in the board instance? The driver should then just configure the clock rate that is needed at that node. Shouldn't the clock framework automatically take care of muxing and parent rates?
+>>> Depends on what you call PHY. In the example above the PHY is what
+>>> allows you to control both lanes.
 >>>
->>> Want the dt to have all the clocks used by the controller. "ti,ext-clk" should
->>> go in the board dt file (suggested by Nishanth).
->>> The point is at some point later if some one wants to change the clock source,
->>> it should be a simple enabling "ti,ext-clk" flag instead of finding the clock
->>> phandle etc..
+>>> So you want sub-nodes for each individual lane given the nomenclature
+>>> of the example?
+>>>
+>>> Or like it is used in the example above, a single PHY node with an index
+>>> in the phy-specifier to pick an individual lane.
+>>>
+>>> IMHO, having both phy-specifier index _and_ PHY sub-node per lane
+>>> has no benefit at all. You cannot even use the PHY sub-nodes for any
+>>> setup properties, as they depend on the consumer claiming the lane.
 >>
->> Wonder if that is implicit by the presence of  "refclk_ext" in the
->> clocks provided?
+>> IMO the dt data should completely describe the HW. So just by looking at the
+>> PHY node, we won't be able to tell the no of PHYs implemented in the IP if we
+>> have a single PHY node (In this case the lanes in the IP).
+>>
+>> However if you think it's an overkill for having sub-nodes for each lane then
+>> single PHY node is fine too.
 > 
-> IMO the presence of "refclk_ext" is useless unless the board indicates it
-> provides the clock source.
+> Yeah, I see your point. I just wonder how many Marvell PHYs we may hit
+> that require the _same_ magic setup inside but have _different_ number
+> of lanes. And even if, we can deal with it using a different compatible
+> string.
 > 
-> refclk_ext holds phandle for *fixed-clock*, so irrespective of whether the
-> board provides a clock or not, it can have that handle for configuring in PRCM.
-> However if the board does not provide the clock source, configuring refclk_ext
-> in PRCM is useless.
+> Currently, I feel a single PHY provider node and a set of compatibles
+> will be most likely, i.e. no per-lane sub-nodes. OTOH, the per-lane
+> sub-nodes is more generic as it allows us to deal PHYs that may
+> suddenly skip one lane in the numbering scheme. The difference for the
+> driver is marginal, i.e. some SoC-specific struct with a field for the
+> number of lanes vs. of_count_child_nodes() and a reg = <n> property for
+> the per-lane sub-nodes.
+> 
+> I used to agree to "DT should descibe HW", but with no datasheet
+> available, it quickly becomes fuzzy what it really looks like.
+> 
+> Anyway, I'll have some discussion with Antoine and Alexandre to sort out
+> the differences and the things in common for the PHY and SoCs in
+> question.
 
-I think what Nishant meant is that if "refclk_ext" is provided it means that the driver
-should use that over "dpll_ref_clock" so no need of a separate "ti,ext-clk" flag.
+cool, thanks.
 
-cheers,
--roger
+-Kishon
