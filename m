@@ -1,27 +1,48 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 15 May 2014 09:50:50 -0700
-Subject: [PATCH v2 2/5] arm64: Support reboot through watchdog subsystem
-In-Reply-To: <20140515090952.GC27594@arm.com>
-References: <1399681883-891-1-git-send-email-linux@roeck-us.net>
- <1399681883-891-3-git-send-email-linux@roeck-us.net>
- <53741A5A.7070503@roeck-us.net> <20140515090952.GC27594@arm.com>
-Message-ID: <20140515165050.GA24903@roeck-us.net>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 15 May 2014 18:51:10 +0200
+Subject: [PATCH] clk: divider: Fix overflow in clk_divider_bestdiv
+In-Reply-To: <1399479850-25292-1-git-send-email-t.figa@samsung.com>
+References: <1399479850-25292-1-git-send-email-t.figa@samsung.com>
+Message-ID: <5374F07E.9070106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 10:09:52AM +0100, Will Deacon wrote:
-> On Thu, May 15, 2014 at 02:37:30AM +0100, Guenter Roeck wrote:
-> > On 05/09/2014 05:31 PM, Guenter Roeck wrote:
-> > > The watchdog subsystem provides an API to perform a system reboot.
-> > > Use it.
-> > >
-> > > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> > 
-> > Any comments / Ack from the arm maintainers ?
+Hi Mike,
+
+On 07.05.2014 18:24, Tomasz Figa wrote:
+> Commit c686078 ("clk: divider: Add round to closest divider") introduced
+> a helper function to check whether given divisor is the best one instead
+> of direct check. However due to int type used instead of unsigned long
+> for passing calculated rates to this function in certain cases an
+> overflow could occur, for example when trying to obtain maximum possible
+> clock rate by calling clk_round_rate(..., UINT_MAX).
 > 
-> I'm fine with the arm/arm64 changes, but I still reckon the parameters
-> should be dropped unless you have a use for them.
+> This patch fixes this issue by changing the type of rate, now and best
+> arguments of the function to unsigned long, which is the type that
+> should be used for clock rates.
+> 
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+>  drivers/clk/clk-divider.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index c572945..e0b360a 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -232,7 +232,7 @@ static int _div_round(struct clk_divider *divider, unsigned long parent_rate,
+>  }
+>  
+>  static bool _is_best_div(struct clk_divider *divider,
+> -		int rate, int now, int best)
+> +		unsigned long rate, unsigned long now, unsigned long best)
+>  {
+>  	if (divider->flags & CLK_DIVIDER_ROUND_CLOSEST)
+>  		return abs(rate - now) < abs(rate - best);
+> 
 
-Ok, I'll drop the parameters and send a new version.
+Ping. It's quite important fix as the issue makes all Exynos boards
+using sdhci-s3c almost unusable.
 
-Guenter
+Best regards,
+Tomasz
