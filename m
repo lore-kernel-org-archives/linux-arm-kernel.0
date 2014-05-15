@@ -1,30 +1,68 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 15 May 2014 17:15:24 +0200
-Subject: [PATCH 2/2] ARM: at91/dt: add NAND + DMA property for at91sam9rl
-In-Reply-To: <47a342121566bca0025a20a57282fb72c990ce09.1400166895.git.nicolas.ferre@atmel.com>
-References: <47a342121566bca0025a20a57282fb72c990ce09.1400166895.git.nicolas.ferre@atmel.com>
-Message-ID: <e1b405979615b46321a63df3f91f1998763b22fe.1400166895.git.nicolas.ferre@atmel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 15 May 2014 17:17:56 +0200
+Subject: [PATCH v3 3/7] mfd: add support for sun6i PRCM
+ (Power/Reset/Clock Management) unit
+In-Reply-To: <20140509135251.GY5767@lee--X1>
+References: <1399633911-7094-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1399633911-7094-4-git-send-email-boris.brezillon@free-electrons.com>
+ <20140509135251.GY5767@lee--X1>
+Message-ID: <20140515151756.GX29258@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the "atmel,nand-has-dma" property to NAND node
+Hi Lee,
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91sam9rl.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+On Fri, May 09, 2014 at 02:52:51PM +0100, Lee Jones wrote:
+> > The PRCM (Power/Reset/Clock Management) block exposes several subdevices
+> > in different subsystems (clk, reset ...)
+> > 
+> > Add basic support for the PRCM unit with clk (AR100, AHB0, and APB0 clks)
+> > and reset controller subdevices.
+> > 
+> > Other subdevices might be added later (if needed).
+> > 
+> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/mfd/Kconfig      |   8 +++
+> >  drivers/mfd/Makefile     |   1 +
+> >  drivers/mfd/sun6i-prcm.c | 134 +++++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 143 insertions(+)
+> >  create mode 100644 drivers/mfd/sun6i-prcm.c
+> 
+> [...]
+> 
+> > +/*
+> > + * Copyright (C) 2014 Free Electrons
+> > + *
+> > + * License Terms: GNU General Public License v2
+> > + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > + *
+> > + * Allwinner PRCM (Power/Reset/Clock Management) driver
+> > + *
+> > + */
+> > +
+> > +#include <linux/mfd/core.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of.h>
+> 
+> Ah, now isn't that better?
+> 
+> Acked-by: Lee Jones <lee.jones@linaro.org>
 
-diff --git a/arch/arm/boot/dts/at91sam9rl.dtsi b/arch/arm/boot/dts/at91sam9rl.dtsi
-index 412617084cfd..f21163c7dc2b 100644
---- a/arch/arm/boot/dts/at91sam9rl.dtsi
-+++ b/arch/arm/boot/dts/at91sam9rl.dtsi
-@@ -95,6 +95,7 @@
- 			      <0xffffe800 0x200>;
- 			atmel,nand-addr-offset = <21>;
- 			atmel,nand-cmd-offset = <22>;
-+			atmel,nand-has-dma;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_nand>;
- 			gpios = <&pioD 17 GPIO_ACTIVE_HIGH>,
+How do you want to merge this? Do you want me to take it through
+mach-sunxi tree, or do you want to take it in your tree?
+
+Maxime
+
 -- 
-1.8.2.2
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140515/695c1d6b/attachment.sig>
