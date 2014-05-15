@@ -1,78 +1,29 @@
-From: stefan@agner.ch (stefan at agner.ch)
-Date: Thu, 15 May 2014 11:38:45 +0200
-Subject: [PATCH v2] drm/panel: add support for EDT ET057090DHU panel
-Message-ID: <1400146725-5788-1-git-send-email-stefan@agner.ch>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 15 May 2014 11:39:41 +0200
+Subject: [PATCH v2 2/3] drm/panel: add support for EDT panels
+In-Reply-To: <1400146519.4102.30.camel@paszta.hi.pengutronix.de>
+References: <cover.1400103181.git.stefan@agner.ch>
+ <35c081171a3d9a9401767601c02a12e266b37dd0.1400103181.git.stefan@agner.ch>
+ <20140515075102.GE5952@ulmo> <4de1d09b7873e012e43525c1f8ab9c66@agner.ch>
+ <20140515091220.GC6434@ulmo>
+ <1400146519.4102.30.camel@paszta.hi.pengutronix.de>
+Message-ID: <cc51075ad7c00d6b08d28834d651b198@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stefan Agner <stefan@agner.ch>
+Am 2014-05-15 11:35, schrieb Philipp Zabel:
+> Am Donnerstag, den 15.05.2014, 11:12 +0200 schrieb Thierry Reding:
+<snip>
+>> I also noticed that Philipp's patch doesn't actually introduce the
+>> device tree bindings, so that will have to be added as well.
+> 
+> Hmm, yes. Should I take over the edt,et070080dh6.txt from Stefan's
+> series and repost all, or can I just hand in the missing
+> edt,etm0700g0dh6.txt separately?
 
-This panel is sold by Toradex for Colibri T20/T30 and Apalis T30
-evaluation kits.
+Just sent a revision of my patch which doesn't contain that text file
+anymore, hence for me it would be preferable if you can add both
+files...
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- .../devicetree/bindings/panel/edt,et057090dhu.txt  |  7 ++++++
- drivers/gpu/drm/panel/panel-simple.c               | 26 ++++++++++++++++++++++
- 2 files changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/panel/edt,et057090dhu.txt
-
-diff --git a/Documentation/devicetree/bindings/panel/edt,et057090dhu.txt b/Documentation/devicetree/bindings/panel/edt,et057090dhu.txt
-new file mode 100644
-index 0000000..4903d7b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/panel/edt,et057090dhu.txt
-@@ -0,0 +1,7 @@
-+Emerging Display Technology Corp. 5.7" VGA TFT LCD panel
-+
-+Required properties:
-+- compatible: should be "edt,et057090dhu"
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index 309f29e..91b4f73 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -306,6 +306,29 @@ static const struct panel_desc chunghwa_claa101wa01a = {
- 	},
- };
- 
-+static const struct drm_display_mode edt_et057090dhu_mode = {
-+	.clock = 25175,
-+	.hdisplay = 640,
-+	.hsync_start = 640 + 16,
-+	.hsync_end = 640 + 16 + 30,
-+	.htotal = 640 + 16 + 30 + 114,
-+	.vdisplay = 480,
-+	.vsync_start = 480 + 10,
-+	.vsync_end = 480 + 10 + 3,
-+	.vtotal = 480 + 10 + 3 + 32,
-+	.vrefresh = 60,
-+	.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
-+};
-+
-+static const struct panel_desc edt_et057090dhu = {
-+	.modes = &edt_et057090dhu_mode,
-+	.num_modes = 1,
-+	.size = {
-+		.width = 115,
-+		.height = 86,
-+	},
-+};
-+
- static const struct drm_display_mode chunghwa_claa101wb01_mode = {
- 	.clock = 69300,
- 	.hdisplay = 1366,
-@@ -383,6 +406,9 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "chunghwa,claa101wb01",
- 		.data = &chunghwa_claa101wb01
- 	}, {
-+		.compatible = "edt,et057090dhu",
-+		.data = &edt_et057090dhu,
-+	}, {
- 		.compatible = "lg,lp129qe",
- 		.data = &lg_lp129qe,
- 	}, {
--- 
-1.9.2
+--
+Stefan
