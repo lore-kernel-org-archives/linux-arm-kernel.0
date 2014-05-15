@@ -1,54 +1,126 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 15 May 2014 11:53:07 -0600
-Subject: [PATCHv3 1/3] ARM: mm: allow sub-architectures to override PCI
- I/O memory type
-In-Reply-To: <20140515153430.GM27594@arm.com>
-References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140515155130.193c3181@free-electrons.com>
- <20140515142924.GI27594@arm.com> <4972763.mtuLYh6sDH@wuerfel>
- <20140515153430.GM27594@arm.com>
-Message-ID: <20140515175307.GA12259@obsidianresearch.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 15 May 2014 13:54:35 -0400
+Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
+In-Reply-To: <5374FE61.50901@linaro.org>
+References: <1399991966-14582-1-git-send-email-santosh.shilimkar@ti.com>
+ <5373C78E.7040301@linaro.org> <5373C8E8.6040208@ti.com>
+ <5373CBB9.40506@linaro.org> <5373DD94.8030208@ti.com>
+ <5374F35E.5040900@ti.com> <5374FE61.50901@linaro.org>
+Message-ID: <5374FF5B.8050702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 04:34:30PM +0100, Will Deacon wrote:
-
-> > How can a write be non-posted on the PCI bus if it's posted on AXI?
+On Thursday 15 May 2014 01:50 PM, Daniel Lezcano wrote:
+> On 05/15/2014 07:03 PM, Santosh Shilimkar wrote:
+>> Daniel,
+>>
+>> On Wednesday 14 May 2014 05:18 PM, Santosh Shilimkar wrote:
+>>> On Wednesday 14 May 2014 04:02 PM, Daniel Lezcano wrote:
+>>>> On 05/14/2014 09:50 PM, Santosh Shilimkar wrote:
+>>>>> On Wednesday 14 May 2014 03:44 PM, Daniel Lezcano wrote:
+>>>>>> On 05/13/2014 04:39 PM, Santosh Shilimkar wrote:
+>>>>>>> On OMAP4 panda board, there have been several bug reports about boot
+>>>>>>> hang and lock-ups with CPU_IDLE enabled. The root cause of the issue
+>>>>>>> is missing interrupts while in idle state. Commit cb7094e8 {cpuidle / omap4 :
+>>>>>>> use CPUIDLE_FLAG_TIMER_STOP flag} moved the broadcast notifiers to common
+>>>>>>> code for right reasons but on OMAP4 which suffers from a nasty ROM code
+>>>>>>> bug with GIC, commit ff999b8a {ARM: OMAP4460: Workaround for ROM bug ..},
+>>>>>>> we loose interrupts which leads to issues like lock-up, hangs etc.
+>>>>>>>
+>>>>>>> Patch reverts commit cb7094 {cpuidle / omap4 : use CPUIDLE_FLAG_TIMER_STOP
+>>>>>>> flag} to avoid the issue. With this change, OMAP4 panda boards, the mentioned
+>>>>>>> issues are getting fixed. We no longer loose interrupts which was the cause
+>>>>>>> of the regression.
+>>>>>>>
+>>>>>>> Cc: Roger Quadros <rogerq@ti.com>
+>>>>>>> Cc: Kevin Hilman <khilman@linaro.org>
+>>>>>>> Cc: Tony Lindgren <tony@atomide.com>
+>>>>>>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>>>>> Reported-tested-by: Roger Quadros <rogerq@ti.com>
+>>>>>>> Reported-tested-by: Kevin Hilman <khilman@linaro.org>
+>>>>>>> Tested-by: Tony Lindgren <tony@atomide.com>
+>>>>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>>>>> ---
+>>>>
+>>>> [ ... ]
+>>>>
+>>>>>>>
+>>>>>>> +    clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
+>>>>>>> +
+>>>>>>>         /*
+>>>>>>>          * Call idle CPU PM enter notifier chain so that
+>>>>>>>          * VFP and per CPU interrupt context is saved.
+>>>>>>> @@ -165,6 +169,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+>>>>>>>         if (dev->cpu == 0 && mpuss_can_lose_context)
+>>>>>>>             cpu_cluster_pm_exit();
+>>>>>>>
+>>>>>>> +    clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
+>>>>
+>>>> [ ... ]
+>>>>
+>>>>>>
+>>>>>> Shouldn't the broadcast timer to be setup with CLOCK_EVT_NOTIFY_BROADCAST_ON also ?
+>>>>>>
+>>>>> Which is already taken care by __cpuidle_register_driver(). Note that setup code
+>>>>> is still used from generic code...
+>>>>
+>>>> Nope, if the flag CPUIDLE_FLAG_TIMER_STOP is not set, the cpuidle framework won't setup the timer.
+>>>>
+>>> I see. I assumed it was taken care. So we might have setup the timer too.
+>>>
+>>>> static void __cpuidle_driver_init(struct cpuidle_driver *drv)
+>>>> {
+>>>>
+>>>>      ...
+>>>>
+>>>>      for (i = drv->state_count - 1; i >= 0 ; i--) {
+>>>>          if (drv->states[i].flags & CPUIDLE_FLAG_TIMER_STOP) {
+>>> May be you should start the bc timer in case 'CPUIDLE_FLAG_TIMER_STOP'
+>>> or 'CPUIDLE_FLAG_COUPLED'
+>>>>              drv->bctimer = 1;
+>>>>              break;
+>>>>          }
+>>>>      }
+>>>>
+>>>>      ...
+>>>>
+>>>> }
+>>>>
+>>>> static int __cpuidle_register_driver(struct cpuidle_driver *drv)
+>>>> {
+>>>>      ...
+>>>>
+>>>>      if (drv->bctimer)
+>>>>          on_each_cpu_mask(drv->cpumask,
+>>>>          cpuidle_setup_broadcast_timer,
+>>>>           (void *)CLOCK_EVT_NOTIFY_BROADCAST_ON, 1);
+>>>>
+>>>>      ...
+>>>> }
+>>>>
+>>>> So the broadcast timer does not operate with this revert. Moreover, I am not sure reverting this patch is the right solution.
+>>>>
+>>> With above mentioned change, it should work. Other alternatives is OMAP4 driver does
+>>> its won registration where it can start the timer. The way it was before the
+>>> consolidation.
+>>>
+>>> Ofcourse if you have better fix, then great.
+>>>
+>> What is your suggestion. We *must* fix the regression asap. I think
+>> $subject patch with an update to bctimer start under CPUIDLE_FLAG_COUPLED
+>> seems a good way forward.
+>>
+>> Do let me know.
 > 
-> From the point-of-view of the CPU it would be posted, but the PCI bus would
-> see an unposted write (so I imagine there would be write buffering at the
-> host controller). However, I worry that I'm missing your point :)
+> Did you see Alex Shi's email [cc'ed] ? Reverting this change makes the panda ES to hang.
+> 
+The hang is definitely due to the bctimer not started. As I said, I assumed it was and
+then you corrected saying it is under the flag.
 
-It is worth being a bit careful with language here, from an AXI
-perspective there is not really such thing as a posted write. 
+> I am not convinced the culprit is this code you are trying to revert.
+> 
+fair enough. Thats why I said if you have an alternative fix thats great.
 
-All writes are explicitly ack'd upon 'completion', however the memory
-type influences when that is allowed to happen.
-
-For PCI IO writes the AXI memory type from the CPU must be 'Device
-Non-bufferable' (AWCACHE = 0), which will require the AXI ACK to be
-generated only once the PCI target returns an IOWr completion TLP.
-
-For PCI Memory writes the AXI memory type from the CPU could be
-'Device Non-bufferable' but it would be best if it is 'Device
-Bufferable' (AWCACHE = 1).
-
-The latter allows more performance by permitting any AXI bridge in the
-path to ack the write early. This is as close as AXI gets to 'posted
-writes'
-
-It is very important that the page tables in the CPU properly select
-the right AXI Memory Type for each space.
-
-Somewhere there should be a table describing how the CPU page table
-attributes map into AXI *CACHE/Memory Type signaling selectors.
-
-Beyond that, as Will points out, a DSB as part of the outl might be
-required to spin the cpu and prevent pipelining.
-
-AFAIK, to duplicate x86 semantics an outl/inl must spin the CPU until
-it completes at the target, and the CPU must not pipeline outl/inl
-operations: outl();  outl(); produces 1 IOWr TLP, waits for
-completion, then produces another.
-
-Jason
+> I will try to reproduce the bug on my board.
+> 
+Sure...
