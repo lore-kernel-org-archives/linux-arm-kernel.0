@@ -1,48 +1,37 @@
-From: elder@linaro.org (Alex Elder)
-Date: Thu, 15 May 2014 12:58:11 -0500
-Subject: [PATCH v3 RESEND 5/5] ARM: dts: enable SMP support for bcm21664
-In-Reply-To: <1400176691-26058-1-git-send-email-elder@linaro.org>
-References: <1400176691-26058-1-git-send-email-elder@linaro.org>
-Message-ID: <1400176691-26058-6-git-send-email-elder@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 May 2014 18:58:23 +0100
+Subject: [PATCH v4 04/20] arm64: boot protocol documentation update for GICv3
+In-Reply-To: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
+References: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1400176719-31275-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define nodes representing the two Cortex A9 CPUs in a bcm21644 SoC.
+Linux has some requirements that must be satisfied in order to boot
+on a system built with a GICv3.
 
-Signed-off-by: Alex Elder <elder@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/boot/dts/bcm21664.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ Documentation/arm64/booting.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm21664.dtsi b/arch/arm/boot/dts/bcm21664.dtsi
-index 08a44d4..a37ded1 100644
---- a/arch/arm/boot/dts/bcm21664.dtsi
-+++ b/arch/arm/boot/dts/bcm21664.dtsi
-@@ -25,6 +25,25 @@
- 		bootargs = "console=ttyS0,115200n8";
- 	};
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index beb754e..fb9f772 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -137,6 +137,12 @@ Before jumping into the kernel, the following conditions must be met:
+   the kernel image will be entered must be initialised by software at a
+   higher exception level to prevent execution in an UNKNOWN state.
  
-+       cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "brcm,bcm11351-cpu-method";
-+		secondary-boot-reg = <0x35004178>;
++  For systems with a GICv3 interrupt controller, it is expected that:
++  - If EL3 is present, it must program ICC_SRE_EL3.Enable (bit 3) to
++    0b1 and ICC_SRE_EL3.SRE (bit 0) to 0b1.
++  - If the kernel is entered at EL1, EL2 must set ICC_SRE_EL2.Enable
++    (bit 3) to 0b1 and ICC_SRE_EL2.SRE (bit 0) to 0b1.
 +
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <1>;
-+		};
-+	};
-+
- 	gic: interrupt-controller at 3ff00100 {
- 		compatible = "arm,cortex-a9-gic";
- 		#interrupt-cells = <3>;
+ The requirements described above for CPU mode, caches, MMUs, architected
+ timers, coherency and system registers apply to all CPUs.  All CPUs must
+ enter the kernel in the same exception level.
 -- 
-1.9.1
+1.8.3.4
