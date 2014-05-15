@@ -1,63 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 15 May 2014 11:25:48 -0700
-Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
- support
-In-Reply-To: <53747DD5.2030406@ti.com>
-References: <1398815562-24113-4-git-send-email-tony@atomide.com>
- <5369EAE7.3030705@ti.com> <20140507150343.GA9502@atomide.com>
- <536A5920.1020908@ti.com> <20140507175919.GH9502@atomide.com>
- <20140508233300.GI2198@atomide.com> <536C924E.5000307@ti.com>
- <20140509153008.GC17814@atomide.com>
- <20140513212639.GA18001@atomide.com> <53747DD5.2030406@ti.com>
-Message-ID: <20140515182548.GD23659@atomide.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Thu, 15 May 2014 14:26:20 -0400
+Subject: [PATCH v3 RESEND 2/5] ARM: add SMP support for Broadcom mobile
+ SoCs
+In-Reply-To: <CAGVrzca20+3kmJjyGv8Pr-qNNV4n0hhADL6GWvcYVDUL4q28Hg@mail.gmail.com>
+References: <1400176691-26058-1-git-send-email-elder@linaro.org>
+ <1400176691-26058-3-git-send-email-elder@linaro.org>
+ <CAGVrzca20+3kmJjyGv8Pr-qNNV4n0hhADL6GWvcYVDUL4q28Hg@mail.gmail.com>
+Message-ID: <20140515182620.GN32082@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [140515 01:42]:
-> On 14/05/14 00:26, Tony Lindgren wrote:
+On Thu, May 15, 2014 at 11:03:49AM -0700, Florian Fainelli wrote:
+> Hi Alex,
 > 
-> > +	/* lcd MO */
-> > +	ddata->mo_gpio = sharp_ls_get_gpio_of(&pdev->dev, 0, 1, "mode");
-> > +	if (PTR_ERR(ddata->mo_gpio) == -EPROBE_DEFER)
-> > +		return -EPROBE_DEFER;
-> > +
-> > +	if (!IS_ERR(ddata->mo_gpio))
-> > +		if (gpiod_get_raw_value_cansleep(ddata->mo_gpio))
-> > +			ddata->flags |= SHARP_LS_QVGA;
+> 2014-05-15 10:58 GMT-07:00 Alex Elder <elder@linaro.org>:
+> > This patch adds SMP support for BCM281XX and BCM21664 family SoCs.
+> >
+> > This feature is controlled with a distinct config option such that a
+> > SMP-enabled multi-v7 binary can be configured to run these SoCs in
+> > uniprocessor mode.  Since this SMP functionality is used for
+> > multiple Broadcom mobile chip families the config option is called
+> > ARCH_BCM_MOBILE_SMP (for lack of a better name).
+> >
+> > On SoCs of this type, the secondary core is not held in reset on
+> > power-on.  Instead it loops in a ROM-based holding pen.  To release
+> > it, one must write into a special register a jump address whose
+> > low-order bits have been replaced with a secondary core's id, then
+> > trigger an event with SEV.  On receipt of an event, the ROM code
+> > will examine the register's contents, and if the low-order bits
+> > match its cpu id, it will clear them and write the value back to the
+> > register just prior to jumping to the address specified.
+> >
+> > The location of the special register is defined in the device tree
+> > using a "secondary-boot-reg" property in a node whose "enable-method"
+> > matches.
+> >
+> > Derived from code originally provided by Ray Jui <rjui@broadcom.com>
+> >
+> > Signed-off-by: Alex Elder <elder@linaro.org>
+> > ---
+> >  arch/arm/mach-bcm/Kconfig   |  18 +++-
+> >  arch/arm/mach-bcm/Makefile  |   3 +
+> >  arch/arm/mach-bcm/platsmp.c | 201 ++++++++++++++++++++++++++++++++++++++++++++
 > 
-> Shouldn't there be an explicit flag in the DT data for this? If the
-> panel's MO pin is hardwired to, say, pull up, then the mode-gpios won't
-> have MO gpio, right? So something like:
-> 
-> 
-> mode-gpios = <0					/* high, lcd MO */
-> 	      &gpio1 2 GPIO_ACTIVE_HIGH		/* gpio2, lcd LR */
-> 	      &gpio1 3 GPIO_ACTIVE_HIGH>;	/* gpio3, lcd UD */
-> 
-> vga-mode;	/* MO hardwired high */
+> Could we make that name a little bit more specific to the mobile SoCs?
+> There are other BCM SoCs either currently supported in this directory
+> (BCM5310X), or making their way to be supported (brcmstb, bcm63xx),
+> and those share nothing with the Mobile SoC SMP code.
  
-Yeah holes there are just fine. I figured let's keep the custom
-vga-mode property out of the way until we actually run into a panel
-that's not using a GPIO for mode.
+Right.
 
-So far it seems that mode GPIO is there for the panels I've seen,
-just the scan direction pins seem to be hard wired on LDP. But
-then again, maybe I'm still having trouble locating all the
-GPIOs in the LDP schematics.
- 
-> Btw, the gpio.txt has each gpio inside <>:
-> 
-> chipsel-gpios = <&gpio1 12 0>,
-> 		 <&gpio1 13 0>,
-> 		 <0>, /* holes are permitted, means no GPIO 2 */
-> 		 <&gpio2 2>;
-> 
-> Is that equivalent to having all gpios inside <>?
+> Maybe we should create another level directory within mach-bcm...
 
-Yeah, just less <> braces. The number of elements for each
-entry is what matters and that's known by the GPIO parsing
-code.
+Let's not go that far. The general direction we need to go is to work
+toward removing this code from mach-bcm/ completely. I don't really want
+to see us adding directories and encouraging burying a lot of new files
+in them.
 
-Regards,
+A unique name will be enough and then we can work toward moving things
+out to drivers/ over time.
 
-Tony
+-Matt
