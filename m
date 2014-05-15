@@ -1,94 +1,118 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 15 May 2014 12:17:29 +0200
-Subject: [PATCH v6 04/17] usb: ehci-orion: add optional PHY support
+Date: Thu, 15 May 2014 12:17:32 +0200
+Subject: [PATCH v6 07/17] usb: host: xhci-plat: add clock support
 In-Reply-To: <1400149062-32661-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1400149062-32661-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1400149062-32661-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1400149062-32661-8-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit extends the ehci-orion so that it can optionally be passed
-a reference to a PHY through the Device Tree. It will be useful for
-the Armada 375 SoCs. If no PHY is provided then the behavior of the
-driver is unchanged.
+Some platforms (such as the Armada 38x ones) can gate the clock of
+their USB controller. This patch adds the support for one clock in
+xhci-plat, by enabling it during probe and disabling it on remove.
 
-[Thomas: use devm_phy_optional_get() so that we handle -EPROBE_DEFER
-properly. Also call phy_power_off() when needed, and rename goto
-labels.]
+To achieve this, it adds a 'struct clk *' member in xhci_hcd. While
+only used for now in xhci-plat, it might be used by other drivers in
+the future. Moreover, the xhci_hcd structure already holds other
+members such as msix_count and msix_entries, which are MSI-X specific,
+and therefore only used by xhci-pci.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Acked-by: Felipe Balbi <balbi@ti.com>
+Acked-by: Mathias Nyman <mathias.nyman@linux.intel.com>
 ---
- drivers/usb/host/ehci-orion.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ drivers/usb/host/xhci-plat.c | 24 +++++++++++++++++++++++-
+ drivers/usb/host/xhci.h      |  2 ++
+ 2 files changed, 25 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
-index 9c98bac0a5bc..22e15cab8ea5 100644
---- a/drivers/usb/host/ehci-orion.c
-+++ b/drivers/usb/host/ehci-orion.c
-@@ -15,6 +15,7 @@
- #include <linux/clk.h>
- #include <linux/platform_data/usb-ehci-orion.h>
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index f5351af4b2c5..8108e58c9e02 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -11,6 +11,7 @@
+  * version 2 as published by the Free Software Foundation.
+  */
+ 
++#include <linux/clk.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/module.h>
  #include <linux/of.h>
-+#include <linux/phy/phy.h>
- #include <linux/of_device.h>
- #include <linux/of_irq.h>
- #include <linux/usb.h>
-@@ -46,6 +47,7 @@
+@@ -91,6 +92,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	struct xhci_hcd		*xhci;
+ 	struct resource         *res;
+ 	struct usb_hcd		*hcd;
++	struct clk              *clk;
+ 	int			ret;
+ 	int			irq;
  
- struct orion_ehci_hcd {
- 	struct clk *clk;
-+	struct phy *phy;
- };
+@@ -137,14 +139,27 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 		goto release_mem_region;
+ 	}
  
- static const char hcd_name[] = "ehci-orion";
-@@ -221,6 +223,20 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
- 	if (!IS_ERR(priv->clk))
- 		clk_prepare_enable(priv->clk);
- 
-+	priv->phy = devm_phy_optional_get(&pdev->dev, "usb");
-+	if (IS_ERR(priv->phy)) {
-+		err = PTR_ERR(priv->phy);
-+		goto err_phy_get;
-+	} else {
-+		err = phy_init(priv->phy);
-+		if (err)
-+			goto err_phy_init;
-+
-+		err = phy_power_on(priv->phy);
-+		if (err)
-+			goto err_phy_power_on;
++	/*
++	 * Not all platforms have a clk so it is not an error if the
++	 * clock does not exists.
++	 */
++	clk = devm_clk_get(&pdev->dev, NULL);
++	if (!IS_ERR(clk)) {
++		ret = clk_prepare_enable(clk);
++		if (ret)
++			goto unmap_registers;
 +	}
 +
- 	/*
- 	 * (Re-)program MBUS remapping windows if we are asked to.
- 	 */
-@@ -256,6 +272,13 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
- 	return 0;
+ 	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+ 	if (ret)
+-		goto unmap_registers;
++		goto disable_clk;
++
+ 	device_wakeup_enable(hcd->self.controller);
  
- err_add_hcd:
-+	if (!IS_ERR(priv->phy))
-+		phy_power_off(priv->phy);
-+err_phy_power_on:
-+	if (!IS_ERR(priv->phy))
-+		phy_exit(priv->phy);
-+err_phy_init:
-+err_phy_get:
- 	if (!IS_ERR(priv->clk))
- 		clk_disable_unprepare(priv->clk);
- 	usb_put_hcd(hcd);
-@@ -273,6 +296,11 @@ static int ehci_orion_drv_remove(struct platform_device *pdev)
- 
+ 	/* USB 2.0 roothub is stored in the platform_device now. */
+ 	hcd = platform_get_drvdata(pdev);
+ 	xhci = hcd_to_xhci(hcd);
++	xhci->clk = clk;
+ 	xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
+ 			dev_name(&pdev->dev), hcd);
+ 	if (!xhci->shared_hcd) {
+@@ -173,6 +188,10 @@ put_usb3_hcd:
+ dealloc_usb2_hcd:
  	usb_remove_hcd(hcd);
  
-+	if (!IS_ERR(priv->phy)) {
-+		phy_power_off(priv->phy);
-+		phy_exit(priv->phy);
-+	}
++disable_clk:
++	if (!IS_ERR(clk))
++		clk_disable_unprepare(clk);
 +
- 	if (!IS_ERR(priv->clk))
- 		clk_disable_unprepare(priv->clk);
+ unmap_registers:
+ 	iounmap(hcd->regs);
  
+@@ -189,11 +208,14 @@ static int xhci_plat_remove(struct platform_device *dev)
+ {
+ 	struct usb_hcd	*hcd = platform_get_drvdata(dev);
+ 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
++	struct clk *clk = xhci->clk;
+ 
+ 	usb_remove_hcd(xhci->shared_hcd);
+ 	usb_put_hcd(xhci->shared_hcd);
+ 
+ 	usb_remove_hcd(hcd);
++	if (!IS_ERR(clk))
++		clk_disable_unprepare(clk);
+ 	iounmap(hcd->regs);
+ 	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+ 	usb_put_hcd(hcd);
+diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
+index d280e9213d08..003dc094ca37 100644
+--- a/drivers/usb/host/xhci.h
++++ b/drivers/usb/host/xhci.h
+@@ -1478,6 +1478,8 @@ struct xhci_hcd {
+ 	/* msi-x vectors */
+ 	int		msix_count;
+ 	struct msix_entry	*msix_entries;
++	/* optional clock */
++	struct clk		*clk;
+ 	/* data structures */
+ 	struct xhci_device_context_array *dcbaa;
+ 	struct xhci_ring	*cmd_ring;
 -- 
 1.8.1.2
