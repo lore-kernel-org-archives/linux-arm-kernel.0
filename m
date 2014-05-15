@@ -1,112 +1,102 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 May 2014 18:55:31 +0200
-Subject: [PATCH v2 06/10] clk: berlin: add core clock driver for BG2/BG2CD
-In-Reply-To: <5374E087.7030703@gmail.com>
-References: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1400098522-14770-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1400098522-14770-7-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140515080921.GQ29318@piout.net> <5374E087.7030703@gmail.com>
-Message-ID: <20140515165531.GV29318@piout.net>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 15 May 2014 17:58:39 +0100
+Subject: [GIT PULL] vexpress: defconfig update for 3.13
+Message-ID: <1400173119.29434.4.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/2014 at 17:43:03 +0200, Sebastian Hesselbarth wrote :
-> On 05/15/2014 10:09 AM, Alexandre Belloni wrote:
-> >On 14/05/2014 at 22:15:17 +0200, Sebastian Hesselbarth wrote :
-> >>+	/* clock divider cells */
-> >>+	parent_names[1] = avpllb_names[CH4];
-> >>+	parent_names[2] = avpllb_names[CH5];
-> >>+	parent_names[3] = avpllb_names[CH6];
-> >>+	parent_names[4] = avpllb_names[CH7];
-> >>+
-> >>+	parent_names[0] = refclk_names[SYSPLL];
-> >
-> >It should actually be:
-> >
-> >parent_names[0] = avpllb_names[CH4];
-> >parent_names[1] = avpllb_names[CH5];
-> >parent_names[2] = avpllb_names[CH6];
-> >parent_names[3] = avpllb_names[CH7];
-> >parent_names[4] = refclk_names[SYSPLL];
-> 
-> Given the comment to remove index 0 in the last patch, I translate that
-> into: "the input mux bypass is there, but {cannot,should not,we do not
-> want it to} be used". *sigh*
-> 
-> Actually, almost all of this is based on Chromecast mirrored BSP code
-> and I though about leaving the bypass mux in - even if it is not used
-> at all.
-> 
-> The reason is that I am _very_ tired of reading through the BSP code
-> and have all the things in mind where the BSP code is unclear.
-> 
+Hello Arnd, Kevin, Olof,
 
-Ok, I made a mistake, I also have a hard time to picture everything
-myself ;)
+The series went through the a couple of review cycles (with the latest
+here: thread.gmane.org/gmane.linux.ports.arm.kernel/320572/) and got set
+of acks from almost all relevant subsystem maintainers.
 
-So, the mux is there iand can be used, hence, the parents are actually:
+The following changes since commit d6d211db37e75de2ddc3a4f979038c40df7cc79c:
 
-parent_names[0] = refclk_names[SYSPLL];
-parent_names[1] = avpllb_names[CH4];
-parent_names[2] = avpllb_names[CH5];
-parent_names[3] = avpllb_names[CH6];
-parent_names[4] = avpllb_names[CH7];
-parent_names[5] = refclk_names[SYSPLL];
+  Linux 3.15-rc5 (2014-05-09 13:10:52 -0700)
 
-and disregard my comment on the previous patch.
+are available in the git repository at:
 
-> >>+	data = &bg2_divs[CLKID_SYS];
-> >>+	clks[CLKID_SYS] = berlin2_div_register(&data->map, base, data->name,
-> >>+		       data->div_flags, parent_names, 5, data->flags, &lock);
-> >>+
-> >>+	parent_names[0] = refclk_names[CPUPLL];
-> >>+	parent_names[5] = refclk_names[MEMPLL];
-> >
-> >The only valid choice here should be (remember, we are not adding 1 to
-> >the index anymore):
-> >parent_names[4] = refclk_names[MEMPLL];
+  git://git.linaro.org/people/pawel.moll/linux.git tags/vexpress/updates-for-3.16
 
-There, you actually had it right, maybe we could set parent_names[1] to
-parent_names[4] to something bogus or all to refclk_names[MEMPLL].
+for you to fetch changes up to 6b2c31c71d6fa8896c5f3f2354d790a5bd3f0a1e:
 
-> 
-> Funny to see that there ought to be a CPUPLL which isn't used by the
-> CPU at all. This also implies to remove CPUPLL, right?
-> 
-> >>+	data = &bg2_divs[CLKID_CPU];
-> >>+	clks[CLKID_CPU] = berlin2_div_register(&data->map, base, data->name,
-> >>+			 data->div_flags, parent_names, 6, data->flags, &lock);
-> >>+
-> >
-> >This is where it gets tricky, now we should have:
-> >parent_names[0] = avpllb_names[CH4];
-> >parent_names[1] = avplla_names[CH5];
-> >parent_names[2] = avpllb_names[CH6];
-> >parent_names[3] = avpllb_names[CH7];
-> >parent_names[4] = refclk_names[SYSPLL];
-> 
-> First I thought that it is just the default input mux clocks again..
-> but then I noticed that it is actually AVPLL_A5 not B5.
-> 
+  ARM: vexpress: move HBI check to sysreg driver (2014-05-15 17:02:21 +0100)
 
-Here it becomes:
-parent_names[0] = refclk_names[SYSPLL];
-parent_names[1] = avpllb_names[CH4];
-parent_names[2] = avplla_names[CH5];
-parent_names[3] = avpllb_names[CH6];
-parent_names[4] = avpllb_names[CH7];
-parent_names[5] = refclk_names[SYSPLL];
+----------------------------------------------------------------
+ARM Versatile Express updates for 3.16
 
+This series reworks VE's platform configuration infrastructure by:
 
-> Ok, I admit having confirmed information is maybe better. So, you agree
-> that we can remove the input mux bypass on the complex divider, too?
-> (Including all the consequences: remove it from the divmap, driver, ...)
-> 
+- making it possible to instantiate selected devices from the
+  Device Tree, prior to massive population,
+- converting custom "func" API into standard "regmap",
+- splitting the existing MFD driver into smaller ones and placing
+  them into relevant directories.
 
-No, let's keep the mux, sorry about that confusion.
+The common clock framework driver can now be selected individually
+(mostly for arm64 sake, where some of them are not used at all).
 
+It also simplifies the machine code, by:
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+- moving the shed clock info clocksource driver,
+- simplifying SMP operations to base them entirely of the DT data,
+- moving platform ID checks into relevant driver.
+
+----------------------------------------------------------------
+Pawel Moll (8):
+      of: Keep track of populated platform devices
+      mfd: vexpress: Convert custom func API to regmap
+      mfd: syscon: Add platform data with a regmap config name
+      mfd: vexpress: Define the device as MFD cells
+      clk: versatile: Split config options for sp810 and vexpress_osc
+      clocksource: Sched clock source for Versatile Express
+      ARM: vexpress: Simplify SMP operations for DT-powered system
+      ARM: vexpress: move HBI check to sysreg driver
+
+Sudeep KarkadaNagesha (1):
+      ARM: vexpress: remove redundant vexpress_dt_cpus_num to get cpu count
+
+ .../devicetree/bindings/arm/vexpress-sysreg.txt    |  79 ++-
+ Documentation/devicetree/bindings/arm/vexpress.txt |  15 +-
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi            |  76 ++-
+ arch/arm/boot/dts/vexpress-v2m.dtsi                |  76 ++-
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |   5 +-
+ arch/arm/mach-vexpress/core.h                      |   3 +-
+ arch/arm/mach-vexpress/ct-ca9x4.c                  |  10 +-
+ arch/arm/mach-vexpress/platsmp.c                   | 187 ++-----
+ arch/arm/mach-vexpress/v2m.c                       |  82 +--
+ arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi       |   2 +-
+ drivers/bus/Kconfig                                |   9 +
+ drivers/bus/Makefile                               |   2 +
+ drivers/bus/vexpress-config.c                      | 202 ++++++++
+ drivers/clk/Kconfig                                |   9 +-
+ drivers/clk/versatile/Kconfig                      |  26 +
+ drivers/clk/versatile/Makefile                     |   5 +-
+ drivers/clk/versatile/clk-vexpress-osc.c           |  96 ++--
+ drivers/clocksource/Kconfig                        |  11 +
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/versatile.c                    |  40 ++
+ drivers/hwmon/vexpress.c                           |  17 +-
+ drivers/mfd/Kconfig                                |  15 +-
+ drivers/mfd/Makefile                               |   2 +-
+ drivers/mfd/syscon.c                               |   4 +
+ drivers/mfd/vexpress-config.c                      | 287 -----------
+ drivers/mfd/vexpress-sysreg.c                      | 554 ++++++---------------
+ drivers/misc/Kconfig                               |   9 +
+ drivers/misc/Makefile                              |   1 +
+ drivers/misc/vexpress-syscfg.c                     | 324 ++++++++++++
+ drivers/of/platform.c                              |  74 ++-
+ drivers/power/reset/vexpress-poweroff.c            |  16 +-
+ drivers/regulator/vexpress.c                       |  50 +-
+ include/linux/of.h                                 |   7 +
+ include/linux/of_platform.h                        |   5 +
+ include/linux/platform_data/syscon.h               |   8 +
+ include/linux/vexpress.h                           |  94 +---
+ 36 files changed, 1253 insertions(+), 1150 deletions(-)
+ create mode 100644 drivers/bus/vexpress-config.c
+ create mode 100644 drivers/clk/versatile/Kconfig
+ create mode 100644 drivers/clocksource/versatile.c
+ delete mode 100644 drivers/mfd/vexpress-config.c
+ create mode 100644 drivers/misc/vexpress-syscfg.c
+ create mode 100644 include/linux/platform_data/syscon.h
