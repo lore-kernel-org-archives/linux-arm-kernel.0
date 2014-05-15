@@ -1,55 +1,120 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 15 May 2014 12:52:31 -0400 (EDT)
-Subject: [PATCH v6 0/5] MCPM backend for Exynos5420
-In-Reply-To: <CAM4voakB57mgyQmtkpCUAF1BVW5z3BGsesvxvTuSg_JwBh-sxw@mail.gmail.com>
-References: <1399982324-27879-1-git-send-email-a.kesavan@samsung.com>
- <alpine.LFD.2.11.1405131325060.980@knanqh.ubzr>
- <CAM4voanvVwj+FuWazTGMHMnM64Cw_qK03D3o=raS43f_zWFfog@mail.gmail.com>
- <alpine.LFD.2.11.1405140031490.980@knanqh.ubzr>
- <CAM4voa=6osyXYg_XF=XuGRYmxLDUO+5=-i+cMrNW92fzBZJjfA@mail.gmail.com>
- <alpine.LFD.2.11.1405140931380.980@knanqh.ubzr>
- <CAM4voam29e7aK7n86_Mpj-wwvkchm-e68qA5=iUFou+sUMONig@mail.gmail.com>
- <CAM4voakB57mgyQmtkpCUAF1BVW5z3BGsesvxvTuSg_JwBh-sxw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1405151250070.17310@knanqh.ubzr>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Thu, 15 May 2014 09:54:32 -0700
+Subject: [PATCHv3 3/4] of: provide a binding for fixed link PHYs
+In-Reply-To: <20140515153957.75a8aa2a@free-electrons.com>
+References: <20140308055033.BE0F2C405B0@trevor.secretlab.ca>
+ <20140515153957.75a8aa2a@free-electrons.com>
+Message-ID: <CAGVrzcZ1h_Cm=b2aKEAcXYJyVOhoRZLcpXFh0oBB-wodMJnB8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 May 2014, Abhilash Kesavan wrote:
+Hi Thomas,
 
-> Hi Nicolas,
-> 
-> On Wed, May 14, 2014 at 7:09 PM, Abhilash Kesavan
-> <kesavan.abhilash@gmail.com> wrote:
-> > Hi Nicolas,
-> >
-> > On Wed, May 14, 2014 at 7:03 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> >> On Wed, 14 May 2014, Abhilash Kesavan wrote:
-> >>
-> >>> Hi Nicolas,
-> >>>
-> >>> [...]
-> >>> >>
-> >>> >> 1) can't create /sys/devices/system/cpu/cpu//online: nonexistent directory
-> >>> >
-> >>> > What do you get if you do:
-> >>> >
-> >>> > $ ls -d /sys/devices/system/cpu/cpu?/online
-> >>> ls: /sys/devices/system/cpu/cpu//online: No such file or directory
-> >>
-> >> Somehow, you or your shell replaced the ? character into a / character.
-> >> You could try with a * instead.
-> > With a different RFS your script runs fine without any change. Will
-> > update with results once testing is done.
-> The script has been running for a few hours on my 5420 based
-> chromebook. I can see all the cores being hotplugged in/out. A snippet
-> of the prints, that I get on running the test, follows:
-> 
-[...]
+2014-05-15 6:39 GMT-07:00 Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com>:
+> Dear Grant Likely,
+>
+> Sorry for bringing back this old topic, but I'm working on this again,
+> hopefully reaching an acceptable solution this time. One question for
+> you below.
+>
+> On Sat, 08 Mar 2014 05:50:33 +0000, Grant Likely wrote:
+>
+>> > +Example:
+>> > +
+>> > +ethernet at 0 {
+>> > +   ...
+>> > +   phy = <&phy0>;
+>> > +   phy0: phy at 0 {
+>> > +         fixed-link;
+>> > +         speed = <1000>;
+>> > +         full-duplex;
+>> > +   };
+>>
+>> The phy phandle to a child node is superfluous. A phandle to a fixed
+>> child node doesn't make a whole lot of sense.
+>
+> [...]
+>
+>> There should be no address portion in the node name. It isn't a child
+>> device, the node is merely more configuration data for the parent.
+>>
+>> Example:
+>>
+>> ethernet at 0 {
+>>       ...
+>>       fixed-link {
+>>             speed = <1000>;
+>>             full-duplex;
+>>       };
+>
+> For my current use case, I'm personally fine with that. But that
+> doesn't work well with Florian Fainelli's which to potentially have the
+> "fixed-link" node as part of another node in the DT, in the case the
+> PHY is configurable through some separate SPI/I2C bus. See his comment
+> in http://article.gmane.org/gmane.linux.network/306789:
 
-Good, that looks pretty good.
+I just re-read Grant's comments, and I don't think we contradict with
+each other here. Since the data-path is symetrical by nature, whether
+you place the 'fixed-link' property on one end (Ethernet MAC) or the
+other (SPI/I2C/GPIO node) does make a huge difference, except you want
+it to be placed where it makes the most sense: in the Ethernet MAC
+node. Properties like the speed, duplex, pause are definitively
+Ethernet MAC only properties.
 
-Once you implement full cluster shutdown I can provide you with another 
-script stressing that part.
+In case we need to specifically associate these two nodes with each
+other, a phandle property to the Ethernet MAC node, or e.g: the SPI
+node can be used.
+
+That said, I think we should go with Grant's proposal of having the
+following representation:
+
+ethernet at 0 {
+      ...
+       fixed-link {
+             speed = <1000>;
+             full-duplex;
+       };
+
+we might want to use 'max-speed' instead of speed, but that's debatable.
+
+>
+> """
+> Another problem with that "old" 'fixed-link' property is that we are
+> not properly capturing and representing Ethernet switches/PHYs whose
+> data-path are isolated from the control path. For instance such
+> devices will traditionally expose their control path as a
+> MMIO/GPIO/I2C/SPI interface. Using the 5-digit 'fixed-link' property
+> we are not representing this, on one side the Ethernet MAC is just
+> told to hardcode the link parameters with some parameters, and on
+> other side, any MMIO/GPIO/I2C/SPI device is not equipped with the
+> correct properties to express the fact that is also has a data-path
+> connected to an Ethernet MAC.
+>
+> What I like about this new binding is that we could place the
+> 'fixed-link' related properties in e.g: a SPI slave node, and have the
+> Ethernet MAC be pointed at it by a phandle to tell it: look this is
+> your PHY, it might not be one you could address on a MDIO bus, so I
+> have been providing additional properties to help you with the link
+> configuration.
+> """
+>
+> What is your opinion about this?
+>
+> Thanks,
+>
+> Thomas
+> --
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 
-Nicolas
+
+-- 
+Florian
