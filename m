@@ -1,103 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 May 2014 18:58:29 +0100
-Subject: [PATCH v4 10/20] KVM: ARM: vgic: move underflow handling to vgic_ops
-In-Reply-To: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
-References: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1400176719-31275-11-git-send-email-marc.zyngier@arm.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 15 May 2014 20:03:06 +0200
+Subject: [PATCH v4 6/9] regulator: AXP20x: Add support for regulators
+ subsystem
+In-Reply-To: <1397209093-10077-7-git-send-email-carlo@caione.org>
+References: <1397209093-10077-1-git-send-email-carlo@caione.org>
+ <1397209093-10077-7-git-send-email-carlo@caione.org>
+Message-ID: <5375015A.10701@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the code dealing with LR underflow handling to its own functions,
-and make them accessible through vgic_ops.
+Hello Carlo,
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- include/kvm/arm_vgic.h |  2 ++
- virt/kvm/arm/vgic.c    | 28 +++++++++++++++++++++++++---
- 2 files changed, 27 insertions(+), 3 deletions(-)
+On 11/04/2014 11:38, Carlo Caione wrote:
+> AXP202 and AXP209 come with two synchronous step-down DC-DCs and five
+> LDOs. This patch introduces basic support for those regulators.
+>
+> Signed-off-by: Carlo Caione <carlo@caione.org>
+> ---
+>  drivers/regulator/Kconfig            |   7 +
+>  drivers/regulator/Makefile           |   1 +
+[...]
+> +	if (!np)
+> +		return 0;
+> +
+> +	regulators = of_find_node_by_name(np, "regulators");
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 4857508..cdfa5d9 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -88,6 +88,8 @@ struct vgic_ops {
- 	u64	(*get_elrsr)(const struct kvm_vcpu *vcpu);
- 	u64	(*get_eisr)(const struct kvm_vcpu *vcpu);
- 	u32	(*get_interrupt_status)(const struct kvm_vcpu *vcpu);
-+	void	(*enable_underflow)(struct kvm_vcpu *vcpu);
-+	void	(*disable_underflow)(struct kvm_vcpu *vcpu);
- };
- 
- struct vgic_dist {
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 9491c22..369016c 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1047,6 +1047,16 @@ static u32 vgic_v2_get_interrupt_status(const struct kvm_vcpu *vcpu)
- 	return ret;
- }
- 
-+static void vgic_v2_enable_underflow(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr |= GICH_HCR_UIE;
-+}
-+
-+static void vgic_v2_disable_underflow(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
-+}
-+
- static const struct vgic_ops vgic_ops = {
- 	.get_lr			= vgic_v2_get_lr,
- 	.set_lr			= vgic_v2_set_lr,
-@@ -1054,6 +1064,8 @@ static const struct vgic_ops vgic_ops = {
- 	.get_elrsr		= vgic_v2_get_elrsr,
- 	.get_eisr		= vgic_v2_get_eisr,
- 	.get_interrupt_status	= vgic_v2_get_interrupt_status,
-+	.enable_underflow	= vgic_v2_enable_underflow,
-+	.disable_underflow	= vgic_v2_disable_underflow,
- };
- 
- static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr)
-@@ -1088,6 +1100,16 @@ static inline u32 vgic_get_interrupt_status(struct kvm_vcpu *vcpu)
- 	return vgic_ops.get_interrupt_status(vcpu);
- }
- 
-+static inline void vgic_enable_underflow(struct kvm_vcpu *vcpu)
-+{
-+	vgic_ops.enable_underflow(vcpu);
-+}
-+
-+static inline void vgic_disable_underflow(struct kvm_vcpu *vcpu)
-+{
-+	vgic_ops.disable_underflow(vcpu);
-+}
-+
- static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-@@ -1269,9 +1291,9 @@ static void __kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
- 
- epilog:
- 	if (overflow) {
--		vgic_cpu->vgic_v2.vgic_hcr |= GICH_HCR_UIE;
-+		vgic_enable_underflow(vcpu);
- 	} else {
--		vgic_cpu->vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
-+		vgic_disable_underflow(vcpu);
- 		/*
- 		 * We're about to run this VCPU, and we've consumed
- 		 * everything the distributor had in store for
-@@ -1324,7 +1346,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 	}
- 
- 	if (status & INT_STATUS_UNDERFLOW)
--		vgic_cpu->vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
-+		vgic_disable_underflow(vcpu);
- 
- 	return level_pending;
- }
+I know I'm late, and this patch has already been applied, but shouldn't
+we use of_get_child_by_name instead of of_find_node_by_name.
+This might lead to wrong regulators node parsing if other regulators are
+defined in the DT after the axp20x node, because, AFAIK, this function
+searches for DT nodes defined after the specified np node, but not
+necessarely children of the np node.
+
+Best Regards,
+
+Boris
+
 -- 
-1.8.3.4
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
