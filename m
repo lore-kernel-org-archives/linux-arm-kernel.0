@@ -1,35 +1,94 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 15 May 2014 13:39:21 +0200
-Subject: [PATCHv3 2/3] ARM: mm: add support for HW coherent systems in
- PL310
-In-Reply-To: <20140515093639.GF11117@localhost>
-References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1400145519-28530-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140515093639.GF11117@localhost>
-Message-ID: <20140515133921.5b153362@free-electrons.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 15 May 2014 20:39:30 +0900
+Subject: [PATCH v2 1/4] ARM: shmobile: r8a7779: Add scif nodes to dtsi
+In-Reply-To: <1400153973-25546-1-git-send-email-horms+renesas@verge.net.au>
+References: <1400153973-25546-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1400153973-25546-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Catalin Marinas,
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-On Thu, 15 May 2014 10:36:39 +0100, Catalin Marinas wrote:
+---
+v2
+* As suggested by Laurent Pinchart
+  - The correct size of the register is 256 not 265.
+    And to make this a bit more readable use 0x100.
+  - List compat strings from most to least specific.
+---
+ arch/arm/boot/dts/r8a7779.dtsi | 60 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
 
-> > While in theory any write to a PL310 register could cause the
-> > deadlock, in practice, disabling ->sync is sufficient to workaround
-> > the deadlock, since the other cache maintenance operations are only
-> > used in very specific situations.
-> > 
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-
-Thanks a lot for having reviewed these patches! I will submit PATCH 1/3
-and PATCH 2/3 in Russell's patch system now.
-
-Thanks,
-
-Thomas
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index bdaaadc..7c3b2d3 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -192,6 +192,66 @@
+ 		status = "disabled";
+ 	};
+ 
++	scif0: serial at ffe40000 {
++		compatible = "renesas,scif-r8a7779", "renesas,scif";
++		reg = <0xffe40000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 88 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg_clocks R8A7779_CLK_P>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif1: serial at ffe41000 {
++		compatible = "renesas,scif-r8a7779", "renesas,scif";
++		reg = <0xffe41000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg_clocks R8A7779_CLK_P>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif2: serial at ffe42000 {
++		compatible = "renesas,scif-r8a7779", "renesas,scif";
++		reg = <0xffe42000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 90 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg_clocks R8A7779_CLK_P>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif3: serial at ffe43000 {
++		compatible = "renesas,scif-r8a7779", "renesas,scif";
++		reg = <0xffe43000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 91 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg_clocks R8A7779_CLK_P>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif4: serial at ffe44000 {
++		compatible = "renesas,scif-r8a7779", "renesas,scif";
++		reg = <0xffe44000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 92 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg_clocks R8A7779_CLK_P>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif5: serial at ffe45000 {
++		compatible = "renesas,scif-r8a7779", "renesas,scif";
++		reg = <0xffe45000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 93 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg_clocks R8A7779_CLK_P>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
+ 	pfc: pfc at fffc0000 {
+ 		compatible = "renesas,pfc-r8a7779";
+ 		reg = <0xfffc0000 0x23c>;
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.8.5.2
