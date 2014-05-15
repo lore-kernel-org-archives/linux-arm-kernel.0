@@ -1,65 +1,75 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 15 May 2014 23:44:49 +0200
-Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
-In-Reply-To: <53753522.30107@samsung.com>
-References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
- <53752E25.9060604@gmail.com>
- <CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>
- <53753522.30107@samsung.com>
-Message-ID: <53753551.2040808@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 15 May 2014 22:47:04 +0100
+Subject: [PATCH v2 09/11] arm64/crypto: add voluntary preemption to Crypto
+ Extensions SHA1
+In-Reply-To: <CAKv+Gu-9P+vDPnvr2Cz4Bcw5=5SuEMw-xFxLM4=SoF65ESvhcQ@mail.gmail.com>
+References: <1400091451-9117-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1400091451-9117-10-git-send-email-ard.biesheuvel@linaro.org>
+ <20140515172458.GE1499@arm.com>
+ <CAKv+Gu-9P+vDPnvr2Cz4Bcw5=5SuEMw-xFxLM4=SoF65ESvhcQ@mail.gmail.com>
+Message-ID: <E28B9BA9-468D-45BD-A479-5D9289616798@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.05.2014 23:44, Kukjin Kim wrote:
-> On 05/16/14 06:33, Doug Anderson wrote:
->> Tomasz,
->>
->> On Thu, May 15, 2014 at 2:14 PM, Tomasz Figa<tomasz.figa@gmail.com> 
->> wrote:
->>> Hi Chirantan,
->>>
->>> On 15.05.2014 23:07, Chirantan Ekbote wrote:
->>>> The multi core timer and the ARM architected timer are two different
->>>> interfaces to the same underlying hardware timer.  This causes some
->>>> strange timing issues when they are both enabled at the same time so
->>>> remove the mct from the device tree and keep only the architected
->>>> timer.
->>>
->>> Huh? I've always thought MCT is a completely separate hardware block
->>> outside of ARM cores, while architected timers are embedded inside the
->>> CPU block in which the ARM cores reside. Could you elaborate on this?
->>
->> Yup.  Our thoughts exactly.
->>
->> ...but it appears not to be the case.  Chirantan demonstrated this in
->> U-Boot just to prove that it's not some strange kernel interaction in
->> <https://chromium-review.googlesource.com/200035>.  I took his patch
->> and tweaked it a little more myself in
->> <https://chromium-review.googlesource.com/200098>.
->>
->> Specifically:
->> * If you stop the MCT, the arch timer stops
->> * If you reset the MCT, the arch timer resets
->> * If you start the MCT again, the arch timer starts again
->> * If you read the MCT and the arch timer, they give the same value.
->>
->>
->> This is apparently the answer to my question at
->> <http://www.spinics.net/lists/linux-samsung-soc/msg29085.html>.
->> Specifically Chirantan found that the big jump in time happened when
->> MCT reset to 0.  That made the arch timer code think that there was a
->> wraparound and jump forward in time a lot.
->>
->>
->> Please confirm if you have a system that has MCT and arch timer in
->> front of you.
->>
-> Hi all,
+On 15 May 2014, at 22:35, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 15 May 2014 10:24, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> On Wed, May 14, 2014 at 07:17:29PM +0100, Ard Biesheuvel wrote:
+>>> +static u8 const *sha1_do_update(struct shash_desc *desc, const u8 *data,
+>>> +                             int blocks, u8 *head, unsigned int len)
+>>> +{
+>>> +     struct sha1_state *sctx = shash_desc_ctx(desc);
+>>> +     struct thread_info *ti = NULL;
+>>> +
+>>> +     /*
+>>> +      * Pass current's thread info pointer to sha1_ce_transform()
+>>> +      * below if we want it to play nice under preemption.
+>>> +      */
+>>> +     if ((IS_ENABLED(CONFIG_PREEMPT_VOLUNTARY) || IS_ENABLED(CONFIG_PREEMPT))
+>>> +         && (desc->flags & CRYPTO_TFM_REQ_MAY_SLEEP))
+>>> +             ti = current_thread_info();
+>>> +
+>>> +     do {
+>>> +             int rem;
+>>> +
+>>> +             kernel_neon_begin_partial(16);
+>>> +             rem = sha1_ce_transform(blocks, data, sctx->state, head, 0, ti);
+>>> +             kernel_neon_end();
+>>> +
+>>> +             data += (blocks - rem) * SHA1_BLOCK_SIZE;
+>>> +             blocks = rem;
+>>> +             head = NULL;
+>>> +     } while (unlikely(ti && blocks > 0));
+>>> +     return data;
+>>> +}
+>> 
+>> What latencies are we talking about? Would it make sense to always
+>> call cond_resched() even if preemption is disabled?
 > 
-> I need to talk to hardware guy to clarify the issue then I'll let you know.
+> Calculating the SHA256 (which is the most striking example) hash of a
+> 4k buffer takes ~10 microseconds, so perhaps this is all a bit moot as
+> I don't think there will generally be many in-kernel users hashing
+> substantially larger quantities of data at a time.
 
-Great, thanks. Having a confirmation from hardware team would be
-definitely nice.
+And what?s the maximum size? Could we do it in blocks of 4K?
 
-Best regards,
-Tomasz
+>> But I think we should have this loop always rescheduling if
+>> CRYPTO_TFM_REQ_MAY_SLEEP. I can see there is a crypto_yield() function
+>> that conditionally reschedules. What's the overhead of calling
+>> sha1_ce_transform() in a loop vs a single call for the entire data?
+> 
+> For SHA256 we lose at least 10% if we call into the core function for
+> each 64 byte block rather than letting it chew away at all the data
+> itself.
+
+I was thinking more like calling it for bigger buffers (e.g. page) at
+once and a crypto_yield() in between.
+
+> (This is due to the fact that it needs to load 64 32-bit round
+> keys) But perhaps (considering the above) it is better to just shelve
+> the last 4 patches in this series until it becomes a problem for
+> anyone.
+
+For the time being I would drop the last 4 patches. We can revisit them
+for the next kernel version.
+
+Catalin
