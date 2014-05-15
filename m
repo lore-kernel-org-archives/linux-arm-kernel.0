@@ -1,146 +1,120 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 May 2014 18:58:19 +0100
-Subject: [PATCH v4 00/20] arm64: GICv3 support
-Message-ID: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 15 May 2014 18:58:26 +0100
+Subject: [PATCH v4 07/20] KVM: ARM: vgic: abstract access to the ELRSR bitmap
+In-Reply-To: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
+References: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1400176719-31275-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GICv3 is the base for a new generation of interrupt controllers
-designed to overcome some of the most glaring limitations of GICv2.
+Move the GICH_ELRSR access to its own functions, and add them to
+the vgic_ops structure.
 
-Some of the features are:
-- Support for more than 8 CPUs (a lot more...)
-- System registers for CPU interface access (instead of the memory
-  mapped GICC, GICV, GICH)
-- Message based interrupts
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ include/kvm/arm_vgic.h |  2 ++
+ virt/kvm/arm/vgic.c    | 38 +++++++++++++++++++++++++++++++++-----
+ 2 files changed, 35 insertions(+), 5 deletions(-)
 
-This patch series currently support:
-- Affinity Routing
-- System Registers
-- Non-Secure Group-1 interrupts only
-- KVM support (GICv3 host, GICv2 guest)
-
-What is *not yet* supported in this series (WIP):
-- LPI/ITS/MSI
-- KVM GICv3 guest support
-- Any form of power management
-- 32bit systems
-
-To be built, this code requires a fairly recent compiler/binutils
-combo. Linaro 13.06 seems to do the trick. This has been tested on the
-ARM FVP and Foundation models, with non-regressions run on a VExpress
-TC-2 and another Cortex-A57 based platform.
-
-So far, the level of reviewing has been embarassingly low (my sincere
-thanks to Christoffer and Will for being the only ones to review
-it). While the documentation is unfortunately not public yet, it is
-available to those actively implementing GICv3 in their hardware, and
-I'm really eager to see reviews and test reports.
-
-Without that kind of engagement, it is unlikely that this code will
-get merged any time soon.
-
-Individuals without access to documentation and/or hardware can still
-review the code (it shares a lot of concepts with GICv2) and test in
-on the freely available Foundation model (see
-http://releases.linaro.org/latest/openembedded/aarch64/ for details on
-how to use the Foundation model).
-
-The code is also available at the following location (warning,
-unstable branch!):
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv3
-
-* From v3 [3]
-  - Fixed a lot of issues found by Christoffer (too many to report
-    here, see the email thread)
-  - New .sync_lr_elrsr backend
-  - New probing method
-  - New irqchip_in_kernel implementation
-  - Checked full bisectability of the series (hopefully got it right
-    this time...)
-  - rebased on top of 3.15-rc5
-
-* From v2 [2]
-  - removed sharing of the xlate method with GICv2 (TI crossbar is now
-    getting in the way...)
-  - Switched to a tree domain to accomodate for the LPI space
-  - Fixed more bisectability
-
-* From the initial revision [1]
-  - Some code sharing with GICv2
-  - Barrier cleanup/clarification
-  - Revised boot protocol update
-  - Consistent use of the MPIDR access macros
-  - Fixed a number of embarassing bugs
-  - Fixed DT examples
-  - Fixed bisectability of the series
-
-[1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/229959.html
-[2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241972.html
-[3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/248008.html
-
-Marc Zyngier (20):
-  ARM: GIC: move some bits of GICv2 to a library-type file
-  arm64: initial support for GICv3
-  arm64: GICv3 device tree binding documentation
-  arm64: boot protocol documentation update for GICv3
-  KVM: arm/arm64: vgic: move GICv2 registers to their own structure
-  KVM: ARM: vgic: introduce vgic_ops and LR manipulation primitives
-  KVM: ARM: vgic: abstract access to the ELRSR bitmap
-  KVM: ARM: vgic: abstract EISR bitmap access
-  KVM: ARM: vgic: abstract MISR decoding
-  KVM: ARM: vgic: move underflow handling to vgic_ops
-  KVM: ARM: vgic: abstract VMCR access
-  KVM: ARM: vgic: introduce vgic_enable
-  KVM: ARM: introduce vgic_params structure
-  KVM: ARM: vgic: split GICv2 backend from the main vgic code
-  KVM: ARM: vgic: revisit implementation of irqchip_in_kernel
-  arm64: KVM: remove __kvm_hyp_code_{start,end} from hyp.S
-  arm64: KVM: split GICv2 world switch from hyp code
-  arm64: KVM: move HCR_EL2.{IMO,FMO} manipulation into the vgic switch
-    code
-  KVM: ARM: vgic: add the GICv3 backend
-  arm64: KVM: vgic: add GICv3 world switch
-
- Documentation/arm64/booting.txt                  |   6 +
- Documentation/devicetree/bindings/arm/gic-v3.txt |  79 +++
- arch/arm/include/asm/kvm_host.h                  |   5 +
- arch/arm/kernel/asm-offsets.c                    |  14 +-
- arch/arm/kvm/Makefile                            |   1 +
- arch/arm/kvm/interrupts_head.S                   |  26 +-
- arch/arm64/Kconfig                               |   1 +
- arch/arm64/include/asm/kvm_arm.h                 |   5 +-
- arch/arm64/include/asm/kvm_asm.h                 |  14 +-
- arch/arm64/include/asm/kvm_host.h                |  28 +
- arch/arm64/include/asm/virt.h                    |   4 +
- arch/arm64/kernel/asm-offsets.c                  |  25 +-
- arch/arm64/kernel/head.S                         |  18 +
- arch/arm64/kernel/hyp-stub.S                     |   1 +
- arch/arm64/kvm/Makefile                          |   4 +
- arch/arm64/kvm/hyp.S                             | 127 +----
- arch/arm64/kvm/vgic-v2-switch.S                  | 133 +++++
- arch/arm64/kvm/vgic-v3-switch.S                  | 271 +++++++++
- drivers/irqchip/Kconfig                          |   5 +
- drivers/irqchip/Makefile                         |   3 +-
- drivers/irqchip/irq-gic-common.c                 | 115 ++++
- drivers/irqchip/irq-gic-common.h                 |  29 +
- drivers/irqchip/irq-gic-v3.c                     | 684 +++++++++++++++++++++++
- drivers/irqchip/irq-gic.c                        |  59 +-
- include/kvm/arm_vgic.h                           | 115 +++-
- include/linux/irqchip/arm-gic-v3.h               | 190 +++++++
- virt/kvm/arm/vgic-v2.c                           | 236 ++++++++
- virt/kvm/arm/vgic-v3.c                           | 225 ++++++++
- virt/kvm/arm/vgic.c                              | 345 ++++++------
- 29 files changed, 2415 insertions(+), 353 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/gic-v3.txt
- create mode 100644 arch/arm64/kvm/vgic-v2-switch.S
- create mode 100644 arch/arm64/kvm/vgic-v3-switch.S
- create mode 100644 drivers/irqchip/irq-gic-common.c
- create mode 100644 drivers/irqchip/irq-gic-common.h
- create mode 100644 drivers/irqchip/irq-gic-v3.c
- create mode 100644 include/linux/irqchip/arm-gic-v3.h
- create mode 100644 virt/kvm/arm/vgic-v2.c
- create mode 100644 virt/kvm/arm/vgic-v3.c
-
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 17bbe51..38864f5 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -84,6 +84,8 @@ struct vgic_lr {
+ struct vgic_ops {
+ 	struct vgic_lr	(*get_lr)(const struct kvm_vcpu *, int);
+ 	void	(*set_lr)(struct kvm_vcpu *, int, struct vgic_lr);
++	void	(*sync_lr_elrsr)(struct kvm_vcpu *, int, struct vgic_lr);
++	u64	(*get_elrsr)(const struct kvm_vcpu *vcpu);
+ };
+ 
+ struct vgic_dist {
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 11408fe..8b73cd6 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1015,9 +1015,24 @@ static void vgic_v2_set_lr(struct kvm_vcpu *vcpu, int lr,
+ 	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = lr_val;
+ }
+ 
++static void vgic_v2_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
++				  struct vgic_lr lr_desc)
++{
++	if (!(lr_desc.state & LR_STATE_MASK))
++		set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
++}
++
++static u64 vgic_v2_get_elrsr(const struct kvm_vcpu *vcpu)
++{
++	const u32 *elrsr = vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr;
++	return *(u64 *)elrsr;
++}
++
+ static const struct vgic_ops vgic_ops = {
+ 	.get_lr			= vgic_v2_get_lr,
+ 	.set_lr			= vgic_v2_set_lr,
++	.sync_lr_elrsr		= vgic_v2_sync_lr_elrsr,
++	.get_elrsr		= vgic_v2_get_elrsr,
+ };
+ 
+ static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr)
+@@ -1031,6 +1046,17 @@ static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr,
+ 	vgic_ops.set_lr(vcpu, lr, vlr);
+ }
+ 
++static void vgic_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
++			       struct vgic_lr vlr)
++{
++	vgic_ops.sync_lr_elrsr(vcpu, lr, vlr);
++}
++
++static inline u64 vgic_get_elrsr(struct kvm_vcpu *vcpu)
++{
++	return vgic_ops.get_elrsr(vcpu);
++}
++
+ static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+@@ -1260,7 +1286,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+ 			 * Despite being EOIed, the LR may not have
+ 			 * been marked as empty.
+ 			 */
+-			set_bit(lr, (unsigned long *)vgic_cpu->vgic_v2.vgic_elrsr);
++			vgic_sync_lr_elrsr(vcpu, lr, vlr);
+ 		}
+ 	}
+ 
+@@ -1278,14 +1304,17 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++	u64 elrsr;
++	unsigned long *elrsr_ptr;
+ 	int lr, pending;
+ 	bool level_pending;
+ 
+ 	level_pending = vgic_process_maintenance(vcpu);
++	elrsr = vgic_get_elrsr(vcpu);
++	elrsr_ptr = (unsigned long *)&elrsr;
+ 
+ 	/* Clear mappings for empty LRs */
+-	for_each_set_bit(lr, (unsigned long *)vgic_cpu->vgic_v2.vgic_elrsr,
+-			 vgic_cpu->nr_lr) {
++	for_each_set_bit(lr, elrsr_ptr, vgic_cpu->nr_lr) {
+ 		struct vgic_lr vlr;
+ 
+ 		if (!test_and_clear_bit(lr, vgic_cpu->lr_used))
+@@ -1298,8 +1327,7 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+ 	}
+ 
+ 	/* Check if we still have something up our sleeve... */
+-	pending = find_first_zero_bit((unsigned long *)vgic_cpu->vgic_v2.vgic_elrsr,
+-				      vgic_cpu->nr_lr);
++	pending = find_first_zero_bit(elrsr_ptr, vgic_cpu->nr_lr);
+ 	if (level_pending || pending < vgic_cpu->nr_lr)
+ 		set_bit(vcpu->vcpu_id, &dist->irq_pending_on_cpu);
+ }
 -- 
 1.8.3.4
