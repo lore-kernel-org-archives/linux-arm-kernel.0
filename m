@@ -1,35 +1,54 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 15 May 2014 07:05:28 -0700
-Subject: [RFC PATCH 0/5] Frequency resolution in CCF vs. cpufreq
-In-Reply-To: <CAKohpokm3WVnu_DggKc4PbhVAKNexrJ4051F-gnVFFTDOyz9ew@mail.gmail.com>
-References: <1400106655-22465-1-git-send-email-soren.brinkmann@xilinx.com>
- <CAKohpokm3WVnu_DggKc4PbhVAKNexrJ4051F-gnVFFTDOyz9ew@mail.gmail.com>
-Message-ID: <3c6b2890-3df4-48e9-8cc5-8e2d8955f64f@BL2FFO11FD032.protection.gbl>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 15 May 2014 16:07:24 +0200
+Subject: [PATCH 1/4] clk: samsung: out: Add infrastructure to register
+ CLKOUT
+In-Reply-To: <CAPdUM4N=k-pPxdhPQgVHh0fb+nqkgs7StwM2Pb6C8gcjx6dw-w@mail.gmail.com>
+References: <1399640410-30957-1-git-send-email-tushar.behera@linaro.org>
+ <1399640410-30957-2-git-send-email-tushar.behera@linaro.org>
+ <536DA243.6000600@samsung.com> <53705243.1030704@linaro.org>
+ <CAPdUM4N=k-pPxdhPQgVHh0fb+nqkgs7StwM2Pb6C8gcjx6dw-w@mail.gmail.com>
+Message-ID: <5374CA1C.8000207@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Hi Rahul, Tushar,
 
-On Thu, 2014-05-15 at 11:42AM +0530, Viresh Kumar wrote:
-> On 15 May 2014 04:00, Soren Brinkmann <soren.brinkmann@xilinx.com> wrote:
-> > I have one or two problems with cpufreq and the CCF, which are caused by
-> > rounding/different frequency resolutions.
-> >
-> > cpufreq works with kHz, while the CCF uses Hz. On Zynq our default frequency is
-> > 666666666 Hz which the CCF, due to rounding, reports as 666666660. And for
-> > cpufreq, which simply divides values it obtains through clk_round_rate() by
-> > 1000, 666666.
-> > Since passing 666666 to clk_round_rate() does not result in 666666660
-> > (clk_round_rate() always rounds down!), we chose to put 666667 in the OPP. This
-> > causes issue 1: cpufreq stats are broken.
+On 15.05.2014 15:44, Rahul Sharma wrote:
+> Hi Tushar,
 > 
-> I know it might a big exercise, but wouldn't it be worth to make cpufreq start
-> using frequencies in Hz ?
+> Basically you are adding a new clock-type for Clkout. IMO clkout
+> is not a special hardware. Existing clock types can be reused to
+> support clkout. I see 3 major problem here:
+> 
+> 1) Clkout -> (Mux + Gate). You clubbed mux and gate together, and
+> exposing as a single clock which is something like a composite clock.
+> IMO this is not a recommended way in CCF.
+> 
+> 2) New Clock Type: Since clkout is just a combination of a simple
+> mux and gate which are already supported, it is a unnecessary
+> duplication.
+> 
+> 3) Clkout registered along with CMU: which is not correct. Clkout is in PMU
+> (Separate physical IP) and should be registered as a independent Clock
+> provider which provides 1 mux and 1 gate clock (As if now). It should also be
+> well connected with main CMU.
+> 
+> I understand the challenge in using regmap interface for a clock provider. But
+> we need to identify a clean solution. IMHO a independent clock provider with
+> iomap, is relatively cleaner approach till CCF is not ready with regmap based
+> reg access for clock registers.
+> 
+> Experts!! please comment.
 
-I haven't looked into this. As you say yourself, that might be a rather
-big project. I will take a look at it, but I can't promise that I have
-time to dedicate to this. Also, as said above, even though our CPU is
-supposed to run at 666666666 Hz, rounding lets the last 6 Hz disappear.
-I think we have to handle deviances either way.
+It's quite unfortunate that Tushar has duplicated the effort to create a
+clkout driver, considering the fact that we did have such driver
+internally at SRPOL and it was quite nice and simple.
 
-	S?ren
+I will post a cleaned-up version today, that is about 2 times smaller in
+terms of lines of added code and provides the same functionality,
+without introducing custom clock types. In addition, it models the
+clkout properly as a feature of PMU, not CMU (CMU only provides outputs
+of particular sub-blocks that are fed into the PMU).
+
+Best regards,
+Tomasz
