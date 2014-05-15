@@ -1,30 +1,90 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 May 2014 17:11:00 -0700
-Subject: [PATCH] bus/omap_l3: avoid sync initcall for modules
-In-Reply-To: <5640589.bzCk17dFyc@wuerfel>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <20140513162731.GD16837@atomide.com>
- <20140514173931.GA14003@kroah.com> <5640589.bzCk17dFyc@wuerfel>
-Message-ID: <20140515001100.GB31594@atomide.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Wed, 14 May 2014 17:32:56 -0700
+Subject: [RFC PATCH 00/10] Tegra XHCI support
+Message-ID: <1400113986-339-1-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [140514 11:16]:
-> On Wednesday 14 May 2014 10:39:31 Greg KH wrote:
-> > On Tue, May 13, 2014 at 09:27:33AM -0700, Tony Lindgren wrote:
-> > > * Arnd Bergmann <arnd@arndb.de> [140513 08:13]:
-> > > 
-> > > I did not look what percentage has tristate in the Kconfig,
-> > > but that might keep some people from making loadable drivers.
-> > > 
-> > > Greg, is the following patch something you may want to
-> > > consider picking up?
-> > 
-> > Sure, is this needed to fix issues in 3.15-final, or is 3.16-rc1 ok?
-> 
-> I don't think anyone cares about it outside of randconfig builds,
-> so 3.16-rc1 is ok.
+This is a first pass at the host and PHY drivers necessary for USB3.0
+support on Tegra114 and Tegra124.  The Tegra XHCI host controller requires
+external firmware [1] which must be loaded before using any USB ports owned
+by the controller.  The XUSB PHY driver handles mapping and enabling of
+the UTMI, HSIC, and SuperSpeed pads to the XHCI controller.
 
-Yeah thanks.
+Tested on a Venice2 with a variety of USB2.0 and USB3.0 memory sticks
+and ethernet dongles.  
 
-Tony
+Notes:
+ - I've included support for Tegra114, but since I don't have Tegra114-based
+   hardware, it is completely untested.
+ - The PCIe and SATA PHYs also are programmed using the XUSB_PADCTL space
+   as well.  At least some of the code can be re-used, specifically with
+   respect to lane programming.  I believe Thierry is working on the PCIe
+   parts of this.
+ - HSIC support is mostly untested and I think there are still some issues
+   to work out there.  I do have a Tegra124 board with a HSIC hub so I'll
+   try to sort those out.
+ - The DT bindings are rough, comments/suggestions very welcome.
+ - The XUSB PHY driver doesn't play nice with the existing Tegra USB2.0
+   PHY driver, so I've assinged all USB ports to XUSB in the DT for now.
+ - Patch 5 is a temporary hack to get to the fuse data.  Internally we
+   have this based on Peter's fuse driver series [2], but I haven't seen
+   any activity on that upstream lately.
+
+Based on work by:
+  a lot of people, but from what I can tell from the L4T tree [3], the
+  original authors of the Tegra XHCI driver are:
+    Ajay Gupta <ajayg@nvidia.com>
+    Bharath Yadav <byadav@nvidia.com>
+
+[1] http://commondatastorage.googleapis.com/chromeos-localmirror/distfiles/xhci-firmware-2014.05.09.00.00.tbz2
+[2] http://patchwork.ozlabs.org/patch/314883/
+[3] git://nv-tegra.nvidia.com/linux-3.10.git
+
+Andrew Bresticker (8):
+  clk: tegra: Fix xusb_hs_src clock hierarchy
+  clk: tegra: Initialize xusb clocks
+  ARM: tegra: Export function to read USB calibration data
+  usb: xhci: Add Tegra XHCI host-controller driver
+  phy: Add Tegra XUSB PHY driver
+  ARM: tegra124: Bind CAR to syscon device
+  ARM: tegra124: Add XHCI controller and PHY
+  ARM: tegra124: Enable XHCI on Venice2
+
+Jim Lin (2):
+  clk: tegra: Enable hardware control of PLLE
+  clk: tegra: Fix xusb_fs_src mux
+
+ .../bindings/phy/nvidia,tegra-xusb-phy.txt         |   76 ++
+ .../devicetree/bindings/usb/nvidia,tegra-xhci.txt  |   42 +
+ arch/arm/boot/dts/tegra124-venice2.dts             |   46 +-
+ arch/arm/boot/dts/tegra124.dtsi                    |   39 +-
+ arch/arm/mach-tegra/fuse.c                         |   13 +
+ drivers/clk/tegra/clk-id.h                         |    1 +
+ drivers/clk/tegra/clk-pll.c                        |   33 +-
+ drivers/clk/tegra/clk-tegra-periph.c               |   10 +-
+ drivers/clk/tegra/clk-tegra114.c                   |   22 +-
+ drivers/clk/tegra/clk-tegra124.c                   |   21 +-
+ drivers/phy/Kconfig                                |   11 +
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-tegra-xusb.c                       | 1171 ++++++++++++++++++++
+ drivers/phy/phy-tegra-xusb.h                       |  270 +++++
+ drivers/usb/host/Kconfig                           |   12 +
+ drivers/usb/host/Makefile                          |    2 +
+ drivers/usb/host/xhci-tegra.c                      |  796 +++++++++++++
+ drivers/usb/host/xhci-tegra.h                      |  131 +++
+ include/dt-bindings/clock/tegra114-car.h           |    3 +-
+ include/dt-bindings/clock/tegra124-car.h           |    3 +-
+ include/linux/tegra-soc.h                          |    1 +
+ include/linux/usb/tegra_xusb.h                     |   66 ++
+ 22 files changed, 2717 insertions(+), 53 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/nvidia,tegra-xusb-phy.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/nvidia,tegra-xhci.txt
+ create mode 100644 drivers/phy/phy-tegra-xusb.c
+ create mode 100644 drivers/phy/phy-tegra-xusb.h
+ create mode 100644 drivers/usb/host/xhci-tegra.c
+ create mode 100644 drivers/usb/host/xhci-tegra.h
+ create mode 100644 include/linux/usb/tegra_xusb.h
+
+-- 
+1.9.1.423.g4596e3a
