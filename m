@@ -1,27 +1,38 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 15 May 2014 09:48:26 +0200
-Subject: [PATCH] i2c: nomadik: Fixup system suspend
-In-Reply-To: <CAPDyKFqxa3ZveRUWseT25cSOcn-6vUVBR0q515qsha1z0WfdNQ@mail.gmail.com>
-References: <1397138376-28427-1-git-send-email-ulf.hansson@linaro.org>
- <CACRpkdb8VJ_Qqype4uP_YJ5=RncJndFUZv_yDxmZwq5S=_yZ2g@mail.gmail.com>
- <CAPDyKFo6K-mbtKcs8wPmc=E-t=Djs-ufi_+SLLpCKej+bEwbDw@mail.gmail.com>
- <CAPDyKFqxa3ZveRUWseT25cSOcn-6vUVBR0q515qsha1z0WfdNQ@mail.gmail.com>
-Message-ID: <20140515074826.GA2591@katana>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 15 May 2014 09:51:03 +0200
+Subject: [PATCH v2 2/3] drm/panel: add support for EDT panels
+In-Reply-To: <35c081171a3d9a9401767601c02a12e266b37dd0.1400103181.git.stefan@agner.ch>
+References: <cover.1400103181.git.stefan@agner.ch>
+ <35c081171a3d9a9401767601c02a12e266b37dd0.1400103181.git.stefan@agner.ch>
+Message-ID: <20140515075102.GE5952@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, May 14, 2014 at 11:45:57PM +0200, stefan at agner.ch wrote:
+> From: Stefan Agner <stefan@agner.ch>
+> 
+> This panels are sold by Toradex for Colibri T20/T30 and Apalis T30
+> evaluation kits.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-> I noticed you merged my other i2c-nomadik patch yesterday - thought I
-> might remind you about this one as well.
+Panel patches should go to the dri-devel mailing list as well.
 
-I was working on for-current. I'll start working on for-next these days.
-I use patchwork, as long as you cc the list, patches won't be forgotten
-;)
+Also a patch was posted only yesterday for a panel that seems to be the
+exact same one as this, even though the name differs minimally, see:
 
+	https://patchwork.kernel.org/patch/4175251/
+
+Adding Philipp on Cc so you guys can work together whether this is
+indeed the same panel. The only differences seem to be in the vertical
+front and back porches, but I suspect that either settings will work on
+both Tegra and i.MX.
+
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140515/5aba0614/attachment.sig>
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140515/234b2dad/attachment.sig>
