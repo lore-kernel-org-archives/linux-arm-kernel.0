@@ -1,29 +1,38 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 15 May 2014 10:28:46 -0300
-Subject: [PATCH] clk: divider: Fix table round up function
-In-Reply-To: <1399481332-9550-1-git-send-email-maxime.coquelin@st.com>
-References: <1399481332-9550-1-git-send-email-maxime.coquelin@st.com>
-Message-ID: <CAOMZO5C9iqLj34mJdztqZsyLNR6oHztyN2GxDY0ORp+0xU1+LA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 May 2014 15:30:06 +0200
+Subject: [RFC PATCH 06/10] usb: xhci: Add Tegra XHCI host-controller driver
+In-Reply-To: <20140515091938.GD6434@ulmo>
+References: <1400113986-339-1-git-send-email-abrestic@chromium.org>
+ <15599140.PsD4j7x3tZ@wuerfel> <20140515091938.GD6434@ulmo>
+Message-ID: <11038777.juA2AddEko@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Thursday 15 May 2014 11:19:40 Thierry Reding wrote:
+> > > +
+> > > +   xhci = platform_device_alloc("xhci-hcd", PLATFORM_DEVID_AUTO);
+> > > +   if (!xhci) {
+> > > +           dev_err(dev, "Failed to allocate XHCI host\n");
+> > > +           ret = -ENOMEM;
+> > > +           goto out;
+> > > +   }
+> > 
+> > This does not feel appropriate at all: Rather than creating a child device,
+> > you should have a specific driver that hooks into functions exported
+> > by the xhci core. See Documentation/driver-model/design-patterns.txt
+> 
+> I don't think Documentation/driver-model/design-patterns.txt documents
+> this. Perhaps this is what you had in mind?
+> 
+>         http://lwn.net/Articles/336262/
 
-On Wed, May 7, 2014 at 1:48 PM, Maxime COQUELIN <maxime.coquelin@st.com> wrote:
-> Commit 1d9fe6b97 ("clk: divider: Fix best div calculation for power-of-two and
-> table dividers") introduces a regression in its _table_round_up function.
->
-> When the divider passed to this function is greater than the max divider
-> available in the table, this function returns table's max divider.
-> Problem is that it causes an infinite loop in clk_divider_bestdiv() because
-> _next_div() will never return a value greater than maxdiv.
->
-> Instead of returning table's max divider, this patch returns INT_MAX.
->
-> Reported-by: Fabio Estevam <festevam@gmail.com>
-> Reported-by: Shawn Guo <shawn.guo@freescale.com>
-> Tested-by: Fabio Estevam <festevam@gmail.com>
-> Cc: Mike Turquette <mike.turquette@linaro.org>
-> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+No, I did mean Documentation/driver-model/design-patterns.txt.
 
-Any comments on this one? It does fix a regression.
+The pattern used in the proposed driver is to create the generic platform_device
+as the child of the more specific platform_device.
+
+The normal pattern is to have only one device and embed the generic structure
+inside of the more specific structure and use container_of to cast between
+the two as needed.
+
+	Arnd
