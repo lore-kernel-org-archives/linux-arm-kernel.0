@@ -1,73 +1,82 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 16 May 2014 05:02:35 +0900
-Subject: [PATCH v5 0/5] ARM: dts: enable hdmi for exynos5 based peach
- and snow boards
-In-Reply-To: <53751493.8050601@gmail.com>
-References: <1400166264-3428-1-git-send-email-rahul.sharma@samsung.com>
- <53751493.8050601@gmail.com>
-Message-ID: <53751D5B.9040208@samsung.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 15 May 2014 16:04:47 -0400
+Subject: [PATCH v1 5/5] pci: keystone: add pcie driver based on designware
+ core driver
+In-Reply-To: <20140515183919.GC11650@obsidianresearch.com>
+References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
+ <6048322.x3M3sdDEWO@wuerfel> <5374FD24.8000806@ti.com>
+ <22200719.Jb5jnJylJH@wuerfel> <20140515183919.GC11650@obsidianresearch.com>
+Message-ID: <53751DDF.40304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/14 04:25, Tomasz Figa wrote:
-> Hi Rahul,
+On 5/15/2014 2:39 PM, Jason Gunthorpe wrote:
+> On Thu, May 15, 2014 at 08:20:13PM +0200, Arnd Bergmann wrote:
+>> On Thursday 15 May 2014 13:45:08 Murali Karicheri wrote:
+>>>>> +#ifdef CONFIG_PCI_KEYSTONE
+>>>>> +/*
+>>>>> + * The KeyStone PCIe controller has maximum read request size of 256 bytes.
+>>>>> + */
+>>>>> +static void quirk_limit_readrequest(struct pci_dev *dev)
+>>>>> +{
+>>>>> +    int readrq = pcie_get_readrq(dev);
+>>>>> +
+>>>>> +    if (readrq > 256)
+>>>>> +            pcie_set_readrq(dev, 256);
+>>>>> +}
+>>>>> +DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_readrequest);
+>>>>> +#endif /* CONFIG_PCI_KEYSTONE */
+>>>> This doesn't work: you can't just limit do this for all devices just based
+>>>> on PCI_KEYSTONE being enabled, you have to check if you are actually using
+>>>> this controller.
+>>>>
+>>>>        Arnd
+>>>    I assume, I need to check if PCI controller's vendor ID/ device ID
+>>> match with the keystone
+>>>    PCI controller's ID and call pcie_set_readrq() for all of the slave
+>>> PCI devices and do this fixup.
+>>> Is this correct understanding?  If you can point me to an example code
+>>> for this that will be
+>>> really helpful so that I can avoid re-inventing the wheel.
+>> I think it would be best to move the quirk into the keystone pci driver
+>> and compare compare the dev->driver pointer of the PCI controller device.
+> The PCI core handles setting the maximum read request size already,
+> can you figure out why the core code isn't doing what you need and
+> correct the root problem?
 >
-> On 15.05.2014 17:04, Rahul Sharma wrote:
->> From: Rahul Sharma<Rahul.Sharma@samsung.com>
->>
->> Enable hdmi for exynos5250 based snow board, exynos5420
->> based peach pit board and 5800 based peach-pi board.
->>
->> V5:
->> 1) Moved hdmi_hpd_irq pin back to board files.
->> 2) Replaced 0 with GPIO_ACTIVE_HIGH while adding gpio property
->> to HDMI node.
->>
->> V4:
->> 1) Removed hdmi_hpd_irq pin from peach-pi board as it already
->> present in exynos5420-pinctrl.dtsi.
->>
->> V3:
->> 1) Re-spin on dependent patches.
->> 2) Added patch to enable hdmi for Peach-pi board.
->>
->> V2:
->> 1) Re-spin on dependent patches.
->> 2) Added patch to remove chip specific hdmi hpd gpio from
->> board file top SoC file.
->>
->> This series is based on Kukjin Kims, for-next branch.
->>
->> It is dependent on
->>
->> 1) Sachin's patch: "ARM: dts: exynos5250-snow: add tps65090 power regulator"
->> at https://patches.linaro.org/28325/ : [Reviewed-by: Doug Anderson]
->>
->> All other dependent patches are already landed in maintainers
->> tree.
->>
->> Rahul Sharma (4):
->>    ARM: dts: enable hdmi for exynos5250 based snow board
->>    ARM: dts: change to correct compatible string for exynos5420 hdmi
->>    ARM: dts: enable hdmi for exynos5420 based peach-pit board
->>    ARM: dts: enable hdmi for exynos5800 based peach-pi board
->>
->>   arch/arm/boot/dts/exynos5250-cros-common.dtsi |    6 +++++-
->>   arch/arm/boot/dts/exynos5250-snow.dts         |   14 ++++++++++++++
->>   arch/arm/boot/dts/exynos5420-peach-pit.dts    |   22 ++++++++++++++++++++++
->>   arch/arm/boot/dts/exynos5420.dtsi             |    7 ++++++-
->>   arch/arm/boot/dts/exynos5800-peach-pi.dts     |   22 ++++++++++++++++++++++
->>   5 files changed, 69 insertions(+), 2 deletions(-)
->>
+> I'm guessing the values in the root port bridge config space are not
+> correct or something like that??
 >
-> For the whole series:
->
-> Acked-by: Tomasz Figa<t.figa@samsung.com>
->
-Looks good to me too.
+> Jason
+What you mean by "The PCI core handles setting the maximum read request 
+size already"
+I see there is function pcie_write_mrrs() in the drivers/pci/probe.c 
+that reads the mps
+using pcie_get_mps() and then set mrrs to mps. But this function is 
+called only from
+pcie_bus_configure_set() that is called by pcie_bus_configure_settings()
 
-Applied but not for-next yet because need to check the status of the 
-tps65090 related patches you mentioned...
+pcie_bus_configure_settings() is called by
 
-Thanks,
-Kukjin
+0 pci-common.c pcibios_scan_phb             1676 
+pcie_bus_configure_settings(child);
+1 pci_gx.c     fixup_read_and_payload_sizes  606 
+pcie_bus_configure_settings(child);
+2 acpi.c       pci_acpi_scan_root            556 
+pcie_bus_configure_settings(child);
+3 pcihp_slot.c pci_configure_slot            164 
+pcie_bus_configure_settings(dev->bus);
+
+None of them gets called on ARM platform.
+
+What is needed for Keystone PCI is that we need to limit mrrs to 256 
+bytes for all
+of the downstream devices that talks to PCIe controller. This needs to 
+be enforced
+through a quirk. Or Is there something missing that Keystone or DW 
+driver is not
+making use of that reads the mrrs value of the RC and set the same on 
+all of the
+downstream devices connected to the bus that the controller is connected to?
+
+Murali
