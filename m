@@ -1,78 +1,56 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Wed, 14 May 2014 17:32:57 -0700
-Subject: [RFC PATCH 01/10] clk: tegra: Enable hardware control of PLLE
+Date: Wed, 14 May 2014 17:33:00 -0700
+Subject: [RFC PATCH 04/10] clk: tegra: Initialize xusb clocks
 In-Reply-To: <1400113986-339-1-git-send-email-abrestic@chromium.org>
 References: <1400113986-339-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1400113986-339-2-git-send-email-abrestic@chromium.org>
+Message-ID: <1400113986-339-5-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jim Lin <jilin@nvidia.com>
-
-Enable hardware control of PLLE spread-spectrum, IDDQ, and enable
-controls when enabling PLLE.  The hardware (e.g. XUSB) using PLLE
-will use these controls for power-saving optimizations.
+Initialize the XUSB-related clocks with appropriate parents and rates
+for both Tegra114 and Tegra124.
 
 Signed-off-by: Jim Lin <jilin@nvidia.com>
 Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 ---
- drivers/clk/tegra/clk-pll.c | 33 ++++++++++++++++++++++++++++++++-
- 1 file changed, 32 insertions(+), 1 deletion(-)
+ drivers/clk/tegra/clk-tegra114.c | 7 ++++++-
+ drivers/clk/tegra/clk-tegra124.c | 6 ++++++
+ 2 files changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
-index 0d20241..84ca8b9 100644
---- a/drivers/clk/tegra/clk-pll.c
-+++ b/drivers/clk/tegra/clk-pll.c
-@@ -96,10 +96,20 @@
- 	(PLLE_SS_MAX_VAL | PLLE_SS_INC_VAL | PLLE_SS_INCINTRV_VAL)
- 
- #define PLLE_AUX_PLLP_SEL	BIT(2)
-+#define PLLE_AUX_USE_LOCKDET	BIT(3)
- #define PLLE_AUX_ENABLE_SWCTL	BIT(4)
-+#define PLLE_AUX_SS_SWCTL	BIT(6)
- #define PLLE_AUX_SEQ_ENABLE	BIT(24)
-+#define PLLE_AUX_SEQ_START_STATE BIT(25)
- #define PLLE_AUX_PLLRE_SEL	BIT(28)
- 
-+#define XUSBIO_PLL_CFG0		0x51c
-+#define XUSBIO_PLL_CFG0_PADPLL_RESET_SWCTL	BIT(0)
-+#define XUSBIO_PLL_CFG0_CLK_ENABLE_SWCTL	BIT(2)
-+#define XUSBIO_PLL_CFG0_PADPLL_USE_LOCKDET	BIT(6)
-+#define XUSBIO_PLL_CFG0_SEQ_ENABLE		BIT(24)
-+#define XUSBIO_PLL_CFG0_SEQ_START_STATE		BIT(25)
-+
- #define PLLE_MISC_PLLE_PTS	BIT(8)
- #define PLLE_MISC_IDDQ_SW_VALUE	BIT(13)
- #define PLLE_MISC_IDDQ_SW_CTRL	BIT(14)
-@@ -1318,7 +1328,28 @@ static int clk_plle_tegra114_enable(struct clk_hw *hw)
- 	pll_writel(val, PLLE_SS_CTRL, pll);
- 	udelay(1);
- 
--	/* TODO: enable hw control of xusb brick pll */
-+	/* Enable hw control of xusb brick pll */
-+	val = pll_readl_misc(pll);
-+	val &= ~PLLE_MISC_IDDQ_SW_CTRL;
-+	pll_writel_misc(val, pll);
-+
-+	val = pll_readl(pll->params->aux_reg, pll);
-+	val |= (PLLE_AUX_USE_LOCKDET | PLLE_AUX_SEQ_START_STATE);
-+	val &= ~(PLLE_AUX_ENABLE_SWCTL | PLLE_AUX_SS_SWCTL);
-+	pll_writel(val, pll->params->aux_reg, pll);
-+	udelay(1);
-+	val |= PLLE_AUX_SEQ_ENABLE;
-+	pll_writel(val, pll->params->aux_reg, pll);
-+
-+	val = pll_readl(XUSBIO_PLL_CFG0, pll);
-+	val |= (XUSBIO_PLL_CFG0_PADPLL_USE_LOCKDET |
-+		XUSBIO_PLL_CFG0_SEQ_START_STATE);
-+	val &= ~(XUSBIO_PLL_CFG0_CLK_ENABLE_SWCTL |
-+		 XUSBIO_PLL_CFG0_PADPLL_RESET_SWCTL);
-+	pll_writel(val, XUSBIO_PLL_CFG0, pll);
-+	udelay(1);
-+	val |= XUSBIO_PLL_CFG0_SEQ_ENABLE;
-+	pll_writel(val, XUSBIO_PLL_CFG0, pll);
- 
- out:
- 	if (pll->lock)
+diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+index 841f54f..b9c8ba2 100644
+--- a/drivers/clk/tegra/clk-tegra114.c
++++ b/drivers/clk/tegra/clk-tegra114.c
+@@ -1296,7 +1296,12 @@ static struct tegra_clk_init_table init_table[] __initdata = {
+ 	{TEGRA114_CLK_GR3D, TEGRA114_CLK_PLL_C2, 300000000, 0},
+ 	{TEGRA114_CLK_DSIALP, TEGRA114_CLK_PLL_P, 68000000, 0},
+ 	{TEGRA114_CLK_DSIBLP, TEGRA114_CLK_PLL_P, 68000000, 0},
+-
++	{TEGRA114_CLK_PLL_RE_VCO, TEGRA114_CLK_CLK_MAX, 612000000, 0},
++	{TEGRA114_CLK_XUSB_SS_SRC, TEGRA114_CLK_PLL_RE_OUT, 122400000, 0},
++	{TEGRA114_CLK_XUSB_FS_SRC, TEGRA114_CLK_PLL_U_48M, 48000000, 0},
++	{TEGRA114_CLK_XUSB_HS_SRC, TEGRA114_CLK_XUSB_SS_DIV2, 61200000, 0},
++	{TEGRA114_CLK_XUSB_FALCON_SRC, TEGRA114_CLK_PLL_P, 204000000, 0},
++	{TEGRA114_CLK_XUSB_HOST_SRC, TEGRA114_CLK_PLL_P, 102000000, 0},
+ 	/* This MUST be the last entry. */
+ 	{TEGRA114_CLK_CLK_MAX, TEGRA114_CLK_CLK_MAX, 0, 0},
+ };
+diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
+index 6cabc3d..80d64bf 100644
+--- a/drivers/clk/tegra/clk-tegra124.c
++++ b/drivers/clk/tegra/clk-tegra124.c
+@@ -1366,6 +1366,12 @@ static struct tegra_clk_init_table init_table[] __initdata = {
+ 	{TEGRA124_CLK_SBC4, TEGRA124_CLK_PLL_P, 12000000, 1},
+ 	{TEGRA124_CLK_TSEC, TEGRA124_CLK_PLL_C3, 0, 0},
+ 	{TEGRA124_CLK_MSENC, TEGRA124_CLK_PLL_C3, 0, 0},
++	{TEGRA124_CLK_PLL_RE_VCO, TEGRA124_CLK_CLK_MAX, 672000000, 0},
++	{TEGRA124_CLK_XUSB_SS_SRC, TEGRA124_CLK_PLL_U_480M, 120000000, 0},
++	{TEGRA124_CLK_XUSB_FS_SRC, TEGRA124_CLK_PLL_U_48M, 48000000, 0},
++	{TEGRA124_CLK_XUSB_HS_SRC, TEGRA124_CLK_PLL_U_60M, 60000000, 0},
++	{TEGRA124_CLK_XUSB_FALCON_SRC, TEGRA124_CLK_PLL_RE_OUT, 224000000, 0},
++	{TEGRA124_CLK_XUSB_HOST_SRC, TEGRA124_CLK_PLL_RE_OUT, 112000000, 0},
+ 	/* This MUST be the last entry. */
+ 	{TEGRA124_CLK_CLK_MAX, TEGRA124_CLK_CLK_MAX, 0, 0},
+ };
 -- 
 1.9.1.423.g4596e3a
