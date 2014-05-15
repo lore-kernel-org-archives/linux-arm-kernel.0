@@ -1,86 +1,45 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 15 May 2014 22:37:31 +0200
-Subject: [PATCH v12 11/31] documentation: iommu: add binding document of
- Exynos System MMU
-In-Reply-To: <4780885.JaktFvJeC7@wuerfel>
-References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
- <6544270.ddFBoY6LMm@wuerfel> <20140428111802.GI19455@ulmo>
- <4780885.JaktFvJeC7@wuerfel>
-Message-ID: <20140515203729.GA7136@mithrandir>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 15 May 2014 13:38:18 -0700
+Subject: [PATCH v3 0/6] watchdog: Add reboot API
+Message-ID: <1400186304-1691-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 02:05:30PM +0200, Arnd Bergmann wrote:
-[...]
-> let me clarify by example:
-> 
-> 	iommu at 1 {
-> 		compatible = "some,simple-iommu";
-> 		reg = <1>;
-> 		#iommu-cells = <0>; /* supports only one master */
-> 	};
-> 
-> 	iommu at 2 {
-> 		compatible = "some,other-iommu";
-> 		reg = <3>;
-> 		#iommu-cells = <1>; /* contains master ID */
-> 	};
-> 
-> 	iommu at 3 {
-> 		compatible = "some,windowed-iommu";
-> 		reg = <2>;
-> 		#iommu-cells = <2>; /* contains dma-window */
-> 	};
-> 
-> 	device at 4 {
-> 		compatible = "some,ethernet";
-> 		iommus = <&/iommu@1>;
-> 	};
-> 
-> 	device at 5 {
-> 		compatible = "some,dmaengine";
-> 		iommus = <&/iommu@2 0x40000000 0x1000000>,
-> 			 <&/iommu@3 0x101>;
-> 	};
-> 
-> The device at address 4 has a one-one relationship with iommu at 1, so there
-> is no need for any data. device at 5 has two master ports. One is connected to
-> an IOMMU that has a per-device aperture, device at 5 can only issue transfers
-> to the 256MB area at 0x40000000, and the IOMMU will have to put entries for
-> this device into that address. The second master port is connected to
-> iommu at 3, which uses a master ID that gets passed along with each transfer,
-> so that needs to be put into the IOTLBs.
+Some hardware implements reboot through its watchdog hardware, for example
+by triggering a watchdog timeout or by writing into its watchdog register
+set. Platform specific code starts to spread into watchdog drivers,
+typically by setting pointers to a callback function which is then called
+from the architecture's reset handler.
 
-iommu at 3 and the second port of device at 5 seem to match what we need for
-Tegra (and as I understand also Exynos). Can we settle on this for now
-so that Hiroshi and Cho can go update their drivers for this binding?
+While global and exported callback function pointers (such as arm_pm_restart)
+may be acceptable as long as they are used from platform and/or architecture
+code, using such a mechanism across subsystems and drivers is less than
+desirable. Ultimately, we'll need a better solution.
 
-> A variation would be to not use #iommu-cells at all, but provide a
-> #address-cells / #size-cells pair in the IOMMU, and have a translation
-> as we do for dma-ranges. This is probably most flexible.
+This patch series provides such a solution. It extends the watchdog
+subsystem to support reboot functionality, provides an API function
+call to trigger reboots, adds support for the new API to arm and arm64,
+and converts the drivers providing reboot functionality to use the new
+infrastructure.
 
-The remainder of this discussion seems to indicate that #iommu-cells and
-dma-ranges don't have to be mutually exclusive. For some IOMMUs it might
-make sense to use both.
+The first patch in the series implements the new API. The second patch
+documents it. The third and fourth patch modify the arm and arm64
+architecture reset handlers to call the added API function. The final
+two patches register the reboot handlers in the sunxi and moxart watchdog
+drivers with the watchdog subsystem.
 
-In fact perhaps we should require every IOMMU user to also specify a
-dma-ranges property, even if for some cases the range would be simply
-the complete physical address space. Perhaps in analogy to the ranges
-property an empty dma-ranges property could be taken to mean all of the
-physical address space.
+The sunxi patch depends on the most recent patch series sumitted by
+Maxime Ripard.
 
-I'm aware that this doesn't cover any of the more exotic cases out
-there, but the fact is that we have real devices out there that ship
-with some variations of these simple IOMMUs and I don't think we're
-doing ourselves a favour by blocking support for these to be added on
-the hope of merging the perfect solution that covers all use-cases.
-Patches for Tegra have already been around for close to half a year.
+Note that I did not address the comments asking for support of multiple
+watchdogs with reset handlers, nor the request to add a flag to provide
+'preferential' treatment for one of those watchdogs. This will require
+additional discussion and needs to be addressed with a later patch if needed.
+Key questions are how to add such support for non-DT systems, and if the
+scope of restart handling is a function of the driver or of the system.
+Also, if one of the watchdogs does not result in a complete system reset
+but another one does, it is not clear to me why the less-than-perfect
+watchdog would be configured in the first place (or how this situation
+would be handled today).
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140515/4fe81178/attachment.sig>
+Compile tested only for arm64. Tested on arm/moxart by Jonas Jensen.
