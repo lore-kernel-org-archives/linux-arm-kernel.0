@@ -1,61 +1,41 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Thu, 15 May 2014 20:34:24 +0530
-Subject: [PATCH v5 4/4] ARM: dts: enable hdmi for exynos5800 based peach-pi
- board
-In-Reply-To: <1400166264-3428-1-git-send-email-rahul.sharma@samsung.com>
-References: <1400166264-3428-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1400166264-3428-5-git-send-email-rahul.sharma@samsung.com>
+From: valentin.longchamp@keymile.com (Valentin Longchamp)
+Date: Thu, 15 May 2014 17:07:48 +0200
+Subject: [PATCH 3/3] ARM: dts: kirkwood: add kirkwood-km_fixedeth DTS file
+In-Reply-To: <20140515130831.GC32684@lunn.ch>
+References: <1400147335-20947-1-git-send-email-valentin.longchamp@keymile.com>
+ <1400147335-20947-4-git-send-email-valentin.longchamp@keymile.com>
+ <20140515130831.GC32684@lunn.ch>
+Message-ID: <5374D844.7070300@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rahul Sharma <Rahul.Sharma@samsung.com>
+On 05/15/2014 03:08 PM, Andrew Lunn wrote:
+>> +	i2c at 0 {
+>> +		compatible = "i2c-gpio";
+>> +		gpios = < &gpio0 8 GPIO_ACTIVE_HIGH		/* sda */
+>> +			  &gpio0 9 GPIO_ACTIVE_HIGH>;		/* scl */
+>> +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+>> +	};
+> 
+> Hi Valentin
+> 
+> Anything interesting on the i2c bus?
 
-Enable hdmi for peach-pi board.
+Well yes, but this is then board specific (for all the Keymile variants of the
+reference design). Since all these variants are not mainlined, I have added
+nothing yet, but this may come later since we are currently reworking our I2C
+bus support/topology.
 
-Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
----
- arch/arm/boot/dts/exynos5800-peach-pi.dts |   22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+> 
+> Does this SoC not have the hardware i2c? I don't see a node for it
+> here.
+> 
 
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 742655b..5a44871 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -72,6 +72,13 @@
- 		samsung,pin-pud = <0>;
- 		samsung,pin-drv = <0>;
- 	};
-+
-+	hdmi_hpd_irq: hdmi-hpd-irq {
-+		samsung,pins = "gpx3-7";
-+		samsung,pin-function = <0>;
-+		samsung,pin-pud = <1>;
-+		samsung,pin-drv = <0>;
-+	};
- };
- 
- &rtc {
-@@ -134,6 +141,21 @@
- 	};
- };
- 
-+&i2c_2 {
-+	status = "okay";
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-max-bus-freq = <66000>;
-+	samsung,i2c-slave-addr = <0x50>;
-+};
-+
-+&hdmi {
-+	status = "okay";
-+	hpd-gpio = <&gpx3 7 GPIO_ACTIVE_HIGH>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hdmi_hpd_irq>;
-+	ddc = <&i2c_2>;
-+};
-+
- /*
-  * Use longest HW watchdog in SoC (32 seconds) since the hardware
-  * watchdog provides no debugging information (compared to soft/hard
--- 
-1.7.9.5
+The SoC does have the hardware I2C, but we don't use it and use the above
+bitbang one instead. I was not in the company when this was chosen/designed. The
+main reason is that the Kirkwood's one is not fast enough (clk < 96 kHz) for our
+usage (we have A LOT of different things on this BUS, some must be quick - the
+bus speed gets changed from (uuuurrghhh) userpace - and this is a NIGHTMARE,
+believe me).
+
+Valentin
