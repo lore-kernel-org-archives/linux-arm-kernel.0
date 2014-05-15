@@ -1,52 +1,26 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 15 May 2014 11:36:33 +0200
-Subject: [PATCH v2 2/3] drm/panel: add support for EDT panels
-In-Reply-To: <20140515090814.GB6434@ulmo>
-References: <cover.1400103181.git.stefan@agner.ch>
- <35c081171a3d9a9401767601c02a12e266b37dd0.1400103181.git.stefan@agner.ch>
- <20140515075102.GE5952@ulmo>
- <1400142449.4102.16.camel@paszta.hi.pengutronix.de>
- <20140515090814.GB6434@ulmo>
-Message-ID: <90bb509e9aa9c705790e2e0574d77b9f@agner.ch>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 15 May 2014 10:36:57 +0100
+Subject: [PATCHv3 3/3] ARM: mvebu: implement L2/PCIe deadlock workaround
+In-Reply-To: <1400145519-28530-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1400145519-28530-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140515093657.GG11117@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2014-05-15 11:08, schrieb Thierry Reding:
-> On Thu, May 15, 2014 at 10:27:29AM +0200, Philipp Zabel wrote:
->> The ETM0700G0DH6 Datasheet lists 2 lines as the typical vsync pulse
->> width, 525 lines as the vertical period, and 35 lines as the vsync -de
->> time, which is vsync len + back porch.
->> So vertical timings 480 + 10 + 2 + 33 = 525 should be valid for the
->> ET0700G0DH6 panel:
+On Thu, May 15, 2014 at 10:18:39AM +0100, Thomas Petazzoni wrote:
+> The Marvell Armada 375 and Armada 38x SOCs, which use the Cortex-A9
+> CPU core, the PL310 cache and the Marvell PCIe hardware block are
+> affected a L2/PCIe deadlock caused by a system erratum when hardware
+> I/O coherency is used.
 > 
-> Shouldn't that work with 480 + 8 + 2 + 35 too? It seems to me that it
-> should still be safe for that panel. Similarily I'd expect your timings
-> to work on the ET070080DH6.
-
-Am 2014-05-15 11:12, schrieb Thierry Reding:
-> Okay, so that means that the panel works for you with the same timings
-> that Philipp has in the ETM0700G0DH6 patch? If so then I definitely
-> think we should be sharing the timings in the driver by making the two
-> compatible entries point to the same driver data.
-
-FWIW, I checked and it works with both timings. And I bet it is really
-the same panel its just a different touch on top.
-
-> Irrespective of that they both seem to have different capabilities so
-> two compatible values should be fine. However for the purpose of the
-> simple panel driver they could be made to share the same timings if it
-> works for both panels and devices.
+> This deadlock can be avoided by mapping the PCIe memory areas as
+> strongly-ordered (note: MT_UNCACHED is strongly-ordered), and by
+> removing the outer cache sync done in software. This is done in this
+> patch, thanks to the new bits of infrastructure added in 'ARM: mm:
+> allow sub-architectures to override PCI I/O memory type' and 'ARM: mm:
+> add support for HW coherent systems in PL310' respectively.
 > 
-> As for the touch panel on the ETM0700G0DH6, do you happen to know how
-> that's usually connected? I suspect it needs external hardware to
-> capture the YU, XL, YD and XR pins and turn that into raw coordinates
-> and pen down interrupts.
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-For Colibri Evaluation Board, those pins are routed to the generic
-4-wire pins of the Colibri SO-DIMM. On the Colibri T30 module, those
-pins are connected to a STMPE811. I also added that to the device tree
-once, however it does not work properly atm, I need to debug this and
-will send a patch at a later time.
-
---
-Stefan
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
