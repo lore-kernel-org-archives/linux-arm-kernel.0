@@ -1,69 +1,56 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 15 May 2014 18:55:22 +0100
-Subject: [PATCH] arm64: fix pud_huge() for 2-level pagetables
-In-Reply-To: <1400171258.21547.136.camel@deneb.redhat.com>
-References: <1400163562-7481-1-git-send-email-msalter@redhat.com>
- <20140515144424.GA23884@linaro.org>
- <1400171258.21547.136.camel@deneb.redhat.com>
-Message-ID: <CAPvkgC2WQcvn5e01Y70cm5nzenYZ6tk_1BampHw66VoRFn7Jiw@mail.gmail.com>
+From: elder@linaro.org (Alex Elder)
+Date: Thu, 15 May 2014 12:58:07 -0500
+Subject: [PATCH v3 RESEND 1/5] devicetree: bindings: document Broadcom CPU
+ enable method
+In-Reply-To: <1400176691-26058-1-git-send-email-elder@linaro.org>
+References: <1400176691-26058-1-git-send-email-elder@linaro.org>
+Message-ID: <1400176691-26058-2-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 May 2014 17:27, Mark Salter <msalter@redhat.com> wrote:
-> On Thu, 2014-05-15 at 15:44 +0100, Steve Capper wrote:
->> On Thu, May 15, 2014 at 10:19:22AM -0400, Mark Salter wrote:
->> > The following happens when trying to run a kvm guest on a kernel
->> > configured for 64k pages. This doesn't happen with 4k pages:
->> >
->> >   BUG: failure at include/linux/mm.h:297/put_page_testzero()!
->> >   Kernel panic - not syncing: BUG!
->> >   CPU: 2 PID: 4228 Comm: qemu-system-aar Tainted: GF            3.13.0-0.rc7.31.sa2.k32v1.aarch64.debug #1
->> >   Call trace:
->> >   [<fffffe0000096034>] dump_backtrace+0x0/0x16c
->> >   [<fffffe00000961b4>] show_stack+0x14/0x1c
->> >   [<fffffe000066e648>] dump_stack+0x84/0xb0
->> >   [<fffffe0000668678>] panic+0xf4/0x220
->> >   [<fffffe000018ec78>] free_reserved_area+0x0/0x110
->> >   [<fffffe000018edd8>] free_pages+0x50/0x88
->> >   [<fffffe00000a759c>] kvm_free_stage2_pgd+0x30/0x40
->> >   [<fffffe00000a5354>] kvm_arch_destroy_vm+0x18/0x44
->> >   [<fffffe00000a1854>] kvm_put_kvm+0xf0/0x184
->> >   [<fffffe00000a1938>] kvm_vm_release+0x10/0x1c
->> >   [<fffffe00001edc1c>] __fput+0xb0/0x288
->> >   [<fffffe00001ede4c>] ____fput+0xc/0x14
->> >   [<fffffe00000d5a2c>] task_work_run+0xa8/0x11c
->> >   [<fffffe0000095c14>] do_notify_resume+0x54/0x58
->> >
->> > In arch/arm/kvm/mmu.c:unmap_range(), we end up doing an extra put_page()
->> > on the stage2 pgd which leads to the BUG in put_page_testzero(). This
->> > happens because a pud_huge() test in unmap_range() returns true when it
->> > should always be false with 2-level pages tables used by 64k pages.
->> > This patch removes support for huge puds if 2-level pagetables are
->> > being used.
->>
->> Hi Mark,
->> I'm still catching up with myself, sorry  (was off sick for a couple
->> of days)...
->>
->> I thought unmap_range was going to be changed?
->> Does the following help things?
->> https://lists.cs.columbia.edu/pipermail/kvmarm/2014-May/009388.html
->
-> No, I get the same BUG. Regardless, pud_huge() should always return
-> false for 2-level pagetables, right?
+Broadcom mobile SoCs use a ROM-implemented holding pen for
+controlled boot of secondary cores.  A special register is
+used to communicate to the ROM that a secondary core should
+start executing kernel code.  This enable method is currently
+used for members of the bcm281xx and bcm21664 SoC families.
 
-Okay, thanks for giving that a go.
+The use of an enable method also allows the SMP operation vector to
+be assigned as a result of device tree content for these SoCs.
 
-Yeah I agree for 64K granule it doesn't make sense to have a huge_pud.
-The patch looks sound now, but checking for a folded pmd may run into
-problems if/when we get to 3-levels and 64K pages in future.
+Signed-off-by: Alex Elder <elder@linaro.org>
+---
+ Documentation/devicetree/bindings/arm/cpus.txt | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Perhaps checking for PAGE_SHIFT==12 (or something similar) would be a
-bit more robust?
-
-Cheers,
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 333f4ae..c6a2411 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -185,6 +185,7 @@ nodes to be present and contain the properties described below.
+ 			    "qcom,gcc-msm8660"
+ 			    "qcom,kpss-acc-v1"
+ 			    "qcom,kpss-acc-v2"
++			    "brcm,bcm11351-cpu-method"
+ 
+ 	- cpu-release-addr
+ 		Usage: required for systems that have an "enable-method"
+@@ -209,6 +210,17 @@ nodes to be present and contain the properties described below.
+ 		Value type: <phandle>
+ 		Definition: Specifies the ACC[2] node associated with this CPU.
+ 
++	- secondary-boot-reg
++		Usage:
++			Required for systems that have an "enable-method"
++			property value of "brcm,bcm11351-cpu-method".
++		Value type: <u32>
++		Definition:
++			Specifies the physical address of the register used to
++			request the ROM holding pen code release a secondary
++			CPU.  The value written to the register is formed by
++			encoding the target CPU id into the low bits of the
++			physical start address it should jump to.
+ 
+ Example 1 (dual-cluster big.LITTLE system 32-bit):
+ 
 -- 
-Steve
-
->
->
+1.9.1
