@@ -1,40 +1,57 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 15 May 2014 07:00:26 -0700
-Subject: [RFC PATCH 0/5] Frequency resolution in CCF vs. cpufreq
-In-Reply-To: <20140515074724.GJ16662@pengutronix.de>
-References: <1400106655-22465-1-git-send-email-soren.brinkmann@xilinx.com>
- <20140515074724.GJ16662@pengutronix.de>
-Message-ID: <6fe97032-ba6b-4dac-9064-34a9c788c57c@BN1BFFO11FD001.protection.gbl>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Thu, 15 May 2014 16:01:42 +0200
+Subject: [PATCH v2 00/10] ARM: STi: Add Clock driver support STiH415 &
+ STiH416
+In-Reply-To: <1400073858-28912-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1400073858-28912-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <5374C8C6.8060202@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi Gabi,
 
-On Thu, 2014-05-15 at 09:47AM +0200, Uwe Kleine-K?nig wrote:
-> On Wed, May 14, 2014 at 03:30:50PM -0700, Soren Brinkmann wrote:
-> > Hi,
-> > 
-> > I have one or two problems with cpufreq and the CCF, which are caused by
-> > rounding/different frequency resolutions.
-> > 
-> > cpufreq works with kHz, while the CCF uses Hz. On Zynq our default frequency is
-> > 666666666 Hz which the CCF, due to rounding, reports as 666666660. And for
-> Why does this happen? Isn't that a bug? What is the actual freqency?
-> 666666666 Hz or 2000000000/3 Hz?
+	For the series:
 
-I don't know for sure. I think it's rounding that takes place in the
-CCF. That output clock goes from a x-tal through an PLL and various
-muxes and dividers. I guess some inaccuracies in the magnitude of a few
-Hz are probably not avoidable in that processing chain.
+	Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-> 
-> > cpufreq, which simply divides values it obtains through clk_round_rate() by
-> > 1000, 666666.
-> > Since passing 666666 to clk_round_rate() does not result in 666666660
-> > (clk_round_rate() always rounds down!), we chose to put 666667 in the OPP. This
-> What is OPP?
+	It will be part of DT pull request I'm preparing for v3.16.
 
-As Nishanth already said, Operating Performance Points. Sorry for being
-lazy and not having spelled that out.
+Thanks,
+Maxime
 
-	S?ren
+On 05/14/2014 03:24 PM, Gabriel FERNANDEZ wrote:
+> Changes in v2:
+>   - move stih415-clks.h & stih416-clks.h to include/dt-bindings/clock/
+>   - add clk_ignore_unused to bootargs. Interconnect clocks are not yet
+>     managed at the init, then we have to start the kernel with
+>     clk_ignore_unused.
+>
+> The goal of this series is to add DT definition for STiH415
+> and STiH416 SoCs on B2000 and B2020 boards.
+>
+> Gabriel Fernandez (10):
+>    ARM: STi: DT: STiH416: 416 DT Entry for clockgen A0/1/10/11/12
+>    ARM: STi: DT: STiH416: Remove unused CLK_S_ICN_REG_0 fixed clock
+>    ARM: STi: DT: STiH416: Remove unused CLK_S_GMAC0_PHY & CLK_S_ETH1_PHY
+>      fixed clocks
+>    ARM: STi: DT: STiH416: 416 DT Entry for clockgen B/C/D/E/F
+>    ARM: STi: DT: STiH416: 416 DT Entry for clockgen A9/DDR/GPU
+>    ARM: STi: DT: STiH415: 415 DT Entry for clockgen A0/1/10/11/12
+>    ARM: STi: DT: STiH415: Remove unused CLK_S_ICN_REG_0 fixed clock
+>    ARM: STi: DT: STiH415: Remove unused CLK_S_GMAC0_PHY & CLK_S_ETH1_PHY
+>      fixed clocks
+>    ARM: STi: DT: STiH415: 415 DT Entry for clockgen A9
+>    ARM: STi: DT: STiH41x Add clk_ignore_unused to bootargs
+>
+>   arch/arm/boot/dts/stih415-clock.dtsi     | 517 +++++++++++++++++++++-
+>   arch/arm/boot/dts/stih415.dtsi           |  10 +-
+>   arch/arm/boot/dts/stih416-clock.dtsi     | 732 ++++++++++++++++++++++++++++++-
+>   arch/arm/boot/dts/stih416.dtsi           |  10 +-
+>   arch/arm/boot/dts/stih41x-b2000.dtsi     |   2 +-
+>   arch/arm/boot/dts/stih41x-b2020.dtsi     |   2 +-
+>   include/dt-bindings/clock/stih415-clks.h |  15 +
+>   include/dt-bindings/clock/stih416-clks.h |  15 +
+>   8 files changed, 1258 insertions(+), 45 deletions(-)
+>   create mode 100644 include/dt-bindings/clock/stih415-clks.h
+>   create mode 100644 include/dt-bindings/clock/stih416-clks.h
+>
