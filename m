@@ -1,44 +1,43 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 15 May 2014 09:59:31 -0500
-Subject: [RFC PATCHv1 0/7] ARM core support for hardware I/O coherency in
- non-SMP platforms
-In-Reply-To: <20140515142205.GC1499@arm.com>
-References: <1400082641-23871-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140514170456.GC15946@arm.com>
- <20140515115010.0d6a4d92@free-electrons.com>
- <20140515142205.GC1499@arm.com>
-Message-ID: <CAL_JsqK80pFHQBgMxc1FGi998UYnbKxOK2gbm_ftqrTaxNq4rA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 15 May 2014 16:59:32 +0200
+Subject: [PATCHv4 1/3] ARM: mm: use MT_UNCACHED as the memory type for PCI I/O
+ mappings
+In-Reply-To: <1400165974-9059-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1400165974-9059-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1400165974-9059-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 9:22 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, May 15, 2014 at 10:50:10AM +0100, Thomas Petazzoni wrote:
->> On Wed, 14 May 2014 18:04:56 +0100, Catalin Marinas wrote:
->> > On Wed, May 14, 2014 at 04:50:34PM +0100, Thomas Petazzoni wrote:
->> > > This hardware I/O coherency mechanism needs a set of ARM core
->> > > requirements to operate properly:
+Arnd Bergmann explains: "The PCI I/O space semantics require
+non-posted writes, which is the main difference between device and
+strongly-ordered mappings."
 
-[...]
+This patch therefore changes the memory type used for PCI I/O mappings
+from MT_DEVICE to MT_UNCACHED. On Marvell EBU platforms, it is part of
+a workaround for a deadlock situation occuring on Armada 375/38x
+between PCIe/PL310 and hardware I/O coherency in SMP situations.
 
->> > >    - The SCU must be enabled
->> >
->> > Again, could the firmware do this?
->>
->> See above. If the kernel does it for SMP cases, why wouldn't it do it
->> also for !SMP I/O coherent cases?
->
-> The I/O coherency is an SoC property rather than an ARM architecture
-> property. I want to separate the two so that the kernel can boot a
-> significant part assuming sane architecture settings. Once you have DT
-> available and start loading device drivers, you are in the SoC realm and
-> you can do whatever initialisation for buses, interconnects, but not
-> going back to change architected settings.
+As Arnd Bergmann indicates: "the same fix is required both for mvebu
+as a workaround for the deadlock as well as for everyone else as a fix
+for an incorrect PCI behavior."
 
-The SCU has nothing to do with the architecture and really is part of
-the SOC. Let's look at this another way. Are there any usecases where
-you would not enable the SCU? If any cores are coherent or the ACP is
-coherent, it must be on. So that leaves all core in AMP mode. In this
-case, does it matter if the SCU is enabled or not?
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mm/ioremap.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Rob
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index f9c32ba..631b0e6 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -445,7 +445,7 @@ int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
+ 	return ioremap_page_range(PCI_IO_VIRT_BASE + offset,
+ 				  PCI_IO_VIRT_BASE + offset + SZ_64K,
+ 				  phys_addr,
+-				  __pgprot(get_mem_type(MT_DEVICE)->prot_pte));
++				  __pgprot(get_mem_type(MT_UNCACHED)->prot_pte));
+ }
+ EXPORT_SYMBOL_GPL(pci_ioremap_io);
+ #endif
+-- 
+1.9.3
