@@ -1,82 +1,58 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 May 2014 18:58:27 +0100
-Subject: [PATCH v4 08/20] KVM: ARM: vgic: abstract EISR bitmap access
+Date: Thu, 15 May 2014 18:58:34 +0100
+Subject: [PATCH v4 15/20] KVM: ARM: vgic: revisit implementation of
+ irqchip_in_kernel
 In-Reply-To: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
 References: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1400176719-31275-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1400176719-31275-16-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the GICH_EISR access to its own function.
+So far, irqchip_in_kernel() was implemented by testing the value of
+vctrl_base, which worked fine with GICv2.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+With GICv3, this field is useless, as we're using system registers
+instead of a emmory mapped interface. To solve this, add a boolean
+flag indicating if the we're using a vgic or not.
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h |  1 +
- virt/kvm/arm/vgic.c    | 17 +++++++++++++++--
- 2 files changed, 16 insertions(+), 2 deletions(-)
+ include/kvm/arm_vgic.h | 3 ++-
+ virt/kvm/arm/vgic.c    | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 38864f5..ccb9b59 100644
+index d8d52a9..f6b9fec 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -86,6 +86,7 @@ struct vgic_ops {
- 	void	(*set_lr)(struct kvm_vcpu *, int, struct vgic_lr);
- 	void	(*sync_lr_elrsr)(struct kvm_vcpu *, int, struct vgic_lr);
- 	u64	(*get_elrsr)(const struct kvm_vcpu *vcpu);
-+	u64	(*get_eisr)(const struct kvm_vcpu *vcpu);
- };
- 
+@@ -117,6 +117,7 @@ struct vgic_params {
  struct vgic_dist {
+ #ifdef CONFIG_KVM_ARM_VGIC
+ 	spinlock_t		lock;
++	bool			in_kernel;
+ 	bool			ready;
+ 
+ 	/* Virtual control interface mapping */
+@@ -212,7 +213,7 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		      struct kvm_exit_mmio *mmio);
+ 
+-#define irqchip_in_kernel(k)	(!!((k)->arch.vgic.vctrl_base))
++#define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+ #define vgic_initialized(k)	((k)->arch.vgic.ready)
+ 
+ int vgic_v2_probe(struct device_node *vgic_node,
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 8b73cd6..0d9701c 100644
+index e4b9cbb..1348e74 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1028,11 +1028,18 @@ static u64 vgic_v2_get_elrsr(const struct kvm_vcpu *vcpu)
- 	return *(u64 *)elrsr;
- }
+@@ -1650,6 +1650,7 @@ int kvm_vgic_create(struct kvm *kvm)
+ 	}
  
-+static u64 vgic_v2_get_eisr(const struct kvm_vcpu *vcpu)
-+{
-+	const u32 *eisr = vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr;
-+	return *(u64 *)eisr;
-+}
-+
- static const struct vgic_ops vgic_ops = {
- 	.get_lr			= vgic_v2_get_lr,
- 	.set_lr			= vgic_v2_set_lr,
- 	.sync_lr_elrsr		= vgic_v2_sync_lr_elrsr,
- 	.get_elrsr		= vgic_v2_get_elrsr,
-+	.get_eisr		= vgic_v2_get_eisr,
- };
- 
- static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr)
-@@ -1057,6 +1064,11 @@ static inline u64 vgic_get_elrsr(struct kvm_vcpu *vcpu)
- 	return vgic_ops.get_elrsr(vcpu);
- }
- 
-+static inline u64 vgic_get_eisr(struct kvm_vcpu *vcpu)
-+{
-+	return vgic_ops.get_eisr(vcpu);
-+}
-+
- static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-@@ -1263,10 +1275,11 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 		 * Some level interrupts have been EOIed. Clear their
- 		 * active bit.
- 		 */
-+		u64 eisr = vgic_get_eisr(vcpu);
-+		unsigned long *eisr_ptr = (unsigned long *)&eisr;
- 		int lr;
- 
--		for_each_set_bit(lr, (unsigned long *)vgic_cpu->vgic_v2.vgic_eisr,
--				 vgic_cpu->nr_lr) {
-+		for_each_set_bit(lr, eisr_ptr, vgic_cpu->nr_lr) {
- 			struct vgic_lr vlr = vgic_get_lr(vcpu, lr);
- 
- 			vgic_irq_clear_active(vcpu, vlr.irq);
+ 	spin_lock_init(&kvm->arch.vgic.lock);
++	kvm->arch.vgic.in_kernel = true;
+ 	kvm->arch.vgic.vctrl_base = vgic->vctrl_base;
+ 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
+ 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
 -- 
 1.8.3.4
