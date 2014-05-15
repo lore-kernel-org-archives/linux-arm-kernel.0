@@ -1,63 +1,44 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 15 May 2014 12:05:31 -0400
-Subject: [RESEND: PATCH v1 0/5] Add Keystone PCIe controller driver
-Message-ID: <1400169931-9724-1-git-send-email-m-karicheri2@ti.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 15 May 2014 18:11:32 +0200
+Subject: [PATCH 1/2] ARM: at91/dt: add DMA controller node to at91sam9rl
+In-Reply-To: <47a342121566bca0025a20a57282fb72c990ce09.1400166895.git.nicolas.ferre@atmel.com>
+References: <47a342121566bca0025a20a57282fb72c990ce09.1400166895.git.nicolas.ferre@atmel.com>
+Message-ID: <20140515161132.GT29318@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resending with some typos fixed...
-
-This patch adds a PCIe controller driver for Keystone SoCs. This
-is based on the original RFC patch series that I had sent earlier. I have
-incorporated following comments against that series:-
-
- - Add an interrupt controller node for Legacy irq chip and use
-   interrupt map/map-mask property to map legacy IRQs A/B/C/D
- - Add a Phy driver to replace the original serdes driver
- - Move common application register handling code to a separate
-   file to allow re-use across other platforms that use older
-   DW PCIe h/w
- - PCI quirk for maximum read request size. Check and override only
-   if the maximum is higher than what controller can handle.
- - Converted to a module platform driver.
-
-CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
-CC: Russell King <linux@arm.linux.org.uk>
-CC: Grant Likely <grant.likely@linaro.org>
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Mohit Kumar <mohit.kumar@st.com>
-CC: Jingoo Han <jg1.han@samsung.com>
-CC: Bjorn Helgaas <bhelgaas@google.com>
-
-
-Murali Karicheri (5):
-  ARM: keystone: add pcie related options
-  pci: designware: enhancements to support keystone pcie
-  phy: pci serdes phy driver for keystone
-  pci: dw: add common functions to support old hw based pci driver
-  pci: keystone: add pcie driver based on designware core driver
-
- .../devicetree/bindings/pci/pcie-keystone.txt      |   68 ++++
- arch/arm/mach-keystone/Kconfig                     |    2 +
- drivers/pci/host/Kconfig                           |   12 +
- drivers/pci/host/Makefile                          |    2 +
- drivers/pci/host/pci-dw-old-msi.c                  |  150 ++++++++
- drivers/pci/host/pci-dw-old.c                      |  371 ++++++++++++++++++
- drivers/pci/host/pci-dw-old.h                      |   30 ++
- drivers/pci/host/pci-keystone.c                    |  400 ++++++++++++++++++++
- drivers/pci/host/pcie-designware.c                 |  101 +++--
- drivers/pci/host/pcie-designware.h                 |   42 +-
- drivers/pci/quirks.c                               |   13 +
- drivers/phy/Kconfig                                |    6 +
- drivers/phy/Makefile                               |    1 +
- drivers/phy/phy-keystone.c                         |  230 +++++++++++
- 14 files changed, 1388 insertions(+), 40 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pci/pcie-keystone.txt
- create mode 100644 drivers/pci/host/pci-dw-old-msi.c
- create mode 100644 drivers/pci/host/pci-dw-old.c
- create mode 100644 drivers/pci/host/pci-dw-old.h
- create mode 100644 drivers/pci/host/pci-keystone.c
- create mode 100644 drivers/phy/phy-keystone.c
+On 15/05/2014 at 17:15:23 +0200, Nicolas Ferre wrote :
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/at91sam9rl.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9rl.dtsi b/arch/arm/boot/dts/at91sam9rl.dtsi
+> index 6e6e87dd0c92..412617084cfd 100644
+> --- a/arch/arm/boot/dts/at91sam9rl.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9rl.dtsi
+> @@ -348,6 +348,15 @@
+>  				};
+>  			};
+>  
+> +			dma0: dma-controller at ffffe600 {
+> +				compatible = "atmel,at91sam9rl-dma";
+> +				reg = <0xffffe600 0x200>;
+> +				interrupts = <21 IRQ_TYPE_LEVEL_HIGH 0>;
+> +				#dma-cells = <2>;
+> +				clocks = <&dma0_clk>;
+> +				clock-names = "dma_clk";
+> +			};
+> +
+>  			ramc0: ramc at ffffea00 {
+>  				compatible = "atmel,at91sam9260-sdramc";
+>  				reg = <0xffffea00 0x200>;
+> -- 
+> 1.8.2.2
+> 
 
 -- 
-1.7.9.5
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
