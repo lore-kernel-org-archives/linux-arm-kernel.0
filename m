@@ -1,120 +1,82 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 May 2014 18:58:26 +0100
-Subject: [PATCH v4 07/20] KVM: ARM: vgic: abstract access to the ELRSR bitmap
+Date: Thu, 15 May 2014 18:58:27 +0100
+Subject: [PATCH v4 08/20] KVM: ARM: vgic: abstract EISR bitmap access
 In-Reply-To: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
 References: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1400176719-31275-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1400176719-31275-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the GICH_ELRSR access to its own functions, and add them to
-the vgic_ops structure.
+Move the GICH_EISR access to its own function.
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h |  2 ++
- virt/kvm/arm/vgic.c    | 38 +++++++++++++++++++++++++++++++++-----
- 2 files changed, 35 insertions(+), 5 deletions(-)
+ include/kvm/arm_vgic.h |  1 +
+ virt/kvm/arm/vgic.c    | 17 +++++++++++++++--
+ 2 files changed, 16 insertions(+), 2 deletions(-)
 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 17bbe51..38864f5 100644
+index 38864f5..ccb9b59 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -84,6 +84,8 @@ struct vgic_lr {
- struct vgic_ops {
- 	struct vgic_lr	(*get_lr)(const struct kvm_vcpu *, int);
+@@ -86,6 +86,7 @@ struct vgic_ops {
  	void	(*set_lr)(struct kvm_vcpu *, int, struct vgic_lr);
-+	void	(*sync_lr_elrsr)(struct kvm_vcpu *, int, struct vgic_lr);
-+	u64	(*get_elrsr)(const struct kvm_vcpu *vcpu);
+ 	void	(*sync_lr_elrsr)(struct kvm_vcpu *, int, struct vgic_lr);
+ 	u64	(*get_elrsr)(const struct kvm_vcpu *vcpu);
++	u64	(*get_eisr)(const struct kvm_vcpu *vcpu);
  };
  
  struct vgic_dist {
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 11408fe..8b73cd6 100644
+index 8b73cd6..0d9701c 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1015,9 +1015,24 @@ static void vgic_v2_set_lr(struct kvm_vcpu *vcpu, int lr,
- 	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = lr_val;
+@@ -1028,11 +1028,18 @@ static u64 vgic_v2_get_elrsr(const struct kvm_vcpu *vcpu)
+ 	return *(u64 *)elrsr;
  }
  
-+static void vgic_v2_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
-+				  struct vgic_lr lr_desc)
++static u64 vgic_v2_get_eisr(const struct kvm_vcpu *vcpu)
 +{
-+	if (!(lr_desc.state & LR_STATE_MASK))
-+		set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
-+}
-+
-+static u64 vgic_v2_get_elrsr(const struct kvm_vcpu *vcpu)
-+{
-+	const u32 *elrsr = vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr;
-+	return *(u64 *)elrsr;
++	const u32 *eisr = vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr;
++	return *(u64 *)eisr;
 +}
 +
  static const struct vgic_ops vgic_ops = {
  	.get_lr			= vgic_v2_get_lr,
  	.set_lr			= vgic_v2_set_lr,
-+	.sync_lr_elrsr		= vgic_v2_sync_lr_elrsr,
-+	.get_elrsr		= vgic_v2_get_elrsr,
+ 	.sync_lr_elrsr		= vgic_v2_sync_lr_elrsr,
+ 	.get_elrsr		= vgic_v2_get_elrsr,
++	.get_eisr		= vgic_v2_get_eisr,
  };
  
  static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr)
-@@ -1031,6 +1046,17 @@ static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr,
- 	vgic_ops.set_lr(vcpu, lr, vlr);
+@@ -1057,6 +1064,11 @@ static inline u64 vgic_get_elrsr(struct kvm_vcpu *vcpu)
+ 	return vgic_ops.get_elrsr(vcpu);
  }
  
-+static void vgic_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
-+			       struct vgic_lr vlr)
++static inline u64 vgic_get_eisr(struct kvm_vcpu *vcpu)
 +{
-+	vgic_ops.sync_lr_elrsr(vcpu, lr, vlr);
-+}
-+
-+static inline u64 vgic_get_elrsr(struct kvm_vcpu *vcpu)
-+{
-+	return vgic_ops.get_elrsr(vcpu);
++	return vgic_ops.get_eisr(vcpu);
 +}
 +
  static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
  {
  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-@@ -1260,7 +1286,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 			 * Despite being EOIed, the LR may not have
- 			 * been marked as empty.
- 			 */
--			set_bit(lr, (unsigned long *)vgic_cpu->vgic_v2.vgic_elrsr);
-+			vgic_sync_lr_elrsr(vcpu, lr, vlr);
- 		}
- 	}
+@@ -1263,10 +1275,11 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+ 		 * Some level interrupts have been EOIed. Clear their
+ 		 * active bit.
+ 		 */
++		u64 eisr = vgic_get_eisr(vcpu);
++		unsigned long *eisr_ptr = (unsigned long *)&eisr;
+ 		int lr;
  
-@@ -1278,14 +1304,17 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	u64 elrsr;
-+	unsigned long *elrsr_ptr;
- 	int lr, pending;
- 	bool level_pending;
+-		for_each_set_bit(lr, (unsigned long *)vgic_cpu->vgic_v2.vgic_eisr,
+-				 vgic_cpu->nr_lr) {
++		for_each_set_bit(lr, eisr_ptr, vgic_cpu->nr_lr) {
+ 			struct vgic_lr vlr = vgic_get_lr(vcpu, lr);
  
- 	level_pending = vgic_process_maintenance(vcpu);
-+	elrsr = vgic_get_elrsr(vcpu);
-+	elrsr_ptr = (unsigned long *)&elrsr;
- 
- 	/* Clear mappings for empty LRs */
--	for_each_set_bit(lr, (unsigned long *)vgic_cpu->vgic_v2.vgic_elrsr,
--			 vgic_cpu->nr_lr) {
-+	for_each_set_bit(lr, elrsr_ptr, vgic_cpu->nr_lr) {
- 		struct vgic_lr vlr;
- 
- 		if (!test_and_clear_bit(lr, vgic_cpu->lr_used))
-@@ -1298,8 +1327,7 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- 	}
- 
- 	/* Check if we still have something up our sleeve... */
--	pending = find_first_zero_bit((unsigned long *)vgic_cpu->vgic_v2.vgic_elrsr,
--				      vgic_cpu->nr_lr);
-+	pending = find_first_zero_bit(elrsr_ptr, vgic_cpu->nr_lr);
- 	if (level_pending || pending < vgic_cpu->nr_lr)
- 		set_bit(vcpu->vcpu_id, &dist->irq_pending_on_cpu);
- }
+ 			vgic_irq_clear_active(vcpu, vlr.irq);
 -- 
 1.8.3.4
