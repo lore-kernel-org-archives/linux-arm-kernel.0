@@ -1,61 +1,52 @@
-From: emilgoode@gmail.com (Emil Goode)
-Date: Fri, 16 May 2014 01:01:44 +0200
-Subject: [PATCH] ARM: imx: clean up error handling
-In-Reply-To: <20140515203212.GD8897@mwanda>
-References: <1400181871-10325-1-git-send-email-emilgoode@gmail.com>
- <20140515203212.GD8897@mwanda>
-Message-ID: <20140515230144.GA10217@lianli>
+From: chirantan@chromium.org (Chirantan Ekbote)
+Date: Thu, 15 May 2014 16:03:24 -0700
+Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
+In-Reply-To: <CAD=FV=WGa7j_As_NpySxU7OEd_SzuGWK6oxU6UeiJ-4HsoWvvg@mail.gmail.com>
+References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
+ <53752E25.9060604@gmail.com>
+ <CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>
+ <53753443.8010303@gmail.com>
+ <CAD=FV=V8UZoeOqEwfx_E015pLM+amTt51LrUa+dk7mTdn=vKgA@mail.gmail.com>
+ <53753C17.1090002@gmail.com>
+ <CAD=FV=WGa7j_As_NpySxU7OEd_SzuGWK6oxU6UeiJ-4HsoWvvg@mail.gmail.com>
+Message-ID: <CAJFHJrrgWGc4XGQB0ysLufAg3Wouz-aYXu97Sy2Kp=HzK+akVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Dan,
+Hi Tomasz,
 
-Thanks for the review and sorry for the late reply.
+On Thu, May 15, 2014 at 3:44 PM, Doug Anderson <dianders@chromium.org> wrote:
+> Tomasz,
+>
+> On Thu, May 15, 2014 at 3:13 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>>> NOTE: if for some reason we need to keep the MCT around, we're
+>>> definitely going to need to account for the fact that tweaking it
+>>> affects the arch timer.  ...and having the arch timer is really nice
+>>> since:
+>>
+>> [Let me reorder the points below to make it easier to comment:]
+>>
+>>> * it's faster to access.
+>>> * it is accessible from userspace for really fast access.
+>>
+>> Do you have some data on whether it is a significant difference,
+>> especially considering real use cases?
+>
+> I know that Chrome makes _a lot_ of calls to gettimeofday() for
+> profiling purposes, enough that it showed up on benchmarks.  In fact,
+> we made a change to the MCT to make accesses faster and there's a
+> small mention of the benchmarking that was done at:
+>
+> https://chromium-review.googlesource.com/#/c/32190/
+>
+> ...that change probably should be sent upstream, actually.
+>
+> I'll let Chirantan comment on how much faster arch timers were.
+> ...and I think David Riley (also CCed now) may be able to comment on
+> the benefits of userspace timers.
+>
 
-On Thu, May 15, 2014 at 11:32:13PM +0300, Dan Carpenter wrote:
-> On Thu, May 15, 2014 at 09:24:30PM +0200, Emil Goode wrote:
-> > If we fail to allocate struct platform_device pdev we
-> > dereference it after the goto label err.
-> > 
-> > I have rearranged the error handling a bit to fix the issue
-> > and also make it more clear.
-> > 
-> > Signed-off-by: Emil Goode <emilgoode@gmail.com>
-> > ---
-> >  arch/arm/mach-imx/devices/platform-ipu-core.c |   22 +++++++++++++---------
-> >  1 file changed, 13 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
-> > index fc4dd7c..14d61d9 100644
-> > --- a/arch/arm/mach-imx/devices/platform-ipu-core.c
-> > +++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
-> > @@ -77,34 +77,38 @@ struct platform_device *__init imx_alloc_mx3_camera(
-> >  
-> >  	pdev = platform_device_alloc("mx3-camera", 0);
-> >  	if (!pdev)
-> > -		goto err;
-> > +		return ERR_PTR(ret);
-> 
-> It's more readable to say "return ERR_PTR(-ENOMEM);".
+When I profiled gettimeofday() calls, they were about 50 - 60% faster
+with the arch timers compared to the mct.
 
-I think so to, will change this one but still use the ret variable at the
-bottom of the function.
-
-> 
-> This patch is great but the subject should say "fix" and not "clean up"
-> since it fixes a NULL dereference bug.  The people who call their
-> checkpatch.pl clean ups "fixes" are also doing it wrong but those are
-> newbies and not worth educating.
-
-I agree, it's a bug fix and not a clean up.
-
-Will resend tomorrow.
-
-Best regards,
-
-Emil Goode
-
-> 
-> regards,
-> dan carpenter
-> 
+- Chirantan
