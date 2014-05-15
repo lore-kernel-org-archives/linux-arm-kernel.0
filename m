@@ -1,64 +1,47 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 15 May 2014 11:30:29 +0200
-Subject: [PATCH v2 2/3] drm/panel: add support for EDT panels
-In-Reply-To: <20140515090814.GB6434@ulmo>
-References: <cover.1400103181.git.stefan@agner.ch>
- <35c081171a3d9a9401767601c02a12e266b37dd0.1400103181.git.stefan@agner.ch>
- <20140515075102.GE5952@ulmo>
- <1400142449.4102.16.camel@paszta.hi.pengutronix.de>
- <20140515090814.GB6434@ulmo>
-Message-ID: <1400146229.4102.26.camel@paszta.hi.pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 May 2014 10:31:30 +0100
+Subject: [PATCH v6 00/15] enable HiP04 SoC
+In-Reply-To: <CAD6h2NSpH0zxpek4KnUMT-p_DFnGZVaxP+x_0hsn1S8O6C7X6g@mail.gmail.com>
+References: <1399795571-17231-1-git-send-email-haojian.zhuang@linaro.org>
+ <14229972.j5k474Mq5Q@wuerfel>
+ <CAD6h2NSpH0zxpek4KnUMT-p_DFnGZVaxP+x_0hsn1S8O6C7X6g@mail.gmail.com>
+Message-ID: <53748972.8040603@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 15.05.2014, 11:08 +0200 schrieb Thierry Reding:
-> On Thu, May 15, 2014 at 10:27:29AM +0200, Philipp Zabel wrote:
-> > Am Donnerstag, den 15.05.2014, 09:51 +0200 schrieb Thierry Reding:
-> > > On Wed, May 14, 2014 at 11:45:57PM +0200, stefan at agner.ch wrote:
-> > > > From: Stefan Agner <stefan@agner.ch>
-> > > > 
-> > > > This panels are sold by Toradex for Colibri T20/T30 and Apalis T30
-> > > > evaluation kits.
-> > > > 
-> > > > Signed-off-by: Stefan Agner <stefan@agner.ch>
-> > > 
-> > > Panel patches should go to the dri-devel mailing list as well.
-> > > 
-> > > Also a patch was posted only yesterday for a panel that seems to be the
-> > > exact same one as this, even though the name differs minimally, see:
-> > > 
-> > > 	https://patchwork.kernel.org/patch/4175251/
-> > > 
-> > > Adding Philipp on Cc so you guys can work together whether this is
-> > > indeed the same panel. The only differences seem to be in the vertical
-> > > front and back porches, but I suspect that either settings will work on
-> > > both Tegra and i.MX.
-> > 
-> > The ETM0700G0DH6 Datasheet lists 2 lines as the typical vsync pulse
-> > width, 525 lines as the vertical period, and 35 lines as the vsync -de
-> > time, which is vsync len + back porch.
-> > So vertical timings 480 + 10 + 2 + 33 = 525 should be valid for the
-> > ET0700G0DH6 panel:
+On 15/05/14 10:20, Haojian Zhuang wrote:
+> On 15 May 2014 02:37, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Sunday 11 May 2014 16:05:56 Haojian Zhuang wrote:
+>>> Changelog:
+>>> v6:
+>>>   * Split HiP04 enabling patch into patches on document, mcpm & hiP04.
+>>>   * Move reset operation in HiP04 MCPM implementation.
+>>>   * Remove ARCH_MULTI_V7_NONLPAE & ARCH_MULTI_V7_LPAE according to olof's
+>>>     comment.
+>>
+>> The latest version looks good to me, at least if all the remaining
+>> comments for the mcpm implementation have been addressed.
+>>
+>> I would suggest to split the series into two, and submit all the gic
+>> related changes through Russell's patch tracker but have a pull
+>> request for the platform changes.
+>>
+>> As far as I can tell, there are no compile-time dependencies between
+>> the two, so we don't get a broken build during bisection, but
+>> of course the platform will only be usable if both parts are merged.
+>>
+>>         Arnd
 > 
-> Shouldn't that work with 480 + 8 + 2 + 35 too? It seems to me that it
-> should still be safe for that panel. Similarily I'd expect your timings
-> to work on the ET070080DH6.
->
-> Irrespective of that they both seem to have different capabilities so
-> two compatible values should be fine. However for the purpose of the
-> simple panel driver they could be made to share the same timings if it
-> works for both panels and devices.
+> Hi Arnd,
+> 
+> Thanks. I'll submit gic patches into Russell's patch tracker.
 
-Yes. As I understand, the 480 + 10 + 2 + 33 timing should be correct for
-both panels.
+Please hold on on the GIC stuff, I still have comments on the main
+changes (I should have sent them earlier), and the KVM stuff is still
+quite wrong.
 
-> As for the touch panel on the ETM0700G0DH6, do you happen to know how
-> that's usually connected? I suspect it needs external hardware to
-> capture the YU, XL, YD and XR pins and turn that into raw coordinates
-> and pen down interrupts.
+Thanks,
 
-The ETM0700G0DH6 has a capacitive touch screen with an EDT-FT5406
-controller connected via I2C, at least on the panels that I have seen.
-
-regards
-Philipp
+	M.
+-- 
+Jazz is not dead. It just smells funny...
