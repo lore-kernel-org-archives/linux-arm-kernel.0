@@ -1,44 +1,50 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 15 May 2014 09:31:52 -0500
-Subject: [PATCH] ARM: QCOM: Enable ARM_AMBA option for Qcom SOCS.
-In-Reply-To: <1400148535-30772-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1400148535-30772-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <4FB5A6A0-B4C5-4E97-AD7D-8049CFA60393@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 May 2014 16:32:43 +0200
+Subject: [PATCHv3 1/3] ARM: mm: allow sub-architectures to override PCI
+ I/O memory type
+In-Reply-To: <20140515142924.GI27594@arm.com>
+References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140515155130.193c3181@free-electrons.com> <20140515142924.GI27594@arm.com>
+Message-ID: <4972763.mtuLYh6sDH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On May 15, 2014, at 5:08 AM, Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
-
-> As some of the IPs on Qualcomm SOCs are based on ARM PrimeCell IPs.
-> For example SDCC controller is PrimeCell MCI pl180. Adding this option will
-> give flexibility to reuse the existing drivers as it is without major
-> modifications.
+On Thursday 15 May 2014 15:29:24 Will Deacon wrote:
+>  Thu, May 15, 2014 at 02:51:30PM +0100, Thomas Petazzoni wrote:
+> > On Thu, 15 May 2014 15:21:25 +0200, Arnd Bergmann wrote:
+> > > On Thursday 15 May 2014 11:18:37 Thomas Petazzoni wrote:
+> > > > @@ -445,7 +452,7 @@ int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
+> > > >         return ioremap_page_range(PCI_IO_VIRT_BASE + offset,
+> > > >                                   PCI_IO_VIRT_BASE + offset + SZ_64K,
+> > > >                                   phys_addr,
+> > > > -                                 __pgprot(get_mem_type(MT_DEVICE)->prot_pte));
+> > > > +                                 __pgprot(get_mem_type(pci_ioremap_mem_type)->prot_pte));
+> > > >  }
+> > > >  EXPORT_SYMBOL_GPL(pci_ioremap_io);
+> > > > 
+> > > 
+> > > As discussed on IRC, I think we'd be better off making this a strong-ordered
+> > > mapping for all platforms unconditionally. The PCI I/O space semantics
+> > > require non-posted writes, which is the main difference between device
+> > > and SO mappings, so the same fix is required both for mvebu as a workaround
+> > > for the deadlock as well as for everyone else as a fix for an incorrect
+> > > PCI behavior.
+> > 
+> > Ok, I'll take that into account when posting a v4.
 > 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
-> arch/arm/mach-qcom/Kconfig | 1 +
-> 1 file changed, 1 insertion(+)
+> Actually, I don't think this reasoning is correct. The memory type here
+> applies to accesses mastered by the CPU onto AXI -- it is the job of the
+> AXI/PCI bridge (i.e. the host controller) to ensure that writes are not
+> posted, so this is irrelevant.
 > 
-> diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
-> index a028be2..5bac591 100644
-> --- a/arch/arm/mach-qcom/Kconfig
-> +++ b/arch/arm/mach-qcom/Kconfig
-> @@ -2,6 +2,7 @@ config ARCH_QCOM
-> 	bool "Qualcomm Support" if ARCH_MULTI_V7
-> 	select ARCH_REQUIRE_GPIOLIB
-> 	select ARM_GIC
-> +	select ARM_AMBA
-> 	select CLKSRC_OF
-> 	select GENERIC_CLOCKEVENTS
-> 	select HAVE_SMP
-> -- 
-> 1.9.1
+> Of course, the erratum in question requires SO memory, but that's an
+> entirely different problem. The default should remain as device memory.
 
-I?d rather have the driver have the select of ARM_AMBA and not the core support.  We clearly don?t need to build ARM_AMBA in to function.
+How can a write be non-posted on the PCI bus if it's posted on AXI?
+The way I understand it, the CPU would continue with the next instruction
+as soon as the write has made it out to the AXI fabric, i.e. before
+the PIO instruction is complete. If this is used to synchronize with a
+DMA, there is no guarantee that the transaction from PCI will be visible
+in memory by then.
 
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+	Arnd
