@@ -1,66 +1,39 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 15 May 2014 21:25:07 +0200
-Subject: [PATCH v5 0/5] ARM: dts: enable hdmi for exynos5 based peach
- and snow boards
-In-Reply-To: <1400166264-3428-1-git-send-email-rahul.sharma@samsung.com>
-References: <1400166264-3428-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <53751493.8050601@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 15 May 2014 13:33:51 -0600
+Subject: [RFC PATCH 00/10] Tegra XHCI support
+In-Reply-To: <1400113986-339-1-git-send-email-abrestic@chromium.org>
+References: <1400113986-339-1-git-send-email-abrestic@chromium.org>
+Message-ID: <5375169F.3060809@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
+On 05/14/2014 06:32 PM, Andrew Bresticker wrote:
+> This is a first pass at the host and PHY drivers necessary for USB3.0
+> support on Tegra114 and Tegra124.  The Tegra XHCI host controller requires
+> external firmware [1] which must be loaded before using any USB ports owned
+> by the controller.  The XUSB PHY driver handles mapping and enabling of
+> the UTMI, HSIC, and SuperSpeed pads to the XHCI controller.
+> 
+> Tested on a Venice2 with a variety of USB2.0 and USB3.0 memory sticks
+> and ethernet dongles.  
+> 
+> Notes:
+>  - I've included support for Tegra114, but since I don't have Tegra114-based
+>    hardware, it is completely untested.
+>  - The PCIe and SATA PHYs also are programmed using the XUSB_PADCTL space
+>    as well.  At least some of the code can be re-used, specifically with
+>    respect to lane programming.  I believe Thierry is working on the PCIe
+>    parts of this.
 
-On 15.05.2014 17:04, Rahul Sharma wrote:
-> From: Rahul Sharma <Rahul.Sharma@samsung.com>
-> 
-> Enable hdmi for exynos5250 based snow board, exynos5420
-> based peach pit board and 5800 based peach-pi board.
-> 
-> V5:
-> 1) Moved hdmi_hpd_irq pin back to board files.
-> 2) Replaced 0 with GPIO_ACTIVE_HIGH while adding gpio property
-> to HDMI node.
-> 
-> V4:
-> 1) Removed hdmi_hpd_irq pin from peach-pi board as it already
-> present in exynos5420-pinctrl.dtsi.
-> 
-> V3:
-> 1) Re-spin on dependent patches.
-> 2) Added patch to enable hdmi for Peach-pi board.
-> 
-> V2:
-> 1) Re-spin on dependent patches.
-> 2) Added patch to remove chip specific hdmi hpd gpio from
-> board file top SoC file.
-> 
-> This series is based on Kukjin Kims, for-next branch.
-> 
-> It is dependent on
-> 
-> 1) Sachin's patch: "ARM: dts: exynos5250-snow: add tps65090 power regulator"
-> at https://patches.linaro.org/28325/ : [Reviewed-by: Doug Anderson]
-> 
-> All other dependent patches are already landed in maintainers
-> tree.
-> 
-> Rahul Sharma (4):
->   ARM: dts: enable hdmi for exynos5250 based snow board
->   ARM: dts: change to correct compatible string for exynos5420 hdmi
->   ARM: dts: enable hdmi for exynos5420 based peach-pit board
->   ARM: dts: enable hdmi for exynos5800 based peach-pi board
-> 
->  arch/arm/boot/dts/exynos5250-cros-common.dtsi |    6 +++++-
->  arch/arm/boot/dts/exynos5250-snow.dts         |   14 ++++++++++++++
->  arch/arm/boot/dts/exynos5420-peach-pit.dts    |   22 ++++++++++++++++++++++
->  arch/arm/boot/dts/exynos5420.dtsi             |    7 ++++++-
->  arch/arm/boot/dts/exynos5800-peach-pi.dts     |   22 ++++++++++++++++++++++
->  5 files changed, 69 insertions(+), 2 deletions(-)
-> 
+If I understand the HW correctly, there's a separate "pad control" HW
+block that provides routing/sharing of signals from USB2(?), USB3, SATA,
+and PCIe to the pads.
 
-For the whole series:
-
-Acked-by: Tomasz Figa <t.figa@samsung.com>
-
-Best regards,
-Tomasz
+I believe Thierry is working on exposing this block as a pinctrl driver,
+or at least something that the other drivers can call into in order to
+configure that block. It'd be good if you can co-ordinate with him to
+rebase this driver on top of that, rather than (I assume; haven't read
+the code yet...) directly manipulating the padctrl registers inside each
+of the different drivers. Co-ordinating that could turn out to be
+problematic, and presumably if each driver does its own thing, we end up
+duplicating defines, code, and DT bindings for configuring the padctrl HW.
