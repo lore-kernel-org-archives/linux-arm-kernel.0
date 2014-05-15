@@ -1,56 +1,54 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 15 May 2014 19:08:49 -0400
-Subject: [PATCH RFC 00/11] Remove mach-kirkwood
-In-Reply-To: <8332148.Z1shujgC24@wuerfel>
-References: <1400163836-9831-1-git-send-email-andrew@lunn.ch>
- <8332148.Z1shujgC24@wuerfel>
-Message-ID: <20140515230849.GS27822@titan.lakedaemon.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 15 May 2014 18:12:30 -0500
+Subject: [PATCH] ARM: OMAP: replace checks for CONFIG_USB_GADGET_OMAP
+In-Reply-To: <1400187345.11786.28.camel@x220>
+References: <1400187345.11786.28.camel@x220>
+Message-ID: <20140515231229.GA25523@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 04:36:35PM +0200, Arnd Bergmann wrote:
-> On Thursday 15 May 2014 16:23:41 Andrew Lunn wrote:
-> > This is an RFC patchset which removes mach-kirkwood, now that kirkwood
-> > support has been converted to DT and lives in mach-mvebu.
-> > 
-> > It is an RFC because some of the final conversion patches have not yet
-> > been accepted by maintainers, in particular:
-> > 
-> > http://www.spinics.net/lists/arm-kernel/msg328068.html
-> > 
-> > which needs to be accepted by the Sound/ASoC maintainer.
-> > 
-> > Once the real patchset is posted, without the RFC status, we would
-> > prefer that each subsystem maintainer takes the relevent patches,
-> > rather than try to take them all through arm-soc.
+On Thu, May 15, 2014 at 10:55:45PM +0200, Paul Bolle wrote:
+> Commit 193ab2a60700 ("usb: gadget: allow multiple gadgets to be built")
+> apparently required that checks for CONFIG_USB_GADGET_OMAP would be
+> replaced with checks for CONFIG_USB_OMAP. Do so now for the remaining
+> checks for CONFIG_USB_GADGET_OMAP, even though these checks have
+> basically been broken since v3.1.
 > 
-> Very nice!
+> Fixes: 193ab2a60700 ("usb: gadget: allow multiple gadgets to be built")
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> ---
+> Also untested.
 > 
-> We had a couple of conflicts in 3.15 between kirkwood and dove both
-> getting moved to multiplatform. Any idea how this can be done better
-> this time?
-
-Yes, once the changes have matured in -next, I'll merge them into a
-single branch to pull instead of separately like I did before.
-
-> There are three other series that may or may not make it into 3.16
-> and that will have conflicts with this one:
+> It seems efficient to also include the change to phy-isp1301-omap.c in
+> this patch (ie, not ship that as a separate patch).
 > 
-> - remove mv78xx0
-> - remove mach-dove
+>  arch/arm/mach-omap1/board-h2.c        | 2 +-
+>  arch/arm/mach-omap1/board-h3.c        | 2 +-
+>  arch/arm/mach-omap1/board-innovator.c | 2 +-
+>  arch/arm/mach-omap1/board-osk.c       | 2 +-
+>  drivers/usb/phy/phy-isp1301-omap.c    | 2 +-
+>  5 files changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
+> index 65d2acb31498..57092bc7f4f1 100644
+> --- a/arch/arm/mach-omap1/board-h2.c
+> +++ b/arch/arm/mach-omap1/board-h2.c
+> @@ -346,7 +346,7 @@ static struct omap_usb_config h2_usb_config __initdata = {
+>  	/* usb1 has a Mini-AB port and external isp1301 transceiver */
+>  	.otg		= 2,
+>  
+> -#ifdef	CONFIG_USB_GADGET_OMAP
+> +#ifdef	CONFIG_USB_OMAP
 
-? I haven't seen anything on these...
+CONFIG_USB_OMAP is tristate, it might be better to use
+IS_ENABLED(CONFIG_USB_OMAP) here. Likewise for the rest of the patch.
 
-> - convert orion5x to multiplatform
-
-I have this one already.
-
-> If we can decide which ones we should have, we can make sure the
-> patches correctly build on top of one another or get merged into
-> one per subsystem.
-
-hmmm, yes, if only we had some people assigned to do that. ;-)
-
-thx,
-
-Jason.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140515/c7af7322/attachment.sig>
