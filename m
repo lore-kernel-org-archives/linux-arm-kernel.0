@@ -1,54 +1,87 @@
-From: dwalker@fifo99.com (dwalker at fifo99.com)
-Date: Thu, 15 May 2014 21:57:26 +0000
-Subject: [PATCH] arm: msm: remove board file for Nexus One (ie. mahimahi)
-In-Reply-To: <1400177413.11786.11.camel@x220>
-References: <1400101656.9826.4.camel@x220> <20140515174448.GA31159@fifo99.com>
- <1400177413.11786.11.camel@x220>
-Message-ID: <20140515215726.GA1171@fifo99.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 15 May 2014 15:10:20 -0700
+Subject: [PATCH v2 09/11] arm64/crypto: add voluntary preemption to Crypto
+ Extensions SHA1
+In-Reply-To: <E28B9BA9-468D-45BD-A479-5D9289616798@arm.com>
+References: <1400091451-9117-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1400091451-9117-10-git-send-email-ard.biesheuvel@linaro.org>
+ <20140515172458.GE1499@arm.com>
+ <CAKv+Gu-9P+vDPnvr2Cz4Bcw5=5SuEMw-xFxLM4=SoF65ESvhcQ@mail.gmail.com>
+ <E28B9BA9-468D-45BD-A479-5D9289616798@arm.com>
+Message-ID: <CAKv+Gu_Tupu8jJX+6hRx_LOM0y05A5+MPXndzSKRNYQcG-yAvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 08:10:13PM +0200, Paul Bolle wrote:
-> Daniel,
-> 
-> On Thu, 2014-05-15 at 17:44 +0000, dwalker at fifo99.com wrote:
-> > On Wed, May 14, 2014 at 11:07:36PM +0200, Paul Bolle wrote:
-> > > Commit 1b802ff79f03 ("arm: msm: add board file for Nexus One (ie.
-> > > mahimahi)") added just board-mahimahi.c. It did not add
-> > > board-mahimahi.h, Makefile changes or Kconfig changes.
-> > > 
-> > > Four years have passed and this file is still dangling. Remove it.
-> > > 
-> > > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> > > ---
-> > > Untested. But what to test here?
-> > > 
-> > I don't mine if Sapphire gets removed,
-> 
-> Could you ACK that patch, please?
+On 15 May 2014 14:47, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On 15 May 2014, at 22:35, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> On 15 May 2014 10:24, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>>> On Wed, May 14, 2014 at 07:17:29PM +0100, Ard Biesheuvel wrote:
+>>>> +static u8 const *sha1_do_update(struct shash_desc *desc, const u8 *data,
+>>>> +                             int blocks, u8 *head, unsigned int len)
+>>>> +{
+>>>> +     struct sha1_state *sctx = shash_desc_ctx(desc);
+>>>> +     struct thread_info *ti = NULL;
+>>>> +
+>>>> +     /*
+>>>> +      * Pass current's thread info pointer to sha1_ce_transform()
+>>>> +      * below if we want it to play nice under preemption.
+>>>> +      */
+>>>> +     if ((IS_ENABLED(CONFIG_PREEMPT_VOLUNTARY) || IS_ENABLED(CONFIG_PREEMPT))
+>>>> +         && (desc->flags & CRYPTO_TFM_REQ_MAY_SLEEP))
+>>>> +             ti = current_thread_info();
+>>>> +
+>>>> +     do {
+>>>> +             int rem;
+>>>> +
+>>>> +             kernel_neon_begin_partial(16);
+>>>> +             rem = sha1_ce_transform(blocks, data, sctx->state, head, 0, ti);
+>>>> +             kernel_neon_end();
+>>>> +
+>>>> +             data += (blocks - rem) * SHA1_BLOCK_SIZE;
+>>>> +             blocks = rem;
+>>>> +             head = NULL;
+>>>> +     } while (unlikely(ti && blocks > 0));
+>>>> +     return data;
+>>>> +}
+>>>
+>>> What latencies are we talking about? Would it make sense to always
+>>> call cond_resched() even if preemption is disabled?
+>>
+>> Calculating the SHA256 (which is the most striking example) hash of a
+>> 4k buffer takes ~10 microseconds, so perhaps this is all a bit moot as
+>> I don't think there will generally be many in-kernel users hashing
+>> substantially larger quantities of data at a time.
+>
+> And what?s the maximum size? Could we do it in blocks of 4K?
+>
 
-I don't mind if it gets removed, but I wouldn't ACK it's removal ..
- 
-> >  but I'm working on this one now..
-> 
-> That's good to hear.
-> 
-> >  So I don't want it deleted.
-> 
-> This is not something I get to decide. Nevertheless, given that this
-> file shouldn't have been merged to begin with, I'd appreciate it if some
-> deadline could be agreed upon.
+Yes, that should be doable as well. Once we feel we actually need this
+feature, that is probably a better approach.
 
-I think I merged it actually, but there's no rules about what gets merged. How when what order, etc.
-It's all free form.
+>>> But I think we should have this loop always rescheduling if
+>>> CRYPTO_TFM_REQ_MAY_SLEEP. I can see there is a crypto_yield() function
+>>> that conditionally reschedules. What's the overhead of calling
+>>> sha1_ce_transform() in a loop vs a single call for the entire data?
+>>
+>> For SHA256 we lose at least 10% if we call into the core function for
+>> each 64 byte block rather than letting it chew away at all the data
+>> itself.
+>
+> I was thinking more like calling it for bigger buffers (e.g. page) at
+> once and a crypto_yield() in between.
+>
+>> (This is due to the fact that it needs to load 64 32-bit round
+>> keys) But perhaps (considering the above) it is better to just shelve
+>> the last 4 patches in this series until it becomes a problem for
+>> anyone.
+>
+> For the time being I would drop the last 4 patches. We can revisit them
+> for the next kernel version.
+>
 
-> That being said, I'm not sure how having just this file in mainline
-> helps your development efforts. It seems it did receive some updates
-> for, well, treewide stuff. But it surely didn't get build coverage or
-> runtime testing. So would you lose much if it only remains in your
-> development tree?
+Agreed.
 
-It's effort to remove it.. Your asking for it to get removed, then re-added.. That sounds
-like a fairly large amount of effort vs just leaving it in place.
+Should I send an updated pull request?
 
-Daniel
+-- 
+Ard.
