@@ -1,46 +1,56 @@
-From: jiada_wang@mentor.com (jiada_wang at mentor.com)
-Date: Wed, 14 May 2014 18:22:13 -0700
-Subject: [PATCH] dma: imx: correct sdmac->status for cyclic dma tx
-Message-ID: <1400116933-14063-1-git-send-email-jiada_wang@mentor.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 14 May 2014 18:37:52 -0700
+Subject: [PATCH v2 3/5] arm: Support reboot through watchdog subsystem
+In-Reply-To: <1399681883-891-4-git-send-email-linux@roeck-us.net>
+References: <1399681883-891-1-git-send-email-linux@roeck-us.net>
+ <1399681883-891-4-git-send-email-linux@roeck-us.net>
+Message-ID: <53741A70.8090606@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jiada Wang <jiada_wang@mentor.com>
+On 05/09/2014 05:31 PM, Guenter Roeck wrote:
+> The watchdog subsystem provides an API to perform a system reboot.
+> Use it.
+>
+> With this change, the arm_pm_restart callback is now optional,
+> so check if it is set before calling it.
+>
+> Tested-by: Jonas Jensen <jonas.jensen@gmail.com>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 
-In cyclic dma tx's handler sdma_handle_channel_loop(),
-SDMA channel statue is set to either DMA_ERROR or DMA_IN_PROGRESS
-based on each period's status. This has the following issues:
+Any comments / ack from the arm maintainers ?
 
-1) If one period's status is BD_RROR, then channel status
-   will be set to DMA_ERROR, but it will be overwritten to DMA_IN_PROGRESS
-   if the following periods are OK.
-2) DMA client may call sdma_control(DMA_TERMINATE_ALL) to stop the cyclic dma
-   operation, sdma channel status will be set to DMA_ERROR,
-   but if after this handler is called, then again the channel status will be overwritten
-   to DMA_IN_PROGRESS. Then the following dmaengine_prep_dma_cyclic() will always fail,
-   as channel status is DMA_IN_PROGRESS.
+Thanks,
+Guenter
 
-As in cyclic dma tx, channel status will be initially set to DMA_IN_PROGRESS,
-driver only needs to change it to DMA_ERROR, when something wrong happens
-(one period status is wrong, or stoped by client explicitly).
-
-Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
----
- drivers/dma/imx-sdma.c |    2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index 19041ce..1287146 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -607,8 +607,6 @@ static void sdma_handle_channel_loop(struct sdma_channel *sdmac)
- 
- 		if (bd->mode.status & BD_RROR)
- 			sdmac->status = DMA_ERROR;
--		else
--			sdmac->status = DMA_IN_PROGRESS;
- 
- 		bd->mode.status |= BD_DONE;
- 		sdmac->buf_tail++;
--- 
-1.7.9.5
+> ---
+> v2: No change
+>
+>   arch/arm/kernel/process.c | 6 +++++-
+>   1 file changed, 5 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index 81ef686..c3b7b5e 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -32,6 +32,7 @@
+>   #include <linux/hw_breakpoint.h>
+>   #include <linux/leds.h>
+>   #include <linux/reboot.h>
+> +#include <linux/watchdog.h>
+>
+>   #include <asm/cacheflush.h>
+>   #include <asm/idmap.h>
+> @@ -230,7 +231,10 @@ void machine_restart(char *cmd)
+>   	local_irq_disable();
+>   	smp_send_stop();
+>
+> -	arm_pm_restart(reboot_mode, cmd);
+> +	if (arm_pm_restart)
+> +		arm_pm_restart(reboot_mode, cmd);
+> +
+> +	watchdog_do_reboot(reboot_mode, cmd);
+>
+>   	/* Give a grace period for failure to restart of 1s */
+>   	mdelay(1000);
+>
