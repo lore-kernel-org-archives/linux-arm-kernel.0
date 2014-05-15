@@ -1,40 +1,40 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Thu, 15 May 2014 21:50:20 +0100
-Subject: [PATCH v3 1/6] watchdog: Add API to trigger reboots
-In-Reply-To: <1400186304-1691-2-git-send-email-linux@roeck-us.net>
-References: <1400186304-1691-1-git-send-email-linux@roeck-us.net>
- <1400186304-1691-2-git-send-email-linux@roeck-us.net>
-Message-ID: <20140515215020.38f03ab1@alan.etchedpixels.co.uk>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 15 May 2014 14:52:10 -0600
+Subject: [PATCH v1 5/5] pci: keystone: add pcie driver based on
+ designware core driver
+In-Reply-To: <53751DDF.40304@ti.com>
+References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
+ <6048322.x3M3sdDEWO@wuerfel> <5374FD24.8000806@ti.com>
+ <22200719.Jb5jnJylJH@wuerfel>
+ <20140515183919.GC11650@obsidianresearch.com>
+ <53751DDF.40304@ti.com>
+Message-ID: <20140515205210.GB14722@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +void watchdog_do_reboot(void)
-> +{
-> +	if (wdd_reboot_dev)
-> +		wdd_reboot_dev->ops->reboot(wdd_reboot_dev);
-> +}
-> +EXPORT_SYMBOL(watchdog_do_reboot);
+On Thu, May 15, 2014 at 04:04:47PM -0400, Murali Karicheri wrote:
 
-Crashes and burns if you are unloading a watchdog just as you try to
-reboot. Yes its wildly unlikely but it's still conceptually wrong.
+> Jason What you mean by "The PCI core handles setting the maximum
+> read request size already" I see there is function pcie_write_mrrs()
+> in the drivers/pci/probe.c that reads the mps using pcie_get_mps()
+> and then set mrrs to mps. But this function is called only from
+> pcie_bus_configure_set() that is called by
+> pcie_bus_configure_settings()
 
->  
-> +	if (wdd->ops->reboot)
-> +		wdd_reboot_dev = wdd;
-> +
+Right, that is the common code that correctly sets the MRRS that you
+should be using instead of quirks.
 
-Two parallel registers from different bus types, parallel
-register/unregister ?
+> None of them gets called on ARM platform.
 
-This feels to me like a backward step. We've gone from various device
-bits leaking into the core code (where they can work all the time) to
-various core code leaking into the devices which is asking for init order
-problems and other races.
+Hmm, a cursory glance tells me the same as well.
 
-Given we are talking about stuff of the order of 10-20 instructions I
-think duplication is not only the lesser evil it's also smaller, more
-reliable and easier to maintain.
+That seems to be the root problem here, ARM needs to do the PCIE
+setup just as much as any other arch.
 
-IMHO this is a solution looking for a problem.
+So, I would prefer to see you fix ARM common code to call
+pcie_bus_configure_settings() properly, that seems very simple and is
+obviously needed for any PCI-E host driver on ARM.
 
-Alan
+Thoughts? Arnd? Bjorn?
+
+Jason
