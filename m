@@ -1,55 +1,103 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Thu, 15 May 2014 16:44:29 +0800
-Subject: RCU stall on panda
-In-Reply-To: <20140513153220.GC16837@atomide.com>
-References: <53675C5F.10509@linaro.org>
- <20140505180617.GM8754@linux.vnet.ibm.com>
- <20140512212102.GF5668@atomide.com> <5371BD69.8010600@linaro.org>
- <20140513153220.GC16837@atomide.com>
-Message-ID: <53747E6D.60500@linaro.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 15 May 2014 09:44:55 +0100
+Subject: [PATCH v4 2/6] dt-bindings: add mtk-timer bindings
+In-Reply-To: <cebe44ba-c543-4f4a-9aeb-810156fe8250@BN1AFFO11FD036.protection.gbl>
+References: <1400087579-4250-1-git-send-email-matthias.bgg@gmail.com>
+ <1400087579-4250-3-git-send-email-matthias.bgg@gmail.com>
+ <cebe44ba-c543-4f4a-9aeb-810156fe8250@BN1AFFO11FD036.protection.gbl>
+Message-ID: <CABuKBeL7yeXbxmBE=+ar3dsHRNs1oscYDSPPs+RnGsM8eJs5PQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2014 11:32 PM, Tony Lindgren wrote:
-> * Alex Shi <alex.shi@linaro.org> [140512 23:37]:
->> On 05/13/2014 05:21 AM, Tony Lindgren wrote:
->>> * Paul E. McKenney <paulmck@linux.vnet.ibm.com> [140505 11:11]:
->>>> On Mon, May 05, 2014 at 05:39:43PM +0800, Alex Shi wrote:
->>>>> I keep seeing the RCU stall problem on panda board from 3.10 kernel to latest upstream kernel
->>>>> and google find some one report it before: https://lkml.org/lkml/2012/9/20/519
->>>>>
->>>>> Is it the hardware issue or a real software problem?
->>>>
->>>> I cannot distinguish between hardware and software from the trace below,
->>>> but given that you are also seeing a soft lockup, either way you do
->>>> appear to have a real problem as opposed to an RCU CPU stall warning
->>>> false positive.
->>>
->>> Looks like you have CPU_IDLE enabled on panda. Hangs with current linux
->>> next with CPU_IDLE are currently being discussed on the linux-omap list
->>> in thread "omap4-panda-es boot issues with v3.15-rc4"
->>>
->>> I've seen occasional system hangs, and I've also noticed that doing
->>> ctrl-a-f h or ctrl-a-f l for sysrq backtrace can unlock the system
->>> producing similar errors to the below.
->>>
+Hi all,
+
+I did not realize that Android gmail app sends HTML mails.
+So I send the comments below accidentally as HTML mail yesterday.
+Sorry for that.
+
+2014-05-14 18:44 GMT+01:00 S?ren Brinkmann <soren.brinkmann@xilinx.com>:
+> Hi Matthias,
+>
+> On Wed, 2014-05-14 at 07:12PM +0200, Matthias Brugger wrote:
+>> Add binding documentation for the General Porpose Timer driver of
+>> the Mediatek SoCs.
 >>
->> Thanks a lot for the info.
->> In fact, the oops keeps in upstream kernel from 3.10 to latest.
-> 
-> Care to test if the revert of commit cb7094 Santosh posted as
-> "[PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled"
-> solves the problem for you?
-> 
+>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+>> ---
+>>  .../devicetree/bindings/timer/mediatek,mtk-timer.txt   | 18 ++++++++++++++++++
+>>  1 file changed, 18 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+>> new file mode 100644
+>> index 0000000..938adf6
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+>> @@ -0,0 +1,18 @@
+>> +Mediatek MT6589, MT6577 and MT6572 Timers
+>> +---------------------------------------
+>> +
+>> +Required properties:
+>> +- compatible: Should be "mediatek,mtk6589-timer"
+>
+> Don't you want compatible strings for the other supported SOCs too?
 
-After enable this patch, system maybe hang in idle. :(
+I'm not sure if it makes sense to define the compatible strings for
+all the SoCs that have this timer as it's actually totally the same
+IP.
 
-> Regards,
-> 
-> Tony
-> 
+In other cases e.g. the arm gic, not all compatible strings are
+defined, that's why I use cortex-a15-gic in the dtsi although I'm
+using a cortex A7 SoC.
+
+I would instead say, that the SoC version of the compatible string,
+mt6589, is something arbitrary. So I propose to use the first known
+SoC which uses the timer. That would be AFAIK mt6577.
+
+>
+>> +- reg: Should contain location and length for timers register.
+>> +- clocks: Clocks driving the timer hardware. This list shoud include two
+>> +     clocks. The order is system clock and as second clock the RTC clock.
+>
+> Sorry for being pedantic, but we had so many ugly bindings in our vendor
+> tree. I'm still getting caught up on the clocks. I have the feeling the SOC
+> has two clocks (system and rtc) which are used to drive this timer,
+> while the timer probably refers differently to its clock inputs.
+> If this was the case, the names 'rtc' and 'system' clock are SOC specific
+> names/implementation details. From the timer perspective it is probably
+> just important that it receives two clock inputs. Since the timer is
+> described here and not the SOC, these SOC specific names should
+> disappear and be replaced with the names the timer IP uses for its input
+> clocks.
+
+The timer is exactly identically described in the three SoC
+datasheets. In the description the clocks are called system and RTC,
+so I think we are on the safe side here. :)
+
+>
+> The clock-names should be listed too, probably as optional properties.
+
+This will lead to a problem, as the clock-names description includes
+the order of the clocks. If we make this property optional, it can be
+easily missunderstood. So I propose to do it the way other drivers in
+the kernel (e.g. arm,sp804) do it and leave the clock-names property
+as it is.
+
+>
+>> +
+>> +Examples:
+>> +
+>> +     timer {
+>> +             compatible = "mediatek,mtk6589-timer";
+>> +             reg = <0x10008000 0x80>;
+>> +             interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
+>> +             clocks = <&system_clk>, <&rtc_clk>;
+>> +             clock-names = "system-clk", "rtc-clk";
+>
+>
+>         S?ren
+
 
 
 -- 
-Thanks
-    Alex
+motzblog.wordpress.com
