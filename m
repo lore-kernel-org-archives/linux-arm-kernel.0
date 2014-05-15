@@ -1,89 +1,67 @@
-From: peter@peter-b.co.uk (Peter TB Brett)
-Date: Thu, 15 May 2014 15:06:28 +0100
-Subject: Accessing GPIOs from userspace using recent kernels
-In-Reply-To: <CABxcv=mFV3nJf1eqNhTbh1KWwe8Z6Z62JtFn5KZbHnGprk1_bg@mail.gmail.com>
-References: <3385f19f3e1427613732f6d5c9f8513d@net2air.co>
- <CABxcv=mFV3nJf1eqNhTbh1KWwe8Z6Z62JtFn5KZbHnGprk1_bg@mail.gmail.com>
-Message-ID: <7bd3dbc0c3217f43eefc8d228995690f@net2air.co>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Thu, 15 May 2014 19:44:12 +0530
+Subject: [PATCH 1/4] clk: samsung: out: Add infrastructure to register
+ CLKOUT
+In-Reply-To: <5374CA1C.8000207@samsung.com>
+References: <1399640410-30957-1-git-send-email-tushar.behera@linaro.org>
+ <1399640410-30957-2-git-send-email-tushar.behera@linaro.org>
+ <536DA243.6000600@samsung.com> <53705243.1030704@linaro.org>
+ <CAPdUM4N=k-pPxdhPQgVHh0fb+nqkgs7StwM2Pb6C8gcjx6dw-w@mail.gmail.com>
+ <5374CA1C.8000207@samsung.com>
+Message-ID: <CAPdUM4NcFGGNZA9fjRP9VkpN3A0Gu+5DSgZ0RPhDD=wicr4GzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+On 15 May 2014 19:37, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Rahul, Tushar,
+>
+> On 15.05.2014 15:44, Rahul Sharma wrote:
+>> Hi Tushar,
+>>
+>> Basically you are adding a new clock-type for Clkout. IMO clkout
+>> is not a special hardware. Existing clock types can be reused to
+>> support clkout. I see 3 major problem here:
+>>
+>> 1) Clkout -> (Mux + Gate). You clubbed mux and gate together, and
+>> exposing as a single clock which is something like a composite clock.
+>> IMO this is not a recommended way in CCF.
+>>
+>> 2) New Clock Type: Since clkout is just a combination of a simple
+>> mux and gate which are already supported, it is a unnecessary
+>> duplication.
+>>
+>> 3) Clkout registered along with CMU: which is not correct. Clkout is in PMU
+>> (Separate physical IP) and should be registered as a independent Clock
+>> provider which provides 1 mux and 1 gate clock (As if now). It should also be
+>> well connected with main CMU.
+>>
+>> I understand the challenge in using regmap interface for a clock provider. But
+>> we need to identify a clean solution. IMHO a independent clock provider with
+>> iomap, is relatively cleaner approach till CCF is not ready with regmap based
+>> reg access for clock registers.
+>>
+>> Experts!! please comment.
+>
+> It's quite unfortunate that Tushar has duplicated the effort to create a
+> clkout driver, considering the fact that we did have such driver
+> internally at SRPOL and it was quite nice and simple.
+>
+> I will post a cleaned-up version today, that is about 2 times smaller in
+> terms of lines of added code and provides the same functionality,
+> without introducing custom clock types. In addition, it models the
+> clkout properly as a feature of PMU, not CMU (CMU only provides outputs
+> of particular sub-blocks that are fed into the PMU).
 
-Thank you for your helpful suggestions.
+oh.. thats nice. Please share the implementation.
 
-On 2014-05-14 11:00, Javier Martinez Canillas wrote:
-> [snip]
-> 
->> If there is no longer a userspace API for these settings, is there any 
->> way
->> that I can simply amend the device tree in order to change a couple of 
->> mux
->> settings?
->> 
-> 
-> Not that I'm aware of, I've added Linus Walleij (the pinctrl subsystem
-> maintainer) on cc who will have an authoritative answer on this
-> subject.
+Regards,
+Rahul Sharma.
 
-Having some sort of debugfs API for runtime modification of pinmux 
-settings from userspace would be very helpful for hardware/firmware 
-prototyping purposes.
-
-> [snip]
-> 
-> You are only defining a set of pinmux configuration pins that will be
-> registered but that does not mean that the configuration will take
-> effect. Need to associate that configuration with a specific device
-> node so the state will be applicable. The good practice is to
-> associate with the device that needs that particular configuration or
-> if there is no such device then you can just add the properties in the
-> pinmux device node.
-> 
-> In your case would be something like should work:
-> 
-> &omap4_pmx_core
-> {
->         pinctrl-names = "default";
->         pinctrl-0 = <
->                 &foo_pins
->         >;
-> 
->         foo_pins: pinmux_foo_pins {
->                pinctrl-single,pins = <
->                0x5e (PIN_INPUT | MUX_MODE3)  /* gpmc_ad15.gpio_39 */ /* 
-> IRQ */
->                0x12e (PIN_INPUT | MUX_MODE3) /* i2c4_scl.gpio_132 */ /* 
-> RST */
->                >
->         };
-> };
-
-Note that this doesn't work; the omap4_pmx_core node already has a 
-pinctrl-0 attribute with a whole bunch of entries (e.g. I2C pins and 
-pins used for other peripherals) and there doesn't appear to be a way to 
-append to the array rather than replacing it.
-
-> But as I said it would be better if you associate the pins with the
-> GPIO controller that contains those pins instead of the pinmux device.
-
-Following this advice, I used:
-
-&gpio1
-{
-   pinctrl-names = "default";
-   pinctrl-0 = < &foo_pins >;
-};
-
-However, with these settings, nothing referring to pinmux_foo_pins 
-appears in pinctrl-devices, pinctrl-maps, pinctrl-handles, or 
-pinmux-pins, so I'm fairly sure these aren't the settings I'm looking 
-for.
-
-Is there any documentation for the debugfs interface to pinctrl?
-
-                                                       Peter
-
-
--- 
-Dr Peter Brett <peter@peter-b.co.uk>
+>
+> Best regards,
+> Tomasz
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
