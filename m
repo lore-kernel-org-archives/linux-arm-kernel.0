@@ -1,120 +1,112 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Thu, 15 May 2014 09:54:32 -0700
-Subject: [PATCHv3 3/4] of: provide a binding for fixed link PHYs
-In-Reply-To: <20140515153957.75a8aa2a@free-electrons.com>
-References: <20140308055033.BE0F2C405B0@trevor.secretlab.ca>
- <20140515153957.75a8aa2a@free-electrons.com>
-Message-ID: <CAGVrzcZ1h_Cm=b2aKEAcXYJyVOhoRZLcpXFh0oBB-wodMJnB8Q@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 15 May 2014 18:55:31 +0200
+Subject: [PATCH v2 06/10] clk: berlin: add core clock driver for BG2/BG2CD
+In-Reply-To: <5374E087.7030703@gmail.com>
+References: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1400098522-14770-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1400098522-14770-7-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140515080921.GQ29318@piout.net> <5374E087.7030703@gmail.com>
+Message-ID: <20140515165531.GV29318@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On 15/05/2014 at 17:43:03 +0200, Sebastian Hesselbarth wrote :
+> On 05/15/2014 10:09 AM, Alexandre Belloni wrote:
+> >On 14/05/2014 at 22:15:17 +0200, Sebastian Hesselbarth wrote :
+> >>+	/* clock divider cells */
+> >>+	parent_names[1] = avpllb_names[CH4];
+> >>+	parent_names[2] = avpllb_names[CH5];
+> >>+	parent_names[3] = avpllb_names[CH6];
+> >>+	parent_names[4] = avpllb_names[CH7];
+> >>+
+> >>+	parent_names[0] = refclk_names[SYSPLL];
+> >
+> >It should actually be:
+> >
+> >parent_names[0] = avpllb_names[CH4];
+> >parent_names[1] = avpllb_names[CH5];
+> >parent_names[2] = avpllb_names[CH6];
+> >parent_names[3] = avpllb_names[CH7];
+> >parent_names[4] = refclk_names[SYSPLL];
+> 
+> Given the comment to remove index 0 in the last patch, I translate that
+> into: "the input mux bypass is there, but {cannot,should not,we do not
+> want it to} be used". *sigh*
+> 
+> Actually, almost all of this is based on Chromecast mirrored BSP code
+> and I though about leaving the bypass mux in - even if it is not used
+> at all.
+> 
+> The reason is that I am _very_ tired of reading through the BSP code
+> and have all the things in mind where the BSP code is unclear.
+> 
 
-2014-05-15 6:39 GMT-07:00 Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com>:
-> Dear Grant Likely,
->
-> Sorry for bringing back this old topic, but I'm working on this again,
-> hopefully reaching an acceptable solution this time. One question for
-> you below.
->
-> On Sat, 08 Mar 2014 05:50:33 +0000, Grant Likely wrote:
->
->> > +Example:
->> > +
->> > +ethernet at 0 {
->> > +   ...
->> > +   phy = <&phy0>;
->> > +   phy0: phy at 0 {
->> > +         fixed-link;
->> > +         speed = <1000>;
->> > +         full-duplex;
->> > +   };
->>
->> The phy phandle to a child node is superfluous. A phandle to a fixed
->> child node doesn't make a whole lot of sense.
->
-> [...]
->
->> There should be no address portion in the node name. It isn't a child
->> device, the node is merely more configuration data for the parent.
->>
->> Example:
->>
->> ethernet at 0 {
->>       ...
->>       fixed-link {
->>             speed = <1000>;
->>             full-duplex;
->>       };
->
-> For my current use case, I'm personally fine with that. But that
-> doesn't work well with Florian Fainelli's which to potentially have the
-> "fixed-link" node as part of another node in the DT, in the case the
-> PHY is configurable through some separate SPI/I2C bus. See his comment
-> in http://article.gmane.org/gmane.linux.network/306789:
+Ok, I made a mistake, I also have a hard time to picture everything
+myself ;)
 
-I just re-read Grant's comments, and I don't think we contradict with
-each other here. Since the data-path is symetrical by nature, whether
-you place the 'fixed-link' property on one end (Ethernet MAC) or the
-other (SPI/I2C/GPIO node) does make a huge difference, except you want
-it to be placed where it makes the most sense: in the Ethernet MAC
-node. Properties like the speed, duplex, pause are definitively
-Ethernet MAC only properties.
+So, the mux is there iand can be used, hence, the parents are actually:
 
-In case we need to specifically associate these two nodes with each
-other, a phandle property to the Ethernet MAC node, or e.g: the SPI
-node can be used.
+parent_names[0] = refclk_names[SYSPLL];
+parent_names[1] = avpllb_names[CH4];
+parent_names[2] = avpllb_names[CH5];
+parent_names[3] = avpllb_names[CH6];
+parent_names[4] = avpllb_names[CH7];
+parent_names[5] = refclk_names[SYSPLL];
 
-That said, I think we should go with Grant's proposal of having the
-following representation:
+and disregard my comment on the previous patch.
 
-ethernet at 0 {
-      ...
-       fixed-link {
-             speed = <1000>;
-             full-duplex;
-       };
+> >>+	data = &bg2_divs[CLKID_SYS];
+> >>+	clks[CLKID_SYS] = berlin2_div_register(&data->map, base, data->name,
+> >>+		       data->div_flags, parent_names, 5, data->flags, &lock);
+> >>+
+> >>+	parent_names[0] = refclk_names[CPUPLL];
+> >>+	parent_names[5] = refclk_names[MEMPLL];
+> >
+> >The only valid choice here should be (remember, we are not adding 1 to
+> >the index anymore):
+> >parent_names[4] = refclk_names[MEMPLL];
 
-we might want to use 'max-speed' instead of speed, but that's debatable.
+There, you actually had it right, maybe we could set parent_names[1] to
+parent_names[4] to something bogus or all to refclk_names[MEMPLL].
 
->
-> """
-> Another problem with that "old" 'fixed-link' property is that we are
-> not properly capturing and representing Ethernet switches/PHYs whose
-> data-path are isolated from the control path. For instance such
-> devices will traditionally expose their control path as a
-> MMIO/GPIO/I2C/SPI interface. Using the 5-digit 'fixed-link' property
-> we are not representing this, on one side the Ethernet MAC is just
-> told to hardcode the link parameters with some parameters, and on
-> other side, any MMIO/GPIO/I2C/SPI device is not equipped with the
-> correct properties to express the fact that is also has a data-path
-> connected to an Ethernet MAC.
->
-> What I like about this new binding is that we could place the
-> 'fixed-link' related properties in e.g: a SPI slave node, and have the
-> Ethernet MAC be pointed at it by a phandle to tell it: look this is
-> your PHY, it might not be one you could address on a MDIO bus, so I
-> have been providing additional properties to help you with the link
-> configuration.
-> """
->
-> What is your opinion about this?
->
-> Thanks,
->
-> Thomas
-> --
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> Funny to see that there ought to be a CPUPLL which isn't used by the
+> CPU at all. This also implies to remove CPUPLL, right?
+> 
+> >>+	data = &bg2_divs[CLKID_CPU];
+> >>+	clks[CLKID_CPU] = berlin2_div_register(&data->map, base, data->name,
+> >>+			 data->div_flags, parent_names, 6, data->flags, &lock);
+> >>+
+> >
+> >This is where it gets tricky, now we should have:
+> >parent_names[0] = avpllb_names[CH4];
+> >parent_names[1] = avplla_names[CH5];
+> >parent_names[2] = avpllb_names[CH6];
+> >parent_names[3] = avpllb_names[CH7];
+> >parent_names[4] = refclk_names[SYSPLL];
+> 
+> First I thought that it is just the default input mux clocks again..
+> but then I noticed that it is actually AVPLL_A5 not B5.
+> 
 
+Here it becomes:
+parent_names[0] = refclk_names[SYSPLL];
+parent_names[1] = avpllb_names[CH4];
+parent_names[2] = avplla_names[CH5];
+parent_names[3] = avpllb_names[CH6];
+parent_names[4] = avpllb_names[CH7];
+parent_names[5] = refclk_names[SYSPLL];
+
+
+> Ok, I admit having confirmed information is maybe better. So, you agree
+> that we can remove the input mux bypass on the complex divider, too?
+> (Including all the consequences: remove it from the divmap, driver, ...)
+> 
+
+No, let's keep the mux, sorry about that confusion.
 
 
 -- 
-Florian
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
