@@ -1,59 +1,104 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 14 May 2014 23:41:28 -0700
-Subject: [PATCH] clk/versatile: export symbols for impd1
-In-Reply-To: <1399560990-1402858-5-git-send-email-arnd@arndb.de>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-5-git-send-email-arnd@arndb.de>
-Message-ID: <20140515064128.9521.73638@quantum>
+From: superlibj8301@gmail.com (Richard Lee)
+Date: Thu, 15 May 2014 13:57:07 +0800
+Subject: [PATCH] ARM: ioremap: Fix static vm area boundary checking.
+Message-ID: <1400133427-5653-1-git-send-email-superlibj8301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Arnd Bergmann (2014-05-08 07:56:16)
-> The impd1 code on mach-integrator can be a loadable module,
-> so we have to export icst_clk_register, integrator_impd1_clk_init
-> and integrator_impd1_clk_exit.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+Static vm area boundary check:
 
-Taken into clk-next.
+      paddr1 --->|       |
+                 |       |
+                 |-------| <-\--- svm->vm->addr(is page aligned)
+      paddr2 --->|       |    |
+                 |     --| <--|-- svm->vm->phys_addr
+                 |       |    |
+      paddr3 --->|       |    |
+                 |       |    |
+                 |-------| <--|-- next page boundary
+                 |       |    |
+      paddr4 --->|       |    | <----- svm->vm->size(including guard page)
+                 |       |    |
+                 |       |    |
+max paddr_end -->|-------| <--|-- svm->vm's phys_addr_end
+                 | ///// |    |
+      paddr5 --->| guard |    |
+                 | page  |    |
+                 | ///// |    |
+                  -------  <-/--- svm->vm->addr + svm->vm_size
 
-Thanks!
-Mike
+<1> If the paddr == paddr1, then continue;
+<2> If the paddr == paddr2~paddr4 and paddr_end > phys_addr_end,
+    then continue;
+<3> if the paddr >= paddr5 then continue;
 
-> ---
->  drivers/clk/versatile/clk-icst.c  | 1 +
->  drivers/clk/versatile/clk-impd1.c | 2 ++
->  2 files changed, 3 insertions(+)
-> 
-> diff --git a/drivers/clk/versatile/clk-icst.c b/drivers/clk/versatile/clk-icst.c
-> index a820b0c..7f3868a 100644
-> --- a/drivers/clk/versatile/clk-icst.c
-> +++ b/drivers/clk/versatile/clk-icst.c
-> @@ -160,3 +160,4 @@ struct clk *icst_clk_register(struct device *dev,
->  
->         return clk;
->  }
-> +EXPORT_SYMBOL_GPL(icst_clk_register);
-> diff --git a/drivers/clk/versatile/clk-impd1.c b/drivers/clk/versatile/clk-impd1.c
-> index 31b44f0..264d8d5 100644
-> --- a/drivers/clk/versatile/clk-impd1.c
-> +++ b/drivers/clk/versatile/clk-impd1.c
-> @@ -133,6 +133,7 @@ void integrator_impd1_clk_init(void __iomem *base, unsigned int id)
->         for (i = 0; i < ARRAY_SIZE(imc->clks); i++)
->                 clkdev_add(imc->clks[i]);
->  }
-> +EXPORT_SYMBOL_GPL(integrator_impd1_clk_init);
->  
->  void integrator_impd1_clk_exit(unsigned int id)
->  {
-> @@ -155,3 +156,4 @@ void integrator_impd1_clk_exit(unsigned int id)
->         kfree(imc->vco2name);
->         kfree(imc->vco1name);
->  }
-> +EXPORT_SYMBOL_GPL(integrator_impd1_clk_exit);
-> -- 
-> 1.8.3.2
-> 
+Signed-off-by: Richard Lee <superlibj8301@gmail.com>
+---
+ arch/arm/mm/ioremap.c | 44 ++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 42 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index be69333..2fa41f4 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -47,16 +47,56 @@ static struct static_vm *find_static_vm_paddr(phys_addr_t paddr,
+ {
+ 	struct static_vm *svm;
+ 	struct vm_struct *vm;
++	size_t offset;
++
++	/*
++	 * Make sure the size the mapping size is page aligned.
++	 */
++	size = PAGE_ALIGN((paddr & ~PAGE_SIZE) + size);
++	offset = paddr & ~PAGE_SIZE;
+ 
+ 	list_for_each_entry(svm, &static_vmlist, list) {
++		phys_addr_t paddr_end, phys_addr_end;
++		size_t vmoff;
++
+ 		vm = &svm->vm;
+ 		if (!(vm->flags & VM_ARM_STATIC_MAPPING))
+ 			continue;
+ 		if ((vm->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
+ 			continue;
+ 
+-		if (vm->phys_addr > paddr ||
+-			paddr + size - 1 > vm->phys_addr + vm->size - 1)
++		/* Static vm area boundary check:
++		 *
++		 *       paddr1 --->|       |
++		 *                  |       |
++		 *                  |-------| <-\--- svm->vm->addr(page aligned)
++		 *       paddr2 --->|       |    |
++		 *                  |     --| <--|-- svm->vm->phys_addr
++		 *                  |       |    |
++		 *       paddr3 --->|       |    |
++		 *                  |       |    |
++		 *                  |-------| <--|-- next page boundary
++		 *                  |       |    |
++		 *       paddr4 --->|       |    | <----- svm->vm->size,
++		 *                  |       |    |         including guard page
++		 *                  |       |    |
++		 * max paddr_end -->|-------| <--|-- svm->vm's phys_addr_end
++		 *                  | ///// |    |
++		 *       paddr5 --->| guard |    |
++		 *                  | page  |    |
++		 *                  | ///// |    |
++		 *                   -------  <-/-- svm->vm->addr + svm->vm_size
++		 *
++		 * <1> If paddr == paddr1, then continue;
++		 * <2> If paddr == paddr2~paddr4 and paddr_end > phys_addr_end,
++		 *     then continue;
++		 * <3> if paddr >= paddr5 then continue;
++		 */
++		vmoff = vm->phys_addr & ~PAGE_SIZE;
++		phys_addr_end = vm->phys_addr + vm->size - PAGE_SIZE - vmoff;
++		paddr_end = paddr + size - offset;
++		if (__phys_to_pfn(vm->phys_addr) > __phys_to_pfn(paddr) ||
++			paddr_end - 1 > phys_addr_end - 1)
+ 			continue;
+ 
+ 		return svm;
+-- 
+1.8.4
