@@ -1,77 +1,23 @@
-From: george.cherian@ti.com (George Cherian)
-Date: Thu, 15 May 2014 11:38:36 +0530
-Subject: [RFC PATCH] ARM: dts: am33xx: Re-arrange the USB dt to reflect
- the h/w configuration
-In-Reply-To: <20140514215034.GL27426@atomide.com>
-References: <1399617068-19826-1-git-send-email-george.cherian@ti.com>
- <20140514215034.GL27426@atomide.com>
-Message-ID: <537459E4.5060203@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 15 May 2014 11:42:09 +0530
+Subject: [RFC PATCH 0/5] Frequency resolution in CCF vs. cpufreq
+In-Reply-To: <1400106655-22465-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1400106655-22465-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <CAKohpokm3WVnu_DggKc4PbhVAKNexrJ4051F-gnVFFTDOyz9ew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-On 5/15/2014 3:20 AM, Tony Lindgren wrote:
-> * George Cherian <george.cherian@ti.com> [140508 23:34]:
->> Re arrange the USB dt for AM33xx to take it a bit closer
->> to the hardware configuration.
->>
->> The USBSS is designed as follows
->>
->> USB control Module	0x44e10_0620
->>
->> USBSS			0x4740_0000
->>
->> USB0			0x4740_1000
->> USB0_PHY		0x4740_1300
->> USB0_CORE		0x4740_1400
->>
->> USB1			0x4740_1800
->> USB1_PHY		0x4740_1b00
->> USB1_CORE		0x4740_1c00
->>
->> CPPI DMA Controller	0x4740_2000
->> CPPI DMA Scheduler	0x4740_3000
->> Queue Manager		0x4740_4000
->>
->> So model the DT as follows
->> USBSS {
->>      usb_ctrl_mod: {
->>          0x44e10_0620
->>      }
->>      usb0: {
->>      0x4740_1000
->>      0x4740_1400
->>      }
->>      usb0_phy:{
->>      0x4740_1300
->>      }
->>      usb1:{
->>      0x4740_1800
->>      0x4740_1c00
->>      }
->>      usb1_phy: {
->>      0x4740_1b00
->>      }
->>      cppi41dma: {
->>      0x4740_2000
->>      0x4740_3000
->>      0x4740_4000
->>      }
->> }
-> Is this just a cosmetic change or is this trying to workaround
-> some edma related init order issue?
-Please ignore this patch. Was trying to workaround some dma and phy 
-related issues.
-The same got fixed with following
-
-http://www.spinics.net/lists/linux-usb/msg107244.html
-
-
+On 15 May 2014 04:00, Soren Brinkmann <soren.brinkmann@xilinx.com> wrote:
+> I have one or two problems with cpufreq and the CCF, which are caused by
+> rounding/different frequency resolutions.
 >
-> Regards,
->
-> Tony
+> cpufreq works with kHz, while the CCF uses Hz. On Zynq our default frequency is
+> 666666666 Hz which the CCF, due to rounding, reports as 666666660. And for
+> cpufreq, which simply divides values it obtains through clk_round_rate() by
+> 1000, 666666.
+> Since passing 666666 to clk_round_rate() does not result in 666666660
+> (clk_round_rate() always rounds down!), we chose to put 666667 in the OPP. This
+> causes issue 1: cpufreq stats are broken.
 
-
--- 
--George
+I know it might a big exercise, but wouldn't it be worth to make cpufreq start
+using frequencies in Hz ?
