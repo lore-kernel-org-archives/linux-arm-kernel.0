@@ -1,95 +1,57 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 15 May 2014 22:55:45 +0200
-Subject: [PATCH] ARM: OMAP: replace checks for CONFIG_USB_GADGET_OMAP
-Message-ID: <1400187345.11786.28.camel@x220>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 16 May 2014 05:55:42 +0900
+Subject: [PATCH] FIX:cache:exynos: Execute the cache reconfiguration
+ unconditionally for Exynos4
+In-Reply-To: <1400153646-827-1-git-send-email-l.majewski@samsung.com>
+References: <1400153646-827-1-git-send-email-l.majewski@samsung.com>
+Message-ID: <537529CE.5030803@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 193ab2a60700 ("usb: gadget: allow multiple gadgets to be built")
-apparently required that checks for CONFIG_USB_GADGET_OMAP would be
-replaced with checks for CONFIG_USB_OMAP. Do so now for the remaining
-checks for CONFIG_USB_GADGET_OMAP, even though these checks have
-basically been broken since v3.1.
+On 05/15/14 20:34, Lukasz Majewski wrote:
+> The commit 2bf73dd61a84cdf27e49f48e08739af6ba70ace1 has made the cache
+> configuration depending on definition of CONFIG_S5P_SLEEP Kconfig flag.
+> It is enabled on various S5PV210 incarnations and not available at Exynos4
+> family of SoCs.
+>
+> The problem emerges when one wants to disable/enable core via hotplug - e.g:
+> echo 0>  /sys/devices/system/cpu/cpu1/online.
+> When CONFIG_CPU_IDLE is enabled (it is not enabled at default exynos_defconfig).
+>
+> On Exynos4 based targets (Exynos4412 and Exynos4210, namely trats2 and
+> trats) board locks up and consumes considerable power.
+>
+> This patch does nothing more than restoration of the state before the
+> offending commit.
+>
+> Tested on top of next-20140514 at Trats board.
+>
+> Signed-off-by: Lukasz Majewski<l.majewski@samsung.com>
+> ---
+>   arch/arm/mach-exynos/exynos.c |    7 +++----
+>   1 file changed, 3 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> index 1b97b93..5c8b334 100644
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -254,10 +254,9 @@ static int __init exynos4_l2x0_cache_init(void)
+>   	if (ret)
+>   		return ret;
+>
+> -	if (IS_ENABLED(CONFIG_S5P_SLEEP)) {
+> -		l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
+> -		clean_dcache_area(&l2x0_regs_phys, sizeof(unsigned long));
+> -	}
 
-Fixes: 193ab2a60700 ("usb: gadget: allow multiple gadgets to be built")
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Also untested.
+Hmm...should be PM_SLEEP instead of removing check the S5P_SLEEP. This 
+is missed when we stopped to use legacy Samsung PM(commit ID d710aa31)
 
-It seems efficient to also include the change to phy-isp1301-omap.c in
-this patch (ie, not ship that as a separate patch).
+- Kukjin
 
- arch/arm/mach-omap1/board-h2.c        | 2 +-
- arch/arm/mach-omap1/board-h3.c        | 2 +-
- arch/arm/mach-omap1/board-innovator.c | 2 +-
- arch/arm/mach-omap1/board-osk.c       | 2 +-
- drivers/usb/phy/phy-isp1301-omap.c    | 2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
-index 65d2acb31498..57092bc7f4f1 100644
---- a/arch/arm/mach-omap1/board-h2.c
-+++ b/arch/arm/mach-omap1/board-h2.c
-@@ -346,7 +346,7 @@ static struct omap_usb_config h2_usb_config __initdata = {
- 	/* usb1 has a Mini-AB port and external isp1301 transceiver */
- 	.otg		= 2,
- 
--#ifdef	CONFIG_USB_GADGET_OMAP
-+#ifdef	CONFIG_USB_OMAP
- 	.hmc_mode	= 19,	/* 0:host(off) 1:dev|otg 2:disabled */
- 	/* .hmc_mode	= 21,*/	/* 0:host(off) 1:dev(loopback) 2:host(loopback) */
- #elif	defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
-diff --git a/arch/arm/mach-omap1/board-h3.c b/arch/arm/mach-omap1/board-h3.c
-index 816ecd13f81e..c828aacf469a 100644
---- a/arch/arm/mach-omap1/board-h3.c
-+++ b/arch/arm/mach-omap1/board-h3.c
-@@ -366,7 +366,7 @@ static struct omap_usb_config h3_usb_config __initdata = {
- 	/* usb1 has a Mini-AB port and external isp1301 transceiver */
- 	.otg	    = 2,
- 
--#ifdef CONFIG_USB_GADGET_OMAP
-+#ifdef CONFIG_USB_OMAP
- 	.hmc_mode       = 19,   /* 0:host(off) 1:dev|otg 2:disabled */
- #elif  defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
- 	/* NONSTANDARD CABLE NEEDED (B-to-Mini-B) */
-diff --git a/arch/arm/mach-omap1/board-innovator.c b/arch/arm/mach-omap1/board-innovator.c
-index bd5f02e9c354..1652ead0effa 100644
---- a/arch/arm/mach-omap1/board-innovator.c
-+++ b/arch/arm/mach-omap1/board-innovator.c
-@@ -312,7 +312,7 @@ static struct omap_usb_config h2_usb_config __initdata = {
- 	/* usb1 has a Mini-AB port and external isp1301 transceiver */
- 	.otg		= 2,
- 
--#ifdef	CONFIG_USB_GADGET_OMAP
-+#ifdef	CONFIG_USB_OMAP
- 	.hmc_mode	= 19,	/* 0:host(off) 1:dev|otg 2:disabled */
- 	/* .hmc_mode	= 21,*/	/* 0:host(off) 1:dev(loopback) 2:host(loopback) */
- #elif	defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
-diff --git a/arch/arm/mach-omap1/board-osk.c b/arch/arm/mach-omap1/board-osk.c
-index 3a0262156e93..70b1b282e5c2 100644
---- a/arch/arm/mach-omap1/board-osk.c
-+++ b/arch/arm/mach-omap1/board-osk.c
-@@ -283,7 +283,7 @@ static struct omap_usb_config osk_usb_config __initdata = {
- 	 * be used, with a NONSTANDARD gender-bending cable/dongle, as
- 	 * a peripheral.
- 	 */
--#ifdef	CONFIG_USB_GADGET_OMAP
-+#ifdef	CONFIG_USB_OMAP
- 	.register_dev	= 1,
- 	.hmc_mode	= 0,
- #else
-diff --git a/drivers/usb/phy/phy-isp1301-omap.c b/drivers/usb/phy/phy-isp1301-omap.c
-index 6e146d723b37..1ea6a0c30040 100644
---- a/drivers/usb/phy/phy-isp1301-omap.c
-+++ b/drivers/usb/phy/phy-isp1301-omap.c
-@@ -1295,7 +1295,7 @@ isp1301_set_host(struct usb_otg *otg, struct usb_bus *host)
- 		return isp1301_otg_enable(isp);
- 	return 0;
- 
--#elif	!defined(CONFIG_USB_GADGET_OMAP)
-+#elif	!defined(CONFIG_USB_OMAP)
- 	// FIXME update its refcount
- 	otg->host = host;
- 
--- 
-1.9.0
+> +	l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
+> +	clean_dcache_area(&l2x0_regs_phys, sizeof(unsigned long));
+> +
+>   	return 0;
+>   }
+>   early_initcall(exynos4_l2x0_cache_init);
