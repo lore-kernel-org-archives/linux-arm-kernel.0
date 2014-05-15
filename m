@@ -1,65 +1,31 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 15 May 2014 12:17:42 +0200
-Subject: [PATCH v6 17/17] ARM: mvebu: add Device Tree description of the EHCI
- controller on Armada 375
-In-Reply-To: <1400149062-32661-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1400149062-32661-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1400149062-32661-18-git-send-email-gregory.clement@free-electrons.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 15 May 2014 15:55:51 +0530
+Subject: [PATCH] ARM: davinci: remove checks for CONFIG_USB_MUSB_PERIPHERAL
+In-Reply-To: <1400149025.20469.22.camel@x220>
+References: <1400149025.20469.22.camel@x220>
+Message-ID: <5374962F.2050004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell Armada 375 SoCs contains one EHCI controller. This commit
-adds the Device Tree description of this interfaces at the SoC level,
-and also enables the USB2 port on the Armada 375 DB platform.
+On Thursday 15 May 2014 03:47 PM, Paul Bolle wrote:
+> The Kconfig symbol USB_MUSB_PERIPHERAL was removed in v3.1. The last two
+> checks for its macro now always evaluate to false. So remove these
+> checks.
+> 
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> ---
+> Eyeball tested only.
+> 
+> This is just a straightforward cleanup. It does remove a comment. Is
+> that comment still useful? Anyhow, I do wonder whether a proper fix is
+> possible here. Perhaps Greg or Felipe knows: it is their commit
+> 622859634a66 ("usb: musb: drop a gigantic amount of ifdeferry") that
+> removed USB_MUSB_PERIPHERAL. On the other hand I noticed that config
+> USB_MUSB_DAVINCI depends on BROKEN. So maybe properly fixing just this
+> small problem doesn't buy us much.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-375-db.dts |  4 ++++
- arch/arm/boot/dts/armada-375.dtsi   | 16 ++++++++++++++++
- 2 files changed, 20 insertions(+)
+Yes, it doesn't buy us much. I will still apply this anyway. The next
+person can save time spent searching for non-existing symbols.
 
-diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
-index 0453d69e6433..01bc5e87898b 100644
---- a/arch/arm/boot/dts/armada-375-db.dts
-+++ b/arch/arm/boot/dts/armada-375-db.dts
-@@ -102,6 +102,10 @@
- 				};
- 			};
- 
-+			usb at 54000 {
-+				status = "okay";
-+			};
-+
- 			usb3 at 58000 {
- 				status = "okay";
- 			};
-diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index 7b303ecc2490..53baeb2f1fe8 100644
---- a/arch/arm/boot/dts/armada-375.dtsi
-+++ b/arch/arm/boot/dts/armada-375.dtsi
-@@ -320,6 +320,22 @@
- 				clocks = <&coreclk 0>;
- 			};
- 
-+			usb at 50000 {
-+				compatible = "marvell,orion-ehci";
-+				reg = <0x50000 0x500>;
-+				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&gateclk 18>;
-+				status = "disabled";
-+			};
-+
-+			usb at 54000 {
-+				compatible = "marvell,orion-ehci";
-+				reg = <0x54000 0x500>;
-+				interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&gateclk 26>;
-+				status = "disabled";
-+			};
-+
- 			usb3 at 58000 {
- 				compatible = "marvell,armada-375-xhci";
- 				reg = <0x58000 0x20000>,<0x5b880 0x80>;
--- 
-1.8.1.2
+Thanks,
+Sekhar
