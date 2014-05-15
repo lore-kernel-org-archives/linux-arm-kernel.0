@@ -1,66 +1,89 @@
-From: superlibj8301@gmail.com (Richard Lee)
-Date: Thu, 15 May 2014 11:46:24 +0800
-Subject: [PATCHv2 1/2] mm/vmalloc: Add IO mapping space reused interface
- support.
-In-Reply-To: <CAL_JsqLncBaJ=uceovX80U1JPU8SW3KWKXW3PiVR8Kbnykcvpg@mail.gmail.com>
-References: <1400055532-13134-1-git-send-email-superlibj8301@gmail.com>
- <1400055532-13134-2-git-send-email-superlibj8301@gmail.com>
- <CAL_JsqLncBaJ=uceovX80U1JPU8SW3KWKXW3PiVR8Kbnykcvpg@mail.gmail.com>
-Message-ID: <CAHPCO9HALgpevhYVYQ5yS8JR66CBD5j=7uk5QQ-4n9ftsA2KTQ@mail.gmail.com>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Thu, 15 May 2014 00:11:27 -0400
+Subject: [PATCH v10 0/3] PSCI v0.2 support and DT bindings
+Message-ID: <1400127090-1320-1-git-send-email-ashwin.chaugule@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 12:06 AM, Rob Herring <robherring2@gmail.com> wrote:
-> Adding Nico...
->
-> On Wed, May 14, 2014 at 3:18 AM, Richard Lee <superlibj8301@gmail.com> wrote:
->> For the IO mapping, the same physical address space maybe
->> mapped more than one time, for example, in some SoCs:
->>   - 0x20001000 ~ 0x20001400 --> 1KB for Dev1
->>   - 0x20001400 ~ 0x20001800 --> 1KB for Dev2
->>   and the page size is 4KB.
->>
->> Then both Dev1 and Dev2 will do ioremap operations, and the IO
->> vmalloc area's virtual address will be aligned down to 4KB, and
->> the size will be aligned up to 4KB. That's to say, only one
->> 4KB size's vmalloc area could contain Dev1 and Dev2 IO mapping area
->> at the same time.
->>
->> For this case, we can ioremap only one time, and the later ioremap
->> operation will just return the exist vmalloc area.
->
-> We already have similar reuse tracking for the static mappings on ARM.
-> I'm wondering if either that can be reused for ioremap as well or this
-> can replace the static mapping tracking. It seems silly to have 2
-> lists to search for finding an existing mapping.
->
+This patchset introduces some functions as defined in the PSCI v0.2 spec
+and a corresponding DT binding to differentiate it from previous PSCI versions.
+Since PSCIv0.2 has standard function IDs, it is possible to statically assign them
+rather than depend on values from DT.
 
-Yes, it is.
+This patchset depends on the PSCI header (/uapi/linux/psci.h) introduced by
+http://www.spinics.net/lists/arm-kernel/msg319712.html which is now merged in the
+ARM KVM tree next branch.
 
-Maybe there is one way to reuse the ARM's static mapping tracking, or one
-new global way to replace it.
+Changes in v10:
+		-		Documented explicit use of case dual PSCI bindings for hypervisors.
+		-		Corrected POWER_STATE macros as per new definitions.
+		-		Added arm64 cpu_kill cpu-op and tied it to psci affinity info.
+		-		Misc cleanups in prints.
 
+Changes in v9:
+		-		Rebased on top of KVM "next" - https://git.kernel.org/cgit/linux/kernel/git/kvmarm/kvmarm.git/log/?h=next
 
+Changes in v8:
+		-		Replace msleep(100) with 10 x msleep(10)
 
-> But there is a fundamental problem with your approach. You do not and
-> cannot check the memory type of the mapping. If you look at the static
-> mapping code, it only reuses mappings if the memory type match. While
-> having aliases with different memory types is bad on ARMv6+, I assume
-> there are some cases that do that given the static mapping code
-> handles that case. We would at least want to detect and warn if we
-> didn't want to allow different attributes rather than just return a
-> mapping with whatever attributes the first mapping used.
->
+Changes in v7:
+		-       Add two new functions: SYSTEM_OFF and SYSTEM_RESET as defined in PSCIv0.2.
+		-       Added a delay before calling cpu_kill to avoid race with cpu_die.
 
-You are right, maybe an alternative is defining one call back for each
-individual
-ARCH or other ways.
+Changes in v6:
+		-       rebase on top of uapi/linux/psci.h introduced by Anups patch
+http://www.spinics.net/lists/arm-kernel/msg319712.html
+		-       rebase on top of Catalins tree tip.
 
+Changes in v5:
+        -       Add uapi/linux/psci.h to kbuild
+        -       ret with err if PSCI_ID_VERSION is not implemented.
 
-Thanks very much for you comments, they are very important for me.
+Changes in v4:
+        -       Correct copyright banner format.
+        -       Check if PSCI Version ID is supported.
+        -       Add all PSCI RET codes in uapi header.
+        -       Explicitely ret 1 from psci_cpu_kill()
 
-BRs,
-Richard Lee
+Changes in v3:
+        -       Roll up common functionality for getting conduit method.
+        -       Remove #defines for ARM32 and ARM64 in uapi/linux/psci.h
+        -       Remove functions not supported by PSCI v0.1
+        -       Misc cleanups.
+        -       Add PSCI_AFFINITY_INFO return types in uapi header.
+        -       Changed function names for PSCI v0.1 and PSCI v0.2
+        -       Added copyright info to uapi header.
+        -       Fixed args to affinity_info call.
+        -       Fix typo in psci_init definition when PSCI is not defined.
 
+Changes in v2:
 
-> Rob
+        -       Add AFFINITY_INFO and MIGRATE_INFO_TYPE functions.
+        -       Add binding Documentation.
+        -       Add function to get PSCI version.
+        -       Add common #defines in uapi/linux/psci.h
+        -       Implement cpu_kill and check if CPU is dead via AFFINITY_INFO.
+        -       Misc cleanups.
+
+Changes in v1:
+
+        -       Add new binding "arm, psci-0.2"
+        -       Separate conduit and PSCI function assignment methods.
+
+Ashwin Chaugule (3):
+  PSCI: Add initial support for PSCIv0.2 functions
+  Documentation: devicetree: Add new binding for PSCIv0.2
+  ARM: Check if a CPU has gone offline
+
+ Documentation/devicetree/bindings/arm/psci.txt |  37 +++-
+ arch/arm/include/asm/psci.h                    |   7 +-
+ arch/arm/kernel/psci.c                         | 196 +++++++++++++++++----
+ arch/arm/kernel/psci_smp.c                     |  33 ++++
+ arch/arm64/include/asm/cpu_ops.h               |   2 +
+ arch/arm64/include/asm/psci.h                  |   2 +-
+ arch/arm64/kernel/psci.c                       | 231 +++++++++++++++++++++----
+ arch/arm64/kernel/smp.c                        |  22 +++
+ 8 files changed, 452 insertions(+), 78 deletions(-)
+
+-- 
+1.8.3.2
