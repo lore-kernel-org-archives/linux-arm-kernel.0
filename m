@@ -1,389 +1,460 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 15 May 2014 19:51:44 +0200
-Subject: [RFC PATCH 2/3] regulator: AXP22x: add support for AXP221 regulators
+Date: Thu, 15 May 2014 19:51:43 +0200
+Subject: [RFC PATCH 1/3] mfd: AXP22x: add support for APX221 PMIC
 In-Reply-To: <1400176305-22737-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1400176305-22737-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1400176305-22737-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1400176305-22737-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP221 PMIC provide 5 DC-DCs regulators and 14 LDO regulators.
-This patch adds support for these regulators.
+This patch introduces preliminary support for the X-Powers AXP221 PMIC.
+The AXP221 is typically used on boards using Allwinner's A31 SoC.
 
-See http://linux-sunxi.org/AXP221#Regulators for detailed informations
-on AXP221's regulators.
+At the moment, this driver only exposes regulator devices, but other
+subdevices.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- drivers/regulator/Kconfig            |   7 +
- drivers/regulator/Makefile           |   1 +
- drivers/regulator/axp22x-regulator.c | 328 +++++++++++++++++++++++++++++++++++
- 3 files changed, 336 insertions(+)
- create mode 100644 drivers/regulator/axp22x-regulator.c
+ drivers/mfd/Kconfig        |  12 +++
+ drivers/mfd/Makefile       |   1 +
+ drivers/mfd/axp22x.c       | 237 +++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mfd/axp22x.h | 149 ++++++++++++++++++++++++++++
+ 4 files changed, 399 insertions(+)
+ create mode 100644 drivers/mfd/axp22x.c
+ create mode 100644 include/linux/mfd/axp22x.h
 
-diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
-index 8cc10e2..0e6da83 100644
---- a/drivers/regulator/Kconfig
-+++ b/drivers/regulator/Kconfig
-@@ -154,6 +154,13 @@ config REGULATOR_AXP20X
- 	  This driver provides support for the voltage regulators on the
- 	  AXP20X PMIC.
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 34d246f..2ee31b41 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -79,6 +79,18 @@ config MFD_AXP20X
+ 	  components like regulators or the PEK (Power Enable Key) under the
+ 	  corresponding menus.
  
-+config REGULATOR_AXP22X
-+	tristate "X-POWERS AXP22X PMIC Regulators"
-+	depends on MFD_AXP20X
++config MFD_AXP22X
++	bool "X-Powers AXP22X"
++	select MFD_CORE
++	select REGMAP_I2C
++	select REGMAP_IRQ
++	depends on I2C=y
 +	help
-+	  This driver provides support for the voltage regulators on the
-+	  AXP22X PMIC.
++	  If you say Y here you get support for the X-Powers AXP221.
++	  This driver include only the core APIs. You have to select individual
++	  components like regulators or the PEK (Power Enable Key) under the
++	  corresponding menus.
 +
- config REGULATOR_DA903X
- 	tristate "Dialog Semiconductor DA9030/DA9034 regulators"
- 	depends on PMIC_DA903X
-diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
-index 194ee45..3d63ad5 100644
---- a/drivers/regulator/Makefile
-+++ b/drivers/regulator/Makefile
-@@ -22,6 +22,7 @@ obj-$(CONFIG_REGULATOR_AS3711) += as3711-regulator.o
- obj-$(CONFIG_REGULATOR_AS3722) += as3722-regulator.o
- obj-$(CONFIG_REGULATOR_BCM590XX) += bcm590xx-regulator.o
- obj-$(CONFIG_REGULATOR_AXP20X) += axp20x-regulator.o
-+obj-$(CONFIG_REGULATOR_AXP22X) += axp22x-regulator.o
- obj-$(CONFIG_REGULATOR_DA903X)	+= da903x.o
- obj-$(CONFIG_REGULATOR_DA9052)	+= da9052-regulator.o
- obj-$(CONFIG_REGULATOR_DA9055)	+= da9055-regulator.o
-diff --git a/drivers/regulator/axp22x-regulator.c b/drivers/regulator/axp22x-regulator.c
+ config MFD_CROS_EC
+ 	tristate "ChromeOS Embedded Controller"
+ 	select MFD_CORE
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index df7823c..8b7d2e5 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -104,6 +104,7 @@ obj-$(CONFIG_PMIC_DA9052)	+= da9052-core.o
+ obj-$(CONFIG_MFD_DA9052_SPI)	+= da9052-spi.o
+ obj-$(CONFIG_MFD_DA9052_I2C)	+= da9052-i2c.o
+ obj-$(CONFIG_MFD_AXP20X)	+= axp20x.o
++obj-$(CONFIG_MFD_AXP22X)	+= axp22x.o
+ 
+ obj-$(CONFIG_MFD_LP3943)	+= lp3943.o
+ obj-$(CONFIG_MFD_LP8788)	+= lp8788.o lp8788-irq.o
+diff --git a/drivers/mfd/axp22x.c b/drivers/mfd/axp22x.c
 new file mode 100644
-index 0000000..88abcac
+index 0000000..c530c9b
 --- /dev/null
-+++ b/drivers/regulator/axp22x-regulator.c
-@@ -0,0 +1,328 @@
++++ b/drivers/mfd/axp22x.c
+@@ -0,0 +1,237 @@
 +/*
-+ * AXP22x regulators driver.
++ * axp22x.c - MFD core driver for the X-Powers AXP221
 + *
-+ * Copyright (C) 2014 Free Electrons
++ * AXP22x comprises an adaptive USB-Compatible PWM charger, 5 BUCK DC-DC
++ * converters, 14 LDOs, multiple 12-bit ADCs of voltage, current and temperature
++ * as well as 2 configurable GPIOs.
 + *
 + * Author: Boris Brezillon <boris.brezillon@free-electrons.com>
 + *
-+ * Derived from drivers/regulator/axp20x-regulator.c:
++ * Derived from drivers/mfd/axp20x.c:
 + *   Author: Carlo Caione <carlo@caione.org>
 + *
-+ * This file is subject to the terms and conditions of the GNU General
-+ * Public License. See the file "COPYING" in the main directory of this
-+ * archive for more details.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
 +
 +#include <linux/err.h>
-+#include <linux/init.h>
++#include <linux/i2c.h>
++#include <linux/interrupt.h>
++#include <linux/kernel.h>
 +#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
 +#include <linux/regmap.h>
++#include <linux/slab.h>
++#include <linux/regulator/consumer.h>
 +#include <linux/mfd/axp22x.h>
-+#include <linux/regulator/driver.h>
-+#include <linux/regulator/of_regulator.h>
++#include <linux/mfd/core.h>
++#include <linux/of_device.h>
++#include <linux/of_irq.h>
 +
-+#define AXP22X_IO_ENABLED		0x04
-+#define AXP22X_IO_DISABLED		0x03
++#define AXP22X_OFF	0x80
 +
-+#define AXP22X_WORKMODE_DCDC2_MASK	BIT(2)
-+#define AXP22X_WORKMODE_DCDC3_MASK	BIT(1)
-+
-+#define AXP22X_FREQ_DCDC_MASK		0x0f
-+
-+#define AXP22X_DESC_IO(_id, _supply, _min, _max, _step, _vreg, _vmask, _ereg,   \
-+		       _emask, _enable_val, _disable_val)			\
-+	[AXP22X_##_id] = {							\
-+		.name		= #_id,						\
-+		.supply_name	= (_supply),					\
-+		.type		= REGULATOR_VOLTAGE,				\
-+		.id		= AXP22X_##_id,					\
-+		.n_voltages	= (((_max) - (_min)) / (_step) + 1),		\
-+		.owner		= THIS_MODULE,					\
-+		.min_uV		= (_min) * 1000,				\
-+		.uV_step	= (_step) * 1000,				\
-+		.vsel_reg	= (_vreg),					\
-+		.vsel_mask	= (_vmask),					\
-+		.enable_reg	= (_ereg),					\
-+		.enable_mask	= (_emask),					\
-+		.enable_val	= (_enable_val),				\
-+		.disable_val	= (_disable_val),				\
-+		.ops		= &axp22x_ops,					\
-+	}
-+
-+#define AXP22X_DESC(_id, _supply, _min, _max, _step, _vreg, _vmask, _ereg,	\
-+		    _emask) 							\
-+	[AXP22X_##_id] = {							\
-+		.name		= #_id,						\
-+		.supply_name	= (_supply),					\
-+		.type		= REGULATOR_VOLTAGE,				\
-+		.id		= AXP22X_##_id,					\
-+		.n_voltages	= (((_max) - (_min)) / (_step) + 1),		\
-+		.owner		= THIS_MODULE,					\
-+		.min_uV		= (_min) * 1000,				\
-+		.uV_step	= (_step) * 1000,				\
-+		.vsel_reg	= (_vreg),					\
-+		.vsel_mask	= (_vmask),					\
-+		.enable_reg	= (_ereg),					\
-+		.enable_mask	= (_emask),					\
-+		.ops		= &axp22x_ops,					\
-+	}
-+
-+#define AXP22X_DESC_FIXED(_id, _supply, _volt)					\
-+	[AXP22X_##_id] = {							\
-+		.name		= #_id,						\
-+		.supply_name	= (_supply),					\
-+		.type		= REGULATOR_VOLTAGE,				\
-+		.id		= AXP22X_##_id,					\
-+		.n_voltages	= 1,						\
-+		.owner		= THIS_MODULE,					\
-+		.min_uV		= (_volt) * 1000,				\
-+		.ops		= &axp22x_ops_fixed				\
-+	}
-+
-+static struct regulator_ops axp22x_ops_fixed = {
-+	.list_voltage		= regulator_list_voltage_linear,
++static const struct regmap_range axp22x_writeable_ranges[] = {
++	regmap_reg_range(AXP22X_DATACACHE(0), AXP22X_IRQ5_STATE),
++	regmap_reg_range(AXP22X_DCDC_MODE, AXP22X_BATLOW_THRES1),
 +};
 +
-+static struct regulator_ops axp22x_ops = {
-+	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
-+	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
-+	.list_voltage		= regulator_list_voltage_linear,
-+	.enable			= regulator_enable_regmap,
-+	.disable		= regulator_disable_regmap,
-+	.is_enabled		= regulator_is_enabled_regmap,
++static const struct regmap_range axp22x_volatile_ranges[] = {
++	regmap_reg_range(AXP22X_IRQ1_EN, AXP22X_IRQ5_STATE),
 +};
 +
-+static const struct regulator_desc axp22x_regulators[] = {
-+	AXP22X_DESC(DCDC1, "vin1", 1600, 3400, 100, AXP22X_DCDC1_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL1, BIT(1)),
-+	AXP22X_DESC(DCDC2, "vin2", 600, 1540, 20, AXP22X_DCDC2_V_OUT, 0x3f,
-+		    AXP22X_PWR_OUT_CTRL1, BIT(2)),
-+	AXP22X_DESC(DCDC3, "vin3", 600, 1860, 20, AXP22X_DCDC3_V_OUT, 0x3f,
-+		    AXP22X_PWR_OUT_CTRL1, BIT(3)),
-+	AXP22X_DESC(DCDC4, "vin4", 600, 1540, 20, AXP22X_DCDC4_V_OUT, 0x3f,
-+		    AXP22X_PWR_OUT_CTRL1, BIT(3)),
-+	AXP22X_DESC(DCDC5, "vin5", 1000, 2550, 50, AXP22X_DCDC5_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL1, BIT(4)),
-+	AXP22X_DESC(DC5LDO, "vin5", 700, 1400, 100, AXP22X_DC5LDO_V_OUT, 0x7,
-+		    AXP22X_PWR_OUT_CTRL1, BIT(0)),
-+	AXP22X_DESC(ALDO1, "aldoin", 700, 3300, 100, AXP22X_ALDO1_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL1, BIT(6)),
-+	AXP22X_DESC(ALDO2, "aldoin", 700, 3300, 100, AXP22X_ALDO2_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL1, BIT(7)),
-+	AXP22X_DESC(ALDO3, "aldoin", 700, 3300, 100, AXP22X_ALDO3_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL3, BIT(7)),
-+	AXP22X_DESC(DLDO1, "dldoin", 700, 3300, 100, AXP22X_DLDO1_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL2, BIT(3)),
-+	AXP22X_DESC(DLDO2, "dldoin", 700, 3300, 100, AXP22X_DLDO2_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL2, BIT(4)),
-+	AXP22X_DESC(DLDO3, "dldoin", 700, 3300, 100, AXP22X_DLDO3_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL2, BIT(5)),
-+	AXP22X_DESC(DLDO4, "dldoin", 700, 3300, 100, AXP22X_DLDO4_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL2, BIT(6)),
-+	AXP22X_DESC(ELDO1, "eldoin", 700, 3300, 100, AXP22X_ELDO1_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL2, BIT(0)),
-+	AXP22X_DESC(ELDO2, "eldoin", 700, 3300, 100, AXP22X_ELDO2_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL2, BIT(1)),
-+	AXP22X_DESC(ELDO3, "eldoin", 700, 3300, 100, AXP22X_ELDO3_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL2, BIT(2)),
-+	AXP22X_DESC_IO(LDO_IO0, "ldoioin", 1800, 3300, 100, AXP22X_LDO_IO0_V_OUT,
-+		       0x1f, AXP22X_GPIO0_CTRL, 0x07, AXP22X_IO_ENABLED,
-+		       AXP22X_IO_DISABLED),
-+	AXP22X_DESC_IO(LDO_IO1, "ldoioin", 1800, 3300, 100, AXP22X_LDO_IO1_V_OUT,
-+		       0x1f, AXP22X_GPIO1_CTRL, 0x07, AXP22X_IO_ENABLED,
-+		       AXP22X_IO_DISABLED),
-+	AXP22X_DESC_FIXED(RTC_LDO, "rtcldoin", 3000),
++static const struct regmap_access_table axp22x_writeable_table = {
++	.yes_ranges	= axp22x_writeable_ranges,
++	.n_yes_ranges	= ARRAY_SIZE(axp22x_writeable_ranges),
 +};
 +
-+#define AXP_MATCH(_name, _id) \
-+	[AXP22X_##_id] = { \
-+		.name		= #_name, \
-+		.driver_data	= (void *) &axp22x_regulators[AXP22X_##_id], \
-+	}
-+
-+static struct of_regulator_match axp22x_matches[] = {
-+	AXP_MATCH(dcdc1, DCDC1),
-+	AXP_MATCH(dcdc2, DCDC2),
-+	AXP_MATCH(dcdc3, DCDC3),
-+	AXP_MATCH(dcdc4, DCDC4),
-+	AXP_MATCH(dcdc5, DCDC5),
-+	AXP_MATCH(dc5ldo, DC5LDO),
-+	AXP_MATCH(aldo1, ALDO1),
-+	AXP_MATCH(aldo2, ALDO2),
-+	AXP_MATCH(aldo3, ALDO3),
-+	AXP_MATCH(dldo1, DLDO1),
-+	AXP_MATCH(dldo2, DLDO2),
-+	AXP_MATCH(dldo3, DLDO3),
-+	AXP_MATCH(dldo4, DLDO4),
-+	AXP_MATCH(eldo1, ELDO1),
-+	AXP_MATCH(eldo2, ELDO2),
-+	AXP_MATCH(eldo3, ELDO3),
-+	AXP_MATCH(ldo_io0, LDO_IO0),
-+	AXP_MATCH(ldo_io1, LDO_IO1),
-+	AXP_MATCH(rtc_ldo, RTC_LDO),
++static const struct regmap_access_table axp22x_volatile_table = {
++	.yes_ranges	= axp22x_volatile_ranges,
++	.n_yes_ranges	= ARRAY_SIZE(axp22x_volatile_ranges),
 +};
 +
-+static int axp22x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
-+{
-+	struct axp22x_dev *axp22x = dev_get_drvdata(pdev->dev.parent);
++static const struct regmap_config axp22x_regmap_config = {
++	.reg_bits	= 8,
++	.val_bits	= 8,
++	.wr_table	= &axp22x_writeable_table,
++	.volatile_table	= &axp22x_volatile_table,
++	.max_register	= AXP22X_BATLOW_THRES1,
++	.cache_type	= REGCACHE_RBTREE,
++};
 +
-+	if (dcdcfreq < 750) {
-+		dcdcfreq = 750;
-+		dev_warn(&pdev->dev, "DCDC frequency too low. Set to 750kHz\n");
-+	}
++#define AXP22X_IRQ(_irq, _off, _mask) \
++	[AXP22X_IRQ_##_irq] = { .reg_offset = (_off), .mask = BIT(_mask) }
 +
-+	if (dcdcfreq > 1875) {
-+		dcdcfreq = 1875;
-+		dev_warn(&pdev->dev, "DCDC frequency too high. Set to 1875kHz\n");
-+	}
++static const struct regmap_irq axp22x_regmap_irqs[] = {
++	AXP22X_IRQ(ACIN_OVER_V,		0, 7),
++	AXP22X_IRQ(ACIN_PLUGIN,		0, 6),
++	AXP22X_IRQ(ACIN_REMOVAL,	0, 5),
++	AXP22X_IRQ(VBUS_OVER_V,		0, 4),
++	AXP22X_IRQ(VBUS_PLUGIN,		0, 3),
++	AXP22X_IRQ(VBUS_REMOVAL,	0, 2),
++	AXP22X_IRQ(VBUS_V_LOW,		0, 1),
++	AXP22X_IRQ(BATT_PLUGIN,		1, 7),
++	AXP22X_IRQ(BATT_REMOVAL,	1, 6),
++	AXP22X_IRQ(BATT_ENT_ACT_MODE,	1, 5),
++	AXP22X_IRQ(BATT_EXIT_ACT_MODE,	1, 4),
++	AXP22X_IRQ(CHARG,		1, 3),
++	AXP22X_IRQ(CHARG_DONE,		1, 2),
++	AXP22X_IRQ(BATT_TEMP_HIGH,	1, 1),
++	AXP22X_IRQ(BATT_TEMP_LOW,	1, 0),
++	AXP22X_IRQ(DIE_TEMP_HIGH,	2, 7),
++	AXP22X_IRQ(CHARG_I_LOW,		2, 6),
++	AXP22X_IRQ(PEK_SHORT,		2, 1),
++	AXP22X_IRQ(PEK_LONG,		2, 0),
++	AXP22X_IRQ(LOW_PWR_LVL1,	3, 1),
++	AXP22X_IRQ(LOW_PWR_LVL2,	3, 0),
++	AXP22X_IRQ(TIMER,		4, 7),
++	AXP22X_IRQ(PEK_RIS_EDGE,	4, 6),
++	AXP22X_IRQ(PEK_FAL_EDGE,	4, 5),
++	AXP22X_IRQ(GPIO1_INPUT,		4, 1),
++	AXP22X_IRQ(GPIO0_INPUT,		4, 0),
++};
 +
-+	dcdcfreq = (dcdcfreq - 750) / 75;
++static const struct of_device_id axp22x_of_match[] = {
++	{ .compatible = "x-powers,axp221", .data = (void *) AXP221_ID },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, axp22x_of_match);
 +
-+	return regmap_update_bits(axp22x->regmap, AXP22X_DCDC_FREQ,
-+				  AXP22X_FREQ_DCDC_MASK, dcdcfreq);
-+}
++/*
++ * This is useless for OF-enabled devices, but it is needed by I2C subsystem
++ */
++static const struct i2c_device_id axp22x_i2c_id[] = {
++	{ },
++};
++MODULE_DEVICE_TABLE(i2c, axp22x_i2c_id);
 +
-+static int axp22x_regulator_parse_dt(struct platform_device *pdev)
-+{
-+	struct device_node *np, *regulators;
-+	int ret;
-+	u32 dcdcfreq;
++static const struct regmap_irq_chip axp22x_regmap_irq_chip = {
++	.name			= "axp22x_irq_chip",
++	.status_base		= AXP22X_IRQ1_STATE,
++	.ack_base		= AXP22X_IRQ1_STATE,
++	.mask_base		= AXP22X_IRQ1_EN,
++	.num_regs		= 5,
++	.irqs			= axp22x_regmap_irqs,
++	.num_irqs		= ARRAY_SIZE(axp22x_regmap_irqs),
++	.mask_invert		= true,
++	.init_ack_masked	= true,
++};
 +
-+	np = of_node_get(pdev->dev.parent->of_node);
-+	if (!np)
-+		return 0;
++static const char * const axp22x_supplies[] = {
++	"vbus",
++	"acin",
++	"vin1",
++	"vin2",
++	"vin3",
++	"vin4",
++	"vin5",
++	"aldoin",
++	"dldoin",
++	"eldoin",
++	"ldoioin",
++	"rtcldoin",
++};
 +
-+	regulators = of_find_node_by_name(np, "regulators");
-+	if (!regulators) {
-+		dev_warn(&pdev->dev, "regulators node not found\n");
-+	} else {
-+		ret = of_regulator_match(&pdev->dev, regulators, axp22x_matches,
-+					 ARRAY_SIZE(axp22x_matches));
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "Error parsing regulator init data: %d\n", ret);
-+			return ret;
-+		}
-+
-+		dcdcfreq = 1500;
-+		of_property_read_u32(regulators, "x-powers,dcdc-freq", &dcdcfreq);
-+		ret = axp22x_set_dcdc_freq(pdev, dcdcfreq);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "Error setting dcdc frequency: %d\n", ret);
-+			return ret;
-+		}
-+
-+		of_node_put(regulators);
-+	}
-+
-+	return 0;
-+}
-+
-+static int axp22x_set_dcdc_workmode(struct regulator_dev *rdev, int id, u32 workmode)
-+{
-+	unsigned int mask = BIT(id);
-+
-+	if (workmode)
-+		workmode = mask;
-+
-+	return regmap_update_bits(rdev->regmap, AXP22X_DCDC_MODE, mask, workmode);
-+}
-+
-+static int axp22x_regulator_probe(struct platform_device *pdev)
-+{
-+	struct regulator_dev *rdev;
-+	struct axp22x_dev *axp22x = dev_get_drvdata(pdev->dev.parent);
-+	struct regulator_config config = { };
-+	struct regulator_init_data *init_data;
-+	bool registered[AXP22X_REG_ID_MAX];
-+	int nregistered = 0;
-+	int prev_nregistered = -1;
-+	int ret, i;
-+	u32 workmode;
-+
-+	ret = axp22x_regulator_parse_dt(pdev);
-+	if (ret)
-+		return ret;
-+
-+	memset(&registered, 0, sizeof(registered));
-+
-+	/*
-+	 * Some regulators might take their power supply from other regulators
-+	 * defined by the same PMIC.
-+	 *
-+	 * Retry regulators registration until all regulators are registered
-+	 * or the last iteration didn't manage to register any new regulator
-+	 * (which means there's an external dependency missing and we can thus
-+	 * return EPROBE_DEFER).
-+	 */
-+	while (nregistered < AXP22X_REG_ID_MAX &&
-+	       prev_nregistered < nregistered) {
-+
-+		prev_nregistered = nregistered;
-+
-+		for (i = 0; i < AXP22X_REG_ID_MAX; i++) {
-+			if (registered[i])
-+				continue;
-+
-+			init_data = axp22x_matches[i].init_data;
-+
-+			config.dev = &pdev->dev;
-+			config.init_data = init_data;
-+			config.regmap = axp22x->regmap;
-+			config.of_node = axp22x_matches[i].of_node;
-+
-+			rdev = devm_regulator_register(&pdev->dev,
-+						       &axp22x_regulators[i],
-+						       &config);
-+			if (IS_ERR(rdev)) {
-+				if (PTR_ERR(rdev) == -EPROBE_DEFER)
-+					continue;
-+
-+				dev_err(&pdev->dev, "Failed to register %s\n",
-+					axp22x_regulators[i].name);
-+
-+				return PTR_ERR(rdev);
-+			}
-+
-+			nregistered++;
-+
-+			ret = of_property_read_u32(axp22x_matches[i].of_node,
-+						   "x-powers,dcdc-workmode",
-+						   &workmode);
-+			if (!ret &&
-+			    axp22x_set_dcdc_workmode(rdev, i, workmode))
-+				dev_err(&pdev->dev,
-+					"Failed to set workmode on %s\n",
-+					axp22x_regulators[i].name);
-+
-+			registered[i] = true;
-+			nregistered++;
-+		}
-+	}
-+
-+	if (nregistered < AXP22X_REG_ID_MAX)
-+		return -EPROBE_DEFER;
-+
-+	return 0;
-+}
-+
-+static struct platform_driver axp22x_regulator_driver = {
-+	.probe	= axp22x_regulator_probe,
-+	.driver	= {
-+		.name		= "axp22x-regulator",
-+		.owner		= THIS_MODULE,
++static struct mfd_cell axp22x_cells[] = {
++	{
++		.name			= "axp22x-regulator",
++		.parent_supplies	= axp22x_supplies,
++		.num_parent_supplies	= ARRAY_SIZE(axp22x_supplies),
 +	},
 +};
 +
-+module_platform_driver(axp22x_regulator_driver);
++static struct axp22x_dev *axp22x_pm_power_off;
++static void axp22x_power_off(void)
++{
++	regmap_write(axp22x_pm_power_off->regmap, AXP22X_OFF_CTRL,
++		     AXP22X_OFF);
++}
 +
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Carlo Caione <carlo@caione.org>");
-+MODULE_DESCRIPTION("Regulator Driver for AXP22X PMIC");
++static int axp22x_i2c_probe(struct i2c_client *i2c,
++			    const struct i2c_device_id *id)
++{
++	struct axp22x_dev *axp22x;
++	const struct of_device_id *of_id;
++	int ret;
++
++	axp22x = devm_kzalloc(&i2c->dev, sizeof(*axp22x), GFP_KERNEL);
++	if (!axp22x)
++		return -ENOMEM;
++
++	of_id = of_match_device(axp22x_of_match, &i2c->dev);
++	if (!of_id) {
++		dev_err(&i2c->dev, "Unable to setup AXP22X data\n");
++		return -ENODEV;
++	}
++	axp22x->variant = (long) of_id->data;
++
++	axp22x->i2c_client = i2c;
++	axp22x->dev = &i2c->dev;
++	dev_set_drvdata(axp22x->dev, axp22x);
++
++	axp22x->regmap = devm_regmap_init_i2c(i2c, &axp22x_regmap_config);
++	if (IS_ERR(axp22x->regmap)) {
++		ret = PTR_ERR(axp22x->regmap);
++		dev_err(&i2c->dev, "regmap init failed: %d\n", ret);
++		return ret;
++	}
++
++	ret = regmap_add_irq_chip(axp22x->regmap, i2c->irq,
++				  IRQF_ONESHOT | IRQF_SHARED, -1,
++				  &axp22x_regmap_irq_chip,
++				  &axp22x->regmap_irqc);
++	if (ret) {
++		dev_err(&i2c->dev, "failed to add irq chip: %d\n", ret);
++		return ret;
++	}
++
++	ret = mfd_add_devices(axp22x->dev, -1, axp22x_cells,
++			      ARRAY_SIZE(axp22x_cells), NULL, 0, NULL);
++
++	if (ret) {
++		dev_err(&i2c->dev, "failed to add MFD devices: %d\n", ret);
++		regmap_del_irq_chip(i2c->irq, axp22x->regmap_irqc);
++		return ret;
++	}
++
++	if (!pm_power_off) {
++		axp22x_pm_power_off = axp22x;
++		pm_power_off = axp22x_power_off;
++	}
++
++	dev_info(&i2c->dev, "AXP22X driver loaded\n");
++
++	return 0;
++}
++
++static int axp22x_i2c_remove(struct i2c_client *i2c)
++{
++	struct axp22x_dev *axp22x = i2c_get_clientdata(i2c);
++
++	if (axp22x == axp22x_pm_power_off) {
++		axp22x_pm_power_off = NULL;
++		pm_power_off = NULL;
++	}
++
++	mfd_remove_devices(axp22x->dev);
++	regmap_del_irq_chip(axp22x->i2c_client->irq, axp22x->regmap_irqc);
++
++	return 0;
++}
++
++static struct i2c_driver axp22x_i2c_driver = {
++	.driver = {
++		.name	= "axp22x",
++		.owner	= THIS_MODULE,
++		.of_match_table	= of_match_ptr(axp22x_of_match),
++	},
++	.probe		= axp22x_i2c_probe,
++	.remove		= axp22x_i2c_remove,
++	.id_table	= axp22x_i2c_id,
++};
++
++module_i2c_driver(axp22x_i2c_driver);
++
++MODULE_DESCRIPTION("PMIC MFD core driver for AXP22X");
++MODULE_AUTHOR("Boris Brezillon <boris.brezillon@free-electrons.com>");
++MODULE_LICENSE("GPL");
+diff --git a/include/linux/mfd/axp22x.h b/include/linux/mfd/axp22x.h
+new file mode 100644
+index 0000000..c75fc35
+--- /dev/null
++++ b/include/linux/mfd/axp22x.h
+@@ -0,0 +1,149 @@
++/*
++ * Functions and registers to access AXP20X power management chip.
++ *
++ * Copyright (C) 2013, Carlo Caione <carlo@caione.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __LINUX_MFD_AXP22X_H
++#define __LINUX_MFD_AXP22X_H
++
++enum {
++	AXP221_ID,
++};
++
++#define AXP22X_DATACACHE(m)		(0x04 + (m))
++
++/* Power supply */
++#define AXP22X_PWR_INPUT_STATUS         0x00
++#define AXP22X_PWR_OP
++#define AXP22X_PWR_OUT_CTRL1		0x10
++#define AXP22X_PWR_OUT_CTRL2		0x12
++#define AXP22X_PWR_OUT_CTRL3		0x13
++#define AXP22X_DLDO1_V_OUT		0x15
++#define AXP22X_DLDO2_V_OUT		0x16
++#define AXP22X_DLDO3_V_OUT		0x17
++#define AXP22X_DLDO4_V_OUT		0x18
++#define AXP22X_ELDO1_V_OUT		0x19
++#define AXP22X_ELDO2_V_OUT		0x1a
++#define AXP22X_ELDO3_V_OUT		0x1b
++#define AXP22X_DC5LDO_V_OUT		0x1c
++#define AXP22X_DCDC1_V_OUT		0x21
++#define AXP22X_DCDC2_V_OUT		0x22
++#define AXP22X_DCDC3_V_OUT		0x23
++#define AXP22X_DCDC4_V_OUT		0x24
++#define AXP22X_DCDC5_V_OUT		0x25
++#define AXP22X_DCDC23_V_RAMP_CTRL	0x27
++#define AXP22X_ALDO1_V_OUT		0x28
++#define AXP22X_ALDO2_V_OUT		0x29
++#define AXP22X_ALDO3_V_OUT		0x2a
++#define AXP22X_WAKE_UP_V_OFF		0x31
++#define AXP22X_OFF_CTRL			0x32
++#define AXP22X_CHRG_CTRL1		0x33
++#define AXP22X_CHRG_CTRL2		0x34
++#define AXP22X_CHRG_CTRL3		0x35
++#define AXP22X_PEK_KEY			0x36
++#define AXP22X_DCDC_FREQ		0x37
++#define AXP22X_V_LTF_CHRG		0x38
++#define AXP22X_V_HTF_CHRG		0x39
++#define AXP22X_V_LTF_DISCHRG		0x3c
++#define AXP22X_V_HTF_DISCHRG		0x3d
++
++/* Interrupt */
++#define AXP22X_IRQ1_EN			0x40
++#define AXP22X_IRQ2_EN			0x41
++#define AXP22X_IRQ3_EN			0x42
++#define AXP22X_IRQ4_EN			0x43
++#define AXP22X_IRQ5_EN			0x44
++#define AXP22X_IRQ1_STATE		0x48
++#define AXP22X_IRQ2_STATE		0x49
++#define AXP22X_IRQ3_STATE		0x4a
++#define AXP22X_IRQ4_STATE		0x4b
++#define AXP22X_IRQ5_STATE		0x4c
++
++/* Power supply */
++#define AXP22X_DCDC_MODE		0x80
++#define AXP22X_ADC_EN1			0x82
++#define AXP22X_ADC_RATE			0x84
++#define AXP22X_TIMER_CTRL		0x8a
++#define AXP22X_PWREN_CTRL1		0x8c
++#define AXP22X_PWREN_CTRL2		0x8d
++#define AXP22X_OVER_TMP			0x8f
++
++/* GPIO */
++#define AXP22X_GPIO0_CTRL		0x90
++#define AXP22X_LDO_IO0_V_OUT		0x91
++#define AXP22X_GPIO1_CTRL		0x90
++#define AXP22X_LDO_IO1_V_OUT		0x93
++#define AXP22X_GPIO_STATE		0x94
++#define AXP22X_GPIO_PULL_DOWN		0x94
++
++/* Battery */
++#define AXP22X_BATLOW_THRES1		0xe6
++
++/* Regulators IDs */
++enum {
++	AXP22X_DCDC1 = 0,
++	AXP22X_DCDC2,
++	AXP22X_DCDC3,
++	AXP22X_DCDC4,
++	AXP22X_DCDC5,
++	AXP22X_DC5LDO,
++	AXP22X_ALDO1,
++	AXP22X_ALDO2,
++	AXP22X_ALDO3,
++	AXP22X_ELDO1,
++	AXP22X_ELDO2,
++	AXP22X_ELDO3,
++	AXP22X_DLDO1,
++	AXP22X_DLDO2,
++	AXP22X_DLDO3,
++	AXP22X_DLDO4,
++	AXP22X_RTC_LDO,
++	AXP22X_LDO_IO0,
++	AXP22X_LDO_IO1,
++	AXP22X_REG_ID_MAX,
++};
++
++/* IRQs */
++enum {
++	AXP22X_IRQ_ACIN_OVER_V = 1,
++	AXP22X_IRQ_ACIN_PLUGIN,
++	AXP22X_IRQ_ACIN_REMOVAL,
++	AXP22X_IRQ_VBUS_OVER_V,
++	AXP22X_IRQ_VBUS_PLUGIN,
++	AXP22X_IRQ_VBUS_REMOVAL,
++	AXP22X_IRQ_VBUS_V_LOW,
++	AXP22X_IRQ_BATT_PLUGIN,
++	AXP22X_IRQ_BATT_REMOVAL,
++	AXP22X_IRQ_BATT_ENT_ACT_MODE,
++	AXP22X_IRQ_BATT_EXIT_ACT_MODE,
++	AXP22X_IRQ_CHARG,
++	AXP22X_IRQ_CHARG_DONE,
++	AXP22X_IRQ_BATT_TEMP_HIGH,
++	AXP22X_IRQ_BATT_TEMP_LOW,
++	AXP22X_IRQ_DIE_TEMP_HIGH,
++	AXP22X_IRQ_CHARG_I_LOW,
++	AXP22X_IRQ_PEK_SHORT,
++	AXP22X_IRQ_PEK_LONG,
++	AXP22X_IRQ_LOW_PWR_LVL1,
++	AXP22X_IRQ_LOW_PWR_LVL2,
++	AXP22X_IRQ_TIMER,
++	AXP22X_IRQ_PEK_RIS_EDGE,
++	AXP22X_IRQ_PEK_FAL_EDGE,
++	AXP22X_IRQ_GPIO1_INPUT,
++	AXP22X_IRQ_GPIO0_INPUT,
++};
++
++struct axp22x_dev {
++	struct device			*dev;
++	struct i2c_client		*i2c_client;
++	struct regmap			*regmap;
++	struct regmap_irq_chip_data	*regmap_irqc;
++	long				variant;
++};
++
++#endif /* __LINUX_MFD_AXP22X_H */
 -- 
 1.8.3.2
