@@ -1,37 +1,303 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 May 2014 18:58:23 +0100
-Subject: [PATCH v4 04/20] arm64: boot protocol documentation update for GICv3
+Date: Thu, 15 May 2014 18:58:20 +0100
+Subject: [PATCH v4 01/20] ARM: GIC: move some bits of GICv2 to a library-type
+ file
 In-Reply-To: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
 References: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1400176719-31275-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1400176719-31275-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linux has some requirements that must be satisfied in order to boot
-on a system built with a GICv3.
+A few GICv2 low-level function are actually very useful to GICv3,
+and it makes some sense to share them across the two drivers.
+They end-up in their own file, with an additional parameter used
+to ensure an optional synchronization (unused on GICv2).
 
+Cc: Thomas Gleixner <tglx@linutronix.de>
 Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- Documentation/arm64/booting.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/irqchip/Makefile         |   2 +-
+ drivers/irqchip/irq-gic-common.c | 115 +++++++++++++++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic-common.h |  29 ++++++++++
+ drivers/irqchip/irq-gic.c        |  59 ++------------------
+ 4 files changed, 149 insertions(+), 56 deletions(-)
+ create mode 100644 drivers/irqchip/irq-gic-common.c
+ create mode 100644 drivers/irqchip/irq-gic-common.h
 
-diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-index beb754e..fb9f772 100644
---- a/Documentation/arm64/booting.txt
-+++ b/Documentation/arm64/booting.txt
-@@ -137,6 +137,12 @@ Before jumping into the kernel, the following conditions must be met:
-   the kernel image will be entered must be initialised by software at a
-   higher exception level to prevent execution in an UNKNOWN state.
- 
-+  For systems with a GICv3 interrupt controller, it is expected that:
-+  - If EL3 is present, it must program ICC_SRE_EL3.Enable (bit 3) to
-+    0b1 and ICC_SRE_EL3.SRE (bit 0) to 0b1.
-+  - If the kernel is entered at EL1, EL2 must set ICC_SRE_EL2.Enable
-+    (bit 3) to 0b1 and ICC_SRE_EL2.SRE (bit 0) to 0b1.
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index f180f8d..880eb66 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -15,7 +15,7 @@ obj-$(CONFIG_ORION_IRQCHIP)		+= irq-orion.o
+ obj-$(CONFIG_ARCH_SUNXI)		+= irq-sun4i.o
+ obj-$(CONFIG_ARCH_SUNXI)		+= irq-sunxi-nmi.o
+ obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
+-obj-$(CONFIG_ARM_GIC)			+= irq-gic.o
++obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
+ obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
+ obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
+ obj-$(CONFIG_IMGPDC_IRQ)		+= irq-imgpdc.o
+diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
+new file mode 100644
+index 0000000..60ac704
+--- /dev/null
++++ b/drivers/irqchip/irq-gic-common.c
+@@ -0,0 +1,115 @@
++/*
++ * Copyright (C) 2002 ARM Limited, All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
- The requirements described above for CPU mode, caches, MMUs, architected
- timers, coherency and system registers apply to all CPUs.  All CPUs must
- enter the kernel in the same exception level.
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/irqchip/arm-gic.h>
++
++#include "irq-gic-common.h"
++
++void gic_configure_irq(unsigned int irq, unsigned int type,
++		       void __iomem *base, void (*sync_access)(void))
++{
++	u32 enablemask = 1 << (irq % 32);
++	u32 enableoff = (irq / 32) * 4;
++	u32 confmask = 0x2 << ((irq % 16) * 2);
++	u32 confoff = (irq / 16) * 4;
++	bool enabled = false;
++	u32 val;
++
++	/*
++	 * Read current configuration register, and insert the config
++	 * for "irq", depending on "type".
++	 */
++	val = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
++	if (type == IRQ_TYPE_LEVEL_HIGH)
++		val &= ~confmask;
++	else if (type == IRQ_TYPE_EDGE_RISING)
++		val |= confmask;
++
++	/*
++	 * As recommended by the spec, disable the interrupt before changing
++	 * the configuration
++	 */
++	if (readl_relaxed(base + GIC_DIST_ENABLE_SET + enableoff) & enablemask) {
++		writel_relaxed(enablemask, base + GIC_DIST_ENABLE_CLEAR + enableoff);
++		if (sync_access)
++			sync_access();
++		enabled = true;
++	}
++
++	/*
++	 * Write back the new configuration, and possibly re-enable
++	 * the interrupt.
++	 */
++	writel_relaxed(val, base + GIC_DIST_CONFIG + confoff);
++
++	if (enabled)
++		writel_relaxed(enablemask, base + GIC_DIST_ENABLE_SET + enableoff);
++
++	if (sync_access)
++		sync_access();
++}
++
++void __init gic_dist_config(void __iomem *base, int gic_irqs,
++			    void (*sync_access)(void))
++{
++	unsigned int i;
++
++	/*
++	 * Set all global interrupts to be level triggered, active low.
++	 */
++	for (i = 32; i < gic_irqs; i += 16)
++		writel_relaxed(0, base + GIC_DIST_CONFIG + i / 4);
++
++	/*
++	 * Set priority on all global interrupts.
++	 */
++	for (i = 32; i < gic_irqs; i += 4)
++		writel_relaxed(0xa0a0a0a0, base + GIC_DIST_PRI + i);
++
++	/*
++	 * Disable all interrupts.  Leave the PPI and SGIs alone
++	 * as they are enabled by redistributor registers.
++	 */
++	for (i = 32; i < gic_irqs; i += 32)
++		writel_relaxed(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i / 8);
++
++	if (sync_access)
++		sync_access();
++}
++
++void gic_cpu_config(void __iomem *base, void (*sync_access)(void))
++{
++	int i;
++
++	/*
++	 * Deal with the banked PPI and SGI interrupts - disable all
++	 * PPI interrupts, ensure all SGI interrupts are enabled.
++	 */
++	writel_relaxed(0xffff0000, base + GIC_DIST_ENABLE_CLEAR);
++	writel_relaxed(0x0000ffff, base + GIC_DIST_ENABLE_SET);
++
++	/*
++	 * Set priority on PPI and SGI interrupts
++	 */
++	for (i = 0; i < 32; i += 4)
++		writel_relaxed(0xa0a0a0a0, base + GIC_DIST_PRI + i * 4 / 4);
++
++	if (sync_access)
++		sync_access();
++}
+diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
+new file mode 100644
+index 0000000..b41f024
+--- /dev/null
++++ b/drivers/irqchip/irq-gic-common.h
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (C) 2002 ARM Limited, All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef _IRQ_GIC_COMMON_H
++#define _IRQ_GIC_COMMON_H
++
++#include <linux/of.h>
++#include <linux/irqdomain.h>
++
++void gic_configure_irq(unsigned int irq, unsigned int type,
++                       void __iomem *base, void (*sync_access)(void));
++void gic_dist_config(void __iomem *base, int gic_irqs,
++		     void (*sync_access)(void));
++void gic_cpu_config(void __iomem *base, void (*sync_access)(void));
++
++#endif /* _IRQ_GIC_COMMON_H */
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 57d165e..e1c55e2b 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -46,6 +46,7 @@
+ #include <asm/exception.h>
+ #include <asm/smp_plat.h>
+ 
++#include "irq-gic-common.h"
+ #include "irqchip.h"
+ 
+ union gic_base {
+@@ -188,12 +189,6 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
+ {
+ 	void __iomem *base = gic_dist_base(d);
+ 	unsigned int gicirq = gic_irq(d);
+-	u32 enablemask = 1 << (gicirq % 32);
+-	u32 enableoff = (gicirq / 32) * 4;
+-	u32 confmask = 0x2 << ((gicirq % 16) * 2);
+-	u32 confoff = (gicirq / 16) * 4;
+-	bool enabled = false;
+-	u32 val;
+ 
+ 	/* Interrupt configuration for SGIs can't be changed */
+ 	if (gicirq < 16)
+@@ -207,25 +202,7 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
+ 	if (gic_arch_extn.irq_set_type)
+ 		gic_arch_extn.irq_set_type(d, type);
+ 
+-	val = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
+-	if (type == IRQ_TYPE_LEVEL_HIGH)
+-		val &= ~confmask;
+-	else if (type == IRQ_TYPE_EDGE_RISING)
+-		val |= confmask;
+-
+-	/*
+-	 * As recommended by the spec, disable the interrupt before changing
+-	 * the configuration
+-	 */
+-	if (readl_relaxed(base + GIC_DIST_ENABLE_SET + enableoff) & enablemask) {
+-		writel_relaxed(enablemask, base + GIC_DIST_ENABLE_CLEAR + enableoff);
+-		enabled = true;
+-	}
+-
+-	writel_relaxed(val, base + GIC_DIST_CONFIG + confoff);
+-
+-	if (enabled)
+-		writel_relaxed(enablemask, base + GIC_DIST_ENABLE_SET + enableoff);
++	gic_configure_irq(gicirq, type, base, NULL);
+ 
+ 	raw_spin_unlock(&irq_controller_lock);
+ 
+@@ -387,12 +364,6 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+ 	writel_relaxed(0, base + GIC_DIST_CTRL);
+ 
+ 	/*
+-	 * Set all global interrupts to be level triggered, active low.
+-	 */
+-	for (i = 32; i < gic_irqs; i += 16)
+-		writel_relaxed(0, base + GIC_DIST_CONFIG + i * 4 / 16);
+-
+-	/*
+ 	 * Set all global interrupts to this CPU only.
+ 	 */
+ 	cpumask = gic_get_cpumask(gic);
+@@ -401,18 +372,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+ 	for (i = 32; i < gic_irqs; i += 4)
+ 		writel_relaxed(cpumask, base + GIC_DIST_TARGET + i * 4 / 4);
+ 
+-	/*
+-	 * Set priority on all global interrupts.
+-	 */
+-	for (i = 32; i < gic_irqs; i += 4)
+-		writel_relaxed(0xa0a0a0a0, base + GIC_DIST_PRI + i * 4 / 4);
+-
+-	/*
+-	 * Disable all interrupts.  Leave the PPI and SGIs alone
+-	 * as these enables are banked registers.
+-	 */
+-	for (i = 32; i < gic_irqs; i += 32)
+-		writel_relaxed(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
++	gic_dist_config(base, gic_irqs, NULL);
+ 
+ 	writel_relaxed(1, base + GIC_DIST_CTRL);
+ }
+@@ -439,18 +399,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+ 		if (i != cpu)
+ 			gic_cpu_map[i] &= ~cpu_mask;
+ 
+-	/*
+-	 * Deal with the banked PPI and SGI interrupts - disable all
+-	 * PPI interrupts, ensure all SGI interrupts are enabled.
+-	 */
+-	writel_relaxed(0xffff0000, dist_base + GIC_DIST_ENABLE_CLEAR);
+-	writel_relaxed(0x0000ffff, dist_base + GIC_DIST_ENABLE_SET);
+-
+-	/*
+-	 * Set priority on PPI and SGI interrupts
+-	 */
+-	for (i = 0; i < 32; i += 4)
+-		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
++	gic_cpu_config(dist_base, NULL);
+ 
+ 	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
+ 	writel_relaxed(1, base + GIC_CPU_CTRL);
 -- 
 1.8.3.4
