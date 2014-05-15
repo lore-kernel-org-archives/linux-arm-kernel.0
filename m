@@ -1,415 +1,109 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 May 2014 09:31:14 +0100
-Subject: [PATCH v3 19/19] arm64: KVM: vgic: add GICv3 world switch
-In-Reply-To: <20140509140738.GT3362@lvm> (Christoffer Dall's message of "Fri,
- 9 May 2014 15:07:38 +0100")
-References: <1397655591-2761-1-git-send-email-marc.zyngier@arm.com>
- <1397655591-2761-20-git-send-email-marc.zyngier@arm.com>
- <20140509140738.GT3362@lvm>
-Message-ID: <874n0rh299.fsf@approximate.cambridge.arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 15 May 2014 10:34:28 +0200
+Subject: [PATCH 2/8] clk: berlin: add clock binding docs for Marvell
+ Berlin2 SoCs
+In-Reply-To: <20140515044106.19795.57249@quantum>
+References: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1399839881-29895-3-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140514223230.19795.63328@quantum> <5373F9A0.6000702@gmail.com>
+ <20140515044106.19795.57249@quantum>
+Message-ID: <20140515083428.GR29318@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09 2014 at  3:07:38 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Wed, Apr 16, 2014 at 02:39:51PM +0100, Marc Zyngier wrote:
->> Introduce the GICv3 world switch code and helper functions, enabling
->> GICv2 emulation on GICv3 hardware.
->>
->> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/include/asm/kvm_asm.h  |   4 +
->>  arch/arm64/include/asm/kvm_host.h |   7 +
->>  arch/arm64/kernel/asm-offsets.c   |   8 ++
->>  arch/arm64/kvm/Makefile           |   2 +
->>  arch/arm64/kvm/vgic-v3-switch.S   | 279 ++++++++++++++++++++++++++++++++++++++
->>  5 files changed, 300 insertions(+)
->>  create mode 100644 arch/arm64/kvm/vgic-v3-switch.S
->>
->> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
->> index 6515a52..270ea13 100644
->> --- a/arch/arm64/include/asm/kvm_asm.h
->> +++ b/arch/arm64/include/asm/kvm_asm.h
->> @@ -105,8 +105,12 @@ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
->>
->>  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
->>
->> +extern u64 __vgic_v3_get_ich_vtr_el2(void);
->> +
->>  extern char __save_vgic_v2_state[];
->>  extern char __restore_vgic_v2_state[];
->> +extern char __save_vgic_v3_state[];
->> +extern char __restore_vgic_v3_state[];
->>
->>  #endif
->>
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index 65f0c43..a10803c 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -216,6 +216,13 @@ static inline void vgic_arch_setup(const struct vgic_params *vgic)
->>               __vgic_sr_vectors.restore_vgic  = __restore_vgic_v2_state;
->>               break;
->>
->> +#ifdef CONFIG_ARM_GIC_V3
->> +     case VGIC_V3:
->> +             __vgic_sr_vectors.save_vgic     = __save_vgic_v3_state;
->> +             __vgic_sr_vectors.restore_vgic  = __restore_vgic_v3_state;
->> +             break;
->> +#endif
->> +
->>       default:
->>               BUG();
->>       }
->> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
->> index dafc415..e74654c 100644
->> --- a/arch/arm64/kernel/asm-offsets.c
->> +++ b/arch/arm64/kernel/asm-offsets.c
->> @@ -139,6 +139,14 @@ int main(void)
->>    DEFINE(VGIC_V2_CPU_ELRSR,  offsetof(struct vgic_cpu, vgic_v2.vgic_elrsr));
->>    DEFINE(VGIC_V2_CPU_APR,    offsetof(struct vgic_cpu, vgic_v2.vgic_apr));
->>    DEFINE(VGIC_V2_CPU_LR,     offsetof(struct vgic_cpu, vgic_v2.vgic_lr));
->> +  DEFINE(VGIC_V3_CPU_HCR,    offsetof(struct vgic_cpu, vgic_v3.vgic_hcr));
->> +  DEFINE(VGIC_V3_CPU_VMCR,   offsetof(struct vgic_cpu, vgic_v3.vgic_vmcr));
->> +  DEFINE(VGIC_V3_CPU_MISR,   offsetof(struct vgic_cpu, vgic_v3.vgic_misr));
->> +  DEFINE(VGIC_V3_CPU_EISR,   offsetof(struct vgic_cpu, vgic_v3.vgic_eisr));
->> +  DEFINE(VGIC_V3_CPU_ELRSR,  offsetof(struct vgic_cpu, vgic_v3.vgic_elrsr));
->> +  DEFINE(VGIC_V3_CPU_AP0R,   offsetof(struct vgic_cpu, vgic_v3.vgic_ap0r));
->> +  DEFINE(VGIC_V3_CPU_AP1R,   offsetof(struct vgic_cpu, vgic_v3.vgic_ap1r));
->> +  DEFINE(VGIC_V3_CPU_LR,     offsetof(struct vgic_cpu, vgic_v3.vgic_lr));
->>    DEFINE(VGIC_CPU_NR_LR,     offsetof(struct vgic_cpu, nr_lr));
->>    DEFINE(KVM_VTTBR,          offsetof(struct kvm, arch.vttbr));
->>    DEFINE(KVM_VGIC_VCTRL,     offsetof(struct kvm, arch.vgic.vctrl_base));
->> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
->> index daf24dc..32a0961 100644
->> --- a/arch/arm64/kvm/Makefile
->> +++ b/arch/arm64/kvm/Makefile
->> @@ -22,4 +22,6 @@ kvm-$(CONFIG_KVM_ARM_HOST) += guest.o reset.o sys_regs.o sys_regs_generic_v8.o
->>  kvm-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic.o
->>  kvm-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic-v2.o
->>  kvm-$(CONFIG_KVM_ARM_VGIC) += vgic-v2-switch.o
->> +kvm-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic-v3.o
->> +kvm-$(CONFIG_KVM_ARM_VGIC) += vgic-v3-switch.o
->>  kvm-$(CONFIG_KVM_ARM_TIMER) += $(KVM)/arm/arch_timer.o
->> diff --git a/arch/arm64/kvm/vgic-v3-switch.S b/arch/arm64/kvm/vgic-v3-switch.S
->> new file mode 100644
->> index 0000000..7d2bc86
->> --- /dev/null
->> +++ b/arch/arm64/kvm/vgic-v3-switch.S
->> @@ -0,0 +1,279 @@
->> +/*
->> + * Copyright (C) 2012,2013 - ARM Ltd
->> + * Author: Marc Zyngier <marc.zyngier@arm.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <linux/linkage.h>
->> +#include <linux/irqchip/arm-gic-v3.h>
->> +
->> +#include <asm/assembler.h>
->> +#include <asm/memory.h>
->> +#include <asm/asm-offsets.h>
->> +#include <asm/kvm.h>
->> +#include <asm/kvm_asm.h>
->> +#include <asm/kvm_arm.h>
->> +
->> +     .text
->> +     .pushsection    .hyp.text, "ax"
->> +
->> +/*
->> + * Save the VGIC CPU state into memory
->> + * x0: Register pointing to VCPU struct
->> + * Do not corrupt x1!!!
->> + */
->> +.macro       save_vgic_v3_state
->> +     // Compute the address of struct vgic_cpu
->> +     add     x3, x0, #VCPU_VGIC_CPU
->> +
->> +     // Make sure stores to the GIC via the memory mapped interface
->> +     // are now visible to the system register interface
->> +     dsb     sy
->> +
->> +     // Save all interesting registers
->> +     mrs     x4, ICH_HCR_EL2
->> +     mrs     x5, ICH_VMCR_EL2
->> +     mrs     x6, ICH_MISR_EL2
->> +     mrs     x7, ICH_EISR_EL2
->> +     mrs     x8, ICH_ELSR_EL2
->> +
->> +     str     w4, [x3, #VGIC_V3_CPU_HCR]
->> +     str     w5, [x3, #VGIC_V3_CPU_VMCR]
->> +     str     w6, [x3, #VGIC_V3_CPU_MISR]
->> +     str     w7, [x3, #VGIC_V3_CPU_EISR]
->> +     str     w8, [x3, #VGIC_V3_CPU_ELRSR]
->> +
->> +     msr     ICH_HCR_EL2, xzr
->> +
->> +     mrs     x21, ICH_VTR_EL2
->> +     and     w22, w21, #0xf
->> +     mov     w23, #0xf
->> +     sub     w23, w23, w22   // How many regs we have to skip
->> +
->> +     adr     x24, 1f
->> +     add     x24, x24, x23, lsl #2
->> +     br      x24
->> +
->> +1:
->> +     mrs     x20, ICH_LR15_EL2
->> +     mrs     x19, ICH_LR14_EL2
->> +     mrs     x18, ICH_LR13_EL2
->> +     mrs     x17, ICH_LR12_EL2
->> +     mrs     x16, ICH_LR11_EL2
->> +     mrs     x15, ICH_LR10_EL2
->> +     mrs     x14, ICH_LR9_EL2
->> +     mrs     x13, ICH_LR8_EL2
->> +     mrs     x12, ICH_LR7_EL2
->> +     mrs     x11, ICH_LR6_EL2
->> +     mrs     x10, ICH_LR5_EL2
->> +     mrs     x9, ICH_LR4_EL2
->> +     mrs     x8, ICH_LR3_EL2
->> +     mrs     x7, ICH_LR2_EL2
->> +     mrs     x6, ICH_LR1_EL2
->> +     mrs     x5, ICH_LR0_EL2
->> +
->> +     adr     x24, 1f
->> +     add     x24, x24, x23, lsl #2   // adr(1f) + unimp_nr*4
->> +     br      x24
->> +
->> +1:
->> +     str     x20, [x3, #(VGIC_V3_CPU_LR + 15*8)]
->> +     str     x19, [x3, #(VGIC_V3_CPU_LR + 14*8)]
->> +     str     x18, [x3, #(VGIC_V3_CPU_LR + 13*8)]
->> +     str     x17, [x3, #(VGIC_V3_CPU_LR + 12*8)]
->> +     str     x16, [x3, #(VGIC_V3_CPU_LR + 11*8)]
->> +     str     x15, [x3, #(VGIC_V3_CPU_LR + 10*8)]
->> +     str     x14, [x3, #(VGIC_V3_CPU_LR + 9*8)]
->> +     str     x13, [x3, #(VGIC_V3_CPU_LR + 8*8)]
->> +     str     x12, [x3, #(VGIC_V3_CPU_LR + 7*8)]
->> +     str     x11, [x3, #(VGIC_V3_CPU_LR + 6*8)]
->> +     str     x10, [x3, #(VGIC_V3_CPU_LR + 5*8)]
->> +     str     x9, [x3, #(VGIC_V3_CPU_LR + 4*8)]
->> +     str     x8, [x3, #(VGIC_V3_CPU_LR + 3*8)]
->> +     str     x7, [x3, #(VGIC_V3_CPU_LR + 2*8)]
->> +     str     x6, [x3, #(VGIC_V3_CPU_LR + 1*8)]
->> +     str     x5, [x3, #VGIC_V3_CPU_LR]
->> +
->> +     lsr     w22, w21, #29   // Get PRIbits
->> +     cmp     w22, #4         // 5 bits
->> +     b.eq    5f
->> +     cmp     w22, #5         // 6 bits
->> +     b.eq    6f
->> +                             // 7 bits
->> +     mrs     x20, ICH_AP0R3_EL2
->> +     str     w20, [x3, #(VGIC_V3_CPU_AP0R + 3*4)]
->> +     mrs     x19, ICH_AP0R2_EL2
->> +     str     w19, [x3, #(VGIC_V3_CPU_AP0R + 2*4)]
->> +6:   mrs     x18, ICH_AP0R1_EL2
->> +     str     w18, [x3, #(VGIC_V3_CPU_AP0R + 1*4)]
->> +5:   mrs     x17, ICH_AP0R0_EL2
->> +     str     w17, [x3, #VGIC_V3_CPU_AP0R]
->> +
->> +     cmp     w22, #4         // 5 bits
->> +     b.eq    5f
->> +     cmp     w22, #5         // 6 bits
->> +     b.eq    6f
->> +                             // 7 bits
->> +     mrs     x20, ICH_AP1R3_EL2
->> +     str     w20, [x3, #(VGIC_V3_CPU_AP1R + 3*4)]
->> +     mrs     x19, ICH_AP1R2_EL2
->> +     str     w19, [x3, #(VGIC_V3_CPU_AP1R + 2*4)]
->> +6:   mrs     x18, ICH_AP1R1_EL2
->> +     str     w18, [x3, #(VGIC_V3_CPU_AP1R + 1*4)]
->> +5:   mrs     x17, ICH_AP1R0_EL2
->> +     str     w17, [x3, #VGIC_V3_CPU_AP1R]
->> +
->> +     // Restore SRE_EL1 access and re-enable SRE at EL1.
->> +     mrs     x5, ICC_SRE_EL2
->> +     orr     x5, x5, #(1 << 3)
->
-> couldn't we define ICC_SRE_ENABLE (1 << 3)?
+On 14/05/2014 at 21:41:06 -0700, Mike Turquette wrote :
+> > > The following is a copy/paste from an email I sent earlier today[1]. Of
+> > > course per-clock data makes great sense if you have an off-SoC clock
+> > > such as a fixed-rate oscillator (e.g. the fixed-clock binding). Let me
+> > > know what you think:
+> > [...]
+> > > Using this type of binding you only need to declare your clock generator
+> > > IP node in dts, and then define a mapping in the DT include chroot. Then
+> > > you can define your per-clock data inside of your clock driver instead
+> > > of putting all of the details inside of DT.
+> > > 
+> > > If you have a strong reason to do it the way that you originally posted
+> > > then let me know.
+> > 
+> > Actually, the intermediate patch set sent before this one had a single
+> > DT clock node. The most important draw-back of a single clock node
+> > is that Berlin's global registers are more like a register dumpster.
+> > Vital other registers, e.g. reset, are intermixed with clock registers.
+> 
+> Yeah, this is pretty common. The compatible string should reflect the IP
+> block as a whole, not just the clocks part of it. Lots of vendors have
+> PRCMs or PRCMUs or CARs or whatever.
+> 
+> Check out the recent series to have the reset bits and regulator support
+> added to the qcom binding[1]. (I'm using qcom quite a bit in my examples
+> but they are not the first to add reset control to their clock driver. I
+> think Tegra did it first...)
+> 
+> > 
+> > Given the lack of public datasheets (I look everything up in some
+> > auto-generated BSP includes), I like the current approach because it
+> > helps to get in at least some structure to the register mess ;)
+> > 
+> > Considering the postponed of_clk_create_name() helper, that would allow
+> > us to remove at least the names from DT again. Another option would be
+> > a syscon node for the registers, that clk, reset, pinctrl drivers can
+> > access. But IIRC early syscon support isn't settled, yet?
+> 
+> Yeah, I'm not sure of the state of syscon. And modeling this stuff in
+> the clock driver isn't the end of the world. There might be better
+> places than drivers/clk/* for sure... I sometimes joke that the name of
+> the IP block determines where the code lands. If it is Power, Reset &
+> Clock Manager (several platforms use this acronym) then it can end up in
+> drivers/clk or drivers/reset really easily. Same for Clock and Reset IP
+> blocks (Tegra).
+> 
 
-We sure can.
+So, this is called "global". On BG2/BG2CD, you have pinmuxing, a
+register enabling nand power and switching the pll bypasses, all the pll
+configuration, complex clocks, reset, product ID, nand write protect,
+simple clocks, more resets, more clocks for which we don't have a driver
+yet and finally pad control.
 
->> +     msr     ICC_SRE_EL2, x5
->> +     isb
->> +     mov     x5, #1
->> +     msr     ICC_SRE_EL1, x5
->
-> the other bits are always read-only (WI), so you can safely just
-> overwrite all other bits here?
+Now, on BG2Q, it is almost the same but between the cpupll registers and
+the global registers, there is the whole APB bus, so timers, gpio
+controllers, ...
 
-Essentially, yes. The only case where the other bits are writable is
-when EL2 is not present, and that's obviously not the case if we're
-running KVM.
+I would believe that is the strong reason you are asking for.
 
->> +
->> +     mov     x2, #HCR_RW
->> +     msr     hcr_el2, x2
->> +.endm
->> +
->> +/*
->> + * Restore the VGIC CPU state from memory
->> + * x0: Register pointing to VCPU struct
->> + */
->> +.macro       restore_vgic_v3_state
->> +     ldr     x2, [x0, #VCPU_IRQ_LINES]
->
-> again, what can this be used for with aarch64?
+It would also break the DT ABI (not that I care) almost each time we add
+a new clock that we didn't know about.
 
-Yes it can.
+Let me suggest something completely wild (to rephrase Thomas Petazzoni
+and Kevin Hilman at ELC):
 
->> +     ldr     x1, [x0, #VCPU_HCR_EL2]
->> +     orr     x2, x2, x1
->> +     msr     hcr_el2, x2
->> +
->> +     // Disable SRE_EL1 access. Necessary, otherwise
->> +     // ICH_VMCR_EL2.VFIQEn becomes one, and FIQ happens...
->> +     msr     ICC_SRE_EL1, xzr
->> +     isb
->> +
->> +     // Compute the address of struct vgic_cpu
->> +     add     x3, x0, #VCPU_VGIC_CPU
->> +
->> +     // Restore all interesting registers
->> +     ldr     w4, [x3, #VGIC_V3_CPU_HCR]
->> +     ldr     w5, [x3, #VGIC_V3_CPU_VMCR]
->> +
->> +     msr     ICH_HCR_EL2, x4
->> +     msr     ICH_VMCR_EL2, x5
->> +
->> +     mrs     x21, ICH_VTR_EL2
->> +
->> +     lsr     w22, w21, #29   // Get PRIbits
->> +     cmp     w22, #4         // 5 bits
->> +     b.eq    5f
->> +     cmp     w22, #5         // 6 bits
->> +     b.eq    6f
->> +                             // 7 bits
->> +     ldr     w20, [x3, #(VGIC_V3_CPU_AP1R + 3*4)]
->> +     msr     ICH_AP1R3_EL2, x20
->> +     ldr     w19, [x3, #(VGIC_V3_CPU_AP1R + 2*4)]
->> +     msr     ICH_AP1R2_EL2, x19
->> +6:   ldr     w18, [x3, #(VGIC_V3_CPU_AP1R + 1*4)]
->> +     msr     ICH_AP1R1_EL2, x18
->> +5:   ldr     w17, [x3, #VGIC_V3_CPU_AP1R]
->> +     msr     ICH_AP1R0_EL2, x17
->> +
->> +     cmp     w22, #4         // 5 bits
->> +     b.eq    5f
->> +     cmp     w22, #5         // 6 bits
->> +     b.eq    6f
->> +                             // 7 bits
->> +     ldr     w20, [x3, #(VGIC_V3_CPU_AP0R + 3*4)]
->> +     msr     ICH_AP0R3_EL2, x20
->> +     ldr     w19, [x3, #(VGIC_V3_CPU_AP0R + 2*4)]
->> +     msr     ICH_AP0R2_EL2, x19
->> +6:   ldr     w18, [x3, #(VGIC_V3_CPU_AP0R + 1*4)]
->> +     msr     ICH_AP0R1_EL2, x18
->> +5:   ldr     w17, [x3, #VGIC_V3_CPU_AP0R]
->> +     msr     ICH_AP0R0_EL2, x17
->> +
->> +     and     w22, w21, #0xf
->> +     mov     w23, #0xf
->> +     sub     w23, w23, w22   // How many regs we have to skip
->> +
->> +     adr     x24, 1f
->> +     add     x24, x24, x23, lsl #2   // adr(1f) + unimp_nr*4
->> +     br      x24
->> +
->> +1:
->> +     ldr     x20, [x3, #(VGIC_V3_CPU_LR + 15*8)]
->> +     ldr     x19, [x3, #(VGIC_V3_CPU_LR + 14*8)]
->> +     ldr     x18, [x3, #(VGIC_V3_CPU_LR + 13*8)]
->> +     ldr     x17, [x3, #(VGIC_V3_CPU_LR + 12*8)]
->> +     ldr     x16, [x3, #(VGIC_V3_CPU_LR + 11*8)]
->> +     ldr     x15, [x3, #(VGIC_V3_CPU_LR + 10*8)]
->> +     ldr     x14, [x3, #(VGIC_V3_CPU_LR + 9*8)]
->> +     ldr     x13, [x3, #(VGIC_V3_CPU_LR + 8*8)]
->> +     ldr     x12, [x3, #(VGIC_V3_CPU_LR + 7*8)]
->> +     ldr     x11, [x3, #(VGIC_V3_CPU_LR + 6*8)]
->> +     ldr     x10, [x3, #(VGIC_V3_CPU_LR + 5*8)]
->> +     ldr     x9, [x3, #(VGIC_V3_CPU_LR + 4*8)]
->> +     ldr     x8, [x3, #(VGIC_V3_CPU_LR + 3*8)]
->> +     ldr     x7, [x3, #(VGIC_V3_CPU_LR + 2*8)]
->> +     ldr     x6, [x3, #(VGIC_V3_CPU_LR + 1*8)]
->> +     ldr     x5, [x3, #VGIC_V3_CPU_LR]
->> +
->> +     adr     x24, 1f
->> +     add     x24, x24, x23, lsl #2
->> +     br      x24
->> +
->> +1:
->> +     msr     ICH_LR15_EL2, x20
->> +     msr     ICH_LR14_EL2, x19
->> +     msr     ICH_LR13_EL2, x18
->> +     msr     ICH_LR12_EL2, x17
->> +     msr     ICH_LR11_EL2, x16
->> +     msr     ICH_LR10_EL2, x15
->> +     msr     ICH_LR9_EL2,  x14
->> +     msr     ICH_LR8_EL2,  x13
->> +     msr     ICH_LR7_EL2,  x12
->> +     msr     ICH_LR6_EL2,  x11
->> +     msr     ICH_LR5_EL2,  x10
->> +     msr     ICH_LR4_EL2,   x9
->> +     msr     ICH_LR3_EL2,   x8
->> +     msr     ICH_LR2_EL2,   x7
->> +     msr     ICH_LR1_EL2,   x6
->> +     msr     ICH_LR0_EL2,   x5
->> +
->> +     // Ensure that the above will be visible via the memory-mapped
->> +     // view of the CPU interface (GICV).
->> +     isb
->> +     dsb     sy
->> +
->> +     // Prevent the guest from touching the GIC system registers
->> +     mrs     x5, ICC_SRE_EL2
->> +     and     x5, x5, #~(1 << 3)
->
-> ditto on the define
->
->> +     msr     ICC_SRE_EL2, x5
->
-> I trust Will reviewed all the barriers etc., but you really don't
-> need an ISB or anything here?
+How about we have only a "marvell,berlin2", "marvell,berlin2cd" or
+"marvell,berlin2q" compatible string and handle that in either
+arch/arm/mach-berlin or driver/soc/mach-berlin and then use a bunch of
+structures to add all the peripherals like clocks, reset, timer, gpio
+controllers, pinmux, padconf...
+Maybe we could call those structures "platform_data" :)
 
-No, we should be fine at that stage. The final ERET into the guest
-ensure architectural execution of this instruction.
 
->> +.endm
->> +
->> +ENTRY(__save_vgic_v3_state)
->> +     save_vgic_v3_state
->> +     ret
->> +ENDPROC(__save_vgic_v3_state)
->> +
->> +ENTRY(__restore_vgic_v3_state)
->> +     restore_vgic_v3_state
->> +     ret
->> +ENDPROC(__restore_vgic_v3_state)
->> +
->> +ENTRY(__vgic_v3_get_ich_vtr_el2)
->> +     mrs     x0, ICH_VTR_EL2
->> +     ret
->> +ENDPROC(__vgic_v3_get_ich_vtr_el2)
->> +
->> +     .popsection
->> --
->> 1.8.3.4
->>
->
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
->
+> > 
+> > So, my current idea is:
+> > - take this as is, stabilize berlin branches for v3.16
+> > - review of_clk_create_name() and of_clk_get_parent_name() to allow
+> >   to remove clock-output-names properties from Berlin (and other) dtsis
+> > - maybe switch to early syscon if it is available in v3.16
+> > 
+> > I know this would likely break DT ABI policy, but hey who else boots
+> > mainline Linux on his Chromecast currently except me :P
+> 
+> I'm not a big fan of DT stable ABI, but if you plan on changing it for
+> 3.17 why not just do it the right way the first time? And switching to
+> syscon is not a hard requirement. I'm OK with you putting the reset and
+> regulator stuff in the clock driver if that makes the most sense for
+> your platform (especially if registers are shared and the same locks
+> need to be used, etc).
+> 
+
 
 -- 
-Jazz is not dead. It just smells funny.
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
