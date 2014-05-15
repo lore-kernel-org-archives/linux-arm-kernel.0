@@ -1,113 +1,146 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 15 May 2014 20:31:56 +0900
-Subject: [PATCH v6 01/17] ARM: shmobile: r8a7779: Add clock index macros for
- DT sources
+Date: Thu, 15 May 2014 20:31:58 +0900
+Subject: [PATCH v6 03/17] ARM: shmobile: Sync Marzen DTS with Marzen reference
+ DTS
 In-Reply-To: <1400153532-23675-1-git-send-email-horms+renesas@verge.net.au>
 References: <1400153532-23675-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1400153532-23675-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1400153532-23675-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add macros usable by device tree sources to reference r8a7779 clocks by
-index.
+Copy the device nodes from Marzen reference into the Marzen device tree
+file. This will allow us to use a single DTS file regardless of kernel
+configuration. In case of legacy C board code the device nodes may or
+may not be used, but in the multiplatform case all the DT device nodes
+will be used.
 
-Based on work for the r8a7791 SoC by Laurent Pinchart.
+Based on a similar change for the Lager board by Laurent Pinchart.
 
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-v5
-* No Change
 
-v4
-* Add R8A7779_CLK_B
+---
+v6
+* Updated for recent changes to Marzen reference DTS
+
+v4 - v5
+* No change
 
 v3
-* As suggested by Laurent Pinchart
-  - Consolidate R8A7779_CLK_HSPI{0,1,2} into R8A7779_CLK_HSPI
-  - Correct inverted indexes of R8A7779_CLK_TMU{1,2}
-  - Consolidate R8A7779_CLK_{E,O}HCI{0,1} into R8A7779_CLK_USB{0,1}
-  - Add ethernet, MMC and HSCIF entries
-  - Replace R8A7779_SCIF6 with R8A7779_CLK_SCIF5
-
-* Add R8A7779_CLK_PCIE
-
-v2
-* No change
+* Updated for recent changes to Marzen reference DTS
 ---
- include/dt-bindings/clock/r8a7779-clock.h | 64 +++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
- create mode 100644 include/dt-bindings/clock/r8a7779-clock.h
+ arch/arm/boot/dts/r8a7779-marzen.dts | 94 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 94 insertions(+)
 
-diff --git a/include/dt-bindings/clock/r8a7779-clock.h b/include/dt-bindings/clock/r8a7779-clock.h
-new file mode 100644
-index 0000000..381a611
---- /dev/null
-+++ b/include/dt-bindings/clock/r8a7779-clock.h
-@@ -0,0 +1,64 @@
-+/*
-+ * Copyright (C) 2013  Horms Solutions Ltd.
-+ *
-+ * Contact: Simon Horman <horms@verge.net.au>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
+diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
+index a7af2c2..ddf9b9e 100644
+--- a/arch/arm/boot/dts/r8a7779-marzen.dts
++++ b/arch/arm/boot/dts/r8a7779-marzen.dts
+@@ -11,6 +11,8 @@
+ 
+ /dts-v1/;
+ #include "r8a7779.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
+ 
+ / {
+ 	model = "marzen";
+@@ -24,4 +26,96 @@
+ 		device_type = "memory";
+ 		reg = <0x60000000 0x40000000>;
+ 	};
 +
-+#ifndef __DT_BINDINGS_CLOCK_R8A7779_H__
-+#define __DT_BINDINGS_CLOCK_R8A7779_H__
++	fixedregulator3v3: fixedregulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "fixed-3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
 +
-+/* CPG */
-+#define R8A7779_CLK_PLLA	0
-+#define R8A7779_CLK_Z		1
-+#define R8A7779_CLK_ZS		2
-+#define R8A7779_CLK_S		3
-+#define R8A7779_CLK_S1		4
-+#define R8A7779_CLK_P		5
-+#define R8A7779_CLK_B		6
-+#define R8A7779_CLK_OUT		7
++	lan0 at 18000000 {
++		compatible = "smsc,lan9220", "smsc,lan9115";
++		reg = <0x18000000 0x100>;
++		pinctrl-0 = <&lan0_pins>;
++		pinctrl-names = "default";
 +
-+/* MSTP 0 */
-+#define R8A7779_CLK_HSPI	7
-+#define R8A7779_CLK_TMU2	14
-+#define R8A7779_CLK_TMU1	15
-+#define R8A7779_CLK_TMU0	16
-+#define R8A7779_CLK_HSCIF1	18
-+#define R8A7779_CLK_HSCIF0	19
-+#define R8A7779_CLK_SCIF5	21
-+#define R8A7779_CLK_SCIF4	22
-+#define R8A7779_CLK_SCIF3	23
-+#define R8A7779_CLK_SCIF2	24
-+#define R8A7779_CLK_SCIF1	25
-+#define R8A7779_CLK_SCIF0	26
-+#define R8A7779_CLK_I2C3	27
-+#define R8A7779_CLK_I2C2	28
-+#define R8A7779_CLK_I2C1	29
-+#define R8A7779_CLK_I2C0	30
++		phy-mode = "mii";
++		interrupt-parent = <&irqpin0>;
++		interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
++		smsc,irq-push-pull;
++		reg-io-width = <4>;
++		vddvario-supply = <&fixedregulator3v3>;
++		vdd33a-supply = <&fixedregulator3v3>;
++	};
 +
-+/* MSTP 1 */
-+#define R8A7779_CLK_USB01	0
-+#define R8A7779_CLK_USB2	1
-+#define R8A7779_CLK_DU		3
-+#define R8A7779_CLK_VIN2	8
-+#define R8A7779_CLK_VIN1	9
-+#define R8A7779_CLK_VIN0	10
-+#define R8A7779_CLK_ETHER	14
-+#define R8A7779_CLK_SATA	15
-+#define R8A7779_CLK_PCIE	16
-+#define R8A7779_CLK_VIN3	20
++	leds {
++		compatible = "gpio-leds";
++		led2 {
++			gpios = <&gpio4 29 GPIO_ACTIVE_HIGH>;
++		};
++		led3 {
++			gpios = <&gpio4 30 GPIO_ACTIVE_HIGH>;
++		};
++		led4 {
++			gpios = <&gpio4 31 GPIO_ACTIVE_HIGH>;
++		};
++	};
++};
 +
-+/* MSTP 3 */
-+#define R8A7779_CLK_SDHI3	20
-+#define R8A7779_CLK_SDHI2	21
-+#define R8A7779_CLK_SDHI1	22
-+#define R8A7779_CLK_SDHI0	23
-+#define R8A7779_CLK_MMC1	30
-+#define R8A7779_CLK_MMC0	31
++&irqpin0 {
++	status = "okay";
++};
 +
++&pfc {
++	pinctrl-0 = <&scif2_pins &scif4_pins>;
++	pinctrl-names = "default";
 +
-+#endif /* __DT_BINDINGS_CLOCK_R8A7779_H__ */
++	lan0_pins: lan0 {
++		intc {
++			renesas,groups = "intc_irq1_b";
++			renesas,function = "intc";
++		};
++		lbsc {
++			renesas,groups = "lbsc_ex_cs0";
++			renesas,function = "lbsc";
++		};
++	};
++
++	scif2_pins: serial2 {
++		renesas,groups = "scif2_data_c";
++		renesas,function = "scif2";
++	};
++
++	scif4_pins: serial4 {
++		renesas,groups = "scif4_data";
++		renesas,function = "scif4";
++	};
++
++	sdhi0_pins: sd0 {
++		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd";
++		renesas,function = "sdhi0";
++	};
++
++	hspi0_pins: hspi0 {
++		renesas,groups = "hspi0";
++		renesas,function = "hspi0";
++	};
++};
++
++&sdhi0 {
++	pinctrl-0 = <&sdhi0_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&fixedregulator3v3>;
++	bus-width = <4>;
++	status = "okay";
++};
++
++&hspi0 {
++	pinctrl-0 = <&hspi0_pins>;
++	pinctrl-names = "default";
++	status = "okay";
+ };
 -- 
 1.8.5.2
