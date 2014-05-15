@@ -1,124 +1,80 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 15 May 2014 15:14:15 +0530
-Subject: [PATCH RESEND v4 3/8] phy: sunxi: Rework phy initialization
-In-Reply-To: <537303C3.8040503@ti.com>
-References: <1399995862-17788-1-git-send-email-maxime.ripard@free-electrons.com>
- <1399995862-17788-4-git-send-email-maxime.ripard@free-electrons.com>
- <537303C3.8040503@ti.com>
-Message-ID: <53748C6F.4090801@ti.com>
+From: valentin.longchamp@keymile.com (Valentin Longchamp)
+Date: Thu, 15 May 2014 11:48:53 +0200
+Subject: [PATCH 1/3] ARM: dts: kirkwood: resynch 98dx4122 dtsi
+In-Reply-To: <1400147335-20947-1-git-send-email-valentin.longchamp@keymile.com>
+References: <1400147335-20947-1-git-send-email-valentin.longchamp@keymile.com>
+Message-ID: <1400147335-20947-2-git-send-email-valentin.longchamp@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The 98DX4122 dtsi file lacks the defintion of the PCIe controller which
+is present on this SoC.
 
+The SATA phys must also be explicitely disabled since they are not
+present on this SoC. If they remain enabled, a hardlock occures when
+their clock gates are enabled.
 
-On Wednesday 14 May 2014 11:18 AM, Kishon Vijay Abraham I wrote:
-> Hi,
-> 
-> On Tuesday 13 May 2014 09:14 PM, Maxime Ripard wrote:
->> Move the phy initialization and variables declaration to the loop itself, since
->> it is where it really belongs. Also remove all the temporary variables, we can
->> use the structure members directly.
->>
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> Reviewed-by: Hans de Goede <hdegoede@redhat.com>
-> 
-> let me know if I have to queue this and the next patch in my PHY tree.
+Signed-off-by: Valentin Longchamp <valentin.longchamp@keymile.com>
+---
 
-queued this and the next patch in my tree.
+ arch/arm/boot/dts/kirkwood-98dx4122.dtsi | 43 ++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-Cheers
-Kishon
-
-> 
-> Cheers
-> Kishon
-> 
->> ---
->>  drivers/phy/phy-sun4i-usb.c | 42 ++++++++++++++++++------------------------
->>  1 file changed, 18 insertions(+), 24 deletions(-)
->>
->> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
->> index e6e6c4ba7145..66a87d50512b 100644
->> --- a/drivers/phy/phy-sun4i-usb.c
->> +++ b/drivers/phy/phy-sun4i-usb.c
->> @@ -224,13 +224,8 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->>  	struct sun4i_usb_phy_data *data;
->>  	struct device *dev = &pdev->dev;
->>  	struct device_node *np = dev->of_node;
->> -	void __iomem *pmu = NULL;
->>  	struct phy_provider *phy_provider;
->> -	struct reset_control *reset;
->> -	struct regulator *vbus;
->>  	struct resource *res;
->> -	struct phy *phy;
->> -	char name[16];
->>  	int i;
->>  
->>  	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
->> @@ -262,42 +257,41 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->>  
->>  	/* Skip 0, 0 is the phy for otg which is not yet supported. */
->>  	for (i = 1; i < data->num_phys; i++) {
->> +		struct sun4i_usb_phy *phy = data->phys + i;
->> +		char name[16];
->> +
->>  		snprintf(name, sizeof(name), "usb%d_vbus", i);
->> -		vbus = devm_regulator_get_optional(dev, name);
->> -		if (IS_ERR(vbus)) {
->> -			if (PTR_ERR(vbus) == -EPROBE_DEFER)
->> +		phy->vbus = devm_regulator_get_optional(dev, name);
->> +		if (IS_ERR(phy->vbus)) {
->> +			if (PTR_ERR(phy->vbus) == -EPROBE_DEFER)
->>  				return -EPROBE_DEFER;
->> -			vbus = NULL;
->> +			phy->vbus = NULL;
->>  		}
->>  
->>  		snprintf(name, sizeof(name), "usb%d_reset", i);
->> -		reset = devm_reset_control_get(dev, name);
->> -		if (IS_ERR(reset)) {
->> +		phy->reset = devm_reset_control_get(dev, name);
->> +		if (IS_ERR(phy->reset)) {
->>  			dev_err(dev, "failed to get reset %s\n", name);
->> -			return PTR_ERR(reset);
->> +			return PTR_ERR(phy->reset);
->>  		}
->>  
->>  		if (i) { /* No pmu for usbc0 */
->>  			snprintf(name, sizeof(name), "pmu%d", i);
->>  			res = platform_get_resource_byname(pdev,
->>  							IORESOURCE_MEM, name);
->> -			pmu = devm_ioremap_resource(dev, res);
->> -			if (IS_ERR(pmu))
->> -				return PTR_ERR(pmu);
->> +			phy->pmu = devm_ioremap_resource(dev, res);
->> +			if (IS_ERR(phy->pmu))
->> +				return PTR_ERR(phy->pmu);
->>  		}
->>  
->> -		phy = devm_phy_create(dev, &sun4i_usb_phy_ops, NULL);
->> -		if (IS_ERR(phy)) {
->> +		phy->phy = devm_phy_create(dev, &sun4i_usb_phy_ops, NULL);
->> +		if (IS_ERR(phy->phy)) {
->>  			dev_err(dev, "failed to create PHY %d\n", i);
->> -			return PTR_ERR(phy);
->> +			return PTR_ERR(phy->phy);
->>  		}
->>  
->> -		data->phys[i].phy = phy;
->> -		data->phys[i].pmu = pmu;
->> -		data->phys[i].vbus = vbus;
->> -		data->phys[i].reset = reset;
->> -		data->phys[i].index = i;
->> -		phy_set_drvdata(phy, &data->phys[i]);
->> +		phy->index = i;
->> +		phy_set_drvdata(phy->phy, &data->phys[i]);
->>  	}
->>  
->>  	dev_set_drvdata(dev, data);
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/arch/arm/boot/dts/kirkwood-98dx4122.dtsi b/arch/arm/boot/dts/kirkwood-98dx4122.dtsi
+index 2e8e412..9e1f741 100644
+--- a/arch/arm/boot/dts/kirkwood-98dx4122.dtsi
++++ b/arch/arm/boot/dts/kirkwood-98dx4122.dtsi
+@@ -1,4 +1,39 @@
+ / {
++	mbus {
++		pciec: pcie-controller {
++			compatible = "marvell,kirkwood-pcie";
++			status = "disabled";
++			device_type = "pci";
++
++			#address-cells = <3>;
++			#size-cells = <2>;
++
++			bus-range = <0x00 0xff>;
++
++			ranges =
++			       <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000
++				0x82000000 0x1 0     MBUS_ID(0x04, 0xe8) 0       1 0 /* Port 0.0 MEM */
++				0x81000000 0x1 0     MBUS_ID(0x04, 0xe0) 0       1 0 /* Port 0.0 IO  */>;
++
++			pcie0: pcie at 1,0 {
++				device_type = "pci";
++				assigned-addresses = <0x82000800 0 0x00040000 0 0x2000>;
++				reg = <0x0800 0 0 0 0>;
++				#address-cells = <3>;
++				#size-cells = <2>;
++				#interrupt-cells = <1>;
++				ranges = <0x82000000 0 0 0x82000000 0x1 0 1 0
++					  0x81000000 0 0 0x81000000 0x1 0 1 0>;
++				interrupt-map-mask = <0 0 0 0>;
++				interrupt-map = <0 0 0 0 &intc 9>;
++				marvell,pcie-port = <0>;
++				marvell,pcie-lane = <0>;
++				clocks = <&gate_clk 2>;
++				status = "disabled";
++			};
++		};
++	};
++
+ 	ocp at f1000000 {
+ 		pinctrl: pin-controller at 10000 {
+ 			compatible = "marvell,98dx4122-pinctrl";
+@@ -6,3 +41,11 @@
+ 		};
+ 	};
+ };
++
++&sata_phy0 {
++	status = "disabled";
++};
++
++&sata_phy1 {
++	status = "disabled";
++};
+-- 
+1.8.0.1
