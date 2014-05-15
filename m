@@ -1,122 +1,158 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 15 May 2014 12:15:54 +0530
-Subject: [PATCH v3 1/6] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <5373B908.5090904@gmail.com>
-References: <1400060942-10588-1-git-send-email-antoine.tenart@free-electrons.com>
- <20140514165722.GA18495@kwain> <5373AE9A.3050008@gmail.com>
- <5764751.ffUj9rhnMd@wuerfel> <5373B908.5090904@gmail.com>
-Message-ID: <537462A2.5020607@ti.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 15 May 2014 08:53:47 +0200
+Subject: [PATCH 2/8] clk: berlin: add clock binding docs for Marvell
+ Berlin2 SoCs
+In-Reply-To: <20140515044106.19795.57249@quantum>
+References: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1399839881-29895-3-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140514223230.19795.63328@quantum> <5373F9A0.6000702@gmail.com>
+ <20140515044106.19795.57249@quantum>
+Message-ID: <5374647B.1070006@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thursday 15 May 2014 12:12 AM, Sebastian Hesselbarth wrote:
-> On 05/14/2014 08:12 PM, Arnd Bergmann wrote:
->> On Wednesday 14 May 2014 19:57:46 Sebastian Hesselbarth wrote:
->>> On 05/14/2014 06:57 PM, Antoine T?nart wrote:
->>>> On Wed, May 14, 2014 at 06:11:24PM +0200, Arnd Bergmann wrote:
->>>>> On Wednesday 14 May 2014 17:49:29 Antoine T?nart wrote:
->>>>>> On Wed, May 14, 2014 at 05:31:24PM +0200, Arnd Bergmann wrote:
+On 05/15/2014 06:41 AM, Mike Turquette wrote:
+> Quoting Sebastian Hesselbarth (2014-05-14 16:17:52)
+>> On 05/15/2014 12:32 AM, Mike Turquette wrote:
+>>> Quoting Sebastian Hesselbarth (2014-05-11 13:24:35)
+>>>> +avpll: pll at ea0040 {
+>>>> +       compatible = "marvell,berlin2-avpll";
+>>>> +       #clock-cells = <2>;
+>>>> +       reg = <0xea0050 0x100>;
+>>>> +       clocks = <&refclk>;
+>>>> +};
 >>>
->>> From what I understand from the conversation, we have a single PHY
->>> register set dealing with both SATA ports available on the SoC.
->>> Also, from the name of the PHY bits we assume the PHY may be able
->>> to work in different modes than just SATA. And we currently have
->>> an AHCI-compatible SATA IP that supports up to two ports, with one
->>> actually connected to a SATA plug on the DMP board.
->>>
->>> Now, thinking about the PHY binding and the (possible) multi-protocol
->>> support, it can be possible that on BG2Q there is a generic 2-lane
->>> LVDS PHY that can be configured to support SATA or PCIe. Both are
->>> electrically and bit-level compatible, so they could be internally
->>> wired-up with AHCI and PCIe controller.
+>>> Thanks for submitting the series. It looks good. I do have some comments
+>>> about the DT bindings though. I'm encouraging new bindings (and
+>>> especially new platforms or existing platforms that are only now
+>>> converting over to CCF) to not put their per-clock data into DTS. This
+>>> has scalability problems, is unpopular with the DT crowd and sometimes
+>>> makes it hard to do things like set CLK_SET_RATE_PARENT flags for
+>>> individual clocks.
 >>
->> Sounds like a reasonable guess. We have other PHY drivers doing the
->> same thing already.
+>> Ok, so you are proposing the have a single node for all the SoCs
+>> internal plls and clocks. The individual SoCs will have to deal
+>> with the differences in a single driver, right?
 > 
-> Well, I based that on what I know about FPGA LVDS transceivers, so
-> I wasn't guessing out of the blue ;)
+> To be precise, I'm talking about modeling an IP block as a single node.
+> So if you have one clock generator IP block then you have one node. If
+> you have more than one clock generator block then you have more than one
+> node. Re-using the qcom example there are compatible strings for two
+> different clock generator blocks named gcc and mmcc, respectively. So
+> two DT nodes in the case for msm platforms that have one gcc instance
+> and one rcg instance.
+
+Hmm, I'd argue that you'd identify an IP block by the price tag is
+carries. You can buy a single PLL but given the vast amount of different
+register sets for PLLs, it is hard to identify what still count for the
+same IP.
+
+> Additionally other IP blocks may have internal clocks that can be
+> modeled as part of that node. OMAP's Display SubSystem (DSS) and Image
+> Signal Processor (ISP) blocks all have internal clocks that are modeled
+> through the clock framework. (There are no DT bindings for that stuff,
+> but the concept still applies)
+
+Agreed. If we hit any clock mux/divider/gate in any other register set,
+I wouldn't think of putting it into the core clock driver but the IP
+driver instead.
+
+>>> If you have a strong reason to do it the way that you originally posted
+>>> then let me know.
+>>
+>> Actually, the intermediate patch set sent before this one had a single
+>> DT clock node. The most important draw-back of a single clock node
+>> is that Berlin's global registers are more like a register dumpster.
+>> Vital other registers, e.g. reset, are intermixed with clock registers.
 > 
->>> From a DT point-of-view, we need a way to (a) link each SATA or PCIe
->>> port to the PHY, (b) specify the PHY lane to be used, and (c) specify
->>> the protocol to be used on that lane. If I got it right, Arnd already
->>> mentioned to use the phy-specifier to deal with it:
->>>
->>> e.g. phy = <&genphy 0 MODE_SATA> or phy = <&genphy 1 MODE_PCIE>
->>
->> Right.
->>
->>> Let's assume we have one dual-port SATA controller and one PCIe
->>> controller with either x1 or x2 support. The only sane DT binding,
->>> I can think of then would be:
->>>
->>> berlin2q.dtsi:
->>>
->>> genphy: lvds at ea00ff {
->>> 	compatible = "marvell,berlin-lvds-phy";
->>> 	reg = <0xea00ff 0x100>;
->>> 	#phy-cells = <2>;
->>> };
->>>
->>> sata: sata at ab00ff {
->>> 	compatible = "ahci-platform";
->>> 	reg = <0xab00ff 0x100>;
->>> 	
->>> 	sata0: sata-port at 0 {
->>> 		reg = <0>;
->>> 		phy = <&genphy 0 MODE_SATA>;
->>> 		status = "disabled";
->>> 	};
->>>
->>> 	sata1: sata-port at 1 {
->>> 		reg = <1>;
->>> 		phy = <&genphy 1 MODE_SATA>;
->>> 		status = "disabled";
->>> 	};
->>> };
->>>
->>> pcie: pcie at ab01ff {
->>> 	compatible = "marvell,berlin-pcie";
->>> 	reg = <0xab01ff 0x100>;
->>>
->>> 	pcie0: pcie-port at 0 {
->>> 		reg = <0>;
->>> 		/* set phy on a per-board basis */
->>> 		/* PCIe x1 on Lane 0 : phy = <&genphy 0 MODE_PCIE>; */
->>> 		/* PCIe x2 on Lane 0 and 1 : phy = <&genphy 0 MODE_PCIE>, <&genphy 1
->>> MODE_PCIE>; */
->>> 		status = "disabled";
->>> 	};
->>> };
->>>
->>> berlin2q-dmp.dts:
->>>
->>> &sata1 {
->>> 	status = "okay";
->>> };
->>>
->>> &pcie0 {
->>> 	phy = <&genphy 1 MODE_PCIE>;
->>> };
->>>
->>> berlin2q-foo.dts:
->>>
->>> &pcie0 {
->>> 	phy = <&genphy 0 MODE_PCIE>, <&genphy 1 MODE_PCIE>;
->>> };
->>
->> Exactly. I would also be fine with keeping the sub-nodes of the
->> phy device as in v3 and using #phy-cells=<1> instead of #phy-cells.
->> The result would be pretty much the same, it just depends on how
->> closely connected the two logical phys are.
+> Yeah, this is pretty common. The compatible string should reflect the IP
+> block as a whole, not just the clocks part of it. Lots of vendors have
+> PRCMs or PRCMUs or CARs or whatever.
+> 
+> Check out the recent series to have the reset bits and regulator support
+> added to the qcom binding[1]. (I'm using qcom quite a bit in my examples
+> but they are not the first to add reset control to their clock driver. I
+> think Tegra did it first...)
 
-huh.. even with sub-nodes you'll need #phy-cells=<2> if we use a single *PHY
-PROVIDER*. Because with just PHYs node pointer we won't be able to get the PHY.
-We'll need PHY providers node pointer.
+Yeah, I have to think about it a while. The register block we are
+talking about contains - from what I remember from the ~20k lines
+include - pinctrl, padctrl, reset, clocks, secondary cpu boot related
+registers.
 
-However I'd prefer to have sub-nodes for each individual PHYs and register a
-single PHY PROVIDER.
+Maybe it is time to admit that these registers will never be split into
+separate blocks but should be dealt with a single node.
 
-Thanks
-Kishon
+>> Given the lack of public datasheets (I look everything up in some
+>> auto-generated BSP includes), I like the current approach because it
+>> helps to get in at least some structure to the register mess ;)
+>>
+>> Considering the postponed of_clk_create_name() helper, that would allow
+>> us to remove at least the names from DT again. Another option would be
+>> a syscon node for the registers, that clk, reset, pinctrl drivers can
+>> access. But IIRC early syscon support isn't settled, yet?
+> 
+> Yeah, I'm not sure of the state of syscon. And modeling this stuff in
+> the clock driver isn't the end of the world. There might be better
+> places than drivers/clk/* for sure... I sometimes joke that the name of
+> the IP block determines where the code lands. If it is Power, Reset &
+> Clock Manager (several platforms use this acronym) then it can end up in
+> drivers/clk or drivers/reset really easily. Same for Clock and Reset IP
+> blocks (Tegra).
+> 
+>>
+>> So, my current idea is:
+>> - take this as is, stabilize berlin branches for v3.16
+>> - review of_clk_create_name() and of_clk_get_parent_name() to allow
+>>   to remove clock-output-names properties from Berlin (and other) dtsis
+>> - maybe switch to early syscon if it is available in v3.16
+>>
+>> I know this would likely break DT ABI policy, but hey who else boots
+>> mainline Linux on his Chromecast currently except me :P
+> 
+> I'm not a big fan of DT stable ABI, but if you plan on changing it for
+> 3.17 why not just do it the right way the first time? And switching to
+> syscon is not a hard requirement. I'm OK with you putting the reset and
+> regulator stuff in the clock driver if that makes the most sense for
+> your platform (especially if registers are shared and the same locks
+> need to be used, etc).
+> 
+> What do you think?
+
+Currently, I think that a single node for the global registers with reg
+property and different nodes for clock/reset and pinctrl would be best.
+I think I can workaround missing early syscon with atomic_io for now and
+have a syscon provided regmap later:
+
+global: registers at ea0000 {
+	compatible = "marvell,berlin2-global-registers";
+	reg = <0xea0000 0x400>;
+};
+
+pinctrl: pin-controller {
+	compatible = "marvell,berlin2-pinctrl";
+	...
+};
+
+clocks: clocks {
+	compatible = "marvell,berlin2-clocks";
+	#clock-cells = <1>;
+	/* or clocks and reset FWIW */
+};
+
+or on a sub-node basis:
+
+global: registers at ea0000 {
+	compatible = "marvell,berlin2-global-registers";
+	reg = <0xea0000 0x400>;
+	#clock-cells = <1>;
+	#reset-cells = <1>;
+
+	pinctrl: pin-controller {
+		compatible = "marvell,berlin2-pinctrl";
+		...
+	};
+};
+
+But I haven't made up my mind, yet.
+
+Sebastian
