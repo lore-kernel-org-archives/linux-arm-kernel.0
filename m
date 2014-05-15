@@ -1,67 +1,70 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Thu, 15 May 2014 19:44:12 +0530
-Subject: [PATCH 1/4] clk: samsung: out: Add infrastructure to register
- CLKOUT
-In-Reply-To: <5374CA1C.8000207@samsung.com>
-References: <1399640410-30957-1-git-send-email-tushar.behera@linaro.org>
- <1399640410-30957-2-git-send-email-tushar.behera@linaro.org>
- <536DA243.6000600@samsung.com> <53705243.1030704@linaro.org>
- <CAPdUM4N=k-pPxdhPQgVHh0fb+nqkgs7StwM2Pb6C8gcjx6dw-w@mail.gmail.com>
- <5374CA1C.8000207@samsung.com>
-Message-ID: <CAPdUM4NcFGGNZA9fjRP9VkpN3A0Gu+5DSgZ0RPhDD=wicr4GzA@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 15 May 2014 10:19:22 -0400
+Subject: [PATCH] arm64: fix pud_huge() for 2-level pagetables
+Message-ID: <1400163562-7481-1-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 May 2014 19:37, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Rahul, Tushar,
->
-> On 15.05.2014 15:44, Rahul Sharma wrote:
->> Hi Tushar,
->>
->> Basically you are adding a new clock-type for Clkout. IMO clkout
->> is not a special hardware. Existing clock types can be reused to
->> support clkout. I see 3 major problem here:
->>
->> 1) Clkout -> (Mux + Gate). You clubbed mux and gate together, and
->> exposing as a single clock which is something like a composite clock.
->> IMO this is not a recommended way in CCF.
->>
->> 2) New Clock Type: Since clkout is just a combination of a simple
->> mux and gate which are already supported, it is a unnecessary
->> duplication.
->>
->> 3) Clkout registered along with CMU: which is not correct. Clkout is in PMU
->> (Separate physical IP) and should be registered as a independent Clock
->> provider which provides 1 mux and 1 gate clock (As if now). It should also be
->> well connected with main CMU.
->>
->> I understand the challenge in using regmap interface for a clock provider. But
->> we need to identify a clean solution. IMHO a independent clock provider with
->> iomap, is relatively cleaner approach till CCF is not ready with regmap based
->> reg access for clock registers.
->>
->> Experts!! please comment.
->
-> It's quite unfortunate that Tushar has duplicated the effort to create a
-> clkout driver, considering the fact that we did have such driver
-> internally at SRPOL and it was quite nice and simple.
->
-> I will post a cleaned-up version today, that is about 2 times smaller in
-> terms of lines of added code and provides the same functionality,
-> without introducing custom clock types. In addition, it models the
-> clkout properly as a feature of PMU, not CMU (CMU only provides outputs
-> of particular sub-blocks that are fed into the PMU).
+The following happens when trying to run a kvm guest on a kernel
+configured for 64k pages. This doesn't happen with 4k pages:
 
-oh.. thats nice. Please share the implementation.
+  BUG: failure at include/linux/mm.h:297/put_page_testzero()!
+  Kernel panic - not syncing: BUG!
+  CPU: 2 PID: 4228 Comm: qemu-system-aar Tainted: GF            3.13.0-0.rc7.31.sa2.k32v1.aarch64.debug #1
+  Call trace:
+  [<fffffe0000096034>] dump_backtrace+0x0/0x16c
+  [<fffffe00000961b4>] show_stack+0x14/0x1c
+  [<fffffe000066e648>] dump_stack+0x84/0xb0
+  [<fffffe0000668678>] panic+0xf4/0x220
+  [<fffffe000018ec78>] free_reserved_area+0x0/0x110
+  [<fffffe000018edd8>] free_pages+0x50/0x88
+  [<fffffe00000a759c>] kvm_free_stage2_pgd+0x30/0x40
+  [<fffffe00000a5354>] kvm_arch_destroy_vm+0x18/0x44
+  [<fffffe00000a1854>] kvm_put_kvm+0xf0/0x184
+  [<fffffe00000a1938>] kvm_vm_release+0x10/0x1c
+  [<fffffe00001edc1c>] __fput+0xb0/0x288
+  [<fffffe00001ede4c>] ____fput+0xc/0x14
+  [<fffffe00000d5a2c>] task_work_run+0xa8/0x11c
+  [<fffffe0000095c14>] do_notify_resume+0x54/0x58
 
-Regards,
-Rahul Sharma.
+In arch/arm/kvm/mmu.c:unmap_range(), we end up doing an extra put_page()
+on the stage2 pgd which leads to the BUG in put_page_testzero(). This
+happens because a pud_huge() test in unmap_range() returns true when it
+should always be false with 2-level pages tables used by 64k pages.
+This patch removes support for huge puds if 2-level pagetables are
+being used.
 
->
-> Best regards,
-> Tomasz
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Mark Salter <msalter@redhat.com>
+---
+ arch/arm64/mm/hugetlbpage.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+index 5e9aec3..9bed38f 100644
+--- a/arch/arm64/mm/hugetlbpage.c
++++ b/arch/arm64/mm/hugetlbpage.c
+@@ -51,7 +51,11 @@ int pmd_huge(pmd_t pmd)
+ 
+ int pud_huge(pud_t pud)
+ {
++#ifndef __PAGETABLE_PMD_FOLDED
+ 	return !(pud_val(pud) & PUD_TABLE_BIT);
++#else
++	return 0;
++#endif
+ }
+ 
+ int pmd_huge_support(void)
+@@ -64,8 +68,10 @@ static __init int setup_hugepagesz(char *opt)
+ 	unsigned long ps = memparse(opt, &opt);
+ 	if (ps == PMD_SIZE) {
+ 		hugetlb_add_hstate(PMD_SHIFT - PAGE_SHIFT);
++#ifndef __PAGETABLE_PMD_FOLDED
+ 	} else if (ps == PUD_SIZE) {
+ 		hugetlb_add_hstate(PUD_SHIFT - PAGE_SHIFT);
++#endif
+ 	} else {
+ 		pr_err("hugepagesz: Unsupported page size %lu M\n", ps >> 20);
+ 		return 0;
+-- 
+1.9.0
