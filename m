@@ -1,77 +1,96 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 15 May 2014 11:27:27 -0700
-Subject: [PATCH v6 0/4] live migration dirty bitmap support for ARMv7
-Message-ID: <1400178451-4984-1-git-send-email-m.smarduch@samsung.com>
+Date: Thu, 15 May 2014 11:27:28 -0700
+Subject: [PATCH v6 1/4] add ARMv7 HYP API to flush VM TLBs without address
+ param
+In-Reply-To: <1400178451-4984-1-git-send-email-m.smarduch@samsung.com>
+References: <1400178451-4984-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <1400178451-4984-2-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is v6 patcheset of live mgiration support for ARMv7.
+Patch adds HYP interface for global VM TLB invalidation without address
+parameter. Added ARM version of kvm_flush_remote_tlbs(), made generic one weak.
 
-- Tested on two 4-way A15 hardware, QEMU 2-way/4-way SMP guest upto 2GB
-- Various dirty data rates tested - 2GB/1s ... 2048 pgs/5ms
-- validated source/destination memory image integrity
+Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+---
+ arch/arm/include/asm/kvm_asm.h |    1 +
+ arch/arm/kvm/interrupts.S      |   11 +++++++++++
+ arch/arm/kvm/mmu.c             |   15 +++++++++++++++
+ virt/kvm/kvm_main.c            |    2 +-
+ 4 files changed, 28 insertions(+), 1 deletion(-)
 
-Changes since v1:
-- add unlock of VM mmu_lock to prevent a deadlock
-- moved migratiion active inside mmu_lock acquire for visibility in 2nd stage
-  data abort handler
-- Added comments
-
-Changes since v2: 
-- move initial VM write protect to memory region architecture prepare function
-  (needed to make dirty logging function generic) 
-- added stage2_mark_pte_ro() - to mark ptes ro - Marc's comment
-- optimized initial VM memory region write protect to do fewer table lookups -
-  applied Marc's comment for walking dirty bitmap mask
-- added pud_addr_end() for stage2 tables, to make the walk 4-level
-- added kvm_flush_remote_tlbs() to use ARM TLB invalidation, made the generic
-  one weak, Marc's comment to for generic dirty bitmap log function
-- optimized walking dirty bit map mask to skip upper tables - Marc's comment
-- deleted x86,arm kvm_vm_ioctl_get_dirty_log(), moved to kvm_main.c tagged 
-  the function weak - Marc's comment
-- changed Data Abort handler pte index handling - Marc's comment
-
-Changes since v3:
-- changed pte updates to reset write bit instead of setting default 
-  value for existing pte's - Steve's comment
-- In addition to PUD add 2nd stage >4GB range functions - Steves
-  suggestion
-- Restructured initial memory slot write protect function for PGD, PUD, PMD
-  table walking - Steves suggestion
-- Renamed variable types to resemble their use - Steves suggestions
-- Added couple pte helpers for 2nd stage tables - Steves suggestion
-- Updated unmap_range() that handles 2nd stage tables and identity mappings
-  to handle 2nd stage addresses >4GB. Left ARMv8 unchanged.
-
-Changes since v4:
-- rebased to 3.15.0-rc1 - 'next' to pickup p*addr_end patches - Gavins comment
-- Update PUD address end function to support 4-level page table walk
-- Elimiated 5th patch of the series that fixed unmap_range(), since it was
-  fixed by Marcs patches.
-
-Changes since v5:
-- Created seperate entry point for VMID TLB flush with no param - Christoffers
-  comment
-- Update documentation for kvm_flush_remote_tlbs() - Christoffers comment
-- Simplified splitting of huge pages - inittial WP and 2nd stage DABT handler
-  clear the huge page PMD, and use current code to fault in small pages.
-  Removed kvm_split_pmd().
-
-Mario Smarduch (4):
-  add ARMv7 HYP API to flush VM TLBs without address param
-  live migration support for initial write protect of VM
-  live migration support for VM dirty log management
-  add 2nd stage page fault handling during live migration
-
- arch/arm/include/asm/kvm_asm.h  |    1 +
- arch/arm/include/asm/kvm_host.h |   11 ++
- arch/arm/include/asm/kvm_mmu.h  |   10 ++
- arch/arm/kvm/arm.c              |    8 +-
- arch/arm/kvm/interrupts.S       |   11 ++
- arch/arm/kvm/mmu.c              |  292 ++++++++++++++++++++++++++++++++++++++-
- arch/x86/kvm/x86.c              |   86 ------------
- virt/kvm/kvm_main.c             |   84 ++++++++++-
- 8 files changed, 409 insertions(+), 94 deletions(-)
-
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 53b3c4a..21bc519 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -78,6 +78,7 @@ extern char __kvm_hyp_code_end[];
+ 
+ extern void __kvm_flush_vm_context(void);
+ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
++extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+ 
+ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+ #endif
+diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+index 0d68d40..bddc66b 100644
+--- a/arch/arm/kvm/interrupts.S
++++ b/arch/arm/kvm/interrupts.S
+@@ -66,6 +66,17 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+ 	bx	lr
+ ENDPROC(__kvm_tlb_flush_vmid_ipa)
+ 
++/**
++ * void __kvm_tlb_flush_vmid(struct kvm *kvm) - Flush per-VMID TLBs
++ *
++ * Reuses __kvm_tlb_flush_vmid_ipa() for ARMv7, without passing address
++ * parameter
++ */
++
++ENTRY(__kvm_tlb_flush_vmid)
++	b	__kvm_tlb_flush_vmid_ipa
++ENDPROC(__kvm_tlb_flush_vmid)
++
+ /********************************************************************
+  * Flush TLBs and instruction caches of all CPUs inside the inner-shareable
+  * domain, for all VMIDs
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 80bb1e6..eea3f0a 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -56,6 +56,21 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ 		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
+ }
+ 
++/**
++ * kvm_flush_remote_tlbs() - flush all VM TLB entries
++ *
++ * Interface to HYP function to flush all VM TLB entries without address
++ * parameter. In HYP mode reuses __kvm_tlb_flush_vmid_ipa() function used by
++ * kvm_tlb_flush_vmid_ipa().
++ *
++ * @kvm:       pointer to kvm structure.
++ */
++void kvm_flush_remote_tlbs(struct kvm *kvm)
++{
++	if (kvm)
++		kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
++}
++
+ static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
+ 				  int min, int max)
+ {
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index fa70c6e..ba25765 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -184,7 +184,7 @@ static bool make_all_cpus_request(struct kvm *kvm, unsigned int req)
+ 	return called;
+ }
+ 
+-void kvm_flush_remote_tlbs(struct kvm *kvm)
++void __weak kvm_flush_remote_tlbs(struct kvm *kvm)
+ {
+ 	long dirty_count = kvm->tlbs_dirty;
+ 
 -- 
 1.7.9.5
