@@ -1,24 +1,38 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 15 May 2014 23:14:13 +0200
-Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
-In-Reply-To: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
-References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
-Message-ID: <53752E25.9060604@gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 15 May 2014 17:16:01 -0400 (EDT)
+Subject: [RFC PATCH 06/10] usb: xhci: Add Tegra XHCI host-controller driver
+In-Reply-To: <CAL1qeaHm7U2NVDeVZS-Tiz5ntkk4c13RR_1ws9MTYGGoGCOB5A@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1405151709100.887-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chirantan,
+On Thu, 15 May 2014, Andrew Bresticker wrote:
 
-On 15.05.2014 23:07, Chirantan Ekbote wrote:
-> The multi core timer and the ARM architected timer are two different
-> interfaces to the same underlying hardware timer.  This causes some
-> strange timing issues when they are both enabled at the same time so
-> remove the mct from the device tree and keep only the architected
-> timer.
+> > This does not feel appropriate at all: Rather than creating a child device,
+> > you should have a specific driver that hooks into functions exported
+> > by the xhci core. See Documentation/driver-model/design-patterns.txt
+> 
+> This is how DWC3, currently the only in-tree non-PCI XHCI host driver,
+> is structured - see drivers/usb/dwc3/host.c.  The recently proposed
+> Armada XHCI driver [1] just adds clock support and a hook in
+> xhci-plat's probe() to do the platform-specific initialization.
+> Tegra's XHCI driver initialization is quite a bit more complicated,
+> mainly due to the need for external firmware and specific ordering
+> (e.g. firmware messages should only be enabled after the HCD is
+> created).  I could do away with the xhci-plat sub-device and just
+> create a Tegra hc_driver, but it seems silly to have three XHCI
+> platform drivers structured in three different ways.  USB folks, do
+> you have an opinion on how this should be done?
 
-Huh? I've always thought MCT is a completely separate hardware block
-outside of ARM cores, while architected timers are embedded inside the
-CPU block in which the ARM cores reside. Could you elaborate on this?
+Felipe and I have differing opinions.  I prefer not to create an extra 
+device level, and he does (that's why the non-PCI EHCI drivers don't do 
+it and the dwc3 driver does).  I consider Felipe's approach to be an 
+example of the "Midlayer Mistake" anti-pattern from the LWN 
+article mentioned earlier in this thread -- I don't know what he thinks 
+about my approach.
 
-Best regards,
-Tomasz
+Anyway, unless I'm totally mistaken, you wouldn't end up with three
+platform drivers structured in three different ways.  Either way, your
+new driver would be structured like one of the existing two.
+
+Alan Stern
