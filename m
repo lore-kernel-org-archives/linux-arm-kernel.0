@@ -1,74 +1,58 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 15 May 2014 09:40:42 +0100
-Subject: [PATCH v4 1/6] clocksource: Add support for the Mediatek SoCs
-In-Reply-To: <2fe960fd-b145-42a8-ace2-e2cd3aaf0cdc@BN1AFFO11FD010.protection.gbl>
-References: <1400087579-4250-1-git-send-email-matthias.bgg@gmail.com>
- <1400087579-4250-2-git-send-email-matthias.bgg@gmail.com>
- <2fe960fd-b145-42a8-ace2-e2cd3aaf0cdc@BN1AFFO11FD010.protection.gbl>
-Message-ID: <CABuKBeLio4A=sRrjv3r0E-8gGe3aMZq66A3wy71Mr7SVeGQ8Gw@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 15 May 2014 11:41:57 +0300
+Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
+ support
+In-Reply-To: <20140513212639.GA18001@atomide.com>
+References: <1398815562-24113-1-git-send-email-tony@atomide.com>
+ <1398815562-24113-4-git-send-email-tony@atomide.com>
+ <5369EAE7.3030705@ti.com> <20140507150343.GA9502@atomide.com>
+ <536A5920.1020908@ti.com> <20140507175919.GH9502@atomide.com>
+ <20140508233300.GI2198@atomide.com> <536C924E.5000307@ti.com>
+ <20140509153008.GC17814@atomide.com> <20140513212639.GA18001@atomide.com>
+Message-ID: <53747DD5.2030406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 14/05/14 00:26, Tony Lindgren wrote:
 
-I did not realize that Android gmail app sends HTML mails.
-So I send the comments below accidentally as HTML mail yesterday.
-Sorry for that.
+> +	/* lcd MO */
+> +	ddata->mo_gpio = sharp_ls_get_gpio_of(&pdev->dev, 0, 1, "mode");
+> +	if (PTR_ERR(ddata->mo_gpio) == -EPROBE_DEFER)
+> +		return -EPROBE_DEFER;
+> +
+> +	if (!IS_ERR(ddata->mo_gpio))
+> +		if (gpiod_get_raw_value_cansleep(ddata->mo_gpio))
+> +			ddata->flags |= SHARP_LS_QVGA;
 
-2014-05-14 18:29 GMT+01:00 S?ren Brinkmann <soren.brinkmann@xilinx.com>:
-> Hi Matthias,
->
-> just a few suggestions below. Nothing serious.
->
-> On Wed, 2014-05-14 at 07:12PM +0200, Matthias Brugger wrote:
->> This patch adds a clock source and clock event for the timer found
->> on the Mediatek SoCs.
->>
->> The Mediatek General Porpose Timer block provides five 32 bit timers and
->> one 64 bit timer.
->>
->> Two 32 bit timers are used:
->> TIMER1: clock events supporting periodic and oneshot events
->> TIMER2: clock source configured as a free running counter
->
-> It is pretty common, I think, to use the free running counter also as
-> sched_clock. You probably want to look into this, but that's just a
-> possible enhancement.
+Shouldn't there be an explicit flag in the DT data for this? If the
+panel's MO pin is hardwired to, say, pull up, then the mode-gpios won't
+have MO gpio, right? So something like:
 
-The timer block has also a 64 bit timer. I plan to have a look on this
-one to use it as sched_clock.
 
-But for now my priority is to get the serial console driver done.
+mode-gpios = <0					/* high, lcd MO */
+	      &gpio1 2 GPIO_ACTIVE_HIGH		/* gpio2, lcd LR */
+	      &gpio1 3 GPIO_ACTIVE_HIGH>;	/* gpio3, lcd UD */
 
->
-> [...]
->> +static void __init mtk_timer_init(struct device_node *node)
->> +{
->> +     struct mtk_clock_event_device *evt;
->> +     struct resource res;
->> +     unsigned long rate = 0;
->> +     struct clk *clk;
->> +     int ret;
->> +     u32 val;
->> +
->> +     evt = kzalloc(sizeof(*evt), GFP_KERNEL);
->> +     if (!evt)
->> +             panic("Can't allocate mtk clock event driver struct");
->
-> I'm not that sure about the A7s, but on Cortex-A9 there is also a global
-> timer which can be used for timing. And there might be other timing
-> options for this SOC too. Do you really want to panic?
-
-Yes, A7 has a arm local timer, but the problem is, that it is not
-working with the SoC. It seems like a chip design error as I tried for
-quite a time to get it working.
-
-Thanks for your comments anyway.
-
->
->         S?ren
+vga-mode;	/* MO hardwired high */
 
 
 
--- 
-motzblog.wordpress.com
+Btw, the gpio.txt has each gpio inside <>:
+
+chipsel-gpios = <&gpio1 12 0>,
+		 <&gpio1 13 0>,
+		 <0>, /* holes are permitted, means no GPIO 2 */
+		 <&gpio2 2>;
+
+Is that equivalent to having all gpios inside <>?
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140515/f1095dc8/attachment.sig>
