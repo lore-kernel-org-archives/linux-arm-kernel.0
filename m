@@ -1,391 +1,134 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 15 May 2014 19:53:12 +0100
-Subject: [PATCH v5 2/4] live migration support for initial write protect
- of VM
-In-Reply-To: <1399509616-4632-3-git-send-email-m.smarduch@samsung.com>
-References: <1399509616-4632-1-git-send-email-m.smarduch@samsung.com>
- <1399509616-4632-3-git-send-email-m.smarduch@samsung.com>
-Message-ID: <20140515185312.GA6159@lvm>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 15 May 2014 20:54:40 +0200
+Subject: Accessing GPIOs from userspace using recent kernels
+In-Reply-To: <7bd3dbc0c3217f43eefc8d228995690f@net2air.co>
+References: <3385f19f3e1427613732f6d5c9f8513d@net2air.co>
+ <CABxcv=mFV3nJf1eqNhTbh1KWwe8Z6Z62JtFn5KZbHnGprk1_bg@mail.gmail.com>
+ <7bd3dbc0c3217f43eefc8d228995690f@net2air.co>
+Message-ID: <CABxcv=nTV23Un91fSUmkixsF5uywoisCOi1qhPqVvZb+RvikDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Peter,
 
-[I know you sent out a newer version but I already reviewed some of this
-patch on the plane today but couldn't send it out before I got home.
-Anyway, here it is:]
+On Thu, May 15, 2014 at 4:06 PM, Peter TB Brett <peter@peter-b.co.uk> wrote:
+> Hi Javier,
+>
+> Thank you for your helpful suggestions.
+>
+> On 2014-05-14 11:00, Javier Martinez Canillas wrote:
+>>
+>> [snip]
+>>
+>>
+>>> If there is no longer a userspace API for these settings, is there any
+>>> way
+>>> that I can simply amend the device tree in order to change a couple of
+>>> mux
+>>> settings?
+>>>
+>>
+>> Not that I'm aware of, I've added Linus Walleij (the pinctrl subsystem
+>> maintainer) on cc who will have an authoritative answer on this
+>> subject.
+>
+>
+> Having some sort of debugfs API for runtime modification of pinmux settings
+> from userspace would be very helpful for hardware/firmware prototyping
+> purposes.
+>
+>> [snip]
+>>
+>>
+>> You are only defining a set of pinmux configuration pins that will be
+>> registered but that does not mean that the configuration will take
+>> effect. Need to associate that configuration with a specific device
+>> node so the state will be applicable. The good practice is to
+>> associate with the device that needs that particular configuration or
+>> if there is no such device then you can just add the properties in the
+>> pinmux device node.
+>>
+>> In your case would be something like should work:
+>>
+>> &omap4_pmx_core
+>> {
+>>         pinctrl-names = "default";
+>>         pinctrl-0 = <
+>>                 &foo_pins
+>>         >;
+>>
+>>         foo_pins: pinmux_foo_pins {
+>>                pinctrl-single,pins = <
+>>                0x5e (PIN_INPUT | MUX_MODE3)  /* gpmc_ad15.gpio_39 */ /*
+>> IRQ */
+>>                0x12e (PIN_INPUT | MUX_MODE3) /* i2c4_scl.gpio_132 */ /*
+>> RST */
+>>                >
+>>         };
+>> };
+>
+>
+> Note that this doesn't work; the omap4_pmx_core node already has a pinctrl-0
+> attribute with a whole bunch of entries (e.g. I2C pins and pins used for
+> other peripherals) and there doesn't appear to be a way to append to the
+> array rather than replacing it.
+>
 
-On Wed, May 07, 2014 at 05:40:14PM -0700, Mario Smarduch wrote:
-> Patch adds support for live migration initial split up of huge pages
-> in memory slot and write protection of all pages in memory slot.
-> 
-> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> ---
->  arch/arm/include/asm/kvm_host.h |    7 ++
->  arch/arm/include/asm/kvm_mmu.h  |   16 +++-
->  arch/arm/kvm/arm.c              |    3 +
->  arch/arm/kvm/mmu.c              |  179 +++++++++++++++++++++++++++++++++++++++
->  virt/kvm/kvm_main.c             |    6 +-
->  5 files changed, 209 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index ac3bb65..91744c3 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -67,6 +67,11 @@ struct kvm_arch {
->  
->  	/* Interrupt controller */
->  	struct vgic_dist	vgic;
-> +	/* Marks start of migration, used to handle 2nd stage page faults
-> +	 * during migration, prevent installing huge pages and split huge pages
-> +	 * to small pages.
-> +	 */
+In that case you can add the pinctrl single pins setup in the
+omap4-panda-common.dtsi file as another element in pinctrl-0.
 
-commenting style
+But I would first look why associating the pins with gpio1 does not work.
 
-this is a bit verbose for a field in a struct, perhaps moving the longer
-version to where you set this?
+>
+>> But as I said it would be better if you associate the pins with the
+>> GPIO controller that contains those pins instead of the pinmux device.
+>
+>
+> Following this advice, I used:
+>
+> &gpio1
+>
+> {
+>   pinctrl-names = "default";
+>   pinctrl-0 = < &foo_pins >;
+> };
+>
+> However, with these settings, nothing referring to pinmux_foo_pins appears
+> in pinctrl-devices, pinctrl-maps, pinctrl-handles, or pinmux-pins, so I'm
+> fairly sure these aren't the settings I'm looking for.
+>
 
-> +	int migration_in_progress;
->  };
->  
->  #define KVM_NR_MEM_OBJS     40
-> @@ -233,4 +238,6 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
->  
->  void kvm_tlb_flush_vmid(struct kvm *kvm);
->  
-> +int kvm_mmu_slot_remove_write_access(struct kvm *kvm, int slot);
-> +
->  #endif /* __ARM_KVM_HOST_H__ */
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index 5c7aa3c..b339fa9 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -114,13 +114,27 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
->  	pmd_val(*pmd) |= L_PMD_S2_RDWR;
->  }
->  
-> +static inline void kvm_set_s2pte_readonly(pte_t *pte)
-> +{
-> +	pte_val(*pte) &= ~(L_PTE_S2_RDONLY ^ L_PTE_S2_RDWR);
+That should work afaict, did you see any errors on the kernel log? can
+you share your complete boot log?
 
-This relies on the pte already having been set as RDONLY or RDWR, if you
-are creating a new pte and calling this function it could be easy to
-miss that distinction, I would prefer:
+Something that looks strange to me is that you say to be using a
+Pandaboard and in your pasted DTS fragment you had:
 
-pte_val(*pte) &= L_PTE_S2_RDWR;
-pte_val(*pte) |= L_PTE_S2_RDONLY;
+0x5e (PIN_INPUT | MUX_MODE3)  /* gpmc_ad15.gpio_39 */ /* IRQ */
+0x12e (PIN_INPUT | MUX_MODE3) /* i2c4_scl.gpio_132 */ /* RST *
 
-> +}
-> +
-> +static inline bool kvm_s2pte_readonly(pte_t *pte)
-> +{
-> +	return (pte_val(*pte) & L_PTE_S2_RDWR) == L_PTE_S2_RDONLY;
-> +}
-> +
->  /* Open coded p*d_addr_end that can deal with 64bit addresses */
->  #define kvm_pgd_addr_end(addr, end)					\
->  ({	u64 __boundary = ((addr) + PGDIR_SIZE) & PGDIR_MASK;		\
->  	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
->  })
->  
-> -#define kvm_pud_addr_end(addr,end)		(end)
-> +/* For - 4-level table walk return PUD range end if end > 1GB */
+but grepping for those registers numbers in omap4-panda-common.dtsi I
+see that they refers to different mux pins and are already configured
+for other devices in different modes:
 
-not sure you need this comment, the scheme is very common all over the
-kernel.
+$ git grep "0x5e\|0x12e" arch/arm/boot/dts/omap4-panda-common.dtsi
 
-> +#define kvm_pud_addr_end(addr, end)					\
-> +({	u64 __boundary = ((addr) + PUD_SIZE) & PUD_MASK;		\
-> +	(__boundary - 1 < (end) - 1) ? __boundary : (end);		\
-> +})
+0x5e (PIN_INPUT_PULLUP | MUX_MODE0)     /* hdmi_sda.hdmi_sda */
+0x12e (PIN_OUTPUT | MUX_MODE5)  /* dispc2_data15 */
 
-why do we need this?  We should only ever have 3 levels of page tables,
-right?
+Also I see that i2c4_scl has another register number and by the way is
+also configured in another mode by i2c4 device node.
+0xee (PIN_INPUT_PULLUP | MUX_MODE0)     /* i2c4_scl */
 
->  
->  #define kvm_pmd_addr_end(addr, end)					\
->  ({	u64 __boundary = ((addr) + PMD_SIZE) & PMD_MASK;		\
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 3c82b37..1055266 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -234,6 +234,9 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
->  				   struct kvm_userspace_memory_region *mem,
->  				   enum kvm_mr_change change)
->  {
-> +	/* Request for migration issued by user, write protect memory slot */
+Is what you shared your real change or just an example that does not
+apply to the Pandaboard? Could you please share your complete DTS?
 
-Does this necessarily only happen when there's a request for migration?
-Isn't it just a log call that could be used for other things
-(potentially)?
+> Is there any documentation for the debugfs interface to pinctrl?
+>
 
-> +	if ((change != KVM_MR_DELETE) && (mem->flags & KVM_MEM_LOG_DIRTY_PAGES))
-> +		return kvm_mmu_slot_remove_write_access(kvm, mem->slot);
->  	return 0;
->  }
->  
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 95c172a..85145d8 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -743,6 +743,185 @@ static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
->  	return false;
->  }
->  
-> +/* kvm_split_pmd - splits huge pages to small pages, required to keep a dirty
-> + *	log of smaller memory granules, otherwise huge pages would need to be
-> + *	migrated. Practically an idle system has problems migrating with
+No that I'm aware of, you should take a look to
+drivers/pinctrl/{core,pinconf,pinmux}.c to figure out what information
+each file exports.
 
-This seems abrupt.  Why can't we just represent a 2M huge page as 512 4K
-bits and write protect the huge pages, if you take a write fault on a 2M
-page, then split it then.
-
-If your use case is HA, then you will be doing this a lot, and you don't
-want to hurt performance of your main live system more than necessary.
-
-> + *	huge pages.  Called during WP of entire VM address space, done
-
-s/WP/write protect/
-
-> + *	initially when  migration thread isses the KVM_MEM_LOG_DIRTY_PAGES
-
-"migration thread"?  I don't think this is a KVM term.  Please keep
-documentation to concepts that can be understood from the KVM
-perspective without knowing anything specific about user space
-implementation.
-
-> + *	ioctl.
-
-This is not an ioctl but a flag in an ioctl.  There's another ioctl to
-get the dirty log.
-
-> + *	The mmu_lock is held during splitting.
-> + *
-> + * @kvm:        The KVM pointer
-> + * @pmd:        Pmd to 2nd stage huge page
-> + * @addr:       Guest Physical Address
-> + */
-
-Thanks for commenting the function, however, a few nits:
-
-again, check the commenting style, checkpatch should complain, kdocs
-usually look like this:
-
-/*
- * kvm_split_pmd - <one line description of function>
- *
- * Some more description of the function which can be on multiple lines.
- */
-
- can you also comment on the return value?
-
-> +static int kvm_split_pmd(struct kvm *kvm, pmd_t *pmd, u64 addr)
-> +{
-> +	struct page *page;
-> +	pfn_t pfn = pmd_pfn(*pmd);
-> +	pte_t *pte;
-> +	int i;
-> +
-> +	page = alloc_page(GFP_KERNEL);
-> +	if (page == NULL)
-> +		return -ENOMEM;
-> +
-> +	pte = page_address(page);
-> +	/* cycle through ptes first, use pmd pfn */
-> +	for (i = 0; i < PTRS_PER_PMD; i++)
-> +		pte[i] = pfn_pte(pfn+i, PAGE_S2);
-> +
-> +	kvm_clean_pte(pte);
-> +	/* After page table setup set pmd */
-> +	pmd_populate_kernel(NULL, pmd, pte);
-> +
-> +	/* get reference on pte page */
-> +	get_page(virt_to_page(pte));
-> +	return 0;
-> +}
-> +
-> +/* Walks PMD page table range and write protects it. Called with
-> + * 'kvm->mmu_lock' * held
-> + */
-> +static void stage2_wp_pmd_range(phys_addr_t addr, phys_addr_t end, pmd_t *pmd)
-> +{
-> +	pte_t *pte;
-> +
-> +	while (addr < end) {
-> +		pte = pte_offset_kernel(pmd, addr);
-> +		addr += PAGE_SIZE;
-> +		if (!pte_present(*pte))
-> +			continue;
-> +		/* skip write protected pages */
-> +		if (kvm_s2pte_readonly(pte))
-> +			continue;
-> +		kvm_set_s2pte_readonly(pte);
-> +	}
-> +}
-> +
-> +/* Walks PUD  page table range to write protects it , if necessary spluts up
-> + * huge pages to small pages. Called with 'kvm->mmu_lock' held.
-> + */
-> +static int stage2_wp_pud_range(struct kvm *kvm, phys_addr_t addr,
-> +				phys_addr_t end, pud_t *pud)
-> +{
-> +	pmd_t *pmd;
-> +	phys_addr_t pmd_end;
-> +	int ret;
-> +
-> +	while (addr < end) {
-> +		/* If needed give up CPU during PUD page table walk */
-> +		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
-> +			cond_resched_lock(&kvm->mmu_lock);
-> +
-> +		pmd = pmd_offset(pud, addr);
-> +		if (!pmd_present(*pmd)) {
-> +			addr = kvm_pmd_addr_end(addr, end);
-> +			continue;
-> +		}
-> +
-> +		if (kvm_pmd_huge(*pmd)) {
-> +			ret = kvm_split_pmd(kvm, pmd, addr);
-> +			/* Failed to split up huge  page abort. */
-> +			if (ret < 0)
-> +				return ret;
-> +
-> +			addr = kvm_pmd_addr_end(addr, end);
-> +			continue;
-> +		}
-> +
-> +		pmd_end = kvm_pmd_addr_end(addr, end);
-> +		stage2_wp_pmd_range(addr, pmd_end, pmd);
-> +		addr = pmd_end;
-> +	}
-> +	return 0;
-> +}
-> +
-> +/* Walks PGD page table range to write protect it. Called with 'kvm->mmu_lock'
-> + * held.
-> + */
-> +static int stage2_wp_pgd_range(struct kvm *kvm, phys_addr_t addr,
-> +				phys_addr_t end, pgd_t *pgd)
-> +{
-> +	phys_addr_t pud_end;
-> +	pud_t *pud;
-> +	int ret;
-> +
-> +	while (addr < end) {
-> +		/* give up CPU if mmu_lock is needed by other vCPUs */
-> +		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
-> +			cond_resched_lock(&kvm->mmu_lock);
-> +
-> +		pud = pud_offset(pgd, addr);
-> +		if (!pud_present(*pud)) {
-> +			addr = kvm_pud_addr_end(addr, end);
-> +			continue;
-> +		}
-> +
-> +		/* Fail if PUD is huge, splitting PUDs not supported */
-> +		if (pud_huge(*pud))
-> +			return -EFAULT;
-> +
-> +		/* By default 'nopud' is supported which fails with guests
-> +		 * larger then 1GB. Added to support 4-level page tables.
-> +		 */
-> +		pud_end = kvm_pud_addr_end(addr, end);
-> +		ret = stage2_wp_pud_range(kvm, addr, pud_end, pud);
-> +		if (ret < 0)
-> +			return ret;
-> +		addr = pud_end;
-> +	}
-> +	return 0;
-> +}
-> +
-> +/**
-> + * kvm_mmu_slot_remove_access - write protects entire memslot address space.
-> + *      Called at start of migration when KVM_MEM_LOG_DIRTY_PAGES ioctl is
-> + *      issued. After this function returns all pages (minus the ones faulted
-> + *      in or released when mmu_lock is give nup) must be write protected to
-> + *	keep track of dirty pages to migrate on subsequent dirty log read.
-> + *      mmu_lock is held during write protecting, released on contention.
-> + *
-> + * @kvm:        The KVM pointer
-> + * @slot:       The memory slot the dirty log is retrieved for
-> + */
-
-your indentation is weird here and you also need a new line after the
-first description.  Also missing return value.
-
-> +int kvm_mmu_slot_remove_write_access(struct kvm *kvm, int slot)
-> +{
-> +	pgd_t *pgd;
-> +	pgd_t *pgdp = kvm->arch.pgd;
-> +	struct kvm_memory_slot *memslot = id_to_memslot(kvm->memslots, slot);
-> +	phys_addr_t addr = memslot->base_gfn << PAGE_SHIFT;
-> +	phys_addr_t end = (memslot->base_gfn + memslot->npages) << PAGE_SHIFT;
-> +	phys_addr_t pgdir_end;
-> +	int ret = -ENOMEM;
-> +
-> +	spin_lock(&kvm->mmu_lock);
-> +	/* set start of migration, sychronize with Data Abort handler */
-
-s/sychronize/synchronize/
-
-What is Data Abort handler?  user_mem_abort()?  Can you use a concrete
-function name?
-
-> +	kvm->arch.migration_in_progress = 1;
-> +
-> +	/* Walk range, split up huge pages as needed and write protect ptes */
-> +	while (addr < end) {
-
-I think this should be rewritten to use the scheme used in
-stage2_flush_memslot, I will submit a patch one of these days that
-changes unmap_range() as well, you can wait for that and take a look.
-
-> +		pgd = pgdp + pgd_index(addr);
-> +		if (!pgd_present(*pgd)) {
-> +			addr = kvm_pgd_addr_end(addr, end);
-> +			continue;
-> +		}
-> +
-> +		pgdir_end = kvm_pgd_addr_end(addr, end);
-> +		ret = stage2_wp_pgd_range(kvm, addr, pgdir_end, pgd);
-> +		/* Failed to WP a pgd range abort */
-> +		if (ret < 0)
-> +			goto out;
-> +		addr = pgdir_end;
-> +	}
-> +	ret = 0;
-> +	/* Flush TLBs, >= ARMv7 variant uses hardware broadcast not IPIs */
-> +	kvm_flush_remote_tlbs(kvm);
-> +out:
-> +	spin_unlock(&kvm->mmu_lock);
-> +	return ret;
-> +}
-> +
->  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  			  struct kvm_memory_slot *memslot,
->  			  unsigned long fault_status)
-> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> index fa70c6e..e49f976 100644
-> --- a/virt/kvm/kvm_main.c
-> +++ b/virt/kvm/kvm_main.c
-> @@ -184,7 +184,11 @@ static bool make_all_cpus_request(struct kvm *kvm, unsigned int req)
->  	return called;
->  }
->  
-> -void kvm_flush_remote_tlbs(struct kvm *kvm)
-> +/*
-> + * Architectures like >= ARMv7 hardware broadcast TLB invalidations and don't
-> + * use IPIs, to flush TLBs.
-> + */
-
-I don't think this comment is appropriate in generic code.  If you want
-to say anything here, you should say that arch code can override this
-function.
-
-> +void __weak kvm_flush_remote_tlbs(struct kvm *kvm)
->  {
->  	long dirty_count = kvm->tlbs_dirty;
->  
-> -- 
-> 1.7.9.5
-> 
+Best regards,
+Javier
