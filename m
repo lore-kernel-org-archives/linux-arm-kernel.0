@@ -1,55 +1,65 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 16 May 2014 09:01:59 -0400
-Subject: [PATCH RFC 00/11] Remove mach-kirkwood
-In-Reply-To: <5375C9EA.3060307@free-electrons.com>
-References: <1400163836-9831-1-git-send-email-andrew@lunn.ch>
- <8332148.Z1shujgC24@wuerfel>
- <20140515230849.GS27822@titan.lakedaemon.net>
- <5375C9EA.3060307@free-electrons.com>
-Message-ID: <20140516130159.GH27822@titan.lakedaemon.net>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Fri, 16 May 2014 09:04:25 -0400
+Subject: [PATCH 1/4] arm64: head.S: remove unnecessary function alignment
+In-Reply-To: <1400233839-15140-2-git-send-email-mark.rutland@arm.com>
+References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
+ <1400233839-15140-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <53760CD9.1010200@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 10:18:50AM +0200, Gregory CLEMENT wrote:
-> On 16/05/2014 01:08, Jason Cooper wrote:
-> > On Thu, May 15, 2014 at 04:36:35PM +0200, Arnd Bergmann wrote:
-> >> On Thursday 15 May 2014 16:23:41 Andrew Lunn wrote:
-> >>> This is an RFC patchset which removes mach-kirkwood, now that kirkwood
-> >>> support has been converted to DT and lives in mach-mvebu.
-> >>>
-> >>> It is an RFC because some of the final conversion patches have not yet
-> >>> been accepted by maintainers, in particular:
-> >>>
-> >>> http://www.spinics.net/lists/arm-kernel/msg328068.html
-> >>>
-> >>> which needs to be accepted by the Sound/ASoC maintainer.
-> >>>
-> >>> Once the real patchset is posted, without the RFC status, we would
-> >>> prefer that each subsystem maintainer takes the relevent patches,
-> >>> rather than try to take them all through arm-soc.
-> >>
-> >> Very nice!
-> >>
-> >> We had a couple of conflicts in 3.15 between kirkwood and dove both
-> >> getting moved to multiplatform. Any idea how this can be done better
-> >> this time?
-> > 
-> > Yes, once the changes have matured in -next, I'll merge them into a
-> > single branch to pull instead of separately like I did before.
-> > 
-> >> There are three other series that may or may not make it into 3.16
-> >> and that will have conflicts with this one:
-> >>
-> >> - remove mv78xx0
+Hi Mark,
+
+On 05/16/2014 05:50 AM, Mark Rutland wrote:
+> Currently __turn_mmu_on is aligned to 64 bytes to ensure that it doesn't
+> span any page boundary, which simplifies the idmap and spares us
+> requiring an additional page table to map half of the function. In
+> keeping with other important requirements in architecture code, this
+> fact is undocumented.
 > 
-> Actually I planned to try to convert this to multiplatform
-> through mvebu. 
+> Additionally, as the function consists of three instructions totalling
+> 12 bytes with no literal pool data, a smaller alignment of 16 bytes
+> would be sufficient.
+> 
+> This patch reduces the alignment to 16 bytes and documents the
+> underlying reason for the alignment. This reduces the required alignment
+> of the entire .head.text section from 64 bytes to 16 bytes, though it
+> may still be aligned to a larger value depending on TEXT_OFFSET.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> ---
+>  arch/arm64/kernel/head.S | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 0fd5650..e8e9883 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -346,8 +346,13 @@ ENDPROC(__enable_mmu)
+>   *  x27 = *virtual* address to jump to upon completion
+>   *
+>   * other registers depend on the function called upon completion
+> + *
+> + * We align the entire function to the smallest power of two larger than it to
+> + * ensure it fits within a single block map entry. Otherwise were PHYS_OFFSET
+> + * close to the end of a 512MB or 1GB block we might require an additional
+> + * table to map the entire function.
+>   */
+> -	.align	6
+> +	.align	4
+>  __turn_mmu_on:
+>  	msr	sctlr_el1, x0
+>  	isb
 
-afaict, the only current users of this were the Debian build farm.  But
-they've moved on to better hardware thanks to a generous donation :)
+If you're feeling ambitious, this requirement could probably be enforced by
+some kind of BUILD_BUG_ON((__turn_mmu_on_end - __turn_mmu_on) / 4 >
+TURN_MMU_ON_ALIGN). I don't know if this code will really need to grow in
+practice, but if it does, forgetting to update the alignment (in spite of your
+helpful comment) seems like an easy mistake to make.
 
-Are we aware of any other users?
+Christopher
 
-thx,
-
-Jason.
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
