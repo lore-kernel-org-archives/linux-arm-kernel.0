@@ -1,71 +1,65 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 16 May 2014 05:45:57 -0500
-Subject: [PATCH 0/3] ARM: OMAP5+: Support Duty Cycle Correction(DCC)
-Message-ID: <1400237160-25125-1-git-send-email-nm@ti.com>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Fri, 16 May 2014 16:19:24 +0530
+Subject: [PATCH 2/2] ARM: dts: enable fimd for exynos5800 based peach-pi
+ board
+In-Reply-To: <CAPdUM4Mfh-LnUX_fHi7BTJ1LcE+b4oHzjgWAJk+AWvV7UJbGnA@mail.gmail.com>
+References: <1399877120-4634-1-git-send-email-rahul.sharma@samsung.com>
+ <1399877120-4634-3-git-send-email-rahul.sharma@samsung.com>
+ <004701cf6e48$b4578910$1d069b30$%han@samsung.com>
+ <CAPdUM4Mfh-LnUX_fHi7BTJ1LcE+b4oHzjgWAJk+AWvV7UJbGnA@mail.gmail.com>
+Message-ID: <CAPdUM4O4bEHtSnmiFno1Lm-0rH9qFLJ6S=7THeywAUCFen_iNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+<Gentle Ping>
 
-This patch series has been carried over in vendor kernel for quiet
-few years now.
-
-Unfortunately, it was very recently re-discovered and upstream kernel
-is noticed to be broken for OMAP5 1.5GHz - at least we are operating
-DPLL at frequency higher than what it was intended to be when CPUFreq
-is enabled. Thankfully, with nominal voltage(we dont use AVS yet in
-upstream for the mentioned platforms) and margins in trimming, we
-have so far not crashed - but I strongly suspect this might be some
-boundary case survival.
-
-Verified on the following impacted platforms using 3.15-rc4 based
-vendor kernel.
-
-Before:
-OMAP5432: http://slexy.org/view/s20cs0qQFg
-DRA72x: http://slexy.org/view/s2TXtSa6mH (refused to lock)
-DRA75x: http://slexy.org/view/s20AW8MU5c
-After:
-OMAP5432: http://slexy.org/view/s21iAfWxpu
-DRA72x: http://slexy.org/view/s2hwsvGLmC (locks properly)
-DRA75x: http://slexy.org/view/s21ehw8WQn
-
-Hopefully, we can get these into some kernel revision in some form.
-
-NOTE: Support for 4470(which is the only other platform requiring
-DCC) is not present in upstream kernel and there are no plans to
-support that SoC, even if it is added at a later point, support can be
-extended as needed.
-
-Series based on v3.15-rc5 tag.
-Also available on my tree:
-	https://github.com/nmenon/linux-2.6-playground/
-	branch:  push/clock/dcc 
-	
-	weblink: https://github.com/nmenon/linux-2.6-playground/commits/push/clock/dcc
-
-Verification:
-3.15-rc4 based kernel - DRA75x-evm, 72x-evm, OMAP5uevm
-3.15-rc5 - OMAP5uEVM(only one supporting 1.5GHz atm)
-
-Andrii Tseglytskyi (1):
-  ARM: OMAP5+: dpll: support Duty Cycle Correction(DCC)
-
-Nishanth Menon (2):
-  clk: dpll: support OMAP5 MPU DPLL that need special handling for
-    higher frequencies
-  ARM: dts: OMAP5/DRA7: use omap5-mpu-dpll-clock capable of dealing
-    with higher frequencies
-
- .../devicetree/bindings/clock/ti/dpll.txt          |    1 +
- arch/arm/boot/dts/dra7xx-clocks.dtsi               |    2 +-
- arch/arm/boot/dts/omap54xx-clocks.dtsi             |    2 +-
- arch/arm/mach-omap2/dpll3xxx.c                     |    9 +++++++++
- drivers/clk/ti/dpll.c                              |   21 ++++++++++++++++++++
- include/linux/clk/ti.h                             |    4 ++++
- 6 files changed, 37 insertions(+), 2 deletions(-)
-
-Regards,
-Nishanth Menon
--- 
-1.7.9.5
+On 13 May 2014 08:53, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+> Thanks Jingoo Han.
+>
+> Hi Kukjin,
+>
+> Please consider both of these series for your tree.
+>
+> 1) http://www.spinics.net/lists/arm-kernel/msg329697.html
+> 2) http://www.spinics.net/lists/arm-kernel/msg330291.html
+>
+> Regards,
+> Rahul Sharma
+>
+> On 13 May 2014 06:44, Jingoo Han <jg1.han@samsung.com> wrote:
+>> On Monday, May 12, 2014 3:45 PM, Rahul Sharma wrote:
+>>>
+>>> From: Rahul Sharma <Rahul.Sharma@samsung.com>
+>>>
+>>> Enable FIMD for peach-pi board.
+>>>
+>>> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
+>>
+>> Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+>>
+>> Best regards,
+>> Jingoo Han
+>>
+>>> ---
+>>>  arch/arm/boot/dts/exynos5800-peach-pi.dts |    5 +++++
+>>>  1 file changed, 5 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>>> index 426705a..cccacdd 100644
+>>> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>>> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>>> @@ -157,6 +157,11 @@
+>>>       };
+>>>  };
+>>>
+>>> +&fimd {
+>>> +     status = "okay";
+>>> +     samsung,invert-vclk;
+>>> +};
+>>> +
+>>>  &hsi2c_9 {
+>>>       status = "okay";
+>>>       clock-frequency = <400000>;
+>>> --
+>>> 1.7.9.5
+>>
