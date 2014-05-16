@@ -1,86 +1,80 @@
-From: wharms@bfs.de (walter harms)
-Date: Fri, 16 May 2014 12:40:19 +0200
-Subject: [PATCH v2] ARM: imx: fix error handling
-In-Reply-To: <1400234045-6022-1-git-send-email-emilgoode@gmail.com>
-References: <1400234045-6022-1-git-send-email-emilgoode@gmail.com>
-Message-ID: <5375EB13.8000200@bfs.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 16 May 2014 05:45:58 -0500
+Subject: [PATCH 1/3] ARM: OMAP5+: dpll: support Duty Cycle Correction(DCC)
+In-Reply-To: <1400237160-25125-1-git-send-email-nm@ti.com>
+References: <1400237160-25125-1-git-send-email-nm@ti.com>
+Message-ID: <1400237160-25125-2-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Andrii Tseglytskyi <andrii.tseglytskyi@ti.com>
 
+Duty Cycle Correction(DCC) needs to be enabled if the MPU is to run at
+frequencies beyond 1.4GHz for OMAP5, DRA75x, DRA72x.
 
-Am 16.05.2014 11:54, schrieb Emil Goode:
-> If we fail to allocate struct platform_device pdev we
-> dereference it after the goto label err.
-> 
-> I have rearranged the error handling a bit to fix the issue
-> and also make it more clear.
-> 
-> Signed-off-by: Emil Goode <emilgoode@gmail.com>
-> ---
-> v2: Changed to return -ENOMEM instead of ret where possible and
->     updated the subject line.
-> 
->  arch/arm/mach-imx/devices/platform-ipu-core.c |   22 +++++++++++++---------
->  1 file changed, 13 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
-> index fc4dd7c..68f2a4a 100644
-> --- a/arch/arm/mach-imx/devices/platform-ipu-core.c
-> +++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
-> @@ -77,34 +77,38 @@ struct platform_device *__init imx_alloc_mx3_camera(
->  
->  	pdev = platform_device_alloc("mx3-camera", 0);
->  	if (!pdev)
-> -		goto err;
-> +		return ERR_PTR(-ENOMEM);
->  
->  	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
->  	if (!pdev->dev.dma_mask)
-> -		goto err;
-> +		goto put_pdev;
->  
->  	*pdev->dev.dma_mask = DMA_BIT_MASK(32);
->  	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
->  
->  	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
->  	if (ret)
-> -		goto err;
-> +		goto free_dma_mask;
->  
->  	if (pdata) {
->  		struct mx3_camera_pdata *copied_pdata;
->  
->  		ret = platform_device_add_data(pdev, pdata, sizeof(*pdata));
-> -		if (ret) {
-> -err:
-> -			kfree(pdev->dev.dma_mask);
-> -			platform_device_put(pdev);
-> -			return ERR_PTR(-ENODEV);
-> -		}
-> +		if (ret)
-> +			goto free_dma_mask;
-> +
->  		copied_pdata = dev_get_platdata(&pdev->dev);
->  		copied_pdata->dma_dev = &imx_ipu_coredev->dev;
+MPU DPLL has a limitation on the maximum frequency it can be locked
+at. Duty Cycle Correction circuit is used to recover a correct duty
+cycle for achieving higher frequencies (hardware internally switches
+output to M3 output(CLKOUTHIF) from M2 output (CLKOUT)).
 
+For further information, See the note on OMAP5432 Technical Reference
+Manual(SWPU282U) chapter 3.6.3.3.1 "DPLLs Output Clocks Parameters",
+and also the "OMAP543x ES2.0 DM Operating Conditions Addendum v0.5"
+chapter 2.1 "Micro Processor Unit (MPU)". Equivalent information is
+present in relevant DRA75x, 72x documentation(SPRUHP2E, SPRUHI2P).
 
-the patch is fine, but what use is this copied_pdata ?
-It scope ends next line ?
+Signed-off-by: Andrii Tseglytskyi <andrii.tseglytskyi@ti.com>
+Signed-off-by: Taras Kondratiuk <taras@ti.com>
+Signed-off-by: J Keerthy <j-keerthy@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+[t-kristo at ti.com: added TRM / DM references for DCC clock rate]
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/dpll3xxx.c |    9 +++++++++
+ include/linux/clk/ti.h         |    4 ++++
+ 2 files changed, 13 insertions(+)
 
-re,
- wh
-
->  	}
->  
->  	return pdev;
-> +
-> +free_dma_mask:
-> +	kfree(pdev->dev.dma_mask);
-> +put_pdev:
-> +	platform_device_put(pdev);
-> +
-> +	return ERR_PTR(ret);
->  }
->  
->  struct platform_device *__init imx_add_mx3_sdc_fb(
+diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+index fcd8036..6d7ba37 100644
+--- a/arch/arm/mach-omap2/dpll3xxx.c
++++ b/arch/arm/mach-omap2/dpll3xxx.c
+@@ -319,6 +319,15 @@ static int omap3_noncore_dpll_program(struct clk_hw_omap *clk, u16 freqsel)
+ 
+ 	/* Set DPLL multiplier, divider */
+ 	v = omap2_clk_readl(clk, dd->mult_div1_reg);
++
++	/* Handle Duty Cycle Correction */
++	if (dd->dcc_mask) {
++		if (dd->last_rounded_rate >= dd->dcc_rate)
++			v |= dd->dcc_mask; /* Enable DCC */
++		else
++			v &= ~dd->dcc_mask; /* Disable DCC */
++	}
++
+ 	v &= ~(dd->mult_mask | dd->div1_mask);
+ 	v |= dd->last_rounded_m << __ffs(dd->mult_mask);
+ 	v |= (dd->last_rounded_n - 1) << __ffs(dd->div1_mask);
+diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+index 4a21a87..1f5c55e 100644
+--- a/include/linux/clk/ti.h
++++ b/include/linux/clk/ti.h
+@@ -41,6 +41,8 @@
+  * @idlest_reg: register containing the DPLL idle status bitfield
+  * @autoidle_mask: mask of the DPLL autoidle mode bitfield in @autoidle_reg
+  * @freqsel_mask: mask of the DPLL jitter correction bitfield in @control_reg
++ * @dcc_mask: mask of the DPLL DCC correction bitfield @mult_div1_reg
++ * @dcc_rate: rate atleast which DCC @dcc_mask must be set
+  * @idlest_mask: mask of the DPLL idle status bitfield in @idlest_reg
+  * @lpmode_mask: mask of the DPLL low-power mode bitfield in @control_reg
+  * @m4xen_mask: mask of the DPLL M4X multiplier bitfield in @control_reg
+@@ -86,6 +88,8 @@ struct dpll_data {
+ 	u32			idlest_mask;
+ 	u32			dco_mask;
+ 	u32			sddiv_mask;
++	u32			dcc_mask;
++	unsigned long		dcc_rate;
+ 	u32			lpmode_mask;
+ 	u32			m4xen_mask;
+ 	u8			auto_recal_bit;
+-- 
+1.7.9.5
