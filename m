@@ -1,60 +1,46 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 16 May 2014 04:45:43 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP2+: some hwmod data patches for v3.16
-Message-ID: <alpine.DEB.2.02.1405160444200.29738@utopia.booyaka.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 16 May 2014 13:45:52 +0900
+Subject: [PATCH] ARM: shmobile: Use shmobile_init_late() on r8a7740
+In-Reply-To: <CANqRtoSKosY3HLc-Hgbf2_ToDeL71QzqamWEd97xX9iaD=2oUQ@mail.gmail.com>
+References: <20140511231050.19908.86623.sendpatchset@w520>
+ <CAMuHMdW4-r8khvk-hJcx1OXqwT0nGsVm3zEnmW6TUhyeDRPWdg@mail.gmail.com>
+ <20140513081019.GA10412@verge.net.au>
+ <20140516040844.GA2503@verge.net.au>
+ <CANqRtoSKosY3HLc-Hgbf2_ToDeL71QzqamWEd97xX9iaD=2oUQ@mail.gmail.com>
+Message-ID: <20140516044548.GA7185@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On Fri, May 16, 2014 at 01:39:11PM +0900, Magnus Damm wrote:
+> Hi Simon,
+> 
+> On Fri, May 16, 2014 at 1:08 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Tue, May 13, 2014 at 05:10:20PM +0900, Simon Horman wrote:
+> >> On Mon, May 12, 2014 at 09:42:15AM +0200, Geert Uytterhoeven wrote:
+> >> > On Mon, May 12, 2014 at 1:10 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> >> > > From: Magnus Damm <damm+renesas@opensource.se>
+> >> > >
+> >> > > Hook up ->init_late for r8a7740 to initialize Suspend-to-RAM
+> >> > > and CPUIdle in case of C-code less board support for r8a7740.
+> >> > >
+> >> > > Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+> >> >
+> >> > Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> >>
+> >> Thanks, I will queue this up.
+> >
+> > Hi Magnus, Hi Geert,
+> >
+> > As I am currently doing some work for the r8a7779
+> > I am wondering if a change like this one is appropriate for that SoC.
+> > If so I'll cook one up.
+> 
+> Yes, we want all SoCs to be converted over. Please take care that some
+> DTS change may be needed to specify maximum frequency, so this may
+> require a DTB update for the user. Which makes it less nice user
+> experience for legacy code - if we care about that at this point. But
+> legacy code also often tends to use early devices and other stuff, so
+> this probably affects DT SoC code and DT reference board code mostly.
 
-Hi Tony
-
-The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
-
-  Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git for-v3.16/hwmod-a
-
-for you to fetch changes up to 433480707967187a74ced38bd38edba749998013:
-
-  ARM: OMAP2+: hwmod: OMAP5 DSS hwmod data (2014-05-14 12:26:10 -0600)
-
-- ----------------------------------------------------------------
-First (and possibly last) set of hwmod data changes for v3.16.  This
-set should clean up some obsolete OMAP4 hwmod data, and add OMAP5 DSS
-support.
-
-Basic build, boot, and PM logs are available here:
-
-http://www.pwsan.com/omap/testlogs/hwmod-a-v3.16/20140515210013/
-
-- ----------------------------------------------------------------
-Archit Taneja (1):
-      ARM: OMAP2+: hwmod: OMAP5 DSS hwmod data
-
-Peter Ujfalusi (1):
-      ARM: omap4: hwmod_data: Clean up audio related structures (remove/merge them)
-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  99 +---------
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 283 +++++++++++++++++++++++++++++
- 2 files changed, 292 insertions(+), 90 deletions(-)
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iQIcBAEBAgAGBQJTdZeVAAoJEMePsQ0LvSpLlPsP/32nvu4wLWKSRfHAZFSTO3cf
-MAPWwxsej9FfkOJN92Y/z6RVt8UNaIGmNTZgJr4tQMhvNuIxTM39jkl2NSB0ggJU
-NlQdJkgV6M5cGhKkAC3u7+Fz7/lxsr8ml2MpBzifHGVf9zZHGrNRhwMs3r34fVz0
-pGu3XGQI/LBkASW5TLfEqWrYfYCBR1dsEVLlFuUfLc+DIvpFU7z07DM577BHLlzg
-17KByqWHFW3dn15JSWYgOEFicYGnD5absjSXayAw5B9gjCKrNycPEk1Tm3FePX8r
-lH8cqHGJ7aiffhj2h/HkX8jUHKXNCyWkyEOzey59V8Rde1G5Rhm3dIxrlBldBS9e
-Wxa16MiqMktcVf4iUbuesTPEldtqkCc39zuiRwqQ6YRotFxmCPZlI+gNKkfmcqSD
-zRn+q+XoeNsh5Y9UekqfK4Cm1+NacLxmS8nxtjxaVPvkzLLX0lYubG8WRedg/501
-7wCd/ubsRGeH+tSt49IItmoEYZgBysareZDxAL8oSX/7zjklaNJcR4k1uGZ8xDVU
-r9MNzxBl0a/wvCz6zGY8gdpy1hbCt9uM9iXH36nopG6oXOFayTQKZlv0g/xOlyzs
-gNy7ELwtVq7AVCnAPaeBy3kLbV5nOFWaTSR/jdaCfNx6oaGOVvFEzsDEU820Sd2G
-WXtp0giThLDS7xBdsQc/
-=seX1
------END PGP SIGNATURE-----
+Does CPU frequency affect this patch (shmobile_init_late) as
+well as the ones to use shmobile_init_delay?
