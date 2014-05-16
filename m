@@ -1,52 +1,40 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 16 May 2014 11:03:11 +0200
-Subject: [PATCH 6/7] ARM: EXYNOS: PM: fix register setup on EXYNOS4x12
- for AFTR mode code
-In-Reply-To: <1399287439-31376-7-git-send-email-b.zolnierkie@samsung.com>
-References: <1399287439-31376-1-git-send-email-b.zolnierkie@samsung.com>
- <1399287439-31376-7-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <5375D44F.7000505@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 16 May 2014 18:08:24 +0900
+Subject: [PATCH v6 13/17] ARM: shmobile: marzen: Add to shmobile defconfig
+In-Reply-To: <CAMuHMdVgt=iai7CM0xx7jpD9t+mZqZGuTXmTvwfv+ULuDBGWyA@mail.gmail.com>
+References: <1400153532-23675-1-git-send-email-horms+renesas@verge.net.au>
+ <1400153532-23675-14-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdXPm_=ejkcnOFOgfnsz9MUc8KpAjkuMcHMKJeaEmVbhQA@mail.gmail.com>
+ <20140515225027.GA29432@verge.net.au>
+ <20140516000409.GB29432@verge.net.au>
+ <CAMuHMdWjxK5K4rhJt0VDbsSUX_Gzq8EXCPStN3bb_GUqq8tEog@mail.gmail.com>
+ <20140516085135.GA20299@verge.net.au>
+ <CAMuHMdVgt=iai7CM0xx7jpD9t+mZqZGuTXmTvwfv+ULuDBGWyA@mail.gmail.com>
+Message-ID: <20140516090824.GA21825@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2014 12:57 PM, Bartlomiej Zolnierkiewicz wrote:
-> Add S5P_CENTRAL_SEQ_OPTION register setup for EXYNOS4x12 to AFTR
-> mode code.  Without this setup AFTR mode doesn't show any benefit
-> over WFI one.  When this setup is applied AFTR mode reduces power
-> consumption by ~12% (as measured on Trats2 board).
->
-> This change is a preparation for adding secure firmware support to
-> EXYNOS cpuidle driver.
->
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->   arch/arm/mach-exynos/pm.c | 4 ++++
->   1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index 18f6bf8..3922968 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -391,6 +391,10 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
->   	case CPU_PM_ENTER:
->   		if (cpu == 0) {
->   			exynos_pm_central_suspend();
-> +			if (soc_is_exynos4212() || soc_is_exynos4412())
-> +				__raw_writel(S5P_USE_STANDBY_WFI0 |
-> +					     S5P_USE_STANDBY_WFE0,
-> +					     S5P_CENTRAL_SEQ_OPTION);
+On Fri, May 16, 2014 at 11:00:24AM +0200, Geert Uytterhoeven wrote:
+> On Fri, May 16, 2014 at 10:51 AM, Simon Horman <horms@verge.net.au> wrote:
+> >> > --- a/arch/arm/configs/shmobile_defconfig
+> >> > +++ b/arch/arm/configs/shmobile_defconfig
+> >>
+> >> > +CONFIG_USB_RCAR_PHY=y
+> >> > +CONFIG_USB_RCAR_GEN2_PHY=y
+> >>
+> >> While I don't dispute the need for CONFIG_USB_RCAR_GEN2_PHY in
+> >> shmobile_defconfig, this is not needed for Marzen, right?
+> >
+> > The CONFIG_USB_RCAR_GEN2_PHY was moved from above (by savedefconfig).
+> 
+> Sorry, I had missed that.
+> 
+> > I decided to include that change due to proximity to the new
+> > CONFIG_USB_RCAR_PHY line. But perhaps it would have been better not to.
+> 
+> Nevermind.
+> 
+> BTW, avoiding this moving around in real changes is another reason for
+> refreshing the defconfigs on a regular basis ;-)
 
-Why not put this code in the exynos_enter_aftr() ?
-
->   			exynos_cpu_save_register();
->   		}
->   		break;
-
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Good point.
