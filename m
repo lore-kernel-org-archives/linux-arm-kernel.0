@@ -1,69 +1,79 @@
 From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 16 May 2014 11:09:29 +0200
-Subject: [PATCH v2] ARM: imx: remove unused defines
-In-Reply-To: <20140515122553.GF5858@pengutronix.de>
-References: <1400140671.20469.7.camel@x220>
- <20140515122553.GF5858@pengutronix.de>
-Message-ID: <1400231369.20342.10.camel@x220>
+Date: Fri, 16 May 2014 11:29:58 +0200
+Subject: [PATCH] ARM: remove ARM710 specific assembler code
+In-Reply-To: <4305975.PvMXZQ020k@wuerfel>
+References: <1364507176.1345.45.camel@x61.thuisdomein>
+ <8309592.drxAj71PnZ@wuerfel> <1400059550.31197.12.camel@x220>
+ <4305975.PvMXZQ020k@wuerfel>
+Message-ID: <1400232598.20342.16.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-None of the defines "for modules using static and dynamic DMA channels"
-are used. Remove these.
+Support for ARM710 CPUs was removed in v3.5. But a few lines of ARM710
+specific assembler code were left in the tree. Remove these too.
 
 Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 ---
-0) v1 was called "ARM: imx: remove check for CONFIG_SDMA_IRAM". This
-version just removes the entire block of defines, as Sascha suggested.
+This minor cleanup was suggested by Arnd. This patch is mostly
+guesswork, as I already told Arnd, since I have never touched ARM
+assembler before (as far as I can remember). Untested too! And this does
+need testing.
 
-1) Still untested.
+ arch/arm/mm/proc-arm720.S | 30 ------------------------------
+ 1 file changed, 30 deletions(-)
 
- arch/arm/mach-imx/mx51.h | 33 ---------------------------------
- 1 file changed, 33 deletions(-)
-
-diff --git a/arch/arm/mach-imx/mx51.h b/arch/arm/mach-imx/mx51.h
-index af844f76261a..3f6d4a674ffb 100644
---- a/arch/arm/mach-imx/mx51.h
-+++ b/arch/arm/mach-imx/mx51.h
-@@ -145,39 +145,6 @@
- #define MX51_SPBA_CTRL	0x3c
+diff --git a/arch/arm/mm/proc-arm720.S b/arch/arm/mm/proc-arm720.S
+index d42c37f9f5bc..6699f91a6a0f 100644
+--- a/arch/arm/mm/proc-arm720.S
++++ b/arch/arm/mm/proc-arm720.S
+@@ -116,34 +116,6 @@ ENTRY(cpu_arm720_reset)
+ ENDPROC(cpu_arm720_reset)
+ 		.popsection
  
- /*
-- * Defines for modules using static and dynamic DMA channels
-- */
--#define MX51_MXC_DMA_CHANNEL_IRAM	30
--#define MX51_MXC_DMA_CHANNEL_SPDIF_TX	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_UART1_RX	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_UART1_TX	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_UART2_RX	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_UART2_TX	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_UART3_RX	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_UART3_TX	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_MMC1	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_MMC2	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_SSI1_RX	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_SSI1_TX	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_SSI2_RX	MXC_DMA_DYNAMIC_CHANNEL
--#ifdef CONFIG_SDMA_IRAM
--#define MX51_MXC_DMA_CHANNEL_SSI2_TX	(MX51_MXC_DMA_CHANNEL_IRAM + 1)
--#else				/*CONFIG_SDMA_IRAM */
--#define MX51_MXC_DMA_CHANNEL_SSI2_TX	MXC_DMA_DYNAMIC_CHANNEL
--#endif				/*CONFIG_SDMA_IRAM */
--#define MX51_MXC_DMA_CHANNEL_CSPI1_RX	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_CSPI1_TX	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_CSPI2_RX	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_CSPI2_TX	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_CSPI3_RX	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_CSPI3_TX	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_ATA_RX	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_ATA_TX	MXC_DMA_DYNAMIC_CHANNEL
--#define MX51_MXC_DMA_CHANNEL_MEMORY	MXC_DMA_DYNAMIC_CHANNEL
+-	.type	__arm710_setup, #function
+-__arm710_setup:
+-	mov	r0, #0
+-	mcr	p15, 0, r0, c7, c7, 0		@ invalidate caches
+-#ifdef CONFIG_MMU
+-	mcr	p15, 0, r0, c8, c7, 0		@ flush TLB (v4)
+-#endif
+-	mrc	p15, 0, r0, c1, c0		@ get control register
+-	ldr	r5, arm710_cr1_clear
+-	bic	r0, r0, r5
+-	ldr	r5, arm710_cr1_set
+-	orr	r0, r0, r5
+-	mov	pc, lr				@ __ret (head.S)
+-	.size	__arm710_setup, . - __arm710_setup
 -
--#define MX51_IS_MEM_DEVICE_NONSHARED(x)		0
+-	/*
+-	 *  R
+-	 * .RVI ZFRS BLDP WCAM
+-	 * .... 0001 ..11 1101
+-	 * 
+-	 */
+-	.type	arm710_cr1_clear, #object
+-	.type	arm710_cr1_set, #object
+-arm710_cr1_clear:
+-	.word	0x0f3f
+-arm710_cr1_set:
+-	.word	0x013d
 -
--/*
-  * DMA request assignments
-  */
- #define MX51_DMA_REQ_VPU		0
+ 	.type	__arm720_setup, #function
+ __arm720_setup:
+ 	mov	r0, #0
+@@ -177,7 +149,6 @@ arm720_crval:
+ 
+ 	string	cpu_arch_name, "armv4t"
+ 	string	cpu_elf_name, "v4"
+-	string	cpu_arm710_name, "ARM710T"
+ 	string	cpu_arm720_name, "ARM720T"
+ 
+ 		.align
+@@ -215,5 +186,4 @@ __\name\()_proc_info:
+ 		.size	__\name\()_proc_info, . - __\name\()_proc_info
+ .endm
+ 
+-	arm720_proc_info arm710, 0x41807100, 0xffffff00, cpu_arm710_name, __arm710_setup
+ 	arm720_proc_info arm720, 0x41807200, 0xffffff00, cpu_arm720_name, __arm720_setup
 -- 
 1.9.0
