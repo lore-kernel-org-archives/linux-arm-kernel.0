@@ -1,82 +1,83 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Fri, 16 May 2014 11:51:26 +0300
-Subject: [PATCH v2] ARM: unistd.h: relocate comments back to place
-Message-ID: <da87ed3ed4d6ee451306b8cc4c05ce011f1b1935.1400230286.git.baruch@tkos.co.il>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Fri, 16 May 2014 10:51:48 +0200
+Subject: [GIT PULL] ARM: STi: DT changes for v3.16
+Message-ID: <5375D1A4.2040205@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit cb8db5d45 (UAPI: (Scripted) Disintegrate arch/arm/include/asm) moved
-these syscall comments out of their context into the UAPI headers. Fix this.
+Hi Olof, Kevin and Arnd,
 
-Fixes: cb8db5d4578a ("UAPI: (Scripted) Disintegrate arch/arm/include/asm")
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
-v2:
-   Rebase on v3.15-rc5
+Please consider these STi DT updates for v3.16.
 
-Hi Arnd,
+Note that two reset patches are part of this pull request, in order to 
+avoid compilation breakage.
+Adding these two patches in this pull request has been accepted by 
+Philipp Zabel.
 
-A previous version of this patch
-(http://thread.gmane.org/gmane.linux.ports.arm.kernel/298234) was ignored. I
-guess Russell is just overloaded. Would you ack this seemingly trivial patch so
-I can put it in Russell's patches tracker?
+The following changes since commit 2542f928b2131a0367e50a4390afc12084cc4cc4:
 
-baruch
----
- arch/arm/include/asm/unistd.h      | 10 ++++++++++
- arch/arm/include/uapi/asm/unistd.h | 11 -----------
- 2 files changed, 10 insertions(+), 11 deletions(-)
+   Merge tag 'renesas-dt2-for-v3.16' of 
+git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas into next/dt 
+(2014-05-05 18:44:12 -0700)
 
-diff --git a/arch/arm/include/asm/unistd.h b/arch/arm/include/asm/unistd.h
-index 43876245fc57..21ca0cebcab0 100644
---- a/arch/arm/include/asm/unistd.h
-+++ b/arch/arm/include/asm/unistd.h
-@@ -15,7 +15,17 @@
- 
- #include <uapi/asm/unistd.h>
- 
-+/*
-+ * This may need to be greater than __NR_last_syscall+1 in order to
-+ * account for the padding in the syscall table
-+ */
- #define __NR_syscalls  (384)
-+
-+/*
-+ * *NOTE*: This is a ghost syscall private to the kernel.  Only the
-+ * __kuser_cmpxchg code in entry-armv.S should be aware of its
-+ * existence.  Don't ever use this from user code.
-+ */
- #define __ARM_NR_cmpxchg		(__ARM_NR_BASE+0x00fff0)
- 
- #define __ARCH_WANT_STAT64
-diff --git a/arch/arm/include/uapi/asm/unistd.h b/arch/arm/include/uapi/asm/unistd.h
-index ba94446c72d9..acd5b66ea3aa 100644
---- a/arch/arm/include/uapi/asm/unistd.h
-+++ b/arch/arm/include/uapi/asm/unistd.h
-@@ -411,11 +411,6 @@
- #define __NR_renameat2			(__NR_SYSCALL_BASE+382)
- 
- /*
-- * This may need to be greater than __NR_last_syscall+1 in order to
-- * account for the padding in the syscall table
-- */
--
--/*
-  * The following SWIs are ARM private.
-  */
- #define __ARM_NR_BASE			(__NR_SYSCALL_BASE+0x0f0000)
-@@ -426,12 +421,6 @@
- #define __ARM_NR_set_tls		(__ARM_NR_BASE+5)
- 
- /*
-- * *NOTE*: This is a ghost syscall private to the kernel.  Only the
-- * __kuser_cmpxchg code in entry-armv.S should be aware of its
-- * existence.  Don't ever use this from user code.
-- */
--
--/*
-  * The following syscalls are obsolete and no longer available for EABI.
-  */
- #if !defined(__KERNEL__)
--- 
-2.0.0.rc0
+are available in the git repository at:
+
+
+   git://git.stlinux.com/devel/kernel/linux-sti.git tags/sti-dt-for-v3.16
+
+for you to fetch changes up to 633cb1924c0ef3ceeaaa7d4c94c8c4816a6f9840:
+
+   ARM: STi: DT: STiH41x Add clk_ignore_unused to bootargs (2014-05-15 
+17:11:58 +0200)
+
+----------------------------------------------------------------
+Gabriel FERNANDEZ (15):
+       driver: reset: sti: add keyscan for stih415
+       driver: reset: sti: add keyscan for stih416
+       ARM: STi: DT: add keyscan for stih415
+       ARM: STi: DT: add keyscan for stih416
+       ARM: STi: DT: add keyscan for stih41x-b2000
+       ARM: STi: DT: STiH416: 416 DT Entry for clockgen A0/1/10/11/12
+       ARM: STi: DT: STiH416: Remove unused CLK_S_ICN_REG_0 fixed clock
+       ARM: STi: DT: STiH416: Remove unused CLK_S_GMAC0_PHY & 
+CLK_S_ETH1_PHY fixed clocks
+       ARM: STi: DT: STiH416: 416 DT Entry for clockgen B/C/D/E/F
+       ARM: STi: DT: STiH416: 416 DT Entry for clockgen A9/DDR/GPU
+       ARM: STi: DT: STiH415: 415 DT Entry for clockgen A0/1/10/11/12
+       ARM: STi: DT: STiH415: Remove unused CLK_S_ICN_REG_0 fixed clock
+       ARM: STi: DT: STiH415: Remove unused CLK_S_GMAC0_PHY & 
+CLK_S_ETH1_PHY fixed clocks
+       ARM: STi: DT: STiH415: 415 DT Entry for clockgen A9
+       ARM: STi: DT: STiH41x Add clk_ignore_unused to bootargs
+
+Maxime Coquelin (2):
+       ARM: dts: Add STiH407 SoC support
+       ARM: dts: STiH407: Add B2120 board support
+
+  arch/arm/boot/dts/Makefile                         |   3 +-
+  arch/arm/boot/dts/stih407-b2120.dts                |  78 +++
+  arch/arm/boot/dts/stih407-clock.dtsi               |  40 ++
+  arch/arm/boot/dts/stih407-pinctrl.dtsi             | 615 +++++++++++++++++
+  arch/arm/boot/dts/stih407.dtsi                     | 263 ++++++++
+  arch/arm/boot/dts/stih415-clock.dtsi               | 517 ++++++++++++++-
+  arch/arm/boot/dts/stih415-pinctrl.dtsi             |  16 +
+  arch/arm/boot/dts/stih415.dtsi                     |  22 +-
+  arch/arm/boot/dts/stih416-clock.dtsi               | 732 
+++++++++++++++++++++-
+  arch/arm/boot/dts/stih416-pinctrl.dtsi             |  16 +
+  arch/arm/boot/dts/stih416.dtsi                     |  22 +-
+  arch/arm/boot/dts/stih41x-b2000.dtsi               |  25 +-
+  arch/arm/boot/dts/stih41x-b2020.dtsi               |   2 +-
+  drivers/reset/sti/reset-stih415.c                  |   1 +
+  drivers/reset/sti/reset-stih416.c                  |   1 +
+  include/dt-bindings/clock/stih415-clks.h           |  15 +
+  include/dt-bindings/clock/stih416-clks.h           |  15 +
+  .../dt-bindings/reset-controller/stih415-resets.h  |   1 +
+  .../dt-bindings/reset-controller/stih416-resets.h  |   1 +
+  19 files changed, 2339 insertions(+), 46 deletions(-)
+  create mode 100644 arch/arm/boot/dts/stih407-b2120.dts
+  create mode 100644 arch/arm/boot/dts/stih407-clock.dtsi
+  create mode 100644 arch/arm/boot/dts/stih407-pinctrl.dtsi
+  create mode 100644 arch/arm/boot/dts/stih407.dtsi
+  create mode 100644 include/dt-bindings/clock/stih415-clks.h
+  create mode 100644 include/dt-bindings/clock/stih416-clks.h
