@@ -1,38 +1,28 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Fri, 16 May 2014 10:53:15 +0200
-Subject: [GIT PULL] ARM: STi: SoC changes for v3.16
-In-Reply-To: <5375D1A4.2040205@st.com>
-References: <5375D1A4.2040205@st.com>
-Message-ID: <5375D1FB.6040309@st.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 16 May 2014 17:55:54 +0900
+Subject: [PATCH/RFC] ARM: shmobile: Enable PM_RUNTIME in defconfig
+In-Reply-To: <CAMuHMdVG0=JG+d=_B9XM2OWn157UG4=2gsg2mfuRNwJ7N3qZFw@mail.gmail.com>
+References: <1400198682-7666-1-git-send-email-horms+renesas@verge.net.au>
+ <20140516020549.GB18137@verge.net.au>
+ <CAMuHMdVEowWbMY+L1TuC4xxYvtGZiH5qYOjmd7-rt1e_=xEz1A@mail.gmail.com>
+ <20140516080825.GA23295@verge.net.au>
+ <CAMuHMdVG0=JG+d=_B9XM2OWn157UG4=2gsg2mfuRNwJ7N3qZFw@mail.gmail.com>
+Message-ID: <20140516085553.GC20299@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Kevin and Arnd,
+On Fri, May 16, 2014 at 10:39:46AM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Fri, May 16, 2014 at 10:08 AM, Simon Horman <horms@verge.net.au> wrote:
+> > With that in mind I'll rephrase my question: are you are ware
+> > of any patches this one (the defconfig update) should depend on?
+> 
+> No, I don't think it will introduce any regressions.
+> We had CONFIG_PM_RUNTIME in most other defconfigs, and I've been
+> running quite some real multi-platform kernels on Koelsch before.
+> 
+> All known clock issues, for which patches have been send/accepted, happen
+> regardless of the value of CONFIG_PM_RUNTIME.
 
-Please consider these STi SoC updates for v3.16.
-
-The following changes since commit 0db543faecf3ebfc3a4e5cafb61ca6b219820bba:
-
-   Merge tag 'renesas-soc2-for-v3.16' of 
-git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas into 
-next/soc (2014-05-05 18:45:10 -0700)
-
-are available in the git repository at:
-
-
-   git://git.stlinux.com/devel/kernel/linux-sti.git tags/sti-soc-for-v3.16
-
-for you to fetch changes up to e9d71b9fdb5dd5395ee011841967068a6167084f:
-
-   ARM: STi: Add STiH407 SoC support (2014-05-13 18:49:32 +0200)
-
-----------------------------------------------------------------
-Maxime Coquelin (1):
-       ARM: STi: Add STiH407 SoC support
-
-  Documentation/arm/sti/stih407-overview.txt    | 18 ++++++++++++++++++
-  Documentation/devicetree/bindings/arm/sti.txt | 15 +++++++++++++++
-  arch/arm/mach-sti/board-dt.c                  |  1 +
-  3 files changed, 34 insertions(+)
-  create mode 100644 Documentation/arm/sti/stih407-overview.txt
-  create mode 100644 Documentation/devicetree/bindings/arm/sti.txt
+Thanks, I'll queue this up.
