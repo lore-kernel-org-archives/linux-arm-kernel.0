@@ -1,52 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 May 2014 09:58:48 +0900
-Subject: [PATCH 7/9] ARM: shmobile: Remove unused r8a7791_init_early()
+Date: Fri, 16 May 2014 09:58:47 +0900
+Subject: [PATCH 6/9] ARM: shmobile: Use r8a7791 DT CPU Frequency for Koelsch
 In-Reply-To: <cover.1400200838.git.horms+renesas@verge.net.au>
 References: <cover.1400200838.git.horms+renesas@verge.net.au>
-Message-ID: <595e9b00fb81f971d84ff451861423d02c39d060.1400200838.git.horms+renesas@verge.net.au>
+Message-ID: <7e99497cf5e7b46ff5f434beae45f6f35005e8b6.1400200838.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Remove the now unused r8a7791_init_early() function.
+Convert the Koelsch board support to use shmobile_init_delay()
+to be able to migrate away from per-SoC delay setup functions.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/r8a7791.h | 1 -
- arch/arm/mach-shmobile/setup-r8a7791.c        | 7 -------
- 2 files changed, 8 deletions(-)
+ arch/arm/mach-shmobile/board-koelsch-reference.c | 2 +-
+ arch/arm/mach-shmobile/board-koelsch.c           | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7791.h b/arch/arm/mach-shmobile/include/mach/r8a7791.h
-index 200fa69..664274c 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7791.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7791.h
-@@ -5,7 +5,6 @@ void r8a7791_add_standard_devices(void);
- void r8a7791_add_dt_devices(void);
- void r8a7791_clock_init(void);
- void r8a7791_pinmux_init(void);
--void r8a7791_init_early(void);
- extern struct smp_operations r8a7791_smp_ops;
+diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
+index a3fd302..ff33d9c 100644
+--- a/arch/arm/mach-shmobile/board-koelsch-reference.c
++++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
+@@ -139,7 +139,7 @@ static const char * const koelsch_boards_compat_dt[] __initconst = {
  
- #endif /* __ASM_R8A7791_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-r8a7791.c b/arch/arm/mach-shmobile/setup-r8a7791.c
-index 2c84e74..949580a 100644
---- a/arch/arm/mach-shmobile/setup-r8a7791.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7791.c
-@@ -210,13 +210,6 @@ void __init r8a7791_add_standard_devices(void)
- 	r8a7791_register_thermal();
- }
+ DT_MACHINE_START(KOELSCH_DT, "koelsch")
+ 	.smp		= smp_ops(r8a7791_smp_ops),
+-	.init_early	= r8a7791_init_early,
++	.init_early	= shmobile_init_delay,
+ 	.init_time	= rcar_gen2_timer_init,
+ 	.init_machine	= koelsch_add_standard_devices,
+ 	.init_late	= shmobile_init_late,
+diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
+index 5a034ff..3cd8008 100644
+--- a/arch/arm/mach-shmobile/board-koelsch.c
++++ b/arch/arm/mach-shmobile/board-koelsch.c
+@@ -522,7 +522,7 @@ static const char * const koelsch_boards_compat_dt[] __initconst = {
  
--void __init r8a7791_init_early(void)
--{
--#ifndef CONFIG_ARM_ARCH_TIMER
--	shmobile_setup_delay(1500, 2, 4); /* Cortex-A15 @ 1500MHz */
--#endif
--}
--
- #ifdef CONFIG_USE_OF
- static const char *r8a7791_boards_compat_dt[] __initdata = {
- 	"renesas,r8a7791",
+ DT_MACHINE_START(KOELSCH_DT, "koelsch")
+ 	.smp		= smp_ops(r8a7791_smp_ops),
+-	.init_early	= r8a7791_init_early,
++	.init_early	= shmobile_init_delay,
+ 	.init_time	= rcar_gen2_timer_init,
+ 	.init_machine	= koelsch_init,
+ 	.init_late	= shmobile_init_late,
 -- 
 1.8.5.2
