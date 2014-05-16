@@ -1,94 +1,84 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 16 May 2014 14:39:07 -0700
-Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
- support
-In-Reply-To: <20140516180154.GG22031@atomide.com>
-References: <CABxcv==_LCw1kPYm17g=h8VfSN2V_qsgXjTnsy-JOetawSv4pA@mail.gmail.com>
- <20140513152518.GA16837@atomide.com> <53730AFB.2090800@ti.com>
- <20140514160216.GD18463@atomide.com> <537487AE.3060906@ti.com>
- <20140515182133.GC23659@atomide.com> <5375A8A8.7080306@ti.com>
- <20140516160717.GD22031@atomide.com>
- <20140516174158.GA11733@earth.universe>
- <20140516180154.GG22031@atomide.com>
-Message-ID: <20140516213907.GL12881@atomide.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Fri, 16 May 2014 14:39:16 -0700
+Subject: [PATCH v5 2/4] live migration support for initial write protect of
+ VM
+In-Reply-To: <537544D8.2030005@samsung.com>
+References: <1399509616-4632-1-git-send-email-m.smarduch@samsung.com>
+ <1399509616-4632-3-git-send-email-m.smarduch@samsung.com>
+ <20140515185312.GA6159@lvm> <537544D8.2030005@samsung.com>
+Message-ID: <53768584.4060705@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [140516 11:02]:
-> * Sebastian Reichel <sre@ring0.de> [140516 10:42]:
-> > On Fri, May 16, 2014 at 09:07:17AM -0700, Tony Lindgren wrote:
-> > > * Tomi Valkeinen <tomi.valkeinen@ti.com> [140515 22:57]:
-> > > > On 15/05/14 21:21, Tony Lindgren wrote:
-> > > > >> But you're right, having "sharp,ls037v7dw01-omap-dss" in the .dts is an
-> > > > >> alternative for the compatible-string conversion we do now. I guess it's
-> > > > >> a matter of taste, but I rather hide it inside the kernel, in an
-> > > > >> internal omapdss file, than pollute the .dts files with those compatible
-> > > > >> strings.
-> > > > > 
-> > > > > Well it avoid you parsing through all the nodes during booting
-> > > > > and leaves out the function to do remapping. And removes the need
-> > > > > for maintaining a custom display mapping table. I'd say that's a
-> > > > > pretty good list of advantages right there :)
-> > > > 
-> > > > Yep... I don't know. Maybe I'm being too careful about doing wrong
-> > > > things with .dts. I just like it more if any hacks are in kernel code,
-> > > > which I can remove without anyone noticing.
-> > > > 
-> > > > Anyway, we already have board.dts files using the non-omapified
-> > > > compatible strings in the mainline, so if I would now add the omapified
-> > > > compatible strings to .dts files, those old board.dts files would break.
-> > > > 
-> > > > So I guess the choice has already been made.
-> > > 
-> > > I really think you should remove this misuse of device tree code ASAP.
-> > > It's better to fix it up now than carry the hack for next two years
-> > > and keep on adding to it.
-> > 
-> > IMHO appending -omap-dss to a random device is an even bigger hack,
-> > since its adding lots of bloat to the API. Let's assume there is
-> > another OS using DT for ARM, but has no proper API for SPI
-> > controllers and it introduces your hack to SPI devices. That would
-> > mean each SPI device has -omap-spi appended (or -exynos-spi,
-> > -foo-spi, ...). At least I would blame them for creating a huge
-> > unmaintainable mess.
-> 
-> I think you're misunderstanding. I do not want the naming to
-> be Linux specific. The naming should naturally be as hardware
-> specific as possible. In this case something like:
-> 
-> compatible = "sharp,ls037v7dw01-dss", "sharp,ls037v7dw01";
-> 
-> Or we should probably use:
-> 
-> compatible = "sharp,ls037v7dw01-dpi", "sharp,ls037v7dw01";
-> 
-> As dpi here reflects the hardware it's connected to. The dss
-> is probably a Linux name.
-> 
-> Not use what you're after with the SPI example though, but sounds
-> like that's something different.
-> 
-> > I think Tomi's workaround is a much better hack, since it keeps the
-> > API clean. If the code simply prefixes "omapdss," to all
-> > "child"-devices of omapdss it can be left mostly untouched, too.
-> 
-> AFAIK that remapping not needed at all. All that is already
-> available with the compatible flags.
+Hi Christoffer,
+  few more comments
+>>>  	struct vgic_dist	vgic;
+>>> +	/* Marks start of migration, used to handle 2nd stage page faults
+>>> +	 * during migration, prevent installing huge pages and split huge pages
+>>> +	 * to small pages.
+>>> +	 */
+>>
+>> commenting style
+>>
+>> this is a bit verbose for a field in a struct, perhaps moving the longer
+>> version to where you set this?
+> Will do.
+>>
+>>> +	int migration_in_progress;
+>>>  };
 
-And alternatively we can also just use the sharp,ls037v7dw01
-in the panel driver(s). We can have the panels bail out in driver
-probe based on of_machine_is_compatible if nothing else is available.
+I think this flag could be removed all together. Migration can be
+stopped at any time (started too), through user request or other events. 
+When that happens (like migrate_cancel) migrate cleanup bh runs and eventually calls 
+KVM memory listener kvm_log_global_start() (cancel handler) 
+that stops logging, clears KVM_MEM_LOG_DIRTY_PAGES, and region ops ioctl,
+clears dirty_bitmap. In either case dirty_bitmap for memslot is set or 
+unset during migration to track dirty pages, following that field seems to be 
+a better way to keep track of migration. This again is QEMU view but it appears 
+all these policies are driven from user space.
 
-Also, currently the remapping code also probably keeps prepending
-more and more omapdss,omapdss,omapdss,... on each kexec reboot? And
-it would be quite silly for each display controller to have to do
-their own remapping for shared panels?
 
-If we still still despite all these reasons decide to go with
-the remapping of the compatible strings, it should really be a
-Linux generic (or drivers/video generic function), not implemented
-for each display controller.
 
-Cheers,
+>>>  
+>>> +/* kvm_split_pmd - splits huge pages to small pages, required to keep a dirty
+>>> + *	log of smaller memory granules, otherwise huge pages would need to be
+>>> + *	migrated. Practically an idle system has problems migrating with
+>>
+>> This seems abrupt.  Why can't we just represent a 2M huge page as 512 4K
+>> bits and write protect the huge pages, if you take a write fault on a 2M
+>> page, then split it then.
+> 
+> That's one alternative the one I put into v6 is clear the PMD
+> and force user_mem_abort() to fault in 4k pages, and mark the
+> dirty_bitmap[] for that page, reuse the current code. Have not
+> checked the impact on performance, it takes few seconds longer
+> to converge for the tests I'm running. 
 
-Tony
+I was thinking about this and if PMD attributes need to be passed
+onto the PTEs then it appears what you recommend is required.
+But during run time I don't see how 2nd stage attributes can
+change, could the guest do anything to change them (SH, Memattr)?
+
+
+Performance may also be other reason but that always depends
+on the load, clearing a PMD seems easier and reuses current code.
+Probably several load tests/benchmarks can help here.
+Also noticed hw PMD/PTE attributes differ a little which
+is not significant now, but moving forward different page size
+and any new revisions to fields may require additional maintenance.
+
+I'll be out next week and back 26'th, I'll create a link with
+details on test environment and tests. The cover letter will
+will go through general overview only.
+
+Thanks,
+  Mario
+
+> 
+>>
+>> If your use case is HA, then you will be doing this a lot, and you don't
+>> want to hurt performance of your main live system more than necessary.
+> 
+>>
+>>> + *	huge pages.  Called during WP of entire VM address space, done
+>>
