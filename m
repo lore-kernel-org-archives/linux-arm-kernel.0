@@ -1,67 +1,37 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Fri, 16 May 2014 23:20:42 +0100
-Subject: [Ksummit-discuss] [TECH TOPIC] ARM legacy board DT conversion
- finalization
-In-Reply-To: <20140516184205.GL27822@titan.lakedaemon.net>
-References: <20140511030009.GO12708@titan.lakedaemon.net>
- <20140511083729.211e9b5f@lwn.net>
- <20140515121546.3A06AC40B0E@trevor.secretlab.ca>
- <CAL_JsqJw11fZBbLVi=xxC559iWdwCMFOJ4XYM-8EjykttoWsOg@mail.gmail.com>
- <20140515194215.GR27822@titan.lakedaemon.net>
- <CAOesGMi0JrTp9kUVDod4duBOCZ+wNRJ0dMmgvBX7jEQRjE5cCA@mail.gmail.com>
- <20140516041022.GY27822@titan.lakedaemon.net>
- <1400265111.2647.54.camel@deadeye.wl.decadent.org.uk>
- <20140516184205.GL27822@titan.lakedaemon.net>
-Message-ID: <1400278842.2647.62.camel@deadeye.wl.decadent.org.uk>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Sat, 17 May 2014 01:21:08 +0300
+Subject: [PATCH v2] ARM: imx: fix error handling
+In-Reply-To: <20140516192451.GP16662@pengutronix.de>
+References: <1400234045-6022-1-git-send-email-emilgoode@gmail.com>
+ <20140516192451.GP16662@pengutronix.de>
+Message-ID: <20140516222108.GI8897@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-05-16 at 14:42 -0400, Jason Cooper wrote:
-> On Fri, May 16, 2014 at 07:31:51PM +0100, Ben Hutchings wrote:
-> > On Fri, 2014-05-16 at 00:10 -0400, Jason Cooper wrote:
-> > > Joking aside, I concede your point.  It looks like the last two mvebu
-> > > legacy platforms (dove, mv78xx0) might get merged into mach-mvebu during
-> > > the next cycle.  After that, we can reach out to the Debian and OpenWRT
-> > > guys and see what legacy platforms are in use or rotting.  We can go
-> > > from there.
-> > 
-> > I just removed ixp4xx from Debian as the kernel image wouldn't fit in
-> > the NSLU2's kernel partition any more (even after disabling quite a few
-> > features that are enabled in most other configurations).  iop32x was
-> > removed for the same reason, a while ago.
+On Fri, May 16, 2014 at 09:24:51PM +0200, Uwe Kleine-K?nig wrote:
+> I didn't check if it is easily possible, but converting this file to use
+> platform_device_register_full might simplify it considerably.
+
+In a separate patch, though, please.
+
 > 
-> Hmmm, I have two NSLU2's, they might make a good platform for the
-> tinification/IoT work.  Small flash, small RAM, slow.
+> I'm not sure this fix is critical, because the problem happens if an
+> allocation during boot fails. But still, if you want to get this fix
+> into a stable release, you should simplify it, i.e. don't do the code
+> reorganisations. (Also the "more clear" part seems to be subjective, I
+> like the error handling better as it is now. But that might only be me.)
 
-Yes, whereas Debian is a general purpose distribution where we don't
-attempt to guess which applications will be used on which platforms.
+Emil's error handling is done exactly in the correct way...  The error
+path and success path are separate.  Unwinding in the reverse order.
+The label names describe the label locations.  Most days I spend hours
+looking at linux kernel error handling and I can assure you that
+sensible labels like this are a rare and wonderful gift.
 
-> > Our 'legacy' (which I take to mean pre-v7) configurations are now
-> > kirkwood, mv78xx0, orion5x (all about to converge to mvebu) and
-> > versatile.
-> 
-> I'm not familiar with versatile, the others I've seen a few times. ;-)
+It's hard for me to imagine how anyone could defend the original error
+handling.  The label was "err".  The error handling was randomly plopped
+in the middle of the success handling.  Whenever I see new "creative"
+error handling like this it drives me nuts because obviously it's going
+to be buggy like a swamp picnic.
 
-Versatile is one of ARM's own development boards, but more importantly
-it's something QEMU can emulate.
-
-> Does Debian see any user activity with mv78xx0?  I know your build
-> system used to have boards with that SoC family, but are there any other
-> users?
-
-There is still one build server (ancina.debian.org) using that board,
-but I don't know that there are any other users.  The kernel package was
-only added to support those build servers.
-
-Ben.
-
--- 
-Ben Hutchings
-If you seem to know what you are doing, you'll be given more to do.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140516/f705ca19/attachment.sig>
+regards,
+dan carpenter
