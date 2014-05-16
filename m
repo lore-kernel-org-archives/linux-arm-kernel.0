@@ -1,52 +1,37 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 16 May 2014 16:07:00 +0200
-Subject: [PATCH] clocksource: marco: fix the affinity set for local timer
- of CPU1
-In-Reply-To: <1399445204-22159-1-git-send-email-21cnbao@gmail.com>
-References: <1399445204-22159-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <53761B84.90109@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 May 2014 15:06:07 +0100
+Subject: [PATCH 4/4] arm64: Enable TEXT_OFFSET fuzzing
+In-Reply-To: <1400233839-15140-5-git-send-email-mark.rutland@arm.com>
+References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
+ <1400233839-15140-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <20140516140606.GH5624@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2014 08:46 AM, Barry Song wrote:
-> From: Zhiwu Song <Zhiwu.Song@csr.com>
->
-> irqchip will reject the affinity set to CPUs which is not online
-> yet. but in the CPU1 wakeup stage, OS only sets CPU1 to be online
-> after local timer is set, so that causes the irq_set_affinity not
-> work. this patch moves to irq_force_affinity() for the low level
-> boot stage.
->
-> Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
->   drivers/clocksource/timer-marco.c |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/clocksource/timer-marco.c b/drivers/clocksource/timer-marco.c
-> index 571d109..dbd3039 100644
-> --- a/drivers/clocksource/timer-marco.c
-> +++ b/drivers/clocksource/timer-marco.c
-> @@ -199,7 +199,7 @@ static int sirfsoc_local_timer_setup(struct clock_event_device *ce)
->
->   	action->dev_id = ce;
->   	BUG_ON(setup_irq(ce->irq, action));
-> -	irq_set_affinity(action->irq, cpumask_of(cpu));
-> +	irq_force_affinity(action->irq, cpumask_of(cpu));
->
->   	clockevents_register_device(ce);
->   	return 0;
+On Fri, May 16, 2014 at 10:50:39AM +0100, Mark Rutland wrote:
+> --- a/arch/arm64/Kconfig.debug
+> +++ b/arch/arm64/Kconfig.debug
+> @@ -37,4 +37,35 @@ config PID_IN_CONTEXTIDR
+>  	  instructions during context switch. Say Y here only if you are
+>  	  planning to use hardware trace tools with this kernel.
+>  
+> +config ARM64_RANDOMIZE_TEXT_OFFSET
+> +	bool "Randomize TEXT_OFFSET at build time (EXPERIMENTAL)"
+> +	default N
 
-Applied to my tree as 3.15 fix.
+(nitpick: no need for default n)
 
-Thanks
-   -- Daniel
+I think that's good for testing. It would have been nice to be able to
+set some limits for the random offset but I can't figure out an easy way
+to do this via Kconfig (maybe with additional options).
 
+> +config ARM64_TEXT_OFFSET
+> +	hex "Required image load offset"
+> +	depends on !ARM64_RANDOMIZE_TEXT_OFFSET
+> +	default "0x0000000000080000"
 
+I don't think we should include this. It encourages people to set
+specific offsets for their SoCs.
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Catalin
