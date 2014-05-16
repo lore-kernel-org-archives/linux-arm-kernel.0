@@ -1,125 +1,44 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 16 May 2014 11:43:30 -0400
-Subject: [PATCH cgroup/for-3.16] cgroup: introduce CSS_NO_REF and skip
- refcnting on normal root csses
-In-Reply-To: <20140516143718.GA5379@htj.dyndns.org>
-References: <1399670015-23463-1-git-send-email-tj@kernel.org>
- <1399670015-23463-10-git-send-email-tj@kernel.org>
- <53751062.2050401@wwwdotorg.org> <53753823.2090402@wwwdotorg.org>
- <20140516143718.GA5379@htj.dyndns.org>
-Message-ID: <20140516154330.GB5379@htj.dyndns.org>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 16 May 2014 11:54:11 -0400
+Subject: [PATCH] arm64: fix pud_huge() for 2-level pagetables
+In-Reply-To: <20140516100434.GG5624@arm.com>
+References: <1400163562-7481-1-git-send-email-msalter@redhat.com>
+ <20140516100434.GG5624@arm.com>
+Message-ID: <1400255651.21547.214.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From 49035d695d8f1c4bbe4e37480e5d06812818947c Mon Sep 17 00:00:00 2001
-From: Tejun Heo <tj@kernel.org>
-Date: Fri, 16 May 2014 11:40:33 -0400
+On Fri, 2014-05-16 at 11:04 +0100, Catalin Marinas wrote:
+> On Thu, May 15, 2014 at 03:19:22PM +0100, Mark Salter wrote:
+> > diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+> > index 5e9aec3..9bed38f 100644
+> > --- a/arch/arm64/mm/hugetlbpage.c
+> > +++ b/arch/arm64/mm/hugetlbpage.c
+> > @@ -51,7 +51,11 @@ int pmd_huge(pmd_t pmd)
+> >  
+> >  int pud_huge(pud_t pud)
+> >  {
+> > +#ifndef __PAGETABLE_PMD_FOLDED
+> >  	return !(pud_val(pud) & PUD_TABLE_BIT);
+> > +#else
+> > +	return 0;
+> > +#endif
+> >  }
+> >  
+> >  int pmd_huge_support(void)
+> > @@ -64,8 +68,10 @@ static __init int setup_hugepagesz(char *opt)
+> >  	unsigned long ps = memparse(opt, &opt);
+> >  	if (ps == PMD_SIZE) {
+> >  		hugetlb_add_hstate(PMD_SHIFT - PAGE_SHIFT);
+> > +#ifndef __PAGETABLE_PMD_FOLDED
+> >  	} else if (ps == PUD_SIZE) {
+> >  		hugetlb_add_hstate(PUD_SHIFT - PAGE_SHIFT);
+> > +#endif
+> 
+> Since PMD_SIZE == PUD_SIZE when __PAGETABLE_PMD_FOLDED, do we need the
+> #ifndef here? Maybe the compiler is smart enough to remove it but it's
+> not on a critical path anyway, so I wouldn't bother.
+> 
 
-9395a4500404 ("cgroup: enable refcnting for root csses") enabled
-reference counting for root csses (cgroup_subsys_states) so that
-cgroup's self csses can be used to manage the lifetime of the
-containing cgroups.
-
-Unfortunately, this change was incorrect.  cpu controller uses
-early_init and starts using css reference counts on its root css from
-then on.  percpu_ref can't initialized during early init and its
-initialization is deferred till cgroup_init() time.  This means that
-cpu was using percpu_ref which wasn't properly initialized.  Due to
-the way percpu variables are laid out on x86, this didn't blow up
-immediately on x86 but ended up incrementing and decrementing the
-percpu variable at offset zero, whatever it may be; however, on other
-archs, this caused fault and early boot failure.
-
-As cgroup self csses still need working refcounting, we can't revert
-9395a4500404.  This patch adds CSS_NO_REF which explicitly inhibits
-reference counting on the css and sets it on all normal (non-self)
-csses.
-
-Signed-off-by: Tejun Heo <tj@kernel.org>
-Reported-by: Stephen Warren <swarren@wwwdotorg.org>
-Fixes: 9395a4500404 ("cgroup: enable refcnting for root csses")
----
-Patch applied to cgroup/for-3.16.
-
-Thanks.
-
- include/linux/cgroup.h | 11 ++++++++---
- kernel/cgroup.c        |  9 +++++++--
- 2 files changed, 15 insertions(+), 5 deletions(-)
-
-diff --git a/include/linux/cgroup.h b/include/linux/cgroup.h
-index 76dadd77..1737db0 100644
---- a/include/linux/cgroup.h
-+++ b/include/linux/cgroup.h
-@@ -77,6 +77,7 @@ struct cgroup_subsys_state {
- 
- /* bits in struct cgroup_subsys_state flags field */
- enum {
-+	CSS_NO_REF	= (1 << 0), /* no reference counting for this css */
- 	CSS_ONLINE	= (1 << 1), /* between ->css_online() and ->css_offline() */
- };
- 
-@@ -88,7 +89,8 @@ enum {
-  */
- static inline void css_get(struct cgroup_subsys_state *css)
- {
--	percpu_ref_get(&css->refcnt);
-+	if (!(css->flags & CSS_NO_REF))
-+		percpu_ref_get(&css->refcnt);
- }
- 
- /**
-@@ -103,7 +105,9 @@ static inline void css_get(struct cgroup_subsys_state *css)
-  */
- static inline bool css_tryget_online(struct cgroup_subsys_state *css)
- {
--	return percpu_ref_tryget_live(&css->refcnt);
-+	if (!(css->flags & CSS_NO_REF))
-+		return percpu_ref_tryget_live(&css->refcnt);
-+	return true;
- }
- 
- /**
-@@ -114,7 +118,8 @@ static inline bool css_tryget_online(struct cgroup_subsys_state *css)
-  */
- static inline void css_put(struct cgroup_subsys_state *css)
- {
--	percpu_ref_put(&css->refcnt);
-+	if (!(css->flags & CSS_NO_REF))
-+		percpu_ref_put(&css->refcnt);
- }
- 
- /* bits in struct cgroup flags field */
-diff --git a/kernel/cgroup.c b/kernel/cgroup.c
-index c01e8e8..ad15bb7 100644
---- a/kernel/cgroup.c
-+++ b/kernel/cgroup.c
-@@ -4593,11 +4593,17 @@ static void __init cgroup_init_subsys(struct cgroup_subsys *ss, bool early)
- 	/* We don't handle early failures gracefully */
- 	BUG_ON(IS_ERR(css));
- 	init_and_link_css(css, ss, &cgrp_dfl_root.cgrp);
-+
-+	/*
-+	 * Root csses are never destroyed and we can't initialize
-+	 * percpu_ref during early init.  Disable refcnting.
-+	 */
-+	css->flags |= CSS_NO_REF;
-+
- 	if (early) {
- 		/* allocation can't be done safely during early init */
- 		css->id = 1;
- 	} else {
--		BUG_ON(percpu_ref_init(&css->refcnt, css_release));
- 		css->id = cgroup_idr_alloc(&ss->css_idr, css, 1, 2, GFP_KERNEL);
- 		BUG_ON(css->id < 0);
- 	}
-@@ -4684,7 +4690,6 @@ int __init cgroup_init(void)
- 			struct cgroup_subsys_state *css =
- 				init_css_set.subsys[ss->id];
- 
--			BUG_ON(percpu_ref_init(&css->refcnt, css_release));
- 			css->id = cgroup_idr_alloc(&ss->css_idr, css, 1, 2,
- 						   GFP_KERNEL);
- 			BUG_ON(css->id < 0);
--- 
-1.9.0
+Yes, I think it would remove it. In any case, one less ifdef would be
+a good thing.
