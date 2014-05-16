@@ -1,15 +1,16 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 May 2014 09:58:43 +0900
-Subject: [PATCH 2/9] ARM: shmobile: Use r8a7740 DT CPU Frequency in common case
+Date: Fri, 16 May 2014 09:58:44 +0900
+Subject: [PATCH 3/9] ARM: shmobile: Use r8a7740 DT CPU Frequency for Armadillo
+ DT Ref
 In-Reply-To: <cover.1400200838.git.horms+renesas@verge.net.au>
 References: <cover.1400200838.git.horms+renesas@verge.net.au>
-Message-ID: <a0c1fb0c285d9aa5f9d078449cfa37883a3f5a91.1400200838.git.horms+renesas@verge.net.au>
+Message-ID: <e568802d13eb1dbcbe688aa4e7cf1db866a52e3e.1400200838.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Convert the common C-code-less r8a7740 DT board support
+Convert the Armadillo r8a7740 DT reference board support
 to use shmobile_init_delay() to be able to migrate away
 from per-SoC delay setup functions.
 
@@ -17,21 +18,21 @@ Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Tested-by: Geert Uytterhoeven <geert@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7740.c | 2 +-
+ arch/arm/mach-shmobile/board-armadillo800eva-reference.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 8f3c681..d1ce3ca 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -935,7 +935,7 @@ static const char *r8a7740_boards_compat_dt[] __initdata = {
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+index 57d1a78..57d246e 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+@@ -187,7 +187,7 @@ static const char *eva_boards_compat_dt[] __initdata = {
  
- DT_MACHINE_START(R8A7740_DT, "Generic R8A7740 (Flattened Device Tree)")
+ DT_MACHINE_START(ARMADILLO800EVA_DT, "armadillo800eva-reference")
  	.map_io		= r8a7740_map_io,
 -	.init_early	= r8a7740_init_delay,
 +	.init_early	= shmobile_init_delay,
  	.init_irq	= r8a7740_init_irq_of,
- 	.init_machine	= r8a7740_generic_init,
- 	.dt_compat	= r8a7740_boards_compat_dt,
+ 	.init_machine	= eva_init,
+ 	.init_late	= shmobile_init_late,
 -- 
 1.8.5.2
