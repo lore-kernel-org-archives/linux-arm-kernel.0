@@ -1,51 +1,60 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Fri, 16 May 2014 14:54:58 +0200
-Subject: [PATCH] ARM: zynq: dt: Add a fixed regulator for CPU voltage
-In-Reply-To: <e9675d40-2fd9-4fed-a020-5b465ea1842d@BN1BFFO11FD047.protection.gbl>
-References: <1399064852-19569-1-git-send-email-soren.brinkmann@xilinx.com>
- <e9675d40-2fd9-4fed-a020-5b465ea1842d@BN1BFFO11FD047.protection.gbl>
-Message-ID: <53760AA2.4040703@monstr.eu>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 16 May 2014 08:58:47 -0400
+Subject: [PATCHv4 3/3] ARM: mvebu: implement L2/PCIe deadlock workaround
+In-Reply-To: <20140516090727.5264dc75@free-electrons.com>
+References: <1400165974-9059-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1400165974-9059-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140516060851.GF27822@titan.lakedaemon.net>
+ <20140516090727.5264dc75@free-electrons.com>
+Message-ID: <20140516125847.GG27822@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2014 04:57 PM, S?ren Brinkmann wrote:
-> ping? Any comments?
+On Fri, May 16, 2014 at 09:07:27AM +0200, Thomas Petazzoni wrote:
+> Dear Jason Cooper,
 > 
-> 	Thanks,
-> 	S?ren
+> On Fri, 16 May 2014 02:08:51 -0400, Jason Cooper wrote:
+> > On Thu, May 15, 2014 at 04:59:34PM +0200, Thomas Petazzoni wrote:
+> > > The Marvell Armada 375 and Armada 38x SOCs, which use the Cortex-A9
+> > > CPU core, the PL310 cache and the Marvell PCIe hardware block are
+> > > affected a L2/PCIe deadlock caused by a system erratum when hardware
+> > > I/O coherency is used.
+> > > 
+> > > This deadlock can be avoided by mapping the PCIe memory areas as
+> > > strongly-ordered (note: MT_UNCACHED is strongly-ordered), and by
+> > > removing the outer cache sync done in software. This is implemented in
+> > > this patch by:
+> > > 
+> > >  * Registering a custom arch_ioremap_caller function that allows to
+> > >    make sure PCI memory regions are mapped MT_UNCACHED.
+> > > 
+> > >  * Adding at runtime the 'arm,io-coherent' property to the PL310 cache
+> > >    controller. This cannot be done permanently in the DT, because the
+> > >    hardware I/O coherency can only be enabled when CONFIG_SMP is
+> > >    enabled, in the current kernel situation.
+> > > 
+> > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > > ---
+> > >  arch/arm/mach-mvebu/coherency.c | 39 +++++++++++++++++++++++++++++++++++++++
+> > >  1 file changed, 39 insertions(+)
+> > 
+> > Applied to mvebu/soc.
 > 
-> On Fri, 2014-05-02 at 02:07PM -0700, Soren Brinkmann wrote:
->> To silence the warning
->> 	cpufreq_cpu0: failed to get cpu0 regulator: -19
->> from the cpufreq driver regarding a missing regulator,
->> add a fixed regulator to the DT.
->> Zynq does not support voltage scaling and the CPU rail should always be
->> supplied with 1 V, hence it is added in the SOC-level dtsi.
->>
->> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
->> ---
->>
->>  arch/arm/boot/dts/zynq-7000.dtsi | 10 ++++++++++
->>  1 file changed, 10 insertions(+)
+> Hum, well, I believe it's OK, but notice that I will very likely have
+> to do a followup patch, because the solution of making all PCI I/O
+> mappings use the MT_UNCACHED memory type, suggested by Arnd, has not
+> been accepted by Will Deacon. So very likely I will have to change
+> again the mach-mvebu/coherency.c code to call a function that makes PCI
+> I/O mappings MT_UNCACHED specifically for the mach-mvebu platform. But
+> that can indeed be a followup patch.
 
-Probably no objection from others.
-Applied to zynq/dt branch.
+Ahh, my mistake.  It was late.  I saw the arm,io-coherent was settled
+and mistakenly thought the other proposed changes wouldn't affect this
+patch.
 
-Thanks,
-Michal
+I could easily drop it if you like.  It's currently the tip of mvebu/soc
+and I haven't done a signed tag for it yet.
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+thx,
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140516/4b47294a/attachment-0001.sig>
+Jason.
