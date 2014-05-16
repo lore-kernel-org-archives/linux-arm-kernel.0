@@ -1,75 +1,35 @@
-From: emilgoode@gmail.com (Emil Goode)
-Date: Fri, 16 May 2014 11:54:05 +0200
-Subject: [PATCH v2] ARM: imx: fix error handling
-Message-ID: <1400234045-6022-1-git-send-email-emilgoode@gmail.com>
+From: jhbird.choi@samsung.com (Jonghwan Choi)
+Date: Fri, 16 May 2014 18:57:38 +0900
+Subject: [PATCH v2] cpufreq: exynos:  Fix the compile error
+In-Reply-To: <5375D150.1020109@gmail.com>
+References: <000001cf70dc$9ccfe4e0$d66faea0$@samsung.com>
+ <5375D150.1020109@gmail.com>
+Message-ID: <000001cf70ed$451bbec0$cf533c40$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we fail to allocate struct platform_device pdev we
-dereference it after the goto label err.
+On 16.05.2014 5:50 PM, Tomasz Figa wrote:
 
-I have rearranged the error handling a bit to fix the issue
-and also make it more clear.
+> We have been discussing Exynos cpufreq framework rework, including DT support since quite a long time.
+> so if you want to know details, please look at respective discussion threads. I don't have time to
+> find them for you right now, but if you look for threads of cpufreq patches by Thomas Abraham and ones
+> about Exynos multiplatform support, then you should have quite complete set of information.
+> 
+I will check that.
 
-Signed-off-by: Emil Goode <emilgoode@gmail.com>
----
-v2: Changed to return -ENOMEM instead of ret where possible and
-    updated the subject line.
+> In general, I can see three ways to "fix" this for 3.15:
+> 
+> 1) revert moving soc_is_* macros to mach-exynos/common.h,
+> 
+> 2) move soc_is_* macros to a header in mach-exynos/include/mach/,
+> 
+> 3) use of_machine_is_compatible() or of_match_node() on root node in this driver to match directly
+> with SoC compatible strings.
+> 
+> Probably option 3) would be preferred, as it would remove some of the dependencies of this driver on
+> arch code and including plat/cpu.h (or mach/cpu.h as would be introduced by 2)) would be no longer
+> necessary.
 
- arch/arm/mach-imx/devices/platform-ipu-core.c |   22 +++++++++++++---------
- 1 file changed, 13 insertions(+), 9 deletions(-)
+Thanks~
 
-diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
-index fc4dd7c..68f2a4a 100644
---- a/arch/arm/mach-imx/devices/platform-ipu-core.c
-+++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
-@@ -77,34 +77,38 @@ struct platform_device *__init imx_alloc_mx3_camera(
- 
- 	pdev = platform_device_alloc("mx3-camera", 0);
- 	if (!pdev)
--		goto err;
-+		return ERR_PTR(-ENOMEM);
- 
- 	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
- 	if (!pdev->dev.dma_mask)
--		goto err;
-+		goto put_pdev;
- 
- 	*pdev->dev.dma_mask = DMA_BIT_MASK(32);
- 	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
- 
- 	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
- 	if (ret)
--		goto err;
-+		goto free_dma_mask;
- 
- 	if (pdata) {
- 		struct mx3_camera_pdata *copied_pdata;
- 
- 		ret = platform_device_add_data(pdev, pdata, sizeof(*pdata));
--		if (ret) {
--err:
--			kfree(pdev->dev.dma_mask);
--			platform_device_put(pdev);
--			return ERR_PTR(-ENODEV);
--		}
-+		if (ret)
-+			goto free_dma_mask;
-+
- 		copied_pdata = dev_get_platdata(&pdev->dev);
- 		copied_pdata->dma_dev = &imx_ipu_coredev->dev;
- 	}
- 
- 	return pdev;
-+
-+free_dma_mask:
-+	kfree(pdev->dev.dma_mask);
-+put_pdev:
-+	platform_device_put(pdev);
-+
-+	return ERR_PTR(ret);
- }
- 
- struct platform_device *__init imx_add_mx3_sdc_fb(
--- 
-1.7.10.4
+Best Regards.
