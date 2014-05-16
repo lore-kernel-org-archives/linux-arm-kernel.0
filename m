@@ -1,53 +1,80 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 16 May 2014 13:20:48 +0200
-Subject: [GIT PULL] Allwinner core for 3.16
-Message-ID: <20140516112048.GA18800@lukather>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 16 May 2014 13:28:53 +0200
+Subject: [PATCH] ARM: dts: Add audio subsystem nodes to exynos4.dtsi
+Message-ID: <1400239733-11782-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+This patch adds the audio subsystem clock controller and the I2S
+IP block nodes for Exynos4 SoC series.
 
-Here is the first of the Allwinner pull requests for the 3.16 merge
-window.
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ arch/arm/boot/dts/exynos4.dtsi |   38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-Thanks!
-Maxime
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 58ff8e2..0eb768c 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -20,6 +20,7 @@
+  */
 
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+ #include <dt-bindings/clock/exynos4.h>
++#include <dt-bindings/clock/exynos-audss-clk.h>
+ #include "skeleton.dtsi"
 
-  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+ / {
+@@ -45,6 +46,23 @@
+ 		fimc3 = &fimc_3;
+ 	};
 
-are available in the git repository at:
++	clock_audss: clock-controller at 03810000 {
++		compatible = "samsung,exynos4210-audss-clock";
++		reg = <0x03810000 0x0C>;
++		#clock-cells = <1>;
++	};
++
++	i2s0: i2s at 03830000 {
++		compatible = "samsung,s5pv210-i2s";
++		reg = <0x03830000 0x100>;
++		clocks = <&clock_audss EXYNOS_I2S_BUS>;
++		clock-names = "iis";
++		dmas = <&pdma0 12>, <&pdma0 11>, <&pdma0 10>;
++		dma-names = "tx", "rx", "tx-sec";
++		samsung,idma-addr = <0x03000000>;
++		status = "disabled";
++	};
++
+ 	chipid at 10000000 {
+ 		compatible = "samsung,exynos4210-chipid";
+ 		reg = <0x10000000 0x100>;
+@@ -289,6 +307,26 @@
+ 		status = "disabled";
+ 	};
 
-  https://github.com/mripard/linux.git tags/sunxi-core-for-3.16
-
-for you to fetch changes up to 324da938cb7eb103a925817f9aacdcc1f0e22576:
-
-  ARM: sunxi: select MFD_SUN6I_PRCM when sun6i arch support is enabled (2014-05-15 17:30:07 +0200)
-
-----------------------------------------------------------------
-Allwinner SoCs core additions for 3.16
-
-Refactor the Kconfig options to have one Kconfig option per machine.
-
-----------------------------------------------------------------
-Boris BREZILLON (1):
-      ARM: sunxi: select MFD_SUN6I_PRCM when sun6i arch support is enabled
-
-Maxime Ripard (1):
-      ARM: sunxi: Split the various SoCs support in Kconfig
-
- arch/arm/mach-sunxi/Kconfig | 38 +++++++++++++++++++++++++++++++-------
- 1 file changed, 31 insertions(+), 7 deletions(-)
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140516/eb8d1c1e/attachment.sig>
++	i2s1: i2s at 13960000 {
++		compatible = "samsung,s5pv210-i2s";
++		reg = <0x13960000 0x100>;
++		clocks = <&clock CLK_I2S1>;
++		clock-names = "iis";
++		dmas = <&pdma1 12>, <&pdma1 11>;
++		dma-names = "tx", "rx";
++		status = "disabled";
++	};
++
++	i2s2: i2s at 13970000 {
++		compatible = "samsung,s5pv210-i2s";
++		reg = <0x13970000 0x100>;
++		clocks = <&clock CLK_I2S2>;
++		clock-names = "iis";
++		dmas = <&pdma0 14>, <&pdma0 13>;
++		dma-names = "tx", "rx";
++		status = "disabled";
++	};
++
+ 	mfc: codec at 13400000 {
+ 		compatible = "samsung,mfc-v5";
+ 		reg = <0x13400000 0x10000>;
+--
+1.7.9.5
