@@ -1,34 +1,86 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 16 May 2014 12:40:40 +0200
-Subject: [PATCH] ARM: pxa: fix typo 'CONFIG_SPI_PXA2XX_MASTER'
-Message-ID: <1400236840.20342.30.camel@x220>
+From: wharms@bfs.de (walter harms)
+Date: Fri, 16 May 2014 12:40:19 +0200
+Subject: [PATCH v2] ARM: imx: fix error handling
+In-Reply-To: <1400234045-6022-1-git-send-email-emilgoode@gmail.com>
+References: <1400234045-6022-1-git-send-email-emilgoode@gmail.com>
+Message-ID: <5375EB13.8000200@bfs.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_SPI_PXA2XX_MASTER was used were it was surely meant to use
-CONFIG_SPI_PXA2XX_MODULE. Use the IS_ENABLED() macro here, as it guards
-against typos like this one.
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Untested, and (hardware) testing for the modular case might be needed.
-This typo was introduced in v2.6.28.
 
- arch/arm/mach-pxa/corgi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Am 16.05.2014 11:54, schrieb Emil Goode:
+> If we fail to allocate struct platform_device pdev we
+> dereference it after the goto label err.
+> 
+> I have rearranged the error handling a bit to fix the issue
+> and also make it more clear.
+> 
+> Signed-off-by: Emil Goode <emilgoode@gmail.com>
+> ---
+> v2: Changed to return -ENOMEM instead of ret where possible and
+>     updated the subject line.
+> 
+>  arch/arm/mach-imx/devices/platform-ipu-core.c |   22 +++++++++++++---------
+>  1 file changed, 13 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
+> index fc4dd7c..68f2a4a 100644
+> --- a/arch/arm/mach-imx/devices/platform-ipu-core.c
+> +++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
+> @@ -77,34 +77,38 @@ struct platform_device *__init imx_alloc_mx3_camera(
+>  
+>  	pdev = platform_device_alloc("mx3-camera", 0);
+>  	if (!pdev)
+> -		goto err;
+> +		return ERR_PTR(-ENOMEM);
+>  
+>  	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
+>  	if (!pdev->dev.dma_mask)
+> -		goto err;
+> +		goto put_pdev;
+>  
+>  	*pdev->dev.dma_mask = DMA_BIT_MASK(32);
+>  	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+>  
+>  	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
+>  	if (ret)
+> -		goto err;
+> +		goto free_dma_mask;
+>  
+>  	if (pdata) {
+>  		struct mx3_camera_pdata *copied_pdata;
+>  
+>  		ret = platform_device_add_data(pdev, pdata, sizeof(*pdata));
+> -		if (ret) {
+> -err:
+> -			kfree(pdev->dev.dma_mask);
+> -			platform_device_put(pdev);
+> -			return ERR_PTR(-ENODEV);
+> -		}
+> +		if (ret)
+> +			goto free_dma_mask;
+> +
+>  		copied_pdata = dev_get_platdata(&pdev->dev);
+>  		copied_pdata->dma_dev = &imx_ipu_coredev->dev;
 
-diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
-index 57d60542f982..ccff8d82cc27 100644
---- a/arch/arm/mach-pxa/corgi.c
-+++ b/arch/arm/mach-pxa/corgi.c
-@@ -513,7 +513,7 @@ static struct pxa2xx_udc_mach_info udc_info __initdata = {
- 	.gpio_pullup		= CORGI_GPIO_USB_PULLUP,
- };
- 
--#if defined(CONFIG_SPI_PXA2XX) || defined(CONFIG_SPI_PXA2XX_MASTER)
-+#if IS_ENABLED(CONFIG_SPI_PXA2XX)
- static struct pxa2xx_spi_master corgi_spi_info = {
- 	.num_chipselect	= 3,
- };
--- 
-1.9.0
+
+the patch is fine, but what use is this copied_pdata ?
+It scope ends next line ?
+
+re,
+ wh
+
+>  	}
+>  
+>  	return pdev;
+> +
+> +free_dma_mask:
+> +	kfree(pdev->dev.dma_mask);
+> +put_pdev:
+> +	platform_device_put(pdev);
+> +
+> +	return ERR_PTR(ret);
+>  }
+>  
+>  struct platform_device *__init imx_add_mx3_sdc_fb(
