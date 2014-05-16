@@ -1,95 +1,111 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 16 May 2014 16:14:02 +0200
-Subject: [PATCHv4 0/5] Add DT support for fixed PHYs
-Message-ID: <1400249647-4643-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri, 16 May 2014 16:14:03 +0200
+Subject: [PATCHv4 1/5] net: phy: decouple PHY id and PHY address in fixed PHY
+ driver
+In-Reply-To: <1400249647-4643-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1400249647-4643-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1400249647-4643-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Subject: Add DT support for fixed PHYs
+Until now, the fixed_phy_add() function was taking as argument
+'phy_id', which was used both as the PHY address on the fake fixed
+MDIO bus, and as the PHY id, as available in the MII_PHYSID1 and
+MII_PHYSID2 registers. However, those two informations are completely
+unrelated.
 
-Hello,
+This patch decouples them. The PHY id of fixed PHYs is hardcoded to be
+0x0. Ideally, a really reserved value would be nicer, but there
+doesn't seem to be an easy of making sure a dummy value can be
+assigned to the Linux kernel for such usage.
 
-Here is a fourth version of the patch set that adds a Device Tree
-binding and the related code to support fixed PHYs. I'm hoping to get
-this merged in 3.16.
+The PHY address remains passed by the caller of phy_fixed_add().
 
-Changes since v3:
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/net/phy/fixed.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
- * Rebased on top of v3.15-rc5
-
- * In patch "net: phy: decouple PHY id and PHY address in fixed PHY
-   driver", changed the PHY ID of fixed PHYs from 0xdeadbeef to 0x0,
-   as suggested by Grant Likely.
-
- * Fixed the !CONFIG_PHY_FIXED case in patch "net: phy: extend fixed
-   driver with fixed_phy_register()". Noticed by Florian Fainelli.
-
- * Added Acked-by from Grant Likely and Florian Fainelli on patch
-   "net: phy: extend fixed driver with fixed_phy_register()".
-
- * Reworked the new fixed-link DT binding to be just a sub-node of the
-   Ethernet MAC node, and not a node referenced by the 'phy'
-   property. This was requested by Grant Likely.
-
- * Reworked the code implementing the new DT binding to also make it
-   accept the old, single property based, DT binding.
-
- * Added a patch that actually uses the new fixed link DT binding for
-   the Armada XP Matrix board.
-
-Changes since v2:
-
- * Rebased on top of v3.14-rc1, and re-tested on hardware.
-
- * Removed the RFC tag, since there seems to be some real interest in
-   this feature, and the code has gone through several iterations
-   already.
-
- * The error handling in fixed_phy_register() has been fixed.
-
-Changes since v1:
-
- * Instead of using a 'fixed-link' property inside the Ethernet device
-   DT node, with a fairly cryptic succession of integer values, we now
-   use a PHY subnode under the Ethernet device DT node, with explicit
-   properties to configure the duplex, speed, pause and other PHY
-   properties.
-
- * The PHY address is automatically allocated by the kernel and no
-   longer visible in the Device Tree binding.
-
- * The PHY device is created directly when the network driver calls
-   of_phy_connect_fixed_link(), and associated to the PHY DT node,
-   which allows the existing of_phy_connect() function to work,
-   without the need to use the deprecated of_phy_connect_fixed_link().
-
-Posts of previous versions:
-
-  RFCv1:   http://www.spinics.net/lists/netdev/msg243253.html
-  RFCv2:   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/196919.html
-  PATCHv3: http://www.spinics.net/lists/netdev/msg273117.html
-
-Thanks,
-
-Thomas
-
-Thomas Petazzoni (5):
-  net: phy: decouple PHY id and PHY address in fixed PHY driver
-  net: phy: extend fixed driver with fixed_phy_register()
-  of: provide a binding for fixed link PHYs
-  net: mvneta: add support for fixed links
-  ARM: mvebu: use the fixed-link PHY DT binding for the Armada XP Matrix
-    board
-
- .../devicetree/bindings/net/fixed-link.txt         | 31 +++++++++
- arch/arm/boot/dts/armada-xp-matrix.dts             |  4 ++
- drivers/net/ethernet/marvell/mvneta.c              | 19 ++++-
- drivers/net/phy/fixed.c                            | 81 +++++++++++++++++++---
- drivers/of/of_mdio.c                               | 67 ++++++++++++++++++
- include/linux/of_mdio.h                            | 15 ++++
- include/linux/phy_fixed.h                          | 11 +++
- 7 files changed, 215 insertions(+), 13 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/fixed-link.txt
-
+diff --git a/drivers/net/phy/fixed.c b/drivers/net/phy/fixed.c
+index ba55adf..e41546d 100644
+--- a/drivers/net/phy/fixed.c
++++ b/drivers/net/phy/fixed.c
+@@ -31,7 +31,7 @@ struct fixed_mdio_bus {
+ };
+ 
+ struct fixed_phy {
+-	int id;
++	int addr;
+ 	u16 regs[MII_REGS_NUM];
+ 	struct phy_device *phydev;
+ 	struct fixed_phy_status status;
+@@ -104,8 +104,8 @@ static int fixed_phy_update_regs(struct fixed_phy *fp)
+ 	if (fp->status.asym_pause)
+ 		lpa |= LPA_PAUSE_ASYM;
+ 
+-	fp->regs[MII_PHYSID1] = fp->id >> 16;
+-	fp->regs[MII_PHYSID2] = fp->id;
++	fp->regs[MII_PHYSID1] = 0;
++	fp->regs[MII_PHYSID2] = 0;
+ 
+ 	fp->regs[MII_BMSR] = bmsr;
+ 	fp->regs[MII_BMCR] = bmcr;
+@@ -115,7 +115,7 @@ static int fixed_phy_update_regs(struct fixed_phy *fp)
+ 	return 0;
+ }
+ 
+-static int fixed_mdio_read(struct mii_bus *bus, int phy_id, int reg_num)
++static int fixed_mdio_read(struct mii_bus *bus, int phy_addr, int reg_num)
+ {
+ 	struct fixed_mdio_bus *fmb = bus->priv;
+ 	struct fixed_phy *fp;
+@@ -124,7 +124,7 @@ static int fixed_mdio_read(struct mii_bus *bus, int phy_id, int reg_num)
+ 		return -1;
+ 
+ 	list_for_each_entry(fp, &fmb->phys, node) {
+-		if (fp->id == phy_id) {
++		if (fp->addr == phy_addr) {
+ 			/* Issue callback if user registered it. */
+ 			if (fp->link_update) {
+ 				fp->link_update(fp->phydev->attached_dev,
+@@ -138,7 +138,7 @@ static int fixed_mdio_read(struct mii_bus *bus, int phy_id, int reg_num)
+ 	return 0xFFFF;
+ }
+ 
+-static int fixed_mdio_write(struct mii_bus *bus, int phy_id, int reg_num,
++static int fixed_mdio_write(struct mii_bus *bus, int phy_addr, int reg_num,
+ 			    u16 val)
+ {
+ 	return 0;
+@@ -160,7 +160,7 @@ int fixed_phy_set_link_update(struct phy_device *phydev,
+ 		return -EINVAL;
+ 
+ 	list_for_each_entry(fp, &fmb->phys, node) {
+-		if (fp->id == phydev->phy_id) {
++		if (fp->addr == phydev->addr) {
+ 			fp->link_update = link_update;
+ 			fp->phydev = phydev;
+ 			return 0;
+@@ -171,7 +171,7 @@ int fixed_phy_set_link_update(struct phy_device *phydev,
+ }
+ EXPORT_SYMBOL_GPL(fixed_phy_set_link_update);
+ 
+-int fixed_phy_add(unsigned int irq, int phy_id,
++int fixed_phy_add(unsigned int irq, int phy_addr,
+ 		  struct fixed_phy_status *status)
+ {
+ 	int ret;
+@@ -184,9 +184,9 @@ int fixed_phy_add(unsigned int irq, int phy_id,
+ 
+ 	memset(fp->regs, 0xFF,  sizeof(fp->regs[0]) * MII_REGS_NUM);
+ 
+-	fmb->irqs[phy_id] = irq;
++	fmb->irqs[phy_addr] = irq;
+ 
+-	fp->id = phy_id;
++	fp->addr = phy_addr;
+ 	fp->status = *status;
+ 
+ 	ret = fixed_phy_update_regs(fp);
 -- 
 1.9.3
