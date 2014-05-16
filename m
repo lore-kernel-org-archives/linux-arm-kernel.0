@@ -1,29 +1,45 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 16 May 2014 13:23:56 -0400
-Subject: [PATCH v2 cgroup/for-3.16] cgroup: introduce CSS_NO_REF and skip
- refcnting on normal root csses
-In-Reply-To: <5376489C.9010902@wwwdotorg.org>
-References: <1399670015-23463-1-git-send-email-tj@kernel.org>
- <1399670015-23463-10-git-send-email-tj@kernel.org>
- <53751062.2050401@wwwdotorg.org> <53753823.2090402@wwwdotorg.org>
- <20140516143718.GA5379@htj.dyndns.org>
- <20140516154330.GB5379@htj.dyndns.org>
- <537643F9.1030303@wwwdotorg.org>
- <20140516170959.GG5379@htj.dyndns.org>
- <5376489C.9010902@wwwdotorg.org>
-Message-ID: <20140516172356.GH5379@htj.dyndns.org>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 16 May 2014 10:26:01 -0700
+Subject: [PATCH] arm64: Fix linker script entry point
+In-Reply-To: <20140516090116.GB12341@arm.com>
+References: <1400195191.12756.9.camel@smoke> <20140516090116.GB12341@arm.com>
+Message-ID: <1400261161.12756.15.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 11:19:24AM -0600, Stephen Warren wrote:
-> On 05/16/2014 11:09 AM, Tejun Heo wrote:
-> > Can you try this one instead?
-> 
-> Yes, this one works great, thanks.
-> Tested-by: Stephen Warren <swarren@nvidia.com>
+Change the arm64 linker script ENTRY() command to define _text as the
+kernel entry point.
 
-Thanks, I reverted the original one and applied the updated one w/
-your Tested-by tag added.
+The arm64 boot protocol specifies that the kernel must be entered at the
+beginning of the kernel image.  The existing ENTRY() command defined the
+symbol stext as the entry point, which emitted an incorrect entry point,
+but would not cause a runtime error because the existing entry code
+immediately jumps to stext.
 
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+---
+Hi Will,
+
+As requested, here is a fix for the linker script.  There are a lot of ways
+we can define the entry point.  Let me know if you want to do it differently.
+
+-Geoff
+
+ arch/arm64/kernel/vmlinux.lds.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 4ba7a55..f1e6d5c 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -13,7 +13,7 @@
+ #define ARM_EXIT_DISCARD(x)	x
+ 
+ OUTPUT_ARCH(aarch64)
+-ENTRY(stext)
++ENTRY(_text)
+ 
+ jiffies = jiffies_64;
+ 
 -- 
-tejun
+1.9.1
