@@ -1,79 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 16 May 2014 11:01:54 -0700
-Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
- support
-In-Reply-To: <20140516174158.GA11733@earth.universe>
-References: <5371F923.80000@ti.com>
- <CABxcv==_LCw1kPYm17g=h8VfSN2V_qsgXjTnsy-JOetawSv4pA@mail.gmail.com>
- <20140513152518.GA16837@atomide.com> <53730AFB.2090800@ti.com>
- <20140514160216.GD18463@atomide.com> <537487AE.3060906@ti.com>
- <20140515182133.GC23659@atomide.com> <5375A8A8.7080306@ti.com>
- <20140516160717.GD22031@atomide.com>
- <20140516174158.GA11733@earth.universe>
-Message-ID: <20140516180154.GG22031@atomide.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 16 May 2014 14:11:25 -0400 (EDT)
+Subject: [PATCH v3] arm: ioremap: Fix static vm area boundary check.
+In-Reply-To: <1400232920-25079-1-git-send-email-Li.Xiubo@freescale.com>
+References: <1400232920-25079-1-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <alpine.LFD.2.11.1405161403400.17310@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sre@ring0.de> [140516 10:42]:
-> On Fri, May 16, 2014 at 09:07:17AM -0700, Tony Lindgren wrote:
-> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [140515 22:57]:
-> > > On 15/05/14 21:21, Tony Lindgren wrote:
-> > > >> But you're right, having "sharp,ls037v7dw01-omap-dss" in the .dts is an
-> > > >> alternative for the compatible-string conversion we do now. I guess it's
-> > > >> a matter of taste, but I rather hide it inside the kernel, in an
-> > > >> internal omapdss file, than pollute the .dts files with those compatible
-> > > >> strings.
-> > > > 
-> > > > Well it avoid you parsing through all the nodes during booting
-> > > > and leaves out the function to do remapping. And removes the need
-> > > > for maintaining a custom display mapping table. I'd say that's a
-> > > > pretty good list of advantages right there :)
-> > > 
-> > > Yep... I don't know. Maybe I'm being too careful about doing wrong
-> > > things with .dts. I just like it more if any hacks are in kernel code,
-> > > which I can remove without anyone noticing.
-> > > 
-> > > Anyway, we already have board.dts files using the non-omapified
-> > > compatible strings in the mainline, so if I would now add the omapified
-> > > compatible strings to .dts files, those old board.dts files would break.
-> > > 
-> > > So I guess the choice has already been made.
-> > 
-> > I really think you should remove this misuse of device tree code ASAP.
-> > It's better to fix it up now than carry the hack for next two years
-> > and keep on adding to it.
+On Fri, 16 May 2014, Xiubo Li wrote:
+
+> For each vmalloc area, there is one guard page at the end of it.
+> so the vm->size = PAGE_ALIGN(offset + request size) + guard page size.
+
+Nope.  There is no guard page for statically created vmalloc areas.
+
+
+> Signed-off-by: Richard Lee <superlibj8301@gmail.com>
+> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+> Cc: Nicolas Pitre <nico@linaro.org>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> ---
+>  arch/arm/mm/ioremap.c | 8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
 > 
-> IMHO appending -omap-dss to a random device is an even bigger hack,
-> since its adding lots of bloat to the API. Let's assume there is
-> another OS using DT for ARM, but has no proper API for SPI
-> controllers and it introduces your hack to SPI devices. That would
-> mean each SPI device has -omap-spi appended (or -exynos-spi,
-> -foo-spi, ...). At least I would blame them for creating a huge
-> unmaintainable mess.
-
-I think you're misunderstanding. I do not want the naming to
-be Linux specific. The naming should naturally be as hardware
-specific as possible. In this case something like:
-
-compatible = "sharp,ls037v7dw01-dss", "sharp,ls037v7dw01";
-
-Or we should probably use:
-
-compatible = "sharp,ls037v7dw01-dpi", "sharp,ls037v7dw01";
-
-As dpi here reflects the hardware it's connected to. The dss
-is probably a Linux name.
-
-Not use what you're after with the SPI example though, but sounds
-like that's something different.
-
-> I think Tomi's workaround is a much better hack, since it keeps the
-> API clean. If the code simply prefixes "omapdss," to all
-> "child"-devices of omapdss it can be left mostly untouched, too.
-
-AFAIK that remapping not needed at all. All that is already
-available with the compatible flags.
-
-Regards,
-
-Tony
+> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+> index be69333..758e8f7 100644
+> --- a/arch/arm/mm/ioremap.c
+> +++ b/arch/arm/mm/ioremap.c
+> @@ -49,14 +49,18 @@ static struct static_vm *find_static_vm_paddr(phys_addr_t paddr,
+>  	struct vm_struct *vm;
+>  
+>  	list_for_each_entry(svm, &static_vmlist, list) {
+> +		phys_addr_t paddr_end, phys_addr_end;
+> +
+>  		vm = &svm->vm;
+>  		if (!(vm->flags & VM_ARM_STATIC_MAPPING))
+>  			continue;
+>  		if ((vm->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
+>  			continue;
+>  
+> -		if (vm->phys_addr > paddr ||
+> -			paddr + size - 1 > vm->phys_addr + vm->size - 1)
+> +		/* The PAGE_SIZE here is vmalloc area's guard page */
+> +		phys_addr_end = vm->phys_addr + vm->size - PAGE_SIZE - 1;
+> +		paddr_end = paddr + size - 1;
+> +		if (vm->phys_addr > paddr || paddr_end > phys_addr_end)
+>  			continue;
+>  
+>  		return svm;
+> -- 
+> 1.8.4
+> 
