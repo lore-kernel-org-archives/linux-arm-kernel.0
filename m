@@ -1,86 +1,41 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 16 May 2014 17:13:06 +0900
-Subject: [PATCH] cpufreq: exynos: Fix the compile error
-In-Reply-To: <CAKohpokxDQ8w0-fJsyp+i3pLsq5Qyfyev-W8ZXXj8gbyP11pqQ@mail.gmail.com>
-References: <006c01cf70db$7e7f3b90$7b7db2b0$@samsung.com>
- <CAKohpomof3h9GG9WmyehM=H8xP=Qqdx+vtMoy4pkNqCsPvnUbg@mail.gmail.com>
- <CAKohpokxDQ8w0-fJsyp+i3pLsq5Qyfyev-W8ZXXj8gbyP11pqQ@mail.gmail.com>
-Message-ID: <02f801cf70de$ad3eac10$07bc0430$@samsung.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 16 May 2014 11:14:32 +0300
+Subject: [PATCH 00/11] ARM: OMAP: OMAP5 & AM43x DSS
+In-Reply-To: <20140512154850.GG31772@atomide.com>
+References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
+ <5370CBD5.3060107@ti.com> <20140512143604.GB31772@atomide.com>
+ <5370E172.20009@ti.com> <20140512154850.GG31772@atomide.com>
+Message-ID: <5375C8E8.1020209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Viresh Kumar wrote:
+On 12/05/14 18:48, Tony Lindgren wrote:
+
+>>> Also, I'm wondering why we still have .clk and .opt_clks entries in the
+>>> hwmod data for am43xx and omap5 which are both device tree based with
+>>> all the clocks coming from .dts files?
+>>
+>> I think they are needed for the omap_device/hwmod stuff to work. Only
+>> omapdss driver knows about the clocks defined in the .dts files, and the
+>> omap_device/hwmod code still needs to do the reset and maybe some other
+>> tasks that require the clocks.
 > 
-> And please use Rafael's email id from Maintainers..
+> We're already populating the hwmod data from dts entries, that's done by
+> omap_device_build_from_dt. Why aren't we doing that for dt defined clocks?
 > 
-> On 16 May 2014 13:25, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> > On 16 May 2014 13:20, Jonghwan Choi <jhbird.choi@samsung.com> wrote:
-> >> Commit 7da83a80 ("ARM: EXYNOS: Migrate Exynos specific macros from
-> >> plat to
-> >> mach")
-> >
-> > Why do you have a line break here ?
-> >
-> >> which lands in samsung tree causes build breakage for cpufreq-exynos
-> >> like
-> >> following:
-> >
-> > Enter a blank line here..
-> >
-> >> drivers/cpufreq/exynos-cpufreq.c: In function 'exynos_cpufreq_probe':
-> >> drivers/cpufreq/exynos-cpufreq.c:166:2: error: implicit declaration
-> >> of function 'soc_is_exynos4210'
-> >> [-Werror=implicit-function-declaration]
-> >
-> > Let these cross 80 columns, don't break them, its unreadable.
-> >
-> >> drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration
-> >> of function 'soc_is_exynos4212'
-> >> [-Werror=implicit-function-declaration]
-> >> drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration
-> >> of function 'soc_is_exynos4412'
-> >> [-Werror=implicit-function-declaration]
-> >> drivers/cpufreq/exynos-cpufreq.c:170:2: error: implicit declaration
-> >> of function 'soc_is_exynos5250'
-> >> [-Werror=implicit-function-declaration]
-> >> cc1: some warnings being treated as errors
-> >> make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
-> >> make[2]: *** Waiting for unfinished jobs....
-> >> drivers/cpufreq/exynos4x12-cpufreq.c: In function
-> 'exynos4x12_set_clkdiv':
-> >> drivers/cpufreq/exynos4x12-cpufreq.c:118:2: error: implicit
-> >> declaration of function 'soc_is_exynos4212'
-> >> [-Werror=implicit-function-declaration]
-> >> cc1: some warnings being treated as errors
-> >> make[2]: *** [drivers/cpufreq/exynos4x12-cpufreq.o] Error 1
-> >> make[1]: *** [drivers/cpufreq] Error 2
-> >
-> > Two blank lines here.
-> >
-> >> This fixes above error with getting SoC information via DT instead of
-> >> soc_is_exynosXXXX().
-> >>
-> >> Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
-> >> ---
-> >>  .../devicetree/bindings/cpufreq/cpufreq-exynos.txt |   18 ++++++++
-> >>  drivers/cpufreq/Kconfig.arm                        |    4 +-
-> >>  drivers/cpufreq/exynos-cpufreq.c                   |   47
-> >> +++++++++++++++++---
-> >>  drivers/cpufreq/exynos-cpufreq.h                   |    8 ++++
-> >>  drivers/cpufreq/exynos4x12-cpufreq.c               |   11 ++---
-> >>  5 files changed, 72 insertions(+), 16 deletions(-)
-> >
-> > I don't think anybody can call that a fix :)
-> >
-> > So what you have done is combined 'fix' with 'cleanups or improvements'.
-> > That's surely wrong..
-> >
-Well, I think this is really _fix_ the build error, this adds support DT binding for exynos cpufreq stuff though. Because we cannot cover exynos cpufreq without this and you can see that on current -next tree.
+> I'd rather not start adding new data that will then just be removed, that's
+> what people call "pointless extra churn".
 
-> > Just give a simple fix for this breakage that will go in 3.15 and do
-> > the DT stuff in another patch for 3.16..
+I don't know why. I have to say I'm not 100% sure if that's done or not,
+but at least I can't find where it's done.
 
-In 3.15, it should be fine. Please check the -next tree and this should be sent to upstream for 3.16 not 3.15 via samsung tree with the patch (commit ID 7da83a80) which causes the build error.
+ Tomi
 
-Thanks,
-Kukjin
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140516/8531d271/attachment.sig>
