@@ -1,48 +1,52 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Fri, 16 May 2014 10:01:11 -0400
-Subject: [GIT PULL] PSCI v0.2 support and DT bindings
-Message-ID: <CAJ5Y-eb8h=ZO=1ugMTdADmhEidp-znaEVjbL6UzekAGDPdzuSA@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 16 May 2014 16:07:00 +0200
+Subject: [PATCH] clocksource: marco: fix the affinity set for local timer
+ of CPU1
+In-Reply-To: <1399445204-22159-1-git-send-email-21cnbao@gmail.com>
+References: <1399445204-22159-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <53761B84.90109@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer, Marc
+On 05/07/2014 08:46 AM, Barry Song wrote:
+> From: Zhiwu Song <Zhiwu.Song@csr.com>
+>
+> irqchip will reject the affinity set to CPUs which is not online
+> yet. but in the CPU1 wakeup stage, OS only sets CPU1 to be online
+> after local timer is set, so that causes the irq_set_affinity not
+> work. this patch moves to irq_force_affinity() for the low level
+> boot stage.
+>
+> Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> ---
+>   drivers/clocksource/timer-marco.c |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/clocksource/timer-marco.c b/drivers/clocksource/timer-marco.c
+> index 571d109..dbd3039 100644
+> --- a/drivers/clocksource/timer-marco.c
+> +++ b/drivers/clocksource/timer-marco.c
+> @@ -199,7 +199,7 @@ static int sirfsoc_local_timer_setup(struct clock_event_device *ce)
+>
+>   	action->dev_id = ce;
+>   	BUG_ON(setup_irq(ce->irq, action));
+> -	irq_set_affinity(action->irq, cpumask_of(cpu));
+> +	irq_force_affinity(action->irq, cpumask_of(cpu));
+>
+>   	clockevents_register_device(ce);
+>   	return 0;
 
-Please pull in the ARM and ARM64 PSCIv0.2 patchwork from the git
-branch below. These patches have been under review on LKAML since
-early March and are now ACK'd. Also, since these patches are dependent
-on the UAPI header file (uapi/linux/psci.h) added by the KVM PSCIv0.2
-patchwork, it makes sense to submit the whole PSCIv0.2 patchwork (KVM
-and core) as one set.
+Applied to my tree as 3.15 fix.
 
-Cheers,
-Ashwin
+Thanks
+   -- Daniel
 
 
-The following changes since commit 4447a208f7fc2e2dff8c6a8df2a1fd6dd72fb3e2:
 
-  ARM/ARM64: KVM: Advertise KVM_CAP_ARM_PSCI_0_2 to user space
-(2014-04-30 04:18:58 -0700)
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-are available in the git repository at:
-
-  git://git.linaro.org/people/ashwin.chaugule/leg-kernel.git kvm-next-psci-v0.2
-
-for you to fetch changes up to c814ca029e1015bb0ecec312f4bb9751ba1a711a:
-
-  ARM: Check if a CPU has gone offline (2014-05-15 10:16:30 -0400)
-
-----------------------------------------------------------------
-Ashwin Chaugule (3):
-      PSCI: Add initial support for PSCIv0.2 functions
-      Documentation: devicetree: Add new binding for PSCIv0.2
-      ARM: Check if a CPU has gone offline
-
- Documentation/devicetree/bindings/arm/psci.txt |  37 +++-
- arch/arm/include/asm/psci.h                    |   7 +-
- arch/arm/kernel/psci.c                         | 196 +++++++++++++++++----
- arch/arm/kernel/psci_smp.c                     |  33 ++++
- arch/arm64/include/asm/cpu_ops.h               |   2 +
- arch/arm64/include/asm/psci.h                  |   2 +-
- arch/arm64/kernel/psci.c                       | 231 +++++++++++++++++++++----
- arch/arm64/kernel/smp.c                        |  22 +++
- 8 files changed, 452 insertions(+), 78 deletions(-)
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
