@@ -1,51 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 May 2014 13:42:58 +0900
-Subject: [PATCH 1/4] ARM: shmobile: r8a7779: Add Maximum CPU Frequency to DTS
+Date: Fri, 16 May 2014 13:43:00 +0900
+Subject: [PATCH 3/4] ARM: shmobile: marzen-reference: Use DT CPU Frequency
 In-Reply-To: <1400215381-7027-1-git-send-email-horms+renesas@verge.net.au>
 References: <1400215381-7027-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1400215381-7027-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1400215381-7027-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add 1GHz to the r8a7779 DTS to describe the maximum CPU frequency.
+Convert the Marzen DT reference board support to use shmobile_init_delay()
+to be able to migrate away from per-SoC delay setup functions.
 
-Based on work by Magnus dam for the r8a7740 SoC.
+Based on work for the Armadillo800 EVA board by Magnus Damm.
 
 Cc: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7779.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-shmobile/board-marzen-reference.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index bdaaadc..038c16a 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -26,21 +26,25 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <0>;
-+			clock-frequency = <1000000000>;
- 		};
- 		cpu at 1 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <1>;
-+			clock-frequency = <1000000000>;
- 		};
- 		cpu at 2 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <2>;
-+			clock-frequency = <1000000000>;
- 		};
- 		cpu at 3 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <3>;
-+			clock-frequency = <1000000000>;
- 		};
- 	};
- 
+diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
+index c6c133d..dbfec58 100644
+--- a/arch/arm/mach-shmobile/board-marzen-reference.c
++++ b/arch/arm/mach-shmobile/board-marzen-reference.c
+@@ -66,7 +66,7 @@ static const char *marzen_boards_compat_dt[] __initdata = {
+ DT_MACHINE_START(MARZEN, "marzen")
+ 	.smp		= smp_ops(r8a7779_smp_ops),
+ 	.map_io		= r8a7779_map_io,
+-	.init_early	= r8a7779_init_delay,
++	.init_early	= shmobile_init_delay,
+ 	.init_time	= marzen_init_timer,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+ 	.init_irq	= r8a7779_init_irq_dt,
 -- 
 1.8.5.2
