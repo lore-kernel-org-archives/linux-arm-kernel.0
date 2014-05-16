@@ -1,135 +1,137 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 15 May 2014 18:22:34 -0700
-Subject: [PATCH v4 1/6] watchdog: Add API to trigger reboots
-In-Reply-To: <1400186304-1691-2-git-send-email-linux@roeck-us.net>
-References: <1400186304-1691-1-git-send-email-linux@roeck-us.net>
- <1400186304-1691-2-git-send-email-linux@roeck-us.net>
-Message-ID: <20140516012234.GA16592@roeck-us.net>
+From: superlibj8301@gmail.com (Richard Lee)
+Date: Fri, 16 May 2014 09:45:44 +0800
+Subject: [PATCHv2] ARM: ioremap: Fix static vm area boundary checking.
+In-Reply-To: <alpine.LFD.2.11.1405151325250.17310@knanqh.ubzr>
+References: <1400142562-9111-1-git-send-email-superlibj8301@gmail.com>
+ <alpine.LFD.2.11.1405151325250.17310@knanqh.ubzr>
+Message-ID: <CAHPCO9GrwRczw2R9nZDL0tDdYxSHV0f2aDhFSat+xhhiWaYbUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some hardware implements reboot through its watchdog hardware,
-for example by triggering a watchdog timeout. Platform specific
-code starts to spread into watchdog drivers, typically by setting
-pointers to a callback functions which is then called from the
-platform reset handler.
+On Fri, May 16, 2014 at 1:28 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Thu, 15 May 2014, Richard Lee wrote:
+>
+>> Static vm area boundary check:
+>>
+>>       paddr1 --->|       |
+>>                  |       |
+>>                  |-------| <-\--- svm->vm->addr(is page aligned)
+>>       paddr2 --->|       |    |
+>>                  |     --| <--|-- svm->vm->phys_addr
+>>                  |       |    |
+>>       paddr3 --->|       |    |
+>>                  |       |    |
+>>                  |-------| <--|-- next page boundary
+>>                  |       |    |
+>>       paddr4 --->|       |    | <----- svm->vm->size(including guard page)
+>>                  |       |    |
+>>                  |       |    |
+>> max paddr_end -->|-------| <--|-- svm->vm's phys_addr_end
+>>                  | ///// |    |
+>>       paddr5 --->| guard |    |
+>>                  | page  |    |
+>>                  | ///// |    |
+>>                   -------  <-/--- svm->vm->addr + svm->vm_size
+>>
+>> <1> If the paddr == paddr1, then continue;
+>> <2> If the paddr == paddr2~paddr4 and paddr_end > phys_addr_end,
+>>     then continue;
+>> <3> if the paddr >= paddr5 then continue;
+>>
+>> Signed-off-by: Richard Lee <superlibj8301@gmail.com>
+>
+> instead of doing this repeatedly, why not simply ensure the recorded
+> static vm information is already page aligned in the first place?
+>
 
-To simplify code and provide a unified API to trigger reboots by
-watchdog drivers, provide a single API to trigger such reboots
-through the watchdog subsystem.
+Sorry, I'm not very sure what vm information you meant here.
 
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
-v4: Protect accesses to wdd_reboot_dev with spinlock to avoid potential
-    race conditions.
-    Drop Acked-by and Tested-by tags because changes are too significant
-    and warrant re-evaluation and re-testing.
-v3: Drop reboot mode and cmd string parameters from API
-v2: Remove unnecessary check for ops in reboot function
+And the 'svm->vm->addr' and 'svm->vm->size' are all page aligned
+already, but we cannot make sure that the 'paddr' and
+'svm->vm->phys_addr' are page aligned.
 
- drivers/watchdog/watchdog_core.c | 27 +++++++++++++++++++++++++++
- include/linux/watchdog.h         |  8 ++++++++
- 2 files changed, 35 insertions(+)
 
-diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
-index cec9b55..e61f4ed 100644
---- a/drivers/watchdog/watchdog_core.c
-+++ b/drivers/watchdog/watchdog_core.c
-@@ -37,12 +37,27 @@
- #include <linux/idr.h>		/* For ida_* macros */
- #include <linux/err.h>		/* For IS_ERR macros */
- #include <linux/of.h>		/* For of_get_timeout_sec */
-+#include <linux/spinlock.h>	/* For spinlock */
- 
- #include "watchdog_core.h"	/* For watchdog_dev_register/... */
- 
- static DEFINE_IDA(watchdog_ida);
- static struct class *watchdog_class;
- 
-+static DEFINE_SPINLOCK(wdd_reboot_lock);
-+static struct watchdog_device *wdd_reboot_dev;
-+
-+void watchdog_do_reboot(void)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&wdd_reboot_lock, flags);
-+	if (wdd_reboot_dev)
-+		wdd_reboot_dev->ops->reboot(wdd_reboot_dev);
-+	spin_unlock_irqrestore(&wdd_reboot_lock, flags);
-+}
-+EXPORT_SYMBOL(watchdog_do_reboot);
-+
- static void watchdog_check_min_max_timeout(struct watchdog_device *wdd)
- {
- 	/*
-@@ -111,6 +126,7 @@ EXPORT_SYMBOL_GPL(watchdog_init_timeout);
- int watchdog_register_device(struct watchdog_device *wdd)
- {
- 	int ret, id, devno;
-+	unsigned long flags;
- 
- 	if (wdd == NULL || wdd->info == NULL || wdd->ops == NULL)
- 		return -EINVAL;
-@@ -162,6 +178,11 @@ int watchdog_register_device(struct watchdog_device *wdd)
- 		return ret;
- 	}
- 
-+	spin_lock_irqsave(&wdd_reboot_lock, flags);
-+	if (wdd->ops->reboot && !wdd_reboot_dev)
-+		wdd_reboot_dev = wdd;
-+	spin_unlock_irqrestore(&wdd_reboot_lock, flags);
-+
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(watchdog_register_device);
-@@ -177,10 +198,16 @@ void watchdog_unregister_device(struct watchdog_device *wdd)
- {
- 	int ret;
- 	int devno;
-+	unsigned long flags;
- 
- 	if (wdd == NULL)
- 		return;
- 
-+	spin_lock_irqsave(&wdd_reboot_lock, flags);
-+	if (wdd == wdd_reboot_dev)
-+		wdd_reboot_dev = NULL;
-+	spin_unlock_irqrestore(&wdd_reboot_lock, flags);
-+
- 	devno = wdd->cdev.dev;
- 	ret = watchdog_dev_unregister(wdd);
- 	if (ret)
-diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
-index 2a3038e..1e9da0a 100644
---- a/include/linux/watchdog.h
-+++ b/include/linux/watchdog.h
-@@ -23,6 +23,7 @@ struct watchdog_device;
-  * @start:	The routine for starting the watchdog device.
-  * @stop:	The routine for stopping the watchdog device.
-  * @ping:	The routine that sends a keepalive ping to the watchdog device.
-+ * @reboot:	The routine for rebooting the system
-  * @status:	The routine that shows the status of the watchdog device.
-  * @set_timeout:The routine for setting the watchdog devices timeout value.
-  * @get_timeleft:The routine that get's the time that's left before a reset.
-@@ -42,6 +43,7 @@ struct watchdog_ops {
- 	int (*stop)(struct watchdog_device *);
- 	/* optional operations */
- 	int (*ping)(struct watchdog_device *);
-+	void (*reboot)(struct watchdog_device *);
- 	unsigned int (*status)(struct watchdog_device *);
- 	int (*set_timeout)(struct watchdog_device *, unsigned int);
- 	unsigned int (*get_timeleft)(struct watchdog_device *);
-@@ -142,4 +144,10 @@ extern int watchdog_init_timeout(struct watchdog_device *wdd,
- extern int watchdog_register_device(struct watchdog_device *);
- extern void watchdog_unregister_device(struct watchdog_device *);
- 
-+#ifdef CONFIG_WATCHDOG_CORE
-+extern void watchdog_do_reboot(void);
-+#else
-+static inline void watchdog_do_reboot(void) { }
-+#endif
-+
- #endif  /* ifndef _LINUX_WATCHDOG_H */
--- 
-1.9.1
+Thanks,
+
+BRs
+Richard Lee
+
+>
+>
+>> ---
+>>
+>>
+>> Change in V2:
+>>  - PAGE_SIZE --> PAGE_MASK
+>>  - remove the 'size' page size align operation.
+>>
+>>
+>>
+>>
+>>
+>>
+>>  arch/arm/mm/ioremap.c | 40 ++++++++++++++++++++++++++++++++++++++--
+>>  1 file changed, 38 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+>> index be69333..f235ab7 100644
+>> --- a/arch/arm/mm/ioremap.c
+>> +++ b/arch/arm/mm/ioremap.c
+>> @@ -47,16 +47,52 @@ static struct static_vm *find_static_vm_paddr(phys_addr_t paddr,
+>>  {
+>>       struct static_vm *svm;
+>>       struct vm_struct *vm;
+>> +     size_t offset;
+>> +
+>> +     offset = paddr & ~PAGE_MASK;
+>>
+>>       list_for_each_entry(svm, &static_vmlist, list) {
+>> +             phys_addr_t paddr_end, phys_addr_end;
+>> +             size_t vmoff;
+>> +
+>>               vm = &svm->vm;
+>>               if (!(vm->flags & VM_ARM_STATIC_MAPPING))
+>>                       continue;
+>>               if ((vm->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
+>>                       continue;
+>>
+>> -             if (vm->phys_addr > paddr ||
+>> -                     paddr + size - 1 > vm->phys_addr + vm->size - 1)
+>> +             /* Static vm area boundary check:
+>> +              *
+>> +              *       paddr1 --->|       |
+>> +              *                  |       |
+>> +              *                  |-------| <-\--- svm->vm->addr(page aligned)
+>> +              *       paddr2 --->|       |    |
+>> +              *                  |     --| <--|-- svm->vm->phys_addr
+>> +              *                  |       |    |
+>> +              *       paddr3 --->|       |    |
+>> +              *                  |       |    |
+>> +              *                  |-------| <--|-- next page boundary
+>> +              *                  |       |    |
+>> +              *       paddr4 --->|       |    | <----- svm->vm->size,
+>> +              *                  |       |    |         including guard page
+>> +              *                  |       |    |
+>> +              * max paddr_end -->|-------| <--|-- svm->vm's phys_addr_end
+>> +              *                  | ///// |    |
+>> +              *       paddr5 --->| guard |    |
+>> +              *                  | page  |    |
+>> +              *                  | ///// |    |
+>> +              *                   -------  <-/-- svm->vm->addr + svm->vm_size
+>> +              *
+>> +              * <1> If paddr == paddr1, then continue;
+>> +              * <2> If paddr == paddr2~paddr4 and paddr_end > phys_addr_end,
+>> +              *     then continue;
+>> +              * <3> if paddr >= paddr5 then continue;
+>> +              */
+>> +             vmoff = vm->phys_addr & ~PAGE_MASK;
+>> +             phys_addr_end = vm->phys_addr + vm->size - PAGE_SIZE - vmoff;
+>> +             paddr_end = paddr + size - offset;
+>> +             if (__phys_to_pfn(vm->phys_addr) > __phys_to_pfn(paddr) ||
+>> +                     paddr_end - 1 > phys_addr_end - 1)
+>>                       continue;
+>>
+>>               return svm;
+>> --
+>> 1.8.4
+>>
