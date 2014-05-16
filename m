@@ -1,49 +1,58 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Fri, 16 May 2014 16:31:09 +0200
-Subject: [GIT PULL] ARM: STi: DT changes for v3.16
-In-Reply-To: <5375DECA.3050600@linaro.org>
-References: <5375D1A4.2040205@st.com> <5375DECA.3050600@linaro.org>
-Message-ID: <5376212D.5010209@st.com>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Fri, 16 May 2014 20:05:12 +0530
+Subject: [PATCH RFC 3/4] clk: samsung: Add driver to control CLKOUT line
+ on Exynos SoCs
+In-Reply-To: <5375EDFD.1020708@samsung.com>
+References: <1400175151-27779-1-git-send-email-t.figa@samsung.com>
+ <1400175151-27779-4-git-send-email-t.figa@samsung.com>
+ <CAPdUM4P7Z1eLVKuc0N1iPaekM_7kNv7KCve2MgrEziszfnzz7A@mail.gmail.com>
+ <5375EDFD.1020708@samsung.com>
+Message-ID: <CAPdUM4O4RKFZFR_tcwG4pd7E6KMkneG9R_VbZPt+m4fGG_UFVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 05/16/2014 11:47 AM, Srinivas Kandagatla wrote:
+On 16 May 2014 16:22, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Rahul,
 >
+> On 16.05.2014 12:39, Rahul Sharma wrote:
+>> [snip]
+>>> +       gate->lock = &clkout_lock;
+>>> +
+>>> +       mux->reg = reg + EXYNOS_PMU_DEBUG_REG;
+>>> +       mux->mask = EXYNOS_CLKOUT_MUX_MASK;
+>>> +       mux->shift = EXYNOS_CLKOUT_MUX_SHIFT;
+>>> +       mux->lock = &clkout_lock;
+>>> +
+>>> +       clk = clk_register_composite(NULL, "clkout", parent_names,
+>>> +                                       parent_count, &mux->hw,
+>>> +                                       &clk_mux_ops, NULL, NULL, &gate->hw,
+>>> +                                       &clk_gate_ops, 0);
+>>> +       if (IS_ERR(clk))
+>>> +               goto err_unmap;
+>>> +
+>>
+>> Hi Tomasz,
+>>
+>> Do we really need a composite clock here? How about registering
+>> a mux and a gate separately?
 >
-> On 16/05/14 09:51, Maxime Coquelin wrote:
->> Hi Olof, Kevin and Arnd,
->>
->> Please consider these STi DT updates for v3.16.
->>
->> Note that two reset patches are part of this pull request, in order to
->> avoid compilation breakage.
->> Adding these two patches in this pull request has been accepted by
->> Philipp Zabel.
->>
->> The following changes since commit
->> 2542f928b2131a0367e50a4390afc12084cc4cc4:
->>
->>    Merge tag 'renesas-dt2-for-v3.16' of
->> git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas into next/dt
->> (2014-05-05 18:44:12 -0700)
->>
+> What's wrong with a composite clock? It simplifies the code as just a
+> single clock needs to be registered. I don't see any drawbacks compared
+> to registering two clocks separately.
 >
-> renesas ??
 
-As discussed on IRC, I have based this pull request on top of arm_soc's 
-next/dt branch, whereas I should have based in top of v3.15-rc1.
+I always took it as a thumb rule to not to use composite clocks if you
+can easily represent the block using basic clocks structures.
 
-Arnd, Olof, Kevin, is it fine for this time?
-Or should I resend the two pull requests based on top of v3.15-rc1?
-Either ways are fine to me, just let me know!
+There can be a problem when drivers using such clocks assume that such
+clock continue to offer composite functionality for all futures SoCs and
+write code around it. This is what we faced when fixing drivers during
+CCF migration.
 
-Thanks,
-Maxime
-
+> Best regards,
+> Tomasz
 >
->> are available in the git repository at:
->>
->>
->>    git://git.stlinux.com/devel/kernel/linux-sti.git tags/sti-dt-for-v3.16
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
