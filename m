@@ -1,116 +1,60 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 16 May 2014 18:22:55 +0200
-Subject: [PATCH 4/5] usb: host: xhci-plat: add optional PHY support
-In-Reply-To: <1400257376-13251-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1400257376-13251-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1400257376-13251-4-git-send-email-gregory.clement@free-electrons.com>
+Date: Fri, 16 May 2014 18:24:25 +0200
+Subject: [PATCH 0/5] Add support for USB cluster(PHY muxer) on the Armada 375
+ SoC
+Message-ID: <1400257465-13422-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit extends the xhci-plat so that it can optionally be passed
-a reference to a PHY through the Device Tree. It will be useful for
-the Armada 375 SoCs. If no PHY is provided then the behavior of the
-driver is unchanged.
+Hello,
 
-As for the clock, to achieve this, it adds a 'struct phy *' member in
-xhci_hcd. While only used for now in xhci-plat, here again, it might
-be used by other drivers in the future.
+This series adds support for the USB cluster which is on the Armada
+375 SoC. We can mainly see this device as a PHY muxer. After talking
+with Antoine T?nart about it I found a better way than the previous
+series to model it.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/usb/host/xhci-plat.c | 29 ++++++++++++++++++++++++++++-
- drivers/usb/host/xhci.h      |  2 ++
- 2 files changed, 30 insertions(+), 1 deletion(-)
+Only one controller can access to the PHY so instead trying to
+enforcing this condition in the init or the power_on ops, I move it
+the xlate function. Having the two USB controllers enable in the same
+time trying to use the PHY in the same time shouldn't happen and would
+only occur with a wrongly written dts. But if this case occurs then we
+provide a phy to the first one and return an error for the next one.
 
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 0f5f4c8f5bf6..34239b582621 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -15,6 +15,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/phy/phy.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- 
-@@ -94,6 +95,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	struct resource         *res;
- 	struct usb_hcd		*hcd;
- 	struct clk              *clk;
-+	struct phy              *phy;
- 	int			ret;
- 	int			irq;
- 
-@@ -160,9 +162,23 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 			goto unmap_registers;
- 	}
- 
-+	phy = devm_phy_optional_get(&pdev->dev, "usb");
-+	if (IS_ERR(phy)) {
-+		ret = PTR_ERR(phy);
-+		goto disable_clk;
-+	} else {
-+		ret = phy_init(phy);
-+		if (ret)
-+			goto disable_phy;
-+
-+		ret = phy_power_on(phy);
-+		if (ret)
-+			goto disable_phy;
-+	}
-+
- 	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
- 	if (ret)
--		goto disable_clk;
-+		goto power_off_phy;
- 
- 	device_wakeup_enable(hcd->self.controller);
- 
-@@ -198,6 +214,12 @@ put_usb3_hcd:
- dealloc_usb2_hcd:
- 	usb_remove_hcd(hcd);
- 
-+power_off_phy:
-+	if (!IS_ERR(phy))
-+		phy_power_off(phy);
-+disable_phy:
-+	if (!IS_ERR(phy))
-+		phy_exit(phy);
- disable_clk:
- 	if (!IS_ERR(clk))
- 		clk_disable_unprepare(clk);
-@@ -219,6 +241,7 @@ static int xhci_plat_remove(struct platform_device *dev)
- 	struct usb_hcd	*hcd = platform_get_drvdata(dev);
- 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
- 	struct clk *clk = xhci->clk;
-+	struct phy *phy = xhci->phy;
- 
- 	usb_remove_hcd(xhci->shared_hcd);
- 	usb_put_hcd(xhci->shared_hcd);
-@@ -226,6 +249,10 @@ static int xhci_plat_remove(struct platform_device *dev)
- 	usb_remove_hcd(hcd);
- 	if (!IS_ERR(clk))
- 		clk_disable_unprepare(clk);
-+	if (!IS_ERR(phy)) {
-+		phy_power_off(phy);
-+		phy_exit(phy);
-+	}
- 	iounmap(hcd->regs);
- 	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
- 	usb_put_hcd(hcd);
-diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
-index 003dc094ca37..4d2e084f6d2d 100644
---- a/drivers/usb/host/xhci.h
-+++ b/drivers/usb/host/xhci.h
-@@ -1480,6 +1480,8 @@ struct xhci_hcd {
- 	struct msix_entry	*msix_entries;
- 	/* optional clock */
- 	struct clk		*clk;
-+	/* optional phy */
-+	struct phy		*phy;
- 	/* data structures */
- 	struct xhci_device_context_array *dcbaa;
- 	struct xhci_ring	*cmd_ring;
+While in the previous version I tried to enforce the use of the xHCI
+for USB it both controller are used, now it will be the first one
+which will get this usage. However in this case the dts is wrong, so
+the better thing to do for the user is to fix his dts.
+
+During the debug I also noticed that xhci don't handle the PHY so I
+also add the support for an optional phy. This patch is for Mathias
+Nyman.
+
+Thanks,
+
+Gregory
+
+Gregory CLEMENT (5):
+  phy: add support for USB cluster on the Armada 375 SoC
+  Documentation: dt-bindings: document the Armada 375 USB cluster
+    binding
+  ARM: mvebu: add Device Tree description of USB cluster controller on
+    Armada 375
+  usb: host: xhci-plat: add optional PHY support
+  ARM: mvebu: add PHY support to the dts for the USB controllers on
+    Armada 375
+
+ .../bindings/phy/armada-375-usb-phy-cluster.txt    |  20 +++
+ arch/arm/boot/dts/armada-375.dtsi                  |  11 ++
+ drivers/phy/Kconfig                                |   6 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-armada375-usb2.c                   | 140 +++++++++++++++++++++
+ drivers/usb/host/xhci-plat.c                       |  29 ++++-
+ drivers/usb/host/xhci.h                            |   2 +
+ include/dt-bindings/phy/armada-375-usb-cluster.h   |  18 +++
+ 8 files changed, 226 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/armada-375-usb-phy-cluster.txt
+ create mode 100644 drivers/phy/phy-armada375-usb2.c
+ create mode 100644 include/dt-bindings/phy/armada-375-usb-cluster.h
+
 -- 
 1.8.1.2
