@@ -1,34 +1,61 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 16 May 2014 16:11:46 +0200
-Subject: [PATCH v2 0/3] Update the Keymile kirkwood DTS files
-In-Reply-To: <1400230143-15620-1-git-send-email-valentin.longchamp@keymile.com>
-References: <1400230143-15620-1-git-send-email-valentin.longchamp@keymile.com>
-Message-ID: <20140516141146.GH10407@lunn.ch>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 16 May 2014 22:29:11 +0800
+Subject: [GIT PULL]]ARM: sirf: machine update for 3.16
+In-Reply-To: <CAGsJ_4yqTkKu+93Fo_D6NaZMyz4T6_EmKz4gZfyeQCi_uF-3dg@mail.gmail.com>
+References: <CAGsJ_4yqTkKu+93Fo_D6NaZMyz4T6_EmKz4gZfyeQCi_uF-3dg@mail.gmail.com>
+Message-ID: <CAGsJ_4wD=FqxNeuEs47f0D9V+Qhn8jyUQL67iv4rsZ3r2K_3vA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 10:49:00AM +0200, Valentin Longchamp wrote:
-> This series resynchs the Keymile Kirkwood DTS files with mainline since
-> the boards do not boot anymore with the 3.15 rc kernels (to be honest, I
-> have not tested the last 2-3 releases).
-> 
-> The changes are the addition of the PCIe controller for the 98dx4122
-> SoC, the explicit disabling of the SATA phys for this same SoC and
-> finally the enabling of the PCIe controller on the Keymile Reference
-> design.
-> 
-> The series introduces kirkwood-km_common.dtsi that factors the common
-> nodes between kirkwood-km_kirkwood.dts and the new board/design below.
-> 
-> The series also adds a new DTS for another Keymile generic design where
-> the mv64xxx eth interace is configured with fixed parameters to no phy
-> but a switch (for board internal communication).
+2014-05-12 21:59 GMT+08:00 Barry Song <21cnbao@gmail.com>:
+> Hi Arnd, Olof, Kevin,
+>
+> The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
+>
+>   Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
+> tags/sirf-soc-for-3.16
+>
+> for you to fetch changes up to 23d7c66a8b096362d38418521f20af76443696b9:
+>
+>   clocksource: marco: fix the affinity set for local timer of CPU1
+> (2014-05-12 21:43:49 +0800)
+>
+> ----------------------------------------------------------------
+> ARM: sirf: machine update for 3.16
+>
+> most of them fix some minor checkpatch issues according to key customers'
+> requirement.
+> and this patchset also cleanups the clk of clocksource: move to get clk
+> by dts properity and move to irq_force_affinity for the irq affinity set
+> of CPU1 local timer.
+>
+> ----------------------------------------------------------------
+> Bin Shi (2):
+>       clocksource: prima2: fix some minor checkpatch issues
+>       irqchip: sirf: fix one minor checkpatch issue
+>
+> Xianglong Du (1):
+>       ARM: prima2: rstc: fix some minor checkpatch issues
+>
+> Zhiwu Song (2):
+>       clocksource:sirf: remove the hardcode for the clk of timers
+>       clocksource: marco: fix the affinity set for local timer of CPU1
 
-Hi Valentin
+as Daniel has applied this one "clocksource: marco: fix the affinity
+set for local timer of CPU1" to his clk tree, i'll rebuilt the tag by
+dropping this.
 
-Looks good to me.
+>
+>  arch/arm/boot/dts/atlas6.dtsi      |    1 +
+>  arch/arm/boot/dts/prima2.dtsi      |    1 +
+>  arch/arm/mach-prima2/rstc.c        |   34 +++++++++++++++-----------
+>  drivers/clocksource/timer-marco.c  |   10 +++-----
+>  drivers/clocksource/timer-prima2.c |   47 ++++++++++++++++++++++--------------
+>  drivers/irqchip/irq-sirfsoc.c      |    3 ++-
+>  6 files changed, 57 insertions(+), 39 deletions(-)
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
-
-Thanks
-	Andrew
+-barry
