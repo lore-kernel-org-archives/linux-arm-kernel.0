@@ -1,18 +1,59 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 16 May 2014 13:20:29 -0300
-Subject: USB with 3.14.3 not working on Freescale i.mx6
-In-Reply-To: <CACWLcfv6akXuM59m_hX-xB=iQYA4iAx7fZ0T5ZB3-7ik-1GZMw@mail.gmail.com>
-References: <CACWLcfv6akXuM59m_hX-xB=iQYA4iAx7fZ0T5ZB3-7ik-1GZMw@mail.gmail.com>
-Message-ID: <CAOMZO5DzLBWFnOMCsz7W1DHg7g0CnZn2bxwjF6H6XVgMYmw-BQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 May 2014 17:20:06 +0100
+Subject: [PATCH] arm64: fix pud_huge() for 2-level pagetables
+In-Reply-To: <1400255651.21547.214.camel@deneb.redhat.com>
+References: <1400163562-7481-1-git-send-email-msalter@redhat.com>
+ <20140516100434.GG5624@arm.com>
+ <1400255651.21547.214.camel@deneb.redhat.com>
+Message-ID: <20140516162006.GJ5624@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 14, 2014 at 6:17 AM, Till Klocke <till.klocke@yetu.com> wrote:
-> Hello,
->
-> Currently I am trying to get a recent and stable Linux kernel running
-> on a Phytec PhyFlex board based on the i.mx6 processor from Freescale.
+On Fri, May 16, 2014 at 04:54:11PM +0100, Mark Salter wrote:
+> On Fri, 2014-05-16 at 11:04 +0100, Catalin Marinas wrote:
+> > On Thu, May 15, 2014 at 03:19:22PM +0100, Mark Salter wrote:
+> > > diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+> > > index 5e9aec3..9bed38f 100644
+> > > --- a/arch/arm64/mm/hugetlbpage.c
+> > > +++ b/arch/arm64/mm/hugetlbpage.c
+> > > @@ -51,7 +51,11 @@ int pmd_huge(pmd_t pmd)
+> > >  
+> > >  int pud_huge(pud_t pud)
+> > >  {
+> > > +#ifndef __PAGETABLE_PMD_FOLDED
+> > >  	return !(pud_val(pud) & PUD_TABLE_BIT);
+> > > +#else
+> > > +	return 0;
+> > > +#endif
+> > >  }
+> > >  
+> > >  int pmd_huge_support(void)
+> > > @@ -64,8 +68,10 @@ static __init int setup_hugepagesz(char *opt)
+> > >  	unsigned long ps = memparse(opt, &opt);
+> > >  	if (ps == PMD_SIZE) {
+> > >  		hugetlb_add_hstate(PMD_SHIFT - PAGE_SHIFT);
+> > > +#ifndef __PAGETABLE_PMD_FOLDED
+> > >  	} else if (ps == PUD_SIZE) {
+> > >  		hugetlb_add_hstate(PUD_SHIFT - PAGE_SHIFT);
+> > > +#endif
+> > 
+> > Since PMD_SIZE == PUD_SIZE when __PAGETABLE_PMD_FOLDED, do we need the
+> > #ifndef here? Maybe the compiler is smart enough to remove it but it's
+> > not on a critical path anyway, so I wouldn't bother.
+> 
+> Yes, I think it would remove it. In any case, one less ifdef would be
+> a good thing.
 
-Which dts file do you use?
+I merged this patch and dropped the last #ifndef.
 
-USB is functional on other mx6 boards.
+I still have doubts about the kvm code calling put_page more than
+necessary, especially since pud == pmd and the loop continues after
+pud_huge() returns true, but your patch looks harmless.
+
+Unless Steve has any objection, I'll push it to mainline. I also added
+Cc: stable # v3.11+
+
+Thanks.
+
+-- 
+Catalin
