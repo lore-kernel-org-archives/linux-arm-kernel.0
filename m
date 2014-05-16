@@ -1,45 +1,37 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 16 May 2014 13:39:11 +0900
-Subject: [PATCH] ARM: shmobile: Use shmobile_init_late() on r8a7740
-In-Reply-To: <20140516040844.GA2503@verge.net.au>
-References: <20140511231050.19908.86623.sendpatchset@w520>
- <CAMuHMdW4-r8khvk-hJcx1OXqwT0nGsVm3zEnmW6TUhyeDRPWdg@mail.gmail.com>
- <20140513081019.GA10412@verge.net.au>
- <20140516040844.GA2503@verge.net.au>
-Message-ID: <CANqRtoSKosY3HLc-Hgbf2_ToDeL71QzqamWEd97xX9iaD=2oUQ@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 16 May 2014 13:42:59 +0900
+Subject: [PATCH 2/4] ARM: shmobile: r8a7779: Use DT CPU Frequency in common
+ case
+In-Reply-To: <1400215381-7027-1-git-send-email-horms+renesas@verge.net.au>
+References: <1400215381-7027-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1400215381-7027-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Convert the common C-code-less r8a7779 DT board support
+to use shmobile_init_delay() to be able to migrate away
+from per-SoC delay setup functions.
 
-On Fri, May 16, 2014 at 1:08 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, May 13, 2014 at 05:10:20PM +0900, Simon Horman wrote:
->> On Mon, May 12, 2014 at 09:42:15AM +0200, Geert Uytterhoeven wrote:
->> > On Mon, May 12, 2014 at 1:10 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
->> > > From: Magnus Damm <damm+renesas@opensource.se>
->> > >
->> > > Hook up ->init_late for r8a7740 to initialize Suspend-to-RAM
->> > > and CPUIdle in case of C-code less board support for r8a7740.
->> > >
->> > > Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
->> >
->> > Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
->>
->> Thanks, I will queue this up.
->
-> Hi Magnus, Hi Geert,
->
-> As I am currently doing some work for the r8a7779
-> I am wondering if a change like this one is appropriate for that SoC.
-> If so I'll cook one up.
+Based on work by Magnus dam for the r8a7740 SoC.
 
-Yes, we want all SoCs to be converted over. Please take care that some
-DTS change may be needed to specify maximum frequency, so this may
-require a DTB update for the user. Which makes it less nice user
-experience for legacy code - if we care about that at this point. But
-legacy code also often tends to use early devices and other stuff, so
-this probably affects DT SoC code and DT reference board code mostly.
+Cc: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-r8a7779.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Cheers,
-
-/ magnus
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index c0e61d5..3cad080 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -773,7 +773,7 @@ static const char *r8a7779_compat_dt[] __initdata = {
+ 
+ DT_MACHINE_START(R8A7779_DT, "Generic R8A7779 (Flattened Device Tree)")
+ 	.map_io		= r8a7779_map_io,
+-	.init_early	= r8a7779_init_delay,
++	.init_early	= shmobile_init_delay,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+ 	.init_irq	= r8a7779_init_irq_dt,
+ 	.init_machine	= r8a7779_add_standard_devices_dt,
+-- 
+1.8.5.2
