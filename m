@@ -1,50 +1,71 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 16 May 2014 05:46:00 -0500
-Subject: [PATCH 3/3] ARM: dts: OMAP5/DRA7: use omap5-mpu-dpll-clock capable of
- dealing with higher frequencies
-In-Reply-To: <1400237160-25125-1-git-send-email-nm@ti.com>
-References: <1400237160-25125-1-git-send-email-nm@ti.com>
-Message-ID: <1400237160-25125-4-git-send-email-nm@ti.com>
+Date: Fri, 16 May 2014 05:45:57 -0500
+Subject: [PATCH 0/3] ARM: OMAP5+: Support Duty Cycle Correction(DCC)
+Message-ID: <1400237160-25125-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP5432, DRA75x and DRA72x have MPU DPLLs that need Duty Cycle
-Correction(DCC) to operate safely at frequencies >= 1.4GHz.
+Hi,
 
-Switch to "ti,omap5-mpu-dpll-clock" compatible property which provides
-this support.
+This patch series has been carried over in vendor kernel for quiet
+few years now.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/boot/dts/dra7xx-clocks.dtsi   |    2 +-
- arch/arm/boot/dts/omap54xx-clocks.dtsi |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Unfortunately, it was very recently re-discovered and upstream kernel
+is noticed to be broken for OMAP5 1.5GHz - at least we are operating
+DPLL at frequency higher than what it was intended to be when CPUFreq
+is enabled. Thankfully, with nominal voltage(we dont use AVS yet in
+upstream for the mentioned platforms) and margins in trimming, we
+have so far not crashed - but I strongly suspect this might be some
+boundary case survival.
 
-diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index cfb8fc7..aac5522 100644
---- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -277,7 +277,7 @@
- 
- 	dpll_mpu_ck: dpll_mpu_ck {
- 		#clock-cells = <0>;
--		compatible = "ti,omap4-dpll-clock";
-+		compatible = "ti,omap5-mpu-dpll-clock";
- 		clocks = <&sys_clkin1>, <&mpu_dpll_hs_clk_div>;
- 		reg = <0x0160>, <0x0164>, <0x016c>, <0x0168>;
- 	};
-diff --git a/arch/arm/boot/dts/omap54xx-clocks.dtsi b/arch/arm/boot/dts/omap54xx-clocks.dtsi
-index d487fda..465505c 100644
---- a/arch/arm/boot/dts/omap54xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/omap54xx-clocks.dtsi
-@@ -362,7 +362,7 @@
- 
- 	dpll_mpu_ck: dpll_mpu_ck {
- 		#clock-cells = <0>;
--		compatible = "ti,omap4-dpll-clock";
-+		compatible = "ti,omap5-mpu-dpll-clock";
- 		clocks = <&sys_clkin>, <&mpu_dpll_hs_clk_div>;
- 		reg = <0x0160>, <0x0164>, <0x016c>, <0x0168>;
- 	};
+Verified on the following impacted platforms using 3.15-rc4 based
+vendor kernel.
+
+Before:
+OMAP5432: http://slexy.org/view/s20cs0qQFg
+DRA72x: http://slexy.org/view/s2TXtSa6mH (refused to lock)
+DRA75x: http://slexy.org/view/s20AW8MU5c
+After:
+OMAP5432: http://slexy.org/view/s21iAfWxpu
+DRA72x: http://slexy.org/view/s2hwsvGLmC (locks properly)
+DRA75x: http://slexy.org/view/s21ehw8WQn
+
+Hopefully, we can get these into some kernel revision in some form.
+
+NOTE: Support for 4470(which is the only other platform requiring
+DCC) is not present in upstream kernel and there are no plans to
+support that SoC, even if it is added at a later point, support can be
+extended as needed.
+
+Series based on v3.15-rc5 tag.
+Also available on my tree:
+	https://github.com/nmenon/linux-2.6-playground/
+	branch:  push/clock/dcc 
+	
+	weblink: https://github.com/nmenon/linux-2.6-playground/commits/push/clock/dcc
+
+Verification:
+3.15-rc4 based kernel - DRA75x-evm, 72x-evm, OMAP5uevm
+3.15-rc5 - OMAP5uEVM(only one supporting 1.5GHz atm)
+
+Andrii Tseglytskyi (1):
+  ARM: OMAP5+: dpll: support Duty Cycle Correction(DCC)
+
+Nishanth Menon (2):
+  clk: dpll: support OMAP5 MPU DPLL that need special handling for
+    higher frequencies
+  ARM: dts: OMAP5/DRA7: use omap5-mpu-dpll-clock capable of dealing
+    with higher frequencies
+
+ .../devicetree/bindings/clock/ti/dpll.txt          |    1 +
+ arch/arm/boot/dts/dra7xx-clocks.dtsi               |    2 +-
+ arch/arm/boot/dts/omap54xx-clocks.dtsi             |    2 +-
+ arch/arm/mach-omap2/dpll3xxx.c                     |    9 +++++++++
+ drivers/clk/ti/dpll.c                              |   21 ++++++++++++++++++++
+ include/linux/clk/ti.h                             |    4 ++++
+ 6 files changed, 37 insertions(+), 2 deletions(-)
+
+Regards,
+Nishanth Menon
 -- 
 1.7.9.5
