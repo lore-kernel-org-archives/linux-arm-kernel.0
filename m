@@ -1,38 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 May 2014 13:55:46 +0100
-Subject: [PATCH] ARM: remove ARM710 specific assembler code
-In-Reply-To: <1400232598.20342.16.camel@x220>
-References: <1364507176.1345.45.camel@x61.thuisdomein>
- <8309592.drxAj71PnZ@wuerfel> <1400059550.31197.12.camel@x220>
- <4305975.PvMXZQ020k@wuerfel> <1400232598.20342.16.camel@x220>
-Message-ID: <20140516125545.GO3693@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 16 May 2014 09:01:59 -0400
+Subject: [PATCH RFC 00/11] Remove mach-kirkwood
+In-Reply-To: <5375C9EA.3060307@free-electrons.com>
+References: <1400163836-9831-1-git-send-email-andrew@lunn.ch>
+ <8332148.Z1shujgC24@wuerfel>
+ <20140515230849.GS27822@titan.lakedaemon.net>
+ <5375C9EA.3060307@free-electrons.com>
+Message-ID: <20140516130159.GH27822@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 11:29:58AM +0200, Paul Bolle wrote:
-> Support for ARM710 CPUs was removed in v3.5. But a few lines of ARM710
-> specific assembler code were left in the tree. Remove these too.
+On Fri, May 16, 2014 at 10:18:50AM +0200, Gregory CLEMENT wrote:
+> On 16/05/2014 01:08, Jason Cooper wrote:
+> > On Thu, May 15, 2014 at 04:36:35PM +0200, Arnd Bergmann wrote:
+> >> On Thursday 15 May 2014 16:23:41 Andrew Lunn wrote:
+> >>> This is an RFC patchset which removes mach-kirkwood, now that kirkwood
+> >>> support has been converted to DT and lives in mach-mvebu.
+> >>>
+> >>> It is an RFC because some of the final conversion patches have not yet
+> >>> been accepted by maintainers, in particular:
+> >>>
+> >>> http://www.spinics.net/lists/arm-kernel/msg328068.html
+> >>>
+> >>> which needs to be accepted by the Sound/ASoC maintainer.
+> >>>
+> >>> Once the real patchset is posted, without the RFC status, we would
+> >>> prefer that each subsystem maintainer takes the relevent patches,
+> >>> rather than try to take them all through arm-soc.
+> >>
+> >> Very nice!
+> >>
+> >> We had a couple of conflicts in 3.15 between kirkwood and dove both
+> >> getting moved to multiplatform. Any idea how this can be done better
+> >> this time?
+> > 
+> > Yes, once the changes have matured in -next, I'll merge them into a
+> > single branch to pull instead of separately like I did before.
+> > 
+> >> There are three other series that may or may not make it into 3.16
+> >> and that will have conflicts with this one:
+> >>
+> >> - remove mv78xx0
 > 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
-> This minor cleanup was suggested by Arnd. This patch is mostly
-> guesswork, as I already told Arnd, since I have never touched ARM
-> assembler before (as far as I can remember). Untested too! And this does
-> need testing.
+> Actually I planned to try to convert this to multiplatform
+> through mvebu. 
 
-NAK.
+afaict, the only current users of this were the Debian build farm.  But
+they've moved on to better hardware thanks to a generous donation :)
 
-There was a CPU called the ARM710, it was ARMv3 and it had no Thumb support.
+Are we aware of any other users?
 
-There is also a CPU called the ARM710T, which is ARMv4 and has Thumb support.
+thx,
 
-These are two completely different CPUs, the former was removed along with
-the removal of ARMv3 support.  The latter remains because we still support
-ARMv4.
-
-This is a nice instance of arm-soc people thinking that they are somehow
-authoritive for core ARM stuff...
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Jason.
