@@ -1,40 +1,27 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 16 May 2014 14:30:54 +0200
-Subject: [GIT PULL] Allwinner defconfig for 3.16
-Message-ID: <20140516123054.GA22574@lukather>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 16 May 2014 14:43:58 +0200
+Subject: [PATCH v3 0/7] ARM: berlin: add pinctrl support
+In-Reply-To: <1399267649-20218-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1399267649-20218-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <CACRpkdYJU3HN2u=eFPUyM4eMmuT1Xw19zxjpb5nj9nXnar3_-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+On Mon, May 5, 2014 at 7:27 AM, Antoine T?nart
+<antoine.tenart@free-electrons.com> wrote:
 
-  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+> This series adds support for the Marvell Berlin pin-controller, allowing
+> to configure the pin muxing from the device tree.
 
-are available in the git repository at:
+OK looking good!
 
-  https://github.com/mripard/linux.git tags/sunxi-defconfig-for-3.16
+I've applied patches 1,2,3,4 and 6 to the pin control tree.
 
-for you to fetch changes up to 5659e3bcbcb5d454fa183351362e852321784f7c:
+Please carry patches 5 and 7 in the MVEBU tree or wherever
+the core SoC is stashed up. It'd not be necessary to pull in the
+pin control tree I think since you're just selecting symbols and
+adding device trees. (The dependencies will magically fall in
+during the merge window, so this is bisectable.)
 
-  ARM: sunxi: drop CONFIG_COMMON_CLK_DEBUG (2014-05-10 12:07:50 -0400)
-
-----------------------------------------------------------------
-Allwinner defconfig additions for 3.16
-
-----------------------------------------------------------------
-Lad, Prabhakar (1):
-      ARM: sunxi: drop CONFIG_COMMON_CLK_DEBUG
-
- arch/arm/configs/sunxi_defconfig | 1 -
- 1 file changed, 1 deletion(-)
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140516/79a75da3/attachment.sig>
+Yours,
+Linus Walleij
