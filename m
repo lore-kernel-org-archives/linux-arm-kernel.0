@@ -1,26 +1,46 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 May 2014 09:04:42 +0900
-Subject: [PATCH/RFC] ARM: shmobile: Enable PM_RUNTIME in defconfig
-Message-ID: <1400198682-7666-1-git-send-email-horms+renesas@verge.net.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 15 May 2014 17:13:06 -0700
+Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
+In-Reply-To: <20140514233119.GA31594@atomide.com>
+References: <1399991966-14582-1-git-send-email-santosh.shilimkar@ti.com>
+ <5373C78E.7040301@linaro.org> <5373C8E8.6040208@ti.com>
+ <5373CBB9.40506@linaro.org> <20140514205649.GC27426@atomide.com>
+ <20140514233119.GA31594@atomide.com>
+Message-ID: <20140516001306.GA6580@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/shmobile_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+* Tony Lindgren <tony@atomide.com> [140514 16:32]:
+> * Tony Lindgren <tony@atomide.com> [140514 13:57]:
+> > * Daniel Lezcano <daniel.lezcano@linaro.org> [140514 13:02]:
+> > > 
+> > > So the broadcast timer does not operate with this revert. Moreover, I am not
+> > > sure reverting this patch is the right solution.
+> > 
+> > OK I'll hold on sending anything until there's some conclusion.
+> > 
+> > Are you able to reproduce the problem with current Linux next?
+> 
+> BTW, I'm also noticing now hangs on omap3 with my PM patches
+> on v3.15-rc4 that seem similar to the panda cpuidle hang.
+> 
+> The hangs on omap3 do not happen on my v3.14 based branch, so
+> I'm wondering if there are some recent cpuidle regressions too
+> in play?
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 114e88e..4cbaf52 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -35,6 +35,7 @@ CONFIG_KEXEC=y
- CONFIG_VFP=y
- CONFIG_NEON=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_PM_RUNTIME=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
--- 
-1.8.5.2
+Looks like the omap3 idle hang is caused by commit 6ddeb6d84459
+(dmaengine: omap-dma: move IRQ handling to omap-dma). This may
+not be related to omap4 cpu_idle hang, but it might.
+
+I'm trying to figure out if it's related to something like
+omap_dma_global_context_save and omap_dma_global_context_restore.
+
+Meanwhile, to test the DMA changes have an effect on the omap4
+cpu_idle issue, you can try reverting the following two patches:
+
+aa4c5b962a7a dmaengine: omap-dma: more consolidation of CCR register setup
+6ddeb6d84459 dmaengine: omap-dma: move IRQ handling to omap-dma
+
+Regards,
+
+Tony
