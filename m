@@ -1,26 +1,30 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 16 May 2014 15:07:40 -0400
-Subject: [PATCH v6 12/17] ARM: configs: enable XHCI mvebu support in
- mvebu_v7_defconfig
-In-Reply-To: <1400149062-32661-13-git-send-email-gregory.clement@free-electrons.com>
+Date: Fri, 16 May 2014 15:07:52 -0400
+Subject: [PATCH v6 14/17] ARM: mvebu: add Device Tree description of
+ xHCI controllers on Armada 38x
+In-Reply-To: <1400149062-32661-15-git-send-email-gregory.clement@free-electrons.com>
 References: <1400149062-32661-1-git-send-email-gregory.clement@free-electrons.com>
- <1400149062-32661-13-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140516190740.GO27822@titan.lakedaemon.net>
+ <1400149062-32661-15-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140516190752.GP27822@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 12:17:37PM +0200, Gregory CLEMENT wrote:
-> The Marvell Armada 38x platform needs the xhci_mvebu driver enabled
-> for the xHCI USB hosts, so this commit enables the corresponding
-> Kconfig option in mvebu_v7_defconfig.
+On Thu, May 15, 2014 at 12:17:39PM +0200, Gregory CLEMENT wrote:
+> The Marvell Armada 38x SoCs contains two xHCI controllers. This commit
+> adds the Device Tree description of those interfaces at the SoC level,
+> and also enables the two USB3 ports on the Armada 385 DB platform and
+> one USB3 port on the Armada 385 RD platform.
 > 
 > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  arch/arm/configs/mvebu_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/boot/dts/armada-385-db.dts |  8 ++++++++
+>  arch/arm/boot/dts/armada-385-rd.dts |  4 ++++
+>  arch/arm/boot/dts/armada-38x.dtsi   | 17 +++++++++++++++++
+>  3 files changed, 29 insertions(+)
 
-Applied to mvebu/defconfig
+Patches 14 through 17 applied to mvebu/dt.  Patch 17 amended as Sergei
+suggested.
 
 thx,
 
