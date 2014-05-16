@@ -1,90 +1,51 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 16 May 2014 14:10:12 +0200
-Subject: [PATCH 1/5] ARM: shmobile: Remove non-multiplatform Genmai reference
+Date: Fri, 16 May 2014 14:10:13 +0200
+Subject: [PATCH 2/5] ARM: shmobile: genmai-reference: Remove legacy clock
  support
 In-Reply-To: <1400242216-20848-1-git-send-email-wsa@the-dreams.de>
 References: <1400242216-20848-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1400242216-20848-2-git-send-email-wsa@the-dreams.de>
+Message-ID: <1400242216-20848-3-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Now that r7s72100 has CCF support, remove the legacy Genmai reference
-Kconfig bits for the non-multiplatform case.
-
-Starting from this commit Genmai board support is always enabled via
-CONFIG_MACH_GENMAI, and CONFIG_ARCH_MULTIPLATFORM is used to select
-between board-genmai.c and board-genmai-reference.c
-
-The file board-genmai-reference.c can no longer be used together with
-the legacy sh-clk clock framework, instead CCF is used.
+genmai-reference is now only built for multiplatform which means that
+CCF comes with the package. Remove unused legacy code ifdefs to clean up
+the code.
 
 Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- arch/arm/boot/dts/Makefile           |  1 -
- arch/arm/mach-shmobile/Kconfig       | 11 -----------
- arch/arm/mach-shmobile/Makefile      |  1 -
- arch/arm/mach-shmobile/Makefile.boot |  1 -
- 4 files changed, 14 deletions(-)
+ arch/arm/mach-shmobile/board-genmai-reference.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index fbebf739dfb0..a6eed6d661ac 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -298,7 +298,6 @@ dtb-$(CONFIG_ARCH_S3C24XX) += s3c2416-smdk2416.dtb
- dtb-$(CONFIG_ARCH_S3C64XX) += s3c6410-mini6410.dtb \
- 	s3c6410-smdk6410.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += r7s72100-genmai.dtb \
--	r7s72100-genmai-reference.dtb \
- 	r8a7740-armadillo800eva.dtb \
- 	r8a7778-bockw.dtb \
- 	r8a7778-bockw-reference.dtb \
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 037c00622de6..bc91eaf99e98 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -229,17 +229,6 @@ config MACH_GENMAI
- 	depends on ARCH_R7S72100
- 	select USE_OF
+diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c b/arch/arm/mach-shmobile/board-genmai-reference.c
+index 33015e5ed52a..968bbba20d08 100644
+--- a/arch/arm/mach-shmobile/board-genmai-reference.c
++++ b/arch/arm/mach-shmobile/board-genmai-reference.c
+@@ -26,7 +26,6 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
  
--config MACH_GENMAI_REFERENCE
--	bool "Genmai board - Reference Device Tree Implementation"
--	depends on ARCH_R7S72100
--	select USE_OF
--	---help---
--	   Use reference implementation of Genmai board support
--	   which makes use of device tree at the expense
--	   of not supporting a number of devices.
--
--	   This is intended to aid developers
--
- config MACH_MARZEN
- 	bool "MARZEN board"
- 	depends on ARCH_R8A7779
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 9c5cd8c53a85..38d5fe825e93 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -66,7 +66,6 @@ obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
- obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
- obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
- obj-$(CONFIG_MACH_GENMAI)	+= board-genmai.o
--obj-$(CONFIG_MACH_GENMAI_REFERENCE)	+= board-genmai-reference.o
- obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
- obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
- obj-$(CONFIG_MACH_LAGER)	+= board-lager.o
-diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
-index 99455ecafa05..918fccffa1b6 100644
---- a/arch/arm/mach-shmobile/Makefile.boot
-+++ b/arch/arm/mach-shmobile/Makefile.boot
-@@ -7,7 +7,6 @@ loadaddr-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE) += 0x40008000
- loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
- loadaddr-$(CONFIG_MACH_BOCKW_REFERENCE) += 0x60008000
- loadaddr-$(CONFIG_MACH_GENMAI) += 0x08008000
--loadaddr-$(CONFIG_MACH_GENMAI_REFERENCE) += 0x08008000
- loadaddr-$(CONFIG_MACH_KOELSCH) += 0x40008000
- loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
- loadaddr-$(CONFIG_MACH_KZM9G_REFERENCE) += 0x41008000
+-#ifdef CONFIG_COMMON_CLK
+ /*
+  * This is a really crude hack to provide clkdev support to platform
+  * devices until they get moved to DT.
+@@ -34,15 +33,10 @@
+ static const struct clk_name clk_names[] = {
+ 	{ "mtu2", "fck", "sh-mtu2" },
+ };
+-#endif
+ 
+ static void __init genmai_add_standard_devices(void)
+ {
+-#ifdef CONFIG_COMMON_CLK
+ 	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), true);
+-#else
+-	r7s72100_clock_init();
+-#endif
+ 	r7s72100_add_dt_devices();
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
 -- 
 1.9.2
