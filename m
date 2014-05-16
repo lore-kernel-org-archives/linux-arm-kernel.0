@@ -1,67 +1,40 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Fri, 16 May 2014 17:01:16 +0200
-Subject: [PATCH] [RFC] ARM: perf: allow tracing with kernel tracepoints events
-Message-ID: <1400252476-20128-1-git-send-email-jean.pihet@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 16 May 2014 08:02:17 -0700
+Subject: [PATCH v3 10/13] ARM: dts: am33xx: Remove obsolete properties
+ from edma node
+In-Reply-To: <1400242640-9902-11-git-send-email-peter.ujfalusi@ti.com>
+References: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
+ <1400242640-9902-11-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20140516150216.GA22031@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When tracing with tracepoints events the IP and CPSR are set to 0,
-preventing the perf code to resolve the symbols:
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [140516 05:18]:
+> dma-channels, ti,edma-regions and ti,edma-slots no longer needed in DT since
+> the the same information is available in the IP's CCCFG register.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
-./perf record -e kmem:kmalloc cal
-[ perf record: Woken up 1 times to write data ]
-[ perf record: Captured and wrote 0.007 MB perf.data (~321 samples) ]
+Acked-by: Tony Lindgren <tony@atomide.com>
 
-./perf report
-Overhead Command Shared Object Symbol
-........ ....... ............. ...........
-40.78%   cal     [unknown]     [.]00000000
-31.6%    cal     [unknown]     [.]00000000
-
-The examination of the gathered samples (perf report -D) shows the IP
-is set to 0 and that the samples are considered as user space samples,
-while the IP should be set from the registers and the samples should be
-considered as kernel samples.
-
-The fix is to implement perf_arch_fetch_caller_regs for ARM, which
-fills the necessary registers: ip, lr, sp and cpsr (used to check
-the user mode property of the samples).
-
-Heavily inspired from arch/arm/include/asm/kexec.h.
-
-Reported by Sneha Priya on linaro-dev, cf.
-http://lists.linaro.org/pipermail/linaro-dev/2014-May/017151.html
-
-Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Reported-by: Sneha Priya <sneha.cse@hotmail.com>
----
- arch/arm/include/asm/perf_event.h | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
-index 7558775..d466e39 100644
---- a/arch/arm/include/asm/perf_event.h
-+++ b/arch/arm/include/asm/perf_event.h
-@@ -26,6 +26,19 @@ struct pt_regs;
- extern unsigned long perf_instruction_pointer(struct pt_regs *regs);
- extern unsigned long perf_misc_flags(struct pt_regs *regs);
- #define perf_misc_flags(regs)	perf_misc_flags(regs)
-+
-+#define perf_arch_fetch_caller_regs(regs, __ip) {	\
-+	instruction_pointer(regs)= (__ip);		\
-+	__asm__ __volatile__ (				\
-+		"mov	%[_ARM_sp], sp\n\t"		\
-+		"str	lr, %[_ARM_lr]\n\t"		\
-+		"mrs	%[_ARM_cpsr], cpsr\n\t"		\
-+		: [_ARM_cpsr] "=r" (regs->ARM_cpsr),	\
-+		  [_ARM_sp] "=r" (regs->ARM_sp),	\
-+		  [_ARM_lr] "=o" (regs->ARM_lr)		\
-+		: : "memory"				\
-+	);						\
-+}
- #endif
- 
- #endif /* __ARM_PERF_EVENT_H__ */
--- 
-1.8.1.2
+> ---
+>  arch/arm/boot/dts/am33xx.dtsi | 3 ---
+>  1 file changed, 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index f1eea4af40ed..37d4cad4dd38 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -147,9 +147,6 @@
+>  				<0x44e10f90 0x40>;
+>  			interrupts = <12 13 14>;
+>  			#dma-cells = <1>;
+> -			dma-channels = <64>;
+> -			ti,edma-regions = <4>;
+> -			ti,edma-slots = <256>;
+>  		};
+>  
+>  		gpio0: gpio at 44e07000 {
+> -- 
+> 1.9.3
+> 
