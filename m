@@ -1,31 +1,123 @@
-From: zhichang.yuan@linaro.org (zhichang.yuan)
-Date: Fri, 16 May 2014 19:38:46 +0800
-Subject: [PATCHv2 0/6] arm64:lib: the optimized string library routines
- for armv8 processors
-In-Reply-To: <20140509125617.GD7950@arm.com>
-References: <1398661895-5559-1-git-send-email-zhichang.yuan@linaro.org>
- <20140509125617.GD7950@arm.com>
-Message-ID: <5375F8C6.1030907@linaro.org>
+From: wharms@bfs.de (walter harms)
+Date: Fri, 16 May 2014 13:49:10 +0200
+Subject: [PATCH v2] ARM: imx: fix error handling
+In-Reply-To: <20140516111646.GC4366@lianli>
+References: <1400234045-6022-1-git-send-email-emilgoode@gmail.com>
+ <5375EB13.8000200@bfs.de> <20140516111646.GC4366@lianli>
+Message-ID: <5375FB36.8020004@bfs.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 2014?05?09? 20:56, Catalin Marinas wrote:
-> On Mon, Apr 28, 2014 at 06:11:28AM +0100, zhichang.yuan at linaro.org wrote:
->> * Done LTP on big-endian and little-endian system according to
->> maintianers' requirement. The test results can be found at
->> https://wiki.linaro.org/WorkingGroups/Kernel/ARMv8/CortexStringsTests.
-> It's not clear to me from the above page but have you done a compat
-> (AArch32) LTP test as well?
->
-> Thanks.
-Hi Catalin,
 
-O, i missed the LTP test on compatible Aarch32 mode.
-At the moment, i have supplement these LTP tests. The LTP tests were OK.
+Am 16.05.2014 13:16, schrieb Emil Goode:
+> Hello Walter,
+> 
+> On Fri, May 16, 2014 at 12:40:19PM +0200, walter harms wrote:
+>>
+>>
+>> Am 16.05.2014 11:54, schrieb Emil Goode:
+>>> If we fail to allocate struct platform_device pdev we
+>>> dereference it after the goto label err.
+>>>
+>>> I have rearranged the error handling a bit to fix the issue
+>>> and also make it more clear.
+>>>
+>>> Signed-off-by: Emil Goode <emilgoode@gmail.com>
+>>> ---
+>>> v2: Changed to return -ENOMEM instead of ret where possible and
+>>>     updated the subject line.
+>>>
+>>>  arch/arm/mach-imx/devices/platform-ipu-core.c |   22 +++++++++++++---------
+>>>  1 file changed, 13 insertions(+), 9 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
+>>> index fc4dd7c..68f2a4a 100644
+>>> --- a/arch/arm/mach-imx/devices/platform-ipu-core.c
+>>> +++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
+>>> @@ -77,34 +77,38 @@ struct platform_device *__init imx_alloc_mx3_camera(
+>>>  
+>>>  	pdev = platform_device_alloc("mx3-camera", 0);
+>>>  	if (!pdev)
+>>> -		goto err;
+>>> +		return ERR_PTR(-ENOMEM);
+>>>  
+>>>  	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
+>>>  	if (!pdev->dev.dma_mask)
+>>> -		goto err;
+>>> +		goto put_pdev;
+>>>  
+>>>  	*pdev->dev.dma_mask = DMA_BIT_MASK(32);
+>>>  	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+>>>  
+>>>  	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
+>>>  	if (ret)
+>>> -		goto err;
+>>> +		goto free_dma_mask;
+>>>  
+>>>  	if (pdata) {
+>>>  		struct mx3_camera_pdata *copied_pdata;
+>>>  
+>>>  		ret = platform_device_add_data(pdev, pdata, sizeof(*pdata));
+>>> -		if (ret) {
+>>> -err:
+>>> -			kfree(pdev->dev.dma_mask);
+>>> -			platform_device_put(pdev);
+>>> -			return ERR_PTR(-ENODEV);
+>>> -		}
+>>> +		if (ret)
+>>> +			goto free_dma_mask;
+>>> +
+>>>  		copied_pdata = dev_get_platdata(&pdev->dev);
+>>>  		copied_pdata->dma_dev = &imx_ipu_coredev->dev;
+>>
+>>
+>> the patch is fine, but what use is this copied_pdata ?
+>> It scope ends next line ?
+>>
+>> re,
+>>  wh
+> 
+> I also thought that looked a bit odd, but copied_pdata is a temporary
+> pointer to platform_data of the dev struct.
+> 
+> dev_get_platdata looks like this:
+> 
+> static inline void *dev_get_platdata(const struct device *dev)
+> {
+>         return dev->platform_data;
+> }
+> 
+> So I believe it's a more compact way of writing:
+> 
+> pdev->dev->platform_data->dma_dev = &imx_ipu_coredev->dev;
 
-According to the new test result, I rewrote the test report at
-https://wiki.linaro.org/WorkingGroups/Kernel/ARMv8/CortexStringsTests .
+ok i see ...
 
-Thanks,
-Zhichang
+Both ways are horrible to read, but the second is at least
+understandable. fortunately i am not the maintainer.
+
+thx,
+
+re,
+ wh
+
+> Best regards,
+> 
+> Emil Goode
+> 
+>>
+>>>  	}
+>>>  
+>>>  	return pdev;
+>>> +
+>>> +free_dma_mask:
+>>> +	kfree(pdev->dev.dma_mask);
+>>> +put_pdev:
+>>> +	platform_device_put(pdev);
+>>> +
+>>> +	return ERR_PTR(ret);
+>>>  }
+>>>  
+>>>  struct platform_device *__init imx_add_mx3_sdc_fb(
+> 
