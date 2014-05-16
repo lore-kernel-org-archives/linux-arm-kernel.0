@@ -1,33 +1,69 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 16 May 2014 15:17:08 +0300
-Subject: [PATCH v3 01/13] ARM: edma: No need to clean the pdata in
- edma_of_parse_dt()
-In-Reply-To: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1400242640-9902-2-git-send-email-peter.ujfalusi@ti.com>
+Date: Fri, 16 May 2014 15:17:07 +0300
+Subject: [PATCH v3 00/13] ARM/DT: edma: IP configuration from hardware and
+ cleanups
+Message-ID: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pdata has been just allocated with devm_kzalloc() in
-edma_setup_info_from_dt() and passed to this function.
+Hi,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Changes since v2:
+- Comments from Sekhar and Arnd has been addressed best as I could.
+- Use the CCCFG information in all cases instead of pdata provided information
+- To achieve this I needed to do a bit more cleanup in this series
+- In the documentation patch, retrain the old properties for reference
+- Cleanups in the old davinci board files and removing edma_soc_info members
+
+Changes sicne v1:
+- added missing patch to remove the memset from edma_of_parse_dt()
+
+We are requesting redundant information via DT for the driver since the very same
+data is available in the HW: by reading and decoding the content of CCCFG
+register we can get:
+Number of channels: NUM_DMACH
+Number of regions: NUM_REGN
+Number of slots (PaRAM sets): NUM_PAENTRY
+Number of TC/EQ: NUM_EVQUE
+
+So these does not need to be provided by the DT binding.
+
+The driver will no longer look for these properties from DT and they can be
+removed from the binding documentation and from the dtsi files as well.
+The change will not introduce regression when new kernel is booted using older
+DTB (since we just ignore the mentioned properties).
+
+Regards,
+Peter
 ---
- arch/arm/common/edma.c | 2 --
- 1 file changed, 2 deletions(-)
+Peter Ujfalusi (13):
+  ARM: edma: No need to clean the pdata in edma_of_parse_dt()
+  ARM: edma: Take the number of tc from edma_soc_info (pdata)
+  ARM: edma: Do not change TC -> Queue mapping, leave it to default.
+  ARM: davinci: Remove eDMA3 queue_tc_mapping data from edma_soc_info
+  ARM/platform_data: edma: Remove queue_tc_mapping data from
+    edma_soc_info
+  ARM: edma: Remove num_cc member from struct edma
+  ARM: edma: Save number of regions from pdata to struct edma
+  ARM: edma: Get IP configuration from HW (number of channels, tc, etc)
+  dt/bindings: ti,edma: Remove redundant properties from documentation
+  ARM: dts: am33xx: Remove obsolete properties from edma node
+  ARM: dts: am4372: Remove obsolete properties from edma node
+  ARM: davinci: Remove redundant/unused parameters for edma
+  ARM/platform_data: edma: Remove redundant/unused parameters from
+    edma_soc_info
 
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index 8452cf246330..01707aae0a2b 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -1472,8 +1472,6 @@ static int edma_of_parse_dt(struct device *dev,
- 	struct edma_rsv_info *rsv_info;
- 	s8 (*queue_tc_map)[2], (*queue_priority_map)[2];
- 
--	memset(pdata, 0, sizeof(struct edma_soc_info));
--
- 	ret = of_property_read_u32(node, "dma-channels", &value);
- 	if (ret < 0)
- 		return ret;
+ Documentation/devicetree/bindings/dma/ti-edma.txt |  13 +-
+ arch/arm/boot/dts/am33xx.dtsi                     |   3 -
+ arch/arm/boot/dts/am4372.dtsi                     |   3 -
+ arch/arm/common/edma.c                            | 149 +++++++++++-----------
+ arch/arm/mach-davinci/devices-da8xx.c             |  31 -----
+ arch/arm/mach-davinci/dm355.c                     |  14 --
+ arch/arm/mach-davinci/dm365.c                     |  16 ---
+ arch/arm/mach-davinci/dm644x.c                    |  14 --
+ arch/arm/mach-davinci/dm646x.c                    |  16 ---
+ include/linux/platform_data/edma.h                |   8 --
+ 10 files changed, 81 insertions(+), 186 deletions(-)
+
 -- 
 1.9.3
