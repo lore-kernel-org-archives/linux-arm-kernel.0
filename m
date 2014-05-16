@@ -1,37 +1,41 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Sat, 17 May 2014 01:21:08 +0300
-Subject: [PATCH v2] ARM: imx: fix error handling
-In-Reply-To: <20140516192451.GP16662@pengutronix.de>
-References: <1400234045-6022-1-git-send-email-emilgoode@gmail.com>
- <20140516192451.GP16662@pengutronix.de>
-Message-ID: <20140516222108.GI8897@mwanda>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 16 May 2014 17:36:09 -0500
+Subject: [PATCH] ARM: DRA7/AM43XX: fix header definition for omap44xx_restart
+Message-ID: <1400279769-28704-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 09:24:51PM +0200, Uwe Kleine-K?nig wrote:
-> I didn't check if it is easily possible, but converting this file to use
-> platform_device_register_full might simplify it considerably.
+omap44xx_restart is defined as a static void inline when DRA7/AM437X is
+defined alone, which implies that the restart function is no longer
+functional even though it is built in. So, fix the definition of the
+same.
 
-In a separate patch, though, please.
+Unfortunately, the number of SoCs starting to use omap44xx_restart is
+starting to grow and the definition looks a little ugly.
 
-> 
-> I'm not sure this fix is critical, because the problem happens if an
-> allocation during boot fails. But still, if you want to get this fix
-> into a stable release, you should simplify it, i.e. don't do the code
-> reorganisations. (Also the "more clear" part seems to be subjective, I
-> like the error handling better as it is now. But that might only be me.)
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
 
-Emil's error handling is done exactly in the correct way...  The error
-path and success path are separate.  Unwinding in the reverse order.
-The label names describe the label locations.  Most days I spend hours
-looking at linux kernel error handling and I can assure you that
-sensible labels like this are a rare and wonderful gift.
+based on v3.15-rc5
 
-It's hard for me to imagine how anyone could defend the original error
-handling.  The label was "err".  The error handling was randomly plopped
-in the middle of the success handling.  Whenever I see new "creative"
-error handling like this it drives me nuts because obviously it's going
-to be buggy like a swamp picnic.
+NOTE: this generates over 80 characters checkpatch warning.. I am not
+sure other than introducing a definition for restart it could be simplified.
 
-regards,
-dan carpenter
+ arch/arm/mach-omap2/common.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index d88aff7..46150f4 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -154,7 +154,7 @@ static inline void omap3xxx_restart(enum reboot_mode mode, const char *cmd)
+ }
+ #endif
+ 
+-#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
++#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM43XX)
+ void omap44xx_restart(enum reboot_mode mode, const char *cmd);
+ #else
+ static inline void omap44xx_restart(enum reboot_mode mode, const char *cmd)
+-- 
+1.7.9.5
