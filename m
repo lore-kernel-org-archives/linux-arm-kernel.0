@@ -1,65 +1,42 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Fri, 16 May 2014 16:19:24 +0530
-Subject: [PATCH 2/2] ARM: dts: enable fimd for exynos5800 based peach-pi
- board
-In-Reply-To: <CAPdUM4Mfh-LnUX_fHi7BTJ1LcE+b4oHzjgWAJk+AWvV7UJbGnA@mail.gmail.com>
-References: <1399877120-4634-1-git-send-email-rahul.sharma@samsung.com>
- <1399877120-4634-3-git-send-email-rahul.sharma@samsung.com>
- <004701cf6e48$b4578910$1d069b30$%han@samsung.com>
- <CAPdUM4Mfh-LnUX_fHi7BTJ1LcE+b4oHzjgWAJk+AWvV7UJbGnA@mail.gmail.com>
-Message-ID: <CAPdUM4O4bEHtSnmiFno1Lm-0rH9qFLJ6S=7THeywAUCFen_iNw@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 16 May 2014 12:52:45 +0200
+Subject: [PATCH RFC 3/4] clk: samsung: Add driver to control CLKOUT line on
+ Exynos SoCs
+In-Reply-To: <CAPdUM4P7Z1eLVKuc0N1iPaekM_7kNv7KCve2MgrEziszfnzz7A@mail.gmail.com>
+References: <1400175151-27779-1-git-send-email-t.figa@samsung.com>
+ <1400175151-27779-4-git-send-email-t.figa@samsung.com>
+ <CAPdUM4P7Z1eLVKuc0N1iPaekM_7kNv7KCve2MgrEziszfnzz7A@mail.gmail.com>
+Message-ID: <5375EDFD.1020708@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<Gentle Ping>
+Hi Rahul,
 
-On 13 May 2014 08:53, Rahul Sharma <rahul.sharma@samsung.com> wrote:
-> Thanks Jingoo Han.
->
-> Hi Kukjin,
->
-> Please consider both of these series for your tree.
->
-> 1) http://www.spinics.net/lists/arm-kernel/msg329697.html
-> 2) http://www.spinics.net/lists/arm-kernel/msg330291.html
->
-> Regards,
-> Rahul Sharma
->
-> On 13 May 2014 06:44, Jingoo Han <jg1.han@samsung.com> wrote:
->> On Monday, May 12, 2014 3:45 PM, Rahul Sharma wrote:
->>>
->>> From: Rahul Sharma <Rahul.Sharma@samsung.com>
->>>
->>> Enable FIMD for peach-pi board.
->>>
->>> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
->>
->> Reviewed-by: Jingoo Han <jg1.han@samsung.com>
->>
->> Best regards,
->> Jingoo Han
->>
->>> ---
->>>  arch/arm/boot/dts/exynos5800-peach-pi.dts |    5 +++++
->>>  1 file changed, 5 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->>> index 426705a..cccacdd 100644
->>> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
->>> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->>> @@ -157,6 +157,11 @@
->>>       };
->>>  };
->>>
->>> +&fimd {
->>> +     status = "okay";
->>> +     samsung,invert-vclk;
->>> +};
->>> +
->>>  &hsi2c_9 {
->>>       status = "okay";
->>>       clock-frequency = <400000>;
->>> --
->>> 1.7.9.5
->>
+On 16.05.2014 12:39, Rahul Sharma wrote:
+> [snip]
+>> +       gate->lock = &clkout_lock;
+>> +
+>> +       mux->reg = reg + EXYNOS_PMU_DEBUG_REG;
+>> +       mux->mask = EXYNOS_CLKOUT_MUX_MASK;
+>> +       mux->shift = EXYNOS_CLKOUT_MUX_SHIFT;
+>> +       mux->lock = &clkout_lock;
+>> +
+>> +       clk = clk_register_composite(NULL, "clkout", parent_names,
+>> +                                       parent_count, &mux->hw,
+>> +                                       &clk_mux_ops, NULL, NULL, &gate->hw,
+>> +                                       &clk_gate_ops, 0);
+>> +       if (IS_ERR(clk))
+>> +               goto err_unmap;
+>> +
+> 
+> Hi Tomasz,
+> 
+> Do we really need a composite clock here? How about registering
+> a mux and a gate separately?
+
+What's wrong with a composite clock? It simplifies the code as just a
+single clock needs to be registered. I don't see any drawbacks compared
+to registering two clocks separately.
+
+Best regards,
+Tomasz
