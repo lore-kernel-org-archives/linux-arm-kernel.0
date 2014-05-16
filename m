@@ -1,140 +1,92 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 16 May 2014 09:35:40 -0400
-Subject: [PATCH v2 2/3] ARM: dts: kirkwood: add kirkwood-km_common DTSI
- files
-In-Reply-To: <1400230143-15620-3-git-send-email-valentin.longchamp@keymile.com>
-References: <1400230143-15620-1-git-send-email-valentin.longchamp@keymile.com>
- <1400230143-15620-3-git-send-email-valentin.longchamp@keymile.com>
-Message-ID: <20140516133540.GJ27822@titan.lakedaemon.net>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 16 May 2014 12:49:50 -0700
+Subject: [PATCH] netdev: add support for interface name retrieval from DT
+ aliases
+In-Reply-To: <536C9146.2060007@free-electrons.com>
+References: <1399390594-1409-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140508.224252.1337086843732451389.davem@davemloft.net>
+ <536C9146.2060007@free-electrons.com>
+Message-ID: <CAGVrzcaFHYtavBp52mkm0aTQtkxpPwty6M6P7J2-FAnuT7Wdwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 10:49:02AM +0200, Valentin Longchamp wrote:
-> This file allows to factor the common parts between the various Keymile
-> Kirkwood Designs.
-> 
-> kirkwood-km_common configures the peripherals that are currently
-> common to all our Kirkwood designs: PCIe, pinctrl, bitbang I2C, NAND
-> Flash controller.
-> 
-> The kirkwood-km_kirkwood file is then changed to include this common
-> file.
-> 
-> Signed-off-by: Valentin Longchamp <valentin.longchamp@keymile.com>
-> 
-> ---
-> 
-> Changes in v2:
-> - introduce kirkwood-km_common.dtsi to allow factoring some nodes
->   between boards
-> 
->  arch/arm/boot/dts/kirkwood-km_common.dtsi  | 48 ++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/kirkwood-km_kirkwood.dts | 38 +----------------------
->  2 files changed, 49 insertions(+), 37 deletions(-)
->  create mode 100644 arch/arm/boot/dts/kirkwood-km_common.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood-km_common.dtsi b/arch/arm/boot/dts/kirkwood-km_common.dtsi
-> new file mode 100644
-> index 0000000..b241135
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-km_common.dtsi
-> @@ -0,0 +1,48 @@
-> +/ {
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200n8 earlyprintk";
-> +		stdout-path = &uart0;
-> +	};
-> +
-> +	mbus {
-> +		pcie-controller {
-> +			status = "okay";
-> +
-> +			pcie at 1,0 {
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-> +
-> +	ocp at f1000000 {
-> +		pinctrl: pin-controller at 10000 {
-> +			pinctrl-0 = < &pmx_i2c_gpio_sda &pmx_i2c_gpio_scl >;
-> +			pinctrl-names = "default";
-> +
-> +			pmx_i2c_gpio_sda: pmx-gpio-sda {
-> +				marvell,pins = "mpp8";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_i2c_gpio_scl: pmx-gpio-scl {
-> +				marvell,pins = "mpp9";
-> +				marvell,function = "gpio";
-> +			};
-> +		};
-> +
-> +		serial at 12000 {
-> +			status = "ok";
+2014-05-09 1:26 GMT-07:00 Boris BREZILLON <boris.brezillon@free-electrons.com>:
+> Hi David,
+>
+> On 09/05/2014 04:42, David Miller wrote:
+>> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> Date: Tue,  6 May 2014 17:36:34 +0200
+>>
+>>> There is currently no proper way to bind a net interface to a specific
+>>> name. The interface name is chosen based on the interface type (eth,
+>>> wlan, ...) and the interfaces already registered (the core codes takes
+>>> the first unused interface id of the given type).
+>>>
+>>> Add support for DT retrieval of the interface id based on DT aliases.
+>>> The alias name must match the interface type (e.g. ethX if you're defining
+>>> an ethernet dev alias).
+>>>
+>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> This really isn't kosher at all.
+>
+> Just for my personal knowledge, what is wrong with this code ?
+> Is it because I'm using "of_" functions in the core code, and you want
+> to keep it DT agnostic ?
+> Or is it something else ?
 
-nit: This should match the other status properties and use "okay".
+I think the major problem is that you are using DT to name interfaces
+and enforcing a naming policy within the kernel, while this should be
+left solely to user-space. I know that coming from an embedded
+use-case this might sound appealing, but the interface naming policy
+had better remain in user-space to avoid mixing policy with
+mechanisms.
 
-> +		};
-> +	};
-> +
-> +	i2c at 0 {
-> +		compatible = "i2c-gpio";
-> +		gpios = < &gpio0 8 GPIO_ACTIVE_HIGH		/* sda */
-> +			  &gpio0 9 GPIO_ACTIVE_HIGH>;		/* scl */
-> +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-> +	};
-> +};
-> +
-> +&nand {
-> +	status = "okay";
-> +	chip-delay = <25>;
-> +};
-> diff --git a/arch/arm/boot/dts/kirkwood-km_kirkwood.dts b/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
-> index 61139bf..235bf38 100644
-> --- a/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
-> +++ b/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
-> @@ -2,6 +2,7 @@
->  
->  #include "kirkwood.dtsi"
->  #include "kirkwood-98dx4122.dtsi"
-> +#include "kirkwood-km_common.dtsi"
->  
->  / {
->  	model = "Keymile Kirkwood Reference Design";
-> @@ -11,43 +12,6 @@
->  		device_type = "memory";
->  		reg = <0x00000000 0x08000000>;
->  	};
-> -
-> -	chosen {
-> -		bootargs = "console=ttyS0,115200n8 earlyprintk";
-> -		stdout-path = &uart0;
-> -	};
-> -
-> -	ocp at f1000000 {
-> -		pinctrl: pin-controller at 10000 {
-> -			pinctrl-0 = < &pmx_i2c_gpio_sda &pmx_i2c_gpio_scl >;
-> -			pinctrl-names = "default";
-> -
-> -			pmx_i2c_gpio_sda: pmx-gpio-sda {
-> -				marvell,pins = "mpp8";
-> -				marvell,function = "gpio";
-> -			};
-> -			pmx_i2c_gpio_scl: pmx-gpio-scl {
-> -				marvell,pins = "mpp9";
-> -				marvell,function = "gpio";
-> -			};
-> -		};
-> -
-> -		serial at 12000 {
-> -			status = "ok";
+>
+>>
+>> And there absolutely is a proper way to bind a net interface to
+>> a specific name, udev has provided this facility for years.
+>
+> Thanks for pointing this out.
+>
+> But, what if the system does not use udev (this is often the case on
+> embedded systems where udev is replaced by mdev) ?
 
-Yeah, I probably let it in in the first place :)
+Traditional embedded systems are also using a lot of custom software,
+why not write a small device mapper program that looks at aliases in
+the device-tree and matches it with sysfs entries for these
+corresponding network interfaces?
 
-If that is all there is with this series, I'll fix it up when I pull it
-in.
+> Moreover, on embedded systems, most users rely on the default interface
+> name provided by the kernel.
+>
+> IIRC (tell me if I'm wrong), before moving to DT we could control the
+> probe order of net interfaces derived from platform devices by modifying
+> the platform dev registration order (okay, this is only true if the
+> platform devices are controlled by the same driver, which is often the
+> case when a SoC provides several net interfaces).
 
-thx,
+I do not quite agree with this, before moving to DT, we were mostly
+relying on the linking order imposed by the lines in the Makefile,
+which is still the case for a few things. It is sometimes fragile, and
+it is sometimes very convenient, and it also provides some perceived
+probing order stability, but that's no longer true with e.g: deffered
+probing which can happen regardless of DT.
 
-Jason.
+> With DT we can't know for sure the exact probe order because it depends
+> on the net interface node position in the DT, and this node position
+> might change over the time (or at least it used to change, now that
+> we're enforced to declare DT nodes in strict memory @ order it should
+> not change that much).
+
+Which is precisely where aliases are coming handy, and I understand
+why it is tempting to use them, but aliases are nothing more than the
+mechanism to help you, not the policy.
+
+>
+> Another issue: what if I want to rename eth0 into eth1 and eth1 into eth0 ?
+> I guess I'll have to execute this sequence: eth1 -> eth2, eth0 -> eth1,
+> eth2 -> eth0, otherwise the SIOCSIFNAME ioctl will return an error.
+
+Just like you swap two variables, use a temporary name.
+-- 
+Florian
