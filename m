@@ -1,55 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 May 2014 09:58:15 +0900
-Subject: [PATCH 06/11] ARM: shmobile: armadillo-reference dts: Add Ethernet
- support
+Date: Fri, 16 May 2014 09:58:20 +0900
+Subject: [PATCH 11/11] ARM: shmobile: r8a7740 dtsi: Remove duplicate
+ interrupt-parent property
 In-Reply-To: <cover.1400200395.git.horms+renesas@verge.net.au>
 References: <cover.1400200395.git.horms+renesas@verge.net.au>
-Message-ID: <15d89dc9bfde872885c6226d86fb25676cbedfb3.1400200395.git.horms+renesas@verge.net.au>
+Message-ID: <3fa3985e624aea24334abc9a33b484c3d316e64e.1400200395.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
+Caused by interaction between commit
+08ec67b50db7ca8c9077e67ca23850cdc5bfc716 ("ARM: shmobile: r8a7740 dtsi:
+Add Ethernet support") and commit 9ff254adc1e32db46000a33b8ecbc4d7047672be
+("ARM: shmobile: dts: Move interrupt-parent property to root node").
+
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/boot/dts/r8a7740.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-index 10344e6..486007d 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-@@ -158,6 +158,18 @@
- 	};
- };
- 
-+&ether {
-+	pinctrl-0 = <&ether_pins>;
-+	pinctrl-names = "default";
-+
-+	phy-handle = <&phy0>;
-+	status = "ok";
-+
-+	phy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+};
-+
- &i2c0 {
- 	status = "okay";
- 	touchscreen at 55 {
-@@ -189,6 +201,11 @@
- 	pinctrl-0 = <&scifa1_pins>;
- 	pinctrl-names = "default";
- 
-+	ether_pins: ether {
-+		renesas,groups = "gether_mii", "gether_int";
-+		renesas,function = "gether";
-+	};
-+
- 	scifa1_pins: serial1 {
- 		renesas,groups = "scifa1_data";
- 		renesas,function = "scifa1";
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index fbf47fb..5d2edd8 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -124,7 +124,6 @@
+ 		compatible = "renesas,gether-r8a7740";
+ 		reg = <0xe9a00000 0x800>,
+ 		      <0xe9a01800 0x800>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH>;
+ 		/* clocks = <&mstp3_clks R8A7740_CLK_GETHER>; */
+ 		phy-mode = "mii";
 -- 
 1.8.5.2
