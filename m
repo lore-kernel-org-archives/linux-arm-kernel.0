@@ -1,123 +1,51 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Fri, 16 May 2014 11:30:36 -0700
-Subject: [PATCHv4 1/5] net: phy: decouple PHY id and PHY address in fixed
- PHY driver
-In-Reply-To: <1400249647-4643-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1400249647-4643-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1400249647-4643-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CAGVrzcYFjROVwHsSTyO-+PAb9G9y55h93AsMk2Viui5Sb4jBpQ@mail.gmail.com>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Fri, 16 May 2014 19:31:51 +0100
+Subject: [Ksummit-discuss] [TECH TOPIC] ARM legacy board DT conversion
+ finalization
+In-Reply-To: <20140516041022.GY27822@titan.lakedaemon.net>
+References: <20140511030009.GO12708@titan.lakedaemon.net>
+ <20140511083729.211e9b5f@lwn.net>
+ <20140515121546.3A06AC40B0E@trevor.secretlab.ca>
+ <CAL_JsqJw11fZBbLVi=xxC559iWdwCMFOJ4XYM-8EjykttoWsOg@mail.gmail.com>
+ <20140515194215.GR27822@titan.lakedaemon.net>
+ <CAOesGMi0JrTp9kUVDod4duBOCZ+wNRJ0dMmgvBX7jEQRjE5cCA@mail.gmail.com>
+ <20140516041022.GY27822@titan.lakedaemon.net>
+Message-ID: <1400265111.2647.54.camel@deadeye.wl.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-05-16 7:14 GMT-07:00 Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com>:
-> Until now, the fixed_phy_add() function was taking as argument
-> 'phy_id', which was used both as the PHY address on the fake fixed
-> MDIO bus, and as the PHY id, as available in the MII_PHYSID1 and
-> MII_PHYSID2 registers. However, those two informations are completely
-> unrelated.
->
-> This patch decouples them. The PHY id of fixed PHYs is hardcoded to be
-> 0x0. Ideally, a really reserved value would be nicer, but there
-> doesn't seem to be an easy of making sure a dummy value can be
-> assigned to the Linux kernel for such usage.
->
-> The PHY address remains passed by the caller of phy_fixed_add().
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On Fri, 2014-05-16 at 00:10 -0400, Jason Cooper wrote:
+[...]
+> Ok, I assumed *everybody* in the Linux ecosystem went to LinuxCon.  I've
+> never actually been to one, but that museum was really crowded in
+> Edinburgh.  I figured that _must_ be everybody. :)
 
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-Tested-by: Florian Fainelli <f.fainelli@gmail.com>
+I find it rather less useful than Plumbers'.
 
-> ---
->  drivers/net/phy/fixed.c | 20 ++++++++++----------
->  1 file changed, 10 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/net/phy/fixed.c b/drivers/net/phy/fixed.c
-> index ba55adf..e41546d 100644
-> --- a/drivers/net/phy/fixed.c
-> +++ b/drivers/net/phy/fixed.c
-> @@ -31,7 +31,7 @@ struct fixed_mdio_bus {
->  };
->
->  struct fixed_phy {
-> -       int id;
-> +       int addr;
->         u16 regs[MII_REGS_NUM];
->         struct phy_device *phydev;
->         struct fixed_phy_status status;
-> @@ -104,8 +104,8 @@ static int fixed_phy_update_regs(struct fixed_phy *fp)
->         if (fp->status.asym_pause)
->                 lpa |= LPA_PAUSE_ASYM;
->
-> -       fp->regs[MII_PHYSID1] = fp->id >> 16;
-> -       fp->regs[MII_PHYSID2] = fp->id;
-> +       fp->regs[MII_PHYSID1] = 0;
-> +       fp->regs[MII_PHYSID2] = 0;
->
->         fp->regs[MII_BMSR] = bmsr;
->         fp->regs[MII_BMCR] = bmcr;
-> @@ -115,7 +115,7 @@ static int fixed_phy_update_regs(struct fixed_phy *fp)
->         return 0;
->  }
->
-> -static int fixed_mdio_read(struct mii_bus *bus, int phy_id, int reg_num)
-> +static int fixed_mdio_read(struct mii_bus *bus, int phy_addr, int reg_num)
->  {
->         struct fixed_mdio_bus *fmb = bus->priv;
->         struct fixed_phy *fp;
-> @@ -124,7 +124,7 @@ static int fixed_mdio_read(struct mii_bus *bus, int phy_id, int reg_num)
->                 return -1;
->
->         list_for_each_entry(fp, &fmb->phys, node) {
-> -               if (fp->id == phy_id) {
-> +               if (fp->addr == phy_addr) {
->                         /* Issue callback if user registered it. */
->                         if (fp->link_update) {
->                                 fp->link_update(fp->phydev->attached_dev,
-> @@ -138,7 +138,7 @@ static int fixed_mdio_read(struct mii_bus *bus, int phy_id, int reg_num)
->         return 0xFFFF;
->  }
->
-> -static int fixed_mdio_write(struct mii_bus *bus, int phy_id, int reg_num,
-> +static int fixed_mdio_write(struct mii_bus *bus, int phy_addr, int reg_num,
->                             u16 val)
->  {
->         return 0;
-> @@ -160,7 +160,7 @@ int fixed_phy_set_link_update(struct phy_device *phydev,
->                 return -EINVAL;
->
->         list_for_each_entry(fp, &fmb->phys, node) {
-> -               if (fp->id == phydev->phy_id) {
-> +               if (fp->addr == phydev->addr) {
->                         fp->link_update = link_update;
->                         fp->phydev = phydev;
->                         return 0;
-> @@ -171,7 +171,7 @@ int fixed_phy_set_link_update(struct phy_device *phydev,
->  }
->  EXPORT_SYMBOL_GPL(fixed_phy_set_link_update);
->
-> -int fixed_phy_add(unsigned int irq, int phy_id,
-> +int fixed_phy_add(unsigned int irq, int phy_addr,
->                   struct fixed_phy_status *status)
->  {
->         int ret;
-> @@ -184,9 +184,9 @@ int fixed_phy_add(unsigned int irq, int phy_id,
->
->         memset(fp->regs, 0xFF,  sizeof(fp->regs[0]) * MII_REGS_NUM);
->
-> -       fmb->irqs[phy_id] = irq;
-> +       fmb->irqs[phy_addr] = irq;
->
-> -       fp->id = phy_id;
-> +       fp->addr = phy_addr;
->         fp->status = *status;
->
->         ret = fixed_phy_update_regs(fp);
-> --
-> 1.9.3
+> Joking aside, I concede your point.  It looks like the last two mvebu
+> legacy platforms (dove, mv78xx0) might get merged into mach-mvebu during
+> the next cycle.  After that, we can reach out to the Debian and OpenWRT
+> guys and see what legacy platforms are in use or rotting.  We can go
+> from there.
 
+I just removed ixp4xx from Debian as the kernel image wouldn't fit in
+the NSLU2's kernel partition any more (even after disabling quite a few
+features that are enabled in most other configurations).  iop32x was
+removed for the same reason, a while ago.
 
+Our 'legacy' (which I take to mean pre-v7) configurations are now
+kirkwood, mv78xx0, orion5x (all about to converge to mvebu) and
+versatile.
+
+Ben.
 
 -- 
-Florian
+Ben Hutchings
+If you seem to know what you are doing, you'll be given more to do.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140516/9795766d/attachment.sig>
