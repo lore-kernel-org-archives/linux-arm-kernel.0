@@ -1,49 +1,31 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 16 May 2014 08:56:56 +0300
-Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
- support
-In-Reply-To: <20140515182133.GC23659@atomide.com>
-References: <CABxcv=mY0a+yJgmCTPN=BhSQD57Pw022zOd5_KxEgvvF_-=O7Q@mail.gmail.com>
- <20140512142646.GA31772@atomide.com> <5370E0C9.8050201@ti.com>
- <20140512155132.GH31772@atomide.com> <5371F923.80000@ti.com>
- <CABxcv==_LCw1kPYm17g=h8VfSN2V_qsgXjTnsy-JOetawSv4pA@mail.gmail.com>
- <20140513152518.GA16837@atomide.com> <53730AFB.2090800@ti.com>
- <20140514160216.GD18463@atomide.com> <537487AE.3060906@ti.com>
- <20140515182133.GC23659@atomide.com>
-Message-ID: <5375A8A8.7080306@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 16 May 2014 01:57:09 -0400
+Subject: [PATCH v6 14/17] ARM: mvebu: add Device Tree description of
+ xHCI controllers on Armada 38x
+In-Reply-To: <1400149062-32661-15-git-send-email-gregory.clement@free-electrons.com>
+References: <1400149062-32661-1-git-send-email-gregory.clement@free-electrons.com>
+ <1400149062-32661-15-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140516055709.GE27822@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/14 21:21, Tony Lindgren wrote:
-
->> But you're right, having "sharp,ls037v7dw01-omap-dss" in the .dts is an
->> alternative for the compatible-string conversion we do now. I guess it's
->> a matter of taste, but I rather hide it inside the kernel, in an
->> internal omapdss file, than pollute the .dts files with those compatible
->> strings.
+On Thu, May 15, 2014 at 12:17:39PM +0200, Gregory CLEMENT wrote:
+> The Marvell Armada 38x SoCs contains two xHCI controllers. This commit
+> adds the Device Tree description of those interfaces at the SoC level,
+> and also enables the two USB3 ports on the Armada 385 DB platform and
+> one USB3 port on the Armada 385 RD platform.
 > 
-> Well it avoid you parsing through all the nodes during booting
-> and leaves out the function to do remapping. And removes the need
-> for maintaining a custom display mapping table. I'd say that's a
-> pretty good list of advantages right there :)
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-385-db.dts |  8 ++++++++
+>  arch/arm/boot/dts/armada-385-rd.dts |  4 ++++
+>  arch/arm/boot/dts/armada-38x.dtsi   | 17 +++++++++++++++++
+>  3 files changed, 29 insertions(+)
 
-Yep... I don't know. Maybe I'm being too careful about doing wrong
-things with .dts. I just like it more if any hacks are in kernel code,
-which I can remove without anyone noticing.
+Patches 14 through 17 applied to mvebu/dt.  Patch 17 amended as Sergei
+suggested.
 
-Anyway, we already have board.dts files using the non-omapified
-compatible strings in the mainline, so if I would now add the omapified
-compatible strings to .dts files, those old board.dts files would break.
+thx,
 
-So I guess the choice has already been made.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140516/24dd0101/attachment-0001.sig>
+Jason.
