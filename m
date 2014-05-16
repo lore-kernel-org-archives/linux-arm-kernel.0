@@ -1,34 +1,624 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 May 2014 09:58:19 +0900
-Subject: [PATCH 10/11] ARM: shmobile: marzen-reference: Set SMSC lan to use
- irq-push-pull
+Date: Fri, 16 May 2014 09:58:16 +0900
+Subject: [PATCH 07/11] ARM: shmobile: dts: Move interrupt-parent property to
+ root node
 In-Reply-To: <cover.1400200395.git.horms+renesas@verge.net.au>
 References: <cover.1400200395.git.horms+renesas@verge.net.au>
-Message-ID: <c9af5428be0cea61a34fa8d5dda83d4c57a03b06.1400200395.git.horms+renesas@verge.net.au>
+Message-ID: <9ff254adc1e32db46000a33b8ecbc4d7047672be.1400200395.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change makes the DTS consistent with the platform data
-that exists in board-marzen.c.
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Empirically it does not appear to be necessary.
+There's no need to duplicate the interrupt-parent property in all DT
+nodes as the kernel automatically walks parent nodes to find the
+property. Specify it once in the root node only.
 
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7779-marzen-reference.dts | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/r8a73a4.dtsi | 18 ------------------
+ arch/arm/boot/dts/r8a7740.dtsi | 12 +-----------
+ arch/arm/boot/dts/r8a7778.dtsi | 18 +-----------------
+ arch/arm/boot/dts/r8a7779.dtsi | 21 +--------------------
+ arch/arm/boot/dts/r8a7791.dtsi |  3 ---
+ 5 files changed, 3 insertions(+), 69 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7779-marzen-reference.dts b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-index 76f5eef..b27c637 100644
---- a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-+++ b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-@@ -45,6 +45,7 @@
- 		phy-mode = "mii";
- 		interrupt-parent = <&irqpin0>;
- 		interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
-+		smsc,irq-push-pull;
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index 62d0211..82c5ac8 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -55,7 +55,6 @@
+ 		#interrupt-cells = <2>;
+ 		interrupt-controller;
+ 		reg = <0 0xe61c0000 0 0x200>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 0 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 1 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 2 IRQ_TYPE_LEVEL_HIGH>,
+@@ -95,7 +94,6 @@
+ 		#interrupt-cells = <2>;
+ 		interrupt-controller;
+ 		reg = <0 0xe61c0200 0 0x200>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 33 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 34 IRQ_TYPE_LEVEL_HIGH>,
+@@ -136,7 +134,6 @@
+ 		dma0: dma-controller at e6700020 {
+ 			compatible = "renesas,shdma-r8a73a4";
+ 			reg = <0 0xe6700020 0 0x89e0>;
+-			interrupt-parent = <&gic>;
+ 			interrupts = <0 220 IRQ_TYPE_LEVEL_HIGH
+ 					0 200 IRQ_TYPE_LEVEL_HIGH
+ 					0 201 IRQ_TYPE_LEVEL_HIGH
+@@ -171,7 +168,6 @@
+ 		compatible = "renesas,rcar-thermal";
+ 		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>,
+ 			 <0 0xe61f0200 0 0x38>, <0 0xe61f0300 0 0x38>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 69 IRQ_TYPE_LEVEL_HIGH>;
+ 	};
+ 
+@@ -180,7 +176,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+ 		reg = <0 0xe6500000 0 0x428>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 174 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+@@ -190,7 +185,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+ 		reg = <0 0xe6510000 0 0x428>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 175 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+@@ -200,7 +194,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+ 		reg = <0 0xe6520000 0 0x428>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 176 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+@@ -210,7 +203,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+ 		reg = <0 0xe6530000 0 0x428>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 177 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+@@ -220,7 +212,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+ 		reg = <0 0xe6540000 0 0x428>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 178 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+@@ -230,7 +221,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+ 		reg = <0 0xe60b0000 0 0x428>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 179 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+@@ -240,7 +230,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+ 		reg = <0 0xe6550000 0 0x428>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 184 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+@@ -250,7 +239,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+ 		reg = <0 0xe6560000 0 0x428>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 185 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+@@ -260,7 +248,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+ 		reg = <0 0xe6570000 0 0x428>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 173 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+@@ -268,7 +255,6 @@
+ 	mmcif0: mmc at ee200000 {
+ 		compatible = "renesas,sh-mmcif";
+ 		reg = <0 0xee200000 0 0x80>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 169 IRQ_TYPE_LEVEL_HIGH>;
  		reg-io-width = <4>;
- 		vddvario-supply = <&fixedregulator3v3>;
- 		vdd33a-supply = <&fixedregulator3v3>;
+ 		status = "disabled";
+@@ -277,7 +263,6 @@
+ 	mmcif1: mmc at ee220000 {
+ 		compatible = "renesas,sh-mmcif";
+ 		reg = <0 0xee220000 0 0x80>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 170 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg-io-width = <4>;
+ 		status = "disabled";
+@@ -309,7 +294,6 @@
+ 	sdhi0: sd at ee100000 {
+ 		compatible = "renesas,sdhi-r8a73a4";
+ 		reg = <0 0xee100000 0 0x100>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>;
+ 		cap-sd-highspeed;
+ 		status = "disabled";
+@@ -318,7 +302,6 @@
+ 	sdhi1: sd at ee120000 {
+ 		compatible = "renesas,sdhi-r8a73a4";
+ 		reg = <0 0xee120000 0 0x100>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 166 IRQ_TYPE_LEVEL_HIGH>;
+ 		cap-sd-highspeed;
+ 		status = "disabled";
+@@ -327,7 +310,6 @@
+ 	sdhi2: sd at ee140000 {
+ 		compatible = "renesas,sdhi-r8a73a4";
+ 		reg = <0 0xee140000 0 0x100>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 167 IRQ_TYPE_LEVEL_HIGH>;
+ 		cap-sd-highspeed;
+ 		status = "disabled";
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index f014789..fbf47fb 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -14,6 +14,7 @@
+ 
+ / {
+ 	compatible = "renesas,r8a7740";
++	interrupt-parent = <&gic>;
+ 
+ 	cpus {
+ 		#address-cells = <1>;
+@@ -49,7 +50,6 @@
+ 			<0xe6900020 1>,
+ 			<0xe6900040 1>,
+ 			<0xe6900060 1>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 149 IRQ_TYPE_LEVEL_HIGH
+ 			      0 149 IRQ_TYPE_LEVEL_HIGH
+ 			      0 149 IRQ_TYPE_LEVEL_HIGH
+@@ -70,7 +70,6 @@
+ 			<0xe6900024 1>,
+ 			<0xe6900044 1>,
+ 			<0xe6900064 1>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 149 IRQ_TYPE_LEVEL_HIGH
+ 			      0 149 IRQ_TYPE_LEVEL_HIGH
+ 			      0 149 IRQ_TYPE_LEVEL_HIGH
+@@ -91,7 +90,6 @@
+ 			<0xe6900028 1>,
+ 			<0xe6900048 1>,
+ 			<0xe6900068 1>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 149 IRQ_TYPE_LEVEL_HIGH
+ 			      0 149 IRQ_TYPE_LEVEL_HIGH
+ 			      0 149 IRQ_TYPE_LEVEL_HIGH
+@@ -112,7 +110,6 @@
+ 			<0xe690002c 1>,
+ 			<0xe690004c 1>,
+ 			<0xe690006c 1>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 149 IRQ_TYPE_LEVEL_HIGH
+ 			      0 149 IRQ_TYPE_LEVEL_HIGH
+ 			      0 149 IRQ_TYPE_LEVEL_HIGH
+@@ -141,7 +138,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,iic-r8a7740", "renesas,rmobile-iic";
+ 		reg = <0xfff20000 0x425>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 201 IRQ_TYPE_LEVEL_HIGH
+ 			      0 202 IRQ_TYPE_LEVEL_HIGH
+ 			      0 203 IRQ_TYPE_LEVEL_HIGH
+@@ -154,7 +150,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,iic-r8a7740", "renesas,rmobile-iic";
+ 		reg = <0xe6c20000 0x425>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 70 IRQ_TYPE_LEVEL_HIGH
+ 			      0 71 IRQ_TYPE_LEVEL_HIGH
+ 			      0 72 IRQ_TYPE_LEVEL_HIGH
+@@ -189,7 +184,6 @@
+ 	mmcif0: mmc@e6bd0000 {
+ 		compatible = "renesas,mmcif-r8a7740", "renesas,sh-mmcif";
+ 		reg = <0xe6bd0000 0x100>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 56 IRQ_TYPE_LEVEL_HIGH
+ 			      0 57 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+@@ -198,7 +192,6 @@
+ 	sdhi0: sd at e6850000 {
+ 		compatible = "renesas,sdhi-r8a7740";
+ 		reg = <0xe6850000 0x100>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 117 IRQ_TYPE_LEVEL_HIGH
+ 			      0 118 IRQ_TYPE_LEVEL_HIGH
+ 			      0 119 IRQ_TYPE_LEVEL_HIGH>;
+@@ -210,7 +203,6 @@
+ 	sdhi1: sd at e6860000 {
+ 		compatible = "renesas,sdhi-r8a7740";
+ 		reg = <0xe6860000 0x100>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 121 IRQ_TYPE_LEVEL_HIGH
+ 			      0 122 IRQ_TYPE_LEVEL_HIGH
+ 			      0 123 IRQ_TYPE_LEVEL_HIGH>;
+@@ -222,7 +214,6 @@
+ 	sdhi2: sd at e6870000 {
+ 		compatible = "renesas,sdhi-r8a7740";
+ 		reg = <0xe6870000 0x100>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 125 IRQ_TYPE_LEVEL_HIGH
+ 			      0 126 IRQ_TYPE_LEVEL_HIGH
+ 			      0 127 IRQ_TYPE_LEVEL_HIGH>;
+@@ -235,7 +226,6 @@
+ 		#sound-dai-cells = <1>;
+ 		compatible = "renesas,fsi2-r8a7740", "renesas,sh_fsi2";
+ 		reg = <0xfe1f0000 0x400>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 9 0x4>;
+ 		status = "disabled";
+ 	};
+diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
+index 3c6fab5..3af0a21 100644
+--- a/arch/arm/boot/dts/r8a7778.dtsi
++++ b/arch/arm/boot/dts/r8a7778.dtsi
+@@ -20,6 +20,7 @@
+ 
+ / {
+ 	compatible = "renesas,r8a7778";
++	interrupt-parent = <&gic>;
+ 
+ 	cpus {
+ 		cpu at 0 {
+@@ -52,7 +53,6 @@
+ 			<0xfe780024 4>,
+ 			<0xfe780044 4>,
+ 			<0xfe780064 4>;
+-		interrupt-parent = <&gic>;
+ 		interrupts =   <0 27 IRQ_TYPE_LEVEL_HIGH
+ 				0 28 IRQ_TYPE_LEVEL_HIGH
+ 				0 29 IRQ_TYPE_LEVEL_HIGH
+@@ -63,7 +63,6 @@
+ 	gpio0: gpio@ffc40000 {
+ 		compatible = "renesas,gpio-r8a7778", "renesas,gpio-rcar";
+ 		reg = <0xffc40000 0x2c>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 103 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+@@ -75,7 +74,6 @@
+ 	gpio1: gpio at ffc41000 {
+ 		compatible = "renesas,gpio-r8a7778", "renesas,gpio-rcar";
+ 		reg = <0xffc41000 0x2c>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 103 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+@@ -87,7 +85,6 @@
+ 	gpio2: gpio at ffc42000 {
+ 		compatible = "renesas,gpio-r8a7778", "renesas,gpio-rcar";
+ 		reg = <0xffc42000 0x2c>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 103 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+@@ -99,7 +96,6 @@
+ 	gpio3: gpio at ffc43000 {
+ 		compatible = "renesas,gpio-r8a7778", "renesas,gpio-rcar";
+ 		reg = <0xffc43000 0x2c>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 103 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+@@ -111,7 +107,6 @@
+ 	gpio4: gpio at ffc44000 {
+ 		compatible = "renesas,gpio-r8a7778", "renesas,gpio-rcar";
+ 		reg = <0xffc44000 0x2c>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 103 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+@@ -130,7 +125,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,i2c-r8a7778";
+ 		reg = <0xffc70000 0x1000>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 67 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+@@ -140,7 +134,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,i2c-r8a7778";
+ 		reg = <0xffc71000 0x1000>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 78 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+@@ -150,7 +143,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,i2c-r8a7778";
+ 		reg = <0xffc72000 0x1000>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 76 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+@@ -160,7 +152,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,i2c-r8a7778";
+ 		reg = <0xffc73000 0x1000>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 77 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+@@ -168,7 +159,6 @@
+ 	mmcif: mmc at ffe4e000 {
+ 		compatible = "renesas,sh-mmcif";
+ 		reg = <0xffe4e000 0x100>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 61 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+@@ -176,7 +166,6 @@
+ 	sdhi0: sd at ffe4c000 {
+ 		compatible = "renesas,sdhi-r8a7778";
+ 		reg = <0xffe4c000 0x100>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 87 IRQ_TYPE_LEVEL_HIGH>;
+ 		cap-sd-highspeed;
+ 		cap-sdio-irq;
+@@ -186,7 +175,6 @@
+ 	sdhi1: sd at ffe4d000 {
+ 		compatible = "renesas,sdhi-r8a7778";
+ 		reg = <0xffe4d000 0x100>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 88 IRQ_TYPE_LEVEL_HIGH>;
+ 		cap-sd-highspeed;
+ 		cap-sdio-irq;
+@@ -196,7 +184,6 @@
+ 	sdhi2: sd at ffe4f000 {
+ 		compatible = "renesas,sdhi-r8a7778";
+ 		reg = <0xffe4f000 0x100>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 86 IRQ_TYPE_LEVEL_HIGH>;
+ 		cap-sd-highspeed;
+ 		cap-sdio-irq;
+@@ -206,7 +193,6 @@
+ 	hspi0: spi at fffc7000 {
+ 		compatible = "renesas,hspi-r8a7778", "renesas,hspi";
+ 		reg = <0xfffc7000 0x18>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 63 IRQ_TYPE_LEVEL_HIGH>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -216,7 +202,6 @@
+ 	hspi1: spi at fffc8000 {
+ 		compatible = "renesas,hspi-r8a7778", "renesas,hspi";
+ 		reg = <0xfffc8000 0x18>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 84 IRQ_TYPE_LEVEL_HIGH>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -226,7 +211,6 @@
+ 	hspi2: spi at fffc6000 {
+ 		compatible = "renesas,hspi-r8a7778", "renesas,hspi";
+ 		reg = <0xfffc6000 0x18>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 85 IRQ_TYPE_LEVEL_HIGH>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index 8b1a336..b517c8e 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -15,6 +15,7 @@
+ 
+ / {
+ 	compatible = "renesas,r8a7779";
++	interrupt-parent = <&gic>;
+ 
+ 	cpus {
+ 		#address-cells = <1>;
+@@ -59,7 +60,6 @@
+ 	gpio0: gpio at ffc40000 {
+ 		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
+ 		reg = <0xffc40000 0x2c>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 141 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+@@ -71,7 +71,6 @@
+ 	gpio1: gpio at ffc41000 {
+ 		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
+ 		reg = <0xffc41000 0x2c>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 142 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+@@ -83,7 +82,6 @@
+ 	gpio2: gpio at ffc42000 {
+ 		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
+ 		reg = <0xffc42000 0x2c>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 143 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+@@ -95,7 +93,6 @@
+ 	gpio3: gpio at ffc43000 {
+ 		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
+ 		reg = <0xffc43000 0x2c>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 144 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+@@ -107,7 +104,6 @@
+ 	gpio4: gpio at ffc44000 {
+ 		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
+ 		reg = <0xffc44000 0x2c>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 145 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+@@ -119,7 +115,6 @@
+ 	gpio5: gpio at ffc45000 {
+ 		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
+ 		reg = <0xffc45000 0x2c>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 146 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+@@ -131,7 +126,6 @@
+ 	gpio6: gpio at ffc46000 {
+ 		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
+ 		reg = <0xffc46000 0x2c>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 147 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+@@ -150,7 +144,6 @@
+ 			<0xfe780024 4>,
+ 			<0xfe780044 4>,
+ 			<0xfe780064 4>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 27 IRQ_TYPE_LEVEL_HIGH
+ 			      0 28 IRQ_TYPE_LEVEL_HIGH
+ 			      0 29 IRQ_TYPE_LEVEL_HIGH
+@@ -163,7 +156,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,i2c-r8a7779";
+ 		reg = <0xffc70000 0x1000>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 79 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+@@ -173,7 +165,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,i2c-r8a7779";
+ 		reg = <0xffc71000 0x1000>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 82 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+@@ -183,7 +174,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,i2c-r8a7779";
+ 		reg = <0xffc72000 0x1000>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+@@ -193,7 +183,6 @@
+ 		#size-cells = <0>;
+ 		compatible = "renesas,i2c-r8a7779";
+ 		reg = <0xffc73000 0x1000>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 81 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+ 	};
+@@ -211,14 +200,12 @@
+ 	sata: sata at fc600000 {
+ 		compatible = "renesas,rcar-sata";
+ 		reg = <0xfc600000 0x2000>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 100 IRQ_TYPE_LEVEL_HIGH>;
+ 	};
+ 
+ 	sdhi0: sd at ffe4c000 {
+ 		compatible = "renesas,sdhi-r8a7779";
+ 		reg = <0xffe4c000 0x100>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 104 IRQ_TYPE_LEVEL_HIGH>;
+ 		cap-sd-highspeed;
+ 		cap-sdio-irq;
+@@ -228,7 +215,6 @@
+ 	sdhi1: sd at ffe4d000 {
+ 		compatible = "renesas,sdhi-r8a7779";
+ 		reg = <0xffe4d000 0x100>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 105 IRQ_TYPE_LEVEL_HIGH>;
+ 		cap-sd-highspeed;
+ 		cap-sdio-irq;
+@@ -238,7 +224,6 @@
+ 	sdhi2: sd at ffe4e000 {
+ 		compatible = "renesas,sdhi-r8a7779";
+ 		reg = <0xffe4e000 0x100>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
+ 		cap-sd-highspeed;
+ 		cap-sdio-irq;
+@@ -248,7 +233,6 @@
+ 	sdhi3: sd at ffe4f000 {
+ 		compatible = "renesas,sdhi-r8a7779";
+ 		reg = <0xffe4f000 0x100>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 106 IRQ_TYPE_LEVEL_HIGH>;
+ 		cap-sd-highspeed;
+ 		cap-sdio-irq;
+@@ -258,7 +242,6 @@
+ 	hspi0: spi at fffc7000 {
+ 		compatible = "renesas,hspi-r8a7779", "renesas,hspi";
+ 		reg = <0xfffc7000 0x18>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 73 IRQ_TYPE_LEVEL_HIGH>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -268,7 +251,6 @@
+ 	hspi1: spi at fffc8000 {
+ 		compatible = "renesas,hspi-r8a7779", "renesas,hspi";
+ 		reg = <0xfffc8000 0x18>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 74 IRQ_TYPE_LEVEL_HIGH>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -278,7 +260,6 @@
+ 	hspi2: spi at fffc6000 {
+ 		compatible = "renesas,hspi-r8a7779", "renesas,hspi";
+ 		reg = <0xfffc6000 0x18>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 98baff4..f4d47e1 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -289,7 +289,6 @@
+ 	sdhi0: sd at ee100000 {
+ 		compatible = "renesas,sdhi-r8a7791";
+ 		reg = <0 0xee100000 0 0x200>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7791_CLK_SDHI0>;
+ 		status = "disabled";
+@@ -298,7 +297,6 @@
+ 	sdhi1: sd at ee140000 {
+ 		compatible = "renesas,sdhi-r8a7791";
+ 		reg = <0 0xee140000 0 0x100>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 167 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7791_CLK_SDHI1>;
+ 		status = "disabled";
+@@ -307,7 +305,6 @@
+ 	sdhi2: sd at ee160000 {
+ 		compatible = "renesas,sdhi-r8a7791";
+ 		reg = <0 0xee160000 0 0x100>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <0 168 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7791_CLK_SDHI2>;
+ 		status = "disabled";
 -- 
 1.8.5.2
