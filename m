@@ -1,106 +1,51 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 16 May 2014 09:19:45 +0900
-Subject: [PATCH v6 00/12] CCF support for Renesas r7s72100
-In-Reply-To: <20140514230241.GA29233@verge.net.au>
-References: <1400029816-24028-1-git-send-email-wsa@the-dreams.de>
- <20140514050801.GE3502@verge.net.au>
- <CAMuHMdUTQbTSU4GSuxZX22QTqyQuo-zsNg4+d+OqpqEbjOnCaA@mail.gmail.com>
- <20140514230241.GA29233@verge.net.au>
-Message-ID: <20140516001944.GA9418@verge.net.au>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 16 May 2014 09:27:38 +0900
+Subject: [PATCH v1 1/5] ARM: keystone: add pcie related options
+In-Reply-To: <1400169692-9677-2-git-send-email-m-karicheri2@ti.com>
+References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
+ <1400169692-9677-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <004e01cf709d$a48b4240$eda1c6c0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 08:02:47AM +0900, Simon Horman wrote:
-> On Wed, May 14, 2014 at 11:44:02AM +0200, Geert Uytterhoeven wrote:
-> > Hi Wolfram, Simon,
-> > 
-> > On Wed, May 14, 2014 at 7:08 AM, Simon Horman <horms@verge.net.au> wrote:
-> > > On Wed, May 14, 2014 at 03:10:04AM +0200, Wolfram Sang wrote:
-> > >> This series moves the r7s72100 platfrom from the legacy clock implementation to
-> > >> the common clock framework.
-> > >>
-> > >> This series has been tested with the renesas-devel-v3.15-rc2-20140428 tag. If
-> > >> you want to boot into a console, you have a runtime dependency [1] which is
-> > >> expected to go away in 3.15-rc6.
-> > >>
-> > >> Changes since V5:
-> > >>
-> > >> * rebased and tested against latest renesas/devel-tag
-> > >>   (with and without CCF)
-> > 
-> > That's genmai-legacy (ARCH_SHMOBILE_LEGACY=y, MACH_GENMAI=y),
-> > and genmai-multiplatform (ARCH_SHMOBILE_MULTI=y, MACH_GENMAI=y,
-> > right?
-> > 
-> > There's still a third variant: genmai-reference (ARCH_SHMOBILE_LEGACY=y,
-> > MACH_GENMAI_REFERENCE=y), which uses board-genmai-reference.c,
-> > but without CCF, i.e. with clock-r7s72100.c.
-> > For that, you still need the legacy clocks (also for serial!), so I needed the
-> > (gmail-whitespace-damaged) temporary workaround below in my local tree.
-> > 
-> > > Thanks, I have queued up this series.
-> > 
-> > Do we want to go for the quick fix below, or just fix the issue for good,
-> > and merge genmai-reference and genmai-multiplatform now, just like we did
-> > for koelsch/lager?
-> > 
-> > I can send a proper patch for the quick fix, depending on your decision.
+On Friday, May 16, 2014 1:01 AM, Murali Karicheri wrote:
 > 
-> I do not feel particularly strongly about this.  But it seems to me that it
-> would make sense to take the same approach as koelsch and lager.
+> Add pcie related options by default for keystone architecture
+> 
+> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> CC: Russell King <linux@arm.linux.org.uk>
+> 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+>  arch/arm/mach-keystone/Kconfig |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
+> index f50bc93..f87844d 100644
+> --- a/arch/arm/mach-keystone/Kconfig
+> +++ b/arch/arm/mach-keystone/Kconfig
+> @@ -8,6 +8,8 @@ config ARCH_KEYSTONE
+>  	select COMMON_CLK_KEYSTONE
+>  	select ARCH_SUPPORTS_BIG_ENDIAN
+>  	select ZONE_DMA if ARM_LPAE
+> +	select MIGHT_HAVE_PCI
+> +	select ARCH_SUPPORTS_MSI
 
-Wolfram, are you planing to handle this one way or another?
+Please, don't select ARCH_SUPPORTS_MSI, because this kconfig
+option was already removed in v3.12 by the commit ebd97be635
+('PCI: remove ARCH_SUPPORTS_MSI kconfig option'). So. there is
+NO need to select 'ARCH_SUPPORTS_MSI'.
 
-> > >From 1b7b851a5d1b7d10f42f68a35b65278827b03cc4 Mon Sep 17 00:00:00 2001
-> > From: Geert Uytterhoeven <geert+renesas@glider.be>
-> > Date: Mon, 12 May 2014 14:32:25 +0200
-> > Subject: [PATCH] ARM: shmobile: genmai-reference: Re-add legacy clocks
-> > 
-> > genmai-reference still uses non-CCF, so it needs the legacy clocks
-> > 
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > ---
-> >  arch/arm/mach-shmobile/clock-r7s72100.c |   10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c
-> > b/arch/arm/mach-shmobile/clock-r7s72100.c
-> > index df187484de5d..1b677e0a69c6 100644
-> > --- a/arch/arm/mach-shmobile/clock-r7s72100.c
-> > +++ b/arch/arm/mach-shmobile/clock-r7s72100.c
-> > @@ -194,6 +194,16 @@ static struct clk_lookup lookups[] = {
-> >   CLKDEV_DEV_ID("rspi-rz.2", &mstp_clks[MSTP105]),
-> >   CLKDEV_DEV_ID("rspi-rz.3", &mstp_clks[MSTP104]),
-> >   CLKDEV_DEV_ID("rspi-rz.4", &mstp_clks[MSTP103]),
-> > + CLKDEV_DEV_ID("e800c800.spi", &mstp_clks[MSTP107]),
-> > + CLKDEV_DEV_ID("e800d000.spi", &mstp_clks[MSTP106]),
-> > + CLKDEV_DEV_ID("e800d800.spi", &mstp_clks[MSTP105]),
-> > + CLKDEV_DEV_ID("e800e000.spi", &mstp_clks[MSTP104]),
-> > + CLKDEV_DEV_ID("e800e800.spi", &mstp_clks[MSTP103]),
-> > + CLKDEV_DEV_ID("fcfee000.i2c", &mstp_clks[MSTP97]),
-> > + CLKDEV_DEV_ID("fcfee400.i2c", &mstp_clks[MSTP96]),
-> > + CLKDEV_DEV_ID("fcfee800.i2c", &mstp_clks[MSTP95]),
-> > + CLKDEV_DEV_ID("fcfeec00.i2c", &mstp_clks[MSTP94]),
-> > + CLKDEV_DEV_ID("e8008000.serial", &mstp_clks[MSTP45]),
-> >   CLKDEV_DEV_ID("r7s72100-ether", &mstp_clks[MSTP74]),
-> > 
-> >   /* ICK */
-> > -- 
-> > 1.7.9.5
-> > 
-> > Gr{oetje,eeting}s,
-> > 
-> >                         Geert
-> > 
-> > --
-> > Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> > 
-> > In personal conversations with technical people, I call myself a hacker. But
-> > when I'm talking to journalists I just say "programmer" or something like that.
-> >                                 -- Linus Torvalds
-> > 
+Best regards,
+Jingoo Han
+
+>  	help
+>  	  Support for boards based on the Texas Instruments Keystone family of
+>  	  SoCs.
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
