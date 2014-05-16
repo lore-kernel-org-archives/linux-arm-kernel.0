@@ -1,47 +1,104 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 16 May 2014 11:00:24 +0200
-Subject: [PATCH v6 13/17] ARM: shmobile: marzen: Add to shmobile defconfig
-In-Reply-To: <20140516085135.GA20299@verge.net.au>
-References: <1400153532-23675-1-git-send-email-horms+renesas@verge.net.au>
- <1400153532-23675-14-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdXPm_=ejkcnOFOgfnsz9MUc8KpAjkuMcHMKJeaEmVbhQA@mail.gmail.com>
- <20140515225027.GA29432@verge.net.au>
- <20140516000409.GB29432@verge.net.au>
- <CAMuHMdWjxK5K4rhJt0VDbsSUX_Gzq8EXCPStN3bb_GUqq8tEog@mail.gmail.com>
- <20140516085135.GA20299@verge.net.au>
-Message-ID: <CAMuHMdVgt=iai7CM0xx7jpD9t+mZqZGuTXmTvwfv+ULuDBGWyA@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 16 May 2014 14:30:56 +0530
+Subject: [PATCH 06/17] pci: host: pcie-designware: Use *base-mask* for
+ configuring the iATU
+In-Reply-To: <5281007.CFRjW0Yeu2@wuerfel>
+References: <1399383244-14556-1-git-send-email-kishon@ti.com>
+ <4528185.oZbgyuuFKX@wuerfel> <537302CD.7000701@ti.com>
+ <5281007.CFRjW0Yeu2@wuerfel>
+Message-ID: <5375D3C8.1060204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 10:51 AM, Simon Horman <horms@verge.net.au> wrote:
->> > --- a/arch/arm/configs/shmobile_defconfig
->> > +++ b/arch/arm/configs/shmobile_defconfig
+Hi Arnd,
+
+On Wednesday 14 May 2014 06:15 PM, Arnd Bergmann wrote:
+> On Wednesday 14 May 2014 11:14:45 Kishon Vijay Abraham I wrote:
+>> hi Arnd,
 >>
->> > +CONFIG_USB_RCAR_PHY=y
->> > +CONFIG_USB_RCAR_GEN2_PHY=y
+>> On Tuesday 13 May 2014 07:04 PM, Arnd Bergmann wrote:
+>>> On Tuesday 13 May 2014 15:27:46 Arnd Bergmann wrote:
+>>>> On Tuesday 13 May 2014 18:56:23 Kishon Vijay Abraham I wrote:
+>>>>>> If you have a case where the outbound translation is a 256MB (i.e. 28bit)
+>>>>>> section of the CPU address space, that could be represented as
+>>>>>>
+>>>>>>       ranges = <0x82000000 0 0  0xb0000000  0 0x10000000>;
+>>>>>>
+>>>>>> or 
+>>>>>>
+>>>>>>       ranges = <0x82000000 0 0xb0000000  0xb0000000  0 0x10000000>;
+>>>>>>
+>>>>>> depending on whether you want the BARs to be programmed using a low
+>>>>>> address 0x0-0x0fffffff or an address matching the window
+>>>>>> 0xb0000000-0xbfffffff.
+>>>>>
+>>>>> The problem is, for configuring the window starting at 0xb0000000, the ATU
+>>>>> should be programmed 0x0000000 (the cpu address for it will be 0xb0000000 though).
+>>>>>
+>>>>
+>>>> Then use the first of the two?
+>>>>
+>>>
+>>> To clarify: using <0x82000000 0 0  0xb0000000  0 0x10000000> will give you 
+>>> a mem_offset of 0xb0000000, which should work just fine for this case.
+>>>
+>>> What I don't understand is why the ATU cares about whether the outbound
+>>> address is 0x0000000 or 0xb0000000 if it just decodes the lower 28 bit
+>>> anyway. Did you mean that we have to program the BARs using low addresses
+>>> regardless of what is programmed in the ATU? That would make more sense,
+>>> and it also matches what I suggested.
 >>
->> While I don't dispute the need for CONFIG_USB_RCAR_GEN2_PHY in
->> shmobile_defconfig, this is not needed for Marzen, right?
->
-> The CONFIG_USB_RCAR_GEN2_PHY was moved from above (by savedefconfig).
+>> No, It's not like it decodes only the lower 28bits. The BARs is programmed with
+>> 32 bit value.
+>>
+>> My pcie dt node has
+>>  ranges = <0x00000800 0 0x20001000 0x20001000 0 0x00002000  /* CONFIG */
+>>            0x81000000 0 0          0x20003000 0 0x00010000  /* IO */
+>>            0x82000000 0 0x20013000 0x20013000 0 0xffed000>; /* MEM */
+>>
+>> Consider MEM address space..
+>>
+>> Here both PCI address and CPU address is 0x20013000. So when there is a write
+>> to cpu addr 0x20013000 [writel(virt_addr(0x20013000)], we want it to be
+>> translated to PCI addr 0x20013000. So in 'ATU', we would expect *base* to be
+>> programmed to *0x20013000* and target to be programmed to *0x20013000*. But
+>> that's not the case for DRA7xx. For DRA7xx *base* should be programmed to
+>> *0x0013000* and target should be programmed to *0x20013000*.
+> 
+> Ok, got it, thanks for your patience.
+> 
+> I think this would best be modeled as a separate bus node that contains the
+> restriction, like this:
+> 
+> / {
+> 	#address-cells = <1>; // or <2> if you support > 4GB address space
+> 	#size-cells = <1>;
+> 
+> 	soc {
+> 		#address-cells <1>;
+> 		#size-cells = <1>;
+> 		ranges;
+> 		dma-ranges;
+> 
+> 		... // all normal devices
+> 
+> 		axi at 20000000 {
+> 			#size-cells = <1>;
+> 			#address-cells = <1>;
+> 			dma-ranges; // can access all 4GB outbound
+> 			ranges = <0 0x20000000 0x10000000>; // 28-bit bus
+> 
+> 			pci at 0 {
+> 				reg = <0x0    0x1000>, // internal regs
+> 				      <0x1000 0x2000>; // config space
 
-Sorry, I had missed that.
+The internal reg address space starts at 0x51000000. By Using this <0
+0x20000000 0x10000000>; as ranges, we are not able to get the memory resource
+properly. Can we use multiple ranges? how do we specify which ranges the *reg*
+property to use?
 
-> I decided to include that change due to proximity to the new
-> CONFIG_USB_RCAR_PHY line. But perhaps it would have been better not to.
+Btw I was using *simple-bus* as compatible to *axi*. Or should I create a new
+*axi* driver to create the pcie memory resources myself?
 
-Nevermind.
-
-BTW, avoiding this moving around in real changes is another reason for
-refreshing the defconfigs on a regular basis ;-)
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks
+Kishon
