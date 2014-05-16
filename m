@@ -1,46 +1,106 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 15 May 2014 17:13:06 -0700
-Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
-In-Reply-To: <20140514233119.GA31594@atomide.com>
-References: <1399991966-14582-1-git-send-email-santosh.shilimkar@ti.com>
- <5373C78E.7040301@linaro.org> <5373C8E8.6040208@ti.com>
- <5373CBB9.40506@linaro.org> <20140514205649.GC27426@atomide.com>
- <20140514233119.GA31594@atomide.com>
-Message-ID: <20140516001306.GA6580@atomide.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 16 May 2014 09:19:45 +0900
+Subject: [PATCH v6 00/12] CCF support for Renesas r7s72100
+In-Reply-To: <20140514230241.GA29233@verge.net.au>
+References: <1400029816-24028-1-git-send-email-wsa@the-dreams.de>
+ <20140514050801.GE3502@verge.net.au>
+ <CAMuHMdUTQbTSU4GSuxZX22QTqyQuo-zsNg4+d+OqpqEbjOnCaA@mail.gmail.com>
+ <20140514230241.GA29233@verge.net.au>
+Message-ID: <20140516001944.GA9418@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [140514 16:32]:
-> * Tony Lindgren <tony@atomide.com> [140514 13:57]:
-> > * Daniel Lezcano <daniel.lezcano@linaro.org> [140514 13:02]:
-> > > 
-> > > So the broadcast timer does not operate with this revert. Moreover, I am not
-> > > sure reverting this patch is the right solution.
+On Thu, May 15, 2014 at 08:02:47AM +0900, Simon Horman wrote:
+> On Wed, May 14, 2014 at 11:44:02AM +0200, Geert Uytterhoeven wrote:
+> > Hi Wolfram, Simon,
 > > 
-> > OK I'll hold on sending anything until there's some conclusion.
+> > On Wed, May 14, 2014 at 7:08 AM, Simon Horman <horms@verge.net.au> wrote:
+> > > On Wed, May 14, 2014 at 03:10:04AM +0200, Wolfram Sang wrote:
+> > >> This series moves the r7s72100 platfrom from the legacy clock implementation to
+> > >> the common clock framework.
+> > >>
+> > >> This series has been tested with the renesas-devel-v3.15-rc2-20140428 tag. If
+> > >> you want to boot into a console, you have a runtime dependency [1] which is
+> > >> expected to go away in 3.15-rc6.
+> > >>
+> > >> Changes since V5:
+> > >>
+> > >> * rebased and tested against latest renesas/devel-tag
+> > >>   (with and without CCF)
 > > 
-> > Are you able to reproduce the problem with current Linux next?
+> > That's genmai-legacy (ARCH_SHMOBILE_LEGACY=y, MACH_GENMAI=y),
+> > and genmai-multiplatform (ARCH_SHMOBILE_MULTI=y, MACH_GENMAI=y,
+> > right?
+> > 
+> > There's still a third variant: genmai-reference (ARCH_SHMOBILE_LEGACY=y,
+> > MACH_GENMAI_REFERENCE=y), which uses board-genmai-reference.c,
+> > but without CCF, i.e. with clock-r7s72100.c.
+> > For that, you still need the legacy clocks (also for serial!), so I needed the
+> > (gmail-whitespace-damaged) temporary workaround below in my local tree.
+> > 
+> > > Thanks, I have queued up this series.
+> > 
+> > Do we want to go for the quick fix below, or just fix the issue for good,
+> > and merge genmai-reference and genmai-multiplatform now, just like we did
+> > for koelsch/lager?
+> > 
+> > I can send a proper patch for the quick fix, depending on your decision.
 > 
-> BTW, I'm also noticing now hangs on omap3 with my PM patches
-> on v3.15-rc4 that seem similar to the panda cpuidle hang.
+> I do not feel particularly strongly about this.  But it seems to me that it
+> would make sense to take the same approach as koelsch and lager.
+
+Wolfram, are you planing to handle this one way or another?
+
+> > >From 1b7b851a5d1b7d10f42f68a35b65278827b03cc4 Mon Sep 17 00:00:00 2001
+> > From: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Date: Mon, 12 May 2014 14:32:25 +0200
+> > Subject: [PATCH] ARM: shmobile: genmai-reference: Re-add legacy clocks
+> > 
+> > genmai-reference still uses non-CCF, so it needs the legacy clocks
+> > 
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > ---
+> >  arch/arm/mach-shmobile/clock-r7s72100.c |   10 ++++++++++
+> >  1 file changed, 10 insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c
+> > b/arch/arm/mach-shmobile/clock-r7s72100.c
+> > index df187484de5d..1b677e0a69c6 100644
+> > --- a/arch/arm/mach-shmobile/clock-r7s72100.c
+> > +++ b/arch/arm/mach-shmobile/clock-r7s72100.c
+> > @@ -194,6 +194,16 @@ static struct clk_lookup lookups[] = {
+> >   CLKDEV_DEV_ID("rspi-rz.2", &mstp_clks[MSTP105]),
+> >   CLKDEV_DEV_ID("rspi-rz.3", &mstp_clks[MSTP104]),
+> >   CLKDEV_DEV_ID("rspi-rz.4", &mstp_clks[MSTP103]),
+> > + CLKDEV_DEV_ID("e800c800.spi", &mstp_clks[MSTP107]),
+> > + CLKDEV_DEV_ID("e800d000.spi", &mstp_clks[MSTP106]),
+> > + CLKDEV_DEV_ID("e800d800.spi", &mstp_clks[MSTP105]),
+> > + CLKDEV_DEV_ID("e800e000.spi", &mstp_clks[MSTP104]),
+> > + CLKDEV_DEV_ID("e800e800.spi", &mstp_clks[MSTP103]),
+> > + CLKDEV_DEV_ID("fcfee000.i2c", &mstp_clks[MSTP97]),
+> > + CLKDEV_DEV_ID("fcfee400.i2c", &mstp_clks[MSTP96]),
+> > + CLKDEV_DEV_ID("fcfee800.i2c", &mstp_clks[MSTP95]),
+> > + CLKDEV_DEV_ID("fcfeec00.i2c", &mstp_clks[MSTP94]),
+> > + CLKDEV_DEV_ID("e8008000.serial", &mstp_clks[MSTP45]),
+> >   CLKDEV_DEV_ID("r7s72100-ether", &mstp_clks[MSTP74]),
+> > 
+> >   /* ICK */
+> > -- 
+> > 1.7.9.5
+> > 
+> > Gr{oetje,eeting}s,
+> > 
+> >                         Geert
+> > 
+> > --
+> > Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> > 
+> > In personal conversations with technical people, I call myself a hacker. But
+> > when I'm talking to journalists I just say "programmer" or something like that.
+> >                                 -- Linus Torvalds
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> The hangs on omap3 do not happen on my v3.14 based branch, so
-> I'm wondering if there are some recent cpuidle regressions too
-> in play?
-
-Looks like the omap3 idle hang is caused by commit 6ddeb6d84459
-(dmaengine: omap-dma: move IRQ handling to omap-dma). This may
-not be related to omap4 cpu_idle hang, but it might.
-
-I'm trying to figure out if it's related to something like
-omap_dma_global_context_save and omap_dma_global_context_restore.
-
-Meanwhile, to test the DMA changes have an effect on the omap4
-cpu_idle issue, you can try reverting the following two patches:
-
-aa4c5b962a7a dmaengine: omap-dma: more consolidation of CCR register setup
-6ddeb6d84459 dmaengine: omap-dma: move IRQ handling to omap-dma
-
-Regards,
-
-Tony
