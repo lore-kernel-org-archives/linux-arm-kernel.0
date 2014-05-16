@@ -1,55 +1,18 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 16 May 2014 09:12:25 -0700
-Subject: [PATCH 0/4] OMAPDSS: sharp-ls037v7dw01 DT support
-In-Reply-To: <1400225402-18274-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1400225402-18274-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <20140516161224.GE22031@atomide.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 16 May 2014 13:20:29 -0300
+Subject: USB with 3.14.3 not working on Freescale i.mx6
+In-Reply-To: <CACWLcfv6akXuM59m_hX-xB=iQYA4iAx7fZ0T5ZB3-7ik-1GZMw@mail.gmail.com>
+References: <CACWLcfv6akXuM59m_hX-xB=iQYA4iAx7fZ0T5ZB3-7ik-1GZMw@mail.gmail.com>
+Message-ID: <CAOMZO5DzLBWFnOMCsz7W1DHg7g0CnZn2bxwjF6H6XVgMYmw-BQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [140516 00:31]:
-> Hi,
-> 
-> These are slightly reworked versions of the patches Tony sent:
-> 
-> * Split the DT doc into separate patch
-> * Handle errors from gpio functions
-> * Remove QVGA support
-> * Removed the change to arch/arm/mach-omap2/display.c. I'll add that to my
->   patch which moves the conversion code to omapdss. Note that if you test this
->   version, you need to add the panel name to the conversion list for now.
-> * Set MO gpio GPIO_ACTIVE_HIGH in omap3-evm-common.dtsi
-> * Set the GPIO default values the same way for DT and non-DT versions.
-> 
-> Tony, I removed the QVGA support as it was a new feature, not supported by the
-> non-DT version. Also, I don't think it should be done as you had implemented
-> it, but rather either have a flag in the DT data in case the pin is hardwired
-> in the hardware, or let the user select the mode at runtime.
+On Wed, May 14, 2014 at 6:17 AM, Till Klocke <till.klocke@yetu.com> wrote:
+> Hello,
+>
+> Currently I am trying to get a recent and stable Linux kernel running
+> on a Phytec PhyFlex board based on the i.mx6 processor from Freescale.
 
-OK. Probably should have both options eventually.
- 
-> Also, I didn't quite understand the implementation. You had set initial values
-> in the driver for MO and RESB differently than on the non-DT version. Was that
-> on purpose?
+Which dts file do you use?
 
-I just configured things to what we had earlier for the legacy booting,
-QVGA for ldp and VGA for omap3-evm.
- 
-> You said in a comment: "The LCD is sideways, so we want the VGA mode instead of
-> QVGA mode.". Why is that? How does the resolution affect the orientation?
-
-Yeah that's pretty confusing and probably written before I got the
-image working properly. I probably initially thought the VGA mode also
-switches the panel to 640x480, while it really sets it to 480x640.
- 
-> With my version, the panel (should) always be in VGA mode, like the non-DT
-> version does.
-> 
-> Only compile tested, I don't have boards with the panel.
-
-Works for me on omap3-evm and ldp after patching in the mode to your
-panel compatible translation database system.
-
-Regards,
-
-Tony
+USB is functional on other mx6 boards.
