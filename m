@@ -1,102 +1,124 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 17 May 2014 01:16:50 +0200
-Subject: [PATCH v4 6/8] ARM: dts: Exynos: add cpu nodes, opp and cpu clock
- configuration data
-In-Reply-To: <1400029876-5830-7-git-send-email-thomas.ab@samsung.com>
-References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
- <1400029876-5830-7-git-send-email-thomas.ab@samsung.com>
-Message-ID: <53769C62.4060900@gmail.com>
+From: emilgoode@gmail.com (Emil Goode)
+Date: Sat, 17 May 2014 01:18:55 +0200
+Subject: [PATCH v2] ARM: imx: fix error handling
+In-Reply-To: <20140516192451.GP16662@pengutronix.de>
+References: <1400234045-6022-1-git-send-email-emilgoode@gmail.com>
+ <20140516192451.GP16662@pengutronix.de>
+Message-ID: <20140516231855.GB4323@lianli>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hello Uwe,
 
-Please see my comments inline.
+Thank you for the review.
 
-On 14.05.2014 03:11, Thomas Abraham wrote:
-> From: Thomas Abraham <thomas.ab@samsung.com>
+On Fri, May 16, 2014 at 09:24:51PM +0200, Uwe Kleine-K?nig wrote:
+> Hello Emil,
 > 
-> For all Exynos based platforms, add CPU nodes, operating points and cpu
-> clock data for migrating from Exynos specific cpufreq driver to using
-> generic cpufreq-cpu0 driver.
+> IMHO the subject is too general. Maybe better use:
 > 
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4210-origen.dts         |    6 +++
->  arch/arm/boot/dts/exynos4210-trats.dts          |    6 +++
->  arch/arm/boot/dts/exynos4210-universal_c210.dts |    6 +++
->  arch/arm/boot/dts/exynos4210.dtsi               |   35 +++++++++++++++++++
->  arch/arm/boot/dts/exynos4212.dtsi               |   18 ++++++++++
->  arch/arm/boot/dts/exynos4412-odroidx.dts        |    6 +++
->  arch/arm/boot/dts/exynos4412-origen.dts         |    6 +++
->  arch/arm/boot/dts/exynos4412-trats2.dts         |    6 +++
->  arch/arm/boot/dts/exynos4412.dtsi               |   31 +++++++++++++++++
->  arch/arm/boot/dts/exynos4x12.dtsi               |   36 ++++++++++++++++++++
->  arch/arm/boot/dts/exynos5250-arndale.dts        |    6 +++
->  arch/arm/boot/dts/exynos5250-cros-common.dtsi   |    6 +++
->  arch/arm/boot/dts/exynos5250-smdk5250.dts       |    6 +++
->  arch/arm/boot/dts/exynos5250.dtsi               |   41 +++++++++++++++++++++++
->  14 files changed, 215 insertions(+), 0 deletions(-)
+> 	ARM: imx: fix error handling in ipu device registration
 
-[snip]
+Agreed, will change this and resend.
 
-> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-> index cacf614..22b967d 100644
-> --- a/arch/arm/boot/dts/exynos4210.dtsi
-> +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> @@ -36,6 +36,33 @@
->  		reg = <0x10023CA0 0x20>;
->  	};
->  
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		cpu at 0 {
+> 
+> On Fri, May 16, 2014 at 11:54:05AM +0200, Emil Goode wrote:
+> > If we fail to allocate struct platform_device pdev we
+> > dereference it after the goto label err.
+> > 
+> > I have rearranged the error handling a bit to fix the issue
+> > and also make it more clear.
+> > 
+> > Signed-off-by: Emil Goode <emilgoode@gmail.com>
+> > ---
+> > v2: Changed to return -ENOMEM instead of ret where possible and
+> >     updated the subject line.
+> > 
+> >  arch/arm/mach-imx/devices/platform-ipu-core.c |   22 +++++++++++++---------
+> >  1 file changed, 13 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
+> > index fc4dd7c..68f2a4a 100644
+> > --- a/arch/arm/mach-imx/devices/platform-ipu-core.c
+> > +++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
+> > @@ -77,34 +77,38 @@ struct platform_device *__init imx_alloc_mx3_camera(
+> >  
+> >  	pdev = platform_device_alloc("mx3-camera", 0);
+> >  	if (!pdev)
+> > -		goto err;
+> > +		return ERR_PTR(-ENOMEM);
+> >  
+> >  	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
+> >  	if (!pdev->dev.dma_mask)
+> > -		goto err;
+> > +		goto put_pdev;
+> >  
+> >  	*pdev->dev.dma_mask = DMA_BIT_MASK(32);
+> >  	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+> >  
+> >  	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
+> >  	if (ret)
+> > -		goto err;
+> > +		goto free_dma_mask;
+> >  
+> >  	if (pdata) {
+> >  		struct mx3_camera_pdata *copied_pdata;
+> >  
+> >  		ret = platform_device_add_data(pdev, pdata, sizeof(*pdata));
+> > -		if (ret) {
+> > -err:
+> > -			kfree(pdev->dev.dma_mask);
+> > -			platform_device_put(pdev);
+> > -			return ERR_PTR(-ENODEV);
+> > -		}
+> > +		if (ret)
+> > +			goto free_dma_mask;
+> > +
+> >  		copied_pdata = dev_get_platdata(&pdev->dev);
+> >  		copied_pdata->dma_dev = &imx_ipu_coredev->dev;
+> >  	}
+> >  
+> >  	return pdev;
+> > +
+> > +free_dma_mask:
+> > +	kfree(pdev->dev.dma_mask);
+> > +put_pdev:
+> > +	platform_device_put(pdev);
+> > +
+> > +	return ERR_PTR(ret);
+> >  }
+> I didn't check if it is easily possible, but converting this file to use
+> platform_device_register_full might simplify it considerably.
 
-style: Please add blank line between last property and first node.
+Will look into this and consider sending another patch.
 
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <0>;
+> 
+> I'm not sure this fix is critical, because the problem happens if an
+> allocation during boot fails. But still, if you want to get this fix
+> into a stable release, you should simplify it, i.e. don't do the code
+> reorganisations. (Also the "more clear" part seems to be subjective, I
+> like the error handling better as it is now. But that might only be me.)
 
-This is not the right value. The bottom 24-bits of MPIDR register on
-Exynos4210 are 0x900 and 0x901 for CPU0 and CPU1 respectively.
+To my knowlege there is no impact on end users and I don't think the bug
+is critical since, as you say, the allocation happens during boot.
+Probably it's not necessary to have this fixed in stable kernels.
 
-Of course this won't work before fixing the GIC driver to not rely on
-wrong assumptions, but I have already posted patches [1] and need to
-address comments.
+> 
+> Are you using this code? I thought arch/arm/mach-imx/devices to be dead
+> as it is unused on dt platforms.
 
-[1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/29573
-
-> +			clocks = <&clock CLK_ARM_CLK>;
-> +			clock-names = "cpu";
-
-[snip]
-
-> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-> index 15d3c0a..85005d1 100644
-> --- a/arch/arm/boot/dts/exynos4412.dtsi
-> +++ b/arch/arm/boot/dts/exynos4412.dtsi
-> @@ -22,6 +22,37 @@
->  / {
->  	compatible = "samsung,exynos4412", "samsung,exynos4";
->  
-> +	cpus {
-> +		cpu at 2 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <2>;
-
-Same here. On Exynos4x12, the MPIDR values for CPUs are 0xa00, 0xa01,
-0xa02 and 0xa03 for CPU0, CPU1, CPU2 and CPU3 respectively.
-
-> +		};
-> +		cpu at 3 {
-
-style: Please keep a single blank line of spacing between nodes.
-
-Otherwise looks good.
+The bug was found using coccinelle. I'm not using the code and I don't know
+what the plans are for this file in the transition to device tree. But as long
+as the file is in the kernel I think it's worth fixing the bug.
 
 Best regards,
-Tomasz
+
+Emil Goode
+
+> 
+> Best regards
+> Uwe
+> 
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
