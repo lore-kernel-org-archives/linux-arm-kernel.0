@@ -1,44 +1,88 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 16 May 2014 12:00:08 +0100
-Subject: [RFC PATCH 2/9] dt: deps: dependency based device creation
-In-Reply-To: <5373DBCF.1080503@ahsoftware.de>
-References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
- <1399913280-6915-3-git-send-email-holler@ahsoftware.de>
- <20140514140534.897F8C4153D@trevor.secretlab.ca>
- <53738261.4000000@ahsoftware.de>
- <20140514200645.15984C4095B@trevor.secretlab.ca>
- <5373DBCF.1080503@ahsoftware.de>
-Message-ID: <20140516110008.E2AC9C403C2@trevor.secretlab.ca>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 16 May 2014 16:37:15 +0530
+Subject: [PATCH v3] cpufreq: exynos: Fix the compile error
+In-Reply-To: <000001cf70f0$2e48f930$8adaeb90$@samsung.com>
+References: <000001cf70f0$2e48f930$8adaeb90$@samsung.com>
+Message-ID: <CAKohponFCpNThX1m9n+_96vN=WqN5zqA-+GWMLMLO_z-3p5okA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 May 2014 23:10:39 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
-> Am 14.05.2014 22:06, schrieb Grant Likely:
-> > On Wed, 14 May 2014 16:49:05 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
-> >> Am 14.05.2014 16:05, schrieb Grant Likely:
-> >>> On Mon, 12 May 2014 18:47:53 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
-> 
-> >> Hmm, I don't really care if that will be merged. I have no motivation to 
-> >> fight with Linux kernel maintainers and I don't know if I will spend the 
-> >> necessary time to do so.
-> > 
-> > The people you need to convince are Rob, Greg, and me, and you've got my
-> > attention. If I'm convinced, then I can probably convince Greg also.
-> > You've got an interesting approach, and I hope you won't give up on it.
-> 
-> Sorry, but that point of the view is already a problem. Why do I have to
-> convince you people?
-> 
-> To summarize:
-> 
-> Linux kernel maintainers
-> 
-> - don't like code they haven't written theirself,
-> - don't like code which doesn't look like they have written it theirself,
-> - don't like ideas they haven't had themself,
-> - do feel good in their closed group they have formed,
+On 16 May 2014 15:48, Jonghwan Choi <jhbird.choi@samsung.com> wrote:
+> Commit 7da83a80 ("ARM: EXYNOS: Migrate Exynos specific macros from plat to mach") which lands in samsung tree causes build breakage
+> for cpufreq-exynos like following:
+>
+> drivers/cpufreq/exynos-cpufreq.c: In function 'exynos_cpufreq_probe':
+> drivers/cpufreq/exynos-cpufreq.c:166:2: error: implicit declaration of function 'soc_is_exynos4210'
+> [-Werror=implicit-function-declaration]
+> drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration of function 'soc_is_exynos4212'
+> [-Werror=implicit-function-declaration]
+> drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration of function 'soc_is_exynos4412'
+> [-Werror=implicit-function-declaration]
+> drivers/cpufreq/exynos-cpufreq.c:170:2: error: implicit declaration of function 'soc_is_exynos5250'
+> [-Werror=implicit-function-declaration]
+> cc1: some warnings being treated as errors
+> make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
+> make[2]: *** Waiting for unfinished jobs....
+> drivers/cpufreq/exynos4x12-cpufreq.c: In function 'exynos4x12_set_clkdiv':
+> drivers/cpufreq/exynos4x12-cpufreq.c:118:2: error: implicit declaration of function 'soc_is_exynos4212'
+> [-Werror=implicit-function-declaration]
+> cc1: some warnings being treated as errors
+> make[2]: *** [drivers/cpufreq/exynos4x12-cpufreq.o] Error 1
+> make[1]: *** [drivers/cpufreq] Error 2
 
-I'm sorry that you feel that way and that you don't want to continue
-with this. Best wishes.
+Blank line here..
 
-g.
+> This fixes above error with getting SoC information via of_machine_is_compatible() instead of soc_is_exynosXXXX().
+>
+> Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+> ---
+>  drivers/cpufreq/exynos-cpufreq.c     |   20 +++++++++++++++++---
+>  drivers/cpufreq/exynos-cpufreq.h     |    8 ++++++++
+>  drivers/cpufreq/exynos4x12-cpufreq.c |   11 ++++-------
+>  3 files changed, 29 insertions(+), 10 deletions(-)
+>
+> diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
+> index f99cfe2..9aecffef 100644
+> --- a/drivers/cpufreq/exynos-cpufreq.c
+> +++ b/drivers/cpufreq/exynos-cpufreq.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/cpufreq.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/of.h>
+>
+>  #include <plat/cpu.h>
+>
+> @@ -163,11 +164,24 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
+>         if (!exynos_info)
+>                 return -ENOMEM;
+>
+> -       if (soc_is_exynos4210())
+> +       if (of_machine_is_compatible("samsung,exynos4210")) {
+> +               exynos_info->type = EXYNOS_SOC_4210;
+> +       } else if (of_machine_is_compatible("samsung,exynos4212")) {
+> +               exynos_info->type = EXYNOS_SOC_4212;
+> +       } else if (of_machine_is_compatible("samsung,exynos4412")) {
+> +               exynos_info->type = EXYNOS_SOC_4212;
+
+4412 ?
+
+> +       } else if (of_machine_is_compatible("samsung,exynos5250")) {
+> +               exynos_info->type = EXYNOS_SOC_5250;
+> +       } else {
+> +               pr_err("%s: Unknown SoC type\n", __func__);
+> +               return -ENODEV;
+> +       }
+> +
+> +       if (exynos_info->type == EXYNOS_SOC_4210)
+>                 ret = exynos4210_cpufreq_init(exynos_info);
+> -       else if (soc_is_exynos4212() || soc_is_exynos4412())
+> +       else if (exynos_info->type == EXYNOS_SOC_4212 || exynos_info->type == EXYNOS_SOC_4412)
+>                 ret = exynos4x12_cpufreq_init(exynos_info);
+> -       else if (soc_is_exynos5250())
+> +       else if (exynos_info->type == EXYNOS_SOC_5250)
+>                 ret = exynos5250_cpufreq_init(exynos_info);
+>         else
+>                 return 0;
+
+Do this in the first if/else only..
