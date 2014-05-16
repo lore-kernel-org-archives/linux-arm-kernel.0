@@ -1,48 +1,76 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 16 May 2014 14:10:15 +0200
-Subject: [PATCH 4/5] ARM: shmobile: Let Genmai multiplatform boot with Genmai
- DTB
+Date: Fri, 16 May 2014 14:10:14 +0200
+Subject: [PATCH 3/5] ARM: shmobile: Sync Genmai DTS with Genmai reference DTS
 In-Reply-To: <1400242216-20848-1-git-send-email-wsa@the-dreams.de>
 References: <1400242216-20848-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1400242216-20848-5-git-send-email-wsa@the-dreams.de>
+Message-ID: <1400242216-20848-4-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Let the multiplatform Genmai support boot with the unified DTS.
+Copy the device nodes from Genmai reference into the Genmai device tree
+file. This will allow us to use a single DTS file regardless of kernel
+configuration. In case of legacy C board code the device nodes may or
+may not be used, but in the multiplatform case all the DT device nodes
+will be used.
 
 Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- arch/arm/boot/dts/Makefile                      | 2 +-
- arch/arm/mach-shmobile/board-genmai-reference.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r7s72100-genmai.dts | 30 +++++++++++++++++++++++++++++-
+ 1 file changed, 29 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a6eed6d661ac..3594914bed5d 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -312,7 +312,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += r7s72100-genmai.dtb \
- 	r8a73a4-ape6evm-reference.dtb \
- 	sh7372-mackerel.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
--	r7s72100-genmai-reference.dtb \
-+	r7s72100-genmai.dtb \
- 	r8a7791-henninger.dtb \
- 	r8a7791-koelsch.dtb \
- 	r8a7790-lager.dtb
-diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c b/arch/arm/mach-shmobile/board-genmai-reference.c
-index 968bbba20d08..2ff6ad6e608e 100644
---- a/arch/arm/mach-shmobile/board-genmai-reference.c
-+++ b/arch/arm/mach-shmobile/board-genmai-reference.c
-@@ -42,7 +42,7 @@ static void __init genmai_add_standard_devices(void)
- }
+diff --git a/arch/arm/boot/dts/r7s72100-genmai.dts b/arch/arm/boot/dts/r7s72100-genmai.dts
+index b1deaf7e2e06..56849b55e1c2 100644
+--- a/arch/arm/boot/dts/r7s72100-genmai.dts
++++ b/arch/arm/boot/dts/r7s72100-genmai.dts
+@@ -1,7 +1,8 @@
+ /*
+  * Device Tree Source for the Genmai board
+  *
+- * Copyright (C) 2013 Renesas Solutions Corp.
++ * Copyright (C) 2013-14 Renesas Solutions Corp.
++ * Copyright (C) 2014 Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
+  *
+  * This file is licensed under the terms of the GNU General Public License
+  * version 2.  This program is licensed "as is" without any warranty of any
+@@ -15,6 +16,10 @@
+ 	model = "Genmai";
+ 	compatible = "renesas,genmai", "renesas,r7s72100";
  
- static const char * const genmai_boards_compat_dt[] __initconst = {
--	"renesas,genmai-reference",
-+	"renesas,genmai",
- 	NULL,
++	aliases {
++		serial2 = &scif2;
++	};
++
+ 	chosen {
+ 		bootargs = "console=ttySC2,115200 ignore_loglevel rw root=/dev/nfs ip=dhcp";
+ 	};
+@@ -29,3 +34,26 @@
+ 		#size-cells = <1>;
+ 	};
  };
- 
++
++&extal_clk {
++	clock-frequency = <13330000>;
++};
++
++&usb_x1_clk {
++	clock-frequency = <48000000>;
++};
++
++&i2c2 {
++	status = "okay";
++	clock-frequency = <400000>;
++
++	eeprom at 50 {
++		compatible = "renesas,24c128";
++		reg = <0x50>;
++		pagesize = <64>;
++	};
++};
++
++&scif2 {
++	status = "okay";
++};
 -- 
 1.9.2
