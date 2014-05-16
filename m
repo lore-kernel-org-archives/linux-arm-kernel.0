@@ -1,36 +1,34 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 16 May 2014 16:14:07 +0200
-Subject: [PATCHv4 5/5] ARM: mvebu: use the fixed-link PHY DT binding for the
- Armada XP Matrix board
-In-Reply-To: <1400249647-4643-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1400249647-4643-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1400249647-4643-6-git-send-email-thomas.petazzoni@free-electrons.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 16 May 2014 16:11:46 +0200
+Subject: [PATCH v2 0/3] Update the Keymile kirkwood DTS files
+In-Reply-To: <1400230143-15620-1-git-send-email-valentin.longchamp@keymile.com>
+References: <1400230143-15620-1-git-send-email-valentin.longchamp@keymile.com>
+Message-ID: <20140516141146.GH10407@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada XP Matrix board has an Ethernet PHY that isn't configurable
-through the MDIO bus, so we use the newly introduced fixed-link PHY DT
-binding to represent the PHY of this platform and get network working.
+On Fri, May 16, 2014 at 10:49:00AM +0200, Valentin Longchamp wrote:
+> This series resynchs the Keymile Kirkwood DTS files with mainline since
+> the boards do not boot anymore with the 3.15 rc kernels (to be honest, I
+> have not tested the last 2-3 releases).
+> 
+> The changes are the addition of the PCIe controller for the 98dx4122
+> SoC, the explicit disabling of the SATA phys for this same SoC and
+> finally the enabling of the PCIe controller on the Keymile Reference
+> design.
+> 
+> The series introduces kirkwood-km_common.dtsi that factors the common
+> nodes between kirkwood-km_kirkwood.dts and the new board/design below.
+> 
+> The series also adds a new DTS for another Keymile generic design where
+> the mv64xxx eth interace is configured with fixed parameters to no phy
+> but a switch (for board internal communication).
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-xp-matrix.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+Hi Valentin
 
-diff --git a/arch/arm/boot/dts/armada-xp-matrix.dts b/arch/arm/boot/dts/armada-xp-matrix.dts
-index c224274..3bb8c00 100644
---- a/arch/arm/boot/dts/armada-xp-matrix.dts
-+++ b/arch/arm/boot/dts/armada-xp-matrix.dts
-@@ -61,6 +61,10 @@
- 			ethernet at 30000 {
- 				status = "okay";
- 				phy-mode = "sgmii";
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
- 			};
- 
- 			pcie-controller {
--- 
-1.9.3
+Looks good to me.
+
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+
+Thanks
+	Andrew
