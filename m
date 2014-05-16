@@ -1,61 +1,49 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 16 May 2014 22:29:11 +0800
-Subject: [GIT PULL]]ARM: sirf: machine update for 3.16
-In-Reply-To: <CAGsJ_4yqTkKu+93Fo_D6NaZMyz4T6_EmKz4gZfyeQCi_uF-3dg@mail.gmail.com>
-References: <CAGsJ_4yqTkKu+93Fo_D6NaZMyz4T6_EmKz4gZfyeQCi_uF-3dg@mail.gmail.com>
-Message-ID: <CAGsJ_4wD=FqxNeuEs47f0D9V+Qhn8jyUQL67iv4rsZ3r2K_3vA@mail.gmail.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Fri, 16 May 2014 16:31:09 +0200
+Subject: [GIT PULL] ARM: STi: DT changes for v3.16
+In-Reply-To: <5375DECA.3050600@linaro.org>
+References: <5375D1A4.2040205@st.com> <5375DECA.3050600@linaro.org>
+Message-ID: <5376212D.5010209@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-05-12 21:59 GMT+08:00 Barry Song <21cnbao@gmail.com>:
-> Hi Arnd, Olof, Kevin,
->
-> The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
->
->   Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
-> tags/sirf-soc-for-3.16
->
-> for you to fetch changes up to 23d7c66a8b096362d38418521f20af76443696b9:
->
->   clocksource: marco: fix the affinity set for local timer of CPU1
-> (2014-05-12 21:43:49 +0800)
->
-> ----------------------------------------------------------------
-> ARM: sirf: machine update for 3.16
->
-> most of them fix some minor checkpatch issues according to key customers'
-> requirement.
-> and this patchset also cleanups the clk of clocksource: move to get clk
-> by dts properity and move to irq_force_affinity for the irq affinity set
-> of CPU1 local timer.
->
-> ----------------------------------------------------------------
-> Bin Shi (2):
->       clocksource: prima2: fix some minor checkpatch issues
->       irqchip: sirf: fix one minor checkpatch issue
->
-> Xianglong Du (1):
->       ARM: prima2: rstc: fix some minor checkpatch issues
->
-> Zhiwu Song (2):
->       clocksource:sirf: remove the hardcode for the clk of timers
->       clocksource: marco: fix the affinity set for local timer of CPU1
+Hi,
 
-as Daniel has applied this one "clocksource: marco: fix the affinity
-set for local timer of CPU1" to his clk tree, i'll rebuilt the tag by
-dropping this.
+On 05/16/2014 11:47 AM, Srinivas Kandagatla wrote:
+>
+>
+> On 16/05/14 09:51, Maxime Coquelin wrote:
+>> Hi Olof, Kevin and Arnd,
+>>
+>> Please consider these STi DT updates for v3.16.
+>>
+>> Note that two reset patches are part of this pull request, in order to
+>> avoid compilation breakage.
+>> Adding these two patches in this pull request has been accepted by
+>> Philipp Zabel.
+>>
+>> The following changes since commit
+>> 2542f928b2131a0367e50a4390afc12084cc4cc4:
+>>
+>>    Merge tag 'renesas-dt2-for-v3.16' of
+>> git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas into next/dt
+>> (2014-05-05 18:44:12 -0700)
+>>
+>
+> renesas ??
+
+As discussed on IRC, I have based this pull request on top of arm_soc's 
+next/dt branch, whereas I should have based in top of v3.15-rc1.
+
+Arnd, Olof, Kevin, is it fine for this time?
+Or should I resend the two pull requests based on top of v3.15-rc1?
+Either ways are fine to me, just let me know!
+
+Thanks,
+Maxime
 
 >
->  arch/arm/boot/dts/atlas6.dtsi      |    1 +
->  arch/arm/boot/dts/prima2.dtsi      |    1 +
->  arch/arm/mach-prima2/rstc.c        |   34 +++++++++++++++-----------
->  drivers/clocksource/timer-marco.c  |   10 +++-----
->  drivers/clocksource/timer-prima2.c |   47 ++++++++++++++++++++++--------------
->  drivers/irqchip/irq-sirfsoc.c      |    3 ++-
->  6 files changed, 57 insertions(+), 39 deletions(-)
-
--barry
+>> are available in the git repository at:
+>>
+>>
+>>    git://git.stlinux.com/devel/kernel/linux-sti.git tags/sti-dt-for-v3.16
