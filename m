@@ -1,70 +1,61 @@
-From: satish.patel@ti.com (Satish Patel)
-Date: Fri, 16 May 2014 09:14:34 +0530
-Subject: [PATCH v2 0/5] Smart Card(SC) interface, TI USIM & NxP SC phy
- driver
-In-Reply-To: <20140130130515.GC23970@kroah.com>
-References: <1390192434-19386-1-git-send-email-satish.patel@ti.com>
- <52E9E8B0.2020000@ti.com> <20140130130515.GC23970@kroah.com>
-Message-ID: <537589A2.8060802@ti.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Fri, 16 May 2014 09:31:38 +0530
+Subject: [PATCH v5 5/6] exynos: cpuidle: do not allow cpuidle registration
+ for Exynos5420
+In-Reply-To: <5375311B.2010202@gmail.com>
+References: <ANuQgHGSPJ45tbrVppAVpOqF0OfHacPWfX=S5mOVxTPr66f7vg@mail.gmail.com>
+ <1400054637-21505-1-git-send-email-chander.kashyap@linaro.org>
+ <1400054637-21505-6-git-send-email-chander.kashyap@linaro.org>
+ <5375311B.2010202@gmail.com>
+Message-ID: <CANuQgHGSA+R__raSa_tzrgpceqLD2SZw+s0XQUHGF4wscgh6Kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tomasz,
 
-On 1/30/2014 6:35 PM, Greg KH wrote:
-> On Thu, Jan 30, 2014 at 11:22:48AM +0530, Satish Patel wrote:
->> On 1/20/2014 10:03 AM, Satish Patel wrote:
->>> Changes from v1:
->>> * RFC(v1) comments are fixed
->>>
->>> ** removed "gpio_to_irq" as GPIO controller process  cell from DT and
->>> give it to DT node
->>> ** comments on documentation
->>> ** few other comments on null checks are resolved
->>>
->>> * BWT timing configuration is added to ti-usim driver
->>>
->>> v1 cover letter link#
->>> https://lkml.org/lkml/2014/1/6/250
->>>
->>> Satish Patel (5):
->>>    sc_phy:SmartCard(SC) PHY interface to SC controller
->>>    misc: tda8026: Add NXP TDA8026 PHY driver
->>>    char: ti-usim: Add driver for USIM module on AM43xx
->>>    ARM: dts: AM43xx: DT entries added for ti-usim
->>>    ARM: dts: AM43xx-epos-evm: DT entries  for ti-usim and phy
->>>
->>>   Documentation/devicetree/bindings/misc/tda8026.txt |   19 +
->>>   .../devicetree/bindings/ti-usim/ti-usim.txt        |   31 +
->>>   Documentation/sc_phy.txt                           |  171 ++
->>>   arch/arm/boot/dts/am4372.dtsi                      |   10 +
->>>   arch/arm/boot/dts/am43x-epos-evm.dts               |   43 +
->>>   drivers/char/Kconfig                               |    7 +
->>>   drivers/char/Makefile                              |    1 +
->>>   drivers/char/ti-usim-hw.h                          |  863 +++++++++
->>>   drivers/char/ti-usim.c                             | 1859 ++++++++++++++++++++
->>>   drivers/misc/Kconfig                               |    7 +
->>>   drivers/misc/Makefile                              |    1 +
->>>   drivers/misc/tda8026.c                             | 1255 +++++++++++++
->>>   include/linux/sc_phy.h                             |  132 ++
->>>   include/linux/ti-usim.h                            |   98 +
->>>   14 files changed, 4497 insertions(+), 0 deletions(-)
->>>   create mode 100644 Documentation/devicetree/bindings/misc/tda8026.txt
->>>   create mode 100644 Documentation/devicetree/bindings/ti-usim/ti-usim.txt
->>>   create mode 100644 Documentation/sc_phy.txt
->>>   create mode 100644 drivers/char/ti-usim-hw.h
->>>   create mode 100644 drivers/char/ti-usim.c
->>>   create mode 100644 drivers/misc/tda8026.c
->>>   create mode 100644 include/linux/sc_phy.h
->>>   create mode 100644 include/linux/ti-usim.h
->> Any comments on this patch series ?
->>
->> If not,
->> Can you accept these patches for next merge window
-> It's the middle of this merge window, and I can't accept any patches
-> until after 3.14-rc1 is out, at which point I'll start to work on my
-> patch backlog.
-Are these to be consider for next submission ? Or you want me to start 
-review cycle one more time.
-> thanks,
+On 16 May 2014 02:56, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Chander,
 >
-> greg k-h
+> On 14.05.2014 10:03, Chander Kashyap wrote:
+>> Exynos5420 is big.Little Soc. It uses cpuidle-big-litle generic cpuidle driver.
+>> Hence do not allow exynos cpuidle driver registration for Exynos5420.
+>>
+>> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+>> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+>>  arch/arm/mach-exynos/cpuidle.c |    3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+>> index 3dd385e..807a386 100644
+>> --- a/arch/arm/mach-exynos/cpuidle.c
+>> +++ b/arch/arm/mach-exynos/cpuidle.c
+>> @@ -218,6 +218,9 @@ static int exynos_cpuidle_probe(struct platform_device *pdev)
+>>       int cpu_id, ret;
+>>       struct cpuidle_device *device;
+>>
+>> +     if (soc_is_exynos5420())
+>> +             return -ENODEV;
+>> +
+>>       if (soc_is_exynos5250())
+>>               exynos5_core_down_clk();
+>>
+>>
+>
+> Why not put this in exynos.c in exynos_dt_machine_init(), so
+> exynos_cpuidle_init() is called only if not running on Exynos5420?
+>
+
+That makes more sense.
+I will update this
+
+Thanks
+> Best regards,
+> Tomasz
+
+
+
+-- 
+with warm regards,
+Chander Kashyap
