@@ -1,60 +1,53 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Fri, 16 May 2014 10:37:27 +0530
-Subject: [PATCH v5 1/5] ARM: EXYNOS: Add generic cpu power control
- functions for all exynos based SoCs
-In-Reply-To: <53752D8C.3030708@gmail.com>
-References: <1399307221-8659-1-git-send-email-a.kesavan@samsung.com>
- <1399307221-8659-2-git-send-email-a.kesavan@samsung.com>
- <019b01cf6e52$75e1a710$61a4f530$@samsung.com>
- <CAM4voamSNYZ_hsjF3eZhqZ=FF__39tFgi5FeXRcUhRbYYzu0LQ@mail.gmail.com>
- <53752D8C.3030708@gmail.com>
-Message-ID: <CAM4voam1UiX+WaxScTdhb4bW+_1nCcsztFEkx4MyWFOBBjV6XQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 16 May 2014 01:07:18 -0400
+Subject: [PATCH v6 00/15] enable HiP04 SoC
+In-Reply-To: <53748972.8040603@arm.com>
+References: <1399795571-17231-1-git-send-email-haojian.zhuang@linaro.org>
+ <14229972.j5k474Mq5Q@wuerfel>
+ <CAD6h2NSpH0zxpek4KnUMT-p_DFnGZVaxP+x_0hsn1S8O6C7X6g@mail.gmail.com>
+ <53748972.8040603@arm.com>
+Message-ID: <20140516050718.GZ27822@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Haojian,
 
-On Fri, May 16, 2014 at 2:41 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi Abhilash,
->
-> On 13.05.2014 12:12, Abhilash Kesavan wrote:
->> On Tue, May 13, 2014 at 7:54 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->
-> [snip]
->
->>>> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-
->>>> pmu.h
->>>> index 4f6a256..0bdfcbc 100644
->>>> --- a/arch/arm/mach-exynos/regs-pmu.h
->>>> +++ b/arch/arm/mach-exynos/regs-pmu.h
->>>> @@ -121,6 +121,12 @@
->>>>
->>>>  #define S5P_CHECK_SLEEP                              0x00000BAD
->>>>
->>>> +#define EXYNOS_ARM_CORE0_CONFIGURATION               S5P_PMUREG(0x2000)
->>>
->>> This can be put in order of address.
->> OK, will fix.
->>>
->>>> +#define EXYNOS_ARM_CORE_CONFIGURATION(_nr)   \
->>>> +                     (EXYNOS_ARM_CORE0_CONFIGURATION + (0x80 * (_nr)))
->>>> +#define EXYNOS_ARM_CORE_STATUS(_nr)          \
->>>> +                     (EXYNOS_ARM_CORE_CONFIGURATION(_nr) + 0x4)
->
-> My patches posted quite a while ago [1] to fix DT CPU topology already
-> add these, remove S5P_ARM_CORE1* and fix corresponding usage in
-> hotplug.c and platsmp.c.
->
-> [1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/29573
->
-> So I think you should rebase on top of them or at least on top of
-> patches 1 and 2 from that series, as 3 and 4 should be dropped.
+On Thu, May 15, 2014 at 10:31:30AM +0100, Marc Zyngier wrote:
+> On 15/05/14 10:20, Haojian Zhuang wrote:
+> > On 15 May 2014 02:37, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> On Sunday 11 May 2014 16:05:56 Haojian Zhuang wrote:
+> >>> Changelog:
+> >>> v6:
+> >>>   * Split HiP04 enabling patch into patches on document, mcpm & hiP04.
+> >>>   * Move reset operation in HiP04 MCPM implementation.
+> >>>   * Remove ARCH_MULTI_V7_NONLPAE & ARCH_MULTI_V7_LPAE according to olof's
+> >>>     comment.
+> >>
+> >> The latest version looks good to me, at least if all the remaining
+> >> comments for the mcpm implementation have been addressed.
+> >>
+> >> I would suggest to split the series into two, and submit all the gic
+> >> related changes through Russell's patch tracker but have a pull
+> >> request for the platform changes.
+> >>
+> >> As far as I can tell, there are no compile-time dependencies between
+> >> the two, so we don't get a broken build during bisection, but
+> >> of course the platform will only be usable if both parts are merged.
+> >>
+> >>         Arnd
+> > 
+> > Hi Arnd,
+> > 
+> > Thanks. I'll submit gic patches into Russell's patch tracker.
+> 
+> Please hold on on the GIC stuff, I still have comments on the main
+> changes (I should have sent them earlier), and the KVM stuff is still
+> quite wrong.
 
-Patch 2 of your series does not apply on kgene's for-next or
-linux-next. Are you planning on re-sending this ?
+I've just started assisting Thomas with review / wrangling patches for
+drivers/irqchip. If you could Cc me on the next revision, I'd appreciate
+it.
 
-Regards,
-Abhilash
->
-> Best regards,
-> Tomasz
+thx,
+
+Jason.
