@@ -1,44 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 16 May 2014 14:44:20 +0100
-Subject: [PATCH] arm64: ptrace: fix setting hw breakpoint/watchpoint
-In-Reply-To: <1399290685-6336-1-git-send-email-catalin.udma@freescale.com>
-References: <1399290685-6336-1-git-send-email-catalin.udma@freescale.com>
-Message-ID: <20140516134420.GG12341@arm.com>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Fri, 16 May 2014 10:01:11 -0400
+Subject: [GIT PULL] PSCI v0.2 support and DT bindings
+Message-ID: <CAJ5Y-eb8h=ZO=1ugMTdADmhEidp-znaEVjbL6UzekAGDPdzuSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 05, 2014 at 12:51:25PM +0100, Catalin Udma wrote:
-> When setting hw breakpoints/watchpoints, GDB reports the error
-> "Unexpected error setting hardware debug registers". The problem is
-> reproducible on A53/A57 models where the supported number of
-> breakpoints/watchpoints (6 or 4 read from ID_AA64DFR0_EL1) it is
-> less than the maximum number of debug registers from user_hwdebug_state
-> 
-> This patch fixes the problem by restricting the registers access to the
-> maximum number of supported breakpoints/watchpoints
+Hi Christoffer, Marc
 
-Actually, I consider this to be a bug in GDB. It shouldn't be trying to
-access registers that don't exist (we tell it the number of registers
-available as part of the 32-bit info register).
+Please pull in the ARM and ARM64 PSCIv0.2 patchwork from the git
+branch below. These patches have been under review on LKAML since
+early March and are now ACK'd. Also, since these patches are dependent
+on the UAPI header file (uapi/linux/psci.h) added by the KVM PSCIv0.2
+patchwork, it makes sense to submit the whole PSCIv0.2 patchwork (KVM
+and core) as one set.
 
-I also think this has been fixed in GDB upstream:
+Cheers,
+Ashwin
 
 
-  commit f45c82da381e0ce5ce51b7fb24d0d28611d266b8
-  Author: Yufeng Zhang <yufeng.zhang@arm.com>
-  Date:   Wed Dec 18 16:47:33 2013 +0000
+The following changes since commit 4447a208f7fc2e2dff8c6a8df2a1fd6dd72fb3e2:
 
-      gdb/
+  ARM/ARM64: KVM: Advertise KVM_CAP_ARM_PSCI_0_2 to user space
+(2014-04-30 04:18:58 -0700)
 
-          * aarch64-linux-nat.c (aarch64_linux_set_debug_regs): Set
-          iov.iov_len with the real length in use.
+are available in the git repository at:
 
-      gdb/gdbserver/
+  git://git.linaro.org/people/ashwin.chaugule/leg-kernel.git kvm-next-psci-v0.2
 
-          * linux-aarch64-low.c (aarch64_linux_set_debug_regs): Set
-          iov.iov_len with the real length in use.
+for you to fetch changes up to c814ca029e1015bb0ecec312f4bb9751ba1a711a:
 
+  ARM: Check if a CPU has gone offline (2014-05-15 10:16:30 -0400)
 
-so there's no need to change the kernel for this.
+----------------------------------------------------------------
+Ashwin Chaugule (3):
+      PSCI: Add initial support for PSCIv0.2 functions
+      Documentation: devicetree: Add new binding for PSCIv0.2
+      ARM: Check if a CPU has gone offline
 
-Will
+ Documentation/devicetree/bindings/arm/psci.txt |  37 +++-
+ arch/arm/include/asm/psci.h                    |   7 +-
+ arch/arm/kernel/psci.c                         | 196 +++++++++++++++++----
+ arch/arm/kernel/psci_smp.c                     |  33 ++++
+ arch/arm64/include/asm/cpu_ops.h               |   2 +
+ arch/arm64/include/asm/psci.h                  |   2 +-
+ arch/arm64/kernel/psci.c                       | 231 +++++++++++++++++++++----
+ arch/arm64/kernel/smp.c                        |  22 +++
+ 8 files changed, 452 insertions(+), 78 deletions(-)
