@@ -1,44 +1,35 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 16 May 2014 11:38:12 +0300
-Subject: [GIT PULL] ARM: OMAP2+: some hwmod data patches for v3.16
-In-Reply-To: <alpine.DEB.2.02.1405160444200.29738@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1405160444200.29738@utopia.booyaka.com>
-Message-ID: <5375CE74.6000603@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 16 May 2014 10:39:46 +0200
+Subject: [PATCH/RFC] ARM: shmobile: Enable PM_RUNTIME in defconfig
+In-Reply-To: <20140516080825.GA23295@verge.net.au>
+References: <1400198682-7666-1-git-send-email-horms+renesas@verge.net.au>
+ <20140516020549.GB18137@verge.net.au>
+ <CAMuHMdVEowWbMY+L1TuC4xxYvtGZiH5qYOjmd7-rt1e_=xEz1A@mail.gmail.com>
+ <20140516080825.GA23295@verge.net.au>
+Message-ID: <CAMuHMdVG0=JG+d=_B9XM2OWn157UG4=2gsg2mfuRNwJ7N3qZFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Simon,
 
-On 16/05/14 07:45, Paul Walmsley wrote:
-> Hi Tony
-> 
-> The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
-> 
->   Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git for-v3.16/hwmod-a
-> 
-> for you to fetch changes up to 433480707967187a74ced38bd38edba749998013:
-> 
->   ARM: OMAP2+: hwmod: OMAP5 DSS hwmod data (2014-05-14 12:26:10 -0600)
-> 
-> ----------------------------------------------------------------
-> First (and possibly last) set of hwmod data changes for v3.16.  This
-> set should clean up some obsolete OMAP4 hwmod data, and add OMAP5 DSS
-> support.
+On Fri, May 16, 2014 at 10:08 AM, Simon Horman <horms@verge.net.au> wrote:
+> With that in mind I'll rephrase my question: are you are ware
+> of any patches this one (the defconfig update) should depend on?
 
-What about the AM43xx hwmod data I sent in the same series:
+No, I don't think it will introduce any regressions.
+We had CONFIG_PM_RUNTIME in most other defconfigs, and I've been
+running quite some real multi-platform kernels on Koelsch before.
 
-http://article.gmane.org/gmane.linux.ports.arm.omap/114192
+All known clock issues, for which patches have been send/accepted, happen
+regardless of the value of CONFIG_PM_RUNTIME.
 
- Tomi
+Gr{oetje,eeting}s,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140516/894eb42c/attachment.sig>
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
