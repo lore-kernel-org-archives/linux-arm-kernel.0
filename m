@@ -1,65 +1,64 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 16 May 2014 09:04:25 -0400
-Subject: [PATCH 1/4] arm64: head.S: remove unnecessary function alignment
-In-Reply-To: <1400233839-15140-2-git-send-email-mark.rutland@arm.com>
-References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
- <1400233839-15140-2-git-send-email-mark.rutland@arm.com>
-Message-ID: <53760CD9.1010200@codeaurora.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 16 May 2014 09:16:53 -0400 (EDT)
+Subject: [PATCHv2] ARM: ioremap: Fix static vm area boundary checking.
+In-Reply-To: <CAHPCO9GrwRczw2R9nZDL0tDdYxSHV0f2aDhFSat+xhhiWaYbUg@mail.gmail.com>
+References: <1400142562-9111-1-git-send-email-superlibj8301@gmail.com>
+ <alpine.LFD.2.11.1405151325250.17310@knanqh.ubzr>
+ <CAHPCO9GrwRczw2R9nZDL0tDdYxSHV0f2aDhFSat+xhhiWaYbUg@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1405160910220.17310@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Fri, 16 May 2014, Richard Lee wrote:
 
-On 05/16/2014 05:50 AM, Mark Rutland wrote:
-> Currently __turn_mmu_on is aligned to 64 bytes to ensure that it doesn't
-> span any page boundary, which simplifies the idmap and spares us
-> requiring an additional page table to map half of the function. In
-> keeping with other important requirements in architecture code, this
-> fact is undocumented.
+> On Fri, May 16, 2014 at 1:28 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Thu, 15 May 2014, Richard Lee wrote:
+> >
+> >> Static vm area boundary check:
+> >>
+> >>       paddr1 --->|       |
+> >>                  |       |
+> >>                  |-------| <-\--- svm->vm->addr(is page aligned)
+> >>       paddr2 --->|       |    |
+> >>                  |     --| <--|-- svm->vm->phys_addr
+> >>                  |       |    |
+> >>       paddr3 --->|       |    |
+> >>                  |       |    |
+> >>                  |-------| <--|-- next page boundary
+> >>                  |       |    |
+> >>       paddr4 --->|       |    | <----- svm->vm->size(including guard page)
+> >>                  |       |    |
+> >>                  |       |    |
+> >> max paddr_end -->|-------| <--|-- svm->vm's phys_addr_end
+> >>                  | ///// |    |
+> >>       paddr5 --->| guard |    |
+> >>                  | page  |    |
+> >>                  | ///// |    |
+> >>                   -------  <-/--- svm->vm->addr + svm->vm_size
+> >>
+> >> <1> If the paddr == paddr1, then continue;
+> >> <2> If the paddr == paddr2~paddr4 and paddr_end > phys_addr_end,
+> >>     then continue;
+> >> <3> if the paddr >= paddr5 then continue;
+> >>
+> >> Signed-off-by: Richard Lee <superlibj8301@gmail.com>
+> >
+> > instead of doing this repeatedly, why not simply ensure the recorded
+> > static vm information is already page aligned in the first place?
+> >
 > 
-> Additionally, as the function consists of three instructions totalling
-> 12 bytes with no literal pool data, a smaller alignment of 16 bytes
-> would be sufficient.
+> Sorry, I'm not very sure what vm information you meant here.
 > 
-> This patch reduces the alignment to 16 bytes and documents the
-> underlying reason for the alignment. This reduces the required alignment
-> of the entire .head.text section from 64 bytes to 16 bytes, though it
-> may still be aligned to a larger value depending on TEXT_OFFSET.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> ---
->  arch/arm64/kernel/head.S | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 0fd5650..e8e9883 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -346,8 +346,13 @@ ENDPROC(__enable_mmu)
->   *  x27 = *virtual* address to jump to upon completion
->   *
->   * other registers depend on the function called upon completion
-> + *
-> + * We align the entire function to the smallest power of two larger than it to
-> + * ensure it fits within a single block map entry. Otherwise were PHYS_OFFSET
-> + * close to the end of a 512MB or 1GB block we might require an additional
-> + * table to map the entire function.
->   */
-> -	.align	6
-> +	.align	4
->  __turn_mmu_on:
->  	msr	sctlr_el1, x0
->  	isb
+> And the 'svm->vm->addr' and 'svm->vm->size' are all page aligned
+> already, but we cannot make sure that the 'paddr' and
+> 'svm->vm->phys_addr' are page aligned.
 
-If you're feeling ambitious, this requirement could probably be enforced by
-some kind of BUILD_BUG_ON((__turn_mmu_on_end - __turn_mmu_on) / 4 >
-TURN_MMU_ON_ALIGN). I don't know if this code will really need to grow in
-practice, but if it does, forgetting to update the alignment (in spite of your
-helpful comment) seems like an easy mistake to make.
+If ->vm->addr is page aligned, then ->vm->phys_addr must be page aligned 
+as well.  The hardware does virtual to physical mappings on a page 
+granularity.  It is then not important to align paddr for the purpose of 
+the search.
 
-Christopher
+In other words, I fail to understand what problem your patch solves.
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+
+Nicolas
