@@ -1,63 +1,45 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 17 May 2014 08:24:49 +0900
-Subject: [PATCH v3] cpufreq: exynos:  Fix the compile error
-In-Reply-To: <2553916.Pl2B0tVZGR@vostro.rjw.lan>
-References: <000001cf70f0$2e48f930$8adaeb90$@samsung.com>
- <037e01cf70f5$25b374d0$711a5e70$@samsung.com>
- <2553916.Pl2B0tVZGR@vostro.rjw.lan>
-Message-ID: <53769E41.5050603@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 16 May 2014 16:26:35 -0700
+Subject: [GIT PULL] at91: cleanup for 3.16 #1
+In-Reply-To: <536A6FD7.40402@atmel.com>
+References: <1399484042-27432-1-git-send-email-nicolas.ferre@atmel.com>
+ <536A6FD7.40402@atmel.com>
+Message-ID: <20140516232635.GB6423@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/14 08:04, Rafael J. Wysocki wrote:
-> On Friday, May 16, 2014 07:54:01 PM Kukjin Kim wrote:
->> Jonghwan Choi wrote:
->>>
->>> Commit 7da83a80 ("ARM: EXYNOS: Migrate Exynos specific macros from plat to
->>> mach") which lands in samsung tree causes build breakage
->>> for cpufreq-exynos like following:
->>>
->>> drivers/cpufreq/exynos-cpufreq.c: In function 'exynos_cpufreq_probe':
->>> drivers/cpufreq/exynos-cpufreq.c:166:2: error: implicit declaration of
->>> function 'soc_is_exynos4210'
->>> [-Werror=implicit-function-declaration]
->>> drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration of
->>> function 'soc_is_exynos4212'
->>> [-Werror=implicit-function-declaration]
->>> drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration of
->>> function 'soc_is_exynos4412'
->>> [-Werror=implicit-function-declaration]
->>> drivers/cpufreq/exynos-cpufreq.c:170:2: error: implicit declaration of
->>> function 'soc_is_exynos5250'
->>> [-Werror=implicit-function-declaration]
->>> cc1: some warnings being treated as errors
->>> make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
->>> make[2]: *** Waiting for unfinished jobs....
->>> drivers/cpufreq/exynos4x12-cpufreq.c: In function 'exynos4x12_set_clkdiv':
->>> drivers/cpufreq/exynos4x12-cpufreq.c:118:2: error: implicit declaration of
->>> function 'soc_is_exynos4212'
->>> [-Werror=implicit-function-declaration]
->>> cc1: some warnings being treated as errors
->>> make[2]: *** [drivers/cpufreq/exynos4x12-cpufreq.o] Error 1
->>> make[1]: *** [drivers/cpufreq] Error 2
->>> This fixes above error with getting SoC information via
->>> of_machine_is_compatible() instead of soc_is_exynosXXXX().
->>>
->>
->> Probably,
->> Suggested-by: Tomasz Figa ?
->>
->>> Signed-off-by: Jonghwan Choi<jhbird.choi@samsung.com>
->>
->> Looks better.
->>
->> Rafael, if you have no objection on this, shall I pick this into samsung
->> tree for 3.16 because of the current build breakage with enabling exynos
->> cpufreq?
->
-> Please go ahead.
->
-Done.
+On Wed, May 07, 2014 at 07:39:35PM +0200, Nicolas Ferre wrote:
+> On 07/05/2014 19:34, Nicolas Ferre :
+> > Arnd, Olof, Kevin,
+> > 
+> > This is the first cleanup pull-request for 3.16. It is pretty big because it
+> > integrates the work from Boris about CCF and Alexandre about IIO/ADC. I
+> > integrated them in this cleanup topic because they both touch the core at91
+> > code, the clk and IIO drivers as well as the DT. The concerned maintainers
+> > added their tags.
+> > 
+> > The patch by Linus is a move of at91 specific GPIO definitions out of the
+> > include/mach directory which is an step towards single zImage.
+> > 
+> > Thanks, best regards,
+> > 
+> > The following changes since commit 89ca3b881987f5a4be4c5dbaa7f0df12bbdde2fd:
+> > 
+> >   Linux 3.15-rc4 (2014-05-04 18:14:42 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://github.com/at91linux/linux-at91.git tags/at91-cleanup
+> 
+> There is a little conflict with at91-3.16-dt that you already pulled in
+> arm-soc: here is the branch that resolves it:
+> 
+> https://github.com/at91linux/linux-at91/commits/at91-3.16-resolved
 
-Thanks,
-Kukjin
+That resolution looks odd. Why is one clock under clocks { } and two of them
+are at the top level? Shouldn't they all be under the clocks subnode?
+
+I've merged in now with your resolution, but I think this needs revisiting.
+
+
+-Olof
