@@ -1,35 +1,44 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 16 May 2014 17:25:10 +0200
-Subject: [PATCH] ARM: remove check for CONFIG_CPU_ICACHE_STREAMING_DISABLE
-Message-ID: <1400253910.20342.52.camel@x220>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 16 May 2014 09:33:35 -0600
+Subject: [PATCHv3 1/3] ARM: mm: allow sub-architectures to override PCI
+ I/O memory type
+In-Reply-To: <20140516095736.GF12341@arm.com>
+References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140515155130.193c3181@free-electrons.com>
+ <20140515142924.GI27594@arm.com> <4972763.mtuLYh6sDH@wuerfel>
+ <20140515153430.GM27594@arm.com>
+ <20140515175307.GA12259@obsidianresearch.com>
+ <20140516095736.GF12341@arm.com>
+Message-ID: <20140516153335.GA29660@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A check for CONFIG_CPU_ICACHE_STREAMING_DISABLE was added in v2.6.4. But
-the related Kconfig symbol was never added to the tree. So that check
-has evaluated to false for a decade. Let's remove that check and the
-single line it guards.
+On Fri, May 16, 2014 at 10:57:36AM +0100, Will Deacon wrote:
+> > AFAIK, to duplicate x86 semantics an outl/inl must spin the CPU until
+> > it completes at the target, and the CPU must not pipeline outl/inl
+> > operations: outl();  outl(); produces 1 IOWr TLP, waits for
+> > completion, then produces another.
+> 
+> So that's the real question: Do we really need to duplicate x86 semantics
+> for IO space accesses? If we do, then we need both strongly-ordered memory
+> *and* a dsb in our accessors. That's not going to be much fun.
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Untested.
+Yep, that is the real question.
 
- arch/arm/mm/proc-arm925.S | 3 ---
- 1 file changed, 3 deletions(-)
+It has been over 10 years since I last converted a driver from IO to
+MMIO - but IIRC the completion timing became a software visible
+difference.
 
-diff --git a/arch/arm/mm/proc-arm925.S b/arch/arm/mm/proc-arm925.S
-index 97448c3acf38..3c31f32153ad 100644
---- a/arch/arm/mm/proc-arm925.S
-+++ b/arch/arm/mm/proc-arm925.S
-@@ -441,9 +441,6 @@ ENTRY(cpu_arm925_set_pte_ext)
- 	.type	__arm925_setup, #function
- __arm925_setup:
- 	mov	r0, #0
--#if defined(CONFIG_CPU_ICACHE_STREAMING_DISABLE)
--        orr     r0,r0,#1 << 7
--#endif
- 
- 	/* Transparent on, D-cache clean & flush mode. See  NOTE2 above */
-         orr     r0,r0,#1 << 1			@ transparent mode on
--- 
-1.9.0
+The entire reasons that this funny non-posted outl exists in PCI is to
+support software compatability. You could take an ISA device and stick
+it on PCI and the driver timing would be completely unaltered.
+
+Linux obviously works on systems where outl is posted, ARM currently,
+for instance. I've also run on MIPS systems that completely lack the
+ability to synchronize outl (and I recall having to convert all the
+drivers to mmio on that system..)
+
+Arnd is right though, I doubt anyone cares, using IO space has been
+discouraged for a decade at least at this point.
+
+Jason
