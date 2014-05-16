@@ -1,172 +1,123 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 16 May 2014 10:50:37 +0100
-Subject: [PATCH 2/4] arm64: place initial page tables above the kernel
+Date: Fri, 16 May 2014 10:50:39 +0100
+Subject: [PATCH 4/4] arm64: Enable TEXT_OFFSET fuzzing
 In-Reply-To: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
 References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1400233839-15140-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1400233839-15140-5-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we place swapper_pg_dir and idmap_pg_dir below the kernel
-image, between PHYS_OFFSET and (PHYS_OFFSET + TEXT_OFFSET). However,
-bootloaders may use portions of this memory below the kernel and we do
-not parse the memory reservation list until after the MMU has been
-enabled. As such we may clobber some memory a bootloader wishes to have
-preserved.
+The arm64 Image header contains a text_offset field which bootloaders
+are supposed to read to determine the offset (from a 2MB aligned "start
+of memory" per booting.txt) at which to load the kernel. The offset is
+not well respected by bootloaders at present, and due to the lack of
+variation there is little incentive to support it. This is unfortunate
+for the sake of future kernels where we may wish to vary the text offset
+(even zeroing it).
 
-To enable the use of all of this memory by bootloaders (when the
-required memory reservations are communicated to the kernel) it is
-necessary to move our initial page tables elsewhere. As we currently
-have an effectively unbound requirement for memory at the end of the
-kernel image for .bss, we can place the page tables here.
-
-This patch moves the initial page table to the end of the kernel image,
-after the BSS. As they do not consist of any initialised data they will
-be stripped from the kernel Image as with the BSS. The BSS clearing
-routine is updated to stop at __bss_stop rather than _end so as to not
-clobber the page tables, and memory reservations made redundant by the
-new organisation are removed.
+This patch adds options to arm64 to enable fuzz-testing of text_offset.
+CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET forces the text offset to a random
+value upon a build of the kernel, and CONFIG_ARM64_TEXT_OFFSET can be
+used to set the text offset to a specific value (between 16B and 2MB).
+It is recommended that distribution kernels enable randomization to test
+bootloaders such that any compliance issues can be fixed early.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm64/include/asm/page.h   |  9 +++++++++
- arch/arm64/kernel/head.S        | 28 ++++++++--------------------
- arch/arm64/kernel/vmlinux.lds.S |  7 +++++++
- arch/arm64/mm/init.c            | 12 ++++--------
- 4 files changed, 28 insertions(+), 28 deletions(-)
+ arch/arm64/Kconfig.debug        | 31 +++++++++++++++++++++++++++++++
+ arch/arm64/Makefile             |  6 +++++-
+ arch/arm64/kernel/head.S        |  8 ++++++--
+ arch/arm64/kernel/vmlinux.lds.S |  5 +++++
+ 4 files changed, 47 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
-index 46bf666..a6331e6 100644
---- a/arch/arm64/include/asm/page.h
-+++ b/arch/arm64/include/asm/page.h
-@@ -31,6 +31,15 @@
- /* We do define AT_SYSINFO_EHDR but don't use the gate mechanism */
- #define __HAVE_ARCH_GATE_AREA		1
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index d10ec33..471ef0d 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -37,4 +37,35 @@ config PID_IN_CONTEXTIDR
+ 	  instructions during context switch. Say Y here only if you are
+ 	  planning to use hardware trace tools with this kernel.
  
-+/*
-+ * The idmap and swapper page tables need some space reserved in the kernel
-+ * image. The idmap only requires a pgd and a next level table to (section) map
-+ * the kernel, while the swapper also maps the FDT and requires an additional
-+ * table to map an early UART. See __create_page_tables for more information.
-+ */
-+#define SWAPPER_DIR_SIZE	(3 * PAGE_SIZE)
-+#define IDMAP_DIR_SIZE		(2 * PAGE_SIZE)
++config ARM64_RANDOMIZE_TEXT_OFFSET
++	bool "Randomize TEXT_OFFSET at build time (EXPERIMENTAL)"
++	default N
++	help
++	  Say Y here if you want the image load offset (AKA TEXT_OFFSET)
++	  of the kernel to be randomized at build-time. When selected,
++	  this option will cause TEXT_OFFSET to be randomized upon any
++	  build of the kernel, and the offset will be reflected in the
++	  text_offset field of the resulting Image. This can be used to
++	  fuzz-test bootloaders which respect text_offset.
 +
- #ifndef __ASSEMBLY__
++	  This option is intended for bootloader and/or kernel testing
++	  only. Bootloaders must make no assumptions regarding the value
++	  of TEXT_OFFSET and platforms must not require a specific
++	  value.
++
++config ARM64_TEXT_OFFSET
++	hex "Required image load offset"
++	depends on !ARM64_RANDOMIZE_TEXT_OFFSET
++	default "0x0000000000080000"
++	help
++	  The image load offset (AKA TEXT_OFFSET) of the kernel. The
++	  load offset will be reflected in the text_offset field of the
++	  Image. TEXT_OFFSET must be a 16-byte aligned value less than
++	  2MB.
++
++	  This option is intended for bootloader and/or kernel testing
++	  only. Bootloaders must make no assumptions regarding the value
++	  of TEXT_OFFSET and platforms must not require a specific
++	  value.
++
+ endmenu
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 2fceb71..a4962d5 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -38,7 +38,11 @@ CHECKFLAGS	+= -D__aarch64__
+ head-y		:= arch/arm64/kernel/head.o
  
- #ifdef CONFIG_ARM64_64K_PAGES
+ # The byte offset of the kernel image in RAM from the start of RAM.
+-TEXT_OFFSET := 0x00080000
++ifeq ($(CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET), y)
++TEXT_OFFSET := $(shell awk 'BEGIN {srand(); printf "0x%05x\n", and(int(0xfffff * rand()), 0xffff0)}')
++else
++TEXT_OFFSET := $(CONFIG_ARM64_TEXT_OFFSET)
++endif
+ 
+ export	TEXT_OFFSET GZFLAGS
+ 
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index e8e9883..5dd8127 100644
+index 542ca97..1a731bc 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -35,29 +35,17 @@
- #include <asm/page.h>
- #include <asm/virt.h>
+@@ -37,8 +37,12 @@
  
--/*
-- * swapper_pg_dir is the virtual address of the initial page table. We place
-- * the page tables 3 * PAGE_SIZE below KERNEL_RAM_VADDR. The idmap_pg_dir has
-- * 2 pages and is placed below swapper_pg_dir.
-- */
  #define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
  
- #if (KERNEL_RAM_VADDR & 0xfffff) != 0x80000
- #error KERNEL_RAM_VADDR must start at 0xXXX80000
+-#if (KERNEL_RAM_VADDR & 0xfffff) != 0x80000
+-#error KERNEL_RAM_VADDR must start at 0xXXX80000
++#if (TEXT_OFFSET & 0xf) != 0
++#error TEXT_OFFSET must be at least 16B aligned
++#elif (PAGE_OFFSET & 0xfffff) != 0
++#error PAGE_OFFSET must be at least 2MB aligned
++#elif TEXT_OFFSET > 0xfffff
++#error TEXT_OFFSET must be less than 2MB
  #endif
  
--#define SWAPPER_DIR_SIZE	(3 * PAGE_SIZE)
--#define IDMAP_DIR_SIZE		(2 * PAGE_SIZE)
--
--	.globl	swapper_pg_dir
--	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - SWAPPER_DIR_SIZE
--
--	.globl	idmap_pg_dir
--	.equ	idmap_pg_dir, swapper_pg_dir - IDMAP_DIR_SIZE
--
--	.macro	pgtbl, ttb0, ttb1, phys
--	add	\ttb1, \phys, #TEXT_OFFSET - SWAPPER_DIR_SIZE
--	sub	\ttb0, \ttb1, #IDMAP_DIR_SIZE
-+	.macro	pgtbl, ttb0, ttb1, virt_to_phys
-+	ldr	\ttb1, =swapper_pg_dir
-+	ldr	\ttb0, =idmap_pg_dir
-+	add	\ttb1, \ttb1, \virt_to_phys
-+	add	\ttb0, \ttb0, \virt_to_phys
- 	.endm
- 
- #ifdef CONFIG_ARM64_64K_PAGES
-@@ -304,7 +292,7 @@ ENTRY(secondary_startup)
- 	mov	x23, x0				// x23=current cpu_table
- 	cbz	x23, __error_p			// invalid processor (x23=0)?
- 
--	pgtbl	x25, x26, x24			// x25=TTBR0, x26=TTBR1
-+	pgtbl	x25, x26, x28			// x25=TTBR0, x26=TTBR1
- 	ldr	x12, [x23, #CPU_INFO_SETUP]
- 	add	x12, x12, x28			// __virt_to_phys
- 	blr	x12				// initialise processor
-@@ -418,7 +406,7 @@ ENDPROC(__calc_phys_offset)
-  *   - pgd entry for fixed mappings (TTBR1)
-  */
- __create_page_tables:
--	pgtbl	x25, x26, x24			// idmap_pg_dir and swapper_pg_dir addresses
-+	pgtbl	x25, x26, x28			// idmap_pg_dir and swapper_pg_dir addresses
- 	mov	x27, lr
- 
- 	/*
-@@ -507,7 +495,7 @@ ENDPROC(__create_page_tables)
- __switch_data:
- 	.quad	__mmap_switched
- 	.quad	__bss_start			// x6
--	.quad	_end				// x7
-+	.quad	__bss_stop			// x7
- 	.quad	processor_id			// x4
- 	.quad	__fdt_pointer			// x5
- 	.quad	memstart_addr			// x6
+ 	.macro	pgtbl, ttb0, ttb1, virt_to_phys
 diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 4ba7a55..51258bc 100644
+index 21a8ad1..05fc047 100644
 --- a/arch/arm64/kernel/vmlinux.lds.S
 +++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -104,6 +104,13 @@ SECTIONS
- 	_edata = .;
- 
- 	BSS_SECTION(0, 0, 0)
+@@ -149,3 +149,8 @@ SECTIONS
+  */
+ ASSERT(((__hyp_idmap_text_start + PAGE_SIZE) > __hyp_idmap_text_end),
+        "HYP init code too big")
 +
-+	. = ALIGN(PAGE_SIZE);
-+	idmap_pg_dir = .;
-+	. += IDMAP_DIR_SIZE;
-+	swapper_pg_dir = .;
-+	. += SWAPPER_DIR_SIZE;
-+
- 	_end = .;
- 
- 	STABS_DEBUG
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 51d5352..cc3339d 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -128,20 +128,16 @@ void __init arm64_memblock_init(void)
- {
- 	u64 *reserve_map, base, size;
- 
--	/* Register the kernel text, kernel data and initrd with memblock */
-+	/*
-+	 * Register the kernel text, kernel data, initrd, and initial
-+	 * pagetables with memblock.
-+	 */
- 	memblock_reserve(__pa(_text), _end - _text);
- #ifdef CONFIG_BLK_DEV_INITRD
- 	if (initrd_start)
- 		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
- #endif
- 
--	/*
--	 * Reserve the page tables.  These are already in use,
--	 * and can only be in node 0.
--	 */
--	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_DIR_SIZE);
--	memblock_reserve(__pa(idmap_pg_dir), IDMAP_DIR_SIZE);
--
- 	/* Reserve the dtb region */
- 	memblock_reserve(virt_to_phys(initial_boot_params),
- 			 be32_to_cpu(initial_boot_params->totalsize));
++/*
++ * If padding is applied before .head.text, virt<->phys conversions will fail.
++ */
++ASSERT(_text == (PAGE_OFFSET + TEXT_OFFSET), "HEAD is misaligned")
 -- 
 1.9.1
