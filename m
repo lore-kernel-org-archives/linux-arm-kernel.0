@@ -1,125 +1,63 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 17 May 2014 01:24:15 +0200
-Subject: [PATCH v4 4/8] Documentation: devicetree: add cpu clock
- configuration data binding for Exynos4/5
-In-Reply-To: <1400029876-5830-5-git-send-email-thomas.ab@samsung.com>
-References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
- <1400029876-5830-5-git-send-email-thomas.ab@samsung.com>
-Message-ID: <53769E1F.1090706@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 17 May 2014 08:24:49 +0900
+Subject: [PATCH v3] cpufreq: exynos:  Fix the compile error
+In-Reply-To: <2553916.Pl2B0tVZGR@vostro.rjw.lan>
+References: <000001cf70f0$2e48f930$8adaeb90$@samsung.com>
+ <037e01cf70f5$25b374d0$711a5e70$@samsung.com>
+ <2553916.Pl2B0tVZGR@vostro.rjw.lan>
+Message-ID: <53769E41.5050603@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On 05/17/14 08:04, Rafael J. Wysocki wrote:
+> On Friday, May 16, 2014 07:54:01 PM Kukjin Kim wrote:
+>> Jonghwan Choi wrote:
+>>>
+>>> Commit 7da83a80 ("ARM: EXYNOS: Migrate Exynos specific macros from plat to
+>>> mach") which lands in samsung tree causes build breakage
+>>> for cpufreq-exynos like following:
+>>>
+>>> drivers/cpufreq/exynos-cpufreq.c: In function 'exynos_cpufreq_probe':
+>>> drivers/cpufreq/exynos-cpufreq.c:166:2: error: implicit declaration of
+>>> function 'soc_is_exynos4210'
+>>> [-Werror=implicit-function-declaration]
+>>> drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration of
+>>> function 'soc_is_exynos4212'
+>>> [-Werror=implicit-function-declaration]
+>>> drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration of
+>>> function 'soc_is_exynos4412'
+>>> [-Werror=implicit-function-declaration]
+>>> drivers/cpufreq/exynos-cpufreq.c:170:2: error: implicit declaration of
+>>> function 'soc_is_exynos5250'
+>>> [-Werror=implicit-function-declaration]
+>>> cc1: some warnings being treated as errors
+>>> make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
+>>> make[2]: *** Waiting for unfinished jobs....
+>>> drivers/cpufreq/exynos4x12-cpufreq.c: In function 'exynos4x12_set_clkdiv':
+>>> drivers/cpufreq/exynos4x12-cpufreq.c:118:2: error: implicit declaration of
+>>> function 'soc_is_exynos4212'
+>>> [-Werror=implicit-function-declaration]
+>>> cc1: some warnings being treated as errors
+>>> make[2]: *** [drivers/cpufreq/exynos4x12-cpufreq.o] Error 1
+>>> make[1]: *** [drivers/cpufreq] Error 2
+>>> This fixes above error with getting SoC information via
+>>> of_machine_is_compatible() instead of soc_is_exynosXXXX().
+>>>
+>>
+>> Probably,
+>> Suggested-by: Tomasz Figa ?
+>>
+>>> Signed-off-by: Jonghwan Choi<jhbird.choi@samsung.com>
+>>
+>> Looks better.
+>>
+>> Rafael, if you have no objection on this, shall I pick this into samsung
+>> tree for 3.16 because of the current build breakage with enabling exynos
+>> cpufreq?
+>
+> Please go ahead.
+>
+Done.
 
-Please see my comments inline.
-
-On 14.05.2014 03:11, Thomas Abraham wrote:
-> From; Thomas Abraham <thomas.ab@samsung.com>
-> 
-> The clock blocks within the CMU_CPU clock domain are put together into a
-> new composite clock type called the cpu clock. This clock type requires
-> configuration data that will be atomically programmed in the multiple
-> clock blocks encapsulated within the cpu clock type when the parent clock
-> frequency is changed. This configuration data is held in the clock controller
-> node. Update clock binding documentation about this configuration data format
-> for Samsung Exynos4 and Exynos5 platforms.
-> 
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: <devicetree@vger.kernel.org>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  .../devicetree/bindings/clock/exynos4-clock.txt    |   37 ++++++++++++++++++++
->  .../devicetree/bindings/clock/exynos5250-clock.txt |   36 +++++++++++++++++++
->  2 files changed, 73 insertions(+), 0 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/exynos4-clock.txt b/Documentation/devicetree/bindings/clock/exynos4-clock.txt
-> index f5a5b19..0934e02 100644
-> --- a/Documentation/devicetree/bindings/clock/exynos4-clock.txt
-> +++ b/Documentation/devicetree/bindings/clock/exynos4-clock.txt
-> @@ -15,6 +15,35 @@ Required Properties:
->  
->  - #clock-cells: should be 1.
->  
-> +- samsung,armclk-divider-table: when the frequency of the APLL is changed
-> +  the divider clocks in CMU_CPU clock domain also need to be updated. These
-> +  divider clocks have SoC specific divider clock output requirements for a
-> +  specific APLL clock speeds. When APLL clock rate is changed, these divider
-> +  clocks are reprogrammed with pre-determined values in order to maintain the
-> +  SoC specific divider clock outputs. This property lists the divider values
-> +  for divider clocks in the CMU_CPU block for supported APLL clock speeds.
-> +  The format of each entry included in the arm-frequency-table should be
-> +  as defined below
-
-As far as I understand, the relation is not between the APLL frequency
-and particular clocks in CPU domain, but rather between the latter and
-input clock to CPU domain, which is _after_ the two dividers (called
-DIV_CORE and DIV_CORE2 or ARM_DIV1 and ARM_DIV2), which is also exactly
-the output frequency of ARMCLK.
-
-> +
-> +  - for Exynos4210 and Exynos4212 based platforms:
-> +      cell #1: arm clock parent frequency
-
-Considering my comment above, this should be rather ARMCLK frequency.
-
-> +      cell #2 ~ cell 9#: value of clock divider in the following order
-> +	        corem0_ratio, corem1_ratio, periph_ratio, atb_ratio,
-> +		pclk_dbg_ratio, apll_ratio, copy_ratio, hpm_ratio.
-> +
-> +  - for Exynos4412 based platforms:
-> +      cell #1: expected arm clock parent frequency
-
-Ditto.
-
-> +      cell #2 ~ cell #10: value of clock divider in the following order
-> +	       corem0_ratio, corem1_ratio, periph_ratio, atb_ratio,
-> +               pclk_dbg_ratio, apll_ratio, copy_ratio, hpm_ratio, cores_ratio
-> +
-> +- samsung,armclk-cells: defines the number of cells in
-> +  samsung,armclk-divider-table property. The value of this property depends on
-> +  the SoC type.
-
-To follow conventions used by all other bindings with variable number of
-cells, the property should be called "#samsung,armclk-cells". AFAIK the
-"#" should be interpreted as "number of" and so accents the meaning of
-the property.
-
-> +
-> +  - for Exynos4210 and Exynos4212: the value should be 9.
-> +  - for Exynos4412: the value should be 10.
-> +
->  Each clock is assigned an identifier and client nodes can use this identifier
->  to specify the clock which they consume.
->  
-> @@ -28,6 +57,14 @@ Example 1: An example of a clock controller node is listed below.
->  		compatible = "samsung,exynos4210-clock";
->  		reg = <0x10030000 0x20000>;
->  		#clock-cells = <1>;
-> +
-> +		samsung,armclk-cells = <9>;
-> +		samsung,armclk-divider-table = <1200000 3 7 3 4 1 7 5 0>,
-> +					       <1000000 3 7 3 4 1 7 4 0>,
-> +					       < 800000 3 7 3 3 1 7 3 0>,
-> +					       < 500000 3 7 3 3 1 7 3 0>,
-> +					       < 400000 3 7 3 3 1 7 3 0>,
-> +					       < 200000 1 3 1 1 1 0 3 0>;
->  	};
->  
->  Example 2: UART controller node that consumes the clock generated by the clock
-> diff --git a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-> index 536eacd..3d63d09 100644
-> --- a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-> +++ b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-> @@ -13,6 +13,24 @@ Required Properties:
-
-Same comments apply to this file as well.
-
-Also, shouldn't you also extend exynos5420-clock.txt in the same way?
-
-Best regards,
-Tomasz
+Thanks,
+Kukjin
