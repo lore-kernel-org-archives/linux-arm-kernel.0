@@ -1,47 +1,60 @@
-From: emilgoode@gmail.com (Emil Goode)
-Date: Sat, 17 May 2014 00:47:33 +0200
-Subject: [PATCH v2] ARM: imx: fix error handling
-In-Reply-To: <20140516222108.GI8897@mwanda>
-References: <1400234045-6022-1-git-send-email-emilgoode@gmail.com>
- <20140516192451.GP16662@pengutronix.de>
- <20140516222108.GI8897@mwanda>
-Message-ID: <20140516224733.GA4323@lianli>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 17 May 2014 01:04:29 +0200
+Subject: [PATCH v3] cpufreq: exynos:  Fix the compile error
+In-Reply-To: <037e01cf70f5$25b374d0$711a5e70$@samsung.com>
+References: <000001cf70f0$2e48f930$8adaeb90$@samsung.com>
+ <037e01cf70f5$25b374d0$711a5e70$@samsung.com>
+Message-ID: <2553916.Pl2B0tVZGR@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Sat, May 17, 2014 at 01:21:08AM +0300, Dan Carpenter wrote:
-> On Fri, May 16, 2014 at 09:24:51PM +0200, Uwe Kleine-K?nig wrote:
-> > I didn't check if it is easily possible, but converting this file to use
-> > platform_device_register_full might simplify it considerably.
-> 
-> In a separate patch, though, please.
-
-Will consider another patch.
-
-> 
+On Friday, May 16, 2014 07:54:01 PM Kukjin Kim wrote:
+> Jonghwan Choi wrote:
 > > 
-> > I'm not sure this fix is critical, because the problem happens if an
-> > allocation during boot fails. But still, if you want to get this fix
-> > into a stable release, you should simplify it, i.e. don't do the code
-> > reorganisations. (Also the "more clear" part seems to be subjective, I
-> > like the error handling better as it is now. But that might only be me.)
+> > Commit 7da83a80 ("ARM: EXYNOS: Migrate Exynos specific macros from plat to
+> > mach") which lands in samsung tree causes build breakage
+> > for cpufreq-exynos like following:
+> > 
+> > drivers/cpufreq/exynos-cpufreq.c: In function 'exynos_cpufreq_probe':
+> > drivers/cpufreq/exynos-cpufreq.c:166:2: error: implicit declaration of
+> > function 'soc_is_exynos4210'
+> > [-Werror=implicit-function-declaration]
+> > drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration of
+> > function 'soc_is_exynos4212'
+> > [-Werror=implicit-function-declaration]
+> > drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration of
+> > function 'soc_is_exynos4412'
+> > [-Werror=implicit-function-declaration]
+> > drivers/cpufreq/exynos-cpufreq.c:170:2: error: implicit declaration of
+> > function 'soc_is_exynos5250'
+> > [-Werror=implicit-function-declaration]
+> > cc1: some warnings being treated as errors
+> > make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
+> > make[2]: *** Waiting for unfinished jobs....
+> > drivers/cpufreq/exynos4x12-cpufreq.c: In function 'exynos4x12_set_clkdiv':
+> > drivers/cpufreq/exynos4x12-cpufreq.c:118:2: error: implicit declaration of
+> > function 'soc_is_exynos4212'
+> > [-Werror=implicit-function-declaration]
+> > cc1: some warnings being treated as errors
+> > make[2]: *** [drivers/cpufreq/exynos4x12-cpufreq.o] Error 1
+> > make[1]: *** [drivers/cpufreq] Error 2
+> > This fixes above error with getting SoC information via
+> > of_machine_is_compatible() instead of soc_is_exynosXXXX().
+> > 
 > 
-> Emil's error handling is done exactly in the correct way...  The error
-> path and success path are separate.  Unwinding in the reverse order.
-> The label names describe the label locations.  Most days I spend hours
-> looking at linux kernel error handling and I can assure you that
-> sensible labels like this are a rare and wonderful gift.
+> Probably,
+> Suggested-by: Tomasz Figa ?
 > 
-> It's hard for me to imagine how anyone could defend the original error
-> handling.  The label was "err".  The error handling was randomly plopped
-> in the middle of the success handling.  Whenever I see new "creative"
-> error handling like this it drives me nuts because obviously it's going
-> to be buggy like a swamp picnic.
+> > Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+> 
+> Looks better.
+> 
+> Rafael, if you have no objection on this, shall I pick this into samsung
+> tree for 3.16 because of the current build breakage with enabling exynos
+> cpufreq?
 
-Thank you for the colorful reply, I guess there is no need for me to
-further defend my choice of labels :)
+Please go ahead.
 
-Best regards,
-
-Emil Goode
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
