@@ -1,88 +1,109 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 16 May 2014 16:37:15 +0530
-Subject: [PATCH v3] cpufreq: exynos: Fix the compile error
-In-Reply-To: <000001cf70f0$2e48f930$8adaeb90$@samsung.com>
-References: <000001cf70f0$2e48f930$8adaeb90$@samsung.com>
-Message-ID: <CAKohponFCpNThX1m9n+_96vN=WqN5zqA-+GWMLMLO_z-3p5okA@mail.gmail.com>
+From: emilgoode@gmail.com (Emil Goode)
+Date: Fri, 16 May 2014 13:16:46 +0200
+Subject: [PATCH v2] ARM: imx: fix error handling
+In-Reply-To: <5375EB13.8000200@bfs.de>
+References: <1400234045-6022-1-git-send-email-emilgoode@gmail.com>
+ <5375EB13.8000200@bfs.de>
+Message-ID: <20140516111646.GC4366@lianli>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 May 2014 15:48, Jonghwan Choi <jhbird.choi@samsung.com> wrote:
-> Commit 7da83a80 ("ARM: EXYNOS: Migrate Exynos specific macros from plat to mach") which lands in samsung tree causes build breakage
-> for cpufreq-exynos like following:
->
-> drivers/cpufreq/exynos-cpufreq.c: In function 'exynos_cpufreq_probe':
-> drivers/cpufreq/exynos-cpufreq.c:166:2: error: implicit declaration of function 'soc_is_exynos4210'
-> [-Werror=implicit-function-declaration]
-> drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration of function 'soc_is_exynos4212'
-> [-Werror=implicit-function-declaration]
-> drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration of function 'soc_is_exynos4412'
-> [-Werror=implicit-function-declaration]
-> drivers/cpufreq/exynos-cpufreq.c:170:2: error: implicit declaration of function 'soc_is_exynos5250'
-> [-Werror=implicit-function-declaration]
-> cc1: some warnings being treated as errors
-> make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
-> make[2]: *** Waiting for unfinished jobs....
-> drivers/cpufreq/exynos4x12-cpufreq.c: In function 'exynos4x12_set_clkdiv':
-> drivers/cpufreq/exynos4x12-cpufreq.c:118:2: error: implicit declaration of function 'soc_is_exynos4212'
-> [-Werror=implicit-function-declaration]
-> cc1: some warnings being treated as errors
-> make[2]: *** [drivers/cpufreq/exynos4x12-cpufreq.o] Error 1
-> make[1]: *** [drivers/cpufreq] Error 2
+Hello Walter,
 
-Blank line here..
+On Fri, May 16, 2014 at 12:40:19PM +0200, walter harms wrote:
+> 
+> 
+> Am 16.05.2014 11:54, schrieb Emil Goode:
+> > If we fail to allocate struct platform_device pdev we
+> > dereference it after the goto label err.
+> > 
+> > I have rearranged the error handling a bit to fix the issue
+> > and also make it more clear.
+> > 
+> > Signed-off-by: Emil Goode <emilgoode@gmail.com>
+> > ---
+> > v2: Changed to return -ENOMEM instead of ret where possible and
+> >     updated the subject line.
+> > 
+> >  arch/arm/mach-imx/devices/platform-ipu-core.c |   22 +++++++++++++---------
+> >  1 file changed, 13 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
+> > index fc4dd7c..68f2a4a 100644
+> > --- a/arch/arm/mach-imx/devices/platform-ipu-core.c
+> > +++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
+> > @@ -77,34 +77,38 @@ struct platform_device *__init imx_alloc_mx3_camera(
+> >  
+> >  	pdev = platform_device_alloc("mx3-camera", 0);
+> >  	if (!pdev)
+> > -		goto err;
+> > +		return ERR_PTR(-ENOMEM);
+> >  
+> >  	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
+> >  	if (!pdev->dev.dma_mask)
+> > -		goto err;
+> > +		goto put_pdev;
+> >  
+> >  	*pdev->dev.dma_mask = DMA_BIT_MASK(32);
+> >  	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+> >  
+> >  	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
+> >  	if (ret)
+> > -		goto err;
+> > +		goto free_dma_mask;
+> >  
+> >  	if (pdata) {
+> >  		struct mx3_camera_pdata *copied_pdata;
+> >  
+> >  		ret = platform_device_add_data(pdev, pdata, sizeof(*pdata));
+> > -		if (ret) {
+> > -err:
+> > -			kfree(pdev->dev.dma_mask);
+> > -			platform_device_put(pdev);
+> > -			return ERR_PTR(-ENODEV);
+> > -		}
+> > +		if (ret)
+> > +			goto free_dma_mask;
+> > +
+> >  		copied_pdata = dev_get_platdata(&pdev->dev);
+> >  		copied_pdata->dma_dev = &imx_ipu_coredev->dev;
+> 
+> 
+> the patch is fine, but what use is this copied_pdata ?
+> It scope ends next line ?
+> 
+> re,
+>  wh
 
-> This fixes above error with getting SoC information via of_machine_is_compatible() instead of soc_is_exynosXXXX().
->
-> Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
-> ---
->  drivers/cpufreq/exynos-cpufreq.c     |   20 +++++++++++++++++---
->  drivers/cpufreq/exynos-cpufreq.h     |    8 ++++++++
->  drivers/cpufreq/exynos4x12-cpufreq.c |   11 ++++-------
->  3 files changed, 29 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
-> index f99cfe2..9aecffef 100644
-> --- a/drivers/cpufreq/exynos-cpufreq.c
-> +++ b/drivers/cpufreq/exynos-cpufreq.c
-> @@ -17,6 +17,7 @@
->  #include <linux/regulator/consumer.h>
->  #include <linux/cpufreq.h>
->  #include <linux/platform_device.h>
-> +#include <linux/of.h>
->
->  #include <plat/cpu.h>
->
-> @@ -163,11 +164,24 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
->         if (!exynos_info)
->                 return -ENOMEM;
->
-> -       if (soc_is_exynos4210())
-> +       if (of_machine_is_compatible("samsung,exynos4210")) {
-> +               exynos_info->type = EXYNOS_SOC_4210;
-> +       } else if (of_machine_is_compatible("samsung,exynos4212")) {
-> +               exynos_info->type = EXYNOS_SOC_4212;
-> +       } else if (of_machine_is_compatible("samsung,exynos4412")) {
-> +               exynos_info->type = EXYNOS_SOC_4212;
+I also thought that looked a bit odd, but copied_pdata is a temporary
+pointer to platform_data of the dev struct.
 
-4412 ?
+dev_get_platdata looks like this:
 
-> +       } else if (of_machine_is_compatible("samsung,exynos5250")) {
-> +               exynos_info->type = EXYNOS_SOC_5250;
-> +       } else {
-> +               pr_err("%s: Unknown SoC type\n", __func__);
-> +               return -ENODEV;
-> +       }
-> +
-> +       if (exynos_info->type == EXYNOS_SOC_4210)
->                 ret = exynos4210_cpufreq_init(exynos_info);
-> -       else if (soc_is_exynos4212() || soc_is_exynos4412())
-> +       else if (exynos_info->type == EXYNOS_SOC_4212 || exynos_info->type == EXYNOS_SOC_4412)
->                 ret = exynos4x12_cpufreq_init(exynos_info);
-> -       else if (soc_is_exynos5250())
-> +       else if (exynos_info->type == EXYNOS_SOC_5250)
->                 ret = exynos5250_cpufreq_init(exynos_info);
->         else
->                 return 0;
+static inline void *dev_get_platdata(const struct device *dev)
+{
+        return dev->platform_data;
+}
 
-Do this in the first if/else only..
+So I believe it's a more compact way of writing:
+
+pdev->dev->platform_data->dma_dev = &imx_ipu_coredev->dev;
+
+Best regards,
+
+Emil Goode
+
+> 
+> >  	}
+> >  
+> >  	return pdev;
+> > +
+> > +free_dma_mask:
+> > +	kfree(pdev->dev.dma_mask);
+> > +put_pdev:
+> > +	platform_device_put(pdev);
+> > +
+> > +	return ERR_PTR(ret);
+> >  }
+> >  
+> >  struct platform_device *__init imx_add_mx3_sdc_fb(
