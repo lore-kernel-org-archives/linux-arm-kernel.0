@@ -1,51 +1,54 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Fri, 16 May 2014 19:31:51 +0100
-Subject: [Ksummit-discuss] [TECH TOPIC] ARM legacy board DT conversion
- finalization
-In-Reply-To: <20140516041022.GY27822@titan.lakedaemon.net>
-References: <20140511030009.GO12708@titan.lakedaemon.net>
- <20140511083729.211e9b5f@lwn.net>
- <20140515121546.3A06AC40B0E@trevor.secretlab.ca>
- <CAL_JsqJw11fZBbLVi=xxC559iWdwCMFOJ4XYM-8EjykttoWsOg@mail.gmail.com>
- <20140515194215.GR27822@titan.lakedaemon.net>
- <CAOesGMi0JrTp9kUVDod4duBOCZ+wNRJ0dMmgvBX7jEQRjE5cCA@mail.gmail.com>
- <20140516041022.GY27822@titan.lakedaemon.net>
-Message-ID: <1400265111.2647.54.camel@deadeye.wl.decadent.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 16 May 2014 13:58:48 -0400
+Subject: [PATCH v2 0/3] Update the Keymile kirkwood DTS files
+In-Reply-To: <1400230143-15620-1-git-send-email-valentin.longchamp@keymile.com>
+References: <1400230143-15620-1-git-send-email-valentin.longchamp@keymile.com>
+Message-ID: <20140516175848.GK27822@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-05-16 at 00:10 -0400, Jason Cooper wrote:
-[...]
-> Ok, I assumed *everybody* in the Linux ecosystem went to LinuxCon.  I've
-> never actually been to one, but that museum was really crowded in
-> Edinburgh.  I figured that _must_ be everybody. :)
+On Fri, May 16, 2014 at 10:49:00AM +0200, Valentin Longchamp wrote:
+> This series resynchs the Keymile Kirkwood DTS files with mainline since
+> the boards do not boot anymore with the 3.15 rc kernels (to be honest, I
+> have not tested the last 2-3 releases).
+> 
+> The changes are the addition of the PCIe controller for the 98dx4122
+> SoC, the explicit disabling of the SATA phys for this same SoC and
+> finally the enabling of the PCIe controller on the Keymile Reference
+> design.
+> 
+> The series introduces kirkwood-km_common.dtsi that factors the common
+> nodes between kirkwood-km_kirkwood.dts and the new board/design below.
+> 
+> The series also adds a new DTS for another Keymile generic design where
+> the mv64xxx eth interace is configured with fixed parameters to no phy
+> but a switch (for board internal communication).
+> 
+> The series applies and was tested on top of Jason's mvebu/dt branch
+> (mvebu-dt-3.16 tag).
+> 
+> Changes in v2:
+> - introduce kirkwood-km_common.dtsi to allow factoring some nodes
+>   between boards
+> - Take advantage of the kirkwood-km_common.dtsi file for
+>   kirkwood-km_fixedeth.dts
+> 
+> Valentin Longchamp (3):
+>   ARM: dts: kirkwood: resynch 98dx4122 dtsi
+>   ARM: dts: kirkwood: add kirkwood-km_common DTSI files
+>   ARM: dts: kirkwood: add kirkwood-km_fixedeth DTS file
+> 
+>  arch/arm/boot/dts/kirkwood-98dx4122.dtsi   | 43 ++++++++++++++++++++++++++
+>  arch/arm/boot/dts/kirkwood-km_common.dtsi  | 48 ++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/kirkwood-km_fixedeth.dts | 23 ++++++++++++++
+>  arch/arm/boot/dts/kirkwood-km_kirkwood.dts | 38 +----------------------
+>  4 files changed, 115 insertions(+), 37 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/kirkwood-km_common.dtsi
+>  create mode 100644 arch/arm/boot/dts/kirkwood-km_fixedeth.dts
 
-I find it rather less useful than Plumbers'.
+Applied whole series to mvebu/dt with Andrew's Ack.  Also, s/ok/okay/ in
+patch 2/3.
 
-> Joking aside, I concede your point.  It looks like the last two mvebu
-> legacy platforms (dove, mv78xx0) might get merged into mach-mvebu during
-> the next cycle.  After that, we can reach out to the Debian and OpenWRT
-> guys and see what legacy platforms are in use or rotting.  We can go
-> from there.
+thx,
 
-I just removed ixp4xx from Debian as the kernel image wouldn't fit in
-the NSLU2's kernel partition any more (even after disabling quite a few
-features that are enabled in most other configurations).  iop32x was
-removed for the same reason, a while ago.
-
-Our 'legacy' (which I take to mean pre-v7) configurations are now
-kirkwood, mv78xx0, orion5x (all about to converge to mvebu) and
-versatile.
-
-Ben.
-
--- 
-Ben Hutchings
-If you seem to know what you are doing, you'll be given more to do.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140516/9795766d/attachment.sig>
+Jason.
