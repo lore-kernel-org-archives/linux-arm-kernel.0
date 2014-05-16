@@ -1,47 +1,40 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 16 May 2014 11:19:24 -0600
-Subject: [PATCH v2 cgroup/for-3.16] cgroup: introduce CSS_NO_REF and skip
- refcnting on normal root csses
-In-Reply-To: <20140516170959.GG5379@htj.dyndns.org>
-References: <1399670015-23463-1-git-send-email-tj@kernel.org>
- <1399670015-23463-10-git-send-email-tj@kernel.org>
- <53751062.2050401@wwwdotorg.org> <53753823.2090402@wwwdotorg.org>
- <20140516143718.GA5379@htj.dyndns.org> <20140516154330.GB5379@htj.dyndns.org>
- <537643F9.1030303@wwwdotorg.org> <20140516170959.GG5379@htj.dyndns.org>
-Message-ID: <5376489C.9010902@wwwdotorg.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 16 May 2014 14:20:27 -0300
+Subject: USB with 3.14.3 not working on Freescale i.mx6
+In-Reply-To: <1400257863.657063826@f426.i.mail.ru>
+References: <CACWLcfv6akXuM59m_hX-xB=iQYA4iAx7fZ0T5ZB3-7ik-1GZMw@mail.gmail.com>
+ <CAOMZO5DzLBWFnOMCsz7W1DHg7g0CnZn2bxwjF6H6XVgMYmw-BQ@mail.gmail.com>
+ <1400257863.657063826@f426.i.mail.ru>
+Message-ID: <CAOMZO5B8NEezrUr5xr8DL1R_V8SeC=WF_eziGYHqaS8vt4sfhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2014 11:09 AM, Tejun Heo wrote:
-> 9395a4500404 ("cgroup: enable refcnting for root csses") enabled
-> reference counting for root csses (cgroup_subsys_states) so that
-> cgroup's self csses can be used to manage the lifetime of the
-> containing cgroups.
-> 
-> Unfortunately, this change was incorrect.  During early init,
-> cgrp_dfl_root self css refcnt is used.  percpu_ref can't initialized
-> during early init and its initialization is deferred till
-> cgroup_init() time.  This means that cpu was using percpu_ref which
-> wasn't properly initialized.  Due to the way percpu variables are laid
-> out on x86, this didn't blow up immediately on x86 but ended up
-> incrementing and decrementing the percpu variable at offset zero,
-> whatever it may be; however, on other archs, this caused fault and
-> early boot failure.
-> 
-> As cgroup self csses for root cgroups of non-dfl hierarchies need
-> working refcounting, we can't revert 9395a4500404.  This patch adds
-> CSS_NO_REF which explicitly inhibits reference counting on the css and
-> sets it on all normal (non-self) csses and cgroup_dfl_root self css.
-> 
-> v2: cgrp_dfl_root.self is the offending one.  Set the flag on it.
-> 
-> Signed-off-by: Tejun Heo <tj@kernel.org>
-> Reported-by: Stephen Warren <swarren@wwwdotorg.org>
-> Fixes: 9395a4500404 ("cgroup: enable refcnting for root csses")
-> ---
-> Hello,
-> 
-> Can you try this one instead?
+On Fri, May 16, 2014 at 1:31 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+> Fri, 16 May 2014 13:20:29 -0300 ?? Fabio Estevam <festevam@gmail.com>:
+>> On Wed, May 14, 2014 at 6:17 AM, Till Klocke <till.klocke@yetu.com> wrote:
+>> > Hello,
+>> >
+>> > Currently I am trying to get a recent and stable Linux kernel running
+>> > on a Phytec PhyFlex board based on the i.mx6 processor from Freescale.
+>>
+>> Which dts file do you use?
+>>
+>> USB is functional on other mx6 boards.
+>
+> It's just words. Fabio, just give portion of the log (if it possible) where we
+> see that USB is works with this kernel version and similar hardware.
 
-Yes, this one works great, thanks.
-Tested-by: Stephen Warren <swarren@nvidia.com>
+Also tested on 3.14.4:
+
+root at freescale /$ uname -r
+3.14.4
+root at freescale /$ lsusb
+Bus 001 Device 002: ID 0457:0151
+Bus 001 Device 001: ID 1d6b:0002
+
+USB is working fine on this board and others, so it is 'not only
+words' as you said :-)
+
+I am not familiar with "Phytec PhyFlex board" and don't know which dts
+file it uses. Also, I haven't seen any kernel logs, so it is difficult
+to tell what is wrong with this hardware.
