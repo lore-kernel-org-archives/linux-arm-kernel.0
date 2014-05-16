@@ -1,30 +1,38 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 16 May 2014 01:57:09 -0400
-Subject: [PATCH v6 14/17] ARM: mvebu: add Device Tree description of
- xHCI controllers on Armada 38x
-In-Reply-To: <1400149062-32661-15-git-send-email-gregory.clement@free-electrons.com>
-References: <1400149062-32661-1-git-send-email-gregory.clement@free-electrons.com>
- <1400149062-32661-15-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140516055709.GE27822@titan.lakedaemon.net>
+Date: Fri, 16 May 2014 02:08:51 -0400
+Subject: [PATCHv4 3/3] ARM: mvebu: implement L2/PCIe deadlock workaround
+In-Reply-To: <1400165974-9059-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1400165974-9059-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1400165974-9059-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140516060851.GF27822@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 12:17:39PM +0200, Gregory CLEMENT wrote:
-> The Marvell Armada 38x SoCs contains two xHCI controllers. This commit
-> adds the Device Tree description of those interfaces at the SoC level,
-> and also enables the two USB3 ports on the Armada 385 DB platform and
-> one USB3 port on the Armada 385 RD platform.
+On Thu, May 15, 2014 at 04:59:34PM +0200, Thomas Petazzoni wrote:
+> The Marvell Armada 375 and Armada 38x SOCs, which use the Cortex-A9
+> CPU core, the PL310 cache and the Marvell PCIe hardware block are
+> affected a L2/PCIe deadlock caused by a system erratum when hardware
+> I/O coherency is used.
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> This deadlock can be avoided by mapping the PCIe memory areas as
+> strongly-ordered (note: MT_UNCACHED is strongly-ordered), and by
+> removing the outer cache sync done in software. This is implemented in
+> this patch by:
+> 
+>  * Registering a custom arch_ioremap_caller function that allows to
+>    make sure PCI memory regions are mapped MT_UNCACHED.
+> 
+>  * Adding at runtime the 'arm,io-coherent' property to the PL310 cache
+>    controller. This cannot be done permanently in the DT, because the
+>    hardware I/O coherency can only be enabled when CONFIG_SMP is
+>    enabled, in the current kernel situation.
+> 
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  arch/arm/boot/dts/armada-385-db.dts |  8 ++++++++
->  arch/arm/boot/dts/armada-385-rd.dts |  4 ++++
->  arch/arm/boot/dts/armada-38x.dtsi   | 17 +++++++++++++++++
->  3 files changed, 29 insertions(+)
+>  arch/arm/mach-mvebu/coherency.c | 39 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
 
-Patches 14 through 17 applied to mvebu/dt.  Patch 17 amended as Sergei
-suggested.
+Applied to mvebu/soc.
 
 thx,
 
