@@ -1,45 +1,102 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 16 May 2014 16:26:35 -0700
-Subject: [GIT PULL] at91: cleanup for 3.16 #1
-In-Reply-To: <536A6FD7.40402@atmel.com>
-References: <1399484042-27432-1-git-send-email-nicolas.ferre@atmel.com>
- <536A6FD7.40402@atmel.com>
-Message-ID: <20140516232635.GB6423@quad.lixom.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 17 May 2014 08:26:53 +0900
+Subject: [PATCH v3] cpufreq: exynos: Fix the compile error
+In-Reply-To: <CAKohponFCpNThX1m9n+_96vN=WqN5zqA-+GWMLMLO_z-3p5okA@mail.gmail.com>
+References: <000001cf70f0$2e48f930$8adaeb90$@samsung.com>
+ <CAKohponFCpNThX1m9n+_96vN=WqN5zqA-+GWMLMLO_z-3p5okA@mail.gmail.com>
+Message-ID: <53769EBD.2000201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 07, 2014 at 07:39:35PM +0200, Nicolas Ferre wrote:
-> On 07/05/2014 19:34, Nicolas Ferre :
-> > Arnd, Olof, Kevin,
-> > 
-> > This is the first cleanup pull-request for 3.16. It is pretty big because it
-> > integrates the work from Boris about CCF and Alexandre about IIO/ADC. I
-> > integrated them in this cleanup topic because they both touch the core at91
-> > code, the clk and IIO drivers as well as the DT. The concerned maintainers
-> > added their tags.
-> > 
-> > The patch by Linus is a move of at91 specific GPIO definitions out of the
-> > include/mach directory which is an step towards single zImage.
-> > 
-> > Thanks, best regards,
-> > 
-> > The following changes since commit 89ca3b881987f5a4be4c5dbaa7f0df12bbdde2fd:
-> > 
-> >   Linux 3.15-rc4 (2014-05-04 18:14:42 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://github.com/at91linux/linux-at91.git tags/at91-cleanup
-> 
-> There is a little conflict with at91-3.16-dt that you already pulled in
-> arm-soc: here is the branch that resolves it:
-> 
-> https://github.com/at91linux/linux-at91/commits/at91-3.16-resolved
+On 05/16/14 20:07, Viresh Kumar wrote:
+> On 16 May 2014 15:48, Jonghwan Choi<jhbird.choi@samsung.com>  wrote:
+>> Commit 7da83a80 ("ARM: EXYNOS: Migrate Exynos specific macros from plat to mach") which lands in samsung tree causes build breakage
+>> for cpufreq-exynos like following:
+>>
+>> drivers/cpufreq/exynos-cpufreq.c: In function 'exynos_cpufreq_probe':
+>> drivers/cpufreq/exynos-cpufreq.c:166:2: error: implicit declaration of function 'soc_is_exynos4210'
+>> [-Werror=implicit-function-declaration]
+>> drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration of function 'soc_is_exynos4212'
+>> [-Werror=implicit-function-declaration]
+>> drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration of function 'soc_is_exynos4412'
+>> [-Werror=implicit-function-declaration]
+>> drivers/cpufreq/exynos-cpufreq.c:170:2: error: implicit declaration of function 'soc_is_exynos5250'
+>> [-Werror=implicit-function-declaration]
+>> cc1: some warnings being treated as errors
+>> make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
+>> make[2]: *** Waiting for unfinished jobs....
+>> drivers/cpufreq/exynos4x12-cpufreq.c: In function 'exynos4x12_set_clkdiv':
+>> drivers/cpufreq/exynos4x12-cpufreq.c:118:2: error: implicit declaration of function 'soc_is_exynos4212'
+>> [-Werror=implicit-function-declaration]
+>> cc1: some warnings being treated as errors
+>> make[2]: *** [drivers/cpufreq/exynos4x12-cpufreq.o] Error 1
+>> make[1]: *** [drivers/cpufreq] Error 2
+>
+> Blank line here..
+>
+>> This fixes above error with getting SoC information via of_machine_is_compatible() instead of soc_is_exynosXXXX().
+>>
+>> Signed-off-by: Jonghwan Choi<jhbird.choi@samsung.com>
+>> ---
+>>   drivers/cpufreq/exynos-cpufreq.c     |   20 +++++++++++++++++---
+>>   drivers/cpufreq/exynos-cpufreq.h     |    8 ++++++++
+>>   drivers/cpufreq/exynos4x12-cpufreq.c |   11 ++++-------
+>>   3 files changed, 29 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
+>> index f99cfe2..9aecffef 100644
+>> --- a/drivers/cpufreq/exynos-cpufreq.c
+>> +++ b/drivers/cpufreq/exynos-cpufreq.c
+>> @@ -17,6 +17,7 @@
+>>   #include<linux/regulator/consumer.h>
+>>   #include<linux/cpufreq.h>
+>>   #include<linux/platform_device.h>
+>> +#include<linux/of.h>
+>>
+>>   #include<plat/cpu.h>
+>>
+>> @@ -163,11 +164,24 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
+>>          if (!exynos_info)
+>>                  return -ENOMEM;
+>>
+>> -       if (soc_is_exynos4210())
+>> +       if (of_machine_is_compatible("samsung,exynos4210")) {
+>> +               exynos_info->type = EXYNOS_SOC_4210;
+>> +       } else if (of_machine_is_compatible("samsung,exynos4212")) {
+>> +               exynos_info->type = EXYNOS_SOC_4212;
+>> +       } else if (of_machine_is_compatible("samsung,exynos4412")) {
+>> +               exynos_info->type = EXYNOS_SOC_4212;
+>
+> 4412 ?
+>
+Yes, I will fix when I apply.
 
-That resolution looks odd. Why is one clock under clocks { } and two of them
-are at the top level? Shouldn't they all be under the clocks subnode?
+>> +       } else if (of_machine_is_compatible("samsung,exynos5250")) {
+>> +               exynos_info->type = EXYNOS_SOC_5250;
+>> +       } else {
+>> +               pr_err("%s: Unknown SoC type\n", __func__);
+>> +               return -ENODEV;
+>> +       }
+>> +
+>> +       if (exynos_info->type == EXYNOS_SOC_4210)
+>>                  ret = exynos4210_cpufreq_init(exynos_info);
+>> -       else if (soc_is_exynos4212() || soc_is_exynos4412())
+>> +       else if (exynos_info->type == EXYNOS_SOC_4212 || exynos_info->type == EXYNOS_SOC_4412)
+>>                  ret = exynos4x12_cpufreq_init(exynos_info);
+>> -       else if (soc_is_exynos5250())
+>> +       else if (exynos_info->type == EXYNOS_SOC_5250)
+>>                  ret = exynos5250_cpufreq_init(exynos_info);
+>>          else
+>>                  return 0;
+>
+> Do this in the first if/else only..
 
-I've merged in now with your resolution, but I think this needs revisiting.
+Probably, you mean following in above?
 
+ >> -       if (soc_is_exynos4210())
 
--Olof
+I've applied this with fixing typo you mentioned just now, if any 
+concerns, please kindly let me know.
+
+Thanks,
+Kukjin
