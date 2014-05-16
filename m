@@ -1,88 +1,49 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 16 May 2014 15:17:10 +0300
-Subject: [PATCH v3 03/13] ARM: edma: Do not change TC -> Queue mapping,
- leave it to default.
+Date: Fri, 16 May 2014 15:17:09 +0300
+Subject: [PATCH v3 02/13] ARM: edma: Take the number of tc from edma_soc_info
+ (pdata)
 In-Reply-To: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1400242640-9902-4-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1400242640-9902-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to change the default TC -> Queue mapping. By default the
-mapping is: TC0 -> Q0, TC1 -> Q1, etc.
-Changing this has no benefits at all and all the board files are just setting
-the same mapping back to the HW.
+Instead of saving the for loop length, take the num_tc value from the pdata.
+In case of DT boot set the n_tc to 3 as it is hardwired in edma_of_parse_dt()
+This is a temporary state since upcoming patch(es) will change how we are
+dealing with these parameters.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/common/edma.c | 28 +---------------------------
- 1 file changed, 1 insertion(+), 27 deletions(-)
+ arch/arm/common/edma.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index d42c84a3432a..0bc5ed6fc249 100644
+index 01707aae0a2b..d42c84a3432a 100644
 --- a/arch/arm/common/edma.c
 +++ b/arch/arm/common/edma.c
-@@ -290,12 +290,6 @@ static void map_dmach_queue(unsigned ctlr, unsigned ch_no,
- 			~(0x7 << bit), queue_no << bit);
- }
+@@ -1488,6 +1488,7 @@ static int edma_of_parse_dt(struct device *dev,
+ 	pdata->n_slot = value;
  
--static void __init map_queue_tc(unsigned ctlr, int queue_no, int tc_no)
--{
--	int bit = queue_no * 4;
--	edma_modify(ctlr, EDMA_QUETCMAP, ~(0x7 << bit), ((tc_no & 0x7) << bit));
--}
--
- static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
- 		int priority)
- {
-@@ -1470,7 +1464,7 @@ static int edma_of_parse_dt(struct device *dev,
- 	struct property *prop;
- 	size_t sz;
- 	struct edma_rsv_info *rsv_info;
--	s8 (*queue_tc_map)[2], (*queue_priority_map)[2];
-+	s8 (*queue_priority_map)[2];
+ 	pdata->n_cc = 1;
++	pdata->n_tc = 3;
  
- 	ret = of_property_read_u32(node, "dma-channels", &value);
- 	if (ret < 0)
-@@ -1495,19 +1489,6 @@ static int edma_of_parse_dt(struct device *dev,
- 		return -ENOMEM;
- 	pdata->rsv = rsv_info;
+ 	rsv_info = devm_kzalloc(dev, sizeof(struct edma_rsv_info), GFP_KERNEL);
+ 	if (!rsv_info)
+@@ -1648,6 +1649,7 @@ static int edma_probe(struct platform_device *pdev)
+ 							EDMA_MAX_PARAMENTRY);
+ 		edma_cc[j]->num_cc = min_t(unsigned, info[j]->n_cc,
+ 							EDMA_MAX_CC);
++		edma_cc[j]->num_tc = info[j]->n_tc;
  
--	queue_tc_map = devm_kzalloc(dev, 8*sizeof(s8), GFP_KERNEL);
--	if (!queue_tc_map)
--		return -ENOMEM;
--
--	for (i = 0; i < 3; i++) {
--		queue_tc_map[i][0] = i;
--		queue_tc_map[i][1] = i;
--	}
--	queue_tc_map[i][0] = -1;
--	queue_tc_map[i][1] = -1;
--
--	pdata->queue_tc_mapping = queue_tc_map;
--
- 	queue_priority_map = devm_kzalloc(dev, 8*sizeof(s8), GFP_KERNEL);
- 	if (!queue_priority_map)
- 		return -ENOMEM;
-@@ -1568,7 +1549,6 @@ static int edma_probe(struct platform_device *pdev)
- 	struct edma_soc_info	**info = pdev->dev.platform_data;
- 	struct edma_soc_info    *ninfo[EDMA_MAX_CC] = {NULL};
- 	s8		(*queue_priority_mapping)[2];
--	s8		(*queue_tc_mapping)[2];
- 	int			i, j, off, ln, found = 0;
- 	int			status = -1;
- 	const s16		(*rsv_chans)[2];
-@@ -1735,14 +1715,8 @@ static int edma_probe(struct platform_device *pdev)
- 		for (i = 0; i < edma_cc[j]->num_channels; i++)
- 			map_dmach_queue(j, i, info[j]->default_queue);
+ 		edma_cc[j]->default_queue = info[j]->default_queue;
  
--		queue_tc_mapping = info[j]->queue_tc_mapping;
- 		queue_priority_mapping = info[j]->queue_priority_mapping;
+@@ -1741,9 +1743,6 @@ static int edma_probe(struct platform_device *pdev)
+ 			map_queue_tc(j, queue_tc_mapping[i][0],
+ 					queue_tc_mapping[i][1]);
  
--		/* Event queue to TC mapping */
--		for (i = 0; queue_tc_mapping[i][0] != -1; i++)
--			map_queue_tc(j, queue_tc_mapping[i][0],
--					queue_tc_mapping[i][1]);
+-		/* Save the number of TCs */
+-		edma_cc[j]->num_tc = i;
 -
  		/* Event queue priority mapping */
  		for (i = 0; queue_priority_mapping[i][0] != -1; i++)
