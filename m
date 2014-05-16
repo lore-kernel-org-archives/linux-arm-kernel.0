@@ -1,84 +1,53 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 16 May 2014 13:24:14 +0200
-Subject: [PATCH v2] ARM: imx: remove unused defines
-In-Reply-To: <1400231369.20342.10.camel@x220>
-References: <1400140671.20469.7.camel@x220>
- <20140515122553.GF5858@pengutronix.de>
- <1400231369.20342.10.camel@x220>
-Message-ID: <20140516112414.GW5858@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 16 May 2014 13:20:48 +0200
+Subject: [GIT PULL] Allwinner core for 3.16
+Message-ID: <20140516112048.GA18800@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 11:09:29AM +0200, Paul Bolle wrote:
-> None of the defines "for modules using static and dynamic DMA channels"
-> are used. Remove these.
-> 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+Hi Arnd, Kevin, Olof,
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Here is the first of the Allwinner pull requests for the 3.16 merge
+window.
 
-Sascha
+Thanks!
+Maxime
 
-> ---
-> 0) v1 was called "ARM: imx: remove check for CONFIG_SDMA_IRAM". This
-> version just removes the entire block of defines, as Sascha suggested.
-> 
-> 1) Still untested.
-> 
->  arch/arm/mach-imx/mx51.h | 33 ---------------------------------
->  1 file changed, 33 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mx51.h b/arch/arm/mach-imx/mx51.h
-> index af844f76261a..3f6d4a674ffb 100644
-> --- a/arch/arm/mach-imx/mx51.h
-> +++ b/arch/arm/mach-imx/mx51.h
-> @@ -145,39 +145,6 @@
->  #define MX51_SPBA_CTRL	0x3c
->  
->  /*
-> - * Defines for modules using static and dynamic DMA channels
-> - */
-> -#define MX51_MXC_DMA_CHANNEL_IRAM	30
-> -#define MX51_MXC_DMA_CHANNEL_SPDIF_TX	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_UART1_RX	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_UART1_TX	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_UART2_RX	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_UART2_TX	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_UART3_RX	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_UART3_TX	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_MMC1	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_MMC2	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_SSI1_RX	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_SSI1_TX	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_SSI2_RX	MXC_DMA_DYNAMIC_CHANNEL
-> -#ifdef CONFIG_SDMA_IRAM
-> -#define MX51_MXC_DMA_CHANNEL_SSI2_TX	(MX51_MXC_DMA_CHANNEL_IRAM + 1)
-> -#else				/*CONFIG_SDMA_IRAM */
-> -#define MX51_MXC_DMA_CHANNEL_SSI2_TX	MXC_DMA_DYNAMIC_CHANNEL
-> -#endif				/*CONFIG_SDMA_IRAM */
-> -#define MX51_MXC_DMA_CHANNEL_CSPI1_RX	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_CSPI1_TX	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_CSPI2_RX	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_CSPI2_TX	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_CSPI3_RX	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_CSPI3_TX	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_ATA_RX	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_ATA_TX	MXC_DMA_DYNAMIC_CHANNEL
-> -#define MX51_MXC_DMA_CHANNEL_MEMORY	MXC_DMA_DYNAMIC_CHANNEL
-> -
-> -#define MX51_IS_MEM_DEVICE_NONSHARED(x)		0
-> -
-> -/*
->   * DMA request assignments
->   */
->  #define MX51_DMA_REQ_VPU		0
-> -- 
-> 1.9.0
-> 
-> 
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+
+are available in the git repository at:
+
+  https://github.com/mripard/linux.git tags/sunxi-core-for-3.16
+
+for you to fetch changes up to 324da938cb7eb103a925817f9aacdcc1f0e22576:
+
+  ARM: sunxi: select MFD_SUN6I_PRCM when sun6i arch support is enabled (2014-05-15 17:30:07 +0200)
+
+----------------------------------------------------------------
+Allwinner SoCs core additions for 3.16
+
+Refactor the Kconfig options to have one Kconfig option per machine.
+
+----------------------------------------------------------------
+Boris BREZILLON (1):
+      ARM: sunxi: select MFD_SUN6I_PRCM when sun6i arch support is enabled
+
+Maxime Ripard (1):
+      ARM: sunxi: Split the various SoCs support in Kconfig
+
+ arch/arm/mach-sunxi/Kconfig | 38 +++++++++++++++++++++++++++++++-------
+ 1 file changed, 31 insertions(+), 7 deletions(-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140516/eb8d1c1e/attachment.sig>
