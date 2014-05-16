@@ -1,43 +1,32 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Fri, 16 May 2014 21:31:20 +0400
-Subject: =?UTF-8?B?UmU6IFtSRkMgUEFUQ0ggMi85XSBkdDogZGVwczogZGVwZW5kZW5jeSBiYXNl?=
- =?UTF-8?B?ZCBkZXZpY2UgY3JlYXRpb24=?=
-In-Reply-To: <5373DBCF.1080503@ahsoftware.de>
-References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
- <20140514200645.15984C4095B@trevor.secretlab.ca>
- <5373DBCF.1080503@ahsoftware.de>
-Message-ID: <1400261480.338700899@f360.i.mail.ru>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 16 May 2014 12:31:27 -0500
+Subject: [PATCH v2 2/5] ARM: edma: Get IP information from HW when booting
+ with DT
+In-Reply-To: <5374B7B8.4060604@ti.com>
+References: <1399977032-26469-1-git-send-email-peter.ujfalusi@ti.com>
+ <1399977032-26469-3-git-send-email-peter.ujfalusi@ti.com>
+ <53748070.4080706@ti.com> <5374B34D.2060904@ti.com> <5374B7B8.4060604@ti.com>
+Message-ID: <53764B6F.9030106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wed, 14 May 2014 23:10:39 +0200 ?? Alexander Holler <holler@ahsoftware.de>:
-> Am 14.05.2014 22:06, schrieb Grant Likely:
-> > On Wed, 14 May 2014 16:49:05 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
-> >> Am 14.05.2014 16:05, schrieb Grant Likely:
-> >>> On Mon, 12 May 2014 18:47:53 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
+On 05/15/2014 07:48 AM, Sekhar Nori wrote:
+> On Thursday 15 May 2014 06:00 PM, Peter Ujfalusi wrote:
 > 
-> >> Hmm, I don't really care if that will be merged. I have no motivation to 
-> >> fight with Linux kernel maintainers and I don't know if I will spend the 
-> >> necessary time to do so.
-> > 
-> > The people you need to convince are Rob, Greg, and me, and you've got my
-> > attention. If I'm convinced, then I can probably convince Greg also.
-> > You've got an interesting approach, and I hope you won't give up on it.
+>> The second controller is not handled because in DT boot we only handle 1 cc as
+>> far as I know. I don't know why, but this is how the DT support has been
+>> written and used.
 > 
-> Sorry, but that point of the view is already a problem. Why do I have to
-> convince you people?
-> 
-> To summarize:
-> 
-> Linux kernel maintainers
-> 
-> - don't like code they haven't written theirself,
-> - don't like code which doesn't look like they have written it theirself,
-> - don't like ideas they haven't had themself,
-> - do feel good in their closed group they have formed,
-> ...
+> Its just because none of the platforms under heavy development use two
+> controllers. Joel promised to work on it at some point ;)
 
-Very correct and well said.
-For many subsystems is it as is, we cannot break these barriers.
+Yeah, often things like that go down in priority when there aren't
+users, and when other things on fire need to be tended to :-D
 
----
+I think the next on-fire thing as far as EDMA goes would be to move out
+into drivers/edma. I like Peter's series in that it probably is a step
+forward there.
+
+thanks,
+
+-Joel
