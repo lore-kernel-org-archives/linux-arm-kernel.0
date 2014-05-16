@@ -1,51 +1,78 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 15 May 2014 17:40:34 -0700
-Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
-In-Reply-To: <20140516001306.GA6580@atomide.com>
-References: <1399991966-14582-1-git-send-email-santosh.shilimkar@ti.com>
- <5373C78E.7040301@linaro.org> <5373C8E8.6040208@ti.com>
- <5373CBB9.40506@linaro.org> <20140514205649.GC27426@atomide.com>
- <20140514233119.GA31594@atomide.com>
- <20140516001306.GA6580@atomide.com>
-Message-ID: <20140516004034.GB6580@atomide.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 16 May 2014 09:48:34 +0900
+Subject: [PATCH v1 0/5] Add Keystone PCIe controller driver
+In-Reply-To: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
+References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <004f01cf70a0$90d7e520$b287af60$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [140515 17:14]:
-> * Tony Lindgren <tony@atomide.com> [140514 16:32]:
-> > * Tony Lindgren <tony@atomide.com> [140514 13:57]:
-> > > * Daniel Lezcano <daniel.lezcano@linaro.org> [140514 13:02]:
-> > > > 
-> > > > So the broadcast timer does not operate with this revert. Moreover, I am not
-> > > > sure reverting this patch is the right solution.
-> > > 
-> > > OK I'll hold on sending anything until there's some conclusion.
-> > > 
-> > > Are you able to reproduce the problem with current Linux next?
-> > 
-> > BTW, I'm also noticing now hangs on omap3 with my PM patches
-> > on v3.15-rc4 that seem similar to the panda cpuidle hang.
-> > 
-> > The hangs on omap3 do not happen on my v3.14 based branch, so
-> > I'm wondering if there are some recent cpuidle regressions too
-> > in play?
+On Friday, May 16, 2014 1:01 AM, Murali Karicheri wrote:
 > 
-> Looks like the omap3 idle hang is caused by commit 6ddeb6d84459
-> (dmaengine: omap-dma: move IRQ handling to omap-dma). This may
-> not be related to omap4 cpu_idle hang, but it might.
+> This patch adds a PCIe controller driver for Keystone SoCs. This
+> is based on the origin RFC patch that I had sent earlier. I have
+> incorporated following comments:-
 > 
-> I'm trying to figure out if it's related to something like
-> omap_dma_global_context_save and omap_dma_global_context_restore.
+>  - Add a interrupt controller node for Legacy irq chip and use
+>    interrupt map/map-mask property to map legacy IRQs A/B/C/D
+>  - Add a Phy driver to replace the original serdes driver
+>  - Move common applicaiton register handling code to a separate
+>    file to allow re-use across other platforms that use older
+>    DW PCIe h/w
+>  - PCI quirk for maximum read request size. Check and override only
+>    if the maximum is higher than what controller can handle.
+>  - Converted to a module platform driver.
 > 
-> Meanwhile, to test the DMA changes have an effect on the omap4
-> cpu_idle issue, you can try reverting the following two patches:
+> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> CC: Russell King <linux@arm.linux.org.uk>
+> CC: Grant Likely <grant.likely@linaro.org>
+> CC: Rob Herring <robh+dt@kernel.org>
+> CC: Mohit Kumar <mohit.kumar@st.com>
+> CC: Jingoo Han <jg1.han@samsung.com>
+> CC: Bjorn Helgaas <bhelgaas@google.com>
 > 
-> aa4c5b962a7a dmaengine: omap-dma: more consolidation of CCR register setup
-> 6ddeb6d84459 dmaengine: omap-dma: move IRQ handling to omap-dma
 
-OK with the above reverted still seeing hangs on my panda es.
-So it seems the cpu_idle issue is different.
+Your patches modify 'pcie-designware.c', and affects other PCIe
+drivers using designware PCIe Core IP. Please add the following
+people to CC list. They are also related to the designware PCIe.
 
-Regards,
+  Pratyush Anand <pratyush.anand@st.com>
+  Richard Zhu <r65037@freescale.com>
+  Kishon Vijay Abraham I <kishon@ti.com>
+  Marek Vasut <marex@denx.de>
 
-Tony
+Best regards,
+Jingoo Han
+
+> 
+> Murali Karicheri (5):
+>   ARM: keystone: add pcie related options
+>   pci: designware: enhancements to support keystone pcie
+>   phy: pci serdes phy driver for keystone
+>   pci: dw: add common functions to support old hw based pci driver
+>   pci: keystone: add pcie driver based on designware core driver
+> 
+>  .../devicetree/bindings/pci/pcie-keystone.txt      |   68 ++++
+>  arch/arm/mach-keystone/Kconfig                     |    2 +
+>  drivers/pci/host/Kconfig                           |   12 +
+>  drivers/pci/host/Makefile                          |    2 +
+>  drivers/pci/host/pci-dw-old-msi.c                  |  150 ++++++++
+>  drivers/pci/host/pci-dw-old.c                      |  371 ++++++++++++++++++
+>  drivers/pci/host/pci-dw-old.h                      |   30 ++
+>  drivers/pci/host/pci-keystone.c                    |  400 ++++++++++++++++++++
+>  drivers/pci/host/pcie-designware.c                 |  101 +++--
+>  drivers/pci/host/pcie-designware.h                 |   42 +-
+>  drivers/pci/quirks.c                               |   13 +
+>  drivers/phy/Kconfig                                |    6 +
+>  drivers/phy/Makefile                               |    1 +
+>  drivers/phy/phy-keystone.c                         |  230 +++++++++++
+>  14 files changed, 1388 insertions(+), 40 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pci/pcie-keystone.txt
+>  create mode 100644 drivers/pci/host/pci-dw-old-msi.c
+>  create mode 100644 drivers/pci/host/pci-dw-old.c
+>  create mode 100644 drivers/pci/host/pci-dw-old.h
+>  create mode 100644 drivers/pci/host/pci-keystone.c
+>  create mode 100644 drivers/phy/phy-keystone.c
+> 
+> --
+> 1.7.9.5
