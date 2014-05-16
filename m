@@ -1,109 +1,84 @@
-From: emilgoode@gmail.com (Emil Goode)
-Date: Fri, 16 May 2014 13:16:46 +0200
-Subject: [PATCH v2] ARM: imx: fix error handling
-In-Reply-To: <5375EB13.8000200@bfs.de>
-References: <1400234045-6022-1-git-send-email-emilgoode@gmail.com>
- <5375EB13.8000200@bfs.de>
-Message-ID: <20140516111646.GC4366@lianli>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 16 May 2014 13:24:14 +0200
+Subject: [PATCH v2] ARM: imx: remove unused defines
+In-Reply-To: <1400231369.20342.10.camel@x220>
+References: <1400140671.20469.7.camel@x220>
+ <20140515122553.GF5858@pengutronix.de>
+ <1400231369.20342.10.camel@x220>
+Message-ID: <20140516112414.GW5858@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Walter,
+On Fri, May 16, 2014 at 11:09:29AM +0200, Paul Bolle wrote:
+> None of the defines "for modules using static and dynamic DMA channels"
+> are used. Remove these.
+> 
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 
-On Fri, May 16, 2014 at 12:40:19PM +0200, walter harms wrote:
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+Sascha
+
+> ---
+> 0) v1 was called "ARM: imx: remove check for CONFIG_SDMA_IRAM". This
+> version just removes the entire block of defines, as Sascha suggested.
+> 
+> 1) Still untested.
+> 
+>  arch/arm/mach-imx/mx51.h | 33 ---------------------------------
+>  1 file changed, 33 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mx51.h b/arch/arm/mach-imx/mx51.h
+> index af844f76261a..3f6d4a674ffb 100644
+> --- a/arch/arm/mach-imx/mx51.h
+> +++ b/arch/arm/mach-imx/mx51.h
+> @@ -145,39 +145,6 @@
+>  #define MX51_SPBA_CTRL	0x3c
+>  
+>  /*
+> - * Defines for modules using static and dynamic DMA channels
+> - */
+> -#define MX51_MXC_DMA_CHANNEL_IRAM	30
+> -#define MX51_MXC_DMA_CHANNEL_SPDIF_TX	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_UART1_RX	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_UART1_TX	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_UART2_RX	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_UART2_TX	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_UART3_RX	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_UART3_TX	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_MMC1	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_MMC2	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_SSI1_RX	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_SSI1_TX	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_SSI2_RX	MXC_DMA_DYNAMIC_CHANNEL
+> -#ifdef CONFIG_SDMA_IRAM
+> -#define MX51_MXC_DMA_CHANNEL_SSI2_TX	(MX51_MXC_DMA_CHANNEL_IRAM + 1)
+> -#else				/*CONFIG_SDMA_IRAM */
+> -#define MX51_MXC_DMA_CHANNEL_SSI2_TX	MXC_DMA_DYNAMIC_CHANNEL
+> -#endif				/*CONFIG_SDMA_IRAM */
+> -#define MX51_MXC_DMA_CHANNEL_CSPI1_RX	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_CSPI1_TX	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_CSPI2_RX	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_CSPI2_TX	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_CSPI3_RX	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_CSPI3_TX	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_ATA_RX	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_ATA_TX	MXC_DMA_DYNAMIC_CHANNEL
+> -#define MX51_MXC_DMA_CHANNEL_MEMORY	MXC_DMA_DYNAMIC_CHANNEL
+> -
+> -#define MX51_IS_MEM_DEVICE_NONSHARED(x)		0
+> -
+> -/*
+>   * DMA request assignments
+>   */
+>  #define MX51_DMA_REQ_VPU		0
+> -- 
+> 1.9.0
 > 
 > 
-> Am 16.05.2014 11:54, schrieb Emil Goode:
-> > If we fail to allocate struct platform_device pdev we
-> > dereference it after the goto label err.
-> > 
-> > I have rearranged the error handling a bit to fix the issue
-> > and also make it more clear.
-> > 
-> > Signed-off-by: Emil Goode <emilgoode@gmail.com>
-> > ---
-> > v2: Changed to return -ENOMEM instead of ret where possible and
-> >     updated the subject line.
-> > 
-> >  arch/arm/mach-imx/devices/platform-ipu-core.c |   22 +++++++++++++---------
-> >  1 file changed, 13 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
-> > index fc4dd7c..68f2a4a 100644
-> > --- a/arch/arm/mach-imx/devices/platform-ipu-core.c
-> > +++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
-> > @@ -77,34 +77,38 @@ struct platform_device *__init imx_alloc_mx3_camera(
-> >  
-> >  	pdev = platform_device_alloc("mx3-camera", 0);
-> >  	if (!pdev)
-> > -		goto err;
-> > +		return ERR_PTR(-ENOMEM);
-> >  
-> >  	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
-> >  	if (!pdev->dev.dma_mask)
-> > -		goto err;
-> > +		goto put_pdev;
-> >  
-> >  	*pdev->dev.dma_mask = DMA_BIT_MASK(32);
-> >  	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-> >  
-> >  	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
-> >  	if (ret)
-> > -		goto err;
-> > +		goto free_dma_mask;
-> >  
-> >  	if (pdata) {
-> >  		struct mx3_camera_pdata *copied_pdata;
-> >  
-> >  		ret = platform_device_add_data(pdev, pdata, sizeof(*pdata));
-> > -		if (ret) {
-> > -err:
-> > -			kfree(pdev->dev.dma_mask);
-> > -			platform_device_put(pdev);
-> > -			return ERR_PTR(-ENODEV);
-> > -		}
-> > +		if (ret)
-> > +			goto free_dma_mask;
-> > +
-> >  		copied_pdata = dev_get_platdata(&pdev->dev);
-> >  		copied_pdata->dma_dev = &imx_ipu_coredev->dev;
-> 
-> 
-> the patch is fine, but what use is this copied_pdata ?
-> It scope ends next line ?
-> 
-> re,
->  wh
 
-I also thought that looked a bit odd, but copied_pdata is a temporary
-pointer to platform_data of the dev struct.
-
-dev_get_platdata looks like this:
-
-static inline void *dev_get_platdata(const struct device *dev)
-{
-        return dev->platform_data;
-}
-
-So I believe it's a more compact way of writing:
-
-pdev->dev->platform_data->dma_dev = &imx_ipu_coredev->dev;
-
-Best regards,
-
-Emil Goode
-
-> 
-> >  	}
-> >  
-> >  	return pdev;
-> > +
-> > +free_dma_mask:
-> > +	kfree(pdev->dev.dma_mask);
-> > +put_pdev:
-> > +	platform_device_put(pdev);
-> > +
-> > +	return ERR_PTR(ret);
-> >  }
-> >  
-> >  struct platform_device *__init imx_add_mx3_sdc_fb(
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
