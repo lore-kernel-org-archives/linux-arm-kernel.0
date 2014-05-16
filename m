@@ -1,42 +1,94 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 16 May 2014 15:21:41 +0200
-Subject: [PATCHv4 3/3] ARM: mvebu: implement L2/PCIe deadlock workaround
-In-Reply-To: <20140516125847.GG27822@titan.lakedaemon.net>
-References: <1400165974-9059-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1400165974-9059-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140516060851.GF27822@titan.lakedaemon.net>
- <20140516090727.5264dc75@free-electrons.com>
- <20140516125847.GG27822@titan.lakedaemon.net>
-Message-ID: <20140516152141.564dde70@free-electrons.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 16 May 2014 14:24:51 +0100
+Subject: [PATCH v7 0/3] Add support for PCI in AArch64
+In-Reply-To: <CA+sq2Ccok5wtKjCZUkBhhj3WsiqFAoMgHK7LY210aBtMku+8SA@mail.gmail.com>
+References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
+ <CA+sq2Ccok5wtKjCZUkBhhj3WsiqFAoMgHK7LY210aBtMku+8SA@mail.gmail.com>
+Message-ID: <20140516132451.GK967@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+Hi Sunil,
 
-On Fri, 16 May 2014 08:58:47 -0400, Jason Cooper wrote:
-
-> > Hum, well, I believe it's OK, but notice that I will very likely have
-> > to do a followup patch, because the solution of making all PCI I/O
-> > mappings use the MT_UNCACHED memory type, suggested by Arnd, has not
-> > been accepted by Will Deacon. So very likely I will have to change
-> > again the mach-mvebu/coherency.c code to call a function that makes PCI
-> > I/O mappings MT_UNCACHED specifically for the mach-mvebu platform. But
-> > that can indeed be a followup patch.
+On Fri, May 16, 2014 at 11:33:04AM +0100, Sunil Kovvuri wrote:
+> Hi Liviu,
 > 
-> Ahh, my mistake.  It was late.  I saw the arm,io-coherent was settled
-> and mistakenly thought the other proposed changes wouldn't affect this
-> patch.
+> I am using your ARM64 PCIe patches to write a PCIe host controller
+> driver for our SOC. I am facing an issue with SR-IOV capable device.
 > 
-> I could easily drop it if you like.  It's currently the tip of mvebu/soc
-> and I haven't done a signed tag for it yet.
+> Consider an PCI Express endpoint connected to a PCI Express
+> Root Port.  The PCI Express endpoint provides PCI-SIG SR-IOV
+> capabilities with a single physical function and a large number
+> of virtual functions.  The Root Port contains a pci-pci bridge in
+> between it and the SR-IOV device.
+> 
+> When the SR-IOV capable device's driver tries to enable sriov
+> (pci_enable_sriov()) it fails to create/add PCI device for each
+> virtual function reporting  "not enough MMIO resources for SR-IOV".
+> 
+> In sriov_enable() (drivers/pci/iov.c)
+> 
+>  296        for (i = 0; i < PCI_SRIOV_NUM_BARS; i++) {
+>  297                 bars |= (1 << (i + PCI_IOV_RESOURCES));
+>  298                 res = dev->resource + PCI_IOV_RESOURCES + i;
+>  299                 if (res->parent)
+>  300                         nres++;
+>  301         }
+>  302         if (nres != iov->nres) {
+>  303                 dev_err(&dev->dev, "not enough MMIO resources for
+>  SR-IOV\n");
+>  304                 return -ENOMEM;
+>  305         }
+> 
+> Here its checking if physical function's IOV resource has a parent or not.
+> Which is pci-pci bridge in this case. Otherwise it doesn't consider
+> that resource.
+> 
+> Added below api to your patch.
+> This will try to claim a resource while creating a PCI device which
+> inturn sets 'res->parent'.
+> 
+> Let me know if this is okay.
+> 
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> index 9f29c9a..fbfb48f 100644
+> --- a/arch/arm64/kernel/pci.c
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -125,6 +125,21 @@ resource_size_t pcibios_align_resource(void
+> *data, const struct resource *res,
+>         return res->start;
+>  }
+> 
+> +int pcibios_add_device(struct pci_dev *pdev)
+> +{
+> +        unsigned int i, type_mask = IORESOURCE_IO | IORESOURCE_MEM;
+> +        struct resource *res;
+> +
+> +        for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+> +                res = &pdev->resource[i];
+> +                if (res->parent || !(res->flags & type_mask))
+> +                        continue;
+> +                pci_claim_resource(pdev, i);
+> +        }
+> +
+> 
 
-I think it's OK, you can keep it: the PCI I/O mapping thing will come
-as an addition.
+I would like not to have to add your patch in this file as I am trying to
+remove it entirely. I don't have an SR-IOV capable device in my setup so
+I am not able to debug your problem, but could you have a go and try to
+figure out why the SR-IOV resources do not get a parent associated with
+when they get created?
 
-Best regards,
+Many thanks,
+Liviu
 
-Thomas
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
