@@ -1,52 +1,56 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 16 May 2014 10:59:37 -0600
-Subject: [PATCH cgroup/for-3.16] cgroup: introduce CSS_NO_REF and skip
- refcnting on normal root csses
-In-Reply-To: <20140516154330.GB5379@htj.dyndns.org>
-References: <1399670015-23463-1-git-send-email-tj@kernel.org>
- <1399670015-23463-10-git-send-email-tj@kernel.org>
- <53751062.2050401@wwwdotorg.org> <53753823.2090402@wwwdotorg.org>
- <20140516143718.GA5379@htj.dyndns.org> <20140516154330.GB5379@htj.dyndns.org>
-Message-ID: <537643F9.1030303@wwwdotorg.org>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Fri, 16 May 2014 21:04:21 +0400
+Subject: =?UTF-8?B?UmU6IFVTQiB3aXRoIDMuMTQuMyBub3Qgd29ya2luZyBvbiBGcmVlc2NhbGUg?=
+ =?UTF-8?B?aS5teDY=?=
+In-Reply-To: <CAOMZO5DKqJFK3KB8Qgjdzk4OKCPDO3cCkQMVKJkTjC91+WQaoA@mail.gmail.com>
+References: <CACWLcfv6akXuM59m_hX-xB=iQYA4iAx7fZ0T5ZB3-7ik-1GZMw@mail.gmail.com>
+ <1400257863.657063826@f426.i.mail.ru>
+ <CAOMZO5DKqJFK3KB8Qgjdzk4OKCPDO3cCkQMVKJkTjC91+WQaoA@mail.gmail.com>
+Message-ID: <1400259861.847940059@f229.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2014 09:43 AM, Tejun Heo wrote:
-> From 49035d695d8f1c4bbe4e37480e5d06812818947c Mon Sep 17 00:00:00 2001
-> From: Tejun Heo <tj@kernel.org>
-> Date: Fri, 16 May 2014 11:40:33 -0400
+Fri, 16 May 2014 13:46:52 -0300 ?? Fabio Estevam <festevam@gmail.com>:
+> On Fri, May 16, 2014 at 1:31 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+> > Fri, 16 May 2014 13:20:29 -0300 ?? Fabio Estevam <festevam@gmail.com>:
+> >> On Wed, May 14, 2014 at 6:17 AM, Till Klocke <till.klocke@yetu.com> wrote:
+> >> > Hello,
+> >> >
+> >> > Currently I am trying to get a recent and stable Linux kernel running
+> >> > on a Phytec PhyFlex board based on the i.mx6 processor from Freescale.
+> >>
+> >> Which dts file do you use?
+> >>
+> >> USB is functional on other mx6 boards.
+> >
+> > It's just words. Fabio, just give portion of the log (if it possible) where we
+> > see that USB is works with this kernel version and similar hardware.
 > 
-> 9395a4500404 ("cgroup: enable refcnting for root csses") enabled
-> reference counting for root csses (cgroup_subsys_states) so that
-> cgroup's self csses can be used to manage the lifetime of the
-> containing cgroups.
+> On a imx6q-wandboard:
 > 
-> Unfortunately, this change was incorrect.  cpu controller uses
-> early_init and starts using css reference counts on its root css from
-> then on.  percpu_ref can't initialized during early init and its
-> initialization is deferred till cgroup_init() time.  This means that
-> cpu was using percpu_ref which wasn't properly initialized.  Due to
-> the way percpu variables are laid out on x86, this didn't blow up
-> immediately on x86 but ended up incrementing and decrementing the
-> percpu variable at offset zero, whatever it may be; however, on other
-> archs, this caused fault and early boot failure.
+> fec 2188000.ethernet eth0: Freescale FEC PHY driver [Atheros 8031 ethernet] (mi)
+> IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
+> scsi 1:0:0:0: Direct-Access     Ut163    USB2FlashStorage 0.00 PQ: 0 ANSI: 2
+> sd 1:0:0:0: [sda] 248000 512-byte logical blocks: (126 MB/121 MiB)
+> sd 1:0:0:0: [sda] Write Protect is off
+> sd 1:0:0:0: [sda] Asking for cache data failed
+> sd 1:0:0:0: [sda] Assuming drive cache: write through
+>  sda: sda1
+> sd 1:0:0:0: [sda] Attached SCSI removable disk
+> ...
 > 
-> As cgroup self csses still need working refcounting, we can't revert
-> 9395a4500404.  This patch adds CSS_NO_REF which explicitly inhibits
-> reference counting on the css and sets it on all normal (non-self)
-> csses.
+> root at freescale /$ uname -r
+> 3.15.0-rc5
+> root at freescale /$ lsusb
+> Bus 001 Device 002: ID 0457:0151
+> Bus 001 Device 001: ID 1d6b:0002
 > 
-> Signed-off-by: Tejun Heo <tj@kernel.org>
-> Reported-by: Stephen Warren <swarren@wwwdotorg.org>
-> Fixes: 9395a4500404 ("cgroup: enable refcnting for root csses")
-> ---
-> Patch applied to cgroup/for-3.16.
+> Haven't tried 3.14 though. Is it broken on 3.14? Can you try 3.15-rc5
+> to compare?
 
-Unfortunately, this patch doesn't seem to solve the problem for me. I
-still get a hang/crash very early during boot, before earlyprintk stars.
+I check USB periodically for themselves. But for i.MX27 only.
+If any *-rc will fail for me, I would say about it.
+So in this case I think there is a common problem with ULPI uninitialize...
+Is UPLI is used in this case?
 
-I tried this patch on top of both next-20150115, and next-20150516. For
-both those kernels, reverting the original problematic patch does
-resolve the problem.
-
-I'll try to investigate more later today.
+---
