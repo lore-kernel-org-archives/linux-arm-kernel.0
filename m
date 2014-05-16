@@ -1,55 +1,50 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 16 May 2014 09:07:27 +0200
-Subject: [PATCHv4 3/3] ARM: mvebu: implement L2/PCIe deadlock workaround
-In-Reply-To: <20140516060851.GF27822@titan.lakedaemon.net>
-References: <1400165974-9059-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1400165974-9059-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140516060851.GF27822@titan.lakedaemon.net>
-Message-ID: <20140516090727.5264dc75@free-electrons.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 16 May 2014 09:17:03 +0200
+Subject: [PATCH/RFC] ARM: shmobile: Enable PM_RUNTIME in defconfig
+In-Reply-To: <20140516020549.GB18137@verge.net.au>
+References: <1400198682-7666-1-git-send-email-horms+renesas@verge.net.au>
+ <20140516020549.GB18137@verge.net.au>
+Message-ID: <CAMuHMdVEowWbMY+L1TuC4xxYvtGZiH5qYOjmd7-rt1e_=xEz1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+Hi Simon,
 
-On Fri, 16 May 2014 02:08:51 -0400, Jason Cooper wrote:
-> On Thu, May 15, 2014 at 04:59:34PM +0200, Thomas Petazzoni wrote:
-> > The Marvell Armada 375 and Armada 38x SOCs, which use the Cortex-A9
-> > CPU core, the PL310 cache and the Marvell PCIe hardware block are
-> > affected a L2/PCIe deadlock caused by a system erratum when hardware
-> > I/O coherency is used.
-> > 
-> > This deadlock can be avoided by mapping the PCIe memory areas as
-> > strongly-ordered (note: MT_UNCACHED is strongly-ordered), and by
-> > removing the outer cache sync done in software. This is implemented in
-> > this patch by:
-> > 
-> >  * Registering a custom arch_ioremap_caller function that allows to
-> >    make sure PCI memory regions are mapped MT_UNCACHED.
-> > 
-> >  * Adding at runtime the 'arm,io-coherent' property to the PL310 cache
-> >    controller. This cannot be done permanently in the DT, because the
-> >    hardware I/O coherency can only be enabled when CONFIG_SMP is
-> >    enabled, in the current kernel situation.
-> > 
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > ---
-> >  arch/arm/mach-mvebu/coherency.c | 39 +++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 39 insertions(+)
-> 
-> Applied to mvebu/soc.
+On Fri, May 16, 2014 at 4:05 AM, Simon Horman <horms@verge.net.au> wrote:
+> I realise this change was your idea but I'd like to confirm some details.
+>
+> My assumption is that it requires
+>
+> [PATCH v4] drivers: sh: compile drivers/sh/pm_runtime.c if ARCH_SHMOBILE_MULTI
+>
+> Is that indeed required?
+> Are there other dependencies that are not in the next branch
+> of my renesas tree?
 
-Hum, well, I believe it's OK, but notice that I will very likely have
-to do a followup patch, because the solution of making all PCI I/O
-mappings use the MT_UNCACHED memory type, suggested by Arnd, has not
-been accepted by Will Deacon. So very likely I will have to change
-again the mach-mvebu/coherency.c code to call a function that makes PCI
-I/O mappings MT_UNCACHED specifically for the mach-mvebu platform. But
-that can indeed be a followup patch.
+Your assumption is wrong. The aforementioned patch is always needed in
+the multi-platform case.
 
-Thanks,
+Please let me clarify:
+drivers/sh/pm_runtime.c registers a bus notifier for platform devices, which
+registers the default clock for automatic clock management by the PM core.
+If CONFIG_PM_RUNTIME=y, the clock will be managed dynamically, based
+on runtime requirements.
+If CONFIG_PM_RUNTIME=n, the clock will be enabled at registration time.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+So even if CONFIG_PM_RUNTIME=n, you need this patch, else the affected
+clocks won't be enabled (if not already enabled by reset state or the boot
+loader).
+
+Note that some drivers (e.g. sh-sci) will still work fine without
+drivers/sh/pm_runtime.c, as they manage their clocks themselves.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
