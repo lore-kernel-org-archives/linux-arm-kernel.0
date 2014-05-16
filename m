@@ -1,45 +1,50 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 16 May 2014 14:42:05 -0400
-Subject: [Ksummit-discuss] [TECH TOPIC] ARM legacy board DT conversion
- finalization
-In-Reply-To: <1400265111.2647.54.camel@deadeye.wl.decadent.org.uk>
-References: <20140511030009.GO12708@titan.lakedaemon.net>
- <20140511083729.211e9b5f@lwn.net>
- <20140515121546.3A06AC40B0E@trevor.secretlab.ca>
- <CAL_JsqJw11fZBbLVi=xxC559iWdwCMFOJ4XYM-8EjykttoWsOg@mail.gmail.com>
- <20140515194215.GR27822@titan.lakedaemon.net>
- <CAOesGMi0JrTp9kUVDod4duBOCZ+wNRJ0dMmgvBX7jEQRjE5cCA@mail.gmail.com>
- <20140516041022.GY27822@titan.lakedaemon.net>
- <1400265111.2647.54.camel@deadeye.wl.decadent.org.uk>
-Message-ID: <20140516184205.GL27822@titan.lakedaemon.net>
+Date: Fri, 16 May 2014 15:07:03 -0400
+Subject: [PATCHv2] ARM: mvebu: use hardware I/O coherency also for PCI
+ devices
+In-Reply-To: <1399997070-11434-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1399997070-11434-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140516190703.GM27822@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 07:31:51PM +0100, Ben Hutchings wrote:
-> On Fri, 2014-05-16 at 00:10 -0400, Jason Cooper wrote:
-> > Joking aside, I concede your point.  It looks like the last two mvebu
-> > legacy platforms (dove, mv78xx0) might get merged into mach-mvebu during
-> > the next cycle.  After that, we can reach out to the Debian and OpenWRT
-> > guys and see what legacy platforms are in use or rotting.  We can go
-> > from there.
+On Tue, May 13, 2014 at 06:04:30PM +0200, Thomas Petazzoni wrote:
+> Since the beginning of the introduction of hardware I/O coherency
+> support for Armada 370 and Armada XP, the special DMA operations
+> should have applied to all DMA capable devices. Unfortunately, while
+> the original code properly took into account platform devices, it
+> didn't take into account PCI devices, which can also be DMA masters.
 > 
-> I just removed ixp4xx from Debian as the kernel image wouldn't fit in
-> the NSLU2's kernel partition any more (even after disabling quite a few
-> features that are enabled in most other configurations).  iop32x was
-> removed for the same reason, a while ago.
+> This commit fixes that by registering a bus notifier on pci_bus_type,
+> to register our custom DMA operations, like is already done for
+> platform devices. While doing this, we also rename
+> mvebu_hwcc_platform_notifier() to mvebu_hwcc_notifier() and
+> mvebu_hwcc_platform_nb to mvebu_hwcc_nb because they are no longer
+> specific to platform devices.
+> 
+> Fixes: e60304f8cb7b ("arm: mvebu: Add hardware I/O Coherency support")
+> Cc: <stable@vger.kernel.org> # v3.8+
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+> Changes since v1:
+>  * Fix stupid tab vs. space problem
+> 
+> Applies to mvebu/soc.
+> 
+> Whether this commit qualifies as stable material can be
+> discussed. Technically, it was a mistake from the original I/O
+> coherency implementation. But in practice, besides not using the I/O
+> coherency, I don't think it's causing any specific problem other than
+> DMA transactions on PCI devices triggering unneeded cache maintenance
+> operations. So I'll leave it to the mvebu maintainers to decide
+> whether this qualifies as stable material or not. I've included the
+> relevant Fixes: and Cc: fields, but don't hesitate to rip them out if
+> you don't think this should go to stable.
+> ---
+>  arch/arm/mach-mvebu/coherency.c | 21 ++++++++++++++++-----
+>  1 file changed, 16 insertions(+), 5 deletions(-)
 
-Hmmm, I have two NSLU2's, they might make a good platform for the
-tinification/IoT work.  Small flash, small RAM, slow.
-
-> Our 'legacy' (which I take to mean pre-v7) configurations are now
-> kirkwood, mv78xx0, orion5x (all about to converge to mvebu) and
-> versatile.
-
-I'm not familiar with versatile, the others I've seen a few times. ;-)
-
-Does Debian see any user activity with mv78xx0?  I know your build
-system used to have boards with that SoC family, but are there any other
-users?
+Applied to mvebu/soc w/o the stable tags.
 
 thx,
 
