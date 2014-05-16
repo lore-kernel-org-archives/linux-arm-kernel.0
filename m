@@ -1,58 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 16 May 2014 17:55:48 +0100
-Subject: [PATCH 4/4] arm64: Enable TEXT_OFFSET fuzzing
-In-Reply-To: <20140516140606.GH5624@arm.com>
-References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
- <1400233839-15140-5-git-send-email-mark.rutland@arm.com>
- <20140516140606.GH5624@arm.com>
-Message-ID: <20140516165548.GA14766@leverpostej>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 16 May 2014 10:59:37 -0600
+Subject: [PATCH cgroup/for-3.16] cgroup: introduce CSS_NO_REF and skip
+ refcnting on normal root csses
+In-Reply-To: <20140516154330.GB5379@htj.dyndns.org>
+References: <1399670015-23463-1-git-send-email-tj@kernel.org>
+ <1399670015-23463-10-git-send-email-tj@kernel.org>
+ <53751062.2050401@wwwdotorg.org> <53753823.2090402@wwwdotorg.org>
+ <20140516143718.GA5379@htj.dyndns.org> <20140516154330.GB5379@htj.dyndns.org>
+Message-ID: <537643F9.1030303@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 03:06:07PM +0100, Catalin Marinas wrote:
-> On Fri, May 16, 2014 at 10:50:39AM +0100, Mark Rutland wrote:
-> > --- a/arch/arm64/Kconfig.debug
-> > +++ b/arch/arm64/Kconfig.debug
-> > @@ -37,4 +37,35 @@ config PID_IN_CONTEXTIDR
-> >  	  instructions during context switch. Say Y here only if you are
-> >  	  planning to use hardware trace tools with this kernel.
-> >  
-> > +config ARM64_RANDOMIZE_TEXT_OFFSET
-> > +	bool "Randomize TEXT_OFFSET at build time (EXPERIMENTAL)"
-> > +	default N
+On 05/16/2014 09:43 AM, Tejun Heo wrote:
+> From 49035d695d8f1c4bbe4e37480e5d06812818947c Mon Sep 17 00:00:00 2001
+> From: Tejun Heo <tj@kernel.org>
+> Date: Fri, 16 May 2014 11:40:33 -0400
 > 
-> (nitpick: no need for default n)
-
-Thanks for pointing that out, I'll remove it :)
-
-> I think that's good for testing. It would have been nice to be able to
-> set some limits for the random offset but I can't figure out an easy way
-> to do this via Kconfig (maybe with additional options).
-
-There are hard-coded limits implicit in the randomization -- between 0B
-and 2MB in 16B increments:
-
-TEXT_OFFSET := $(shell awk 'BEGIN {srand(); printf "0x%05x\n", and(int(0xfffff * rand()), 0xffff0)}')
-
-The 16B increment is required due to some code in head.S (__turn_mmu_on)
-requiring a minimum 16B alignment for the object.
-
-The 2MB maximum comes from the fact we rely on the start of memory being
-2MB aligned. I'm not sure there's a compelling reason to limit the
-randomization if enabled at all -- either you can handle it or you
-can't. Are we ever likely to want an offset larger than the memory
-alignment?
-
-> > +config ARM64_TEXT_OFFSET
-> > +	hex "Required image load offset"
-> > +	depends on !ARM64_RANDOMIZE_TEXT_OFFSET
-> > +	default "0x0000000000080000"
+> 9395a4500404 ("cgroup: enable refcnting for root csses") enabled
+> reference counting for root csses (cgroup_subsys_states) so that
+> cgroup's self csses can be used to manage the lifetime of the
+> containing cgroups.
 > 
-> I don't think we should include this. It encourages people to set
-> specific offsets for their SoCs.
+> Unfortunately, this change was incorrect.  cpu controller uses
+> early_init and starts using css reference counts on its root css from
+> then on.  percpu_ref can't initialized during early init and its
+> initialization is deferred till cgroup_init() time.  This means that
+> cpu was using percpu_ref which wasn't properly initialized.  Due to
+> the way percpu variables are laid out on x86, this didn't blow up
+> immediately on x86 but ended up incrementing and decrementing the
+> percpu variable at offset zero, whatever it may be; however, on other
+> archs, this caused fault and early boot failure.
+> 
+> As cgroup self csses still need working refcounting, we can't revert
+> 9395a4500404.  This patch adds CSS_NO_REF which explicitly inhibits
+> reference counting on the css and sets it on all normal (non-self)
+> csses.
+> 
+> Signed-off-by: Tejun Heo <tj@kernel.org>
+> Reported-by: Stephen Warren <swarren@wwwdotorg.org>
+> Fixes: 9395a4500404 ("cgroup: enable refcnting for root csses")
+> ---
+> Patch applied to cgroup/for-3.16.
 
-Sure, I was worried about potential abuse also (hence the warning in the
-help text). I'll drop this portion.
+Unfortunately, this patch doesn't seem to solve the problem for me. I
+still get a hang/crash very early during boot, before earlyprintk stars.
 
-Cheers,
-Mark.
+I tried this patch on top of both next-20150115, and next-20150516. For
+both those kernels, reverting the original problematic patch does
+resolve the problem.
+
+I'll try to investigate more later today.
