@@ -1,29 +1,47 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 16 May 2014 10:59:06 +0200
-Subject: [PATCH 4/7] ARM: EXYNOS: PM: replace EXYNOS_BOOT_VECTOR_* macros
- by static inlines
-In-Reply-To: <1399287439-31376-5-git-send-email-b.zolnierkie@samsung.com>
-References: <1399287439-31376-1-git-send-email-b.zolnierkie@samsung.com>
- <1399287439-31376-5-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <5375D35A.6030806@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 16 May 2014 11:00:24 +0200
+Subject: [PATCH v6 13/17] ARM: shmobile: marzen: Add to shmobile defconfig
+In-Reply-To: <20140516085135.GA20299@verge.net.au>
+References: <1400153532-23675-1-git-send-email-horms+renesas@verge.net.au>
+ <1400153532-23675-14-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdXPm_=ejkcnOFOgfnsz9MUc8KpAjkuMcHMKJeaEmVbhQA@mail.gmail.com>
+ <20140515225027.GA29432@verge.net.au>
+ <20140516000409.GB29432@verge.net.au>
+ <CAMuHMdWjxK5K4rhJt0VDbsSUX_Gzq8EXCPStN3bb_GUqq8tEog@mail.gmail.com>
+ <20140516085135.GA20299@verge.net.au>
+Message-ID: <CAMuHMdVgt=iai7CM0xx7jpD9t+mZqZGuTXmTvwfv+ULuDBGWyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2014 12:57 PM, Bartlomiej Zolnierkiewicz wrote:
-> Replace EXYNOS_BOOT_VECTOR_ADDR and EXYNOS_BOOT_VECTOR_FLAG macros
-> by exynos_boot_vector_addr() and exynos_boot_vector_flag() static
-> inlines.
+On Fri, May 16, 2014 at 10:51 AM, Simon Horman <horms@verge.net.au> wrote:
+>> > --- a/arch/arm/configs/shmobile_defconfig
+>> > +++ b/arch/arm/configs/shmobile_defconfig
+>>
+>> > +CONFIG_USB_RCAR_PHY=y
+>> > +CONFIG_USB_RCAR_GEN2_PHY=y
+>>
+>> While I don't dispute the need for CONFIG_USB_RCAR_GEN2_PHY in
+>> shmobile_defconfig, this is not needed for Marzen, right?
 >
-> This patch shouldn't cause any functionality changes.
->
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> The CONFIG_USB_RCAR_GEN2_PHY was moved from above (by savedefconfig).
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Sorry, I had missed that.
 
+> I decided to include that change due to proximity to the new
+> CONFIG_USB_RCAR_PHY line. But perhaps it would have been better not to.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Nevermind.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+BTW, avoiding this moving around in real changes is another reason for
+refreshing the defconfigs on a regular basis ;-)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
