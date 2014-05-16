@@ -1,63 +1,125 @@
-From: sre@ring0.de (Sebastian Reichel)
-Date: Fri, 16 May 2014 19:41:58 +0200
-Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
- support
-In-Reply-To: <20140516160717.GD22031@atomide.com>
-References: <20140512155132.GH31772@atomide.com> <5371F923.80000@ti.com>
- <CABxcv==_LCw1kPYm17g=h8VfSN2V_qsgXjTnsy-JOetawSv4pA@mail.gmail.com>
- <20140513152518.GA16837@atomide.com> <53730AFB.2090800@ti.com>
- <20140514160216.GD18463@atomide.com> <537487AE.3060906@ti.com>
- <20140515182133.GC23659@atomide.com> <5375A8A8.7080306@ti.com>
- <20140516160717.GD22031@atomide.com>
-Message-ID: <20140516174158.GA11733@earth.universe>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Fri, 16 May 2014 23:12:36 +0530
+Subject: [PATCH v7 0/3] Add support for PCI in AArch64
+In-Reply-To: <20140516132451.GK967@e106497-lin.cambridge.arm.com>
+References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
+ <CA+sq2Ccok5wtKjCZUkBhhj3WsiqFAoMgHK7LY210aBtMku+8SA@mail.gmail.com>
+ <20140516132451.GK967@e106497-lin.cambridge.arm.com>
+Message-ID: <CA+sq2CejJFg--0rS1arr4Sactp-ssENB8Y3g4b61JPGPBCms=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 09:07:17AM -0700, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140515 22:57]:
-> > On 15/05/14 21:21, Tony Lindgren wrote:
-> > >> But you're right, having "sharp,ls037v7dw01-omap-dss" in the .dts is an
-> > >> alternative for the compatible-string conversion we do now. I guess it's
-> > >> a matter of taste, but I rather hide it inside the kernel, in an
-> > >> internal omapdss file, than pollute the .dts files with those compatible
-> > >> strings.
-> > > 
-> > > Well it avoid you parsing through all the nodes during booting
-> > > and leaves out the function to do remapping. And removes the need
-> > > for maintaining a custom display mapping table. I'd say that's a
-> > > pretty good list of advantages right there :)
-> > 
-> > Yep... I don't know. Maybe I'm being too careful about doing wrong
-> > things with .dts. I just like it more if any hacks are in kernel code,
-> > which I can remove without anyone noticing.
-> > 
-> > Anyway, we already have board.dts files using the non-omapified
-> > compatible strings in the mainline, so if I would now add the omapified
-> > compatible strings to .dts files, those old board.dts files would break.
-> > 
-> > So I guess the choice has already been made.
-> 
-> I really think you should remove this misuse of device tree code ASAP.
-> It's better to fix it up now than carry the hack for next two years
-> and keep on adding to it.
+Hi Liviu,
 
-IMHO appending -omap-dss to a random device is an even bigger hack,
-since its adding lots of bloat to the API. Let's assume there is
-another OS using DT for ARM, but has no proper API for SPI
-controllers and it introduces your hack to SPI devices. That would
-mean each SPI device has -omap-spi appended (or -exynos-spi,
--foo-spi, ...). At least I would blame them for creating a huge
-unmaintainable mess.
+Issue may not be only with SR-IOV resources.
 
-I think Tomi's workaround is a much better hack, since it keeps the
-API clean. If the code simply prefixes "omapdss," to all
-"child"-devices of omapdss it can be left mostly untouched, too.
+I am not an expert with Linux PCI core. But i am trying to understand
+how even for a non SR-IOV capable device's resource, gets a parent
+associated with it.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140516/7622116f/attachment-0001.sig>
+When a PCI device driver calls pci_enable_device() which inturn calls
+'arch/arm64/kernel/pci.c' pcibios_enable_device() which uses Linux PCI core
+API 'pci_enable_resources'. This API checks 'res->parent' for all
+valid resources
+before enabling them, otherwise it fails.
+                if (!r->parent) {
+                        dev_err(&dev->dev, "device not available "
+                                "(can't reserve %pR)\n", r);
+                        return -EINVAL;
+                }
+
+Can you please let me know where this hierarchy is being set for
+'pcibios_enable_resources' to work.
+
+I could only find request_resource() API which sets the parent and
+pci_claim_resource() uses this.
+
+Thanks,
+Sunil.
+
+On Fri, May 16, 2014 at 6:54 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> Hi Sunil,
+>
+> On Fri, May 16, 2014 at 11:33:04AM +0100, Sunil Kovvuri wrote:
+>> Hi Liviu,
+>>
+>> I am using your ARM64 PCIe patches to write a PCIe host controller
+>> driver for our SOC. I am facing an issue with SR-IOV capable device.
+>>
+>> Consider an PCI Express endpoint connected to a PCI Express
+>> Root Port.  The PCI Express endpoint provides PCI-SIG SR-IOV
+>> capabilities with a single physical function and a large number
+>> of virtual functions.  The Root Port contains a pci-pci bridge in
+>> between it and the SR-IOV device.
+>>
+>> When the SR-IOV capable device's driver tries to enable sriov
+>> (pci_enable_sriov()) it fails to create/add PCI device for each
+>> virtual function reporting  "not enough MMIO resources for SR-IOV".
+>>
+>> In sriov_enable() (drivers/pci/iov.c)
+>>
+>>  296        for (i = 0; i < PCI_SRIOV_NUM_BARS; i++) {
+>>  297                 bars |= (1 << (i + PCI_IOV_RESOURCES));
+>>  298                 res = dev->resource + PCI_IOV_RESOURCES + i;
+>>  299                 if (res->parent)
+>>  300                         nres++;
+>>  301         }
+>>  302         if (nres != iov->nres) {
+>>  303                 dev_err(&dev->dev, "not enough MMIO resources for
+>>  SR-IOV\n");
+>>  304                 return -ENOMEM;
+>>  305         }
+>>
+>> Here its checking if physical function's IOV resource has a parent or not.
+>> Which is pci-pci bridge in this case. Otherwise it doesn't consider
+>> that resource.
+>>
+>> Added below api to your patch.
+>> This will try to claim a resource while creating a PCI device which
+>> inturn sets 'res->parent'.
+>>
+>> Let me know if this is okay.
+>>
+>> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+>> index 9f29c9a..fbfb48f 100644
+>> --- a/arch/arm64/kernel/pci.c
+>> +++ b/arch/arm64/kernel/pci.c
+>> @@ -125,6 +125,21 @@ resource_size_t pcibios_align_resource(void
+>> *data, const struct resource *res,
+>>         return res->start;
+>>  }
+>>
+>> +int pcibios_add_device(struct pci_dev *pdev)
+>> +{
+>> +        unsigned int i, type_mask = IORESOURCE_IO | IORESOURCE_MEM;
+>> +        struct resource *res;
+>> +
+>> +        for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+>> +                res = &pdev->resource[i];
+>> +                if (res->parent || !(res->flags & type_mask))
+>> +                        continue;
+>> +                pci_claim_resource(pdev, i);
+>> +        }
+>> +
+>>
+>
+> I would like not to have to add your patch in this file as I am trying to
+> remove it entirely. I don't have an SR-IOV capable device in my setup so
+> I am not able to debug your problem, but could you have a go and try to
+> figure out why the SR-IOV resources do not get a parent associated with
+> when they get created?
+>
+> Many thanks,
+> Liviu
+>
+>
+> --
+> ====================
+> | I would like to |
+> | fix the world,  |
+> | but they're not |
+> | giving me the   |
+>  \ source code!  /
+>   ---------------
+>     ?\_(?)_/?
+>
