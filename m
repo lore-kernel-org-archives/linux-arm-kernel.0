@@ -1,191 +1,48 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 16 May 2014 15:17:11 +0300
-Subject: [PATCH v3 04/13] ARM: davinci: Remove eDMA3 queue_tc_mapping data
- from edma_soc_info
+Date: Fri, 16 May 2014 15:17:13 +0300
+Subject: [PATCH v3 06/13] ARM: edma: Remove num_cc member from struct edma
 In-Reply-To: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1400242640-9902-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1400242640-9902-7-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is ignored by the edma driver since we are just setting back the default
-mapping of TC -> Queue.
+The struct edma is allocated per CC bases so the member num_cc does not make
+any sense. One CC is one CC, it does not have sub CCs.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-davinci/devices-da8xx.c | 16 ----------------
- arch/arm/mach-davinci/dm355.c         |  9 ---------
- arch/arm/mach-davinci/dm365.c         | 11 -----------
- arch/arm/mach-davinci/dm644x.c        |  9 ---------
- arch/arm/mach-davinci/dm646x.c        | 11 -----------
- 5 files changed, 56 deletions(-)
+ arch/arm/common/edma.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index 56ea41d5f849..7f376e54b266 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -134,13 +134,6 @@ struct platform_device da8xx_serial_device[] = {
- 	}
- };
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 0bc5ed6fc249..929a03e4749c 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -233,7 +233,6 @@ struct edma {
+ 	unsigned	num_region;
+ 	unsigned	num_slots;
+ 	unsigned	num_tc;
+-	unsigned	num_cc;
+ 	enum dma_event_q 	default_queue;
  
--static s8 da8xx_queue_tc_mapping[][2] = {
--	/* {event queue no, TC no} */
--	{0, 0},
--	{1, 1},
--	{-1, -1}
--};
--
- static s8 da8xx_queue_priority_mapping[][2] = {
- 	/* {event queue no, Priority} */
- 	{0, 3},
-@@ -148,12 +141,6 @@ static s8 da8xx_queue_priority_mapping[][2] = {
- 	{-1, -1}
- };
+ 	/* list of channels with no even trigger; terminated by "-1" */
+@@ -1481,7 +1480,6 @@ static int edma_of_parse_dt(struct device *dev,
+ 		return ret;
+ 	pdata->n_slot = value;
  
--static s8 da850_queue_tc_mapping[][2] = {
--	/* {event queue no, TC no} */
--	{0, 0},
--	{-1, -1}
--};
--
- static s8 da850_queue_priority_mapping[][2] = {
- 	/* {event queue no, Priority} */
- 	{0, 3},
-@@ -166,7 +153,6 @@ static struct edma_soc_info da830_edma_cc0_info = {
- 	.n_slot			= 128,
- 	.n_tc			= 2,
- 	.n_cc			= 1,
--	.queue_tc_mapping	= da8xx_queue_tc_mapping,
- 	.queue_priority_mapping	= da8xx_queue_priority_mapping,
- 	.default_queue		= EVENTQ_1,
- };
-@@ -182,7 +168,6 @@ static struct edma_soc_info da850_edma_cc_info[] = {
- 		.n_slot			= 128,
- 		.n_tc			= 2,
- 		.n_cc			= 1,
--		.queue_tc_mapping	= da8xx_queue_tc_mapping,
- 		.queue_priority_mapping	= da8xx_queue_priority_mapping,
- 		.default_queue		= EVENTQ_1,
- 	},
-@@ -192,7 +177,6 @@ static struct edma_soc_info da850_edma_cc_info[] = {
- 		.n_slot			= 128,
- 		.n_tc			= 1,
- 		.n_cc			= 1,
--		.queue_tc_mapping	= da850_queue_tc_mapping,
- 		.queue_priority_mapping	= da850_queue_priority_mapping,
- 		.default_queue		= EVENTQ_0,
- 	},
-diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
-index 07381d8cea62..e27f7ff54570 100644
---- a/arch/arm/mach-davinci/dm355.c
-+++ b/arch/arm/mach-davinci/dm355.c
-@@ -569,14 +569,6 @@ static u8 dm355_default_priorities[DAVINCI_N_AINTC_IRQ] = {
- /*----------------------------------------------------------------------*/
+-	pdata->n_cc = 1;
+ 	pdata->n_tc = 3;
  
- static s8
--queue_tc_mapping[][2] = {
--	/* {event queue no, TC no} */
--	{0, 0},
--	{1, 1},
--	{-1, -1},
--};
--
--static s8
- queue_priority_mapping[][2] = {
- 	/* {event queue no, Priority} */
- 	{0, 3},
-@@ -590,7 +582,6 @@ static struct edma_soc_info edma_cc0_info = {
- 	.n_slot			= 128,
- 	.n_tc			= 2,
- 	.n_cc			= 1,
--	.queue_tc_mapping	= queue_tc_mapping,
- 	.queue_priority_mapping	= queue_priority_mapping,
- 	.default_queue		= EVENTQ_1,
- };
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index 08a61b938333..88835b0aaead 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -853,16 +853,6 @@ static u8 dm365_default_priorities[DAVINCI_N_AINTC_IRQ] = {
+ 	rsv_info = devm_kzalloc(dev, sizeof(struct edma_rsv_info), GFP_KERNEL);
+@@ -1627,8 +1625,6 @@ static int edma_probe(struct platform_device *pdev)
+ 							EDMA_MAX_DMACH);
+ 		edma_cc[j]->num_slots = min_t(unsigned, info[j]->n_slot,
+ 							EDMA_MAX_PARAMENTRY);
+-		edma_cc[j]->num_cc = min_t(unsigned, info[j]->n_cc,
+-							EDMA_MAX_CC);
+ 		edma_cc[j]->num_tc = info[j]->n_tc;
  
- /* Four Transfer Controllers on DM365 */
- static s8
--dm365_queue_tc_mapping[][2] = {
--	/* {event queue no, TC no} */
--	{0, 0},
--	{1, 1},
--	{2, 2},
--	{3, 3},
--	{-1, -1},
--};
--
--static s8
- dm365_queue_priority_mapping[][2] = {
- 	/* {event queue no, Priority} */
- 	{0, 7},
-@@ -878,7 +868,6 @@ static struct edma_soc_info edma_cc0_info = {
- 	.n_slot			= 256,
- 	.n_tc			= 4,
- 	.n_cc			= 1,
--	.queue_tc_mapping	= dm365_queue_tc_mapping,
- 	.queue_priority_mapping	= dm365_queue_priority_mapping,
- 	.default_queue		= EVENTQ_3,
- };
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index 5debffba4b24..8ea34be879b4 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -499,14 +499,6 @@ static u8 dm644x_default_priorities[DAVINCI_N_AINTC_IRQ] = {
- /*----------------------------------------------------------------------*/
- 
- static s8
--queue_tc_mapping[][2] = {
--	/* {event queue no, TC no} */
--	{0, 0},
--	{1, 1},
--	{-1, -1},
--};
--
--static s8
- queue_priority_mapping[][2] = {
- 	/* {event queue no, Priority} */
- 	{0, 3},
-@@ -520,7 +512,6 @@ static struct edma_soc_info edma_cc0_info = {
- 	.n_slot			= 128,
- 	.n_tc			= 2,
- 	.n_cc			= 1,
--	.queue_tc_mapping	= queue_tc_mapping,
- 	.queue_priority_mapping	= queue_priority_mapping,
- 	.default_queue		= EVENTQ_1,
- };
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index 332d00d24dc2..97e90dc5ed43 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -533,16 +533,6 @@ static u8 dm646x_default_priorities[DAVINCI_N_AINTC_IRQ] = {
- 
- /* Four Transfer Controllers on DM646x */
- static s8
--dm646x_queue_tc_mapping[][2] = {
--	/* {event queue no, TC no} */
--	{0, 0},
--	{1, 1},
--	{2, 2},
--	{3, 3},
--	{-1, -1},
--};
--
--static s8
- dm646x_queue_priority_mapping[][2] = {
- 	/* {event queue no, Priority} */
- 	{0, 4},
-@@ -558,7 +548,6 @@ static struct edma_soc_info edma_cc0_info = {
- 	.n_slot			= 512,
- 	.n_tc			= 4,
- 	.n_cc			= 1,
--	.queue_tc_mapping	= dm646x_queue_tc_mapping,
- 	.queue_priority_mapping	= dm646x_queue_priority_mapping,
- 	.default_queue		= EVENTQ_1,
- };
+ 		edma_cc[j]->default_queue = info[j]->default_queue;
 -- 
 1.9.3
