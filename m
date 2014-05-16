@@ -1,42 +1,32 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 16 May 2014 15:17:20 +0300
-Subject: [PATCH v3 13/13] ARM/platform_data: edma: Remove redundant/unused
- parameters from edma_soc_info
-In-Reply-To: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1400242640-9902-14-git-send-email-peter.ujfalusi@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 16 May 2014 14:22:20 +0200
+Subject: [PATCH 0/5] remove Genmai Reference from Legacy support
+In-Reply-To: <1400242216-20848-1-git-send-email-wsa@the-dreams.de>
+References: <1400242216-20848-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <CAMuHMdVoCgKF6FjGGHk3bb4Yr9k4frtfMkM85cNhJd8gaPJkxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following parameters are no longer needed by the edma driver since the
-information can be obtained from the IP's CCCFG register:
-n_channel, n_region, n_slot and n_tc.
-Remove the n_cc as well since in this context it has no meaning. We have
-separate edma_soc_info struct/eDMA3_CC instance so this member does not
-make any sense (and the driver no longer uses it).
+Hi Wolfram,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- include/linux/platform_data/edma.h | 7 -------
- 1 file changed, 7 deletions(-)
+On Fri, May 16, 2014 at 2:10 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+>   ARM: shmobile: Remove non-multiplatform Genmai reference support
+>   ARM: shmobile: genmai-reference: Remove legacy clock support
+>   ARM: shmobile: Sync Genmai DTS with Genmai reference DTS
+>   ARM: shmobile: Let Genmai multiplatform boot with Genmai DTB
+>   ARM: shmobile: Remove Genmai reference DTS
 
-diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
-index 633e196ebdf2..eb8d5627d080 100644
---- a/include/linux/platform_data/edma.h
-+++ b/include/linux/platform_data/edma.h
-@@ -158,13 +158,6 @@ struct edma_rsv_info {
- 
- /* platform_data for EDMA driver */
- struct edma_soc_info {
--
--	/* how many dma resources of each type */
--	unsigned	n_channel;
--	unsigned	n_region;
--	unsigned	n_slot;
--	unsigned	n_tc;
--	unsigned	n_cc;
- 	/*
- 	 * Default queue is expected to be a low-priority queue.
- 	 * This way, long transfers on the default queue started
--- 
-1.9.3
+Thanks a lot!
+
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
