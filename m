@@ -1,134 +1,60 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Fri, 16 May 2014 10:25:57 +0530
-Subject: [PATCH v4 3/8] clk: samsung: add infrastructure to register cpu
- clocks
-In-Reply-To: <CAD=FV=XLLprb_2yyFnngGibrch2BgNnf93LnH+eV2VbgD=o5Kg@mail.gmail.com>
-References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
- <12969374.fAYJcpG05n@phil>
- <CAD=FV=VGWxgy+snupOzmKQxNPbGb95vGL0KhQFaSL9m_dx84wQ@mail.gmail.com>
- <3283853.4gaNQ8iXN1@phil>
- <CAD=FV=XLLprb_2yyFnngGibrch2BgNnf93LnH+eV2VbgD=o5Kg@mail.gmail.com>
-Message-ID: <CAJuA9ahOu6GS+HujTXktvmJN63bxujBqSNekZigmdkaMaQa-OQ@mail.gmail.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Fri, 16 May 2014 10:37:27 +0530
+Subject: [PATCH v5 1/5] ARM: EXYNOS: Add generic cpu power control
+ functions for all exynos based SoCs
+In-Reply-To: <53752D8C.3030708@gmail.com>
+References: <1399307221-8659-1-git-send-email-a.kesavan@samsung.com>
+ <1399307221-8659-2-git-send-email-a.kesavan@samsung.com>
+ <019b01cf6e52$75e1a710$61a4f530$@samsung.com>
+ <CAM4voamSNYZ_hsjF3eZhqZ=FF__39tFgi5FeXRcUhRbYYzu0LQ@mail.gmail.com>
+ <53752D8C.3030708@gmail.com>
+Message-ID: <CAM4voam1UiX+WaxScTdhb4bW+_1nCcsztFEkx4MyWFOBBjV6XQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 1:56 AM, Doug Anderson <dianders@chromium.org> wrote:
-> Heiko,
+Hi Tomasz,
+
+On Fri, May 16, 2014 at 2:41 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Abhilash,
 >
-> On Thu, May 15, 2014 at 1:12 PM, Heiko St?bner <heiko@sntech.de> wrote:
->> Hi Doug,
->>
->> Am Donnerstag, 15. Mai 2014, 12:36:45 schrieb Doug Anderson:
->>> On Thu, May 15, 2014 at 12:17 PM, Heiko St?bner <heiko@sntech.de> wrote:
->>> > Am Donnerstag, 15. Mai 2014, 11:18:44 schrieb Doug Anderson:
->>> >> Thomas,
->>> >>
->>> >> On Tue, May 13, 2014 at 6:11 PM, Thomas Abraham <ta.omasab@gmail.com>
->> wrote:
->>> >> > From: Thomas Abraham <thomas.ab@samsung.com>
->>> >> > +static int exynos4210_armclk_pre_rate_change(struct clk_notifier_data
->>> >> > *ndata, +                       struct exynos_cpuclk *armclk, void
->>> >> > __iomem *base) +{
->>> >> > +       struct exynos4210_armclk_data *armclk_data = armclk->data;
->>> >> > +       unsigned long alt_prate = clk_get_rate(armclk->alt_parent);
->>> >> > +       unsigned long alt_div, div0, div1, tdiv0, mux_reg;
->>> >> > +       unsigned long cur_armclk_rate, timeout;
->>> >> > +       unsigned long flags;
->>> >> > +
->>> >> > +       /* find out the divider values to use for clock data */
->>> >> > +       while (armclk_data->prate != ndata->new_rate) {
->>> >> > +               if (armclk_data->prate == 0)
->>> >> > +                       return -EINVAL;
->>> >> > +               armclk_data++;
->>> >> > +       }
->>> >> > +
->>> >> > +       div0 = armclk_data->div0;
->>> >> > +       div1 = armclk_data->div1;
->>> >> > +       if (readl(base + SRC_CPU) & EXYNOS4210_MUX_HPM_MASK) {
->>> >> > +               div1 = readl(base + DIV_CPU1) &
->>> >> > EXYNOS4210_DIV1_HPM_MASK;
->>> >> > +               div1 |= ((armclk_data->div1) &
->>> >> > ~EXYNOS4210_DIV1_HPM_MASK);
->>> >> > +       }
->>> >> > +
->>> >> > +       /*
->>> >> > +        * if the new and old parent clock speed is less than the clock
->>> >> > speed +        * of the alternate parent, then it should be ensured
->>> >> > that
->>> >> > at no point +        * the armclk speed is more than the old_prate
->>> >> > until
->>> >> > the dividers are +        * set.
->>> >> > +        */
->>> >> > +       tdiv0 = readl(base + DIV_CPU0);
->>> >> > +       cur_armclk_rate = ndata->old_rate / EXYNOS4210_ARM_DIV1(tdiv0)
->>> >> > /
->>> >> > +                               EXYNOS4210_ARM_DIV2(tdiv0);
->>> >> > +       if (alt_prate > cur_armclk_rate) {
->>> >> > +               alt_div = _calc_div(alt_prate, cur_armclk_rate);
->>> >> > +               _exynos4210_set_armclk_div(base, alt_div);
->>> >> > +               div0 |= alt_div;
->>> >>
->>> >> Don't you need to up the voltage here, too?  ...I haven't reviewed
->>> >> this whole patch (so perhaps it's elsewhere in the patch or in the
->>> >> series), but I stumbled upon this while trying to solve a different
->>> >> problem and figured I'd check...
->>> >
->>> > setting the voltage should be done by the cpufreq driver like cpufreq-cpu0
->>> > - whose usage this series intents to allow.
->>> >
->>> > As I've hijacked Thomas' concept for my current rockchip clock work, I've
->>> > already seen this working nicely :-) .
+> On 13.05.2014 12:12, Abhilash Kesavan wrote:
+>> On Tue, May 13, 2014 at 7:54 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>
+> [snip]
+>
+>>>> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-
+>>>> pmu.h
+>>>> index 4f6a256..0bdfcbc 100644
+>>>> --- a/arch/arm/mach-exynos/regs-pmu.h
+>>>> +++ b/arch/arm/mach-exynos/regs-pmu.h
+>>>> @@ -121,6 +121,12 @@
+>>>>
+>>>>  #define S5P_CHECK_SLEEP                              0x00000BAD
+>>>>
+>>>> +#define EXYNOS_ARM_CORE0_CONFIGURATION               S5P_PMUREG(0x2000)
 >>>
->>> I guess I should have been more clear.  I was talking more
->>> specifically about upping the voltage as part of the mux switch in the
->>> case that alt_prate > cur_armclk_rate.
->>
->> from earlier discussions I remember Thomas and me talked about setting a
->> divider to make sure that alt_prate <= cur_armclk_rate, so the voltage can
->> stay at its current level. I haven't looked deeply into this revision, but the
->> last one did exactly this.
->
-> Ah-ha, that's a reasonable solution to this problem.  I was familiar
-> with the old code and know that it used to set the CPUD ratio here, so
-> I assumed that was what Thomas's code did.  ...but you're right, his
-> code is setting the divider here.  I didn't double-check all of his
-> code / calculations, but he's certainly tweaking the right bits.
->
-> Nice!
->
->
->>> ...if you're switching from 200MHz to 300MHz and the alt_prate is
->>> 800MHz, you need to account for that fact.  The code here accounts for
->>> the fact in setting the "armclk_div", but (I don't think) it accounts
->>> for the fact that 800MHz will need a higher voltage.
+>>> This can be put in order of address.
+>> OK, will fix.
 >>>
->>> As per a separate discussion, a clean solution might be to move the
->>> mux switching to the core of CPU_FREQ.  That would have the side
->>> effect of also making it very easy to send notifications.
->>
->> I'll just wait until you all decide what the best solution is :-), but
->> personally I like the concept of keeping the clock logic inside the clock
->> driver, especially as this is not limited to setting the mux but also adapting
->> tightly bound child clocks and this all may not fit into a generic
->> implementation of a cpufreq driver.
-
-+1. I also prefer to go with this approach.
-
+>>>> +#define EXYNOS_ARM_CORE_CONFIGURATION(_nr)   \
+>>>> +                     (EXYNOS_ARM_CORE0_CONFIGURATION + (0x80 * (_nr)))
+>>>> +#define EXYNOS_ARM_CORE_STATUS(_nr)          \
+>>>> +                     (EXYNOS_ARM_CORE_CONFIGURATION(_nr) + 0x4)
 >
-> Yup, I didn't think of the solution you guys came up with.  Your
-> solution handles things nicely.
+> My patches posted quite a while ago [1] to fix DT CPU topology already
+> add these, remove S5P_ARM_CORE1* and fix corresponding usage in
+> hotplug.c and platsmp.c.
 >
-> Thanks!
+> [1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/29573
 >
-> -Doug
+> So I think you should rebase on top of them or at least on top of
+> patches 1 and 2 from that series, as 3 and 4 should be dropped.
 
-Doug,
+Patch 2 of your series does not apply on kgene's for-next or
+linux-next. Are you planning on re-sending this ?
 
-Heiko had suggested to use the divider to keep the armclk within
-limits during the frequency transition. This helped to avoid the
-corresponding voltage scaling step which greatly simplified the
-frequency scaling for exynos. We definitely plan to use the same
-suggestion on other exynos platforms as well.
-
-Thanks,
-Thomas.
+Regards,
+Abhilash
+>
+> Best regards,
+> Tomasz
