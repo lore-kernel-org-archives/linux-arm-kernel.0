@@ -1,192 +1,63 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Fri, 16 May 2014 12:33:38 -0500
-Subject: [PATCH v3 08/13] ARM: edma: Get IP configuration from HW (number
- of channels, tc, etc)
-In-Reply-To: <1400242640-9902-9-git-send-email-peter.ujfalusi@ti.com>
-References: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
- <1400242640-9902-9-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <53764BF2.1030805@ti.com>
+From: sre@ring0.de (Sebastian Reichel)
+Date: Fri, 16 May 2014 19:41:58 +0200
+Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
+ support
+In-Reply-To: <20140516160717.GD22031@atomide.com>
+References: <20140512155132.GH31772@atomide.com> <5371F923.80000@ti.com>
+ <CABxcv==_LCw1kPYm17g=h8VfSN2V_qsgXjTnsy-JOetawSv4pA@mail.gmail.com>
+ <20140513152518.GA16837@atomide.com> <53730AFB.2090800@ti.com>
+ <20140514160216.GD18463@atomide.com> <537487AE.3060906@ti.com>
+ <20140515182133.GC23659@atomide.com> <5375A8A8.7080306@ti.com>
+ <20140516160717.GD22031@atomide.com>
+Message-ID: <20140516174158.GA11733@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2014 07:17 AM, Peter Ujfalusi wrote:
-> From CCCFG register of eDMA3 we can get all the needed information for the
-> driver about the IP:
-> Number of channels: NUM_DMACH
-> Number of regions: NUM_REGN
-> Number of slots (PaRAM sets): NUM_PAENTRY
-> Number of TC/EQ: NUM_EVQUE
+On Fri, May 16, 2014 at 09:07:17AM -0700, Tony Lindgren wrote:
+> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140515 22:57]:
+> > On 15/05/14 21:21, Tony Lindgren wrote:
+> > >> But you're right, having "sharp,ls037v7dw01-omap-dss" in the .dts is an
+> > >> alternative for the compatible-string conversion we do now. I guess it's
+> > >> a matter of taste, but I rather hide it inside the kernel, in an
+> > >> internal omapdss file, than pollute the .dts files with those compatible
+> > >> strings.
+> > > 
+> > > Well it avoid you parsing through all the nodes during booting
+> > > and leaves out the function to do remapping. And removes the need
+> > > for maintaining a custom display mapping table. I'd say that's a
+> > > pretty good list of advantages right there :)
+> > 
+> > Yep... I don't know. Maybe I'm being too careful about doing wrong
+> > things with .dts. I just like it more if any hacks are in kernel code,
+> > which I can remove without anyone noticing.
+> > 
+> > Anyway, we already have board.dts files using the non-omapified
+> > compatible strings in the mainline, so if I would now add the omapified
+> > compatible strings to .dts files, those old board.dts files would break.
+> > 
+> > So I guess the choice has already been made.
 > 
-> In case when booted with DT or the queue_priority_mapping is not provided
-> set up a default priority map.
+> I really think you should remove this misuse of device tree code ASAP.
+> It's better to fix it up now than carry the hack for next two years
+> and keep on adding to it.
 
-Thanks.
+IMHO appending -omap-dss to a random device is an even bigger hack,
+since its adding lots of bloat to the API. Let's assume there is
+another OS using DT for ARM, but has no proper API for SPI
+controllers and it introduces your hack to SPI devices. That would
+mean each SPI device has -omap-spi appended (or -exynos-spi,
+-foo-spi, ...). At least I would blame them for creating a huge
+unmaintainable mess.
 
-Acked-by: Joel Fernandes <joelf@ti.com>
+I think Tomi's workaround is a much better hack, since it keeps the
+API clean. If the code simply prefixes "omapdss," to all
+"child"-devices of omapdss it can be left mostly untouched, too.
 
-
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->  arch/arm/common/edma.c | 115 +++++++++++++++++++++++++++++++------------------
->  1 file changed, 73 insertions(+), 42 deletions(-)
-> 
-> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-> index aa9473cb0c23..485be42519b9 100644
-> --- a/arch/arm/common/edma.c
-> +++ b/arch/arm/common/edma.c
-> @@ -102,7 +102,13 @@
->  #define PARM_OFFSET(param_no)	(EDMA_PARM + ((param_no) << 5))
->  
->  #define EDMA_DCHMAP	0x0100  /* 64 registers */
-> -#define CHMAP_EXIST	BIT(24)
-> +
-> +/* CCCFG register */
-> +#define GET_NUM_DMACH(x)	(x & 0x7) /* bits 0-2 */
-> +#define GET_NUM_PAENTRY(x)	((x & 0x7000) >> 12) /* bits 12-14 */
-> +#define GET_NUM_EVQUE(x)	((x & 0x70000) >> 16) /* bits 16-18 */
-> +#define GET_NUM_REGN(x)		((x & 0x300000) >> 20) /* bits 20-21 */
-> +#define CHMAP_EXIST		BIT(24)
->  
->  #define EDMA_MAX_DMACH           64
->  #define EDMA_MAX_PARAMENTRY     512
-> @@ -1408,6 +1414,67 @@ void edma_clear_event(unsigned channel)
->  }
->  EXPORT_SYMBOL(edma_clear_event);
->  
-> +static int edma_setup_from_hw(struct device *dev, struct edma_soc_info *pdata,
-> +			      struct edma *edma_cc)
-> +{
-> +	int i;
-> +	u32 value, cccfg;
-> +	s8 (*queue_priority_map)[2];
-> +
-> +	/* Decode the eDMA3 configuration from CCCFG register */
-> +	cccfg = edma_read(0, EDMA_CCCFG);
-> +
-> +	value = GET_NUM_REGN(cccfg);
-> +	edma_cc->num_region = BIT(value);
-> +
-> +	value = GET_NUM_DMACH(cccfg);
-> +	edma_cc->num_channels = BIT(value + 1);
-> +
-> +	value = GET_NUM_PAENTRY(cccfg);
-> +	edma_cc->num_slots = BIT(value + 4);
-> +
-> +	value = GET_NUM_EVQUE(cccfg);
-> +	edma_cc->num_tc = value + 1;
-> +
-> +	dev_dbg(dev, "eDMA3 HW configuration (cccfg: 0x%08x):\n", cccfg);
-> +	dev_dbg(dev, "num_region: %u\n", edma_cc->num_region);
-> +	dev_dbg(dev, "num_channel: %u\n", edma_cc->num_channels);
-> +	dev_dbg(dev, "num_slot: %u\n", edma_cc->num_slots);
-> +	dev_dbg(dev, "num_tc: %u\n", edma_cc->num_tc);
-> +
-> +	/* Nothing need to be done if queue priority is provided */
-> +	if (pdata->queue_priority_mapping)
-> +		return 0;
-> +
-> +	/*
-> +	 * Configure TC/queue priority as follows:
-> +	 * Q0 - priority 0
-> +	 * Q1 - priority 1
-> +	 * Q2 - priority 2
-> +	 * ...
-> +	 * The meaning of priority numbers: 0 highest priority, 7 lowest
-> +	 * priority. So Q0 is the highest priority queue and the last queue has
-> +	 * the lowest priority.
-> +	 */
-> +	queue_priority_map = devm_kzalloc(dev,
-> +					  (edma_cc->num_tc + 1) * sizeof(s8),
-> +					  GFP_KERNEL);
-> +	if (!queue_priority_map)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; i < edma_cc->num_tc; i++) {
-> +		queue_priority_map[i][0] = i;
-> +		queue_priority_map[i][1] = i;
-> +	}
-> +	queue_priority_map[i][0] = -1;
-> +	queue_priority_map[i][1] = -1;
-> +
-> +	pdata->queue_priority_mapping = queue_priority_map;
-> +	pdata->default_queue = 0;
-> +
-> +	return 0;
-> +}
-> +
->  #if IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_DMADEVICES)
->  
->  static int edma_xbar_event_map(struct device *dev, struct device_node *node,
-> @@ -1458,50 +1525,16 @@ static int edma_of_parse_dt(struct device *dev,
->  			    struct device_node *node,
->  			    struct edma_soc_info *pdata)
->  {
-> -	int ret = 0, i;
-> -	u32 value;
-> +	int ret = 0;
->  	struct property *prop;
->  	size_t sz;
->  	struct edma_rsv_info *rsv_info;
-> -	s8 (*queue_priority_map)[2];
-> -
-> -	ret = of_property_read_u32(node, "dma-channels", &value);
-> -	if (ret < 0)
-> -		return ret;
-> -	pdata->n_channel = value;
-> -
-> -	ret = of_property_read_u32(node, "ti,edma-regions", &value);
-> -	if (ret < 0)
-> -		return ret;
-> -	pdata->n_region = value;
-> -
-> -	ret = of_property_read_u32(node, "ti,edma-slots", &value);
-> -	if (ret < 0)
-> -		return ret;
-> -	pdata->n_slot = value;
-> -
-> -	pdata->n_tc = 3;
->  
->  	rsv_info = devm_kzalloc(dev, sizeof(struct edma_rsv_info), GFP_KERNEL);
->  	if (!rsv_info)
->  		return -ENOMEM;
->  	pdata->rsv = rsv_info;
->  
-> -	queue_priority_map = devm_kzalloc(dev, 8*sizeof(s8), GFP_KERNEL);
-> -	if (!queue_priority_map)
-> -		return -ENOMEM;
-> -
-> -	for (i = 0; i < 3; i++) {
-> -		queue_priority_map[i][0] = i;
-> -		queue_priority_map[i][1] = i;
-> -	}
-> -	queue_priority_map[i][0] = -1;
-> -	queue_priority_map[i][1] = -1;
-> -
-> -	pdata->queue_priority_mapping = queue_priority_map;
-> -
-> -	pdata->default_queue = 0;
-> -
->  	prop = of_find_property(node, "ti,edma-xbar-event-map", &sz);
->  	if (prop)
->  		ret = edma_xbar_event_map(dev, node, pdata, sz);
-> @@ -1621,14 +1654,12 @@ static int edma_probe(struct platform_device *pdev)
->  		if (!edma_cc[j])
->  			return -ENOMEM;
->  
-> -		edma_cc[j]->num_channels = min_t(unsigned, info[j]->n_channel,
-> -							EDMA_MAX_DMACH);
-> -		edma_cc[j]->num_slots = min_t(unsigned, info[j]->n_slot,
-> -							EDMA_MAX_PARAMENTRY);
-> -		edma_cc[j]->num_tc = info[j]->n_tc;
-> +		/* Get eDMA3 configuration from IP */
-> +		ret = edma_setup_from_hw(dev, info[j], edma_cc[j]);
-> +		if (ret)
-> +			return ret;
->  
->  		edma_cc[j]->default_queue = info[j]->default_queue;
-> -		edma_cc[j]->num_region = info[j]->n_region;
->  
->  		dev_dbg(&pdev->dev, "DMA REG BASE ADDR=%p\n",
->  			edmacc_regs_base[j]);
-> 
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140516/7622116f/attachment-0001.sig>
