@@ -1,43 +1,130 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 16 May 2014 10:05:14 -0700
-Subject: [PATCH] clk: qcom: Fix msm8660 GCC probe
-Message-ID: <1400259914-28121-1-git-send-email-sboyd@codeaurora.org>
+From: tj@kernel.org (Tejun Heo)
+Date: Fri, 16 May 2014 13:09:59 -0400
+Subject: [PATCH v2 cgroup/for-3.16] cgroup: introduce CSS_NO_REF and skip
+ refcnting on normal root csses
+In-Reply-To: <537643F9.1030303@wwwdotorg.org>
+References: <1399670015-23463-1-git-send-email-tj@kernel.org>
+ <1399670015-23463-10-git-send-email-tj@kernel.org>
+ <53751062.2050401@wwwdotorg.org> <53753823.2090402@wwwdotorg.org>
+ <20140516143718.GA5379@htj.dyndns.org>
+ <20140516154330.GB5379@htj.dyndns.org>
+ <537643F9.1030303@wwwdotorg.org>
+Message-ID: <20140516170959.GG5379@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When consolidating the msm8660 GCC probe code I forgot to keep
-around these temporary clock registrations. Put them back so the
-clock tree is not entirely orphaned.
+9395a4500404 ("cgroup: enable refcnting for root csses") enabled
+reference counting for root csses (cgroup_subsys_states) so that
+cgroup's self csses can be used to manage the lifetime of the
+containing cgroups.
 
-Fixes: 49fc825f0cc2 (clk: qcom: Consolidate common probe code)
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Unfortunately, this change was incorrect.  During early init,
+cgrp_dfl_root self css refcnt is used.  percpu_ref can't initialized
+during early init and its initialization is deferred till
+cgroup_init() time.  This means that cpu was using percpu_ref which
+wasn't properly initialized.  Due to the way percpu variables are laid
+out on x86, this didn't blow up immediately on x86 but ended up
+incrementing and decrementing the percpu variable at offset zero,
+whatever it may be; however, on other archs, this caused fault and
+early boot failure.
+
+As cgroup self csses for root cgroups of non-dfl hierarchies need
+working refcounting, we can't revert 9395a4500404.  This patch adds
+CSS_NO_REF which explicitly inhibits reference counting on the css and
+sets it on all normal (non-self) csses and cgroup_dfl_root self css.
+
+v2: cgrp_dfl_root.self is the offending one.  Set the flag on it.
+
+Signed-off-by: Tejun Heo <tj@kernel.org>
+Reported-by: Stephen Warren <swarren@wwwdotorg.org>
+Fixes: 9395a4500404 ("cgroup: enable refcnting for root csses")
 ---
- drivers/clk/qcom/gcc-msm8660.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Hello,
 
-diff --git a/drivers/clk/qcom/gcc-msm8660.c b/drivers/clk/qcom/gcc-msm8660.c
-index 44bc6fa64d78..0c4b727ae429 100644
---- a/drivers/clk/qcom/gcc-msm8660.c
-+++ b/drivers/clk/qcom/gcc-msm8660.c
-@@ -2718,6 +2718,18 @@ MODULE_DEVICE_TABLE(of, gcc_msm8660_match_table);
+Can you try this one instead?
+
+Thanks.
+
+ include/linux/cgroup.h |   11 ++++++++---
+ kernel/cgroup.c        |   11 +++++++++--
+ 2 files changed, 17 insertions(+), 5 deletions(-)
+
+--- a/include/linux/cgroup.h
++++ b/include/linux/cgroup.h
+@@ -77,6 +77,7 @@ struct cgroup_subsys_state {
  
- static int gcc_msm8660_probe(struct platform_device *pdev)
+ /* bits in struct cgroup_subsys_state flags field */
+ enum {
++	CSS_NO_REF	= (1 << 0), /* no reference counting for this css */
+ 	CSS_ONLINE	= (1 << 1), /* between ->css_online() and ->css_offline() */
+ };
+ 
+@@ -88,7 +89,8 @@ enum {
+  */
+ static inline void css_get(struct cgroup_subsys_state *css)
  {
-+	struct clk *clk;
-+	struct device *dev = &pdev->dev;
-+
-+	/* Temporary until RPM clocks supported */
-+	clk = clk_register_fixed_rate(dev, "cxo", NULL, CLK_IS_ROOT, 19200000);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	clk = clk_register_fixed_rate(dev, "pxo", NULL, CLK_IS_ROOT, 27000000);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
- 	return qcom_cc_probe(pdev, &gcc_msm8660_desc);
+-	percpu_ref_get(&css->refcnt);
++	if (!(css->flags & CSS_NO_REF))
++		percpu_ref_get(&css->refcnt);
  }
  
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+ /**
+@@ -103,7 +105,9 @@ static inline void css_get(struct cgroup
+  */
+ static inline bool css_tryget_online(struct cgroup_subsys_state *css)
+ {
+-	return percpu_ref_tryget_live(&css->refcnt);
++	if (!(css->flags & CSS_NO_REF))
++		return percpu_ref_tryget_live(&css->refcnt);
++	return true;
+ }
+ 
+ /**
+@@ -114,7 +118,8 @@ static inline bool css_tryget_online(str
+  */
+ static inline void css_put(struct cgroup_subsys_state *css)
+ {
+-	percpu_ref_put(&css->refcnt);
++	if (!(css->flags & CSS_NO_REF))
++		percpu_ref_put(&css->refcnt);
+ }
+ 
+ /* bits in struct cgroup flags field */
+--- a/kernel/cgroup.c
++++ b/kernel/cgroup.c
+@@ -4593,11 +4593,17 @@ static void __init cgroup_init_subsys(st
+ 	/* We don't handle early failures gracefully */
+ 	BUG_ON(IS_ERR(css));
+ 	init_and_link_css(css, ss, &cgrp_dfl_root.cgrp);
++
++	/*
++	 * Root csses are never destroyed and we can't initialize
++	 * percpu_ref during early init.  Disable refcnting.
++	 */
++	css->flags |= CSS_NO_REF;
++
+ 	if (early) {
+ 		/* allocation can't be done safely during early init */
+ 		css->id = 1;
+ 	} else {
+-		BUG_ON(percpu_ref_init(&css->refcnt, css_release));
+ 		css->id = cgroup_idr_alloc(&ss->css_idr, css, 1, 2, GFP_KERNEL);
+ 		BUG_ON(css->id < 0);
+ 	}
+@@ -4636,6 +4642,8 @@ int __init cgroup_init_early(void)
+ 	int i;
+ 
+ 	init_cgroup_root(&cgrp_dfl_root, &opts);
++	cgrp_dfl_root.cgrp.self.flags |= CSS_NO_REF;
++
+ 	RCU_INIT_POINTER(init_task.cgroups, &init_css_set);
+ 
+ 	for_each_subsys(ss, i) {
+@@ -4684,7 +4692,6 @@ int __init cgroup_init(void)
+ 			struct cgroup_subsys_state *css =
+ 				init_css_set.subsys[ss->id];
+ 
+-			BUG_ON(percpu_ref_init(&css->refcnt, css_release));
+ 			css->id = cgroup_idr_alloc(&ss->css_idr, css, 1, 2,
+ 						   GFP_KERNEL);
+ 			BUG_ON(css->id < 0);
