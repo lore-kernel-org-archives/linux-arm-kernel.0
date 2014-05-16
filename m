@@ -1,44 +1,58 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 16 May 2014 10:51:25 +0100
-Subject: [PATCH] arm64: fix pud_huge() for 2-level pagetables
-In-Reply-To: <1400179157.21547.147.camel@deneb.redhat.com>
-References: <1400163562-7481-1-git-send-email-msalter@redhat.com>
- <20140515144424.GA23884@linaro.org>
- <1400171258.21547.136.camel@deneb.redhat.com>
- <CAPvkgC2WQcvn5e01Y70cm5nzenYZ6tk_1BampHw66VoRFn7Jiw@mail.gmail.com>
- <1400179157.21547.147.camel@deneb.redhat.com>
-Message-ID: <20140516095125.GF5624@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 16 May 2014 10:53:33 +0100
+Subject: [PATCHv3 1/3] ARM: mm: allow sub-architectures to override PCI
+ I/O memory type
+In-Reply-To: <11787153.NWVGbVfAPV@wuerfel>
+References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <4972763.mtuLYh6sDH@wuerfel> <20140515153430.GM27594@arm.com>
+ <11787153.NWVGbVfAPV@wuerfel>
+Message-ID: <20140516095333.GE12341@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 07:39:17PM +0100, Mark Salter wrote:
-> On Thu, 2014-05-15 at 18:55 +0100, Steve Capper wrote:
-> > On 15 May 2014 17:27, Mark Salter <msalter@redhat.com> wrote:
-> > > On Thu, 2014-05-15 at 15:44 +0100, Steve Capper wrote:
-> > >> On Thu, May 15, 2014 at 10:19:22AM -0400, Mark Salter wrote:
-> > >> > In arch/arm/kvm/mmu.c:unmap_range(), we end up doing an extra put_page()
-> > >> > on the stage2 pgd which leads to the BUG in put_page_testzero(). This
-> > >> > happens because a pud_huge() test in unmap_range() returns true when it
-> > >> > should always be false with 2-level pages tables used by 64k pages.
-> > >> > This patch removes support for huge puds if 2-level pagetables are
-> > >> > being used.
-[...]
-> > Yeah I agree for 64K granule it doesn't make sense to have a huge_pud.
-> > The patch looks sound now, but checking for a folded pmd may run into
-> > problems if/when we get to 3-levels and 64K pages in future.
+On Thu, May 15, 2014 at 04:55:52PM +0100, Arnd Bergmann wrote:
+> On Thursday 15 May 2014 16:34:30 Will Deacon wrote:
+> > > The way I understand it, the CPU would continue with the next instruction
+> > > as soon as the write has made it out to the AXI fabric, i.e. before
+> > > the PIO instruction is complete.
 > > 
-> > Perhaps checking for PAGE_SHIFT==12 (or something similar) would be a
-> > bit more robust?
+> > The CPU can continue regardless -- you'd need a DSB if you want to hold up
+> > the instruction stream based on completion of a memory access. With the
+> > posted write (device type), the write may complete as soon as it reaches an
+> > ordered bus.
+> > 
+> > Note that nGnRnE accesses in AArch64 (the equivalent to strongly-ordered)
+> > *can* still get an early write response -- that is simply a hint to the
+> > memory subsystem.
+> > 
+> > > If this is used to synchronize with a DMA, there is no guarantee that the
+> > > transaction from PCI will be visible in memory by then.
+> > 
+> > Can you elaborate on this scenario please? When would we use an I/O space
+> > write to synchronise with a DMA transfer from a PCI endpoint? You're
+> > definitely referring to I/O space as opposed to Configuration Space, right?
 > 
-> I don't think testing based on granule size is generally correct either.
-> Maybe support for 3-level page tables with 64k granule gets added as an
-> option. That would break the pagesize based test. With a folded pmd, we
-> know there is no pud, so pud_huge() should always be false.
+> Correct. Assume a PCI device uses PIO and DMA. It sends a DMA to main memory
+> and lets the CPU know about the data using a level (IntA as opposed to MSI)
+> interrupt. The CPU performs an outl() operation to an I/O port to let the
+> hardware know it has received the IRQ and the response of the outl() is
+> guaranteed to flush the DMA transaction: by the time the outl() completes
+> we know that the data in memory is valid because it is strongly ordered
+> relative to the DMA.
 
-I agree, pud_huge() should be false in the same way we define
-pud_present() to be 1 when __PGTABLE_PMD_FOLDED. The *_huge() macros
-aren't covered by the generic headers unfortunately (some clean-up would
-be useful at some point but for now this patch is fine).
+Hmm, when you say `guaranteed to flush the DMA transaction', is that a PCI
+requirement? If so, whether or not that DMA data is then visible to the CPU
+is really specific to the host-controller implementation. It could easily be
+buffered somewhere between the host controller and memory, for example.
 
--- 
-Catalin
+> outl() actually does a dsb() internally, but unfortunately that is
+> before the store, not after, so I assume that a driver relying on the
+> behavior above would still be racy.
+
+Yup, we'd need an additional dsb. I think we're confusing what the PCI
+specification says about ordering and what the inb/outb instructions provide
+on x86. It may well be that we want to emulate the x86 behaviour on ARM, but
+that's not going to come cheap and I don't think it's a decision we should
+take lightly.
+
+Will
