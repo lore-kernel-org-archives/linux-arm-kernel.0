@@ -1,261 +1,248 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 16 May 2014 16:07:12 -0700
-Subject: [PATCH 5/7] clk: qcom: Properly support display clocks on msm8974
+Date: Fri, 16 May 2014 16:07:13 -0700
+Subject: [PATCH 6/7] clk: qcom: Support msm8974pro global clock control
+ hardware
 In-Reply-To: <1400281634-9313-1-git-send-email-sboyd@codeaurora.org>
 References: <1400281634-9313-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1400281634-9313-6-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1400281634-9313-7-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The display clocks all source from dedicated phy PLLs within their
-respective multimedia hardware block. Hook up these PLLs to the
-display clocks with the appropriate parent mappings, clock flags,
-and the appropriate clock ops. This should allow the display
-clocks to work once the appropriate phy PLL driver registers their
-PLL clocks.
+A new PLL (gpll4) is added on msm8974 PRO devices to support a
+faster sdc1 clock rate. Add support for this and the two new sdcc
+cal clocks.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/qcom/mmcc-msm8974.c | 105 +++++++++++++++++++++-------------------
- 1 file changed, 54 insertions(+), 51 deletions(-)
+ .../devicetree/bindings/clock/qcom,gcc.txt         |   2 +
+ drivers/clk/qcom/gcc-msm8974.c                     | 130 ++++++++++++++++++++-
+ include/dt-bindings/clock/qcom,gcc-msm8974.h       |   4 +
+ 3 files changed, 130 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clk/qcom/mmcc-msm8974.c b/drivers/clk/qcom/mmcc-msm8974.c
-index 62200bbc759e..c65b90515872 100644
---- a/drivers/clk/qcom/mmcc-msm8974.c
-+++ b/drivers/clk/qcom/mmcc-msm8974.c
-@@ -41,9 +41,11 @@
- #define P_EDPVCO	3
- #define P_GPLL1		4
- #define P_DSI0PLL	4
-+#define P_DSI0PLL_BYTE	4
- #define P_MMPLL2	4
- #define P_MMPLL3	4
- #define P_DSI1PLL	5
-+#define P_DSI1PLL_BYTE	5
+diff --git a/Documentation/devicetree/bindings/clock/qcom,gcc.txt b/Documentation/devicetree/bindings/clock/qcom,gcc.txt
+index 7b7104e8cb1e..9cfcb4f2bc97 100644
+--- a/Documentation/devicetree/bindings/clock/qcom,gcc.txt
++++ b/Documentation/devicetree/bindings/clock/qcom,gcc.txt
+@@ -8,6 +8,8 @@ Required properties :
+ 			"qcom,gcc-msm8660"
+ 			"qcom,gcc-msm8960"
+ 			"qcom,gcc-msm8974"
++			"qcom,gcc-msm8974pro"
++			"qcom,gcc-msm8974pro-ac"
  
- static const u8 mmcc_xo_mmpll0_mmpll1_gpll0_map[] = {
+ - reg : shall contain base register location and length
+ - #clock-cells : shall contain 1
+diff --git a/drivers/clk/qcom/gcc-msm8974.c b/drivers/clk/qcom/gcc-msm8974.c
+index 0d1edc1e9b31..33eb051d7255 100644
+--- a/drivers/clk/qcom/gcc-msm8974.c
++++ b/drivers/clk/qcom/gcc-msm8974.c
+@@ -35,6 +35,7 @@
+ #define P_XO	0
+ #define P_GPLL0	1
+ #define P_GPLL1	1
++#define P_GPLL4	2
+ 
+ static const u8 gcc_xo_gpll0_map[] = {
  	[P_XO]		= 0,
-@@ -161,6 +163,24 @@ static const char *mmcc_xo_dsi_hdmi_edp_gpll0[] = {
- 	"dsi1pll",
+@@ -46,6 +47,18 @@ static const char *gcc_xo_gpll0[] = {
+ 	"gpll0_vote",
  };
  
-+static const u8 mmcc_xo_dsibyte_hdmi_edp_gpll0_map[] = {
-+	[P_XO]			= 0,
-+	[P_EDPLINK]		= 4,
-+	[P_HDMIPLL]		= 3,
-+	[P_GPLL0]		= 5,
-+	[P_DSI0PLL_BYTE]	= 1,
-+	[P_DSI1PLL_BYTE]	= 2,
++static const u8 gcc_xo_gpll0_gpll4_map[] = {
++	[P_XO]		= 0,
++	[P_GPLL0]	= 1,
++	[P_GPLL4]	= 5,
 +};
 +
-+static const char *mmcc_xo_dsibyte_hdmi_edp_gpll0[] = {
++static const char *gcc_xo_gpll0_gpll4[] = {
 +	"xo",
-+	"edp_link_clk",
-+	"hdmipll",
 +	"gpll0_vote",
-+	"dsi0pllbyte",
-+	"dsi1pllbyte",
++	"gpll4_vote",
 +};
 +
  #define F(f, s, h, m, n) { (f), (s), (2 * (h) - 1), (m), (n) }
  
- static struct clk_pll mmpll0 = {
-@@ -500,15 +520,8 @@ static struct clk_rcg2 jpeg2_clk_src = {
+ static struct clk_pll gpll0 = {
+@@ -138,6 +151,33 @@ static struct clk_regmap gpll1_vote = {
  	},
  };
  
--static struct freq_tbl ftbl_mdss_pclk0_clk[] = {
--	F(125000000, P_DSI0PLL, 2, 0, 0),
--	F(250000000, P_DSI0PLL, 1, 0, 0),
--	{ }
--};
--
--static struct freq_tbl ftbl_mdss_pclk1_clk[] = {
--	F(125000000, P_DSI1PLL, 2, 0, 0),
--	F(250000000, P_DSI1PLL, 1, 0, 0),
-+static struct freq_tbl pixel_freq_tbl[] = {
-+	{ .src = P_DSI0PLL },
++static struct clk_pll gpll4 = {
++	.l_reg = 0x1dc4,
++	.m_reg = 0x1dc8,
++	.n_reg = 0x1dcc,
++	.config_reg = 0x1dd4,
++	.mode_reg = 0x1dc0,
++	.status_reg = 0x1ddc,
++	.status_bit = 17,
++	.clkr.hw.init = &(struct clk_init_data){
++		.name = "gpll4",
++		.parent_names = (const char *[]){ "xo" },
++		.num_parents = 1,
++		.ops = &clk_pll_ops,
++	},
++};
++
++static struct clk_regmap gpll4_vote = {
++	.enable_reg = 0x1480,
++	.enable_mask = BIT(4),
++	.hw.init = &(struct clk_init_data){
++		.name = "gpll4_vote",
++		.parent_names = (const char *[]){ "gpll4" },
++		.num_parents = 1,
++		.ops = &clk_pll_vote_ops,
++	},
++};
++
+ static const struct freq_tbl ftbl_gcc_usb30_master_clk[] = {
+ 	F(125000000, P_GPLL0, 1, 5, 24),
+ 	{ }
+@@ -812,18 +852,33 @@ static const struct freq_tbl ftbl_gcc_sdcc1_4_apps_clk[] = {
  	{ }
  };
  
-@@ -517,12 +530,13 @@ static struct clk_rcg2 pclk0_clk_src = {
++static const struct freq_tbl ftbl_gcc_sdcc1_apps_clk_pro[] = {
++	F(144000, P_XO, 16, 3, 25),
++	F(400000, P_XO, 12, 1, 4),
++	F(20000000, P_GPLL0, 15, 1, 2),
++	F(25000000, P_GPLL0, 12, 1, 2),
++	F(50000000, P_GPLL0, 12, 0, 0),
++	F(100000000, P_GPLL0, 6, 0, 0),
++	F(192000000, P_GPLL4, 4, 0, 0),
++	F(200000000, P_GPLL0, 3, 0, 0),
++	F(384000000, P_GPLL4, 2, 0, 0),
++	{ }
++};
++
++static struct clk_init_data sdcc1_apps_clk_src_init = {
++	.name = "sdcc1_apps_clk_src",
++	.parent_names = gcc_xo_gpll0,
++	.num_parents = 2,
++	.ops = &clk_rcg2_ops,
++};
++
+ static struct clk_rcg2 sdcc1_apps_clk_src = {
+ 	.cmd_rcgr = 0x04d0,
  	.mnd_width = 8,
  	.hid_width = 5,
- 	.parent_map = mmcc_xo_dsi_hdmi_edp_gpll0_map,
--	.freq_tbl = ftbl_mdss_pclk0_clk,
-+	.freq_tbl = pixel_freq_tbl,
- 	.clkr.hw.init = &(struct clk_init_data){
- 		.name = "pclk0_clk_src",
- 		.parent_names = mmcc_xo_dsi_hdmi_edp_gpll0,
- 		.num_parents = 6,
+ 	.parent_map = gcc_xo_gpll0_map,
+ 	.freq_tbl = ftbl_gcc_sdcc1_4_apps_clk,
+-	.clkr.hw.init = &(struct clk_init_data){
+-		.name = "sdcc1_apps_clk_src",
+-		.parent_names = gcc_xo_gpll0,
+-		.num_parents = 2,
 -		.ops = &clk_rcg2_ops,
-+		.ops = &clk_pixel_ops,
-+		.flags = CLK_SET_RATE_PARENT,
+-	},
++	.clkr.hw.init = &sdcc1_apps_clk_src_init,
+ };
+ 
+ static struct clk_rcg2 sdcc2_apps_clk_src = {
+@@ -1995,6 +2050,38 @@ static struct clk_branch gcc_sdcc1_apps_clk = {
  	},
  };
  
-@@ -531,12 +545,13 @@ static struct clk_rcg2 pclk1_clk_src = {
- 	.mnd_width = 8,
- 	.hid_width = 5,
- 	.parent_map = mmcc_xo_dsi_hdmi_edp_gpll0_map,
--	.freq_tbl = ftbl_mdss_pclk1_clk,
-+	.freq_tbl = pixel_freq_tbl,
- 	.clkr.hw.init = &(struct clk_init_data){
- 		.name = "pclk1_clk_src",
- 		.parent_names = mmcc_xo_dsi_hdmi_edp_gpll0,
- 		.num_parents = 6,
--		.ops = &clk_rcg2_ops,
-+		.ops = &clk_pixel_ops,
-+		.flags = CLK_SET_RATE_PARENT,
- 	},
++static struct clk_branch gcc_sdcc1_cdccal_ff_clk = {
++	.halt_reg = 0x04e8,
++	.clkr = {
++		.enable_reg = 0x04e8,
++		.enable_mask = BIT(0),
++		.hw.init = &(struct clk_init_data){
++			.name = "gcc_sdcc1_cdccal_ff_clk",
++			.parent_names = (const char *[]){
++				"xo"
++			},
++			.num_parents = 1,
++			.ops = &clk_branch2_ops,
++		},
++	},
++};
++
++static struct clk_branch gcc_sdcc1_cdccal_sleep_clk = {
++	.halt_reg = 0x04e4,
++	.clkr = {
++		.enable_reg = 0x04e4,
++		.enable_mask = BIT(0),
++		.hw.init = &(struct clk_init_data){
++			.name = "gcc_sdcc1_cdccal_sleep_clk",
++			.parent_names = (const char *[]){
++				"sleep_clk_src"
++			},
++			.num_parents = 1,
++			.ops = &clk_branch2_ops,
++		},
++	},
++};
++
+ static struct clk_branch gcc_sdcc2_ahb_clk = {
+ 	.halt_reg = 0x0508,
+ 	.clkr = {
+@@ -2484,6 +2571,10 @@ static struct clk_regmap *gcc_msm8974_clocks[] = {
+ 	[GCC_USB_HSIC_IO_CAL_SLEEP_CLK] = &gcc_usb_hsic_io_cal_sleep_clk.clkr,
+ 	[GCC_USB_HSIC_SYSTEM_CLK] = &gcc_usb_hsic_system_clk.clkr,
+ 	[GCC_MMSS_GPLL0_CLK_SRC] = &gcc_mmss_gpll0_clk_src,
++	[GPLL4] = NULL,
++	[GPLL4_VOTE] = NULL,
++	[GCC_SDCC1_CDCCAL_SLEEP_CLK] = NULL,
++	[GCC_SDCC1_CDCCAL_FF_CLK] = NULL,
  };
  
-@@ -754,41 +769,36 @@ static struct clk_rcg2 cpp_clk_src = {
- 	},
- };
+ static const struct qcom_reset_map gcc_msm8974_resets[] = {
+@@ -2585,14 +2676,41 @@ static const struct qcom_cc_desc gcc_msm8974_desc = {
  
--static struct freq_tbl ftbl_mdss_byte0_clk[] = {
--	F(93750000, P_DSI0PLL, 8, 0, 0),
--	F(187500000, P_DSI0PLL, 4, 0, 0),
--	{ }
--};
--
--static struct freq_tbl ftbl_mdss_byte1_clk[] = {
--	F(93750000, P_DSI1PLL, 8, 0, 0),
--	F(187500000, P_DSI1PLL, 4, 0, 0),
-+static struct freq_tbl byte_freq_tbl[] = {
-+	{ .src = P_DSI0PLL_BYTE },
+ static const struct of_device_id gcc_msm8974_match_table[] = {
+ 	{ .compatible = "qcom,gcc-msm8974" },
++	{ .compatible = "qcom,gcc-msm8974pro" , .data = (void *)1UL },
++	{ .compatible = "qcom,gcc-msm8974pro-ac", .data = (void *)1UL },
  	{ }
  };
+ MODULE_DEVICE_TABLE(of, gcc_msm8974_match_table);
  
- static struct clk_rcg2 byte0_clk_src = {
- 	.cmd_rcgr = 0x2120,
- 	.hid_width = 5,
--	.parent_map = mmcc_xo_dsi_hdmi_edp_gpll0_map,
--	.freq_tbl = ftbl_mdss_byte0_clk,
-+	.parent_map = mmcc_xo_dsibyte_hdmi_edp_gpll0_map,
-+	.freq_tbl = byte_freq_tbl,
- 	.clkr.hw.init = &(struct clk_init_data){
- 		.name = "byte0_clk_src",
--		.parent_names = mmcc_xo_dsi_hdmi_edp_gpll0,
-+		.parent_names = mmcc_xo_dsibyte_hdmi_edp_gpll0,
- 		.num_parents = 6,
--		.ops = &clk_rcg2_ops,
-+		.ops = &clk_byte_ops,
-+		.flags = CLK_SET_RATE_PARENT,
- 	},
- };
++static void msm8974_pro_clock_override(void)
++{
++	sdcc1_apps_clk_src_init.parent_names = gcc_xo_gpll0_gpll4;
++	sdcc1_apps_clk_src_init.num_parents = 3;
++	sdcc1_apps_clk_src.freq_tbl = ftbl_gcc_sdcc1_apps_clk_pro;
++	sdcc1_apps_clk_src.parent_map = gcc_xo_gpll0_gpll4_map;
++
++	gcc_msm8974_clocks[GPLL4] = &gpll4.clkr;
++	gcc_msm8974_clocks[GPLL4_VOTE] = &gpll4_vote;
++	gcc_msm8974_clocks[GCC_SDCC1_CDCCAL_SLEEP_CLK] =
++		&gcc_sdcc1_cdccal_sleep_clk.clkr;
++	gcc_msm8974_clocks[GCC_SDCC1_CDCCAL_FF_CLK] =
++		&gcc_sdcc1_cdccal_ff_clk.clkr;
++}
++
+ static int gcc_msm8974_probe(struct platform_device *pdev)
+ {
+ 	struct clk *clk;
+ 	struct device *dev = &pdev->dev;
++	bool pro;
++	const struct of_device_id *id;
++
++	id = of_match_device(gcc_msm8974_match_table, dev);
++	if (!id)
++		return -ENODEV;
++	pro = !!(id->data);
++
++	if (pro)
++		msm8974_pro_clock_override();
  
- static struct clk_rcg2 byte1_clk_src = {
- 	.cmd_rcgr = 0x2140,
- 	.hid_width = 5,
--	.parent_map = mmcc_xo_dsi_hdmi_edp_gpll0_map,
--	.freq_tbl = ftbl_mdss_byte1_clk,
-+	.parent_map = mmcc_xo_dsibyte_hdmi_edp_gpll0_map,
-+	.freq_tbl = byte_freq_tbl,
- 	.clkr.hw.init = &(struct clk_init_data){
- 		.name = "byte1_clk_src",
--		.parent_names = mmcc_xo_dsi_hdmi_edp_gpll0,
-+		.parent_names = mmcc_xo_dsibyte_hdmi_edp_gpll0,
- 		.num_parents = 6,
--		.ops = &clk_rcg2_ops,
-+		.ops = &clk_byte_ops,
-+		.flags = CLK_SET_RATE_PARENT,
- 	},
- };
+ 	/* Temporary until RPM clocks supported */
+ 	clk = clk_register_fixed_rate(dev, "xo", NULL, CLK_IS_ROOT, 19200000);
+diff --git a/include/dt-bindings/clock/qcom,gcc-msm8974.h b/include/dt-bindings/clock/qcom,gcc-msm8974.h
+index 223ca174d9d3..51e51c860fe6 100644
+--- a/include/dt-bindings/clock/qcom,gcc-msm8974.h
++++ b/include/dt-bindings/clock/qcom,gcc-msm8974.h
+@@ -316,5 +316,9 @@
+ #define GCC_CE2_CLK_SLEEP_ENA					299
+ #define GCC_CE2_AXI_CLK_SLEEP_ENA				300
+ #define GCC_CE2_AHB_CLK_SLEEP_ENA				301
++#define GPLL4							302
++#define GPLL4_VOTE						303
++#define GCC_SDCC1_CDCCAL_SLEEP_CLK				304
++#define GCC_SDCC1_CDCCAL_FF_CLK					305
  
-@@ -826,12 +836,12 @@ static struct clk_rcg2 edplink_clk_src = {
- 		.parent_names = mmcc_xo_dsi_hdmi_edp_gpll0,
- 		.num_parents = 6,
- 		.ops = &clk_rcg2_ops,
-+		.flags = CLK_SET_RATE_PARENT,
- 	},
- };
- 
--static struct freq_tbl ftbl_mdss_edppixel_clk[] = {
--	F(175000000, P_EDPVCO, 2, 0, 0),
--	F(350000000, P_EDPVCO, 11, 0, 0),
-+static struct freq_tbl edp_pixel_freq_tbl[] = {
-+	{ .src = P_EDPVCO },
- 	{ }
- };
- 
-@@ -840,12 +850,12 @@ static struct clk_rcg2 edppixel_clk_src = {
- 	.mnd_width = 8,
- 	.hid_width = 5,
- 	.parent_map = mmcc_xo_dsi_hdmi_edp_map,
--	.freq_tbl = ftbl_mdss_edppixel_clk,
-+	.freq_tbl = edp_pixel_freq_tbl,
- 	.clkr.hw.init = &(struct clk_init_data){
- 		.name = "edppixel_clk_src",
- 		.parent_names = mmcc_xo_dsi_hdmi_edp,
- 		.num_parents = 6,
--		.ops = &clk_rcg2_ops,
-+		.ops = &clk_edp_pixel_ops,
- 	},
- };
- 
-@@ -857,11 +867,11 @@ static struct freq_tbl ftbl_mdss_esc0_1_clk[] = {
- static struct clk_rcg2 esc0_clk_src = {
- 	.cmd_rcgr = 0x2160,
- 	.hid_width = 5,
--	.parent_map = mmcc_xo_dsi_hdmi_edp_gpll0_map,
-+	.parent_map = mmcc_xo_dsibyte_hdmi_edp_gpll0_map,
- 	.freq_tbl = ftbl_mdss_esc0_1_clk,
- 	.clkr.hw.init = &(struct clk_init_data){
- 		.name = "esc0_clk_src",
--		.parent_names = mmcc_xo_dsi_hdmi_edp_gpll0,
-+		.parent_names = mmcc_xo_dsibyte_hdmi_edp_gpll0,
- 		.num_parents = 6,
- 		.ops = &clk_rcg2_ops,
- 	},
-@@ -870,26 +880,18 @@ static struct clk_rcg2 esc0_clk_src = {
- static struct clk_rcg2 esc1_clk_src = {
- 	.cmd_rcgr = 0x2180,
- 	.hid_width = 5,
--	.parent_map = mmcc_xo_dsi_hdmi_edp_gpll0_map,
-+	.parent_map = mmcc_xo_dsibyte_hdmi_edp_gpll0_map,
- 	.freq_tbl = ftbl_mdss_esc0_1_clk,
- 	.clkr.hw.init = &(struct clk_init_data){
- 		.name = "esc1_clk_src",
--		.parent_names = mmcc_xo_dsi_hdmi_edp_gpll0,
-+		.parent_names = mmcc_xo_dsibyte_hdmi_edp_gpll0,
- 		.num_parents = 6,
- 		.ops = &clk_rcg2_ops,
- 	},
- };
- 
--static struct freq_tbl ftbl_mdss_extpclk_clk[] = {
--	F(25200000, P_HDMIPLL, 1, 0, 0),
--	F(27000000, P_HDMIPLL, 1, 0, 0),
--	F(27030000, P_HDMIPLL, 1, 0, 0),
--	F(65000000, P_HDMIPLL, 1, 0, 0),
--	F(74250000, P_HDMIPLL, 1, 0, 0),
--	F(108000000, P_HDMIPLL, 1, 0, 0),
--	F(148500000, P_HDMIPLL, 1, 0, 0),
--	F(268500000, P_HDMIPLL, 1, 0, 0),
--	F(297000000, P_HDMIPLL, 1, 0, 0),
-+static struct freq_tbl extpclk_freq_tbl[] = {
-+	{ .src = P_HDMIPLL },
- 	{ }
- };
- 
-@@ -897,12 +899,13 @@ static struct clk_rcg2 extpclk_clk_src = {
- 	.cmd_rcgr = 0x2060,
- 	.hid_width = 5,
- 	.parent_map = mmcc_xo_dsi_hdmi_edp_gpll0_map,
--	.freq_tbl = ftbl_mdss_extpclk_clk,
-+	.freq_tbl = extpclk_freq_tbl,
- 	.clkr.hw.init = &(struct clk_init_data){
- 		.name = "extpclk_clk_src",
- 		.parent_names = mmcc_xo_dsi_hdmi_edp_gpll0,
- 		.num_parents = 6,
--		.ops = &clk_rcg2_ops,
-+		.ops = &clk_byte_ops,
-+		.flags = CLK_SET_RATE_PARENT,
- 	},
- };
- 
+ #endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
