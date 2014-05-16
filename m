@@ -1,7 +1,7 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 16 May 2014 23:12:00 +0800
-Subject: [GIT PULL] ARM: imx: soc changes for 3.16
-Message-ID: <20140516151158.GC10685@dragon>
+Date: Fri, 16 May 2014 23:12:59 +0800
+Subject: [GIT PULL] ARM: imx: device tree changes for 3.16
+Message-ID: <20140516151258.GD10685@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,159 +11,240 @@ The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-3.16
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt-3.16
 
-for you to fetch changes up to 46ae42498ef6febdaa6b51359f1ede38cd6b5a47:
+for you to fetch changes up to c6f0b878f9b56a755431c74e217830f6550f62b4:
 
-  ARM: mx25: Add CLKO support (2014-05-16 22:51:34 +0800)
-
-----------------------------------------------------------------
-i.MX SoC changes for 3.16:
- - A few cleanups on mx21ads board file, which should make the later
-   conversion to DT a little bit easier.
- - Add some missing clocks and drop unused clk lookups for i.MX1 and
-   i.MX27 clock drivers
- - Add initial i.MX SoloX (imx6sx) SoC support
- - Remove mx51_babbage and mach-cpuimx51sd board files, as the
-   equivalent DT support is ready for the boards
- - Clean up device tree timer initialization a little bit
- - Add missing i2c4 clock for i.MX6 DualLite/Solo
- - Add missing CKO clock i.MX25
- - Add shared gate clock support for i.MX specific clk_gate2
- - Add low-level debug support for SoC VF610
- - Some random code cleanups and defconfig updates
+  ARM: dts: imx35-pdk: Fix memory region description (2014-05-16 23:02:13 +0800)
 
 ----------------------------------------------------------------
-Alexander Shiyan (10):
-      ARM: i.MX: mx21ads: Replace direct handling of peripheral bits with GPIOs
-      ARM: i.MX: mx21ads: Use fixed voltage regulator for LCD power
-      ARM: i.MX: mx21ads: Cleanup board
-      ARM: i.MX: Remove #ifdef CONFIG_OF
-      ARM: i.MX27 clk: Add missing clocks for MSHC and RTIC
-      ARM: i.MX27 clk: Remove clk_register_clkdev() for unused clocks
-      ARM: i.MX: Fix eMMa PrP resource size
-      ARM: i.MX: Setup IRQ handler from IRQ driver
-      ARM: i.MX1 clk: Add missing clocks
-      ARM: i.MX1 clk: Remove clk_register_clkdev() for unused clocks
+i.MX device tree changes for 3.16:
+ - New board support: imx35-pdk, imx51-digi-connectcore, imx6dl-phytec,
+   imx6dl-riotboard, and vf610-colibri.
+ - Improve device tree support for imx51-babbage and eukrea-cpuimx51 to
+   get the same level support as board files, so that we can kill the
+   board files.
+ - Quite some updates on imx27-phytec-phycore board support from
+   Alexander Shiyan
+ - Enable USB, sound and touchscreen on the eukrea imx25/35/51 boards,
+   from Denis Carikli
+ - Quite a lot of patches from Fabio Estevam, updating Freescale
+   imx25-pdk and imx27-pdk board support
+ - Correct USB device configuration for imx25/35
+ - Fixes i2c4 device node in imx6dl.dtsi regarding to compatible string
+   and clock data
+ - Enable HDMI, TVE, LVDS display support on a bunch of imx5/6 boards
+ - Update PCIe to the new binding and enable PCIe support on
+   imx6qdl-sabresd board
+ - A couple of imx6q-dmo-edmqmx6 updates from Lucas Stach, adding pfuze
+   irq gpio and SPI flash
+ - Enable CODA7541 VPU for i.MX53
+ - A series of updates on imx6qdl-phytec boards from Philipp Zabel
+ - Small cleanups and fixes on board imx28-duckbill - Michael Heimpold
+ - Add stdout-path property to i.MX boards
+ - Karo TX25 board updates from Sascha Hauer
+ - Enable pwm and sdhc devices for board vf610-twr
 
-Anson Huang (1):
-      ARM: imx: add clock driver for imx6sx
+----------------------------------------------------------------
+Alexander Shiyan (20):
+      ARM: dts: imx27-phytec-phycore-rdk: Add missing pinctrl definition for SPI CS1
+      ARM: dts: imx27-phytec-phycore-som: Enable SSI1
+      ARM: dts: imx27-phytec-phycore-rdk: Add display support
+      ARM: dts: imx27-phytec-phycore-rdk: Add display control signal definitions
+      ARM: dts: i.MX: Use single naming style for i.MX WEIM device
+      ARM i.MX51: Add Digi ConnectCore devicetree
+      ARM: dts: i.MX51: Allow to define partitions onto NFC
+      ARM: dts: imx51-babbage: Move "hog" pins into corresponded pin groups
+      ARM: dts: imx51-babbage: Add missing pingroup for PMIC
+      ARM: dts: imx51-babbage: Use predefined constants for keys definition
+      ARM: dts: imx51-babbage: Add USB OTG regulator node
+      ARM: dts: imx51-babbage: Sort nodes by name
+      ARM: dts: imx51-babbage: Add devicetree node for I2C1
+      ARM: dts: imx51-babbage: Use predefined constants for clock definition
+      ARM: dts: imx27-phytec-phycore-rdk: Remove duplicate entries for USB PHY
+      ARM: dts: imx27-phytec-phycore-som: Fix active level for FEC reset
+      ARM: dts: imx27-phytec-phycore-som: Disable PM pins for USB OTG
+      ARM: dts: imx: Remove excess entries for PMIC
+      ARM: dts: imx27-phytec-phycore-rdk: Add CSI enable switch
+      ARM: dts: imx27-phytec-phycore-rdk: Fix "reg" property for USBH2 PHY
 
-Brian Norris (1):
-      ARM: imx/mxs defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
+Cosmin Stoica (1):
+      ARM: dts: vf610-twr: Add support for sdhc1
 
-Denis Carikli (2):
-      ARM: imx_v4_v5_defconfig: Enable drivers for i.MX25/i.MX35 USB support.
-      ARM: imx_v6_v7_defconfig: Add more drm drivers.
+Denis Carikli (7):
+      ARM: dts: mbimxsd35: Add sound support.
+      ARM: dts: mbimxsd25 baseboard: Add USB support
+      ARM: dts: i.MX35: Add USB support.
+      ARM: dts: mbimxsd35 baseboard: Add USB support.
+      ARM: dts: mbimxsd51 baseboard: Add USB support.
+      ARM: dts: cpuimx35 Add touchscreen support.
+      ARM: dts: cpuimx51 Add touchscreen support.
 
-Fabio Estevam (4):
-      ARM: imx: Remove mx51_babbage board file
-      ARM: mxs_defconfig: Select CONFIG_CRYPTO_DEV_MXS_DCP
-      ARM: mx51: Remove mach-cpuimx51sd board file
-      ARM: mx25: Add CLKO support
+Fabio Estevam (34):
+      ARM: dts: imx25-pdk: Sort the dt nodes
+      ARM: dts: imx25-pdk: Add UART1 pins
+      ARM: dts: imx25-pdk: Add FEC pins
+      ARM: dts: imx25-pdk: Provide a regulator for Ethernet PHY
+      ARM: dts: imx25-pdk: Provide an Ethernet PHY reset
+      ARM: dts: imx25-pdk: Add esdhc1 support
+      ARM: dts: mx25: USB block requires only one clock
+      ARM: dts: mx35: USB block requires only one clock
+      ARM: dts: imx25.dtsi: Fix USB support.
+      ARM: dts: imx25-pdk: Add audio support
+      ARM: dts: imx25-pdk: Add keypad support
+      ARM: dts: imx25-pdk: Add CAN support
+      ARM: dts: imx25-pdk: Add USB Host1 support
+      ARM: dts: imx35-pdk: Add initial device tree support
+      ARM: dts: imx51-babbage: Add USB Host1 support
+      ARM: dts: imx51-babbage: Add USB OTG support
+      ARM: dts: imx27-pdk: Pass the memory range
+      ARM: dts: imx27-pdk: Keep the dt nodes sorted
+      ARM: dts: imx27-pdk: Pass the UART1 pin configuration
+      ARM: dts: imx27-pdk: Pass the FEC pin configuration
+      ARM: dts: imx27-pdk: Add PMIC support
+      ARM: dts: imx27-phytec-phycore-som: Move PMIC IRQ GPIO into a separate pin group
+      ARM: dts: imx27: Use the correct usb clock gate
+      ARM: dts: imx27: Place the usb phy nodes in the board dts files
+      ARM: dts: imx27-pdk: Add USB OTG support
+      ARM: dts: imx27-pdk: Add NAND support
+      ARM: dts: imx27-pdk: Add keypad support
+      ARM: dts: imx6qdl-sabresd: Add HDMI support
+      ARM: dts: imx6qdl-wandboard: Add HDMI support
+      ARM: dts: imx53-qsb-common: Add TVE support
+      ARM: dts: imx6q-udoo: Add HDMI support
+      ARM: dts: imx6qdl-sabresd: Add USDHC4 support
+      ARM: dts: imx51-eukrea-mbimxsd51-baseboard: Add CAN support
+      ARM: dts: imx35-pdk: Fix memory region description
 
-Gilles Chanteperdrix (1):
-      ARM: imx: factor device tree timer initialization
+Iain Paton (2):
+      ARM: dts: imx6: i2c4 cleanup
+      ARM: dts: imx6: add new board RIoTboard
 
-Iain Paton (1):
-      ARM: imx6: clk: i.MX6 DualLite/Solo i2c4 clock
+Lucas Stach (4):
+      ARM: dts: imx6: update pcie to bring in line with new binding
+      ARM: dts: imx6qdl-sabresd: remove power-on gpio from pcie
+      ARM: dts: imx6: edmqmx6: add pinctrl for pfuze irq gpio
+      ARM: dts: imx6: edmqmx6: add SPI bus and flash
 
-Juan Solano (1):
-      ARM: i.MX27 pca100: remove deprecated IRQF_DISABLED
+Marek Vasut (2):
+      ARM: dts: imx: Add alias for ethernet controller
+      ARM: dts: imx6qdl-sabresd: Add PCIe support
 
-Philipp Zabel (1):
-      ARM: i.MX5: Remove outdated VPU clock lookups
+Michael Heimpold (4):
+      ARM: dts: imx28-duckbill: fix mmc settings
+      ARM: dts: imx28: include gpio.h to allow use of symbolic names
+      ARM: dts: imx28-duckbill: fix phy reset gpio
+      ARM: dts: imx28-duckbill: use symbolic names from gpio.h
 
-Shawn Guo (10):
-      ARM: imx_v6_v7_defconfig: enable cpufreq and CMA support
-      ARM: imx: drop CONFIG_MMC_UNSAFE_RESUME from defconfig
-      ARM: imx_v6_v7_defconfig: enable option CONFIG_LOCALVERSION_AUTO
-      ARM: imx: define struct clk_gate2 on our own
-      ARM: imx: lock is always valid for clk_gate2
-      ARM: imx: add shared gate clock support
-      ARM: imx6q: add the missing esai_ahb clock
-      ARM: imx_v4_v5_defconfig: drop CONFIG_COMMON_CLK_DEBUG option
-      ARM: imx: add low-level debug support for imx6sx
-      ARM: imx: add basic imx6sx SoC support
+Philipp Zabel (13):
+      ARM: dts: i.MX53: Enable CODA7541 VPU
+      ARM: dts: i.MX53: Add reset line to VPU device node
+      ARM: dts: Add Phytec pfla02 with i.MX6 DualLite/Solo
+      ARM: dts: Add Phytec pbab01 with i.MX6 DualLite/Solo
+      ARM: dts: pfla02: Add GPIO LEDs
+      ARM: dts: pfla02: PHY reset is active-low
+      ARM: dts: pbab01: Set linux,stdout-path to UART4
+      ARM: dts: pbab01: Add I2C2 and I2C3
+      ARM: dts: pbab01: Add I2C devices
+      ARM: dts: pfla02: Add UART1 (uart3)
+      ARM: dts: pbab01: Enable UART1
+      ARM: dts: pbab01: Enable DVI
+      ARM: dts: imx6q-gk802: Enable HDMI
 
-Stefan Agner (1):
-      ARM: vf610: add UART choice for low-level debug
+Russell King (1):
+      ARM: imx: add HDMI support for SolidRun HummingBoard and Cubox-i
 
- .../devicetree/bindings/clock/imx25-clock.txt      |   3 +
- .../devicetree/bindings/clock/imx27-clock.txt      |   7 +-
- .../devicetree/bindings/clock/imx6q-clock.txt      |   1 +
- .../devicetree/bindings/clock/imx6sx-clock.txt     |  13 +
- arch/arm/Kconfig.debug                             |  22 +-
- arch/arm/configs/imx_v4_v5_defconfig               |   8 +-
- arch/arm/configs/imx_v6_v7_defconfig               |  12 +-
- arch/arm/configs/mxs_defconfig                     |   7 +-
- arch/arm/include/debug/imx-uart.h                  |  11 +
- arch/arm/include/debug/vf.S                        |  15 +-
- arch/arm/mach-imx/Kconfig                          |  69 +--
- arch/arm/mach-imx/Makefile                         |   6 +-
- arch/arm/mach-imx/avic.c                           |   4 +-
- arch/arm/mach-imx/clk-gate2.c                      |  47 +-
- arch/arm/mach-imx/clk-imx1.c                       |  41 +-
- arch/arm/mach-imx/clk-imx25.c                      |  24 +-
- arch/arm/mach-imx/clk-imx27.c                      |  27 +-
- arch/arm/mach-imx/clk-imx31.c                      |   2 -
- arch/arm/mach-imx/clk-imx51-imx53.c                |  20 +-
- arch/arm/mach-imx/clk-imx6q.c                      |  21 +-
- arch/arm/mach-imx/clk-imx6sl.c                     |   6 +-
- arch/arm/mach-imx/clk-imx6sx.c                     | 524 +++++++++++++++++++++
- arch/arm/mach-imx/clk.h                            |  13 +-
- arch/arm/mach-imx/common.h                         |  15 +-
- arch/arm/mach-imx/cpu.c                            |   3 +
- arch/arm/mach-imx/devices/platform-mx2-emma.c      |   2 +-
- arch/arm/mach-imx/eukrea_mbimxsd51-baseboard.c     | 231 ---------
- arch/arm/mach-imx/imx25-dt.c                       |   1 -
- arch/arm/mach-imx/imx27-dt.c                       |   1 -
- arch/arm/mach-imx/imx31-dt.c                       |   1 -
- arch/arm/mach-imx/imx35-dt.c                       |   1 -
- arch/arm/mach-imx/imx51-dt.c                       |   1 -
- arch/arm/mach-imx/mach-apf9328.c                   |   1 -
- arch/arm/mach-imx/mach-armadillo5x0.c              |   1 -
- arch/arm/mach-imx/mach-bug.c                       |   1 -
- arch/arm/mach-imx/mach-cpuimx27.c                  |   1 -
- arch/arm/mach-imx/mach-cpuimx35.c                  |   1 -
- arch/arm/mach-imx/mach-cpuimx51sd.c                | 364 --------------
- arch/arm/mach-imx/mach-eukrea_cpuimx25.c           |   1 -
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c        |   1 -
- arch/arm/mach-imx/mach-imx27ipcam.c                |   1 -
- arch/arm/mach-imx/mach-imx27lite.c                 |   1 -
- arch/arm/mach-imx/mach-imx50.c                     |   1 -
- arch/arm/mach-imx/mach-imx53.c                     |   1 -
- arch/arm/mach-imx/mach-imx6sx.c                    |  51 ++
- arch/arm/mach-imx/mach-kzm_arm11_01.c              |   1 -
- arch/arm/mach-imx/mach-mx1ads.c                    |   2 -
- arch/arm/mach-imx/mach-mx21ads.c                   | 174 +++----
- arch/arm/mach-imx/mach-mx25_3ds.c                  |   1 -
- arch/arm/mach-imx/mach-mx27_3ds.c                  |   1 -
- arch/arm/mach-imx/mach-mx27ads.c                   |   1 -
- arch/arm/mach-imx/mach-mx31_3ds.c                  |   1 -
- arch/arm/mach-imx/mach-mx31ads.c                   |   1 -
- arch/arm/mach-imx/mach-mx31lilly.c                 |   1 -
- arch/arm/mach-imx/mach-mx31lite.c                  |   1 -
- arch/arm/mach-imx/mach-mx31moboard.c               |   1 -
- arch/arm/mach-imx/mach-mx35_3ds.c                  |   1 -
- arch/arm/mach-imx/mach-mx51_babbage.c              | 428 -----------------
- arch/arm/mach-imx/mach-mxt_td60.c                  |   1 -
- arch/arm/mach-imx/mach-pca100.c                    |   4 +-
- arch/arm/mach-imx/mach-pcm037.c                    |   1 -
- arch/arm/mach-imx/mach-pcm038.c                    |   1 -
- arch/arm/mach-imx/mach-pcm043.c                    |   1 -
- arch/arm/mach-imx/mach-qong.c                      |   1 -
- arch/arm/mach-imx/mach-scb9328.c                   |   1 -
- arch/arm/mach-imx/mach-vpr200.c                    |   1 -
- arch/arm/mach-imx/mxc.h                            |   6 +
- arch/arm/mach-imx/time.c                           |  15 +
- arch/arm/mach-imx/tzic.c                           |   4 +-
- include/dt-bindings/clock/imx6sx-clock.h           | 256 ++++++++++
- 70 files changed, 1152 insertions(+), 1339 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/imx6sx-clock.txt
- create mode 100644 arch/arm/mach-imx/clk-imx6sx.c
- delete mode 100644 arch/arm/mach-imx/eukrea_mbimxsd51-baseboard.c
- delete mode 100644 arch/arm/mach-imx/mach-cpuimx51sd.c
- create mode 100644 arch/arm/mach-imx/mach-imx6sx.c
- delete mode 100644 arch/arm/mach-imx/mach-mx51_babbage.c
- create mode 100644 include/dt-bindings/clock/imx6sx-clock.h
+Sascha Hauer (7):
+      ARM: dts: Add stdout-path property to i.MX boards
+      ARM: dts: i.MX51 babbage: Fix FEC pad ctrl settings
+      ARM: dts: i.MX25: Add mmc aliases
+      ARM: dts: i.MX25: Add IRAM node
+      ARM: dts: Karo TX25: Add pinctrl nodes
+      ARM: dts: Karo TX25: Add phy reset gpio and supply for FEC
+      ARM: dts: Karo TX25: use hardware ecc
+
+Silvio Fricke (1):
+      ARM: dts: imx6: edmqmx6: add vcc and vio power supplies to stmpe
+
+Stefan Agner (2):
+      of: add vendor prefix for Toradex AG
+      ARM: dts: add initial Colibri VF61 board support
+
+Tim Harvey (3):
+      ARM: dts: ventana: Add HDMI support
+      ARM: dts: imx: add LVDS backlight for Ventana
+      ARM: dts: imx: Fix LVDS mapping for Ventana GW52xx
+
+Vincent Stehl? (1):
+      ARM: dts: imx6qdl-sabresd.dtsi: Add red led
+
+Xiubo Li (3):
+      ARM: dts: vf610: Add Freescale FTM PWM node.
+      ARM: dts: vf610-twr: Add PWM0's pinctrl node
+      ARM: dts: vf610-twr: Enables FTM PWM device.
+
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   5 +
+ .../boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts  |  13 +
+ arch/arm/boot/dts/imx25-karo-tx25.dts              |  77 +++
+ arch/arm/boot/dts/imx25-pdk.dts                    | 217 ++++++++-
+ arch/arm/boot/dts/imx25.dtsi                       |  46 +-
+ arch/arm/boot/dts/imx27-pdk.dts                    | 170 ++++++-
+ arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts   |   4 +
+ arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts     | 116 ++++-
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi    |  53 +-
+ arch/arm/boot/dts/imx27.dtsi                       |  30 +-
+ arch/arm/boot/dts/imx28-duckbill.dts               |  12 +-
+ arch/arm/boot/dts/imx28.dtsi                       |   1 +
+ arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi       |  15 +
+ .../boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts  |  22 +
+ arch/arm/boot/dts/imx35-pdk.dts                    |  68 +++
+ arch/arm/boot/dts/imx35.dtsi                       |  25 +-
+ arch/arm/boot/dts/imx50.dtsi                       |   1 +
+ arch/arm/boot/dts/imx51-babbage.dts                | 374 +++++++++-----
+ arch/arm/boot/dts/imx51-digi-connectcore-jsk.dts   | 108 +++++
+ arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi  | 377 ++++++++++++++
+ arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi       |  11 +
+ .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  | 120 +++++
+ arch/arm/boot/dts/imx51.dtsi                       |   3 +
+ arch/arm/boot/dts/imx53-mba53.dts                  |   4 +
+ arch/arm/boot/dts/imx53-qsb-common.dtsi            |  21 +
+ arch/arm/boot/dts/imx53.dtsi                       |   3 +-
+ arch/arm/boot/dts/imx6dl-hummingboard.dts          |  31 ++
+ arch/arm/boot/dts/imx6dl-phytec-pbab01.dts         |  19 +
+ arch/arm/boot/dts/imx6dl-phytec-pfla02.dtsi        |  22 +
+ arch/arm/boot/dts/imx6dl-riotboard.dts             | 539 +++++++++++++++++++++
+ arch/arm/boot/dts/imx6dl.dtsi                      |   3 +-
+ arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts            |  40 +-
+ arch/arm/boot/dts/imx6q-gk802.dts                  |   7 +-
+ arch/arm/boot/dts/imx6q-gw5400-a.dts               |   5 +
+ arch/arm/boot/dts/imx6q-phytec-pbab01.dts          |  33 +-
+ arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi         | 307 +-----------
+ arch/arm/boot/dts/imx6q-udoo.dts                   |  23 +
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi             |  27 ++
+ arch/arm/boot/dts/imx6qdl-dfi-fs700-m60.dtsi       |   2 +-
+ arch/arm/boot/dts/imx6qdl-gw51xx.dtsi              |   5 +
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi              |  45 ++
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi              |  24 +
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi              |  24 +
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi          |   4 +
+ arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi       | 102 ++++
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi       | 356 ++++++++++++++
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi           |   4 +
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |  65 +++
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi           |  19 +
+ arch/arm/boot/dts/imx6qdl.dtsi                     |   8 +-
+ arch/arm/boot/dts/imx6sl.dtsi                      |   1 +
+ arch/arm/boot/dts/vf610-colibri.dts                | 123 +++++
+ arch/arm/boot/dts/vf610-twr.dts                    |  36 ++
+ arch/arm/boot/dts/vf610.dtsi                       |  24 +
+ 55 files changed, 3257 insertions(+), 538 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx35-pdk.dts
+ create mode 100644 arch/arm/boot/dts/imx51-digi-connectcore-jsk.dts
+ create mode 100644 arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi
+ create mode 100644 arch/arm/boot/dts/imx6dl-phytec-pbab01.dts
+ create mode 100644 arch/arm/boot/dts/imx6dl-phytec-pfla02.dtsi
+ create mode 100644 arch/arm/boot/dts/imx6dl-riotboard.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
+ create mode 100644 arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+ create mode 100644 arch/arm/boot/dts/vf610-colibri.dts
