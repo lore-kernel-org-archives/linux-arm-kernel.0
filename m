@@ -1,94 +1,48 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 16 May 2014 14:24:51 +0100
-Subject: [PATCH v7 0/3] Add support for PCI in AArch64
-In-Reply-To: <CA+sq2Ccok5wtKjCZUkBhhj3WsiqFAoMgHK7LY210aBtMku+8SA@mail.gmail.com>
-References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
- <CA+sq2Ccok5wtKjCZUkBhhj3WsiqFAoMgHK7LY210aBtMku+8SA@mail.gmail.com>
-Message-ID: <20140516132451.GK967@e106497-lin.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 16 May 2014 15:35:48 +0200
+Subject: [PATCH v3 6/7] Documentation: add the Marvell Berlin pinctrl
+ documentation
+In-Reply-To: <1399267649-20218-7-git-send-email-antoine.tenart@free-electrons.com>
+References: <1399267649-20218-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1399267649-20218-7-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <CACRpkdaL9tzfUrY=wLjSR3dcD7JC1mUX3kdG+Wh5gDyxGY2Yqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sunil,
+On Mon, May 5, 2014 at 7:27 AM, Antoine T?nart
+<antoine.tenart@free-electrons.com> wrote:
 
-On Fri, May 16, 2014 at 11:33:04AM +0100, Sunil Kovvuri wrote:
-> Hi Liviu,
-> 
-> I am using your ARM64 PCIe patches to write a PCIe host controller
-> driver for our SOC. I am facing an issue with SR-IOV capable device.
-> 
-> Consider an PCI Express endpoint connected to a PCI Express
-> Root Port.  The PCI Express endpoint provides PCI-SIG SR-IOV
-> capabilities with a single physical function and a large number
-> of virtual functions.  The Root Port contains a pci-pci bridge in
-> between it and the SR-IOV device.
-> 
-> When the SR-IOV capable device's driver tries to enable sriov
-> (pci_enable_sriov()) it fails to create/add PCI device for each
-> virtual function reporting  "not enough MMIO resources for SR-IOV".
-> 
-> In sriov_enable() (drivers/pci/iov.c)
-> 
->  296        for (i = 0; i < PCI_SRIOV_NUM_BARS; i++) {
->  297                 bars |= (1 << (i + PCI_IOV_RESOURCES));
->  298                 res = dev->resource + PCI_IOV_RESOURCES + i;
->  299                 if (res->parent)
->  300                         nres++;
->  301         }
->  302         if (nres != iov->nres) {
->  303                 dev_err(&dev->dev, "not enough MMIO resources for
->  SR-IOV\n");
->  304                 return -ENOMEM;
->  305         }
-> 
-> Here its checking if physical function's IOV resource has a parent or not.
-> Which is pci-pci bridge in this case. Otherwise it doesn't consider
-> that resource.
-> 
-> Added below api to your patch.
-> This will try to claim a resource while creating a PCI device which
-> inturn sets 'res->parent'.
-> 
-> Let me know if this is okay.
-> 
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index 9f29c9a..fbfb48f 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -125,6 +125,21 @@ resource_size_t pcibios_align_resource(void
-> *data, const struct resource *res,
->         return res->start;
->  }
-> 
-> +int pcibios_add_device(struct pci_dev *pdev)
-> +{
-> +        unsigned int i, type_mask = IORESOURCE_IO | IORESOURCE_MEM;
-> +        struct resource *res;
+> Add the documentation related to the Berlin pin-controller driver and
+> explain how to configure this group based controller.
+>
+> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+(...)
+
+When I see this:
+
+> +Required subnode-properties:
+> +- marvell,groups: a list of strings describing the group names.
+> +- marvell,function: a string describing the function used to mux the groups.
 > +
-> +        for (i = 0; i < PCI_NUM_RESOURCES; i++) {
-> +                res = &pdev->resource[i];
-> +                if (res->parent || !(res->flags & type_mask))
-> +                        continue;
-> +                pci_claim_resource(pdev, i);
-> +        }
+> +Example:
 > +
-> 
+> +sm_pinctrl: pin-controller at 0 {
+> +       compatible = "marvell,berlin2q-sysmgr-pinctrl";
+> +       reg = <0xfc0000 0x44>;
+> +
+> +       uart0_pmux: uart0-pmux {
+> +               marvell,groups = "GSM12", "GSM13";
+> +               marvell,function = "uart0";
+> +       };
+> +}
 
-I would like not to have to add your patch in this file as I am trying to
-remove it entirely. I don't have an SR-IOV capable device in my setup so
-I am not able to debug your problem, but could you have a go and try to
-figure out why the SR-IOV resources do not get a parent associated with
-when they get created?
+I feel like ... can't we just standardize that and make it a common
+pinctrl binding, and name the properties "groups" and "function"
+for a family of pin controllers just mapping N groups to 1 function?
 
-Many thanks,
-Liviu
+I will merge the patches as are, but maybe we can make it generic
+on top of this before the merge window?
 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Yours,
+Linus Walleij
