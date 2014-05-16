@@ -1,28 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 16 May 2014 08:57:53 +0100
-Subject: [PATCH v6 00/15] enable HiP04 SoC
-In-Reply-To: <20140516050718.GZ27822@titan.lakedaemon.net>
-References: <1399795571-17231-1-git-send-email-haojian.zhuang@linaro.org>
- <14229972.j5k474Mq5Q@wuerfel>
- <CAD6h2NSpH0zxpek4KnUMT-p_DFnGZVaxP+x_0hsn1S8O6C7X6g@mail.gmail.com>
- <53748972.8040603@arm.com> <20140516050718.GZ27822@titan.lakedaemon.net>
-Message-ID: <40e13d6093a50fc81d77be607a00098f@www.loen.fr>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 16 May 2014 09:59:53 +0200
+Subject: [PATCH RFC 00/11] Remove mach-kirkwood
+In-Reply-To: <8332148.Z1shujgC24@wuerfel>
+References: <1400163836-9831-1-git-send-email-andrew@lunn.ch>
+ <8332148.Z1shujgC24@wuerfel>
+Message-ID: <20140516095953.19522ebd@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Dear Arnd Bergmann,
 
-> I've just started assisting Thomas with review / wrangling patches 
-> for
-> drivers/irqchip. If you could Cc me on the next revision, I'd 
-> appreciate
-> it.
+On Thu, 15 May 2014 16:36:35 +0200, Arnd Bergmann wrote:
 
-That's excellent news! If you didn't have enough on your plate already, 
-feel free to have a look at the GICv3 patches I reposted yesterday! :-)
+> There are three other series that may or may not make it into 3.16
+> and that will have conflicts with this one:
+> 
+> - remove mv78xx0
+> - remove mach-dove
+> - convert orion5x to multiplatform
 
-Thanks,
+The work on Orion5x is still on-going. I'd like to progressively
+continue the DT migration of Orion5x, moving to multiplatform, and then
+once it's done, move into mach-mvebu. I'd appreciate to not rush things
+more than necessary.
 
-         M.
+Thanks!
+
+Thomas
 -- 
-Fast, cheap, reliable. Pick two.
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
