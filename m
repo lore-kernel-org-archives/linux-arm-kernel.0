@@ -1,86 +1,43 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 16 May 2014 10:30:24 -0700
-Subject: [PATCH v4 4/4] drivers: net: Add APM X-Gene SoC ethernet driver
- support.
-In-Reply-To: <1400258705.21547.217.camel@deneb.redhat.com>
-References: <1399326447-2329-1-git-send-email-isubramanian@apm.com>
- <1399326447-2329-5-git-send-email-isubramanian@apm.com>
- <1400258705.21547.217.camel@deneb.redhat.com>
-Message-ID: <CAKh23FnAJZ-fa06WtCjJ+Of3_cDPypb+kgFFbWMy2-twjQhuPg@mail.gmail.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Fri, 16 May 2014 21:31:20 +0400
+Subject: =?UTF-8?B?UmU6IFtSRkMgUEFUQ0ggMi85XSBkdDogZGVwczogZGVwZW5kZW5jeSBiYXNl?=
+ =?UTF-8?B?ZCBkZXZpY2UgY3JlYXRpb24=?=
+In-Reply-To: <5373DBCF.1080503@ahsoftware.de>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
+ <20140514200645.15984C4095B@trevor.secretlab.ca>
+ <5373DBCF.1080503@ahsoftware.de>
+Message-ID: <1400261480.338700899@f360.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 9:45 AM, Mark Salter <msalter@redhat.com> wrote:
-> On Mon, 2014-05-05 at 14:47 -0700, Iyappan Subramanian wrote:
->> +static int xgene_enet_probe(struct platform_device *pdev)
->> +{
->> +       struct net_device *ndev;
->> +       struct xgene_enet_pdata *pdata;
->> +       struct device *dev = &pdev->dev;
->> +       struct napi_struct *napi;
->> +       int ret = 0;
->> +
->> +       ndev = alloc_etherdev(sizeof(struct xgene_enet_pdata));
->> +       if (!ndev)
->> +               return -ENOMEM;
->> +
->> +       pdata = netdev_priv(ndev);
->> +
->> +       pdata->pdev = pdev;
->> +       pdata->ndev = ndev;
->> +       SET_NETDEV_DEV(ndev, dev);
->> +       platform_set_drvdata(pdev, pdata);
->> +       ndev->netdev_ops = &xgene_ndev_ops;
->> +       ndev->features |= NETIF_F_IP_CSUM;
->> +       ndev->features |= NETIF_F_GSO;
->> +       ndev->features |= NETIF_F_GRO;
->> +
->
-> You're missing:
->
->          spin_lock_init(&pdata->stats_lock);
+Wed, 14 May 2014 23:10:39 +0200 ?? Alexander Holler <holler@ahsoftware.de>:
+> Am 14.05.2014 22:06, schrieb Grant Likely:
+> > On Wed, 14 May 2014 16:49:05 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
+> >> Am 14.05.2014 16:05, schrieb Grant Likely:
+> >>> On Mon, 12 May 2014 18:47:53 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
+> 
+> >> Hmm, I don't really care if that will be merged. I have no motivation to 
+> >> fight with Linux kernel maintainers and I don't know if I will spend the 
+> >> necessary time to do so.
+> > 
+> > The people you need to convince are Rob, Greg, and me, and you've got my
+> > attention. If I'm convinced, then I can probably convince Greg also.
+> > You've got an interesting approach, and I hope you won't give up on it.
+> 
+> Sorry, but that point of the view is already a problem. Why do I have to
+> convince you people?
+> 
+> To summarize:
+> 
+> Linux kernel maintainers
+> 
+> - don't like code they haven't written theirself,
+> - don't like code which doesn't look like they have written it theirself,
+> - don't like ideas they haven't had themself,
+> - do feel good in their closed group they have formed,
+> ...
 
-I really appreciate the help.  This fixed the crash.
+Very correct and well said.
+For many subsystems is it as is, we cannot break these barriers.
 
->
-> Lockdep (if enabled) complains:
->
->  xgene_enet_probe: 852
->  INFO: trying to register non-static key.
->  the code is fine but needs lockdep annotation.
->  turning off the locking correctness validator.
->  CPU: 4 PID: 1 Comm: swapper/0 Not tainted 3.15.0-rc4+ #13
->  Call trace:
->  [<ffffffc000087ef4>] dump_backtrace+0x0/0x16c
->  [<ffffffc000088070>] show_stack+0x10/0x1c
->  [<ffffffc000766b04>] dump_stack+0x88/0xb8
->  [<ffffffc00010243c>] __lock_acquire+0x1914/0x1ce0
->  [<ffffffc000102fa0>] lock_acquire+0x9c/0x1d0
->  [<ffffffc00076d418>] _raw_spin_lock+0x40/0x58
->  [<ffffffc0004fced0>] xgene_enet_get_stats+0x34/0x140
->  [<ffffffc0005fd7dc>] dev_get_stats+0x90/0xbc
->  [<ffffffc00061736c>] rtnl_fill_ifinfo+0x388/0x8e4
->  [<ffffffc000617938>] rtmsg_ifinfo+0x70/0x10c
->  [<ffffffc000609e98>] register_netdevice+0x370/0x400
->  [<ffffffc000609f3c>] register_netdev+0x14/0x2c
->  [<ffffffc0004fd7ec>] xgene_enet_probe+0x1cc/0x618
->  [<ffffffc0004a1928>] platform_drv_probe+0x28/0x80
->  [<ffffffc00049fc38>] driver_probe_device+0x98/0x3ac
->  [<ffffffc0004a0040>] __driver_attach+0xa0/0xa8
->  [<ffffffc00049dd78>] bus_for_each_dev+0x54/0x98
->  [<ffffffc00049f65c>] driver_attach+0x1c/0x28
->  [<ffffffc00049f234>] bus_add_driver+0x164/0x240
->  [<ffffffc0004a06b8>] driver_register+0x64/0x130
->  [<ffffffc0004a187c>] __platform_driver_register+0x5c/0x68
->  [<ffffffc000c08e14>] xgene_enet_driver_init+0x14/0x20
->  [<ffffffc000081418>] do_one_initcall+0xc4/0x154
->  [<ffffffc000bd2a74>] kernel_init_freeable+0x204/0x2a8
->  [<ffffffc00075e8a0>] kernel_init+0xc/0xd4
->
->> +       ret = xgene_enet_get_resources(pdata);
->> +       if (ret)
->> +               goto err;
->> +
->> +       ret = register_netdev(ndev);
->
->
+---
