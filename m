@@ -1,50 +1,70 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 15 May 2014 20:39:22 -0700
-Subject: [Ksummit-discuss] [TECH TOPIC] ARM legacy board DT conversion
- finalization
-In-Reply-To: <20140515121546.3A06AC40B0E@trevor.secretlab.ca>
-References: <20140511030009.GO12708@titan.lakedaemon.net>
- <20140511083729.211e9b5f@lwn.net>
- <20140515121546.3A06AC40B0E@trevor.secretlab.ca>
-Message-ID: <CAOesGMircGRTGA7Cj=X8b_YopMrCnoKfgZzzYQmnGGWyVz8P6Q@mail.gmail.com>
+From: satish.patel@ti.com (Satish Patel)
+Date: Fri, 16 May 2014 09:14:34 +0530
+Subject: [PATCH v2 0/5] Smart Card(SC) interface, TI USIM & NxP SC phy
+ driver
+In-Reply-To: <20140130130515.GC23970@kroah.com>
+References: <1390192434-19386-1-git-send-email-satish.patel@ti.com>
+ <52E9E8B0.2020000@ti.com> <20140130130515.GC23970@kroah.com>
+Message-ID: <537589A2.8060802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 5:15 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Sun, 11 May 2014 08:37:29 -0400, Jonathan Corbet <corbet@lwn.net> wrote:
->> On Sat, 10 May 2014 23:00:09 -0400
->> Jason Cooper <jason@lakedaemon.net> wrote:
+
+On 1/30/2014 6:35 PM, Greg KH wrote:
+> On Thu, Jan 30, 2014 at 11:22:48AM +0530, Satish Patel wrote:
+>> On 1/20/2014 10:03 AM, Satish Patel wrote:
+>>> Changes from v1:
+>>> * RFC(v1) comments are fixed
+>>>
+>>> ** removed "gpio_to_irq" as GPIO controller process  cell from DT and
+>>> give it to DT node
+>>> ** comments on documentation
+>>> ** few other comments on null checks are resolved
+>>>
+>>> * BWT timing configuration is added to ti-usim driver
+>>>
+>>> v1 cover letter link#
+>>> https://lkml.org/lkml/2014/1/6/250
+>>>
+>>> Satish Patel (5):
+>>>    sc_phy:SmartCard(SC) PHY interface to SC controller
+>>>    misc: tda8026: Add NXP TDA8026 PHY driver
+>>>    char: ti-usim: Add driver for USIM module on AM43xx
+>>>    ARM: dts: AM43xx: DT entries added for ti-usim
+>>>    ARM: dts: AM43xx-epos-evm: DT entries  for ti-usim and phy
+>>>
+>>>   Documentation/devicetree/bindings/misc/tda8026.txt |   19 +
+>>>   .../devicetree/bindings/ti-usim/ti-usim.txt        |   31 +
+>>>   Documentation/sc_phy.txt                           |  171 ++
+>>>   arch/arm/boot/dts/am4372.dtsi                      |   10 +
+>>>   arch/arm/boot/dts/am43x-epos-evm.dts               |   43 +
+>>>   drivers/char/Kconfig                               |    7 +
+>>>   drivers/char/Makefile                              |    1 +
+>>>   drivers/char/ti-usim-hw.h                          |  863 +++++++++
+>>>   drivers/char/ti-usim.c                             | 1859 ++++++++++++++++++++
+>>>   drivers/misc/Kconfig                               |    7 +
+>>>   drivers/misc/Makefile                              |    1 +
+>>>   drivers/misc/tda8026.c                             | 1255 +++++++++++++
+>>>   include/linux/sc_phy.h                             |  132 ++
+>>>   include/linux/ti-usim.h                            |   98 +
+>>>   14 files changed, 4497 insertions(+), 0 deletions(-)
+>>>   create mode 100644 Documentation/devicetree/bindings/misc/tda8026.txt
+>>>   create mode 100644 Documentation/devicetree/bindings/ti-usim/ti-usim.txt
+>>>   create mode 100644 Documentation/sc_phy.txt
+>>>   create mode 100644 drivers/char/ti-usim-hw.h
+>>>   create mode 100644 drivers/char/ti-usim.c
+>>>   create mode 100644 drivers/misc/tda8026.c
+>>>   create mode 100644 include/linux/sc_phy.h
+>>>   create mode 100644 include/linux/ti-usim.h
+>> Any comments on this patch series ?
 >>
->> > So, I'm proposing a session where each sub-arch gives a brief run-down
->> > of the status of the legacy board conversion, and wraps up with a todo
->> > list.  After all of the sub-arches have given their status (5 - 10
->> > minutes each?), we hash out helping each other with the final pieces.
->>
->> This *really* looks like an ARM minisummit topic to me; hopefully one
->> of those is in the works?
+>> If not,
+>> Can you accept these patches for next merge window
+> It's the middle of this merge window, and I can't accept any patches
+> until after 3.14-rc1 is out, at which point I'll start to work on my
+> patch backlog.
+Are these to be consider for next submission ? Or you want me to start 
+review cycle one more time.
+> thanks,
 >
-> It does, doesn't it? I wouldn't want this as a main ksummit topic.
->
-> The problem with ARM minisummits these days is it is very easy to
-> devolve into a nothing-but-dt meeting with a bunch of people sitting
-> around looking either annoyed or bored. We weren't able to pull enough
-> topics together when we tried to do an ARM minisummit at the ELC.
->
-> Instead of a traditional ARM minisummit, perhaps we should do an ARM
-> platforms minisprint instead. Light on any kind of presentations, but
-> have the right people in the room to try and knock out some of the
-> legacy backlog (which is kind of what Jason described)
-
-I'm not entirely sold on the practicality of this. So many of the
-legacy platforms need some random piece of hardware to test on, and
-having people drag that with them to Chicago seems awkward.
-
-But I'm willing to entertain the thought and see where we end up. We
-would need a rough todo list and a list of people that would need to
-be in the room for the thing to be productive.
-
-(I wonder if it would make more sense to colocate something like it
-with the Linaro Connect in California this fall instead).
-
-
--Olof
+> greg k-h
