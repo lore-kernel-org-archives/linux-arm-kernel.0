@@ -1,64 +1,98 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 16 May 2014 10:57:36 +0100
-Subject: [PATCHv3 1/3] ARM: mm: allow sub-architectures to override PCI
- I/O memory type
-In-Reply-To: <20140515175307.GA12259@obsidianresearch.com>
-References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140515155130.193c3181@free-electrons.com>
- <20140515142924.GI27594@arm.com> <4972763.mtuLYh6sDH@wuerfel>
- <20140515153430.GM27594@arm.com>
- <20140515175307.GA12259@obsidianresearch.com>
-Message-ID: <20140516095736.GF12341@arm.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 16 May 2014 12:00:57 +0200
+Subject: [PATCH v2] ARM: OMAP: replace checks for CONFIG_USB_GADGET_OMAP
+In-Reply-To: <1400232974.20342.22.camel@x220>
+References: <1400187345.11786.28.camel@x220>
+ <20140515231229.GA25523@saruman.home> <1400232974.20342.22.camel@x220>
+Message-ID: <1400234457.20342.25.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 06:53:07PM +0100, Jason Gunthorpe wrote:
-> On Thu, May 15, 2014 at 04:34:30PM +0100, Will Deacon wrote:
-> > > How can a write be non-posted on the PCI bus if it's posted on AXI?
-> > 
-> > From the point-of-view of the CPU it would be posted, but the PCI bus would
-> > see an unposted write (so I imagine there would be write buffering at the
-> > host controller). However, I worry that I'm missing your point :)
-> 
-> It is worth being a bit careful with language here, from an AXI
-> perspective there is not really such thing as a posted write. 
-> 
-> All writes are explicitly ack'd upon 'completion', however the memory
-> type influences when that is allowed to happen.
+Commit 193ab2a60700 ("usb: gadget: allow multiple gadgets to be built")
+apparently required that checks for CONFIG_USB_GADGET_OMAP would be
+replaced with checks for CONFIG_USB_OMAP. Do so now for the remaining
+checks for CONFIG_USB_GADGET_OMAP, even though these checks have
+basically been broken since v3.1.
 
-Correct. I was trying desperately to avoid delving into AXI signals as it
-adds another source of confusion, despite the attempt at being precise.
+And, since we're touching this code, use the IS_ENABLED() macro, so
+things will now (hopefully) also work if USB_OMAP is modular.
 
-> For PCI IO writes the AXI memory type from the CPU must be 'Device
-> Non-bufferable' (AWCACHE = 0), which will require the AXI ACK to be
-> generated only once the PCI target returns an IOWr completion TLP.
+Fixes: 193ab2a60700 ("usb: gadget: allow multiple gadgets to be built")
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+v2: us IS_ENABLED() as Felipe requested. Still untested.
 
-That sounds like `strongly-ordered memory' for ARMv7.
+ arch/arm/mach-omap1/board-h2.c        | 2 +-
+ arch/arm/mach-omap1/board-h3.c        | 2 +-
+ arch/arm/mach-omap1/board-innovator.c | 2 +-
+ arch/arm/mach-omap1/board-osk.c       | 2 +-
+ drivers/usb/phy/phy-isp1301-omap.c    | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
-> For PCI Memory writes the AXI memory type from the CPU could be
-> 'Device Non-bufferable' but it would be best if it is 'Device
-> Bufferable' (AWCACHE = 1).
-
-That sounds like `device memory' for ARMv7.
-
-> The latter allows more performance by permitting any AXI bridge in the
-> path to ack the write early. This is as close as AXI gets to 'posted
-> writes'
-> 
-> It is very important that the page tables in the CPU properly select
-> the right AXI Memory Type for each space.
-
-But, as far as I know, this ordering/completion guarantee for I/O space
-accesses is a property of the x86 architecture, not something mandated by
-the PCI spec (after all, this is nothing to do with the PCI bus).
-
-> AFAIK, to duplicate x86 semantics an outl/inl must spin the CPU until
-> it completes at the target, and the CPU must not pipeline outl/inl
-> operations: outl();  outl(); produces 1 IOWr TLP, waits for
-> completion, then produces another.
-
-So that's the real question: Do we really need to duplicate x86 semantics
-for IO space accesses? If we do, then we need both strongly-ordered memory
-*and* a dsb in our accessors. That's not going to be much fun.
-
-Will
+diff --git a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
+index 65d2acb31498..5b45d266d83e 100644
+--- a/arch/arm/mach-omap1/board-h2.c
++++ b/arch/arm/mach-omap1/board-h2.c
+@@ -346,7 +346,7 @@ static struct omap_usb_config h2_usb_config __initdata = {
+ 	/* usb1 has a Mini-AB port and external isp1301 transceiver */
+ 	.otg		= 2,
+ 
+-#ifdef	CONFIG_USB_GADGET_OMAP
++#if IS_ENABLED(CONFIG_USB_OMAP)
+ 	.hmc_mode	= 19,	/* 0:host(off) 1:dev|otg 2:disabled */
+ 	/* .hmc_mode	= 21,*/	/* 0:host(off) 1:dev(loopback) 2:host(loopback) */
+ #elif	defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
+diff --git a/arch/arm/mach-omap1/board-h3.c b/arch/arm/mach-omap1/board-h3.c
+index 816ecd13f81e..bfed4f928663 100644
+--- a/arch/arm/mach-omap1/board-h3.c
++++ b/arch/arm/mach-omap1/board-h3.c
+@@ -366,7 +366,7 @@ static struct omap_usb_config h3_usb_config __initdata = {
+ 	/* usb1 has a Mini-AB port and external isp1301 transceiver */
+ 	.otg	    = 2,
+ 
+-#ifdef CONFIG_USB_GADGET_OMAP
++#if IS_ENABLED(CONFIG_USB_OMAP)
+ 	.hmc_mode       = 19,   /* 0:host(off) 1:dev|otg 2:disabled */
+ #elif  defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
+ 	/* NONSTANDARD CABLE NEEDED (B-to-Mini-B) */
+diff --git a/arch/arm/mach-omap1/board-innovator.c b/arch/arm/mach-omap1/board-innovator.c
+index bd5f02e9c354..c49ce83cc1eb 100644
+--- a/arch/arm/mach-omap1/board-innovator.c
++++ b/arch/arm/mach-omap1/board-innovator.c
+@@ -312,7 +312,7 @@ static struct omap_usb_config h2_usb_config __initdata = {
+ 	/* usb1 has a Mini-AB port and external isp1301 transceiver */
+ 	.otg		= 2,
+ 
+-#ifdef	CONFIG_USB_GADGET_OMAP
++#if IS_ENABLED(CONFIG_USB_OMAP)
+ 	.hmc_mode	= 19,	/* 0:host(off) 1:dev|otg 2:disabled */
+ 	/* .hmc_mode	= 21,*/	/* 0:host(off) 1:dev(loopback) 2:host(loopback) */
+ #elif	defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
+diff --git a/arch/arm/mach-omap1/board-osk.c b/arch/arm/mach-omap1/board-osk.c
+index 3a0262156e93..7436d4cf6596 100644
+--- a/arch/arm/mach-omap1/board-osk.c
++++ b/arch/arm/mach-omap1/board-osk.c
+@@ -283,7 +283,7 @@ static struct omap_usb_config osk_usb_config __initdata = {
+ 	 * be used, with a NONSTANDARD gender-bending cable/dongle, as
+ 	 * a peripheral.
+ 	 */
+-#ifdef	CONFIG_USB_GADGET_OMAP
++#if IS_ENABLED(CONFIG_USB_OMAP)
+ 	.register_dev	= 1,
+ 	.hmc_mode	= 0,
+ #else
+diff --git a/drivers/usb/phy/phy-isp1301-omap.c b/drivers/usb/phy/phy-isp1301-omap.c
+index 6e146d723b37..69e49be8866b 100644
+--- a/drivers/usb/phy/phy-isp1301-omap.c
++++ b/drivers/usb/phy/phy-isp1301-omap.c
+@@ -1295,7 +1295,7 @@ isp1301_set_host(struct usb_otg *otg, struct usb_bus *host)
+ 		return isp1301_otg_enable(isp);
+ 	return 0;
+ 
+-#elif	!defined(CONFIG_USB_GADGET_OMAP)
++#elif !IS_ENABLED(CONFIG_USB_OMAP)
+ 	// FIXME update its refcount
+ 	otg->host = host;
+ 
+-- 
+1.9.0
