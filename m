@@ -1,107 +1,143 @@
-From: peter@peter-b.co.uk (Peter TB Brett)
-Date: Fri, 16 May 2014 11:15:35 +0100
-Subject: Accessing GPIOs from userspace using recent kernels
-In-Reply-To: <CABxcv=nTV23Un91fSUmkixsF5uywoisCOi1qhPqVvZb+RvikDA@mail.gmail.com>
-References: <3385f19f3e1427613732f6d5c9f8513d@net2air.co>
- <CABxcv=mFV3nJf1eqNhTbh1KWwe8Z6Z62JtFn5KZbHnGprk1_bg@mail.gmail.com>
- <7bd3dbc0c3217f43eefc8d228995690f@net2air.co>
- <CABxcv=nTV23Un91fSUmkixsF5uywoisCOi1qhPqVvZb+RvikDA@mail.gmail.com>
-Message-ID: <ea43ccacfe4caf1f51f9e5a5c8bbdd5e@net2air.co>
+From: jhbird.choi@samsung.com (Jonghwan Choi)
+Date: Fri, 16 May 2014 19:18:28 +0900
+Subject: [PATCH v3] cpufreq: exynos:  Fix the compile error
+Message-ID: <000001cf70f0$2e48f930$8adaeb90$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-05-15 19:54, Javier Martinez Canillas wrote:
+Commit 7da83a80 ("ARM: EXYNOS: Migrate Exynos specific macros from plat to mach") which lands in samsung tree causes build breakage
+for cpufreq-exynos like following:
 
-> [snip]
-> 
-> But I would first look why associating the pins with gpio1 does not 
-> work.
-> 
->> 
->>> But as I said it would be better if you associate the pins with the
->>> GPIO controller that contains those pins instead of the pinmux 
->>> device.
->> 
->> 
->> Following this advice, I used:
->> 
->> &gpio1
->> 
->> {
->>   pinctrl-names = "default";
->>   pinctrl-0 = < &foo_pins >;
->> };
->> 
->> However, with these settings, nothing referring to pinmux_foo_pins 
->> appears
->> in pinctrl-devices, pinctrl-maps, pinctrl-handles, or pinmux-pins, so 
->> I'm
->> fairly sure these aren't the settings I'm looking for.
->> 
-> 
-> That should work afaict, did you see any errors on the kernel log? can
-> you share your complete boot log?
+drivers/cpufreq/exynos-cpufreq.c: In function 'exynos_cpufreq_probe':
+drivers/cpufreq/exynos-cpufreq.c:166:2: error: implicit declaration of function 'soc_is_exynos4210'
+[-Werror=implicit-function-declaration]
+drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration of function 'soc_is_exynos4212'
+[-Werror=implicit-function-declaration]
+drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration of function 'soc_is_exynos4412'
+[-Werror=implicit-function-declaration]
+drivers/cpufreq/exynos-cpufreq.c:170:2: error: implicit declaration of function 'soc_is_exynos5250'
+[-Werror=implicit-function-declaration]
+cc1: some warnings being treated as errors
+make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
+drivers/cpufreq/exynos4x12-cpufreq.c: In function 'exynos4x12_set_clkdiv':
+drivers/cpufreq/exynos4x12-cpufreq.c:118:2: error: implicit declaration of function 'soc_is_exynos4212'
+[-Werror=implicit-function-declaration]
+cc1: some warnings being treated as errors
+make[2]: *** [drivers/cpufreq/exynos4x12-cpufreq.o] Error 1
+make[1]: *** [drivers/cpufreq] Error 2
+This fixes above error with getting SoC information via of_machine_is_compatible() instead of soc_is_exynosXXXX().
 
-Ah yes, there were some relevant messages:
+Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+---
+ drivers/cpufreq/exynos-cpufreq.c     |   20 +++++++++++++++++---
+ drivers/cpufreq/exynos-cpufreq.h     |    8 ++++++++
+ drivers/cpufreq/exynos4x12-cpufreq.c |   11 ++++-------
+ 3 files changed, 29 insertions(+), 10 deletions(-)
 
-[    2.939453] pinctrl-single 4a100040.pinmux: pin 4a10009e.0 already 
-requested by 4a100040.pinmux; cannot claim for 4a310000.gpio
-[    2.951843] pinctrl-single 4a100040.pinmux: pin-47 (4a310000.gpio) 
-status -22
-[    2.955261] pinctrl-single 4a100040.pinmux: could not request pin 47 
-on device pinctrl-single
-
-I should have spotted those.
-
-> Something that looks strange to me is that you say to be using a
-> Pandaboard and in your pasted DTS fragment you had:
-> 
-> 0x5e (PIN_INPUT | MUX_MODE3)  /* gpmc_ad15.gpio_39 */ /* IRQ */
-> 0x12e (PIN_INPUT | MUX_MODE3) /* i2c4_scl.gpio_132 */ /* RST *
-> 
-> but grepping for those registers numbers in omap4-panda-common.dtsi I
-> see that they refers to different mux pins and are already configured
-> for other devices in different modes:
-> 
-> $ git grep "0x5e\|0x12e" arch/arm/boot/dts/omap4-panda-common.dtsi
-> 
-> 0x5e (PIN_INPUT_PULLUP | MUX_MODE0)     /* hdmi_sda.hdmi_sda */
-> 0x12e (PIN_OUTPUT | MUX_MODE5)  /* dispc2_data15 */
-
-Yes, that's my mistake.  I took the pin control register addresses from 
-the OMAP4 documentation and forgot that you have to subtract 0x40 to get 
-the correct address for use in the device tree.
-
-The correct snippet has 0x1e and 0xee.
-
-> Also I see that i2c4_scl has another register number and by the way is
-> also configured in another mode by i2c4 device node.
-> 0xee (PIN_INPUT_PULLUP | MUX_MODE0)     /* i2c4_scl */
-
-The I2C4 controller is exposed on the Pandaboard's expansion header, but 
-I want to use the pins for something else.  It seems that I can just 
-override the i2c4 device node's pinctrl-0 attribute to be empty and thus 
-prevent it from claiming pins?
-
-> Is what you shared your real change or just an example that does not
-> apply to the Pandaboard? Could you please share your complete DTS?
-
-The attached .dts file sort of works-ish.  It's an ugly hack, but I 
-don't have the time to do any more investigation into this now, 
-unfortunately.
-
-I guess my main question is: if I use /sys/class/gpio/export to export a 
-GPIO for userspace control, it would make sense for the kernel to try 
-and ensure that the GPIO is actually connected to something!  Please 
-consider this a feature request for OMAP4's GPIO and pinctrl drivers.
-
-The current call chain seems to be: gpiod_export() --> gpiod_request() 
---> omap_gpio_request().  Looking at other GPIO drivers, it seems like 
-omap_gpio_request() should eventually call pinctrl_request_gpio().  
-Would be useful if someone who knows about OMAP4/gpio/pinctrl could take 
-a look at this.
-
-                                      Peter
-
+diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
+index f99cfe2..9aecffef 100644
+--- a/drivers/cpufreq/exynos-cpufreq.c
++++ b/drivers/cpufreq/exynos-cpufreq.c
+@@ -17,6 +17,7 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/cpufreq.h>
+ #include <linux/platform_device.h>
++#include <linux/of.h>
+ 
+ #include <plat/cpu.h>
+ 
+@@ -163,11 +164,24 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
+ 	if (!exynos_info)
+ 		return -ENOMEM;
+ 
+-	if (soc_is_exynos4210())
++	if (of_machine_is_compatible("samsung,exynos4210")) {
++		exynos_info->type = EXYNOS_SOC_4210;
++	} else if (of_machine_is_compatible("samsung,exynos4212")) {
++		exynos_info->type = EXYNOS_SOC_4212;
++	} else if (of_machine_is_compatible("samsung,exynos4412")) {
++		exynos_info->type = EXYNOS_SOC_4212;
++	} else if (of_machine_is_compatible("samsung,exynos5250")) {
++		exynos_info->type = EXYNOS_SOC_5250;
++	} else {
++		pr_err("%s: Unknown SoC type\n", __func__);
++		return -ENODEV;
++	}
++
++	if (exynos_info->type == EXYNOS_SOC_4210)
+ 		ret = exynos4210_cpufreq_init(exynos_info);
+-	else if (soc_is_exynos4212() || soc_is_exynos4412())
++	else if (exynos_info->type == EXYNOS_SOC_4212 || exynos_info->type == EXYNOS_SOC_4412)
+ 		ret = exynos4x12_cpufreq_init(exynos_info);
+-	else if (soc_is_exynos5250())
++	else if (exynos_info->type == EXYNOS_SOC_5250)
+ 		ret = exynos5250_cpufreq_init(exynos_info);
+ 	else
+ 		return 0;
+diff --git a/drivers/cpufreq/exynos-cpufreq.h b/drivers/cpufreq/exynos-cpufreq.h
+index 3ddade8..f189547 100644
+--- a/drivers/cpufreq/exynos-cpufreq.h
++++ b/drivers/cpufreq/exynos-cpufreq.h
+@@ -17,6 +17,13 @@ enum cpufreq_level_index {
+ 	L20,
+ };
+ 
++enum exynos_soc_type {
++	EXYNOS_SOC_4210,
++	EXYNOS_SOC_4212,
++	EXYNOS_SOC_4412,
++	EXYNOS_SOC_5250,
++};
++
+ #define APLL_FREQ(f, a0, a1, a2, a3, a4, a5, a6, a7, b0, b1, b2, m, p, s) \
+ 	{ \
+ 		.freq = (f) * 1000, \
+@@ -34,6 +41,7 @@ struct apll_freq {
+ };
+ 
+ struct exynos_dvfs_info {
++	enum exynos_soc_type type;
+ 	unsigned long	mpll_freq_khz;
+ 	unsigned int	pll_safe_idx;
+ 	struct clk	*cpu_clk;
+diff --git a/drivers/cpufreq/exynos4x12-cpufreq.c b/drivers/cpufreq/exynos4x12-cpufreq.c
+index 466c76a..63a3907 100644
+--- a/drivers/cpufreq/exynos4x12-cpufreq.c
++++ b/drivers/cpufreq/exynos4x12-cpufreq.c
+@@ -100,7 +100,6 @@ static struct apll_freq apll_freq_4412[] = {
+ static void exynos4x12_set_clkdiv(unsigned int div_index)
+ {
+ 	unsigned int tmp;
+-	unsigned int stat_cpu1;
+ 
+ 	/* Change Divider - CPU0 */
+ 
+@@ -115,13 +114,11 @@ static void exynos4x12_set_clkdiv(unsigned int div_index)
+ 	tmp = apll_freq_4x12[div_index].clk_div_cpu1;
+ 
+ 	__raw_writel(tmp, EXYNOS4_CLKDIV_CPU1);
+-	if (soc_is_exynos4212())
+-		stat_cpu1 = 0x11;
+-	else
+-		stat_cpu1 = 0x111;
+ 
+-	while (__raw_readl(EXYNOS4_CLKDIV_STATCPU1) & stat_cpu1)
++	do {
+ 		cpu_relax();
++		tmp = __raw_readl(EXYNOS4_CLKDIV_STATCPU1);
++	} while (tmp != 0x0);
+ }
+ 
+ static void exynos4x12_set_apll(unsigned int index)
+@@ -184,7 +181,7 @@ int exynos4x12_cpufreq_init(struct exynos_dvfs_info *info)
+ 	if (IS_ERR(mout_apll))
+ 		goto err_mout_apll;
+ 
+-	if (soc_is_exynos4212())
++	if (info->type == EXYNOS_SOC_4212)
+ 		apll_freq_4x12 = apll_freq_4212;
+ 	else
+ 		apll_freq_4x12 = apll_freq_4412;
 -- 
-Dr Peter Brett <peter@peter-b.co.uk>
+1.7.10.4
