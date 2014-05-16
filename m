@@ -1,98 +1,41 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 16 May 2014 12:00:57 +0200
-Subject: [PATCH v2] ARM: OMAP: replace checks for CONFIG_USB_GADGET_OMAP
-In-Reply-To: <1400232974.20342.22.camel@x220>
-References: <1400187345.11786.28.camel@x220>
- <20140515231229.GA25523@saruman.home> <1400232974.20342.22.camel@x220>
-Message-ID: <1400234457.20342.25.camel@x220>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 May 2014 11:04:34 +0100
+Subject: [PATCH] arm64: fix pud_huge() for 2-level pagetables
+In-Reply-To: <1400163562-7481-1-git-send-email-msalter@redhat.com>
+References: <1400163562-7481-1-git-send-email-msalter@redhat.com>
+Message-ID: <20140516100434.GG5624@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 193ab2a60700 ("usb: gadget: allow multiple gadgets to be built")
-apparently required that checks for CONFIG_USB_GADGET_OMAP would be
-replaced with checks for CONFIG_USB_OMAP. Do so now for the remaining
-checks for CONFIG_USB_GADGET_OMAP, even though these checks have
-basically been broken since v3.1.
+On Thu, May 15, 2014 at 03:19:22PM +0100, Mark Salter wrote:
+> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+> index 5e9aec3..9bed38f 100644
+> --- a/arch/arm64/mm/hugetlbpage.c
+> +++ b/arch/arm64/mm/hugetlbpage.c
+> @@ -51,7 +51,11 @@ int pmd_huge(pmd_t pmd)
+>  
+>  int pud_huge(pud_t pud)
+>  {
+> +#ifndef __PAGETABLE_PMD_FOLDED
+>  	return !(pud_val(pud) & PUD_TABLE_BIT);
+> +#else
+> +	return 0;
+> +#endif
+>  }
+>  
+>  int pmd_huge_support(void)
+> @@ -64,8 +68,10 @@ static __init int setup_hugepagesz(char *opt)
+>  	unsigned long ps = memparse(opt, &opt);
+>  	if (ps == PMD_SIZE) {
+>  		hugetlb_add_hstate(PMD_SHIFT - PAGE_SHIFT);
+> +#ifndef __PAGETABLE_PMD_FOLDED
+>  	} else if (ps == PUD_SIZE) {
+>  		hugetlb_add_hstate(PUD_SHIFT - PAGE_SHIFT);
+> +#endif
 
-And, since we're touching this code, use the IS_ENABLED() macro, so
-things will now (hopefully) also work if USB_OMAP is modular.
+Since PMD_SIZE == PUD_SIZE when __PAGETABLE_PMD_FOLDED, do we need the
+#ifndef here? Maybe the compiler is smart enough to remove it but it's
+not on a critical path anyway, so I wouldn't bother.
 
-Fixes: 193ab2a60700 ("usb: gadget: allow multiple gadgets to be built")
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-v2: us IS_ENABLED() as Felipe requested. Still untested.
-
- arch/arm/mach-omap1/board-h2.c        | 2 +-
- arch/arm/mach-omap1/board-h3.c        | 2 +-
- arch/arm/mach-omap1/board-innovator.c | 2 +-
- arch/arm/mach-omap1/board-osk.c       | 2 +-
- drivers/usb/phy/phy-isp1301-omap.c    | 2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
-index 65d2acb31498..5b45d266d83e 100644
---- a/arch/arm/mach-omap1/board-h2.c
-+++ b/arch/arm/mach-omap1/board-h2.c
-@@ -346,7 +346,7 @@ static struct omap_usb_config h2_usb_config __initdata = {
- 	/* usb1 has a Mini-AB port and external isp1301 transceiver */
- 	.otg		= 2,
- 
--#ifdef	CONFIG_USB_GADGET_OMAP
-+#if IS_ENABLED(CONFIG_USB_OMAP)
- 	.hmc_mode	= 19,	/* 0:host(off) 1:dev|otg 2:disabled */
- 	/* .hmc_mode	= 21,*/	/* 0:host(off) 1:dev(loopback) 2:host(loopback) */
- #elif	defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
-diff --git a/arch/arm/mach-omap1/board-h3.c b/arch/arm/mach-omap1/board-h3.c
-index 816ecd13f81e..bfed4f928663 100644
---- a/arch/arm/mach-omap1/board-h3.c
-+++ b/arch/arm/mach-omap1/board-h3.c
-@@ -366,7 +366,7 @@ static struct omap_usb_config h3_usb_config __initdata = {
- 	/* usb1 has a Mini-AB port and external isp1301 transceiver */
- 	.otg	    = 2,
- 
--#ifdef CONFIG_USB_GADGET_OMAP
-+#if IS_ENABLED(CONFIG_USB_OMAP)
- 	.hmc_mode       = 19,   /* 0:host(off) 1:dev|otg 2:disabled */
- #elif  defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
- 	/* NONSTANDARD CABLE NEEDED (B-to-Mini-B) */
-diff --git a/arch/arm/mach-omap1/board-innovator.c b/arch/arm/mach-omap1/board-innovator.c
-index bd5f02e9c354..c49ce83cc1eb 100644
---- a/arch/arm/mach-omap1/board-innovator.c
-+++ b/arch/arm/mach-omap1/board-innovator.c
-@@ -312,7 +312,7 @@ static struct omap_usb_config h2_usb_config __initdata = {
- 	/* usb1 has a Mini-AB port and external isp1301 transceiver */
- 	.otg		= 2,
- 
--#ifdef	CONFIG_USB_GADGET_OMAP
-+#if IS_ENABLED(CONFIG_USB_OMAP)
- 	.hmc_mode	= 19,	/* 0:host(off) 1:dev|otg 2:disabled */
- 	/* .hmc_mode	= 21,*/	/* 0:host(off) 1:dev(loopback) 2:host(loopback) */
- #elif	defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
-diff --git a/arch/arm/mach-omap1/board-osk.c b/arch/arm/mach-omap1/board-osk.c
-index 3a0262156e93..7436d4cf6596 100644
---- a/arch/arm/mach-omap1/board-osk.c
-+++ b/arch/arm/mach-omap1/board-osk.c
-@@ -283,7 +283,7 @@ static struct omap_usb_config osk_usb_config __initdata = {
- 	 * be used, with a NONSTANDARD gender-bending cable/dongle, as
- 	 * a peripheral.
- 	 */
--#ifdef	CONFIG_USB_GADGET_OMAP
-+#if IS_ENABLED(CONFIG_USB_OMAP)
- 	.register_dev	= 1,
- 	.hmc_mode	= 0,
- #else
-diff --git a/drivers/usb/phy/phy-isp1301-omap.c b/drivers/usb/phy/phy-isp1301-omap.c
-index 6e146d723b37..69e49be8866b 100644
---- a/drivers/usb/phy/phy-isp1301-omap.c
-+++ b/drivers/usb/phy/phy-isp1301-omap.c
-@@ -1295,7 +1295,7 @@ isp1301_set_host(struct usb_otg *otg, struct usb_bus *host)
- 		return isp1301_otg_enable(isp);
- 	return 0;
- 
--#elif	!defined(CONFIG_USB_GADGET_OMAP)
-+#elif !IS_ENABLED(CONFIG_USB_OMAP)
- 	// FIXME update its refcount
- 	otg->host = host;
- 
 -- 
-1.9.0
+Catalin
