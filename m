@@ -1,53 +1,48 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 16 May 2014 11:42:18 +0300
-Subject: [PATCH 00/11] ARM: OMAP: OMAP5 & AM43x DSS
-In-Reply-To: <20140512143604.GB31772@atomide.com>
-References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
- <5370CBD5.3060107@ti.com> <20140512143604.GB31772@atomide.com>
-Message-ID: <5375CF6A.7030602@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 16 May 2014 10:43:33 +0200
+Subject: [PATCH v6 13/17] ARM: shmobile: marzen: Add to shmobile defconfig
+In-Reply-To: <20140516000409.GB29432@verge.net.au>
+References: <1400153532-23675-1-git-send-email-horms+renesas@verge.net.au>
+ <1400153532-23675-14-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdXPm_=ejkcnOFOgfnsz9MUc8KpAjkuMcHMKJeaEmVbhQA@mail.gmail.com>
+ <20140515225027.GA29432@verge.net.au>
+ <20140516000409.GB29432@verge.net.au>
+Message-ID: <CAMuHMdWjxK5K4rhJt0VDbsSUX_Gzq8EXCPStN3bb_GUqq8tEog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/14 17:36, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140512 06:26]:
->> Hi Tony,
->>
->> On 09/05/14 14:56, Tomi Valkeinen wrote:
->>> Hi,
->>>
->>> Here are arch/arm/ patches to add display support for OMAP5 and AM43x.
->>>
->>> I have these in my tree, in a branch I will send to Tony for merging. Most of
->>> these patches have already been around the lists, but I wanted to send them one
->>> more time to verify that all looks right and everybody is fine with them.
->>
->> I have pushed these to:
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/tomba/linux.git 3.16/omap
->>
->> If you're fine with these, I think we can consider that branch stable.
->> There are probably still a few display related .dts changed for the
->> board coming up, but I'll add those on top of the current commits.
-> 
-> Please coordinate things with Paul and Tero so you at least have proper
-> acks for the hwmod and and clock patches. In general we really want to
-> queue hwmod and clock changes separately as those can easily mess up things
-> in a bad way like we've already seen with overlapping hwmod entries in
-> the .dts files.
+Hi Simon,
 
-I don't think the clock dts changes can be separated from the other dts
-changes, as the new 'dss_l3_iclk' clock node is required by the
-omap5.dtsi when adding the DSS support.
+On Fri, May 16, 2014 at 2:04 AM, Simon Horman <horms@verge.net.au> wrote:
+> Add marzen to shmobile defconfig now that it supports multiplatform
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>
+> ---
+> v6.1
+> * Also enable SPI_SH_HSPI and USB_RCAR_PHY
+>
+> v2 - v6
+> * No Change
+>
+> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+> index b76fb9b..114e88e 100644
+> --- a/arch/arm/configs/shmobile_defconfig
+> +++ b/arch/arm/configs/shmobile_defconfig
 
-The HWMOD patches can go separately.
+> +CONFIG_USB_RCAR_PHY=y
+> +CONFIG_USB_RCAR_GEN2_PHY=y
 
- Tomi
+While I don't dispute the need for CONFIG_USB_RCAR_GEN2_PHY in
+shmobile_defconfig, this is not needed for Marzen, right?
 
+Gr{oetje,eeting}s,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140516/6e0779cc/attachment.sig>
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
