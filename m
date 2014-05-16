@@ -1,84 +1,134 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 16 May 2014 04:48:05 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP2+: some PRCM cleanup patches for v3.16
-Message-ID: <alpine.DEB.2.02.1405160445440.29738@utopia.booyaka.com>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Fri, 16 May 2014 10:25:57 +0530
+Subject: [PATCH v4 3/8] clk: samsung: add infrastructure to register cpu
+ clocks
+In-Reply-To: <CAD=FV=XLLprb_2yyFnngGibrch2BgNnf93LnH+eV2VbgD=o5Kg@mail.gmail.com>
+References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
+ <12969374.fAYJcpG05n@phil>
+ <CAD=FV=VGWxgy+snupOzmKQxNPbGb95vGL0KhQFaSL9m_dx84wQ@mail.gmail.com>
+ <3283853.4gaNQ8iXN1@phil>
+ <CAD=FV=XLLprb_2yyFnngGibrch2BgNnf93LnH+eV2VbgD=o5Kg@mail.gmail.com>
+Message-ID: <CAJuA9ahOu6GS+HujTXktvmJN63bxujBqSNekZigmdkaMaQa-OQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On Fri, May 16, 2014 at 1:56 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Heiko,
+>
+> On Thu, May 15, 2014 at 1:12 PM, Heiko St?bner <heiko@sntech.de> wrote:
+>> Hi Doug,
+>>
+>> Am Donnerstag, 15. Mai 2014, 12:36:45 schrieb Doug Anderson:
+>>> On Thu, May 15, 2014 at 12:17 PM, Heiko St?bner <heiko@sntech.de> wrote:
+>>> > Am Donnerstag, 15. Mai 2014, 11:18:44 schrieb Doug Anderson:
+>>> >> Thomas,
+>>> >>
+>>> >> On Tue, May 13, 2014 at 6:11 PM, Thomas Abraham <ta.omasab@gmail.com>
+>> wrote:
+>>> >> > From: Thomas Abraham <thomas.ab@samsung.com>
+>>> >> > +static int exynos4210_armclk_pre_rate_change(struct clk_notifier_data
+>>> >> > *ndata, +                       struct exynos_cpuclk *armclk, void
+>>> >> > __iomem *base) +{
+>>> >> > +       struct exynos4210_armclk_data *armclk_data = armclk->data;
+>>> >> > +       unsigned long alt_prate = clk_get_rate(armclk->alt_parent);
+>>> >> > +       unsigned long alt_div, div0, div1, tdiv0, mux_reg;
+>>> >> > +       unsigned long cur_armclk_rate, timeout;
+>>> >> > +       unsigned long flags;
+>>> >> > +
+>>> >> > +       /* find out the divider values to use for clock data */
+>>> >> > +       while (armclk_data->prate != ndata->new_rate) {
+>>> >> > +               if (armclk_data->prate == 0)
+>>> >> > +                       return -EINVAL;
+>>> >> > +               armclk_data++;
+>>> >> > +       }
+>>> >> > +
+>>> >> > +       div0 = armclk_data->div0;
+>>> >> > +       div1 = armclk_data->div1;
+>>> >> > +       if (readl(base + SRC_CPU) & EXYNOS4210_MUX_HPM_MASK) {
+>>> >> > +               div1 = readl(base + DIV_CPU1) &
+>>> >> > EXYNOS4210_DIV1_HPM_MASK;
+>>> >> > +               div1 |= ((armclk_data->div1) &
+>>> >> > ~EXYNOS4210_DIV1_HPM_MASK);
+>>> >> > +       }
+>>> >> > +
+>>> >> > +       /*
+>>> >> > +        * if the new and old parent clock speed is less than the clock
+>>> >> > speed +        * of the alternate parent, then it should be ensured
+>>> >> > that
+>>> >> > at no point +        * the armclk speed is more than the old_prate
+>>> >> > until
+>>> >> > the dividers are +        * set.
+>>> >> > +        */
+>>> >> > +       tdiv0 = readl(base + DIV_CPU0);
+>>> >> > +       cur_armclk_rate = ndata->old_rate / EXYNOS4210_ARM_DIV1(tdiv0)
+>>> >> > /
+>>> >> > +                               EXYNOS4210_ARM_DIV2(tdiv0);
+>>> >> > +       if (alt_prate > cur_armclk_rate) {
+>>> >> > +               alt_div = _calc_div(alt_prate, cur_armclk_rate);
+>>> >> > +               _exynos4210_set_armclk_div(base, alt_div);
+>>> >> > +               div0 |= alt_div;
+>>> >>
+>>> >> Don't you need to up the voltage here, too?  ...I haven't reviewed
+>>> >> this whole patch (so perhaps it's elsewhere in the patch or in the
+>>> >> series), but I stumbled upon this while trying to solve a different
+>>> >> problem and figured I'd check...
+>>> >
+>>> > setting the voltage should be done by the cpufreq driver like cpufreq-cpu0
+>>> > - whose usage this series intents to allow.
+>>> >
+>>> > As I've hijacked Thomas' concept for my current rockchip clock work, I've
+>>> > already seen this working nicely :-) .
+>>>
+>>> I guess I should have been more clear.  I was talking more
+>>> specifically about upping the voltage as part of the mux switch in the
+>>> case that alt_prate > cur_armclk_rate.
+>>
+>> from earlier discussions I remember Thomas and me talked about setting a
+>> divider to make sure that alt_prate <= cur_armclk_rate, so the voltage can
+>> stay at its current level. I haven't looked deeply into this revision, but the
+>> last one did exactly this.
+>
+> Ah-ha, that's a reasonable solution to this problem.  I was familiar
+> with the old code and know that it used to set the CPUD ratio here, so
+> I assumed that was what Thomas's code did.  ...but you're right, his
+> code is setting the divider here.  I didn't double-check all of his
+> code / calculations, but he's certainly tweaking the right bits.
+>
+> Nice!
+>
+>
+>>> ...if you're switching from 200MHz to 300MHz and the alt_prate is
+>>> 800MHz, you need to account for that fact.  The code here accounts for
+>>> the fact in setting the "armclk_div", but (I don't think) it accounts
+>>> for the fact that 800MHz will need a higher voltage.
+>>>
+>>> As per a separate discussion, a clean solution might be to move the
+>>> mux switching to the core of CPU_FREQ.  That would have the side
+>>> effect of also making it very easy to send notifications.
+>>
+>> I'll just wait until you all decide what the best solution is :-), but
+>> personally I like the concept of keeping the clock logic inside the clock
+>> driver, especially as this is not limited to setting the mux but also adapting
+>> tightly bound child clocks and this all may not fit into a generic
+>> implementation of a cpufreq driver.
 
-Hi Tony
++1. I also prefer to go with this approach.
 
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+>
+> Yup, I didn't think of the solution you guys came up with.  Your
+> solution handles things nicely.
+>
+> Thanks!
+>
+> -Doug
 
-  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+Doug,
 
-are available in the git repository at:
+Heiko had suggested to use the divider to keep the armclk within
+limits during the frequency transition. This helped to avoid the
+corresponding voltage scaling step which greatly simplified the
+frequency scaling for exynos. We definitely plan to use the same
+suggestion on other exynos platforms as well.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git for-v3.16/prcm-cleanup-a
-
-for you to fetch changes up to 70fcebf1965b66d73bd8ae7955bd663ab8012c56:
-
-  ARM: OMAP4: PRCM: remove references to cm-regbits-44xx.h from PRCM core files (2014-05-15 22:35:10 -0600)
-
-- ----------------------------------------------------------------
-Some OMAP PRCM cleanup patches.  These help prepare to convert the PRCM
-code into drivers.
-
-Basic build, boot, and PM test results are available here:
-
-http://www.pwsan.com/omap/testlogs/prcm-cleanup-v3.16/20140515213244/
-
-- ----------------------------------------------------------------
-Tero Kristo (10):
-      ARM: OMAP3: CM: remove a few OMAP34XX_CM_REGADDR defines
-      ARM: OMAP2+: prcm: add omap_test_timeout to prcm-common.h
-      ARM: OMAP2/3: CM: remove some external dependencies
-      ARM: OMAP4: CM: use cm_base* in register address calculations
-      ARM: OMAP2+: PRCM: cleanup some header includes
-      ARM: OMAP2+: PRM: remove unnecessary cpu_is_XXX calls from prm_init / exit
-      ARM: OMAP3/4: PRM: provide io chain reconfig function through irq setup
-      ARM: OMAP3/OMAP4: PRM: add prm_features flags and add IO wakeup under it
-      ARM: OMAP3/4: PRM: add support of late_init call to prm_ll_ops
-      ARM: OMAP4: PRCM: remove references to cm-regbits-44xx.h from PRCM core files
-
- arch/arm/mach-omap2/clockdomain.h                  |  3 ++-
- arch/arm/mach-omap2/cm2xxx.c                       | 15 ++-----------
- arch/arm/mach-omap2/cm33xx.h                       |  3 ---
- arch/arm/mach-omap2/cm3xxx.c                       | 25 ++++++++--------------
- arch/arm/mach-omap2/cm3xxx.h                       |  5 ++---
- arch/arm/mach-omap2/cm44xx.c                       | 11 ++++------
- arch/arm/mach-omap2/cm_common.c                    |  2 +-
- arch/arm/mach-omap2/cminst44xx.c                   | 10 ++++++---
- .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  1 +
- arch/arm/mach-omap2/powerdomain-common.c           |  1 -
- arch/arm/mach-omap2/powerdomain.c                  |  1 +
- arch/arm/mach-omap2/powerdomain.h                  |  3 +--
- arch/arm/mach-omap2/prcm-common.h                  | 24 +++++++++++++++++++++
- arch/arm/mach-omap2/prcm_mpu44xx.h                 |  1 -
- arch/arm/mach-omap2/prm.h                          | 10 +++++++++
- arch/arm/mach-omap2/prm2xxx.c                      | 13 +----------
- arch/arm/mach-omap2/prm2xxx_3xxx.c                 |  1 -
- arch/arm/mach-omap2/prm33xx.c                      |  1 -
- arch/arm/mach-omap2/prm3xxx.c                      | 20 ++++++++---------
- arch/arm/mach-omap2/prm44xx.c                      | 18 +++++++---------
- arch/arm/mach-omap2/prm_common.c                   | 17 +++++++++------
- 21 files changed, 93 insertions(+), 92 deletions(-)
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iQIcBAEBAgAGBQJTdZg7AAoJEMePsQ0LvSpLvYYP/1QjKttZU9isMb2/WRR3tGay
-PKLkTu0OxHn7PznzdML+vpucD0ouQoD2wuDxpVrUQ1xzrk3yu2nAMm7hCWt3oPC0
-jXzY/b6Ikf0SBk1HQ2ZqcBhYwhqAva8FwyZ6eUbztspnxPl5DIKWZ/0bEi1+3bLD
-Pp2kBX6bexssCOH26x+I4n3zVprlH9U1RgYhO/OaQ+rDaucOqTf30WyOxltCy1dI
-T/g2Q+obbTw8XGvP90T8Jognf6HgUpq8FuyX4WM6ypJ03bvlb/dNXUHj/MTcfUG0
-MWz3I2LtgtYnhh4B3Rv77bVBCRPOyEBfDTXd+Lm3n3mc3dPgSrBoeZUoJNTVKeUG
-KJbm3qxjps5/iyGJyuif+opriey8IeQrAQhQSFB7oFw0Kl++L13Cm4HKCgx9QkBc
-TFNKK8N3oNHJPlgHWIDrJY/mdqmR7/kxFVy2bvxnfmSkxSyPXxWvGSe17GjIlTfN
-/jYOaygegbMI1Q6n+EuAhUY4v7qhDuzu75BnRpItxB5mzyYIYIV+f4tJlE6uDglh
-SEtFtRQnIjmNDQ72+70mYlgjy8VvdXc++JW1bjJyONMO5Ghb3CsrpeU+EThBw3Fu
-x+HJYNWDd0M3Jhhjjn3pfhkrpGbZNfCxM2QGczkZFWjhlsqdNwn8i/u1HMGb91Yr
-nm22ofeTTQrISphxouKg
-=fLlV
------END PGP SIGNATURE-----
+Thanks,
+Thomas.
