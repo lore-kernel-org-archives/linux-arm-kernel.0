@@ -1,124 +1,125 @@
-From: emilgoode@gmail.com (Emil Goode)
-Date: Sat, 17 May 2014 01:18:55 +0200
-Subject: [PATCH v2] ARM: imx: fix error handling
-In-Reply-To: <20140516192451.GP16662@pengutronix.de>
-References: <1400234045-6022-1-git-send-email-emilgoode@gmail.com>
- <20140516192451.GP16662@pengutronix.de>
-Message-ID: <20140516231855.GB4323@lianli>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 17 May 2014 01:24:15 +0200
+Subject: [PATCH v4 4/8] Documentation: devicetree: add cpu clock
+ configuration data binding for Exynos4/5
+In-Reply-To: <1400029876-5830-5-git-send-email-thomas.ab@samsung.com>
+References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
+ <1400029876-5830-5-git-send-email-thomas.ab@samsung.com>
+Message-ID: <53769E1F.1090706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Uwe,
+Hi Thomas,
 
-Thank you for the review.
+Please see my comments inline.
 
-On Fri, May 16, 2014 at 09:24:51PM +0200, Uwe Kleine-K?nig wrote:
-> Hello Emil,
+On 14.05.2014 03:11, Thomas Abraham wrote:
+> From; Thomas Abraham <thomas.ab@samsung.com>
 > 
-> IMHO the subject is too general. Maybe better use:
+> The clock blocks within the CMU_CPU clock domain are put together into a
+> new composite clock type called the cpu clock. This clock type requires
+> configuration data that will be atomically programmed in the multiple
+> clock blocks encapsulated within the cpu clock type when the parent clock
+> frequency is changed. This configuration data is held in the clock controller
+> node. Update clock binding documentation about this configuration data format
+> for Samsung Exynos4 and Exynos5 platforms.
 > 
-> 	ARM: imx: fix error handling in ipu device registration
-
-Agreed, will change this and resend.
-
+> Cc: Tomasz Figa <t.figa@samsung.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: <devicetree@vger.kernel.org>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> ---
+>  .../devicetree/bindings/clock/exynos4-clock.txt    |   37 ++++++++++++++++++++
+>  .../devicetree/bindings/clock/exynos5250-clock.txt |   36 +++++++++++++++++++
+>  2 files changed, 73 insertions(+), 0 deletions(-)
 > 
-> On Fri, May 16, 2014 at 11:54:05AM +0200, Emil Goode wrote:
-> > If we fail to allocate struct platform_device pdev we
-> > dereference it after the goto label err.
-> > 
-> > I have rearranged the error handling a bit to fix the issue
-> > and also make it more clear.
-> > 
-> > Signed-off-by: Emil Goode <emilgoode@gmail.com>
-> > ---
-> > v2: Changed to return -ENOMEM instead of ret where possible and
-> >     updated the subject line.
-> > 
-> >  arch/arm/mach-imx/devices/platform-ipu-core.c |   22 +++++++++++++---------
-> >  1 file changed, 13 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
-> > index fc4dd7c..68f2a4a 100644
-> > --- a/arch/arm/mach-imx/devices/platform-ipu-core.c
-> > +++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
-> > @@ -77,34 +77,38 @@ struct platform_device *__init imx_alloc_mx3_camera(
-> >  
-> >  	pdev = platform_device_alloc("mx3-camera", 0);
-> >  	if (!pdev)
-> > -		goto err;
-> > +		return ERR_PTR(-ENOMEM);
-> >  
-> >  	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
-> >  	if (!pdev->dev.dma_mask)
-> > -		goto err;
-> > +		goto put_pdev;
-> >  
-> >  	*pdev->dev.dma_mask = DMA_BIT_MASK(32);
-> >  	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-> >  
-> >  	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
-> >  	if (ret)
-> > -		goto err;
-> > +		goto free_dma_mask;
-> >  
-> >  	if (pdata) {
-> >  		struct mx3_camera_pdata *copied_pdata;
-> >  
-> >  		ret = platform_device_add_data(pdev, pdata, sizeof(*pdata));
-> > -		if (ret) {
-> > -err:
-> > -			kfree(pdev->dev.dma_mask);
-> > -			platform_device_put(pdev);
-> > -			return ERR_PTR(-ENODEV);
-> > -		}
-> > +		if (ret)
-> > +			goto free_dma_mask;
-> > +
-> >  		copied_pdata = dev_get_platdata(&pdev->dev);
-> >  		copied_pdata->dma_dev = &imx_ipu_coredev->dev;
-> >  	}
-> >  
-> >  	return pdev;
-> > +
-> > +free_dma_mask:
-> > +	kfree(pdev->dev.dma_mask);
-> > +put_pdev:
-> > +	platform_device_put(pdev);
-> > +
-> > +	return ERR_PTR(ret);
-> >  }
-> I didn't check if it is easily possible, but converting this file to use
-> platform_device_register_full might simplify it considerably.
+> diff --git a/Documentation/devicetree/bindings/clock/exynos4-clock.txt b/Documentation/devicetree/bindings/clock/exynos4-clock.txt
+> index f5a5b19..0934e02 100644
+> --- a/Documentation/devicetree/bindings/clock/exynos4-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/exynos4-clock.txt
+> @@ -15,6 +15,35 @@ Required Properties:
+>  
+>  - #clock-cells: should be 1.
+>  
+> +- samsung,armclk-divider-table: when the frequency of the APLL is changed
+> +  the divider clocks in CMU_CPU clock domain also need to be updated. These
+> +  divider clocks have SoC specific divider clock output requirements for a
+> +  specific APLL clock speeds. When APLL clock rate is changed, these divider
+> +  clocks are reprogrammed with pre-determined values in order to maintain the
+> +  SoC specific divider clock outputs. This property lists the divider values
+> +  for divider clocks in the CMU_CPU block for supported APLL clock speeds.
+> +  The format of each entry included in the arm-frequency-table should be
+> +  as defined below
 
-Will look into this and consider sending another patch.
+As far as I understand, the relation is not between the APLL frequency
+and particular clocks in CPU domain, but rather between the latter and
+input clock to CPU domain, which is _after_ the two dividers (called
+DIV_CORE and DIV_CORE2 or ARM_DIV1 and ARM_DIV2), which is also exactly
+the output frequency of ARMCLK.
 
-> 
-> I'm not sure this fix is critical, because the problem happens if an
-> allocation during boot fails. But still, if you want to get this fix
-> into a stable release, you should simplify it, i.e. don't do the code
-> reorganisations. (Also the "more clear" part seems to be subjective, I
-> like the error handling better as it is now. But that might only be me.)
+> +
+> +  - for Exynos4210 and Exynos4212 based platforms:
+> +      cell #1: arm clock parent frequency
 
-To my knowlege there is no impact on end users and I don't think the bug
-is critical since, as you say, the allocation happens during boot.
-Probably it's not necessary to have this fixed in stable kernels.
+Considering my comment above, this should be rather ARMCLK frequency.
 
-> 
-> Are you using this code? I thought arch/arm/mach-imx/devices to be dead
-> as it is unused on dt platforms.
+> +      cell #2 ~ cell 9#: value of clock divider in the following order
+> +	        corem0_ratio, corem1_ratio, periph_ratio, atb_ratio,
+> +		pclk_dbg_ratio, apll_ratio, copy_ratio, hpm_ratio.
+> +
+> +  - for Exynos4412 based platforms:
+> +      cell #1: expected arm clock parent frequency
 
-The bug was found using coccinelle. I'm not using the code and I don't know
-what the plans are for this file in the transition to device tree. But as long
-as the file is in the kernel I think it's worth fixing the bug.
+Ditto.
+
+> +      cell #2 ~ cell #10: value of clock divider in the following order
+> +	       corem0_ratio, corem1_ratio, periph_ratio, atb_ratio,
+> +               pclk_dbg_ratio, apll_ratio, copy_ratio, hpm_ratio, cores_ratio
+> +
+> +- samsung,armclk-cells: defines the number of cells in
+> +  samsung,armclk-divider-table property. The value of this property depends on
+> +  the SoC type.
+
+To follow conventions used by all other bindings with variable number of
+cells, the property should be called "#samsung,armclk-cells". AFAIK the
+"#" should be interpreted as "number of" and so accents the meaning of
+the property.
+
+> +
+> +  - for Exynos4210 and Exynos4212: the value should be 9.
+> +  - for Exynos4412: the value should be 10.
+> +
+>  Each clock is assigned an identifier and client nodes can use this identifier
+>  to specify the clock which they consume.
+>  
+> @@ -28,6 +57,14 @@ Example 1: An example of a clock controller node is listed below.
+>  		compatible = "samsung,exynos4210-clock";
+>  		reg = <0x10030000 0x20000>;
+>  		#clock-cells = <1>;
+> +
+> +		samsung,armclk-cells = <9>;
+> +		samsung,armclk-divider-table = <1200000 3 7 3 4 1 7 5 0>,
+> +					       <1000000 3 7 3 4 1 7 4 0>,
+> +					       < 800000 3 7 3 3 1 7 3 0>,
+> +					       < 500000 3 7 3 3 1 7 3 0>,
+> +					       < 400000 3 7 3 3 1 7 3 0>,
+> +					       < 200000 1 3 1 1 1 0 3 0>;
+>  	};
+>  
+>  Example 2: UART controller node that consumes the clock generated by the clock
+> diff --git a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
+> index 536eacd..3d63d09 100644
+> --- a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
+> @@ -13,6 +13,24 @@ Required Properties:
+
+Same comments apply to this file as well.
+
+Also, shouldn't you also extend exynos5420-clock.txt in the same way?
 
 Best regards,
-
-Emil Goode
-
-> 
-> Best regards
-> Uwe
-> 
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Tomasz
