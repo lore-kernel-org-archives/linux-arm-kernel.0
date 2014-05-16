@@ -1,54 +1,42 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 16 May 2014 13:58:48 -0400
-Subject: [PATCH v2 0/3] Update the Keymile kirkwood DTS files
-In-Reply-To: <1400230143-15620-1-git-send-email-valentin.longchamp@keymile.com>
-References: <1400230143-15620-1-git-send-email-valentin.longchamp@keymile.com>
-Message-ID: <20140516175848.GK27822@titan.lakedaemon.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 16 May 2014 19:39:15 +0100
+Subject: [PATCH 4/6] arm64: topology: add MPIDR-based detection
+In-Reply-To: <53763DFC.8070309@arm.com>
+References: <1399063112-16917-1-git-send-email-broonie@kernel.org>
+ <1399063112-16917-5-git-send-email-broonie@kernel.org>
+ <53763DFC.8070309@arm.com>
+Message-ID: <20140516183915.GP22111@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 10:49:00AM +0200, Valentin Longchamp wrote:
-> This series resynchs the Keymile Kirkwood DTS files with mainline since
-> the boards do not boot anymore with the 3.15 rc kernels (to be honest, I
-> have not tested the last 2-3 releases).
-> 
-> The changes are the addition of the PCIe controller for the 98dx4122
-> SoC, the explicit disabling of the SATA phys for this same SoC and
-> finally the enabling of the PCIe controller on the Keymile Reference
-> design.
-> 
-> The series introduces kirkwood-km_common.dtsi that factors the common
-> nodes between kirkwood-km_kirkwood.dts and the new board/design below.
-> 
-> The series also adds a new DTS for another Keymile generic design where
-> the mv64xxx eth interace is configured with fixed parameters to no phy
-> but a switch (for board internal communication).
-> 
-> The series applies and was tested on top of Jason's mvebu/dt branch
-> (mvebu-dt-3.16 tag).
-> 
-> Changes in v2:
-> - introduce kirkwood-km_common.dtsi to allow factoring some nodes
->   between boards
-> - Take advantage of the kirkwood-km_common.dtsi file for
->   kirkwood-km_fixedeth.dts
-> 
-> Valentin Longchamp (3):
->   ARM: dts: kirkwood: resynch 98dx4122 dtsi
->   ARM: dts: kirkwood: add kirkwood-km_common DTSI files
->   ARM: dts: kirkwood: add kirkwood-km_fixedeth DTS file
-> 
->  arch/arm/boot/dts/kirkwood-98dx4122.dtsi   | 43 ++++++++++++++++++++++++++
->  arch/arm/boot/dts/kirkwood-km_common.dtsi  | 48 ++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/kirkwood-km_fixedeth.dts | 23 ++++++++++++++
->  arch/arm/boot/dts/kirkwood-km_kirkwood.dts | 38 +----------------------
->  4 files changed, 115 insertions(+), 37 deletions(-)
->  create mode 100644 arch/arm/boot/dts/kirkwood-km_common.dtsi
->  create mode 100644 arch/arm/boot/dts/kirkwood-km_fixedeth.dts
+On Fri, May 16, 2014 at 05:34:04PM +0100, Sudeep Holla wrote:
 
-Applied whole series to mvebu/dt with Andrew's Ack.  Also, s/ok/okay/ in
-patch 2/3.
+> This is broken, IIRC Lorenzo commented on this in the previous version of the
+> patch.
 
-thx,
+Could you please be specific?  Lorenzo was concerned about overflow but
+that ought to be addressed here.
 
-Jason.
+> Take a simple example of system with 2 Quad core clusters.
+> The mpidr_hash.shift_aff[1] will be 6 as you need minimum 2 bits to represent
+> aff[0]. So you will end up with second cluster with id = 4 instead of 1.
+
+This isn't a problem, the clusters can have any numbers so long as they
+are distinct.  There is no other requirement.
+
+> I am not sure if we need this serialization, but even if we need it you can't
+> simply use the hash bits generated for MPIDR.Aff{3..0} serialization directly
+> as is for serializing parts of it.
+
+Ah, now I look at what the hash is doing that is indeed directly useful
+- we can mask or shift out the bits we don't want.  Equally well it just
+looks like a preference?
+
+This does seem like something that could be dealt with incrementally.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140516/29e065c5/attachment.sig>
