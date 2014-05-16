@@ -1,41 +1,54 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 16 May 2014 11:04:34 +0100
-Subject: [PATCH] arm64: fix pud_huge() for 2-level pagetables
-In-Reply-To: <1400163562-7481-1-git-send-email-msalter@redhat.com>
-References: <1400163562-7481-1-git-send-email-msalter@redhat.com>
-Message-ID: <20140516100434.GG5624@arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 16 May 2014 12:09:04 +0200
+Subject: [PATCH v2 1/2] of: add mundoreader and radxa vendor prefixes
+In-Reply-To: <1399396211-25353-1-git-send-email-b.galvani@gmail.com>
+References: <1399396211-25353-1-git-send-email-b.galvani@gmail.com>
+Message-ID: <2536935.asXUKXC7IY@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 03:19:22PM +0100, Mark Salter wrote:
-> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-> index 5e9aec3..9bed38f 100644
-> --- a/arch/arm64/mm/hugetlbpage.c
-> +++ b/arch/arm64/mm/hugetlbpage.c
-> @@ -51,7 +51,11 @@ int pmd_huge(pmd_t pmd)
->  
->  int pud_huge(pud_t pud)
->  {
-> +#ifndef __PAGETABLE_PMD_FOLDED
->  	return !(pud_val(pud) & PUD_TABLE_BIT);
-> +#else
-> +	return 0;
-> +#endif
->  }
->  
->  int pmd_huge_support(void)
-> @@ -64,8 +68,10 @@ static __init int setup_hugepagesz(char *opt)
->  	unsigned long ps = memparse(opt, &opt);
->  	if (ps == PMD_SIZE) {
->  		hugetlb_add_hstate(PMD_SHIFT - PAGE_SHIFT);
-> +#ifndef __PAGETABLE_PMD_FOLDED
->  	} else if (ps == PUD_SIZE) {
->  		hugetlb_add_hstate(PUD_SHIFT - PAGE_SHIFT);
-> +#endif
+Hi Beniamino,
 
-Since PMD_SIZE == PUD_SIZE when __PAGETABLE_PMD_FOLDED, do we need the
-#ifndef here? Maybe the compiler is smart enough to remove it but it's
-not on a critical path anyway, so I wouldn't bother.
+Am Dienstag, 6. Mai 2014, 19:10:10 schrieb Beniamino Galvani:
+> Add new vendor prefixes for:
+> 
+>     * Mundo Reader S.L., a company that produces tablets and e-readers
+>     * Radxa, manufacturer of ARM boards
+> 
+> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
 
--- 
-Catalin
+Just FYI, I've sent both patches off, as part of my dt changes pull request on 
+monday.
+
+
+Heiko
+
+> ---
+> 
+> v2:
+>  - use mundoreader prefix instead of bq as suggested by Heiko Stuebner
+> 
+>  Documentation/devicetree/bindings/vendor-prefixes.txt |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> b/Documentation/devicetree/bindings/vendor-prefixes.txt index
+> abc3080..53bd92f 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -79,6 +79,7 @@ microchip	Microchip Technology Inc.
+>  mosaixtech	Mosaix Technologies, Inc.
+>  moxa	Moxa
+>  mpl	MPL AG
+> +mundoreader	Mundo Reader S.L.
+>  mxicy	Macronix International Co., Ltd.
+>  national	National Semiconductor
+>  neonode		Neonode Inc.
+> @@ -98,6 +99,7 @@ powervr	PowerVR (deprecated, use img)
+>  qca	Qualcomm Atheros, Inc.
+>  qcom	Qualcomm Technologies, Inc
+>  qnap	QNAP Systems, Inc.
+> +radxa	Radxa
+>  raidsonic	RaidSonic Technology GmbH
+>  ralink	Mediatek/Ralink Technology Corp.
+>  ramtron	Ramtron International
