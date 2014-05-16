@@ -1,56 +1,84 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 16 May 2014 13:48:00 +0900
-Subject: [PATCH] ARM: shmobile: Use shmobile_init_late() on r8a7740
-In-Reply-To: <20140516044548.GA7185@verge.net.au>
-References: <20140511231050.19908.86623.sendpatchset@w520>
- <CAMuHMdW4-r8khvk-hJcx1OXqwT0nGsVm3zEnmW6TUhyeDRPWdg@mail.gmail.com>
- <20140513081019.GA10412@verge.net.au>
- <20140516040844.GA2503@verge.net.au>
- <CANqRtoSKosY3HLc-Hgbf2_ToDeL71QzqamWEd97xX9iaD=2oUQ@mail.gmail.com>
- <20140516044548.GA7185@verge.net.au>
-Message-ID: <CANqRtoSAHF1uX42LPGhK5r7sFPHDKEaBCFWaP2yqdagRhHFejA@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 16 May 2014 04:48:05 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: some PRCM cleanup patches for v3.16
+Message-ID: <alpine.DEB.2.02.1405160445440.29738@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-On Fri, May 16, 2014 at 1:45 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Fri, May 16, 2014 at 01:39:11PM +0900, Magnus Damm wrote:
->> Hi Simon,
->>
->> On Fri, May 16, 2014 at 1:08 PM, Simon Horman <horms@verge.net.au> wrote:
->> > On Tue, May 13, 2014 at 05:10:20PM +0900, Simon Horman wrote:
->> >> On Mon, May 12, 2014 at 09:42:15AM +0200, Geert Uytterhoeven wrote:
->> >> > On Mon, May 12, 2014 at 1:10 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
->> >> > > From: Magnus Damm <damm+renesas@opensource.se>
->> >> > >
->> >> > > Hook up ->init_late for r8a7740 to initialize Suspend-to-RAM
->> >> > > and CPUIdle in case of C-code less board support for r8a7740.
->> >> > >
->> >> > > Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
->> >> >
->> >> > Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
->> >>
->> >> Thanks, I will queue this up.
->> >
->> > Hi Magnus, Hi Geert,
->> >
->> > As I am currently doing some work for the r8a7779
->> > I am wondering if a change like this one is appropriate for that SoC.
->> > If so I'll cook one up.
->>
->> Yes, we want all SoCs to be converted over. Please take care that some
->> DTS change may be needed to specify maximum frequency, so this may
->> require a DTB update for the user. Which makes it less nice user
->> experience for legacy code - if we care about that at this point. But
->> legacy code also often tends to use early devices and other stuff, so
->> this probably affects DT SoC code and DT reference board code mostly.
->
-> Does CPU frequency affect this patch (shmobile_init_late) as
-> well as the ones to use shmobile_init_delay?
+Hi Tony
 
-Oops, wrong patch from my side. =) Please ignore my comment.
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 
-But we still want the SoCs to be converted over.
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
 
-/ magnus
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git for-v3.16/prcm-cleanup-a
+
+for you to fetch changes up to 70fcebf1965b66d73bd8ae7955bd663ab8012c56:
+
+  ARM: OMAP4: PRCM: remove references to cm-regbits-44xx.h from PRCM core files (2014-05-15 22:35:10 -0600)
+
+- ----------------------------------------------------------------
+Some OMAP PRCM cleanup patches.  These help prepare to convert the PRCM
+code into drivers.
+
+Basic build, boot, and PM test results are available here:
+
+http://www.pwsan.com/omap/testlogs/prcm-cleanup-v3.16/20140515213244/
+
+- ----------------------------------------------------------------
+Tero Kristo (10):
+      ARM: OMAP3: CM: remove a few OMAP34XX_CM_REGADDR defines
+      ARM: OMAP2+: prcm: add omap_test_timeout to prcm-common.h
+      ARM: OMAP2/3: CM: remove some external dependencies
+      ARM: OMAP4: CM: use cm_base* in register address calculations
+      ARM: OMAP2+: PRCM: cleanup some header includes
+      ARM: OMAP2+: PRM: remove unnecessary cpu_is_XXX calls from prm_init / exit
+      ARM: OMAP3/4: PRM: provide io chain reconfig function through irq setup
+      ARM: OMAP3/OMAP4: PRM: add prm_features flags and add IO wakeup under it
+      ARM: OMAP3/4: PRM: add support of late_init call to prm_ll_ops
+      ARM: OMAP4: PRCM: remove references to cm-regbits-44xx.h from PRCM core files
+
+ arch/arm/mach-omap2/clockdomain.h                  |  3 ++-
+ arch/arm/mach-omap2/cm2xxx.c                       | 15 ++-----------
+ arch/arm/mach-omap2/cm33xx.h                       |  3 ---
+ arch/arm/mach-omap2/cm3xxx.c                       | 25 ++++++++--------------
+ arch/arm/mach-omap2/cm3xxx.h                       |  5 ++---
+ arch/arm/mach-omap2/cm44xx.c                       | 11 ++++------
+ arch/arm/mach-omap2/cm_common.c                    |  2 +-
+ arch/arm/mach-omap2/cminst44xx.c                   | 10 ++++++---
+ .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  1 +
+ arch/arm/mach-omap2/powerdomain-common.c           |  1 -
+ arch/arm/mach-omap2/powerdomain.c                  |  1 +
+ arch/arm/mach-omap2/powerdomain.h                  |  3 +--
+ arch/arm/mach-omap2/prcm-common.h                  | 24 +++++++++++++++++++++
+ arch/arm/mach-omap2/prcm_mpu44xx.h                 |  1 -
+ arch/arm/mach-omap2/prm.h                          | 10 +++++++++
+ arch/arm/mach-omap2/prm2xxx.c                      | 13 +----------
+ arch/arm/mach-omap2/prm2xxx_3xxx.c                 |  1 -
+ arch/arm/mach-omap2/prm33xx.c                      |  1 -
+ arch/arm/mach-omap2/prm3xxx.c                      | 20 ++++++++---------
+ arch/arm/mach-omap2/prm44xx.c                      | 18 +++++++---------
+ arch/arm/mach-omap2/prm_common.c                   | 17 +++++++++------
+ 21 files changed, 93 insertions(+), 92 deletions(-)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+
+iQIcBAEBAgAGBQJTdZg7AAoJEMePsQ0LvSpLvYYP/1QjKttZU9isMb2/WRR3tGay
+PKLkTu0OxHn7PznzdML+vpucD0ouQoD2wuDxpVrUQ1xzrk3yu2nAMm7hCWt3oPC0
+jXzY/b6Ikf0SBk1HQ2ZqcBhYwhqAva8FwyZ6eUbztspnxPl5DIKWZ/0bEi1+3bLD
+Pp2kBX6bexssCOH26x+I4n3zVprlH9U1RgYhO/OaQ+rDaucOqTf30WyOxltCy1dI
+T/g2Q+obbTw8XGvP90T8Jognf6HgUpq8FuyX4WM6ypJ03bvlb/dNXUHj/MTcfUG0
+MWz3I2LtgtYnhh4B3Rv77bVBCRPOyEBfDTXd+Lm3n3mc3dPgSrBoeZUoJNTVKeUG
+KJbm3qxjps5/iyGJyuif+opriey8IeQrAQhQSFB7oFw0Kl++L13Cm4HKCgx9QkBc
+TFNKK8N3oNHJPlgHWIDrJY/mdqmR7/kxFVy2bvxnfmSkxSyPXxWvGSe17GjIlTfN
+/jYOaygegbMI1Q6n+EuAhUY4v7qhDuzu75BnRpItxB5mzyYIYIV+f4tJlE6uDglh
+SEtFtRQnIjmNDQ72+70mYlgjy8VvdXc++JW1bjJyONMO5Ghb3CsrpeU+EThBw3Fu
+x+HJYNWDd0M3Jhhjjn3pfhkrpGbZNfCxM2QGczkZFWjhlsqdNwn8i/u1HMGb91Yr
+nm22ofeTTQrISphxouKg
+=fLlV
+-----END PGP SIGNATURE-----
