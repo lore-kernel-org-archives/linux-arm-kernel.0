@@ -1,124 +1,81 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 May 2014 09:58:08 +0900
-Subject: [PATCH 1/2] ARM: shmobile: lager: Enable SCIF0 and SCIF1 serial ports
- in DT
-In-Reply-To: <cover.1400201670.git.horms+renesas@verge.net.au>
-References: <cover.1400201670.git.horms+renesas@verge.net.au>
-Message-ID: <4e9c4877aacc134b568e480eb8998de58b43d63e.1400201670.git.horms+renesas@verge.net.au>
+Date: Fri, 16 May 2014 09:58:16 +0900
+Subject: [GIT PULL] Third Round of Renesas ARM Based SoC DT Updates for v3.16
+Message-ID: <cover.1400200395.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-SCIF0 and SCIF1 are used as debug serial ports. Enable them and
-configure pinmuxing appropriately. We can now remove the clkdev
-registration hack for SCIF devices from the Lager reference board file.
+Please consider these third round of Renesas ARM based SoC DT updates for v3.16.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-[horms+renesas at verge.net.au: updated changelog to remove references to
-                             device renaming]
-[horms+renesas at verge.net.au: resolved conflicts]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7790-lager.dts            | 21 ++++++++++++++++++++-
- arch/arm/mach-shmobile/board-lager-reference.c | 10 ----------
- arch/arm/mach-shmobile/setup-r8a7790.c         | 10 +++++-----
- 3 files changed, 25 insertions(+), 16 deletions(-)
+This pull request is based on the previous round of
+such requests, tagged as renesas-dt2-for-v3.16,
+which I have already sent a pull-request for.
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 6e99eb2..25e0485 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -17,6 +17,11 @@
- 	model = "Lager";
- 	compatible = "renesas,lager", "renesas,r8a7790";
- 
-+	aliases {
-+		serial6 = &scif0;
-+		serial7 = &scif1;
-+	};
-+
- 	chosen {
- 		bootargs = "console=ttySC6,115200 ignore_loglevel rw root=/dev/nfs ip=dhcp";
- 	};
-@@ -112,7 +117,7 @@
- };
- 
- &pfc {
--	pinctrl-0 = <&du_pins &scif0_pins &scif1_pins>;
-+	pinctrl-0 = <&du_pins>;
- 	pinctrl-names = "default";
- 
- 	du_pins: du {
-@@ -221,6 +226,20 @@
- 	};
- };
- 
-+&scif0 {
-+	pinctrl-0 = <&scif0_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
-+
-+&scif1 {
-+	pinctrl-0 = <&scif1_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
-+
- &sdhi0 {
- 	pinctrl-0 = <&sdhi0_pins>;
- 	pinctrl-names = "default";
-diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
-index 1bca2748..749832e 100644
---- a/arch/arm/mach-shmobile/board-lager-reference.c
-+++ b/arch/arm/mach-shmobile/board-lager-reference.c
-@@ -91,16 +91,6 @@ static void __init lager_add_du_device(void)
-  */
- static const struct clk_name clk_names[] __initconst = {
- 	{ "cmt0", "fck", "sh-cmt-48-gen2.0" },
--	{ "scifa0", NULL, "sh-sci.0" },
--	{ "scifa1", NULL, "sh-sci.1" },
--	{ "scifb0", NULL, "sh-sci.2" },
--	{ "scifb1", NULL, "sh-sci.3" },
--	{ "scifb2", NULL, "sh-sci.4" },
--	{ "scifa2", NULL, "sh-sci.5" },
--	{ "scif0", NULL, "sh-sci.6" },
--	{ "scif1", NULL, "sh-sci.7" },
--	{ "hscif0", NULL, "sh-sci.8" },
--	{ "hscif1", NULL, "sh-sci.9" },
- 	{ "du0", "du.0", "rcar-du-r8a7790" },
- 	{ "du1", "du.1", "rcar-du-r8a7790" },
- 	{ "du2", "du.2", "rcar-du-r8a7790" },
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index 87327f3..5fc9b17 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -287,6 +287,11 @@ static struct resource cmt0_resources[] = {
- 
- void __init r8a7790_add_dt_devices(void)
- {
-+	r8a7790_register_cmt(0);
-+}
-+
-+void __init r8a7790_add_standard_devices(void)
-+{
- 	r8a7790_register_scif(0);
- 	r8a7790_register_scif(1);
- 	r8a7790_register_scif(2);
-@@ -297,11 +302,6 @@ void __init r8a7790_add_dt_devices(void)
- 	r8a7790_register_scif(7);
- 	r8a7790_register_scif(8);
- 	r8a7790_register_scif(9);
--	r8a7790_register_cmt(0);
--}
--
--void __init r8a7790_add_standard_devices(void)
--{
- 	r8a7790_add_dt_devices();
- 	r8a7790_register_irqc(0);
- 	r8a7790_register_thermal();
--- 
-1.8.5.2
+
+The following changes since commit 5a62ec57004f1a434bfd3feed43e447b5780baf6:
+
+  ARM: shmobile: henninger: enable SATA0 (2014-04-28 09:12:04 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt3-for-v3.16
+
+for you to fetch changes up to 3fa3985e624aea24334abc9a33b484c3d316e64e:
+
+  ARM: shmobile: r8a7740 dtsi: Remove duplicate interrupt-parent property (2014-05-15 08:09:59 +0900)
+
+----------------------------------------------------------------
+Third Round of Renesas ARM Based SoC DT Updates for v3.16
+
+r8a7791 (R-Car M2), r8a7779 (R-Car H1), r8a7778 (R-Car M1),
+r8a7740 (R-Mobile A1) and r8a73a4 (R-Mobile APE6) SoCs
+* Move interrupt-parent property to root node
+
+r8a7791 (R-Car M2) and r8a7790 (R-Car H2) SoCs
+* Add GPIO clocks
+
+r8a7791 (R-Car M2) based Henninger board
+* Add MSIOF0, QSPI and SDHI0/2 support
+* Specify EXTAL frequency
+
+r8a7779 (R-Car H1) based Marzen board
+* Set SMSC lan to use irq-push-pull
+
+r8a7740 (R-Mobile A1) SoC
+* Remove duplicate interrupt-parent property
+
+r8a7740 (R-Mobile A1) based Armadillo800 EVA board
+* Add Ethernet support
+
+----------------------------------------------------------------
+Geert Uytterhoeven (5):
+      ARM: shmobile: r8a7740 dtsi: Add Ethernet support
+      ARM: shmobile: armadillo-reference dts: Add Ethernet support
+      ARM: shmobile: r8a7790 dtsi: Add GPIO clocks
+      ARM: shmobile: r8a7791 dtsi: Add GPIO clocks
+      ARM: shmobile: r8a7740 dtsi: Remove duplicate interrupt-parent property
+
+Laurent Pinchart (1):
+      ARM: shmobile: dts: Move interrupt-parent property to root node
+
+Sergei Shtylyov (4):
+      ARM: shmobile: henninger: specify EXTAL frequency
+      ARM: shmobile: henninger: add SDHI0/2 DT support
+      ARM: shmobile: henninger: add QSPI DT support
+      ARM: shmobile: henninger: add MSIOF0 DT support
+
+Simon Horman (1):
+      ARM: shmobile: marzen-reference: Set SMSC lan to use irq-push-pull
+
+ arch/arm/boot/dts/r8a73a4.dtsi                     |  18 ---
+ .../boot/dts/r8a7740-armadillo800eva-reference.dts |  17 +++
+ arch/arm/boot/dts/r8a7740.dtsi                     |  24 ++--
+ arch/arm/boot/dts/r8a7778.dtsi                     |  18 +--
+ arch/arm/boot/dts/r8a7779-marzen-reference.dts     |   1 +
+ arch/arm/boot/dts/r8a7779.dtsi                     |  21 +---
+ arch/arm/boot/dts/r8a7790.dtsi                     |  13 +-
+ arch/arm/boot/dts/r8a7791-henninger.dts            | 139 +++++++++++++++++++++
+ arch/arm/boot/dts/r8a7791.dtsi                     |  22 +++-
+ 9 files changed, 200 insertions(+), 73 deletions(-)
