@@ -1,155 +1,25 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Fri, 16 May 2014 07:17:37 +0000
-Subject: [PATCHv2] ARM: ioremap: Fix static vm area boundary checking.
-In-Reply-To: <CAHPCO9GrwRczw2R9nZDL0tDdYxSHV0f2aDhFSat+xhhiWaYbUg@mail.gmail.com>
-References: <1400142562-9111-1-git-send-email-superlibj8301@gmail.com>
- <alpine.LFD.2.11.1405151325250.17310@knanqh.ubzr>
- <CAHPCO9GrwRczw2R9nZDL0tDdYxSHV0f2aDhFSat+xhhiWaYbUg@mail.gmail.com>
-Message-ID: <308e7a7eeaf04ae8a90b8db39697009b@BY2PR03MB505.namprd03.prod.outlook.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 16 May 2014 09:18:04 +0200
+Subject: [PATCH/RFC] ARM: shmobile: Enable PM_RUNTIME in defconfig
+In-Reply-To: <1400198682-7666-1-git-send-email-horms+renesas@verge.net.au>
+References: <1400198682-7666-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXu3hz6jEb0KKT_LS2YHhde+RXAy-eaQLE2-nOHSPXgrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCHv2] ARM: ioremap: Fix static vm area boundary checking.
-> 
-> On Fri, May 16, 2014 at 1:28 AM, Nicolas Pitre <nicolas.pitre@linaro.org>
-> wrote:
-> > On Thu, 15 May 2014, Richard Lee wrote:
-> >
-> >> Static vm area boundary check:
-> >>
-> >>       paddr1 --->|       |
-> >>                  |       |
-> >>                  |-------| <-\--- svm->vm->addr(is page aligned)
-> >>       paddr2 --->|       |    |
-> >>                  |     --| <--|-- svm->vm->phys_addr
-> >>                  |       |    |
-> >>       paddr3 --->|       |    |
-> >>                  |       |    |
-> >>                  |-------| <--|-- next page boundary
-> >>                  |       |    |
-> >>       paddr4 --->|       |    | <----- svm->vm->size(including guard page)
-> >>                  |       |    |
-> >>                  |       |    |
-> >> max paddr_end -->|-------| <--|-- svm->vm's phys_addr_end
-> >>                  | ///// |    |
-> >>       paddr5 --->| guard |    |
-> >>                  | page  |    |
-> >>                  | ///// |    |
-> >>                   -------  <-/--- svm->vm->addr + svm->vm_size
-> >>
-> >> <1> If the paddr == paddr1, then continue;
-> >> <2> If the paddr == paddr2~paddr4 and paddr_end > phys_addr_end,
-> >>     then continue;
-> >> <3> if the paddr >= paddr5 then continue;
-> >>
-> >> Signed-off-by: Richard Lee <superlibj8301@gmail.com>
-> >
-> > instead of doing this repeatedly, why not simply ensure the recorded
-> > static vm information is already page aligned in the first place?
-> >
-> 
-> Sorry, I'm not very sure what vm information you meant here.
-> 
-> And the 'svm->vm->addr' and 'svm->vm->size' are all page aligned
-> already, but we cannot make sure that the 'paddr' and
-> 'svm->vm->phys_addr' are page aligned.
-> 
+On Fri, May 16, 2014 at 2:04 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-The paddr and svm->vm->phys_addr are all already pfn aligned here.
-What we should fix about is the boundary of them. 
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-Thanks,
-BRs
-Xiubo
+Gr{oetje,eeting}s,
 
+                        Geert
 
-> 
-> Thanks,
-> 
-> BRs
-> Richard Lee
-> 
-> >
-> >
-> >> ---
-> >>
-> >>
-> >> Change in V2:
-> >>  - PAGE_SIZE --> PAGE_MASK
-> >>  - remove the 'size' page size align operation.
-> >>
-> >>
-> >>
-> >>
-> >>
-> >>
-> >>  arch/arm/mm/ioremap.c | 40 ++++++++++++++++++++++++++++++++++++++--
-> >>  1 file changed, 38 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-> >> index be69333..f235ab7 100644
-> >> --- a/arch/arm/mm/ioremap.c
-> >> +++ b/arch/arm/mm/ioremap.c
-> >> @@ -47,16 +47,52 @@ static struct static_vm
-> *find_static_vm_paddr(phys_addr_t paddr,
-> >>  {
-> >>       struct static_vm *svm;
-> >>       struct vm_struct *vm;
-> >> +     size_t offset;
-> >> +
-> >> +     offset = paddr & ~PAGE_MASK;
-> >>
-> >>       list_for_each_entry(svm, &static_vmlist, list) {
-> >> +             phys_addr_t paddr_end, phys_addr_end;
-> >> +             size_t vmoff;
-> >> +
-> >>               vm = &svm->vm;
-> >>               if (!(vm->flags & VM_ARM_STATIC_MAPPING))
-> >>                       continue;
-> >>               if ((vm->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
-> >>                       continue;
-> >>
-> >> -             if (vm->phys_addr > paddr ||
-> >> -                     paddr + size - 1 > vm->phys_addr + vm->size - 1)
-> >> +             /* Static vm area boundary check:
-> >> +              *
-> >> +              *       paddr1 --->|       |
-> >> +              *                  |       |
-> >> +              *                  |-------| <-\--- svm->vm->addr(page
-> aligned)
-> >> +              *       paddr2 --->|       |    |
-> >> +              *                  |     --| <--|-- svm->vm->phys_addr
-> >> +              *                  |       |    |
-> >> +              *       paddr3 --->|       |    |
-> >> +              *                  |       |    |
-> >> +              *                  |-------| <--|-- next page boundary
-> >> +              *                  |       |    |
-> >> +              *       paddr4 --->|       |    | <----- svm->vm->size,
-> >> +              *                  |       |    |         including guard
-> page
-> >> +              *                  |       |    |
-> >> +              * max paddr_end -->|-------| <--|-- svm->vm's phys_addr_end
-> >> +              *                  | ///// |    |
-> >> +              *       paddr5 --->| guard |    |
-> >> +              *                  | page  |    |
-> >> +              *                  | ///// |    |
-> >> +              *                   -------  <-/-- svm->vm->addr + svm-
-> >vm_size
-> >> +              *
-> >> +              * <1> If paddr == paddr1, then continue;
-> >> +              * <2> If paddr == paddr2~paddr4 and paddr_end >
-> phys_addr_end,
-> >> +              *     then continue;
-> >> +              * <3> if paddr >= paddr5 then continue;
-> >> +              */
-> >> +             vmoff = vm->phys_addr & ~PAGE_MASK;
-> >> +             phys_addr_end = vm->phys_addr + vm->size - PAGE_SIZE - vmoff;
-> >> +             paddr_end = paddr + size - offset;
-> >> +             if (__phys_to_pfn(vm->phys_addr) > __phys_to_pfn(paddr) ||
-> >> +                     paddr_end - 1 > phys_addr_end - 1)
-> >>                       continue;
-> >>
-> >>               return svm;
-> >> --
-> >> 1.8.4
-> >>
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
