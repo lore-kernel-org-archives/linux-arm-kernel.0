@@ -1,44 +1,47 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 16 May 2014 18:17:05 +0100
-Subject: [GIT PULL] arm64 fixes for 3.15
-Message-ID: <20140516171659.GA11088@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 16 May 2014 11:19:24 -0600
+Subject: [PATCH v2 cgroup/for-3.16] cgroup: introduce CSS_NO_REF and skip
+ refcnting on normal root csses
+In-Reply-To: <20140516170959.GG5379@htj.dyndns.org>
+References: <1399670015-23463-1-git-send-email-tj@kernel.org>
+ <1399670015-23463-10-git-send-email-tj@kernel.org>
+ <53751062.2050401@wwwdotorg.org> <53753823.2090402@wwwdotorg.org>
+ <20140516143718.GA5379@htj.dyndns.org> <20140516154330.GB5379@htj.dyndns.org>
+ <537643F9.1030303@wwwdotorg.org> <20140516170959.GG5379@htj.dyndns.org>
+Message-ID: <5376489C.9010902@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 05/16/2014 11:09 AM, Tejun Heo wrote:
+> 9395a4500404 ("cgroup: enable refcnting for root csses") enabled
+> reference counting for root csses (cgroup_subsys_states) so that
+> cgroup's self csses can be used to manage the lifetime of the
+> containing cgroups.
+> 
+> Unfortunately, this change was incorrect.  During early init,
+> cgrp_dfl_root self css refcnt is used.  percpu_ref can't initialized
+> during early init and its initialization is deferred till
+> cgroup_init() time.  This means that cpu was using percpu_ref which
+> wasn't properly initialized.  Due to the way percpu variables are laid
+> out on x86, this didn't blow up immediately on x86 but ended up
+> incrementing and decrementing the percpu variable at offset zero,
+> whatever it may be; however, on other archs, this caused fault and
+> early boot failure.
+> 
+> As cgroup self csses for root cgroups of non-dfl hierarchies need
+> working refcounting, we can't revert 9395a4500404.  This patch adds
+> CSS_NO_REF which explicitly inhibits reference counting on the css and
+> sets it on all normal (non-self) csses and cgroup_dfl_root self css.
+> 
+> v2: cgrp_dfl_root.self is the offending one.  Set the flag on it.
+> 
+> Signed-off-by: Tejun Heo <tj@kernel.org>
+> Reported-by: Stephen Warren <swarren@wwwdotorg.org>
+> Fixes: 9395a4500404 ("cgroup: enable refcnting for root csses")
+> ---
+> Hello,
+> 
+> Can you try this one instead?
 
-Please pull the arm64 fixes below. Thanks.
-
-
-The following changes since commit 89ca3b881987f5a4be4c5dbaa7f0df12bbdde2fd:
-
-  Linux 3.15-rc4 (2014-05-04 18:14:42 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to 4797ec2dc83a43be35bad56037d1b53db9e2b5d5:
-
-  arm64: fix pud_huge() for 2-level pagetables (2014-05-16 17:34:40 +0100)
-
-----------------------------------------------------------------
-- arm64 migrate_irqs() fix following commit ffde1de64012 (irqchip: Gic:
-  Support forced affinity setting)
-- fix arm64 pud_huge() to return 0 when only 2 levels page tables are
-  used (__PAGETABLE_PMD_FOLDED defined and pmd_huge already covers block
-  entries at the first level), otherwise KVM gets confused
-
-----------------------------------------------------------------
-Mark Salter (1):
-      arm64: fix pud_huge() for 2-level pagetables
-
-Sudeep Holla (1):
-      arm64: use cpu_online_mask when using forced irq_set_affinity
-
- arch/arm64/kernel/irq.c     | 10 +++++++---
- arch/arm64/mm/hugetlbpage.c |  4 ++++
- 2 files changed, 11 insertions(+), 3 deletions(-)
-
--- 
-Catalin
+Yes, this one works great, thanks.
+Tested-by: Stephen Warren <swarren@nvidia.com>
