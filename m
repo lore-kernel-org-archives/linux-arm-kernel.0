@@ -1,35 +1,50 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 16 May 2014 01:23:59 -0400
-Subject: [PATCHv2] ARM: Kirkwood: DT versions of OpenRD boards
-In-Reply-To: <1399836639-1918-1-git-send-email-andrew@lunn.ch>
-References: <1399836639-1918-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20140516052359.GA27822@titan.lakedaemon.net>
+Date: Fri, 16 May 2014 01:35:30 -0400
+Subject: [PATCHv2] ARM: mvebu: use hardware I/O coherency also for PCI
+ devices
+In-Reply-To: <1399997070-11434-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1399997070-11434-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140516053530.GB27822@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 11, 2014 at 09:30:39PM +0200, Andrew Lunn wrote:
-> Create DTS files to describe the Marvell OpenRD boards.
+On Tue, May 13, 2014 at 06:04:30PM +0200, Thomas Petazzoni wrote:
+> Since the beginning of the introduction of hardware I/O coherency
+> support for Armada 370 and Armada XP, the special DMA operations
+> should have applied to all DMA capable devices. Unfortunately, while
+> the original code properly took into account platform devices, it
+> didn't take into account PCI devices, which can also be DMA masters.
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Tested-by: Francois Lorrain <francois.lorrain@gmail.com>
-> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> This commit fixes that by registering a bus notifier on pci_bus_type,
+> to register our custom DMA operations, like is already done for
+> platform devices. While doing this, we also rename
+> mvebu_hwcc_platform_notifier() to mvebu_hwcc_notifier() and
+> mvebu_hwcc_platform_nb to mvebu_hwcc_nb because they are no longer
+> specific to platform devices.
+> 
+> Fixes: e60304f8cb7b ("arm: mvebu: Add hardware I/O Coherency support")
+> Cc: <stable@vger.kernel.org> # v3.8+
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
-> s/descrition/description/
-> Remove i2c pinctrl properties
-> Fixed status of mvsdio node.
+> Changes since v1:
+>  * Fix stupid tab vs. space problem
+> 
+> Applies to mvebu/soc.
+> 
+> Whether this commit qualifies as stable material can be
+> discussed. Technically, it was a mistake from the original I/O
+> coherency implementation. But in practice, besides not using the I/O
+> coherency, I don't think it's causing any specific problem other than
+> DMA transactions on PCI devices triggering unneeded cache maintenance
+> operations. So I'll leave it to the mvebu maintainers to decide
+> whether this qualifies as stable material or not. I've included the
+> relevant Fixes: and Cc: fields, but don't hesitate to rip them out if
+> you don't think this should go to stable.
 > ---
->  arch/arm/boot/dts/Makefile                     |  3 +
->  arch/arm/boot/dts/kirkwood-openrd-base.dts     | 42 ++++++++++++
->  arch/arm/boot/dts/kirkwood-openrd-client.dts   | 73 +++++++++++++++++++++
->  arch/arm/boot/dts/kirkwood-openrd-ultimate.dts | 58 +++++++++++++++++
->  arch/arm/boot/dts/kirkwood-openrd.dtsi         | 90 ++++++++++++++++++++++++++
->  5 files changed, 266 insertions(+)
->  create mode 100644 arch/arm/boot/dts/kirkwood-openrd-base.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-openrd-client.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-openrd-ultimate.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-openrd.dtsi
+>  arch/arm/mach-mvebu/coherency.c | 21 ++++++++++++++++-----
+>  1 file changed, 16 insertions(+), 5 deletions(-)
 
-Applied to mvebu/dt
+Applied to mvebu/soc w/o the stable tags.
 
 thx,
 
