@@ -1,70 +1,135 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 May 2014 09:58:50 +0900
-Subject: [PATCH 9/9] ARM: shmobile: Set clock frequency in HZ from OF nodes
-In-Reply-To: <cover.1400200838.git.horms+renesas@verge.net.au>
-References: <cover.1400200838.git.horms+renesas@verge.net.au>
-Message-ID: <f492b81777c93b33afe892b424e022022b5bc297.1400200838.git.horms+renesas@verge.net.au>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 15 May 2014 18:22:34 -0700
+Subject: [PATCH v4 1/6] watchdog: Add API to trigger reboots
+In-Reply-To: <1400186304-1691-2-git-send-email-linux@roeck-us.net>
+References: <1400186304-1691-1-git-send-email-linux@roeck-us.net>
+ <1400186304-1691-2-git-send-email-linux@roeck-us.net>
+Message-ID: <20140516012234.GA16592@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-shmobile_init_delay() looks for OF "clock-frequency" to determine
-the delay which is set by calling shmobile_setup_delay().
+Some hardware implements reboot through its watchdog hardware,
+for example by triggering a watchdog timeout. Platform specific
+code starts to spread into watchdog drivers, typically by setting
+pointers to a callback functions which is then called from the
+platform reset handler.
 
-Unfortunately this seems to be incorrect in detail as
-"clock-frequency" node values are in HZ whereas the frequency
-argument to shmobile_setup_delay() is in MHz.
+To simplify code and provide a unified API to trigger reboots by
+watchdog drivers, provide a single API to trigger such reboots
+through the watchdog subsystem.
 
-Provide a variant of shmobile_setup_delay() that accepts HZ to
-correct this problem.
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- arch/arm/mach-shmobile/timer.c | 23 ++++++++++++++++++++---
- 1 file changed, 20 insertions(+), 3 deletions(-)
+v4: Protect accesses to wdd_reboot_dev with spinlock to avoid potential
+    race conditions.
+    Drop Acked-by and Tested-by tags because changes are too significant
+    and warrant re-evaluation and re-testing.
+v3: Drop reboot mode and cmd string parameters from API
+v2: Remove unnecessary check for ops in reboot function
 
-diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
-index ccecde9..68bc0b8 100644
---- a/arch/arm/mach-shmobile/timer.c
-+++ b/arch/arm/mach-shmobile/timer.c
-@@ -23,6 +23,23 @@
- #include <linux/delay.h>
- #include <linux/of_address.h>
+ drivers/watchdog/watchdog_core.c | 27 +++++++++++++++++++++++++++
+ include/linux/watchdog.h         |  8 ++++++++
+ 2 files changed, 35 insertions(+)
+
+diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
+index cec9b55..e61f4ed 100644
+--- a/drivers/watchdog/watchdog_core.c
++++ b/drivers/watchdog/watchdog_core.c
+@@ -37,12 +37,27 @@
+ #include <linux/idr.h>		/* For ida_* macros */
+ #include <linux/err.h>		/* For IS_ERR macros */
+ #include <linux/of.h>		/* For of_get_timeout_sec */
++#include <linux/spinlock.h>	/* For spinlock */
  
-+void __init shmobile_setup_delay_hz(unsigned int max_cpu_core_hz,
-+				    unsigned int mult, unsigned int div)
+ #include "watchdog_core.h"	/* For watchdog_dev_register/... */
+ 
+ static DEFINE_IDA(watchdog_ida);
+ static struct class *watchdog_class;
+ 
++static DEFINE_SPINLOCK(wdd_reboot_lock);
++static struct watchdog_device *wdd_reboot_dev;
++
++void watchdog_do_reboot(void)
 +{
-+	/* calculate a worst-case loops-per-jiffy value
-+	 * based on maximum cpu core hz setting and the
-+	 * __delay() implementation in arch/arm/lib/delay.S
-+	 *
-+	 * this will result in a longer delay than expected
-+	 * when the cpu core runs on lower frequencies.
-+	 */
++	unsigned long flags;
 +
-+	unsigned int value = HZ * div / mult;
-+
-+	if (!preset_lpj)
-+		preset_lpj = max_cpu_core_hz / value;
++	spin_lock_irqsave(&wdd_reboot_lock, flags);
++	if (wdd_reboot_dev)
++		wdd_reboot_dev->ops->reboot(wdd_reboot_dev);
++	spin_unlock_irqrestore(&wdd_reboot_lock, flags);
 +}
++EXPORT_SYMBOL(watchdog_do_reboot);
 +
- void __init shmobile_setup_delay(unsigned int max_cpu_core_mhz,
- 				 unsigned int mult, unsigned int div)
+ static void watchdog_check_min_max_timeout(struct watchdog_device *wdd)
  {
-@@ -58,12 +75,12 @@ void __init shmobile_init_delay(void)
+ 	/*
+@@ -111,6 +126,7 @@ EXPORT_SYMBOL_GPL(watchdog_init_timeout);
+ int watchdog_register_device(struct watchdog_device *wdd)
+ {
+ 	int ret, id, devno;
++	unsigned long flags;
  
- 	if (max_freq) {
- 		if (of_find_compatible_node(NULL, NULL, "arm,cortex-a8"))
--			shmobile_setup_delay(max_freq, 1, 3);
-+			shmobile_setup_delay_hz(max_freq, 1, 3);
- 		else if (of_find_compatible_node(NULL, NULL, "arm,cortex-a9"))
--			shmobile_setup_delay(max_freq, 1, 3);
-+			shmobile_setup_delay_hz(max_freq, 1, 3);
- 		else if (of_find_compatible_node(NULL, NULL, "arm,cortex-a15"))
- 			if (!IS_ENABLED(CONFIG_ARM_ARCH_TIMER))
--				shmobile_setup_delay(max_freq, 2, 4);
-+				shmobile_setup_delay_hz(max_freq, 2, 4);
+ 	if (wdd == NULL || wdd->info == NULL || wdd->ops == NULL)
+ 		return -EINVAL;
+@@ -162,6 +178,11 @@ int watchdog_register_device(struct watchdog_device *wdd)
+ 		return ret;
  	}
- }
  
++	spin_lock_irqsave(&wdd_reboot_lock, flags);
++	if (wdd->ops->reboot && !wdd_reboot_dev)
++		wdd_reboot_dev = wdd;
++	spin_unlock_irqrestore(&wdd_reboot_lock, flags);
++
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(watchdog_register_device);
+@@ -177,10 +198,16 @@ void watchdog_unregister_device(struct watchdog_device *wdd)
+ {
+ 	int ret;
+ 	int devno;
++	unsigned long flags;
+ 
+ 	if (wdd == NULL)
+ 		return;
+ 
++	spin_lock_irqsave(&wdd_reboot_lock, flags);
++	if (wdd == wdd_reboot_dev)
++		wdd_reboot_dev = NULL;
++	spin_unlock_irqrestore(&wdd_reboot_lock, flags);
++
+ 	devno = wdd->cdev.dev;
+ 	ret = watchdog_dev_unregister(wdd);
+ 	if (ret)
+diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
+index 2a3038e..1e9da0a 100644
+--- a/include/linux/watchdog.h
++++ b/include/linux/watchdog.h
+@@ -23,6 +23,7 @@ struct watchdog_device;
+  * @start:	The routine for starting the watchdog device.
+  * @stop:	The routine for stopping the watchdog device.
+  * @ping:	The routine that sends a keepalive ping to the watchdog device.
++ * @reboot:	The routine for rebooting the system
+  * @status:	The routine that shows the status of the watchdog device.
+  * @set_timeout:The routine for setting the watchdog devices timeout value.
+  * @get_timeleft:The routine that get's the time that's left before a reset.
+@@ -42,6 +43,7 @@ struct watchdog_ops {
+ 	int (*stop)(struct watchdog_device *);
+ 	/* optional operations */
+ 	int (*ping)(struct watchdog_device *);
++	void (*reboot)(struct watchdog_device *);
+ 	unsigned int (*status)(struct watchdog_device *);
+ 	int (*set_timeout)(struct watchdog_device *, unsigned int);
+ 	unsigned int (*get_timeleft)(struct watchdog_device *);
+@@ -142,4 +144,10 @@ extern int watchdog_init_timeout(struct watchdog_device *wdd,
+ extern int watchdog_register_device(struct watchdog_device *);
+ extern void watchdog_unregister_device(struct watchdog_device *);
+ 
++#ifdef CONFIG_WATCHDOG_CORE
++extern void watchdog_do_reboot(void);
++#else
++static inline void watchdog_do_reboot(void) { }
++#endif
++
+ #endif  /* ifndef _LINUX_WATCHDOG_H */
 -- 
-1.8.5.2
+1.9.1
