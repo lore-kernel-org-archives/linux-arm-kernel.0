@@ -1,40 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 16 May 2014 08:02:32 -0700
-Subject: [PATCH v3 11/13] ARM: dts: am4372: Remove obsolete properties
- from edma node
-In-Reply-To: <1400242640-9902-12-git-send-email-peter.ujfalusi@ti.com>
-References: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
- <1400242640-9902-12-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20140516150232.GB22031@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 May 2014 16:11:30 +0100
+Subject: [RFC PATCHv1 0/7] ARM core support for hardware I/O coherency in
+ non-SMP platforms
+In-Reply-To: <CAL_JsqKSzsyi-XmTKRK=87Z5wFzDjXaLNHj_irOM4V2-8ds1Tw@mail.gmail.com>
+References: <1400082641-23871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140514170456.GC15946@arm.com>
+ <20140515115010.0d6a4d92@free-electrons.com>
+ <20140515142205.GC1499@arm.com>
+ <CAL_JsqK80pFHQBgMxc1FGi998UYnbKxOK2gbm_ftqrTaxNq4rA@mail.gmail.com>
+ <20140515152553.GA30423@localhost>
+ <CAL_JsqKSzsyi-XmTKRK=87Z5wFzDjXaLNHj_irOM4V2-8ds1Tw@mail.gmail.com>
+Message-ID: <20140516151130.GB7171@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [140516 05:19]:
-> dma-channels, ti,edma-regions and ti,edma-slots no longer needed in DT since
-> the the same information is available in the IP's CCCFG register.
+On Thu, May 15, 2014 at 08:11:13PM +0100, Rob Herring wrote:
+> On Thu, May 15, 2014 at 10:25 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Thu, May 15, 2014 at 03:59:31PM +0100, Rob Herring wrote:
+> >> On Thu, May 15, 2014 at 9:22 AM, Catalin Marinas
+> >> <catalin.marinas@arm.com> wrote:
+> >> > On Thu, May 15, 2014 at 10:50:10AM +0100, Thomas Petazzoni wrote:
+> >> >> On Wed, 14 May 2014 18:04:56 +0100, Catalin Marinas wrote:
+> >> >> > On Wed, May 14, 2014 at 04:50:34PM +0100, Thomas Petazzoni wrote:
+> >> >> > >    - The SCU must be enabled
+> >> >> >
+> >> >> > Again, could the firmware do this?
+> >> >>
+> >> >> See above. If the kernel does it for SMP cases, why wouldn't it do it
+> >> >> also for !SMP I/O coherent cases?
+> >> >
+> >> > The I/O coherency is an SoC property rather than an ARM architecture
+> >> > property. I want to separate the two so that the kernel can boot a
+> >> > significant part assuming sane architecture settings. Once you have DT
+> >> > available and start loading device drivers, you are in the SoC realm and
+> >> > you can do whatever initialisation for buses, interconnects, but not
+> >> > going back to change architected settings.
+> >>
+> >> The SCU has nothing to do with the architecture and really is part of
+> >> the SOC.
+> >
+> > Indeed, it's not part of the architecture but I don't see it any
+> > different than other early configuration like SDRAM controller.
+> >
+> >> Let's look at this another way. Are there any usecases where
+> >> you would not enable the SCU? If any cores are coherent or the ACP is
+> >> coherent, it must be on. So that leaves all core in AMP mode. In this
+> >> case, does it matter if the SCU is enabled or not?
+> >
+> > I don't fully follow the question. You may not enable the SCU if you
+> > don't care at all about the SMP mode or other coherency like ACP.
+> > Otherwise it should be enabled, the latest before the secondaries start.
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> My question is should the kernel unconditionally enable the SCU
+> regardless of CONFIG_SMP or any other condition? Is there harm in
+> enabling the SCU when in AMP mode?
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+I don't see why we couldn't always enable the SCU at boot, whether the
+OS runs SMP, AMP or UP mode.
 
-> ---
->  arch/arm/boot/dts/am4372.dtsi | 3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-> index 03a225505126..b9f83b705f4b 100644
-> --- a/arch/arm/boot/dts/am4372.dtsi
-> +++ b/arch/arm/boot/dts/am4372.dtsi
-> @@ -108,9 +108,6 @@
->  					<GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
->  					<GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
->  			#dma-cells = <1>;
-> -			dma-channels = <64>;
-> -			ti,edma-regions = <4>;
-> -			ti,edma-slots = <256>;
->  		};
->  
->  		uart0: serial at 44e09000 {
-> -- 
-> 1.9.3
-> 
+-- 
+Catalin
