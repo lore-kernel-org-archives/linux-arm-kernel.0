@@ -1,93 +1,53 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Fri, 16 May 2014 10:41:12 +0200
-Subject: [PATCH 4/4] perf tools: Add libdw DWARF post unwind support for ARM
-In-Reply-To: <1400229672-16104-1-git-send-email-jean.pihet@linaro.org>
-References: <CAFrcx1mkE-N+DYUe0ZK06_BL1tsZvmyMHpAynnFkgZBqjghE5Q@mail.gmail.com>
- <1400229672-16104-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <1400229672-16104-4-git-send-email-jean.pihet@linaro.org>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 16 May 2014 11:42:18 +0300
+Subject: [PATCH 00/11] ARM: OMAP: OMAP5 & AM43x DSS
+In-Reply-To: <20140512143604.GB31772@atomide.com>
+References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
+ <5370CBD5.3060107@ti.com> <20140512143604.GB31772@atomide.com>
+Message-ID: <5375CF6A.7030602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding libdw DWARF post unwind support, which is part
-of elfutils-devel/libdw-dev package from version 0.158.
+On 12/05/14 17:36, Tony Lindgren wrote:
+> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140512 06:26]:
+>> Hi Tony,
+>>
+>> On 09/05/14 14:56, Tomi Valkeinen wrote:
+>>> Hi,
+>>>
+>>> Here are arch/arm/ patches to add display support for OMAP5 and AM43x.
+>>>
+>>> I have these in my tree, in a branch I will send to Tony for merging. Most of
+>>> these patches have already been around the lists, but I wanted to send them one
+>>> more time to verify that all looks right and everybody is fine with them.
+>>
+>> I have pushed these to:
+>>
+>> git://git.kernel.org/pub/scm/linux/kernel/git/tomba/linux.git 3.16/omap
+>>
+>> If you're fine with these, I think we can consider that branch stable.
+>> There are probably still a few display related .dts changed for the
+>> board coming up, but I'll add those on top of the current commits.
+> 
+> Please coordinate things with Paul and Tero so you at least have proper
+> acks for the hwmod and and clock patches. In general we really want to
+> queue hwmod and clock changes separately as those can easily mess up things
+> in a bad way like we've already seen with overlapping hwmod entries in
+> the .dts files.
 
-The new code is contained in unwin-libdw.c object, and
-implements unwind__get_entries unwind interface function.
+I don't think the clock dts changes can be separated from the other dts
+changes, as the new 'dss_l3_iclk' clock node is required by the
+omap5.dtsi when adding the DSS support.
 
-Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Corey Ashford <cjashfor@linux.vnet.ibm.com>
-Cc: Frederic Weisbecker <fweisbec@gmail.com>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Cc: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
-Cc: David Ahern <dsahern@gmail.com>
----
- tools/perf/arch/arm/Makefile            |  5 +++++
- tools/perf/arch/arm/util/unwind-libdw.c | 36 +++++++++++++++++++++++++++++++++
- 2 files changed, 41 insertions(+)
- create mode 100644 tools/perf/arch/arm/util/unwind-libdw.c
+The HWMOD patches can go separately.
 
-diff --git a/tools/perf/arch/arm/Makefile b/tools/perf/arch/arm/Makefile
-index 221f21d..09d6215 100644
---- a/tools/perf/arch/arm/Makefile
-+++ b/tools/perf/arch/arm/Makefile
-@@ -4,6 +4,11 @@ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
- endif
- ifndef NO_LIBUNWIND
- LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libunwind.o
-+endif
-+ifndef NO_LIBDW_DWARF_UNWIND
-+LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libdw.o
-+endif
-+ifndef NO_DWARF_UNWIND
- LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/regs_load.o
- LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/dwarf-unwind.o
- endif
-diff --git a/tools/perf/arch/arm/util/unwind-libdw.c b/tools/perf/arch/arm/util/unwind-libdw.c
-new file mode 100644
-index 0000000..b4176c6
---- /dev/null
-+++ b/tools/perf/arch/arm/util/unwind-libdw.c
-@@ -0,0 +1,36 @@
-+#include <elfutils/libdwfl.h>
-+#include "../../util/unwind-libdw.h"
-+#include "../../util/perf_regs.h"
-+
-+bool libdw__arch_set_initial_registers(Dwfl_Thread *thread, void *arg)
-+{
-+	struct unwind_info *ui = arg;
-+	struct regs_dump *user_regs = &ui->sample->user_regs;
-+	Dwarf_Word dwarf_regs[PERF_REG_ARM_MAX];
-+
-+#define REG(r) ({						\
-+	Dwarf_Word val = 0;					\
-+	perf_reg_value(&val, user_regs, PERF_REG_ARM_##r);	\
-+	val;							\
-+})
-+
-+	dwarf_regs[0]  = REG(R0);
-+	dwarf_regs[1]  = REG(R1);
-+	dwarf_regs[2]  = REG(R2);
-+	dwarf_regs[3]  = REG(R3);
-+	dwarf_regs[4]  = REG(R4);
-+	dwarf_regs[5]  = REG(R5);
-+	dwarf_regs[6]  = REG(R6);
-+	dwarf_regs[7]  = REG(R7);
-+	dwarf_regs[8]  = REG(R8);
-+	dwarf_regs[9]  = REG(R9);
-+	dwarf_regs[10] = REG(R10);
-+	dwarf_regs[11] = REG(FP);
-+	dwarf_regs[12] = REG(IP);
-+	dwarf_regs[13] = REG(SP);
-+	dwarf_regs[14] = REG(LR);
-+	dwarf_regs[15] = REG(PC);
-+
-+	return dwfl_thread_state_registers(thread, 0, PERF_REG_ARM_MAX,
-+					   dwarf_regs);
-+}
--- 
-1.7.11.7
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140516/6e0779cc/attachment.sig>
