@@ -1,42 +1,46 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 16 May 2014 19:39:15 +0100
-Subject: [PATCH 4/6] arm64: topology: add MPIDR-based detection
-In-Reply-To: <53763DFC.8070309@arm.com>
-References: <1399063112-16917-1-git-send-email-broonie@kernel.org>
- <1399063112-16917-5-git-send-email-broonie@kernel.org>
- <53763DFC.8070309@arm.com>
-Message-ID: <20140516183915.GP22111@sirena.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 16 May 2014 14:42:05 -0400
+Subject: [Ksummit-discuss] [TECH TOPIC] ARM legacy board DT conversion
+ finalization
+In-Reply-To: <1400265111.2647.54.camel@deadeye.wl.decadent.org.uk>
+References: <20140511030009.GO12708@titan.lakedaemon.net>
+ <20140511083729.211e9b5f@lwn.net>
+ <20140515121546.3A06AC40B0E@trevor.secretlab.ca>
+ <CAL_JsqJw11fZBbLVi=xxC559iWdwCMFOJ4XYM-8EjykttoWsOg@mail.gmail.com>
+ <20140515194215.GR27822@titan.lakedaemon.net>
+ <CAOesGMi0JrTp9kUVDod4duBOCZ+wNRJ0dMmgvBX7jEQRjE5cCA@mail.gmail.com>
+ <20140516041022.GY27822@titan.lakedaemon.net>
+ <1400265111.2647.54.camel@deadeye.wl.decadent.org.uk>
+Message-ID: <20140516184205.GL27822@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 05:34:04PM +0100, Sudeep Holla wrote:
+On Fri, May 16, 2014 at 07:31:51PM +0100, Ben Hutchings wrote:
+> On Fri, 2014-05-16 at 00:10 -0400, Jason Cooper wrote:
+> > Joking aside, I concede your point.  It looks like the last two mvebu
+> > legacy platforms (dove, mv78xx0) might get merged into mach-mvebu during
+> > the next cycle.  After that, we can reach out to the Debian and OpenWRT
+> > guys and see what legacy platforms are in use or rotting.  We can go
+> > from there.
+> 
+> I just removed ixp4xx from Debian as the kernel image wouldn't fit in
+> the NSLU2's kernel partition any more (even after disabling quite a few
+> features that are enabled in most other configurations).  iop32x was
+> removed for the same reason, a while ago.
 
-> This is broken, IIRC Lorenzo commented on this in the previous version of the
-> patch.
+Hmmm, I have two NSLU2's, they might make a good platform for the
+tinification/IoT work.  Small flash, small RAM, slow.
 
-Could you please be specific?  Lorenzo was concerned about overflow but
-that ought to be addressed here.
+> Our 'legacy' (which I take to mean pre-v7) configurations are now
+> kirkwood, mv78xx0, orion5x (all about to converge to mvebu) and
+> versatile.
 
-> Take a simple example of system with 2 Quad core clusters.
-> The mpidr_hash.shift_aff[1] will be 6 as you need minimum 2 bits to represent
-> aff[0]. So you will end up with second cluster with id = 4 instead of 1.
+I'm not familiar with versatile, the others I've seen a few times. ;-)
 
-This isn't a problem, the clusters can have any numbers so long as they
-are distinct.  There is no other requirement.
+Does Debian see any user activity with mv78xx0?  I know your build
+system used to have boards with that SoC family, but are there any other
+users?
 
-> I am not sure if we need this serialization, but even if we need it you can't
-> simply use the hash bits generated for MPIDR.Aff{3..0} serialization directly
-> as is for serializing parts of it.
+thx,
 
-Ah, now I look at what the hash is doing that is indeed directly useful
-- we can mask or shift out the bits we don't want.  Equally well it just
-looks like a preference?
-
-This does seem like something that could be dealt with incrementally.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140516/29e065c5/attachment.sig>
+Jason.
