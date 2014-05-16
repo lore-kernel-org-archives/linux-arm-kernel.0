@@ -1,82 +1,120 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 16 May 2014 12:25:45 -0600
-Subject: [GIT PULL 2/3] ARM: tegra: device tree changes for 3.16
-In-Reply-To: <1400264746-13106-1-git-send-email-swarren@wwwdotorg.org>
-References: <1400264746-13106-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1400264746-13106-2-git-send-email-swarren@wwwdotorg.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 16 May 2014 11:27:36 -0700
+Subject: [PATCHv4 0/5] Add DT support for fixed PHYs
+In-Reply-To: <1400249647-4643-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1400249647-4643-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CAGVrzca7xi4_sGgF0FyFcM0Zo3-mMENP0-aoU=qoV9qshxNzsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bulk of Tegra changes for 3.16 are to device trees. Highlights are:
+Hi Thomas,
 
-- New board support for:
-  - Jetson TK1.
-  - SHIELD.
-  - Tegra Note 7.
-  - Colibri T30 module.
-- HDMI support on Venice2.
-- SD card write-protect GPIOs added to some boards.
-- Numerous regulator cleanups.
+2014-05-16 7:14 GMT-07:00 Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com>:
+> Subject: Add DT support for fixed PHYs
+>
+> Hello,
+>
+> Here is a fourth version of the patch set that adds a Device Tree
+> binding and the related code to support fixed PHYs. I'm hoping to get
+> this merged in 3.16.
 
-----------------------------------------------------------------
+Thanks for being persistent on this and coming back with these
+patches, that is really appreciated.
 
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+I gave this patch set a try on a brcmstb system with SYSTEMPORT and my
+latest changes to net/dsa/ to allow for different PHY setups to be
+used with the SoC integrated switch. This switch has a mix of fixed
+and real PHYs. This works like a charm, so long as you consistently
+use the "new" functions, and not the old ones, which is totally
+expected. This is excellent work!
 
-  Linux 3.15-rc1
+As we discussed offline, I think we need to progressively get rid of
+of_phy_connect_fixed() to avoid having to debug situations where the
+old 'fixed-link' property used some sparse addressing scheme, which is
+now incompatible with the dynamic address allocation scheme.
 
-are available in the git repository at:
+>
+> Changes since v3:
+>
+>  * Rebased on top of v3.15-rc5
+>
+>  * In patch "net: phy: decouple PHY id and PHY address in fixed PHY
+>    driver", changed the PHY ID of fixed PHYs from 0xdeadbeef to 0x0,
+>    as suggested by Grant Likely.
+>
+>  * Fixed the !CONFIG_PHY_FIXED case in patch "net: phy: extend fixed
+>    driver with fixed_phy_register()". Noticed by Florian Fainelli.
+>
+>  * Added Acked-by from Grant Likely and Florian Fainelli on patch
+>    "net: phy: extend fixed driver with fixed_phy_register()".
+>
+>  * Reworked the new fixed-link DT binding to be just a sub-node of the
+>    Ethernet MAC node, and not a node referenced by the 'phy'
+>    property. This was requested by Grant Likely.
+>
+>  * Reworked the code implementing the new DT binding to also make it
+>    accept the old, single property based, DT binding.
+>
+>  * Added a patch that actually uses the new fixed link DT binding for
+>    the Armada XP Matrix board.
+>
+> Changes since v2:
+>
+>  * Rebased on top of v3.14-rc1, and re-tested on hardware.
+>
+>  * Removed the RFC tag, since there seems to be some real interest in
+>    this feature, and the code has gone through several iterations
+>    already.
+>
+>  * The error handling in fixed_phy_register() has been fixed.
+>
+> Changes since v1:
+>
+>  * Instead of using a 'fixed-link' property inside the Ethernet device
+>    DT node, with a fairly cryptic succession of integer values, we now
+>    use a PHY subnode under the Ethernet device DT node, with explicit
+>    properties to configure the duplex, speed, pause and other PHY
+>    properties.
+>
+>  * The PHY address is automatically allocated by the kernel and no
+>    longer visible in the Device Tree binding.
+>
+>  * The PHY device is created directly when the network driver calls
+>    of_phy_connect_fixed_link(), and associated to the PHY DT node,
+>    which allows the existing of_phy_connect() function to work,
+>    without the need to use the deprecated of_phy_connect_fixed_link().
+>
+> Posts of previous versions:
+>
+>   RFCv1:   http://www.spinics.net/lists/netdev/msg243253.html
+>   RFCv2:   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/196919.html
+>   PATCHv3: http://www.spinics.net/lists/netdev/msg273117.html
+>
+> Thanks,
+>
+> Thomas
+>
+> Thomas Petazzoni (5):
+>   net: phy: decouple PHY id and PHY address in fixed PHY driver
+>   net: phy: extend fixed driver with fixed_phy_register()
+>   of: provide a binding for fixed link PHYs
+>   net: mvneta: add support for fixed links
+>   ARM: mvebu: use the fixed-link PHY DT binding for the Armada XP Matrix
+>     board
+>
+>  .../devicetree/bindings/net/fixed-link.txt         | 31 +++++++++
+>  arch/arm/boot/dts/armada-xp-matrix.dts             |  4 ++
+>  drivers/net/ethernet/marvell/mvneta.c              | 19 ++++-
+>  drivers/net/phy/fixed.c                            | 81 +++++++++++++++++++---
+>  drivers/of/of_mdio.c                               | 67 ++++++++++++++++++
+>  include/linux/of_mdio.h                            | 15 ++++
+>  include/linux/phy_fixed.h                          | 11 +++
+>  7 files changed, 215 insertions(+), 13 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/net/fixed-link.txt
+>
+> --
+> 1.9.3
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tegra-for-3.16-dt
-
-for you to fetch changes up to 446e9c63161519902a251c3670d2fbb455146475:
-
-  ARM: tegra: initial add of Colibri T30
-
-----------------------------------------------------------------
-
-Alexandre Courbot (2):
-      ARM: tegra: add Tegra Note 7 device tree
-      ARM: tegra: add device tree for SHIELD
-
-Andrew Bresticker (1):
-      ARM: tegra: fix Venice2 SD card VQMMC supply
-
-Stefan Agner (1):
-      ARM: tegra: initial add of Colibri T30
-
-Stephen Warren (8):
-      ARM: tegra: add Jetson TK1 device tree
-      ARM: tegra: define Jetson TK1 regulators
-      ARM: tegra: fix Jetson TK1 SD card supply
-      ARM: tegra: make Venice's +3.3V_RUN regulator always on
-      ARM: tegra: use correct audio CODEC on Jetson TK1
-      ARM: tegra: add SD wp-gpios to Jetson TK1 DT
-      ARM: tegra: add SD wp-gpios to Dalmore DT
-      ARM: tegra: add SD wp-gpios to Venice2 DT
-
-Thierry Reding (7):
-      ARM: tegra: Add Tegra124 HDMI support
-      ARM: tegra: venice2 - Enable HDMI
-      ARM: tegra: jetson-tk1 - Enable HDMI support
-      ARM: tegra: harmony - Add +5V HDMI supply
-      ARM: tegra: beaver - Add +5V HDMI supply
-      ARM: tegra: dalmore - Add +5V HDMI supply
-      ARM: tegra: dalmore - Add DSI power supply
-
- arch/arm/boot/dts/Makefile                    |    4 +
- arch/arm/boot/dts/tegra114-dalmore.dts        |   21 +-
- arch/arm/boot/dts/tegra114-roth.dts           | 1113 ++++++++++++
- arch/arm/boot/dts/tegra114-tn7.dts            |  348 ++++
- arch/arm/boot/dts/tegra124-jetson-tk1.dts     | 1827 ++++++++++++++++++++
- arch/arm/boot/dts/tegra124-venice2.dts        |   42 +-
- arch/arm/boot/dts/tegra124.dtsi               |   12 +
- arch/arm/boot/dts/tegra20-harmony.dts         |   12 +
- arch/arm/boot/dts/tegra30-beaver.dts          |   12 +
- arch/arm/boot/dts/tegra30-colibri-eval-v3.dts |  205 +++
- arch/arm/boot/dts/tegra30-colibri.dtsi        |  377 ++++
- 11 files changed, 3965 insertions(+), 8 deletions(-)
- create mode 100644 arch/arm/boot/dts/tegra114-roth.dts
- create mode 100644 arch/arm/boot/dts/tegra114-tn7.dts
- create mode 100644 arch/arm/boot/dts/tegra124-jetson-tk1.dts
- create mode 100644 arch/arm/boot/dts/tegra30-colibri-eval-v3.dts
- create mode 100644 arch/arm/boot/dts/tegra30-colibri.dtsi
+-- 
+Florian
