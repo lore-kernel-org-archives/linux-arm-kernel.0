@@ -1,47 +1,65 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 16 May 2014 13:46:52 -0300
-Subject: USB with 3.14.3 not working on Freescale i.mx6
-In-Reply-To: <1400257863.657063826@f426.i.mail.ru>
-References: <CACWLcfv6akXuM59m_hX-xB=iQYA4iAx7fZ0T5ZB3-7ik-1GZMw@mail.gmail.com>
- <CAOMZO5DzLBWFnOMCsz7W1DHg7g0CnZn2bxwjF6H6XVgMYmw-BQ@mail.gmail.com>
- <1400257863.657063826@f426.i.mail.ru>
-Message-ID: <CAOMZO5DKqJFK3KB8Qgjdzk4OKCPDO3cCkQMVKJkTjC91+WQaoA@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Fri, 16 May 2014 18:47:51 +0200
+Subject: [PATCH v3 6/7] Documentation: add the Marvell Berlin pinctrl
+ documentation
+In-Reply-To: <CACRpkdaL9tzfUrY=wLjSR3dcD7JC1mUX3kdG+Wh5gDyxGY2Yqw@mail.gmail.com>
+References: <1399267649-20218-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1399267649-20218-7-git-send-email-antoine.tenart@free-electrons.com>
+ <CACRpkdaL9tzfUrY=wLjSR3dcD7JC1mUX3kdG+Wh5gDyxGY2Yqw@mail.gmail.com>
+Message-ID: <20140516164751.GA8406@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 1:31 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
-> Fri, 16 May 2014 13:20:29 -0300 ?? Fabio Estevam <festevam@gmail.com>:
->> On Wed, May 14, 2014 at 6:17 AM, Till Klocke <till.klocke@yetu.com> wrote:
->> > Hello,
->> >
->> > Currently I am trying to get a recent and stable Linux kernel running
->> > on a Phytec PhyFlex board based on the i.mx6 processor from Freescale.
->>
->> Which dts file do you use?
->>
->> USB is functional on other mx6 boards.
->
-> It's just words. Fabio, just give portion of the log (if it possible) where we
-> see that USB is works with this kernel version and similar hardware.
+Linus,
 
-On a imx6q-wandboard:
+On Fri, May 16, 2014 at 03:35:48PM +0200, Linus Walleij wrote:
+> On Mon, May 5, 2014 at 7:27 AM, Antoine T?nart
+> <antoine.tenart@free-electrons.com> wrote:
+> 
+> > Add the documentation related to the Berlin pin-controller driver and
+> > explain how to configure this group based controller.
+> >
+> > Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> > Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> (...)
+> 
+> When I see this:
+> 
+> > +Required subnode-properties:
+> > +- marvell,groups: a list of strings describing the group names.
+> > +- marvell,function: a string describing the function used to mux the groups.
+> > +
+> > +Example:
+> > +
+> > +sm_pinctrl: pin-controller at 0 {
+> > +       compatible = "marvell,berlin2q-sysmgr-pinctrl";
+> > +       reg = <0xfc0000 0x44>;
+> > +
+> > +       uart0_pmux: uart0-pmux {
+> > +               marvell,groups = "GSM12", "GSM13";
+> > +               marvell,function = "uart0";
+> > +       };
+> > +}
+> 
+> I feel like ... can't we just standardize that and make it a common
+> pinctrl binding, and name the properties "groups" and "function"
+> for a family of pin controllers just mapping N groups to 1 function?
+> 
+> I will merge the patches as are, but maybe we can make it generic
+> on top of this before the merge window?
 
-fec 2188000.ethernet eth0: Freescale FEC PHY driver [Atheros 8031 ethernet] (mi)
-IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
-scsi 1:0:0:0: Direct-Access     Ut163    USB2FlashStorage 0.00 PQ: 0 ANSI: 2
-sd 1:0:0:0: [sda] 248000 512-byte logical blocks: (126 MB/121 MiB)
-sd 1:0:0:0: [sda] Write Protect is off
-sd 1:0:0:0: [sda] Asking for cache data failed
-sd 1:0:0:0: [sda] Assuming drive cache: write through
- sda: sda1
-sd 1:0:0:0: [sda] Attached SCSI removable disk
-...
+Do you mean just changing:
 
-root at freescale /$ uname -r
-3.15.0-rc5
-root at freescale /$ lsusb
-Bus 001 Device 002: ID 0457:0151
-Bus 001 Device 001: ID 1d6b:0002
+s/marvell,groups/groups/
+s/marvell,function/function/
 
-Haven't tried 3.14 though. Is it broken on 3.14? Can you try 3.15-rc5
-to compare?
+and updating the documentation ?
+
+If so, I can definitely do that.
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
