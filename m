@@ -1,22 +1,20 @@
 From: jean.pihet@linaro.org (Jean Pihet)
-Date: Fri, 16 May 2014 10:41:11 +0200
-Subject: [PATCH 3/4] perf tests: Add dwarf unwind test on ARM
+Date: Fri, 16 May 2014 10:41:12 +0200
+Subject: [PATCH 4/4] perf tools: Add libdw DWARF post unwind support for ARM
 In-Reply-To: <1400229672-16104-1-git-send-email-jean.pihet@linaro.org>
 References: <CAFrcx1mkE-N+DYUe0ZK06_BL1tsZvmyMHpAynnFkgZBqjghE5Q@mail.gmail.com>
  <1400229672-16104-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <1400229672-16104-3-git-send-email-jean.pihet@linaro.org>
+Message-ID: <1400229672-16104-4-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding dwarf unwind test, that setups live machine data over
-the perf test thread and does the remote unwind.
+Adding libdw DWARF post unwind support, which is part
+of elfutils-devel/libdw-dev package from version 0.158.
 
-Need to use -fno-optimize-sibling-calls for test compilation,
-otherwise 'krava_*' function calls are optimized into jumps
-and ommited from the stack unwind.
+The new code is contained in unwin-libdw.c object, and
+implements unwind__get_entries unwind interface function.
 
-So far it was enabled only for x86.
-
+Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 Cc: Jiri Olsa <jolsa@redhat.com>
 Cc: Corey Ashford <cjashfor@linux.vnet.ibm.com>
@@ -27,164 +25,69 @@ Cc: Paul Mackerras <paulus@samba.org>
 Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
 Cc: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
 Cc: David Ahern <dsahern@gmail.com>
-Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
 ---
- tools/perf/Makefile.perf                 |  2 +-
- tools/perf/arch/arm/Makefile             |  1 +
- tools/perf/arch/arm/include/perf_regs.h  |  3 ++
- tools/perf/arch/arm/tests/dwarf-unwind.c | 60 ++++++++++++++++++++++++++++++++
- tools/perf/config/Makefile               |  4 +--
- tools/perf/tests/builtin-test.c          |  2 +-
- tools/perf/tests/tests.h                 |  2 +-
- 7 files changed, 69 insertions(+), 5 deletions(-)
- create mode 100644 tools/perf/arch/arm/tests/dwarf-unwind.c
+ tools/perf/arch/arm/Makefile            |  5 +++++
+ tools/perf/arch/arm/util/unwind-libdw.c | 36 +++++++++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+)
+ create mode 100644 tools/perf/arch/arm/util/unwind-libdw.c
 
-diff --git a/tools/perf/Makefile.perf b/tools/perf/Makefile.perf
-index 2baf61c..dea2d633 100644
---- a/tools/perf/Makefile.perf
-+++ b/tools/perf/Makefile.perf
-@@ -411,7 +411,7 @@ LIB_OBJS += $(OUTPUT)tests/code-reading.o
- LIB_OBJS += $(OUTPUT)tests/sample-parsing.o
- LIB_OBJS += $(OUTPUT)tests/parse-no-sample-id-all.o
- ifndef NO_DWARF_UNWIND
--ifeq ($(ARCH),x86)
-+ifeq ($(ARCH),$(filter $(ARCH),x86 arm))
- LIB_OBJS += $(OUTPUT)tests/dwarf-unwind.o
- endif
- endif
 diff --git a/tools/perf/arch/arm/Makefile b/tools/perf/arch/arm/Makefile
-index 9b8f87e..221f21d 100644
+index 221f21d..09d6215 100644
 --- a/tools/perf/arch/arm/Makefile
 +++ b/tools/perf/arch/arm/Makefile
-@@ -5,4 +5,5 @@ endif
+@@ -4,6 +4,11 @@ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
+ endif
  ifndef NO_LIBUNWIND
  LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libunwind.o
++endif
++ifndef NO_LIBDW_DWARF_UNWIND
++LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libdw.o
++endif
++ifndef NO_DWARF_UNWIND
  LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/regs_load.o
-+LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/dwarf-unwind.o
+ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/dwarf-unwind.o
  endif
-diff --git a/tools/perf/arch/arm/include/perf_regs.h b/tools/perf/arch/arm/include/perf_regs.h
-index 33abcfa..f619c9c 100644
---- a/tools/perf/arch/arm/include/perf_regs.h
-+++ b/tools/perf/arch/arm/include/perf_regs.h
-@@ -8,6 +8,9 @@
- void perf_regs_load(u64 *regs);
- 
- #define PERF_REGS_MASK	((1ULL << PERF_REG_ARM_MAX) - 1)
-+#define PERF_REGS_MAX	PERF_REG_ARM_MAX
-+#define PERF_SAMPLE_REGS_ABI	PERF_SAMPLE_REGS_ABI_32
-+
- #define PERF_REG_IP	PERF_REG_ARM_PC
- #define PERF_REG_SP	PERF_REG_ARM_SP
- 
-diff --git a/tools/perf/arch/arm/tests/dwarf-unwind.c b/tools/perf/arch/arm/tests/dwarf-unwind.c
+diff --git a/tools/perf/arch/arm/util/unwind-libdw.c b/tools/perf/arch/arm/util/unwind-libdw.c
 new file mode 100644
-index 0000000..9f870d2
+index 0000000..b4176c6
 --- /dev/null
-+++ b/tools/perf/arch/arm/tests/dwarf-unwind.c
-@@ -0,0 +1,60 @@
-+#include <string.h>
-+#include "perf_regs.h"
-+#include "thread.h"
-+#include "map.h"
-+#include "event.h"
-+#include "tests/tests.h"
++++ b/tools/perf/arch/arm/util/unwind-libdw.c
+@@ -0,0 +1,36 @@
++#include <elfutils/libdwfl.h>
++#include "../../util/unwind-libdw.h"
++#include "../../util/perf_regs.h"
 +
-+#define STACK_SIZE 8192
-+
-+static int sample_ustack(struct perf_sample *sample,
-+			 struct thread *thread, u64 *regs)
++bool libdw__arch_set_initial_registers(Dwfl_Thread *thread, void *arg)
 +{
-+	struct stack_dump *stack = &sample->user_stack;
-+	struct map *map;
-+	unsigned long sp;
-+	u64 stack_size, *buf;
++	struct unwind_info *ui = arg;
++	struct regs_dump *user_regs = &ui->sample->user_regs;
++	Dwarf_Word dwarf_regs[PERF_REG_ARM_MAX];
 +
-+	buf = malloc(STACK_SIZE);
-+	if (!buf) {
-+		pr_debug("failed to allocate sample uregs data\n");
-+		return -1;
-+	}
++#define REG(r) ({						\
++	Dwarf_Word val = 0;					\
++	perf_reg_value(&val, user_regs, PERF_REG_ARM_##r);	\
++	val;							\
++})
 +
-+	sp = (unsigned long) regs[PERF_REG_ARM_SP];
++	dwarf_regs[0]  = REG(R0);
++	dwarf_regs[1]  = REG(R1);
++	dwarf_regs[2]  = REG(R2);
++	dwarf_regs[3]  = REG(R3);
++	dwarf_regs[4]  = REG(R4);
++	dwarf_regs[5]  = REG(R5);
++	dwarf_regs[6]  = REG(R6);
++	dwarf_regs[7]  = REG(R7);
++	dwarf_regs[8]  = REG(R8);
++	dwarf_regs[9]  = REG(R9);
++	dwarf_regs[10] = REG(R10);
++	dwarf_regs[11] = REG(FP);
++	dwarf_regs[12] = REG(IP);
++	dwarf_regs[13] = REG(SP);
++	dwarf_regs[14] = REG(LR);
++	dwarf_regs[15] = REG(PC);
 +
-+	map = map_groups__find(thread->mg, MAP__VARIABLE, (u64) sp);
-+	if (!map) {
-+		pr_debug("failed to get stack map\n");
-+		free(buf);
-+		return -1;
-+	}
-+
-+	stack_size = map->end - sp;
-+	stack_size = stack_size > STACK_SIZE ? STACK_SIZE : stack_size;
-+
-+	memcpy(buf, (void *) sp, stack_size);
-+	stack->data = (char *) buf;
-+	stack->size = stack_size;
-+	return 0;
++	return dwfl_thread_state_registers(thread, 0, PERF_REG_ARM_MAX,
++					   dwarf_regs);
 +}
-+
-+int test__arch_unwind_sample(struct perf_sample *sample,
-+			     struct thread *thread)
-+{
-+	struct regs_dump *regs = &sample->user_regs;
-+	u64 *buf;
-+
-+	buf = calloc(1, sizeof(u64) * PERF_REGS_MAX);
-+	if (!buf) {
-+		pr_debug("failed to allocate sample uregs data\n");
-+		return -1;
-+	}
-+
-+	perf_regs_load(buf);
-+	regs->abi  = PERF_SAMPLE_REGS_ABI;
-+	regs->regs = buf;
-+	regs->mask = PERF_REGS_MASK;
-+
-+	return sample_ustack(sample, thread, buf);
-+}
-diff --git a/tools/perf/config/Makefile b/tools/perf/config/Makefile
-index f2edc59..729bbdf 100644
---- a/tools/perf/config/Makefile
-+++ b/tools/perf/config/Makefile
-@@ -40,11 +40,11 @@ ifeq ($(ARCH),arm64)
-   LIBUNWIND_LIBS = -lunwind -lunwind-aarch64
- endif
- 
--# So far there's only x86 libdw unwind support merged in perf.
-+# So far there's only x86 and arm libdw unwind support merged in perf.
- # Disable it on all other architectures in case libdw unwind
- # support is detected in system. Add supported architectures
- # to the check.
--ifneq ($(ARCH),x86)
-+ifneq ($(ARCH),$(filter $(ARCH),x86 arm))
-   NO_LIBDW_DWARF_UNWIND := 1
- endif
- 
-diff --git a/tools/perf/tests/builtin-test.c b/tools/perf/tests/builtin-test.c
-index 0d5afaf..5e0764b 100644
---- a/tools/perf/tests/builtin-test.c
-+++ b/tools/perf/tests/builtin-test.c
-@@ -115,7 +115,7 @@ static struct test {
- 		.desc = "Test parsing with no sample_id_all bit set",
- 		.func = test__parse_no_sample_id_all,
- 	},
--#if defined(__x86_64__) || defined(__i386__)
-+#if defined(__x86_64__) || defined(__i386__) || defined(__arm__)
- #ifdef HAVE_DWARF_UNWIND_SUPPORT
- 	{
- 		.desc = "Test dwarf unwind",
-diff --git a/tools/perf/tests/tests.h b/tools/perf/tests/tests.h
-index a9d7cb0..8f91fb0 100644
---- a/tools/perf/tests/tests.h
-+++ b/tools/perf/tests/tests.h
-@@ -45,7 +45,7 @@ int test__hists_filter(void);
- int test__mmap_thread_lookup(void);
- int test__thread_mg_share(void);
- 
--#if defined(__x86_64__) || defined(__i386__)
-+#if defined(__x86_64__) || defined(__i386__) || defined(__arm__)
- #ifdef HAVE_DWARF_UNWIND_SUPPORT
- struct thread;
- struct perf_sample;
 -- 
 1.7.11.7
