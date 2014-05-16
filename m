@@ -1,52 +1,54 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 16 May 2014 14:29:15 +0200
-Subject: [PATCH] ARM: S3C24XX: check for
- 'CONFIG_SND_SOC_SAMSUNG_SMDK2443_WM9710'
-Message-ID: <1400243355.20342.43.camel@x220>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 16 May 2014 14:30:55 +0200
+Subject: [PATCH v4 2/8] clk: samsung: change scope of samsung clock lock to
+ global
+In-Reply-To: <1400029876-5830-3-git-send-email-thomas.ab@samsung.com>
+References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
+ <1400029876-5830-3-git-send-email-thomas.ab@samsung.com>
+Message-ID: <537604FF.2010106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since v2.6.34 there are two checks for CONFIG_SND_SOC_SMDK2443_WM9710.
-But a Kconfig symbol SND_SOC_SMDK2443_WM9710 has never been part of the
-tree. However, in v2.6.38 a symbol SND_SOC_SAMSUNG_SMDK2443_WM9710 was
-added, so it seems these checks should be for its macro.
+Hi Thomas,
 
-But the second check is a guard for
-    s3c24xx_ac97_setup_gpio(S3C24XX_AC97_GPE0);
+On 14.05.2014 03:11, Thomas Abraham wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
+> 
+> Access to samsung clock lock is required to support newer samsung specific
+> clock types. So change the scope of the samsung clock lock to global. And
+> prefix 'samsung_clk_' to the existing name of the lock to prevent name space
+> pollution.
+> 
+> Cc: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> ---
+>  drivers/clk/samsung/clk.c |   13 ++++++++-----
+>  drivers/clk/samsung/clk.h |    2 ++
+>  2 files changed, 10 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
+> index 91bec3e..c86c28c 100644
+> --- a/drivers/clk/samsung/clk.c
+> +++ b/drivers/clk/samsung/clk.c
+> @@ -14,7 +14,7 @@
+>  #include <linux/syscore_ops.h>
+>  #include "clk.h"
+>  
+> -static DEFINE_SPINLOCK(lock);
+> +DEFINE_SPINLOCK(samsung_clk_lock);
 
-And since neither s3c24xx_ac97_setup_gpio nor S3C24XX_AC97_GPE0 are
-defined anywhere, that second check can be dropped entirely.
+I'm afraid this series needs to be rebased on top of samsung-clk-next
+branch of Samsung clock tree:
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Tested with git grep. Needs further testing, obviously.
+git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git
 
- arch/arm/mach-s3c24xx/mach-smdk2443.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+You can find there patches adding Samsung clock context struct, which
+should be passed to Samsung clock helper functions and which replaces
+the global variables above.
 
-diff --git a/arch/arm/mach-s3c24xx/mach-smdk2443.c b/arch/arm/mach-s3c24xx/mach-smdk2443.c
-index 06c4d77de3a5..ce842189bc64 100644
---- a/arch/arm/mach-s3c24xx/mach-smdk2443.c
-+++ b/arch/arm/mach-s3c24xx/mach-smdk2443.c
-@@ -112,7 +112,7 @@ static struct platform_device *smdk2443_devices[] __initdata = {
- 	&s3c_device_wdt,
- 	&s3c_device_i2c0,
- 	&s3c_device_hsmmc1,
--#ifdef CONFIG_SND_SOC_SMDK2443_WM9710
-+#ifdef CONFIG_SND_SOC_SAMSUNG_SMDK2443_WM9710
- 	&s3c_device_ac97,
- #endif
- 	&s3c2443_device_dma,
-@@ -130,10 +130,6 @@ static void __init smdk2443_machine_init(void)
- {
- 	s3c_i2c0_set_platdata(NULL);
- 
--#ifdef CONFIG_SND_SOC_SMDK2443_WM9710
--	s3c24xx_ac97_setup_gpio(S3C24XX_AC97_GPE0);
--#endif
--
- 	platform_add_devices(smdk2443_devices, ARRAY_SIZE(smdk2443_devices));
- 	smdk_machine_init();
- }
--- 
-1.9.0
+So changes introduced by this patch will be no longer necessary, as you
+will be able to just pass the context struct to registration function of
+your clock type.
+
+Best regards,
+Tomasz
