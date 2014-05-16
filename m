@@ -1,64 +1,42 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 16 May 2014 09:16:53 -0400 (EDT)
-Subject: [PATCHv2] ARM: ioremap: Fix static vm area boundary checking.
-In-Reply-To: <CAHPCO9GrwRczw2R9nZDL0tDdYxSHV0f2aDhFSat+xhhiWaYbUg@mail.gmail.com>
-References: <1400142562-9111-1-git-send-email-superlibj8301@gmail.com>
- <alpine.LFD.2.11.1405151325250.17310@knanqh.ubzr>
- <CAHPCO9GrwRczw2R9nZDL0tDdYxSHV0f2aDhFSat+xhhiWaYbUg@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1405160910220.17310@knanqh.ubzr>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 16 May 2014 15:21:41 +0200
+Subject: [PATCHv4 3/3] ARM: mvebu: implement L2/PCIe deadlock workaround
+In-Reply-To: <20140516125847.GG27822@titan.lakedaemon.net>
+References: <1400165974-9059-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1400165974-9059-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140516060851.GF27822@titan.lakedaemon.net>
+ <20140516090727.5264dc75@free-electrons.com>
+ <20140516125847.GG27822@titan.lakedaemon.net>
+Message-ID: <20140516152141.564dde70@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 May 2014, Richard Lee wrote:
+Dear Jason Cooper,
 
-> On Fri, May 16, 2014 at 1:28 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Thu, 15 May 2014, Richard Lee wrote:
-> >
-> >> Static vm area boundary check:
-> >>
-> >>       paddr1 --->|       |
-> >>                  |       |
-> >>                  |-------| <-\--- svm->vm->addr(is page aligned)
-> >>       paddr2 --->|       |    |
-> >>                  |     --| <--|-- svm->vm->phys_addr
-> >>                  |       |    |
-> >>       paddr3 --->|       |    |
-> >>                  |       |    |
-> >>                  |-------| <--|-- next page boundary
-> >>                  |       |    |
-> >>       paddr4 --->|       |    | <----- svm->vm->size(including guard page)
-> >>                  |       |    |
-> >>                  |       |    |
-> >> max paddr_end -->|-------| <--|-- svm->vm's phys_addr_end
-> >>                  | ///// |    |
-> >>       paddr5 --->| guard |    |
-> >>                  | page  |    |
-> >>                  | ///// |    |
-> >>                   -------  <-/--- svm->vm->addr + svm->vm_size
-> >>
-> >> <1> If the paddr == paddr1, then continue;
-> >> <2> If the paddr == paddr2~paddr4 and paddr_end > phys_addr_end,
-> >>     then continue;
-> >> <3> if the paddr >= paddr5 then continue;
-> >>
-> >> Signed-off-by: Richard Lee <superlibj8301@gmail.com>
-> >
-> > instead of doing this repeatedly, why not simply ensure the recorded
-> > static vm information is already page aligned in the first place?
-> >
+On Fri, 16 May 2014 08:58:47 -0400, Jason Cooper wrote:
+
+> > Hum, well, I believe it's OK, but notice that I will very likely have
+> > to do a followup patch, because the solution of making all PCI I/O
+> > mappings use the MT_UNCACHED memory type, suggested by Arnd, has not
+> > been accepted by Will Deacon. So very likely I will have to change
+> > again the mach-mvebu/coherency.c code to call a function that makes PCI
+> > I/O mappings MT_UNCACHED specifically for the mach-mvebu platform. But
+> > that can indeed be a followup patch.
 > 
-> Sorry, I'm not very sure what vm information you meant here.
+> Ahh, my mistake.  It was late.  I saw the arm,io-coherent was settled
+> and mistakenly thought the other proposed changes wouldn't affect this
+> patch.
 > 
-> And the 'svm->vm->addr' and 'svm->vm->size' are all page aligned
-> already, but we cannot make sure that the 'paddr' and
-> 'svm->vm->phys_addr' are page aligned.
+> I could easily drop it if you like.  It's currently the tip of mvebu/soc
+> and I haven't done a signed tag for it yet.
 
-If ->vm->addr is page aligned, then ->vm->phys_addr must be page aligned 
-as well.  The hardware does virtual to physical mappings on a page 
-granularity.  It is then not important to align paddr for the purpose of 
-the search.
+I think it's OK, you can keep it: the PCI I/O mapping thing will come
+as an addition.
 
-In other words, I fail to understand what problem your patch solves.
+Best regards,
 
-
-Nicolas
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
