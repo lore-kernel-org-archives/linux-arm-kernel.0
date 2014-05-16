@@ -1,76 +1,43 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 16 May 2014 14:10:14 +0200
-Subject: [PATCH 3/5] ARM: shmobile: Sync Genmai DTS with Genmai reference DTS
-In-Reply-To: <1400242216-20848-1-git-send-email-wsa@the-dreams.de>
-References: <1400242216-20848-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1400242216-20848-4-git-send-email-wsa@the-dreams.de>
+Date: Fri, 16 May 2014 14:10:11 +0200
+Subject: [PATCH 0/5] remove Genmai Reference from Legacy support
+Message-ID: <1400242216-20848-1-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Here is the series to remove Genmai Reference from Legacy support since we now
+have CCF in multiplatform. Removal is done very similar to Marzen and the
+commit messages are largely from that series. Thanks a lot!
 
-Copy the device nodes from Genmai reference into the Genmai device tree
-file. This will allow us to use a single DTS file regardless of kernel
-configuration. In case of legacy C board code the device nodes may or
-may not be used, but in the multiplatform case all the DT device nodes
-will be used.
+Technically, only the first patch fixes the unbootable Genmai-Reference-with-
+Legacy-constellation. The other patches clean up the leftovers. Simon, I think
+you know best when to push which patches?
 
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
----
- arch/arm/boot/dts/r7s72100-genmai.dts | 30 +++++++++++++++++++++++++++++-
- 1 file changed, 29 insertions(+), 1 deletion(-)
+The series has been tested with/without multiplatform on a genmai board. The
+branch is based on my r7s-ccf branch and can also be found here:
 
-diff --git a/arch/arm/boot/dts/r7s72100-genmai.dts b/arch/arm/boot/dts/r7s72100-genmai.dts
-index b1deaf7e2e06..56849b55e1c2 100644
---- a/arch/arm/boot/dts/r7s72100-genmai.dts
-+++ b/arch/arm/boot/dts/r7s72100-genmai.dts
-@@ -1,7 +1,8 @@
- /*
-  * Device Tree Source for the Genmai board
-  *
-- * Copyright (C) 2013 Renesas Solutions Corp.
-+ * Copyright (C) 2013-14 Renesas Solutions Corp.
-+ * Copyright (C) 2014 Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
-  *
-  * This file is licensed under the terms of the GNU General Public License
-  * version 2.  This program is licensed "as is" without any warranty of any
-@@ -15,6 +16,10 @@
- 	model = "Genmai";
- 	compatible = "renesas,genmai", "renesas,r7s72100";
- 
-+	aliases {
-+		serial2 = &scif2;
-+	};
-+
- 	chosen {
- 		bootargs = "console=ttySC2,115200 ignore_loglevel rw root=/dev/nfs ip=dhcp";
- 	};
-@@ -29,3 +34,26 @@
- 		#size-cells = <1>;
- 	};
- };
-+
-+&extal_clk {
-+	clock-frequency = <13330000>;
-+};
-+
-+&usb_x1_clk {
-+	clock-frequency = <48000000>;
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	eeprom at 50 {
-+		compatible = "renesas,24c128";
-+		reg = <0x50>;
-+		pagesize = <64>;
-+	};
-+};
-+
-+&scif2 {
-+	status = "okay";
-+};
+git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git renesas/r7s-ccf-with-fixup
+
+Thanks,
+
+   Wolfram
+
+Wolfram Sang (5):
+  ARM: shmobile: Remove non-multiplatform Genmai reference support
+  ARM: shmobile: genmai-reference: Remove legacy clock support
+  ARM: shmobile: Sync Genmai DTS with Genmai reference DTS
+  ARM: shmobile: Let Genmai multiplatform boot with Genmai DTB
+  ARM: shmobile: Remove Genmai reference DTS
+
+ arch/arm/boot/dts/Makefile                      |  3 +-
+ arch/arm/boot/dts/r7s72100-genmai-reference.dts | 59 -------------------------
+ arch/arm/boot/dts/r7s72100-genmai.dts           | 30 ++++++++++++-
+ arch/arm/mach-shmobile/Kconfig                  | 11 -----
+ arch/arm/mach-shmobile/Makefile                 |  1 -
+ arch/arm/mach-shmobile/Makefile.boot            |  1 -
+ arch/arm/mach-shmobile/board-genmai-reference.c |  8 +---
+ 7 files changed, 31 insertions(+), 82 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/r7s72100-genmai-reference.dts
+
 -- 
 1.9.2
