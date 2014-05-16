@@ -1,63 +1,54 @@
-From: m-karicheri2@ti.com (Karicheri, Muralidharan)
-Date: Fri, 16 May 2014 14:36:37 +0000
-Subject: [PATCH v1 1/5] ARM: keystone: add pcie related options
-In-Reply-To: <004e01cf709d$a48b4240$eda1c6c0$%han@samsung.com>
-References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
- <1400169692-9677-2-git-send-email-m-karicheri2@ti.com>
- <004e01cf709d$a48b4240$eda1c6c0$%han@samsung.com>
-Message-ID: <3E54258959B69E4282D79E01AB1F32B7047413F8@DFLE11.ent.ti.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Fri, 16 May 2014 10:37:18 -0400
+Subject: [PATCH 9/9] cgroup: use cgroup->self.refcnt for cgroup refcnting
+In-Reply-To: <53753823.2090402@wwwdotorg.org>
+References: <1399670015-23463-1-git-send-email-tj@kernel.org>
+ <1399670015-23463-10-git-send-email-tj@kernel.org>
+ <53751062.2050401@wwwdotorg.org> <53753823.2090402@wwwdotorg.org>
+Message-ID: <20140516143718.GA5379@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Jingoo Han [mailto:jg1.han at samsung.com]
->Sent: Thursday, May 15, 2014 8:28 PM
->To: Karicheri, Muralidharan
->Cc: linux-kernel at vger.kernel.org; linux-pci at vger.kernel.org; linux-arm-
->kernel at lists.infradead.org; Shilimkar, Santosh; 'Russell King'; 'Jingoo Han'
->Subject: Re: [PATCH v1 1/5] ARM: keystone: add pcie related options
->
->On Friday, May 16, 2014 1:01 AM, Murali Karicheri wrote:
->>
->> Add pcie related options by default for keystone architecture
->>
->> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> CC: Russell King <linux@arm.linux.org.uk>
->>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> ---
->>  arch/arm/mach-keystone/Kconfig |    2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm/mach-keystone/Kconfig
->> b/arch/arm/mach-keystone/Kconfig index f50bc93..f87844d 100644
->> --- a/arch/arm/mach-keystone/Kconfig
->> +++ b/arch/arm/mach-keystone/Kconfig
->> @@ -8,6 +8,8 @@ config ARCH_KEYSTONE
->>  	select COMMON_CLK_KEYSTONE
->>  	select ARCH_SUPPORTS_BIG_ENDIAN
->>  	select ZONE_DMA if ARM_LPAE
->> +	select MIGHT_HAVE_PCI
->> +	select ARCH_SUPPORTS_MSI
->
->Please, don't select ARCH_SUPPORTS_MSI, because this kconfig option was already
->removed in v3.12 by the commit ebd97be635
->('PCI: remove ARCH_SUPPORTS_MSI kconfig option'). So. there is NO need to select
->'ARCH_SUPPORTS_MSI'.
->
+Hello, Stephen.
 
-Will do. Thanks.
+On Thu, May 15, 2014 at 03:56:51PM -0600, Stephen Warren wrote:
+> On 05/15/2014 01:07 PM, Stephen Warren wrote:
+> > On 05/09/2014 03:13 PM, Tejun Heo wrote:
+> >> Currently cgroup implements refcnting separately using atomic_t
+> >> cgroup->refcnt.  The destruction paths of cgroup and css are rather
+> >> complex and bear a lot of similiarities including the use of RCU and
+> >> bouncing to a work item.
+> >>
+> >> This patch makes cgroup use the refcnt of self css for refcnting
+> >> instead of using its own.  This makes cgroup refcnting use css's
+> >> percpu refcnt and share the destruction mechanism.
+> >> ...
+> > 
+> > In next-20150515, this patch causes silent boot failures on NVIDIA Tegra
+> > ARM systems. There isn't even any earlyprintk. Reverting this one patch
+> > solves this.
+> > 
+> > I was a bit surprised that cgroups would cause such an issue, but
+> > looking at a normal kernel boot, I guess cgroup does get initialized
+> > very early:
+> > 
+> > Uncompressing Linux... done, booting the kernel.
+> > [    0.000000] Booting Linux on physical CPU 0x0
+> > [    0.000000] Initializing cgroup subsys cpu
+> > [    0.000000] Initializing cgroup subsys cpuacct
+> > 
+> > Anyway, I'll try to track down what the problem is, but if someone
+> > familiar with this patch could give it a look, that'd be very useful,
+> > since I'm not at all familiar with this code or feature.
+> 
+> It looks like this has something to do with the new code using percpu_
+> functions from within cgroup_init_early, yet that function being called
+> before init/main.c calls setup_per_cpu_areas() etc.? Unfortunately I
+> have to run to some meetings now, so won't look at this until tomorrow.
 
->Best regards,
->Jingoo Han
->
->>  	help
->>  	  Support for boards based on the Texas Instruments Keystone family of
->>  	  SoCs.
->> --
->> 1.7.9.5
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pci"
->> in the body of a message to majordomo at vger.kernel.org More majordomo
->> info at  http://vger.kernel.org/majordomo-info.html
+Yeap, I know where the issue is.  Will post a fix soon.
+
+Thanks.
+
+-- 
+tejun
