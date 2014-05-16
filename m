@@ -1,113 +1,86 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Fri, 16 May 2014 11:04:07 +0800
-Subject: [PATCH] ARM: at91: remove ISI code for AT91SAM9263
-In-Reply-To: <1400142868.20469.12.camel@x220>
-References: <1400142868.20469.12.camel@x220>
-Message-ID: <53758027.6030603@atmel.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 15 May 2014 20:30:10 -0700
+Subject: [Ksummit-discuss] [TECH TOPIC] ARM legacy board DT conversion
+ finalization
+In-Reply-To: <20140515194215.GR27822@titan.lakedaemon.net>
+References: <20140511030009.GO12708@titan.lakedaemon.net>
+ <20140511083729.211e9b5f@lwn.net>
+ <20140515121546.3A06AC40B0E@trevor.secretlab.ca>
+ <CAL_JsqJw11fZBbLVi=xxC559iWdwCMFOJ4XYM-8EjykttoWsOg@mail.gmail.com>
+ <20140515194215.GR27822@titan.lakedaemon.net>
+Message-ID: <CAOesGMi0JrTp9kUVDod4duBOCZ+wNRJ0dMmgvBX7jEQRjE5cCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Paul
+Hi,
 
-On 5/15/2014 4:34 PM, Paul Bolle wrote:
-> In v2.6.25 code was added for an Image Sensor Interface (ISI) for
-> AT91SAM9263. That code depended on the Kconfig macro
-> CONFIG_VIDEO_AT91_ISI and its MODULE variant. The related Kconfig symbol
-> has never been added to the tree. The net effect of this was that
-> at91_add_device_isi() was a NOP. No one noticed because no callers of
-> that function were added to the tree at that time.
+On Thu, May 15, 2014 at 12:42 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> On Thu, May 15, 2014 at 01:50:02PM -0500, Rob Herring wrote:
+>> On Thu, May 15, 2014 at 7:15 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>> > On Sun, 11 May 2014 08:37:29 -0400, Jonathan Corbet <corbet@lwn.net> wrote:
+>> >> On Sat, 10 May 2014 23:00:09 -0400
+>> >> Jason Cooper <jason@lakedaemon.net> wrote:
+>> >>
+>> >> > So, I'm proposing a session where each sub-arch gives a brief run-down
+>> >> > of the status of the legacy board conversion, and wraps up with a todo
+>> >> > list.  After all of the sub-arches have given their status (5 - 10
+>> >> > minutes each?), we hash out helping each other with the final pieces.
+>> >>
+>> >> This *really* looks like an ARM minisummit topic to me; hopefully one
+>> >> of those is in the works?
+>> >
+>> > It does, doesn't it? I wouldn't want this as a main ksummit topic.
+>> >
+>> > The problem with ARM minisummits these days is it is very easy to
+>> > devolve into a nothing-but-dt meeting with a bunch of people sitting
+>> > around looking either annoyed or bored. We weren't able to pull enough
+>> > topics together when we tried to do an ARM minisummit at the ELC.
+>> >
+>> > Instead of a traditional ARM minisummit, perhaps we should do an ARM
+>> > platforms minisprint instead. Light on any kind of presentations, but
+>> > have the right people in the room to try and knock out some of the
+>> > legacy backlog (which is kind of what Jason described)
+>>
+>> Isn't a large part of the backlog cases of we need DT bindings for X?
+>> There are cases like moving platforms to common clk, but is there
+>> anything to discuss for those? Most of those cases need bodies to work
+>> on them. It seems like the rest of the todo lists could become an all
+>> DT discussion. I'm not saying it shouldn't happen, just pointing out
+>> where I think sprint discussions will go.
 >
-> The first caller of a function with that name was added in v3.4. But
-> that caller apparently only called the function defined for AT91SAM9G45.
-> (that function was also added in v3.4). So even then AT91SAM9263's NOP
-> version of at91_add_device_isi() remained unused. This means that the
-> ISI code for AT91SAM9263 can be removed.
+> As gregkh mentioned for the staging tree:
 >
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
-> Untested!
+> $ ls arch/arm/*/TODO
 >
-> Could someone please verify that this definition of
-> at91_add_device_isi() really never will be called.
+> would be helpful for folks who aren't familiar with an SoC, but can
+> easily generate patches.  imho, this is work for *after* the proposed
+> discussion.  We don't currently have a good idea which directories to
+> deprecate, convert, or leave to bit rot.  Once we do, I think the TODO
+> list would be helpful.
 
-Right. There is no implement to support for at91sam9263 ISI. So in 
-at91sam9263ek it will not call at91_add_device_isi().
-Current ISI driver only support at91sam9g45 and later chips.
+Anyone should feel free to add a TODO file and list in their machine
+directory at any given time. I don't think there's need for discussion
+before that happens. There's also the elinux.org wikis if you want to
+keep it out of the kernel -- keeping the TODO around for old kernel
+versions might not be very useful so having it out of tree might be
+just as fine.
 
-Acked-by: Josh Wu <josh.wu@atmel.com>
+> My main reason for raising this topic was the proximity to LinuxCon.
+> There's a better chance of getting some distro representation to give us
+> valuable feedback: "This SoC is quiet, no patches, but is actively used"
+> and "We thought the kernel guys had a reason for keeping that one."
 
-Best Regards,
-Josh Wu
+Funny, I would have thought ELC to have been a much more suitable
+venue for that, especially since the older ARM platforms tend to be
+embedded, and not generic compute ones. :)
 
->
->   arch/arm/mach-at91/at91sam9263_devices.c | 57 --------------------------------
->   1 file changed, 57 deletions(-)
->
-> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-> index 43d53d6156dd..f2dab0a872a1 100644
-> --- a/arch/arm/mach-at91/at91sam9263_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
-> @@ -897,63 +897,6 @@ void __init at91_add_device_lcdc(struct atmel_lcdfb_pdata *data) {}
->   
->
->   /* --------------------------------------------------------------------
-> - *  Image Sensor Interface
-> - * -------------------------------------------------------------------- */
-> -
-> -#if defined(CONFIG_VIDEO_AT91_ISI) || defined(CONFIG_VIDEO_AT91_ISI_MODULE)
-> -
-> -struct resource isi_resources[] = {
-> -	[0] = {
-> -		.start	= AT91SAM9263_BASE_ISI,
-> -		.end	= AT91SAM9263_BASE_ISI + SZ_16K - 1,
-> -		.flags	= IORESOURCE_MEM,
-> -	},
-> -	[1] = {
-> -		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_ISI,
-> -		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_ISI,
-> -		.flags	= IORESOURCE_IRQ,
-> -	},
-> -};
-> -
-> -static struct platform_device at91sam9263_isi_device = {
-> -	.name		= "at91_isi",
-> -	.id		= -1,
-> -	.resource	= isi_resources,
-> -	.num_resources	= ARRAY_SIZE(isi_resources),
-> -};
-> -
-> -void __init at91_add_device_isi(struct isi_platform_data *data,
-> -		bool use_pck_as_mck)
-> -{
-> -	at91_set_A_periph(AT91_PIN_PE0, 0);	/* ISI_D0 */
-> -	at91_set_A_periph(AT91_PIN_PE1, 0);	/* ISI_D1 */
-> -	at91_set_A_periph(AT91_PIN_PE2, 0);	/* ISI_D2 */
-> -	at91_set_A_periph(AT91_PIN_PE3, 0);	/* ISI_D3 */
-> -	at91_set_A_periph(AT91_PIN_PE4, 0);	/* ISI_D4 */
-> -	at91_set_A_periph(AT91_PIN_PE5, 0);	/* ISI_D5 */
-> -	at91_set_A_periph(AT91_PIN_PE6, 0);	/* ISI_D6 */
-> -	at91_set_A_periph(AT91_PIN_PE7, 0);	/* ISI_D7 */
-> -	at91_set_A_periph(AT91_PIN_PE8, 0);	/* ISI_PCK */
-> -	at91_set_A_periph(AT91_PIN_PE9, 0);	/* ISI_HSYNC */
-> -	at91_set_A_periph(AT91_PIN_PE10, 0);	/* ISI_VSYNC */
-> -	at91_set_B_periph(AT91_PIN_PE12, 0);	/* ISI_PD8 */
-> -	at91_set_B_periph(AT91_PIN_PE13, 0);	/* ISI_PD9 */
-> -	at91_set_B_periph(AT91_PIN_PE14, 0);	/* ISI_PD10 */
-> -	at91_set_B_periph(AT91_PIN_PE15, 0);	/* ISI_PD11 */
-> -
-> -	if (use_pck_as_mck) {
-> -		at91_set_B_periph(AT91_PIN_PE11, 0);	/* ISI_MCK (PCK3) */
-> -
-> -		/* TODO: register the PCK for ISI_MCK and set its parent */
-> -	}
-> -}
-> -#else
-> -void __init at91_add_device_isi(struct isi_platform_data *data,
-> -		bool use_pck_as_mck) {}
-> -#endif
-> -
-> -
-> -/* --------------------------------------------------------------------
->    *  Timer/Counter block
->    * -------------------------------------------------------------------- */
->   
+> eg: I know ixp4xx had an active community around it at one time for the
+> NSLU2, and the Gateworks boards used that SoC.  Are there people still
+> running it?  Well, my Dad is, but I can fix that if needed. ;-)
+
+I suspect it'll be hard to get that answered at LinuxCon, nor at an
+ARM maintainer summit since the fringe platforms tend to not be
+represented there either.
+
+
+-Olof
