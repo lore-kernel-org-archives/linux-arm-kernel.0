@@ -1,54 +1,40 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 16 May 2014 14:30:55 +0200
-Subject: [PATCH v4 2/8] clk: samsung: change scope of samsung clock lock to
- global
-In-Reply-To: <1400029876-5830-3-git-send-email-thomas.ab@samsung.com>
-References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
- <1400029876-5830-3-git-send-email-thomas.ab@samsung.com>
-Message-ID: <537604FF.2010106@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 16 May 2014 14:30:54 +0200
+Subject: [GIT PULL] Allwinner defconfig for 3.16
+Message-ID: <20140516123054.GA22574@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 
-On 14.05.2014 03:11, Thomas Abraham wrote:
-> From: Thomas Abraham <thomas.ab@samsung.com>
-> 
-> Access to samsung clock lock is required to support newer samsung specific
-> clock types. So change the scope of the samsung clock lock to global. And
-> prefix 'samsung_clk_' to the existing name of the lock to prevent name space
-> pollution.
-> 
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  drivers/clk/samsung/clk.c |   13 ++++++++-----
->  drivers/clk/samsung/clk.h |    2 ++
->  2 files changed, 10 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
-> index 91bec3e..c86c28c 100644
-> --- a/drivers/clk/samsung/clk.c
-> +++ b/drivers/clk/samsung/clk.c
-> @@ -14,7 +14,7 @@
->  #include <linux/syscore_ops.h>
->  #include "clk.h"
->  
-> -static DEFINE_SPINLOCK(lock);
-> +DEFINE_SPINLOCK(samsung_clk_lock);
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
 
-I'm afraid this series needs to be rebased on top of samsung-clk-next
-branch of Samsung clock tree:
+are available in the git repository at:
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git
+  https://github.com/mripard/linux.git tags/sunxi-defconfig-for-3.16
 
-You can find there patches adding Samsung clock context struct, which
-should be passed to Samsung clock helper functions and which replaces
-the global variables above.
+for you to fetch changes up to 5659e3bcbcb5d454fa183351362e852321784f7c:
 
-So changes introduced by this patch will be no longer necessary, as you
-will be able to just pass the context struct to registration function of
-your clock type.
+  ARM: sunxi: drop CONFIG_COMMON_CLK_DEBUG (2014-05-10 12:07:50 -0400)
 
-Best regards,
-Tomasz
+----------------------------------------------------------------
+Allwinner defconfig additions for 3.16
+
+----------------------------------------------------------------
+Lad, Prabhakar (1):
+      ARM: sunxi: drop CONFIG_COMMON_CLK_DEBUG
+
+ arch/arm/configs/sunxi_defconfig | 1 -
+ 1 file changed, 1 deletion(-)
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140516/79a75da3/attachment.sig>
