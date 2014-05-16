@@ -1,333 +1,212 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 16 May 2014 11:26:11 +0100
-Subject: [PATCH 7/8] arm64/kexec: Add core kexec support
-In-Reply-To: <1400020050.11178.73.camel@smoke>
-References: <cover.1399594544.git.geoff@infradead.org>
- <64ef27888fa70b3e27ddcf4ca594fa71ab7f7777.1399594544.git.geoff@infradead.org>
- <20140509153656.GB16418@e106331-lin.cambridge.arm.com>
- <1400020050.11178.73.camel@smoke>
-Message-ID: <20140516102611.GB12965@leverpostej>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Fri, 16 May 2014 16:03:04 +0530
+Subject: [PATCH v7 0/3] Add support for PCI in AArch64
+In-Reply-To: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <CA+sq2Ccok5wtKjCZUkBhhj3WsiqFAoMgHK7LY210aBtMku+8SA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 11:27:30PM +0100, Geoff Levand wrote:
-> Hi Mark,
-> 
-> On Fri, 2014-05-09 at 16:36 +0100, Mark Rutland wrote:
-> > On Fri, May 09, 2014 at 01:48:17AM +0100, Geoff Levand wrote:
-> > > Add three new files, kexec.h, machine_kexec.c and relocate_kernel.S, to the
-> > > arm64 architecture that add support for the kexec re-boot mechanism on arm64
-> > > (CONFIG_KEXEC).
-> > >
-> > > This implementation supports re-boots of kernels with either PSCI or spin-table
-> > > enable methods, but with some limitations on the match of 1st and 2nd stage
-> > > kernels.  The known limitations are checked in the kexec_compat_check() routine,
-> > > which is called during a kexec_load syscall.  If any limitations are reached an
-> > > error is returned by the kexec_load syscall.  Many of the limitations can be
-> > > removed with some enhancment to the CPU shutdown management code in
-> > > machine_kexec.c.
-> >
-> > I think if we cannot offline a CPU through the generic hotplug
-> > infrastructure then we should fail to kexec. If we need a way of doing
-> > hotplug without PSCI then we should sort that out [1] rather than
-> > working around brokenness with more brokenness
-> 
-> OK, as I mentioned in the cover message I agree with this.
+Hi Liviu,
 
-Ok.
+I am using your ARM64 PCIe patches to write a PCIe host controller
+driver for our SOC. I am facing an issue with SR-IOV capable device.
 
-> > I also don't think that kexec should care about the precise hotplug
-> > mechanism so long as it works. If the DTB passed to the new kernel
-> > describes a different mechanism than is currently in use, that's the
-> > caller's choice and I don't see any point second-guessing that -- we're
-> > already allowing them to boot an arbitrary kernel and so long as we
-> > leave the system in a sane state I don't see a good reason to deny the
-> > user from immediately destroying that.
-> 
-> One use case for kexec is to use linux as a bootloader.  The 1st stage
-> bootloader kernel should be able to boot any other kernel.  For this to work
-> the 1st stage kernel should do whatever it can to get the secondary cpus into a
-> state compatible with the 2nd stage kernel.  If any of the secondary cpus
-> have a 1st stage enable method different from the 2nd stage enable method,
-> then the 1st stage kernel should move the cpus to their 2nd stage enable
-> method at shutdown.  Also, any cpus stuck in the kernel secondary_holding_pen
-> should to be moved to their 2nd stage enable method.  I have not tried to
-> implement this, but it seems to me that it can be done.
+Consider an PCI Express endpoint connected to a PCI Express
+Root Port.  The PCI Express endpoint provides PCI-SIG SR-IOV
+capabilities with a single physical function and a large number
+of virtual functions.  The Root Port contains a pci-pci bridge in
+between it and the SR-IOV device.
 
-While using Linux as a chained bootloader could make sense, I don't
-think it makes sense for that bootloader kernel to bring the secondaries
-up at all if we're not going to be able to hotplug them off.
+When the SR-IOV capable device's driver tries to enable sriov
+(pci_enable_sriov()) it fails to create/add PCI device for each
+virtual function reporting  "not enough MMIO resources for SR-IOV".
 
-I'm not sure I follow the reasoning w.r.t. making the first kernel
-behave as a shim to use a different enable-method for the second kernel.
-Why would you not teach the secondary kernel to handle the real enable
-method?
+In sriov_enable() (drivers/pci/iov.c)
 
-> Do you see any reason why this would not work?
+ 296        for (i = 0; i < PCI_SRIOV_NUM_BARS; i++) {
+ 297                 bars |= (1 << (i + PCI_IOV_RESOURCES));
+ 298                 res = dev->resource + PCI_IOV_RESOURCES + i;
+ 299                 if (res->parent)
+ 300                         nres++;
+ 301         }
+ 302         if (nres != iov->nres) {
+ 303                 dev_err(&dev->dev, "not enough MMIO resources for
+ SR-IOV\n");
+ 304                 return -ENOMEM;
+ 305         }
 
-This may work, but I think there is a much better solution (i.e.
-ensuring we have real hotplug mechanisms where we need them). 
+Here its checking if physical function's IOV resource has a parent or not.
+Which is pci-pci bridge in this case. Otherwise it doesn't consider
+that resource.
 
-I am concerned that if and when we get more enable methods, the
-complexity of performing the shim work is going to expand dramatically.
-It certainly isn't going to be possible to shim all combinations (e.g.
-spint-table -> PSCI).
+Added below api to your patch.
+This will try to claim a resource while creating a PCI device which
+inturn sets 'res->parent'.
 
-> > [1] For hotplug without PSCI I think we can get away with adding an
-> > optional property to spin-table describing a (physical) address to
-> > branch to which returns CPUs to their original spin code. So long as the
-> > kernel zeroes the release address first we should be able to boot a CPU
-> > exactly as we managed to the first time.
-> 
-> I think just this would be just the address of the cpu's spin code, with the
-> restriction that the code is entered at this address also.  If there is no code
-> there, in the case of a PSCI to spin-table re-boot, then the 1st stage kernel
-> needs to install some spin code.  Also, shouldn't this be a required property
-> to avoid the spin code memory leakage problem?
+Let me know if this is okay.
 
-The initial spin code must have been protected with a memeserve, so it
-should still be there. Why would we need to install some new code there?
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index 9f29c9a..fbfb48f 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -125,6 +125,21 @@ resource_size_t pcibios_align_resource(void
+*data, const struct resource *res,
+        return res->start;
+ }
 
-As the original code is still present, retaining the original memreserve
-will be sufficient. We won't leak memory through additional memreserves,
-and we won't clobber the spin-table code as it was reserved.
++int pcibios_add_device(struct pci_dev *pdev)
++{
++        unsigned int i, type_mask = IORESOURCE_IO | IORESOURCE_MEM;
++        struct resource *res;
++
++        for (i = 0; i < PCI_NUM_RESOURCES; i++) {
++                res = &pdev->resource[i];
++                if (res->parent || !(res->flags & type_mask))
++                        continue;
++                pci_claim_resource(pdev, i);
++        }
++
 
-If it's not present we simply don't have hotplug, cannot hotplug the
-CPU, and cannot kexec in SMP.
 
-> > For spin-table we'll also need to jump back up to EL2 when EL2 is
-> > present. It should be possible to do that within the spin-table code if
-> > we update the initial EL2 vector and get KVM to tear itself down before
-> > cpu_die happens.
-> 
-> OK, I have not yet considered EL2.
-> 
-> > > +/**
-> > > + * struct kexec_cpu_info_spin - Info needed for the "spin table" enable method.
-> > > + */
-> > > +
-> > > +struct kexec_cpu_info_spin {
-> > > +       phys_addr_t phy_release_addr; /* cpu order */
-> >
-> > I assume you mean this is in the endianness of the current kernel? I was
-> > initially confused by the comment, and I think it might be better to
-> > drop it -- unless told that a variable is in a specific endianness I
-> > would assume that it's the current native endianness anyway.
-> 
-> The value is read as LE from the device tree, and this comment is to clarify
-> that the conversion from LE to cpu has been done.  Maybe 'cpu byte order' is
-> less confusing?  Normally, I think the term 'machine order' would be used, but
-> I chose 'cpu' from the name of the le64_to_cpu routine.
-
-To me, the code is more confusing due to the presence of the comment. My
-default assumption would be that all variables are {native,cpu}-endian
-unless commented otherwise.
-
-I'm not sure what you mean w.r.t. the LE conversion. The address in the
-DT will be big-endian, and the accessors will covert them to native
-endianness as required. The value _at_ the address will be LE, but there
-is no conversion necessary on the address itself.
-
-> > > +struct kexec_ctx {
-> > > +       struct kexec_dt_info dt_1st;
-> > > +       struct kexec_dt_info dt_2nd;
-> > > +};
-> > > +
-> > > +static struct kexec_ctx *ctx;
-> >
-> > Is there any reason this should be dynamically allocated?
-> >
-> > Do we even need the current DTB if we rely on hotplug?
-> 
-> I think so, for this implementation we need to at least check if the enable
-> methods and cpu counts of the two DTs match and fail the kexec-load syscall
-> if they do not.
-
-With the approach I described, we would not need to perform this check.
-We should simply trust that the user knows what they are doing (we're
-letting them boot an arbitrary kernel anyway...).
-
-> 
-> > > +/**
-> > > + * kexec_is_dtb_user - Helper routine to check the device tree header signature.
-> > > + */
-> > > +
-> > > +static int kexec_is_dtb_user(const void *dtb)
-> > > +{
-> > > +       __be32 magic;
-> > > +
-> > > +       get_user(magic, (__be32 *)dtb);
-> >
-> > Return value check? Unless we know this can't fail?
-> >
-> > If it can fail, surely we should return an appropriate error and forward
-> > it to userspace. EFAULT?
-> >
-> > > +
-> > > +       return kexec_is_dtb(magic);
-> >
-> > And EINVAL if we can read this but it's not a DTB?
-> 
-> These kexec_is_dtb are just used to search for the DTB segment, so are expected
-> to return false for non-DTB segments.  I'll change the return type to bool to
-> make the usage more clear.
-
-While that's fine for the latter, I think the former should fail all the
-way to userspace which has handed us a pointer to memory which it does
-not own.
-
-> 
-> > > +/**
-> > > + * kexec_read_memreserve - Initialize memreserve info from a dtb.
-> > > + */
-> > > +
-> > > +static int kexec_read_memreserve(const void *dtb, struct kexec_dt_info *info)
-> > > +{
-> > > +       const struct boot_param_header *h = dtb;
-> > > +       struct pair {
-> > > +               __be64 phy_addr;
-> > > +               __be64 size;
-> > > +       } const *pair;
-> > > +
-> > > +       pair = dtb + be32_to_cpu(h->off_mem_rsvmap);
-> > > +
-> > > +       if ((pair + 1)->size)
-> > > +               pr_warn("kexec: Multiple memreserve regions found.");
-> >
-> > Huh? Multiple arbitrary memreserves are entirely valid. Why should we
-> > warn in that case?
-> 
-> If a user reports a problem I thought this comment may be useful in debugging
-> since the current implementation does not consider them.
-
-Given that multiple memreserves are entirely valid this is going to
-result in false positives. I think we can get rid of this if we rely on
-userspace passing the right information along.
-
-> 
-> > > +
-> > > +       info->phy_memreserve_addr = be64_to_cpu(pair->phy_addr);
-> > > +       info->memreserve_size = be64_to_cpu(pair->size);
-> >
-> > So we're assuming that the memory described in an arbitrary memreserve
-> > entry (which is intended to describe memory which shouldn't be touched
-> > unless we know what we're doing) is for our arbitrary use!?
-> >
-> > NAK.
-> >
-> > We shouldn't need to special-case reserved memory handling if we rely on
-> > cpu hotplug. If we don't then the only functional option is to add a
-> > memreserve, but that will end up leaking a small amount of memory upon
-> > every kexec. I believe that the former is the only sane option.
-> 
-> I think the solution is to have the cpu spin code address property.
-
-Ok.
-
-> 
-> > > +static int kexec_setup_cpu_spin(const struct device_node *dn,
-> > > +       struct kexec_cpu_info_spin *info)
-> > > +{
-> > > +       int result;
-> > > +       u64 t1;
-> > > +
-> > > +       memset(info, 0, sizeof(*info));
-> > > +
-> > > +       result = of_property_read_u64(dn, "cpu-release-addr", &t1);
-> > > +
-> > > +       if (result) {
-> > > +               pr_warn("kexec: Read cpu-release-addr failed.\n");
-> > > +               return result;
-> > > +       }
-> > > +
-> > > +       info->phy_release_addr = le64_to_cpu(t1);
-> >
-> > Why are we calling le64_to_cpu here?
-> >
-> > of_property_read_u64 reads a be64 value from dt into cpu endianness, so
-> > at the very least the annotation is the wrong way around.
-> 
-> I'll check it again.  I read this and thought the conversion was needed:
-> 
->   The value will be written as a single 64-bit little-endian
->   value, so CPUs must convert the read value to their native endianness
->   before jumping to it.
-
-Endianness conversion may be necessary on the value written/read to/from
-the address but you're converting the endianness of the address of the
-mailbox, not the value written to the mailbox...
-
-> 
-> > Have you tested this with a BE kernel? We should ensure that LE->LE,
-> > LE->BE, BE->BE, BE->LE all work.
-> 
-> Not yet.  I'm in the process of setting up a BE test environment.
-
-Ok. I'd very much like to know that this will work across BE<->LE
-boundaries.
-
-> 
-> > > +int kexec_cpu_info_init(const struct device_node *dn,
-> > > +       struct kexec_dt_info *info)
-> > > +{
-> > > +       int result;
-> > > +       unsigned int cpu;
-> > > +       const struct device_node *i;
-> > > +
-> > > +       info->cpu_info = kmalloc(
-> > > +               (1 + info->cpu_count) * sizeof(struct kexec_cpu_info),
-> > > +               GFP_KERNEL);
-> >
-> > Why one more than the cpu count? I thought cpu_count covered all the
-> > CPUs in the dtb?
-> 
-> Yes, a left over from when the array was zero terminated.  Thanks for such
-> a detailed check!
-> 
-> > [...]
-> >
-> > > +int kexec_dt_info_init(void *dtb, struct kexec_dt_info *info)
-> > > +{
-> > > +       int result;
-> > > +       struct device_node *i;
-> > > +       struct device_node *dn;
-> > > +
-> > > +       if (!dtb) {
-> > > +               /* 1st stage. */
-> > > +               dn = NULL;
-> > > +       } else {
-> > > +               /* 2nd stage. */
-> > > +
-> > > +               of_fdt_unflatten_tree(dtb, &dn);
-> >
-> > This may fail. We should check that dn is not NULL before we try to use
-> > it later -- many of_* functions will traverse the current kernel's boot
-> > DT if provided with a NULL root.
-> 
-> OK, I'll fix it.
-> 
-> > > +
-> > > +               result = kexec_read_memreserve(dtb, info);
-> > > +
-> > > +               if (result)
-> > > +                       return result;
-> > > +       }
-> > > +
-> > > +       /*
-> > > +        * We may need to work with offline cpus to get them into the correct
-> > > +        * state for a given enable method to work, and so need an info_array
-> > > +        * that has info about all the platform cpus.
-> > > +        */
-> >
-> > What exactly do we need to do to offline CPUs?
-> 
-> As mentioned above, to get them into a state expected by the 2nd stage
-> kernel if we choose to do so, but to do the compatibility checks for
-> this implementation.  Maybe I'll change the wording of this comment.
-
-I still don't understand why we would need to bring them online to later
-fake putting them offline, rather than getting the next kernel to handle
-the real enable method.
-
-Cheers,
-Mark.
+On Fri, Mar 14, 2014 at 9:04 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> Hi,
+>
+> This patch adds support for PCI to AArch64. It is based on my v7 patch
+> that adds support for creating generic host bridge structure from
+> device tree. With that in place, I was able to boot a platform that
+> has PCIe host bridge support and use a PCIe network card.
+>
+> I have dropped the RFC tag from the subject as I now have the ambitious goal
+> of trying to get it mainlined.
+>
+> Changes from v6:
+>   - Guard the pci_domain_nr() inline implementation with #ifdef CONFIG_PCI as
+>     to avoid conflict with default empty version present in include/linux/pci.h.
+>     Thanks to Jingoo Han for catching this.
+>
+> Changes from v5:
+>   - Removed pcibios_fixup_bridge_ranges() as the week default version is fine.
+>   - Removed the ALIGN() call in pcibios_align_resource()
+>   - Stopped exporting pcibios_align_resource()
+>
+> Changes from v4:
+>   - Fixed the pci_domain_nr() implementation for arm64. Now we use
+>     find_pci_host_bride() to find the host bridge before we retrieve
+>     the domain number.
+>
+> Changes from v3:
+>   - Added Acks accumulated so far ;)
+>   - Still carrying Catalin's patch for moving the PCI_IO_BASE until it
+>     lands in linux-next or mainline, in order to ease applying the series
+>
+> Changes from v2:
+>   - Implement an arch specific version of pci_register_io_range() and
+>     pci_address_to_pio().
+>   - Return 1 from pci_proc_domain().
+>
+> Changes from v1:
+>   - Added Catalin's patch for moving the PCI_IO_BASE location and extend
+>     its size to 16MB
+>   - Integrated Arnd's version of pci_ioremap_io that uses a bitmap for
+>     keeping track of assigned IO space and returns an io_offset. At the
+>     moment the code is added in arch/arm64 but it can be moved in drivers/pci.
+>   - Added a fix for the generic ioport_map() function when !CONFIG_GENERIC_IOMAP
+>     as suggested by Arnd.
+>
+> v6 thread here: https://lkml.org/lkml/2014/3/5/41
+> v5 thread here: https://lkml.org/lkml/2014/3/4/307
+> v4 thread here: https://lkml.org/lkml/2014/3/3/298
+> v3 thread here: https://lkml.org/lkml/2014/2/28/211
+> v2 thread here: https://lkml.org/lkml/2014/2/27/255
+> v1 thread here: https://lkml.org/lkml/2014/2/3/389
+>
+>
+> The API used is different from the one used by ARM architecture. There is
+> no pci_common_init_dev() function and no hw_pci structure, as that is no
+> longer needed. Once the last signature is added to the legal agreement, I
+> will post the host bridge driver code that I am using. Meanwhile, here
+> is an example of what the probe function looks like, posted as an example:
+>
+> static int myhostbridge_probe(struct platform_device *pdev)
+> {
+>         int err;
+>         struct device_node *dev;
+>         struct pci_host_bridge *bridge;
+>         struct myhostbridge_port *pp;
+>         resource_size_t lastbus;
+>
+>         dev = pdev->dev.of_node;
+>
+>         if (!of_device_is_available(dev)) {
+>                 pr_warn("%s: disabled\n", dev->full_name);
+>                 return -ENODEV;
+>         }
+>
+>         pp = kzalloc(sizeof(struct myhostbridge_port), GFP_KERNEL);
+>         if (!pp)
+>                 return -ENOMEM;
+>
+>         bridge = of_create_pci_host_bridge(&pdev->dev, &myhostbridge_ops, pp);
+>         if (IS_ERR(bridge)) {
+>                 err = PTR_ERR(bridge);
+>                 goto bridge_create_fail;
+>         }
+>
+>         err = myhostbridge_setup(bridge->bus);
+>         if (err)
+>                 goto bridge_setup_fail;
+>
+>         /* We always enable PCI domains and we keep domain 0 backward
+>          * compatible in /proc for video cards
+>          */
+>         pci_add_flags(PCI_ENABLE_PROC_DOMAINS);
+>         pci_add_flags(PCI_REASSIGN_ALL_BUS | PCI_REASSIGN_ALL_RSRC);
+>
+>         lastbus = pci_scan_child_bus(bridge->bus);
+>         pci_bus_update_busn_res_end(bridge->bus, lastbus);
+>
+>         pci_assign_unassigned_bus_resources(bridge->bus);
+>
+>         pci_bus_add_devices(bridge->bus);
+>
+>         return 0;
+>
+> bridge_setup_fail:
+>         put_device(&bridge->dev);
+>         device_unregister(&bridge->dev);
+> bridge_create_fail:
+>         kfree(pp);
+>         return err;
+> }
+>
+> Best regards,
+> Liviu
+>
+>
+> Catalin Marinas (1):
+>   arm64: Extend the PCI I/O space to 16MB
+>
+> Liviu Dudau (2):
+>   Fix ioport_map() for !CONFIG_GENERIC_IOMAP cases.
+>   arm64: Add architecture support for PCI
+>
+>  Documentation/arm64/memory.txt |  16 +--
+>  arch/arm64/Kconfig             |  19 +++-
+>  arch/arm64/include/asm/Kbuild  |   1 +
+>  arch/arm64/include/asm/io.h    |   5 +-
+>  arch/arm64/include/asm/pci.h   |  51 +++++++++
+>  arch/arm64/kernel/Makefile     |   1 +
+>  arch/arm64/kernel/pci.c        | 173 +++++++++++++++++++++++++++++++
+>  include/asm-generic/io.h       |   2 +-
+>  8 files changed, 258 insertions(+), 10 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/pci.h
+>  create mode 100644 arch/arm64/kernel/pci.c
+>
+> --
+> 1.9.0
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
