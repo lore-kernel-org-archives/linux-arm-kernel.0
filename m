@@ -1,38 +1,154 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Fri, 16 May 2014 15:41:57 +0800
-Subject: RCU stall on panda
-In-Reply-To: <5375091D.3010607@ti.com>
-References: <53675C5F.10509@linaro.org>
- <20140505180617.GM8754@linux.vnet.ibm.com>
- <20140512212102.GF5668@atomide.com> <5371BD69.8010600@linaro.org>
- <20140513153220.GC16837@atomide.com> <53747E6D.60500@linaro.org>
- <53748371.5030704@linaro.org> <5374C07C.1070400@linaro.org>
- <20140515183247.GF23659@atomide.com> <5375091D.3010607@ti.com>
-Message-ID: <5375C145.6070904@linaro.org>
+From: superlibj8301@gmail.com (Richard Lee)
+Date: Fri, 16 May 2014 15:45:36 +0800
+Subject: [PATCHv2] ARM: ioremap: Fix static vm area boundary checking.
+In-Reply-To: <308e7a7eeaf04ae8a90b8db39697009b@BY2PR03MB505.namprd03.prod.outlook.com>
+References: <1400142562-9111-1-git-send-email-superlibj8301@gmail.com>
+ <alpine.LFD.2.11.1405151325250.17310@knanqh.ubzr>
+ <CAHPCO9GrwRczw2R9nZDL0tDdYxSHV0f2aDhFSat+xhhiWaYbUg@mail.gmail.com>
+ <308e7a7eeaf04ae8a90b8db39697009b@BY2PR03MB505.namprd03.prod.outlook.com>
+Message-ID: <CAHPCO9FuuRY1eyKpXr4OpHpeS8ZW4BroMOkUPYEhLNu4xdDcSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2014 02:36 AM, Santosh Shilimkar wrote:
->>> >> yes.
->>> >> My board is panda ES. without this revert, it works.
->> > 
->> > Care to specify what linux version you are testing against?
->> > 
->> > Does it hang in idle always immediately on booting?
->> > 
->> > Or does the serial console first hang with sysrq still
->> > working (ctrl-a h in minicom for help) with device
->> > eventually locking up hard?
+On Fri, May 16, 2014 at 3:17 PM, Li.Xiubo at freescale.com
+<Li.Xiubo@freescale.com> wrote:
+>> Subject: Re: [PATCHv2] ARM: ioremap: Fix static vm area boundary checking.
+>>
+>> On Fri, May 16, 2014 at 1:28 AM, Nicolas Pitre <nicolas.pitre@linaro.org>
+>> wrote:
+>> > On Thu, 15 May 2014, Richard Lee wrote:
 >> >
-> I just posted an updated patch Alex on other thread.
-> Attaching here again for your reference. Please try
-> it out and see if the you still get a hang.
+>> >> Static vm area boundary check:
+>> >>
+>> >>       paddr1 --->|       |
+>> >>                  |       |
+>> >>                  |-------| <-\--- svm->vm->addr(is page aligned)
+>> >>       paddr2 --->|       |    |
+>> >>                  |     --| <--|-- svm->vm->phys_addr
+>> >>                  |       |    |
+>> >>       paddr3 --->|       |    |
+>> >>                  |       |    |
+>> >>                  |-------| <--|-- next page boundary
+>> >>                  |       |    |
+>> >>       paddr4 --->|       |    | <----- svm->vm->size(including guard page)
+>> >>                  |       |    |
+>> >>                  |       |    |
+>> >> max paddr_end -->|-------| <--|-- svm->vm's phys_addr_end
+>> >>                  | ///// |    |
+>> >>       paddr5 --->| guard |    |
+>> >>                  | page  |    |
+>> >>                  | ///// |    |
+>> >>                   -------  <-/--- svm->vm->addr + svm->vm_size
+>> >>
+>> >> <1> If the paddr == paddr1, then continue;
+>> >> <2> If the paddr == paddr2~paddr4 and paddr_end > phys_addr_end,
+>> >>     then continue;
+>> >> <3> if the paddr >= paddr5 then continue;
+>> >>
+>> >> Signed-off-by: Richard Lee <superlibj8301@gmail.com>
+>> >
+>> > instead of doing this repeatedly, why not simply ensure the recorded
+>> > static vm information is already page aligned in the first place?
+>> >
+>>
+>> Sorry, I'm not very sure what vm information you meant here.
+>>
+>> And the 'svm->vm->addr' and 'svm->vm->size' are all page aligned
+>> already, but we cannot make sure that the 'paddr' and
+>> 'svm->vm->phys_addr' are page aligned.
+>>
+>
+> The paddr and svm->vm->phys_addr are all already pfn aligned here.
+> What we should fix about is the boundary of them.
+>
 
-it does not hang this time.
+Sorry, I'm a fresher and I'll be out of the opensource mail list for
+changing jobs and then I have no chance to do this.
+Could you help me fix this issue please ?
 
-but I am not sure it can solve my problem, since RCU stall is not easy
-to reproduce in short time.
+And thanks for your help about how to appoarch the opensource list.
+Thanks very much,
 
--- 
-Thanks
-    Alex
+   Richard,
+
+>> >>
+>> >>
+>> >> Change in V2:
+>> >>  - PAGE_SIZE --> PAGE_MASK
+>> >>  - remove the 'size' page size align operation.
+>> >>
+>> >>
+>> >>
+>> >>
+>> >>
+>> >>
+>> >>  arch/arm/mm/ioremap.c | 40 ++++++++++++++++++++++++++++++++++++++--
+>> >>  1 file changed, 38 insertions(+), 2 deletions(-)
+>> >>
+>> >> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+>> >> index be69333..f235ab7 100644
+>> >> --- a/arch/arm/mm/ioremap.c
+>> >> +++ b/arch/arm/mm/ioremap.c
+>> >> @@ -47,16 +47,52 @@ static struct static_vm
+>> *find_static_vm_paddr(phys_addr_t paddr,
+>> >>  {
+>> >>       struct static_vm *svm;
+>> >>       struct vm_struct *vm;
+>> >> +     size_t offset;
+>> >> +
+>> >> +     offset = paddr & ~PAGE_MASK;
+>> >>
+>> >>       list_for_each_entry(svm, &static_vmlist, list) {
+>> >> +             phys_addr_t paddr_end, phys_addr_end;
+>> >> +             size_t vmoff;
+>> >> +
+>> >>               vm = &svm->vm;
+>> >>               if (!(vm->flags & VM_ARM_STATIC_MAPPING))
+>> >>                       continue;
+>> >>               if ((vm->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
+>> >>                       continue;
+>> >>
+>> >> -             if (vm->phys_addr > paddr ||
+>> >> -                     paddr + size - 1 > vm->phys_addr + vm->size - 1)
+>> >> +             /* Static vm area boundary check:
+>> >> +              *
+>> >> +              *       paddr1 --->|       |
+>> >> +              *                  |       |
+>> >> +              *                  |-------| <-\--- svm->vm->addr(page
+>> aligned)
+>> >> +              *       paddr2 --->|       |    |
+>> >> +              *                  |     --| <--|-- svm->vm->phys_addr
+>> >> +              *                  |       |    |
+>> >> +              *       paddr3 --->|       |    |
+>> >> +              *                  |       |    |
+>> >> +              *                  |-------| <--|-- next page boundary
+>> >> +              *                  |       |    |
+>> >> +              *       paddr4 --->|       |    | <----- svm->vm->size,
+>> >> +              *                  |       |    |         including guard
+>> page
+>> >> +              *                  |       |    |
+>> >> +              * max paddr_end -->|-------| <--|-- svm->vm's phys_addr_end
+>> >> +              *                  | ///// |    |
+>> >> +              *       paddr5 --->| guard |    |
+>> >> +              *                  | page  |    |
+>> >> +              *                  | ///// |    |
+>> >> +              *                   -------  <-/-- svm->vm->addr + svm-
+>> >vm_size
+>> >> +              *
+>> >> +              * <1> If paddr == paddr1, then continue;
+>> >> +              * <2> If paddr == paddr2~paddr4 and paddr_end >
+>> phys_addr_end,
+>> >> +              *     then continue;
+>> >> +              * <3> if paddr >= paddr5 then continue;
+>> >> +              */
+>> >> +             vmoff = vm->phys_addr & ~PAGE_MASK;
+>> >> +             phys_addr_end = vm->phys_addr + vm->size - PAGE_SIZE - vmoff;
+>> >> +             paddr_end = paddr + size - offset;
+>> >> +             if (__phys_to_pfn(vm->phys_addr) > __phys_to_pfn(paddr) ||
+>> >> +                     paddr_end - 1 > phys_addr_end - 1)
+>> >>                       continue;
+>> >>
+>> >>               return svm;
+>> >> --
+>> >> 1.8.4
+>> >>
