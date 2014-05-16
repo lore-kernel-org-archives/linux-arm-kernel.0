@@ -1,48 +1,47 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 16 May 2014 10:43:33 +0200
-Subject: [PATCH v6 13/17] ARM: shmobile: marzen: Add to shmobile defconfig
-In-Reply-To: <20140516000409.GB29432@verge.net.au>
-References: <1400153532-23675-1-git-send-email-horms+renesas@verge.net.au>
- <1400153532-23675-14-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdXPm_=ejkcnOFOgfnsz9MUc8KpAjkuMcHMKJeaEmVbhQA@mail.gmail.com>
- <20140515225027.GA29432@verge.net.au>
- <20140516000409.GB29432@verge.net.au>
-Message-ID: <CAMuHMdWjxK5K4rhJt0VDbsSUX_Gzq8EXCPStN3bb_GUqq8tEog@mail.gmail.com>
+From: valentin.longchamp@keymile.com (Valentin Longchamp)
+Date: Fri, 16 May 2014 10:49:00 +0200
+Subject: [PATCH v2 0/3] Update the Keymile kirkwood DTS files
+Message-ID: <1400230143-15620-1-git-send-email-valentin.longchamp@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+This series resynchs the Keymile Kirkwood DTS files with mainline since
+the boards do not boot anymore with the 3.15 rc kernels (to be honest, I
+have not tested the last 2-3 releases).
 
-On Fri, May 16, 2014 at 2:04 AM, Simon Horman <horms@verge.net.au> wrote:
-> Add marzen to shmobile defconfig now that it supports multiplatform
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->
-> ---
-> v6.1
-> * Also enable SPI_SH_HSPI and USB_RCAR_PHY
->
-> v2 - v6
-> * No Change
->
-> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-> index b76fb9b..114e88e 100644
-> --- a/arch/arm/configs/shmobile_defconfig
-> +++ b/arch/arm/configs/shmobile_defconfig
+The changes are the addition of the PCIe controller for the 98dx4122
+SoC, the explicit disabling of the SATA phys for this same SoC and
+finally the enabling of the PCIe controller on the Keymile Reference
+design.
 
-> +CONFIG_USB_RCAR_PHY=y
-> +CONFIG_USB_RCAR_GEN2_PHY=y
+The series introduces kirkwood-km_common.dtsi that factors the common
+nodes between kirkwood-km_kirkwood.dts and the new board/design below.
 
-While I don't dispute the need for CONFIG_USB_RCAR_GEN2_PHY in
-shmobile_defconfig, this is not needed for Marzen, right?
+The series also adds a new DTS for another Keymile generic design where
+the mv64xxx eth interace is configured with fixed parameters to no phy
+but a switch (for board internal communication).
 
-Gr{oetje,eeting}s,
+The series applies and was tested on top of Jason's mvebu/dt branch
+(mvebu-dt-3.16 tag).
 
-                        Geert
+Changes in v2:
+- introduce kirkwood-km_common.dtsi to allow factoring some nodes
+  between boards
+- Take advantage of the kirkwood-km_common.dtsi file for
+  kirkwood-km_fixedeth.dts
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Valentin Longchamp (3):
+  ARM: dts: kirkwood: resynch 98dx4122 dtsi
+  ARM: dts: kirkwood: add kirkwood-km_common DTSI files
+  ARM: dts: kirkwood: add kirkwood-km_fixedeth DTS file
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+ arch/arm/boot/dts/kirkwood-98dx4122.dtsi   | 43 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-km_common.dtsi  | 48 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-km_fixedeth.dts | 23 ++++++++++++++
+ arch/arm/boot/dts/kirkwood-km_kirkwood.dts | 38 +----------------------
+ 4 files changed, 115 insertions(+), 37 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-km_common.dtsi
+ create mode 100644 arch/arm/boot/dts/kirkwood-km_fixedeth.dts
+
+-- 
+1.8.0.1
