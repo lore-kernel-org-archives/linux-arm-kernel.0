@@ -1,36 +1,52 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 May 2014 09:58:46 +0900
-Subject: [PATCH 5/9] ARM: shmobile: Use r8a7791 DT CPU Frequency in common case
+Date: Fri, 16 May 2014 09:58:48 +0900
+Subject: [PATCH 7/9] ARM: shmobile: Remove unused r8a7791_init_early()
 In-Reply-To: <cover.1400200838.git.horms+renesas@verge.net.au>
 References: <cover.1400200838.git.horms+renesas@verge.net.au>
-Message-ID: <648c687a6a43a6473caedba4785a16537bd21bfb.1400200838.git.horms+renesas@verge.net.au>
+Message-ID: <595e9b00fb81f971d84ff451861423d02c39d060.1400200838.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Convert the common C-code-less r8a7791 DT board support
-to use shmobile_init_delay() to be able to migrate away
-from per-SoC delay setup functions.
+Remove the now unused r8a7791_init_early() function.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7791.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-shmobile/include/mach/r8a7791.h | 1 -
+ arch/arm/mach-shmobile/setup-r8a7791.c        | 7 -------
+ 2 files changed, 8 deletions(-)
 
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7791.h b/arch/arm/mach-shmobile/include/mach/r8a7791.h
+index 200fa69..664274c 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7791.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7791.h
+@@ -5,7 +5,6 @@ void r8a7791_add_standard_devices(void);
+ void r8a7791_add_dt_devices(void);
+ void r8a7791_clock_init(void);
+ void r8a7791_pinmux_init(void);
+-void r8a7791_init_early(void);
+ extern struct smp_operations r8a7791_smp_ops;
+ 
+ #endif /* __ASM_R8A7791_H__ */
 diff --git a/arch/arm/mach-shmobile/setup-r8a7791.c b/arch/arm/mach-shmobile/setup-r8a7791.c
-index a7e4966..2c84e74 100644
+index 2c84e74..949580a 100644
 --- a/arch/arm/mach-shmobile/setup-r8a7791.c
 +++ b/arch/arm/mach-shmobile/setup-r8a7791.c
-@@ -225,7 +225,7 @@ static const char *r8a7791_boards_compat_dt[] __initdata = {
+@@ -210,13 +210,6 @@ void __init r8a7791_add_standard_devices(void)
+ 	r8a7791_register_thermal();
+ }
  
- DT_MACHINE_START(R8A7791_DT, "Generic R8A7791 (Flattened Device Tree)")
- 	.smp		= smp_ops(r8a7791_smp_ops),
--	.init_early	= r8a7791_init_early,
-+	.init_early	= shmobile_init_delay,
- 	.init_time	= rcar_gen2_timer_init,
- 	.dt_compat	= r8a7791_boards_compat_dt,
- MACHINE_END
+-void __init r8a7791_init_early(void)
+-{
+-#ifndef CONFIG_ARM_ARCH_TIMER
+-	shmobile_setup_delay(1500, 2, 4); /* Cortex-A15 @ 1500MHz */
+-#endif
+-}
+-
+ #ifdef CONFIG_USE_OF
+ static const char *r8a7791_boards_compat_dt[] __initdata = {
+ 	"renesas,r8a7791",
 -- 
 1.8.5.2
