@@ -1,75 +1,50 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 16 May 2014 05:45:59 -0500
-Subject: [PATCH 2/3] clk: dpll: support OMAP5 MPU DPLL that need special
- handling for higher frequencies
+Date: Fri, 16 May 2014 05:46:00 -0500
+Subject: [PATCH 3/3] ARM: dts: OMAP5/DRA7: use omap5-mpu-dpll-clock capable of
+ dealing with higher frequencies
 In-Reply-To: <1400237160-25125-1-git-send-email-nm@ti.com>
 References: <1400237160-25125-1-git-send-email-nm@ti.com>
-Message-ID: <1400237160-25125-3-git-send-email-nm@ti.com>
+Message-ID: <1400237160-25125-4-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MPU DPLL on OMAP5, DRA75x, DRA72x has a limitation on the maximum
-frequency it can be locked at. Duty Cycle Correction circuit is used
-to recover a correct duty cycle for achieving higher frequencies
-(hardware internally switches output to M3 output(CLKOUTHIF) from M2
-output (CLKOUT)).
+OMAP5432, DRA75x and DRA72x have MPU DPLLs that need Duty Cycle
+Correction(DCC) to operate safely at frequencies >= 1.4GHz.
 
-So provide support to setup required data to handle Duty cycle by
-the setting up the minimum frequency for DPLL. 1.4GHz is common
-for all these devices and is based on Technical Reference Manual
-information for OMAP5432((SWPU282U) chapter 3.6.3.3.1 "DPLLs Output
-Clocks Parameters", and equivalent information from DRA75x, DRA72x
-documentation(SPRUHP2E, SPRUHI2P).
+Switch to "ti,omap5-mpu-dpll-clock" compatible property which provides
+this support.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- .../devicetree/bindings/clock/ti/dpll.txt          |    1 +
- drivers/clk/ti/dpll.c                              |   21 ++++++++++++++++++++
- 2 files changed, 22 insertions(+)
+ arch/arm/boot/dts/dra7xx-clocks.dtsi   |    2 +-
+ arch/arm/boot/dts/omap54xx-clocks.dtsi |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/ti/dpll.txt b/Documentation/devicetree/bindings/clock/ti/dpll.txt
-index 30bfdb7..a4d0723 100644
---- a/Documentation/devicetree/bindings/clock/ti/dpll.txt
-+++ b/Documentation/devicetree/bindings/clock/ti/dpll.txt
-@@ -24,6 +24,7 @@ Required properties:
- 		"ti,omap4-dpll-core-clock",
- 		"ti,omap4-dpll-m4xen-clock",
- 		"ti,omap4-dpll-j-type-clock",
-+		"ti,omap5-mpu-dpll-clock",
- 		"ti,am3-dpll-no-gate-clock",
- 		"ti,am3-dpll-j-type-clock",
- 		"ti,am3-dpll-no-gate-j-type-clock",
-diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
-index 7e498a4..c06e94a 100644
---- a/drivers/clk/ti/dpll.c
-+++ b/drivers/clk/ti/dpll.c
-@@ -396,6 +396,27 @@ static void __init of_ti_omap4_dpll_setup(struct device_node *node)
- CLK_OF_DECLARE(ti_omap4_dpll_clock, "ti,omap4-dpll-clock",
- 	       of_ti_omap4_dpll_setup);
+diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+index cfb8fc7..aac5522 100644
+--- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
++++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+@@ -277,7 +277,7 @@
  
-+static void __init of_ti_omap5_mpu_dpll_setup(struct device_node *node)
-+{
-+	const struct dpll_data dd = {
-+		.idlest_mask = 0x1,
-+		.enable_mask = 0x7,
-+		.autoidle_mask = 0x7,
-+		.mult_mask = 0x7ff << 8,
-+		.div1_mask = 0x7f,
-+		.max_multiplier = 2047,
-+		.max_divider = 128,
-+		.dcc_mask = BIT(22),
-+		.dcc_rate = 1400000000, /* DCC beyond 1.4GHz */
-+		.min_divider = 1,
-+		.modes = (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
-+	};
-+
-+	of_ti_dpll_setup(node, &dpll_ck_ops, &dd, DPLL_HAS_AUTOIDLE);
-+}
-+CLK_OF_DECLARE(of_ti_omap5_mpu_dpll_clock, "ti,omap5-mpu-dpll-clock",
-+	       of_ti_omap5_mpu_dpll_setup);
-+
- static void __init of_ti_omap4_core_dpll_setup(struct device_node *node)
- {
- 	const struct dpll_data dd = {
+ 	dpll_mpu_ck: dpll_mpu_ck {
+ 		#clock-cells = <0>;
+-		compatible = "ti,omap4-dpll-clock";
++		compatible = "ti,omap5-mpu-dpll-clock";
+ 		clocks = <&sys_clkin1>, <&mpu_dpll_hs_clk_div>;
+ 		reg = <0x0160>, <0x0164>, <0x016c>, <0x0168>;
+ 	};
+diff --git a/arch/arm/boot/dts/omap54xx-clocks.dtsi b/arch/arm/boot/dts/omap54xx-clocks.dtsi
+index d487fda..465505c 100644
+--- a/arch/arm/boot/dts/omap54xx-clocks.dtsi
++++ b/arch/arm/boot/dts/omap54xx-clocks.dtsi
+@@ -362,7 +362,7 @@
+ 
+ 	dpll_mpu_ck: dpll_mpu_ck {
+ 		#clock-cells = <0>;
+-		compatible = "ti,omap4-dpll-clock";
++		compatible = "ti,omap5-mpu-dpll-clock";
+ 		clocks = <&sys_clkin>, <&mpu_dpll_hs_clk_div>;
+ 		reg = <0x0160>, <0x0164>, <0x016c>, <0x0168>;
+ 	};
 -- 
 1.7.9.5
