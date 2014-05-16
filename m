@@ -1,15 +1,15 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 16 May 2014 08:02:17 -0700
-Subject: [PATCH v3 10/13] ARM: dts: am33xx: Remove obsolete properties
+Date: Fri, 16 May 2014 08:02:32 -0700
+Subject: [PATCH v3 11/13] ARM: dts: am4372: Remove obsolete properties
  from edma node
-In-Reply-To: <1400242640-9902-11-git-send-email-peter.ujfalusi@ti.com>
+In-Reply-To: <1400242640-9902-12-git-send-email-peter.ujfalusi@ti.com>
 References: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
- <1400242640-9902-11-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20140516150216.GA22031@atomide.com>
+ <1400242640-9902-12-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20140516150232.GB22031@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [140516 05:18]:
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [140516 05:19]:
 > dma-channels, ti,edma-regions and ti,edma-slots no longer needed in DT since
 > the the same information is available in the IP's CCCFG register.
 > 
@@ -18,23 +18,23 @@ List-Id: linux-arm-kernel.lists.infradead.org
 Acked-by: Tony Lindgren <tony@atomide.com>
 
 > ---
->  arch/arm/boot/dts/am33xx.dtsi | 3 ---
+>  arch/arm/boot/dts/am4372.dtsi | 3 ---
 >  1 file changed, 3 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index f1eea4af40ed..37d4cad4dd38 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -147,9 +147,6 @@
->  				<0x44e10f90 0x40>;
->  			interrupts = <12 13 14>;
+> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+> index 03a225505126..b9f83b705f4b 100644
+> --- a/arch/arm/boot/dts/am4372.dtsi
+> +++ b/arch/arm/boot/dts/am4372.dtsi
+> @@ -108,9 +108,6 @@
+>  					<GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
+>  					<GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
 >  			#dma-cells = <1>;
 > -			dma-channels = <64>;
 > -			ti,edma-regions = <4>;
 > -			ti,edma-slots = <256>;
 >  		};
 >  
->  		gpio0: gpio at 44e07000 {
+>  		uart0: serial at 44e09000 {
 > -- 
 > 1.9.3
 > 
