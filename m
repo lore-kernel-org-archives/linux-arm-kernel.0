@@ -1,58 +1,61 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Fri, 16 May 2014 20:05:12 +0530
-Subject: [PATCH RFC 3/4] clk: samsung: Add driver to control CLKOUT line
- on Exynos SoCs
-In-Reply-To: <5375EDFD.1020708@samsung.com>
-References: <1400175151-27779-1-git-send-email-t.figa@samsung.com>
- <1400175151-27779-4-git-send-email-t.figa@samsung.com>
- <CAPdUM4P7Z1eLVKuc0N1iPaekM_7kNv7KCve2MgrEziszfnzz7A@mail.gmail.com>
- <5375EDFD.1020708@samsung.com>
-Message-ID: <CAPdUM4O4RKFZFR_tcwG4pd7E6KMkneG9R_VbZPt+m4fGG_UFVg@mail.gmail.com>
+From: catalin.udma@freescale.com (catalin.udma at freescale.com)
+Date: Fri, 16 May 2014 14:35:45 +0000
+Subject: [PATCH] arm64: ptrace: fix setting hw breakpoint/watchpoint
+In-Reply-To: <20140516134420.GG12341@arm.com>
+References: <1399290685-6336-1-git-send-email-catalin.udma@freescale.com>
+ <20140516134420.GG12341@arm.com>
+Message-ID: <145f917e71694a30b406ebcaa889e604@BL2PR03MB164.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 May 2014 16:22, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Rahul,
->
-> On 16.05.2014 12:39, Rahul Sharma wrote:
->> [snip]
->>> +       gate->lock = &clkout_lock;
->>> +
->>> +       mux->reg = reg + EXYNOS_PMU_DEBUG_REG;
->>> +       mux->mask = EXYNOS_CLKOUT_MUX_MASK;
->>> +       mux->shift = EXYNOS_CLKOUT_MUX_SHIFT;
->>> +       mux->lock = &clkout_lock;
->>> +
->>> +       clk = clk_register_composite(NULL, "clkout", parent_names,
->>> +                                       parent_count, &mux->hw,
->>> +                                       &clk_mux_ops, NULL, NULL, &gate->hw,
->>> +                                       &clk_gate_ops, 0);
->>> +       if (IS_ERR(clk))
->>> +               goto err_unmap;
->>> +
->>
->> Hi Tomasz,
->>
->> Do we really need a composite clock here? How about registering
->> a mux and a gate separately?
->
-> What's wrong with a composite clock? It simplifies the code as just a
-> single clock needs to be registered. I don't see any drawbacks compared
-> to registering two clocks separately.
->
+Thank you, Will. The gdb patch seems to solve the problem.
 
-I always took it as a thumb rule to not to use composite clocks if you
-can easily represent the block using basic clocks structures.
+As long as the kernel can rely on the registers number sent from GDB,
+then there is no need for this kernel patch.
 
-There can be a problem when drivers using such clocks assume that such
-clock continue to offer composite functionality for all futures SoCs and
-write code around it. This is what we faced when fixing drivers during
-CCF migration.
+Regards,
+Catalin
 
-> Best regards,
-> Tomasz
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: Friday, May 16, 2014 4:44 PM
+> To: Udma Catalin-Dan-B32721
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] arm64: ptrace: fix setting hw breakpoint/watchpoint
+> 
+> On Mon, May 05, 2014 at 12:51:25PM +0100, Catalin Udma wrote:
+> > When setting hw breakpoints/watchpoints, GDB reports the error
+> > "Unexpected error setting hardware debug registers". The problem is
+> > reproducible on A53/A57 models where the supported number of
+> > breakpoints/watchpoints (6 or 4 read from ID_AA64DFR0_EL1) it is
+> > less than the maximum number of debug registers from user_hwdebug_state
+> >
+> > This patch fixes the problem by restricting the registers access to the
+> > maximum number of supported breakpoints/watchpoints
+> 
+> Actually, I consider this to be a bug in GDB. It shouldn't be trying to
+> access registers that don't exist (we tell it the number of registers
+> available as part of the 32-bit info register).
+> 
+> I also think this has been fixed in GDB upstream:
+> 
+> 
+>   commit f45c82da381e0ce5ce51b7fb24d0d28611d266b8
+>   Author: Yufeng Zhang <yufeng.zhang@arm.com>
+>   Date:   Wed Dec 18 16:47:33 2013 +0000
+> 
+>       gdb/
+> 
+>           * aarch64-linux-nat.c (aarch64_linux_set_debug_regs): Set
+>           iov.iov_len with the real length in use.
+> 
+>       gdb/gdbserver/
+> 
+>           * linux-aarch64-low.c (aarch64_linux_set_debug_regs): Set
+>           iov.iov_len with the real length in use.
+> 
+> 
+> so there's no need to change the kernel for this.
+> 
+> Will
