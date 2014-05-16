@@ -1,88 +1,33 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 16 May 2014 14:10:16 +0200
-Subject: [PATCH 5/5] ARM: shmobile: Remove Genmai reference DTS
-In-Reply-To: <1400242216-20848-1-git-send-email-wsa@the-dreams.de>
-References: <1400242216-20848-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1400242216-20848-6-git-send-email-wsa@the-dreams.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 16 May 2014 15:17:08 +0300
+Subject: [PATCH v3 01/13] ARM: edma: No need to clean the pdata in
+ edma_of_parse_dt()
+In-Reply-To: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1400242640-9902-2-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+The pdata has been just allocated with devm_kzalloc() in
+edma_setup_info_from_dt() and passed to this function.
 
-Now that the DTS file r7s72100-genmai.dts can be used with
-board-genmai.c and board-genmai-reference.c, proceed with removing
-r7s72100-genmai-reference.dts.
-
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/r7s72100-genmai-reference.dts | 59 -------------------------
- 1 file changed, 59 deletions(-)
- delete mode 100644 arch/arm/boot/dts/r7s72100-genmai-reference.dts
+ arch/arm/common/edma.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r7s72100-genmai-reference.dts b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
-deleted file mode 100644
-index ca88458e0706..000000000000
---- a/arch/arm/boot/dts/r7s72100-genmai-reference.dts
-+++ /dev/null
-@@ -1,59 +0,0 @@
--/*
-- * Device Tree Source for the Genmai board
-- *
-- * Copyright (C) 2013-14 Renesas Solutions Corp.
-- * Copyright (C) 2014 Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
-- *
-- * This file is licensed under the terms of the GNU General Public License
-- * version 2.  This program is licensed "as is" without any warranty of any
-- * kind, whether express or implied.
-- */
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 8452cf246330..01707aae0a2b 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -1472,8 +1472,6 @@ static int edma_of_parse_dt(struct device *dev,
+ 	struct edma_rsv_info *rsv_info;
+ 	s8 (*queue_tc_map)[2], (*queue_priority_map)[2];
+ 
+-	memset(pdata, 0, sizeof(struct edma_soc_info));
 -
--/dts-v1/;
--#include "r7s72100.dtsi"
--
--/ {
--	model = "Genmai";
--	compatible = "renesas,genmai-reference", "renesas,r7s72100";
--
--	aliases {
--		serial2 = &scif2;
--	};
--
--	chosen {
--		bootargs = "console=ttySC2,115200 ignore_loglevel rw root=/dev/nfs ip=dhcp";
--	};
--
--	memory {
--		device_type = "memory";
--		reg = <0x08000000 0x08000000>;
--	};
--
--	lbsc {
--		#address-cells = <1>;
--		#size-cells = <1>;
--	};
--};
--
--&extal_clk {
--	clock-frequency = <13330000>;
--};
--
--&usb_x1_clk {
--	clock-frequency = <48000000>;
--};
--
--&i2c2 {
--	status = "okay";
--	clock-frequency = <400000>;
--
--	eeprom at 50 {
--		compatible = "renesas,24c128";
--		reg = <0x50>;
--		pagesize = <64>;
--	};
--};
--
--&scif2 {
--	status = "okay";
--};
+ 	ret = of_property_read_u32(node, "dma-channels", &value);
+ 	if (ret < 0)
+ 		return ret;
 -- 
-1.9.2
+1.9.3
