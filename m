@@ -1,61 +1,63 @@
-From: catalin.udma@freescale.com (catalin.udma at freescale.com)
-Date: Fri, 16 May 2014 14:35:45 +0000
-Subject: [PATCH] arm64: ptrace: fix setting hw breakpoint/watchpoint
-In-Reply-To: <20140516134420.GG12341@arm.com>
-References: <1399290685-6336-1-git-send-email-catalin.udma@freescale.com>
- <20140516134420.GG12341@arm.com>
-Message-ID: <145f917e71694a30b406ebcaa889e604@BL2PR03MB164.namprd03.prod.outlook.com>
+From: m-karicheri2@ti.com (Karicheri, Muralidharan)
+Date: Fri, 16 May 2014 14:36:37 +0000
+Subject: [PATCH v1 1/5] ARM: keystone: add pcie related options
+In-Reply-To: <004e01cf709d$a48b4240$eda1c6c0$%han@samsung.com>
+References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
+ <1400169692-9677-2-git-send-email-m-karicheri2@ti.com>
+ <004e01cf709d$a48b4240$eda1c6c0$%han@samsung.com>
+Message-ID: <3E54258959B69E4282D79E01AB1F32B7047413F8@DFLE11.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank you, Will. The gdb patch seems to solve the problem.
+>-----Original Message-----
+>From: Jingoo Han [mailto:jg1.han at samsung.com]
+>Sent: Thursday, May 15, 2014 8:28 PM
+>To: Karicheri, Muralidharan
+>Cc: linux-kernel at vger.kernel.org; linux-pci at vger.kernel.org; linux-arm-
+>kernel at lists.infradead.org; Shilimkar, Santosh; 'Russell King'; 'Jingoo Han'
+>Subject: Re: [PATCH v1 1/5] ARM: keystone: add pcie related options
+>
+>On Friday, May 16, 2014 1:01 AM, Murali Karicheri wrote:
+>>
+>> Add pcie related options by default for keystone architecture
+>>
+>> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> CC: Russell King <linux@arm.linux.org.uk>
+>>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> ---
+>>  arch/arm/mach-keystone/Kconfig |    2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-keystone/Kconfig
+>> b/arch/arm/mach-keystone/Kconfig index f50bc93..f87844d 100644
+>> --- a/arch/arm/mach-keystone/Kconfig
+>> +++ b/arch/arm/mach-keystone/Kconfig
+>> @@ -8,6 +8,8 @@ config ARCH_KEYSTONE
+>>  	select COMMON_CLK_KEYSTONE
+>>  	select ARCH_SUPPORTS_BIG_ENDIAN
+>>  	select ZONE_DMA if ARM_LPAE
+>> +	select MIGHT_HAVE_PCI
+>> +	select ARCH_SUPPORTS_MSI
+>
+>Please, don't select ARCH_SUPPORTS_MSI, because this kconfig option was already
+>removed in v3.12 by the commit ebd97be635
+>('PCI: remove ARCH_SUPPORTS_MSI kconfig option'). So. there is NO need to select
+>'ARCH_SUPPORTS_MSI'.
+>
 
-As long as the kernel can rely on the registers number sent from GDB,
-then there is no need for this kernel patch.
+Will do. Thanks.
 
-Regards,
-Catalin
-
-
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: Friday, May 16, 2014 4:44 PM
-> To: Udma Catalin-Dan-B32721
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] arm64: ptrace: fix setting hw breakpoint/watchpoint
-> 
-> On Mon, May 05, 2014 at 12:51:25PM +0100, Catalin Udma wrote:
-> > When setting hw breakpoints/watchpoints, GDB reports the error
-> > "Unexpected error setting hardware debug registers". The problem is
-> > reproducible on A53/A57 models where the supported number of
-> > breakpoints/watchpoints (6 or 4 read from ID_AA64DFR0_EL1) it is
-> > less than the maximum number of debug registers from user_hwdebug_state
-> >
-> > This patch fixes the problem by restricting the registers access to the
-> > maximum number of supported breakpoints/watchpoints
-> 
-> Actually, I consider this to be a bug in GDB. It shouldn't be trying to
-> access registers that don't exist (we tell it the number of registers
-> available as part of the 32-bit info register).
-> 
-> I also think this has been fixed in GDB upstream:
-> 
-> 
->   commit f45c82da381e0ce5ce51b7fb24d0d28611d266b8
->   Author: Yufeng Zhang <yufeng.zhang@arm.com>
->   Date:   Wed Dec 18 16:47:33 2013 +0000
-> 
->       gdb/
-> 
->           * aarch64-linux-nat.c (aarch64_linux_set_debug_regs): Set
->           iov.iov_len with the real length in use.
-> 
->       gdb/gdbserver/
-> 
->           * linux-aarch64-low.c (aarch64_linux_set_debug_regs): Set
->           iov.iov_len with the real length in use.
-> 
-> 
-> so there's no need to change the kernel for this.
-> 
-> Will
+>Best regards,
+>Jingoo Han
+>
+>>  	help
+>>  	  Support for boards based on the Texas Instruments Keystone family of
+>>  	  SoCs.
+>> --
+>> 1.7.9.5
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci"
+>> in the body of a message to majordomo at vger.kernel.org More majordomo
+>> info at  http://vger.kernel.org/majordomo-info.html
