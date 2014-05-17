@@ -1,51 +1,48 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 17 May 2014 09:02:46 +0900
-Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
-In-Reply-To: <CAJFHJrrb2XFDZqJh4OuLdFP=J0aR4pGe-WLWKZ7ZpMfUSPGd4Q@mail.gmail.com>
-References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>	<53752E25.9060604@gmail.com>	<CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>	<53753443.8010303@gmail.com>	<CAD=FV=V8UZoeOqEwfx_E015pLM+amTt51LrUa+dk7mTdn=vKgA@mail.gmail.com>	<53753C17.1090002@gmail.com>	<CAD=FV=WGa7j_As_NpySxU7OEd_SzuGWK6oxU6UeiJ-4HsoWvvg@mail.gmail.com>	<CAJFHJrrgWGc4XGQB0ysLufAg3Wouz-aYXu97Sy2Kp=HzK+akVQ@mail.gmail.com>	<CAASgrz2Nr69tpfC8ka9gbs2OvjLEGsvgAj4vBCFxhsamuFum7w@mail.gmail.com>	<53754CE2.3000905@gmail.com>	<CAD=FV=UMoL7i9rg_QtBAqPwisSQyRqRmk8wQhneMXAiLBjTT1A@mail.gmail.com>	<CAPz6YkU8GDrLj8UkqEQXxxqxWF5_p427wKSDgAp+QPR7WE7Ujg@mail.gmail.com>
- <CAJFHJrrb2XFDZqJh4OuLdFP=J0aR4pGe-WLWKZ7ZpMfUSPGd4Q@mail.gmail.com>
-Message-ID: <5376A726.4000106@samsung.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 17 May 2014 02:04:27 +0200
+Subject: [PATCH v4 7/8] ARM: Exynos: switch to using generic cpufreq-cpu0
+ driver
+In-Reply-To: <1400029876-5830-8-git-send-email-thomas.ab@samsung.com>
+References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
+ <1400029876-5830-8-git-send-email-thomas.ab@samsung.com>
+Message-ID: <5376A78B.1080903@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/14 07:56, Chirantan Ekbote wrote:
->>>> Anyway, I'm by no means opposed to switching to arch timers. They
->>>> provide a well designed, generic interface and drivers shared by
->>>> multiple platforms, which means more code sharing and possibly more eyes
->>>> looking at the code, which is always good. However if they don't support
->>>> low power states correctly, we can't just remove MCT.
->>>
->>> I think low power states aren't in mainline (right?).
->>>
->>> One solution that might work could be to leave the device tree entry
->>> alone but change the MCT init code to simply act as a no-op if it sees
->>> an arch timer is in the device tree and enabled.  Then when/if someone
->>> got the low power states enabled we could just change source code
->>> rather than dts files.
->>>
->
-> Doug and I were talking about this and we think we may have a way to
-> have the mct and arch timers co-exist.  The main issue is that the mct
-> (and therefore arch timer) gets cleared once during boot and every
-> time we do a suspend / resume.  This happens in
-> exynos4_mct_frc_start() but it's not immediately clear to us why the
-> counter needs to be reset at all.  If we remove the lines that clear
-> the counter then there is no longer an issue with having both the mct
-> and the arch timers on at the same time.
->
-> Alternately, if there is some code that depends on the mct being reset
-> we could store an offset instead of clearing the counter and then
-> subtract that offset every time something reads it.  Doug has a patch
-> that does this at
-> https://chromium-review.googlesource.com/#/c/200298/.  Effectively the
-> visible behavior will not change.  Would either of these options work?
->
-Hi all,
 
-Even though I've heard something about the behavior of mct and arch 
-timer...but I couldn't finish the talk to h/w guys yet. I need to talk 
-again in next week then I could provide some useful information. Sorry 
-for late and can you please wait a minute before deciding whatever.
 
-Thanks,
-Kukjin
+On 14.05.2014 03:11, Thomas Abraham wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
+> 
+> Remove the platform device instantiation for Exynos specific cpufreq
+> driver and add the platform device for cpufreq-cpu0 driver.
+> 
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> ---
+>  arch/arm/mach-exynos/exynos.c |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> index b32a907..489a495 100644
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -232,7 +232,9 @@ void __init exynos_cpuidle_init(void)
+>  
+>  void __init exynos_cpufreq_init(void)
+>  {
+> -	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
+> +	if (!(of_machine_is_compatible("samsung,exynos5420")) &&
+> +		!(of_machine_is_compatible("samsung,exynos5440")))
+> +		platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
+>  }
+>  
+>  void __init exynos_init_late(void)
+> 
+
+As a good intermediate step that can be completely replaced in future,
+if necessary (as opposed to stable DT bindings...):
+
+Acked-by: Tomasz Figa <t.figa@samsung.com>
+
+Best regards,
+Tomasz
