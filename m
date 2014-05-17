@@ -1,109 +1,25 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 17 May 2014 02:14:17 +0200
-Subject: [PATCH v4 0/8] cpufreq: use cpufreq-cpu0 driver for exynos based
- platforms
-In-Reply-To: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
-References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <5376A9D9.3070702@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Sat, 17 May 2014 09:24:03 +0900
+Subject: [PATCH 0/5] remove Genmai Reference from Legacy support
+In-Reply-To: <CAMuHMdVoCgKF6FjGGHk3bb4Yr9k4frtfMkM85cNhJd8gaPJkxg@mail.gmail.com>
+References: <1400242216-20848-1-git-send-email-wsa@the-dreams.de>
+ <CAMuHMdVoCgKF6FjGGHk3bb4Yr9k4frtfMkM85cNhJd8gaPJkxg@mail.gmail.com>
+Message-ID: <20140517002402.GC10078@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Fri, May 16, 2014 at 02:22:20PM +0200, Geert Uytterhoeven wrote:
+> Hi Wolfram,
+> 
+> On Fri, May 16, 2014 at 2:10 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> >   ARM: shmobile: Remove non-multiplatform Genmai reference support
+> >   ARM: shmobile: genmai-reference: Remove legacy clock support
+> >   ARM: shmobile: Sync Genmai DTS with Genmai reference DTS
+> >   ARM: shmobile: Let Genmai multiplatform boot with Genmai DTB
+> >   ARM: shmobile: Remove Genmai reference DTS
+> 
+> Thanks a lot!
+> 
+> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-In general the design already looks good, but I commented on several
-implementation issues I found in particular patches (and some minor
-nitpicks while at it).
-
-Please let me know whether you have time to work on addressing them.
-Otherwise we can just let me, Lukasz or someone else address remaining
-issues.
-
-Best regards,
-Tomasz
-
-On 14.05.2014 03:11, Thomas Abraham wrote:
-> Changes since v3:
-> - Addressed comments from Tomasz Figa <t.figa@samsung.com>
->   [http://www.spinics.net/lists/cpufreq/msg09290.html]
-> - Rebased to v3.15-rc4
-> 
-> Changes since v2:
-> - Safe operating voltage is not required while switching APLL frequency
->   since the temporary parent's clock is divided down to keep armclk within
->   permissible limits. Thanks to Heiko St?bner <heiko@sntech.de> for this
->   suggesting this.
-> - Rob had suggested to use max frequency for each of the divider clock
->   outputs instead of divider values. But due to certain SoC specific
->   characteristics, the divider values corresponding to the input clock
->   frequency for the CMU_CPU clock blocks have to be used.
-> 
-> Changes since v1:
-> - Removes Exynos4x12 and Exynos5250 cpufreq driver also.
-> - Device tree based clock configuration lookup as suggested by Lukasz
->   Majewski and Tomasz Figa.
-> - safe operating point binding reworked as suggested by Shawn Guo.
-> 
-> The patch series removes the use of Exynos specific cpufreq driver and enables
-> the use of cpufreq-cpu0 driver for Exynos4210, Exynos4x12 and Exynos5250 based
-> platforms. This is being done for few reasons.
-> 
-> (a) The Exynos cpufreq driver reads/writes clock controller registers
->     bypassing the Exynos CCF driver which is sort of problematic.
-> (b) Removes the need for having clock controller register definitions
->     in the cpufreq driver and also removes the need for statically
->     io-remapping clock controller address space (helps in moving towards
->     multiplatform kernel).
-> 
-> Thomas Abraham (8):
->   cpufreq: cpufreq-cpu0: allow use of optional boost mode frequencies
->   clk: samsung: change scope of samsung clock lock to global
->   clk: samsung: add infrastructure to register cpu clocks
->   Documentation: devicetree: add cpu clock configuration data binding for Exynos4/5
->   clk: exynos: use cpu-clock provider type to represent arm clock
->   ARM: dts: Exynos: add cpu nodes, opp and cpu clock configuration data
->   ARM: Exynos: switch to using generic cpufreq-cpu0 driver
->   cpufreq: exynos: remove all exynos specific cpufreq driver support
-> 
-> 
->  .../devicetree/bindings/clock/exynos4-clock.txt    |   37 ++
->  .../devicetree/bindings/clock/exynos5250-clock.txt |   36 ++
->  .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |    2 +
->  arch/arm/boot/dts/exynos4210-origen.dts            |    6 +
->  arch/arm/boot/dts/exynos4210-trats.dts             |    6 +
->  arch/arm/boot/dts/exynos4210-universal_c210.dts    |    6 +
->  arch/arm/boot/dts/exynos4210.dtsi                  |   35 ++
->  arch/arm/boot/dts/exynos4212.dtsi                  |   18 +
->  arch/arm/boot/dts/exynos4412-odroidx.dts           |    6 +
->  arch/arm/boot/dts/exynos4412-origen.dts            |    6 +
->  arch/arm/boot/dts/exynos4412-trats2.dts            |    6 +
->  arch/arm/boot/dts/exynos4412.dtsi                  |   31 ++
->  arch/arm/boot/dts/exynos4x12.dtsi                  |   36 ++
->  arch/arm/boot/dts/exynos5250-arndale.dts           |    6 +
->  arch/arm/boot/dts/exynos5250-cros-common.dtsi      |    6 +
->  arch/arm/boot/dts/exynos5250-smdk5250.dts          |    6 +
->  arch/arm/boot/dts/exynos5250.dtsi                  |   41 ++
->  arch/arm/mach-exynos/exynos.c                      |    4 +-
->  drivers/clk/samsung/Makefile                       |    2 +-
->  drivers/clk/samsung/clk-cpu.c                      |  458 ++++++++++++++++++++
->  drivers/clk/samsung/clk-exynos4.c                  |   25 +-
->  drivers/clk/samsung/clk-exynos5250.c               |   12 +-
->  drivers/clk/samsung/clk.c                          |   13 +-
->  drivers/clk/samsung/clk.h                          |    7 +
->  drivers/cpufreq/Kconfig                            |   11 +
->  drivers/cpufreq/Kconfig.arm                        |   52 ---
->  drivers/cpufreq/Makefile                           |    4 -
->  drivers/cpufreq/cpufreq-cpu0.c                     |    5 +
->  drivers/cpufreq/exynos-cpufreq.c                   |  209 ---------
->  drivers/cpufreq/exynos-cpufreq.h                   |   91 ----
->  drivers/cpufreq/exynos4210-cpufreq.c               |  157 -------
->  drivers/cpufreq/exynos4x12-cpufreq.c               |  211 ---------
->  drivers/cpufreq/exynos5250-cpufreq.c               |  183 --------
->  include/dt-bindings/clock/exynos5250.h             |    1 +
->  34 files changed, 799 insertions(+), 936 deletions(-)
->  create mode 100644 drivers/clk/samsung/clk-cpu.c
->  delete mode 100644 drivers/cpufreq/exynos-cpufreq.c
->  delete mode 100644 drivers/cpufreq/exynos-cpufreq.h
->  delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
->  delete mode 100644 drivers/cpufreq/exynos4x12-cpufreq.c
->  delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
-> 
+Thanks, I will queue these up.
