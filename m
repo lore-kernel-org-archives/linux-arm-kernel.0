@@ -1,33 +1,162 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 17 May 2014 06:22:16 +0200
-Subject: [GIT PULL] at91: cleanup for 3.16 #1
-In-Reply-To: <20140516232635.GB6423@quad.lixom.net>
-References: <1399484042-27432-1-git-send-email-nicolas.ferre@atmel.com>
- <536A6FD7.40402@atmel.com> <20140516232635.GB6423@quad.lixom.net>
-Message-ID: <20140517042216.GI29318@piout.net>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Sat, 17 May 2014 17:04:55 +0900
+Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
+References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20140517170455.08e181f16d3abf36d1ec6274@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/05/2014 at 16:26:35 -0700, Olof Johansson wrote :
-> On Wed, May 07, 2014 at 07:39:35PM +0200, Nicolas Ferre wrote:
-> > There is a little conflict with at91-3.16-dt that you already pulled in
-> > arm-soc: here is the branch that resolves it:
-> > 
-> > https://github.com/at91linux/linux-at91/commits/at91-3.16-resolved
+On Fri, 16 May 2014 14:23:18 +0200, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
 > 
-> That resolution looks odd. Why is one clock under clocks { } and two of them
-> are at the top level? Shouldn't they all be under the clocks subnode?
+> This commit introduces a generic device tree binding for IOMMU devices.
+> Only a very minimal subset is described here, but it is enough to cover
+> the requirements of both the Exynos System MMU and Tegra SMMU as
+> discussed here:
 > 
-> I've merged in now with your resolution, but I think this needs revisiting.
+>     https://lkml.org/lkml/2014/4/27/346
 > 
+> More advanced functionality such as the dma-ranges property can easily
+> be added in a backwards-compatible way. In the absence of a dma-ranges
+> property it should be safe to default to the whole address space.
+> 
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+>  Documentation/devicetree/bindings/iommu/iommu.txt | 109 ++++++++++++++++++++++
+>  1 file changed, 109 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iommu/iommu.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/iommu/iommu.txt b/Documentation/devicetree/bindings/iommu/iommu.txt
+> new file mode 100644
+> index 000000000000..2d67b52b656e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iommu/iommu.txt
+> @@ -0,0 +1,109 @@
+> +This document describes the generic device tree binding for IOMMUs and their
+> +master(s).
+> +
+> +
+> +IOMMU device node:
+> +==================
+> +
+> +An IOMMU can provide the following services:
+> +
+> +* Remap address space to allow devices to access physical memory ranges that
+> +  they otherwise wouldn't be capable of accessing.
+> +
+> +  Example: 32-bit DMA to 64-bit physical addresses
+> +
+> +* Implement scatter-gather at page level granularity so that the device does
+> +  not have to.
+> +
+> +* Provide system protection against "rogue" DMA by forcing all accesses to go
+> +  through the IOMMU and faulting when encountering accesses to unmapped
+> +  address regions.
+> +
+> +* Provide address space isolation between multiple contexts.
+> +
+> +  Example: Virtualization
+> +
+> +Device nodes compatible with this binding represent hardware with some of the
+> +above capabilities.
+> +
+> +IOMMUs can be single-master or multiple-master. Single-master IOMMU devices
+> +typically have a fixed association to the master device, whereas multiple-
+> +master IOMMU devices can translate accesses from more than one master.
+> +
+> +Required properties:
+> +--------------------
+> +- #iommu-cells: The number of cells in an IOMMU specifier. The meaning of the
+> +  cells is defined by the binding for the IOMMU device.
+> +
+> +  Typical values include:
+> +  * 0: Single-master IOMMU devices are often not configurable, therefore the
+> +    specifying doesn't need to encode any information and can be empty.
+> +
+> +  * 1: Multiple-master IOMMU devices need to know for which master they should
+> +    enable translation. Typically the single cell in the specifier corresponds
+> +    to the master device's ID.
+> +
+> +
+> +IOMMU master node:
+> +==================
+> +
+> +Devices that access memory through an IOMMU are called masters. A device can
+> +have multiple master interfaces (to one or more IOMMU devices).
+> +
+> +Required properties:
+> +--------------------
+> +- iommus: A list of phandle and IOMMU specifier pairs that describe the IOMMU
+> +  master interfaces of the device. One entry in the list describes one master
+> +  interface of the device.
+> +
+> +Optional properties:
+> +--------------------
+> +- iommu-names: A list of names identifying each entry in the iommus property.
+> +
+> +
+> +Examples:
+> +=========
+> +
+> +Single-master IOMMU:
+> +--------------------
+> +
+> +	iommu {
+> +		#iommu-cells = <0>;
+> +	};
+> +
+> +	master {
+> +		iommu = <&/iommu>;
+> +	};
+> +
 
-Actually, all the clocks should end up at the root, please refer to:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/240219.html
+Great work, Thierry.
 
-I feel that was one of the topics we should have discussed at ELC but we
-ended up talking about DT ABI stability instead...
+One simple comment.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+This should be also applicable to multi-master IOMMUs that the masters
+of an IOMMU is not configurable with ID or something.
+I think the title needs to be changed to cover such IOMMUs which always
+translate master's transactions and unable to change the configuration
+of the relationship between the masters and IOMMUs by S/W.
+
+Regards,
+
+KyongHo
+
+> +Multi-master IOMMU:
+> +-------------------
+> +
+> +	iommu {
+> +		/* the specifier represents the ID of the master */
+> +		#iommu-cells = <1>;
+> +	};
+> +
+> +	master {
+> +		/* device has master ID 42 in the IOMMU */
+> +		iommu = <&/iommu 42>;
+> +	};
+> +
+> +Multi-master device:
+> +--------------------
+> +
+> +	/* single-master IOMMU */
+> +	iommu at 1 {
+> +		#iommu-cells = <0>;
+> +	};
+> +
+> +	/* multi-master IOMMU */
+> +	iommu at 2 {
+> +		/* the specifier represents the ID of the master */
+> +		#iommu-cells = <1>;
+> +	};
+> +
+> +	/* device with two master interfaces */
+> +	master {
+> +		iommus = <&/iommu@1>,    /* master of the single-master IOMMU */
+> +			 <&/iommu@2 42>; /* ID 42 in multi-master IOMMU */
+> +	};
+> -- 
+> 1.9.2
+> 
