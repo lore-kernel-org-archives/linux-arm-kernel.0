@@ -1,40 +1,31 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 17 May 2014 18:41:14 +0200
-Subject: [PATCH] ARM: sunxi: dt: build DTs according to new MACH_SUNxI
- Kconfig symbols
-In-Reply-To: <1400332280-5398-1-git-send-email-wens@csie.org>
-References: <1400332280-5398-1-git-send-email-wens@csie.org>
-Message-ID: <20140517164114.GL29258@lukather>
+From: dgreid@chromium.org (Dylan Reid)
+Date: Sat, 17 May 2014 11:21:20 -0700
+Subject: [PATCH 1/2] ARM: tegra: Mark Tegra124 HDMI compatible with Tegra114
+Message-ID: <1400350881-22008-1-git-send-email-dgreid@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 17, 2014 at 09:11:20PM +0800, Chen-Yu Tsai wrote:
-> Allwinner sunxi support has been split into the various SoCs in Kconfig.
-> Adapt the new symbols for the device trees.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> 
-> Hi,
-> 
-> This patch lets us build the DTBs according to the SoCs we selected in
-> kernel config. This matches the build behavior of the kernel itself
-> after splitting up sunxi support to various SoCs in Kconfig.
-> 
-> Maxime, could you take this?
+The HDMI driver that handles Tegra114 can handle Tegra124 as well,
+mark Tegra124 as compatible.  This makes HDMI output work on Venice2.
 
-Applied, thanks.
+Signed-off-by: Dylan Reid <dgreid@chromium.org>
+---
+ arch/arm/boot/dts/tegra124.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Maxime
-
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index 197e848..fbaf985 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -52,7 +52,8 @@
+ 		};
+ 
+ 		hdmi at 0,54280000 {
+-			compatible = "nvidia,tegra124-hdmi";
++			compatible = "nvidia,tegra124-hdmi",
++				     "nvidia,tegra114-hdmi";
+ 			reg = <0x0 0x54280000 0x0 0x00040000>;
+ 			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&tegra_car TEGRA124_CLK_HDMI>,
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140517/fdcc119e/attachment-0001.sig>
+1.8.1.3.605.g02339dd
