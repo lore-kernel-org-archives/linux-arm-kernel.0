@@ -1,90 +1,73 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 17 May 2014 03:23:42 +0200
-Subject: [PATCH v4 0/3] Generic Device Tree based power domain look-up
-In-Reply-To: <1399553355-6615-1-git-send-email-t.figa@samsung.com>
-References: <1399553355-6615-1-git-send-email-t.figa@samsung.com>
-Message-ID: <5376BA1E.8050309@gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Sat, 17 May 2014 10:24:53 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC r7s72100-ccf Updates
+ for v3.16
+Message-ID: <cover.1400289483.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Olof, Hi Kevin, Hi Arnd,
 
-On 08.05.2014 14:49, Tomasz Figa wrote:
-> Up till now there was no single generic method to bind devices to their
-> power domains using Device Tree. Each platform has been doing this using
-> its own way, example of which are Exynos power domain bindings [1] and
-> look-up code [2].
-> 
-> This series is intended to change this and provide generic DT bindings for
-> power domain specification and generic code performing look-up of power
-> domains and binding them to devices.
-> 
-> First two patches are the most important part of this series, as they
-> introduce $subject. Patch 3 converts mach-exynos to use the new generic
-> method. Further patches are adding one more user of the new code,
-> mach-s3c64xx, with first 3 patches (4-6) required to clean-up its power
-> domain driver a bit and last 3 patches (9-11) adding display support for
-> Mini6410 board, including a node for display controller (FIMD) which is
-> a power domain consumer.
-> 
-> The design of DT bindings and provider code is heavily inspired by
-> implementation of clock providers in Common Clock Framework, while
-> the code binding devices to power domains by my Exynos power domain
-> implementation (now removed by this series ;)).
-> 
-> Successfully tested on Exynos4210-based Trats and Exynos4412-based Trats2
-> boards using MFC, 
-> 
-> [1] Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> [2] arch/arm/mach-exynos/pm_domains.c
-> 
-> Changes since v3:
-> (http://thread.gmane.org/gmane.linux.power-management.general/44571)
->  - rebased onto current Rafael's linux-pm bleeding-edge branch (0a112bf),
->  - renamed "power-domain" property to "power-domains" to facilitate further
->    extension to support multiple power domains per device in future.
-> 
-> Changes since v2:
-> (http://thread.gmane.org/gmane.linux.kernel/1658926)
->  - rebased onto current Rafael's linux-pm bleeding-edge branch,
->  - dropped patches for s3c64xx for now. I will send them in separate series,
->  - do not call pm_genpd_dev_need_restore(true) in genpd_bind_domain(),
->  - fixed various stylistic issues reported in review comments.
-> 
-> Changes since v1 (RFC):
-> [https://lkml.org/lkml/2014/1/11/141]
->  - rebased onto current Rafael's linux-pm bleeding-edge branch,
->  - reordered the patches a bit (to have the generic ones first),
->  - dropped renaming of S3C64xx power domains (as suggested by Mark Brown),
->  - added support for deferred probing (as suggested by Stephen Boyd),
->  - fixed several minor issues pointed by Stephen Boyd,
->  - replaced notifiers with direct hooks in driver core to make power domain
->    support independent from specific bus type and allow error handling.
-> 
-> Tomasz Figa (3):
->   base: power: Add generic OF-based power domain look-up
->   drivercore: Bind/unbind power domain on probe/remove
->   ARM: exynos: Move to generic power domain bindings
-> 
->  .../bindings/arm/exynos/power_domain.txt           |  12 +-
->  .../devicetree/bindings/power/power_domain.txt     |  51 ++++
->  arch/arm/mach-exynos/pm_domains.c                  |  81 +-----
->  drivers/base/dd.c                                  |   9 +-
->  drivers/base/power/domain.c                        | 283 +++++++++++++++++++++
->  include/linux/pm_domain.h                          |  46 ++++
->  kernel/power/Kconfig                               |   4 +
->  7 files changed, 398 insertions(+), 88 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/power/power_domain.txt
-> 
+Please consider these Second Round of
+Renesas ARM Based SoC r7s72100 CCF Updates for v3.16.
 
-Rob, Mark, could we have your ACK (or NAK if you find some issues) for
-DT bindings introduced by this series?
+This pull request is based on the previous round of
+such requests, tagged as renesas-r7s72100-ccf-for-v3.16,
+which I have already sent a pull-request for.
 
-Rafael, I wonder if we could still have this series applied for 3.16. I
-know it is a bit late already, but the series isn't too invasive, as it
-mostly generalizes what was being done on per-platform basis and makes
-the code generic. Also I have already seen at least two other series
-depending on this one, so they would benefit from this being merged.
+This comprehensively addresses an oversight in patches included in
+the pull request that it depends on, specifically leaving broken
+non-multiplatform support in place for genmai-reference.
 
-Best regards,
-Tomasz
+This pull request has some minor conflicts with other DT changes which I
+have previously sent pull requests for. These conflicts are in
+arch/arm/boot/dts/Makefile. A resolution can be found in the
+renesas-next-v3.15-rc1-20140517 tag if my renesas tree. In words:
+
+    CONFIG_ARCH_SHMOBILE_LEGACY hunk:
+    * Remove emev2-kzm9d.dtb
+    * Remove r7s72100-genmai-reference.dtb
+    * Keep r7s72100-genmai.dtb
+
+    CONFIG_ARCH_SHMOBILE_MULTI hunk:
+    * Remove r7s72100-genmai-reference.dtb
+    * Keep r7s72100-genmai.dtb
+    * Keep r8a7791-henninger.dtb
+
+
+
+The following changes since commit 9fbb1ae01b878e2cce9626fa6fdc9e5dcefeb6b5:
+
+  ARM: shmobile: r7s72100: use workaround for non DT-clocks (2014-05-14 11:42:55 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-r7s72100-ccf2-for-v3.16
+
+for you to fetch changes up to a5176e0d9de31a54e08468f21c15dc08e006857f:
+
+  ARM: shmobile: Remove Genmai reference DTS (2014-05-17 09:06:29 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC r7s72100 CCF Updates for v3.16
+
+r7s72100 (RZ/A1H) SoC based Genmai board
+* Remove non-multiplatform support from genmai-reference
+
+----------------------------------------------------------------
+Wolfram Sang (5):
+      ARM: shmobile: Remove non-multiplatform Genmai reference support
+      ARM: shmobile: genmai-reference: Remove legacy clock support
+      ARM: shmobile: Sync Genmai DTS with Genmai reference DTS
+      ARM: shmobile: Let Genmai multiplatform boot with Genmai DTB
+      ARM: shmobile: Remove Genmai reference DTS
+
+ arch/arm/boot/dts/Makefile                      |  3 +-
+ arch/arm/boot/dts/r7s72100-genmai-reference.dts | 59 -------------------------
+ arch/arm/boot/dts/r7s72100-genmai.dts           | 30 ++++++++++++-
+ arch/arm/mach-shmobile/Kconfig                  | 11 -----
+ arch/arm/mach-shmobile/Makefile                 |  1 -
+ arch/arm/mach-shmobile/Makefile.boot            |  1 -
+ arch/arm/mach-shmobile/board-genmai-reference.c |  8 +---
+ 7 files changed, 31 insertions(+), 82 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/r7s72100-genmai-reference.dts
