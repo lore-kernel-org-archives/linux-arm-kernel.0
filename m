@@ -1,59 +1,53 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 17 May 2014 10:28:28 +0900
-Subject: [PATCH 0/5] remove Genmai Reference from Legacy support
-In-Reply-To: <1400242216-20848-1-git-send-email-wsa@the-dreams.de>
-References: <1400242216-20848-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <20140517012828.GA25731@verge.net.au>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 16 May 2014 18:33:04 -0700
+Subject: [PATCH] clk: qcom: Fix msm8660 GCC probe
+In-Reply-To: <1400259914-28121-1-git-send-email-sboyd@codeaurora.org>
+References: <1400259914-28121-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140517013304.9521.38400@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 02:10:11PM +0200, Wolfram Sang wrote:
-> Here is the series to remove Genmai Reference from Legacy support since we now
-> have CCF in multiplatform. Removal is done very similar to Marzen and the
-> commit messages are largely from that series. Thanks a lot!
+Quoting Stephen Boyd (2014-05-16 10:05:14)
+> When consolidating the msm8660 GCC probe code I forgot to keep
+> around these temporary clock registrations. Put them back so the
+> clock tree is not entirely orphaned.
 > 
-> Technically, only the first patch fixes the unbootable Genmai-Reference-with-
-> Legacy-constellation. The other patches clean up the leftovers. Simon, I think
-> you know best when to push which patches?
+> Fixes: 49fc825f0cc2 (clk: qcom: Consolidate common probe code)
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Thanks. I appreciate the way you have arranged the series.
+Taken into clk-next.
 
-I have decided to take all of the patches and expedited a pull-request
-(without the usual cooling off period in next, so if it blows up we will
-have some egg on our faces :^).
+Regards,
+Mike
 
+> ---
+>  drivers/clk/qcom/gcc-msm8660.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 > 
-> The series has been tested with/without multiplatform on a genmai board. The
-> branch is based on my r7s-ccf branch and can also be found here:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git renesas/r7s-ccf-with-fixup
-> 
-> Thanks,
-> 
->    Wolfram
-> 
-> Wolfram Sang (5):
->   ARM: shmobile: Remove non-multiplatform Genmai reference support
->   ARM: shmobile: genmai-reference: Remove legacy clock support
->   ARM: shmobile: Sync Genmai DTS with Genmai reference DTS
->   ARM: shmobile: Let Genmai multiplatform boot with Genmai DTB
->   ARM: shmobile: Remove Genmai reference DTS
-> 
->  arch/arm/boot/dts/Makefile                      |  3 +-
->  arch/arm/boot/dts/r7s72100-genmai-reference.dts | 59 -------------------------
->  arch/arm/boot/dts/r7s72100-genmai.dts           | 30 ++++++++++++-
->  arch/arm/mach-shmobile/Kconfig                  | 11 -----
->  arch/arm/mach-shmobile/Makefile                 |  1 -
->  arch/arm/mach-shmobile/Makefile.boot            |  1 -
->  arch/arm/mach-shmobile/board-genmai-reference.c |  8 +---
->  7 files changed, 31 insertions(+), 82 deletions(-)
->  delete mode 100644 arch/arm/boot/dts/r7s72100-genmai-reference.dts
-> 
+> diff --git a/drivers/clk/qcom/gcc-msm8660.c b/drivers/clk/qcom/gcc-msm8660.c
+> index 44bc6fa64d78..0c4b727ae429 100644
+> --- a/drivers/clk/qcom/gcc-msm8660.c
+> +++ b/drivers/clk/qcom/gcc-msm8660.c
+> @@ -2718,6 +2718,18 @@ MODULE_DEVICE_TABLE(of, gcc_msm8660_match_table);
+>  
+>  static int gcc_msm8660_probe(struct platform_device *pdev)
+>  {
+> +       struct clk *clk;
+> +       struct device *dev = &pdev->dev;
+> +
+> +       /* Temporary until RPM clocks supported */
+> +       clk = clk_register_fixed_rate(dev, "cxo", NULL, CLK_IS_ROOT, 19200000);
+> +       if (IS_ERR(clk))
+> +               return PTR_ERR(clk);
+> +
+> +       clk = clk_register_fixed_rate(dev, "pxo", NULL, CLK_IS_ROOT, 27000000);
+> +       if (IS_ERR(clk))
+> +               return PTR_ERR(clk);
+> +
+>         return qcom_cc_probe(pdev, &gcc_msm8660_desc);
+>  }
+>  
 > -- 
-> 1.9.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
 > 
