@@ -1,68 +1,34 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Sat, 17 May 2014 22:48:06 +0200
-Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140517170455.08e181f16d3abf36d1ec6274@samsung.com>
-References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
- <20140517170455.08e181f16d3abf36d1ec6274@samsung.com>
-Message-ID: <20140517204805.GA1046@mithrandir>
+Date: Sat, 17 May 2014 23:33:00 +0200
+Subject: [PATCH 1/2] ARM: tegra: Mark Tegra124 HDMI compatible with
+ Tegra114
+In-Reply-To: <1400350881-22008-1-git-send-email-dgreid@chromium.org>
+References: <1400350881-22008-1-git-send-email-dgreid@chromium.org>
+Message-ID: <20140517213258.GE1046@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 17, 2014 at 05:04:55PM +0900, Cho KyongHo wrote:
-> On Fri, 16 May 2014 14:23:18 +0200, Thierry Reding wrote:
-[...]
-> > +Examples:
-> > +=========
-> > +
-> > +Single-master IOMMU:
-> > +--------------------
-> > +
-> > +	iommu {
-> > +		#iommu-cells = <0>;
-> > +	};
-> > +
-> > +	master {
-> > +		iommu = <&/iommu>;
-> > +	};
-> > +
+On Sat, May 17, 2014 at 11:21:20AM -0700, Dylan Reid wrote:
+> The HDMI driver that handles Tegra114 can handle Tegra124 as well,
+> mark Tegra124 as compatible.  This makes HDMI output work on Venice2.
 > 
-> Great work, Thierry.
-> 
-> One simple comment.
-> 
-> This should be also applicable to multi-master IOMMUs that the masters
-> of an IOMMU is not configurable with ID or something.
-> I think the title needs to be changed to cover such IOMMUs which always
-> translate master's transactions and unable to change the configuration
-> of the relationship between the masters and IOMMUs by S/W.
+> Signed-off-by: Dylan Reid <dgreid@chromium.org>
+> ---
+>  arch/arm/boot/dts/tegra124.dtsi | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 
-Agreed, how about we add a separate example for that case:
+These patches don't seem to be based on linux-next. There are a couple
+of patches in linux-next (queued for 3.16) that should fix these, in
+particular:
 
-Multiple-master IOMMU with fixed associations:
-----------------------------------------------
+	4b9701e02b3b drm/tegra: hdmi - Add Tegra124 support
+	0d6696438d2c drm/tegra: hdmi - Add connector supply support
 
-	/* multiple-master IOMMU */
-	iommu {
-		/*
-		 * Masters are statically associated with this IOMMU and
-		 * address translation is always enabled.
-		 */
-		#iommu-cells = <0>;
-	};
-
-	/* static association with IOMMU */
-	master at 1 {
-		reg = <1>;
-		iommus = <&/iommu>;
-	};
-
-	/* static association with IOMMU */
-	master at 2 {
-		reg = <2>;
-		iommus = <&/iommu>;
-	};
-
-?
+Could you try a recent linux-next to see if that fixes the issues you
+are seeing? Note that Tegra doesn't boot on linux-next from the last few
+days because of some cgroup regressions, but a fix was merged and should
+be in Monday's linux-next, so unless new regressions are introduced that
+would be a good candidate to test.
 
 Thierry
 -------------- next part --------------
@@ -71,4 +37,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140517/c41fa770/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140517/9f5c0b36/attachment.sig>
