@@ -1,48 +1,37 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 17 May 2014 02:04:27 +0200
-Subject: [PATCH v4 7/8] ARM: Exynos: switch to using generic cpufreq-cpu0
- driver
-In-Reply-To: <1400029876-5830-8-git-send-email-thomas.ab@samsung.com>
-References: <1400029876-5830-1-git-send-email-thomas.ab@samsung.com>
- <1400029876-5830-8-git-send-email-thomas.ab@samsung.com>
-Message-ID: <5376A78B.1080903@gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 17 May 2014 02:16:10 +0200
+Subject: [PATCH v2] ARM: rockchip: convert smp bringup to
+ CPU_METHOD_OF_DECLARE
+In-Reply-To: <20140516225422.GA6028@quad.lixom.net>
+References: <1632873.urGeGsUMPH@diego> <155552153.z5UXrbJMBi@phil>
+ <20140516225422.GA6028@quad.lixom.net>
+Message-ID: <21547723.QIMYqQcA8Y@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Olof,
 
-
-On 14.05.2014 03:11, Thomas Abraham wrote:
-> From: Thomas Abraham <thomas.ab@samsung.com>
+Am Freitag, 16. Mai 2014, 15:54:22 schrieb Olof Johansson:
+> On Mon, May 12, 2014 at 07:17:46PM +0200, Heiko St?bner wrote:
+> > Am Donnerstag, 27. M?rz 2014, 01:06:32 schrieb Heiko St?bner:
+> > > With the newly introduced CPU_METHOD_OF_DECLARE is not necessary anymore
+> > > to reference the relevant smp_ops in the board file, but instead it can
+> > > simply be set by the enable-method property of the cpu nodes.
+> > > 
+> > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > 
+> > more responses to this? [or maybe even an ack :-) ? ]
 > 
-> Remove the platform device instantiation for Exynos specific cpufreq
-> driver and add the platform device for cpufreq-cpu0 driver.
+> Looks reasonable to me:
 > 
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  arch/arm/mach-exynos/exynos.c |    4 +++-
->  1 files changed, 3 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index b32a907..489a495 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -232,7 +232,9 @@ void __init exynos_cpuidle_init(void)
->  
->  void __init exynos_cpufreq_init(void)
->  {
-> -	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
-> +	if (!(of_machine_is_compatible("samsung,exynos5420")) &&
-> +		!(of_machine_is_compatible("samsung,exynos5440")))
-> +		platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
->  }
->  
->  void __init exynos_init_late(void)
-> 
+> Acked-by: Olof Johansson <olof@lixom.net>
 
-As a good intermediate step that can be completely replaced in future,
-if necessary (as opposed to stable DT bindings...):
+or you could simply apply it to arm-soc directly :-)
 
-Acked-by: Tomasz Figa <t.figa@samsung.com>
+Because apart from the pull request I sent two days ago, this patch looks like 
+the last one for 3.16 ... everything else needs to marture a bit longer.
 
-Best regards,
-Tomasz
+Otherwise I'll send a pull-request for this one patch in the next days.
+
+
+Heiko
