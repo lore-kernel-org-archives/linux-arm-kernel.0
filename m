@@ -1,135 +1,132 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 17 May 2014 16:24:19 +0200
-Subject: [RFC PATCH 2/9] dt: deps: dependency based device creation
-In-Reply-To: <20140514140534.897F8C4153D@trevor.secretlab.ca>
-References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>	<1399913280-6915-3-git-send-email-holler@ahsoftware.de>
- <20140514140534.897F8C4153D@trevor.secretlab.ca>
-Message-ID: <53777113.3070909@gmail.com>
+From: emilgoode@gmail.com (Emil Goode)
+Date: Sat, 17 May 2014 17:35:40 +0200
+Subject: [PATCH v2] ARM: imx: fix error handling
+In-Reply-To: <20140516193139.GQ16662@pengutronix.de>
+References: <1400234045-6022-1-git-send-email-emilgoode@gmail.com>
+ <5375EB13.8000200@bfs.de> <20140516111646.GC4366@lianli>
+ <5375FB36.8020004@bfs.de> <20140516193139.GQ16662@pengutronix.de>
+Message-ID: <20140517153540.GA4309@lianli>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Uwe,
 
-On 14.05.2014 16:05, Grant Likely wrote:
-> On Mon, 12 May 2014 18:47:53 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
->> Use the properties named 'dependencies' in binary device tree blobs to build
->> a dependency based initialization order for platform devices and drivers.
->>
->> This is done by building a directed acyclic graph using an adjacency list
->> and doing a topological sort to retrieve the order in which devices/drivers
->> should be created/initialized.
->>
->> Signed-off-by: Alexander Holler <holler@ahsoftware.de>
+On Fri, May 16, 2014 at 09:31:39PM +0200, Uwe Kleine-K?nig wrote:
+> Hello Walter,
 > 
-> Hi Alexander,
+> On Fri, May 16, 2014 at 01:49:10PM +0200, walter harms wrote:
+> > Am 16.05.2014 13:16, schrieb Emil Goode:
+> > > Hello Walter,
+> > > 
+> > > On Fri, May 16, 2014 at 12:40:19PM +0200, walter harms wrote:
+> > >>
+> > >>
+> > >> Am 16.05.2014 11:54, schrieb Emil Goode:
+> > >>> If we fail to allocate struct platform_device pdev we
+> > >>> dereference it after the goto label err.
+> > >>>
+> > >>> I have rearranged the error handling a bit to fix the issue
+> > >>> and also make it more clear.
+> > >>>
+> > >>> Signed-off-by: Emil Goode <emilgoode@gmail.com>
+> > >>> ---
+> > >>> v2: Changed to return -ENOMEM instead of ret where possible and
+> > >>>     updated the subject line.
+> > >>>
+> > >>>  arch/arm/mach-imx/devices/platform-ipu-core.c |   22 +++++++++++++---------
+> > >>>  1 file changed, 13 insertions(+), 9 deletions(-)
+> > >>>
+> > >>> diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
+> > >>> index fc4dd7c..68f2a4a 100644
+> > >>> --- a/arch/arm/mach-imx/devices/platform-ipu-core.c
+> > >>> +++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
+> > >>> @@ -77,34 +77,38 @@ struct platform_device *__init imx_alloc_mx3_camera(
+> > >>>  
+> > >>>  	pdev = platform_device_alloc("mx3-camera", 0);
+> > >>>  	if (!pdev)
+> > >>> -		goto err;
+> > >>> +		return ERR_PTR(-ENOMEM);
+> > >>>  
+> > >>>  	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
+> > >>>  	if (!pdev->dev.dma_mask)
+> > >>> -		goto err;
+> > >>> +		goto put_pdev;
+> > >>>  
+> > >>>  	*pdev->dev.dma_mask = DMA_BIT_MASK(32);
+> > >>>  	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+> > >>>  
+> > >>>  	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
+> > >>>  	if (ret)
+> > >>> -		goto err;
+> > >>> +		goto free_dma_mask;
+> > >>>  
+> > >>>  	if (pdata) {
+> > >>>  		struct mx3_camera_pdata *copied_pdata;
+> > >>>  
+> > >>>  		ret = platform_device_add_data(pdev, pdata, sizeof(*pdata));
+> > >>> -		if (ret) {
+> > >>> -err:
+> > >>> -			kfree(pdev->dev.dma_mask);
+> > >>> -			platform_device_put(pdev);
+> > >>> -			return ERR_PTR(-ENODEV);
+> > >>> -		}
+> > >>> +		if (ret)
+> > >>> +			goto free_dma_mask;
+> > >>> +
+> > >>>  		copied_pdata = dev_get_platdata(&pdev->dev);
+> > >>>  		copied_pdata->dma_dev = &imx_ipu_coredev->dev;
+> > >>
+> > >>
+> > >> the patch is fine, but what use is this copied_pdata ?
+> > >> It scope ends next line ?
+> > >>
+> > >> re,
+> > >>  wh
+> > > 
+> > > I also thought that looked a bit odd, but copied_pdata is a temporary
+> > > pointer to platform_data of the dev struct.
+> > > 
+> > > dev_get_platdata looks like this:
+> > > 
+> > > static inline void *dev_get_platdata(const struct device *dev)
+> > > {
+> > >         return dev->platform_data;
+> > > }
+> > > 
+> > > So I believe it's a more compact way of writing:
+> > > 
+> > > pdev->dev->platform_data->dma_dev = &imx_ipu_coredev->dev;
+> It's not about compactness. The dev_get_platdata accessor exists to be
+> used instead of directly accessing dev->platform_data. I admit a comment
+> would be nice ...
 > 
-> Thanks for looking at this. It is a difficult problem. I've made
-> comments below, but first I've got some general comments...
+> Anyhow this is all ugly, actually you'd want to have the dma_dev member
+> already fixed when calling platform_device_add_data. But you cannot
+> simply do
 > 
-> First, I'm going to be very cautious about this. It is a complicated
-> piece of code making the device initialization process a lot more
-> complicated than it already is. I'm the first one to admit that deferred
-> probe handles the problem in quite a naive manner, but it is simple,
-> correct (when drivers support deferred probe) and easy to audit. This
-> series digs deep into the registration order of *both* devices and
-> drivers which gives me the heebee jeebees.
+> 	pdata->dma_dev = &imx_ipu_coredev->dev;
+> 	ret = platform_device_add_data(pdev, pdata, sizeof(*pdata));
 > 
-> Personally, I think the parts of this patch that manipulate the device registration
-> order is entirely the wrong way to handle it. If anything, I would say
-> continue to register the devices, even if the dependencies are unmet.
-> Instead, I would focus on the driver core (drivers/base) to catch
-> device probe attempts when a known dependency is not met, remember it,
-> and perform the probe after the other driver shows up. That is also
-> going to be a complicated bit of code, but it works for every kind of
-> device, not just platform_devices, and has far less impact on the
-> platform setup code.
+> because *pdata is const.
 
-Grant, I tend to disagree with you on this. While Alexander's solution
-has certain flaws (that I'm going to list further in my reply), I also
-believe that an approach based on device registration order is most
-likely the way to go. As compared to other possible approaches, here is
-the list of advantages I can see (in random order):
+Thank you for the explanation. Regarding the possibility of using
+platform_device_register_full() to simplify this function. It seem to
+be possible, the following inline function is available to help with this.
 
-1) If compared with resource-based approach, when you detect
-dependencies at runtime, based on existing resource specifiers (GPIOs,
-clocks, etc.), you don't need to change anything in the implementation
-whenever a new kind of resources is introduced. Moreover, there is no
-need to make device probing code aware of any resources or dependencies,
-because all you need to do is to register devices in certain order, as
-defined by precompiled dependency lists.
+imx_add_platform_device_dmamask()
 
-2) If implemented properly, it helps solving problem of binding proper
-driver to a device with multiple compatible strings. Current way of
-handling this by Linux is _broken_, because the device will be bound to
-first driver that shows up and contains matching compatible string in
-its match table. Notice that this way the whole idea of having multiple
-compatible strings specified from most specific to most generic is made
-useless. Now you may wonder how both problems relate. Basically in both
-cases you need to wait until drivers for devices are available (e.g.
-registered in system-wide list), either to guarantee that registering a
-device means probing it (in first case) or to look through the list of
-available drivers and select the one that is a best match (in second case).
+Available here:
 
-3) DeviceTree is not the only firmware "interface" supported by Linux
-and so I'd be careful with pushing this into generic driver core that is
-also shared with board files and ACPI and possibly something else I'm
-not aware of. Moreover, I think the existing driver core is already
-quite complex and complicating it even more might not be the best idea,
-unless really the only option.
+arch/arm/mach-imx/devices/devices-common.h
 
-4) This approach is far less complicated than anything mentioned above.
-What's so complicated in creating a graph of devices and registering
-them in certain order?
+But as you mentioned above we need to allocate a new platform_device
+struct before we can assign &imx_ipu_coredev->dev to dma_dev, since
+pdata is const. I guess this assignment could be done after calling
+imx_add_platform_device_dmamask() but I don't think that makes the
+code easier to read.
 
-> 
-> BTW, this has to be able to work at the level of struct device instead
-> of struct platform_device. There are far more kinds of devices than just
-> platform_device, and they all have the same problem.
-
-Agreed.
-
-> Also, may I suggest that the more pieces that you can break this series
-> up into, the greater chance you'll have of getting a smaller subset
-> merged earlier if it can be proven to be useful on its own.
-
-Agreed. It is usually a good idea to separate things that could live on
-their own and be useful.
-
-Now, I'll spare myself from judging the code, as until we get an
-accepted design, I don't think there is any point in discussing about
-implementation details, not even mentioning things like coding style
-(which is important, but not when much of the code might still be
-rewritten completely).
-
-OK, so I mentioned above what I like in this kind of approach. Now let's
-move to what I don't like.
-
-I think the part that alters driver registration and initcalls isn't
-really necessary. With current code, we can see that initcalls
-themselves (not driver code in terms of driver model) are already well
-ordered, as things happening there seems to work, without any need to
-defer anything. Now Alexander's approach relies on
-module_platform_driver() and similar macros to obtain the list of
-platform_drivers in the system, but I think this isn't necessary either.
-
-Now this is just a bit of guessing, as I still haven't been able to
-allocate time to take a deeper look into initcall and driver code, but
-what if we let the initcalls do their work, let's say up to
-late_initcall level and only then register drivers in our precomputed
-order? We seem to be already relying an assumption that on late_initcall
-level the devices should be already probed, as we have various calls
-disabling unused resources, such as regulators and clocks, at this
-level. I can see certain drivers being registered in late_initcalls, but
-this would be after our device registration, so most of dependencies
-should be already there and if not, we still have deferred probing.
-
-With such design in place, we would be able to also solve the other
-problem I mentioned above, the problem of matching devices with most
-appropriate drivers. Since at device registration and probing time,
-(almost) all the drivers would be already available, the matching code
-could select the right one to bind.
-
-Alright, that's my take on this. Looking forward to your comments.
+I think it's best to resend the current patch. (with updated subject line)
 
 Best regards,
-Tomasz
+
+Emil Goode
