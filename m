@@ -1,162 +1,54 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Sat, 17 May 2014 17:04:55 +0900
-Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
-References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20140517170455.08e181f16d3abf36d1ec6274@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 17 May 2014 10:23:37 +0100
+Subject: [PATCH] ARM: remove ARM710 specific assembler code
+In-Reply-To: <20140516125545.GO3693@n2100.arm.linux.org.uk>
+References: <1364507176.1345.45.camel@x61.thuisdomein>
+ <8309592.drxAj71PnZ@wuerfel> <1400059550.31197.12.camel@x220>
+ <4305975.PvMXZQ020k@wuerfel> <1400232598.20342.16.camel@x220>
+ <20140516125545.GO3693@n2100.arm.linux.org.uk>
+Message-ID: <20140517092337.GA67711@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 May 2014 14:23:18 +0200, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
+On Fri, May 16, 2014 at 01:55:46PM +0100, Russell King - ARM Linux wrote:
+> There was a CPU called the ARM710, it was ARMv3 and it had no Thumb support.
 > 
-> This commit introduces a generic device tree binding for IOMMU devices.
-> Only a very minimal subset is described here, but it is enough to cover
-> the requirements of both the Exynos System MMU and Tegra SMMU as
-> discussed here:
+> There is also a CPU called the ARM710T, which is ARMv4 and has Thumb support.
 > 
->     https://lkml.org/lkml/2014/4/27/346
-> 
-> More advanced functionality such as the dma-ranges property can easily
-> be added in a backwards-compatible way. In the absence of a dma-ranges
-> property it should be safe to default to the whole address space.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
->  Documentation/devicetree/bindings/iommu/iommu.txt | 109 ++++++++++++++++++++++
->  1 file changed, 109 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iommu/iommu.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/iommu/iommu.txt b/Documentation/devicetree/bindings/iommu/iommu.txt
-> new file mode 100644
-> index 000000000000..2d67b52b656e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iommu/iommu.txt
-> @@ -0,0 +1,109 @@
-> +This document describes the generic device tree binding for IOMMUs and their
-> +master(s).
-> +
-> +
-> +IOMMU device node:
-> +==================
-> +
-> +An IOMMU can provide the following services:
-> +
-> +* Remap address space to allow devices to access physical memory ranges that
-> +  they otherwise wouldn't be capable of accessing.
-> +
-> +  Example: 32-bit DMA to 64-bit physical addresses
-> +
-> +* Implement scatter-gather at page level granularity so that the device does
-> +  not have to.
-> +
-> +* Provide system protection against "rogue" DMA by forcing all accesses to go
-> +  through the IOMMU and faulting when encountering accesses to unmapped
-> +  address regions.
-> +
-> +* Provide address space isolation between multiple contexts.
-> +
-> +  Example: Virtualization
-> +
-> +Device nodes compatible with this binding represent hardware with some of the
-> +above capabilities.
-> +
-> +IOMMUs can be single-master or multiple-master. Single-master IOMMU devices
-> +typically have a fixed association to the master device, whereas multiple-
-> +master IOMMU devices can translate accesses from more than one master.
-> +
-> +Required properties:
-> +--------------------
-> +- #iommu-cells: The number of cells in an IOMMU specifier. The meaning of the
-> +  cells is defined by the binding for the IOMMU device.
-> +
-> +  Typical values include:
-> +  * 0: Single-master IOMMU devices are often not configurable, therefore the
-> +    specifying doesn't need to encode any information and can be empty.
-> +
-> +  * 1: Multiple-master IOMMU devices need to know for which master they should
-> +    enable translation. Typically the single cell in the specifier corresponds
-> +    to the master device's ID.
-> +
-> +
-> +IOMMU master node:
-> +==================
-> +
-> +Devices that access memory through an IOMMU are called masters. A device can
-> +have multiple master interfaces (to one or more IOMMU devices).
-> +
-> +Required properties:
-> +--------------------
-> +- iommus: A list of phandle and IOMMU specifier pairs that describe the IOMMU
-> +  master interfaces of the device. One entry in the list describes one master
-> +  interface of the device.
-> +
-> +Optional properties:
-> +--------------------
-> +- iommu-names: A list of names identifying each entry in the iommus property.
-> +
-> +
-> +Examples:
-> +=========
-> +
-> +Single-master IOMMU:
-> +--------------------
-> +
-> +	iommu {
-> +		#iommu-cells = <0>;
-> +	};
-> +
-> +	master {
-> +		iommu = <&/iommu>;
-> +	};
-> +
+> These are two completely different CPUs, the former was removed along with
+> the removal of ARMv3 support.  The latter remains because we still support
+> ARMv4.
 
-Great work, Thierry.
+BTW, while clearly this patch was removing code for the wrong reasons, I
+think we should set a longer term timeline for getting rid of some of
+old features. Let's say in 10 years time we remove everything ARMv4,
+another 10 years ARMv5 and so on. We could make these milestones shorter
+but it really depends on what people use, we should not force them out
+of the kernel if still in use.
 
-One simple comment.
+We can start with ARM core and SoC code that we suspect people haven't
+used in a while (or at least not with mainline). We should not remove
+them straight away but give some advanced warning. My proposal is to add
+a CONFIG_DEPRECATED option and update it with a 2 year cadence. Code
+that we want to remove will depend on DEPRECATED and explicitly not
+covered by defconfig. This way we can get interested parties sending
+patches to remove the DEPRECATED dependency. Something like this:
 
-This should be also applicable to multi-master IOMMUs that the masters
-of an IOMMU is not configurable with ID or something.
-I think the title needs to be changed to cover such IOMMUs which always
-translate master's transactions and unable to change the configuration
-of the relationship between the masters and IOMMUs by S/W.
+config DEPRECATED
+	bool "Enable deprecated kernel features"
+	help
+	  Kernel features no longer in use are marked as DEPRECATED for
+	  two years and removed at the end of this period. This option
+	  should only be enabled explicitly and must not be included in
+	  defconfig files. If you think a DEPRECATED kernel feature is
+	  still needed, please contact the corresponding maintainers to
+	  remove the DEPRECATED dependency.
 
-Regards,
+	  The next scheduled DEPRECATED code removal is planned for 2016.
 
-KyongHo
+It would be even better if we make such option across the whole kernel,
+especially since we have significant ARM SoC code into drivers.
+Otherwise calling it ARM_DEPRECATED would work as well.
 
-> +Multi-master IOMMU:
-> +-------------------
-> +
-> +	iommu {
-> +		/* the specifier represents the ID of the master */
-> +		#iommu-cells = <1>;
-> +	};
-> +
-> +	master {
-> +		/* device has master ID 42 in the IOMMU */
-> +		iommu = <&/iommu 42>;
-> +	};
-> +
-> +Multi-master device:
-> +--------------------
-> +
-> +	/* single-master IOMMU */
-> +	iommu at 1 {
-> +		#iommu-cells = <0>;
-> +	};
-> +
-> +	/* multi-master IOMMU */
-> +	iommu at 2 {
-> +		/* the specifier represents the ID of the master */
-> +		#iommu-cells = <1>;
-> +	};
-> +
-> +	/* device with two master interfaces */
-> +	master {
-> +		iommus = <&/iommu@1>,    /* master of the single-master IOMMU */
-> +			 <&/iommu@2 42>; /* ID 42 in multi-master IOMMU */
-> +	};
-> -- 
-> 1.9.2
-> 
+-- 
+Catalin
