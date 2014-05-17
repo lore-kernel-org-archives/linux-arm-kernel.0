@@ -1,71 +1,74 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 17 May 2014 21:18:21 +0200
-Subject: [PATCH v3] ARM: imx: fix error handling in ipu device registration
-In-Reply-To: <1400352033-18262-1-git-send-email-emilgoode@gmail.com>
-References: <1400352033-18262-1-git-send-email-emilgoode@gmail.com>
-Message-ID: <20140517191821.GD16662@pengutronix.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Sat, 17 May 2014 22:48:06 +0200
+Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140517170455.08e181f16d3abf36d1ec6274@samsung.com>
+References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
+ <20140517170455.08e181f16d3abf36d1ec6274@samsung.com>
+Message-ID: <20140517204805.GA1046@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Emil,
-
-On Sat, May 17, 2014 at 08:40:33PM +0200, Emil Goode wrote:
-> If we fail to allocate struct platform_device pdev we
-> dereference it after the goto label err.
+On Sat, May 17, 2014 at 05:04:55PM +0900, Cho KyongHo wrote:
+> On Fri, 16 May 2014 14:23:18 +0200, Thierry Reding wrote:
+[...]
+> > +Examples:
+> > +=========
+> > +
+> > +Single-master IOMMU:
+> > +--------------------
+> > +
+> > +	iommu {
+> > +		#iommu-cells = <0>;
+> > +	};
+> > +
+> > +	master {
+> > +		iommu = <&/iommu>;
+> > +	};
+> > +
 > 
-> I have rearranged the error handling a bit to fix the issue
-> and also make it more clear.
+> Great work, Thierry.
 > 
-> Signed-off-by: Emil Goode <emilgoode@gmail.com>
-> ---
-> v3: Made subject line more specific.
-> v2: Changed to return -ENOMEM instead of ret where possible and
->     updated the subject line.
+> One simple comment.
 > 
->  arch/arm/mach-imx/devices/platform-ipu-core.c |   22 +++++++++++++---------
->  1 file changed, 13 insertions(+), 9 deletions(-)
-Considering that you can fix the issue also by just doing:
+> This should be also applicable to multi-master IOMMUs that the masters
+> of an IOMMU is not configurable with ID or something.
+> I think the title needs to be changed to cover such IOMMUs which always
+> translate master's transactions and unable to change the configuration
+> of the relationship between the masters and IOMMUs by S/W.
 
-diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
-index fc4dd7cedc11..6bd7c3f37ac0 100644
---- a/arch/arm/mach-imx/devices/platform-ipu-core.c
-+++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
-@@ -77,7 +77,7 @@ struct platform_device *__init imx_alloc_mx3_camera(
- 
- 	pdev = platform_device_alloc("mx3-camera", 0);
- 	if (!pdev)
--		goto err;
-+		return ERR_PTR(-ENOMEM);
- 
- 	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
- 	if (!pdev->dev.dma_mask)
+Agreed, how about we add a separate example for that case:
 
-or
+Multiple-master IOMMU with fixed associations:
+----------------------------------------------
 
-diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
-index fc4dd7cedc11..c609f3667200 100644
---- a/arch/arm/mach-imx/devices/platform-ipu-core.c
-+++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
-@@ -96,7 +96,8 @@ struct platform_device *__init imx_alloc_mx3_camera(
- 		ret = platform_device_add_data(pdev, pdata, sizeof(*pdata));
- 		if (ret) {
- err:
--			kfree(pdev->dev.dma_mask);
-+			if (pdev)
-+				kfree(pdev->dev.dma_mask);
- 			platform_device_put(pdev);
- 			return ERR_PTR(-ENODEV);
- 		}
+	/* multiple-master IOMMU */
+	iommu {
+		/*
+		 * Masters are statically associated with this IOMMU and
+		 * address translation is always enabled.
+		 */
+		#iommu-cells = <0>;
+	};
 
-I would prefer one of them as it is easier to justify and for the next
-cycle convert the function to platform_device_register_full.
+	/* static association with IOMMU */
+	master at 1 {
+		reg = <1>;
+		iommus = <&/iommu>;
+	};
 
-Also you should point out in the commit log that the issue was found by
-coccinelle.
+	/* static association with IOMMU */
+	master at 2 {
+		reg = <2>;
+		iommus = <&/iommu>;
+	};
 
-Best regards
-Uwe
+?
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140517/c41fa770/attachment.sig>
