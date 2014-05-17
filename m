@@ -1,40 +1,79 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 17 May 2014 22:05:26 +0800
-Subject: [PATCH] ahci: imx: PLL clock needs 100us to settle down
-In-Reply-To: <CAOMZO5BDg1g=Gr6o8kW3X--ZajBsKZcKwSmse7374tC2e=ju1A@mail.gmail.com>
-References: <1400330761-2432-1-git-send-email-shawn.guo@freescale.com>
- <CAOMZO5BDg1g=Gr6o8kW3X--ZajBsKZcKwSmse7374tC2e=ju1A@mail.gmail.com>
-Message-ID: <20140517140525.GE10685@dragon>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 17 May 2014 22:09:04 +0800
+Subject: [PATCH v2 0/5] mmc: sdhci: a few fixes on timeout and
+ max_discard_to
+In-Reply-To: <1387268191-19859-1-git-send-email-b29396@freescale.com>
+References: <1387268191-19859-1-git-send-email-b29396@freescale.com>
+Message-ID: <20140517140902.GB12916@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 17, 2014 at 10:58:20AM -0300, Fabio Estevam wrote:
-> On Sat, May 17, 2014 at 9:46 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> > The commit e783c51 (ahci: imx: software workaround for phy reset issue
-> > in resume) calls imx_sata_phy_reset() to reset phy immediately after
-> > SATA MPLL is enabled.  It seems working fine mostly, but fails in some
-> > case as below.
-> >
-> > ...
-> > ahci-imx 2200000.sata: failed to reset phy: -110
-> > ahci-imx: probe of 2200000.sata failed with error -110
-> >
-> > After talking to the designer, we learnt that when enabling i.MX6Q SATA
-> > MPLL, we need to wait 100us for it to settle down for safety.  Add this
-> > required delay to fix above failure.
-> >
-> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+On Tue, Dec 17, 2013 at 04:16:26PM +0800, Dong Aisheng wrote:
+> Patch 1~4 mainly fixes the issue that the max timeout counter for uSDHC is
+> 1 << 28 rather than 1 << 27. 1~2 fix getting the max timeout counter
+> while 3~4 fix setting the max timeout.
+> Thus it introduces two new platform hook: get_max_timeout_count and set_timeout
+> for those platform which have different timeout setting.
 > 
-> On my sabresd board that was not connected to any sata disk I was
-> always getting the 'failed to reset phy' error.
+> This issue is firstly reported here by Ed Sutter:
+> http://www.spinics.net/lists/linux-mmc/msg23375.html
+> The root cause is the max_discard_to got from uSDHC is too small, only 677ms,
+> which cause the max_discard_bytes for eMMC is only 512, then the discard operation
+> of mkfs.ext3 for an eMMC card is too slow, just like dead.
+> With above patches, the issue can be fixed.
 
-Damn.  I never noticed that the error is even there when no SATA disk is
-attached.  Sorry.
-> 
-> With this patch the error goes away and the driver probes successfully.
-> 
-> Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+It seems the series got lost?  The issue reported by Ed Sutter is still
+there with the latest kernel.
 
-Thanks.
+Dong, you may need to rebase it a little bit and resend.
 
 Shawn
+
+> 
+> Patch 5 adds the capability to calcalute the max_discard_to dynamically
+> for SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK.
+> 
+> Originally the max_discard_to for a high speed sdhc card may be:
+> mmc1: new high speed SDHC card at address aaaa
+> mmc1: calculated max. discard sectors 49152 for timeout 1355 ms
+> After fix:
+> mmc1: new high speed SDHC card at address aaaa
+> mmc1: calculated max. discard sectors 712704 for timeout 5422 ms
+> 
+> It also improves the card discard performance a lot due to max_discard_sectors
+> increase a lot.
+> 
+> There's also discussion about remove max_discard_to limit here:
+> http://www.spinics.net/lists/linux-mmc/msg23395.html
+> But it does not help for uSDHC since we can observe data timeout
+> on a Toshiba SD3.0 cards if we do not disable data timeout interrupt.
+> 
+> ChangeLog:
+> v1->v2:
+>  1. change .get_max_timeout to .get_max_timeout_count to reuse some code
+>  2. some other minor changes based on Shawn's comment.
+>  3. patch 6 in v1 is dropped since not need anymore after change 1
+> 
+> 
+> 
+> Dong Aisheng (5):
+>   mmc: sdhci: add platfrom get_max_timeout_count hook
+>   mmc: sdhci-esdhc-imx: fix incorrect max_discard_to for uSDHC
+>   mmc: sdhci: add platform set_timeout hook
+>   mmc: sdhci-esdhc-imx: set the correct max timeout value for uSDHC
+>   mmc: sdhci: calculate max_discard_to dynamically for
+>     SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
+> 
+>  drivers/mmc/host/sdhci-esdhc-imx.c |   20 +++++++++++
+>  drivers/mmc/host/sdhci.c           |   66 +++++++++++++++++++++++------------
+>  drivers/mmc/host/sdhci.h           |    3 ++
+>  3 files changed, 66 insertions(+), 23 deletions(-)
+> 
+> -- 
+> 1.7.2.rc3
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
