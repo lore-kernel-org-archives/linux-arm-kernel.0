@@ -1,58 +1,49 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 17 May 2014 14:16:52 +0200
-Subject: [RFC PATCH 1/9] dt: deps: dtc: Automatically add new property
- 'dependencies' which contains a list of referenced phandles
-In-Reply-To: <1399913280-6915-2-git-send-email-holler@ahsoftware.de>
-References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
- <1399913280-6915-2-git-send-email-holler@ahsoftware.de>
-Message-ID: <53775334.3030704@gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 17 May 2014 20:46:01 +0800
+Subject: [PATCH] ahci: imx: PLL clock needs 100us to settle down
+Message-ID: <1400330761-2432-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
+The commit e783c51 (ahci: imx: software workaround for phy reset issue
+in resume) calls imx_sata_phy_reset() to reset phy immediately after
+SATA MPLL is enabled.  It seems working fine mostly, but fails in some
+case as below.
 
-On 12.05.2014 18:47, Alexander Holler wrote:
-> During the step from .dts to .dtb the information about dependcies contained
-> in the .dts through phandle references is lost. This makes it impossible to
-> use the binary blob to create a dependency graph without knowing the semantic
-> of all cell arrays.
-> 
-> Therefor automatically add a new property called 'dependencies' to all nodes
-> which have phandle references in one of their properties.
-> 
-> This new property will contain an array of phandles with one value for every
-> phandle referenced by other properties in the node.
-> 
-> If such a property already exists (e.g. to manually add dependencies through
-> the .dts), the existing list will be expanded.
-> 
-> Added phandles will be the phandle of either the referenced node itself (if
-> it has a property named 'compatible', or of the next parent of the referenced
-> node which as property named 'compatible'. This ensures only dependencies to
-> drivers will be added.
-> 
+...
+ahci-imx 2200000.sata: failed to reset phy: -110
+ahci-imx: probe of 2200000.sata failed with error -110
 
-Sounds good.
+After talking to the designer, we learnt that when enabling i.MX6Q SATA
+MPLL, we need to wait 100us for it to settle down for safety.  Add this
+required delay to fix above failure.
 
-> References to phandles of parent or child nodes will not be added to this
-> property, because this information is already contained in the blob (in the
-> form of the tree itself).
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+Tejun,
 
-I wonder if we shouldn't be including them too for consistency related
-reasons, so we have all the necessary information in one place.
-References to child nodes are great recipes for cycles, though...
+Sorry for that I did not catch it when I was working on the phy reset
+issue in the first place.  I used to test the driver with a 32GiB and
+64GiB SanDisk SSDs, and did not run into this issue.  But it gets
+exposed on a 8GiB SSD I got to play recently.
 
-No strong opinion, though, just an idea.
+Shawn
 
-> 
-> No dependencies to disabled nodes will be added.
-> 
+ drivers/ata/ahci_imx.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Same here. IMHO it might be wise to let the parsing entity (e.g. kernel)
-decide whether to ignore a dependency to disabled node or not.
-
-Otherwise, I like the simplicity of compile-time dependency list
-creation. Quite a nice work.
-
-Best regards,
-Tomasz
+diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
+index 5824d99..8befeb6 100644
+--- a/drivers/ata/ahci_imx.c
++++ b/drivers/ata/ahci_imx.c
+@@ -258,6 +258,8 @@ static int imx_sata_enable(struct ahci_host_priv *hpriv)
+ 				   IMX6Q_GPR13_SATA_MPLL_CLK_EN,
+ 				   IMX6Q_GPR13_SATA_MPLL_CLK_EN);
+ 
++		usleep_range(100, 200);
++
+ 		ret = imx_sata_phy_reset(hpriv);
+ 		if (ret) {
+ 			dev_err(dev, "failed to reset phy: %d\n", ret);
+-- 
+1.8.3.2
