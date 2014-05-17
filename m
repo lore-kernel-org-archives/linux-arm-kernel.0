@@ -1,67 +1,76 @@
-From: dgreid@chromium.org (Dylan Reid)
-Date: Sat, 17 May 2014 11:21:21 -0700
-Subject: [PATCH 2/2] drm/tegra: Enable HDMI_5V_CON regulator
-In-Reply-To: <1400350881-22008-1-git-send-email-dgreid@chromium.org>
-References: <1400350881-22008-1-git-send-email-dgreid@chromium.org>
-Message-ID: <1400350881-22008-2-git-send-email-dgreid@chromium.org>
+From: emilgoode@gmail.com (Emil Goode)
+Date: Sat, 17 May 2014 20:40:33 +0200
+Subject: [PATCH v3] ARM: imx: fix error handling in ipu device registration
+Message-ID: <1400352033-18262-1-git-send-email-emilgoode@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DDC bus uses this for it's supply, enable it so EDID can be read.
-This eliminates I2C read timeouts on Venice2 and EDID can be verified
-with i2cdump.
+If we fail to allocate struct platform_device pdev we
+dereference it after the goto label err.
 
-Signed-off-by: Dylan Reid <dgreid@chromium.org>
+I have rearranged the error handling a bit to fix the issue
+and also make it more clear.
+
+Signed-off-by: Emil Goode <emilgoode@gmail.com>
 ---
- drivers/gpu/drm/tegra/hdmi.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+v3: Made subject line more specific.
+v2: Changed to return -ENOMEM instead of ret where possible and
+    updated the subject line.
 
-diff --git a/drivers/gpu/drm/tegra/hdmi.c b/drivers/gpu/drm/tegra/hdmi.c
-index 6928015..3d3cd7e 100644
---- a/drivers/gpu/drm/tegra/hdmi.c
-+++ b/drivers/gpu/drm/tegra/hdmi.c
-@@ -44,6 +44,7 @@ struct tegra_hdmi {
+ arch/arm/mach-imx/devices/platform-ipu-core.c |   22 +++++++++++++---------
+ 1 file changed, 13 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
+index fc4dd7c..68f2a4a 100644
+--- a/arch/arm/mach-imx/devices/platform-ipu-core.c
++++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
+@@ -77,34 +77,38 @@ struct platform_device *__init imx_alloc_mx3_camera(
  
- 	struct regulator *vdd;
- 	struct regulator *pll;
-+	struct regulator *hdmi_5v;
+ 	pdev = platform_device_alloc("mx3-camera", 0);
+ 	if (!pdev)
+-		goto err;
++		return ERR_PTR(-ENOMEM);
  
- 	void __iomem *regs;
- 	unsigned int irq;
-@@ -1263,6 +1264,13 @@ static int tegra_hdmi_init(struct host1x_client *client)
- 		return err;
- 	}
+ 	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
+ 	if (!pdev->dev.dma_mask)
+-		goto err;
++		goto put_pdev;
  
-+	err = regulator_enable(hdmi->hdmi_5v);
-+	if (err < 0) {
-+		dev_err(client->dev, "failed to enable HDMI 5V regulator: %d\n",
-+			err);
-+		return err;
-+	}
+ 	*pdev->dev.dma_mask = DMA_BIT_MASK(32);
+ 	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+ 
+ 	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
+ 	if (ret)
+-		goto err;
++		goto free_dma_mask;
+ 
+ 	if (pdata) {
+ 		struct mx3_camera_pdata *copied_pdata;
+ 
+ 		ret = platform_device_add_data(pdev, pdata, sizeof(*pdata));
+-		if (ret) {
+-err:
+-			kfree(pdev->dev.dma_mask);
+-			platform_device_put(pdev);
+-			return ERR_PTR(-ENODEV);
+-		}
++		if (ret)
++			goto free_dma_mask;
 +
- 	hdmi->output.type = TEGRA_OUTPUT_HDMI;
- 	hdmi->output.dev = client->dev;
- 	hdmi->output.ops = &hdmi_ops;
-@@ -1307,6 +1315,7 @@ static int tegra_hdmi_exit(struct host1x_client *client)
+ 		copied_pdata = dev_get_platdata(&pdev->dev);
+ 		copied_pdata->dma_dev = &imx_ipu_coredev->dev;
  	}
  
- 	regulator_disable(hdmi->vdd);
-+	regulator_disable(hdmi->hdmi_5v);
- 
- 	return 0;
+ 	return pdev;
++
++free_dma_mask:
++	kfree(pdev->dev.dma_mask);
++put_pdev:
++	platform_device_put(pdev);
++
++	return ERR_PTR(ret);
  }
-@@ -1411,6 +1420,12 @@ static int tegra_hdmi_probe(struct platform_device *pdev)
- 		return PTR_ERR(hdmi->pll);
- 	}
  
-+	hdmi->hdmi_5v = devm_regulator_get(&pdev->dev, "hdmi");
-+	if (IS_ERR(hdmi->hdmi_5v)) {
-+		dev_err(&pdev->dev, "failed to get HDMI 5V regulator\n");
-+		return PTR_ERR(hdmi->hdmi_5v);
-+	}
-+
- 	hdmi->output.dev = &pdev->dev;
- 
- 	err = tegra_output_probe(&hdmi->output);
+ struct platform_device *__init imx_add_mx3_sdc_fb(
 -- 
-1.8.1.3.605.g02339dd
+1.7.10.4
