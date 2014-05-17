@@ -1,53 +1,33 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 16 May 2014 18:33:04 -0700
-Subject: [PATCH] clk: qcom: Fix msm8660 GCC probe
-In-Reply-To: <1400259914-28121-1-git-send-email-sboyd@codeaurora.org>
-References: <1400259914-28121-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140517013304.9521.38400@quantum>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat, 17 May 2014 06:22:16 +0200
+Subject: [GIT PULL] at91: cleanup for 3.16 #1
+In-Reply-To: <20140516232635.GB6423@quad.lixom.net>
+References: <1399484042-27432-1-git-send-email-nicolas.ferre@atmel.com>
+ <536A6FD7.40402@atmel.com> <20140516232635.GB6423@quad.lixom.net>
+Message-ID: <20140517042216.GI29318@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2014-05-16 10:05:14)
-> When consolidating the msm8660 GCC probe code I forgot to keep
-> around these temporary clock registrations. Put them back so the
-> clock tree is not entirely orphaned.
+On 16/05/2014 at 16:26:35 -0700, Olof Johansson wrote :
+> On Wed, May 07, 2014 at 07:39:35PM +0200, Nicolas Ferre wrote:
+> > There is a little conflict with at91-3.16-dt that you already pulled in
+> > arm-soc: here is the branch that resolves it:
+> > 
+> > https://github.com/at91linux/linux-at91/commits/at91-3.16-resolved
 > 
-> Fixes: 49fc825f0cc2 (clk: qcom: Consolidate common probe code)
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-
-Taken into clk-next.
-
-Regards,
-Mike
-
-> ---
->  drivers/clk/qcom/gcc-msm8660.c | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+> That resolution looks odd. Why is one clock under clocks { } and two of them
+> are at the top level? Shouldn't they all be under the clocks subnode?
 > 
-> diff --git a/drivers/clk/qcom/gcc-msm8660.c b/drivers/clk/qcom/gcc-msm8660.c
-> index 44bc6fa64d78..0c4b727ae429 100644
-> --- a/drivers/clk/qcom/gcc-msm8660.c
-> +++ b/drivers/clk/qcom/gcc-msm8660.c
-> @@ -2718,6 +2718,18 @@ MODULE_DEVICE_TABLE(of, gcc_msm8660_match_table);
->  
->  static int gcc_msm8660_probe(struct platform_device *pdev)
->  {
-> +       struct clk *clk;
-> +       struct device *dev = &pdev->dev;
-> +
-> +       /* Temporary until RPM clocks supported */
-> +       clk = clk_register_fixed_rate(dev, "cxo", NULL, CLK_IS_ROOT, 19200000);
-> +       if (IS_ERR(clk))
-> +               return PTR_ERR(clk);
-> +
-> +       clk = clk_register_fixed_rate(dev, "pxo", NULL, CLK_IS_ROOT, 27000000);
-> +       if (IS_ERR(clk))
-> +               return PTR_ERR(clk);
-> +
->         return qcom_cc_probe(pdev, &gcc_msm8660_desc);
->  }
->  
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
+> I've merged in now with your resolution, but I think this needs revisiting.
 > 
+
+Actually, all the clocks should end up at the root, please refer to:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/240219.html
+
+I feel that was one of the topics we should have discussed at ELC but we
+ended up talking about DT ABI stability instead...
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
