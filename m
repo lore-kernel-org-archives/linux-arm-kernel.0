@@ -1,25 +1,61 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 17 May 2014 09:24:03 +0900
-Subject: [PATCH 0/5] remove Genmai Reference from Legacy support
-In-Reply-To: <CAMuHMdVoCgKF6FjGGHk3bb4Yr9k4frtfMkM85cNhJd8gaPJkxg@mail.gmail.com>
-References: <1400242216-20848-1-git-send-email-wsa@the-dreams.de>
- <CAMuHMdVoCgKF6FjGGHk3bb4Yr9k4frtfMkM85cNhJd8gaPJkxg@mail.gmail.com>
-Message-ID: <20140517002402.GC10078@verge.net.au>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 17 May 2014 02:32:57 +0200
+Subject: [PATCH v5 1/5] ARM: EXYNOS: Add generic cpu power control
+ functions for all exynos based SoCs
+In-Reply-To: <CAM4voam1UiX+WaxScTdhb4bW+_1nCcsztFEkx4MyWFOBBjV6XQ@mail.gmail.com>
+References: <1399307221-8659-1-git-send-email-a.kesavan@samsung.com>	<1399307221-8659-2-git-send-email-a.kesavan@samsung.com>	<019b01cf6e52$75e1a710$61a4f530$@samsung.com>	<CAM4voamSNYZ_hsjF3eZhqZ=FF__39tFgi5FeXRcUhRbYYzu0LQ@mail.gmail.com>	<53752D8C.3030708@gmail.com>
+ <CAM4voam1UiX+WaxScTdhb4bW+_1nCcsztFEkx4MyWFOBBjV6XQ@mail.gmail.com>
+Message-ID: <5376AE39.1030301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 02:22:20PM +0200, Geert Uytterhoeven wrote:
-> Hi Wolfram,
-> 
-> On Fri, May 16, 2014 at 2:10 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> >   ARM: shmobile: Remove non-multiplatform Genmai reference support
-> >   ARM: shmobile: genmai-reference: Remove legacy clock support
-> >   ARM: shmobile: Sync Genmai DTS with Genmai reference DTS
-> >   ARM: shmobile: Let Genmai multiplatform boot with Genmai DTB
-> >   ARM: shmobile: Remove Genmai reference DTS
-> 
-> Thanks a lot!
-> 
-> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-Thanks, I will queue these up.
+
+On 16.05.2014 07:07, Abhilash Kesavan wrote:
+> Hi Tomasz,
+> 
+> On Fri, May 16, 2014 at 2:41 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>> Hi Abhilash,
+>>
+>> On 13.05.2014 12:12, Abhilash Kesavan wrote:
+>>> On Tue, May 13, 2014 at 7:54 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>>
+>> [snip]
+>>
+>>>>> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-
+>>>>> pmu.h
+>>>>> index 4f6a256..0bdfcbc 100644
+>>>>> --- a/arch/arm/mach-exynos/regs-pmu.h
+>>>>> +++ b/arch/arm/mach-exynos/regs-pmu.h
+>>>>> @@ -121,6 +121,12 @@
+>>>>>
+>>>>>  #define S5P_CHECK_SLEEP                              0x00000BAD
+>>>>>
+>>>>> +#define EXYNOS_ARM_CORE0_CONFIGURATION               S5P_PMUREG(0x2000)
+>>>>
+>>>> This can be put in order of address.
+>>> OK, will fix.
+>>>>
+>>>>> +#define EXYNOS_ARM_CORE_CONFIGURATION(_nr)   \
+>>>>> +                     (EXYNOS_ARM_CORE0_CONFIGURATION + (0x80 * (_nr)))
+>>>>> +#define EXYNOS_ARM_CORE_STATUS(_nr)          \
+>>>>> +                     (EXYNOS_ARM_CORE_CONFIGURATION(_nr) + 0x4)
+>>
+>> My patches posted quite a while ago [1] to fix DT CPU topology already
+>> add these, remove S5P_ARM_CORE1* and fix corresponding usage in
+>> hotplug.c and platsmp.c.
+>>
+>> [1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/29573
+>>
+>> So I think you should rebase on top of them or at least on top of
+>> patches 1 and 2 from that series, as 3 and 4 should be dropped.
+> 
+> Patch 2 of your series does not apply on kgene's for-next or
+> linux-next. Are you planning on re-sending this ?
+
+OK, it seems like Kukjin has already applied your v6 series, so let's
+drop my series for now. I'll remove patch 1 from my series and rebase it
+on top of your v6.
+
+Best regards,
+Tomasz
