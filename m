@@ -1,185 +1,28 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sun, 18 May 2014 23:44:36 +0300
-Subject: [PATCH 2/2] dmaengine: s3c24xx-dma: Add cyclic transfer support
-In-Reply-To: <1400445779-17365-1-git-send-email-anarsoul@gmail.com>
-References: <1400445779-17365-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1400445876-17460-1-git-send-email-anarsoul@gmail.com>
+From: emilgoode@gmail.com (Emil Goode)
+Date: Sun, 18 May 2014 22:50:58 +0200
+Subject: [PATCH 0/2] ARM: imx: bug fix and convertion to
+ platform_device_register_full()
+Message-ID: <1400446261-27085-1-git-send-email-emilgoode@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many audio interface drivers require support of cyclic transfers to work
-correctly, for example Samsung ASoC DMA driver. This patch adds support
-for cyclic transfers to the s3c24xx-dma driver
+This small series fixes a potential NULL pointer dereference bug and
+also converts the imx camera allocation and initialization functions
+to use platform_device_register_full().
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- drivers/dma/s3c24xx-dma.c | 111 +++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 110 insertions(+), 1 deletion(-)
+The change the first patch makes is removed by the second patch, so the
+purpose of the first one is purely for easy backporting and git history.
 
-diff --git a/drivers/dma/s3c24xx-dma.c b/drivers/dma/s3c24xx-dma.c
-index 2167608..1e419fb 100644
---- a/drivers/dma/s3c24xx-dma.c
-+++ b/drivers/dma/s3c24xx-dma.c
-@@ -164,6 +164,7 @@ struct s3c24xx_sg {
-  * @disrcc: value for source control register
-  * @didstc: value for destination control register
-  * @dcon: base value for dcon register
-+ * @cyclic: indicate cyclic transfer
-  */
- struct s3c24xx_txd {
- 	struct virt_dma_desc vd;
-@@ -173,6 +174,7 @@ struct s3c24xx_txd {
- 	u32 disrcc;
- 	u32 didstc;
- 	u32 dcon;
-+	bool cyclic;
- };
- 
- struct s3c24xx_dma_chan;
-@@ -669,8 +671,10 @@ static irqreturn_t s3c24xx_dma_irq(int irq, void *data)
- 		/* when more sg's are in this txd, start the next one */
- 		if (!list_is_last(txd->at, &txd->dsg_list)) {
- 			txd->at = txd->at->next;
-+			if (txd->cyclic)
-+				vchan_cyclic_callback(&txd->vd);
- 			s3c24xx_dma_start_next_sg(s3cchan, txd);
--		} else {
-+		} else if (!txd->cyclic) {
- 			s3cchan->at = NULL;
- 			vchan_cookie_complete(&txd->vd);
- 
-@@ -682,6 +686,12 @@ static irqreturn_t s3c24xx_dma_irq(int irq, void *data)
- 				s3c24xx_dma_start_next_txd(s3cchan);
- 			else
- 				s3c24xx_dma_phy_free(s3cchan);
-+		} else {
-+			vchan_cyclic_callback(&txd->vd);
-+
-+			/* Cyclic: reset at beginning */
-+			txd->at = txd->dsg_list.next;
-+			s3c24xx_dma_start_next_sg(s3cchan, txd);
- 		}
- 	}
- 	spin_unlock(&s3cchan->vc.lock);
-@@ -877,6 +887,103 @@ static struct dma_async_tx_descriptor *s3c24xx_dma_prep_memcpy(
- 	return vchan_tx_prep(&s3cchan->vc, &txd->vd, flags);
- }
- 
-+static struct dma_async_tx_descriptor *s3c24xx_dma_prep_dma_cyclic(
-+	struct dma_chan *chan, dma_addr_t addr, size_t size, size_t period,
-+	enum dma_transfer_direction direction, unsigned long flags,
-+	void *context)
-+{
-+	struct s3c24xx_dma_chan *s3cchan = to_s3c24xx_dma_chan(chan);
-+	struct s3c24xx_dma_engine *s3cdma = s3cchan->host;
-+	const struct s3c24xx_dma_platdata *pdata = s3cdma->pdata;
-+	struct s3c24xx_dma_channel *cdata = &pdata->channels[s3cchan->id];
-+	struct s3c24xx_txd *txd;
-+	struct s3c24xx_sg *dsg;
-+	unsigned sg_len;
-+	dma_addr_t slave_addr;
-+	u32 hwcfg = 0;
-+	int i;
-+
-+	dev_dbg(&s3cdma->pdev->dev,
-+		"prepare cyclic transaction of %d bytes with period %d from %s\n",
-+		size, period, s3cchan->name);
-+
-+	txd = s3c24xx_dma_get_txd();
-+	if (!txd)
-+		return NULL;
-+
-+	txd->cyclic = 1;
-+
-+	if (cdata->handshake)
-+		txd->dcon |= S3C24XX_DCON_HANDSHAKE;
-+
-+	switch (cdata->bus) {
-+	case S3C24XX_DMA_APB:
-+		txd->dcon |= S3C24XX_DCON_SYNC_PCLK;
-+		hwcfg |= S3C24XX_DISRCC_LOC_APB;
-+		break;
-+	case S3C24XX_DMA_AHB:
-+		txd->dcon |= S3C24XX_DCON_SYNC_HCLK;
-+		hwcfg |= S3C24XX_DISRCC_LOC_AHB;
-+		break;
-+	}
-+
-+	/*
-+	 * Always assume our peripheral desintation is a fixed
-+	 * address in memory.
-+	 */
-+	hwcfg |= S3C24XX_DISRCC_INC_FIXED;
-+
-+	/*
-+	 * Individual dma operations are requested by the slave,
-+	 * so serve only single atomic operations (S3C24XX_DCON_SERV_SINGLE).
-+	 */
-+	txd->dcon |= S3C24XX_DCON_SERV_SINGLE;
-+
-+	if (direction == DMA_MEM_TO_DEV) {
-+		txd->disrcc = S3C24XX_DISRCC_LOC_AHB |
-+			      S3C24XX_DISRCC_INC_INCREMENT;
-+		txd->didstc = hwcfg;
-+		slave_addr = s3cchan->cfg.dst_addr;
-+		txd->width = s3cchan->cfg.dst_addr_width;
-+	} else if (direction == DMA_DEV_TO_MEM) {
-+		txd->disrcc = hwcfg;
-+		txd->didstc = S3C24XX_DIDSTC_LOC_AHB |
-+			      S3C24XX_DIDSTC_INC_INCREMENT;
-+		slave_addr = s3cchan->cfg.src_addr;
-+		txd->width = s3cchan->cfg.src_addr_width;
-+	} else {
-+		s3c24xx_dma_free_txd(txd);
-+		dev_err(&s3cdma->pdev->dev,
-+			"direction %d unsupported\n", direction);
-+		return NULL;
-+	}
-+
-+	sg_len = size / period;
-+
-+	for (i = 0; i < sg_len; i++) {
-+		dsg = kzalloc(sizeof(*dsg), GFP_NOWAIT);
-+		if (!dsg) {
-+			s3c24xx_dma_free_txd(txd);
-+			return NULL;
-+		}
-+		list_add_tail(&dsg->node, &txd->dsg_list);
-+
-+		dsg->len = period;
-+		/* Check last period length */
-+		if (i == (sg_len - 1))
-+			dsg->len = size - (period * i);
-+		if (direction == DMA_MEM_TO_DEV) {
-+			dsg->src_addr = addr + (period * i);
-+			dsg->dst_addr = slave_addr;
-+		} else { /* DMA_DEV_TO_MEM */
-+			dsg->src_addr = slave_addr;
-+			dsg->dst_addr = addr + (period * i);
-+		}
-+	}
-+
-+	return vchan_tx_prep(&s3cchan->vc, &txd->vd, flags);
-+}
-+
- static struct dma_async_tx_descriptor *s3c24xx_dma_prep_slave_sg(
- 		struct dma_chan *chan, struct scatterlist *sgl,
- 		unsigned int sg_len, enum dma_transfer_direction direction,
-@@ -1197,6 +1304,7 @@ static int s3c24xx_dma_probe(struct platform_device *pdev)
- 
- 	/* Initialize slave engine for SoC internal dedicated peripherals */
- 	dma_cap_set(DMA_SLAVE, s3cdma->slave.cap_mask);
-+	dma_cap_set(DMA_CYCLIC, s3cdma->slave.cap_mask);
- 	dma_cap_set(DMA_PRIVATE, s3cdma->slave.cap_mask);
- 	s3cdma->slave.dev = &pdev->dev;
- 	s3cdma->slave.device_alloc_chan_resources =
-@@ -1206,6 +1314,7 @@ static int s3c24xx_dma_probe(struct platform_device *pdev)
- 	s3cdma->slave.device_tx_status = s3c24xx_dma_tx_status;
- 	s3cdma->slave.device_issue_pending = s3c24xx_dma_issue_pending;
- 	s3cdma->slave.device_prep_slave_sg = s3c24xx_dma_prep_slave_sg;
-+	s3cdma->slave.device_prep_dma_cyclic = s3c24xx_dma_prep_dma_cyclic;
- 	s3cdma->slave.device_control = s3c24xx_dma_control;
- 
- 	/* Register as many memcpy channels as there are physical channels */
+Emil Goode (2):
+  ARM: imx: fix error handling in ipu device registration
+  ARM: imx: convert camera init to use platform_device_register_full()
+
+ arch/arm/mach-imx/devices/platform-ipu-core.c |   43 +++++++++----------------
+ arch/arm/mach-imx/mach-mx31_3ds.c             |    5 ++-
+ arch/arm/mach-imx/mach-mx31moboard.c          |    6 ++--
+ arch/arm/mach-imx/mach-mx35_3ds.c             |    5 ++-
+ arch/arm/mach-imx/mach-pcm037.c               |    5 ++-
+ 5 files changed, 23 insertions(+), 41 deletions(-)
+
 -- 
-1.9.2
+1.7.10.4
