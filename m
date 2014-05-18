@@ -1,32 +1,72 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 18 May 2014 12:18:54 +0200
-Subject: [PATCHv4 0/5] Add DT support for fixed PHYs
-In-Reply-To: <20140516.172009.632611701865367987.davem@davemloft.net>
-References: <1400249647-4643-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140516.172009.632611701865367987.davem@davemloft.net>
-Message-ID: <20140518121854.3b4a17fa@free-electrons.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sun, 18 May 2014 20:07:14 +0800
+Subject: [GIT PULL]]ARM: sirf: machine update for 3.16
+In-Reply-To: <CAGsJ_4wD=FqxNeuEs47f0D9V+Qhn8jyUQL67iv4rsZ3r2K_3vA@mail.gmail.com>
+References: <CAGsJ_4yqTkKu+93Fo_D6NaZMyz4T6_EmKz4gZfyeQCi_uF-3dg@mail.gmail.com>
+ <CAGsJ_4wD=FqxNeuEs47f0D9V+Qhn8jyUQL67iv4rsZ3r2K_3vA@mail.gmail.com>
+Message-ID: <CAGsJ_4y7gEQd9-Em6LW2kZ79qUOz5dSYzeWnBLbt8o8QsOSA6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear David Miller,
+>> Bin Shi (2):
+>>       clocksource: prima2: fix some minor checkpatch issues
+>>       irqchip: sirf: fix one minor checkpatch issue
+>>
+>> Xianglong Du (1):
+>>       ARM: prima2: rstc: fix some minor checkpatch issues
+>>
+>> Zhiwu Song (2):
+>>       clocksource:sirf: remove the hardcode for the clk of timers
+>>       clocksource: marco: fix the affinity set for local timer of CPU1
+>
+> as Daniel has applied this one "clocksource: marco: fix the affinity
+> set for local timer of CPU1" to his clk tree, i'll rebuilt the tag by
+> dropping this.
 
-On Fri, 16 May 2014 17:20:09 -0400 (EDT), David Miller wrote:
-> From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Date: Fri, 16 May 2014 16:14:02 +0200
-> 
-> > Here is a fourth version of the patch set that adds a Device Tree
-> > binding and the related code to support fixed PHYs. I'm hoping to get
-> > this merged in 3.16.
-> 
-> Series applied, thanks Thomas.
+hi Olof,
+i did a force update to tags/sirf-soc-for-3.16 after dropping
+"clocksource: marco: fix the affinity set for local timer of CPU1"
+which has been in clk tree , the new request is as below:
 
-Thanks! Did you also pull PATCH 5/5, which changes the Armada XP Matrix
-Device Tree file?
+The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
 
-Thanks,
+  Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
+tags/sirf-soc-for-3.16
+
+for you to fetch changes up to c7cff54d5926e3f419c23eff2ebaf6f5e12da05d:
+
+  clocksource:sirf: remove the hardcode for the clk of timers
+(2014-05-12 21:43:49 +0800)
+
+----------------------------------------------------------------
+ARM: sirf: machine update for 3.16
+
+most of them fix some minor checkpatch issues according to key customers'
+requirement. And this patchset also cleanups the clk of clocksource: move
+to get clk by dts properity.
+
+----------------------------------------------------------------
+Bin Shi (2):
+      clocksource: prima2: fix some minor checkpatch issues
+      irqchip: sirf: fix one minor checkpatch issue
+
+Xianglong Du (1):
+      ARM: prima2: rstc: fix some minor checkpatch issues
+
+Zhiwu Song (1):
+      clocksource:sirf: remove the hardcode for the clk of timers
+
+ arch/arm/boot/dts/atlas6.dtsi      |    1 +
+ arch/arm/boot/dts/prima2.dtsi      |    1 +
+ arch/arm/mach-prima2/rstc.c        |   34 +++++++++++++++-----------
+ drivers/clocksource/timer-marco.c  |    8 +++---
+ drivers/clocksource/timer-prima2.c |   47 ++++++++++++++++++++++--------------
+ drivers/irqchip/irq-sirfsoc.c      |    3 ++-
+ 6 files changed, 56 insertions(+), 38 deletions(-)
+
+
+-barry
