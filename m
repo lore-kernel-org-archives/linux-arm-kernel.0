@@ -1,37 +1,40 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Sat, 17 May 2014 21:09:08 -0300
-Subject: [RFC PATCH] ARM: dts: am33xx: Re-arrange the USB dt to reflect
- the h/w configuration
-In-Reply-To: <20140514215034.GL27426@atomide.com>
-References: <1399617068-19826-1-git-send-email-george.cherian@ti.com>
- <20140514215034.GL27426@atomide.com>
-Message-ID: <20140518000908.GA2092@arch.cereza>
+From: dgreid@chromium.org (Dylan Reid)
+Date: Sat, 17 May 2014 19:28:44 -0700
+Subject: [PATCH 1/2] ARM: tegra: Mark Tegra124 HDMI compatible with
+ Tegra114
+In-Reply-To: <20140517213258.GE1046@mithrandir>
+References: <1400350881-22008-1-git-send-email-dgreid@chromium.org>
+ <20140517213258.GE1046@mithrandir>
+Message-ID: <CAEUnVG74DWmebZVE=7hiYoy8JZR1noW9Jfi_U8TOJJW395zL5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tony,
+On Sat, May 17, 2014 at 2:33 PM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Sat, May 17, 2014 at 11:21:20AM -0700, Dylan Reid wrote:
+>> The HDMI driver that handles Tegra114 can handle Tegra124 as well,
+>> mark Tegra124 as compatible.  This makes HDMI output work on Venice2.
+>>
+>> Signed-off-by: Dylan Reid <dgreid@chromium.org>
+>> ---
+>>  arch/arm/boot/dts/tegra124.dtsi | 3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> These patches don't seem to be based on linux-next. There are a couple
+> of patches in linux-next (queued for 3.16) that should fix these, in
+> particular:
+>
+>         4b9701e02b3b drm/tegra: hdmi - Add Tegra124 support
+>         0d6696438d2c drm/tegra: hdmi - Add connector supply support
+>
+> Could you try a recent linux-next to see if that fixes the issues you
+> are seeing? Note that Tegra doesn't boot on linux-next from the last few
+> days because of some cgroup regressions, but a fix was merged and should
+> be in Monday's linux-next, so unless new regressions are introduced that
+> would be a good candidate to test.
 
-On 14 May 02:50 PM, Tony Lindgren wrote:
-> * George Cherian <george.cherian@ti.com> [140508 23:34]:
-> > Re arrange the USB dt for AM33xx to take it a bit closer
-> > to the hardware configuration.
-> > 
-[..]
-> 
-> Is this just a cosmetic change or is this trying to workaround
-> some edma related init order issue?
-> 
+Those look like they'll do the trick.  I'll give it a try on Monday.
+Thanks Thierry.
 
-This was an attempt from George to workaround an that happens when
-the musb_am335x module is removed. However, we've agreed to prevent
-the removal instead. I've just (re)sent a patch for it:
-
-See: [PATCH for v3.15] usb: musb: Fix panic upon musb_am335x module removal
-
-AFAIK, this fixes a serious problem so I've marked it for stable.
-
-For the DMA init order issue, I've done a new patch that forces the
-probe order in the driver. I'll post that soon.
--- 
-Ezequiel Garcia, VanguardiaSur
-www.vanguardiasur.com.ar
+>
+> Thierry
