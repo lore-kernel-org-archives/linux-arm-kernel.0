@@ -1,159 +1,58 @@
-From: emilgoode@gmail.com (Emil Goode)
-Date: Sun, 18 May 2014 22:51:00 +0200
-Subject: [PATCH 2/2] ARM: imx: convert camera init to use
- platform_device_register_full()
-In-Reply-To: <1400446261-27085-1-git-send-email-emilgoode@gmail.com>
-References: <1400446261-27085-1-git-send-email-emilgoode@gmail.com>
-Message-ID: <1400446261-27085-3-git-send-email-emilgoode@gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Sun, 18 May 2014 22:59:36 +0200 (CEST)
+Subject: [PATCH v2 2/3] [media] atmel-isi: convert the pdata from pointer
+ to structure
+In-Reply-To: <1395744087-5753-3-git-send-email-josh.wu@atmel.com>
+References: <1395744087-5753-1-git-send-email-josh.wu@atmel.com>
+ <1395744087-5753-3-git-send-email-josh.wu@atmel.com>
+Message-ID: <Pine.LNX.4.64.1405182255540.23804@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This converts the imx camera allocation and initialization functions
-to use platform_device_register_full() thus simplifying the code.
+Hi Josh,
 
-Signed-off-by: Emil Goode <emilgoode@gmail.com>
+I'm still waiting for an update of Ben's patches to then also apply yours, 
+but I decided to have a look at yours now to see if I find anything, that 
+might be worth changing. A small note to this one below.
+
+On Tue, 25 Mar 2014, Josh Wu wrote:
+
+> Now the platform data is initialized by allocation of isi
+> structure. In the future, we use pdata to store the dt parameters.
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+> v1 --> v2:
+>  no change.
+> 
+>  drivers/media/platform/soc_camera/atmel-isi.c |   22 +++++++++++-----------
+>  1 file changed, 11 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+> index 9d977c5..f4add0a 100644
+> --- a/drivers/media/platform/soc_camera/atmel-isi.c
+> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+
+[snip]
+
+> @@ -912,7 +912,7 @@ static int atmel_isi_probe(struct platform_device *pdev)
+>  	if (IS_ERR(isi->pclk))
+>  		return PTR_ERR(isi->pclk);
+>  
+> -	isi->pdata = pdata;
+> +	memcpy(&isi->pdata, pdata, sizeof(struct isi_platform_data));
+
+I think it'd be better to use
+
++	memcpy(&isi->pdata, pdata, sizeof(isi->pdata));
+
+This way if the type of the pdata changes at any time in the future this 
+line will not have to be changed. If you don't mind I can make this change 
+myself, so you don't have to make a new version just for this.
+
+Thanks
+Guennadi
 ---
-Only build tested, unfortunately I currently don't have the hardware.
-
- arch/arm/mach-imx/devices/platform-ipu-core.c |   43 +++++++++----------------
- arch/arm/mach-imx/mach-mx31_3ds.c             |    5 ++-
- arch/arm/mach-imx/mach-mx31moboard.c          |    6 ++--
- arch/arm/mach-imx/mach-mx35_3ds.c             |    5 ++-
- arch/arm/mach-imx/mach-pcm037.c               |    5 ++-
- 5 files changed, 23 insertions(+), 41 deletions(-)
-
-diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
-index 6bd7c3f..13ea542 100644
---- a/arch/arm/mach-imx/devices/platform-ipu-core.c
-+++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
-@@ -69,42 +69,29 @@ struct platform_device *__init imx_alloc_mx3_camera(
- 			.flags = IORESOURCE_MEM,
- 		},
- 	};
--	int ret = -ENOMEM;
--	struct platform_device *pdev;
-+	struct platform_device_info pdevinfo;
-+	struct mx3_camera_pdata tmppdata;
- 
- 	if (IS_ERR_OR_NULL(imx_ipu_coredev))
- 		return ERR_PTR(-ENODEV);
- 
--	pdev = platform_device_alloc("mx3-camera", 0);
--	if (!pdev)
--		return ERR_PTR(-ENOMEM);
--
--	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
--	if (!pdev->dev.dma_mask)
--		goto err;
--
--	*pdev->dev.dma_mask = DMA_BIT_MASK(32);
--	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
--
--	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
--	if (ret)
--		goto err;
-+	memset(&pdevinfo, 0, sizeof(pdevinfo));
-+	pdevinfo.name = "mx3-camera";
-+	pdevinfo.id = 0;
-+	pdevinfo.res = res;
-+	pdevinfo.num_res = ARRAY_SIZE(res);
-+	pdevinfo.dma_mask = DMA_BIT_MASK(32);
- 
- 	if (pdata) {
--		struct mx3_camera_pdata *copied_pdata;
--
--		ret = platform_device_add_data(pdev, pdata, sizeof(*pdata));
--		if (ret) {
--err:
--			kfree(pdev->dev.dma_mask);
--			platform_device_put(pdev);
--			return ERR_PTR(-ENODEV);
--		}
--		copied_pdata = dev_get_platdata(&pdev->dev);
--		copied_pdata->dma_dev = &imx_ipu_coredev->dev;
-+		tmppdata = *pdata;
-+		tmppdata.dma_dev = &imx_ipu_coredev->dev;
-+
-+		pdata = &tmppdata;
-+		pdevinfo.data = pdata;
-+		pdevinfo.size_data = sizeof(*pdata);
- 	}
- 
--	return pdev;
-+	return platform_device_register_full(&pdevinfo);
- }
- 
- struct platform_device *__init imx_add_mx3_sdc_fb(
-diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
-index 4217871..a73a933 100644
---- a/arch/arm/mach-imx/mach-mx31_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx31_3ds.c
-@@ -199,10 +199,9 @@ static int __init mx31_3ds_init_camera(void)
- 	if (!(dma & DMA_MEMORY_MAP))
- 		goto err;
- 
--	ret = platform_device_add(pdev);
--	if (ret)
-+	return 0;
- err:
--		platform_device_put(pdev);
-+	platform_device_put(pdev);
- 
- 	return ret;
- }
-diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
-index 08730f2..14ca3b8 100644
---- a/arch/arm/mach-imx/mach-mx31moboard.c
-+++ b/arch/arm/mach-imx/mach-mx31moboard.c
-@@ -492,13 +492,11 @@ static int __init mx31moboard_init_cam(void)
- 	if (!(dma & DMA_MEMORY_MAP))
- 		goto err;
- 
--	ret = platform_device_add(pdev);
--	if (ret)
-+	return 0;
- err:
--		platform_device_put(pdev);
-+	platform_device_put(pdev);
- 
- 	return ret;
--
- }
- 
- static void mx31moboard_poweroff(void)
-diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
-index 4e8b184..c5a1b44 100644
---- a/arch/arm/mach-imx/mach-mx35_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx35_3ds.c
-@@ -282,10 +282,9 @@ static int __init imx35_3ds_init_camera(void)
- 	if (!(dma & DMA_MEMORY_MAP))
- 		goto err;
- 
--	ret = platform_device_add(pdev);
--	if (ret)
-+	return 0;
- err:
--		platform_device_put(pdev);
-+	platform_device_put(pdev);
- 
- 	return ret;
- }
-diff --git a/arch/arm/mach-imx/mach-pcm037.c b/arch/arm/mach-imx/mach-pcm037.c
-index 81b8aff..fa00e6d 100644
---- a/arch/arm/mach-imx/mach-pcm037.c
-+++ b/arch/arm/mach-imx/mach-pcm037.c
-@@ -425,10 +425,9 @@ static int __init pcm037_init_camera(void)
- 	if (!(dma & DMA_MEMORY_MAP))
- 		goto err;
- 
--	ret = platform_device_add(pdev);
--	if (ret)
-+	return 0;
- err:
--		platform_device_put(pdev);
-+	platform_device_put(pdev);
- 
- 	return ret;
- }
--- 
-1.7.10.4
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
