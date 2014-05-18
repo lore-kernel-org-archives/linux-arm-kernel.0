@@ -1,54 +1,32 @@
-From: emilgoode@gmail.com (Emil Goode)
-Date: Sun, 18 May 2014 17:38:51 +0200
-Subject: [PATCH v2] ARM: imx: fix error handling
-In-Reply-To: <20140517190546.GC16662@pengutronix.de>
-References: <1400234045-6022-1-git-send-email-emilgoode@gmail.com>
- <5375EB13.8000200@bfs.de> <20140516111646.GC4366@lianli>
- <5375FB36.8020004@bfs.de> <20140516193139.GQ16662@pengutronix.de>
- <20140517153540.GA4309@lianli>
- <20140517190546.GC16662@pengutronix.de>
-Message-ID: <20140518153851.GB4310@lianli>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sun, 18 May 2014 10:21:10 -0700
+Subject: [PATCHv4 0/5] Add DT support for fixed PHYs
+In-Reply-To: <20140518121854.3b4a17fa@free-electrons.com>
+References: <1400249647-4643-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140516.172009.632611701865367987.davem@davemloft.net>
+ <20140518121854.3b4a17fa@free-electrons.com>
+Message-ID: <CAGVrzcYN1-0zM0pVSFZkD5HVAwq6rXEQOBN29x+vBn9hpbmOcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I appologise for providing incomplete information in my previous message.
+2014-05-18 3:18 GMT-07:00 Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com>:
+> Dear David Miller,
+>
+> On Fri, 16 May 2014 17:20:09 -0400 (EDT), David Miller wrote:
+>> From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> Date: Fri, 16 May 2014 16:14:02 +0200
+>>
+>> > Here is a fourth version of the patch set that adds a Device Tree
+>> > binding and the related code to support fixed PHYs. I'm hoping to get
+>> > this merged in 3.16.
+>>
+>> Series applied, thanks Thomas.
+>
+> Thanks! Did you also pull PATCH 5/5, which changes the Armada XP Matrix
+> Device Tree file?
 
-The involved call sites are the following:
-
-arch/arm/mach-imx/mach-mx35_3ds.c +265
-
-imx35_3ds_init_camera()
-	imx35_alloc_mx3_camera()
-		imx_alloc_mx3_camera()
-	dma_declare_coherent_memory()
-	platform_device_add()
-
-arch/arm/mach-imx/mach-mx31moboard.c +477
-
-mx31moboard_init_cam()
-	imx31_alloc_mx3_camera()
-		imx_alloc_mx3_camera()
-	dma_declare_coherent_memory()
-	platform_device_add()
-
-arch/arm/mach-imx/mach-mx31_3ds.c +182
-
-mx31_3ds_init_camera()
-	imx31_alloc_mx3_camera()
-		imx_alloc_mx3_camera()
-	dma_declare_coherent_memory()
-	platform_device_add()
-
-arch/arm/mach-imx/mach-pcm037.c +413
-
-pcm037_init_camera()
-	imx31_alloc_mx3_camera()
-		imx_alloc_mx3_camera()
-	dma_declare_coherent_memory()
-	platform_device_add()
-
-Sorry about the mistake!
-
-Best regards,
-
-Emil Goode
+It has been applied:
+http://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=84f6e11f21d40025ae9b0ebbf1c9b3be91ea8e1a
+-- 
+Florian
