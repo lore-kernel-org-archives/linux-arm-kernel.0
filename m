@@ -1,28 +1,40 @@
 From: emilgoode@gmail.com (Emil Goode)
-Date: Sun, 18 May 2014 22:50:58 +0200
-Subject: [PATCH 0/2] ARM: imx: bug fix and convertion to
- platform_device_register_full()
-Message-ID: <1400446261-27085-1-git-send-email-emilgoode@gmail.com>
+Date: Sun, 18 May 2014 22:50:59 +0200
+Subject: [PATCH 1/2 v4] ARM: imx: fix error handling in ipu device registration
+In-Reply-To: <1400446261-27085-1-git-send-email-emilgoode@gmail.com>
+References: <1400446261-27085-1-git-send-email-emilgoode@gmail.com>
+Message-ID: <1400446261-27085-2-git-send-email-emilgoode@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This small series fixes a potential NULL pointer dereference bug and
-also converts the imx camera allocation and initialization functions
-to use platform_device_register_full().
+If we fail to allocate struct platform_device pdev we
+dereference it after the goto label err.
 
-The change the first patch makes is removed by the second patch, so the
-purpose of the first one is purely for easy backporting and git history.
+This bug was found using coccinelle.
 
-Emil Goode (2):
-  ARM: imx: fix error handling in ipu device registration
-  ARM: imx: convert camera init to use platform_device_register_full()
+Signed-off-by: Emil Goode <emilgoode@gmail.com>
+---
+v4: Simplified version that just fixes the bug.
+    Also updated the changelog.
+v3: Made subject line more specific.
+v2: Changed to return -ENOMEM instead of ret where possible and
+    updated the subject line.
 
- arch/arm/mach-imx/devices/platform-ipu-core.c |   43 +++++++++----------------
- arch/arm/mach-imx/mach-mx31_3ds.c             |    5 ++-
- arch/arm/mach-imx/mach-mx31moboard.c          |    6 ++--
- arch/arm/mach-imx/mach-mx35_3ds.c             |    5 ++-
- arch/arm/mach-imx/mach-pcm037.c               |    5 ++-
- 5 files changed, 23 insertions(+), 41 deletions(-)
+ arch/arm/mach-imx/devices/platform-ipu-core.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
+index fc4dd7c..6bd7c3f 100644
+--- a/arch/arm/mach-imx/devices/platform-ipu-core.c
++++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
+@@ -77,7 +77,7 @@ struct platform_device *__init imx_alloc_mx3_camera(
+ 
+ 	pdev = platform_device_alloc("mx3-camera", 0);
+ 	if (!pdev)
+-		goto err;
++		return ERR_PTR(-ENOMEM);
+ 
+ 	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
+ 	if (!pdev->dev.dma_mask)
 -- 
 1.7.10.4
