@@ -1,58 +1,78 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 18 May 2014 23:10:54 +0200
-Subject: [PATCH v3 0/7] ARM: berlin: add pinctrl support
-In-Reply-To: <CACRpkdYJU3HN2u=eFPUyM4eMmuT1Xw19zxjpb5nj9nXnar3_-A@mail.gmail.com>
-References: <1399267649-20218-1-git-send-email-antoine.tenart@free-electrons.com>
- <CACRpkdYJU3HN2u=eFPUyM4eMmuT1Xw19zxjpb5nj9nXnar3_-A@mail.gmail.com>
-Message-ID: <537921DE.3030107@gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Sun, 18 May 2014 23:51:59 +0200 (CEST)
+Subject: [PATCH v2 3/3] [media] atmel-isi: add primary DT support
+In-Reply-To: <1395744320-15025-1-git-send-email-josh.wu@atmel.com>
+References: <1395744087-5753-1-git-send-email-josh.wu@atmel.com>
+ <1395744320-15025-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <Pine.LNX.4.64.1405182308110.23804@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2014 02:43 PM, Linus Walleij wrote:
-> On Mon, May 5, 2014 at 7:27 AM, Antoine T?nart
-> <antoine.tenart@free-electrons.com> wrote:
+On Tue, 25 Mar 2014, Josh Wu wrote:
+
+> This patch add the DT support for Atmel ISI driver.
+> It use the same v4l2 DT interface that defined in video-interfaces.txt.
 > 
->> This series adds support for the Marvell Berlin pin-controller, allowing
->> to configure the pin muxing from the device tree.
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> Cc: devicetree at vger.kernel.org
+> ---
+> v1 --> v2:
+>  refine the binding document.
+>  add port node description.
+>  removed the optional property.
 > 
-> OK looking good!
-> 
-> I've applied patches 1,2,3,4 and 6 to the pin control tree.
+>  .../devicetree/bindings/media/atmel-isi.txt        |   50 ++++++++++++++++++++
+>  drivers/media/platform/soc_camera/atmel-isi.c      |   31 +++++++++++-
+>  2 files changed, 79 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/media/atmel-isi.txt
 
-Linus,
+[snip]
 
-thanks for taking the driver. Unfortunately, while working on
-clock drivers, I forgot you may take it in before I made up my
-mind with the register set pinctrl _and_ clock are in.
+> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+> index f4add0a..d6a1f7b 100644
+> --- a/drivers/media/platform/soc_camera/atmel-isi.c
+> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
 
-Mike came up with a request to try to expose as little of the
-clock internals as possible [1]. Also, after looking hours and
-hours at the chip-ctrl and system-ctrl registers of Berlin SoCs,
-I think using regmaps will be the only option.
+[snip]
 
-I have reworked berlin's pinctrl drivers so they use a mmio regmap
-instead of ioremapped addresses. Instead of "independent" pinctrl
-nodes, there will be common chip-ctrl/system-ctrl nodes that provide
-both clocks and pinctrl (and reset, padmux, ...).
+> @@ -885,6 +887,20 @@ static int atmel_isi_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +static int atmel_isi_probe_dt(struct atmel_isi *isi,
+> +			struct platform_device *pdev)
+> +{
+> +	struct device_node *node = pdev->dev.of_node;
+> +
+> +	/* Default settings for ISI */
+> +	isi->pdata.full_mode = 1;
+> +	isi->pdata.mck_hz = ISI_DEFAULT_MCLK_FREQ;
+> +	isi->pdata.frate = ISI_CFG1_FRATE_CAPTURE_ALL;
 
-Except regmap, there is no functional change in the driver itself,
-just the way the DT compatible and node are accessed.
+The above flags eventually should probably partially be added as new 
+driver-specific DT properties, partially derived from DT clock bindings. 
+But I'm ok to have them fixed like this in the initial version.
 
-I need Alexandre and Antoine to add the necessary changes for BG2Q
-clocks and pinctrl respectively first, but do you prefer proper
-follow-up patches or can you squash them into the ones you've just
-taken?
+> +	isi->pdata.data_width_flags = ISI_DATAWIDTH_8 | ISI_DATAWIDTH_10;
 
-[1] https://lkml.kernel.org/r/20140515044106.19795.57249 at quantum
+Whereas these flags, I think, should already now be derived from the 
+bus-width standard property? v4l2_of_parse_parallel_bus() will extract 
+them for you and I just asked Ben to add a call to 
+v4l2_of_parse_endpoint() to his patch. Consequently you'll have to 
+rearrange bus-width interpretation in isi_camera_try_bus_param() a bit and 
+use OF parsing results there directly if available? Or maybe you find a 
+better way. It would certainly be better to extend your probing code and 
+just use OF results to initialise isi->width_flags, but that might be 
+impossible, because OF parsing would be performed inside 
+soc_camera_host_register() and your isi_camera_try_bus_param() can also be 
+called immediately from it if all required I2C devices are already 
+available? If your I2C subdevice drivers defer probing until the host has 
+probed, then you could initialise .width_flags after 
+soc_camera_host_register(), but you cannot rely on that.
 
-> Please carry patches 5 and 7 in the MVEBU tree or wherever
-> the core SoC is stashed up. It'd not be necessary to pull in the
-> pin control tree I think since you're just selecting symbols and
-> adding device trees. (The dependencies will magically fall in
-> during the merge window, so this is bisectable.)
-
-Yeah, sure, as soon as we have an agreement with Mike on the clocks
-and you on the groups/function binding I'll post reworked patches
-5 and 7 that fit.
-
-Sebastian
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
