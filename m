@@ -1,40 +1,159 @@
 From: emilgoode@gmail.com (Emil Goode)
-Date: Sun, 18 May 2014 22:50:59 +0200
-Subject: [PATCH 1/2 v4] ARM: imx: fix error handling in ipu device registration
+Date: Sun, 18 May 2014 22:51:00 +0200
+Subject: [PATCH 2/2] ARM: imx: convert camera init to use
+ platform_device_register_full()
 In-Reply-To: <1400446261-27085-1-git-send-email-emilgoode@gmail.com>
 References: <1400446261-27085-1-git-send-email-emilgoode@gmail.com>
-Message-ID: <1400446261-27085-2-git-send-email-emilgoode@gmail.com>
+Message-ID: <1400446261-27085-3-git-send-email-emilgoode@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we fail to allocate struct platform_device pdev we
-dereference it after the goto label err.
-
-This bug was found using coccinelle.
+This converts the imx camera allocation and initialization functions
+to use platform_device_register_full() thus simplifying the code.
 
 Signed-off-by: Emil Goode <emilgoode@gmail.com>
 ---
-v4: Simplified version that just fixes the bug.
-    Also updated the changelog.
-v3: Made subject line more specific.
-v2: Changed to return -ENOMEM instead of ret where possible and
-    updated the subject line.
+Only build tested, unfortunately I currently don't have the hardware.
 
- arch/arm/mach-imx/devices/platform-ipu-core.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-imx/devices/platform-ipu-core.c |   43 +++++++++----------------
+ arch/arm/mach-imx/mach-mx31_3ds.c             |    5 ++-
+ arch/arm/mach-imx/mach-mx31moboard.c          |    6 ++--
+ arch/arm/mach-imx/mach-mx35_3ds.c             |    5 ++-
+ arch/arm/mach-imx/mach-pcm037.c               |    5 ++-
+ 5 files changed, 23 insertions(+), 41 deletions(-)
 
 diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
-index fc4dd7c..6bd7c3f 100644
+index 6bd7c3f..13ea542 100644
 --- a/arch/arm/mach-imx/devices/platform-ipu-core.c
 +++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
-@@ -77,7 +77,7 @@ struct platform_device *__init imx_alloc_mx3_camera(
+@@ -69,42 +69,29 @@ struct platform_device *__init imx_alloc_mx3_camera(
+ 			.flags = IORESOURCE_MEM,
+ 		},
+ 	};
+-	int ret = -ENOMEM;
+-	struct platform_device *pdev;
++	struct platform_device_info pdevinfo;
++	struct mx3_camera_pdata tmppdata;
  
- 	pdev = platform_device_alloc("mx3-camera", 0);
- 	if (!pdev)
+ 	if (IS_ERR_OR_NULL(imx_ipu_coredev))
+ 		return ERR_PTR(-ENODEV);
+ 
+-	pdev = platform_device_alloc("mx3-camera", 0);
+-	if (!pdev)
+-		return ERR_PTR(-ENOMEM);
+-
+-	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
+-	if (!pdev->dev.dma_mask)
 -		goto err;
-+		return ERR_PTR(-ENOMEM);
+-
+-	*pdev->dev.dma_mask = DMA_BIT_MASK(32);
+-	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+-
+-	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
+-	if (ret)
+-		goto err;
++	memset(&pdevinfo, 0, sizeof(pdevinfo));
++	pdevinfo.name = "mx3-camera";
++	pdevinfo.id = 0;
++	pdevinfo.res = res;
++	pdevinfo.num_res = ARRAY_SIZE(res);
++	pdevinfo.dma_mask = DMA_BIT_MASK(32);
  
- 	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
- 	if (!pdev->dev.dma_mask)
+ 	if (pdata) {
+-		struct mx3_camera_pdata *copied_pdata;
+-
+-		ret = platform_device_add_data(pdev, pdata, sizeof(*pdata));
+-		if (ret) {
+-err:
+-			kfree(pdev->dev.dma_mask);
+-			platform_device_put(pdev);
+-			return ERR_PTR(-ENODEV);
+-		}
+-		copied_pdata = dev_get_platdata(&pdev->dev);
+-		copied_pdata->dma_dev = &imx_ipu_coredev->dev;
++		tmppdata = *pdata;
++		tmppdata.dma_dev = &imx_ipu_coredev->dev;
++
++		pdata = &tmppdata;
++		pdevinfo.data = pdata;
++		pdevinfo.size_data = sizeof(*pdata);
+ 	}
+ 
+-	return pdev;
++	return platform_device_register_full(&pdevinfo);
+ }
+ 
+ struct platform_device *__init imx_add_mx3_sdc_fb(
+diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
+index 4217871..a73a933 100644
+--- a/arch/arm/mach-imx/mach-mx31_3ds.c
++++ b/arch/arm/mach-imx/mach-mx31_3ds.c
+@@ -199,10 +199,9 @@ static int __init mx31_3ds_init_camera(void)
+ 	if (!(dma & DMA_MEMORY_MAP))
+ 		goto err;
+ 
+-	ret = platform_device_add(pdev);
+-	if (ret)
++	return 0;
+ err:
+-		platform_device_put(pdev);
++	platform_device_put(pdev);
+ 
+ 	return ret;
+ }
+diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
+index 08730f2..14ca3b8 100644
+--- a/arch/arm/mach-imx/mach-mx31moboard.c
++++ b/arch/arm/mach-imx/mach-mx31moboard.c
+@@ -492,13 +492,11 @@ static int __init mx31moboard_init_cam(void)
+ 	if (!(dma & DMA_MEMORY_MAP))
+ 		goto err;
+ 
+-	ret = platform_device_add(pdev);
+-	if (ret)
++	return 0;
+ err:
+-		platform_device_put(pdev);
++	platform_device_put(pdev);
+ 
+ 	return ret;
+-
+ }
+ 
+ static void mx31moboard_poweroff(void)
+diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
+index 4e8b184..c5a1b44 100644
+--- a/arch/arm/mach-imx/mach-mx35_3ds.c
++++ b/arch/arm/mach-imx/mach-mx35_3ds.c
+@@ -282,10 +282,9 @@ static int __init imx35_3ds_init_camera(void)
+ 	if (!(dma & DMA_MEMORY_MAP))
+ 		goto err;
+ 
+-	ret = platform_device_add(pdev);
+-	if (ret)
++	return 0;
+ err:
+-		platform_device_put(pdev);
++	platform_device_put(pdev);
+ 
+ 	return ret;
+ }
+diff --git a/arch/arm/mach-imx/mach-pcm037.c b/arch/arm/mach-imx/mach-pcm037.c
+index 81b8aff..fa00e6d 100644
+--- a/arch/arm/mach-imx/mach-pcm037.c
++++ b/arch/arm/mach-imx/mach-pcm037.c
+@@ -425,10 +425,9 @@ static int __init pcm037_init_camera(void)
+ 	if (!(dma & DMA_MEMORY_MAP))
+ 		goto err;
+ 
+-	ret = platform_device_add(pdev);
+-	if (ret)
++	return 0;
+ err:
+-		platform_device_put(pdev);
++	platform_device_put(pdev);
+ 
+ 	return ret;
+ }
 -- 
 1.7.10.4
