@@ -1,58 +1,58 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Sun, 18 May 2014 22:59:36 +0200 (CEST)
-Subject: [PATCH v2 2/3] [media] atmel-isi: convert the pdata from pointer
- to structure
-In-Reply-To: <1395744087-5753-3-git-send-email-josh.wu@atmel.com>
-References: <1395744087-5753-1-git-send-email-josh.wu@atmel.com>
- <1395744087-5753-3-git-send-email-josh.wu@atmel.com>
-Message-ID: <Pine.LNX.4.64.1405182255540.23804@axis700.grange>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sun, 18 May 2014 23:10:54 +0200
+Subject: [PATCH v3 0/7] ARM: berlin: add pinctrl support
+In-Reply-To: <CACRpkdYJU3HN2u=eFPUyM4eMmuT1Xw19zxjpb5nj9nXnar3_-A@mail.gmail.com>
+References: <1399267649-20218-1-git-send-email-antoine.tenart@free-electrons.com>
+ <CACRpkdYJU3HN2u=eFPUyM4eMmuT1Xw19zxjpb5nj9nXnar3_-A@mail.gmail.com>
+Message-ID: <537921DE.3030107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
-
-I'm still waiting for an update of Ben's patches to then also apply yours, 
-but I decided to have a look at yours now to see if I find anything, that 
-might be worth changing. A small note to this one below.
-
-On Tue, 25 Mar 2014, Josh Wu wrote:
-
-> Now the platform data is initialized by allocation of isi
-> structure. In the future, we use pdata to store the dt parameters.
+On 05/16/2014 02:43 PM, Linus Walleij wrote:
+> On Mon, May 5, 2014 at 7:27 AM, Antoine T?nart
+> <antoine.tenart@free-electrons.com> wrote:
 > 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
-> v1 --> v2:
->  no change.
+>> This series adds support for the Marvell Berlin pin-controller, allowing
+>> to configure the pin muxing from the device tree.
 > 
->  drivers/media/platform/soc_camera/atmel-isi.c |   22 +++++++++++-----------
->  1 file changed, 11 insertions(+), 11 deletions(-)
+> OK looking good!
 > 
-> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-> index 9d977c5..f4add0a 100644
-> --- a/drivers/media/platform/soc_camera/atmel-isi.c
-> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+> I've applied patches 1,2,3,4 and 6 to the pin control tree.
 
-[snip]
+Linus,
 
-> @@ -912,7 +912,7 @@ static int atmel_isi_probe(struct platform_device *pdev)
->  	if (IS_ERR(isi->pclk))
->  		return PTR_ERR(isi->pclk);
->  
-> -	isi->pdata = pdata;
-> +	memcpy(&isi->pdata, pdata, sizeof(struct isi_platform_data));
+thanks for taking the driver. Unfortunately, while working on
+clock drivers, I forgot you may take it in before I made up my
+mind with the register set pinctrl _and_ clock are in.
 
-I think it'd be better to use
+Mike came up with a request to try to expose as little of the
+clock internals as possible [1]. Also, after looking hours and
+hours at the chip-ctrl and system-ctrl registers of Berlin SoCs,
+I think using regmaps will be the only option.
 
-+	memcpy(&isi->pdata, pdata, sizeof(isi->pdata));
+I have reworked berlin's pinctrl drivers so they use a mmio regmap
+instead of ioremapped addresses. Instead of "independent" pinctrl
+nodes, there will be common chip-ctrl/system-ctrl nodes that provide
+both clocks and pinctrl (and reset, padmux, ...).
 
-This way if the type of the pdata changes at any time in the future this 
-line will not have to be changed. If you don't mind I can make this change 
-myself, so you don't have to make a new version just for this.
+Except regmap, there is no functional change in the driver itself,
+just the way the DT compatible and node are accessed.
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+I need Alexandre and Antoine to add the necessary changes for BG2Q
+clocks and pinctrl respectively first, but do you prefer proper
+follow-up patches or can you squash them into the ones you've just
+taken?
+
+[1] https://lkml.kernel.org/r/20140515044106.19795.57249 at quantum
+
+> Please carry patches 5 and 7 in the MVEBU tree or wherever
+> the core SoC is stashed up. It'd not be necessary to pull in the
+> pin control tree I think since you're just selecting symbols and
+> adding device trees. (The dependencies will magically fall in
+> during the merge window, so this is bisectable.)
+
+Yeah, sure, as soon as we have an agreement with Mike on the clocks
+and you on the groups/function binding I'll post reworked patches
+5 and 7 that fit.
+
+Sebastian
