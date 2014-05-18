@@ -1,72 +1,50 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sun, 18 May 2014 20:07:14 +0800
-Subject: [GIT PULL]]ARM: sirf: machine update for 3.16
-In-Reply-To: <CAGsJ_4wD=FqxNeuEs47f0D9V+Qhn8jyUQL67iv4rsZ3r2K_3vA@mail.gmail.com>
-References: <CAGsJ_4yqTkKu+93Fo_D6NaZMyz4T6_EmKz4gZfyeQCi_uF-3dg@mail.gmail.com>
- <CAGsJ_4wD=FqxNeuEs47f0D9V+Qhn8jyUQL67iv4rsZ3r2K_3vA@mail.gmail.com>
-Message-ID: <CAGsJ_4y7gEQd9-Em6LW2kZ79qUOz5dSYzeWnBLbt8o8QsOSA6w@mail.gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sun, 18 May 2014 14:08:02 +0200
+Subject: [PATCH] arm/omap4: add twd clock to DT
+In-Reply-To: <535662F0.4080300@ti.com>
+References: <1396901139-17268-1-git-send-email-gilles.chanteperdrix@xenomai.org>
+ <20140418223948.GK21823@atomide.com> <5353F44F.5080400@xenomai.org>
+ <535662F0.4080300@ti.com>
+Message-ID: <CAGhQ9Vw-QaB+OnLa3yNVvD6a=XOutSZ1ejbsuUXvEcyrxEsRcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Bin Shi (2):
->>       clocksource: prima2: fix some minor checkpatch issues
->>       irqchip: sirf: fix one minor checkpatch issue
+On 22 April 2014 14:39, Tero Kristo <t-kristo@ti.com> wrote:
+> On 04/20/2014 07:22 PM, Gilles Chanteperdrix wrote:
 >>
->> Xianglong Du (1):
->>       ARM: prima2: rstc: fix some minor checkpatch issues
+>> Le 19/04/2014 00:39, Tony Lindgren a ?crit :
+>>>
+>>> * Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org> [140407 13:09]:
+>>>>
+>>>> Booting Linux 3.14 on Pandaboard currently gets the following
+>>>> message displayed:
+>>>>
+>>>> smp_twd: clock not found -2
+>>>>
+>>>> Define "mpu_periphclk" as the twd clock in omap4 dts to avoid this.
+>>>
+>>>
+>>> Tero, care to ack?
 >>
->> Zhiwu Song (2):
->>       clocksource:sirf: remove the hardcode for the clk of timers
->>       clocksource: marco: fix the affinity set for local timer of CPU1
+>>
+>> Sorry if I did not mail the right people, get_maintainer.pl gave me a
+>> long list, and I did not feel like spamming all these people for such a
+>> small patch. I do not believe Tero was in this list.
+>>
+>> Regards.
 >
-> as Daniel has applied this one "clocksource: marco: fix the affinity
-> set for local timer of CPU1" to his clk tree, i'll rebuilt the tag by
-> dropping this.
+>
+> Yea I don't think this is my expertise area, however the patch looks good to
+> me, so if you really need it:
+>
+> Acked-by: Tero Kristo <t-kristo@ti.com>
 
-hi Olof,
-i did a force update to tags/sirf-soc-for-3.16 after dropping
-"clocksource: marco: fix the affinity set for local timer of CPU1"
-which has been in clk tree , the new request is as below:
+Tony, care to add this to your omap 3.16 dt branch?
 
-The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
+I am still getting:
+[ 0.000152] smp_twd: clock not found -2
 
-  Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
+So this fix from Gilles would be nice to have.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
-tags/sirf-soc-for-3.16
-
-for you to fetch changes up to c7cff54d5926e3f419c23eff2ebaf6f5e12da05d:
-
-  clocksource:sirf: remove the hardcode for the clk of timers
-(2014-05-12 21:43:49 +0800)
-
-----------------------------------------------------------------
-ARM: sirf: machine update for 3.16
-
-most of them fix some minor checkpatch issues according to key customers'
-requirement. And this patchset also cleanups the clk of clocksource: move
-to get clk by dts properity.
-
-----------------------------------------------------------------
-Bin Shi (2):
-      clocksource: prima2: fix some minor checkpatch issues
-      irqchip: sirf: fix one minor checkpatch issue
-
-Xianglong Du (1):
-      ARM: prima2: rstc: fix some minor checkpatch issues
-
-Zhiwu Song (1):
-      clocksource:sirf: remove the hardcode for the clk of timers
-
- arch/arm/boot/dts/atlas6.dtsi      |    1 +
- arch/arm/boot/dts/prima2.dtsi      |    1 +
- arch/arm/mach-prima2/rstc.c        |   34 +++++++++++++++-----------
- drivers/clocksource/timer-marco.c  |    8 +++---
- drivers/clocksource/timer-prima2.c |   47 ++++++++++++++++++++++--------------
- drivers/irqchip/irq-sirfsoc.c      |    3 ++-
- 6 files changed, 56 insertions(+), 38 deletions(-)
-
-
--barry
+regards
+Joachim Eastwood
