@@ -1,110 +1,158 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Sun, 18 May 2014 20:50:40 +0800
-Subject: [GIT PULL] sirf clk update for 3.16
-In-Reply-To: <20140515060124.3084.44286@quantum>
-References: <CAGsJ_4z+Y2P1YNTQWC-VsaT3N0Kasd=LvxAbLVLMftnt8gZbkg@mail.gmail.com>
- <20140515060124.3084.44286@quantum>
-Message-ID: <CAGsJ_4ymGxROu5fz2YFwPMTsPDiXrHUshoQFJ5SWhtHCK5HGKg@mail.gmail.com>
+Date: Sun, 18 May 2014 21:13:20 +0800
+Subject: [RFC PATCH] ARM: cache-l2x0: add setup entry for l2 in non-secure
+ mode
+In-Reply-To: <5374532D.7030602@lge.com>
+References: <5374532D.7030602@lge.com>
+Message-ID: <CAGsJ_4zN39jeHz574_r9y_hjdn1Acbkr9gQhE=1L-Fs82-vDkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-05-15 14:01 GMT+08:00 Mike Turquette <mturquette@linaro.org>:
-> Quoting Barry Song (2014-05-12 07:45:00)
->> Hi Mike,
->>
->> can you pull the below update for 3.16? it cleanups the sirf clk codes
->> to fix some minor checkpatch issues according to key customer's
->> requirement.
->>
->>
->> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
->>
->>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
->> tags/clk-sirf-for-3.16
+2014-05-15 13:39 GMT+08:00 Gioh Kim <gioh.kim@lge.com>:
 >
-> Hi Barry,
+> Hi,
 >
-> I get the following warnings when pulling this tag onto the clk-next
-> branch:
+> My board is using Trustzone and running kernel is non-secure mode.
+> But setup function of PL310 driver is only for secure mode kernel.
 >
-> In file included from drivers/clk/sirf/clk-prima2.c:20:0:
-> drivers/clk/sirf/clk-common.c:199:2: warning: initialization discards ?const? qualifier from pointer target type [enabled by default]
->   .parent_names = pll_clk_parents,
->   ^
->   ... repeats a for every .parent_names instance ...
+> What about adding an entry for non-secure mode setup function?
 >
-> In file included from drivers/clk/sirf/clk-atlas6.c:20:0:
-> drivers/clk/sirf/clk-common.c:199:2: warning: initialization discards ?const? qualifier from pointer target type [enabled by default]
->   .parent_names = pll_clk_parents,
->   ^
->   ... repeats a for every .parent_names instance ...
+> I'm sorry for my poor code but I just wanna say what I need .
+
+Gioh,
+
+i don't really understand what is the user scenarios for this, if you
+are running linux in non-secure mode, your security-mode codes have
+enabled L2, so this makes non-secure linux have no chance to execute
+setup at all:
+ 992         /* L2 configuration can only be changed if the cache is disabled */
+ 993         if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
+ 994                 if (data->setup)
+ 995                         data->setup(np, &aux_val, &aux_mask);
+
+anyway, cache-l2x0.c supported non-secure linux as you can read:
+ 387         /*
+ 388          * Check if l2x0 controller is already enabled.
+ 389          * If you are booting from non-secure mode
+ 390          * accessing the below registers will fault.
+ 391          */
+ 392         if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
+ 393                 /* Make sure that I&D is not locked down when starting */
+ 394                 l2x0_unlock(cache_id);
+ 395
+ 396                 /* l2x0 controller is disabled */
+ 397                 writel_relaxed(aux, l2x0_base + L2X0_AUX_CTRL);
+ 398
+ 399                 l2x0_inv_all();
+ 400
+ 401                 /* enable L2X0 */
+ 402                 writel_relaxed(L2X0_CTRL_EN, l2x0_base + L2X0_CTRL);
+ 403         }
+
+
+
 >
-> Can you fix up and resubmit?
+> ------------------------------ 8< -------------------------------
+> From ee4b03fb2c12038c6bbb9f752558abae8d500c07 Mon Sep 17 00:00:00 2001
+> From: Gioh Kim <gioh.kim@lge.com>
+> Date: Thu, 15 May 2014 14:06:36 +0900
+> Subject: [PATCH] ARM: cache-l2x0: add setup entry for l2 in non-secure mode
 >
-
-hi Mike,
-this might mean we need a fix in clk core. we moved to "const char *
-const" for clk parents
-by:
-137 -static const char *pll_clk_parents[] = {
-138 +static const char * const pll_clk_parents[] = {
-...
-repeated for every clk_parent.
-...
-
-to fix checkpatch issues like:
-#287: FILE: clk-common.c:287:
-+static const char *dmn_clk_parents[] = {
-
-WARNING: static const char * array should probably be static const char * const
-
-but in clk_init_data, parent_names are "const char **"
-const char              **parent_names;
-
-if we don't change the parent_names of clk_init_data structure, the
-only thing we can do to fix "warning: initialization discards ?const?
-qualifier from pointer target type" is doing things like:
-
- static struct clk_init_data clk_spi1_init = {
-        .name = "spi1",
-        .ops = &ios_ops,
--       .parent_names = std_clk_io_parents,
-+       .parent_names = (const char **)std_clk_io_parents,
-        .num_parents = ARRAY_SIZE(std_clk_io_parents),
- };
-
-but this looks not too right. what is your opinion? i want to send a
-fix for this issue by:
-
-commit ef10a461aaa5db647a5e8d4d1f43659bab2ae9e1
-Author: Barry Song <Baohua.Song@csr.com>
-Date:   Sun May 18 20:47:29 2014 +0800
-
-    clk: move parent_names of clk_init_data to "const char * const *"
-
-    Signed-off-by: Barry Song ...
-
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 5119174..f919806 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -188,7 +188,7 @@ struct clk_ops {
- struct clk_init_data {
-        const char              *name;
-        const struct clk_ops    *ops;
--       const char              **parent_names;
-+       const char * const      *parent_names;
-        u8                      num_parents;
-        unsigned long           flags;
- };
-
-
-> Regards,
-> Mike
+> For some platforms using Trustzone and running kernel in non-secure mode,
+> another l2 setup function is necessary.
 >
+> Signed-off-by: Gioh Kim <gioh.kim@lge.c>
+> ---
+>  arch/arm/include/asm/hardware/cache-l2x0.h |    9 +++++++++
+>  arch/arm/mm/cache-l2x0.c                   |   26 +++++++++++++++++++++++++-
+>  2 files changed, 34 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+> index 6dec6da..de31114 100644
+> --- a/arch/arm/include/asm/hardware/cache-l2x0.h
+> +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+> @@ -21,6 +21,7 @@
+>  #define __ASM_ARM_HARDWARE_L2X0_H
+>
+>  #include <linux/errno.h>
+> +#include <linux/of.h>
+>
+>  #define L2X0_CACHE_ID                  0x000
+>  #define L2X0_CACHE_TYPE                        0x004
+> @@ -110,11 +111,19 @@
+>  extern void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask);
+>  #if defined(CONFIG_CACHE_L2X0) && defined(CONFIG_OF)
+>  extern int l2x0_of_init(u32 aux_val, u32 aux_mask);
+> +extern int l2x0_of_set_setup_nonsecure(const char *compatible, size_t len,
+> +                       void (*fp)(const struct device_node *, u32 *, u32 *));
+>  #else
+>  static inline int l2x0_of_init(u32 aux_val, u32 aux_mask)
+>  {
+>         return -ENODEV;
+>  }
+> +static inline int l2x0_of_set_setup_nonsecure(const char *compatible,
+> +                                             size_t len,
+> +                     void (*fp)(const struct device_node *, u32 *, u32 *))
+> +{
+> +       return -ENODEV;
+> +}
+>  #endif
+>
+>  struct l2x0_regs {
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index 728d644..582ea37 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -45,6 +45,7 @@ struct l2x0_regs l2x0_saved_regs;
+>  struct l2x0_of_data {
+>         void (*setup)(const struct device_node *, u32 *, u32 *);
+>         void (*save)(void);
+> +       void (*setup_nonsecure)(const struct device_node *, u32 *, u32 *);
+>         struct outer_cache_fns outer_cache;
+>  };
+>
+> @@ -968,6 +969,23 @@ static const struct of_device_id l2x0_ids[] __initconst = {
+>         {}
+>  };
+>
+> +int l2x0_of_set_setup_nonsecure(const char *compatible, size_t len,
+> +                       void (*fp)(const struct device_node *, u32 *, u32 *))
+> +{
+> +       const struct of_device_id *id;
+> +
+> +       for (id = &l2x0_ids[0]; id->compatible != NULL; id++) {
+> +               if (strncmp(id->compatible, compatible, len) == 0) {
+> +                       struct l2x0_of_data *data = id->data;
+> +
+> +                       data->setup_nonsecure = fp;
+> +                       return 0;
+> +               }
+> +       }
+> +
+> +       return -EINVAL;
+> +}
+> +
+>  int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+>  {
+>         struct device_node *np;
+> @@ -989,8 +1007,14 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+>
+>         /* L2 configuration can only be changed if the cache is disabled */
+>         if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
+> -               if (data->setup)
+> +
+> +               if (data->setup_nonsecure)
+> +                       data->setup_nonsecure(np, &aux_val, &aux_mask);
+> +               else if (data->setup)
+>                         data->setup(np, &aux_val, &aux_mask);
+> +               else
+> +                       /* no function to enable cache */
+> +                       return -ENODEV;
+>
+>                 /* For aurora cache in no outer mode select the
+>                  * correct mode using the coprocessor*/
+> --
+> 1.7.9.5
+
 
 -barry
