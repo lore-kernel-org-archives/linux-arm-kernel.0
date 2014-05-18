@@ -1,78 +1,146 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Sun, 18 May 2014 23:51:59 +0200 (CEST)
-Subject: [PATCH v2 3/3] [media] atmel-isi: add primary DT support
-In-Reply-To: <1395744320-15025-1-git-send-email-josh.wu@atmel.com>
-References: <1395744087-5753-1-git-send-email-josh.wu@atmel.com>
- <1395744320-15025-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <Pine.LNX.4.64.1405182308110.23804@axis700.grange>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 19 May 2014 00:23:33 +0200
+Subject: [RFC PATCH] clk: composite: support determine_rate using
+ rate_ops->round_rate + mux_ops->set_parent
+In-Reply-To: <20140114204146.4167.2654@quantum>
+References: <1387769564-12894-2-git-send-email-emilio@elopez.com.ar>
+ <1389114233-11162-1-git-send-email-b.brezillon@overkiz.com>
+ <20140114204146.4167.2654@quantum>
+Message-ID: <8501850.VY2X0jf8VS@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Mar 2014, Josh Wu wrote:
-
-> This patch add the DT support for Atmel ISI driver.
-> It use the same v4l2 DT interface that defined in video-interfaces.txt.
+Am Dienstag, 14. Januar 2014, 12:41:46 schrieb Mike Turquette:
+> Quoting Boris BREZILLON (2014-01-07 09:03:52)
 > 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> Cc: devicetree at vger.kernel.org
-> ---
-> v1 --> v2:
->  refine the binding document.
->  add port node description.
->  removed the optional property.
+> > In case the rate_hw does not implement determine_rate, but only round_rate
+> > we fallback to best_parent selection if mux_hw is present and support
+> > reparenting.
+> > 
+> > Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 > 
->  .../devicetree/bindings/media/atmel-isi.txt        |   50 ++++++++++++++++++++
->  drivers/media/platform/soc_camera/atmel-isi.c      |   31 +++++++++++-
->  2 files changed, 79 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/media/atmel-isi.txt
+> Since this change affects users of the composite clock type I will hold
+> off reviewing/applying this patch until after the merge window.
 
-[snip]
+sorry for resurrecting this old code, but it looks like it was forgotten 
+somehow and I'm currently hit by a problem that this patch fixes.
 
-> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-> index f4add0a..d6a1f7b 100644
-> --- a/drivers/media/platform/soc_camera/atmel-isi.c
-> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+When using a composite clk containing both a divider and mux using the 
+standard clock ops, all rate changes ignore the divider completely and only 
+handle the mux. In my case the parents provide 800 and 600MHz while I'm 
+requesting 300MHz. As only mux_ops->determine_rate runs, I get 600MHz instead 
+of anything <= 300 when using the included divider.
 
-[snip]
+Boris' patch fixes this issue for me, so
 
-> @@ -885,6 +887,20 @@ static int atmel_isi_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +static int atmel_isi_probe_dt(struct atmel_isi *isi,
-> +			struct platform_device *pdev)
-> +{
-> +	struct device_node *node = pdev->dev.of_node;
-> +
-> +	/* Default settings for ISI */
-> +	isi->pdata.full_mode = 1;
-> +	isi->pdata.mck_hz = ISI_DEFAULT_MCLK_FREQ;
-> +	isi->pdata.frate = ISI_CFG1_FRATE_CAPTURE_ALL;
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+Acked-by: Heiko Stuebner <heiko@sntech.de>
 
-The above flags eventually should probably partially be added as new 
-driver-specific DT properties, partially derived from DT clock bindings. 
-But I'm ok to have them fixed like this in the initial version.
 
-> +	isi->pdata.data_width_flags = ISI_DATAWIDTH_8 | ISI_DATAWIDTH_10;
+The patch applies nicely after adapting it according to 
+5d2043fbe4ddc6cc16ba71b49c2c13f4cb2fe932 ("clk: composite: pass mux_hw into 
+determine_rate")
 
-Whereas these flags, I think, should already now be derived from the 
-bus-width standard property? v4l2_of_parse_parallel_bus() will extract 
-them for you and I just asked Ben to add a call to 
-v4l2_of_parse_endpoint() to his patch. Consequently you'll have to 
-rearrange bus-width interpretation in isi_camera_try_bus_param() a bit and 
-use OF parsing results there directly if available? Or maybe you find a 
-better way. It would certainly be better to extend your probing code and 
-just use OF results to initialise isi->width_flags, but that might be 
-impossible, because OF parsing would be performed inside 
-soc_camera_host_register() and your isi_camera_try_bus_param() can also be 
-called immediately from it if all required I2C devices are already 
-available? If your I2C subdevice drivers defer probing until the host has 
-probed, then you could initialise .width_flags after 
-soc_camera_host_register(), but you cannot rely on that.
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Heiko
+
+> > ---
+> > 
+> >  drivers/clk/clk-composite.c |   49
+> >  ++++++++++++++++++++++++++++++++++++++++++- 1 file changed, 48
+> >  insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+> > index 753d0b7..d3cf49a 100644
+> > --- a/drivers/clk/clk-composite.c
+> > +++ b/drivers/clk/clk-composite.c
+> > @@ -64,11 +64,57 @@ static long clk_composite_determine_rate(struct clk_hw
+> > *hw, unsigned long rate,> 
+> >         const struct clk_ops *mux_ops = composite->mux_ops;
+> >         struct clk_hw *rate_hw = composite->rate_hw;
+> >         struct clk_hw *mux_hw = composite->mux_hw;
+> > 
+> > +       struct clk *parent;
+> > +       unsigned long parent_rate;
+> > +       long tmp_rate;
+> > +       unsigned long rate_diff;
+> > +       unsigned long best_rate_diff = ULONG_MAX;
+> > +       int i;
+> > 
+> >         if (rate_hw && rate_ops && rate_ops->determine_rate) {
+> >         
+> >                 rate_hw->clk = hw->clk;
+> >                 return rate_ops->determine_rate(rate_hw, rate,
+> >                 best_parent_rate,
+> >                 
+> >                                                 best_parent_p);
+> > 
+> > +       } else if (rate_hw && rate_ops && rate_ops->round_rate &&
+> > +                  mux_hw && mux_ops && mux_ops->set_parent) {
+> > +               *best_parent_p = NULL;
+> > +
+> > +               if (__clk_get_flags(hw->clk) & CLK_SET_RATE_NO_REPARENT) {
+> > +                       *best_parent_p = clk_get_parent(mux_hw->clk);
+> > +                       *best_parent_rate =
+> > __clk_get_rate(*best_parent_p);
+> > +
+> > +                       return rate_ops->round_rate(rate_hw, rate,
+> > +                                                   best_parent_rate);
+> > +               }
+> > +
+> > +               for (i = 0; i < __clk_get_num_parents(mux_hw->clk); i++) {
+> > +                       parent = clk_get_parent_by_index(mux_hw->clk, i);
+> > +                       if (!parent)
+> > +                               continue;
+> > +
+> > +                       parent_rate = __clk_get_rate(parent);
+> > +
+> > +                       tmp_rate = rate_ops->round_rate(rate_hw, rate,
+> > +                                                       &parent_rate);
+> > +                       if (tmp_rate < 0)
+> > +                               continue;
+> > +
+> > +                       if (tmp_rate < rate)
+> > +                               rate_diff = rate - tmp_rate;
+> > +                       else
+> > +                               rate_diff = tmp_rate - rate;
+> > +
+> > +                       if (!rate_diff || !*best_parent_p ||
+> > best_rate_diff > rate_diff) { +                              
+> > *best_parent_p = parent;
+> > +                               *best_parent_rate = parent_rate;
+> > +                               best_rate_diff = rate_diff;
+> > +                       }
+> > +
+> > +                       if (!rate_diff)
+> > +                               return rate;
+> > +               }
+> > +
+> > +               return best_rate_diff;
+> > 
+> >         } else if (mux_hw && mux_ops && mux_ops->determine_rate) {
+> >         
+> >                 mux_hw->clk = hw->clk;
+> >                 return mux_ops->determine_rate(rate_hw, rate,
+> >                 best_parent_rate,
+> > 
+> > @@ -196,7 +242,8 @@ struct clk *clk_register_composite(struct device *dev,
+> > const char *name,> 
+> >                 composite->rate_hw = rate_hw;
+> >                 composite->rate_ops = rate_ops;
+> >                 clk_composite_ops->recalc_rate =
+> >                 clk_composite_recalc_rate;
+> > 
+> > -               if (rate_ops->determine_rate)
+> > +               if (rate_ops->determine_rate ||
+> > +                   (rate_ops->round_rate &&
+> > clk_composite_ops->set_parent))> 
+> >                         clk_composite_ops->determine_rate =
+> >                         clk_composite_determine_rate;
+> >         
+> >         }
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
