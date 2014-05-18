@@ -1,20 +1,25 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sun, 18 May 2014 11:33:37 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNOiBpLk1YMSBjbGs6IEFkZCBkZXZpY2V0cmVlIHN1?=
- =?UTF-8?B?cHBvcnQ=?=
-In-Reply-To: <1400397340-8943-1-git-send-email-shc_work@mail.ru>
-References: <1400397340-8943-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1400398417.255985036@f256.i.mail.ru>
+From: lho@apm.com (Loc Ho)
+Date: Sun, 18 May 2014 01:41:55 -0600
+Subject: [PATCH 0/3] mmc: Add APM X-Gene SoC SDHC controller support to Arasan
+ SDHCI driver
+Message-ID: <1400398918-1502-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sun, 18 May 2014 11:15:40 +0400 ?? Alexander Shiyan <shc_work@mail.ru>:
-> This patch adds devicetree support CCM module for i.MX1 (MC9328MX1) CPUs.
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
-...
+This patch adds support for the APM X-Gene SoC SDHC controller to Arasan
+SDHCI driver.
 
-Seems that I did patch for the wrong tree. So, please just ignore this patch.
-
+Signed-off-by: Loc Ho <lho@apm.com>
 ---
+Loc Ho (3):
+  Documentation: Update Arasan SDHC documentation for the APM X-Gene
+    SoC SDHC DTS binding
+  mmc: Add APM X-Gene SoC SDHC controller support to Arasan SDHCI
+    driver
+  arm64: Add APM X-Gene SoC SDHC controller DTS entry
+
+ .../devicetree/bindings/mmc/arasan,sdhci.txt       |    9 +-
+ arch/arm64/boot/dts/apm-storm.dtsi                 |    8 ++
+ drivers/mmc/host/Kconfig                           |    4 +-
+ drivers/mmc/host/sdhci-of-arasan.c                 |  126 ++++++++++++++++++--
+ 4 files changed, 134 insertions(+), 13 deletions(-)
