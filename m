@@ -1,66 +1,125 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 May 2014 19:47:13 +0200
-Subject: [Patch v3 0/5] Introduce keystone reset driver
-In-Reply-To: <537A1E2C.8040102@ti.com>
-References: <1400495155-11136-1-git-send-email-ivan.khoronzhuk@ti.com>
- <537A1E2C.8040102@ti.com>
-Message-ID: <5095812.b6DgWAxYzH@wuerfel>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Mon, 19 May 2014 19:50:50 +0200
+Subject: [PATCH 06/11] ARM: OMAP2+: Fix voltage scaling init for device
+ tree
+In-Reply-To: <1397173639-29587-7-git-send-email-tony@atomide.com>
+References: <1397173639-29587-1-git-send-email-tony@atomide.com>
+ <1397173639-29587-7-git-send-email-tony@atomide.com>
+Message-ID: <CAGhQ9VxS+Hg6EX=CDxbibV2TFw++LwZY+GQomZEHx--JGuWHNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 May 2014 11:07:24 Santosh Shilimkar wrote:
-> On Monday 19 May 2014 06:25 AM, Ivan Khoronzhuk wrote:
-> > These patches introduce keystone reset driver.
-> > 
-> > The keystone SoC can be rebooted in several ways. By external reset
-> > pin, by soft and by watchdogs. This driver allows software reset and reset
-> > by one of the watchdogs. Also added opportunity to set soft/hard reset type.
-> > 
-> > Based on v3.15-rc5
-> > 
-> Arnd,
-> Can I have have your ack/reviewed-by please since you did gave few comments
-> on previous version.
+Hi Tony,
 
-Sorry for not getting back to you earlier on this topic.
+If found this patch in your omap-for-v3.16/pm-signed tag and tested it
+on top of Linus master + omap 3.16 dt + Tomi fbdev omap. I assumed
+it's going upstream for 3.16(?).
 
-> On 04/14/2014 09:44 PM, Arnd Bergmann wrote:
-> > On Monday 14 April 2014 20:41:20 Ivan Khoronzhuk wrote:
-> >> +Optional properties:
-> >> +
-> >> +- ti,soft-reset:       Boolean option indicating soft reset.
-> >> +                       By default hard reset is used.
-> >> +
-> >> +- ti,wdt_list:         WDT list that can cause SoC reset.
-> >> +                       The list in format: <0>, <2>;
-> >> +                       Begins from 0 to 3, as keystone can contain up
-> >> +                       to 4 SoC reset watchdogs.
-> > 
-> > This looks like your binding just describes a subset of the
-> > watchdog timer registers. If so, don't do a standalone reset
-> 
-> The registers are not a subset of watchdog hardware it's SoC specific future
-> controlled by SoC specific registers (bootregs and PLL regs).
-> 
-> For watchog IP setup, the Keystone uses the watchdog driver common with
-> other
-> SoCs -- davinci_watchdog that is not depend on other SoC settings like
-> this driver does.
-> 
-> The Keystone SoCs have separate registers to tune Keystone2 reset
-> functionality
-> by configuring Reset multiplexer &  PLL. And it tunes not only watchdog
-> usage.
-> The keystone SoC can be rebooted in several ways. By external reset pin,
-> by soft and
-> by watchdogs. This driver allows software reset or reset by one of the
-> watchdogs
-> (and other settings) independently on watchdog driver settings. This is
-> job of reset driver.
+First of all; is this safe on OMAP4460?
+As far as I understand voltage scaling on 4460 has never been
+mainline, but this code enables voltage scaling for all omap4 parts.
+More below.
 
-It sounds like you use a syscon area in the reset driver. This is not
-uncommon, but it means you should probably have a generic node for
-the SoC specific registers that contains all of them at once and
-exports them as a regmap using the drivers/mfd/syscon.c driver.
+On 11 April 2014 01:47, Tony Lindgren <tony@atomide.com> wrote:
+> We are currently disabling the init of voltage scaling
+> for device tree. With the voltage scaling problems fixed
+> for omap3 in general, there's no need to disable the voltage
+> scaling init for device tree based booting.
+>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/pm.c | 28 ++++++++++++----------------
+>  1 file changed, 12 insertions(+), 16 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+> index e1b4141..ccefd11 100644
+> --- a/arch/arm/mach-omap2/pm.c
+> +++ b/arch/arm/mach-omap2/pm.c
+> @@ -287,25 +287,21 @@ omap_postcore_initcall(omap2_common_pm_init);
+>
+>  int __init omap2_common_pm_late_init(void)
+>  {
+> -       /*
+> -        * In the case of DT, the PMIC and SR initialization will be done using
+> -        * a completely different mechanism.
+> -        * Disable this part if a DT blob is available.
+> -        */
+> -       if (!of_have_populated_dt()) {
+> -
+> -               /* Init the voltage layer */
+> -               omap_pmic_late_init();
+> -               omap_voltage_late_init();
+> +       if (of_have_populated_dt()) {
+> +               omap3_twl_init();
+> +               omap4_twl_init();
+> +       }
+>
+> -               /* Initialize the voltages */
+> -               omap3_init_voltages();
+> -               omap4_init_voltages();
+> +       /* Init the voltage layer */
+> +       omap_pmic_late_init();
+> +       omap_voltage_late_init();
+>
+> -               /* Smartreflex device init */
+> -               omap_devinit_smartreflex();
+> +       /* Initialize the voltages */
+> +       omap3_init_voltages();
+> +       omap4_init_voltages();
+>
+> -       }
+> +       /* Smartreflex device init */
+> +       omap_devinit_smartreflex();
+>
+>         /* cpufreq dummy device instantiation */
+>         omap_init_cpufreq();
+> --
 
-	Arnd
+In omap4_twl_init() we have:
+if (!cpu_is_omap44xx())
+    return -ENODEV;
+
+voltdm = voltdm_lookup("mpu");
+omap_voltage_register_pmic(voltdm, &omap4_mpu_pmic);
+
+voltdm = voltdm_lookup("iva");
+omap_voltage_register_pmic(voltdm, &omap4_iva_pmic);
+
+voltdm = voltdm_lookup("core");
+omap_voltage_register_pmic(voltdm, &omap4_core_pmic);
+
+As far as I understand the setup above is only valid for 4430 and not
+4460 since it is hook up to the twl in diffent way. External switcher
+(TPS62361) for mpu rail and the other rails are used differently.
+
+I also get the following messages on boot now:
+[ 2.458740] twl: not initialized
+[ 2.462127] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+1375000 Vs max 1316660
+[ 2.470581] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+1375000 Vs max 1316660
+[ 2.479003] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+1375000 Vs max 1316660
+[ 2.487457] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+1375000 Vs max 1316660
+[ 2.495880] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+1375000 Vs max 1316660
+[ 2.504302] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+1375000 Vs max 1316660
+[ 2.512725] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+1410000 Vs max 1316660
+[ 2.521179] omap2_set_init_voltage: unable to find boot up OPP for vdd_mpu
+[ 2.528411] omap2_set_init_voltage: unable to set vdd_mpu
+[ 2.534088] omap2_set_init_voltage: unable to find boot up OPP for vdd_core
+[ 2.541412] omap2_set_init_voltage: unable to set vdd_core
+[ 2.547210] omap2_set_init_voltage: unable to find boot up OPP for vdd_iva
+[ 2.554443] omap2_set_init_voltage: unable to set vdd_iva
+
+It doesn't seem too happy on my 4460.
+
+regards
+Joachim Eastwood
