@@ -1,86 +1,134 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 May 2014 14:45:47 +0200
-Subject: [PATCH 06/17] pci: host: pcie-designware: Use *base-mask* for
- configuring the iATU
-In-Reply-To: <5375D3C8.1060204@ti.com>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>
- <5281007.CFRjW0Yeu2@wuerfel> <5375D3C8.1060204@ti.com>
-Message-ID: <5193704.9YxYic1Nyf@wuerfel>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 19 May 2014 14:53:37 +0200
+Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <4391809.OTRCiJQXS4@wuerfel>
+References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
+ <4391809.OTRCiJQXS4@wuerfel>
+Message-ID: <20140519125336.GA9466@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 May 2014 14:30:56 Kishon Vijay Abraham I wrote:
-> On Wednesday 14 May 2014 06:15 PM, Arnd Bergmann wrote:
-> > On Wednesday 14 May 2014 11:14:45 Kishon Vijay Abraham I wrote:
-> > / {
-> >       #address-cells = <1>; // or <2> if you support > 4GB address space
-> >       #size-cells = <1>;
+On Mon, May 19, 2014 at 12:26:35PM +0200, Arnd Bergmann wrote:
+> On Friday 16 May 2014 14:23:18 Thierry Reding wrote:
+> > From: Thierry Reding <treding@nvidia.com>
 > > 
-> >       soc {
-> >               #address-cells <1>;
-> >               #size-cells = <1>;
-> >               ranges;
-> >               dma-ranges;
+> > This commit introduces a generic device tree binding for IOMMU devices.
+> > Only a very minimal subset is described here, but it is enough to cover
+> > the requirements of both the Exynos System MMU and Tegra SMMU as
+> > discussed here:
 > > 
-> >               ... // all normal devices
+> >     https://lkml.org/lkml/2014/4/27/346
 > > 
-> >               axi at 20000000 {
-> >                       #size-cells = <1>;
-> >                       #address-cells = <1>;
-> >                       dma-ranges; // can access all 4GB outbound
-> >                       ranges = <0 0x20000000 0x10000000>; // 28-bit bus
+> > More advanced functionality such as the dma-ranges property can easily
+> > be added in a backwards-compatible way. In the absence of a dma-ranges
+> > property it should be safe to default to the whole address space.
 > > 
-> >                       pci at 0 {
-> >                               reg = <0x0    0x1000>, // internal regs
-> >                                     <0x1000 0x2000>; // config space
 > 
-> The internal reg address space starts at 0x51000000. By Using this <0
-> 0x20000000 0x10000000>; as ranges, we are not able to get the memory resource
-> properly. Can we use multiple ranges? how do we specify which ranges the *reg*
-> property to use?
+> The basic binding looks fine, but I'd like it to be more explicit
+> about dma-ranges. Most importantly, what does "the whole address space"
+> mean?
 
-Yes, multiple ranges will work fine. You can make up a representation
-yourself if you don't know what the hardware really does.
+The whole point was to leave out any mention of dma-ranges from the
+binding until we've figured out more of the puzzle.
 
-Two possible ways of doing this would be
+So what I was trying to avoid was another lengthy discussion on the
+topic of dma-ranges. Oh well... =)
 
-a)
+> A lot of IOMMUs have only 32-bit bus addresses when targetted
+> by a bus master, it would also be normal for some to be smaller and
+> some might even support 64-bit.
+> 
+> For the upstream side, I'd hope we always have access to the full
+> physical memory, but since this is a brand-new binding, it should
+> be straightforward to just ask for upstream dma-ranges properties
+> to be set all the way up to the root to confirm that.
+> 
+> For downstream, we don't actually have a good place to put the
+> dma-ranges property.
 
-	/* two separate physical connections represented as one logical bus */
-	axi at 20000000 {
+I'm not sure I understand what you mean by upstream and downstream in
+this context.
+
+> We can't put it into the iommu node, because  that would imply translating
+> to the iommu's parent bus, not the iommu's own bus space.
+
+My understanding was that the purpose of dma-ranges was to define a
+mapping from one bus to another. So the general form of
+
+	child-address  parent-address  child-size
+
+Would be used to translate a region of size <child-size> from the
+<child-address> (the I/O address space created by the IOMMU) to the
+<parent-address> (physical address space).
+
+> We also can't put it into the master, because dma-ranges is supposed to be
+> in the parent bus.
+
+I don't understand. From the above I would think that the master's node
+is precisely where it belongs.
+
+> Finally, it makes no sense to use the dma-ranges property of the master's
+> parent bus, because that bus isn't actually involved in the translation.
+
+My understanding here is mostly based on the OpenFirmware working group
+proposal for the dma-ranges property[0]. I'll give another example to
+try and clarify how I had imagined this to work:
+
+	/ {
 		#address-cells = <2>;
-		#size-cells = <1>;
-		ranges = <0 0 0x20000000 0x10000000>, /* configurable registers */
-			 <1 0 0x51000000 0x01000000>; /* PCI host registers */
+		#size-cells = <2>;
 
-		pci at 1.0 {
-			reg = <1 0 0x01000000>, /* host registers */
-				<0 0x1000 0x2000>; /* config space */
-		}
+		iommu {
+			/*
+			 * This is somewhat unusual (or maybe not) in that we
+			 * need 2 cells to represent the size of an address
+			 * space that is 32 bits long.
+			 */
+			#address-cells = <1>;
+			#size-cells = <2>;
 
+			#iommu-cells = <1>;
+		};
+
+		master {
+			iommus = <&/iommu 42>;
+			/*
+			 * Map I/O addresses 0 - 4 GiB to physical addresses
+			 * 2 GiB - 6 GiB.
+			 */
+			dma-ranges = <0x00000000 0 0x80000000 1 0>;
+		};
 	};
 
-b) 
+This is somewhat incompatible with [0] in that #address-cells used to
+parse the child address must be taken from the iommu node rather than
+the child node. But that seems to me to be the only reasonable thing
+to do, because after all the IOMMU creates a completely new address
+space for the master.
 
-	/* one physical bus, with some address munging */
-	axi at 20000000 {
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges = <0 0x20000000 0x10000000>, /* configurable registers */
-			 <0x51000000 0x51000000 0x01000000>; /* PCI host registers */
+[0]: http://www.openfirmware.org/ofwg/proposals/Closed/Accepted/410-it.txt
 
-		pci at 1.0 {
-			reg = <0x51000000 0x01000000>, /* host registers */
-				<0x1000 0x2000>; /* config space */
-		}
+> My preferred option would be to always put the address range into
+> the iommu descriptor, using the iommu's #address-cells.
 
-	};
+That could become impossible to parse. I'm not sure if such hardware
+actually exists, but if for some reason we have to split the address
+range into two, then there's no longer any way to determine the size
+needed for the specifier.
 
+On the other hand what you propose makes it easy to represent multiple
+master interfaces on a device. With a separate dma-ranges property how
+can you define which ranges apply to which of the master interfaces?
 
-> Btw I was using *simple-bus* as compatible to *axi*. Or should I create a new
-> *axi* driver to create the pcie memory resources myself?
+Then again if address ranges can't be broken up in the first place, then
+dma-ranges could be considered to be one entry per IOMMU in the iommus
+property.
 
-simple-bus is best here, since you don't have a complex bus that needs to
-be set up using register accesses or that generates interrupts.
-
-	Arnd
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/4288a7e6/attachment-0001.sig>
