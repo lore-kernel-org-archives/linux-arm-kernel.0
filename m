@@ -1,98 +1,56 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 19 May 2014 13:12:05 +0300
-Subject: [PATCH 01/11] ARM: AM43xx: hwmod: add DSS hwmod data
-In-Reply-To: <5379CDD2.6080807@ti.com>
-References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
- <1399636579-8062-2-git-send-email-tomi.valkeinen@ti.com>
- <5379CDD2.6080807@ti.com>
-Message-ID: <5379D8F5.9030008@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 19 May 2014 11:18:49 +0100
+Subject: [PATCH] ARM: remove ARM710 specific assembler code
+In-Reply-To: <20140517102638.GQ3693@n2100.arm.linux.org.uk>
+References: <1364507176.1345.45.camel@x61.thuisdomein>
+ <8309592.drxAj71PnZ@wuerfel> <1400059550.31197.12.camel@x220>
+ <4305975.PvMXZQ020k@wuerfel> <1400232598.20342.16.camel@x220>
+ <20140516125545.GO3693@n2100.arm.linux.org.uk>
+ <20140517092337.GA67711@MacBook-Pro.local>
+ <20140517094636.GP3693@n2100.arm.linux.org.uk>
+ <9DBC3527-1961-40DD-8CBA-9A1B5D3003C9@arm.com>
+ <20140517102638.GQ3693@n2100.arm.linux.org.uk>
+Message-ID: <20140519101848.GG5113@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/05/14 12:24, Rajendra Nayak wrote:
-> On Friday 09 May 2014 05:26 PM, Tomi Valkeinen wrote:
->> From: Sathya Prakash M R <sathyap@ti.com>
->>
->> Add DSS hwmod data for AM43xx.
->>
->> Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
->> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
->> ---
->>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 104 +++++++++++++++++++++++++++++
->>  arch/arm/mach-omap2/prcm43xx.h             |   1 +
->>  2 files changed, 105 insertions(+)
->>
->> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
->> index 5c2cc8083fdd..8c14db2e1e47 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
->> @@ -19,6 +19,8 @@
->>  #include "omap_hwmod.h"
->>  #include "omap_hwmod_33xx_43xx_common_data.h"
->>  #include "prcm43xx.h"
->> +#include "omap_hwmod_common_data.h"
->> +
->>  
->>  /* IP blocks */
->>  static struct omap_hwmod am43xx_l4_hs_hwmod = {
->> @@ -415,6 +417,76 @@ static struct omap_hwmod am43xx_qspi_hwmod = {
->>  	},
->>  };
->>  
->> +/* Display sub system - DSS */
->> +
->> +static struct omap_hwmod_dma_info am43xx_dss_sdma_chs[] = {
->> +	{ .name = "dispc", .dma_req = 5 },
->> +	{ .dma_req = -1 },
->> +};
+On Sat, May 17, 2014 at 11:26:38AM +0100, Russell King - ARM Linux wrote:
+> On Sat, May 17, 2014 at 10:56:02AM +0100, Catalin Marinas wrote:
+> > > The difference between what you're proposing and what happened to ARMv3
+> > > is that ARMv3 was broken for quite some time (we read from some of the
+> > > CP15 registers which are read-only in ARMv3) and no one ever raised a
+> > > problem with that.  So, after a sufficient period of time, it got removed
+> > > - and no one batted an eyelid.  That's the correct way to do it - allow
+> > > code to age, and if no one notices it's been broken, then it can be
+> > > removed.
+> > 
+> > I?m more for pro-actively ?breaking? it with a DEPRECATED
+> > dependency. For example, if you suspect that some code like ARM710T is
+> > no longer in use, we mark it and see if anyone complains about this over
+> > a two years period. If not, it gets removed.
+> > 
+> > Waiting for code to get broken is another way but it?s less
+> > predictable.
 > 
-> the dma info needs to come in from DT. Besides these are edma
-> request lines and not sdma.
+> When code being used gets broken, it's nice to think that we'll get
+> bug reports which will tell us if it's still being used.
 
-Right, the sdma information is not needed anymore.
+But if you don't get any reports, you can't really whether it's broken
+(just because it compiles doesn't mean it still works). So we end up
+with keeping code in the kernel for much longer than necessary.
 
->> +
->> +struct omap_dss_dispc_dev_attr am43xx_dss_dispc_dev_attr = {
->> +	.manager_count		= 1,
->> +	.has_framedonetv_irq	= 0
->> +};
->> +
->> +
-> []..
-> 
->> +
->>  /* Interfaces */
->>  static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
->>  	.master		= &am33xx_l3_main_hwmod,
->> @@ -654,6 +726,34 @@ static struct omap_hwmod_ocp_if am43xx_l3_s__qspi = {
->>  	.user           = OCP_USER_MPU | OCP_USER_SDMA,
->>  };
->>  
->> +static struct omap_hwmod_ocp_if am43xx_dss__l3_main = {
->> +	.master		= &am43xx_dss_core_hwmod,
->> +	.slave		= &am33xx_l3_main_hwmod,
->> +	.clk		= "disp_clk",
-> 
-> Isn't l3_gclk that clocks the l3 OCP master port?
+> The problem
+> with DEPRECATED is that it will get lost amongst all the thousands
+> of other config options and won't be noticed.  Just like EXPERIMENTAL
+> or any of the other similar options we've had.
 
-Hmm, possibly... dispc_clk looks a bit odd there. It's been very
-difficult to figure out things like that, with the not-so-good am43xx
-documentation.
+DEPRECATED is meant for documenting the planned removal. If people
+complain afterwards, it's their problem for not reporting it earlier.
 
-The documentation mentions "L3 Fast Interconnect" and "LCDL3OCPIFCLK"
-related to DSS's OCP master, but searching for those in the TRM doesn't
-reveal much.
+But we can make it even clearer by adding "depends on n" for DEPRECATED
+or just making it not user selectable, so that people would need to
+actively change the Kconfig source. They can't complain they haven't
+noticed.
 
-Would the l3_gclk match the "L3 Fast Interconnect" and l3s_gclk match
-the "L3 Slow Interconnect".
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/468c7519/attachment-0001.sig>
+-- 
+Catalin
