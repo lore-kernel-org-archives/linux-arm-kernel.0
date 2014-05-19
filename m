@@ -1,88 +1,100 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 19 May 2014 21:45:31 +0200
-Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
-In-Reply-To: <20140519193622.GA11945@atomide.com>
-References: <5374FE61.50901@linaro.org> <5374FF5B.8050702@ti.com>
- <5375079E.3060305@ti.com> <537615EA.3020809@ti.com>
- <20140516212942.GK12881@atomide.com> <537A3544.1050307@linaro.org>
- <20140519172338.GJ4849@atomide.com> <537A408F.7070301@ti.com>
- <20140519175157.GK4849@atomide.com> <537A4827.30604@linaro.org>
- <20140519193622.GA11945@atomide.com>
-Message-ID: <537A5F5B.6050403@linaro.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 19 May 2014 21:46:13 +0200
+Subject: [PATCH v2 00/10] Marvell Berlin full clock support
+In-Reply-To: <1400517811-24668-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1400517811-24668-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <537A5F85.4090709@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/2014 09:36 PM, Tony Lindgren wrote:
-> * Daniel Lezcano <daniel.lezcano@linaro.org> [140519 11:07]:
->> On 05/19/2014 07:51 PM, Tony Lindgren wrote:
->>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [140519 10:35]:
->>>> On Monday 19 May 2014 01:23 PM, Tony Lindgren wrote:
->>>>> * Daniel Lezcano <daniel.lezcano@linaro.org> [140519 09:46]:
->>>>>> On 05/16/2014 11:29 PM, Tony Lindgren wrote:
->>>>>>>
->>>>>>> And just to recap, this problem can be reproduced with current
->>>>>>> Linux next with omap2plus_defconfig with CONFIG_CPU_IDLE enabled. The
->>>>>>> system should hang during the boot at some point.
->>>>>>
->>>>>> I can take the time to investigate a bit more but not right now. What is
->>>>>> your deadline before committing the reverts ?
->>>>>
->>>>> Well we do have several automated build and boot systems failing
->>>>> because of this with multi_v7_defconfig. And users are complaining,
->>>>> see this report from Tobias Jakobi:
->>>>>
->>>>> https://bugzilla.kernel.org/show_bug.cgi?id=75421
->>>>>
->>>>> It seems that doing the revert is not enough based on the
->>>>> page above.
->>>>>
->>>> Thats not true. The above link used the half patch and not the
->>>> updated patch. Updated patch worked for Alex also. As you can
->>>> see they saw RCU stalls and they go away after the updated patch.
->>>>
->>>> Can you please point them to try out the updated patch ?
->>>
->>> OK good point. I added a link to the updated patch in
->>> bugzilla.
->>>
->>>>> I'd prefer we'd fix this issue properly for sure, it seems that
->>>>> we're not quite understanding what's going on. And this might
->>>>> hit other platforms too when they start implementing deeper
->>>>> PM idle states in the mainline kernel.
->>>>>
->>>> I am certain that the updated patch fixed the regression
->>>> for sure. The issue is really not generic enough since its related
->>>> an OMAP ROM errata which needs that special handling of
->>>> interrupt re-trigger etc. You don't need that for other platforms
->>>> so they are not likely get affected.
->>>
->>> OK makes sense to me considering the ROM code. Daniel, are you OK
->>> with that or do you still want to investigate further?
->>
->> For the moment I am a bit short in time for some other tasks. So feel free
->> to apply the revert and I will look for a proper fix when I will have time.
->
-> Added Tobias to Cc. At the bugzilla link Tobias is saying
-> he used the right patch from Santosh to test and it still
-> fails.
+On 05/19/2014 06:43 PM, Sebastian Hesselbarth wrote:
+> Mike,
+> 
+> this is v2 of the Berlin SoC clock driver [1] but with a reworked DT
+> binding as requested [2]. We decided to not even try to split up the chip
+> control registers that deal with pinmux, padmux, clock, reset, and evil
+> stuff we haven't even looked at. Instead we keep a single node that clock
+> driver will remap early, while proper platform_drivers use a regmap
+> instead. Although clock and other drivers share the same register range,
+> they use individual registers exclusively.
+> 
+> There are some functional fixes in the single clock drivers, I noticed
+> while retesting each individial driver. There will be more to fixup but
+> without any drivers actually using the clocks, it is hard to tell what
+> isn't working now.
+> 
+> Anyway, the current binding should match what you requested and having
+> a clock driver for v3.16 will really be a huge benefit for us to work
+> on more driver support.
+> 
+> If you are fine with it, please take patches 2-7 and I'll pick up
+> 1,8-10 in berlin branch.
 
-So apparently Santosh, Kevin and Alex say they are not facing the issue 
-anymore with the revert. But Tobias is still facing this issue.
+nit: I also take patch 2 as it is the required DT include. Makes 3-7
+to pick up for you.
 
-There is this simple program [1] which usually makes cpuidle to hang the 
-system more quickly when there is a problem somewhere. May be worth to 
-check with it.
+Sebastian
 
-Hope that helps.
-
-   -- Daniel
-
-[1] 
-https://git.linaro.org/power/pm-qa.git/blob/HEAD:/cpuidle/cpuidle_killer.c
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> [1] https://lkml.kernel.org/r/1399839881-29895-1-git-send-email-sebastian.hesselbarth at gmail.com
+> [2] https://lkml.kernel.org/r/20140515044106.19795.57249 at quantum
+> 
+> Alexandre Belloni (4):
+>   clk: berlin: add driver for BG2x simple PLLs
+>   clk: berlin: add driver for BG2x complex divider cells
+>   clk: berlin: add core clock driver for BG2Q
+>   ARM: dts: berlin: convert BG2Q to DT clock nodes
+> 
+> Sebastian Hesselbarth (6):
+>   dt-binding: ARM: add clock binding docs for Marvell Berlin2 SoCs
+>   clk: berlin: add binding include for Berlin SoC clock ids
+>   clk: berlin: add driver for BG2x audio/video PLL
+>   clk: berlin: add core clock driver for BG2/BG2CD
+>   ARM: dts: berlin: convert BG2CD to DT clock nodes
+>   ARM: dts: berlin: convert BG2 to DT clock nodes
+> 
+>  .../devicetree/bindings/arm/marvell,berlin.txt     |  47 ++
+>  arch/arm/boot/dts/berlin2.dtsi                     |  56 +-
+>  arch/arm/boot/dts/berlin2cd.dtsi                   |  53 +-
+>  arch/arm/boot/dts/berlin2q.dtsi                    |  54 +-
+>  drivers/clk/Makefile                               |   1 +
+>  drivers/clk/berlin/Makefile                        |   4 +
+>  drivers/clk/berlin/berlin2-avpll.c                 | 393 ++++++++++++
+>  drivers/clk/berlin/berlin2-avpll.h                 |  36 ++
+>  drivers/clk/berlin/berlin2-div.c                   | 265 ++++++++
+>  drivers/clk/berlin/berlin2-div.h                   |  89 +++
+>  drivers/clk/berlin/berlin2-pll.c                   | 117 ++++
+>  drivers/clk/berlin/berlin2-pll.h                   |  37 ++
+>  drivers/clk/berlin/bg2.c                           | 691 +++++++++++++++++++++
+>  drivers/clk/berlin/bg2q.c                          | 389 ++++++++++++
+>  drivers/clk/berlin/common.h                        |  29 +
+>  include/dt-bindings/clock/berlin2.h                |  45 ++
+>  include/dt-bindings/clock/berlin2q.h               |  31 +
+>  17 files changed, 2240 insertions(+), 97 deletions(-)
+>  create mode 100644 drivers/clk/berlin/Makefile
+>  create mode 100644 drivers/clk/berlin/berlin2-avpll.c
+>  create mode 100644 drivers/clk/berlin/berlin2-avpll.h
+>  create mode 100644 drivers/clk/berlin/berlin2-div.c
+>  create mode 100644 drivers/clk/berlin/berlin2-div.h
+>  create mode 100644 drivers/clk/berlin/berlin2-pll.c
+>  create mode 100644 drivers/clk/berlin/berlin2-pll.h
+>  create mode 100644 drivers/clk/berlin/bg2.c
+>  create mode 100644 drivers/clk/berlin/bg2q.c
+>  create mode 100644 drivers/clk/berlin/common.h
+>  create mode 100644 include/dt-bindings/clock/berlin2.h
+>  create mode 100644 include/dt-bindings/clock/berlin2q.h
+> 
+> ---
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Randy Dunlap <rdunlap@infradead.org>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Cc: Jisheng Zhang <jszhang@marvell.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-doc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> 
