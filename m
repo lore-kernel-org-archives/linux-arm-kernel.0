@@ -1,44 +1,51 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 19 May 2014 15:07:54 +0800
-Subject: [PATCH] ARM: imx: fix error handling in ipu device registration
-Message-ID: <1400483274-13680-1-git-send-email-shawn.guo@freescale.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 19 May 2014 09:11:05 +0200
+Subject: [PATCH v3] pwm: i.MX: Avoid sample FIFO overflow for i.MX PWM
+ version2
+In-Reply-To: <1400217068-22642-1-git-send-email-Ying.Liu@freescale.com>
+References: <1400217068-22642-1-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <20140519071105.GZ5858@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Emil Goode <emilgoode@gmail.com>
+On Fri, May 16, 2014 at 01:11:08PM +0800, Liu Ying wrote:
+> The i.MX PWM version2 is embedded in several i.MX SoCs,
+> such as i.MX27, i.MX51 and i.MX6SL.  There are four 16bit
+> sample FIFOs in this IP, each of which determines the duty
+> period of a PWM waveform in one full cycle.  The IP spec
+> mentions that we should not write a fourth sample because
+> the FIFOs will become full and trigger a FIFO write error
+> (FWE) which will prevent the PWM from starting once it is
+> enabled.  In order to avoid any sample FIFO overflow issue,
+> this patch clears all sample FIFOs or waits for a rollover
+> event to consume a FIFO slot when necessary.  In this way,
+> only the first FIFO slot will be loaded at most.
+> 
+> Note that the PWM controller will not generate any rollover
+> event if the duty period is zero.  This makes the logic a
+> bit complicated to determine if we clear the sample FIFOs
+> or wait for a rollover event.
+> 
+> The FIFO overflow issue can be reproduced by the following
+> commands on the i.MX6SL EVK platform, assuming we use PWM2
+> for the debug LED which is driven by the pin HSIC_STROBE
+> and the maximal brightness is 255.
+> echo 0   > /sys/class/leds/user/brightness
+> echo 0   > /sys/class/leds/user/brightness
+> echo 0   > /sys/class/leds/user/brightness
+> echo 0   > /sys/class/leds/user/brightness
+> echo 255 > /sys/class/leds/user/brightness
+> Here, FWE happens(PWMSR register reads 0x58) and the LED
+> can not be lighten.
 
-If we fail to allocate struct platform_device pdev we
-dereference it after the goto label err.
+I find this overly complicated. It adds 89 lines to a 300 lines driver
+for a single workaround. Wouldn't it be sufficient to add a delay
+of period_ns in imx_pwm_config_v2 when the FIFO is full?
 
-This bug was found using coccinelle.
+Sascha
 
-Fixes: afa77ef (ARM: mx3: dynamically allocate "ipu-core" devices)
-Signed-off-by: Emil Goode <emilgoode@gmail.com>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
-Arnd, Olof,
-
-Please consider to apply this fix for 3.15.  Thanks.
-
-Shawn
-
- arch/arm/mach-imx/devices/platform-ipu-core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
-index fc4dd7c..6bd7c3f 100644
---- a/arch/arm/mach-imx/devices/platform-ipu-core.c
-+++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
-@@ -77,7 +77,7 @@ struct platform_device *__init imx_alloc_mx3_camera(
- 
- 	pdev = platform_device_alloc("mx3-camera", 0);
- 	if (!pdev)
--		goto err;
-+		return ERR_PTR(-ENOMEM);
- 
- 	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
- 	if (!pdev->dev.dma_mask)
 -- 
-1.8.3.2
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
