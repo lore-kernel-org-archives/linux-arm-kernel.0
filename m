@@ -1,70 +1,39 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Mon, 19 May 2014 15:05:58 +0530
-Subject: [PATCH 0/9] arm64: KVM: debug infrastructure support
-In-Reply-To: <87d2fanmm7.fsf@approximate.cambridge.arm.com>
-References: <1399476054-21571-1-git-send-email-marc.zyngier@arm.com>
- <CALrVBkscsWxRsS42eJi9deFeaBbjQMKq9R2e-u5ztu70rKUvUw@mail.gmail.com>
- <87d2fanmm7.fsf@approximate.cambridge.arm.com>
-Message-ID: <CALrVBktviU6qs_N3AoRd0=BKEVRar65FBca8uQLkzZiuetNkVg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 19 May 2014 10:37:28 +0100
+Subject: [PATCHv5 2/4] ARM: mm: add support for HW coherent systems in
+ PL310
+In-Reply-To: <1400487234-4501-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1400487234-4501-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1400487234-4501-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140519093728.GC5113@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 May 2014 14:58, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Mon, May 19 2014 at 10:05:42 am BST, Anup Patel <anup.patel@linaro.org> wrote
->
-> Hi Anup,
->
->> Overall the patchset looks good to me.
->>
->> The debug register usage by Guest will be very rare
->> so a lazy save/restore makes lot-of-sense here.
->>
->> The only concern here is that amount of time spend in
->> world-switch will increase for Guest once Guest starts
->> accessing debug registers.
->>
->> I was wondering if it is possible to detect that Guest
->> has stopped using debug HW and we can mark debug
->> state as clean. (or something similar)
->
-> If you look carefully at patch #8 (last hunk of the patch), you'll see
-> that I always reset the debug state to "clean" at the end of a guest
-> run:
->
-> @@ -609,6 +1040,12 @@ __kvm_vcpu_return:
->
->         bl __restore_sysregs
->         bl __restore_fpsimd
-> +
-> +       skip_clean_debug_state x3, 1f
-> +       // Clear the dirty flag for the next run
-> +       str     xzr, [x0, #VCPU_DEBUG_FLAGS]
-> +       bl      __restore_debug
-> +1:
->         restore_host_regs
->
->         mov     x0, x1
->
-> This ensures that the guest's debug state will only be reloaded if:
->
-> - MDSCR_EL1 has either MDE or KDE set (which means the guest is actively
-> using the debug infrastructure)
-> - or the guest has written to a trapped register (which marks the state
-> as dirty).
+On Mon, May 19, 2014 at 09:13:52AM +0100, Thomas Petazzoni wrote:
+> When a PL310 cache is used on a system that provides hardware
+> coherency, the outer cache sync operation is useless, and can be
+> skipped. Moreover, on some systems, it is harmful as it causes
+> deadlocks between the Marvell coherency mechanism, the Marvell PCIe
+> controller and the Cortex-A9.
+> 
+> To avoid this, this commit introduces a new Device Tree property
+> 'arm,io-coherent' for the L2 cache controller node, valid only for the
+> PL310 cache. It identifies the usage of the PL310 cache in an I/O
+> coherent configuration. Internally, it makes the driver disable the
+> outer cache sync operation.
+> 
+> Note that technically speaking, a fully coherent system wouldn't
+> require any of the other .outer_cache operations. However, in
+> practice, when booting secondary CPUs, these are not yet coherent, and
+> therefore a set of cache maintenance operations are necessary at this
+> point. This explains why we keep the other .outer_cache operations and
+> only ->sync is disabled.
+> 
+> While in theory any write to a PL310 register could cause the
+> deadlock, in practice, disabling ->sync is sufficient to workaround
+> the deadlock, since the other cache maintenance operations are only
+> used in very specific situations.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Thanks for pointing out.
-
-Can you add this info as comment in patch#8 where you
-clear the dirty flag?
-
->
-> I don't think we can do less work than this. Or can we?
->
-> Thanks,
->
->         M.
-> --
-> Jazz is not dead. It just smells funny.
-
---
-Anup
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
