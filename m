@@ -1,54 +1,147 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 May 2014 13:26:48 +0200
-Subject: [PATCH] ARM: remove ARM710 specific assembler code
-In-Reply-To: <9DBC3527-1961-40DD-8CBA-9A1B5D3003C9@arm.com>
-References: <1364507176.1345.45.camel@x61.thuisdomein>
- <20140517094636.GP3693@n2100.arm.linux.org.uk>
- <9DBC3527-1961-40DD-8CBA-9A1B5D3003C9@arm.com>
-Message-ID: <5053472.zFAHKQVpbv@wuerfel>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 19 May 2014 13:30:11 +0200
+Subject: [PATCH v9 1/3] ARM: EXYNOS: Add support for EXYNOS5410 SoC
+In-Reply-To: <1400470640-30611-2-git-send-email-t.dakhran@samsung.com>
+References: <1400470640-30611-1-git-send-email-t.dakhran@samsung.com>
+ <1400470640-30611-2-git-send-email-t.dakhran@samsung.com>
+Message-ID: <5379EB43.2050702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 17 May 2014 10:56:02 Catalin Marinas wrote:
-> > The difference between what you're proposing and what happened to ARMv3
-> > is that ARMv3 was broken for quite some time (we read from some of the
-> > CP15 registers which are read-only in ARMv3) and no one ever raised a
-> > problem with that.  So, after a sufficient period of time, it got removed
-> > - and no one batted an eyelid.  That's the correct way to do it - allow
-> > code to age, and if no one notices it's been broken, then it can be
-> > removed.
+Hi Tarek,
+
+On 19.05.2014 05:37, Tarek Dakhran wrote:
+> EXYNOS5410 is SoC in Samsung's Exynos5 SoC series.
+> Add initial support for this SoC.
 > 
-> I?m more for pro-actively ?breaking? it with a DEPRECATED
-> dependency. For example, if you suspect that some code like ARM710T is
-> no longer in use, we mark it and see if anyone complains about this over
-> a two years period. If not, it gets removed.
+> Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
+> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+
+IIRC, the Reviewed-by tag stands only for the version for which it was
+posted, except versions with no changes. This one apparently contains
+changes compared to previous version.
+
+> ---
+>  arch/arm/mach-exynos/Kconfig             |    8 ++++++++
+>  arch/arm/mach-exynos/exynos.c            |    1 +
+>  arch/arm/mach-exynos/platsmp.c           |    4 ++++
+>  arch/arm/plat-samsung/include/plat/cpu.h |   11 ++++++++++-
+>  4 files changed, 23 insertions(+), 1 deletion(-)
 > 
-> Waiting for code to get broken is another way but it?s less
-> predictable.
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index 1602abc..79a3e85 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -84,6 +84,14 @@ config SOC_EXYNOS5250
+>  	help
+>  	  Enable EXYNOS5250 SoC support
+>  
+> +config SOC_EXYNOS5410
+> +	bool "SAMSUNG EXYNOS5410"
+> +	default y
+> +	depends on ARCH_EXYNOS5
+> +	select PM_GENERIC_DOMAINS if PM_RUNTIME
+> +	help
+> +	  Enable EXYNOS5410 SoC support
+> +
+>  config SOC_EXYNOS5420
+>  	bool "SAMSUNG EXYNOS5420"
+>  	default y
+> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> index e973ff5..12db6cf 100644
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -312,6 +312,7 @@ static char const *exynos_dt_compat[] __initconst = {
+>  	"samsung,exynos4412",
+>  	"samsung,exynos5",
+>  	"samsung,exynos5250",
+> +	"samsung,exynos5410",
 
-We used to have 'feature-removal-schedule.txt' file in the Documentation.
-It never worked, and I don't see a reason to introduce something like that
-again.
+AFAIK you don't need this change now, as you can boot using the generic
+Exynos5 compatible string just fine.
 
-Yes, this means we will keep going through things that may or may not be
-considered obsolete occasionally asking whether it's already dead. There
-are a number of platforms we removed in the past years (e.g. shark,
-h720x, bcmring, pnx4008, ixp2xxx, tcc8k and others before) and we haven't
-had to revert any of those back. The rule has always been that even if
-someone later comes and wants them back, we will revert the removal.
-Others have been given temporary (e.g. gemini) or permanent (e.g. ixp4xx)
-extensions, based on the feedback from the maintainers or remaining
-users.
+>  	"samsung,exynos5420",
+>  	"samsung,exynos5440",
+>  	NULL
+> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+> index 78002c7..a95213d 100644
+> --- a/arch/arm/mach-exynos/platsmp.c
+> +++ b/arch/arm/mach-exynos/platsmp.c
+> @@ -60,6 +60,8 @@ static inline void __iomem *cpu_boot_reg_base(void)
+>  {
+>  	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
+>  		return S5P_INFORM5;
+> +	if (soc_is_exynos5410())
+> +		return sysram_ns_base_addr;
 
-For the case of ARM710T, I think the last remaining user that can be
-configured is mach-integrator, but I don't know if anybody even has that
-CPU tile, or wants to keep using it. If Russell and Linus as the only
-people that have cared about Integrator in the past years want to
-cut down the number of supported CPUs, that would be a different matter:
-quite a number of CPUs are not supported in any other platform.
-Note that the integrator target in qemu does not support any ARM7, only
-StrongARM, ARM9 or later. I also double-checked about mach-clps711x,
-but I'm pretty sure those SoCs are all either ARM710a (no longer supported)
-or ARM720T (quite active).
+This would suggest that instead you need to enable secure firmware
+support on your board, by adding respective firmware node to your dts.
+Tushar just sent a similar patch series for Exynos5420 [1].
 
-	Arnd
+[1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/31840
+
+>  	return sysram_base_addr;
+>  }
+>  
+> @@ -72,6 +74,8 @@ static inline void __iomem *cpu_boot_reg(int cpu)
+>  		return ERR_PTR(-ENODEV);
+>  	if (soc_is_exynos4412())
+>  		boot_reg += 4*cpu;
+> +	else if (soc_is_exynos5410())
+> +		boot_reg += (0x1c);
+
+This offset is typical for secure firmware. The series I mentioned above
+also deals with bypassing adding of 4*cpu offset for Exynos5420. Seems
+like it might be also necessary for Exynos5410, however I will reply in
+that thread with the way I'd see this done.
+
+>  	else if (soc_is_exynos5420())
+>  		boot_reg += 4;
+>  	return boot_reg;
+> diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
+> index 5992b8d..21db380 100644
+> --- a/arch/arm/plat-samsung/include/plat/cpu.h
+> +++ b/arch/arm/plat-samsung/include/plat/cpu.h
+> @@ -49,6 +49,7 @@ extern unsigned long samsung_cpu_id;
+>  #define EXYNOS4_CPU_MASK	0xFFFE0000
+>  
+>  #define EXYNOS5250_SOC_ID	0x43520000
+> +#define EXYNOS5410_SOC_ID	0xE5410000
+>  #define EXYNOS5420_SOC_ID	0xE5420000
+>  #define EXYNOS5440_SOC_ID	0xE5440000
+>  #define EXYNOS5_SOC_MASK	0xFFFFF000
+> @@ -72,6 +73,7 @@ IS_SAMSUNG_CPU(exynos4210, EXYNOS4210_CPU_ID, EXYNOS4_CPU_MASK)
+>  IS_SAMSUNG_CPU(exynos4212, EXYNOS4212_CPU_ID, EXYNOS4_CPU_MASK)
+>  IS_SAMSUNG_CPU(exynos4412, EXYNOS4412_CPU_ID, EXYNOS4_CPU_MASK)
+>  IS_SAMSUNG_CPU(exynos5250, EXYNOS5250_SOC_ID, EXYNOS5_SOC_MASK)
+> +IS_SAMSUNG_CPU(exynos5410, EXYNOS5410_SOC_ID, EXYNOS5_SOC_MASK)
+>  IS_SAMSUNG_CPU(exynos5420, EXYNOS5420_SOC_ID, EXYNOS5_SOC_MASK)
+>  IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
+>  
+> @@ -154,6 +156,12 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
+>  # define soc_is_exynos5250()	0
+>  #endif
+>  
+> +#if defined(CONFIG_SOC_EXYNOS5410)
+> +# define soc_is_exynos5410()	is_samsung_exynos5410()
+> +#else
+> +# define soc_is_exynos5410()	0
+> +#endif
+> +
+>  #if defined(CONFIG_SOC_EXYNOS5420)
+>  # define soc_is_exynos5420()	is_samsung_exynos5420()
+>  #else
+> @@ -168,7 +176,8 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
+>  
+>  #define soc_is_exynos4() (soc_is_exynos4210() || soc_is_exynos4212() || \
+>  			  soc_is_exynos4412())
+> -#define soc_is_exynos5() (soc_is_exynos5250() || soc_is_exynos5420())
+> +#define soc_is_exynos5() (soc_is_exynos5250() || soc_is_exynos5410() || \
+> +			  soc_is_exynos5420())
+
+After addressing the comments above, you won't need any changes to this
+file anymore (including all the soc_is_*() macros).
+
+Best regards,
+Tomasz
