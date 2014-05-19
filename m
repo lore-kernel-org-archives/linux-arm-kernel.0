@@ -1,27 +1,25 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 19 May 2014 15:24:27 +0100
-Subject: [PATCH v3 3/7] mfd: add support for sun6i PRCM
- (Power/Reset/Clock Management) unit
-In-Reply-To: <20140519140555.GJ29466@lukather>
+Date: Mon, 19 May 2014 15:26:54 +0100
+Subject: [PATCH v3 4/7] mfd: sun6i-prcm: document DT bindings
+In-Reply-To: <1399633911-7094-5-git-send-email-boris.brezillon@free-electrons.com>
 References: <1399633911-7094-1-git-send-email-boris.brezillon@free-electrons.com>
- <1399633911-7094-4-git-send-email-boris.brezillon@free-electrons.com>
- <20140509135251.GY5767@lee--X1> <20140515151756.GX29258@lukather>
- <20140519092159.GE4978@lee--X1> <20140519092725.GE29466@lukather>
- <20140519133253.GJ4978@lee--X1> <20140519140555.GJ29466@lukather>
-Message-ID: <20140519142427.GO4978@lee--X1>
+ <1399633911-7094-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140519142654.GP4978@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > When you say 'this', do you mean this patch, or this set?  If I can
-> > just apply this patch, that will be ideal?
+> Document DT bindings of the PRCM (Power/Reset/Clock Management) unit.
 > 
-> I mean you can apply these two patches:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256537.html
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256535.html
-> 
-> And it would be ideal :)
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  .../devicetree/bindings/mfd/sun6i-prcm.txt         | 59 ++++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
 
-Perfect!
+Been on the list a while now, doesn't seem to have any potentially
+controversial bindings and looks mostly fine.
+
+Applied, thanks.
 
 -- 
 Lee Jones
