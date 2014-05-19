@@ -1,126 +1,60 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 19 May 2014 14:54:34 +0530
-Subject: [PATCH 01/11] ARM: AM43xx: hwmod: add DSS hwmod data
-In-Reply-To: <1399636579-8062-2-git-send-email-tomi.valkeinen@ti.com>
-References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
- <1399636579-8062-2-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <5379CDD2.6080807@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 19 May 2014 10:28:32 +0100
+Subject: [PATCH 0/9] arm64: KVM: debug infrastructure support
+In-Reply-To: <CALrVBkscsWxRsS42eJi9deFeaBbjQMKq9R2e-u5ztu70rKUvUw@mail.gmail.com>
+ (Anup Patel's message of "Mon, 19 May 2014 10:05:42 +0100")
+References: <1399476054-21571-1-git-send-email-marc.zyngier@arm.com>
+ <CALrVBkscsWxRsS42eJi9deFeaBbjQMKq9R2e-u5ztu70rKUvUw@mail.gmail.com>
+Message-ID: <87d2fanmm7.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 May 2014 05:26 PM, Tomi Valkeinen wrote:
-> From: Sathya Prakash M R <sathyap@ti.com>
-> 
-> Add DSS hwmod data for AM43xx.
-> 
-> Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 104 +++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/prcm43xx.h             |   1 +
->  2 files changed, 105 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> index 5c2cc8083fdd..8c14db2e1e47 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> @@ -19,6 +19,8 @@
->  #include "omap_hwmod.h"
->  #include "omap_hwmod_33xx_43xx_common_data.h"
->  #include "prcm43xx.h"
-> +#include "omap_hwmod_common_data.h"
-> +
->  
->  /* IP blocks */
->  static struct omap_hwmod am43xx_l4_hs_hwmod = {
-> @@ -415,6 +417,76 @@ static struct omap_hwmod am43xx_qspi_hwmod = {
->  	},
->  };
->  
-> +/* Display sub system - DSS */
-> +
-> +static struct omap_hwmod_dma_info am43xx_dss_sdma_chs[] = {
-> +	{ .name = "dispc", .dma_req = 5 },
-> +	{ .dma_req = -1 },
-> +};
+On Mon, May 19 2014 at 10:05:42 am BST, Anup Patel <anup.patel@linaro.org> wrote
 
-the dma info needs to come in from DT. Besides these are edma
-request lines and not sdma.
+Hi Anup,
 
-> +
-> +struct omap_dss_dispc_dev_attr am43xx_dss_dispc_dev_attr = {
-> +	.manager_count		= 1,
-> +	.has_framedonetv_irq	= 0
-> +};
-> +
-> +
-[]..
+> Overall the patchset looks good to me.
+>
+> The debug register usage by Guest will be very rare
+> so a lazy save/restore makes lot-of-sense here.
+>
+> The only concern here is that amount of time spend in
+> world-switch will increase for Guest once Guest starts
+> accessing debug registers.
+>
+> I was wondering if it is possible to detect that Guest
+> has stopped using debug HW and we can mark debug
+> state as clean. (or something similar)
 
-> +
->  /* Interfaces */
->  static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
->  	.master		= &am33xx_l3_main_hwmod,
-> @@ -654,6 +726,34 @@ static struct omap_hwmod_ocp_if am43xx_l3_s__qspi = {
->  	.user           = OCP_USER_MPU | OCP_USER_SDMA,
->  };
->  
-> +static struct omap_hwmod_ocp_if am43xx_dss__l3_main = {
-> +	.master		= &am43xx_dss_core_hwmod,
-> +	.slave		= &am33xx_l3_main_hwmod,
-> +	.clk		= "disp_clk",
+If you look carefully at patch #8 (last hunk of the patch), you'll see
+that I always reset the debug state to "clean" at the end of a guest
+run:
 
-Isn't l3_gclk that clocks the l3 OCP master port?
+@@ -609,6 +1040,12 @@ __kvm_vcpu_return:
+ 
+        bl __restore_sysregs
+        bl __restore_fpsimd
++
++       skip_clean_debug_state x3, 1f
++       // Clear the dirty flag for the next run
++       str     xzr, [x0, #VCPU_DEBUG_FLAGS]
++       bl      __restore_debug
++1:
+        restore_host_regs
+ 
+        mov     x0, x1
 
-regards,
-Rajendra
+This ensures that the guest's debug state will only be reloaded if:
 
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +static struct omap_hwmod_ocp_if am43xx_l4_ls__dss = {
-> +	.master		= &am33xx_l4_ls_hwmod,
-> +	.slave		= &am43xx_dss_core_hwmod,
-> +	.clk		= "l4ls_gclk",
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_dispc = {
-> +	.master		= &am33xx_l4_ls_hwmod,
-> +	.slave		= &am43xx_dss_dispc_hwmod,
-> +	.clk		= "l4ls_gclk",
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
-> +static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
-> +	.master		= &am33xx_l4_ls_hwmod,
-> +	.slave		= &am43xx_dss_rfbi_hwmod,
-> +	.clk		= "l4ls_gclk",
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
->  static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
->  	&am33xx_l4_wkup__synctimer,
->  	&am43xx_l4_ls__timer8,
-> @@ -748,6 +848,10 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
->  	&am43xx_l4_ls__ocp2scp1,
->  	&am43xx_l3_s__usbotgss0,
->  	&am43xx_l3_s__usbotgss1,
-> +	&am43xx_dss__l3_main,
-> +	&am43xx_l4_ls__dss,
-> +	&am43xx_l4_ls__dss_dispc,
-> +	&am43xx_l4_ls__dss_rfbi,
->  	NULL,
->  };
->  
-> diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
-> index 7785be984edd..ad7b3e9977f8 100644
-> --- a/arch/arm/mach-omap2/prcm43xx.h
-> +++ b/arch/arm/mach-omap2/prcm43xx.h
-> @@ -142,5 +142,6 @@
->  #define AM43XX_CM_PER_USBPHYOCP2SCP0_CLKCTRL_OFFSET	0x05B8
->  #define AM43XX_CM_PER_USB_OTG_SS1_CLKCTRL_OFFSET        0x0268
->  #define AM43XX_CM_PER_USBPHYOCP2SCP1_CLKCTRL_OFFSET	0x05C0
-> +#define AM43XX_CM_PER_DSS_CLKCTRL_OFFSET		0x0a20
->  
->  #endif
-> 
+- MDSCR_EL1 has either MDE or KDE set (which means the guest is actively
+using the debug infrastructure)
+- or the guest has written to a trapped register (which marks the state
+as dirty).
+
+I don't think we can do less work than this. Or can we?
+
+Thanks,
+
+        M.
+-- 
+Jazz is not dead. It just smells funny.
