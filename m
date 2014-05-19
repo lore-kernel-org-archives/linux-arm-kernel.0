@@ -1,34 +1,37 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 19 May 2014 16:18:45 +0200
-Subject: [PATCH] clocksource:sirf: remove the hardcode for the clk of
- timers
-In-Reply-To: <1399289404-10247-1-git-send-email-21cnbao@gmail.com>
-References: <1399289404-10247-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <537A12C5.60304@linaro.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 19 May 2014 17:21:43 +0300
+Subject: [PATCHv2 00/14]: ARM: OMAP2: clock DT conversion
+In-Reply-To: <1393924700-6510-1-git-send-email-t-kristo@ti.com>
+References: <1393924700-6510-1-git-send-email-t-kristo@ti.com>
+Message-ID: <537A1377.7070004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2014 01:30 PM, Barry Song wrote:
-> From: Zhiwu Song <Zhiwu.Song@csr.com>
+On 03/04/2014 11:18 AM, Tero Kristo wrote:
+> Hi,
 >
-> Nobody want to know the connection between io clk and timer clk,
-> so exposing this information to timer module is not reasonable.
-> this patch moves to define the timers' clk in dt.
+> Changes compared to v1:
+> - fixed OMAP2 only build issues
+> - fixed OMAP2420 boot issues
+> - added patch #13 and #14 to remove legacy clock data for OMAP2/OMAP3
+> - fixed smatch + DT bindings documentation problems reported by Nishanth
 >
-> Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> This set is un-tested on OMAP2 hardware as I don't have access to any. So,
+> any testing feedback welcome.
+>
+> Test branch available:
+> tree: https://github.com/t-kristo/linux-pm.git
+> branch: 3.14-rc4-omap2-dt-clks-v2
 
-[fixed the subject format]
+I just queued these for 3.16/ti-clk-drv.
 
-Applied to my tree for 3.16
+-Tero
 
-Thanks
-   -- Daniel
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+>
+> -Tero
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
