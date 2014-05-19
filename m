@@ -1,181 +1,66 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Mon, 19 May 2014 14:50:12 +0530
-Subject: [linux-pm] [RFC PATCH 3/5] thermal: cpu_cooling: Add support to
- find nearby frequency levels.
-In-Reply-To: <20140515185254.GC3138@developer>
-References: <1399559880-20562-1-git-send-email-amit.daniel@samsung.com>
- <1399559880-20562-4-git-send-email-amit.daniel@samsung.com>
- <20140515185254.GC3138@developer>
-Message-ID: <CADGdYn6F0ZWf+t4JcfwCmm71BUrm3eGe+U9bLc9a1hBMmb=e-Q@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 19 May 2014 12:21:40 +0300
+Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
+ support
+In-Reply-To: <20140516180154.GG22031@atomide.com>
+References: <5371F923.80000@ti.com>
+ <CABxcv==_LCw1kPYm17g=h8VfSN2V_qsgXjTnsy-JOetawSv4pA@mail.gmail.com>
+ <20140513152518.GA16837@atomide.com> <53730AFB.2090800@ti.com>
+ <20140514160216.GD18463@atomide.com> <537487AE.3060906@ti.com>
+ <20140515182133.GC23659@atomide.com> <5375A8A8.7080306@ti.com>
+ <20140516160717.GD22031@atomide.com> <20140516174158.GA11733@earth.universe>
+ <20140516180154.GG22031@atomide.com>
+Message-ID: <5379CD24.6040508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 12:22 AM, Eduardo Valentin <edubezval@gmail.com> wrote:
-> Hello Amit,
->
-> On Thu, May 08, 2014 at 08:07:58PM +0530, Amit Daniel Kachhap wrote:
->> This patch adds suuport to get P state ceil/floor level for nearest frequency.
->> This will be used for consolidating ACPI cpufreq cooling via the generic cpu
->> cooling framework.
->>
->> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> ---
->>  drivers/thermal/cpu_cooling.c                   |   42 +++++++++++++++++------
->>  drivers/thermal/samsung/exynos_thermal_common.c |    3 +-
->>  include/linux/cpu_cooling.h                     |   23 ++++++++++++-
->>  3 files changed, 55 insertions(+), 13 deletions(-)
->>
->> diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
->> index e2aeb36..6f5430e 100644
->> --- a/drivers/thermal/cpu_cooling.c
->> +++ b/drivers/thermal/cpu_cooling.c
->> @@ -120,12 +120,7 @@ static int is_cpufreq_valid(int cpu)
->>       return !cpufreq_get_policy(&policy, cpu);
->>  }
->>
->> -enum cpufreq_cooling_property {
->> -     GET_LEVEL,
->> -     GET_FREQ,
->> -     GET_MAXL,
->> -};
->> -
->> +#define GET_FREQ (GET_MAXL + 1)
->
-> What happens if we add another level manipulating after GET_MAXL? say,
-> GET_MINL?
-yes correct. Good catch.
->
->>  /**
->>   * get_property - fetch a property of interest for a give cpu.
->>   * @cpu: cpu for which the property is required
->> @@ -207,15 +202,37 @@ static int get_property(unsigned int cpu, unsigned long input,
->>               /* now we have a valid frequency entry */
->>               freq = table[i].frequency;
->>
->> -             if (property == GET_LEVEL && (unsigned int)input == freq) {
->> +             if (property == GET_LEVEL_EXACT &&
->> +                                     (unsigned int)input == freq) {
->>                       /* get level by frequency */
->>                       *output = descend ? j : (max_level - j);
->>                       return 0;
->> -             }
->> -             if (property == GET_FREQ && level == j) {
->> +             } else if (property == GET_FREQ && level == j) {
->>                       /* get frequency by level */
->>                       *output = freq;
->>                       return 0;
->> +             } else if (property == GET_LEVEL_FLOOR) {
->> +                     /* get minimum possible level by frequency */
->> +                     if (descend && freq <= input) {
->> +                             *output = j;
->> +                             return 0;
->> +                     } else if (!descend) {
->> +                             if (freq <= input)
->> +                                     *output = (max_level - j);
->> +                             else
->> +                                     return 0;
->> +                     }
->> +             } else if (property == GET_LEVEL_CEIL) {
->> +                     /* get maximum possible level by frequency */
->> +                     if (!descend && freq >= input) {
->> +                             *output = (max_level - j);
->> +                             return 0;
->> +                     } else if (descend) {
->> +                             if (freq >= input)
->> +                                     *output = j;
->> +                             else
->> +                                     return 0;
->> +                     }
->>               }
->>               j++;
->>       }
->> @@ -227,6 +244,8 @@ static int get_property(unsigned int cpu, unsigned long input,
->>   * cpufreq_cooling_get_level - for a give cpu, return the cooling level.
->>   * @cpu: cpu for which the level is required
->>   * @freq: the frequency of interest
->> + * @property: can be GET_LEVEL_CEIL, GET_LEVEL_FLOOR, GET_LEVEL_EXACT or
->> + * GET_MAXL
->>   *
->>   * This function will match the cooling level corresponding to the
->>   * requested @freq and return it.
->> @@ -234,11 +253,12 @@ static int get_property(unsigned int cpu, unsigned long input,
->>   * Return: The matched cooling level on success or THERMAL_CSTATE_INVALID
->>   * otherwise.
->>   */
->> -unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq)
->> +unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq,
->> +                     enum cpufreq_cooling_property property)
->>  {
->>       unsigned int val;
->>
->> -     if (get_property(cpu, (unsigned long)freq, &val, GET_LEVEL))
->> +     if (get_property(cpu, (unsigned long)freq, &val, property))
->>               return THERMAL_CSTATE_INVALID;
->>
->>       return (unsigned long)val;
->> diff --git a/drivers/thermal/samsung/exynos_thermal_common.c b/drivers/thermal/samsung/exynos_thermal_common.c
->> index a7306fa..aa4696b 100644
->> --- a/drivers/thermal/samsung/exynos_thermal_common.c
->> +++ b/drivers/thermal/samsung/exynos_thermal_common.c
->> @@ -156,7 +156,8 @@ static int exynos_bind(struct thermal_zone_device *thermal,
->>       /* Bind the thermal zone to the cpufreq cooling device */
->>       for (i = 0; i < tab_size; i++) {
->>               clip_data = (struct freq_clip_table *)&(tab_ptr[i]);
->> -             level = cpufreq_cooling_get_level(0, clip_data->freq_clip_max);
->> +             level = cpufreq_cooling_get_level(0, clip_data->freq_clip_max,
->> +                                             GET_LEVEL_EXACT);
->>               if (level == THERMAL_CSTATE_INVALID)
->>                       return 0;
->>               switch (GET_ZONE(i)) {
->> diff --git a/include/linux/cpu_cooling.h b/include/linux/cpu_cooling.h
->> index f786935..f4d2b0e 100644
->> --- a/include/linux/cpu_cooling.h
->> +++ b/include/linux/cpu_cooling.h
->> @@ -44,6 +44,13 @@ struct cpufreq_cooling_status {
->>       void *devdata;
->>  };
->>
->> +enum cpufreq_cooling_property {
->> +     GET_LEVEL_CEIL,
->> +     GET_LEVEL_FLOOR,
->> +     GET_LEVEL_EXACT,
->> +     GET_MAXL,
->> +};
->
-> Please document this enum.
->
->> +
->>  #ifdef CONFIG_CPU_THERMAL
->>  /**
->>   * cpufreq_cooling_register - function to create cpufreq cooling device.
->> @@ -77,7 +84,21 @@ of_cpufreq_cooling_register(struct device_node *np,
->>   */
->>  void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev);
->>
->> -unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq);
->> +/**
->> + * cpufreq_cooling_get_level - for a give cpu, return the cooling level.
->> + * @cpu: cpu for which the level is required
->> + * @freq: the frequency of interest
->> + * @property: can be GET_LEVEL_CEIL, GET_LEVEL_FLOOR, GET_LEVEL_EXACT or
->> + * GET_MAXL
->> + *
->> + * This function will match the cooling level corresponding to the
->> + * requested @freq and return it.
->> + *
->> + * Return: The matched cooling level on success or THERMAL_CSTATE_INVALID
->> + * otherwise.
->> + */
->> +unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq,
->> +                                     enum cpufreq_cooling_property);
->>
->>  /**
->>   * cpufreq_cooling_register_notifier - register a driver with cpufreq cooling.
->> --
->> 1.7.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
+On 16/05/14 21:01, Tony Lindgren wrote:
+
+>> IMHO appending -omap-dss to a random device is an even bigger hack,
+>> since its adding lots of bloat to the API. Let's assume there is
+>> another OS using DT for ARM, but has no proper API for SPI
+>> controllers and it introduces your hack to SPI devices. That would
+>> mean each SPI device has -omap-spi appended (or -exynos-spi,
+>> -foo-spi, ...). At least I would blame them for creating a huge
+>> unmaintainable mess.
+> 
+> I think you're misunderstanding. I do not want the naming to
+> be Linux specific. The naming should naturally be as hardware
+> specific as possible. In this case something like:
+> 
+> compatible = "sharp,ls037v7dw01-dss", "sharp,ls037v7dw01";
+> 
+> Or we should probably use:
+> 
+> compatible = "sharp,ls037v7dw01-dpi", "sharp,ls037v7dw01";
+> 
+> As dpi here reflects the hardware it's connected to. The dss
+> is probably a Linux name.
+
+Well, "dss" or "omapdss" is as much a hardware term as "dpi". And "dpi"
+wouldn't really be a good extension, as what we want is an omapdss
+driver specific compatible string. So I think "-omapdss" is the best
+extension if that method is used.
+
+But I don't think that's really the point. The point is that the panel's
+compatible string should be "sharp,ls037v7dw01", nothing else.
+
+All the variations of "sharp,ls037v7dw01-dss" are not correct, and are
+only made for Linux SW reasons. So I would say they are Linux specific
+SW names, even if the words themselves are also HW terms.
+
+> Not use what you're after with the SPI example though, but sounds
+> like that's something different.
+
+I think Sebastien's example is just like the issue here.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/86a3571b/attachment.sig>
