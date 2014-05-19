@@ -1,59 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 May 2014 14:06:36 +0200
-Subject: [PATCH v1 5/5] pci: keystone: add pcie driver based on designware
- core driver
-In-Reply-To: <5376748B.7080302@ti.com>
-References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
- <22200719.Jb5jnJylJH@wuerfel> <5376748B.7080302@ti.com>
-Message-ID: <5671513.YgJm44AVLV@wuerfel>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 19 May 2014 14:08:08 +0200
+Subject: [PATCH v5 2/2] ARM: dts: mx51: Remove mach-cpuimx51sd board file
+In-Reply-To: <CAOMZO5ArKGZfqSZurMpsGA28MxNRmqcnYc38G8rR3axVDfwaaQ@mail.gmail.com>
+References: <1399736856-9489-1-git-send-email-festevam@gmail.com>
+ <1399736856-9489-2-git-send-email-festevam@gmail.com>
+ <20140513015431.GI8330@dragon> <1400492895.2007.7.camel@x220>
+ <CAOMZO5ArKGZfqSZurMpsGA28MxNRmqcnYc38G8rR3axVDfwaaQ@mail.gmail.com>
+Message-ID: <1400501288.2007.37.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 May 2014 16:26:51 Murali Karicheri wrote:
-> On 5/15/2014 2:20 PM, Arnd Bergmann wrote:
-> > On Thursday 15 May 2014 13:45:08 Murali Karicheri wrote:
-> >>>> +#ifdef CONFIG_PCI_KEYSTONE
-> >>>> +/*
-> >>>> + * The KeyStone PCIe controller has maximum read request size of 256 bytes.
-> >>>> + */
-> >>>> +static void quirk_limit_readrequest(struct pci_dev *dev)
-> >>>> +{
-> >>>> +    int readrq = pcie_get_readrq(dev);
-> >>>> +
-> >>>> +    if (readrq > 256)
-> >>>> +            pcie_set_readrq(dev, 256);
-> >>>> +}
-> >>>> +DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_readrequest);
-> >>>> +#endif /* CONFIG_PCI_KEYSTONE */
-> >>> This doesn't work: you can't just limit do this for all devices just based
-> >>> on PCI_KEYSTONE being enabled, you have to check if you are actually using
-> >>> this controller.
-> >>>
-> >>>        Arnd
-> >>    I assume, I need to check if PCI controller's vendor ID/ device ID
-> >> match with the keystone
-> >>    PCI controller's ID and call pcie_set_readrq() for all of the slave
-> >> PCI devices and do this fixup.
-> >> Is this correct understanding?  If you can point me to an example code
-> >> for this that will be
-> >> really helpful so that I can avoid re-inventing the wheel.
-> > I think it would be best to move the quirk into the keystone pci driver
-> > and compare compare the dev->driver pointer of the PCI controller device.
-> >
-> >       Arnd
-> Arnd,
-> 
-> I will move this quirk to keystone pci driver. So in that case, I guess 
-> your original comment
-> is not applicable as  this quirk gets enabled only with PCI keystone 
-> driver enabled. Right?
+On Mon, 2014-05-19 at 08:57 -0300, Fabio Estevam wrote:
+> MACH_EUKREA_MBIMXSD51_BASEBOARD should be removed from sound/soc/fsl/Kconfig.
 
-Of course you still have to fix the bug, not just move the code into
-the driver. Otherwise it's still broken for every machine after the keystone
-driver is enabled.
+Thanks for looking into this.
 
-I also agree with Jason that changing the PCI core to call
-pcie_bus_configure_settings() would be a better way of dealing with this
-if it solves the problem.
+> Would you like to submit a patch?
 
-	Arnd
+Only if all you want for a commit explanation is something like "Remove
+a select statement for MACH_EUKREA_MBIMXSD51_BASEBOARD. It's a NOP".
+ 
+But I suppose it might be nice to add a few lines why removing config
+MACH_EUKREA_MBIMXSD51_BASEBOARD didn't break the code (that is enabled
+by setting SND_SOC_EUKREA_TLV320). And I wouldn't know how to write
+those lines, because I have no idea how this all fits together. So I
+actually prefer if someone else submitted that patch.
+
+But I do hope you don't mind if I drop in a reminder if that patch takes
+too long.
+
+
+Paul Bolle
