@@ -1,109 +1,86 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 19 May 2014 16:30:59 +0300
-Subject: [RFC PATCH] of/irq: do irq resolution in platform_get_irq_byname()
-Message-ID: <1400506259-18397-1-git-send-email-grygorii.strashko@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 May 2014 14:45:47 +0200
+Subject: [PATCH 06/17] pci: host: pcie-designware: Use *base-mask* for
+ configuring the iATU
+In-Reply-To: <5375D3C8.1060204@ti.com>
+References: <1399383244-14556-1-git-send-email-kishon@ti.com>
+ <5281007.CFRjW0Yeu2@wuerfel> <5375D3C8.1060204@ti.com>
+Message-ID: <5193704.9YxYic1Nyf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 9ec36cafe43bf835f8f29273597a5b0cbc8267ef
-"of/irq: do irq resolution in platform_get_irq" from Rob Herring -
-moves resolving of the interrupt resources in platform_get_irq().
-But this solution isn't complete because platform_get_irq_byname()
-need to be modified the same way.
+On Friday 16 May 2014 14:30:56 Kishon Vijay Abraham I wrote:
+> On Wednesday 14 May 2014 06:15 PM, Arnd Bergmann wrote:
+> > On Wednesday 14 May 2014 11:14:45 Kishon Vijay Abraham I wrote:
+> > / {
+> >       #address-cells = <1>; // or <2> if you support > 4GB address space
+> >       #size-cells = <1>;
+> > 
+> >       soc {
+> >               #address-cells <1>;
+> >               #size-cells = <1>;
+> >               ranges;
+> >               dma-ranges;
+> > 
+> >               ... // all normal devices
+> > 
+> >               axi at 20000000 {
+> >                       #size-cells = <1>;
+> >                       #address-cells = <1>;
+> >                       dma-ranges; // can access all 4GB outbound
+> >                       ranges = <0 0x20000000 0x10000000>; // 28-bit bus
+> > 
+> >                       pci at 0 {
+> >                               reg = <0x0    0x1000>, // internal regs
+> >                                     <0x1000 0x2000>; // config space
+> 
+> The internal reg address space starts at 0x51000000. By Using this <0
+> 0x20000000 0x10000000>; as ranges, we are not able to get the memory resource
+> properly. Can we use multiple ranges? how do we specify which ranges the *reg*
+> property to use?
 
-Hence, fix it by adding interrupt resolution code at the
-platform_get_irq_byname() function too.
+Yes, multiple ranges will work fine. You can make up a representation
+yourself if you don't know what the hardware really does.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Rob Herring <robh@kernel.org>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Thierry Reding <thierry.reding@gmail.com>
+Two possible ways of doing this would be
 
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- drivers/base/platform.c |    7 +++++--
- drivers/of/irq.c        |   25 +++++++++++++++++++++++++
- include/linux/of_irq.h  |    5 +++++
- 3 files changed, 35 insertions(+), 2 deletions(-)
+a)
 
-diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-index 5b47210..9e9227e 100644
---- a/drivers/base/platform.c
-+++ b/drivers/base/platform.c
-@@ -131,9 +131,12 @@ EXPORT_SYMBOL_GPL(platform_get_resource_byname);
-  */
- int platform_get_irq_byname(struct platform_device *dev, const char *name)
- {
--	struct resource *r = platform_get_resource_byname(dev, IORESOURCE_IRQ,
--							  name);
-+	struct resource *r;
-+
-+	if (IS_ENABLED(CONFIG_OF_IRQ) && dev->dev.of_node)
-+		return of_irq_get_byname(dev->dev.of_node, name);
- 
-+	r = platform_get_resource_byname(dev, IORESOURCE_IRQ, name);
- 	return r ? r->start : -ENXIO;
- }
- EXPORT_SYMBOL_GPL(platform_get_irq_byname);
-diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-index 5aeb894..6419de9 100644
---- a/drivers/of/irq.c
-+++ b/drivers/of/irq.c
-@@ -406,6 +406,31 @@ int of_irq_get(struct device_node *dev, int index)
- }
- 
- /**
-+ * of_irq_get_byname - Decode a node's IRQ and return it as a Linux irq number
-+ * @dev: pointer to device tree node
-+ * @name: zero-based index of the irq
-+ *
-+ * Returns Linux irq number on success, or -EPROBE_DEFER if the irq domain
-+ * is not yet created, or errorno in case of failure.
-+ *
-+ */
-+int of_irq_get_byname(struct device_node *dev, const char *name)
-+{
-+	const char *name_irq = NULL;
-+	int index = 0;
-+
-+	if (unlikely(!name))
-+		return -EINVAL;
-+
-+	while (!of_property_read_string_index(dev, "interrupt-names",
-+					      index, &name_irq))
-+		if (!strcmp(name, name_irq))
-+			return of_irq_get(dev, index);
-+
-+	return -ENXIO;
-+}
-+
-+/**
-  * of_irq_count - Count the number of IRQs a node uses
-  * @dev: pointer to device tree node
-  */
-diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
-index 6404253..bfec136 100644
---- a/include/linux/of_irq.h
-+++ b/include/linux/of_irq.h
-@@ -45,6 +45,7 @@ extern void of_irq_init(const struct of_device_id *matches);
- #ifdef CONFIG_OF_IRQ
- extern int of_irq_count(struct device_node *dev);
- extern int of_irq_get(struct device_node *dev, int index);
-+extern int of_irq_get_byname(struct device_node *dev, const char *name);
- #else
- static inline int of_irq_count(struct device_node *dev)
- {
-@@ -54,6 +55,10 @@ static inline int of_irq_get(struct device_node *dev, int index)
- {
- 	return 0;
- }
-+static inline int of_irq_get_byname(struct device_node *dev, const char *name)
-+{
-+	return 0;
-+}
- #endif
- 
- #if defined(CONFIG_OF)
--- 
-1.7.9.5
+	/* two separate physical connections represented as one logical bus */
+	axi at 20000000 {
+		#address-cells = <2>;
+		#size-cells = <1>;
+		ranges = <0 0 0x20000000 0x10000000>, /* configurable registers */
+			 <1 0 0x51000000 0x01000000>; /* PCI host registers */
+
+		pci at 1.0 {
+			reg = <1 0 0x01000000>, /* host registers */
+				<0 0x1000 0x2000>; /* config space */
+		}
+
+	};
+
+b) 
+
+	/* one physical bus, with some address munging */
+	axi at 20000000 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0 0x20000000 0x10000000>, /* configurable registers */
+			 <0x51000000 0x51000000 0x01000000>; /* PCI host registers */
+
+		pci at 1.0 {
+			reg = <0x51000000 0x01000000>, /* host registers */
+				<0x1000 0x2000>; /* config space */
+		}
+
+	};
+
+
+> Btw I was using *simple-bus* as compatible to *axi*. Or should I create a new
+> *axi* driver to create the pcie memory resources myself?
+
+simple-bus is best here, since you don't have a complex bus that needs to
+be set up using register accesses or that generates interrupts.
+
+	Arnd
