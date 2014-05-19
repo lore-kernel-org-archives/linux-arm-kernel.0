@@ -1,86 +1,83 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 19 May 2014 16:05:55 +0200
-Subject: [PATCH v3 3/7] mfd: add support for sun6i PRCM
- (Power/Reset/Clock Management) unit
-In-Reply-To: <20140519133253.GJ4978@lee--X1>
-References: <1399633911-7094-1-git-send-email-boris.brezillon@free-electrons.com>
- <1399633911-7094-4-git-send-email-boris.brezillon@free-electrons.com>
- <20140509135251.GY5767@lee--X1> <20140515151756.GX29258@lukather>
- <20140519092159.GE4978@lee--X1> <20140519092725.GE29466@lukather>
- <20140519133253.GJ4978@lee--X1>
-Message-ID: <20140519140555.GJ29466@lukather>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 19 May 2014 15:13:24 +0100
+Subject: [PATCH 4/6] arm64: topology: add MPIDR-based detection
+In-Reply-To: <20140519123314.GU12304@sirena.org.uk>
+References: <1399063112-16917-1-git-send-email-broonie@kernel.org>
+ <1399063112-16917-5-git-send-email-broonie@kernel.org>
+ <53763DFC.8070309@arm.com> <20140516183915.GP22111@sirena.org.uk>
+ <5379D594.2000200@arm.com>
+ <20140519105405.GC5935@e102568-lin.cambridge.arm.com>
+ <20140519123314.GU12304@sirena.org.uk>
+Message-ID: <20140519141323.GA2917@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 02:32:53PM +0100, Lee Jones wrote:
+On Mon, May 19, 2014 at 01:33:14PM +0100, Mark Brown wrote:
+> On Mon, May 19, 2014 at 11:54:05AM +0100, Lorenzo Pieralisi wrote:
 > 
-> > > > > > The PRCM (Power/Reset/Clock Management) block exposes several subdevices
-> > > > > > in different subsystems (clk, reset ...)
-> > > > > > 
-> > > > > > Add basic support for the PRCM unit with clk (AR100, AHB0, and APB0 clks)
-> > > > > > and reset controller subdevices.
-> > > > > > 
-> > > > > > Other subdevices might be added later (if needed).
-> > > > > > 
-> > > > > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > > > > > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > > > > ---
-> > > > > >  drivers/mfd/Kconfig      |   8 +++
-> > > > > >  drivers/mfd/Makefile     |   1 +
-> > > > > >  drivers/mfd/sun6i-prcm.c | 134 +++++++++++++++++++++++++++++++++++++++++++++++
-> > > > > >  3 files changed, 143 insertions(+)
-> > > > > >  create mode 100644 drivers/mfd/sun6i-prcm.c
-> > > > > 
-> > > > > [...]
-> > > > > 
-> > > > > > +/*
-> > > > > > + * Copyright (C) 2014 Free Electrons
-> > > > > > + *
-> > > > > > + * License Terms: GNU General Public License v2
-> > > > > > + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > > > > > + *
-> > > > > > + * Allwinner PRCM (Power/Reset/Clock Management) driver
-> > > > > > + *
-> > > > > > + */
-> > > > > > +
-> > > > > > +#include <linux/mfd/core.h>
-> > > > > > +#include <linux/module.h>
-> > > > > > +#include <linux/of.h>
-> > > > > 
-> > > > > Ah, now isn't that better?
-> > > > > 
-> > > > > Acked-by: Lee Jones <lee.jones@linaro.org>
-> > > > 
-> > > > How do you want to merge this? Do you want me to take it through
-> > > > mach-sunxi tree, or do you want to take it in your tree?
-> > > 
-> > > If Boris can tell me what needs to go in with this patch (or if it
-> > > can go in on its own), I will create a(n immutable) branch from which
-> > > you can pull into your tree.
-> > 
-> > We don't have any runtime or compile time dependency on this, so you
-> > can merge it through your tree. Unless something change, I don't have
-> > to pull anything in my tree.
+> > As to what should we use as cluster id, honestly I do not know.
 > 
-> When you say 'this', do you mean this patch, or this set?  If I can
-> just apply this patch, that will be ideal?
+> > I am quite tempted to use just three affinity levels for the moment
+> > and fix it when need arises, after all on ARM we have aff2 completely
+> > unused at the moment for the non-SMT systems (ie all ARM SMP systems in
+> > the mainline) and we are not coalescing affinity 2 into affinity 1 in
+> > any way.
+> 
+> > So either you ignore aff3, or can do something like that (non-SMT):
+> 
+> > cluster_id = MPIDR_EL1[39:32] << 16 | MPIDR_EL1[23:16] << 8 | MPIDR_EL1[15:8]
+> 
+> Which is roughly what the original code that you were worried about did
+> IIRC?  It seems silly to ignore the higher affinity levels since it's
+> trivial to look at them and means the kernel will at least split
+> everything into clusters if it does encounter some hardware that uses
+> them as opposed to merging those distinguished only by the higher
+> affinity levels.
 
-I mean you can apply these two patches:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256537.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256535.html
+No, it is not, at all, you do not remember correctly I am afraid.
 
-And it would be ideal :)
+Using the pseudo code above is as useful as using the hashing algorithm,
+they both provide you with a unique id and that's all we need for the
+topology.
 
-Maxime
+The original code was using the hash shifts the wrong way, which could
+lead to incorrect behaviour.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/21814b11/attachment-0001.sig>
+If ignoring affinity levels is silly, then we have to fix ARM 32 bit
+code too, since there on ALL SMP ARM systems in the mainline, affinity
+level 2 *is* ignored (since they are not SMT systems).
+
+Having said that, I really think that for the time being we should use three
+affinity levels (for topology purposes) as ARM 32 does and be done with this
+stuff.
+
+To be 100% precise, I think the best way to do it is to add another
+topology level (ie "book" in the kernel or whatever you want to call it for
+ARM, which I think is unused) and update the parsing code and data structure
+accordingly so that if two clusters have the same id but belong to different
+"books" (aff2 or aff3 - depending on SMT) the sibling masks are still correct.
+
+Documentation/cputopology.txt
+
+We will cross that bridge when we come to it instead of lumping affinity
+levels together, that's my opinion.
+
+> > Also please remove the warning on the missing topology information, if
+> > we fall back to MPIDR_EL1 we will always have a topology of sorts, as
+> > borked as it might be, so that warning becomes useless, ie it is never
+> > triggered.
+> 
+> I'll add something to this patch - the warning is needed if the DT code
+> gets merged without this and it seems this one still going round the
+> loop.  :/
+
+Yes but *this* patch is bumping the log level not the other ones and what I
+am saying is that when this code patch gets merged that warning is useless (ie
+never triggered - cluster id can't be == -1) unless I am missing something
+here.
+
+Do not bother, use three affinity levels and be done with that, we will
+deal with aff3 (and aff2) when time comes.
+
+Thanks,
+Lorenzo
