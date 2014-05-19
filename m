@@ -1,112 +1,86 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 19 May 2014 15:07:52 +0100
-Subject: [PATCH 1/4] phy: miphy365x: Add Device Tree bindings for the
- MiPHY365x
-In-Reply-To: <537A0E73.9080006@ti.com>
-References: <1398756095-32542-1-git-send-email-lee.jones@linaro.org>
- <1398756095-32542-2-git-send-email-lee.jones@linaro.org>
- <20140519135622.GL4978@lee--X1> <537A0E73.9080006@ti.com>
-Message-ID: <20140519140752.GN4978@lee--X1>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 19 May 2014 16:05:55 +0200
+Subject: [PATCH v3 3/7] mfd: add support for sun6i PRCM
+ (Power/Reset/Clock Management) unit
+In-Reply-To: <20140519133253.GJ4978@lee--X1>
+References: <1399633911-7094-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1399633911-7094-4-git-send-email-boris.brezillon@free-electrons.com>
+ <20140509135251.GY5767@lee--X1> <20140515151756.GX29258@lukather>
+ <20140519092159.GE4978@lee--X1> <20140519092725.GE29466@lukather>
+ <20140519133253.GJ4978@lee--X1>
+Message-ID: <20140519140555.GJ29466@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Did you receive this set okay?  I believe it's still unmerged?
+On Mon, May 19, 2014 at 02:32:53PM +0100, Lee Jones wrote:
 > 
-> I think I missed it. But I'm already done with the PULL REQUEST to greg for
-> 3.16 merge window.
-
-Really, already? It's only -rc5?
-
-> Can't we take it through dt tree for miphy?
-
-Well there are 3 patches.  2 of which could go through your DT tree,
-but the 3rd one is the driver itself.
-
-> >> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-> >> devices. It has 2 ports which it can use for either; both SATA, both
-> >> PCIe or one of each in any configuration.
-> >>
-> >> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> >> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> >> Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
-> >> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >> ---
-> >>  .../devicetree/bindings/phy/phy-miphy365x.txt      | 62 ++++++++++++++++++++++
-> >>  1 file changed, 62 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> >> new file mode 100644
-> >> index 0000000..cb39de1
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> >> @@ -0,0 +1,62 @@
-> >> +STMicroelectronics STi MIPHY365x PHY binding
-> >> +============================================
-> >> +
-> >> +This binding describes a miphy device that is used to control PHY hardware
-> >> +for SATA and PCIe.
-> >> +
-> >> +Required properties:
-> >> +- compatible :	Should be "st,miphy365x-phy"
-> >> +- #phy-cells :	Should be 2 (See second example)
-> >> +		First cell is the port number from:
-> >> +			- MIPHY_PORT_0
-> >> +			- MIPHY_PORT_1
-> >> +		Second cell is device type from:
-> >> +			- MIPHY_TYPE_SATA
-> >> +			- MIPHY_TYPE_PCI
-> >> +- reg       :	Address and length of register sets for each device in
-> >> +		"reg-names"
-> >> +- reg-names : 	The names of the register addresses corresponding to the
-> >> +		registers filled in "reg", from:
-> >> +			- sata0: For SATA port 0 registers
-> >> +			- sata1: For SATA port 1 registers
-> >> +			- pcie0: For PCIE port 0 registers
-> >> +			- pcie1: For PCIE port 1 registers
-> >> +- st,syscfg : 	Should be a phandle of the system configuration register group
-> >> +		which contain the SATA, PCIe mode setting bits
-> >> +
-> >> +Optional properties:
-> >> +- st,sata-gen	     :	Generation of locally attached SATA IP. Expected values
-> >> +			are {1,2,3). If not supplied generation 1 hardware will
-> >> +			be expected
-> >> +- st,pcie-tx-pol-inv :	Bool property to invert the polarity PCIe Tx (Txn/Txp)
-> >> +- st,sata-tx-pol-inv :	Bool property to invert the polarity SATA Tx (Txn/Txp)
-> >> +
-> >> +Example:
-> >> +
-> >> +	miphy365x_phy: miphy365x at fe382000 {
-> >> +		compatible = "st,miphy365x-phy";
-> >> +		#phy-cells = <2>;
-> >> +		reg =	<0xfe382000 0x100>,
-> >> +			<0xfe38a000 0x100>,
-> >> +			<0xfe394000 0x100>,
-> >> +			<0xfe804000 0x100>;
-> >> +		reg-names = "sata0", "sata1", "pcie0", "pcie1";
-> >> +		st,syscfg = <&syscfg_rear>;
-> >> +	};
-> >> +
-> >> +Specifying phy control of devices
-> >> +=================================
-> >> +
-> >> +Device nodes should specify the configuration required in their "phys"
-> >> +property, containing a phandle to the miphy device node, a port number
-> >> +and a device type.
-> >> +
-> >> +Example:
-> >> +
-> >> +#include <dt-bindings/phy/phy-miphy365x.h>
-> >> +
-> >> +	sata0: sata at fe380000 {
-> >> +		...
-> >> +		phys	  = <&miphy365x_phy MIPHY_PORT_0 MIPHY_TYPE_SATA>;
-> >> +		...
-> >> +	};
+> > > > > > The PRCM (Power/Reset/Clock Management) block exposes several subdevices
+> > > > > > in different subsystems (clk, reset ...)
+> > > > > > 
+> > > > > > Add basic support for the PRCM unit with clk (AR100, AHB0, and APB0 clks)
+> > > > > > and reset controller subdevices.
+> > > > > > 
+> > > > > > Other subdevices might be added later (if needed).
+> > > > > > 
+> > > > > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > > > > > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > > > > ---
+> > > > > >  drivers/mfd/Kconfig      |   8 +++
+> > > > > >  drivers/mfd/Makefile     |   1 +
+> > > > > >  drivers/mfd/sun6i-prcm.c | 134 +++++++++++++++++++++++++++++++++++++++++++++++
+> > > > > >  3 files changed, 143 insertions(+)
+> > > > > >  create mode 100644 drivers/mfd/sun6i-prcm.c
+> > > > > 
+> > > > > [...]
+> > > > > 
+> > > > > > +/*
+> > > > > > + * Copyright (C) 2014 Free Electrons
+> > > > > > + *
+> > > > > > + * License Terms: GNU General Public License v2
+> > > > > > + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > > > > > + *
+> > > > > > + * Allwinner PRCM (Power/Reset/Clock Management) driver
+> > > > > > + *
+> > > > > > + */
+> > > > > > +
+> > > > > > +#include <linux/mfd/core.h>
+> > > > > > +#include <linux/module.h>
+> > > > > > +#include <linux/of.h>
+> > > > > 
+> > > > > Ah, now isn't that better?
+> > > > > 
+> > > > > Acked-by: Lee Jones <lee.jones@linaro.org>
+> > > > 
+> > > > How do you want to merge this? Do you want me to take it through
+> > > > mach-sunxi tree, or do you want to take it in your tree?
+> > > 
+> > > If Boris can tell me what needs to go in with this patch (or if it
+> > > can go in on its own), I will create a(n immutable) branch from which
+> > > you can pull into your tree.
 > > 
+> > We don't have any runtime or compile time dependency on this, so you
+> > can merge it through your tree. Unless something change, I don't have
+> > to pull anything in my tree.
+> 
+> When you say 'this', do you mean this patch, or this set?  If I can
+> just apply this patch, that will be ideal?
+
+I mean you can apply these two patches:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256537.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256535.html
+
+And it would be ideal :)
+
+Maxime
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/21814b11/attachment-0001.sig>
