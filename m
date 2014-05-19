@@ -1,77 +1,100 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 May 2014 18:40:51 +0200
-Subject: [PATCHv3 1/3] ARM: mm: allow sub-architectures to override PCI
- I/O memory type
-In-Reply-To: <20140519142355.GD15130@arm.com>
-References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <66413148.lBD9c9XUns@wuerfel> <20140519142355.GD15130@arm.com>
-Message-ID: <4669695.sl9JY8Fb9h@wuerfel>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 19 May 2014 18:43:22 +0200
+Subject: [PATCH v2 01/10] dt-binding: ARM: add clock binding docs for Marvell
+ Berlin2 SoCs
+In-Reply-To: <1400517811-24668-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1400517811-24668-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1400517811-24668-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 May 2014 15:23:55 Will Deacon wrote:
-> On Mon, May 19, 2014 at 02:19:58PM +0100, Arnd Bergmann wrote:
-> > On Friday 16 May 2014 10:53:33 Will Deacon wrote:
-> > > On Thu, May 15, 2014 at 04:55:52PM +0100, Arnd Bergmann wrote:
-> > > > On Thursday 15 May 2014 16:34:30 Will Deacon wrote:
-> > > > > > If this is used to synchronize with a DMA, there is no guarantee that the
-> > > > > > transaction from PCI will be visible in memory by then.
-> > > > > 
-> > > > > Can you elaborate on this scenario please? When would we use an I/O space
-> > > > > write to synchronise with a DMA transfer from a PCI endpoint? You're
-> > > > > definitely referring to I/O space as opposed to Configuration Space, right?
-> > > > 
-> > > > Correct. Assume a PCI device uses PIO and DMA. It sends a DMA to main memory
-> > > > and lets the CPU know about the data using a level (IntA as opposed to MSI)
-> > > > interrupt. The CPU performs an outl() operation to an I/O port to let the
-> > > > hardware know it has received the IRQ and the response of the outl() is
-> > > > guaranteed to flush the DMA transaction: by the time the outl() completes
-> > > > we know that the data in memory is valid because it is strongly ordered
-> > > > relative to the DMA.
-> > > 
-> > > Hmm, when you say `guaranteed to flush the DMA transaction', is that a PCI
-> > > requirement? If so, whether or not that DMA data is then visible to the CPU
-> > > is really specific to the host-controller implementation. It could easily be
-> > > buffered somewhere between the host controller and memory, for example.
-> > 
-> > It's something that drivers are supposed to rely on, and the PCI host
-> > already has to make the same guarantee about ordering of MSI, MMIO-read
-> > and DMA transactions, all of which we definitely rely on in the kernel.
-> 
-> Supposed to rely on for x86, sure. I don't think we can even give you this
-> guarantee for arm64, where nE is nothing more than a *hint* to the memory
-> subsystem.
+This adds mandatory device tree binding documentation for the clock related
+IP found on Marvell Berlin2 (BG2, BG2CD, and BG2Q) SoCs to the Berlin SoC
+binding documentation.
 
-That might be why SBSA actually doesn't specify I/O space at all ;-)
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Changelog:
+v1->v2:
+- typo fixed (Reported by Alexandre Belloni)
+- reworked binding to not represent individual clocks but chip control
+  IP/registers instead (Suggested by Mike Turquette)
+- dropped clock indices, refer to the include instead (Requested by Mike
+  Turquette)
+- moved the documentation from bindings/clock to Marvell Berlin SoC
+  binding, as there will be more functions (e.g. pinctrl) to describe
+
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Randy Dunlap <rdunlap@infradead.org>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Jisheng Zhang <jszhang@marvell.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-doc at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ .../devicetree/bindings/arm/marvell,berlin.txt     | 47 ++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+index 0677003e1476..744a7ea569d4 100644
+--- a/Documentation/devicetree/bindings/arm/marvell,berlin.txt
++++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+@@ -23,3 +23,50 @@ SoC and board used. Currently known SoC compatibles are:
  
-> For the MSI case, I thought we had to go and poke the SCU for the Marvell
-> SoC?
-
-I'd consider that a bug workaround for a case where the hardware doesn't
-do the reasonably thing.
-
-> > > > outl() actually does a dsb() internally, but unfortunately that is
-> > > > before the store, not after, so I assume that a driver relying on the
-> > > > behavior above would still be racy.
-> > > 
-> > > Yup, we'd need an additional dsb. I think we're confusing what the PCI
-> > > specification says about ordering and what the inb/outb instructions provide
-> > > on x86. It may well be that we want to emulate the x86 behaviour on ARM, but
-> > > that's not going to come cheap and I don't think it's a decision we should
-> > > take lightly.
-> > 
-> > outb() is expected to be an extremely heavyweight operation, that's why nobody
-> > uses it. Why would you care about whether it's one or two microsecond latency
-> > on a MIDI port or an ISDN adapter?
-> 
-> Fair enough -- I just don't think we should dress up an erratum workaround as
-> a bug fix, especially when it's adding a new user of strongly-ordered memory
-> to the kernel which we can't honour for arm64.
-
-Makes sense. How about a patch then that just changes the memory type for
-the I/O space and adds a comment explaining all we found out? From what
-I can tell, strict ordering is required for Armada 3xx, may or may not
-be required elsewhere but should never hurt noticeably. We may want to restrict
-it to ARMv6/v7 so we don't have to pick the right domain.
-
-	Arnd
+ 	...
+ }
++
++* Marvell Berlin2 chip control binding
++
++Marvell Berlin SoCs have a chip control register set providing several
++individual registers dealing with pinmux, padmux, clock, reset, and secondary
++CPU boot address. Unfortunately, the individual registers are spread among the
++chip control registers, so there should be a single DT node only providing the
++different functions which are described below.
++
++Required properties:
++- compatible: shall be one of
++	"marvell,berlin2-chip-ctrl" for BG2
++	"marvell,berlin2cd-chip-ctrl" for BG2CD
++	"marvell,berlin2q-chip-ctrl" for BG2Q
++- reg: address and length of following register sets for
++  BG2/BG2CD: chip control register set
++  BG2Q: chip control register set and cpu pll registers
++
++* Clock provider binding
++
++As clock related registers are spread among the chip control registers, the
++chip control node also provides the clocks. Marvell Berlin2 (BG2, BG2CD, BG2Q)
++SoCs share the same IP for PLLs and clocks, with some minor differences in
++features and register layout.
++
++Required properties:
++- #clock-cells: shall be set to 1
++- clocks: clock specifiers referencing the core clock input clocks
++- clock-names: array of strings describing the input clock specifiers above.
++    Allowed clock-names for the reference clocks are
++      "refclk" for the SoCs osciallator input on all SoCs,
++    and SoC-specific input clocks for
++      BG2/BG2CD: "video_ext0" for the external video clock input
++
++Clocks provided by core clocks shall be referenced by a clock specifier
++indexing one of the provided clocks. Refer to dt-bindings/clock/berlin<soc>.h
++for the corresponding index mapping.
++
++Example:
++
++chip: chip-control at ea0000 {
++	compatible = "marvell,berlin2-chip-ctrl";
++	#clock-cells = <1>;
++	reg = <0xea0000 0x400>;
++	clocks = <&refclk>, <&externaldev 0>;
++	clock-names = "refclk", "video_ext0";
++};
+-- 
+1.9.1
