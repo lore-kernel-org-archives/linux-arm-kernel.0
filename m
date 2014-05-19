@@ -1,89 +1,65 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 19 May 2014 20:26:18 +0400
-Subject: [PATCH 2/3] Documentation: add Device tree bindings for Hisilicon
- hix5hd2 ethernet
-In-Reply-To: <1400504227-12047-3-git-send-email-zhangfei.gao@linaro.org>
-References: <1400504227-12047-1-git-send-email-zhangfei.gao@linaro.org>
- <1400504227-12047-3-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <537A30AA.8080107@cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 May 2014 09:27:41 -0700
+Subject: [PATCH] arm/omap4: add twd clock to DT
+In-Reply-To: <CAGhQ9Vy-mvaXZ_=E_mmqYqxF5EiJSdN1rJayussm+AgKf94a+g@mail.gmail.com>
+References: <1396901139-17268-1-git-send-email-gilles.chanteperdrix@xenomai.org>
+ <20140418223948.GK21823@atomide.com> <5353F44F.5080400@xenomai.org>
+ <535662F0.4080300@ti.com>
+ <CAGhQ9Vw-QaB+OnLa3yNVvD6a=XOutSZ1ejbsuUXvEcyrxEsRcQ@mail.gmail.com>
+ <20140519161319.GD4849@atomide.com>
+ <CAGhQ9Vy-mvaXZ_=E_mmqYqxF5EiJSdN1rJayussm+AgKf94a+g@mail.gmail.com>
+Message-ID: <20140519162741.GG4849@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+* Joachim Eastwood <manabian@gmail.com> [140519 09:24]:
+> On 19 May 2014 18:13, Tony Lindgren <tony@atomide.com> wrote:
+> > * Joachim Eastwood <manabian@gmail.com> [140518 05:08]:
+> >> On 22 April 2014 14:39, Tero Kristo <t-kristo@ti.com> wrote:
+> >> > On 04/20/2014 07:22 PM, Gilles Chanteperdrix wrote:
+> >> >>
+> >> >> Le 19/04/2014 00:39, Tony Lindgren a ?crit :
+> >> >>>
+> >> >>> * Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org> [140407 13:09]:
+> >> >>>>
+> >> >>>> Booting Linux 3.14 on Pandaboard currently gets the following
+> >> >>>> message displayed:
+> >> >>>>
+> >> >>>> smp_twd: clock not found -2
+> >> >>>>
+> >> >>>> Define "mpu_periphclk" as the twd clock in omap4 dts to avoid this.
+> >> >>>
+> >> >>>
+> >> >>> Tero, care to ack?
+> >> >>
+> >> >>
+> >> >> Sorry if I did not mail the right people, get_maintainer.pl gave me a
+> >> >> long list, and I did not feel like spamming all these people for such a
+> >> >> small patch. I do not believe Tero was in this list.
+> >> >>
+> >> >> Regards.
+> >> >
+> >> >
+> >> > Yea I don't think this is my expertise area, however the patch looks good to
+> >> > me, so if you really need it:
+> >> >
+> >> > Acked-by: Tero Kristo <t-kristo@ti.com>
+> >>
+> >> Tony, care to add this to your omap 3.16 dt branch?
+> >>
+> >> I am still getting:
+> >> [ 0.000152] smp_twd: clock not found -2
+> >>
+> >> So this fix from Gilles would be nice to have.
+> >
+> > Best that Tero picks this one up along with the other dt clock changes
+> > he's queueing.
+> 
+> I kinda assumed you would take it since you asked Tero to ack it. But
+> either way is fine :)
 
-On 05/19/2014 04:57 PM, Zhangfei Gao wrote:
+Yes that was before Tero started collecting the dt clock patches :)
 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> ---
->   .../bindings/net/hisilicon-hix5hd2-net.txt         |   37 ++++++++++++++++++++
->   1 file changed, 37 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hix5hd2-net.txt
+Regards,
 
-> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-net.txt b/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-net.txt
-> new file mode 100644
-> index 0000000..16b1f0e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-net.txt
-> @@ -0,0 +1,37 @@
-> +Hisilicon hix5hd2 Ethernet Controller
-> +
-> +Required properties:
-> +- compatible: should be "hisilicon,hix5hd2-mac".
-> +- reg : Specifies base physical address(s) and size of the device registers.
-
-    Er, I must note that the colon style here is not consistent with the rest 
-of the properties, i.e. there's space before the colon here, while in other 
-cases there's none.
-
-> +  The first region is the mac register base and size.
-
-    s/mac/MAC/.
-
-> +  The second region is external interface control register.
-> +- interrupts: Should contain the MAC interrupts
-> +- #address-cells: Must be <1>.
-> +- #size-cells: Must be <0>.
-
-    Descriptions should consistently start with a lower case, I think...
-
-> +- phy-mode: see ethernet.txt [1].
-> +- phy-handle: see ethernet.txt [1].
-> +- mac-address: see ethernet.txt [1].
-> +- clocks: clock phandle and specifier pair.
-> +
-> +- phy subnode: inherits from phy binding [2]
-
-    s/phy/PHY/.
-
-> +
-> +[1] Documentation/devicetree/bindings/net/ethernet.txt
-> +[2] Documentation/devicetree/bindings/net/phy.txt
-> +
-> +Example:
-> +	gmac0: ethernet at f9840000 {
-> +		compatible = "hisilicon,hix5hd2-mac";
-> +		reg = <0xf9840000 0x1000>,<0xf984300c 0x4>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		phy-handle = <&phy0>;
-> +		phy-mode = "mii";
-> +		mac-address = [00 00 00 00 00 00];
-
-    Don't think that's a good value, unless this is only a placeholder.
-
-> +		interrupts = <0 71 4>;
-> +		clocks = <&clock HIX5HD2_MAC0_CLK>;
-> +
-> +		phy0: ethernet-phy at 2 {
-
-    I'd rather label ut phy2...
-
-> +			reg = <2>;
-> +			compatible = "ethernet-phy-ieee802.3-c22";
-
-    This is the default "compatible", i.e. there's no need to specify it, IIRC.
-
-> +		};
-> +	};
-
-WBR, Sergei
+Tony
