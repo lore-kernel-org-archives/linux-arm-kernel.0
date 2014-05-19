@@ -1,42 +1,88 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 19 May 2014 22:39:57 +0300
-Subject: [PATCH] s3cmci: port DMA code to dmaengine API
-In-Reply-To: <4667090.Oyf6jd3Lyk@wuerfel>
-References: <1400522593-6366-1-git-send-email-anarsoul@gmail.com>
- <7633675.1cAc12AFAY@wuerfel>
- <CA+E=qVeG8bXowBvdhKpVSYSL08n6ZUVG2LkjhPwjBnbv+egNLw@mail.gmail.com>
- <4667090.Oyf6jd3Lyk@wuerfel>
-Message-ID: <CA+E=qVc+gk8zt3MMTQ6qWR0+v3UTww5oufd7v3ffrfnNCBfTUA@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 19 May 2014 21:45:31 +0200
+Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
+In-Reply-To: <20140519193622.GA11945@atomide.com>
+References: <5374FE61.50901@linaro.org> <5374FF5B.8050702@ti.com>
+ <5375079E.3060305@ti.com> <537615EA.3020809@ti.com>
+ <20140516212942.GK12881@atomide.com> <537A3544.1050307@linaro.org>
+ <20140519172338.GJ4849@atomide.com> <537A408F.7070301@ti.com>
+ <20140519175157.GK4849@atomide.com> <537A4827.30604@linaro.org>
+ <20140519193622.GA11945@atomide.com>
+Message-ID: <537A5F5B.6050403@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 10:02 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-
->> Well, at least s3c64xx uses resources for passing dma channel number,
->> and so did I.
->> Btw, It'll make transition to device tree a bit easier.
+On 05/19/2014 09:36 PM, Tony Lindgren wrote:
+> * Daniel Lezcano <daniel.lezcano@linaro.org> [140519 11:07]:
+>> On 05/19/2014 07:51 PM, Tony Lindgren wrote:
+>>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [140519 10:35]:
+>>>> On Monday 19 May 2014 01:23 PM, Tony Lindgren wrote:
+>>>>> * Daniel Lezcano <daniel.lezcano@linaro.org> [140519 09:46]:
+>>>>>> On 05/16/2014 11:29 PM, Tony Lindgren wrote:
+>>>>>>>
+>>>>>>> And just to recap, this problem can be reproduced with current
+>>>>>>> Linux next with omap2plus_defconfig with CONFIG_CPU_IDLE enabled. The
+>>>>>>> system should hang during the boot at some point.
+>>>>>>
+>>>>>> I can take the time to investigate a bit more but not right now. What is
+>>>>>> your deadline before committing the reverts ?
+>>>>>
+>>>>> Well we do have several automated build and boot systems failing
+>>>>> because of this with multi_v7_defconfig. And users are complaining,
+>>>>> see this report from Tobias Jakobi:
+>>>>>
+>>>>> https://bugzilla.kernel.org/show_bug.cgi?id=75421
+>>>>>
+>>>>> It seems that doing the revert is not enough based on the
+>>>>> page above.
+>>>>>
+>>>> Thats not true. The above link used the half patch and not the
+>>>> updated patch. Updated patch worked for Alex also. As you can
+>>>> see they saw RCU stalls and they go away after the updated patch.
+>>>>
+>>>> Can you please point them to try out the updated patch ?
+>>>
+>>> OK good point. I added a link to the updated patch in
+>>> bugzilla.
+>>>
+>>>>> I'd prefer we'd fix this issue properly for sure, it seems that
+>>>>> we're not quite understanding what's going on. And this might
+>>>>> hit other platforms too when they start implementing deeper
+>>>>> PM idle states in the mainline kernel.
+>>>>>
+>>>> I am certain that the updated patch fixed the regression
+>>>> for sure. The issue is really not generic enough since its related
+>>>> an OMAP ROM errata which needs that special handling of
+>>>> interrupt re-trigger etc. You don't need that for other platforms
+>>>> so they are not likely get affected.
+>>>
+>>> OK makes sense to me considering the ROM code. Daniel, are you OK
+>>> with that or do you still want to investigate further?
+>>
+>> For the moment I am a bit short in time for some other tasks. So feel free
+>> to apply the revert and I will look for a proper fix when I will have time.
 >
-> Actually it doesn't help with the transition to DT at all, because DT
-> does not use resources for DMA requests. Instead there is a
-> dma_request_slave_channel() interface that gets passed a string to
-> match the DT descriptor of the DMA channel. If you want to enable
-> DT probing while keeping the traditional way alive, you can
-> use dma_request_slave_channel_compat(), although I find it not
-> much easier than open-coding it.
->
-> There is one issue with dma_request_slave_channel_compat and
-> dma_request_channel, which is that you need a pointer to the
-> filter function. In portable drivers that pointer should get passed
-> in platform_data for the non-DT case, along with the data it
-> needs, because there are dma engines that need more than just
-> an integer to identify a slave.
->
-> For this driver, you don't have to go that far, as long as it's
-> ensure that the pointer to the filter function is available to
-> the driver, i.e. you can't have a built-in s3mci driver when the
-> dmaengine driver is a loadable module.
+> Added Tobias to Cc. At the bugzilla link Tobias is saying
+> he used the right patch from Santosh to test and it still
+> fails.
 
-I'll take a look at dma_request_slave_channel_compat(), thanks for a hint!
+So apparently Santosh, Kevin and Alex say they are not facing the issue 
+anymore with the revert. But Tobias is still facing this issue.
 
-Regards,
-Vasily
+There is this simple program [1] which usually makes cpuidle to hang the 
+system more quickly when there is a problem somewhere. May be worth to 
+check with it.
+
+Hope that helps.
+
+   -- Daniel
+
+[1] 
+https://git.linaro.org/power/pm-qa.git/blob/HEAD:/cpuidle/cpuidle_killer.c
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
