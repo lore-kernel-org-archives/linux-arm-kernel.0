@@ -1,50 +1,26 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 19 May 2014 08:27:22 +0200
-Subject: [PATCH 2/2] ARM: imx: convert camera init to use
- platform_device_register_full()
-In-Reply-To: <1400446261-27085-3-git-send-email-emilgoode@gmail.com>
+Date: Mon, 19 May 2014 08:31:45 +0200
+Subject: [PATCH 1/2 v4] ARM: imx: fix error handling in ipu device
+ registration
+In-Reply-To: <1400446261-27085-2-git-send-email-emilgoode@gmail.com>
 References: <1400446261-27085-1-git-send-email-emilgoode@gmail.com>
- <1400446261-27085-3-git-send-email-emilgoode@gmail.com>
-Message-ID: <20140519062722.GE16662@pengutronix.de>
+ <1400446261-27085-2-git-send-email-emilgoode@gmail.com>
+Message-ID: <20140519063145.GF16662@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Emil,
-
-thanks for your effort.
-
-On Sun, May 18, 2014 at 10:51:00PM +0200, Emil Goode wrote:
-> This converts the imx camera allocation and initialization functions
-> to use platform_device_register_full() thus simplifying the code.
+On Sun, May 18, 2014 at 10:50:59PM +0200, Emil Goode wrote:
+> If we fail to allocate struct platform_device pdev we
+> dereference it after the goto label err.
+> 
+> This bug was found using coccinelle.
 > 
 > Signed-off-by: Emil Goode <emilgoode@gmail.com>
-> ---
-> Only build tested, unfortunately I currently don't have the hardware.
-> 
->  arch/arm/mach-imx/devices/platform-ipu-core.c |   43 +++++++++----------------
->  arch/arm/mach-imx/mach-mx31_3ds.c             |    5 ++-
->  arch/arm/mach-imx/mach-mx31moboard.c          |    6 ++--
->  arch/arm/mach-imx/mach-mx35_3ds.c             |    5 ++-
->  arch/arm/mach-imx/mach-pcm037.c               |    5 ++-
->  5 files changed, 23 insertions(+), 41 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
-> index 6bd7c3f..13ea542 100644
-> --- a/arch/arm/mach-imx/devices/platform-ipu-core.c
-> +++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
-> @@ -69,42 +69,29 @@ struct platform_device *__init imx_alloc_mx3_camera(
-IMHO you should better rename the function because now it doesn't only
-allocate the device, but also registers it.
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Also I doubt that it's OK to call dma_declare_coherent_memory after the
-device is added. In this case maybe extend
-platform_device_register_full? And also add a warning to
-dma_declare_coherent_memory if it is called for an already added device?
-(Added a few people to Cc: that might be able to comment this. I don't
-even know if there is a reliable way to check if a device is already
-added.)
+Shawn, is it already to late for 3.15?
 
-Best regards
+Thanks
 Uwe
 
 -- 
