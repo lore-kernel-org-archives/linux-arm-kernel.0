@@ -1,69 +1,141 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 May 2014 12:36:22 -0700
-Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
-In-Reply-To: <537A4827.30604@linaro.org>
-References: <5374FE61.50901@linaro.org> <5374FF5B.8050702@ti.com>
- <5375079E.3060305@ti.com> <537615EA.3020809@ti.com>
- <20140516212942.GK12881@atomide.com> <537A3544.1050307@linaro.org>
- <20140519172338.GJ4849@atomide.com> <537A408F.7070301@ti.com>
- <20140519175157.GK4849@atomide.com> <537A4827.30604@linaro.org>
-Message-ID: <20140519193622.GA11945@atomide.com>
+From: tthayer.linux@gmail.com (Thor Thayer)
+Date: Mon, 19 May 2014 14:37:38 -0500
+Subject: [PATCHv5 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
+ controller
+In-Reply-To: <20140519191206.GH949@pengutronix.de>
+References: <1400169891-29546-1-git-send-email-tthayer@altera.com>
+ <1400169891-29546-2-git-send-email-tthayer@altera.com>
+ <20140516075344.GF949@pengutronix.de>
+ <CAF03EBfOrBWsGVkwYHQt9Pm858LtkgUThkM6dFjksa93ETo_bw@mail.gmail.com>
+ <20140519191206.GH949@pengutronix.de>
+Message-ID: <CAF03EBfwFC7bK=j0W3K+no9TK7xe2nF1ZXH9bMBRNzVErB5EjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Daniel Lezcano <daniel.lezcano@linaro.org> [140519 11:07]:
-> On 05/19/2014 07:51 PM, Tony Lindgren wrote:
-> >* Santosh Shilimkar <santosh.shilimkar@ti.com> [140519 10:35]:
-> >>On Monday 19 May 2014 01:23 PM, Tony Lindgren wrote:
-> >>>* Daniel Lezcano <daniel.lezcano@linaro.org> [140519 09:46]:
-> >>>>On 05/16/2014 11:29 PM, Tony Lindgren wrote:
-> >>>>>
-> >>>>>And just to recap, this problem can be reproduced with current
-> >>>>>Linux next with omap2plus_defconfig with CONFIG_CPU_IDLE enabled. The
-> >>>>>system should hang during the boot at some point.
-> >>>>
-> >>>>I can take the time to investigate a bit more but not right now. What is
-> >>>>your deadline before committing the reverts ?
-> >>>
-> >>>Well we do have several automated build and boot systems failing
-> >>>because of this with multi_v7_defconfig. And users are complaining,
-> >>>see this report from Tobias Jakobi:
-> >>>
-> >>>https://bugzilla.kernel.org/show_bug.cgi?id=75421
-> >>>
-> >>>It seems that doing the revert is not enough based on the
-> >>>page above.
-> >>>
-> >>Thats not true. The above link used the half patch and not the
-> >>updated patch. Updated patch worked for Alex also. As you can
-> >>see they saw RCU stalls and they go away after the updated patch.
-> >>
-> >>Can you please point them to try out the updated patch ?
-> >
-> >OK good point. I added a link to the updated patch in
-> >bugzilla.
-> >
-> >>>I'd prefer we'd fix this issue properly for sure, it seems that
-> >>>we're not quite understanding what's going on. And this might
-> >>>hit other platforms too when they start implementing deeper
-> >>>PM idle states in the mainline kernel.
-> >>>
-> >>I am certain that the updated patch fixed the regression
-> >>for sure. The issue is really not generic enough since its related
-> >>an OMAP ROM errata which needs that special handling of
-> >>interrupt re-trigger etc. You don't need that for other platforms
-> >>so they are not likely get affected.
-> >
-> >OK makes sense to me considering the ROM code. Daniel, are you OK
-> >with that or do you still want to investigate further?
-> 
-> For the moment I am a bit short in time for some other tasks. So feel free
-> to apply the revert and I will look for a proper fix when I will have time.
+On Mon, May 19, 2014 at 2:12 PM, Steffen Trumtrar
+<s.trumtrar@pengutronix.de> wrote:
+> Hi Thor!
+>
+> On Mon, May 19, 2014 at 01:36:30PM -0500, Thor Thayer wrote:
+>> On Fri, May 16, 2014 at 2:53 AM, Steffen Trumtrar
+>> <s.trumtrar@pengutronix.de> wrote:
+>> > Hi!
+>> >
+>> > On Thu, May 15, 2014 at 11:04:49AM -0500, tthayer at altera.com wrote:
+>> >> From: Thor Thayer <tthayer@altera.com>
+>> >>
+>> >> Addition of the Altera SDRAM controller bindings and device
+>> >> tree changes to the Altera SoC project.
+>> >>
+>> >> v2: Changes to SoC SDRAM EDAC code.
+>> >>
+>> >> v3: Implement code suggestions for SDRAM EDAC code.
+>> >>
+>> >> v4: Remove syscon from SDRAM controller bindings.
+>> >>
+>> >> v5: No Change, bump version for consistency.
+>> >>
+>> >> Signed-off-by: Thor Thayer <tthayer@altera.com>
+>> >> ---
+>> >>  .../bindings/arm/altera/socfpga-sdram.txt          |   11 +++++++++++
+>> >>  arch/arm/boot/dts/socfpga.dtsi                     |    5 +++++
+>> >>  2 files changed, 16 insertions(+)
+>> >>  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+>> >>
+>> >> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+>> >> new file mode 100644
+>> >> index 0000000..8f8746b
+>> >> --- /dev/null
+>> >> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+>> >> @@ -0,0 +1,11 @@
+>> >> +Altera SOCFPGA SDRAM Controller
+>> >> +
+>> >> +Required properties:
+>> >> +- compatible : "altr,sdr-ctl";
+>> >> +- reg : Should contain 1 register ranges(address and length)
+>> >> +
+>> >> +Example:
+>> >> +     sdrctl at ffc25000 {
+>> >> +             compatible = "altr,sdr-ctl";
+>> >> +             reg = <0xffc25000 0x1000>;
+>> >> +     };
+>> >> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+>> >> index df43702..6ce912e 100644
+>> >> --- a/arch/arm/boot/dts/socfpga.dtsi
+>> >> +++ b/arch/arm/boot/dts/socfpga.dtsi
+>> >> @@ -676,6 +676,11 @@
+>> >>                       clocks = <&l4_sp_clk>;
+>> >>               };
+>> >>
+>> >> +             sdrctl at ffc25000 {
+>> >> +                     compatible = "altr,sdr-ctl", "syscon";
+>> >                                                    ^^^^^^^^^^
+>> >
+>> > Get rid of that, too, please.
+>>
+>> Hi Steffan,
+>>
+>> I believe I need to keep the "syscon". The same register (ctrlcfg)
+>> that has the ECC enable bitfield also includes the DRAM configuration
+>> bitfields that other drivers will want to access (specifically the
+>> FPGA bridge needs this information). Since this register will be
+>> shared between drivers,  syscon seems like the best solution.
+>>
+>
+> Hm, from looking at the documentation of the ctrlcfg I can't really
+> understand which bits you would need for the FPGA brigde and why.
+> That all sounds like stuff you would want to set for the specific
+> RAM you are dealing with on a specific board.
+> What bridge are you talking about? The SDRAM bridge?
+>
+> I can see the problem with the ECC enable, though.
+>
+> Regards,
+> Steffen
+>
 
-Added Tobias to Cc. At the bugzilla link Tobias is saying
-he used the right patch from Santosh to test and it still 
-fails.
+Hi Steffen,
 
-Regards,
+I'll get more details from the guy working on the FPGA bridge when he
+gets back in the office. When I started working on EDAC, that register
+had been allocated by the FPGA bridge driver so we decided to use the
+syscon to allow sharing of the register.
 
-Tony
+My understanding was that the FPGA bridge as an SDRAM master would
+allow FPGA devices to access the SDRAM.  As part of that process, they
+may want to read the SDRAM configuration.
+
+I'll need to get more details from the driver developer because the
+FPGA driver is in flux while the appropriate driver architecture is
+being discussed.
+
+Thor
+
+
+>> >                 sdrctl at ffc25000 {
+>> >                         compatible = "altr,sdr-ctl";
+>> >                         reg = <0xffc25000 0x1000>;
+>> >                         ranges;
+>> >
+>> >                         edac at ffc2502c {
+>> >                                 compatible = "altr,sdram-edac";
+>> >                                 reg = <0xffc2502c 0x50>;
+>> >                                 interrupts = <0 39 4>;
+>> >                         };
+>> >                 };
+>> >
+>> > Then we can later add:
+>> >
+>> >                         sdr-ports: ports at ffc2507c {
+>> >                                 #reset-cells = <1>;
+>> >                                 compatible = "altr,sdr-ports";
+>> >                                 reg = <0xffc2507c 0x10>;
+>> >                                 clocks = <&ddr_dqs_clk>;
+>> >                                 ...
+>> >                         };
+>
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
