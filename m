@@ -1,195 +1,80 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 19 May 2014 18:43:30 +0200
-Subject: [PATCH v2 09/10] ARM: dts: berlin: convert BG2 to DT clock nodes
-In-Reply-To: <1400517811-24668-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1400517811-24668-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1400517811-24668-10-git-send-email-sebastian.hesselbarth@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 19 May 2014 18:45:56 +0200
+Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
+In-Reply-To: <20140516212942.GK12881@atomide.com>
+References: <1399991966-14582-1-git-send-email-santosh.shilimkar@ti.com>
+ <5373C78E.7040301@linaro.org> <5373C8E8.6040208@ti.com>
+ <5373CBB9.40506@linaro.org> <5373DD94.8030208@ti.com>
+ <5374F35E.5040900@ti.com> <5374FE61.50901@linaro.org>
+ <5374FF5B.8050702@ti.com> <5375079E.3060305@ti.com> <537615EA.3020809@ti.com>
+ <20140516212942.GK12881@atomide.com>
+Message-ID: <537A3544.1050307@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This converts Berlin BG2 SoC dtsi to make use of the new DT clock
-nodes for Berlin SoCs. While at it, also fix up twdclk which is
-running at cpuclk/3 instead of sysclk.
+On 05/16/2014 11:29 PM, Tony Lindgren wrote:
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [140516 06:43]:
+>> Tony,
+>>
+>> On Thursday 15 May 2014 02:29 PM, Santosh Shilimkar wrote:
+>>> On Thursday 15 May 2014 01:54 PM, Santosh Shilimkar wrote:
+>>>> On Thursday 15 May 2014 01:50 PM, Daniel Lezcano wrote:
+>>>>> On 05/15/2014 07:03 PM, Santosh Shilimkar wrote:
+>>>
+>>> [..]
+>>>
+>>>>>>> With above mentioned change, it should work. Other alternatives is OMAP4 driver does
+>>>>>>> its won registration where it can start the timer. The way it was before the
+>>>>>>> consolidation.
+>>>>>>>
+>>>>>>> Ofcourse if you have better fix, then great.
+>>>>>>>
+>>>>>> What is your suggestion. We *must* fix the regression asap. I think
+>>>>>> $subject patch with an update to bctimer start under CPUIDLE_FLAG_COUPLED
+>>>>>> seems a good way forward.
+>>>>>>
+>>>>>> Do let me know.
+>>>>>
+>>>>> Did you see Alex Shi's email [cc'ed] ? Reverting this change makes the panda ES to hang.
+>>>>>
+>>>> The hang is definitely due to the bctimer not started. As I said, I assumed it was and
+>>>> then you corrected saying it is under the flag.
+>>>>
+>>>>> I am not convinced the culprit is this code you are trying to revert.
+>>>>>
+>>>> fair enough. Thats why I said if you have an alternative fix thats great.
+>>>>
+>>> For record, below is updated patch with bctimer started which
+>>> was missed in earlier version. I haven't tested it though.
+>>>
+>>> Alex,
+>>> Please give a try with your test-case and see if you still see the hang.
+>>> Am just curious about your issue and hence the request..
+>>>
+>> Alex tested below patch and he don't see the hang so the patch is
+>> addressing the issue.
+>>
+>> If Daniel works out an alternate fix to avoid reverts, that will be great
+>> but if not, we should merge the below patch. I let you take call on it.
+>
+> Daniel any news on this?
+>
+> And just to recap, this problem can be reproduced with current
+> Linux next with omap2plus_defconfig with CONFIG_CPU_IDLE enabled. The
+> system should hang during the boot at some point.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Changelog:
-v1->v2:
-- adapt to new single chip control node and compatible
+I can take the time to investigate a bit more but not right now. What is 
+your deadline before committing the reverts ?
 
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Jisheng Zhang <jszhang@marvell.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/boot/dts/berlin2.dtsi | 56 +++++++++++++++++-------------------------
- 1 file changed, 23 insertions(+), 33 deletions(-)
+> And for the record, the omap3 hang fix is now posted to the lists as
+> "[PATCH] ARM: OMAP2+: Fix DMA hang after off-idle". This should not
+> have anything to do with the omap4 cpu_idle hang as omap4 does not
+> currently lose context during idle.
 
-diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-index 57cadd31f4e1..591d4b8c1c2b 100644
---- a/arch/arm/boot/dts/berlin2.dtsi
-+++ b/arch/arm/boot/dts/berlin2.dtsi
-@@ -12,6 +12,7 @@
-  */
- 
- #include "skeleton.dtsi"
-+#include <dt-bindings/clock/berlin2.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- 
- / {
-@@ -37,24 +38,10 @@
- 		};
- 	};
- 
--	clocks {
--		smclk: sysmgr-clock {
--			compatible = "fixed-clock";
--			#clock-cells = <0>;
--			clock-frequency = <25000000>;
--		};
--
--		cfgclk: cfg-clock {
--			compatible = "fixed-clock";
--			#clock-cells = <0>;
--			clock-frequency = <100000000>;
--		};
--
--		sysclk: system-clock {
--			compatible = "fixed-clock";
--			#clock-cells = <0>;
--			clock-frequency = <400000000>;
--		};
-+	refclk: oscillator {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <25000000>;
- 	};
- 
- 	soc {
-@@ -88,7 +75,7 @@
- 			compatible = "arm,cortex-a9-twd-timer";
- 			reg = <0xad0600 0x20>;
- 			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&sysclk>;
-+			clocks = <&chip CLKID_TWD>;
- 		};
- 
- 		apb at e80000 {
-@@ -175,7 +162,7 @@
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c00 0x14>;
- 				interrupts = <8>;
--				clocks = <&cfgclk>;
-+				clocks = <&chip CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "okay";
- 			};
-@@ -184,7 +171,7 @@
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c14 0x14>;
- 				interrupts = <9>;
--				clocks = <&cfgclk>;
-+				clocks = <&chip CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "okay";
- 			};
-@@ -193,7 +180,7 @@
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c28 0x14>;
- 				interrupts = <10>;
--				clocks = <&cfgclk>;
-+				clocks = <&chip CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -202,7 +189,7 @@
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c3c 0x14>;
- 				interrupts = <11>;
--				clocks = <&cfgclk>;
-+				clocks = <&chip CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -211,7 +198,7 @@
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c50 0x14>;
- 				interrupts = <12>;
--				clocks = <&cfgclk>;
-+				clocks = <&chip CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -220,7 +207,7 @@
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c64 0x14>;
- 				interrupts = <13>;
--				clocks = <&cfgclk>;
-+				clocks = <&chip CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -229,7 +216,7 @@
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c78 0x14>;
- 				interrupts = <14>;
--				clocks = <&cfgclk>;
-+				clocks = <&chip CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -238,7 +225,7 @@
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c8c 0x14>;
- 				interrupts = <15>;
--				clocks = <&cfgclk>;
-+				clocks = <&chip CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -253,9 +240,12 @@
- 			};
- 		};
- 
--		generic-regs at ea0184 {
--			compatible = "marvell,berlin-generic-regs", "syscon";
--			reg = <0xea0184 0x10>;
-+		chip: chip-control at ea0000 {
-+			compatible = "marvell,berlin2-chip-ctrl";
-+			#clock-cells = <1>;
-+			reg = <0xea0000 0x400>;
-+			clocks = <&refclk>;
-+			clock-names = "refclk";
- 		};
- 
- 		apb at fc0000 {
-@@ -305,7 +295,7 @@
- 				reg-shift = <2>;
- 				reg-io-width = <1>;
- 				interrupts = <8>;
--				clocks = <&smclk>;
-+				clocks = <&refclk>;
- 				status = "disabled";
- 			};
- 
-@@ -315,7 +305,7 @@
- 				reg-shift = <2>;
- 				reg-io-width = <1>;
- 				interrupts = <9>;
--				clocks = <&smclk>;
-+				clocks = <&refclk>;
- 				status = "disabled";
- 			};
- 
-@@ -325,7 +315,7 @@
- 				reg-shift = <2>;
- 				reg-io-width = <1>;
- 				interrupts = <10>;
--				clocks = <&smclk>;
-+				clocks = <&refclk>;
- 				status = "disabled";
- 			};
- 
+
 -- 
-1.9.1
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
