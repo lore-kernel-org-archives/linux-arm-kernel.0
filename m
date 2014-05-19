@@ -1,16 +1,20 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Mon, 19 May 2014 14:13:05 +0530
-Subject: [PATCH 1/9] arm64: KVM: rename pm_fake handler to trap_wi_raz
-In-Reply-To: <1399476054-21571-2-git-send-email-marc.zyngier@arm.com>
-References: <1399476054-21571-1-git-send-email-marc.zyngier@arm.com>
- <1399476054-21571-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CALrVBksmOg9V_sy+0kasttFNGh5DuTzBbxR=99EsNGQjzPpRiQ@mail.gmail.com>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Mon, 19 May 2014 11:51:31 +0300
+Subject: [PATCH 3/4] spi: qup: Fix order of spi_register_master
+In-Reply-To: <1400016884-9568-4-git-send-email-agross@codeaurora.org>
+References: <1400016884-9568-1-git-send-email-agross@codeaurora.org>
+ <1400016884-9568-4-git-send-email-agross@codeaurora.org>
+Message-ID: <1400489491.1464.15.camel@iivanov-dev>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks good to me.
+On Tue, 2014-05-13 at 16:34 -0500, Andy Gross wrote:
+> This patch moves the devm_spi_register_master below the initialization of the
+> runtime_pm.  If done in the wrong order, the spi_register_master fails if any
+> probed slave devices issue SPI transactions.
+> 
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
 
-FWIW, Reviewed-by: Anup Patel <anup.patel@linaro.org>
+Thank you.
 
---
-Anup
+Acked-by: Ivan T. Ivanov <iivanov@mm-sol.com>
