@@ -1,126 +1,95 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Mon, 19 May 2014 11:40:30 +0300
-Subject: [PATCH 2/2] dmaengine: s3c24xx-dma: Add cyclic transfer support
-In-Reply-To: <1400445876-17460-1-git-send-email-anarsoul@gmail.com>
-References: <1400445779-17365-1-git-send-email-anarsoul@gmail.com>
- <1400445876-17460-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1400488830.3703.64.camel@smile.fi.intel.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Mon, 19 May 2014 10:41:11 +0200
+Subject: [RFC PATCH 2/9] dt: deps: dependency based device creation
+In-Reply-To: <20140518145922.9D59FC40D85@trevor.secretlab.ca>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>	<1399913280-6915-3-git-send-email-holler@ahsoftware.de>	<20140514140534.897F8C4153D@trevor.secretlab.ca>	<53777113.3070909@gmail.com>
+ <20140518145922.9D59FC40D85@trevor.secretlab.ca>
+Message-ID: <5379C3A7.1090404@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2014-05-18 at 23:44 +0300, Vasily Khoruzhick wrote:
-> Many audio interface drivers require support of cyclic transfers to work
-> correctly, for example Samsung ASoC DMA driver. This patch adds support
-> for cyclic transfers to the s3c24xx-dma driver
+Am 18.05.2014 16:59, schrieb Grant Likely:
+> Hi Tomasz,
+>
+> Thanks for weighing in on this. Thoughts and comments below.
+>
+> On Sat, 17 May 2014 16:24:19 +0200, Tomasz Figa <tomasz.figa@gmail.com> wrote:
 
-> +static struct dma_async_tx_descriptor *s3c24xx_dma_prep_dma_cyclic(
-> +	struct dma_chan *chan, dma_addr_t addr, size_t size, size_t period,
-> +	enum dma_transfer_direction direction, unsigned long flags,
-> +	void *context)
-> +{
-> +	struct s3c24xx_dma_chan *s3cchan = to_s3c24xx_dma_chan(chan);
-> +	struct s3c24xx_dma_engine *s3cdma = s3cchan->host;
-> +	const struct s3c24xx_dma_platdata *pdata = s3cdma->pdata;
-> +	struct s3c24xx_dma_channel *cdata = &pdata->channels[s3cchan->id];
-> +	struct s3c24xx_txd *txd;
-> +	struct s3c24xx_sg *dsg;
-> +	unsigned sg_len;
-> +	dma_addr_t slave_addr;
-> +	u32 hwcfg = 0;
-> +	int i;
-> +
-> +	dev_dbg(&s3cdma->pdev->dev,
-> +		"prepare cyclic transaction of %d bytes with period %d from %s\n",
-> +		size, period, s3cchan->name);
-> +
-> +	txd = s3c24xx_dma_get_txd();
-> +	if (!txd)
-> +		return NULL;
-> +
-> +	txd->cyclic = 1;
-> +
-> +	if (cdata->handshake)
-> +		txd->dcon |= S3C24XX_DCON_HANDSHAKE;
-> +
-> +	switch (cdata->bus) {
-> +	case S3C24XX_DMA_APB:
-> +		txd->dcon |= S3C24XX_DCON_SYNC_PCLK;
-> +		hwcfg |= S3C24XX_DISRCC_LOC_APB;
-> +		break;
-> +	case S3C24XX_DMA_AHB:
-> +		txd->dcon |= S3C24XX_DCON_SYNC_HCLK;
-> +		hwcfg |= S3C24XX_DISRCC_LOC_AHB;
-> +		break;
-> +	}
-> +
-> +	/*
-> +	 * Always assume our peripheral desintation is a fixed
-> +	 * address in memory.
-> +	 */
-> +	hwcfg |= S3C24XX_DISRCC_INC_FIXED;
-> +
-> +	/*
-> +	 * Individual dma operations are requested by the slave,
-> +	 * so serve only single atomic operations (S3C24XX_DCON_SERV_SINGLE).
-> +	 */
-> +	txd->dcon |= S3C24XX_DCON_SERV_SINGLE;
-> +
-> +	if (direction == DMA_MEM_TO_DEV) {
-> +		txd->disrcc = S3C24XX_DISRCC_LOC_AHB |
-> +			      S3C24XX_DISRCC_INC_INCREMENT;
-> +		txd->didstc = hwcfg;
-> +		slave_addr = s3cchan->cfg.dst_addr;
-> +		txd->width = s3cchan->cfg.dst_addr_width;
-> +	} else if (direction == DMA_DEV_TO_MEM) {
-> +		txd->disrcc = hwcfg;
-> +		txd->didstc = S3C24XX_DIDSTC_LOC_AHB |
-> +			      S3C24XX_DIDSTC_INC_INCREMENT;
-> +		slave_addr = s3cchan->cfg.src_addr;
-> +		txd->width = s3cchan->cfg.src_addr_width;
-> +	} else {
-> +		s3c24xx_dma_free_txd(txd);
-> +		dev_err(&s3cdma->pdev->dev,
-> +			"direction %d unsupported\n", direction);
-> +		return NULL;
-> +	}
+> registration order. Alexander had to hook into the driver registration
+> patch to get the optimal probe order. For device order to be effective,
 
-Instead of doing this, you may put few lines on top of function
+I had to hook into the driver registration to get information about the 
+(available) drivers. Without the hook it is currently impossible to 
+identify drivers before they start doing things.
 
-if (!is_slave_direction) {
-	dev_err(&s3cdma->pdev->dev, "direction %d unsupported\n", direction);
-	return NULL;
-}
+To reccover, I had to solve several problems:
 
-As an additional effect you can transform the 'else if' to just 'else' above the code.
+- Getting dependencies (happens almost automatically by using phandle 
+references)
+- Get them to the kernel (done by using a new property)
+- Build order (already a solved problem, think at make)
+- Identify available drivers (invented hook, "well done" is meant in 
+regard to this feature, I needed a name and found "well done" apropriate 
+because it too might stimulate driver authors to use it)
+- Check out how to handle/start/register devices and drivers (in order).
 
-> +
-> +	sg_len = size / period;
-> +
-> +	for (i = 0; i < sg_len; i++) {
-> +		dsg = kzalloc(sizeof(*dsg), GFP_NOWAIT);
-> +		if (!dsg) {
-> +			s3c24xx_dma_free_txd(txd);
-> +			return NULL;
-> +		}
-> +		list_add_tail(&dsg->node, &txd->dsg_list);
-> +
-> +		dsg->len = period;
-> +		/* Check last period length */
-> +		if (i == (sg_len - 1))
-> +			dsg->len = size - (period * i);
-> +		if (direction == DMA_MEM_TO_DEV) {
-> +			dsg->src_addr = addr + (period * i);
-> +			dsg->dst_addr = slave_addr;
-> +		} else { /* DMA_DEV_TO_MEM */
-> +			dsg->src_addr = slave_addr;
-> +			dsg->dst_addr = addr + (period * i);
-> +		}
-> +	}
-> +
-> +	return vchan_tx_prep(&s3cchan->vc, &txd->vd, flags);
-> +}
+I think the last one is the most unfinished and questionable part.
 
+The part to identify drivers could be done much better by linking an 
+array of struct platform_driver, but in order to use such an array, 
+drivers have to be done "well done" too (which means no action before 
+probe). So that well-done hook can be seen as an intermediate step.
 
--- 
-Andy Shevchenko <andriy.shevchenko@intel.com>
-Intel Finland Oy
+> Having said that, there are some things that I worry about. I worry
+> about the cost of doing dependency sorting, both in calculating the
+> dependency tree and in pushing back probe calls to the end of initcalls.
+
+Building and calculating the dependency tree just needs a few ms and I 
+think it's much faster than what is necessary afterwards, all those 
+string compares to match drivers/devices.
+
+But this string compares already do happen, and I think this part could 
+optimized a lot, when a list of drivers and their compatibility strings 
+is available. Then it's possible to build a hash or e.g. radix tree 
+which leads from the compatibility string to the available driver(s).
+
+> I worry that incorrect dependency information will cause some devices to
+> not get bound (say because the kernel things the dependency isn't met
+> when it actually is).
+
+All (not started) drivers and (unbounded) devices can still be 
+registered/bound after those which appear in the order. That would be 
+just like before.
+
+But as said, the whole handling which happens after the order was build 
+is done quick & dirty, done with missing knownledge about the device 
+model, and might contain a lot of bugs and even might need that some 
+drivers will be changed.
+
+Therefor all changes disappear when CONFIG_OF_DEPENDENCIES is disabled. 
+So tested platforms might use it (taking advantage of a deterministic 
+order in order to get rid of hardcoded stuff to fix the order) and 
+others don't have to care.
+
+So, as already said, I've posted these patches to make evaluation easy, 
+without the need to discuss just ideas but something real to play with 
+(in order to get something happen on this front, not just hardcoded 
+hacks done in individual drivers because such passes maintainers easier).
+
+I didn't cared much about form or how to split those patches into more 
+convenient parts. That is stuff where I just do it like a maintainer 
+does want it. I did them as I like them, and I don't want to end up in a 
+time wasting discussions about form, style or similiar questions.
+
+So if anyone would be comfortable to merge these patches (for evaluation 
+by others) in other form or splitted in more parts, I will just hear and do.
+
+I also don't have any objections in changes in the stuff which happens 
+after the order was build. In fact I would even like it if someone with 
+more experience with the driver model would do it. I just had to do 
+something there too, otherwise it would still have been just an idea 
+which wouldn't offer much motivation to actually look at it.
+
+Regards,
+
+Alexander Holler
