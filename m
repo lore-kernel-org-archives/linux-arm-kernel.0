@@ -1,56 +1,47 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 19 May 2014 10:30:38 +0100
-Subject: [PATCH 1/9] ARM: STi: DT: STiH416: 416 DT Entry for clockgen
- A0/1/10/11/12
-In-Reply-To: <5373586A.5000302@st.com>
-References: <1399305223-18703-1-git-send-email-gabriel.fernandez@linaro.org>
- <1399305223-18703-2-git-send-email-gabriel.fernandez@linaro.org>
- <20140506071843.GD5206@lee--X1>
- <CAG374jD+msPPbPtFS+ji=8jS9+D-YHu31k7zzzC7Ty7jw9n7jQ@mail.gmail.com>
- <20140508080344.GE5307@lee--X1> <5373586A.5000302@st.com>
-Message-ID: <20140519093038.GF4978@lee--X1>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 19 May 2014 11:30:42 +0200
+Subject: [PATCH RFC 00/11] Remove mach-kirkwood
+In-Reply-To: <4484941.ZWPK5p5yoC@wuerfel>
+References: <1400163836-9831-1-git-send-email-andrew@lunn.ch>
+ <8332148.Z1shujgC24@wuerfel> <20140516095953.19522ebd@free-electrons.com>
+ <4484941.ZWPK5p5yoC@wuerfel>
+Message-ID: <5379CF42.8070306@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 May 2014, Maxime Coquelin wrote:
+On 05/19/2014 11:12 AM, Arnd Bergmann wrote:
+> On Friday 16 May 2014 09:59:53 Thomas Petazzoni wrote:
+>> Dear Arnd Bergmann,
+>>
+>> On Thu, 15 May 2014 16:36:35 +0200, Arnd Bergmann wrote:
+>>
+>>> There are three other series that may or may not make it into 3.16
+>>> and that will have conflicts with this one:
+>>>
+>>> - remove mv78xx0
+>>> - remove mach-dove
+>>> - convert orion5x to multiplatform
+>>
+>> The work on Orion5x is still on-going. I'd like to progressively
+>> continue the DT migration of Orion5x, moving to multiplatform, and then
+>> once it's done, move into mach-mvebu. I'd appreciate to not rush things
+>> more than necessary.
+>
+> Yes, that's fine. I'd just want to be sure we all understand what is
+> going into 3.16 and what isn't.
+>
+> So your plan for now is to do DT support in 3.16 and multiplatform after
+> 3.16? That won't have any conflicts with the kirkwood patches then, as
+> far as I can tell.
+>
+> What about dove? Are we ready to remove it or do we give it another
+> cycle?
 
-> Hi Lee,
-> 
-> On 05/08/2014 10:03 AM, Lee Jones wrote:
-> >>>>Patch adds DT entries for clockgen A0/1/10/11/12
-> >>>>
-> >>>>Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
-> >>>>Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-> >>>>---
-> >>>>  arch/arm/boot/dts/stih416-clks.h     |  15 ++
-> >>>
-> >>>This should live in include/dt-bindings/clk
-> >>>
-> >>include/dt-bindings/clk or  include/dt-bindings/clock ?
-> >
-> >I have no idea what the difference between the two are.  I guess you
-> >are in a better position to answer that.  My point was just that the
-> >includes should be in the include directory, rather than being held
-> >locally in the 'dts' directory.
-> 
-> Even if these .h files are only used by the DTS files??
-> 
-> There are some .h files for pincfg related stuff, shouldn't we do
-> the same in this case?
+I still have some pending fixes for mmc subsystem. The
+ARCH_DOVE/MACH_DOVE patch didn't make it in, and I wasn't able
+to get any mmc feedback on 2-3 pings. I'll do a proper RESEND
+and see what happens.
 
-I believe so.  There are a few include files which are only referenced
-from DTS(I) files.  I would be cautious about needlessly overloading
-arch/arm/boot/dts with files which do not need to be there.  This is
-my personal opinion though, perhaps the DT guys have other ideas.
+So removing legacy dove will definitely _not_ happen for v3.16.
 
-> >>>>  arch/arm/boot/dts/stih416-clock.dtsi | 477 ++++++++++++++++++++++++++++++++++
-> >>>>  arch/arm/boot/dts/stih416.dtsi       |  10 +-
-> >>>>  3 files changed, 497 insertions(+), 5 deletions(-)
-> >>>>  create mode 100644 arch/arm/boot/dts/stih416-clks.h
-> >
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Sebastian
