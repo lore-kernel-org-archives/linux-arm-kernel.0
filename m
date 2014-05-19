@@ -1,77 +1,39 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Mon, 19 May 2014 17:42:22 +0200
-Subject: [STLinux Kernel] [PATCH 3/4] ARM: DT: STi: Add DT node for
- MiPHY365x
-In-Reply-To: <1398756095-32542-4-git-send-email-lee.jones@linaro.org>
-References: <1398756095-32542-1-git-send-email-lee.jones@linaro.org>
- <1398756095-32542-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <537A265E.8080407@st.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 20 May 2014 00:45:01 +0900
+Subject: [PATCHv5 0/5] Support new Exynos3250 SoC based on Cortex-A7 dual
+ core
+In-Reply-To: <5379ED6B.8060309@gmail.com>
+References: <1399986308-23744-1-git-send-email-cw00.choi@samsung.com>
+ <5374426B.6000505@samsung.com> <5379ECBF.9010706@gmail.com>
+ <5379ED6B.8060309@gmail.com>
+Message-ID: <537A26FD.2010808@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 04/29/2014 09:21 AM, Lee Jones wrote:
-> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-> devices. It has 2 ports which it can use for either; both SATA, both
-> PCIe or one of each in any configuration.
+On 05/19/14 20:39, Tomasz Figa wrote:
 >
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->   arch/arm/boot/dts/stih416-b2020-revE.dts | 22 ++++++++++++++++++++++
->   arch/arm/boot/dts/stih416-b2020.dts      |  6 ++++++
->   arch/arm/boot/dts/stih416.dtsi           | 14 ++++++++++++++
->   3 files changed, 42 insertions(+)
->   create mode 100644 arch/arm/boot/dts/stih416-b2020-revE.dts
 >
-> diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
-> new file mode 100644
-> index 0000000..23fdaf7
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
-> @@ -0,0 +1,22 @@
-> +/*
-> + * Copyright (C) 2014 STMicroelectronics Limited.
-> + * Author: Lee Jones <lee.jones@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * publishhed by the Free Software Foundation.
-> + */
-> +/dts-v1/;
-> +#include "stih416.dtsi"
-> +#include "stih41x-b2020.dtsi"
-> +/ {
-> +        model = "STiH416 B2020 REV-E";
-> +	compatible = "st,stih416-b2020", "st,stih416";
-> +
-> +	soc {
-> +		miphy365x_phy: miphy365x at fe382000 {
-> +			st,pcie-tx-pol-inv;
-> +			st,sata-gen = <3>;
-> +		};
-> +	};
-> +};
-Shouldn't this new board being added in a separate patch?
-
-
-
-> diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
-> index 276f28d..172f222 100644
-> --- a/arch/arm/boot/dts/stih416-b2020.dts
-> +++ b/arch/arm/boot/dts/stih416-b2020.dts
-> @@ -13,4 +13,10 @@
->   	model = "STiH416 B2020";
->   	compatible = "st,stih416", "st,stih416-b2020";
+> On 19.05.2014 13:36, Tomasz Figa wrote:
+>> Hi Kukjin, Chanwoo,
+>>
+>> On 15.05.2014 06:28, Chanwoo Choi wrote:
+>>> Dear Kukjin,
+>>>
+>>> Could you please pick following patches?
+>>> - [PATCHv5 1/5] ARM: EXYNOS: Add Exynos3250 SoC ID
+>>> - [PATCHv5 2/5] ARM: EXYNOS: Support secondary CPU boot of Exynos3250
+>>
+>> I'd say that [PATCHv5 5/5] ARM: dts: Add device tree sources for
+>> Exynos3250 would be also useful. :)
 >
-> +	soc {
-> +		miphy365x_phy: miphy365x at fe382000 {
-> +			st,pcie-tx-pol-inv;
-> +			st,sata-gen = <3>;
-> +		};
-> +	};
->   };
-...
+> Aha, it is already applied. I should have checked in the tree first. Sorry.
+>
+No problem and I applied this without any reply...
+
+I'm thinking the way to add soc_is_exynosOOOO() for new SoC and just 
+holding it on including 5260, 5800 as well.
+
+Any updates, I'll let you know.
+
+Thanks,
+Kukjin
