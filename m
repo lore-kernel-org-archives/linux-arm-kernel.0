@@ -1,65 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 May 2014 09:27:41 -0700
-Subject: [PATCH] arm/omap4: add twd clock to DT
-In-Reply-To: <CAGhQ9Vy-mvaXZ_=E_mmqYqxF5EiJSdN1rJayussm+AgKf94a+g@mail.gmail.com>
-References: <1396901139-17268-1-git-send-email-gilles.chanteperdrix@xenomai.org>
- <20140418223948.GK21823@atomide.com> <5353F44F.5080400@xenomai.org>
- <535662F0.4080300@ti.com>
- <CAGhQ9Vw-QaB+OnLa3yNVvD6a=XOutSZ1ejbsuUXvEcyrxEsRcQ@mail.gmail.com>
- <20140519161319.GD4849@atomide.com>
- <CAGhQ9Vy-mvaXZ_=E_mmqYqxF5EiJSdN1rJayussm+AgKf94a+g@mail.gmail.com>
-Message-ID: <20140519162741.GG4849@atomide.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 19 May 2014 19:37:29 +0300
+Subject: [PATCH v3 02/13] ARM: edma: Take the number of tc from
+ edma_soc_info (pdata)
+In-Reply-To: <5379E5E6.9080500@ti.com>
+References: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
+ <1400242640-9902-3-git-send-email-peter.ujfalusi@ti.com>
+ <5379E5E6.9080500@ti.com>
+Message-ID: <537A3349.3030404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Joachim Eastwood <manabian@gmail.com> [140519 09:24]:
-> On 19 May 2014 18:13, Tony Lindgren <tony@atomide.com> wrote:
-> > * Joachim Eastwood <manabian@gmail.com> [140518 05:08]:
-> >> On 22 April 2014 14:39, Tero Kristo <t-kristo@ti.com> wrote:
-> >> > On 04/20/2014 07:22 PM, Gilles Chanteperdrix wrote:
-> >> >>
-> >> >> Le 19/04/2014 00:39, Tony Lindgren a ?crit :
-> >> >>>
-> >> >>> * Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org> [140407 13:09]:
-> >> >>>>
-> >> >>>> Booting Linux 3.14 on Pandaboard currently gets the following
-> >> >>>> message displayed:
-> >> >>>>
-> >> >>>> smp_twd: clock not found -2
-> >> >>>>
-> >> >>>> Define "mpu_periphclk" as the twd clock in omap4 dts to avoid this.
-> >> >>>
-> >> >>>
-> >> >>> Tero, care to ack?
-> >> >>
-> >> >>
-> >> >> Sorry if I did not mail the right people, get_maintainer.pl gave me a
-> >> >> long list, and I did not feel like spamming all these people for such a
-> >> >> small patch. I do not believe Tero was in this list.
-> >> >>
-> >> >> Regards.
-> >> >
-> >> >
-> >> > Yea I don't think this is my expertise area, however the patch looks good to
-> >> > me, so if you really need it:
-> >> >
-> >> > Acked-by: Tero Kristo <t-kristo@ti.com>
-> >>
-> >> Tony, care to add this to your omap 3.16 dt branch?
-> >>
-> >> I am still getting:
-> >> [ 0.000152] smp_twd: clock not found -2
-> >>
-> >> So this fix from Gilles would be nice to have.
-> >
-> > Best that Tero picks this one up along with the other dt clock changes
-> > he's queueing.
-> 
-> I kinda assumed you would take it since you asked Tero to ack it. But
-> either way is fine :)
+On 05/19/2014 02:07 PM, Sekhar Nori wrote:
+> To which baseline do the patches apply? These lines are not present at
+> least in v3.15-rc5. I am applying the patch without this hunk.
 
-Yes that was before Tero started collecting the dt clock patches :)
+It is generate on top of linux-next-20140515.
+next picked up several patches since 3.15-rc and I also have my other patch in
+my working branch under this series:
+ARM: edma: Clean up and simplify the code around irq request
 
-Regards,
-
-Tony
+--
+P?ter
