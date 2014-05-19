@@ -1,76 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 19 May 2014 11:27:25 +0200
-Subject: [PATCH v3 3/7] mfd: add support for sun6i PRCM
- (Power/Reset/Clock Management) unit
-In-Reply-To: <20140519092159.GE4978@lee--X1>
-References: <1399633911-7094-1-git-send-email-boris.brezillon@free-electrons.com>
- <1399633911-7094-4-git-send-email-boris.brezillon@free-electrons.com>
- <20140509135251.GY5767@lee--X1> <20140515151756.GX29258@lukather>
- <20140519092159.GE4978@lee--X1>
-Message-ID: <20140519092725.GE29466@lukather>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 19 May 2014 10:30:38 +0100
+Subject: [PATCH 1/9] ARM: STi: DT: STiH416: 416 DT Entry for clockgen
+ A0/1/10/11/12
+In-Reply-To: <5373586A.5000302@st.com>
+References: <1399305223-18703-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1399305223-18703-2-git-send-email-gabriel.fernandez@linaro.org>
+ <20140506071843.GD5206@lee--X1>
+ <CAG374jD+msPPbPtFS+ji=8jS9+D-YHu31k7zzzC7Ty7jw9n7jQ@mail.gmail.com>
+ <20140508080344.GE5307@lee--X1> <5373586A.5000302@st.com>
+Message-ID: <20140519093038.GF4978@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 10:21:59AM +0100, Lee Jones wrote:
-> > > > The PRCM (Power/Reset/Clock Management) block exposes several subdevices
-> > > > in different subsystems (clk, reset ...)
-> > > > 
-> > > > Add basic support for the PRCM unit with clk (AR100, AHB0, and APB0 clks)
-> > > > and reset controller subdevices.
-> > > > 
-> > > > Other subdevices might be added later (if needed).
-> > > > 
-> > > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > > > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > > ---
-> > > >  drivers/mfd/Kconfig      |   8 +++
-> > > >  drivers/mfd/Makefile     |   1 +
-> > > >  drivers/mfd/sun6i-prcm.c | 134 +++++++++++++++++++++++++++++++++++++++++++++++
-> > > >  3 files changed, 143 insertions(+)
-> > > >  create mode 100644 drivers/mfd/sun6i-prcm.c
-> > > 
-> > > [...]
-> > > 
-> > > > +/*
-> > > > + * Copyright (C) 2014 Free Electrons
-> > > > + *
-> > > > + * License Terms: GNU General Public License v2
-> > > > + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > > > + *
-> > > > + * Allwinner PRCM (Power/Reset/Clock Management) driver
-> > > > + *
-> > > > + */
-> > > > +
-> > > > +#include <linux/mfd/core.h>
-> > > > +#include <linux/module.h>
-> > > > +#include <linux/of.h>
-> > > 
-> > > Ah, now isn't that better?
-> > > 
-> > > Acked-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > How do you want to merge this? Do you want me to take it through
-> > mach-sunxi tree, or do you want to take it in your tree?
+On Wed, 14 May 2014, Maxime Coquelin wrote:
+
+> Hi Lee,
 > 
-> If Boris can tell me what needs to go in with this patch (or if it
-> can go in on its own), I will create a(n immutable) branch from which
-> you can pull into your tree.
+> On 05/08/2014 10:03 AM, Lee Jones wrote:
+> >>>>Patch adds DT entries for clockgen A0/1/10/11/12
+> >>>>
+> >>>>Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
+> >>>>Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> >>>>---
+> >>>>  arch/arm/boot/dts/stih416-clks.h     |  15 ++
+> >>>
+> >>>This should live in include/dt-bindings/clk
+> >>>
+> >>include/dt-bindings/clk or  include/dt-bindings/clock ?
+> >
+> >I have no idea what the difference between the two are.  I guess you
+> >are in a better position to answer that.  My point was just that the
+> >includes should be in the include directory, rather than being held
+> >locally in the 'dts' directory.
+> 
+> Even if these .h files are only used by the DTS files??
+> 
+> There are some .h files for pincfg related stuff, shouldn't we do
+> the same in this case?
 
-We don't have any runtime or compile time dependency on this, so you
-can merge it through your tree. Unless something change, I don't have
-to pull anything in my tree.
+I believe so.  There are a few include files which are only referenced
+from DTS(I) files.  I would be cautious about needlessly overloading
+arch/arm/boot/dts with files which do not need to be there.  This is
+my personal opinion though, perhaps the DT guys have other ideas.
 
-Thanks!
-Maxime
+> >>>>  arch/arm/boot/dts/stih416-clock.dtsi | 477 ++++++++++++++++++++++++++++++++++
+> >>>>  arch/arm/boot/dts/stih416.dtsi       |  10 +-
+> >>>>  3 files changed, 497 insertions(+), 5 deletions(-)
+> >>>>  create mode 100644 arch/arm/boot/dts/stih416-clks.h
+> >
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/39717223/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
