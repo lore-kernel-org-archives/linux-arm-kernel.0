@@ -1,81 +1,138 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 May 2014 10:13:51 +0200
-Subject: [PATCHv5 1/4] ARM: mm: allow sub-architectures to override PCI I/O
- memory type
-In-Reply-To: <1400487234-4501-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1400487234-4501-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1400487234-4501-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 19 May 2014 10:13:50 +0200
+Subject: [PATCHv5 0/4] ARM: implement workaround for Cortex-A9/PL310/PCIe
+ deadlock
+Message-ID: <1400487234-4501-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to a design incompatibility between the PCIe Marvell controller
-and the Cortex-A9, stressing PCIe devices with a lot of traffic
-quickly causes a deadlock.
+Russell, Will, Catalin,
 
-One part of the workaround for this is to have all PCIe regions mapped
-as strongly-ordered (MT_UNCACHED) instead of the default
-MT_DEVICE. While the arch_ioremap_caller() mechanism allows
-sub-architecture code to override ioremap(), used to map PCIe memory
-regions, there isn't such a mechanism to override the behavior of
-pci_ioremap_io().
+This patch series adresses a problem that affects the newer Marvell
+Armada 375 and 38x SOCs, based on Cortex-A9+PL310, combined with the
+Marvell PCIe hardware unit. When the hardware I/O coherency is
+enabled, the combination of Cortex-A9/PL310/Marvell PCIe hardware unit
+will quickly cause a deadlock when the PCIe bus is stressed.
 
-This commit adds the arch_pci_ioremap_mem_type variable, initialized
-to MT_DEVICE by default, and that sub-architecture code can
-override. We have chosen to expose a single variable rather than
-offering the possibility of overriding the entire pci_ioremap_io(),
-because implementing pci_ioremap_io() requires calling functions
-(get_mem_type()) that are private to the arch/arm/mm/ code.
+The workaround for this problem has been suggested by ARM, and
+consists in two things:
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/include/asm/io.h | 6 ++++++
- arch/arm/mm/ioremap.c     | 9 ++++++++-
- 2 files changed, 14 insertions(+), 1 deletion(-)
+ (1) Map the PCIe regions as strongly-ordered
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 8aa4cca..3d23418 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -179,6 +179,12 @@ static inline void __iomem *__typesafe_io(unsigned long addr)
- /* PCI fixed i/o mapping */
- #define PCI_IO_VIRT_BASE	0xfee00000
- 
-+#if defined(CONFIG_PCI)
-+void pci_ioremap_set_mem_type(int mem_type);
-+#else
-+static inline void pci_ioremap_set_mem_type(int mem_type) {}
-+#endif
-+
- extern int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr);
- 
- /*
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index f9c32ba..d1e5ad7 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -438,6 +438,13 @@ void __arm_iounmap(volatile void __iomem *io_addr)
- EXPORT_SYMBOL(__arm_iounmap);
- 
- #ifdef CONFIG_PCI
-+static int pci_ioremap_mem_type = MT_DEVICE;
-+
-+void pci_ioremap_set_mem_type(int mem_type)
-+{
-+	pci_ioremap_mem_type = mem_type;
-+}
-+
- int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
- {
- 	BUG_ON(offset + SZ_64K > IO_SPACE_LIMIT);
-@@ -445,7 +452,7 @@ int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
- 	return ioremap_page_range(PCI_IO_VIRT_BASE + offset,
- 				  PCI_IO_VIRT_BASE + offset + SZ_64K,
- 				  phys_addr,
--				  __pgprot(get_mem_type(MT_DEVICE)->prot_pte));
-+				  __pgprot(get_mem_type(pci_ioremap_mem_type)->prot_pte));
- }
- EXPORT_SYMBOL_GPL(pci_ioremap_io);
- #endif
+ (2) Disable the outer cache sync of the PL310 when hardware I/O
+     coherency is used, since it is unneeded and causes the deadlock.
+
+The following four patches address the problem in the following way:
+
+ * PATCH 1/4 adds a small API in arch/arm/mm/ioremap.c to allow
+   sub-architectures to override the memory type used for PCI I/O
+   mappings.
+
+ * PATCH 2/4 extends the l2x0 cache driver with a new property
+   "arm,io-coherent", valid for the PL310, which makes the driver
+   disable the outer cache sync operation. This patch should be routed
+   through Russell's tree.
+
+ * PATCH 3/4 actually implements the Armada 375/38x workaround, by
+   using MT_UNCACHED for PCI memory mappings, and adding the
+   "arm,io-coherent" property to the cache controller Device Tree node
+   when appropriate (i.e, when hardware I/O coherency is
+   enabled). This patch has no build dependency on the two previous
+   patches. It has already been merged by the mvebu maintainers.
+
+ * PATCH 4/4 uses the API introduced in PATCH 1/4 to map PCI I/O
+   regions as strongly ordered. It should also go through the mvebu
+   maintainers tree, but was kept separate from PATCH 3/4, since 1/
+   PATCH 3 has already been merged and 2/ PATCH 4 has a build
+   dependency on PATCH 1, which may cause a delay in merging of PATCH
+   4.
+
+Changes since v4:
+
+ - Re-introduce the patch to allow sub-architectures to override the
+   memory type used for PCI I/O mappings, since switching to
+   strongly-ordered for all platforms does not seem to be well
+   accepted/understood at this point.
+
+ - Remove the of_device_is_compatible() check for the PL310, when
+   testing for 'arm,io-coherent'. Suggested by Rob Herring. However,
+   the code tetsing 'arm,io-coherent' cannot be moved into
+   pl310_of_setup(), because this function is called *before* the
+   'outer_cache' structure is initialized.
+
+ - Add a separate patch to use the pci_ioremap_set_mem_type() API in
+   mach-mvebu/coherency.c.
+
+Changes since v3:
+
+ - Withdrawn all Acked-by tags since the changes compared to v3 are
+   quite significant.
+
+ - Instead of introducing a small mechanism to allow each
+   sub-architecture to override the memory type used for PCI I/O
+   mappings, simply make all of them mapped MT_UNCACHED instead of
+   MT_DEVICE, as suggested by Arnd Bergmann. This also has the nice
+   consequence that there is no longer a build dependency between
+   PATCH 3/3 and PATCH 1/3. Suggested by Arnd Bergmann.
+
+ - Change the name of the new property of the PL310 DT binding from
+   the too generic 'dma-coherent' to 'arm,io-coherent'. Suggested by
+   Rob Herring.
+
+ - Instead of adding a complete set of L2 cache operations in
+   cache-l2x0.c, simply nullify the outer_cache.sync operation when
+   'arm,io-coherent' is specified. Suggested by Rob Herring.
+
+ - Move the Armada 375/38x specific code from mach-mvebu/board-v7.c to
+   mach-mvebu/coherency.c, which makes more sense. Suggested by Arnd
+   Bergmann.
+
+Changes since v2:
+
+ - Added Acked-by from Catalin on "ARM: mm: allow sub-architectures to
+   override PCI I/O memory type".
+
+ - Dropped the patch fixing the of_update_property() function, since
+   we're no longer using it.
+
+ - Instead of using a different compatible string to identify PL310
+   used in an I/O coherent configuration, use a separate boolean
+   property. Suggested by Catalin.
+
+ - Rework the mach-mvebu/coherency.c to add the boolean property
+   "dma-coherent" when needed instead of updating the compatible
+   string of the cache controller.
+
+Changes since v1:
+
+ - Instead of introducing separate l2x0 initialization functions, rely
+   on a separate compatible string to identify whether we're coherent
+   or not. The compatible string *has* to be modified at runtime,
+   because Armada 375 and 38x are only I/O coherent when in SMP
+   mode. In non-SMP mode, they are not I/O coherent, so we cannot
+   change the DT to 'arm,pl310-coherent-cache'.
+
+ - Addition of the drivers/of fix to be able to use
+   of_update_property() early and fix up the PL310 compatible string,
+   as explained in the previous item.
+
+Thanks!
+
+Thomas
+
+Thomas Petazzoni (4):
+  ARM: mm: allow sub-architectures to override PCI I/O memory type
+  ARM: mm: add support for HW coherent systems in PL310
+  ARM: mvebu: implement L2/PCIe deadlock workaround
+  ARM: mvebu: use pci_ioremap_set_mem_type() to map PCI I/O as strongly
+    ordered
+
+ Documentation/devicetree/bindings/arm/l2cc.txt |  3 ++
+ arch/arm/include/asm/io.h                      |  6 ++++
+ arch/arm/mach-mvebu/coherency.c                | 40 ++++++++++++++++++++++++++
+ arch/arm/mm/cache-l2x0.c                       | 13 +++++++++
+ arch/arm/mm/ioremap.c                          |  9 +++++-
+ 5 files changed, 70 insertions(+), 1 deletion(-)
+
 -- 
 1.9.3
