@@ -1,147 +1,103 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 19 May 2014 13:30:11 +0200
-Subject: [PATCH v9 1/3] ARM: EXYNOS: Add support for EXYNOS5410 SoC
-In-Reply-To: <1400470640-30611-2-git-send-email-t.dakhran@samsung.com>
-References: <1400470640-30611-1-git-send-email-t.dakhran@samsung.com>
- <1400470640-30611-2-git-send-email-t.dakhran@samsung.com>
-Message-ID: <5379EB43.2050702@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 May 2014 13:30:54 +0200
+Subject: [PATCH] pinctrl: sunxi: Fix recursive dependency
+In-Reply-To: <1400343715-27884-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1400343715-27884-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <4667053.sVVFqnz4qh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tarek,
-
-On 19.05.2014 05:37, Tarek Dakhran wrote:
-> EXYNOS5410 is SoC in Samsung's Exynos5 SoC series.
-> Add initial support for this SoC.
+On Saturday 17 May 2014 18:21:55 Maxime Ripard wrote:
+> Fix the following configuration error:
+> drivers/pinctrl/sunxi/Kconfig:3:error: recursive dependency detected!
+> drivers/pinctrl/sunxi/Kconfig:3:        symbol PINCTRL_SUNXI is selected by PINCTRL_SUN4I_A10
+> drivers/pinctrl/sunxi/Kconfig:9:        symbol PINCTRL_SUN4I_A10 default value contains PINCTRL_SUNXI
 > 
-> Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
-> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-
-IIRC, the Reviewed-by tag stands only for the version for which it was
-posted, except versions with no changes. This one apparently contains
-changes compared to previous version.
-
-> ---
->  arch/arm/mach-exynos/Kconfig             |    8 ++++++++
->  arch/arm/mach-exynos/exynos.c            |    1 +
->  arch/arm/mach-exynos/platsmp.c           |    4 ++++
->  arch/arm/plat-samsung/include/plat/cpu.h |   11 ++++++++++-
->  4 files changed, 23 insertions(+), 1 deletion(-)
+> Drop the select on PINCTRL_SUNXI, and make PINCTRL_SUNXI enabled by default instead.
 > 
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index 1602abc..79a3e85 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -84,6 +84,14 @@ config SOC_EXYNOS5250
->  	help
->  	  Enable EXYNOS5250 SoC support
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+I stubled over the same thing already, but came to a different conclusion.
+
+>  drivers/pinctrl/sunxi/Kconfig | 8 +-------
+>  1 file changed, 1 insertion(+), 7 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
+> index 2007327e0c48..8411857d2a45 100644
+> --- a/drivers/pinctrl/sunxi/Kconfig
+> +++ b/drivers/pinctrl/sunxi/Kconfig
+> @@ -1,32 +1,26 @@
+>  if ARCH_SUNXI
 >  
-> +config SOC_EXYNOS5410
-> +	bool "SAMSUNG EXYNOS5410"
-> +	default y
-> +	depends on ARCH_EXYNOS5
-> +	select PM_GENERIC_DOMAINS if PM_RUNTIME
-> +	help
-> +	  Enable EXYNOS5410 SoC support
-> +
->  config SOC_EXYNOS5420
->  	bool "SAMSUNG EXYNOS5420"
->  	default y
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index e973ff5..12db6cf 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -312,6 +312,7 @@ static char const *exynos_dt_compat[] __initconst = {
->  	"samsung,exynos4412",
->  	"samsung,exynos5",
->  	"samsung,exynos5250",
-> +	"samsung,exynos5410",
-
-AFAIK you don't need this change now, as you can boot using the generic
-Exynos5 compatible string just fine.
-
->  	"samsung,exynos5420",
->  	"samsung,exynos5440",
->  	NULL
-> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-> index 78002c7..a95213d 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -60,6 +60,8 @@ static inline void __iomem *cpu_boot_reg_base(void)
->  {
->  	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
->  		return S5P_INFORM5;
-> +	if (soc_is_exynos5410())
-> +		return sysram_ns_base_addr;
-
-This would suggest that instead you need to enable secure firmware
-support on your board, by adding respective firmware node to your dts.
-Tushar just sent a similar patch series for Exynos5420 [1].
-
-[1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/31840
-
->  	return sysram_base_addr;
->  }
+>  config PINCTRL_SUNXI
+> -       bool
+> +       def_bool ARCH_SUNXI
+>         select PINMUX
+>         select GENERIC_PINCONF
 >  
-> @@ -72,6 +74,8 @@ static inline void __iomem *cpu_boot_reg(int cpu)
->  		return ERR_PTR(-ENODEV);
->  	if (soc_is_exynos4412())
->  		boot_reg += 4*cpu;
-> +	else if (soc_is_exynos5410())
-> +		boot_reg += (0x1c);
-
-This offset is typical for secure firmware. The series I mentioned above
-also deals with bypassing adding of 4*cpu offset for Exynos5420. Seems
-like it might be also necessary for Exynos5410, however I will reply in
-that thread with the way I'd see this done.
-
->  	else if (soc_is_exynos5420())
->  		boot_reg += 4;
->  	return boot_reg;
-> diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
-> index 5992b8d..21db380 100644
-> --- a/arch/arm/plat-samsung/include/plat/cpu.h
-> +++ b/arch/arm/plat-samsung/include/plat/cpu.h
-> @@ -49,6 +49,7 @@ extern unsigned long samsung_cpu_id;
->  #define EXYNOS4_CPU_MASK	0xFFFE0000
+>  config PINCTRL_SUN4I_A10
+>         def_bool PINCTRL_SUNXI || MACH_SUN4I
+> -       select PINCTRL_SUNXI
 >  
->  #define EXYNOS5250_SOC_ID	0x43520000
-> +#define EXYNOS5410_SOC_ID	0xE5410000
->  #define EXYNOS5420_SOC_ID	0xE5420000
->  #define EXYNOS5440_SOC_ID	0xE5440000
->  #define EXYNOS5_SOC_MASK	0xFFFFF000
-> @@ -72,6 +73,7 @@ IS_SAMSUNG_CPU(exynos4210, EXYNOS4210_CPU_ID, EXYNOS4_CPU_MASK)
->  IS_SAMSUNG_CPU(exynos4212, EXYNOS4212_CPU_ID, EXYNOS4_CPU_MASK)
->  IS_SAMSUNG_CPU(exynos4412, EXYNOS4412_CPU_ID, EXYNOS4_CPU_MASK)
->  IS_SAMSUNG_CPU(exynos5250, EXYNOS5250_SOC_ID, EXYNOS5_SOC_MASK)
-> +IS_SAMSUNG_CPU(exynos5410, EXYNOS5410_SOC_ID, EXYNOS5_SOC_MASK)
->  IS_SAMSUNG_CPU(exynos5420, EXYNOS5420_SOC_ID, EXYNOS5_SOC_MASK)
->  IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
->  
-> @@ -154,6 +156,12 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
->  # define soc_is_exynos5250()	0
->  #endif
->  
-> +#if defined(CONFIG_SOC_EXYNOS5410)
-> +# define soc_is_exynos5410()	is_samsung_exynos5410()
-> +#else
-> +# define soc_is_exynos5410()	0
-> +#endif
-> +
->  #if defined(CONFIG_SOC_EXYNOS5420)
->  # define soc_is_exynos5420()	is_samsung_exynos5420()
->  #else
-> @@ -168,7 +176,8 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
->  
->  #define soc_is_exynos4() (soc_is_exynos4210() || soc_is_exynos4212() || \
->  			  soc_is_exynos4412())
-> -#define soc_is_exynos5() (soc_is_exynos5250() || soc_is_exynos5420())
-> +#define soc_is_exynos5() (soc_is_exynos5250() || soc_is_exynos5410() || \
-> +			  soc_is_exynos5420())
 
-After addressing the comments above, you won't need any changes to this
-file anymore (including all the soc_is_*() macros).
+This means you won't be able to stop selecting all drivers dropping
+the 'select PINCTRL_SUNXI' later. How about this one?
 
-Best regards,
-Tomasz
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
+index 2007327..75b71bb 100644
+--- a/drivers/pinctrl/sunxi/Kconfig
++++ b/drivers/pinctrl/sunxi/Kconfig
+@@ -2,31 +2,34 @@ if ARCH_SUNXI
+ 
+ config PINCTRL_SUNXI
+ 	bool
++
++config PINCTRL_SUNXI_COMMON
++	bool
+ 	select PINMUX
+ 	select GENERIC_PINCONF
+ 
+ config PINCTRL_SUN4I_A10
+        def_bool PINCTRL_SUNXI || MACH_SUN4I
+-       select PINCTRL_SUNXI
++       select PINCTRL_SUNXI_COMMON
+ 
+ config PINCTRL_SUN5I_A10S
+        def_bool PINCTRL_SUNXI || MACH_SUN5I
+-       select PINCTRL_SUNXI
++       select PINCTRL_SUNXI_COMMON
+ 
+ config PINCTRL_SUN5I_A13
+        def_bool PINCTRL_SUNXI || MACH_SUN5I
+-       select PINCTRL_SUNXI
++       select PINCTRL_SUNXI_COMMON
+ 
+ config PINCTRL_SUN6I_A31
+        def_bool PINCTRL_SUNXI || MACH_SUN6I
+-       select PINCTRL_SUNXI
++       select PINCTRL_SUNXI_COMMON
+ 
+ config PINCTRL_SUN6I_A31_R
+        def_bool PINCTRL_SUNXI || MACH_SUN6I
+-       select PINCTRL_SUNXI
++       select PINCTRL_SUNXI_COMMON
+ 
+ config PINCTRL_SUN7I_A20
+        def_bool PINCTRL_SUNXI || MACH_SUN7I
+-       select PINCTRL_SUNXI
++       select PINCTRL_SUNXI_COMMON
+ 
+ endif
+diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
+index 8e23a15..0f4461c 100644
+--- a/drivers/pinctrl/sunxi/Makefile
++++ b/drivers/pinctrl/sunxi/Makefile
+@@ -1,5 +1,5 @@
+ # Core
+-obj-$(CONFIG_PINCTRL_SUNXI)	+= pinctrl-sunxi.o
++obj-$(CONFIG_PINCTRL_SUNXI_COMMON)	+= pinctrl-sunxi.o
+ 
+ # SoC Drivers
+ obj-$(CONFIG_PINCTRL_SUN4I_A10)		+= pinctrl-sun4i-a10.o
