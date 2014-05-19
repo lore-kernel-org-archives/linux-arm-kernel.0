@@ -1,109 +1,60 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 19 May 2014 19:30:19 +0530
-Subject: [PATCH 1/4] phy: miphy365x: Add Device Tree bindings for the
- MiPHY365x
-In-Reply-To: <20140519135622.GL4978@lee--X1>
-References: <1398756095-32542-1-git-send-email-lee.jones@linaro.org>
- <1398756095-32542-2-git-send-email-lee.jones@linaro.org>
- <20140519135622.GL4978@lee--X1>
-Message-ID: <537A0E73.9080006@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 19 May 2014 15:02:49 +0100
+Subject: [RFC 13/47] mtd: nand: stm_nand_bch: provide Device Tree support
+In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EACBC8F@DBDE04.ent.ti.com>
+References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
+ <1395735604-26706-14-git-send-email-lee.jones@linaro.org>
+ <20980858CB6D3A4BAE95CA194937D5E73EAB5C83@DBDE04.ent.ti.com>
+ <20140430125406.GN29462@lee--X1>
+ <20980858CB6D3A4BAE95CA194937D5E73EACA3F0@DBDE04.ent.ti.com>
+ <20140509100304.GR5767@lee--X1>
+ <20980858CB6D3A4BAE95CA194937D5E73EACBC8F@DBDE04.ent.ti.com>
+Message-ID: <20140519140249.GM4978@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Monday 19 May 2014 07:26 PM, Lee Jones wrote:
-> Kishon,
+> >> >> >+	of_property_read_u32(np, "st,bch-bitflip-threshold",
+> >> >> >+			     &pdata->bch_bitflip_threshold);
+> >> >> >+
+> >> >> mtd->bitflip_threshold is by default set to ecc.strength (unless a driver initializes it).
+> >> >> And then can be re-configured for each MTD partition separately
+> >> >> 	/sys/class/mtd/mtdX/bitflip_threshold
+> >> >> 	Refer: $kernel/Documentation/ABI/testing/sysfs-class-mtd
+> >> >> So, I don't think this is a HW parameter, and so should not be passed from DT.
+> >> >
+> >> >I think the bit-flip threshold is/can be chip specific, and as we know
+> >> >which chip we're likely to be booting on, we can specify this via the
+> >> >hardware description.  Thus, I think it's perfectly viable for an
+> >> >option to pass through DT to exist.
+> >> >
+> >> I don't think that?s the correct interpretation of bitflip_threshold.
+> >>
+> >> (1) bitflip_threshold is dependent on ecc.strength (ECC scheme) of your driver.
+> >> MTD layers uses bitflip_threshold to warn above layers that number of
+> >> correctable bit-flips have reached a dangerous level beyond which driver's
+> >> ECC scheme may not be able to correct them. So above layers should start
+> >> taking additional corrective action like scrubbing.
+> >> 	@@drivers/mtd/mtdcore.c: mtd_read()
+> >> 		return ret_code >= mtd->bitflip_threshold ? -EUCLEAN : 0;
+> >>
+> >> (2) Also, user-space may control it based on how your device ages on field.
+> >> A fresh silicon may not show too many bitflips. But as device ages the
+> >> probability of simultaneous bitflips will increase. So user-space may lower
+> >> the bitflip_threshold to avoid accumulation of bitflips in a single page.
+> >>
+> >> Thus, bitflip_threshold should not be passed via DT.
+> >> It's neither a hardware parameter, nor it?s a static constant.
+> >
+> >Ah, I see.  I will fixup, thanks for the explanation.
 > 
-> Did you receive this set okay?  I believe it's still unmerged?
+> Please wait, I'll review your [v2] series also, then you can further
+> send all fixes together. I'm bit caught in other commitments for 3.16,
+> so hopefully I'll be able to review your patches by next week.
 
-I think I missed it. But I'm already done with the PULL REQUEST to greg for
-3.16 merge window.
+Did you manage to find some time to review the driver at all last week?
 
-Can't we take it through dt tree for miphy?
-
-Thanks
-Kishon
-> 
->> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
->> devices. It has 2 ports which it can use for either; both SATA, both
->> PCIe or one of each in any configuration.
->>
->> Cc: Kishon Vijay Abraham I <kishon@ti.com>
->> Acked-by: Mark Rutland <mark.rutland@arm.com>
->> Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->> ---
->>  .../devicetree/bindings/phy/phy-miphy365x.txt      | 62 ++++++++++++++++++++++
->>  1 file changed, 62 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy365x.txt
->>
->> diff --git a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
->> new file mode 100644
->> index 0000000..cb39de1
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
->> @@ -0,0 +1,62 @@
->> +STMicroelectronics STi MIPHY365x PHY binding
->> +============================================
->> +
->> +This binding describes a miphy device that is used to control PHY hardware
->> +for SATA and PCIe.
->> +
->> +Required properties:
->> +- compatible :	Should be "st,miphy365x-phy"
->> +- #phy-cells :	Should be 2 (See second example)
->> +		First cell is the port number from:
->> +			- MIPHY_PORT_0
->> +			- MIPHY_PORT_1
->> +		Second cell is device type from:
->> +			- MIPHY_TYPE_SATA
->> +			- MIPHY_TYPE_PCI
->> +- reg       :	Address and length of register sets for each device in
->> +		"reg-names"
->> +- reg-names : 	The names of the register addresses corresponding to the
->> +		registers filled in "reg", from:
->> +			- sata0: For SATA port 0 registers
->> +			- sata1: For SATA port 1 registers
->> +			- pcie0: For PCIE port 0 registers
->> +			- pcie1: For PCIE port 1 registers
->> +- st,syscfg : 	Should be a phandle of the system configuration register group
->> +		which contain the SATA, PCIe mode setting bits
->> +
->> +Optional properties:
->> +- st,sata-gen	     :	Generation of locally attached SATA IP. Expected values
->> +			are {1,2,3). If not supplied generation 1 hardware will
->> +			be expected
->> +- st,pcie-tx-pol-inv :	Bool property to invert the polarity PCIe Tx (Txn/Txp)
->> +- st,sata-tx-pol-inv :	Bool property to invert the polarity SATA Tx (Txn/Txp)
->> +
->> +Example:
->> +
->> +	miphy365x_phy: miphy365x at fe382000 {
->> +		compatible = "st,miphy365x-phy";
->> +		#phy-cells = <2>;
->> +		reg =	<0xfe382000 0x100>,
->> +			<0xfe38a000 0x100>,
->> +			<0xfe394000 0x100>,
->> +			<0xfe804000 0x100>;
->> +		reg-names = "sata0", "sata1", "pcie0", "pcie1";
->> +		st,syscfg = <&syscfg_rear>;
->> +	};
->> +
->> +Specifying phy control of devices
->> +=================================
->> +
->> +Device nodes should specify the configuration required in their "phys"
->> +property, containing a phandle to the miphy device node, a port number
->> +and a device type.
->> +
->> +Example:
->> +
->> +#include <dt-bindings/phy/phy-miphy365x.h>
->> +
->> +	sata0: sata at fe380000 {
->> +		...
->> +		phys	  = <&miphy365x_phy MIPHY_PORT_0 MIPHY_TYPE_SATA>;
->> +		...
->> +	};
-> 
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
