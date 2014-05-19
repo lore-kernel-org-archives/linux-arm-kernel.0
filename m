@@ -1,66 +1,61 @@
-From: gioh.kim@lge.com (Gioh Kim)
-Date: Mon, 19 May 2014 18:21:49 +0900
-Subject: [RFC PATCH] ARM: cache-l2x0: add setup entry for l2 in non-secure
- mode
-In-Reply-To: <CAGsJ_4wF7_BmTrWoxAu+NMVpsuN4oxJngBW0b2-4naXtwx5g5g@mail.gmail.com>
-References: <5374532D.7030602@lge.com>
- <CAGsJ_4zN39jeHz574_r9y_hjdn1Acbkr9gQhE=1L-Fs82-vDkw@mail.gmail.com>
- <53795080.1010007@lge.com>
- <CAGsJ_4wF7_BmTrWoxAu+NMVpsuN4oxJngBW0b2-4naXtwx5g5g@mail.gmail.com>
-Message-ID: <5379CD2D.4080300@lge.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 19 May 2014 10:21:59 +0100
+Subject: [PATCH v3 3/7] mfd: add support for sun6i PRCM
+ (Power/Reset/Clock Management) unit
+In-Reply-To: <20140515151756.GX29258@lukather>
+References: <1399633911-7094-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1399633911-7094-4-git-send-email-boris.brezillon@free-electrons.com>
+ <20140509135251.GY5767@lee--X1> <20140515151756.GX29258@lukather>
+Message-ID: <20140519092159.GE4978@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> > > The PRCM (Power/Reset/Clock Management) block exposes several subdevices
+> > > in different subsystems (clk, reset ...)
+> > > 
+> > > Add basic support for the PRCM unit with clk (AR100, AHB0, and APB0 clks)
+> > > and reset controller subdevices.
+> > > 
+> > > Other subdevices might be added later (if needed).
+> > > 
+> > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > ---
+> > >  drivers/mfd/Kconfig      |   8 +++
+> > >  drivers/mfd/Makefile     |   1 +
+> > >  drivers/mfd/sun6i-prcm.c | 134 +++++++++++++++++++++++++++++++++++++++++++++++
+> > >  3 files changed, 143 insertions(+)
+> > >  create mode 100644 drivers/mfd/sun6i-prcm.c
+> > 
+> > [...]
+> > 
+> > > +/*
+> > > + * Copyright (C) 2014 Free Electrons
+> > > + *
+> > > + * License Terms: GNU General Public License v2
+> > > + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > > + *
+> > > + * Allwinner PRCM (Power/Reset/Clock Management) driver
+> > > + *
+> > > + */
+> > > +
+> > > +#include <linux/mfd/core.h>
+> > > +#include <linux/module.h>
+> > > +#include <linux/of.h>
+> > 
+> > Ah, now isn't that better?
+> > 
+> > Acked-by: Lee Jones <lee.jones@linaro.org>
+> 
+> How do you want to merge this? Do you want me to take it through
+> mach-sunxi tree, or do you want to take it in your tree?
 
+If Boris can tell me what needs to go in with this patch (or if it
+can go in on its own), I will create a(n immutable) branch from which
+you can pull into your tree.
 
-2014-05-19 ?? 6:11, Barry Song ? ?:
-> 2014-05-19 8:29 GMT+08:00 Gioh Kim <gioh.kim@lge.com>:
->>
->>
->> 2014-05-18 ?? 10:13, Barry Song ? ?:
->>
->>> 2014-05-15 13:39 GMT+08:00 Gioh Kim <gioh.kim@lge.com>:
->>>>
->>>>
->>>> Hi,
->>>>
->>>> My board is using Trustzone and running kernel is non-secure mode.
->>>> But setup function of PL310 driver is only for secure mode kernel.
->>>>
->>>> What about adding an entry for non-secure mode setup function?
->>>>
->>>> I'm sorry for my poor code but I just wanna say what I need .
->>>
->>>
->>> Gioh,
->>>
->>> i don't really understand what is the user scenarios for this, if you
->>> are running linux in non-secure mode, your security-mode codes have
->>> enabled L2, so this makes non-secure linux have no chance to execute
->>> setup at all:
->>
->>
->> My platform runs linux kernel before L2 cache activation.
->> And the L2 cache is activated when the kernel sends command to Trustzone
->> firmware.
->> At this moment L2 is not activated. Linux should send command for L2
->> activation to Trustzone at the moment.
->
-> i think you can send command to trustzone firmware to enable L2 at
-> first, then make your Linux l2 driver run.
-
-Right. My platform is working like that.
-Activate L2 first and run l2x0 driver.
-
-But I think many platforms have trustzone firmware and are working like my platform.
-They might need non-secure setup.
-
->
->
-> -barry
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
->
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
