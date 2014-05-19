@@ -1,93 +1,63 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Mon, 19 May 2014 10:43:01 +0800
-Subject: [PATCH v2 0/5] mmc: sdhci: a few fixes on timeout and
- max_discard_to
-In-Reply-To: <20140517140902.GB12916@dragon>
-References: <1387268191-19859-1-git-send-email-b29396@freescale.com>
- <20140517140902.GB12916@dragon>
-Message-ID: <CAA+hA=QuWZudYbgv+K-amUJxLC7MyY2MNUXw10tTFvCOTCo8xA@mail.gmail.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Mon, 19 May 2014 02:49:26 +0000
+Subject: [PATCH v3] arm: ioremap: Fix static vm area boundary check.
+In-Reply-To: <alpine.LFD.2.11.1405161403400.17310@knanqh.ubzr>
+References: <1400232920-25079-1-git-send-email-Li.Xiubo@freescale.com>
+ <alpine.LFD.2.11.1405161403400.17310@knanqh.ubzr>
+Message-ID: <9258c0b00a33484a8d289378047f8cd4@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 17, 2014 at 10:09 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Tue, Dec 17, 2013 at 04:16:26PM +0800, Dong Aisheng wrote:
->> Patch 1~4 mainly fixes the issue that the max timeout counter for uSDHC is
->> 1 << 28 rather than 1 << 27. 1~2 fix getting the max timeout counter
->> while 3~4 fix setting the max timeout.
->> Thus it introduces two new platform hook: get_max_timeout_count and set_timeout
->> for those platform which have different timeout setting.
->>
->> This issue is firstly reported here by Ed Sutter:
->> http://www.spinics.net/lists/linux-mmc/msg23375.html
->> The root cause is the max_discard_to got from uSDHC is too small, only 677ms,
->> which cause the max_discard_bytes for eMMC is only 512, then the discard operation
->> of mkfs.ext3 for an eMMC card is too slow, just like dead.
->> With above patches, the issue can be fixed.
->
-> It seems the series got lost?  The issue reported by Ed Sutter is still
-> there with the latest kernel.
->
-> Dong, you may need to rebase it a little bit and resend.
->
+> > For each vmalloc area, there is one guard page at the end of it.
+> > so the vm->size = PAGE_ALIGN(offset + request size) + guard page size.
+> 
+> Nope.  There is no guard page for statically created vmalloc areas.
+> 
 
-Yes, it's lost.
-I will rebase and resend it.
+Yes, you are right, I'm thinking why the static area has no guard page?
 
-Regards
-Dong Aisheng
+Thanks very much,
 
-> Shawn
->
->>
->> Patch 5 adds the capability to calcalute the max_discard_to dynamically
->> for SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK.
->>
->> Originally the max_discard_to for a high speed sdhc card may be:
->> mmc1: new high speed SDHC card at address aaaa
->> mmc1: calculated max. discard sectors 49152 for timeout 1355 ms
->> After fix:
->> mmc1: new high speed SDHC card at address aaaa
->> mmc1: calculated max. discard sectors 712704 for timeout 5422 ms
->>
->> It also improves the card discard performance a lot due to max_discard_sectors
->> increase a lot.
->>
->> There's also discussion about remove max_discard_to limit here:
->> http://www.spinics.net/lists/linux-mmc/msg23395.html
->> But it does not help for uSDHC since we can observe data timeout
->> on a Toshiba SD3.0 cards if we do not disable data timeout interrupt.
->>
->> ChangeLog:
->> v1->v2:
->>  1. change .get_max_timeout to .get_max_timeout_count to reuse some code
->>  2. some other minor changes based on Shawn's comment.
->>  3. patch 6 in v1 is dropped since not need anymore after change 1
->>
->>
->>
->> Dong Aisheng (5):
->>   mmc: sdhci: add platfrom get_max_timeout_count hook
->>   mmc: sdhci-esdhc-imx: fix incorrect max_discard_to for uSDHC
->>   mmc: sdhci: add platform set_timeout hook
->>   mmc: sdhci-esdhc-imx: set the correct max timeout value for uSDHC
->>   mmc: sdhci: calculate max_discard_to dynamically for
->>     SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
->>
->>  drivers/mmc/host/sdhci-esdhc-imx.c |   20 +++++++++++
->>  drivers/mmc/host/sdhci.c           |   66 +++++++++++++++++++++++------------
->>  drivers/mmc/host/sdhci.h           |    3 ++
->>  3 files changed, 66 insertions(+), 23 deletions(-)
->>
->> --
->> 1.7.2.rc3
->>
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+BRs
+Xiubo
+
+
+> 
+> > Signed-off-by: Richard Lee <superlibj8301@gmail.com>
+> > Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+> > Cc: Nicolas Pitre <nico@linaro.org>
+> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Cc: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> > ---
+> >  arch/arm/mm/ioremap.c | 8 ++++++--
+> >  1 file changed, 6 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+> > index be69333..758e8f7 100644
+> > --- a/arch/arm/mm/ioremap.c
+> > +++ b/arch/arm/mm/ioremap.c
+> > @@ -49,14 +49,18 @@ static struct static_vm
+> *find_static_vm_paddr(phys_addr_t paddr,
+> >  	struct vm_struct *vm;
+> >
+> >  	list_for_each_entry(svm, &static_vmlist, list) {
+> > +		phys_addr_t paddr_end, phys_addr_end;
+> > +
+> >  		vm = &svm->vm;
+> >  		if (!(vm->flags & VM_ARM_STATIC_MAPPING))
+> >  			continue;
+> >  		if ((vm->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
+> >  			continue;
+> >
+> > -		if (vm->phys_addr > paddr ||
+> > -			paddr + size - 1 > vm->phys_addr + vm->size - 1)
+> > +		/* The PAGE_SIZE here is vmalloc area's guard page */
+> > +		phys_addr_end = vm->phys_addr + vm->size - PAGE_SIZE - 1;
+> > +		paddr_end = paddr + size - 1;
+> > +		if (vm->phys_addr > paddr || paddr_end > phys_addr_end)
+> >  			continue;
+> >
+> >  		return svm;
+> > --
+> > 1.8.4
+> >
