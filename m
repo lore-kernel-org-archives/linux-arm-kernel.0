@@ -1,89 +1,98 @@
-From: max.schwarz@online.de (Max Schwarz)
-Date: Mon, 19 May 2014 12:09:30 +0200
-Subject: [PATCH v2 00/11] Add real clock support for Rockchip's RK3188
-In-Reply-To: <3477211.Gkyeur83TV@diego>
-References: <3477211.Gkyeur83TV@diego>
-Message-ID: <31832939.LB4tpb30Bt@typ>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 19 May 2014 13:12:05 +0300
+Subject: [PATCH 01/11] ARM: AM43xx: hwmod: add DSS hwmod data
+In-Reply-To: <5379CDD2.6080807@ti.com>
+References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
+ <1399636579-8062-2-git-send-email-tomi.valkeinen@ti.com>
+ <5379CDD2.6080807@ti.com>
+Message-ID: <5379D8F5.9030008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Heiko,
+On 19/05/14 12:24, Rajendra Nayak wrote:
+> On Friday 09 May 2014 05:26 PM, Tomi Valkeinen wrote:
+>> From: Sathya Prakash M R <sathyap@ti.com>
+>>
+>> Add DSS hwmod data for AM43xx.
+>>
+>> Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
+>> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 104 +++++++++++++++++++++++++++++
+>>  arch/arm/mach-omap2/prcm43xx.h             |   1 +
+>>  2 files changed, 105 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+>> index 5c2cc8083fdd..8c14db2e1e47 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+>> @@ -19,6 +19,8 @@
+>>  #include "omap_hwmod.h"
+>>  #include "omap_hwmod_33xx_43xx_common_data.h"
+>>  #include "prcm43xx.h"
+>> +#include "omap_hwmod_common_data.h"
+>> +
+>>  
+>>  /* IP blocks */
+>>  static struct omap_hwmod am43xx_l4_hs_hwmod = {
+>> @@ -415,6 +417,76 @@ static struct omap_hwmod am43xx_qspi_hwmod = {
+>>  	},
+>>  };
+>>  
+>> +/* Display sub system - DSS */
+>> +
+>> +static struct omap_hwmod_dma_info am43xx_dss_sdma_chs[] = {
+>> +	{ .name = "dispc", .dma_req = 5 },
+>> +	{ .dma_req = -1 },
+>> +};
+> 
+> the dma info needs to come in from DT. Besides these are edma
+> request lines and not sdma.
 
-This series:
-Acked-by: Max Schwarz <max.schwarz@online.de>
-Tested-by: Max Schwarz <max.schwarz@online.de>
-on Radxa Rock (RK3188).
+Right, the sdma information is not needed anymore.
 
-Cheers,
-  Max
+>> +
+>> +struct omap_dss_dispc_dev_attr am43xx_dss_dispc_dev_attr = {
+>> +	.manager_count		= 1,
+>> +	.has_framedonetv_irq	= 0
+>> +};
+>> +
+>> +
+> []..
+> 
+>> +
+>>  /* Interfaces */
+>>  static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
+>>  	.master		= &am33xx_l3_main_hwmod,
+>> @@ -654,6 +726,34 @@ static struct omap_hwmod_ocp_if am43xx_l3_s__qspi = {
+>>  	.user           = OCP_USER_MPU | OCP_USER_SDMA,
+>>  };
+>>  
+>> +static struct omap_hwmod_ocp_if am43xx_dss__l3_main = {
+>> +	.master		= &am43xx_dss_core_hwmod,
+>> +	.slave		= &am33xx_l3_main_hwmod,
+>> +	.clk		= "disp_clk",
+> 
+> Isn't l3_gclk that clocks the l3 OCP master port?
 
-On Wednesday 07 May 2014 at 23:09:53, Heiko St?bner wrote:
-> This series add a clock driver infrastructure for Rockchip SoCs in
-> general and clock-definitions for the RK3188 in particular.
-> 
-> Due to the lack of any usable documentation of the RK3188 clocks, the
-> clock tree is based on my own doc [0] collected by analyzing the
-> clock_data code in current Rockchip kernels. As a result the gathered
-> data may contain errors. So to prevent API issues with the clock-ids,
-> the exported ones are currently limited to well understood or really
-> measured clocks.
-> 
-> The previous attempt to define parts separately in the devicetree did
-> not really fit with the clock structure, which became apparent with more
-> knowledge about the clock tree and this new driver framework, heavily
-> inspired by the Samsung clock driver, fits very well for clock controllers
-> in Rockchip SoCs.
-> 
-> The whole structure should support Rockchip SoCs at least down to
-> the RK28xx (ARM9) which all share a very similar setup of their clock
-> controllers in PLL, divider and gate handling as well as the included
-> softreset parts.
-> 
-> changes since v1:
-> - adapt to apply on current clk-next branch
-> - add saradc clock
-> - add rk3188a cru, which has a slightly different handling of one
->   pll value (bwadj)
-> 
-> [0]
-> https://docs.google.com/document/d/1voaR9Xk3lisCQIG3ThySOSnSHBUequljQYnceFl
-> r53w/edit?usp=sharing
-> 
-> Heiko Stuebner (11):
->   clk: divider: add CLK_DIVIDER_READ_ONLY flag
->   clk: rockchip: add basic infrastructure
->   clk: rockchip: add clock type for pll clocks and pll used on rk3066
->   clk: rockchip: add special cpu clock type
->   clk: rockchip: add reset controller
->   dt-bindings: add documentation for rk3188 clock and reset unit
->   clk: rockchip: add clock driver for rk3188 clocks
->   ARM: rockchip: Select ARCH_HAS_RESET_CONTROLLER
->   ARM: dts: rk3188: add cru node and update device clocks to use it
->   ARM: dts: rockchip: move rk3188 core input clocks into main dtsi
->   ARM: dts: rockchip: remove the now obsolete rk3188-clocks.dtsi
-> 
->  .../bindings/clock/rockchip,rk3188-cru.txt         |  74 ++++
->  arch/arm/boot/dts/rk3188-clocks.dtsi               | 289 -------------
->  arch/arm/boot/dts/rk3188.dtsi                      |  80 +++-
->  arch/arm/mach-rockchip/Kconfig                     |   1 +
->  drivers/clk/clk-divider.c                          |  10 +-
->  drivers/clk/rockchip/Makefile                      |   6 +
->  drivers/clk/rockchip/clk-cpu.c                     | 434
-> +++++++++++++++++++ drivers/clk/rockchip/clk-pll.c                     |
-> 316 ++++++++++++++ drivers/clk/rockchip/clk-rk3188.c                  | 479
-> +++++++++++++++++++++ drivers/clk/rockchip/clk.c                         |
-> 168 ++++++++ drivers/clk/rockchip/clk.h                         | 251
-> +++++++++++ drivers/clk/rockchip/softrst.c                     | 115 +++++
->  include/dt-bindings/clock/rk3188-cru.h             |  81 ++++
->  include/linux/clk-provider.h                       |   4 +
->  14 files changed, 2013 insertions(+), 295 deletions(-)
->  create mode 100644
-> Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt delete mode
-> 100644 arch/arm/boot/dts/rk3188-clocks.dtsi
->  create mode 100644 drivers/clk/rockchip/clk-cpu.c
->  create mode 100644 drivers/clk/rockchip/clk-pll.c
->  create mode 100644 drivers/clk/rockchip/clk-rk3188.c
->  create mode 100644 drivers/clk/rockchip/clk.c
->  create mode 100644 drivers/clk/rockchip/clk.h
->  create mode 100644 drivers/clk/rockchip/softrst.c
->  create mode 100644 include/dt-bindings/clock/rk3188-cru.h
+Hmm, possibly... dispc_clk looks a bit odd there. It's been very
+difficult to figure out things like that, with the not-so-good am43xx
+documentation.
+
+The documentation mentions "L3 Fast Interconnect" and "LCDL3OCPIFCLK"
+related to DSS's OCP master, but searching for those in the TRM doesn't
+reveal much.
+
+Would the l3_gclk match the "L3 Fast Interconnect" and l3s_gclk match
+the "L3 Slow Interconnect".
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/468c7519/attachment-0001.sig>
