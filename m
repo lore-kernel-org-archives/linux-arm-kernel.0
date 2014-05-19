@@ -1,39 +1,54 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 19 May 2014 10:37:28 +0100
-Subject: [PATCHv5 2/4] ARM: mm: add support for HW coherent systems in
- PL310
-In-Reply-To: <1400487234-4501-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1400487234-4501-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1400487234-4501-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140519093728.GC5113@arm.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 19 May 2014 11:39:42 +0200
+Subject: [linux-sunxi] Re: [PATCH v5 4/8] input: misc: Add driver for
+ AXP20x Power Enable Key
+In-Reply-To: <20140519091553.GC4978@lee--X1>
+References: <1398947374-3115-1-git-send-email-carlo@caione.org>
+ <1398947374-3115-5-git-send-email-carlo@caione.org>
+ <20140503010604.GE4090@lukather>
+ <20140519055745.GL29386@core.coreip.homeip.net>
+ <CAOQ7t2bPHnjfpeqQjMsYJs--qpd1_1RvBEFXztTDgnf5yW=Yxg@mail.gmail.com>
+ <20140519091553.GC4978@lee--X1>
+Message-ID: <CAOQ7t2a=V_dO17Xg4VJUTV3W_OFCaE5Wuj15_Fox2jywjH+RPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 09:13:52AM +0100, Thomas Petazzoni wrote:
-> When a PL310 cache is used on a system that provides hardware
-> coherency, the outer cache sync operation is useless, and can be
-> skipped. Moreover, on some systems, it is harmful as it causes
-> deadlocks between the Marvell coherency mechanism, the Marvell PCIe
-> controller and the Cortex-A9.
-> 
-> To avoid this, this commit introduces a new Device Tree property
-> 'arm,io-coherent' for the L2 cache controller node, valid only for the
-> PL310 cache. It identifies the usage of the PL310 cache in an I/O
-> coherent configuration. Internally, it makes the driver disable the
-> outer cache sync operation.
-> 
-> Note that technically speaking, a fully coherent system wouldn't
-> require any of the other .outer_cache operations. However, in
-> practice, when booting secondary CPUs, these are not yet coherent, and
-> therefore a set of cache maintenance operations are necessary at this
-> point. This explains why we keep the other .outer_cache operations and
-> only ->sync is disabled.
-> 
-> While in theory any write to a PL310 register could cause the
-> deadlock, in practice, disabling ->sync is sufficient to workaround
-> the deadlock, since the other cache maintenance operations are only
-> used in very specific situations.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On Mon, May 19, 2014 at 11:15 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Mon, 19 May 2014, Carlo Caione wrote:
+>
+>> On Mon, May 19, 2014 at 7:57 AM, Dmitry Torokhov
+>> <dmitry.torokhov@gmail.com> wrote:
+>> > On Fri, May 02, 2014 at 06:06:04PM -0700, Maxime Ripard wrote:
+>> >> On Thu, May 01, 2014 at 02:29:30PM +0200, Carlo Caione wrote:
+>> >> > This patch add support for the Power Enable Key found on MFD AXP202 and
+>> >> > AXP209. Besides the basic support for the button, the driver adds two
+>> >> > entries in sysfs to configure the time delay for power on/off.
+>> >> >
+>> >> > Signed-off-by: Carlo Caione <carlo@caione.org>
+>> >>
+>> >> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> >
+>> > Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>> >
+>> > How are we merging it? MFD tree?
+>>
+>> No idea. Lee, can you help in merging it?
+>> The only thing still  left out is the DT to be merged through Maxime
+>> (I need to submit a v6 only for that).
+>
+> Yes.
+>
+> Weren't you in receipt of my email sent out an hour before this one?
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Yes, but this email was sent before receiving yours :)
+
+> I thought you were re-sending the test though (v6?).
+>
+> If you can set that, complete with all the Acks, I'd be much obliged.
+
+Ok, no problem. I'll also fix a small compilation-warning spotted by Hans.
+
+Thank you,
+
+-- 
+Carlo Caione
