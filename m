@@ -1,24 +1,33 @@
-From: catalin.udma@freescale.com (catalin.udma at freescale.com)
-Date: Mon, 19 May 2014 08:24:52 +0000
-Subject: [PATCH] arm64: ptrace: fix setting hw breakpoint/watchpoint
-In-Reply-To: <20140516162138.GA1694@arm.com>
-References: <1399290685-6336-1-git-send-email-catalin.udma@freescale.com>
- <20140516134420.GG12341@arm.com>
- <145f917e71694a30b406ebcaa889e604@BL2PR03MB164.namprd03.prod.outlook.com>
- <20140516162138.GA1694@arm.com>
-Message-ID: <2d7e185bf71048e2ab24e1f64f5f099a@BY2PR03MB175.namprd03.prod.outlook.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 19 May 2014 10:25:30 +0200
+Subject: [PATCH] regulator: AXP20x: fix wrong call to of_find_node_by_name
+Message-ID: <1400487930-22949-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The of_find_node_by_name function will search for a DT node named
+"regulators" after the provided np node, but will not ensure that this node
+is a child of np.
+This might result in retrieving a "regulators" node that is not related to
+the axp20x PMIC.
 
-> > As long as the kernel can rely on the registers number sent from GDB,
-> > then there is no need for this kernel patch.
-> 
-> What do you mean? Userspace can pass whatever it likes and the regset
-> accessors will do the right thing.
-> 
-> Will
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+ drivers/regulator/axp20x-regulator.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I meant I agree with you that there is no need to change the kernel with this patch. 
-Thank you,
-Catalin
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index 78a29e6..61ae4d4 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -188,7 +188,7 @@ static int axp20x_regulator_parse_dt(struct platform_device *pdev)
+ 	if (!np)
+ 		return 0;
+ 
+-	regulators = of_find_node_by_name(np, "regulators");
++	regulators = of_get_child_by_name(np, "regulators");
+ 	if (!regulators) {
+ 		dev_warn(&pdev->dev, "regulators node not found\n");
+ 	} else {
+-- 
+1.8.3.2
