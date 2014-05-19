@@ -1,44 +1,85 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 May 2014 10:13:54 +0200
-Subject: [PATCHv5 4/4] ARM: mvebu: use pci_ioremap_set_mem_type() to map PCI
- I/O as strongly ordered
-In-Reply-To: <1400487234-4501-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1400487234-4501-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1400487234-4501-5-git-send-email-thomas.petazzoni@free-electrons.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 19 May 2014 13:45:53 +0530
+Subject: [PATCH v3 09/13] dt/bindings: ti,
+ edma: Remove redundant properties from documentation
+In-Reply-To: <1400242640-9902-10-git-send-email-peter.ujfalusi@ti.com>
+References: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
+ <1400242640-9902-10-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <5379BDB9.50905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Part of the workaround for the PCIe/SMP/PL310 deadlock on Armada
-375/38x is to map PCI mappings strongly ordered. Mapping PCI memory
-regions as strongly ordered was already done thanks to the
-arch_ioremap_caller mechanism. This patch does the same for the PCI
-I/O regions by using the new pci_ioremap_set_mem_type() function.
++ DT maintainers
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-This patch is kept separate from the rest of the
-mach-mvebu/coherency.c code for the workaround, as this patch has a
-build dependency on the new API. Since the new API patch will go
-through Russell's tree, and this patch through the mvebu tree, there
-might be some merging issue, or even the need to delay the merging of
-this patch.
+On Friday 16 May 2014 05:47 PM, Peter Ujfalusi wrote:
+> From CCCFG register of eDMA3 we can get all the needed information for the
+> driver about the IP:
+> Number of channels: NUM_DMACH
+> Number of regions: NUM_REGN
+> Number of slots (PaRAM sets): NUM_PAENTRY
+> Number of TC/EQ: NUM_EVQUE
+> 
+> The ti,edma-regions; ti,edma-slots and dma-channels in DT are
+> redundant since the very same information can be obtained from the HW.
+> The mentioned properties are deprecated.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-mvebu/coherency.c | 1 +
- 1 file changed, 1 insertion(+)
+DT maintainers,
 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index f6be9c6..0215614 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -335,6 +335,7 @@ static void __init armada_375_380_coherency_init(struct device_node *np)
- 
- 	coherency_cpu_base = of_iomap(np, 0);
- 	arch_ioremap_caller = armada_pcie_wa_ioremap_caller;
-+	pci_ioremap_set_mem_type(MT_UNCACHED);
- 
- 	/*
- 	 * Add the PL310 property "arm,io-coherent". This makes sure the
--- 
-1.9.3
+Can I get an ack on deprecation of these bindings? We are using hardware
+to detect the same properties so it should not cause any backward
+compatibility issue when moving to newer kernels while keeping the same DTB.
+
+Link to last mail on this topic as part of v2 thread:
+
+http://lkml.iu.edu/hypermail/linux/kernel/1405.1/05152.html
+
+Thanks,
+Sekhar
+
+> ---
+>  Documentation/devicetree/bindings/dma/ti-edma.txt | 13 +++++++------
+>  1 file changed, 7 insertions(+), 6 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/ti-edma.txt b/Documentation/devicetree/bindings/dma/ti-edma.txt
+> index 68ff2137bae7..5ba525a10035 100644
+> --- a/Documentation/devicetree/bindings/dma/ti-edma.txt
+> +++ b/Documentation/devicetree/bindings/dma/ti-edma.txt
+> @@ -2,11 +2,8 @@ TI EDMA
+>  
+>  Required properties:
+>  - compatible : "ti,edma3"
+> -- ti,edma-regions: Number of regions
+> -- ti,edma-slots: Number of slots
+>  - #dma-cells: Should be set to <1>
+>                Clients should use a single channel number per DMA request.
+> -- dma-channels: Specify total DMA channels per CC
+>  - reg: Memory map for accessing module
+>  - interrupt-parent: Interrupt controller the interrupt is routed through
+>  - interrupts: Exactly 3 interrupts need to be specified in the order:
+> @@ -17,6 +14,13 @@ Optional properties:
+>  - ti,hwmods: Name of the hwmods associated to the EDMA
+>  - ti,edma-xbar-event-map: Crossbar event to channel map
+>  
+> +Deprecated properties:
+> +Listed here in case one wants to boot an old kernel with new DTB. These
+> +properties might need to be added to the new DTS files.
+> +- ti,edma-regions: Number of regions
+> +- ti,edma-slots: Number of slots
+> +- dma-channels: Specify total DMA channels per CC
+> +
+>  Example:
+>  
+>  edma: edma at 49000000 {
+> @@ -26,9 +30,6 @@ edma: edma at 49000000 {
+>  	compatible = "ti,edma3";
+>  	ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
+>  	#dma-cells = <1>;
+> -	dma-channels = <64>;
+> -	ti,edma-regions = <4>;
+> -	ti,edma-slots = <256>;
+>  	ti,edma-xbar-event-map = /bits/ 16 <1 12
+>  					    2 13>;
+>  };
+> 
