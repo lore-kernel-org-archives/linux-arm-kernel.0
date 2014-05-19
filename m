@@ -1,54 +1,42 @@
-From: ritesh.harjani@gmail.com (Ritesh Harjani)
-Date: Mon, 19 May 2014 16:37:07 +0530
-Subject: [PATCH 1/1] arm64: TLB maintainance: Implement flush_kern_tlb_page
-In-Reply-To: <20140519110113.GL5113@arm.com>
-References: <1400495665-48279-1-git-send-email-ritesh.harjani@gmail.com>
- <1400495665-48279-2-git-send-email-ritesh.harjani@gmail.com>
- <20140519104632.GI5113@arm.com>
- <CAD15agbbyEPbM5rw9gfAC5qMUxi-0rWp58J40j2XYYyf27rozQ@mail.gmail.com>
- <20140519110113.GL5113@arm.com>
-Message-ID: <CAD15agY6bbEOJ24wR81XpBm6CW9rJotx59GQcExUBtuSoXfjOw@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 19 May 2014 16:37:18 +0530
+Subject: [PATCH v3 02/13] ARM: edma: Take the number of tc from
+ edma_soc_info (pdata)
+In-Reply-To: <1400242640-9902-3-git-send-email-peter.ujfalusi@ti.com>
+References: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
+ <1400242640-9902-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <5379E5E6.9080500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 4:31 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Mon, May 19, 2014 at 11:54:31AM +0100, Ritesh Harjani wrote:
->> On Mon, May 19, 2014 at 4:16 PM, Catalin Marinas
->> <catalin.marinas@arm.com> wrote:
->> > On Mon, May 19, 2014 at 11:34:25AM +0100, ritesh.harjani at gmail.com wrote:
->> >> From: Ritesh Harjani <ritesh.harjani@gmail.com>
->> >>
->> >> Implement flush_kern_tlb_page mentioned in the header
->> >> comment of arch/arm64/include/asm/tlbflush.h
->> >
->> > Alternatively, clean-up the comment.
->>
->> You mean this function is of no use ? Or there are other plans which
->> might require clean up of this file ?
->
-> Since we don't have it and the kernel builds fine, I guess we don't need
-> it.
-Ok.
+Peter,
 
->
->> Also, could you please confirm whether the implementation of the
->> function is correct ?
->>
->> >> +       asm("tlbi       vae1is, %0" : : "r" (addr));
->>
->> Should following instruction be more appropriate instead of above:
->> asm("tlbi       vaae1is, %0" : : "r" (addr));
->
-> You should use the vaae1is variant for all ASIDs since it's a global
-> mapping (see flush_tlb_kernel_range()).
+On Friday 16 May 2014 05:47 PM, Peter Ujfalusi wrote:
+> Instead of saving the for loop length, take the num_tc value from the pdata.
+> In case of DT boot set the n_tc to 3 as it is hardwired in edma_of_parse_dt()
+> This is a temporary state since upcoming patch(es) will change how we are
+> dealing with these parameters.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>  arch/arm/common/edma.c | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+> index 01707aae0a2b..d42c84a3432a 100644
+> --- a/arch/arm/common/edma.c
+> +++ b/arch/arm/common/edma.c
 
-Yes!!, ok thanks!!.
+> @@ -1741,9 +1743,6 @@ static int edma_probe(struct platform_device *pdev)
+>  			map_queue_tc(j, queue_tc_mapping[i][0],
+>  					queue_tc_mapping[i][1]);
+>  
+> -		/* Save the number of TCs */
+> -		edma_cc[j]->num_tc = i;
+> -
 
->
-> --
-> Catalin
+To which baseline do the patches apply? These lines are not present at
+least in v3.15-rc5. I am applying the patch without this hunk.
 
-
-Thanks
-Ritesh
+Thanks,
+Sekhar
