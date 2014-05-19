@@ -1,70 +1,81 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 19 May 2014 17:10:32 +0200
-Subject: [GIT PULL] at91: cleanup for 3.16 #1
-In-Reply-To: <20140516233141.GC6423@quad.lixom.net>
-References: <1399484042-27432-1-git-send-email-nicolas.ferre@atmel.com>
- <536A6FD7.40402@atmel.com> <20140516232635.GB6423@quad.lixom.net>
- <20140516233141.GC6423@quad.lixom.net>
-Message-ID: <537A1EE8.6030303@atmel.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Mon, 19 May 2014 17:09:19 +0200
+Subject: [GIT PULL] ARM: STi: DT changes for v3.16
+Message-ID: <537A1E9F.2010804@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/05/2014 01:31, Olof Johansson :
-> On Fri, May 16, 2014 at 04:26:35PM -0700, Olof Johansson wrote:
->> On Wed, May 07, 2014 at 07:39:35PM +0200, Nicolas Ferre wrote:
->>> On 07/05/2014 19:34, Nicolas Ferre :
->>>> Arnd, Olof, Kevin,
->>>>
->>>> This is the first cleanup pull-request for 3.16. It is pretty big because it
->>>> integrates the work from Boris about CCF and Alexandre about IIO/ADC. I
->>>> integrated them in this cleanup topic because they both touch the core at91
->>>> code, the clk and IIO drivers as well as the DT. The concerned maintainers
->>>> added their tags.
->>>>
->>>> The patch by Linus is a move of at91 specific GPIO definitions out of the
->>>> include/mach directory which is an step towards single zImage.
->>>>
->>>> Thanks, best regards,
->>>>
->>>> The following changes since commit 89ca3b881987f5a4be4c5dbaa7f0df12bbdde2fd:
->>>>
->>>>   Linux 3.15-rc4 (2014-05-04 18:14:42 -0700)
->>>>
->>>> are available in the git repository at:
->>>>
->>>>   git://github.com/at91linux/linux-at91.git tags/at91-cleanup
->>>
->>> There is a little conflict with at91-3.16-dt that you already pulled in
->>> arm-soc: here is the branch that resolves it:
->>>
->>> https://github.com/at91linux/linux-at91/commits/at91-3.16-resolved
->>
->> That resolution looks odd. Why is one clock under clocks { } and two of them
->> are at the top level? Shouldn't they all be under the clocks subnode?
->>
->> I've merged in now with your resolution, but I think this needs revisiting.
+Hi Olof, Kevin and Arnd,
 
-With information from Alexandre, I have the feeling that we should
-remove the "clocks" container altogether. I propose to clean completely
-this part in 3.17 as it will not change the system but only its
-representation in DT...
-Still, we will fix the ugliest parts like this one:
-http://code.bulix.org/by22lb-86239
+Please consider these STi DT updates for v3.16.
 
-> Oh, and also: The branch was named cleanup, but it really contains mostly new
-> driver and new contents, so I merged it under next/soc instead. In the future,
-> for releases when you have more contents, please split it up a bit more (dt
-> updates separately, driver updates separately) if it can be done without too
-> much hassle. For now it's not a huge deal to do it this way though.
+This is now based on v3.15-rc1.
 
-Yes. The issue with these series that switch from one description to
-another is that if we split the driver and dt parts it would add extra
-steps which are not very easy to keep in sync, implement and are kind of
-useless.
+Note that two reset patches are part of this pull request, in order to avoid
+compilation breakage.
+Adding these two patches in this pull request has been accepted by Philipp Zabel.
 
-I have more series to come for 3.16 that I named "cleanup" as well. I
-will double check to see if I can split them up more...
 
-Thanks, bye,
--- 
-Nicolas Ferre
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+
+are available in the git repository at:
+
+  git://git.stlinux.com/devel/kernel/linux-sti.git tags/sti-dt-for-v3.16
+
+for you to fetch changes up to c3037f761ff57b8a85cd41bbe995af78af064e33:
+
+  ARM: STi: DT: STiH41x Add clk_ignore_unused to bootargs (2014-05-17 10:19:09 +0200)
+
+----------------------------------------------------------------
+Device tree changes for STi platforms
+
+----------------------------------------------------------------
+Gabriel FERNANDEZ (15):
+      driver: reset: sti: add keyscan for stih415
+      driver: reset: sti: add keyscan for stih416
+      ARM: STi: DT: add keyscan for stih415
+      ARM: STi: DT: add keyscan for stih416
+      ARM: STi: DT: add keyscan for stih41x-b2000
+      ARM: STi: DT: STiH416: 416 DT Entry for clockgen A0/1/10/11/12
+      ARM: STi: DT: STiH416: Remove unused CLK_S_ICN_REG_0 fixed clock
+      ARM: STi: DT: STiH416: Remove unused CLK_S_GMAC0_PHY & CLK_S_ETH1_PHY fixed clocks
+      ARM: STi: DT: STiH416: 416 DT Entry for clockgen B/C/D/E/F
+      ARM: STi: DT: STiH416: 416 DT Entry for clockgen A9/DDR/GPU
+      ARM: STi: DT: STiH415: 415 DT Entry for clockgen A0/1/10/11/12
+      ARM: STi: DT: STiH415: Remove unused CLK_S_ICN_REG_0 fixed clock
+      ARM: STi: DT: STiH415: Remove unused CLK_S_GMAC0_PHY & CLK_S_ETH1_PHY fixed clocks
+      ARM: STi: DT: STiH415: 415 DT Entry for clockgen A9
+      ARM: STi: DT: STiH41x Add clk_ignore_unused to bootargs
+
+Maxime Coquelin (2):
+      ARM: dts: Add STiH407 SoC support
+      ARM: dts: STiH407: Add B2120 board support
+
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/stih407-b2120.dts                |  78 +++
+ arch/arm/boot/dts/stih407-clock.dtsi               |  40 ++
+ arch/arm/boot/dts/stih407-pinctrl.dtsi             | 615 +++++++++++++++++
+ arch/arm/boot/dts/stih407.dtsi                     | 263 ++++++++
+ arch/arm/boot/dts/stih415-clock.dtsi               | 517 ++++++++++++++-
+ arch/arm/boot/dts/stih415-pinctrl.dtsi             |  16 +
+ arch/arm/boot/dts/stih415.dtsi                     |  22 +-
+ arch/arm/boot/dts/stih416-clock.dtsi               | 732 ++++++++++++++++++++-
+ arch/arm/boot/dts/stih416-pinctrl.dtsi             |  16 +
+ arch/arm/boot/dts/stih416.dtsi                     |  22 +-
+ arch/arm/boot/dts/stih41x-b2000.dtsi               |  25 +-
+ arch/arm/boot/dts/stih41x-b2020.dtsi               |   2 +-
+ drivers/reset/sti/reset-stih415.c                  |   1 +
+ drivers/reset/sti/reset-stih416.c                  |   1 +
+ include/dt-bindings/clock/stih415-clks.h           |  15 +
+ include/dt-bindings/clock/stih416-clks.h           |  15 +
+ .../dt-bindings/reset-controller/stih415-resets.h  |   1 +
+ .../dt-bindings/reset-controller/stih416-resets.h  |   1 +
+ 19 files changed, 2339 insertions(+), 46 deletions(-)
+ create mode 100644 arch/arm/boot/dts/stih407-b2120.dts
+ create mode 100644 arch/arm/boot/dts/stih407-clock.dtsi
+ create mode 100644 arch/arm/boot/dts/stih407-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/stih407.dtsi
+ create mode 100644 include/dt-bindings/clock/stih415-clks.h
+ create mode 100644 include/dt-bindings/clock/stih416-clks.h
