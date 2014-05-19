@@ -1,63 +1,25 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 20 May 2014 01:33 +0200
-Subject: [PATCH v3] cpufreq: exynos:  Fix the compile error
-In-Reply-To: <2553916.Pl2B0tVZGR@vostro.rjw.lan>
-References: <000001cf70f0$2e48f930$8adaeb90$@samsung.com>
- <037e01cf70f5$25b374d0$711a5e70$@samsung.com>
- <2553916.Pl2B0tVZGR@vostro.rjw.lan>
-Message-ID: <1655043.7FHqnunz6p@vostro.rjw.lan>
+Date: Tue, 20 May 2014 01:36:56 +0200
+Subject: [PATCH 3/3] cpufreq: Enable big.LITTLE cpufreq driver on arm64
+In-Reply-To: <20140519230729.GD30457@sirena.org.uk>
+References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
+ <2437793.vfcRUkFCet@vostro.rjw.lan> <20140519230729.GD30457@sirena.org.uk>
+Message-ID: <3610030.uyJEv7eFhP@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, May 17, 2014 01:04:29 AM Rafael J. Wysocki wrote:
-> On Friday, May 16, 2014 07:54:01 PM Kukjin Kim wrote:
-> > Jonghwan Choi wrote:
-> > > 
-> > > Commit 7da83a80 ("ARM: EXYNOS: Migrate Exynos specific macros from plat to
-> > > mach") which lands in samsung tree causes build breakage
-> > > for cpufreq-exynos like following:
-> > > 
-> > > drivers/cpufreq/exynos-cpufreq.c: In function 'exynos_cpufreq_probe':
-> > > drivers/cpufreq/exynos-cpufreq.c:166:2: error: implicit declaration of
-> > > function 'soc_is_exynos4210'
-> > > [-Werror=implicit-function-declaration]
-> > > drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration of
-> > > function 'soc_is_exynos4212'
-> > > [-Werror=implicit-function-declaration]
-> > > drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration of
-> > > function 'soc_is_exynos4412'
-> > > [-Werror=implicit-function-declaration]
-> > > drivers/cpufreq/exynos-cpufreq.c:170:2: error: implicit declaration of
-> > > function 'soc_is_exynos5250'
-> > > [-Werror=implicit-function-declaration]
-> > > cc1: some warnings being treated as errors
-> > > make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
-> > > make[2]: *** Waiting for unfinished jobs....
-> > > drivers/cpufreq/exynos4x12-cpufreq.c: In function 'exynos4x12_set_clkdiv':
-> > > drivers/cpufreq/exynos4x12-cpufreq.c:118:2: error: implicit declaration of
-> > > function 'soc_is_exynos4212'
-> > > [-Werror=implicit-function-declaration]
-> > > cc1: some warnings being treated as errors
-> > > make[2]: *** [drivers/cpufreq/exynos4x12-cpufreq.o] Error 1
-> > > make[1]: *** [drivers/cpufreq] Error 2
-> > > This fixes above error with getting SoC information via
-> > > of_machine_is_compatible() instead of soc_is_exynosXXXX().
-> > > 
-> > 
-> > Probably,
-> > Suggested-by: Tomasz Figa ?
-> > 
-> > > Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
-> > 
-> > Looks better.
-> > 
-> > Rafael, if you have no objection on this, shall I pick this into samsung
-> > tree for 3.16 because of the current build breakage with enabling exynos
-> > cpufreq?
+On Tuesday, May 20, 2014 12:07:29 AM Mark Brown wrote:
 > 
-> Please go ahead.
+> --MAH+hnPXVZWQ5cD/
+> Content-Type: text/plain; charset=us-ascii
+> Content-Disposition: inline
+> 
+> On Tue, May 20, 2014 at 01:19:03AM +0200, Rafael J. Wysocki wrote:
+> 
+> > I've queued this one up for 3.16, thanks!
+> 
+> This will fail to build without patch 1 - it uses the stubs added there.
 
-Actually, this conflicts with one patch already in my tree.  The resoultion
-is quite obvious, but it would be better to avoid this conflict altogether.
+OK, dropping then.
 
 Rafael
