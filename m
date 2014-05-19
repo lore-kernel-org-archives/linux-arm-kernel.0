@@ -1,58 +1,48 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 20 May 2014 01:19:03 +0200
-Subject: [PATCH 3/3] cpufreq: Enable big.LITTLE cpufreq driver on arm64
-In-Reply-To: <CAKohpo=4c=eDOMxxFi37mLA7LViJ-P_Rb42Yt5ARa_qgiGU8eg@mail.gmail.com>
-References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
- <1399653631-4938-3-git-send-email-broonie@kernel.org>
- <CAKohpo=4c=eDOMxxFi37mLA7LViJ-P_Rb42Yt5ARa_qgiGU8eg@mail.gmail.com>
-Message-ID: <2437793.vfcRUkFCet@vostro.rjw.lan>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 19 May 2014 18:06:02 -0500
+Subject: [Ksummit-discuss] [TECH TOPIC] ARM legacy board DT conversion
+ finalization
+In-Reply-To: <4931877.zNfKfvcgox@wuerfel>
+References: <20140511030009.GO12708@titan.lakedaemon.net>
+ <20140516184205.GL27822@titan.lakedaemon.net>
+ <1400278842.2647.62.camel@deadeye.wl.decadent.org.uk>
+ <4931877.zNfKfvcgox@wuerfel>
+Message-ID: <CAL_Jsq+kOu82okhJn0_ftwemE_m4nsTRawrF-fWAU2XTJ9xRcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, May 12, 2014 09:46:01 AM Viresh Kumar wrote:
-> On 9 May 2014 22:10, Mark Brown <broonie@kernel.org> wrote:
-> > From: Mark Brown <broonie@linaro.org>
-> >
-> > There are arm64 big.LITTLE systems so enable the big.LITTLE cpufreq driver.
-> > While IKS is not available for these systems the driver is still useful
-> > since it manages clusters with shared frequencies which is the common case
-> > for these systems.
-> >
-> > Long term combining the cpufreq-cpu0 and big.LITTLE drivers may be a
-> > more sensible option but that is substantially more complex especially
-> > in the case of IKS.
-> 
-> Yeah, it was left separately for IKS specially :(
-> 
-> > Signed-off-by: Mark Brown <broonie@linaro.org>
-> > ---
-> >  drivers/cpufreq/Kconfig.arm | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> > index 6e05a1e18e52..6a7dd3e958d5 100644
-> > --- a/drivers/cpufreq/Kconfig.arm
-> > +++ b/drivers/cpufreq/Kconfig.arm
-> > @@ -5,7 +5,8 @@
-> >  # big LITTLE core layer and glue drivers
-> >  config ARM_BIG_LITTLE_CPUFREQ
-> >         tristate "Generic ARM big LITTLE CPUfreq driver"
-> > -       depends on ARM && BIG_LITTLE && ARM_CPU_TOPOLOGY && HAVE_CLK
-> > +       depends on (BIG_LITTLE && ARM_CPU_TOPOLOGY) || (ARM64 && SMP)
-> > +       depends on HAVE_CLK
-> >         select PM_OPP
-> >         help
-> >           This enables the Generic CPUfreq driver for ARM big.LITTLE platforms.
-> 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+On Mon, May 19, 2014 at 7:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 16 May 2014 23:20:42 Ben Hutchings wrote:
+>> On Fri, 2014-05-16 at 14:42 -0400, Jason Cooper wrote:
+>> > On Fri, May 16, 2014 at 07:31:51PM +0100, Ben Hutchings wrote:
+>> > > Our 'legacy' (which I take to mean pre-v7) configurations are now
+>> > > kirkwood, mv78xx0, orion5x (all about to converge to mvebu) and
+>> > > versatile.
+>> >
+>> > I'm not familiar with versatile, the others I've seen a few times.
+>>
+>> Versatile is one of ARM's own development boards, but more importantly
+>> it's something QEMU can emulate.
+>
+> We should really have this in multiplatform soon, I think the last issue
+> for versatile is common clock support, but Linus Walleij may have more
+> details about what remains here.
 
-I've queued this one up for 3.16, thanks!
+While not necessarily the same thing, but does move versatile in the
+right direction, I've got patches in progress which fully move
+versatile over to DT. The main issues there are:
 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+common clock
+irq cntlr init from DT
+Move PCI to DT and platform driver
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+I'd like to do this all in one step to avoid doing things like non-DT
+common clock init. It's blocked on the common DT PCI code and my free
+time.
+
+There are then a few bits related to mach/plat headers needed move
+versatile to multiplatform. I think these issues are mostly the same
+changes that have been done or are needed on integrator which is what
+Linus has been working on.
+
+Rob
