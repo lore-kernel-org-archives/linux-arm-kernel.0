@@ -1,129 +1,95 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 19 May 2014 18:43:23 +0200
-Subject: [PATCH v2 02/10] clk: berlin: add binding include for Berlin SoC
- clock ids
-In-Reply-To: <1400517811-24668-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1400517811-24668-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1400517811-24668-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Mon, 19 May 2014 18:43:21 +0200
+Subject: [PATCH v2 00/10] Marvell Berlin full clock support
+Message-ID: <1400517811-24668-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a dt-binding include for Marvell Berlin BG2/BG2CD and BG2Q
-core clock IDs.
+Mike,
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+this is v2 of the Berlin SoC clock driver [1] but with a reworked DT
+binding as requested [2]. We decided to not even try to split up the chip
+control registers that deal with pinmux, padmux, clock, reset, and evil
+stuff we haven't even looked at. Instead we keep a single node that clock
+driver will remap early, while proper platform_drivers use a regmap
+instead. Although clock and other drivers share the same register range,
+they use individual registers exclusively.
+
+There are some functional fixes in the single clock drivers, I noticed
+while retesting each individial driver. There will be more to fixup but
+without any drivers actually using the clocks, it is hard to tell what
+isn't working now.
+
+Anyway, the current binding should match what you requested and having
+a clock driver for v3.16 will really be a huge benefit for us to work
+on more driver support.
+
+If you are fine with it, please take patches 2-7 and I'll pick up
+1,8-10 in berlin branch.
+
+Sebastian
+
+[1] https://lkml.kernel.org/r/1399839881-29895-1-git-send-email-sebastian.hesselbarth at gmail.com
+[2] https://lkml.kernel.org/r/20140515044106.19795.57249 at quantum
+
+Alexandre Belloni (4):
+  clk: berlin: add driver for BG2x simple PLLs
+  clk: berlin: add driver for BG2x complex divider cells
+  clk: berlin: add core clock driver for BG2Q
+  ARM: dts: berlin: convert BG2Q to DT clock nodes
+
+Sebastian Hesselbarth (6):
+  dt-binding: ARM: add clock binding docs for Marvell Berlin2 SoCs
+  clk: berlin: add binding include for Berlin SoC clock ids
+  clk: berlin: add driver for BG2x audio/video PLL
+  clk: berlin: add core clock driver for BG2/BG2CD
+  ARM: dts: berlin: convert BG2CD to DT clock nodes
+  ARM: dts: berlin: convert BG2 to DT clock nodes
+
+ .../devicetree/bindings/arm/marvell,berlin.txt     |  47 ++
+ arch/arm/boot/dts/berlin2.dtsi                     |  56 +-
+ arch/arm/boot/dts/berlin2cd.dtsi                   |  53 +-
+ arch/arm/boot/dts/berlin2q.dtsi                    |  54 +-
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/berlin/Makefile                        |   4 +
+ drivers/clk/berlin/berlin2-avpll.c                 | 393 ++++++++++++
+ drivers/clk/berlin/berlin2-avpll.h                 |  36 ++
+ drivers/clk/berlin/berlin2-div.c                   | 265 ++++++++
+ drivers/clk/berlin/berlin2-div.h                   |  89 +++
+ drivers/clk/berlin/berlin2-pll.c                   | 117 ++++
+ drivers/clk/berlin/berlin2-pll.h                   |  37 ++
+ drivers/clk/berlin/bg2.c                           | 691 +++++++++++++++++++++
+ drivers/clk/berlin/bg2q.c                          | 389 ++++++++++++
+ drivers/clk/berlin/common.h                        |  29 +
+ include/dt-bindings/clock/berlin2.h                |  45 ++
+ include/dt-bindings/clock/berlin2q.h               |  31 +
+ 17 files changed, 2240 insertions(+), 97 deletions(-)
+ create mode 100644 drivers/clk/berlin/Makefile
+ create mode 100644 drivers/clk/berlin/berlin2-avpll.c
+ create mode 100644 drivers/clk/berlin/berlin2-avpll.h
+ create mode 100644 drivers/clk/berlin/berlin2-div.c
+ create mode 100644 drivers/clk/berlin/berlin2-div.h
+ create mode 100644 drivers/clk/berlin/berlin2-pll.c
+ create mode 100644 drivers/clk/berlin/berlin2-pll.h
+ create mode 100644 drivers/clk/berlin/bg2.c
+ create mode 100644 drivers/clk/berlin/bg2q.c
+ create mode 100644 drivers/clk/berlin/common.h
+ create mode 100644 include/dt-bindings/clock/berlin2.h
+ create mode 100644 include/dt-bindings/clock/berlin2q.h
+
 ---
-Changelog:
-v1->v2:
-- separate patch to allow to use it in the driver (Suggested by Alexandre
-  Belloni)
-
 Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
 Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Randy Dunlap <rdunlap@infradead.org>
 Cc: Mike Turquette <mturquette@linaro.org>
 Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Cc: Jisheng Zhang <jszhang@marvell.com>
 Cc: devicetree at vger.kernel.org
+Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
----
- include/dt-bindings/clock/berlin2.h  | 45 ++++++++++++++++++++++++++++++++++++
- include/dt-bindings/clock/berlin2q.h | 31 +++++++++++++++++++++++++
- 2 files changed, 76 insertions(+)
- create mode 100644 include/dt-bindings/clock/berlin2.h
- create mode 100644 include/dt-bindings/clock/berlin2q.h
-
-diff --git a/include/dt-bindings/clock/berlin2.h b/include/dt-bindings/clock/berlin2.h
-new file mode 100644
-index 000000000000..0c30800175df
---- /dev/null
-+++ b/include/dt-bindings/clock/berlin2.h
-@@ -0,0 +1,45 @@
-+/*
-+ * Berlin2 BG2/BG2CD clock tree IDs
-+ */
-+
-+#define CLKID_SYS		0
-+#define CLKID_CPU		1
-+#define CLKID_DRMFIGO		2
-+#define CLKID_CFG		3
-+#define CLKID_GFX		4
-+#define CLKID_ZSP		5
-+#define CLKID_PERIF		6
-+#define CLKID_PCUBE		7
-+#define CLKID_VSCOPE		8
-+#define CLKID_NFC_ECC		9
-+#define CLKID_VPP		10
-+#define CLKID_APP		11
-+#define CLKID_AUDIO0		12
-+#define CLKID_AUDIO2		13
-+#define CLKID_AUDIO3		14
-+#define CLKID_AUDIO1		15
-+#define CLKID_GFX3D_CORE	16
-+#define CLKID_GFX3D_SYS		17
-+#define CLKID_ARC		18
-+#define CLKID_VIP		19
-+#define CLKID_SDIO0XIN		20
-+#define CLKID_SDIO1XIN		21
-+#define CLKID_GFX3D_EXTRA	22
-+#define CLKID_GC360		23
-+#define CLKID_SDIO_DLLMST	24
-+#define CLKID_GETH0		25
-+#define CLKID_GETH1		26
-+#define CLKID_SATA		27
-+#define CLKID_AHBAPB		28
-+#define CLKID_USB0		29
-+#define CLKID_USB1		30
-+#define CLKID_PBRIDGE		31
-+#define CLKID_SDIO0		32
-+#define CLKID_SDIO1		33
-+#define CLKID_NFC		34
-+#define CLKID_SMEMC		35
-+#define CLKID_AUDIOHD		36
-+#define CLKID_VIDEO0		37
-+#define CLKID_VIDEO1		38
-+#define CLKID_VIDEO2		39
-+#define CLKID_TWD		40
-diff --git a/include/dt-bindings/clock/berlin2q.h b/include/dt-bindings/clock/berlin2q.h
-new file mode 100644
-index 000000000000..287fc3b4afb2
---- /dev/null
-+++ b/include/dt-bindings/clock/berlin2q.h
-@@ -0,0 +1,31 @@
-+/*
-+ * Berlin2 BG2Q clock tree IDs
-+ */
-+
-+#define CLKID_SYS		0
-+#define CLKID_DRMFIGO		1
-+#define CLKID_CFG		2
-+#define CLKID_GFX2D		3
-+#define CLKID_ZSP		4
-+#define CLKID_PERIF		5
-+#define CLKID_PCUBE		6
-+#define CLKID_VSCOPE		7
-+#define CLKID_NFC_ECC		8
-+#define CLKID_VPP		9
-+#define CLKID_APP		10
-+#define CLKID_SDIO0XIN		11
-+#define CLKID_SDIO1XIN		12
-+#define CLKID_GFX2DAXI		13
-+#define CLKID_GETH0		14
-+#define CLKID_SATA		15
-+#define CLKID_AHBAPB		16
-+#define CLKID_USB0		17
-+#define CLKID_USB1		18
-+#define CLKID_USB2		19
-+#define CLKID_USB3		20
-+#define CLKID_PBRIDGE		21
-+#define CLKID_SDIO		22
-+#define CLKID_NFC		23
-+#define CLKID_SMEMC		24
-+#define CLKID_PCIE		25
-+#define CLKID_TWD		26
 -- 
 1.9.1
