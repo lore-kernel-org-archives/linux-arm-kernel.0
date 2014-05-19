@@ -1,95 +1,176 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 19 May 2014 18:43:21 +0200
-Subject: [PATCH v2 00/10] Marvell Berlin full clock support
-Message-ID: <1400517811-24668-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 19 May 2014 09:41:32 -0700
+Subject: [RFC PATCH 2/5] clk: Introduce 'clk_round_rate_nearest()'
+In-Reply-To: <20140519161949.GG16662@pengutronix.de>
+References: <1400106655-22465-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1400106655-22465-3-git-send-email-soren.brinkmann@xilinx.com>
+ <20140515073816.GI16662@pengutronix.de>
+ <91822600-39d0-4e71-b0f5-9eda35b76ec0@BN1AFFO11FD016.protection.gbl>
+ <20140519161949.GG16662@pengutronix.de>
+Message-ID: <db8633e5-01a9-4d3a-80e8-74e23a456d52@BN1BFFO11FD051.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
+On Mon, 2014-05-19 at 06:19PM +0200, Uwe Kleine-K?nig wrote:
+> Hi S?ren,
+> 
+> On Sun, May 18, 2014 at 05:51:05PM -0700, S?ren Brinkmann wrote:
+> > ------------------8<-----------------8<---------------------8<-------------8<---
+> > From: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > Date: Tue, 2 Apr 2013 10:08:13 -0700
+> > Subject: [PATCH] clk: Introduce 'clk_round_rate_nearest()'
+> > 
+> > Introduce a new API function to round a rate to the closest possible
+> > rate the HW clock can generate.
+> > In contrast to 'clk_round_rate()' which works similar, but always returns
+> > a frequency <= its input rate.
+> > 
+> > Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > ---
+> >  drivers/clk/clk.c   | 43 +++++++++++++++++++++++++++++++++++++++++--
+> >  include/linux/clk.h | 14 ++++++++++++--
+> >  2 files changed, 53 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index dff0373f53c1..faf24d0569df 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -1011,8 +1011,9 @@ unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
+> >   * @rate: the rate which is to be rounded
+> >   *
+> >   * Takes in a rate as input and rounds it to a rate that the clk can actually
+> > - * use which is then returned.  If clk doesn't support round_rate operation
+> > - * then the parent rate is returned.
+> > + * use and does not exceed the requested frequency, which is then returned.
+> > + * If clk doesn't support round_rate operation then the parent rate
+> > + * is returned.
+> >   */
+> >  long clk_round_rate(struct clk *clk, unsigned long rate)
+> >  {
+> > @@ -1027,6 +1028,44 @@ long clk_round_rate(struct clk *clk, unsigned long rate)
+> >  EXPORT_SYMBOL_GPL(clk_round_rate);
+> >  
+> >  /**
+> > + * clk_round_rate_nearest - round the given rate for a clk
+> > + * @clk: the clk for which we are rounding a rate
+> > + * @rate: the rate which is to be rounded
+> > + *
+> > + * Takes in a rate as input and rounds it to the closest rate that the clk
+> > + * can actually use which is then returned. If clk doesn't support
+> > + * round_rate operation then the parent rate is returned.
+> > + */
+> > +long clk_round_rate_nearest(struct clk *clk, unsigned long rate)
+> Why does this function doesn't return an unsigned long when it never
+> returns a negative value? Ditto for clk_round_rate?
 
-this is v2 of the Berlin SoC clock driver [1] but with a reworked DT
-binding as requested [2]. We decided to not even try to split up the chip
-control registers that deal with pinmux, padmux, clock, reset, and evil
-stuff we haven't even looked at. Instead we keep a single node that clock
-driver will remap early, while proper platform_drivers use a regmap
-instead. Although clock and other drivers share the same register range,
-they use individual registers exclusively.
+I matched the definition of clk_round_rate(). But you're probably right,
+it may be the right thing to change clk_round_rate to return an
+unsigned, but with that being exposed API it would be a risky change.
 
-There are some functional fixes in the single clock drivers, I noticed
-while retesting each individial driver. There will be more to fixup but
-without any drivers actually using the clocks, it is hard to tell what
-isn't working now.
+> 
+> > +{
+> > +	unsigned long lower, upper, cur, lower_last, upper_last;
+> > +
+> > +	lower = clk_round_rate(clk, rate);
+> > +	if (lower >= rate)
+> > +		return lower;
+> Is the >-case worth a warning?
 
-Anyway, the current binding should match what you requested and having
-a clock driver for v3.16 will really be a huge benefit for us to work
-on more driver support.
+No, it's correct behavior. If you request a rate that is way lower than what the
+clock can generate, returning something larger is perfectly valid, IMHO.
+Which reveals one problem in this whole discussion. The API does not
+require clk_round_rate() to round down. It is actually an implementation
+choice that had been made for clk-divider.
 
-If you are fine with it, please take patches 2-7 and I'll pick up
-1,8-10 in berlin branch.
+> 
+> > +
+> > +	upper = clk_round_rate(clk, rate + rate - lower);
+> This was parenthesized in my original patch on purpose. If rate is big
+> 
+> 	rate + rate - lower
+> 
+> might overflow when
+> 
+> 	rate + (rate - lower)
+> 
+> doesn't. Thinking again, there is no real problem, because this is
+> unsigned arithmetic. To be save we still need to check if rate + (rate -
+> lower) overflows.
 
-Sebastian
+Good point. I'll add the parentheses.
 
-[1] https://lkml.kernel.org/r/1399839881-29895-1-git-send-email-sebastian.hesselbarth at gmail.com
-[2] https://lkml.kernel.org/r/20140515044106.19795.57249 at quantum
+> 
+> > +	if (upper == lower)
+> if (upper <= rate) is the better check here. (= would be a bug.)
 
-Alexandre Belloni (4):
-  clk: berlin: add driver for BG2x simple PLLs
-  clk: berlin: add driver for BG2x complex divider cells
-  clk: berlin: add core clock driver for BG2Q
-  ARM: dts: berlin: convert BG2Q to DT clock nodes
+I don't understand. Passing rate + x to round rate can never return
+something below 'lower'. Only something in the range [lower,lower+x].
+So, if upper == lower we found our closest frequency and return it.
+Otherwise we have to iterate over [lower+1,upper]. Or what did I miss?
 
-Sebastian Hesselbarth (6):
-  dt-binding: ARM: add clock binding docs for Marvell Berlin2 SoCs
-  clk: berlin: add binding include for Berlin SoC clock ids
-  clk: berlin: add driver for BG2x audio/video PLL
-  clk: berlin: add core clock driver for BG2/BG2CD
-  ARM: dts: berlin: convert BG2CD to DT clock nodes
-  ARM: dts: berlin: convert BG2 to DT clock nodes
+> 
+> > +		return upper;
+> > +
+> > +	lower = rate + 1;
+> ok, so your loop invariant is that the best freq is in [lower; upper].
 
- .../devicetree/bindings/arm/marvell,berlin.txt     |  47 ++
- arch/arm/boot/dts/berlin2.dtsi                     |  56 +-
- arch/arm/boot/dts/berlin2cd.dtsi                   |  53 +-
- arch/arm/boot/dts/berlin2q.dtsi                    |  54 +-
- drivers/clk/Makefile                               |   1 +
- drivers/clk/berlin/Makefile                        |   4 +
- drivers/clk/berlin/berlin2-avpll.c                 | 393 ++++++++++++
- drivers/clk/berlin/berlin2-avpll.h                 |  36 ++
- drivers/clk/berlin/berlin2-div.c                   | 265 ++++++++
- drivers/clk/berlin/berlin2-div.h                   |  89 +++
- drivers/clk/berlin/berlin2-pll.c                   | 117 ++++
- drivers/clk/berlin/berlin2-pll.h                   |  37 ++
- drivers/clk/berlin/bg2.c                           | 691 +++++++++++++++++++++
- drivers/clk/berlin/bg2q.c                          | 389 ++++++++++++
- drivers/clk/berlin/common.h                        |  29 +
- include/dt-bindings/clock/berlin2.h                |  45 ++
- include/dt-bindings/clock/berlin2q.h               |  31 +
- 17 files changed, 2240 insertions(+), 97 deletions(-)
- create mode 100644 drivers/clk/berlin/Makefile
- create mode 100644 drivers/clk/berlin/berlin2-avpll.c
- create mode 100644 drivers/clk/berlin/berlin2-avpll.h
- create mode 100644 drivers/clk/berlin/berlin2-div.c
- create mode 100644 drivers/clk/berlin/berlin2-div.h
- create mode 100644 drivers/clk/berlin/berlin2-pll.c
- create mode 100644 drivers/clk/berlin/berlin2-pll.h
- create mode 100644 drivers/clk/berlin/bg2.c
- create mode 100644 drivers/clk/berlin/bg2q.c
- create mode 100644 drivers/clk/berlin/common.h
- create mode 100644 include/dt-bindings/clock/berlin2.h
- create mode 100644 include/dt-bindings/clock/berlin2q.h
+right.
 
----
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Randy Dunlap <rdunlap@infradead.org>
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Jisheng Zhang <jszhang@marvell.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-doc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
--- 
-1.9.1
+> 
+> > +	do {
+> > +		upper_last = upper;
+> > +		lower_last = lower;
+> > +
+> > +		cur = clk_round_rate(clk, lower + ((upper - lower) >> 1));
+> > +		if (cur < lower)
+> > +			lower += (upper - lower) >> 1;
+> You already know that lower + ((upper - lower) >> 1) is too small, so
+> you can better do
+> 
+> 	lower += ((upper - lower) >> 1) + 1;
+
+right. I'll add the '+1'
+
+> 
+> > +		else
+> > +			upper = cur;
+> > +
+> > +	} while (lower_last != lower && upper_last != upper);
+> > +
+> > +	return upper;
+> > +}
+> > +EXPORT_SYMBOL_GPL(clk_round_rate_nearest);
+> I think the function still has potential for optimisation, what about:
+
+At first glance, I don't see many differences except for the comments
+you made above. I'll have a closer look though.
+
+> 
+> unsigned long clk_round_rate_nearest(struct clk *clk, unsigned long rate)
+> {
+> 	unsigned long lower, upper, rounded;
+> 
+> 	rounded = clk_round_rate(clk, rate);
+> 
+> 	if (rounded >= rate)
+> 		return rounded;
+> 
+> 	/*
+> 	 * rounded is the best approximation for rate that is not
+> 	 * bigger than rate. If there is a better one, it must be in the
+> 	 * interval (rate; rate + (rate - rounded)).
+> 	 * Note that the upper limit isn't better than rate itself, so
+> 	 * that one doesn't need to be considered.
+> 	 */
+> 	 
+> 	upper = rate + (rate - rounded) - 1;
+> 	if (upper < rate)
+> 		upper = ULONG_MAX; 
+
+Aren't we done here? Your search for an upper boundary resulted in
+'lower'. Hence there is no valid frequency closer to 'rate' than 'lower'. Why do
+you extend to ULONG_MAX?
+
+	Thanks,
+	S?ren
