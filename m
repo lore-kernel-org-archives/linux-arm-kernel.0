@@ -1,50 +1,51 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Mon, 19 May 2014 11:10:36 +0530
-Subject: [PATCH v6 0/6] add cpuidle support for Exynos5420
-In-Reply-To: <1400227438-27155-1-git-send-email-chander.kashyap@linaro.org>
-References: <CANuQgHGSA+R__raSa_tzrgpceqLD2SZw+s0XQUHGF4wscgh6Kg@mail.gmail.com>
- <1400227438-27155-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <CANuQgHH1_O-8XHhRREdu5WjOwz1oeASdVf7TQFdGxjr0WDSvhQ@mail.gmail.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Mon, 19 May 2014 07:39:47 +0200
+Subject: [PATCH] Fix for possible null pointer dereference in dma.c
+In-Reply-To: <1400191076-28279-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+References: <1400191076-28279-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+Message-ID: <20140519073947.66bb2c46@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel/Kgene,
+Hi,
 
-On 16 May 2014 13:33, Chander Kashyap <chander.kashyap@linaro.org> wrote:
-> Exynos5420 is a big-little Soc from Samsung. It has 4 A15 and 4 A7 cores.
+Rickard Strandqvist wrote:
+> There is otherwise a risk of a possible null pointer dereference.
+> 
+> Was largely found by using a static code analysis program called cppcheck.
+> 
+> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
+> ---
+>  sound/soc/samsung/dma.c |   10 ++++++----
+>  1 fil ?ndrad, 6 till?gg(+), 4 borttagningar(-)
+> 
+> diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
+> index dc09b71..b1f6757 100644
+> --- a/sound/soc/samsung/dma.c
+> +++ b/sound/soc/samsung/dma.c
+> @@ -115,17 +115,19 @@ static void dma_enqueue(struct snd_pcm_substream *substream)
+>  static void audio_buffdone(void *data)
+>  {
+>  	struct snd_pcm_substream *substream = data;
+> -	struct runtime_data *prtd = substream->runtime->private_data;
+> +	struct runtime_data *prtd = NULL;
+>  
+>  	pr_debug("Entered %s\n", __func__);
+>  
+> -	if (prtd->state & ST_RUNNING) {
+> +	if(substream)
 >
-> This patchset adds cpuidle support for Exynos5420 SoC based on
-> generic big.little cpuidle driver.
->
-> Tested on SMDK5420.
->
-> This patch set depends on:
->         1. [PATCH 0/5] MCPM backend for Exynos5420
->            http://www.spinics.net/lists/arm-kernel/msg331100.html
-> Changelog is in respective patches.
-> Chander Kashyap (5):
->   driver: cpuidle-big-little: add of_device_id structure
->   arm: exynos: add generic function to calculate cpu number
->   cpuidle: config: Add ARCH_EXYNOS entry to select cpuidle-big-little
->     driver
->   driver: cpuidle: cpuidle-big-little: init driver for Exynos5420
->   exynos: cpuidle: do not allow cpuidle registration for Exynos5420
->   mcpm: exynos: populate suspend and powered_up callbacks
->
->  arch/arm/mach-exynos/exynos.c        |    4 +++-
->  arch/arm/mach-exynos/mcpm-exynos.c   |   36 ++++++++++++++++++++++++++++++++++
->  arch/arm/mach-exynos/regs-pmu.h      |    9 +++++++++
->  drivers/cpuidle/Kconfig.arm          |    2 +-
->  drivers/cpuidle/cpuidle-big_little.c |   12 +++++++++++-
->  5 files changed, 60 insertions(+), 3 deletions(-)
->
-> --
-> 1.7.9.5
->
+Missing space.
 
-As dependency patches are merged. If their are no further comment, can
-these patches be taken?
 
+Lothar Wa?mann
 -- 
-with warm regards,
-Chander Kashyap
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
