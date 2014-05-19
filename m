@@ -1,93 +1,126 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 19 May 2014 11:25:42 +0200
-Subject: [PATCH] ARM: imx6: Fix procedure to switch the parent of
- LDB_DI_CLK
-In-Reply-To: <1397044538-12676-1-git-send-email-festevam@gmail.com>
-References: <1397044538-12676-1-git-send-email-festevam@gmail.com>
-Message-ID: <20140519112542.5588c492@ipc1.ka-ro>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 19 May 2014 14:54:34 +0530
+Subject: [PATCH 01/11] ARM: AM43xx: hwmod: add DSS hwmod data
+In-Reply-To: <1399636579-8062-2-git-send-email-tomi.valkeinen@ti.com>
+References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
+ <1399636579-8062-2-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <5379CDD2.6080807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Friday 09 May 2014 05:26 PM, Tomi Valkeinen wrote:
+> From: Sathya Prakash M R <sathyap@ti.com>
 > 
-> Due to incorrect placement of the clock gate cell in the ldb_di[x]_clk tree,
-> the glitchy parent mux of ldb_di[x]_clk can cause a glitch to enter the
-> ldb_di_ipu_div divider. If the divider gets locked up, no ldb_di[x]_clk is
-> generated, and the LVDS display will hang when the ipu_di_clk is sourced from
-> ldb_di_clk.
+> Add DSS hwmod data for AM43xx.
 > 
-> To fix the problem, both the new and current parent of the ldb_di_clk should
-> be disabled before the switch. This patch ensures that correct steps are
-> followed when ldb_di_clk parent is switched in the beginning of boot.
-> 
-> Signed-off-by: Ranjani Vaidyanathan <Ranjani.Vaidyanathan@freescale.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 > ---
->  arch/arm/mach-imx/clk-imx6q.c | 125 ++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 121 insertions(+), 4 deletions(-)
+>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 104 +++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/prcm43xx.h             |   1 +
+>  2 files changed, 105 insertions(+)
 > 
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> index 20ad0d1..3ee45f4 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -140,6 +140,123 @@ static struct clk_div_table video_div_table[] = {
->  	{ /* sentinel */ }
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> index 5c2cc8083fdd..8c14db2e1e47 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> @@ -19,6 +19,8 @@
+>  #include "omap_hwmod.h"
+>  #include "omap_hwmod_33xx_43xx_common_data.h"
+>  #include "prcm43xx.h"
+> +#include "omap_hwmod_common_data.h"
+> +
+>  
+>  /* IP blocks */
+>  static struct omap_hwmod am43xx_l4_hs_hwmod = {
+> @@ -415,6 +417,76 @@ static struct omap_hwmod am43xx_qspi_hwmod = {
+>  	},
 >  };
 >  
-> +static void init_ldb_clks(enum mx6q_clks new_parent)
-> +{
-> +	struct device_node *np;
-> +	static void __iomem *ccm_base;
-> +	unsigned int reg;
+> +/* Display sub system - DSS */
 > +
-> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-ccm");
-> +	ccm_base = of_iomap(np, 0);
-> +	WARN_ON(!ccm_base);
+> +static struct omap_hwmod_dma_info am43xx_dss_sdma_chs[] = {
+> +	{ .name = "dispc", .dma_req = 5 },
+> +	{ .dma_req = -1 },
+> +};
+
+the dma info needs to come in from DT. Besides these are edma
+request lines and not sdma.
+
 > +
-> +	/*
-> +	 * Need to follow a strict procedure when changing the LDB
-> +	 * clock, else we can introduce a glitch. Things to keep in
-> +	 * mind:
-> +	 * 1. The current and new parent clocks must be disabled.
-> +	 * 2. The default clock for ldb_dio_clk is mmdc_ch1 which has
-> +	 * no CG bit.
-> +	 * 3. In the RTL implementation of the LDB_DI_CLK_SEL mux
-> +	 * the top four options are in one mux and the PLL3 option along
-> +	 * with another option is in the second mux. There is third mux
-> +	 * used to decide between the first and second mux.
-> +	 * The code below switches the parent to the bottom mux first
-> +	 * and then manipulates the top mux. This ensures that no glitch
-> +	 * will enter the divider.
-> +	 *
-> +	 * Need to disable MMDC_CH1 clock manually as there is no CG bit
-> +	 * for this clock. The only way to disable this clock is to move
-> +	 * it topll3_sw_clk and then to disable pll3_sw_clk
-> +	 * Make sure periph2_clk2_sel is set to pll3_sw_clk
-> +	 */
-> +	reg = readl_relaxed(ccm_base + 0x18);
-> +	reg &= ~(1 << 20);
-> +	writel_relaxed(reg, ccm_base + 0x18);
+> +struct omap_dss_dispc_dev_attr am43xx_dss_dispc_dev_attr = {
+> +	.manager_count		= 1,
+> +	.has_framedonetv_irq	= 0
+> +};
 > +
-> +	/* Set MMDC_CH1 mask bit */
-> +	reg = readl_relaxed(ccm_base + 0x4);
-> +	reg |= 1 << 16;
-> +	writel_relaxed(reg, ccm_base + 0x4);
 > +
-symbolic register offsets instead of magic numbers would make the code
-more readable and less error prone!
+[]..
 
+> +
+>  /* Interfaces */
+>  static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
+>  	.master		= &am33xx_l3_main_hwmod,
+> @@ -654,6 +726,34 @@ static struct omap_hwmod_ocp_if am43xx_l3_s__qspi = {
+>  	.user           = OCP_USER_MPU | OCP_USER_SDMA,
+>  };
+>  
+> +static struct omap_hwmod_ocp_if am43xx_dss__l3_main = {
+> +	.master		= &am43xx_dss_core_hwmod,
+> +	.slave		= &am33xx_l3_main_hwmod,
+> +	.clk		= "disp_clk",
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Isn't l3_gclk that clocks the l3 OCP master port?
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+regards,
+Rajendra
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +static struct omap_hwmod_ocp_if am43xx_l4_ls__dss = {
+> +	.master		= &am33xx_l4_ls_hwmod,
+> +	.slave		= &am43xx_dss_core_hwmod,
+> +	.clk		= "l4ls_gclk",
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_dispc = {
+> +	.master		= &am33xx_l4_ls_hwmod,
+> +	.slave		= &am43xx_dss_dispc_hwmod,
+> +	.clk		= "l4ls_gclk",
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
+> +	.master		= &am33xx_l4_ls_hwmod,
+> +	.slave		= &am43xx_dss_rfbi_hwmod,
+> +	.clk		= "l4ls_gclk",
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+>  static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+>  	&am33xx_l4_wkup__synctimer,
+>  	&am43xx_l4_ls__timer8,
+> @@ -748,6 +848,10 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+>  	&am43xx_l4_ls__ocp2scp1,
+>  	&am43xx_l3_s__usbotgss0,
+>  	&am43xx_l3_s__usbotgss1,
+> +	&am43xx_dss__l3_main,
+> +	&am43xx_l4_ls__dss,
+> +	&am43xx_l4_ls__dss_dispc,
+> +	&am43xx_l4_ls__dss_rfbi,
+>  	NULL,
+>  };
+>  
+> diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
+> index 7785be984edd..ad7b3e9977f8 100644
+> --- a/arch/arm/mach-omap2/prcm43xx.h
+> +++ b/arch/arm/mach-omap2/prcm43xx.h
+> @@ -142,5 +142,6 @@
+>  #define AM43XX_CM_PER_USBPHYOCP2SCP0_CLKCTRL_OFFSET	0x05B8
+>  #define AM43XX_CM_PER_USB_OTG_SS1_CLKCTRL_OFFSET        0x0268
+>  #define AM43XX_CM_PER_USBPHYOCP2SCP1_CLKCTRL_OFFSET	0x05C0
+> +#define AM43XX_CM_PER_DSS_CLKCTRL_OFFSET		0x0a20
+>  
+>  #endif
+> 
