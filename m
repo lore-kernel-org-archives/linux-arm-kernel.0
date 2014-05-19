@@ -1,20 +1,17 @@
 From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Mon, 19 May 2014 17:09:19 +0200
-Subject: [GIT PULL] ARM: STi: DT changes for v3.16
-Message-ID: <537A1E9F.2010804@st.com>
+Date: Mon, 19 May 2014 17:11:56 +0200
+Subject: [GIT PULL] ARM: STi: SoC changes for v3.16
+In-Reply-To: <5375D1A4.2040205@st.com>
+References: <5375D1A4.2040205@st.com>
+Message-ID: <537A1F3C.90405@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Olof, Kevin and Arnd,
 
-Please consider these STi DT updates for v3.16.
+Please consider these STi SoC updates for v3.16.
 
 This is now based on v3.15-rc1.
-
-Note that two reset patches are part of this pull request, in order to avoid
-compilation breakage.
-Adding these two patches in this pull request has been accepted by Philipp Zabel.
-
 
 The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 
@@ -22,60 +19,22 @@ The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 
 are available in the git repository at:
 
-  git://git.stlinux.com/devel/kernel/linux-sti.git tags/sti-dt-for-v3.16
+  git://git.stlinux.com/devel/kernel/linux-sti.git tags/sti-soc-for-v3.16
 
-for you to fetch changes up to c3037f761ff57b8a85cd41bbe995af78af064e33:
+for you to fetch changes up to c6594025c0f8cea2ba089444a359495bd0ea3e6f:
 
-  ARM: STi: DT: STiH41x Add clk_ignore_unused to bootargs (2014-05-17 10:19:09 +0200)
-
-----------------------------------------------------------------
-Device tree changes for STi platforms
+  ARM: STi: Add STiH407 SoC support (2014-05-17 10:22:30 +0200)
 
 ----------------------------------------------------------------
-Gabriel FERNANDEZ (15):
-      driver: reset: sti: add keyscan for stih415
-      driver: reset: sti: add keyscan for stih416
-      ARM: STi: DT: add keyscan for stih415
-      ARM: STi: DT: add keyscan for stih416
-      ARM: STi: DT: add keyscan for stih41x-b2000
-      ARM: STi: DT: STiH416: 416 DT Entry for clockgen A0/1/10/11/12
-      ARM: STi: DT: STiH416: Remove unused CLK_S_ICN_REG_0 fixed clock
-      ARM: STi: DT: STiH416: Remove unused CLK_S_GMAC0_PHY & CLK_S_ETH1_PHY fixed clocks
-      ARM: STi: DT: STiH416: 416 DT Entry for clockgen B/C/D/E/F
-      ARM: STi: DT: STiH416: 416 DT Entry for clockgen A9/DDR/GPU
-      ARM: STi: DT: STiH415: 415 DT Entry for clockgen A0/1/10/11/12
-      ARM: STi: DT: STiH415: Remove unused CLK_S_ICN_REG_0 fixed clock
-      ARM: STi: DT: STiH415: Remove unused CLK_S_GMAC0_PHY & CLK_S_ETH1_PHY fixed clocks
-      ARM: STi: DT: STiH415: 415 DT Entry for clockgen A9
-      ARM: STi: DT: STiH41x Add clk_ignore_unused to bootargs
+SoC changes for STi platforms
 
-Maxime Coquelin (2):
-      ARM: dts: Add STiH407 SoC support
-      ARM: dts: STiH407: Add B2120 board support
+----------------------------------------------------------------
+Maxime Coquelin (1):
+      ARM: STi: Add STiH407 SoC support
 
- arch/arm/boot/dts/Makefile                         |   3 +-
- arch/arm/boot/dts/stih407-b2120.dts                |  78 +++
- arch/arm/boot/dts/stih407-clock.dtsi               |  40 ++
- arch/arm/boot/dts/stih407-pinctrl.dtsi             | 615 +++++++++++++++++
- arch/arm/boot/dts/stih407.dtsi                     | 263 ++++++++
- arch/arm/boot/dts/stih415-clock.dtsi               | 517 ++++++++++++++-
- arch/arm/boot/dts/stih415-pinctrl.dtsi             |  16 +
- arch/arm/boot/dts/stih415.dtsi                     |  22 +-
- arch/arm/boot/dts/stih416-clock.dtsi               | 732 ++++++++++++++++++++-
- arch/arm/boot/dts/stih416-pinctrl.dtsi             |  16 +
- arch/arm/boot/dts/stih416.dtsi                     |  22 +-
- arch/arm/boot/dts/stih41x-b2000.dtsi               |  25 +-
- arch/arm/boot/dts/stih41x-b2020.dtsi               |   2 +-
- drivers/reset/sti/reset-stih415.c                  |   1 +
- drivers/reset/sti/reset-stih416.c                  |   1 +
- include/dt-bindings/clock/stih415-clks.h           |  15 +
- include/dt-bindings/clock/stih416-clks.h           |  15 +
- .../dt-bindings/reset-controller/stih415-resets.h  |   1 +
- .../dt-bindings/reset-controller/stih416-resets.h  |   1 +
- 19 files changed, 2339 insertions(+), 46 deletions(-)
- create mode 100644 arch/arm/boot/dts/stih407-b2120.dts
- create mode 100644 arch/arm/boot/dts/stih407-clock.dtsi
- create mode 100644 arch/arm/boot/dts/stih407-pinctrl.dtsi
- create mode 100644 arch/arm/boot/dts/stih407.dtsi
- create mode 100644 include/dt-bindings/clock/stih415-clks.h
- create mode 100644 include/dt-bindings/clock/stih416-clks.h
+ Documentation/arm/sti/stih407-overview.txt    | 18 ++++++++++++++++++
+ Documentation/devicetree/bindings/arm/sti.txt | 15 +++++++++++++++
+ arch/arm/mach-sti/board-dt.c                  |  1 +
+ 3 files changed, 34 insertions(+)
+ create mode 100644 Documentation/arm/sti/stih407-overview.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/sti.txt
