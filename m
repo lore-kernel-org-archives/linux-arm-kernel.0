@@ -1,29 +1,52 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sun, 18 May 2014 22:57:45 -0700
-Subject: [PATCH v5 4/8] input: misc: Add driver for AXP20x Power Enable Key
-In-Reply-To: <20140503010604.GE4090@lukather>
-References: <1398947374-3115-1-git-send-email-carlo@caione.org>
- <1398947374-3115-5-git-send-email-carlo@caione.org>
- <20140503010604.GE4090@lukather>
-Message-ID: <20140519055745.GL29386@core.coreip.homeip.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 19 May 2014 08:27:22 +0200
+Subject: [PATCH 2/2] ARM: imx: convert camera init to use
+ platform_device_register_full()
+In-Reply-To: <1400446261-27085-3-git-send-email-emilgoode@gmail.com>
+References: <1400446261-27085-1-git-send-email-emilgoode@gmail.com>
+ <1400446261-27085-3-git-send-email-emilgoode@gmail.com>
+Message-ID: <20140519062722.GE16662@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 06:06:04PM -0700, Maxime Ripard wrote:
-> On Thu, May 01, 2014 at 02:29:30PM +0200, Carlo Caione wrote:
-> > This patch add support for the Power Enable Key found on MFD AXP202 and
-> > AXP209. Besides the basic support for the button, the driver adds two
-> > entries in sysfs to configure the time delay for power on/off.
-> > 
-> > Signed-off-by: Carlo Caione <carlo@caione.org>
+Hello Emil,
+
+thanks for your effort.
+
+On Sun, May 18, 2014 at 10:51:00PM +0200, Emil Goode wrote:
+> This converts the imx camera allocation and initialization functions
+> to use platform_device_register_full() thus simplifying the code.
 > 
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Emil Goode <emilgoode@gmail.com>
+> ---
+> Only build tested, unfortunately I currently don't have the hardware.
+> 
+>  arch/arm/mach-imx/devices/platform-ipu-core.c |   43 +++++++++----------------
+>  arch/arm/mach-imx/mach-mx31_3ds.c             |    5 ++-
+>  arch/arm/mach-imx/mach-mx31moboard.c          |    6 ++--
+>  arch/arm/mach-imx/mach-mx35_3ds.c             |    5 ++-
+>  arch/arm/mach-imx/mach-pcm037.c               |    5 ++-
+>  5 files changed, 23 insertions(+), 41 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
+> index 6bd7c3f..13ea542 100644
+> --- a/arch/arm/mach-imx/devices/platform-ipu-core.c
+> +++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
+> @@ -69,42 +69,29 @@ struct platform_device *__init imx_alloc_mx3_camera(
+IMHO you should better rename the function because now it doesn't only
+allocate the device, but also registers it.
 
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Also I doubt that it's OK to call dma_declare_coherent_memory after the
+device is added. In this case maybe extend
+platform_device_register_full? And also add a warning to
+dma_declare_coherent_memory if it is called for an already added device?
+(Added a few people to Cc: that might be able to comment this. I don't
+even know if there is a reliable way to check if a device is already
+added.)
 
-How are we merging it? MFD tree?
-
-Thanks.
+Best regards
+Uwe
 
 -- 
-Dmitry
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
