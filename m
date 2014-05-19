@@ -1,40 +1,74 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Mon, 19 May 2014 17:11:56 +0200
-Subject: [GIT PULL] ARM: STi: SoC changes for v3.16
-In-Reply-To: <5375D1A4.2040205@st.com>
-References: <5375D1A4.2040205@st.com>
-Message-ID: <537A1F3C.90405@st.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 19 May 2014 08:12:42 -0700
+Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
+In-Reply-To: <5376A726.4000106@samsung.com>
+References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
+ <53752E25.9060604@gmail.com>
+ <CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>
+ <53753443.8010303@gmail.com>
+ <CAD=FV=V8UZoeOqEwfx_E015pLM+amTt51LrUa+dk7mTdn=vKgA@mail.gmail.com>
+ <53753C17.1090002@gmail.com>
+ <CAD=FV=WGa7j_As_NpySxU7OEd_SzuGWK6oxU6UeiJ-4HsoWvvg@mail.gmail.com>
+ <CAJFHJrrgWGc4XGQB0ysLufAg3Wouz-aYXu97Sy2Kp=HzK+akVQ@mail.gmail.com>
+ <CAASgrz2Nr69tpfC8ka9gbs2OvjLEGsvgAj4vBCFxhsamuFum7w@mail.gmail.com>
+ <53754CE2.3000905@gmail.com>
+ <CAD=FV=UMoL7i9rg_QtBAqPwisSQyRqRmk8wQhneMXAiLBjTT1A@mail.gmail.com>
+ <CAPz6YkU8GDrLj8UkqEQXxxqxWF5_p427wKSDgAp+QPR7WE7Ujg@mail.gmail.com>
+ <CAJFHJrrb2XFDZqJh4OuLdFP=J0aR4pGe-WLWKZ7ZpMfUSPGd4Q@mail.gmail.com>
+ <5376A726.4000106@samsung.com>
+Message-ID: <CAD=FV=VXSP1TM9qY8PxFuQ+Tq2Ju57VdpzpwsHXqHshQm_havQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Kevin and Arnd,
+Kukjin,
 
-Please consider these STi SoC updates for v3.16.
+On Fri, May 16, 2014 at 5:02 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 05/17/14 07:56, Chirantan Ekbote wrote:
+>>>>>
+>>>>> Anyway, I'm by no means opposed to switching to arch timers. They
+>>>>> provide a well designed, generic interface and drivers shared by
+>>>>> multiple platforms, which means more code sharing and possibly more
+>>>>> eyes
+>>>>> looking at the code, which is always good. However if they don't
+>>>>> support
+>>>>> low power states correctly, we can't just remove MCT.
+>>>>
+>>>>
+>>>> I think low power states aren't in mainline (right?).
+>>>>
+>>>> One solution that might work could be to leave the device tree entry
+>>>> alone but change the MCT init code to simply act as a no-op if it sees
+>>>> an arch timer is in the device tree and enabled.  Then when/if someone
+>>>> got the low power states enabled we could just change source code
+>>>> rather than dts files.
+>>>>
+>>
+>> Doug and I were talking about this and we think we may have a way to
+>> have the mct and arch timers co-exist.  The main issue is that the mct
+>> (and therefore arch timer) gets cleared once during boot and every
+>> time we do a suspend / resume.  This happens in
+>> exynos4_mct_frc_start() but it's not immediately clear to us why the
+>> counter needs to be reset at all.  If we remove the lines that clear
+>> the counter then there is no longer an issue with having both the mct
+>> and the arch timers on at the same time.
+>>
+>> Alternately, if there is some code that depends on the mct being reset
+>> we could store an offset instead of clearing the counter and then
+>> subtract that offset every time something reads it.  Doug has a patch
+>> that does this at
+>> https://chromium-review.googlesource.com/#/c/200298/.  Effectively the
+>> visible behavior will not change.  Would either of these options work?
+>>
+> Hi all,
+>
+> Even though I've heard something about the behavior of mct and arch
+> timer...but I couldn't finish the talk to h/w guys yet. I need to talk again
+> in next week then I could provide some useful information. Sorry for late
+> and can you please wait a minute before deciding whatever.
 
-This is now based on v3.15-rc1.
+I think we could wait a few days.  Note however, that Chirantan's
+latest proposal keeps all existing functionality (can use both MCT and
+arch timers).  It merely removes the unnecessary bit of the MCT init
+code setting the timer.  No functionality is affected by that.
 
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-
-  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-
-are available in the git repository at:
-
-  git://git.stlinux.com/devel/kernel/linux-sti.git tags/sti-soc-for-v3.16
-
-for you to fetch changes up to c6594025c0f8cea2ba089444a359495bd0ea3e6f:
-
-  ARM: STi: Add STiH407 SoC support (2014-05-17 10:22:30 +0200)
-
-----------------------------------------------------------------
-SoC changes for STi platforms
-
-----------------------------------------------------------------
-Maxime Coquelin (1):
-      ARM: STi: Add STiH407 SoC support
-
- Documentation/arm/sti/stih407-overview.txt    | 18 ++++++++++++++++++
- Documentation/devicetree/bindings/arm/sti.txt | 15 +++++++++++++++
- arch/arm/mach-sti/board-dt.c                  |  1 +
- 3 files changed, 34 insertions(+)
- create mode 100644 Documentation/arm/sti/stih407-overview.txt
- create mode 100644 Documentation/devicetree/bindings/arm/sti.txt
+-Doug
