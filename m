@@ -1,62 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 May 2014 09:09:02 -0700
-Subject: [GIT PULL] ARM: OMAP2+: some hwmod data patches for v3.16
-In-Reply-To: <5379C866.2040404@ti.com>
-References: <alpine.DEB.2.02.1405160444200.29738@utopia.booyaka.com>
- <5375CE74.6000603@ti.com> <20140516212327.GI12881@atomide.com>
- <5379C866.2040404@ti.com>
-Message-ID: <20140519160901.GC4849@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 19 May 2014 17:09:48 +0100
+Subject: [PATCH Resend] ARM: kdump: makes second kernel use strict
+ pfn_valid
+In-Reply-To: <1400464443-34816-1-git-send-email-wangnan0@huawei.com>
+References: <1400464443-34816-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <20140519160947.GM15130@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [140519 02:02]:
-> On 17/05/14 00:23, Tony Lindgren wrote:
-> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [140516 01:39]:
-> >> Hi Paul,
-> >>
-> >> On 16/05/14 07:45, Paul Walmsley wrote:
-> >>> Hi Tony
-> >>>
-> >>> The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
-> >>>
-> >>>   Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
-> >>>
-> >>> are available in the git repository at:
-> >>>
-> >>>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git for-v3.16/hwmod-a
-> >>>
-> >>> for you to fetch changes up to 433480707967187a74ced38bd38edba749998013:
-> >>>
-> >>>   ARM: OMAP2+: hwmod: OMAP5 DSS hwmod data (2014-05-14 12:26:10 -0600)
-> >>>
-> >>> ----------------------------------------------------------------
-> >>> First (and possibly last) set of hwmod data changes for v3.16.  This
-> >>> set should clean up some obsolete OMAP4 hwmod data, and add OMAP5 DSS
-> >>> support.
-> >>
-> >> What about the AM43xx hwmod data I sent in the same series:
-> >>
-> >> http://article.gmane.org/gmane.linux.ports.arm.omap/114192
-> > 
-> > I guess the issue there is that there's no way for Paul or much
-> > anybody else to check it against any documentation or hardware :(
-> > 
-> > Is this just cut and paste code, or has you verified it against
-> > the documentation and the hardare?
+On Mon, May 19, 2014 at 02:54:03AM +0100, Wang Nan wrote:
+> When SPARSEMEM and CRASH_DUMP both selected, simple pfn_valid prevents
+> the second kernel ioremap first kernel's memory if the address falls
+> into second kernel section. This limitation requires the second kernel
+> occupies a full section, and elfcorehdr must resides in another section.
 > 
-> It's a cut and paste from TI's kernel, I did not write it. I have tested
-> it on two different AM4xxx boards, and reviewed it, although I have not
-> checked every individual bit of information there as it's a bit
-> difficult to find information of all the details.
+> This patch makes crash dump kernel use strict pfn_valid, removes such
+> limitation.
 > 
-> The AM43xx's DSS is more or less a subset of the DSS in OMAP3, so while
-> a proper bit-for-bit review cannot be done without AM43xx documentation,
-> a  "looks sane" review can be done against OMAP3.
+> For example:
+> 
+>   For a platform with SECTION_SIZE_BITS == 28 (256MiB) and
+>   crashkernel=128M at 0x28000000 in kernel cmdline, the second
+>   kernel is loaded at 0x28000000. Kexec puts elfcorehdr at
+>   0x2ff00000, and passes 'elfcorehdr=0x2ff00000 mem=130048K' to
+>   second kernel. When second kernel start, it tries to use
+>   ioremap to retrive its elfcorehrd. In this case, elfcodehdr is at the
+>   same section of the second kernel, pfn_valid will recongnize
+>   the page as valid, so ioremap will refuse to map it.
 
-OK thanks for reviewing it. Looks like Rajendra found few issues, so
-I'm personally fine with your and Rajendra's acks on it. Paul may
-have still other comments though.
+So isn't the issue here that you're passing an incorrect mem= parameter
+to the crash kernel?
 
-Regards,
-
-Tony
+Will
