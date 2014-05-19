@@ -1,30 +1,34 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Mon, 19 May 2014 10:31:44 +0300
-Subject: [PATCH 2/4] spi: qup: Correct selection of FIFO/Block mode
-In-Reply-To: <1400016884-9568-3-git-send-email-agross@codeaurora.org>
-References: <1400016884-9568-1-git-send-email-agross@codeaurora.org>
- <1400016884-9568-3-git-send-email-agross@codeaurora.org>
-Message-ID: <1400484704.1464.4.camel@iivanov-dev>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 19 May 2014 12:06:12 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAzLzRdIEFSTTogaW14OiByZW1vdmUgaW14NTEgbm9uLURU?=
+ =?UTF-8?B?IHN1cHBvcnQgZmlsZXM=?=
+In-Reply-To: <1400482606-8278-4-git-send-email-shawn.guo@freescale.com>
+References: <1400482606-8278-1-git-send-email-shawn.guo@freescale.com>
+ <1400482606-8278-4-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1400486772.124660835@f325.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-05-13 at 16:34 -0500, Andy Gross wrote:
-> This patch fixes the calculation for determining whether to use FIFO or BLOCK
-> mode.
+Mon, 19 May 2014 14:56:45 +0800 ?? Shawn Guo <shawn.guo@freescale.com>:
+> Since i.MX51 becomes a DT only platform, those non-DT support files can
+> be removed now.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  arch/arm/mach-imx/Makefile        |   2 +-
+>  arch/arm/mach-imx/devices-imx51.h |  66 ---
+>  arch/arm/mach-imx/ehci-imx5.c     | 171 --------
+>  arch/arm/mach-imx/iomux-mx51.h    | 827 --------------------------------------
+>  4 files changed, 1 insertion(+), 1065 deletions(-)
+>  delete mode 100644 arch/arm/mach-imx/devices-imx51.h
+>  delete mode 100644 arch/arm/mach-imx/ehci-imx5.c
+>  delete mode 100644 arch/arm/mach-imx/iomux-mx51.h
 
-<snip>
+...
 
-> @@ -368,7 +368,7 @@ static int spi_qup_io_config(struct spi_device *spi, struct spi_transfer *xfer)
->  	n_words = xfer->len / w_size;
->  	controller->w_size = w_size;
->  
-> -	if (n_words <= controller->in_fifo_sz) {
-> +	if (n_words <= (controller->in_fifo_sz / sizeof(u32))) {
+> -int mx51_initialize_usb_hw(int port, unsigned int flags)
 
-Wouldn't be better to divide by w_size? Probably will not make
-too much difference, but..
+Additionally, we should not forget to remove mx51_initialize_usb_hw() declaration
+from include/linux/platform_data/usb-ehci-mxc.h in the future.
 
->  		mode = QUP_IO_M_MODE_FIFO;
-
-Regards,
-Ivan
+---
