@@ -1,54 +1,77 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 20 May 2014 00:40:40 +0900
-Subject: [PATCH v3 0/4] ARM: dts: enable display for peach-pit and snow
- boards
-In-Reply-To: <1399630186-22610-1-git-send-email-rahul.sharma@samsung.com>
-References: <1399630186-22610-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <537A25F8.4040604@samsung.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Mon, 19 May 2014 17:42:22 +0200
+Subject: [STLinux Kernel] [PATCH 3/4] ARM: DT: STi: Add DT node for
+ MiPHY365x
+In-Reply-To: <1398756095-32542-4-git-send-email-lee.jones@linaro.org>
+References: <1398756095-32542-1-git-send-email-lee.jones@linaro.org>
+ <1398756095-32542-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <537A265E.8080407@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/14 19:09, Rahul Sharma wrote:
-> From: Rahul Sharma<Rahul.Sharma@samsung.com>
 
-Probably, should be "Rahul Sharma <rahul.sharma@...>"
 
-Please make sure your gitconfig has no problem.
+On 04/29/2014 09:21 AM, Lee Jones wrote:
+> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
+> devices. It has 2 ports which it can use for either; both SATA, both
+> PCIe or one of each in any configuration.
+>
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>   arch/arm/boot/dts/stih416-b2020-revE.dts | 22 ++++++++++++++++++++++
+>   arch/arm/boot/dts/stih416-b2020.dts      |  6 ++++++
+>   arch/arm/boot/dts/stih416.dtsi           | 14 ++++++++++++++
+>   3 files changed, 42 insertions(+)
+>   create mode 100644 arch/arm/boot/dts/stih416-b2020-revE.dts
+>
+> diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
+> new file mode 100644
+> index 0000000..23fdaf7
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
+> @@ -0,0 +1,22 @@
+> +/*
+> + * Copyright (C) 2014 STMicroelectronics Limited.
+> + * Author: Lee Jones <lee.jones@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * publishhed by the Free Software Foundation.
+> + */
+> +/dts-v1/;
+> +#include "stih416.dtsi"
+> +#include "stih41x-b2020.dtsi"
+> +/ {
+> +        model = "STiH416 B2020 REV-E";
+> +	compatible = "st,stih416-b2020", "st,stih416";
+> +
+> +	soc {
+> +		miphy365x_phy: miphy365x at fe382000 {
+> +			st,pcie-tx-pol-inv;
+> +			st,sata-gen = <3>;
+> +		};
+> +	};
+> +};
+Shouldn't this new board being added in a separate patch?
 
-Just note, I found same thing and fixed your email address in my tree...
 
->
-> Add nodes for fimd and dp controller for exynos5250 based snow
-> and exynos5420 based peach-pit board.
->
-> This series is based on Kukjin Kims, for-next branch.
->
-> V3:
-> 1) Dropped 1 patch "ARM: dts: move dp hpd line to the board file for
->   exynos5420".
-> 2) Extra blank lines for readability.
-> 3) dp hpd gpio name change (dp_hpd ->  dp_hpd_gpio)
->
-> V2:
-> 1) Rebase on Peach-pit dependent patches.
->
-> It is dependent on
-> 1) Andrew Bresticker's patch for hpd gpio addition, avilable at
-> http://www.spinics.net/lists/linux-samsung-soc/msg28827.html [Patch is 'ACK'ed.]
-> 2) Arun's patch for adding peach-pit board dts file at
-> http://www.spinics.net/lists/linux-samsung-soc/msg30103.html. [Patch is 'ACK'ed.]
->
-> Rahul Sharma (4):
->    ARM: dts: enable fimd for exynos5250 based snow board
->    ARM: dts: enable dp-controller for exynos5250 based snow board
->    ARM: dts: enable fimd for exynos5420 based peach-pit board
->    ARM: dts: enable dp-controller for exynos5420 based peach-pit board
->
->   arch/arm/boot/dts/exynos5250-snow.dts      |   35 ++++++++++++++++++++++++
->   arch/arm/boot/dts/exynos5420-peach-pit.dts |   41 ++++++++++++++++++++++++++++
->   2 files changed, 76 insertions(+)
->
-OK, applied whole series with Jingoo's 'reviewed-by'.
 
-Thanks,
-Kukjin
+> diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
+> index 276f28d..172f222 100644
+> --- a/arch/arm/boot/dts/stih416-b2020.dts
+> +++ b/arch/arm/boot/dts/stih416-b2020.dts
+> @@ -13,4 +13,10 @@
+>   	model = "STiH416 B2020";
+>   	compatible = "st,stih416", "st,stih416-b2020";
+>
+> +	soc {
+> +		miphy365x_phy: miphy365x at fe382000 {
+> +			st,pcie-tx-pol-inv;
+> +			st,sata-gen = <3>;
+> +		};
+> +	};
+>   };
+...
