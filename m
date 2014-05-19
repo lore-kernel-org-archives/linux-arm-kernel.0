@@ -1,55 +1,40 @@
 From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Mon, 19 May 2014 16:49:12 +0530
-Subject: [PATCH V3 0/4] dts: Add usb2phy to Exynos 5250/5420
-Message-ID: <1400498356-26803-1-git-send-email-vikas.sajjan@samsung.com>
+Date: Mon, 19 May 2014 16:49:15 +0530
+Subject: [PATCH V3 3/4] ARM: dts: Add usb2phy support on exynos5420
+In-Reply-To: <1400498356-26803-1-git-send-email-vikas.sajjan@samsung.com>
+References: <1400498356-26803-1-git-send-email-vikas.sajjan@samsung.com>
+Message-ID: <1400498356-26803-4-git-send-email-vikas.sajjan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on 'for-next' branch of Kgene's linux-samsung tree.
-These patches are as per discussions on the driver side patches
-which have already been acked. [1]
+From: Vivek Gautam <gautam.vivek@samsung.com>
 
-Changes from v2:
-	- Addressed kukjin's comments to update DT binding documentation for sysreg.
-	- removed the version for each patch. Made all patches version as same.
+Add required device node for usb2phy to let enable USB 2.0
+support.
 
-Changes from v1:
- - Rebase on 'for-next' branch.
- - Removed 'phy-names' property as per discuusion in the driver patches. [1]
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+---
+ arch/arm/boot/dts/exynos5420.dtsi |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-V1 of this series was the next version for earlier patch-series:
-[PATCH v7 0/2] dts: Add usb2phy to Exynos 5250 [2]
-
-Changes from v7 series:
- - Added patches to enable usb 2.0 support on exynos5420;
-   which include dt nodes for usb2phy as well as ehci and ohci
-   controllers.
-
-Changes from v6:
- - Splitted the patch into two:
-    adding syscon nodes to Exynos5250 and Exynos5420 in first;
-    and phy entry change in the second.
- - Changed the name of phandle for usb2phy from 'usb2_phy_new'
-   to 'usb2_phy_gen' indicating generic phy.
- - Using clock macros in dt entries.
-
-[1] http://www.spinics.net/lists/linux-usb/msg106908.html
-    http://www.spinics.net/lists/linux-usb/msg106837.html
-[2] http://www.spinics.net/lists/linux-usb/msg106427.html
-
-Kamil Debski (1):
-  ARM: dts: Add usb2phy to Exynos 5250
-
-Vivek Gautam (3):
-  ARM: dts: Add sysreg sytem controller node to exynos5250 and
-    exynos5420
-  ARM: dts: Add usb2phy support on exynos5420
-  ARM: dts: Add usb 2.0 support on exynos5420
-
- .../devicetree/bindings/arm/samsung/sysreg.txt     |   11 ++++-
- arch/arm/boot/dts/exynos5250.dtsi                  |   27 ++++++++++++
- arch/arm/boot/dts/exynos5420.dtsi                  |   45 ++++++++++++++++++++
- 3 files changed, 81 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index f9b051b..2eb00cb 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -838,4 +838,14 @@
+ 		samsung,pmu-syscon = <&pmu_system_controller>;
+ 		#phy-cells = <1>;
+ 	};
++
++	usb2_phy: phy at 12130000 {
++		compatible = "samsung,exynos5250-usb2-phy";
++		reg = <0x12130000 0x100>;
++		clocks = <&clock CLK_USBH20>, <&clock CLK_SCLK_USBPHY300>;
++		clock-names = "phy", "ref";
++		#phy-cells = <1>;
++		samsung,sysreg-phandle = <&sysreg_system_controller>;
++		samsung,pmureg-phandle = <&pmu_system_controller>;
++	};
+ };
 -- 
 1.7.9.5
