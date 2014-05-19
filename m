@@ -1,66 +1,66 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 19 May 2014 12:21:40 +0300
-Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
- support
-In-Reply-To: <20140516180154.GG22031@atomide.com>
-References: <5371F923.80000@ti.com>
- <CABxcv==_LCw1kPYm17g=h8VfSN2V_qsgXjTnsy-JOetawSv4pA@mail.gmail.com>
- <20140513152518.GA16837@atomide.com> <53730AFB.2090800@ti.com>
- <20140514160216.GD18463@atomide.com> <537487AE.3060906@ti.com>
- <20140515182133.GC23659@atomide.com> <5375A8A8.7080306@ti.com>
- <20140516160717.GD22031@atomide.com> <20140516174158.GA11733@earth.universe>
- <20140516180154.GG22031@atomide.com>
-Message-ID: <5379CD24.6040508@ti.com>
+From: gioh.kim@lge.com (Gioh Kim)
+Date: Mon, 19 May 2014 18:21:49 +0900
+Subject: [RFC PATCH] ARM: cache-l2x0: add setup entry for l2 in non-secure
+ mode
+In-Reply-To: <CAGsJ_4wF7_BmTrWoxAu+NMVpsuN4oxJngBW0b2-4naXtwx5g5g@mail.gmail.com>
+References: <5374532D.7030602@lge.com>
+ <CAGsJ_4zN39jeHz574_r9y_hjdn1Acbkr9gQhE=1L-Fs82-vDkw@mail.gmail.com>
+ <53795080.1010007@lge.com>
+ <CAGsJ_4wF7_BmTrWoxAu+NMVpsuN4oxJngBW0b2-4naXtwx5g5g@mail.gmail.com>
+Message-ID: <5379CD2D.4080300@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/05/14 21:01, Tony Lindgren wrote:
-
->> IMHO appending -omap-dss to a random device is an even bigger hack,
->> since its adding lots of bloat to the API. Let's assume there is
->> another OS using DT for ARM, but has no proper API for SPI
->> controllers and it introduces your hack to SPI devices. That would
->> mean each SPI device has -omap-spi appended (or -exynos-spi,
->> -foo-spi, ...). At least I would blame them for creating a huge
->> unmaintainable mess.
-> 
-> I think you're misunderstanding. I do not want the naming to
-> be Linux specific. The naming should naturally be as hardware
-> specific as possible. In this case something like:
-> 
-> compatible = "sharp,ls037v7dw01-dss", "sharp,ls037v7dw01";
-> 
-> Or we should probably use:
-> 
-> compatible = "sharp,ls037v7dw01-dpi", "sharp,ls037v7dw01";
-> 
-> As dpi here reflects the hardware it's connected to. The dss
-> is probably a Linux name.
-
-Well, "dss" or "omapdss" is as much a hardware term as "dpi". And "dpi"
-wouldn't really be a good extension, as what we want is an omapdss
-driver specific compatible string. So I think "-omapdss" is the best
-extension if that method is used.
-
-But I don't think that's really the point. The point is that the panel's
-compatible string should be "sharp,ls037v7dw01", nothing else.
-
-All the variations of "sharp,ls037v7dw01-dss" are not correct, and are
-only made for Linux SW reasons. So I would say they are Linux specific
-SW names, even if the words themselves are also HW terms.
-
-> Not use what you're after with the SPI example though, but sounds
-> like that's something different.
-
-I think Sebastien's example is just like the issue here.
-
- Tomi
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/86a3571b/attachment.sig>
+2014-05-19 ?? 6:11, Barry Song ? ?:
+> 2014-05-19 8:29 GMT+08:00 Gioh Kim <gioh.kim@lge.com>:
+>>
+>>
+>> 2014-05-18 ?? 10:13, Barry Song ? ?:
+>>
+>>> 2014-05-15 13:39 GMT+08:00 Gioh Kim <gioh.kim@lge.com>:
+>>>>
+>>>>
+>>>> Hi,
+>>>>
+>>>> My board is using Trustzone and running kernel is non-secure mode.
+>>>> But setup function of PL310 driver is only for secure mode kernel.
+>>>>
+>>>> What about adding an entry for non-secure mode setup function?
+>>>>
+>>>> I'm sorry for my poor code but I just wanna say what I need .
+>>>
+>>>
+>>> Gioh,
+>>>
+>>> i don't really understand what is the user scenarios for this, if you
+>>> are running linux in non-secure mode, your security-mode codes have
+>>> enabled L2, so this makes non-secure linux have no chance to execute
+>>> setup at all:
+>>
+>>
+>> My platform runs linux kernel before L2 cache activation.
+>> And the L2 cache is activated when the kernel sends command to Trustzone
+>> firmware.
+>> At this moment L2 is not activated. Linux should send command for L2
+>> activation to Trustzone at the moment.
+>
+> i think you can send command to trustzone firmware to enable L2 at
+> first, then make your Linux l2 driver run.
+
+Right. My platform is working like that.
+Activate L2 first and run l2x0 driver.
+
+But I think many platforms have trustzone firmware and are working like my platform.
+They might need non-secure setup.
+
+>
+>
+> -barry
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+>
