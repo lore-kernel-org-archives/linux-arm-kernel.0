@@ -1,79 +1,102 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 19 May 2014 19:22:49 +0200
-Subject: [PATCH/RFC V6 0/2] clk: Default clk parents and rates assigned in DT
-Message-ID: <1400520171-6698-1-git-send-email-s.nawrocki@samsung.com>
+Date: Mon, 19 May 2014 19:22:50 +0200
+Subject: [PATCH/RFC V6 1/2] clk: Add of_clk_get_by_clkspec() helper
+In-Reply-To: <1400520171-6698-1-git-send-email-s.nawrocki@samsung.com>
+References: <1400520171-6698-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1400520171-6698-2-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds a DT binding documentation for new 'clock-parents'
-and 'clock-rates' DT properties and a helper to parse DT and set the
-specified clocks configuration. The helper is now called in the platform
-bus before driver probing and by the clock core after registering a clock
-provider.
+This patch adds of_clk_get_by_clkspec() helper function, which does only
+a struct clk lookup from the clock providers. It is used in the subsequent
+patch where parsing of a clock from device tree and the lookup from
+providers needed to be split.
 
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
 Changes since v5:
- - reverted to the DT binding as sugested by Grant, it should now work
-   for both clock suppliers and consumers, similarly as pinctrl hogging;
- - fixed detecting of null phandles (ENOENT error handling);
- - the clocks will now also be attempted to be configured right after
-   registering the clock provider, this allows to avoid a call to
-   of_clk_set_defaults() in multiple clock provider drivers;
- - dropped of_clk_get_by_property() helper, added of_clk_get_by_clkspec.
+ - dropped of_clk_get_by_property(), added of_clk_get_by_clkspec().
 
 Changes since v4:
- - added note explaining how to skip setting parent and rate of a clock,
- - added missing call to of_node_put(),
- - moved of_clk_dev_init() calls to the platform bus,
- - dropped debug traces.
+ - none.
 
 Changes since v3:
- - improved documentation of the DT binding,
- - fixed build errors for !CONFIG_OF, the parsing helpers are only
-   compiled in if CONFIG_OF is set.
+ - added missing 'static inline' to the function stub definition.
 
 Changes since v2:
- - code reordering to ensure there is no build errors, the clock
-   configuration code moved to a separate file,
- - introduced an 'assigned-clocks' DT node which is supposed to contain
-   clocks, clock-parents, clock-rates properties and be child node
-   a clock provider node, and a code parsing it called from of_clk_init();
-   It's for clocks which are not directly connected to consumer devices.
-   An alternative would be to list such assigned clocks in 'clocks'
-   property, along with "proper" parent clocks, but then there would
-   be phandles in clocks property of a node pointing to itself and it
-   would require proper handling in of_clock_init().
-   I actually tried it but it looked a bit ugly and chose this time to
-   use an extra subnode.
+ - moved the function declaration from drivers/clk/clk.h to
+   include/linux/clk.h
 
 Changes since v1:
- - updated DT binding documentation,
- - dropped the platform bus notifier, the clock setup routine is now
-   being called directly from the driver core before a driver probe() call;
-   this has an advantage such as all bus types are handled and any errors
-   are propagated, so that, for instance a driver probe() can be deferred
-   also when resources specified by clock-parents/clock-rates properties
-   are not yet available; an alternative would be to let drivers call
-   of_clk_device_setup() directly,
- - dropped the patch adding a macro definition for maximum DT property
-   name length for now.
+ - s/of_clk_get_list_entry/of_clk_get_by_property.
+---
+ drivers/clk/clk.h    |    1 +
+ drivers/clk/clkdev.c |   34 +++++++++++++++++++++++++++-------
+ 2 files changed, 28 insertions(+), 7 deletions(-)
 
-This series has been tested on ARM, on Exynos4412 Odroid U3 board.
+diff --git a/drivers/clk/clk.h b/drivers/clk/clk.h
+index 795cc9f..c798138 100644
+--- a/drivers/clk/clk.h
++++ b/drivers/clk/clk.h
+@@ -10,6 +10,7 @@
+  */
 
-Sylwester Nawrocki (2):
-  clk: Add of_clk_get_by_clkspec() helper
-  clk: Add handling of clk parent and rate assigned from DT
+ #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
++struct clk *of_clk_get_by_clkspec(struct of_phandle_args *clkspec);
+ struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec);
+ void of_clk_lock(void);
+ void of_clk_unlock(void);
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index a360b2e..f890b90 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -27,6 +27,32 @@ static LIST_HEAD(clocks);
+ static DEFINE_MUTEX(clocks_mutex);
 
- .../devicetree/bindings/clock/clock-bindings.txt   |   32 +++++
- drivers/base/platform.c                            |    5 +
- drivers/clk/Makefile                               |    3 +
- drivers/clk/clk-conf.c                             |  141 ++++++++++++++++++++
- drivers/clk/clk.c                                  |   27 +++-
- drivers/clk/clk.h                                  |    1 +
- drivers/clk/clkdev.c                               |   34 ++++-
- include/linux/clk/clk-conf.h                       |   20 +++
- 8 files changed, 253 insertions(+), 10 deletions(-)
- create mode 100644 drivers/clk/clk-conf.c
- create mode 100644 include/linux/clk/clk-conf.h
+ #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
++
++/**
++ * of_clk_get_by_clkspec() - Lookup a clock form a clock provider
++ * @clkspec: pointer to a clock specifier data structure
++ *
++ * This function looks up a struct clk from the registered list of clock
++ * providers, an input is a clock specifier data structure as returned
++ * from the of_parse_phandle_with_args() function call.
++ */
++struct clk *of_clk_get_by_clkspec(struct of_phandle_args *clkspec)
++{
++	struct clk *clk;
++
++	if (!clkspec)
++		return ERR_PTR(-EINVAL);
++
++	of_clk_lock();
++	clk = __of_clk_get_from_provider(clkspec);
++
++	if (!IS_ERR(clk) && !__clk_get(clk))
++		clk = ERR_PTR(-ENOENT);
++
++	of_clk_unlock();
++	return clk;
++}
++
+ struct clk *of_clk_get(struct device_node *np, int index)
+ {
+ 	struct of_phandle_args clkspec;
+@@ -41,13 +67,7 @@ struct clk *of_clk_get(struct device_node *np, int index)
+ 	if (rc)
+ 		return ERR_PTR(rc);
 
+-	of_clk_lock();
+-	clk = __of_clk_get_from_provider(&clkspec);
+-
+-	if (!IS_ERR(clk) && !__clk_get(clk))
+-		clk = ERR_PTR(-ENOENT);
+-
+-	of_clk_unlock();
++	clk = of_clk_get_by_clkspec(&clkspec);
+ 	of_node_put(clkspec.np);
+ 	return clk;
+ }
 --
 1.7.9.5
