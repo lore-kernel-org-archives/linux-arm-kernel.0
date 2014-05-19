@@ -1,41 +1,61 @@
 From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 19 May 2014 07:39:47 +0200
-Subject: [PATCH] Fix for possible null pointer dereference in dma.c
-In-Reply-To: <1400191076-28279-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-References: <1400191076-28279-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-Message-ID: <20140519073947.66bb2c46@ipc1.ka-ro>
+Date: Mon, 19 May 2014 07:53:28 +0200
+Subject: [PATCH v3] pwm: i.MX: Avoid sample FIFO overflow for i.MX PWM
+ version2
+In-Reply-To: <1400217068-22642-1-git-send-email-Ying.Liu@freescale.com>
+References: <1400217068-22642-1-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <20140519075328.7f2ef0c5@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Rickard Strandqvist wrote:
-> There is otherwise a risk of a possible null pointer dereference.
-> 
-> Was largely found by using a static code analysis program called cppcheck.
-> 
-> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
-> ---
->  sound/soc/samsung/dma.c |   10 ++++++----
->  1 fil ?ndrad, 6 till?gg(+), 4 borttagningar(-)
-> 
-> diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
-> index dc09b71..b1f6757 100644
-> --- a/sound/soc/samsung/dma.c
-> +++ b/sound/soc/samsung/dma.c
-> @@ -115,17 +115,19 @@ static void dma_enqueue(struct snd_pcm_substream *substream)
->  static void audio_buffdone(void *data)
->  {
->  	struct snd_pcm_substream *substream = data;
-> -	struct runtime_data *prtd = substream->runtime->private_data;
-> +	struct runtime_data *prtd = NULL;
+Liu Ying wrote:
+[...]
+> @@ -30,6 +32,7 @@
+>  /* i.MX27, i.MX31, i.MX35 share the same PWM function block: */
 >  
->  	pr_debug("Entered %s\n", __func__);
+>  #define MX3_PWMCR                 0x00    /* PWM Control Register */
+> +#define MX3_PWMIR                 0x08    /* PWM Interrupt Register */
+>  #define MX3_PWMSAR                0x0C    /* PWM Sample Register */
+>  #define MX3_PWMPR                 0x10    /* PWM Period Register */
+>  #define MX3_PWMCR_PRESCALER(x)    (((x - 1) & 0xFFF) << 4)
+> @@ -38,7 +41,12 @@
+>  #define MX3_PWMCR_DBGEN			(1 << 22)
+>  #define MX3_PWMCR_CLKSRC_IPG_HIGH (2 << 16)
+>  #define MX3_PWMCR_CLKSRC_IPG      (1 << 16)
+> +#define MX3_PWMCR_SWR		  (1 << 3)
+>  #define MX3_PWMCR_EN              (1 << 0)
+> +#define MX3_PWMSR_ROV             (1 << 4)
+> +#define MX3_PWMIR_RIE             (1 << 1)
+> +
+You should decide whether to use tabs or spaces for indentation.
+And probably cleanup the indentation of the existing definitions to use
+all the same indentation style.
+
+> @@ -128,6 +160,13 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
+>  	else
+>  		period_cycles = 0;
 >  
-> -	if (prtd->state & ST_RUNNING) {
-> +	if(substream)
->
-Missing space.
+> +	if (!enable || duty_cycles == 0)
+> +		imx_pwm_software_reset_v2(chip);
+> +	else if (readl(imx->mmio_base + MX3_PWMSAR))
+> +		/* No rollover irq generated if duty peroid is zero. */
+typo: 'period'.
+
+> @@ -135,27 +174,55 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
+>  		MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN |
+>  		MX3_PWMCR_DBGEN | MX3_PWMCR_CLKSRC_IPG_HIGH;
+>  
+> -	if (test_bit(PWMF_ENABLED, &pwm->flags))
+> +	if (enable)
+>  		cr |= MX3_PWMCR_EN;
+>  
+>  	writel(cr, imx->mmio_base + MX3_PWMCR);
+>  
+> +	if (enable && duty_cycles)
+> +		/* No rollover irq generated if duty peroid is zero. */
+dto.
 
 
 Lothar Wa?mann
