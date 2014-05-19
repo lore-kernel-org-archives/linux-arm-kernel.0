@@ -1,73 +1,93 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Mon, 19 May 2014 08:12:28 +0530
-Subject: [PATCH v5 1/5] ARM: EXYNOS: Add generic cpu power control
- functions for all exynos based SoCs
-In-Reply-To: <5376AE39.1030301@gmail.com>
-References: <1399307221-8659-1-git-send-email-a.kesavan@samsung.com>
- <1399307221-8659-2-git-send-email-a.kesavan@samsung.com>
- <019b01cf6e52$75e1a710$61a4f530$@samsung.com>
- <CAM4voamSNYZ_hsjF3eZhqZ=FF__39tFgi5FeXRcUhRbYYzu0LQ@mail.gmail.com>
- <53752D8C.3030708@gmail.com>
- <CAM4voam1UiX+WaxScTdhb4bW+_1nCcsztFEkx4MyWFOBBjV6XQ@mail.gmail.com>
- <5376AE39.1030301@gmail.com>
-Message-ID: <CAM4voan1SjvaSsWemxSFkkuSZH5v8X4KY6giLnvDznnw2aryWg@mail.gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Mon, 19 May 2014 10:43:01 +0800
+Subject: [PATCH v2 0/5] mmc: sdhci: a few fixes on timeout and
+ max_discard_to
+In-Reply-To: <20140517140902.GB12916@dragon>
+References: <1387268191-19859-1-git-send-email-b29396@freescale.com>
+ <20140517140902.GB12916@dragon>
+Message-ID: <CAA+hA=QuWZudYbgv+K-amUJxLC7MyY2MNUXw10tTFvCOTCo8xA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
-
-On Sat, May 17, 2014 at 6:02 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->
->
-> On 16.05.2014 07:07, Abhilash Kesavan wrote:
->> Hi Tomasz,
+On Sat, May 17, 2014 at 10:09 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Tue, Dec 17, 2013 at 04:16:26PM +0800, Dong Aisheng wrote:
+>> Patch 1~4 mainly fixes the issue that the max timeout counter for uSDHC is
+>> 1 << 28 rather than 1 << 27. 1~2 fix getting the max timeout counter
+>> while 3~4 fix setting the max timeout.
+>> Thus it introduces two new platform hook: get_max_timeout_count and set_timeout
+>> for those platform which have different timeout setting.
 >>
->> On Fri, May 16, 2014 at 2:41 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->>> Hi Abhilash,
->>>
->>> On 13.05.2014 12:12, Abhilash Kesavan wrote:
->>>> On Tue, May 13, 2014 at 7:54 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->>>
->>> [snip]
->>>
->>>>>> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-
->>>>>> pmu.h
->>>>>> index 4f6a256..0bdfcbc 100644
->>>>>> --- a/arch/arm/mach-exynos/regs-pmu.h
->>>>>> +++ b/arch/arm/mach-exynos/regs-pmu.h
->>>>>> @@ -121,6 +121,12 @@
->>>>>>
->>>>>>  #define S5P_CHECK_SLEEP                              0x00000BAD
->>>>>>
->>>>>> +#define EXYNOS_ARM_CORE0_CONFIGURATION               S5P_PMUREG(0x2000)
->>>>>
->>>>> This can be put in order of address.
->>>> OK, will fix.
->>>>>
->>>>>> +#define EXYNOS_ARM_CORE_CONFIGURATION(_nr)   \
->>>>>> +                     (EXYNOS_ARM_CORE0_CONFIGURATION + (0x80 * (_nr)))
->>>>>> +#define EXYNOS_ARM_CORE_STATUS(_nr)          \
->>>>>> +                     (EXYNOS_ARM_CORE_CONFIGURATION(_nr) + 0x4)
->>>
->>> My patches posted quite a while ago [1] to fix DT CPU topology already
->>> add these, remove S5P_ARM_CORE1* and fix corresponding usage in
->>> hotplug.c and platsmp.c.
->>>
->>> [1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/29573
->>>
->>> So I think you should rebase on top of them or at least on top of
->>> patches 1 and 2 from that series, as 3 and 4 should be dropped.
->>
->> Patch 2 of your series does not apply on kgene's for-next or
->> linux-next. Are you planning on re-sending this ?
+>> This issue is firstly reported here by Ed Sutter:
+>> http://www.spinics.net/lists/linux-mmc/msg23375.html
+>> The root cause is the max_discard_to got from uSDHC is too small, only 677ms,
+>> which cause the max_discard_bytes for eMMC is only 512, then the discard operation
+>> of mkfs.ext3 for an eMMC card is too slow, just like dead.
+>> With above patches, the issue can be fixed.
 >
-> OK, it seems like Kukjin has already applied your v6 series, so let's
-> drop my series for now. I'll remove patch 1 from my series and rebase it
-> on top of your v6.
-Ok, thanks.
+> It seems the series got lost?  The issue reported by Ed Sutter is still
+> there with the latest kernel.
+>
+> Dong, you may need to rebase it a little bit and resend.
+>
 
-Regards,
-Abhilash
+Yes, it's lost.
+I will rebase and resend it.
+
+Regards
+Dong Aisheng
+
+> Shawn
 >
-> Best regards,
-> Tomasz
+>>
+>> Patch 5 adds the capability to calcalute the max_discard_to dynamically
+>> for SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK.
+>>
+>> Originally the max_discard_to for a high speed sdhc card may be:
+>> mmc1: new high speed SDHC card at address aaaa
+>> mmc1: calculated max. discard sectors 49152 for timeout 1355 ms
+>> After fix:
+>> mmc1: new high speed SDHC card at address aaaa
+>> mmc1: calculated max. discard sectors 712704 for timeout 5422 ms
+>>
+>> It also improves the card discard performance a lot due to max_discard_sectors
+>> increase a lot.
+>>
+>> There's also discussion about remove max_discard_to limit here:
+>> http://www.spinics.net/lists/linux-mmc/msg23395.html
+>> But it does not help for uSDHC since we can observe data timeout
+>> on a Toshiba SD3.0 cards if we do not disable data timeout interrupt.
+>>
+>> ChangeLog:
+>> v1->v2:
+>>  1. change .get_max_timeout to .get_max_timeout_count to reuse some code
+>>  2. some other minor changes based on Shawn's comment.
+>>  3. patch 6 in v1 is dropped since not need anymore after change 1
+>>
+>>
+>>
+>> Dong Aisheng (5):
+>>   mmc: sdhci: add platfrom get_max_timeout_count hook
+>>   mmc: sdhci-esdhc-imx: fix incorrect max_discard_to for uSDHC
+>>   mmc: sdhci: add platform set_timeout hook
+>>   mmc: sdhci-esdhc-imx: set the correct max timeout value for uSDHC
+>>   mmc: sdhci: calculate max_discard_to dynamically for
+>>     SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
+>>
+>>  drivers/mmc/host/sdhci-esdhc-imx.c |   20 +++++++++++
+>>  drivers/mmc/host/sdhci.c           |   66 +++++++++++++++++++++++------------
+>>  drivers/mmc/host/sdhci.h           |    3 ++
+>>  3 files changed, 66 insertions(+), 23 deletions(-)
+>>
+>> --
+>> 1.7.2.rc3
+>>
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
