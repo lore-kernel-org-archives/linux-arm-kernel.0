@@ -1,28 +1,37 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 19 May 2014 15:13:06 +0800
-Subject: [PATCH 1/4] ARM: imx: move SOC_IMX5 and SOC_IMX51 into 'Device
- tree only'
-In-Reply-To: <1400483195.557817536@f437.i.mail.ru>
-References: <1400482606-8278-1-git-send-email-shawn.guo@freescale.com>
- <1400482606-8278-2-git-send-email-shawn.guo@freescale.com>
- <1400483195.557817536@f437.i.mail.ru>
-Message-ID: <20140519071304.GL10685@dragon>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 19 May 2014 09:18:23 +0200
+Subject: [linux-sunxi] Re: [PATCH v5 4/8] input: misc: Add driver for
+ AXP20x Power Enable Key
+In-Reply-To: <20140519055745.GL29386@core.coreip.homeip.net>
+References: <1398947374-3115-1-git-send-email-carlo@caione.org>
+ <1398947374-3115-5-git-send-email-carlo@caione.org>
+ <20140503010604.GE4090@lukather>
+ <20140519055745.GL29386@core.coreip.homeip.net>
+Message-ID: <CAOQ7t2bPHnjfpeqQjMsYJs--qpd1_1RvBEFXztTDgnf5yW=Yxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 11:06:35AM +0400, Alexander Shiyan wrote:
-> > @@ -704,6 +691,19 @@ if ARCH_MULTI_V7
-> >  
-> >  comment "Device tree only"
-> >  
-> > +config SOC_IMX5
-> > +	bool
-> > +	select ARCH_HAS_CPUFREQ
-> > +	select ARCH_HAS_OPP
-> > +	select ARCH_MXC_IOMUX_V3
-> 
-> We can drop ARCH_MXC_IOMUX_V3 now.
+On Mon, May 19, 2014 at 7:57 AM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
+> On Fri, May 02, 2014 at 06:06:04PM -0700, Maxime Ripard wrote:
+>> On Thu, May 01, 2014 at 02:29:30PM +0200, Carlo Caione wrote:
+>> > This patch add support for the Power Enable Key found on MFD AXP202 and
+>> > AXP209. Besides the basic support for the button, the driver adds two
+>> > entries in sysfs to configure the time delay for power on/off.
+>> >
+>> > Signed-off-by: Carlo Caione <carlo@caione.org>
+>>
+>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>
+> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>
+> How are we merging it? MFD tree?
 
-Yes, you're right.  Dropped it.  Thanks, Alexander.
+No idea. Lee, can you help in merging it?
+The only thing still  left out is the DT to be merged through Maxime
+(I need to submit a v6 only for that).
 
-Shawn
+Thanks,
+
+-- 
+Carlo Caione
