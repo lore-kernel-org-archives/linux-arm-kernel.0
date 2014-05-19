@@ -1,47 +1,229 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 May 2014 12:26:35 +0200
-Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
-References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <4391809.OTRCiJQXS4@wuerfel>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Mon, 19 May 2014 13:25:51 +0300
+Subject: [Patch v3 1/5] Power: reset: keystone-reset: introduce keystone reset
+ driver
+In-Reply-To: <1400495155-11136-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1400495155-11136-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <1400495155-11136-2-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 May 2014 14:23:18 Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> This commit introduces a generic device tree binding for IOMMU devices.
-> Only a very minimal subset is described here, but it is enough to cover
-> the requirements of both the Exynos System MMU and Tegra SMMU as
-> discussed here:
-> 
->     https://lkml.org/lkml/2014/4/27/346
-> 
-> More advanced functionality such as the dma-ranges property can easily
-> be added in a backwards-compatible way. In the absence of a dma-ranges
-> property it should be safe to default to the whole address space.
-> 
+The keystone SoC can be rebooted in several ways. By external reset
+pin, by soft and by watchdogs. To allow keystone SoC reset if
+watchdog is triggered we have to enable it in reset mux configuration
+register regarding of watchdog configuration. Also we need to set
+soft/hard reset we are going to use.
 
-The basic binding looks fine, but I'd like it to be more explicit
-about dma-ranges. Most importantly, what does "the whole address space"
-mean? A lot of IOMMUs have only 32-bit bus addresses when targetted
-by a bus master, it would also be normal for some to be smaller and
-some might even support 64-bit.
+So add keystone reset driver to handle all this stuff.
 
-For the upstream side, I'd hope we always have access to the full
-physical memory, but since this is a brand-new binding, it should
-be straightforward to just ask for upstream dma-ranges properties
-to be set all the way up to the root to confirm that.
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+ drivers/power/reset/Kconfig          |   7 ++
+ drivers/power/reset/Makefile         |   1 +
+ drivers/power/reset/keystone-reset.c | 171 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 179 insertions(+)
+ create mode 100644 drivers/power/reset/keystone-reset.c
 
-For downstream, we don't actually have a good place to put the
-dma-ranges property. We can't put it into the iommu node, because
-that would imply translating to the iommu's parent bus, not the
-iommu's own bus space. We also can't put it into the master, because
-dma-ranges is supposed to be in the parent bus. Finally, it makes
-no sense to use the dma-ranges property of the master's parent bus,
-because that bus isn't actually involved in the translation.
-
-My preferred option would be to always put the address range into
-the iommu descriptor, using the iommu's #address-cells.
-
-	Arnd
+diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+index fa0e4e0..4d2d3d8 100644
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -57,3 +57,10 @@ config POWER_RESET_XGENE
+ 	depends on POWER_RESET
+ 	help
+ 	  Reboot support for the APM SoC X-Gene Eval boards.
++
++config POWER_RESET_KEYSTONE
++	bool "Keystone reset driver"
++	depends on ARCH_KEYSTONE
++	help
++	  Reboot support for the KEYSTONE SoCs.
++
+diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+index a5b4a77..802a420 100644
+--- a/drivers/power/reset/Makefile
++++ b/drivers/power/reset/Makefile
+@@ -5,3 +5,4 @@ obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
+ obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
+ obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
+ obj-$(CONFIG_POWER_RESET_XGENE) += xgene-reboot.o
++obj-$(CONFIG_POWER_RESET_KEYSTONE) += keystone-reset.o
+diff --git a/drivers/power/reset/keystone-reset.c b/drivers/power/reset/keystone-reset.c
+new file mode 100644
+index 0000000..3e44040
+--- /dev/null
++++ b/drivers/power/reset/keystone-reset.c
+@@ -0,0 +1,171 @@
++/*
++ * TI keystone reboot driver
++ *
++ * Copyright (C) 2014 Texas Instruments Incorporated. http://www.ti.com/
++ *
++ * Author: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/reboot.h>
++#include <asm/system_misc.h>
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
++
++#define RSTYPE_RG			0x0
++#define RSCTRL_RG			0x4
++#define RSCFG_RG			0x8
++#define RSISO_RG			0xc
++
++#define RSCTRL_KEY_MASK			0xffff0000
++#define RSCTRL_KEY			0x5a69
++#define RSCTRL_RESET			BIT(16)
++
++#define RSMUX_OMODE_MASK		0xe
++#define RSMUX_OMODE_RESET_SOC		0xa
++#define RSMUX_OMODE_RESET_OFF		0x0
++#define RSMUX_LOCK_MASK			0x1
++#define RSMUX_LOCK_SET			0x1
++
++#define RSCFG_RSTYPE_SOFT		0x300f
++#define RSCFG_RSTYPE_HARD		0x0
++
++#define WDT_MUX_NUMBER			0x4
++
++static void __iomem *rspll_base;
++
++/**
++ * rsctrl_enable_rspll_write - enable access to RSCTRL, RSCFG
++ * To be able to access to RSCTRL, RSCFG registers
++ * we have to write a key before
++ */
++static void rsctrl_enable_rspll_write(void)
++{
++	u32 val;
++	void __iomem *rstctrl_rg;
++
++	rstctrl_rg = rspll_base + RSCTRL_RG;
++	val = readl(rstctrl_rg);
++	val &= RSCTRL_KEY_MASK;
++	val |= RSCTRL_KEY;
++	writel(val, rstctrl_rg);
++}
++
++static void rsctrl_restart(enum reboot_mode mode, const char *cmd)
++{
++	u32 val;
++	void __iomem *rstctrl;
++
++	/* enable write access to RSTCTRL */
++	rsctrl_enable_rspll_write();
++
++	/* reset the SOC */
++	rstctrl = rspll_base + RSCTRL_RG;
++	val = readl(rstctrl);
++	val &= ~RSCTRL_RESET;
++	writel(val, rstctrl);
++}
++
++static struct of_device_id rsctrl_of_match[] = {
++	{.compatible = "ti,keystone-reset", },
++	{},
++};
++
++static int rsctrl_probe(struct platform_device *pdev)
++{
++	int i;
++	int ret;
++	u32 val;
++	void __iomem *rg;
++	struct resource *res;
++	void __iomem *rsmux_base;
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++
++	if (!np)
++		return -ENODEV;
++
++	i = of_property_match_string(np, "reg-names", "pllregs");
++	res = platform_get_resource(pdev, IORESOURCE_MEM, i);
++	rspll_base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(rspll_base))
++		return PTR_ERR(rspll_base);
++
++	i = of_property_match_string(np, "reg-names", "muxregs");
++	res = platform_get_resource(pdev, IORESOURCE_MEM, i);
++	rsmux_base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(rsmux_base))
++		return PTR_ERR(rsmux_base);
++
++	/* set soft/hard reset */
++	val = of_property_read_bool(np, "ti,soft-reset");
++	val = val ? RSCFG_RSTYPE_SOFT : RSCFG_RSTYPE_HARD;
++
++	rsctrl_enable_rspll_write();
++	writel(val, rspll_base + RSCFG_RG);
++
++	arm_pm_restart = rsctrl_restart;
++
++	/* disable reset isolation for all module clocks */
++	writel(0, rspll_base + RSISO_RG);
++
++	/* enable reset for watchdogs from list */
++	for (i = 0; i < WDT_MUX_NUMBER; i++) {
++		ret = of_property_read_u32_index(np, "ti,wdt_list", i, &val);
++		if (ret == -EOVERFLOW && !i) {
++			dev_err(dev, "ti,wdt_list property has to contain at"
++				"least one entry\n");
++			return -EINVAL;
++		} else if (ret) {
++			break;
++		}
++
++		if (val >= WDT_MUX_NUMBER) {
++			dev_err(dev, "ti,wdt_list property can contain"
++				"only numbers < 4\n");
++			return -EINVAL;
++		}
++
++		rg = rsmux_base + val * 4;
++
++		val = readl(rg);
++		val &= ~RSMUX_OMODE_MASK;
++		val |= RSMUX_OMODE_RESET_SOC | RSMUX_LOCK_SET;
++		writel(val, rg);
++	}
++
++	/* disable reset for watchdogs from not list */
++	for (i = 0; i < WDT_MUX_NUMBER; i++) {
++		rg = rsmux_base + i * 4;
++
++		val = readl(rg);
++		if (!(val & RSMUX_LOCK_MASK)) {
++			val &= ~RSMUX_OMODE_MASK;
++			val |= RSMUX_OMODE_RESET_OFF | RSMUX_LOCK_SET;
++			writel(val, rg);
++		}
++	}
++
++	devm_iounmap(dev, rsmux_base);
++	return 0;
++}
++
++static struct platform_driver rsctrl_driver = {
++	.probe = rsctrl_probe,
++	.driver = {
++		.owner = THIS_MODULE,
++		.name = KBUILD_MODNAME,
++		.of_match_table = rsctrl_of_match,
++	},
++};
++module_platform_driver(rsctrl_driver);
++
++MODULE_AUTHOR("Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>");
++MODULE_DESCRIPTION("Texas Instruments keystone reset driver");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:" KBUILD_MODNAME);
+-- 
+1.8.3.2
