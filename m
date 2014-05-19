@@ -1,32 +1,81 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 20 May 2014 00:56:19 +0900
-Subject: [PATCH V2 0/2] ARM: dts: snow: add backlight node
-In-Reply-To: <1400476540-14828-1-git-send-email-ajaykumar.rs@samsung.com>
-References: <1400476540-14828-1-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <537A29A3.4000302@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 19 May 2014 16:51:06 +0100
+Subject: [STLinux Kernel] [PATCH 3/4] ARM: DT: STi: Add DT node for
+ MiPHY365x
+In-Reply-To: <537A265E.8080407@st.com>
+References: <1398756095-32542-1-git-send-email-lee.jones@linaro.org>
+ <1398756095-32542-4-git-send-email-lee.jones@linaro.org>
+ <537A265E.8080407@st.com>
+Message-ID: <20140519155106.GR4978@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/14 14:15, Ajay Kumar wrote:
-> This series is based on Kukjin Kim's tree, for-next branch.
->
-> This series adds:
-> 	-- pinctrl definitions for pwmX_out on exynos5250
-> 	-- pwm-backlight DT node for exynos5250 based snow board
->
-> Changes since V1:
-> 	-- Added the branch name against which patches are created.
-> 	-- Rebase the patches on top of for-next branch.
->
-> Ajay Kumar (2):
->    [PATCH V2 1/2] ARM: dts: Add pwmX_out pinctrl nodes to Exynos5250
->    [PATCH V2 2/2] ARM: dts: enable pwm backlight for snow
->
->   arch/arm/boot/dts/exynos5250-pinctrl.dtsi |   28 ++++++++++++++++++++++++++++
->   arch/arm/boot/dts/exynos5250-snow.dts     |   10 ++++++++++
->   2 files changed, 38 insertions(+)
->
-As I requested before, it looks good to me, applied.
+> >The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
+> >devices. It has 2 ports which it can use for either; both SATA, both
+> >PCIe or one of each in any configuration.
+> >
+> >Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> >Acked-by: Mark Rutland <mark.rutland@arm.com>
+> >Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
+> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >---
+> >  arch/arm/boot/dts/stih416-b2020-revE.dts | 22 ++++++++++++++++++++++
+> >  arch/arm/boot/dts/stih416-b2020.dts      |  6 ++++++
+> >  arch/arm/boot/dts/stih416.dtsi           | 14 ++++++++++++++
+> >  3 files changed, 42 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/stih416-b2020-revE.dts
+> >
+> >diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
+> >new file mode 100644
+> >index 0000000..23fdaf7
+> >--- /dev/null
+> >+++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
+> >@@ -0,0 +1,22 @@
+> >+/*
+> >+ * Copyright (C) 2014 STMicroelectronics Limited.
+> >+ * Author: Lee Jones <lee.jones@linaro.org>
+> >+ *
+> >+ * This program is free software; you can redistribute it and/or modify
+> >+ * it under the terms of the GNU General Public License version 2 as
+> >+ * publishhed by the Free Software Foundation.
+> >+ */
+> >+/dts-v1/;
+> >+#include "stih416.dtsi"
+> >+#include "stih41x-b2020.dtsi"
+> >+/ {
+> >+        model = "STiH416 B2020 REV-E";
+> >+	compatible = "st,stih416-b2020", "st,stih416";
+> >+
+> >+	soc {
+> >+		miphy365x_phy: miphy365x at fe382000 {
+> >+			st,pcie-tx-pol-inv;
+> >+			st,sata-gen = <3>;
+> >+		};
+> >+	};
+> >+};
+> Shouldn't this new board being added in a separate patch?
 
-Thanks,
-Kukjin
+I certainly can do that, but I don't think that it's necessary?
+
+> >diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
+> >index 276f28d..172f222 100644
+> >--- a/arch/arm/boot/dts/stih416-b2020.dts
+> >+++ b/arch/arm/boot/dts/stih416-b2020.dts
+> >@@ -13,4 +13,10 @@
+> >  	model = "STiH416 B2020";
+> >  	compatible = "st,stih416", "st,stih416-b2020";
+> >
+> >+	soc {
+> >+		miphy365x_phy: miphy365x at fe382000 {
+> >+			st,pcie-tx-pol-inv;
+> >+			st,sata-gen = <3>;
+> >+		};
+> >+	};
+> >  };
+> ...
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
