@@ -1,43 +1,52 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 19 May 2014 09:58:04 +0900
-Subject: [PATCH v8 0/3] Exynos 5410 support
-In-Reply-To: <7hppk5f26g.fsf@paris.lan>
-References: <1397459860-21869-1-git-send-email-t.dakhran@samsung.com>
- <7hppk5f26g.fsf@paris.lan>
-Message-ID: <019101cf72fd$644883c0$2cd98b40$@samsung.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Mon, 19 May 2014 09:54:03 +0800
+Subject: [PATCH Resend] ARM: kdump: makes second kernel use strict pfn_valid
+Message-ID: <1400464443-34816-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman wrote:
-> 
-> Tarek Dakhran <t.dakhran@samsung.com> writes:
-> 
-> > The series of patches represent support of Exynos 5410 SoC
-> >
-> > The Exynos 5410 is the first Samsung SoC based on bigLITTLE architecture
-> >
-> > Patches add new platform description, support of clock controller and
-> device
-> > tree for Exynos 5410.
-> >
-> > Has been build on Linux Kernel v3.15-rc1
-> > Has been tested on: 1) Exynos 5410 reference board (exynos_defconfig)
-> > 		    2) Odroid-XU board (exynos_defconfig)
-> 
-Hi all,
+When SPARSEMEM and CRASH_DUMP both selected, simple pfn_valid prevents
+the second kernel ioremap first kernel's memory if the address falls
+into second kernel section. This limitation requires the second kernel
+occupies a full section, and elfcorehdr must resides in another section.
 
-Sorry for late response...
+This patch makes crash dump kernel use strict pfn_valid, removes such
+limitation.
 
-> Tested-by: Kevin Hilman <khilman@linaro.org>
-> 
-Kevin,
+For example:
 
-Thanks for your test :-)
+  For a platform with SECTION_SIZE_BITS == 28 (256MiB) and
+  crashkernel=128M at 0x28000000 in kernel cmdline, the second
+  kernel is loaded at 0x28000000. Kexec puts elfcorehdr at
+  0x2ff00000, and passes 'elfcorehdr=0x2ff00000 mem=130048K' to
+  second kernel. When second kernel start, it tries to use
+  ioremap to retrive its elfcorehrd. In this case, elfcodehdr is at the
+  same section of the second kernel, pfn_valid will recongnize
+  the page as valid, so ioremap will refuse to map it.
 
-[...]
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+Cc: Geng Hui <hui.geng@huawei.com>
+---
 
-Tarek, can you please re-spin this series based on my current for-next
-because some common stuff has been changed?
+I have sent this patch once, but get no response. Resend with commit
+message update.
 
-Thanks,
-Kukjin
+---
+ arch/arm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index db3c541..795b1d4 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1800,7 +1800,7 @@ config ARCH_SELECT_MEMORY_MODEL
+ 	def_bool ARCH_SPARSEMEM_ENABLE
+ 
+ config HAVE_ARCH_PFN_VALID
+-	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
++	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM || CRASH_DUMP
+ 
+ config HIGHMEM
+ 	bool "High Memory Support"
+-- 
+1.8.4
