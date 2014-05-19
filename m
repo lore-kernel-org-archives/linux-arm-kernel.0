@@ -1,41 +1,99 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Sun, 18 May 2014 22:47:21 -0500
-Subject: [GIT PULL] SOCFPGA DTS updates for 3.16, take 2
-Message-ID: <1400471241-21456-1-git-send-email-dinguyen@altera.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Mon, 19 May 2014 04:11:35 +0000
+Subject: [PATCHv4 2/2] regmap: add DT endianness binding support.
+In-Reply-To: <20140509164719.GE16418@e106331-lin.cambridge.arm.com>
+References: <1399601073-19278-1-git-send-email-Li.Xiubo@freescale.com>
+ <1399601073-19278-3-git-send-email-Li.Xiubo@freescale.com>
+ <20140509164719.GE16418@e106331-lin.cambridge.arm.com>
+Message-ID: <00adcdedcfdf4c828d5fd5a8dd7e28bd@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin and Olof,
+> Subject: Re: [PATCHv4 2/2] regmap: add DT endianness binding support.
+> 
+> On Fri, May 09, 2014 at 03:04:33AM +0100, Xiubo Li wrote:
+> > For many drivers which will support rich endianness of CPU<-->Dev
+> > need define DT properties by itself without the binding support.
+> >
+> > The endianness using regmap:
+> > Index    CPU       Device     Endianess flag for DT bool property
+> > ------------------------------------------------------------
+> > 1        LE        LE         -
+> > 2        LE        BE         'big-endian-{val,reg}'
+> > 3        BE        BE         -
+> > 4        BE        LE         'little-endian-{val,reg}'
+> 
+> Get rid of the CPU column. It has precisely _nothing_ to do with the
+> device.
+> 
+> If you happen to have a device that can be integrated with varying
+> endianness, the endianness should be described regardless of whether
+> this happens to be the same as the CPU endianness. The kernel can then
+> choose to do the right thing regardless.
+> 
+> Assuming LE or BE by default is sane if most implementations are one
+> rather than the other. Probing and figuring it out dynamically is also
+> fine. Assuming that it's the same as the kernel is broken in general,
+> and should be avoided -- those cases _require_ a *-endian property to
+> work if the CPU can function in either endianness.
+> 
 
-Please consider pulling in this patch for 3.16. This patch adds the DTS
-entries for the GPIOs on the SOCFPGA platform.
+Yes, If my understanding is correct, if we need inverting the bytes order, 
+should be add one property here, regardless of the CPU's endianesses.
 
-Olof had a question regarding how the GPIO node needed 2-layer approach.
 
-http://thread.gmane.org/gmane.linux.kernel/1671569/focus=1702208
+> > Please see the following documetation for detail:
+> >     Documentation/devicetree/bindings/endianness/endianness.txt
+> 
+> I don't think this is sufficient. That document describes the preferred
+> idiom, not the meaning w.r.t. a specific binding.
+> 
+> [...]
+> 
+> > +	case REGMAP_ENDIAN_REG:
+> > +		if (of_property_read_bool(np, "big-endian-reg"))
+> > +			*endian = REGMAP_ENDIAN_BIG;
+> > +		else if (of_property_read_bool(np, "little-endian-reg"))
+> > +			*endian = REGMAP_ENDIAN_LITTLE;
+> 
+> While this follows the guidelines you've added, context is still
+> required to understand precisely what this means. We need a binding
+> document describing what *-endian-reg means for this binding (i.e. what
+> does -reg cover? All registers? some? buffers?).
+> 
 
-I hope that Alan Tull was able to answer Olof's question.
+Yes, for now the 'reg' is for all registers of the device.
+And the 'val' is for all the values and buffers of the device.
+
+@Mark Brown,
+Do you have any correction here ?
+
+
+> Imagine I added a little-endian-foo property. You'd be able to reason
+> that something is little endian, but you'd have no idea of precisely
+> what without reading documentation or code. As not everyone wants to
+> read several thousand lines of Linux kernel code to write a dts we
+> require documentation.
+> 
+
+@Mark Rutland, @Mark Brown,
+Yes, where should I locate the documentation ?
+Is Documentation/devicetree/bindings/regmap/ okay ?
+
 
 Thanks,
 
-The following changes since commit 2bfac3a551978c4953f659e1bd18d58c3c249f64:
+BRs
+Xiubo
 
-  Merge tag 'socfpga-dt-updates-for-3.16_v3' of git://git.rocketboards.org/linux-socfpga-next into next/dt (2014-05-16 16:07:37 -0700)
 
-are available in the git repository at:
-
-  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_dt_updates-for-3.16_take_2
-
-for you to fetch changes up to 45e3e6316ba45980c756189fdcd79f11e5984501:
-
-  ARM: dts: socfpga: add gpio pieces (2014-05-18 21:39:59 -0500)
-
-----------------------------------------------------------------
-Add the gpio dts entry for the SOCFPGA platform.
-
-----------------------------------------------------------------
-Sebastian Andrzej Siewior (1):
-      ARM: dts: socfpga: add gpio pieces
-
- arch/arm/boot/dts/socfpga.dtsi |   60 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
+> > +	case REGMAP_ENDIAN_VAL:
+> > +		if (of_property_read_bool(np, "big-endian-val"))
+> > +			*endian = REGMAP_ENDIAN_BIG;
+> > +		else if (of_property_read_bool(np, "little-endian-val"))
+> > +			*endian = REGMAP_ENDIAN_LITTLE;
+> 
+> Likewise.
+> 
+> Cheers,
+> Mark.
