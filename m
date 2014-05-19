@@ -1,99 +1,188 @@
-From: Ranjani.Vaidyanathan@freescale.com (Ranjani.Vaidyanathan at freescale.com)
-Date: Mon, 19 May 2014 17:07:45 +0000
-Subject: [PATCH] ARM: imx6: Fix procedure to switch the parent of
- LDB_DI_CLK
-In-Reply-To: <5379B11B.3010501@de.bosch.com>
-References: <1397044538-12676-1-git-send-email-festevam@gmail.com>
- <5379B11B.3010501@de.bosch.com>
-Message-ID: <ba7881a0a50042ff9b2b25b6369ee2bc@BY2PR03MB379.namprd03.prod.outlook.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 19 May 2014 20:05:58 +0300
+Subject: [PATCH v2 2/2] dmaengine: s3c24xx-dma: Add cyclic transfer support
+In-Reply-To: <1400519158-5801-1-git-send-email-anarsoul@gmail.com>
+References: <1400519158-5801-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <1400519158-5801-2-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
+Many audio interface drivers require support of cyclic transfers to work
+correctly, for example Samsung ASoC DMA driver. This patch adds support
+for cyclic transfers to the s3c24xx-dma driver
 
-There is no reason to mask the MMDC_CH1 handshake-mask after the periph2_clk2_sel bit has been set/cleared. It can be done before this step too.
-Only need to make sure that the MMDC handshake-mask is set before switching periph2_clk_sel (bit 26 in CCM_CBCDR).
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+v2: make a code a bit shorter by using is_slave_direction()
 
-Thanks,
-Ranjani
+ drivers/dma/s3c24xx-dma.c | 112 +++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 111 insertions(+), 1 deletion(-)
 
------Original Message-----
-From: Dirk Behme [mailto:dirk.behme at de.bosch.com] 
-Sent: Monday, May 19, 2014 2:22 AM
-To: Fabio Estevam; Vaidyanathan Ranjani-RA5478
-Cc: Guo Shawn-R65073; Estevam Fabio-R49496; christian.gmeiner at gmail.com; linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCH] ARM: imx6: Fix procedure to switch the parent of LDB_DI_CLK
-
-Hi Fabio and Ranjani,
-
-On 09.04.2014 13:55, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
->
-> Due to incorrect placement of the clock gate cell in the ldb_di[x]_clk 
-> tree, the glitchy parent mux of ldb_di[x]_clk can cause a glitch to 
-> enter the ldb_di_ipu_div divider. If the divider gets locked up, no 
-> ldb_di[x]_clk is generated, and the LVDS display will hang when the 
-> ipu_di_clk is sourced from ldb_di_clk.
->
-> To fix the problem, both the new and current parent of the ldb_di_clk 
-> should be disabled before the switch. This patch ensures that correct 
-> steps are followed when ldb_di_clk parent is switched in the beginning of boot.
->
-> Signed-off-by: Ranjani Vaidyanathan 
-> <Ranjani.Vaidyanathan@freescale.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->   arch/arm/mach-imx/clk-imx6q.c | 125 ++++++++++++++++++++++++++++++++++++++++--
->   1 file changed, 121 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c 
-> b/arch/arm/mach-imx/clk-imx6q.c index 20ad0d1..3ee45f4 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -140,6 +140,123 @@ static struct clk_div_table video_div_table[] = {
->   	{ /* sentinel */ }
->   };
->
-> +static void init_ldb_clks(enum mx6q_clks new_parent) {
-> +	struct device_node *np;
-> +	static void __iomem *ccm_base;
-> +	unsigned int reg;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-ccm");
-> +	ccm_base = of_iomap(np, 0);
-> +	WARN_ON(!ccm_base);
-> +
-> +	/*
-> +	 * Need to follow a strict procedure when changing the LDB
-> +	 * clock, else we can introduce a glitch. Things to keep in
-> +	 * mind:
-> +	 * 1. The current and new parent clocks must be disabled.
-> +	 * 2. The default clock for ldb_dio_clk is mmdc_ch1 which has
-> +	 * no CG bit.
-> +	 * 3. In the RTL implementation of the LDB_DI_CLK_SEL mux
-> +	 * the top four options are in one mux and the PLL3 option along
-> +	 * with another option is in the second mux. There is third mux
-> +	 * used to decide between the first and second mux.
-> +	 * The code below switches the parent to the bottom mux first
-> +	 * and then manipulates the top mux. This ensures that no glitch
-> +	 * will enter the divider.
-> +	 *
-> +	 * Need to disable MMDC_CH1 clock manually as there is no CG bit
-> +	 * for this clock. The only way to disable this clock is to move
-> +	 * it topll3_sw_clk and then to disable pll3_sw_clk
-> +	 * Make sure periph2_clk2_sel is set to pll3_sw_clk
-> +	 */
-> +	reg = readl_relaxed(ccm_base + 0x18);
-> +	reg &= ~(1 << 20);
-> +	writel_relaxed(reg, ccm_base + 0x18);
-> +
-> +	/* Set MMDC_CH1 mask bit */
-> +	reg = readl_relaxed(ccm_base + 0x4);
-> +	reg |= 1 << 16;
-> +	writel_relaxed(reg, ccm_base + 0x4);
-
-Just a hopefully simple question: Why do you mask MMDC_CH1 *after* switching to pll3_sw_clk above? Why not mask first, and then switch periph2_clk2_sel to pll3_sw_clk?
-
-Thanks
-
-Dirk
+diff --git a/drivers/dma/s3c24xx-dma.c b/drivers/dma/s3c24xx-dma.c
+index 2167608..141e220 100644
+--- a/drivers/dma/s3c24xx-dma.c
++++ b/drivers/dma/s3c24xx-dma.c
+@@ -164,6 +164,7 @@ struct s3c24xx_sg {
+  * @disrcc: value for source control register
+  * @didstc: value for destination control register
+  * @dcon: base value for dcon register
++ * @cyclic: indicate cyclic transfer
+  */
+ struct s3c24xx_txd {
+ 	struct virt_dma_desc vd;
+@@ -173,6 +174,7 @@ struct s3c24xx_txd {
+ 	u32 disrcc;
+ 	u32 didstc;
+ 	u32 dcon;
++	bool cyclic;
+ };
+ 
+ struct s3c24xx_dma_chan;
+@@ -669,8 +671,10 @@ static irqreturn_t s3c24xx_dma_irq(int irq, void *data)
+ 		/* when more sg's are in this txd, start the next one */
+ 		if (!list_is_last(txd->at, &txd->dsg_list)) {
+ 			txd->at = txd->at->next;
++			if (txd->cyclic)
++				vchan_cyclic_callback(&txd->vd);
+ 			s3c24xx_dma_start_next_sg(s3cchan, txd);
+-		} else {
++		} else if (!txd->cyclic) {
+ 			s3cchan->at = NULL;
+ 			vchan_cookie_complete(&txd->vd);
+ 
+@@ -682,6 +686,12 @@ static irqreturn_t s3c24xx_dma_irq(int irq, void *data)
+ 				s3c24xx_dma_start_next_txd(s3cchan);
+ 			else
+ 				s3c24xx_dma_phy_free(s3cchan);
++		} else {
++			vchan_cyclic_callback(&txd->vd);
++
++			/* Cyclic: reset at beginning */
++			txd->at = txd->dsg_list.next;
++			s3c24xx_dma_start_next_sg(s3cchan, txd);
+ 		}
+ 	}
+ 	spin_unlock(&s3cchan->vc.lock);
+@@ -877,6 +887,104 @@ static struct dma_async_tx_descriptor *s3c24xx_dma_prep_memcpy(
+ 	return vchan_tx_prep(&s3cchan->vc, &txd->vd, flags);
+ }
+ 
++static struct dma_async_tx_descriptor *s3c24xx_dma_prep_dma_cyclic(
++	struct dma_chan *chan, dma_addr_t addr, size_t size, size_t period,
++	enum dma_transfer_direction direction, unsigned long flags,
++	void *context)
++{
++	struct s3c24xx_dma_chan *s3cchan = to_s3c24xx_dma_chan(chan);
++	struct s3c24xx_dma_engine *s3cdma = s3cchan->host;
++	const struct s3c24xx_dma_platdata *pdata = s3cdma->pdata;
++	struct s3c24xx_dma_channel *cdata = &pdata->channels[s3cchan->id];
++	struct s3c24xx_txd *txd;
++	struct s3c24xx_sg *dsg;
++	unsigned sg_len;
++	dma_addr_t slave_addr;
++	u32 hwcfg = 0;
++	int i;
++
++	dev_dbg(&s3cdma->pdev->dev,
++		"prepare cyclic transaction of %d bytes with period %d from %s\n",
++		size, period, s3cchan->name);
++
++	if (!is_slave_direction(direction)) {
++		dev_err(&s3cdma->pdev->dev,
++			"direction %d unsupported\n", direction);
++		return NULL;
++	}
++
++	txd = s3c24xx_dma_get_txd();
++	if (!txd)
++		return NULL;
++
++	txd->cyclic = 1;
++
++	if (cdata->handshake)
++		txd->dcon |= S3C24XX_DCON_HANDSHAKE;
++
++	switch (cdata->bus) {
++	case S3C24XX_DMA_APB:
++		txd->dcon |= S3C24XX_DCON_SYNC_PCLK;
++		hwcfg |= S3C24XX_DISRCC_LOC_APB;
++		break;
++	case S3C24XX_DMA_AHB:
++		txd->dcon |= S3C24XX_DCON_SYNC_HCLK;
++		hwcfg |= S3C24XX_DISRCC_LOC_AHB;
++		break;
++	}
++
++	/*
++	 * Always assume our peripheral desintation is a fixed
++	 * address in memory.
++	 */
++	hwcfg |= S3C24XX_DISRCC_INC_FIXED;
++
++	/*
++	 * Individual dma operations are requested by the slave,
++	 * so serve only single atomic operations (S3C24XX_DCON_SERV_SINGLE).
++	 */
++	txd->dcon |= S3C24XX_DCON_SERV_SINGLE;
++
++	if (direction == DMA_MEM_TO_DEV) {
++		txd->disrcc = S3C24XX_DISRCC_LOC_AHB |
++			      S3C24XX_DISRCC_INC_INCREMENT;
++		txd->didstc = hwcfg;
++		slave_addr = s3cchan->cfg.dst_addr;
++		txd->width = s3cchan->cfg.dst_addr_width;
++	} else {
++		txd->disrcc = hwcfg;
++		txd->didstc = S3C24XX_DIDSTC_LOC_AHB |
++			      S3C24XX_DIDSTC_INC_INCREMENT;
++		slave_addr = s3cchan->cfg.src_addr;
++		txd->width = s3cchan->cfg.src_addr_width;
++	}
++
++	sg_len = size / period;
++
++	for (i = 0; i < sg_len; i++) {
++		dsg = kzalloc(sizeof(*dsg), GFP_NOWAIT);
++		if (!dsg) {
++			s3c24xx_dma_free_txd(txd);
++			return NULL;
++		}
++		list_add_tail(&dsg->node, &txd->dsg_list);
++
++		dsg->len = period;
++		/* Check last period length */
++		if (i == (sg_len - 1))
++			dsg->len = size - (period * i);
++		if (direction == DMA_MEM_TO_DEV) {
++			dsg->src_addr = addr + (period * i);
++			dsg->dst_addr = slave_addr;
++		} else { /* DMA_DEV_TO_MEM */
++			dsg->src_addr = slave_addr;
++			dsg->dst_addr = addr + (period * i);
++		}
++	}
++
++	return vchan_tx_prep(&s3cchan->vc, &txd->vd, flags);
++}
++
+ static struct dma_async_tx_descriptor *s3c24xx_dma_prep_slave_sg(
+ 		struct dma_chan *chan, struct scatterlist *sgl,
+ 		unsigned int sg_len, enum dma_transfer_direction direction,
+@@ -1197,6 +1305,7 @@ static int s3c24xx_dma_probe(struct platform_device *pdev)
+ 
+ 	/* Initialize slave engine for SoC internal dedicated peripherals */
+ 	dma_cap_set(DMA_SLAVE, s3cdma->slave.cap_mask);
++	dma_cap_set(DMA_CYCLIC, s3cdma->slave.cap_mask);
+ 	dma_cap_set(DMA_PRIVATE, s3cdma->slave.cap_mask);
+ 	s3cdma->slave.dev = &pdev->dev;
+ 	s3cdma->slave.device_alloc_chan_resources =
+@@ -1206,6 +1315,7 @@ static int s3c24xx_dma_probe(struct platform_device *pdev)
+ 	s3cdma->slave.device_tx_status = s3c24xx_dma_tx_status;
+ 	s3cdma->slave.device_issue_pending = s3c24xx_dma_issue_pending;
+ 	s3cdma->slave.device_prep_slave_sg = s3c24xx_dma_prep_slave_sg;
++	s3cdma->slave.device_prep_dma_cyclic = s3c24xx_dma_prep_dma_cyclic;
+ 	s3cdma->slave.device_control = s3c24xx_dma_control;
+ 
+ 	/* Register as many memcpy channels as there are physical channels */
+-- 
+1.9.3
