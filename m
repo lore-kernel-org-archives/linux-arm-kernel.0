@@ -1,67 +1,46 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Mon, 19 May 2014 09:00:46 +0530
-Subject: [PATCH 1/4] clk: samsung: out: Add infrastructure to register
- CLKOUT
-In-Reply-To: <5374CA1C.8000207@samsung.com>
-References: <1399640410-30957-1-git-send-email-tushar.behera@linaro.org>
- <1399640410-30957-2-git-send-email-tushar.behera@linaro.org>
- <536DA243.6000600@samsung.com> <53705243.1030704@linaro.org>
- <CAPdUM4N=k-pPxdhPQgVHh0fb+nqkgs7StwM2Pb6C8gcjx6dw-w@mail.gmail.com>
- <5374CA1C.8000207@samsung.com>
-Message-ID: <CAHbNUh03TVxbXZcT3e6618zPdu_53_y6nVjwJE7cWa6zxLMpqA@mail.gmail.com>
+From: t.dakhran@samsung.com (Tarek Dakhran)
+Date: Mon, 19 May 2014 07:37:17 +0400
+Subject: [PATCH v9 0/3] Exynos 5410 support
+Message-ID: <1400470640-30611-1-git-send-email-t.dakhran@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 May 2014 19:37, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Rahul, Tushar,
->
-> On 15.05.2014 15:44, Rahul Sharma wrote:
->> Hi Tushar,
->>
->> Basically you are adding a new clock-type for Clkout. IMO clkout
->> is not a special hardware. Existing clock types can be reused to
->> support clkout. I see 3 major problem here:
->>
->> 1) Clkout -> (Mux + Gate). You clubbed mux and gate together, and
->> exposing as a single clock which is something like a composite clock.
->> IMO this is not a recommended way in CCF.
->>
->> 2) New Clock Type: Since clkout is just a combination of a simple
->> mux and gate which are already supported, it is a unnecessary
->> duplication.
->>
->> 3) Clkout registered along with CMU: which is not correct. Clkout is in PMU
->> (Separate physical IP) and should be registered as a independent Clock
->> provider which provides 1 mux and 1 gate clock (As if now). It should also be
->> well connected with main CMU.
->>
->> I understand the challenge in using regmap interface for a clock provider. But
->> we need to identify a clean solution. IMHO a independent clock provider with
->> iomap, is relatively cleaner approach till CCF is not ready with regmap based
->> reg access for clock registers.
->>
->> Experts!! please comment.
->
-> It's quite unfortunate that Tushar has duplicated the effort to create a
-> clkout driver, considering the fact that we did have such driver
-> internally at SRPOL and it was quite nice and simple.
->
+The series of patches represent support of Exynos 5410 SoC
 
-I had no idea that you had some solutions to this available to be posted :(
+The Exynos 5410 is the first Samsung SoC based on big.LITTLE architecture
 
-Now that the new series is posted, I will test that at my end and
-update you later.
+Patches add new platform description, support of clock controller and device
+tree for Exynos 5410.
 
-> I will post a cleaned-up version today, that is about 2 times smaller in
-> terms of lines of added code and provides the same functionality,
-> without introducing custom clock types. In addition, it models the
-> clkout properly as a feature of PMU, not CMU (CMU only provides outputs
-> of particular sub-blocks that are fed into the PMU).
->
-> Best regards,
-> Tomasz
+Has been build on Samsung Linux Kernel
+  (branch: for-next, commit: ccf5511 ARM: EXYNOS: Add MCPM call-back functions)
+Has been tested on: 1) Exynos 5410 reference board (exynos_defconfig)
+		    2) Odroid-XU board (exynos_defconfig)
 
+Tarek.
 
+Tarek Dakhran (3):
+  ARM: EXYNOS: Add support for EXYNOS5410 SoC
+  clk: exynos5410: register clocks using common clock framework
+  ARM: dts: Add initial device tree support for EXYNOS5410
+
+ .../devicetree/bindings/clock/exynos5410-clock.txt |   51 +++++
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/exynos5410-smdk5410.dts          |   65 ++++++
+ arch/arm/boot/dts/exynos5410.dtsi                  |  158 ++++++++++++++
+ arch/arm/mach-exynos/Kconfig                       |    8 +
+ arch/arm/mach-exynos/exynos.c                      |    1 +
+ arch/arm/mach-exynos/platsmp.c                     |    4 +
+ arch/arm/plat-samsung/include/plat/cpu.h           |   11 +-
+ drivers/clk/samsung/Makefile                       |    1 +
+ drivers/clk/samsung/clk-exynos5410.c               |  223 ++++++++++++++++++++
+ include/dt-bindings/clock/exynos5410.h             |   33 +++
+ 11 files changed, 555 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-clock.txt
+ create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
+ create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
+ create mode 100644 drivers/clk/samsung/clk-exynos5410.c
+ create mode 100644 include/dt-bindings/clock/exynos5410.h
 
 -- 
-Tushar Behera
+1.7.9.5
