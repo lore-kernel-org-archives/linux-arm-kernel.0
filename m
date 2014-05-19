@@ -1,47 +1,19 @@
-From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
-Date: Mon, 19 May 2014 23:37:23 +0200
-Subject: [PATCH] sound: soc: samsung: dma.c: Fix for possible null pointer
- dereference
-Message-ID: <1400535443-5886-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 20 May 2014 01:48:27 +0400
+Subject: [PATCH v2 0/3] Add R8A7791/Koelsch/Henninger board PCI DT support
+Message-ID: <201405200148.28683.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is otherwise a risk of a possible null pointer dereference.
+Hello.
 
-Was largely found by using a static code analysis program called cppcheck.
+   Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-v3.15-rc5-20140517' tag. Here we add internal PCI support for
+the R8A7791-based Koelsch and Henninger boards for the sake of getting USB
+EHCI/OHCI working...
 
-Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
----
- sound/soc/samsung/dma.c |   10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+[1/3] ARM: shmobile: r8a7791: add internal PCI bridge nodes
+[2/3] ARM: shmobile: koelsch: enable internal PCI
+[3/3] ARM: shmobile: henninger: enable internal PCI
 
-diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
-index dc09b71..1d9bcaa 100644
---- a/sound/soc/samsung/dma.c
-+++ b/sound/soc/samsung/dma.c
-@@ -115,17 +115,19 @@ static void dma_enqueue(struct snd_pcm_substream *substream)
- static void audio_buffdone(void *data)
- {
- 	struct snd_pcm_substream *substream = data;
--	struct runtime_data *prtd = substream->runtime->private_data;
-+	struct runtime_data *prtd = NULL;
- 
- 	pr_debug("Entered %s\n", __func__);
- 
--	if (prtd->state & ST_RUNNING) {
-+	if (substream)
-+		prtd = substream->runtime->private_data;
-+
-+	if (prtd && prtd->state & ST_RUNNING) {
- 		prtd->dma_pos += prtd->dma_period;
- 		if (prtd->dma_pos >= prtd->dma_end)
- 			prtd->dma_pos = prtd->dma_start;
- 
--		if (substream)
--			snd_pcm_period_elapsed(substream);
-+		snd_pcm_period_elapsed(substream);
- 
- 		spin_lock(&prtd->lock);
- 		if (!samsung_dma_has_circular()) {
--- 
-1.7.10.4
+WBR, Sergei
