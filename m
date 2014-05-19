@@ -1,60 +1,80 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 19 May 2014 10:28:32 +0100
-Subject: [PATCH 0/9] arm64: KVM: debug infrastructure support
-In-Reply-To: <CALrVBkscsWxRsS42eJi9deFeaBbjQMKq9R2e-u5ztu70rKUvUw@mail.gmail.com>
- (Anup Patel's message of "Mon, 19 May 2014 10:05:42 +0100")
-References: <1399476054-21571-1-git-send-email-marc.zyngier@arm.com>
- <CALrVBkscsWxRsS42eJi9deFeaBbjQMKq9R2e-u5ztu70rKUvUw@mail.gmail.com>
-Message-ID: <87d2fanmm7.fsf@approximate.cambridge.arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 19 May 2014 18:28:55 +0900
+Subject: [PATCH v9 1/4] ARM: dts: Add sysreg sytem controller node to
+ exynos5250 and exynos5420
+In-Reply-To: <1399641784-10833-2-git-send-email-gautam.vivek@samsung.com>
+References: <1399641784-10833-1-git-send-email-gautam.vivek@samsung.com>
+ <1399641784-10833-2-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <02fe01cf7344$c19d36f0$44d7a4d0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19 2014 at 10:05:42 am BST, Anup Patel <anup.patel@linaro.org> wrote
+Vivek Gautam wrote:
+> 
+> This patch adds sysreg-syscon node to exynos5250 and exynos5420 device
+> tree, to access System Register's registers using syscon driver.
+> 
+> Signed-off-by: Kamil Debski <k.debski@samsung.com>
+> [gautam.vivek at samsung.com: Split this syreg-syscon dts entry from
+> dts: Add usb2phy to Exynos 5250 patch]
+> [gautam.vivek at samsung.com: added similar syscon entry for exynos5420]
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> ---
+> 
+Vivek,
 
-Hi Anup,
+See my comment below.
 
-> Overall the patchset looks good to me.
->
-> The debug register usage by Guest will be very rare
-> so a lazy save/restore makes lot-of-sense here.
->
-> The only concern here is that amount of time spend in
-> world-switch will increase for Guest once Guest starts
-> accessing debug registers.
->
-> I was wondering if it is possible to detect that Guest
-> has stopped using debug HW and we can mark debug
-> state as clean. (or something similar)
+And please don't version each patch in series...it's really not a good way.
+It cause very big confusing...
 
-If you look carefully at patch #8 (last hunk of the patch), you'll see
-that I always reset the debug state to "clean" at the end of a guest
-run:
+> Changes since v7:
+> None
+> 
+>  arch/arm/boot/dts/exynos5250.dtsi |    5 +++++
+>  arch/arm/boot/dts/exynos5420.dtsi |    5 +++++
+>  2 files changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+> b/arch/arm/boot/dts/exynos5250.dtsi
+> index 3742331..70f0cd5 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -175,6 +175,11 @@
+>  		reg = <0x10040000 0x5000>;
+>  	};
+> 
+> +	sysreg_system_controller: syscon at 10050000 {
+> +		compatible = "samsung,exynos5250-sys", "syscon";
 
-@@ -609,6 +1040,12 @@ __kvm_vcpu_return:
- 
-        bl __restore_sysregs
-        bl __restore_fpsimd
-+
-+       skip_clean_debug_state x3, 1f
-+       // Clear the dirty flag for the next run
-+       str     xzr, [x0, #VCPU_DEBUG_FLAGS]
-+       bl      __restore_debug
-+1:
-        restore_host_regs
- 
-        mov     x0, x1
+Maybe exynos5250-sysreg?
 
-This ensures that the guest's debug state will only be reloaded if:
+And need to add/modify binding doc?
 
-- MDSCR_EL1 has either MDE or KDE set (which means the guest is actively
-using the debug infrastructure)
-- or the guest has written to a trapped register (which marks the state
-as dirty).
+- Kukjin
 
-I don't think we can do less work than this. Or can we?
-
-Thanks,
-
-        M.
--- 
-Jazz is not dead. It just smells funny.
+> +		reg = <0x10050000 0x5000>;
+> +	};
+> +
+>  	watchdog at 101D0000 {
+>  		compatible = "samsung,exynos5250-wdt";
+>  		reg = <0x101D0000 0x100>;
+> diff --git a/arch/arm/boot/dts/exynos5420.dtsi
+> b/arch/arm/boot/dts/exynos5420.dtsi
+> index a802f74..5d5d6e3 100644
+> --- a/arch/arm/boot/dts/exynos5420.dtsi
+> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+> @@ -682,6 +682,11 @@
+>  		reg = <0x10040000 0x5000>;
+>  	};
+> 
+> +	sysreg_system_controller: syscon at 10050000 {
+> +		compatible = "samsung,exynos5420-sys", "syscon";
+> +		reg = <0x10050000 0x5000>;
+> +	};
+> +
+>  	tmu_cpu0: tmu at 10060000 {
+>  		compatible = "samsung,exynos5420-tmu";
+>  		reg = <0x10060000 0x100>;
+> --
+> 1.7.10.4
