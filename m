@@ -1,31 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 May 2014 19:04:24 +0200
-Subject: [PATCHv3 1/3] ARM: mm: allow sub-architectures to override PCI
- I/O memory type
-In-Reply-To: <20140519165010.GQ15130@arm.com>
-References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <4669695.sl9JY8Fb9h@wuerfel> <20140519165010.GQ15130@arm.com>
-Message-ID: <6041406.aOYqt5yzTp@wuerfel>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 19 May 2014 20:05:57 +0300
+Subject: [PATCH v2 1/2] dmaengine: s3c24xx-dma: Process whole SG chain
+Message-ID: <1400519158-5801-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 May 2014 17:50:10 Will Deacon wrote:
-> On Mon, May 19, 2014 at 05:40:51PM +0100, Arnd Bergmann wrote:
-> > On Monday 19 May 2014 15:23:55 Will Deacon wrote:
-> > > Fair enough -- I just don't think we should dress up an erratum workaround as
-> > > a bug fix, especially when it's adding a new user of strongly-ordered memory
-> > > to the kernel which we can't honour for arm64.
-> > 
-> > Makes sense. How about a patch then that just changes the memory type for
-> > the I/O space and adds a comment explaining all we found out? From what
-> > I can tell, strict ordering is required for Armada 3xx, may or may not
-> > be required elsewhere but should never hurt noticeably. We may want to restrict
-> > it to ARMv6/v7 so we don't have to pick the right domain.
-> 
-> Ok, and we don't bother with the extra dsb in outb? I'm alright with that if
-> the comment goes into enough detail.
+Due to redundant 'break' in loop driver processed only first chunk.
 
-That was my idea. I'm fine with it either way, with the dsb or without it.
-Let's see what Russell thinks about this, he probably has a preference.
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+v2: No changes
 
-	Arnd
+ drivers/dma/s3c24xx-dma.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/dma/s3c24xx-dma.c b/drivers/dma/s3c24xx-dma.c
+index 4eddedb..2167608 100644
+--- a/drivers/dma/s3c24xx-dma.c
++++ b/drivers/dma/s3c24xx-dma.c
+@@ -961,7 +961,6 @@ static struct dma_async_tx_descriptor *s3c24xx_dma_prep_slave_sg(
+ 			dsg->src_addr = slave_addr;
+ 			dsg->dst_addr = sg_dma_address(sg);
+ 		}
+-		break;
+ 	}
+ 
+ 	return vchan_tx_prep(&s3cchan->vc, &txd->vd, flags);
+-- 
+1.9.3
