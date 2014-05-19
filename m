@@ -1,34 +1,74 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 19 May 2014 11:05:03 +0200
-Subject: [PATCH v3 4/4] ARM: multi_v5: Enable LaCie 2Big and 5Big Network
- v2
-In-Reply-To: <1400163836-9831-8-git-send-email-andrew@lunn.ch>
-References: <1400163836-9831-1-git-send-email-andrew@lunn.ch>
- <1400163836-9831-8-git-send-email-andrew@lunn.ch>
-Message-ID: <5379C93F.8050302@gmail.com>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Mon, 19 May 2014 14:35:42 +0530
+Subject: [PATCH 0/9] arm64: KVM: debug infrastructure support
+In-Reply-To: <1399476054-21571-1-git-send-email-marc.zyngier@arm.com>
+References: <1399476054-21571-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CALrVBkscsWxRsS42eJi9deFeaBbjQMKq9R2e-u5ztu70rKUvUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Added arm at kernel.org so they can spot the patch more easily]
+On 7 May 2014 20:50, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> This patch series adds debug support, a key feature missing from the
+> KVM/arm64 port.
+>
+> The main idea is to keep track of whether the debug registers are
+> "dirty" (changed by the guest) or not. In this case, perform the usual
+> save/restore dance, for one run only. It means we only have a penalty
+> if a guest is actually using the debug registers.
+>
+> The huge amount of registers is properly frightening, but CPUs
+> actually only implement a subset of them. Also, there is a number of
+> registers we don't bother emulating (things having to do with external
+> debug and OSlock).
+>
+> This has been tested on a Cortex-A57 platform, running both 32 and
+> 64bit guests, on top of 3.15-rc4. This code also lives in my tree in
+> the kvm-arm64/debug-trap branch.
+>
+> Marc Zyngier (9):
+>   arm64: KVM: rename pm_fake handler to trap_wi_raz
+>   arm64: move DBG_MDSCR_* to asm/debug-monitors.h
+>   arm64: KVM: add trap handlers for AArch64 debug registers
+>   arm64: KVM: common infrastructure for handling AArch32 CP14/CP15
+>   arm64: KVM: use separate tables for AArch32 32 and 64bit traps
+>   arm64: KVM: check ordering of all system register tables
+>   arm64: KVM: add trap handlers for AArch32 debug registers
+>   arm64: KVM: implement lazy world switch for debug registers
+>   arm64: KVM: enable trapping of all debug registers
+>
+>  arch/arm64/include/asm/debug-monitors.h |  19 +-
+>  arch/arm64/include/asm/kvm_asm.h        |  39 ++-
+>  arch/arm64/include/asm/kvm_coproc.h     |   3 +-
+>  arch/arm64/include/asm/kvm_host.h       |  12 +-
+>  arch/arm64/kernel/asm-offsets.c         |   1 +
+>  arch/arm64/kernel/debug-monitors.c      |   9 -
+>  arch/arm64/kvm/handle_exit.c            |   4 +-
+>  arch/arm64/kvm/hyp.S                    | 457 ++++++++++++++++++++++++++++-
+>  arch/arm64/kvm/sys_regs.c               | 494 +++++++++++++++++++++++++++-----
+>  9 files changed, 940 insertions(+), 98 deletions(-)
+>
+> --
+> 1.8.3.4
+>
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
 
-On 05/15/2014 04:23 PM, Andrew Lunn wrote:
-> Enable building LaCie 2Big and 5Big Network v2 in the multi v5 kernel.
->
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->   arch/arm/configs/multi_v5_defconfig | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
-> index 5ebfa8bf8509..02d4e79826d3 100644
-> --- a/arch/arm/configs/multi_v5_defconfig
-> +++ b/arch/arm/configs/multi_v5_defconfig
-> @@ -11,6 +11,7 @@ CONFIG_MODULE_UNLOAD=y
->   # CONFIG_ARCH_MULTI_V7 is not set
->   CONFIG_ARCH_MVEBU=y
->   CONFIG_MACH_KIRKWOOD=y
-> +CONFIG_MACH_NETXBIG=y
->   CONFIG_ARCH_MXC=y
->   CONFIG_MACH_IMX25_DT=y
->   CONFIG_MACH_IMX27_DT=y
->
+Hi Marc,
+
+Overall the patchset looks good to me.
+
+The debug register usage by Guest will be very rare
+so a lazy save/restore makes lot-of-sense here.
+
+The only concern here is that amount of time spend in
+world-switch will increase for Guest once Guest starts
+accessing debug registers.
+
+I was wondering if it is possible to detect that Guest
+has stopped using debug HW and we can mark debug
+state as clean. (or something similar)
+
+Regards,
+Anup
