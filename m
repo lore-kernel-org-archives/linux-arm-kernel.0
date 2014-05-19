@@ -1,29 +1,46 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 May 2014 13:41:06 +0200
-Subject: [PATCHv5 4/4] ARM: mvebu: use pci_ioremap_set_mem_type() to map
- PCI I/O as strongly ordered
-In-Reply-To: <20140519095949.GD5113@arm.com>
-References: <1400487234-4501-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1400487234-4501-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140519095949.GD5113@arm.com>
-Message-ID: <20140519134106.2c71260c@free-electrons.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 19 May 2014 13:53:28 +0200
+Subject: [PATCH] arm: msm: remove board file for Nexus One (ie. mahimahi)
+In-Reply-To: <20140515215726.GA1171@fifo99.com>
+References: <1400101656.9826.4.camel@x220>
+ <20140515174448.GA31159@fifo99.com> <1400177413.11786.11.camel@x220>
+ <20140515215726.GA1171@fifo99.com>
+Message-ID: <1400500408.2007.29.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Catalin Marinas,
+Daniel,
 
-On Mon, 19 May 2014 10:59:49 +0100, Catalin Marinas wrote:
+On Thu, 2014-05-15 at 21:57 +0000, dwalker at fifo99.com wrote:
+> On Thu, May 15, 2014 at 08:10:13PM +0200, Paul Bolle wrote:
+> > This is not something I get to decide. Nevertheless, given that this
+> > file shouldn't have been merged to begin with, I'd appreciate it if some
+> > deadline could be agreed upon.
+> 
+> I think I merged it actually, but there's no rules about what gets merged. How when what order, etc.
+> It's all free form.
 
-> The patch is fine but for this to work in the UP case we need to fix
-> MT_UNCACHED definition for sections. It seems to create SO memory but
-> not necessarily writable (unless I miss something). Anyway, untested,
-> something like this:
+There do not seem to be formal rules. But there surely are some
+requirements for code to be added. One of the requirements is, I think,
+that it should build. This file cannot be built: it is not wired into a
+Makefile and it also includes, what appears to be, its own header file,
+but that header is not part of the tree.
 
-I justed tested in !CONFIG_SMP on Armada 38x, and writing to a PCI I/O
-mapping works in both the MT_UNCACHED and MT_DEVICE cases.
+Even the most dubious of code in drivers/staging is expected to "compile
+properly"!
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> > That being said, I'm not sure how having just this file in mainline
+> > helps your development efforts. It seems it did receive some updates
+> > for, well, treewide stuff. But it surely didn't get build coverage or
+> > runtime testing. So would you lose much if it only remains in your
+> > development tree?
+> 
+> It's effort to remove it.. Your asking for it to get removed, then re-added.. That sounds
+> like a fairly large amount of effort vs just leaving it in place.
+
+Yes, it takes some effort to remove code. And it will also take effort
+to re-add that code later. But I think that's a risk one runs with code
+that has clearly never been buildable.
+
+
+Paul Bolle
