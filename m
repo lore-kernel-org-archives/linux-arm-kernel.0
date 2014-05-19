@@ -1,46 +1,44 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 19 May 2014 13:53:28 +0200
-Subject: [PATCH] arm: msm: remove board file for Nexus One (ie. mahimahi)
-In-Reply-To: <20140515215726.GA1171@fifo99.com>
-References: <1400101656.9826.4.camel@x220>
- <20140515174448.GA31159@fifo99.com> <1400177413.11786.11.camel@x220>
- <20140515215726.GA1171@fifo99.com>
-Message-ID: <1400500408.2007.29.camel@x220>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 19 May 2014 08:57:59 -0300
+Subject: [PATCH v5 2/2] ARM: dts: mx51: Remove mach-cpuimx51sd board file
+In-Reply-To: <1400492895.2007.7.camel@x220>
+References: <1399736856-9489-1-git-send-email-festevam@gmail.com>
+ <1399736856-9489-2-git-send-email-festevam@gmail.com>
+ <20140513015431.GI8330@dragon> <1400492895.2007.7.camel@x220>
+Message-ID: <CAOMZO5ArKGZfqSZurMpsGA28MxNRmqcnYc38G8rR3axVDfwaaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
+On Mon, May 19, 2014 at 6:48 AM, Paul Bolle <pebolle@tiscali.nl> wrote:
 
-On Thu, 2014-05-15 at 21:57 +0000, dwalker at fifo99.com wrote:
-> On Thu, May 15, 2014 at 08:10:13PM +0200, Paul Bolle wrote:
-> > This is not something I get to decide. Nevertheless, given that this
-> > file shouldn't have been merged to begin with, I'd appreciate it if some
-> > deadline could be agreed upon.
-> 
-> I think I merged it actually, but there's no rules about what gets merged. How when what order, etc.
-> It's all free form.
+> This patch just hit linux-next (in next-20140519) as "ARM: mx51: Remove
+> mach-cpuimx51sd board file".
+>
+> It removed the Kconfig symbol MACH_EUKREA_MBIMXSD51_BASEBOARD. But it
+> left one reference to that symbol in sound/soc/fsl/Kconfig untouched,
+> see:
+>
+> config SND_SOC_EUKREA_TLV320
+>         tristate "Eukrea TLV320"
+>         depends on MACH_EUKREA_MBIMX27_BASEBOARD \
+>                 || MACH_EUKREA_MBIMXSD25_BASEBOARD \
+>                 || MACH_EUKREA_MBIMXSD35_BASEBOARD \
+>                 || MACH_EUKREA_MBIMXSD51_BASEBOARD \
+>                 || (OF && ARM)
+>         depends on I2C
+>         select SND_SOC_TLV320AIC23_I2C
+>         select SND_SOC_IMX_AUDMUX
+>         select SND_SOC_IMX_SSI
+>         select SND_SOC_FSL_SSI
+>         select SND_SOC_IMX_PCM_DMA
+>         help
+>           Enable I2S based access to the TLV320AIC23B codec attached
+>           to the SSI interface
+>
+> What should be done with that last reference?
 
-There do not seem to be formal rules. But there surely are some
-requirements for code to be added. One of the requirements is, I think,
-that it should build. This file cannot be built: it is not wired into a
-Makefile and it also includes, what appears to be, its own header file,
-but that header is not part of the tree.
+Thanks for reporting.
 
-Even the most dubious of code in drivers/staging is expected to "compile
-properly"!
+MACH_EUKREA_MBIMXSD51_BASEBOARD should be removed from sound/soc/fsl/Kconfig.
 
-> > That being said, I'm not sure how having just this file in mainline
-> > helps your development efforts. It seems it did receive some updates
-> > for, well, treewide stuff. But it surely didn't get build coverage or
-> > runtime testing. So would you lose much if it only remains in your
-> > development tree?
-> 
-> It's effort to remove it.. Your asking for it to get removed, then re-added.. That sounds
-> like a fairly large amount of effort vs just leaving it in place.
-
-Yes, it takes some effort to remove code. And it will also take effort
-to re-add that code later. But I think that's a risk one runs with code
-that has clearly never been buildable.
-
-
-Paul Bolle
+Would you like to submit a patch?
