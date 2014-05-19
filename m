@@ -1,49 +1,70 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 May 2014 11:34:01 +0200
-Subject: [PATCH RFC 00/11] Remove mach-kirkwood
-In-Reply-To: <4484941.ZWPK5p5yoC@wuerfel>
-References: <1400163836-9831-1-git-send-email-andrew@lunn.ch>
- <8332148.Z1shujgC24@wuerfel>
- <20140516095953.19522ebd@free-electrons.com>
- <4484941.ZWPK5p5yoC@wuerfel>
-Message-ID: <20140519113401.4c83e663@free-electrons.com>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Mon, 19 May 2014 15:05:58 +0530
+Subject: [PATCH 0/9] arm64: KVM: debug infrastructure support
+In-Reply-To: <87d2fanmm7.fsf@approximate.cambridge.arm.com>
+References: <1399476054-21571-1-git-send-email-marc.zyngier@arm.com>
+ <CALrVBkscsWxRsS42eJi9deFeaBbjQMKq9R2e-u5ztu70rKUvUw@mail.gmail.com>
+ <87d2fanmm7.fsf@approximate.cambridge.arm.com>
+Message-ID: <CALrVBktviU6qs_N3AoRd0=BKEVRar65FBca8uQLkzZiuetNkVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
+On 19 May 2014 14:58, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On Mon, May 19 2014 at 10:05:42 am BST, Anup Patel <anup.patel@linaro.org> wrote
+>
+> Hi Anup,
+>
+>> Overall the patchset looks good to me.
+>>
+>> The debug register usage by Guest will be very rare
+>> so a lazy save/restore makes lot-of-sense here.
+>>
+>> The only concern here is that amount of time spend in
+>> world-switch will increase for Guest once Guest starts
+>> accessing debug registers.
+>>
+>> I was wondering if it is possible to detect that Guest
+>> has stopped using debug HW and we can mark debug
+>> state as clean. (or something similar)
+>
+> If you look carefully at patch #8 (last hunk of the patch), you'll see
+> that I always reset the debug state to "clean" at the end of a guest
+> run:
+>
+> @@ -609,6 +1040,12 @@ __kvm_vcpu_return:
+>
+>         bl __restore_sysregs
+>         bl __restore_fpsimd
+> +
+> +       skip_clean_debug_state x3, 1f
+> +       // Clear the dirty flag for the next run
+> +       str     xzr, [x0, #VCPU_DEBUG_FLAGS]
+> +       bl      __restore_debug
+> +1:
+>         restore_host_regs
+>
+>         mov     x0, x1
+>
+> This ensures that the guest's debug state will only be reloaded if:
+>
+> - MDSCR_EL1 has either MDE or KDE set (which means the guest is actively
+> using the debug infrastructure)
+> - or the guest has written to a trapped register (which marks the state
+> as dirty).
 
-On Mon, 19 May 2014 11:12:05 +0200, Arnd Bergmann wrote:
+Thanks for pointing out.
 
-> > The work on Orion5x is still on-going. I'd like to progressively
-> > continue the DT migration of Orion5x, moving to multiplatform, and then
-> > once it's done, move into mach-mvebu. I'd appreciate to not rush things
-> > more than necessary.
-> 
-> Yes, that's fine. I'd just want to be sure we all understand what is
-> going into 3.16 and what isn't.
-> 
-> So your plan for now is to do DT support in 3.16 and multiplatform after
-> 3.16? That won't have any conflicts with the kirkwood patches then, as
-> far as I can tell.
+Can you add this info as comment in patch#8 where you
+clear the dirty flag?
 
-Yes, my plan is to have what's already in the 'mvebu' branches for
-3.16, i.e the migration to DT of a small number of Orion5x machines, as
-well as the corresponding dependencies (pinctrl support, clock support,
-etc.).
+>
+> I don't think we can do less work than this. Or can we?
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny.
 
-Then, for 3.17, I'll try to:
-
- * convert more Orion5x boards to DT
- * support PCIe through DT
- * move to multiplatform
-
-Of course, that's a purely tentative schedule, Orion5x is really a
-spare time effort today.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+--
+Anup
