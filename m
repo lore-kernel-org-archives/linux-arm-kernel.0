@@ -1,70 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 19 May 2014 14:32:53 +0100
-Subject: [PATCH v3 3/7] mfd: add support for sun6i PRCM
- (Power/Reset/Clock Management) unit
-In-Reply-To: <20140519092725.GE29466@lukather>
-References: <1399633911-7094-1-git-send-email-boris.brezillon@free-electrons.com>
- <1399633911-7094-4-git-send-email-boris.brezillon@free-electrons.com>
- <20140509135251.GY5767@lee--X1> <20140515151756.GX29258@lukather>
- <20140519092159.GE4978@lee--X1> <20140519092725.GE29466@lukather>
-Message-ID: <20140519133253.GJ4978@lee--X1>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 19 May 2014 15:38:15 +0200
+Subject: [RFC PATCHv1 0/7] ARM core support for hardware I/O coherency
+ in non-SMP platforms
+In-Reply-To: <20140514170456.GC15946@arm.com>
+References: <1400082641-23871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140514170456.GC15946@arm.com>
+Message-ID: <20140519153815.0c147a6e@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Catalin Marinas,
 
-> > > > > The PRCM (Power/Reset/Clock Management) block exposes several subdevices
-> > > > > in different subsystems (clk, reset ...)
-> > > > > 
-> > > > > Add basic support for the PRCM unit with clk (AR100, AHB0, and APB0 clks)
-> > > > > and reset controller subdevices.
-> > > > > 
-> > > > > Other subdevices might be added later (if needed).
-> > > > > 
-> > > > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > > > > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > > > ---
-> > > > >  drivers/mfd/Kconfig      |   8 +++
-> > > > >  drivers/mfd/Makefile     |   1 +
-> > > > >  drivers/mfd/sun6i-prcm.c | 134 +++++++++++++++++++++++++++++++++++++++++++++++
-> > > > >  3 files changed, 143 insertions(+)
-> > > > >  create mode 100644 drivers/mfd/sun6i-prcm.c
-> > > > 
-> > > > [...]
-> > > > 
-> > > > > +/*
-> > > > > + * Copyright (C) 2014 Free Electrons
-> > > > > + *
-> > > > > + * License Terms: GNU General Public License v2
-> > > > > + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > > > > + *
-> > > > > + * Allwinner PRCM (Power/Reset/Clock Management) driver
-> > > > > + *
-> > > > > + */
-> > > > > +
-> > > > > +#include <linux/mfd/core.h>
-> > > > > +#include <linux/module.h>
-> > > > > +#include <linux/of.h>
-> > > > 
-> > > > Ah, now isn't that better?
-> > > > 
-> > > > Acked-by: Lee Jones <lee.jones@linaro.org>
-> > > 
-> > > How do you want to merge this? Do you want me to take it through
-> > > mach-sunxi tree, or do you want to take it in your tree?
-> > 
-> > If Boris can tell me what needs to go in with this patch (or if it
-> > can go in on its own), I will create a(n immutable) branch from which
-> > you can pull into your tree.
+On Wed, 14 May 2014 18:04:56 +0100, Catalin Marinas wrote:
+
+> >    - The pages must be set as shareable.
 > 
-> We don't have any runtime or compile time dependency on this, so you
-> can merge it through your tree. Unless something change, I don't have
-> to pull anything in my tree.
+> Here you may have some conflict between the initial page tables set in
+> __create_page_tables as non-shareable (that's unless MPIDR shows it as
+> SMP but I guess not since smp-on-up kicks in). I have to think a bit
+> more about the implications (the ARM ARM has a chapter on mismatched
+> memory attributes and I think it talks about shareable vs
+> non-shareable).
 
-When you say 'this', do you mean this patch, or this set?  If I can
-just apply this patch, that will be ideal?
+Do you have more insights about this potential conflict?
 
+The problem is that at the arch/arm/kernel/head.S stage, it's currently
+not possible to do platform-specific code while keeping multiplatform
+characteristics, because I don't see how we could get a machine_desc
+pointer or any other platform-specific indicator so early in the boot.
+Do you have suggestions?
+
+Thanks,
+
+Thomas
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
