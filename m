@@ -1,31 +1,30 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 19 May 2014 08:23:48 +0100
-Subject: [PATCH v5 4/8] input: misc: Add driver for AXP20x Power Enable Key
-In-Reply-To: <20140519055745.GL29386@core.coreip.homeip.net>
-References: <1398947374-3115-1-git-send-email-carlo@caione.org>
- <1398947374-3115-5-git-send-email-carlo@caione.org>
- <20140503010604.GE4090@lukather>
- <20140519055745.GL29386@core.coreip.homeip.net>
-Message-ID: <20140519072348.GD2339@lee--X1>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Mon, 19 May 2014 10:31:44 +0300
+Subject: [PATCH 2/4] spi: qup: Correct selection of FIFO/Block mode
+In-Reply-To: <1400016884-9568-3-git-send-email-agross@codeaurora.org>
+References: <1400016884-9568-1-git-send-email-agross@codeaurora.org>
+ <1400016884-9568-3-git-send-email-agross@codeaurora.org>
+Message-ID: <1400484704.1464.4.camel@iivanov-dev>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > This patch add support for the Power Enable Key found on MFD AXP202 and
-> > > AXP209. Besides the basic support for the button, the driver adds two
-> > > entries in sysfs to configure the time delay for power on/off.
-> > > 
-> > > Signed-off-by: Carlo Caione <carlo@caione.org>
-> > 
-> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> 
-> How are we merging it? MFD tree?
+On Tue, 2014-05-13 at 16:34 -0500, Andy Gross wrote:
+> This patch fixes the calculation for determining whether to use FIFO or BLOCK
+> mode.
 
-Yes, I'm happy to do that.
+<snip>
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> @@ -368,7 +368,7 @@ static int spi_qup_io_config(struct spi_device *spi, struct spi_transfer *xfer)
+>  	n_words = xfer->len / w_size;
+>  	controller->w_size = w_size;
+>  
+> -	if (n_words <= controller->in_fifo_sz) {
+> +	if (n_words <= (controller->in_fifo_sz / sizeof(u32))) {
+
+Wouldn't be better to divide by w_size? Probably will not make
+too much difference, but..
+
+>  		mode = QUP_IO_M_MODE_FIFO;
+
+Regards,
+Ivan
