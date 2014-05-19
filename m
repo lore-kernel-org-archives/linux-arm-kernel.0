@@ -1,24 +1,49 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 19 May 2014 18:32:02 +0530
-Subject: [PATCH v3 05/13] ARM/platform_data: edma: Remove queue_tc_mapping
- data from edma_soc_info
-In-Reply-To: <1400242640-9902-6-git-send-email-peter.ujfalusi@ti.com>
+Date: Mon, 19 May 2014 18:36:58 +0530
+Subject: [PATCH v3 00/13]  ARM/DT: edma: IP configuration from hardware
+ and cleanups
+In-Reply-To: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
- <1400242640-9902-6-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <537A00CA.2060009@ti.com>
+Message-ID: <537A01F2.2090107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 16 May 2014 05:47 PM, Peter Ujfalusi wrote:
-> It is no longer in use by the driver or board files.
+> Hi,
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Changes since v2:
+> - Comments from Sekhar and Arnd has been addressed best as I could.
+> - Use the CCCFG information in all cases instead of pdata provided information
+> - To achieve this I needed to do a bit more cleanup in this series
+> - In the documentation patch, retrain the old properties for reference
+> - Cleanups in the old davinci board files and removing edma_soc_info members
+> 
+> Changes sicne v1:
+> - added missing patch to remove the memset from edma_of_parse_dt()
+> 
+> We are requesting redundant information via DT for the driver since the very same
+> data is available in the HW: by reading and decoding the content of CCCFG
+> register we can get:
+> Number of channels: NUM_DMACH
+> Number of regions: NUM_REGN
+> Number of slots (PaRAM sets): NUM_PAENTRY
+> Number of TC/EQ: NUM_EVQUE
+> 
+> So these does not need to be provided by the DT binding.
+> 
+> The driver will no longer look for these properties from DT and they can be
+> removed from the binding documentation and from the dtsi files as well.
+> The change will not introduce regression when new kernel is booted using older
+> DTB (since we just ignore the mentioned properties).
 
-I dropped the /platform_data in subject like to keep it consistent with
-what has been done for this file so far. Even looking at logs for other
-files in this directory there is no such convention.
+Applied all patches and pushed to branch v3.16/edma of:
 
-Same thing for 13/13.
+git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git
+
+Since the patches did not apply cleanly, please verify. I tested on
+DA850 EVM using MMC/SD as EDMA user.
+
+I will wait to get acks from DT maintainers before sending to ARM-SoC.
 
 Thanks,
 Sekhar
