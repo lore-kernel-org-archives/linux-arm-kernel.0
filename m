@@ -1,34 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 May 2014 11:09:38 +0200
-Subject: [PATCH 1/3] Documentation: Update Arasan SDHC documentation for
- the APM X-Gene SoC SDHC DTS binding
-In-Reply-To: <1400398918-1502-2-git-send-email-lho@apm.com>
-References: <1400398918-1502-1-git-send-email-lho@apm.com>
- <1400398918-1502-2-git-send-email-lho@apm.com>
-Message-ID: <7213964.4Qu0G1nWOL@wuerfel>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 19 May 2014 17:11:06 +0800
+Subject: [RFC PATCH] ARM: cache-l2x0: add setup entry for l2 in non-secure
+ mode
+In-Reply-To: <53795080.1010007@lge.com>
+References: <5374532D.7030602@lge.com>
+ <CAGsJ_4zN39jeHz574_r9y_hjdn1Acbkr9gQhE=1L-Fs82-vDkw@mail.gmail.com>
+ <53795080.1010007@lge.com>
+Message-ID: <CAGsJ_4wF7_BmTrWoxAu+NMVpsuN4oxJngBW0b2-4naXtwx5g5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 18 May 2014 01:41:56 Loc Ho wrote:
-> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> @@ -8,14 +8,17 @@ Device Tree Bindings for the Arasan SDHCI Controller
->    [3] Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
->  
->  Required Properties:
-> -  - compatible: Compatibility string. Must be 'arasan,sdhci-8.9a'
-> +  - compatible: Compatibility string. Must be 'arasan,sdhci-8.9a' or
-> +                'xgene,arasan,sdhci-8.9a'
->    - reg: From mmc bindings: Register location and length.
-> -  - clocks: From clock bindings: Handles to clock inputs.
-> -  - clock-names: From clock bindings: Tuple including "clk_xin" and "clk_ahb"
-> 
+2014-05-19 8:29 GMT+08:00 Gioh Kim <gioh.kim@lge.com>:
+>
+>
+> 2014-05-18 ?? 10:13, Barry Song ? ?:
+>
+>> 2014-05-15 13:39 GMT+08:00 Gioh Kim <gioh.kim@lge.com>:
+>>>
+>>>
+>>> Hi,
+>>>
+>>> My board is using Trustzone and running kernel is non-secure mode.
+>>> But setup function of PL310 driver is only for secure mode kernel.
+>>>
+>>> What about adding an entry for non-secure mode setup function?
+>>>
+>>> I'm sorry for my poor code but I just wanna say what I need .
+>>
+>>
+>> Gioh,
+>>
+>> i don't really understand what is the user scenarios for this, if you
+>> are running linux in non-secure mode, your security-mode codes have
+>> enabled L2, so this makes non-secure linux have no chance to execute
+>> setup at all:
+>
+>
+> My platform runs linux kernel before L2 cache activation.
+> And the L2 cache is activated when the kernel sends command to Trustzone
+> firmware.
+> At this moment L2 is not activated. Linux should send command for L2
+> activation to Trustzone at the moment.
 
-The driver as you patch is in this version actually requires a second set
-of registers. As I commented there, it's probably not the best way to do
-things, but you also forgot to update the binding here.
+i think you can send command to trustzone firmware to enable L2 at
+first, then make your Linux l2 driver run.
 
-Always make sure that the binding document actually documents what you
-implement!
 
-	Arnd
+-barry
