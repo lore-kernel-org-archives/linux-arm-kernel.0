@@ -1,107 +1,138 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 19 May 2014 18:56:48 +0100
-Subject: [PATCH v5 2/4] live migration support for initial write protect
- of VM
-In-Reply-To: <53768584.4060705@samsung.com>
-References: <1399509616-4632-1-git-send-email-m.smarduch@samsung.com>
- <1399509616-4632-3-git-send-email-m.smarduch@samsung.com>
- <20140515185312.GA6159@lvm> <537544D8.2030005@samsung.com>
- <53768584.4060705@samsung.com>
-Message-ID: <20140519175648.GB5292@lvm>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 May 2014 11:01:04 -0700
+Subject: [PATCH 06/11] ARM: OMAP2+: Fix voltage scaling init for device
+ tree
+In-Reply-To: <CAGhQ9VxS+Hg6EX=CDxbibV2TFw++LwZY+GQomZEHx--JGuWHNg@mail.gmail.com>
+References: <1397173639-29587-1-git-send-email-tony@atomide.com>
+ <1397173639-29587-7-git-send-email-tony@atomide.com>
+ <CAGhQ9VxS+Hg6EX=CDxbibV2TFw++LwZY+GQomZEHx--JGuWHNg@mail.gmail.com>
+Message-ID: <20140519180104.GL4849@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 02:39:16PM -0700, Mario Smarduch wrote:
-> Hi Christoffer,
->   few more comments
-> >>>  	struct vgic_dist	vgic;
-> >>> +	/* Marks start of migration, used to handle 2nd stage page faults
-> >>> +	 * during migration, prevent installing huge pages and split huge pages
-> >>> +	 * to small pages.
-> >>> +	 */
-> >>
-> >> commenting style
-> >>
-> >> this is a bit verbose for a field in a struct, perhaps moving the longer
-> >> version to where you set this?
-> > Will do.
-> >>
-> >>> +	int migration_in_progress;
-> >>>  };
+* Joachim Eastwood <manabian@gmail.com> [140519 10:51]:
+> Hi Tony,
 > 
-> I think this flag could be removed all together. Migration can be
-> stopped at any time (started too), through user request or other events. 
-> When that happens (like migrate_cancel) migrate cleanup bh runs and eventually calls 
-> KVM memory listener kvm_log_global_start() (cancel handler) 
-> that stops logging, clears KVM_MEM_LOG_DIRTY_PAGES, and region ops ioctl,
-> clears dirty_bitmap. In either case dirty_bitmap for memslot is set or 
-> unset during migration to track dirty pages, following that field seems to be 
-> a better way to keep track of migration. This again is QEMU view but it appears 
-> all these policies are driven from user space.
-> 
+> If found this patch in your omap-for-v3.16/pm-signed tag and tested it
+> on top of Linus master + omap 3.16 dt + Tomi fbdev omap. I assumed
+> it's going upstream for 3.16(?).
 
-ok, I need to look more closely at the whole thing to properly comment
-on this.
+Yes.
+ 
+> First of all; is this safe on OMAP4460?
+> As far as I understand voltage scaling on 4460 has never been
+> mainline, but this code enables voltage scaling for all omap4 parts.
+> More below.
 
-> 
-> 
-> >>>  
-> >>> +/* kvm_split_pmd - splits huge pages to small pages, required to keep a dirty
-> >>> + *	log of smaller memory granules, otherwise huge pages would need to be
-> >>> + *	migrated. Practically an idle system has problems migrating with
-> >>
-> >> This seems abrupt.  Why can't we just represent a 2M huge page as 512 4K
-> >> bits and write protect the huge pages, if you take a write fault on a 2M
-> >> page, then split it then.
-> > 
-> > That's one alternative the one I put into v6 is clear the PMD
-> > and force user_mem_abort() to fault in 4k pages, and mark the
-> > dirty_bitmap[] for that page, reuse the current code. Have not
-> > checked the impact on performance, it takes few seconds longer
-> > to converge for the tests I'm running. 
-> 
-> I was thinking about this and if PMD attributes need to be passed
-> onto the PTEs then it appears what you recommend is required.
-> But during run time I don't see how 2nd stage attributes can
-> change, could the guest do anything to change them (SH, Memattr)?
+Sounds like something's not right then. This should just restore
+the earlier code path we had for legacy booting for omap4.
 
-You should be able to just grab the kvm_mmu lock, update the stage-2
-page tables to remove all writable bits, flush all Stage-2 TLBs for that
-VMID, and you should be all set.
+> On 11 April 2014 01:47, Tony Lindgren <tony@atomide.com> wrote:
+> > We are currently disabling the init of voltage scaling
+> > for device tree. With the voltage scaling problems fixed
+> > for omap3 in general, there's no need to disable the voltage
+> > scaling init for device tree based booting.
+> >
+> > Cc: Kevin Hilman <khilman@linaro.org>
+> > Cc: Nishanth Menon <nm@ti.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Tero Kristo <t-kristo@ti.com>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > ---
+> >  arch/arm/mach-omap2/pm.c | 28 ++++++++++++----------------
+> >  1 file changed, 12 insertions(+), 16 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+> > index e1b4141..ccefd11 100644
+> > --- a/arch/arm/mach-omap2/pm.c
+> > +++ b/arch/arm/mach-omap2/pm.c
+> > @@ -287,25 +287,21 @@ omap_postcore_initcall(omap2_common_pm_init);
+> >
+> >  int __init omap2_common_pm_late_init(void)
+> >  {
+> > -       /*
+> > -        * In the case of DT, the PMIC and SR initialization will be done using
+> > -        * a completely different mechanism.
+> > -        * Disable this part if a DT blob is available.
+> > -        */
+> > -       if (!of_have_populated_dt()) {
+> > -
+> > -               /* Init the voltage layer */
+> > -               omap_pmic_late_init();
+> > -               omap_voltage_late_init();
+> > +       if (of_have_populated_dt()) {
+> > +               omap3_twl_init();
+> > +               omap4_twl_init();
+> > +       }
+> >
+> > -               /* Initialize the voltages */
+> > -               omap3_init_voltages();
+> > -               omap4_init_voltages();
+> > +       /* Init the voltage layer */
+> > +       omap_pmic_late_init();
+> > +       omap_voltage_late_init();
+> >
+> > -               /* Smartreflex device init */
+> > -               omap_devinit_smartreflex();
+> > +       /* Initialize the voltages */
+> > +       omap3_init_voltages();
+> > +       omap4_init_voltages();
+> >
+> > -       }
+> > +       /* Smartreflex device init */
+> > +       omap_devinit_smartreflex();
+> >
+> >         /* cpufreq dummy device instantiation */
+> >         omap_init_cpufreq();
+> > --
+> 
+> In omap4_twl_init() we have:
+> if (!cpu_is_omap44xx())
+>     return -ENODEV;
+> 
+> voltdm = voltdm_lookup("mpu");
+> omap_voltage_register_pmic(voltdm, &omap4_mpu_pmic);
+> 
+> voltdm = voltdm_lookup("iva");
+> omap_voltage_register_pmic(voltdm, &omap4_iva_pmic);
+> 
+> voltdm = voltdm_lookup("core");
+> omap_voltage_register_pmic(voltdm, &omap4_core_pmic);
+> 
+> As far as I understand the setup above is only valid for 4430 and not
+> 4460 since it is hook up to the twl in diffent way. External switcher
+> (TPS62361) for mpu rail and the other rails are used differently.
 
-> 
-> 
-> Performance may also be other reason but that always depends
-> on the load, clearing a PMD seems easier and reuses current code.
-> Probably several load tests/benchmarks can help here.
-> Also noticed hw PMD/PTE attributes differ a little which
-> is not significant now, but moving forward different page size
-> and any new revisions to fields may require additional maintenance.
+Hmm interesting, I think we had this enabled with legacy booting?
 
-I think clearing out all PMD mappings will carry a significant
-performance degradation on the source VM, and in the case you keep it
-running, will be quite unfortunate.  Hint: Page faults are expensive and
-huge pages have shown to give about 10-15% performance increase on ARMv7
-for CPU/memory intensive benchmarks.
+> I also get the following messages on boot now:
+> [ 2.458740] twl: not initialized
+> [ 2.462127] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+> 1375000 Vs max 1316660
+> [ 2.470581] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+> 1375000 Vs max 1316660
+> [ 2.479003] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+> 1375000 Vs max 1316660
+> [ 2.487457] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+> 1375000 Vs max 1316660
+> [ 2.495880] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+> 1375000 Vs max 1316660
+> [ 2.504302] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+> 1375000 Vs max 1316660
+> [ 2.512725] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+> 1410000 Vs max 1316660
+> [ 2.521179] omap2_set_init_voltage: unable to find boot up OPP for vdd_mpu
+> [ 2.528411] omap2_set_init_voltage: unable to set vdd_mpu
+> [ 2.534088] omap2_set_init_voltage: unable to find boot up OPP for vdd_core
+> [ 2.541412] omap2_set_init_voltage: unable to set vdd_core
+> [ 2.547210] omap2_set_init_voltage: unable to find boot up OPP for vdd_iva
+> [ 2.554443] omap2_set_init_voltage: unable to set vdd_iva
+> 
+> It doesn't seem too happy on my 4460.
 
-> 
-> I'll be out next week and back 26'th, I'll create a link with
-> details on test environment and tests. The cover letter will
-> will go through general overview only.
-> 
+Indeed, we need to fix it. Nishant, any comments on how we should
+deal with this one?
 
-ok, I have some time then.
+Regards,
 
--Christoffer
-
-> 
-> > 
-> >>
-> >> If your use case is HA, then you will be doing this a lot, and you don't
-> >> want to hurt performance of your main live system more than necessary.
-> > 
-> >>
-> >>> + *	huge pages.  Called during WP of entire VM address space, done
-> >>
-> 
-> 
+Tony
