@@ -1,304 +1,49 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 19 May 2014 16:44:04 +0300
-Subject: [PATCH 1/2] ARM: DTS: omap54xx-clocks: remove the autoidle
- properties for clock nodes
-In-Reply-To: <5360ECF5.6080801@ti.com>
-References: <1398858096-32144-1-git-send-email-peter.ujfalusi@ti.com>
- <5360ECF5.6080801@ti.com>
-Message-ID: <537A0AA4.50904@ti.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 19 May 2014 22:43:44 +0900
+Subject: [PATCH] clk: shmobile: Add R8A7740-specific clock support
+In-Reply-To: <CAO3366xgmXPUWAc4DSxgRaMimZozkPNyzMr0X3U9hUTzJvQv2Q@mail.gmail.com>
+References: <1400156437-19694-1-git-send-email-ulrich.hecht+renesas@gmail.com>
+ <CANqRtoTq5ri+ye7Htcg3hSRZCUmvyMcuWAXvkcAV8arDjuLYzw@mail.gmail.com>
+ <CAO3366xgmXPUWAc4DSxgRaMimZozkPNyzMr0X3U9hUTzJvQv2Q@mail.gmail.com>
+Message-ID: <CANqRtoS4nx44zpVEdyMb-kdSiNGTr09CBhE4M_o3HjKU35vPAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/30/2014 03:30 PM, Tero Kristo wrote:
-> On 04/30/2014 02:41 PM, Peter Ujfalusi wrote:
->> In OMAP5 bit 8 in PRCM registers are not defined (Reserved) unlike their
->> counterpart in OMAP4.
->> It is better to not write to these bits.
->
-> Yeah, looks like this bug was copied over from the legacy clock data.
->
-> Acked-by: Tero Kristo <t-kristo@ti.com>
+Hi Ulrich,
 
-Also, queued for 3.15-rc/clk-dt.
-
--Tero
-
+On Fri, May 16, 2014 at 3:26 PM, Ulrich Hecht <ulrich.hecht@gmail.com> wrote:
+> On Fri, May 16, 2014 at 3:52 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>> On Thu, May 15, 2014 at 9:20 PM, Ulrich Hecht <ulrich.hecht@gmail.com> wrote:
+>>> Driver for the R8A7740's clocks that are too specific to be supported by a
+>>> generic driver.
+>>>
+>>> Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+>>> ---
+>>
+>> Thanks a lot for your patches. My gut feeling is that r8a7740 CCF
+>> support should be pretty close to be finalized, but I also see some
+>> feedback and I have a bit of hard time following what is going on. My
+>> hope has been to include r8a7740 CCF in v3.16 (this patch), but we may
+>> be running out of time there. What's the latest status?
 >
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> ---
->>   arch/arm/boot/dts/omap54xx-clocks.dtsi | 48
->> ----------------------------------
->>   1 file changed, 48 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/omap54xx-clocks.dtsi
->> b/arch/arm/boot/dts/omap54xx-clocks.dtsi
->> index d487fdab3921..d784ff5d3904 100644
->> --- a/arch/arm/boot/dts/omap54xx-clocks.dtsi
->> +++ b/arch/arm/boot/dts/omap54xx-clocks.dtsi
->> @@ -120,10 +120,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_abe_x2_ck>;
->>           ti,max-div = <31>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x01f0>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       abe_24m_fclk: abe_24m_fclk {
->> @@ -164,10 +162,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_abe_x2_ck>;
->>           ti,max-div = <31>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x01f4>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       dpll_core_ck: dpll_core_ck {
->> @@ -188,10 +184,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_core_x2_ck>;
->>           ti,max-div = <63>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x0150>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       c2c_fclk: c2c_fclk {
->> @@ -215,10 +209,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_core_x2_ck>;
->>           ti,max-div = <63>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x0138>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       dpll_core_h12x2_ck: dpll_core_h12x2_ck {
->> @@ -226,10 +218,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_core_x2_ck>;
->>           ti,max-div = <63>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x013c>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       dpll_core_h13x2_ck: dpll_core_h13x2_ck {
->> @@ -237,10 +227,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_core_x2_ck>;
->>           ti,max-div = <63>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x0140>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       dpll_core_h14x2_ck: dpll_core_h14x2_ck {
->> @@ -248,10 +236,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_core_x2_ck>;
->>           ti,max-div = <63>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x0144>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       dpll_core_h22x2_ck: dpll_core_h22x2_ck {
->> @@ -259,10 +245,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_core_x2_ck>;
->>           ti,max-div = <63>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x0154>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       dpll_core_h23x2_ck: dpll_core_h23x2_ck {
->> @@ -270,10 +254,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_core_x2_ck>;
->>           ti,max-div = <63>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x0158>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       dpll_core_h24x2_ck: dpll_core_h24x2_ck {
->> @@ -281,10 +263,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_core_x2_ck>;
->>           ti,max-div = <63>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x015c>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       dpll_core_m2_ck: dpll_core_m2_ck {
->> @@ -292,10 +272,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_core_ck>;
->>           ti,max-div = <31>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x0130>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       dpll_core_m3x2_ck: dpll_core_m3x2_ck {
->> @@ -303,10 +281,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_core_x2_ck>;
->>           ti,max-div = <31>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x0134>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       iva_dpll_hs_clk_div: iva_dpll_hs_clk_div {
->> @@ -335,10 +311,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_iva_x2_ck>;
->>           ti,max-div = <63>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x01b8>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       dpll_iva_h12x2_ck: dpll_iva_h12x2_ck {
->> @@ -346,10 +320,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_iva_x2_ck>;
->>           ti,max-div = <63>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x01bc>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       mpu_dpll_hs_clk_div: mpu_dpll_hs_clk_div {
->> @@ -372,10 +344,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_mpu_ck>;
->>           ti,max-div = <31>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x0170>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       per_dpll_hs_clk_div: per_dpll_hs_clk_div {
->> @@ -642,10 +612,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_per_x2_ck>;
->>           ti,max-div = <63>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x0158>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       dpll_per_h12x2_ck: dpll_per_h12x2_ck {
->> @@ -653,10 +621,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_per_x2_ck>;
->>           ti,max-div = <63>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x015c>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       dpll_per_h14x2_ck: dpll_per_h14x2_ck {
->> @@ -664,10 +630,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_per_x2_ck>;
->>           ti,max-div = <63>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x0164>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       dpll_per_m2_ck: dpll_per_m2_ck {
->> @@ -675,10 +639,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_per_ck>;
->>           ti,max-div = <31>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x0150>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       dpll_per_m2x2_ck: dpll_per_m2x2_ck {
->> @@ -686,10 +648,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_per_x2_ck>;
->>           ti,max-div = <31>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x0150>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       dpll_per_m3x2_ck: dpll_per_m3x2_ck {
->> @@ -697,10 +657,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_per_x2_ck>;
->>           ti,max-div = <31>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x0154>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       dpll_unipro1_ck: dpll_unipro1_ck {
->> @@ -723,10 +681,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_unipro1_ck>;
->>           ti,max-div = <127>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x0210>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       dpll_unipro2_ck: dpll_unipro2_ck {
->> @@ -749,10 +705,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_unipro2_ck>;
->>           ti,max-div = <127>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x01d0>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       dpll_usb_ck: dpll_usb_ck {
->> @@ -775,10 +729,8 @@
->>           compatible = "ti,divider-clock";
->>           clocks = <&dpll_usb_ck>;
->>           ti,max-div = <127>;
->> -        ti,autoidle-shift = <8>;
->>           reg = <0x0190>;
->>           ti,index-starts-at-one;
->> -        ti,invert-autoidle-bit;
->>       };
->>
->>       func_128m_clk: func_128m_clk {
->>
+> IIRC there have been no complaints about the r8a7740 CCF part.
+
+Ok, thanks. Could you please collect acks from people giving feedback
+and ping the maintainer?
+
+>> Would it be possible for you to adjust your work flow to always
+>> include version number of patch and also include a change log?
+>> Basically, I'd like to know which is the latest patch and if all the
+>> issues have been fixed up.
 >
+> One might call this v2; the only change is that it has been reshuffled
+> to include the DT bindings and Makefile patch, because that's what
+> "clk: shmobile: add CPG driver for rz-platforms" looks like...
+
+Once you resend, please reflect this in the next version of the patch!
+
+Thanks for your help!
+
+Cheers,
+
+/ magnus
