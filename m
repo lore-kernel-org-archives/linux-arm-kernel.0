@@ -1,187 +1,84 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 19 May 2014 14:10:41 +0300
-Subject: [PATCH 01/11] ARM: AM43xx: hwmod: add DSS hwmod data
-In-Reply-To: <5379DCCE.3050400@ti.com>
-References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
- <1399636579-8062-2-git-send-email-tomi.valkeinen@ti.com>
- <5379CDD2.6080807@ti.com> <5379D8F5.9030008@ti.com> <5379DCCE.3050400@ti.com>
-Message-ID: <5379E6B1.5000409@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 19 May 2014 13:17:57 +0200
+Subject: [RFC PATCHv1 0/7] ARM core support for hardware I/O coherency
+ in non-SMP platforms
+In-Reply-To: <20140519104219.GH5113@arm.com>
+References: <1400082641-23871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140514170456.GC15946@arm.com>
+ <20140515115010.0d6a4d92@free-electrons.com>
+ <20140515142205.GC1499@arm.com>
+ <20140519111739.39ae3b82@free-electrons.com>
+ <20140519104219.GH5113@arm.com>
+Message-ID: <20140519131757.20021784@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/05/14 13:28, Rajendra Nayak wrote:
+Catalin,
 
-> Yeah, thats what it looks like to me. l3_gclk is the 200Mhz clock derived from 
-> core-m4 post divider and l3s_gclk/l4ls_gclk are half of that at 100Mhz, derived
-> using a fixed divider of 2.
+On Mon, 19 May 2014 11:42:19 +0100, Catalin Marinas wrote:
 
-Here's an updated patch, with the sdma entry removed and the ocp clock
-changed to l3_gclk.
+> > I have no problem about the bootloader doing some initialization, so if
+> > that's a requirement for arm64, no problem. But it should be a
+> > requirement regardless of the kernel configuration: in the current
+> > kernel, some initialization is done when CONFIG_SMP is enabled. And now
+> > that the same initialization is needed in !CONFIG_SMP, I'm asked to do
+> > it in the bootloader. That's the thing I don't buy.
+> 
+> And that's a hard thing for me to sell for arm32 ;) because of the
+> current code already doing this.
+> 
+> One of the issues is secure vs non-secure kernel deployment and
+> secure-only registers like ACTLR (and even SCU). I've seen SoCs for
+> which the mainline kernel assumes secure mode but it's deployed as
+> non-secure in the field with out of tree modifications to make it work.
+> I would rather have a single kernel image for both cases.
 
->From bfaf0fafb21c698c86640764c1aa62d6fc73992a Mon Sep 17 00:00:00 2001
-From: Sathya Prakash M R <sathyap@ti.com>
-Date: Mon, 24 Mar 2014 16:31:53 +0530
-Subject: [PATCH] ARM: AM43xx: hwmod: add DSS hwmod data
+As things are today, I believe the Armada 370/XP/375/38x are always
+booted in secure mode. Couldn't the kernel detect if it's running
+secure or non-secure. If it's running secure, it can do all the ACTLR
+configuration (and other things that require being in secure mode). If
+it's running non-secure, then it doesn't do this configuration, and
+assumes the firmware/bootloader did it.
 
-Add DSS hwmod data for AM43xx.
+> > > > Unfortunately, __create_page_tables is called so early that I don't
+> > > > know if it's possible to access 'struct machine_desc' at this point to
+> > > > know whether the platform needs shareable pages or not.
+> > > > 
+> > > > Also, don't we have the same problem with the TTB_FLAGS_{SMP,UP) ?
+> > > 
+> > > I don't think we do because we use the ALT_{SMP,UP} for TTB settings and
+> > > we have the smp-on-up fixup running before __v7_setup.
+> > 
+> > Ok. For Armada 370, I don't need shareable pages. For Armada 380, I
+> > need shareable pages, but even if the processor is single core, I
+> > believe it pretends to be SMP in MPIDR.
+> 
+> You'd need to check this.
 
-Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 98 ++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/prcm43xx.h             |  1 +
- 2 files changed, 99 insertions(+)
+I got the confirmation. *But* this is only going to affect CONFIG_SMP
+builds. Armada 380 being single core, we want I/O coherency to work on
+it in !CONFIG_SMP configurations. And in !CONFIG_SMP configuration,
+it's always ALT_UP() that is used, regardless of what MPIDR says. And
+therefore the TTB_FLAGS_UP will be used.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-index 5c2cc8083fdd..d2a7b6dc36f2 100644
---- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-@@ -19,6 +19,8 @@
- #include "omap_hwmod.h"
- #include "omap_hwmod_33xx_43xx_common_data.h"
- #include "prcm43xx.h"
-+#include "omap_hwmod_common_data.h"
-+
- 
- /* IP blocks */
- static struct omap_hwmod am43xx_l4_hs_hwmod = {
-@@ -415,6 +417,70 @@ static struct omap_hwmod am43xx_qspi_hwmod = {
- 	},
- };
- 
-+/* Display sub system - DSS */
-+
-+struct omap_dss_dispc_dev_attr am43xx_dss_dispc_dev_attr = {
-+	.manager_count		= 1,
-+	.has_framedonetv_irq	= 0
-+};
-+
-+
-+static struct omap_hwmod_class_sysconfig am43xx_dispc_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x0010,
-+	.syss_offs	= 0x0014,
-+	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type1,
-+};
-+
-+static struct omap_hwmod_class am43xx_dispc_hwmod_class = {
-+	.name	= "dispc",
-+	.sysc	= &am43xx_dispc_sysc,
-+};
-+
-+static struct omap_hwmod am43xx_dss_core_hwmod = {
-+	.name		= "dss_core",
-+	.class		= &omap2_dss_hwmod_class,
-+	.clkdm_name	= "dss_clkdm",
-+	.main_clk	= "disp_clk",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = AM43XX_CM_PER_DSS_CLKCTRL_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
-+		},
-+	},
-+};
-+
-+/* display controller -dispc*/
-+
-+static struct omap_hwmod am43xx_dss_dispc_hwmod = {
-+	.name		= "dss_dispc",
-+	.class		= &am43xx_dispc_hwmod_class,
-+	.clkdm_name	= "dss_clkdm",
-+	.main_clk	= "disp_clk",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = AM43XX_CM_PER_DSS_CLKCTRL_OFFSET,
-+		},
-+	},
-+	.dev_attr	= &am43xx_dss_dispc_dev_attr,
-+};
-+
-+/*RFBI*/
-+
-+static struct omap_hwmod am43xx_dss_rfbi_hwmod = {
-+	.name		= "dss_rfbi",
-+	.class		= &omap2_rfbi_hwmod_class,
-+	.clkdm_name	= "dss_clkdm",
-+	.main_clk	= "disp_clk",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = AM43XX_CM_PER_DSS_CLKCTRL_OFFSET,
-+		},
-+	},
-+};
-+
- /* Interfaces */
- static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
- 	.master		= &am33xx_l3_main_hwmod,
-@@ -654,6 +720,34 @@ static struct omap_hwmod_ocp_if am43xx_l3_s__qspi = {
- 	.user           = OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+static struct omap_hwmod_ocp_if am43xx_dss__l3_main = {
-+	.master		= &am43xx_dss_core_hwmod,
-+	.slave		= &am33xx_l3_main_hwmod,
-+	.clk		= "l3_gclk",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+static struct omap_hwmod_ocp_if am43xx_l4_ls__dss = {
-+	.master		= &am33xx_l4_ls_hwmod,
-+	.slave		= &am43xx_dss_core_hwmod,
-+	.clk		= "l4ls_gclk",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_dispc = {
-+	.master		= &am33xx_l4_ls_hwmod,
-+	.slave		= &am43xx_dss_dispc_hwmod,
-+	.clk		= "l4ls_gclk",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
-+	.master		= &am33xx_l4_ls_hwmod,
-+	.slave		= &am43xx_dss_rfbi_hwmod,
-+	.clk		= "l4ls_gclk",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
- 	&am33xx_l4_wkup__synctimer,
- 	&am43xx_l4_ls__timer8,
-@@ -748,6 +842,10 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
- 	&am43xx_l4_ls__ocp2scp1,
- 	&am43xx_l3_s__usbotgss0,
- 	&am43xx_l3_s__usbotgss1,
-+	&am43xx_dss__l3_main,
-+	&am43xx_l4_ls__dss,
-+	&am43xx_l4_ls__dss_dispc,
-+	&am43xx_l4_ls__dss_rfbi,
- 	NULL,
- };
- 
-diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
-index 7785be984edd..ad7b3e9977f8 100644
---- a/arch/arm/mach-omap2/prcm43xx.h
-+++ b/arch/arm/mach-omap2/prcm43xx.h
-@@ -142,5 +142,6 @@
- #define AM43XX_CM_PER_USBPHYOCP2SCP0_CLKCTRL_OFFSET	0x05B8
- #define AM43XX_CM_PER_USB_OTG_SS1_CLKCTRL_OFFSET        0x0268
- #define AM43XX_CM_PER_USBPHYOCP2SCP1_CLKCTRL_OFFSET	0x05C0
-+#define AM43XX_CM_PER_DSS_CLKCTRL_OFFSET		0x0a20
- 
- #endif
+> > > I'm always for the former (and that's the case for arm64), though for
+> > > some older boards it's too late to change.
+> > 
+> > Indeed. So how do we move forward?
+> 
+> As I said previously, it's not my call, just a recommendation. It's up
+> to the arm/arm-soc maintainers to take this. Give the arm32 SMP
+> initialisation precedent, forcing it for an existing platform is a
+> harder sell.
+
+Ok. So I should keep going with the approach proposed in my patch
+series, obviously after fixing the various other comments that were
+posted?
+
+Thanks,
+
+Thomas
 -- 
-1.9.1
-
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/d8fe3fef/attachment.sig>
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
