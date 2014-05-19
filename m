@@ -1,27 +1,27 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 19 May 2014 19:36:32 +0200
-Subject: [PATCH v4 4/7] pinctrl: berlin: add the BG2CD pinctrl driver
+Date: Mon, 19 May 2014 19:36:34 +0200
+Subject: [PATCH v4 6/7] dt-binding: ARM: add pinctrl binding docs for Marvell
+ Berlin2 SoCs
 In-Reply-To: <1400520995-27365-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1400520995-27365-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1400520995-27365-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1400520995-27365-7-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Antoine Tenart <antoine.tenart@free-electrons.com>
 
-Add the pin-controller driver for the Berlin BG2Q SoC, with definition
-of its groups and functions. Pin control registers are part of chip/
-system control registers, which will be represented by a single node.
-Until a proper driver for the chip/system control is available,
-register the corresponding regmap in pinctrl driver probe.
+Add pin control binding documentation to the SoC binding documentaion
+as pinctrl is part of chip/system control registers. The documentation
+also explains how to configure this group based controller.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Changelog:
 v3->v4:
-- change compatible to the settled name of the chip/system control
-  nodes and register a regmap for the core driver instead.
+- move documentation of an exclusive pinctrl node to the Berlin SoC
+  binding documentation of chip/system control nodes instead.
+- remove "marvell," prefix from pinctrl function/groups property
 
 Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: Antoine Tenart <antoine.tenart@free-electrons.com>
@@ -32,258 +32,85 @@ Cc: jszhang at marvell.com
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/pinctrl/berlin/Kconfig        |   4 +
- drivers/pinctrl/berlin/Makefile       |   1 +
- drivers/pinctrl/berlin/berlin-bg2cd.c | 217 ++++++++++++++++++++++++++++++++++
- 3 files changed, 222 insertions(+)
- create mode 100644 drivers/pinctrl/berlin/berlin-bg2cd.c
+ .../devicetree/bindings/arm/marvell,berlin.txt     | 54 ++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
 
-diff --git a/drivers/pinctrl/berlin/Kconfig b/drivers/pinctrl/berlin/Kconfig
-index 381f46347c51..b18322bc7bf9 100644
---- a/drivers/pinctrl/berlin/Kconfig
-+++ b/drivers/pinctrl/berlin/Kconfig
-@@ -9,6 +9,10 @@ config PINCTRL_BERLIN_BG2
- 	bool
- 	select PINCTRL_BERLIN
+diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+index 744a7ea569d4..94013a9a8769 100644
+--- a/Documentation/devicetree/bindings/arm/marvell,berlin.txt
++++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+@@ -41,6 +41,18 @@ Required properties:
+   BG2/BG2CD: chip control register set
+   BG2Q: chip control register set and cpu pll registers
  
-+config PINCTRL_BERLIN_BG2CD
-+	bool
-+	select PINCTRL_BERLIN
++* Marvell Berlin2 system control binding
 +
- config PINCTRL_BERLIN_BG2Q
- 	bool
- 	select PINCTRL_BERLIN
-diff --git a/drivers/pinctrl/berlin/Makefile b/drivers/pinctrl/berlin/Makefile
-index e37e4e7a8838..deb0c6baf316 100644
---- a/drivers/pinctrl/berlin/Makefile
-+++ b/drivers/pinctrl/berlin/Makefile
-@@ -1,3 +1,4 @@
- obj-$(CONFIG_PINCTRL_BERLIN)		+= berlin.o
- obj-$(CONFIG_PINCTRL_BERLIN_BG2)	+= berlin-bg2.o
-+obj-$(CONFIG_PINCTRL_BERLIN_BG2CD)	+= berlin-bg2cd.o
- obj-$(CONFIG_PINCTRL_BERLIN_BG2Q)	+= berlin-bg2q.o
-diff --git a/drivers/pinctrl/berlin/berlin-bg2cd.c b/drivers/pinctrl/berlin/berlin-bg2cd.c
-new file mode 100644
-index 000000000000..1f08ec2d8a57
---- /dev/null
-+++ b/drivers/pinctrl/berlin/berlin-bg2cd.c
-@@ -0,0 +1,217 @@
-+/*
-+ * Marvell Berlin BG2CD pinctrl driver.
-+ *
-+ * Copyright (C) 2014 Marvell Technology Group Ltd.
-+ *
-+ * Antoine T?nart <antoine.tenart@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
++Marvell Berlin SoCs have a system control register set providing several
++individual registers dealing with pinmux, padmux, and reset.
 +
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
++Required properties:
++- compatible: should be one of
++	"marvell,berlin2-system-ctrl" for BG2
++	"marvell,berlin2cd-system-ctrl" for BG2CD
++	"marvell,berlin2q-system-ctrl" for BG2Q
++- reg: address and length of the system control register set
 +
-+#include "berlin.h"
+ * Clock provider binding
+ 
+ As clock related registers are spread among the chip control registers, the
+@@ -61,6 +73,23 @@ Clocks provided by core clocks shall be referenced by a clock specifier
+ indexing one of the provided clocks. Refer to dt-bindings/clock/berlin<soc>.h
+ for the corresponding index mapping.
+ 
++* Pin controller binding
 +
-+static const struct berlin_desc_group berlin2cd_soc_pinctrl_groups[] = {
-+	/* G */
-+	BERLIN_PINCTRL_GROUP("G0", 0x00, 0x1, 0x00,
-+		BERLIN_PINCTRL_FUNCTION(0x0, "jtag"),
-+		BERLIN_PINCTRL_FUNCTION(0x1, "gpio"),
-+		BERLIN_PINCTRL_FUNCTION(0x2, "led"),
-+		BERLIN_PINCTRL_FUNCTION(0x3, "pwm")),
-+	BERLIN_PINCTRL_GROUP("G1", 0x00, 0x2, 0x01,
-+		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
-+		BERLIN_PINCTRL_FUNCTION(0x1, "sd0"),
-+		BERLIN_PINCTRL_FUNCTION(0x6, "usb0_dbg"),
-+		BERLIN_PINCTRL_FUNCTION(0x7, "usb1_dbg")),
-+	BERLIN_PINCTRL_GROUP("G2", 0x00, 0x2, 0x02,
-+		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
-+		BERLIN_PINCTRL_FUNCTION(0x1, "sd0"),
-+		BERLIN_PINCTRL_FUNCTION(0x2, "fe"),
-+		BERLIN_PINCTRL_FUNCTION(0x3, "pll"),
-+		BERLIN_PINCTRL_FUNCTION(0x6, "usb0_dbg"),
-+		BERLIN_PINCTRL_FUNCTION(0x7, "usb1_dbg")),
-+	BERLIN_PINCTRL_GROUP("G3", 0x00, 0x2, 0x04,
-+		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
-+		BERLIN_PINCTRL_FUNCTION(0x1, "sd0"),
-+		BERLIN_PINCTRL_FUNCTION(0x2, "twsi2"),
-+		BERLIN_PINCTRL_FUNCTION(0x3, "pll"),
-+		BERLIN_PINCTRL_FUNCTION(0x4, "fe"),
-+		BERLIN_PINCTRL_FUNCTION(0x6, "usb0_dbg"),
-+		BERLIN_PINCTRL_FUNCTION(0x7, "usb1_dbg")),
-+	BERLIN_PINCTRL_GROUP("G4", 0x00, 0x2, 0x06,
-+		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
-+		BERLIN_PINCTRL_FUNCTION(0x1, "sd0"),
-+		BERLIN_PINCTRL_FUNCTION(0x2, "twsi3"),
-+		BERLIN_PINCTRL_FUNCTION(0x3, "pll"),
-+		BERLIN_PINCTRL_FUNCTION(0x4, "pwm"),
-+		BERLIN_PINCTRL_FUNCTION(0x6, "usb0_dbg"),
-+		BERLIN_PINCTRL_FUNCTION(0x7, "usb1_dbg")),
-+	BERLIN_PINCTRL_GROUP("G5", 0x00, 0x3, 0x08,
-+		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
-+		BERLIN_PINCTRL_FUNCTION(0x1, "sd0"),
-+		BERLIN_PINCTRL_FUNCTION(0x2, "twsi3"),
-+		BERLIN_PINCTRL_FUNCTION(0x3, "arc"),
-+		BERLIN_PINCTRL_FUNCTION(0x4, "pwm"),
-+		BERLIN_PINCTRL_FUNCTION(0x6, "usb0_dbg"),
-+		BERLIN_PINCTRL_FUNCTION(0x7, "usb1_dbg")),
-+	BERLIN_PINCTRL_GROUP("G6", 0x00, 0x2, 0x0b,
-+		BERLIN_PINCTRL_FUNCTION(0x0, "uart0"),	/* RX/TX */
-+		BERLIN_PINCTRL_FUNCTION(0x1, "gpio")),
-+	BERLIN_PINCTRL_GROUP("G7", 0x00, 0x3, 0x0d,
-+		BERLIN_PINCTRL_FUNCTION(0x0, "eddc"),
-+		BERLIN_PINCTRL_FUNCTION(0x1, "twsi1"),
-+		BERLIN_PINCTRL_FUNCTION(0x2, "gpio")),
-+	BERLIN_PINCTRL_GROUP("G8", 0x00, 0x3, 0x10,
-+		BERLIN_PINCTRL_FUNCTION(0x0, "ss0"),
-+		BERLIN_PINCTRL_FUNCTION(0x1, "gpio")),
-+	BERLIN_PINCTRL_GROUP("G9", 0x00, 0x3, 0x13,
-+		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
-+		BERLIN_PINCTRL_FUNCTION(0x1, "spi1"),
-+		BERLIN_PINCTRL_FUNCTION(0x2, "twsi0")),
-+	BERLIN_PINCTRL_GROUP("G10", 0x00, 0x2, 0x16,
-+		BERLIN_PINCTRL_FUNCTION(0x0, "spi1"),
-+		BERLIN_PINCTRL_FUNCTION(0x1, "gpio")),
-+	BERLIN_PINCTRL_GROUP("G11", 0x00, 0x2, 0x18,
-+		BERLIN_PINCTRL_FUNCTION(0x0, "spi1"),
-+		BERLIN_PINCTRL_FUNCTION(0x1, "gpio")),
-+	BERLIN_PINCTRL_GROUP("G12", 0x00, 0x3, 0x1a,
-+		BERLIN_PINCTRL_FUNCTION(0x0, "usb1"),
-+		BERLIN_PINCTRL_FUNCTION(0x1, "gpio")),
-+	BERLIN_PINCTRL_GROUP("G13", 0x04, 0x3, 0x00,
-+		BERLIN_PINCTRL_FUNCTION(0x0, "nand"),
-+		BERLIN_PINCTRL_FUNCTION(0x1, "usb0_dbg"),
-+		BERLIN_PINCTRL_FUNCTION(0x2, "usb1_dbg")),
-+	BERLIN_PINCTRL_GROUP("G14", 0x04, 0x1, 0x03,
-+		BERLIN_PINCTRL_FUNCTION(0x0, "nand"),
-+		BERLIN_PINCTRL_FUNCTION(0x1, "gpio")),
-+	BERLIN_PINCTRL_GROUP("G15", 0x04, 0x2, 0x04,
-+		BERLIN_PINCTRL_FUNCTION(0x0, "jtag"),
-+		BERLIN_PINCTRL_FUNCTION(0x1, "gpio")),
-+	BERLIN_PINCTRL_GROUP("G16", 0x04, 0x3, 0x06,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("G17", 0x04, 0x3, 0x09,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("G18", 0x04, 0x1, 0x0c,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("G19", 0x04, 0x1, 0x0d,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("G20", 0x04, 0x1, 0x0e,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("G21", 0x04, 0x3, 0x0f,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("G22", 0x04, 0x3, 0x12,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("G23", 0x04, 0x3, 0x15,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("G24", 0x04, 0x2, 0x18,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("G25", 0x04, 0x2, 0x1a,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("G26", 0x04, 0x1, 0x1c,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("G27", 0x04, 0x1, 0x1d,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("G28", 0x04, 0x2, 0x1e,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
++Pin control registers are part of both register sets, chip control and system
++control. The pins controlled are organized in groups, so no actual pin
++information is needed.
++
++A pin-controller node should contain subnodes representing the pin group
++configurations, one per function. Each subnode has the group name and the muxing
++function used.
++
++Be aware the Marvell Berlin datasheets use the keyword 'mode' for what is called
++a 'function' in the pin-controller subsystem.
++
++Required subnode-properties:
++- groups: a list of strings describing the group names.
++- function: a string describing the function used to mux the groups.
++
+ Example:
+ 
+ chip: chip-control at ea0000 {
+@@ -69,4 +98,29 @@ chip: chip-control at ea0000 {
+ 	reg = <0xea0000 0x400>;
+ 	clocks = <&refclk>, <&externaldev 0>;
+ 	clock-names = "refclk", "video_ext0";
++
++	spi1_pmux: spi1-pmux {
++		groups = "G0";
++		function = "spi1";
++	};
 +};
 +
-+static const struct berlin_desc_group berlin2cd_sysmgr_pinctrl_groups[] = {
-+	/* GSM */
-+	BERLIN_PINCTRL_GROUP("GSM0", 0x40, 0x2, 0x00,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("GSM1", 0x40, 0x2, 0x02,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("GSM2", 0x40, 0x2, 0x04,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("GSM3", 0x40, 0x2, 0x06,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("GSM4", 0x40, 0x2, 0x08,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("GSM5", 0x40, 0x2, 0x0a,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("GSM6", 0x40, 0x2, 0x0c,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("GSM7", 0x40, 0x1, 0x0e,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("GSM8", 0x40, 0x1, 0x0f,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("GSM9", 0x40, 0x1, 0x10,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("GSM10", 0x40, 0x1, 0x11,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+	BERLIN_PINCTRL_GROUP("GSM11", 0x40, 0x1, 0x12,
-+		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
-+};
++sysctrl: system-controller at d000 {
++	compatible = "marvell,berlin2-system-ctrl";
++	reg = <0xd000 0x100>;
 +
-+static const struct berlin_pinctrl_desc berlin2cd_soc_pinctrl_data = {
-+	.groups = berlin2cd_soc_pinctrl_groups,
-+	.ngroups = ARRAY_SIZE(berlin2cd_soc_pinctrl_groups),
-+};
++	uart0_pmux: uart0-pmux {
++		groups = "GSM4";
++		function = "uart0";
++	};
 +
-+static const struct berlin_pinctrl_desc berlin2cd_sysmgr_pinctrl_data = {
-+	.groups = berlin2cd_sysmgr_pinctrl_groups,
-+	.ngroups = ARRAY_SIZE(berlin2cd_sysmgr_pinctrl_groups),
-+};
++	uart1_pmux: uart1-pmux {
++		groups = "GSM5";
++		function = "uart1";
++	};
 +
-+static const struct of_device_id berlin2cd_pinctrl_match[] = {
-+	{
-+		.compatible = "marvell,berlin2cd-chip-ctrl",
-+		.data = &berlin2cd_soc_pinctrl_data
-+	},
-+	{
-+		.compatible = "marvell,berlin2cd-system-ctrl",
-+		.data = &berlin2cd_sysmgr_pinctrl_data
-+	},
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, berlin2cd_pinctrl_match);
-+
-+static int berlin2cd_pinctrl_probe(struct platform_device *pdev)
-+{
-+	const struct of_device_id *match =
-+		of_match_device(berlin2cd_pinctrl_match, &pdev->dev);
-+	struct regmap_config *rmconfig;
-+	struct regmap *regmap;
-+	struct resource *res;
-+	void __iomem *base;
-+
-+	rmconfig = devm_kzalloc(&pdev->dev, sizeof(*rmconfig), GFP_KERNEL);
-+	if (!rmconfig)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_request_and_ioremap(&pdev->dev, res);
-+	if (!base)
-+		return -EADDRNOTAVAIL;
-+
-+	rmconfig->reg_bits = 32,
-+	rmconfig->val_bits = 32,
-+	rmconfig->reg_stride = 4,
-+	rmconfig->max_register = resource_size(res);
-+
-+	regmap = devm_regmap_init_mmio(&pdev->dev, base, rmconfig);
-+	if (IS_ERR(regmap))
-+		return PTR_ERR(regmap);
-+
-+	return berlin_pinctrl_probe(pdev, match->data);
-+}
-+
-+static struct platform_driver berlin2cd_pinctrl_driver = {
-+	.probe	= berlin2cd_pinctrl_probe,
-+	.driver	= {
-+		.name = "berlin-bg2cd-pinctrl",
-+		.owner = THIS_MODULE,
-+		.of_match_table = berlin2cd_pinctrl_match,
-+	},
-+};
-+module_platform_driver(berlin2cd_pinctrl_driver);
-+
-+MODULE_AUTHOR("Antoine T?nart <antoine.tenart@free-electrons.com>");
-+MODULE_DESCRIPTION("Marvell Berlin BG2CD pinctrl driver");
-+MODULE_LICENSE("GPL");
++	uart2_pmux: uart2-pmux {
++		groups = "GSM3";
++		function = "uart2";
++	};
+ };
 -- 
 1.9.1
