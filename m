@@ -1,84 +1,55 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 May 2014 13:17:57 +0200
-Subject: [RFC PATCHv1 0/7] ARM core support for hardware I/O coherency
- in non-SMP platforms
-In-Reply-To: <20140519104219.GH5113@arm.com>
-References: <1400082641-23871-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140514170456.GC15946@arm.com>
- <20140515115010.0d6a4d92@free-electrons.com>
- <20140515142205.GC1499@arm.com>
- <20140519111739.39ae3b82@free-electrons.com>
- <20140519104219.GH5113@arm.com>
-Message-ID: <20140519131757.20021784@free-electrons.com>
+From: vikas.sajjan@samsung.com (Vikas Sajjan)
+Date: Mon, 19 May 2014 16:49:12 +0530
+Subject: [PATCH V3 0/4] dts: Add usb2phy to Exynos 5250/5420
+Message-ID: <1400498356-26803-1-git-send-email-vikas.sajjan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin,
+Based on 'for-next' branch of Kgene's linux-samsung tree.
+These patches are as per discussions on the driver side patches
+which have already been acked. [1]
 
-On Mon, 19 May 2014 11:42:19 +0100, Catalin Marinas wrote:
+Changes from v2:
+	- Addressed kukjin's comments to update DT binding documentation for sysreg.
+	- removed the version for each patch. Made all patches version as same.
 
-> > I have no problem about the bootloader doing some initialization, so if
-> > that's a requirement for arm64, no problem. But it should be a
-> > requirement regardless of the kernel configuration: in the current
-> > kernel, some initialization is done when CONFIG_SMP is enabled. And now
-> > that the same initialization is needed in !CONFIG_SMP, I'm asked to do
-> > it in the bootloader. That's the thing I don't buy.
-> 
-> And that's a hard thing for me to sell for arm32 ;) because of the
-> current code already doing this.
-> 
-> One of the issues is secure vs non-secure kernel deployment and
-> secure-only registers like ACTLR (and even SCU). I've seen SoCs for
-> which the mainline kernel assumes secure mode but it's deployed as
-> non-secure in the field with out of tree modifications to make it work.
-> I would rather have a single kernel image for both cases.
+Changes from v1:
+ - Rebase on 'for-next' branch.
+ - Removed 'phy-names' property as per discuusion in the driver patches. [1]
 
-As things are today, I believe the Armada 370/XP/375/38x are always
-booted in secure mode. Couldn't the kernel detect if it's running
-secure or non-secure. If it's running secure, it can do all the ACTLR
-configuration (and other things that require being in secure mode). If
-it's running non-secure, then it doesn't do this configuration, and
-assumes the firmware/bootloader did it.
+V1 of this series was the next version for earlier patch-series:
+[PATCH v7 0/2] dts: Add usb2phy to Exynos 5250 [2]
 
-> > > > Unfortunately, __create_page_tables is called so early that I don't
-> > > > know if it's possible to access 'struct machine_desc' at this point to
-> > > > know whether the platform needs shareable pages or not.
-> > > > 
-> > > > Also, don't we have the same problem with the TTB_FLAGS_{SMP,UP) ?
-> > > 
-> > > I don't think we do because we use the ALT_{SMP,UP} for TTB settings and
-> > > we have the smp-on-up fixup running before __v7_setup.
-> > 
-> > Ok. For Armada 370, I don't need shareable pages. For Armada 380, I
-> > need shareable pages, but even if the processor is single core, I
-> > believe it pretends to be SMP in MPIDR.
-> 
-> You'd need to check this.
+Changes from v7 series:
+ - Added patches to enable usb 2.0 support on exynos5420;
+   which include dt nodes for usb2phy as well as ehci and ohci
+   controllers.
 
-I got the confirmation. *But* this is only going to affect CONFIG_SMP
-builds. Armada 380 being single core, we want I/O coherency to work on
-it in !CONFIG_SMP configurations. And in !CONFIG_SMP configuration,
-it's always ALT_UP() that is used, regardless of what MPIDR says. And
-therefore the TTB_FLAGS_UP will be used.
+Changes from v6:
+ - Splitted the patch into two:
+    adding syscon nodes to Exynos5250 and Exynos5420 in first;
+    and phy entry change in the second.
+ - Changed the name of phandle for usb2phy from 'usb2_phy_new'
+   to 'usb2_phy_gen' indicating generic phy.
+ - Using clock macros in dt entries.
 
-> > > I'm always for the former (and that's the case for arm64), though for
-> > > some older boards it's too late to change.
-> > 
-> > Indeed. So how do we move forward?
-> 
-> As I said previously, it's not my call, just a recommendation. It's up
-> to the arm/arm-soc maintainers to take this. Give the arm32 SMP
-> initialisation precedent, forcing it for an existing platform is a
-> harder sell.
+[1] http://www.spinics.net/lists/linux-usb/msg106908.html
+    http://www.spinics.net/lists/linux-usb/msg106837.html
+[2] http://www.spinics.net/lists/linux-usb/msg106427.html
 
-Ok. So I should keep going with the approach proposed in my patch
-series, obviously after fixing the various other comments that were
-posted?
+Kamil Debski (1):
+  ARM: dts: Add usb2phy to Exynos 5250
 
-Thanks,
+Vivek Gautam (3):
+  ARM: dts: Add sysreg sytem controller node to exynos5250 and
+    exynos5420
+  ARM: dts: Add usb2phy support on exynos5420
+  ARM: dts: Add usb 2.0 support on exynos5420
 
-Thomas
+ .../devicetree/bindings/arm/samsung/sysreg.txt     |   11 ++++-
+ arch/arm/boot/dts/exynos5250.dtsi                  |   27 ++++++++++++
+ arch/arm/boot/dts/exynos5420.dtsi                  |   45 ++++++++++++++++++++
+ 3 files changed, 81 insertions(+), 2 deletions(-)
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.9.5
