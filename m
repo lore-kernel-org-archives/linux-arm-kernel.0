@@ -1,150 +1,65 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 19 May 2014 21:57:18 +0300
-Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
- support
-In-Reply-To: <20140519155732.GA4849@atomide.com>
-References: <53730AFB.2090800@ti.com> <20140514160216.GD18463@atomide.com>
- <537487AE.3060906@ti.com> <20140515182133.GC23659@atomide.com>
- <5375A8A8.7080306@ti.com> <20140516160717.GD22031@atomide.com>
- <20140516174158.GA11733@earth.universe> <20140516180154.GG22031@atomide.com>
- <20140516213907.GL12881@atomide.com> <5379D35F.8040207@ti.com>
- <20140519155732.GA4849@atomide.com>
-Message-ID: <537A540E.8070302@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 May 2014 21:02:55 +0200
+Subject: [PATCH] s3cmci: port DMA code to dmaengine API
+In-Reply-To: <CA+E=qVeG8bXowBvdhKpVSYSL08n6ZUVG2LkjhPwjBnbv+egNLw@mail.gmail.com>
+References: <1400522593-6366-1-git-send-email-anarsoul@gmail.com>
+ <7633675.1cAc12AFAY@wuerfel>
+ <CA+E=qVeG8bXowBvdhKpVSYSL08n6ZUVG2LkjhPwjBnbv+egNLw@mail.gmail.com>
+Message-ID: <4667090.Oyf6jd3Lyk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/05/14 18:57, Tony Lindgren wrote:
-
->> I'm not sure if it's even possible to load both of those drivers at the
->> same time, but if it was, and the first one would get probe() called for
->> a device, and the driver would return an error, I'm quite sure the
->> driver framework won't continue trying with the other driver, as the
->> first driver already matched for the device.
+On Monday 19 May 2014 21:54:28 Vasily Khoruzhick wrote:
+> On Mon, May 19, 2014 at 9:18 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 19 May 2014 21:03:13 Vasily Khoruzhick wrote:
+> >> Utilise new s3c24xx-dma dmaengine driver for DMA ops.
+> >>
+> >> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 > 
-> No need to load multiple drivers at this point. That's why I'm saying
-> you can bail out on the undesired display controller probes using
-> of_machine_is_compatible test. It's not that uncommon for drivers to do:
-
-Hmm, I don't follow. If both, say, omap and exynos have a panel driver
-for the same sharp panel, both need a driver for it (presuming exynos
-has a proper display component driver system, which may not be true).
-
-Both drivers would be loaded at boot time for the probe to be even to be
-possible. Even if the other one bails out from a device probe using
-of_machine_is_compatible, afaik the driver framework will stop probing
-at that point, as that driver reports being compatible with the device
-in question.
-
-...
-
-Ah, ok, now I see. I think you mean module init, not probe? For some
-reason I was just thinking about the probe stage.
-
-Maybe that would work. I need to test tomorrow.
-
->>> it would be quite silly for each display controller to have to do
->>> their own remapping for shared panels?
->>
->> It would, but wouldn't it be just as silly (well, even more silly in my
->> opinion) to have each display controller require driver specific
->> compatible strings for the panels used?
+> > - I did not remove MMC_S3C_PIODMA, but I don't see anything wrong
+> >   with yours there
 > 
-> Not driver specific, but hardware package specific. That's being done
-> all the time. For example, compatible strings like "nvidia,tegra124",
-> "ti,omap5" describe a package of an ARM core and various devices.
+> It didn't work even with legacy code for me. I don't want to fix it,
+> so it's just dropped.
+> Anyway, I don't see much sense in PIODMA mode.
 
-It feels to me rather wrong if I'd specify the compatible string for an
-external piece of hardware based on the SoC it's connected to.
+Ah, that makes sense.
 
-> But by using of_machine_is_compatible in the display drivers, you
-> can use the right compatible flags from the start if you want to go
-> that way.
-
-Yes, with that we could have right compatible flags in the .dts.
-
->> Well, I sure hope nobody else has to implement similar thing.
+> > - the slave config setup is slightly different
 > 
-> Suuuure.. I've heard that about 20 times before and guess what
-> happenened? Things never got fixed until some poor maintainer
-> had to start fixing it all over the place about three years later.
-
-The poor maintainer here being me =). And it's still a case of
-pick-your-poison. We need to hack around the issue, in some form or
-another. So in any case the poor maintainer has to fix it at some point
-in the future.
-
-But all this is fixed when we have a common display framework. And
-that's something that is really badly needed in some form or another,
-the sooner the better.
-
-So the "fix" here is not just some internal thing that could be left at
-that and forgotten.
-
->> To open that up a bit, traditionally other display driver architectures
->> have not had drivers for each display "entity", like the panels. So you
->> would really just have the display subsystem in the .dts, and some raw
->> data there (panel timings) to get the panel running.
+> Yep.
 > 
-> Right, I believe that is the way to go, no doubt about it.
-
-No, that's exactly _not_ the way to go =). We need proper drivers for
-display components, instead of trying to avoid that and embed panel data
-into the display controller's data.
-
-> Here's a list of things that bothers me:
+> > - I hardcode the DMA request number, while you pass it as a resource.
+> >   Actually both are wrong I guess, it should be platform data instead.
 > 
-> 1. Searching through the dtb from a driver instead of relying on the
->    driver probe mechanism for the components in question. If the parsing
->    of the dtb needs to be done it should be done in a Linux generic way
->    from some framework instead.
+> Well, at least s3c64xx uses resources for passing dma channel number,
+> and so did I.
+> Btw, It'll make transition to device tree a bit easier.
 
-The reason I haven't made the conversion code available for others to
-use is that there are no other users at the moment. And I hope there
-will be no other user until we get the common display framework. If
-there is, we'll need to move the code to a generic place.
+Actually it doesn't help with the transition to DT at all, because DT
+does not use resources for DMA requests. Instead there is a
+dma_request_slave_channel() interface that gets passed a string to
+match the DT descriptor of the DMA channel. If you want to enable
+DT probing while keeping the traditional way alive, you can
+use dma_request_slave_channel_compat(), although I find it not
+much easier than open-coding it.
 
-> 2. Having to do this all early before we even have any debug console
->    available. We are trying to move everything to happen later on to avoid
->    all the issues related to initializing things early.
+There is one issue with dma_request_slave_channel_compat and
+dma_request_channel, which is that you need a pointer to the
+filter function. In portable drivers that pointer should get passed
+in platform_data for the non-DT case, along with the data it
+needs, because there are dma engines that need more than just
+an integer to identify a slave.
 
-It worked fine for me when doing it as subsys_init level. Why do you say
-it'd be early, before debug console?
+For this driver, you don't have to go that far, as long as it's
+ensure that the pointer to the filter function is available to
+the driver, i.e. you can't have a built-in s3mci driver when the
+dmaengine driver is a loadable module.
 
-All the drivers with converted compatible strings are normal drivers, so
-afaik things work fine if we just convert the strings before the module
-init level.
+> There's one more difference: original s3cmci doesn't restore prescaler
+> value when necessary on s3c2410,
+> my version has a fix for it.
 
-> 3. Having to maintain a database in kernel of display mappings separately
->    in addition to the .dts files.
+Ok.
 
-Yes, that's slightly annoying. Not really a big burden, though, as it's
-quite rare to get a new encoder or panel driver.
-
-> 4. Having this hack limited to device tree based booting while we are
->    trying to unify the functions for drivers to use to get their
->    resources.
-
-I don't understand this one. With non-DT boot we don't have the issue at
-all, there's no need for hacks.
-
-> 5. Seeing the possibility of this spreading to other drivers.
-
-Well, until we have a common display framework, one of the hacky options
-we've discussed will spread to other drivers if they need to have their
-own drivers for the same hardware devices.
-
-Which is not nice, but not something we can escape. And using the
-of_machine_is_compatible or having the compatible strings in .dts
-appended with "dss" or such doesn't change that, it just changes which
-hack may spread.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/98152665/attachment-0001.sig>
+	Arnd
