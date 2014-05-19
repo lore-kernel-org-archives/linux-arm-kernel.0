@@ -1,294 +1,145 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 May 2014 20:18:58 +0200
-Subject: [PATCH] s3cmci: port DMA code to dmaengine API
-In-Reply-To: <1400522593-6366-1-git-send-email-anarsoul@gmail.com>
-References: <1400522593-6366-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <7633675.1cAc12AFAY@wuerfel>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 19 May 2014 13:32:46 -0500
+Subject: [PATCH 06/11] ARM: OMAP2+: Fix voltage scaling init for device
+ tree
+In-Reply-To: <20140519180104.GL4849@atomide.com>
+References: <1397173639-29587-1-git-send-email-tony@atomide.com>
+ <1397173639-29587-7-git-send-email-tony@atomide.com>
+ <CAGhQ9VxS+Hg6EX=CDxbibV2TFw++LwZY+GQomZEHx--JGuWHNg@mail.gmail.com>
+ <20140519180104.GL4849@atomide.com>
+Message-ID: <CAGo_u6oGHFAFimYSc8Utgbp=oCahXzO0ZoYjhFgOkT3YkppS6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 May 2014 21:03:13 Vasily Khoruzhick wrote:
-> Utilise new s3c24xx-dma dmaengine driver for DMA ops.
-> 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+On Mon, May 19, 2014 at 1:01 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Joachim Eastwood <manabian@gmail.com> [140519 10:51]:
+>> Hi Tony,
+>>
+>> If found this patch in your omap-for-v3.16/pm-signed tag and tested it
+>> on top of Linus master + omap 3.16 dt + Tomi fbdev omap. I assumed
+>> it's going upstream for 3.16(?).
+>
+> Yes.
+>
+>> First of all; is this safe on OMAP4460?
+>> As far as I understand voltage scaling on 4460 has never been
+>> mainline, but this code enables voltage scaling for all omap4 parts.
+>> More below.
+>
+> Sounds like something's not right then. This should just restore
+> the earlier code path we had for legacy booting for omap4.
+>
+>> On 11 April 2014 01:47, Tony Lindgren <tony@atomide.com> wrote:
+>> > We are currently disabling the init of voltage scaling
+>> > for device tree. With the voltage scaling problems fixed
+>> > for omap3 in general, there's no need to disable the voltage
+>> > scaling init for device tree based booting.
+>> >
+>> > Cc: Kevin Hilman <khilman@linaro.org>
+>> > Cc: Nishanth Menon <nm@ti.com>
+>> > Cc: Paul Walmsley <paul@pwsan.com>
+>> > Cc: Tero Kristo <t-kristo@ti.com>
+>> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+>> > ---
+>> >  arch/arm/mach-omap2/pm.c | 28 ++++++++++++----------------
+>> >  1 file changed, 12 insertions(+), 16 deletions(-)
+>> >
+>> > diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+>> > index e1b4141..ccefd11 100644
+>> > --- a/arch/arm/mach-omap2/pm.c
+>> > +++ b/arch/arm/mach-omap2/pm.c
+>> > @@ -287,25 +287,21 @@ omap_postcore_initcall(omap2_common_pm_init);
+>> >
+>> >  int __init omap2_common_pm_late_init(void)
+>> >  {
+>> > -       /*
+>> > -        * In the case of DT, the PMIC and SR initialization will be done using
+>> > -        * a completely different mechanism.
+>> > -        * Disable this part if a DT blob is available.
+>> > -        */
+>> > -       if (!of_have_populated_dt()) {
+>> > -
+>> > -               /* Init the voltage layer */
+>> > -               omap_pmic_late_init();
+>> > -               omap_voltage_late_init();
+>> > +       if (of_have_populated_dt()) {
+>> > +               omap3_twl_init();
+>> > +               omap4_twl_init();
+>> > +       }
+>> >
+>> > -               /* Initialize the voltages */
+>> > -               omap3_init_voltages();
+>> > -               omap4_init_voltages();
+>> > +       /* Init the voltage layer */
+>> > +       omap_pmic_late_init();
+>> > +       omap_voltage_late_init();
+>> >
+>> > -               /* Smartreflex device init */
+>> > -               omap_devinit_smartreflex();
+>> > +       /* Initialize the voltages */
+>> > +       omap3_init_voltages();
+>> > +       omap4_init_voltages();
+>> >
+>> > -       }
+>> > +       /* Smartreflex device init */
+>> > +       omap_devinit_smartreflex();
+>> >
+>> >         /* cpufreq dummy device instantiation */
+>> >         omap_init_cpufreq();
+>> > --
+>>
+>> In omap4_twl_init() we have:
+>> if (!cpu_is_omap44xx())
+>>     return -ENODEV;
+>>
+>> voltdm = voltdm_lookup("mpu");
+>> omap_voltage_register_pmic(voltdm, &omap4_mpu_pmic);
+>>
+>> voltdm = voltdm_lookup("iva");
+>> omap_voltage_register_pmic(voltdm, &omap4_iva_pmic);
+>>
+>> voltdm = voltdm_lookup("core");
+>> omap_voltage_register_pmic(voltdm, &omap4_core_pmic);
+>>
+>> As far as I understand the setup above is only valid for 4430 and not
+>> 4460 since it is hook up to the twl in diffent way. External switcher
+>> (TPS62361) for mpu rail and the other rails are used differently.
+>
+> Hmm interesting, I think we had this enabled with legacy booting?
+>
+>> I also get the following messages on boot now:
+>> [ 2.458740] twl: not initialized
+>> [ 2.462127] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+>> 1375000 Vs max 1316660
+>> [ 2.470581] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+>> 1375000 Vs max 1316660
+>> [ 2.479003] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+>> 1375000 Vs max 1316660
+>> [ 2.487457] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+>> 1375000 Vs max 1316660
+>> [ 2.495880] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+>> 1375000 Vs max 1316660
+>> [ 2.504302] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+>> 1375000 Vs max 1316660
+>> [ 2.512725] twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for
+>> 1410000 Vs max 1316660
+>> [ 2.521179] omap2_set_init_voltage: unable to find boot up OPP for vdd_mpu
+>> [ 2.528411] omap2_set_init_voltage: unable to set vdd_mpu
+>> [ 2.534088] omap2_set_init_voltage: unable to find boot up OPP for vdd_core
+>> [ 2.541412] omap2_set_init_voltage: unable to set vdd_core
+>> [ 2.547210] omap2_set_init_voltage: unable to find boot up OPP for vdd_iva
+>> [ 2.554443] omap2_set_init_voltage: unable to set vdd_iva
+>>
+>> It doesn't seem too happy on my 4460.
+>
+> Indeed, we need to fix it. Nishant, any comments on how we should
+> deal with this one?
 
-Very nice!
 
-I had done a similar conversion earlier but not tested and only
-posted in a reply to another thread. I'd assume that your
-version is better and that you have actually tested it, but just
-for reference, here is what I had. Maybe it helps you to take
-a look at my version to see if there is something you missed.
 
-Here are the differences I found:
+we can add TPS data here for 4460 mpu (panda-ES) if that is
+interesting to us - given that the common voltage domain/VC/VP stuff
+so far has gone in no positive direction in our discussions last year.
 
-- I don't save the 'desc' pointer as you do, but I don't see it used
-  anywhere.
-- I did not remove MMC_S3C_PIODMA, but I don't see anything wrong
-  with yours there
-- the slave config setup is slightly different
-- I hardcode the DMA request number, while you pass it as a resource.
-  Actually both are wrong I guess, it should be platform data instead.
- 
-	Arnd
-
-diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-index f237826..02847d3 100644
---- a/drivers/mmc/host/s3cmci.c
-+++ b/drivers/mmc/host/s3cmci.c
-@@ -14,6 +14,7 @@
- #include <linux/module.h>
- #include <linux/dma-mapping.h>
- #include <linux/clk.h>
-+#include <linux/dmaengine.h>
- #include <linux/mmc/host.h>
- #include <linux/platform_device.h>
- #include <linux/cpufreq.h>
-@@ -28,6 +29,7 @@
- #include <mach/gpio-samsung.h>
- 
- #include <linux/platform_data/mmc-s3cmci.h>
-+#include <linux/platform_data/dma-s3c24xx.h>
- 
- #include "s3cmci.h"
- 
-@@ -140,10 +142,6 @@ static const int dbgmap_debug = dbg_err | dbg_debug;
- 		dev_dbg(&host->pdev->dev, args);  \
- 	} while (0)
- 
--static struct s3c2410_dma_client s3cmci_dma_client = {
--	.name		= "s3c-mci",
--};
--
- static void finalize_request(struct s3cmci_host *host);
- static void s3cmci_send_request(struct mmc_host *mmc);
- static void s3cmci_reset(struct s3cmci_host *host);
-@@ -841,9 +839,7 @@ static irqreturn_t s3cmci_irq_cd(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
--static void s3cmci_dma_done_callback(struct s3c2410_dma_chan *dma_ch,
--				     void *buf_id, int size,
--				     enum s3c2410_dma_buffresult result)
-+static void s3cmci_dma_done_callback(void *buf_id)
- {
- 	struct s3cmci_host *host = buf_id;
- 	unsigned long iflags;
-@@ -856,45 +852,18 @@ static void s3cmci_dma_done_callback(struct s3c2410_dma_chan *dma_ch,
- 
- 	BUG_ON(!host->mrq);
- 	BUG_ON(!host->mrq->data);
--	BUG_ON(!host->dmatogo);
- 
- 	spin_lock_irqsave(&host->complete_lock, iflags);
- 
--	if (result != S3C2410_RES_OK) {
--		dbg(host, dbg_fail, "DMA FAILED: csta=0x%08x dsta=0x%08x "
--			"fsta=0x%08x dcnt:0x%08x result:0x%08x toGo:%u\n",
--			mci_csta, mci_dsta, mci_fsta,
--			mci_dcnt, result, host->dmatogo);
--
--		goto fail_request;
--	}
--
--	host->dmatogo--;
--	if (host->dmatogo) {
--		dbg(host, dbg_dma, "DMA DONE  Size:%i DSTA:[%08x] "
--			"DCNT:[%08x] toGo:%u\n",
--			size, mci_dsta, mci_dcnt, host->dmatogo);
--
--		goto out;
--	}
--
--	dbg(host, dbg_dma, "DMA FINISHED Size:%i DSTA:%08x DCNT:%08x\n",
--		size, mci_dsta, mci_dcnt);
-+	dbg(host, dbg_dma, "DMA FINISHED DSTA:%08x DCNT:%08x\n",
-+		mci_dsta, mci_dcnt);
- 
- 	host->dma_complete = 1;
- 	host->complete_what = COMPLETION_FINALIZE;
- 
--out:
- 	tasklet_schedule(&host->pio_tasklet);
- 	spin_unlock_irqrestore(&host->complete_lock, iflags);
- 	return;
--
--fail_request:
--	host->mrq->data->error = -EINVAL;
--	host->complete_what = COMPLETION_FINALIZE;
--	clear_imask(host);
--
--	goto out;
- }
- 
- static void finalize_request(struct s3cmci_host *host)
-@@ -966,7 +935,7 @@ static void finalize_request(struct s3cmci_host *host)
- 	 * DMA channel and the fifo to clear out any garbage. */
- 	if (mrq->data->error != 0) {
- 		if (s3cmci_host_usedma(host))
--			s3c2410_dma_ctrl(host->dma, S3C2410_DMAOP_FLUSH);
-+			dmaengine_terminate_all(host->dma);
- 
- 		if (host->is2440) {
- 			/* Clear failure register and reset fifo. */
-@@ -993,26 +962,27 @@ request_done:
- }
- 
- static void s3cmci_dma_setup(struct s3cmci_host *host,
--			     enum dma_data_direction source)
-+			     enum dma_transfer_direction source)
- {
--	static enum dma_data_direction last_source = -1;
--	static int setup_ok;
-+	static enum dma_transfer_direction last_source = -1;
-+	struct dma_slave_config slave_config;
- 
- 	if (last_source == source)
- 		return;
- 
--	last_source = source;
--
--	s3c2410_dma_devconfig(host->dma, source,
--			      host->mem->start + host->sdidata);
--
--	if (!setup_ok) {
--		s3c2410_dma_config(host->dma, 4);
--		s3c2410_dma_set_buffdone_fn(host->dma,
--					    s3cmci_dma_done_callback);
--		s3c2410_dma_setflags(host->dma, S3C2410_DMAF_AUTOSTART);
--		setup_ok = 1;
-+	memset(&slave_config, 0, sizeof(struct dma_slave_config));
-+	slave_config.direction = source;
-+	if (source == DMA_DEV_TO_MEM) {
-+		slave_config.src_addr = host->mem->start + host->sdidata;
-+		slave_config.src_addr_width = 4;
-+		slave_config.src_maxburst = 1;
-+	} else {
-+		slave_config.dst_addr = host->mem->start + host->sdidata;
-+		slave_config.dst_addr_width = 4;
-+		slave_config.dst_maxburst = 1;
- 	}
-+	last_source = source;
-+	dmaengine_slave_config(host->dma, &slave_config);
- }
- 
- static void s3cmci_send_command(struct s3cmci_host *host,
-@@ -1162,41 +1132,33 @@ static int s3cmci_prepare_pio(struct s3cmci_host *host, struct mmc_data *data)
- 
- static int s3cmci_prepare_dma(struct s3cmci_host *host, struct mmc_data *data)
- {
--	int dma_len, i;
--	int rw = data->flags & MMC_DATA_WRITE;
-+	int dma_len;
-+	int dir = data->flags & MMC_DATA_WRITE ? DMA_TO_DEVICE : DMA_FROM_DEVICE;
-+	struct dma_async_tx_descriptor *desc;
- 
- 	BUG_ON((data->flags & BOTH_DIR) == BOTH_DIR);
- 
--	s3cmci_dma_setup(host, rw ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
--	s3c2410_dma_ctrl(host->dma, S3C2410_DMAOP_FLUSH);
--
--	dma_len = dma_map_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
--			     rw ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
-+	s3cmci_dma_setup(host, dir);
- 
-+	dma_len = dma_map_sg(mmc_dev(host->mmc), data->sg, data->sg_len, dir);
- 	if (dma_len == 0)
- 		return -ENOMEM;
- 
--	host->dma_complete = 0;
--	host->dmatogo = dma_len;
--
--	for (i = 0; i < dma_len; i++) {
--		int res;
-+	desc = dmaengine_prep_slave_sg(host->dma, data->sg, dma_len,
-+				       dir, DMA_CTRL_ACK);
- 
--		dbg(host, dbg_dma, "enqueue %i: %08x@%u\n", i,
--		    sg_dma_address(&data->sg[i]),
--		    sg_dma_len(&data->sg[i]));
-+	if (!desc) {
-+		dma_unmap_sg(mmc_dev(host->mmc), data->sg, dma_len, dir);
-+		return -EIO;
-+	}
- 
--		res = s3c2410_dma_enqueue(host->dma, host,
--					  sg_dma_address(&data->sg[i]),
--					  sg_dma_len(&data->sg[i]));
-+	host->dma_complete = 0;
- 
--		if (res) {
--			s3c2410_dma_ctrl(host->dma, S3C2410_DMAOP_FLUSH);
--			return -EBUSY;
--		}
--	}
-+	desc->callback = s3cmci_dma_done_callback;
-+	desc->callback_param = host;
- 
--	s3c2410_dma_ctrl(host->dma, S3C2410_DMAOP_START);
-+	dmaengine_submit(desc);
-+	dma_async_issue_pending(host->dma);
- 
- 	return 0;
- }
-@@ -1765,9 +1727,14 @@ static int s3cmci_probe(struct platform_device *pdev)
- 	/* depending on the dma state, get a dma channel to use. */
- 
- 	if (s3cmci_host_usedma(host)) {
--		host->dma = s3c2410_dma_request(DMACH_SDI, &s3cmci_dma_client,
--						host);
--		if (host->dma < 0) {
-+		dma_cap_mask_t mask;
-+        
-+		dma_cap_zero(mask);
-+		dma_cap_set(DMA_SLAVE, mask);
-+
-+		host->dma = dma_request_channel(mask, s3c24xx_dma_filter, (void *)DMACH_SDI);
-+
-+		if (!host->dma) {
- 			dev_err(&pdev->dev, "cannot get DMA channel.\n");
- 			if (!s3cmci_host_canpio()) {
- 				ret = -EBUSY;
-@@ -1816,9 +1783,9 @@ static int s3cmci_probe(struct platform_device *pdev)
- 	mmc->max_segs		= 128;
- 
- 	dbg(host, dbg_debug,
--	    "probe: mode:%s mapped mci_base:%p irq:%u irq_cd:%u dma:%u.\n",
-+	    "probe: mode:%s mapped mci_base:%p irq:%u irq_cd:%u.\n",
- 	    (host->is2440?"2440":""),
--	    host->base, host->irq, host->irq_cd, host->dma);
-+	    host->base, host->irq, host->irq_cd);
- 
- 	ret = s3cmci_cpufreq_register(host);
- 	if (ret) {
-@@ -1852,7 +1819,7 @@ static int s3cmci_probe(struct platform_device *pdev)
- 
-  probe_free_dma:
- 	if (s3cmci_host_usedma(host))
--		s3c2410_dma_free(host->dma, &s3cmci_dma_client);
-+		dma_release_channel(host->dma);
- 
-  probe_free_gpio_wp:
- 	if (!host->pdata->no_wprotect)
-@@ -1914,7 +1881,7 @@ static int s3cmci_remove(struct platform_device *pdev)
- 	tasklet_disable(&host->pio_tasklet);
- 
- 	if (s3cmci_host_usedma(host))
--		s3c2410_dma_free(host->dma, &s3cmci_dma_client);
-+		dma_release_channel(host->dma);
- 
- 	free_irq(host->irq, host);
- 
-diff --git a/drivers/mmc/host/s3cmci.h b/drivers/mmc/host/s3cmci.h
-index c76b53d..514a887 100644
---- a/drivers/mmc/host/s3cmci.h
-+++ b/drivers/mmc/host/s3cmci.h
-@@ -26,7 +26,7 @@ struct s3cmci_host {
- 	void __iomem		*base;
- 	int			irq;
- 	int			irq_cd;
--	int			dma;
-+	struct dma_chan		*dma;
- 
- 	unsigned long		clk_rate;
- 	unsigned long		clk_div;
+Regards,
+Nishanth Menon
