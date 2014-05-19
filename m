@@ -1,44 +1,49 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 19 May 2014 13:32:28 +0100
-Subject: [PATCH 0/9] arm64: KVM: debug infrastructure support
-In-Reply-To: <87d2fanmm7.fsf@approximate.cambridge.arm.com>
-References: <1399476054-21571-1-git-send-email-marc.zyngier@arm.com>
- <CALrVBkscsWxRsS42eJi9deFeaBbjQMKq9R2e-u5ztu70rKUvUw@mail.gmail.com>
- <87d2fanmm7.fsf@approximate.cambridge.arm.com>
-Message-ID: <CAFEAcA9K0fu+B-j0sN7OaWPzkT+0hYCxu3JLwDKT3qYob4h1PA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 19 May 2014 13:33:14 +0100
+Subject: [PATCH 4/6] arm64: topology: add MPIDR-based detection
+In-Reply-To: <20140519105405.GC5935@e102568-lin.cambridge.arm.com>
+References: <1399063112-16917-1-git-send-email-broonie@kernel.org>
+ <1399063112-16917-5-git-send-email-broonie@kernel.org>
+ <53763DFC.8070309@arm.com> <20140516183915.GP22111@sirena.org.uk>
+ <5379D594.2000200@arm.com>
+ <20140519105405.GC5935@e102568-lin.cambridge.arm.com>
+Message-ID: <20140519123314.GU12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 May 2014 10:28, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> If you look carefully at patch #8 (last hunk of the patch), you'll see
-> that I always reset the debug state to "clean" at the end of a guest
-> run:
->
-> @@ -609,6 +1040,12 @@ __kvm_vcpu_return:
->
->         bl __restore_sysregs
->         bl __restore_fpsimd
-> +
-> +       skip_clean_debug_state x3, 1f
-> +       // Clear the dirty flag for the next run
-> +       str     xzr, [x0, #VCPU_DEBUG_FLAGS]
-> +       bl      __restore_debug
-> +1:
->         restore_host_regs
->
->         mov     x0, x1
->
-> This ensures that the guest's debug state will only be reloaded if:
->
-> - MDSCR_EL1 has either MDE or KDE set (which means the guest is actively
-> using the debug infrastructure)
-> - or the guest has written to a trapped register (which marks the state
-> as dirty).
+On Mon, May 19, 2014 at 11:54:05AM +0100, Lorenzo Pieralisi wrote:
 
-Do we also handle the case where the guest didn't
-write to the trapped register but userspace did (via
-the SET_ONE_REG API)? Maybe this just falls out in the
-wash or is handled already...
+> As to what should we use as cluster id, honestly I do not know.
 
-thanks
--- PMM
+> I am quite tempted to use just three affinity levels for the moment
+> and fix it when need arises, after all on ARM we have aff2 completely
+> unused at the moment for the non-SMT systems (ie all ARM SMP systems in
+> the mainline) and we are not coalescing affinity 2 into affinity 1 in
+> any way.
+
+> So either you ignore aff3, or can do something like that (non-SMT):
+
+> cluster_id = MPIDR_EL1[39:32] << 16 | MPIDR_EL1[23:16] << 8 | MPIDR_EL1[15:8]
+
+Which is roughly what the original code that you were worried about did
+IIRC?  It seems silly to ignore the higher affinity levels since it's
+trivial to look at them and means the kernel will@least split
+everything into clusters if it does encounter some hardware that uses
+them as opposed to merging those distinguished only by the higher
+affinity levels.
+
+> Also please remove the warning on the missing topology information, if
+> we fall back to MPIDR_EL1 we will always have a topology of sorts, as
+> borked as it might be, so that warning becomes useless, ie it is never
+> triggered.
+
+I'll add something to this patch - the warning is needed if the DT code
+gets merged without this and it seems this one still going round the
+loop.  :/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/36dee615/attachment.sig>
