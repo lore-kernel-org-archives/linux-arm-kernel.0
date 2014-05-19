@@ -1,94 +1,44 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 May 2014 10:13:53 +0200
-Subject: [PATCHv5 3/4] ARM: mvebu: implement L2/PCIe deadlock workaround
+Date: Mon, 19 May 2014 10:13:54 +0200
+Subject: [PATCHv5 4/4] ARM: mvebu: use pci_ioremap_set_mem_type() to map PCI
+ I/O as strongly ordered
 In-Reply-To: <1400487234-4501-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1400487234-4501-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1400487234-4501-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1400487234-4501-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell Armada 375 and Armada 38x SOCs, which use the Cortex-A9
-CPU core, the PL310 cache and the Marvell PCIe hardware block are
-affected a L2/PCIe deadlock caused by a system erratum when hardware
-I/O coherency is used.
-
-This deadlock can be avoided by mapping the PCIe memory areas as
-strongly-ordered (note: MT_UNCACHED is strongly-ordered), and by
-removing the outer cache sync done in software. This is implemented in
-this patch by:
-
- * Registering a custom arch_ioremap_caller function that allows to
-   make sure PCI memory regions are mapped MT_UNCACHED.
-
- * Adding at runtime the 'arm,io-coherent' property to the PL310 cache
-   controller. This cannot be done permanently in the DT, because the
-   hardware I/O coherency can only be enabled when CONFIG_SMP is
-   enabled, in the current kernel situation.
+Part of the workaround for the PCIe/SMP/PL310 deadlock on Armada
+375/38x is to map PCI mappings strongly ordered. Mapping PCI memory
+regions as strongly ordered was already done thanks to the
+arch_ioremap_caller mechanism. This patch does the same for the PCI
+I/O regions by using the new pci_ioremap_set_mem_type() function.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/coherency.c | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+This patch is kept separate from the rest of the
+mach-mvebu/coherency.c code for the workaround, as this patch has a
+build dependency on the new API. Since the new API patch will go
+through Russell's tree, and this patch through the mvebu tree, there
+might be some merging issue, or even the need to delay the merging of
+this patch.
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/coherency.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index d5a975b..f6be9c6 100644
+index f6be9c6..0215614 100644
 --- a/arch/arm/mach-mvebu/coherency.c
 +++ b/arch/arm/mach-mvebu/coherency.c
-@@ -31,6 +31,7 @@
- #include <linux/clk.h>
- #include <asm/smp_plat.h>
- #include <asm/cacheflush.h>
-+#include <asm/mach/map.h>
- #include "armada-370-xp.h"
- #include "coherency.h"
- #include "mvebu-soc-id.h"
-@@ -308,9 +309,47 @@ static void __init armada_370_coherency_init(struct device_node *np)
- 	set_cpu_coherent();
- }
+@@ -335,6 +335,7 @@ static void __init armada_375_380_coherency_init(struct device_node *np)
  
-+/*
-+ * This ioremap hook is used on Armada 375/38x to ensure that PCIe
-+ * memory areas are mapped as MT_UNCACHED instead of MT_DEVICE. This
-+ * is needed as a workaround for a deadlock issue between the PCIe
-+ * interface and the cache controller.
-+ */
-+static void __iomem *
-+armada_pcie_wa_ioremap_caller(phys_addr_t phys_addr, size_t size,
-+			      unsigned int mtype, void *caller)
-+{
-+	struct resource pcie_mem;
-+
-+	mvebu_mbus_get_pcie_mem_aperture(&pcie_mem);
-+
-+	if (pcie_mem.start <= phys_addr && (phys_addr + size) <= pcie_mem.end)
-+		mtype = MT_UNCACHED;
-+
-+	return __arm_ioremap_caller(phys_addr, size, mtype, caller);
-+}
-+
- static void __init armada_375_380_coherency_init(struct device_node *np)
- {
-+	struct device_node *cache_dn;
-+
  	coherency_cpu_base = of_iomap(np, 0);
-+	arch_ioremap_caller = armada_pcie_wa_ioremap_caller;
-+
-+	/*
-+	 * Add the PL310 property "arm,io-coherent". This makes sure the
-+	 * outer sync operation is not used, which allows to
-+	 * workaround the system erratum that causes deadlocks when
-+	 * doing PCIe in an SMP situation on Armada 375 and Armada
-+	 * 38x.
-+	 */
-+	for_each_compatible_node(cache_dn, NULL, "arm,pl310-cache") {
-+		struct property *p;
-+
-+		p = kzalloc(sizeof(*p), GFP_KERNEL);
-+		p->name = kstrdup("arm,io-coherent", GFP_KERNEL);
-+		of_add_property(cache_dn, p);
-+	}
- }
+ 	arch_ioremap_caller = armada_pcie_wa_ioremap_caller;
++	pci_ioremap_set_mem_type(MT_UNCACHED);
  
- static int coherency_type(void)
+ 	/*
+ 	 * Add the PL310 property "arm,io-coherent". This makes sure the
 -- 
 1.9.3
