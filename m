@@ -1,54 +1,55 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 19 May 2014 11:39:42 +0200
-Subject: [linux-sunxi] Re: [PATCH v5 4/8] input: misc: Add driver for
- AXP20x Power Enable Key
-In-Reply-To: <20140519091553.GC4978@lee--X1>
-References: <1398947374-3115-1-git-send-email-carlo@caione.org>
- <1398947374-3115-5-git-send-email-carlo@caione.org>
- <20140503010604.GE4090@lukather>
- <20140519055745.GL29386@core.coreip.homeip.net>
- <CAOQ7t2bPHnjfpeqQjMsYJs--qpd1_1RvBEFXztTDgnf5yW=Yxg@mail.gmail.com>
- <20140519091553.GC4978@lee--X1>
-Message-ID: <CAOQ7t2a=V_dO17Xg4VJUTV3W_OFCaE5Wuj15_Fox2jywjH+RPg@mail.gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 19 May 2014 11:48:15 +0200
+Subject: [PATCH v5 2/2] ARM: dts: mx51: Remove mach-cpuimx51sd board file
+In-Reply-To: <20140513015431.GI8330@dragon>
+References: <1399736856-9489-1-git-send-email-festevam@gmail.com>
+ <1399736856-9489-2-git-send-email-festevam@gmail.com>
+ <20140513015431.GI8330@dragon>
+Message-ID: <1400492895.2007.7.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 11:15 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Mon, 19 May 2014, Carlo Caione wrote:
->
->> On Mon, May 19, 2014 at 7:57 AM, Dmitry Torokhov
->> <dmitry.torokhov@gmail.com> wrote:
->> > On Fri, May 02, 2014 at 06:06:04PM -0700, Maxime Ripard wrote:
->> >> On Thu, May 01, 2014 at 02:29:30PM +0200, Carlo Caione wrote:
->> >> > This patch add support for the Power Enable Key found on MFD AXP202 and
->> >> > AXP209. Besides the basic support for the button, the driver adds two
->> >> > entries in sysfs to configure the time delay for power on/off.
->> >> >
->> >> > Signed-off-by: Carlo Caione <carlo@caione.org>
->> >>
->> >> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> >
->> > Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->> >
->> > How are we merging it? MFD tree?
->>
->> No idea. Lee, can you help in merging it?
->> The only thing still  left out is the DT to be merged through Maxime
->> (I need to submit a v6 only for that).
->
-> Yes.
->
-> Weren't you in receipt of my email sent out an hour before this one?
+On Tue, 2014-05-13 at 09:54 +0800, Shawn Guo wrote:
+> On Sat, May 10, 2014 at 12:47:36PM -0300, Fabio Estevam wrote:
+> > From: Fabio Estevam <fabio.estevam@freescale.com>
+> > 
+> > eukrea_mbimxsd51-baseboard.c and mach-cpuimx51sd.c can be replaced with their
+> > devicetree equivalents: imx51-eukrea-mbimxsd51-baseboard.dts and 
+> > imx51-eukrea-cpuimx51.dtsi respectively, so remove the board files.
+> > 
+> > This allows the conversion of mx51 to a devicetree-only platform.
+> > 
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> This is not a dts patch, so I dropped 'dts' from patch prefix.
+> 
+> Applied both, thanks.
 
-Yes, but this email was sent before receiving yours :)
+This patch just hit linux-next (in next-20140519) as "ARM: mx51: Remove
+mach-cpuimx51sd board file".
 
-> I thought you were re-sending the test though (v6?).
->
-> If you can set that, complete with all the Acks, I'd be much obliged.
+It removed the Kconfig symbol MACH_EUKREA_MBIMXSD51_BASEBOARD. But it
+left one reference to that symbol in sound/soc/fsl/Kconfig untouched,
+see:
 
-Ok, no problem. I'll also fix a small compilation-warning spotted by Hans.
+config SND_SOC_EUKREA_TLV320
+	tristate "Eukrea TLV320"
+	depends on MACH_EUKREA_MBIMX27_BASEBOARD \
+		|| MACH_EUKREA_MBIMXSD25_BASEBOARD \
+		|| MACH_EUKREA_MBIMXSD35_BASEBOARD \
+		|| MACH_EUKREA_MBIMXSD51_BASEBOARD \
+		|| (OF && ARM)
+	depends on I2C
+	select SND_SOC_TLV320AIC23_I2C
+	select SND_SOC_IMX_AUDMUX
+	select SND_SOC_IMX_SSI
+	select SND_SOC_FSL_SSI
+	select SND_SOC_IMX_PCM_DMA
+	help
+	  Enable I2S based access to the TLV320AIC23B codec attached
+	  to the SSI interface
 
-Thank you,
+What should be done with that last reference?
 
--- 
-Carlo Caione
+
+Paul Bolle
