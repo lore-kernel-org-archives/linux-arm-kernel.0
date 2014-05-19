@@ -1,45 +1,52 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 19 May 2014 19:30:38 +0200
-Subject: [PATCH] ASoC: samsung: Allow setting OP_CLK of the IIS Multi Audio
- Interface
-Message-ID: <1400520638-6907-1-git-send-email-s.nawrocki@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 19 May 2014 13:34:07 -0400
+Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
+In-Reply-To: <20140519172338.GJ4849@atomide.com>
+References: <5373C8E8.6040208@ti.com> <5373CBB9.40506@linaro.org>
+ <5373DD94.8030208@ti.com> <5374F35E.5040900@ti.com>
+ <5374FE61.50901@linaro.org> <5374FF5B.8050702@ti.com>
+ <5375079E.3060305@ti.com> <537615EA.3020809@ti.com>
+ <20140516212942.GK12881@atomide.com> <537A3544.1050307@linaro.org>
+ <20140519172338.GJ4849@atomide.com>
+Message-ID: <537A408F.7070301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for setting source clock of the "Core CLK"
-of the IIS Multi Audio Interface.
+On Monday 19 May 2014 01:23 PM, Tony Lindgren wrote:
+> * Daniel Lezcano <daniel.lezcano@linaro.org> [140519 09:46]:
+>> On 05/16/2014 11:29 PM, Tony Lindgren wrote:
+>>>
+>>> And just to recap, this problem can be reproduced with current
+>>> Linux next with omap2plus_defconfig with CONFIG_CPU_IDLE enabled. The
+>>> system should hang during the boot at some point.
+>>
+>> I can take the time to investigate a bit more but not right now. What is
+>> your deadline before committing the reverts ?
+> 
+> Well we do have several automated build and boot systems failing
+> because of this with multi_v7_defconfig. And users are complaining,
+> see this report from Tobias Jakobi:
+> 
+> https://bugzilla.kernel.org/show_bug.cgi?id=75421
+> 
+> It seems that doing the revert is not enough based on the
+> page above.
+>
+Thats not true. The above link used the half patch and not the
+updated patch. Updated patch worked for Alex also. As you can
+see they saw RCU stalls and they go away after the updated patch.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
- sound/soc/samsung/i2s.c |    4 ++++
- sound/soc/samsung/i2s.h |    1 +
- 2 files changed, 5 insertions(+)
+Can you please point them to try out the updated patch ?
+ 
+> I'd prefer we'd fix this issue properly for sure, it seems that
+> we're not quite understanding what's going on. And this might
+> hit other platforms too when they start implementing deeper
+> PM idle states in the mainline kernel.
+> 
+I am certain that the updated patch fixed the regression
+for sure. The issue is really not generic enough since its related
+an OMAP ROM errata which needs that special handling of
+interrupt re-trigger etc. You don't need that for other platforms
+so they are not likely get affected.
 
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index 048ead9..ae02811 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -451,6 +451,10 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
- 	u32 mod = readl(i2s->addr + I2SMOD);
  
- 	switch (clk_id) {
-+	case SAMSUNG_I2S_OPCLK:
-+		mod &= ~MOD_OPCLK_MASK;
-+		mod |= dir;
-+		break;
- 	case SAMSUNG_I2S_CDCLK:
- 		/* Shouldn't matter in GATING(CLOCK_IN) mode */
- 		if (dir == SND_SOC_CLOCK_IN)
-diff --git a/sound/soc/samsung/i2s.h b/sound/soc/samsung/i2s.h
-index 7966afc..21ff24e 100644
---- a/sound/soc/samsung/i2s.h
-+++ b/sound/soc/samsung/i2s.h
-@@ -18,5 +18,6 @@
- #define SAMSUNG_I2S_RCLKSRC_0	0
- #define SAMSUNG_I2S_RCLKSRC_1	1
- #define SAMSUNG_I2S_CDCLK		2
-+#define SAMSUNG_I2S_OPCLK		3
- 
- #endif /* __SND_SOC_SAMSUNG_I2S_H */
--- 
-1.7.9.5
