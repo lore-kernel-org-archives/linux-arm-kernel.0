@@ -1,17 +1,29 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 19 May 2014 13:51:16 +0800
-Subject: [PATCH v2] ARM: imx: remove unused defines
-In-Reply-To: <1400231369.20342.10.camel@x220>
-References: <1400140671.20469.7.camel@x220>
- <20140515122553.GF5858@pengutronix.de> <1400231369.20342.10.camel@x220>
-Message-ID: <20140519055109.GJ10685@dragon>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Sun, 18 May 2014 22:57:45 -0700
+Subject: [PATCH v5 4/8] input: misc: Add driver for AXP20x Power Enable Key
+In-Reply-To: <20140503010604.GE4090@lukather>
+References: <1398947374-3115-1-git-send-email-carlo@caione.org>
+ <1398947374-3115-5-git-send-email-carlo@caione.org>
+ <20140503010604.GE4090@lukather>
+Message-ID: <20140519055745.GL29386@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 11:09:29AM +0200, Paul Bolle wrote:
-> None of the defines "for modules using static and dynamic DMA channels"
-> are used. Remove these.
+On Fri, May 02, 2014 at 06:06:04PM -0700, Maxime Ripard wrote:
+> On Thu, May 01, 2014 at 02:29:30PM +0200, Carlo Caione wrote:
+> > This patch add support for the Power Enable Key found on MFD AXP202 and
+> > AXP209. Besides the basic support for the button, the driver adds two
+> > entries in sysfs to configure the time delay for power on/off.
+> > 
+> > Signed-off-by: Carlo Caione <carlo@caione.org>
 > 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Applied, thanks.
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+
+How are we merging it? MFD tree?
+
+Thanks.
+
+-- 
+Dmitry
