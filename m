@@ -1,66 +1,80 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 May 2014 15:42:13 -0700
-Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
-In-Reply-To: <537A7522.30007@math.uni-bielefeld.de>
-References: <537615EA.3020809@ti.com> <20140516212942.GK12881@atomide.com>
- <537A3544.1050307@linaro.org> <20140519172338.GJ4849@atomide.com>
- <537A408F.7070301@ti.com> <20140519175157.GK4849@atomide.com>
- <537A4827.30604@linaro.org> <20140519193622.GA11945@atomide.com>
- <537A5F5B.6050403@linaro.org>
- <537A7522.30007@math.uni-bielefeld.de>
-Message-ID: <20140519224212.GL11945@atomide.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Mon, 19 May 2014 16:01:28 -0700
+Subject: [PATCH v2] PM / devfreq: Use freq_table for available_frequencies
+In-Reply-To: <30733097.432311399543337408.JavaMail.weblogic@epv6ml09>
+References: <30733097.432311399543337408.JavaMail.weblogic@epv6ml09>
+Message-ID: <537A8D48.7020201@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tobias Jakobi <tjakobi@math.uni-bielefeld.de> [140519 14:19]:
-> Daniel Lezcano wrote:
-> >
-> > So apparently Santosh, Kevin and Alex say they are not facing the
-> > issue anymore with the revert. But Tobias is still facing this issue.
-> >
-> > There is this simple program [1] which usually makes cpuidle to hang
-> > the system more quickly when there is a problem somewhere. May be
-> > worth to check with it.
-> >
-> > Hope that helps.
-> >
-> >   -- Daniel
-> >
-> > [1]
-> > https://git.linaro.org/power/pm-qa.git/blob/HEAD:/cpuidle/cpuidle_killer.c
-> >
-> Hello,
+On 05/08/2014 03:02 AM, MyungJoo Ham wrote:
+>> On 04/29/2014 01:00 PM, Saravana Kannan wrote:
+>>> On 04/27/2014 06:41 PM, MyungJoo Ham wrote:
+>>>> You are hereby changing the semmantics of the original
+>>>> available_frequencies node.
+>>>>
+>>>> When a frequency/voltage pair has been disabled (opp_disable), probably
+>>>> by opp_disable(), the frequency is no more "available".
+>>>> However, when the driver author supplied freq_table as well as OPP
+>>>> in order to see the statistics, the node will behave differently.
+>>>>
+>>>> Please do not affect the current users as long as it does not give
+>>>> additional benefit or fix a bug.
+>>>
+>>> I was actually trying to stick with the semantics as it was documented.
+>>> The documentation for this file says it'll show frequencies that are not
+>>> allowed by the current min/max settings either. To me, an OPP disable
+>>> seems similar to some frequencies "disabled" by min/max settings.
+>>>
+>>> Giving preference to OPP is not a hard change to do, but it seems to go
+>>> againsts the documented semantics.
+>>>
+>>> Thoughts?
+>>
+>> I'll send out another patch like you wanted -- with OPP being given
+>> preference over freq_table when listing frequencies.
+>>
+>> But I would still like to hear your thoughts. As of today, there's no
+>> clean way to get the complete list of available frequencies that would
+>> give a consistent output irrespective of the temporary limits/conditions
+>> imposed by thermal, current limiting, etc. The round about way is to cat
+>> trans_stat and parse the frequencies from that.
+>>
+>> That's why I was trying to give preference to freq_table.
+>>
+>> Thanks,
+>> Saravana
 > 
-> just to clarify. I never encountered the boot failure problem on my
-> Panda ES in the first place. The issue with CPU_IDLE for me, like I also
-> say in the bugreport, showed itself through instability of the USB. I
-> saw the boot issue on the ml, read that it was caused by CPU_IDLE, and
-> thought I should make Tony aware that I have a similar problem.
+> The node, available_frequencies, was suggested before freq_table concept.
+> At that time, available_frequencies was supposed to show the list of
+> available OPP lists for those who use OPP for devfreq device, excluding
+> those disabled by OPP. (OPP lists are external to devfreq and devfreq's
+> min/max are internal to devfreq)
 > 
-> Now, after applying the latest version of the patch that Santosh
-> proposed, the situation with CPU_IDLE improves. But it is still not
-> stable for me, since after some while, working with an SSH session of
-> WiFi (which IIRC is not connected via USB on the board), this 'BUG'
-> storm hits. This does _not_ happen when I disable CPU_IDLE completly.
-
-OK that seems like a different problem.
- 
-> But even if I don't connect via WiFi at all, just boot and let me system
-> run with serial console connected, after some time I get a kernel 'WARNING':
-> http://www.math.uni-bielefeld.de/~tjakobi/archive/dmesg.1.log
+> Locally, this node has been used to debug the behavior of a devfreq device.
+> With min/max nodes, we know the range while we cannot (easily at shell)
+> see which OPP points are available at the moment, where we have been able
+> to use available_frequencies.
 > 
-> So something with CPU_IDLE is not right here. However I can't say if
-> it's exactly this boot issue which this thread was initially about.
-> Maybe seperate issues are at work here, who knows.
+> We do not want to lose such capavility as long as we do not have OPP sysfs
+> automatically assigned to any OPP lists. If I remember correctly, we don't
+> have it, yet.
 > 
-> Anyway, I'm going to have a look at that cpuidle killer thingy later.
+> 
+> A. I want to minimize semantics changes in sysfs. Adding another without
+> interfering with previous usage is ok.
+> B. (more importantly) I don't want to lose the debugging capabilities.
+> 
 
-OK. I gave it a try, but did not get any errors at least after about
-30 minutes of testing on my panda es.
+Thanks for the response MyungJoo. Makes sense. I was also discussing
+this internally and was considering a "possible_frequencies" similar to
+available vs possible CPUs.
 
-I'll apply the patch from Santosh as that gets things booting again
-with linux next.
+I'll make such a patch for that and send it out. In that case, I'll
+probably leave "available_frequencies" alone.
 
-Regards,
+-Saravana
 
-Tony
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
