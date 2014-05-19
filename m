@@ -1,51 +1,45 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 19 May 2014 12:25:02 +0200
-Subject: [PATCH RFC 3/4] clk: samsung: Add driver to control CLKOUT line
- on Exynos SoCs
-In-Reply-To: <5379AFB9.9030608@linaro.org>
-References: <1400175151-27779-1-git-send-email-t.figa@samsung.com>
- <1400175151-27779-4-git-send-email-t.figa@samsung.com>
- <5379AFB9.9030608@linaro.org>
-Message-ID: <5379DBFE.4010000@gmail.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Mon, 19 May 2014 13:25:50 +0300
+Subject: [Patch v3 0/5] Introduce keystone reset driver
+Message-ID: <1400495155-11136-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tushar,
+These patches introduce keystone reset driver.
 
-On 19.05.2014 09:16, Tushar Behera wrote:
-> On 05/15/2014 11:02 PM, Tomasz Figa wrote:
->> This patch introduces a driver that handles configuration of CLKOUT pin
->> of Exynos SoCs that can be used to output certain clocks from inside of
->> the SoC to a dedicated output pin.
->>
->> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
->> ---
-> 
-> Tested the series on Exynos5420-based peach-pit board for audio playback
-> (with an internal patch to set CLK_FIN_PLL as the parent of clkout).
-> 
-> Tested-by: Tushar Behera <tushar.behera@linaro.org>
-> 
+The keystone SoC can be rebooted in several ways. By external reset
+pin, by soft and by watchdogs. This driver allows software reset and reset
+by one of the watchdogs. Also added opportunity to set soft/hard reset type.
 
-Thank you for testing.
+Based on v3.15-rc5
 
->>  Example :
->>  pmu_system_controller: system-controller at 10040000 {
->>  	compatible = "samsung,exynos5250-pmu", "syscon";
->>  	reg = <0x10040000 0x5000>;
->> +	#clock-cells = <0>;
->> +	clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
->> +			"clkout4", "clkout8", "clkout9";
->> +	clocks = <&clock CLK_OUT_DMC>, <&clock CLK_OUT_TOP>,
->> +		<&clock CLK_OUT_LEFTBUS>, <&clock CLK_OUT_RIGHTBUS>,
->> +		<&clock CLK_OUT_CPU>, <&clock CLK_XXTI>,
->> +		<&clock CLK_XUSBXTI>;
->>  };
-> 
-> Adding an usage example in the documentation would be helpful.
+v2..v3
+  Power: reset: keystone-reset: introduce keystone reset driver
+	- no functional changes, only sanity
+  Power: reset: add bindings for keystone reset driver
+  	- corrected WDT numeration in examples
+	- extended description of wdt_list property
 
-Right, that's usually a good idea, I don't know why I haven't added one.
-Thanks.
+v1..v2
+	- re basedon on v3.15-rc1 without changes
 
-Best regards,
-Tomasz
+Ivan Khoronzhuk (5):
+  Power: reset: keystone-reset: introduce keystone reset driver
+  Power: reset: add bindings for keystone reset driver
+  ARM: keystone: remove redundant reset stuff
+  ARM: dts: keystone: update reset node to work with reset driver
+  ARM: keystone: enable reset driver support
+
+ .../bindings/power/reset/keystone-reset.txt        |  61 ++++++++
+ arch/arm/boot/dts/keystone.dtsi                    |   4 +-
+ arch/arm/configs/keystone_defconfig                |   3 +
+ arch/arm/mach-keystone/keystone.c                  |  35 -----
+ drivers/power/reset/Kconfig                        |   7 +
+ drivers/power/reset/Makefile                       |   1 +
+ drivers/power/reset/keystone-reset.c               | 171 +++++++++++++++++++++
+ 7 files changed, 246 insertions(+), 36 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/reset/keystone-reset.txt
+ create mode 100644 drivers/power/reset/keystone-reset.c
+
+-- 
+1.8.3.2
