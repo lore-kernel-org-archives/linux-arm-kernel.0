@@ -1,144 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 May 2014 14:12:22 +0200
-Subject: [PATCH v1 5/5] pci: keystone: add pcie driver based on designware
- core driver
-In-Reply-To: <537694DC.3060507@ti.com>
-References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
- <4195791.GS9XG8RaXW@wuerfel> <537694DC.3060507@ti.com>
-Message-ID: <4701649.DeaM8ocX7D@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 19 May 2014 13:14:33 +0100
+Subject: [PATCH 4/6] arm64: topology: add MPIDR-based detection
+In-Reply-To: <5379D594.2000200@arm.com>
+References: <1399063112-16917-1-git-send-email-broonie@kernel.org>
+ <1399063112-16917-5-git-send-email-broonie@kernel.org>
+ <53763DFC.8070309@arm.com> <20140516183915.GP22111@sirena.org.uk>
+ <5379D594.2000200@arm.com>
+Message-ID: <20140519121433.GT12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 May 2014 18:44:44 Murali Karicheri wrote:
-> On 5/15/2014 12:28 PM, Arnd Bergmann wrote:
-> > On Thursday 15 May 2014 12:01:32 Murali Karicheri wrote:
-> >> +Sample bindings shown below:-
-> >> +
-> >> + - Remove ti,enable-linktrain if boot loader already does Link training and do EP
-> >> +   configuration.
-> >> + - Remove ti,init-phy if boot loader already initialize the phy and sets up pcie
-> >> +   link
-> > You actually have to document all the properties. Have a look at the
-> > other bindings for what this means.
-> 
-> Actually this is dw pcie variant. So I will document if there are any 
-> deviations from the dw-designware
-> bindings. Based on comments from Jingo, I think I need to add a new DT 
-> property for old hw that we
-> use in keystone. May be a compatibility string for older dw h/w like 
-> "snps ,dw-pcie-v3.65" is that we
-> could use and do things differently in the common code.
+On Mon, May 19, 2014 at 10:57:40AM +0100, Sudeep Holla wrote:
+> On 16/05/14 19:39, Mark Brown wrote:
+> >On Fri, May 16, 2014 at 05:34:04PM +0100, Sudeep Holla wrote:
 
-A compatible string with the exact version sounds like a good idea, yes.
+> >>Take a simple example of system with 2 Quad core clusters.
+> >>The mpidr_hash.shift_aff[1] will be 6 as you need minimum 2 bits to represent
+> >>aff[0]. So you will end up with second cluster with id = 4 instead of 1.
 
-> So I will update the Documentation of dw bindings  once we agree on this.
-> >> +
-> >> +               pcie at 21800000 {
-> >> +                       compatible = "ti,keystone-pcie";
-> >> +                       device_type = "pci";
-> >> +                       clocks = <&clkpcie>;
-> >> +                       clock-names = "pcie";
-> > The dw-pcie binding lists two clocks.
->
-> Ok. As per dw documentation, pcie and pcie_bus are the clocks. But 
-> pci-imx6 is currently not using pcie_bus. So the pcie_bus
-> clock is actually optional. In the case of keystone pcie, bus clock is 
-> provided by the phy hardware and if I need to provide
-> a clock for bus, it has to be a dummy or change documentation to make 
-> pcie_bus an optional clock. I prefer later, but want
-> to know if this is true for pci-imx6. There is also a plan to move the 
-> pcie clock API call to designware core. So making pcie_bus
-> clock optional looks correct to me.
+> >This isn't a problem, the clusters can have any numbers so long as they
+> >are distinct.  There is no other requirement.
 
-A documentation change sounds fine to me. How about documenting that
-there should be either a "pcie_bus" clock or a phy reference?
+> IIUC these topology information is exposed via sysfs. So it's good to have
+> uniformity though they can have any number. As mentioned in the example, if the
+> linearisation depend on aff[0], then this factor will not be uniform.
 
-> >> +                       #address-cells = >;
-> >> +                       #size-cells = <2>;
-> >> +                       reg =  <0x21800000 0x1000>, <0x0262014c 4>;
-> >> +                       reg-names = "reg_rc_app", "reg_devcfg";
-> > There should be standard names that are documented in the binding.
-> 
-> Currently  Documentation says
-> 
-> - reg: base addresses and lengths of the pcie controller,
->      the phy controller, additional register for the phy controller.
-> 
-> And following dw drivers defines as
-> 
-> samsung,exynos5440-pcie
-> 
->          reg = <0x290000 0x1000
->              0x270000 0x1000
->              0x271000 0x40>;
-> 
-> fsl,imx6q-pcie"
->          reg = <0x01ffc000 0x4000>; /* DBI */
-> 
-> There are no names used for registers. So this needs to be documented in 
-> the dw-designware
-> bindings. reg_dbi is what is common to pci controller assuming at index 
-> 0 of the both above drivers use
-> reg_dbi address for config space. Shall I modify the documentation to 
-> include optional reg name
-> reg_dbi  for config space base address registers? Additional registers 
-> are optional and varies from
-> platform to platform. Phy registers are actually part of Phy driver and 
-> should be removed from
-> the dw-documentation bindings. Agree?
-
-It makes sense to remove the phy registers if there is always a separate
-phy driver. Regarding the names, it's probably easier to remove them
-completely than to document them.
-
-If the register names are optional, you can't rely on them anyway
-and have to uses the indexes/
-
-> >
-> >> +                       interrupts = <GIC_SPI 30 IRQ_TYPE_EDGE_RISING>,
-> >> +                                       <GIC_SPI 31 IRQ_TYPE_EDGE_RISING>,
-> >> +                                       <GIC_SPI 32 IRQ_TYPE_EDGE_RISING>,
-> >> +                                       <GIC_SPI 33 IRQ_TYPE_EDGE_RISING>,
-> >> +                                       <GIC_SPI 34 IRQ_TYPE_EDGE_RISING>,
-> >> +                                       <GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
-> >> +                                       <GIC_SPI 36 IRQ_TYPE_EDGE_RISING>,
-> >> +                                       <GIC_SPI 37 IRQ_TYPE_EDGE_RISING>,
-> >> +                                       <GIC_SPI 38 IRQ_TYPE_EDGE_RISING>; /* Error IRQ */
-> > What are all these interrupts?
-> These are MSI interrupts tied to the GIC over which MSI interrupts are 
-> multiplexed.  I will document
-> it in the keystone PCI DT bindings.
-
-Maybe they should be moved into the subnode that has the LSI interrupts,
-or perhaps a separate node? I don't know how the other dw-pcie variants
-do it, but it always seems like a good idea to keep MSI separate because
-you might not want to use it if there is also an MSI capable GIC in the
-system.
-
-> >> +                       ranges = <0x00000800 0 0x21801000 0x21801000 0 0x0002000    /* Configuration space */
-> >> +                                 0x81000000 0 0          0x24000000 0 0x4000       /* downstream I/O */
-> >> +                                 0x82000000 0 0x50000000 0x50000000 0 0x10000000>; /* non-prefetchable memory */
-> > Please move the config space into 'reg' now instead of 'ranges'.
-> > This was a mistake earlier, and there are already other front-ends
-> > doing the same thing.
->   This has to be coordinated with other drivers when DW core makes the 
-> change.
-> 
-> Jingoo, Sean,
-> 
-> What is the plan for this change? I  have to defer this currently.
-
-> >> +                       #interrupt-cells = <1>;
-> >> +                       interrupt-map-mask = <0 0 0 0>;
-> >> +                       interrupt-map = <0 0 0 1 &pcie_intc 1>, // INT A
-> >> +                                       <0 0 0 2 &pcie_intc 2>, // INT B
-> >> +                                       <0 0 0 3 &pcie_intc 3>, // INT C
-> >> +                                       <0 0 0 4 &pcie_intc 4>; // INT D
-> > I think this is the wrong map-mask.
-> I think this should be changed to
-> 
-> interrupt-map-mask = <0 0 0 0x7> ?
-
-That sounds reasonable. Is that what your hardware implements?
-
-	Arnd
+So your concern is that the width of aff[0] will vary?  That's
+reasonable.  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/4aa2344e/attachment.sig>
