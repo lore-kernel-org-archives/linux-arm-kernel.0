@@ -1,371 +1,73 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 19 May 2014 21:03:13 +0300
-Subject: [PATCH] s3cmci: port DMA code to dmaengine API
-Message-ID: <1400522593-6366-1-git-send-email-anarsoul@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 19 May 2014 20:06:31 +0200
+Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
+In-Reply-To: <20140519175157.GK4849@atomide.com>
+References: <5373DD94.8030208@ti.com> <5374F35E.5040900@ti.com>
+ <5374FE61.50901@linaro.org> <5374FF5B.8050702@ti.com>
+ <5375079E.3060305@ti.com> <537615EA.3020809@ti.com>
+ <20140516212942.GK12881@atomide.com> <537A3544.1050307@linaro.org>
+ <20140519172338.GJ4849@atomide.com> <537A408F.7070301@ti.com>
+ <20140519175157.GK4849@atomide.com>
+Message-ID: <537A4827.30604@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Utilise new s3c24xx-dma dmaengine driver for DMA ops.
+On 05/19/2014 07:51 PM, Tony Lindgren wrote:
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [140519 10:35]:
+>> On Monday 19 May 2014 01:23 PM, Tony Lindgren wrote:
+>>> * Daniel Lezcano <daniel.lezcano@linaro.org> [140519 09:46]:
+>>>> On 05/16/2014 11:29 PM, Tony Lindgren wrote:
+>>>>>
+>>>>> And just to recap, this problem can be reproduced with current
+>>>>> Linux next with omap2plus_defconfig with CONFIG_CPU_IDLE enabled. The
+>>>>> system should hang during the boot at some point.
+>>>>
+>>>> I can take the time to investigate a bit more but not right now. What is
+>>>> your deadline before committing the reverts ?
+>>>
+>>> Well we do have several automated build and boot systems failing
+>>> because of this with multi_v7_defconfig. And users are complaining,
+>>> see this report from Tobias Jakobi:
+>>>
+>>> https://bugzilla.kernel.org/show_bug.cgi?id=75421
+>>>
+>>> It seems that doing the revert is not enough based on the
+>>> page above.
+>>>
+>> Thats not true. The above link used the half patch and not the
+>> updated patch. Updated patch worked for Alex also. As you can
+>> see they saw RCU stalls and they go away after the updated patch.
+>>
+>> Can you please point them to try out the updated patch ?
+>
+> OK good point. I added a link to the updated patch in
+> bugzilla.
+>
+>>> I'd prefer we'd fix this issue properly for sure, it seems that
+>>> we're not quite understanding what's going on. And this might
+>>> hit other platforms too when they start implementing deeper
+>>> PM idle states in the mainline kernel.
+>>>
+>> I am certain that the updated patch fixed the regression
+>> for sure. The issue is really not generic enough since its related
+>> an OMAP ROM errata which needs that special handling of
+>> interrupt re-trigger etc. You don't need that for other platforms
+>> so they are not likely get affected.
+>
+> OK makes sense to me considering the ROM code. Daniel, are you OK
+> with that or do you still want to investigate further?
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- drivers/mmc/host/Kconfig  |   9 ---
- drivers/mmc/host/s3cmci.c | 183 +++++++++++++++-------------------------------
- drivers/mmc/host/s3cmci.h |   6 +-
- 3 files changed, 61 insertions(+), 137 deletions(-)
+For the moment I am a bit short in time for some other tasks. So feel 
+free to apply the revert and I will look for a proper fix when I will 
+have time.
 
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 1384f67..45c791c3 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -457,15 +457,6 @@ config MMC_S3C_DMA
- 	  working properly and needs to be debugged before this
- 	  option is useful.
- 
--config MMC_S3C_PIODMA
--	bool "Support for both PIO and DMA"
--	help
--	  Compile both the PIO and DMA transfer routines into the
--	  driver and let the platform select at run-time which one
--	  is best.
--
--	  See notes for the DMA option.
--
- endchoice
- 
- config MMC_SDRICOH_CS
-diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-index f237826..9f32a30 100644
---- a/drivers/mmc/host/s3cmci.c
-+++ b/drivers/mmc/host/s3cmci.c
-@@ -12,6 +12,7 @@
-  */
- 
- #include <linux/module.h>
-+#include <linux/dmaengine.h>
- #include <linux/dma-mapping.h>
- #include <linux/clk.h>
- #include <linux/mmc/host.h>
-@@ -24,9 +25,9 @@
- #include <linux/io.h>
- 
- #include <plat/gpio-cfg.h>
--#include <mach/dma.h>
- #include <mach/gpio-samsung.h>
- 
-+#include <linux/platform_data/dma-s3c24xx.h>
- #include <linux/platform_data/mmc-s3cmci.h>
- 
- #include "s3cmci.h"
-@@ -140,10 +141,6 @@ static const int dbgmap_debug = dbg_err | dbg_debug;
- 		dev_dbg(&host->pdev->dev, args);  \
- 	} while (0)
- 
--static struct s3c2410_dma_client s3cmci_dma_client = {
--	.name		= "s3c-mci",
--};
--
- static void finalize_request(struct s3cmci_host *host);
- static void s3cmci_send_request(struct mmc_host *mmc);
- static void s3cmci_reset(struct s3cmci_host *host);
-@@ -256,25 +253,8 @@ static inline bool s3cmci_host_usedma(struct s3cmci_host *host)
- {
- #ifdef CONFIG_MMC_S3C_PIO
- 	return false;
--#elif defined(CONFIG_MMC_S3C_DMA)
--	return true;
--#else
--	return host->dodma;
--#endif
--}
--
--/**
-- * s3cmci_host_canpio - return true if host has pio code available
-- *
-- * Return true if the driver has been compiled with the PIO support code
-- * available.
-- */
--static inline bool s3cmci_host_canpio(void)
--{
--#ifdef CONFIG_MMC_S3C_PIO
-+#else /* CONFIG_MMC_S3C_DMA */
- 	return true;
--#else
--	return false;
- #endif
- }
- 
-@@ -841,11 +821,9 @@ static irqreturn_t s3cmci_irq_cd(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
--static void s3cmci_dma_done_callback(struct s3c2410_dma_chan *dma_ch,
--				     void *buf_id, int size,
--				     enum s3c2410_dma_buffresult result)
-+static void s3cmci_dma_done_callback(void *arg)
- {
--	struct s3cmci_host *host = buf_id;
-+	struct s3cmci_host *host = arg;
- 	unsigned long iflags;
- 	u32 mci_csta, mci_dsta, mci_fsta, mci_dcnt;
- 
-@@ -856,45 +834,17 @@ static void s3cmci_dma_done_callback(struct s3c2410_dma_chan *dma_ch,
- 
- 	BUG_ON(!host->mrq);
- 	BUG_ON(!host->mrq->data);
--	BUG_ON(!host->dmatogo);
- 
- 	spin_lock_irqsave(&host->complete_lock, iflags);
- 
--	if (result != S3C2410_RES_OK) {
--		dbg(host, dbg_fail, "DMA FAILED: csta=0x%08x dsta=0x%08x "
--			"fsta=0x%08x dcnt:0x%08x result:0x%08x toGo:%u\n",
--			mci_csta, mci_dsta, mci_fsta,
--			mci_dcnt, result, host->dmatogo);
--
--		goto fail_request;
--	}
--
--	host->dmatogo--;
--	if (host->dmatogo) {
--		dbg(host, dbg_dma, "DMA DONE  Size:%i DSTA:[%08x] "
--			"DCNT:[%08x] toGo:%u\n",
--			size, mci_dsta, mci_dcnt, host->dmatogo);
--
--		goto out;
--	}
--
--	dbg(host, dbg_dma, "DMA FINISHED Size:%i DSTA:%08x DCNT:%08x\n",
--		size, mci_dsta, mci_dcnt);
-+	dbg(host, dbg_dma, "DMA FINISHED\n");
- 
- 	host->dma_complete = 1;
- 	host->complete_what = COMPLETION_FINALIZE;
- 
--out:
- 	tasklet_schedule(&host->pio_tasklet);
- 	spin_unlock_irqrestore(&host->complete_lock, iflags);
--	return;
- 
--fail_request:
--	host->mrq->data->error = -EINVAL;
--	host->complete_what = COMPLETION_FINALIZE;
--	clear_imask(host);
--
--	goto out;
- }
- 
- static void finalize_request(struct s3cmci_host *host)
-@@ -966,7 +916,7 @@ static void finalize_request(struct s3cmci_host *host)
- 	 * DMA channel and the fifo to clear out any garbage. */
- 	if (mrq->data->error != 0) {
- 		if (s3cmci_host_usedma(host))
--			s3c2410_dma_ctrl(host->dma, S3C2410_DMAOP_FLUSH);
-+			dmaengine_terminate_all(host->dma);
- 
- 		if (host->is2440) {
- 			/* Clear failure register and reset fifo. */
-@@ -992,29 +942,6 @@ request_done:
- 	mmc_request_done(host->mmc, mrq);
- }
- 
--static void s3cmci_dma_setup(struct s3cmci_host *host,
--			     enum dma_data_direction source)
--{
--	static enum dma_data_direction last_source = -1;
--	static int setup_ok;
--
--	if (last_source == source)
--		return;
--
--	last_source = source;
--
--	s3c2410_dma_devconfig(host->dma, source,
--			      host->mem->start + host->sdidata);
--
--	if (!setup_ok) {
--		s3c2410_dma_config(host->dma, 4);
--		s3c2410_dma_set_buffdone_fn(host->dma,
--					    s3cmci_dma_done_callback);
--		s3c2410_dma_setflags(host->dma, S3C2410_DMAF_AUTOSTART);
--		setup_ok = 1;
--	}
--}
--
- static void s3cmci_send_command(struct s3cmci_host *host,
- 					struct mmc_command *cmd)
- {
-@@ -1162,43 +1089,44 @@ static int s3cmci_prepare_pio(struct s3cmci_host *host, struct mmc_data *data)
- 
- static int s3cmci_prepare_dma(struct s3cmci_host *host, struct mmc_data *data)
- {
--	int dma_len, i;
- 	int rw = data->flags & MMC_DATA_WRITE;
-+	struct dma_slave_config conf = {
-+		.src_addr = host->mem->start + host->sdidata,
-+		.dst_addr = host->mem->start + host->sdidata,
-+		.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES,
-+		.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES,
-+	};
- 
- 	BUG_ON((data->flags & BOTH_DIR) == BOTH_DIR);
- 
--	s3cmci_dma_setup(host, rw ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
--	s3c2410_dma_ctrl(host->dma, S3C2410_DMAOP_FLUSH);
--
--	dma_len = dma_map_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
--			     rw ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
--
--	if (dma_len == 0)
--		return -ENOMEM;
--
--	host->dma_complete = 0;
--	host->dmatogo = dma_len;
--
--	for (i = 0; i < dma_len; i++) {
--		int res;
--
--		dbg(host, dbg_dma, "enqueue %i: %08x@%u\n", i,
--		    sg_dma_address(&data->sg[i]),
--		    sg_dma_len(&data->sg[i]));
-+	/* Restore prescaler value */
-+	writel(host->prescaler, host->base + S3C2410_SDIPRE);
- 
--		res = s3c2410_dma_enqueue(host->dma, host,
--					  sg_dma_address(&data->sg[i]),
--					  sg_dma_len(&data->sg[i]));
-+	if (!rw)
-+		conf.direction = DMA_DEV_TO_MEM;
-+	else
-+		conf.direction = DMA_MEM_TO_DEV;
- 
--		if (res) {
--			s3c2410_dma_ctrl(host->dma, S3C2410_DMAOP_FLUSH);
--			return -EBUSY;
--		}
--	}
-+	dma_map_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-+			     rw ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
- 
--	s3c2410_dma_ctrl(host->dma, S3C2410_DMAOP_START);
-+	dmaengine_slave_config(host->dma, &conf);
-+	host->desc = dmaengine_prep_slave_sg(host->dma, data->sg, data->sg_len,
-+		conf.direction,
-+		DMA_CTRL_ACK | DMA_PREP_INTERRUPT);
-+	if (!host->desc)
-+		goto unmap_exit;
-+	host->desc->callback = s3cmci_dma_done_callback;
-+	host->desc->callback_param = host;
-+	dmaengine_submit(host->desc);
-+	dma_async_issue_pending(host->dma);
- 
- 	return 0;
-+
-+unmap_exit:
-+	dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-+			     rw ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
-+	return -ENOMEM;
- }
- 
- static void s3cmci_send_request(struct mmc_host *mmc)
-@@ -1676,10 +1604,6 @@ static int s3cmci_probe(struct platform_device *pdev)
- 	host->complete_what 	= COMPLETION_NONE;
- 	host->pio_active 	= XFER_NONE;
- 
--#ifdef CONFIG_MMC_S3C_PIODMA
--	host->dodma		= host->pdata->use_dma;
--#endif
--
- 	host->mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!host->mem) {
- 		dev_err(&pdev->dev,
-@@ -1765,17 +1689,26 @@ static int s3cmci_probe(struct platform_device *pdev)
- 	/* depending on the dma state, get a dma channel to use. */
- 
- 	if (s3cmci_host_usedma(host)) {
--		host->dma = s3c2410_dma_request(DMACH_SDI, &s3cmci_dma_client,
--						host);
--		if (host->dma < 0) {
-+		struct resource *res;
-+		dma_cap_mask_t mask;
-+
-+		res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
-+		if (!res) {
-+			dev_err(&pdev->dev,
-+				"failed to get dma resource.\n");
-+			ret = -ENOENT;
-+			goto probe_free_gpio_wp;
-+		}
-+
-+		dma_cap_zero(mask);
-+		dma_cap_set(DMA_SLAVE, mask);
-+
-+		host->dma = dma_request_channel(mask,
-+			s3c24xx_dma_filter, (void *)res->start);
-+		if (!host->dma) {
- 			dev_err(&pdev->dev, "cannot get DMA channel.\n");
--			if (!s3cmci_host_canpio()) {
--				ret = -EBUSY;
--				goto probe_free_gpio_wp;
--			} else {
--				dev_warn(&pdev->dev, "falling back to PIO.\n");
--				host->dodma = 0;
--			}
-+			ret = -EBUSY;
-+			goto probe_free_gpio_wp;
- 		}
- 	}
- 
-@@ -1816,7 +1749,7 @@ static int s3cmci_probe(struct platform_device *pdev)
- 	mmc->max_segs		= 128;
- 
- 	dbg(host, dbg_debug,
--	    "probe: mode:%s mapped mci_base:%p irq:%u irq_cd:%u dma:%u.\n",
-+	    "probe: mode:%s mapped mci_base:%p irq:%u irq_cd:%u dma:%p.\n",
- 	    (host->is2440?"2440":""),
- 	    host->base, host->irq, host->irq_cd, host->dma);
- 
-@@ -1852,7 +1785,7 @@ static int s3cmci_probe(struct platform_device *pdev)
- 
-  probe_free_dma:
- 	if (s3cmci_host_usedma(host))
--		s3c2410_dma_free(host->dma, &s3cmci_dma_client);
-+		dma_release_channel(host->dma);
- 
-  probe_free_gpio_wp:
- 	if (!host->pdata->no_wprotect)
-@@ -1914,7 +1847,7 @@ static int s3cmci_remove(struct platform_device *pdev)
- 	tasklet_disable(&host->pio_tasklet);
- 
- 	if (s3cmci_host_usedma(host))
--		s3c2410_dma_free(host->dma, &s3cmci_dma_client);
-+		dma_release_channel(host->dma);
- 
- 	free_irq(host->irq, host);
- 
-diff --git a/drivers/mmc/host/s3cmci.h b/drivers/mmc/host/s3cmci.h
-index c76b53d..09dbbcd 100644
---- a/drivers/mmc/host/s3cmci.h
-+++ b/drivers/mmc/host/s3cmci.h
-@@ -26,7 +26,9 @@ struct s3cmci_host {
- 	void __iomem		*base;
- 	int			irq;
- 	int			irq_cd;
--	int			dma;
-+	struct dma_chan		*dma;
-+	struct dma_async_tx_descriptor
-+				*desc;
- 
- 	unsigned long		clk_rate;
- 	unsigned long		clk_div;
-@@ -36,8 +38,6 @@ struct s3cmci_host {
- 	int			is2440;
- 	unsigned		sdiimsk;
- 	unsigned		sdidata;
--	int			dodma;
--	int			dmatogo;
- 
- 	bool			irq_disabled;
- 	bool			irq_enabled;
+Thanks
+   -- Daniel
+
+
 -- 
-1.9.3
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
