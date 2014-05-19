@@ -1,92 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 20 May 2014 07:39:13 +0900
-Subject: [PATCHv2 resend 00/11] improve PWM lookup support without device
- tree
-In-Reply-To: <1400532162-29483-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1400532162-29483-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140519223913.GE20590@verge.net.au>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 19 May 2014 23:41:04 +0100
+Subject: [Ksummit-discuss] [TECH TOPIC] ARM legacy board DT conversion
+ finalization
+In-Reply-To: <4931877.zNfKfvcgox@wuerfel>
+References: <20140511030009.GO12708@titan.lakedaemon.net>
+ <20140516184205.GL27822@titan.lakedaemon.net>
+ <1400278842.2647.62.camel@deadeye.wl.decadent.org.uk>
+ <4931877.zNfKfvcgox@wuerfel>
+Message-ID: <CAFEAcA-1d_47g3Z3R=CNyE8U5+huJ0yDvAMU+BRacajxE5qPXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ CCed Laurent Pinchart ]
+On 19 May 2014 13:20, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 16 May 2014 23:20:42 Ben Hutchings wrote:
+>> Versatile is one of ARM's own development boards, but more importantly
+>> it's something QEMU can emulate.
+>
+> We should really have this in multiplatform soon, I think the last issue
+> for versatile is common clock support, but Linus Walleij may have more
+> details about what remains here.
+>
+> We should also make it possible to enable ARCH_VIRT for pre-ARMv7 to
+> get qemu users to move over to that.
 
-The renesas and shmobile portions of this seem reasonable to me
-and I have checked that there do not seem to be any conflicts
-with changes I already have queued up for v3.16 (and v3.17).
+I think the main reason many people still use QEMU's versatilepb
+model is that it has PCI. If you want people to move off that then
+getting those "generic device-tree driven PCI" patches into the
+kernel would probably be a good start :-)  At that point we can
+reasonably easily add PCI support to the QEMU 'virt' board.
 
-I have CCed Laurent Pinchart as I believe he most recently
-did work on the renesas and shmobile code in question.
-
-On Mon, May 19, 2014 at 10:42:31PM +0200, Alexandre Belloni wrote:
-> Hi,
-> 
-> Originally sent on Apr 14th, note that this series is blocking another 16
-> patches series, I would like it to be taken in 3.16 if we can agree on this
-> implementation.
-> 
-> A patch set as suggested by Thierry to make lookup with the lookup table
-> instead of device tree behave more like when using device tree.
-> 
-> The first patch adds a period and a polarity member to the lookup table and use
-> those to set period and polarity.
-> 
-> Patch 2, 4 and 5 are making use of those new members from the board files.
-> Patch 3 removes useless code since setting the polarity is now handled by the
-> PWM core.
-> 
-> I couldn't decide on a good name for the extended PWM_LOOKUP macro and I believe
-> we won't have to add members to that structure soon so:
-> Patch 6 modifies the PWM_LOOKUP macro to also initialize period and polarity
-> and
-> Patch 7-9 are making use of the new PWM_LOOKUP macro in the board files
-> 
-> Patch 10 and 11 are making the leds-pwm and pwm_bl drivers get the period from
-> the PWM before using pwm_period_ns if it is not already set.
-> 
-> Patch 10 will obviously conflict with the series of Russell reworking the
-> leds-pwm probing. I can rebase if necessary
-> 
-> The final goal would be to get rid of .pwm_period_ns in leds-pwm and pwm_bl
-> after moving all the remaining users (still around 25) to pwm_lookup.
-> 
-> Changes in v2:
->  - correctly unlock the pwm_lookup_lock mutex before returning.
->  - don't change PWM_LOOKUP atomically
->  - remove tpu_pwm_platform_data and the associated header file
->  - make the leds-pwm and pwm_bl drivers get the period from the PWM
-> 
-> Alexandre Belloni (11):
->   pwm: add period and polarity to struct pwm_lookup
->   ARM: shmobile: Armadillo 800 EVA: initialize all struct pwm_lookup
->     members
->   pwm: renesas-tpu: remove useless struct tpu_pwm_platform_data
-
-The above two patches:
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
-
->   ARM: OMAP3: Beagle: initialize all the struct pwm_lookup members
->   ARM: pxa: hx4700: initialize all the struct pwm_lookup members
->   pwm: modify PWM_LOOKUP to initialize all struct pwm_lookup members
->   ARM: OMAP3: Beagle: use PWM_LOOKUP to initialize struct pwm_lookup
->   ARM: shmobile: Armadillo 800 EVA: use PWM_LOOKUP to initialize struct
->     pwm_lookup
-
-The above patch:
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
-
->   ARM: pxa: hx4700: use PWM_LOOKUP to initialize struct pwm_lookup
->   leds: leds-pwm: retrieve configured pwm period
->   backlight: pwm_bl: retrieve configured pwm period
-> 
->  Documentation/pwm.txt                          |  3 ++-
->  arch/arm/mach-omap2/board-omap3beagle.c        |  3 ++-
->  arch/arm/mach-pxa/hx4700.c                     |  3 ++-
->  arch/arm/mach-shmobile/board-armadillo800eva.c | 14 +++-----------
->  drivers/leds/leds-pwm.c                        |  5 ++++-
->  drivers/pwm/core.c                             |  8 +++++++-
->  drivers/pwm/pwm-renesas-tpu.c                  | 19 +++----------------
->  drivers/video/backlight/pwm_bl.c               |  8 +++++---
->  include/linux/platform_data/pwm-renesas-tpu.h  | 16 ----------------
->  include/linux/pwm.h                            |  6 +++++-
->  10 files changed, 33 insertions(+), 52 deletions(-)
->  delete mode 100644 include/linux/platform_data/pwm-renesas-tpu.h
+thanks
+-- PMM
