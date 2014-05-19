@@ -1,24 +1,22 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 19 May 2014 17:40:17 +0100
-Subject: [PATCH] regulator: AXP20x: fix wrong call to of_find_node_by_name
-In-Reply-To: <1400487930-22949-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1400487930-22949-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140519164017.GG12304@sirena.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 19 May 2014 17:41:04 +0100
+Subject: [PATCH 4/4] phy: miphy365x: Provide support for the MiPHY356x
+ Generic PHY
+In-Reply-To: <537A1354.6010408@ti.com>
+References: <1392377036-12816-1-git-send-email-lee.jones@linaro.org>
+ <1392377036-12816-4-git-send-email-lee.jones@linaro.org>
+ <20140305075548.GG20016@e106331-lin.cambridge.arm.com>
+ <537A1354.6010408@ti.com>
+Message-ID: <20140519164104.GS4978@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 10:25:30AM +0200, Boris BREZILLON wrote:
-> The of_find_node_by_name function will search for a DT node named
-> "regulators" after the provided np node, but will not ensure that this node
-> is a child of np.
-> This might result in retrieving a "regulators" node that is not related to
-> the axp20x PMIC.
+> I don't seem to have the update patch series? Can you resend please?
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/cbfc57cd/attachment.sig>
+Sure.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
