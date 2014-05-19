@@ -1,69 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 May 2014 16:46:03 +0200
-Subject: [PATCH] pinctrl: sunxi: Fix recursive dependency
-In-Reply-To: <20140519142913.GK29466@lukather>
-References: <1400343715-27884-1-git-send-email-maxime.ripard@free-electrons.com>
- <4667053.sVVFqnz4qh@wuerfel> <20140519142913.GK29466@lukather>
-Message-ID: <4631163.YRjUDyHifq@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 19 May 2014 17:04:22 +0200
+Subject: [PATCH v2 1/6] wdt: sunxi: Move restart code to the watchdog
+ driver
+In-Reply-To: <20140515091123.GQ29258@lukather>
+References: <1399430664-29091-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399430664-29091-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20140507213318.GA2105@roeck-us.net>
+ <20140515091123.GQ29258@lukather>
+Message-ID: <20140519150422.GA27329@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 May 2014 16:29:13 Maxime Ripard wrote:
-> Hi
-> 
-> On Mon, May 19, 2014 at 01:30:54PM +0200, Arnd Bergmann wrote:
-> > On Saturday 17 May 2014 18:21:55 Maxime Ripard wrote:
-> > > Fix the following configuration error:
-> > > drivers/pinctrl/sunxi/Kconfig:3:error: recursive dependency detected!
-> > > drivers/pinctrl/sunxi/Kconfig:3:        symbol PINCTRL_SUNXI is selected by PINCTRL_SUN4I_A10
-> > > drivers/pinctrl/sunxi/Kconfig:9:        symbol PINCTRL_SUN4I_A10 default value contains PINCTRL_SUNXI
-> > > 
-> > > Drop the select on PINCTRL_SUNXI, and make PINCTRL_SUNXI enabled by default instead.
+On Thu, May 15, 2014 at 11:11:23AM +0200, Maxime Ripard wrote:
+> On Wed, May 07, 2014 at 02:33:18PM -0700, Guenter Roeck wrote:
+> > On Tue, May 06, 2014 at 09:44:19PM -0500, Maxime Ripard wrote:
+> > > Most of the watchdog code is duplicated between the machine restart code and
+> > > the watchdog driver. Add the restart hook to the watchdog driver, to be able to
+> > > remove it from the machine code eventually.
 > > > 
 > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
 > > 
-> > I stubled over the same thing already, but came to a different conclusion.
-> > 
-> > >  drivers/pinctrl/sunxi/Kconfig | 8 +-------
-> > >  1 file changed, 1 insertion(+), 7 deletions(-)
-> > > 
-> > > diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
-> > > index 2007327e0c48..8411857d2a45 100644
-> > > --- a/drivers/pinctrl/sunxi/Kconfig
-> > > +++ b/drivers/pinctrl/sunxi/Kconfig
-> > > @@ -1,32 +1,26 @@
-> > >  if ARCH_SUNXI
-> > >  
-> > >  config PINCTRL_SUNXI
-> > > -       bool
-> > > +       def_bool ARCH_SUNXI
-> > >         select PINMUX
-> > >         select GENERIC_PINCONF
-> > >  
-> > >  config PINCTRL_SUN4I_A10
-> > >         def_bool PINCTRL_SUNXI || MACH_SUN4I
-> > > -       select PINCTRL_SUNXI
-> > >  
-> > 
-> > This means you won't be able to stop selecting all drivers dropping
-> > the 'select PINCTRL_SUNXI' later. How about this one?
+> > Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 > 
-> I'm not sure what you mean here.
-> 
-> We won't have to select PINCTRL_SUNXI anymore with this patch either,
-> since it's already enabled whenever ARCH_SUNXI is enabled.
-> 
-> And the drivers won't have to be selected either, because they will
-> either default to PINCTRL_SUNXI, or to the MACH_SUN*I definition.
-> 
-> As I was saying in the commit log, this is just a temporary solution,
-> and eventually, and the select PINCTRL_SUNXI should be removed
-> eventually.
+> Wim, do you have any comment on this one?
 
-The difference is that in your patch, PINCTRL_SUNXI defaults to 'y'
-if ARCH_SUNXI is set, so you have to remove both the 'select' and
-the 'def_bool' and then put back the 'select PINCTRL_SUNXI' for the
-individual drivers. I guess it's not a big difference, you just end up
-doing one patch extra.
+Ping?
 
-	Arnd
+It would be really great to see this in 3.16, and we get quite close
+to the end of ARM's merge window.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/ab19d5ae/attachment.sig>
