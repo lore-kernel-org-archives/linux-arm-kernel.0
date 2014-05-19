@@ -1,55 +1,38 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 19 May 2014 22:42:37 +0200
-Subject: [PATCHv2 resend 06/11] pwm: modify PWM_LOOKUP to initialize all
- struct pwm_lookup members
+Date: Mon, 19 May 2014 22:42:38 +0200
+Subject: [PATCHv2 resend 07/11] ARM: OMAP3: Beagle: use PWM_LOOKUP to
+ initialize struct pwm_lookup
 In-Reply-To: <1400532162-29483-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1400532162-29483-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1400532162-29483-7-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1400532162-29483-8-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that PWM_LOOKUP is not used anymore, modify it to initialize all the
-members of struct pwm_lookup.
-
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- Documentation/pwm.txt | 3 ++-
- include/linux/pwm.h   | 4 +++-
- 2 files changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/board-omap3beagle.c | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/pwm.txt b/Documentation/pwm.txt
-index 93cb97974986..f38f99cda64f 100644
---- a/Documentation/pwm.txt
-+++ b/Documentation/pwm.txt
-@@ -19,7 +19,8 @@ should instead register a static mapping that can be used to match PWM
- consumers to providers, as given in the following example:
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index f27e1ec90b5e..54c135a5b4f7 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -61,14 +61,8 @@
  
- 	static struct pwm_lookup board_pwm_lookup[] = {
--		PWM_LOOKUP("tegra-pwm", 0, "pwm-backlight", NULL),
-+		PWM_LOOKUP("tegra-pwm", 0, "pwm-backlight", NULL,
-+			   50000, PWM_POLARITY_NORMAL),
- 	};
- 
- 	static void __init board_init(void)
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index 2f45e2fe5b93..e90628cac8fa 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -278,12 +278,14 @@ struct pwm_lookup {
- 	enum pwm_polarity polarity;
+ static struct pwm_lookup pwm_lookup[] = {
+ 	/* LEDB -> PMU_STAT */
+-	{
+-		.provider = "twl-pwmled",
+-		.index = 1,
+-		.dev_id = "leds_pwm",
+-		.con_id = "beagleboard::pmu_stat",
+-		.period = 7812500,
+-		.polarity = PWM_POLARITY_NORMAL,
+-	},
++	PWM_LOOKUP("twl-pwmled", 1, "leds_pwm", "beagleboard::pmu_stat",
++		   7812500, PWM_POLARITY_NORMAL),
  };
  
--#define PWM_LOOKUP(_provider, _index, _dev_id, _con_id)	\
-+#define PWM_LOOKUP(_provider, _index, _dev_id, _con_id, _period, _polarity) \
- 	{						\
- 		.provider = _provider,			\
- 		.index = _index,			\
- 		.dev_id = _dev_id,			\
- 		.con_id = _con_id,			\
-+		.period = _period,			\
-+		.polarity = _polarity			\
- 	}
- 
- #if IS_ENABLED(CONFIG_PWM)
+ static struct led_pwm pwm_leds[] = {
 -- 
 1.9.1
