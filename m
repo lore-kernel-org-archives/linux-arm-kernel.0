@@ -1,141 +1,42 @@
-From: tthayer.linux@gmail.com (Thor Thayer)
-Date: Mon, 19 May 2014 14:37:38 -0500
-Subject: [PATCHv5 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
- controller
-In-Reply-To: <20140519191206.GH949@pengutronix.de>
-References: <1400169891-29546-1-git-send-email-tthayer@altera.com>
- <1400169891-29546-2-git-send-email-tthayer@altera.com>
- <20140516075344.GF949@pengutronix.de>
- <CAF03EBfOrBWsGVkwYHQt9Pm858LtkgUThkM6dFjksa93ETo_bw@mail.gmail.com>
- <20140519191206.GH949@pengutronix.de>
-Message-ID: <CAF03EBfwFC7bK=j0W3K+no9TK7xe2nF1ZXH9bMBRNzVErB5EjQ@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 19 May 2014 22:39:57 +0300
+Subject: [PATCH] s3cmci: port DMA code to dmaengine API
+In-Reply-To: <4667090.Oyf6jd3Lyk@wuerfel>
+References: <1400522593-6366-1-git-send-email-anarsoul@gmail.com>
+ <7633675.1cAc12AFAY@wuerfel>
+ <CA+E=qVeG8bXowBvdhKpVSYSL08n6ZUVG2LkjhPwjBnbv+egNLw@mail.gmail.com>
+ <4667090.Oyf6jd3Lyk@wuerfel>
+Message-ID: <CA+E=qVc+gk8zt3MMTQ6qWR0+v3UTww5oufd7v3ffrfnNCBfTUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 2:12 PM, Steffen Trumtrar
-<s.trumtrar@pengutronix.de> wrote:
-> Hi Thor!
+On Mon, May 19, 2014 at 10:02 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+
+>> Well, at least s3c64xx uses resources for passing dma channel number,
+>> and so did I.
+>> Btw, It'll make transition to device tree a bit easier.
 >
-> On Mon, May 19, 2014 at 01:36:30PM -0500, Thor Thayer wrote:
->> On Fri, May 16, 2014 at 2:53 AM, Steffen Trumtrar
->> <s.trumtrar@pengutronix.de> wrote:
->> > Hi!
->> >
->> > On Thu, May 15, 2014 at 11:04:49AM -0500, tthayer at altera.com wrote:
->> >> From: Thor Thayer <tthayer@altera.com>
->> >>
->> >> Addition of the Altera SDRAM controller bindings and device
->> >> tree changes to the Altera SoC project.
->> >>
->> >> v2: Changes to SoC SDRAM EDAC code.
->> >>
->> >> v3: Implement code suggestions for SDRAM EDAC code.
->> >>
->> >> v4: Remove syscon from SDRAM controller bindings.
->> >>
->> >> v5: No Change, bump version for consistency.
->> >>
->> >> Signed-off-by: Thor Thayer <tthayer@altera.com>
->> >> ---
->> >>  .../bindings/arm/altera/socfpga-sdram.txt          |   11 +++++++++++
->> >>  arch/arm/boot/dts/socfpga.dtsi                     |    5 +++++
->> >>  2 files changed, 16 insertions(+)
->> >>  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
->> >>
->> >> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
->> >> new file mode 100644
->> >> index 0000000..8f8746b
->> >> --- /dev/null
->> >> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
->> >> @@ -0,0 +1,11 @@
->> >> +Altera SOCFPGA SDRAM Controller
->> >> +
->> >> +Required properties:
->> >> +- compatible : "altr,sdr-ctl";
->> >> +- reg : Should contain 1 register ranges(address and length)
->> >> +
->> >> +Example:
->> >> +     sdrctl at ffc25000 {
->> >> +             compatible = "altr,sdr-ctl";
->> >> +             reg = <0xffc25000 0x1000>;
->> >> +     };
->> >> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
->> >> index df43702..6ce912e 100644
->> >> --- a/arch/arm/boot/dts/socfpga.dtsi
->> >> +++ b/arch/arm/boot/dts/socfpga.dtsi
->> >> @@ -676,6 +676,11 @@
->> >>                       clocks = <&l4_sp_clk>;
->> >>               };
->> >>
->> >> +             sdrctl at ffc25000 {
->> >> +                     compatible = "altr,sdr-ctl", "syscon";
->> >                                                    ^^^^^^^^^^
->> >
->> > Get rid of that, too, please.
->>
->> Hi Steffan,
->>
->> I believe I need to keep the "syscon". The same register (ctrlcfg)
->> that has the ECC enable bitfield also includes the DRAM configuration
->> bitfields that other drivers will want to access (specifically the
->> FPGA bridge needs this information). Since this register will be
->> shared between drivers,  syscon seems like the best solution.
->>
+> Actually it doesn't help with the transition to DT at all, because DT
+> does not use resources for DMA requests. Instead there is a
+> dma_request_slave_channel() interface that gets passed a string to
+> match the DT descriptor of the DMA channel. If you want to enable
+> DT probing while keeping the traditional way alive, you can
+> use dma_request_slave_channel_compat(), although I find it not
+> much easier than open-coding it.
 >
-> Hm, from looking at the documentation of the ctrlcfg I can't really
-> understand which bits you would need for the FPGA brigde and why.
-> That all sounds like stuff you would want to set for the specific
-> RAM you are dealing with on a specific board.
-> What bridge are you talking about? The SDRAM bridge?
+> There is one issue with dma_request_slave_channel_compat and
+> dma_request_channel, which is that you need a pointer to the
+> filter function. In portable drivers that pointer should get passed
+> in platform_data for the non-DT case, along with the data it
+> needs, because there are dma engines that need more than just
+> an integer to identify a slave.
 >
-> I can see the problem with the ECC enable, though.
->
-> Regards,
-> Steffen
->
+> For this driver, you don't have to go that far, as long as it's
+> ensure that the pointer to the filter function is available to
+> the driver, i.e. you can't have a built-in s3mci driver when the
+> dmaengine driver is a loadable module.
 
-Hi Steffen,
+I'll take a look at dma_request_slave_channel_compat(), thanks for a hint!
 
-I'll get more details from the guy working on the FPGA bridge when he
-gets back in the office. When I started working on EDAC, that register
-had been allocated by the FPGA bridge driver so we decided to use the
-syscon to allow sharing of the register.
-
-My understanding was that the FPGA bridge as an SDRAM master would
-allow FPGA devices to access the SDRAM.  As part of that process, they
-may want to read the SDRAM configuration.
-
-I'll need to get more details from the driver developer because the
-FPGA driver is in flux while the appropriate driver architecture is
-being discussed.
-
-Thor
-
-
->> >                 sdrctl at ffc25000 {
->> >                         compatible = "altr,sdr-ctl";
->> >                         reg = <0xffc25000 0x1000>;
->> >                         ranges;
->> >
->> >                         edac at ffc2502c {
->> >                                 compatible = "altr,sdram-edac";
->> >                                 reg = <0xffc2502c 0x50>;
->> >                                 interrupts = <0 39 4>;
->> >                         };
->> >                 };
->> >
->> > Then we can later add:
->> >
->> >                         sdr-ports: ports at ffc2507c {
->> >                                 #reset-cells = <1>;
->> >                                 compatible = "altr,sdr-ports";
->> >                                 reg = <0xffc2507c 0x10>;
->> >                                 clocks = <&ddr_dqs_clk>;
->> >                                 ...
->> >                         };
->
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Vasily
