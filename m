@@ -1,51 +1,42 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 19 May 2014 09:11:05 +0200
-Subject: [PATCH v3] pwm: i.MX: Avoid sample FIFO overflow for i.MX PWM
- version2
-In-Reply-To: <1400217068-22642-1-git-send-email-Ying.Liu@freescale.com>
-References: <1400217068-22642-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <20140519071105.GZ5858@pengutronix.de>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Mon, 19 May 2014 12:46:09 +0530
+Subject: [PATCH RFC 3/4] clk: samsung: Add driver to control CLKOUT line
+ on Exynos SoCs
+In-Reply-To: <1400175151-27779-4-git-send-email-t.figa@samsung.com>
+References: <1400175151-27779-1-git-send-email-t.figa@samsung.com>
+ <1400175151-27779-4-git-send-email-t.figa@samsung.com>
+Message-ID: <5379AFB9.9030608@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 01:11:08PM +0800, Liu Ying wrote:
-> The i.MX PWM version2 is embedded in several i.MX SoCs,
-> such as i.MX27, i.MX51 and i.MX6SL.  There are four 16bit
-> sample FIFOs in this IP, each of which determines the duty
-> period of a PWM waveform in one full cycle.  The IP spec
-> mentions that we should not write a fourth sample because
-> the FIFOs will become full and trigger a FIFO write error
-> (FWE) which will prevent the PWM from starting once it is
-> enabled.  In order to avoid any sample FIFO overflow issue,
-> this patch clears all sample FIFOs or waits for a rollover
-> event to consume a FIFO slot when necessary.  In this way,
-> only the first FIFO slot will be loaded at most.
+On 05/15/2014 11:02 PM, Tomasz Figa wrote:
+> This patch introduces a driver that handles configuration of CLKOUT pin
+> of Exynos SoCs that can be used to output certain clocks from inside of
+> the SoC to a dedicated output pin.
 > 
-> Note that the PWM controller will not generate any rollover
-> event if the duty period is zero.  This makes the logic a
-> bit complicated to determine if we clear the sample FIFOs
-> or wait for a rollover event.
-> 
-> The FIFO overflow issue can be reproduced by the following
-> commands on the i.MX6SL EVK platform, assuming we use PWM2
-> for the debug LED which is driven by the pin HSIC_STROBE
-> and the maximal brightness is 255.
-> echo 0   > /sys/class/leds/user/brightness
-> echo 0   > /sys/class/leds/user/brightness
-> echo 0   > /sys/class/leds/user/brightness
-> echo 0   > /sys/class/leds/user/brightness
-> echo 255 > /sys/class/leds/user/brightness
-> Here, FWE happens(PWMSR register reads 0x58) and the LED
-> can not be lighten.
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> ---
 
-I find this overly complicated. It adds 89 lines to a 300 lines driver
-for a single workaround. Wouldn't it be sufficient to add a delay
-of period_ns in imx_pwm_config_v2 when the FIFO is full?
+Tested the series on Exynos5420-based peach-pit board for audio playback
+(with an internal patch to set CLK_FIN_PLL as the parent of clkout).
 
-Sascha
+Tested-by: Tushar Behera <tushar.behera@linaro.org>
+
+>  Example :
+>  pmu_system_controller: system-controller at 10040000 {
+>  	compatible = "samsung,exynos5250-pmu", "syscon";
+>  	reg = <0x10040000 0x5000>;
+> +	#clock-cells = <0>;
+> +	clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
+> +			"clkout4", "clkout8", "clkout9";
+> +	clocks = <&clock CLK_OUT_DMC>, <&clock CLK_OUT_TOP>,
+> +		<&clock CLK_OUT_LEFTBUS>, <&clock CLK_OUT_RIGHTBUS>,
+> +		<&clock CLK_OUT_CPU>, <&clock CLK_XXTI>,
+> +		<&clock CLK_XUSBXTI>;
+>  };
+
+Adding an usage example in the documentation would be helpful.
+
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Tushar Behera
