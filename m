@@ -1,62 +1,182 @@
-From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Mon, 19 May 2014 16:49:16 +0530
-Subject: [PATCH V3 4/4] ARM: dts: Add usb 2.0 support on exynos5420
-In-Reply-To: <1400498356-26803-1-git-send-email-vikas.sajjan@samsung.com>
-References: <1400498356-26803-1-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <1400498356-26803-5-git-send-email-vikas.sajjan@samsung.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 19 May 2014 16:53:01 +0530
+Subject: [PATCH 01/11] ARM: AM43xx: hwmod: add DSS hwmod data
+In-Reply-To: <5379E6B1.5000409@ti.com>
+References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
+ <1399636579-8062-2-git-send-email-tomi.valkeinen@ti.com>
+ <5379CDD2.6080807@ti.com> <5379D8F5.9030008@ti.com> <5379DCCE.3050400@ti.com>
+ <5379E6B1.5000409@ti.com>
+Message-ID: <5379E995.80604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vivek Gautam <gautam.vivek@samsung.com>
+On Monday 19 May 2014 04:40 PM, Tomi Valkeinen wrote:
+> On 19/05/14 13:28, Rajendra Nayak wrote:
+> 
+>> Yeah, thats what it looks like to me. l3_gclk is the 200Mhz clock derived from 
+>> core-m4 post divider and l3s_gclk/l4ls_gclk are half of that at 100Mhz, derived
+>> using a fixed divider of 2.
+> 
+> Here's an updated patch, with the sdma entry removed and the ocp clock
+> changed to l3_gclk.
+> 
+> From bfaf0fafb21c698c86640764c1aa62d6fc73992a Mon Sep 17 00:00:00 2001
+> From: Sathya Prakash M R <sathyap@ti.com>
+> Date: Mon, 24 Mar 2014 16:31:53 +0530
+> Subject: [PATCH] ARM: AM43xx: hwmod: add DSS hwmod data
+> 
+> Add DSS hwmod data for AM43xx.
+> 
+> Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 
-Add required device node for ehci and ohci controllers to
-enable USB 2.0 support.
+Looks good to me, feel free to add
+Acked-by: Rajendra Nayak <rnayak@ti.com>
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
----
- arch/arm/boot/dts/exynos5420.dtsi |   30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index 2eb00cb..921885a 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -839,6 +839,36 @@
- 		#phy-cells = <1>;
- 	};
- 
-+	usbhost2: usb at 12110000 {
-+		compatible = "samsung,exynos4210-ehci";
-+		reg = <0x12110000 0x100>;
-+		interrupts = <0 71 0>;
-+
-+		clocks = <&clock CLK_USBH20>;
-+		clock-names = "usbhost";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		port at 0 {
-+			reg = <0>;
-+			phys = <&usb2_phy 1>;
-+		};
-+	};
-+
-+	usbhost1: usb at 12120000 {
-+		compatible = "samsung,exynos4210-ohci";
-+		reg = <0x12120000 0x100>;
-+		interrupts = <0 71 0>;
-+
-+		clocks = <&clock CLK_USBH20>;
-+		clock-names = "usbhost";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		port at 0 {
-+			reg = <0>;
-+			phys = <&usb2_phy 1>;
-+		};
-+	};
-+
- 	usb2_phy: phy at 12130000 {
- 		compatible = "samsung,exynos5250-usb2-phy";
- 		reg = <0x12130000 0x100>;
--- 
-1.7.9.5
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 98 ++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/prcm43xx.h             |  1 +
+>  2 files changed, 99 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> index 5c2cc8083fdd..d2a7b6dc36f2 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> @@ -19,6 +19,8 @@
+>  #include "omap_hwmod.h"
+>  #include "omap_hwmod_33xx_43xx_common_data.h"
+>  #include "prcm43xx.h"
+> +#include "omap_hwmod_common_data.h"
+> +
+>  
+>  /* IP blocks */
+>  static struct omap_hwmod am43xx_l4_hs_hwmod = {
+> @@ -415,6 +417,70 @@ static struct omap_hwmod am43xx_qspi_hwmod = {
+>  	},
+>  };
+>  
+> +/* Display sub system - DSS */
+> +
+> +struct omap_dss_dispc_dev_attr am43xx_dss_dispc_dev_attr = {
+> +	.manager_count		= 1,
+> +	.has_framedonetv_irq	= 0
+> +};
+> +
+> +
+> +static struct omap_hwmod_class_sysconfig am43xx_dispc_sysc = {
+> +	.rev_offs	= 0x0000,
+> +	.sysc_offs	= 0x0010,
+> +	.syss_offs	= 0x0014,
+> +	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE),
+> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+> +	.sysc_fields	= &omap_hwmod_sysc_type1,
+> +};
+> +
+> +static struct omap_hwmod_class am43xx_dispc_hwmod_class = {
+> +	.name	= "dispc",
+> +	.sysc	= &am43xx_dispc_sysc,
+> +};
+> +
+> +static struct omap_hwmod am43xx_dss_core_hwmod = {
+> +	.name		= "dss_core",
+> +	.class		= &omap2_dss_hwmod_class,
+> +	.clkdm_name	= "dss_clkdm",
+> +	.main_clk	= "disp_clk",
+> +	.prcm = {
+> +		.omap4 = {
+> +			.clkctrl_offs = AM43XX_CM_PER_DSS_CLKCTRL_OFFSET,
+> +			.modulemode   = MODULEMODE_SWCTRL,
+> +		},
+> +	},
+> +};
+> +
+> +/* display controller -dispc*/
+> +
+> +static struct omap_hwmod am43xx_dss_dispc_hwmod = {
+> +	.name		= "dss_dispc",
+> +	.class		= &am43xx_dispc_hwmod_class,
+> +	.clkdm_name	= "dss_clkdm",
+> +	.main_clk	= "disp_clk",
+> +	.prcm = {
+> +		.omap4 = {
+> +			.clkctrl_offs = AM43XX_CM_PER_DSS_CLKCTRL_OFFSET,
+> +		},
+> +	},
+> +	.dev_attr	= &am43xx_dss_dispc_dev_attr,
+> +};
+> +
+> +/*RFBI*/
+> +
+> +static struct omap_hwmod am43xx_dss_rfbi_hwmod = {
+> +	.name		= "dss_rfbi",
+> +	.class		= &omap2_rfbi_hwmod_class,
+> +	.clkdm_name	= "dss_clkdm",
+> +	.main_clk	= "disp_clk",
+> +	.prcm = {
+> +		.omap4 = {
+> +			.clkctrl_offs = AM43XX_CM_PER_DSS_CLKCTRL_OFFSET,
+> +		},
+> +	},
+> +};
+> +
+>  /* Interfaces */
+>  static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
+>  	.master		= &am33xx_l3_main_hwmod,
+> @@ -654,6 +720,34 @@ static struct omap_hwmod_ocp_if am43xx_l3_s__qspi = {
+>  	.user           = OCP_USER_MPU | OCP_USER_SDMA,
+>  };
+>  
+> +static struct omap_hwmod_ocp_if am43xx_dss__l3_main = {
+> +	.master		= &am43xx_dss_core_hwmod,
+> +	.slave		= &am33xx_l3_main_hwmod,
+> +	.clk		= "l3_gclk",
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +static struct omap_hwmod_ocp_if am43xx_l4_ls__dss = {
+> +	.master		= &am33xx_l4_ls_hwmod,
+> +	.slave		= &am43xx_dss_core_hwmod,
+> +	.clk		= "l4ls_gclk",
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_dispc = {
+> +	.master		= &am33xx_l4_ls_hwmod,
+> +	.slave		= &am43xx_dss_dispc_hwmod,
+> +	.clk		= "l4ls_gclk",
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
+> +	.master		= &am33xx_l4_ls_hwmod,
+> +	.slave		= &am43xx_dss_rfbi_hwmod,
+> +	.clk		= "l4ls_gclk",
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+>  static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+>  	&am33xx_l4_wkup__synctimer,
+>  	&am43xx_l4_ls__timer8,
+> @@ -748,6 +842,10 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+>  	&am43xx_l4_ls__ocp2scp1,
+>  	&am43xx_l3_s__usbotgss0,
+>  	&am43xx_l3_s__usbotgss1,
+> +	&am43xx_dss__l3_main,
+> +	&am43xx_l4_ls__dss,
+> +	&am43xx_l4_ls__dss_dispc,
+> +	&am43xx_l4_ls__dss_rfbi,
+>  	NULL,
+>  };
+>  
+> diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
+> index 7785be984edd..ad7b3e9977f8 100644
+> --- a/arch/arm/mach-omap2/prcm43xx.h
+> +++ b/arch/arm/mach-omap2/prcm43xx.h
+> @@ -142,5 +142,6 @@
+>  #define AM43XX_CM_PER_USBPHYOCP2SCP0_CLKCTRL_OFFSET	0x05B8
+>  #define AM43XX_CM_PER_USB_OTG_SS1_CLKCTRL_OFFSET        0x0268
+>  #define AM43XX_CM_PER_USBPHYOCP2SCP1_CLKCTRL_OFFSET	0x05C0
+> +#define AM43XX_CM_PER_DSS_CLKCTRL_OFFSET		0x0a20
+>  
+>  #endif
+> 
