@@ -1,25 +1,26 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 20 May 2014 01:36:56 +0200
-Subject: [PATCH 3/3] cpufreq: Enable big.LITTLE cpufreq driver on arm64
-In-Reply-To: <20140519230729.GD30457@sirena.org.uk>
-References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
- <2437793.vfcRUkFCet@vostro.rjw.lan> <20140519230729.GD30457@sirena.org.uk>
-Message-ID: <3610030.uyJEv7eFhP@vostro.rjw.lan>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 20 May 2014 08:37:14 +0900
+Subject: [PATCH 00/03] ARM: shmobile: Use shmobile_init_delay() on r8a7790
+Message-ID: <20140519233714.10496.31390.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, May 20, 2014 12:07:29 AM Mark Brown wrote:
-> 
-> --MAH+hnPXVZWQ5cD/
-> Content-Type: text/plain; charset=us-ascii
-> Content-Disposition: inline
-> 
-> On Tue, May 20, 2014 at 01:19:03AM +0200, Rafael J. Wysocki wrote:
-> 
-> > I've queued this one up for 3.16, thanks!
-> 
-> This will fail to build without patch 1 - it uses the stubs added there.
+ARM: shmobile: Use shmobile_init_delay() on r8a7790
 
-OK, dropping then.
+[PATCH 01/03] ARM: shmobile: Use r8a7790 DT CPU Frequency in common case	
+[PATCH 02/03] ARM: shmobile: Use r8a7790 DT CPU Frequency for Lager
+[PATCH 03/03] ARM: shmobile: Remove unused r8a7790_init_early()
 
-Rafael
+Convert r8a7790 to rely on shmobile_init_delay() instead of using a per-SoC
+delay setup function. Very similar to the r8a7791 implementation.
+
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+---
+
+ Written against renesas-devel-v3.15-rc5-20140517
+
+ arch/arm/mach-shmobile/board-lager-reference.c |    2 +-
+ arch/arm/mach-shmobile/board-lager.c           |    2 +-
+ arch/arm/mach-shmobile/include/mach/r8a7790.h  |    1 -
+ arch/arm/mach-shmobile/setup-r8a7790.c         |    9 +--------
+ 4 files changed, 3 insertions(+), 11 deletions(-)
