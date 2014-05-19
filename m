@@ -1,39 +1,38 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 19 May 2014 22:42:39 +0200
-Subject: [PATCHv2 resend 08/11] ARM: shmobile: Armadillo 800 EVA: use
- PWM_LOOKUP to initialize struct pwm_lookup
+Date: Mon, 19 May 2014 22:42:40 +0200
+Subject: [PATCHv2 resend 09/11] ARM: pxa: hx4700: use PWM_LOOKUP to initialize
+ struct pwm_lookup
 In-Reply-To: <1400532162-29483-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1400532162-29483-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1400532162-29483-9-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1400532162-29483-10-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-armadillo800eva.c | 10 ++--------
+ arch/arm/mach-pxa/hx4700.c | 10 ++--------
  1 file changed, 2 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index 1bf61dad9a35..ca82b1e2ebab 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -407,14 +407,8 @@ static struct platform_device pwm_device = {
+diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+index 0788a1f171fe..c66ad4edc5e3 100644
+--- a/arch/arm/mach-pxa/hx4700.c
++++ b/arch/arm/mach-pxa/hx4700.c
+@@ -574,14 +574,8 @@ static struct platform_device backlight = {
  };
  
- static struct pwm_lookup pwm_lookup[] = {
+ static struct pwm_lookup hx4700_pwm_lookup[] = {
 -	{
--		.provider = "renesas-tpu-pwm",
--		.index = 2,
--		.dev_id = "pwm-backlight.0",
+-		.provider = "pxa27x-pwm.1",
+-		.index = 0,
+-		.dev_id = "pwm-backlight",
 -		.con_id = NULL,
--		.period = 33333,
--		.polarity = PWM_POLARITY_INVERSED,
+-		.period = 30923,
+-		.polarity = PWM_POLARITY_NORMAL,
 -	},
-+	PWM_LOOKUP("renesas-tpu-pwm", 2, "pwm-backlight.0", NULL,
-+		   33333, PWM_POLARITY_INVERSED),
++	PWM_LOOKUP("pxa27x-pwm.1", 0, "pwm-backlight", NULL,
++		   30923, PWM_POLARITY_NORMAL),
  };
  
- /* LCDC and backlight */
+ /*
 -- 
 1.9.1
