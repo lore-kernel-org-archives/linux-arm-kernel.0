@@ -1,80 +1,76 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 19 May 2014 18:28:55 +0900
-Subject: [PATCH v9 1/4] ARM: dts: Add sysreg sytem controller node to
- exynos5250 and exynos5420
-In-Reply-To: <1399641784-10833-2-git-send-email-gautam.vivek@samsung.com>
-References: <1399641784-10833-1-git-send-email-gautam.vivek@samsung.com>
- <1399641784-10833-2-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <02fe01cf7344$c19d36f0$44d7a4d0$@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 19 May 2014 11:27:25 +0200
+Subject: [PATCH v3 3/7] mfd: add support for sun6i PRCM
+ (Power/Reset/Clock Management) unit
+In-Reply-To: <20140519092159.GE4978@lee--X1>
+References: <1399633911-7094-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1399633911-7094-4-git-send-email-boris.brezillon@free-electrons.com>
+ <20140509135251.GY5767@lee--X1> <20140515151756.GX29258@lukather>
+ <20140519092159.GE4978@lee--X1>
+Message-ID: <20140519092725.GE29466@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vivek Gautam wrote:
+On Mon, May 19, 2014 at 10:21:59AM +0100, Lee Jones wrote:
+> > > > The PRCM (Power/Reset/Clock Management) block exposes several subdevices
+> > > > in different subsystems (clk, reset ...)
+> > > > 
+> > > > Add basic support for the PRCM unit with clk (AR100, AHB0, and APB0 clks)
+> > > > and reset controller subdevices.
+> > > > 
+> > > > Other subdevices might be added later (if needed).
+> > > > 
+> > > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > > > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > > ---
+> > > >  drivers/mfd/Kconfig      |   8 +++
+> > > >  drivers/mfd/Makefile     |   1 +
+> > > >  drivers/mfd/sun6i-prcm.c | 134 +++++++++++++++++++++++++++++++++++++++++++++++
+> > > >  3 files changed, 143 insertions(+)
+> > > >  create mode 100644 drivers/mfd/sun6i-prcm.c
+> > > 
+> > > [...]
+> > > 
+> > > > +/*
+> > > > + * Copyright (C) 2014 Free Electrons
+> > > > + *
+> > > > + * License Terms: GNU General Public License v2
+> > > > + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > > > + *
+> > > > + * Allwinner PRCM (Power/Reset/Clock Management) driver
+> > > > + *
+> > > > + */
+> > > > +
+> > > > +#include <linux/mfd/core.h>
+> > > > +#include <linux/module.h>
+> > > > +#include <linux/of.h>
+> > > 
+> > > Ah, now isn't that better?
+> > > 
+> > > Acked-by: Lee Jones <lee.jones@linaro.org>
+> > 
+> > How do you want to merge this? Do you want me to take it through
+> > mach-sunxi tree, or do you want to take it in your tree?
 > 
-> This patch adds sysreg-syscon node to exynos5250 and exynos5420 device
-> tree, to access System Register's registers using syscon driver.
-> 
-> Signed-off-by: Kamil Debski <k.debski@samsung.com>
-> [gautam.vivek at samsung.com: Split this syreg-syscon dts entry from
-> dts: Add usb2phy to Exynos 5250 patch]
-> [gautam.vivek at samsung.com: added similar syscon entry for exynos5420]
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> ---
-> 
-Vivek,
+> If Boris can tell me what needs to go in with this patch (or if it
+> can go in on its own), I will create a(n immutable) branch from which
+> you can pull into your tree.
 
-See my comment below.
+We don't have any runtime or compile time dependency on this, so you
+can merge it through your tree. Unless something change, I don't have
+to pull anything in my tree.
 
-And please don't version each patch in series...it's really not a good way.
-It cause very big confusing...
+Thanks!
+Maxime
 
-> Changes since v7:
-> None
-> 
->  arch/arm/boot/dts/exynos5250.dtsi |    5 +++++
->  arch/arm/boot/dts/exynos5420.dtsi |    5 +++++
->  2 files changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
-> b/arch/arm/boot/dts/exynos5250.dtsi
-> index 3742331..70f0cd5 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -175,6 +175,11 @@
->  		reg = <0x10040000 0x5000>;
->  	};
-> 
-> +	sysreg_system_controller: syscon at 10050000 {
-> +		compatible = "samsung,exynos5250-sys", "syscon";
-
-Maybe exynos5250-sysreg?
-
-And need to add/modify binding doc?
-
-- Kukjin
-
-> +		reg = <0x10050000 0x5000>;
-> +	};
-> +
->  	watchdog at 101D0000 {
->  		compatible = "samsung,exynos5250-wdt";
->  		reg = <0x101D0000 0x100>;
-> diff --git a/arch/arm/boot/dts/exynos5420.dtsi
-> b/arch/arm/boot/dts/exynos5420.dtsi
-> index a802f74..5d5d6e3 100644
-> --- a/arch/arm/boot/dts/exynos5420.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> @@ -682,6 +682,11 @@
->  		reg = <0x10040000 0x5000>;
->  	};
-> 
-> +	sysreg_system_controller: syscon at 10050000 {
-> +		compatible = "samsung,exynos5420-sys", "syscon";
-> +		reg = <0x10050000 0x5000>;
-> +	};
-> +
->  	tmu_cpu0: tmu at 10060000 {
->  		compatible = "samsung,exynos5420-tmu";
->  		reg = <0x10060000 0x100>;
-> --
-> 1.7.10.4
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/39717223/attachment.sig>
