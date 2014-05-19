@@ -1,74 +1,105 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 19 May 2014 08:12:42 -0700
-Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
-In-Reply-To: <5376A726.4000106@samsung.com>
-References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
- <53752E25.9060604@gmail.com>
- <CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>
- <53753443.8010303@gmail.com>
- <CAD=FV=V8UZoeOqEwfx_E015pLM+amTt51LrUa+dk7mTdn=vKgA@mail.gmail.com>
- <53753C17.1090002@gmail.com>
- <CAD=FV=WGa7j_As_NpySxU7OEd_SzuGWK6oxU6UeiJ-4HsoWvvg@mail.gmail.com>
- <CAJFHJrrgWGc4XGQB0ysLufAg3Wouz-aYXu97Sy2Kp=HzK+akVQ@mail.gmail.com>
- <CAASgrz2Nr69tpfC8ka9gbs2OvjLEGsvgAj4vBCFxhsamuFum7w@mail.gmail.com>
- <53754CE2.3000905@gmail.com>
- <CAD=FV=UMoL7i9rg_QtBAqPwisSQyRqRmk8wQhneMXAiLBjTT1A@mail.gmail.com>
- <CAPz6YkU8GDrLj8UkqEQXxxqxWF5_p427wKSDgAp+QPR7WE7Ujg@mail.gmail.com>
- <CAJFHJrrb2XFDZqJh4OuLdFP=J0aR4pGe-WLWKZ7ZpMfUSPGd4Q@mail.gmail.com>
- <5376A726.4000106@samsung.com>
-Message-ID: <CAD=FV=VXSP1TM9qY8PxFuQ+Tq2Ju57VdpzpwsHXqHshQm_havQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 19 May 2014 16:19:38 +0100
+Subject: [RFC PATCHv1 0/7] ARM core support for hardware I/O coherency in
+ non-SMP platforms
+In-Reply-To: <20140519131757.20021784@free-electrons.com>
+References: <1400082641-23871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140514170456.GC15946@arm.com>
+ <20140515115010.0d6a4d92@free-electrons.com>
+ <20140515142205.GC1499@arm.com>
+ <20140519111739.39ae3b82@free-electrons.com>
+ <20140519104219.GH5113@arm.com>
+ <20140519131757.20021784@free-electrons.com>
+Message-ID: <20140519151938.GC4822@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin,
+On Mon, May 19, 2014 at 12:17:57PM +0100, Thomas Petazzoni wrote:
+> On Mon, 19 May 2014 11:42:19 +0100, Catalin Marinas wrote:
+> > > I have no problem about the bootloader doing some initialization, so if
+> > > that's a requirement for arm64, no problem. But it should be a
+> > > requirement regardless of the kernel configuration: in the current
+> > > kernel, some initialization is done when CONFIG_SMP is enabled. And now
+> > > that the same initialization is needed in !CONFIG_SMP, I'm asked to do
+> > > it in the bootloader. That's the thing I don't buy.
+> > 
+> > And that's a hard thing for me to sell for arm32 ;) because of the
+> > current code already doing this.
+> > 
+> > One of the issues is secure vs non-secure kernel deployment and
+> > secure-only registers like ACTLR (and even SCU). I've seen SoCs for
+> > which the mainline kernel assumes secure mode but it's deployed as
+> > non-secure in the field with out of tree modifications to make it work.
+> > I would rather have a single kernel image for both cases.
+> 
+> As things are today, I believe the Armada 370/XP/375/38x are always
+> booted in secure mode. Couldn't the kernel detect if it's running
+> secure or non-secure. If it's running secure, it can do all the ACTLR
+> configuration (and other things that require being in secure mode). If
+> it's running non-secure, then it doesn't do this configuration, and
+> assumes the firmware/bootloader did it.
 
-On Fri, May 16, 2014 at 5:02 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> On 05/17/14 07:56, Chirantan Ekbote wrote:
->>>>>
->>>>> Anyway, I'm by no means opposed to switching to arch timers. They
->>>>> provide a well designed, generic interface and drivers shared by
->>>>> multiple platforms, which means more code sharing and possibly more
->>>>> eyes
->>>>> looking at the code, which is always good. However if they don't
->>>>> support
->>>>> low power states correctly, we can't just remove MCT.
->>>>
->>>>
->>>> I think low power states aren't in mainline (right?).
->>>>
->>>> One solution that might work could be to leave the device tree entry
->>>> alone but change the MCT init code to simply act as a no-op if it sees
->>>> an arch timer is in the device tree and enabled.  Then when/if someone
->>>> got the low power states enabled we could just change source code
->>>> rather than dts files.
->>>>
->>
->> Doug and I were talking about this and we think we may have a way to
->> have the mct and arch timers co-exist.  The main issue is that the mct
->> (and therefore arch timer) gets cleared once during boot and every
->> time we do a suspend / resume.  This happens in
->> exynos4_mct_frc_start() but it's not immediately clear to us why the
->> counter needs to be reset at all.  If we remove the lines that clear
->> the counter then there is no longer an issue with having both the mct
->> and the arch timers on at the same time.
->>
->> Alternately, if there is some code that depends on the mct being reset
->> we could store an offset instead of clearing the counter and then
->> subtract that offset every time something reads it.  Doug has a patch
->> that does this at
->> https://chromium-review.googlesource.com/#/c/200298/.  Effectively the
->> visible behavior will not change.  Would either of these options work?
->>
-> Hi all,
->
-> Even though I've heard something about the behavior of mct and arch
-> timer...but I couldn't finish the talk to h/w guys yet. I need to talk again
-> in next week then I could provide some useful information. Sorry for late
-> and can you please wait a minute before deciding whatever.
+Unfortunately there is no easy way to detect secure vs non-secure at
+boot time. What we have for other platforms is a check for whether the
+corresponding ACTLR bit is set and if yes, we avoid writing the
+register (which would undef).
 
-I think we could wait a few days.  Note however, that Chirantan's
-latest proposal keeps all existing functionality (can use both MCT and
-arch timers).  It merely removes the unnecessary bit of the MCT init
-code setting the timer.  No functionality is affected by that.
+> > > > > Unfortunately, __create_page_tables is called so early that I don't
+> > > > > know if it's possible to access 'struct machine_desc' at this point to
+> > > > > know whether the platform needs shareable pages or not.
+> > > > > 
+> > > > > Also, don't we have the same problem with the TTB_FLAGS_{SMP,UP) ?
+> > > > 
+> > > > I don't think we do because we use the ALT_{SMP,UP} for TTB settings and
+> > > > we have the smp-on-up fixup running before __v7_setup.
+> > > 
+> > > Ok. For Armada 370, I don't need shareable pages. For Armada 380, I
+> > > need shareable pages, but even if the processor is single core, I
+> > > believe it pretends to be SMP in MPIDR.
+> > 
+> > You'd need to check this.
+> 
+> I got the confirmation. *But* this is only going to affect CONFIG_SMP
+> builds. Armada 380 being single core, we want I/O coherency to work on
+> it in !CONFIG_SMP configurations. And in !CONFIG_SMP configuration,
+> it's always ALT_UP() that is used, regardless of what MPIDR says. And
+> therefore the TTB_FLAGS_UP will be used.
 
--Doug
+Good point. In this case you could have a coherency problem as the page
+table walks are not shareable. In practice, it's only one CPU that
+writes/reads the page tables I think it should be OK.
+
+The other case is non-shareable cacheable access with the original
+page table and later switched to shareable. I don't think the cache
+lines would be tagged with a shareable attribute but it's worth asking
+the hw people (but you are really into microarchitecture details).
+
+According to the ARM ARM (A3.5.7) you shouldn't have different agents
+accessing the same location with different shareability attributes (page
+table walker is such agent):
+
+  If the mismatched attributes for a location mean that multiple
+  cacheable accesses to the location might be made with different
+  shareability attributes, then coherency is guaranteed only if each
+  thread of execution that accesses the location with a cacheable
+  attribute performs a clean and invalidate of the location.
+
+> > > > I'm always for the former (and that's the case for arm64), though for
+> > > > some older boards it's too late to change.
+> > > 
+> > > Indeed. So how do we move forward?
+> > 
+> > As I said previously, it's not my call, just a recommendation. It's up
+> > to the arm/arm-soc maintainers to take this. Give the arm32 SMP
+> > initialisation precedent, forcing it for an existing platform is a
+> > harder sell.
+> 
+> Ok. So I should keep going with the approach proposed in my patch
+> series, obviously after fixing the various other comments that were
+> posted?
+
+I assume it's business as usual unless you hear otherwise from rmk or
+arm-soc ;).
+
+-- 
+Catalin
