@@ -1,103 +1,49 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Mon, 19 May 2014 14:45:28 +0530
-Subject: [linux-pm] [RFC PATCH 4/5] thermal: cpu_cooling: Release the
- upper cooling limit checks
-In-Reply-To: <20140515185814.GD3138@developer>
-References: <1399559880-20562-1-git-send-email-amit.daniel@samsung.com>
- <1399559880-20562-5-git-send-email-amit.daniel@samsung.com>
- <20140515185814.GD3138@developer>
-Message-ID: <CADGdYn5v8JS_rQwYT+mx+GBK0mAdcj=MNBTMHJ3BYA9-f2N2qw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 19 May 2014 10:15:53 +0100
+Subject: [linux-sunxi] Re: [PATCH v5 4/8] input: misc: Add driver for
+ AXP20x Power Enable Key
+In-Reply-To: <CAOQ7t2bPHnjfpeqQjMsYJs--qpd1_1RvBEFXztTDgnf5yW=Yxg@mail.gmail.com>
+References: <1398947374-3115-1-git-send-email-carlo@caione.org>
+ <1398947374-3115-5-git-send-email-carlo@caione.org>
+ <20140503010604.GE4090@lukather>
+ <20140519055745.GL29386@core.coreip.homeip.net>
+ <CAOQ7t2bPHnjfpeqQjMsYJs--qpd1_1RvBEFXztTDgnf5yW=Yxg@mail.gmail.com>
+Message-ID: <20140519091553.GC4978@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 12:28 AM, Eduardo Valentin <edubezval@gmail.com> wrote:
-> Hello Amit,
->
-> On Thu, May 08, 2014 at 08:07:59PM +0530, Amit Daniel Kachhap wrote:
->> This is required as with addition of cpufreq cooling notifiers
->> mechanism the client can enable some more cooling states at a later
->> point of time. Say when minimum p state is reached then ACPI specific
->> throttling is enabled which may add some more cooling states.
->>
->> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> ---
->>  drivers/thermal/step_wise.c    |    2 +-
->>  drivers/thermal/thermal_core.c |    9 +++------
->>  include/linux/thermal.h        |    1 +
->>  3 files changed, 5 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/thermal/step_wise.c b/drivers/thermal/step_wise.c
->> index f251521..7d65617 100644
->> --- a/drivers/thermal/step_wise.c
->> +++ b/drivers/thermal/step_wise.c
->> @@ -72,7 +72,7 @@ static unsigned long get_target_state(struct thermal_instance *instance,
->>               }
->>               break;
->>       case THERMAL_TREND_RAISE_FULL:
->> -             if (throttle)
->> +             if (instance->upper != THERMAL_CSTATE_MAX && throttle)
->>                       next_target = instance->upper;
->>               break;
->>       case THERMAL_TREND_DROPPING:
->> diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
->> index 71b0ec0..36bb107 100644
->> --- a/drivers/thermal/thermal_core.c
->> +++ b/drivers/thermal/thermal_core.c
->> @@ -921,7 +921,6 @@ int thermal_zone_bind_cooling_device(struct thermal_zone_device *tz,
->>       struct thermal_instance *pos;
->>       struct thermal_zone_device *pos1;
->>       struct thermal_cooling_device *pos2;
->> -     unsigned long max_state;
->>       int result;
->>
->>       if (trip >= tz->trips || (trip < 0 && trip != THERMAL_TRIPS_NONE))
->> @@ -939,13 +938,11 @@ int thermal_zone_bind_cooling_device(struct thermal_zone_device *tz,
->>       if (tz != pos1 || cdev != pos2)
->>               return -EINVAL;
->>
->> -     cdev->ops->get_max_state(cdev, &max_state);
->> -
->
-> I am not sure I follow why we need to release this check. Can't the user
-> use the notifier infrastructure and change the max state?
->
-> I think I need a better view of use cases where max state would change.
-I think i missed adding more description. I will add more details in
-the documentation. Actually now with notifier mechanism max state may
-change on some condition and at some later time so having this check
-here in early stage will not allow taking cooling action for later
-dynamic higher cooling states.
->
->
->
->> -     /* lower default 0, upper default max_state */
->> +     /* lower default 0, upper default THERMAL_CSTATE_MAX */
->>       lower = lower == THERMAL_NO_LIMIT ? 0 : lower;
->> -     upper = upper == THERMAL_NO_LIMIT ? max_state : upper;
->> +     upper = upper == THERMAL_NO_LIMIT ? THERMAL_CSTATE_MAX : upper;
->>
->> -     if (lower > upper || upper > max_state)
->> +     if (lower > upper)
->>               return -EINVAL;
->>
->>       dev =
->> diff --git a/include/linux/thermal.h b/include/linux/thermal.h
->> index f7e11c7..3748e6d 100644
->> --- a/include/linux/thermal.h
->> +++ b/include/linux/thermal.h
->> @@ -36,6 +36,7 @@
->>
->>  /* invalid cooling state */
->>  #define THERMAL_CSTATE_INVALID -1UL
->> +#define THERMAL_CSTATE_MAX 1UL
->>
->>  /* No upper/lower limit requirement */
->>  #define THERMAL_NO_LIMIT     THERMAL_CSTATE_INVALID
->> --
->> 1.7.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
+On Mon, 19 May 2014, Carlo Caione wrote:
+
+> On Mon, May 19, 2014 at 7:57 AM, Dmitry Torokhov
+> <dmitry.torokhov@gmail.com> wrote:
+> > On Fri, May 02, 2014 at 06:06:04PM -0700, Maxime Ripard wrote:
+> >> On Thu, May 01, 2014 at 02:29:30PM +0200, Carlo Caione wrote:
+> >> > This patch add support for the Power Enable Key found on MFD AXP202 and
+> >> > AXP209. Besides the basic support for the button, the driver adds two
+> >> > entries in sysfs to configure the time delay for power on/off.
+> >> >
+> >> > Signed-off-by: Carlo Caione <carlo@caione.org>
+> >>
+> >> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >
+> > Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> >
+> > How are we merging it? MFD tree?
+> 
+> No idea. Lee, can you help in merging it?
+> The only thing still  left out is the DT to be merged through Maxime
+> (I need to submit a v6 only for that).
+
+Yes.
+
+Weren't you in receipt of my email sent out an hour before this one?
+
+I thought you were re-sending the test though (v6?).
+
+If you can set that, complete with all the Acks, I'd be much obliged.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
