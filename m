@@ -1,100 +1,145 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 19 May 2014 21:46:13 +0200
-Subject: [PATCH v2 00/10] Marvell Berlin full clock support
-In-Reply-To: <1400517811-24668-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1400517811-24668-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <537A5F85.4090709@gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 19 May 2014 21:47:41 +0200
+Subject: [PATCH v6 0/7] mfd: AXP20x: Add support for AXP202 and AXP209
+Message-ID: <1400528868-5971-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/2014 06:43 PM, Sebastian Hesselbarth wrote:
-> Mike,
-> 
-> this is v2 of the Berlin SoC clock driver [1] but with a reworked DT
-> binding as requested [2]. We decided to not even try to split up the chip
-> control registers that deal with pinmux, padmux, clock, reset, and evil
-> stuff we haven't even looked at. Instead we keep a single node that clock
-> driver will remap early, while proper platform_drivers use a regmap
-> instead. Although clock and other drivers share the same register range,
-> they use individual registers exclusively.
-> 
-> There are some functional fixes in the single clock drivers, I noticed
-> while retesting each individial driver. There will be more to fixup but
-> without any drivers actually using the clocks, it is hard to tell what
-> isn't working now.
-> 
-> Anyway, the current binding should match what you requested and having
-> a clock driver for v3.16 will really be a huge benefit for us to work
-> on more driver support.
-> 
-> If you are fine with it, please take patches 2-7 and I'll pick up
-> 1,8-10 in berlin branch.
+AXP209 and AXP202 are the PMUs (Power Management Unit) used by A10, A13
+and A20 SoCs and developed by X-Powers, a sister company of Allwinner.
+AXP20x comprises an adaptive USB-Compatible PWM charger, 2 BUCK DC-DC
+converters, 5 LDOs, multiple 12-bit ADCs of voltage, current and temperature
+as well as 4 configurable GPIOs. 
 
-nit: I also take patch 2 as it is the required DT include. Makes 3-7
-to pick up for you.
+This set of patches introduces the core driver and support for two different
+subsystems:
+	- Regulators
+	- PEK (Power Enable Key)
 
-Sebastian
+Changes since v1:
 
-> [1] https://lkml.kernel.org/r/1399839881-29895-1-git-send-email-sebastian.hesselbarth at gmail.com
-> [2] https://lkml.kernel.org/r/20140515044106.19795.57249 at quantum
-> 
-> Alexandre Belloni (4):
->   clk: berlin: add driver for BG2x simple PLLs
->   clk: berlin: add driver for BG2x complex divider cells
->   clk: berlin: add core clock driver for BG2Q
->   ARM: dts: berlin: convert BG2Q to DT clock nodes
-> 
-> Sebastian Hesselbarth (6):
->   dt-binding: ARM: add clock binding docs for Marvell Berlin2 SoCs
->   clk: berlin: add binding include for Berlin SoC clock ids
->   clk: berlin: add driver for BG2x audio/video PLL
->   clk: berlin: add core clock driver for BG2/BG2CD
->   ARM: dts: berlin: convert BG2CD to DT clock nodes
->   ARM: dts: berlin: convert BG2 to DT clock nodes
-> 
->  .../devicetree/bindings/arm/marvell,berlin.txt     |  47 ++
->  arch/arm/boot/dts/berlin2.dtsi                     |  56 +-
->  arch/arm/boot/dts/berlin2cd.dtsi                   |  53 +-
->  arch/arm/boot/dts/berlin2q.dtsi                    |  54 +-
->  drivers/clk/Makefile                               |   1 +
->  drivers/clk/berlin/Makefile                        |   4 +
->  drivers/clk/berlin/berlin2-avpll.c                 | 393 ++++++++++++
->  drivers/clk/berlin/berlin2-avpll.h                 |  36 ++
->  drivers/clk/berlin/berlin2-div.c                   | 265 ++++++++
->  drivers/clk/berlin/berlin2-div.h                   |  89 +++
->  drivers/clk/berlin/berlin2-pll.c                   | 117 ++++
->  drivers/clk/berlin/berlin2-pll.h                   |  37 ++
->  drivers/clk/berlin/bg2.c                           | 691 +++++++++++++++++++++
->  drivers/clk/berlin/bg2q.c                          | 389 ++++++++++++
->  drivers/clk/berlin/common.h                        |  29 +
->  include/dt-bindings/clock/berlin2.h                |  45 ++
->  include/dt-bindings/clock/berlin2q.h               |  31 +
->  17 files changed, 2240 insertions(+), 97 deletions(-)
->  create mode 100644 drivers/clk/berlin/Makefile
->  create mode 100644 drivers/clk/berlin/berlin2-avpll.c
->  create mode 100644 drivers/clk/berlin/berlin2-avpll.h
->  create mode 100644 drivers/clk/berlin/berlin2-div.c
->  create mode 100644 drivers/clk/berlin/berlin2-div.h
->  create mode 100644 drivers/clk/berlin/berlin2-pll.c
->  create mode 100644 drivers/clk/berlin/berlin2-pll.h
->  create mode 100644 drivers/clk/berlin/bg2.c
->  create mode 100644 drivers/clk/berlin/bg2q.c
->  create mode 100644 drivers/clk/berlin/common.h
->  create mode 100644 include/dt-bindings/clock/berlin2.h
->  create mode 100644 include/dt-bindings/clock/berlin2q.h
-> 
-> ---
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Randy Dunlap <rdunlap@infradead.org>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Cc: Jisheng Zhang <jszhang@marvell.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-doc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> 
+	- Added a new standalone patch for defconfig
+
+	- MFD core:
+	  * Removed axp,system-power-controller property
+
+	- Bindings documentation:
+	  * Corrected description for dcdc-workmode property
+	  * Removed unused axp20x-pek compatible
+
+	- Input misc PEK driver:
+	  * Fixed seconds in lower case
+
+	- Regulators subsystem:
+	  * Fixed axp20x_set_suspend_voltage()
+	  * Switched to using multi-bit control for regulators
+	  * When "regulators" node is not found driver doesn't quit
+	  * Driver is now using devm_regulator_register()
+	  * Added module_platform_driver() instead of subsys_initcall()
+
+	- DT:
+	  * Added new DTSI for AXP209
+	  * Added support for cubietruck and olinuxino-micro
+
+Changes since v2:
+
+	- Added a new patch for multi_v7_defconfig to enable MFD core
+	  and subsystems
+
+	- DT:
+	  * Dropped axp,system-power-controller property from DTS
+	  * Moved compatible and interrupt-related properties from the
+	    DTSI file to the DTS board files
+
+	- Regulators subsystem:
+	  * Deleted useless struct axp20x_regulators
+	  * Added a warning when out of specs values are used for the
+	    dcdc frequency
+
+	- MFD core:
+	  * Fixed coding style
+	  * Removed IDs from device table for i2c
+
+	- Bindings documentation:
+	  * Several corrections and fixes
+
+Changes since v3:
+
+	- Removed x-powers-axp209.dtsi file
+	- Rewritten bindings document
+
+	- MFD core:
+	  * Fixed casting
+	  * Better comments / documentation
+
+	- Input misc PEK driver:
+	  * Timings are now expressed in ms and the sysfs appies the
+	    closest possible value
+	  * No more useless pretty-printing
+	  * Removed devm_request_threaded_irq in favour of
+	    devm_request_any_context_irq
+	  * Moved from input attributes to platform device attributes
+
+	- Regulators subsystem:
+	  * Removed suspend mode (axp20x_set_suspend_voltage)
+	  * Added regulators input supply
+
+	- DT:
+	  * DTs doesn't include anymore the dtsi
+	  * Added input supplies for regulators
+
+Changes since v4:
+
+	- Removed regulator patches already applied / acked by Mark Brown
+
+	- Input misc PEK driver:
+	  * Don't print anymore the "us" unit
+	  * Added cleanup for attributes when unbindind the device
+	  * Fixed error code returned when device_create_file() fails
+
+	- DT:
+	  * Enable all the regulators on at boot-time
+       	  * Removed min and max microvolts for all the regulators but DCDC2
+	  * Moved the axp_ipsout regulator outside the MFD node
+	  
+	- MFD core:
+	  * The supply regulators are now specified in the MFD driver using
+	    regulator_bulk_register_supply_alias() and the .parent_supplies
+	    in the MFD cell
+
+Changes since v5:
+	- Added ACKs
+	- Fixed compilation warning (reported by Hans De Goede)
+	- Vendor-prefixes are now sorted
+	- Removed DT patch
+
+Carlo Caione (7):
+  mfd: AXP20x: Add mfd driver for AXP20x PMIC
+  dt-bindings: add vendor-prefix for X-Powers
+  mfd: AXP20x: Add bindings documentation
+  input: misc: Add driver for AXP20x Power Enable Key
+  input: misc: Add ABI docs for AXP20x PEK
+  ARM: sunxi: Add AXP20x support in defconfig
+  ARM: sunxi: Add AXP20x support multi_v7_defconfig
+
+ .../ABI/testing/sysfs-driver-input-axp-pek         |  11 +
+ Documentation/devicetree/bindings/mfd/axp20x.txt   |  93 +++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/configs/multi_v7_defconfig                |   3 +
+ arch/arm/configs/sunxi_defconfig                   |   4 +
+ drivers/input/misc/Kconfig                         |  11 +
+ drivers/input/misc/Makefile                        |   1 +
+ drivers/input/misc/axp20x-pek.c                    | 281 +++++++++++++++++++++
+ drivers/mfd/Kconfig                                |  12 +
+ drivers/mfd/Makefile                               |   1 +
+ drivers/mfd/axp20x.c                               | 258 +++++++++++++++++++
+ include/linux/mfd/axp20x.h                         | 180 +++++++++++++
+ 12 files changed, 856 insertions(+)
+ create mode 100644 Documentation/ABI/testing/sysfs-driver-input-axp-pek
+ create mode 100644 Documentation/devicetree/bindings/mfd/axp20x.txt
+ create mode 100644 drivers/input/misc/axp20x-pek.c
+ create mode 100644 drivers/mfd/axp20x.c
+ create mode 100644 include/linux/mfd/axp20x.h
+
+-- 
+1.9.1
