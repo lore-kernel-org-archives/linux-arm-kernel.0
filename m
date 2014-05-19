@@ -1,67 +1,30 @@
-From: david@hardeman.nu (David =?iso-8859-1?Q?H=E4rdeman?=)
-Date: Mon, 19 May 2014 22:26:16 +0200
-Subject: [PATCH v7 2/3] [media] rc: add sunxi-ir driver
-In-Reply-To: <1400104602-16431-3-git-send-email-bay@hackerdom.ru>
-References: <1400104602-16431-1-git-send-email-bay@hackerdom.ru>
- <1400104602-16431-3-git-send-email-bay@hackerdom.ru>
-Message-ID: <20140519202616.GA25415@hardeman.nu>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 19 May 2014 22:30:44 +0200
+Subject: [PATCH resend] pwm: atmel: set pwm_chip can_sleep flag
+Message-ID: <1400531444-28613-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 03:56:41AM +0600, Alexander Bersenev wrote:
->This patch adds driver for sunxi IR controller.
->It is based on Alexsey Shestacov's work based on the original driver
->supplied by Allwinner.
->
+atmel_pwm_config() calls clk_get_rate() which might sleep, so we need to set
+pwm_chip can_sleep flag.
 
-...
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/pwm/pwm-atmel.c | 1 +
+ 1 file changed, 1 insertion(+)
 
->+static irqreturn_t sunxi_ir_irq(int irqno, void *dev_id)
->+{
->+	unsigned long status;
->+	unsigned char dt;
->+	unsigned int cnt, rc;
->+	struct sunxi_ir *ir = dev_id;
->+	DEFINE_IR_RAW_EVENT(rawir);
->+
->+	spin_lock(&ir->ir_lock);
->+
->+	status = readl(ir->base + SUNXI_IR_RXSTA_REG);
->+
->+	/* clean all pending statuses */
->+	writel(status | REG_RXSTA_CLEARALL, ir->base + SUNXI_IR_RXSTA_REG);
->+
->+	if (status & REG_RXINT_RAI_EN) {
->+		/* How many messages in fifo */
->+		rc  = (status >> REG_RXSTA_RAC__SHIFT) & REG_RXSTA_RAC__MASK;
->+		/* Sanity check */
->+		rc = rc > SUNXI_IR_FIFO_SIZE ? SUNXI_IR_FIFO_SIZE : rc;
->+		/* If we have data */
->+		for (cnt = 0; cnt < rc; cnt++) {
->+			/* for each bit in fifo */
->+			dt = readb(ir->base + SUNXI_IR_RXFIFO_REG);
->+			rawir.pulse = (dt & 0x80) != 0;
->+			rawir.duration = (dt & 0x7f) * SUNXI_IR_SAMPLE;
-
-Can the hardware actually return a zero duration or should that be dt &
-0x7f + 1?
-
-(Not familiar with this particular hardware but I know I've seen that
-behaviour before).
-
->+			ir_raw_event_store_with_filter(ir->rc, &rawir);
->+		}
->+	}
->+
->+	if (status & REG_RXINT_ROI_EN) {
->+		ir_raw_event_reset(ir->rc);
->+	} else if (status & REG_RXINT_RPEI_EN) {
->+		ir_raw_event_set_idle(ir->rc, true);
->+		ir_raw_event_handle(ir->rc);
->+	}
->+
->+	spin_unlock(&ir->ir_lock);
->+
->+	return IRQ_HANDLED;
->+}
-....
+diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+index 0adc952cc4ef..6e700a541ca3 100644
+--- a/drivers/pwm/pwm-atmel.c
++++ b/drivers/pwm/pwm-atmel.c
+@@ -357,6 +357,7 @@ static int atmel_pwm_probe(struct platform_device *pdev)
+ 
+ 	atmel_pwm->chip.base = -1;
+ 	atmel_pwm->chip.npwm = 4;
++	atmel_pwm->chip.can_sleep = true;
+ 	atmel_pwm->config = data->config;
+ 
+ 	ret = pwmchip_add(&atmel_pwm->chip);
+-- 
+1.9.1
