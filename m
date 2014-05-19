@@ -1,42 +1,47 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 19 May 2014 22:42:42 +0200
-Subject: [PATCHv2 resend 11/11] backlight: pwm_bl: retrieve configured pwm
- period
-In-Reply-To: <1400532162-29483-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 May 2014 13:49:54 -0700
+Subject: [PATCHv2 resend 04/11] ARM: OMAP3: Beagle: initialize all the
+ struct pwm_lookup members
+In-Reply-To: <1400532162-29483-5-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1400532162-29483-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1400532162-29483-12-git-send-email-alexandre.belloni@free-electrons.com>
+ <1400532162-29483-5-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140519204954.GD11945@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PWM core is now able to initialize the PWM period from platform_data. Use it
-and if it is not configured, use the supplied pwm_period_ns.
+* Alexandre Belloni <alexandre.belloni@free-electrons.com> [140519 13:44]:
+> This will allow to get rid of the .pwm_period_ns member of struct led_pwm as the
+> period will be set by the PWM core.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/video/backlight/pwm_bl.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+This should not conflict with anything I have:
 
-diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-index b75201ff46f6..1bb8a69062c5 100644
---- a/drivers/video/backlight/pwm_bl.c
-+++ b/drivers/video/backlight/pwm_bl.c
-@@ -304,12 +304,14 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 	/*
- 	 * The DT case will set the pwm_period_ns field to 0 and store the
- 	 * period, parsed from the DT, in the PWM device. For the non-DT case,
--	 * set the period from platform data.
-+	 * set the period from platform data if it is not already set.
- 	 */
--	if (data->pwm_period_ns > 0)
-+	pb->period = pwm_get_period(pb->pwm);
-+	if (!pb->period && (data->pwm_period_ns > 0)) {
-+		pb->period = data->pwm_period_ns;
- 		pwm_set_period(pb->pwm, data->pwm_period_ns);
-+	}
+Acked-by: Tony Lindgren <tony@atomide.com>
  
--	pb->period = pwm_get_period(pb->pwm);
- 	pb->lth_brightness = data->lth_brightness * (pb->period / pb->scale);
- 
- 	memset(&props, 0, sizeof(struct backlight_properties));
--- 
-1.9.1
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  arch/arm/mach-omap2/board-omap3beagle.c | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+> index d6ed819ff15c..f27e1ec90b5e 100644
+> --- a/arch/arm/mach-omap2/board-omap3beagle.c
+> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
+> @@ -61,7 +61,14 @@
+>  
+>  static struct pwm_lookup pwm_lookup[] = {
+>  	/* LEDB -> PMU_STAT */
+> -	PWM_LOOKUP("twl-pwmled", 1, "leds_pwm", "beagleboard::pmu_stat"),
+> +	{
+> +		.provider = "twl-pwmled",
+> +		.index = 1,
+> +		.dev_id = "leds_pwm",
+> +		.con_id = "beagleboard::pmu_stat",
+> +		.period = 7812500,
+> +		.polarity = PWM_POLARITY_NORMAL,
+> +	},
+>  };
+>  
+>  static struct led_pwm pwm_leds[] = {
+> -- 
+> 1.9.1
+> 
