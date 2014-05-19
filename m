@@ -1,57 +1,67 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 19 May 2014 14:28:37 +0100
-Subject: [linux-sunxi] Re: [PATCH v5 4/8] input: misc: Add driver for
- AXP20x Power Enable Key
-In-Reply-To: <CAOQ7t2a=V_dO17Xg4VJUTV3W_OFCaE5Wuj15_Fox2jywjH+RPg@mail.gmail.com>
-References: <1398947374-3115-1-git-send-email-carlo@caione.org>
- <1398947374-3115-5-git-send-email-carlo@caione.org>
- <20140503010604.GE4090@lukather>
- <20140519055745.GL29386@core.coreip.homeip.net>
- <CAOQ7t2bPHnjfpeqQjMsYJs--qpd1_1RvBEFXztTDgnf5yW=Yxg@mail.gmail.com>
- <20140519091553.GC4978@lee--X1>
- <CAOQ7t2a=V_dO17Xg4VJUTV3W_OFCaE5Wuj15_Fox2jywjH+RPg@mail.gmail.com>
-Message-ID: <20140519132837.GI4978@lee--X1>
+Date: Mon, 19 May 2014 14:32:53 +0100
+Subject: [PATCH v3 3/7] mfd: add support for sun6i PRCM
+ (Power/Reset/Clock Management) unit
+In-Reply-To: <20140519092725.GE29466@lukather>
+References: <1399633911-7094-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1399633911-7094-4-git-send-email-boris.brezillon@free-electrons.com>
+ <20140509135251.GY5767@lee--X1> <20140515151756.GX29258@lukather>
+ <20140519092159.GE4978@lee--X1> <20140519092725.GE29466@lukather>
+Message-ID: <20140519133253.GJ4978@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 May 2014, Carlo Caione wrote:
 
-> On Mon, May 19, 2014 at 11:15 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Mon, 19 May 2014, Carlo Caione wrote:
-> >
-> >> On Mon, May 19, 2014 at 7:57 AM, Dmitry Torokhov
-> >> <dmitry.torokhov@gmail.com> wrote:
-> >> > On Fri, May 02, 2014 at 06:06:04PM -0700, Maxime Ripard wrote:
-> >> >> On Thu, May 01, 2014 at 02:29:30PM +0200, Carlo Caione wrote:
-> >> >> > This patch add support for the Power Enable Key found on MFD AXP202 and
-> >> >> > AXP209. Besides the basic support for the button, the driver adds two
-> >> >> > entries in sysfs to configure the time delay for power on/off.
-> >> >> >
-> >> >> > Signed-off-by: Carlo Caione <carlo@caione.org>
-> >> >>
-> >> >> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >> >
-> >> > Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> >> >
-> >> > How are we merging it? MFD tree?
-> >>
-> >> No idea. Lee, can you help in merging it?
-> >> The only thing still  left out is the DT to be merged through Maxime
-> >> (I need to submit a v6 only for that).
-> >
-> > Yes.
-> >
-> > Weren't you in receipt of my email sent out an hour before this one?
+> > > > > The PRCM (Power/Reset/Clock Management) block exposes several subdevices
+> > > > > in different subsystems (clk, reset ...)
+> > > > > 
+> > > > > Add basic support for the PRCM unit with clk (AR100, AHB0, and APB0 clks)
+> > > > > and reset controller subdevices.
+> > > > > 
+> > > > > Other subdevices might be added later (if needed).
+> > > > > 
+> > > > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > > > > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > > > ---
+> > > > >  drivers/mfd/Kconfig      |   8 +++
+> > > > >  drivers/mfd/Makefile     |   1 +
+> > > > >  drivers/mfd/sun6i-prcm.c | 134 +++++++++++++++++++++++++++++++++++++++++++++++
+> > > > >  3 files changed, 143 insertions(+)
+> > > > >  create mode 100644 drivers/mfd/sun6i-prcm.c
+> > > > 
+> > > > [...]
+> > > > 
+> > > > > +/*
+> > > > > + * Copyright (C) 2014 Free Electrons
+> > > > > + *
+> > > > > + * License Terms: GNU General Public License v2
+> > > > > + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > > > > + *
+> > > > > + * Allwinner PRCM (Power/Reset/Clock Management) driver
+> > > > > + *
+> > > > > + */
+> > > > > +
+> > > > > +#include <linux/mfd/core.h>
+> > > > > +#include <linux/module.h>
+> > > > > +#include <linux/of.h>
+> > > > 
+> > > > Ah, now isn't that better?
+> > > > 
+> > > > Acked-by: Lee Jones <lee.jones@linaro.org>
+> > > 
+> > > How do you want to merge this? Do you want me to take it through
+> > > mach-sunxi tree, or do you want to take it in your tree?
+> > 
+> > If Boris can tell me what needs to go in with this patch (or if it
+> > can go in on its own), I will create a(n immutable) branch from which
+> > you can pull into your tree.
 > 
-> Yes, but this email was sent before receiving yours :)
-> 
-> > I thought you were re-sending the test though (v6?).
-> >
-> > If you can set that, complete with all the Acks, I'd be much obliged.
-> 
-> Ok, no problem. I'll also fix a small compilation-warning spotted by Hans.
+> We don't have any runtime or compile time dependency on this, so you
+> can merge it through your tree. Unless something change, I don't have
+> to pull anything in my tree.
 
-Great thanks, and sorry for all the typos, I was in a rush. :)
+When you say 'this', do you mean this patch, or this set?  If I can
+just apply this patch, that will be ideal?
 
 -- 
 Lee Jones
