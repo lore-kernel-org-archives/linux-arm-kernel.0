@@ -1,46 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 19 May 2014 10:18:36 +0100
-Subject: [PATCH 7/7] ARM: tegra: Add the EC i2c tunnel to tegra124-venice2
-In-Reply-To: <CAOesGMhe-STC3GUwAyC6qeEPWWmxdsWbXqdevy8b4MHDgM2v=A@mail.gmail.com>
-References: <1397757570-19750-1-git-send-email-dianders@chromium.org>
- <1397757570-19750-8-git-send-email-dianders@chromium.org>
- <53750A9A.8000808@wwwdotorg.org>
- <CAD=FV=Vj5M_yiYZOkjzB-QjYJa9WE2fcGcwwzAF1h8gcjc9jeA@mail.gmail.com>
- <CAOesGMhe-STC3GUwAyC6qeEPWWmxdsWbXqdevy8b4MHDgM2v=A@mail.gmail.com>
-Message-ID: <20140519091836.GD4978@lee--X1>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 19 May 2014 11:19:15 +0200
+Subject: [RFC PATCHv1 0/7] ARM core support for hardware I/O coherency
+ in non-SMP platforms
+In-Reply-To: <20140516151130.GB7171@localhost>
+References: <1400082641-23871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140514170456.GC15946@arm.com>
+ <20140515115010.0d6a4d92@free-electrons.com>
+ <20140515142205.GC1499@arm.com>
+ <CAL_JsqK80pFHQBgMxc1FGi998UYnbKxOK2gbm_ftqrTaxNq4rA@mail.gmail.com>
+ <20140515152553.GA30423@localhost>
+ <CAL_JsqKSzsyi-XmTKRK=87Z5wFzDjXaLNHj_irOM4V2-8ds1Tw@mail.gmail.com>
+ <20140516151130.GB7171@localhost>
+Message-ID: <20140519111915.7cfe0470@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 May 2014, Olof Johansson wrote:
+Dear Catalin Marinas,
 
-> On Thu, May 15, 2014 at 11:55 AM, Doug Anderson <dianders@chromium.org> wrote:
-> > Stephen,
-> >
-> > On Thu, May 15, 2014 at 11:42 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> >> On 04/17/2014 11:59 AM, Doug Anderson wrote:
-> >>> This adds the EC i2c tunnel (and devices under it) to the
-> >>> tegra124-venice2 device tree.
-> >>
-> >> Did the MFD patches at the start of this series get applied yet? I was
-> >> hoping to apply this one patch to the Tegra tree for 3.16, and that
-> >> needs to happen by tomorrow morning at the latest since -rc6 is looming
-> >> fast. However, I'm holding off until the rest of the series is applied
-> >> to the MFD tree so I can be sure the DT binding is accepted first...
-> >
-> > As far as I know, they didn't.  Lee was waiting on Wolfram's ack to
-> > the i2c tunnel before landing them.  ...and I'm still eagerly awaiting
-> > Wolfram's next i2c tunnel review.
+On Fri, 16 May 2014 16:11:30 +0100, Catalin Marinas wrote:
+
+> > My question is should the kernel unconditionally enable the SCU
+> > regardless of CONFIG_SMP or any other condition? Is there harm in
+> > enabling the SCU when in AMP mode?
 > 
-> The i2c portion can be revisited if needed, the MFD piece should be
-> possible to land sooner than that... Lee?
+> I don't see why we couldn't always enable the SCU at boot, whether the
+> OS runs SMP, AMP or UP mode.
 
-The set 'will' make it in during this cycle.  The trouble is, once
-it's applied, the I2C portion will have to wait until the next cycle.
-By applying late, I'm giving this set every chance to go in as a
-whole.
+Does this means that my "[RFC PATCHv1 4/7] ARM: kernel: allow the SCU
+to be enabled even on !SMP" is OK ?
 
+Thanks,
+
+Thomas
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
