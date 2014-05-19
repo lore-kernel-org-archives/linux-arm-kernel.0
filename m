@@ -1,34 +1,56 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 19 May 2014 10:12:26 -0300
-Subject: [PATCH v5 2/2] ARM: dts: mx51: Remove mach-cpuimx51sd board file
-In-Reply-To: <1400501288.2007.37.camel@x220>
-References: <1399736856-9489-1-git-send-email-festevam@gmail.com>
- <1399736856-9489-2-git-send-email-festevam@gmail.com>
- <20140513015431.GI8330@dragon> <1400492895.2007.7.camel@x220>
- <CAOMZO5ArKGZfqSZurMpsGA28MxNRmqcnYc38G8rR3axVDfwaaQ@mail.gmail.com>
- <1400501288.2007.37.camel@x220>
-Message-ID: <CAOMZO5DkHpaLq1YSB+Ny88_wQoN3nf_9AJmw77BmRA6ZTkkNDA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 May 2014 15:19:58 +0200
+Subject: [PATCHv3 1/3] ARM: mm: allow sub-architectures to override PCI
+ I/O memory type
+In-Reply-To: <20140516095333.GE12341@arm.com>
+References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <11787153.NWVGbVfAPV@wuerfel> <20140516095333.GE12341@arm.com>
+Message-ID: <66413148.lBD9c9XUns@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 9:08 AM, Paul Bolle <pebolle@tiscali.nl> wrote:
-> On Mon, 2014-05-19 at 08:57 -0300, Fabio Estevam wrote:
->> MACH_EUKREA_MBIMXSD51_BASEBOARD should be removed from sound/soc/fsl/Kconfig.
->
-> Thanks for looking into this.
->
->> Would you like to submit a patch?
->
-> Only if all you want for a commit explanation is something like "Remove
-> a select statement for MACH_EUKREA_MBIMXSD51_BASEBOARD. It's a NOP".
->
-> But I suppose it might be nice to add a few lines why removing config
-> MACH_EUKREA_MBIMXSD51_BASEBOARD didn't break the code (that is enabled
-> by setting SND_SOC_EUKREA_TLV320). And I wouldn't know how to write
-> those lines, because I have no idea how this all fits together. So I
-> actually prefer if someone else submitted that patch.
->
-> But I do hope you don't mind if I drop in a reminder if that patch takes
-> too long.
+On Friday 16 May 2014 10:53:33 Will Deacon wrote:
+> On Thu, May 15, 2014 at 04:55:52PM +0100, Arnd Bergmann wrote:
+> > On Thursday 15 May 2014 16:34:30 Will Deacon wrote:
+> > > > If this is used to synchronize with a DMA, there is no guarantee that the
+> > > > transaction from PCI will be visible in memory by then.
+> > > 
+> > > Can you elaborate on this scenario please? When would we use an I/O space
+> > > write to synchronise with a DMA transfer from a PCI endpoint? You're
+> > > definitely referring to I/O space as opposed to Configuration Space, right?
+> > 
+> > Correct. Assume a PCI device uses PIO and DMA. It sends a DMA to main memory
+> > and lets the CPU know about the data using a level (IntA as opposed to MSI)
+> > interrupt. The CPU performs an outl() operation to an I/O port to let the
+> > hardware know it has received the IRQ and the response of the outl() is
+> > guaranteed to flush the DMA transaction: by the time the outl() completes
+> > we know that the data in memory is valid because it is strongly ordered
+> > relative to the DMA.
+> 
+> Hmm, when you say `guaranteed to flush the DMA transaction', is that a PCI
+> requirement? If so, whether or not that DMA data is then visible to the CPU
+> is really specific to the host-controller implementation. It could easily be
+> buffered somewhere between the host controller and memory, for example.
 
-No problem. I can send a patch for this when 3.16-rc1 is out.
+It's something that drivers are supposed to rely on, and the PCI host
+already has to make the same guarantee about ordering of MSI, MMIO-read
+and DMA transactions, all of which we definitely rely on in the kernel.
+
+> > outl() actually does a dsb() internally, but unfortunately that is
+> > before the store, not after, so I assume that a driver relying on the
+> > behavior above would still be racy.
+> 
+> Yup, we'd need an additional dsb. I think we're confusing what the PCI
+> specification says about ordering and what the inb/outb instructions provide
+> on x86. It may well be that we want to emulate the x86 behaviour on ARM, but
+> that's not going to come cheap and I don't think it's a decision we should
+> take lightly.
+
+outb() is expected to be an extremely heavyweight operation, that's why nobody
+uses it. Why would you care about whether it's one or two microsecond latency
+on a MIDI port or an ISDN adapter?
+
+We can decide that we don't care about correctness here, but the performance
+argument doesn't seem overly important.
+
+	Arnd
