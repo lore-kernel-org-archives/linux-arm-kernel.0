@@ -1,37 +1,69 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 19 May 2014 17:21:43 +0300
-Subject: [PATCHv2 00/14]: ARM: OMAP2: clock DT conversion
-In-Reply-To: <1393924700-6510-1-git-send-email-t-kristo@ti.com>
-References: <1393924700-6510-1-git-send-email-t-kristo@ti.com>
-Message-ID: <537A1377.7070004@ti.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 19 May 2014 19:51:08 +0530
+Subject: [PATCH 4/4] phy: miphy365x: Provide support for the MiPHY356x
+ Generic PHY
+In-Reply-To: <20140305075548.GG20016@e106331-lin.cambridge.arm.com>
+References: <1392377036-12816-1-git-send-email-lee.jones@linaro.org>
+ <1392377036-12816-4-git-send-email-lee.jones@linaro.org>
+ <20140305075548.GG20016@e106331-lin.cambridge.arm.com>
+Message-ID: <537A1354.6010408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2014 11:18 AM, Tero Kristo wrote:
-> Hi,
->
-> Changes compared to v1:
-> - fixed OMAP2 only build issues
-> - fixed OMAP2420 boot issues
-> - added patch #13 and #14 to remove legacy clock data for OMAP2/OMAP3
-> - fixed smatch + DT bindings documentation problems reported by Nishanth
->
-> This set is un-tested on OMAP2 hardware as I don't have access to any. So,
-> any testing feedback welcome.
->
-> Test branch available:
-> tree: https://github.com/t-kristo/linux-pm.git
-> branch: 3.14-rc4-omap2-dt-clks-v2
+Hi,
 
-I just queued these for 3.16/ti-clk-drv.
+On Wednesday 05 March 2014 01:25 PM, Mark Rutland wrote:
+> On Fri, Feb 14, 2014 at 11:23:56AM +0000, Lee Jones wrote:
+>> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
+>> devices. It has 2 ports which it can use for either; both SATA, both
+>> PCIe or one of each in any configuration.
+>>
+>> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>> ---
+>>  drivers/phy/Kconfig         |  10 +
+>>  drivers/phy/Makefile        |   1 +
+>>  drivers/phy/phy-miphy365x.c | 614 ++++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 625 insertions(+)
+>>  create mode 100644 drivers/phy/phy-miphy365x.c
+> 
+> [...]
+> 
+>> +enum miphy_sata_gen {
+>> +       SATA_GEN1 = 1,
+>> +       SATA_GEN2,
+>> +       SATA_GEN3
+>> +};
+> 
+> It would be nice to have a comment here that these values are ABI and
+> cannot change.
+> 
+> [...]
+> 
+>> +static struct phy *miphy365x_phy_xlate(struct device *dev,
+>> +                                      struct of_phandle_args *args)
+>> +{
+>> +       struct miphy365x_dev *state = dev_get_drvdata(dev);
+>> +       u8 port = args->args[0];
+>> +       u8 type = args->args[1];
+> 
+> In case of a bad dt, it would be nice to check args->arg_count == 2.
+> 
+> ALso, we throw away the top 24 bits, which may have been set
+> erroneously. If we want to make use of those in future we should test
+> they are clear here to force people to do the right thing.
 
--Tero
+I don't seem to have the update patch series? Can you resend please?
 
->
-> -Tero
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+Thanks
+Kishon
+> 
+> Otherwise, this looks fine to me.
+> 
+> With those additions:
+> 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> Cheers,
+> Mark.
+> 
