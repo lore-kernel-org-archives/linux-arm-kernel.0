@@ -1,19 +1,18 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 19 May 2014 18:43:28 +0200
-Subject: [PATCH v2 07/10] clk: berlin: add core clock driver for BG2Q
+Date: Mon, 19 May 2014 18:43:27 +0200
+Subject: [PATCH v2 06/10] clk: berlin: add core clock driver for BG2/BG2CD
 In-Reply-To: <1400517811-24668-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1400517811-24668-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1400517811-24668-8-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1400517811-24668-7-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+This driver deals with the core clocks found on Marvell Berlin
+BG2 and BG2CD. For the shared register dividers, make use of the
+corresponding driver and add some single clock muxes and gates for
+the rest.
 
-This driver deals with the core clocks found on Marvell Berlin BG2Q. For the
-shared register dividers, make use of the corresponding driver and add some
-single clock muxes and gates for the rest.
-
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Changelog:
 v1->v2:
@@ -26,31 +25,32 @@ Cc: Jisheng Zhang <jszhang@marvell.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/clk/berlin/Makefile |   1 +
- drivers/clk/berlin/bg2q.c   | 389 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 390 insertions(+)
- create mode 100644 drivers/clk/berlin/bg2q.c
+ drivers/clk/berlin/Makefile |   2 +
+ drivers/clk/berlin/bg2.c    | 691 ++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/berlin/common.h |  29 ++
+ 3 files changed, 722 insertions(+)
+ create mode 100644 drivers/clk/berlin/bg2.c
+ create mode 100644 drivers/clk/berlin/common.h
 
 diff --git a/drivers/clk/berlin/Makefile b/drivers/clk/berlin/Makefile
-index 2b33e1e74503..2a36ab710a07 100644
+index f0a7dc8b5e30..2b33e1e74503 100644
 --- a/drivers/clk/berlin/Makefile
 +++ b/drivers/clk/berlin/Makefile
-@@ -1,3 +1,4 @@
+@@ -1 +1,3 @@
  obj-y += berlin2-avpll.o berlin2-pll.o berlin2-div.o
- obj-$(CONFIG_MACH_BERLIN_BG2)	+= bg2.o
- obj-$(CONFIG_MACH_BERLIN_BG2CD)	+= bg2.o
-+obj-$(CONFIG_MACH_BERLIN_BG2Q)	+= bg2q.o
-diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
++obj-$(CONFIG_MACH_BERLIN_BG2)	+= bg2.o
++obj-$(CONFIG_MACH_BERLIN_BG2CD)	+= bg2.o
+diff --git a/drivers/clk/berlin/bg2.c b/drivers/clk/berlin/bg2.c
 new file mode 100644
-index 000000000000..21784e4eb3f0
+index 000000000000..515fb133495c
 --- /dev/null
-+++ b/drivers/clk/berlin/bg2q.c
-@@ -0,0 +1,389 @@
++++ b/drivers/clk/berlin/bg2.c
+@@ -0,0 +1,691 @@
 +/*
 + * Copyright (c) 2014 Marvell Technology Group Ltd.
 + *
-+ * Alexandre Belloni <alexandre.belloni@free-electrons.com>
 + * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
++ * Alexandre Belloni <alexandre.belloni@free-electrons.com>
 + *
 + * This program is free software; you can redistribute it and/or modify it
 + * under the terms and conditions of the GNU General Public License,
@@ -72,45 +72,106 @@ index 000000000000..21784e4eb3f0
 +#include <linux/of_address.h>
 +#include <linux/slab.h>
 +
-+#include <dt-bindings/clock/berlin2q.h>
++#include <dt-bindings/clock/berlin2.h>
 +
++#include "berlin2-avpll.h"
 +#include "berlin2-div.h"
 +#include "berlin2-pll.h"
 +#include "common.h"
 +
-+#define REG_PINMUX0		0x0018
-+#define REG_PINMUX5		0x002c
-+#define REG_SYSPLLCTL0		0x0030
-+#define REG_SYSPLLCTL4		0x0040
-+#define REG_CLKENABLE		0x00e8
-+#define REG_CLKSELECT0		0x00ec
-+#define REG_CLKSELECT1		0x00f0
-+#define REG_CLKSELECT2		0x00f4
-+#define REG_CLKSWITCH0		0x00f8
-+#define REG_CLKSWITCH1		0x00fc
-+#define REG_SW_GENERIC0		0x0110
-+#define REG_SW_GENERIC3		0x011c
-+#define REG_SDIO0XIN_CLKCTL	0x0158
-+#define REG_SDIO1XIN_CLKCTL	0x015c
++#define REG_PINMUX0		0x0000
++#define REG_PINMUX1		0x0004
++#define REG_SYSPLLCTL0		0x0014
++#define REG_SYSPLLCTL4		0x0024
++#define REG_MEMPLLCTL0		0x0028
++#define REG_MEMPLLCTL4		0x0038
++#define REG_CPUPLLCTL0		0x003c
++#define REG_CPUPLLCTL4		0x004c
++#define REG_AVPLLCTL0		0x0050
++#define REG_AVPLLCTL31		0x00cc
++#define REG_AVPLLCTL62		0x0148
++#define REG_PLLSTATUS		0x014c
++#define REG_CLKENABLE		0x0150
++#define REG_CLKSELECT0		0x0154
++#define REG_CLKSELECT1		0x0158
++#define REG_CLKSELECT2		0x015c
++#define REG_CLKSELECT3		0x0160
++#define REG_CLKSWITCH0		0x0164
++#define REG_CLKSWITCH1		0x0168
++#define REG_RESET_TRIGGER	0x0178
++#define REG_RESET_STATUS0	0x017c
++#define REG_RESET_STATUS1	0x0180
++#define REG_SW_GENERIC0		0x0184
++#define REG_SW_GENERIC3		0x0190
++#define REG_PRODUCTID		0x01cc
++#define REG_PRODUCTID_EXT	0x01d0
++#define REG_GFX3DCORE_CLKCTL	0x022c
++#define REG_GFX3DSYS_CLKCTL	0x0230
++#define REG_ARC_CLKCTL		0x0234
++#define REG_VIP_CLKCTL		0x0238
++#define REG_SDIO0XIN_CLKCTL	0x023c
++#define REG_SDIO1XIN_CLKCTL	0x0240
++#define REG_GFX3DEXTRA_CLKCTL	0x0244
++#define REG_GFX3D_RESET		0x0248
++#define REG_GC360_CLKCTL	0x024c
++#define REG_SDIO_DLLMST_CLKCTL	0x0250
 +
-+#define	MAX_CLKS 27
++/*
++ * BG2/BG2CD SoCs have the following audio/video I/O units:
++ *
++ * audiohd: HDMI TX audio
++ * audio0:  7.1ch TX
++ * audio1:  2ch TX
++ * audio2:  2ch RX
++ * audio3:  SPDIF TX
++ * video0:  HDMI video
++ * video1:  Secondary video
++ * video2:  SD auxiliary video
++ *
++ * There are no external audio clocks (ACLKI0, ACLKI1) and
++ * only one external video clock (VCLKI0).
++ *
++ * Currently missing bits and pieces:
++ * - audio_fast_pll is unknown
++ * - audiohd_pll is unknown
++ * - video0_pll is unknown
++ * - audio[023], audiohd parent pll is assumed to be audio_fast_pll
++ *
++ */
++
++#define	MAX_CLKS 41
 +static struct clk *clks[MAX_CLKS];
 +static struct clk_onecell_data clk_data;
 +static DEFINE_SPINLOCK(lock);
 +static void __iomem *gbase;
-+static void __iomem *cpupll_base;
 +
 +enum {
-+	REFCLK,
-+	SYSPLL, CPUPLL,
++	REFCLK, VIDEO_EXT0,
++	SYSPLL, MEMPLL, CPUPLL,
++	AVPLL_A1, AVPLL_A2, AVPLL_A3, AVPLL_A4,
++	AVPLL_A5, AVPLL_A6, AVPLL_A7, AVPLL_A8,
 +	AVPLL_B1, AVPLL_B2, AVPLL_B3, AVPLL_B4,
 +	AVPLL_B5, AVPLL_B6, AVPLL_B7, AVPLL_B8,
++	AUDIO1_PLL, AUDIO_FAST_PLL,
++	VIDEO0_PLL, VIDEO0_IN,
++	VIDEO1_PLL, VIDEO1_IN,
++	VIDEO2_PLL, VIDEO2_IN,
 +};
 +
 +static const char *clk_names[] = {
 +	[REFCLK]		= "refclk",
++	[VIDEO_EXT0]		= "video_ext0",
 +	[SYSPLL]		= "syspll",
++	[MEMPLL]		= "mempll",
 +	[CPUPLL]		= "cpupll",
++	[AVPLL_A1]		= "avpll_a1",
++	[AVPLL_A2]		= "avpll_a2",
++	[AVPLL_A3]		= "avpll_a3",
++	[AVPLL_A4]		= "avpll_a4",
++	[AVPLL_A5]		= "avpll_a5",
++	[AVPLL_A6]		= "avpll_a6",
++	[AVPLL_A7]		= "avpll_a7",
++	[AVPLL_A8]		= "avpll_a8",
 +	[AVPLL_B1]		= "avpll_b1",
 +	[AVPLL_B2]		= "avpll_b2",
 +	[AVPLL_B3]		= "avpll_b3",
@@ -119,25 +180,35 @@ index 000000000000..21784e4eb3f0
 +	[AVPLL_B6]		= "avpll_b6",
 +	[AVPLL_B7]		= "avpll_b7",
 +	[AVPLL_B8]		= "avpll_b8",
++	[AUDIO1_PLL]		= "audio1_pll",
++	[AUDIO_FAST_PLL]	= "audio_fast_pll",
++	[VIDEO0_PLL]		= "video0_pll",
++	[VIDEO0_IN]		= "video0_in",
++	[VIDEO1_PLL]		= "video1_pll",
++	[VIDEO1_IN]		= "video1_in",
++	[VIDEO2_PLL]		= "video2_pll",
++	[VIDEO2_IN]		= "video2_in",
 +};
 +
-+static const struct berlin2_pll_map bg2q_pll_map __initconst = {
-+	.vcodiv		= {1, 0, 2, 0, 3, 4, 0, 6, 8},
-+	.mult		= 1,
-+	.fbdiv_shift	= 7,
-+	.rfdiv_shift	= 2,
-+	.divsel_shift	= 9,
++static const struct berlin2_pll_map bg2_pll_map __initconst = {
++	.vcodiv		= {10, 15, 20, 25, 30, 40, 50, 60, 80},
++	.mult		= 10,
++	.fbdiv_shift	= 6,
++	.rfdiv_shift	= 1,
++	.divsel_shift	= 7,
 +};
 +
 +static const u8 default_parent_ids[] = {
-+	SYSPLL, AVPLL_B4, AVPLL_B5, AVPLL_B6, AVPLL_B7, SYSPLL
++	SYSPLL, AVPLL_B4, AVPLL_A5, AVPLL_B6, AVPLL_B7, SYSPLL
 +};
 +
-+static const struct berlin2_div_data bg2q_divs[] __initconst = {
++static const struct berlin2_div_data bg2_divs[] __initconst = {
 +	{
 +		.name = "sys",
-+		.parent_ids = default_parent_ids,
-+		.num_parents = ARRAY_SIZE(default_parent_ids),
++		.parent_ids = (const u8 []){
++			SYSPLL, AVPLL_B4, AVPLL_B5, AVPLL_B6, AVPLL_B7, SYSPLL
++		},
++		.num_parents = 6,
 +		.map = {
 +			BERLIN2_DIV_GATE(REG_CLKENABLE, 0),
 +			BERLIN2_PLL_SELECT(REG_CLKSELECT0, 0),
@@ -150,16 +221,32 @@ index 000000000000..21784e4eb3f0
 +		.flags = CLK_IGNORE_UNUSED,
 +	},
 +	{
-+		.name = "drmfigo",
-+		.parent_ids = default_parent_ids,
-+		.num_parents = ARRAY_SIZE(default_parent_ids),
++		.name = "cpu",
++		.parent_ids = (const u8 []){
++			CPUPLL, MEMPLL, MEMPLL, MEMPLL, MEMPLL
++		},
++		.num_parents = 5,
 +		.map = {
-+			BERLIN2_DIV_GATE(REG_CLKENABLE, 17),
 +			BERLIN2_PLL_SELECT(REG_CLKSELECT0, 6),
 +			BERLIN2_DIV_SELECT(REG_CLKSELECT0, 9),
 +			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 6),
 +			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 7),
 +			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 8),
++		},
++		.div_flags = BERLIN2_DIV_HAS_MUX,
++		.flags = 0,
++	},
++	{
++		.name = "drmfigo",
++		.parent_ids = default_parent_ids,
++		.num_parents = ARRAY_SIZE(default_parent_ids),
++		.map = {
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 16),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT0, 17),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT0, 20),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 12),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 13),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 14),
 +		},
 +		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
 +		.flags = 0,
@@ -170,26 +257,26 @@ index 000000000000..21784e4eb3f0
 +		.num_parents = ARRAY_SIZE(default_parent_ids),
 +		.map = {
 +			BERLIN2_DIV_GATE(REG_CLKENABLE, 1),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT0, 12),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT0, 15),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 9),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 10),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 11),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT0, 23),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT0, 26),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 15),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 16),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 17),
 +		},
 +		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
 +		.flags = 0,
 +	},
 +	{
-+		.name = "gfx2d",
++		.name = "gfx",
 +		.parent_ids = default_parent_ids,
 +		.num_parents = ARRAY_SIZE(default_parent_ids),
 +		.map = {
 +			BERLIN2_DIV_GATE(REG_CLKENABLE, 4),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT0, 18),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT0, 21),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 12),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 13),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 14),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT0, 29),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 0),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 18),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 19),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 20),
 +		},
 +		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
 +		.flags = 0,
@@ -199,12 +286,12 @@ index 000000000000..21784e4eb3f0
 +		.parent_ids = default_parent_ids,
 +		.num_parents = ARRAY_SIZE(default_parent_ids),
 +		.map = {
-+			BERLIN2_DIV_GATE(REG_CLKENABLE, 6),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT0, 24),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT0, 27),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 15),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 16),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 17),
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 5),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 3),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 6),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 21),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 22),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 23),
 +		},
 +		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
 +		.flags = 0,
@@ -214,12 +301,12 @@ index 000000000000..21784e4eb3f0
 +		.parent_ids = default_parent_ids,
 +		.num_parents = ARRAY_SIZE(default_parent_ids),
 +		.map = {
-+			BERLIN2_DIV_GATE(REG_CLKENABLE, 7),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 0),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 3),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 18),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 19),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 20),
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 6),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 9),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 12),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 24),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 25),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 26),
 +		},
 +		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
 +		.flags = CLK_IGNORE_UNUSED,
@@ -230,11 +317,11 @@ index 000000000000..21784e4eb3f0
 +		.num_parents = ARRAY_SIZE(default_parent_ids),
 +		.map = {
 +			BERLIN2_DIV_GATE(REG_CLKENABLE, 2),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 6),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 9),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 21),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 22),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 23),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 15),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 18),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 27),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 28),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 29),
 +		},
 +		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
 +		.flags = 0,
@@ -245,11 +332,11 @@ index 000000000000..21784e4eb3f0
 +		.num_parents = ARRAY_SIZE(default_parent_ids),
 +		.map = {
 +			BERLIN2_DIV_GATE(REG_CLKENABLE, 3),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 12),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 15),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 24),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 25),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 26),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 21),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 24),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 30),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 31),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH1, 0),
 +		},
 +		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
 +		.flags = 0,
@@ -259,12 +346,12 @@ index 000000000000..21784e4eb3f0
 +		.parent_ids = default_parent_ids,
 +		.num_parents = ARRAY_SIZE(default_parent_ids),
 +		.map = {
-+			BERLIN2_DIV_GATE(REG_CLKENABLE, 19),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 18),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 21),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 27),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 28),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH0, 29),
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 18),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 27),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT2, 0),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH1, 1),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH1, 2),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH1, 3),
 +		},
 +		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
 +		.flags = 0,
@@ -275,11 +362,11 @@ index 000000000000..21784e4eb3f0
 +		.num_parents = ARRAY_SIZE(default_parent_ids),
 +		.map = {
 +			BERLIN2_DIV_GATE(REG_CLKENABLE, 21),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT1, 24),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT1, 27),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH0, 30),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH0, 31),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH1, 0),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT2, 3),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT2, 6),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH1, 4),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH1, 5),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH1, 6),
 +		},
 +		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
 +		.flags = 0,
@@ -290,11 +377,103 @@ index 000000000000..21784e4eb3f0
 +		.num_parents = ARRAY_SIZE(default_parent_ids),
 +		.map = {
 +			BERLIN2_DIV_GATE(REG_CLKENABLE, 20),
-+			BERLIN2_PLL_SELECT(REG_CLKSELECT2, 0),
-+			BERLIN2_DIV_SELECT(REG_CLKSELECT2, 3),
-+			BERLIN2_PLL_SWITCH(REG_CLKSWITCH1, 1),
-+			BERLIN2_DIV_SWITCH(REG_CLKSWITCH1, 2),
-+			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH1, 3),
++			BERLIN2_PLL_SELECT(REG_CLKSELECT2, 9),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT2, 12),
++			BERLIN2_PLL_SWITCH(REG_CLKSWITCH1, 7),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH1, 8),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH1, 9),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++		.flags = 0,
++	},
++	{
++		.name = "audio0",
++		.parent_ids = (const u8 []){ AUDIO_FAST_PLL },
++		.num_parents = 1,
++		.map = {
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 22),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT2, 17),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH1, 10),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH1, 11),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE,
++		.flags = 0,
++	},
++	{
++		.name = "audio2",
++		.parent_ids = (const u8 []){ AUDIO_FAST_PLL },
++		.num_parents = 1,
++		.map = {
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 24),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT2, 20),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH1, 14),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH1, 15),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE,
++		.flags = 0,
++	},
++	{
++		.name = "audio3",
++		.parent_ids = (const u8 []){ AUDIO_FAST_PLL },
++		.num_parents = 1,
++		.map = {
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 25),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT2, 23),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH1, 16),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH1, 17),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE,
++		.flags = 0,
++	},
++	{
++		.name = "audio1",
++		.parent_ids = (const u8 []){ AUDIO1_PLL },
++		.num_parents = 1,
++		.map = {
++			BERLIN2_DIV_GATE(REG_CLKENABLE, 23),
++			BERLIN2_DIV_SELECT(REG_CLKSELECT3, 0),
++			BERLIN2_DIV_SWITCH(REG_CLKSWITCH1, 12),
++			BERLIN2_DIV_D3SWITCH(REG_CLKSWITCH1, 13),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE,
++		.flags = 0,
++	},
++	{
++		.name = "gfx3d_core",
++		.parent_ids = default_parent_ids,
++		.num_parents = ARRAY_SIZE(default_parent_ids),
++		.map = {
++			BERLIN2_SINGLE_DIV(REG_GFX3DCORE_CLKCTL),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++		.flags = 0,
++	},
++	{
++		.name = "gfx3d_sys",
++		.parent_ids = default_parent_ids,
++		.num_parents = ARRAY_SIZE(default_parent_ids),
++		.map = {
++			BERLIN2_SINGLE_DIV(REG_GFX3DSYS_CLKCTL),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++		.flags = 0,
++	},
++	{
++		.name = "arc",
++		.parent_ids = default_parent_ids,
++		.num_parents = ARRAY_SIZE(default_parent_ids),
++		.map = {
++			BERLIN2_SINGLE_DIV(REG_ARC_CLKCTL),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++		.flags = 0,
++	},
++	{
++		.name = "vip",
++		.parent_ids = default_parent_ids,
++		.num_parents = ARRAY_SIZE(default_parent_ids),
++		.map = {
++			BERLIN2_SINGLE_DIV(REG_VIP_CLKCTL),
 +		},
 +		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
 +		.flags = 0,
@@ -319,43 +498,66 @@ index 000000000000..21784e4eb3f0
 +		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
 +		.flags = 0,
 +	},
++	{
++		.name = "gfx3d_extra",
++		.parent_ids = default_parent_ids,
++		.num_parents = ARRAY_SIZE(default_parent_ids),
++		.map = {
++			BERLIN2_SINGLE_DIV(REG_GFX3DEXTRA_CLKCTL),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++		.flags = 0,
++	},
++	{
++		.name = "gc360",
++		.parent_ids = default_parent_ids,
++		.num_parents = ARRAY_SIZE(default_parent_ids),
++		.map = {
++			BERLIN2_SINGLE_DIV(REG_GC360_CLKCTL),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++		.flags = 0,
++	},
++	{
++		.name = "sdio_dllmst",
++		.parent_ids = default_parent_ids,
++		.num_parents = ARRAY_SIZE(default_parent_ids),
++		.map = {
++			BERLIN2_SINGLE_DIV(REG_SDIO_DLLMST_CLKCTL),
++		},
++		.div_flags = BERLIN2_DIV_HAS_GATE | BERLIN2_DIV_HAS_MUX,
++		.flags = 0,
++	},
 +};
 +
-+static const struct berlin2_gate_data bg2q_gates[] __initconst = {
-+	{ "gfx2daxi",	"perif",	5 },
-+	{ "geth0",	"perif",	8 },
++static const struct berlin2_gate_data bg2_gates[] __initconst = {
++	{ "geth0",	"perif",	7 },
++	{ "geth1",	"perif",	8 },
 +	{ "sata",	"perif",	9 },
 +	{ "ahbapb",	"perif",	10, CLK_IGNORE_UNUSED },
 +	{ "usb0",	"perif",	11 },
 +	{ "usb1",	"perif",	12 },
-+	{ "usb2",	"perif",	13 },
-+	{ "usb3",	"perif",	14 },
-+	{ "pbridge",	"perif",	15, CLK_IGNORE_UNUSED },
-+	{ "sdio",	"perif",	16, CLK_IGNORE_UNUSED },
-+	{ "nfc",	"perif",	18 },
++	{ "pbridge",	"perif",	13, CLK_IGNORE_UNUSED },
++	{ "sdio0",	"perif",	14, CLK_IGNORE_UNUSED },
++	{ "sdio1",	"perif",	15, CLK_IGNORE_UNUSED },
++	{ "nfc",	"perif",	17 },
 +	{ "smemc",	"perif",	19 },
-+	{ "pcie",	"perif",	22 },
++	{ "audiohd",	"audiohd_pll",	26 },
++	{ "video0",	"video0_in",	27 },
++	{ "video1",	"video1_in",	28 },
++	{ "video2",	"video2_in",	29 },
 +};
 +
-+static void __init berlin2q_clock_setup(struct device_node *np)
++static void __init berlin2_clock_setup(struct device_node *np)
 +{
 +	const char *parent_names[9];
 +	struct clk *clk;
++	u8 avpll_flags = 0;
 +	int n;
 +
 +	gbase = of_iomap(np, 0);
-+	if (!gbase) {
-+		pr_err("%s: Unable to map global base\n", np->full_name);
++	if (!gbase)
 +		return;
-+	}
-+
-+	/* BG2Q CPU PLL is not part of global registers */
-+	cpupll_base = of_iomap(np, 1);
-+	if (!cpupll_base) {
-+		pr_err("%s: Unable to map cpupll base\n", np->full_name);
-+		iounmap(gbase);
-+		return;
-+	}
 +
 +	/* overwrite default clock names with DT provided ones */
 +	clk = of_clk_get_by_name(np, clk_names[REFCLK]);
@@ -364,27 +566,130 @@ index 000000000000..21784e4eb3f0
 +		clk_put(clk);
 +	}
 +
++	clk = of_clk_get_by_name(np, clk_names[VIDEO_EXT0]);
++	if (!IS_ERR(clk)) {
++		clk_names[VIDEO_EXT0] = __clk_get_name(clk);
++		clk_put(clk);
++	}
++
 +	/* simple register PLLs */
-+	clk = berlin2_pll_register(&bg2q_pll_map, gbase + REG_SYSPLLCTL0,
++	clk = berlin2_pll_register(&bg2_pll_map, gbase + REG_SYSPLLCTL0,
 +				   clk_names[SYSPLL], clk_names[REFCLK], 0);
 +	if (IS_ERR(clk))
-+		goto bg2q_fail;
++		goto bg2_fail;
 +
-+	clk = berlin2_pll_register(&bg2q_pll_map, cpupll_base,
++	clk = berlin2_pll_register(&bg2_pll_map, gbase + REG_MEMPLLCTL0,
++				   clk_names[MEMPLL], clk_names[REFCLK], 0);
++	if (IS_ERR(clk))
++		goto bg2_fail;
++
++	clk = berlin2_pll_register(&bg2_pll_map, gbase + REG_CPUPLLCTL0,
 +				   clk_names[CPUPLL], clk_names[REFCLK], 0);
 +	if (IS_ERR(clk))
-+		goto bg2q_fail;
++		goto bg2_fail;
 +
-+	/* TODO: add BG2Q AVPLL */
++	if (of_device_is_compatible(np, "marvell,berlin2-global-register"))
++		avpll_flags |= BERLIN2_AVPLL_SCRAMBLE_QUIRK;
 +
-+	/*
-+	 * TODO: add reference clock bypass switches:
-+	 * memPLLSWBypass, cpuPLLSWBypass, and sysPLLSWBypass
-+	 */
++	/* audio/video VCOs */
++	clk = berlin2_avpll_vco_register(gbase + REG_AVPLLCTL0, "avpll_vcoA",
++			 clk_names[REFCLK], avpll_flags, 0);
++	if (IS_ERR(clk))
++		goto bg2_fail;
++
++	for (n = 0; n < 8; n++) {
++		clk = berlin2_avpll_channel_register(gbase + REG_AVPLLCTL0,
++			     clk_names[AVPLL_A1 + n], n, "avpll_vcoA",
++			     avpll_flags, 0);
++		if (IS_ERR(clk))
++			goto bg2_fail;
++	}
++
++	clk = berlin2_avpll_vco_register(gbase + REG_AVPLLCTL31, "avpll_vcoB",
++				 clk_names[REFCLK], BERLIN2_AVPLL_BIT_QUIRK |
++				 avpll_flags, 0);
++	if (IS_ERR(clk))
++		goto bg2_fail;
++
++	for (n = 0; n < 8; n++) {
++		clk = berlin2_avpll_channel_register(gbase + REG_AVPLLCTL31,
++			     clk_names[AVPLL_B1 + n], n, "avpll_vcoB",
++			     BERLIN2_AVPLL_BIT_QUIRK | avpll_flags, 0);
++		if (IS_ERR(clk))
++			goto bg2_fail;
++	}
++
++	/* reference clock bypass switches */
++	parent_names[0] = clk_names[SYSPLL];
++	parent_names[1] = clk_names[REFCLK];
++	clk = clk_register_mux(NULL, "syspll_byp", parent_names, 2,
++			       0, gbase + REG_CLKSWITCH0, 0, 1, 0, &lock);
++	if (IS_ERR(clk))
++		goto bg2_fail;
++	clk_names[SYSPLL] = __clk_get_name(clk);
++
++	parent_names[0] = clk_names[MEMPLL];
++	parent_names[1] = clk_names[REFCLK];
++	clk = clk_register_mux(NULL, "mempll_byp", parent_names, 2,
++			       0, gbase + REG_CLKSWITCH0, 1, 1, 0, &lock);
++	if (IS_ERR(clk))
++		goto bg2_fail;
++	clk_names[MEMPLL] = __clk_get_name(clk);
++
++	parent_names[0] = clk_names[CPUPLL];
++	parent_names[1] = clk_names[REFCLK];
++	clk = clk_register_mux(NULL, "cpupll_byp", parent_names, 2,
++			       0, gbase + REG_CLKSWITCH0, 2, 1, 0, &lock);
++	if (IS_ERR(clk))
++		goto bg2_fail;
++	clk_names[CPUPLL] = __clk_get_name(clk);
++
++	/* clock muxes */
++	parent_names[0] = clk_names[AVPLL_B3];
++	parent_names[1] = clk_names[AVPLL_A3];
++	clk = clk_register_mux(NULL, clk_names[AUDIO1_PLL], parent_names, 2,
++			       0, gbase + REG_CLKSELECT2, 29, 1, 0, &lock);
++	if (IS_ERR(clk))
++		goto bg2_fail;
++
++	parent_names[0] = clk_names[VIDEO0_PLL];
++	parent_names[1] = clk_names[VIDEO_EXT0];
++	clk = clk_register_mux(NULL, clk_names[VIDEO0_IN], parent_names, 2,
++			       0, gbase + REG_CLKSELECT3, 4, 1, 0, &lock);
++	if (IS_ERR(clk))
++		goto bg2_fail;
++
++	parent_names[0] = clk_names[VIDEO1_PLL];
++	parent_names[1] = clk_names[VIDEO_EXT0];
++	clk = clk_register_mux(NULL, clk_names[VIDEO1_IN], parent_names, 2,
++			       0, gbase + REG_CLKSELECT3, 6, 1, 0, &lock);
++	if (IS_ERR(clk))
++		goto bg2_fail;
++
++	parent_names[0] = clk_names[AVPLL_A2];
++	parent_names[1] = clk_names[AVPLL_B2];
++	clk = clk_register_mux(NULL, clk_names[VIDEO1_PLL], parent_names, 2,
++			       0, gbase + REG_CLKSELECT3, 7, 1, 0, &lock);
++	if (IS_ERR(clk))
++		goto bg2_fail;
++
++	parent_names[0] = clk_names[VIDEO2_PLL];
++	parent_names[1] = clk_names[VIDEO_EXT0];
++	clk = clk_register_mux(NULL, clk_names[VIDEO2_IN], parent_names, 2,
++			       0, gbase + REG_CLKSELECT3, 9, 1, 0, &lock);
++	if (IS_ERR(clk))
++		goto bg2_fail;
++
++	parent_names[0] = clk_names[AVPLL_B1];
++	parent_names[1] = clk_names[AVPLL_A5];
++	clk = clk_register_mux(NULL, clk_names[VIDEO2_PLL], parent_names, 2,
++			       0, gbase + REG_CLKSELECT3, 10, 1, 0, &lock);
++	if (IS_ERR(clk))
++		goto bg2_fail;
 +
 +	/* clock divider cells */
-+	for (n = 0; n < ARRAY_SIZE(bg2q_divs); n++) {
-+		const struct berlin2_div_data *dd = &bg2q_divs[n];
++	for (n = 0; n < ARRAY_SIZE(bg2_divs); n++) {
++		const struct berlin2_div_data *dd = &bg2_divs[n];
 +		int k;
 +
 +		for (k = 0; k < dd->num_parents; k++)
@@ -396,21 +701,17 @@ index 000000000000..21784e4eb3f0
 +	}
 +
 +	/* clock gate cells */
-+	for (n = 0; n < ARRAY_SIZE(bg2q_gates); n++) {
-+		const struct berlin2_gate_data *gd = &bg2q_gates[n];
++	for (n = 0; n < ARRAY_SIZE(bg2_gates); n++) {
++		const struct berlin2_gate_data *gd = &bg2_gates[n];
 +
-+		clks[CLKID_GFX2DAXI + n] = clk_register_gate(NULL, gd->name,
++		clks[CLKID_GETH0 + n] = clk_register_gate(NULL, gd->name,
 +			    gd->parent_name, gd->flags, gbase + REG_CLKENABLE,
 +			    gd->bit_idx, 0, &lock);
 +	}
 +
-+	/*
-+	 * twdclk is derived from cpu/3
-+	 * TODO: use cpupll until cpuclk is not available
-+	 */
++	/* twdclk is derived from cpu/3 */
 +	clks[CLKID_TWD] =
-+		clk_register_fixed_factor(NULL, "twd", clk_names[CPUPLL],
-+					  0, 1, 3);
++		clk_register_fixed_factor(NULL, "twd", "cpu", 0, 1, 3);
 +
 +	/* check for errors on leaf clocks */
 +	for (n = 0; n < MAX_CLKS; n++) {
@@ -419,7 +720,7 @@ index 000000000000..21784e4eb3f0
 +
 +		pr_err("%s: Unable to register leaf clock %d\n",
 +		       np->full_name, n);
-+		goto bg2q_fail;
++		goto bg2_fail;
 +	}
 +
 +	/* register clk-provider */
@@ -429,11 +730,47 @@ index 000000000000..21784e4eb3f0
 +
 +	return;
 +
-+bg2q_fail:
-+	iounmap(cpupll_base);
++bg2_fail:
 +	iounmap(gbase);
 +}
-+CLK_OF_DECLARE(berlin2q_clock, "marvell,berlin2q-chip-ctrl",
-+	       berlin2q_clock_setup);
++CLK_OF_DECLARE(berlin2_clock, "marvell,berlin2-chip-ctrl",
++	       berlin2_clock_setup);
++CLK_OF_DECLARE(berlin2cd_clock, "marvell,berlin2cd-chip-ctrl",
++	       berlin2_clock_setup);
+diff --git a/drivers/clk/berlin/common.h b/drivers/clk/berlin/common.h
+new file mode 100644
+index 000000000000..bc68a14c4550
+--- /dev/null
++++ b/drivers/clk/berlin/common.h
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (c) 2014 Marvell Technology Group Ltd.
++ *
++ * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
++ * Alexandre Belloni <alexandre.belloni@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __BERLIN2_COMMON_H
++#define __BERLIN2_COMMON_H
++
++struct berlin2_gate_data {
++	const char *name;
++	const char *parent_name;
++	u8 bit_idx;
++	unsigned long flags;
++};
++
++#endif /* BERLIN2_COMMON_H */
 -- 
 1.9.1
