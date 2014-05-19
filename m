@@ -1,49 +1,58 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 19 May 2014 13:33:14 +0100
-Subject: [PATCH 4/6] arm64: topology: add MPIDR-based detection
-In-Reply-To: <20140519105405.GC5935@e102568-lin.cambridge.arm.com>
-References: <1399063112-16917-1-git-send-email-broonie@kernel.org>
- <1399063112-16917-5-git-send-email-broonie@kernel.org>
- <53763DFC.8070309@arm.com> <20140516183915.GP22111@sirena.org.uk>
- <5379D594.2000200@arm.com>
- <20140519105405.GC5935@e102568-lin.cambridge.arm.com>
-Message-ID: <20140519123314.GU12304@sirena.org.uk>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Mon, 19 May 2014 14:35:49 +0200
+Subject: [RFC PATCH 1/9] dt: deps: dtc: Automatically add new property
+ 'dependencies' which contains a list of referenced phandles
+In-Reply-To: <53775334.3030704@gmail.com>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
+ <1399913280-6915-2-git-send-email-holler@ahsoftware.de>
+ <53775334.3030704@gmail.com>
+Message-ID: <5379FAA5.10404@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 11:54:05AM +0100, Lorenzo Pieralisi wrote:
+Am 17.05.2014 14:16, schrieb Tomasz Figa:
 
-> As to what should we use as cluster id, honestly I do not know.
+>> References to phandles of parent or child nodes will not be added to this
+>> property, because this information is already contained in the blob (in the
+>> form of the tree itself).
+>
+> I wonder if we shouldn't be including them too for consistency related
+> reasons, so we have all the necessary information in one place.
+> References to child nodes are great recipes for cycles, though...
+>
+> No strong opinion, though, just an idea.
 
-> I am quite tempted to use just three affinity levels for the moment
-> and fix it when need arises, after all on ARM we have aff2 completely
-> unused at the moment for the non-SMT systems (ie all ARM SMP systems in
-> the mainline) and we are not coalescing affinity 2 into affinity 1 in
-> any way.
+As said, they are already in the tree itself. And they are already 
+included in the graph (these are the black edges), so they just don't 
+appear in the property dependencies.
 
-> So either you ignore aff3, or can do something like that (non-SMT):
+>
+>>
+>> No dependencies to disabled nodes will be added.
+>>
+>
+> Same here. IMHO it might be wise to let the parsing entity (e.g. kernel)
+> decide whether to ignore a dependency to disabled node or not.
+>
+> Otherwise, I like the simplicity of compile-time dependency list
+> creation. Quite a nice work.
 
-> cluster_id = MPIDR_EL1[39:32] << 16 | MPIDR_EL1[23:16] << 8 | MPIDR_EL1[15:8]
+Thanks.
 
-Which is roughly what the original code that you were worried about did
-IIRC?  It seems silly to ignore the higher affinity levels since it's
-trivial to look at them and means the kernel will@least split
-everything into clusters if it does encounter some hardware that uses
-them as opposed to merging those distinguished only by the higher
-affinity levels.
+What's still questionable about the patches for dtc is if dependencies 
+to devices and not just drivers should be included in the new property 
+dependencies too. My current assumption is that all devices belonging to 
+one and the same driver don't have dependencies between each other. In 
+other words the order in which devices will be attached to one and the 
+same driver isn't important. If that assumption is correct it would be 
+possible to just attach all devices belonging to a driver after the 
+driver was loaded (also I haven't that done in my patches).
 
-> Also please remove the warning on the missing topology information, if
-> we fall back to MPIDR_EL1 we will always have a topology of sorts, as
-> borked as it might be, so that warning becomes useless, ie it is never
-> triggered.
+And thinking about that again, I think I was wrong and doing so have 
+been some kind of evil premature optimization I did in order to spare a 
+few dependencies/edges. But changing this can done by removing a few 
+lines in the code for dtc (patch 1).
 
-I'll add something to this patch - the warning is needed if the DT code
-gets merged without this and it seems this one still going round the
-loop.  :/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/36dee615/attachment.sig>
+Regards,
+
+Alexander Holler
