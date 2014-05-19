@@ -1,96 +1,64 @@
-From: ritesh.harjani@gmail.com (Ritesh Harjani)
-Date: Mon, 19 May 2014 20:37:59 +0530
-Subject: [PATCH 1/1] arm: dma-iommu: Clean up redundant variable
-In-Reply-To: <1400511859-22286-2-git-send-email-ritesh.harjani@gmail.com>
-References: <1400511859-22286-1-git-send-email-ritesh.harjani@gmail.com>
- <1400511859-22286-2-git-send-email-ritesh.harjani@gmail.com>
-Message-ID: <CAD15agb4zgZUVvqLYC+nNvojB8oVwu72P4_0nQdF5cn9ePro4A@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 19 May 2014 11:07:24 -0400
+Subject: [Patch v3 0/5] Introduce keystone reset driver
+In-Reply-To: <1400495155-11136-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1400495155-11136-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <537A1E2C.8040102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-++ mailing lists
 
-On Mon, May 19, 2014 at 8:34 PM,  <ritesh.harjani@gmail.com> wrote:
-> From: Ritesh Harjani <ritesh.harjani@gmail.com>
->
-> mapping->size can be derived from mapping->bits << PAGE_SHIFT
-> which makes mapping->size as redundant.
->
-> Clean this up.
->
-> Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
-> ---
->  arch/arm/include/asm/dma-iommu.h |  1 -
->  arch/arm/mm/dma-mapping.c        | 11 ++++++-----
->  2 files changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
-> index eec0a12..8e3fcb9 100644
-> --- a/arch/arm/include/asm/dma-iommu.h
-> +++ b/arch/arm/include/asm/dma-iommu.h
-> @@ -18,7 +18,6 @@ struct dma_iommu_mapping {
->         unsigned int            extensions;
->         size_t                  bitmap_size;    /* size of a single bitmap */
->         size_t                  bits;           /* per bitmap */
-> -       unsigned int            size;           /* per bitmap */
->         dma_addr_t              base;
->
->         spinlock_t              lock;
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 6b00be1..ec3373c 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1074,6 +1074,7 @@ static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
->         unsigned int order = get_order(size);
->         unsigned int align = 0;
->         unsigned int count, start;
-> +       unsigned int mapping_size = mapping->bits << PAGE_SHIFT;
->         unsigned long flags;
->         dma_addr_t iova;
->         int i;
-> @@ -1119,7 +1120,7 @@ static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
->         }
->         spin_unlock_irqrestore(&mapping->lock, flags);
->
-> -       iova = mapping->base + (mapping->size * i);
-> +       iova = mapping->base + (mapping_size * i);
->         iova += start << PAGE_SHIFT;
->
->         return iova;
-> @@ -1129,6 +1130,7 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
->                                dma_addr_t addr, size_t size)
->  {
->         unsigned int start, count;
-> +       unsigned int mapping_size = mapping->bits << PAGE_SHIFT;
->         unsigned long flags;
->         dma_addr_t bitmap_base;
->         u32 bitmap_index;
-> @@ -1136,14 +1138,14 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
->         if (!size)
->                 return;
->
-> -       bitmap_index = (u32) (addr - mapping->base) / (u32) mapping->size;
-> +       bitmap_index = (u32) (addr - mapping->base) / (u32) mapping_size;
->         BUG_ON(addr < mapping->base || bitmap_index > mapping->extensions);
->
-> -       bitmap_base = mapping->base + mapping->size * bitmap_index;
-> +       bitmap_base = mapping->base + mapping_size * bitmap_index;
->
->         start = (addr - bitmap_base) >> PAGE_SHIFT;
->
-> -       if (addr + size > bitmap_base + mapping->size) {
-> +       if (addr + size > bitmap_base + mapping_size) {
->                 /*
->                  * The address range to be freed reaches into the iova
->                  * range of the next bitmap. This should not happen as
-> @@ -1964,7 +1966,6 @@ arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
->         mapping->extensions = extensions;
->         mapping->base = base;
->         mapping->bits = BITS_PER_BYTE * bitmap_size;
-> -       mapping->size = mapping->bits << PAGE_SHIFT;
->
->         spin_lock_init(&mapping->lock);
->
-> --
-> 1.8.1.3
->
+
+On Monday 19 May 2014 06:25 AM, Ivan Khoronzhuk wrote:
+> These patches introduce keystone reset driver.
+> 
+> The keystone SoC can be rebooted in several ways. By external reset
+> pin, by soft and by watchdogs. This driver allows software reset and reset
+> by one of the watchdogs. Also added opportunity to set soft/hard reset type.
+> 
+> Based on v3.15-rc5
+> 
+Arnd,
+Can I have have your ack/reviewed-by please since you did gave few comments
+on previous version.
+
+Dmitry, David W,
+Are you ok to get the drivers/power/reset/ related changes merged via arm-soc
+tree ? If not, we can split the series accordingly.
+
+Am hoping to get the series merged for v3.16 so do let me know your preference
+as early as you can.
+
+
+
+> v2..v3
+>   Power: reset: keystone-reset: introduce keystone reset driver
+> 	- no functional changes, only sanity
+>   Power: reset: add bindings for keystone reset driver
+>   	- corrected WDT numeration in examples
+> 	- extended description of wdt_list property
+> 
+> v1..v2
+> 	- re basedon on v3.15-rc1 without changes
+> 
+> Ivan Khoronzhuk (5):
+>   Power: reset: keystone-reset: introduce keystone reset driver
+>   Power: reset: add bindings for keystone reset driver
+>   ARM: keystone: remove redundant reset stuff
+>   ARM: dts: keystone: update reset node to work with reset driver
+>   ARM: keystone: enable reset driver support
+> 
+>  .../bindings/power/reset/keystone-reset.txt        |  61 ++++++++
+>  arch/arm/boot/dts/keystone.dtsi                    |   4 +-
+>  arch/arm/configs/keystone_defconfig                |   3 +
+>  arch/arm/mach-keystone/keystone.c                  |  35 -----
+>  drivers/power/reset/Kconfig                        |   7 +
+>  drivers/power/reset/Makefile                       |   1 +
+>  drivers/power/reset/keystone-reset.c               | 171 +++++++++++++++++++++
+>  7 files changed, 246 insertions(+), 36 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/power/reset/keystone-reset.txt
+>  create mode 100644 drivers/power/reset/keystone-reset.c
+> 
+
+Regards,
+Santosh
