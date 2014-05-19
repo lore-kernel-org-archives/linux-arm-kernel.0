@@ -1,77 +1,53 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 19 May 2014 15:31:52 +0300
-Subject: [PATCH] ARM: AM43xx: clk: Change the wdt1 func clk src to per_32k
- clk
-In-Reply-To: <53563F2D.20906@ti.com>
-References: <1397621648-15691-1-git-send-email-lokeshvutla@ti.com>
- <53563F2D.20906@ti.com>
-Message-ID: <5379F9B8.6070402@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 19 May 2014 13:32:30 +0100
+Subject: [PATCH 1/3] Documentation: Update Arasan SDHC documentation for
+ the APM X-Gene SoC SDHC DTS binding
+In-Reply-To: <1400398918-1502-2-git-send-email-lho@apm.com>
+References: <1400398918-1502-1-git-send-email-lho@apm.com>
+ <1400398918-1502-2-git-send-email-lho@apm.com>
+Message-ID: <20140519123230.GA3663@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2014 01:06 PM, Tero Kristo wrote:
-> On 04/16/2014 07:14 AM, Lokesh Vutla wrote:
->> WDT1 module can take one of the below clocks as input functional
->> clock -
->>     - On-Chip 32K RC Osc [default/reset]
->>     - 32K from PRCM
->>
->> The On-Chip 32K RC Osc clock is not an accurate clock-source as per
->> the design/spec, so as a result, for example, timer which supposed
->> to get expired @60Sec, but will expire somewhere ~@40Sec, which is
->> not expected by any use-case.
->>
->> The solution here is to switch the input clock-source to PRCM
->> generated 32K clock-source during boot-time itself.
->> This is derived from AM33xx clock file.
->
-> I guess this patch should wait until we have a proper solution upstream
-> for selecting parents based on DT data, unless you have pressing need to
-> merge this as a temporary hack.
+On Sun, May 18, 2014 at 08:41:56AM +0100, Loc Ho wrote:
+> This patch updates Arasan SDHC documentation for the APM X-Gene SoC SDHC controller
+> DTS binding.
+> 
+> Signed-off-by: Loc Ho <lho@apm.com>
+> ---
+>  .../devicetree/bindings/mmc/arasan,sdhci.txt       |    9 ++++++---
+>  1 files changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> index 98ee2ab..8fc4cc4 100644
+> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> @@ -8,14 +8,17 @@ Device Tree Bindings for the Arasan SDHCI Controller
+>    [3] Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+>  
+>  Required Properties:
+> -  - compatible: Compatibility string. Must be 'arasan,sdhci-8.9a'
+> +  - compatible: Compatibility string. Must be 'arasan,sdhci-8.9a' or
+> +                'xgene,arasan,sdhci-8.9a'
 
-I've decided to take this patch in its current form as the DT parenting 
-is still WIP.
+"xgene" is not a vendor, nor is it documented as such.
 
-Queued for 3.16/ti-clk-drv.
+>    - reg: From mmc bindings: Register location and length.
+> -  - clocks: From clock bindings: Handles to clock inputs.
+> -  - clock-names: From clock bindings: Tuple including "clk_xin" and "clk_ahb"
+>    - interrupts: Interrupt specifier
+>    - interrupt-parent: Phandle for the interrupt controller that services
+>  		      interrupts for this device.
+>  
+> +Optional Properties:
+> +  - clocks: From clock bindings: Handles to clock inputs.
+> +  - clock-names: From clock bindings: Tuple including "clk_xin" and "clk_ahb"
 
--Tero
+Given that these used to be required, they are presumably still required
+in some cases?
 
->
->>
->> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->> ---
->>   drivers/clk/ti/clk-43xx.c |   13 +++++++++++++
->>   1 file changed, 13 insertions(+)
->>
->> diff --git a/drivers/clk/ti/clk-43xx.c b/drivers/clk/ti/clk-43xx.c
->> index 67c8de5..ae2524e 100644
->> --- a/drivers/clk/ti/clk-43xx.c
->> +++ b/drivers/clk/ti/clk-43xx.c
->> @@ -110,9 +110,22 @@ static struct ti_dt_clk am43xx_clks[] = {
->>
->>   int __init am43xx_dt_clk_init(void)
->>   {
->> +    struct clk *clk1, *clk2;
->> +
->>       ti_dt_clocks_register(am43xx_clks);
->>
->>       omap2_clk_disable_autoidle_all();
->>
->> +    /*
->> +     * The On-Chip 32K RC Osc clock is not an accurate clock-source
->> as per
->> +     * the design/spec, so as a result, for example, timer which
->> supposed
->> +     * to get expired @60Sec, but will expire somewhere ~@40Sec,
->> which is
->> +     * not expected by any use-case, so change WDT1 clock source to PRCM
->> +     * 32KHz clock.
->> +     */
->> +    clk1 = clk_get_sys(NULL, "wdt1_fck");
->> +    clk2 = clk_get_sys(NULL, "clkdiv32k_ick");
->> +    clk_set_parent(clk1, clk2);
->> +
->>       return 0;
->>   }
->>
->
+If we're going to alter these lines, it'd be nice to clean them up at
+the same time (a list is not a tuple, clocks aren't just phandles).
+
+Cheers,
+Mark.
