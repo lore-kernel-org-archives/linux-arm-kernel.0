@@ -1,131 +1,63 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Mon, 19 May 2014 14:31:14 +0530
-Subject: [RFC PATCH 2/5] thermal: cpu_cooling: Add notifications support
- for the clients
-In-Reply-To: <20140516173226.GE2856@e102654-lin.cambridge.arm.com>
-References: <1399559880-20562-1-git-send-email-amit.daniel@samsung.com>
- <1399559880-20562-3-git-send-email-amit.daniel@samsung.com>
- <20140516173226.GE2856@e102654-lin.cambridge.arm.com>
-Message-ID: <CADGdYn7CvQqSEcHGgqLcBaW3XXQPO1ay5A03Ld1=eRqzLsBMkQ@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 19 May 2014 12:01:26 +0300
+Subject: [GIT PULL] ARM: OMAP2+: some hwmod data patches for v3.16
+In-Reply-To: <20140516212327.GI12881@atomide.com>
+References: <alpine.DEB.2.02.1405160444200.29738@utopia.booyaka.com>
+ <5375CE74.6000603@ti.com> <20140516212327.GI12881@atomide.com>
+Message-ID: <5379C866.2040404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 11:02 PM, Javi Merino <javi.merino@arm.com> wrote:
-> Hi Amit,
->
-> On Thu, May 08, 2014 at 03:37:57PM +0100, Amit Daniel Kachhap wrote:
->> This patch adds notification support for those clients of cpu_cooling
->> APIs which may want to do something interesting after receiving these
->> cpu_cooling events. The notifier structure passed is of both Set/Get type.
->> The notfications events can be of type,
->> 1. CPU_COOLING_SET_STATE_PRE
->> 2. CPU_COOLING_SET_STATE_POST
->> 3. CPU_COOLING_GET_CUR_STATE
->> 4. CPU_COOLING_GET_MAX_STATE
+On 17/05/14 00:23, Tony Lindgren wrote:
+> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140516 01:39]:
+>> Hi Paul,
 >>
->> The advantages of these notfications is to differentiate between different
->> P states in the cpufreq table and the cooling states. The clients of these
->> events may group few P states into 1 cooling states. Also some more cooling
->> states can be enabled when the maximum of P state is reached. Post notifications
->> can be used for those cases.
+>> On 16/05/14 07:45, Paul Walmsley wrote:
+>>> Hi Tony
+>>>
+>>> The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
+>>>
+>>>   Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git for-v3.16/hwmod-a
+>>>
+>>> for you to fetch changes up to 433480707967187a74ced38bd38edba749998013:
+>>>
+>>>   ARM: OMAP2+: hwmod: OMAP5 DSS hwmod data (2014-05-14 12:26:10 -0600)
+>>>
+>>> ----------------------------------------------------------------
+>>> First (and possibly last) set of hwmod data changes for v3.16.  This
+>>> set should clean up some obsolete OMAP4 hwmod data, and add OMAP5 DSS
+>>> support.
 >>
->> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> ---
->>  drivers/thermal/cpu_cooling.c |   99 +++++++++++++++++++++++++++++++++++++++-
->>  include/linux/cpu_cooling.h   |   55 +++++++++++++++++++++++
->>  2 files changed, 151 insertions(+), 3 deletions(-)
+>> What about the AM43xx hwmod data I sent in the same series:
 >>
->> diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
->> index 21f44d4..e2aeb36 100644
->> --- a/drivers/thermal/cpu_cooling.c
->> +++ b/drivers/thermal/cpu_cooling.c
->> @@ -50,6 +50,7 @@ struct cpufreq_cooling_device {
->>       unsigned int cpufreq_state;
->>       unsigned int cpufreq_val;
->>       struct cpumask allowed_cpus;
->> +     struct cpufreq_cooling_status request_status;
->>       struct list_head node;
->>  };
->>  static DEFINE_IDR(cpufreq_idr);
->> @@ -59,6 +60,8 @@ static DEFINE_MUTEX(cooling_cpufreq_lock);
->>  #define NOTIFY_INVALID NULL
->>  static struct cpufreq_cooling_device *notify_device;
->>
->> +/* Notfier list to validates/updates the cpufreq cooling states */
->> +static BLOCKING_NOTIFIER_HEAD(cpufreq_cooling_state_notifier_list);
->>  /* A list to hold all the cpufreq cooling devices registered */
->>  static LIST_HEAD(cpufreq_cooling_list);
->>
->> @@ -266,6 +269,21 @@ static unsigned int get_cpu_frequency(unsigned int cpu, unsigned long level)
->>       return freq;
->>  }
->>
->> +static int
->> +cpufreq_cooling_notify_states(struct cpufreq_cooling_status *request,
->> +                     enum cpu_cooling_state_ops op)
->> +{
->> +     /* Invoke the notifiers which have registered for this state change */
->> +     if (op == CPU_COOLING_SET_STATE_PRE ||
->> +             op == CPU_COOLING_SET_STATE_POST ||
->> +             op == CPU_COOLING_GET_MAX_STATE ||
->> +             op == CPU_COOLING_GET_CUR_STATE) {
->> +             blocking_notifier_call_chain(
->> +                     &cpufreq_cooling_state_notifier_list, op, request);
->> +     }
->> +     return 0;
->> +}
->> +
->>  /**
->>   * cpufreq_apply_cooling - function to apply frequency clipping.
->>   * @cpufreq_device: cpufreq_cooling_device pointer containing frequency
->> @@ -285,9 +303,18 @@ static int cpufreq_apply_cooling(struct cpufreq_cooling_device *cpufreq_device,
->>       struct cpumask *mask = &cpufreq_device->allowed_cpus;
->>       unsigned int cpu = cpumask_any(mask);
->>
->> +     cpufreq_device->request_status.cur_state =
->> +                                             cpufreq_device->cpufreq_state;
->> +     cpufreq_device->request_status.new_state = cooling_state;
->> +
->> +     cpufreq_cooling_notify_states(&cpufreq_device->request_status,
->> +                                     CPU_COOLING_SET_STATE_PRE);
->> +
->> +     cooling_state = cpufreq_device->request_status.new_state;
->>
->>       /* Check if the old cooling action is same as new cooling action */
->> -     if (cpufreq_device->cpufreq_state == cooling_state)
->> +     if (cpufreq_device->cpufreq_state ==
->> +                             cpufreq_device->request_status.new_state)
->>               return 0;
->>
->>       clip_freq = get_cpu_frequency(cpu, cooling_state);
->> @@ -304,7 +331,8 @@ static int cpufreq_apply_cooling(struct cpufreq_cooling_device *cpufreq_device,
->>       }
->>
->>       notify_device = NOTIFY_INVALID;
->> -
->> +     cpufreq_cooling_notify_states(&cpufreq_device->request_status,
->> +                                     CPU_COOLING_SET_STATE_POST);
->>       return 0;
->>  }
->>
->> @@ -383,6 +411,11 @@ static int cpufreq_get_max_state(struct thermal_cooling_device *cdev,
->>       if (count > 0)
->>               *state = count;
->>
->> +     cpufreq_device->request_status.max_state = count;
->> +     cpufreq_cooling_notify_states(&cpufreq_device->request_status,
->> +                                     CPU_COOLING_GET_MAX_STATE);
->> +     *state = cpufreq_device->request_status.max_state;
->> +
->
-> I think this should all be inside the "if (count > 0)".  If not, then
-> remove it, as it is dead code now.
-yes this looks buggy. Will remove them. thanks
->
-> Cheers,
-> Javi
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> http://article.gmane.org/gmane.linux.ports.arm.omap/114192
+> 
+> I guess the issue there is that there's no way for Paul or much
+> anybody else to check it against any documentation or hardware :(
+> 
+> Is this just cut and paste code, or has you verified it against
+> the documentation and the hardare?
+
+It's a cut and paste from TI's kernel, I did not write it. I have tested
+it on two different AM4xxx boards, and reviewed it, although I have not
+checked every individual bit of information there as it's a bit
+difficult to find information of all the details.
+
+The AM43xx's DSS is more or less a subset of the DSS in OMAP3, so while
+a proper bit-for-bit review cannot be done without AM43xx documentation,
+a  "looks sane" review can be done against OMAP3.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/c8d14b74/attachment.sig>
