@@ -1,65 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 May 2014 21:02:55 +0200
-Subject: [PATCH] s3cmci: port DMA code to dmaengine API
-In-Reply-To: <CA+E=qVeG8bXowBvdhKpVSYSL08n6ZUVG2LkjhPwjBnbv+egNLw@mail.gmail.com>
-References: <1400522593-6366-1-git-send-email-anarsoul@gmail.com>
- <7633675.1cAc12AFAY@wuerfel>
- <CA+E=qVeG8bXowBvdhKpVSYSL08n6ZUVG2LkjhPwjBnbv+egNLw@mail.gmail.com>
-Message-ID: <4667090.Oyf6jd3Lyk@wuerfel>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 19 May 2014 22:05:15 +0300
+Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
+ support
+In-Reply-To: <20140519160447.GB4849@atomide.com>
+References: <20140513152518.GA16837@atomide.com> <53730AFB.2090800@ti.com>
+ <20140514160216.GD18463@atomide.com> <537487AE.3060906@ti.com>
+ <20140515182133.GC23659@atomide.com> <5375A8A8.7080306@ti.com>
+ <20140516160717.GD22031@atomide.com> <20140516174158.GA11733@earth.universe>
+ <20140516180154.GG22031@atomide.com> <5379CD24.6040508@ti.com>
+ <20140519160447.GB4849@atomide.com>
+Message-ID: <537A55EB.1080507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 May 2014 21:54:28 Vasily Khoruzhick wrote:
-> On Mon, May 19, 2014 at 9:18 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday 19 May 2014 21:03:13 Vasily Khoruzhick wrote:
-> >> Utilise new s3c24xx-dma dmaengine driver for DMA ops.
-> >>
-> >> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+On 19/05/14 19:04, Tony Lindgren wrote:
+
+> In many cases however we do have multiple compatible strings that
+> describe how the device is wired. See drivers/tty/serial/of_serial.c
+> for example. It has "ns16550" but then it also has additional
+> "nvidia,tegra20-uart", "nxp,lpc3220-uart" and "ibm,qpace-nwp-serial".
+
+All those sound like SoC components. In that case it sounds fine to have
+the device compatible contain the SoC name. We're talking here about
+external, detachable devices.
+
+>>> Not use what you're after with the SPI example though, but sounds
+>>> like that's something different.
+>>
+>> I think Sebastien's example is just like the issue here.
 > 
-> > - I did not remove MMC_S3C_PIODMA, but I don't see anything wrong
-> >   with yours there
-> 
-> It didn't work even with legacy code for me. I don't want to fix it,
-> so it's just dropped.
-> Anyway, I don't see much sense in PIODMA mode.
+> Hmm is there some existing example in the kernel like that?
 
-Ah, that makes sense.
+No, Sebastien's example was just a hypothetical case. Here, using your
+way of having SoC specific data in the .dts, we would have
+"sharp,ls037v7dw01-omap-dss", and in Sebastien's example with a touch
+sensor we'd have, say, "synaptics,xyz123-omap-spi".
 
-> > - the slave config setup is slightly different
-> 
-> Yep.
-> 
-> > - I hardcode the DMA request number, while you pass it as a resource.
-> >   Actually both are wrong I guess, it should be platform data instead.
-> 
-> Well, at least s3c64xx uses resources for passing dma channel number,
-> and so did I.
-> Btw, It'll make transition to device tree a bit easier.
+ Tomi
 
-Actually it doesn't help with the transition to DT at all, because DT
-does not use resources for DMA requests. Instead there is a
-dma_request_slave_channel() interface that gets passed a string to
-match the DT descriptor of the DMA channel. If you want to enable
-DT probing while keeping the traditional way alive, you can
-use dma_request_slave_channel_compat(), although I find it not
-much easier than open-coding it.
 
-There is one issue with dma_request_slave_channel_compat and
-dma_request_channel, which is that you need a pointer to the
-filter function. In portable drivers that pointer should get passed
-in platform_data for the non-DT case, along with the data it
-needs, because there are dma engines that need more than just
-an integer to identify a slave.
-
-For this driver, you don't have to go that far, as long as it's
-ensure that the pointer to the filter function is available to
-the driver, i.e. you can't have a built-in s3mci driver when the
-dmaengine driver is a loadable module.
-
-> There's one more difference: original s3cmci doesn't restore prescaler
-> value when necessary on s3c2410,
-> my version has a fix for it.
-
-Ok.
-
-	Arnd
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/4b36944d/attachment.sig>
