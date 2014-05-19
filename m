@@ -1,44 +1,69 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 19 May 2014 10:45:45 -0400
-Subject: [PATCH v3 4/4] ARM: multi_v5: Enable LaCie 2Big and 5Big
- Network v2
-In-Reply-To: <5379C93F.8050302@gmail.com>
-References: <1400163836-9831-1-git-send-email-andrew@lunn.ch>
- <1400163836-9831-8-git-send-email-andrew@lunn.ch>
- <5379C93F.8050302@gmail.com>
-Message-ID: <20140519144545.GI27822@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 May 2014 16:46:03 +0200
+Subject: [PATCH] pinctrl: sunxi: Fix recursive dependency
+In-Reply-To: <20140519142913.GK29466@lukather>
+References: <1400343715-27884-1-git-send-email-maxime.ripard@free-electrons.com>
+ <4667053.sVVFqnz4qh@wuerfel> <20140519142913.GK29466@lukather>
+Message-ID: <4631163.YRjUDyHifq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 11:05:03AM +0200, Sebastian Hesselbarth wrote:
-> [Added arm at kernel.org so they can spot the patch more easily]
-
-Thanks, but we're really only worried about multi_v7_defconfig.
-multi_v5_defconfig hasn't proven to be conflict-prone yet.
-
-thx,
-
-Jason.
-
-> On 05/15/2014 04:23 PM, Andrew Lunn wrote:
-> >Enable building LaCie 2Big and 5Big Network v2 in the multi v5 kernel.
-> >
-> >Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> >---
-> >  arch/arm/configs/multi_v5_defconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> >diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
-> >index 5ebfa8bf8509..02d4e79826d3 100644
-> >--- a/arch/arm/configs/multi_v5_defconfig
-> >+++ b/arch/arm/configs/multi_v5_defconfig
-> >@@ -11,6 +11,7 @@ CONFIG_MODULE_UNLOAD=y
-> >  # CONFIG_ARCH_MULTI_V7 is not set
-> >  CONFIG_ARCH_MVEBU=y
-> >  CONFIG_MACH_KIRKWOOD=y
-> >+CONFIG_MACH_NETXBIG=y
-> >  CONFIG_ARCH_MXC=y
-> >  CONFIG_MACH_IMX25_DT=y
-> >  CONFIG_MACH_IMX27_DT=y
-> >
+On Monday 19 May 2014 16:29:13 Maxime Ripard wrote:
+> Hi
 > 
+> On Mon, May 19, 2014 at 01:30:54PM +0200, Arnd Bergmann wrote:
+> > On Saturday 17 May 2014 18:21:55 Maxime Ripard wrote:
+> > > Fix the following configuration error:
+> > > drivers/pinctrl/sunxi/Kconfig:3:error: recursive dependency detected!
+> > > drivers/pinctrl/sunxi/Kconfig:3:        symbol PINCTRL_SUNXI is selected by PINCTRL_SUN4I_A10
+> > > drivers/pinctrl/sunxi/Kconfig:9:        symbol PINCTRL_SUN4I_A10 default value contains PINCTRL_SUNXI
+> > > 
+> > > Drop the select on PINCTRL_SUNXI, and make PINCTRL_SUNXI enabled by default instead.
+> > > 
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > 
+> > I stubled over the same thing already, but came to a different conclusion.
+> > 
+> > >  drivers/pinctrl/sunxi/Kconfig | 8 +-------
+> > >  1 file changed, 1 insertion(+), 7 deletions(-)
+> > > 
+> > > diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
+> > > index 2007327e0c48..8411857d2a45 100644
+> > > --- a/drivers/pinctrl/sunxi/Kconfig
+> > > +++ b/drivers/pinctrl/sunxi/Kconfig
+> > > @@ -1,32 +1,26 @@
+> > >  if ARCH_SUNXI
+> > >  
+> > >  config PINCTRL_SUNXI
+> > > -       bool
+> > > +       def_bool ARCH_SUNXI
+> > >         select PINMUX
+> > >         select GENERIC_PINCONF
+> > >  
+> > >  config PINCTRL_SUN4I_A10
+> > >         def_bool PINCTRL_SUNXI || MACH_SUN4I
+> > > -       select PINCTRL_SUNXI
+> > >  
+> > 
+> > This means you won't be able to stop selecting all drivers dropping
+> > the 'select PINCTRL_SUNXI' later. How about this one?
+> 
+> I'm not sure what you mean here.
+> 
+> We won't have to select PINCTRL_SUNXI anymore with this patch either,
+> since it's already enabled whenever ARCH_SUNXI is enabled.
+> 
+> And the drivers won't have to be selected either, because they will
+> either default to PINCTRL_SUNXI, or to the MACH_SUN*I definition.
+> 
+> As I was saying in the commit log, this is just a temporary solution,
+> and eventually, and the select PINCTRL_SUNXI should be removed
+> eventually.
+
+The difference is that in your patch, PINCTRL_SUNXI defaults to 'y'
+if ARCH_SUNXI is set, so you have to remove both the 'select' and
+the 'def_bool' and then put back the 'select PINCTRL_SUNXI' for the
+individual drivers. I guess it's not a big difference, you just end up
+doing one patch extra.
+
+	Arnd
