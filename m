@@ -1,69 +1,54 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 19 May 2014 20:26:01 +0900
-Subject: [PATCH v6 5/8] ARM: dts: exynos5250-snow: Add Vbus regulator for
- USB 3.0
-In-Reply-To: <1400076070-12456-6-git-send-email-gautam.vivek@samsung.com>
-References: <1400076070-12456-1-git-send-email-gautam.vivek@samsung.com>
- <1400076070-12456-6-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <03a701cf7355$1d485dd0$57d91970$@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 May 2014 13:26:48 +0200
+Subject: [PATCH] ARM: remove ARM710 specific assembler code
+In-Reply-To: <9DBC3527-1961-40DD-8CBA-9A1B5D3003C9@arm.com>
+References: <1364507176.1345.45.camel@x61.thuisdomein>
+ <20140517094636.GP3693@n2100.arm.linux.org.uk>
+ <9DBC3527-1961-40DD-8CBA-9A1B5D3003C9@arm.com>
+Message-ID: <5053472.zFAHKQVpbv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vivek Gautam wrote:
+On Saturday 17 May 2014 10:56:02 Catalin Marinas wrote:
+> > The difference between what you're proposing and what happened to ARMv3
+> > is that ARMv3 was broken for quite some time (we read from some of the
+> > CP15 registers which are read-only in ARMv3) and no one ever raised a
+> > problem with that.  So, after a sufficient period of time, it got removed
+> > - and no one batted an eyelid.  That's the correct way to do it - allow
+> > code to age, and if no one notices it's been broken, then it can be
+> > removed.
 > 
-> Add required fixed-regulator for VBUS supply for USB 3.0
-> controller phy.
+> I?m more for pro-actively ?breaking? it with a DEPRECATED
+> dependency. For example, if you suspect that some code like ARM710T is
+> no longer in use, we mark it and see if anyone complains about this over
+> a two years period. If not, it gets removed.
 > 
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5250-snow.dts |   22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts
-> b/arch/arm/boot/dts/exynos5250-snow.dts
-> index 1ce1088..fd9b3b3 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -37,6 +37,13 @@
->  		sd3_bus4: sd3-bus-width4 {
->  			samsung,pin-drv = <0>;
->  		};
-> +
-> +		usb3_vbus_en: usb3-vbus-en {
-> +			samsung,pins = "gpx2-7";
-> +			samsung,pin-function = <1>;
-> +			samsung,pin-pud = <0>;
-> +			samsung,pin-drv = <0>;
-> +		};
->  	};
-> 
->  	gpio-keys {
-> @@ -196,6 +203,21 @@
->  		};
->  	};
-> 
-> +	usb3_vbus_reg: regulator-usb3 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "P5.0V_USB3CON";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		gpio = <&gpx2 7 0>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&usb3_vbus_en>;
-> +		enable-active-high;
-> +	};
-> +
-> +	phy at 12100000 {
-> +		vbus-supply = <&usb3_vbus_reg>;
-> +	};
-> +
->  	usb at 12110000 {
->  		samsung,vbus-gpio = <&gpx1 1 0>;
->  	};
-> --
-> 1.7.10.4
+> Waiting for code to get broken is another way but it?s less
+> predictable.
 
-Looks OK to me and applied 5 to 8 as well.
+We used to have 'feature-removal-schedule.txt' file in the Documentation.
+It never worked, and I don't see a reason to introduce something like that
+again.
 
-Thanks,
-Kukjin
+Yes, this means we will keep going through things that may or may not be
+considered obsolete occasionally asking whether it's already dead. There
+are a number of platforms we removed in the past years (e.g. shark,
+h720x, bcmring, pnx4008, ixp2xxx, tcc8k and others before) and we haven't
+had to revert any of those back. The rule has always been that even if
+someone later comes and wants them back, we will revert the removal.
+Others have been given temporary (e.g. gemini) or permanent (e.g. ixp4xx)
+extensions, based on the feedback from the maintainers or remaining
+users.
+
+For the case of ARM710T, I think the last remaining user that can be
+configured is mach-integrator, but I don't know if anybody even has that
+CPU tile, or wants to keep using it. If Russell and Linus as the only
+people that have cared about Integrator in the past years want to
+cut down the number of supported CPUs, that would be a different matter:
+quite a number of CPUs are not supported in any other platform.
+Note that the integrator target in qemu does not support any ARM7, only
+StrongARM, ARM9 or later. I also double-checked about mach-clps711x,
+but I'm pretty sure those SoCs are all either ARM710a (no longer supported)
+or ARM720T (quite active).
+
+	Arnd
