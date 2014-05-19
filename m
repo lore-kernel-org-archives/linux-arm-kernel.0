@@ -1,19 +1,18 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 19 May 2014 16:17:22 +0200
-Subject: [PATCH] clocksource: qcom: Implement read_current_timer for udelay
-In-Reply-To: <1400022060-30118-1-git-send-email-sboyd@codeaurora.org>
-References: <1400022060-30118-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <537A1272.1020206@linaro.org>
+Date: Mon, 19 May 2014 16:18:00 +0200
+Subject: [PATCH] clocksource: prima2: fix some minor checkpatch issues
+In-Reply-To: <1399387349-19346-1-git-send-email-21cnbao@gmail.com>
+References: <1399387349-19346-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <537A1298.9040205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2014 01:01 AM, Stephen Boyd wrote:
-> Setup the same timer used as the clocksource to be used as the
-> read_current_timer implementation. This allows us to support a
-> stable udelay implementation on MSMs where it's possible for the
-> CPUs to scale speeds independently of one another.
+On 05/06/2014 04:42 PM, Barry Song wrote:
+> From: Bin Shi <Bin.Shi@csr.com>
 >
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Fix the "line over 80 characters". users of the codes - key customers
+> really care about that.
+>
 
 Applied to my tree for 3.16
 
