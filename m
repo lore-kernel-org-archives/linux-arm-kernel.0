@@ -1,68 +1,20 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 19 May 2014 12:44:11 +0200
-Subject: [PATCH 1/4] clk: samsung: out: Add infrastructure to register
- CLKOUT
-In-Reply-To: <CAHbNUh03TVxbXZcT3e6618zPdu_53_y6nVjwJE7cWa6zxLMpqA@mail.gmail.com>
-References: <1399640410-30957-1-git-send-email-tushar.behera@linaro.org>	<1399640410-30957-2-git-send-email-tushar.behera@linaro.org>	<536DA243.6000600@samsung.com>	<53705243.1030704@linaro.org>	<CAPdUM4N=k-pPxdhPQgVHh0fb+nqkgs7StwM2Pb6C8gcjx6dw-w@mail.gmail.com>	<5374CA1C.8000207@samsung.com>
- <CAHbNUh03TVxbXZcT3e6618zPdu_53_y6nVjwJE7cWa6zxLMpqA@mail.gmail.com>
-Message-ID: <5379E07B.9040507@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 19 May 2014 11:46:33 +0100
+Subject: [PATCH 1/1] arm64: TLB maintainance: Implement flush_kern_tlb_page
+In-Reply-To: <1400495665-48279-2-git-send-email-ritesh.harjani@gmail.com>
+References: <1400495665-48279-1-git-send-email-ritesh.harjani@gmail.com>
+ <1400495665-48279-2-git-send-email-ritesh.harjani@gmail.com>
+Message-ID: <20140519104632.GI5113@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.05.2014 05:30, Tushar Behera wrote:
-> On 15 May 2014 19:37, Tomasz Figa <t.figa@samsung.com> wrote:
->> Hi Rahul, Tushar,
->>
->> On 15.05.2014 15:44, Rahul Sharma wrote:
->>> Hi Tushar,
->>>
->>> Basically you are adding a new clock-type for Clkout. IMO clkout
->>> is not a special hardware. Existing clock types can be reused to
->>> support clkout. I see 3 major problem here:
->>>
->>> 1) Clkout -> (Mux + Gate). You clubbed mux and gate together, and
->>> exposing as a single clock which is something like a composite clock.
->>> IMO this is not a recommended way in CCF.
->>>
->>> 2) New Clock Type: Since clkout is just a combination of a simple
->>> mux and gate which are already supported, it is a unnecessary
->>> duplication.
->>>
->>> 3) Clkout registered along with CMU: which is not correct. Clkout is in PMU
->>> (Separate physical IP) and should be registered as a independent Clock
->>> provider which provides 1 mux and 1 gate clock (As if now). It should also be
->>> well connected with main CMU.
->>>
->>> I understand the challenge in using regmap interface for a clock provider. But
->>> we need to identify a clean solution. IMHO a independent clock provider with
->>> iomap, is relatively cleaner approach till CCF is not ready with regmap based
->>> reg access for clock registers.
->>>
->>> Experts!! please comment.
->>
->> It's quite unfortunate that Tushar has duplicated the effort to create a
->> clkout driver, considering the fact that we did have such driver
->> internally at SRPOL and it was quite nice and simple.
->>
+On Mon, May 19, 2014 at 11:34:25AM +0100, ritesh.harjani at gmail.com wrote:
+> From: Ritesh Harjani <ritesh.harjani@gmail.com>
 > 
-> I had no idea that you had some solutions to this available to be posted :(
-> 
-> Now that the new series is posted, I will test that at my end and
-> update you later.
+> Implement flush_kern_tlb_page mentioned in the header
+> comment of arch/arm64/include/asm/tlbflush.h
 
-Again, sorry for this duplicated effort.
+Alternatively, clean-up the comment.
 
-The biggest problem is that we (SRPOL and Linaro) don't have a way to
-share our upstream TODO lists and say "hey, we have this working, if you
-need it, we can upstream it \o/" or "we need it too, but don't have
-resources right now to work on it :(".
-
-Maybe we should set up some wiki or any other semi-public site for this
-purpose? I need to talk with other people from my team and my manager to
-see what we can do. Other guys (other Samsung teams, Chromium folks,
-hobbyists) could also benefit from it.
-
-Anyway, thanks for your understanding and testing.
-
-Best regards,
-Tomasz
+-- 
+Catalin
