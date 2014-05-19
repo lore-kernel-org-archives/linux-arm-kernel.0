@@ -1,63 +1,42 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 19 May 2014 12:01:26 +0300
-Subject: [GIT PULL] ARM: OMAP2+: some hwmod data patches for v3.16
-In-Reply-To: <20140516212327.GI12881@atomide.com>
-References: <alpine.DEB.2.02.1405160444200.29738@utopia.booyaka.com>
- <5375CE74.6000603@ti.com> <20140516212327.GI12881@atomide.com>
-Message-ID: <5379C866.2040404@ti.com>
+From: b38611@freescale.com (Fugang Duan)
+Date: Mon, 19 May 2014 15:46:41 +0800
+Subject: [PATCH 1/2] ARM: imx6sl: add missing enet clock for imx6sl
+Message-ID: <1400485601-2896-1-git-send-email-b38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/05/14 00:23, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140516 01:39]:
->> Hi Paul,
->>
->> On 16/05/14 07:45, Paul Walmsley wrote:
->>> Hi Tony
->>>
->>> The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
->>>
->>>   Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
->>>
->>> are available in the git repository at:
->>>
->>>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git for-v3.16/hwmod-a
->>>
->>> for you to fetch changes up to 433480707967187a74ced38bd38edba749998013:
->>>
->>>   ARM: OMAP2+: hwmod: OMAP5 DSS hwmod data (2014-05-14 12:26:10 -0600)
->>>
->>> ----------------------------------------------------------------
->>> First (and possibly last) set of hwmod data changes for v3.16.  This
->>> set should clean up some obsolete OMAP4 hwmod data, and add OMAP5 DSS
->>> support.
->>
->> What about the AM43xx hwmod data I sent in the same series:
->>
->> http://article.gmane.org/gmane.linux.ports.arm.omap/114192
-> 
-> I guess the issue there is that there's no way for Paul or much
-> anybody else to check it against any documentation or hardware :(
-> 
-> Is this just cut and paste code, or has you verified it against
-> the documentation and the hardare?
+There's a enet clock gate missing in clock tree, thus add it.
 
-It's a cut and paste from TI's kernel, I did not write it. I have tested
-it on two different AM4xxx boards, and reviewed it, although I have not
-checked every individual bit of information there as it's a bit
-difficult to find information of all the details.
+Signed-off-by: Fugang Duan <B38611@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx6sl.c           |    1 +
+ include/dt-bindings/clock/imx6sl-clock.h |    3 ++-
+ 2 files changed, 3 insertions(+), 1 deletions(-)
 
-The AM43xx's DSS is more or less a subset of the DSS in OMAP3, so while
-a proper bit-for-bit review cannot be done without AM43xx documentation,
-a  "looks sane" review can be done against OMAP3.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/c8d14b74/attachment.sig>
+diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
+index 21cf06c..5408ca7 100644
+--- a/arch/arm/mach-imx/clk-imx6sl.c
++++ b/arch/arm/mach-imx/clk-imx6sl.c
+@@ -312,6 +312,7 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX6SL_CLK_ECSPI2]       = imx_clk_gate2("ecspi2",       "ecspi_root",        base + 0x6c, 2);
+ 	clks[IMX6SL_CLK_ECSPI3]       = imx_clk_gate2("ecspi3",       "ecspi_root",        base + 0x6c, 4);
+ 	clks[IMX6SL_CLK_ECSPI4]       = imx_clk_gate2("ecspi4",       "ecspi_root",        base + 0x6c, 6);
++	clks[IMX6SL_CLK_ENET]         = imx_clk_gate2("enet",         "ipg",               base + 0x6c, 10);
+ 	clks[IMX6SL_CLK_EPIT1]        = imx_clk_gate2("epit1",        "perclk",            base + 0x6c, 12);
+ 	clks[IMX6SL_CLK_EPIT2]        = imx_clk_gate2("epit2",        "perclk",            base + 0x6c, 14);
+ 	clks[IMX6SL_CLK_EXTERN_AUDIO] = imx_clk_gate2("extern_audio", "extern_audio_podf", base + 0x6c, 16);
+diff --git a/include/dt-bindings/clock/imx6sl-clock.h b/include/dt-bindings/clock/imx6sl-clock.h
+index 7cf5c99..b91dd46 100644
+--- a/include/dt-bindings/clock/imx6sl-clock.h
++++ b/include/dt-bindings/clock/imx6sl-clock.h
+@@ -145,6 +145,7 @@
+ #define IMX6SL_CLK_USDHC4		132
+ #define IMX6SL_CLK_PLL4_AUDIO_DIV	133
+ #define IMX6SL_CLK_SPBA			134
+-#define IMX6SL_CLK_END			135
++#define IMX6SL_CLK_ENET			135
++#define IMX6SL_CLK_END			136
+ 
+ #endif /* __DT_BINDINGS_CLOCK_IMX6SL_H */
+-- 
+1.7.8
