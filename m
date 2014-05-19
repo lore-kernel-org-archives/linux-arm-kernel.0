@@ -1,64 +1,70 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 19 May 2014 11:07:24 -0400
-Subject: [Patch v3 0/5] Introduce keystone reset driver
-In-Reply-To: <1400495155-11136-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1400495155-11136-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <537A1E2C.8040102@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 19 May 2014 17:10:32 +0200
+Subject: [GIT PULL] at91: cleanup for 3.16 #1
+In-Reply-To: <20140516233141.GC6423@quad.lixom.net>
+References: <1399484042-27432-1-git-send-email-nicolas.ferre@atmel.com>
+ <536A6FD7.40402@atmel.com> <20140516232635.GB6423@quad.lixom.net>
+ <20140516233141.GC6423@quad.lixom.net>
+Message-ID: <537A1EE8.6030303@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 17/05/2014 01:31, Olof Johansson :
+> On Fri, May 16, 2014 at 04:26:35PM -0700, Olof Johansson wrote:
+>> On Wed, May 07, 2014 at 07:39:35PM +0200, Nicolas Ferre wrote:
+>>> On 07/05/2014 19:34, Nicolas Ferre :
+>>>> Arnd, Olof, Kevin,
+>>>>
+>>>> This is the first cleanup pull-request for 3.16. It is pretty big because it
+>>>> integrates the work from Boris about CCF and Alexandre about IIO/ADC. I
+>>>> integrated them in this cleanup topic because they both touch the core at91
+>>>> code, the clk and IIO drivers as well as the DT. The concerned maintainers
+>>>> added their tags.
+>>>>
+>>>> The patch by Linus is a move of at91 specific GPIO definitions out of the
+>>>> include/mach directory which is an step towards single zImage.
+>>>>
+>>>> Thanks, best regards,
+>>>>
+>>>> The following changes since commit 89ca3b881987f5a4be4c5dbaa7f0df12bbdde2fd:
+>>>>
+>>>>   Linux 3.15-rc4 (2014-05-04 18:14:42 -0700)
+>>>>
+>>>> are available in the git repository at:
+>>>>
+>>>>   git://github.com/at91linux/linux-at91.git tags/at91-cleanup
+>>>
+>>> There is a little conflict with at91-3.16-dt that you already pulled in
+>>> arm-soc: here is the branch that resolves it:
+>>>
+>>> https://github.com/at91linux/linux-at91/commits/at91-3.16-resolved
+>>
+>> That resolution looks odd. Why is one clock under clocks { } and two of them
+>> are at the top level? Shouldn't they all be under the clocks subnode?
+>>
+>> I've merged in now with your resolution, but I think this needs revisiting.
 
+With information from Alexandre, I have the feeling that we should
+remove the "clocks" container altogether. I propose to clean completely
+this part in 3.17 as it will not change the system but only its
+representation in DT...
+Still, we will fix the ugliest parts like this one:
+http://code.bulix.org/by22lb-86239
 
-On Monday 19 May 2014 06:25 AM, Ivan Khoronzhuk wrote:
-> These patches introduce keystone reset driver.
-> 
-> The keystone SoC can be rebooted in several ways. By external reset
-> pin, by soft and by watchdogs. This driver allows software reset and reset
-> by one of the watchdogs. Also added opportunity to set soft/hard reset type.
-> 
-> Based on v3.15-rc5
-> 
-Arnd,
-Can I have have your ack/reviewed-by please since you did gave few comments
-on previous version.
+> Oh, and also: The branch was named cleanup, but it really contains mostly new
+> driver and new contents, so I merged it under next/soc instead. In the future,
+> for releases when you have more contents, please split it up a bit more (dt
+> updates separately, driver updates separately) if it can be done without too
+> much hassle. For now it's not a huge deal to do it this way though.
 
-Dmitry, David W,
-Are you ok to get the drivers/power/reset/ related changes merged via arm-soc
-tree ? If not, we can split the series accordingly.
+Yes. The issue with these series that switch from one description to
+another is that if we split the driver and dt parts it would add extra
+steps which are not very easy to keep in sync, implement and are kind of
+useless.
 
-Am hoping to get the series merged for v3.16 so do let me know your preference
-as early as you can.
+I have more series to come for 3.16 that I named "cleanup" as well. I
+will double check to see if I can split them up more...
 
-
-
-> v2..v3
->   Power: reset: keystone-reset: introduce keystone reset driver
-> 	- no functional changes, only sanity
->   Power: reset: add bindings for keystone reset driver
->   	- corrected WDT numeration in examples
-> 	- extended description of wdt_list property
-> 
-> v1..v2
-> 	- re basedon on v3.15-rc1 without changes
-> 
-> Ivan Khoronzhuk (5):
->   Power: reset: keystone-reset: introduce keystone reset driver
->   Power: reset: add bindings for keystone reset driver
->   ARM: keystone: remove redundant reset stuff
->   ARM: dts: keystone: update reset node to work with reset driver
->   ARM: keystone: enable reset driver support
-> 
->  .../bindings/power/reset/keystone-reset.txt        |  61 ++++++++
->  arch/arm/boot/dts/keystone.dtsi                    |   4 +-
->  arch/arm/configs/keystone_defconfig                |   3 +
->  arch/arm/mach-keystone/keystone.c                  |  35 -----
->  drivers/power/reset/Kconfig                        |   7 +
->  drivers/power/reset/Makefile                       |   1 +
->  drivers/power/reset/keystone-reset.c               | 171 +++++++++++++++++++++
->  7 files changed, 246 insertions(+), 36 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/power/reset/keystone-reset.txt
->  create mode 100644 drivers/power/reset/keystone-reset.c
-> 
-
-Regards,
-Santosh
+Thanks, bye,
+-- 
+Nicolas Ferre
