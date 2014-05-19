@@ -1,92 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 19 May 2014 16:32:20 +0100
-Subject: [PATCH v3 2/2] arm64: enable context tracking
-In-Reply-To: <1399672310-9061-3-git-send-email-larry.bassel@linaro.org>
-References: <1399672310-9061-1-git-send-email-larry.bassel@linaro.org>
- <1399672310-9061-3-git-send-email-larry.bassel@linaro.org>
-Message-ID: <20140519153220.GH15130@arm.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 19 May 2014 18:34:41 +0300
+Subject: [PATCH 2/2] dmaengine: s3c24xx-dma: Add cyclic transfer support
+In-Reply-To: <1400488830.3703.64.camel@smile.fi.intel.com>
+References: <1400445779-17365-1-git-send-email-anarsoul@gmail.com>
+ <1400445876-17460-1-git-send-email-anarsoul@gmail.com>
+ <1400488830.3703.64.camel@smile.fi.intel.com>
+Message-ID: <CA+E=qVfsEQhZqFOjmn1ktGct8Czu_Hv0YCTaFU+oYWODN-bupA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 10:51:50PM +0100, Larry Bassel wrote:
-> Make calls to ct_user_enter when the kernel is exited
-> and ct_user_exit when the kernel is entered (in el0_da,
-> el0_ia, el0_svc, el0_irq and all of the "error" paths).
-> 
-> These macros expand to function calls which will only work
-> properly if el0_sync and related code has been rearranged
-> (in a previous patch of this series).
-> 
-> The calls to ct_user_exit are made after hw debugging has been
-> enabled (enable_dbg).
-> 
-> The call to ct_user_enter is made at the beginning of the
-> kernel_exit macro.
-> 
-> This patch is based on earlier work by Kevin Hilman.
+Hi Andy,
 
-[...]
+On Mon, May 19, 2014 at 11:40 AM, Andy Shevchenko
+<andriy.shevchenko@linux.intel.com> wrote:
+>> +
+>> +     if (direction == DMA_MEM_TO_DEV) {
+>> +             txd->disrcc = S3C24XX_DISRCC_LOC_AHB |
+>> +                           S3C24XX_DISRCC_INC_INCREMENT;
+>> +             txd->didstc = hwcfg;
+>> +             slave_addr = s3cchan->cfg.dst_addr;
+>> +             txd->width = s3cchan->cfg.dst_addr_width;
+>> +     } else if (direction == DMA_DEV_TO_MEM) {
+>> +             txd->disrcc = hwcfg;
+>> +             txd->didstc = S3C24XX_DIDSTC_LOC_AHB |
+>> +                           S3C24XX_DIDSTC_INC_INCREMENT;
+>> +             slave_addr = s3cchan->cfg.src_addr;
+>> +             txd->width = s3cchan->cfg.src_addr_width;
+>> +     } else {
+>> +             s3c24xx_dma_free_txd(txd);
+>> +             dev_err(&s3cdma->pdev->dev,
+>> +                     "direction %d unsupported\n", direction);
+>> +             return NULL;
+>> +     }
+>
+> Instead of doing this, you may put few lines on top of function
+>
+> if (!is_slave_direction) {
+>         dev_err(&s3cdma->pdev->dev, "direction %d unsupported\n", direction);
+>         return NULL;
+> }
+>
+> As an additional effect you can transform the 'else if' to just 'else' above the code.
 
-> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-> index 720e70b..301ea6a 100644
-> --- a/arch/arm64/include/asm/thread_info.h
-> +++ b/arch/arm64/include/asm/thread_info.h
-> @@ -108,6 +108,7 @@ static inline struct thread_info *current_thread_info(void)
->  #define TIF_SINGLESTEP		21
->  #define TIF_32BIT		22	/* 32bit process */
->  #define TIF_SWITCH_MM		23	/* deferred switch_mm */
-> +#define TIF_NOHZ                24
->  
->  #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
->  #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 136bb7d..c839bab 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -30,6 +30,44 @@
->  #include <asm/unistd32.h>
->  
->  /*
-> + * Context tracking subsystem.  Used to instrument transitions
-> + * between user and kernel mode.
-> + */
-> +	.macro ct_user_exit, save = 0
-> +#ifdef CONFIG_CONTEXT_TRACKING
-> +	bl	context_tracking_user_exit
-> +	.if \save == 1
+Sounds reasonable, will resend v2 in few mins.
 
-It would be clearer to refer to the parameter as `restore' for the exit
-case, I reckon.
+Regards
+Vasily
 
-> +	/*
-> +	 * save/restore needed during syscalls.  Restore syscall arguments from
-> +	 * the values already saved on stack during kernel_entry
-> +	 */
-> +	ldp	x0, x1, [sp]
-> +	ldp	x2, x3, [sp, #S_X2]
-> +	ldp	x4, x5, [sp, #S_X4]
-> +	ldp	x6, x7, [sp, #S_X6]
-> +	.endif
-> +#endif
-> +	.endm
-
-[...]
-
->  	.macro	kernel_exit, el, ret = 0
->  	ldp	x21, x22, [sp, #S_PC]		// load ELR, SPSR
->  	.if	\el == 0
-> +	ct_user_enter \ret
->  	ldr	x23, [sp, #S_SP]		// load return stack pointer
->  	.endif
->  	.if	\ret
-
-You should check how this patch applies against my debug exception rework:
-
-2a2830703a23 ("arm64: debug: avoid accessing mdscr_el1 on fault paths where
-possible") in today's next.
-
-As well as addressing the conflicts, it's worth nothing that the thread_info
-becomes available in tsk much earlier for exceptions from userspace with
-that patch applied.
-
-Will
+> --
+> Andy Shevchenko <andriy.shevchenko@intel.com>
+> Intel Finland Oy
