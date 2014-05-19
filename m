@@ -1,30 +1,187 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 19 May 2014 13:09:28 +0200
-Subject: [PATCH v6 10/17] ARM: mvebu: add USB3 support for Armada 38x
-In-Reply-To: <20140516190729.GN27822@titan.lakedaemon.net>
-References: <1400149062-32661-1-git-send-email-gregory.clement@free-electrons.com>
- <1400149062-32661-11-git-send-email-gregory.clement@free-electrons.com>
- <20140516190729.GN27822@titan.lakedaemon.net>
-Message-ID: <1400497768.2007.10.camel@x220>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 19 May 2014 14:10:41 +0300
+Subject: [PATCH 01/11] ARM: AM43xx: hwmod: add DSS hwmod data
+In-Reply-To: <5379DCCE.3050400@ti.com>
+References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
+ <1399636579-8062-2-git-send-email-tomi.valkeinen@ti.com>
+ <5379CDD2.6080807@ti.com> <5379D8F5.9030008@ti.com> <5379DCCE.3050400@ti.com>
+Message-ID: <5379E6B1.5000409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-05-16 at 15:07 -0400, Jason Cooper wrote:
-> On Thu, May 15, 2014 at 12:17:35PM +0200, Gregory CLEMENT wrote:
-> > This patch adds the selection of the config symbol needed to build the
-> > USB3 support for Armada 38x into mvebu_v7_defconfig.
-> > 
-> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > ---
-> >  arch/arm/mach-mvebu/Kconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> 
-> Patches 10 and 11 applied to mvebu/soc
+On 19/05/14 13:28, Rajendra Nayak wrote:
 
-These two just hit linux-next (in next-20140519). They're pointless, as
-config USB_ARCH_HAS_XHCI was dropped in commit b797b76fb464 ("usb: host:
-remove USB_ARCH_HAS_?HCI").
+> Yeah, thats what it looks like to me. l3_gclk is the 200Mhz clock derived from 
+> core-m4 post divider and l3s_gclk/l4ls_gclk are half of that at 100Mhz, derived
+> using a fixed divider of 2.
+
+Here's an updated patch, with the sdma entry removed and the ocp clock
+changed to l3_gclk.
+
+>From bfaf0fafb21c698c86640764c1aa62d6fc73992a Mon Sep 17 00:00:00 2001
+From: Sathya Prakash M R <sathyap@ti.com>
+Date: Mon, 24 Mar 2014 16:31:53 +0530
+Subject: [PATCH] ARM: AM43xx: hwmod: add DSS hwmod data
+
+Add DSS hwmod data for AM43xx.
+
+Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 98 ++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/prcm43xx.h             |  1 +
+ 2 files changed, 99 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+index 5c2cc8083fdd..d2a7b6dc36f2 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+@@ -19,6 +19,8 @@
+ #include "omap_hwmod.h"
+ #include "omap_hwmod_33xx_43xx_common_data.h"
+ #include "prcm43xx.h"
++#include "omap_hwmod_common_data.h"
++
+ 
+ /* IP blocks */
+ static struct omap_hwmod am43xx_l4_hs_hwmod = {
+@@ -415,6 +417,70 @@ static struct omap_hwmod am43xx_qspi_hwmod = {
+ 	},
+ };
+ 
++/* Display sub system - DSS */
++
++struct omap_dss_dispc_dev_attr am43xx_dss_dispc_dev_attr = {
++	.manager_count		= 1,
++	.has_framedonetv_irq	= 0
++};
++
++
++static struct omap_hwmod_class_sysconfig am43xx_dispc_sysc = {
++	.rev_offs	= 0x0000,
++	.sysc_offs	= 0x0010,
++	.syss_offs	= 0x0014,
++	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE),
++	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
++	.sysc_fields	= &omap_hwmod_sysc_type1,
++};
++
++static struct omap_hwmod_class am43xx_dispc_hwmod_class = {
++	.name	= "dispc",
++	.sysc	= &am43xx_dispc_sysc,
++};
++
++static struct omap_hwmod am43xx_dss_core_hwmod = {
++	.name		= "dss_core",
++	.class		= &omap2_dss_hwmod_class,
++	.clkdm_name	= "dss_clkdm",
++	.main_clk	= "disp_clk",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = AM43XX_CM_PER_DSS_CLKCTRL_OFFSET,
++			.modulemode   = MODULEMODE_SWCTRL,
++		},
++	},
++};
++
++/* display controller -dispc*/
++
++static struct omap_hwmod am43xx_dss_dispc_hwmod = {
++	.name		= "dss_dispc",
++	.class		= &am43xx_dispc_hwmod_class,
++	.clkdm_name	= "dss_clkdm",
++	.main_clk	= "disp_clk",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = AM43XX_CM_PER_DSS_CLKCTRL_OFFSET,
++		},
++	},
++	.dev_attr	= &am43xx_dss_dispc_dev_attr,
++};
++
++/*RFBI*/
++
++static struct omap_hwmod am43xx_dss_rfbi_hwmod = {
++	.name		= "dss_rfbi",
++	.class		= &omap2_rfbi_hwmod_class,
++	.clkdm_name	= "dss_clkdm",
++	.main_clk	= "disp_clk",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = AM43XX_CM_PER_DSS_CLKCTRL_OFFSET,
++		},
++	},
++};
++
+ /* Interfaces */
+ static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
+ 	.master		= &am33xx_l3_main_hwmod,
+@@ -654,6 +720,34 @@ static struct omap_hwmod_ocp_if am43xx_l3_s__qspi = {
+ 	.user           = OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++static struct omap_hwmod_ocp_if am43xx_dss__l3_main = {
++	.master		= &am43xx_dss_core_hwmod,
++	.slave		= &am33xx_l3_main_hwmod,
++	.clk		= "l3_gclk",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++static struct omap_hwmod_ocp_if am43xx_l4_ls__dss = {
++	.master		= &am33xx_l4_ls_hwmod,
++	.slave		= &am43xx_dss_core_hwmod,
++	.clk		= "l4ls_gclk",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_dispc = {
++	.master		= &am33xx_l4_ls_hwmod,
++	.slave		= &am43xx_dss_dispc_hwmod,
++	.clk		= "l4ls_gclk",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
++	.master		= &am33xx_l4_ls_hwmod,
++	.slave		= &am43xx_dss_rfbi_hwmod,
++	.clk		= "l4ls_gclk",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am33xx_l4_wkup__synctimer,
+ 	&am43xx_l4_ls__timer8,
+@@ -748,6 +842,10 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am43xx_l4_ls__ocp2scp1,
+ 	&am43xx_l3_s__usbotgss0,
+ 	&am43xx_l3_s__usbotgss1,
++	&am43xx_dss__l3_main,
++	&am43xx_l4_ls__dss,
++	&am43xx_l4_ls__dss_dispc,
++	&am43xx_l4_ls__dss_rfbi,
+ 	NULL,
+ };
+ 
+diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
+index 7785be984edd..ad7b3e9977f8 100644
+--- a/arch/arm/mach-omap2/prcm43xx.h
++++ b/arch/arm/mach-omap2/prcm43xx.h
+@@ -142,5 +142,6 @@
+ #define AM43XX_CM_PER_USBPHYOCP2SCP0_CLKCTRL_OFFSET	0x05B8
+ #define AM43XX_CM_PER_USB_OTG_SS1_CLKCTRL_OFFSET        0x0268
+ #define AM43XX_CM_PER_USBPHYOCP2SCP1_CLKCTRL_OFFSET	0x05C0
++#define AM43XX_CM_PER_DSS_CLKCTRL_OFFSET		0x0a20
+ 
+ #endif
+-- 
+1.9.1
 
 
-Paul Bolle
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/d8fe3fef/attachment.sig>
