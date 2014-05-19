@@ -1,44 +1,65 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 19 May 2014 14:56:42 +0800
-Subject: [PATCH 0/4] ARM: imx: clean up i.MX5 files
-Message-ID: <1400482606-8278-1-git-send-email-shawn.guo@freescale.com>
+Date: Mon, 19 May 2014 14:56:43 +0800
+Subject: [PATCH 1/4] ARM: imx: move SOC_IMX5 and SOC_IMX51 into 'Device tree
+ only'
+In-Reply-To: <1400482606-8278-1-git-send-email-shawn.guo@freescale.com>
+References: <1400482606-8278-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1400482606-8278-2-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX51 becomes a DT only platform.  So some non-DT support code can be
-removed now.
+After moving SOC_IMX51 support over to device tree, all i.MX5 support
+becomes device tree only now.  So options SOC_IMX5 and SOC_IMX51 can
+just be under 'Device tree only'.
 
-Shawn Guo (4):
-  ARM: imx: move SOC_IMX5 and SOC_IMX51 into 'Device tree only'
-  ARM: imx: drop option MACH_IMX51_DT
-  ARM: imx: remove imx51 non-DT support files
-  ARM: imx: remove i.MX5 non-DT device registration helpers
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/mach-imx/Kconfig | 26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
 
- arch/arm/configs/imx_v6_v7_defconfig               |   2 +-
- arch/arm/configs/multi_v7_defconfig                |   2 +-
- arch/arm/mach-imx/Kconfig                          |  26 +-
- arch/arm/mach-imx/Makefile                         |   4 +-
- arch/arm/mach-imx/devices-imx51.h                  |  66 --
- arch/arm/mach-imx/devices/platform-fec.c           |  12 -
- arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c  |   5 -
- arch/arm/mach-imx/devices/platform-imx-i2c.c       |  26 -
- arch/arm/mach-imx/devices/platform-imx-keypad.c    |  10 -
- arch/arm/mach-imx/devices/platform-imx-ssi.c       |  20 -
- arch/arm/mach-imx/devices/platform-imx-uart.c      |  22 -
- arch/arm/mach-imx/devices/platform-imx2-wdt.c      |  18 -
- arch/arm/mach-imx/devices/platform-mxc-ehci.c      |   9 -
- arch/arm/mach-imx/devices/platform-mxc_nand.c      |   5 -
- arch/arm/mach-imx/devices/platform-pata_imx.c      |  10 -
- .../mach-imx/devices/platform-sdhci-esdhc-imx.c    |  24 -
- arch/arm/mach-imx/devices/platform-spi_imx.c       |  27 -
- arch/arm/mach-imx/ehci-imx5.c                      | 171 -----
- arch/arm/mach-imx/iomux-mx51.h                     | 827 ---------------------
- arch/arm/mach-imx/{imx51-dt.c => mach-imx51.c}     |   0
- 20 files changed, 15 insertions(+), 1271 deletions(-)
- delete mode 100644 arch/arm/mach-imx/devices-imx51.h
- delete mode 100644 arch/arm/mach-imx/ehci-imx5.c
- delete mode 100644 arch/arm/mach-imx/iomux-mx51.h
- rename arch/arm/mach-imx/{imx51-dt.c => mach-imx51.c} (100%)
-
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index a6ee115..19c609e 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -122,19 +122,6 @@ config SOC_IMX35
+ 	select PINCTRL_IMX35
+ 	select SMP_ON_UP if SMP
+ 
+-config SOC_IMX5
+-	bool
+-	select ARCH_HAS_CPUFREQ
+-	select ARCH_HAS_OPP
+-	select ARCH_MXC_IOMUX_V3
+-	select HAVE_IMX_SRC
+-	select MXC_TZIC
+-
+-config	SOC_IMX51
+-	bool
+-	select PINCTRL_IMX51
+-	select SOC_IMX5
+-
+ if ARCH_MULTI_V4T
+ 
+ comment "MX1 platforms:"
+@@ -704,6 +691,19 @@ if ARCH_MULTI_V7
+ 
+ comment "Device tree only"
+ 
++config SOC_IMX5
++	bool
++	select ARCH_HAS_CPUFREQ
++	select ARCH_HAS_OPP
++	select ARCH_MXC_IOMUX_V3
++	select HAVE_IMX_SRC
++	select MXC_TZIC
++
++config	SOC_IMX51
++	bool
++	select PINCTRL_IMX51
++	select SOC_IMX5
++
+ config	SOC_IMX50
+ 	bool "i.MX50 support"
+ 	select PINCTRL_IMX50
 -- 
 1.8.3.2
