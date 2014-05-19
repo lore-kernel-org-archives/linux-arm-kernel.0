@@ -1,56 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 May 2014 15:19:58 +0200
-Subject: [PATCHv3 1/3] ARM: mm: allow sub-architectures to override PCI
- I/O memory type
-In-Reply-To: <20140516095333.GE12341@arm.com>
-References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <11787153.NWVGbVfAPV@wuerfel> <20140516095333.GE12341@arm.com>
-Message-ID: <66413148.lBD9c9XUns@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 19 May 2014 14:28:37 +0100
+Subject: [linux-sunxi] Re: [PATCH v5 4/8] input: misc: Add driver for
+ AXP20x Power Enable Key
+In-Reply-To: <CAOQ7t2a=V_dO17Xg4VJUTV3W_OFCaE5Wuj15_Fox2jywjH+RPg@mail.gmail.com>
+References: <1398947374-3115-1-git-send-email-carlo@caione.org>
+ <1398947374-3115-5-git-send-email-carlo@caione.org>
+ <20140503010604.GE4090@lukather>
+ <20140519055745.GL29386@core.coreip.homeip.net>
+ <CAOQ7t2bPHnjfpeqQjMsYJs--qpd1_1RvBEFXztTDgnf5yW=Yxg@mail.gmail.com>
+ <20140519091553.GC4978@lee--X1>
+ <CAOQ7t2a=V_dO17Xg4VJUTV3W_OFCaE5Wuj15_Fox2jywjH+RPg@mail.gmail.com>
+Message-ID: <20140519132837.GI4978@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 May 2014 10:53:33 Will Deacon wrote:
-> On Thu, May 15, 2014 at 04:55:52PM +0100, Arnd Bergmann wrote:
-> > On Thursday 15 May 2014 16:34:30 Will Deacon wrote:
-> > > > If this is used to synchronize with a DMA, there is no guarantee that the
-> > > > transaction from PCI will be visible in memory by then.
-> > > 
-> > > Can you elaborate on this scenario please? When would we use an I/O space
-> > > write to synchronise with a DMA transfer from a PCI endpoint? You're
-> > > definitely referring to I/O space as opposed to Configuration Space, right?
-> > 
-> > Correct. Assume a PCI device uses PIO and DMA. It sends a DMA to main memory
-> > and lets the CPU know about the data using a level (IntA as opposed to MSI)
-> > interrupt. The CPU performs an outl() operation to an I/O port to let the
-> > hardware know it has received the IRQ and the response of the outl() is
-> > guaranteed to flush the DMA transaction: by the time the outl() completes
-> > we know that the data in memory is valid because it is strongly ordered
-> > relative to the DMA.
+On Mon, 19 May 2014, Carlo Caione wrote:
+
+> On Mon, May 19, 2014 at 11:15 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Mon, 19 May 2014, Carlo Caione wrote:
+> >
+> >> On Mon, May 19, 2014 at 7:57 AM, Dmitry Torokhov
+> >> <dmitry.torokhov@gmail.com> wrote:
+> >> > On Fri, May 02, 2014 at 06:06:04PM -0700, Maxime Ripard wrote:
+> >> >> On Thu, May 01, 2014 at 02:29:30PM +0200, Carlo Caione wrote:
+> >> >> > This patch add support for the Power Enable Key found on MFD AXP202 and
+> >> >> > AXP209. Besides the basic support for the button, the driver adds two
+> >> >> > entries in sysfs to configure the time delay for power on/off.
+> >> >> >
+> >> >> > Signed-off-by: Carlo Caione <carlo@caione.org>
+> >> >>
+> >> >> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >> >
+> >> > Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> >> >
+> >> > How are we merging it? MFD tree?
+> >>
+> >> No idea. Lee, can you help in merging it?
+> >> The only thing still  left out is the DT to be merged through Maxime
+> >> (I need to submit a v6 only for that).
+> >
+> > Yes.
+> >
+> > Weren't you in receipt of my email sent out an hour before this one?
 > 
-> Hmm, when you say `guaranteed to flush the DMA transaction', is that a PCI
-> requirement? If so, whether or not that DMA data is then visible to the CPU
-> is really specific to the host-controller implementation. It could easily be
-> buffered somewhere between the host controller and memory, for example.
-
-It's something that drivers are supposed to rely on, and the PCI host
-already has to make the same guarantee about ordering of MSI, MMIO-read
-and DMA transactions, all of which we definitely rely on in the kernel.
-
-> > outl() actually does a dsb() internally, but unfortunately that is
-> > before the store, not after, so I assume that a driver relying on the
-> > behavior above would still be racy.
+> Yes, but this email was sent before receiving yours :)
 > 
-> Yup, we'd need an additional dsb. I think we're confusing what the PCI
-> specification says about ordering and what the inb/outb instructions provide
-> on x86. It may well be that we want to emulate the x86 behaviour on ARM, but
-> that's not going to come cheap and I don't think it's a decision we should
-> take lightly.
+> > I thought you were re-sending the test though (v6?).
+> >
+> > If you can set that, complete with all the Acks, I'd be much obliged.
+> 
+> Ok, no problem. I'll also fix a small compilation-warning spotted by Hans.
 
-outb() is expected to be an extremely heavyweight operation, that's why nobody
-uses it. Why would you care about whether it's one or two microsecond latency
-on a MIDI port or an ISDN adapter?
+Great thanks, and sorry for all the typos, I was in a rush. :)
 
-We can decide that we don't care about correctness here, but the performance
-argument doesn't seem overly important.
-
-	Arnd
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
