@@ -1,38 +1,56 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 19 May 2014 12:51:36 +0200
-Subject: [PATCH v9 0/3] Exynos 5410 support
-In-Reply-To: <1400470640-30611-1-git-send-email-t.dakhran@samsung.com>
-References: <1400470640-30611-1-git-send-email-t.dakhran@samsung.com>
-Message-ID: <5379E238.1080803@gmail.com>
+Date: Mon, 19 May 2014 12:52:52 +0200
+Subject: [PATCH] Fix for possible null pointer dereference in dma.c
+In-Reply-To: <1400191076-28279-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+References: <1400191076-28279-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+Message-ID: <5379E284.7030700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tarek,
+Hi Rickard,
 
-On 19.05.2014 05:37, Tarek Dakhran wrote:
-> The series of patches represent support of Exynos 5410 SoC
+On 15.05.2014 23:57, Rickard Strandqvist wrote:
+> There is otherwise a risk of a possible null pointer dereference.
 > 
-> The Exynos 5410 is the first Samsung SoC based on big.LITTLE architecture
+> Was largely found by using a static code analysis program called cppcheck.
 > 
-> Patches add new platform description, support of clock controller and device
-> tree for Exynos 5410.
+> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
+> ---
+>  sound/soc/samsung/dma.c |   10 ++++++----
+>  1 fil ?ndrad, 6 till?gg(+), 4 borttagningar(-)
 > 
-> Has been build on Samsung Linux Kernel
->   (branch: for-next, commit: ccf5511 ARM: EXYNOS: Add MCPM call-back functions)
+> diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
+> index dc09b71..b1f6757 100644
+> --- a/sound/soc/samsung/dma.c
+> +++ b/sound/soc/samsung/dma.c
+> @@ -115,17 +115,19 @@ static void dma_enqueue(struct snd_pcm_substream *substream)
+>  static void audio_buffdone(void *data)
+>  {
+>  	struct snd_pcm_substream *substream = data;
+> -	struct runtime_data *prtd = substream->runtime->private_data;
+> +	struct runtime_data *prtd = NULL;
+>  
+>  	pr_debug("Entered %s\n", __func__);
+>  
+> -	if (prtd->state & ST_RUNNING) {
+> +	if(substream)
+> +		prtd = substream->runtime->private_data;
+> +
+> +	if (prtd && prtd->state & ST_RUNNING) {
+>  		prtd->dma_pos += prtd->dma_period;
+>  		if (prtd->dma_pos >= prtd->dma_end)
+>  			prtd->dma_pos = prtd->dma_start;
+>  
+> -		if (substream)
+> -			snd_pcm_period_elapsed(substream);
+> +		snd_pcm_period_elapsed(substream);
+>  
+>  		spin_lock(&prtd->lock);
+>  		if (!samsung_dma_has_circular()) {
+> 
 
-This doesn't look like an up-to-date tip of that branch. There was a lot
-of changes merged 2 days ago, especially from samsung-clk tree and your
-patches won't apply and/or compile (at least patch 2/3). Are you sure
-you didn't have a git fetch error?
-
-Moreover I can still see the dts using full-path syntax, instead of
-reference-based one and also no soc node, as I pointed in v8. [1]
-
-[1] https://lkml.org/lkml/2014/4/26/59
-
-Another thing is that I still see a custom fixed clock binding being
-used for oscclk in the clock driver, while I believe I pointed in some
-of the previous versions that generic fixed clock should be used.
+Can you find a path (or use case, if possible) on which any of affected
+pointers will be NULL?
 
 Best regards,
 Tomasz
