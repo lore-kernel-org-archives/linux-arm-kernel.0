@@ -1,23 +1,24 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 19 May 2014 19:37:29 +0300
-Subject: [PATCH v3 02/13] ARM: edma: Take the number of tc from
- edma_soc_info (pdata)
-In-Reply-To: <5379E5E6.9080500@ti.com>
-References: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
- <1400242640-9902-3-git-send-email-peter.ujfalusi@ti.com>
- <5379E5E6.9080500@ti.com>
-Message-ID: <537A3349.3030404@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 19 May 2014 17:40:17 +0100
+Subject: [PATCH] regulator: AXP20x: fix wrong call to of_find_node_by_name
+In-Reply-To: <1400487930-22949-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1400487930-22949-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140519164017.GG12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/2014 02:07 PM, Sekhar Nori wrote:
-> To which baseline do the patches apply? These lines are not present at
-> least in v3.15-rc5. I am applying the patch without this hunk.
+On Mon, May 19, 2014 at 10:25:30AM +0200, Boris BREZILLON wrote:
+> The of_find_node_by_name function will search for a DT node named
+> "regulators" after the provided np node, but will not ensure that this node
+> is a child of np.
+> This might result in retrieving a "regulators" node that is not related to
+> the axp20x PMIC.
 
-It is generate on top of linux-next-20140515.
-next picked up several patches since 3.15-rc and I also have my other patch in
-my working branch under this series:
-ARM: edma: Clean up and simplify the code around irq request
-
---
-P?ter
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140519/cbfc57cd/attachment.sig>
