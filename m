@@ -1,81 +1,141 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 19 May 2014 16:51:06 +0100
-Subject: [STLinux Kernel] [PATCH 3/4] ARM: DT: STi: Add DT node for
- MiPHY365x
-In-Reply-To: <537A265E.8080407@st.com>
-References: <1398756095-32542-1-git-send-email-lee.jones@linaro.org>
- <1398756095-32542-4-git-send-email-lee.jones@linaro.org>
- <537A265E.8080407@st.com>
-Message-ID: <20140519155106.GR4978@lee--X1>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 May 2014 08:57:33 -0700
+Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
+ support
+In-Reply-To: <5379D35F.8040207@ti.com>
+References: <53730AFB.2090800@ti.com> <20140514160216.GD18463@atomide.com>
+ <537487AE.3060906@ti.com> <20140515182133.GC23659@atomide.com>
+ <5375A8A8.7080306@ti.com> <20140516160717.GD22031@atomide.com>
+ <20140516174158.GA11733@earth.universe>
+ <20140516180154.GG22031@atomide.com>
+ <20140516213907.GL12881@atomide.com> <5379D35F.8040207@ti.com>
+Message-ID: <20140519155732.GA4849@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-> >devices. It has 2 ports which it can use for either; both SATA, both
-> >PCIe or one of each in any configuration.
-> >
-> >Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> >Acked-by: Mark Rutland <mark.rutland@arm.com>
-> >Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
-> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >---
-> >  arch/arm/boot/dts/stih416-b2020-revE.dts | 22 ++++++++++++++++++++++
-> >  arch/arm/boot/dts/stih416-b2020.dts      |  6 ++++++
-> >  arch/arm/boot/dts/stih416.dtsi           | 14 ++++++++++++++
-> >  3 files changed, 42 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/stih416-b2020-revE.dts
-> >
-> >diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
-> >new file mode 100644
-> >index 0000000..23fdaf7
-> >--- /dev/null
-> >+++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
-> >@@ -0,0 +1,22 @@
-> >+/*
-> >+ * Copyright (C) 2014 STMicroelectronics Limited.
-> >+ * Author: Lee Jones <lee.jones@linaro.org>
-> >+ *
-> >+ * This program is free software; you can redistribute it and/or modify
-> >+ * it under the terms of the GNU General Public License version 2 as
-> >+ * publishhed by the Free Software Foundation.
-> >+ */
-> >+/dts-v1/;
-> >+#include "stih416.dtsi"
-> >+#include "stih41x-b2020.dtsi"
-> >+/ {
-> >+        model = "STiH416 B2020 REV-E";
-> >+	compatible = "st,stih416-b2020", "st,stih416";
-> >+
-> >+	soc {
-> >+		miphy365x_phy: miphy365x at fe382000 {
-> >+			st,pcie-tx-pol-inv;
-> >+			st,sata-gen = <3>;
-> >+		};
-> >+	};
-> >+};
-> Shouldn't this new board being added in a separate patch?
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [140519 02:49]:
+> On 17/05/14 00:39, Tony Lindgren wrote:
+> 
+> >> AFAIK that remapping not needed at all. All that is already
+> >> available with the compatible flags.
+> > 
+> > And alternatively we can also just use the sharp,ls037v7dw01
+> > in the panel driver(s). We can have the panels bail out in driver
+> > probe based on of_machine_is_compatible if nothing else is available.
+> 
+> I don't think that would work. Then we could have two panel drivers,
+> both loaded into the kernel and both having the same driver name and the
+> same compatible-string.
+> 
+> I'm not sure if it's even possible to load both of those drivers at the
+> same time, but if it was, and the first one would get probe() called for
+> a device, and the driver would return an error, I'm quite sure the
+> driver framework won't continue trying with the other driver, as the
+> first driver already matched for the device.
 
-I certainly can do that, but I don't think that it's necessary?
+No need to load multiple drivers at this point. That's why I'm saying
+you can bail out on the undesired display controller probes using
+of_machine_is_compatible test. It's not that uncommon for drivers to do:
 
-> >diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
-> >index 276f28d..172f222 100644
-> >--- a/arch/arm/boot/dts/stih416-b2020.dts
-> >+++ b/arch/arm/boot/dts/stih416-b2020.dts
-> >@@ -13,4 +13,10 @@
-> >  	model = "STiH416 B2020";
-> >  	compatible = "st,stih416", "st,stih416-b2020";
-> >
-> >+	soc {
-> >+		miphy365x_phy: miphy365x at fe382000 {
-> >+			st,pcie-tx-pol-inv;
-> >+			st,sata-gen = <3>;
-> >+		};
-> >+	};
-> >  };
-> ...
+$ git grep of_machine_is_compatible drivers/ | wc -l
+116
+ 
+> > Also, currently the remapping code also probably keeps prepending
+> > more and more omapdss,omapdss,omapdss,... on each kexec reboot? And
+> 
+> I don't think so. The code looks for, say, "ti,tfp410", and it wouldn't
+> match for "omapdss,ti,tfp410".
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+OK
+ 
+> > it would be quite silly for each display controller to have to do
+> > their own remapping for shared panels?
+> 
+> It would, but wouldn't it be just as silly (well, even more silly in my
+> opinion) to have each display controller require driver specific
+> compatible strings for the panels used?
+
+Not driver specific, but hardware package specific. That's being done
+all the time. For example, compatible strings like "nvidia,tegra124",
+"ti,omap5" describe a package of an ARM core and various devices.
+
+But by using of_machine_is_compatible in the display drivers, you
+can use the right compatible flags from the start if you want to go
+that way.
+
+> Until we have a common display framework, we need _some_ way to handle
+> this problem. Either we mess up the .dts files as you suggest, or we
+> have a driver internal hack.
+
+It seems that there's no need to mess up the .dts files here by
+using the of_machine_is_compatible check in the drivers.
+ 
+> > If we still still despite all these reasons decide to go with
+> > the remapping of the compatible strings, it should really be a
+> > Linux generic (or drivers/video generic function), not implemented
+> > for each display controller.
+> 
+> Well, I sure hope nobody else has to implement similar thing.
+
+Suuuure.. I've heard that about 20 times before and guess what
+happenened? Things never got fixed until some poor maintainer
+had to start fixing it all over the place about three years later.
+ 
+> The reason why we have this code, and others do not, is mainly that
+> omapdss is maybe the first driver to implement the display components
+> properly, both in the SW side and in the .dts side, and that I wanted
+> omapdss to behave correctly even if there are other display
+> subsystems/panels compiled into the same kernel.
+> 
+> To open that up a bit, traditionally other display driver architectures
+> have not had drivers for each display "entity", like the panels. So you
+> would really just have the display subsystem in the .dts, and some raw
+> data there (panel timings) to get the panel running.
+
+Right, I believe that is the way to go, no doubt about it.
+ 
+> Now, with omapdss, we have separate drivers for each display entity.
+> Unfortunately those drivers are all tied to the omapdss driver's API
+> (and cannot thus be used on anything else than OMAP), as there's not yet
+> a driver framework for display entities (DRM is a bit different thing,
+> in my opinion).
+> 
+> Everything with that was simple with platform data, as the omap board
+> files created the panel devices, and there were no name clashing
+> problems with other platforms.
+> 
+> With DT that changed, as the bindings are common, and thus the
+> compatible strings are common also. But we still have omapdss specific
+> panel drivers. This is the reason we do the compatible-string conversion
+> hack. As soon as we can create platform agnostic panel drivers, we can
+> remove the hack.
+> 
+> And, I want to remind, it's an omapdss internal hack (after the patch I
+> sent), not visible to anyone else. The .dts files, the arch/arm files,
+> they are all not touched. So I don't quite understand why you see it as
+> such a bad thing. It's ugly, sure, but what harm does it do (except some
+> maintainer burden, for me)?
+
+Here's a list of things that bothers me:
+
+1. Searching through the dtb from a driver instead of relying on the
+   driver probe mechanism for the components in question. If the parsing
+   of the dtb needs to be done it should be done in a Linux generic way
+   from some framework instead.
+
+2. Having to do this all early before we even have any debug console
+   available. We are trying to move everything to happen later on to avoid
+   all the issues related to initializing things early.
+
+3. Having to maintain a database in kernel of display mappings separately
+   in addition to the .dts files.
+
+4. Having this hack limited to device tree based booting while we are
+   trying to unify the functions for drivers to use to get their
+   resources.
+
+5. Seeing the possibility of this spreading to other drivers.
+
+Regards,
+
+Tony
