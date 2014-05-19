@@ -1,74 +1,61 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Mon, 19 May 2014 14:35:42 +0530
-Subject: [PATCH 0/9] arm64: KVM: debug infrastructure support
-In-Reply-To: <1399476054-21571-1-git-send-email-marc.zyngier@arm.com>
-References: <1399476054-21571-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CALrVBkscsWxRsS42eJi9deFeaBbjQMKq9R2e-u5ztu70rKUvUw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 May 2014 11:07:51 +0200
+Subject: [PATCH 2/3] mmc: Add APM X-Gene SoC SDHC controller support to
+ Arasan SDHCI driver
+In-Reply-To: <1400398918-1502-3-git-send-email-lho@apm.com>
+References: <1400398918-1502-1-git-send-email-lho@apm.com>
+ <1400398918-1502-2-git-send-email-lho@apm.com>
+ <1400398918-1502-3-git-send-email-lho@apm.com>
+Message-ID: <5286335.Al3nIKDAQo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 May 2014 20:50, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> This patch series adds debug support, a key feature missing from the
-> KVM/arm64 port.
->
-> The main idea is to keep track of whether the debug registers are
-> "dirty" (changed by the guest) or not. In this case, perform the usual
-> save/restore dance, for one run only. It means we only have a penalty
-> if a guest is actually using the debug registers.
->
-> The huge amount of registers is properly frightening, but CPUs
-> actually only implement a subset of them. Also, there is a number of
-> registers we don't bother emulating (things having to do with external
-> debug and OSlock).
->
-> This has been tested on a Cortex-A57 platform, running both 32 and
-> 64bit guests, on top of 3.15-rc4. This code also lives in my tree in
-> the kvm-arm64/debug-trap branch.
->
-> Marc Zyngier (9):
->   arm64: KVM: rename pm_fake handler to trap_wi_raz
->   arm64: move DBG_MDSCR_* to asm/debug-monitors.h
->   arm64: KVM: add trap handlers for AArch64 debug registers
->   arm64: KVM: common infrastructure for handling AArch32 CP14/CP15
->   arm64: KVM: use separate tables for AArch32 32 and 64bit traps
->   arm64: KVM: check ordering of all system register tables
->   arm64: KVM: add trap handlers for AArch32 debug registers
->   arm64: KVM: implement lazy world switch for debug registers
->   arm64: KVM: enable trapping of all debug registers
->
->  arch/arm64/include/asm/debug-monitors.h |  19 +-
->  arch/arm64/include/asm/kvm_asm.h        |  39 ++-
->  arch/arm64/include/asm/kvm_coproc.h     |   3 +-
->  arch/arm64/include/asm/kvm_host.h       |  12 +-
->  arch/arm64/kernel/asm-offsets.c         |   1 +
->  arch/arm64/kernel/debug-monitors.c      |   9 -
->  arch/arm64/kvm/handle_exit.c            |   4 +-
->  arch/arm64/kvm/hyp.S                    | 457 ++++++++++++++++++++++++++++-
->  arch/arm64/kvm/sys_regs.c               | 494 +++++++++++++++++++++++++++-----
->  9 files changed, 940 insertions(+), 98 deletions(-)
->
-> --
-> 1.8.3.4
->
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+On Sunday 18 May 2014 01:41:57 Loc Ho wrote:
+> @@ -34,6 +36,19 @@
+>   */
+>  struct sdhci_arasan_data {
+>  	struct clk	*clk_ahb;
+> +	struct platform_device *pdev;
+> +	void __iomem	*ahb_aim_csr;
+> +	const struct sdhci_arasan_ahb_ops *ahb_ops;
+> +};
+> +
+> +/**
+> + * struct sdhci_arasan_ahb_ops
+> + * @init_ahb	Initialize translation bus
+> + * @xlat_addr	Set up an 64-bit addressing translation
+> + */
+> +struct sdhci_arasan_ahb_ops {
+> +	int (*init_ahb)(struct sdhci_arasan_data *data);
+> +	void (*xlat_addr)(struct sdhci_arasan_data *data, u64 dma_addr);
+>  };
+>  
+>  static unsigned int sdhci_arasan_get_timeout_clock(struct sdhci_host *host)
+> @@ -51,7 +66,21 @@ static unsigned int sdhci_arasan_get_timeout_clock(struct sdhci_host *host)
+>  	return freq;
+>  }
+>  
+> +static void sdhci_arasan_writel(struct sdhci_host *host, u32 val, int reg)
+> +{
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct sdhci_arasan_data *sdhci_arasan = pltfm_host->priv;
+> +
+> +	if (reg == SDHCI_DMA_ADDRESS) {
+> +		if (sdhci_arasan->ahb_ops && sdhci_arasan->ahb_ops->xlat_addr)
+> +			sdhci_arasan->ahb_ops->xlat_addr(sdhci_arasan,
+> +				sg_dma_address(host->data->sg));
+> +	}
+> +	writel(val, host->ioaddr + reg);
+> +}
+> +
+>  static struct sdhci_ops sdhci_arasan_ops = {
+> +	.write_l = sdhci_arasan_writel,
+>  	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
+>  	.get_timeout_clock = sdhci_arasan_get_timeout_clock,
+>  };
 
-Hi Marc,
+This looks like you are doing it at the wrong place. From what I understand,
+you are using the AHB inbound window as a minimal IOMMU. Why don't you make
+this a proper IOMMU driver instead and leave the SDHCI driver unchanged?
 
-Overall the patchset looks good to me.
-
-The debug register usage by Guest will be very rare
-so a lazy save/restore makes lot-of-sense here.
-
-The only concern here is that amount of time spend in
-world-switch will increase for Guest once Guest starts
-accessing debug registers.
-
-I was wondering if it is possible to detect that Guest
-has stopped using debug HW and we can mark debug
-state as clean. (or something similar)
-
-Regards,
-Anup
+	Arnd
