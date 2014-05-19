@@ -1,79 +1,47 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Mon, 19 May 2014 13:25:53 +0300
-Subject: [Patch v3 3/5] ARM: keystone: remove redundant reset stuff
-In-Reply-To: <1400495155-11136-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1400495155-11136-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1400495155-11136-4-git-send-email-ivan.khoronzhuk@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 May 2014 12:26:35 +0200
+Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
+References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <4391809.OTRCiJQXS4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove reset stuff in flavour of using keystone reset driver:
-driver/power/reset/keystone-reset.c
+On Friday 16 May 2014 14:23:18 Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+> 
+> This commit introduces a generic device tree binding for IOMMU devices.
+> Only a very minimal subset is described here, but it is enough to cover
+> the requirements of both the Exynos System MMU and Tegra SMMU as
+> discussed here:
+> 
+>     https://lkml.org/lkml/2014/4/27/346
+> 
+> More advanced functionality such as the dma-ranges property can easily
+> be added in a backwards-compatible way. In the absence of a dma-ranges
+> property it should be safe to default to the whole address space.
+> 
 
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
- arch/arm/mach-keystone/keystone.c | 35 -----------------------------------
- 1 file changed, 35 deletions(-)
+The basic binding looks fine, but I'd like it to be more explicit
+about dma-ranges. Most importantly, what does "the whole address space"
+mean? A lot of IOMMUs have only 32-bit bus addresses when targetted
+by a bus master, it would also be normal for some to be smaller and
+some might even support 64-bit.
 
-diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
-index e0b9e1b..c96e2a4 100644
---- a/arch/arm/mach-keystone/keystone.c
-+++ b/arch/arm/mach-keystone/keystone.c
-@@ -23,24 +23,8 @@
- 
- #include "keystone.h"
- 
--#define PLL_RESET_WRITE_KEY_MASK		0xffff0000
--#define PLL_RESET_WRITE_KEY			0x5a69
--#define PLL_RESET				BIT(16)
--
--static void __iomem *keystone_rstctrl;
--
- static void __init keystone_init(void)
- {
--	struct device_node *node;
--
--	node = of_find_compatible_node(NULL, NULL, "ti,keystone-reset");
--	if (WARN_ON(!node))
--		pr_warn("ti,keystone-reset node undefined\n");
--
--	keystone_rstctrl = of_iomap(node, 0);
--	if (WARN_ON(!keystone_rstctrl))
--		pr_warn("ti,keystone-reset iomap error\n");
--
- 	keystone_pm_runtime_init();
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
-@@ -50,24 +34,6 @@ static const char *keystone_match[] __initconst = {
- 	NULL,
- };
- 
--void keystone_restart(enum reboot_mode mode, const char *cmd)
--{
--	u32 val;
--
--	BUG_ON(!keystone_rstctrl);
--
--	/* Enable write access to RSTCTRL */
--	val = readl(keystone_rstctrl);
--	val &= PLL_RESET_WRITE_KEY_MASK;
--	val |= PLL_RESET_WRITE_KEY;
--	writel(val, keystone_rstctrl);
--
--	/* Reset the SOC */
--	val = readl(keystone_rstctrl);
--	val &= ~PLL_RESET;
--	writel(val, keystone_rstctrl);
--}
--
- DT_MACHINE_START(KEYSTONE, "Keystone")
- #if defined(CONFIG_ZONE_DMA) && defined(CONFIG_ARM_LPAE)
- 	.dma_zone_size	= SZ_2G,
-@@ -75,5 +41,4 @@ DT_MACHINE_START(KEYSTONE, "Keystone")
- 	.smp		= smp_ops(keystone_smp_ops),
- 	.init_machine	= keystone_init,
- 	.dt_compat	= keystone_match,
--	.restart	= keystone_restart,
- MACHINE_END
--- 
-1.8.3.2
+For the upstream side, I'd hope we always have access to the full
+physical memory, but since this is a brand-new binding, it should
+be straightforward to just ask for upstream dma-ranges properties
+to be set all the way up to the root to confirm that.
+
+For downstream, we don't actually have a good place to put the
+dma-ranges property. We can't put it into the iommu node, because
+that would imply translating to the iommu's parent bus, not the
+iommu's own bus space. We also can't put it into the master, because
+dma-ranges is supposed to be in the parent bus. Finally, it makes
+no sense to use the dma-ranges property of the master's parent bus,
+because that bus isn't actually involved in the translation.
+
+My preferred option would be to always put the address range into
+the iommu descriptor, using the iommu's #address-cells.
+
+	Arnd
