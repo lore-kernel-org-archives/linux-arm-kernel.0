@@ -1,180 +1,135 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 20 May 2014 10:11:03 +0900
-Subject: [GIT PULL 2/5] Samsung clock updates for 3.16
-Message-ID: <014501cf73c8$5eb66960$1c233c20$@samsung.com>
+Date: Tue, 20 May 2014 10:11:41 +0900
+Subject: [GIT PULL 4/5] Samsung DT updates for 3.16
+Message-ID: <014701cf73c8$752a65c0$5f7f3140$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 34c453ce16633539a94a2e876faeb731ac1be899:
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 
-  ARM: S3C24XX: fix merge conflict (2014-05-15 05:54:38 +0900)
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
 
 are available in the git repository at:
 
   http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-clk
+tags/samsung-dt
 
-for you to fetch changes up to 6520e968eef4f88c076a84a80e026049d157132e:
+for you to fetch changes up to b5839bd87f197e133a0025c36df286eab6e1d858:
 
-  clk: exynos5420: Add 5800 specific clocks (2014-05-19 22:15:08 +0900)
-
-----------------------------------------------------------------
-Samsung clock updates for 3.16
-
-In this time, it is having dependency with arch/arm/ for 3.16,
-I pulled them into samsung tree from Tomasz under agreement from Mike.
-
-- Pull for_3.16/exynos5260 from Tomasz Figa:
-
-  "This pull request contains patches preparing Samsung Common Clock
-Framework
-  helpers to support Exynos5260 by adding support for multiple clock
-providers
-  and then adding clock driver for Exynos5260."
-
-- Pull for_3.16/clk_fixes_non_critical from Tomasz Figa:
-
-  "This pull requests contains a number of non-critical fixes for Samsung
-clock
-  framework and drivers, including:
-  1) a series of fixes for Exynos5420 to correct clock definitions and make
-the
-  driver closer to the documentation,
-  2) several missing clocks and clock IDs added to Exynos4, Exynos5250 and
-  Exynos5420 drivers,
-  3) fix for incorrect initialization of clock table with NULL,
-  4) compiler warning fix."
-
-- Pull for_3.16/clk_cleanup from Tomasz Figa:
-
-  "This pull requests contains minor clean-up related to Samsung clock
-  support, including:
-  1) move Kconfig entries of Samsung clock drivers to drivers/clk,
-  2) compile drivers/clk/samsung conditionally when COMMON_CLK_SAMSUNG is
-  selected,
-  3) remove obsolete Kconfig lines after moving s3c24xx to CCF."
-
-- Pull for_3.16/exynos3250 from Tomasz Figa:
-
-  "This small pull request contains a patch adding clock driver for
-Exynos3250,
-  which depends on previous pull requests in this series."
-
-- add dt bindings for exynos3250 clock
-- add exynos5800 specific clocks in current exynos5420 clock
-
-Note that this branch is based on s3c24xx ccf branch
+  ARM: dts: Add MFC memory banks to exynos5420 boards (2014-05-20 01:04:13
++0900)
 
 ----------------------------------------------------------------
-Alim Akhtar (1):
-      clk: exynos5420: Add 5800 specific clocks
+Samsung DT updates for v3.16
 
-Arun Kumar K (2):
-      clk: samsung: exynos5250: Add clocks for G3D
-      clk: samsung: exynos5420: Add clock IDs needed by GPU
+- exynos4
+  : add missing pinctrls
 
-Chanwoo Choi (1):
-      dt-bindings: add documentation for Exynos3250 clock controller
+- exynos4412-trats2
+  : update camera nodes and add rear camera nodes
+  : rename alias for i2c_ak8975 label
+  Update camera nodes for exynos4 and exynos4412-trats2
 
-Kukjin Kim (4):
-      Merge branch 'for_3.16/exynos5260' of
-git://git.kernel.org/.../tfiga/samsung-clk into v3.16-next/clk-samsung
-      Merge branch 'for_3.16/clk_fixes_non_critical' of
-git://git.kernel.org/.../tfiga/samsung-clk into v3.16-next/clk-samsung
-      Merge branch 'for_3.16/clk_cleanup' of
-git://git.kernel.org/.../tfiga/samsung-clk into v3.16-next/clk-samsung
-      Merge branch 'for_3.16/exynos3250' of
-git://git.kernel.org/.../tfiga/samsung-clk into v3.16-next/clk-samsung
+- exynos5250
+  : update DWC3 usb controller and enable to use generic USB DRD phy
 
-Naveen Krishna Chatradhi (1):
-      clk: samsung: exynos5250/5420: Add gate clock for SSS module
+- exynos5250-snow
+  : enable dp-controller, fimd, hdmi and pwm backlight
+  : add sound node and Vbus regulator for USB 3.0
+  : add tps65090 power regulator
+  : add pinctrl for EC irq and i2c-arbitrator
 
-Pankaj Dubey (6):
-      clk/samsung: add support for pll2550xx
-      clk: samsung: fixed compiler warning [-Wpointer-to-int-cast]
-      clk: samsung: add new Kconfig for Samsung common clock option
-      ARM: select COMMON_CLK_SAMSUNG for ARCH_EXYNOS and ARCH_S3C64XX
-      ARM: S3C24XX: move S3C24XX clock Kconfig options to Samsung clock
-Kconfig file
-      drivers: clk: use COMMON_CLK_SAMSUNG for Samsung clock support
+- exynos5420
+  : change to correct compatible string for hdmi
+  : add PD entry to MFC codec and enable DWC3 and USB 3.0 PHY
+  : add MFC memory banks for smdk5420 and arndale-octa boards
 
-Rahul Sharma (4):
-      clk/samsung: add support for multiple clock providers
-      clk/samsung: add support for pll2650xx
-      clk/exynos5260: add macros and documentation for exynos5260
-      clk/exynos5260: add clock file for exynos5260
+- exynos5420-peach-pit
+  : add support exynos5420 based peach-pit board
+  : add sound node and Vbus regulatro for USB 3.0
+  : enable dp-controller, fimd
 
-Sachin Kamat (1):
-      clk: samsung: exynos5420: Fix VPLL lock offset
+- exynos5420-smdk5420
+  : add Vbus regulatro for USB 3.0
 
-Shaik Ameer Basha (15):
-      clk: samsung: exynos5420: Rename mux parent arrays
-      clk: samsung: exynos5420: add clocks for ISP block
-      clk: samsung: exynos5420: update clocks for GSCL and MSCL blocks
-      clk: samsung: exynos5420: fix parent clocks for mscl sysmmu
-      clk: samsung: exynos5420: update clocks for G2D and G3D blocks
-      clk: samsung: exynos5420: update clocks for DISP1 block
-      clk: samsung: exynos5420: update clocks for PERIC block
-      clk: samsung: exynos5420: update clocks for PERIS and GEN blocks
-      clk: samsung: exynos5420: update clocks for WCORE block
-      clk: samsung: exynos5420: update clocks for FSYS and FSYS2 blocks
-      clk: samsung: exynos5420: correct sysmmu-mfc parent clocks
-      clk: samsung: exynos5420: fix register offset for sclk_bpll
-      clk: samsung: exynos5420: update clocks for MAU Block
-      clk: samsung: exynos5420: add misc clocks
-      clk: samsung: exynos5420: add more registers to restore list
+- use generic DT bindings for map SYSRAM
 
-Sylwester Nawrocki (1):
-      clk: samsung: exynos4: Use single clock ID for CLK_MDMA gate clocks
+----------------------------------------------------------------
+Ajay Kumar (2):
+      ARM: dts: Add pwmX_out pinctrl nodes to exynos5250
+      ARM: dts: enable pwm backlight for exynos5250-snow
 
-Tomasz Figa (3):
-      clk: samsung: Initialize clock table with error pointers
-      ARM: S3C24XX: Remove omitted Kconfig selects and conditionals
-      clk: samsung: exynos3250: Add clocks using common clock framework
+Arun Kumar K (3):
+      ARM: dts: Add pwmX_out pinctrl nodes to exynos5420
+      ARM: dts: Add node labels to exynos5420
+      ARM: dts: Add exynos5420 peach-pit board support
 
-Tomasz Stanislawski (1):
-      clk: samsung: exynos4: export sclk_hdmiphy clock
+Doug Anderson (3):
+      ARM: dts: add pinctrl for i2c-arbitrator of exynos5250-snow
+      ARM: dts: add pinctrl for EC irq of exynos5250-snow
+      ARM: dts: add tps65090 power regulator for exynos5250-snow
 
- .../devicetree/bindings/clock/exynos3250-clock.txt |   41 +
- .../devicetree/bindings/clock/exynos5260-clock.txt |  190 ++
- .../devicetree/bindings/clock/exynos5420-clock.txt |    3 +-
- .../bindings/clock/samsung,s3c2410-clock.txt       |    2 +-
- arch/arm/Kconfig                                   |    4 +-
- arch/arm/boot/dts/exynos5420.dtsi                  |   14 +-
- arch/arm/mach-s3c24xx/Kconfig                      |   37 +-
- drivers/clk/Kconfig                                |    2 +
- drivers/clk/Makefile                               |    2 +-
- drivers/clk/samsung/Kconfig                        |   26 +
- drivers/clk/samsung/Makefile                       |    2 +
- drivers/clk/samsung/clk-exynos3250.c               |  780 ++++++++
- drivers/clk/samsung/clk-exynos4.c                  |   51 +-
- drivers/clk/samsung/clk-exynos5250.c               |   41 +-
- drivers/clk/samsung/clk-exynos5260.c               | 1980
+Rahul Sharma (7):
+      ARM: dts: enable hdmi for exynos5250 based snow board
+      ARM: dts: change to correct compatible string for exynos5420 hdmi
+      ARM: dts: enable hdmi for exynos5420-peach-pit board
+      ARM: dts: enable fimd for exynos5250-snow board
+      ARM: dts: enable dp-controller for exynos5250-snow board
+      ARM: dts: enable fimd for exynos5420 based peach-pit board
+      ARM: dts: enable dp-controller for exynos5420-peach-pit board
+
+Sachin Kamat (4):
+      ARM: EXYNOS: Map SYSRAM through generic DT bindings
+      devicetree: bindings: document SYSRAM binding
+      ARM: dts: Add PD entry to MFC codec on exynos5420
+      ARM: dts: Add MFC memory banks to exynos5420 boards
+
+Sylwester Nawrocki (2):
+      ARM: dts: Update camera nodes for exynos4 and exynos4412-trats2
+      ARM: dts: Add rear camera nodes for exynos4412-trats2
+
+Tomasz Stanislawski (2):
+      ARM: dts: add missing pinctrls for I2C of exynos4
+      ARM: dts: rename alias for i2c_ak8975 label for exynos4412-trats2
+
+Tushar Behera (2):
+      ARM: dts: Add sound node for exynos5250-snow board
+      ARM: dts: Add sound node for exynos5420-peach-pit board
+
+Vivek Gautam (7):
+      ARM: dts: Enable support for USB 3.0 PHY controller for exynos5420
+      ARM: dts: Enable support for DWC3 controller for exynos5420
+      ARM: dts: Enable support for generic USB DRD phy for exynos5250
+      ARM: dts: Update DWC3 usb controller to use new phy driver for
+exynos5250
+      ARM: dts: Add Vbus regulator for USB 3.0 on exynos5250-snow
+      ARM: dts: Add Vbus regulator for USB 3.0 on exynos5420-peach-pit
+      ARM: dts: Add Vbus regulator for USB 3.0 on exynos5420-smdk5420
+
+ .../devicetree/bindings/arm/exynos/smp-sysram.txt  |   38 +++
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/exynos4.dtsi                     |   18 +-
+ arch/arm/boot/dts/exynos4210-universal_c210.dts    |   15 +
+ arch/arm/boot/dts/exynos4210.dtsi                  |   18 ++
+ arch/arm/boot/dts/exynos4412-trats2.dts            |   79 +++++-
+ arch/arm/boot/dts/exynos4x12.dtsi                  |   18 ++
+ arch/arm/boot/dts/exynos5250-cros-common.dtsi      |    6 +-
+ arch/arm/boot/dts/exynos5250-pinctrl.dtsi          |   28 ++
+ arch/arm/boot/dts/exynos5250-snow.dts              |  224 +++++++++++++++
+ arch/arm/boot/dts/exynos5250.dtsi                  |   38 ++-
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts      |    5 +
+ arch/arm/boot/dts/exynos5420-peach-pit.dts         |  287
 ++++++++++++++++++++
- drivers/clk/samsung/clk-exynos5260.h               |  459 +++++
- drivers/clk/samsung/clk-exynos5420.c               | 1127 +++++++----
- drivers/clk/samsung/clk-exynos5440.c               |   18 +-
- drivers/clk/samsung/clk-pll.c                      |  223 ++-
- drivers/clk/samsung/clk-pll.h                      |    2 +
- drivers/clk/samsung/clk-s3c2410.c                  |   51 +-
- drivers/clk/samsung/clk-s3c2412.c                  |   29 +-
- drivers/clk/samsung/clk-s3c2443.c                  |   46 +-
- drivers/clk/samsung/clk-s3c64xx.c                  |   44 +-
- drivers/clk/samsung/clk.c                          |  123 +-
- drivers/clk/samsung/clk.h                          |   72 +-
- include/dt-bindings/clock/exynos3250.h             |  258 +++
- include/dt-bindings/clock/exynos4.h                |    2 +-
- include/dt-bindings/clock/exynos5250.h             |    5 +-
- include/dt-bindings/clock/exynos5260-clk.h         |  469 +++++
- include/dt-bindings/clock/exynos5420.h             |   43 +-
- 31 files changed, 5543 insertions(+), 603 deletions(-)
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |   28 ++
+ arch/arm/boot/dts/exynos5420-smdk5420.dts          |   51 ++++
+ arch/arm/boot/dts/exynos5420.dtsi                  |  106 +++++++-
+ arch/arm/mach-exynos/common.h                      |    1 +
+ arch/arm/mach-exynos/exynos.c                      |   64 -----
+ arch/arm/mach-exynos/firmware.c                    |    8 +-
+ arch/arm/mach-exynos/include/mach/map.h            |    7 -
+ arch/arm/mach-exynos/platsmp.c                     |   56 +++-
+ 22 files changed, 984 insertions(+), 113 deletions(-)
  create mode 100644
-Documentation/devicetree/bindings/clock/exynos3250-clock.txt
- create mode 100644
-Documentation/devicetree/bindings/clock/exynos5260-clock.txt
- create mode 100644 drivers/clk/samsung/Kconfig
- create mode 100644 drivers/clk/samsung/clk-exynos3250.c
- create mode 100644 drivers/clk/samsung/clk-exynos5260.c
- create mode 100644 drivers/clk/samsung/clk-exynos5260.h
- create mode 100644 include/dt-bindings/clock/exynos3250.h
- create mode 100644 include/dt-bindings/clock/exynos5260-clk.h
+Documentation/devicetree/bindings/arm/exynos/smp-sysram.txt
+ create mode 100644 arch/arm/boot/dts/exynos5420-peach-pit.dts
