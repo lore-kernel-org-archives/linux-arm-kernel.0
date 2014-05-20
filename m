@@ -1,157 +1,170 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 20 May 2014 23:32:04 +0200
-Subject: [PATCH v3 4/9] of: mtd: add documentation for the ONFI NAND timing
- mode property
-In-Reply-To: <20140520195240.GW28907@ld-irv-0074>
-References: <1394647664-8258-1-git-send-email-b.brezillon.dev@gmail.com>
- <1394647664-8258-5-git-send-email-b.brezillon.dev@gmail.com>
- <20140520182542.GS28907@ld-irv-0074> <537BAD59.3060902@free-electrons.com>
- <20140520195240.GW28907@ld-irv-0074>
-Message-ID: <537BC9D4.6070200@free-electrons.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 20 May 2014 23:38:30 +0200
+Subject: [PATCH] clk: exynos5250: Add missing sysmmu clocks for DISP and
+ ISP blocks
+In-Reply-To: <CAOD6ATq2A1yJM-Mw+4k0Vt-bLYSJ6-yO66Zj=p1NPOrUDuTgMQ@mail.gmail.com>
+References: <1399900817-10544-1-git-send-email-shaik.ameer@samsung.com>
+ <CAOD6ATq2A1yJM-Mw+4k0Vt-bLYSJ6-yO66Zj=p1NPOrUDuTgMQ@mail.gmail.com>
+Message-ID: <537BCB56.4000107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Shaik,
 
-On 20/05/2014 21:52, Brian Norris wrote:
-> On Tue, May 20, 2014 at 09:30:33PM +0200, Boris BREZILLON wrote:
->> Hi Brian,
+On 20.05.2014 06:08, Shaik Ameer Basha wrote:
+> Hi Tomasz,
+> 
+> Any comments on this patch ?
+
+Looks good.
+
+Kukjin, if you still can pick this up to your tree for 3.16, since all
+the dependencies are already there, then
+
+Acked-by: Tomasz Figa <t.figa@samsung.com>
+
+If not, I will pick it up to my tree for 3.17.
+
+Best regards,
+Tomasz
+
+> 
+> Regards,
+> Shaik
+> 
+> On Mon, May 12, 2014 at 6:50 PM, Shaik Ameer Basha
+> <shaik.ameer@samsung.com> wrote:
+>> From: Cho KyongHo <pullip.cho@samsung.com>
 >>
->> On 20/05/2014 20:25, Brian Norris wrote:
->>> Hi Boris,
->>>
->>> On Wed, Mar 12, 2014 at 07:07:39PM +0100, Boris BREZILLON wrote:
->>>> Add documentation for the ONFI NAND timing mode property.
->>>>
->>>> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
->>>> ---
->>>>  Documentation/devicetree/bindings/mtd/nand.txt |    8 ++++++++
->>>>  1 file changed, 8 insertions(+)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/mtd/nand.txt b/Documentation/devicetree/bindings/mtd/nand.txt
->>>> index b53f92e..2046027 100644
->>>> --- a/Documentation/devicetree/bindings/mtd/nand.txt
->>>> +++ b/Documentation/devicetree/bindings/mtd/nand.txt
->>>> @@ -19,3 +19,11 @@ errors per {size} bytes".
->>>>  The interpretation of these parameters is implementation-defined, so not all
->>>>  implementations must support all possible combinations. However, implementations
->>>>  are encouraged to further specify the value(s) they support.
->>>> +
->>>> +- onfi,nand-timing-mode: an integer encoding the supported ONFI timing modes of
->>>> +  the NAND chip. Each supported mode is represented as a bit position (i.e. :
->>>> +  mode 0 and 1 => (1 << 0) | (1 << 1) = 0x3).
->>>> +  This is only used when the chip does not support the ONFI standard.
->>>> +  The last bit set represent the closest mode fulfilling the NAND chip timings.
->>>> +  For a full description of the different timing modes see this document:
->>>> +  www.onfi.org/~/media/ONFI/specs/onfi_3_1_spec.pdf
->>> I'm not 100% convinced this property should go in the device tree. With
->>> most other flash properties (device size, page size, and even minimum
->>> ECC requirements), we try to auto-detect these parameters to some
->>> extent. ONFI makes it easy for some class of chips, but for others, we
->>> typically rely on an in-kernel device ID table or ID decoding heuristic
->>> -- we don't require a DT description of every property of the flash. So
->>> what makes this property different?
->> AFAICT nothing, but the same goes for the ECC requirements, and we've
->> recently added DT bindings to define these requirements.
->> I'm not telling we should drop these ECC requirements bindings (actually
->> I'm using them :-)), but what's different with the timings requirements ?
-> ECC selection is not quite as scientific; with ECC, there are external
-> factors that influence the ECC mode that you should use, since any data
-> read/written from Linux has to be compatible with any data read/written
-> with another entity (e.g., bootloader). Note that the ECC bindings do
-> not represent a property of the flash chip itself (i.e., they don't hold
-> the "minimum required ECC strength"), but of the entire flash system
-> (i.e., "what ECC must I use to play nicely with the rest of the world").
-
-If the ECC bindings don't encode the "minimum required ECC strength" but
-rather the "ECC config on a specific board" then I guess "minimum
-required ECC strength" for non-ONFI chips should be defined somewhere
-else (stored in the device ID table ?).
-
-Actually, in the sunxi NAND controller driver, I'm using the DT defined
-ECC config when the NAND does not support ONFI timings retrieval.
-
->
-> With timing modes, this is purely a property of the flash chip, and we
-> do not have to synchronize it with the bootloader. We don't exactly care
-> if a bootloader and Linux use slightly different timing modes.
-
-Agreed.
-
-
->
->> Moreover, we will end up with a lot of new entries in the device ID
->> table if we decide to put these informations in this table.
-> Yes, that could be a problem.
->
-> What sort of non-ONFI flash chips do you have that need this property?
-
-I only have the Hynix one defined in my patch series.
-Other people tested my driver on different boards but I don't recall
-exactly which NAND they had (a samsung one IIRC).
-
-> And what timing mode(s) do they use? Is there, for instance, a pattern
-> such that all Hynix MLC of a certain generation use a particular timing
-> mode?
-
-I'll take a look.
-
->
->>> I realize that we may not include device ID entries for every flash that
->>> you need in the ID table (although we still are able to detect the
->>> important properties accurately, like page and block size). But would it
->>> suffice to default these flash to a lowest common timing mode, like mode
->>> 0?
->> IMHO this is not a good solution: you'll end up with lower perfomances
->> on most of the supported NAND chips and I'm not sure this is what we want.
-> No, we wouldn't want to always use mode 0. But it's possible we can get
-> good enough heuristics for most flash, if we can integrate timing modes
-> into the current extended ID decoding. Not sure.
->
-> I'm also concerned here that this kind of binding will be difficult to
-> use properly. A user/developer/board-designer would have to read the
-> datasheet and compare all its values to the ONFI spec to find the
-> closest match, and they would have to do this for each new flash they
-> use. If we can help them by autodetecting this, that would be great.
- 
-
->
->>> If no other option works well, then I am still open to describing the
->>> supported timing modes in the DT.
->>>
->>> BTW, this bitfield property looks kinda strange to me. Do non-ONFI flash
->>> typically support multiple timing modes? And if so, how are we supposed
->>> to *change* modes? AFAIK, ONFI provides the only standard for
->>> configuring the flash's timing mode. So maybe you're really only wanting
->>> a "default timing mode" property that is a single integer, not a
->>> bitfield.
->> Indeed, I based it on the ONFI NAND timings mode model, but AFAIK (tell
->> me if I'm wrong), it should work because most of the timings are min
->> requirements.
->> This means, even if you provide slower signals transitions, the NAND
->> will work as expected.
-> So you're saying that even though the chip actually specifies a single
-> set of timings, you would describe this as a bitmask of several
-> supported ONFI timing modes, up to the "max performance"?
->
-> Is there ever a case where (for instance) a non-ONFI flash supports the
-> equivalent of timing mode 3, but it does not support mode 2 or 1?
-
-I don't think so.
-
->> But I can modify the bindings to just encode the maximum supported
->> timing mode.
-> AIUI, the non-ONFI datasheets really only specify a single timing mode,
-> so I think we should only specify the "max." And as a bonus, this
-> actually makes the binding easier to use. A driver does not care about
-> how many different modes are supported; it only needs to know what the
-> max is.
-
-Agreed, actually my first binding was defining it this way.
-
->
-> Brian
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+>> This patch adds the missing sysmmu clocks for Display and
+>> ISP blocks.
+>>
+>> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+>> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+>> ---
+>>  drivers/clk/samsung/clk-exynos5250.c   |   35 ++++++++++++++++++++++++++++++++
+>>  include/dt-bindings/clock/exynos5250.h |   16 +++++++++++++++
+>>  2 files changed, 51 insertions(+)
+>>
+>> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+>> index 65cb966..3bc8f40 100644
+>> --- a/drivers/clk/samsung/clk-exynos5250.c
+>> +++ b/drivers/clk/samsung/clk-exynos5250.c
+>> @@ -28,6 +28,8 @@
+>>  #define MPLL_CON0              0x4100
+>>  #define SRC_CORE1              0x4204
+>>  #define GATE_IP_ACP            0x8800
+>> +#define GATE_IP_ISP0           0xc800
+>> +#define GATE_IP_ISP1           0xc804
+>>  #define CPLL_LOCK              0x10020
+>>  #define EPLL_LOCK              0x10030
+>>  #define VPLL_LOCK              0x10040
+>> @@ -145,6 +147,8 @@ static unsigned long exynos5250_clk_regs[] __initdata = {
+>>         PLL_DIV2_SEL,
+>>         GATE_IP_DISP1,
+>>         GATE_IP_ACP,
+>> +       GATE_IP_ISP0,
+>> +       GATE_IP_ISP1,
+>>  };
+>>
+>>  static int exynos5250_clk_suspend(void)
+>> @@ -202,6 +206,7 @@ PNAME(mout_aclk400_p)       = { "mout_aclk400_g3d_mid", "mout_gpll" };
+>>  PNAME(mout_aclk200_sub_p) = { "fin_pll", "div_aclk200" };
+>>  PNAME(mout_aclk266_sub_p) = { "fin_pll", "div_aclk266" };
+>>  PNAME(mout_aclk333_sub_p) = { "fin_pll", "div_aclk333" };
+>> +PNAME(mout_aclk400_isp_sub_p) = { "fin_pll", "div_aclk400_isp" };
+>>  PNAME(mout_hdmi_p)     = { "div_hdmi_pixel", "sclk_hdmiphy" };
+>>  PNAME(mout_usb3_p)     = { "mout_mpll_user", "mout_cpll" };
+>>  PNAME(mout_group1_p)   = { "fin_pll", "fin_pll", "sclk_hdmi27m",
+>> @@ -281,6 +286,7 @@ static struct samsung_mux_clock exynos5250_mux_clks[] __initdata = {
+>>         MUX(0, "mout_aclk333", mout_aclk166_p, SRC_TOP0, 16, 1),
+>>         MUX(0, "mout_aclk400_g3d_mid", mout_aclk200_p, SRC_TOP0, 20, 1),
+>>
+>> +       MUX(0, "mout_aclk400_isp", mout_aclk200_p, SRC_TOP1, 24, 1),
+>>         MUX(0, "mout_aclk400_g3d", mout_aclk400_p, SRC_TOP1, 28, 1),
+>>
+>>         MUX(0, "mout_cpll", mout_cpll_p, SRC_TOP2, 8, 1),
+>> @@ -292,6 +298,9 @@ static struct samsung_mux_clock exynos5250_mux_clks[] __initdata = {
+>>
+>>         MUX(0, "mout_aclk200_disp1_sub", mout_aclk200_sub_p, SRC_TOP3, 4, 1),
+>>         MUX(0, "mout_aclk266_gscl_sub", mout_aclk266_sub_p, SRC_TOP3, 8, 1),
+>> +       MUX(0, "mout_aclk_266_isp_sub", mout_aclk266_sub_p, SRC_TOP3, 16, 1),
+>> +       MUX(0, "mout_aclk_400_isp_sub", mout_aclk400_isp_sub_p,
+>> +                       SRC_TOP3, 20, 1),
+>>         MUX(0, "mout_aclk333_sub", mout_aclk333_sub_p, SRC_TOP3, 24, 1),
+>>
+>>         MUX(0, "mout_cam_bayer", mout_group1_p, SRC_GSCL, 12, 4),
+>> @@ -364,6 +373,7 @@ static struct samsung_div_clock exynos5250_div_clks[] __initdata = {
+>>         DIV(0, "div_aclk400_g3d", "mout_aclk400_g3d", DIV_TOP0,
+>>                                                         24, 3),
+>>
+>> +       DIV(0, "div_aclk400_isp", "mout_aclk400_isp", DIV_TOP1, 20, 3),
+>>         DIV(0, "div_aclk66_pre", "mout_mpll_user", DIV_TOP1, 24, 3),
+>>
+>>         DIV(0, "div_cam_bayer", "mout_cam_bayer", DIV_GSCL, 12, 4),
+>> @@ -629,6 +639,31 @@ static struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
+>>         GATE(CLK_WDT, "wdt", "div_aclk66", GATE_IP_PERIS, 19, 0, 0),
+>>         GATE(CLK_RTC, "rtc", "div_aclk66", GATE_IP_PERIS, 20, 0, 0),
+>>         GATE(CLK_TMU, "tmu", "div_aclk66", GATE_IP_PERIS, 21, 0, 0),
+>> +       GATE(CLK_SMMU_TV, "smmu_tv", "mout_aclk200_disp1_sub",
+>> +                       GATE_IP_DISP1, 2, 0, 0),
+>> +       GATE(CLK_SMMU_FIMD1, "smmu_fimd1", "mout_aclk200_disp1_sub",
+>> +                       GATE_IP_DISP1, 8, 0, 0),
+>> +       GATE(CLK_SMMU_2D, "smmu_2d", "div_aclk200", GATE_IP_ACP, 7, 0, 0),
+>> +       GATE(CLK_SMMU_FIMC_ISP, "smmu_fimc_isp", "mout_aclk_266_isp_sub",
+>> +                       GATE_IP_ISP0, 8, 0, 0),
+>> +       GATE(CLK_SMMU_FIMC_DRC, "smmu_fimc_drc", "mout_aclk_266_isp_sub",
+>> +                       GATE_IP_ISP0, 9, 0, 0),
+>> +       GATE(CLK_SMMU_FIMC_FD, "smmu_fimc_fd", "mout_aclk_266_isp_sub",
+>> +                       GATE_IP_ISP0, 10, 0, 0),
+>> +       GATE(CLK_SMMU_FIMC_SCC, "smmu_fimc_scc", "mout_aclk_266_isp_sub",
+>> +                       GATE_IP_ISP0, 11, 0, 0),
+>> +       GATE(CLK_SMMU_FIMC_SCP, "smmu_fimc_scp", "mout_aclk_266_isp_sub",
+>> +                       GATE_IP_ISP0, 12, 0, 0),
+>> +       GATE(CLK_SMMU_FIMC_MCU, "smmu_fimc_mcu", "mout_aclk_400_isp_sub",
+>> +                       GATE_IP_ISP0, 13, 0, 0),
+>> +       GATE(CLK_SMMU_FIMC_ODC, "smmu_fimc_odc", "mout_aclk_266_isp_sub",
+>> +                       GATE_IP_ISP1, 4, 0, 0),
+>> +       GATE(CLK_SMMU_FIMC_DIS0, "smmu_fimc_dis0", "mout_aclk_266_isp_sub",
+>> +                       GATE_IP_ISP1, 5, 0, 0),
+>> +       GATE(CLK_SMMU_FIMC_DIS1, "smmu_fimc_dis1", "mout_aclk_266_isp_sub",
+>> +                       GATE_IP_ISP1, 6, 0, 0),
+>> +       GATE(CLK_SMMU_FIMC_3DNR, "smmu_fimc_3dnr", "mout_aclk_266_isp_sub",
+>> +                       GATE_IP_ISP1, 7, 0, 0),
+>>  };
+>>
+>>  static struct samsung_pll_rate_table vpll_24mhz_tbl[] __initdata = {
+>> diff --git a/include/dt-bindings/clock/exynos5250.h b/include/dt-bindings/clock/exynos5250.h
+>> index 415d447..be6e97c 100644
+>> --- a/include/dt-bindings/clock/exynos5250.h
+>> +++ b/include/dt-bindings/clock/exynos5250.h
+>> @@ -152,6 +152,22 @@
+>>  #define CLK_SMMU_MDMA0         347
+>>  #define CLK_SSS                        348
+>>  #define CLK_G3D                        349
+>> +#define CLK_SMMU_TV            350
+>> +#define CLK_SMMU_FIMD1         351
+>> +#define CLK_SMMU_2D            352
+>> +#define CLK_SMMU_FIMC_ISP      353
+>> +#define CLK_SMMU_FIMC_DRC      354
+>> +#define CLK_SMMU_FIMC_SCC      355
+>> +#define CLK_SMMU_FIMC_SCP      356
+>> +#define CLK_SMMU_FIMC_FD       357
+>> +#define CLK_SMMU_FIMC_MCU      358
+>> +#define CLK_SMMU_FIMC_ODC      359
+>> +#define CLK_SMMU_FIMC_DIS0     360
+>> +#define CLK_SMMU_FIMC_DIS1     361
+>> +#define CLK_SMMU_FIMC_3DNR     362
+>> +#define CLK_SMMU_FIMC_LITE0    363
+>> +#define CLK_SMMU_FIMC_LITE1    364
+>> +#define CLK_CAMIF_TOP          365
+>>
+>>  /* mux clocks */
+>>  #define CLK_MOUT_HDMI          1024
+>> --
+>> 1.7.9.5
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
