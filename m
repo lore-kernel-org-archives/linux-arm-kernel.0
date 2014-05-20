@@ -1,28 +1,28 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 20 May 2014 11:10:42 +0100
-Subject: [PATCH] ASoC: samsung: Allow setting OP_CLK of the IIS Multi
- Audio Interface
-In-Reply-To: <537B1BF0.8060302@samsung.com>
-References: <1400520638-6907-1-git-send-email-s.nawrocki@samsung.com>
- <537AE4C1.7050703@linaro.org> <537B1BF0.8060302@samsung.com>
-Message-ID: <20140520101042.GK12304@sirena.org.uk>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Tue, 20 May 2014 13:22:35 +0300
+Subject: [PATCH] s3cmci: port DMA code to dmaengine API
+In-Reply-To: <4667090.Oyf6jd3Lyk@wuerfel>
+References: <1400522593-6366-1-git-send-email-anarsoul@gmail.com>
+ <7633675.1cAc12AFAY@wuerfel>
+ <CA+E=qVeG8bXowBvdhKpVSYSL08n6ZUVG2LkjhPwjBnbv+egNLw@mail.gmail.com>
+ <4667090.Oyf6jd3Lyk@wuerfel>
+Message-ID: <CA+E=qVch0K+raN4dkPK6XzXqOQc4t433UyCJ2Qnc2uymgTq7cA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 11:10:08AM +0200, Sylwester Nawrocki wrote:
+Hi Arnd,
 
-> So how do you think this should be addressed ? Isn't it better to give
-> options to the machine drivers to alter these clock settings, rather than
-> hard coding it in the I2S driver ? Let's not forget it covers multiple 
-> Samsung SoC series.
+On Mon, May 19, 2014 at 10:02 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> For this driver, you don't have to go that far, as long as it's
+> ensure that the pointer to the filter function is available to
+> the driver, i.e. you can't have a built-in s3mci driver when the
+> dmaengine driver is a loadable module.
 
-Yes, it's better to make it controllable - ideally this could be moved
-into the clock API but for ASoC level stuff set_sysclk() with a sensible
-default is how it's supposed to be done.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/b741032e/attachment.sig>
+OK, so I guess I need to add explicit dependency on
+CONFIG_S3C24XX_DMAC for s3cmci driver.
+
+Btw, I didn't understand if it's acceptable to pass DMA channel number
+through DMA resource for non-DT case or not?
+
+Regards
+Vasily
