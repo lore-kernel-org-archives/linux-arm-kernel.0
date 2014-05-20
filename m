@@ -1,37 +1,39 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 May 2014 17:35:05 +0200
-Subject: [PATCH RFCv2 5/5] ARM: mvebu: add debugging message indicating the
- status of I/O coherency
-In-Reply-To: <1400600105-3013-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1400600105-3013-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1400600105-3013-6-git-send-email-thomas.petazzoni@free-electrons.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 20 May 2014 18:36:08 +0300
+Subject: [PATCH 0/3] Use Tegra's microsecond counter for udelay()
+Message-ID: <1400600176-435-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the requirements for I/O coherency to work may not be trivial,
-it's useful to have a debugging message that indicates whether the
-hardware I/O coherency is enabled or not.
+This patchset introduces support for Tegra's microsecond counter as the
+udelay() timer. This is useful on Tegra SoCs which do not have an arch timer
+such as Tegra20 and Tegra30. Using the microsecond counter instead of a delay
+based loop avoids potential problems during cpu frequency changes.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-mvebu/coherency.c | 5 +++++
- 1 file changed, 5 insertions(+)
+The set consists of 3 patches:
 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 2a204d0..6fad623 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -363,6 +363,11 @@ int __init coherency_init(void)
- 		 type == COHERENCY_FABRIC_TYPE_ARMADA_380)
- 		armada_375_380_coherency_init(np);
- 
-+	if (type != COHERENCY_FABRIC_TYPE_NONE)
-+		pr_info("hardware I/O coherency enabled\n");
-+	else
-+		pr_info("hardware I/O coherency disabled\n");
-+
- 	return 0;
- }
- 
+Patch 1 introduces a new call which is used by the ARM architecture delay
+timer code to prevent changing the delay timer after calibration is finished
+and thus can be in use.
+
+Patch 2 adds logic to choose the delay timer with the highest resolution. This
+allows the same registration code to be used on all Tegra SoCs and yet use the
+higher resolution arch timer when available (eg on Tegra114 or Tegra124).
+
+Patch 3 adds the actual delay timer code.
+
+Patch set has been verified on ventana (Tegra20), beaver (Tegra30),
+dalmore (Tegra114) and jetson TK1 (Tegra124).
+
+Peter De Schrijver (3):
+  kernel: add calibration_delay_done()
+  ARM: choose highest resolution delay timer
+  clocksource: tegra: Use uS counter as delay timer
+
+ arch/arm/lib/delay.c                |   26 ++++++++++++++++++++++----
+ drivers/clocksource/tegra20_timer.c |   13 +++++++++++++
+ init/calibrate.c                    |   12 ++++++++++++
+ 3 files changed, 47 insertions(+), 4 deletions(-)
+
 -- 
-1.9.3
+1.7.7.rc0.72.g4b5ea.dirty
