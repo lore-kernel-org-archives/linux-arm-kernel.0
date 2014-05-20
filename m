@@ -1,77 +1,192 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Tue, 20 May 2014 10:12:08 +0530
-Subject: [PATCH v6 0/5] MCPM backend for Exynos5420
-In-Reply-To: <alpine.LFD.2.11.1405192321040.17310@knanqh.ubzr>
-References: <1399982324-27879-1-git-send-email-a.kesavan@samsung.com>
- <alpine.LFD.2.11.1405131325060.980@knanqh.ubzr>
- <CAM4voanvVwj+FuWazTGMHMnM64Cw_qK03D3o=raS43f_zWFfog@mail.gmail.com>
- <alpine.LFD.2.11.1405140031490.980@knanqh.ubzr>
- <CAM4voa=6osyXYg_XF=XuGRYmxLDUO+5=-i+cMrNW92fzBZJjfA@mail.gmail.com>
- <alpine.LFD.2.11.1405140931380.980@knanqh.ubzr>
- <CAM4voam29e7aK7n86_Mpj-wwvkchm-e68qA5=iUFou+sUMONig@mail.gmail.com>
- <CAM4voakB57mgyQmtkpCUAF1BVW5z3BGsesvxvTuSg_JwBh-sxw@mail.gmail.com>
- <alpine.LFD.2.11.1405151250070.17310@knanqh.ubzr>
- <CAM4voakoSd0DXvG_fSXSAYxjMDNJmvOY5GMW=jQKD5Y0jTtJ+A@mail.gmail.com>
- <alpine.LFD.2.11.1405192321040.17310@knanqh.ubzr>
-Message-ID: <CAM4voamHMH0xohbuJvDTS2k1KApYnLBnqZyyOPQBCLijhe_6jA@mail.gmail.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue, 20 May 2014 12:43:59 +0800
+Subject: [PATCH v7 06/15] ARM: hisi: enable MCPM implementation
+In-Reply-To: <alpine.LFD.2.11.1405151549330.17310@knanqh.ubzr>
+References: <1399795571-17231-7-git-send-email-haojian.zhuang@linaro.org>
+ <1399981484-31628-1-git-send-email-haojian.zhuang@linaro.org>
+ <alpine.LFD.2.11.1405131449270.980@knanqh.ubzr>
+ <CAD6h2NRMzgsZWkP8MYbCHqo4JkojbJxjj-kZwSj65A1SNBNRyw@mail.gmail.com>
+ <alpine.LFD.2.11.1405151549330.17310@knanqh.ubzr>
+Message-ID: <CAD6h2NTku5zS5QONpOqdhAXgfFutGC4jyAAo-UGnAsc=Xan8dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 9:00 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Mon, 19 May 2014, Abhilash Kesavan wrote:
+On 16 May 2014 04:01, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Thu, 15 May 2014, Haojian Zhuang wrote:
 >
->> Hi Nicolas,
+>> On 14 May 2014 03:43, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> > On Tue, 13 May 2014, Haojian Zhuang wrote:
+>> >
+>> >> +     data = readl_relaxed(fabric + FAB_SF_MODE);
+>> >> +     if (on)
+>> >> +             data |= 1 << cluster;
+>> >> +     else
+>> >> +             data &= ~(1 << cluster);
+>> >> +     writel_relaxed(data, fabric + FAB_SF_MODE);
+>> >> +     while (1) {
+>> >> +             if (data == readl_relaxed(fabric + FAB_SF_MODE))
+>> >> +                     break;
+>> >> +     }
+>> >> +}
+>> >
+>> > The above could be easily coded in assembly for the power_up_setup
+>> > callback thusly:
+>> >
+>> > hip04_power_up_setup:
+>> >
+>> >         cmp     r0, #0                  @ check affinity level
+>> >         bxeq    lr                      @ nothing to do at CPU level
+>> >
+>> >         mrc     p15, 0, r0, c0, c0, 5   @ get MPIDR
+>> >         ubfx    r0, r0, #8, #8          @ extract cluster number
+>> >
+>> >         adr     r1, .LC0
+>> >         ldmia   r1, {r2, r3}
+>> >         sub     r2, r2, r1              @ virt_addr - phys_addr
+>> >         ldr     r1, [r2, r3]            @ get fabric_phys_addr
+>> >         mov     r2, #1
+>> >         ldr     r3, [r1, #FAB_SF_MODE]  @ read "data"
+>> >         orr     r3, r3, r2, lsl r0      @ set cluster bit
+>> >         str     r3, [r1, #FAB_SF_MODE]  @ write it back
+>> >
+>> > 1:      ldr     r2, [r1, #FAB_SF_MODE]  @ read register content
+>> >         cmp     r2, r3                  @ make sure it matches
+>> >         bne     1b                      @ otherwise retry
+>> >
+>> >         bx      lr
+>> >
+>> > :LC0:   .word   .
+>> >         .word   fabric_phys_addr - .LC0
+>> >
+>> > That should be it.
+>> >
 >>
->> On Thu, May 15, 2014 at 10:22 PM, Nicolas Pitre
->> <nicolas.pitre@linaro.org> wrote:
->> > Once you implement full cluster shutdown I can provide you with another
->> > script stressing that part.
->> I am done with the cluster power on/off code and it seems to work fine
->> with bL_switcher. Can you please provide me with your stress script.
+>> No. These code should be executed before new CPU on. If I transfer
+>> them to assembler code, it means that code will be executed after
+>> new CPU on.
 >
-> Here's the script.  Credits go to Dave Martin for this one.
+> Exact.
 >
-> The script assumes that cluster 0 comprises cpus 0 to 3 and cluster 1
-> comprises cpus 4 to 7.  You need to edit it otherwise.
+>> Then it results me failing to make new CPU online.
 >
-> ----- >8
-> #!/bin/bash
+> The assembly code could be wrong as well.  Are you sure this is not the
+> actual reason?
 >
-> echo 0 >/sys/kernel/bL_switcher/active
-> sleep 1
+> Is there some documentation for this stuff?
 >
-> pids=
->
-> for x in \
->         "cluster=cluster0; cpus='cpu0 cpu1 cpu2 cpu3'" \
->         "cluster=cluster1; cpus='cpu4 cpu5 cpu6 cpu7'"
-> do
->         eval "$x"
->         eval "\
-> $cluster () {
->         pids=
->                 `for cpu in $cpus; do cat <<EOF; done
->         (sleep .00\\$RANDOM; echo \\$1 >/sys/devices/system/cpu/$cpu/online)&
->         echo \\$1 >/sys/devices/system/cpu/$cpu/online&
->         pids=\\$pids\ \\$!
-> EOF`
->         wait \$pids
->         if [ \$1 = 0 ]; then
->                 echo \"\$n: $cluster off\"
->         else
->                 echo \"\$n: $cluster on\"
->         fi
-> }"
-> done
->
-> n=0
-> while :; do
->         : $((++n))
->         cluster1 1; cluster0 0
->         cluster0 1; cluster1 0
-> done
-> ----- >8
-Thanks Nicolas. Will test with the script and post the patch if it works.
 
-Regards,
-Abhilash
+There's no problem in assembly code. I even rewrite your assembly code.
+
+If I keep my c code with assembly code, new CPU could be online right.
+If I only use assembly code, I only get the kernel panic. So it's not
+caused by assembly code. It's caused by executing code after new CPU
+on.
+
+There's no documentation on this. They didn't prepare well on documents.
+I think they'll improve it in the future.
+
+>> >> +static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
+>> >> +{
+>> >> +     unsigned long data, mask;
+>> >> +
+>> >> +     if (!relocation || !sysctrl)
+>> >> +             return -ENODEV;
+>> >> +     if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
+>> >> +             return -EINVAL;
+>> >> +
+>> >> +     spin_lock_irq(&boot_lock);
+>> >> +     writel_relaxed(hip04_boot.bootwrapper_phys, relocation);
+>> >> +     writel_relaxed(hip04_boot.bootwrapper_magic, relocation + 4);
+>> >> +     writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
+>> >> +     writel_relaxed(0, relocation + 12);
+>> >
+>> > Shouldn't you do the above writes only when
+>> > hip04_cpu_table[cluster][cpu] is zero?  Please see the comment in
+>> > mcpm_cpu_power_down() about unordered calls.
+>> >
+>> OK. I can add the check.
+>>
+>> >> +     if (hip04_cluster_down(cluster)) {
+>> >> +             data = CLUSTER_DEBUG_RESET_BIT;
+>> >> +             writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
+>> >> +             do {
+>> >> +                     mask = CLUSTER_DEBUG_RESET_STATUS;
+>> >> +                     data = readl_relaxed(sysctrl + \
+>> >> +                                          SC_CPU_RESET_STATUS(cluster));
+>> >> +             } while (data & mask);
+>> >> +             hip04_set_snoop_filter(cluster, 1);
+>> >> +     }
+>> >> +
+>> >> +     hip04_cpu_table[cluster][cpu]++;
+>> >> +
+>> >> +     data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
+>> >> +            CORE_DEBUG_RESET_BIT(cpu);
+>> >> +     writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
+>> >> +     spin_unlock_irq(&boot_lock);
+>> >> +     msleep(POLL_MSEC);
+>> >> +
+>> >> +     return 0;
+>> >> +}
+>> >> +
+>> >> +static void hip04_mcpm_power_down(void)
+>> >> +{
+>> >> +     unsigned int mpidr, cpu, cluster, data = 0;
+>> >> +     bool skip_reset = false;
+>> >> +
+>> >> +     mpidr = read_cpuid_mpidr();
+>> >> +     cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+>> >> +     cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+>> >> +
+>> >> +     __mcpm_cpu_going_down(cpu, cluster);
+>> >> +
+>> >> +     spin_lock(&boot_lock);
+>> >> +     BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
+>> >> +     hip04_cpu_table[cluster][cpu]--;
+>> >> +     if (hip04_cpu_table[cluster][cpu] == 1) {
+>> >> +             /* A power_up request went ahead of us. */
+>> >> +             skip_reset = true;
+>> >> +     } else if (hip04_cpu_table[cluster][cpu] > 1) {
+>> >> +             pr_err("Cluster %d CPU%d is still running\n", cluster, cpu);
+>> >
+>> > This message is misleading.  If execution gets here, that means
+>> > mcpm_cpu_power_up() was called more than twice in a row for the same CPU
+>> > which should never happen.
+>> >
+>> OK. I'll replace the comments.
+>>
+>> >> +             BUG();
+>> >> +     }
+>> >> +
+>> >> +     spin_unlock(&boot_lock);
+>> >> +
+>> >> +     v7_exit_coherency_flush(louis);
+>> >> +
+>> >> +     __mcpm_cpu_down(cpu, cluster);
+>> >> +
+>> >> +     if (!skip_reset) {
+>> >> +             data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
+>> >> +                    CORE_DEBUG_RESET_BIT(cpu);
+>> >> +             writel_relaxed(data, sysctrl + SC_CPU_RESET_REQ(cluster));
+>> >
+>> > You should not perform this outside the lock protected region as this
+>> > could race with hip04_mcpm_power_up().  Instead, this should be done
+>> > above when hip04_cpu_table[cluster][cpu] == 0 after being decremented.
+>> >
+>>
+>> No. power_down() is executed on the specified CPU. If spin_unlock() is
+>> placed after reset operation, it means that there's no chance to
+>> execute the spin_unlock(). Because CPU is already in reset mode at
+>> this time.
+>
+> Normally, reset is effective only when WFI is later executed.  Are you
+> sure this is not the case on hip04 as well?
+>
+>
+Oh. it's different. cpu_v7_reset() likes to give a reset pulse signal to CPU
+core logic.
+The operation on SC_CPU_RESET_REQ register likes make CPU out of
+reset mode. After system is power on, all CPUs except for CPU0 stay
+in reset mode.
+
+Regards
+Haojian
