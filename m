@@ -1,29 +1,106 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 May 2014 17:34:42 -0700
-Subject: [PATCH v2] ARM: OMAP2+: Remove suspend_set_ops from common pm
- late init
-In-Reply-To: <1399919601-15543-1-git-send-email-d-gerlach@ti.com>
-References: <1399919601-15543-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <20140520003442.GC15793@atomide.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 20 May 2014 02:55:54 +0200
+Subject: [PATCHv2 resend 00/11] improve PWM lookup support without device
+ tree
+In-Reply-To: <20140519223913.GE20590@verge.net.au>
+References: <1400532162-29483-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20140519223913.GE20590@verge.net.au>
+Message-ID: <1902427.MlnO7xrXmN@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [140512 11:34]:
-> In omap2_common_pm_late_init suspend_set_ops was called to set common
-> suspend handling functions for all omap platforms. This created two
-> problems. First, these suspend ops were being set for all platforms,
-> regardless of whether or not suspend support has been integrated so in
-> the case of AM33XX, suspend to mem was presented as available but
-> failed every time. Second, some platforms will need to define a
-> completely separate set of suspend ops, such as AM33XX, due to
-> differences from previous omap platforms so there is no need to
-> always set the common omap ops.
+Hi Alexandre and Simon,
+
+On Tuesday 20 May 2014 07:39:13 Simon Horman wrote:
+> [ CCed Laurent Pinchart ]
 > 
-> This patch moves the suspend_set_ops call from omap2_common_pm_late_init
-> into a separate function that then gets called in the omap*_pm_init
-> functions for each platform.
+> The renesas and shmobile portions of this seem reasonable to me
+> and I have checked that there do not seem to be any conflicts
+> with changes I already have queued up for v3.16 (and v3.17).
+> 
+> I have CCed Laurent Pinchart as I believe he most recently
+> did work on the renesas and shmobile code in question.
 
-Gets rid of some ifdefs too. Applying into omap-for-v3.16/soc
-thanks.
+The series look sane to me. For the three patches that Simon has acked below,
 
-Tony
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> On Mon, May 19, 2014 at 10:42:31PM +0200, Alexandre Belloni wrote:
+> > Hi,
+> > 
+> > Originally sent on Apr 14th, note that this series is blocking another 16
+> > patches series, I would like it to be taken in 3.16 if we can agree on
+> > this implementation.
+> > 
+> > A patch set as suggested by Thierry to make lookup with the lookup table
+> > instead of device tree behave more like when using device tree.
+> > 
+> > The first patch adds a period and a polarity member to the lookup table
+> > and use those to set period and polarity.
+> > 
+> > Patch 2, 4 and 5 are making use of those new members from the board files.
+> > Patch 3 removes useless code since setting the polarity is now handled by
+> > the PWM core.
+> > 
+> > I couldn't decide on a good name for the extended PWM_LOOKUP macro and I
+> > believe we won't have to add members to that structure soon so:
+> > Patch 6 modifies the PWM_LOOKUP macro to also initialize period and
+> > polarity and Patch 7-9 are making use of the new PWM_LOOKUP macro in the
+> > board files
+> > 
+> > Patch 10 and 11 are making the leds-pwm and pwm_bl drivers get the period
+> > from the PWM before using pwm_period_ns if it is not already set.
+> > 
+> > Patch 10 will obviously conflict with the series of Russell reworking the
+> > leds-pwm probing. I can rebase if necessary
+> > 
+> > The final goal would be to get rid of .pwm_period_ns in leds-pwm and
+> > pwm_bl after moving all the remaining users (still around 25) to
+> > pwm_lookup.
+> > 
+> > Changes in v2:
+> >  - correctly unlock the pwm_lookup_lock mutex before returning.
+> >  - don't change PWM_LOOKUP atomically
+> >  - remove tpu_pwm_platform_data and the associated header file
+> >  - make the leds-pwm and pwm_bl drivers get the period from the PWM
+> > 
+> > Alexandre Belloni (11):
+> >   pwm: add period and polarity to struct pwm_lookup
+> >   ARM: shmobile: Armadillo 800 EVA: initialize all struct pwm_lookup
+> >     members
+> >   pwm: renesas-tpu: remove useless struct tpu_pwm_platform_data
+> 
+> The above two patches:
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> >   ARM: OMAP3: Beagle: initialize all the struct pwm_lookup members
+> >   ARM: pxa: hx4700: initialize all the struct pwm_lookup members
+> >   pwm: modify PWM_LOOKUP to initialize all struct pwm_lookup members
+> >   ARM: OMAP3: Beagle: use PWM_LOOKUP to initialize struct pwm_lookup
+> >   ARM: shmobile: Armadillo 800 EVA: use PWM_LOOKUP to initialize struct
+> >     pwm_lookup
+> 
+> The above patch:
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> >   ARM: pxa: hx4700: use PWM_LOOKUP to initialize struct pwm_lookup
+> >   leds: leds-pwm: retrieve configured pwm period
+> >   backlight: pwm_bl: retrieve configured pwm period
+> >  
+> >  Documentation/pwm.txt                          |  3 ++-
+> >  arch/arm/mach-omap2/board-omap3beagle.c        |  3 ++-
+> >  arch/arm/mach-pxa/hx4700.c                     |  3 ++-
+> >  arch/arm/mach-shmobile/board-armadillo800eva.c | 14 +++-----------
+> >  drivers/leds/leds-pwm.c                        |  5 ++++-
+> >  drivers/pwm/core.c                             |  8 +++++++-
+> >  drivers/pwm/pwm-renesas-tpu.c                  | 19 +++----------------
+> >  drivers/video/backlight/pwm_bl.c               |  8 +++++---
+> >  include/linux/platform_data/pwm-renesas-tpu.h  | 16 ----------------
+> >  include/linux/pwm.h                            |  6 +++++-
+> >  10 files changed, 33 insertions(+), 52 deletions(-)
+> >  delete mode 100644 include/linux/platform_data/pwm-renesas-tpu.h
+
+-- 
+Regards,
+
+Laurent Pinchart
