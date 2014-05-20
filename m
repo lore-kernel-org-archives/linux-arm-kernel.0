@@ -1,39 +1,92 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 20 May 2014 20:00:55 +0100
-Subject: [PATCH v2 2/4] mfd: bcm590xx: add support for secondary I2C
- slave address
-In-Reply-To: <20140520161131.GB32025@lee--X1>
-References: <1398295293-11033-1-git-send-email-mporter@linaro.org>
- <1398295293-11033-3-git-send-email-mporter@linaro.org>
- <20140428115627.GY21279@lee--X1> <20140428140910.GB7719@beef>
- <20140520161131.GB32025@lee--X1>
-Message-ID: <20140520190055.GQ12304@sirena.org.uk>
+From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
+Date: Tue, 20 May 2014 21:12:22 +0200
+Subject: [PATCH] Fix for possible null pointer dereference in dma.c
+In-Reply-To: <5379E284.7030700@gmail.com>
+References: <1400191076-28279-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+ <5379E284.7030700@gmail.com>
+Message-ID: <CAFo99gZ3kVGn04we5OtRtbkceYRs6SiHXRyoX1Gb-SknJH=z=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 05:11:31PM +0100, Lee Jones wrote:
+Hi Tomasz
 
-> > > >  drivers/mfd/bcm590xx.c       | 60 +++++++++++++++++++++++++++++++++-----------
-> > > >  include/linux/mfd/bcm590xx.h |  9 ++++---
-> > > >  2 files changed, 52 insertions(+), 17 deletions(-)
+What I based my patch on is really because of this line:
+if (substream)
+         snd_pcm_period_elapsed(substream);
 
-> > There's cross-deps so the regulator driver will need to go with it.
-> > Mark mentioned earlier in the thread that he wanted to merge through
-> > the regulator tree though.
+Boojin Kim thought that this was needed, if this is true anymore..? I
+have not been able to immerse myself so much in all patches.
+I'm working on about 100 similar patches.
 
-> Still nothing.
+344b4c48 sound/soc/samsung/dma.c         (Boojin Kim        2011-09-02
+09:44:43 +0900 123)              prtd->dma_pos += prtd->dma_period;
+344b4c48 sound/soc/samsung/dma.c         (Boojin Kim        2011-09-02
+09:44:43 +0900 124)              if (prtd->dma_pos >= prtd->dma_end)
+344b4c48 sound/soc/samsung/dma.c         (Boojin Kim        2011-09-02
+09:44:43 +0900 125)                      prtd->dma_pos =
+prtd->dma_start;
+5111c075 sound/soc/s3c24xx/s3c24xx-pcm.c (Mark Brown        2008-04-30
+17:19:32 +0200 126)
+344b4c48 sound/soc/samsung/dma.c         (Boojin Kim        2011-09-02
+09:44:43 +0900 127)              if (substream)
+344b4c48 sound/soc/samsung/dma.c         (Boojin Kim        2011-09-02
+09:44:43 +0900 128)
+snd_pcm_period_elapsed(substream);
+c0f41bb1 sound/soc/s3c24xx/s3c24xx-pcm.c (Ben Dooks         2007-02-14
+13:20:03 +0100 129)
+344b4c48 sound/soc/samsung/dma.c         (Boojin Kim        2011-09-02
+09:44:43 +0900 130)              spin_lock(&prtd->lock);
 
-> Mark,
->   Can I apply this set and supply you with a pull-request?
 
-Can someone please send me whatever it is you want me to look at, the
-above diffstat doesn't look relevant.  Given the frequency of respins
-I'm not always paying a huge amount of attention to MFD serieses which
-look like they're going to be resent.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/4133fe63/attachment.sig>
+Best regards
+Rickard Strandqvist
+
+
+2014-05-19 12:52 GMT+02:00 Tomasz Figa <tomasz.figa@gmail.com>:
+> Hi Rickard,
+>
+> On 15.05.2014 23:57, Rickard Strandqvist wrote:
+>> There is otherwise a risk of a possible null pointer dereference.
+>>
+>> Was largely found by using a static code analysis program called cppcheck.
+>>
+>> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
+>> ---
+>>  sound/soc/samsung/dma.c |   10 ++++++----
+>>  1 fil ?ndrad, 6 till?gg(+), 4 borttagningar(-)
+>>
+>> diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
+>> index dc09b71..b1f6757 100644
+>> --- a/sound/soc/samsung/dma.c
+>> +++ b/sound/soc/samsung/dma.c
+>> @@ -115,17 +115,19 @@ static void dma_enqueue(struct snd_pcm_substream *substream)
+>>  static void audio_buffdone(void *data)
+>>  {
+>>       struct snd_pcm_substream *substream = data;
+>> -     struct runtime_data *prtd = substream->runtime->private_data;
+>> +     struct runtime_data *prtd = NULL;
+>>
+>>       pr_debug("Entered %s\n", __func__);
+>>
+>> -     if (prtd->state & ST_RUNNING) {
+>> +     if(substream)
+>> +             prtd = substream->runtime->private_data;
+>> +
+>> +     if (prtd && prtd->state & ST_RUNNING) {
+>>               prtd->dma_pos += prtd->dma_period;
+>>               if (prtd->dma_pos >= prtd->dma_end)
+>>                       prtd->dma_pos = prtd->dma_start;
+>>
+>> -             if (substream)
+>> -                     snd_pcm_period_elapsed(substream);
+>> +             snd_pcm_period_elapsed(substream);
+>>
+>>               spin_lock(&prtd->lock);
+>>               if (!samsung_dma_has_circular()) {
+>>
+>
+> Can you find a path (or use case, if possible) on which any of affected
+> pointers will be NULL?
+>
+> Best regards,
+> Tomasz
