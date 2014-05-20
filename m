@@ -1,74 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 May 2014 12:08:44 +0200
-Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140519203232.GD30737@mithrandir>
-References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
- <20140519172113.GA13858@e103592.cambridge.arm.com>
- <20140519203232.GD30737@mithrandir>
-Message-ID: <5080348.QmhgfQRxZW@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 20 May 2014 11:10:42 +0100
+Subject: [PATCH] ASoC: samsung: Allow setting OP_CLK of the IIS Multi
+ Audio Interface
+In-Reply-To: <537B1BF0.8060302@samsung.com>
+References: <1400520638-6907-1-git-send-email-s.nawrocki@samsung.com>
+ <537AE4C1.7050703@linaro.org> <537B1BF0.8060302@samsung.com>
+Message-ID: <20140520101042.GK12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 May 2014 22:32:33 Thierry Reding wrote:
-> On Mon, May 19, 2014 at 06:22:31PM +0100, Dave Martin wrote:
-> > On Mon, May 19, 2014 at 01:53:37PM +0100, Thierry Reding wrote:
-> [...]
-> > > My understanding here is mostly based on the OpenFirmware working group
-> > > proposal for the dma-ranges property[0]. I'll give another example to
-> > > try and clarify how I had imagined this to work:
-> > > 
-> > >     / {
-> > >             #address-cells = <2>;
-> > >             #size-cells = <2>;
-> > > 
-> > >             iommu {
-> > >                     /*
-> > >                      * This is somewhat unusual (or maybe not) in that we
-> > >                      * need 2 cells to represent the size of an address
-> > >                      * space that is 32 bits long.
-> > >                      */
-> > >                     #address-cells = <1>;
-> > >                     #size-cells = <2>;
-> > > 
-> > >                     #iommu-cells = <1>;
-> > >             };
-> > > 
-> > >             master {
-> > >                     iommus = <&/iommu 42>;
-> > 
-> > Comparing this with the other discussion thread, we have a similar
-> > concept here, in that the iommu is made a logical parent, however...
-> > 
-> > Firstly, there's an implicit assumption here that the only kind of
-> > thing the master could possibly be connected to is an IOMMU, with
-> > no non-trivial interconnect in between.  I'm not sure this is going
-> > to scale to complex SoCs.
-> 
-> Here we go again. We're now in the very same bad spot that we've been in
-> so many times before. There are at least two SoCs that we know do not
-> require anything fancy, yet we're blocking adding support for those use
-> cases because we think that at some point some IOMMU may require more
-> than that. But at the same time it seems like we don't have enough data
-> about what exactly that is, so we keep speculating. At this rate we're
-> making it impossible to get a reasonable feature set supported upstream.
-> 
-> That's very frustrating.
+On Tue, May 20, 2014 at 11:10:08AM +0200, Sylwester Nawrocki wrote:
 
-I agree. While I just commented that I want to think through how this
-would look for other IOMMUs, the generic case of all masters that Dave
-wants is going overboard with the complexity and we'd be better off
-deferring this to whenever someone needs it, which I assume is never.
+> So how do you think this should be addressed ? Isn't it better to give
+> options to the machine drivers to alter these clock settings, rather than
+> hard coding it in the I2S driver ? Let's not forget it covers multiple 
+> Samsung SoC series.
 
-> > If a range of Stream IDs may be issued (especially from something like
-> > a PCIe RC where the stream ID may be a many-bit value), describing
-> > the IDs individually may be impractical.
-> 
-> The IOMMU specifier is completely specific to the IOMMU. If an IOMMU has
-> a need to represent the stream IDs as a range there's nothing keeping it
-> from defining the specifier accordingly.
-
-If we make the IOMMU address space look like the PCI address space, we
-can have a simple representation for this in DT. For the code, I assume
-that we will always have to treat PCI and platform devices differently.
-
-	Arnd
+Yes, it's better to make it controllable - ideally this could be moved
+into the clock API but for ASoC level stuff set_sysclk() with a sensible
+default is how it's supposed to be done.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/b741032e/attachment.sig>
