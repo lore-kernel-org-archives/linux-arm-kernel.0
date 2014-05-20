@@ -1,42 +1,46 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 20 May 2014 23:21:08 +0200
-Subject: [alsa-devel] [PATCH] Fix for possible null pointer dereference
- in dma.c
-In-Reply-To: <537BAA2B.9090906@gmail.com>
-References: <1400191076-28279-1-git-send-email-rickard_strandqvist@spectrumdigital.se>	<5379E284.7030700@gmail.com>
- <CAFo99gZ3kVGn04we5OtRtbkceYRs6SiHXRyoX1Gb-SknJH=z=w@mail.gmail.com>
- <537BAA2B.9090906@gmail.com>
-Message-ID: <537BC744.8020601@metafoo.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 20 May 2014 17:31:39 -0400 (EDT)
+Subject: [PATCH 1/2] arm64: topology: Tell the scheduler about the relative
+ power of cores
+In-Reply-To: <20140520173727.GD28293@arm.com>
+References: <1400545421-28067-1-git-send-email-broonie@kernel.org>
+ <20140520173727.GD28293@arm.com>
+Message-ID: <alpine.LFD.2.11.1405201716460.17310@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/20/2014 09:16 PM, Tomasz Figa wrote:
-> Hi Rickard,
->
-> On 20.05.2014 21:12, Rickard Strandqvist wrote:
->> Hi Tomasz
->>
->> What I based my patch on is really because of this line:
->> if (substream)
->>           snd_pcm_period_elapsed(substream);
->>
->> Boojin Kim thought that this was needed, if this is true anymore..? I
->> have not been able to immerse myself so much in all patches.
->> I'm working on about 100 similar patches.
->
-> To me having NULL as either data argument of buffer done callback or
-> private_data would be a serious driver bug and IMHO it's better to let
-> it crash with a NULL pointer dereference to let someone notice than mask
-> it by adding a condition.
->
-> Still, I'm not too experienced with ALSA and ASoC, so I might be wrong.
-> Mark, what do you think about this?
+On Tue, 20 May 2014, Catalin Marinas wrote:
 
-Given that there is a patch[1] which removes the whole file I think we can stop 
-the discussion about this patch here.
+> On Tue, May 20, 2014 at 01:23:40AM +0100, Mark Brown wrote:
+> > In heterogeneous systems like big.LITTLE systems the scheduler will be
+> > able to make better use of the available cores if we provide power numbers
+> > to it indicating their relative performance. Do this by parsing the CPU
+> > nodes in the DT.
+> 
+> Last time we discussed these two patches, my understanding was that the
+> mainline scheduler doesn't behave any better on big.LITTLE with this
+> additional information, unless you also have additional out of tree b.L
+> MP patches. Vincent is also cleaning up some of the cpu_power usage in
+> the scheduler.
+> 
+> So unless there are clear benefits in providing such information to the
+> mainline scheduler, I don't plan to merge them for the time being (I'm
+> also not convinced of the numbers in the second patch, they need some
+> benchmarking on real hardware).
 
-But for the record, substream will never ever be NULL in this function. prtd 
-might be though if the DMA completion callback races against the closing of the 
-PCM stream.
+We are indeed in the process of working out how to use this information 
+in the scheduler, submitting patches, etc.  Thing is, we risk seeing the 
+scheduler maintainers saying: "unless there are clear users of those 
+enhancements to the mainline scheduler, we don't plan to merge them for 
+the time being."
 
-[1] http://mailman.alsa-project.org/pipermail/alsa-devel/2014-May/076860.html
+It might be more productive to merge _something_ first, and doing so on 
+the architecture side is certainly the least intrusive initial move.
+
+As to the numbers themselves... I suspect it will be hard to come up 
+with a benchmark that everyone will agree with.  Those numbers certainly 
+can be refined later when the scheduler side has evolved and more tests 
+have been performed.
+
+
+Nicolas
