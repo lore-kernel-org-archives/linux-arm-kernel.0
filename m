@@ -1,189 +1,285 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Tue, 20 May 2014 20:43:51 +0400
-Subject: [PATCH] ARM: i.MX: Remove registration helper for i.MX1 USB UDC
-In-Reply-To: <1400604231-2672-1-git-send-email-shc_work@mail.ru>
-References: <1400604231-2672-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1400604231-2672-3-git-send-email-shc_work@mail.ru>
+Date: Tue, 20 May 2014 20:43:49 +0400
+Subject: [PATCH v2] ARM: i.MX1 clk: Add devicetree support
+Message-ID: <1400604231-2672-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx_udc driver was removed from the kernel of about 10 months ago.
-This patch removes a registration helper for this driver and
-orphaned driver header.
+This patch adds devicetree support CCM module for i.MX1 (MC9328MX1) CPUs.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-imx/devices/Kconfig            |  3 --
- arch/arm/mach-imx/devices/Makefile           |  1 -
- arch/arm/mach-imx/devices/devices-common.h   | 16 ------
- arch/arm/mach-imx/devices/platform-imx_udc.c | 75 ----------------------------
- include/linux/platform_data/usb-imx_udc.h    | 23 ---------
- 5 files changed, 118 deletions(-)
- delete mode 100644 arch/arm/mach-imx/devices/platform-imx_udc.c
- delete mode 100644 include/linux/platform_data/usb-imx_udc.h
+ .../devicetree/bindings/clock/imx1-clock.txt       |  26 ++++
+ arch/arm/mach-imx/clk-imx1.c                       | 153 +++++++++++----------
+ include/dt-bindings/clock/imx1-clock.h             |  40 ++++++
+ 3 files changed, 148 insertions(+), 71 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx1-clock.txt
+ create mode 100644 include/dt-bindings/clock/imx1-clock.h
 
-diff --git a/arch/arm/mach-imx/devices/Kconfig b/arch/arm/mach-imx/devices/Kconfig
-index 2d260a5..dd7e0b4 100644
---- a/arch/arm/mach-imx/devices/Kconfig
-+++ b/arch/arm/mach-imx/devices/Kconfig
-@@ -43,9 +43,6 @@ config IMX_HAVE_PLATFORM_IMX_SSI
- config IMX_HAVE_PLATFORM_IMX_UART
- 	bool
+diff --git a/Documentation/devicetree/bindings/clock/imx1-clock.txt b/Documentation/devicetree/bindings/clock/imx1-clock.txt
+new file mode 100644
+index 0000000..b7adf4e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/imx1-clock.txt
+@@ -0,0 +1,26 @@
++* Clock bindings for Freescale i.MX1 CPUs
++
++Required properties:
++- compatible: Should be "fsl,imx1-ccm".
++- reg: Address and length of the register set.
++- #clock-cells: Should be <1>.
++
++The clock consumer should specify the desired clock by having the clock
++ID in its "clocks" phandle cell. See include/dt-bindings/clock/imx1-clock.h
++for the full list of i.MX1 clock IDs.
++
++Examples:
++	clks: ccm at 0021b000 {
++		#clock-cells = <1>;
++		compatible = "fsl,imx1-ccm";
++		reg = <0x0021b000 0x1000>;
++	};
++
++	pwm: pwm at 00208000 {
++		#pwm-cells = <2>;
++		compatible = "fsl,imx1-pwm";
++		reg = <0x00208000 0x1000>;
++		interrupts = <34>;
++		clocks = <&clks IMX1_CLK_DUMMY>, <&clks IMX1_CLK_PER1>;
++		clock-names = "ipg", "per";
++	};
+diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
+index 7f739be..e9c391b 100644
+--- a/arch/arm/mach-imx/clk-imx1.c
++++ b/arch/arm/mach-imx/clk-imx1.c
+@@ -15,100 +15,111 @@
+  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
+  */
  
--config IMX_HAVE_PLATFORM_IMX_UDC
--	bool
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+ #include <linux/clk.h>
+-#include <linux/io.h>
+ #include <linux/clkdev.h>
++#include <linux/clk-provider.h>
+ #include <linux/err.h>
++#include <linux/init.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <dt-bindings/clock/imx1-clock.h>
+ 
+ #include "clk.h"
+ #include "common.h"
+ #include "hardware.h"
+ 
+-/* CCM register addresses */
+-#define IO_ADDR_CCM(off)	(MX1_IO_ADDRESS(MX1_CCM_BASE_ADDR + (off)))
 -
- config IMX_HAVE_PLATFORM_IPU_CORE
- 	bool
+-#define CCM_CSCR	IO_ADDR_CCM(0x0)
+-#define CCM_MPCTL0	IO_ADDR_CCM(0x4)
+-#define CCM_SPCTL0	IO_ADDR_CCM(0xc)
+-#define CCM_PCDR	IO_ADDR_CCM(0x20)
+-
+-/* SCM register addresses */
+-#define IO_ADDR_SCM(off)	(MX1_IO_ADDRESS(MX1_SCM_BASE_ADDR + (off)))
+-
+-#define SCM_GCCR	IO_ADDR_SCM(0xc)
+-
+ static const char *prem_sel_clks[] = { "clk32_premult", "clk16m", };
+ static const char *clko_sel_clks[] = { "per1", "hclk", "clk48m", "clk16m",
+ 				       "prem", "fclk", };
  
-diff --git a/arch/arm/mach-imx/devices/Makefile b/arch/arm/mach-imx/devices/Makefile
-index 1cbc14c..6bb144d 100644
---- a/arch/arm/mach-imx/devices/Makefile
-+++ b/arch/arm/mach-imx/devices/Makefile
-@@ -16,7 +16,6 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_KEYPAD) += platform-imx-keypad.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_PATA_IMX) += platform-pata_imx.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_SSI) += platform-imx-ssi.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_UART) += platform-imx-uart.o
--obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_UDC) += platform-imx_udc.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IPU_CORE) += platform-ipu-core.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_MX1_CAMERA) += platform-mx1-camera.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_MX2_CAMERA) += platform-mx2-camera.o
-diff --git a/arch/arm/mach-imx/devices/devices-common.h b/arch/arm/mach-imx/devices/devices-common.h
-index 61352a8..69bafc8 100644
---- a/arch/arm/mach-imx/devices/devices-common.h
-+++ b/arch/arm/mach-imx/devices/devices-common.h
-@@ -176,22 +176,6 @@ struct platform_device *__init imx_add_imx_uart_1irq(
- 		const struct imx_imx_uart_1irq_data *data,
- 		const struct imxuart_platform_data *pdata);
- 
--#include <linux/platform_data/usb-imx_udc.h>
--struct imx_imx_udc_data {
--	resource_size_t iobase;
--	resource_size_t iosize;
--	resource_size_t irq0;
--	resource_size_t irq1;
--	resource_size_t irq2;
--	resource_size_t irq3;
--	resource_size_t irq4;
--	resource_size_t irq5;
--	resource_size_t irq6;
+-enum imx1_clks {
+-	dummy, clk32, clk16m_ext, clk16m, clk32_premult, prem, mpll, mpll_gate,
+-	spll, spll_gate, mcu, fclk, hclk, clk48m, per1, per2, per3, clko,
+-	uart3_gate, ssi2_gate, brom_gate, dma_gate, csi_gate, mma_gate,
+-	usbd_gate, clk_max
 -};
--struct platform_device *__init imx_add_imx_udc(
--		const struct imx_imx_udc_data *data,
--		const struct imxusb_platform_data *pdata);
++static struct clk *clk[IMX1_CLK_MAX];
++static struct clk_onecell_data clk_data;
+ 
+-static struct clk *clk[clk_max];
++static void __iomem *ccm __initdata;
++#define CCM_CSCR	(ccm + 0x0000)
++#define CCM_MPCTL0	(ccm + 0x0004)
++#define CCM_SPCTL0	(ccm + 0x000c)
++#define CCM_PCDR	(ccm + 0x0020)
++#define SCM_GCCR	(ccm + 0x0810)
+ 
+-int __init mx1_clocks_init(unsigned long fref)
++static void __init _mx1_clocks_init(unsigned long fref)
+ {
+-	int i;
 -
- #include <linux/platform_data/video-mx3fb.h>
- #include <linux/platform_data/camera-mx3.h>
- struct imx_ipu_core_data {
-diff --git a/arch/arm/mach-imx/devices/platform-imx_udc.c b/arch/arm/mach-imx/devices/platform-imx_udc.c
-deleted file mode 100644
-index 5ced7e4..0000000
---- a/arch/arm/mach-imx/devices/platform-imx_udc.c
-+++ /dev/null
-@@ -1,75 +0,0 @@
--/*
-- * Copyright (C) 2010 Pengutronix
-- * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include "../hardware.h"
--#include "devices-common.h"
--
--#define imx_imx_udc_data_entry_single(soc, _size)			\
--	{								\
--		.iobase = soc ## _USBD_BASE_ADDR,			\
--		.iosize = _size,					\
--		.irq0 = soc ## _INT_USBD0,				\
--		.irq1 = soc ## _INT_USBD1,				\
--		.irq2 = soc ## _INT_USBD2,				\
--		.irq3 = soc ## _INT_USBD3,				\
--		.irq4 = soc ## _INT_USBD4,				\
--		.irq5 = soc ## _INT_USBD5,				\
--		.irq6 = soc ## _INT_USBD6,				\
--	}
--
--#define imx_imx_udc_data_entry(soc, _size)				\
--	[_id] = imx_imx_udc_data_entry_single(soc, _size)
--
--#ifdef CONFIG_SOC_IMX1
--const struct imx_imx_udc_data imx1_imx_udc_data __initconst =
--	imx_imx_udc_data_entry_single(MX1, SZ_4K);
--#endif /* ifdef CONFIG_SOC_IMX1 */
--
--struct platform_device *__init imx_add_imx_udc(
--		const struct imx_imx_udc_data *data,
--		const struct imxusb_platform_data *pdata)
--{
--	struct resource res[] = {
--		{
--			.start = data->iobase,
--			.end = data->iobase + data->iosize - 1,
--			.flags = IORESOURCE_MEM,
--		}, {
--			.start = data->irq0,
--			.end = data->irq0,
--			.flags = IORESOURCE_IRQ,
--		}, {
--			.start = data->irq1,
--			.end = data->irq1,
--			.flags = IORESOURCE_IRQ,
--		}, {
--			.start = data->irq2,
--			.end = data->irq2,
--			.flags = IORESOURCE_IRQ,
--		}, {
--			.start = data->irq3,
--			.end = data->irq3,
--			.flags = IORESOURCE_IRQ,
--		}, {
--			.start = data->irq4,
--			.end = data->irq4,
--			.flags = IORESOURCE_IRQ,
--		}, {
--			.start = data->irq5,
--			.end = data->irq5,
--			.flags = IORESOURCE_IRQ,
--		}, {
--			.start = data->irq6,
--			.end = data->irq6,
--			.flags = IORESOURCE_IRQ,
--		},
--	};
--
--	return imx_add_platform_device("imx_udc", 0,
--			res, ARRAY_SIZE(res), pdata, sizeof(*pdata));
--}
-diff --git a/include/linux/platform_data/usb-imx_udc.h b/include/linux/platform_data/usb-imx_udc.h
-deleted file mode 100644
-index be27337..0000000
---- a/include/linux/platform_data/usb-imx_udc.h
-+++ /dev/null
-@@ -1,23 +0,0 @@
--/*
-- *	Copyright (C) 2008 Darius Augulis <augulis.darius@gmail.com>
-- *
-- *	This program is free software; you can redistribute it and/or modify
-- *	it under the terms of the GNU General Public License as published by
-- *	the Free Software Foundation; either version 2 of the License, or
-- *	(at your option) any later version.
-- *
-- *	This program is distributed in the hope that it will be useful,
-- *	but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *	GNU General Public License for more details.
-- */
--
--#ifndef __ASM_ARCH_MXC_USB
--#define __ASM_ARCH_MXC_USB
--
--struct imxusb_platform_data {
--	int (*init)(struct device *);
--	void (*exit)(struct device *);
--};
--
--#endif /* __ASM_ARCH_MXC_USB */
+-	clk[dummy] = imx_clk_fixed("dummy", 0);
+-	clk[clk32] = imx_clk_fixed("clk32", fref);
+-	clk[clk16m_ext] = imx_clk_fixed("clk16m_ext", 16000000);
+-	clk[clk16m] = imx_clk_gate("clk16m", "clk16m_ext", CCM_CSCR, 17);
+-	clk[clk32_premult] = imx_clk_fixed_factor("clk32_premult", "clk32", 512, 1);
+-	clk[prem] = imx_clk_mux("prem", CCM_CSCR, 16, 1, prem_sel_clks,
+-			ARRAY_SIZE(prem_sel_clks));
+-	clk[mpll] = imx_clk_pllv1("mpll", "clk32_premult", CCM_MPCTL0);
+-	clk[mpll_gate] = imx_clk_gate("mpll_gate", "mpll", CCM_CSCR, 0);
+-	clk[spll] = imx_clk_pllv1("spll", "prem", CCM_SPCTL0);
+-	clk[spll_gate] = imx_clk_gate("spll_gate", "spll", CCM_CSCR, 1);
+-	clk[mcu] = imx_clk_divider("mcu", "clk32_premult", CCM_CSCR, 15, 1);
+-	clk[fclk] = imx_clk_divider("fclk", "mpll_gate", CCM_CSCR, 15, 1);
+-	clk[hclk] = imx_clk_divider("hclk", "spll_gate", CCM_CSCR, 10, 4);
+-	clk[clk48m] = imx_clk_divider("clk48m", "spll_gate", CCM_CSCR, 26, 3);
+-	clk[per1] = imx_clk_divider("per1", "spll_gate", CCM_PCDR, 0, 4);
+-	clk[per2] = imx_clk_divider("per2", "spll_gate", CCM_PCDR, 4, 4);
+-	clk[per3] = imx_clk_divider("per3", "spll_gate", CCM_PCDR, 16, 7);
+-	clk[clko] = imx_clk_mux("clko", CCM_CSCR, 29, 3, clko_sel_clks,
+-			ARRAY_SIZE(clko_sel_clks));
+-	clk[uart3_gate] = imx_clk_gate("uart3_gate", "hclk", SCM_GCCR, 6);
+-	clk[ssi2_gate] = imx_clk_gate("ssi2_gate", "hclk", SCM_GCCR, 5);
+-	clk[brom_gate] = imx_clk_gate("brom_gate", "hclk", SCM_GCCR, 4);
+-	clk[dma_gate] = imx_clk_gate("dma_gate", "hclk", SCM_GCCR, 3);
+-	clk[csi_gate] = imx_clk_gate("csi_gate", "hclk", SCM_GCCR, 2);
+-	clk[mma_gate] = imx_clk_gate("mma_gate", "hclk", SCM_GCCR, 1);
+-	clk[usbd_gate] = imx_clk_gate("usbd_gate", "clk48m", SCM_GCCR, 0);
++	unsigned i;
++
++	clk[IMX1_CLK_DUMMY] = imx_clk_fixed("dummy", 0);
++	clk[IMX1_CLK_CLK32] = imx_obtain_fixed_clock("clk32", fref);
++	clk[IMX1_CLK_CLK16M_EXT] = imx_clk_fixed("clk16m_ext", 16000000);
++	clk[IMX1_CLK_CLK16M] = imx_clk_gate("clk16m", "clk16m_ext", CCM_CSCR, 17);
++	clk[IMX1_CLK_CLK32_PREMULT] = imx_clk_fixed_factor("clk32_premult", "clk32", 512, 1);
++	clk[IMX1_CLK_PREM] = imx_clk_mux("prem", CCM_CSCR, 16, 1, prem_sel_clks, ARRAY_SIZE(prem_sel_clks));
++	clk[IMX1_CLK_MPLL] = imx_clk_pllv1("mpll", "clk32_premult", CCM_MPCTL0);
++	clk[IMX1_CLK_MPLL_GATE] = imx_clk_gate("mpll_gate", "mpll", CCM_CSCR, 0);
++	clk[IMX1_CLK_SPLL] = imx_clk_pllv1("spll", "prem", CCM_SPCTL0);
++	clk[IMX1_CLK_SPLL_GATE] = imx_clk_gate("spll_gate", "spll", CCM_CSCR, 1);
++	clk[IMX1_CLK_MCU] = imx_clk_divider("mcu", "clk32_premult", CCM_CSCR, 15, 1);
++	clk[IMX1_CLK_FCLK] = imx_clk_divider("fclk", "mpll_gate", CCM_CSCR, 15, 1);
++	clk[IMX1_CLK_HCLK] = imx_clk_divider("hclk", "spll_gate", CCM_CSCR, 10, 4);
++	clk[IMX1_CLK_CLK48M] = imx_clk_divider("clk48m", "spll_gate", CCM_CSCR, 26, 3);
++	clk[IMX1_CLK_PER1] = imx_clk_divider("per1", "spll_gate", CCM_PCDR, 0, 4);
++	clk[IMX1_CLK_PER2] = imx_clk_divider("per2", "spll_gate", CCM_PCDR, 4, 4);
++	clk[IMX1_CLK_PER3] = imx_clk_divider("per3", "spll_gate", CCM_PCDR, 16, 7);
++	clk[IMX1_CLK_CLKO] = imx_clk_mux("clko", CCM_CSCR, 29, 3, clko_sel_clks, ARRAY_SIZE(clko_sel_clks));
++	clk[IMX1_CLK_UART3_GATE] = imx_clk_gate("uart3_gate", "hclk", SCM_GCCR, 6);
++	clk[IMX1_CLK_SSI2_GATE] = imx_clk_gate("ssi2_gate", "hclk", SCM_GCCR, 5);
++	clk[IMX1_CLK_BROM_GATE] = imx_clk_gate("brom_gate", "hclk", SCM_GCCR, 4);
++	clk[IMX1_CLK_DMA_GATE] = imx_clk_gate("dma_gate", "hclk", SCM_GCCR, 3);
++	clk[IMX1_CLK_CSI_GATE] = imx_clk_gate("csi_gate", "hclk", SCM_GCCR, 2);
++	clk[IMX1_CLK_MMA_GATE] = imx_clk_gate("mma_gate", "hclk", SCM_GCCR, 1);
++	clk[IMX1_CLK_USBD_GATE] = imx_clk_gate("usbd_gate", "clk48m", SCM_GCCR, 0);
+ 
+ 	for (i = 0; i < ARRAY_SIZE(clk); i++)
+ 		if (IS_ERR(clk[i]))
+ 			pr_err("imx1 clk %d: register failed with %ld\n",
+ 				i, PTR_ERR(clk[i]));
+ 
+-	clk_register_clkdev(clk[dma_gate], "ahb", "imx1-dma");
+-	clk_register_clkdev(clk[hclk], "ipg", "imx1-dma");
+-	clk_register_clkdev(clk[per1], "per", "imx-gpt.0");
+-	clk_register_clkdev(clk[hclk], "ipg", "imx-gpt.0");
+-	clk_register_clkdev(clk[per1], "per", "imx1-uart.0");
+-	clk_register_clkdev(clk[hclk], "ipg", "imx1-uart.0");
+-	clk_register_clkdev(clk[per1], "per", "imx1-uart.1");
+-	clk_register_clkdev(clk[hclk], "ipg", "imx1-uart.1");
+-	clk_register_clkdev(clk[per1], "per", "imx1-uart.2");
+-	clk_register_clkdev(clk[uart3_gate], "ipg", "imx1-uart.2");
+-	clk_register_clkdev(clk[hclk], NULL, "imx1-i2c.0");
+-	clk_register_clkdev(clk[per2], "per", "imx1-cspi.0");
+-	clk_register_clkdev(clk[dummy], "ipg", "imx1-cspi.0");
+-	clk_register_clkdev(clk[per2], "per", "imx1-cspi.1");
+-	clk_register_clkdev(clk[dummy], "ipg", "imx1-cspi.1");
+-	clk_register_clkdev(clk[per2], "per", "imx1-fb.0");
+-	clk_register_clkdev(clk[dummy], "ipg", "imx1-fb.0");
+-	clk_register_clkdev(clk[dummy], "ahb", "imx1-fb.0");
++	clk_register_clkdev(clk[IMX1_CLK_PER1], "per", "imx-gpt.0");
++	clk_register_clkdev(clk[IMX1_CLK_HCLK], "ipg", "imx-gpt.0");
++}
++
++int __init mx1_clocks_init(unsigned long fref)
++{
++	ccm = MX1_IO_ADDRESS(MX1_CCM_BASE_ADDR);
++
++	_mx1_clocks_init(fref);
++
++	clk_register_clkdev(clk[IMX1_CLK_DMA_GATE], "ahb", "imx1-dma");
++	clk_register_clkdev(clk[IMX1_CLK_HCLK], "ipg", "imx1-dma");
++	clk_register_clkdev(clk[IMX1_CLK_PER1], "per", "imx1-uart.0");
++	clk_register_clkdev(clk[IMX1_CLK_HCLK], "ipg", "imx1-uart.0");
++	clk_register_clkdev(clk[IMX1_CLK_PER1], "per", "imx1-uart.1");
++	clk_register_clkdev(clk[IMX1_CLK_HCLK], "ipg", "imx1-uart.1");
++	clk_register_clkdev(clk[IMX1_CLK_PER1], "per", "imx1-uart.2");
++	clk_register_clkdev(clk[IMX1_CLK_UART3_GATE], "ipg", "imx1-uart.2");
++	clk_register_clkdev(clk[IMX1_CLK_HCLK], NULL, "imx1-i2c.0");
++	clk_register_clkdev(clk[IMX1_CLK_PER2], "per", "imx1-cspi.0");
++	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ipg", "imx1-cspi.0");
++	clk_register_clkdev(clk[IMX1_CLK_PER2], "per", "imx1-cspi.1");
++	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ipg", "imx1-cspi.1");
++	clk_register_clkdev(clk[IMX1_CLK_PER2], "per", "imx1-fb.0");
++	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ipg", "imx1-fb.0");
++	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ahb", "imx1-fb.0");
+ 
+ 	mxc_timer_init(MX1_IO_ADDRESS(MX1_TIM1_BASE_ADDR), MX1_TIM1_INT);
+ 
+ 	return 0;
+ }
++
++static void __init mx1_clocks_init_dt(struct device_node *np)
++{
++	ccm = of_iomap(np, 0);
++	BUG_ON(!ccm);
++
++	_mx1_clocks_init(32768);
++
++	clk_data.clks = clk;
++	clk_data.clk_num = ARRAY_SIZE(clk);
++	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
++
++	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx1-gpt"));
++}
++CLK_OF_DECLARE(imx1_ccm, "fsl,imx1-ccm", mx1_clocks_init_dt);
+diff --git a/include/dt-bindings/clock/imx1-clock.h b/include/dt-bindings/clock/imx1-clock.h
+new file mode 100644
+index 0000000..607bf01
+--- /dev/null
++++ b/include/dt-bindings/clock/imx1-clock.h
+@@ -0,0 +1,40 @@
++/*
++ * Copyright (C) 2014 Alexander Shiyan <shc_work@mail.ru>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#ifndef __DT_BINDINGS_CLOCK_IMX1_H
++#define __DT_BINDINGS_CLOCK_IMX1_H
++
++#define IMX1_CLK_DUMMY		0
++#define IMX1_CLK_CLK32		1
++#define IMX1_CLK_CLK16M_EXT	2
++#define IMX1_CLK_CLK16M		3
++#define IMX1_CLK_CLK32_PREMULT	4
++#define IMX1_CLK_PREM		5
++#define IMX1_CLK_MPLL		6
++#define IMX1_CLK_MPLL_GATE	7
++#define IMX1_CLK_SPLL		8
++#define IMX1_CLK_SPLL_GATE	9
++#define IMX1_CLK_MCU		10
++#define IMX1_CLK_FCLK		11
++#define IMX1_CLK_HCLK		12
++#define IMX1_CLK_CLK48M		13
++#define IMX1_CLK_PER1		14
++#define IMX1_CLK_PER2		15
++#define IMX1_CLK_PER3		16
++#define IMX1_CLK_CLKO		17
++#define IMX1_CLK_UART3_GATE	18
++#define IMX1_CLK_SSI2_GATE	19
++#define IMX1_CLK_BROM_GATE	20
++#define IMX1_CLK_DMA_GATE	21
++#define IMX1_CLK_CSI_GATE	22
++#define IMX1_CLK_MMA_GATE	23
++#define IMX1_CLK_USBD_GATE	24
++#define IMX1_CLK_MAX		25
++
++#endif
 -- 
 1.8.5.5
