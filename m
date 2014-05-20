@@ -1,59 +1,27 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 20 May 2014 19:47:04 +0800
-Subject: [PATCH 05/20] ARM: imx5: remove i.MX5 non-DT device registration
- helpers
-In-Reply-To: <1400576552.352489173@f117.i.mail.ru>
-References: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
- <1400575538-21136-6-git-send-email-shawn.guo@freescale.com>
- <1400576552.352489173@f117.i.mail.ru>
-Message-ID: <20140520114700.GA20778@dragon>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 20 May 2014 13:49:39 +0200
+Subject: [PATCH/RFC V6 2/2] clk: Add handling of clk parent and rate
+ assigned from DT
+In-Reply-To: <1400520171-6698-3-git-send-email-s.nawrocki@samsung.com>
+References: <1400520171-6698-1-git-send-email-s.nawrocki@samsung.com>
+ <1400520171-6698-3-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <537B4153.8030203@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 01:02:32PM +0400, Alexander Shiyan wrote:
-> Tue, 20 May 2014 16:45:23 +0800 ?? Shawn Guo <shawn.guo@freescale.com>:
-> > i.MX5 is DT only platforms, so these non-DT device registration helpers
-> > is used nowhere.  Remove them.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > ---
-> >  arch/arm/mach-imx/devices/platform-fec.c           | 12 ----------
-> >  arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c  |  5 ----
-> >  arch/arm/mach-imx/devices/platform-imx-i2c.c       | 26 ---------------------
-> >  arch/arm/mach-imx/devices/platform-imx-keypad.c    | 10 --------
-> >  arch/arm/mach-imx/devices/platform-imx-ssi.c       | 20 ----------------
-> >  arch/arm/mach-imx/devices/platform-imx-uart.c      | 22 ------------------
-> >  arch/arm/mach-imx/devices/platform-imx2-wdt.c      | 18 ---------------
-> >  arch/arm/mach-imx/devices/platform-mxc-ehci.c      |  9 --------
-> >  arch/arm/mach-imx/devices/platform-mxc_nand.c      |  5 ----
-> >  arch/arm/mach-imx/devices/platform-pata_imx.c      | 10 --------
-> >  .../mach-imx/devices/platform-sdhci-esdhc-imx.c    | 24 -------------------
-> >  arch/arm/mach-imx/devices/platform-spi_imx.c       | 27 ----------------------
-> 
-> Seems, as an follow patch we should also remove SOC_IMX5* symbol
-> dependencies from arch/arm/mach-imx/devices/Kconfig.
+On 19/05/14 19:22, Sylwester Nawrocki wrote:
+> @@ -2620,7 +2639,10 @@ void __init of_clk_init(const struct of_device_id *matches)
+>  		list_for_each_entry_safe(clk_provider, next,
+>  					&clk_provider_list, node) {
+>  			if (force || parent_ready(clk_provider->np)) {
+> +
+>  				clk_provider->clk_init_cb(clk_provider->np);
+> +				of_clk_set_defaults(np, true);
 
-Ah, yes.  I just amended the following change into the patch.
+There is an error in this patch, this line should read:
 
-Shawn
++				of_clk_set_defaults(clk_provider->np, true);
 
-diff --git a/arch/arm/mach-imx/devices/Kconfig b/arch/arm/mach-imx/devices/Kconfig
-index 2d260a5..e40a0ab 100644
---- a/arch/arm/mach-imx/devices/Kconfig
-+++ b/arch/arm/mach-imx/devices/Kconfig
-@@ -1,6 +1,6 @@
- config IMX_HAVE_PLATFORM_FEC
-        bool
--       default y if ARCH_MX25 || SOC_IMX27 || SOC_IMX35 || SOC_IMX51 || SOC_IMX53
-+       default y if ARCH_MX25 || SOC_IMX27 || SOC_IMX35
-
- config IMX_HAVE_PLATFORM_FLEXCAN
-        bool
-@@ -10,7 +10,6 @@ config IMX_HAVE_PLATFORM_FSL_USB2_UDC
-
- config IMX_HAVE_PLATFORM_GPIO_KEYS
-        bool
--       default y if SOC_IMX51
-
- config IMX_HAVE_PLATFORM_IMX21_HCD
-        bool
+>  				list_del(&clk_provider->node);
+>  				kfree(clk_provider);
+>  				is_init_done = true;
