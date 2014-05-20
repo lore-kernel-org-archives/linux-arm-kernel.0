@@ -1,72 +1,67 @@
 From: maxime.coquelin@st.com (Maxime COQUELIN)
-Date: Tue, 20 May 2014 15:17:30 +0200
-Subject: [PATCH v7 2/4] ARM: dts: Fix STi boards compatibles
-In-Reply-To: <1400591852-17577-1-git-send-email-maxime.coquelin@st.com>
-References: <1400591852-17577-1-git-send-email-maxime.coquelin@st.com>
-Message-ID: <1400591852-17577-3-git-send-email-maxime.coquelin@st.com>
+Date: Tue, 20 May 2014 15:17:28 +0200
+Subject: [PATCH v7 0/4] Add STiH407 SoC and reference board support
+Message-ID: <1400591852-17577-1-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The compatible strings have to be ordered from specific to generic.
-This patch fixes this for STi boards, which did the exact opposite.
+This series adds basic support to the STMicroelectronics STiH407 SoC and its
+B2120 reference board. The STiH407 is a dual-core ARM Cortex-A9 CPU aimed at
+STB market.
 
-Cc: Olof Johansson <olof@lixom.net>
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
----
- arch/arm/boot/dts/stih415-b2000.dts | 2 +-
- arch/arm/boot/dts/stih415-b2020.dts | 2 +-
- arch/arm/boot/dts/stih416-b2000.dts | 3 +--
- arch/arm/boot/dts/stih416-b2020.dts | 3 +--
- 4 files changed, 4 insertions(+), 6 deletions(-)
+Changes since v6:
+-----------------
+    - No more uppercase and camelcase in DT labels and node names
 
-diff --git a/arch/arm/boot/dts/stih415-b2000.dts b/arch/arm/boot/dts/stih415-b2000.dts
-index d4af531..bdfbd37 100644
---- a/arch/arm/boot/dts/stih415-b2000.dts
-+++ b/arch/arm/boot/dts/stih415-b2000.dts
-@@ -11,5 +11,5 @@
- #include "stih41x-b2000.dtsi"
- / {
- 	model = "STiH415 B2000 Board";
--	compatible = "st,stih415", "st,stih415-b2000";
-+	compatible = "st,stih415-b2000", "st,stih415";
- };
-diff --git a/arch/arm/boot/dts/stih415-b2020.dts b/arch/arm/boot/dts/stih415-b2020.dts
-index 442b019..71903a8 100644
---- a/arch/arm/boot/dts/stih415-b2020.dts
-+++ b/arch/arm/boot/dts/stih415-b2020.dts
-@@ -11,5 +11,5 @@
- #include "stih41x-b2020.dtsi"
- / {
- 	model = "STiH415 B2020 Board";
--	compatible = "st,stih415", "st,stih415-b2020";
-+	compatible = "st,stih415-b2020", "st,stih415";
- };
-diff --git a/arch/arm/boot/dts/stih416-b2000.dts b/arch/arm/boot/dts/stih416-b2000.dts
-index a5eb6ee..488e80a 100644
---- a/arch/arm/boot/dts/stih416-b2000.dts
-+++ b/arch/arm/boot/dts/stih416-b2000.dts
-@@ -9,8 +9,7 @@
- /dts-v1/;
- #include "stih416.dtsi"
- #include "stih41x-b2000.dtsi"
--
- / {
--	compatible = "st,stih416", "st,stih416-b2000";
- 	model = "STiH416 B2000";
-+	compatible = "st,stih416-b2000", "st,stih416";
- };
-diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
-index 276f28d..4e2df66 100644
---- a/arch/arm/boot/dts/stih416-b2020.dts
-+++ b/arch/arm/boot/dts/stih416-b2020.dts
-@@ -11,6 +11,5 @@
- #include "stih41x-b2020.dtsi"
- / {
- 	model = "STiH416 B2020";
--	compatible = "st,stih416", "st,stih416-b2020";
--
-+	compatible = "st,stih416-b2020", "st,stih416";
- };
+Changes since v5:
+-----------------
+    - Sort STi boards in DTS'es Makefile
+    - Re-order compatibles in STi boards from specific to generic
+    - Only contains DT patches, other patches being merged
+
+Changes since v4:
+-----------------
+    - remove patches already present in v3.15 (pinctrl)
+    - rebase on top of v3.15-rc2
+
+Changes since v3:
+-----------------
+    - Removed SOC_STIH407 as unused for now
+    - Cosmetic changes in DT
+    - Added new lines in pinctrl-st around if:s
+    - Use ARRAY_SIZE instead of raw values
+
+Changes since v2:
+-----------------
+    - Reordered the pinctrl patches
+    - Moved stih407_flashdata to stih407 pinctrl patch
+
+Changes since v1:
+-----------------
+    - Changed patch 2 commit title
+    - Rebased pinctrl patches to linux-pinctrl/devel
+    - Rebased ARM patches to arm_soc/for-next
+
+Maxime Coquelin (4):
+  ARM: dts: Sort STi boards in Makefile
+  ARM: dts: Fix STi boards compatibles
+  ARM: dts: Add STiH407 SoC support
+  ARM: dts: STiH407: Add B2120 board support
+
+ arch/arm/boot/dts/Makefile             |   5 +-
+ arch/arm/boot/dts/stih407-b2120.dts    |  78 +++++
+ arch/arm/boot/dts/stih407-clock.dtsi   |  39 +++
+ arch/arm/boot/dts/stih407-pinctrl.dtsi | 615 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/stih407.dtsi         | 263 ++++++++++++++
+ arch/arm/boot/dts/stih415-b2000.dts    |   2 +-
+ arch/arm/boot/dts/stih415-b2020.dts    |   2 +-
+ arch/arm/boot/dts/stih416-b2000.dts    |   3 +-
+ arch/arm/boot/dts/stih416-b2020.dts    |   3 +-
+ 9 files changed, 1002 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm/boot/dts/stih407-b2120.dts
+ create mode 100644 arch/arm/boot/dts/stih407-clock.dtsi
+ create mode 100644 arch/arm/boot/dts/stih407-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/stih407.dtsi
+
 -- 
 1.9.1
