@@ -1,73 +1,59 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 20 May 2014 18:06:03 +0100
-Subject: [PATCH] arm64: KVM: Enable minimalistic support for Cortex-A53
-Message-ID: <1400605563-25533-1-git-send-email-marc.zyngier@arm.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 21 May 2014 01:13:17 +0800
+Subject: [GIT PULL] at91: DT for 3.16 #2
+In-Reply-To: <20140520055041.GO18956@quad.lixom.net>
+References: <1400059162-630-1-git-send-email-nicolas.ferre@atmel.com>
+ <20140520055041.GO18956@quad.lixom.net>
+Message-ID: <58381B35-AAB4-4FE5-833D-603052C97E9E@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to allow KVM to run on Cortex-A53 implementations, wire the
-minimal support required.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/cputype.h     | 1 +
- arch/arm64/include/uapi/asm/kvm.h    | 3 ++-
- arch/arm64/kvm/guest.c               | 2 ++
- arch/arm64/kvm/sys_regs_generic_v8.c | 2 ++
- 4 files changed, 7 insertions(+), 1 deletion(-)
+On May 20, 2014, at 1:50 PM, Olof Johansson <olof@lixom.net> wrote:
 
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index c404fb0..27f54a7 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -41,6 +41,7 @@
- 
- #define ARM_CPU_PART_AEM_V8	0xD0F0
- #define ARM_CPU_PART_FOUNDATION	0xD000
-+#define ARM_CPU_PART_CORTEX_A53	0xD030
- #define ARM_CPU_PART_CORTEX_A57	0xD070
- 
- #define APM_CPU_PART_POTENZA	0x0000
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index eaf54a3..6396eda 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -56,8 +56,9 @@ struct kvm_regs {
- #define KVM_ARM_TARGET_FOUNDATION_V8	1
- #define KVM_ARM_TARGET_CORTEX_A57	2
- #define KVM_ARM_TARGET_XGENE_POTENZA	3
-+#define KVM_ARM_TARGET_CORTEX_A53	4
- 
--#define KVM_ARM_NUM_TARGETS		4
-+#define KVM_ARM_NUM_TARGETS		5
- 
- /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
- #define KVM_ARM_DEVICE_TYPE_SHIFT	0
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 0874557..60b5c31 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -214,6 +214,8 @@ int __attribute_const__ kvm_target_cpu(void)
- 			return KVM_ARM_TARGET_AEM_V8;
- 		case ARM_CPU_PART_FOUNDATION:
- 			return KVM_ARM_TARGET_FOUNDATION_V8;
-+		case ARM_CPU_PART_CORTEX_A53:
-+			return KVM_ARM_TARGET_CORTEX_A53;
- 		case ARM_CPU_PART_CORTEX_A57:
- 			return KVM_ARM_TARGET_CORTEX_A57;
- 		};
-diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
-index 8fe6f76..475fd29 100644
---- a/arch/arm64/kvm/sys_regs_generic_v8.c
-+++ b/arch/arm64/kvm/sys_regs_generic_v8.c
-@@ -88,6 +88,8 @@ static int __init sys_reg_genericv8_init(void)
- 					  &genericv8_target_table);
- 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_FOUNDATION_V8,
- 					  &genericv8_target_table);
-+	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A53,
-+					  &genericv8_target_table);
- 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A57,
- 					  &genericv8_target_table);
- 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_XGENE_POTENZA,
--- 
-1.8.3.4
+> 
+> On Wed, May 14, 2014 at 11:19:22AM +0200, Nicolas Ferre wrote:
+>> Arnd, Olof, Kevin,
+>> 
+>> More DT material for AT91. Some fixes that apply on what was merged for 3.15
+>> but that are not very critical.
+>> The other patches are feature additions to old or very recent product/board:
+>> at91sam9261 or sama5d3 Xplained.
+>> 
+>> Thanks, best regards,
+>> 
+>> The following changes since commit 27a96a0364787d2b41d2a72d08143d95263e1b07:
+>> 
+>>  ARM: at91: sama5d3: clock for ssc from rk pin (2014-04-18 22:43:44 +0200)
+>> 
+>> are available in the git repository at:
+>> 
+>>  git://github.com/at91linux/linux-at91.git tags/at91-dt2
+>> 
+>> for you to fetch changes up to a93f9c88b7701d1c4c3b22d39d64a408f000a6ef:
+>> 
+>>  ARM: at91/dt: at91-sama5d3_xplained: add the regulator device node (2014-05-12 16:48:54 +0200)
+> 
+> Merged, but:
+> 
+>> arch/arm/boot/dts/at91-sama5d3_xplained.dts |  62 +++++++++++++++
+>> arch/arm/boot/dts/at91sam9261.dtsi          | 114 ++++++++++++++++++++++++++--
+>> arch/arm/boot/dts/at91sam9rl.dtsi           |   7 +-
+>> arch/arm/boot/dts/sama5d3.dtsi              |  78 +++++++++++++++++++
+> 
+> Grmbl. I remember being somewhat annoyed that you didn't use at91 prefix
+> when you introduced the sama5d3 dtsi files, but please don't start using
+> it on a random board like this, especially when other boards just use
+> the sama5d3_<board>.dts format.
+> 
+> Care to fix this up in time for 3.16 merge window?
+
+there is a small issue here Atmel drop the at91 in the soc name
+
+Best Regards,
+J.
+> 
+> 
+> Thanks,
+> 
+> -Olof
