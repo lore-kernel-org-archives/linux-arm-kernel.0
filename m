@@ -1,49 +1,47 @@
-From: elder@linaro.org (Alex Elder)
-Date: Tue, 20 May 2014 12:40:05 -0500
-Subject: [PATCH v4 4/5] ARM: dts: enable SMP support for bcm28155
-In-Reply-To: <1400607606-10810-1-git-send-email-elder@linaro.org>
-References: <1400607606-10810-1-git-send-email-elder@linaro.org>
-Message-ID: <1400607606-10810-5-git-send-email-elder@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 20 May 2014 21:41:31 +0400
+Subject: [PATCH 1/3] kernel: add calibration_delay_done()
+In-Reply-To: <1400600176-435-2-git-send-email-pdeschrijver@nvidia.com>
+References: <1400600176-435-1-git-send-email-pdeschrijver@nvidia.com>
+ <1400600176-435-2-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <537B93CB.3040109@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define nodes representing the two Cortex A9 CPUs in a bcm28155 SoC.
+On 05/20/2014 07:36 PM, Peter De Schrijver wrote:
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Signed-off-by: Alex Elder <elder@linaro.org>
----
- arch/arm/boot/dts/bcm11351.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+> Add calibration_delay_done() call and dummy implementation. This allows
+> architectures to stop accepting registrations for new timer based delay
+> functions.
 
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index 64d069b..61372a6 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -27,6 +27,25 @@
- 		bootargs = "console=ttyS0,115200n8";
- 	};
- 
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "brcm,bcm11351-cpu-method";
-+		secondary-boot-reg = <0x3500417c>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <1>;
-+		};
-+	};
-+
- 	gic: interrupt-controller at 3ff00100 {
- 		compatible = "arm,cortex-a9-gic";
- 		#interrupt-cells = <3>;
--- 
-1.9.1
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> ---
+>   init/calibrate.c |   12 ++++++++++++
+>   1 files changed, 12 insertions(+), 0 deletions(-)
+
+> diff --git a/init/calibrate.c b/init/calibrate.c
+> index 520702d..31cae76 100644
+> --- a/init/calibrate.c
+> +++ b/init/calibrate.c
+> @@ -262,6 +262,16 @@ unsigned long __attribute__((weak)) calibrate_delay_is_known(void)
+>   	return 0;
+>   }
+>
+> +/*
+> + * Indicate the cpu delay calibration is done. This can be used by
+> + * architectures to stop accepting delay timer registrations after this point.
+> + */
+> +
+> +void __attribute__((weak)) calibration_delay_done(void)
+> +{
+> +	return;
+
+    Not really needed.
+
+> +}
+> +
+>   void calibrate_delay(void)
+>   {
+>   	unsigned long lpj;
+
+WBR, Sergei
