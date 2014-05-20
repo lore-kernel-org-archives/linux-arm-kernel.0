@@ -1,351 +1,75 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 20 May 2014 16:45:23 +0800
-Subject: [PATCH 05/20] ARM: imx5: remove i.MX5 non-DT device registration
- helpers
+Date: Tue, 20 May 2014 16:45:25 +0800
+Subject: [PATCH 07/20] ARM: imx5: drop arguments from mx5_clocks_common_init()
 In-Reply-To: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
 References: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1400575538-21136-6-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1400575538-21136-8-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX5 is DT only platforms, so these non-DT device registration helpers
-is used nowhere.  Remove them.
+The function mx5_clocks_common_init() was created with a number of
+arguments to pass oscillator clock rate in non-DT boot.  Since i.MX5
+is DT only platform, the arguments can be dropped, and the clock rate
+can just be retrieved from device tree.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-imx/devices/platform-fec.c           | 12 ----------
- arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c  |  5 ----
- arch/arm/mach-imx/devices/platform-imx-i2c.c       | 26 ---------------------
- arch/arm/mach-imx/devices/platform-imx-keypad.c    | 10 --------
- arch/arm/mach-imx/devices/platform-imx-ssi.c       | 20 ----------------
- arch/arm/mach-imx/devices/platform-imx-uart.c      | 22 ------------------
- arch/arm/mach-imx/devices/platform-imx2-wdt.c      | 18 ---------------
- arch/arm/mach-imx/devices/platform-mxc-ehci.c      |  9 --------
- arch/arm/mach-imx/devices/platform-mxc_nand.c      |  5 ----
- arch/arm/mach-imx/devices/platform-pata_imx.c      | 10 --------
- .../mach-imx/devices/platform-sdhci-esdhc-imx.c    | 24 -------------------
- arch/arm/mach-imx/devices/platform-spi_imx.c       | 27 ----------------------
- 12 files changed, 188 deletions(-)
+ arch/arm/mach-imx/clk-imx51-imx53.c | 18 ++++++++----------
+ 1 file changed, 8 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-imx/devices/platform-fec.c b/arch/arm/mach-imx/devices/platform-fec.c
-index 63eba08..d86f925 100644
---- a/arch/arm/mach-imx/devices/platform-fec.c
-+++ b/arch/arm/mach-imx/devices/platform-fec.c
-@@ -35,18 +35,6 @@ const struct imx_fec_data imx35_fec_data __initconst =
- 	imx_fec_data_entry_single(MX35, "imx27-fec");
- #endif
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 1e22d35..67f686e 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -86,17 +86,15 @@ static const char *mx51_spdif1_com_sel[] = { "spdif1_podf", "ssi2_root_gate", };
+ static struct clk *clk[IMX5_CLK_END];
+ static struct clk_onecell_data clk_data;
  
--#ifdef CONFIG_SOC_IMX51
--/* i.mx51 has the i.mx27 type fec */
--const struct imx_fec_data imx51_fec_data __initconst =
--	imx_fec_data_entry_single(MX51, "imx27-fec");
--#endif
--
--#ifdef CONFIG_SOC_IMX53
--/* i.mx53 has the i.mx25 type fec */
--const struct imx_fec_data imx53_fec_data __initconst =
--	imx_fec_data_entry_single(MX53, "imx25-fec");
--#endif
--
- struct platform_device *__init imx_add_fec(
- 		const struct imx_fec_data *data,
- 		const struct fec_platform_data *pdata)
-diff --git a/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c b/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
-index 3c06bd9..23b0061 100644
---- a/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
-+++ b/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
-@@ -38,11 +38,6 @@ const struct imx_fsl_usb2_udc_data imx35_fsl_usb2_udc_data __initconst =
- 	imx_fsl_usb2_udc_data_entry_single(MX35, "imx-udc-mx27");
- #endif /* ifdef CONFIG_SOC_IMX35 */
- 
--#ifdef CONFIG_SOC_IMX51
--const struct imx_fsl_usb2_udc_data imx51_fsl_usb2_udc_data __initconst =
--	imx_fsl_usb2_udc_data_entry_single(MX51, "imx-udc-mx51");
--#endif
--
- struct platform_device *__init imx_add_fsl_usb2_udc(
- 		const struct imx_fsl_usb2_udc_data *data,
- 		const struct fsl_usb2_platform_data *pdata)
-diff --git a/arch/arm/mach-imx/devices/platform-imx-i2c.c b/arch/arm/mach-imx/devices/platform-imx-i2c.c
-index 57d342e..644ac26 100644
---- a/arch/arm/mach-imx/devices/platform-imx-i2c.c
-+++ b/arch/arm/mach-imx/devices/platform-imx-i2c.c
-@@ -70,32 +70,6 @@ const struct imx_imx_i2c_data imx35_imx_i2c_data[] __initconst = {
- };
- #endif /* ifdef CONFIG_SOC_IMX35 */
- 
--#ifdef CONFIG_SOC_IMX51
--const struct imx_imx_i2c_data imx51_imx_i2c_data[] __initconst = {
--#define imx51_imx_i2c_data_entry(_id, _hwid)				\
--	imx_imx_i2c_data_entry(MX51, "imx21-i2c", _id, _hwid, SZ_4K)
--	imx51_imx_i2c_data_entry(0, 1),
--	imx51_imx_i2c_data_entry(1, 2),
--	{
--		.devid = "imx21-i2c",
--		.id = 2,
--		.iobase = MX51_HSI2C_DMA_BASE_ADDR,
--		.iosize = SZ_16K,
--		.irq = MX51_INT_HS_I2C,
--	},
--};
--#endif /* ifdef CONFIG_SOC_IMX51 */
--
--#ifdef CONFIG_SOC_IMX53
--const struct imx_imx_i2c_data imx53_imx_i2c_data[] __initconst = {
--#define imx53_imx_i2c_data_entry(_id, _hwid)				\
--	imx_imx_i2c_data_entry(MX53, "imx21-i2c", _id, _hwid, SZ_4K)
--	imx53_imx_i2c_data_entry(0, 1),
--	imx53_imx_i2c_data_entry(1, 2),
--	imx53_imx_i2c_data_entry(2, 3),
--};
--#endif /* ifdef CONFIG_SOC_IMX53 */
--
- struct platform_device *__init imx_add_imx_i2c(
- 		const struct imx_imx_i2c_data *data,
- 		const struct imxi2c_platform_data *pdata)
-diff --git a/arch/arm/mach-imx/devices/platform-imx-keypad.c b/arch/arm/mach-imx/devices/platform-imx-keypad.c
-index 8f22a4c..f42200b 100644
---- a/arch/arm/mach-imx/devices/platform-imx-keypad.c
-+++ b/arch/arm/mach-imx/devices/platform-imx-keypad.c
-@@ -41,16 +41,6 @@ const struct imx_imx_keypad_data imx35_imx_keypad_data __initconst =
- 	imx_imx_keypad_data_entry_single(MX35, SZ_16);
- #endif /* ifdef CONFIG_SOC_IMX35 */
- 
--#ifdef CONFIG_SOC_IMX51
--const struct imx_imx_keypad_data imx51_imx_keypad_data __initconst =
--	imx_imx_keypad_data_entry_single(MX51, SZ_16);
--#endif /* ifdef CONFIG_SOC_IMX51 */
--
--#ifdef CONFIG_SOC_IMX53
--const struct imx_imx_keypad_data imx53_imx_keypad_data __initconst =
--	imx_imx_keypad_data_entry_single(MX53, SZ_16);
--#endif /* ifdef CONFIG_SOC_IMX53 */
--
- struct platform_device *__init imx_add_imx_keypad(
- 		const struct imx_imx_keypad_data *data,
- 		const struct matrix_keymap_data *pdata)
-diff --git a/arch/arm/mach-imx/devices/platform-imx-ssi.c b/arch/arm/mach-imx/devices/platform-imx-ssi.c
-index bfcb8f3..1c7c721 100644
---- a/arch/arm/mach-imx/devices/platform-imx-ssi.c
-+++ b/arch/arm/mach-imx/devices/platform-imx-ssi.c
-@@ -66,26 +66,6 @@ const struct imx_imx_ssi_data imx35_imx_ssi_data[] __initconst = {
- };
- #endif /* ifdef CONFIG_SOC_IMX35 */
- 
--#ifdef CONFIG_SOC_IMX51
--const struct imx_imx_ssi_data imx51_imx_ssi_data[] __initconst = {
--#define imx51_imx_ssi_data_entry(_id, _hwid)				\
--	imx_imx_ssi_data_entry(MX51, _id, _hwid, SZ_16K)
--	imx51_imx_ssi_data_entry(0, 1),
--	imx51_imx_ssi_data_entry(1, 2),
--	imx51_imx_ssi_data_entry(2, 3),
--};
--#endif /* ifdef CONFIG_SOC_IMX51 */
--
--#ifdef CONFIG_SOC_IMX53
--const struct imx_imx_ssi_data imx53_imx_ssi_data[] __initconst = {
--#define imx53_imx_ssi_data_entry(_id, _hwid)				\
--	imx_imx_ssi_data_entry(MX53, _id, _hwid, SZ_16K)
--	imx53_imx_ssi_data_entry(0, 1),
--	imx53_imx_ssi_data_entry(1, 2),
--	imx53_imx_ssi_data_entry(2, 3),
--};
--#endif /* ifdef CONFIG_SOC_IMX53 */
--
- struct platform_device *__init imx_add_imx_ssi(
- 		const struct imx_imx_ssi_data *data,
- 		const struct imx_ssi_platform_data *pdata)
-diff --git a/arch/arm/mach-imx/devices/platform-imx-uart.c b/arch/arm/mach-imx/devices/platform-imx-uart.c
-index faac4aa..8c01836 100644
---- a/arch/arm/mach-imx/devices/platform-imx-uart.c
-+++ b/arch/arm/mach-imx/devices/platform-imx-uart.c
-@@ -94,28 +94,6 @@ const struct imx_imx_uart_1irq_data imx35_imx_uart_data[] __initconst = {
- };
- #endif /* ifdef CONFIG_SOC_IMX35 */
- 
--#ifdef CONFIG_SOC_IMX51
--const struct imx_imx_uart_1irq_data imx51_imx_uart_data[] __initconst = {
--#define imx51_imx_uart_data_entry(_id, _hwid)				\
--	imx_imx_uart_1irq_data_entry(MX51, _id, _hwid, SZ_4K)
--	imx51_imx_uart_data_entry(0, 1),
--	imx51_imx_uart_data_entry(1, 2),
--	imx51_imx_uart_data_entry(2, 3),
--};
--#endif /* ifdef CONFIG_SOC_IMX51 */
--
--#ifdef CONFIG_SOC_IMX53
--const struct imx_imx_uart_1irq_data imx53_imx_uart_data[] __initconst = {
--#define imx53_imx_uart_data_entry(_id, _hwid)				\
--	imx_imx_uart_1irq_data_entry(MX53, _id, _hwid, SZ_4K)
--	imx53_imx_uart_data_entry(0, 1),
--	imx53_imx_uart_data_entry(1, 2),
--	imx53_imx_uart_data_entry(2, 3),
--	imx53_imx_uart_data_entry(3, 4),
--	imx53_imx_uart_data_entry(4, 5),
--};
--#endif /* ifdef CONFIG_SOC_IMX53 */
--
- struct platform_device *__init imx_add_imx_uart_3irq(
- 		const struct imx_imx_uart_3irq_data *data,
- 		const struct imxuart_platform_data *pdata)
-diff --git a/arch/arm/mach-imx/devices/platform-imx2-wdt.c b/arch/arm/mach-imx/devices/platform-imx2-wdt.c
-index ec75d64..54f63bc 100644
---- a/arch/arm/mach-imx/devices/platform-imx2-wdt.c
-+++ b/arch/arm/mach-imx/devices/platform-imx2-wdt.c
-@@ -45,24 +45,6 @@ const struct imx_imx2_wdt_data imx35_imx2_wdt_data __initconst =
- 	imx_imx2_wdt_data_entry_single(MX35, 0, , SZ_16K);
- #endif /* ifdef CONFIG_SOC_IMX35 */
- 
--#ifdef CONFIG_SOC_IMX51
--const struct imx_imx2_wdt_data imx51_imx2_wdt_data[] __initconst = {
--#define imx51_imx2_wdt_data_entry(_id, _hwid)				\
--	imx_imx2_wdt_data_entry(MX51, _id, _hwid, SZ_16K)
--	imx51_imx2_wdt_data_entry(0, 1),
--	imx51_imx2_wdt_data_entry(1, 2),
--};
--#endif /* ifdef CONFIG_SOC_IMX51 */
--
--#ifdef CONFIG_SOC_IMX53
--const struct imx_imx2_wdt_data imx53_imx2_wdt_data[] __initconst = {
--#define imx53_imx2_wdt_data_entry(_id, _hwid)				\
--	imx_imx2_wdt_data_entry(MX53, _id, _hwid, SZ_16K)
--	imx53_imx2_wdt_data_entry(0, 1),
--	imx53_imx2_wdt_data_entry(1, 2),
--};
--#endif /* ifdef CONFIG_SOC_IMX53 */
--
- struct platform_device *__init imx_add_imx2_wdt(
- 		const struct imx_imx2_wdt_data *data)
+-static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+-		unsigned long rate_osc, unsigned long rate_ckih1,
+-		unsigned long rate_ckih2)
++static void __init mx5_clocks_common_init(void)
  {
-diff --git a/arch/arm/mach-imx/devices/platform-mxc-ehci.c b/arch/arm/mach-imx/devices/platform-mxc-ehci.c
-index 5d4bbbf..2963536 100644
---- a/arch/arm/mach-imx/devices/platform-mxc-ehci.c
-+++ b/arch/arm/mach-imx/devices/platform-mxc-ehci.c
-@@ -50,15 +50,6 @@ const struct imx_mxc_ehci_data imx35_mxc_ehci_hs_data __initconst =
- 	imx_mxc_ehci_data_entry_single(MX35, 1, HS);
- #endif /* ifdef CONFIG_SOC_IMX35 */
+ 	int i;
  
--#ifdef CONFIG_SOC_IMX51
--const struct imx_mxc_ehci_data imx51_mxc_ehci_otg_data __initconst =
--	imx_mxc_ehci_data_entry_single(MX51, 0, OTG);
--const struct imx_mxc_ehci_data imx51_mxc_ehci_hs_data[] __initconst = {
--	imx_mxc_ehci_data_entry_single(MX51, 1, HS1),
--	imx_mxc_ehci_data_entry_single(MX51, 2, HS2),
--};
--#endif /* ifdef CONFIG_SOC_IMX51 */
--
- struct platform_device *__init imx_add_mxc_ehci(
- 		const struct imx_mxc_ehci_data *data,
- 		const struct mxc_usbh_platform_data *pdata)
-diff --git a/arch/arm/mach-imx/devices/platform-mxc_nand.c b/arch/arm/mach-imx/devices/platform-mxc_nand.c
-index 7af1c53..fa618a3 100644
---- a/arch/arm/mach-imx/devices/platform-mxc_nand.c
-+++ b/arch/arm/mach-imx/devices/platform-mxc_nand.c
-@@ -54,11 +54,6 @@ const struct imx_mxc_nand_data imx35_mxc_nand_data __initconst =
- 	imx_mxc_nand_data_entry_single(MX35, "imx25-nand", SZ_8K);
- #endif
+ 	clk[IMX5_CLK_DUMMY]		= imx_clk_fixed("dummy", 0);
+-	clk[IMX5_CLK_CKIL]		= imx_obtain_fixed_clock("ckil", rate_ckil);
+-	clk[IMX5_CLK_OSC]		= imx_obtain_fixed_clock("osc", rate_osc);
+-	clk[IMX5_CLK_CKIH1]		= imx_obtain_fixed_clock("ckih1", rate_ckih1);
+-	clk[IMX5_CLK_CKIH2]		= imx_obtain_fixed_clock("ckih2", rate_ckih2);
++	clk[IMX5_CLK_CKIL]		= imx_obtain_fixed_clock("ckil", 0);
++	clk[IMX5_CLK_OSC]		= imx_obtain_fixed_clock("osc", 0);
++	clk[IMX5_CLK_CKIH1]		= imx_obtain_fixed_clock("ckih1", 0);
++	clk[IMX5_CLK_CKIH2]		= imx_obtain_fixed_clock("ckih2", 0);
  
--#ifdef CONFIG_SOC_IMX51
--const struct imx_mxc_nand_data imx51_mxc_nand_data __initconst =
--	imx_mxc_nandv3_data_entry_single(MX51, "imx51-nand", SZ_16K);
--#endif
--
- struct platform_device *__init imx_add_mxc_nand(
- 		const struct imx_mxc_nand_data *data,
- 		const struct mxc_nand_platform_data *pdata)
-diff --git a/arch/arm/mach-imx/devices/platform-pata_imx.c b/arch/arm/mach-imx/devices/platform-pata_imx.c
-index e4ec11c..1c7f895 100644
---- a/arch/arm/mach-imx/devices/platform-pata_imx.c
-+++ b/arch/arm/mach-imx/devices/platform-pata_imx.c
-@@ -28,16 +28,6 @@ const struct imx_pata_imx_data imx35_pata_imx_data __initconst =
- 	imx_pata_imx_data_entry_single(MX35, SZ_16K);
- #endif /* ifdef CONFIG_SOC_IMX35 */
+ 	clk[IMX5_CLK_PERIPH_APM]	= imx_clk_mux("periph_apm", MXC_CCM_CBCMR, 12, 2,
+ 						periph_apm_sel, ARRAY_SIZE(periph_apm_sel));
+@@ -358,7 +356,7 @@ static void __init mx50_clocks_init(struct device_node *np)
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
  
--#ifdef CONFIG_SOC_IMX51
--const struct imx_pata_imx_data imx51_pata_imx_data __initconst =
--	imx_pata_imx_data_entry_single(MX51, SZ_16K);
--#endif /* ifdef CONFIG_SOC_IMX51 */
--
--#ifdef CONFIG_SOC_IMX53
--const struct imx_pata_imx_data imx53_pata_imx_data __initconst =
--	imx_pata_imx_data_entry_single(MX53, SZ_16K);
--#endif /* ifdef CONFIG_SOC_IMX53 */
--
- struct platform_device *__init imx_add_pata_imx(
- 		const struct imx_pata_imx_data *data)
- {
-diff --git a/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c b/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
-index e66a4e3..fb8d4a2 100644
---- a/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
-+++ b/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
-@@ -43,30 +43,6 @@ imx35_sdhci_esdhc_imx_data[] __initconst = {
- };
- #endif /* ifdef CONFIG_SOC_IMX35 */
+-	mx5_clocks_common_init(0, 0, 0, 0);
++	mx5_clocks_common_init();
  
--#ifdef CONFIG_SOC_IMX51
--const struct imx_sdhci_esdhc_imx_data
--imx51_sdhci_esdhc_imx_data[] __initconst = {
--#define imx51_sdhci_esdhc_imx_data_entry(_id, _hwid)			\
--	imx_sdhci_esdhc_imx_data_entry(MX51, "sdhci-esdhc-imx51", _id, _hwid)
--	imx51_sdhci_esdhc_imx_data_entry(0, 1),
--	imx51_sdhci_esdhc_imx_data_entry(1, 2),
--	imx51_sdhci_esdhc_imx_data_entry(2, 3),
--	imx51_sdhci_esdhc_imx_data_entry(3, 4),
--};
--#endif /* ifdef CONFIG_SOC_IMX51 */
--
--#ifdef CONFIG_SOC_IMX53
--const struct imx_sdhci_esdhc_imx_data
--imx53_sdhci_esdhc_imx_data[] __initconst = {
--#define imx53_sdhci_esdhc_imx_data_entry(_id, _hwid)			\
--	imx_sdhci_esdhc_imx_data_entry(MX53, "sdhci-esdhc-imx53", _id, _hwid)
--	imx53_sdhci_esdhc_imx_data_entry(0, 1),
--	imx53_sdhci_esdhc_imx_data_entry(1, 2),
--	imx53_sdhci_esdhc_imx_data_entry(2, 3),
--	imx53_sdhci_esdhc_imx_data_entry(3, 4),
--};
--#endif /* ifdef CONFIG_SOC_IMX53 */
--
- static const struct esdhc_platform_data default_esdhc_pdata __initconst = {
- 	.wp_type = ESDHC_WP_NONE,
- 	.cd_type = ESDHC_CD_NONE,
-diff --git a/arch/arm/mach-imx/devices/platform-spi_imx.c b/arch/arm/mach-imx/devices/platform-spi_imx.c
-index 8880bcb..aca825d 100644
---- a/arch/arm/mach-imx/devices/platform-spi_imx.c
-+++ b/arch/arm/mach-imx/devices/platform-spi_imx.c
-@@ -79,33 +79,6 @@ const struct imx_spi_imx_data imx35_cspi_data[] __initconst = {
- };
- #endif /* ifdef CONFIG_SOC_IMX35 */
+ 	/* set SDHC root clock to 200MHZ*/
+ 	clk_set_rate(clk[IMX5_CLK_ESDHC_A_PODF], 200000000);
+@@ -424,7 +422,7 @@ static void __init mx51_clocks_init(struct device_node *np)
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
  
--#ifdef CONFIG_SOC_IMX51
--/* i.mx51 has the i.mx35 type cspi */
--const struct imx_spi_imx_data imx51_cspi_data __initconst =
--	imx_spi_imx_data_entry_single(MX51, CSPI, "imx35-cspi", 2, , SZ_4K);
--
--const struct imx_spi_imx_data imx51_ecspi_data[] __initconst = {
--#define imx51_ecspi_data_entry(_id, _hwid)				\
--	imx_spi_imx_data_entry(MX51, ECSPI, "imx51-ecspi", _id, _hwid, SZ_4K)
--	imx51_ecspi_data_entry(0, 1),
--	imx51_ecspi_data_entry(1, 2),
--};
--#endif /* ifdef CONFIG_SOC_IMX51 */
--
--#ifdef CONFIG_SOC_IMX53
--/* i.mx53 has the i.mx35 type cspi */
--const struct imx_spi_imx_data imx53_cspi_data __initconst =
--	imx_spi_imx_data_entry_single(MX53, CSPI, "imx35-cspi", 2, , SZ_4K);
--
--/* i.mx53 has the i.mx51 type ecspi */
--const struct imx_spi_imx_data imx53_ecspi_data[] __initconst = {
--#define imx53_ecspi_data_entry(_id, _hwid)				\
--	imx_spi_imx_data_entry(MX53, ECSPI, "imx51-ecspi", _id, _hwid, SZ_4K)
--	imx53_ecspi_data_entry(0, 1),
--	imx53_ecspi_data_entry(1, 2),
--};
--#endif /* ifdef CONFIG_SOC_IMX53 */
--
- struct platform_device *__init imx_add_spi_imx(
- 		const struct imx_spi_imx_data *data,
- 		const struct spi_imx_master *pdata)
+-	mx5_clocks_common_init(0, 0, 0, 0);
++	mx5_clocks_common_init();
+ 
+ 	clk_register_clkdev(clk[IMX5_CLK_HSI2C_GATE], NULL, "imx21-i2c.2");
+ 	clk_register_clkdev(clk[IMX5_CLK_MX51_MIPI], "mipi_hsp", NULL);
+@@ -542,7 +540,7 @@ static void __init mx53_clocks_init(struct device_node *np)
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 
+-	mx5_clocks_common_init(0, 0, 0, 0);
++	mx5_clocks_common_init();
+ 
+ 	clk_register_clkdev(clk[IMX5_CLK_I2C3_GATE], NULL, "imx21-i2c.2");
+ 	clk_register_clkdev(clk[IMX5_CLK_FEC_GATE], NULL, "imx25-fec.0");
 -- 
 1.8.3.2
