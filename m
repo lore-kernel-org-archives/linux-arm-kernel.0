@@ -1,58 +1,54 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Tue, 20 May 2014 11:10:59 +0530
-Subject: [PATCH] sound: soc: samsung: dma.c: Fix for possible null pointer
- dereference
-In-Reply-To: <1400535443-5886-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-References: <1400535443-5886-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-Message-ID: <537AEAEB.8040803@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 May 2014 22:48:52 -0700
+Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
+ support
+In-Reply-To: <20140520051203.GB28812@earth.universe>
+References: <537487AE.3060906@ti.com> <20140515182133.GC23659@atomide.com>
+ <5375A8A8.7080306@ti.com> <20140516160717.GD22031@atomide.com>
+ <20140516174158.GA11733@earth.universe>
+ <20140516180154.GG22031@atomide.com> <5379CD24.6040508@ti.com>
+ <20140519160447.GB4849@atomide.com> <537A55EB.1080507@ti.com>
+ <20140520051203.GB28812@earth.universe>
+Message-ID: <20140520054852.GA12384@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/20/2014 03:07 AM, Rickard Strandqvist wrote:
-> There is otherwise a risk of a possible null pointer dereference.
+* Sebastian Reichel <sre@kernel.org> [140519 22:13]:
+> On Mon, May 19, 2014 at 10:05:15PM +0300, Tomi Valkeinen wrote:
+> > On 19/05/14 19:04, Tony Lindgren wrote:
+> > 
+> > > In many cases however we do have multiple compatible strings that
+> > > describe how the device is wired. See drivers/tty/serial/of_serial.c
+> > > for example. It has "ns16550" but then it also has additional
+> > > "nvidia,tegra20-uart", "nxp,lpc3220-uart" and "ibm,qpace-nwp-serial".
+> > 
+> > All those sound like SoC components. In that case it sounds fine to have
+> > the device compatible contain the SoC name. We're talking here about
+> > external, detachable devices.
+
+Yes I agree it's also hackish. But playing with the compatible flags
+avoids adding other custom workarounds.
+
+> > >>> Not use what you're after with the SPI example though, but sounds
+> > >>> like that's something different.
+> > >>
+> > >> I think Sebastien's example is just like the issue here.
+> > > 
+> > > Hmm is there some existing example in the kernel like that?
+> > 
+> > No, Sebastien's example was just a hypothetical case. Here, using your
+> > way of having SoC specific data in the .dts, we would have
+> > "sharp,ls037v7dw01-omap-dss", and in Sebastien's example with a touch
+> > sensor we'd have, say, "synaptics,xyz123-omap-spi".
 > 
-> Was largely found by using a static code analysis program called cppcheck.
-> 
-> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
-> ---
->  sound/soc/samsung/dma.c |   10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
-> 
-> diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
-> index dc09b71..1d9bcaa 100644
-> --- a/sound/soc/samsung/dma.c
-> +++ b/sound/soc/samsung/dma.c
-> @@ -115,17 +115,19 @@ static void dma_enqueue(struct snd_pcm_substream *substream)
->  static void audio_buffdone(void *data)
->  {
->  	struct snd_pcm_substream *substream = data;
-> -	struct runtime_data *prtd = substream->runtime->private_data;
-> +	struct runtime_data *prtd = NULL;
+> Yes, that's what I wanted to say :)
 
-I am not sure if this check is required as audio_buffdone() is set as a
-callback function with known valid parameter during dma_enqueue().
+Hmm I think we need to add few things to the hypothetical SPI case
+to get it even close to the panel example. Like assume that no SPI bus
+exists, and that potentially multiple different Synaptics drivers are
+trying to share the same compatible flag for a non-existing generic
+binding.. I think then it's getting close to the panel example :)
 
->  
->  	pr_debug("Entered %s\n", __func__);
->  
-> -	if (prtd->state & ST_RUNNING) {
-> +	if (substream)
-> +		prtd = substream->runtime->private_data;
-> +
-> +	if (prtd && prtd->state & ST_RUNNING) {
+Regards,
 
-ditto as above
-
->  		prtd->dma_pos += prtd->dma_period;
->  		if (prtd->dma_pos >= prtd->dma_end)
->  			prtd->dma_pos = prtd->dma_start;
->  
-> -		if (substream)
-> -			snd_pcm_period_elapsed(substream);
-> +		snd_pcm_period_elapsed(substream);
-
-This check certainly can be removed as snd_pcm_period_elapsed() also
-checks the validity of the argument.
-
--- 
-Tushar Behera
+Tony
