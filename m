@@ -1,34 +1,81 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 19 May 2014 23:13:47 -0400 (EDT)
-Subject: [PATCH v3] arm: ioremap: Fix static vm area boundary check.
-In-Reply-To: <9258c0b00a33484a8d289378047f8cd4@BY2PR03MB505.namprd03.prod.outlook.com>
-References: <1400232920-25079-1-git-send-email-Li.Xiubo@freescale.com>
- <alpine.LFD.2.11.1405161403400.17310@knanqh.ubzr>
- <9258c0b00a33484a8d289378047f8cd4@BY2PR03MB505.namprd03.prod.outlook.com>
-Message-ID: <alpine.LFD.2.11.1405192306390.17310@knanqh.ubzr>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue, 20 May 2014 11:24:08 +0800
+Subject: [PATCH v6 03/15] irq: gic: support hip04 gic
+In-Reply-To: <53748A2B.9050304@arm.com>
+References: <1399795571-17231-1-git-send-email-haojian.zhuang@linaro.org>
+ <1399795571-17231-4-git-send-email-haojian.zhuang@linaro.org>
+ <53748A2B.9050304@arm.com>
+Message-ID: <CAD6h2NSksfsOZOG4mjH2M5037mDp9H3s=12adsYAF00YHfpmzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 May 2014, Li.Xiubo at freescale.com wrote:
+On 15 May 2014 17:34, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 11/05/14 09:05, Haojian Zhuang wrote:
+>>
+>> +static inline bool gic_is_standard(struct gic_chip_data *gic)
+>
+> Please loose all of the inlines. The compiler can do this by itself.
+>
+Since others also agree on inline, I'll keep to use it.
 
-> > > For each vmalloc area, there is one guard page at the end of it.
-> > > so the vm->size = PAGE_ALIGN(offset + request size) + guard page size.
-> > 
-> > Nope.  There is no guard page for statically created vmalloc areas.
-> > 
-> 
-> Yes, you are right, I'm thinking why the static area has no guard page?
+>> -static u8 gic_get_cpumask(struct gic_chip_data *gic)
+>> +static u16 gic_get_cpumask(struct gic_chip_data *gic)
+>>  {
+>>         void __iomem *base = gic_data_dist_base(gic);
+>>         u32 mask, i;
+>>
+>> -       for (i = mask = 0; i < 32; i += 4) {
+>> -               mask = readl_relaxed(base + GIC_DIST_TARGET + i);
+>> -               mask |= mask >> 16;
+>> -               mask |= mask >> 8;
+>> +       /*
+>> +        * ARM GIC uses 8 registers for interrupt 0-31,
+>> +        * HiP04 GIC uses 16 registers for interrupt 0-31.
+>> +        */
+>> +       for (i = mask = 0; i < 32; i += gic_irqs_per_target_reg(gic)) {
+>> +               if (gic_is_standard(gic)) {
+>> +                       mask = readl_relaxed(base + GIC_DIST_TARGET + i);
+>> +                       mask |= mask >> 16;
+>> +                       mask |= mask >> 8;
+>> +               } else {                        /* HiP04 GIC */
+>> +                       mask = readl_relaxed(base + GIC_DIST_TARGET + i * 2);
+>> +                       mask |= mask >> 16;
+>> +               }
+>
+> You have irq_to_target_reg now, and you can rewrite most of this without
+> duplication (see my previous review comment).
+>
 
-The virtual addresses being used are provided by the static mapping 
-descriptions themselves.  Sometimes those mappings are large and 
-contiguous, covering multiple peripherals at once with a single TLB, 
-etc.  There is simply no room for a guard page, or no guard page at all 
-between different areas covered by a single section mapping (1MB worth 
-of mapping from a single page table entry).
+At here, the offset from GIC_DIST_TARGET is got directly.
+In irq_to_target_reg(), the parameter is struct irq_data. These two
+cases are different.
 
-All this to say that trying to enforce a guard page in those cases is 
-likely to throw away all the performance advantage and conplexify 
-things.
+How could I reuse the irq_to_target_reg() at here?
 
 
-Nicolas
+>> @@ -392,10 +452,17 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+>>          * Set all global interrupts to this CPU only.
+>>          */
+>>         cpumask = gic_get_cpumask(gic);
+>> -       cpumask |= cpumask << 8;
+>> +       if (gic_is_standard(gic))
+>> +               cpumask |= cpumask << 8;
+>>         cpumask |= cpumask << 16;
+>> -       for (i = 32; i < gic_irqs; i += 4)
+>> -               writel_relaxed(cpumask, base + GIC_DIST_TARGET + i * 4 / 4);
+>> +       for (i = 32; i < gic_irqs; i += gic_irqs_per_target_reg(gic)) {
+>> +               if (gic_is_standard(gic))
+>> +                       writel_relaxed(cpumask,
+>> +                                      base + GIC_DIST_TARGET + i / 4 * 4);
+>> +               else
+>> +                       writel_relaxed(cpumask,
+>> +                                      base + GIC_DIST_TARGET + i / 2 * 4);
+>> +       }
+>
+> Same here.
+>
+Same reason that I can't use irq_to_target_reg(). There's no struct
+irq_data at here.
+
+Regards
+Haojian
