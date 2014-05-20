@@ -1,31 +1,93 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 20 May 2014 15:55:32 +0200
-Subject: [PATCH v2 2/3] ARM: dts: overo: Add support for 4.3'' LCD output
-In-Reply-To: <537B4D6B.5070106@ti.com>
-References: <1400589069-21572-1-git-send-email-florian.vaussard@epfl.ch>
- <1400589069-21572-3-git-send-email-florian.vaussard@epfl.ch>
- <537B4D6B.5070106@ti.com>
-Message-ID: <537B5ED4.3040805@epfl.ch>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 20 May 2014 09:57:50 -0400
+Subject: [PATCH v2 0/6] soc: ti: Add Keystone Navigator drivers
+In-Reply-To: <1398296783-1176-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1398296783-1176-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <537B5F5E.9080703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Greg,
 
+On Wednesday 23 April 2014 07:46 PM, Santosh Shilimkar wrote:
+> Here is an updated version of the Keystone Navigator drivers after
+> addressing comments from earlier version [1].
+> 
+> The QMSS found on Keystone SOCs is one of the main hardware sub
+> system which forms the backbone of the Keystone Multi-core Navigator.
+> QMSS consist of queue managers, packed-data structure processors(PDSP),
+> linking RAM, descriptor pools and infrastructure DMA.
+> 
+> After the discussion and alignment [2] on Navigator DMA, now we pair
+> this driver along with QMSS. Initially this driver was proposed as DMA
+> engine driver but since the hardware is not typical DMA engine and doesn't
+> comply with typical DMA engine driver needs, that approach was naked.
+> 
+> These two drivers works as infrastructure drivers for subsystems like
+> Ethernet subsystem, SRIO subsystem, Crypto Engines etc on Keystone
+> SOC families. Testing is done with NetCP(ethernet) subsystem drivers.
+> 
+> I would like to get these drivers merged in upcoming(3.16) window, so
+> any help in terms of review is appreciated. Thanks
+> 
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> 
+I plan to respin v3 of the series for the few device tree related
+comments I received from Rob H (thanks Rob). Can you please have a
+look and gsee if you have any comments so that I can include them
+in next version.
 
-On 05/20/2014 02:41 PM, Tomi Valkeinen wrote:
-> On 20/05/14 15:31, Florian Vaussard wrote:
-> 
->> +	lcd0: display at 0 { +		compatible = "samsung,lte430wq-f0c",
->> "panel-dpi"; +		label = "lcd"; + +		gpios = <&gpio5 16
->> GPIO_ACTIVE_HIGH		/* gpio_144: enable */ +			 &gpio5 17
->> GPIO_ACTIVE_HIGH>;		/* gpio_145: brightness */
-> 
-> The panel-dpi only takes one gpio, the enable. The backlight should
-> be handled with gpio-backlight driver.
-> 
-> The same applies for the Alto35 patch.
-> 
+thanks.
 
-Indeed. I will send a v3.
-
-Regards,
-Florian
+> Sandeep Nair (3):
+>   firmware: add Keystone QMSS PDSP accumulator firmware blob
+>   Documentation: dt: soc: add Keystone Navigator QMSS bindings
+>   soc: ti: add Keystone Navigator QMSS driver
+> 
+> Santosh Shilimkar (3):
+>   soc: Introduce drivers/soc place-holder for SOC specific drivers
+>   Documentation: dt: soc: add Keystone Navigator DMA bindings
+>   soc: ti: add Keystone Navigator DMA support
+> 
+>  .../bindings/soc/keystone-navigator-dma.txt        |  101 ++
+>  .../bindings/soc/keystone-navigator-qmss.txt       |  232 +++
+>  drivers/Kconfig                                    |    4 +
+>  drivers/Makefile                                   |    3 +
+>  drivers/soc/Kconfig                                |    5 +
+>  drivers/soc/Makefile                               |    5 +
+>  drivers/soc/ti/Kconfig                             |   31 +
+>  drivers/soc/ti/Makefile                            |    5 +
+>  drivers/soc/ti/knav_dma.c                          |  776 +++++++++
+>  drivers/soc/ti/knav_qmss.h                         |  386 +++++
+>  drivers/soc/ti/knav_qmss_acc.c                     |  591 +++++++
+>  drivers/soc/ti/knav_qmss_queue.c                   | 1814 ++++++++++++++++++++
+>  firmware/Makefile                                  |    1 +
+>  .../keystone/qmss_pdsp_acc48_k2_le_1_0_0_8.fw.ihex |  110 ++
+>  include/linux/soc/ti/knav_dma.h                    |  175 ++
+>  include/linux/soc/ti/knav_qmss.h                   |   90 +
+>  16 files changed, 4329 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/soc/keystone-navigator-dma.txt
+>  create mode 100644 Documentation/devicetree/bindings/soc/keystone-navigator-qmss.txt
+>  create mode 100644 drivers/soc/Kconfig
+>  create mode 100644 drivers/soc/Makefile
+>  create mode 100644 drivers/soc/ti/Kconfig
+>  create mode 100644 drivers/soc/ti/Makefile
+>  create mode 100644 drivers/soc/ti/knav_dma.c
+>  create mode 100644 drivers/soc/ti/knav_qmss.h
+>  create mode 100644 drivers/soc/ti/knav_qmss_acc.c
+>  create mode 100644 drivers/soc/ti/knav_qmss_queue.c
+>  create mode 100644 firmware/keystone/qmss_pdsp_acc48_k2_le_1_0_0_8.fw.ihex
+>  create mode 100644 include/linux/soc/ti/knav_dma.h
+>  create mode 100644 include/linux/soc/ti/knav_qmss.h
+> 
+> Regards,
+> Santosh
+> [1] https://lkml.org/lkml/2014/2/28/567
+> [2] https://lkml.org/lkml/2014/3/18/340
+> 
