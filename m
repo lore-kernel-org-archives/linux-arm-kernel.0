@@ -1,86 +1,79 @@
 From: elder@linaro.org (Alex Elder)
-Date: Tue, 20 May 2014 07:52:38 -0500
-Subject: [PATCH v2 1/5] clk: bcm281xx: add an initialized flag
+Date: Tue, 20 May 2014 07:52:41 -0500
+Subject: [PATCH v2 4/5] clk: bcm281xx: define a bus clock
 In-Reply-To: <1400590362-11177-1-git-send-email-elder@linaro.org>
 References: <1400590362-11177-1-git-send-email-elder@linaro.org>
-Message-ID: <1400590362-11177-2-git-send-email-elder@linaro.org>
+Message-ID: <1400590362-11177-5-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a flag that tracks whether a clock has already been initialized.
-This will be used by the next patch to avoid initializing a clock
-more than once when it's listed as a prerequisite.
+Define the bus clock "bsc3_apb".  This bus clock has to be managed
+using the CCU policy mechanism, so add the definitions required for
+that to the clock and its CCU.
+
+This one bus clock in particular is defined because it is needed
+by peripheral clock "bsc3".  Our boot loader does not properly
+activate "bsc3_apb", and as a result, "bsc3" isn't able to function
+properly.  With "bsc3_apb" specified as a prerequisite clock for
+"bsc3", the latter works correctly.
+
+For now only this one bus clock is defined, because it allows
+correct operation of "bsc3".  Others can be added later as needed
+(and this patch serves to show how that's done).
 
 Signed-off-by: Alex Elder <elder@linaro.org>
 ---
- drivers/clk/bcm/clk-kona.c | 17 +++++++++++++++--
- drivers/clk/bcm/clk-kona.h |  7 +++++++
- 2 files changed, 22 insertions(+), 2 deletions(-)
+ drivers/clk/bcm/clk-bcm281xx.c       | 13 ++++++++++++-
+ include/dt-bindings/clock/bcm281xx.h |  3 ++-
+ 2 files changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
-index d603c4e..d8a7f38 100644
---- a/drivers/clk/bcm/clk-kona.c
-+++ b/drivers/clk/bcm/clk-kona.c
-@@ -27,6 +27,9 @@
- #define CCU_ACCESS_PASSWORD      0xA5A500
- #define CLK_GATE_DELAY_LOOP      2000
+diff --git a/drivers/clk/bcm/clk-bcm281xx.c b/drivers/clk/bcm/clk-bcm281xx.c
+index 502a487..b937fc9 100644
+--- a/drivers/clk/bcm/clk-bcm281xx.c
++++ b/drivers/clk/bcm/clk-bcm281xx.c
+@@ -309,8 +309,17 @@ static struct peri_clk_data pwm_data = {
+ 	.trig		= TRIGGER(0x0afc, 15),
+ };
  
-+#define clk_is_initialized(_clk)	FLAG_TEST((_clk), KONA, INITIALIZED)
-+#define clk_set_initialized(_clk)	FLAG_SET((_clk), KONA, INITIALIZED)
++static struct bus_clk_data bsc3_apb_data = {
++	.policy		= POLICY(0x0048, 4),
++	.gate		= HW_SW_GATE(0x0484, 16, 0, 1),
++};
 +
- /* Bitfield operations */
+ static struct ccu_data slave_ccu_data = {
+ 	BCM281XX_CCU_COMMON(slave, SLAVE),
++	.policy		= {
++		.enable		= CCU_LVM_EN(0x0034, 0),
++		.control	= CCU_POLICY_CTL(0x000c, 0, 1, 2),
++	},
+ 	.kona_clks	= {
+ 		[BCM281XX_SLAVE_CCU_UARTB] =
+ 			KONA_CLK(slave, uartb, peri),
+@@ -329,9 +338,11 @@ static struct ccu_data slave_ccu_data = {
+ 		[BCM281XX_SLAVE_CCU_BSC2] =
+ 			KONA_CLK(slave, bsc2, peri),
+ 		[BCM281XX_SLAVE_CCU_BSC3] =
+-			KONA_CLK(slave, bsc3, peri),
++			KONA_CLK_PREREQ(slave, bsc3, peri, bsc3_apb),
+ 		[BCM281XX_SLAVE_CCU_PWM] =
+ 			KONA_CLK(slave, pwm, peri),
++		[BCM281XX_SLAVE_CCU_BSC3_APB] =
++			KONA_CLK(slave, bsc3_apb, bus),
+ 		[BCM281XX_SLAVE_CCU_CLOCK_COUNT] = LAST_KONA_CLK,
+ 	},
+ };
+diff --git a/include/dt-bindings/clock/bcm281xx.h b/include/dt-bindings/clock/bcm281xx.h
+index a763460..99f4aad 100644
+--- a/include/dt-bindings/clock/bcm281xx.h
++++ b/include/dt-bindings/clock/bcm281xx.h
+@@ -72,6 +72,7 @@
+ #define BCM281XX_SLAVE_CCU_BSC2			7
+ #define BCM281XX_SLAVE_CCU_BSC3			8
+ #define BCM281XX_SLAVE_CCU_PWM			9
+-#define BCM281XX_SLAVE_CCU_CLOCK_COUNT		10
++#define BCM281XX_SLAVE_CCU_BSC3_APB		10
++#define BCM281XX_SLAVE_CCU_CLOCK_COUNT		11
  
- /* Produces a mask of set bits covering a range of a 32-bit value */
-@@ -1194,13 +1197,23 @@ static bool __peri_clk_init(struct kona_clk *bcm_clk)
- 
- static bool __kona_clk_init(struct kona_clk *bcm_clk)
- {
-+	bool ret;
-+
-+	if (clk_is_initialized(bcm_clk))
-+		return true;
-+
- 	switch (bcm_clk->type) {
- 	case bcm_clk_peri:
--		return __peri_clk_init(bcm_clk);
-+		ret = __peri_clk_init(bcm_clk);
-+		break;
- 	default:
-+		ret = false;
- 		BUG();
- 	}
--	return -EINVAL;
-+	if (ret)
-+		clk_set_initialized(bcm_clk);
-+
-+	return ret;
- }
- 
- /* Set a CCU and all its clocks into their desired initial state */
-diff --git a/drivers/clk/bcm/clk-kona.h b/drivers/clk/bcm/clk-kona.h
-index 2537b30..10e238d 100644
---- a/drivers/clk/bcm/clk-kona.h
-+++ b/drivers/clk/bcm/clk-kona.h
-@@ -406,6 +406,7 @@ struct kona_clk {
- 	struct clk_init_data init_data;	/* includes name of this clock */
- 	struct ccu_data *ccu;	/* ccu this clock is associated with */
- 	enum bcm_clk_type type;
-+	u32 flags;		/* BCM_CLK_KONA_FLAGS_* below */
- 	union {
- 		void *data;
- 		struct peri_clk_data *peri;
-@@ -414,6 +415,12 @@ struct kona_clk {
- #define to_kona_clk(_hw) \
- 	container_of(_hw, struct kona_clk, hw)
- 
-+/*
-+ * Kona clock flags:
-+ *   INITIALIZED	clock has been initialized already
-+ */
-+#define BCM_CLK_KONA_FLAGS_INITIALIZED	((u32)1 << 0)	/* Clock initialized */
-+
- /* Initialization macro for an entry in a CCU's kona_clks[] array. */
- #define KONA_CLK(_ccu_name, _clk_name, _type)				\
- 	{								\
+ #endif /* _CLOCK_BCM281XX_H */
 -- 
 1.9.1
