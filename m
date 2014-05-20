@@ -1,30 +1,30 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 20 May 2014 14:55:40 +0300
-Subject: [PATCH] s3cmci: port DMA code to dmaengine API
-In-Reply-To: <6873175.VdOFbJiHYM@wuerfel>
-References: <1400522593-6366-1-git-send-email-anarsoul@gmail.com>
- <6897537.JWQLgZ3Zsx@wuerfel>
- <CA+E=qVcqO9yaMdJABzQXiG4ikWTaB_XjT7GpD_rH6VTeBXYdKw@mail.gmail.com>
- <6873175.VdOFbJiHYM@wuerfel>
-Message-ID: <CA+E=qVe0GONTbpe4E_dhg7kwUzG4QpTkxGbBQ2Z00M1B_octQw@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 20 May 2014 19:53:07 +0800
+Subject: [PATCH 17/20] ARM: imx5: move init hooks into mach-imx5x.c
+In-Reply-To: <1400575538-21136-18-git-send-email-shawn.guo@freescale.com>
+References: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
+ <1400575538-21136-18-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20140520115306.GC20778@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 2:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> Let's just leave channel number hardcoded, how it was before conversion.
->> It doesn't seem to be a good idea to clean non-DT machine code now, since
->> it's better to put some effort into converting s3c2410 and s3c244{0,2} to DT.
->
-> Ok, fair enough.
->
-> I'm actually more interested in making s3c24xx multiplatform capable than
-> moving it to DT, but we that requires a few other patches as well, and
-> we can fix this one along with those.
+On Tue, May 20, 2014 at 04:45:35PM +0800, Shawn Guo wrote:
+> @@ -24,6 +24,12 @@
+>  #include "hardware.h"
+>  #include "mx53.h"
+>  
+> +static void __init imx53_init_early(void)
+> +{
+> +	mxc_set_cpu_type(MXC_CPU_MX53);
+> +	imx_src_init();
 
-Hm, but s3c2410, s3c2440 and s3c2442 are armv4t. Is it possible at all
-to make them multiplatform?
+This imx_src_init() call should be moved into imx53_dt_init() like what
+we did for imx51.
 
-Regards
-Vasily
+Shawn
 
->         Arnd
+> +}
+> +
+>  static void __init imx53_dt_init(void)
+>  {
+>  	mxc_arch_reset_init_dt();
