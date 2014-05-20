@@ -1,35 +1,259 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 20 May 2014 06:20:05 -0500
-Subject: [PATCH] ARM: DRA752: add detection of SoC information
-In-Reply-To: <537AF088.4000506@ti.com>
-References: <1400513231-25092-1-git-send-email-nm@ti.com>
- <537AF088.4000506@ti.com>
-Message-ID: <CAGo_u6om25s4Fxyf6LAEcoL0t0jfm_QREJuD57FQQ16E9A=bWw@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 20 May 2014 20:29:33 +0900
+Subject: [PATCH v8 1/8] ftrace: make CALLER_ADDRx macros more generic
+In-Reply-To: <20140502151957.6978d870@gandalf.local.home>
+References: <1394862048-28758-1-git-send-email-takahiro.akashi@linaro.org>	<1398851676-16389-1-git-send-email-takahiro.akashi@linaro.org>	<1398851676-16389-2-git-send-email-takahiro.akashi@linaro.org>
+ <20140502151957.6978d870@gandalf.local.home>
+Message-ID: <537B3C9D.3060008@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 1:04 AM, Rajendra Nayak <rnayak@ti.com> wrote:
-> So we are back to checking revisions based on idcode register then?
-> This patch was posted almost a year back and was shot down by you
-> included saying we need to use dt compatibles for it.
+Hi Will, Steven,
+
+So sorry, I completely missed this message thread. I will submit a new patch (replacement of [1/8])
+in the following e-mail.
+
+-Takahiro AKASHI
+
+On 05/03/2014 04:19 AM, Steven Rostedt wrote:
+> On Wed, 30 Apr 2014 18:54:29 +0900
+> AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
 >
-> https://www.mail-archive.com/linux-omap at vger.kernel.org/msg93136.html
-
-No, even thought it looks like, we are not intending to here. we are
-fixing a sysfs break.
-
-soc_is_dra7xx() is still based on machine_of_ compatible - we have'nt
-touched that here. What is taking place at the moment is that
-/sys/devices/soc0/ sysfs entries are being populated in same way as
-AM437x and other DT only platforms. Currently we follow the same style
-as non-dt code as OMAP3 still co-exist DT+non-DT - we have not yet
-introduced a new driver for soc device - but once we go full DT, we
-probably should do that at the root of the entire dt tree (similar  to
-what tegra has done) and populare soc sysfs with proper values. Now,
-if that generic driver decides to use only OF-information for
-revision, That is good as well -> so far, there has been no attempt to
-support such a revision binding (despite our discussion).
-
-
-Regards,
-Nishanth Menon
+>> Most archs with HAVE_ARCH_CALLER_ADDR have the almost same definitions
+>> of CALLER_ADDRx(n), and so put them into linux/ftrace.h.
+>
+> Please add a bit more to the change log. Like what you did. Something
+> like:
+>
+> ----
+> Most archs with HAVE_ARCH_CALLER_ADDR have pretty much the same
+> definitions of CALLER_ADDRx(n). Instead of duplicating the code for all
+> the archs, define a ftrace_return_address0() and
+> ftrace_return_address(n) that can be overwritten by the archs if they
+> need to do something different. Instead of 7 macros in every arch, we
+> now only have at most 2 (and actually only 1 as
+> ftrace_return_address0() should be the same for all archs).
+>
+> The CALLER_ADDRx(n) will now be defined in linux/ftrace.h and use the
+> ftrace_return_address*(n?) macros. This removes a lot of the duplicate
+> code.
+> -----
+>
+> Use that if you want :-)
+>
+>
+>>
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> ---
+>>   arch/arm/include/asm/ftrace.h      |   10 +---------
+>>   arch/blackfin/include/asm/ftrace.h |   11 +----------
+>>   arch/parisc/include/asm/ftrace.h   |   10 +---------
+>>   arch/sh/include/asm/ftrace.h       |   10 +---------
+>>   arch/xtensa/include/asm/ftrace.h   |   14 ++++----------
+>>   include/linux/ftrace.h             |   34 ++++++++++++++++++----------------
+>>   6 files changed, 26 insertions(+), 63 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+>> index f89515a..eb577f4 100644
+>> --- a/arch/arm/include/asm/ftrace.h
+>> +++ b/arch/arm/include/asm/ftrace.h
+>> @@ -52,15 +52,7 @@ extern inline void *return_address(unsigned int level)
+>>
+>>   #endif
+>>
+>> -#define HAVE_ARCH_CALLER_ADDR
+>> -
+>> -#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
+>> -#define CALLER_ADDR1 ((unsigned long)return_address(1))
+>> -#define CALLER_ADDR2 ((unsigned long)return_address(2))
+>> -#define CALLER_ADDR3 ((unsigned long)return_address(3))
+>> -#define CALLER_ADDR4 ((unsigned long)return_address(4))
+>> -#define CALLER_ADDR5 ((unsigned long)return_address(5))
+>> -#define CALLER_ADDR6 ((unsigned long)return_address(6))
+>> +#define ftrace_return_addr(n) return_address(n)
+>>
+>>   #endif /* ifndef __ASSEMBLY__ */
+>>
+>> diff --git a/arch/blackfin/include/asm/ftrace.h b/arch/blackfin/include/asm/ftrace.h
+>> index 8a02950..2f1c3c2 100644
+>> --- a/arch/blackfin/include/asm/ftrace.h
+>> +++ b/arch/blackfin/include/asm/ftrace.h
+>> @@ -66,16 +66,7 @@ extern inline void *return_address(unsigned int level)
+>>
+>>   #endif /* CONFIG_FRAME_POINTER */
+>>
+>> -#define HAVE_ARCH_CALLER_ADDR
+>> -
+>> -/* inline function or macro may lead to unexpected result */
+>> -#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
+>> -#define CALLER_ADDR1 ((unsigned long)return_address(1))
+>> -#define CALLER_ADDR2 ((unsigned long)return_address(2))
+>> -#define CALLER_ADDR3 ((unsigned long)return_address(3))
+>> -#define CALLER_ADDR4 ((unsigned long)return_address(4))
+>> -#define CALLER_ADDR5 ((unsigned long)return_address(5))
+>> -#define CALLER_ADDR6 ((unsigned long)return_address(6))
+>> +#define ftrace_return_address(n) return_address(n)
+>>
+>>   #endif /* __ASSEMBLY__ */
+>>
+>> diff --git a/arch/parisc/include/asm/ftrace.h b/arch/parisc/include/asm/ftrace.h
+>> index 72c0faf..544ed8e 100644
+>> --- a/arch/parisc/include/asm/ftrace.h
+>> +++ b/arch/parisc/include/asm/ftrace.h
+>> @@ -24,15 +24,7 @@ extern void return_to_handler(void);
+>>
+>>   extern unsigned long return_address(unsigned int);
+>>
+>> -#define HAVE_ARCH_CALLER_ADDR
+>> -
+>> -#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
+>> -#define CALLER_ADDR1 return_address(1)
+>> -#define CALLER_ADDR2 return_address(2)
+>> -#define CALLER_ADDR3 return_address(3)
+>> -#define CALLER_ADDR4 return_address(4)
+>> -#define CALLER_ADDR5 return_address(5)
+>> -#define CALLER_ADDR6 return_address(6)
+>> +#define ftrace_return_address(n) return_address(n)
+>>
+>>   #endif /* __ASSEMBLY__ */
+>>
+>> diff --git a/arch/sh/include/asm/ftrace.h b/arch/sh/include/asm/ftrace.h
+>> index 13e9966..e79fb6e 100644
+>> --- a/arch/sh/include/asm/ftrace.h
+>> +++ b/arch/sh/include/asm/ftrace.h
+>> @@ -40,15 +40,7 @@ static inline unsigned long ftrace_call_adjust(unsigned long addr)
+>>   /* arch/sh/kernel/return_address.c */
+>>   extern void *return_address(unsigned int);
+>>
+>> -#define HAVE_ARCH_CALLER_ADDR
+>> -
+>> -#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
+>> -#define CALLER_ADDR1 ((unsigned long)return_address(1))
+>> -#define CALLER_ADDR2 ((unsigned long)return_address(2))
+>> -#define CALLER_ADDR3 ((unsigned long)return_address(3))
+>> -#define CALLER_ADDR4 ((unsigned long)return_address(4))
+>> -#define CALLER_ADDR5 ((unsigned long)return_address(5))
+>> -#define CALLER_ADDR6 ((unsigned long)return_address(6))
+>> +#define ftrace_return_address(n) return_address(n)
+>>
+>>   #endif /* __ASSEMBLY__ */
+>>
+>> diff --git a/arch/xtensa/include/asm/ftrace.h b/arch/xtensa/include/asm/ftrace.h
+>> index 736b9d2..6c6d9a9 100644
+>> --- a/arch/xtensa/include/asm/ftrace.h
+>> +++ b/arch/xtensa/include/asm/ftrace.h
+>> @@ -12,24 +12,18 @@
+>>
+>>   #include <asm/processor.h>
+>>
+>> -#define HAVE_ARCH_CALLER_ADDR
+>>   #ifndef __ASSEMBLY__
+>> -#define CALLER_ADDR0 ({ unsigned long a0, a1; \
+>> +#define ftrace_return_address0 ({ unsigned long a0, a1; \
+>>   		__asm__ __volatile__ ( \
+>>   			"mov %0, a0\n" \
+>>   			"mov %1, a1\n" \
+>>   			: "=r"(a0), "=r"(a1)); \
+>>   		MAKE_PC_FROM_RA(a0, a1); })
+>> +
+>>   #ifdef CONFIG_FRAME_POINTER
+>>   extern unsigned long return_address(unsigned level);
+>> -#define CALLER_ADDR1 return_address(1)
+>> -#define CALLER_ADDR2 return_address(2)
+>> -#define CALLER_ADDR3 return_address(3)
+>> -#else /* CONFIG_FRAME_POINTER */
+>> -#define CALLER_ADDR1 (0)
+>> -#define CALLER_ADDR2 (0)
+>> -#define CALLER_ADDR3 (0)
+>> -#endif /* CONFIG_FRAME_POINTER */
+>> +#define ftrace_return_address(n) return_address(n)
+>
+> I would add a comment here that states:
+>
+> /*
+>   * #else !CONFIG_FRAME_POINTER
+>   *
+>   * Define CALLER_ADDRn (n > 0) to 0 is the default in linux/ftrace.h if
+>   * ftrace_return_address(n) and CONFIG_FRAME_POINTER are not defined.
+>   */
+>
+> Otherwise it looks like you are missing the #else statement.
+>
+>> +#endif
+>>   #endif /* __ASSEMBLY__ */
+>>
+>>   #ifdef CONFIG_FUNCTION_TRACER
+>> diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
+>> index 9212b01..18f1ae7 100644
+>> --- a/include/linux/ftrace.h
+>> +++ b/include/linux/ftrace.h
+>> @@ -614,25 +614,27 @@ static inline void __ftrace_enabled_restore(int enabled)
+>>   #endif
+>>   }
+>>
+>> -#ifndef HAVE_ARCH_CALLER_ADDR
+>> +/* All archs should have this, but we define it for consistency */
+>
+> The comment is a little confusing. I think it may be better stated as:
+>
+> /*
+>   * All archs should be able to use __builtin_return_address(0) but
+>   * we allow them to redefine it for consistency.
+>   */
+>
+>> +#ifndef ftrace_return_address0
+>> +# define ftrace_return_address0 __builtin_return_address(0)
+>> +#endif
+>> +
+>> +/* Archs may use other ways for ADDR1 and beyond */
+>
+> How about:
+>
+> /* Not all archs can use __builtin_return_address(n) where n > 0 */
+>
+>> +#ifndef ftrace_return_address
+>>   # ifdef CONFIG_FRAME_POINTER
+>> -#  define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
+>> -#  define CALLER_ADDR1 ((unsigned long)__builtin_return_address(1))
+>> -#  define CALLER_ADDR2 ((unsigned long)__builtin_return_address(2))
+>> -#  define CALLER_ADDR3 ((unsigned long)__builtin_return_address(3))
+>> -#  define CALLER_ADDR4 ((unsigned long)__builtin_return_address(4))
+>> -#  define CALLER_ADDR5 ((unsigned long)__builtin_return_address(5))
+>> -#  define CALLER_ADDR6 ((unsigned long)__builtin_return_address(6))
+>> +#  define ftrace_return_address(n) __builtin_return_address(n)
+>>   # else
+>> -#  define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
+>> -#  define CALLER_ADDR1 0UL
+>> -#  define CALLER_ADDR2 0UL
+>> -#  define CALLER_ADDR3 0UL
+>> -#  define CALLER_ADDR4 0UL
+>> -#  define CALLER_ADDR5 0UL
+>> -#  define CALLER_ADDR6 0UL
+>> +#  define ftrace_return_address(n) 0UL
+>>   # endif
+>> -#endif /* ifndef HAVE_ARCH_CALLER_ADDR */
+>> +#endif
+>> +
+>> +#define CALLER_ADDR0 ((unsigned long)ftrace_return_address0)
+>> +#define CALLER_ADDR1 ((unsigned long)ftrace_return_address(1))
+>> +#define CALLER_ADDR2 ((unsigned long)ftrace_return_address(2))
+>> +#define CALLER_ADDR3 ((unsigned long)ftrace_return_address(3))
+>> +#define CALLER_ADDR4 ((unsigned long)ftrace_return_address(4))
+>> +#define CALLER_ADDR5 ((unsigned long)ftrace_return_address(5))
+>> +#define CALLER_ADDR6 ((unsigned long)ftrace_return_address(6))
+>
+> Other than that, it looks good. You can send me the patch and I'll add
+> it to my 3.16 queue.
+>
+> Feel free to reply to this email with a v9. When I pull patches into
+> git, it adds the link to the thread for the patch in LKML. To keep this
+> entire thread, just reply to it.
+>
+> Thanks!
+>
+> -- Steve
+>
+>>
+>>   #ifdef CONFIG_IRQSOFF_TRACER
+>>     extern void time_hardirqs_on(unsigned long a0, unsigned long a1);
+>
