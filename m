@@ -1,70 +1,34 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 20 May 2014 12:01:37 +0300
-Subject: [PATCH] arm/omap4: add twd clock to DT
-In-Reply-To: <20140519162741.GG4849@atomide.com>
-References: <1396901139-17268-1-git-send-email-gilles.chanteperdrix@xenomai.org>
- <20140418223948.GK21823@atomide.com> <5353F44F.5080400@xenomai.org>
- <535662F0.4080300@ti.com>
- <CAGhQ9Vw-QaB+OnLa3yNVvD6a=XOutSZ1ejbsuUXvEcyrxEsRcQ@mail.gmail.com>
- <20140519161319.GD4849@atomide.com>
- <CAGhQ9Vy-mvaXZ_=E_mmqYqxF5EiJSdN1rJayussm+AgKf94a+g@mail.gmail.com>
- <20140519162741.GG4849@atomide.com>
-Message-ID: <537B19F1.5040907@ti.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Tue, 20 May 2014 13:02:32 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAwNS8yMF0gQVJNOiBpbXg1OiByZW1vdmUgaS5NWDUgbm9u?=
+ =?UTF-8?B?LURUIGRldmljZSByZWdpc3RyYXRpb24gaGVscGVycw==?=
+In-Reply-To: <1400575538-21136-6-git-send-email-shawn.guo@freescale.com>
+References: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
+ <1400575538-21136-6-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1400576552.352489173@f117.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/2014 07:27 PM, Tony Lindgren wrote:
-> * Joachim Eastwood <manabian@gmail.com> [140519 09:24]:
->> On 19 May 2014 18:13, Tony Lindgren <tony@atomide.com> wrote:
->>> * Joachim Eastwood <manabian@gmail.com> [140518 05:08]:
->>>> On 22 April 2014 14:39, Tero Kristo <t-kristo@ti.com> wrote:
->>>>> On 04/20/2014 07:22 PM, Gilles Chanteperdrix wrote:
->>>>>>
->>>>>> Le 19/04/2014 00:39, Tony Lindgren a ?crit :
->>>>>>>
->>>>>>> * Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org> [140407 13:09]:
->>>>>>>>
->>>>>>>> Booting Linux 3.14 on Pandaboard currently gets the following
->>>>>>>> message displayed:
->>>>>>>>
->>>>>>>> smp_twd: clock not found -2
->>>>>>>>
->>>>>>>> Define "mpu_periphclk" as the twd clock in omap4 dts to avoid this.
->>>>>>>
->>>>>>>
->>>>>>> Tero, care to ack?
->>>>>>
->>>>>>
->>>>>> Sorry if I did not mail the right people, get_maintainer.pl gave me a
->>>>>> long list, and I did not feel like spamming all these people for such a
->>>>>> small patch. I do not believe Tero was in this list.
->>>>>>
->>>>>> Regards.
->>>>>
->>>>>
->>>>> Yea I don't think this is my expertise area, however the patch looks good to
->>>>> me, so if you really need it:
->>>>>
->>>>> Acked-by: Tero Kristo <t-kristo@ti.com>
->>>>
->>>> Tony, care to add this to your omap 3.16 dt branch?
->>>>
->>>> I am still getting:
->>>> [ 0.000152] smp_twd: clock not found -2
->>>>
->>>> So this fix from Gilles would be nice to have.
->>>
->>> Best that Tero picks this one up along with the other dt clock changes
->>> he's queueing.
->>
->> I kinda assumed you would take it since you asked Tero to ack it. But
->> either way is fine :)
->
-> Yes that was before Tero started collecting the dt clock patches :)
+Tue, 20 May 2014 16:45:23 +0800 ?? Shawn Guo <shawn.guo@freescale.com>:
+> i.MX5 is DT only platforms, so these non-DT device registration helpers
+> is used nowhere.  Remove them.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  arch/arm/mach-imx/devices/platform-fec.c           | 12 ----------
+>  arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c  |  5 ----
+>  arch/arm/mach-imx/devices/platform-imx-i2c.c       | 26 ---------------------
+>  arch/arm/mach-imx/devices/platform-imx-keypad.c    | 10 --------
+>  arch/arm/mach-imx/devices/platform-imx-ssi.c       | 20 ----------------
+>  arch/arm/mach-imx/devices/platform-imx-uart.c      | 22 ------------------
+>  arch/arm/mach-imx/devices/platform-imx2-wdt.c      | 18 ---------------
+>  arch/arm/mach-imx/devices/platform-mxc-ehci.c      |  9 --------
+>  arch/arm/mach-imx/devices/platform-mxc_nand.c      |  5 ----
+>  arch/arm/mach-imx/devices/platform-pata_imx.c      | 10 --------
+>  .../mach-imx/devices/platform-sdhci-esdhc-imx.c    | 24 -------------------
+>  arch/arm/mach-imx/devices/platform-spi_imx.c       | 27 ----------------------
 
-I wouldn't say this to be a clock patch as such, this touches the driver 
-behavior, i.e. registers the correct clock for the driver. That being 
-said, I can still queue this up with the clock patches if that is what 
-you want.
+Seems, as an follow patch we should also remove SOC_IMX5* symbol
+dependencies from arch/arm/mach-imx/devices/Kconfig.
 
--Tero
+---
