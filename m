@@ -1,66 +1,49 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 20 May 2014 09:39:12 +0200
-Subject: [RFC PATCH 1/3] mfd: AXP22x: add support for APX221 PMIC
-In-Reply-To: <537A4324.4060905@free-electrons.com>
-References: <1400176305-22737-1-git-send-email-boris.brezillon@free-electrons.com>
- <1400176305-22737-2-git-send-email-boris.brezillon@free-electrons.com>
- <20140519172817.GE20435@lee--X1> <537A4324.4060905@free-electrons.com>
-Message-ID: <537B06A0.3040706@redhat.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 20 May 2014 08:43:53 +0100
+Subject: [PATCH v4 6/6] ARM: dts: STiH407: Add B2120 board support
+In-Reply-To: <CAOesGMioLwX3jgGEsR=rHV0u6yR54b4x8BfyZ91vjJnMapUHew@mail.gmail.com>
+References: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>
+ <1394614210-15698-7-git-send-email-maxime.coquelin@st.com>
+ <CAOesGMg5Jk_XB3zdfKz8VxRObYbFO8OMuRyo7Ba-kavANbci1w@mail.gmail.com>
+ <20140520072048.GC20874@lee--X1>
+ <CAOesGMioLwX3jgGEsR=rHV0u6yR54b4x8BfyZ91vjJnMapUHew@mail.gmail.com>
+Message-ID: <20140520074353.GD20874@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 05/19/2014 07:45 PM, Boris BREZILLON wrote:
-> Hello Lee,
+> >> > +       soc {
+> >> > +               sbc_serial0: serial at 9530000 {
+> >> > +                       status = "okay";
+> >> > +               };
+> >>
+> >> You might want to consider reference-based syntax here instead, so you
+> >> don't have to mimic the hierarchy. That'd be (at the root level of the
+> >> file, below this secion:
+> >>
+> >> &sbc_serial0: {
+> >>         status = "okay";
+> >> };
+> >
+> > I'm personally not keen on this scheme.  It's sometimes helpful to know
+> > the hierarchy and I don't think it's a large overhead to format the
+> > subordinate DTS files in this way.
+> >
+> > Please consider not enforcing this.
 > 
-> On 19/05/2014 19:28, Lee Jones wrote:
->>> This patch introduces preliminary support for the X-Powers AXP221 PMIC.
->>> The AXP221 is typically used on boards using Allwinner's A31 SoC.
->>>
->>> At the moment, this driver only exposes regulator devices, but other
->>> subdevices.
->>>
->>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
->>> ---
->>>  drivers/mfd/Kconfig        |  12 +++
->>>  drivers/mfd/Makefile       |   1 +
->>>  drivers/mfd/axp22x.c       | 237 +++++++++++++++++++++++++++++++++++++++++++++
->>>  include/linux/mfd/axp22x.h | 149 ++++++++++++++++++++++++++++
->>>  4 files changed, 399 insertions(+)
->>>  create mode 100644 drivers/mfd/axp22x.c
->>>  create mode 100644 include/linux/mfd/axp22x.h
->> Not a chance.
->>
->> Farrrr, too much common code with axp20x.c - please merge into one file.
->>
+> Definitely not enforcing it, and I didn't use to like it either but it
+> has some real upsides.
 > 
-> This was one of the questions I asked in my cover letter (could you take
-> a look at it and tell me what's your prefered solution ?) ;-).
-> 
-> I first tried to reuse the axp20x drivers, but ended up copying almost
-> all definitions, hence I decided to first do a different driver and ask
-> for advices.
+> In particular, it saves a lot of grief when you're changing something
+> like the unit-id of a node in .dtsi and forget to do the same update
+> in the dts.
 
-I've just taken a good look at this (I'm planning on doing an axp152 driver
-myself), and it seems that using a single mfd driver for the 20x and 221 should
-be quite feasible:
+I'm not entirely sure what a unit-id is, but I can see that there
+would be benefits to using the referenced-based syntax as you call
+it.  If any of those benefits hold true here I won't push back, but I
+would personally like to see us default to the hierarchical scheme.
 
-- axp20x.h would get some new register defines for registers which are
-  different (or unique) to the 221 prefixed with aXP221
-- An axp20x_writeable_ranges would need
-  to be extended with a third range going from AXP221_BAT_CAP1 (0xe0)
-  to AXP221_BAT_LOW_THRESH (0xe6)
-- axp20x_writeable_table would get .n_yes_ranges set to 2, and a new
-  apx22x_writeable_table would be introduced with n_yes_ranges set to 3.
-- add a new axp221_supplies array
-- add a new axp221_cells array
-- and finally use the proper structs in axp20x_i2c_probe depending on the type
-
-Note that this means sharing ie the interrupt table, which is ok since they
-are the same, except that the 221 has a couple of interrupts missing, but
-the ones which are shared are all at the same place.
-
-Regards,
-
-Hans
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
