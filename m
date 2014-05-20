@@ -1,204 +1,66 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 20 May 2014 09:33:58 +0200
-Subject: [RFC PATCH 2/5] clk: Introduce 'clk_round_rate_nearest()'
-In-Reply-To: <db8633e5-01a9-4d3a-80e8-74e23a456d52@BN1BFFO11FD051.protection.gbl>
-References: <1400106655-22465-1-git-send-email-soren.brinkmann@xilinx.com>
- <1400106655-22465-3-git-send-email-soren.brinkmann@xilinx.com>
- <20140515073816.GI16662@pengutronix.de>
- <91822600-39d0-4e71-b0f5-9eda35b76ec0@BN1AFFO11FD016.protection.gbl>
- <20140519161949.GG16662@pengutronix.de>
- <db8633e5-01a9-4d3a-80e8-74e23a456d52@BN1BFFO11FD051.protection.gbl>
-Message-ID: <20140520073358.GJ16662@pengutronix.de>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 20 May 2014 09:39:12 +0200
+Subject: [RFC PATCH 1/3] mfd: AXP22x: add support for APX221 PMIC
+In-Reply-To: <537A4324.4060905@free-electrons.com>
+References: <1400176305-22737-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1400176305-22737-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20140519172817.GE20435@lee--X1> <537A4324.4060905@free-electrons.com>
+Message-ID: <537B06A0.3040706@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi S?ren,
+Hi,
 
-On Mon, May 19, 2014 at 09:41:32AM -0700, S?ren Brinkmann wrote:
-> On Mon, 2014-05-19 at 06:19PM +0200, Uwe Kleine-K?nig wrote:
-> > Hi S?ren,
-> > 
-> > On Sun, May 18, 2014 at 05:51:05PM -0700, S?ren Brinkmann wrote:
-> > > ------------------8<-----------------8<---------------------8<-------------8<---
-> > > From: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > > Date: Tue, 2 Apr 2013 10:08:13 -0700
-> > > Subject: [PATCH] clk: Introduce 'clk_round_rate_nearest()'
-> > > 
-> > > Introduce a new API function to round a rate to the closest possible
-> > > rate the HW clock can generate.
-> > > In contrast to 'clk_round_rate()' which works similar, but always returns
-> > > a frequency <= its input rate.
-> > > 
-> > > Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > > ---
-> > >  drivers/clk/clk.c   | 43 +++++++++++++++++++++++++++++++++++++++++--
-> > >  include/linux/clk.h | 14 ++++++++++++--
-> > >  2 files changed, 53 insertions(+), 4 deletions(-)
-> > > 
-> > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > > index dff0373f53c1..faf24d0569df 100644
-> > > --- a/drivers/clk/clk.c
-> > > +++ b/drivers/clk/clk.c
-> > > @@ -1011,8 +1011,9 @@ unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
-> > >   * @rate: the rate which is to be rounded
-> > >   *
-> > >   * Takes in a rate as input and rounds it to a rate that the clk can actually
-> > > - * use which is then returned.  If clk doesn't support round_rate operation
-> > > - * then the parent rate is returned.
-> > > + * use and does not exceed the requested frequency, which is then returned.
-> > > + * If clk doesn't support round_rate operation then the parent rate
-> > > + * is returned.
-> > >   */
-> > >  long clk_round_rate(struct clk *clk, unsigned long rate)
-> > >  {
-> > > @@ -1027,6 +1028,44 @@ long clk_round_rate(struct clk *clk, unsigned long rate)
-> > >  EXPORT_SYMBOL_GPL(clk_round_rate);
-> > >  
-> > >  /**
-> > > + * clk_round_rate_nearest - round the given rate for a clk
-> > > + * @clk: the clk for which we are rounding a rate
-> > > + * @rate: the rate which is to be rounded
-> > > + *
-> > > + * Takes in a rate as input and rounds it to the closest rate that the clk
-> > > + * can actually use which is then returned. If clk doesn't support
-> > > + * round_rate operation then the parent rate is returned.
-> > > + */
-> > > +long clk_round_rate_nearest(struct clk *clk, unsigned long rate)
-> > Why does this function doesn't return an unsigned long when it never
-> > returns a negative value? Ditto for clk_round_rate?
+On 05/19/2014 07:45 PM, Boris BREZILLON wrote:
+> Hello Lee,
 > 
-> I matched the definition of clk_round_rate(). But you're probably right,
-> it may be the right thing to change clk_round_rate to return an
-> unsigned, but with that being exposed API it would be a risky change.
-Russell, what do you think?
-
-> > > +{
-> > > +	unsigned long lower, upper, cur, lower_last, upper_last;
-> > > +
-> > > +	lower = clk_round_rate(clk, rate);
-> > > +	if (lower >= rate)
-> > > +		return lower;
-> > Is the >-case worth a warning?
+> On 19/05/2014 19:28, Lee Jones wrote:
+>>> This patch introduces preliminary support for the X-Powers AXP221 PMIC.
+>>> The AXP221 is typically used on boards using Allwinner's A31 SoC.
+>>>
+>>> At the moment, this driver only exposes regulator devices, but other
+>>> subdevices.
+>>>
+>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>>> ---
+>>>  drivers/mfd/Kconfig        |  12 +++
+>>>  drivers/mfd/Makefile       |   1 +
+>>>  drivers/mfd/axp22x.c       | 237 +++++++++++++++++++++++++++++++++++++++++++++
+>>>  include/linux/mfd/axp22x.h | 149 ++++++++++++++++++++++++++++
+>>>  4 files changed, 399 insertions(+)
+>>>  create mode 100644 drivers/mfd/axp22x.c
+>>>  create mode 100644 include/linux/mfd/axp22x.h
+>> Not a chance.
+>>
+>> Farrrr, too much common code with axp20x.c - please merge into one file.
+>>
 > 
-> No, it's correct behavior. If you request a rate that is way lower than what the
-> clock can generate, returning something larger is perfectly valid, IMHO.
-> Which reveals one problem in this whole discussion. The API does not
-> require clk_round_rate() to round down. It is actually an implementation
-> choice that had been made for clk-divider.
-I'm sure it's more than an implementation choice for clk-divider. But I
-don't find any respective documentation (but I didn't try hard).
-
-
-> > > +
-> > > +	upper = clk_round_rate(clk, rate + rate - lower);
-> > This was parenthesized in my original patch on purpose. If rate is big
-> > 
-> > 	rate + rate - lower
-> > 
-> > might overflow when
-> > 
-> > 	rate + (rate - lower)
-> > 
-> > doesn't. Thinking again, there is no real problem, because this is
-> > unsigned arithmetic. To be save we still need to check if rate + (rate -
-> > lower) overflows.
+> This was one of the questions I asked in my cover letter (could you take
+> a look at it and tell me what's your prefered solution ?) ;-).
 > 
-> Good point. I'll add the parentheses.
-> 
-> > 
-> > > +	if (upper == lower)
-> > if (upper <= rate) is the better check here. (= would be a bug.)
-> 
-> I don't understand. Passing rate + x to round rate can never return
-> something below 'lower'. Only something in the range [lower,lower+x].
-> So, if upper == lower we found our closest frequency and return it.
-> Otherwise we have to iterate over [lower+1,upper]. Or what did I miss?
-Assuming a correct implementation of clk_round_rate there is no
-difference. Checking for <= rate is just a bit more robust for broken
-implementations.
+> I first tried to reuse the axp20x drivers, but ended up copying almost
+> all definitions, hence I decided to first do a different driver and ask
+> for advices.
 
-> > > +		return upper;
-> > > +
-> > > +	lower = rate + 1;
-> > ok, so your loop invariant is that the best freq is in [lower; upper].
-> 
-> right.
-> 
-> > 
-> > > +	do {
-> > > +		upper_last = upper;
-> > > +		lower_last = lower;
-> > > +
-> > > +		cur = clk_round_rate(clk, lower + ((upper - lower) >> 1));
-> > > +		if (cur < lower)
-> > > +			lower += (upper - lower) >> 1;
-> > You already know that lower + ((upper - lower) >> 1) is too small, so
-> > you can better do
-> > 
-> > 	lower += ((upper - lower) >> 1) + 1;
-> 
-> right. I'll add the '+1'
-> 
-> > 
-> > > +		else
-> > > +			upper = cur;
-> > > +
-> > > +	} while (lower_last != lower && upper_last != upper);
-> > > +
-> > > +	return upper;
-> > > +}
-> > > +EXPORT_SYMBOL_GPL(clk_round_rate_nearest);
-> > I think the function still has potential for optimisation, what about:
-> 
-> At first glance, I don't see many differences except for the comments
-> you made above. I'll have a closer look though.
-I would expect my variant to result in more effective code as it has
-simpler expressions.
+I've just taken a good look at this (I'm planning on doing an axp152 driver
+myself), and it seems that using a single mfd driver for the 20x and 221 should
+be quite feasible:
 
-> > unsigned long clk_round_rate_nearest(struct clk *clk, unsigned long rate)
-> > {
-> > 	unsigned long lower, upper, rounded;
-> > 
-> > 	rounded = clk_round_rate(clk, rate);
-> > 
-> > 	if (rounded >= rate)
-> > 		return rounded;
-> > 
-> > 	/*
-> > 	 * rounded is the best approximation for rate that is not
-> > 	 * bigger than rate. If there is a better one, it must be in the
-> > 	 * interval (rate; rate + (rate - rounded)).
-> > 	 * Note that the upper limit isn't better than rate itself, so
-> > 	 * that one doesn't need to be considered.
-> > 	 */
-> > 	 
-> > 	upper = rate + (rate - rounded) - 1;
-> > 	if (upper < rate)
-> > 		upper = ULONG_MAX; 
-> 
-> Aren't we done here? Your search for an upper boundary resulted in
-> 'lower'. Hence there is no valid frequency closer to 'rate' than 'lower'. Why do
-> you extend to ULONG_MAX?
-Consider a clock that can do (assuming ULONG_MAX = 4294967295):
+- axp20x.h would get some new register defines for registers which are
+  different (or unique) to the 221 prefixed with aXP221
+- An axp20x_writeable_ranges would need
+  to be extended with a third range going from AXP221_BAT_CAP1 (0xe0)
+  to AXP221_BAT_LOW_THRESH (0xe6)
+- axp20x_writeable_table would get .n_yes_ranges set to 2, and a new
+  apx22x_writeable_table would be introduced with n_yes_ranges set to 3.
+- add a new axp221_supplies array
+- add a new axp221_cells array
+- and finally use the proper structs in axp20x_i2c_probe depending on the type
 
-	12000, 4294967285
+Note that this means sharing ie the interrupt table, which is ok since they
+are the same, except that the 221 has a couple of interrupts missing, but
+the ones which are shared are all at the same place.
 
-and you call
+Regards,
 
-	clk_round_rate_nearest(clk, 4294967283)
-
-Then we have:
-
-	rounded = clk_round_rate(clk, 4294967283) = 12000.
-	upper = 4294955269
-
-because the addition overflowed upper is smaller than rate. Still we
-want to find rate=4294967285, right?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Hans
