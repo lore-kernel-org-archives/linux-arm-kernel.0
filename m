@@ -1,24 +1,39 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 21 May 2014 08:49:24 +0900
-Subject: [PATCH 00/03] ARM: shmobile: Use shmobile_init_delay() on r8a7790
-In-Reply-To: <CAMuHMdVHzp7sK8ufi9J35-ZaBXsvOZPrZDNcCwX8wTBSZpOpoA@mail.gmail.com>
-References: <20140519233714.10496.31390.sendpatchset@w520>
- <CAMuHMdVHzp7sK8ufi9J35-ZaBXsvOZPrZDNcCwX8wTBSZpOpoA@mail.gmail.com>
-Message-ID: <20140520234923.GA28186@verge.net.au>
+Date: Wed, 21 May 2014 08:50:50 +0900
+Subject: [PATCH 0/4] ARM: shmobile: r8a7779: Use shmobile_init_delay()
+In-Reply-To: <1400215381-7027-1-git-send-email-horms+renesas@verge.net.au>
+References: <1400215381-7027-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20140520235050.GA21367@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 09:48:08AM +0200, Geert Uytterhoeven wrote:
-> On Tue, May 20, 2014 at 1:37 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> > [PATCH 01/03] ARM: shmobile: Use r8a7790 DT CPU Frequency in common case
-> > [PATCH 02/03] ARM: shmobile: Use r8a7790 DT CPU Frequency for Lager
-> > [PATCH 03/03] ARM: shmobile: Remove unused r8a7790_init_early()
-> >
-> > Convert r8a7790 to rely on shmobile_init_delay() instead of using a per-SoC
-> > delay setup function. Very similar to the r8a7791 implementation.
-> >
-> > Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+On Fri, May 16, 2014 at 01:42:57PM +0900, Simon Horman wrote:
+> Use shmobile_init_delay() on r8a7779 SoC.
 > 
-> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Convert r8a7779 to rely on shmobile_init_delay() instead of using a per-SoC
+> delay setup function. This is a cleanup towards enabling Multiplatform support
+> for the r8a7779 SoC.
+> 
+> Based on work for the r8a7740 SoC by Magnus Damm.
+> 
+> Based on the renesas-devel-v3.15-rc5-20140516
+> tag of my renesas tree.
 
-Thanks I will queue these up.
+As no objections have been raised and this follows a pattern
+already used for several over SoCs I will queue this up.
+
+> Simon Horman (4):
+>   ARM: shmobile: r8a7779: Add Maximum CPU Frequency to DTS
+>   ARM: shmobile: r8a7779: Use DT CPU Frequency in common case
+>   ARM: shmobile: marzen-reference: Use DT CPU Frequency
+>   ARM: shmobile: r8a7779: Remove unused r8a7779_init_delay()
+> 
+>  arch/arm/boot/dts/r8a7779.dtsi                  | 4 ++++
+>  arch/arm/mach-shmobile/board-marzen-reference.c | 2 +-
+>  arch/arm/mach-shmobile/include/mach/r8a7779.h   | 1 -
+>  arch/arm/mach-shmobile/setup-r8a7779.c          | 7 +------
+>  4 files changed, 6 insertions(+), 8 deletions(-)
+> 
+> -- 
+> 1.8.5.2
+> 
