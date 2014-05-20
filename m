@@ -1,78 +1,46 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 20 May 2014 09:29:36 +0900
-Subject: [PATCH v3] cpufreq: exynos:  Fix the compile error
-In-Reply-To: <1655043.7FHqnunz6p@vostro.rjw.lan>
-References: <000001cf70f0$2e48f930$8adaeb90$@samsung.com>
- <037e01cf70f5$25b374d0$711a5e70$@samsung.com>
- <2553916.Pl2B0tVZGR@vostro.rjw.lan> <1655043.7FHqnunz6p@vostro.rjw.lan>
-Message-ID: <013c01cf73c2$94289150$bc79b3f0$@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 May 2014 17:34:20 -0700
+Subject: [GIT PULL] omap fixes for v3.15 -rc cycle
+Message-ID: <20140520003419.GA15793@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rafael J. Wysocki wrote:
-> 
-> On Saturday, May 17, 2014 01:04:29 AM Rafael J. Wysocki wrote:
-> > On Friday, May 16, 2014 07:54:01 PM Kukjin Kim wrote:
-> > > Jonghwan Choi wrote:
-> > > >
-> > > > Commit 7da83a80 ("ARM: EXYNOS: Migrate Exynos specific macros from
-> plat to
-> > > > mach") which lands in samsung tree causes build breakage
-> > > > for cpufreq-exynos like following:
-> > > >
-> > > > drivers/cpufreq/exynos-cpufreq.c: In function 'exynos_cpufreq_probe':
-> > > > drivers/cpufreq/exynos-cpufreq.c:166:2: error: implicit declaration
-> of
-> > > > function 'soc_is_exynos4210'
-> > > > [-Werror=implicit-function-declaration]
-> > > > drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration
-> of
-> > > > function 'soc_is_exynos4212'
-> > > > [-Werror=implicit-function-declaration]
-> > > > drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration
-> of
-> > > > function 'soc_is_exynos4412'
-> > > > [-Werror=implicit-function-declaration]
-> > > > drivers/cpufreq/exynos-cpufreq.c:170:2: error: implicit declaration
-> of
-> > > > function 'soc_is_exynos5250'
-> > > > [-Werror=implicit-function-declaration]
-> > > > cc1: some warnings being treated as errors
-> > > > make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
-> > > > make[2]: *** Waiting for unfinished jobs....
-> > > > drivers/cpufreq/exynos4x12-cpufreq.c: In function
-> 'exynos4x12_set_clkdiv':
-> > > > drivers/cpufreq/exynos4x12-cpufreq.c:118:2: error: implicit
-> declaration of
-> > > > function 'soc_is_exynos4212'
-> > > > [-Werror=implicit-function-declaration]
-> > > > cc1: some warnings being treated as errors
-> > > > make[2]: *** [drivers/cpufreq/exynos4x12-cpufreq.o] Error 1
-> > > > make[1]: *** [drivers/cpufreq] Error 2
-> > > > This fixes above error with getting SoC information via
-> > > > of_machine_is_compatible() instead of soc_is_exynosXXXX().
-> > > >
-> > >
-> > > Probably,
-> > > Suggested-by: Tomasz Figa ?
-> > >
-> > > > Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
-> > >
-> > > Looks better.
-> > >
-> > > Rafael, if you have no objection on this, shall I pick this into
-> samsung
-> > > tree for 3.16 because of the current build breakage with enabling
-> exynos
-> > > cpufreq?
-> >
-> > Please go ahead.
-> 
-> Actually, this conflicts with one patch already in my tree.  The
-> resoultion
-> is quite obvious, but it would be better to avoid this conflict altogether.
-> 
-Yeah. If you don't mind, shall I pick the patch (commit e5eaa445b0dc)into samsung tree with your ack?
+The following changes since commit 89ca3b881987f5a4be4c5dbaa7f0df12bbdde2fd:
 
-Thanks,
-Kukjin
+  Linux 3.15-rc4 (2014-05-04 18:14:42 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/fixes-v3-signed
+
+for you to fetch changes up to 4b353a706a86598ba47307c47301c3c428b79e09:
+
+  ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled (2014-05-19 11:20:38 -0700)
+
+----------------------------------------------------------------
+Regression fixes for omaps for NAND, DMA, cpu_idle and audio.
+Also a minor one line fix for audio clock on 54xx.
+
+----------------------------------------------------------------
+Laurent Pinchart (1):
+      ARM: OMAP3: clock: Back-propagate rate change from cam_mclk to dpll4_m5 on all OMAP3 platforms
+
+Peter Ujfalusi (1):
+      ARM: omap5: hwmod_data: Correct IDLEMODE for McPDM
+
+Roger Quadros (1):
+      ARM: OMAP2+: nand: Fix NAND on OMAP2 and OMAP3 boards
+
+Santosh Shilimkar (1):
+      ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
+
+Tony Lindgren (2):
+      Merge tag 'for-v3.15-rc/omap-fixes-b' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.15/fixes-v3
+      ARM: OMAP2+: Fix DMA hang after off-idle
+
+ arch/arm/mach-omap2/board-flash.c          |  2 +-
+ arch/arm/mach-omap2/cclock3xxx_data.c      |  3 ++-
+ arch/arm/mach-omap2/cpuidle44xx.c          | 25 +++++++++++++++++++++----
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c |  2 +-
+ arch/arm/plat-omap/dma.c                   | 10 ++++++++++
+ 5 files changed, 35 insertions(+), 7 deletions(-)
