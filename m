@@ -1,40 +1,101 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 May 2014 09:05:13 -0700
-Subject: [PATCH] ARM: remove ARM710 specific assembler code
-In-Reply-To: <5053472.zFAHKQVpbv@wuerfel>
-References: <1364507176.1345.45.camel@x61.thuisdomein>
- <20140517094636.GP3693@n2100.arm.linux.org.uk>
- <9DBC3527-1961-40DD-8CBA-9A1B5D3003C9@arm.com>
- <5053472.zFAHKQVpbv@wuerfel>
-Message-ID: <20140520160512.GE27830@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 20 May 2014 17:08:27 +0100
+Subject: [PATCH 4/4] arm64: Enable TEXT_OFFSET fuzzing
+In-Reply-To: <20140520141126.GA1752@bill-the-cat>
+References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
+ <1400233839-15140-5-git-send-email-mark.rutland@arm.com>
+ <20140516140606.GH5624@arm.com>
+ <20140516165548.GA14766@leverpostej>
+ <20140520141126.GA1752@bill-the-cat>
+Message-ID: <20140520160827.GK3663@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [140519 04:27]:
-> On Saturday 17 May 2014 10:56:02 Catalin Marinas wrote:
+On Tue, May 20, 2014 at 03:11:26PM +0100, Tom Rini wrote:
+> On Fri, May 16, 2014 at 05:55:48PM +0100, Mark Rutland wrote:
+> > On Fri, May 16, 2014 at 03:06:07PM +0100, Catalin Marinas wrote:
+> > > On Fri, May 16, 2014 at 10:50:39AM +0100, Mark Rutland wrote:
+> > > > --- a/arch/arm64/Kconfig.debug
+> > > > +++ b/arch/arm64/Kconfig.debug
+> > > > @@ -37,4 +37,35 @@ config PID_IN_CONTEXTIDR
+> > > >  	  instructions during context switch. Say Y here only if you are
+> > > >  	  planning to use hardware trace tools with this kernel.
+> > > >  
+> > > > +config ARM64_RANDOMIZE_TEXT_OFFSET
+> > > > +	bool "Randomize TEXT_OFFSET at build time (EXPERIMENTAL)"
+> > > > +	default N
+> > > 
+> > > (nitpick: no need for default n)
+> > 
+> > Thanks for pointing that out, I'll remove it :)
+> > 
+> > > I think that's good for testing. It would have been nice to be able to
+> > > set some limits for the random offset but I can't figure out an easy way
+> > > to do this via Kconfig (maybe with additional options).
+> > 
+> > There are hard-coded limits implicit in the randomization -- between 0B
+> > and 2MB in 16B increments:
+> > 
+> > TEXT_OFFSET := $(shell awk 'BEGIN {srand(); printf "0x%05x\n", and(int(0xfffff * rand()), 0xffff0)}')
 > 
-> For the case of ARM710T, I think the last remaining user that can be
-> configured is mach-integrator, but I don't know if anybody even has that
-> CPU tile, or wants to keep using it. If Russell and Linus as the only
-> people that have cared about Integrator in the past years want to
-> cut down the number of supported CPUs, that would be a different matter:
-> quite a number of CPUs are not supported in any other platform.
-> Note that the integrator target in qemu does not support any ARM7, only
-> StrongARM, ARM9 or later. I also double-checked about mach-clps711x,
-> but I'm pretty sure those SoCs are all either ARM710a (no longer supported)
-> or ARM720T (quite active).
+> Note, is mawk expected to be able to be used for kernel building?  It
+> doesn't have 'and' as a function.
 
-Hmm I don't think mach-integrator is using ARM710T?
+Ouch. I hadn't realised this was gawk-only. My new local machine only
+has mawk and builds the kernel fine otherwise, so it seems like we can't
+just expect gawk. It also seems that mawk doesn't like inline hex
+values...
 
-The ARM710T was done by NEC and was used by the Psion MX hardware.
-It's very close to ARM720T as far as I remember so might as well keep
-the CPU support for it as that's just a few lines of code in the
-mainline kernel.
+The masking is only there to ensure the value is a multiple of 16 (i.e.
+the last digit is 0), so we can just handle that in the print instead.
+Then 0xffff is 65535, so:
 
-I don't think we have any mach directories using ARM710T, but I
-would not be surprised if somebody comes along with device tree
-based booting patches for Psion MX at some point.
+TEXT_OFFSET := $(shell awk 'BEGIN {srand(); printf "0x%04x0\n", int(65535 * rand())}')
 
-Regards,
+That seems to work in gawk and mawk.
 
-Tony
+> 
+> > The 16B increment is required due to some code in head.S (__turn_mmu_on)
+> > requiring a minimum 16B alignment for the object.
+> > 
+> > The 2MB maximum comes from the fact we rely on the start of memory being
+> > 2MB aligned. I'm not sure there's a compelling reason to limit the
+> > randomization if enabled at all -- either you can handle it or you
+> > can't. Are we ever likely to want an offset larger than the memory
+> > alignment?
+> 
+> A reason to limit the randomization is to make it easier on the
+> bootloaders to be able to rule of thumb initial loads.  It's not a big
+> deal with Image if it gets loaded lower than the offset, we can start
+> shifting data at the end.  But when we start looking at Image.gz (or xz
+> or ...), in some cases we'll get the whole image read into memory (network
+> booting for example), uncompress the first block so we can confirm a
+> good Image header and see about text_offset/image_size.  If we know that
+> text_offset is somewhere random inside of 2MB (or some other documented
+> max), we can then go with saying an initial load should be at say +32MB
+> (to mirror Documentation/arm/Booting).  If it can be anywhere, then
+> things get hard, or at least annoying (error out and tell the user to
+> re-load things because of a random value?  I can see testing frameworks
+> being annoyed about that).
+
+Ouch, that is somewhat painful.
+
+I don't think we expect to see a text_offset larger than 2MB, and I
+can't immediately see why we'd care about any particular text offset
+assuming the page tables are at the end of the runtime image. That said,
+I'm not completely clear on the history of the text_offset.
+
+> And we should document the range of the offset in
+> Documentation/arm64/booting.txt as well.
+
+As far as I am aware, we have a 64-bit field specifically to allow for
+an arbitrarily large value, so placing limitations on that may be a
+little difficult.
+
+As stated above, I don't think there'd be a reason for having a
+text_offset larger than our memory alignment restriction (2MB), but
+there may be something I've missed. If others are reasonably confident
+with an upper limit, I'd be happy to go with it.
+
+Cheers,
+Mark.
