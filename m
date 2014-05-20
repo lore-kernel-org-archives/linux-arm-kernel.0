@@ -1,60 +1,89 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 20 May 2014 16:25:14 +0200
-Subject: [GIT PULL] Xilinx Zynq clk patches for v3.16
-Message-ID: <537B65CA.4070604@monstr.eu>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Tue, 20 May 2014 16:25:46 +0200
+Subject: [PATCH] ARM: dts: duovero-parlor: Add HDMI output
+Message-ID: <1400595946-1294-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Add the necessary DTS nodes to enable the micro-HDMI output on Parlor
+board.
 
-please pull these 2 patches to your tree.
+Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+---
+ arch/arm/boot/dts/omap4-duovero-parlor.dts | 42 ++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-Thanks,
-Michal
-
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-
-  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-
-are available in the git repository at:
-
-  git://git.xilinx.com/linux-xlnx.git tags/zynq-clk-for-3.16
-
-for you to fetch changes up to 44731f5db44087f54d4e1ed6a460c75552fadcf7:
-
-  clk: si570: Fix email address specifiction (2014-05-20 16:18:18 +0200)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq clk patches for v3.16
-
-- Keep debug clocks in bootup state
-- Fix email address in si570
-
-----------------------------------------------------------------
-Michal Simek (1):
-      clk: si570: Fix email address specifiction
-
-Soren Brinkmann (1):
-      clk: zynq: Leave debug clocks in bootup state
-
- drivers/clk/clk-si570.c |  2 +-
- drivers/clk/zynq/clkc.c | 12 ++++++++++++
- 2 files changed, 13 insertions(+), 1 deletion(-)
-
-
-
+diff --git a/arch/arm/boot/dts/omap4-duovero-parlor.dts b/arch/arm/boot/dts/omap4-duovero-parlor.dts
+index 96f51d8..3b234b8 100644
+--- a/arch/arm/boot/dts/omap4-duovero-parlor.dts
++++ b/arch/arm/boot/dts/omap4-duovero-parlor.dts
+@@ -15,6 +15,10 @@
+ 	model = "OMAP4430 Gumstix Duovero on Parlor";
+ 	compatible = "gumstix,omap4-duovero-parlor", "gumstix,omap4-duovero", "ti,omap4430", "ti,omap4";
+ 
++	aliases {
++		display0 = &hdmi0;
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		led0 {
+@@ -35,6 +39,19 @@
+ 			gpio-key,wakeup;
+ 		};
+ 	};
++
++	hdmi0: connector at 0 {
++		compatible = "hdmi-connector";
++		label = "hdmi";
++
++		type = "d";
++
++		port {
++			hdmi_connector_in: endpoint {
++				remote-endpoint = <&hdmi_out>;
++			};
++		};
++	};
+ };
+ 
+ &omap4_pmx_core {
+@@ -77,6 +94,15 @@
+ 			0x30 (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_a24.gpio_48: amdix enabled */
+ 		>;
+ 	};
++
++	dss_hdmi_pins: pinmux_dss_hdmi_pins {
++		pinctrl-single,pins = <
++			0x58 (PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_hpd.hdmi_hpd */
++			0x5a (PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_cec.hdmi_cec */
++			0x5c (PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_ddc_scl.hdmi_ddc_scl */
++			0x5e (PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_ddc_sda.hdmi_ddc_sda */
++		>;
++	};
+ };
+ 
+ &i2c2 {
+@@ -143,4 +169,20 @@
+ 	};
+ };
+ 
++&dss {
++	status = "ok";
++};
++
++&hdmi {
++	status = "ok";
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&dss_hdmi_pins>;
++
++	port {
++		hdmi_out: endpoint {
++			remote-endpoint = <&hdmi_connector_in>;
++		};
++	};
++};
+ 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/c6ba7543/attachment.sig>
+1.8.3.2
