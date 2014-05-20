@@ -1,334 +1,153 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 20 May 2014 11:35:58 +0800
-Subject: [PATCH v6 03/15] irq: gic: support hip04 gic
-In-Reply-To: <20140519020533.GD27822@titan.lakedaemon.net>
-References: <1399795571-17231-1-git-send-email-haojian.zhuang@linaro.org>
- <1399795571-17231-4-git-send-email-haojian.zhuang@linaro.org>
- <20140519020533.GD27822@titan.lakedaemon.net>
-Message-ID: <CAD6h2NRxsjx_tcTsJYun5O14kKQZoEKdBH-113_ayPnaGW-M+w@mail.gmail.com>
+From: shaik.samsung@gmail.com (Shaik Ameer Basha)
+Date: Tue, 20 May 2014 09:38:52 +0530
+Subject: [PATCH] clk: exynos5250: Add missing sysmmu clocks for DISP and
+ ISP blocks
+In-Reply-To: <1399900817-10544-1-git-send-email-shaik.ameer@samsung.com>
+References: <1399900817-10544-1-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <CAOD6ATq2A1yJM-Mw+4k0Vt-bLYSJ6-yO66Zj=p1NPOrUDuTgMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 May 2014 10:05, Jason Cooper <jason@lakedaemon.net> wrote:
-> Haojian,
->
-> On Sun, May 11, 2014 at 04:05:59PM +0800, Haojian Zhuang wrote:
->> There's a little difference between ARM GIC and HiP04 GIC.
->>
->> * HiP04 GIC could support 16 cores at most, and ARM GIC could support
->> 8 cores at most. So the difination on GIC_DIST_TARGET registers are
->> different since CPU interfaces are increased from 8-bit to 16-bit.
->>
->> * HiP04 GIC could support 510 interrupts at most, and ARM GIC could
->> support 1020 interrupts at most.
->>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->> ---
->>  Documentation/devicetree/bindings/arm/gic.txt |   1 +
->>  drivers/irqchip/irq-gic.c                     | 160 ++++++++++++++++++++------
->>  2 files changed, 129 insertions(+), 32 deletions(-)
->
-> As I'm still coming up to speed on this driver, I'm just going to make
-> some general comments about this patch.  If I appear to be off-base on
-> something, please don't assume I know better ;-)
->
-> I have no strong preference regarding using 'inline'.  In my own code, I
-> prefer to be explicit, but I also prefer to use macros in some of the
-> situations below.
->
-> I would try to avoid runtime calculations of known values (register
-> offsets, masks, etc) where possible.  I've tried to highlight some of
-> them below:
->
->>
->> -     if (cpu >= NR_GIC_CPU_IF || cpu >= nr_cpu_ids)
->> +     if (cpu >= gic_data->nr_cpu_if || cpu >= nr_cpu_ids)
->>               return -EINVAL;
->>
->> +     reg = gic_dist_base(d) + irq_to_target_reg(d);
->> +
->>       raw_spin_lock(&irq_controller_lock);
->> -     mask = 0xff << shift;
->> +     mask = irq_to_core_mask(d);
->
-> You're inside a spinlock here, calculating a mask value (in
-> irq_to_core_mask()) that never changes after boot.  It, in turn, calls
-> irq_to_core_shift() and checks gic_is_standard() to use two values that
-> also never change after boot.
->
-> Sure, these functions are inlined, but the compiler can't optimize for
-> something that's determined at runtime.  eg the mask, and X and Y in
-> ((i % X) << Y).
->
+Hi Tomasz,
 
-Do you mean that inlined is useless at here? So I should drop inlined
-at here instead.
+Any comments on this patch ?
 
+Regards,
+Shaik
 
->>       bit = gic_cpu_map[cpu] << shift;
->>       val = readl_relaxed(reg) & ~mask;
->>       writel_relaxed(val | bit, reg);
->> @@ -354,15 +401,24 @@ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
->>       irq_set_chained_handler(irq, gic_handle_cascade_irq);
->>  }
->>
->> -static u8 gic_get_cpumask(struct gic_chip_data *gic)
->> +static u16 gic_get_cpumask(struct gic_chip_data *gic)
->>  {
->>       void __iomem *base = gic_data_dist_base(gic);
->>       u32 mask, i;
->>
->> -     for (i = mask = 0; i < 32; i += 4) {
->> -             mask = readl_relaxed(base + GIC_DIST_TARGET + i);
->> -             mask |= mask >> 16;
->> -             mask |= mask >> 8;
->> +     /*
->> +      * ARM GIC uses 8 registers for interrupt 0-31,
->> +      * HiP04 GIC uses 16 registers for interrupt 0-31.
->> +      */
->> +     for (i = mask = 0; i < 32; i += gic_irqs_per_target_reg(gic)) {
->> +             if (gic_is_standard(gic)) {
->> +                     mask = readl_relaxed(base + GIC_DIST_TARGET + i);
->> +                     mask |= mask >> 16;
->> +                     mask |= mask >> 8;
->> +             } else {                        /* HiP04 GIC */
->> +                     mask = readl_relaxed(base + GIC_DIST_TARGET + i * 2);
->> +                     mask |= mask >> 16;
->> +             }
->>               if (mask)
->>                       break;
->>       }
->> @@ -370,6 +426,10 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
->>       if (!mask)
->>               pr_crit("GIC CPU mask not found - kernel will fail to boot.\n");
->>
->> +     /* ARM GIC needs 8-bit cpu mask, HiP04 GIC needs 16-bit cpu mask. */
->> +     if (gic_is_standard(gic))
->> +             mask &= 0xff;
->> +
->>       return mask;
->>  }
->>
->> @@ -392,10 +452,17 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
->>        * Set all global interrupts to this CPU only.
->>        */
->>       cpumask = gic_get_cpumask(gic);
->> -     cpumask |= cpumask << 8;
->> +     if (gic_is_standard(gic))
->> +             cpumask |= cpumask << 8;
->>       cpumask |= cpumask << 16;
->> -     for (i = 32; i < gic_irqs; i += 4)
->> -             writel_relaxed(cpumask, base + GIC_DIST_TARGET + i * 4 / 4);
->> +     for (i = 32; i < gic_irqs; i += gic_irqs_per_target_reg(gic)) {
->> +             if (gic_is_standard(gic))
->> +                     writel_relaxed(cpumask,
->> +                                    base + GIC_DIST_TARGET + i / 4 * 4);
->> +             else
->> +                     writel_relaxed(cpumask,
->> +                                    base + GIC_DIST_TARGET + i / 2 * 4);
->> +     }
->>
->>       /*
->>        * Set priority on all global interrupts.
->> @@ -423,7 +490,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->>       /*
->>        * Get what the GIC says our CPU mask is.
->>        */
->> -     BUG_ON(cpu >= NR_GIC_CPU_IF);
->> +     BUG_ON(cpu >= gic->nr_cpu_if);
->>       cpu_mask = gic_get_cpumask(gic);
->>       gic_cpu_map[cpu] = cpu_mask;
->>
->> @@ -431,7 +498,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->>        * Clear our mask from the other map entries in case they're
->>        * still undefined.
->>        */
->> -     for (i = 0; i < NR_GIC_CPU_IF; i++)
->> +     for (i = 0; i < gic->nr_cpu_if; i++)
->>               if (i != cpu)
->>                       gic_cpu_map[i] &= ~cpu_mask;
->>
->> @@ -467,7 +534,7 @@ void gic_cpu_if_down(void)
->>   */
->>  static void gic_dist_save(unsigned int gic_nr)
->>  {
->> -     unsigned int gic_irqs;
->> +     unsigned int gic_irqs, nr_irq_per_target;
->>       void __iomem *dist_base;
->>       int i;
->>
->> @@ -476,6 +543,7 @@ static void gic_dist_save(unsigned int gic_nr)
->>
->>       gic_irqs = gic_data[gic_nr].gic_irqs;
->>       dist_base = gic_data_dist_base(&gic_data[gic_nr]);
->> +     nr_irq_per_target = gic_irqs_per_target_reg(&gic_data[gic_nr]);
+On Mon, May 12, 2014 at 6:50 PM, Shaik Ameer Basha
+<shaik.ameer@samsung.com> wrote:
+> From: Cho KyongHo <pullip.cho@samsung.com>
 >
-> gic_dist_save() isn't called too often (suspend/idle), but this is
-> another example of calculating something that doesn't change after boot.
+> This patch adds the missing sysmmu clocks for Display and
+> ISP blocks.
 >
->>
->>       if (!dist_base)
->>               return;
->> @@ -484,7 +552,7 @@ static void gic_dist_save(unsigned int gic_nr)
->>               gic_data[gic_nr].saved_spi_conf[i] =
->>                       readl_relaxed(dist_base + GIC_DIST_CONFIG + i * 4);
->>
->> -     for (i = 0; i < DIV_ROUND_UP(gic_irqs, 4); i++)
->> +     for (i = 0; i < DIV_ROUND_UP(gic_irqs, nr_irq_per_target); i++)
->>               gic_data[gic_nr].saved_spi_target[i] =
->>                       readl_relaxed(dist_base + GIC_DIST_TARGET + i * 4);
->>
->> @@ -502,7 +570,7 @@ static void gic_dist_save(unsigned int gic_nr)
->>   */
->>  static void gic_dist_restore(unsigned int gic_nr)
->>  {
->> -     unsigned int gic_irqs;
->> +     unsigned int gic_irqs, nr_irq_per_target;
->>       unsigned int i;
->>       void __iomem *dist_base;
->>
->> @@ -511,6 +579,7 @@ static void gic_dist_restore(unsigned int gic_nr)
->>
->>       gic_irqs = gic_data[gic_nr].gic_irqs;
->>       dist_base = gic_data_dist_base(&gic_data[gic_nr]);
->> +     nr_irq_per_target = gic_irqs_per_target_reg(&gic_data[gic_nr]);
+> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos5250.c   |   35 ++++++++++++++++++++++++++++++++
+>  include/dt-bindings/clock/exynos5250.h |   16 +++++++++++++++
+>  2 files changed, 51 insertions(+)
 >
-> Same.
+> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+> index 65cb966..3bc8f40 100644
+> --- a/drivers/clk/samsung/clk-exynos5250.c
+> +++ b/drivers/clk/samsung/clk-exynos5250.c
+> @@ -28,6 +28,8 @@
+>  #define MPLL_CON0              0x4100
+>  #define SRC_CORE1              0x4204
+>  #define GATE_IP_ACP            0x8800
+> +#define GATE_IP_ISP0           0xc800
+> +#define GATE_IP_ISP1           0xc804
+>  #define CPLL_LOCK              0x10020
+>  #define EPLL_LOCK              0x10030
+>  #define VPLL_LOCK              0x10040
+> @@ -145,6 +147,8 @@ static unsigned long exynos5250_clk_regs[] __initdata = {
+>         PLL_DIV2_SEL,
+>         GATE_IP_DISP1,
+>         GATE_IP_ACP,
+> +       GATE_IP_ISP0,
+> +       GATE_IP_ISP1,
+>  };
 >
->>
->>       if (!dist_base)
->>               return;
->> @@ -525,7 +594,7 @@ static void gic_dist_restore(unsigned int gic_nr)
->>               writel_relaxed(0xa0a0a0a0,
->>                       dist_base + GIC_DIST_PRI + i * 4);
->>
->> -     for (i = 0; i < DIV_ROUND_UP(gic_irqs, 4); i++)
->> +     for (i = 0; i < DIV_ROUND_UP(gic_irqs, nr_irq_per_target); i++)
->>               writel_relaxed(gic_data[gic_nr].saved_spi_target[i],
->>                       dist_base + GIC_DIST_TARGET + i * 4);
->>
->> @@ -665,9 +734,19 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->>        */
->>       dmb(ishst);
->>
->> -     /* this always happens on GIC0 */
->> -     writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
->> -
->> +     /*
->> +      * CPUTargetList -- bit[23:16] in GIC_DIST_SOFTINT in ARM GIC.
->> +      *                  bit[23:8] in GIC_DIST_SOFTINT in HiP04 GIC.
->> +      * NSATT -- bit[15] in GIC_DIST_SOFTINT in ARM GIC.
->> +      *          bit[7] in GIC_DIST_SOFTINT in HiP04 GIC.
->> +      * this always happens on GIC0
->> +      */
->> +     if (gic_is_standard(&gic_data[0]))
->> +             map = map << 16;
->> +     else
->> +             map = map << 8;
+>  static int exynos5250_clk_suspend(void)
+> @@ -202,6 +206,7 @@ PNAME(mout_aclk400_p)       = { "mout_aclk400_g3d_mid", "mout_gpll" };
+>  PNAME(mout_aclk200_sub_p) = { "fin_pll", "div_aclk200" };
+>  PNAME(mout_aclk266_sub_p) = { "fin_pll", "div_aclk266" };
+>  PNAME(mout_aclk333_sub_p) = { "fin_pll", "div_aclk333" };
+> +PNAME(mout_aclk400_isp_sub_p) = { "fin_pll", "div_aclk400_isp" };
+>  PNAME(mout_hdmi_p)     = { "div_hdmi_pixel", "sclk_hdmiphy" };
+>  PNAME(mout_usb3_p)     = { "mout_mpll_user", "mout_cpll" };
+>  PNAME(mout_group1_p)   = { "fin_pll", "fin_pll", "sclk_hdmi27m",
+> @@ -281,6 +286,7 @@ static struct samsung_mux_clock exynos5250_mux_clks[] __initdata = {
+>         MUX(0, "mout_aclk333", mout_aclk166_p, SRC_TOP0, 16, 1),
+>         MUX(0, "mout_aclk400_g3d_mid", mout_aclk200_p, SRC_TOP0, 20, 1),
 >
-> ditto.  Inside a spinlock as well.
+> +       MUX(0, "mout_aclk400_isp", mout_aclk200_p, SRC_TOP1, 24, 1),
+>         MUX(0, "mout_aclk400_g3d", mout_aclk400_p, SRC_TOP1, 28, 1),
 >
->> +     writel_relaxed(map | irq,
->> +                    gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
->>       raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
->>  }
->>  #endif
->> @@ -681,10 +760,15 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->>   */
->>  void gic_send_sgi(unsigned int cpu_id, unsigned int irq)
->>  {
->> -     BUG_ON(cpu_id >= NR_GIC_CPU_IF);
->> +     BUG_ON(cpu_id >= gic_data[0].nr_cpu_if);
->>       cpu_id = 1 << cpu_id;
->>       /* this always happens on GIC0 */
->> -     writel_relaxed((cpu_id << 16) | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
->> +     if (gic_is_standard(&gic_data[0]))
->> +             cpu_id = cpu_id << 16;
->> +     else
->> +             cpu_id = cpu_id << 8;
+>         MUX(0, "mout_cpll", mout_cpll_p, SRC_TOP2, 8, 1),
+> @@ -292,6 +298,9 @@ static struct samsung_mux_clock exynos5250_mux_clks[] __initdata = {
 >
-> ditto.
+>         MUX(0, "mout_aclk200_disp1_sub", mout_aclk200_sub_p, SRC_TOP3, 4, 1),
+>         MUX(0, "mout_aclk266_gscl_sub", mout_aclk266_sub_p, SRC_TOP3, 8, 1),
+> +       MUX(0, "mout_aclk_266_isp_sub", mout_aclk266_sub_p, SRC_TOP3, 16, 1),
+> +       MUX(0, "mout_aclk_400_isp_sub", mout_aclk400_isp_sub_p,
+> +                       SRC_TOP3, 20, 1),
+>         MUX(0, "mout_aclk333_sub", mout_aclk333_sub_p, SRC_TOP3, 24, 1),
 >
->> +     writel_relaxed(cpu_id | irq,
->> +                    gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
->>  }
->>
->>  /*
->> @@ -700,7 +784,7 @@ int gic_get_cpu_id(unsigned int cpu)
->>  {
->>       unsigned int cpu_bit;
->>
->> -     if (cpu >= NR_GIC_CPU_IF)
->> +     if (cpu >= gic_data[0].nr_cpu_if)
->>               return -1;
->>       cpu_bit = gic_cpu_map[cpu];
->>       if (cpu_bit & (cpu_bit - 1))
->> @@ -931,7 +1015,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>       irq_hw_number_t hwirq_base;
->>       struct gic_chip_data *gic;
->>       int gic_irqs, irq_base, i;
->> -     int nr_routable_irqs;
->> +     int nr_routable_irqs, max_nr_irq;
->>
->>       BUG_ON(gic_nr >= MAX_GIC_NR);
->>
->> @@ -967,12 +1051,22 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>               gic_set_base_accessor(gic, gic_get_common_base);
->>       }
->>
->> +     if (of_device_is_compatible(node, "hisilicon,hip04-gic")) {
->> +             /* HiP04 GIC supports 16 CPUs at most */
->> +             gic->nr_cpu_if = 16;
->> +             max_nr_irq = 510;
->> +     } else {
->> +             /* ARM/Qualcomm GIC supports 8 CPUs at most */
->> +             gic->nr_cpu_if = 8;
->> +             max_nr_irq = 1020;
->> +     }
->> +
->>       /*
->>        * Initialize the CPU interface map to all CPUs.
->>        * It will be refined as each CPU probes its ID.
->>        */
->> -     for (i = 0; i < NR_GIC_CPU_IF; i++)
->> -             gic_cpu_map[i] = 0xff;
->> +     for (i = 0; i < gic->nr_cpu_if; i++)
->> +             gic_cpu_map[i] = (1 << gic->nr_cpu_if) - 1;
->>
->>       /*
->>        * For primary GICs, skip over SGIs.
->> @@ -988,12 +1082,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>
->>       /*
->>        * Find out how many interrupts are supported.
->> -      * The GIC only supports up to 1020 interrupt sources.
->> +      * The ARM/Qualcomm GIC only supports up to 1020 interrupt sources.
->> +      * The HiP04 GIC only supports up to 510 interrupt sources.
->>        */
->>       gic_irqs = readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_CTR) & 0x1f;
->>       gic_irqs = (gic_irqs + 1) * 32;
->> -     if (gic_irqs > 1020)
->> -             gic_irqs = 1020;
->> +     if (gic_irqs > max_nr_irq)
->> +             gic_irqs = max_nr_irq;
->>       gic->gic_irqs = gic_irqs;
->>
->>       gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
->> @@ -1069,6 +1164,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
->>  }
->>  IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
->>  IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
->> +IRQCHIP_DECLARE(hip04_gic, "hisilicon,hip04-gic", gic_of_init);
->>  IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
->>  IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
+>         MUX(0, "mout_cam_bayer", mout_group1_p, SRC_GSCL, 12, 4),
+> @@ -364,6 +373,7 @@ static struct samsung_div_clock exynos5250_div_clks[] __initdata = {
+>         DIV(0, "div_aclk400_g3d", "mout_aclk400_g3d", DIV_TOP0,
+>                                                         24, 3),
 >
-> I would re-evaluate your use of gic_is_standard() and attempt to
-> eliminate all post-bootup callers of it.
+> +       DIV(0, "div_aclk400_isp", "mout_aclk400_isp", DIV_TOP1, 20, 3),
+>         DIV(0, "div_aclk66_pre", "mout_mpll_user", DIV_TOP1, 24, 3),
 >
-
-I didn't get your point. Do you mean that I should use macro or global
-variable instead? All inlined should be dropped, since they're embedded
-in spin_lock_irqsave().
-
-Regards
-Haojian
+>         DIV(0, "div_cam_bayer", "mout_cam_bayer", DIV_GSCL, 12, 4),
+> @@ -629,6 +639,31 @@ static struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
+>         GATE(CLK_WDT, "wdt", "div_aclk66", GATE_IP_PERIS, 19, 0, 0),
+>         GATE(CLK_RTC, "rtc", "div_aclk66", GATE_IP_PERIS, 20, 0, 0),
+>         GATE(CLK_TMU, "tmu", "div_aclk66", GATE_IP_PERIS, 21, 0, 0),
+> +       GATE(CLK_SMMU_TV, "smmu_tv", "mout_aclk200_disp1_sub",
+> +                       GATE_IP_DISP1, 2, 0, 0),
+> +       GATE(CLK_SMMU_FIMD1, "smmu_fimd1", "mout_aclk200_disp1_sub",
+> +                       GATE_IP_DISP1, 8, 0, 0),
+> +       GATE(CLK_SMMU_2D, "smmu_2d", "div_aclk200", GATE_IP_ACP, 7, 0, 0),
+> +       GATE(CLK_SMMU_FIMC_ISP, "smmu_fimc_isp", "mout_aclk_266_isp_sub",
+> +                       GATE_IP_ISP0, 8, 0, 0),
+> +       GATE(CLK_SMMU_FIMC_DRC, "smmu_fimc_drc", "mout_aclk_266_isp_sub",
+> +                       GATE_IP_ISP0, 9, 0, 0),
+> +       GATE(CLK_SMMU_FIMC_FD, "smmu_fimc_fd", "mout_aclk_266_isp_sub",
+> +                       GATE_IP_ISP0, 10, 0, 0),
+> +       GATE(CLK_SMMU_FIMC_SCC, "smmu_fimc_scc", "mout_aclk_266_isp_sub",
+> +                       GATE_IP_ISP0, 11, 0, 0),
+> +       GATE(CLK_SMMU_FIMC_SCP, "smmu_fimc_scp", "mout_aclk_266_isp_sub",
+> +                       GATE_IP_ISP0, 12, 0, 0),
+> +       GATE(CLK_SMMU_FIMC_MCU, "smmu_fimc_mcu", "mout_aclk_400_isp_sub",
+> +                       GATE_IP_ISP0, 13, 0, 0),
+> +       GATE(CLK_SMMU_FIMC_ODC, "smmu_fimc_odc", "mout_aclk_266_isp_sub",
+> +                       GATE_IP_ISP1, 4, 0, 0),
+> +       GATE(CLK_SMMU_FIMC_DIS0, "smmu_fimc_dis0", "mout_aclk_266_isp_sub",
+> +                       GATE_IP_ISP1, 5, 0, 0),
+> +       GATE(CLK_SMMU_FIMC_DIS1, "smmu_fimc_dis1", "mout_aclk_266_isp_sub",
+> +                       GATE_IP_ISP1, 6, 0, 0),
+> +       GATE(CLK_SMMU_FIMC_3DNR, "smmu_fimc_3dnr", "mout_aclk_266_isp_sub",
+> +                       GATE_IP_ISP1, 7, 0, 0),
+>  };
+>
+>  static struct samsung_pll_rate_table vpll_24mhz_tbl[] __initdata = {
+> diff --git a/include/dt-bindings/clock/exynos5250.h b/include/dt-bindings/clock/exynos5250.h
+> index 415d447..be6e97c 100644
+> --- a/include/dt-bindings/clock/exynos5250.h
+> +++ b/include/dt-bindings/clock/exynos5250.h
+> @@ -152,6 +152,22 @@
+>  #define CLK_SMMU_MDMA0         347
+>  #define CLK_SSS                        348
+>  #define CLK_G3D                        349
+> +#define CLK_SMMU_TV            350
+> +#define CLK_SMMU_FIMD1         351
+> +#define CLK_SMMU_2D            352
+> +#define CLK_SMMU_FIMC_ISP      353
+> +#define CLK_SMMU_FIMC_DRC      354
+> +#define CLK_SMMU_FIMC_SCC      355
+> +#define CLK_SMMU_FIMC_SCP      356
+> +#define CLK_SMMU_FIMC_FD       357
+> +#define CLK_SMMU_FIMC_MCU      358
+> +#define CLK_SMMU_FIMC_ODC      359
+> +#define CLK_SMMU_FIMC_DIS0     360
+> +#define CLK_SMMU_FIMC_DIS1     361
+> +#define CLK_SMMU_FIMC_3DNR     362
+> +#define CLK_SMMU_FIMC_LITE0    363
+> +#define CLK_SMMU_FIMC_LITE1    364
+> +#define CLK_CAMIF_TOP          365
+>
+>  /* mux clocks */
+>  #define CLK_MOUT_HDMI          1024
+> --
+> 1.7.9.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
