@@ -1,43 +1,73 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 20 May 2014 11:02:21 -0600
-Subject: [PATCH v1 5/5] pci: keystone: add pcie driver based on
- designware core driver
-In-Reply-To: <3E54258959B69E4282D79E01AB1F32B704742133@DFLE11.ent.ti.com>
-References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
- <6048322.x3M3sdDEWO@wuerfel> <5374FD24.8000806@ti.com>
- <22200719.Jb5jnJylJH@wuerfel>
- <20140515183919.GC11650@obsidianresearch.com>
- <53751DDF.40304@ti.com>
- <20140515205210.GB14722@obsidianresearch.com>
- <3E54258959B69E4282D79E01AB1F32B704742133@DFLE11.ent.ti.com>
-Message-ID: <20140520170221.GA5130@obsidianresearch.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 20 May 2014 18:06:03 +0100
+Subject: [PATCH] arm64: KVM: Enable minimalistic support for Cortex-A53
+Message-ID: <1400605563-25533-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 08:29:56PM +0000, Karicheri, Muralidharan wrote:
+In order to allow KVM to run on Cortex-A53 implementations, wire the
+minimal support required.
 
-> But pcie_bus_configure_settings just make sure the mrrs for a device
-> is not greater than the max payload size. 
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/cputype.h     | 1 +
+ arch/arm64/include/uapi/asm/kvm.h    | 3 ++-
+ arch/arm64/kvm/guest.c               | 2 ++
+ arch/arm64/kvm/sys_regs_generic_v8.c | 2 ++
+ 4 files changed, 7 insertions(+), 1 deletion(-)
 
-Not quite, it first scans the network checking the Maximum Payload Size
-Supported (MPSS) for each device, and chooses the highest supported by
-all as the MPS for all.
-
-PCI-E requires that an end point support all packets up to the MPS, so
-if your bridge can't generate a 512 byte read response packet, then it
-must not advertise a MPSS greater than 256 bytes.
-
-Setting your MPSS to 128, 256, then using the
-pcie_bus_configure_settings to run the standard algorithm should
-properly limit the readrq to 256 and be able to properly support all
-the fun edge cases like hot plug.
-
-If the config space in your root port bridge is correct and already
-declares a MPSS of 256 then you have nothing else to do but make sure
-pcie_bus_configure_settings gets calls.
-
-If it is broken and claims a higher MPSS than it can support then you
-need to use a quirk only for the root port bridge or edit the config
-reply in the driver only to fix the MPSS.
-
-Jason
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index c404fb0..27f54a7 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -41,6 +41,7 @@
+ 
+ #define ARM_CPU_PART_AEM_V8	0xD0F0
+ #define ARM_CPU_PART_FOUNDATION	0xD000
++#define ARM_CPU_PART_CORTEX_A53	0xD030
+ #define ARM_CPU_PART_CORTEX_A57	0xD070
+ 
+ #define APM_CPU_PART_POTENZA	0x0000
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index eaf54a3..6396eda 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -56,8 +56,9 @@ struct kvm_regs {
+ #define KVM_ARM_TARGET_FOUNDATION_V8	1
+ #define KVM_ARM_TARGET_CORTEX_A57	2
+ #define KVM_ARM_TARGET_XGENE_POTENZA	3
++#define KVM_ARM_TARGET_CORTEX_A53	4
+ 
+-#define KVM_ARM_NUM_TARGETS		4
++#define KVM_ARM_NUM_TARGETS		5
+ 
+ /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
+ #define KVM_ARM_DEVICE_TYPE_SHIFT	0
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 0874557..60b5c31 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -214,6 +214,8 @@ int __attribute_const__ kvm_target_cpu(void)
+ 			return KVM_ARM_TARGET_AEM_V8;
+ 		case ARM_CPU_PART_FOUNDATION:
+ 			return KVM_ARM_TARGET_FOUNDATION_V8;
++		case ARM_CPU_PART_CORTEX_A53:
++			return KVM_ARM_TARGET_CORTEX_A53;
+ 		case ARM_CPU_PART_CORTEX_A57:
+ 			return KVM_ARM_TARGET_CORTEX_A57;
+ 		};
+diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
+index 8fe6f76..475fd29 100644
+--- a/arch/arm64/kvm/sys_regs_generic_v8.c
++++ b/arch/arm64/kvm/sys_regs_generic_v8.c
+@@ -88,6 +88,8 @@ static int __init sys_reg_genericv8_init(void)
+ 					  &genericv8_target_table);
+ 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_FOUNDATION_V8,
+ 					  &genericv8_target_table);
++	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A53,
++					  &genericv8_target_table);
+ 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A57,
+ 					  &genericv8_target_table);
+ 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_XGENE_POTENZA,
+-- 
+1.8.3.4
