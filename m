@@ -1,202 +1,213 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 20 May 2014 16:45:35 +0800
-Subject: [PATCH 17/20] ARM: imx5: move init hooks into mach-imx5x.c
+Date: Tue, 20 May 2014 16:45:34 +0800
+Subject: [PATCH 16/20] ARM: imx5: use dynamic mapping for Cortex and GPC block
 In-Reply-To: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
 References: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1400575538-21136-18-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1400575538-21136-17-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These imx5 init_early[late] hooks are called only from mach-imx5x.c.
-Let's move them into mach-imx5x.c.
-
-While at it, replace the static mapping in imx51_ipu_mipi_setup() with
-dynamic mapping.  Also this function and imx_src_init() do not
-necessarily to be called at .init_early hook, so move them into
-.init_machine.
-
-The mxc_iomux_v3_init() is dropped from imx51_init_early() in the
-moving, since it's only needed by non-DT boot.
+The imx5 pm code uses static mapping to access Cortex and GPC registers.
+The patch create struct imx5_pm_data to encode physical address of
+Cortex and GPC block, and create dynamic mapping for them at run-time.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-imx/common.h     |  4 ----
- arch/arm/mach-imx/mach-imx51.c | 39 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/mach-imx53.c | 11 +++++++++++
- arch/arm/mach-imx/mm-imx5.c    | 44 ------------------------------------------
- 4 files changed, 50 insertions(+), 48 deletions(-)
+ arch/arm/mach-imx/common.h  |  6 ++--
+ arch/arm/mach-imx/mm-imx5.c |  4 +--
+ arch/arm/mach-imx/pm-imx5.c | 84 +++++++++++++++++++++++++++++----------------
+ 3 files changed, 60 insertions(+), 34 deletions(-)
 
 diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 1156bf6..b480f0b 100644
+index 8aa198c..1156bf6 100644
 --- a/arch/arm/mach-imx/common.h
 +++ b/arch/arm/mach-imx/common.h
-@@ -34,8 +34,6 @@ void imx25_init_early(void);
- void imx27_init_early(void);
- void imx31_init_early(void);
- void imx35_init_early(void);
--void imx51_init_early(void);
--void imx53_init_early(void);
- void mxc_init_irq(void __iomem *);
- void tzic_init_irq(void);
- void mx1_init_irq(void);
-@@ -50,8 +48,6 @@ void imx25_soc_init(void);
- void imx27_soc_init(void);
- void imx31_soc_init(void);
- void imx35_soc_init(void);
--void imx51_init_late(void);
--void imx53_init_late(void);
- void epit_timer_init(void __iomem *base, int irq);
- void mxc_timer_init(void __iomem *, int);
- void mxc_timer_init_dt(struct device_node *);
-diff --git a/arch/arm/mach-imx/mach-imx51.c b/arch/arm/mach-imx/mach-imx51.c
-index a849d43..a2027d2 100644
---- a/arch/arm/mach-imx/mach-imx51.c
-+++ b/arch/arm/mach-imx/mach-imx51.c
-@@ -10,6 +10,7 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
+@@ -142,10 +142,12 @@ void imx6sl_pm_init(void);
+ void imx6q_pm_set_ccm_base(void __iomem *base);
  
-+#include <linux/io.h>
- #include <linux/irq.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
-@@ -17,18 +18,56 @@
- #include <asm/mach/time.h>
+ #ifdef CONFIG_PM
+-void imx5_pm_init(void);
++void imx51_pm_init(void);
++void imx53_pm_init(void);
+ void imx5_pm_set_ccm_base(void __iomem *base);
+ #else
+-static inline void imx5_pm_init(void) {}
++static inline void imx51_pm_init(void) {}
++static inline void imx53_pm_init(void) {}
+ static inline void imx5_pm_set_ccm_base(void __iomem *base) {}
+ #endif
  
- #include "common.h"
-+#include "hardware.h"
- #include "mx51.h"
- 
-+static void __init imx51_init_early(void)
-+{
-+	mxc_set_cpu_type(MXC_CPU_MX51);
-+}
-+
-+/*
-+ * The MIPI HSC unit has been removed from the i.MX51 Reference Manual by
-+ * the Freescale marketing division. However this did not remove the
-+ * hardware from the chip which still needs to be configured for proper
-+ * IPU support.
-+ */
-+#define MX51_MIPI_HSC_BASE 0x83fdc000
-+static void __init imx51_ipu_mipi_setup(void)
-+{
-+	void __iomem *hsc_addr;
-+
-+	hsc_addr = ioremap(MX51_MIPI_HSC_BASE, SZ_16K);
-+	WARN_ON(!hsc_addr);
-+
-+	/* setup MIPI module to legacy mode */
-+	__raw_writel(0xf00, hsc_addr);
-+
-+	/* CSI mode: reserved; DI control mode: legacy (from Freescale BSP) */
-+	__raw_writel(__raw_readl(hsc_addr + 0x800) | 0x30ff,
-+		hsc_addr + 0x800);
-+
-+	iounmap(hsc_addr);
-+}
-+
- static void __init imx51_dt_init(void)
- {
- 	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", };
- 
- 	mxc_arch_reset_init_dt();
-+	imx51_ipu_mipi_setup();
-+	imx_src_init();
- 
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 	platform_device_register_full(&devinfo);
- }
- 
-+static void __init imx51_init_late(void)
-+{
-+	mx51_neon_fixup();
-+	imx51_pm_init();
-+}
-+
- static const char *imx51_dt_board_compat[] __initconst = {
- 	"fsl,imx51",
- 	NULL
-diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-index 9a066af..40005b8 100644
---- a/arch/arm/mach-imx/mach-imx53.c
-+++ b/arch/arm/mach-imx/mach-imx53.c
-@@ -24,6 +24,12 @@
- #include "hardware.h"
- #include "mx53.h"
- 
-+static void __init imx53_init_early(void)
-+{
-+	mxc_set_cpu_type(MXC_CPU_MX53);
-+	imx_src_init();
-+}
-+
- static void __init imx53_dt_init(void)
- {
- 	mxc_arch_reset_init_dt();
-@@ -31,6 +37,11 @@ static void __init imx53_dt_init(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
-+static void __init imx53_init_late(void)
-+{
-+	imx53_pm_init();
-+}
-+
- static const char *imx53_dt_board_compat[] __initconst = {
- 	"fsl,imx53",
- 	NULL
 diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
-index 9e43e87..768fede 100644
+index 771ab36..9e43e87 100644
 --- a/arch/arm/mach-imx/mm-imx5.c
 +++ b/arch/arm/mach-imx/mm-imx5.c
-@@ -59,47 +59,3 @@ void __init mx53_map_io(void)
+@@ -96,10 +96,10 @@ void __init imx53_init_early(void)
+ void __init imx51_init_late(void)
  {
- 	iotable_init(mx53_io_desc, ARRAY_SIZE(mx53_io_desc));
+ 	mx51_neon_fixup();
+-	imx5_pm_init();
++	imx51_pm_init();
  }
+ 
+ void __init imx53_init_late(void)
+ {
+-	imx5_pm_init();
++	imx53_pm_init();
+ }
+diff --git a/arch/arm/mach-imx/pm-imx5.c b/arch/arm/mach-imx/pm-imx5.c
+index 3544c25..f1f80ab 100644
+--- a/arch/arm/mach-imx/pm-imx5.c
++++ b/arch/arm/mach-imx/pm-imx5.c
+@@ -28,21 +28,14 @@
+ #define MXC_CCM_CLPCR_VSTBY		(0x1 << 8)
+ #define MXC_CCM_CLPCR_SBYOS		(0x1 << 6)
+ 
+-#define MX51_CORTEXA8_BASE		MX51_IO_ADDRESS(MX51_ARM_BASE_ADDR)
+-#define MXC_CORTEXA8_PLAT_LPC		(MX51_CORTEXA8_BASE + 0xc)
++#define MXC_CORTEXA8_PLAT_LPC		0xc
+ #define MXC_CORTEXA8_PLAT_LPC_DSM	(1 << 0)
+ #define MXC_CORTEXA8_PLAT_LPC_DBG_DSM	(1 << 1)
+ 
+-#define MX51_GPC_BASE			MX51_IO_ADDRESS(MX51_GPC_BASE_ADDR)
+-#define MXC_SRPG_NEON_BASE		(MX51_GPC_BASE + 0x280)
+-#define MXC_SRPG_ARM_BASE		(MX51_GPC_BASE + 0x2a0)
+-#define MXC_SRPG_EMPGC0_BASE		(MX51_GPC_BASE + 0x2c0)
+-#define MXC_SRPG_EMPGC1_BASE		(MX51_GPC_BASE + 0x2d0)
 -
--/*
-- * The MIPI HSC unit has been removed from the i.MX51 Reference Manual by
-- * the Freescale marketing division. However this did not remove the
-- * hardware from the chip which still needs to be configured for proper
-- * IPU support.
-- */
--static void __init imx51_ipu_mipi_setup(void)
--{
--	void __iomem *hsc_addr;
--	hsc_addr = MX51_IO_ADDRESS(MX51_MIPI_HSC_BASE_ADDR);
--
--	/* setup MIPI module to legacy mode */
--	__raw_writel(0xf00, hsc_addr);
--
--	/* CSI mode: reserved; DI control mode: legacy (from Freescale BSP) */
--	__raw_writel(__raw_readl(hsc_addr + 0x800) | 0x30ff,
--		hsc_addr + 0x800);
--}
--
--void __init imx51_init_early(void)
--{
--	imx51_ipu_mipi_setup();
--	mxc_set_cpu_type(MXC_CPU_MX51);
--	mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
--	imx_src_init();
--}
--
--void __init imx53_init_early(void)
--{
--	mxc_set_cpu_type(MXC_CPU_MX53);
--	imx_src_init();
--}
--
--void __init imx51_init_late(void)
--{
--	mx51_neon_fixup();
--	imx51_pm_init();
--}
--
--void __init imx53_init_late(void)
--{
--	imx53_pm_init();
--}
+-#define MXC_SRPG_NEON_SRPGCR		(MXC_SRPG_NEON_BASE + 0x0)
+-#define MXC_SRPG_ARM_SRPGCR		(MXC_SRPG_ARM_BASE + 0x0)
+-#define MXC_SRPG_EMPGC0_SRPGCR		(MXC_SRPG_EMPGC0_BASE + 0x0)
+-#define MXC_SRPG_EMPGC1_SRPGCR		(MXC_SRPG_EMPGC1_BASE + 0x0)
++#define MXC_SRPG_NEON_SRPGCR		0x280
++#define MXC_SRPG_ARM_SRPGCR		0x2a0
++#define MXC_SRPG_EMPGC0_SRPGCR		0x2c0
++#define MXC_SRPG_EMPGC1_SRPGCR		0x2d0
+ 
+ #define MXC_SRPGCR_PCR			1
+ 
+@@ -56,7 +49,24 @@
+  */
+ #define IMX5_DEFAULT_CPU_IDLE_STATE WAIT_UNCLOCKED_POWER_OFF
+ 
++struct imx5_pm_data {
++	phys_addr_t cortex_addr;
++	phys_addr_t gpc_addr;
++};
++
++static const struct imx5_pm_data imx51_pm_data __initconst = {
++	.cortex_addr = 0x83fa0000,
++	.gpc_addr = 0x73fd8000,
++};
++
++static const struct imx5_pm_data imx53_pm_data __initconst = {
++	.cortex_addr = 0x63fa0000,
++	.gpc_addr = 0x53fd8000,
++};
++
+ static void __iomem *ccm_base;
++static void __iomem *cortex_base;
++static void __iomem *gpc_base;
+ 
+ void __init imx5_pm_set_ccm_base(void __iomem *base)
+ {
+@@ -74,13 +84,16 @@ static void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
+ 	int stop_mode = 0;
+ 
+ 	/* always allow platform to issue a deep sleep mode request */
+-	plat_lpc = __raw_readl(MXC_CORTEXA8_PLAT_LPC) &
++	plat_lpc = __raw_readl(cortex_base + MXC_CORTEXA8_PLAT_LPC) &
+ 	    ~(MXC_CORTEXA8_PLAT_LPC_DSM);
+ 	ccm_clpcr = __raw_readl(ccm_base + MXC_CCM_CLPCR) &
+ 		    ~(MXC_CCM_CLPCR_LPM_MASK);
+-	arm_srpgcr = __raw_readl(MXC_SRPG_ARM_SRPGCR) & ~(MXC_SRPGCR_PCR);
+-	empgc0 = __raw_readl(MXC_SRPG_EMPGC0_SRPGCR) & ~(MXC_SRPGCR_PCR);
+-	empgc1 = __raw_readl(MXC_SRPG_EMPGC1_SRPGCR) & ~(MXC_SRPGCR_PCR);
++	arm_srpgcr = __raw_readl(gpc_base + MXC_SRPG_ARM_SRPGCR) &
++		     ~(MXC_SRPGCR_PCR);
++	empgc0 = __raw_readl(gpc_base + MXC_SRPG_EMPGC0_SRPGCR) &
++		 ~(MXC_SRPGCR_PCR);
++	empgc1 = __raw_readl(gpc_base + MXC_SRPG_EMPGC1_SRPGCR) &
++		 ~(MXC_SRPGCR_PCR);
+ 
+ 	switch (mode) {
+ 	case WAIT_CLOCKED:
+@@ -114,17 +127,17 @@ static void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
+ 		return;
+ 	}
+ 
+-	__raw_writel(plat_lpc, MXC_CORTEXA8_PLAT_LPC);
++	__raw_writel(plat_lpc, cortex_base + MXC_CORTEXA8_PLAT_LPC);
+ 	__raw_writel(ccm_clpcr, ccm_base + MXC_CCM_CLPCR);
+-	__raw_writel(arm_srpgcr, MXC_SRPG_ARM_SRPGCR);
+-	__raw_writel(arm_srpgcr, MXC_SRPG_NEON_SRPGCR);
++	__raw_writel(arm_srpgcr, gpc_base + MXC_SRPG_ARM_SRPGCR);
++	__raw_writel(arm_srpgcr, gpc_base + MXC_SRPG_NEON_SRPGCR);
+ 
+ 	if (stop_mode) {
+ 		empgc0 |= MXC_SRPGCR_PCR;
+ 		empgc1 |= MXC_SRPGCR_PCR;
+ 
+-		__raw_writel(empgc0, MXC_SRPG_EMPGC0_SRPGCR);
+-		__raw_writel(empgc1, MXC_SRPG_EMPGC1_SRPGCR);
++		__raw_writel(empgc0, gpc_base + MXC_SRPG_EMPGC0_SRPGCR);
++		__raw_writel(empgc1, gpc_base + MXC_SRPG_EMPGC1_SRPGCR);
+ 	}
+ }
+ 
+@@ -146,8 +159,8 @@ static int mx5_suspend_enter(suspend_state_t state)
+ 		flush_cache_all();
+ 
+ 		/*clear the EMPGC0/1 bits */
+-		__raw_writel(0, MXC_SRPG_EMPGC0_SRPGCR);
+-		__raw_writel(0, MXC_SRPG_EMPGC1_SRPGCR);
++		__raw_writel(0, gpc_base + MXC_SRPG_EMPGC0_SRPGCR);
++		__raw_writel(0, gpc_base + MXC_SRPG_EMPGC1_SRPGCR);
+ 	}
+ 	cpu_do_idle();
+ 
+@@ -181,7 +194,7 @@ static void imx5_pm_idle(void)
+ 	imx5_cpu_do_idle();
+ }
+ 
+-static int __init imx5_pm_common_init(void)
++static int __init imx5_pm_common_init(const struct imx5_pm_data *data)
+ {
+ 	int ret;
+ 	struct clk *gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
+@@ -195,17 +208,28 @@ static int __init imx5_pm_common_init(void)
+ 
+ 	arm_pm_idle = imx5_pm_idle;
+ 
+-	WARN_ON(!ccm_base);
++	cortex_base = ioremap(data->cortex_addr, SZ_16K);
++	gpc_base = ioremap(data->gpc_addr, SZ_16K);
++	WARN_ON(!ccm_base || !cortex_base || !gpc_base);
+ 
+ 	/* Set the registers to the default cpu idle state. */
+ 	mx5_cpu_lp_set(IMX5_DEFAULT_CPU_IDLE_STATE);
+ 
+-	return imx5_cpuidle_init();
++	ret = imx5_cpuidle_init();
++	if (ret)
++		pr_warn("%s: cpuidle init failed %d\n", __func__, ret);
++
++	suspend_set_ops(&mx5_suspend_ops);
++
++	return 0;
++}
++
++void __init imx51_pm_init(void)
++{
++	imx5_pm_common_init(&imx51_pm_data);
+ }
+ 
+-void __init imx5_pm_init(void)
++void __init imx53_pm_init(void)
+ {
+-	int ret = imx5_pm_common_init();
+-	if (!ret)
+-		suspend_set_ops(&mx5_suspend_ops);
++	imx5_pm_common_init(&imx53_pm_data);
+ }
 -- 
 1.8.3.2
