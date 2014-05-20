@@ -1,85 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 20 May 2014 16:51:02 +0200
-Subject: [PATCH] pinctrl: sunxi: Fix recursive dependency
-In-Reply-To: <4631163.YRjUDyHifq@wuerfel>
-References: <1400343715-27884-1-git-send-email-maxime.ripard@free-electrons.com>
- <4667053.sVVFqnz4qh@wuerfel> <20140519142913.GK29466@lukather>
- <4631163.YRjUDyHifq@wuerfel>
-Message-ID: <20140520145102.GJ27329@lukather>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 20 May 2014 16:01:19 +0100
+Subject: [PATCH 1/7] mfd: twl4030-power: Fix hang on reboot if sleep
+ configuration was loaded earlier
+In-Reply-To: <1400031250-29542-2-git-send-email-tony@atomide.com>
+References: <1400031250-29542-1-git-send-email-tony@atomide.com>
+ <1400031250-29542-2-git-send-email-tony@atomide.com>
+Message-ID: <20140520150119.GW24991@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 04:46:03PM +0200, Arnd Bergmann wrote:
-> On Monday 19 May 2014 16:29:13 Maxime Ripard wrote:
-> > Hi
-> > 
-> > On Mon, May 19, 2014 at 01:30:54PM +0200, Arnd Bergmann wrote:
-> > > On Saturday 17 May 2014 18:21:55 Maxime Ripard wrote:
-> > > > Fix the following configuration error:
-> > > > drivers/pinctrl/sunxi/Kconfig:3:error: recursive dependency detected!
-> > > > drivers/pinctrl/sunxi/Kconfig:3:        symbol PINCTRL_SUNXI is selected by PINCTRL_SUN4I_A10
-> > > > drivers/pinctrl/sunxi/Kconfig:9:        symbol PINCTRL_SUN4I_A10 default value contains PINCTRL_SUNXI
-> > > > 
-> > > > Drop the select on PINCTRL_SUNXI, and make PINCTRL_SUNXI enabled by default instead.
-> > > > 
-> > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > 
-> > > I stubled over the same thing already, but came to a different conclusion.
-> > > 
-> > > >  drivers/pinctrl/sunxi/Kconfig | 8 +-------
-> > > >  1 file changed, 1 insertion(+), 7 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
-> > > > index 2007327e0c48..8411857d2a45 100644
-> > > > --- a/drivers/pinctrl/sunxi/Kconfig
-> > > > +++ b/drivers/pinctrl/sunxi/Kconfig
-> > > > @@ -1,32 +1,26 @@
-> > > >  if ARCH_SUNXI
-> > > >  
-> > > >  config PINCTRL_SUNXI
-> > > > -       bool
-> > > > +       def_bool ARCH_SUNXI
-> > > >         select PINMUX
-> > > >         select GENERIC_PINCONF
-> > > >  
-> > > >  config PINCTRL_SUN4I_A10
-> > > >         def_bool PINCTRL_SUNXI || MACH_SUN4I
-> > > > -       select PINCTRL_SUNXI
-> > > >  
-> > > 
-> > > This means you won't be able to stop selecting all drivers dropping
-> > > the 'select PINCTRL_SUNXI' later. How about this one?
-> > 
-> > I'm not sure what you mean here.
-> > 
-> > We won't have to select PINCTRL_SUNXI anymore with this patch either,
-> > since it's already enabled whenever ARCH_SUNXI is enabled.
-> > 
-> > And the drivers won't have to be selected either, because they will
-> > either default to PINCTRL_SUNXI, or to the MACH_SUN*I definition.
-> > 
-> > As I was saying in the commit log, this is just a temporary solution,
-> > and eventually, and the select PINCTRL_SUNXI should be removed
-> > eventually.
+On Tue, 13 May 2014, Tony Lindgren wrote:
+
+> Looks like we can still hit the issue of wrong load order of
+> twl4030 configuration. If we have a sleep configuration loaded,
+> and do a warm reset, the device can hang while initializing the
+> wakeup12 sequence. We do have a warning message about wrong order
+> of twl4030 configuration, but in this case it does not help as
+> the sleep configuration was loaded during the previous boot and
+> the state of twl4030 is maintained throughout the warm reset.
 > 
-> The difference is that in your patch, PINCTRL_SUNXI defaults to 'y'
-> if ARCH_SUNXI is set, so you have to remove both the 'select' and
-> the 'def_bool' and then put back the 'select PINCTRL_SUNXI' for the
-> individual drivers. I guess it's not a big difference, you just end up
-> doing one patch extra.
+> Fix the issue by clearing any existing sleep configuration
+> before we load the warm reset configuration.
+> 
+> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  drivers/mfd/twl4030-power.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
 
-Ah, yes. I guess we can take your patch then.
+Can't vouch for the semantics of the patch, but the code looks good.
 
-Maxime
+  Acked-by: Lee Jones <lee.jones@linaro.org>
+
+Can I just apply this, or would you like Peter to review it first?
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/03ff14d9/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
