@@ -1,38 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 20 May 2014 23:08:02 +0100
-Subject: [PATCH v4 12/17] ASoC: fsl-ssi: set bitclock in master mode from
- hw_params
-In-Reply-To: <1398682498-24357-13-git-send-email-mpa@pengutronix.de>
-References: <1398682498-24357-1-git-send-email-mpa@pengutronix.de>
- <1398682498-24357-13-git-send-email-mpa@pengutronix.de>
-Message-ID: <20140520220802.GC12304@sirena.org.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 20 May 2014 15:08:45 -0700
+Subject: [PATCH] mmc: dw_mmc: Make sure we don't get stuck when we get an
+ error
+In-Reply-To: <003a01cf73cd$fa2ee160$ee8ca420$%jun@samsung.com>
+References: <1395901126-6141-1-git-send-email-yuvaraj.cd@samsung.com>
+ <CAKuRcOL_JVjOfLNspb14kRxcAXjpEwX4WkvmM+izryZbZBE4XA@mail.gmail.com>
+ <CAPz6YkVwT0PrcLP1MJy0vVRw811+_7PwsV_ggKxQkqrjOWeWWw@mail.gmail.com>
+ <002001cf6c59$b5b5e680$2121b380$%jun@samsung.com>
+ <CAD=FV=X=9cTvST5cM=H9H23SMD28cHSExXt3YR=v2AQ6dFJY5w@mail.gmail.com>
+ <001b01cf6e67$2183b400$648b1c00$%jun@samsung.com>
+ <003a01cf73cd$fa2ee160$ee8ca420$%jun@samsung.com>
+Message-ID: <CAD=FV=Vtpup1DaAnN1cO4R5CgxMKa0aosw53sj1eKcUPJsEoYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 12:54:53PM +0200, Markus Pargmann wrote:
-> From: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> The fsl_ssi driver uses the .set_sysclk callback to configure the
-> bitclock for master mode. This is unnecessary since the bitclock
-> is known in hw_params. This patch removes the .set_sysclk callback
-> and configures the bitclock from .hw_params.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
+Seungwon,
 
-This isn't signed off either.  Are we positive that none of the users
-set the bitclock to something non-default - there are devices out there
-which require an unusual bitclock (eg, where it's also used as the
-master clock and so needs overclocking)?
+On Mon, May 19, 2014 at 6:51 PM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+>> > >> >> +                       } else {
+>> > >> >> +                               /*
+>> > >> >> +                                * If we don't have a command complete now we'll
+>> > >> >> +                                * never get one since we just reset everything;
+>> > >> >> +                                * better end the request.
+>> > >> >> +                                *
+>> > >> >> +                                * If we do have a command complete we'll fall
+>> > >> >> +                                * through to the SENDING_STOP command and
+>> > >> >> +                                * everything will be peachy keen.
+>> > >> >> +                                *
+>> > >> >> +                                * TODO: I guess we shouldn't send a stop?
+>
+> Please remove TODO:
 
-Providing a default as this does is a definite win, but allowing it to
-be overridden may be needed sometimes (rarely fortunately).  Leaving a
-stub set_sysclk() that just sets a variable and then using that value
-instead of calculating in hw_params() would get the best of both worlds.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/36dbe8fb/attachment.sig>
+OK
+
+> We already reset controller in dw_mci_data_complete() through "mmc: dw_mmc: change to use recommended reset procedure"?
+> I guess it depends on that patch.
+> Then, we don't need to stop sequence anymore.
+
+Even without that patch we've still pretty much stopped everything in
+dw_mci_fifo_reset(), so I'm not sure there's any strong dependency.
+...but in our tree this did land after the patch you mention, so you
+could wait until it lands if you want.
+
+
+NOTE: We found that on some machines we were getting warnings after
+enabling tuning and using this patch.  The warnings were benign, but
+we should probably squash the fix into this patch.  See
+<https://chromium-review.googlesource.com/#/c/200652/> for details.
+
+-Doug
