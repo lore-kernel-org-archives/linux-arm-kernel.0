@@ -1,53 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 May 2014 10:44:30 +0200
-Subject: [PATCH v7 0/3] Add support for PCI in AArch64
-In-Reply-To: <CA+sq2Ce+8YB+02B7zhxTXwropZXv9spy-w=AJ8YXCP69kr-_1A@mail.gmail.com>
-References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
- <4292818.mI6kZGgTzd@wuerfel>
- <CA+sq2Ce+8YB+02B7zhxTXwropZXv9spy-w=AJ8YXCP69kr-_1A@mail.gmail.com>
-Message-ID: <5759329.P75jKFdv3B@wuerfel>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 20 May 2014 16:45:20 +0800
+Subject: [PATCH 02/20] ARM: imx5: move SOC_IMX5 and SOC_IMX51 into 'Device
+ tree only'
+In-Reply-To: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
+References: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1400575538-21136-3-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 May 2014 09:52:33 Sunil Kovvuri wrote:
-> >> In sriov_enable() (drivers/pci/iov.c)
-> >>
-> >>  296        for (i = 0; i < PCI_SRIOV_NUM_BARS; i++) {
-> >>  297                 bars |= (1 << (i + PCI_IOV_RESOURCES));
-> >>  298                 res = dev->resource + PCI_IOV_RESOURCES + i;
-> >>  299                 if (res->parent)
-> >>  300                         nres++;
-> >>  301         }
-> >>  302         if (nres != iov->nres) {
-> >>  303                 dev_err(&dev->dev, "not enough MMIO resources for
-> >>  SR-IOV\n");
-> >>  304                 return -ENOMEM;
-> >>  305         }
-> >>
-> >> Here its checking if physical function's IOV resource has a parent or not.
-> >> Which is pci-pci bridge in this case. Otherwise it doesn't consider
-> >> that resource.
-> >>
-> >> Added below api to your patch.
-> >> This will try to claim a resource while creating a PCI device which
-> >> inturn sets 'res->parent'.
-> >
-> > This looks like the wrong approach. The PCI host controller should
-> > really have been registered with the root 'iomem_resource' during
-> > the probe of the host controller.
-> >
-> I didn't get this, if a SR-IOV device is connected to a PCI-PCI bridge
-> and inturn bridge connected to root port. Then the parent bus is not root,
-> but the bridge.  The issue is either hierarchy should not be checked for
-> SR-IOV resources or someone should set the hierarchy (i.e parent resources).
+After moving SOC_IMX51 support over to device tree, all i.MX5 support
+becomes device tree only now.  So options SOC_IMX5 and SOC_IMX51 can
+just be under 'Device tree only'.
 
-Ah, I misunderstood the problem, I thought the PCI core was complaining
-about lack of space in the resources, not about a lack of BARs.
+While at it, 'select ARCH_MXC_IOMUX_V3' is dropped, since it's only
+needed by non-DT build before.
 
-It seems there is code like yours in a couple of architectures, but they
-only claim the resources of bridges, not the actual devices as you
-seem to be doing. Can you check if the x86 version of
-pcibios_allocate_bus_resources() does the trick for you? Maybe we can
-turn that into a generic helper.
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/mach-imx/Kconfig | 25 ++++++++++++-------------
+ 1 file changed, 12 insertions(+), 13 deletions(-)
 
-	Arnd
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index a6ee115..c6a5e37 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -122,19 +122,6 @@ config SOC_IMX35
+ 	select PINCTRL_IMX35
+ 	select SMP_ON_UP if SMP
+ 
+-config SOC_IMX5
+-	bool
+-	select ARCH_HAS_CPUFREQ
+-	select ARCH_HAS_OPP
+-	select ARCH_MXC_IOMUX_V3
+-	select HAVE_IMX_SRC
+-	select MXC_TZIC
+-
+-config	SOC_IMX51
+-	bool
+-	select PINCTRL_IMX51
+-	select SOC_IMX5
+-
+ if ARCH_MULTI_V4T
+ 
+ comment "MX1 platforms:"
+@@ -704,6 +691,18 @@ if ARCH_MULTI_V7
+ 
+ comment "Device tree only"
+ 
++config SOC_IMX5
++	bool
++	select ARCH_HAS_CPUFREQ
++	select ARCH_HAS_OPP
++	select HAVE_IMX_SRC
++	select MXC_TZIC
++
++config	SOC_IMX51
++	bool
++	select PINCTRL_IMX51
++	select SOC_IMX5
++
+ config	SOC_IMX50
+ 	bool "i.MX50 support"
+ 	select PINCTRL_IMX50
+-- 
+1.8.3.2
