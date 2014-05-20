@@ -1,59 +1,66 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Tue, 20 May 2014 16:40:58 +0200
-Subject: [PATCH v4 1/7] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <20140520140652.GB21579@kwain>
-References: <1400576675-25265-1-git-send-email-antoine.tenart@free-electrons.com>
- <1400576675-25265-2-git-send-email-antoine.tenart@free-electrons.com>
- <1821771.zFvTDGF2Ae@amdc1032> <20140520140652.GB21579@kwain>
-Message-ID: <20140520144058.GE21579@kwain>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 20 May 2014 16:43:28 +0200
+Subject: [PATCH] ARM: mvebu: fix definitions of PCIe interfaces on Armada 38x
+Message-ID: <1400597008-4148-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 04:06:52PM +0200, Antoine T?nart wrote:
-> Hi,
-> 
-> On Tue, May 20, 2014 at 02:34:20PM +0200, Bartlomiej Zolnierkiewicz wrote:
-> > On Tuesday, May 20, 2014 11:04:29 AM Antoine T?nart wrote:
-> > > +
-> > > +static struct phy_berlin_desc desc[] = {
-> > > +	{ .val = POWER_DOWN_PHY0 },
-> > > +	{ .val = POWER_DOWN_PHY1 },
-> > 
-> > Only .val entry of struct phy_berlin_desc is initialized and needed,
-> > it seems that u32 vals[] should be used instead of desc[].
-> 
-> Sure.
-> 
-> > > +
-> > > +static int phy_berlin_sata_probe(struct platform_device *pdev)
-> > > +{
-> > > +	struct device *dev = &pdev->dev;
-> > > +	struct phy *phy;
-> > > +	struct phy_provider *phy_provider;
-> > > +	struct phy_berlin_priv *priv;
-> > > +	struct resource *res;
-> > > +	int i;
-> > > +
-> > > +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> > > +	if (!priv)
-> > > +		return -ENOMEM;
-> > > +
-> > > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+Due a copy/paste error, the 'reg' values for the third PCIe interface
+on Armada 380, and the third and fourth PCIe interfaces on Armada 385
+are wrong: they are equal to the one of the second PCIe interface.
 
-We also need to check res isn't NULL here.
+This patch fixes this by using the appropriate 'reg' values for those
+PCIe interfaces.
 
-> > > +	priv->base = devm_ioremap(dev, res->start, resource_size(res));
-> > > +	if (IS_ERR(priv->base))
-> > > +		return PTR_ERR(priv->base);
-> > 
-> > devm_ioremap() (contrary to devm_ioremap_resource()) returns a valid
-> > pointer or NULL so return value checking should be fixed.
-> 
-> I'll fix this.
+Without this fix, the third and fourth PCIe interfaces are unusable on
+those platforms.
 
-Antoine
+Reported-by: Nadav Haklai <nadavh@marvell.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Fixes: 0d3d96ab0059 ("ARM: mvebu: add Device Tree description of the Armada 380/385 SoCs")
+---
+This is based on mvebu/dt. It should be pushed to 3.15-rc.
 
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-380.dtsi | 2 +-
+ arch/arm/boot/dts/armada-385.dtsi | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/armada-380.dtsi b/arch/arm/boot/dts/armada-380.dtsi
+index aa71718..e69bc67 100644
+--- a/arch/arm/boot/dts/armada-380.dtsi
++++ b/arch/arm/boot/dts/armada-380.dtsi
+@@ -101,7 +101,7 @@
+ 			pcie at 3,0 {
+ 				device_type = "pci";
+ 				assigned-addresses = <0x82000800 0 0x44000 0 0x2000>;
+-				reg = <0x1000 0 0 0 0>;
++				reg = <0x1800 0 0 0 0>;
+ 				#address-cells = <3>;
+ 				#size-cells = <2>;
+ 				#interrupt-cells = <1>;
+diff --git a/arch/arm/boot/dts/armada-385.dtsi b/arch/arm/boot/dts/armada-385.dtsi
+index 2c7990d..f011009 100644
+--- a/arch/arm/boot/dts/armada-385.dtsi
++++ b/arch/arm/boot/dts/armada-385.dtsi
+@@ -112,7 +112,7 @@
+ 			pcie at 3,0 {
+ 				device_type = "pci";
+ 				assigned-addresses = <0x82000800 0 0x44000 0 0x2000>;
+-				reg = <0x1000 0 0 0 0>;
++				reg = <0x1800 0 0 0 0>;
+ 				#address-cells = <3>;
+ 				#size-cells = <2>;
+ 				#interrupt-cells = <1>;
+@@ -133,7 +133,7 @@
+ 			pcie at 4,0 {
+ 				device_type = "pci";
+ 				assigned-addresses = <0x82000800 0 0x48000 0 0x2000>;
+-				reg = <0x1000 0 0 0 0>;
++				reg = <0x2000 0 0 0 0>;
+ 				#address-cells = <3>;
+ 				#size-cells = <2>;
+ 				#interrupt-cells = <1>;
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.9.3
