@@ -1,60 +1,90 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 19 May 2014 21:32:44 -0700
-Subject: [GIT PULL] at91: cleanup for 3.16 #1
-In-Reply-To: <20140520042525.GA18956@quad.lixom.net>
-References: <1399484042-27432-1-git-send-email-nicolas.ferre@atmel.com>
- <536A6FD7.40402@atmel.com> <20140516232635.GB6423@quad.lixom.net>
- <20140517042216.GI29318@piout.net>
- <20140520042525.GA18956@quad.lixom.net>
-Message-ID: <CAOesGMjLqurfyGPuF_nhtg+MY+_NGLs_A318JQ=zBQJ1cM0NYA@mail.gmail.com>
+From: ritesh.harjani@gmail.com (ritesh.harjani at gmail.com)
+Date: Tue, 20 May 2014 10:02:59 +0530
+Subject: [PATCH v2] arm: dma-iommu: Clean up redundant variable
+Message-ID: <1400560379-1502-1-git-send-email-ritesh.harjani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Really adding Mark]
+From: Ritesh Harjani <ritesh.harjani@gmail.com>
 
-On Mon, May 19, 2014 at 9:25 PM, Olof Johansson <olof@lixom.net> wrote:
-> [adding Mark]
->
-> On Sat, May 17, 2014 at 06:22:16AM +0200, Alexandre Belloni wrote:
->> On 16/05/2014 at 16:26:35 -0700, Olof Johansson wrote :
->> > On Wed, May 07, 2014 at 07:39:35PM +0200, Nicolas Ferre wrote:
->> > > There is a little conflict with at91-3.16-dt that you already pulled in
->> > > arm-soc: here is the branch that resolves it:
->> > >
->> > > https://github.com/at91linux/linux-at91/commits/at91-3.16-resolved
->> >
->> > That resolution looks odd. Why is one clock under clocks { } and two of them
->> > are at the top level? Shouldn't they all be under the clocks subnode?
->> >
->> > I've merged in now with your resolution, but I think this needs revisiting.
->> >
->>
->> Actually, all the clocks should end up at the root, please refer to:
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/240219.html
->>
->> I feel that was one of the topics we should have discussed at ELC but we
->> ended up talking about DT ABI stability instead...
->
-> I'm looking more for consistency than anything else. Having a few in the
-> root and the few in a subnode certainly indicates that something's wrong.
->
-> It's a good thing that we have several DT maintainers to spread the load,
-> but it's also harder to learn the preferences of the maintainer(s) since
-> there seems to be variety (some care more about some things than others).
->
-> I'm not saying that Mark is wrong, but it's quite possible that someone
-> else would disagree or not care enough to point it out. The current
-> practice of having clocks under a subnode is prevalent almost everywhere
-> in the tree, and this is a mostly new direction set by Mark. It makes
-> it very hard to figure out what's the best way to do things when there's
-> less consistency.
->
-> Clearly, having clocks grouped in a subnode is common practice already, and
-> makes some sense from a readability point of view.
->
-> Anyway, I'll leave the rest for some DT maintainer to sort out. Please
-> follow up with patches to switch over to one or the other model no matter
-> what, please.
->
->
-> -Olof
+mapping->size can be derived from mapping->bits << PAGE_SHIFT
+which makes mapping->size as redundant.
+
+Clean this up.
+
+Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
+Reported-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/dma-iommu.h |  1 -
+ arch/arm/mm/dma-mapping.c        | 11 ++++++-----
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
+index eec0a12..8e3fcb9 100644
+--- a/arch/arm/include/asm/dma-iommu.h
++++ b/arch/arm/include/asm/dma-iommu.h
+@@ -18,7 +18,6 @@ struct dma_iommu_mapping {
+ 	unsigned int		extensions;
+ 	size_t			bitmap_size;	/* size of a single bitmap */
+ 	size_t			bits;		/* per bitmap */
+-	unsigned int		size;		/* per bitmap */
+ 	dma_addr_t		base;
+ 
+ 	spinlock_t		lock;
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 6b00be1..3d43c41 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1074,6 +1074,7 @@ static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
+ 	unsigned int order = get_order(size);
+ 	unsigned int align = 0;
+ 	unsigned int count, start;
++	size_t mapping_size = mapping->bits << PAGE_SHIFT;
+ 	unsigned long flags;
+ 	dma_addr_t iova;
+ 	int i;
+@@ -1119,7 +1120,7 @@ static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
+ 	}
+ 	spin_unlock_irqrestore(&mapping->lock, flags);
+ 
+-	iova = mapping->base + (mapping->size * i);
++	iova = mapping->base + (mapping_size * i);
+ 	iova += start << PAGE_SHIFT;
+ 
+ 	return iova;
+@@ -1129,6 +1130,7 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
+ 			       dma_addr_t addr, size_t size)
+ {
+ 	unsigned int start, count;
++	size_t mapping_size = mapping->bits << PAGE_SHIFT;
+ 	unsigned long flags;
+ 	dma_addr_t bitmap_base;
+ 	u32 bitmap_index;
+@@ -1136,14 +1138,14 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
+ 	if (!size)
+ 		return;
+ 
+-	bitmap_index = (u32) (addr - mapping->base) / (u32) mapping->size;
++	bitmap_index = (u32) (addr - mapping->base) / (u32) mapping_size;
+ 	BUG_ON(addr < mapping->base || bitmap_index > mapping->extensions);
+ 
+-	bitmap_base = mapping->base + mapping->size * bitmap_index;
++	bitmap_base = mapping->base + mapping_size * bitmap_index;
+ 
+ 	start = (addr - bitmap_base) >>	PAGE_SHIFT;
+ 
+-	if (addr + size > bitmap_base + mapping->size) {
++	if (addr + size > bitmap_base + mapping_size) {
+ 		/*
+ 		 * The address range to be freed reaches into the iova
+ 		 * range of the next bitmap. This should not happen as
+@@ -1964,7 +1966,6 @@ arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
+ 	mapping->extensions = extensions;
+ 	mapping->base = base;
+ 	mapping->bits = BITS_PER_BYTE * bitmap_size;
+-	mapping->size = mapping->bits << PAGE_SHIFT;
+ 
+ 	spin_lock_init(&mapping->lock);
+ 
+-- 
+1.8.1.3
