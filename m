@@ -1,69 +1,101 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 20 May 2014 15:01:45 +0200
-Subject: [GIT PULL] Renesas SoC Clock Cleanups for v3.1
-In-Reply-To: <20140520053839.GM18956@quad.lixom.net>
-References: <cover.1399967755.git.horms+renesas@verge.net.au>
- <20140520053839.GM18956@quad.lixom.net>
-Message-ID: <537B5239.8090005@linaro.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 20 May 2014 15:06:37 +0200
+Subject: [PATCH v2] arm: dma-iommu: Clean up redundant variable
+In-Reply-To: <1400560379-1502-1-git-send-email-ritesh.harjani@gmail.com>
+References: <1400560379-1502-1-git-send-email-ritesh.harjani@gmail.com>
+Message-ID: <537B535D.1090303@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/20/2014 07:38 AM, Olof Johansson wrote:
-> On Tue, May 13, 2014 at 05:03:41PM +0900, Simon Horman wrote:
->> Hi Olof, Hi Kevin, Hi Arnd,
->>
->> Please consider these Renesas SoC Clock Cleanups for v3.16.
->>
->> This pull request is based a merge of the following to provide dependencies
->> and avoid conflicts.
->>
->> * Renesas ARM Based SoC Board Updates for v3.16,
->>    tagged as renesas-boards-for-v3.16, which you have already pulled.
->>
->> * Renesas ARM Based SoC Clock Updates for v3.16,
->>    tagged as renesas-clock-for-v3.16, which you have already pulled.
->>
->> * The cmt-mtu2-tmu-cleanups-for-v3.16 branch of
->>    Daniel Lezcano's tree.
->>
->>    git://git.linaro.org/people/daniel.lezcano/linux.git clockevents/cmt-mtu2-tmu-cleanups
+Hello,
+
+On 2014-05-20 06:32, ritesh.harjani at gmail.com wrote:
+> From: Ritesh Harjani <ritesh.harjani@gmail.com>
 >
-> Daniel, I don't think we were part of a three-way handshake on this. Is
-> this branch 100% guaranteed to be stable between now and when Linus will
-> merge it, i.e. it will never be rebased? If so, we can pull in a copy
-> of it. If not, well, that'll get difficult.
+> mapping->size can be derived from mapping->bits << PAGE_SHIFT
+> which makes mapping->size as redundant.
+>
+> Clean this up.
+>
+> Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
+> Reported-by: Will Deacon <will.deacon@arm.com>
 
-Hi Olof,
+Thanks for this cleanup. I will add it to my tree.
 
-actually, it is a common branch between Simon and I.
+> ---
+>   arch/arm/include/asm/dma-iommu.h |  1 -
+>   arch/arm/mm/dma-mapping.c        | 11 ++++++-----
+>   2 files changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
+> index eec0a12..8e3fcb9 100644
+> --- a/arch/arm/include/asm/dma-iommu.h
+> +++ b/arch/arm/include/asm/dma-iommu.h
+> @@ -18,7 +18,6 @@ struct dma_iommu_mapping {
+>   	unsigned int		extensions;
+>   	size_t			bitmap_size;	/* size of a single bitmap */
+>   	size_t			bits;		/* per bitmap */
+> -	unsigned int		size;		/* per bitmap */
+>   	dma_addr_t		base;
+>   
+>   	spinlock_t		lock;
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 6b00be1..3d43c41 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1074,6 +1074,7 @@ static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
+>   	unsigned int order = get_order(size);
+>   	unsigned int align = 0;
+>   	unsigned int count, start;
+> +	size_t mapping_size = mapping->bits << PAGE_SHIFT;
+>   	unsigned long flags;
+>   	dma_addr_t iova;
+>   	int i;
+> @@ -1119,7 +1120,7 @@ static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
+>   	}
+>   	spin_unlock_irqrestore(&mapping->lock, flags);
+>   
+> -	iova = mapping->base + (mapping->size * i);
+> +	iova = mapping->base + (mapping_size * i);
+>   	iova += start << PAGE_SHIFT;
+>   
+>   	return iova;
+> @@ -1129,6 +1130,7 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
+>   			       dma_addr_t addr, size_t size)
+>   {
+>   	unsigned int start, count;
+> +	size_t mapping_size = mapping->bits << PAGE_SHIFT;
+>   	unsigned long flags;
+>   	dma_addr_t bitmap_base;
+>   	u32 bitmap_index;
+> @@ -1136,14 +1138,14 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
+>   	if (!size)
+>   		return;
+>   
+> -	bitmap_index = (u32) (addr - mapping->base) / (u32) mapping->size;
+> +	bitmap_index = (u32) (addr - mapping->base) / (u32) mapping_size;
+>   	BUG_ON(addr < mapping->base || bitmap_index > mapping->extensions);
+>   
+> -	bitmap_base = mapping->base + mapping->size * bitmap_index;
+> +	bitmap_base = mapping->base + mapping_size * bitmap_index;
+>   
+>   	start = (addr - bitmap_base) >>	PAGE_SHIFT;
+>   
+> -	if (addr + size > bitmap_base + mapping->size) {
+> +	if (addr + size > bitmap_base + mapping_size) {
+>   		/*
+>   		 * The address range to be freed reaches into the iova
+>   		 * range of the next bitmap. This should not happen as
+> @@ -1964,7 +1966,6 @@ arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
+>   	mapping->extensions = extensions;
+>   	mapping->base = base;
+>   	mapping->bits = BITS_PER_BYTE * bitmap_size;
+> -	mapping->size = mapping->bits << PAGE_SHIFT;
+>   
+>   	spin_lock_init(&mapping->lock);
+>   
 
-The branch clockevents/cmt-mtu2-tmu-cleanups contains Laurent's changes 
-which was pulled into Simon's branch as described above.
-
-This branch has been merged into my clockevents/3.16 branch which will 
-be pulled by Thomas into tip/timers/core.
-
-Nobody else should pull from clockevents/cmt-mtu2-tmu-cleanups IIUC.
-
-In any case, clockevents/cmt-mtu2-tmu-cleanups won't be changed until 
-they are pulled.
-
-It is the second time I use this procedure, I could have missed 
-something but I believe I applied it carefully.
-
-Let me know if you think something is wrong.
-
-Cc'ed Thomas.
-
-Thanks
-
-   -- Daniel
-
-
-
+Best regards
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
