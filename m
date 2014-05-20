@@ -1,58 +1,69 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Tue, 20 May 2014 16:06:52 +0200
-Subject: [PATCH v4 1/7] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <1821771.zFvTDGF2Ae@amdc1032>
-References: <1400576675-25265-1-git-send-email-antoine.tenart@free-electrons.com>
- <1400576675-25265-2-git-send-email-antoine.tenart@free-electrons.com>
- <1821771.zFvTDGF2Ae@amdc1032>
-Message-ID: <20140520140652.GB21579@kwain>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 20 May 2014 16:08:28 +0200
+Subject: [PATCH] clk: exynos4: Register custom fixed rate clocks conditionally
+Message-ID: <1400594908-11941-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Use the Exynos custom fixed rate clocks registration (for oscillators
+connected to the XXTI or XUSBXTI pins) only if "fixed-rate-clocks"
+node is found in device tree. This allows to handle new dtbs with those
+clocks described in a generic way and having the "fixed-rate-clocks"
+node removed.
 
-On Tue, May 20, 2014 at 02:34:20PM +0200, Bartlomiej Zolnierkiewicz wrote:
-> On Tuesday, May 20, 2014 11:04:29 AM Antoine T?nart wrote:
-> > +
-> > +static struct phy_berlin_desc desc[] = {
-> > +	{ .val = POWER_DOWN_PHY0 },
-> > +	{ .val = POWER_DOWN_PHY1 },
-> 
-> Only .val entry of struct phy_berlin_desc is initialized and needed,
-> it seems that u32 vals[] should be used instead of desc[].
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos4.c |   24 +++++++++++++++++-------
+ 1 file changed, 17 insertions(+), 7 deletions(-)
 
-Sure.
-
-> > +
-> > +static int phy_berlin_sata_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	struct phy *phy;
-> > +	struct phy_provider *phy_provider;
-> > +	struct phy_berlin_priv *priv;
-> > +	struct resource *res;
-> > +	int i;
-> > +
-> > +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> > +	if (!priv)
-> > +		return -ENOMEM;
-> > +
-> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	priv->base = devm_ioremap(dev, res->start, resource_size(res));
-> > +	if (IS_ERR(priv->base))
-> > +		return PTR_ERR(priv->base);
-> 
-> devm_ioremap() (contrary to devm_ioremap_resource()) returns a valid
-> pointer or NULL so return value checking should be fixed.
-
-I'll fix this.
-
-
-Thanks for the review!
-
-Antoine
-
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index 05fc93c..f0b8420 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -1045,7 +1045,7 @@ static unsigned long exynos4_get_xom(void)
+ 	return xom;
+ }
+ 
+-static void __init exynos4_clk_register_finpll(void)
++static void __init exynos4_clk_register_finpll(struct device_node *np)
+ {
+ 	struct samsung_fixed_rate_clock fclk;
+ 	struct clk *clk;
+@@ -1054,7 +1054,10 @@ static void __init exynos4_clk_register_finpll(void)
+ 	unsigned int xom = exynos4_get_xom();
+ 
+ 	parent_name = xom & 1 ? "xusbxti" : "xxti";
+-	clk = clk_get(NULL, parent_name);
++	if (np)
++		clk = of_clk_get_by_name(np, parent_name);
++	else
++		clk = clk_get(NULL, parent_name);
+ 	if (IS_ERR(clk)) {
+ 		pr_err("%s: failed to lookup parent clock %s, assuming "
+ 			"fin_pll clock frequency is 24MHz\n", __func__,
+@@ -1193,11 +1196,18 @@ static void __init exynos4_clk_init(struct device_node *np,
+ 
+ 	samsung_clk_init(np, reg_base, CLK_NR_CLKS);
+ 
+-	samsung_clk_of_register_fixed_ext(exynos4_fixed_rate_ext_clks,
+-			ARRAY_SIZE(exynos4_fixed_rate_ext_clks),
+-			ext_clk_match);
+-
+-	exynos4_clk_register_finpll();
++	if (of_find_node_by_name(np, "fixed-rate-clocks")) {
++		/*
++		 * Exynos custom fixed clock registration, only for
++		 * compatibility with legacy dtbs.
++		 */
++		samsung_clk_of_register_fixed_ext(exynos4_fixed_rate_ext_clks,
++					ARRAY_SIZE(exynos4_fixed_rate_ext_clks),
++					ext_clk_match);
++		exynos4_clk_register_finpll(NULL);
++	} else {
++		exynos4_clk_register_finpll(np);
++	}
+ 
+ 	if (exynos4_soc == EXYNOS4210) {
+ 		samsung_clk_register_mux(exynos4210_mux_early,
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.9.5
