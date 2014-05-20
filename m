@@ -1,36 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 May 2014 07:39:32 -0700
-Subject: [PATCH] ARM: dts: duovero-parlor: Add HDMI output
-In-Reply-To: <1400595946-1294-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1400595946-1294-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <20140520143932.GA27830@atomide.com>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Tue, 20 May 2014 16:40:03 +0200
+Subject: [PATCH v4 1/7] phy: add a driver for the Berlin SATA PHY
+In-Reply-To: <20140520140631.GF9873@lunn.ch>
+References: <1400576675-25265-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1400576675-25265-2-git-send-email-antoine.tenart@free-electrons.com>
+ <1821771.zFvTDGF2Ae@amdc1032> <20140520134942.GC9873@lunn.ch>
+ <20140520140325.GA21579@kwain> <20140520140631.GF9873@lunn.ch>
+Message-ID: <20140520144003.GD21579@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Florian Vaussard <florian.vaussard@epfl.ch> [140520 07:26]:
-> @@ -77,6 +94,15 @@
->  			0x30 (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_a24.gpio_48: amdix enabled */
->  		>;
->  	};
-> +
-> +	dss_hdmi_pins: pinmux_dss_hdmi_pins {
-> +		pinctrl-single,pins = <
-> +			0x58 (PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_hpd.hdmi_hpd */
-> +			0x5a (PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_cec.hdmi_cec */
-> +			0x5c (PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_ddc_scl.hdmi_ddc_scl */
-> +			0x5e (PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_ddc_sda.hdmi_ddc_sda */
-> +		>;
-> +	};
->  };
->  
->  &i2c2 {
+On Tue, May 20, 2014 at 04:06:31PM +0200, Andrew Lunn wrote:
+> > > > > +config PHY_BERLIN_SATA
+> > > > > +	bool
+> > > > 
+> > > > Is there any real reason why this cannot be tristate?
+> > > 
+> > > What we have seen with SATA drivers and phys, is there is link time
+> > > breakage if the SATA driver is built in and the phy is modular.
+> > > 
+> > > Maybe this has been fixed now? 
+> > 
+> > Using tristate shouldn't be a problem. I compiled without the PHY
+> > driver, no link issue.
+> 
+> The problem i think was when the PHY core and driver was a module and
+> SATA built in. Please give that configuration a go.
 
-This seems to apply with fuzz against omap-for-v3.16/dt-v2, but
-should be updated against omap-for-v3.16/dt-v2 to use OMAP4_IOPAD
-as omap4-duovero-parlor.dts is now using it. That makes checking
-the muxing easier against the TRM. See commit 5efa994b0d49 for
-the script Joachim used.
+I tested, it went fine.
 
-Regards,
+This was actually fixed by:
+b51fbf9fb0c3 phy-core: Don't allow building phy-core as a module
 
-Tony
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
