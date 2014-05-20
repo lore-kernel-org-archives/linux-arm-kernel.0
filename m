@@ -1,227 +1,78 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 20 May 2014 01:23:40 +0100
-Subject: [PATCH 1/2] arm64: topology: Tell the scheduler about the relative
- power of cores
-Message-ID: <1400545421-28067-1-git-send-email-broonie@kernel.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 20 May 2014 09:29:36 +0900
+Subject: [PATCH v3] cpufreq: exynos:  Fix the compile error
+In-Reply-To: <1655043.7FHqnunz6p@vostro.rjw.lan>
+References: <000001cf70f0$2e48f930$8adaeb90$@samsung.com>
+ <037e01cf70f5$25b374d0$711a5e70$@samsung.com>
+ <2553916.Pl2B0tVZGR@vostro.rjw.lan> <1655043.7FHqnunz6p@vostro.rjw.lan>
+Message-ID: <013c01cf73c2$94289150$bc79b3f0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+Rafael J. Wysocki wrote:
+> 
+> On Saturday, May 17, 2014 01:04:29 AM Rafael J. Wysocki wrote:
+> > On Friday, May 16, 2014 07:54:01 PM Kukjin Kim wrote:
+> > > Jonghwan Choi wrote:
+> > > >
+> > > > Commit 7da83a80 ("ARM: EXYNOS: Migrate Exynos specific macros from
+> plat to
+> > > > mach") which lands in samsung tree causes build breakage
+> > > > for cpufreq-exynos like following:
+> > > >
+> > > > drivers/cpufreq/exynos-cpufreq.c: In function 'exynos_cpufreq_probe':
+> > > > drivers/cpufreq/exynos-cpufreq.c:166:2: error: implicit declaration
+> of
+> > > > function 'soc_is_exynos4210'
+> > > > [-Werror=implicit-function-declaration]
+> > > > drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration
+> of
+> > > > function 'soc_is_exynos4212'
+> > > > [-Werror=implicit-function-declaration]
+> > > > drivers/cpufreq/exynos-cpufreq.c:168:2: error: implicit declaration
+> of
+> > > > function 'soc_is_exynos4412'
+> > > > [-Werror=implicit-function-declaration]
+> > > > drivers/cpufreq/exynos-cpufreq.c:170:2: error: implicit declaration
+> of
+> > > > function 'soc_is_exynos5250'
+> > > > [-Werror=implicit-function-declaration]
+> > > > cc1: some warnings being treated as errors
+> > > > make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
+> > > > make[2]: *** Waiting for unfinished jobs....
+> > > > drivers/cpufreq/exynos4x12-cpufreq.c: In function
+> 'exynos4x12_set_clkdiv':
+> > > > drivers/cpufreq/exynos4x12-cpufreq.c:118:2: error: implicit
+> declaration of
+> > > > function 'soc_is_exynos4212'
+> > > > [-Werror=implicit-function-declaration]
+> > > > cc1: some warnings being treated as errors
+> > > > make[2]: *** [drivers/cpufreq/exynos4x12-cpufreq.o] Error 1
+> > > > make[1]: *** [drivers/cpufreq] Error 2
+> > > > This fixes above error with getting SoC information via
+> > > > of_machine_is_compatible() instead of soc_is_exynosXXXX().
+> > > >
+> > >
+> > > Probably,
+> > > Suggested-by: Tomasz Figa ?
+> > >
+> > > > Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+> > >
+> > > Looks better.
+> > >
+> > > Rafael, if you have no objection on this, shall I pick this into
+> samsung
+> > > tree for 3.16 because of the current build breakage with enabling
+> exynos
+> > > cpufreq?
+> >
+> > Please go ahead.
+> 
+> Actually, this conflicts with one patch already in my tree.  The
+> resoultion
+> is quite obvious, but it would be better to avoid this conflict altogether.
+> 
+Yeah. If you don't mind, shall I pick the patch (commit e5eaa445b0dc)into samsung tree with your ack?
 
-In heterogeneous systems like big.LITTLE systems the scheduler will be
-able to make better use of the available cores if we provide power numbers
-to it indicating their relative performance. Do this by parsing the CPU
-nodes in the DT.
-
-This code currently has no effect as no information on the relative
-performance of the cores is provided.
-
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- arch/arm64/kernel/topology.c | 153 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 153 insertions(+)
-
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 4c3b2511a6a1..08ce694e5078 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -19,11 +19,35 @@
- #include <linux/nodemask.h>
- #include <linux/of.h>
- #include <linux/sched.h>
-+#include <linux/slab.h>
- 
- #include <asm/cputype.h>
- #include <asm/smp_plat.h>
- #include <asm/topology.h>
- 
-+/*
-+ * cpu power table
-+ * This per cpu data structure describes the relative capacity of each core.
-+ * On a heteregenous system, cores don't have the same computation capacity
-+ * and we reflect that difference in the cpu_power field so the scheduler can
-+ * take this difference into account during load balance. A per cpu structure
-+ * is preferred because each CPU updates its own cpu_power field during the
-+ * load balance except for idle cores. One idle core is selected to run the
-+ * rebalance_domains for all idle cores and the cpu_power can be updated
-+ * during this sequence.
-+ */
-+static DEFINE_PER_CPU(unsigned long, cpu_scale);
-+
-+unsigned long arch_scale_freq_power(struct sched_domain *sd, int cpu)
-+{
-+	return per_cpu(cpu_scale, cpu);
-+}
-+
-+static void set_power_scale(unsigned int cpu, unsigned long power)
-+{
-+	per_cpu(cpu_scale, cpu) = power;
-+}
-+
- static int __init get_cpu_for_node(struct device_node *node)
- {
- 	struct device_node *cpu_node;
-@@ -162,6 +186,38 @@ static int __init parse_cluster(struct device_node *cluster, int depth)
- 	return 0;
- }
- 
-+struct cpu_efficiency {
-+	const char *compatible;
-+	unsigned long efficiency;
-+};
-+
-+/*
-+ * Table of relative efficiency of each processors
-+ * The efficiency value must fit in 20bit and the final
-+ * cpu_scale value must be in the range
-+ *   0 < cpu_scale < 3*SCHED_POWER_SCALE/2
-+ * in order to return@most 1 when DIV_ROUND_CLOSEST
-+ * is used to compute the capacity of a CPU.
-+ * Processors that are not defined in the table,
-+ * use the default SCHED_POWER_SCALE value for cpu_scale.
-+ */
-+static const struct cpu_efficiency table_efficiency[] = {
-+	{ NULL, },
-+};
-+
-+static unsigned long *__cpu_capacity;
-+#define cpu_capacity(cpu)	__cpu_capacity[cpu]
-+
-+static unsigned long middle_capacity = 1;
-+
-+/*
-+ * Iterate all CPUs' descriptor in DT and compute the efficiency
-+ * (as per table_efficiency). Also calculate a middle efficiency
-+ * as close as possible to  (max{eff_i} - min{eff_i}) / 2
-+ * This is later used to scale the cpu_power field such that an
-+ * 'average' CPU is of middle power. Also see the comments near
-+ * table_efficiency[] and update_cpu_power().
-+ */
- static int __init parse_dt_topology(void)
- {
- 	struct device_node *cn, *map;
-@@ -205,6 +261,91 @@ out:
- 	return ret;
- }
- 
-+static void __init parse_dt_cpu_power(void)
-+{
-+	const struct cpu_efficiency *cpu_eff;
-+	struct device_node *cn;
-+	unsigned long min_capacity = ULONG_MAX;
-+	unsigned long max_capacity = 0;
-+	unsigned long capacity = 0;
-+	int cpu;
-+
-+	__cpu_capacity = kcalloc(nr_cpu_ids, sizeof(*__cpu_capacity),
-+				 GFP_NOWAIT);
-+
-+	for_each_possible_cpu(cpu) {
-+		const u32 *rate;
-+		int len;
-+
-+		/* Too early to use cpu->of_node */
-+		cn = of_get_cpu_node(cpu, NULL);
-+		if (!cn) {
-+			pr_err("Missing device node for CPU %d\n", cpu);
-+			continue;
-+		}
-+
-+		for (cpu_eff = table_efficiency; cpu_eff->compatible; cpu_eff++)
-+			if (of_device_is_compatible(cn, cpu_eff->compatible))
-+				break;
-+
-+		if (cpu_eff->compatible == NULL) {
-+			pr_warn("%s: Unknown CPU type\n", cn->full_name);
-+			continue;
-+		}
-+
-+		rate = of_get_property(cn, "clock-frequency", &len);
-+		if (!rate || len != 4) {
-+			pr_err("%s: Missing clock-frequency property\n",
-+				cn->full_name);
-+			continue;
-+		}
-+
-+		capacity = ((be32_to_cpup(rate)) >> 20) * cpu_eff->efficiency;
-+
-+		/* Save min capacity of the system */
-+		if (capacity < min_capacity)
-+			min_capacity = capacity;
-+
-+		/* Save max capacity of the system */
-+		if (capacity > max_capacity)
-+			max_capacity = capacity;
-+
-+		cpu_capacity(cpu) = capacity;
-+	}
-+
-+	/* If min and max capacities are equal we bypass the update of the
-+	 * cpu_scale because all CPUs have the same capacity. Otherwise, we
-+	 * compute a middle_capacity factor that will ensure that the capacity
-+	 * of an 'average' CPU of the system will be as close as possible to
-+	 * SCHED_POWER_SCALE, which is the default value, but with the
-+	 * constraint explained near table_efficiency[].
-+	 */
-+	if (min_capacity == max_capacity)
-+		return;
-+	else if (4 * max_capacity < (3 * (max_capacity + min_capacity)))
-+		middle_capacity = (min_capacity + max_capacity)
-+				>> (SCHED_POWER_SHIFT+1);
-+	else
-+		middle_capacity = ((max_capacity / 3)
-+				>> (SCHED_POWER_SHIFT-1)) + 1;
-+}
-+
-+/*
-+ * Look for a customed capacity of a CPU in the cpu_topo_data table during the
-+ * boot. The update of all CPUs is in O(n^2) for heteregeneous system but the
-+ * function returns directly for SMP system.
-+ */
-+static void update_cpu_power(unsigned int cpu)
-+{
-+	if (!cpu_capacity(cpu))
-+		return;
-+
-+	set_power_scale(cpu, cpu_capacity(cpu) / middle_capacity);
-+
-+	pr_info("CPU%u: update cpu_power %lu\n",
-+		cpu, arch_scale_freq_power(NULL, cpu));
-+}
-+
- /*
-  * cpu topology table
-  */
-@@ -288,6 +429,7 @@ void store_cpu_topology(unsigned int cpuid)
- 
- topology_populated:
- 	update_siblings_masks(cpuid);
-+	update_cpu_power(cpuid);
- }
- 
- static void __init reset_cpu_topology(void)
-@@ -308,6 +450,14 @@ static void __init reset_cpu_topology(void)
- 	}
- }
- 
-+static void __init reset_cpu_power(void)
-+{
-+	unsigned int cpu;
-+
-+	for_each_possible_cpu(cpu)
-+		set_power_scale(cpu, SCHED_POWER_SCALE);
-+}
-+
- void __init init_cpu_topology(void)
- {
- 	reset_cpu_topology();
-@@ -318,4 +468,7 @@ void __init init_cpu_topology(void)
- 	 */
- 	if (parse_dt_topology())
- 		reset_cpu_topology();
-+
-+	reset_cpu_power();
-+	parse_dt_cpu_power();
- }
--- 
-2.0.0.rc2
+Thanks,
+Kukjin
