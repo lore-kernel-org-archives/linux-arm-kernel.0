@@ -1,189 +1,116 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Tue, 20 May 2014 10:51:11 +0900
-Subject: [PATCH] mmc: dw_mmc: Make sure we don't get stuck when we get an
- error
-In-Reply-To: <001b01cf6e67$2183b400$648b1c00$%jun@samsung.com>
-References: <1395901126-6141-1-git-send-email-yuvaraj.cd@samsung.com>
- <CAKuRcOL_JVjOfLNspb14kRxcAXjpEwX4WkvmM+izryZbZBE4XA@mail.gmail.com>
- <CAPz6YkVwT0PrcLP1MJy0vVRw811+_7PwsV_ggKxQkqrjOWeWWw@mail.gmail.com>
- <002001cf6c59$b5b5e680$2121b380$%jun@samsung.com>
- <CAD=FV=X=9cTvST5cM=H9H23SMD28cHSExXt3YR=v2AQ6dFJY5w@mail.gmail.com>
- <001b01cf6e67$2183b400$648b1c00$%jun@samsung.com>
-Message-ID: <003a01cf73cd$fa2ee160$ee8ca420$%jun@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 May 2014 18:55:20 -0700
+Subject: [GIT PULL 4/4] omap dt changes for v3.16 merge window, part 2
+In-Reply-To: <20140520013125.GH15793@atomide.com>
+References: <20140520013125.GH15793@atomide.com>
+Message-ID: <20140520015519.GI15793@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014, Seungwon Jeon wrote:
-> Hi Doug,
+* Tony Lindgren <tony@atomide.com> [140519 18:32]:
+> The following changes since commit 3fdb77174a2c173e0e69f2499b836a0e412f6c4d:
 > 
-> On Tue, May 13, 2014, Doug Anderson wrote:
-> > Seungwon,
-> >
-> > On Sat, May 10, 2014 at 7:11 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
-> > > On Fri, May 09, 2014, Sonny Rao wrote:
-> > >> On Thu, May 8, 2014 at 2:42 AM, Yuvaraj Kumar <yuvaraj.cd@gmail.com> wrote:
-> > >> > Any comments on this patch?
-> > >> >
-> > >>
-> > >> I'll just add that without this fix, running the tuning loop for UHS
-> > >> modes is not reliable on dw_mmc because errors will happen and you
-> > >> will eventually hit this race and hang.  This can happen any time
-> > >> there is tuning like during boot or during resume from suspend.
-> > >>
-> > >> > On Thu, Mar 27, 2014 at 11:48 AM, Yuvaraj Kumar C D
-> > >> > <yuvaraj.cd@gmail.com> wrote:
-> > >> >> From: Doug Anderson <dianders@chromium.org>
-> > >> >>
-> > >> >> If we happened to get a data error at just the wrong time the dw_mmc
-> > >> >> driver could get into a state where it would never complete its
-> > >> >> request.  That would leave the caller just hanging there.
-> > >> >>
-> > >> >> We fix this two ways and both of the two fixes on their own appear to
-> > >> >> fix the problems we've seen:
-> > >> >>
-> > >> >> 1. Fix a race in the tasklet where the interrupt setting the data
-> > >> >>    error happens _just after_ we check for it, then we get a
-> > >> >>    EVENT_XFER_COMPLETE.  We fix this by repeating a bit of code.
-> > > I think repeating is not good approach to fix race.
-> > > In your case, XFER_COMPLETE preceded data error and DTO didn't come?
-> > > It seems strange case.
-> > > I want to know actual error value if you can reproduce.
-> >
-> > XFER_COMPLETE didn't necessarily precede data error.  Imagine this scenario:
-> >
-> > 1. Check for data error: nope
-> > 2. Interrupt happens and we get a data error and immediately xfer complete
-> > 3. Check for xfer complete: yup
-> >
-> > That's the state that we are handling.
-> >
-> > The system that dw_mmc uses where the interrupt handler has no locking
-> > makes it incredibly difficult to get things right.  Can you propose an
-> > alternate fix that would avoid the race?
-> Thank you for detailed scenario.
-> You're right.
-> Have you consider using spin_lock() in interrupt handler?
-> Then, we'll need to change spin_lock() to spin_lock_irqsave() in tasklet func.
-> And other locks in driver may need to be adjusted properly.
+>   ARM: dts: omap3-n900: use MATRIX_KEY for keymap (2014-05-06 10:22:51 -0700)
 > 
-> To return above scenario:
-> 1. Check for data error: nope
-> 2. Check for xfer complete: nope -> escape tasklet.
-> 3. Interrupt happens and we get a data error and immediately xfer complete
-> 4. Check for data error (Again in tasklet) : yup
+> are available in the git repository at:
 > 
-> How about this change?
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/dt-part2-v2
 > 
-> Thanks,
-> Seungwon Jeon
-> >
-> >
-> > >> >> 2. Fix it so that if we detect that we've got an error in the "data
-> > >> >>    busy" state and we're not going to do anything else we end the
-> > >> >>    request and unblock anyone waiting.
-> > >> >>
-> > >> >> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> > >> >> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@gmail.com>
-> > >> >> ---
-> > >> >>  drivers/mmc/host/dw_mmc.c |   47 +++++++++++++++++++++++++++++++++++++++++++++
-> > >> >>  1 file changed, 47 insertions(+)
-> > >> >>
-> > >> >> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> > >> >> index 1d77431..4c589f1 100644
-> > >> >> --- a/drivers/mmc/host/dw_mmc.c
-> > >> >> +++ b/drivers/mmc/host/dw_mmc.c
-> > >> >> @@ -1300,6 +1300,14 @@ static void dw_mci_tasklet_func(unsigned long priv)
-> > >> >>                         /* fall through */
-> > >> >>
-> > >> >>                 case STATE_SENDING_DATA:
-> > >> >> +                       /*
-> > >> >> +                        * We could get a data error and never a transfer
-> > >> >> +                        * complete so we'd better check for it here.
-> > >> >> +                        *
-> > >> >> +                        * Note that we don't really care if we also got a
-> > >> >> +                        * transfer complete; stopping the DMA and sending an
-> > >> >> +                        * abort won't hurt.
-> > >> >> +                        */
-> > >> >>                         if (test_and_clear_bit(EVENT_DATA_ERROR,
-> > >> >>                                                &host->pending_events)) {
-> > >> >>                                 dw_mci_stop_dma(host);
-> > >> >> @@ -1313,7 +1321,29 @@ static void dw_mci_tasklet_func(unsigned long priv)
-> > >> >>                                 break;
-> > >> >>
-> > >> >>                         set_bit(EVENT_XFER_COMPLETE, &host->completed_events);
-> > >> >> +
-> > >> >> +                       /*
-> > >> >> +                        * Handle an EVENT_DATA_ERROR that might have shown up
-> > >> >> +                        * before the transfer completed.  This might not have
-> > >> >> +                        * been caught by the check above because the interrupt
-> > >> >> +                        * could have gone off between the previous check and
-> > >> >> +                        * the check for transfer complete.
-> > >> >> +                        *
-> > >> >> +                        * Technically this ought not be needed assuming we
-> > >> >> +                        * get a DATA_COMPLETE eventually (we'll notice the
-> > >> >> +                        * error and end the request), but it shouldn't hurt.
-> > >> >> +                        *
-> > >> >> +                        * This has the advantage of sending the stop command.
-> > >> >> +                        */
-> > >> >> +                       if (test_and_clear_bit(EVENT_DATA_ERROR,
-> > >> >> +                                              &host->pending_events)) {
-> > >> >> +                               dw_mci_stop_dma(host);
-> > >> >> +                               send_stop_abort(host, data);
-> > >> >> +                               state = STATE_DATA_ERROR;
-> > >> >> +                               break;
-> > >> >> +                       }
-> > >> >>                         prev_state = state = STATE_DATA_BUSY;
-> > >> >> +
-> > >> >>                         /* fall through */
-> > >> >>
-> > >> >>                 case STATE_DATA_BUSY:
-> > >> >> @@ -1336,6 +1366,23 @@ static void dw_mci_tasklet_func(unsigned long priv)
-> > >> >>                                 /* stop command for open-ended transfer*/
-> > >> >>                                 if (data->stop)
-> > >> >>                                         send_stop_abort(host, data);
-> > >> >> +                       } else {
-> > >> >> +                               /*
-> > >> >> +                                * If we don't have a command complete now we'll
-> > >> >> +                                * never get one since we just reset everything;
-> > >> >> +                                * better end the request.
-> > >> >> +                                *
-> > >> >> +                                * If we do have a command complete we'll fall
-> > >> >> +                                * through to the SENDING_STOP command and
-> > >> >> +                                * everything will be peachy keen.
-> > >> >> +                                *
-> > >> >> +                                * TODO: I guess we shouldn't send a stop?
+> for you to fetch changes up to d712ff63b18309c939396f593510fbcccbafb9e4:
+> 
+>   ARM: dts: Enable mcpdm and mcbsp1 on DuoVero (2014-05-19 17:20:31 -0700)
+> 
+> ----------------------------------------------------------------
+> Device tree related changes for omaps.
 
-Please remove TODO:
-We already reset controller in dw_mci_data_complete() through "mmc: dw_mmc: change to use recommended reset procedure"?
-I guess it depends on that patch.
-Then, we don't need to stop sequence anymore.
+Looks like my first set on the 8th of May never made it to the
+lists, I've ben having a bit hard time sending stuff with my
+scripts since I updated them a while back. Anyways, pulling this
+will also pull in the earlier set.
 
-Thanks,
-Seungwon Jeon
+Regards,
 
-> > >> >> +                                */
-> > >> >> +                               if (!test_bit(EVENT_CMD_COMPLETE,
-> > >> >> +                                             &host->pending_events)) {
-> > >> >> +                                       dw_mci_request_end(host, mrq);
-> > >> >> +                                       goto unlock;
-> > >> >> +                               }
-> > > Can you explain what happens above?
-> > > What is it for?
-> >
-> > This was an alternate fix for the above, but appears to actually hit
-> > in practice too.
-> >
-> > Said another way: if we don't add the extra checking for
-> > EVENT_DATA_ERROR (above) we'll end up here.  ...and if we ever get
-> > into this "else" and don't do _something_ then we'll wedge forever.
-> >
-> > -Doug
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Tony
+ 
+> ----------------------------------------------------------------
+> Balaji T K (2):
+>       ARM: dts: omap5: add sata node
+>       ARM: dts: dra7: add OCP2SCP3 and SATA nodes
 > 
+> Joachim Eastwood (7):
+>       ARM: dts: Change IOPAD macro's for OMAP4/5
+>       ARM: dts: Add support for OMAP4 Variscite OM44 family
+>       ARM: dts: Add support for OMAP4 VAR-DVK-OM44
+>       ARM: dts: Add VAR-SOM-OM44 WLAN nodes
+>       ARM: OMAP2+: Use pdata quirks for wl12xx on VAR-STK/DVK-OM44
+>       ARM: dts: Convert DuoVero Parlor to use IOPAD macro
+>       ARM: dts: Enable mcpdm and mcbsp1 on DuoVero
+> 
+> Johan Hovold (1):
+>       ARM: dts: AM33XX: fix ethernet and mdio default state
+> 
+> Minal Shah (1):
+>       ARM: dts: dra7: add support for parallel NAND flash
+> 
+> Mugunthan V N (2):
+>       ARM: dts: am4372: Add cpsw phy sel dt node
+>       ARM: dts: am437x-gp-evm: Add ethernet support for GP EVM
+> 
+> Pekon Gupta (1):
+>       ARM: dts: am43xx: fix starting offset of NAND.filesystem MTD partition
+> 
+> Roger Quadros (4):
+>       ARM: dts: omap4+: Add clocks to USB2 PHY node
+>       ARM: dts: dra7-clock: Add "l3init_960m_gfclk" clock gate
+>       ARM: dts: dra7: Add USB related nodes
+>       dts: dra7-evm: add USB support
+> 
+> Sourav Poddar (2):
+>       ARM: omap2+: skip device build from platform code for dt
+>       ARM: dts: am4372: Add hdq device tree data
+> 
+> Wolfram Sang (1):
+>       ARM: dts: am335x-evm: fix comments for lcd pins
+> 
+>  .../devicetree/bindings/arm/omap/omap.txt          |   6 +
+>  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+>  arch/arm/boot/dts/Makefile                         |   3 +-
+>  arch/arm/boot/dts/am335x-bone-common.dtsi          |   3 +-
+>  arch/arm/boot/dts/am335x-evm.dts                   |  58 ++--
+>  arch/arm/boot/dts/am335x-evmsk.dts                 |   2 +
+>  arch/arm/boot/dts/am335x-igep0033.dtsi             |   8 +
+>  arch/arm/boot/dts/am335x-nano.dts                  |   5 +
+>  arch/arm/boot/dts/am33xx.dtsi                      |   2 +
+>  arch/arm/boot/dts/am4372.dtsi                      |  16 +
+>  arch/arm/boot/dts/am437x-gp-evm.dts                |  72 +++++
+>  arch/arm/boot/dts/am43x-epos-evm.dts               |  14 +-
+>  arch/arm/boot/dts/dra7-evm.dts                     | 142 +++++++++
+>  arch/arm/boot/dts/dra7.dtsi                        | 208 +++++++++++++
+>  arch/arm/boot/dts/dra7xx-clocks.dtsi               |  12 +-
+>  arch/arm/boot/dts/omap4-duovero-parlor.dts         |  18 +-
+>  arch/arm/boot/dts/omap4-duovero.dtsi               |  98 +++---
+>  arch/arm/boot/dts/omap4-var-dvk-om44.dts           |  71 +++++
+>  arch/arm/boot/dts/omap4-var-om44customboard.dtsi   | 235 ++++++++++++++
+>  arch/arm/boot/dts/omap4-var-som-om44-wlan.dtsi     |  68 ++++
+>  arch/arm/boot/dts/omap4-var-som-om44.dtsi          | 343 +++++++++++++++++++++
+>  arch/arm/boot/dts/omap4-var-som.dts                |  96 ------
+>  arch/arm/boot/dts/omap4-var-stk-om44.dts           |  17 +
+>  arch/arm/boot/dts/omap4.dtsi                       |   2 +
+>  arch/arm/boot/dts/omap5-cm-t54.dts                 |  66 ++--
+>  arch/arm/boot/dts/omap5-sbc-t54.dts                |   8 +-
+>  arch/arm/boot/dts/omap5.dtsi                       |  42 +++
+>  arch/arm/mach-omap2/hdq1w.c                        |   2 +
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  10 -
+>  arch/arm/mach-omap2/pdata-quirks.c                 |   7 +
+>  include/dt-bindings/pinctrl/omap.h                 |  13 +-
+>  31 files changed, 1415 insertions(+), 233 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/omap4-var-dvk-om44.dts
+>  create mode 100644 arch/arm/boot/dts/omap4-var-om44customboard.dtsi
+>  create mode 100644 arch/arm/boot/dts/omap4-var-som-om44-wlan.dtsi
+>  create mode 100644 arch/arm/boot/dts/omap4-var-som-om44.dtsi
+>  delete mode 100644 arch/arm/boot/dts/omap4-var-som.dts
+>  create mode 100644 arch/arm/boot/dts/omap4-var-stk-om44.dts
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
