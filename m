@@ -1,60 +1,52 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 20 May 2014 09:49:17 -0400
-Subject: [Patch v3 0/5] Introduce keystone reset driver
-In-Reply-To: <5272855.vIyLIadgKe@wuerfel>
-References: <1400495155-11136-1-git-send-email-ivan.khoronzhuk@ti.com>
- <5095812.b6DgWAxYzH@wuerfel> <537B5598.8070603@ti.com>
- <5272855.vIyLIadgKe@wuerfel>
-Message-ID: <537B5D5D.8030106@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 20 May 2014 15:52:07 +0200
+Subject: [PATCH v9 10/14] ARM: config: append lpae configuration
+In-Reply-To: <1400591427-21922-11-git-send-email-haojian.zhuang@linaro.org>
+References: <1400591427-21922-1-git-send-email-haojian.zhuang@linaro.org>
+ <1400591427-21922-11-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <537B5E07.6090206@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 May 2014 09:44 AM, Arnd Bergmann wrote:
-> On Tuesday 20 May 2014 16:16:08 Ivan Khoronzhuk wrote:
->> Thank for the reply
->>
->> The reset driver uses two ranges:
->> - RSTYPE, RSTCTRL,RSTCFG, RSISO  (Reset Main PLL Controller)
->> - RESETMUX8-10 registers
->>
->> The content of these register ranges are completely used by the reset 
->> driver.
->> Currently no one on the SoC can access them instead of the reset driver.
->> Also we don't use syscon/regmap at all - so adding this will be some 
->> overhead.
->>
->> As I posted previously:
->> "...configuring Reset multiplexer & PLL. And it tunes not only watchdog 
->> usage..."
->>
->> Yes, it tunes not only watchdog usage and uses part of registers from 
->> PLL controller,
->> but all it works with are connected with reset functionality. These 
->> ranges are used only
->> by reset driver and their purpose is reset functionality.
->>
->> Maybe in the future some soft can use ranges in question for own tasks, 
->> but it should be
->> done via reset driver. So as I see there is no reasons to use regmap for 
->> reset driver.
-> 
-> You should not look at these registers in isolation, they are part of
-> some register area that has other functions as well and that you should
-> at least represent correctly in DT.
->
-> When I see something like
-> 
-> +                       reg = <0x23100e4 0x10>,
-> +                             <0x2620328 0x10>;
-> 
-> I am certain that there are other things between 0x2310000 and 0x23100e3, and
-> probably after 0x23100f4 as well. There must be some data sheet that
-> gives this register range a proper name, so put that into DT rather than
-> making up some arbitrary stuff that happens to match how today's kernel
-> driver needs it.
-> 
-Even though there are no other users, I think you have a valid point about
-DT representing the hardware layout in the correct form.
+Hi Haojian,
 
-Regards,
-Santosh
+On 20/05/2014 15:10, Haojian Zhuang wrote:
+> Append multi_v7_lpae_config. In this default configuration,
+> CONFIG_ARCH_MULTI_V6 is disabled. CONFIG_ARM_LPAE is enabled.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  arch/arm/configs/multi_v7_lpae_defconfig | 351 +++++++++++++++++++++++++++++++
+>  1 file changed, 351 insertions(+)
+>  create mode 100644 arch/arm/configs/multi_v7_lpae_defconfig
+> 
+> diff --git a/arch/arm/configs/multi_v7_lpae_defconfig b/arch/arm/configs/multi_v7_lpae_defconfig
+> new file mode 100644
+> index 0000000..59fcefc
+> --- /dev/null
+> +++ b/arch/arm/configs/multi_v7_lpae_defconfig
+> @@ -0,0 +1,351 @@
+
+[...]
+
+
+> +CONFIG_MACH_ARMADA_370=y
+> +CONFIG_MACH_ARMADA_375=y
+> +CONFIG_MACH_ARMADA_38X=y
+> +CONFIG_MACH_ARMADA_XP=y
+> +CONFIG_MACH_DOVE=y
+
+Among them only ARMADA_XP is LPAE capable
+
+
+Thanks,
+
+Gregory
+
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
