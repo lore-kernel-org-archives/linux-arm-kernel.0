@@ -1,108 +1,99 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 20 May 2014 16:45:18 +0800
-Subject: [PATCH v2 00/20] ARM: imx: clean up i.MX5 support
-Message-ID: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
+Date: Tue, 20 May 2014 16:45:21 +0800
+Subject: [PATCH 03/20] ARM: imx5: drop option MACH_IMX51_DT
+In-Reply-To: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
+References: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1400575538-21136-4-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX51 becomes a DT only platform, so a lot of legacy code which are
-needed only by non-DT boot can be cleaned up now.  At the end of the
-day, all the static mapping and defines are removed except of a couple
-which were not defined in device tree in the first place.
+Since i.MX51 becomes DT only now, we can drop option MACH_IMX51_DT and
+just use SOC_IMX51 instead.  While at it, rename imx51-dt.c to
+mach-imx51.c to align with the name schema of other IMX DT only
+platforms.
 
-Changes since v1:
- - Address review comments from Alexander Shiyan
- - Add more patches for a further cleanup
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig           |  2 +-
+ arch/arm/configs/multi_v7_defconfig            |  2 +-
+ arch/arm/mach-imx/Kconfig                      | 10 +++-------
+ arch/arm/mach-imx/Makefile                     |  2 +-
+ arch/arm/mach-imx/{imx51-dt.c => mach-imx51.c} |  0
+ 5 files changed, 6 insertions(+), 10 deletions(-)
+ rename arch/arm/mach-imx/{imx51-dt.c => mach-imx51.c} (100%)
 
-Shawn Guo (20):
-  ARM: imx: move EHCI platform defines out of platform_data header
-  ARM: imx5: move SOC_IMX5 and SOC_IMX51 into 'Device tree only'
-  ARM: imx5: drop option MACH_IMX51_DT
-  ARM: imx5: remove imx51 non-DT support files
-  ARM: imx5: remove i.MX5 non-DT device registration helpers
-  ARM: imx5: make mx51_clocks_init() a DT call
-  ARM: imx5: drop arguments from mx5_clocks_common_init()
-  ARM: imx5: tzic_init_irq() can directly be .init_irq hook
-  ARM: imx5: remove function imx51_soc_init()
-  ARM: imx5: call mxc_timer_init_dt() on imx51
-  ARM: imx5: retrieve iim base from device tree
-  ARM: imx5: remove header crm-regs-imx5.h
-  ARM: imx5: use dynamic mapping for CCM block
-  ARM: imx5: use dynamic mapping for DPLL block
-  ARM: imx5: reuse clock CCM mapping in pm code
-  ARM: imx5: use dynamic mapping for Cortex and GPC block
-  ARM: imx5: move init hooks into mach-imx5x.c
-  ARM: imx5: remove file mm-imx5.c
-  ARM: imx5: clean function declarations in mx51.h
-  ARM: imx5: remove mx51.h and mx53.h
-
- arch/arm/configs/imx_v6_v7_defconfig               |   2 +-
- arch/arm/configs/multi_v7_defconfig                |   2 +-
- arch/arm/mach-imx/Kconfig                          |  25 +-
- arch/arm/mach-imx/Makefile                         |   4 +-
- arch/arm/mach-imx/clk-imx51-imx53.c                | 144 +++-
- arch/arm/mach-imx/common.h                         |  22 +-
- arch/arm/mach-imx/cpu-imx5.c                       |  25 +-
- arch/arm/mach-imx/crm-regs-imx5.h                  | 600 ---------------
- arch/arm/mach-imx/devices-imx51.h                  |  66 --
- arch/arm/mach-imx/devices/platform-fec.c           |  12 -
- arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c  |   5 -
- arch/arm/mach-imx/devices/platform-imx-i2c.c       |  26 -
- arch/arm/mach-imx/devices/platform-imx-keypad.c    |  10 -
- arch/arm/mach-imx/devices/platform-imx-ssi.c       |  20 -
- arch/arm/mach-imx/devices/platform-imx-uart.c      |  22 -
- arch/arm/mach-imx/devices/platform-imx2-wdt.c      |  18 -
- arch/arm/mach-imx/devices/platform-mxc-ehci.c      |   9 -
- arch/arm/mach-imx/devices/platform-mxc_nand.c      |   5 -
- arch/arm/mach-imx/devices/platform-pata_imx.c      |  10 -
- .../mach-imx/devices/platform-sdhci-esdhc-imx.c    |  24 -
- arch/arm/mach-imx/devices/platform-spi_imx.c       |  27 -
- arch/arm/mach-imx/ehci-imx25.c                     |   1 +
- arch/arm/mach-imx/ehci-imx27.c                     |   1 +
- arch/arm/mach-imx/ehci-imx31.c                     |   1 +
- arch/arm/mach-imx/ehci-imx35.c                     |   1 +
- arch/arm/mach-imx/ehci-imx5.c                      | 171 -----
- arch/arm/mach-imx/ehci.h                           |  43 ++
- arch/arm/mach-imx/hardware.h                       |   2 -
- arch/arm/mach-imx/iomux-mx51.h                     | 827 ---------------------
- arch/arm/mach-imx/mach-armadillo5x0.c              |   1 +
- arch/arm/mach-imx/mach-cpuimx27.c                  |   1 +
- arch/arm/mach-imx/mach-eukrea_cpuimx25.c           |   1 +
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c        |   1 +
- arch/arm/mach-imx/mach-imx50.c                     |   3 +-
- arch/arm/mach-imx/{imx51-dt.c => mach-imx51.c}     |  43 +-
- arch/arm/mach-imx/mach-imx53.c                     |  15 +-
- arch/arm/mach-imx/mach-mx25_3ds.c                  |   1 +
- arch/arm/mach-imx/mach-mx27_3ds.c                  |   1 +
- arch/arm/mach-imx/mach-mx31_3ds.c                  |   1 +
- arch/arm/mach-imx/mach-mx31lilly.c                 |   1 +
- arch/arm/mach-imx/mach-mx31lite.c                  |   1 +
- arch/arm/mach-imx/mach-mx31moboard.c               |   1 +
- arch/arm/mach-imx/mach-mx35_3ds.c                  |   1 +
- arch/arm/mach-imx/mach-pca100.c                    |   1 +
- arch/arm/mach-imx/mach-pcm037.c                    |   1 +
- arch/arm/mach-imx/mach-pcm038.c                    |   1 +
- arch/arm/mach-imx/mach-pcm043.c                    |   1 +
- arch/arm/mach-imx/mach-vpr200.c                    |   1 +
- arch/arm/mach-imx/mm-imx5.c                        | 155 ----
- arch/arm/mach-imx/mx31moboard-devboard.c           |   1 +
- arch/arm/mach-imx/mx31moboard-marxbot.c            |   1 +
- arch/arm/mach-imx/mx31moboard-smartbot.c           |   1 +
- arch/arm/mach-imx/mx51.h                           | 313 --------
- arch/arm/mach-imx/mx53.h                           | 342 ---------
- arch/arm/mach-imx/pm-imx5.c                        |  98 ++-
- arch/arm/mach-imx/tzic.c                           |   9 +-
- include/linux/platform_data/usb-ehci-mxc.h         |  46 --
- 57 files changed, 356 insertions(+), 2812 deletions(-)
- delete mode 100644 arch/arm/mach-imx/crm-regs-imx5.h
- delete mode 100644 arch/arm/mach-imx/devices-imx51.h
- delete mode 100644 arch/arm/mach-imx/ehci-imx5.c
- create mode 100644 arch/arm/mach-imx/ehci.h
- delete mode 100644 arch/arm/mach-imx/iomux-mx51.h
- rename arch/arm/mach-imx/{imx51-dt.c => mach-imx51.c} (54%)
- delete mode 100644 arch/arm/mach-imx/mm-imx5.c
- delete mode 100644 arch/arm/mach-imx/mx51.h
- delete mode 100644 arch/arm/mach-imx/mx53.h
-
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index ef88153..d8ec820 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -31,7 +31,7 @@ CONFIG_MACH_IMX35_DT=y
+ CONFIG_MACH_PCM043=y
+ CONFIG_MACH_MX35_3DS=y
+ CONFIG_MACH_VPR200=y
+-CONFIG_MACH_IMX51_DT=y
++CONFIG_SOC_IMX51=y
+ CONFIG_SOC_IMX50=y
+ CONFIG_SOC_IMX53=y
+ CONFIG_SOC_IMX6Q=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index d4e8a47..a045052 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -25,7 +25,7 @@ CONFIG_ARCH_HIGHBANK=y
+ CONFIG_ARCH_HI3xxx=y
+ CONFIG_ARCH_KEYSTONE=y
+ CONFIG_ARCH_MXC=y
+-CONFIG_MACH_IMX51_DT=y
++CONFIG_SOC_IMX51=y
+ CONFIG_SOC_IMX53=y
+ CONFIG_SOC_IMX6Q=y
+ CONFIG_SOC_IMX6SL=y
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index c6a5e37..3b2a5c5 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -698,11 +698,6 @@ config SOC_IMX5
+ 	select HAVE_IMX_SRC
+ 	select MXC_TZIC
+ 
+-config	SOC_IMX51
+-	bool
+-	select PINCTRL_IMX51
+-	select SOC_IMX5
+-
+ config	SOC_IMX50
+ 	bool "i.MX50 support"
+ 	select PINCTRL_IMX50
+@@ -711,9 +706,10 @@ config	SOC_IMX50
+ 	help
+ 	  This enables support for Freescale i.MX50 processor.
+ 
+-config MACH_IMX51_DT
++config SOC_IMX51
+ 	bool "i.MX51 support"
+-	select SOC_IMX51
++	select PINCTRL_IMX51
++	select SOC_IMX5
+ 	help
+ 	  This enables support for Freescale i.MX51 processor
+ 
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index bbe93bb..9d7b46f 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -109,8 +109,8 @@ obj-$(CONFIG_SOC_IMX6) += suspend-imx6.o
+ endif
+ obj-$(CONFIG_SOC_IMX6) += pm-imx6.o
+ 
+-obj-$(CONFIG_MACH_IMX51_DT) += imx51-dt.o
+ obj-$(CONFIG_SOC_IMX50) += mach-imx50.o
++obj-$(CONFIG_SOC_IMX51) += mach-imx51.o
+ obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
+ 
+ obj-$(CONFIG_SOC_VF610) += clk-vf610.o mach-vf610.o
+diff --git a/arch/arm/mach-imx/imx51-dt.c b/arch/arm/mach-imx/mach-imx51.c
+similarity index 100%
+rename from arch/arm/mach-imx/imx51-dt.c
+rename to arch/arm/mach-imx/mach-imx51.c
 -- 
 1.8.3.2
