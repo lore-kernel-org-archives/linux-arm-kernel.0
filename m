@@ -1,66 +1,77 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 May 2014 16:43:28 +0200
-Subject: [PATCH] ARM: mvebu: fix definitions of PCIe interfaces on Armada 38x
-Message-ID: <1400597008-4148-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue, 20 May 2014 22:37:00 +0800
+Subject: [PATCH v3 1/6] ARM: hisi: store reboot reg in global variable
+In-Reply-To: <1400596625-16830-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1400596625-16830-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1400596625-16830-2-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due a copy/paste error, the 'reg' values for the third PCIe interface
-on Armada 380, and the third and fourth PCIe interfaces on Armada 385
-are wrong: they are equal to the one of the second PCIe interface.
+Avoid to parse DT in restart() function. Parsing these in init_late()
+instead.
 
-This patch fixes this by using the appropriate 'reg' values for those
-PCIe interfaces.
-
-Without this fix, the third and fourth PCIe interfaces are unusable on
-those platforms.
-
-Reported-by: Nadav Haklai <nadavh@marvell.com>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Fixes: 0d3d96ab0059 ("ARM: mvebu: add Device Tree description of the Armada 380/385 SoCs")
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
-This is based on mvebu/dt. It should be pushed to 3.15-rc.
+ arch/arm/mach-hisi/hisilicon.c | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-380.dtsi | 2 +-
- arch/arm/boot/dts/armada-385.dtsi | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/armada-380.dtsi b/arch/arm/boot/dts/armada-380.dtsi
-index aa71718..e69bc67 100644
---- a/arch/arm/boot/dts/armada-380.dtsi
-+++ b/arch/arm/boot/dts/armada-380.dtsi
-@@ -101,7 +101,7 @@
- 			pcie at 3,0 {
- 				device_type = "pci";
- 				assigned-addresses = <0x82000800 0 0x44000 0 0x2000>;
--				reg = <0x1000 0 0 0 0>;
-+				reg = <0x1800 0 0 0 0>;
- 				#address-cells = <3>;
- 				#size-cells = <2>;
- 				#interrupt-cells = <1>;
-diff --git a/arch/arm/boot/dts/armada-385.dtsi b/arch/arm/boot/dts/armada-385.dtsi
-index 2c7990d..f011009 100644
---- a/arch/arm/boot/dts/armada-385.dtsi
-+++ b/arch/arm/boot/dts/armada-385.dtsi
-@@ -112,7 +112,7 @@
- 			pcie at 3,0 {
- 				device_type = "pci";
- 				assigned-addresses = <0x82000800 0 0x44000 0 0x2000>;
--				reg = <0x1000 0 0 0 0>;
-+				reg = <0x1800 0 0 0 0>;
- 				#address-cells = <3>;
- 				#size-cells = <2>;
- 				#interrupt-cells = <1>;
-@@ -133,7 +133,7 @@
- 			pcie at 4,0 {
- 				device_type = "pci";
- 				assigned-addresses = <0x82000800 0 0x48000 0 0x2000>;
--				reg = <0x1000 0 0 0 0>;
-+				reg = <0x2000 0 0 0 0>;
- 				#address-cells = <3>;
- 				#size-cells = <2>;
- 				#interrupt-cells = <1>;
+diff --git a/arch/arm/mach-hisi/hisilicon.c b/arch/arm/mach-hisi/hisilicon.c
+index a9f648f..48c91ae 100644
+--- a/arch/arm/mach-hisi/hisilicon.c
++++ b/arch/arm/mach-hisi/hisilicon.c
+@@ -45,33 +45,38 @@ static struct map_desc hi3620_io_desc[] __initdata = {
+ 	},
+ };
+ 
++static void __iomem *sysctrl_base;
++static u32 reboot_offset;
++
+ static void __init hi3620_map_io(void)
+ {
+ 	debug_ll_io_init();
+ 	iotable_init(hi3620_io_desc, ARRAY_SIZE(hi3620_io_desc));
+ }
+ 
+-static void hi3xxx_restart(enum reboot_mode mode, const char *cmd)
++static void __init hi3xxx_init_late(void)
+ {
+ 	struct device_node *np;
+-	void __iomem *base;
+-	int offset;
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
+ 	if (!np) {
+ 		pr_err("failed to find hisilicon,sysctrl node\n");
+ 		return;
+ 	}
+-	base = of_iomap(np, 0);
+-	if (!base) {
++	sysctrl_base = of_iomap(np, 0);
++	if (!sysctrl_base) {
+ 		pr_err("failed to map address in hisilicon,sysctrl node\n");
+ 		return;
+ 	}
+-	if (of_property_read_u32(np, "reboot-offset", &offset) < 0) {
++	if (of_property_read_u32(np, "reboot-offset", &reboot_offset) < 0) {
+ 		pr_err("failed to find reboot-offset property\n");
+ 		return;
+ 	}
+-	writel_relaxed(0xdeadbeef, base + offset);
++}
++
++static void hi3xxx_restart(enum reboot_mode mode, const char *cmd)
++{
++	writel_relaxed(0xdeadbeef, sysctrl_base + reboot_offset);
+ 
+ 	while (1)
+ 		cpu_do_idle();
+@@ -85,6 +90,7 @@ static const char *hi3xxx_compat[] __initconst = {
+ DT_MACHINE_START(HI3620, "Hisilicon Hi3620 (Flattened Device Tree)")
+ 	.map_io		= hi3620_map_io,
+ 	.dt_compat	= hi3xxx_compat,
++	.init_late	= hi3xxx_init_late,
+ 	.smp		= smp_ops(hi3xxx_smp_ops),
+ 	.restart	= hi3xxx_restart,
+ MACHINE_END
 -- 
-1.9.3
+1.9.1
