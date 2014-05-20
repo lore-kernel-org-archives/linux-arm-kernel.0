@@ -1,48 +1,29 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 20 May 2014 18:37:05 +0100
-Subject: [PATCH 1/7] mfd: twl4030-power: Fix hang on reboot if sleep
- configuration was loaded earlier
-In-Reply-To: <20140520150748.GD27830@atomide.com>
-References: <1400031250-29542-1-git-send-email-tony@atomide.com>
- <1400031250-29542-2-git-send-email-tony@atomide.com>
- <20140520150119.GW24991@lee--X1>
- <20140520150748.GD27830@atomide.com>
-Message-ID: <20140520173705.GA1458@lee--X1>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 20 May 2014 18:37:27 +0100
+Subject: [PATCH 1/2] arm64: topology: Tell the scheduler about the
+ relative power of cores
+In-Reply-To: <1400545421-28067-1-git-send-email-broonie@kernel.org>
+References: <1400545421-28067-1-git-send-email-broonie@kernel.org>
+Message-ID: <20140520173727.GD28293@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > Looks like we can still hit the issue of wrong load order of
-> > > twl4030 configuration. If we have a sleep configuration loaded,
-> > > and do a warm reset, the device can hang while initializing the
-> > > wakeup12 sequence. We do have a warning message about wrong order
-> > > of twl4030 configuration, but in this case it does not help as
-> > > the sleep configuration was loaded during the previous boot and
-> > > the state of twl4030 is maintained throughout the warm reset.
-> > > 
-> > > Fix the issue by clearing any existing sleep configuration
-> > > before we load the warm reset configuration.
-> > > 
-> > > Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > > ---
-> > >  drivers/mfd/twl4030-power.c | 6 ++++++
-> > >  1 file changed, 6 insertions(+)
-> > 
-> > Can't vouch for the semantics of the patch, but the code looks good.
-> > 
-> >   Acked-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > Can I just apply this, or would you like Peter to review it first?
-> 
-> As far as I'm concerned you can go ahead an apply, it's been
-> floating on the list for a while and Peter is probably busy
-> with other things.
+On Tue, May 20, 2014 at 01:23:40AM +0100, Mark Brown wrote:
+> In heterogeneous systems like big.LITTLE systems the scheduler will be
+> able to make better use of the available cores if we provide power numbers
+> to it indicating their relative performance. Do this by parsing the CPU
+> nodes in the DT.
 
-No problem.  Just a couple of things for you to look at in the other
-patches, then we can go ahead and apply for v3.16.
+Last time we discussed these two patches, my understanding was that the
+mainline scheduler doesn't behave any better on big.LITTLE with this
+additional information, unless you also have additional out of tree b.L
+MP patches. Vincent is also cleaning up some of the cpu_power usage in
+the scheduler.
+
+So unless there are clear benefits in providing such information to the
+mainline scheduler, I don't plan to merge them for the time being (I'm
+also not convinced of the numbers in the second patch, they need some
+benchmarking on real hardware).
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Catalin
