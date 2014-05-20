@@ -1,25 +1,41 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 20 May 2014 23:53:08 +0200
-Subject: [PATCH v2 0/9] DT instantiation of sound on T5325
-In-Reply-To: <20140520214718.GT12304@sirena.org.uk>
-References: <1399141819-23924-1-git-send-email-andrew@lunn.ch>
- <20140508173748.GK27377@lunn.ch>
- <20140520214718.GT12304@sirena.org.uk>
-Message-ID: <20140520215308.GD11248@lunn.ch>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 20 May 2014 22:58:54 +0100
+Subject: [alsa-devel] [PATCH] Fix for possible null pointer dereference
+ in dma.c
+In-Reply-To: <537BC744.8020601@metafoo.de>
+References: <1400191076-28279-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+ <5379E284.7030700@gmail.com>
+ <CAFo99gZ3kVGn04we5OtRtbkceYRs6SiHXRyoX1Gb-SknJH=z=w@mail.gmail.com>
+ <537BAA2B.9090906@gmail.com> <537BC744.8020601@metafoo.de>
+Message-ID: <20140520215854.GY12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 10:47:18PM +0100, Mark Brown wrote:
-> On Thu, May 08, 2014 at 07:37:48PM +0200, Andrew Lunn wrote:
-> 
-> > The ARM mvebu maintainer is happy with these patches. Does anybody
-> > have any comments on the sound/soc parts? Mark, will you take the
-> > alc5623 and simple-card patches?
-> 
-> Are there dependencies here?  If not then yes.
+On Tue, May 20, 2014 at 11:21:08PM +0200, Lars-Peter Clausen wrote:
+> On 05/20/2014 09:16 PM, Tomasz Figa wrote:
 
-Hi Mark
+> >Still, I'm not too experienced with ALSA and ASoC, so I might be wrong.
+> >Mark, what do you think about this?
 
-No compile time dependencies.
+> Given that there is a patch[1] which removes the whole file I think we can
+> stop the discussion about this patch here.
 
-   Andrew
+> But for the record, substream will never ever be NULL in this function. prtd
+> might be though if the DMA completion callback races against the closing of
+> the PCM stream.
+
+Yeah, what Lars said - obviously the patch removing the driver is more
+comprehensive!
+
+For the record it's very helpful to be specific about what the problem
+being addressed is in the changelog, if it's not obvious what the bug
+that's being fixed is that'll slow things down.  Please also use subject
+lines appropriate for the subsystem, it will help your patch get
+noticed.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/f0995ade/attachment.sig>
