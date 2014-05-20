@@ -1,26 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 20 May 2014 23:05:03 +0100
-Subject: [PATCH v4 11/17] ASoC: fsl-ssi: Move fsl_ssi_set_dai_sysclk
- above fsl_ssi_hw_params
-In-Reply-To: <1398682498-24357-12-git-send-email-mpa@pengutronix.de>
-References: <1398682498-24357-1-git-send-email-mpa@pengutronix.de>
- <1398682498-24357-12-git-send-email-mpa@pengutronix.de>
-Message-ID: <20140520220503.GB12304@sirena.org.uk>
+From: mporter@linaro.org (Matt Porter)
+Date: Tue, 20 May 2014 17:57:26 -0400
+Subject: [PATCH v2 2/4] mfd: bcm590xx: add support for secondary I2C
+ slave address
+In-Reply-To: <20140520214439.GS12304@sirena.org.uk>
+References: <1398295293-11033-1-git-send-email-mporter@linaro.org>
+ <1398295293-11033-3-git-send-email-mporter@linaro.org>
+ <20140428115627.GY21279@lee--X1> <20140428140910.GB7719@beef>
+ <20140520161131.GB32025@lee--X1>
+ <20140520190055.GQ12304@sirena.org.uk>
+ <20140520202923.GT32082@beef>
+ <20140520214439.GS12304@sirena.org.uk>
+Message-ID: <20140520215726.GU32082@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 12:54:52PM +0200, Markus Pargmann wrote:
-> From: Sascha Hauer <s.hauer@pengutronix.de>
+On Tue, May 20, 2014 at 10:44:39PM +0100, Mark Brown wrote:
+> On Tue, May 20, 2014 at 04:29:23PM -0400, Matt Porter wrote:
 > 
-> fsl_ssi_set_dai_sysclk will be called from fsl_ssi_hw_params in the
-> next patch. Move up to avoid forward declaration and to keep the next patch
-> more readable. No functional change.
+> > Just resent the v2 series.
+> 
+> I looked at that but it seems I already acked the regulator part of the
+> series and nothing else looked immediately relevant?
 
-Applied, thanks.
+The series has cross dependencies (shared header include) and thus needs
+to have both the mfd and regulator portions merged together. You had
+mentioned in the v1 version that you'd like to take it through the
+regulator tree and so Lee's comments earlier were with regard to you
+taking the mfd portions.
+
+-Matt
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
+Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/e06b2d86/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/7981cc23/attachment.sig>
