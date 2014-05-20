@@ -1,167 +1,261 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Tue, 20 May 2014 13:55:11 -0300
-Subject: [PATCH for v3.15] usb: musb: Fix panic upon musb_am335x module
- removal
-In-Reply-To: <1400371473-2053-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-References: <1400371473-2053-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-Message-ID: <20140520165510.GA28859@arch.cereza>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 20 May 2014 17:55:39 +0100
+Subject: [PATCH v2 3/9] arm64: KVM: add trap handlers for AArch64 debug
+ registers
+In-Reply-To: <1400604945-25247-1-git-send-email-marc.zyngier@arm.com>
+References: <1400604945-25247-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1400604945-25247-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 May 09:04 PM, Ezequiel Garcia wrote:
-> At probe time, the musb_am335x driver register its childs by
-> calling of_platform_populate(), which registers all childs in
-> the devicetree hierarchy recursively.
-> 
-> On the other side, the driver's remove() function uses of_device_unregister()
-> to remove each child of musb_am335x's.
-> 
-> However, when musb_dsps is loaded, its devices are attached to the musb_am335x
-> device as musb_am335x childs. Hence, musb_am335x remove() will attempt to
-> unregister the devices registered by musb_dsps, which produces a kernel panic.
-> 
-> In other words, the childs in the "struct device" hierarchy are not the same
-> as the childs in the "devicetree" hierarchy.
-> 
-> Ideally, we should enforce the removal of the devices registered by
-> musb_am335x *only*, instead of all its child devices. However, because of the
-> recursive nature of of_platform_populate, this doesn't seem possible.
-> 
-> Therefore, as the only solution at hand, this commit disables musb_am335x
-> driver removal capability, preventing it from being ever removed. This was
-> originally suggested by Sebastian Siewior:
-> 
-> https://www.mail-archive.com/linux-omap at vger.kernel.org/msg104946.html
-> 
-> And for reference, here's the panic upon module removal:
-> 
-> musb-hdrc musb-hdrc.0.auto: remove, state 4
-> usb usb1: USB disconnect, device number 1
-> musb-hdrc musb-hdrc.0.auto: USB bus 1 deregistered
-> Unable to handle kernel NULL pointer dereference at virtual address 0000008c
-> pgd = de11c000
-> [0000008c] *pgd=9e174831, *pte=00000000, *ppte=00000000
-> Internal error: Oops: 17 [#1] ARM
-> Modules linked in: musb_am335x(-) musb_dsps musb_hdrc usbcore usb_common
-> CPU: 0 PID: 623 Comm: modprobe Not tainted 3.15.0-rc4-00001-g24efd13 #69
-> task: de1b7500 ti: de122000 task.ti: de122000
-> PC is at am335x_shutdown+0x10/0x28
-> LR is at am335x_shutdown+0xc/0x28
-> pc : [<c0327798>]    lr : [<c0327794>]    psr: a0000013
-> sp : de123df8  ip : 00000004  fp : 00028f00
-> r10: 00000000  r9 : de122000  r8 : c000e6c4
-> r7 : de0e3c10  r6 : de0e3800  r5 : de624010  r4 : de1ec750
-> r3 : de0e3810  r2 : 00000000  r1 : 00000001  r0 : 00000000
-> Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-> Control: 10c5387d  Table: 9e11c019  DAC: 00000015
-> Process modprobe (pid: 623, stack limit = 0xde122240)
-> Stack: (0xde123df8 to 0xde124000)
-> 3de0:                                                       de0e3810 bf054488
-> 3e00: bf05444c de624010 60000013 bf043650 000012fc de624010 de0e3810 bf043a20
-> 3e20: de0e3810 bf04b240 c0635b88 c02ca37c c02ca364 c02c8db0 de1b7500 de0e3844
-> 3e40: de0e3810 c02c8e28 c0635b88 de02824c de0e3810 c02c884c de0e3800 de0e3810
-> 3e60: de0e3818 c02c5b20 bf05417c de0e3800 de0e3800 c0635b88 de0f2410 c02ca838
-> 3e80: bf05417c de0e3800 bf055438 c02ca8cc de0e3c10 bf054194 de0e3c10 c02ca37c
-> 3ea0: c02ca364 c02c8db0 de1b7500 de0e3c44 de0e3c10 c02c8e28 c0635b88 de02824c
-> 3ec0: de0e3c10 c02c884c de0e3c10 de0e3c10 de0e3c18 c02c5b20 de0e3c10 de0e3c10
-> 3ee0: 00000000 bf059000 a0000013 c02c5bc0 00000000 bf05900c de0e3c10 c02c5c48
-> 3f00: de0dd0c0 de1ec970 de0f2410 bf05929c de0f2444 bf05902c de0f2410 c02ca37c
-> 3f20: c02ca364 c02c8db0 bf05929c de0f2410 bf05929c c02c94c8 bf05929c 00000000
-> 3f40: 00000800 c02c8ab4 bf0592e0 c007fc40 c00dd820 6273756d 336d615f 00783533
-> 3f60: c064a0ac de1b7500 de122000 de1b7500 c000e590 00000001 c000e6c4 c0060160
-> 3f80: 00028e70 00028e70 00028ea4 00000081 60000010 00028e70 00028e70 00028ea4
-> 3fa0: 00000081 c000e500 00028e70 00028e70 00028ea4 00000800 becb59f8 00027608
-> 3fc0: 00028e70 00028e70 00028ea4 00000081 00000001 00000001 00000000 00028f00
-> 3fe0: b6e6b6f0 becb59d4 000160e8 b6e6b6fc 60000010 00028ea4 00000000 00000000
-> [<c0327798>] (am335x_shutdown) from [<bf054488>] (dsps_musb_exit+0x3c/0x4c [musb_dsps])
-> [<bf054488>] (dsps_musb_exit [musb_dsps]) from [<bf043650>] (musb_shutdown+0x80/0x90 [musb_hdrc])
-> [<bf043650>] (musb_shutdown [musb_hdrc]) from [<bf043a20>] (musb_remove+0x24/0x68 [musb_hdrc])
-> [<bf043a20>] (musb_remove [musb_hdrc]) from [<c02ca37c>] (platform_drv_remove+0x18/0x1c)
-> [<c02ca37c>] (platform_drv_remove) from [<c02c8db0>] (__device_release_driver+0x70/0xc8)
-> [<c02c8db0>] (__device_release_driver) from [<c02c8e28>] (device_release_driver+0x20/0x2c)
-> [<c02c8e28>] (device_release_driver) from [<c02c884c>] (bus_remove_device+0xdc/0x10c)
-> [<c02c884c>] (bus_remove_device) from [<c02c5b20>] (device_del+0x104/0x198)
-> [<c02c5b20>] (device_del) from [<c02ca838>] (platform_device_del+0x14/0x9c)
-> [<c02ca838>] (platform_device_del) from [<c02ca8cc>] (platform_device_unregister+0xc/0x20)
-> [<c02ca8cc>] (platform_device_unregister) from [<bf054194>] (dsps_remove+0x18/0x38 [musb_dsps])
-> [<bf054194>] (dsps_remove [musb_dsps]) from [<c02ca37c>] (platform_drv_remove+0x18/0x1c)
-> [<c02ca37c>] (platform_drv_remove) from [<c02c8db0>] (__device_release_driver+0x70/0xc8)
-> [<c02c8db0>] (__device_release_driver) from [<c02c8e28>] (device_release_driver+0x20/0x2c)
-> [<c02c8e28>] (device_release_driver) from [<c02c884c>] (bus_remove_device+0xdc/0x10c)
-> [<c02c884c>] (bus_remove_device) from [<c02c5b20>] (device_del+0x104/0x198)
-> [<c02c5b20>] (device_del) from [<c02c5bc0>] (device_unregister+0xc/0x20)
-> [<c02c5bc0>] (device_unregister) from [<bf05900c>] (of_remove_populated_child+0xc/0x14 [musb_am335x])
-> [<bf05900c>] (of_remove_populated_child [musb_am335x]) from [<c02c5c48>] (device_for_each_child+0x44/0x70)
-> [<c02c5c48>] (device_for_each_child) from [<bf05902c>] (am335x_child_remove+0x18/0x30 [musb_am335x])
-> [<bf05902c>] (am335x_child_remove [musb_am335x]) from [<c02ca37c>] (platform_drv_remove+0x18/0x1c)
-> [<c02ca37c>] (platform_drv_remove) from [<c02c8db0>] (__device_release_driver+0x70/0xc8)
-> [<c02c8db0>] (__device_release_driver) from [<c02c94c8>] (driver_detach+0xb4/0xb8)
-> [<c02c94c8>] (driver_detach) from [<c02c8ab4>] (bus_remove_driver+0x4c/0xa0)
-> [<c02c8ab4>] (bus_remove_driver) from [<c007fc40>] (SyS_delete_module+0x128/0x1cc)
-> [<c007fc40>] (SyS_delete_module) from [<c000e500>] (ret_fast_syscall+0x0/0x48)
-> 
-> Fixes: 97238b35d5bb ("usb: musb: dsps: use proper child nodes")
-> Cc: <stable@vger.kernel.org> # v3.12+
-> Acked-by: George Cherian <george.cherian@ti.com>
-> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-> ---
->  drivers/usb/musb/musb_am335x.c | 23 ++++++-----------------
->  1 file changed, 6 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/usb/musb/musb_am335x.c b/drivers/usb/musb/musb_am335x.c
-> index d235378..1e58ed2 100644
-> --- a/drivers/usb/musb/musb_am335x.c
-> +++ b/drivers/usb/musb/musb_am335x.c
-> @@ -19,21 +19,6 @@ err:
->  	return ret;
->  }
->  
-> -static int of_remove_populated_child(struct device *dev, void *d)
-> -{
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -
-> -	of_device_unregister(pdev);
-> -	return 0;
-> -}
-> -
-> -static int am335x_child_remove(struct platform_device *pdev)
-> -{
-> -	device_for_each_child(&pdev->dev, NULL, of_remove_populated_child);
-> -	pm_runtime_disable(&pdev->dev);
-> -	return 0;
-> -}
-> -
->  static const struct of_device_id am335x_child_of_match[] = {
->  	{ .compatible = "ti,am33xx-usb" },
->  	{  },
-> @@ -42,13 +27,17 @@ MODULE_DEVICE_TABLE(of, am335x_child_of_match);
->  
->  static struct platform_driver am335x_child_driver = {
->  	.probe		= am335x_child_probe,
-> -	.remove         = am335x_child_remove,
->  	.driver         = {
->  		.name   = "am335x-usb-childs",
->  		.of_match_table	= am335x_child_of_match,
->  	},
->  };
->  
-> -module_platform_driver(am335x_child_driver);
-> +static int __init am335x_child_init(void)
-> +{
-> +	return platform_driver_register(&am335x_child_driver);
-> +}
-> +module_init(am335x_child_init);
-> +
->  MODULE_DESCRIPTION("AM33xx child devices");
->  MODULE_LICENSE("GPL v2");
-> -- 
-> 1.9.1
-> 
+Add handlers for all the AArch64 debug registers that are accessible
+from EL0 or EL1. The trapping code keeps track of the state of the
+debug registers, allowing for the switch code to implement a lazy
+switching strategy.
 
-Felipe,
+Reviewed-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/kvm_asm.h  |  28 ++++++--
+ arch/arm64/include/asm/kvm_host.h |   3 +
+ arch/arm64/kvm/sys_regs.c         | 130 +++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 151 insertions(+), 10 deletions(-)
 
-Any comments on this?
-
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index 9fcd54b..e6b159a 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -43,14 +43,25 @@
+ #define	AMAIR_EL1	19	/* Aux Memory Attribute Indirection Register */
+ #define	CNTKCTL_EL1	20	/* Timer Control Register (EL1) */
+ #define	PAR_EL1		21	/* Physical Address Register */
++#define MDSCR_EL1	22	/* Monitor Debug System Control Register */
++#define DBGBCR0_EL1	23	/* Debug Breakpoint Control Registers (0-15) */
++#define DBGBCR15_EL1	38
++#define DBGBVR0_EL1	39	/* Debug Breakpoint Value Registers (0-15) */
++#define DBGBVR15_EL1	54
++#define DBGWCR0_EL1	55	/* Debug Watchpoint Control Registers (0-15) */
++#define DBGWCR15_EL1	70
++#define DBGWVR0_EL1	71	/* Debug Watchpoint Value Registers (0-15) */
++#define DBGWVR15_EL1	86
++#define MDCCINT_EL1	87	/* Monitor Debug Comms Channel Interrupt Enable Reg */
++
+ /* 32bit specific registers. Keep them at the end of the range */
+-#define	DACR32_EL2	22	/* Domain Access Control Register */
+-#define	IFSR32_EL2	23	/* Instruction Fault Status Register */
+-#define	FPEXC32_EL2	24	/* Floating-Point Exception Control Register */
+-#define	DBGVCR32_EL2	25	/* Debug Vector Catch Register */
+-#define	TEECR32_EL1	26	/* ThumbEE Configuration Register */
+-#define	TEEHBR32_EL1	27	/* ThumbEE Handler Base Register */
+-#define	NR_SYS_REGS	28
++#define	DACR32_EL2	88	/* Domain Access Control Register */
++#define	IFSR32_EL2	89	/* Instruction Fault Status Register */
++#define	FPEXC32_EL2	90	/* Floating-Point Exception Control Register */
++#define	DBGVCR32_EL2	91	/* Debug Vector Catch Register */
++#define	TEECR32_EL1	92	/* ThumbEE Configuration Register */
++#define	TEEHBR32_EL1	93	/* ThumbEE Handler Base Register */
++#define	NR_SYS_REGS	94
+ 
+ /* 32bit mapping */
+ #define c0_MPIDR	(MPIDR_EL1 * 2)	/* MultiProcessor ID Register */
+@@ -87,6 +98,9 @@
+ #define ARM_EXCEPTION_IRQ	  0
+ #define ARM_EXCEPTION_TRAP	  1
+ 
++#define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
++#define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
++
+ #ifndef __ASSEMBLY__
+ struct kvm;
+ struct kvm_vcpu;
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 0a1d697..4737961 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -101,6 +101,9 @@ struct kvm_vcpu_arch {
+ 	/* Exception Information */
+ 	struct kvm_vcpu_fault_info fault;
+ 
++	/* Debug state */
++	u64 debug_flags;
++
+ 	/* Pointer to host CPU context */
+ 	kvm_cpu_context_t *host_cpu_context;
+ 
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index c3d28f1..d46a965 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -30,6 +30,7 @@
+ #include <asm/kvm_mmu.h>
+ #include <asm/cacheflush.h>
+ #include <asm/cputype.h>
++#include <asm/debug-monitors.h>
+ #include <trace/events/kvm.h>
+ 
+ #include "sys_regs.h"
+@@ -173,6 +174,58 @@ static bool trap_raz_wi(struct kvm_vcpu *vcpu,
+ 		return read_zero(vcpu, p);
+ }
+ 
++static bool trap_oslsr_el1(struct kvm_vcpu *vcpu,
++			   const struct sys_reg_params *p,
++			   const struct sys_reg_desc *r)
++{
++	if (p->is_write) {
++		return ignore_write(vcpu, p);
++	} else {
++		*vcpu_reg(vcpu, p->Rt) = (1 << 3);
++		return true;
++	}
++}
++
++static bool trap_dbgauthstatus_el1(struct kvm_vcpu *vcpu,
++				   const struct sys_reg_params *p,
++				   const struct sys_reg_desc *r)
++{
++	if (p->is_write) {
++		return ignore_write(vcpu, p);
++	} else {
++		*vcpu_reg(vcpu, p->Rt) = 0x2222; /* Implemented and disabled */
++		return true;
++	}
++}
++
++/*
++ * Trap handler for DBG[BW][CV]Rn_EL1 and MDSCR_EL1. We track the
++ * "dirtiness" of the registers.
++ */
++static bool trap_debug_regs(struct kvm_vcpu *vcpu,
++			    const struct sys_reg_params *p,
++			    const struct sys_reg_desc *r)
++{
++	/*
++	 * The best thing to do would be to trap MDSCR_EL1
++	 * independently, test if DBG_MDSCR_KDE or DBG_MDSCR_MDE is
++	 * getting set, and only set the DIRTY bit in that case.
++	 *
++	 * Unfortunately, "old" Linux kernels tend to hit MDSCR_EL1
++	 * like a woodpecker on a tree, and it is better to disable
++	 * trapping as soon as possible in this case. Some day, make
++	 * this a tuneable...
++	 */
++	if (p->is_write) {
++		vcpu_sys_reg(vcpu, r->reg) = *vcpu_reg(vcpu, p->Rt);
++		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
++	} else {
++		*vcpu_reg(vcpu, p->Rt) = vcpu_sys_reg(vcpu, r->reg);
++	}
++
++	return true;
++}
++
+ static void reset_amair_el1(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+ {
+ 	u64 amair;
+@@ -189,6 +242,21 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+ 	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1UL << 31) | (vcpu->vcpu_id & 0xff);
+ }
+ 
++/* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go*/
++#define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
++	/* DBGBVRn_EL1 */						\
++	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b100),	\
++	  trap_debug_regs, reset_val, (DBGBCR0_EL1 + (n)), 0 },		\
++	/* DBGBCRn_EL1 */						\
++	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b101),	\
++	  trap_debug_regs, reset_val, (DBGBVR0_EL1 + (n)), 0 },		\
++	/* DBGWVRn_EL1 */						\
++	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b110),	\
++	  trap_debug_regs, reset_val, (DBGWCR0_EL1 + (n)), 0 },		\
++	/* DBGWCRn_EL1 */						\
++	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b111),	\
++	  trap_debug_regs, reset_val, (DBGWVR0_EL1 + (n)), 0 }
++
+ /*
+  * Architected system registers.
+  * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
+@@ -200,9 +268,6 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+  * Therefore we tell the guest we have 0 counters.  Unfortunately, we
+  * must always support PMCCNTR (the cycle counter): we just RAZ/WI for
+  * all PM registers, which doesn't crash the guest kernel at least.
+- *
+- * Same goes for the whole debug infrastructure, which probably breaks
+- * some guest functionnality. This should be fixed.
+  */
+ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	/* DC ISW */
+@@ -215,12 +280,71 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	{ Op0(0b01), Op1(0b000), CRn(0b0111), CRm(0b1110), Op2(0b010),
+ 	  access_dcsw },
+ 
++	DBG_BCR_BVR_WCR_WVR_EL1(0),
++	DBG_BCR_BVR_WCR_WVR_EL1(1),
++	/* MDCCINT_EL1 */
++	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm(0b0010), Op2(0b000),
++	  trap_debug_regs, reset_val, MDCCINT_EL1, 0 },
++	/* MDSCR_EL1 */
++	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm(0b0010), Op2(0b010),
++	  trap_debug_regs, reset_val, MDSCR_EL1, 0 },
++	DBG_BCR_BVR_WCR_WVR_EL1(2),
++	DBG_BCR_BVR_WCR_WVR_EL1(3),
++	DBG_BCR_BVR_WCR_WVR_EL1(4),
++	DBG_BCR_BVR_WCR_WVR_EL1(5),
++	DBG_BCR_BVR_WCR_WVR_EL1(6),
++	DBG_BCR_BVR_WCR_WVR_EL1(7),
++	DBG_BCR_BVR_WCR_WVR_EL1(8),
++	DBG_BCR_BVR_WCR_WVR_EL1(9),
++	DBG_BCR_BVR_WCR_WVR_EL1(10),
++	DBG_BCR_BVR_WCR_WVR_EL1(11),
++	DBG_BCR_BVR_WCR_WVR_EL1(12),
++	DBG_BCR_BVR_WCR_WVR_EL1(13),
++	DBG_BCR_BVR_WCR_WVR_EL1(14),
++	DBG_BCR_BVR_WCR_WVR_EL1(15),
++
++	/* MDRAR_EL1 */
++	{ Op0(0b10), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b000),
++	  trap_raz_wi },
++	/* OSLAR_EL1 */
++	{ Op0(0b10), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b100),
++	  trap_raz_wi },
++	/* OSLSR_EL1 */
++	{ Op0(0b10), Op1(0b000), CRn(0b0001), CRm(0b0001), Op2(0b100),
++	  trap_oslsr_el1 },
++	/* OSDLR_EL1 */
++	{ Op0(0b10), Op1(0b000), CRn(0b0001), CRm(0b0011), Op2(0b100),
++	  trap_raz_wi },
++	/* DBGPRCR_EL1 */
++	{ Op0(0b10), Op1(0b000), CRn(0b0001), CRm(0b0100), Op2(0b100),
++	  trap_raz_wi },
++	/* DBGCLAIMSET_EL1 */
++	{ Op0(0b10), Op1(0b000), CRn(0b0111), CRm(0b1000), Op2(0b110),
++	  trap_raz_wi },
++	/* DBGCLAIMCLR_EL1 */
++	{ Op0(0b10), Op1(0b000), CRn(0b0111), CRm(0b1001), Op2(0b110),
++	  trap_raz_wi },
++	/* DBGAUTHSTATUS_EL1 */
++	{ Op0(0b10), Op1(0b000), CRn(0b0111), CRm(0b1110), Op2(0b110),
++	  trap_dbgauthstatus_el1 },
++
+ 	/* TEECR32_EL1 */
+ 	{ Op0(0b10), Op1(0b010), CRn(0b0000), CRm(0b0000), Op2(0b000),
+ 	  NULL, reset_val, TEECR32_EL1, 0 },
+ 	/* TEEHBR32_EL1 */
+ 	{ Op0(0b10), Op1(0b010), CRn(0b0001), CRm(0b0000), Op2(0b000),
+ 	  NULL, reset_val, TEEHBR32_EL1, 0 },
++
++	/* MDCCSR_EL1 */
++	{ Op0(0b10), Op1(0b011), CRn(0b0000), CRm(0b0001), Op2(0b000),
++	  trap_raz_wi },
++	/* DBGDTR_EL0 */
++	{ Op0(0b10), Op1(0b011), CRn(0b0000), CRm(0b0100), Op2(0b000),
++	  trap_raz_wi },
++	/* DBGDTR[TR]X_EL0 */
++	{ Op0(0b10), Op1(0b011), CRn(0b0000), CRm(0b0101), Op2(0b000),
++	  trap_raz_wi },
++
+ 	/* DBGVCR32_EL2 */
+ 	{ Op0(0b10), Op1(0b100), CRn(0b0000), CRm(0b0111), Op2(0b000),
+ 	  NULL, reset_val, DBGVCR32_EL2, 0 },
 -- 
-Ezequiel Garcia, VanguardiaSur
-www.vanguardiasur.com.ar
+1.8.3.4
