@@ -1,101 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 20 May 2014 17:08:27 +0100
-Subject: [PATCH 4/4] arm64: Enable TEXT_OFFSET fuzzing
-In-Reply-To: <20140520141126.GA1752@bill-the-cat>
-References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
- <1400233839-15140-5-git-send-email-mark.rutland@arm.com>
- <20140516140606.GH5624@arm.com>
- <20140516165548.GA14766@leverpostej>
- <20140520141126.GA1752@bill-the-cat>
-Message-ID: <20140520160827.GK3663@leverpostej>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 20 May 2014 17:11:31 +0100
+Subject: [PATCH v2 2/4] mfd: bcm590xx: add support for secondary I2C
+ slave address
+In-Reply-To: <20140428140910.GB7719@beef>
+References: <1398295293-11033-1-git-send-email-mporter@linaro.org>
+ <1398295293-11033-3-git-send-email-mporter@linaro.org>
+ <20140428115627.GY21279@lee--X1> <20140428140910.GB7719@beef>
+Message-ID: <20140520161131.GB32025@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 03:11:26PM +0100, Tom Rini wrote:
-> On Fri, May 16, 2014 at 05:55:48PM +0100, Mark Rutland wrote:
-> > On Fri, May 16, 2014 at 03:06:07PM +0100, Catalin Marinas wrote:
-> > > On Fri, May 16, 2014 at 10:50:39AM +0100, Mark Rutland wrote:
-> > > > --- a/arch/arm64/Kconfig.debug
-> > > > +++ b/arch/arm64/Kconfig.debug
-> > > > @@ -37,4 +37,35 @@ config PID_IN_CONTEXTIDR
-> > > >  	  instructions during context switch. Say Y here only if you are
-> > > >  	  planning to use hardware trace tools with this kernel.
-> > > >  
-> > > > +config ARM64_RANDOMIZE_TEXT_OFFSET
-> > > > +	bool "Randomize TEXT_OFFSET at build time (EXPERIMENTAL)"
-> > > > +	default N
+> > > BCM590xx utilizes a secondary I2C slave address to access additional
+> > > register space. Add support for the secondary address space by
+> > > instantiating a dummy I2C device with the appropriate secondary
+> > > I2C slave address. Also expose a secondary regmap register space so
+> > > that MFD drivers can access this secondary i2c slave address space.
 > > > 
-> > > (nitpick: no need for default n)
+> > > Signed-off-by: Matt Porter <mporter@linaro.org>
+> > > ---
+> > >  drivers/mfd/bcm590xx.c       | 60 +++++++++++++++++++++++++++++++++-----------
+> > >  include/linux/mfd/bcm590xx.h |  9 ++++---
+> > >  2 files changed, 52 insertions(+), 17 deletions(-)
 > > 
-> > Thanks for pointing that out, I'll remove it :)
+> > Nice, flows much better now.
 > > 
-> > > I think that's good for testing. It would have been nice to be able to
-> > > set some limits for the random offset but I can't figure out an easy way
-> > > to do this via Kconfig (maybe with additional options).
-> > 
-> > There are hard-coded limits implicit in the randomization -- between 0B
-> > and 2MB in 16B increments:
-> > 
-> > TEXT_OFFSET := $(shell awk 'BEGIN {srand(); printf "0x%05x\n", and(int(0xfffff * rand()), 0xffff0)}')
+> > Can I just apply the two MFD patches, or are there cross-deps?
 > 
-> Note, is mawk expected to be able to be used for kernel building?  It
-> doesn't have 'and' as a function.
+> There's cross-deps so the regulator driver will need to go with it.
+> Mark mentioned earlier in the thread that he wanted to merge through
+> the regulator tree though.
 
-Ouch. I hadn't realised this was gawk-only. My new local machine only
-has mawk and builds the kernel fine otherwise, so it seems like we can't
-just expect gawk. It also seems that mawk doesn't like inline hex
-values...
+Still nothing.
 
-The masking is only there to ensure the value is a multiple of 16 (i.e.
-the last digit is 0), so we can just handle that in the print instead.
-Then 0xffff is 65535, so:
+Mark,
+  Can I apply this set and supply you with a pull-request?
 
-TEXT_OFFSET := $(shell awk 'BEGIN {srand(); printf "0x%04x0\n", int(65535 * rand())}')
-
-That seems to work in gawk and mawk.
-
-> 
-> > The 16B increment is required due to some code in head.S (__turn_mmu_on)
-> > requiring a minimum 16B alignment for the object.
-> > 
-> > The 2MB maximum comes from the fact we rely on the start of memory being
-> > 2MB aligned. I'm not sure there's a compelling reason to limit the
-> > randomization if enabled at all -- either you can handle it or you
-> > can't. Are we ever likely to want an offset larger than the memory
-> > alignment?
-> 
-> A reason to limit the randomization is to make it easier on the
-> bootloaders to be able to rule of thumb initial loads.  It's not a big
-> deal with Image if it gets loaded lower than the offset, we can start
-> shifting data at the end.  But when we start looking at Image.gz (or xz
-> or ...), in some cases we'll get the whole image read into memory (network
-> booting for example), uncompress the first block so we can confirm a
-> good Image header and see about text_offset/image_size.  If we know that
-> text_offset is somewhere random inside of 2MB (or some other documented
-> max), we can then go with saying an initial load should be at say +32MB
-> (to mirror Documentation/arm/Booting).  If it can be anywhere, then
-> things get hard, or at least annoying (error out and tell the user to
-> re-load things because of a random value?  I can see testing frameworks
-> being annoyed about that).
-
-Ouch, that is somewhat painful.
-
-I don't think we expect to see a text_offset larger than 2MB, and I
-can't immediately see why we'd care about any particular text offset
-assuming the page tables are at the end of the runtime image. That said,
-I'm not completely clear on the history of the text_offset.
-
-> And we should document the range of the offset in
-> Documentation/arm64/booting.txt as well.
-
-As far as I am aware, we have a 64-bit field specifically to allow for
-an arbitrarily large value, so placing limitations on that may be a
-little difficult.
-
-As stated above, I don't think there'd be a reason for having a
-text_offset larger than our memory alignment restriction (2MB), but
-there may be something I've missed. If others are reasonably confident
-with an upper limit, I'd be happy to go with it.
-
-Cheers,
-Mark.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
