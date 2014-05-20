@@ -1,275 +1,97 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 20 May 2014 16:09:35 -0500
-Subject: [PATCH 09/10] dts: versatile: add clock tree
+Date: Tue, 20 May 2014 16:09:36 -0500
+Subject: [PATCH 10/10] clk: versatile: add versatile OSC support
 In-Reply-To: <1400620176-7239-1-git-send-email-robherring2@gmail.com>
 References: <1400620176-7239-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1400620176-7239-10-git-send-email-robherring2@gmail.com>
+Message-ID: <1400620176-7239-11-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <robh@kernel.org>
 
-The versatile dts is missing any clock data. Add the clocks.
-
-It is not clear from the documentation where pclk comes from, so for
-now it is a dummy clock which is sufficient for things to work.
+Versatile platforms share the same OSC programming model as Integrator
+platforms. Add the necessary parameters and init functions for Versatile.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Mike Turquette <mturquette@linaro.org>
 ---
- arch/arm/boot/dts/versatile-ab.dts | 74 ++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/versatile-pb.dts | 10 ++++++
- 2 files changed, 84 insertions(+)
+ drivers/clk/versatile/Makefile         |  3 +--
+ drivers/clk/versatile/clk-integrator.c | 35 ++++++++++++++++++++++++++++++++--
+ 2 files changed, 34 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/versatile-ab.dts b/arch/arm/boot/dts/versatile-ab.dts
-index e4cba63..37e01b4 100644
---- a/arch/arm/boot/dts/versatile-ab.dts
-+++ b/arch/arm/boot/dts/versatile-ab.dts
-@@ -19,6 +19,40 @@
- 		reg = <0x0 0x08000000>;
- 	};
+diff --git a/drivers/clk/versatile/Makefile b/drivers/clk/versatile/Makefile
+index c16ca78..fb7f916 100644
+--- a/drivers/clk/versatile/Makefile
++++ b/drivers/clk/versatile/Makefile
+@@ -1,6 +1,5 @@
+ # Makefile for Versatile-specific clocks
+-obj-$(CONFIG_ICST)		+= clk-icst.o
+-obj-$(CONFIG_ARCH_INTEGRATOR)	+= clk-integrator.o
++obj-$(CONFIG_ICST)		+= clk-icst.o clk-integrator.o
+ obj-$(CONFIG_INTEGRATOR_IMPD1)	+= clk-impd1.o
+ obj-$(CONFIG_ARCH_REALVIEW)	+= clk-realview.o
+ obj-$(CONFIG_ARCH_VEXPRESS)	+= clk-vexpress.o clk-sp810.o
+diff --git a/drivers/clk/versatile/clk-integrator.c b/drivers/clk/versatile/clk-integrator.c
+index 734c4b8..fe52a79 100644
+--- a/drivers/clk/versatile/clk-integrator.c
++++ b/drivers/clk/versatile/clk-integrator.c
+@@ -17,6 +17,9 @@
  
-+	core-module at 10000000 {
-+		compatible = "arm,core-module-versatile";
-+		reg = <0x10000000 0x200>;
+ #define INTEGRATOR_HDR_LOCK_OFFSET	0x14
+ 
++#define VERSATILE_SYS_OSCCLCD_OFFSET	0x1c
++#define VERSATILE_SYS_LOCK_OFFSET	0x20
 +
-+		osc24M: oscillator at 24M {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <24000000>;
-+		};
+ /* Base offset for the core module */
+ static void __iomem *cm_base;
+ 
+@@ -37,11 +40,27 @@ static const struct clk_icst_desc __initdata cm_auxosc_desc = {
+ 	.lock_offset = INTEGRATOR_HDR_LOCK_OFFSET,
+ };
+ 
+-static void __init of_integrator_cm_osc_setup(struct device_node *np)
++static const struct icst_params versatile_auxosc_params = {
++	.vco_max	= ICST307_VCO_MAX,
++	.vco_min	= ICST307_VCO_MIN,
++	.vd_min		= 4 + 8,
++	.vd_max		= 511 + 8,
++	.rd_min		= 1 + 2,
++	.rd_max		= 127 + 2,
++	.s2div		= icst307_s2div,
++	.idx2s		= icst307_idx2s,
++};
 +
-+		/* OSC1 on AB, OSC4 on PB */
-+		osc1: cm_aux_osc at 24M {
-+			#clock-cells = <0>;
-+			compatible = "arm,versatile-cm-auxosc";
-+			clocks = <&osc24M>;
-+		};
++static const struct clk_icst_desc versatile_auxosc_desc __initconst = {
++	.params = &versatile_auxosc_params,
++	.vco_offset = VERSATILE_SYS_OSCCLCD_OFFSET,
++	.lock_offset = VERSATILE_SYS_LOCK_OFFSET,
++};
++static void __init cm_osc_setup(struct device_node *np,
++				const struct clk_icst_desc *desc)
+ {
+ 	struct clk *clk = ERR_PTR(-EINVAL);
+ 	const char *clk_name = np->name;
+-	const struct clk_icst_desc *desc = &cm_auxosc_desc;
+ 	const char *parent_name;
+ 
+ 	if (!cm_base) {
+@@ -65,5 +84,17 @@ static void __init of_integrator_cm_osc_setup(struct device_node *np)
+ 	if (!IS_ERR(clk))
+ 		of_clk_add_provider(np, of_clk_src_simple_get, clk);
+ }
 +
-+		/* The timer clock is the 24 MHz oscillator divided to 1MHz */
-+		timclk: timclk at 1M {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clock-div = <24>;
-+			clock-mult = <1>;
-+			clocks = <&osc24M>;
-+		};
++static void __init of_integrator_cm_osc_setup(struct device_node *np)
++{
++	cm_osc_setup(np, &cm_auxosc_desc);
++}
+ CLK_OF_DECLARE(integrator_cm_auxosc_clk,
+ 	"arm,integrator-cm-auxosc", of_integrator_cm_osc_setup);
 +
-+		/* Actually hclk ? */
-+		pclk: pclk at 0 {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <0>;
-+		};
-+	};
-+
- 	flash at 34000000 {
- 		compatible = "arm,versatile-flash";
- 		reg = <0x34000000 0x4000000>;
-@@ -79,63 +113,85 @@
- 			compatible = "arm,pl081", "arm,primecell";
- 			reg = <0x10130000 0x1000>;
- 			interrupts = <17>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
- 		};
- 
- 		uart0: uart at 101f1000 {
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x101f1000 0x1000>;
- 			interrupts = <12>;
-+			clocks = <&osc24M>, <&pclk>;
-+			clock-names = "uartclk", "apb_pclk";
- 		};
- 
- 		uart1: uart at 101f2000 {
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x101f2000 0x1000>;
- 			interrupts = <13>;
-+			clocks = <&osc24M>, <&pclk>;
-+			clock-names = "uartclk", "apb_pclk";
- 		};
- 
- 		uart2: uart at 101f3000 {
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x101f3000 0x1000>;
- 			interrupts = <14>;
-+			clocks = <&osc24M>, <&pclk>;
-+			clock-names = "uartclk", "apb_pclk";
- 		};
- 
- 		smc at 10100000 {
- 			compatible = "arm,primecell";
- 			reg = <0x10100000 0x1000>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
- 		};
- 
- 		mpmc at 10110000 {
- 			compatible = "arm,primecell";
- 			reg = <0x10110000 0x1000>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
- 		};
- 
- 		display at 10120000 {
- 			compatible = "arm,pl110", "arm,primecell";
- 			reg = <0x10120000 0x1000>;
- 			interrupts = <16>;
-+			clocks = <&osc1>, <&pclk>;
-+			clock-names = "clcd", "apb_pclk";
- 		};
- 
- 		sctl at 101e0000 {
- 			compatible = "arm,primecell";
- 			reg = <0x101e0000 0x1000>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
- 		};
- 
- 		watchdog at 101e1000 {
- 			compatible = "arm,primecell";
- 			reg = <0x101e1000 0x1000>;
- 			interrupts = <0>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
- 		};
- 
- 		timer at 101e2000 {
- 			compatible = "arm,sp804", "arm,primecell";
- 			reg = <0x101e2000 0x1000>;
- 			interrupts = <4>;
-+			clocks = <&timclk>, <&pclk>;
-+			clock-names = "tmrclk", "apb_pclk";
- 		};
- 
- 		timer at 101e3000 {
- 			compatible = "arm,sp804", "arm,primecell";
- 			reg = <0x101e3000 0x1000>;
- 			interrupts = <5>;
-+			clocks = <&timclk>, <&pclk>;
-+			clock-names = "tmrclk", "apb_pclk";
- 		};
- 
- 		gpio0: gpio at 101e4000 {
-@@ -146,6 +202,8 @@
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
- 		};
- 
- 		gpio1: gpio at 101e5000 {
-@@ -156,24 +214,32 @@
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
- 		};
- 
- 		rtc at 101e8000 {
- 			compatible = "arm,pl030", "arm,primecell";
- 			reg = <0x101e8000 0x1000>;
- 			interrupts = <10>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
- 		};
- 
- 		sci at 101f0000 {
- 			compatible = "arm,primecell";
- 			reg = <0x101f0000 0x1000>;
- 			interrupts = <15>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
- 		};
- 
- 		ssp at 101f4000 {
- 			compatible = "arm,pl022", "arm,primecell";
- 			reg = <0x101f4000 0x1000>;
- 			interrupts = <11>;
-+			clocks = <&osc24M>, <&pclk>;
-+			clock-names = "sspclk", "apb_pclk";
- 		};
- 
- 		fpga {
-@@ -186,23 +252,31 @@
- 				compatible = "arm,primecell";
- 				reg = <0x4000 0x1000>;
- 				interrupts = <24>;
-+				clocks = <&pclk>;
-+				clock-names = "apb_pclk";
- 			};
- 			mmc at 5000 {
- 				compatible = "arm,pl180", "arm,primecell";
- 				reg = < 0x5000 0x1000>;
- 				interrupts-extended = <&vic 22 &sic 2>;
-+				clocks = <&osc24M>, <&pclk>;
-+				clock-names = "mclk", "apb_pclk";
- 			};
- 			kmi at 6000 {
- 				compatible = "arm,pl050", "arm,primecell";
- 				reg = <0x6000 0x1000>;
- 				interrupt-parent = <&sic>;
- 				interrupts = <3>;
-+				clocks = <&osc24M>, <&pclk>;
-+				clock-names = "KMIREFCLK", "apb_pclk";
- 			};
- 			kmi at 7000 {
- 				compatible = "arm,pl050", "arm,primecell";
- 				reg = <0x7000 0x1000>;
- 				interrupt-parent = <&sic>;
- 				interrupts = <4>;
-+				clocks = <&osc24M>, <&pclk>;
-+				clock-names = "KMIREFCLK", "apb_pclk";
- 			};
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/versatile-pb.dts b/arch/arm/boot/dts/versatile-pb.dts
-index a428541..473081d 100644
---- a/arch/arm/boot/dts/versatile-pb.dts
-+++ b/arch/arm/boot/dts/versatile-pb.dts
-@@ -13,6 +13,8 @@
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
- 		};
- 
- 		gpio3: gpio at 101e7000 {
-@@ -23,6 +25,8 @@
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
- 		};
- 
- 		fpga {
-@@ -31,17 +35,23 @@
- 				reg = <0x9000 0x1000>;
- 				interrupt-parent = <&sic>;
- 				interrupts = <6>;
-+				clocks = <&osc24M>, <&pclk>;
-+				clock-names = "uartclk", "apb_pclk";
- 			};
- 			sci at a000 {
- 				compatible = "arm,primecell";
- 				reg = <0xa000 0x1000>;
- 				interrupt-parent = <&sic>;
- 				interrupts = <5>;
-+				clocks = <&osc24M>;
-+				clock-names = "apb_pclk";
- 			};
- 			mmc at b000 {
- 				compatible = "arm,pl180", "arm,primecell";
- 				reg = <0xb000 0x1000>;
- 				interrupts-extended = <&vic 23 &sic 2>;
-+				clocks = <&osc24M>, <&pclk>;
-+				clock-names = "mclk", "apb_pclk";
- 			};
- 		};
- 	};
++static void __init of_versatile_cm_osc_setup(struct device_node *np)
++{
++	cm_osc_setup(np, &versatile_auxosc_desc);
++}
++CLK_OF_DECLARE(versatile_cm_auxosc_clk,
++	       "arm,versatile-cm-auxosc", of_versatile_cm_osc_setup);
 -- 
 1.9.1
