@@ -1,52 +1,67 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 20 May 2014 14:36:49 +0300
-Subject: [PATCH] s3cmci: port DMA code to dmaengine API
-In-Reply-To: <6897537.JWQLgZ3Zsx@wuerfel>
-References: <1400522593-6366-1-git-send-email-anarsoul@gmail.com>
- <4667090.Oyf6jd3Lyk@wuerfel>
- <CA+E=qVch0K+raN4dkPK6XzXqOQc4t433UyCJ2Qnc2uymgTq7cA@mail.gmail.com>
- <6897537.JWQLgZ3Zsx@wuerfel>
-Message-ID: <CA+E=qVcqO9yaMdJABzQXiG4ikWTaB_XjT7GpD_rH6VTeBXYdKw@mail.gmail.com>
+From: emilgoode@gmail.com (Emil Goode)
+Date: Tue, 20 May 2014 13:43:15 +0200
+Subject: [PATCH 2/2] ARM: imx: convert camera init to use
+ platform_device_register_full()
+In-Reply-To: <20140519062722.GE16662@pengutronix.de>
+References: <1400446261-27085-1-git-send-email-emilgoode@gmail.com>
+ <1400446261-27085-3-git-send-email-emilgoode@gmail.com>
+ <20140519062722.GE16662@pengutronix.de>
+Message-ID: <20140520114315.GA4438@lianli>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 1:39 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 20 May 2014 13:22:35 Vasily Khoruzhick wrote:
->> Hi Arnd,
->>
->> On Mon, May 19, 2014 at 10:02 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > For this driver, you don't have to go that far, as long as it's
->> > ensure that the pointer to the filter function is available to
->> > the driver, i.e. you can't have a built-in s3mci driver when the
->> > dmaengine driver is a loadable module.
->>
->> OK, so I guess I need to add explicit dependency on
->> CONFIG_S3C24XX_DMAC for s3cmci driver.
->>
->> Btw, I didn't understand if it's acceptable to pass DMA channel number
->> through DMA resource for non-DT case or not?
->
-> It's commonly done on certain SoCs, but I'd prefer to not start doing
-> it on those that don't do it today.
->
-> At the moment, we do it only on s3c64xx, s5p, davinci, omap1, and pxa
-> on ARM, as well as arch/blackfin and one MIPS machine.
-> I suppose we have to introduce it on s3c24xx in order to keep
-> supporting sound, unless we put the audio dma channels into
-> s3c_audio_pdata.
->
-> I think that would be a better approach, given that you also need
-> to put the filter function pointer for the audio stuff somewhere.
->
-> Maybe Mark Brown has a strong preference to how he wants this done
-> in the audio drivers, then you can do it the same way for s3cmci.
+Hello Uwe,
 
-Let's just leave channel number hardcoded, how it was before conversion.
-It doesn't seem to be a good idea to clean non-DT machine code now, since
-it's better to put some effort into converting s3c2410 and s3c244{0,2} to DT.
+Thank you for the review and sorry for the late response.
 
-Regards
-Vasily
+On Mon, May 19, 2014 at 08:27:22AM +0200, Uwe Kleine-K?nig wrote:
+> Hello Emil,
+> 
+> thanks for your effort.
+> 
+> On Sun, May 18, 2014 at 10:51:00PM +0200, Emil Goode wrote:
+> > This converts the imx camera allocation and initialization functions
+> > to use platform_device_register_full() thus simplifying the code.
+> > 
+> > Signed-off-by: Emil Goode <emilgoode@gmail.com>
+> > ---
+> > Only build tested, unfortunately I currently don't have the hardware.
+> > 
+> >  arch/arm/mach-imx/devices/platform-ipu-core.c |   43 +++++++++----------------
+> >  arch/arm/mach-imx/mach-mx31_3ds.c             |    5 ++-
+> >  arch/arm/mach-imx/mach-mx31moboard.c          |    6 ++--
+> >  arch/arm/mach-imx/mach-mx35_3ds.c             |    5 ++-
+> >  arch/arm/mach-imx/mach-pcm037.c               |    5 ++-
+> >  5 files changed, 23 insertions(+), 41 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
+> > index 6bd7c3f..13ea542 100644
+> > --- a/arch/arm/mach-imx/devices/platform-ipu-core.c
+> > +++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
+> > @@ -69,42 +69,29 @@ struct platform_device *__init imx_alloc_mx3_camera(
+> IMHO you should better rename the function because now it doesn't only
+> allocate the device, but also registers it.
 
->
->         Arnd
+Agreed.
+
+> 
+> Also I doubt that it's OK to call dma_declare_coherent_memory after the
+> device is added. In this case maybe extend
+> platform_device_register_full? And also add a warning to
+> dma_declare_coherent_memory if it is called for an already added device?
+> (Added a few people to Cc: that might be able to comment this. I don't
+> even know if there is a reliable way to check if a device is already
+> added.)
+
+Yes I also had doubts about that. However, apart from this patch there are
+three other places in arch/arm/mach-imx/ where dma_declare_coherent_memory()
+is called after calling platform_device_register_full().
+
+Perhaps this is enough reason to extend platform_device_register_full().
+
+It would be great to get some more feedback on this and also if there is a
+reliable way to check if a device is already added.
+
+Best regards,
+
+Emil Goode
