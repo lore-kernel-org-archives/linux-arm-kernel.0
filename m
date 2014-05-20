@@ -1,192 +1,136 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 20 May 2014 12:43:59 +0800
-Subject: [PATCH v7 06/15] ARM: hisi: enable MCPM implementation
-In-Reply-To: <alpine.LFD.2.11.1405151549330.17310@knanqh.ubzr>
-References: <1399795571-17231-7-git-send-email-haojian.zhuang@linaro.org>
- <1399981484-31628-1-git-send-email-haojian.zhuang@linaro.org>
- <alpine.LFD.2.11.1405131449270.980@knanqh.ubzr>
- <CAD6h2NRMzgsZWkP8MYbCHqo4JkojbJxjj-kZwSj65A1SNBNRyw@mail.gmail.com>
- <alpine.LFD.2.11.1405151549330.17310@knanqh.ubzr>
-Message-ID: <CAD6h2NTku5zS5QONpOqdhAXgfFutGC4jyAAo-UGnAsc=Xan8dw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 20 May 2014 06:45:54 +0200
+Subject: [PATCH V4] mmc: mmci: Enforce DMA configuration through DT
+Message-ID: <1400561154-17846-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 May 2014 04:01, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Thu, 15 May 2014, Haojian Zhuang wrote:
->
->> On 14 May 2014 03:43, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->> > On Tue, 13 May 2014, Haojian Zhuang wrote:
->> >
->> >> +     data = readl_relaxed(fabric + FAB_SF_MODE);
->> >> +     if (on)
->> >> +             data |= 1 << cluster;
->> >> +     else
->> >> +             data &= ~(1 << cluster);
->> >> +     writel_relaxed(data, fabric + FAB_SF_MODE);
->> >> +     while (1) {
->> >> +             if (data == readl_relaxed(fabric + FAB_SF_MODE))
->> >> +                     break;
->> >> +     }
->> >> +}
->> >
->> > The above could be easily coded in assembly for the power_up_setup
->> > callback thusly:
->> >
->> > hip04_power_up_setup:
->> >
->> >         cmp     r0, #0                  @ check affinity level
->> >         bxeq    lr                      @ nothing to do at CPU level
->> >
->> >         mrc     p15, 0, r0, c0, c0, 5   @ get MPIDR
->> >         ubfx    r0, r0, #8, #8          @ extract cluster number
->> >
->> >         adr     r1, .LC0
->> >         ldmia   r1, {r2, r3}
->> >         sub     r2, r2, r1              @ virt_addr - phys_addr
->> >         ldr     r1, [r2, r3]            @ get fabric_phys_addr
->> >         mov     r2, #1
->> >         ldr     r3, [r1, #FAB_SF_MODE]  @ read "data"
->> >         orr     r3, r3, r2, lsl r0      @ set cluster bit
->> >         str     r3, [r1, #FAB_SF_MODE]  @ write it back
->> >
->> > 1:      ldr     r2, [r1, #FAB_SF_MODE]  @ read register content
->> >         cmp     r2, r3                  @ make sure it matches
->> >         bne     1b                      @ otherwise retry
->> >
->> >         bx      lr
->> >
->> > :LC0:   .word   .
->> >         .word   fabric_phys_addr - .LC0
->> >
->> > That should be it.
->> >
->>
->> No. These code should be executed before new CPU on. If I transfer
->> them to assembler code, it means that code will be executed after
->> new CPU on.
->
-> Exact.
->
->> Then it results me failing to make new CPU online.
->
-> The assembly code could be wrong as well.  Are you sure this is not the
-> actual reason?
->
-> Is there some documentation for this stuff?
->
+Remove the option to provide DMA configuration as platform data,
+enforce it through DT.
 
-There's no problem in assembly code. I even rewrite your assembly code.
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Roland Stigge <stigge@antcom.de>
+---
 
-If I keep my c code with assembly code, new CPU could be online right.
-If I only use assembly code, I only get the kernel panic. So it's not
-caused by assembly code. It's caused by executing code after new CPU
-on.
+Note, this patch is based upon the next branch from the following git
+git://git.linaro.org/people/ulf.hansson/mmc.git
 
-There's no documentation on this. They didn't prepare well on documents.
-I think they'll improve it in the future.
+Changes in v4:
+	Removed the NULL pointer assignment of ->dma_filter cb for mach-lpc32xx.
 
->> >> +static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
->> >> +{
->> >> +     unsigned long data, mask;
->> >> +
->> >> +     if (!relocation || !sysctrl)
->> >> +             return -ENODEV;
->> >> +     if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
->> >> +             return -EINVAL;
->> >> +
->> >> +     spin_lock_irq(&boot_lock);
->> >> +     writel_relaxed(hip04_boot.bootwrapper_phys, relocation);
->> >> +     writel_relaxed(hip04_boot.bootwrapper_magic, relocation + 4);
->> >> +     writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
->> >> +     writel_relaxed(0, relocation + 12);
->> >
->> > Shouldn't you do the above writes only when
->> > hip04_cpu_table[cluster][cpu] is zero?  Please see the comment in
->> > mcpm_cpu_power_down() about unordered calls.
->> >
->> OK. I can add the check.
->>
->> >> +     if (hip04_cluster_down(cluster)) {
->> >> +             data = CLUSTER_DEBUG_RESET_BIT;
->> >> +             writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
->> >> +             do {
->> >> +                     mask = CLUSTER_DEBUG_RESET_STATUS;
->> >> +                     data = readl_relaxed(sysctrl + \
->> >> +                                          SC_CPU_RESET_STATUS(cluster));
->> >> +             } while (data & mask);
->> >> +             hip04_set_snoop_filter(cluster, 1);
->> >> +     }
->> >> +
->> >> +     hip04_cpu_table[cluster][cpu]++;
->> >> +
->> >> +     data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
->> >> +            CORE_DEBUG_RESET_BIT(cpu);
->> >> +     writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
->> >> +     spin_unlock_irq(&boot_lock);
->> >> +     msleep(POLL_MSEC);
->> >> +
->> >> +     return 0;
->> >> +}
->> >> +
->> >> +static void hip04_mcpm_power_down(void)
->> >> +{
->> >> +     unsigned int mpidr, cpu, cluster, data = 0;
->> >> +     bool skip_reset = false;
->> >> +
->> >> +     mpidr = read_cpuid_mpidr();
->> >> +     cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
->> >> +     cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
->> >> +
->> >> +     __mcpm_cpu_going_down(cpu, cluster);
->> >> +
->> >> +     spin_lock(&boot_lock);
->> >> +     BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
->> >> +     hip04_cpu_table[cluster][cpu]--;
->> >> +     if (hip04_cpu_table[cluster][cpu] == 1) {
->> >> +             /* A power_up request went ahead of us. */
->> >> +             skip_reset = true;
->> >> +     } else if (hip04_cpu_table[cluster][cpu] > 1) {
->> >> +             pr_err("Cluster %d CPU%d is still running\n", cluster, cpu);
->> >
->> > This message is misleading.  If execution gets here, that means
->> > mcpm_cpu_power_up() was called more than twice in a row for the same CPU
->> > which should never happen.
->> >
->> OK. I'll replace the comments.
->>
->> >> +             BUG();
->> >> +     }
->> >> +
->> >> +     spin_unlock(&boot_lock);
->> >> +
->> >> +     v7_exit_coherency_flush(louis);
->> >> +
->> >> +     __mcpm_cpu_down(cpu, cluster);
->> >> +
->> >> +     if (!skip_reset) {
->> >> +             data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
->> >> +                    CORE_DEBUG_RESET_BIT(cpu);
->> >> +             writel_relaxed(data, sysctrl + SC_CPU_RESET_REQ(cluster));
->> >
->> > You should not perform this outside the lock protected region as this
->> > could race with hip04_mcpm_power_up().  Instead, this should be done
->> > above when hip04_cpu_table[cluster][cpu] == 0 after being decremented.
->> >
->>
->> No. power_down() is executed on the specified CPU. If spin_unlock() is
->> placed after reset operation, it means that there's no chance to
->> execute the spin_unlock(). Because CPU is already in reset mode at
->> this time.
->
-> Normally, reset is effective only when WFI is later executed.  Are you
-> sure this is not the case on hip04 as well?
->
->
-Oh. it's different. cpu_v7_reset() likes to give a reset pulse signal to CPU
-core logic.
-The operation on SC_CPU_RESET_REQ register likes make CPU out of
-reset mode. After system is power on, all CPUs except for CPU0 stay
-in reset mode.
+---
+ arch/arm/mach-lpc32xx/phy3250.c |    3 ---
+ drivers/mmc/host/mmci.c         |   24 +-----------------------
+ include/linux/amba/mmci.h       |   17 -----------------
+ 3 files changed, 1 insertion(+), 43 deletions(-)
 
-Regards
-Haojian
+diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
+index 34932e0..7858d5b 100644
+--- a/arch/arm/mach-lpc32xx/phy3250.c
++++ b/arch/arm/mach-lpc32xx/phy3250.c
+@@ -202,9 +202,6 @@ static struct mmci_platform_data lpc32xx_mmci_data = {
+ 	.ocr_mask	= MMC_VDD_30_31 | MMC_VDD_31_32 |
+ 			  MMC_VDD_32_33 | MMC_VDD_33_34,
+ 	.ios_handler	= mmc_handle_ios,
+-	.dma_filter	= NULL,
+-	/* No DMA for now since AMBA PL080 dmaengine driver only does scatter
+-	 * gather, and the MMCI driver doesn't do it this way */
+ };
+ 
+ static struct lpc32xx_slc_platform_data lpc32xx_slc_data = {
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 758efea..a084edd 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -366,7 +366,6 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
+ #ifdef CONFIG_DMA_ENGINE
+ static void mmci_dma_setup(struct mmci_host *host)
+ {
+-	struct mmci_platform_data *plat = host->plat;
+ 	const char *rxname, *txname;
+ 	dma_cap_mask_t mask;
+ 
+@@ -380,25 +379,6 @@ static void mmci_dma_setup(struct mmci_host *host)
+ 	dma_cap_zero(mask);
+ 	dma_cap_set(DMA_SLAVE, mask);
+ 
+-	if (plat && plat->dma_filter) {
+-		if (!host->dma_rx_channel && plat->dma_rx_param) {
+-			host->dma_rx_channel = dma_request_channel(mask,
+-							   plat->dma_filter,
+-							   plat->dma_rx_param);
+-			/* E.g if no DMA hardware is present */
+-			if (!host->dma_rx_channel)
+-				dev_err(mmc_dev(host->mmc), "no RX DMA channel\n");
+-		}
+-
+-		if (!host->dma_tx_channel && plat->dma_tx_param) {
+-			host->dma_tx_channel = dma_request_channel(mask,
+-							   plat->dma_filter,
+-							   plat->dma_tx_param);
+-			if (!host->dma_tx_channel)
+-				dev_warn(mmc_dev(host->mmc), "no TX DMA channel\n");
+-		}
+-	}
+-
+ 	/*
+ 	 * If only an RX channel is specified, the driver will
+ 	 * attempt to use it bidirectionally, however if it is
+@@ -446,11 +426,9 @@ static void mmci_dma_setup(struct mmci_host *host)
+  */
+ static inline void mmci_dma_release(struct mmci_host *host)
+ {
+-	struct mmci_platform_data *plat = host->plat;
+-
+ 	if (host->dma_rx_channel)
+ 		dma_release_channel(host->dma_rx_channel);
+-	if (host->dma_tx_channel && plat->dma_tx_param)
++	if (host->dma_tx_channel)
+ 		dma_release_channel(host->dma_tx_channel);
+ 	host->dma_rx_channel = host->dma_tx_channel = NULL;
+ }
+diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
+index 3f95d32..8c98113 100644
+--- a/include/linux/amba/mmci.h
++++ b/include/linux/amba/mmci.h
+@@ -6,9 +6,6 @@
+ 
+ #include <linux/mmc/host.h>
+ 
+-/* Just some dummy forwarding */
+-struct dma_chan;
+-
+ /**
+  * struct mmci_platform_data - platform configuration for the MMCI
+  * (also known as PL180) block.
+@@ -26,17 +23,6 @@ struct dma_chan;
+  * @gpio_wp: read this GPIO pin to see if the card is write protected
+  * @gpio_cd: read this GPIO pin to detect card insertion
+  * @cd_invert: true if the gpio_cd pin value is active low
+- * @dma_filter: function used to select an appropriate RX and TX
+- * DMA channel to be used for DMA, if and only if you're deploying the
+- * generic DMA engine
+- * @dma_rx_param: parameter passed to the DMA allocation
+- * filter in order to select an appropriate RX channel. If
+- * there is a bidirectional RX+TX channel, then just specify
+- * this and leave dma_tx_param set to NULL
+- * @dma_tx_param: parameter passed to the DMA allocation
+- * filter in order to select an appropriate TX channel. If this
+- * is NULL the driver will attempt to use the RX channel as a
+- * bidirectional channel
+  */
+ struct mmci_platform_data {
+ 	unsigned int ocr_mask;
+@@ -45,9 +31,6 @@ struct mmci_platform_data {
+ 	int	gpio_wp;
+ 	int	gpio_cd;
+ 	bool	cd_invert;
+-	bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
+-	void *dma_rx_param;
+-	void *dma_tx_param;
+ };
+ 
+ #endif
+-- 
+1.7.9.5
