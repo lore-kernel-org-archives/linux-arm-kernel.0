@@ -1,38 +1,58 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 19 May 2014 22:03:07 -0700
-Subject: [GIT PULL] ARM: rockchip: devicetree changes for  v3.16
-In-Reply-To: <2444863.NDeixHyn6k@phil>
-References: <2444863.NDeixHyn6k@phil>
-Message-ID: <20140520050307.GH18956@quad.lixom.net>
+Date: Mon, 19 May 2014 22:07:40 -0700
+Subject: [GIT PULL]]ARM: sirf: machine update for 3.16
+In-Reply-To: <CAGsJ_4y7gEQd9-Em6LW2kZ79qUOz5dSYzeWnBLbt8o8QsOSA6w@mail.gmail.com>
+References: <CAGsJ_4yqTkKu+93Fo_D6NaZMyz4T6_EmKz4gZfyeQCi_uF-3dg@mail.gmail.com>
+ <CAGsJ_4wD=FqxNeuEs47f0D9V+Qhn8jyUQL67iv4rsZ3r2K_3vA@mail.gmail.com>
+ <CAGsJ_4y7gEQd9-Em6LW2kZ79qUOz5dSYzeWnBLbt8o8QsOSA6w@mail.gmail.com>
+Message-ID: <20140520050740.GI18956@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 12, 2014 at 11:39:03AM +0200, Heiko St?bner wrote:
-> The following changes since commit a798c10faf62a505d24e5f6213fbaf904a39623f:
+On Sun, May 18, 2014 at 08:07:14PM +0800, Barry Song wrote:
+> >> Bin Shi (2):
+> >>       clocksource: prima2: fix some minor checkpatch issues
+> >>       irqchip: sirf: fix one minor checkpatch issue
+> >>
+> >> Xianglong Du (1):
+> >>       ARM: prima2: rstc: fix some minor checkpatch issues
+> >>
+> >> Zhiwu Song (2):
+> >>       clocksource:sirf: remove the hardcode for the clk of timers
+> >>       clocksource: marco: fix the affinity set for local timer of CPU1
+> >
+> > as Daniel has applied this one "clocksource: marco: fix the affinity
+> > set for local timer of CPU1" to his clk tree, i'll rebuilt the tag by
+> > dropping this.
 > 
->   Linux 3.15-rc2 (2014-04-20 11:08:50 -0700)
+> hi Olof,
+> i did a force update to tags/sirf-soc-for-3.16 after dropping
+> "clocksource: marco: fix the affinity set for local timer of CPU1"
+> which has been in clk tree , the new request is as below:
+> 
+> The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
+> 
+>   Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.16-rockchip-dt
+>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
+> tags/sirf-soc-for-3.16
 > 
-> for you to fetch changes up to 56f2b894dcf455ffd31bd2e8e96a074249aeb4ba:
+> for you to fetch changes up to c7cff54d5926e3f419c23eff2ebaf6f5e12da05d:
 > 
->   ARM: dts: rockchip: convert pinctrl nodes to new bindings (2014-05-10 01:41:20 +0200)
-> 
-> ----------------------------------------------------------------
-> Addition of missing board compatible names and their vendor-prefixes
-> as well as the dts portions of the pinctrl rework.
+>   clocksource:sirf: remove the hardcode for the clk of timers
+> (2014-05-12 21:43:49 +0800)
 > 
 > ----------------------------------------------------------------
-> Beniamino Galvani (2):
->       of: add mundoreader and radxa vendor prefixes
->       ARM: dts: rockchip: add root compatible properties
+> ARM: sirf: machine update for 3.16
 > 
-> Heiko Stuebner (1):
->       ARM: dts: rockchip: convert pinctrl nodes to new bindings
+> most of them fix some minor checkpatch issues according to key customers'
+> requirement. And this patchset also cleanups the clk of clocksource: move
+> to get clk by dts properity.
+> 
 
-Merged. Thanks!
+Merged into next/cleanup. Thanks.
 
 
 -Olof
