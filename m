@@ -1,72 +1,82 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 20 May 2014 08:20:48 +0100
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 20 May 2014 00:24:31 -0700
 Subject: [PATCH v4 6/6] ARM: dts: STiH407: Add B2120 board support
-In-Reply-To: <CAOesGMg5Jk_XB3zdfKz8VxRObYbFO8OMuRyo7Ba-kavANbci1w@mail.gmail.com>
+In-Reply-To: <20140520072048.GC20874@lee--X1>
 References: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>
  <1394614210-15698-7-git-send-email-maxime.coquelin@st.com>
  <CAOesGMg5Jk_XB3zdfKz8VxRObYbFO8OMuRyo7Ba-kavANbci1w@mail.gmail.com>
-Message-ID: <20140520072048.GC20874@lee--X1>
+ <20140520072048.GC20874@lee--X1>
+Message-ID: <CAOesGMioLwX3jgGEsR=rHV0u6yR54b4x8BfyZ91vjJnMapUHew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > B2120 HDK is the reference board for STiH407 SoC.
-> > It has the following characteristics:
-> >  - 1GB DDR3
-> >  - 8GB eMMC / SD-Card slot
-> >  - 32MB NOR Flash
-> >  - 1 x Gbit Ethernet
-> >  - 1 x USB 3.0 port
-> >  - 1 x Mini-PCIe
-> >  - 1 x SATA
-> >  - 1 x HDMI output
-> >  - 1 x HDMI input
-> >  - 1 x SPDIF
-> >
-> > This patch only introduces basic functionnalities, such as I2C and UART.
-> >
-> > Acked-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> > Acked-by: Lee Jones <lee.jones@linaro.org>
-> > Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> > Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
-> > ---
-> >  arch/arm/boot/dts/Makefile          |  3 +-
-> >  arch/arm/boot/dts/stih407-b2120.dts | 78 +++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 80 insertions(+), 1 deletion(-)
-> >  create mode 100644 arch/arm/boot/dts/stih407-b2120.dts
+On Tue, May 20, 2014 at 12:20 AM, Lee Jones <lee.jones@linaro.org> wrote:
+>> > B2120 HDK is the reference board for STiH407 SoC.
+>> > It has the following characteristics:
+>> >  - 1GB DDR3
+>> >  - 8GB eMMC / SD-Card slot
+>> >  - 32MB NOR Flash
+>> >  - 1 x Gbit Ethernet
+>> >  - 1 x USB 3.0 port
+>> >  - 1 x Mini-PCIe
+>> >  - 1 x SATA
+>> >  - 1 x HDMI output
+>> >  - 1 x HDMI input
+>> >  - 1 x SPDIF
+>> >
+>> > This patch only introduces basic functionnalities, such as I2C and UART.
+>> >
+>> > Acked-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+>> > Acked-by: Lee Jones <lee.jones@linaro.org>
+>> > Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+>> > Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+>> > ---
+>> >  arch/arm/boot/dts/Makefile          |  3 +-
+>> >  arch/arm/boot/dts/stih407-b2120.dts | 78 +++++++++++++++++++++++++++++++++++++
+>> >  2 files changed, 80 insertions(+), 1 deletion(-)
+>> >  create mode 100644 arch/arm/boot/dts/stih407-b2120.dts
+>
+> [...]
+>
+>> > +/ {
+>> > +       model = "STiH407 B2120";
+>> > +       compatible = "st,stih407", "st,stih407-b2120";
+>>
+>> This should go from specific to generic, so the order needs to be the other way.
+>
+> I did have a patch-set that changed all of these.  Wonder where that went!
 
-[...]
+Cool.
 
-> > +/ {
-> > +       model = "STiH407 B2120";
-> > +       compatible = "st,stih407", "st,stih407-b2120";
-> 
-> This should go from specific to generic, so the order needs to be the other way.
+>
+> [...]
+>
+>> > +       soc {
+>> > +               sbc_serial0: serial at 9530000 {
+>> > +                       status = "okay";
+>> > +               };
+>>
+>> You might want to consider reference-based syntax here instead, so you
+>> don't have to mimic the hierarchy. That'd be (at the root level of the
+>> file, below this secion:
+>>
+>> &sbc_serial0: {
+>>         status = "okay";
+>> };
+>
+> I'm personally not keen on this scheme.  It's sometimes helpful to know
+> the hierarchy and I don't think it's a large overhead to format the
+> subordinate DTS files in this way.
+>
+> Please consider not enforcing this.
 
-I did have a patch-set that changed all of these.  Wonder where that went!
+Definitely not enforcing it, and I didn't use to like it either but it
+has some real upsides.
 
-[...]
+In particular, it saves a lot of grief when you're changing something
+like the unit-id of a node in .dtsi and forget to do the same update
+in the dts.
 
-> > +       soc {
-> > +               sbc_serial0: serial at 9530000 {
-> > +                       status = "okay";
-> > +               };
-> 
-> You might want to consider reference-based syntax here instead, so you
-> don't have to mimic the hierarchy. That'd be (at the root level of the
-> file, below this secion:
-> 
-> &sbc_serial0: {
->         status = "okay";
-> };
 
-I'm personally not keen on this scheme.  It's sometimes helpful to know
-the hierarchy and I don't think it's a large overhead to format the
-subordinate DTS files in this way.
 
-Please consider not enforcing this.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+-Olof
