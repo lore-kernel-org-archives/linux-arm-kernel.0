@@ -1,60 +1,70 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Tue, 20 May 2014 14:25:11 +0530
-Subject: [PATCH v7 0/3] Add support for PCI in AArch64
-In-Reply-To: <5759329.P75jKFdv3B@wuerfel>
-References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
- <4292818.mI6kZGgTzd@wuerfel>
- <CA+sq2Ce+8YB+02B7zhxTXwropZXv9spy-w=AJ8YXCP69kr-_1A@mail.gmail.com>
- <5759329.P75jKFdv3B@wuerfel>
-Message-ID: <CA+sq2CeyUkg6ELYrWYqtxaXhNVeQ9UWiMC=GY4ADE-ZWS1bf9g@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 20 May 2014 12:01:37 +0300
+Subject: [PATCH] arm/omap4: add twd clock to DT
+In-Reply-To: <20140519162741.GG4849@atomide.com>
+References: <1396901139-17268-1-git-send-email-gilles.chanteperdrix@xenomai.org>
+ <20140418223948.GK21823@atomide.com> <5353F44F.5080400@xenomai.org>
+ <535662F0.4080300@ti.com>
+ <CAGhQ9Vw-QaB+OnLa3yNVvD6a=XOutSZ1ejbsuUXvEcyrxEsRcQ@mail.gmail.com>
+ <20140519161319.GD4849@atomide.com>
+ <CAGhQ9Vy-mvaXZ_=E_mmqYqxF5EiJSdN1rJayussm+AgKf94a+g@mail.gmail.com>
+ <20140519162741.GG4849@atomide.com>
+Message-ID: <537B19F1.5040907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 2:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 20 May 2014 09:52:33 Sunil Kovvuri wrote:
->> >> In sriov_enable() (drivers/pci/iov.c)
->> >>
->> >>  296        for (i = 0; i < PCI_SRIOV_NUM_BARS; i++) {
->> >>  297                 bars |= (1 << (i + PCI_IOV_RESOURCES));
->> >>  298                 res = dev->resource + PCI_IOV_RESOURCES + i;
->> >>  299                 if (res->parent)
->> >>  300                         nres++;
->> >>  301         }
->> >>  302         if (nres != iov->nres) {
->> >>  303                 dev_err(&dev->dev, "not enough MMIO resources for
->> >>  SR-IOV\n");
->> >>  304                 return -ENOMEM;
->> >>  305         }
->> >>
->> >> Here its checking if physical function's IOV resource has a parent or not.
->> >> Which is pci-pci bridge in this case. Otherwise it doesn't consider
->> >> that resource.
->> >>
->> >> Added below api to your patch.
->> >> This will try to claim a resource while creating a PCI device which
->> >> inturn sets 'res->parent'.
->> >
->> > This looks like the wrong approach. The PCI host controller should
->> > really have been registered with the root 'iomem_resource' during
->> > the probe of the host controller.
->> >
->> I didn't get this, if a SR-IOV device is connected to a PCI-PCI bridge
->> and inturn bridge connected to root port. Then the parent bus is not root,
->> but the bridge.  The issue is either hierarchy should not be checked for
->> SR-IOV resources or someone should set the hierarchy (i.e parent resources).
+On 05/19/2014 07:27 PM, Tony Lindgren wrote:
+> * Joachim Eastwood <manabian@gmail.com> [140519 09:24]:
+>> On 19 May 2014 18:13, Tony Lindgren <tony@atomide.com> wrote:
+>>> * Joachim Eastwood <manabian@gmail.com> [140518 05:08]:
+>>>> On 22 April 2014 14:39, Tero Kristo <t-kristo@ti.com> wrote:
+>>>>> On 04/20/2014 07:22 PM, Gilles Chanteperdrix wrote:
+>>>>>>
+>>>>>> Le 19/04/2014 00:39, Tony Lindgren a ?crit :
+>>>>>>>
+>>>>>>> * Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org> [140407 13:09]:
+>>>>>>>>
+>>>>>>>> Booting Linux 3.14 on Pandaboard currently gets the following
+>>>>>>>> message displayed:
+>>>>>>>>
+>>>>>>>> smp_twd: clock not found -2
+>>>>>>>>
+>>>>>>>> Define "mpu_periphclk" as the twd clock in omap4 dts to avoid this.
+>>>>>>>
+>>>>>>>
+>>>>>>> Tero, care to ack?
+>>>>>>
+>>>>>>
+>>>>>> Sorry if I did not mail the right people, get_maintainer.pl gave me a
+>>>>>> long list, and I did not feel like spamming all these people for such a
+>>>>>> small patch. I do not believe Tero was in this list.
+>>>>>>
+>>>>>> Regards.
+>>>>>
+>>>>>
+>>>>> Yea I don't think this is my expertise area, however the patch looks good to
+>>>>> me, so if you really need it:
+>>>>>
+>>>>> Acked-by: Tero Kristo <t-kristo@ti.com>
+>>>>
+>>>> Tony, care to add this to your omap 3.16 dt branch?
+>>>>
+>>>> I am still getting:
+>>>> [ 0.000152] smp_twd: clock not found -2
+>>>>
+>>>> So this fix from Gilles would be nice to have.
+>>>
+>>> Best that Tero picks this one up along with the other dt clock changes
+>>> he's queueing.
+>>
+>> I kinda assumed you would take it since you asked Tero to ack it. But
+>> either way is fine :)
 >
-> Ah, I misunderstood the problem, I thought the PCI core was complaining
-> about lack of space in the resources, not about a lack of BARs.
->
-> It seems there is code like yours in a couple of architectures, but they
-> only claim the resources of bridges, not the actual devices as you
-> seem to be doing. Can you check if the x86 version of
-> pcibios_allocate_bus_resources() does the trick for you? Maybe we can
-> turn that into a generic helper.
->
-Thanks for the suggestion. Will try that once.
-FYI, IA64 architecture does claim resources for devices as well.
-arch/ia64/pci/pci.c  'pcibios_fixup_device_resources()'
+> Yes that was before Tero started collecting the dt clock patches :)
 
-Thanks,
-Sunil.
+I wouldn't say this to be a clock patch as such, this touches the driver 
+behavior, i.e. registers the correct clock for the driver. That being 
+said, I can still queue this up with the clock patches if that is what 
+you want.
+
+-Tero
