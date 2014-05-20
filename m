@@ -1,90 +1,77 @@
-From: ritesh.harjani@gmail.com (ritesh.harjani at gmail.com)
-Date: Tue, 20 May 2014 10:02:59 +0530
-Subject: [PATCH v2] arm: dma-iommu: Clean up redundant variable
-Message-ID: <1400560379-1502-1-git-send-email-ritesh.harjani@gmail.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Tue, 20 May 2014 10:12:08 +0530
+Subject: [PATCH v6 0/5] MCPM backend for Exynos5420
+In-Reply-To: <alpine.LFD.2.11.1405192321040.17310@knanqh.ubzr>
+References: <1399982324-27879-1-git-send-email-a.kesavan@samsung.com>
+ <alpine.LFD.2.11.1405131325060.980@knanqh.ubzr>
+ <CAM4voanvVwj+FuWazTGMHMnM64Cw_qK03D3o=raS43f_zWFfog@mail.gmail.com>
+ <alpine.LFD.2.11.1405140031490.980@knanqh.ubzr>
+ <CAM4voa=6osyXYg_XF=XuGRYmxLDUO+5=-i+cMrNW92fzBZJjfA@mail.gmail.com>
+ <alpine.LFD.2.11.1405140931380.980@knanqh.ubzr>
+ <CAM4voam29e7aK7n86_Mpj-wwvkchm-e68qA5=iUFou+sUMONig@mail.gmail.com>
+ <CAM4voakB57mgyQmtkpCUAF1BVW5z3BGsesvxvTuSg_JwBh-sxw@mail.gmail.com>
+ <alpine.LFD.2.11.1405151250070.17310@knanqh.ubzr>
+ <CAM4voakoSd0DXvG_fSXSAYxjMDNJmvOY5GMW=jQKD5Y0jTtJ+A@mail.gmail.com>
+ <alpine.LFD.2.11.1405192321040.17310@knanqh.ubzr>
+Message-ID: <CAM4voamHMH0xohbuJvDTS2k1KApYnLBnqZyyOPQBCLijhe_6jA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ritesh Harjani <ritesh.harjani@gmail.com>
+On Tue, May 20, 2014 at 9:00 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Mon, 19 May 2014, Abhilash Kesavan wrote:
+>
+>> Hi Nicolas,
+>>
+>> On Thu, May 15, 2014 at 10:22 PM, Nicolas Pitre
+>> <nicolas.pitre@linaro.org> wrote:
+>> > Once you implement full cluster shutdown I can provide you with another
+>> > script stressing that part.
+>> I am done with the cluster power on/off code and it seems to work fine
+>> with bL_switcher. Can you please provide me with your stress script.
+>
+> Here's the script.  Credits go to Dave Martin for this one.
+>
+> The script assumes that cluster 0 comprises cpus 0 to 3 and cluster 1
+> comprises cpus 4 to 7.  You need to edit it otherwise.
+>
+> ----- >8
+> #!/bin/bash
+>
+> echo 0 >/sys/kernel/bL_switcher/active
+> sleep 1
+>
+> pids=
+>
+> for x in \
+>         "cluster=cluster0; cpus='cpu0 cpu1 cpu2 cpu3'" \
+>         "cluster=cluster1; cpus='cpu4 cpu5 cpu6 cpu7'"
+> do
+>         eval "$x"
+>         eval "\
+> $cluster () {
+>         pids=
+>                 `for cpu in $cpus; do cat <<EOF; done
+>         (sleep .00\\$RANDOM; echo \\$1 >/sys/devices/system/cpu/$cpu/online)&
+>         echo \\$1 >/sys/devices/system/cpu/$cpu/online&
+>         pids=\\$pids\ \\$!
+> EOF`
+>         wait \$pids
+>         if [ \$1 = 0 ]; then
+>                 echo \"\$n: $cluster off\"
+>         else
+>                 echo \"\$n: $cluster on\"
+>         fi
+> }"
+> done
+>
+> n=0
+> while :; do
+>         : $((++n))
+>         cluster1 1; cluster0 0
+>         cluster0 1; cluster1 0
+> done
+> ----- >8
+Thanks Nicolas. Will test with the script and post the patch if it works.
 
-mapping->size can be derived from mapping->bits << PAGE_SHIFT
-which makes mapping->size as redundant.
-
-Clean this up.
-
-Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
-Reported-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/dma-iommu.h |  1 -
- arch/arm/mm/dma-mapping.c        | 11 ++++++-----
- 2 files changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
-index eec0a12..8e3fcb9 100644
---- a/arch/arm/include/asm/dma-iommu.h
-+++ b/arch/arm/include/asm/dma-iommu.h
-@@ -18,7 +18,6 @@ struct dma_iommu_mapping {
- 	unsigned int		extensions;
- 	size_t			bitmap_size;	/* size of a single bitmap */
- 	size_t			bits;		/* per bitmap */
--	unsigned int		size;		/* per bitmap */
- 	dma_addr_t		base;
- 
- 	spinlock_t		lock;
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 6b00be1..3d43c41 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1074,6 +1074,7 @@ static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
- 	unsigned int order = get_order(size);
- 	unsigned int align = 0;
- 	unsigned int count, start;
-+	size_t mapping_size = mapping->bits << PAGE_SHIFT;
- 	unsigned long flags;
- 	dma_addr_t iova;
- 	int i;
-@@ -1119,7 +1120,7 @@ static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
- 	}
- 	spin_unlock_irqrestore(&mapping->lock, flags);
- 
--	iova = mapping->base + (mapping->size * i);
-+	iova = mapping->base + (mapping_size * i);
- 	iova += start << PAGE_SHIFT;
- 
- 	return iova;
-@@ -1129,6 +1130,7 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
- 			       dma_addr_t addr, size_t size)
- {
- 	unsigned int start, count;
-+	size_t mapping_size = mapping->bits << PAGE_SHIFT;
- 	unsigned long flags;
- 	dma_addr_t bitmap_base;
- 	u32 bitmap_index;
-@@ -1136,14 +1138,14 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
- 	if (!size)
- 		return;
- 
--	bitmap_index = (u32) (addr - mapping->base) / (u32) mapping->size;
-+	bitmap_index = (u32) (addr - mapping->base) / (u32) mapping_size;
- 	BUG_ON(addr < mapping->base || bitmap_index > mapping->extensions);
- 
--	bitmap_base = mapping->base + mapping->size * bitmap_index;
-+	bitmap_base = mapping->base + mapping_size * bitmap_index;
- 
- 	start = (addr - bitmap_base) >>	PAGE_SHIFT;
- 
--	if (addr + size > bitmap_base + mapping->size) {
-+	if (addr + size > bitmap_base + mapping_size) {
- 		/*
- 		 * The address range to be freed reaches into the iova
- 		 * range of the next bitmap. This should not happen as
-@@ -1964,7 +1966,6 @@ arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
- 	mapping->extensions = extensions;
- 	mapping->base = base;
- 	mapping->bits = BITS_PER_BYTE * bitmap_size;
--	mapping->size = mapping->bits << PAGE_SHIFT;
- 
- 	spin_lock_init(&mapping->lock);
- 
--- 
-1.8.1.3
+Regards,
+Abhilash
