@@ -1,70 +1,52 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Tue, 20 May 2014 10:41:25 +0530
-Subject: [PATCH v3 0/4] ARM: dts: enable display for peach-pit and snow
- boards
-In-Reply-To: <537A25F8.4040604@samsung.com>
-References: <1399630186-22610-1-git-send-email-rahul.sharma@samsung.com>
- <537A25F8.4040604@samsung.com>
-Message-ID: <CAPdUM4OcHOiSAbNt_6yEo_YY3FqGxef=p33opW21nEt7P+m6Xw@mail.gmail.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Tue, 20 May 2014 07:12:03 +0200
+Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
+ support
+In-Reply-To: <537A55EB.1080507@ti.com>
+References: <20140514160216.GD18463@atomide.com> <537487AE.3060906@ti.com>
+ <20140515182133.GC23659@atomide.com> <5375A8A8.7080306@ti.com>
+ <20140516160717.GD22031@atomide.com>
+ <20140516174158.GA11733@earth.universe>
+ <20140516180154.GG22031@atomide.com> <5379CD24.6040508@ti.com>
+ <20140519160447.GB4849@atomide.com> <537A55EB.1080507@ti.com>
+Message-ID: <20140520051203.GB28812@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Kukjin,
+On Mon, May 19, 2014 at 10:05:15PM +0300, Tomi Valkeinen wrote:
+> On 19/05/14 19:04, Tony Lindgren wrote:
+> 
+> > In many cases however we do have multiple compatible strings that
+> > describe how the device is wired. See drivers/tty/serial/of_serial.c
+> > for example. It has "ns16550" but then it also has additional
+> > "nvidia,tegra20-uart", "nxp,lpc3220-uart" and "ibm,qpace-nwp-serial".
+> 
+> All those sound like SoC components. In that case it sounds fine to have
+> the device compatible contain the SoC name. We're talking here about
+> external, detachable devices.
+>
+> >>> Not use what you're after with the SPI example though, but sounds
+> >>> like that's something different.
+> >>
+> >> I think Sebastien's example is just like the issue here.
+> > 
+> > Hmm is there some existing example in the kernel like that?
+> 
+> No, Sebastien's example was just a hypothetical case. Here, using your
+> way of having SoC specific data in the .dts, we would have
+> "sharp,ls037v7dw01-omap-dss", and in Sebastien's example with a touch
+> sensor we'd have, say, "synaptics,xyz123-omap-spi".
 
-I have changed it in my environment now.
+Yes, that's what I wanted to say :)
 
-Regards,
-Rahul Sharma.
+My name is spelled Sebastian, though. Sebastien is the French
+variant as far as i know.
 
-On 19 May 2014 21:10, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> On 05/09/14 19:09, Rahul Sharma wrote:
->>
->> From: Rahul Sharma<Rahul.Sharma@samsung.com>
->
->
-> Probably, should be "Rahul Sharma <rahul.sharma@...>"
->
-> Please make sure your gitconfig has no problem.
->
-> Just note, I found same thing and fixed your email address in my tree...
->
->
->>
->> Add nodes for fimd and dp controller for exynos5250 based snow
->> and exynos5420 based peach-pit board.
->>
->> This series is based on Kukjin Kims, for-next branch.
->>
->> V3:
->> 1) Dropped 1 patch "ARM: dts: move dp hpd line to the board file for
->>   exynos5420".
->> 2) Extra blank lines for readability.
->> 3) dp hpd gpio name change (dp_hpd ->  dp_hpd_gpio)
->>
->> V2:
->> 1) Rebase on Peach-pit dependent patches.
->>
->> It is dependent on
->> 1) Andrew Bresticker's patch for hpd gpio addition, avilable at
->> http://www.spinics.net/lists/linux-samsung-soc/msg28827.html [Patch is
->> 'ACK'ed.]
->> 2) Arun's patch for adding peach-pit board dts file at
->> http://www.spinics.net/lists/linux-samsung-soc/msg30103.html. [Patch is
->> 'ACK'ed.]
->>
->> Rahul Sharma (4):
->>    ARM: dts: enable fimd for exynos5250 based snow board
->>    ARM: dts: enable dp-controller for exynos5250 based snow board
->>    ARM: dts: enable fimd for exynos5420 based peach-pit board
->>    ARM: dts: enable dp-controller for exynos5420 based peach-pit board
->>
->>   arch/arm/boot/dts/exynos5250-snow.dts      |   35
->> ++++++++++++++++++++++++
->>   arch/arm/boot/dts/exynos5420-peach-pit.dts |   41
->> ++++++++++++++++++++++++++++
->>   2 files changed, 76 insertions(+)
->>
-> OK, applied whole series with Jingoo's 'reviewed-by'.
->
-> Thanks,
-> Kukjin
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/c690405c/attachment.sig>
