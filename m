@@ -1,52 +1,56 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 20 May 2014 07:12:03 +0200
-Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
- support
-In-Reply-To: <537A55EB.1080507@ti.com>
-References: <20140514160216.GD18463@atomide.com> <537487AE.3060906@ti.com>
- <20140515182133.GC23659@atomide.com> <5375A8A8.7080306@ti.com>
- <20140516160717.GD22031@atomide.com>
- <20140516174158.GA11733@earth.universe>
- <20140516180154.GG22031@atomide.com> <5379CD24.6040508@ti.com>
- <20140519160447.GB4849@atomide.com> <537A55EB.1080507@ti.com>
-Message-ID: <20140520051203.GB28812@earth.universe>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Tue, 20 May 2014 10:44:41 +0530
+Subject: [PATCH] ASoC: samsung: Allow setting OP_CLK of the IIS Multi
+ Audio Interface
+In-Reply-To: <1400520638-6907-1-git-send-email-s.nawrocki@samsung.com>
+References: <1400520638-6907-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <537AE4C1.7050703@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 10:05:15PM +0300, Tomi Valkeinen wrote:
-> On 19/05/14 19:04, Tony Lindgren wrote:
+On 05/19/2014 11:00 PM, Sylwester Nawrocki wrote:
+> This patch adds support for setting source clock of the "Core CLK"
+> of the IIS Multi Audio Interface.
 > 
-> > In many cases however we do have multiple compatible strings that
-> > describe how the device is wired. See drivers/tty/serial/of_serial.c
-> > for example. It has "ns16550" but then it also has additional
-> > "nvidia,tegra20-uart", "nxp,lpc3220-uart" and "ibm,qpace-nwp-serial".
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+>  sound/soc/samsung/i2s.c |    4 ++++
+>  sound/soc/samsung/i2s.h |    1 +
+>  2 files changed, 5 insertions(+)
 > 
-> All those sound like SoC components. In that case it sounds fine to have
-> the device compatible contain the SoC name. We're talking here about
-> external, detachable devices.
->
-> >>> Not use what you're after with the SPI example though, but sounds
-> >>> like that's something different.
-> >>
-> >> I think Sebastien's example is just like the issue here.
-> > 
-> > Hmm is there some existing example in the kernel like that?
-> 
-> No, Sebastien's example was just a hypothetical case. Here, using your
-> way of having SoC specific data in the .dts, we would have
-> "sharp,ls037v7dw01-omap-dss", and in Sebastien's example with a touch
-> sensor we'd have, say, "synaptics,xyz123-omap-spi".
+> diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+> index 048ead9..ae02811 100644
+> --- a/sound/soc/samsung/i2s.c
+> +++ b/sound/soc/samsung/i2s.c
+> @@ -451,6 +451,10 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
+>  	u32 mod = readl(i2s->addr + I2SMOD);
+>  
+>  	switch (clk_id) {
+> +	case SAMSUNG_I2S_OPCLK:
+> +		mod &= ~MOD_OPCLK_MASK;
+> +		mod |= dir;
 
-Yes, that's what I wanted to say :)
+I am assuming here that dir is one of SND_SOC_CLOCK_IN or
+SND_SOC_CLOCK_OUT. In that case, you need to take care of offset (30).
 
-My name is spelled Sebastian, though. Sebastien is the French
-variant as far as i know.
+Also the value of this bit-field doesn't match with SND_SOC_CLOCK_XXX
+macros.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/c690405c/attachment.sig>
+Bit-field (2'b):
+00	Codec Clock out
+01	Codec Clock in
+10	Bit clock out
+11	Audio bus clock
+
+Value of macros:
+SND_SOC_CLOCK_IN	0
+SND_SOC_CLOCK_OUT	1
+
+In the manual, this field is suggested to be Audio bus clock always. Is
+there an use-case where we might need to update this?
+
+The default value for audio playback right now is 00 (2'b), which needs
+to be fixed anyways.
+
+-- 
+Tushar Behera
