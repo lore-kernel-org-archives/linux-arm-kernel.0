@@ -1,70 +1,191 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 20 May 2014 16:26:09 +0530
-Subject: [PATCH v3 00/13]  ARM/DT: edma: IP configuration from hardware
- and cleanups
-In-Reply-To: <537A36F9.40004@ti.com>
-References: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
- <537A01F2.2090107@ti.com> <537A36F9.40004@ti.com>
-Message-ID: <537B34C9.1020508@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 20 May 2014 13:05:37 +0200
+Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <5759340.gycj7cP1t3@wuerfel>
+References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
+ <14622654.QO8kH1AoTT@wuerfel> <20140519205945.GE30737@mithrandir>
+ <5759340.gycj7cP1t3@wuerfel>
+Message-ID: <20140520110536.GA10302@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 May 2014 10:23 PM, Peter Ujfalusi wrote:
-> On 05/19/2014 04:06 PM, Sekhar Nori wrote:
->> On Friday 16 May 2014 05:47 PM, Peter Ujfalusi wrote:
->>> Hi,
->>>
->>> Changes since v2:
->>> - Comments from Sekhar and Arnd has been addressed best as I could.
->>> - Use the CCCFG information in all cases instead of pdata provided information
->>> - To achieve this I needed to do a bit more cleanup in this series
->>> - In the documentation patch, retrain the old properties for reference
->>> - Cleanups in the old davinci board files and removing edma_soc_info members
->>>
->>> Changes sicne v1:
->>> - added missing patch to remove the memset from edma_of_parse_dt()
->>>
->>> We are requesting redundant information via DT for the driver since the very same
->>> data is available in the HW: by reading and decoding the content of CCCFG
->>> register we can get:
->>> Number of channels: NUM_DMACH
->>> Number of regions: NUM_REGN
->>> Number of slots (PaRAM sets): NUM_PAENTRY
->>> Number of TC/EQ: NUM_EVQUE
->>>
->>> So these does not need to be provided by the DT binding.
->>>
->>> The driver will no longer look for these properties from DT and they can be
->>> removed from the binding documentation and from the dtsi files as well.
->>> The change will not introduce regression when new kernel is booted using older
->>> DTB (since we just ignore the mentioned properties).
->>
->> Applied all patches and pushed to branch v3.16/edma of:
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git
->>
->> Since the patches did not apply cleanly, please verify. I tested on
->> DA850 EVM using MMC/SD as EDMA user.
+On Tue, May 20, 2014 at 12:04:54PM +0200, Arnd Bergmann wrote:
+> On Monday 19 May 2014 22:59:46 Thierry Reding wrote:
+> > On Mon, May 19, 2014 at 08:34:07PM +0200, Arnd Bergmann wrote:
+> > > On Monday 19 May 2014 14:53:37 Thierry Reding wrote:
+> > > > On Mon, May 19, 2014 at 12:26:35PM +0200, Arnd Bergmann wrote:
+> > > > > On Friday 16 May 2014 14:23:18 Thierry Reding wrote:
+> > > > > > From: Thierry Reding <treding@nvidia.com>
+[...]
+> > > > > Finally, it makes no sense to use the dma-ranges property of the master's
+> > > > > parent bus, because that bus isn't actually involved in the translation.
+> > > > 
+> > > > My understanding here is mostly based on the OpenFirmware working group
+> > > > proposal for the dma-ranges property[0]. I'll give another example to
+> > > > try and clarify how I had imagined this to work:
+> > > > 
+> > > > 	/ {
+> > > > 		#address-cells = <2>;
+> > > > 		#size-cells = <2>;
+> > > > 
+> > > > 		iommu {
+> > > > 			/*
+> > > > 			 * This is somewhat unusual (or maybe not) in that we
+> > > > 			 * need 2 cells to represent the size of an address
+> > > > 			 * space that is 32 bits long.
+> > > > 			 */
+> > > > 			#address-cells = <1>;
+> > > > 			#size-cells = <2>;
+> > > 
+> > > You should never need #size-cells > #address-cells
+> > 
+> > That was always my impression as well. But how then do you represent the
+> > full 4 GiB address space in a 32-bit system? It starts at 0 and ends at
+> > 4 GiB - 1, which makes it 4 GiB large. That's:
+> > 
+> > 	<0 1 0>
+> > 
+> > With #address-cells = <1> and #size-cells = <1> the best you can do is:
+> > 
+> > 	<0 0xffffffff>
+> > 
+> > but that's not accurate.
 > 
-> The patches in this series looks OK in your branch.
-> However I can not find the following commits in there, which I have in linux-next:
-> c689a7b79c28 Merge remote-tracking branch 'slave-dma/next'
-> cdae05a0f0f7 dmaengine: edma: Make reading the position of active channels work
-> cf7eb979116c ARM: common: edma: Fix xbar mapping
-> 232b223d8281 dmaengine: edma: Set DMA_CYCLIC capability flag
-> 7cf2af90cd51 arm: common: edma: Save the number of event queues/TCs
+> I think we've done both in the past, either extended #size-cells or
+> taken 0xffffffff as a special token. Note that in your example,
+> the iommu actually needs #address-cells = <2> anyway.
+
+But it needs #address-cells = <2> only to encode an ID in addition to
+the address. If this was a single-master IOMMU then there'd be no need
+for the ID.
+
+This really isn't specific to IOMMUs though. It really applies to all
+cases where #address-cells and #size-cells are parsed. While it's way
+too late to change the semantics of standard properties, perhaps for
+properties that are introduced it would make more sense to encode this
+as a <start limit> pair, both of length #address-cells, to avoid this
+type of corner case.
+
+On the other hand doing so would make it inconsistent with existing
+bindings which may not be desirable either.
+
+But since it seems like we're headed for something completely different
+for IOMMUs, perhaps it would be worth considering to describe the IOMMU
+range as <start limit>. Since it will likely use #iommu-cells rather
+than #address-cells we have an opportunity to change the semantics.
+
+> > > Let me do another example, with the address merged into the iommu
+> > > references:
+> > > 
+> > > / {
+> > > 	#address-cells = <2>; // 64-bit address
+> > > 	#size-cells = <2>;
+> > > 
+> > > 	iommu at a {
+> > > 		#address-cells = <2>; // 1 cell ID, 1 cell address
+> > > 		#size-cells = <1>;
+> > > 
+> > > 		// no need for #iommu-cells
+> > > 	};
+> > > 
+> > > 
+> > > 	master at b {
+> > > 		iommus = <&/iommu@a // iommu
+> > > 			0x23  	     // ID
+> > > 			0x40000000   // window start
+> > > 			0x10000000>; //window size
+> > > 	};
+> > > };
+> > > 
+> > > A disadvantage of this model would be that for all ARM SMMU users, we'd
+> > > have to always list a 4GB address space, which is kind of redundant.
+> > 
+> > Isn't that the equivalent of the "whole address space" default that I
+> > mentioned in the commit message? Could this be handled with
+> > #address-cells = <1> and #size-cells = <0> in the iommu node? That way
+> > the only cell that needs to be specified in iommus would be the ID and
+> > the redundant address space could be simply omitted from DT since it
+> > would be implied by the compatible string.
 > 
-> They might come via different route...
+> Yes, that's right. After giving it some more thought, I agree that the
+> #size-cells case makes sense as an indicator for cases where the master
+> doesn't have to care about the address at all and no further translation
+> with dma-ranges is possible.
+> 
+> Back to my example with dma-ranges, the simplest case would an IOMMU
+> that has an ID per bus, with multiple masters sharing that ID:
+> 
+> / {
+> 	#address-cells = <1>;
+> 	#size-cells = <1>;
+> 
+> 	iommu {
+> 		#address-cells = <2>; // ID, address
+> 		#size-cells = <2>;
+> 	};
+> 
+> 	master at a {
+> 		iommus = <& {/iommu} 0xa 0x0  0x1 0x0>; // 4GB ID '0xa'
+> 	}
+> 
+> 	bus1 {
+> 		#address-cells = <1>;
+> 		#size-cells = <1>;
+> 		ranges;
+> 		iommus = <& {/iommu} 0 0   0x100 0>; // all IDs
+> 		dma-ranges = <0  0xb 0  1 0>; // child devices use ID '0xb'
+> 
+> 		anothermaster {
+> 			// no iommus link, implied by dma-ranges above
+> 		};
+> 	};
+> };
+> 
+> If you set #size-cells=<0>, you can't really do that but instead would
+> require an iommus property in each master, which is not a big concern
+> either.
 
-Vinod,
+I'm not sure I understand the need for 0x100 (all IDs) entry above. If
+bus1's iommus property applies to all devices on the bus, why can't the
+ID 0xb be listed in the iommus property?
 
-Do you have an immutable branch based on which I can send this patch
-series to ARM-SoC? Some of the patches in the series depend on code that
-went through your tree.
+	bus1 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+		iommus = <&{/iommu} 0xb 0  0x1 0x0>; // 4GB ID '0xb'
+		dma-ranges = <0  0xb 0  0x1 0x0>;
 
-Or if you are comfortable taking this series through your tree, thats
-okay by me too. We are still waiting for acks from DT maintainers on the
-binding change patches.
+		anothermaster {
+			...
+		};
+	};
 
-Thanks,
-Sekhar
+In which case I guess dma-ranges would be redundant.
+
+> The main advantage I think would be for IOMMUs that use the PCI b/d/f
+> numbers as IDs. These can have #address-cells=<3>, #size-cells=<2>
+> and have an empty dma-ranges property in the PCI host bridge node,
+> and interpret this as using the same encoding as the PCI BARs in
+> the ranges property.
+
+I'm somewhat confused here, since you said earlier:
+
+> After giving the ranges stuff some more thought, I have come to the
+> conclusion that using #iommu-cells should work fine for almost
+> all cases, including windowed iommus, because the window is not
+> actually needed in the device, but only in the iommu, wihch is of course
+> free to interpret the arguments as addresses.
+
+But now you seem to be saying that we should still be using the
+#address-cells and #size-cells properties in the IOMMU node to determine
+the length of the specifier.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/54105368/attachment-0001.sig>
