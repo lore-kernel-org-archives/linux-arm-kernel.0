@@ -1,46 +1,157 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 20 May 2014 17:31:39 -0400 (EDT)
-Subject: [PATCH 1/2] arm64: topology: Tell the scheduler about the relative
- power of cores
-In-Reply-To: <20140520173727.GD28293@arm.com>
-References: <1400545421-28067-1-git-send-email-broonie@kernel.org>
- <20140520173727.GD28293@arm.com>
-Message-ID: <alpine.LFD.2.11.1405201716460.17310@knanqh.ubzr>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue, 20 May 2014 23:32:04 +0200
+Subject: [PATCH v3 4/9] of: mtd: add documentation for the ONFI NAND timing
+ mode property
+In-Reply-To: <20140520195240.GW28907@ld-irv-0074>
+References: <1394647664-8258-1-git-send-email-b.brezillon.dev@gmail.com>
+ <1394647664-8258-5-git-send-email-b.brezillon.dev@gmail.com>
+ <20140520182542.GS28907@ld-irv-0074> <537BAD59.3060902@free-electrons.com>
+ <20140520195240.GW28907@ld-irv-0074>
+Message-ID: <537BC9D4.6070200@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 May 2014, Catalin Marinas wrote:
 
-> On Tue, May 20, 2014 at 01:23:40AM +0100, Mark Brown wrote:
-> > In heterogeneous systems like big.LITTLE systems the scheduler will be
-> > able to make better use of the available cores if we provide power numbers
-> > to it indicating their relative performance. Do this by parsing the CPU
-> > nodes in the DT.
-> 
-> Last time we discussed these two patches, my understanding was that the
-> mainline scheduler doesn't behave any better on big.LITTLE with this
-> additional information, unless you also have additional out of tree b.L
-> MP patches. Vincent is also cleaning up some of the cpu_power usage in
-> the scheduler.
-> 
-> So unless there are clear benefits in providing such information to the
-> mainline scheduler, I don't plan to merge them for the time being (I'm
-> also not convinced of the numbers in the second patch, they need some
-> benchmarking on real hardware).
+On 20/05/2014 21:52, Brian Norris wrote:
+> On Tue, May 20, 2014 at 09:30:33PM +0200, Boris BREZILLON wrote:
+>> Hi Brian,
+>>
+>> On 20/05/2014 20:25, Brian Norris wrote:
+>>> Hi Boris,
+>>>
+>>> On Wed, Mar 12, 2014 at 07:07:39PM +0100, Boris BREZILLON wrote:
+>>>> Add documentation for the ONFI NAND timing mode property.
+>>>>
+>>>> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/mtd/nand.txt |    8 ++++++++
+>>>>  1 file changed, 8 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/mtd/nand.txt b/Documentation/devicetree/bindings/mtd/nand.txt
+>>>> index b53f92e..2046027 100644
+>>>> --- a/Documentation/devicetree/bindings/mtd/nand.txt
+>>>> +++ b/Documentation/devicetree/bindings/mtd/nand.txt
+>>>> @@ -19,3 +19,11 @@ errors per {size} bytes".
+>>>>  The interpretation of these parameters is implementation-defined, so not all
+>>>>  implementations must support all possible combinations. However, implementations
+>>>>  are encouraged to further specify the value(s) they support.
+>>>> +
+>>>> +- onfi,nand-timing-mode: an integer encoding the supported ONFI timing modes of
+>>>> +  the NAND chip. Each supported mode is represented as a bit position (i.e. :
+>>>> +  mode 0 and 1 => (1 << 0) | (1 << 1) = 0x3).
+>>>> +  This is only used when the chip does not support the ONFI standard.
+>>>> +  The last bit set represent the closest mode fulfilling the NAND chip timings.
+>>>> +  For a full description of the different timing modes see this document:
+>>>> +  www.onfi.org/~/media/ONFI/specs/onfi_3_1_spec.pdf
+>>> I'm not 100% convinced this property should go in the device tree. With
+>>> most other flash properties (device size, page size, and even minimum
+>>> ECC requirements), we try to auto-detect these parameters to some
+>>> extent. ONFI makes it easy for some class of chips, but for others, we
+>>> typically rely on an in-kernel device ID table or ID decoding heuristic
+>>> -- we don't require a DT description of every property of the flash. So
+>>> what makes this property different?
+>> AFAICT nothing, but the same goes for the ECC requirements, and we've
+>> recently added DT bindings to define these requirements.
+>> I'm not telling we should drop these ECC requirements bindings (actually
+>> I'm using them :-)), but what's different with the timings requirements ?
+> ECC selection is not quite as scientific; with ECC, there are external
+> factors that influence the ECC mode that you should use, since any data
+> read/written from Linux has to be compatible with any data read/written
+> with another entity (e.g., bootloader). Note that the ECC bindings do
+> not represent a property of the flash chip itself (i.e., they don't hold
+> the "minimum required ECC strength"), but of the entire flash system
+> (i.e., "what ECC must I use to play nicely with the rest of the world").
 
-We are indeed in the process of working out how to use this information 
-in the scheduler, submitting patches, etc.  Thing is, we risk seeing the 
-scheduler maintainers saying: "unless there are clear users of those 
-enhancements to the mainline scheduler, we don't plan to merge them for 
-the time being."
+If the ECC bindings don't encode the "minimum required ECC strength" but
+rather the "ECC config on a specific board" then I guess "minimum
+required ECC strength" for non-ONFI chips should be defined somewhere
+else (stored in the device ID table ?).
 
-It might be more productive to merge _something_ first, and doing so on 
-the architecture side is certainly the least intrusive initial move.
+Actually, in the sunxi NAND controller driver, I'm using the DT defined
+ECC config when the NAND does not support ONFI timings retrieval.
 
-As to the numbers themselves... I suspect it will be hard to come up 
-with a benchmark that everyone will agree with.  Those numbers certainly 
-can be refined later when the scheduler side has evolved and more tests 
-have been performed.
+>
+> With timing modes, this is purely a property of the flash chip, and we
+> do not have to synchronize it with the bootloader. We don't exactly care
+> if a bootloader and Linux use slightly different timing modes.
+
+Agreed.
 
 
-Nicolas
+>
+>> Moreover, we will end up with a lot of new entries in the device ID
+>> table if we decide to put these informations in this table.
+> Yes, that could be a problem.
+>
+> What sort of non-ONFI flash chips do you have that need this property?
+
+I only have the Hynix one defined in my patch series.
+Other people tested my driver on different boards but I don't recall
+exactly which NAND they had (a samsung one IIRC).
+
+> And what timing mode(s) do they use? Is there, for instance, a pattern
+> such that all Hynix MLC of a certain generation use a particular timing
+> mode?
+
+I'll take a look.
+
+>
+>>> I realize that we may not include device ID entries for every flash that
+>>> you need in the ID table (although we still are able to detect the
+>>> important properties accurately, like page and block size). But would it
+>>> suffice to default these flash to a lowest common timing mode, like mode
+>>> 0?
+>> IMHO this is not a good solution: you'll end up with lower perfomances
+>> on most of the supported NAND chips and I'm not sure this is what we want.
+> No, we wouldn't want to always use mode 0. But it's possible we can get
+> good enough heuristics for most flash, if we can integrate timing modes
+> into the current extended ID decoding. Not sure.
+>
+> I'm also concerned here that this kind of binding will be difficult to
+> use properly. A user/developer/board-designer would have to read the
+> datasheet and compare all its values to the ONFI spec to find the
+> closest match, and they would have to do this for each new flash they
+> use. If we can help them by autodetecting this, that would be great.
+ 
+
+>
+>>> If no other option works well, then I am still open to describing the
+>>> supported timing modes in the DT.
+>>>
+>>> BTW, this bitfield property looks kinda strange to me. Do non-ONFI flash
+>>> typically support multiple timing modes? And if so, how are we supposed
+>>> to *change* modes? AFAIK, ONFI provides the only standard for
+>>> configuring the flash's timing mode. So maybe you're really only wanting
+>>> a "default timing mode" property that is a single integer, not a
+>>> bitfield.
+>> Indeed, I based it on the ONFI NAND timings mode model, but AFAIK (tell
+>> me if I'm wrong), it should work because most of the timings are min
+>> requirements.
+>> This means, even if you provide slower signals transitions, the NAND
+>> will work as expected.
+> So you're saying that even though the chip actually specifies a single
+> set of timings, you would describe this as a bitmask of several
+> supported ONFI timing modes, up to the "max performance"?
+>
+> Is there ever a case where (for instance) a non-ONFI flash supports the
+> equivalent of timing mode 3, but it does not support mode 2 or 1?
+
+I don't think so.
+
+>> But I can modify the bindings to just encode the maximum supported
+>> timing mode.
+> AIUI, the non-ONFI datasheets really only specify a single timing mode,
+> so I think we should only specify the "max." And as a bonus, this
+> actually makes the binding easier to use. A driver does not care about
+> how many different modes are supported; it only needs to know what the
+> max is.
+
+Agreed, actually my first binding was defining it this way.
+
+>
+> Brian
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
