@@ -1,42 +1,48 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 20 May 2014 16:09:30 -0500
-Subject: [PATCH 04/10] irqchip: versatile-fpga: add DT init
-In-Reply-To: <1400620176-7239-1-git-send-email-robherring2@gmail.com>
-References: <1400620176-7239-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1400620176-7239-5-git-send-email-robherring2@gmail.com>
+Date: Tue, 20 May 2014 16:09:26 -0500
+Subject: [PATCH 00/10] ARM: Versatile irq and clock DT support
+Message-ID: <1400620176-7239-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <robh@kernel.org>
 
-Add IRQCHIP_DECLARE call for the versatile-fpga interrupt controller so
-that initialization from DT will work.
+This series is some preparation work to fully convert Versatile platform 
+to DT. This converts the IRQ initialization to DT based init and adds 
+clocks to the Versatile DT. This doesn't actually enable using common 
+clock framework, but that is only a matter of removing the old clock 
+code and enabling the appropriate Kconfig options. This will be done 
+when Versatile can be completely converted over to DT boot. I have that 
+working in my tree, but full DT conversion is also dependent on DT PCI 
+support.
 
-Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
----
- drivers/irqchip/irq-versatile-fpga.c | 3 +++
- 1 file changed, 3 insertions(+)
+I've tested under QEMU and Linus Walleij has tested an earlier version 
+on Versatile AB h/w.
 
-diff --git a/drivers/irqchip/irq-versatile-fpga.c b/drivers/irqchip/irq-versatile-fpga.c
-index 328440b..11ab10d 100644
---- a/drivers/irqchip/irq-versatile-fpga.c
-+++ b/drivers/irqchip/irq-versatile-fpga.c
-@@ -14,6 +14,8 @@
- #include <asm/exception.h>
- #include <asm/mach/irq.h>
- 
-+#include "irqchip.h"
-+
- #define IRQ_STATUS		0x00
- #define IRQ_RAW_STATUS		0x04
- #define IRQ_ENABLE_SET		0x08
-@@ -217,4 +219,5 @@ int __init fpga_irq_of_init(struct device_node *node,
- 
- 	return 0;
- }
-+IRQCHIP_DECLARE(arm_fpga, "arm,versatile-sic", fpga_irq_of_init);
- #endif
+Rob
+
+Rob Herring (10):
+  dt/bindings: add passthru-mask property to versatile-fpga-irq
+  dts: versatile: add missing irq controller properties
+  irqchip: versatile-fpga: add pass-thru enable support
+  irqchip: versatile-fpga: add DT init
+  ARM: versatile: remove init_irq hook for DT boot
+  dts: versatile: add pl180 compatible strings
+  dt/bindings: arm-boards: add binding for Versatile core module
+  dt/bindings: add compatible string for versatile osc clock
+  dts: versatile: add clock tree
+  clk: versatile: add versatile OSC support
+
+ Documentation/devicetree/bindings/arm/arm-boards   |  6 ++
+ .../devicetree/bindings/arm/versatile-fpga-irq.txt |  3 +
+ .../devicetree/bindings/clock/arm-integrator.txt   |  4 +-
+ arch/arm/boot/dts/versatile-ab.dts                 | 81 +++++++++++++++++++++-
+ arch/arm/boot/dts/versatile-pb.dts                 | 12 +++-
+ arch/arm/mach-versatile/versatile_dt.c             |  1 -
+ drivers/clk/versatile/Makefile                     |  3 +-
+ drivers/clk/versatile/clk-integrator.c             | 35 +++++++++-
+ drivers/irqchip/irq-versatile-fpga.c               |  9 +++
+ 9 files changed, 145 insertions(+), 9 deletions(-)
+
 -- 
 1.9.1
