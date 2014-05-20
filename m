@@ -1,106 +1,64 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 20 May 2014 10:41:07 +0200
-Subject: [STLinux Kernel] [PATCH 3/4] ARM: DT: STi: Add DT node for
- MiPHY365x
-In-Reply-To: <20140520082858.GF20874@lee--X1>
-References: <1398756095-32542-1-git-send-email-lee.jones@linaro.org>
- <1398756095-32542-4-git-send-email-lee.jones@linaro.org>
- <537A265E.8080407@st.com> <20140519155106.GR4978@lee--X1>
- <537B01E9.8020507@st.com> <20140520082858.GF20874@lee--X1>
-Message-ID: <537B1523.1010503@st.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 20 May 2014 14:10:09 +0530
+Subject: [PATCH 00/11] ARM: OMAP: OMAP5 & AM43x DSS
+In-Reply-To: <537AE8A7.4080307@ti.com>
+References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
+ <5370CBD5.3060107@ti.com> <20140512143604.GB31772@atomide.com>
+ <5370E172.20009@ti.com> <20140512154850.GG31772@atomide.com>
+ <5375C8E8.1020209@ti.com> <537AE8A7.4080307@ti.com>
+Message-ID: <537B14E9.2050108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 05/20/2014 10:28 AM, Lee Jones wrote:
->>>>> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
->>>>> devices. It has 2 ports which it can use for either; both SATA, both
->>>>> PCIe or one of each in any configuration.
->>>>>
->>>>> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
->>>>> Acked-by: Mark Rutland <mark.rutland@arm.com>
->>>>> Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
->>>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>>>> ---
->>>>>   arch/arm/boot/dts/stih416-b2020-revE.dts | 22 ++++++++++++++++++++++
->>>>>   arch/arm/boot/dts/stih416-b2020.dts      |  6 ++++++
->>>>>   arch/arm/boot/dts/stih416.dtsi           | 14 ++++++++++++++
->>>>>   3 files changed, 42 insertions(+)
->>>>>   create mode 100644 arch/arm/boot/dts/stih416-b2020-revE.dts
->>>>>
->>>>> diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
->>>>> new file mode 100644
->>>>> index 0000000..23fdaf7
->>>>> --- /dev/null
->>>>> +++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
->>>>> @@ -0,0 +1,22 @@
->>>>> +/*
->>>>> + * Copyright (C) 2014 STMicroelectronics Limited.
->>>>> + * Author: Lee Jones <lee.jones@linaro.org>
->>>>> + *
->>>>> + * This program is free software; you can redistribute it and/or modify
->>>>> + * it under the terms of the GNU General Public License version 2 as
->>>>> + * publishhed by the Free Software Foundation.
->>>>> + */
->>>>> +/dts-v1/;
->>>>> +#include "stih416.dtsi"
->>>>> +#include "stih41x-b2020.dtsi"
->>>>> +/ {
->>>>> +        model = "STiH416 B2020 REV-E";
->>>>> +	compatible = "st,stih416-b2020", "st,stih416";
->>>>> +
->>>>> +	soc {
->>>>> +		miphy365x_phy: miphy365x at fe382000 {
->>>>> +			st,pcie-tx-pol-inv;
->>>>> +			st,sata-gen = <3>;
->>>>> +		};
->>>>> +	};
->>>>> +};
->>>> Shouldn't this new board being added in a separate patch?
->>>
->>> I certainly can do that, but I don't think that it's necessary?
+On Tuesday 20 May 2014 11:01 AM, Archit Taneja wrote:
+> Hi,
+> 
+> On Friday 16 May 2014 01:44 PM, Tomi Valkeinen wrote:
+>> On 12/05/14 18:48, Tony Lindgren wrote:
 >>
->> I think it is, as you introduce a new board.
->
-> Introducing an empty dts file just so you can say "this is a new
-> board" seems odd to me, but I'll go with whatever you feel it right.
->
->> Moreover, the miphy description being the same as in
->> stih416-b2020.dts, so I don't understand why you introduce this
->> board for this feature.
->
-> It's historical.  There are other differences between rev-E and the
-> other reversions, such as; gpio-leds (red, green) and the reset GPIO
-> for ethernet.  As these are dts files (rather than dtsi) files, you
-> can only use one at a time.
-
-My point was to create a new patch that would also introduce the 
-differences (Ethernet, leds...). The commit message would explain the 
-differences versus stih416-b2020.
-
- From your patch, if I didn't know the differences, I would ask why you 
-don't use stih416-b2020.dts.
-
-If you have another pending patch that make Ethernet to work on revE 
-board, you can keep this one as it is.
-
->
->>>>> diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
->>>>> index 276f28d..172f222 100644
->>>>> --- a/arch/arm/boot/dts/stih416-b2020.dts
->>>>> +++ b/arch/arm/boot/dts/stih416-b2020.dts
->>>>> @@ -13,4 +13,10 @@
->>>>>   	model = "STiH416 B2020";
->>>>>   	compatible = "st,stih416", "st,stih416-b2020";
->>>>>
->>>>> +	soc {
->>>>> +		miphy365x_phy: miphy365x at fe382000 {
->>>>> +			st,pcie-tx-pol-inv;
->>>>> +			st,sata-gen = <3>;
->>>>> +		};
->>>>> +	};
->>>>>   };
->>>> ...
+>>>>> Also, I'm wondering why we still have .clk and .opt_clks entries in the
+>>>>> hwmod data for am43xx and omap5 which are both device tree based with
+>>>>> all the clocks coming from .dts files?
+>>>>
+>>>> I think they are needed for the omap_device/hwmod stuff to work. Only
+>>>> omapdss driver knows about the clocks defined in the .dts files, and the
+>>>> omap_device/hwmod code still needs to do the reset and maybe some other
+>>>> tasks that require the clocks.
 >>>
->
+>>> We're already populating the hwmod data from dts entries, that's done by
+>>> omap_device_build_from_dt. Why aren't we doing that for dt defined clocks?
+>>>
+>>> I'd rather not start adding new data that will then just be removed, that's
+>>> what people call "pointless extra churn".
+>>
+>> I don't know why. I have to say I'm not 100% sure if that's done or not,
+>> but at least I can't find where it's done.
+> 
+> The reason why clocks are needed from hwmod data is because we still don't populate hwmod fields like main_clk and opt_clock from DT clocks.
+> 
+> The reason why this isn't done yet is because we currently haven't figured out a clean way to tell hwmod what clock is the main_clk, and what clocks are optional clocks.
+> 
+> One of the proposed methods was to assume the clock named to be "fck" as main_clk, and the remaining clocks as optional clocks for hwmod. That method wasn't agreed upon, this looks like the thread which discusses this:
+> 
+> http://marc.info/?l=linux-arm-kernel&m=138928084823142&w=2
+
+So I started to look through this again and I realized most of the opt clock information
+is actually unused within hwmod and does not even need to be there. I just proposed an RFC here to clean some of that [1]
+
+The only modules which do need this seem to be gpio and dss (though we still need to check if all the newer platforms
+need this, or this is one of those things just carried forward because some old platform had an issue with gpio and dss
+ocp reset)
+
+As far as DSS is concerned, this is used within the custom reset function (not within hwmod) in display.c in mach-omap2/
+Its just that the current code relies on hwmod structures, which can very easily now extract this from DT instead.
+
+That just leaves gpio, which should be the only clock information that will have to exist in hwmod till we figure out
+how to move it to DT. All the main_clks from hwmod can very easily to moved to DT as already proposed using something like
+'fck' to identify them.
+
+[1] http://marc.info/?l=linux-omap&m=140057445618162&w=2
+
+> 
+> Archit
+> 
+> 
