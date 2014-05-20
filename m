@@ -1,39 +1,51 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 19 May 2014 22:57:41 -0700
-Subject: [PATCH] ARM: edma: Clean up and simplify the code around irq
- request
-In-Reply-To: <5374AD6D.8090002@ti.com>
-References: <1399965961-23739-1-git-send-email-peter.ujfalusi@ti.com>
- <5374AD6D.8090002@ti.com>
-Message-ID: <20140520055741.GR18956@quad.lixom.net>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 20 May 2014 08:01:34 +0200
+Subject: [GIT PULL 2/2] ARM: berlin: SoC changes for v3.16
+In-Reply-To: <1400565694-1568-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1400565694-1568-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1400565694-1568-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 05:35:01PM +0530, Sekhar Nori wrote:
-> + ARM SoC team
-> 
-> On Tuesday 13 May 2014 12:56 PM, Peter Ujfalusi wrote:
-> > Get the two interrupt line number at the same time by merging the two
-> > instance of if(node){}else{} places.
-> > replace the &pdev->dev with the already existing dev which makes it possible
-> > to collapse lines with devm_request_irq()
-> > 
-> > Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> 
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
-> 
-> Arnd, Olof, Kevin,
-> 
-> Do you mind applying this directly for v3.16? I do not have anything
-> else queued ATM so not sending a pull request.
+Arnd, Kevin, Olof,
 
-I see it was reposted today as part of a larger patch set with some
-question as to what it applies to.
+these are the SoC related changes for Berlin SoCs. Alexandre Belloni and
+Antoine Tenart picked up work on quad-core Cortex A9 BG2Q SoC and provided
+valuable drivers for pinctrl and clocks. The corresponding drivers should
+go to the submaintainer's trees, this is what is left to do on the
+mach-berlin side.
 
-Sekhar, if you just have one patch for us to apply, then feel free to
-resend it to use (git send-email --to=arm at kernel.org) and make it clear
-(below the --- separator) that you want us to apply it directly, and
-we'll be happy to do so.
+Please pull.
 
+Thanks,
+  Sebastian
 
--Olof
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+
+are available in the git repository at:
+
+  https://github.com/shesselba/linux-berlin.git tags/berlin-soc-3.16
+
+for you to fetch changes up to 03dac26a831c51e544dc95ba12ea9e3520829e7e:
+
+  ARM: berlin: add the pinctrl dependency for the Marvell Berlin SoCs (2014-05-19 22:52:39 +0200)
+
+----------------------------------------------------------------
+Despite relatively young Berlin SoC support, we already have support
+for a BG2Q SoC provided by Alexandre Belloni and Antoine Tenart. Also,
+we gained support for DW gpio and a pinctrl driver.
+
+----------------------------------------------------------------
+Alexandre Belloni (1):
+      ARM: berlin: add MACH_BERLIN_BG2Q symbol
+
+Antoine Tenart (3):
+      ARM: berlin: add Marvell Armada 1500 pro to Marvell doc
+      ARM: berlin: add the LIBGPIO as a dependency for the BG2Q
+      ARM: berlin: add the pinctrl dependency for the Marvell Berlin SoCs
+
+ Documentation/arm/Marvell/README |  5 +++++
+ arch/arm/mach-berlin/Kconfig     | 10 ++++++++++
+ 2 files changed, 15 insertions(+)
