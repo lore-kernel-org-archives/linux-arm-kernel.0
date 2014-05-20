@@ -1,98 +1,33 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 20 May 2014 21:30:33 +0200
-Subject: [PATCH v3 4/9] of: mtd: add documentation for the ONFI NAND timing
- mode property
-In-Reply-To: <20140520182542.GS28907@ld-irv-0074>
-References: <1394647664-8258-1-git-send-email-b.brezillon.dev@gmail.com>
- <1394647664-8258-5-git-send-email-b.brezillon.dev@gmail.com>
- <20140520182542.GS28907@ld-irv-0074>
-Message-ID: <537BAD59.3060902@free-electrons.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 20 May 2014 21:31:57 +0200
+Subject: [alsa-devel] [PATCH] Fix for possible null pointer dereference
+ in dma.c
+In-Reply-To: <20140520192958.GE6639@foghorn.codeweavers.com>
+References: <1400191076-28279-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+ <5379E284.7030700@gmail.com>
+ <CAFo99gZ3kVGn04we5OtRtbkceYRs6SiHXRyoX1Gb-SknJH=z=w@mail.gmail.com>
+ <537BAA2B.9090906@gmail.com> <20140520192958.GE6639@foghorn.codeweavers.com>
+Message-ID: <537BADAD.5070904@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
 
-On 20/05/2014 20:25, Brian Norris wrote:
-> Hi Boris,
->
-> On Wed, Mar 12, 2014 at 07:07:39PM +0100, Boris BREZILLON wrote:
->> Add documentation for the ONFI NAND timing mode property.
+
+On 20.05.2014 21:29, Andrew Eikum wrote:
+> On Tue, May 20, 2014 at 09:16:59PM +0200, Tomasz Figa wrote:
+>> To me having NULL as either data argument of buffer done callback or
+>> private_data would be a serious driver bug and IMHO it's better to let
+>> it crash with a NULL pointer dereference to let someone notice than mask
+>> it by adding a condition.
 >>
->> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
->> ---
->>  Documentation/devicetree/bindings/mtd/nand.txt |    8 ++++++++
->>  1 file changed, 8 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/mtd/nand.txt b/Documentation/devicetree/bindings/mtd/nand.txt
->> index b53f92e..2046027 100644
->> --- a/Documentation/devicetree/bindings/mtd/nand.txt
->> +++ b/Documentation/devicetree/bindings/mtd/nand.txt
->> @@ -19,3 +19,11 @@ errors per {size} bytes".
->>  The interpretation of these parameters is implementation-defined, so not all
->>  implementations must support all possible combinations. However, implementations
->>  are encouraged to further specify the value(s) they support.
->> +
->> +- onfi,nand-timing-mode: an integer encoding the supported ONFI timing modes of
->> +  the NAND chip. Each supported mode is represented as a bit position (i.e. :
->> +  mode 0 and 1 => (1 << 0) | (1 << 1) = 0x3).
->> +  This is only used when the chip does not support the ONFI standard.
->> +  The last bit set represent the closest mode fulfilling the NAND chip timings.
->> +  For a full description of the different timing modes see this document:
->> +  www.onfi.org/~/media/ONFI/specs/onfi_3_1_spec.pdf
-> I'm not 100% convinced this property should go in the device tree. With
-> most other flash properties (device size, page size, and even minimum
-> ECC requirements), we try to auto-detect these parameters to some
-> extent. ONFI makes it easy for some class of chips, but for others, we
-> typically rely on an in-kernel device ID table or ID decoding heuristic
-> -- we don't require a DT description of every property of the flash. So
-> what makes this property different?
+> 
+> Please, no.  Regardless of who is at fault, crashes in library code
+> are insanely frustrating to application developers.  Error codes can
+> be handled nicely and expressed to the user as an error message.
+> Crashes are hideous for end users and usually end up being support
+> nightmares for developers.
 
-AFAICT nothing, but the same goes for the ECC requirements, and we've
-recently added DT bindings to define these requirements.
-I'm not telling we should drop these ECC requirements bindings (actually
-I'm using them :-)), but what's different with the timings requirements ?
+How is the related code a library?
 
-Moreover, we will end up with a lot of new entries in the device ID
-table if we decide to put these informations in this table.
-
->
-> I realize that we may not include device ID entries for every flash that
-> you need in the ID table (although we still are able to detect the
-> important properties accurately, like page and block size). But would it
-> suffice to default these flash to a lowest common timing mode, like mode
-> 0?
-
-IMHO this is not a good solution: you'll end up with lower perfomances
-on most of the supported NAND chips and I'm not sure this is what we want.
-
->
-> If no other option works well, then I am still open to describing the
-> supported timing modes in the DT.
->
-> BTW, this bitfield property looks kinda strange to me. Do non-ONFI flash
-> typically support multiple timing modes? And if so, how are we supposed
-> to *change* modes? AFAIK, ONFI provides the only standard for
-> configuring the flash's timing mode. So maybe you're really only wanting
-> a "default timing mode" property that is a single integer, not a
-> bitfield.
-
-Indeed, I based it on the ONFI NAND timings mode model, but AFAIK (tell
-me if I'm wrong), it should work because most of the timings are min
-requirements.
-This means, even if you provide slower signals transitions, the NAND
-will work as expected.
-
-But I can modify the bindings to just encode the maximum supported
-timing mode.
-
-Thanks for your feedback.
-
-Best Regards,
-
-Boris
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Best regards,
+Tomasz
