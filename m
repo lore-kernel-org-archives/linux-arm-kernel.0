@@ -1,21 +1,71 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Tue, 20 May 2014 13:42:55 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxOC8yMF0gQVJNOiBpbXg1OiByZW1vdmUgZmlsZSBtbS1p?=
- =?UTF-8?B?bXg1LmM=?=
-In-Reply-To: <1400575538-21136-19-git-send-email-shawn.guo@freescale.com>
-References: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
- <1400575538-21136-19-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1400578975.608551061@f382.i.mail.ru>
+From: maxime.coquelin@st.com (Maxime COQUELIN)
+Date: Tue, 20 May 2014 11:46:30 +0200
+Subject: [PATCH v6 2/4] ARM: dts: Fix STi boards compatibles
+In-Reply-To: <1400579192-17620-1-git-send-email-maxime.coquelin@st.com>
+References: <1400579192-17620-1-git-send-email-maxime.coquelin@st.com>
+Message-ID: <1400579192-17620-3-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tue, 20 May 2014 16:45:36 +0800 ?? Shawn Guo <shawn.guo@freescale.com>:
-> The only code left in mm-imx5.c is to create static mapping.  While all
-> IMX platform code are moved to use dynamic mapping, the file can just be
-> removed now.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+The compatible strings have to be ordered from specific to generic.
+This patch fixes this for STi boards, which did the exact opposite.
 
-Do we need a static mappings for UART lowlevel debug?
-
+Cc: Olof Johansson <olof@lixom.net>
+Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
+ arch/arm/boot/dts/stih415-b2000.dts | 2 +-
+ arch/arm/boot/dts/stih415-b2020.dts | 2 +-
+ arch/arm/boot/dts/stih416-b2000.dts | 3 +--
+ arch/arm/boot/dts/stih416-b2020.dts | 3 +--
+ 4 files changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/boot/dts/stih415-b2000.dts b/arch/arm/boot/dts/stih415-b2000.dts
+index d4af531..bdfbd37 100644
+--- a/arch/arm/boot/dts/stih415-b2000.dts
++++ b/arch/arm/boot/dts/stih415-b2000.dts
+@@ -11,5 +11,5 @@
+ #include "stih41x-b2000.dtsi"
+ / {
+ 	model = "STiH415 B2000 Board";
+-	compatible = "st,stih415", "st,stih415-b2000";
++	compatible = "st,stih415-b2000", "st,stih415";
+ };
+diff --git a/arch/arm/boot/dts/stih415-b2020.dts b/arch/arm/boot/dts/stih415-b2020.dts
+index 442b019..71903a8 100644
+--- a/arch/arm/boot/dts/stih415-b2020.dts
++++ b/arch/arm/boot/dts/stih415-b2020.dts
+@@ -11,5 +11,5 @@
+ #include "stih41x-b2020.dtsi"
+ / {
+ 	model = "STiH415 B2020 Board";
+-	compatible = "st,stih415", "st,stih415-b2020";
++	compatible = "st,stih415-b2020", "st,stih415";
+ };
+diff --git a/arch/arm/boot/dts/stih416-b2000.dts b/arch/arm/boot/dts/stih416-b2000.dts
+index a5eb6ee..488e80a 100644
+--- a/arch/arm/boot/dts/stih416-b2000.dts
++++ b/arch/arm/boot/dts/stih416-b2000.dts
+@@ -9,8 +9,7 @@
+ /dts-v1/;
+ #include "stih416.dtsi"
+ #include "stih41x-b2000.dtsi"
+-
+ / {
+-	compatible = "st,stih416", "st,stih416-b2000";
+ 	model = "STiH416 B2000";
++	compatible = "st,stih416-b2000", "st,stih416";
+ };
+diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
+index 276f28d..4e2df66 100644
+--- a/arch/arm/boot/dts/stih416-b2020.dts
++++ b/arch/arm/boot/dts/stih416-b2020.dts
+@@ -11,6 +11,5 @@
+ #include "stih41x-b2020.dtsi"
+ / {
+ 	model = "STiH416 B2020";
+-	compatible = "st,stih416", "st,stih416-b2020";
+-
++	compatible = "st,stih416-b2020", "st,stih416";
+ };
+-- 
+1.9.1
