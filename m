@@ -1,79 +1,52 @@
 From: elder@linaro.org (Alex Elder)
-Date: Tue, 20 May 2014 07:52:41 -0500
-Subject: [PATCH v2 4/5] clk: bcm281xx: define a bus clock
-In-Reply-To: <1400590362-11177-1-git-send-email-elder@linaro.org>
-References: <1400590362-11177-1-git-send-email-elder@linaro.org>
-Message-ID: <1400590362-11177-5-git-send-email-elder@linaro.org>
+Date: Tue, 20 May 2014 07:52:37 -0500
+Subject: [PATCH v2 0/5] clk: bcm: prerequisite and bus clock support
+Message-ID: <1400590362-11177-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the bus clock "bsc3_apb".  This bus clock has to be managed
-using the CCU policy mechanism, so add the definitions required for
-that to the clock and its CCU.
+Currently only peripheral clocks are supported for Broadcom platforms
+that use Kona style CCUs for clocking.  This series adds support for
+bus clocks as well.
 
-This one bus clock in particular is defined because it is needed
-by peripheral clock "bsc3".  Our boot loader does not properly
-activate "bsc3_apb", and as a result, "bsc3" isn't able to function
-properly.  With "bsc3_apb" specified as a prerequisite clock for
-"bsc3", the latter works correctly.
+One motivation for doing this is that there exist peripheral clocks
+that cannot be configured without having first enabled a related
+bus clock.  Adding bus clock support allows such peripheral clocks
+to be usable.
 
-For now only this one bus clock is defined, because it allows
-correct operation of "bsc3".  Others can be added later as needed
-(and this patch serves to show how that's done).
+This also imposes a new requirement, however--that the bus clock
+be enabled *before* the clock that depends on it.  For this, we
+define the notion of a "prerequisite" clock.  If a clock has a
+prerequisite specified, that prequisite clock will be initialized
+first.  For now this only affects startup-time initialization.
 
-Signed-off-by: Alex Elder <elder@linaro.org>
----
- drivers/clk/bcm/clk-bcm281xx.c       | 13 ++++++++++++-
- include/dt-bindings/clock/bcm281xx.h |  3 ++-
- 2 files changed, 14 insertions(+), 2 deletions(-)
+These patches are based on Mike Turquette's current "clk-next"
+branch.
+    6ed8eb5 Merge tag 'clk-hisi-for-v3.16' of https://git.kern...
 
-diff --git a/drivers/clk/bcm/clk-bcm281xx.c b/drivers/clk/bcm/clk-bcm281xx.c
-index 502a487..b937fc9 100644
---- a/drivers/clk/bcm/clk-bcm281xx.c
-+++ b/drivers/clk/bcm/clk-bcm281xx.c
-@@ -309,8 +309,17 @@ static struct peri_clk_data pwm_data = {
- 	.trig		= TRIGGER(0x0afc, 15),
- };
- 
-+static struct bus_clk_data bsc3_apb_data = {
-+	.policy		= POLICY(0x0048, 4),
-+	.gate		= HW_SW_GATE(0x0484, 16, 0, 1),
-+};
-+
- static struct ccu_data slave_ccu_data = {
- 	BCM281XX_CCU_COMMON(slave, SLAVE),
-+	.policy		= {
-+		.enable		= CCU_LVM_EN(0x0034, 0),
-+		.control	= CCU_POLICY_CTL(0x000c, 0, 1, 2),
-+	},
- 	.kona_clks	= {
- 		[BCM281XX_SLAVE_CCU_UARTB] =
- 			KONA_CLK(slave, uartb, peri),
-@@ -329,9 +338,11 @@ static struct ccu_data slave_ccu_data = {
- 		[BCM281XX_SLAVE_CCU_BSC2] =
- 			KONA_CLK(slave, bsc2, peri),
- 		[BCM281XX_SLAVE_CCU_BSC3] =
--			KONA_CLK(slave, bsc3, peri),
-+			KONA_CLK_PREREQ(slave, bsc3, peri, bsc3_apb),
- 		[BCM281XX_SLAVE_CCU_PWM] =
- 			KONA_CLK(slave, pwm, peri),
-+		[BCM281XX_SLAVE_CCU_BSC3_APB] =
-+			KONA_CLK(slave, bsc3_apb, bus),
- 		[BCM281XX_SLAVE_CCU_CLOCK_COUNT] = LAST_KONA_CLK,
- 	},
- };
-diff --git a/include/dt-bindings/clock/bcm281xx.h b/include/dt-bindings/clock/bcm281xx.h
-index a763460..99f4aad 100644
---- a/include/dt-bindings/clock/bcm281xx.h
-+++ b/include/dt-bindings/clock/bcm281xx.h
-@@ -72,6 +72,7 @@
- #define BCM281XX_SLAVE_CCU_BSC2			7
- #define BCM281XX_SLAVE_CCU_BSC3			8
- #define BCM281XX_SLAVE_CCU_PWM			9
--#define BCM281XX_SLAVE_CCU_CLOCK_COUNT		10
-+#define BCM281XX_SLAVE_CCU_BSC3_APB		10
-+#define BCM281XX_SLAVE_CCU_CLOCK_COUNT		11
- 
- #endif /* _CLOCK_BCM281XX_H */
+They are available here:
+    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
+    Branch review/bcm-bus-clk
+
+					-Alex
+
+Version history:
+v2: Added field "p" to the previously unnamed prereq union.
+
+Alex Elder (5):
+  clk: bcm281xx: add an initialized flag
+  clk: bcm281xx: implement prerequisite clocks
+  clk: bcm281xx: add bus clock support
+  clk: bcm281xx: define a bus clock
+  ARM: dts: add bus clock bsc3_apb for bcm281xx
+
+ arch/arm/boot/dts/bcm11351.dtsi      |   3 +-
+ drivers/clk/bcm/clk-bcm281xx.c       |  13 +++-
+ drivers/clk/bcm/clk-kona-setup.c     | 112 ++++++++++++++++++++++++++++++--
+ drivers/clk/bcm/clk-kona.c           | 120 ++++++++++++++++++++++++++++++++++-
+ drivers/clk/bcm/clk-kona.h           |  35 +++++++++-
+ include/dt-bindings/clock/bcm281xx.h |   3 +-
+ 6 files changed, 271 insertions(+), 15 deletions(-)
+
 -- 
 1.9.1
