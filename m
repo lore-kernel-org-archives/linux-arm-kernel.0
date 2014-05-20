@@ -1,69 +1,55 @@
-From: trini@kernel.crashing.org (Tom Rini)
-Date: Tue, 20 May 2014 10:11:26 -0400
-Subject: [PATCH 4/4] arm64: Enable TEXT_OFFSET fuzzing
-In-Reply-To: <20140516165548.GA14766@leverpostej>
+From: trini@ti.com (Tom Rini)
+Date: Tue, 20 May 2014 10:12:19 -0400
+Subject: [PATCH 3/4] arm64: export effective Image size to bootloaders
+In-Reply-To: <1400233839-15140-4-git-send-email-mark.rutland@arm.com>
 References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
- <1400233839-15140-5-git-send-email-mark.rutland@arm.com>
- <20140516140606.GH5624@arm.com>
- <20140516165548.GA14766@leverpostej>
-Message-ID: <20140520141126.GA1752@bill-the-cat>
+ <1400233839-15140-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <20140520141219.GB1752@bill-the-cat>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 05:55:48PM +0100, Mark Rutland wrote:
-> On Fri, May 16, 2014 at 03:06:07PM +0100, Catalin Marinas wrote:
-> > On Fri, May 16, 2014 at 10:50:39AM +0100, Mark Rutland wrote:
-> > > --- a/arch/arm64/Kconfig.debug
-> > > +++ b/arch/arm64/Kconfig.debug
-> > > @@ -37,4 +37,35 @@ config PID_IN_CONTEXTIDR
-> > >  	  instructions during context switch. Say Y here only if you are
-> > >  	  planning to use hardware trace tools with this kernel.
-> > >  
-> > > +config ARM64_RANDOMIZE_TEXT_OFFSET
-> > > +	bool "Randomize TEXT_OFFSET at build time (EXPERIMENTAL)"
-> > > +	default N
-> > 
-> > (nitpick: no need for default n)
-> 
-> Thanks for pointing that out, I'll remove it :)
-> 
-> > I think that's good for testing. It would have been nice to be able to
-> > set some limits for the random offset but I can't figure out an easy way
-> > to do this via Kconfig (maybe with additional options).
-> 
-> There are hard-coded limits implicit in the randomization -- between 0B
-> and 2MB in 16B increments:
-> 
-> TEXT_OFFSET := $(shell awk 'BEGIN {srand(); printf "0x%05x\n", and(int(0xfffff * rand()), 0xffff0)}')
+On Fri, May 16, 2014 at 10:50:38AM +0100, Mark Rutland wrote:
 
-Note, is mawk expected to be able to be used for kernel building?  It
-doesn't have 'and' as a function.
-
-> The 16B increment is required due to some code in head.S (__turn_mmu_on)
-> requiring a minimum 16B alignment for the object.
+> Currently the kernel Image is stripped of everything past the initial
+> stack, and at runtime the memory is initialised and used by the kernel.
+> This makes the effective minimum memory footprint of the kernel larger
+> than the size of the loaded binary, though bootloaders have no mechanism
+> to identify how large this minimum memory footprint is. This makes it
+> difficult to choose safe locations to place both the kernel and other
+> binaries required at boot (DTB, initrd, etc), such that the kernel won't
+> clobber said binaries or other reserved memory during initialisation.
 > 
-> The 2MB maximum comes from the fact we rely on the start of memory being
-> 2MB aligned. I'm not sure there's a compelling reason to limit the
-> randomization if enabled at all -- either you can handle it or you
-> can't. Are we ever likely to want an offset larger than the memory
-> alignment?
+> Additionally when big endian support was added the image load offset was
+> overlooked, and is currently of an arbitrary endianness, which makes it
+> difficult for bootloaders to make use of it. It seems that bootloaders
+> aren't respecting the image load offset at present anyway, and are
+> assuming that offset 0x80000 will always be correct.
+> 
+> This patch adds an effective image size to the kernel header which
+> describes the amount of memory from the start of the kernel Image binary
+> which the kernel expects to use before detecting memory and handling any
+> memory reservations. This can be used by bootloaders to choose suitable
+> locations to load the kernel and/or other binaries such that the kernel
+> will not clobber any memory unexpectedly. As before, memory reservations
+> are required to prevent the kernel from clobbering these locations
+> later.
+> 
+> Both the image load offset and the effective image size are forced to be
+> little-endian regardless of the native endianness of the kernel to
+> enable bootloaders to load a kernel of arbitrary endianness. Bootloaders
+> which wish to make use of the load offset can inspect the effective
+> image size field for a non-zero value to determine if the offset is of a
+> known endianness.
+> 
+> The documentation is updated to clarify these details. To discourage
+> future assumptions regarding the value of text_offset, the value at this
+> point in time is removed from the main flow of the documentation (though
+> kept as a compatibility note).
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 
-A reason to limit the randomization is to make it easier on the
-bootloaders to be able to rule of thumb initial loads.  It's not a big
-deal with Image if it gets loaded lower than the offset, we can start
-shifting data at the end.  But when we start looking at Image.gz (or xz
-or ...), in some cases we'll get the whole image read into memory (network
-booting for example), uncompress the first block so we can confirm a
-good Image header and see about text_offset/image_size.  If we know that
-text_offset is somewhere random inside of 2MB (or some other documented
-max), we can then go with saying an initial load should be at say +32MB
-(to mirror Documentation/arm/Booting).  If it can be anywhere, then
-things get hard, or at least annoying (error out and tell the user to
-re-load things because of a random value?  I can see testing frameworks
-being annoyed about that).
-
-And we should document the range of the offset in
-Documentation/arm64/booting.txt as well.
+Putting on my U-Boot hat, this looks sensible and implementable so:
+Acked-by: Tom Rini <trini@ti.com>
 
 -- 
 Tom
