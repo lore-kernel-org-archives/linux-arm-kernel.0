@@ -1,81 +1,91 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 20 May 2014 21:34:35 +0800
-Subject: [PATCH v9 14/14] virt: arm: support hip04 gic
-In-Reply-To: <1400591427-21922-15-git-send-email-haojian.zhuang@linaro.org>
-References: <1400591427-21922-1-git-send-email-haojian.zhuang@linaro.org>
- <1400591427-21922-15-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CAD6h2NQw6VC5HhUtUWGCDk_P_UQpTMVpKk8Jpe_LUH=vr530HQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 20 May 2014 15:34:46 +0200
+Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140520131741.GB6240@ulmo>
+References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
+ <8663464.40PHEumOar@wuerfel> <20140520131741.GB6240@ulmo>
+Message-ID: <4161434.ylGuoPKcfs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 May 2014 21:10, Haojian Zhuang <haojian.zhuang@linaro.org> wrote:
-> In ARM standard GIC, GICH_APR offset is 0xf0 & GICH_LR0 offset is 0x100.
-> In HiP04 GIC, GICH_APR offset is 0x70 & GICH_LR0 offset is 0x80.
->
-> Now reuse the nr_lr field in struct vgic_cpu. Bit[31:16] is used to store
-> GICH_APR offset in HiP04, and bit[15:0] is used to store real nr_lr
-> variable. In ARM standard GIC, don't set bit[31:16]. So we could avoid
-> to change the VGIC implementation in arm64.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> ---
->  arch/arm/kernel/asm-offsets.c   |  2 +-
->  arch/arm/kvm/interrupts_head.S  | 29 +++++++++++++++++++------
->  arch/arm64/kernel/asm-offsets.c |  2 +-
->  arch/arm64/kvm/hyp.S            | 28 ++++++++++++++++++------
->  include/kvm/arm_vgic.h          |  7 ++++--
->  include/linux/irqchip/arm-gic.h |  6 ++++++
->  virt/kvm/arm/vgic.c             | 48 +++++++++++++++++++++++++++++------------
->  7 files changed, 92 insertions(+), 30 deletions(-)
->
-> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-> index 85598b5..166cc98 100644
-> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> index 2c56012..a4a8b3d 100644
-> --- a/arch/arm64/kvm/hyp.S
-> +++ b/arch/arm64/kvm/hyp.S
-> @@ -402,7 +402,9 @@ __kvm_hyp_code_start:
->         ldr     w8, [x2, #GICH_EISR1]
->         ldr     w9, [x2, #GICH_ELRSR0]
->         ldr     w10, [x2, #GICH_ELRSR1]
-> -       ldr     w11, [x2, #GICH_APR]
-> +       ldr     w11, [x3, #VGIC_CPU_HW_CFG]
-> +       mov     w11, w11, lsr #HWCFG_APR_SHIFT
-> +       ldr     w11, [x2, w10]
->  CPU_BE(        rev     w4,  w4  )
->  CPU_BE(        rev     w5,  w5  )
->  CPU_BE(        rev     w6,  w6  )
-> @@ -425,8 +427,13 @@ CPU_BE(    rev     w11, w11 )
->         str     wzr, [x2, #GICH_HCR]
->
->         /* Save list registers */
-> -       add     x2, x2, #GICH_LR0
-> -       ldr     w4, [x3, #VGIC_CPU_NR_LR]
-> +       ldr     w4, [x3, #VGIC_CPU_HW_CFG]
-> +       mov     w6, w4, lsr #HWCFG_APR_SHIFT
-> +       ldr     w7, =HWCFG_NR_LR_MASK
-> +       and     w4, w4, w7
-> +       /* the offset between GICH_APR and GICH_LR0 is 0x10 */
-> +       add     w6, w6, 0x10
-> +       add     x2, x2, w6
->         add     x3, x3, #VGIC_CPU_LR
->  1:     ldr     w5, [x2], #4
->  CPU_BE(        rev     w5, w5 )
-> @@ -461,11 +468,20 @@ CPU_BE(   rev     w6, w6 )
->
->         str     w4, [x2, #GICH_HCR]
->         str     w5, [x2, #GICH_VMCR]
-> -       str     w6, [x2, #GICH_APR]
-> +       ldr     w4, [x3, #VGIC_CPU_HW_CFG]
-> +       mov     w4, w4, #HWCFG_APR_SHIFT
-> +       str     w6, [x2, w4]
+On Tuesday 20 May 2014 15:17:43 Thierry Reding wrote:
+> On Tue, May 20, 2014 at 02:41:18PM +0200, Arnd Bergmann wrote:
+> > On Tuesday 20 May 2014 14:02:43 Thierry Reding wrote:
+> [...]
+> > > Couldn't a single-master IOMMU be windowed?
+> > 
+> > Ah, yes. That would actually be like an IBM pSeries, which has a windowed
+> > IOMMU but uses one window per virtual machine. In that case, the window could
+> > be a property of the iommu node though, rather than part of the address
+> > in the link.
+> 
+> Does that mean that the IOMMU has one statically configured window which
+> is the same for each virtual machine? That would require some other
+> mechanism to assign separate address spaces to each virtual machine,
+> wouldn't it? But I suspect that if the IOMMU allows that it could be
+> allocated dynamically at runtime.
 
-Oh, I just found it's wrong.
+The way it works on pSeries is that upon VM creation, the guest is assigned
+one 256MB window for use by assigned DMA capable devices. When the guest
+creates a mapping, it uses a hypercall to associate a bus address in that
+range with a guest physical address. The hypervisor checks that the bus
+address is within the allowed range, and translates the guest physical
+address into a host physical address, then enters both into the I/O page
+table or I/O TLB.
 
-Marc,
+> > I would like to add an explanation about dma-ranges to the binding:
+> > 
+> > 8<--------
+> > The parent bus of the iommu must have a valid "dma-ranges" property
+> > describing how the physical address space of the IOMMU maps into
+> > memory.
+> 
+> With physical address space you mean the addresses after translation,
+> not the I/O virtual addresses, right? But even so, how will this work
+> when there are multiple IOMMU devices? What determines which IOMMU is
+> mapped via which entry?
+> 
+> Perhaps having multiple IOMMUs implies that there will have to be some
+> partitioning of the parent address space to make sure two IOMMUs don't
+> translate to the same ranges?
 
-How to handle this case? Do I need to use another x{n} register at here?
-If so, how to convert data from 32-bit register to 64-bit register?
+These dma-ranges properties would almost always be for the entire RAM,
+and we can treat anything else as a bug.
 
-Regards
-Haojian
+The mapping between what goes into the IOMMU and what comes out of it
+is not reflected in DT at all, since it only happens at runtime.
+The dma-ranges property I mean above describes how what comes out of
+the IOMMU maps into physical memory.
+
+> > A device with an "iommus" property will ignore the "dma-ranges" property
+> > of the parent node and rely on the IOMMU for translation instead.
+> 
+> Do we need to consider the case where an IOMMU listed in iommus isn't
+> enabled (status = "disabled")? In that case presumably the device would
+> either not function or may optionally continue to master onto the parent
+> untranslated.
+
+My reasoning was that the DT should specify whether we use the IOMMU
+or not. Being able to just switch on or off the IOMMU sounds nice as
+well, so we could change the text above to do that.
+
+Another option would be to do this in the IOMMU code, basically
+falling back to the IOMMU parent's dma-ranges property and using
+linear dma_map_ops when that is disabled.
+
+> > Using an "iommus" property in bus device nodes with "dma-ranges"
+> > specifying how child devices relate to the IOMMU is a possible extension
+> > but is not recommended until this binding gets extended.
+> 
+> Just for my understanding, bus device nodes with iommus and dma-ranges
+> properties could be equivalently written by explicitly moving the iommus
+> properties into the child device nodes, right? In which case they should
+> be the same as the other examples. So that concept is a convenience
+> notation to reduce duplication, but doesn't fundamentally introduce any
+> new concept.
+
+The one case  where that doesn't work is PCI, because we don't list the
+PCI devices in DT normally, and the iommus property would only exist
+at the PCI host controller node.
+
+	Arnd
