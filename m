@@ -1,126 +1,74 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 20 May 2014 16:44:47 +0200
-Subject: [PATCHv5 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
- controller
-In-Reply-To: <CANk1AXTdSheUkNtF2fSmtcYaUrd2CnTjBxGitmSy88H4VRVbnw@mail.gmail.com>
-References: <1400169891-29546-1-git-send-email-tthayer@altera.com>
- <1400169891-29546-2-git-send-email-tthayer@altera.com>
- <20140516075344.GF949@pengutronix.de>
- <CAF03EBfOrBWsGVkwYHQt9Pm858LtkgUThkM6dFjksa93ETo_bw@mail.gmail.com>
- <20140519191206.GH949@pengutronix.de>
- <CAF03EBfwFC7bK=j0W3K+no9TK7xe2nF1ZXH9bMBRNzVErB5EjQ@mail.gmail.com>
- <CANk1AXTdSheUkNtF2fSmtcYaUrd2CnTjBxGitmSy88H4VRVbnw@mail.gmail.com>
-Message-ID: <20140520144446.GJ949@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 May 2014 07:49:28 -0700
+Subject: [PATCH] arm/omap4: add twd clock to DT
+In-Reply-To: <537B19F1.5040907@ti.com>
+References: <1396901139-17268-1-git-send-email-gilles.chanteperdrix@xenomai.org>
+ <20140418223948.GK21823@atomide.com> <5353F44F.5080400@xenomai.org>
+ <535662F0.4080300@ti.com>
+ <CAGhQ9Vw-QaB+OnLa3yNVvD6a=XOutSZ1ejbsuUXvEcyrxEsRcQ@mail.gmail.com>
+ <20140519161319.GD4849@atomide.com>
+ <CAGhQ9Vy-mvaXZ_=E_mmqYqxF5EiJSdN1rJayussm+AgKf94a+g@mail.gmail.com>
+ <20140519162741.GG4849@atomide.com> <537B19F1.5040907@ti.com>
+Message-ID: <20140520144928.GB27830@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-On Tue, May 20, 2014 at 09:31:06AM -0500, Alan Tull wrote:
-> On Mon, May 19, 2014 at 2:37 PM, Thor Thayer <tthayer.linux@gmail.com> wrote:
-> 
-> >>> >> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
-> >>> >> new file mode 100644
-> >>> >> index 0000000..8f8746b
-> >>> >> --- /dev/null
-> >>> >> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
-> >>> >> @@ -0,0 +1,11 @@
-> >>> >> +Altera SOCFPGA SDRAM Controller
-> >>> >> +
-> >>> >> +Required properties:
-> >>> >> +- compatible : "altr,sdr-ctl";
-> >>> >> +- reg : Should contain 1 register ranges(address and length)
-> >>> >> +
-> >>> >> +Example:
-> >>> >> +     sdrctl at ffc25000 {
-> >>> >> +             compatible = "altr,sdr-ctl";
-> >>> >> +             reg = <0xffc25000 0x1000>;
-> >>> >> +     };
-> >>> >> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> >>> >> index df43702..6ce912e 100644
-> >>> >> --- a/arch/arm/boot/dts/socfpga.dtsi
-> >>> >> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> >>> >> @@ -676,6 +676,11 @@
-> >>> >>                       clocks = <&l4_sp_clk>;
-> >>> >>               };
-> >>> >>
-> >>> >> +             sdrctl at ffc25000 {
-> >>> >> +                     compatible = "altr,sdr-ctl", "syscon";
-> >>> >                                                    ^^^^^^^^^^
-> >>> >
-> >>> > Get rid of that, too, please.
+* Tero Kristo <t-kristo@ti.com> [140520 02:01]:
+> On 05/19/2014 07:27 PM, Tony Lindgren wrote:
+> >* Joachim Eastwood <manabian@gmail.com> [140519 09:24]:
+> >>On 19 May 2014 18:13, Tony Lindgren <tony@atomide.com> wrote:
+> >>>* Joachim Eastwood <manabian@gmail.com> [140518 05:08]:
+> >>>>On 22 April 2014 14:39, Tero Kristo <t-kristo@ti.com> wrote:
+> >>>>>On 04/20/2014 07:22 PM, Gilles Chanteperdrix wrote:
+> >>>>>>
+> >>>>>>Le 19/04/2014 00:39, Tony Lindgren a ?crit :
+> >>>>>>>
+> >>>>>>>* Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org> [140407 13:09]:
+> >>>>>>>>
+> >>>>>>>>Booting Linux 3.14 on Pandaboard currently gets the following
+> >>>>>>>>message displayed:
+> >>>>>>>>
+> >>>>>>>>smp_twd: clock not found -2
+> >>>>>>>>
+> >>>>>>>>Define "mpu_periphclk" as the twd clock in omap4 dts to avoid this.
+> >>>>>>>
+> >>>>>>>
+> >>>>>>>Tero, care to ack?
+> >>>>>>
+> >>>>>>
+> >>>>>>Sorry if I did not mail the right people, get_maintainer.pl gave me a
+> >>>>>>long list, and I did not feel like spamming all these people for such a
+> >>>>>>small patch. I do not believe Tero was in this list.
+> >>>>>>
+> >>>>>>Regards.
+> >>>>>
+> >>>>>
+> >>>>>Yea I don't think this is my expertise area, however the patch looks good to
+> >>>>>me, so if you really need it:
+> >>>>>
+> >>>>>Acked-by: Tero Kristo <t-kristo@ti.com>
+> >>>>
+> >>>>Tony, care to add this to your omap 3.16 dt branch?
+> >>>>
+> >>>>I am still getting:
+> >>>>[ 0.000152] smp_twd: clock not found -2
+> >>>>
+> >>>>So this fix from Gilles would be nice to have.
 > >>>
-> >>> Hi Steffan,
-> >>>
-> >>> I believe I need to keep the "syscon". The same register (ctrlcfg)
-> >>> that has the ECC enable bitfield also includes the DRAM configuration
-> >>> bitfields that other drivers will want to access (specifically the
-> >>> FPGA bridge needs this information). Since this register will be
-> >>> shared between drivers,  syscon seems like the best solution.
-> >>>
+> >>>Best that Tero picks this one up along with the other dt clock changes
+> >>>he's queueing.
 > >>
-> >> Hm, from looking at the documentation of the ctrlcfg I can't really
-> >> understand which bits you would need for the FPGA brigde and why.
-> 
-> Hi Steffen,
-> 
-> Offset 0x80 in the sdr-ctl is the "fpgaportrst" register.  14 bits
-> wide, defaults to 0.  When appropriate bits set to 1 in that reg, it
-> allows an FPGA port to come out of reset (enables that port).  Has no
-> other effect on SDRAM configuration.
-> 
-> >> That all sounds like stuff you would want to set for the specific
-> >> RAM you are dealing with on a specific board.
-> >> What bridge are you talking about? The SDRAM bridge?
-> 
-> Yes, the port allows the FPGA a direct path to the SDRAM.  This one
-> register the only register in the sdr that the bridge driver needs.
-> 
-
-So, what I suggested down ...
-
-> >>
-> >> I can see the problem with the ECC enable, though.
-> >>
-> >> Regards,
-> >> Steffen
-> >>
+> >>I kinda assumed you would take it since you asked Tero to ack it. But
+> >>either way is fine :)
 > >
-> >>> >                 sdrctl at ffc25000 {
-> >>> >                         compatible = "altr,sdr-ctl";
-> >>> >                         reg = <0xffc25000 0x1000>;
-> >>> >                         ranges;
-> >>> >
-> >>> >                         edac at ffc2502c {
-> >>> >                                 compatible = "altr,sdram-edac";
-> >>> >                                 reg = <0xffc2502c 0x50>;
-> >>> >                                 interrupts = <0 39 4>;
-> >>> >                         };
-> >>> >                 };
-> >>> >
-> >>> > Then we can later add:
-> >>> >
-> >>> >                         sdr-ports: ports at ffc2507c {
-> >>> >                                 #reset-cells = <1>;
-> >>> >                                 compatible = "altr,sdr-ports";
-> >>> >                                 reg = <0xffc2507c 0x10>;
-> >>> >                                 clocks = <&ddr_dqs_clk>;
-> >>> >                                 ...
-> >>> >                         };
->
+> >Yes that was before Tero started collecting the dt clock patches :)
+> 
+> I wouldn't say this to be a clock patch as such, this touches the driver
+> behavior, i.e. registers the correct clock for the driver. That being said,
+> I can still queue this up with the clock patches if that is what you want.
 
-... here should work. No?! Just a simple driver that registers with the
-reset-framework. I would add 0x7c to that driver and than that driver could
-"configure" the port and let it out of reset.
+Yes please go ahead and take this one.
 
-I have done the same thing for the other 3 bridges, but am not finished yet.
-Especially the GPV-stuff needs to at least be able to be added later if not now.
+Thanks,
 
-Regard,
-Steffen
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Tony
