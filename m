@@ -1,48 +1,94 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 May 2014 22:09:48 +0200
-Subject: [PATCH] ARM: remove ARM710 specific assembler code
-In-Reply-To: <20140520160512.GE27830@atomide.com>
-References: <1364507176.1345.45.camel@x61.thuisdomein>
- <5053472.zFAHKQVpbv@wuerfel> <20140520160512.GE27830@atomide.com>
-Message-ID: <4437236.32BrGIk46D@wuerfel>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 21 May 2014 00:12:30 +0400
+Subject: [PATCH v3 1/2] ARM: shmobile: r8a7790: add internal PCI bridge nodes
+In-Reply-To: <201405210008.15145.sergei.shtylyov@cogentembedded.com>
+References: <201405210008.15145.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201405210012.31347.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 May 2014 09:05:13 Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [140519 04:27]:
-> > On Saturday 17 May 2014 10:56:02 Catalin Marinas wrote:
-> > 
-> > For the case of ARM710T, I think the last remaining user that can be
-> > configured is mach-integrator, but I don't know if anybody even has that
-> > CPU tile, or wants to keep using it. If Russell and Linus as the only
-> > people that have cared about Integrator in the past years want to
-> > cut down the number of supported CPUs, that would be a different matter:
-> > quite a number of CPUs are not supported in any other platform.
-> > Note that the integrator target in qemu does not support any ARM7, only
-> > StrongARM, ARM9 or later. I also double-checked about mach-clps711x,
-> > but I'm pretty sure those SoCs are all either ARM710a (no longer supported)
-> > or ARM720T (quite active).
-> 
-> Hmm I don't think mach-integrator is using ARM710T?
+From: Ben Dooks <ben.dooks@codethink.co.uk>
 
-I don't know, we don't have a separate Kconfig option, so ARM710T and ARM720T
-use the same CONFIG_CPU_ARM720T symbol that can be enabled for integrator.
-Without any further information, I assumed that both might potentially be used.
+Add device nodes for the R8A7790 internal PCI bridge devices.
 
-> The ARM710T was done by NEC and was used by the Psion MX hardware.
-> It's very close to ARM720T as far as I remember so might as well keep
-> the CPU support for it as that's just a few lines of code in the
-> mainline kernel.
-> 
-> I don't think we have any mach directories using ARM710T, but I
-> would not be surprised if somebody comes along with device tree
-> based booting patches for Psion MX at some point.
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
+[Sergei: added interrupt-related properties to the PCI bridge nodes]
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Of course, if someone does this, the CPU support would be the least
-of their work ;-)
+---
+Changes in version 3:
+- added interrupt-related properties to the PCI bridge nodes;
+- refreshed the patch.
 
-Just out of curiosity: was that NEC 710T a SoC that replaced the
-CL/PS7110, or a standalone CPU that Psion combined with a custom
-ASIC?
+Changes in version 2:
+- reworded summary (fixing typo) and changelog;
+- removed extra spaces before {;
+- refreshed the patch.
 
-	Arnd
+ arch/arm/boot/dts/r8a7790.dtsi |   54 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
++++ renesas/arch/arm/boot/dts/r8a7790.dtsi
+@@ -876,4 +876,58 @@
+ 		#size-cells = <0>;
+ 		status = "disabled";
+ 	};
++
++	pci0: pci at ee090000 {
++		compatible = "renesas,pci-r8a7790";
++		clocks = <&mstp7_clks R8A7790_CLK_EHCI>;
++		reg = <0x0 0xee090000 0x0 0xc00>,
++		      <0x0 0xee080000 0x0 0x1100>;
++		interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++
++		bus-range = <0 0>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0xff00 0 0 0x7>;
++		interrupt-map = <0x0000 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
++			      	 0x0800 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
++			      	 0x1000 0 0 2 &gic 0 108 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
++	pci1: pci at ee0b0000 {
++		compatible = "renesas,pci-r8a7790";
++		clocks = <&mstp7_clks R8A7790_CLK_EHCI>;
++		reg = <0x0 0xee0b0000 0x0 0xc00>,
++		      <0x0 0xee0a0000 0x0 0x1100>;
++		interrupts = <0 112 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++
++		bus-range = <1 1>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0xff00 0 0 0x7>;
++		interrupt-map = <0x0000 0 0 1 &gic 0 112 IRQ_TYPE_LEVEL_HIGH
++			      	 0x0800 0 0 1 &gic 0 112 IRQ_TYPE_LEVEL_HIGH
++			      	 0x1000 0 0 2 &gic 0 112 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
++	pci2: pci at ee0d0000 {
++		compatible = "renesas,pci-r8a7790";
++		clocks = <&mstp7_clks R8A7790_CLK_EHCI>;
++		reg = <0x0 0xee0d0000 0x0 0xc00>,
++		      <0x0 0xee0c0000 0x0 0x1100>;
++		interrupts = <0 113 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++
++		bus-range = <2 2>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0xff00 0 0 0x7>;
++		interrupt-map = <0x0000 0 0 1 &gic 0 113 IRQ_TYPE_LEVEL_HIGH
++			      	 0x0800 0 0 1 &gic 0 113 IRQ_TYPE_LEVEL_HIGH
++			      	 0x1000 0 0 2 &gic 0 113 IRQ_TYPE_LEVEL_HIGH>;
++	};
+ };
