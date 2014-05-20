@@ -1,28 +1,24 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 20 May 2014 22:44:39 +0100
-Subject: [PATCH v2 2/4] mfd: bcm590xx: add support for secondary I2C
- slave address
-In-Reply-To: <20140520202923.GT32082@beef>
-References: <1398295293-11033-1-git-send-email-mporter@linaro.org>
- <1398295293-11033-3-git-send-email-mporter@linaro.org>
- <20140428115627.GY21279@lee--X1> <20140428140910.GB7719@beef>
- <20140520161131.GB32025@lee--X1>
- <20140520190055.GQ12304@sirena.org.uk>
- <20140520202923.GT32082@beef>
-Message-ID: <20140520214439.GS12304@sirena.org.uk>
+Date: Tue, 20 May 2014 22:47:18 +0100
+Subject: [PATCH v2 0/9] DT instantiation of sound on T5325
+In-Reply-To: <20140508173748.GK27377@lunn.ch>
+References: <1399141819-23924-1-git-send-email-andrew@lunn.ch>
+ <20140508173748.GK27377@lunn.ch>
+Message-ID: <20140520214718.GT12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 04:29:23PM -0400, Matt Porter wrote:
+On Thu, May 08, 2014 at 07:37:48PM +0200, Andrew Lunn wrote:
 
-> Just resent the v2 series.
+> The ARM mvebu maintainer is happy with these patches. Does anybody
+> have any comments on the sound/soc parts? Mark, will you take the
+> alc5623 and simple-card patches?
 
-I looked at that but it seems I already acked the regulator part of the
-series and nothing else looked immediately relevant?
+Are there dependencies here?  If not then yes.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/2a96885c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/54ceb988/attachment.sig>
