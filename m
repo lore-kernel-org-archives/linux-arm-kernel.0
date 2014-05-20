@@ -1,192 +1,204 @@
-From: b38611@freescale.com (Fugang Duan)
-Date: Tue, 20 May 2014 14:11:06 +0800
-Subject: [PATCH] ARM: imx6: init enet MAC address
-Message-ID: <1400566266-22746-1-git-send-email-b38611@freescale.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 20 May 2014 09:33:58 +0200
+Subject: [RFC PATCH 2/5] clk: Introduce 'clk_round_rate_nearest()'
+In-Reply-To: <db8633e5-01a9-4d3a-80e8-74e23a456d52@BN1BFFO11FD051.protection.gbl>
+References: <1400106655-22465-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1400106655-22465-3-git-send-email-soren.brinkmann@xilinx.com>
+ <20140515073816.GI16662@pengutronix.de>
+ <91822600-39d0-4e71-b0f5-9eda35b76ec0@BN1AFFO11FD016.protection.gbl>
+ <20140519161949.GG16662@pengutronix.de>
+ <db8633e5-01a9-4d3a-80e8-74e23a456d52@BN1BFFO11FD051.protection.gbl>
+Message-ID: <20140520073358.GJ16662@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enet get MAC address order:
->From module parameters or kernel command line -> device tree ->
-pfuse -> mac registers set by bootloader -> random mac address.
+Hi S?ren,
 
-When there have no "fec.macaddr" parameters set in kernel command
-line, enet driver get MAC address from device tree. And then if
-the MAC address set in device tree and is valid, enet driver get
-MAC address from device tree. Otherwise, enet get MAC address from
-pfuse. So, in the condition, update the MAC address (read from pfuse)
-to device tree.
+On Mon, May 19, 2014 at 09:41:32AM -0700, S?ren Brinkmann wrote:
+> On Mon, 2014-05-19 at 06:19PM +0200, Uwe Kleine-K?nig wrote:
+> > Hi S?ren,
+> > 
+> > On Sun, May 18, 2014 at 05:51:05PM -0700, S?ren Brinkmann wrote:
+> > > ------------------8<-----------------8<---------------------8<-------------8<---
+> > > From: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > > Date: Tue, 2 Apr 2013 10:08:13 -0700
+> > > Subject: [PATCH] clk: Introduce 'clk_round_rate_nearest()'
+> > > 
+> > > Introduce a new API function to round a rate to the closest possible
+> > > rate the HW clock can generate.
+> > > In contrast to 'clk_round_rate()' which works similar, but always returns
+> > > a frequency <= its input rate.
+> > > 
+> > > Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > > ---
+> > >  drivers/clk/clk.c   | 43 +++++++++++++++++++++++++++++++++++++++++--
+> > >  include/linux/clk.h | 14 ++++++++++++--
+> > >  2 files changed, 53 insertions(+), 4 deletions(-)
+> > > 
+> > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > > index dff0373f53c1..faf24d0569df 100644
+> > > --- a/drivers/clk/clk.c
+> > > +++ b/drivers/clk/clk.c
+> > > @@ -1011,8 +1011,9 @@ unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
+> > >   * @rate: the rate which is to be rounded
+> > >   *
+> > >   * Takes in a rate as input and rounds it to a rate that the clk can actually
+> > > - * use which is then returned.  If clk doesn't support round_rate operation
+> > > - * then the parent rate is returned.
+> > > + * use and does not exceed the requested frequency, which is then returned.
+> > > + * If clk doesn't support round_rate operation then the parent rate
+> > > + * is returned.
+> > >   */
+> > >  long clk_round_rate(struct clk *clk, unsigned long rate)
+> > >  {
+> > > @@ -1027,6 +1028,44 @@ long clk_round_rate(struct clk *clk, unsigned long rate)
+> > >  EXPORT_SYMBOL_GPL(clk_round_rate);
+> > >  
+> > >  /**
+> > > + * clk_round_rate_nearest - round the given rate for a clk
+> > > + * @clk: the clk for which we are rounding a rate
+> > > + * @rate: the rate which is to be rounded
+> > > + *
+> > > + * Takes in a rate as input and rounds it to the closest rate that the clk
+> > > + * can actually use which is then returned. If clk doesn't support
+> > > + * round_rate operation then the parent rate is returned.
+> > > + */
+> > > +long clk_round_rate_nearest(struct clk *clk, unsigned long rate)
+> > Why does this function doesn't return an unsigned long when it never
+> > returns a negative value? Ditto for clk_round_rate?
+> 
+> I matched the definition of clk_round_rate(). But you're probably right,
+> it may be the right thing to change clk_round_rate to return an
+> unsigned, but with that being exposed API it would be a risky change.
+Russell, what do you think?
 
-Signed-off-by: Fugang Duan <B38611@freescale.com>
----
- arch/arm/mach-imx/common.h      |    1 +
- arch/arm/mach-imx/mach-imx6q.c  |   90 ++++++++++++++++++++++++++++++++++++++-
- arch/arm/mach-imx/mach-imx6sl.c |    8 +++-
- 3 files changed, 96 insertions(+), 3 deletions(-)
+> > > +{
+> > > +	unsigned long lower, upper, cur, lower_last, upper_last;
+> > > +
+> > > +	lower = clk_round_rate(clk, rate);
+> > > +	if (lower >= rate)
+> > > +		return lower;
+> > Is the >-case worth a warning?
+> 
+> No, it's correct behavior. If you request a rate that is way lower than what the
+> clock can generate, returning something larger is perfectly valid, IMHO.
+> Which reveals one problem in this whole discussion. The API does not
+> require clk_round_rate() to round down. It is actually an implementation
+> choice that had been made for clk-divider.
+I'm sure it's more than an implementation choice for clk-divider. But I
+don't find any respective documentation (but I didn't try hard).
 
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 4facd01..5c69325 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -145,6 +145,7 @@ void imx6sl_set_wait_clk(bool enter);
- 
- void imx_cpu_die(unsigned int cpu);
- int imx_cpu_kill(unsigned int cpu);
-+void imx6_enet_mac_init(const char *compatible);
- 
- #ifdef CONFIG_SUSPEND
- void v7_cpu_resume(void);
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index e60456d..2bec13d 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -22,6 +22,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-+#include <linux/of_net.h>
- #include <linux/of_platform.h>
- #include <linux/pm_opp.h>
- #include <linux/pci.h>
-@@ -164,6 +165,85 @@ static int ar8035_phy_fixup(struct phy_device *dev)
- 	return 0;
- }
- 
-+#define OCOTP_MACn(n)		(0x00000620 + (n) * 0x10)
-+#define IMX_MAX_ENET_NUM	2
-+void __init imx6_enet_mac_init(const char *compatible)
-+{
-+	struct device_node *ocotp_np, *enet_np, *from = NULL;
-+	void __iomem *base;
-+	struct property *newmac;
-+	u32 macaddr0_low;
-+	u32 macaddr0_high = 0;
-+	u32 macaddr1_high = 0;
-+	u8 *macaddr;
-+	int i;
-+
-+	for (i = 0; i < IMX_MAX_ENET_NUM; i++) {
-+		enet_np = of_find_compatible_node(from, NULL, compatible);
-+		if (!enet_np)
-+			return;
-+
-+		from = enet_np;
-+
-+		if (of_get_mac_address(enet_np))
-+			goto put_enet_node;
-+
-+		ocotp_np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-ocotp");
-+		if (!ocotp_np) {
-+			pr_warn("failed to find ocotp node\n");
-+			goto put_enet_node;
-+		}
-+
-+		base = of_iomap(ocotp_np, 0);
-+		if (!base) {
-+			pr_warn("failed to map ocotp\n");
-+			goto put_ocotp_node;
-+		}
-+
-+		macaddr0_low = readl_relaxed(base + OCOTP_MACn(1));
-+		if (i)
-+			macaddr1_high = readl_relaxed(base + OCOTP_MACn(2));
-+		else
-+			macaddr0_high = readl_relaxed(base + OCOTP_MACn(0));
-+
-+		newmac = kzalloc(sizeof(*newmac) + 6, GFP_KERNEL);
-+		if (!newmac)
-+			goto put_ocotp_node;
-+
-+		newmac->value = newmac + 1;
-+		newmac->length = 6;
-+		newmac->name = kstrdup("local-mac-address", GFP_KERNEL);
-+		if (!newmac->name) {
-+			kfree(newmac);
-+			goto put_ocotp_node;
-+		}
-+
-+		macaddr = newmac->value;
-+		if (i) {
-+			macaddr[0] = (macaddr1_high >> 24) & 0xff;
-+			macaddr[1] = (macaddr1_high >> 16) & 0xff;
-+			macaddr[2] = (macaddr1_high >> 8) & 0xff;
-+			macaddr[3] = macaddr1_high & 0xff;
-+			macaddr[4] = (macaddr0_low >> 24) & 0xff;
-+			macaddr[5] = (macaddr0_low >> 16) & 0xff;
-+		} else {
-+			macaddr[0] = (macaddr0_low >> 8) & 0xff;
-+			macaddr[1] = macaddr0_low & 0xff;
-+			macaddr[2] = (macaddr0_high >> 24) & 0xff;
-+			macaddr[3] = (macaddr0_high >> 16) & 0xff;
-+			macaddr[4] = (macaddr0_high >> 8) & 0xff;
-+			macaddr[5] = macaddr0_high & 0xff;
-+		}
-+
-+		of_update_property(enet_np, newmac);
-+
-+put_ocotp_node:
-+		of_node_put(ocotp_np);
-+put_enet_node:
-+		of_node_put(enet_np);
-+	}
-+}
-+
- #define PHY_ID_AR8035 0x004dd072
- 
- static void __init imx6q_enet_phy_init(void)
-@@ -228,6 +308,13 @@ put_node:
- 	of_node_put(np);
- }
- 
-+static inline void imx6q_enet_init(void)
-+{
-+	imx6_enet_mac_init("fsl,imx6q-fec");
-+	imx6q_enet_phy_init();
-+	imx6q_1588_init();
-+}
-+
- static void __init imx6q_axi_init(void)
- {
- 	struct regmap *gpr;
-@@ -274,13 +361,12 @@ static void __init imx6q_init_machine(void)
- 	if (parent == NULL)
- 		pr_warn("failed to initialize soc device\n");
- 
--	imx6q_enet_phy_init();
- 
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
- 
-+	imx6q_enet_init();
- 	imx_anatop_init();
- 	cpu_is_imx6q() ?  imx6q_pm_init() : imx6dl_pm_init();
--	imx6q_1588_init();
- 	imx6q_axi_init();
- }
- 
-diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
-index ad32338..cb001d4 100644
---- a/arch/arm/mach-imx/mach-imx6sl.c
-+++ b/arch/arm/mach-imx/mach-imx6sl.c
-@@ -19,7 +19,7 @@
- #include "common.h"
- #include "cpuidle.h"
- 
--static void __init imx6sl_fec_init(void)
-+static void __init imx6sl_fec_clk_init(void)
- {
- 	struct regmap *gpr;
- 
-@@ -35,6 +35,12 @@ static void __init imx6sl_fec_init(void)
- 	}
- }
- 
-+static inline void imx6sl_fec_init(void)
-+{
-+	imx6sl_fec_clk_init();
-+	imx6_enet_mac_init("fsl,imx6sl-fec");
-+}
-+
- static void __init imx6sl_init_late(void)
- {
- 	/* imx6sl reuses imx6q cpufreq driver */
+
+> > > +
+> > > +	upper = clk_round_rate(clk, rate + rate - lower);
+> > This was parenthesized in my original patch on purpose. If rate is big
+> > 
+> > 	rate + rate - lower
+> > 
+> > might overflow when
+> > 
+> > 	rate + (rate - lower)
+> > 
+> > doesn't. Thinking again, there is no real problem, because this is
+> > unsigned arithmetic. To be save we still need to check if rate + (rate -
+> > lower) overflows.
+> 
+> Good point. I'll add the parentheses.
+> 
+> > 
+> > > +	if (upper == lower)
+> > if (upper <= rate) is the better check here. (= would be a bug.)
+> 
+> I don't understand. Passing rate + x to round rate can never return
+> something below 'lower'. Only something in the range [lower,lower+x].
+> So, if upper == lower we found our closest frequency and return it.
+> Otherwise we have to iterate over [lower+1,upper]. Or what did I miss?
+Assuming a correct implementation of clk_round_rate there is no
+difference. Checking for <= rate is just a bit more robust for broken
+implementations.
+
+> > > +		return upper;
+> > > +
+> > > +	lower = rate + 1;
+> > ok, so your loop invariant is that the best freq is in [lower; upper].
+> 
+> right.
+> 
+> > 
+> > > +	do {
+> > > +		upper_last = upper;
+> > > +		lower_last = lower;
+> > > +
+> > > +		cur = clk_round_rate(clk, lower + ((upper - lower) >> 1));
+> > > +		if (cur < lower)
+> > > +			lower += (upper - lower) >> 1;
+> > You already know that lower + ((upper - lower) >> 1) is too small, so
+> > you can better do
+> > 
+> > 	lower += ((upper - lower) >> 1) + 1;
+> 
+> right. I'll add the '+1'
+> 
+> > 
+> > > +		else
+> > > +			upper = cur;
+> > > +
+> > > +	} while (lower_last != lower && upper_last != upper);
+> > > +
+> > > +	return upper;
+> > > +}
+> > > +EXPORT_SYMBOL_GPL(clk_round_rate_nearest);
+> > I think the function still has potential for optimisation, what about:
+> 
+> At first glance, I don't see many differences except for the comments
+> you made above. I'll have a closer look though.
+I would expect my variant to result in more effective code as it has
+simpler expressions.
+
+> > unsigned long clk_round_rate_nearest(struct clk *clk, unsigned long rate)
+> > {
+> > 	unsigned long lower, upper, rounded;
+> > 
+> > 	rounded = clk_round_rate(clk, rate);
+> > 
+> > 	if (rounded >= rate)
+> > 		return rounded;
+> > 
+> > 	/*
+> > 	 * rounded is the best approximation for rate that is not
+> > 	 * bigger than rate. If there is a better one, it must be in the
+> > 	 * interval (rate; rate + (rate - rounded)).
+> > 	 * Note that the upper limit isn't better than rate itself, so
+> > 	 * that one doesn't need to be considered.
+> > 	 */
+> > 	 
+> > 	upper = rate + (rate - rounded) - 1;
+> > 	if (upper < rate)
+> > 		upper = ULONG_MAX; 
+> 
+> Aren't we done here? Your search for an upper boundary resulted in
+> 'lower'. Hence there is no valid frequency closer to 'rate' than 'lower'. Why do
+> you extend to ULONG_MAX?
+Consider a clock that can do (assuming ULONG_MAX = 4294967295):
+
+	12000, 4294967285
+
+and you call
+
+	clk_round_rate_nearest(clk, 4294967283)
+
+Then we have:
+
+	rounded = clk_round_rate(clk, 4294967283) = 12000.
+	upper = 4294955269
+
+because the addition overflowed upper is smaller than rate. Still we
+want to find rate=4294967285, right?
+
+Best regards
+Uwe
+
 -- 
-1.7.8
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
