@@ -1,40 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 19 May 2014 22:24:11 -0700
-Subject: [GIT PULL 2/2] ARM: Keystone DTS updates for 3.16
-In-Reply-To: <1399912899-29640-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1399912899-29640-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20140520052411.GK18956@quad.lixom.net>
+From: archit@ti.com (Archit Taneja)
+Date: Tue, 20 May 2014 11:01:19 +0530
+Subject: [PATCH 00/11] ARM: OMAP: OMAP5 & AM43x DSS
+In-Reply-To: <5375C8E8.1020209@ti.com>
+References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
+ <5370CBD5.3060107@ti.com> <20140512143604.GB31772@atomide.com>
+ <5370E172.20009@ti.com> <20140512154850.GG31772@atomide.com>
+ <5375C8E8.1020209@ti.com>
+Message-ID: <537AE8A7.4080307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 12, 2014 at 12:41:39PM -0400, Santosh Shilimkar wrote:
-> Hi Arm-soc folks,
-> 
-> Please pull below keystone DTS updates for 3.16. It merges cleanly with
-> arm-soc 'next/dts' head.
-> 
-> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-> 
->   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts
-> 
-> for you to fetch changes up to 18131ae615cf20b06860a1b668e0625db714af2e:
-> 
->   ARM: dts: keystone-evm: add spi nor flash support (2014-05-12 11:43:59 -0400)
-> 
-> ----------------------------------------------------------------
-> Keystone DTS updates for 3.16
-> 
-> - Few of address cell warning fixes.
-> - Add Lamarr and Edision EVM NOR flash and NAND devices.
-> - Update dts to make use of dma-ranges and dma-coherent properties.
+Hi,
 
-As far as I can see, this branch has no dependencies on the soc branch (and the
-dma branch), so I've merged it into next/dt.
+On Friday 16 May 2014 01:44 PM, Tomi Valkeinen wrote:
+> On 12/05/14 18:48, Tony Lindgren wrote:
+>
+>>>> Also, I'm wondering why we still have .clk and .opt_clks entries in the
+>>>> hwmod data for am43xx and omap5 which are both device tree based with
+>>>> all the clocks coming from .dts files?
+>>>
+>>> I think they are needed for the omap_device/hwmod stuff to work. Only
+>>> omapdss driver knows about the clocks defined in the .dts files, and the
+>>> omap_device/hwmod code still needs to do the reset and maybe some other
+>>> tasks that require the clocks.
+>>
+>> We're already populating the hwmod data from dts entries, that's done by
+>> omap_device_build_from_dt. Why aren't we doing that for dt defined clocks?
+>>
+>> I'd rather not start adding new data that will then just be removed, that's
+>> what people call "pointless extra churn".
+>
+> I don't know why. I have to say I'm not 100% sure if that's done or not,
+> but at least I can't find where it's done.
 
-Thanks,
+The reason why clocks are needed from hwmod data is because we still 
+don't populate hwmod fields like main_clk and opt_clock from DT clocks.
 
--Olof
+The reason why this isn't done yet is because we currently haven't 
+figured out a clean way to tell hwmod what clock is the main_clk, and 
+what clocks are optional clocks.
+
+One of the proposed methods was to assume the clock named to be "fck" as 
+main_clk, and the remaining clocks as optional clocks for hwmod. That 
+method wasn't agreed upon, this looks like the thread which discusses this:
+
+http://marc.info/?l=linux-arm-kernel&m=138928084823142&w=2
+
+Archit
