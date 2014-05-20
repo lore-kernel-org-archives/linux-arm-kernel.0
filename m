@@ -1,161 +1,238 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 20 May 2014 18:43:28 +0200
-Subject: [PATCH 1/4] clk: samsung: exynos4: Add missing CPU/DMC clock hierarchy
+Date: Tue, 20 May 2014 18:43:30 +0200
+Subject: [PATCH 3/4] clk: samsung: Add driver to control CLKOUT line on Exynos
+ SoCs
 In-Reply-To: <1400604211-9447-1-git-send-email-t.figa@samsung.com>
 References: <1400604211-9447-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1400604211-9447-2-git-send-email-t.figa@samsung.com>
+Message-ID: <1400604211-9447-4-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds missing definitions of clocks from CPU and DMC clock
-domains, which are necessary to properly represent CLKOUT clock hierarchy
-added in further patch.
+This patch introduces a driver that handles configuration of CLKOUT pin
+of Exynos SoCs that can be used to output certain clocks from inside of
+the SoC to a dedicated output pin.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- drivers/clk/samsung/clk-exynos4.c | 50 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
+ .../devicetree/bindings/arm/samsung/pmu.txt        |  30 ++++
+ drivers/clk/samsung/Makefile                       |   1 +
+ drivers/clk/samsung/clk-exynos-clkout.c            | 153 +++++++++++++++++++++
+ 3 files changed, 184 insertions(+)
+ create mode 100644 drivers/clk/samsung/clk-exynos-clkout.c
 
-diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-index c4df294..9d13fed 100644
---- a/drivers/clk/samsung/clk-exynos4.c
-+++ b/drivers/clk/samsung/clk-exynos4.c
-@@ -397,10 +397,15 @@ PNAME(mout_audio2_p4210) = { "cdclk2", "none", "sclk_hdmi24m",
- 				"sclk_epll", "sclk_vpll", };
- PNAME(mout_mixer_p4210)	= { "sclk_dac", "sclk_hdmi", };
- PNAME(mout_dac_p4210)	= { "sclk_vpll", "sclk_hdmiphy", };
-+PNAME(mout_pwi_p4210) = { "xxti", "xusbxti", "sclk_hdmi24m", "sclk_usbphy0",
-+				"sclk_usbphy1", "sclk_hdmiphy", "none",
-+				"sclk_epll", "sclk_vpll" };
+diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+index b562634..5ed94a9 100644
+--- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
++++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+@@ -11,8 +11,38 @@ Properties:
  
- /* Exynos 4x12-specific parent groups */
- PNAME(mout_mpll_user_p4x12) = { "fin_pll", "sclk_mpll", };
- PNAME(mout_core_p4x12)	= { "mout_apll", "mout_mpll_user_c", };
-+PNAME(mout_gdl_p4x12)	= { "mout_mpll_user_l", "sclk_apll", };
-+PNAME(mout_gdr_p4x12)	= { "mout_mpll_user_r", "sclk_apll", };
- PNAME(sclk_ampll_p4x12)	= { "mout_mpll_user_t", "sclk_apll", };
- PNAME(group1_p4x12)	= { "xxti", "xusbxti", "sclk_hdmi24m", "sclk_usbphy0",
- 				"none",	"sclk_hdmiphy", "mout_mpll_user_t",
-@@ -418,6 +423,9 @@ PNAME(aclk_p4412)	= { "mout_mpll_user_t", "sclk_apll", };
- PNAME(mout_user_aclk400_mcuisp_p4x12) = {"fin_pll", "div_aclk400_mcuisp", };
- PNAME(mout_user_aclk200_p4x12) = {"fin_pll", "div_aclk200", };
- PNAME(mout_user_aclk266_gps_p4x12) = {"fin_pll", "div_aclk266_gps", };
-+PNAME(mout_pwi_p4x12) = { "xxti", "xusbxti", "sclk_hdmi24m", "sclk_usbphy0",
-+				"none", "sclk_hdmiphy", "sclk_mpll",
-+				"sclk_epll", "sclk_vpll" };
+  - reg : offset and length of the register set.
  
- /* fixed rate clocks generated outside the soc */
- static struct samsung_fixed_rate_clock exynos4_fixed_rate_ext_clks[] __initdata = {
-@@ -451,6 +459,9 @@ static struct samsung_mux_clock exynos4_mux_clks[] __initdata = {
- 	MUX(0, "mout_onenand1", mout_onenand1_p, SRC_TOP0, 0, 1),
- 	MUX(CLK_SCLK_EPLL, "sclk_epll", mout_epll_p, SRC_TOP0, 4, 1),
- 	MUX(0, "mout_onenand", mout_onenand_p, SRC_TOP0, 28, 1),
++ - #clock-cells : must be <1>, since PMU requires once cell as clock specifier.
++		The single specifier cell is used as index to list of clocks
++		provided by PMU, which is currently:
++			0 : SoC clock output (CLKOUT pin)
 +
-+	MUX(0, "mout_dmc_bus", sclk_ampll_p4210, SRC_DMC, 4, 1),
-+	MUX(0, "mout_dphy", sclk_ampll_p4210, SRC_DMC, 8, 1),
++ - clock-names : list of clock names for particular CLKOUT mux inputs in
++		following format:
++			"clkoutN", where N is a decimal number corresponding to
++			CLKOUT mux control bits value for given input, e.g.
++				"clkout0", "clkout7", "clkout15".
++
++ - clocks : list of phandles and specifiers to all input clocks listed in
++		clock-names property.
++
+ Example :
+ pmu_system_controller: system-controller at 10040000 {
+ 	compatible = "samsung,exynos5250-pmu", "syscon";
+ 	reg = <0x10040000 0x5000>;
++	#clock-cells = <1>;
++	clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
++			"clkout4", "clkout8", "clkout9";
++	clocks = <&clock CLK_OUT_DMC>, <&clock CLK_OUT_TOP>,
++		<&clock CLK_OUT_LEFTBUS>, <&clock CLK_OUT_RIGHTBUS>,
++		<&clock CLK_OUT_CPU>, <&clock CLK_XXTI>,
++		<&clock CLK_XUSBXTI>;
++};
++
++Example of clock consumer :
++
++usb3503: usb3503 at 08 {
++	/* ... */
++	clock-names = "refclk";
++	clocks = <&pmu_system_controller 0>;
++	/* ... */
  };
- 
- /* list of mux clocks supported in exynos4210 soc */
-@@ -459,6 +470,10 @@ static struct samsung_mux_clock exynos4210_mux_early[] __initdata = {
- };
- 
- static struct samsung_mux_clock exynos4210_mux_clks[] __initdata = {
-+	MUX(0, "mout_gdl", sclk_ampll_p4210, SRC_LEFTBUS, 0, 1),
+diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
+index 25646c6..efeb8e5 100644
+--- a/drivers/clk/samsung/Makefile
++++ b/drivers/clk/samsung/Makefile
+@@ -10,6 +10,7 @@ obj-$(CONFIG_SOC_EXYNOS5260)	+= clk-exynos5260.o
+ obj-$(CONFIG_SOC_EXYNOS5420)	+= clk-exynos5420.o
+ obj-$(CONFIG_SOC_EXYNOS5440)	+= clk-exynos5440.o
+ obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-audss.o
++obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-clkout.o
+ obj-$(CONFIG_S3C2410_COMMON_CLK)+= clk-s3c2410.o
+ obj-$(CONFIG_S3C2410_COMMON_DCLK)+= clk-s3c2410-dclk.o
+ obj-$(CONFIG_S3C2412_COMMON_CLK)+= clk-s3c2412.o
+diff --git a/drivers/clk/samsung/clk-exynos-clkout.c b/drivers/clk/samsung/clk-exynos-clkout.c
+new file mode 100644
+index 0000000..3a7cb25
+--- /dev/null
++++ b/drivers/clk/samsung/clk-exynos-clkout.c
+@@ -0,0 +1,153 @@
++/*
++ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
++ * Author: Tomasz Figa <t.figa@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Clock driver for Exynos clock output
++ */
 +
-+	MUX(0, "mout_gdr", sclk_ampll_p4210, SRC_RIGHTBUS, 0, 1),
++#include <linux/clk.h>
++#include <linux/clkdev.h>
++#include <linux/clk-provider.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/syscore_ops.h>
 +
- 	MUX(0, "mout_aclk200", sclk_ampll_p4210, SRC_TOP0, 12, 1),
- 	MUX(0, "mout_aclk100", sclk_ampll_p4210, SRC_TOP0, 16, 1),
- 	MUX(0, "mout_aclk160", sclk_ampll_p4210, SRC_TOP0, 20, 1),
-@@ -472,6 +487,7 @@ static struct samsung_mux_clock exynos4210_mux_clks[] __initdata = {
- 	MUX(0, "mout_mipi1", group1_p4210, E4210_SRC_LCD1, 12, 4),
- 	MUX(CLK_SCLK_MPLL, "sclk_mpll", mout_mpll_p, SRC_CPU, 8, 1),
- 	MUX(CLK_MOUT_CORE, "mout_core", mout_core_p4210, SRC_CPU, 16, 1),
-+	MUX(0, "mout_hpm", mout_core_p4210, SRC_CPU, 20, 1),
- 	MUX(CLK_SCLK_VPLL, "sclk_vpll", sclk_vpll_p4210, SRC_TOP0, 8, 1),
- 	MUX(CLK_MOUT_FIMC0, "mout_fimc0", group1_p4210, SRC_CAM, 0, 4),
- 	MUX(CLK_MOUT_FIMC1, "mout_fimc1", group1_p4210, SRC_CAM, 4, 4),
-@@ -503,10 +519,18 @@ static struct samsung_mux_clock exynos4210_mux_clks[] __initdata = {
- 	MUX(0, "mout_spi0", group1_p4210, SRC_PERIL1, 16, 4),
- 	MUX(0, "mout_spi1", group1_p4210, SRC_PERIL1, 20, 4),
- 	MUX(0, "mout_spi2", group1_p4210, SRC_PERIL1, 24, 4),
++#define EXYNOS_CLKOUT_NR_CLKS		1
++#define EXYNOS_CLKOUT_PARENTS		32
 +
-+	MUX(0, "mout_pwi", mout_pwi_p4210, SRC_DMC, 16, 4),
- };
- 
- /* list of mux clocks supported in exynos4x12 soc */
- static struct samsung_mux_clock exynos4x12_mux_clks[] __initdata = {
-+	MUX(0, "mout_mpll_user_l", mout_mpll_p, SRC_LEFTBUS, 4, 1),
-+	MUX(0, "mout_gdl", mout_gdl_p4x12, SRC_LEFTBUS, 0, 1),
++#define EXYNOS_PMU_DEBUG_REG		0xa00
++#define EXYNOS_CLKOUT_DISABLE_SHIFT	0
++#define EXYNOS_CLKOUT_MUX_SHIFT		8
++#define EXYNOS4_CLKOUT_MUX_MASK		0xf
++#define EXYNOS5_CLKOUT_MUX_MASK		0x1f
 +
-+	MUX(0, "mout_mpll_user_r", mout_mpll_p, SRC_RIGHTBUS, 4, 1),
-+	MUX(0, "mout_gdr", mout_gdr_p4x12, SRC_RIGHTBUS, 0, 1),
++struct exynos_clkout {
++	struct clk_gate gate;
++	struct clk_mux mux;
++	spinlock_t slock;
++	struct clk_onecell_data data;
++	struct clk *clk_table[EXYNOS_CLKOUT_NR_CLKS];
++	void __iomem *reg;
++	u32 pmu_debug_save;
++};
 +
- 	MUX(CLK_MOUT_MPLL_USER_C, "mout_mpll_user_c", mout_mpll_user_p4x12,
- 			SRC_CPU, 24, 1),
- 	MUX(0, "mout_aclk266_gps", aclk_p4412, SRC_TOP1, 4, 1),
-@@ -531,6 +555,7 @@ static struct samsung_mux_clock exynos4x12_mux_clks[] __initdata = {
- 	MUX(CLK_SCLK_MPLL, "sclk_mpll", mout_mpll_p, SRC_DMC, 12, 1),
- 	MUX(CLK_SCLK_VPLL, "sclk_vpll", mout_vpll_p, SRC_TOP0, 8, 1),
- 	MUX(CLK_MOUT_CORE, "mout_core", mout_core_p4x12, SRC_CPU, 16, 1),
-+	MUX(0, "mout_hpm", mout_core_p4x12, SRC_CPU, 20, 1),
- 	MUX(CLK_MOUT_FIMC0, "mout_fimc0", group1_p4x12, SRC_CAM, 0, 4),
- 	MUX(CLK_MOUT_FIMC1, "mout_fimc1", group1_p4x12, SRC_CAM, 4, 4),
- 	MUX(CLK_MOUT_FIMC2, "mout_fimc2", group1_p4x12, SRC_CAM, 8, 4),
-@@ -565,6 +590,8 @@ static struct samsung_mux_clock exynos4x12_mux_clks[] __initdata = {
- 	MUX(0, "mout_spi0_isp", group1_p4x12, E4X12_SRC_ISP, 4, 4),
- 	MUX(0, "mout_spi1_isp", group1_p4x12, E4X12_SRC_ISP, 8, 4),
- 	MUX(0, "mout_uart_isp", group1_p4x12, E4X12_SRC_ISP, 12, 4),
-+	MUX(0, "mout_c2c", sclk_ampll_p4210, SRC_DMC, 0, 1),
-+	MUX(0, "mout_pwi", mout_pwi_p4x12, SRC_DMC, 16, 4),
- 	MUX(0, "mout_g2d0", sclk_ampll_p4210, SRC_DMC, 20, 1),
- 	MUX(0, "mout_g2d1", sclk_evpll_p, SRC_DMC, 24, 1),
- 	MUX(0, "mout_g2d", mout_g2d_p, SRC_DMC, 28, 1),
-@@ -572,8 +599,21 @@ static struct samsung_mux_clock exynos4x12_mux_clks[] __initdata = {
- 
- /* list of divider clocks supported in all exynos4 soc's */
- static struct samsung_div_clock exynos4_div_clks[] __initdata = {
-+	DIV(0, "div_gdl", "mout_gdl", DIV_LEFTBUS, 0, 3),
-+	DIV(0, "div_gpl", "div_gdl", DIV_LEFTBUS, 4, 3),
++static struct exynos_clkout *clkout;
 +
-+	DIV(0, "div_gdr", "mout_gdr", DIV_RIGHTBUS, 0, 3),
-+	DIV(0, "div_gpr", "div_gdr", DIV_RIGHTBUS, 4, 3),
++static int exynos_clkout_suspend(void)
++{
++	clkout->pmu_debug_save = readl(clkout->reg + EXYNOS_PMU_DEBUG_REG);
 +
- 	DIV(0, "div_core", "mout_core", DIV_CPU0, 0, 3),
-+	DIV(0, "div_corem0", "div_core2", DIV_CPU0, 4, 3),
-+	DIV(0, "div_corem1", "div_core2", DIV_CPU0, 8, 3),
-+	DIV(0, "div_periph", "div_core2", DIV_CPU0, 12, 3),
-+	DIV(0, "div_atb", "mout_core", DIV_CPU0, 16, 3),
-+	DIV(0, "div_pclk_dbg", "div_atb", DIV_CPU0, 20, 3),
- 	DIV(0, "div_core2", "div_core", DIV_CPU0, 28, 3),
-+	DIV(0, "div_copy", "mout_hpm", DIV_CPU1, 0, 3),
-+	DIV(0, "div_hpm", "div_copy", DIV_CPU1, 4, 3),
- 	DIV(0, "div_fimc0", "mout_fimc0", DIV_CAM, 0, 4),
- 	DIV(0, "div_fimc1", "mout_fimc1", DIV_CAM, 4, 4),
- 	DIV(0, "div_fimc2", "mout_fimc2", DIV_CAM, 8, 4),
-@@ -631,6 +671,14 @@ static struct samsung_div_clock exynos4_div_clks[] __initdata = {
- 			CLK_SET_RATE_PARENT, 0),
- 	DIV_F(0, "div_mmc_pre3", "div_mmc3", DIV_FSYS2, 24, 8,
- 			CLK_SET_RATE_PARENT, 0),
++	return 0;
++}
 +
-+	DIV(0, "div_acp", "mout_dmc_bus", DIV_DMC0, 0, 3),
-+	DIV(0, "div_acp_pclk", "div_acp", DIV_DMC0, 4, 3),
-+	DIV(0, "div_dphy", "mout_dphy", DIV_DMC0, 8, 3),
-+	DIV(0, "div_dmc", "mout_dmc_bus", DIV_DMC0, 12, 3),
-+	DIV(0, "div_dmcd", "div_dmc", DIV_DMC0, 16, 3),
-+	DIV(0, "div_dmcp", "div_dmcd", DIV_DMC0, 20, 3),
-+	DIV(0, "div_pwi", "mout_pwi", DIV_DMC1, 8, 4),
- };
- 
- /* list of divider clocks supported in exynos4210 soc */
-@@ -671,6 +719,8 @@ static struct samsung_div_clock exynos4x12_div_clks[] __initdata = {
- 	DIV_F(CLK_DIV_MCUISP1, "div_mcuisp1", "div_mcuisp0", E4X12_DIV_ISP1,
- 						8, 3, CLK_GET_RATE_NOCACHE, 0),
- 	DIV(CLK_SCLK_FIMG2D, "sclk_fimg2d", "mout_g2d", DIV_DMC1, 0, 4),
-+	DIV(0, "div_c2c", "mout_c2c", DIV_DMC1, 4, 3),
-+	DIV(0, "div_c2c_aclk", "div_c2c", DIV_DMC1, 12, 3),
- };
- 
- /* list of gate clocks supported in all exynos4 soc's */
++static void exynos_clkout_resume(void)
++{
++	writel(clkout->pmu_debug_save, clkout->reg + EXYNOS_PMU_DEBUG_REG);
++}
++
++static struct syscore_ops exynos_clkout_syscore_ops = {
++	.suspend = exynos_clkout_suspend,
++	.resume = exynos_clkout_resume,
++};
++
++static void __init exynos_clkout_init(struct device_node *node, u32 mux_mask)
++{
++	const char *parent_names[EXYNOS_CLKOUT_PARENTS];
++	struct clk *parents[EXYNOS_CLKOUT_PARENTS];
++	int parent_count;
++	int ret;
++	int i;
++
++	clkout = kzalloc(sizeof(*clkout), GFP_KERNEL);
++	if (!clkout)
++		return;
++
++	spin_lock_init(&clkout->slock);
++
++	parent_count = 0;
++	for (i = 0; i < EXYNOS_CLKOUT_PARENTS; ++i) {
++		char name[] = "clkoutXX";
++
++		snprintf(name, sizeof(name), "clkout%d", i);
++		parents[i] = of_clk_get_by_name(node, name);
++		if (IS_ERR(parents[i])) {
++			parent_names[i] = "none";
++			continue;
++		}
++
++		parent_names[i] = __clk_get_name(parents[i]);
++		parent_count = i + 1;
++	}
++
++	if (!parent_count)
++		goto free_clkout;
++
++	clkout->reg = of_iomap(node, 0);
++	if (!clkout->reg)
++		goto clks_put;
++
++	clkout->gate.reg = clkout->reg + EXYNOS_PMU_DEBUG_REG;
++	clkout->gate.bit_idx = EXYNOS_CLKOUT_DISABLE_SHIFT;
++	clkout->gate.flags = CLK_GATE_SET_TO_DISABLE;
++	clkout->gate.lock = &clkout->slock;
++
++	clkout->mux.reg = clkout->reg + EXYNOS_PMU_DEBUG_REG;
++	clkout->mux.mask = mux_mask;
++	clkout->mux.shift = EXYNOS_CLKOUT_MUX_SHIFT;
++	clkout->mux.lock = &clkout->slock;
++
++	clkout->clk_table[0] = clk_register_composite(NULL, "clkout",
++				parent_names, parent_count, &clkout->mux.hw,
++				&clk_mux_ops, NULL, NULL, &clkout->gate.hw,
++				&clk_gate_ops, CLK_SET_RATE_PARENT
++				| CLK_SET_RATE_NO_REPARENT);
++	if (IS_ERR(clkout->clk_table[0]))
++		goto err_unmap;
++
++	clkout->data.clks = clkout->clk_table;
++	clkout->data.clk_num = EXYNOS_CLKOUT_NR_CLKS;
++	ret = of_clk_add_provider(node, of_clk_src_onecell_get, &clkout->data);
++	if (ret)
++		goto err_clk_unreg;
++
++	register_syscore_ops(&exynos_clkout_syscore_ops);
++
++	return;
++
++err_clk_unreg:
++	clk_unregister(clkout->clk_table[0]);
++err_unmap:
++	iounmap(clkout->reg);
++clks_put:
++	for (i = 0; i < EXYNOS_CLKOUT_PARENTS; ++i)
++		if (!IS_ERR(parents[i]))
++			clk_put(parents[i]);
++free_clkout:
++	kfree(clkout);
++
++	pr_err("%s: failed to register clkout clock\n", __func__);
++}
++
++static void __init exynos4_clkout_init(struct device_node *node)
++{
++	exynos_clkout_init(node, EXYNOS4_CLKOUT_MUX_MASK);
++}
++CLK_OF_DECLARE(exynos4210_clkout, "samsung,exynos4210-pmu",
++		exynos4_clkout_init);
++CLK_OF_DECLARE(exynos4212_clkout, "samsung,exynos4212-pmu",
++		exynos4_clkout_init);
++CLK_OF_DECLARE(exynos4412_clkout, "samsung,exynos4412-pmu",
++		exynos4_clkout_init);
++
++static void __init exynos5_clkout_init(struct device_node *node)
++{
++	exynos_clkout_init(node, EXYNOS5_CLKOUT_MUX_MASK);
++}
++CLK_OF_DECLARE(exynos5250_clkout, "samsung,exynos5250-pmu",
++		exynos5_clkout_init);
++CLK_OF_DECLARE(exynos5420_clkout, "samsung,exynos5420-pmu",
++		exynos5_clkout_init);
 -- 
 1.9.3
