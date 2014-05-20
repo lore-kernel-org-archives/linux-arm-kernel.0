@@ -1,64 +1,53 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 20 May 2014 14:10:09 +0530
-Subject: [PATCH 00/11] ARM: OMAP: OMAP5 & AM43x DSS
-In-Reply-To: <537AE8A7.4080307@ti.com>
-References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
- <5370CBD5.3060107@ti.com> <20140512143604.GB31772@atomide.com>
- <5370E172.20009@ti.com> <20140512154850.GG31772@atomide.com>
- <5375C8E8.1020209@ti.com> <537AE8A7.4080307@ti.com>
-Message-ID: <537B14E9.2050108@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 20 May 2014 10:44:30 +0200
+Subject: [PATCH v7 0/3] Add support for PCI in AArch64
+In-Reply-To: <CA+sq2Ce+8YB+02B7zhxTXwropZXv9spy-w=AJ8YXCP69kr-_1A@mail.gmail.com>
+References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
+ <4292818.mI6kZGgTzd@wuerfel>
+ <CA+sq2Ce+8YB+02B7zhxTXwropZXv9spy-w=AJ8YXCP69kr-_1A@mail.gmail.com>
+Message-ID: <5759329.P75jKFdv3B@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 May 2014 11:01 AM, Archit Taneja wrote:
-> Hi,
-> 
-> On Friday 16 May 2014 01:44 PM, Tomi Valkeinen wrote:
->> On 12/05/14 18:48, Tony Lindgren wrote:
->>
->>>>> Also, I'm wondering why we still have .clk and .opt_clks entries in the
->>>>> hwmod data for am43xx and omap5 which are both device tree based with
->>>>> all the clocks coming from .dts files?
->>>>
->>>> I think they are needed for the omap_device/hwmod stuff to work. Only
->>>> omapdss driver knows about the clocks defined in the .dts files, and the
->>>> omap_device/hwmod code still needs to do the reset and maybe some other
->>>> tasks that require the clocks.
->>>
->>> We're already populating the hwmod data from dts entries, that's done by
->>> omap_device_build_from_dt. Why aren't we doing that for dt defined clocks?
->>>
->>> I'd rather not start adding new data that will then just be removed, that's
->>> what people call "pointless extra churn".
->>
->> I don't know why. I have to say I'm not 100% sure if that's done or not,
->> but at least I can't find where it's done.
-> 
-> The reason why clocks are needed from hwmod data is because we still don't populate hwmod fields like main_clk and opt_clock from DT clocks.
-> 
-> The reason why this isn't done yet is because we currently haven't figured out a clean way to tell hwmod what clock is the main_clk, and what clocks are optional clocks.
-> 
-> One of the proposed methods was to assume the clock named to be "fck" as main_clk, and the remaining clocks as optional clocks for hwmod. That method wasn't agreed upon, this looks like the thread which discusses this:
-> 
-> http://marc.info/?l=linux-arm-kernel&m=138928084823142&w=2
+On Tuesday 20 May 2014 09:52:33 Sunil Kovvuri wrote:
+> >> In sriov_enable() (drivers/pci/iov.c)
+> >>
+> >>  296        for (i = 0; i < PCI_SRIOV_NUM_BARS; i++) {
+> >>  297                 bars |= (1 << (i + PCI_IOV_RESOURCES));
+> >>  298                 res = dev->resource + PCI_IOV_RESOURCES + i;
+> >>  299                 if (res->parent)
+> >>  300                         nres++;
+> >>  301         }
+> >>  302         if (nres != iov->nres) {
+> >>  303                 dev_err(&dev->dev, "not enough MMIO resources for
+> >>  SR-IOV\n");
+> >>  304                 return -ENOMEM;
+> >>  305         }
+> >>
+> >> Here its checking if physical function's IOV resource has a parent or not.
+> >> Which is pci-pci bridge in this case. Otherwise it doesn't consider
+> >> that resource.
+> >>
+> >> Added below api to your patch.
+> >> This will try to claim a resource while creating a PCI device which
+> >> inturn sets 'res->parent'.
+> >
+> > This looks like the wrong approach. The PCI host controller should
+> > really have been registered with the root 'iomem_resource' during
+> > the probe of the host controller.
+> >
+> I didn't get this, if a SR-IOV device is connected to a PCI-PCI bridge
+> and inturn bridge connected to root port. Then the parent bus is not root,
+> but the bridge.  The issue is either hierarchy should not be checked for
+> SR-IOV resources or someone should set the hierarchy (i.e parent resources).
 
-So I started to look through this again and I realized most of the opt clock information
-is actually unused within hwmod and does not even need to be there. I just proposed an RFC here to clean some of that [1]
+Ah, I misunderstood the problem, I thought the PCI core was complaining
+about lack of space in the resources, not about a lack of BARs.
 
-The only modules which do need this seem to be gpio and dss (though we still need to check if all the newer platforms
-need this, or this is one of those things just carried forward because some old platform had an issue with gpio and dss
-ocp reset)
+It seems there is code like yours in a couple of architectures, but they
+only claim the resources of bridges, not the actual devices as you
+seem to be doing. Can you check if the x86 version of
+pcibios_allocate_bus_resources() does the trick for you? Maybe we can
+turn that into a generic helper.
 
-As far as DSS is concerned, this is used within the custom reset function (not within hwmod) in display.c in mach-omap2/
-Its just that the current code relies on hwmod structures, which can very easily now extract this from DT instead.
-
-That just leaves gpio, which should be the only clock information that will have to exist in hwmod till we figure out
-how to move it to DT. All the main_clks from hwmod can very easily to moved to DT as already proposed using something like
-'fck' to identify them.
-
-[1] http://marc.info/?l=linux-omap&m=140057445618162&w=2
-
-> 
-> Archit
-> 
-> 
+	Arnd
