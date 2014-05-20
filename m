@@ -1,139 +1,50 @@
-From: delicious.quinoa@gmail.com (Alan Tull)
-Date: Tue, 20 May 2014 09:31:06 -0500
-Subject: [PATCHv5 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
- controller
-In-Reply-To: <CAF03EBfwFC7bK=j0W3K+no9TK7xe2nF1ZXH9bMBRNzVErB5EjQ@mail.gmail.com>
-References: <1400169891-29546-1-git-send-email-tthayer@altera.com>
- <1400169891-29546-2-git-send-email-tthayer@altera.com>
- <20140516075344.GF949@pengutronix.de>
- <CAF03EBfOrBWsGVkwYHQt9Pm858LtkgUThkM6dFjksa93ETo_bw@mail.gmail.com>
- <20140519191206.GH949@pengutronix.de>
- <CAF03EBfwFC7bK=j0W3K+no9TK7xe2nF1ZXH9bMBRNzVErB5EjQ@mail.gmail.com>
-Message-ID: <CANk1AXTdSheUkNtF2fSmtcYaUrd2CnTjBxGitmSy88H4VRVbnw@mail.gmail.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue, 20 May 2014 22:36:59 +0800
+Subject: [PATCH v3 0/6] enable Hix5hd2 SoC
+Message-ID: <1400596625-16830-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 2:37 PM, Thor Thayer <tthayer.linux@gmail.com> wrote:
+Changelog:
+v3:
+  * Clean in headsmp.S.
+  * Remove CONFIG_ARCH_HIX5HD2 in Makefile for headsmp.o. Use
+    CONFIG_SMP instead.
 
->>> >> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
->>> >> new file mode 100644
->>> >> index 0000000..8f8746b
->>> >> --- /dev/null
->>> >> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
->>> >> @@ -0,0 +1,11 @@
->>> >> +Altera SOCFPGA SDRAM Controller
->>> >> +
->>> >> +Required properties:
->>> >> +- compatible : "altr,sdr-ctl";
->>> >> +- reg : Should contain 1 register ranges(address and length)
->>> >> +
->>> >> +Example:
->>> >> +     sdrctl at ffc25000 {
->>> >> +             compatible = "altr,sdr-ctl";
->>> >> +             reg = <0xffc25000 0x1000>;
->>> >> +     };
->>> >> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
->>> >> index df43702..6ce912e 100644
->>> >> --- a/arch/arm/boot/dts/socfpga.dtsi
->>> >> +++ b/arch/arm/boot/dts/socfpga.dtsi
->>> >> @@ -676,6 +676,11 @@
->>> >>                       clocks = <&l4_sp_clk>;
->>> >>               };
->>> >>
->>> >> +             sdrctl at ffc25000 {
->>> >> +                     compatible = "altr,sdr-ctl", "syscon";
->>> >                                                    ^^^^^^^^^^
->>> >
->>> > Get rid of that, too, please.
->>>
->>> Hi Steffan,
->>>
->>> I believe I need to keep the "syscon". The same register (ctrlcfg)
->>> that has the ECC enable bitfield also includes the DRAM configuration
->>> bitfields that other drivers will want to access (specifically the
->>> FPGA bridge needs this information). Since this register will be
->>> shared between drivers,  syscon seems like the best solution.
->>>
->>
->> Hm, from looking at the documentation of the ctrlcfg I can't really
->> understand which bits you would need for the FPGA brigde and why.
+v2:
+  * Add document on DT binding.
+  * Clean DTS file.
+  * Avoid to parse DT binding in restart function.
+  * Fix the hotplug issue.
+  * Remove hardcoding in platsmp.
 
-Hi Steffen,
+Haifeng Yan (3):
+  ARM: debug: Rename Hi3716 to HI5XHD2
+  ARM: hisi: enable hix5hd2 SoC
+  ARM: dts: Add hix5hd2-dkb dts file.
 
-Offset 0x80 in the sdr-ctl is the "fpgaportrst" register.  14 bits
-wide, defaults to 0.  When appropriate bits set to 1 in that reg, it
-allows an FPGA port to come out of reset (enables that port).  Has no
-other effect on SDRAM configuration.
+Haojian Zhuang (3):
+  ARM: hisi: store reboot reg in global variable
+  ARM: config: add ARCH_HIX5HD2 in hi3xxx_defconfig
+  document: add dt binding on hix5hd2 SoC
 
->> That all sounds like stuff you would want to set for the specific
->> RAM you are dealing with on a specific board.
->> What bridge are you talking about? The SDRAM bridge?
+ .../bindings/arm/hisilicon/hisilicon.txt           |   9 ++
+ arch/arm/Kconfig.debug                             |  20 +--
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/hix5hd2-dkb.dts                  |  52 +++++++
+ arch/arm/boot/dts/hix5hd2.dtsi                     | 171 +++++++++++++++++++++
+ arch/arm/configs/hi3xxx_defconfig                  |   1 +
+ arch/arm/mach-hisi/Kconfig                         |  13 +-
+ arch/arm/mach-hisi/Makefile                        |   2 +-
+ arch/arm/mach-hisi/core.h                          |   5 +
+ arch/arm/mach-hisi/headsmp.S                       |  16 ++
+ arch/arm/mach-hisi/hisilicon.c                     |  32 +++-
+ arch/arm/mach-hisi/hotplug.c                       |  58 +++++++
+ arch/arm/mach-hisi/platsmp.c                       |  50 +++++-
+ 13 files changed, 407 insertions(+), 23 deletions(-)
+ create mode 100644 arch/arm/boot/dts/hix5hd2-dkb.dts
+ create mode 100644 arch/arm/boot/dts/hix5hd2.dtsi
+ create mode 100644 arch/arm/mach-hisi/headsmp.S
 
-Yes, the port allows the FPGA a direct path to the SDRAM.  This one
-register the only register in the sdr that the bridge driver needs.
-
->>
->> I can see the problem with the ECC enable, though.
->>
->> Regards,
->> Steffen
->>
->
-> Hi Steffen,
->
-> I'll get more details from the guy working on the FPGA bridge when he
-> gets back in the office. When I started working on EDAC, that register
-> had been allocated by the FPGA bridge driver so we decided to use the
-> syscon to allow sharing of the register.
->
-> My understanding was that the FPGA bridge as an SDRAM master would
-> allow FPGA devices to access the SDRAM.  As part of that process, they
-> may want to read the SDRAM configuration.
-
-The FPGA bridge driver doesn't look at the SDRAM configuration.  It
-just wants access to this one register so it can enable or disable the
-FPGA path to SDRAM.  The only function of this bridge driver is to
-enable/disable the bridge.
-
-~Alan
-
->
-> I'll need to get more details from the driver developer because the
-> FPGA driver is in flux while the appropriate driver architecture is
-> being discussed.
->
-> Thor
->
->
->>> >                 sdrctl at ffc25000 {
->>> >                         compatible = "altr,sdr-ctl";
->>> >                         reg = <0xffc25000 0x1000>;
->>> >                         ranges;
->>> >
->>> >                         edac at ffc2502c {
->>> >                                 compatible = "altr,sdram-edac";
->>> >                                 reg = <0xffc2502c 0x50>;
->>> >                                 interrupts = <0 39 4>;
->>> >                         };
->>> >                 };
->>> >
->>> > Then we can later add:
->>> >
->>> >                         sdr-ports: ports at ffc2507c {
->>> >                                 #reset-cells = <1>;
->>> >                                 compatible = "altr,sdr-ports";
->>> >                                 reg = <0xffc2507c 0x10>;
->>> >                                 clocks = <&ddr_dqs_clk>;
->>> >                                 ...
->>> >                         };
->>
->> --
->> Pengutronix e.K.                           |                             |
->> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
->> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
->> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+-- 
+1.9.1
