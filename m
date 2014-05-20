@@ -1,20 +1,57 @@
 From: b38611@freescale.com (Fugang Duan)
-Date: Tue, 20 May 2014 14:50:43 +0800
-Subject: [PATCH v1 0/2] net: fec: Add fec sleep pinctrl for pin PM state
-Message-ID: <1400568645-10214-1-git-send-email-b38611@freescale.com>
+Date: Tue, 20 May 2014 14:50:44 +0800
+Subject: [PATCH v1 1/2] ARM: dts: imx6sl: add fec sleep pinctrl for pin PM
+ state
+In-Reply-To: <1400568645-10214-1-git-send-email-b38611@freescale.com>
+References: <1400568645-10214-1-git-send-email-b38611@freescale.com>
+Message-ID: <1400568645-10214-2-git-send-email-b38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The two patches is to add fec sleep pinctrl for pin PM state in imx6sl
-evk platform.
+when system suspend, need to set pins to low power state to
+save IO power consumption, there are three states of pinctrl:
+"default", "idle" and "sleep". Currently enet supports default
+and sleep state.
 
-Fugang Duan (2):
-  ARM: dts: imx6sl: add fec sleep pinctrl for pin PM state
-  net: fec: use pinctrl PM helpers
+Signed-off-by: Fugang Duan <B38611@freescale.com>
+---
+ arch/arm/boot/dts/imx6sl-evk.dts |   16 +++++++++++++++-
+ 1 files changed, 15 insertions(+), 1 deletions(-)
 
- arch/arm/boot/dts/imx6sl-evk.dts          |   16 +++++++++++++++-
- drivers/net/ethernet/freescale/fec_main.c |   10 ++++++++++
- 2 files changed, 25 insertions(+), 1 deletions(-)
-
+diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
+index a8d9a93..050786d 100644
+--- a/arch/arm/boot/dts/imx6sl-evk.dts
++++ b/arch/arm/boot/dts/imx6sl-evk.dts
+@@ -116,8 +116,9 @@
+ };
+ 
+ &fec {
+-	pinctrl-names = "default";
++	pinctrl-names = "default", "sleep";
+ 	pinctrl-0 = <&pinctrl_fec>;
++	pinctrl-1 = <&pinctrl_fec_sleep>;
+ 	phy-mode = "rmii";
+ 	status = "okay";
+ };
+@@ -300,6 +301,19 @@
+ 			>;
+ 		};
+ 
++		pinctrl_fec_sleep: fecgrp-sleep {
++			fsl,pins = <
++				MX6SL_PAD_FEC_MDC__GPIO4_IO23      0x3080
++				MX6SL_PAD_FEC_CRS_DV__GPIO4_IO25   0x3080
++				MX6SL_PAD_FEC_RXD0__GPIO4_IO17     0x3080
++				MX6SL_PAD_FEC_RXD1__GPIO4_IO18     0x3080
++				MX6SL_PAD_FEC_TX_EN__GPIO4_IO22    0x3080
++				MX6SL_PAD_FEC_TXD0__GPIO4_IO24     0x3080
++				MX6SL_PAD_FEC_TXD1__GPIO4_IO16     0x3080
++				MX6SL_PAD_FEC_REF_CLK__GPIO4_IO26  0x3080
++			>;
++		};
++
+ 		pinctrl_i2c1: i2c1grp {
+ 			fsl,pins = <
+ 				MX6SL_PAD_I2C1_SCL__I2C1_SCL	0x4001b8b1
 -- 
 1.7.8
