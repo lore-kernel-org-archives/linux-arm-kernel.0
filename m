@@ -1,99 +1,72 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 20 May 2014 16:45:21 +0800
-Subject: [PATCH 03/20] ARM: imx5: drop option MACH_IMX51_DT
+Date: Tue, 20 May 2014 16:45:29 +0800
+Subject: [PATCH 11/20] ARM: imx5: retrieve iim base from device tree
 In-Reply-To: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
 References: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1400575538-21136-4-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1400575538-21136-12-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since i.MX51 becomes DT only now, we can drop option MACH_IMX51_DT and
-just use SOC_IMX51 instead.  While at it, rename imx51-dt.c to
-mach-imx51.c to align with the name schema of other IMX DT only
-platforms.
+Instead of using static define and mapping, the patch changes imx5 code
+that reads chip revision from IIM to retrieve base address from device
+tree and use dynamic mapping.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/configs/imx_v6_v7_defconfig           |  2 +-
- arch/arm/configs/multi_v7_defconfig            |  2 +-
- arch/arm/mach-imx/Kconfig                      | 10 +++-------
- arch/arm/mach-imx/Makefile                     |  2 +-
- arch/arm/mach-imx/{imx51-dt.c => mach-imx51.c} |  0
- 5 files changed, 6 insertions(+), 10 deletions(-)
- rename arch/arm/mach-imx/{imx51-dt.c => mach-imx51.c} (100%)
+ arch/arm/mach-imx/cpu-imx5.c | 25 +++++++++++++++++++++----
+ 1 file changed, 21 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index ef88153..d8ec820 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -31,7 +31,7 @@ CONFIG_MACH_IMX35_DT=y
- CONFIG_MACH_PCM043=y
- CONFIG_MACH_MX35_3DS=y
- CONFIG_MACH_VPR200=y
--CONFIG_MACH_IMX51_DT=y
-+CONFIG_SOC_IMX51=y
- CONFIG_SOC_IMX50=y
- CONFIG_SOC_IMX53=y
- CONFIG_SOC_IMX6Q=y
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index d4e8a47..a045052 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -25,7 +25,7 @@ CONFIG_ARCH_HIGHBANK=y
- CONFIG_ARCH_HI3xxx=y
- CONFIG_ARCH_KEYSTONE=y
- CONFIG_ARCH_MXC=y
--CONFIG_MACH_IMX51_DT=y
-+CONFIG_SOC_IMX51=y
- CONFIG_SOC_IMX53=y
- CONFIG_SOC_IMX6Q=y
- CONFIG_SOC_IMX6SL=y
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index c6a5e37..3b2a5c5 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -698,11 +698,6 @@ config SOC_IMX5
- 	select HAVE_IMX_SRC
- 	select MXC_TZIC
+diff --git a/arch/arm/mach-imx/cpu-imx5.c b/arch/arm/mach-imx/cpu-imx5.c
+index c1c99a7..3403bac 100644
+--- a/arch/arm/mach-imx/cpu-imx5.c
++++ b/arch/arm/mach-imx/cpu-imx5.c
+@@ -16,6 +16,8 @@
+ #include <linux/init.h>
+ #include <linux/module.h>
+ #include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
  
--config	SOC_IMX51
--	bool
--	select PINCTRL_IMX51
--	select SOC_IMX5
--
- config	SOC_IMX50
- 	bool "i.MX50 support"
- 	select PINCTRL_IMX50
-@@ -711,9 +706,10 @@ config	SOC_IMX50
- 	help
- 	  This enables support for Freescale i.MX50 processor.
+ #include "hardware.h"
+ #include "common.h"
+@@ -24,10 +26,26 @@ static int mx5_cpu_rev = -1;
  
--config MACH_IMX51_DT
-+config SOC_IMX51
- 	bool "i.MX51 support"
--	select SOC_IMX51
-+	select PINCTRL_IMX51
-+	select SOC_IMX5
- 	help
- 	  This enables support for Freescale i.MX51 processor
+ #define IIM_SREV 0x24
  
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index bbe93bb..9d7b46f 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -109,8 +109,8 @@ obj-$(CONFIG_SOC_IMX6) += suspend-imx6.o
- endif
- obj-$(CONFIG_SOC_IMX6) += pm-imx6.o
++static u32 imx5_read_srev_reg(const char *compat)
++{
++	void __iomem *iim_base;
++	struct device_node *np;
++	u32 srev;
++
++	np = of_find_compatible_node(NULL, NULL, compat);
++	iim_base = of_iomap(np, 0);
++	WARN_ON(!iim_base);
++
++	srev = readl(iim_base + IIM_SREV) & 0xff;
++
++	iounmap(iim_base);
++
++	return srev;
++}
++
+ static int get_mx51_srev(void)
+ {
+-	void __iomem *iim_base = MX51_IO_ADDRESS(MX51_IIM_BASE_ADDR);
+-	u32 rev = readl(iim_base + IIM_SREV) & 0xff;
++	u32 rev = imx5_read_srev_reg("fsl,imx51-iim");
  
--obj-$(CONFIG_MACH_IMX51_DT) += imx51-dt.o
- obj-$(CONFIG_SOC_IMX50) += mach-imx50.o
-+obj-$(CONFIG_SOC_IMX51) += mach-imx51.o
- obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
+ 	switch (rev) {
+ 	case 0x0:
+@@ -77,8 +95,7 @@ int __init mx51_neon_fixup(void)
  
- obj-$(CONFIG_SOC_VF610) += clk-vf610.o mach-vf610.o
-diff --git a/arch/arm/mach-imx/imx51-dt.c b/arch/arm/mach-imx/mach-imx51.c
-similarity index 100%
-rename from arch/arm/mach-imx/imx51-dt.c
-rename to arch/arm/mach-imx/mach-imx51.c
+ static int get_mx53_srev(void)
+ {
+-	void __iomem *iim_base = MX51_IO_ADDRESS(MX53_IIM_BASE_ADDR);
+-	u32 rev = readl(iim_base + IIM_SREV) & 0xff;
++	u32 rev = imx5_read_srev_reg("fsl,imx53-iim");
+ 
+ 	switch (rev) {
+ 	case 0x0:
 -- 
 1.8.3.2
