@@ -1,27 +1,24 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 20 May 2014 13:49:39 +0200
-Subject: [PATCH/RFC V6 2/2] clk: Add handling of clk parent and rate
- assigned from DT
-In-Reply-To: <1400520171-6698-3-git-send-email-s.nawrocki@samsung.com>
-References: <1400520171-6698-1-git-send-email-s.nawrocki@samsung.com>
- <1400520171-6698-3-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <537B4153.8030203@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 20 May 2014 19:50:13 +0800
+Subject: [PATCH 18/20] ARM: imx5: remove file mm-imx5.c
+In-Reply-To: <1400578975.608551061@f382.i.mail.ru>
+References: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
+ <1400575538-21136-19-git-send-email-shawn.guo@freescale.com>
+ <1400578975.608551061@f382.i.mail.ru>
+Message-ID: <20140520115011.GB20778@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/05/14 19:22, Sylwester Nawrocki wrote:
-> @@ -2620,7 +2639,10 @@ void __init of_clk_init(const struct of_device_id *matches)
->  		list_for_each_entry_safe(clk_provider, next,
->  					&clk_provider_list, node) {
->  			if (force || parent_ready(clk_provider->np)) {
-> +
->  				clk_provider->clk_init_cb(clk_provider->np);
-> +				of_clk_set_defaults(np, true);
+On Tue, May 20, 2014 at 01:42:55PM +0400, Alexander Shiyan wrote:
+> Tue, 20 May 2014 16:45:36 +0800 ?? Shawn Guo <shawn.guo@freescale.com>:
+> > The only code left in mm-imx5.c is to create static mapping.  While all
+> > IMX platform code are moved to use dynamic mapping, the file can just be
+> > removed now.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> 
+> Do we need a static mappings for UART lowlevel debug?
 
-There is an error in this patch, this line should read:
+It's been handled by debug_ll_io_init().  So we're fine.
 
-+				of_clk_set_defaults(clk_provider->np, true);
-
->  				list_del(&clk_provider->node);
->  				kfree(clk_provider);
->  				is_init_done = true;
+Shawn
