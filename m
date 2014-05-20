@@ -1,71 +1,48 @@
-From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Tue, 20 May 2014 19:27:18 +0200
-Subject: [PATCHv2 resend 00/11] improve PWM lookup support without device
- tree
-In-Reply-To: <1400532162-29483-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1400532162-29483-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <CA+gwMccr8N+oZA4A5DY168Vis0Q6OaVDJuJaWzRVTQ389ixjjQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 20 May 2014 18:37:05 +0100
+Subject: [PATCH 1/7] mfd: twl4030-power: Fix hang on reboot if sleep
+ configuration was loaded earlier
+In-Reply-To: <20140520150748.GD27830@atomide.com>
+References: <1400031250-29542-1-git-send-email-tony@atomide.com>
+ <1400031250-29542-2-git-send-email-tony@atomide.com>
+ <20140520150119.GW24991@lee--X1>
+ <20140520150748.GD27830@atomide.com>
+Message-ID: <20140520173705.GA1458@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+> > > Looks like we can still hit the issue of wrong load order of
+> > > twl4030 configuration. If we have a sleep configuration loaded,
+> > > and do a warm reset, the device can hang while initializing the
+> > > wakeup12 sequence. We do have a warning message about wrong order
+> > > of twl4030 configuration, but in this case it does not help as
+> > > the sleep configuration was loaded during the previous boot and
+> > > the state of twl4030 is maintained throughout the warm reset.
+> > > 
+> > > Fix the issue by clearing any existing sleep configuration
+> > > before we load the warm reset configuration.
+> > > 
+> > > Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > > ---
+> > >  drivers/mfd/twl4030-power.c | 6 ++++++
+> > >  1 file changed, 6 insertions(+)
+> > 
+> > Can't vouch for the semantics of the patch, but the code looks good.
+> > 
+> >   Acked-by: Lee Jones <lee.jones@linaro.org>
+> > 
+> > Can I just apply this, or would you like Peter to review it first?
+> 
+> As far as I'm concerned you can go ahead an apply, it's been
+> floating on the list for a while and Peter is probably busy
+> with other things.
 
-On Mon, May 19, 2014 at 10:42 PM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> Hi,
->
-> Originally sent on Apr 14th, note that this series is blocking another 16
-> patches series, I would like it to be taken in 3.16 if we can agree on this
-> implementation.
->
-> A patch set as suggested by Thierry to make lookup with the lookup table
-> instead of device tree behave more like when using device tree.
->
-> The first patch adds a period and a polarity member to the lookup table and use
-> those to set period and polarity.
->
-> Patch 2, 4 and 5 are making use of those new members from the board files.
-> Patch 3 removes useless code since setting the polarity is now handled by the
-> PWM core.
->
-> I couldn't decide on a good name for the extended PWM_LOOKUP macro and I believe
-> we won't have to add members to that structure soon so:
-> Patch 6 modifies the PWM_LOOKUP macro to also initialize period and polarity
-> and
-> Patch 7-9 are making use of the new PWM_LOOKUP macro in the board files
->
-> Patch 10 and 11 are making the leds-pwm and pwm_bl drivers get the period from
-> the PWM before using pwm_period_ns if it is not already set.
->
-> Patch 10 will obviously conflict with the series of Russell reworking the
-> leds-pwm probing. I can rebase if necessary
->
-> The final goal would be to get rid of .pwm_period_ns in leds-pwm and pwm_bl
-> after moving all the remaining users (still around 25) to pwm_lookup.
->
-> Changes in v2:
->  - correctly unlock the pwm_lookup_lock mutex before returning.
->  - don't change PWM_LOOKUP atomically
->  - remove tpu_pwm_platform_data and the associated header file
->  - make the leds-pwm and pwm_bl drivers get the period from the PWM
->
-> Alexandre Belloni (11):
->   pwm: add period and polarity to struct pwm_lookup
->   ARM: shmobile: Armadillo 800 EVA: initialize all struct pwm_lookup
->     members
->   pwm: renesas-tpu: remove useless struct tpu_pwm_platform_data
->   ARM: OMAP3: Beagle: initialize all the struct pwm_lookup members
->   ARM: pxa: hx4700: initialize all the struct pwm_lookup members
->   pwm: modify PWM_LOOKUP to initialize all struct pwm_lookup members
->   ARM: OMAP3: Beagle: use PWM_LOOKUP to initialize struct pwm_lookup
->   ARM: shmobile: Armadillo 800 EVA: use PWM_LOOKUP to initialize struct
->     pwm_lookup
->   ARM: pxa: hx4700: use PWM_LOOKUP to initialize struct pwm_lookup
->   leds: leds-pwm: retrieve configured pwm period
->   backlight: pwm_bl: retrieve configured pwm period
+No problem.  Just a couple of things for you to look at in the other
+patches, then we can go ahead and apply for v3.16.
 
-For the hx4700 patches (5 an 9),
-Acked-by: Philipp Zabel <philipp.zabel@gmail.com>
-
-regards
-Philipp
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
