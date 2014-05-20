@@ -1,129 +1,155 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 20 May 2014 16:45:32 +0800
-Subject: [PATCH 14/20] ARM: imx5: use dynamic mapping for DPLL block
+Date: Tue, 20 May 2014 16:45:36 +0800
+Subject: [PATCH 18/20] ARM: imx5: remove file mm-imx5.c
 In-Reply-To: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
 References: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1400575538-21136-15-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1400575538-21136-19-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the static mapping of DPLL block with dynamic mapping by
-calling ioremap().  Ideally, this should be done by calling of_iomap(),
-so that the physical address of DPLL can also be retrieved from device
-tree.  But unfortunately, DPLL blocks are not defined in DT in the first
-place.  So to maintain the compatibility of existing DTB, we use
-ioremap() with physical address defines in the code.
+The only code left in mm-imx5.c is to create static mapping.  While all
+IMX platform code are moved to use dynamic mapping, the file can just be
+removed now.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-imx/clk-imx51-imx53.c | 65 +++++++++++++++++++++++++++----------
- 1 file changed, 48 insertions(+), 17 deletions(-)
+ arch/arm/mach-imx/Makefile     |  2 +-
+ arch/arm/mach-imx/common.h     |  2 --
+ arch/arm/mach-imx/mach-imx50.c |  1 -
+ arch/arm/mach-imx/mach-imx51.c |  1 -
+ arch/arm/mach-imx/mach-imx53.c |  1 -
+ arch/arm/mach-imx/mm-imx5.c    | 61 ------------------------------------------
+ 6 files changed, 1 insertion(+), 67 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/mm-imx5.c
 
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 9eb54a8..4b69183 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -22,13 +22,14 @@
- #include "common.h"
- #include "hardware.h"
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 5396b38..2c8ca00 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -12,7 +12,7 @@ obj-$(CONFIG_SOC_IMX31) += mm-imx3.o cpu-imx31.o clk-imx31.o iomux-imx31.o ehci-
+ obj-$(CONFIG_SOC_IMX35) += mm-imx3.o cpu-imx35.o clk-imx35.o ehci-imx35.o pm-imx3.o
  
--#define MX51_DPLL1_BASE		MX51_IO_ADDRESS(MX51_PLL1_BASE_ADDR)
--#define MX51_DPLL2_BASE		MX51_IO_ADDRESS(MX51_PLL2_BASE_ADDR)
--#define MX51_DPLL3_BASE		MX51_IO_ADDRESS(MX51_PLL3_BASE_ADDR)
--#define MX53_DPLL1_BASE		MX53_IO_ADDRESS(MX53_PLL1_BASE_ADDR)
--#define MX53_DPLL2_BASE		MX53_IO_ADDRESS(MX53_PLL2_BASE_ADDR)
--#define MX53_DPLL3_BASE		MX53_IO_ADDRESS(MX53_PLL3_BASE_ADDR)
--#define MX53_DPLL4_BASE		MX53_IO_ADDRESS(MX53_PLL4_BASE_ADDR)
-+#define MX51_DPLL1_BASE		0x83f80000
-+#define MX51_DPLL2_BASE		0x83f84000
-+#define MX51_DPLL3_BASE		0x83f88000
-+
-+#define MX53_DPLL1_BASE		0x63f80000
-+#define MX53_DPLL2_BASE		0x63f84000
-+#define MX53_DPLL3_BASE		0x63f88000
-+#define MX53_DPLL4_BASE		0x63f8c000
+ imx5-pm-$(CONFIG_PM) += pm-imx5.o
+-obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o mm-imx5.o clk-imx51-imx53.o $(imx5-pm-y)
++obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o clk-imx51-imx53.o $(imx5-pm-y)
  
- #define MXC_CCM_CCR		(ccm_base + 0x00)
- #define MXC_CCM_CCDR		(ccm_base + 0x04)
-@@ -363,12 +364,21 @@ static void __init mx5_clocks_common_init(void __iomem *ccm_base)
- static void __init mx50_clocks_init(struct device_node *np)
- {
- 	void __iomem *ccm_base;
-+	void __iomem *pll_base;
- 	unsigned long r;
- 	int i;
+ obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
+ 			    clk-pfd.o clk-busy.o clk.o \
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index b480f0b..53ee569 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -26,8 +26,6 @@ void mx25_map_io(void);
+ void mx27_map_io(void);
+ void mx31_map_io(void);
+ void mx35_map_io(void);
+-void mx51_map_io(void);
+-void mx53_map_io(void);
+ void imx1_init_early(void);
+ void imx21_init_early(void);
+ void imx25_init_early(void);
+diff --git a/arch/arm/mach-imx/mach-imx50.c b/arch/arm/mach-imx/mach-imx50.c
+index 66e537b..62a4d45 100644
+--- a/arch/arm/mach-imx/mach-imx50.c
++++ b/arch/arm/mach-imx/mach-imx50.c
+@@ -29,7 +29,6 @@ static const char *imx50_dt_board_compat[] __initconst = {
+ };
  
--	clk[IMX5_CLK_PLL1_SW]		= imx_clk_pllv2("pll1_sw", "osc", MX53_DPLL1_BASE);
--	clk[IMX5_CLK_PLL2_SW]		= imx_clk_pllv2("pll2_sw", "osc", MX53_DPLL2_BASE);
--	clk[IMX5_CLK_PLL3_SW]		= imx_clk_pllv2("pll3_sw", "osc", MX53_DPLL3_BASE);
-+	pll_base = ioremap(MX53_DPLL1_BASE, SZ_16K);
-+	WARN_ON(!pll_base);
-+	clk[IMX5_CLK_PLL1_SW]		= imx_clk_pllv2("pll1_sw", "osc", pll_base);
-+
-+	pll_base = ioremap(MX53_DPLL2_BASE, SZ_16K);
-+	WARN_ON(!pll_base);
-+	clk[IMX5_CLK_PLL2_SW]		= imx_clk_pllv2("pll2_sw", "osc", pll_base);
-+
-+	pll_base = ioremap(MX53_DPLL3_BASE, SZ_16K);
-+	WARN_ON(!pll_base);
-+	clk[IMX5_CLK_PLL3_SW]		= imx_clk_pllv2("pll3_sw", "osc", pll_base);
+ DT_MACHINE_START(IMX50_DT, "Freescale i.MX50 (Device Tree Support)")
+-	.map_io		= mx53_map_io,
+ 	.init_irq	= tzic_init_irq,
+ 	.init_machine	= imx50_dt_init,
+ 	.dt_compat	= imx50_dt_board_compat,
+diff --git a/arch/arm/mach-imx/mach-imx51.c b/arch/arm/mach-imx/mach-imx51.c
+index a2027d2..92806ad 100644
+--- a/arch/arm/mach-imx/mach-imx51.c
++++ b/arch/arm/mach-imx/mach-imx51.c
+@@ -74,7 +74,6 @@ static const char *imx51_dt_board_compat[] __initconst = {
+ };
  
- 	ccm_base = of_iomap(np, 0);
- 	WARN_ON(!ccm_base);
-@@ -422,12 +432,21 @@ CLK_OF_DECLARE(imx50_ccm, "fsl,imx50-ccm", mx50_clocks_init);
- static void __init mx51_clocks_init(struct device_node *np)
- {
- 	void __iomem *ccm_base;
-+	void __iomem *pll_base;
- 	int i;
- 	u32 val;
+ DT_MACHINE_START(IMX51_DT, "Freescale i.MX51 (Device Tree Support)")
+-	.map_io		= mx51_map_io,
+ 	.init_early	= imx51_init_early,
+ 	.init_irq	= tzic_init_irq,
+ 	.init_machine	= imx51_dt_init,
+diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
+index 40005b8..754c491 100644
+--- a/arch/arm/mach-imx/mach-imx53.c
++++ b/arch/arm/mach-imx/mach-imx53.c
+@@ -48,7 +48,6 @@ static const char *imx53_dt_board_compat[] __initconst = {
+ };
  
--	clk[IMX5_CLK_PLL1_SW]		= imx_clk_pllv2("pll1_sw", "osc", MX51_DPLL1_BASE);
--	clk[IMX5_CLK_PLL2_SW]		= imx_clk_pllv2("pll2_sw", "osc", MX51_DPLL2_BASE);
--	clk[IMX5_CLK_PLL3_SW]		= imx_clk_pllv2("pll3_sw", "osc", MX51_DPLL3_BASE);
-+	pll_base = ioremap(MX51_DPLL1_BASE, SZ_16K);
-+	WARN_ON(!pll_base);
-+	clk[IMX5_CLK_PLL1_SW]		= imx_clk_pllv2("pll1_sw", "osc", pll_base);
-+
-+	pll_base = ioremap(MX51_DPLL2_BASE, SZ_16K);
-+	WARN_ON(!pll_base);
-+	clk[IMX5_CLK_PLL2_SW]		= imx_clk_pllv2("pll2_sw", "osc", pll_base);
-+
-+	pll_base = ioremap(MX51_DPLL3_BASE, SZ_16K);
-+	WARN_ON(!pll_base);
-+	clk[IMX5_CLK_PLL3_SW]		= imx_clk_pllv2("pll3_sw", "osc", pll_base);
- 
- 	ccm_base = of_iomap(np, 0);
- 	WARN_ON(!ccm_base);
-@@ -526,13 +545,25 @@ CLK_OF_DECLARE(imx51_ccm, "fsl,imx51-ccm", mx51_clocks_init);
- static void __init mx53_clocks_init(struct device_node *np)
- {
- 	void __iomem *ccm_base;
-+	void __iomem *pll_base;
- 	int i;
- 	unsigned long r;
- 
--	clk[IMX5_CLK_PLL1_SW]		= imx_clk_pllv2("pll1_sw", "osc", MX53_DPLL1_BASE);
--	clk[IMX5_CLK_PLL2_SW]		= imx_clk_pllv2("pll2_sw", "osc", MX53_DPLL2_BASE);
--	clk[IMX5_CLK_PLL3_SW]		= imx_clk_pllv2("pll3_sw", "osc", MX53_DPLL3_BASE);
--	clk[IMX5_CLK_PLL4_SW]		= imx_clk_pllv2("pll4_sw", "osc", MX53_DPLL4_BASE);
-+	pll_base = ioremap(MX53_DPLL1_BASE, SZ_16K);
-+	WARN_ON(!pll_base);
-+	clk[IMX5_CLK_PLL1_SW]		= imx_clk_pllv2("pll1_sw", "osc", pll_base);
-+
-+	pll_base = ioremap(MX53_DPLL2_BASE, SZ_16K);
-+	WARN_ON(!pll_base);
-+	clk[IMX5_CLK_PLL2_SW]		= imx_clk_pllv2("pll2_sw", "osc", pll_base);
-+
-+	pll_base = ioremap(MX53_DPLL3_BASE, SZ_16K);
-+	WARN_ON(!pll_base);
-+	clk[IMX5_CLK_PLL3_SW]		= imx_clk_pllv2("pll3_sw", "osc", pll_base);
-+
-+	pll_base = ioremap(MX53_DPLL4_BASE, SZ_16K);
-+	WARN_ON(!pll_base);
-+	clk[IMX5_CLK_PLL4_SW]		= imx_clk_pllv2("pll4_sw", "osc", pll_base);
- 
- 	ccm_base = of_iomap(np, 0);
- 	WARN_ON(!ccm_base);
+ DT_MACHINE_START(IMX53_DT, "Freescale i.MX53 (Device Tree Support)")
+-	.map_io		= mx53_map_io,
+ 	.init_early	= imx53_init_early,
+ 	.init_irq	= tzic_init_irq,
+ 	.init_machine	= imx53_dt_init,
+diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+deleted file mode 100644
+index 768fede..0000000
+--- a/arch/arm/mach-imx/mm-imx5.c
++++ /dev/null
+@@ -1,61 +0,0 @@
+-/*
+- * Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
+- *
+- * The code contained herein is licensed under the GNU General Public
+- * License.  You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- *
+- * Create static mapping between physical to virtual memory.
+- */
+-
+-#include <linux/mm.h>
+-#include <linux/init.h>
+-#include <linux/clk.h>
+-#include <linux/pinctrl/machine.h>
+-#include <linux/of_address.h>
+-
+-#include <asm/mach/map.h>
+-
+-#include "common.h"
+-#include "devices/devices-common.h"
+-#include "hardware.h"
+-#include "iomux-v3.h"
+-
+-/*
+- * Define the MX51 memory map.
+- */
+-static struct map_desc mx51_io_desc[] __initdata = {
+-	imx_map_entry(MX51, TZIC, MT_DEVICE),
+-	imx_map_entry(MX51, IRAM, MT_DEVICE),
+-	imx_map_entry(MX51, AIPS1, MT_DEVICE),
+-	imx_map_entry(MX51, SPBA0, MT_DEVICE),
+-	imx_map_entry(MX51, AIPS2, MT_DEVICE),
+-};
+-
+-/*
+- * Define the MX53 memory map.
+- */
+-static struct map_desc mx53_io_desc[] __initdata = {
+-	imx_map_entry(MX53, TZIC, MT_DEVICE),
+-	imx_map_entry(MX53, AIPS1, MT_DEVICE),
+-	imx_map_entry(MX53, SPBA0, MT_DEVICE),
+-	imx_map_entry(MX53, AIPS2, MT_DEVICE),
+-};
+-
+-/*
+- * This function initializes the memory map. It is called during the
+- * system startup to create static physical to virtual memory mappings
+- * for the IO modules.
+- */
+-void __init mx51_map_io(void)
+-{
+-	iotable_init(mx51_io_desc, ARRAY_SIZE(mx51_io_desc));
+-}
+-
+-void __init mx53_map_io(void)
+-{
+-	iotable_init(mx53_io_desc, ARRAY_SIZE(mx53_io_desc));
+-}
 -- 
 1.8.3.2
