@@ -1,97 +1,79 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 20 May 2014 09:28:58 +0100
-Subject: [STLinux Kernel] [PATCH 3/4] ARM: DT: STi: Add DT node for
- MiPHY365x
-In-Reply-To: <537B01E9.8020507@st.com>
-References: <1398756095-32542-1-git-send-email-lee.jones@linaro.org>
- <1398756095-32542-4-git-send-email-lee.jones@linaro.org>
- <537A265E.8080407@st.com> <20140519155106.GR4978@lee--X1>
- <537B01E9.8020507@st.com>
-Message-ID: <20140520082858.GF20874@lee--X1>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Tue, 20 May 2014 11:31:20 +0300
+Subject: [PATCH v2 2/2] dmaengine: s3c24xx-dma: Add cyclic transfer support
+In-Reply-To: <1400519158-5801-2-git-send-email-anarsoul@gmail.com>
+References: <1400519158-5801-1-git-send-email-anarsoul@gmail.com>
+ <1400519158-5801-2-git-send-email-anarsoul@gmail.com>
+Message-ID: <1400574680.3703.72.camel@smile.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>>The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-> >>>devices. It has 2 ports which it can use for either; both SATA, both
-> >>>PCIe or one of each in any configuration.
-> >>>
-> >>>Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> >>>Acked-by: Mark Rutland <mark.rutland@arm.com>
-> >>>Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
-> >>>Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >>>---
-> >>>  arch/arm/boot/dts/stih416-b2020-revE.dts | 22 ++++++++++++++++++++++
-> >>>  arch/arm/boot/dts/stih416-b2020.dts      |  6 ++++++
-> >>>  arch/arm/boot/dts/stih416.dtsi           | 14 ++++++++++++++
-> >>>  3 files changed, 42 insertions(+)
-> >>>  create mode 100644 arch/arm/boot/dts/stih416-b2020-revE.dts
-> >>>
-> >>>diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
-> >>>new file mode 100644
-> >>>index 0000000..23fdaf7
-> >>>--- /dev/null
-> >>>+++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
-> >>>@@ -0,0 +1,22 @@
-> >>>+/*
-> >>>+ * Copyright (C) 2014 STMicroelectronics Limited.
-> >>>+ * Author: Lee Jones <lee.jones@linaro.org>
-> >>>+ *
-> >>>+ * This program is free software; you can redistribute it and/or modify
-> >>>+ * it under the terms of the GNU General Public License version 2 as
-> >>>+ * publishhed by the Free Software Foundation.
-> >>>+ */
-> >>>+/dts-v1/;
-> >>>+#include "stih416.dtsi"
-> >>>+#include "stih41x-b2020.dtsi"
-> >>>+/ {
-> >>>+        model = "STiH416 B2020 REV-E";
-> >>>+	compatible = "st,stih416-b2020", "st,stih416";
-> >>>+
-> >>>+	soc {
-> >>>+		miphy365x_phy: miphy365x at fe382000 {
-> >>>+			st,pcie-tx-pol-inv;
-> >>>+			st,sata-gen = <3>;
-> >>>+		};
-> >>>+	};
-> >>>+};
-> >>Shouldn't this new board being added in a separate patch?
-> >
-> >I certainly can do that, but I don't think that it's necessary?
-> 
-> I think it is, as you introduce a new board.
+On Mon, 2014-05-19 at 20:05 +0300, Vasily Khoruzhick wrote:
+> Many audio interface drivers require support of cyclic transfers to work
+> correctly, for example Samsung ASoC DMA driver. This patch adds support
+> for cyclic transfers to the s3c24xx-dma driver
 
-Introducing an empty dts file just so you can say "this is a new
-board" seems odd to me, but I'll go with whatever you feel it right.
+Sorry, not mentioned earlier, but couple of nitpicks below. (I think you
+may wait for more comments and then decide what to do with mine)
 
-> Moreover, the miphy description being the same as in
-> stih416-b2020.dts, so I don't understand why you introduce this
-> board for this feature.
+> +static struct dma_async_tx_descriptor *s3c24xx_dma_prep_dma_cyclic(
+> +	struct dma_chan *chan, dma_addr_t addr, size_t size, size_t period,
+> +	enum dma_transfer_direction direction, unsigned long flags,
+> +	void *context)
+> +{
+> +	struct s3c24xx_dma_chan *s3cchan = to_s3c24xx_dma_chan(chan);
+> +	struct s3c24xx_dma_engine *s3cdma = s3cchan->host;
+> +	const struct s3c24xx_dma_platdata *pdata = s3cdma->pdata;
+> +	struct s3c24xx_dma_channel *cdata = &pdata->channels[s3cchan->id];
+> +	struct s3c24xx_txd *txd;
+> +	struct s3c24xx_sg *dsg;
+> +	unsigned sg_len;
+> +	dma_addr_t slave_addr;
+> +	u32 hwcfg = 0;
+> +	int i;
+> +
+> +	dev_dbg(&s3cdma->pdev->dev,
+> +		"prepare cyclic transaction of %d bytes with period %d from %s\n",
+> +		size, period, s3cchan->name);
 
-It's historical.  There are other differences between rev-E and the
-other reversions, such as; gpio-leds (red, green) and the reset GPIO
-for ethernet.  As these are dts files (rather than dtsi) files, you
-can only use one at a time.
+size and period are size_t, thus %zu.
 
-> >>>diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
-> >>>index 276f28d..172f222 100644
-> >>>--- a/arch/arm/boot/dts/stih416-b2020.dts
-> >>>+++ b/arch/arm/boot/dts/stih416-b2020.dts
-> >>>@@ -13,4 +13,10 @@
-> >>>  	model = "STiH416 B2020";
-> >>>  	compatible = "st,stih416", "st,stih416-b2020";
-> >>>
-> >>>+	soc {
-> >>>+		miphy365x_phy: miphy365x at fe382000 {
-> >>>+			st,pcie-tx-pol-inv;
-> >>>+			st,sata-gen = <3>;
-> >>>+		};
-> >>>+	};
-> >>>  };
-> >>...
-> >
+...
+
+> +	for (i = 0; i < sg_len; i++) {
+> +		dsg = kzalloc(sizeof(*dsg), GFP_NOWAIT);
+> +		if (!dsg) {
+> +			s3c24xx_dma_free_txd(txd);
+> +			return NULL;
+> +		}
+> +		list_add_tail(&dsg->node, &txd->dsg_list);
+> +
+> +		dsg->len = period;
+> +		/* Check last period length */
+> +		if (i == (sg_len - 1))
+
+Redundant parenthesis.
+
+> +			dsg->len = size - (period * i);
+> +		if (direction == DMA_MEM_TO_DEV) {
+> +			dsg->src_addr = addr + (period * i);
+
+Ditto.
+
+> +			dsg->dst_addr = slave_addr;
+> +		} else { /* DMA_DEV_TO_MEM */
+> +			dsg->src_addr = slave_addr;
+> +			dsg->dst_addr = addr + (period * i);
+
+Ditto.
+
+> +		}
+> +	}
+> +
+> +	return vchan_tx_prep(&s3cchan->vc, &txd->vd, flags);
+> +}
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Andy Shevchenko <andriy.shevchenko@intel.com>
+Intel Finland Oy
