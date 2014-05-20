@@ -1,100 +1,291 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 May 2014 18:31:25 -0700
-Subject: [GIT PULL 4/4] omap dt changes for v3.16 merge window, part 2
-Message-ID: <20140520013125.GH15793@atomide.com>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Tue, 20 May 2014 10:49:53 +0900
+Subject: [PATCHv2] mmc: dw_mmc: change to use recommended reset procedure
+In-Reply-To: <CAPz6YkVF4VsgMAi4t=KxRcDU=TDzzRCoSPO-cQa6qMESVSgo9g@mail.gmail.com>
+References: <1399945121-7387-1-git-send-email-sonnyrao@chromium.org>
+ <002301cf6e68$8809ee00$981dca00$%jun@samsung.com>
+ <CAPz6YkWObQe86MZYmyLrbYOkQ4hHkb2Hcpe8QZWDZCMO5U0f_Q@mail.gmail.com>
+ <002a01cf6e9b$c0538900$40fa9b00$%jun@samsung.com>
+ <CAPz6YkVF4VsgMAi4t=KxRcDU=TDzzRCoSPO-cQa6qMESVSgo9g@mail.gmail.com>
+Message-ID: <003901cf73cd$cb5c56b0$62150410$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 3fdb77174a2c173e0e69f2499b836a0e412f6c4d:
+On Sat, May 17, 2014, Sonny Rao wrote:
+> On Tue, May 13, 2014 at 4:09 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+> > On Tuesday, May 13, Sonny Rao wrote:
+> >> On Mon, May 12, 2014 at 10:02 PM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+> >> > As I mentioned in previous version, you put all reset stuff in existing fifo_reset function.
+> >> > Although databook mentions ciu_reset case for SBE error, it's not obvious when ciu_reset is
+> needed
+> >> in other error cases.
+> >> > If you intend to add some robust error handing, it would be better to make another function.
+> >>
+> >> The document I have actually doesn't mention error cases, it describes
+> >> this procedure as "Controller/DMA/FIFO Reset Usage" so I believe it is
+> >> saying this is the correct procedure in all cases, and based on our
+> >> testing it seems to work.  I understand the skepticism, as I shared it
+> >> initially when I saw this, but based on our experience, this is
+> >> correct and it doesn't need to live in a separate function.
+> > I agree this active error handling.
+> > But, existing fifo_reset function is focused on fifo reset purely.
+> > I think your change is close to error recovery and it seems overloaded to basic function.
+> > So, you suggest renaming function for new sequence.
+> 
+> I think the documentation says it should always be done, not just in
+> error recovery.  I can rename the function to dw_mci_reset rather than
+> dw_mci_fifo_reset.  Is that what you mean? Or do you mean make a new
+> function that is only called in error cases?
+Both are okay.
 
-  ARM: dts: omap3-n900: use MATRIX_KEY for keymap (2014-05-06 10:22:51 -0700)
+> 
+> > And look into dw_mci_work_routine_card(). dw_mci_idmac_reset() is redundancy.
+> > I expect it can be cleaned.
+> >
+> > <Quot>
+> >                                 /* Clear down the FIFO */
+> >                                 dw_mci_fifo_reset(host);
+> > #ifdef CONFIG_MMC_DW_IDMAC
+> >                                 dw_mci_idmac_reset(host);
+> > #endif
+> > </Quot>
+> >
+> 
+> Ok, I'll remove that extra reset, thanks for catching.
+> 
+> >>
+> >> > Please check my comments below.
+> >> >
+> >> > On Tue, May 13, 2014, Sonny Rao wrote:
+> >> >> This patch changes the fifo reset code to follow the reset procedure
+> >> >> outlined in the documentation of Synopsys  Mobile storage host databook
+> >> >> 7.2.13.
+> > Please remove this section number.
+> > No needed. It's old version.
+> >
+> 
+> Ok
+> 
+> >> >>
+> >> >> v2: Add Generic DMA support
+> >> >>     per the documentation, move interrupt clear before wait
+> >> >>     make the test for DMA host->use_dma rather than host->using_dma
+> >> >>     add proper return values (although it appears no caller checks)
+> >> >>
+> >> >> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+> >> >> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+> >> >> ---
+> >> >>  drivers/mmc/host/dw_mmc.c | 55 ++++++++++++++++++++++++++++++++++++++++++++++-
+> >> >>  drivers/mmc/host/dw_mmc.h |  1 +
+> >> >>  2 files changed, 55 insertions(+), 1 deletion(-)
+> >> >>
+> >> >> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> >> >> index 55cd110..aff57e1 100644
+> >> >> --- a/drivers/mmc/host/dw_mmc.c
+> >> >> +++ b/drivers/mmc/host/dw_mmc.c
+> >> >> @@ -2325,6 +2325,7 @@ static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset)
+> >> >>
+> >> >>  static inline bool dw_mci_fifo_reset(struct dw_mci *host)
+> >> >>  {
+> >> >> +     u32 flags = SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET;
+> >> >>       /*
+> >> >>        * Reseting generates a block interrupt, hence setting
+> >> >>        * the scatter-gather pointer to NULL.
+> >> >> @@ -2334,7 +2335,59 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
+> >> >>               host->sg = NULL;
+> >> >>       }
+> >> >>
+> >> >> -     return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
+> >> >> +     /*
+> >> >> +      * The recommended method for resetting is to always reset the
+> >> >> +      * controller and the fifo, but differs slightly depending on the mode.
+> >> >> +      * The Generic DMA mode (non IDMAC) also needs to reset DMA where IDMAC
+> >> >> +      * mode resets IDMAC at the end.
+> >> >> +      *
+> >> >> +      */
+> >> >> +#ifndef CONFIG_MMC_DW_IDMAC
+> >> > Is it added for generic DMA?
+> >> > IDMAC should be considered for dma_reseet as well.
+> >> > Please check databook.
+> >> >
+> >>
+> >> Yeah it's a little unclear.  In the "7.2.13 Controller/DMA/FIFO Reset
+> >> Usage" part of the document they mention It is set for what they call
+> >> "generic" DMA, which I think is when there is an external DMA
+> >> controller, and the part below that it says for "DW-DMA/Non-DW-DMA"
+> >> that controller_reset and fifo_reset should be set.   I believe this
+> >> "DW-DMA" case refers to what is called IDMAC.  So, I think it's not
+> >> required for this case, but I admit I'm not sure why they also say
+> >> "Non-DW-DMA". If you know of a good way to differentiate the "Generic
+> >> DMA" case  I can implement it.  It wasn't clear to me if the driver
+> >> even supported this "generic" dma case, but it sounds like it might,
+> >> so I added this code.  In practice, on the Exynos Systems we have,
+> >> which are using IDMAC, the reset procedure seems to work okay without
+> >> the dma_reset bit set, but I cannot test this "generic dma" case.
+> >>
+> >> The other places in the doc where I see them mention the dma_reset bit
+> >> are "7.2.21 Transmission and Reception with Internal DMAC (IDMAC)"
+> >> and the description of the CTRL register, and in "7.1
+> >> Software/Hardware Restrictions" where they say it will terminate any
+> >> pending transfer.
+> > "DW-DMA" means Synopsys's DMA controller not IDMAC.
+> > SDMMC_CTRL_DMA_RESET can apply in all type DMA interface.
+> 
+> So, do you think I should always set that bit if we're using DMA?
+Yes. Although you used it for general dma at first, IDMAC also needs it.
 
-are available in the git repository at:
+> 
+> >
+> >>
+> >> >> +     if (host->use_dma)
+> >> >> +             flags |= SDMMC_CTRL_DMA_RESET;
+> >> >> +#endif
+> >> >> +     if (dw_mci_ctrl_reset(host, flags)) {
+> >> >> +             /*
+> >> >> +              * In all cases we clear the RAWINTS register to clear any
+> >> >> +              * interrupts.
+> >> >> +              */
+> >> > I think interrupt masking is needed before reset because we will not handle it anymore.
+> >> > And Is there any reason to move interrupt clear here compared with previous version?
+> >>
+> >> Yeah I moved it to match the description in the document more closely.
+> >>  The documents mentioned doing the interrupt clear after setting the
+> >> reset bits, and before waiting for the dma_req bit in the status
+> >> register to clear.  We've been running it with the interrupt clear
+> >> below the loop, for a while, and I just tested it with the clear above
+> >> the wait to make sure it still works properly and I was able to pass
+> >> the tuning process with some errors, so I believe this works fine too,
+> >> and more closely matches the description in the doc that I have.
+> > When I tried ciu_reset, I found some unexpected interrupts occurred.
+> > It means that interrupt handler will run to handle extra interrupts.
+> > Then, we may need mask the interrupt.
+> > Can you check it for test?
+> 
+> You're right.  When I have the controller reset bit set, I see one
+> interrupt coming in shortly after we write the reset bits, which has
+> status bits of 0x180.  This has Response timeout (RTO) and Data CRC
+> error set.  It sounds like some interrupt ocurring may be expected
+> since they say to clear RINTSTS as part of the procedure though.
+Yes, it needs to clear RINTSTS.
+While this interrupt occurs, interrupt handler is called and thus tasklet function is also called.
+Can we handle this unexpected interrupt properly?
+To prevent these calling, we may need interrupt mask before resetting.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/dt-part2-v2
+> 
+> 
+> >
+> >>
+> >> >> +             mci_writel(host, RINTSTS, 0xFFFFFFFF);
+> >> >> +
+> >> >> +             /* if using dma we wait for dma_req to clear */
+> >> >> +             if (host->use_dma) {
+> >> >> +                     unsigned long timeout = jiffies + msecs_to_jiffies(500);
+> >> >> +                     u32 status;
+> >> >> +                     do {
+> >> >> +                             status = mci_readl(host, STATUS);
+> >> >> +                             if (!(status & SDMMC_STATUS_DMA_REQ))
+> >> >> +                                     break;
+> >> >> +                             cpu_relax();
+> >> > What did you intend here?
+> >> > If you intent busy-wait, how about using sleep instead?
+> >>
+> >> Yes it is a busy-wait.  There is similar code in dw_mci_ctrl_reset,
+> >> where that function is polling without sleeps, so I was trying to
+> >> match that.  The cpu_relax() is something I saw in other busy-waits in
+> >> the kernel, but I'm happy to take it out if you'd like.
+> > In case of ctrl_reset, waiting is during 2 clock.
+> > If this polling status is not long, I'm OK.
+> >
+> >>
+> >> >> +                     } while (time_before(jiffies, timeout));
+> >> >> +
+> >> >> +                     if (status & SDMMC_STATUS_DMA_REQ) {
+> >> >> +                             dev_err(host->dev,
+> >> >> +                                     "%s: Timeout waiting for dma_req to "
+> >> >> +                                     "clear during reset", __func__);
+> >> >> +                             return false;
+> >> >> +                     }
+> >> >> +
+> >> >> +                     /* when using DMA next we reset the fifo again */
+> >> >> +                     dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
+> >> >> +             }
+> >> >> +     } else {
+> >> >> +             dev_err(host->dev, "%s: Reset bits didn't clear", __func__);
+> >> > If ciu_reset is cleared, clk update below is needed?
+> >>
+> >> I'm honestly not sure what happens if the reset bits don't clear.  The
+> >> docs say controller_reset and dma_reset will auto clear after a number
+> >> of clocks, but fifo_reset will clear "after completion of the reset
+> >> operation"  So in this particular error case I'm not sure if it's
+> >> possible to recover properly or not and might hang, so I thought it
+> >> best to just return the error immediately.
+> > Yes.
+> > But at least if ciu_reset is done successfully, it may need clock update sequence again.
+> > In addition, printing reset bit[2:0] will be helpful for debug information.
+> 
+> The dw_mci_ctrl_reset() function would run this code if some of the
+> bits didn't clear:
+> 
+>         dev_err(host->dev,
+>                 "Timeout resetting block (ctrl reset %#x)\n",
+>                 ctrl & reset);
+> 
+> Does that give you what you're looking for?
+Ah, it was there.
 
-for you to fetch changes up to d712ff63b18309c939396f593510fbcccbafb9e4:
+Thanks,
+Seungwon Jeon
 
-  ARM: dts: Enable mcpdm and mcbsp1 on DuoVero (2014-05-19 17:20:31 -0700)
-
-----------------------------------------------------------------
-Device tree related changes for omaps.
-
-----------------------------------------------------------------
-Balaji T K (2):
-      ARM: dts: omap5: add sata node
-      ARM: dts: dra7: add OCP2SCP3 and SATA nodes
-
-Joachim Eastwood (7):
-      ARM: dts: Change IOPAD macro's for OMAP4/5
-      ARM: dts: Add support for OMAP4 Variscite OM44 family
-      ARM: dts: Add support for OMAP4 VAR-DVK-OM44
-      ARM: dts: Add VAR-SOM-OM44 WLAN nodes
-      ARM: OMAP2+: Use pdata quirks for wl12xx on VAR-STK/DVK-OM44
-      ARM: dts: Convert DuoVero Parlor to use IOPAD macro
-      ARM: dts: Enable mcpdm and mcbsp1 on DuoVero
-
-Johan Hovold (1):
-      ARM: dts: AM33XX: fix ethernet and mdio default state
-
-Minal Shah (1):
-      ARM: dts: dra7: add support for parallel NAND flash
-
-Mugunthan V N (2):
-      ARM: dts: am4372: Add cpsw phy sel dt node
-      ARM: dts: am437x-gp-evm: Add ethernet support for GP EVM
-
-Pekon Gupta (1):
-      ARM: dts: am43xx: fix starting offset of NAND.filesystem MTD partition
-
-Roger Quadros (4):
-      ARM: dts: omap4+: Add clocks to USB2 PHY node
-      ARM: dts: dra7-clock: Add "l3init_960m_gfclk" clock gate
-      ARM: dts: dra7: Add USB related nodes
-      dts: dra7-evm: add USB support
-
-Sourav Poddar (2):
-      ARM: omap2+: skip device build from platform code for dt
-      ARM: dts: am4372: Add hdq device tree data
-
-Wolfram Sang (1):
-      ARM: dts: am335x-evm: fix comments for lcd pins
-
- .../devicetree/bindings/arm/omap/omap.txt          |   6 +
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/Makefile                         |   3 +-
- arch/arm/boot/dts/am335x-bone-common.dtsi          |   3 +-
- arch/arm/boot/dts/am335x-evm.dts                   |  58 ++--
- arch/arm/boot/dts/am335x-evmsk.dts                 |   2 +
- arch/arm/boot/dts/am335x-igep0033.dtsi             |   8 +
- arch/arm/boot/dts/am335x-nano.dts                  |   5 +
- arch/arm/boot/dts/am33xx.dtsi                      |   2 +
- arch/arm/boot/dts/am4372.dtsi                      |  16 +
- arch/arm/boot/dts/am437x-gp-evm.dts                |  72 +++++
- arch/arm/boot/dts/am43x-epos-evm.dts               |  14 +-
- arch/arm/boot/dts/dra7-evm.dts                     | 142 +++++++++
- arch/arm/boot/dts/dra7.dtsi                        | 208 +++++++++++++
- arch/arm/boot/dts/dra7xx-clocks.dtsi               |  12 +-
- arch/arm/boot/dts/omap4-duovero-parlor.dts         |  18 +-
- arch/arm/boot/dts/omap4-duovero.dtsi               |  98 +++---
- arch/arm/boot/dts/omap4-var-dvk-om44.dts           |  71 +++++
- arch/arm/boot/dts/omap4-var-om44customboard.dtsi   | 235 ++++++++++++++
- arch/arm/boot/dts/omap4-var-som-om44-wlan.dtsi     |  68 ++++
- arch/arm/boot/dts/omap4-var-som-om44.dtsi          | 343 +++++++++++++++++++++
- arch/arm/boot/dts/omap4-var-som.dts                |  96 ------
- arch/arm/boot/dts/omap4-var-stk-om44.dts           |  17 +
- arch/arm/boot/dts/omap4.dtsi                       |   2 +
- arch/arm/boot/dts/omap5-cm-t54.dts                 |  66 ++--
- arch/arm/boot/dts/omap5-sbc-t54.dts                |   8 +-
- arch/arm/boot/dts/omap5.dtsi                       |  42 +++
- arch/arm/mach-omap2/hdq1w.c                        |   2 +
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  10 -
- arch/arm/mach-omap2/pdata-quirks.c                 |   7 +
- include/dt-bindings/pinctrl/omap.h                 |  13 +-
- 31 files changed, 1415 insertions(+), 233 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap4-var-dvk-om44.dts
- create mode 100644 arch/arm/boot/dts/omap4-var-om44customboard.dtsi
- create mode 100644 arch/arm/boot/dts/omap4-var-som-om44-wlan.dtsi
- create mode 100644 arch/arm/boot/dts/omap4-var-som-om44.dtsi
- delete mode 100644 arch/arm/boot/dts/omap4-var-som.dts
- create mode 100644 arch/arm/boot/dts/omap4-var-stk-om44.dts
+> 
+> >
+> > Thanks,
+> > Seungwon Jeon
+> >
+> >>
+> >> > Thanks,
+> >> > Seungwon Jeon
+> >> >
+> >> >> +             return false;
+> >> >> +     }
+> >> >> +
+> >> >> +#ifdef CONFIG_MMC_DW_IDMAC
+> >> >> +     /* It is also recommended that we reset and reprogram idmac */
+> >> >> +     dw_mci_idmac_reset(host);
+> >> >> +#endif
+> >> >> +
+> >> >> +     /* After a CTRL reset we need to have CIU set clock registers  */
+> >> >> +     mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
+> >> >> +
+> >> >> +     return true;
+> >> >>  }
+> >> >>
+> >> >>  static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
+> >> >> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+> >> >> index 6bf24ab..2505804 100644
+> >> >> --- a/drivers/mmc/host/dw_mmc.h
+> >> >> +++ b/drivers/mmc/host/dw_mmc.h
+> >> >> @@ -129,6 +129,7 @@
+> >> >>  #define SDMMC_CMD_INDX(n)            ((n) & 0x1F)
+> >> >>  /* Status register defines */
+> >> >>  #define SDMMC_GET_FCNT(x)            (((x)>>17) & 0x1FFF)
+> >> >> +#define SDMMC_STATUS_DMA_REQ         BIT(31)
+> >> >>  /* FIFOTH register defines */
+> >> >>  #define SDMMC_SET_FIFOTH(m, r, t)    (((m) & 0x7) << 28 | \
+> >> >>                                        ((r) & 0xFFF) << 16 | \
+> >> >> --
+> >> >> 1.9.1.423.g4596e3a
+> >> >>
+> >> >> --
+> >> >> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> >> >> the body of a message to majordomo at vger.kernel.org
+> >> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >> >
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> >> the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
