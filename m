@@ -1,195 +1,120 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 May 2014 09:55:57 +0200
-Subject: [PATCH v1 5/5] pci: keystone: add pcie driver based on designware
- core driver
-In-Reply-To: <537A735A.9070607@ti.com>
-References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
- <5671513.YgJm44AVLV@wuerfel> <537A735A.9070607@ti.com>
-Message-ID: <4769015.Y4xoyoQxYb@wuerfel>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 20 May 2014 16:59:49 +0900
+Subject: [PATCH 00/08] ARM: shmobile: Rework include path (Try 2, Part 1)
+Message-ID: <20140520075949.13851.42995.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 May 2014 17:10:50 Murali Karicheri wrote:
-> On 5/19/2014 8:06 AM, Arnd Bergmann wrote:
-> > On Friday 16 May 2014 16:26:51 Murali Karicheri wrote:
-> >> On 5/15/2014 2:20 PM, Arnd Bergmann wrote:
-> >>> On Thursday 15 May 2014 13:45:08 Murali Karicheri wrote:
-> >>>>>> +#ifdef CONFIG_PCI_KEYSTONE
-> >>>>>> +/*
-> >>>>>> + * The KeyStone PCIe controller has maximum read request size of 256 bytes.
-> >>>>>> + */
-> >>>>>> +static void quirk_limit_readrequest(struct pci_dev *dev)
-> >>>>>> +{
-> >>>>>> +    int readrq = pcie_get_readrq(dev);
-> >>>>>> +
-> >>>>>> +    if (readrq > 256)
-> >>>>>> +            pcie_set_readrq(dev, 256);
-> >>>>>> +}
-> >>>>>> +DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_readrequest);
-> >>>>>> +#endif /* CONFIG_PCI_KEYSTONE */
-> >>>>> This doesn't work: you can't just limit do this for all devices just based
-> >>>>> on PCI_KEYSTONE being enabled, you have to check if you are actually using
-> >>>>> this controller.
-> >>>>>
-> >>>>>         Arnd
-> >>>>     I assume, I need to check if PCI controller's vendor ID/ device ID
-> >>>> match with the keystone
-> >>>>     PCI controller's ID and call pcie_set_readrq() for all of the slave
-> >>>> PCI devices and do this fixup.
-> >>>> Is this correct understanding?  If you can point me to an example code
-> >>>> for this that will be
-> >>>> really helpful so that I can avoid re-inventing the wheel.
-> >>> I think it would be best to move the quirk into the keystone pci driver
-> >>> and compare compare the dev->driver pointer of the PCI controller device.
-> >>>
-> >>>        Arnd
-> >> Arnd,
-> >>
-> >> I will move this quirk to keystone pci driver. So in that case, I guess
-> >> your original comment
-> >> is not applicable as  this quirk gets enabled only with PCI keystone
-> >> driver enabled. Right?
-> > Of course you still have to fix the bug, not just move the code into
-> > the driver. Otherwise it's still broken for every machine after the keystone
-> > driver is enabled.
-> 
-> Agree. I have tried following to get this work so that the quirk gets 
-> applied only for
-> keystone pci controller.
-> 
-> #define KS_K2HK_PCI_DEVICE_ID    0xb008
-> #define KS_K2E_PCI_DEVICE_ID    0xb009
-> #define KS_K2L_PCI_DEVICE_ID    0xb00a
-> 
-> static u16 root_pci_ids[] =
->      {KS_K2HK_PCI_DEVICE_ID, KS_K2E_PCI_DEVICE_ID, KS_K2L_PCI_DEVICE_ID, 
-> 0 };
-> /*
->   * The KeyStone PCIe controller has maximum read request size of 256 bytes.
->   */
-> static void quirk_limit_readrequest(struct pci_dev *dev)
-> {
->      struct pci_dev *root_dev;
->      int i = 0;
-> 
->      /* Apply quirk only if this bridge device is keystone */
->      while (root_pci_ids[i]) {
->          root_dev = pci_get_device(PCI_VENDOR_ID_TI, root_pci_ids[i], NULL);
->          if ((root_dev->class >> 8) == PCI_CLASS_BRIDGE_PCI) {
->              int readrq;
-> 
->              readrq = pcie_get_readrq(dev);
->              if (pcie_get_readrq(dev) > 256) {
->                  pcie_set_readrq(dev, 256);
->                  printk("Applied quirk\n");
->              }
->              break;
->          };
->      }
-> }
-> DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_readrequest);
+ARM: shmobile: Rework include path (Try 2, Part 1)
 
-Why not compare the driver pointer as I suggested?
+[PATCH 01/08] ARM: shmobile: Move intc.h, cleanup sh_intc.h usage
+[PATCH 02/08] ARM: shmobile: Move dma-register.h
+[PATCH 03/08] ARM: shmobile: Move clock.h
+[PATCH 04/08] ARM: shmobile: Move most of irqs.h, keep some for pinctl
+[PATCH 05/08] ARM: shmobile: Move common.h
+[PATCH 06/08] ARM: shmobile: Move pm-rmobile.h, cleanup sh73xx.h
+[PATCH 07/08] ARM: shmobile: Move pm-rcar.h, cleanup r8a7779 case
+[PATCH 08/08] ARM: shmobile: Move rcar-gen2.h, cleanup r8a7790 case
 
-> > I also agree with Jason that changing the PCI core to call
-> > pcie_bus_configure_settings() would be a better way of dealing with this
-> > if it solves the problem.
-> 
-> I tried following piece of code added to bios32.c
-> 
-> void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
-> {
->          struct pci_sys_data *sys;
->          LIST_HEAD(head);
-> 
->          pci_add_flags(PCI_REASSIGN_ALL_RSRC);
->          if (hw->preinit)
->                  hw->preinit();
-> 
->           ........
->           ....
-> 
->           list_for_each_entry(sys, &head, node) {
->                  struct pci_bus *bus = sys->bus;
-> 
->                  if (!pci_has_flag(PCI_PROBE_ONLY)) {
->                          /*
->                           * Size the bridge windows.
->                           */
->                          pci_bus_size_bridges(bus);
-> 
->                          /*
->                           * Assign resources.
->                           */
->                          pci_bus_assign_resources(bus);
->                  }
->                  /*
->                   * Tell drivers about devices found.
->                   */
->                  pci_bus_add_devices(bus);
->          }
-> 
-> // New code starts here
->          list_for_each_entry(sys, &head, node) {
->                  struct pci_bus *bus = sys->bus;
-> 
->                  /* Configure PCI Express settings */
->                  if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
->                          struct pci_bus *child;
-> 
->                          list_for_each_entry(child, &bus->children, node)
->                          pcie_bus_configure_settings(child);
->                  }
->          }
-> // New code ends.
+Olof, here my latest take on the header move that you requested earlier.
 
-This is the ARM specific part of the PCI code. I think it would be
-better to do this independent of the architecture.
+This particular series hopefully follows your proposed way and moves the
+most common shared header files for mach-shmobile from <mach/foobar.h>
+to "foobar.h" without any workaround. Left are still per-SoC header files
+that will be moved once I know you are comformatble with this format.
 
-> This seems to do different things based on the pci bootargs. The key 
-> requirement for Keystone PCI controller
-> is that the MRRS can't be more than 256 bytes.  The only option that 
-> works for keystone PCI controller
-> is with pci=pcie_bus_perf.   I see following logs:-
-> 
-> [    3.382747] pcie_bus_configure_settings, config 2
-> [    3.382753] pcie_bus_configure_set
-> [    3.382781] pcieport 0000:00:00.0: Max Payload Size set to  256/ 256 
-> (was  128), Max Read Rq  256
-> [    3.382788] pcie_bus_configure_set
-> [    3.382846] pci 0000:01:00.0: Max Payload Size set to  256/ 256 (was  
-> 128), Max Read Rq  256
-> [    3.382852] pcie_bus_configure_set
-> [    3.382909] pci 0000:01:00.1: Max Payload Size set to  256/ 256 (was  
-> 128), Max Read Rq  256
-> 
-> On ARM, by default pci_bus_config seems to be set to 0 
-> (PCIE_BUS_TUNE_OFF). So the code doesn't get
-> executed for this default. But for PCIE_BUS_SAFE, it doesn't change the 
-> mrrs at the EP and is not
-> good for our platform w.r.t mrrs settings. For PCIE_BUS_PERFORMANCE, it 
-> seems to increase the payload
-> size as well and Keystone Payload size is limited to 128 bytes. So it is 
-> not safe to increase the payload
-> size to 256 based on the log.
-> 
-> On other platforms, Why the PCI core try to set the payload size equal 
-> to mrrs? Is this explained in any
-> PCI spec?  Looks like this is done for performance? Let me know if you 
-> want me to send a patch for
-> review to add the pcie_bus_configure_settings() code to 
-> arch/arm/kernel/bios32.c
-> 
-> For the Keystone PCI driver, I believe. it is safe to have the quirk so 
-> that controller can handle the
-> read requests properly. Let me know if the quirk code above looks good 
-> to go.
+Please note that these are only lightly compile tested with a handful
+of defconfigs, but any potential issue should be trivial to fix.
 
-I don't know enough about these to give you a definite answer, but
-I'd still prefer to handle this in generic code. A quirk seems to
-be the wrong answer here. If this isn't something we can do in generic
-fashion, can you do it in the add_bus() callback perhaps?
+Also, there are certain bits of arch/arm/mach-shmobile/include/mach/
+get included from places like arch/arm/boot/compressed/ (booting
+legacy kernel directly from reset vector) and also from SoC specific
+legacy code under drivers/pinctrl. My proposal is to keep those users
+as-is until we phase out legacy board support (2-3 kernels?), let me
+know if you would like to get rid of "include/mach" sooner!
 
-Maybe Jason or Bjorn have a better idea.
+Thanks!
 
-	Arnd
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+---
+
+ Written against renesas.git tag renesas-devel-v3.15-rc5-20140517
+ and "[PATCH 00/03] ARM: shmobile: Use shmobile_init_delay() on r8a7790"
+
+ arch/arm/mach-shmobile/board-ape6evm-reference.c         |    2 
+ arch/arm/mach-shmobile/board-ape6evm.c                   |    4 
+ arch/arm/mach-shmobile/board-armadillo800eva-reference.c |    2 
+ arch/arm/mach-shmobile/board-armadillo800eva.c           |    6 
+ arch/arm/mach-shmobile/board-bockw-reference.c           |    2 
+ arch/arm/mach-shmobile/board-bockw.c                     |    4 
+ arch/arm/mach-shmobile/board-genmai-reference.c          |    4 
+ arch/arm/mach-shmobile/board-genmai.c                    |    4 
+ arch/arm/mach-shmobile/board-koelsch-reference.c         |    8 
+ arch/arm/mach-shmobile/board-koelsch.c                   |    6 
+ arch/arm/mach-shmobile/board-kzm9g-reference.c           |    2 
+ arch/arm/mach-shmobile/board-kzm9g.c                     |    4 
+ arch/arm/mach-shmobile/board-lager-reference.c           |    8 
+ arch/arm/mach-shmobile/board-lager.c                     |    5 
+ arch/arm/mach-shmobile/board-mackerel.c                  |   10 
+ arch/arm/mach-shmobile/board-marzen-reference.c          |    6 
+ arch/arm/mach-shmobile/board-marzen.c                    |    4 
+ arch/arm/mach-shmobile/clock-r7s72100.c                  |    2 
+ arch/arm/mach-shmobile/clock-r8a73a4.c                   |    4 
+ arch/arm/mach-shmobile/clock-r8a7740.c                   |    4 
+ arch/arm/mach-shmobile/clock-r8a7778.c                   |    4 
+ arch/arm/mach-shmobile/clock-r8a7779.c                   |    4 
+ arch/arm/mach-shmobile/clock-r8a7790.c                   |    5 
+ arch/arm/mach-shmobile/clock-r8a7791.c                   |    6 
+ arch/arm/mach-shmobile/clock-sh7372.c                    |    4 
+ arch/arm/mach-shmobile/clock-sh73a0.c                    |    4 
+ arch/arm/mach-shmobile/clock.c                           |    6 
+ arch/arm/mach-shmobile/clock.h                           |   56 ++
+ arch/arm/mach-shmobile/common.h                          |   56 ++
+ arch/arm/mach-shmobile/console.c                         |    2 
+ arch/arm/mach-shmobile/dma-register.h                    |   84 ++++
+ arch/arm/mach-shmobile/include/mach/clock.h              |   56 --
+ arch/arm/mach-shmobile/include/mach/common.h             |   56 --
+ arch/arm/mach-shmobile/include/mach/dma-register.h       |   84 ----
+ arch/arm/mach-shmobile/include/mach/intc.h               |  290 --------------
+ arch/arm/mach-shmobile/include/mach/irqs.h               |   17 
+ arch/arm/mach-shmobile/include/mach/pm-rcar.h            |   15 
+ arch/arm/mach-shmobile/include/mach/pm-rmobile.h         |   63 ---
+ arch/arm/mach-shmobile/include/mach/r8a7740.h            |    2 
+ arch/arm/mach-shmobile/include/mach/r8a7779.h            |   13 
+ arch/arm/mach-shmobile/include/mach/r8a7790.h            |    2 
+ arch/arm/mach-shmobile/include/mach/rcar-gen2.h          |    8 
+ arch/arm/mach-shmobile/include/mach/sh7372.h             |    4 
+ arch/arm/mach-shmobile/intc-sh7372.c                     |    5 
+ arch/arm/mach-shmobile/intc-sh73a0.c                     |    5 
+ arch/arm/mach-shmobile/intc.h                            |  290 ++++++++++++++
+ arch/arm/mach-shmobile/irqs.h                            |   21 +
+ arch/arm/mach-shmobile/platsmp-apmu.c                    |    2 
+ arch/arm/mach-shmobile/platsmp-scu.c                     |    2 
+ arch/arm/mach-shmobile/platsmp.c                         |    2 
+ arch/arm/mach-shmobile/pm-r8a7740.c                      |    4 
+ arch/arm/mach-shmobile/pm-r8a7779.c                      |   15 
+ arch/arm/mach-shmobile/pm-r8a7790.c                      |    2 
+ arch/arm/mach-shmobile/pm-rcar.c                         |    2 
+ arch/arm/mach-shmobile/pm-rcar.h                         |   15 
+ arch/arm/mach-shmobile/pm-rmobile.c                      |    2 
+ arch/arm/mach-shmobile/pm-rmobile.h                      |   63 +++
+ arch/arm/mach-shmobile/pm-sh7372.c                       |    4 
+ arch/arm/mach-shmobile/pm-sh73a0.c                       |    2 
+ arch/arm/mach-shmobile/rcar-gen2.h                       |    8 
+ arch/arm/mach-shmobile/setup-emev2.c                     |    2 
+ arch/arm/mach-shmobile/setup-r7s72100.c                  |    4 
+ arch/arm/mach-shmobile/setup-r8a73a4.c                   |    6 
+ arch/arm/mach-shmobile/setup-r8a7740.c                   |    8 
+ arch/arm/mach-shmobile/setup-r8a7778.c                   |    4 
+ arch/arm/mach-shmobile/setup-r8a7779.c                   |    4 
+ arch/arm/mach-shmobile/setup-r8a7790.c                   |    7 
+ arch/arm/mach-shmobile/setup-r8a7791.c                   |    6 
+ arch/arm/mach-shmobile/setup-rcar-gen2.c                 |    4 
+ arch/arm/mach-shmobile/setup-sh7372.c                    |    8 
+ arch/arm/mach-shmobile/setup-sh73a0.c                    |    7 
+ arch/arm/mach-shmobile/smp-emev2.c                       |    2 
+ arch/arm/mach-shmobile/smp-r8a7779.c                     |    4 
+ arch/arm/mach-shmobile/smp-r8a7790.c                     |    4 
+ arch/arm/mach-shmobile/smp-r8a7791.c                     |    4 
+ arch/arm/mach-shmobile/smp-sh73a0.c                      |    2 
+ 76 files changed, 724 insertions(+), 728 deletions(-)
