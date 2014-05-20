@@ -1,51 +1,51 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 20 May 2014 15:08:45 -0700
-Subject: [PATCH] mmc: dw_mmc: Make sure we don't get stuck when we get an
- error
-In-Reply-To: <003a01cf73cd$fa2ee160$ee8ca420$%jun@samsung.com>
-References: <1395901126-6141-1-git-send-email-yuvaraj.cd@samsung.com>
- <CAKuRcOL_JVjOfLNspb14kRxcAXjpEwX4WkvmM+izryZbZBE4XA@mail.gmail.com>
- <CAPz6YkVwT0PrcLP1MJy0vVRw811+_7PwsV_ggKxQkqrjOWeWWw@mail.gmail.com>
- <002001cf6c59$b5b5e680$2121b380$%jun@samsung.com>
- <CAD=FV=X=9cTvST5cM=H9H23SMD28cHSExXt3YR=v2AQ6dFJY5w@mail.gmail.com>
- <001b01cf6e67$2183b400$648b1c00$%jun@samsung.com>
- <003a01cf73cd$fa2ee160$ee8ca420$%jun@samsung.com>
-Message-ID: <CAD=FV=Vtpup1DaAnN1cO4R5CgxMKa0aosw53sj1eKcUPJsEoYg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 20 May 2014 15:10:44 -0700
+Subject: [PATCH v4 6/6] ARM: dts: STiH407: Add B2120 board support
+In-Reply-To: <20140520074353.GD20874@lee--X1>
+References: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>
+ <1394614210-15698-7-git-send-email-maxime.coquelin@st.com>
+ <CAOesGMg5Jk_XB3zdfKz8VxRObYbFO8OMuRyo7Ba-kavANbci1w@mail.gmail.com>
+ <20140520072048.GC20874@lee--X1>
+ <CAOesGMioLwX3jgGEsR=rHV0u6yR54b4x8BfyZ91vjJnMapUHew@mail.gmail.com>
+ <20140520074353.GD20874@lee--X1>
+Message-ID: <CAOesGMigF7CGtTmLMW4zbRemGaMbWs6NV6KLPFZQFYmnHc=HQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Seungwon,
-
-On Mon, May 19, 2014 at 6:51 PM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
->> > >> >> +                       } else {
->> > >> >> +                               /*
->> > >> >> +                                * If we don't have a command complete now we'll
->> > >> >> +                                * never get one since we just reset everything;
->> > >> >> +                                * better end the request.
->> > >> >> +                                *
->> > >> >> +                                * If we do have a command complete we'll fall
->> > >> >> +                                * through to the SENDING_STOP command and
->> > >> >> +                                * everything will be peachy keen.
->> > >> >> +                                *
->> > >> >> +                                * TODO: I guess we shouldn't send a stop?
+On Tue, May 20, 2014 at 12:43 AM, Lee Jones <lee.jones@linaro.org> wrote:
+>> >> > +       soc {
+>> >> > +               sbc_serial0: serial at 9530000 {
+>> >> > +                       status = "okay";
+>> >> > +               };
+>> >>
+>> >> You might want to consider reference-based syntax here instead, so you
+>> >> don't have to mimic the hierarchy. That'd be (at the root level of the
+>> >> file, below this secion:
+>> >>
+>> >> &sbc_serial0: {
+>> >>         status = "okay";
+>> >> };
+>> >
+>> > I'm personally not keen on this scheme.  It's sometimes helpful to know
+>> > the hierarchy and I don't think it's a large overhead to format the
+>> > subordinate DTS files in this way.
+>> >
+>> > Please consider not enforcing this.
+>>
+>> Definitely not enforcing it, and I didn't use to like it either but it
+>> has some real upsides.
+>>
+>> In particular, it saves a lot of grief when you're changing something
+>> like the unit-id of a node in .dtsi and forget to do the same update
+>> in the dts.
 >
-> Please remove TODO:
+> I'm not entirely sure what a unit-id is, but I can see that there
+> would be benefits to using the referenced-based syntax as you call
+> it.  If any of those benefits hold true here I won't push back, but I
+> would personally like to see us default to the hierarchical scheme.
 
-OK
-
-> We already reset controller in dw_mci_data_complete() through "mmc: dw_mmc: change to use recommended reset procedure"?
-> I guess it depends on that patch.
-> Then, we don't need to stop sequence anymore.
-
-Even without that patch we've still pretty much stopped everything in
-dw_mci_fifo_reset(), so I'm not sure there's any strong dependency.
-...but in our tree this did land after the patch you mention, so you
-could wait until it lands if you want.
+Sorry, I meant unit-address. I.e. the portion that goes behind the @
+in the node name.
 
 
-NOTE: We found that on some machines we were getting warnings after
-enabling tuning and using this patch.  The warnings were benign, but
-we should probably squash the fix into this patch.  See
-<https://chromium-review.googlesource.com/#/c/200652/> for details.
-
--Doug
+-Olof
