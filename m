@@ -1,133 +1,354 @@
-From: fugang.duan@freescale.com (fugang.duan at freescale.com)
-Date: Tue, 20 May 2014 09:24:01 +0000
-Subject: [PATCH] ARM: imx6: init enet MAC address
-In-Reply-To: <20140520090312.GH5858@pengutronix.de>
-References: <1400566266-22746-1-git-send-email-b38611@freescale.com>
- <20140520090312.GH5858@pengutronix.de>
-Message-ID: <9e30b11d922542fb851c09c46685599d@BLUPR03MB373.namprd03.prod.outlook.com>
+From: yegor_sub1@visionsystems.de (Yegor Yefremov)
+Date: Tue, 20 May 2014 11:26:07 +0200
+Subject: [PATCH RESEND 3/5] tty/serial: Add GPIOLIB helpers for controlling
+ modem lines
+In-Reply-To: <1400005245-11943-4-git-send-email-richard.genoud@gmail.com>
+References: <1400005245-11943-1-git-send-email-richard.genoud@gmail.com>
+ <1400005245-11943-4-git-send-email-richard.genoud@gmail.com>
+Message-ID: <537B1FAF.9080706@visionsystems.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
-Data: Tuesday, May 20, 2014 5:03 PM
+On 13.05.2014 20:20, Richard Genoud wrote:
+> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
+> GPIO.
+> This will be useful for many boards which have a serial controller that
+> only handle CTS/RTS pins (or even just RX/TX).
+>
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
->To: Duan Fugang-B38611
->Cc: Li Frank-B20596; Guo Shawn-R65073; linux-arm-
->kernel at lists.infradead.org; kernel at pengutronix.de
->Subject: Re: [PATCH] ARM: imx6: init enet MAC address
->
->On Tue, May 20, 2014 at 02:11:06PM +0800, Fugang Duan wrote:
->> Enet get MAC address order:
->> From module parameters or kernel command line -> device tree -> pfuse
->> -> mac registers set by bootloader -> random mac address.
->>
->> When there have no "fec.macaddr" parameters set in kernel command
->> line, enet driver get MAC address from device tree. And then if the
->> MAC address set in device tree and is valid, enet driver get MAC
->> address from device tree. Otherwise, enet get MAC address from pfuse.
->> So, in the condition, update the MAC address (read from pfuse) to
->> device tree.
->>
->> +#define OCOTP_MACn(n)		(0x00000620 + (n) * 0x10)
->> +#define IMX_MAX_ENET_NUM	2
->> +void __init imx6_enet_mac_init(const char *compatible)
->
->static
->
-The .fun() will be called for imx6sl, imx6sx(the latest chip) machine files.
+Tested-by: Yegor Yefremov <yegorslists@googlemail.com>
 
->> +{
->> +	struct device_node *ocotp_np, *enet_np, *from = NULL;
->> +	void __iomem *base;
->> +	struct property *newmac;
->> +	u32 macaddr0_low;
->> +	u32 macaddr0_high = 0;
->> +	u32 macaddr1_high = 0;
->> +	u8 *macaddr;
->> +	int i;
->> +
->> +	for (i = 0; i < IMX_MAX_ENET_NUM; i++) {
->> +		enet_np = of_find_compatible_node(from, NULL, compatible);
->> +		if (!enet_np)
->> +			return;
->> +
->> +		from = enet_np;
->> +
->> +		if (of_get_mac_address(enet_np))
->> +			goto put_enet_node;
->> +
->> +		ocotp_np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-
->ocotp");
->> +		if (!ocotp_np) {
->> +			pr_warn("failed to find ocotp node\n");
->> +			goto put_enet_node;
->> +		}
->> +
->> +		base = of_iomap(ocotp_np, 0);
->> +		if (!base) {
->> +			pr_warn("failed to map ocotp\n");
->> +			goto put_ocotp_node;
->> +		}
->
->Move this outside the loop.
->
-Agree, I will move the ocotp node from the loop. 
 
->> +
->> +		macaddr0_low = readl_relaxed(base + OCOTP_MACn(1));
->> +		if (i)
->> +			macaddr1_high = readl_relaxed(base + OCOTP_MACn(2));
->> +		else
->> +			macaddr0_high = readl_relaxed(base + OCOTP_MACn(0));
+> ---
+>  Documentation/serial/driver            |   25 ++++++
+>  drivers/tty/serial/Kconfig             |    3 +
+>  drivers/tty/serial/Makefile            |    3 +
+>  drivers/tty/serial/serial_mctrl_gpio.c |  143 ++++++++++++++++++++++++++++++++
+>  drivers/tty/serial/serial_mctrl_gpio.h |  110 ++++++++++++++++++++++++
+>  5 files changed, 284 insertions(+)
+>  create mode 100644 drivers/tty/serial/serial_mctrl_gpio.c
+>  create mode 100644 drivers/tty/serial/serial_mctrl_gpio.h
 >
->You go over these register reads two times and read the very same
->registers two times. Argh! Could please look at your code before posting
->it?
->
-For some other platform like imx6sx has two enet MACs, so "i" is 0, 1.
-You means OCOTP_MACn(1) is read twice, I will change it. Thanks.
-
->> +
->> +		newmac = kzalloc(sizeof(*newmac) + 6, GFP_KERNEL);
->> +		if (!newmac)
->> +			goto put_ocotp_node;
->> +
->> +		newmac->value = newmac + 1;
->> +		newmac->length = 6;
->> +		newmac->name = kstrdup("local-mac-address", GFP_KERNEL);
->> +		if (!newmac->name) {
->> +			kfree(newmac);
->> +			goto put_ocotp_node;
->> +		}
->> +
->> +		macaddr = newmac->value;
->> +		if (i) {
->> +			macaddr[0] = (macaddr1_high >> 24) & 0xff;
->> +			macaddr[1] = (macaddr1_high >> 16) & 0xff;
->> +			macaddr[2] = (macaddr1_high >> 8) & 0xff;
->> +			macaddr[3] = macaddr1_high & 0xff;
->> +			macaddr[4] = (macaddr0_low >> 24) & 0xff;
->> +			macaddr[5] = (macaddr0_low >> 16) & 0xff;
->> +		} else {
->> +			macaddr[0] = (macaddr0_low >> 8) & 0xff;
->> +			macaddr[1] = macaddr0_low & 0xff;
->> +			macaddr[2] = (macaddr0_high >> 24) & 0xff;
->> +			macaddr[3] = (macaddr0_high >> 16) & 0xff;
->> +			macaddr[4] = (macaddr0_high >> 8) & 0xff;
->> +			macaddr[5] = macaddr0_high & 0xff;
->> +		}
->
->It makes no sense to have a IMX_MAX_ENET_NUM define when the code assumes
->that the only valid value is 2.
->
-You mean remove the "IMX_MAX_ENET_NUM" ?
-
->All this is probably far more readable and less fishy when you move the
->fixup of a single enet device to a extra function which you call from the
->loop.
->
-Because imx6sx has two enet MACs, and the function is called for imx6qdl/imx6sl/imx6sx, so add the loop in here.
-For imx6qdl/imx6sl, there just have one MAC, the second loop don't go through the flow. 
-Do you have other suggestion ?
-
-Thanks! 
+> diff --git a/Documentation/serial/driver b/Documentation/serial/driver
+> index c3a7689..3bba1ae 100644
+> --- a/Documentation/serial/driver
+> +++ b/Documentation/serial/driver
+> @@ -429,3 +429,28 @@ thus:
+>  		struct uart_port	port;
+>  		int			my_stuff;
+>  	};
+> +
+> +Modem control lines via GPIO
+> +----------------------------
+> +
+> +Some helpers are provided in order to set/get modem control lines via GPIO.
+> +
+> +mctrl_gpio_init(dev, idx):
+> +	This will get the {cts,rts,...}-gpios from device tree if they are
+> +	present and request them, set direction etc, and return an
+> +	allocated structure. devm_* functions are used, so there's no need
+> +	to call mctrl_gpio_free().
+> +
+> +mctrl_gpio_free(dev, gpios):
+> +	This will free the requested gpios in mctrl_gpio_init().
+> +	As devm_* function are used, there's generally no need to call
+> +	this function.
+> +
+> +mctrl_gpio_to_gpiod(gpios, gidx)
+> +	This returns the gpio structure associated to the modem line index.
+> +
+> +mctrl_gpio_set(gpios, mctrl):
+> +	This will sets the gpios according to the mctrl state.
+> +
+> +mctrl_gpio_get(gpios, mctrl):
+> +	This will update mctrl with the gpios values.
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index 5d9b01a..95afd31 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -1510,4 +1510,7 @@ config SERIAL_ST_ASC_CONSOLE
+>  
+>  endmenu
+>  
+> +config SERIAL_MCTRL_GPIO
+> +	tristate
+> +
+>  endif # TTY
+> diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
+> index 3680854..bcf31da 100644
+> --- a/drivers/tty/serial/Makefile
+> +++ b/drivers/tty/serial/Makefile
+> @@ -87,3 +87,6 @@ obj-$(CONFIG_SERIAL_EFM32_UART) += efm32-uart.o
+>  obj-$(CONFIG_SERIAL_ARC)	+= arc_uart.o
+>  obj-$(CONFIG_SERIAL_RP2)	+= rp2.o
+>  obj-$(CONFIG_SERIAL_FSL_LPUART)	+= fsl_lpuart.o
+> +
+> +# GPIOLIB helpers for modem control lines
+> +obj-$(CONFIG_SERIAL_MCTRL_GPIO) += serial_mctrl_gpio.o
+> diff --git a/drivers/tty/serial/serial_mctrl_gpio.c b/drivers/tty/serial/serial_mctrl_gpio.c
+> new file mode 100644
+> index 0000000..bf9560f
+> --- /dev/null
+> +++ b/drivers/tty/serial/serial_mctrl_gpio.c
+> @@ -0,0 +1,143 @@
+> +/*
+> + * Helpers for controlling modem lines via GPIO
+> + *
+> + * Copyright (C) 2014 Paratronic S.A.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#include <linux/err.h>
+> +#include <linux/device.h>
+> +#include <linux/gpio/consumer.h>
+> +#include <uapi/asm-generic/termios.h>
+> +
+> +#include "serial_mctrl_gpio.h"
+> +
+> +struct mctrl_gpios {
+> +	struct gpio_desc *gpio[UART_GPIO_MAX];
+> +};
+> +
+> +static const struct {
+> +	const char *name;
+> +	unsigned int mctrl;
+> +	bool dir_out;
+> +} mctrl_gpios_desc[UART_GPIO_MAX] = {
+> +	{ "cts", TIOCM_CTS, false, },
+> +	{ "dsr", TIOCM_DSR, false, },
+> +	{ "dcd", TIOCM_CD, false, },
+> +	{ "rng", TIOCM_RNG, false, },
+> +	{ "rts", TIOCM_RTS, true, },
+> +	{ "dtr", TIOCM_DTR, true, },
+> +	{ "out1", TIOCM_OUT1, true, },
+> +	{ "out2", TIOCM_OUT2, true, },
+> +};
+> +
+> +void mctrl_gpio_set(struct mctrl_gpios *gpios, unsigned int mctrl)
+> +{
+> +	enum mctrl_gpio_idx i;
+> +
+> +	if (IS_ERR_OR_NULL(gpios))
+> +		return;
+> +
+> +	for (i = 0; i < UART_GPIO_MAX; i++)
+> +		if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
+> +		    mctrl_gpios_desc[i].dir_out)
+> +			gpiod_set_value(gpios->gpio[i],
+> +					!!(mctrl & mctrl_gpios_desc[i].mctrl));
+> +}
+> +EXPORT_SYMBOL_GPL(mctrl_gpio_set);
+> +
+> +struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
+> +				      enum mctrl_gpio_idx gidx)
+> +{
+> +	if (!IS_ERR_OR_NULL(gpios) && !IS_ERR_OR_NULL(gpios->gpio[gidx]))
+> +		return gpios->gpio[gidx];
+> +	else
+> +		return NULL;
+> +}
+> +EXPORT_SYMBOL_GPL(mctrl_gpio_to_gpiod);
+> +
+> +unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
+> +{
+> +	enum mctrl_gpio_idx i;
+> +
+> +	/*
+> +	 * return it unchanged if the structure is not allocated
+> +	 */
+> +	if (IS_ERR_OR_NULL(gpios))
+> +		return *mctrl;
+> +
+> +	for (i = 0; i < UART_GPIO_MAX; i++) {
+> +		if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
+> +		    !mctrl_gpios_desc[i].dir_out) {
+> +			if (gpiod_get_value(gpios->gpio[i]))
+> +				*mctrl |= mctrl_gpios_desc[i].mctrl;
+> +			else
+> +				*mctrl &= ~mctrl_gpios_desc[i].mctrl;
+> +		}
+> +	}
+> +
+> +	return *mctrl;
+> +}
+> +EXPORT_SYMBOL_GPL(mctrl_gpio_get);
+> +
+> +struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
+> +{
+> +	struct mctrl_gpios *gpios;
+> +	enum mctrl_gpio_idx i;
+> +	int err;
+> +
+> +	gpios = devm_kzalloc(dev, sizeof(*gpios), GFP_KERNEL);
+> +	if (!gpios)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	for (i = 0; i < UART_GPIO_MAX; i++) {
+> +		gpios->gpio[i] = devm_gpiod_get_index(dev,
+> +						      mctrl_gpios_desc[i].name,
+> +						      idx);
+> +
+> +		/*
+> +		 * The GPIOs are maybe not all filled,
+> +		 * this is not an error.
+> +		 */
+> +		if (IS_ERR_OR_NULL(gpios->gpio[i]))
+> +			continue;
+> +
+> +		if (mctrl_gpios_desc[i].dir_out)
+> +			err = gpiod_direction_output(gpios->gpio[i], 0);
+> +		else
+> +			err = gpiod_direction_input(gpios->gpio[i]);
+> +		if (err) {
+> +			dev_dbg(dev, "Unable to set direction for %s GPIO",
+> +				mctrl_gpios_desc[i].name);
+> +			devm_gpiod_put(dev, gpios->gpio[i]);
+> +			gpios->gpio[i] = NULL;
+> +		}
+> +	}
+> +
+> +	return gpios;
+> +}
+> +EXPORT_SYMBOL_GPL(mctrl_gpio_init);
+> +
+> +void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
+> +{
+> +	enum mctrl_gpio_idx i;
+> +
+> +	if (IS_ERR_OR_NULL(gpios))
+> +		return;
+> +
+> +	for (i = 0; i < UART_GPIO_MAX; i++)
+> +		if (!IS_ERR_OR_NULL(gpios->gpio[i]))
+> +			devm_gpiod_put(dev, gpios->gpio[i]);
+> +	devm_kfree(dev, gpios);
+> +}
+> +EXPORT_SYMBOL_GPL(mctrl_gpio_free);
+> diff --git a/drivers/tty/serial/serial_mctrl_gpio.h b/drivers/tty/serial/serial_mctrl_gpio.h
+> new file mode 100644
+> index 0000000..400ba04
+> --- /dev/null
+> +++ b/drivers/tty/serial/serial_mctrl_gpio.h
+> @@ -0,0 +1,110 @@
+> +/*
+> + * Helpers for controlling modem lines via GPIO
+> + *
+> + * Copyright (C) 2014 Paratronic S.A.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#ifndef __SERIAL_MCTRL_GPIO__
+> +#define __SERIAL_MCTRL_GPIO__
+> +
+> +#include <linux/err.h>
+> +#include <linux/device.h>
+> +#include <linux/gpio/consumer.h>
+> +
+> +enum mctrl_gpio_idx {
+> +	UART_GPIO_CTS,
+> +	UART_GPIO_DSR,
+> +	UART_GPIO_DCD,
+> +	UART_GPIO_RNG,
+> +	UART_GPIO_RI = UART_GPIO_RNG,
+> +	UART_GPIO_RTS,
+> +	UART_GPIO_DTR,
+> +	UART_GPIO_OUT1,
+> +	UART_GPIO_OUT2,
+> +	UART_GPIO_MAX,
+> +};
+> +
+> +/*
+> + * Opaque descriptor for modem lines controlled by GPIOs
+> + */
+> +struct mctrl_gpios;
+> +
+> +#ifdef CONFIG_GPIOLIB
+> +
+> +/*
+> + * Set state of the modem control output lines via GPIOs.
+> + */
+> +void mctrl_gpio_set(struct mctrl_gpios *gpios, unsigned int mctrl);
+> +
+> +/*
+> + * Get state of the modem control output lines from GPIOs.
+> + * The mctrl flags are updated and returned.
+> + */
+> +unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl);
+> +
+> +/*
+> + * Returns the associated struct gpio_desc to the modem line gidx
+> + */
+> +struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
+> +				      enum mctrl_gpio_idx gidx);
+> +
+> +/*
+> + * Request and set direction of modem control lines GPIOs.
+> + * devm_* functions are used, so there's no need to call mctrl_gpio_free().
+> + * Returns a pointer to the allocated mctrl structure if ok, -ENOMEM on
+> + * allocation error.
+> + */
+> +struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx);
+> +
+> +/*
+> + * Free the mctrl_gpios structure.
+> + * Normally, this function will not be called, as the GPIOs will
+> + * be disposed of by the resource management code.
+> + */
+> +void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios);
+> +
+> +#else /* GPIOLIB */
+> +
+> +static inline
+> +void mctrl_gpio_set(struct mctrl_gpios *gpios, unsigned int mctrl)
+> +{
+> +}
+> +
+> +static inline
+> +unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
+> +{
+> +	return *mctrl;
+> +}
+> +
+> +static inline
+> +struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
+> +				      enum mctrl_gpio_idx gidx)
+> +{
+> +	return ERR_PTR(-ENOSYS);
+> +}
+> +
+> +static inline
+> +struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
+> +{
+> +	return ERR_PTR(-ENOSYS);
+> +}
+> +
+> +static inline
+> +void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
+> +{
+> +}
+> +
+> +#endif /* GPIOLIB */
+> +
+> +#endif
