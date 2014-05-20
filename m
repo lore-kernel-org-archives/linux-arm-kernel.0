@@ -1,46 +1,56 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 May 2014 17:35:04 +0200
-Subject: [PATCH RFCv2 4/5] ARM: mvebu: enable coherency only when possible on
- Armada XP
+Date: Tue, 20 May 2014 17:35:02 +0200
+Subject: [PATCH RFCv2 2/5] ARM: kernel: allow the SCU to be enabled even on
+ !SMP
 In-Reply-To: <1400600105-3013-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1400600105-3013-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1400600105-3013-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1400600105-3013-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Armada XP, the hardware I/O coherency can only be enabled if the
-SMP capabilities are enabled (shareable pages, SMP bit, etc.). This
-commit ensures that we don't enable hardware I/O coherency if such
-requirements are not met.
+Certain non-SMP platforms rely on the SCU being enabled to provide
+hardware I/O coherency between DMA masters and the CPU. Therefore, the
+scu_enable() hook should not be reduced to a no-op when CONFIG_SMP is
+disabled.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/coherency.c | 13 ++++++++++---
- 1 file changed, 10 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/smp_scu.h | 2 +-
+ arch/arm/kernel/smp_scu.c      | 2 --
+ 2 files changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index d5a975b..2a204d0 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -322,9 +322,16 @@ static int coherency_type(void)
- 	if (np) {
- 		int type = (int) match->data;
+diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
+index 0393fba..e78f72d 100644
+--- a/arch/arm/include/asm/smp_scu.h
++++ b/arch/arm/include/asm/smp_scu.h
+@@ -37,7 +37,7 @@ static inline int scu_power_mode(void __iomem *scu_base, unsigned int mode)
+ }
+ #endif
  
--		/* Armada 370/XP coherency works in both UP and SMP */
--		if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
--			return type;
-+		/*
-+		 * Armada 370 coherency has not special requirements,
-+		 * Armada XP coherency requires SMP capabilities.
-+		 */
-+		if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP) {
-+			if (of_machine_is_compatible("marvell,armadaxp") && is_smp())
-+				return type;
-+			else if (of_machine_is_compatible("marvell,armada370"))
-+				return type;
-+		}
+-#if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
++#if defined(CONFIG_HAVE_ARM_SCU)
+ void scu_enable(void __iomem *scu_base);
+ #else
+ static inline void scu_enable(void __iomem *scu_base) {}
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 1aafa0d..09d21b0 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -22,7 +22,6 @@
+ #define SCU_INVALIDATE		0x0c
+ #define SCU_FPGA_REVISION	0x10
  
- 		/* Armada 375 coherency works only on SMP */
- 		else if (type == COHERENCY_FABRIC_TYPE_ARMADA_375 && is_smp())
+-#ifdef CONFIG_SMP
+ /*
+  * Get the number of CPU cores from the SCU configuration
+  */
+@@ -62,7 +61,6 @@ void scu_enable(void __iomem *scu_base)
+ 	 */
+ 	flush_cache_all();
+ }
+-#endif
+ 
+ /*
+  * Set the executing CPUs power mode as defined.  This will be in
 -- 
 1.9.3
