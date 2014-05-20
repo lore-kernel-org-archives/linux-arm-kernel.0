@@ -1,58 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 May 2014 21:27:48 +0200
-Subject: [Patch v3 0/5] Introduce keystone reset driver
-In-Reply-To: <537BA06B.5060200@ti.com>
-References: <1400495155-11136-1-git-send-email-ivan.khoronzhuk@ti.com>
- <537B5D5D.8030106@ti.com> <537BA06B.5060200@ti.com>
-Message-ID: <10992709.10WgsOixXr@wuerfel>
+From: aeikum@codeweavers.com (Andrew Eikum)
+Date: Tue, 20 May 2014 14:29:58 -0500
+Subject: [alsa-devel] [PATCH] Fix for possible null pointer dereference
+ in dma.c
+In-Reply-To: <537BAA2B.9090906@gmail.com>
+References: <1400191076-28279-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+ <5379E284.7030700@gmail.com>
+ <CAFo99gZ3kVGn04we5OtRtbkceYRs6SiHXRyoX1Gb-SknJH=z=w@mail.gmail.com>
+ <537BAA2B.9090906@gmail.com>
+Message-ID: <20140520192958.GE6639@foghorn.codeweavers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 May 2014 21:35:23 Ivan Khoronzhuk wrote:
-> Thank for the note.
+On Tue, May 20, 2014 at 09:16:59PM +0200, Tomasz Figa wrote:
+> To me having NULL as either data argument of buffer done callback or
+> private_data would be a serious driver bug and IMHO it's better to let
+> it crash with a NULL pointer dereference to let someone notice than mask
+> it by adding a condition.
 > 
-> Ok.
-> 
-> Memory map:
-> [00 02310000 - 00 023101FF] size=512 PLL Controller
-> [00 02620000 - 00 02620FFF] size=4K device state control registers
-> 
-> I'll define in DT two new syscon compatible nodes like:
-> 
->          pllctrl: pll_controller {
->              compatible = "syscon";
->              reg = <0x2310000 0x200>;
->          };
-> 
->          devctrl: device_state_control {
->              compatible = "syscon";
->              reg = <0x2620000 0x1000>;
->          };
 
-Please add a well-defined compatible-string in addition to "syscon" as
-well.
+Please, no.  Regardless of who is at fault, crashes in library code
+are insanely frustrating to application developers.  Error codes can
+be handled nicely and expressed to the user as an error message.
+Crashes are hideous for end users and usually end up being support
+nightmares for developers.
 
-> then correct reset-controller node like:
-> 
->          rstctrl: reset-controller {
->              compatible = "ti,keystone-reset";
->              reg = <0xE4 0x10>, <0x328 0x10>;
->              reg-names = "pllregs", "muxregs";
->              syscon1 = <&pllctrl>;
->              syscon2 = <&devctrl>;
->              ti,wdt_list = <0>;
->          };
+Related:
+https://git.kernel.org/cgit/linux/kernel/git/kay/libabc.git/tree/README?id=0573b57c7bdb4c82d6acd62f7923a6503f4f679a#n126
 
-You can't really use the "reg" property to refer to syscon
-registers, but you can make up your own property for that,
-or put the register numbers into the syscon1/2 properties,
-or just hardcode the offsets in the driver.
-
-> And correct reset-controller code to get regmap by phandle,
-> then access registers by regmap.
-> 
-> Also I'll post two separate patches that add syscon nodes in question.
-
-Sounds good, thanks!
-
-	Arnd
+Andrew
