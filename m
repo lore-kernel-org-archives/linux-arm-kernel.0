@@ -1,82 +1,46 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 20 May 2014 16:45:24 +0800
-Subject: [PATCH 06/20] ARM: imx5: make mx51_clocks_init() a DT call
+Date: Tue, 20 May 2014 16:45:37 +0800
+Subject: [PATCH 19/20] ARM: imx5: clean function declarations in mx51.h
 In-Reply-To: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
 References: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1400575538-21136-7-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1400575538-21136-20-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since i.MX51 becomes a DT only platform, we can make mx51_clocks_init()
-a DT call and save function mx51_clocks_init_dt() now.
+The mx51_display_revision() is a dead declaration.  Remove it.  Also,
+move mx51_revision() into common.h.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-imx/clk-imx51-imx53.c | 16 +++-------------
- arch/arm/mach-imx/common.h          |  2 --
- 2 files changed, 3 insertions(+), 15 deletions(-)
+ arch/arm/mach-imx/common.h | 1 +
+ arch/arm/mach-imx/mx51.h   | 5 -----
+ 2 files changed, 1 insertion(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 21d2b11..1e22d35 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -375,12 +375,10 @@ static void __init mx50_clocks_init(struct device_node *np)
- }
- CLK_OF_DECLARE(imx50_ccm, "fsl,imx50-ccm", mx50_clocks_init);
- 
--int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
--			unsigned long rate_ckih1, unsigned long rate_ckih2)
-+static void __init mx51_clocks_init(struct device_node *np)
- {
- 	int i;
- 	u32 val;
--	struct device_node *np;
- 
- 	clk[IMX5_CLK_PLL1_SW]		= imx_clk_pllv2("pll1_sw", "osc", MX51_DPLL1_BASE);
- 	clk[IMX5_CLK_PLL2_SW]		= imx_clk_pllv2("pll2_sw", "osc", MX51_DPLL2_BASE);
-@@ -422,12 +420,11 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- 			pr_err("i.MX51 clk %d: register failed with %ld\n",
- 				i, PTR_ERR(clk[i]));
- 
--	np = of_find_compatible_node(NULL, NULL, "fsl,imx51-ccm");
- 	clk_data.clks = clk;
- 	clk_data.clk_num = ARRAY_SIZE(clk);
- 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
- 
--	mx5_clocks_common_init(rate_ckil, rate_osc, rate_ckih1, rate_ckih2);
-+	mx5_clocks_common_init(0, 0, 0, 0);
- 
- 	clk_register_clkdev(clk[IMX5_CLK_HSI2C_GATE], NULL, "imx21-i2c.2");
- 	clk_register_clkdev(clk[IMX5_CLK_MX51_MIPI], "mipi_hsp", NULL);
-@@ -474,15 +471,8 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- 	val = readl(MXC_CCM_CLPCR);
- 	val |= 1 << 23;
- 	writel(val, MXC_CCM_CLPCR);
--
--	return 0;
--}
--
--static void __init mx51_clocks_init_dt(struct device_node *np)
--{
--	mx51_clocks_init(0, 0, 0, 0);
- }
--CLK_OF_DECLARE(imx51_ccm, "fsl,imx51-ccm", mx51_clocks_init_dt);
-+CLK_OF_DECLARE(imx51_ccm, "fsl,imx51-ccm", mx51_clocks_init);
- 
- static void __init mx53_clocks_init(struct device_node *np)
- {
 diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 9ab785c..cf9e9c2 100644
+index 53ee569..5aaea2b 100644
 --- a/arch/arm/mach-imx/common.h
 +++ b/arch/arm/mach-imx/common.h
-@@ -64,8 +64,6 @@ int mx25_clocks_init(void);
- int mx27_clocks_init(unsigned long fref);
- int mx31_clocks_init(unsigned long fref);
- int mx35_clocks_init(void);
--int mx51_clocks_init(unsigned long ckil, unsigned long osc,
--			unsigned long ckih1, unsigned long ckih2);
- int mx25_clocks_init_dt(void);
- int mx27_clocks_init_dt(void);
- int mx31_clocks_init_dt(void);
+@@ -64,6 +64,7 @@ void mxc_set_cpu_type(unsigned int type);
+ void mxc_restart(enum reboot_mode, const char *);
+ void mxc_arch_reset_init(void __iomem *);
+ void mxc_arch_reset_init_dt(void);
++int mx51_revision(void);
+ int mx53_revision(void);
+ void imx_set_aips(void __iomem *);
+ int mxc_device_init(void);
+diff --git a/arch/arm/mach-imx/mx51.h b/arch/arm/mach-imx/mx51.h
+index 3f6d4a6..a569528 100644
+--- a/arch/arm/mach-imx/mx51.h
++++ b/arch/arm/mach-imx/mx51.h
+@@ -305,9 +305,4 @@
+ #define MX51_INT_EMI_NFC		(NR_IRQS_LEGACY + 101)
+ #define MX51_INT_GPU_IDLE		(NR_IRQS_LEGACY + 102)
+ 
+-#if !defined(__ASSEMBLY__) && !defined(__MXC_BOOT_UNCOMPRESS)
+-extern int mx51_revision(void);
+-extern void mx51_display_revision(void);
+-#endif
+-
+ #endif	/* ifndef __MACH_MX51_H__ */
 -- 
 1.8.3.2
