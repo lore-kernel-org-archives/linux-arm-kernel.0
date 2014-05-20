@@ -1,48 +1,42 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 20 May 2014 16:09:26 -0500
-Subject: [PATCH 00/10] ARM: Versatile irq and clock DT support
-Message-ID: <1400620176-7239-1-git-send-email-robherring2@gmail.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 20 May 2014 23:21:08 +0200
+Subject: [alsa-devel] [PATCH] Fix for possible null pointer dereference
+ in dma.c
+In-Reply-To: <537BAA2B.9090906@gmail.com>
+References: <1400191076-28279-1-git-send-email-rickard_strandqvist@spectrumdigital.se>	<5379E284.7030700@gmail.com>
+ <CAFo99gZ3kVGn04we5OtRtbkceYRs6SiHXRyoX1Gb-SknJH=z=w@mail.gmail.com>
+ <537BAA2B.9090906@gmail.com>
+Message-ID: <537BC744.8020601@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <robh@kernel.org>
+On 05/20/2014 09:16 PM, Tomasz Figa wrote:
+> Hi Rickard,
+>
+> On 20.05.2014 21:12, Rickard Strandqvist wrote:
+>> Hi Tomasz
+>>
+>> What I based my patch on is really because of this line:
+>> if (substream)
+>>           snd_pcm_period_elapsed(substream);
+>>
+>> Boojin Kim thought that this was needed, if this is true anymore..? I
+>> have not been able to immerse myself so much in all patches.
+>> I'm working on about 100 similar patches.
+>
+> To me having NULL as either data argument of buffer done callback or
+> private_data would be a serious driver bug and IMHO it's better to let
+> it crash with a NULL pointer dereference to let someone notice than mask
+> it by adding a condition.
+>
+> Still, I'm not too experienced with ALSA and ASoC, so I might be wrong.
+> Mark, what do you think about this?
 
-This series is some preparation work to fully convert Versatile platform 
-to DT. This converts the IRQ initialization to DT based init and adds 
-clocks to the Versatile DT. This doesn't actually enable using common 
-clock framework, but that is only a matter of removing the old clock 
-code and enabling the appropriate Kconfig options. This will be done 
-when Versatile can be completely converted over to DT boot. I have that 
-working in my tree, but full DT conversion is also dependent on DT PCI 
-support.
+Given that there is a patch[1] which removes the whole file I think we can stop 
+the discussion about this patch here.
 
-I've tested under QEMU and Linus Walleij has tested an earlier version 
-on Versatile AB h/w.
+But for the record, substream will never ever be NULL in this function. prtd 
+might be though if the DMA completion callback races against the closing of the 
+PCM stream.
 
-Rob
-
-Rob Herring (10):
-  dt/bindings: add passthru-mask property to versatile-fpga-irq
-  dts: versatile: add missing irq controller properties
-  irqchip: versatile-fpga: add pass-thru enable support
-  irqchip: versatile-fpga: add DT init
-  ARM: versatile: remove init_irq hook for DT boot
-  dts: versatile: add pl180 compatible strings
-  dt/bindings: arm-boards: add binding for Versatile core module
-  dt/bindings: add compatible string for versatile osc clock
-  dts: versatile: add clock tree
-  clk: versatile: add versatile OSC support
-
- Documentation/devicetree/bindings/arm/arm-boards   |  6 ++
- .../devicetree/bindings/arm/versatile-fpga-irq.txt |  3 +
- .../devicetree/bindings/clock/arm-integrator.txt   |  4 +-
- arch/arm/boot/dts/versatile-ab.dts                 | 81 +++++++++++++++++++++-
- arch/arm/boot/dts/versatile-pb.dts                 | 12 +++-
- arch/arm/mach-versatile/versatile_dt.c             |  1 -
- drivers/clk/versatile/Makefile                     |  3 +-
- drivers/clk/versatile/clk-integrator.c             | 35 +++++++++-
- drivers/irqchip/irq-versatile-fpga.c               |  9 +++
- 9 files changed, 145 insertions(+), 9 deletions(-)
-
--- 
-1.9.1
+[1] http://mailman.alsa-project.org/pipermail/alsa-devel/2014-May/076860.html
