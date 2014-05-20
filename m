@@ -1,23 +1,22 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 20 May 2014 23:10:59 +0100
-Subject: [PATCH v4 00/17] ASoC: fsl-ssi: Driver cleanup
-In-Reply-To: <1398682498-24357-1-git-send-email-mpa@pengutronix.de>
-References: <1398682498-24357-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20140520221059.GD12304@sirena.org.uk>
+Date: Tue, 20 May 2014 23:12:47 +0100
+Subject: [PATCH v2 1/9] ASoC: alc5623: Add device tree binding
+In-Reply-To: <1399141819-23924-2-git-send-email-andrew@lunn.ch>
+References: <1399141819-23924-1-git-send-email-andrew@lunn.ch>
+ <1399141819-23924-2-git-send-email-andrew@lunn.ch>
+Message-ID: <20140520221247.GE12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 12:54:41PM +0200, Markus Pargmann wrote:
-> Hi,
-> 
-> This series is a cleanup of the fsl-ssi driver.
+On Sat, May 03, 2014 at 08:30:11PM +0200, Andrew Lunn wrote:
+> Let the ALC5623 codec be instantiated from DT. Add a simple binding
+> for the additional control register and the jack detect register.
 
-All the patches I didn't comment on specifically look good apart from a
-few that need signoffs adding.
+Applied, thanks.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/732ff284/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/df115313/attachment.sig>
