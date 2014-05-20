@@ -1,46 +1,50 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 20 May 2014 08:37:42 +0900
-Subject: [PATCH 03/03] ARM: shmobile: Remove unused r8a7790_init_early()
-In-Reply-To: <20140519233714.10496.31390.sendpatchset@w520>
-References: <20140519233714.10496.31390.sendpatchset@w520>
-Message-ID: <20140519233742.10496.54331.sendpatchset@w520>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 20 May 2014 01:23:41 +0100
+Subject: [PATCH 2/2] arm64: topology: Provide relative power numbers for cores
+In-Reply-To: <1400545421-28067-1-git-send-email-broonie@kernel.org>
+References: <1400545421-28067-1-git-send-email-broonie@kernel.org>
+Message-ID: <1400545421-28067-2-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+From: Mark Brown <broonie@linaro.org>
 
-Remove the now unused r8a7790_init_early() function.
+Provide performance numbers to the scheduler to help it fill the cores in
+the system on big.LITTLE systems. With the current scheduler this may
+perform poorly for applications that try to do OpenMP style work over all
+cores but should help for more common workloads. The current 32 bit ARM
+implementation provides a similar estimate so this helps ensure that
+work to improve big.LITTLE systems on ARMv7 systems performs similarly
+on ARMv8 systems.
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+The power numbers are the same as for ARMv7 since it seems that the
+expected differential between the big and little cores is very similar on
+both ARMv7 and ARMv8.  In both ARMv7 and ARMv8 cases the numbers were
+based on the published DMIPS numbers.
+
+These numbers are just an initial and basic approximation for use with
+the current scheduler, it is likely that both experience with silicon
+and ongoing work on improving the scheduler will lead to further tuning
+or will tune automatically at runtime and so make the specific choice of
+numbers here less critical.
+
+Signed-off-by: Mark Brown <broonie@linaro.org>
 ---
+ arch/arm64/kernel/topology.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
- arch/arm/mach-shmobile/include/mach/r8a7790.h |    1 -
- arch/arm/mach-shmobile/setup-r8a7790.c        |    7 -------
- 2 files changed, 8 deletions(-)
-
---- 0001/arch/arm/mach-shmobile/include/mach/r8a7790.h
-+++ work/arch/arm/mach-shmobile/include/mach/r8a7790.h	2014-05-19 22:26:16.000000000 +0900
-@@ -33,7 +33,6 @@ void r8a7790_add_dt_devices(void);
- void r8a7790_clock_init(void);
- void r8a7790_pinmux_init(void);
- void r8a7790_pm_init(void);
--void r8a7790_init_early(void);
- extern struct smp_operations r8a7790_smp_ops;
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 08ce694e5078..224c49c1127c 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -202,6 +202,8 @@ struct cpu_efficiency {
+  * use the default SCHED_POWER_SCALE value for cpu_scale.
+  */
+ static const struct cpu_efficiency table_efficiency[] = {
++	{ "arm,cortex-a57", 3891 },
++	{ "arm,cortex-a53", 2048 },
+ 	{ NULL, },
+ };
  
- #endif /* __ASM_R8A7790_H__ */
---- 0003/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2014-05-19 22:25:49.000000000 +0900
-@@ -307,13 +307,6 @@ void __init r8a7790_add_standard_devices
- 	r8a7790_register_audio_dmac(1);
- }
- 
--void __init r8a7790_init_early(void)
--{
--#ifndef CONFIG_ARM_ARCH_TIMER
--	shmobile_setup_delay(1300, 2, 4); /* Cortex-A15 @ 1300MHz */
--#endif
--}
--
- #ifdef CONFIG_USE_OF
- 
- static const char * const r8a7790_boards_compat_dt[] __initconst = {
+-- 
+2.0.0.rc2
