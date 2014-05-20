@@ -1,41 +1,126 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 20 May 2014 16:01:19 +0100
-Subject: [PATCH 1/7] mfd: twl4030-power: Fix hang on reboot if sleep
- configuration was loaded earlier
-In-Reply-To: <1400031250-29542-2-git-send-email-tony@atomide.com>
-References: <1400031250-29542-1-git-send-email-tony@atomide.com>
- <1400031250-29542-2-git-send-email-tony@atomide.com>
-Message-ID: <20140520150119.GW24991@lee--X1>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 20 May 2014 16:58:38 +0200
+Subject: [PATCH v4 03/20] arm64: GICv3 device tree binding documentation
+In-Reply-To: <1400176719-31275-4-git-send-email-marc.zyngier@arm.com>
+References: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
+ <1400176719-31275-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <537B6D9E.4000801@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 May 2014, Tony Lindgren wrote:
-
-> Looks like we can still hit the issue of wrong load order of
-> twl4030 configuration. If we have a sleep configuration loaded,
-> and do a warm reset, the device can hang while initializing the
-> wakeup12 sequence. We do have a warning message about wrong order
-> of twl4030 configuration, but in this case it does not help as
-> the sleep configuration was loaded during the previous boot and
-> the state of twl4030 is maintained throughout the warm reset.
-> 
-> Fix the issue by clearing any existing sleep configuration
-> before we load the warm reset configuration.
-> 
-> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+On 05/15/2014 07:58 PM, Marc Zyngier wrote:
+> Add the necessary documentation to support GICv3.
+>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/mfd/twl4030-power.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+>  Documentation/devicetree/bindings/arm/gic-v3.txt | 79 ++++++++++++++++++++++++
+>  1 file changed, 79 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/gic-v3.txt
+>
+> diff --git a/Documentation/devicetree/bindings/arm/gic-v3.txt b/Documentation/devicetree/bindings/arm/gic-v3.txt
+> new file mode 100644
+> index 0000000..33cd05e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/gic-v3.txt
+> @@ -0,0 +1,79 @@
+> +* ARM Generic Interrupt Controller, version 3
+> +
+> +AArch64 SMP cores are often associated with a GICv3, providing Private
+> +Peripheral Interrupts (PPI), Shared Peripheral Interrupts (SPI),
+> +Software Generated Interrupts (SGI), and Locality-specific Peripheral
+> +Interrupts (LPI).
+> +
+> +Main node required properties:
+> +
+> +- compatible : should at least contain  "arm,gic-v3".
+> +- interrupt-controller : Identifies the node as an interrupt controller
+> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> +  interrupt source. Must be a single cell with a value of at least 3.
+> +
+> +  The 1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI
+> +  interrupts. Other values are reserved for future use.
+> +
+> +  The 2nd cell contains the interrupt number for the interrupt type.
+> +  SPI interrupts are in the range [0-987]. PPI interrupts are in the
+> +  range [0-15].
+> +
+> +  The 3rd cell is the flags, encoded as follows:
+> +     bits[3:0] trigger type and level flags.
+> +             1 = edge triggered
+> +             4 = level triggered
+> +
+> +  Cells 4 and beyond are reserved for future use. When the 1st cell
+> +  has a value of 0 or 1, cells 4 and beyond act as padding, and may be
+> +  ignored. It is recommended that padding cells have a value of 0.
+> +
+> +- reg : Specifies base physical address(s) and size of the GIC
+> +  registers, in the following order:
+> +  - GIC Distributor interface (GICD)
+> +  - GIC Redistributors (GICR), one range per redistributor region
+> +  - GIC CPU interface (GICC)
+> +  - GIC Hypervisor interface (GICH)
+> +  - GIC Virtual CPU interface (GICV)
+> +
+> +  GICC, GICH and GICV are optional.
 
-Can't vouch for the semantics of the patch, but the code looks good.
+I wonder if it should be noted here that a lack of these last three
+regions denies GICv2 emulation support for KVM guests.
+It's probably not worth to introduce a special property for this v2
+compat support, but if the lack of these registers is indicating that
+fact, it should be added here.
 
-  Acked-by: Lee Jones <lee.jones@linaro.org>
+Regards,
+Andre.
 
-Can I just apply this, or would you like Peter to review it first?
+> +
+> +- interrupts : Interrupt source of the VGIC maintenance interrupt.
+> +
+> +Optional
+> +
+> +- redistributor-stride : If using padding pages, specifies the stride
+> +  of consecutive redistributors. Must be a multiple of 64kB.
+> +
+> +- #redistributor-regions: The number of independent contiguous regions
+> +  occupied by the redistributors. Required if more than one such
+> +  region is present.
+> +
+> +Examples:
+> +
+> +     gic: interrupt-controller at 2cf00000 {
+> +             compatible = "arm,gic-v3";
+> +             #interrupt-cells = <3>;
+> +             interrupt-controller;
+> +             reg = <0x0 0x2f000000 0 0x10000>,       // GICD
+> +                   <0x0 0x2f100000 0 0x200000>,      // GICR
+> +                   <0x0 0x2c000000 0 0x2000>,        // GICC
+> +                   <0x0 0x2c010000 0 0x2000>,        // GICH
+> +                   <0x0 0x2c020000 0 0x2000>;        // GICV
+> +             interrupts = <1 9 4>;
+> +     };
+> +
+> +     gic: interrupt-controller at 2c010000 {
+> +             compatible = "arm,gic-v3";
+> +             #interrupt-cells = <3>;
+> +             interrupt-controller;
+> +             redistributor-stride = <0x0 0x40000>;   // 256kB stride
+> +             #redistributor-regions = <2>;
+> +             reg = <0x0 0x2c010000 0 0x10000>,       // GICD
+> +                   <0x0 0x2d000000 0 0x800000>,      // GICR 1: CPUs 0-31
+> +                   <0x0 0x2e000000 0 0x800000>;      // GICR 2: CPUs 32-63
+> +                   <0x0 0x2c040000 0 0x2000>,        // GICC
+> +                   <0x0 0x2c060000 0 0x2000>,        // GICH
+> +                   <0x0 0x2c080000 0 0x2000>;        // GICV
+> +             interrupts = <1 9 4>;
+> +     };
+>
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+
+ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
+ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
