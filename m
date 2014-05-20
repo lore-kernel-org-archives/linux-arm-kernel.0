@@ -1,78 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 20 May 2014 19:45:10 +0100
-Subject: [PATCH 1/2] arm64: topology: Tell the scheduler about the
- relative power of cores
-In-Reply-To: <20140520173727.GD28293@arm.com>
-References: <1400545421-28067-1-git-send-email-broonie@kernel.org>
- <20140520173727.GD28293@arm.com>
-Message-ID: <20140520184510.GN12304@sirena.org.uk>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 20 May 2014 11:49:42 -0700
+Subject: [PATCH v3 5/9] mtd: nand: add sunxi NAND flash controller support
+In-Reply-To: <536D069A.40401@gmail.com>
+References: <1394647664-8258-1-git-send-email-b.brezillon.dev@gmail.com>
+ <1394647664-8258-6-git-send-email-b.brezillon.dev@gmail.com>
+ <20140509160341.GA6984@arch.cereza> <536D069A.40401@gmail.com>
+Message-ID: <20140520184942.GT28907@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 06:37:27PM +0100, Catalin Marinas wrote:
-> On Tue, May 20, 2014 at 01:23:40AM +0100, Mark Brown wrote:
-> > In heterogeneous systems like big.LITTLE systems the scheduler will be
-> > able to make better use of the available cores if we provide power numbers
-> > to it indicating their relative performance. Do this by parsing the CPU
-> > nodes in the DT.
+On Fri, May 09, 2014 at 06:47:22PM +0200, Boris BREZILLON wrote:
+> On 09/05/2014 18:03, Ezequiel Garcia wrote:
+> > On 12 Mar 07:07 PM, Boris BREZILLON wrote:
+> >> --- /dev/null
+> >> +++ b/drivers/mtd/nand/sunxi_nand.c
+> >> @@ -0,0 +1,1276 @@
+...
+> >> +static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
+> >> +			       struct device_node *np)
+> >> +{
+> >> +	struct nand_chip *nand = mtd->priv;
+> >> +	int ecc_step_size, ecc_strength;
+> >> +	int ret;
+> >> +
+> >> +	ecc_step_size = of_get_nand_ecc_step_size(np);
+> >> +	ecc_strength = of_get_nand_ecc_strength(np);
+> >> +	if (ecc_step_size > 0 && ecc_strength > 0) {
+> >> +		ecc->size = ecc_step_size;
+> >> +		ecc->strength = ecc_strength;
+> >> +	} else {
+> >> +		ecc->size = nand->ecc_step_ds;
+> >> +		ecc->strength = nand->ecc_strength_ds;
+> >> +	}
+> >> +
+> > Shouldn't you check the devicetree value is not weaker than the ONFI-obtained?
+> 
+> I can definitely do that.
 
-> Last time we discussed these two patches, my understanding was that the
-> mainline scheduler doesn't behave any better on big.LITTLE with this
-> additional information, unless you also have additional out of tree b.L
+You can do that here, but take a look at the discussion Ezequiel and I
+had about this:
 
-That wasn't my recollection and I'm certainly seeing code in the current
-scheduler which appears to make use of the information though I cannot
-claim any depth of understanding.  It's possible you're recalling some
-offline/other conversation with people more involved in the scheduler
-though?  
+  http://thread.gmane.org/gmane.linux.drivers.devicetree/67462
 
-The issue I'm aware of with this is the one called out in the changelog
-- it could do odd things with loads that try to saturate all cores with
-one thread per core, but then I'm not clear that such loads are going to
-work effectively on a big.LITTLE system anyway (either some jobs get
-packed on a big core or some jobs run a lot slower on little cores).  My
-understanding was that more typical workloads with load spread over more
-tasks should tend to do better with this.
+We probably don't want to be doing anything drastic like overriding the
+device tree configuration. Instead, we might want to stick a warning
+into the core nand_base code that does the proper comparison of the
+'*_ds' values with the actual values chosen in
+chip->ecc->{size,strength}. The comparison is kind of subtle, actually,
+so it'd be good to do it exactly once for everyone.
 
-The biggest win with the out of tree patches is that they have some idea
-of the power tradeoffs with the two clusters and actively push to
-exploit them.
-
-> MP patches. Vincent is also cleaning up some of the cpu_power usage in
-> the scheduler.
-
-> So unless there are clear benefits in providing such information to the
-> mainline scheduler, I don't plan to merge them for the time being (I'm
-
-The main thing I'm seeing here is consistency between ARMv8 and ARMv7
-big.LITTLE implementations - there's readily available ARMv7 big.LITTLE
-hardware out there so I would expect that much of the work on the
-scheduler will continue to focus on ARMv7.  Keeping ARMv8 consistent
-with ARMv7 should avoid nasty surprises there.
-
-Unless I'm completely misreading the code I'm looking at in fair.c I
-suspect I could come up with benchmarks that showed an impact but I'm
-not sure that's too useful unless there's something you're particularly
-interested in, this sort of thing always has an element of taste.
-
-It would be nice to at least merge the parsing code in the first patch,
-without the performance numbers in the table from the second patch it
-won't have any practical impact but it's less diff to carry around and
-easier for people to experiment with when doing in tree work (including
-possibly setting other parameters as a result of parsing).  Does that
-seem reasonable?
-
-> also not convinced of the numbers in the second patch, they need some
-> benchmarking on real hardware).
-
-I'm sure we can all have confidence in the published performance
-numbers!  More seriously as I've said before I think you're overthinking
-the importance of their accuracy, though as that change is so small it's
-a bit less of a concern for diff to carry about.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/1d0de466/attachment.sig>
+Brian
