@@ -1,99 +1,97 @@
-From: jiada_wang@mentor.com (Jiada Wang)
-Date: Tue, 20 May 2014 00:00:46 -0700
-Subject: [PATCH] ARM: imx: powerdown PLL before changing of its setting
-In-Reply-To: <537AF384.9070900@de.bosch.com>
-References: <1400060197-706-1-git-send-email-jiada_wang@mentor.com>
- <CAOMZO5CU4WQSpH3eR719p8JBi8=xumGwLtxA-GqKRm8Jh0Rwng@mail.gmail.com>
- <537AF384.9070900@de.bosch.com>
-Message-ID: <537AFD9E.9080203@mentor.com>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Tue, 20 May 2014 12:35:40 +0530
+Subject: [PATCH v3 0/4] ARM: dts: enable display for peach-pit and snow
+ boards
+In-Reply-To: <CAPdUM4OcHOiSAbNt_6yEo_YY3FqGxef=p33opW21nEt7P+m6Xw@mail.gmail.com>
+References: <1399630186-22610-1-git-send-email-rahul.sharma@samsung.com>
+ <537A25F8.4040604@samsung.com>
+ <CAPdUM4OcHOiSAbNt_6yEo_YY3FqGxef=p33opW21nEt7P+m6Xw@mail.gmail.com>
+Message-ID: <CAPdUM4NBCC+R+WkREhLhh0sDTg35bKyb6FZhgYJiUDVtEtXjdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk and Fabio
-
-On 05/19/2014 11:17 PM, Dirk Behme wrote:
-> Hi Fabio,
+On 20 May 2014 10:41, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+> Thanks Kukjin,
 >
-> On 19.05.2014 19:31, Fabio Estevam wrote:
->> Hi Jiada,
->>
->> On Wed, May 14, 2014 at 6:36 AM, Jiada Wang <jiada_wang@mentor.com>
->> wrote:
->>> According to i.MX6 user manual,  "Before changing the PLL setting,
->>> power it down. Power up the PLL after the change"
->>> But currently PLL setting is being updated without power-down
->>> it first. This may end up with improper output/gitches which
->>> prevents furture operation.
->>>
->>> Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
->>> ---
->>>   arch/arm/mach-imx/clk-pllv3.c | 72
->>> +++++++++++++++++++++++++++++++++++++++----
->>>   1 file changed, 66 insertions(+), 6 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-imx/clk-pllv3.c
->>> b/arch/arm/mach-imx/clk-pllv3.c
->>> index 6136405..f77edd6 100644
->>> --- a/arch/arm/mach-imx/clk-pllv3.c
->>> +++ b/arch/arm/mach-imx/clk-pllv3.c
->>> @@ -67,6 +67,42 @@ static int clk_pllv3_wait_lock(struct clk_pllv3 *pll)
->>>          return readl_relaxed(pll->base) & BM_PLL_LOCK ? 0 : -ETIMEDOUT;
->>>   }
->>>
->>> +static void clk_pllv3_powerdown(struct clk_pllv3 *pll)
->>> +{
->>> +       u32 val;
->>> +
->>> +       val = readl_relaxed(pll->base);
->>> +       val |= BM_PLL_BYPASS;
->>> +       writel_relaxed(val, pll->base);
->>> +
->>> +       if (pll->powerup_set)
->>> +               val &= ~BM_PLL_POWER;
->>> +       else
->>> +               val |= BM_PLL_POWER;
->>> +       writel_relaxed(val, pll->base);
->>> +}
->>> +
->>> +static int clk_pllv3_powerrestore(struct clk_pllv3 *pll, u32 power,
->>> u32 bypass)
->>> +{
->>> +       u32 val;
->>> +       int ret;
->>> +
->>> +       val = readl_relaxed(pll->base);
->>> +       val &= ~BM_PLL_POWER;
->>
->> Shouldn't this be:
->>        if (pll->powerup_set)
->>               val |= BM_PLL_POWER;
->>         else
->>               val &= ~BM_PLL_POWER;
->>
->
-> Jiada will correct me if I'm wrong, but to my understanding the job of
-> this function is to *restore* the previously configured power state (not
-> to set any particular one).
->
-> The previously configured power state is passed in 'u32 power'. So we
-> just mask out the POWER bit here to be able to restore the old power
-> state, independent if it is 0 or 1. So I would think
->
-> +    val = readl_relaxed(pll->base);
-> +    val &= ~BM_PLL_POWER;
-> +    val |= power;
-> +    writel_relaxed(val, pll->base);
->
-> is correct here.
->
-> Best regards
->
-> Dirk
+> I have changed it in my environment now.
 >
 
-Yes, this function restores power state as well as bypass state,
-as set_rate() may be called before prepare(),
-so we have no idea about power and bypass state here.
+Kukjin,
 
-Thanks,
-Jiada
+dp_hpd_gpio got accidentally merged to pinctrl_3 in your "for-next"
+branch. It should
+be in pinctrl_0.
+
+/*****************/
+        };
+
+        dp_hpd_gpio: dp_hpd_gpio {
+               samsung,pins = "gpx2-6";
+               samsung,pin-function = <0>;
+               samsung,pin-pud = <3>;
+                samsung,pin-drv = <0>;
+        };
+};
+
+&pinctrl_3 {
+usb300_vbus_en: usb300-vbus-en {
+/*****************/
+
+Regards,
+Rahul Sharma.
+
+> Regards,
+> Rahul Sharma.
+>
+> On 19 May 2014 21:10, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> On 05/09/14 19:09, Rahul Sharma wrote:
+>>>
+>>> From: Rahul Sharma<Rahul.Sharma@samsung.com>
+>>
+>>
+>> Probably, should be "Rahul Sharma <rahul.sharma@...>"
+>>
+>> Please make sure your gitconfig has no problem.
+>>
+>> Just note, I found same thing and fixed your email address in my tree...
+>>
+>>
+>>>
+>>> Add nodes for fimd and dp controller for exynos5250 based snow
+>>> and exynos5420 based peach-pit board.
+>>>
+>>> This series is based on Kukjin Kims, for-next branch.
+>>>
+>>> V3:
+>>> 1) Dropped 1 patch "ARM: dts: move dp hpd line to the board file for
+>>>   exynos5420".
+>>> 2) Extra blank lines for readability.
+>>> 3) dp hpd gpio name change (dp_hpd ->  dp_hpd_gpio)
+>>>
+>>> V2:
+>>> 1) Rebase on Peach-pit dependent patches.
+>>>
+>>> It is dependent on
+>>> 1) Andrew Bresticker's patch for hpd gpio addition, avilable at
+>>> http://www.spinics.net/lists/linux-samsung-soc/msg28827.html [Patch is
+>>> 'ACK'ed.]
+>>> 2) Arun's patch for adding peach-pit board dts file at
+>>> http://www.spinics.net/lists/linux-samsung-soc/msg30103.html. [Patch is
+>>> 'ACK'ed.]
+>>>
+>>> Rahul Sharma (4):
+>>>    ARM: dts: enable fimd for exynos5250 based snow board
+>>>    ARM: dts: enable dp-controller for exynos5250 based snow board
+>>>    ARM: dts: enable fimd for exynos5420 based peach-pit board
+>>>    ARM: dts: enable dp-controller for exynos5420 based peach-pit board
+>>>
+>>>   arch/arm/boot/dts/exynos5250-snow.dts      |   35
+>>> ++++++++++++++++++++++++
+>>>   arch/arm/boot/dts/exynos5420-peach-pit.dts |   41
+>>> ++++++++++++++++++++++++++++
+>>>   2 files changed, 76 insertions(+)
+>>>
+>> OK, applied whole series with Jingoo's 'reviewed-by'.
+>>
+>> Thanks,
+>> Kukjin
