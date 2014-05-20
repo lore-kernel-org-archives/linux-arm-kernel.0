@@ -1,96 +1,135 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Tue, 20 May 2014 16:16:08 +0300
-Subject: [Patch v3 0/5] Introduce keystone reset driver
-In-Reply-To: <5095812.b6DgWAxYzH@wuerfel>
-References: <1400495155-11136-1-git-send-email-ivan.khoronzhuk@ti.com>
- <537A1E2C.8040102@ti.com> <5095812.b6DgWAxYzH@wuerfel>
-Message-ID: <537B5598.8070603@ti.com>
+From: maxime.coquelin@st.com (Maxime COQUELIN)
+Date: Tue, 20 May 2014 15:17:32 +0200
+Subject: [PATCH v7 4/4] ARM: dts: STiH407: Add B2120 board support
+In-Reply-To: <1400591852-17577-1-git-send-email-maxime.coquelin@st.com>
+References: <1400591852-17577-1-git-send-email-maxime.coquelin@st.com>
+Message-ID: <1400591852-17577-5-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+B2120 HDK is the reference board for STiH407 SoC.
+It has the following characteristics:
+ - 1GB DDR3
+ - 8GB eMMC / SD-Card slot
+ - 32MB NOR Flash
+ - 1 x Gbit Ethernet
+ - 1 x USB 3.0 port
+ - 1 x Mini-PCIe
+ - 1 x SATA
+ - 1 x HDMI output
+ - 1 x HDMI input
+ - 1 x SPDIF
 
-On 05/19/2014 08:47 PM, Arnd Bergmann wrote:
-> On Monday 19 May 2014 11:07:24 Santosh Shilimkar wrote:
->> On Monday 19 May 2014 06:25 AM, Ivan Khoronzhuk wrote:
->>> These patches introduce keystone reset driver.
->>>
->>> The keystone SoC can be rebooted in several ways. By external reset
->>> pin, by soft and by watchdogs. This driver allows software reset and reset
->>> by one of the watchdogs. Also added opportunity to set soft/hard reset type.
->>>
->>> Based on v3.15-rc5
->>>
->> Arnd,
->> Can I have have your ack/reviewed-by please since you did gave few comments
->> on previous version.
-> Sorry for not getting back to you earlier on this topic.
->
->> On 04/14/2014 09:44 PM, Arnd Bergmann wrote:
->>> On Monday 14 April 2014 20:41:20 Ivan Khoronzhuk wrote:
->>>> +Optional properties:
->>>> +
->>>> +- ti,soft-reset:       Boolean option indicating soft reset.
->>>> +                       By default hard reset is used.
->>>> +
->>>> +- ti,wdt_list:         WDT list that can cause SoC reset.
->>>> +                       The list in format: <0>, <2>;
->>>> +                       Begins from 0 to 3, as keystone can contain up
->>>> +                       to 4 SoC reset watchdogs.
->>> This looks like your binding just describes a subset of the
->>> watchdog timer registers. If so, don't do a standalone reset
->> The registers are not a subset of watchdog hardware it's SoC specific future
->> controlled by SoC specific registers (bootregs and PLL regs).
->>
->> For watchog IP setup, the Keystone uses the watchdog driver common with
->> other
->> SoCs -- davinci_watchdog that is not depend on other SoC settings like
->> this driver does.
->>
->> The Keystone SoCs have separate registers to tune Keystone2 reset
->> functionality
->> by configuring Reset multiplexer &  PLL. And it tunes not only watchdog
->> usage.
->> The keystone SoC can be rebooted in several ways. By external reset pin,
->> by soft and
->> by watchdogs. This driver allows software reset or reset by one of the
->> watchdogs
->> (and other settings) independently on watchdog driver settings. This is
->> job of reset driver.
-> It sounds like you use a syscon area in the reset driver. This is not
-> uncommon, but it means you should probably have a generic node for
-> the SoC specific registers that contains all of them at once and
-> exports them as a regmap using the drivers/mfd/syscon.c driver.
->
-> 	Arnd
+This patch only introduces basic functionnalities, such as I2C and UART.
 
-Arnd,
-Thank for the reply
+Acked-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
+Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+---
+ arch/arm/boot/dts/Makefile          |  3 +-
+ arch/arm/boot/dts/stih407-b2120.dts | 78 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 80 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/stih407-b2120.dts
 
-The reset driver uses two ranges:
-- RSTYPE, RSTCTRL,RSTCFG, RSISO  (Reset Main PLL Controller)
-- RESETMUX8-10 registers
-
-The content of these register ranges are completely used by the reset 
-driver.
-Currently no one on the SoC can access them instead of the reset driver.
-Also we don't use syscon/regmap at all - so adding this will be some 
-overhead.
-
-As I posted previously:
-"...configuring Reset multiplexer & PLL. And it tunes not only watchdog 
-usage..."
-
-Yes, it tunes not only watchdog usage and uses part of registers from 
-PLL controller,
-but all it works with are connected with reset functionality. These 
-ranges are used only
-by reset driver and their purpose is reset functionality.
-
-Maybe in the future some soft can use ranges in question for own tasks, 
-but it should be
-done via reset driver. So as I see there is no reasons to use regmap for 
-reset driver.
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 6fa1343..19322a1 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -335,7 +335,8 @@ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
+ 	spear320-evb.dtb \
+ 	spear320-hmi.dtb
+ dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
+-dtb-$(CONFIG_ARCH_STI)+= stih415-b2000.dtb \
++dtb-$(CONFIG_ARCH_STI)+= stih407-b2120.dtb \
++	stih415-b2000.dtb \
+ 	stih415-b2020.dtb \
+ 	stih416-b2000.dtb \
+ 	stih416-b2020.dtb
+diff --git a/arch/arm/boot/dts/stih407-b2120.dts b/arch/arm/boot/dts/stih407-b2120.dts
+new file mode 100644
+index 0000000..fe69f92
+--- /dev/null
++++ b/arch/arm/boot/dts/stih407-b2120.dts
+@@ -0,0 +1,78 @@
++/*
++ * Copyright (C) 2014 STMicroelectronics (R&D) Limited.
++ * Author: Giuseppe Cavallaro <peppe.cavallaro@st.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
++#include "stih407.dtsi"
++/ {
++	model = "STiH407 B2120";
++	compatible = "st,stih407-b2120", "st,stih407";
++
++	chosen {
++		bootargs = "console=ttyAS0,115200";
++		linux,stdout-path = &sbc_serial0;
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x40000000 0x80000000>;
++	};
++
++	aliases {
++		ttyAS0 = &sbc_serial0;
++	};
++
++	soc {
++		sbc_serial0: serial at 9530000 {
++			status = "okay";
++		};
++
++		leds {
++			compatible = "gpio-leds";
++			red {
++				#gpio-cells = <2>;
++				label = "Front Panel LED";
++				gpios = <&pio4 1 0>;
++				linux,default-trigger = "heartbeat";
++			};
++			green {
++				#gpio-cells = <2>;
++				gpios = <&pio1 3 0>;
++				default-state = "off";
++			};
++		};
++
++		i2c at 9842000 {
++			status = "okay";
++		};
++
++		i2c at 9843000 {
++			status = "okay";
++		};
++
++		i2c at 9844000 {
++			status = "okay";
++		};
++
++		i2c at 9845000 {
++			status = "okay";
++		};
++
++		i2c at 9540000 {
++			status = "okay";
++		};
++
++		/* SSC11 to HDMI */
++		i2c at 9541000 {
++			status = "okay";
++			/* HDMI V1.3a supports Standard mode only */
++			clock-frequency = <100000>;
++			st,i2c-min-scl-pulse-width-us = <0>;
++			st,i2c-min-sda-pulse-width-us = <5>;
++		};
++	};
++};
 -- 
-Regards,
-Ivan Khoronzhuk
+1.9.1
