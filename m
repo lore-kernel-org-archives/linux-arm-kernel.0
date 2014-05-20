@@ -1,285 +1,102 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Tue, 20 May 2014 20:43:49 +0400
-Subject: [PATCH v2] ARM: i.MX1 clk: Add devicetree support
-Message-ID: <1400604231-2672-1-git-send-email-shc_work@mail.ru>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 20 May 2014 09:47:46 -0700
+Subject: [GIT PULL] at91: DT for 3.16 #2
+In-Reply-To: <537B727C.5080404@atmel.com>
+References: <1400059162-630-1-git-send-email-nicolas.ferre@atmel.com>
+ <20140520055041.GO18956@quad.lixom.net>
+ <537B727C.5080404@atmel.com>
+Message-ID: <20140520164746.GA601@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds devicetree support CCM module for i.MX1 (MC9328MX1) CPUs.
+Hi,
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- .../devicetree/bindings/clock/imx1-clock.txt       |  26 ++++
- arch/arm/mach-imx/clk-imx1.c                       | 153 +++++++++++----------
- include/dt-bindings/clock/imx1-clock.h             |  40 ++++++
- 3 files changed, 148 insertions(+), 71 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/imx1-clock.txt
- create mode 100644 include/dt-bindings/clock/imx1-clock.h
+On Tue, May 20, 2014 at 05:19:24PM +0200, Nicolas Ferre wrote:
+> On 20/05/2014 07:50, Olof Johansson :
+> > On Wed, May 14, 2014 at 11:19:22AM +0200, Nicolas Ferre wrote:
+> >> Arnd, Olof, Kevin,
+> >>
+> >> More DT material for AT91. Some fixes that apply on what was merged for 3.15
+> >> but that are not very critical.
+> >> The other patches are feature additions to old or very recent product/board:
+> >> at91sam9261 or sama5d3 Xplained.
+> >>
+> >> Thanks, best regards,
+> >>
+> >> The following changes since commit 27a96a0364787d2b41d2a72d08143d95263e1b07:
+> >>
+> >>   ARM: at91: sama5d3: clock for ssc from rk pin (2014-04-18 22:43:44 +0200)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   git://github.com/at91linux/linux-at91.git tags/at91-dt2
+> >>
+> >> for you to fetch changes up to a93f9c88b7701d1c4c3b22d39d64a408f000a6ef:
+> >>
+> >>   ARM: at91/dt: at91-sama5d3_xplained: add the regulator device node (2014-05-12 16:48:54 +0200)
+> > 
+> > Merged, but:
+> > 
+> >>  arch/arm/boot/dts/at91-sama5d3_xplained.dts |  62 +++++++++++++++
+> >>  arch/arm/boot/dts/at91sam9261.dtsi          | 114 ++++++++++++++++++++++++++--
+> >>  arch/arm/boot/dts/at91sam9rl.dtsi           |   7 +-
+> >>  arch/arm/boot/dts/sama5d3.dtsi              |  78 +++++++++++++++++++
+> > 
+> > Grmbl. I remember being somewhat annoyed that you didn't use at91 prefix
+> > when you introduced the sama5d3 dtsi files, but please don't start using
+> > it on a random board like this, especially when other boards just use
+> > the sama5d3_<board>.dts format.
+> 
+> Well, I don't understand completely. Since our discussion during 3.10
+> merge window ([GIT PULL] at91: DT changes for 3.10 #2), I try to conform
+> to this rule:
+> 
+> 1/ all pre-3.10 and 3.10 device tree file names stay unchanged
+> -> sama5d3.dti (SoC)
+> -> sama5d35ek.dts (board)
+> 
+> 2/ all *SoC* DT files conform to their marking:
+> at91sam9263.dtsi
+> at91sam9rl.dtsi
+> sama5d3.dtsi, sama5d36.dtsi
+> sama5d4.dtsi, sama5d46.dtsi (maybe in the future, who knows...)
+> 
+> 3/ all post-3.10 *boards* have the "at91-" prefix, whether they are
+> populated with sam9 or sama5:
+> at91-ariag25.dts (since 3.10, using a at91sam9g25)
+> at91-qil_a9260.dts (since 3.14, using at91sam9260)
+> at91-sama5d3_xplained.dts (since 3.14, using sama5d36)
+> 
+> The rule for AT91 has never been to prefix the board DT filename with
+> the name of the SoC or SoC family.
 
-diff --git a/Documentation/devicetree/bindings/clock/imx1-clock.txt b/Documentation/devicetree/bindings/clock/imx1-clock.txt
-new file mode 100644
-index 0000000..b7adf4e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/imx1-clock.txt
-@@ -0,0 +1,26 @@
-+* Clock bindings for Freescale i.MX1 CPUs
-+
-+Required properties:
-+- compatible: Should be "fsl,imx1-ccm".
-+- reg: Address and length of the register set.
-+- #clock-cells: Should be <1>.
-+
-+The clock consumer should specify the desired clock by having the clock
-+ID in its "clocks" phandle cell. See include/dt-bindings/clock/imx1-clock.h
-+for the full list of i.MX1 clock IDs.
-+
-+Examples:
-+	clks: ccm at 0021b000 {
-+		#clock-cells = <1>;
-+		compatible = "fsl,imx1-ccm";
-+		reg = <0x0021b000 0x1000>;
-+	};
-+
-+	pwm: pwm at 00208000 {
-+		#pwm-cells = <2>;
-+		compatible = "fsl,imx1-pwm";
-+		reg = <0x00208000 0x1000>;
-+		interrupts = <34>;
-+		clocks = <&clks IMX1_CLK_DUMMY>, <&clks IMX1_CLK_PER1>;
-+		clock-names = "ipg", "per";
-+	};
-diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
-index 7f739be..e9c391b 100644
---- a/arch/arm/mach-imx/clk-imx1.c
-+++ b/arch/arm/mach-imx/clk-imx1.c
-@@ -15,100 +15,111 @@
-  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
-  */
- 
--#include <linux/kernel.h>
--#include <linux/init.h>
- #include <linux/clk.h>
--#include <linux/io.h>
- #include <linux/clkdev.h>
-+#include <linux/clk-provider.h>
- #include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <dt-bindings/clock/imx1-clock.h>
- 
- #include "clk.h"
- #include "common.h"
- #include "hardware.h"
- 
--/* CCM register addresses */
--#define IO_ADDR_CCM(off)	(MX1_IO_ADDRESS(MX1_CCM_BASE_ADDR + (off)))
--
--#define CCM_CSCR	IO_ADDR_CCM(0x0)
--#define CCM_MPCTL0	IO_ADDR_CCM(0x4)
--#define CCM_SPCTL0	IO_ADDR_CCM(0xc)
--#define CCM_PCDR	IO_ADDR_CCM(0x20)
--
--/* SCM register addresses */
--#define IO_ADDR_SCM(off)	(MX1_IO_ADDRESS(MX1_SCM_BASE_ADDR + (off)))
--
--#define SCM_GCCR	IO_ADDR_SCM(0xc)
--
- static const char *prem_sel_clks[] = { "clk32_premult", "clk16m", };
- static const char *clko_sel_clks[] = { "per1", "hclk", "clk48m", "clk16m",
- 				       "prem", "fclk", };
- 
--enum imx1_clks {
--	dummy, clk32, clk16m_ext, clk16m, clk32_premult, prem, mpll, mpll_gate,
--	spll, spll_gate, mcu, fclk, hclk, clk48m, per1, per2, per3, clko,
--	uart3_gate, ssi2_gate, brom_gate, dma_gate, csi_gate, mma_gate,
--	usbd_gate, clk_max
--};
-+static struct clk *clk[IMX1_CLK_MAX];
-+static struct clk_onecell_data clk_data;
- 
--static struct clk *clk[clk_max];
-+static void __iomem *ccm __initdata;
-+#define CCM_CSCR	(ccm + 0x0000)
-+#define CCM_MPCTL0	(ccm + 0x0004)
-+#define CCM_SPCTL0	(ccm + 0x000c)
-+#define CCM_PCDR	(ccm + 0x0020)
-+#define SCM_GCCR	(ccm + 0x0810)
- 
--int __init mx1_clocks_init(unsigned long fref)
-+static void __init _mx1_clocks_init(unsigned long fref)
- {
--	int i;
--
--	clk[dummy] = imx_clk_fixed("dummy", 0);
--	clk[clk32] = imx_clk_fixed("clk32", fref);
--	clk[clk16m_ext] = imx_clk_fixed("clk16m_ext", 16000000);
--	clk[clk16m] = imx_clk_gate("clk16m", "clk16m_ext", CCM_CSCR, 17);
--	clk[clk32_premult] = imx_clk_fixed_factor("clk32_premult", "clk32", 512, 1);
--	clk[prem] = imx_clk_mux("prem", CCM_CSCR, 16, 1, prem_sel_clks,
--			ARRAY_SIZE(prem_sel_clks));
--	clk[mpll] = imx_clk_pllv1("mpll", "clk32_premult", CCM_MPCTL0);
--	clk[mpll_gate] = imx_clk_gate("mpll_gate", "mpll", CCM_CSCR, 0);
--	clk[spll] = imx_clk_pllv1("spll", "prem", CCM_SPCTL0);
--	clk[spll_gate] = imx_clk_gate("spll_gate", "spll", CCM_CSCR, 1);
--	clk[mcu] = imx_clk_divider("mcu", "clk32_premult", CCM_CSCR, 15, 1);
--	clk[fclk] = imx_clk_divider("fclk", "mpll_gate", CCM_CSCR, 15, 1);
--	clk[hclk] = imx_clk_divider("hclk", "spll_gate", CCM_CSCR, 10, 4);
--	clk[clk48m] = imx_clk_divider("clk48m", "spll_gate", CCM_CSCR, 26, 3);
--	clk[per1] = imx_clk_divider("per1", "spll_gate", CCM_PCDR, 0, 4);
--	clk[per2] = imx_clk_divider("per2", "spll_gate", CCM_PCDR, 4, 4);
--	clk[per3] = imx_clk_divider("per3", "spll_gate", CCM_PCDR, 16, 7);
--	clk[clko] = imx_clk_mux("clko", CCM_CSCR, 29, 3, clko_sel_clks,
--			ARRAY_SIZE(clko_sel_clks));
--	clk[uart3_gate] = imx_clk_gate("uart3_gate", "hclk", SCM_GCCR, 6);
--	clk[ssi2_gate] = imx_clk_gate("ssi2_gate", "hclk", SCM_GCCR, 5);
--	clk[brom_gate] = imx_clk_gate("brom_gate", "hclk", SCM_GCCR, 4);
--	clk[dma_gate] = imx_clk_gate("dma_gate", "hclk", SCM_GCCR, 3);
--	clk[csi_gate] = imx_clk_gate("csi_gate", "hclk", SCM_GCCR, 2);
--	clk[mma_gate] = imx_clk_gate("mma_gate", "hclk", SCM_GCCR, 1);
--	clk[usbd_gate] = imx_clk_gate("usbd_gate", "clk48m", SCM_GCCR, 0);
-+	unsigned i;
-+
-+	clk[IMX1_CLK_DUMMY] = imx_clk_fixed("dummy", 0);
-+	clk[IMX1_CLK_CLK32] = imx_obtain_fixed_clock("clk32", fref);
-+	clk[IMX1_CLK_CLK16M_EXT] = imx_clk_fixed("clk16m_ext", 16000000);
-+	clk[IMX1_CLK_CLK16M] = imx_clk_gate("clk16m", "clk16m_ext", CCM_CSCR, 17);
-+	clk[IMX1_CLK_CLK32_PREMULT] = imx_clk_fixed_factor("clk32_premult", "clk32", 512, 1);
-+	clk[IMX1_CLK_PREM] = imx_clk_mux("prem", CCM_CSCR, 16, 1, prem_sel_clks, ARRAY_SIZE(prem_sel_clks));
-+	clk[IMX1_CLK_MPLL] = imx_clk_pllv1("mpll", "clk32_premult", CCM_MPCTL0);
-+	clk[IMX1_CLK_MPLL_GATE] = imx_clk_gate("mpll_gate", "mpll", CCM_CSCR, 0);
-+	clk[IMX1_CLK_SPLL] = imx_clk_pllv1("spll", "prem", CCM_SPCTL0);
-+	clk[IMX1_CLK_SPLL_GATE] = imx_clk_gate("spll_gate", "spll", CCM_CSCR, 1);
-+	clk[IMX1_CLK_MCU] = imx_clk_divider("mcu", "clk32_premult", CCM_CSCR, 15, 1);
-+	clk[IMX1_CLK_FCLK] = imx_clk_divider("fclk", "mpll_gate", CCM_CSCR, 15, 1);
-+	clk[IMX1_CLK_HCLK] = imx_clk_divider("hclk", "spll_gate", CCM_CSCR, 10, 4);
-+	clk[IMX1_CLK_CLK48M] = imx_clk_divider("clk48m", "spll_gate", CCM_CSCR, 26, 3);
-+	clk[IMX1_CLK_PER1] = imx_clk_divider("per1", "spll_gate", CCM_PCDR, 0, 4);
-+	clk[IMX1_CLK_PER2] = imx_clk_divider("per2", "spll_gate", CCM_PCDR, 4, 4);
-+	clk[IMX1_CLK_PER3] = imx_clk_divider("per3", "spll_gate", CCM_PCDR, 16, 7);
-+	clk[IMX1_CLK_CLKO] = imx_clk_mux("clko", CCM_CSCR, 29, 3, clko_sel_clks, ARRAY_SIZE(clko_sel_clks));
-+	clk[IMX1_CLK_UART3_GATE] = imx_clk_gate("uart3_gate", "hclk", SCM_GCCR, 6);
-+	clk[IMX1_CLK_SSI2_GATE] = imx_clk_gate("ssi2_gate", "hclk", SCM_GCCR, 5);
-+	clk[IMX1_CLK_BROM_GATE] = imx_clk_gate("brom_gate", "hclk", SCM_GCCR, 4);
-+	clk[IMX1_CLK_DMA_GATE] = imx_clk_gate("dma_gate", "hclk", SCM_GCCR, 3);
-+	clk[IMX1_CLK_CSI_GATE] = imx_clk_gate("csi_gate", "hclk", SCM_GCCR, 2);
-+	clk[IMX1_CLK_MMA_GATE] = imx_clk_gate("mma_gate", "hclk", SCM_GCCR, 1);
-+	clk[IMX1_CLK_USBD_GATE] = imx_clk_gate("usbd_gate", "clk48m", SCM_GCCR, 0);
- 
- 	for (i = 0; i < ARRAY_SIZE(clk); i++)
- 		if (IS_ERR(clk[i]))
- 			pr_err("imx1 clk %d: register failed with %ld\n",
- 				i, PTR_ERR(clk[i]));
- 
--	clk_register_clkdev(clk[dma_gate], "ahb", "imx1-dma");
--	clk_register_clkdev(clk[hclk], "ipg", "imx1-dma");
--	clk_register_clkdev(clk[per1], "per", "imx-gpt.0");
--	clk_register_clkdev(clk[hclk], "ipg", "imx-gpt.0");
--	clk_register_clkdev(clk[per1], "per", "imx1-uart.0");
--	clk_register_clkdev(clk[hclk], "ipg", "imx1-uart.0");
--	clk_register_clkdev(clk[per1], "per", "imx1-uart.1");
--	clk_register_clkdev(clk[hclk], "ipg", "imx1-uart.1");
--	clk_register_clkdev(clk[per1], "per", "imx1-uart.2");
--	clk_register_clkdev(clk[uart3_gate], "ipg", "imx1-uart.2");
--	clk_register_clkdev(clk[hclk], NULL, "imx1-i2c.0");
--	clk_register_clkdev(clk[per2], "per", "imx1-cspi.0");
--	clk_register_clkdev(clk[dummy], "ipg", "imx1-cspi.0");
--	clk_register_clkdev(clk[per2], "per", "imx1-cspi.1");
--	clk_register_clkdev(clk[dummy], "ipg", "imx1-cspi.1");
--	clk_register_clkdev(clk[per2], "per", "imx1-fb.0");
--	clk_register_clkdev(clk[dummy], "ipg", "imx1-fb.0");
--	clk_register_clkdev(clk[dummy], "ahb", "imx1-fb.0");
-+	clk_register_clkdev(clk[IMX1_CLK_PER1], "per", "imx-gpt.0");
-+	clk_register_clkdev(clk[IMX1_CLK_HCLK], "ipg", "imx-gpt.0");
-+}
-+
-+int __init mx1_clocks_init(unsigned long fref)
-+{
-+	ccm = MX1_IO_ADDRESS(MX1_CCM_BASE_ADDR);
-+
-+	_mx1_clocks_init(fref);
-+
-+	clk_register_clkdev(clk[IMX1_CLK_DMA_GATE], "ahb", "imx1-dma");
-+	clk_register_clkdev(clk[IMX1_CLK_HCLK], "ipg", "imx1-dma");
-+	clk_register_clkdev(clk[IMX1_CLK_PER1], "per", "imx1-uart.0");
-+	clk_register_clkdev(clk[IMX1_CLK_HCLK], "ipg", "imx1-uart.0");
-+	clk_register_clkdev(clk[IMX1_CLK_PER1], "per", "imx1-uart.1");
-+	clk_register_clkdev(clk[IMX1_CLK_HCLK], "ipg", "imx1-uart.1");
-+	clk_register_clkdev(clk[IMX1_CLK_PER1], "per", "imx1-uart.2");
-+	clk_register_clkdev(clk[IMX1_CLK_UART3_GATE], "ipg", "imx1-uart.2");
-+	clk_register_clkdev(clk[IMX1_CLK_HCLK], NULL, "imx1-i2c.0");
-+	clk_register_clkdev(clk[IMX1_CLK_PER2], "per", "imx1-cspi.0");
-+	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ipg", "imx1-cspi.0");
-+	clk_register_clkdev(clk[IMX1_CLK_PER2], "per", "imx1-cspi.1");
-+	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ipg", "imx1-cspi.1");
-+	clk_register_clkdev(clk[IMX1_CLK_PER2], "per", "imx1-fb.0");
-+	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ipg", "imx1-fb.0");
-+	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ahb", "imx1-fb.0");
- 
- 	mxc_timer_init(MX1_IO_ADDRESS(MX1_TIM1_BASE_ADDR), MX1_TIM1_INT);
- 
- 	return 0;
- }
-+
-+static void __init mx1_clocks_init_dt(struct device_node *np)
-+{
-+	ccm = of_iomap(np, 0);
-+	BUG_ON(!ccm);
-+
-+	_mx1_clocks_init(32768);
-+
-+	clk_data.clks = clk;
-+	clk_data.clk_num = ARRAY_SIZE(clk);
-+	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-+
-+	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx1-gpt"));
-+}
-+CLK_OF_DECLARE(imx1_ccm, "fsl,imx1-ccm", mx1_clocks_init_dt);
-diff --git a/include/dt-bindings/clock/imx1-clock.h b/include/dt-bindings/clock/imx1-clock.h
-new file mode 100644
-index 0000000..607bf01
---- /dev/null
-+++ b/include/dt-bindings/clock/imx1-clock.h
-@@ -0,0 +1,40 @@
-+/*
-+ * Copyright (C) 2014 Alexander Shiyan <shc_work@mail.ru>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#ifndef __DT_BINDINGS_CLOCK_IMX1_H
-+#define __DT_BINDINGS_CLOCK_IMX1_H
-+
-+#define IMX1_CLK_DUMMY		0
-+#define IMX1_CLK_CLK32		1
-+#define IMX1_CLK_CLK16M_EXT	2
-+#define IMX1_CLK_CLK16M		3
-+#define IMX1_CLK_CLK32_PREMULT	4
-+#define IMX1_CLK_PREM		5
-+#define IMX1_CLK_MPLL		6
-+#define IMX1_CLK_MPLL_GATE	7
-+#define IMX1_CLK_SPLL		8
-+#define IMX1_CLK_SPLL_GATE	9
-+#define IMX1_CLK_MCU		10
-+#define IMX1_CLK_FCLK		11
-+#define IMX1_CLK_HCLK		12
-+#define IMX1_CLK_CLK48M		13
-+#define IMX1_CLK_PER1		14
-+#define IMX1_CLK_PER2		15
-+#define IMX1_CLK_PER3		16
-+#define IMX1_CLK_CLKO		17
-+#define IMX1_CLK_UART3_GATE	18
-+#define IMX1_CLK_SSI2_GATE	19
-+#define IMX1_CLK_BROM_GATE	20
-+#define IMX1_CLK_DMA_GATE	21
-+#define IMX1_CLK_CSI_GATE	22
-+#define IMX1_CLK_MMA_GATE	23
-+#define IMX1_CLK_USBD_GATE	24
-+#define IMX1_CLK_MAX		25
-+
-+#endif
--- 
-1.8.5.5
+So, going back and looking at the discussion from a year ago, I think the
+disconnect was in what consistency we were looking for. Yes, we would have
+preferred to prefix the sama5d3* dts/dtsis with at91, and you even
+offered to do it. ;-) But I think even more important for sanity is
+to stay consistent with how we handle all platforms, which is that the
+board dts files are prefixed with the SoC name.
+
+In the past, we've had cases where this didn't happen, but these days we have
+tried to be very consistent on it. I.e. omap3*, exynos<##>*, etc.
+
+So, if you have at91- as a prefix, have the SoC as the second component. But
+that gets awkward too, so I would juts use the current SoC dtsi as the prefix
+at91sam9263-<boardname>.dts, or sama5d35_<boardname>.dts.
+
+> > Care to fix this up in time for 3.16 merge window?
+> 
+> Well, I do not know what to fix as the files were already present in
+> mainline before this kernel revision and that I am a little bit
+> reluctant to change file names after they are merged in mainline.
+> 
+> Now, can we keep the current policy described above (somehow weird, I
+> admit) for future SoCs and boards?
+
+It is unfortunate that I didn't catch this for 3.14 so that name has been
+there in a release. I guess the least disruptive thing for now would be
+to change over to use the SoC dtsi prefix for any new board files from
+here on out, and treat at91-sama5d3_xplained as a one-time thing.
+
+
+-Olof
