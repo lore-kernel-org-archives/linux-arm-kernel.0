@@ -1,49 +1,46 @@
-From: archit@ti.com (Archit Taneja)
-Date: Tue, 20 May 2014 11:01:19 +0530
-Subject: [PATCH 00/11] ARM: OMAP: OMAP5 & AM43x DSS
-In-Reply-To: <5375C8E8.1020209@ti.com>
-References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
- <5370CBD5.3060107@ti.com> <20140512143604.GB31772@atomide.com>
- <5370E172.20009@ti.com> <20140512154850.GG31772@atomide.com>
- <5375C8E8.1020209@ti.com>
-Message-ID: <537AE8A7.4080307@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 19 May 2014 22:36:27 -0700
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Clock Updates
+ for v3.16
+In-Reply-To: <cover.1399967342.git.horms+renesas@verge.net.au>
+References: <cover.1399967342.git.horms+renesas@verge.net.au>
+Message-ID: <20140520053627.GL18956@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, May 13, 2014 at 05:03:28PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these second round of
+> Renesas ARM based SoC clock updates for v3.16.
+> 
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-clock-for-v3.16,
+> which you have already pulled.
+> 
+> 
+> The following changes since commit 932616eed0308cbebbb20a079e4bed3674bf1117:
+> 
+>   ARM: shmobile: r8a7790: remove old style audio clock (2014-04-14 12:49:43 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clock2-for-v3.16
+> 
+> for you to fetch changes up to a505daa501dc3f02b08d0b48b049bce719299b74:
+> 
+>   ARM: shmobile: r8a7791: Correct SYS-DMAC clock defines (2014-05-13 10:16:42 +0900)
+> 
+> ----------------------------------------------------------------
+> Second Round of Renesas ARM Based SoC Clock Updates for v3.16
+> 
+> r8a7791 (R-Car M2) SoC
+> * Correct SYS-DMAC clock defines
+> 
+> r8a7740 (R-Mobile A1) SoC
+> * Correct name of DT Ethernet clock
 
-On Friday 16 May 2014 01:44 PM, Tomi Valkeinen wrote:
-> On 12/05/14 18:48, Tony Lindgren wrote:
->
->>>> Also, I'm wondering why we still have .clk and .opt_clks entries in the
->>>> hwmod data for am43xx and omap5 which are both device tree based with
->>>> all the clocks coming from .dts files?
->>>
->>> I think they are needed for the omap_device/hwmod stuff to work. Only
->>> omapdss driver knows about the clocks defined in the .dts files, and the
->>> omap_device/hwmod code still needs to do the reset and maybe some other
->>> tasks that require the clocks.
->>
->> We're already populating the hwmod data from dts entries, that's done by
->> omap_device_build_from_dt. Why aren't we doing that for dt defined clocks?
->>
->> I'd rather not start adding new data that will then just be removed, that's
->> what people call "pointless extra churn".
->
-> I don't know why. I have to say I'm not 100% sure if that's done or not,
-> but at least I can't find where it's done.
+Merged, thanks.
 
-The reason why clocks are needed from hwmod data is because we still 
-don't populate hwmod fields like main_clk and opt_clock from DT clocks.
 
-The reason why this isn't done yet is because we currently haven't 
-figured out a clean way to tell hwmod what clock is the main_clk, and 
-what clocks are optional clocks.
-
-One of the proposed methods was to assume the clock named to be "fck" as 
-main_clk, and the remaining clocks as optional clocks for hwmod. That 
-method wasn't agreed upon, this looks like the thread which discusses this:
-
-http://marc.info/?l=linux-arm-kernel&m=138928084823142&w=2
-
-Archit
+-Olof
