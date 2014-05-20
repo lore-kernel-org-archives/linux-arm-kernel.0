@@ -1,88 +1,61 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 May 2014 19:10:30 -0700
-Subject: [GIT PULL 1/3] omap non urgent fixes for v3.16 merge window, resend
-Message-ID: <20140520021029.GK15793@atomide.com>
+Date: Mon, 19 May 2014 19:11:52 -0700
+Subject: [GIT PULL 2/3] omap pm changes for v3.16 merge window, resend
+Message-ID: <20140520021151.GL15793@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The following changes since commit 89ca3b881987f5a4be4c5dbaa7f0df12bbdde2fd:
 
-Here are three pull requests that never made the lists
-on the 8th of May as I have something still wrong with
-my scripts it seems. Anyways, these should be fine pulled
-out of order, if in doubt see my temporary merge branch
-at omap-for-v3.16/tmp-merge-2014-05-19.
-
-The following changes since commit fb677ef70b65e22cd4401d31b700a8b4041efae1:
-
-  ARM: OMAP2+: Fix GPMC remap for devices using an offset (2014-04-23 11:09:22 -0700)
+  Linux 3.15-rc4 (2014-05-04 18:14:42 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/fixes-not-urgent-signed
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/pm-signed
 
-for you to fetch changes up to e610c9d3aeca8d7335803f816ae2e39e5103233e:
+for you to fetch changes up to 57b05572267581c2320462e9b606709fa6da4c5a:
 
-  Merge branch 'pull/l3noc/dts-fixes' of https://github.com/nmenon/linux-2.6-playground into omap-for-v3.16/fixes-not-urgent (2014-05-08 08:02:57 -0700)
-
-----------------------------------------------------------------
-
-Non urgent omap fixes for v3.16 merge window.
+  ARM: OMAP2+: Enable CPUidle in omap2plus_defconfig (2014-05-06 15:45:15 -0700)
 
 ----------------------------------------------------------------
-Afzal Mohammed (1):
-      ARM: dts: AM4372: add l3-noc information
+PM related fixes for omap3 that were discovered during omap3
+conversion to device tree. This series sets up the PMIC signaling
+in a way where we can test for PM regressions easily by
+looking at state of the the sys_clkreq and sys_off_mode pins.
 
-Dave Gerlach (1):
-      ARM: dts: am437x-gp-evm: Do not reset gpio5
+Note that this series alone does not make omap3 PM to cut
+off core voltage during off-idle, changes to twl4030-power.c
+configurations are still needed. Those will be posted
+separately.
 
-Javier Martinez Canillas (1):
-      ARM: dts: omap3-igep0020: use SMSC9221 timings
+----------------------------------------------------------------
+Tony Lindgren (10):
+      mfd: twl-core: Fix idle mode signaling for omaps when booted with device tree
+      Merge tag 'ib-mfd-omap-3.16' of git://git.kernel.org/.../lee/mfd into omap-for-v3.16/pm
+      ARM: dts: Fix omap serial wake-up when booted with device tree
+      ARM: OMAP3: Fix idle mode signaling for sys_clkreq and sys_off_mode
+      ARM: OMAP3: Disable broken omap3_set_off_timings function
+      ARM: OMAP3: Fix voltage control for deeper idle states
+      ARM: dts: Configure omap3 twl4030 I2C4 pins by default
+      ARM: OMAP2+: Fix voltage scaling init for device tree
+      ARM: dts: Enable N900 keyboard sleep leds by default
+      ARM: OMAP2+: Enable CPUidle in omap2plus_defconfig
 
-Joel Fernandes (2):
-      ARM: OMAP5: Switch to THUMB mode if needed on secondary CPU
-      ARM: OMAP5: Redo THUMB mode switch on secondary CPU
-
-Johan Hovold (1):
-      ARM: dts: am335x-boneblack: remove use of ti,vcc-aux-disable-is-sleep
-
-Oussama Ghorbel (1):
-      ARM: OMAP2+: free use_gptimer_clksrc variable after boot
-
-Pekon Gupta (1):
-      ARM: dts: am43xx: fix starting offset of NAND.filesystem MTD partition
-
-Rajendra Nayak (1):
-      ARM: dts: DRA7: Use dra7-l3-noc instead of omap4-l3-noc
-
-Suman Anna (3):
-      ARM: dts: OMAP5: Add mailbox dt node to fix boot warning
-      ARM: dts: OMAP2: Fix interrupts for OMAP2420 mailbox
-      ARM: dts: AM3517: Disable absent IPs inherited from OMAP3
-
-Tony Lindgren (4):
-      ARM: dts: Fix bad OTG muxing for cm-t boards
-      ARM: dts: Fix GPMC Ethernet timings for omap cm-t sbc-t boards for device tree
-      ARM: dts: Fix GPMC timings for LAN9220
-      Merge branch 'pull/l3noc/dts-fixes' of https://github.com/nmenon/linux-2.6-playground into omap-for-v3.16/fixes-not-urgent
-
- arch/arm/boot/dts/am335x-boneblack.dts    |  1 -
- arch/arm/boot/dts/am3517.dtsi             | 16 ++++++++
- arch/arm/boot/dts/am4372.dtsi             |  6 ++-
- arch/arm/boot/dts/am437x-gp-evm.dts       |  5 +++
- arch/arm/boot/dts/am43x-epos-evm.dts      |  2 +-
- arch/arm/boot/dts/dra7.dtsi               |  6 +--
- arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi | 19 ++++-----
- arch/arm/boot/dts/omap2.dtsi              |  7 ----
- arch/arm/boot/dts/omap2420.dtsi           |  8 ++++
- arch/arm/boot/dts/omap2430.dtsi           |  7 ++++
- arch/arm/boot/dts/omap3-cm-t3x30.dtsi     | 66 +++++++------------------------
- arch/arm/boot/dts/omap3-igep.dtsi         |  2 +-
- arch/arm/boot/dts/omap3-igep0020.dts      |  4 +-
- arch/arm/boot/dts/omap3-sb-t35.dtsi       | 37 +++++------------
- arch/arm/boot/dts/omap3-sbc-t3517.dts     | 13 ++++++
- arch/arm/boot/dts/omap3.dtsi              |  2 +-
- arch/arm/boot/dts/omap5.dtsi              |  7 ++++
- arch/arm/mach-omap2/omap-headsmp.S        |  6 +--
- arch/arm/mach-omap2/timer.c               |  2 +-
- 19 files changed, 106 insertions(+), 110 deletions(-)
+ arch/arm/boot/dts/omap3-evm-37xx.dts      |   9 ++
+ arch/arm/boot/dts/omap3-ldp.dts           |   4 +
+ arch/arm/boot/dts/omap3-n900.dts          |  19 +++
+ arch/arm/boot/dts/omap3.dtsi              |   6 +-
+ arch/arm/boot/dts/omap4-panda-common.dtsi |  15 ++
+ arch/arm/boot/dts/omap4-sdp.dts           |   6 +
+ arch/arm/boot/dts/omap4.dtsi              |   6 +-
+ arch/arm/boot/dts/twl4030_omap3.dtsi      |  19 ++-
+ arch/arm/configs/omap2plus_defconfig      |   8 ++
+ arch/arm/mach-omap2/omap_twl.c            |  60 --------
+ arch/arm/mach-omap2/pm.c                  |  28 ++--
+ arch/arm/mach-omap2/pm34xx.c              |   4 +
+ arch/arm/mach-omap2/prm-regbits-34xx.h    |  11 +-
+ arch/arm/mach-omap2/vc.c                  | 232 ++++++++++++++++++++----------
+ arch/arm/mach-omap2/vc.h                  |   3 +
+ drivers/mfd/twl-core.c                    |  15 ++
+ include/dt-bindings/pinctrl/omap.h        |  12 ++
+ 17 files changed, 296 insertions(+), 161 deletions(-)
