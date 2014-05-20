@@ -1,53 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 May 2014 10:48:27 -0700
-Subject: [PATCH 1/7] mfd: twl4030-power: Fix hang on reboot if sleep
- configuration was loaded earlier
-In-Reply-To: <20140520173705.GA1458@lee--X1>
-References: <1400031250-29542-1-git-send-email-tony@atomide.com>
- <1400031250-29542-2-git-send-email-tony@atomide.com>
- <20140520150119.GW24991@lee--X1>
- <20140520150748.GD27830@atomide.com>
- <20140520173705.GA1458@lee--X1>
-Message-ID: <20140520174827.GF27830@atomide.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 20 May 2014 10:48:43 -0700
+Subject: [RFC PATCH 2/5] clk: Introduce 'clk_round_rate_nearest()'
+In-Reply-To: <4bb5f44a-60bb-4e34-8f88-f91b8419be8d@BL2FFO11FD050.protection.gbl>
+References: <1400106655-22465-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1400106655-22465-3-git-send-email-soren.brinkmann@xilinx.com>
+ <20140515073816.GI16662@pengutronix.de>
+ <91822600-39d0-4e71-b0f5-9eda35b76ec0@BN1AFFO11FD016.protection.gbl>
+ <20140519161949.GG16662@pengutronix.de>
+ <db8633e5-01a9-4d3a-80e8-74e23a456d52@BN1BFFO11FD051.protection.gbl>
+ <20140520073358.GJ16662@pengutronix.de>
+ <4bb5f44a-60bb-4e34-8f88-f91b8419be8d@BL2FFO11FD050.protection.gbl>
+Message-ID: <537B957B.5010001@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lee Jones <lee.jones@linaro.org> [140520 10:38]:
-> > > > Looks like we can still hit the issue of wrong load order of
-> > > > twl4030 configuration. If we have a sleep configuration loaded,
-> > > > and do a warm reset, the device can hang while initializing the
-> > > > wakeup12 sequence. We do have a warning message about wrong order
-> > > > of twl4030 configuration, but in this case it does not help as
-> > > > the sleep configuration was loaded during the previous boot and
-> > > > the state of twl4030 is maintained throughout the warm reset.
-> > > > 
-> > > > Fix the issue by clearing any existing sleep configuration
-> > > > before we load the warm reset configuration.
-> > > > 
-> > > > Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> > > > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > > > ---
-> > > >  drivers/mfd/twl4030-power.c | 6 ++++++
-> > > >  1 file changed, 6 insertions(+)
-> > > 
-> > > Can't vouch for the semantics of the patch, but the code looks good.
-> > > 
-> > >   Acked-by: Lee Jones <lee.jones@linaro.org>
-> > > 
-> > > Can I just apply this, or would you like Peter to review it first?
-> > 
-> > As far as I'm concerned you can go ahead an apply, it's been
-> > floating on the list for a while and Peter is probably busy
-> > with other things.
-> 
-> No problem.  Just a couple of things for you to look at in the other
-> patches, then we can go ahead and apply for v3.16.
+On 05/20/14 09:01, S?ren Brinkmann wrote:
+>
+>>>>> +{
+>>>>> +	unsigned long lower, upper, cur, lower_last, upper_last;
+>>>>> +
+>>>>> +	lower = clk_round_rate(clk, rate);
+>>>>> +	if (lower >= rate)
+>>>>> +		return lower;
+>>>> Is the >-case worth a warning?
+>>> No, it's correct behavior. If you request a rate that is way lower than what the
+>>> clock can generate, returning something larger is perfectly valid, IMHO.
+>>> Which reveals one problem in this whole discussion. The API does not
+>>> require clk_round_rate() to round down. It is actually an implementation
+>>> choice that had been made for clk-divider.
+>> I'm sure it's more than an implementation choice for clk-divider. But I
+>> don't find any respective documentation (but I didn't try hard).
+> A similar discussion - without final conclusion:
+> https://lkml.org/lkml/2010/7/14/260
+>
+>
 
-OK thanks yeah saw those. Will fix them up and test today. Then
-maybe you can apply them to the immutable branch we set earlier
-or I can send you a pull request against that branch whichever
-you prefer.
+Please call this new API something like clk_find_nearest_rate() or
+something. clk_round_rate() is supposed to return the rate that will be
+set if you call clk_set_rate() with the same arguments. It's up to the
+implementation to decide if that means rounding the rate up or down or
+to the nearest value.
 
-Regards,
-
-Tony
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
