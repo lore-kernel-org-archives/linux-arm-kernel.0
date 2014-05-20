@@ -1,141 +1,223 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Tue, 20 May 2014 20:02:50 +0800
-Subject: [PATCH 1/3] hix5hd2-clock: add complex clk
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1724924B@AcuExch.aculab.com>
-References: <1400504227-12047-1-git-send-email-zhangfei.gao@linaro.org>
- <1400504227-12047-2-git-send-email-zhangfei.gao@linaro.org>
- <063D6719AE5E284EB5DD2968C1650D6D1724924B@AcuExch.aculab.com>
-Message-ID: <537B446A.2080500@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 20 May 2014 14:02:43 +0200
+Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <10711669.TTjp9L4tTG@wuerfel>
+References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
+ <5759340.gycj7cP1t3@wuerfel> <20140520110536.GA10302@ulmo>
+ <10711669.TTjp9L4tTG@wuerfel>
+Message-ID: <20140520120242.GA20995@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear David
+On Tue, May 20, 2014 at 01:15:48PM +0200, Arnd Bergmann wrote:
+> On Tuesday 20 May 2014 13:05:37 Thierry Reding wrote:
+> > On Tue, May 20, 2014 at 12:04:54PM +0200, Arnd Bergmann wrote:
+> > > On Monday 19 May 2014 22:59:46 Thierry Reding wrote:
+> > > > On Mon, May 19, 2014 at 08:34:07PM +0200, Arnd Bergmann wrote:
+[...]
+> > > > > You should never need #size-cells > #address-cells
+> > > > 
+> > > > That was always my impression as well. But how then do you represent the
+> > > > full 4 GiB address space in a 32-bit system? It starts at 0 and ends at
+> > > > 4 GiB - 1, which makes it 4 GiB large. That's:
+> > > > 
+> > > > 	<0 1 0>
+> > > > 
+> > > > With #address-cells = <1> and #size-cells = <1> the best you can do is:
+> > > > 
+> > > > 	<0 0xffffffff>
+> > > > 
+> > > > but that's not accurate.
+> > > 
+> > > I think we've done both in the past, either extended #size-cells or
+> > > taken 0xffffffff as a special token. Note that in your example,
+> > > the iommu actually needs #address-cells = <2> anyway.
+> > 
+> > But it needs #address-cells = <2> only to encode an ID in addition to
+> > the address. If this was a single-master IOMMU then there'd be no need
+> > for the ID.
+> 
+> Right. But for a single-master IOMMU, there is no need to specify
+> any additional data, it could have #address-cells=<0> if we take the
+> optimization you suggested.
 
-On 05/19/2014 09:11 PM, David Laight wrote:
-> From: Zhangfei Gao
-> ...
->> diff --git a/drivers/clk/hisilicon/clk-hix5hd2.c b/drivers/clk/hisilicon/clk-hix5hd2.c
->> index e5fcfb4..1b1347f 100644
->> --- a/drivers/clk/hisilicon/clk-hix5hd2.c
->> +++ b/drivers/clk/hisilicon/clk-hix5hd2.c
->> @@ -9,6 +9,8 @@
->>
->>   #include <linux/of_address.h>
->>   #include <dt-bindings/clock/hix5hd2-clock.h>
->> +#include <linux/slab.h>
->> +#include <linux/delay.h>
->>   #include "clk.h"
->>
->>   static struct hisi_fixed_rate_clock hix5hd2_fixed_rate_clks[] __initdata = {
->> @@ -79,8 +81,186 @@ static struct hisi_gate_clock hix5hd2_gate_clks[] __initdata = {
->>   		CLK_SET_RATE_PARENT, 0xa0, 1, 0, },
->>   	{ HIX5HD2_MMC_CIU_RST, "rst_mmc_ciu", "clk_mmc_ciu",
->>   		CLK_SET_RATE_PARENT, 0xa0, 4, CLK_GATE_SET_TO_DISABLE, },
->> +	/*gsf*/
->> +	{ HIX5HD2_FWD_BUS_CLK, "clk_fwd_bus", NULL, 0, 0xcc, 0, 0, },
->> +	{ HIX5HD2_FWD_SYS_CLK, "clk_fwd_sys", "clk_fwd_bus", 0, 0xcc, 5, 0, },
->> +	{ HIX5HD2_MAC0_PHY_CLK, "clk_fephy", "clk_fwd_sys",
->> +		 CLK_SET_RATE_PARENT, 0x120, 0, 0, },
->>   };
->>
->> +enum {TYPE_COMPLEX, TYPE_ETHER};
->
-> Shouldn't this be a named enum to make it more obvious
-> where the values should be used?
-Yes, it's better.
->
->> +
->> +struct hix5hd2_complex_clock {
->> +	unsigned int	id;
->
-> Reorder the fields to avoid the implicit pad here.
-Curious, what's the impact if there is a pad.
-It may inconsistent with other table.
+Couldn't a single-master IOMMU be windowed?
 
->
->> +	const char	*name;
->> +	const char	*parent_name;
->> +	u32		ctrl_reg;
->> +	u32		ctrl_clk_mask;
->> +	u32		ctrl_rst_mask;
->> +	u32		phy_reg;
->> +	u32		phy_clk_mask;
->> +	u32		phy_rst_mask;
->> +	u32		type;
->> +};
->> +
->> +struct hix5hd2_clk_complex {
->> +	struct clk_hw	hw;
->> +	u32		id;
->> +	void __iomem	*ctrl_reg;
->> +	u32		ctrl_clk_mask;
->> +	u32		ctrl_rst_mask;
->> +	void __iomem	*phy_reg;
->> +	u32		phy_clk_mask;
->> +	u32		phy_rst_mask;
->> +};
->> +
->> +static struct hix5hd2_complex_clock hix5hd2_complex_clks[] __initdata = {
->> +	{HIX5HD2_MAC0_CLK, "clk_mac0", "clk_fephy",
->> +		0xcc, 0xa, 0x500, 0x120, 0, 0x10, TYPE_ETHER},
->> +	{HIX5HD2_MAC1_CLK, "clk_mac1", "clk_fwd_sys",
->> +		0xcc, 0x14, 0xa00, 0x168, 0x2, 0, TYPE_ETHER},
->> +	{HIX5HD2_SATA_CLK, "clk_sata", NULL,
->> +		0xa8, 0x1f, 0x300, 0xac, 0x1, 0x0, TYPE_COMPLEX},
->> +	{HIX5HD2_USB_CLK, "clk_usb", NULL,
->> +		0xb8, 0xff, 0x3f00, 0xbc, 0x7, 0x3f00, TYPE_COMPLEX},
->> +};
->> +
->> +#define to_complex_clk(_hw) container_of(_hw, struct hix5hd2_clk_complex, hw)
->> +
->> +static int clk_ether_enable(struct clk_hw *hw)
->> +{
->> +	struct hix5hd2_clk_complex *clk = to_complex_clk(hw);
->> +	u32 val;
->> +
->> +	val = readl(clk->ctrl_reg);
->> +	val |= clk->ctrl_clk_mask | clk->ctrl_rst_mask;
->> +	writel(val, clk->ctrl_reg);
->> +	udelay(50);
->> +	val &= ~(clk->ctrl_rst_mask);
->> +	writel(val, clk->ctrl_reg);
->
-> I'd need to be convinced that the udelay() has the desired effect.
-> I suspect you are trying to assert reset for a minimum period.
-Yes, it is just want to make sure the reset takeing effect.
-In fact, it works without udelay here, it is not required as timing as 
-the following mdelay.
+> > I'm not sure I understand the need for 0x100 (all IDs) entry above. If
+> > bus1's iommus property applies to all devices on the bus, why can't the
+> > ID 0xb be listed in the iommus property?
+> > 
+> > 	bus1 {
+> > 		#address-cells = <1>;
+> > 		#size-cells = <1>;
+> > 		ranges;
+> > 		iommus = <&{/iommu} 0xb 0  0x1 0x0>; // 4GB ID '0xb'
+> > 		dma-ranges = <0  0xb 0  0x1 0x0>;
+> > 
+> > 		anothermaster {
+> > 			...
+> > 		};
+> > 	};
+> 
+> It depends on how the address is interpreted, but we could make this
+> a valid case too.
+> 
+> > In which case I guess dma-ranges would be redundant.
+> 
+> No, because the iommus property doesn't translate the address range, it
+> just creates a new address space. bus1 and iommu in the example have
+> different #address-cells, so you definitely need a non-empty ranges
+> property.
 
-> However the first write can be 'posted' by all sorts of hardware
-> for all sorts of reasons - so the writes can actually be back to back.
-Sorry, not understand.
-Do you mean the first write will not take effect immediately, so the two 
-write happens continuously.
-What's the recommended behavior?
+Ah, now I get it.
 
-Will use readl_relaxed & writel_relaxed instead.
+> > > The main advantage I think would be for IOMMUs that use the PCI b/d/f
+> > > numbers as IDs. These can have #address-cells=<3>, #size-cells=<2>
+> > > and have an empty dma-ranges property in the PCI host bridge node,
+> > > and interpret this as using the same encoding as the PCI BARs in
+> > > the ranges property.
+> > 
+> > I'm somewhat confused here, since you said earlier:
+> > 
+> > > After giving the ranges stuff some more thought, I have come to the
+> > > conclusion that using #iommu-cells should work fine for almost
+> > > all cases, including windowed iommus, because the window is not
+> > > actually needed in the device, but only in the iommu, wihch is of course
+> > > free to interpret the arguments as addresses.
+> > 
+> > But now you seem to be saying that we should still be using the
+> > #address-cells and #size-cells properties in the IOMMU node to determine
+> > the length of the specifier.
+> 
+> I probably wasn't clear. I think we can make it work either way, but
+> my feeling is that using #address-cells/#size-cells gives us a nicer
+> syntax for the more complex cases.
 
->
-> 	David
->
->> +
->> +	val = readl(clk->phy_reg);
->> +	val |= clk->phy_clk_mask;
->> +	val &= ~(clk->phy_rst_mask);
->> +	writel(val, clk->phy_reg);
->> +	mdelay(10);
->> +
->> +	val &= ~(clk->phy_clk_mask);
->> +	val |= clk->phy_rst_mask;
->> +	writel(val, clk->phy_reg);
->> +	mdelay(10);
->> +
->> +	val |= clk->phy_clk_mask;
->> +	val &= ~(clk->phy_rst_mask);
->> +	writel(val, clk->phy_reg);
->> +	mdelay(30);
->> +	return 0;
->> +}
->> +
+Okay, so in summary we'd have something like this for simple cases:
 
-Thanks
+Required properties:
+--------------------
+- #address-cells: The number of cells in an IOMMU specifier needed to encode
+  an address.
+- #size-cells: The number of cells in an IOMMU specifier needed to represent
+  the length of an address range.
+
+Typical values for the above include:
+- #address-cells = <0>, size-cells = <0>: Single master IOMMU devices are not
+  configurable and therefore no additional information needs to be encoded in
+  the specifier. This may also apply to multiple master IOMMU devices that do
+  not allow the association of masters to be configured.
+- #address-cells = <1>, size-cells = <0>: Multiple master IOMMU devices may
+  need to be configured in order to enable translation for a given master. In
+  such cases the single address cell corresponds to the master device's ID.
+- #address-cells = <2>, size-cells = <2>: Some IOMMU devices allow the DMA
+  window for masters to be configured. The first cell of the address in this
+  may contain the master device's ID for example, while the second cell could
+  contain the start of the DMA window for the given device. The length of the
+  DMA window is specified by two additional cells.
+
+Examples:
+=========
+
+Single-master IOMMU:
+--------------------
+
+	iommu {
+		#address-cells = <0>;
+		#size-cells = <0>;
+	};
+
+	master {
+		iommus = <&/iommu>;
+	};
+
+Multiple-master IOMMU with fixed associations:
+----------------------------------------------
+
+	/* multiple-master IOMMU */
+	iommu {
+		/*
+		 * Masters are statically associated with this IOMMU and
+		 * address translation is always enabled.
+		 */
+		#iommu-cells = <0>;
+	};
+
+	/* static association with IOMMU */
+	master at 1 {
+		reg = <1>;
+		iommus = <&/iommu>;
+	};
+
+	/* static association with IOMMU */
+	master at 2 {
+		reg = <2>;
+		iommus = <&/iommu>;
+	};
+
+Multiple-master IOMMU:
+----------------------
+
+	iommu {
+		/* the specifier represents the ID of the master */
+		#address-cells = <1>;
+		#size-cells = <0>;
+	};
+
+	master {
+		/* device has master ID 42 in the IOMMU */
+		iommus = <&/iommu 42>;
+	};
+
+Multiple-master device:
+-----------------------
+
+	/* single-master IOMMU */
+	iommu at 1 {
+		reg = <1>;
+		#address-cells = <0>;
+		#size-cells = <0>;
+	};
+
+	/* multiple-master IOMMU */
+	iommu at 2 {
+		reg = <2>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+	};
+
+	/* device with two master interfaces */
+	master {
+		iommus = <&/iommu@1>,    /* master of the single-master IOMMU */
+			 <&/iommu@2 42>; /* ID 42 in multiple-master IOMMU */
+	};
+
+Multiple-master IOMMU with configurable DMA window:
+---------------------------------------------------
+
+	/ {
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		iommu {
+			/* master ID, address of DMA window */
+			#address-cells = <2>;
+			#size-cells = <2>;
+		};
+
+		master {
+			/* master ID 42, 4 GiB DMA window starting at 0 */
+			iommus = <&/iommu  42 0  0x1 0x0>;
+		};
+	};
+
+Does that sound about right?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/928a8df0/attachment-0001.sig>
