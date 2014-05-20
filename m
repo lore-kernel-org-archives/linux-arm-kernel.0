@@ -1,170 +1,121 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 20 May 2014 09:22:25 -0700
-Subject: [PATCH 3/4] arm64: export effective Image size to bootloaders
-In-Reply-To: <1400233839-15140-4-git-send-email-mark.rutland@arm.com>
-References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
- <1400233839-15140-4-git-send-email-mark.rutland@arm.com>
-Message-ID: <537B8141.3070408@codeaurora.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 20 May 2014 18:21:06 +0200
+Subject: [PATCH v4 03/20] arm64: GICv3 device tree binding documentation
+In-Reply-To: <8761l031q7.fsf@approximate.cambridge.arm.com>
+References: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>	<1400176719-31275-4-git-send-email-marc.zyngier@arm.com>	<537B6D9E.4000801@arm.com>
+ <8761l031q7.fsf@approximate.cambridge.arm.com>
+Message-ID: <537B80F2.3080102@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/16/2014 2:50 AM, Mark Rutland wrote:
-> Currently the kernel Image is stripped of everything past the initial
-> stack, and at runtime the memory is initialised and used by the kernel.
-> This makes the effective minimum memory footprint of the kernel larger
-> than the size of the loaded binary, though bootloaders have no mechanism
-> to identify how large this minimum memory footprint is. This makes it
-> difficult to choose safe locations to place both the kernel and other
-> binaries required at boot (DTB, initrd, etc), such that the kernel won't
-> clobber said binaries or other reserved memory during initialisation.
-> 
-> Additionally when big endian support was added the image load offset was
-> overlooked, and is currently of an arbitrary endianness, which makes it
-> difficult for bootloaders to make use of it. It seems that bootloaders
-> aren't respecting the image load offset at present anyway, and are
-> assuming that offset 0x80000 will always be correct.
-> 
-> This patch adds an effective image size to the kernel header which
-> describes the amount of memory from the start of the kernel Image binary
-> which the kernel expects to use before detecting memory and handling any
-> memory reservations. This can be used by bootloaders to choose suitable
-> locations to load the kernel and/or other binaries such that the kernel
-> will not clobber any memory unexpectedly. As before, memory reservations
-> are required to prevent the kernel from clobbering these locations
-> later.
-> 
-> Both the image load offset and the effective image size are forced to be
-> little-endian regardless of the native endianness of the kernel to
-> enable bootloaders to load a kernel of arbitrary endianness. Bootloaders
-> which wish to make use of the load offset can inspect the effective
-> image size field for a non-zero value to determine if the offset is of a
-> known endianness.
-> 
-> The documentation is updated to clarify these details. To discourage
-> future assumptions regarding the value of text_offset, the value at this
-> point in time is removed from the main flow of the documentation (though
-> kept as a compatibility note).
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> ---
->  Documentation/arm64/booting.txt | 28 +++++++++++++++++++++++-----
->  arch/arm64/kernel/head.S        |  4 ++--
->  arch/arm64/kernel/vmlinux.lds.S | 28 ++++++++++++++++++++++++++++
->  3 files changed, 53 insertions(+), 7 deletions(-)
-> 
-> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-> index beb754e..0d8201c 100644
-> --- a/Documentation/arm64/booting.txt
-> +++ b/Documentation/arm64/booting.txt
-> @@ -72,8 +72,8 @@ The decompressed kernel image contains a 64-byte header as follows:
->  
->    u32 code0;			/* Executable code */
->    u32 code1;			/* Executable code */
-> -  u64 text_offset;		/* Image load offset */
-> -  u64 res0	= 0;		/* reserved */
-> +  u64 text_offset;		/* Image load offset, little endian */
-> +  u64 image_size;		/* Effective Image size, little endian */
->    u64 res1	= 0;		/* reserved */
->    u64 res2	= 0;		/* reserved */
->    u64 res3	= 0;		/* reserved */
-> @@ -86,9 +86,27 @@ Header notes:
->  
->  - code0/code1 are responsible for branching to stext.
->  
-> -The image must be placed at the specified offset (currently 0x80000)
-> -from the start of the system RAM and called there. The start of the
-> -system RAM must be aligned to 2MB.
-> +- Older kernel versions did not define the endianness of text_offset.
-> +  In these cases image_size is zero and text_offset is 0x80000 in the
-> +  endianness of the kernel. Where image_size is non-zero image_size is
-> +  little-endian and must be respected.
-> +
-> +- When image_size is zero, a bootloader should attempt to keep as much
-> +  memory as possible free for use by the kernel immediately after the
-> +  end of the kernel image. Typically 1MB should be sufficient for this
-> +  case.
-> +
-> +The Image must be placed text_offset bytes from a 2MB aligned base
-> +address near the start of usable system RAM and called there. Memory
-> +below that base address is currently unusable by Linux, and therefore it
-> +is strongly recommended that this location is the start of system RAM.
-> +At least image_size bytes from the start of the image must be free for
-> +use by the kernel.
-> +
-> +Any memory described to the kernel (even that below the 2MB aligned base
-> +address) which is not marked as reserved from the kernel e.g. with a
-> +memreserve region in the device tree) will be considered as available to
-> +the kernel.
->  
->  Before jumping into the kernel, the following conditions must be met:
->  
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 5dd8127..542ca97 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -98,8 +98,8 @@
->  	 */
->  	b	stext				// branch to kernel start, magic
->  	.long	0				// reserved
-> -	.quad	TEXT_OFFSET			// Image load offset from start of RAM
-> -	.quad	0				// reserved
-> +	.quad	_kernel_offset_le		// Image load offset from start of RAM, little-endian
-> +	.quad	_kernel_size_le			// Effective size of kernel image, little-endian
->  	.quad	0				// reserved
->  	.quad	0				// reserved
->  	.quad	0				// reserved
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index 51258bc..21a8ad1 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -30,6 +30,25 @@ jiffies = jiffies_64;
->  	*(.hyp.text)					\
->  	VMLINUX_SYMBOL(__hyp_text_end) = .;
->  
-> +/*
-> + * There aren't any ELF relocations we can use to endian-swap values known only
-> + * at link time (e.g. the subtraction of two symbol addresses), so we must get
-> + * the linker to endian-swap certain values before emitting them.
-> + */
-> +#ifdef CONFIG_CPU_BIG_ENDIAN
-> +#define DATA_LE64(data)					\
-> +	((((data) & 0x00000000000000ff) << 56) |	\
-> +	 (((data) & 0x000000000000ff00) << 40) |	\
-> +	 (((data) & 0x0000000000ff0000) << 24) |	\
-> +	 (((data) & 0x00000000ff000000) << 8)  |	\
-> +	 (((data) & 0x000000ff00000000) >> 8)  |	\
-> +	 (((data) & 0x0000ff0000000000) >> 24) |	\
-> +	 (((data) & 0x00ff000000000000) >> 40) |	\
-> +	 (((data) & 0xff00000000000000) >> 56))
-> +#else
-> +#define DATA_LE64(data) ((data) & 0xffffffffffffffff)
-> +#endif
-> +
->  SECTIONS
->  {
->  	/*
-> @@ -114,6 +133,15 @@ SECTIONS
->  	_end = .;
->  
->  	STABS_DEBUG
-> +
-> +	/*
-> +	 * These will output as part of the Image header, which should be
-> +	 * little-endian regardless of the endianness of the kernel. While
-> +	 * constant values could be endian swapped in head.S, all are done here
-> +	 * for consistency.
-> +	 */
-> +	_kernel_size_le = DATA_LE64(_end - _text);
-> +	_kernel_offset_le = DATA_LE64(TEXT_OFFSET);
->  }
->  
->  /*
-> 
+On 05/20/2014 05:32 PM, Marc Zyngier wrote:
 
-Tested-by: Laura Abbott <lauraa@codeaurora.org>
+Hi Marc,
 
-Both 4K and 64K pages
+>
+> On Tue, May 20 2014 at  3:58:38 pm BST, Andre Przywara <andre.przywara@arm.com> wrote:
+>> On 05/15/2014 07:58 PM, Marc Zyngier wrote:
+>>> Add the necessary documentation to support GICv3.
+>>>
+>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>>> Acked-by: Rob Herring <robh@kernel.org>
+>>> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/arm/gic-v3.txt | 79
+>>> ++++++++++++++++++++++++
+>>>  1 file changed, 79 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/arm/gic-v3.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/gic-v3.txt
+>>> b/Documentation/devicetree/bindings/arm/gic-v3.txt
+>>> new file mode 100644
+>>> index 0000000..33cd05e
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/arm/gic-v3.txt
+>>> @@ -0,0 +1,79 @@
+>>> +* ARM Generic Interrupt Controller, version 3
+>>> +
+>>> +AArch64 SMP cores are often associated with a GICv3, providing Private
+>>> +Peripheral Interrupts (PPI), Shared Peripheral Interrupts (SPI),
+>>> +Software Generated Interrupts (SGI), and Locality-specific Peripheral
+>>> +Interrupts (LPI).
+>>> +
+>>> +Main node required properties:
+>>> +
+>>> +- compatible : should at least contain  "arm,gic-v3".
+>>> +- interrupt-controller : Identifies the node as an interrupt controller
+>>> +- #interrupt-cells : Specifies the number of cells needed to encode an
+>>> +  interrupt source. Must be a single cell with a value of at least 3.
+>>> +
+>>> +  The 1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI
+>>> +  interrupts. Other values are reserved for future use.
+>>> +
+>>> +  The 2nd cell contains the interrupt number for the interrupt type.
+>>> +  SPI interrupts are in the range [0-987]. PPI interrupts are in the
+>>> +  range [0-15].
+>>> +
+>>> +  The 3rd cell is the flags, encoded as follows:
+>>> +   bits[3:0] trigger type and level flags.
+>>> +           1 = edge triggered
+>>> +           4 = level triggered
+>>> +
+>>> +  Cells 4 and beyond are reserved for future use. When the 1st cell
+>>> +  has a value of 0 or 1, cells 4 and beyond act as padding, and may be
+>>> +  ignored. It is recommended that padding cells have a value of 0.
+>>> +
+>>> +- reg : Specifies base physical address(s) and size of the GIC
+>>> +  registers, in the following order:
+>>> +  - GIC Distributor interface (GICD)
+>>> +  - GIC Redistributors (GICR), one range per redistributor region
+>>> +  - GIC CPU interface (GICC)
+>>> +  - GIC Hypervisor interface (GICH)
+>>> +  - GIC Virtual CPU interface (GICV)
+>>> +
+>>> +  GICC, GICH and GICV are optional.
+>>
+>> I wonder if it should be noted here that a lack of these last three
+>> regions denies GICv2 emulation support for KVM guests.
+>
+> Only the lack of the last one prevents KVM from emulating a GICv2. But
+> that's a software support issue, and does not impact the hardware
+> description (which is what we're doing in this patch).
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+But the lack of hardware vGICv2 compat support is a hardware feature.
+Either the GIC(v3) hardware supports it or not. Currently I am
+"guessing" this in my patch series based on the existence of these
+addresses in the DT. Based on this bit I allow an instantiation of a
+virtual GICv2 in the guest or require a GICv3.
+I'd just like to see this documented.
+
+> KVM can still use software emulation of GICv2 (just like we did back in
+> the days...).
+
+But KVM would need to know whether it can use the hardware emulation
+bits or not. I am fine with deducing this from the existence of some
+registers, but would like to see this officially stated here.
+
+Cheers,
+Andre.
+
+>> It's probably not worth to introduce a special property for this v2
+>> compat support, but if the lack of these registers is indicating that
+>> fact, it should be added here.
+>
+> Absence of these ranges just indicates that the OS must be GICv3 aware
+> to boot (i.e can't be GICv2 only).
+> I don't think that how this
+> information is used for guests is relevant to the DT documentation.
+>
+> Thanks,
+>
+>       M.
+>
+
+
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+
+ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
+ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
