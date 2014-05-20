@@ -1,32 +1,198 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 20 May 2014 16:45:28 +0800
-Subject: [PATCH 10/20] ARM: imx5: call mxc_timer_init_dt() on imx51
+Date: Tue, 20 May 2014 16:45:31 +0800
+Subject: [PATCH 13/20] ARM: imx5: use dynamic mapping for CCM block
 In-Reply-To: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
 References: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1400575538-21136-11-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1400575538-21136-14-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since i.MX51 supports DT only, it's more appropriate to call
-mxc_timer_init_dt() than mxc_timer_init() to initialize timer.
+Replace the static mapping of CCM block with dynamic mapping and
+retrieve CCM base address from device tree.  Though it's not nice to
+encode the variable ccm_base in macros, it helps to avoid a massive
+churn on the code.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-imx/clk-imx51-imx53.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-imx/clk-imx51-imx53.c | 90 +++++++++++++++++++++----------------
+ 1 file changed, 51 insertions(+), 39 deletions(-)
 
 diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 67f686e..972b24c 100644
+index c8c88df..9eb54a8 100644
 --- a/arch/arm/mach-imx/clk-imx51-imx53.c
 +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -449,7 +449,7 @@ static void __init mx51_clocks_init(struct device_node *np)
- 	clk_set_rate(clk[IMX5_CLK_ESDHC_B_PODF], 166250000);
+@@ -22,7 +22,6 @@
+ #include "common.h"
+ #include "hardware.h"
  
- 	/* System timer */
--	mxc_timer_init(MX51_IO_ADDRESS(MX51_GPT1_BASE_ADDR), MX51_INT_GPT);
-+	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx51-gpt"));
+-#define MX51_CCM_BASE		MX51_IO_ADDRESS(MX51_CCM_BASE_ADDR)
+ #define MX51_DPLL1_BASE		MX51_IO_ADDRESS(MX51_PLL1_BASE_ADDR)
+ #define MX51_DPLL2_BASE		MX51_IO_ADDRESS(MX51_PLL2_BASE_ADDR)
+ #define MX51_DPLL3_BASE		MX51_IO_ADDRESS(MX51_PLL3_BASE_ADDR)
+@@ -31,40 +30,40 @@
+ #define MX53_DPLL3_BASE		MX53_IO_ADDRESS(MX53_PLL3_BASE_ADDR)
+ #define MX53_DPLL4_BASE		MX53_IO_ADDRESS(MX53_PLL4_BASE_ADDR)
  
- 	clk_prepare_enable(clk[IMX5_CLK_IIM_GATE]);
- 	imx_print_silicon_rev("i.MX51", mx51_revision());
+-#define MXC_CCM_CCR		(MX51_CCM_BASE + 0x00)
+-#define MXC_CCM_CCDR		(MX51_CCM_BASE + 0x04)
+-#define MXC_CCM_CSR		(MX51_CCM_BASE + 0x08)
+-#define MXC_CCM_CCSR		(MX51_CCM_BASE + 0x0c)
+-#define MXC_CCM_CACRR		(MX51_CCM_BASE + 0x10)
+-#define MXC_CCM_CBCDR		(MX51_CCM_BASE + 0x14)
+-#define MXC_CCM_CBCMR		(MX51_CCM_BASE + 0x18)
+-#define MXC_CCM_CSCMR1		(MX51_CCM_BASE + 0x1c)
+-#define MXC_CCM_CSCMR2		(MX51_CCM_BASE + 0x20)
+-#define MXC_CCM_CSCDR1		(MX51_CCM_BASE + 0x24)
+-#define MXC_CCM_CS1CDR		(MX51_CCM_BASE + 0x28)
+-#define MXC_CCM_CS2CDR		(MX51_CCM_BASE + 0x2c)
+-#define MXC_CCM_CDCDR		(MX51_CCM_BASE + 0x30)
+-#define MXC_CCM_CHSCDR		(MX51_CCM_BASE + 0x34)
+-#define MXC_CCM_CSCDR2		(MX51_CCM_BASE + 0x38)
+-#define MXC_CCM_CSCDR3		(MX51_CCM_BASE + 0x3c)
+-#define MXC_CCM_CSCDR4		(MX51_CCM_BASE + 0x40)
+-#define MXC_CCM_CWDR		(MX51_CCM_BASE + 0x44)
+-#define MXC_CCM_CDHIPR		(MX51_CCM_BASE + 0x48)
+-#define MXC_CCM_CDCR		(MX51_CCM_BASE + 0x4c)
+-#define MXC_CCM_CTOR		(MX51_CCM_BASE + 0x50)
+-#define MXC_CCM_CLPCR		(MX51_CCM_BASE + 0x54)
+-#define MXC_CCM_CISR		(MX51_CCM_BASE + 0x58)
+-#define MXC_CCM_CIMR		(MX51_CCM_BASE + 0x5c)
+-#define MXC_CCM_CCOSR		(MX51_CCM_BASE + 0x60)
+-#define MXC_CCM_CGPR		(MX51_CCM_BASE + 0x64)
+-#define MXC_CCM_CCGR0		(MX51_CCM_BASE + 0x68)
+-#define MXC_CCM_CCGR1		(MX51_CCM_BASE + 0x6c)
+-#define MXC_CCM_CCGR2		(MX51_CCM_BASE + 0x70)
+-#define MXC_CCM_CCGR3		(MX51_CCM_BASE + 0x74)
+-#define MXC_CCM_CCGR4		(MX51_CCM_BASE + 0x78)
+-#define MXC_CCM_CCGR5		(MX51_CCM_BASE + 0x7c)
+-#define MXC_CCM_CCGR6		(MX51_CCM_BASE + 0x80)
+-#define MXC_CCM_CCGR7		(MX51_CCM_BASE + 0x84)
++#define MXC_CCM_CCR		(ccm_base + 0x00)
++#define MXC_CCM_CCDR		(ccm_base + 0x04)
++#define MXC_CCM_CSR		(ccm_base + 0x08)
++#define MXC_CCM_CCSR		(ccm_base + 0x0c)
++#define MXC_CCM_CACRR		(ccm_base + 0x10)
++#define MXC_CCM_CBCDR		(ccm_base + 0x14)
++#define MXC_CCM_CBCMR		(ccm_base + 0x18)
++#define MXC_CCM_CSCMR1		(ccm_base + 0x1c)
++#define MXC_CCM_CSCMR2		(ccm_base + 0x20)
++#define MXC_CCM_CSCDR1		(ccm_base + 0x24)
++#define MXC_CCM_CS1CDR		(ccm_base + 0x28)
++#define MXC_CCM_CS2CDR		(ccm_base + 0x2c)
++#define MXC_CCM_CDCDR		(ccm_base + 0x30)
++#define MXC_CCM_CHSCDR		(ccm_base + 0x34)
++#define MXC_CCM_CSCDR2		(ccm_base + 0x38)
++#define MXC_CCM_CSCDR3		(ccm_base + 0x3c)
++#define MXC_CCM_CSCDR4		(ccm_base + 0x40)
++#define MXC_CCM_CWDR		(ccm_base + 0x44)
++#define MXC_CCM_CDHIPR		(ccm_base + 0x48)
++#define MXC_CCM_CDCR		(ccm_base + 0x4c)
++#define MXC_CCM_CTOR		(ccm_base + 0x50)
++#define MXC_CCM_CLPCR		(ccm_base + 0x54)
++#define MXC_CCM_CISR		(ccm_base + 0x58)
++#define MXC_CCM_CIMR		(ccm_base + 0x5c)
++#define MXC_CCM_CCOSR		(ccm_base + 0x60)
++#define MXC_CCM_CGPR		(ccm_base + 0x64)
++#define MXC_CCM_CCGR0		(ccm_base + 0x68)
++#define MXC_CCM_CCGR1		(ccm_base + 0x6c)
++#define MXC_CCM_CCGR2		(ccm_base + 0x70)
++#define MXC_CCM_CCGR3		(ccm_base + 0x74)
++#define MXC_CCM_CCGR4		(ccm_base + 0x78)
++#define MXC_CCM_CCGR5		(ccm_base + 0x7c)
++#define MXC_CCM_CCGR6		(ccm_base + 0x80)
++#define MXC_CCM_CCGR7		(ccm_base + 0x84)
+ 
+ /* Low-power Audio Playback Mode clock */
+ static const char *lp_apm_sel[] = { "osc", };
+@@ -129,7 +128,7 @@ static const char *mx51_spdif1_com_sel[] = { "spdif1_podf", "ssi2_root_gate", };
+ static struct clk *clk[IMX5_CLK_END];
+ static struct clk_onecell_data clk_data;
+ 
+-static void __init mx5_clocks_common_init(void)
++static void __init mx5_clocks_common_init(void __iomem *ccm_base)
+ {
+ 	int i;
+ 
+@@ -363,6 +362,7 @@ static void __init mx5_clocks_common_init(void)
+ 
+ static void __init mx50_clocks_init(struct device_node *np)
+ {
++	void __iomem *ccm_base;
+ 	unsigned long r;
+ 	int i;
+ 
+@@ -370,6 +370,9 @@ static void __init mx50_clocks_init(struct device_node *np)
+ 	clk[IMX5_CLK_PLL2_SW]		= imx_clk_pllv2("pll2_sw", "osc", MX53_DPLL2_BASE);
+ 	clk[IMX5_CLK_PLL3_SW]		= imx_clk_pllv2("pll3_sw", "osc", MX53_DPLL3_BASE);
+ 
++	ccm_base = of_iomap(np, 0);
++	WARN_ON(!ccm_base);
++
+ 	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 10, 1,
+ 						lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
+ 	clk[IMX5_CLK_ESDHC1_PER_GATE]	= imx_clk_gate2("esdhc1_per_gate", "esdhc_a_podf", MXC_CCM_CCGR3, 2);
+@@ -399,7 +402,7 @@ static void __init mx50_clocks_init(struct device_node *np)
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 
+-	mx5_clocks_common_init();
++	mx5_clocks_common_init(ccm_base);
+ 
+ 	/* set SDHC root clock to 200MHZ*/
+ 	clk_set_rate(clk[IMX5_CLK_ESDHC_A_PODF], 200000000);
+@@ -418,12 +421,17 @@ CLK_OF_DECLARE(imx50_ccm, "fsl,imx50-ccm", mx50_clocks_init);
+ 
+ static void __init mx51_clocks_init(struct device_node *np)
+ {
++	void __iomem *ccm_base;
+ 	int i;
+ 	u32 val;
+ 
+ 	clk[IMX5_CLK_PLL1_SW]		= imx_clk_pllv2("pll1_sw", "osc", MX51_DPLL1_BASE);
+ 	clk[IMX5_CLK_PLL2_SW]		= imx_clk_pllv2("pll2_sw", "osc", MX51_DPLL2_BASE);
+ 	clk[IMX5_CLK_PLL3_SW]		= imx_clk_pllv2("pll3_sw", "osc", MX51_DPLL3_BASE);
++
++	ccm_base = of_iomap(np, 0);
++	WARN_ON(!ccm_base);
++
+ 	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 9, 1,
+ 						lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
+ 	clk[IMX5_CLK_IPU_DI0_SEL]	= imx_clk_mux("ipu_di0_sel", MXC_CCM_CSCMR2, 26, 3,
+@@ -465,7 +473,7 @@ static void __init mx51_clocks_init(struct device_node *np)
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 
+-	mx5_clocks_common_init();
++	mx5_clocks_common_init(ccm_base);
+ 
+ 	clk_register_clkdev(clk[IMX5_CLK_HSI2C_GATE], NULL, "imx21-i2c.2");
+ 	clk_register_clkdev(clk[IMX5_CLK_MX51_MIPI], "mipi_hsp", NULL);
+@@ -517,6 +525,7 @@ CLK_OF_DECLARE(imx51_ccm, "fsl,imx51-ccm", mx51_clocks_init);
+ 
+ static void __init mx53_clocks_init(struct device_node *np)
+ {
++	void __iomem *ccm_base;
+ 	int i;
+ 	unsigned long r;
+ 
+@@ -525,6 +534,9 @@ static void __init mx53_clocks_init(struct device_node *np)
+ 	clk[IMX5_CLK_PLL3_SW]		= imx_clk_pllv2("pll3_sw", "osc", MX53_DPLL3_BASE);
+ 	clk[IMX5_CLK_PLL4_SW]		= imx_clk_pllv2("pll4_sw", "osc", MX53_DPLL4_BASE);
+ 
++	ccm_base = of_iomap(np, 0);
++	WARN_ON(!ccm_base);
++
+ 	clk[IMX5_CLK_LP_APM]		= imx_clk_mux("lp_apm", MXC_CCM_CCSR, 10, 1,
+ 						lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
+ 	clk[IMX5_CLK_LDB_DI1_DIV_3_5]	= imx_clk_fixed_factor("ldb_di1_div_3_5", "ldb_di1_sel", 2, 7);
+@@ -583,7 +595,7 @@ static void __init mx53_clocks_init(struct device_node *np)
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 
+-	mx5_clocks_common_init();
++	mx5_clocks_common_init(ccm_base);
+ 
+ 	clk_register_clkdev(clk[IMX5_CLK_I2C3_GATE], NULL, "imx21-i2c.2");
+ 	clk_register_clkdev(clk[IMX5_CLK_FEC_GATE], NULL, "imx25-fec.0");
 -- 
 1.8.3.2
