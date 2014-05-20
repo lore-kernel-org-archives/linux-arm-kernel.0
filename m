@@ -1,67 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 May 2014 22:40:50 +0200
-Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140520163912.GC5041@e103592.cambridge.arm.com>
-References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
- <20140520152659.GA30404@arm.com>
- <20140520163912.GC5041@e103592.cambridge.arm.com>
-Message-ID: <4511166.2tFHJMxbnG@wuerfel>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 20 May 2014 22:55:26 +0200
+Subject: [PATCH 2/2] ARM: sun6i: Add MMC0 controller to the Colombus board
+In-Reply-To: <1400600866-29938-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1400600866-29938-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1400600866-29938-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <537BC13E.4080901@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 May 2014 17:39:12 Dave Martin wrote:
-> On Tue, May 20, 2014 at 04:26:59PM +0100, Will Deacon wrote:
-> > On Tue, May 20, 2014 at 02:23:47PM +0100, Arnd Bergmann wrote:
-> > > 	Bit#   33222222 22221111 11111100 00000000
-> > > 	       10987654 32109876 54321098 76543210
-> > > phys.hi cell:  npt000ss bbbbbbbb dddddfff rrrrrrrr
-> > > phys.mid cell: hhhhhhhh hhhhhhhh hhhhhhhh hhhhhhhh
-> > > phys.lo cell:  llllllll llllllll llllllll llllllll
-> > > 
-> > > where:
-> > > n is 0 if the address is relocatable, 1 otherwise
-> > > p is 1 if the addressable region is "prefetchable", 0 otherwise
-> > > t is 1 if the address is aliased (for non-relocatable I/O),
-> > >  below 1 MB (for Memory), or below 64 KB (for relocatable I/O).
-> > > ss is the space code, denoting the address space
-> > > bbbbbbbb is the 8-bit Bus Number
-> > > ddddd is the 5-bit Device Number
-> > > fff is the 3-bit Function Number
-> > > rrrrrrrr is the 8-bit Register Number
-> > > hh...hh is a 32-bit unsigned number
-> > > ll...ll is a 32-bit unsigned number
-> > > 
-> > > We can ignore n, p, t and r here, and use the same format for a DMA
-> > > address, then define an empty "dma-ranges" property. That would
-> > > imply that using b/d/f is sufficient to identify each master at the
-> > > iommu. Any device outside of the PCI host but connected to the same
-> > > iommu can use the same notation to list the logical b/d/f that gets
-> > > sent to the IOMMU in bus master transactions.
-> > > 
-> > > Do you think this is sufficient for the ARM SMMU, or do we need
-> > > something beyond that?
-> > 
-> > I think it can define the common-cases for the existing implementations,
-> > yes. I anticipate Stream-IDs becoming > 16-bit in the near future though,
-> > so we'd need extra bits if we're describing other devices coming into the
-> > SMMU.
-> > 
-> > Note that we already have a binding for the current SMMU driver, so I'm not
-> > really in a position to shift over to a new binding until the next version of
-> > the SMMU architecture comes along...
-> 
-> How much code relies on the meaning of the nptsbdf bits?
+Hi,
 
-Not much at all, I think this was defined mostly for open firmware
-client interfaces, which we don't use with FDT.
+On 05/20/2014 05:47 PM, Maxime Ripard wrote:
+> The Colombus has a full size SD slot wired to the MMC0 controller. In order to
+> work, the MMC lines have to have the pull-ups enabled though.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>   arch/arm/boot/dts/sun6i-a31-colombus.dts | 27 +++++++++++++++++++++++++++
+>   1 file changed, 27 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun6i-a31-colombus.dts b/arch/arm/boot/dts/sun6i-a31-colombus.dts
+> index 3898a7bce831..e2cf2f3646bf 100644
+> --- a/arch/arm/boot/dts/sun6i-a31-colombus.dts
+> +++ b/arch/arm/boot/dts/sun6i-a31-colombus.dts
+> @@ -13,6 +13,7 @@
+>
+>   /dts-v1/;
+>   /include/ "sun6i-a31.dtsi"
+> +/include/ "sunxi-common-regulators.dtsi"
+>
+>   / {
+>   	model = "WITS A31 Colombus Evaluation Board";
+> @@ -23,6 +24,32 @@
+>   	};
+>
+>   	soc at 01c00000 {
+> +		mmc0: mmc at 01c0f000 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&mmc0_pins_colombus>, <&mmc0_cd_pin_colombus>;
+> +			vmmc-supply = <&reg_vcc3v0>;
+> +			bus-width = <4>;
+> +			cd-gpios = <&pio 0 8 0>; /* PA8 */
+> +			cd-inverted;
+> +			status = "okay";
+> +		};
+> +
+> +		pio: pinctrl at 01c20800 {
+> +			mmc0_pins_colombus: mmc0 at 0 {
+> +				allwinner,pins = "PF0","PF1","PF2","PF3","PF4","PF5";
+> +				allwinner,function = "mmc0";
+> +				allwinner,drive = <2>;
+> +				allwinner,pull = <1>;
+> +			};
 
-n, t and r are probably only used in PCI functions that are listed
-in DT, not in the host bridge.
+You could just use mmc0_pins_a here and only set allwinner,pull.
 
-b/d/f I think is mostly used for the interrupt-maps property, when
-describing hardwired interrupts.
+Other then that both patches are:
 
-p and s are used when setting up the translation for inbound MMIO
-and PIO.
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 
-	Arnd
+Regards,
+
+Hans
