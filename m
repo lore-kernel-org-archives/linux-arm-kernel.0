@@ -1,106 +1,202 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 20 May 2014 16:45:33 +0800
-Subject: [PATCH 15/20] ARM: imx5: reuse clock CCM mapping in pm code
+Date: Tue, 20 May 2014 16:45:35 +0800
+Subject: [PATCH 17/20] ARM: imx5: move init hooks into mach-imx5x.c
 In-Reply-To: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
 References: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1400575538-21136-16-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1400575538-21136-18-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx5 pm code needs to access CCM registers.  Let's remove the use
-of CCM static mapping in pm code by reusing the dynamic mapping created
-in clock code.
+These imx5 init_early[late] hooks are called only from mach-imx5x.c.
+Let's move them into mach-imx5x.c.
+
+While at it, replace the static mapping in imx51_ipu_mipi_setup() with
+dynamic mapping.  Also this function and imx_src_init() do not
+necessarily to be called at .init_early hook, so move them into
+.init_machine.
+
+The mxc_iomux_v3_init() is dropped from imx51_init_early() in the
+moving, since it's only needed by non-DT boot.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-imx/clk-imx51-imx53.c |  2 ++
- arch/arm/mach-imx/common.h          |  2 ++
- arch/arm/mach-imx/pm-imx5.c         | 17 +++++++++++++----
- 3 files changed, 17 insertions(+), 4 deletions(-)
+ arch/arm/mach-imx/common.h     |  4 ----
+ arch/arm/mach-imx/mach-imx51.c | 39 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/mach-imx53.c | 11 +++++++++++
+ arch/arm/mach-imx/mm-imx5.c    | 44 ------------------------------------------
+ 4 files changed, 50 insertions(+), 48 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 4b69183..4e95865 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -133,6 +133,8 @@ static void __init mx5_clocks_common_init(void __iomem *ccm_base)
- {
- 	int i;
- 
-+	imx5_pm_set_ccm_base(ccm_base);
-+
- 	clk[IMX5_CLK_DUMMY]		= imx_clk_fixed("dummy", 0);
- 	clk[IMX5_CLK_CKIL]		= imx_obtain_fixed_clock("ckil", 0);
- 	clk[IMX5_CLK_OSC]		= imx_obtain_fixed_clock("osc", 0);
 diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 1d6cf4d..8aa198c 100644
+index 1156bf6..b480f0b 100644
 --- a/arch/arm/mach-imx/common.h
 +++ b/arch/arm/mach-imx/common.h
-@@ -143,8 +143,10 @@ void imx6q_pm_set_ccm_base(void __iomem *base);
- 
- #ifdef CONFIG_PM
- void imx5_pm_init(void);
-+void imx5_pm_set_ccm_base(void __iomem *base);
- #else
- static inline void imx5_pm_init(void) {}
-+static inline void imx5_pm_set_ccm_base(void __iomem *base) {}
- #endif
- 
- #ifdef CONFIG_NEON
-diff --git a/arch/arm/mach-imx/pm-imx5.c b/arch/arm/mach-imx/pm-imx5.c
-index 7dfd005..3544c25 100644
---- a/arch/arm/mach-imx/pm-imx5.c
-+++ b/arch/arm/mach-imx/pm-imx5.c
-@@ -21,8 +21,7 @@
- #include "cpuidle.h"
- #include "hardware.h"
- 
--#define MX51_CCM_BASE			MX51_IO_ADDRESS(MX51_CCM_BASE_ADDR)
--#define MXC_CCM_CLPCR			(MX51_CCM_BASE + 0x54)
-+#define MXC_CCM_CLPCR			0x54
- #define MXC_CCM_CLPCR_LPM_OFFSET	0
- #define MXC_CCM_CLPCR_LPM_MASK		0x3
- #define MXC_CCM_CLPCR_STBY_COUNT_OFFSET	9
-@@ -57,6 +56,13 @@
+@@ -34,8 +34,6 @@ void imx25_init_early(void);
+ void imx27_init_early(void);
+ void imx31_init_early(void);
+ void imx35_init_early(void);
+-void imx51_init_early(void);
+-void imx53_init_early(void);
+ void mxc_init_irq(void __iomem *);
+ void tzic_init_irq(void);
+ void mx1_init_irq(void);
+@@ -50,8 +48,6 @@ void imx25_soc_init(void);
+ void imx27_soc_init(void);
+ void imx31_soc_init(void);
+ void imx35_soc_init(void);
+-void imx51_init_late(void);
+-void imx53_init_late(void);
+ void epit_timer_init(void __iomem *base, int irq);
+ void mxc_timer_init(void __iomem *, int);
+ void mxc_timer_init_dt(struct device_node *);
+diff --git a/arch/arm/mach-imx/mach-imx51.c b/arch/arm/mach-imx/mach-imx51.c
+index a849d43..a2027d2 100644
+--- a/arch/arm/mach-imx/mach-imx51.c
++++ b/arch/arm/mach-imx/mach-imx51.c
+@@ -10,6 +10,7 @@
+  * http://www.gnu.org/copyleft/gpl.html
   */
- #define IMX5_DEFAULT_CPU_IDLE_STATE WAIT_UNCLOCKED_POWER_OFF
  
-+static void __iomem *ccm_base;
-+
-+void __init imx5_pm_set_ccm_base(void __iomem *base)
++#include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+@@ -17,18 +18,56 @@
+ #include <asm/mach/time.h>
+ 
+ #include "common.h"
++#include "hardware.h"
+ #include "mx51.h"
+ 
++static void __init imx51_init_early(void)
 +{
-+	ccm_base = base;
++	mxc_set_cpu_type(MXC_CPU_MX51);
 +}
 +
- /*
-  * set cpu low power mode before WFI instruction. This function is called
-  * mx5 because it can be used for mx51, and mx53.
-@@ -70,7 +76,8 @@ static void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
- 	/* always allow platform to issue a deep sleep mode request */
- 	plat_lpc = __raw_readl(MXC_CORTEXA8_PLAT_LPC) &
- 	    ~(MXC_CORTEXA8_PLAT_LPC_DSM);
--	ccm_clpcr = __raw_readl(MXC_CCM_CLPCR) & ~(MXC_CCM_CLPCR_LPM_MASK);
-+	ccm_clpcr = __raw_readl(ccm_base + MXC_CCM_CLPCR) &
-+		    ~(MXC_CCM_CLPCR_LPM_MASK);
- 	arm_srpgcr = __raw_readl(MXC_SRPG_ARM_SRPGCR) & ~(MXC_SRPGCR_PCR);
- 	empgc0 = __raw_readl(MXC_SRPG_EMPGC0_SRPGCR) & ~(MXC_SRPGCR_PCR);
- 	empgc1 = __raw_readl(MXC_SRPG_EMPGC1_SRPGCR) & ~(MXC_SRPGCR_PCR);
-@@ -108,7 +115,7 @@ static void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
- 	}
- 
- 	__raw_writel(plat_lpc, MXC_CORTEXA8_PLAT_LPC);
--	__raw_writel(ccm_clpcr, MXC_CCM_CLPCR);
-+	__raw_writel(ccm_clpcr, ccm_base + MXC_CCM_CLPCR);
- 	__raw_writel(arm_srpgcr, MXC_SRPG_ARM_SRPGCR);
- 	__raw_writel(arm_srpgcr, MXC_SRPG_NEON_SRPGCR);
- 
-@@ -188,6 +195,8 @@ static int __init imx5_pm_common_init(void)
- 
- 	arm_pm_idle = imx5_pm_idle;
- 
-+	WARN_ON(!ccm_base);
++/*
++ * The MIPI HSC unit has been removed from the i.MX51 Reference Manual by
++ * the Freescale marketing division. However this did not remove the
++ * hardware from the chip which still needs to be configured for proper
++ * IPU support.
++ */
++#define MX51_MIPI_HSC_BASE 0x83fdc000
++static void __init imx51_ipu_mipi_setup(void)
++{
++	void __iomem *hsc_addr;
 +
- 	/* Set the registers to the default cpu idle state. */
- 	mx5_cpu_lp_set(IMX5_DEFAULT_CPU_IDLE_STATE);
++	hsc_addr = ioremap(MX51_MIPI_HSC_BASE, SZ_16K);
++	WARN_ON(!hsc_addr);
++
++	/* setup MIPI module to legacy mode */
++	__raw_writel(0xf00, hsc_addr);
++
++	/* CSI mode: reserved; DI control mode: legacy (from Freescale BSP) */
++	__raw_writel(__raw_readl(hsc_addr + 0x800) | 0x30ff,
++		hsc_addr + 0x800);
++
++	iounmap(hsc_addr);
++}
++
+ static void __init imx51_dt_init(void)
+ {
+ 	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", };
  
+ 	mxc_arch_reset_init_dt();
++	imx51_ipu_mipi_setup();
++	imx_src_init();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ 	platform_device_register_full(&devinfo);
+ }
+ 
++static void __init imx51_init_late(void)
++{
++	mx51_neon_fixup();
++	imx51_pm_init();
++}
++
+ static const char *imx51_dt_board_compat[] __initconst = {
+ 	"fsl,imx51",
+ 	NULL
+diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
+index 9a066af..40005b8 100644
+--- a/arch/arm/mach-imx/mach-imx53.c
++++ b/arch/arm/mach-imx/mach-imx53.c
+@@ -24,6 +24,12 @@
+ #include "hardware.h"
+ #include "mx53.h"
+ 
++static void __init imx53_init_early(void)
++{
++	mxc_set_cpu_type(MXC_CPU_MX53);
++	imx_src_init();
++}
++
+ static void __init imx53_dt_init(void)
+ {
+ 	mxc_arch_reset_init_dt();
+@@ -31,6 +37,11 @@ static void __init imx53_dt_init(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
++static void __init imx53_init_late(void)
++{
++	imx53_pm_init();
++}
++
+ static const char *imx53_dt_board_compat[] __initconst = {
+ 	"fsl,imx53",
+ 	NULL
+diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+index 9e43e87..768fede 100644
+--- a/arch/arm/mach-imx/mm-imx5.c
++++ b/arch/arm/mach-imx/mm-imx5.c
+@@ -59,47 +59,3 @@ void __init mx53_map_io(void)
+ {
+ 	iotable_init(mx53_io_desc, ARRAY_SIZE(mx53_io_desc));
+ }
+-
+-/*
+- * The MIPI HSC unit has been removed from the i.MX51 Reference Manual by
+- * the Freescale marketing division. However this did not remove the
+- * hardware from the chip which still needs to be configured for proper
+- * IPU support.
+- */
+-static void __init imx51_ipu_mipi_setup(void)
+-{
+-	void __iomem *hsc_addr;
+-	hsc_addr = MX51_IO_ADDRESS(MX51_MIPI_HSC_BASE_ADDR);
+-
+-	/* setup MIPI module to legacy mode */
+-	__raw_writel(0xf00, hsc_addr);
+-
+-	/* CSI mode: reserved; DI control mode: legacy (from Freescale BSP) */
+-	__raw_writel(__raw_readl(hsc_addr + 0x800) | 0x30ff,
+-		hsc_addr + 0x800);
+-}
+-
+-void __init imx51_init_early(void)
+-{
+-	imx51_ipu_mipi_setup();
+-	mxc_set_cpu_type(MXC_CPU_MX51);
+-	mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
+-	imx_src_init();
+-}
+-
+-void __init imx53_init_early(void)
+-{
+-	mxc_set_cpu_type(MXC_CPU_MX53);
+-	imx_src_init();
+-}
+-
+-void __init imx51_init_late(void)
+-{
+-	mx51_neon_fixup();
+-	imx51_pm_init();
+-}
+-
+-void __init imx53_init_late(void)
+-{
+-	imx53_pm_init();
+-}
 -- 
 1.8.3.2
