@@ -1,46 +1,76 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 20 May 2014 16:45:37 +0800
-Subject: [PATCH 19/20] ARM: imx5: clean function declarations in mx51.h
+Date: Tue, 20 May 2014 16:45:27 +0800
+Subject: [PATCH 09/20] ARM: imx5: remove function imx51_soc_init()
 In-Reply-To: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
 References: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1400575538-21136-20-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1400575538-21136-10-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mx51_display_revision() is a dead declaration.  Remove it.  Also,
-move mx51_revision() into common.h.
+The function imx51_soc_init() was used by non-DT boot only.  Since
+i.MX51 supports DT only, the function can be removed now.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-imx/common.h | 1 +
- arch/arm/mach-imx/mx51.h   | 5 -----
- 2 files changed, 1 insertion(+), 5 deletions(-)
+ arch/arm/mach-imx/common.h  |  1 -
+ arch/arm/mach-imx/mm-imx5.c | 33 ---------------------------------
+ 2 files changed, 34 deletions(-)
 
 diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 53ee569..5aaea2b 100644
+index 6d018c0..1d6cf4d 100644
 --- a/arch/arm/mach-imx/common.h
 +++ b/arch/arm/mach-imx/common.h
-@@ -64,6 +64,7 @@ void mxc_set_cpu_type(unsigned int type);
- void mxc_restart(enum reboot_mode, const char *);
- void mxc_arch_reset_init(void __iomem *);
- void mxc_arch_reset_init_dt(void);
-+int mx51_revision(void);
- int mx53_revision(void);
- void imx_set_aips(void __iomem *);
- int mxc_device_init(void);
-diff --git a/arch/arm/mach-imx/mx51.h b/arch/arm/mach-imx/mx51.h
-index 3f6d4a6..a569528 100644
---- a/arch/arm/mach-imx/mx51.h
-+++ b/arch/arm/mach-imx/mx51.h
-@@ -305,9 +305,4 @@
- #define MX51_INT_EMI_NFC		(NR_IRQS_LEGACY + 101)
- #define MX51_INT_GPU_IDLE		(NR_IRQS_LEGACY + 102)
+@@ -50,7 +50,6 @@ void imx25_soc_init(void);
+ void imx27_soc_init(void);
+ void imx31_soc_init(void);
+ void imx35_soc_init(void);
+-void imx51_soc_init(void);
+ void imx51_init_late(void);
+ void imx53_init_late(void);
+ void epit_timer_init(void __iomem *base, int irq);
+diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+index d5dbf80..771ab36 100644
+--- a/arch/arm/mach-imx/mm-imx5.c
++++ b/arch/arm/mach-imx/mm-imx5.c
+@@ -93,39 +93,6 @@ void __init imx53_init_early(void)
+ 	imx_src_init();
+ }
  
--#if !defined(__ASSEMBLY__) && !defined(__MXC_BOOT_UNCOMPRESS)
--extern int mx51_revision(void);
--extern void mx51_display_revision(void);
--#endif
+-static struct sdma_platform_data imx51_sdma_pdata __initdata = {
+-	.fw_name = "sdma-imx51.bin",
+-};
 -
- #endif	/* ifndef __MACH_MX51_H__ */
+-static const struct resource imx51_audmux_res[] __initconst = {
+-	DEFINE_RES_MEM(MX51_AUDMUX_BASE_ADDR, SZ_16K),
+-};
+-
+-void __init imx51_soc_init(void)
+-{
+-	mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG1_BASE_ADDR));
+-	mxc_device_init();
+-
+-	/* i.mx51 has the i.mx35 type gpio */
+-	mxc_register_gpio("imx35-gpio", 0, MX51_GPIO1_BASE_ADDR, SZ_16K, MX51_INT_GPIO1_LOW, MX51_INT_GPIO1_HIGH);
+-	mxc_register_gpio("imx35-gpio", 1, MX51_GPIO2_BASE_ADDR, SZ_16K, MX51_INT_GPIO2_LOW, MX51_INT_GPIO2_HIGH);
+-	mxc_register_gpio("imx35-gpio", 2, MX51_GPIO3_BASE_ADDR, SZ_16K, MX51_INT_GPIO3_LOW, MX51_INT_GPIO3_HIGH);
+-	mxc_register_gpio("imx35-gpio", 3, MX51_GPIO4_BASE_ADDR, SZ_16K, MX51_INT_GPIO4_LOW, MX51_INT_GPIO4_HIGH);
+-
+-	pinctrl_provide_dummies();
+-
+-	/* i.mx51 has the i.mx35 type sdma */
+-	imx_add_imx_sdma("imx35-sdma", MX51_SDMA_BASE_ADDR, MX51_INT_SDMA, &imx51_sdma_pdata);
+-
+-	/* Setup AIPS registers */
+-	imx_set_aips(MX51_IO_ADDRESS(MX51_AIPS1_BASE_ADDR));
+-	imx_set_aips(MX51_IO_ADDRESS(MX51_AIPS2_BASE_ADDR));
+-
+-	/* i.mx51 has the i.mx31 type audmux */
+-	platform_device_register_simple("imx31-audmux", 0, imx51_audmux_res,
+-					ARRAY_SIZE(imx51_audmux_res));
+-}
+-
+ void __init imx51_init_late(void)
+ {
+ 	mx51_neon_fixup();
 -- 
 1.8.3.2
