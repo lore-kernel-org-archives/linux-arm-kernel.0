@@ -1,217 +1,93 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 20 May 2014 11:57:05 +0200
-Subject: [PATCH] ARM: imx6: init enet MAC address
-In-Reply-To: <9e30b11d922542fb851c09c46685599d@BLUPR03MB373.namprd03.prod.outlook.com>
-References: <1400566266-22746-1-git-send-email-b38611@freescale.com>
- <20140520090312.GH5858@pengutronix.de>
- <9e30b11d922542fb851c09c46685599d@BLUPR03MB373.namprd03.prod.outlook.com>
-Message-ID: <20140520095705.GJ5858@pengutronix.de>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Tue, 20 May 2014 15:31:24 +0530
+Subject: [PATCH] ASoC: samsung: Allow setting OP_CLK of the IIS Multi
+ Audio Interface
+In-Reply-To: <537B1BF0.8060302@samsung.com>
+References: <1400520638-6907-1-git-send-email-s.nawrocki@samsung.com>
+ <537AE4C1.7050703@linaro.org> <537B1BF0.8060302@samsung.com>
+Message-ID: <537B27F4.5030008@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 09:24:01AM +0000, fugang.duan at freescale.com wrote:
-> From: Sascha Hauer <s.hauer@pengutronix.de>
-> Data: Tuesday, May 20, 2014 5:03 PM
+On 05/20/2014 02:40 PM, Sylwester Nawrocki wrote:
+> On 20/05/14 07:14, Tushar Behera wrote:
+>> On 05/19/2014 11:00 PM, Sylwester Nawrocki wrote:
+>>> This patch adds support for setting source clock of the "Core CLK"
+>>> of the IIS Multi Audio Interface.
+>>>
+>>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>>> ---
+>>>  sound/soc/samsung/i2s.c |    4 ++++
+>>>  sound/soc/samsung/i2s.h |    1 +
+>>>  2 files changed, 5 insertions(+)
+>>>
+>>> diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+>>> index 048ead9..ae02811 100644
+>>> --- a/sound/soc/samsung/i2s.c
+>>> +++ b/sound/soc/samsung/i2s.c
+>>> @@ -451,6 +451,10 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
+>>>  	u32 mod = readl(i2s->addr + I2SMOD);
+>>>  
+>>>  	switch (clk_id) {
+>>> +	case SAMSUNG_I2S_OPCLK:
+>>> +		mod &= ~MOD_OPCLK_MASK;
+>>> +		mod |= dir;
+>>
+>> I am assuming here that dir is one of SND_SOC_CLOCK_IN or
+>> SND_SOC_CLOCK_OUT. In that case, you need to take care of offset (30).
 > 
-> >To: Duan Fugang-B38611
-> >Cc: Li Frank-B20596; Guo Shawn-R65073; linux-arm-
-> >kernel at lists.infradead.org; kernel at pengutronix.de
-> >Subject: Re: [PATCH] ARM: imx6: init enet MAC address
-> >
-> >On Tue, May 20, 2014 at 02:11:06PM +0800, Fugang Duan wrote:
-> >> Enet get MAC address order:
-> >> From module parameters or kernel command line -> device tree -> pfuse
-> >> -> mac registers set by bootloader -> random mac address.
-> >>
-> >> When there have no "fec.macaddr" parameters set in kernel command
-> >> line, enet driver get MAC address from device tree. And then if the
-> >> MAC address set in device tree and is valid, enet driver get MAC
-> >> address from device tree. Otherwise, enet get MAC address from pfuse.
-> >> So, in the condition, update the MAC address (read from pfuse) to
-> >> device tree.
-> >>
-> >> +#define OCOTP_MACn(n)		(0x00000620 + (n) * 0x10)
-> >> +#define IMX_MAX_ENET_NUM	2
-> >> +void __init imx6_enet_mac_init(const char *compatible)
-> >
-> >static
-> >
-> The .fun() will be called for imx6sl, imx6sx(the latest chip) machine files.
+> And that's not a correct assumption. I also got similarly confused when 
+> first seeing this in our downstream kernels. 'dir' is supposed to be one 
+> of the MOD_OPCLK_* constants, as defined in sound/soc/samsung/i2s-regs.h.
 > 
-> >> +{
-> >> +	struct device_node *ocotp_np, *enet_np, *from = NULL;
-> >> +	void __iomem *base;
-> >> +	struct property *newmac;
-> >> +	u32 macaddr0_low;
-> >> +	u32 macaddr0_high = 0;
-> >> +	u32 macaddr1_high = 0;
-> >> +	u8 *macaddr;
-> >> +	int i;
-> >> +
-> >> +	for (i = 0; i < IMX_MAX_ENET_NUM; i++) {
-> >> +		enet_np = of_find_compatible_node(from, NULL, compatible);
-> >> +		if (!enet_np)
-> >> +			return;
-> >> +
-> >> +		from = enet_np;
-> >> +
-> >> +		if (of_get_mac_address(enet_np))
-> >> +			goto put_enet_node;
-> >> +
-> >> +		ocotp_np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-
-> >ocotp");
-> >> +		if (!ocotp_np) {
-> >> +			pr_warn("failed to find ocotp node\n");
-> >> +			goto put_enet_node;
-> >> +		}
-> >> +
-> >> +		base = of_iomap(ocotp_np, 0);
-> >> +		if (!base) {
-> >> +			pr_warn("failed to map ocotp\n");
-> >> +			goto put_ocotp_node;
-> >> +		}
-> >
-> >Move this outside the loop.
-> >
-> Agree, I will move the ocotp node from the loop. 
+> #define MOD_OPCLK_CDCLK_OUT	(0 << 30)
+> #define MOD_OPCLK_CDCLK_IN	(1 << 30)
+> #define MOD_OPCLK_BCLK_OUT	(2 << 30)
+> #define MOD_OPCLK_PCLK		(3 << 30)
+> #define MOD_OPCLK_MASK		(3 << 30)
 > 
-> >> +
-> >> +		macaddr0_low = readl_relaxed(base + OCOTP_MACn(1));
-> >> +		if (i)
-> >> +			macaddr1_high = readl_relaxed(base + OCOTP_MACn(2));
-> >> +		else
-> >> +			macaddr0_high = readl_relaxed(base + OCOTP_MACn(0));
-> >
-> >You go over these register reads two times and read the very same
-> >registers two times. Argh! Could please look at your code before posting
-> >it?
-> >
-> For some other platform like imx6sx has two enet MACs, so "i" is 0, 1.
-> You means OCOTP_MACn(1) is read twice, I will change it. Thanks.
-
-What you do is:
-
-	for (i = 0; i < IMX_MAX_ENET_NUM; i++) {
-		...
-		macaddr0_low = readl_relaxed(base + OCOTP_MACn(1));
-		if (i)
-			macaddr1_high = readl_relaxed(base + OCOTP_MACn(2));
-		else
-			macaddr0_high = readl_relaxed(base + OCOTP_MACn(0));
-		...
-	}
-
-What you should do is:
-
-	macaddr0_low = readl_relaxed(base + OCOTP_MACn(1));
-	macaddr1_high = readl_relaxed(base + OCOTP_MACn(2));
-	macaddr0_high = readl_relaxed(base + OCOTP_MACn(0));
-
-	for (i = 0; i < IMX_MAX_ENET_NUM; i++) {
-		...
-	}
+> So the clock is reconfigured with calls like:
+> snd_soc_dai_set_sysclk(cpu_dai, SAMSUNG_I2S_OPCLK, 0, MOD_OPCLK_PCLK);
 > 
-> >> +
-> >> +		newmac = kzalloc(sizeof(*newmac) + 6, GFP_KERNEL);
-> >> +		if (!newmac)
-> >> +			goto put_ocotp_node;
-> >> +
-> >> +		newmac->value = newmac + 1;
-> >> +		newmac->length = 6;
-> >> +		newmac->name = kstrdup("local-mac-address", GFP_KERNEL);
-> >> +		if (!newmac->name) {
-> >> +			kfree(newmac);
-> >> +			goto put_ocotp_node;
-> >> +		}
-> >> +
-> >> +		macaddr = newmac->value;
-> >> +		if (i) {
-> >> +			macaddr[0] = (macaddr1_high >> 24) & 0xff;
-> >> +			macaddr[1] = (macaddr1_high >> 16) & 0xff;
-> >> +			macaddr[2] = (macaddr1_high >> 8) & 0xff;
-> >> +			macaddr[3] = macaddr1_high & 0xff;
-> >> +			macaddr[4] = (macaddr0_low >> 24) & 0xff;
-> >> +			macaddr[5] = (macaddr0_low >> 16) & 0xff;
-> >> +		} else {
-> >> +			macaddr[0] = (macaddr0_low >> 8) & 0xff;
-> >> +			macaddr[1] = macaddr0_low & 0xff;
-> >> +			macaddr[2] = (macaddr0_high >> 24) & 0xff;
-> >> +			macaddr[3] = (macaddr0_high >> 16) & 0xff;
-> >> +			macaddr[4] = (macaddr0_high >> 8) & 0xff;
-> >> +			macaddr[5] = macaddr0_high & 0xff;
-> >> +		}
-> >
-> >It makes no sense to have a IMX_MAX_ENET_NUM define when the code assumes
-> >that the only valid value is 2.
-> >
-> You mean remove the "IMX_MAX_ENET_NUM" ?
+
+Ok.
+
+>> Also the value of this bit-field doesn't match with SND_SOC_CLOCK_XXX
+>> macros.
+>>
+>> Bit-field (2'b):
+>> 00	Codec Clock out
+>> 01	Codec Clock in
+>> 10	Bit clock out
+>> 11	Audio bus clock
+>>
+>> Value of macros:
+>> SND_SOC_CLOCK_IN	0
+>> SND_SOC_CLOCK_OUT	1
 > 
-> >All this is probably far more readable and less fishy when you move the
-> >fixup of a single enet device to a extra function which you call from the
-> >loop.
-> >
-> Because imx6sx has two enet MACs, and the function is called for imx6qdl/imx6sl/imx6sx, so add the loop in here.
-> For imx6qdl/imx6sl, there just have one MAC, the second loop don't go through the flow. 
-> Do you have other suggestion ?
+>> In the manual, this field is suggested to be Audio bus clock always. Is
+>> there an use-case where we might need to update this?
+> 
+> I've checked couple boards and AFAICS we're always setting MOD_OPCLK_PCLK,
+> however it's still different from the default value after reset - 
+> MOD_OPCLK_CDCLK_OUT. 
+> So how do you think this should be addressed ? Isn't it better to give
+> options to the machine drivers to alter these clock settings, rather than
+> hard coding it in the I2S driver ? Let's not forget it covers multiple 
+> Samsung SoC series.
+> 
 
-What I want to say is: When you have a loop and the loop body gets to
-complicated, then it often improves readability to move the loop body to
-an extra function, like this:
+I don't have any objection to this patch. Just that, I could not find
+any use-case where we would not like to set the value as MOD_OPCLK_PCLK.
 
-static int imx6_enet_mac_init_one(struct device_node *enet, const u8 *mac)
-{
-	struct property *newmac;
-	u8 mac[6];
+>> The default value for audio playback right now is 00 (2'b), which needs
+>> to be fixed anyways.
+> 
+> --
+> Regards,
+> Sylwester
+> 
 
-	if (of_get_mac_address(enet))
-		return 0;
-
-	newmac = kzalloc(sizeof(*newmac) + 6, GFP_KERNEL);
-	if (!newmac)
-		return -ENOMEM;
-
-	newmac->length = 6;
-	newmac->name = kstrdup("local-mac-address", GFP_KERNEL);
-	newmac->value = kmemdup(mac, 6, GFP_KERNEL);
-
-	of_update_property(enet_np, newmac);
-
-	release_stuff();
-}
-
-int imx6_enet_mac_init(const char *compatible)
-{
-	struct device_node *from = NULL;
-	u8 mac[6];
-
-	macaddr0_low = readl_relaxed(base + OCOTP_MACn(1));
-	macaddr1_high = readl_relaxed(base + OCOTP_MACn(2));
-	macaddr0_high = readl_relaxed(base + OCOTP_MACn(0));
-
-	mac[0] = ...;
-
-	enet_np = of_find_compatible_node(NULL, NULL, compatible);
-	if (!enet_np)
-		return 0;
-
-	imx6_enet_mac_init_one(enet_np, mac);
-
-	enet_np = of_find_compatible_node(enet_np, NULL, compatible);
-	if (!enet_np)
-		return 0;
-
-	mac[0] = ...;
-
-	imx6_enet_mac_init_one(enet_no, mac);
-}
-
-(here I removed the loop which makes the code even more straight
-forward)
-
-Sascha
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Tushar Behera
