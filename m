@@ -1,64 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 May 2014 19:13:00 -0700
-Subject: [GIT PULL 3/3] omap l3-noc bus driver changes for v3.16 merge
- window, resend
-Message-ID: <20140520021300.GM15793@atomide.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 19 May 2014 23:13:47 -0400 (EDT)
+Subject: [PATCH v3] arm: ioremap: Fix static vm area boundary check.
+In-Reply-To: <9258c0b00a33484a8d289378047f8cd4@BY2PR03MB505.namprd03.prod.outlook.com>
+References: <1400232920-25079-1-git-send-email-Li.Xiubo@freescale.com>
+ <alpine.LFD.2.11.1405161403400.17310@knanqh.ubzr>
+ <9258c0b00a33484a8d289378047f8cd4@BY2PR03MB505.namprd03.prod.outlook.com>
+Message-ID: <alpine.LFD.2.11.1405192306390.17310@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 455c6fdbd219161bd09b1165f11699d6d73de11c:
+On Mon, 19 May 2014, Li.Xiubo at freescale.com wrote:
 
-  Linux 3.14 (2014-03-30 20:40:15 -0700)
+> > > For each vmalloc area, there is one guard page at the end of it.
+> > > so the vm->size = PAGE_ALIGN(offset + request size) + guard page size.
+> > 
+> > Nope.  There is no guard page for statically created vmalloc areas.
+> > 
+> 
+> Yes, you are right, I'm thinking why the static area has no guard page?
 
-are available in the git repository at:
+The virtual addresses being used are provided by the static mapping 
+descriptions themselves.  Sometimes those mappings are large and 
+contiguous, covering multiple peripherals at once with a single TLB, 
+etc.  There is simply no room for a guard page, or no guard page at all 
+between different areas covered by a single section mapping (1MB worth 
+of mapping from a single page table entry).
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/l3-noc-signed
+All this to say that trying to enforce a guard page in those cases is 
+likely to throw away all the performance advantage and conplexify 
+things.
 
-for you to fetch changes up to 27b7d5f3cc49f2e5cd6c005d73696058b7140c5c:
 
-  bus: omap_l3_noc: Add AM4372 interconnect error data (2014-05-05 14:34:37 -0500)
-
-----------------------------------------------------------------
-Improvments to omap l3-noc bus driver for v3.16 merge window
-to add support for am347x and dra7.
-
-----------------------------------------------------------------
-Afzal Mohammed (2):
-      bus: omap_l3_noc: ignore masked out unclearable targets
-      bus: omap_l3_noc: Add AM4372 interconnect error data
-
-Nishanth Menon (14):
-      bus: omap_l3_noc: Fix copyright information
-      bus: omap_l3_noc: remove iclk from omap_l3 struct
-      bus: omap_l3_noc: populate l3->dev and use it
-      bus: omap_l3_noc: switch over to relaxed variants of readl/writel
-      bus: omap_l3_noc: un-obfuscate l3_targ address computation
-      bus: omap_l3_noc: move L3 master data structure out
-      bus: omap_l3_noc: convert target information into a structure
-      bus: omap_l3_noc: convert flagmux information into a structure
-      bus: omap_l3_noc: fix masterid detection
-      bus: omap_l3_noc: make error reporting and handling common
-      bus: omap_l3_noc: improve readability by using helper for slave event parsing
-      bus: omap_l3_noc: add information about the type of operation
-      bus: omap_l3_noc: Add information about the context of operation
-      bus: omap_l3_noc: introduce concept of submodule
-
-Peter Ujfalusi (5):
-      drivers: bus: omap_l3: Convert to use devm_kzalloc
-      drivers: bus: omap_l3: Convert to use devm_ioremap_resource()
-      drivers: bus: omap_l3: Convert to use devm_request_irq()
-      drivers: bus: omap_l3: Remove the platform driver's remove function
-      drivers: bus: omap_l3: Change pr_crit() to dev_err() when IRQ request fails
-
-Rajendra Nayak (2):
-      bus: omap_l3_noc: Add support for discountinous flag mux input numbers
-      bus: omap_l3_noc: Add DRA7 interconnect error data
-
-Sricharan R (2):
-      bus: omap_l3_noc: rename functions and data to omap_l3
-      bus: omap_l3_noc: use of_match_data to pick up SoC information
-
- .../devicetree/bindings/arm/omap/l3-noc.txt        |   2 +
- drivers/bus/omap_l3_noc.c                          | 406 ++++++++-------
- drivers/bus/omap_l3_noc.h                          | 545 ++++++++++++++++-----
- 3 files changed, 653 insertions(+), 300 deletions(-)
+Nicolas
