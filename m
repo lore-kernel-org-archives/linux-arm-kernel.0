@@ -1,45 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 20 May 2014 13:20:48 +0100
-Subject: [PATCH v6 4/4] ARM: dts: STiH407: Add B2120 board support
-In-Reply-To: <1400579192-17620-5-git-send-email-maxime.coquelin@st.com>
-References: <1400579192-17620-1-git-send-email-maxime.coquelin@st.com>
- <1400579192-17620-5-git-send-email-maxime.coquelin@st.com>
-Message-ID: <20140520122048.GO24991@lee--X1>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 20 May 2014 14:22:57 +0200
+Subject: [PATCH] ARM: sun6i: Enable USB Host support on the Colombus board
+In-Reply-To: <20140520121657.GG27329@lukather>
+References: <1400587155-19387-1-git-send-email-maxime.ripard@free-electrons.com>
+ <537B4587.5020803@redhat.com> <20140520121657.GG27329@lukather>
+Message-ID: <537B4921.1020804@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 May 2014, Maxime COQUELIN wrote:
+Hi,
 
-> B2120 HDK is the reference board for STiH407 SoC.
-> It has the following characteristics:
->  - 1GB DDR3
->  - 8GB eMMC / SD-Card slot
->  - 32MB NOR Flash
->  - 1 x Gbit Ethernet
->  - 1 x USB 3.0 port
->  - 1 x Mini-PCIe
->  - 1 x SATA
->  - 1 x HDMI output
->  - 1 x HDMI input
->  - 1 x SPDIF
+On 05/20/2014 02:16 PM, Maxime Ripard wrote:
+> Hi,
 > 
-> This patch only introduces basic functionnalities, such as I2C and UART.
+> On Tue, May 20, 2014 at 02:07:35PM +0200, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 05/20/2014 01:59 PM, Maxime Ripard wrote:
+>>> The colombus board has a on-board USB hub, that is enabled through the pin
+>>> PH24, and wired to the first EHCI controller.
+>>
+>> ehci0 is not hooked up at all on this board ? I would expect it to go to
+>> a usb wifi card for example.
+>>
+>> Assuming that ehci0 is not hooked up, this is:
+>>
+>> Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 > 
-> Acked-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> Acked-by: Patrice Chotard <patrice.chotard@st.com>
-> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
-> ---
->  arch/arm/boot/dts/Makefile          |  3 +-
->  arch/arm/boot/dts/stih407-b2120.dts | 78 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 80 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/stih407-b2120.dts
+> It's unclear, because the schematics say that we have two options,
+> either USB or SDIO wifi chips.
+> 
+> However, looking at the boards, it looks like it's the latter.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Ok.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+
+Hans
