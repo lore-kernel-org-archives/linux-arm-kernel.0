@@ -1,38 +1,53 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 19 May 2014 23:11:14 -0700
-Subject: [GIT PULL] ARM: STi: SoC changes for v3.16
-In-Reply-To: <537A1F3C.90405@st.com>
-References: <5375D1A4.2040205@st.com>
- <537A1F3C.90405@st.com>
-Message-ID: <20140520061114.GU18956@quad.lixom.net>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 20 May 2014 15:17:00 +0900
+Subject: [RFC PATCH] of/irq: do irq resolution in platform_get_irq_byname()
+In-Reply-To: <20140519125738.GB9466@ulmo>
+References: <1400506259-18397-1-git-send-email-grygorii.strashko@ti.com>
+ <20140519125738.GB9466@ulmo>
+Message-ID: <20140520061700.ED542C41087@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 05:11:56PM +0200, Maxime Coquelin wrote:
-> Hi Olof, Kevin and Arnd,
+On Mon, 19 May 2014 14:57:39 +0200, Thierry Reding <thierry.reding@gmail.com> wrote:
+> On Mon, May 19, 2014 at 04:30:59PM +0300, Grygorii Strashko wrote:
+> [...]
+> > diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> [...]
+> >  /**
+> > + * of_irq_get_byname - Decode a node's IRQ and return it as a Linux irq number
+> > + * @dev: pointer to device tree node
+> > + * @name: zero-based index of the irq
 > 
-> Please consider these STi SoC updates for v3.16.
+> This is a name, not an index.
 > 
-> This is now based on v3.15-rc1.
+> > + *
+> > + * Returns Linux irq number on success, or -EPROBE_DEFER if the irq domain
+> > + * is not yet created, or errorno in case of failure.
 > 
-> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+> s/errorno/error code/? Also EPROBE_DEFER is also an error code, so I'm
+> not sure if it's worth a special case in the description here.
 > 
->   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+> > + *
+> > + */
+> > +int of_irq_get_byname(struct device_node *dev, const char *name)
+> > +{
+> > +	const char *name_irq = NULL;
+> > +	int index = 0;
+> > +
+> > +	if (unlikely(!name))
+> > +		return -EINVAL;
+> > +
+> > +	while (!of_property_read_string_index(dev, "interrupt-names",
+> > +					      index, &name_irq))
+> > +		if (!strcmp(name, name_irq))
+> > +			return of_irq_get(dev, index);
 > 
-> are available in the git repository at:
-> 
->   git://git.stlinux.com/devel/kernel/linux-sti.git tags/sti-soc-for-v3.16
-> 
-> for you to fetch changes up to c6594025c0f8cea2ba089444a359495bd0ea3e6f:
-> 
->   ARM: STi: Add STiH407 SoC support (2014-05-17 10:22:30 +0200)
-> 
-> ----------------------------------------------------------------
-> SoC changes for STi platforms
+> Isn't this missing an index++ somewhere? Otherwise it seems like this
+> would loop infinitely if there was no match on the first entry.
 
-Merged, thanks. Please provide a descriptive tag for every pull request. I
-know that's somewhat artificial on a single-patch pull request though,
-but keep it in mind for the future.
+Better yet, use of_property_match_string().
 
+g.
 
--Olof
+> 
+> Thierry
