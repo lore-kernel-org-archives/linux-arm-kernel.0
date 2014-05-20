@@ -1,77 +1,126 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 20 May 2014 22:37:00 +0800
-Subject: [PATCH v3 1/6] ARM: hisi: store reboot reg in global variable
-In-Reply-To: <1400596625-16830-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1400596625-16830-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1400596625-16830-2-git-send-email-haojian.zhuang@linaro.org>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Tue, 20 May 2014 16:44:47 +0200
+Subject: [PATCHv5 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
+ controller
+In-Reply-To: <CANk1AXTdSheUkNtF2fSmtcYaUrd2CnTjBxGitmSy88H4VRVbnw@mail.gmail.com>
+References: <1400169891-29546-1-git-send-email-tthayer@altera.com>
+ <1400169891-29546-2-git-send-email-tthayer@altera.com>
+ <20140516075344.GF949@pengutronix.de>
+ <CAF03EBfOrBWsGVkwYHQt9Pm858LtkgUThkM6dFjksa93ETo_bw@mail.gmail.com>
+ <20140519191206.GH949@pengutronix.de>
+ <CAF03EBfwFC7bK=j0W3K+no9TK7xe2nF1ZXH9bMBRNzVErB5EjQ@mail.gmail.com>
+ <CANk1AXTdSheUkNtF2fSmtcYaUrd2CnTjBxGitmSy88H4VRVbnw@mail.gmail.com>
+Message-ID: <20140520144446.GJ949@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid to parse DT in restart() function. Parsing these in init_late()
-instead.
+Hi!
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- arch/arm/mach-hisi/hisilicon.c | 20 +++++++++++++-------
- 1 file changed, 13 insertions(+), 7 deletions(-)
+On Tue, May 20, 2014 at 09:31:06AM -0500, Alan Tull wrote:
+> On Mon, May 19, 2014 at 2:37 PM, Thor Thayer <tthayer.linux@gmail.com> wrote:
+> 
+> >>> >> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+> >>> >> new file mode 100644
+> >>> >> index 0000000..8f8746b
+> >>> >> --- /dev/null
+> >>> >> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+> >>> >> @@ -0,0 +1,11 @@
+> >>> >> +Altera SOCFPGA SDRAM Controller
+> >>> >> +
+> >>> >> +Required properties:
+> >>> >> +- compatible : "altr,sdr-ctl";
+> >>> >> +- reg : Should contain 1 register ranges(address and length)
+> >>> >> +
+> >>> >> +Example:
+> >>> >> +     sdrctl at ffc25000 {
+> >>> >> +             compatible = "altr,sdr-ctl";
+> >>> >> +             reg = <0xffc25000 0x1000>;
+> >>> >> +     };
+> >>> >> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> >>> >> index df43702..6ce912e 100644
+> >>> >> --- a/arch/arm/boot/dts/socfpga.dtsi
+> >>> >> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> >>> >> @@ -676,6 +676,11 @@
+> >>> >>                       clocks = <&l4_sp_clk>;
+> >>> >>               };
+> >>> >>
+> >>> >> +             sdrctl at ffc25000 {
+> >>> >> +                     compatible = "altr,sdr-ctl", "syscon";
+> >>> >                                                    ^^^^^^^^^^
+> >>> >
+> >>> > Get rid of that, too, please.
+> >>>
+> >>> Hi Steffan,
+> >>>
+> >>> I believe I need to keep the "syscon". The same register (ctrlcfg)
+> >>> that has the ECC enable bitfield also includes the DRAM configuration
+> >>> bitfields that other drivers will want to access (specifically the
+> >>> FPGA bridge needs this information). Since this register will be
+> >>> shared between drivers,  syscon seems like the best solution.
+> >>>
+> >>
+> >> Hm, from looking at the documentation of the ctrlcfg I can't really
+> >> understand which bits you would need for the FPGA brigde and why.
+> 
+> Hi Steffen,
+> 
+> Offset 0x80 in the sdr-ctl is the "fpgaportrst" register.  14 bits
+> wide, defaults to 0.  When appropriate bits set to 1 in that reg, it
+> allows an FPGA port to come out of reset (enables that port).  Has no
+> other effect on SDRAM configuration.
+> 
+> >> That all sounds like stuff you would want to set for the specific
+> >> RAM you are dealing with on a specific board.
+> >> What bridge are you talking about? The SDRAM bridge?
+> 
+> Yes, the port allows the FPGA a direct path to the SDRAM.  This one
+> register the only register in the sdr that the bridge driver needs.
+> 
 
-diff --git a/arch/arm/mach-hisi/hisilicon.c b/arch/arm/mach-hisi/hisilicon.c
-index a9f648f..48c91ae 100644
---- a/arch/arm/mach-hisi/hisilicon.c
-+++ b/arch/arm/mach-hisi/hisilicon.c
-@@ -45,33 +45,38 @@ static struct map_desc hi3620_io_desc[] __initdata = {
- 	},
- };
- 
-+static void __iomem *sysctrl_base;
-+static u32 reboot_offset;
-+
- static void __init hi3620_map_io(void)
- {
- 	debug_ll_io_init();
- 	iotable_init(hi3620_io_desc, ARRAY_SIZE(hi3620_io_desc));
- }
- 
--static void hi3xxx_restart(enum reboot_mode mode, const char *cmd)
-+static void __init hi3xxx_init_late(void)
- {
- 	struct device_node *np;
--	void __iomem *base;
--	int offset;
- 
- 	np = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
- 	if (!np) {
- 		pr_err("failed to find hisilicon,sysctrl node\n");
- 		return;
- 	}
--	base = of_iomap(np, 0);
--	if (!base) {
-+	sysctrl_base = of_iomap(np, 0);
-+	if (!sysctrl_base) {
- 		pr_err("failed to map address in hisilicon,sysctrl node\n");
- 		return;
- 	}
--	if (of_property_read_u32(np, "reboot-offset", &offset) < 0) {
-+	if (of_property_read_u32(np, "reboot-offset", &reboot_offset) < 0) {
- 		pr_err("failed to find reboot-offset property\n");
- 		return;
- 	}
--	writel_relaxed(0xdeadbeef, base + offset);
-+}
-+
-+static void hi3xxx_restart(enum reboot_mode mode, const char *cmd)
-+{
-+	writel_relaxed(0xdeadbeef, sysctrl_base + reboot_offset);
- 
- 	while (1)
- 		cpu_do_idle();
-@@ -85,6 +90,7 @@ static const char *hi3xxx_compat[] __initconst = {
- DT_MACHINE_START(HI3620, "Hisilicon Hi3620 (Flattened Device Tree)")
- 	.map_io		= hi3620_map_io,
- 	.dt_compat	= hi3xxx_compat,
-+	.init_late	= hi3xxx_init_late,
- 	.smp		= smp_ops(hi3xxx_smp_ops),
- 	.restart	= hi3xxx_restart,
- MACHINE_END
+So, what I suggested down ...
+
+> >>
+> >> I can see the problem with the ECC enable, though.
+> >>
+> >> Regards,
+> >> Steffen
+> >>
+> >
+> >>> >                 sdrctl at ffc25000 {
+> >>> >                         compatible = "altr,sdr-ctl";
+> >>> >                         reg = <0xffc25000 0x1000>;
+> >>> >                         ranges;
+> >>> >
+> >>> >                         edac at ffc2502c {
+> >>> >                                 compatible = "altr,sdram-edac";
+> >>> >                                 reg = <0xffc2502c 0x50>;
+> >>> >                                 interrupts = <0 39 4>;
+> >>> >                         };
+> >>> >                 };
+> >>> >
+> >>> > Then we can later add:
+> >>> >
+> >>> >                         sdr-ports: ports at ffc2507c {
+> >>> >                                 #reset-cells = <1>;
+> >>> >                                 compatible = "altr,sdr-ports";
+> >>> >                                 reg = <0xffc2507c 0x10>;
+> >>> >                                 clocks = <&ddr_dqs_clk>;
+> >>> >                                 ...
+> >>> >                         };
+>
+
+... here should work. No?! Just a simple driver that registers with the
+reset-framework. I would add 0x7c to that driver and than that driver could
+"configure" the port and let it out of reset.
+
+I have done the same thing for the other 3 bridges, but am not finished yet.
+Especially the GPV-stuff needs to at least be able to be added later if not now.
+
+Regard,
+Steffen
+
 -- 
-1.9.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
