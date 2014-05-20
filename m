@@ -1,85 +1,64 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Tue, 20 May 2014 10:12:23 +0800
-Subject: [PATCH 2/3] Documentation: add Device tree bindings for Hisilicon
- hix5hd2 ethernet
-In-Reply-To: <537A30AA.8080107@cogentembedded.com>
-References: <1400504227-12047-1-git-send-email-zhangfei.gao@linaro.org>
- <1400504227-12047-3-git-send-email-zhangfei.gao@linaro.org>
- <537A30AA.8080107@cogentembedded.com>
-Message-ID: <537ABA07.7020308@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 May 2014 19:13:00 -0700
+Subject: [GIT PULL 3/3] omap l3-noc bus driver changes for v3.16 merge
+ window, resend
+Message-ID: <20140520021300.GM15793@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The following changes since commit 455c6fdbd219161bd09b1165f11699d6d73de11c:
 
+  Linux 3.14 (2014-03-30 20:40:15 -0700)
 
-On 05/20/2014 12:26 AM, Sergei Shtylyov wrote:
-> On 05/19/2014 04:57 PM, Zhangfei Gao wrote:
->> +Hisilicon hix5hd2 Ethernet Controller
->> +
->> +Required properties:
->> +- compatible: should be "hisilicon,hix5hd2-mac".
->> +- reg : Specifies base physical address(s) and size of the device
->> registers.
->
->     Er, I must note that the colon style here is not consistent with the
-> rest of the properties, i.e. there's space before the colon here, while
-> in other cases there's none.
-Will remove the space.
+are available in the git repository at:
 
->
->> +  The first region is the mac register base and size.
->
->     s/mac/MAC/.
->
->> +  The second region is external interface control register.
->> +- interrupts: Should contain the MAC interrupts
->> +- #address-cells: Must be <1>.
->> +- #size-cells: Must be <0>.
->
->     Descriptions should consistently start with a lower case, I think...
-OK.
->
->> +- phy-mode: see ethernet.txt [1].
->> +- phy-handle: see ethernet.txt [1].
->> +- mac-address: see ethernet.txt [1].
->> +- clocks: clock phandle and specifier pair.
->> +
->> +- phy subnode: inherits from phy binding [2]
->
->     s/phy/PHY/.
->
->> +
->> +[1] Documentation/devicetree/bindings/net/ethernet.txt
->> +[2] Documentation/devicetree/bindings/net/phy.txt
->> +
->> +Example:
->> +    gmac0: ethernet at f9840000 {
->> +        compatible = "hisilicon,hix5hd2-mac";
->> +        reg = <0xf9840000 0x1000>,<0xf984300c 0x4>;
->> +        #address-cells = <1>;
->> +        #size-cells = <0>;
->> +        phy-handle = <&phy0>;
->> +        phy-mode = "mii";
->> +        mac-address = [00 00 00 00 00 00];
->
->     Don't think that's a good value, unless this is only a placeholder.
-Yes, mac-address is placeholder here and would be filled by boot-loader.
-Otherwise random mac addr will be used.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/l3-noc-signed
 
->
->> +        interrupts = <0 71 4>;
->> +        clocks = <&clock HIX5HD2_MAC0_CLK>;
->> +
->> +        phy0: ethernet-phy at 2 {
->
->     I'd rather label ut phy2...
-OK
->
->> +            reg = <2>;
->> +            compatible = "ethernet-phy-ieee802.3-c22";
->
->     This is the default "compatible", i.e. there's no need to specify
-> it, IIRC.
-Got it, find it is clarified in phy.txt.
+for you to fetch changes up to 27b7d5f3cc49f2e5cd6c005d73696058b7140c5c:
 
-Thanks
+  bus: omap_l3_noc: Add AM4372 interconnect error data (2014-05-05 14:34:37 -0500)
+
+----------------------------------------------------------------
+Improvments to omap l3-noc bus driver for v3.16 merge window
+to add support for am347x and dra7.
+
+----------------------------------------------------------------
+Afzal Mohammed (2):
+      bus: omap_l3_noc: ignore masked out unclearable targets
+      bus: omap_l3_noc: Add AM4372 interconnect error data
+
+Nishanth Menon (14):
+      bus: omap_l3_noc: Fix copyright information
+      bus: omap_l3_noc: remove iclk from omap_l3 struct
+      bus: omap_l3_noc: populate l3->dev and use it
+      bus: omap_l3_noc: switch over to relaxed variants of readl/writel
+      bus: omap_l3_noc: un-obfuscate l3_targ address computation
+      bus: omap_l3_noc: move L3 master data structure out
+      bus: omap_l3_noc: convert target information into a structure
+      bus: omap_l3_noc: convert flagmux information into a structure
+      bus: omap_l3_noc: fix masterid detection
+      bus: omap_l3_noc: make error reporting and handling common
+      bus: omap_l3_noc: improve readability by using helper for slave event parsing
+      bus: omap_l3_noc: add information about the type of operation
+      bus: omap_l3_noc: Add information about the context of operation
+      bus: omap_l3_noc: introduce concept of submodule
+
+Peter Ujfalusi (5):
+      drivers: bus: omap_l3: Convert to use devm_kzalloc
+      drivers: bus: omap_l3: Convert to use devm_ioremap_resource()
+      drivers: bus: omap_l3: Convert to use devm_request_irq()
+      drivers: bus: omap_l3: Remove the platform driver's remove function
+      drivers: bus: omap_l3: Change pr_crit() to dev_err() when IRQ request fails
+
+Rajendra Nayak (2):
+      bus: omap_l3_noc: Add support for discountinous flag mux input numbers
+      bus: omap_l3_noc: Add DRA7 interconnect error data
+
+Sricharan R (2):
+      bus: omap_l3_noc: rename functions and data to omap_l3
+      bus: omap_l3_noc: use of_match_data to pick up SoC information
+
+ .../devicetree/bindings/arm/omap/l3-noc.txt        |   2 +
+ drivers/bus/omap_l3_noc.c                          | 406 ++++++++-------
+ drivers/bus/omap_l3_noc.h                          | 545 ++++++++++++++++-----
+ 3 files changed, 653 insertions(+), 300 deletions(-)
