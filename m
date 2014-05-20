@@ -1,47 +1,47 @@
 From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 20 May 2014 16:23:37 +0200
-Subject: [GIT PULL] Xilinx Zynq dt changes for v3.16
-Message-ID: <537B6569.2010005@monstr.eu>
+Date: Tue, 20 May 2014 16:25:14 +0200
+Subject: [GIT PULL] Xilinx Zynq clk patches for v3.16
+Message-ID: <537B65CA.4070604@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+Hi Mike,
 
-please pull these 3 patches to your tree.
+please pull these 2 patches to your tree.
 
 Thanks,
 Michal
 
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 
-The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
-
-  Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
 
 are available in the git repository at:
 
-  git://git.xilinx.com/linux-xlnx.git tags/zynq-dt-for-3.16
+  git://git.xilinx.com/linux-xlnx.git tags/zynq-clk-for-3.16
 
-for you to fetch changes up to e1e22df1380d689209ddfab061847cc541941667:
+for you to fetch changes up to 44731f5db44087f54d4e1ed6a460c75552fadcf7:
 
-  ARM: zynq: dt: Add a fixed regulator for CPU voltage (2014-05-16 14:54:14 +0200)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq dt patches for v3.16
-
-- Cleanup GIC mode
-- Cleanup node names
-- Add regulators
+  clk: si570: Fix email address specifiction (2014-05-20 16:18:18 +0200)
 
 ----------------------------------------------------------------
-Lucas Stach (1):
-      ARM: dts: zynq: drop address cells from GIC node
+arm: Xilinx Zynq clk patches for v3.16
 
-Soren Brinkmann (2):
-      ARM: zynq: dt: Clean up device tree
-      ARM: zynq: dt: Add a fixed regulator for CPU voltage
+- Keep debug clocks in bootup state
+- Fix email address in si570
 
- arch/arm/boot/dts/zynq-7000.dtsi | 40 +++++++++++++++++++++++++---------------
- 1 file changed, 25 insertions(+), 15 deletions(-)
+----------------------------------------------------------------
+Michal Simek (1):
+      clk: si570: Fix email address specifiction
+
+Soren Brinkmann (1):
+      clk: zynq: Leave debug clocks in bootup state
+
+ drivers/clk/clk-si570.c |  2 +-
+ drivers/clk/zynq/clkc.c | 12 ++++++++++++
+ 2 files changed, 13 insertions(+), 1 deletion(-)
+
+
 
 -- 
 Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
@@ -57,4 +57,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 263 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/9e73ed53/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/c6ba7543/attachment.sig>
