@@ -1,72 +1,32 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 20 May 2014 16:45:29 +0800
-Subject: [PATCH 11/20] ARM: imx5: retrieve iim base from device tree
+Date: Tue, 20 May 2014 16:45:28 +0800
+Subject: [PATCH 10/20] ARM: imx5: call mxc_timer_init_dt() on imx51
 In-Reply-To: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
 References: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1400575538-21136-12-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1400575538-21136-11-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using static define and mapping, the patch changes imx5 code
-that reads chip revision from IIM to retrieve base address from device
-tree and use dynamic mapping.
+Since i.MX51 supports DT only, it's more appropriate to call
+mxc_timer_init_dt() than mxc_timer_init() to initialize timer.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-imx/cpu-imx5.c | 25 +++++++++++++++++++++----
- 1 file changed, 21 insertions(+), 4 deletions(-)
+ arch/arm/mach-imx/clk-imx51-imx53.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-imx/cpu-imx5.c b/arch/arm/mach-imx/cpu-imx5.c
-index c1c99a7..3403bac 100644
---- a/arch/arm/mach-imx/cpu-imx5.c
-+++ b/arch/arm/mach-imx/cpu-imx5.c
-@@ -16,6 +16,8 @@
- #include <linux/init.h>
- #include <linux/module.h>
- #include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 67f686e..972b24c 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -449,7 +449,7 @@ static void __init mx51_clocks_init(struct device_node *np)
+ 	clk_set_rate(clk[IMX5_CLK_ESDHC_B_PODF], 166250000);
  
- #include "hardware.h"
- #include "common.h"
-@@ -24,10 +26,26 @@ static int mx5_cpu_rev = -1;
+ 	/* System timer */
+-	mxc_timer_init(MX51_IO_ADDRESS(MX51_GPT1_BASE_ADDR), MX51_INT_GPT);
++	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx51-gpt"));
  
- #define IIM_SREV 0x24
- 
-+static u32 imx5_read_srev_reg(const char *compat)
-+{
-+	void __iomem *iim_base;
-+	struct device_node *np;
-+	u32 srev;
-+
-+	np = of_find_compatible_node(NULL, NULL, compat);
-+	iim_base = of_iomap(np, 0);
-+	WARN_ON(!iim_base);
-+
-+	srev = readl(iim_base + IIM_SREV) & 0xff;
-+
-+	iounmap(iim_base);
-+
-+	return srev;
-+}
-+
- static int get_mx51_srev(void)
- {
--	void __iomem *iim_base = MX51_IO_ADDRESS(MX51_IIM_BASE_ADDR);
--	u32 rev = readl(iim_base + IIM_SREV) & 0xff;
-+	u32 rev = imx5_read_srev_reg("fsl,imx51-iim");
- 
- 	switch (rev) {
- 	case 0x0:
-@@ -77,8 +95,7 @@ int __init mx51_neon_fixup(void)
- 
- static int get_mx53_srev(void)
- {
--	void __iomem *iim_base = MX51_IO_ADDRESS(MX53_IIM_BASE_ADDR);
--	u32 rev = readl(iim_base + IIM_SREV) & 0xff;
-+	u32 rev = imx5_read_srev_reg("fsl,imx53-iim");
- 
- 	switch (rev) {
- 	case 0x0:
+ 	clk_prepare_enable(clk[IMX5_CLK_IIM_GATE]);
+ 	imx_print_silicon_rev("i.MX51", mx51_revision());
 -- 
 1.8.3.2
