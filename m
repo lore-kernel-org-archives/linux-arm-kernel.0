@@ -1,57 +1,86 @@
-From: andriy.shevchenko@intel.com (Shevchenko, Andriy)
-Date: Tue, 20 May 2014 12:52:34 +0000
-Subject: [linux-sunxi] [PATCH v7] DMA: sun6i: Add driver for the
- Allwinner A31 DMA controller
-In-Reply-To: <537B4D55.5040804@elopez.com.ar>
-References: <1398349364-10726-1-git-send-email-maxime.ripard@free-electrons.com>
- <1398349364-10726-2-git-send-email-maxime.ripard@free-electrons.com>
- <537B4D55.5040804@elopez.com.ar>
-Message-ID: <1400590354.28000.14.camel@smile.fi.intel.com>
+From: elder@linaro.org (Alex Elder)
+Date: Tue, 20 May 2014 07:52:38 -0500
+Subject: [PATCH v2 1/5] clk: bcm281xx: add an initialized flag
+In-Reply-To: <1400590362-11177-1-git-send-email-elder@linaro.org>
+References: <1400590362-11177-1-git-send-email-elder@linaro.org>
+Message-ID: <1400590362-11177-2-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-05-20 at 09:40 -0300, Emilio L?pez wrote:
-> El 24/04/14 11:22, Maxime Ripard escribi?:
-> > The Allwinner A31 has a 16 channels DMA controller that it shares with the
-> > newer A23. Although sharing some similarities with the DMA controller of the
-> > older Allwinner SoCs, it's significantly different, I don't expect it to be
-> > possible to share the driver for these two.
-> >
-> > The A31 Controller is able to memory-to-memory or memory-to-device transfers on
-> > the 16 channels in parallel.
+Add a flag that tracks whether a clock has already been initialized.
+This will be used by the next patch to avoid initializing a clock
+more than once when it's listed as a prerequisite.
 
-...
+Signed-off-by: Alex Elder <elder@linaro.org>
+---
+ drivers/clk/bcm/clk-kona.c | 17 +++++++++++++++--
+ drivers/clk/bcm/clk-kona.h |  7 +++++++
+ 2 files changed, 22 insertions(+), 2 deletions(-)
 
-> > diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> > index 5c5863842de9..360a10c71388 100644
-> > --- a/drivers/dma/Kconfig
-> > +++ b/drivers/dma/Kconfig
-> > @@ -361,6 +361,14 @@ config FSL_EDMA
-> >   	  multiplexing capability for DMA request sources(slot).
-> >   	  This module can be found on Freescale Vybrid and LS-1 SoCs.
-> >
-> > +config DMA_SUN6I
-> > +	tristate "Allwinner A31 SoCs DMA support"
-> > +	depends on ARCH_SUNXI
-> > +	select DMA_ENGINE
-> > +	select DMA_VIRTUAL_CHANNELS
-> 
-> I think you also need to select DMA_OF here as you are using 
-> of_dma_controller_register
-
-of_dma_controller_register should have a stub (which it does).
-No need to have such a dependency.
-
+diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
+index d603c4e..d8a7f38 100644
+--- a/drivers/clk/bcm/clk-kona.c
++++ b/drivers/clk/bcm/clk-kona.c
+@@ -27,6 +27,9 @@
+ #define CCU_ACCESS_PASSWORD      0xA5A500
+ #define CLK_GATE_DELAY_LOOP      2000
+ 
++#define clk_is_initialized(_clk)	FLAG_TEST((_clk), KONA, INITIALIZED)
++#define clk_set_initialized(_clk)	FLAG_SET((_clk), KONA, INITIALIZED)
++
+ /* Bitfield operations */
+ 
+ /* Produces a mask of set bits covering a range of a 32-bit value */
+@@ -1194,13 +1197,23 @@ static bool __peri_clk_init(struct kona_clk *bcm_clk)
+ 
+ static bool __kona_clk_init(struct kona_clk *bcm_clk)
+ {
++	bool ret;
++
++	if (clk_is_initialized(bcm_clk))
++		return true;
++
+ 	switch (bcm_clk->type) {
+ 	case bcm_clk_peri:
+-		return __peri_clk_init(bcm_clk);
++		ret = __peri_clk_init(bcm_clk);
++		break;
+ 	default:
++		ret = false;
+ 		BUG();
+ 	}
+-	return -EINVAL;
++	if (ret)
++		clk_set_initialized(bcm_clk);
++
++	return ret;
+ }
+ 
+ /* Set a CCU and all its clocks into their desired initial state */
+diff --git a/drivers/clk/bcm/clk-kona.h b/drivers/clk/bcm/clk-kona.h
+index 2537b30..10e238d 100644
+--- a/drivers/clk/bcm/clk-kona.h
++++ b/drivers/clk/bcm/clk-kona.h
+@@ -406,6 +406,7 @@ struct kona_clk {
+ 	struct clk_init_data init_data;	/* includes name of this clock */
+ 	struct ccu_data *ccu;	/* ccu this clock is associated with */
+ 	enum bcm_clk_type type;
++	u32 flags;		/* BCM_CLK_KONA_FLAGS_* below */
+ 	union {
+ 		void *data;
+ 		struct peri_clk_data *peri;
+@@ -414,6 +415,12 @@ struct kona_clk {
+ #define to_kona_clk(_hw) \
+ 	container_of(_hw, struct kona_clk, hw)
+ 
++/*
++ * Kona clock flags:
++ *   INITIALIZED	clock has been initialized already
++ */
++#define BCM_CLK_KONA_FLAGS_INITIALIZED	((u32)1 << 0)	/* Clock initialized */
++
+ /* Initialization macro for an entry in a CCU's kona_clks[] array. */
+ #define KONA_CLK(_ccu_name, _clk_name, _type)				\
+ 	{								\
 -- 
-Andy Shevchenko <andriy.shevchenko@intel.com>
-Intel Finland Oy
----------------------------------------------------------------------
-Intel Finland Oy
-Registered Address: PL 281, 00181 Helsinki 
-Business Identity Code: 0357606 - 4 
-Domiciled in Helsinki 
-
-This e-mail and any attachments may contain confidential material for
-the sole use of the intended recipient(s). Any review or distribution
-by others is strictly prohibited. If you are not the intended
-recipient, please contact the sender and delete all copies.
+1.9.1
