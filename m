@@ -1,244 +1,57 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 20 May 2014 15:58:56 +0200
-Subject: [PATCH v3 2/3] ARM: dts: overo: Add support for 4.3'' LCD output
-In-Reply-To: <1400594337-5096-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1400594337-5096-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1400594337-5096-3-git-send-email-florian.vaussard@epfl.ch>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 20 May 2014 15:59:41 +0200
+Subject: [PATCH v3 00/11] ARM: STi: Add Clock driver support STiH415 &
+ STiH416
+In-Reply-To: <1400592175-13176-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1400592175-13176-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <537B5FCD.8040704@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chestnut43, Gallop43 and Palo43 expansion boards have a ZIF connector
-for a 4.3'' LCD. Add a common include file for this configuration, and
-use it on relevant expansion boards.
+For the series:
 
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
----
- .../boot/dts/omap3-overo-chestnut43-common.dtsi    |   1 +
- arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi    | 178 +++++++++++++++++++++
- arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi |   1 +
- arch/arm/boot/dts/omap3-overo-palo43-common.dtsi   |   1 +
- 4 files changed, 181 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi
+Acked-by: Maxime Coquelin <maixme.coquelin@st.com>
 
-diff --git a/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi b/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi
-index 19de6ff..17b82f8 100644
---- a/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi
-@@ -11,6 +11,7 @@
-  */
- 
- #include "omap3-overo-common-peripherals.dtsi"
-+#include "omap3-overo-common-lcd43.dtsi"
- 
- #include <dt-bindings/input/input.h>
- 
-diff --git a/arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi b/arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi
-new file mode 100644
-index 0000000..f5395b7
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi
-@@ -0,0 +1,178 @@
-+/*
-+ * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * 4.3'' LCD panel output for some Gumstix Overo boards (Gallop43, Chestnut43)
-+ */
-+
-+&omap3_pmx_core {
-+	dss_dpi_pins: pinmux_dss_dpi_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x20d4, PIN_OUTPUT | MUX_MODE0)	/* dss_pclk.dss_pclk */
-+			OMAP3_CORE1_IOPAD(0x20d6, PIN_OUTPUT | MUX_MODE0)	/* dss_hsync.dss_hsync */
-+			OMAP3_CORE1_IOPAD(0x20d8, PIN_OUTPUT | MUX_MODE0)	/* dss_vsync.dss_vsync */
-+			OMAP3_CORE1_IOPAD(0x20da, PIN_OUTPUT | MUX_MODE0)	/* dss_acbias.dss_acbias */
-+			OMAP3_CORE1_IOPAD(0x20dc, PIN_OUTPUT | MUX_MODE0)	/* dss_data0.dss_data0 */
-+			OMAP3_CORE1_IOPAD(0x20de, PIN_OUTPUT | MUX_MODE0)	/* dss_data1.dss_data1 */
-+			OMAP3_CORE1_IOPAD(0x20e0, PIN_OUTPUT | MUX_MODE0)	/* dss_data2.dss_data2 */
-+			OMAP3_CORE1_IOPAD(0x20e2, PIN_OUTPUT | MUX_MODE0)	/* dss_data3.dss_data3 */
-+			OMAP3_CORE1_IOPAD(0x20e4, PIN_OUTPUT | MUX_MODE0)	/* dss_data4.dss_data4 */
-+			OMAP3_CORE1_IOPAD(0x20e6, PIN_OUTPUT | MUX_MODE0)	/* dss_data5.dss_data5 */
-+			OMAP3_CORE1_IOPAD(0x20e8, PIN_OUTPUT | MUX_MODE0)	/* dss_data6.dss_data6 */
-+			OMAP3_CORE1_IOPAD(0x20ea, PIN_OUTPUT | MUX_MODE0)	/* dss_data7.dss_data7 */
-+			OMAP3_CORE1_IOPAD(0x20ec, PIN_OUTPUT | MUX_MODE0)	/* dss_data8.dss_data8 */
-+			OMAP3_CORE1_IOPAD(0x20ee, PIN_OUTPUT | MUX_MODE0)	/* dss_data9.dss_data9 */
-+			OMAP3_CORE1_IOPAD(0x20f0, PIN_OUTPUT | MUX_MODE0)	/* dss_data10.dss_data10 */
-+			OMAP3_CORE1_IOPAD(0x20f2, PIN_OUTPUT | MUX_MODE0)	/* dss_data11.dss_data11 */
-+			OMAP3_CORE1_IOPAD(0x20f4, PIN_OUTPUT | MUX_MODE0)	/* dss_data12.dss_data12 */
-+			OMAP3_CORE1_IOPAD(0x20f6, PIN_OUTPUT | MUX_MODE0)	/* dss_data13.dss_data13 */
-+			OMAP3_CORE1_IOPAD(0x20f8, PIN_OUTPUT | MUX_MODE0)	/* dss_data14.dss_data14 */
-+			OMAP3_CORE1_IOPAD(0x20fa, PIN_OUTPUT | MUX_MODE0)	/* dss_data15.dss_data15 */
-+			OMAP3_CORE1_IOPAD(0x20fc, PIN_OUTPUT | MUX_MODE0)	/* dss_data16.dss_data16 */
-+			OMAP3_CORE1_IOPAD(0x20fe, PIN_OUTPUT | MUX_MODE0)	/* dss_data17.dss_data17 */
-+			OMAP3_CORE1_IOPAD(0x2100, PIN_OUTPUT | MUX_MODE0)	/* dss_data18.dss_data18 */
-+			OMAP3_CORE1_IOPAD(0x2102, PIN_OUTPUT | MUX_MODE0)	/* dss_data19.dss_data19 */
-+			OMAP3_CORE1_IOPAD(0x2104, PIN_OUTPUT | MUX_MODE0)	/* dss_data20.dss_data20 */
-+			OMAP3_CORE1_IOPAD(0x2106, PIN_OUTPUT | MUX_MODE0)	/* dss_data21.dss_data21 */
-+			OMAP3_CORE1_IOPAD(0x2108, PIN_OUTPUT | MUX_MODE0)	/* dss_data22.dss_data22 */
-+			OMAP3_CORE1_IOPAD(0x210a, PIN_OUTPUT | MUX_MODE0)	/* dss_data23.dss_data23 */
-+		>;
-+	};
-+
-+	lte430_pins: pinmux_lte430_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x2174, PIN_OUTPUT | MUX_MODE4)	/* uart2_cts.gpio_144 */
-+		>;
-+	};
-+
-+	backlight_pins: pinmux_backlight_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x2176, PIN_OUTPUT | MUX_MODE4)	/* uart2_rts.gpio_145 */
-+		>;
-+	};
-+
-+	mcspi1_pins: pinmux_mcspi1_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x21c8, PIN_INPUT | MUX_MODE0)	/* mcspi1_clk.mcspi1_clk */
-+			OMAP3_CORE1_IOPAD(0x21ca, PIN_INPUT | MUX_MODE0)	/* mcspi1_simo.mcspi1_simo */
-+			OMAP3_CORE1_IOPAD(0x21cc, PIN_INPUT | MUX_MODE0)	/* mcspi1_somi.mcspi1_somi */
-+			OMAP3_CORE1_IOPAD(0x21ce, PIN_INPUT | MUX_MODE0)	/* mcspi1_cs0.mcspi1_cs0 */
-+		>;
-+	};
-+
-+	ads7846_pins: pinmux_ads7846_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x2138, PIN_INPUT_PULLDOWN | MUX_MODE4)	/* csi2_dx1.gpio_114 */
-+		>;
-+	};
-+};
-+
-+/* Needed to power the DPI pins */
-+&vpll2 {
-+	regulator-always-on;
-+};
-+
-+&dss {
-+	status = "ok";
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&dss_dpi_pins>;
-+
-+	port {
-+		dpi_out: endpoint {
-+			remote-endpoint = <&lcd_in>;
-+			data-lines = <24>;
-+		};
-+	};
-+};
-+
-+/ {
-+	aliases {
-+		display0 = &lcd0;
-+	};
-+
-+	lcd0: display at 0 {
-+		compatible = "samsung,lte430wq-f0c", "panel-dpi";
-+		label = "lcd";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&lte430_pins>;
-+		enable-gpios = <&gpio5 16 GPIO_ACTIVE_HIGH>;		/* gpio_144 */
-+
-+		port {
-+			lcd_in: endpoint {
-+				remote-endpoint = <&dpi_out>;
-+			};
-+		};
-+
-+		panel-timing {
-+			clock-frequency = <9200000>;
-+			hactive = <480>;
-+			vactive = <272>;
-+			hfront-porch = <8>;
-+			hback-porch = <4>;
-+			hsync-len = <41>;
-+			vback-porch = <2>;
-+			vfront-porch = <4>;
-+			vsync-len = <10>;
-+
-+			hsync-active = <0>;
-+			vsync-active = <0>;
-+			de-active = <1>;
-+			pixelclk-active = <1>;
-+		};
-+	};
-+
-+	ads7846reg: ads7846-reg {
-+		compatible = "regulator-fixed";
-+		regulator-name = "ads7846-reg";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	backlight {
-+		compatible = "gpio-backlight";
-+		
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&backlight_pins>;
-+		gpios = <&gpio5 17 GPIO_ACTIVE_HIGH>;		/* gpio_145 */
-+
-+		default-on;
-+	};
-+};
-+
-+&mcspi1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mcspi1_pins>;
-+
-+	/* touch controller */
-+	ads7846 at 0 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&ads7846_pins>;
-+
-+		compatible = "ti,ads7846";
-+		vcc-supply = <&ads7846reg>;
-+
-+		reg = <0>;				/* CS0 */
-+		spi-max-frequency = <1500000>;
-+
-+		interrupt-parent = <&gpio4>;
-+		interrupts = <18 0>;			/* gpio_114 */
-+		pendown-gpio = <&gpio4 18 0>;
-+
-+		ti,x-min = /bits/ 16 <0x0>;
-+		ti,x-max = /bits/ 16 <0x0fff>;
-+		ti,y-min = /bits/ 16 <0x0>;
-+		ti,y-max = /bits/ 16 <0x0fff>;
-+		ti,x-plate-ohms = /bits/ 16 <180>;
-+		ti,pressure-max = /bits/ 16 <255>;
-+
-+		linux,wakeup;
-+	};
-+};
-+
-diff --git a/arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi b/arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi
-index 5e848c2..49d2254 100644
---- a/arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi
-@@ -11,6 +11,7 @@
-  */
- 
- #include "omap3-overo-common-peripherals.dtsi"
-+#include "omap3-overo-common-lcd43.dtsi"
- 
- #include <dt-bindings/input/input.h>
- 
-diff --git a/arch/arm/boot/dts/omap3-overo-palo43-common.dtsi b/arch/arm/boot/dts/omap3-overo-palo43-common.dtsi
-index abea232..087aedf 100644
---- a/arch/arm/boot/dts/omap3-overo-palo43-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo-palo43-common.dtsi
-@@ -11,6 +11,7 @@
-  */
- 
- #include "omap3-overo-common-peripherals.dtsi"
-+#include "omap3-overo-common-lcd43.dtsi"
- 
- #include <dt-bindings/input/input.h>
- 
--- 
-1.8.3.2
+Thanks,
+Maxime
+
+On 05/20/2014 03:22 PM, Gabriel FERNANDEZ wrote:
+> Changes in v2:
+>   - cosmetic changes (lower case of clock nodes and names)
+>
+> Changes in v2:
+>   - move stih415-clks.h & stih416-clks.h to include/dt-bindings/clock/
+>   - add clk_ignore_unused to bootargs. Interconnect clocks are not yet
+>     managed at the init, then we have to start the kernel with
+>     clk_ignore_unused.
+>
+> The goal of this series is to add DT definition for STiH415
+> and STiH416 SoCs on B2000 and B2020 boards.
+>
+> Gabriel Fernandez (11):
+>    ARM: STi: DT: STiH41x: Rename CLK_SYSIN into clk_sysin
+>    ARM: STi: DT: STiH416: 416 DT Entry for clockgen A0/1/10/11/12
+>    ARM: STi: DT: STiH416: Remove unused CLK_S_ICN_REG_0 fixed clock
+>    ARM: STi: DT: STiH416: Remove unused CLK_S_GMAC0_PHY & CLK_S_ETH1_PHY
+>      fixed clocks
+>    ARM: STi: DT: STiH416: 416 DT Entry for clockgen B/C/D/E/F
+>    ARM: STi: DT: STiH416: 416 DT Entry for clockgen A9/DDR/GPU
+>    ARM: STi: DT: STiH415: 415 DT Entry for clockgen A0/1/10/11/12
+>    ARM: STi: DT: STiH415: Remove unused CLK_S_ICN_REG_0 fixed clock
+>    ARM: STi: DT: STiH415: Remove unused CLK_S_GMAC0_PHY & CLK_S_ETH1_PHY
+>      fixed clocks
+>    ARM: STi: DT: STiH415: 415 DT Entry for clockgen A9
+>    ARM: STi: DT: STiH41x Add clk_ignore_unused to bootargs
+>
+>   arch/arm/boot/dts/stih415-clock.dtsi     | 519 +++++++++++++++++++++-
+>   arch/arm/boot/dts/stih415.dtsi           |  18 +-
+>   arch/arm/boot/dts/stih416-clock.dtsi     | 735 ++++++++++++++++++++++++++++++-
+>   arch/arm/boot/dts/stih416.dtsi           |  18 +-
+>   arch/arm/boot/dts/stih41x-b2000.dtsi     |   2 +-
+>   arch/arm/boot/dts/stih41x-b2020.dtsi     |   2 +-
+>   include/dt-bindings/clock/stih415-clks.h |  15 +
+>   include/dt-bindings/clock/stih416-clks.h |  15 +
+>   8 files changed, 1268 insertions(+), 56 deletions(-)
+>   create mode 100644 include/dt-bindings/clock/stih415-clks.h
+>   create mode 100644 include/dt-bindings/clock/stih416-clks.h
+>
