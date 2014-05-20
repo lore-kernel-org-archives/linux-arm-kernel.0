@@ -1,59 +1,49 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 21 May 2014 01:13:17 +0800
-Subject: [GIT PULL] at91: DT for 3.16 #2
-In-Reply-To: <20140520055041.GO18956@quad.lixom.net>
-References: <1400059162-630-1-git-send-email-nicolas.ferre@atmel.com>
- <20140520055041.GO18956@quad.lixom.net>
-Message-ID: <58381B35-AAB4-4FE5-833D-603052C97E9E@jcrosoft.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 20 May 2014 11:17:25 -0600
+Subject: [PATCH v1 5/5] pci: keystone: add pcie driver based on designware
+ core driver
+In-Reply-To: <4769015.Y4xoyoQxYb@wuerfel>
+References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
+ <5671513.YgJm44AVLV@wuerfel> <537A735A.9070607@ti.com>
+ <4769015.Y4xoyoQxYb@wuerfel>
+Message-ID: <CAErSpo5iehwoDAuETCxCEHHj1_0jHCJUnn+wj1OUAn6PpxbtyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, May 20, 2014 at 1:55 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 19 May 2014 17:10:50 Murali Karicheri wrote:
 
-On May 20, 2014, at 1:50 PM, Olof Johansson <olof@lixom.net> wrote:
+>> On ARM, by default pci_bus_config seems to be set to 0
+>> (PCIE_BUS_TUNE_OFF). So the code doesn't get
+>> executed for this default. But for PCIE_BUS_SAFE, it doesn't change the
+>> mrrs at the EP and is not
+>> good for our platform w.r.t mrrs settings. For PCIE_BUS_PERFORMANCE, it
+>> seems to increase the payload
+>> size as well and Keystone Payload size is limited to 128 bytes. So it is
+>> not safe to increase the payload
+>> size to 256 based on the log.
+>>
+>> On other platforms, Why the PCI core try to set the payload size equal
+>> to mrrs? Is this explained in any
+>> PCI spec?  Looks like this is done for performance? Let me know if you
+>> want me to send a patch for
+>> review to add the pcie_bus_configure_settings() code to
+>> arch/arm/kernel/bios32.c
+>>
+>> For the Keystone PCI driver, I believe. it is safe to have the quirk so
+>> that controller can handle the
+>> read requests properly. Let me know if the quirk code above looks good
+>> to go.
+>
+> I don't know enough about these to give you a definite answer, but
+> I'd still prefer to handle this in generic code. A quirk seems to
+> be the wrong answer here. If this isn't something we can do in generic
+> fashion, can you do it in the add_bus() callback perhaps?
 
-> 
-> On Wed, May 14, 2014 at 11:19:22AM +0200, Nicolas Ferre wrote:
->> Arnd, Olof, Kevin,
->> 
->> More DT material for AT91. Some fixes that apply on what was merged for 3.15
->> but that are not very critical.
->> The other patches are feature additions to old or very recent product/board:
->> at91sam9261 or sama5d3 Xplained.
->> 
->> Thanks, best regards,
->> 
->> The following changes since commit 27a96a0364787d2b41d2a72d08143d95263e1b07:
->> 
->>  ARM: at91: sama5d3: clock for ssc from rk pin (2014-04-18 22:43:44 +0200)
->> 
->> are available in the git repository at:
->> 
->>  git://github.com/at91linux/linux-at91.git tags/at91-dt2
->> 
->> for you to fetch changes up to a93f9c88b7701d1c4c3b22d39d64a408f000a6ef:
->> 
->>  ARM: at91/dt: at91-sama5d3_xplained: add the regulator device node (2014-05-12 16:48:54 +0200)
-> 
-> Merged, but:
-> 
->> arch/arm/boot/dts/at91-sama5d3_xplained.dts |  62 +++++++++++++++
->> arch/arm/boot/dts/at91sam9261.dtsi          | 114 ++++++++++++++++++++++++++--
->> arch/arm/boot/dts/at91sam9rl.dtsi           |   7 +-
->> arch/arm/boot/dts/sama5d3.dtsi              |  78 +++++++++++++++++++
-> 
-> Grmbl. I remember being somewhat annoyed that you didn't use at91 prefix
-> when you introduced the sama5d3 dtsi files, but please don't start using
-> it on a random board like this, especially when other boards just use
-> the sama5d3_<board>.dts format.
-> 
-> Care to fix this up in time for 3.16 merge window?
+I definitely prefer a more generic approach than a quirk.
+Unfortunately the MPS management was implemented originally just for
+x86, not because there's anything arch-specific about it, but because
+the author was only concerned about x86.  Making that more generic has
+been an open issue all along.
 
-there is a small issue here Atmel drop the at91 in the soc name
-
-Best Regards,
-J.
-> 
-> 
-> Thanks,
-> 
-> -Olof
+Bjorn
