@@ -1,49 +1,31 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 20 May 2014 08:43:53 +0100
-Subject: [PATCH v4 6/6] ARM: dts: STiH407: Add B2120 board support
-In-Reply-To: <CAOesGMioLwX3jgGEsR=rHV0u6yR54b4x8BfyZ91vjJnMapUHew@mail.gmail.com>
-References: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>
- <1394614210-15698-7-git-send-email-maxime.coquelin@st.com>
- <CAOesGMg5Jk_XB3zdfKz8VxRObYbFO8OMuRyo7Ba-kavANbci1w@mail.gmail.com>
- <20140520072048.GC20874@lee--X1>
- <CAOesGMioLwX3jgGEsR=rHV0u6yR54b4x8BfyZ91vjJnMapUHew@mail.gmail.com>
-Message-ID: <20140520074353.GD20874@lee--X1>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 20 May 2014 09:48:08 +0200
+Subject: [PATCH 00/03] ARM: shmobile: Use shmobile_init_delay() on r8a7790
+In-Reply-To: <20140519233714.10496.31390.sendpatchset@w520>
+References: <20140519233714.10496.31390.sendpatchset@w520>
+Message-ID: <CAMuHMdVHzp7sK8ufi9J35-ZaBXsvOZPrZDNcCwX8wTBSZpOpoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> > +       soc {
-> >> > +               sbc_serial0: serial at 9530000 {
-> >> > +                       status = "okay";
-> >> > +               };
-> >>
-> >> You might want to consider reference-based syntax here instead, so you
-> >> don't have to mimic the hierarchy. That'd be (at the root level of the
-> >> file, below this secion:
-> >>
-> >> &sbc_serial0: {
-> >>         status = "okay";
-> >> };
-> >
-> > I'm personally not keen on this scheme.  It's sometimes helpful to know
-> > the hierarchy and I don't think it's a large overhead to format the
-> > subordinate DTS files in this way.
-> >
-> > Please consider not enforcing this.
-> 
-> Definitely not enforcing it, and I didn't use to like it either but it
-> has some real upsides.
-> 
-> In particular, it saves a lot of grief when you're changing something
-> like the unit-id of a node in .dtsi and forget to do the same update
-> in the dts.
+On Tue, May 20, 2014 at 1:37 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> [PATCH 01/03] ARM: shmobile: Use r8a7790 DT CPU Frequency in common case
+> [PATCH 02/03] ARM: shmobile: Use r8a7790 DT CPU Frequency for Lager
+> [PATCH 03/03] ARM: shmobile: Remove unused r8a7790_init_early()
+>
+> Convert r8a7790 to rely on shmobile_init_delay() instead of using a per-SoC
+> delay setup function. Very similar to the r8a7791 implementation.
+>
+> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 
-I'm not entirely sure what a unit-id is, but I can see that there
-would be benefits to using the referenced-based syntax as you call
-it.  If any of those benefits hold true here I won't push back, but I
-would personally like to see us default to the hierarchical scheme.
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
