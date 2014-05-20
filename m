@@ -1,80 +1,34 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 20 May 2014 17:19:24 +0200
-Subject: [GIT PULL] at91: DT for 3.16 #2
-In-Reply-To: <20140520055041.GO18956@quad.lixom.net>
-References: <1400059162-630-1-git-send-email-nicolas.ferre@atmel.com>
- <20140520055041.GO18956@quad.lixom.net>
-Message-ID: <537B727C.5080404@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 20 May 2014 16:20:54 +0100
+Subject: [PATCH] mfd: abx500-core: Fix compiler warning larger stack frame
+In-Reply-To: <536E1543.3090107@aurabindo.in>
+References: <536E1543.3090107@aurabindo.in>
+Message-ID: <20140520152054.GB24991@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/05/2014 07:50, Olof Johansson :
-> On Wed, May 14, 2014 at 11:19:22AM +0200, Nicolas Ferre wrote:
->> Arnd, Olof, Kevin,
->>
->> More DT material for AT91. Some fixes that apply on what was merged for 3.15
->> but that are not very critical.
->> The other patches are feature additions to old or very recent product/board:
->> at91sam9261 or sama5d3 Xplained.
->>
->> Thanks, best regards,
->>
->> The following changes since commit 27a96a0364787d2b41d2a72d08143d95263e1b07:
->>
->>   ARM: at91: sama5d3: clock for ssc from rk pin (2014-04-18 22:43:44 +0200)
->>
->> are available in the git repository at:
->>
->>   git://github.com/at91linux/linux-at91.git tags/at91-dt2
->>
->> for you to fetch changes up to a93f9c88b7701d1c4c3b22d39d64a408f000a6ef:
->>
->>   ARM: at91/dt: at91-sama5d3_xplained: add the regulator device node (2014-05-12 16:48:54 +0200)
+> From 95f6ac368dbe352af0dfa2097b7d58b416447be5 Mon Sep 17 00:00:00 2001
+> From: Aurabindo J <mail@aurabindo.in>
+> Date: Sat, 10 May 2014 15:16:58 +0530
+> Subject: [PATCH] mfd: abx500-core: Fix compiler warning larger stack frame
 > 
-> Merged, but:
+> On systems with CONFIG_FRAME_WARN=1024, compiler warns the allocation of
+> an object of struct device on stack. Make the allocation dynamically to
+> fix the warning.
 > 
->>  arch/arm/boot/dts/at91-sama5d3_xplained.dts |  62 +++++++++++++++
->>  arch/arm/boot/dts/at91sam9261.dtsi          | 114 ++++++++++++++++++++++++++--
->>  arch/arm/boot/dts/at91sam9rl.dtsi           |   7 +-
->>  arch/arm/boot/dts/sama5d3.dtsi              |  78 +++++++++++++++++++
+> drivers/mfd/abx500-core.c: In function ?abx500_dump_all_banks?:
+> drivers/mfd/abx500-core.c:167:1: warning: the frame size of 1032 bytes
+> is larger than 1024 bytes [-Wframe-larger-than=]
 > 
-> Grmbl. I remember being somewhat annoyed that you didn't use at91 prefix
-> when you introduced the sama5d3 dtsi files, but please don't start using
-> it on a random board like this, especially when other boards just use
-> the sama5d3_<board>.dts format.
+> Signed-off-by: Aurabindo J <mail@aurabindo.in>
+> ---
+>  drivers/mfd/abx500-core.c | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
 
-Well, I don't understand completely. Since our discussion during 3.10
-merge window ([GIT PULL] at91: DT changes for 3.10 #2), I try to conform
-to this rule:
+Looks good to me.  I'll apply it until Linus complains.
 
-1/ all pre-3.10 and 3.10 device tree file names stay unchanged
--> sama5d3.dti (SoC)
--> sama5d35ek.dts (board)
-
-2/ all *SoC* DT files conform to their marking:
-at91sam9263.dtsi
-at91sam9rl.dtsi
-sama5d3.dtsi, sama5d36.dtsi
-sama5d4.dtsi, sama5d46.dtsi (maybe in the future, who knows...)
-
-3/ all post-3.10 *boards* have the "at91-" prefix, whether they are
-populated with sam9 or sama5:
-at91-ariag25.dts (since 3.10, using a at91sam9g25)
-at91-qil_a9260.dts (since 3.14, using at91sam9260)
-at91-sama5d3_xplained.dts (since 3.14, using sama5d36)
-
-The rule for AT91 has never been to prefix the board DT filename with
-the name of the SoC or SoC family.
-
-> Care to fix this up in time for 3.16 merge window?
-
-Well, I do not know what to fix as the files were already present in
-mainline before this kernel revision and that I am a little bit
-reluctant to change file names after they are merged in mainline.
-
-Now, can we keep the current policy described above (somehow weird, I
-admit) for future SoCs and boards?
-
-Best regards,
 -- 
-Nicolas Ferre
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
