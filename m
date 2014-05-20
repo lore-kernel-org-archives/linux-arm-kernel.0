@@ -1,29 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 20 May 2014 18:37:27 +0100
-Subject: [PATCH 1/2] arm64: topology: Tell the scheduler about the
- relative power of cores
-In-Reply-To: <1400545421-28067-1-git-send-email-broonie@kernel.org>
-References: <1400545421-28067-1-git-send-email-broonie@kernel.org>
-Message-ID: <20140520173727.GD28293@arm.com>
+From: elder@linaro.org (Alex Elder)
+Date: Tue, 20 May 2014 12:40:01 -0500
+Subject: [PATCH v4 0/5] ARM: SMP: support Broadcom mobile SoCs
+Message-ID: <1400607606-10810-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 01:23:40AM +0100, Mark Brown wrote:
-> In heterogeneous systems like big.LITTLE systems the scheduler will be
-> able to make better use of the available cores if we provide power numbers
-> to it indicating their relative performance. Do this by parsing the CPU
-> nodes in the DT.
+This series adds SMP support for two Broadcom mobile SoC families.
+It uses CPU_METHOD_OF_DECLARE() so that SMP operations are assigned
+using device tree rather than adding it to a machine definition in a
+board file.
 
-Last time we discussed these two patches, my understanding was that the
-mainline scheduler doesn't behave any better on big.LITTLE with this
-additional information, unless you also have additional out of tree b.L
-MP patches. Vincent is also cleaning up some of the cpu_power usage in
-the scheduler.
+The enable method starts a secondary core by writing to a register
+monitored by CPUs spinning in a ROM-based holding pen loop.  The
+address of this register is recorded as a property in the "cpus"
+node of the device tree.
 
-So unless there are clear benefits in providing such information to the
-mainline scheduler, I don't plan to merge them for the time being (I'm
-also not convinced of the numbers in the second patch, they need some
-benchmarking on real hardware).
+					-Alex
+
+Note:
+This series is based on v3.15-rc4, plus one more recently-posted patch:
+    http://permalink.gmane.org/gmane.linux.kernel/1683693
+
+History
+v3: - Renamed "platsmp.c" to be "kona_smp.c".
+    - Rebased onto v3.15-rc5
+v3: - Dropped definition and use of CPU_METHOD_OF_DECLARE_SETUP()
+    - Added documentation for "enable-method"
+    - Rebased onto v3.15-rc4
+v2: - Fixed a Makefile error (:= should have been +=)
+    - No longer set CONFIG_NR_CPUS in bcm_defconfig
+    - Rebased onto v3.15-rc1
+
+This series is available here:
+    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
+    Branch review/bcm-smp-v4
+
+Alex Elder (5):
+  devicetree: bindings: document Broadcom CPU enable method
+  ARM: add SMP support for Broadcom mobile SoCs
+  ARM: configs: enable SMP in bcm_defconfig
+  ARM: dts: enable SMP support for bcm28155
+  ARM: dts: enable SMP support for bcm21664
+
+ Documentation/devicetree/bindings/arm/cpus.txt |  12 ++
+ arch/arm/boot/dts/bcm11351.dtsi                |  19 +++
+ arch/arm/boot/dts/bcm21664.dtsi                |  19 +++
+ arch/arm/configs/bcm_defconfig                 |   1 +
+ arch/arm/mach-bcm/Kconfig                      |  18 ++-
+ arch/arm/mach-bcm/Makefile                     |   3 +
+ arch/arm/mach-bcm/kona_smp.c                   | 202 +++++++++++++++++++++++++
+ 7 files changed, 271 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-bcm/kona_smp.c
 
 -- 
-Catalin
+1.9.1
