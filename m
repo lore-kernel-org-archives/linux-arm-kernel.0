@@ -1,50 +1,77 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 20 May 2014 22:36:59 +0800
-Subject: [PATCH v3 0/6] enable Hix5hd2 SoC
-Message-ID: <1400596625-16830-1-git-send-email-haojian.zhuang@linaro.org>
+Date: Tue, 20 May 2014 22:37:01 +0800
+Subject: [PATCH v3 2/6] ARM: debug: Rename Hi3716 to HI5XHD2
+In-Reply-To: <1400596625-16830-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1400596625-16830-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1400596625-16830-3-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changelog:
-v3:
-  * Clean in headsmp.S.
-  * Remove CONFIG_ARCH_HIX5HD2 in Makefile for headsmp.o. Use
-    CONFIG_SMP instead.
+From: Haifeng Yan <yanhaifeng@gmail.com>
 
-v2:
-  * Add document on DT binding.
-  * Clean DTS file.
-  * Avoid to parse DT binding in restart function.
-  * Fix the hotplug issue.
-  * Remove hardcoding in platsmp.
+Rename Hisilicon HI3716 to HI5XHD2. And it relies on ARCH_HI5XHD2
+instead.
 
-Haifeng Yan (3):
-  ARM: debug: Rename Hi3716 to HI5XHD2
-  ARM: hisi: enable hix5hd2 SoC
-  ARM: dts: Add hix5hd2-dkb dts file.
+Hi5XHD2 is a SoC with dual Cortex A9 cores.
 
-Haojian Zhuang (3):
-  ARM: hisi: store reboot reg in global variable
-  ARM: config: add ARCH_HIX5HD2 in hi3xxx_defconfig
-  document: add dt binding on hix5hd2 SoC
+Signed-off-by: Haifeng Yan <yanhaifeng@gmail.com>
+Signed-off-by: Jiancheng Xue <jchxue@gmail.com>
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ arch/arm/Kconfig.debug | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
- .../bindings/arm/hisilicon/hisilicon.txt           |   9 ++
- arch/arm/Kconfig.debug                             |  20 +--
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/hix5hd2-dkb.dts                  |  52 +++++++
- arch/arm/boot/dts/hix5hd2.dtsi                     | 171 +++++++++++++++++++++
- arch/arm/configs/hi3xxx_defconfig                  |   1 +
- arch/arm/mach-hisi/Kconfig                         |  13 +-
- arch/arm/mach-hisi/Makefile                        |   2 +-
- arch/arm/mach-hisi/core.h                          |   5 +
- arch/arm/mach-hisi/headsmp.S                       |  16 ++
- arch/arm/mach-hisi/hisilicon.c                     |  32 +++-
- arch/arm/mach-hisi/hotplug.c                       |  58 +++++++
- arch/arm/mach-hisi/platsmp.c                       |  50 +++++-
- 13 files changed, 407 insertions(+), 23 deletions(-)
- create mode 100644 arch/arm/boot/dts/hix5hd2-dkb.dts
- create mode 100644 arch/arm/boot/dts/hix5hd2.dtsi
- create mode 100644 arch/arm/mach-hisi/headsmp.S
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 5a311af..df930e5 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -215,14 +215,6 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on HI3620 UART.
+ 
+-	config DEBUG_HI3716_UART
+-		bool "Hisilicon Hi3716 Debug UART"
+-		depends on ARCH_HI3xxx
+-		select DEBUG_UART_PL01X
+-		help
+-		  Say Y here if you want kernel low-level debugging support
+-		  on HI3716 UART.
+-
+ 	config DEBUG_HIP04_UART
+ 		bool "Hisilicon HiP04 Debug UART"
+ 		depends on ARCH_HIP04
+@@ -231,6 +223,14 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on HIP04 UART.
+ 
++	config DEBUG_HIX5HD2_UART
++		bool "Hisilicon Hix5hd2 Debug UART"
++		depends on ARCH_HIX5HD2
++		select DEBUG_UART_PL01X
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Hix5hd2 UART.
++
+ 	config DEBUG_HIGHBANK_UART
+ 		bool "Kernel low-level debugging messages via Highbank UART"
+ 		depends on ARCH_HIGHBANK
+@@ -1058,7 +1058,7 @@ config DEBUG_UART_PHYS
+ 	default 0xf1012000 if ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
+ 				ARCH_ORION5X
+ 	default 0xf7fc9000 if DEBUG_BERLIN_UART
+-	default 0xf8b00000 if DEBUG_HI3716_UART
++	default 0xf8b00000 if DEBUG_HIX5HD2_UART
+ 	default 0xfcb00000 if DEBUG_HI3620_UART
+ 	default 0xfe800000 if ARCH_IOP32X
+ 	default 0xffc02000 if DEBUG_SOCFPGA_UART
+@@ -1101,7 +1101,7 @@ config DEBUG_UART_VIRT
+ 	default 0xfe230000 if DEBUG_PICOXCELL_UART
+ 	default 0xfe300000 if DEBUG_BCM_KONA_UART
+ 	default 0xfe800000 if ARCH_IOP32X
+-	default 0xfeb00000 if DEBUG_HI3620_UART || DEBUG_HI3716_UART
++	default 0xfeb00000 if DEBUG_HI3620_UART || DEBUG_HIX5HD2_UART
+ 	default 0xfeb24000 if DEBUG_RK3X_UART0
+ 	default 0xfeb26000 if DEBUG_RK3X_UART1
+ 	default 0xfeb30c00 if DEBUG_KEYSTONE_UART0
 -- 
 1.9.1
