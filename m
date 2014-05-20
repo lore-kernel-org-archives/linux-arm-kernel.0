@@ -1,161 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 May 2014 13:15:48 +0200
-Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140520110536.GA10302@ulmo>
-References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
- <5759340.gycj7cP1t3@wuerfel> <20140520110536.GA10302@ulmo>
-Message-ID: <10711669.TTjp9L4tTG@wuerfel>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 20 May 2014 06:20:05 -0500
+Subject: [PATCH] ARM: DRA752: add detection of SoC information
+In-Reply-To: <537AF088.4000506@ti.com>
+References: <1400513231-25092-1-git-send-email-nm@ti.com>
+ <537AF088.4000506@ti.com>
+Message-ID: <CAGo_u6om25s4Fxyf6LAEcoL0t0jfm_QREJuD57FQQ16E9A=bWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 May 2014 13:05:37 Thierry Reding wrote:
-> On Tue, May 20, 2014 at 12:04:54PM +0200, Arnd Bergmann wrote:
-> > On Monday 19 May 2014 22:59:46 Thierry Reding wrote:
-> > > On Mon, May 19, 2014 at 08:34:07PM +0200, Arnd Bergmann wrote:
-> > > > On Monday 19 May 2014 14:53:37 Thierry Reding wrote:
-> > > > > On Mon, May 19, 2014 at 12:26:35PM +0200, Arnd Bergmann wrote:
-> > > > > > On Friday 16 May 2014 14:23:18 Thierry Reding wrote:
-> > > > > > > From: Thierry Reding <treding@nvidia.com>
-> [...]
-> > > > > > Finally, it makes no sense to use the dma-ranges property of the master's
-> > > > > > parent bus, because that bus isn't actually involved in the translation.
-> > > > > 
-> > > > > My understanding here is mostly based on the OpenFirmware working group
-> > > > > proposal for the dma-ranges property[0]. I'll give another example to
-> > > > > try and clarify how I had imagined this to work:
-> > > > > 
-> > > > > 	/ {
-> > > > > 		#address-cells = <2>;
-> > > > > 		#size-cells = <2>;
-> > > > > 
-> > > > > 		iommu {
-> > > > > 			/*
-> > > > > 			 * This is somewhat unusual (or maybe not) in that we
-> > > > > 			 * need 2 cells to represent the size of an address
-> > > > > 			 * space that is 32 bits long.
-> > > > > 			 */
-> > > > > 			#address-cells = <1>;
-> > > > > 			#size-cells = <2>;
-> > > > 
-> > > > You should never need #size-cells > #address-cells
-> > > 
-> > > That was always my impression as well. But how then do you represent the
-> > > full 4 GiB address space in a 32-bit system? It starts at 0 and ends at
-> > > 4 GiB - 1, which makes it 4 GiB large. That's:
-> > > 
-> > > 	<0 1 0>
-> > > 
-> > > With #address-cells = <1> and #size-cells = <1> the best you can do is:
-> > > 
-> > > 	<0 0xffffffff>
-> > > 
-> > > but that's not accurate.
-> > 
-> > I think we've done both in the past, either extended #size-cells or
-> > taken 0xffffffff as a special token. Note that in your example,
-> > the iommu actually needs #address-cells = <2> anyway.
-> 
-> But it needs #address-cells = <2> only to encode an ID in addition to
-> the address. If this was a single-master IOMMU then there'd be no need
-> for the ID.
+On Tue, May 20, 2014 at 1:04 AM, Rajendra Nayak <rnayak@ti.com> wrote:
+> So we are back to checking revisions based on idcode register then?
+> This patch was posted almost a year back and was shot down by you
+> included saying we need to use dt compatibles for it.
+>
+> https://www.mail-archive.com/linux-omap at vger.kernel.org/msg93136.html
 
-Right. But for a single-master IOMMU, there is no need to specify
-any additional data, it could have #address-cells=<0> if we take the
-optimization you suggested.
+No, even thought it looks like, we are not intending to here. we are
+fixing a sysfs break.
 
-> This really isn't specific to IOMMUs though. It really applies to all
-> cases where #address-cells and #size-cells are parsed. While it's way
-> too late to change the semantics of standard properties, perhaps for
-> properties that are introduced it would make more sense to encode this
-> as a <start limit> pair, both of length #address-cells, to avoid this
-> type of corner case.
-> 
-> On the other hand doing so would make it inconsistent with existing
-> bindings which may not be desirable either.
-> 
-> But since it seems like we're headed for something completely different
-> for IOMMUs, perhaps it would be worth considering to describe the IOMMU
-> range as <start limit>. Since it will likely use #iommu-cells rather
-> than #address-cells we have an opportunity to change the semantics.
+soc_is_dra7xx() is still based on machine_of_ compatible - we have'nt
+touched that here. What is taking place at the moment is that
+/sys/devices/soc0/ sysfs entries are being populated in same way as
+AM437x and other DT only platforms. Currently we follow the same style
+as non-dt code as OMAP3 still co-exist DT+non-DT - we have not yet
+introduced a new driver for soc device - but once we go full DT, we
+probably should do that at the root of the entire dt tree (similar  to
+what tegra has done) and populare soc sysfs with proper values. Now,
+if that generic driver decides to use only OF-information for
+revision, That is good as well -> so far, there has been no attempt to
+support such a revision binding (despite our discussion).
 
-I'd still prefer #address-cells/#size-cells over #iommu-cells.
 
-> > / {
-> > 	#address-cells = <1>;
-> > 	#size-cells = <1>;
-> > 
-> > 	iommu {
-> > 		#address-cells = <2>; // ID, address
-> > 		#size-cells = <2>;
-> > 	};
-> > 
-> > 	master at a {
-> > 		iommus = <& {/iommu} 0xa 0x0  0x1 0x0>; // 4GB ID '0xa'
-> > 	}
-> > 
-> > 	bus1 {
-> > 		#address-cells = <1>;
-> > 		#size-cells = <1>;
-> > 		ranges;
-> > 		iommus = <& {/iommu} 0 0   0x100 0>; // all IDs
-> > 		dma-ranges = <0  0xb 0  1 0>; // child devices use ID '0xb'
-> > 
-> > 		anothermaster {
-> > 			// no iommus link, implied by dma-ranges above
-> > 		};
-> > 	};
-> > };
-> > 
-> > If you set #size-cells=<0>, you can't really do that but instead would
-> > require an iommus property in each master, which is not a big concern
-> > either.
-> 
-> I'm not sure I understand the need for 0x100 (all IDs) entry above. If
-> bus1's iommus property applies to all devices on the bus, why can't the
-> ID 0xb be listed in the iommus property?
-> 
-> 	bus1 {
-> 		#address-cells = <1>;
-> 		#size-cells = <1>;
-> 		ranges;
-> 		iommus = <&{/iommu} 0xb 0  0x1 0x0>; // 4GB ID '0xb'
-> 		dma-ranges = <0  0xb 0  0x1 0x0>;
-> 
-> 		anothermaster {
-> 			...
-> 		};
-> 	};
-
-It depends on how the address is interpreted, but we could make this
-a valid case too.
-
-> In which case I guess dma-ranges would be redundant.
-
-No, because the iommus property doesn't translate the address range, it
-just creates a new address space. bus1 and iommu in the example have
-different #address-cells, so you definitely need a non-empty ranges
-property.
-
-> > The main advantage I think would be for IOMMUs that use the PCI b/d/f
-> > numbers as IDs. These can have #address-cells=<3>, #size-cells=<2>
-> > and have an empty dma-ranges property in the PCI host bridge node,
-> > and interpret this as using the same encoding as the PCI BARs in
-> > the ranges property.
-> 
-> I'm somewhat confused here, since you said earlier:
-> 
-> > After giving the ranges stuff some more thought, I have come to the
-> > conclusion that using #iommu-cells should work fine for almost
-> > all cases, including windowed iommus, because the window is not
-> > actually needed in the device, but only in the iommu, wihch is of course
-> > free to interpret the arguments as addresses.
-> 
-> But now you seem to be saying that we should still be using the
-> #address-cells and #size-cells properties in the IOMMU node to determine
-> the length of the specifier.
-
-I probably wasn't clear. I think we can make it work either way, but
-my feeling is that using #address-cells/#size-cells gives us a nicer
-syntax for the more complex cases.
-
-	Arnd
+Regards,
+Nishanth Menon
