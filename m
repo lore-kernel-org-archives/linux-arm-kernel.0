@@ -1,155 +1,60 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 20 May 2014 16:45:36 +0800
-Subject: [PATCH 18/20] ARM: imx5: remove file mm-imx5.c
-In-Reply-To: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
-References: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1400575538-21136-19-git-send-email-shawn.guo@freescale.com>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Tue, 20 May 2014 14:25:11 +0530
+Subject: [PATCH v7 0/3] Add support for PCI in AArch64
+In-Reply-To: <5759329.P75jKFdv3B@wuerfel>
+References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
+ <4292818.mI6kZGgTzd@wuerfel>
+ <CA+sq2Ce+8YB+02B7zhxTXwropZXv9spy-w=AJ8YXCP69kr-_1A@mail.gmail.com>
+ <5759329.P75jKFdv3B@wuerfel>
+Message-ID: <CA+sq2CeyUkg6ELYrWYqtxaXhNVeQ9UWiMC=GY4ADE-ZWS1bf9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only code left in mm-imx5.c is to create static mapping.  While all
-IMX platform code are moved to use dynamic mapping, the file can just be
-removed now.
+On Tue, May 20, 2014 at 2:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 20 May 2014 09:52:33 Sunil Kovvuri wrote:
+>> >> In sriov_enable() (drivers/pci/iov.c)
+>> >>
+>> >>  296        for (i = 0; i < PCI_SRIOV_NUM_BARS; i++) {
+>> >>  297                 bars |= (1 << (i + PCI_IOV_RESOURCES));
+>> >>  298                 res = dev->resource + PCI_IOV_RESOURCES + i;
+>> >>  299                 if (res->parent)
+>> >>  300                         nres++;
+>> >>  301         }
+>> >>  302         if (nres != iov->nres) {
+>> >>  303                 dev_err(&dev->dev, "not enough MMIO resources for
+>> >>  SR-IOV\n");
+>> >>  304                 return -ENOMEM;
+>> >>  305         }
+>> >>
+>> >> Here its checking if physical function's IOV resource has a parent or not.
+>> >> Which is pci-pci bridge in this case. Otherwise it doesn't consider
+>> >> that resource.
+>> >>
+>> >> Added below api to your patch.
+>> >> This will try to claim a resource while creating a PCI device which
+>> >> inturn sets 'res->parent'.
+>> >
+>> > This looks like the wrong approach. The PCI host controller should
+>> > really have been registered with the root 'iomem_resource' during
+>> > the probe of the host controller.
+>> >
+>> I didn't get this, if a SR-IOV device is connected to a PCI-PCI bridge
+>> and inturn bridge connected to root port. Then the parent bus is not root,
+>> but the bridge.  The issue is either hierarchy should not be checked for
+>> SR-IOV resources or someone should set the hierarchy (i.e parent resources).
+>
+> Ah, I misunderstood the problem, I thought the PCI core was complaining
+> about lack of space in the resources, not about a lack of BARs.
+>
+> It seems there is code like yours in a couple of architectures, but they
+> only claim the resources of bridges, not the actual devices as you
+> seem to be doing. Can you check if the x86 version of
+> pcibios_allocate_bus_resources() does the trick for you? Maybe we can
+> turn that into a generic helper.
+>
+Thanks for the suggestion. Will try that once.
+FYI, IA64 architecture does claim resources for devices as well.
+arch/ia64/pci/pci.c  'pcibios_fixup_device_resources()'
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- arch/arm/mach-imx/Makefile     |  2 +-
- arch/arm/mach-imx/common.h     |  2 --
- arch/arm/mach-imx/mach-imx50.c |  1 -
- arch/arm/mach-imx/mach-imx51.c |  1 -
- arch/arm/mach-imx/mach-imx53.c |  1 -
- arch/arm/mach-imx/mm-imx5.c    | 61 ------------------------------------------
- 6 files changed, 1 insertion(+), 67 deletions(-)
- delete mode 100644 arch/arm/mach-imx/mm-imx5.c
-
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 5396b38..2c8ca00 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -12,7 +12,7 @@ obj-$(CONFIG_SOC_IMX31) += mm-imx3.o cpu-imx31.o clk-imx31.o iomux-imx31.o ehci-
- obj-$(CONFIG_SOC_IMX35) += mm-imx3.o cpu-imx35.o clk-imx35.o ehci-imx35.o pm-imx3.o
- 
- imx5-pm-$(CONFIG_PM) += pm-imx5.o
--obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o mm-imx5.o clk-imx51-imx53.o $(imx5-pm-y)
-+obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o clk-imx51-imx53.o $(imx5-pm-y)
- 
- obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
- 			    clk-pfd.o clk-busy.o clk.o \
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index b480f0b..53ee569 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -26,8 +26,6 @@ void mx25_map_io(void);
- void mx27_map_io(void);
- void mx31_map_io(void);
- void mx35_map_io(void);
--void mx51_map_io(void);
--void mx53_map_io(void);
- void imx1_init_early(void);
- void imx21_init_early(void);
- void imx25_init_early(void);
-diff --git a/arch/arm/mach-imx/mach-imx50.c b/arch/arm/mach-imx/mach-imx50.c
-index 66e537b..62a4d45 100644
---- a/arch/arm/mach-imx/mach-imx50.c
-+++ b/arch/arm/mach-imx/mach-imx50.c
-@@ -29,7 +29,6 @@ static const char *imx50_dt_board_compat[] __initconst = {
- };
- 
- DT_MACHINE_START(IMX50_DT, "Freescale i.MX50 (Device Tree Support)")
--	.map_io		= mx53_map_io,
- 	.init_irq	= tzic_init_irq,
- 	.init_machine	= imx50_dt_init,
- 	.dt_compat	= imx50_dt_board_compat,
-diff --git a/arch/arm/mach-imx/mach-imx51.c b/arch/arm/mach-imx/mach-imx51.c
-index a2027d2..92806ad 100644
---- a/arch/arm/mach-imx/mach-imx51.c
-+++ b/arch/arm/mach-imx/mach-imx51.c
-@@ -74,7 +74,6 @@ static const char *imx51_dt_board_compat[] __initconst = {
- };
- 
- DT_MACHINE_START(IMX51_DT, "Freescale i.MX51 (Device Tree Support)")
--	.map_io		= mx51_map_io,
- 	.init_early	= imx51_init_early,
- 	.init_irq	= tzic_init_irq,
- 	.init_machine	= imx51_dt_init,
-diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-index 40005b8..754c491 100644
---- a/arch/arm/mach-imx/mach-imx53.c
-+++ b/arch/arm/mach-imx/mach-imx53.c
-@@ -48,7 +48,6 @@ static const char *imx53_dt_board_compat[] __initconst = {
- };
- 
- DT_MACHINE_START(IMX53_DT, "Freescale i.MX53 (Device Tree Support)")
--	.map_io		= mx53_map_io,
- 	.init_early	= imx53_init_early,
- 	.init_irq	= tzic_init_irq,
- 	.init_machine	= imx53_dt_init,
-diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
-deleted file mode 100644
-index 768fede..0000000
---- a/arch/arm/mach-imx/mm-imx5.c
-+++ /dev/null
-@@ -1,61 +0,0 @@
--/*
-- * Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
-- *
-- * The code contained herein is licensed under the GNU General Public
-- * License.  You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
-- *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
-- *
-- * Create static mapping between physical to virtual memory.
-- */
--
--#include <linux/mm.h>
--#include <linux/init.h>
--#include <linux/clk.h>
--#include <linux/pinctrl/machine.h>
--#include <linux/of_address.h>
--
--#include <asm/mach/map.h>
--
--#include "common.h"
--#include "devices/devices-common.h"
--#include "hardware.h"
--#include "iomux-v3.h"
--
--/*
-- * Define the MX51 memory map.
-- */
--static struct map_desc mx51_io_desc[] __initdata = {
--	imx_map_entry(MX51, TZIC, MT_DEVICE),
--	imx_map_entry(MX51, IRAM, MT_DEVICE),
--	imx_map_entry(MX51, AIPS1, MT_DEVICE),
--	imx_map_entry(MX51, SPBA0, MT_DEVICE),
--	imx_map_entry(MX51, AIPS2, MT_DEVICE),
--};
--
--/*
-- * Define the MX53 memory map.
-- */
--static struct map_desc mx53_io_desc[] __initdata = {
--	imx_map_entry(MX53, TZIC, MT_DEVICE),
--	imx_map_entry(MX53, AIPS1, MT_DEVICE),
--	imx_map_entry(MX53, SPBA0, MT_DEVICE),
--	imx_map_entry(MX53, AIPS2, MT_DEVICE),
--};
--
--/*
-- * This function initializes the memory map. It is called during the
-- * system startup to create static physical to virtual memory mappings
-- * for the IO modules.
-- */
--void __init mx51_map_io(void)
--{
--	iotable_init(mx51_io_desc, ARRAY_SIZE(mx51_io_desc));
--}
--
--void __init mx53_map_io(void)
--{
--	iotable_init(mx53_io_desc, ARRAY_SIZE(mx53_io_desc));
--}
--- 
-1.8.3.2
+Thanks,
+Sunil.
