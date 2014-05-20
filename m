@@ -1,64 +1,70 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 20 May 2014 11:51:53 +0100
-Subject: [PATCH v6 15/15] virt: arm: support hip04 gic
-In-Reply-To: <CAD6h2NTDh3uzvB0UVBsviTWTF9_wpdY6KY0ocv5qwc9Z=3i4hg@mail.gmail.com>
-References: <1399795571-17231-1-git-send-email-haojian.zhuang@linaro.org>
- <1399795571-17231-16-git-send-email-haojian.zhuang@linaro.org>
- <53748BE8.8060203@arm.com>
- <CAD6h2NTDh3uzvB0UVBsviTWTF9_wpdY6KY0ocv5qwc9Z=3i4hg@mail.gmail.com>
-Message-ID: <20140520105153.GC5292@lvm>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 20 May 2014 16:26:09 +0530
+Subject: [PATCH v3 00/13]  ARM/DT: edma: IP configuration from hardware
+ and cleanups
+In-Reply-To: <537A36F9.40004@ti.com>
+References: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
+ <537A01F2.2090107@ti.com> <537A36F9.40004@ti.com>
+Message-ID: <537B34C9.1020508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 09:09:05PM +0800, Haojian Zhuang wrote:
-> On 15 May 2014 17:42, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > On 11/05/14 09:06, Haojian Zhuang wrote:
-> >> In ARM standard GIC, GICH_APR offset is 0xf0 & GICH_LR0 offset is 0x100.
-> >> In HiP04 GIC, GICH_APR offset is 0x70 & GICH_LR0 offset is 0x80.
-> >>
-> >> Now reuse the nr_lr field in struct vgic_cpu. Bit[31:16] is used to store
-> >> GICH_APR offset in HiP04, and bit[15:0] is used to store real nr_lr
-> >> variable. In ARM standard GIC, don't set bit[31:16]. So we could avoid
-> >> to change the VGIC implementation in arm64.
-> >>
-> >> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> >> ---
-> >>  arch/arm/kvm/interrupts_head.S  | 32 ++++++++++++++++++++++------
-> >>  include/kvm/arm_vgic.h          |  5 ++++-
-> >>  include/linux/irqchip/arm-gic.h |  6 ++++++
-> >>  virt/kvm/arm/vgic.c             | 47 +++++++++++++++++++++++++++++------------
-> >>  4 files changed, 69 insertions(+), 21 deletions(-)
-> >>
-> >> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-> >> index 76af9302..7aacaff 100644
-> >> --- a/arch/arm/kvm/interrupts_head.S
-> >> +++ b/arch/arm/kvm/interrupts_head.S
-> >> @@ -419,7 +419,10 @@ vcpu     .req    r0              @ vcpu pointer always in r0
-> >>       ldr     r7, [r2, #GICH_EISR1]
-> >>       ldr     r8, [r2, #GICH_ELRSR0]
-> >>       ldr     r9, [r2, #GICH_ELRSR1]
-> >> -     ldr     r10, [r2, #GICH_APR]
-> >> +     ldr     r10, [r11, #VGIC_CPU_NR_LR]
-> >
-> > Please rename this field to something else, now that it contains more
-> > than the number of LRs.
+On Monday 19 May 2014 10:23 PM, Peter Ujfalusi wrote:
+> On 05/19/2014 04:06 PM, Sekhar Nori wrote:
+>> On Friday 16 May 2014 05:47 PM, Peter Ujfalusi wrote:
+>>> Hi,
+>>>
+>>> Changes since v2:
+>>> - Comments from Sekhar and Arnd has been addressed best as I could.
+>>> - Use the CCCFG information in all cases instead of pdata provided information
+>>> - To achieve this I needed to do a bit more cleanup in this series
+>>> - In the documentation patch, retrain the old properties for reference
+>>> - Cleanups in the old davinci board files and removing edma_soc_info members
+>>>
+>>> Changes sicne v1:
+>>> - added missing patch to remove the memset from edma_of_parse_dt()
+>>>
+>>> We are requesting redundant information via DT for the driver since the very same
+>>> data is available in the HW: by reading and decoding the content of CCCFG
+>>> register we can get:
+>>> Number of channels: NUM_DMACH
+>>> Number of regions: NUM_REGN
+>>> Number of slots (PaRAM sets): NUM_PAENTRY
+>>> Number of TC/EQ: NUM_EVQUE
+>>>
+>>> So these does not need to be provided by the DT binding.
+>>>
+>>> The driver will no longer look for these properties from DT and they can be
+>>> removed from the binding documentation and from the dtsi files as well.
+>>> The change will not introduce regression when new kernel is booted using older
+>>> DTB (since we just ignore the mentioned properties).
+>>
+>> Applied all patches and pushed to branch v3.16/edma of:
+>>
+>> git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git
+>>
+>> Since the patches did not apply cleanly, please verify. I tested on
+>> DA850 EVM using MMC/SD as EDMA user.
 > 
-> Since vgic driver is shared between arm & arm64, I only use high word
-> in VGIC_CPU_NR_LR register if SoC is HiP04. Then I could avoid to
-> change the vgic implementation in arm64.
+> The patches in this series looks OK in your branch.
+> However I can not find the following commits in there, which I have in linux-next:
+> c689a7b79c28 Merge remote-tracking branch 'slave-dma/next'
+> cdae05a0f0f7 dmaengine: edma: Make reading the position of active channels work
+> cf7eb979116c ARM: common: edma: Fix xbar mapping
+> 232b223d8281 dmaengine: edma: Set DMA_CYCLIC capability flag
+> 7cf2af90cd51 arm: common: edma: Save the number of event queues/TCs
 > 
-> Do you want to me change arm64 implementation at the same time?
-> 
-> >
-> >> +     movs    r10, r10, lsr #HWCFG_APR_SHIFT
-> >> +     ldrne   r10, [r2, r10]
-> >> +     ldreq   r10, [r2, #GICH_APR]
-> >
-> > No. Just encode the offset there always. No need for a test.
-> >
+> They might come via different route...
 
-We don't want all these conditionals in the critical path and it makes
-the code impossible to read, please follow Marc's advice.
+Vinod,
+
+Do you have an immutable branch based on which I can send this patch
+series to ARM-SoC? Some of the patches in the series depend on code that
+went through your tree.
+
+Or if you are comfortable taking this series through your tree, thats
+okay by me too. We are still waiting for acks from DT maintainers on the
+binding change patches.
 
 Thanks,
--Christoffer
+Sekhar
