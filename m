@@ -1,70 +1,44 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 May 2014 18:30:50 -0700
-Subject: [GIT PULL 2/4] omap prcm changes for v3.16 merge window
-Message-ID: <20140520013050.GF15793@atomide.com>
+Date: Mon, 19 May 2014 18:31:08 -0700
+Subject: [GIT PULL 3/4] omap board changes for v3.16 merge window
+Message-ID: <20140520013107.GG15793@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit be2d62844819b3536233b7fc726b8f17d9fa7f05:
+The following changes since commit 89ca3b881987f5a4be4c5dbaa7f0df12bbdde2fd:
 
-  ARM: OMAP: debug-leds: raw read and write endian fix (2014-05-08 07:09:55 -0700)
+  Linux 3.15-rc4 (2014-05-04 18:14:42 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/prcm-signed
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/board-signed
 
-for you to fetch changes up to ea351c1603df0607b68eb4663b82ba7a70519d2e:
+for you to fetch changes up to 77c2f02edbeda9409a7cf3fd66233015820c213a:
 
-  Merge tag 'for-v3.16/prcm-cleanup-a' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.16/prcm (2014-05-16 15:26:22 -0700)
-
-----------------------------------------------------------------
-
-PRCM changes for omaps. I ended up merging these with the
-big endian changes because of the merge conflicts for read
-and write operations. Via Paul Walmsley <paul@pwsan.com>:
-
-Some OMAP PRCM cleanup patches.  These help prepare to convert the PRCM
-code into drivers.
-
-Basic build, boot, and PM test results are available here:
-
-http://www.pwsan.com/omap/testlogs/prcm-cleanup-v3.16/20140515213244/
+  ARM: OMAP: replace checks for CONFIG_USB_GADGET_OMAP (2014-05-16 14:14:25 -0700)
 
 ----------------------------------------------------------------
-Tero Kristo (10):
-      ARM: OMAP3: CM: remove a few OMAP34XX_CM_REGADDR defines
-      ARM: OMAP2+: prcm: add omap_test_timeout to prcm-common.h
-      ARM: OMAP2/3: CM: remove some external dependencies
-      ARM: OMAP4: CM: use cm_base* in register address calculations
-      ARM: OMAP2+: PRCM: cleanup some header includes
-      ARM: OMAP2+: PRM: remove unnecessary cpu_is_XXX calls from prm_init / exit
-      ARM: OMAP3/4: PRM: provide io chain reconfig function through irq setup
-      ARM: OMAP3/OMAP4: PRM: add prm_features flags and add IO wakeup under it
-      ARM: OMAP3/4: PRM: add support of late_init call to prm_ll_ops
-      ARM: OMAP4: PRCM: remove references to cm-regbits-44xx.h from PRCM core files
+Board related changes for omaps.
 
-Tony Lindgren (1):
-      Merge tag 'for-v3.16/prcm-cleanup-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.16/prcm
+----------------------------------------------------------------
+Paul Bolle (5):
+      ARM: OMAP: omap3stalker: remove two Kconfig macros
+      ARM: OMAP: remove some dead code
+      ARM: OMAP: SX1: remove check for CONFIG_SX1_OLD_FLASH
+      ARM: OMAP: AM3517EVM: remove check for CONFIG_PANEL_SHARP_LQ043T1DG01
+      ARM: OMAP: replace checks for CONFIG_USB_GADGET_OMAP
 
- arch/arm/mach-omap2/clockdomain.h                  |  3 ++-
- arch/arm/mach-omap2/cm2xxx.c                       | 15 ++-----------
- arch/arm/mach-omap2/cm33xx.h                       |  3 ---
- arch/arm/mach-omap2/cm3xxx.c                       | 25 ++++++++--------------
- arch/arm/mach-omap2/cm3xxx.h                       |  5 ++---
- arch/arm/mach-omap2/cm44xx.c                       | 11 ++++------
- arch/arm/mach-omap2/cm_common.c                    |  2 +-
- arch/arm/mach-omap2/cminst44xx.c                   | 10 ++++++---
- .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  1 +
- arch/arm/mach-omap2/powerdomain-common.c           |  1 -
- arch/arm/mach-omap2/powerdomain.c                  |  1 +
- arch/arm/mach-omap2/powerdomain.h                  |  3 +--
- arch/arm/mach-omap2/prcm-common.h                  | 24 +++++++++++++++++++++
- arch/arm/mach-omap2/prcm_mpu44xx.h                 |  1 -
- arch/arm/mach-omap2/prm.h                          | 10 +++++++++
- arch/arm/mach-omap2/prm2xxx.c                      | 13 +----------
- arch/arm/mach-omap2/prm2xxx_3xxx.c                 |  1 -
- arch/arm/mach-omap2/prm33xx.c                      |  1 -
- arch/arm/mach-omap2/prm3xxx.c                      | 22 +++++++++----------
- arch/arm/mach-omap2/prm44xx.c                      | 20 ++++++++---------
- arch/arm/mach-omap2/prm_common.c                   | 17 +++++++++------
- 21 files changed, 95 insertions(+), 94 deletions(-)
+Sebastian Reichel (1):
+      ARM: OMAP2+: Add support for RNG on DT booted N900
+
+ arch/arm/mach-omap1/board-h2.c           |  2 +-
+ arch/arm/mach-omap1/board-h3.c           |  2 +-
+ arch/arm/mach-omap1/board-innovator.c    |  2 +-
+ arch/arm/mach-omap1/board-osk.c          |  2 +-
+ arch/arm/mach-omap1/board-sx1.c          | 26 --------------------------
+ arch/arm/mach-omap1/pm.c                 | 13 +------------
+ arch/arm/mach-omap2/board-am3517evm.c    |  5 -----
+ arch/arm/mach-omap2/board-omap3stalker.c |  4 ----
+ arch/arm/mach-omap2/pdata-quirks.c       | 12 ++++++++++++
+ drivers/usb/phy/phy-isp1301-omap.c       |  2 +-
+ 10 files changed, 18 insertions(+), 52 deletions(-)
