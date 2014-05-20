@@ -1,93 +1,205 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 20 May 2014 09:57:50 -0400
-Subject: [PATCH v2 0/6] soc: ti: Add Keystone Navigator drivers
-In-Reply-To: <1398296783-1176-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1398296783-1176-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <537B5F5E.9080703@ti.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Tue, 20 May 2014 15:58:57 +0200
+Subject: [PATCH v3 3/3] ARM: dts: overo: Add support for 3.5'' LCD output
+In-Reply-To: <1400594337-5096-1-git-send-email-florian.vaussard@epfl.ch>
+References: <1400594337-5096-1-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1400594337-5096-4-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
+Alto35 expansion board has a ZIF connector for a 3.5'' LCD.
+Add a common include file for this configuration, and use it
+on Alto35.
 
-On Wednesday 23 April 2014 07:46 PM, Santosh Shilimkar wrote:
-> Here is an updated version of the Keystone Navigator drivers after
-> addressing comments from earlier version [1].
-> 
-> The QMSS found on Keystone SOCs is one of the main hardware sub
-> system which forms the backbone of the Keystone Multi-core Navigator.
-> QMSS consist of queue managers, packed-data structure processors(PDSP),
-> linking RAM, descriptor pools and infrastructure DMA.
-> 
-> After the discussion and alignment [2] on Navigator DMA, now we pair
-> this driver along with QMSS. Initially this driver was proposed as DMA
-> engine driver but since the hardware is not typical DMA engine and doesn't
-> comply with typical DMA engine driver needs, that approach was naked.
-> 
-> These two drivers works as infrastructure drivers for subsystems like
-> Ethernet subsystem, SRIO subsystem, Crypto Engines etc on Keystone
-> SOC families. Testing is done with NetCP(ethernet) subsystem drivers.
-> 
-> I would like to get these drivers merged in upcoming(3.16) window, so
-> any help in terms of review is appreciated. Thanks
-> 
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> 
-I plan to respin v3 of the series for the few device tree related
-comments I received from Rob H (thanks Rob). Can you please have a
-look and gsee if you have any comments so that I can include them
-in next version.
+Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+---
+ arch/arm/boot/dts/omap3-overo-alto35-common.dtsi |   1 +
+ arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi  | 165 +++++++++++++++++++++++
+ 2 files changed, 166 insertions(+)
+ create mode 100644 arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi
 
-thanks.
-
-> Sandeep Nair (3):
->   firmware: add Keystone QMSS PDSP accumulator firmware blob
->   Documentation: dt: soc: add Keystone Navigator QMSS bindings
->   soc: ti: add Keystone Navigator QMSS driver
-> 
-> Santosh Shilimkar (3):
->   soc: Introduce drivers/soc place-holder for SOC specific drivers
->   Documentation: dt: soc: add Keystone Navigator DMA bindings
->   soc: ti: add Keystone Navigator DMA support
-> 
->  .../bindings/soc/keystone-navigator-dma.txt        |  101 ++
->  .../bindings/soc/keystone-navigator-qmss.txt       |  232 +++
->  drivers/Kconfig                                    |    4 +
->  drivers/Makefile                                   |    3 +
->  drivers/soc/Kconfig                                |    5 +
->  drivers/soc/Makefile                               |    5 +
->  drivers/soc/ti/Kconfig                             |   31 +
->  drivers/soc/ti/Makefile                            |    5 +
->  drivers/soc/ti/knav_dma.c                          |  776 +++++++++
->  drivers/soc/ti/knav_qmss.h                         |  386 +++++
->  drivers/soc/ti/knav_qmss_acc.c                     |  591 +++++++
->  drivers/soc/ti/knav_qmss_queue.c                   | 1814 ++++++++++++++++++++
->  firmware/Makefile                                  |    1 +
->  .../keystone/qmss_pdsp_acc48_k2_le_1_0_0_8.fw.ihex |  110 ++
->  include/linux/soc/ti/knav_dma.h                    |  175 ++
->  include/linux/soc/ti/knav_qmss.h                   |   90 +
->  16 files changed, 4329 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/keystone-navigator-dma.txt
->  create mode 100644 Documentation/devicetree/bindings/soc/keystone-navigator-qmss.txt
->  create mode 100644 drivers/soc/Kconfig
->  create mode 100644 drivers/soc/Makefile
->  create mode 100644 drivers/soc/ti/Kconfig
->  create mode 100644 drivers/soc/ti/Makefile
->  create mode 100644 drivers/soc/ti/knav_dma.c
->  create mode 100644 drivers/soc/ti/knav_qmss.h
->  create mode 100644 drivers/soc/ti/knav_qmss_acc.c
->  create mode 100644 drivers/soc/ti/knav_qmss_queue.c
->  create mode 100644 firmware/keystone/qmss_pdsp_acc48_k2_le_1_0_0_8.fw.ihex
->  create mode 100644 include/linux/soc/ti/knav_dma.h
->  create mode 100644 include/linux/soc/ti/knav_qmss.h
-> 
-> Regards,
-> Santosh
-> [1] https://lkml.org/lkml/2014/2/28/567
-> [2] https://lkml.org/lkml/2014/3/18/340
-> 
+diff --git a/arch/arm/boot/dts/omap3-overo-alto35-common.dtsi b/arch/arm/boot/dts/omap3-overo-alto35-common.dtsi
+index 19d6486..7aae8fb 100644
+--- a/arch/arm/boot/dts/omap3-overo-alto35-common.dtsi
++++ b/arch/arm/boot/dts/omap3-overo-alto35-common.dtsi
+@@ -11,6 +11,7 @@
+  */
+ 
+ #include "omap3-overo-common-peripherals.dtsi"
++#include "omap3-overo-common-lcd35.dtsi"
+ 
+ #include <dt-bindings/input/input.h>
+ 
+diff --git a/arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi b/arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi
+new file mode 100644
+index 0000000..233c69e
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi
+@@ -0,0 +1,165 @@
++/*
++ * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/*
++ * 4.3'' LCD panel output for some Gumstix Overo boards (Gallop43, Chestnut43)
++ */
++
++&omap3_pmx_core {
++	dss_dpi_pins: pinmux_dss_dpi_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x20d4, PIN_OUTPUT | MUX_MODE0)	/* dss_pclk.dss_pclk */
++			OMAP3_CORE1_IOPAD(0x20d6, PIN_OUTPUT | MUX_MODE0)	/* dss_hsync.dss_hsync */
++			OMAP3_CORE1_IOPAD(0x20d8, PIN_OUTPUT | MUX_MODE0)	/* dss_vsync.dss_vsync */
++			OMAP3_CORE1_IOPAD(0x20da, PIN_OUTPUT | MUX_MODE0)	/* dss_acbias.dss_acbias */
++			OMAP3_CORE1_IOPAD(0x20dc, PIN_OUTPUT | MUX_MODE0)	/* dss_data0.dss_data0 */
++			OMAP3_CORE1_IOPAD(0x20de, PIN_OUTPUT | MUX_MODE0)	/* dss_data1.dss_data1 */
++			OMAP3_CORE1_IOPAD(0x20e0, PIN_OUTPUT | MUX_MODE0)	/* dss_data2.dss_data2 */
++			OMAP3_CORE1_IOPAD(0x20e2, PIN_OUTPUT | MUX_MODE0)	/* dss_data3.dss_data3 */
++			OMAP3_CORE1_IOPAD(0x20e4, PIN_OUTPUT | MUX_MODE0)	/* dss_data4.dss_data4 */
++			OMAP3_CORE1_IOPAD(0x20e6, PIN_OUTPUT | MUX_MODE0)	/* dss_data5.dss_data5 */
++			OMAP3_CORE1_IOPAD(0x20e8, PIN_OUTPUT | MUX_MODE0)	/* dss_data6.dss_data6 */
++			OMAP3_CORE1_IOPAD(0x20ea, PIN_OUTPUT | MUX_MODE0)	/* dss_data7.dss_data7 */
++			OMAP3_CORE1_IOPAD(0x20ec, PIN_OUTPUT | MUX_MODE0)	/* dss_data8.dss_data8 */
++			OMAP3_CORE1_IOPAD(0x20ee, PIN_OUTPUT | MUX_MODE0)	/* dss_data9.dss_data9 */
++			OMAP3_CORE1_IOPAD(0x20f0, PIN_OUTPUT | MUX_MODE0)	/* dss_data10.dss_data10 */
++			OMAP3_CORE1_IOPAD(0x20f2, PIN_OUTPUT | MUX_MODE0)	/* dss_data11.dss_data11 */
++			OMAP3_CORE1_IOPAD(0x20f4, PIN_OUTPUT | MUX_MODE0)	/* dss_data12.dss_data12 */
++			OMAP3_CORE1_IOPAD(0x20f6, PIN_OUTPUT | MUX_MODE0)	/* dss_data13.dss_data13 */
++			OMAP3_CORE1_IOPAD(0x20f8, PIN_OUTPUT | MUX_MODE0)	/* dss_data14.dss_data14 */
++			OMAP3_CORE1_IOPAD(0x20fa, PIN_OUTPUT | MUX_MODE0)	/* dss_data15.dss_data15 */
++			OMAP3_CORE1_IOPAD(0x20fc, PIN_OUTPUT | MUX_MODE0)	/* dss_data16.dss_data16 */
++			OMAP3_CORE1_IOPAD(0x20fe, PIN_OUTPUT | MUX_MODE0)	/* dss_data17.dss_data17 */
++			OMAP3_CORE1_IOPAD(0x2100, PIN_OUTPUT | MUX_MODE0)	/* dss_data18.dss_data18 */
++			OMAP3_CORE1_IOPAD(0x2102, PIN_OUTPUT | MUX_MODE0)	/* dss_data19.dss_data19 */
++			OMAP3_CORE1_IOPAD(0x2104, PIN_OUTPUT | MUX_MODE0)	/* dss_data20.dss_data20 */
++			OMAP3_CORE1_IOPAD(0x2106, PIN_OUTPUT | MUX_MODE0)	/* dss_data21.dss_data21 */
++			OMAP3_CORE1_IOPAD(0x2108, PIN_OUTPUT | MUX_MODE0)	/* dss_data22.dss_data22 */
++			OMAP3_CORE1_IOPAD(0x210a, PIN_OUTPUT | MUX_MODE0)	/* dss_data23.dss_data23 */
++		>;
++	};
++
++	lb035_pins: pinmux_lb035_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x2174, PIN_OUTPUT | MUX_MODE4)	/* uart2_cts.gpio_144 */
++		>;
++	};
++
++	backlight_pins: pinmux_backlight_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x2176, PIN_OUTPUT | MUX_MODE4)	/* uart2_rts.gpio_145 */
++		>;
++	};
++
++	mcspi1_pins: pinmux_mcspi1_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x21c8, PIN_INPUT | MUX_MODE0)	/* mcspi1_clk.mcspi1_clk */
++			OMAP3_CORE1_IOPAD(0x21ca, PIN_INPUT | MUX_MODE0)	/* mcspi1_simo.mcspi1_simo */
++			OMAP3_CORE1_IOPAD(0x21cc, PIN_INPUT | MUX_MODE0)	/* mcspi1_somi.mcspi1_somi */
++			OMAP3_CORE1_IOPAD(0x21ce, PIN_INPUT | MUX_MODE0)	/* mcspi1_cs0.mcspi1_cs0 */
++		>;
++	};
++
++	ads7846_pins: pinmux_ads7846_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x2138, PIN_INPUT_PULLDOWN | MUX_MODE4)	/* csi2_dx1.gpio_114 */
++		>;
++	};
++};
++
++/* Needed to power the DPI pins */
++&vpll2 {
++	regulator-always-on;
++};
++
++&dss {
++	status = "ok";
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&dss_dpi_pins>;
++
++	port {
++		dpi_out: endpoint {
++			remote-endpoint = <&lcd_in>;
++			data-lines = <24>;
++		};
++	};
++};
++
++/ {
++	aliases {
++		display0 = &lcd0;
++	};
++
++	ads7846reg: ads7846-reg {
++		compatible = "regulator-fixed";
++		regulator-name = "ads7846-reg";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	backlight {
++		compatible = "gpio-backlight";
++		
++		pinctrl-names = "default";
++		pinctrl-0 = <&backlight_pins>;
++		gpios = <&gpio5 17 GPIO_ACTIVE_HIGH>;		/* gpio_145 */
++
++		default-on;
++	};
++};
++
++&mcspi1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mcspi1_pins>;
++
++	lcd0: display at 0 {
++		compatible = "lgphilips,lb035q02";
++		label = "lcd";
++
++		reg = <1>;					/* CS1 */
++		spi-max-frequency = <10000000>;
++		spi-cpol;
++		spi-cpha;
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&lb035_pins>;
++		enable-gpios = <&gpio5 16 GPIO_ACTIVE_HIGH>;	/* gpio_144 */
++
++		port {
++			lcd_in: endpoint {
++				remote-endpoint = <&dpi_out>;
++			};
++		};
++	};
++
++	/* touch controller */
++	ads7846 at 0 {
++		pinctrl-names = "default";
++		pinctrl-0 = <&ads7846_pins>;
++
++		compatible = "ti,ads7846";
++		vcc-supply = <&ads7846reg>;
++
++		reg = <0>;				/* CS0 */
++		spi-max-frequency = <1500000>;
++
++		interrupt-parent = <&gpio4>;
++		interrupts = <18 0>;			/* gpio_114 */
++		pendown-gpio = <&gpio4 18 0>;
++
++		ti,x-min = /bits/ 16 <0x0>;
++		ti,x-max = /bits/ 16 <0x0fff>;
++		ti,y-min = /bits/ 16 <0x0>;
++		ti,y-max = /bits/ 16 <0x0fff>;
++		ti,x-plate-ohms = /bits/ 16 <180>;
++		ti,pressure-max = /bits/ 16 <255>;
++
++		linux,wakeup;
++	};
++};
+-- 
+1.8.3.2
