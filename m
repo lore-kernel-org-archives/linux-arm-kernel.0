@@ -1,115 +1,83 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 May 2014 18:55:20 -0700
-Subject: [GIT PULL 4/4] omap dt changes for v3.16 merge window, part 2
-In-Reply-To: <20140520013125.GH15793@atomide.com>
-References: <20140520013125.GH15793@atomide.com>
-Message-ID: <20140520015519.GI15793@atomide.com>
+Date: Mon, 19 May 2014 18:56:37 -0700
+Subject: [GIT PULL 2/4] omap prcm changes for v3.16 merge window
+In-Reply-To: <20140520013050.GF15793@atomide.com>
+References: <20140520013050.GF15793@atomide.com>
+Message-ID: <20140520015636.GJ15793@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [140519 18:32]:
-> The following changes since commit 3fdb77174a2c173e0e69f2499b836a0e412f6c4d:
+* Tony Lindgren <tony@atomide.com> [140519 18:31]:
+> The following changes since commit be2d62844819b3536233b7fc726b8f17d9fa7f05:
 > 
->   ARM: dts: omap3-n900: use MATRIX_KEY for keymap (2014-05-06 10:22:51 -0700)
+>   ARM: OMAP: debug-leds: raw read and write endian fix (2014-05-08 07:09:55 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/dt-part2-v2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/prcm-signed
 > 
-> for you to fetch changes up to d712ff63b18309c939396f593510fbcccbafb9e4:
+> for you to fetch changes up to ea351c1603df0607b68eb4663b82ba7a70519d2e:
 > 
->   ARM: dts: Enable mcpdm and mcbsp1 on DuoVero (2014-05-19 17:20:31 -0700)
+>   Merge tag 'for-v3.16/prcm-cleanup-a' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.16/prcm (2014-05-16 15:26:22 -0700)
 > 
 > ----------------------------------------------------------------
-> Device tree related changes for omaps.
+> 
+> PRCM changes for omaps. I ended up merging these with the
+> big endian changes because of the merge conflicts for read
+> and write operations. Via Paul Walmsley <paul@pwsan.com>:
+> 
+> Some OMAP PRCM cleanup patches.  These help prepare to convert the PRCM
+> code into drivers.
+> 
+> Basic build, boot, and PM test results are available here:
+> 
+> http://www.pwsan.com/omap/testlogs/prcm-cleanup-v3.16/20140515213244/
 
-Looks like my first set on the 8th of May never made it to the
-lists, I've ben having a bit hard time sending stuff with my
-scripts since I updated them a while back. Anyways, pulling this
-will also pull in the earlier set.
+Note that pulling this will also pull in the earlier trivial big
+endian changes I posted on the 8th of May but did not make the lists.
 
 Regards,
 
 Tony
  
 > ----------------------------------------------------------------
-> Balaji T K (2):
->       ARM: dts: omap5: add sata node
->       ARM: dts: dra7: add OCP2SCP3 and SATA nodes
+> Tero Kristo (10):
+>       ARM: OMAP3: CM: remove a few OMAP34XX_CM_REGADDR defines
+>       ARM: OMAP2+: prcm: add omap_test_timeout to prcm-common.h
+>       ARM: OMAP2/3: CM: remove some external dependencies
+>       ARM: OMAP4: CM: use cm_base* in register address calculations
+>       ARM: OMAP2+: PRCM: cleanup some header includes
+>       ARM: OMAP2+: PRM: remove unnecessary cpu_is_XXX calls from prm_init / exit
+>       ARM: OMAP3/4: PRM: provide io chain reconfig function through irq setup
+>       ARM: OMAP3/OMAP4: PRM: add prm_features flags and add IO wakeup under it
+>       ARM: OMAP3/4: PRM: add support of late_init call to prm_ll_ops
+>       ARM: OMAP4: PRCM: remove references to cm-regbits-44xx.h from PRCM core files
 > 
-> Joachim Eastwood (7):
->       ARM: dts: Change IOPAD macro's for OMAP4/5
->       ARM: dts: Add support for OMAP4 Variscite OM44 family
->       ARM: dts: Add support for OMAP4 VAR-DVK-OM44
->       ARM: dts: Add VAR-SOM-OM44 WLAN nodes
->       ARM: OMAP2+: Use pdata quirks for wl12xx on VAR-STK/DVK-OM44
->       ARM: dts: Convert DuoVero Parlor to use IOPAD macro
->       ARM: dts: Enable mcpdm and mcbsp1 on DuoVero
+> Tony Lindgren (1):
+>       Merge tag 'for-v3.16/prcm-cleanup-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.16/prcm
 > 
-> Johan Hovold (1):
->       ARM: dts: AM33XX: fix ethernet and mdio default state
-> 
-> Minal Shah (1):
->       ARM: dts: dra7: add support for parallel NAND flash
-> 
-> Mugunthan V N (2):
->       ARM: dts: am4372: Add cpsw phy sel dt node
->       ARM: dts: am437x-gp-evm: Add ethernet support for GP EVM
-> 
-> Pekon Gupta (1):
->       ARM: dts: am43xx: fix starting offset of NAND.filesystem MTD partition
-> 
-> Roger Quadros (4):
->       ARM: dts: omap4+: Add clocks to USB2 PHY node
->       ARM: dts: dra7-clock: Add "l3init_960m_gfclk" clock gate
->       ARM: dts: dra7: Add USB related nodes
->       dts: dra7-evm: add USB support
-> 
-> Sourav Poddar (2):
->       ARM: omap2+: skip device build from platform code for dt
->       ARM: dts: am4372: Add hdq device tree data
-> 
-> Wolfram Sang (1):
->       ARM: dts: am335x-evm: fix comments for lcd pins
-> 
->  .../devicetree/bindings/arm/omap/omap.txt          |   6 +
->  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
->  arch/arm/boot/dts/Makefile                         |   3 +-
->  arch/arm/boot/dts/am335x-bone-common.dtsi          |   3 +-
->  arch/arm/boot/dts/am335x-evm.dts                   |  58 ++--
->  arch/arm/boot/dts/am335x-evmsk.dts                 |   2 +
->  arch/arm/boot/dts/am335x-igep0033.dtsi             |   8 +
->  arch/arm/boot/dts/am335x-nano.dts                  |   5 +
->  arch/arm/boot/dts/am33xx.dtsi                      |   2 +
->  arch/arm/boot/dts/am4372.dtsi                      |  16 +
->  arch/arm/boot/dts/am437x-gp-evm.dts                |  72 +++++
->  arch/arm/boot/dts/am43x-epos-evm.dts               |  14 +-
->  arch/arm/boot/dts/dra7-evm.dts                     | 142 +++++++++
->  arch/arm/boot/dts/dra7.dtsi                        | 208 +++++++++++++
->  arch/arm/boot/dts/dra7xx-clocks.dtsi               |  12 +-
->  arch/arm/boot/dts/omap4-duovero-parlor.dts         |  18 +-
->  arch/arm/boot/dts/omap4-duovero.dtsi               |  98 +++---
->  arch/arm/boot/dts/omap4-var-dvk-om44.dts           |  71 +++++
->  arch/arm/boot/dts/omap4-var-om44customboard.dtsi   | 235 ++++++++++++++
->  arch/arm/boot/dts/omap4-var-som-om44-wlan.dtsi     |  68 ++++
->  arch/arm/boot/dts/omap4-var-som-om44.dtsi          | 343 +++++++++++++++++++++
->  arch/arm/boot/dts/omap4-var-som.dts                |  96 ------
->  arch/arm/boot/dts/omap4-var-stk-om44.dts           |  17 +
->  arch/arm/boot/dts/omap4.dtsi                       |   2 +
->  arch/arm/boot/dts/omap5-cm-t54.dts                 |  66 ++--
->  arch/arm/boot/dts/omap5-sbc-t54.dts                |   8 +-
->  arch/arm/boot/dts/omap5.dtsi                       |  42 +++
->  arch/arm/mach-omap2/hdq1w.c                        |   2 +
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  10 -
->  arch/arm/mach-omap2/pdata-quirks.c                 |   7 +
->  include/dt-bindings/pinctrl/omap.h                 |  13 +-
->  31 files changed, 1415 insertions(+), 233 deletions(-)
->  create mode 100644 arch/arm/boot/dts/omap4-var-dvk-om44.dts
->  create mode 100644 arch/arm/boot/dts/omap4-var-om44customboard.dtsi
->  create mode 100644 arch/arm/boot/dts/omap4-var-som-om44-wlan.dtsi
->  create mode 100644 arch/arm/boot/dts/omap4-var-som-om44.dtsi
->  delete mode 100644 arch/arm/boot/dts/omap4-var-som.dts
->  create mode 100644 arch/arm/boot/dts/omap4-var-stk-om44.dts
+>  arch/arm/mach-omap2/clockdomain.h                  |  3 ++-
+>  arch/arm/mach-omap2/cm2xxx.c                       | 15 ++-----------
+>  arch/arm/mach-omap2/cm33xx.h                       |  3 ---
+>  arch/arm/mach-omap2/cm3xxx.c                       | 25 ++++++++--------------
+>  arch/arm/mach-omap2/cm3xxx.h                       |  5 ++---
+>  arch/arm/mach-omap2/cm44xx.c                       | 11 ++++------
+>  arch/arm/mach-omap2/cm_common.c                    |  2 +-
+>  arch/arm/mach-omap2/cminst44xx.c                   | 10 ++++++---
+>  .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  1 +
+>  arch/arm/mach-omap2/powerdomain-common.c           |  1 -
+>  arch/arm/mach-omap2/powerdomain.c                  |  1 +
+>  arch/arm/mach-omap2/powerdomain.h                  |  3 +--
+>  arch/arm/mach-omap2/prcm-common.h                  | 24 +++++++++++++++++++++
+>  arch/arm/mach-omap2/prcm_mpu44xx.h                 |  1 -
+>  arch/arm/mach-omap2/prm.h                          | 10 +++++++++
+>  arch/arm/mach-omap2/prm2xxx.c                      | 13 +----------
+>  arch/arm/mach-omap2/prm2xxx_3xxx.c                 |  1 -
+>  arch/arm/mach-omap2/prm33xx.c                      |  1 -
+>  arch/arm/mach-omap2/prm3xxx.c                      | 22 +++++++++----------
+>  arch/arm/mach-omap2/prm44xx.c                      | 20 ++++++++---------
+>  arch/arm/mach-omap2/prm_common.c                   | 17 +++++++++------
+>  21 files changed, 95 insertions(+), 94 deletions(-)
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
 > the body of a message to majordomo at vger.kernel.org
