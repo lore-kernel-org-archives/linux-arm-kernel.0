@@ -1,52 +1,96 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 20 May 2014 16:15:47 +0300
-Subject: [PATCH v2 2/2] dmaengine: s3c24xx-dma: Add cyclic transfer support
-In-Reply-To: <1400574680.3703.72.camel@smile.fi.intel.com>
-References: <1400519158-5801-1-git-send-email-anarsoul@gmail.com>
- <1400519158-5801-2-git-send-email-anarsoul@gmail.com>
- <1400574680.3703.72.camel@smile.fi.intel.com>
-Message-ID: <CA+E=qVfsWdENHd5yCiTjb-QE7hDcUF6GiEvFBFbQwvt2wok+NA@mail.gmail.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Tue, 20 May 2014 16:16:08 +0300
+Subject: [Patch v3 0/5] Introduce keystone reset driver
+In-Reply-To: <5095812.b6DgWAxYzH@wuerfel>
+References: <1400495155-11136-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <537A1E2C.8040102@ti.com> <5095812.b6DgWAxYzH@wuerfel>
+Message-ID: <537B5598.8070603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 11:31 AM, Andy Shevchenko
-<andriy.shevchenko@linux.intel.com> wrote:
-> On Mon, 2014-05-19 at 20:05 +0300, Vasily Khoruzhick wrote:
->> Many audio interface drivers require support of cyclic transfers to work
->> correctly, for example Samsung ASoC DMA driver. This patch adds support
->> for cyclic transfers to the s3c24xx-dma driver
+
+On 05/19/2014 08:47 PM, Arnd Bergmann wrote:
+> On Monday 19 May 2014 11:07:24 Santosh Shilimkar wrote:
+>> On Monday 19 May 2014 06:25 AM, Ivan Khoronzhuk wrote:
+>>> These patches introduce keystone reset driver.
+>>>
+>>> The keystone SoC can be rebooted in several ways. By external reset
+>>> pin, by soft and by watchdogs. This driver allows software reset and reset
+>>> by one of the watchdogs. Also added opportunity to set soft/hard reset type.
+>>>
+>>> Based on v3.15-rc5
+>>>
+>> Arnd,
+>> Can I have have your ack/reviewed-by please since you did gave few comments
+>> on previous version.
+> Sorry for not getting back to you earlier on this topic.
 >
-> Sorry, not mentioned earlier, but couple of nitpicks below. (I think you
-> may wait for more comments and then decide what to do with mine)
+>> On 04/14/2014 09:44 PM, Arnd Bergmann wrote:
+>>> On Monday 14 April 2014 20:41:20 Ivan Khoronzhuk wrote:
+>>>> +Optional properties:
+>>>> +
+>>>> +- ti,soft-reset:       Boolean option indicating soft reset.
+>>>> +                       By default hard reset is used.
+>>>> +
+>>>> +- ti,wdt_list:         WDT list that can cause SoC reset.
+>>>> +                       The list in format: <0>, <2>;
+>>>> +                       Begins from 0 to 3, as keystone can contain up
+>>>> +                       to 4 SoC reset watchdogs.
+>>> This looks like your binding just describes a subset of the
+>>> watchdog timer registers. If so, don't do a standalone reset
+>> The registers are not a subset of watchdog hardware it's SoC specific future
+>> controlled by SoC specific registers (bootregs and PLL regs).
+>>
+>> For watchog IP setup, the Keystone uses the watchdog driver common with
+>> other
+>> SoCs -- davinci_watchdog that is not depend on other SoC settings like
+>> this driver does.
+>>
+>> The Keystone SoCs have separate registers to tune Keystone2 reset
+>> functionality
+>> by configuring Reset multiplexer &  PLL. And it tunes not only watchdog
+>> usage.
+>> The keystone SoC can be rebooted in several ways. By external reset pin,
+>> by soft and
+>> by watchdogs. This driver allows software reset or reset by one of the
+>> watchdogs
+>> (and other settings) independently on watchdog driver settings. This is
+>> job of reset driver.
+> It sounds like you use a syscon area in the reset driver. This is not
+> uncommon, but it means you should probably have a generic node for
+> the SoC specific registers that contains all of them at once and
+> exports them as a regmap using the drivers/mfd/syscon.c driver.
 >
->> +     dev_dbg(&s3cdma->pdev->dev,
->> +             "prepare cyclic transaction of %d bytes with period %d from %s\n",
->> +             size, period, s3cchan->name);
->
-> size and period are size_t, thus %zu.
+> 	Arnd
 
-Ok.
+Arnd,
+Thank for the reply
 
->> +             /* Check last period length */
->> +             if (i == (sg_len - 1))
->
-> Redundant parenthesis.
+The reset driver uses two ranges:
+- RSTYPE, RSTCTRL,RSTCFG, RSISO  (Reset Main PLL Controller)
+- RESETMUX8-10 registers
 
-Ok
+The content of these register ranges are completely used by the reset 
+driver.
+Currently no one on the SoC can access them instead of the reset driver.
+Also we don't use syscon/regmap at all - so adding this will be some 
+overhead.
 
->> +                     dsg->len = size - (period * i);
->> +             if (direction == DMA_MEM_TO_DEV) {
->> +                     dsg->src_addr = addr + (period * i);
->
-> Ditto.
+As I posted previously:
+"...configuring Reset multiplexer & PLL. And it tunes not only watchdog 
+usage..."
 
-Ok
+Yes, it tunes not only watchdog usage and uses part of registers from 
+PLL controller,
+but all it works with are connected with reset functionality. These 
+ranges are used only
+by reset driver and their purpose is reset functionality.
 
->> +                     dsg->dst_addr = slave_addr;
->> +             } else { /* DMA_DEV_TO_MEM */
->> +                     dsg->src_addr = slave_addr;
->> +                     dsg->dst_addr = addr + (period * i);
->
-> Ditto.
+Maybe in the future some soft can use ranges in question for own tasks, 
+but it should be
+done via reset driver. So as I see there is no reasons to use regmap for 
+reset driver.
 
-Ok
+-- 
+Regards,
+Ivan Khoronzhuk
