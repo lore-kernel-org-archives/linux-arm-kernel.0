@@ -1,66 +1,30 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 20 May 2014 13:59:15 +0200
-Subject: [PATCH] ARM: sun6i: Enable USB Host support on the Colombus board
-Message-ID: <1400587155-19387-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Tue, 20 May 2014 13:59:58 +0200
+Subject: [PATCH] ARM: sun6i: Fix OHCI2 node name
+Message-ID: <1400587198-19668-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The colombus board has a on-board USB hub, that is enabled through the pin
-PH24, and wired to the first EHCI controller.
+The unit-address doesn't match the reg property. Since the reg property is
+correct, change the unit-address accordingly.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun6i-a31-colombus.dts | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-colombus.dts b/arch/arm/boot/dts/sun6i-a31-colombus.dts
-index 3898a7bce831..a907c1d3e939 100644
---- a/arch/arm/boot/dts/sun6i-a31-colombus.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-colombus.dts
-@@ -13,6 +13,7 @@
- 
- /dts-v1/;
- /include/ "sun6i-a31.dtsi"
-+/include/ "sunxi-common-regulators.dtsi"
- 
- / {
- 	model = "WITS A31 Colombus Evaluation Board";
-@@ -23,6 +24,24 @@
- 	};
- 
- 	soc at 01c00000 {
-+		pio: pinctrl at 01c20800 {
-+			usb2_vbus_pin_colombus: usb2_vbus_pin at 0 {
-+				allwinner,pins = "PH24";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+		};
-+
-+		usbphy: phy at 01c19400 {
-+			usb2_vbus-supply = <&reg_usb2_vbus>;
-+			status = "okay";
-+		};
-+
-+		ehci1: usb at 01c1b000 {
-+			status = "okay";
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
-@@ -47,4 +66,11 @@
- 			status = "okay";
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 4155fc43ecff..0f4ea4990d2c 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -410,7 +410,7 @@
+ 			status = "disabled";
  		};
- 	};
-+
-+	reg_usb2_vbus: usb2-vbus {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&usb2_vbus_pin_colombus>;
-+		gpio = <&pio 7 24 0>;
-+		status = "okay";
-+	};
- };
+ 
+-		ohci2: usb at 01c1c000 {
++		ohci2: usb at 01c1c400 {
+ 			compatible = "allwinner,sun6i-a31-ohci", "generic-ohci";
+ 			reg = <0x01c1c400 0x100>;
+ 			interrupts = <0 77 4>;
 -- 
 1.9.3
