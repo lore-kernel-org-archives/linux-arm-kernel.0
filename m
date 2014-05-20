@@ -1,93 +1,252 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Tue, 20 May 2014 15:31:24 +0530
-Subject: [PATCH] ASoC: samsung: Allow setting OP_CLK of the IIS Multi
- Audio Interface
-In-Reply-To: <537B1BF0.8060302@samsung.com>
-References: <1400520638-6907-1-git-send-email-s.nawrocki@samsung.com>
- <537AE4C1.7050703@linaro.org> <537B1BF0.8060302@samsung.com>
-Message-ID: <537B27F4.5030008@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 20 May 2014 12:04:54 +0200
+Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140519205945.GE30737@mithrandir>
+References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
+ <14622654.QO8kH1AoTT@wuerfel> <20140519205945.GE30737@mithrandir>
+Message-ID: <5759340.gycj7cP1t3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/20/2014 02:40 PM, Sylwester Nawrocki wrote:
-> On 20/05/14 07:14, Tushar Behera wrote:
->> On 05/19/2014 11:00 PM, Sylwester Nawrocki wrote:
->>> This patch adds support for setting source clock of the "Core CLK"
->>> of the IIS Multi Audio Interface.
->>>
->>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->>> ---
->>>  sound/soc/samsung/i2s.c |    4 ++++
->>>  sound/soc/samsung/i2s.h |    1 +
->>>  2 files changed, 5 insertions(+)
->>>
->>> diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
->>> index 048ead9..ae02811 100644
->>> --- a/sound/soc/samsung/i2s.c
->>> +++ b/sound/soc/samsung/i2s.c
->>> @@ -451,6 +451,10 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
->>>  	u32 mod = readl(i2s->addr + I2SMOD);
->>>  
->>>  	switch (clk_id) {
->>> +	case SAMSUNG_I2S_OPCLK:
->>> +		mod &= ~MOD_OPCLK_MASK;
->>> +		mod |= dir;
->>
->> I am assuming here that dir is one of SND_SOC_CLOCK_IN or
->> SND_SOC_CLOCK_OUT. In that case, you need to take care of offset (30).
+On Monday 19 May 2014 22:59:46 Thierry Reding wrote:
+> On Mon, May 19, 2014 at 08:34:07PM +0200, Arnd Bergmann wrote:
+> > On Monday 19 May 2014 14:53:37 Thierry Reding wrote:
+> > > On Mon, May 19, 2014 at 12:26:35PM +0200, Arnd Bergmann wrote:
+> > > > On Friday 16 May 2014 14:23:18 Thierry Reding wrote:
+> > > > > From: Thierry Reding <treding@nvidia.com>
+> > > > > 
+> > > > > This commit introduces a generic device tree binding for IOMMU devices.
+> > > > > Only a very minimal subset is described here, but it is enough to cover
+> > > > > the requirements of both the Exynos System MMU and Tegra SMMU as
+> > > > > discussed here:
+> > > > > 
+> > > > >     https://lkml.org/lkml/2014/4/27/346
+> > > > > 
+> > > > > More advanced functionality such as the dma-ranges property can easily
+> > > > > be added in a backwards-compatible way. In the absence of a dma-ranges
+> > > > > property it should be safe to default to the whole address space.
+> > > > > 
+> > > > 
+> > > > The basic binding looks fine, but I'd like it to be more explicit
+> > > > about dma-ranges. Most importantly, what does "the whole address space"
+> > > > mean?
+> > > 
+> > > The whole point was to leave out any mention of dma-ranges from the
+> > > binding until we've figured out more of the puzzle.
+> > > 
+> > > So what I was trying to avoid was another lengthy discussion on the
+> > > topic of dma-ranges. Oh well... =)
+> > 
+> > I think that can't work, because we need a way to specify the
+> > ranges for some iommu drivers. We have to make sure we at least
+> > don't prevent it from working.
 > 
-> And that's not a correct assumption. I also got similarly confused when 
-> first seeing this in our downstream kernels. 'dir' is supposed to be one 
-> of the MOD_OPCLK_* constants, as defined in sound/soc/samsung/i2s-regs.h.
+> That was precisely why I wanted to let this out of the binding for now
+> so that we can actually focus on making existing hardware work rather
+> than speculate about what we may or may not need.
 > 
-> #define MOD_OPCLK_CDCLK_OUT	(0 << 30)
-> #define MOD_OPCLK_CDCLK_IN	(1 << 30)
-> #define MOD_OPCLK_BCLK_OUT	(2 << 30)
-> #define MOD_OPCLK_PCLK		(3 << 30)
-> #define MOD_OPCLK_MASK		(3 << 30)
+> If you think the current minimal binding will cause future use-cases to
+> break, then we should change it to avoid that. What you're proposing is
+> to make the binding more complex on the assumption that we'll get it
+> right.
 > 
-> So the clock is reconfigured with calls like:
-> snd_soc_dai_set_sysclk(cpu_dai, SAMSUNG_I2S_OPCLK, 0, MOD_OPCLK_PCLK);
-> 
+> Wouldn't it be safer to keep things to the bare minimum necessary to
+> represent hardware that we have access to and understand now, rather
+> than speculating about what may be necessary at some point. I'd much
+> prefer to add complexity on an as-needed basis and when we have a better
+> understand of where we're headed.
 
-Ok.
+I just want to think it through for the cases we know about. We don't
+have to implement it all at once, but I think there is a danger in making
+an important binding too simple or too complicated, both of which are
+equally bad.
 
->> Also the value of this bit-field doesn't match with SND_SOC_CLOCK_XXX
->> macros.
->>
->> Bit-field (2'b):
->> 00	Codec Clock out
->> 01	Codec Clock in
->> 10	Bit clock out
->> 11	Audio bus clock
->>
->> Value of macros:
->> SND_SOC_CLOCK_IN	0
->> SND_SOC_CLOCK_OUT	1
+After giving the ranges stuff some more thought, I have come to the
+conclusion that using #iommu-cells should work fine for almost
+all cases, including windowed iommus, because the window is not
+actually needed in the device, but only in the iommu, wihch is of course
+free to interpret the arguments as addresses.
+ 
+> > > > Finally, it makes no sense to use the dma-ranges property of the master's
+> > > > parent bus, because that bus isn't actually involved in the translation.
+> > > 
+> > > My understanding here is mostly based on the OpenFirmware working group
+> > > proposal for the dma-ranges property[0]. I'll give another example to
+> > > try and clarify how I had imagined this to work:
+> > > 
+> > > 	/ {
+> > > 		#address-cells = <2>;
+> > > 		#size-cells = <2>;
+> > > 
+> > > 		iommu {
+> > > 			/*
+> > > 			 * This is somewhat unusual (or maybe not) in that we
+> > > 			 * need 2 cells to represent the size of an address
+> > > 			 * space that is 32 bits long.
+> > > 			 */
+> > > 			#address-cells = <1>;
+> > > 			#size-cells = <2>;
+> > 
+> > You should never need #size-cells > #address-cells
 > 
->> In the manual, this field is suggested to be Audio bus clock always. Is
->> there an use-case where we might need to update this?
+> That was always my impression as well. But how then do you represent the
+> full 4 GiB address space in a 32-bit system? It starts at 0 and ends at
+> 4 GiB - 1, which makes it 4 GiB large. That's:
 > 
-> I've checked couple boards and AFAICS we're always setting MOD_OPCLK_PCLK,
-> however it's still different from the default value after reset - 
-> MOD_OPCLK_CDCLK_OUT. 
-> So how do you think this should be addressed ? Isn't it better to give
-> options to the machine drivers to alter these clock settings, rather than
-> hard coding it in the I2S driver ? Let's not forget it covers multiple 
-> Samsung SoC series.
+> 	<0 1 0>
 > 
+> With #address-cells = <1> and #size-cells = <1> the best you can do is:
+> 
+> 	<0 0xffffffff>
+> 
+> but that's not accurate.
 
-I don't have any objection to this patch. Just that, I could not find
-any use-case where we would not like to set the value as MOD_OPCLK_PCLK.
+I think we've done both in the past, either extended #size-cells or
+taken 0xffffffff as a special token. Note that in your example,
+the iommu actually needs #address-cells = <2> anyway.
 
->> The default value for audio playback right now is 00 (2'b), which needs
->> to be fixed anyways.
+> > > 			#iommu-cells = <1>;
+> > > 		};
+> > > 
+> > > 		master {
+> > > 			iommus = <&/iommu 42>;
+> > > 			/*
+> > > 			 * Map I/O addresses 0 - 4 GiB to physical addresses
+> > > 			 * 2 GiB - 6 GiB.
+> > > 			 */
+> > > 			dma-ranges = <0x00000000 0 0x80000000 1 0>;
+> > > 		};
+> > > 	};
+> > > 
+> > > This is somewhat incompatible with [0] in that #address-cells used to
+> > > parse the child address must be taken from the iommu node rather than
+> > > the child node. But that seems to me to be the only reasonable thing
+> > > to do, because after all the IOMMU creates a completely new address
+> > > space for the master.
+> > > 
+> > > [0]: http://www.openfirmware.org/ofwg/proposals/Closed/Accepted/410-it.txt
+> > 
+> > I don't think you can have a dma-ranges without a #address-cells and
+> > #size-cells property in the same node. In your example, I'd also expect
+> > a child node below 'master' that then interprets the address space
+> > made up by dma-ranges.
 > 
-> --
-> Regards,
-> Sylwester
+> Okay, so what Dave and you have been saying strongly indicates that
+> dma-ranges isn't the right thing to use here.
+
+There are cases where I think we could use dma-ranges, but not in the
+way you have it above. I'll get to that below.
+
+> > As a comment on the numbers in your example, I don't expect to ever
+> > see a 4GB IOMMU address space that doesn't start at an offset. Instead
+> > I'd expect either addresses that encode a device ID, or those that
+> > are just a subset of the parent address space, with non-overlapping
+> > bus addresses for each master.
 > 
+> As I understand the Tegra SMMU allows each of the clients to be assigned
+> a separate address space (4 GiB on earlier generations and 16 GiB on new
+> generations) and all addresses in each address space can be mapped to
+> arbitrary physical addresses.
 
+Right, so this is not a windowed IOMMU, and you wouldn't need to encode
+the address at all.
 
--- 
-Tushar Behera
+> > > > My preferred option would be to always put the address range into
+> > > > the iommu descriptor, using the iommu's #address-cells.
+> > > 
+> > > That could become impossible to parse. I'm not sure if such hardware
+> > > actually exists, but if for some reason we have to split the address
+> > > range into two, then there's no longer any way to determine the size
+> > > needed for the specifier.
+> > > 
+> > > On the other hand what you propose makes it easy to represent multiple
+> > > master interfaces on a device. With a separate dma-ranges property how
+> > > can you define which ranges apply to which of the master interfaces?
+> > 
+> > Well, you could have multiple links to the same IOMMU if you want to 
+> > do that, and define that there must be at least one dma-ranges entry
+> > for each IOMMU entry (although not necessarily the other way round,
+> > you could have direct ranges in addition to translated ones.
+> > 
+> > > Then again if address ranges can't be broken up in the first place, then
+> > > dma-ranges could be considered to be one entry per IOMMU in the iommus
+> > > property.
+> > 
+> > Let me do another example, with the address merged into the iommu
+> > references:
+> > 
+> > / {
+> > 	#address-cells = <2>; // 64-bit address
+> > 	#size-cells = <2>;
+> > 
+> > 	iommu at a {
+> > 		#address-cells = <2>; // 1 cell ID, 1 cell address
+> > 		#size-cells = <1>;
+> > 
+> > 		// no need for #iommu-cells
+> > 	};
+> > 
+> > 
+> > 	master at b {
+> > 		iommus = <&/iommu@a // iommu
+> > 			0x23  	     // ID
+> > 			0x40000000   // window start
+> > 			0x10000000>; //window size
+> > 	};
+> > };
+> > 
+> > A disadvantage of this model would be that for all ARM SMMU users, we'd
+> > have to always list a 4GB address space, which is kind of redundant.
+> 
+> Isn't that the equivalent of the "whole address space" default that I
+> mentioned in the commit message? Could this be handled with
+> #address-cells = <1> and #size-cells = <0> in the iommu node? That way
+> the only cell that needs to be specified in iommus would be the ID and
+> the redundant address space could be simply omitted from DT since it
+> would be implied by the compatible string.
+
+Yes, that's right. After giving it some more thought, I agree that the
+#size-cells case makes sense as an indicator for cases where the master
+doesn't have to care about the address at all and no further translation
+with dma-ranges is possible.
+
+Back to my example with dma-ranges, the simplest case would an IOMMU
+that has an ID per bus, with multiple masters sharing that ID:
+
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	iommu {
+		#address-cells = <2>; // ID, address
+		#size-cells = <2>;
+	};
+
+	master at a {
+		iommus = <& {/iommu} 0xa 0x0  0x1 0x0>; // 4GB ID '0xa'
+	}
+
+	bus1 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+		iommus = <& {/iommu} 0 0   0x100 0>; // all IDs
+		dma-ranges = <0  0xb 0  1 0>; // child devices use ID '0xb'
+
+		anothermaster {
+			// no iommus link, implied by dma-ranges above
+		};
+	};
+};
+
+If you set #size-cells=<0>, you can't really do that but instead would
+require an iommus property in each master, which is not a big concern
+either.
+
+The main advantage I think would be for IOMMUs that use the PCI b/d/f
+numbers as IDs. These can have #address-cells=<3>, #size-cells=<2>
+and have an empty dma-ranges property in the PCI host bridge node,
+and interpret this as using the same encoding as the PCI BARs in
+the ranges property.
+
+	Arnd
