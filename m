@@ -1,62 +1,40 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Tue, 20 May 2014 11:04:28 +0200
-Subject: [PATCH v4 0/7] ARM: berlin: add AHCI support
-Message-ID: <1400576675-25265-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Tue, 20 May 2014 11:04:30 +0200
+Subject: [PATCH v4 2/7] Documentation: bindings: add the Berlin SATA PHY
+In-Reply-To: <1400576675-25265-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1400576675-25265-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1400576675-25265-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the support for Berlin SoC AHCI controller. The
-controller allows to use the SATA host interface and, for example, the
-eSATA port on the BG2Q.
+The Berlin SATA PHY drives the PHY related to the SATA interface. Add
+the corresponding documentation.
 
-The series adds a PHY driver to control the two SATA ports available,
-and uses the existing ahci_platform driver.
-
-Also enable the eSATA interface on the BG2Q DMP.
-
-Changes since v3:
-        - moved all PHY operations to the PHY driver
-        - removed PHY sub-nodes
-        - removed the custom Berlin AHCI driver and switched to
-          ahci_platform
-        - added multiple PHYs support to the libahci_platform
-
-Changes since v2:
-        - modeled each PHY as a sub-node
-        - cosmetic fixups
-
-Changes since v1:
-        - added a PHY driver, allowing to enable each port
-          individually and removed the 'force-port-map' property
-        - made the drivers a bit less magic :)
-        - wrote a function to select and configure registers in the
-          AHCI driver
-        - removed BG2 / BG2CD nodes
-
-Antoine T?nart (7):
-  phy: add a driver for the Berlin SATA PHY
-  Documentation: bindings: add the Berlin SATA PHY
-  ata: libahci: allow to use multiple PHYs
-  ata: ahci_platform: add the Marvell Berlin AHCI compatible
-  Documentation: bindings: document the sub-nodes AHCI bindings
-  ARM: berlin: add the AHCI node for the BG2Q
-  ARM: berlin: enable the eSATA interface on the BG2Q DMP
-
- .../devicetree/bindings/ata/ahci-platform.txt      |  38 +++-
- .../devicetree/bindings/phy/berlin-sata-phy.txt    |  14 ++
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |   8 +
- arch/arm/boot/dts/berlin2q.dtsi                    |  27 +++
- drivers/ata/Kconfig                                |   1 +
- drivers/ata/ahci.h                                 |   3 +-
- drivers/ata/ahci_platform.c                        |   1 +
- drivers/ata/libahci.c                              |   7 +
- drivers/ata/libahci_platform.c                     | 165 +++++++++++----
- drivers/phy/Kconfig                                |   5 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-berlin-sata.c                      | 230 +++++++++++++++++++++
- 12 files changed, 463 insertions(+), 37 deletions(-)
+Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+---
+ Documentation/devicetree/bindings/phy/berlin-sata-phy.txt | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
- create mode 100644 drivers/phy/phy-berlin-sata.c
 
+diff --git a/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt b/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
+new file mode 100644
+index 000000000000..72646db2f5fc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
+@@ -0,0 +1,14 @@
++Berlin SATA PHY
++---------------
++
++Required properties:
++- compatible: "marvell,berlin-sata-phy"
++- phy-cells: from the generic PHY bindings, must be 1
++- reg: address and length of the register
++
++Example:
++	sata_phy: phy at f7e900a0 {
++		compatible = "marvell,berlin-sata-phy";
++		reg = <0xf7e900a0 0x200>;
++		#phy-cells = <1>;
++	};
 -- 
 1.9.1
