@@ -1,52 +1,39 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 20 May 2014 11:49:42 -0700
-Subject: [PATCH v3 5/9] mtd: nand: add sunxi NAND flash controller support
-In-Reply-To: <536D069A.40401@gmail.com>
-References: <1394647664-8258-1-git-send-email-b.brezillon.dev@gmail.com>
- <1394647664-8258-6-git-send-email-b.brezillon.dev@gmail.com>
- <20140509160341.GA6984@arch.cereza> <536D069A.40401@gmail.com>
-Message-ID: <20140520184942.GT28907@ld-irv-0074>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 20 May 2014 20:00:55 +0100
+Subject: [PATCH v2 2/4] mfd: bcm590xx: add support for secondary I2C
+ slave address
+In-Reply-To: <20140520161131.GB32025@lee--X1>
+References: <1398295293-11033-1-git-send-email-mporter@linaro.org>
+ <1398295293-11033-3-git-send-email-mporter@linaro.org>
+ <20140428115627.GY21279@lee--X1> <20140428140910.GB7719@beef>
+ <20140520161131.GB32025@lee--X1>
+Message-ID: <20140520190055.GQ12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 06:47:22PM +0200, Boris BREZILLON wrote:
-> On 09/05/2014 18:03, Ezequiel Garcia wrote:
-> > On 12 Mar 07:07 PM, Boris BREZILLON wrote:
-> >> --- /dev/null
-> >> +++ b/drivers/mtd/nand/sunxi_nand.c
-> >> @@ -0,0 +1,1276 @@
-...
-> >> +static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
-> >> +			       struct device_node *np)
-> >> +{
-> >> +	struct nand_chip *nand = mtd->priv;
-> >> +	int ecc_step_size, ecc_strength;
-> >> +	int ret;
-> >> +
-> >> +	ecc_step_size = of_get_nand_ecc_step_size(np);
-> >> +	ecc_strength = of_get_nand_ecc_strength(np);
-> >> +	if (ecc_step_size > 0 && ecc_strength > 0) {
-> >> +		ecc->size = ecc_step_size;
-> >> +		ecc->strength = ecc_strength;
-> >> +	} else {
-> >> +		ecc->size = nand->ecc_step_ds;
-> >> +		ecc->strength = nand->ecc_strength_ds;
-> >> +	}
-> >> +
-> > Shouldn't you check the devicetree value is not weaker than the ONFI-obtained?
-> 
-> I can definitely do that.
+On Tue, May 20, 2014 at 05:11:31PM +0100, Lee Jones wrote:
 
-You can do that here, but take a look at the discussion Ezequiel and I
-had about this:
+> > > >  drivers/mfd/bcm590xx.c       | 60 +++++++++++++++++++++++++++++++++-----------
+> > > >  include/linux/mfd/bcm590xx.h |  9 ++++---
+> > > >  2 files changed, 52 insertions(+), 17 deletions(-)
 
-  http://thread.gmane.org/gmane.linux.drivers.devicetree/67462
+> > There's cross-deps so the regulator driver will need to go with it.
+> > Mark mentioned earlier in the thread that he wanted to merge through
+> > the regulator tree though.
 
-We probably don't want to be doing anything drastic like overriding the
-device tree configuration. Instead, we might want to stick a warning
-into the core nand_base code that does the proper comparison of the
-'*_ds' values with the actual values chosen in
-chip->ecc->{size,strength}. The comparison is kind of subtle, actually,
-so it'd be good to do it exactly once for everyone.
+> Still nothing.
 
-Brian
+> Mark,
+>   Can I apply this set and supply you with a pull-request?
+
+Can someone please send me whatever it is you want me to look at, the
+above diffstat doesn't look relevant.  Given the frequency of respins
+I'm not always paying a huge amount of attention to MFD serieses which
+look like they're going to be resent.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/4133fe63/attachment.sig>
