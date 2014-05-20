@@ -1,67 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 20 May 2014 08:48:10 +0100
-Subject: [RFC PATCH 1/3] mfd: AXP22x: add support for APX221 PMIC
-In-Reply-To: <537B06A0.3040706@redhat.com>
-References: <1400176305-22737-1-git-send-email-boris.brezillon@free-electrons.com>
- <1400176305-22737-2-git-send-email-boris.brezillon@free-electrons.com>
- <20140519172817.GE20435@lee--X1>
- <537A4324.4060905@free-electrons.com> <537B06A0.3040706@redhat.com>
-Message-ID: <20140520074810.GE20874@lee--X1>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 20 May 2014 09:51:58 +0200
+Subject: [RFC PATCH 2/5] clk: Introduce 'clk_round_rate_nearest()'
+In-Reply-To: <df742b46-c630-49ea-b234-4d746bb66ec1@BL2FFO11FD040.protection.gbl>
+References: <1400106655-22465-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1400106655-22465-3-git-send-email-soren.brinkmann@xilinx.com>
+ <20140515073816.GI16662@pengutronix.de>
+ <91822600-39d0-4e71-b0f5-9eda35b76ec0@BN1AFFO11FD016.protection.gbl>
+ <20140519161949.GG16662@pengutronix.de>
+ <db8633e5-01a9-4d3a-80e8-74e23a456d52@BN1BFFO11FD051.protection.gbl>
+ <df742b46-c630-49ea-b234-4d746bb66ec1@BL2FFO11FD040.protection.gbl>
+Message-ID: <20140520075158.GK16662@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>> This patch introduces preliminary support for the X-Powers AXP221 PMIC.
-> >>> The AXP221 is typically used on boards using Allwinner's A31 SoC.
-> >>>
-> >>> At the moment, this driver only exposes regulator devices, but other
-> >>> subdevices.
-> >>>
-> >>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> >>> ---
-> >>>  drivers/mfd/Kconfig        |  12 +++
-> >>>  drivers/mfd/Makefile       |   1 +
-> >>>  drivers/mfd/axp22x.c       | 237 +++++++++++++++++++++++++++++++++++++++++++++
-> >>>  include/linux/mfd/axp22x.h | 149 ++++++++++++++++++++++++++++
-> >>>  4 files changed, 399 insertions(+)
-> >>>  create mode 100644 drivers/mfd/axp22x.c
-> >>>  create mode 100644 include/linux/mfd/axp22x.h
-> >> Not a chance.
-> >>
-> >> Farrrr, too much common code with axp20x.c - please merge into one file.
-> >>
-> > 
-> > This was one of the questions I asked in my cover letter (could you take
-> > a look at it and tell me what's your prefered solution ?) ;-).
-> > 
-> > I first tried to reuse the axp20x drivers, but ended up copying almost
-> > all definitions, hence I decided to first do a different driver and ask
-> > for advices.
-> 
-> I've just taken a good look at this (I'm planning on doing an axp152 driver
-> myself), and it seems that using a single mfd driver for the 20x and 221 should
-> be quite feasible:
-> 
-> - axp20x.h would get some new register defines for registers which are
->   different (or unique) to the 221 prefixed with aXP221
-> - An axp20x_writeable_ranges would need
->   to be extended with a third range going from AXP221_BAT_CAP1 (0xe0)
->   to AXP221_BAT_LOW_THRESH (0xe6)
-> - axp20x_writeable_table would get .n_yes_ranges set to 2, and a new
->   apx22x_writeable_table would be introduced with n_yes_ranges set to 3.
-> - add a new axp221_supplies array
-> - add a new axp221_cells array
-> - and finally use the proper structs in axp20x_i2c_probe depending on the type
-> 
-> Note that this means sharing ie the interrupt table, which is ok since they
-> are the same, except that the 221 has a couple of interrupts missing, but
-> the ones which are shared are all at the same place.
+Hello,
 
-Exactly.  As .probe() is identical, you only require some device
-matching and some extra structs where the data actually differs
-between devices.
+On Mon, May 19, 2014 at 10:29:05AM -0700, S?ren Brinkmann wrote:
+> With the improvements suggested by you I have this now:
+> 
+> long clk_round_rate_nearest(struct clk *clk, unsigned long rate)
+> {
+> 	unsigned long lower, upper;
+> 
+> 	lower = clk_round_rate(clk, rate);
+> 	if (lower >= rate)
+> 		return lower;
+> 
+> 	upper = clk_round_rate(clk, rate + (rate - lower) - 1);
+> 	if (upper == lower)
+> 		return upper;
+> 
+> 	lower = rate + 1;
+> 	while (lower < upper) {
+> 		unsigned long rounded, mid;
+> 
+> 		mid = lower + ((upper - lower) >> 1);
+> 		rounded = clk_round_rate(clk, mid);
+> 		if (rounded < lower)
+> 			lower = mid + 1;
+> 		else
+> 			upper = rounded;
+> 	}
+> 
+> 	return upper;
+> }
+This is nearly my version now. I just lacks the overflow check when
+calculating upper and I skipped the early return if (upper == lower).
+(Instead the while condition evaluates to false on the first hit and
+returns with the same result.)
+
+Other than that I added a few comments. :-)
+
+Something we still should resolve is the return type. It should match
+clk_round_rate, but should both be signed or unsigned? 
+
+Uwe
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
