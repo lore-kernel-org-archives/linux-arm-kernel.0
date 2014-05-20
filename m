@@ -1,51 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 19 May 2014 21:58:00 -0700
-Subject: [GIT PULL] ARM: mvebu: SoC orion5x DT conversion for v3.16
-In-Reply-To: <20140508180249.GL12708@titan.lakedaemon.net>
-References: <20140508180249.GL12708@titan.lakedaemon.net>
-Message-ID: <20140520045800.GF18956@quad.lixom.net>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Tue, 20 May 2014 06:57:49 +0200
+Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
+ support
+In-Reply-To: <537A540E.8070302@ti.com>
+References: <537487AE.3060906@ti.com> <20140515182133.GC23659@atomide.com>
+ <5375A8A8.7080306@ti.com> <20140516160717.GD22031@atomide.com>
+ <20140516174158.GA11733@earth.universe>
+ <20140516180154.GG22031@atomide.com>
+ <20140516213907.GL12881@atomide.com> <5379D35F.8040207@ti.com>
+ <20140519155732.GA4849@atomide.com> <537A540E.8070302@ti.com>
+Message-ID: <20140520045748.GA28812@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 02:02:49PM -0400, Jason Cooper wrote:
-> guys,
-> 
-> This is a great series by Thomas that gets orion5x well on it's way to
-> happy devicetree land. :)
-> 
-> This series crosses quite a few subdirectories, but the changes are
-> isolated to orion5x-specific files and legacy platform code.  iow, any
-> conflicts are going to be internal to mvebu.  This branch has been up in
-> -next for over a week without problems.
-> 
-> I chose to keep the series together to keep orion5x bootable during
-> bisection.  If you have any trouble with this branch, please let me
-> know.
+Hi,
 
-No problem at all. Excellent to see the platform being converted over.
+On Mon, May 19, 2014 at 09:57:18PM +0300, Tomi Valkeinen wrote:
+> > 3. Having to maintain a database in kernel of display mappings separately
+> >    in addition to the .dts files.
+> 
+> Yes, that's slightly annoying. Not really a big burden, though, as it's
+> quite rare to get a new encoder or panel driver.
 
-> 
-> Please pull.
-> 
-> thx,
-> 
-> Jason.
-> 
-> 
-> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-> 
->   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-orion5x-3.16
-> 
-> for you to fetch changes up to 19e00f20e90e349cdeef3d7b63e6179215c9ff9d:
-> 
->   ARM: orion: remove no longer needed gpio DT code (2014-04-26 19:45:28 +0000)
+I wonder if the "omapdss," prefix could be added to *all* remote
+endpoints seen by omapdss. Pseudocode:
 
-Merged into next/soc.
+for each port in dss {
+    for each endpoint in port {
+        panel = get_phandle(endpoint, "remote-endpoint");
 
+        /* only add prefix if it's not already there (kexec) */
+        if (panel.compatible != "omapdss,.*")
+            panel.compatible = "omapdss," + panel.compatible;
+    }
+}
 
-
--Olof
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140520/cf5dd055/attachment.sig>
