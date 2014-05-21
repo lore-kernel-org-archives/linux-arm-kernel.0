@@ -1,62 +1,70 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 20 May 2014 22:12:56 -0700
-Subject: [GIT PULL] Xilinx Zynq clk patches for v3.16
-In-Reply-To: <537B65CA.4070604@monstr.eu>
-References: <537B65CA.4070604@monstr.eu>
-Message-ID: <20140521051256.9521.88119@quantum>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 20 May 2014 23:20:07 -0600
+Subject: [PATCHv3 1/3] ARM: mm: allow sub-architectures to override PCI
+ I/O memory type
+In-Reply-To: <20140516095333.GE12341@arm.com>
+References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <4972763.mtuLYh6sDH@wuerfel> <20140515153430.GM27594@arm.com>
+ <11787153.NWVGbVfAPV@wuerfel> <20140516095333.GE12341@arm.com>
+Message-ID: <20140521052007.GA14888@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Michal Simek (2014-05-20 07:25:14)
-> Hi Mike,
-> 
-> please pull these 2 patches to your tree.
-> 
-> Thanks,
-> Michal
-> 
-> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-> 
->   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.xilinx.com/linux-xlnx.git tags/zynq-clk-for-3.16
-> 
-> for you to fetch changes up to 44731f5db44087f54d4e1ed6a460c75552fadcf7:
-> 
->   clk: si570: Fix email address specifiction (2014-05-20 16:18:18 +0200)
+On Fri, May 16, 2014 at 10:53:33AM +0100, Will Deacon wrote:
 
-Pulled.
+> > Correct. Assume a PCI device uses PIO and DMA. It sends a DMA to main memory
+> > and lets the CPU know about the data using a level (IntA as opposed to MSI)
+> > interrupt. The CPU performs an outl() operation to an I/O port to let the
+> > hardware know it has received the IRQ and the response of the outl() is
+> > guaranteed to flush the DMA transaction: by the time the outl() completes
+> > we know that the data in memory is valid because it is strongly ordered
+> > relative to the DMA.
 
-Regards,
-Mike
+Keep in mind that the IntA message itself is going to flush the DMA,
+no sane host bridge implementation should process the IntA until all
+prior DMA writes are completed, just like MSI.
 
-> 
-> ----------------------------------------------------------------
-> arm: Xilinx Zynq clk patches for v3.16
-> 
-> - Keep debug clocks in bootup state
-> - Fix email address in si570
-> 
-> ----------------------------------------------------------------
-> Michal Simek (1):
->       clk: si570: Fix email address specifiction
-> 
-> Soren Brinkmann (1):
->       clk: zynq: Leave debug clocks in bootup state
-> 
->  drivers/clk/clk-si570.c |  2 +-
->  drivers/clk/zynq/clkc.c | 12 ++++++++++++
->  2 files changed, 13 insertions(+), 1 deletion(-)
-> 
-> 
-> 
-> -- 
-> Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-> w: www.monstr.eu p: +42-0-721842854
-> Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-> Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-> Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-> 
-> 
+Also, legacy non-MSI interrupts are always sharable, so the ISR must
+always start with a read of a device specific status reguster, which
+will also flush any DMA writes.
+
+The simplest common scenario to show synchronous outl is this:
+
+void pci_isr()
+{
+   if (inl(status_reg) & INT_PENDING)
+      outl(ACK_INT,status_reg);
+}
+
+Where the outl is not expected to complete at the CPU until the device
+has lowered the level triggered interrupt line.
+
+If outl is not synchronous then a spurious interrupt will be caused.
+
+When converting a driver to MMIO you'd often have to do this:
+
+void pci_isr()
+{
+   if (readl(status_reg) & INT_PENDING) {
+      writel(ACK_INT,status_reg);
+      readl(status_reg); // Synchronizing read, flushes write.
+   }
+}
+
+Which is one of the software visible impacts of io vs mmio.
+
+> Hmm, when you say `guaranteed to flush the DMA transaction', is that a PCI
+> requirement? If so, whether or not that DMA data is then visible to the CPU
+> is really specific to the host-controller implementation. It could easily be
+> buffered somewhere between the host controller and memory, for example.
+
+PCI has the producer/consumer ordering model as part of the
+driving concept in the spec. Basically it wants to see the ordering
+model preserved right to the driver code itself.
+
+Realistically, way back, archs that couldn't do the synchronous IO
+(like my old MIPS design) had to convert their drivers to MMIO and run
+that way. It never worked 100% properly, or made sense to try an use an
+async outl, even though some systems provided it :)
+
+Jason
