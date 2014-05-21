@@ -1,75 +1,29 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 21 May 2014 09:34:57 +0200
-Subject: [RFC PATCH 2/5] clk: Introduce 'clk_round_rate_nearest()'
-In-Reply-To: <668683e3-856e-4f30-9b11-8f3e91e12d1d@BL2FFO11FD038.protection.gbl>
-References: <1400106655-22465-1-git-send-email-soren.brinkmann@xilinx.com>
- <1400106655-22465-3-git-send-email-soren.brinkmann@xilinx.com>
- <20140515073816.GI16662@pengutronix.de>
- <91822600-39d0-4e71-b0f5-9eda35b76ec0@BN1AFFO11FD016.protection.gbl>
- <20140519161949.GG16662@pengutronix.de>
- <db8633e5-01a9-4d3a-80e8-74e23a456d52@BN1BFFO11FD051.protection.gbl>
- <20140520073358.GJ16662@pengutronix.de>
- <4bb5f44a-60bb-4e34-8f88-f91b8419be8d@BL2FFO11FD050.protection.gbl>
- <537B957B.5010001@codeaurora.org>
- <668683e3-856e-4f30-9b11-8f3e91e12d1d@BL2FFO11FD038.protection.gbl>
-Message-ID: <20140521073457.GD31687@pengutronix.de>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 21 May 2014 09:52:51 +0200
+Subject: [PATCH v4 1/2] i2c: sunxi: Change i2c compatibles
+In-Reply-To: <1396270498-30703-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1396270498-30703-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1396270498-30703-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140521075251.GA2708@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, May 20, 2014 at 02:48:20PM -0700, S?ren Brinkmann wrote:
-> On Tue, 2014-05-20 at 10:48AM -0700, Stephen Boyd wrote:
-> > On 05/20/14 09:01, S?ren Brinkmann wrote:
-> > >
-> > >>>>> +{
-> > >>>>> +	unsigned long lower, upper, cur, lower_last, upper_last;
-> > >>>>> +
-> > >>>>> +	lower = clk_round_rate(clk, rate);
-> > >>>>> +	if (lower >= rate)
-> > >>>>> +		return lower;
-> > >>>> Is the >-case worth a warning?
-> > >>> No, it's correct behavior. If you request a rate that is way lower than what the
-> > >>> clock can generate, returning something larger is perfectly valid, IMHO.
-> > >>> Which reveals one problem in this whole discussion. The API does not
-> > >>> require clk_round_rate() to round down. It is actually an implementation
-> > >>> choice that had been made for clk-divider.
-> > >> I'm sure it's more than an implementation choice for clk-divider. But I
-> > >> don't find any respective documentation (but I didn't try hard).
-> > > A similar discussion - without final conclusion:
-> > > https://lkml.org/lkml/2010/7/14/260
-> > >
-> > >
-> > 
-> > Please call this new API something like clk_find_nearest_rate() or
-> > something. clk_round_rate() is supposed to return the rate that will be
-> > set if you call clk_set_rate() with the same arguments. It's up to the
-> > implementation to decide if that means rounding the rate up or down or
-> > to the nearest value.
+On Mon, Mar 31, 2014 at 02:54:57PM +0200, Maxime Ripard wrote:
+> The Allwinner A10 compatibles were following a slightly different compatible
+> patterns than the rest of the SoCs for historical reasons. Move to the other
+> pattern for consistency across all Allwinner Socs.
 > 
-> Sounds good to me. Are there any cases of clocks that round up? I think
-> that case would not be handled correctly. But I also don't see a use
-> case for such an implementation.
-I don't really care which semantic (i.e. round up, round down or round
-closest) is picked, but I'd vote that all should pick up the same. I
-think the least surprising definition is to choose rounding down and add
-the function that is under discussion here to get a nearest match.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-So I suggest:
+I still don't prefer the removal of the old binding, but as this has
+been discussed:
 
-	- if round_rate is given a rate that is smaller than the
-	  smallest available rate, return 0
-	- add WARN_ONCE to round_rate and set_rate if they return with a
-	  rate bigger than requested
-	- change the return values to unsigned long
+Applied to for-next, thanks!
 
-Do we also need a round_up implementation?
-
-Mike? Russell? Any thoughts from your side?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/40e54070/attachment.sig>
