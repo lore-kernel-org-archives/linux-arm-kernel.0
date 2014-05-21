@@ -1,46 +1,46 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 21 May 2014 13:57:46 -0500
-Subject: [RFC PATCH] arm64: Add arch support for PCI
-In-Reply-To: <CACoXjcmJPHdkrGRng8oWosgo9V_pLDNYw5Z3R_yN6w_rUe=G8Q@mail.gmail.com>
-References: <1382529163-31968-1-git-send-email-tinamdar@apm.com>
- <1382531997.14960.8.camel@mbp>
- <CACoXjcmJPHdkrGRng8oWosgo9V_pLDNYw5Z3R_yN6w_rUe=G8Q@mail.gmail.com>
-Message-ID: <805EF793-7CA2-4F4A-B7D2-0AF2582EFFAA@codeaurora.org>
+Date: Wed, 21 May 2014 14:14:29 -0500
+Subject: [PATCH v1 4/4] ARM: debug: qcom: Add APQ8084 DEBUG_LL UART support
+In-Reply-To: <1400686086.856.15.camel@iivanov-dev>
+References: <1400684225-21381-1-git-send-email-gdjakov@mm-sol.com>
+ <1400684225-21381-5-git-send-email-gdjakov@mm-sol.com>
+ <4365639.JcFl1cP048@wuerfel> <1400686086.856.15.camel@iivanov-dev>
+Message-ID: <A9A4B705-E550-407D-BDAD-91083417B356@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On Nov 21, 2013, at 7:38 AM, Tanmay Inamdar <tinamdar@apm.com> wrote:
+On May 21, 2014, at 10:28 AM, Ivan T. Ivanov <iivanov@mm-sol.com> wrote:
 
-> This patch adds the PCI(e) arch support in arm64. The files are
-> based on PCI(e) support in 32bit arm.
+> Hi, 
+> 
+> On Wed, 2014-05-21 at 17:18 +0200, Arnd Bergmann wrote:
+>> On Wednesday 21 May 2014 17:57:05 Georgi Djakov wrote:
+> 
+>>> 
+>>> +#ifdef CONFIG_DEBUG_APQ8084_UART
+>>> +#define MSM_DEBUG_UART_BASE    0xFA75E000
+>>> +#define MSM_DEBUG_UART_PHYS    0xF995E000
+>>> +#endif
+>>> +
+> 
+>> Maybe we should move debug/msm.S over to use
+>> CONFIG_DEBUG_UART_PHYS/CONFIG_DEBUG_UART_VIRT now?
+>> 
+> 
+> There is patch which do this [1]. It was reviewed 
+> by Stephen Boyd [2].
+> 
+> Regards,
+> Ivan
 > 
 > 
-> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
-> ---
-> arch/arm64/Kconfig               |   19 ++
-> arch/arm64/include/asm/dma.h     |   18 +
-> arch/arm64/include/asm/pci.h     |   74 ++++
-> arch/arm64/include/asm/pcibios.h |   98 ++++++
-> arch/arm64/kernel/Makefile       |    1 +
-> arch/arm64/kernel/pcibios.c      |  689 ++++++++++++++++++++++++++++++++++++++
-> arch/arm64/mm/Makefile           |    2 +-
-> arch/arm64/mm/iomap.c            |   31 ++
-> drivers/pci/Makefile             |    1 +
-> 9 files changed, 932 insertions(+), 1 deletion(-)
-> 
-> create mode 100644 arch/arm64/include/asm/dma.h
-> create mode 100644 arch/arm64/include/asm/pci.h
-> create mode 100644 arch/arm64/include/asm/pcibios.h
-> create mode 100644 arch/arm64/kernel/pcibios.c
-> create mode 100644 arch/arm64/mm/iomap.c
+> [1] https://lkml.org/lkml/2014/4/14/312
+> [2] https://lkml.org/lkml/2014/4/14/542
 
-Do you mind reposting this, the version I can find on mailing list archives seems corrupt.  This is at least useful until we get something merged upstream for arm64 pci work.
-
-thanks
+I?ll grab Ivan?s patch and send via my qcom tree to arm-soc.
 
 - k
-
 
 -- 
 Employee of Qualcomm Innovation Center, Inc.
