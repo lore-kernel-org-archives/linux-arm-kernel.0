@@ -1,20 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 May 2014 17:23:41 +0200
-Subject: [PATCH v8 0/2] Add support for the Allwinner A31 DMA Controller
-In-Reply-To: <1400685357-508-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1400685357-508-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <4828893.NoTbcUXQEt@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 21 May 2014 08:26:14 -0700
+Subject: [PATCH 0/6] AM43xx & OMAP5 DSS DT changes
+In-Reply-To: <537CC376.5050501@ti.com>
+References: <1400676625-30078-1-git-send-email-tomi.valkeinen@ti.com>
+ <20140521150231.GH17417@atomide.com> <537CC376.5050501@ti.com>
+Message-ID: <20140521152613.GJ17417@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 May 2014 17:15:54 Maxime Ripard wrote:
-> Changes from v7:
->   - select DMA_OF, since we're only relying on DT
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [140521 08:18]:
+> On 21/05/14 18:02, Tony Lindgren wrote:
+> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [140521 05:51]:
+> >> Hi,
+> >>
+> >> Here are the AM43xx and OMAP5 display DT changes again. I've sent the clock
+> >> related changes separately, and I removed OMAP5's RFBI node, which depends on
+> >> more clock changes. The RFBI driver doesn't work at the moment anyway, so
+> >> removing the RFBI node should not be an issue.
+> >>
+> >> Tony, if these look fine (the rfbi change is the only one compared to the
+> >> previous versions), can you queue them for 3.16?
+> > 
+> > Probably best that you do a late branch again after arm-soc dts changes
+> > have been merged. Sounds like you have at least that macro dependency
+> > to omap-for-v3.16/dt-v2 so you should probably base your branch on
 > 
+> There are no dependencies that I know of. Which macro dependency is that?
 
-I missed the discussion about this issue, but it seems wrong to me.
-DMA_OF is currently enabled if we have both DMAENGINE and OF turned on.
+Oh for the "[PATCH v2] ARM: dts: duovero-parlor: Add HDMI output" that
+now uses the OMAP4_IOPAD macro.
 
-If OF is disabled but DMA_OF gets selected by DMA_SUN6I, what happens?
+Regards,
 
-	Arnd
+Tony
