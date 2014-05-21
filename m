@@ -1,36 +1,78 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 21 May 2014 09:20:15 +0100
-Subject: [PATCH 3/3] ARM: sti: stih41x: Provide a proper header for this DTSI
- file
-In-Reply-To: <1400660415-14720-1-git-send-email-lee.jones@linaro.org>
-References: <1400660415-14720-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1400660415-14720-3-git-send-email-lee.jones@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 May 2014 10:20:57 +0200
+Subject: [PATCHv3 1/3] ARM: mm: allow sub-architectures to override PCI
+ I/O memory type
+In-Reply-To: <20140521052007.GA14888@obsidianresearch.com>
+References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140516095333.GE12341@arm.com>
+ <20140521052007.GA14888@obsidianresearch.com>
+Message-ID: <8688804.rOhvi9AvoE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also explicitly include STiH416 Clk bindings instead of relying on
-inheriting them from other DTSI files which we happen to include.
+On Tuesday 20 May 2014 23:20:07 Jason Gunthorpe wrote:
+> On Fri, May 16, 2014 at 10:53:33AM +0100, Will Deacon wrote:
+> 
+> > > Correct. Assume a PCI device uses PIO and DMA. It sends a DMA to main memory
+> > > and lets the CPU know about the data using a level (IntA as opposed to MSI)
+> > > interrupt. The CPU performs an outl() operation to an I/O port to let the
+> > > hardware know it has received the IRQ and the response of the outl() is
+> > > guaranteed to flush the DMA transaction: by the time the outl() completes
+> > > we know that the data in memory is valid because it is strongly ordered
+> > > relative to the DMA.
+> 
+> Keep in mind that the IntA message itself is going to flush the DMA,
+> no sane host bridge implementation should process the IntA until all
+> prior DMA writes are completed, just like MSI.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stih41x.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+I was thinking of PCI, not PCIe here, where the interrupt can be directly
+wired to the irqchip.
 
-diff --git a/arch/arm/boot/dts/stih41x.dtsi b/arch/arm/boot/dts/stih41x.dtsi
-index f5b9898..32730e5 100644
---- a/arch/arm/boot/dts/stih41x.dtsi
-+++ b/arch/arm/boot/dts/stih41x.dtsi
-@@ -1,3 +1,11 @@
-+/*
-+ * Copyright (C) 2014 STMicroelectronics Limited.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * publishhed by the Free Software Foundation.
-+ */
-+#include "stih416-clock.dtsi"
- / {
- 	#address-cells = <1>;
- 	#size-cells = <1>;
--- 
-1.8.3.2
+> Also, legacy non-MSI interrupts are always sharable, so the ISR must
+> always start with a read of a device specific status reguster, which
+> will also flush any DMA writes.
+
+Right, good point.
+
+> The simplest common scenario to show synchronous outl is this:
+> 
+> void pci_isr()
+> {
+>    if (inl(status_reg) & INT_PENDING)
+>       outl(ACK_INT,status_reg);
+> }
+> 
+> Where the outl is not expected to complete at the CPU until the device
+> has lowered the level triggered interrupt line.
+> 
+> If outl is not synchronous then a spurious interrupt will be caused.
+> 
+> When converting a driver to MMIO you'd often have to do this:
+> 
+> void pci_isr()
+> {
+>    if (readl(status_reg) & INT_PENDING) {
+>       writel(ACK_INT,status_reg);
+>       readl(status_reg); // Synchronizing read, flushes write.
+>    }
+> }
+> 
+> Which is one of the software visible impacts of io vs mmio.
+> 
+> > Hmm, when you say `guaranteed to flush the DMA transaction', is that a PCI
+> > requirement? If so, whether or not that DMA data is then visible to the CPU
+> > is really specific to the host-controller implementation. It could easily be
+> > buffered somewhere between the host controller and memory, for example.
+> 
+> PCI has the producer/consumer ordering model as part of the
+> driving concept in the spec. Basically it wants to see the ordering
+> model preserved right to the driver code itself.
+> 
+> Realistically, way back, archs that couldn't do the synchronous IO
+> (like my old MIPS design) had to convert their drivers to MMIO and run
+> that way. It never worked 100% properly, or made sense to try an use an
+> async outl, even though some systems provided it 
+
+Thanks for the extra background information!
+
+	Arnd
