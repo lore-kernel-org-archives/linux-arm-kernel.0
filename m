@@ -1,47 +1,42 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 21 May 2014 10:12:27 +0100
-Subject: [PATCH 3/3] ARM: sti: stih41x: Provide a proper header for this
- DTSI file
-In-Reply-To: <537C64A6.4050409@st.com>
-References: <1400660415-14720-1-git-send-email-lee.jones@linaro.org>
- <1400660415-14720-3-git-send-email-lee.jones@linaro.org>
- <537C64A6.4050409@st.com>
-Message-ID: <20140521091227.GA6679@lee--X1>
+Date: Wed, 21 May 2014 10:14:56 +0100
+Subject: [PATCH v6 0/7] mfd: AXP20x: Add support for AXP202 and AXP209
+In-Reply-To: <CAOQ7t2aBc5tFYk2MkfL9QqvFf5fcebwKtO97F3S=WdJ2uFE_jg@mail.gmail.com>
+References: <1400528868-5971-1-git-send-email-carlo@caione.org>
+ <20140520222307.GK12304@sirena.org.uk>
+ <CAOQ7t2aBc5tFYk2MkfL9QqvFf5fcebwKtO97F3S=WdJ2uFE_jg@mail.gmail.com>
+Message-ID: <20140521091456.GB6679@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >Also explicitly include STiH416 Clk bindings instead of relying on
-> >inheriting them from other DTSI files which we happen to include.
+> >> This set of patches introduces the core driver and support for two different
+> >> subsystems:
+> >>       - Regulators
 > >
-> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >---
-> >  arch/arm/boot/dts/stih41x.dtsi | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
+> >>  .../ABI/testing/sysfs-driver-input-axp-pek         |  11 +
+> >>  Documentation/devicetree/bindings/mfd/axp20x.txt   |  93 +++++++
+> >>  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+> >>  arch/arm/configs/multi_v7_defconfig                |   3 +
+> >>  arch/arm/configs/sunxi_defconfig                   |   4 +
+> >>  drivers/input/misc/Kconfig                         |  11 +
+> >>  drivers/input/misc/Makefile                        |   1 +
+> >>  drivers/input/misc/axp20x-pek.c                    | 281 +++++++++++++++++++++
+> >>  drivers/mfd/Kconfig                                |  12 +
+> >>  drivers/mfd/Makefile                               |   1 +
+> >>  drivers/mfd/axp20x.c                               | 258 +++++++++++++++++++
+> >>  include/linux/mfd/axp20x.h                         | 180 +++++++++++++
+> >>  12 files changed, 856 insertions(+)
 > >
-> >diff --git a/arch/arm/boot/dts/stih41x.dtsi b/arch/arm/boot/dts/stih41x.dtsi
-> >index f5b9898..32730e5 100644
-> >--- a/arch/arm/boot/dts/stih41x.dtsi
-> >+++ b/arch/arm/boot/dts/stih41x.dtsi
-> >@@ -1,3 +1,11 @@
-> >+/*
-> >+ * Copyright (C) 2014 STMicroelectronics Limited.
-> >+ *
-> >+ * This program is free software; you can redistribute it and/or modify
-> >+ * it under the terms of the GNU General Public License version 2 as
-> >+ * publishhed by the Free Software Foundation.
-> >+ */
-> >+#include "stih416-clock.dtsi"
+> > The regulator changes don't appear to be showing up in the diffstat or
+> > obviously in the series?
 > 
-> Nack.
-> As discussed on IRC, this dtsi file is included by stih415.dtsi.
-> In this case, we want to include stih415-clocks.dtsi instead.
+> Right. Cut-and-paste error.
+> You have already applied the regulator patches so I didn't include
+> them here (in theory I posted this series to be picked up by Lee).
 
-+1 resubmitted.
-
-> >  / {
-> >  	#address-cells = <1>;
-> >  	#size-cells = <1>;
-> >
+That's fine.  Just tell me which patches need to stay together and
+which are able to be applied through their respective subsystem trees
+separately.  Then, once I have all the Acks I can apply no problem.
 
 -- 
 Lee Jones
