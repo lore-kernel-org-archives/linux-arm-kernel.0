@@ -1,63 +1,27 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 21 May 2014 10:29:13 +0100
-Subject: [PATCH v2 4/4] ARM: dts: bcm590xx: add support for GPLDO and
- VBUS regulators
-In-Reply-To: <1398295293-11033-5-git-send-email-mporter@linaro.org>
-References: <1398295293-11033-1-git-send-email-mporter@linaro.org>
- <1398295293-11033-5-git-send-email-mporter@linaro.org>
-Message-ID: <20140521092913.GG6679@lee--X1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 May 2014 11:32:23 +0200
+Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140521090244.GB19268@ulmo>
+References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
+ <4506822.XX7GrvtHhk@wuerfel> <20140521090244.GB19268@ulmo>
+Message-ID: <11242680.PQytQQqlPJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Adds additional nodes to support GPLDO1-6 and VBUS regulators which
-> are now supported in the bcm590xx regulator driver.
+On Wednesday 21 May 2014 11:02:45 Thierry Reding wrote:
+> On Wed, May 21, 2014 at 10:54:42AM +0200, Arnd Bergmann wrote:
+>
+> > Right. As long as we always unmap the buffers from the IOMMU after they
+> > have stopped being in use, it's very unlikely that even a broken device
+> > driver causes a DMA into some bus address that happens to be mapped for
+> > another device.
 > 
-> Signed-off-by: Matt Porter <mporter@linaro.org>
-> ---
->  arch/arm/boot/dts/bcm59056.dtsi | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
+> I think that if buffers remain mapped in the IOMMU when they have been
+> deallocated that should be considered a bug.
 
-I'm not going to apply this with the rest of the set.  It will have to
-go in via your normal arch/arm route.
+You could see it as a performance optimization in some cases, e.g. when you
+cannot flush individual IOTLBs or doing so is expensive, and you just keep
+assigning new addresses until every one has been used, then you do a global
+IOTLB flush once. Obviously you have to maintain the IO page tables correctly.
 
-> diff --git a/arch/arm/boot/dts/bcm59056.dtsi b/arch/arm/boot/dts/bcm59056.dtsi
-> index dfadaaa..066adfb 100644
-> --- a/arch/arm/boot/dts/bcm59056.dtsi
-> +++ b/arch/arm/boot/dts/bcm59056.dtsi
-> @@ -70,5 +70,26 @@
->  
->  		vsr_reg: vsr {
->  		};
-> +
-> +		gpldo1_reg: gpldo1 {
-> +		};
-
-What do these empty nodes do in any case?
-
-Don't you at least need a status property in there or something?
-
-> +		gpldo2_reg: gpldo2 {
-> +		};
-> +
-> +		gpldo3_reg: gpldo3 {
-> +		};
-> +
-> +		gpldo4_reg: gpldo4 {
-> +		};
-> +
-> +		gpldo5_reg: gpldo5 {
-> +		};
-> +
-> +		gpldo6_reg: gpldo6 {
-> +		};
-> +
-> +		vbus_reg: vbus {
-> +		};
->  	};
->  };
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+	Arnd
