@@ -1,47 +1,38 @@
-From: keescook@google.com (Kees Cook)
-Date: Tue, 20 May 2014 21:11:56 -0700
-Subject: [PATCH 2/2] ARM: Kconfig: remove dependence of
- CONFIG_DEBUG_RODATA on !kexec
-In-Reply-To: <20140520083557.GA21866@arm.com>
-References: <1399887117-2605-1-git-send-email-Nikolay.Borisov@arm.com>
- <1399887117-2605-2-git-send-email-Nikolay.Borisov@arm.com>
- <20140516164917.GE1694@arm.com>
- <CAGXu5jK_RwA+3H9fSz4u9+hnFVuP5ST9x_sn1hSeNp98SK4TNg@mail.gmail.com>
- <20140520083557.GA21866@arm.com>
-Message-ID: <CAGXu5j+PnkFSH-zywzZE0vNz+Y6kHqqSk7yvsjrm=jnJHhL71Q@mail.gmail.com>
+From: ritesh.harjani@gmail.com (ritesh.harjani at gmail.com)
+Date: Wed, 21 May 2014 09:43:20 +0530
+Subject: [PATCH 1/1] arm64: tlbflush.h: Clean up comment
+In-Reply-To: <1400645600-35973-1-git-send-email-ritesh.harjani@gmail.com>
+References: <1400645600-35973-1-git-send-email-ritesh.harjani@gmail.com>
+Message-ID: <1400645600-35973-2-git-send-email-ritesh.harjani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 1:35 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, May 19, 2014 at 08:33:51PM +0100, Kees Cook wrote:
->> On Fri, May 16, 2014 at 9:49 AM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Mon, May 12, 2014 at 10:31:57AM +0100, Nikolay Borisov wrote:
->> >> Remove DEBUG_RODATA dependence on !kexec since "ARM: kexec: Make .text R/W in
->> >> machine_kexec" fixes the incompatibility between those 2
->> >> options.
->> >>
->> >> Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
->> >
->> >   Acked-by: Will Deacon <will.deacon@arm.com>
->>
->> We've got, from what I can see, about 4 sets of patches that are or
->> revolve around DEBUG_RODATA. What do you think is the best way to
->> gather everything together? Do you want me to build 1 giant set of
->> patches that includes kexec, DEBUG_RODATA, FIXMAP, and kgdb all
->> together, or should we just start flushing each one separately into
->> the patch tracker?
->
-> It's probably worth you collating the patches together into a single series,
-> giving it some testing, then reposting that to the list. Then, assuming
-> nothing explodes, sending a pull request to rmk (although it's getting quite
-> late in the day for 3.16).
->
-> Sound like a plan?
+From: Ritesh Harjani <ritesh.harjani@gmail.com>
 
-Sure! I'll start collecting it. :)
+Clean up the undefined function name(flush_kern_tlb_page)
+from the comment in tlbflush.h
 
--Kees
+Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
+---
+ arch/arm64/include/asm/tlbflush.h | 6 ------
+ 1 file changed, 6 deletions(-)
 
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index 8b48203..85e4f98 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -63,12 +63,6 @@ extern struct cpu_tlb_fns cpu_tlb;
+  *		- vaddr - virtual address (may not be aligned)
+  *		- vma	- vma_struct describing address range
+  *
+- *	flush_kern_tlb_page(kaddr)
+- *
+- *		Invalidate the TLB entry for the specified page.  The address
+- *		will be in the kernels virtual memory space.  Current uses
+- *		only require the D-TLB to be invalidated.
+- *		- kaddr - Kernel virtual memory address
+  */
+ static inline void flush_tlb_all(void)
+ {
 -- 
-Kees Cook
-Chrome OS Security
+1.8.1.3
