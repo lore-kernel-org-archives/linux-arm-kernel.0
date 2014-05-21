@@ -1,109 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 May 2014 16:01:41 +0200
-Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140521105034.GA2014@ulmo>
-References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
- <5371868.4QO1YJ0hU2@wuerfel> <20140521105034.GA2014@ulmo>
-Message-ID: <4994892.2gk6QRjAPD@wuerfel>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 21 May 2014 16:02:26 +0200
+Subject: [PATCH 2/3] ARM: EXYNOS: Enable multi-platform build support
+In-Reply-To: <036c01cf74fa$2da9c320$88fd4960$@samsung.com>
+References: <1400655169-21683-1-git-send-email-sachin.kamat@linaro.org>
+ <CAK9yfHxj-z1bWQqiaWVwvL2yRotqZn86ecjKcoHcyMQHZCrVcA@mail.gmail.com>
+ <036c01cf74fa$2da9c320$88fd4960$@samsung.com>
+Message-ID: <2191387.Fu2TRadtVb@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 May 2014 12:50:38 Thierry Reding wrote:
-> On Wed, May 21, 2014 at 11:36:32AM +0200, Arnd Bergmann wrote:
-> > On Wednesday 21 May 2014 11:00:38 Thierry Reding wrote:
-> > > On Wed, May 21, 2014 at 10:50:38AM +0200, Arnd Bergmann wrote:
-> > > > On Wednesday 21 May 2014 10:26:11 Thierry Reding wrote:
+
+Hi,
+
+On Wednesday, May 21, 2014 10:40:07 PM Kukjin Kim wrote:
+> Sachin Kamat wrote:
 > > 
-> > > > > > > For determining dma masks, it is the output address that it
-> > > > > > > important.  Santosh's code can probably be taught to handle this,
-> > > > > > > if given an additional traversal rule for following "iommus"
-> > > > > > > properties.  However, deploying an IOMMU whose output address size
-> > > > > > > is smaller than the 
-> > > > > > 
-> > > > > > Something seems to be missing here. I don't think we want to handle
-> > > > > > the case where the IOMMU output cannot the entire memory address
-> > > > > > space. If necessary, that would mean using both an IOMMU driver
-> > > > > > and swiotlb, but I think it's a reasonable assumption that hardware
-> > > > > > isn't /that/ crazy.
-> > > > > 
-> > > > > Similarily, should the IOMMU not be treated like any other device here?
-> > > > > Its DMA mask should determine what address range it can access.
-> > > > 
-> > > > Right. But for that we need a dma-ranges property in the parent of the
-> > > > iommu, just so the mask can be set correctly and we don't have to
-> > > > rely on the 32-bit fallback case.
-> > > 
-> > > Shouldn't the IOMMU driver be the one to set the DMA mask for the device
-> > > in exactly the same way that other drivers override the 32-bit default?
+> > Hi Bartlomiej,
 > > 
-> > The IOMMU driver could /ask/ for an appropriate mask based on its internal
-> > design, but if you have an IOMMU with a 64-bit output address connected
-> > to a 32-bit bus, that should fail.
-> 
-> Are there real use-cases where that really happens? I guess if we need
-> that the correct thing would be to bitwise AND both the DMA mask of the
-> IOMMU device (as set by the driver) with that derived from the IOMMU's
-> parent bus' dma-ranges property.
+> > On 21 May 2014 16:06, Bartlomiej Zolnierkiewicz
+> > <b.zolnierkie@samsung.com> wrote:
+> > >
+> > > Hi,
+> > >
+> > > On Wednesday, May 21, 2014 12:22:48 PM Sachin Kamat wrote:
+> > >> From: Arnd Bergmann <arnd@arndb.de>
+> > >>
+> > >> This makes it possible to enable the exynos platform as part of a
+> > >> multiplatform kernel, in addition to keeping the single-platform
+> > >> Exynos support.
+> > >
+> > > The patch description is wrong.  After this patch single-platform Exynos
+> > > support is no longer available
+> > 
+> > Forgot to update the message while rebasing. Thanks for noticing.
+> > 
+> > > and it adds at least one serious regression
+> > 
+> > I have mentioned about this in the cover letter.
+> > 
+> > > (cpufreq) which should be fixed before merging this patch.  Moreover it
+> > > seems that this patch (#2) should be merged with patch #3 to preserve
+> > > bisectability.
+> > 
+> > At this point exynos_defconfig works.
+> > 
+> > >Please also note that exynos_defconfig is no longer useful
+> > > after these changes and can be be removed.
+> > 
+> > Yes.
+> > 
+> Well, I think keeping the exynos_defconfig would be nice like other platform in multiplatforms...and I'm going to enable possible configs in exynos_defconfig for exynso SoCs then it can cover more for exynos...
 
-It would be unusual for an IOMMU to need this, but it's how the DMA
-mask is supposed to work for normal devices. As mentioned before, I
-would probably just error out if we ever encounter such an IOMMU.
+I know that many other platforms still have their own configs [*] but
+I would strongly prefer to have a single config supporting Exynos SoCs
+(that would be a multiplatform one) to simplify testing and prevent
+situations when something works with one config but not the other.
 
-> > Note that it's not obvious what the IOMMU's DMA mask actually means.
-> > It clearly has to be the mask that is used for allocating the IO page
-> > tables, but it wouldn't normally be used in the path that allocates
-> > pages on behalf of a DMA master attached to the IOMMU, because that
-> > allocation is performed by the code that looks at the other device's
-> > dma mask.
-> 
-> Interesting. If a DMA buffer is allocated using the master's DMA mask
-> wouldn't that cause breakage if the IOMMU and master's DMA masks don't
-> match. It seems to me like the right thing to do for buffer allocation
-> is to use the IOMMU's DMA mask if a device uses the IOMMU for
-> translation and use the device's DMA mask when determining to what I/O
-> virtual address to map that buffer.
+[*] I also hope that they get removed in the longer-term.. 
 
-Unfortunately not all code agrees regarding how dma mask is actually
-interpreted. The most important use is within the dma_map_ops, and
-that is aware of the IOMMU. The dma_map_ops use that to decide what
-IOVA (bus address) to generate that is usable for the device, normally
-this would be a 32-bit range.
-
-When driver code looks at the dma mask of the device itself to make
-an allocation decision without taking the IOMMU or swiotlb into
-account, things can indeed go wrong.
-
-Russell has recently done a good cleanup of various issues around
-dma masks, and I can't find any drivers that get this wrong.
-However, there is an issue with the two or three subsystems using
-"PCI_DMA_BUS_IS_PHYS" to decide how they should treat high buffers
-coming from user space that get passed to hardware.
-
-If the SCSI layer or the network layer find the horribly misnamed
-PCI_DMA_BUS_IS_PHYS (which is hardcoded to "1" on ARM32), they
-will create copy in low memory for any data that is above
-the device dma_mask (SCSI) or above max_low_pfn (network).
-
-This is not normally a bug, and won't hurt for the swiotlb case,
-but will give us worse performance for the IOMMU case, and
-we should probably change this code to calculate the boundary
-per device by calling a function from dma_map_ops.
-
-We also really need to implement swiotlb support on ARM32 to deal
-with any other device (besides SCSI and network) that does not
-have an IOMMU but wants to use the streaming DMA API on pages
-outside of the dma_mask. We already have this case on shmobile.
-
-> Obviously if we always assume that IOMMU hardware is sane and can always
-> access at least the whole memory then this isn't an issue. But what if a
-> device can do DMA to a 64-bit address space, but the IOMMU can only
-> address 32 bits. If the device's DMA mask is used for allocations, then
-> buffers could reside beyond the 4 GiB boundary that the IOMMU can
-> address, so effectively the IOMMU wouldn't be able to write to those
-> buffers.
-
-The mask of the device is not even an issue here, it's more the general
-case of passing a buffer outside of the IOMMU's upstream bus DMA mask
-into a driver connected to the IOMMU.
-
-	Arnd
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
