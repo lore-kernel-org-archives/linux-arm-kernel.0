@@ -1,89 +1,96 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 21 May 2014 11:16:27 +0200
-Subject: [PATCHv2 resend 00/11] improve PWM lookup support without device
- tree
-In-Reply-To: <1400532162-29483-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1400532162-29483-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140521091626.GA21211@ulmo>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 21 May 2014 10:18:57 +0100
+Subject: [PATCH 5/7] mfd: twl4030-power: Add support for board specific
+ configuration
+In-Reply-To: <20140521024552.GD17417@atomide.com>
+References: <1400031250-29542-1-git-send-email-tony@atomide.com>
+ <1400031250-29542-6-git-send-email-tony@atomide.com>
+ <20140520151722.GA24991@lee--X1>
+ <20140521024552.GD17417@atomide.com>
+Message-ID: <20140521091857.GD6679@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 10:42:31PM +0200, Alexandre Belloni wrote:
-> Hi,
-> 
-> Originally sent on Apr 14th, note that this series is blocking another 16
-> patches series, I would like it to be taken in 3.16 if we can agree on this
-> implementation.
-> 
-> A patch set as suggested by Thierry to make lookup with the lookup table
-> instead of device tree behave more like when using device tree.
-> 
-> The first patch adds a period and a polarity member to the lookup table and use
-> those to set period and polarity.
-> 
-> Patch 2, 4 and 5 are making use of those new members from the board files.
-> Patch 3 removes useless code since setting the polarity is now handled by the
-> PWM core.
-> 
-> I couldn't decide on a good name for the extended PWM_LOOKUP macro and I believe
-> we won't have to add members to that structure soon so:
-> Patch 6 modifies the PWM_LOOKUP macro to also initialize period and polarity
-> and
-> Patch 7-9 are making use of the new PWM_LOOKUP macro in the board files
-> 
-> Patch 10 and 11 are making the leds-pwm and pwm_bl drivers get the period from
-> the PWM before using pwm_period_ns if it is not already set.
-> 
-> Patch 10 will obviously conflict with the series of Russell reworking the
-> leds-pwm probing. I can rebase if necessary
-> 
-> The final goal would be to get rid of .pwm_period_ns in leds-pwm and pwm_bl
-> after moving all the remaining users (still around 25) to pwm_lookup.
-> 
-> Changes in v2:
->  - correctly unlock the pwm_lookup_lock mutex before returning.
->  - don't change PWM_LOOKUP atomically
->  - remove tpu_pwm_platform_data and the associated header file
->  - make the leds-pwm and pwm_bl drivers get the period from the PWM
-> 
-> Alexandre Belloni (11):
->   pwm: add period and polarity to struct pwm_lookup
->   ARM: shmobile: Armadillo 800 EVA: initialize all struct pwm_lookup
->     members
->   pwm: renesas-tpu: remove useless struct tpu_pwm_platform_data
->   ARM: OMAP3: Beagle: initialize all the struct pwm_lookup members
->   ARM: pxa: hx4700: initialize all the struct pwm_lookup members
->   pwm: modify PWM_LOOKUP to initialize all struct pwm_lookup members
->   ARM: OMAP3: Beagle: use PWM_LOOKUP to initialize struct pwm_lookup
->   ARM: shmobile: Armadillo 800 EVA: use PWM_LOOKUP to initialize struct
->     pwm_lookup
->   ARM: pxa: hx4700: use PWM_LOOKUP to initialize struct pwm_lookup
->   leds: leds-pwm: retrieve configured pwm period
->   backlight: pwm_bl: retrieve configured pwm period
-> 
->  Documentation/pwm.txt                          |  3 ++-
->  arch/arm/mach-omap2/board-omap3beagle.c        |  3 ++-
->  arch/arm/mach-pxa/hx4700.c                     |  3 ++-
->  arch/arm/mach-shmobile/board-armadillo800eva.c | 14 +++-----------
->  drivers/leds/leds-pwm.c                        |  5 ++++-
->  drivers/pwm/core.c                             |  8 +++++++-
->  drivers/pwm/pwm-renesas-tpu.c                  | 19 +++----------------
->  drivers/video/backlight/pwm_bl.c               |  8 +++++---
->  include/linux/platform_data/pwm-renesas-tpu.h  | 16 ----------------
->  include/linux/pwm.h                            |  6 +++++-
->  10 files changed, 33 insertions(+), 52 deletions(-)
->  delete mode 100644 include/linux/platform_data/pwm-renesas-tpu.h
+On Tue, 20 May 2014, Tony Lindgren wrote:
 
-I've applied this whole series with some minor fixups (mostly adding
-detail to commit messages). Test builds show no breakage, so I've pushed
-this to the for-next branch.
+> * Lee Jones <lee.jones@linaro.org> [140520 08:18]:
+> > 
+> > Ah, I forgot to Ack this last time, didn't I?
+> > 
+> >   Acked-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Yeah, here's this one updated with your ack.
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/5061ccec/attachment.sig>
+Has the code changed at all, or are you just reposting with my Ack
+applied?
+
+> 8< ---------------------------
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Tue, 20 May 2014 11:17:54 -0700
+> Subject: [PATCH] mfd: twl4030-power: Add support for board specific configuration
+> 
+> With the recommended twl4030 configuration added, we can now add
+> board specific changes as modifications to the recommended
+> configuration.
+> 
+> Note that the data is private to this driver, and the data must
+> always have a NULL resource in the sentinel.
+> 
+> Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> --- a/drivers/mfd/twl4030-power.c
+> +++ b/drivers/mfd/twl4030-power.c
+> @@ -567,13 +567,34 @@ twl4030_power_configure_scripts(const struct twl4030_power_data *pdata)
+>  	return 0;
+>  }
+>  
+> +static void twl4030_patch_rconfig(struct twl4030_resconfig *common,
+> +				  struct twl4030_resconfig *board)
+> +{
+> +	while (common->resource) {
+> +		struct twl4030_resconfig *b = board;
+> +
+> +		while (b->resource) {
+> +			if (b->resource == common->resource) {
+> +				*common = *b;
+> +				break;
+> +			}
+> +			b++;
+> +		}
+> +		common++;
+> +	}
+> +}
+> +
+>  static int
+>  twl4030_power_configure_resources(const struct twl4030_power_data *pdata)
+>  {
+>  	struct twl4030_resconfig *resconfig = pdata->resource_config;
+> +	struct twl4030_resconfig *boardconf = pdata->board_config;
+>  	int err;
+>  
+>  	if (resconfig) {
+> +		if (boardconf)
+> +			twl4030_patch_rconfig(resconfig, boardconf);
+> +
+>  		while (resconfig->resource) {
+>  			err = twl4030_configure_resource(resconfig);
+>  			if (err)
+> --- a/include/linux/i2c/twl.h
+> +++ b/include/linux/i2c/twl.h
+> @@ -674,6 +674,7 @@ struct twl4030_power_data {
+>  	struct twl4030_script **scripts;
+>  	unsigned num;
+>  	struct twl4030_resconfig *resource_config;
+> +	struct twl4030_resconfig *board_config;
+>  #define TWL4030_RESCONFIG_UNDEF	((u8)-1)
+>  	bool use_poweroff;	/* Board is wired for TWL poweroff */
+>  };
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
