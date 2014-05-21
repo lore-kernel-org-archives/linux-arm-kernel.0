@@ -1,18 +1,37 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 21 May 2014 19:35:12 +0530
-Subject: [PATCH] cpufreq: exynos: Fix driver compilation with
- ARCH_MULTIPLATFORM
-In-Reply-To: <036901cf74f9$0562e640$1028b2c0$@samsung.com>
-References: <537C6350.2010707@gmail.com>
- <1400670752-673-1-git-send-email-t.figa@samsung.com>
- <7243145.22RNvZMdch@wuerfel> <537C9B81.5040301@samsung.com>
- <CAJuA9ajHAyB6eLe0nQiNcCAS1ojG7W+FTJ1EH62H3Ch-DP2bcw@mail.gmail.com>
- <036901cf74f9$0562e640$1028b2c0$@samsung.com>
-Message-ID: <CAKohpomrv77TE=eH5jiN8YuhhaDZtg0B20GmbWB2ryHcYSwKNg@mail.gmail.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Wed, 21 May 2014 17:16:00 +0300
+Subject: [Patch] ARM: dts: keystone: add device state control syscon entry
+Message-ID: <1400681760-24351-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 May 2014 19:01, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> If there is no comments more on Thomas P Abraham's series v4 ;-), I will take that series in this time with ack from Viresh.
+Device state control registers has register regions with different
+purposes so add syscon entry in order to be able to correctly access
+them from appropriate places.
 
-@Thomas: Please post V5 quickly, let close it ASAP :)
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+
+Based on linux-next/master
+
+ arch/arm/boot/dts/keystone.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+index 5e67c5b..8b899ba 100644
+--- a/arch/arm/boot/dts/keystone.dtsi
++++ b/arch/arm/boot/dts/keystone.dtsi
+@@ -71,6 +71,11 @@
+ 			reg = <0x2310000 0x200>;
+ 		};
+ 
++		devctrl: device_state_control {
++			compatible = "ti,keystone-devctrl", "syscon";
++			reg = <0x2620000 0x1000>;
++		};
++
+ 		rstctrl: reset-controller {
+ 			compatible = "ti,keystone-reset";
+ 			reg = <0x023100e8 4>;	/* pll reset control reg */
+-- 
+1.8.3.2
