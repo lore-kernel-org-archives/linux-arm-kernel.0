@@ -1,32 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 May 2014 18:04:43 +0200
-Subject: [PATCH v8 0/2] Add support for the Allwinner A31 DMA Controller
-In-Reply-To: <20140521155551.GV27329@lukather>
-References: <1400685357-508-1-git-send-email-maxime.ripard@free-electrons.com>
- <4828893.NoTbcUXQEt@wuerfel> <20140521155551.GV27329@lukather>
-Message-ID: <5291281.0OW8pVdbhQ@wuerfel>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Wed, 21 May 2014 19:05:21 +0300
+Subject: [Patch v4 4/5] ARM: dts: keystone: update reset node to work
+ with reset driver
+In-Reply-To: <15259908.YoiO6LMEzV@wuerfel>
+References: <1400682454-24535-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1400682454-24535-5-git-send-email-ivan.khoronzhuk@ti.com>
+ <15259908.YoiO6LMEzV@wuerfel>
+Message-ID: <537CCEC1.1070801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 May 2014 17:55:51 Maxime Ripard wrote:
-> On Wed, May 21, 2014 at 05:23:41PM +0200, Arnd Bergmann wrote:
-> > On Wednesday 21 May 2014 17:15:54 Maxime Ripard wrote:
-> > > Changes from v7:
-> > >   - select DMA_OF, since we're only relying on DT
-> > > 
-> > 
-> > I missed the discussion about this issue, but it seems wrong to me.
-> > DMA_OF is currently enabled if we have both DMAENGINE and OF turned on.
-> > 
-> > If OF is disabled but DMA_OF gets selected by DMA_SUN6I, what happens?
-> 
-> Is that even possible with a multiplatform-based platform?
 
-It's not possible for ARCH_SUNXI or any other that depends on
-ARCH_MULTIPLATFORM. I just noticed that you have 'depends on ARCH_SUNXI',
-so the 'select DMA_OF' statement is just redundant, not wrong.
+On 05/21/2014 05:50 PM, Arnd Bergmann wrote:
+> On Wednesday 21 May 2014 17:27:33 Ivan Khoronzhuk wrote:
+>> The keystone driver requires the next additional properties:
+>>
+>> "ti,syscon-pll" - syscon register range used to access pll controller
+>>                    registers in order to use reset control registers.
+>> "ti,syscon-dev" - syscon register range used to access device state
+>>                    control registers in order to use mux block
+>>                    registers for all watchdogs.
+>>
+>> "ti,wdt_list"   - option to declare what watchdog are used to reboot
+>>                    the SoC, so set "0" WDT as default.
+>>
+>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> Same comment as what I had for the binding: it's not a register range
+> any more, but a phandle for a device.
+>
+>> ---
+>>   arch/arm/boot/dts/keystone.dtsi | 4 +++-
+>>   1 file changed, 3 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+>> index 8b899ba..783da60 100644
+>> --- a/arch/arm/boot/dts/keystone.dtsi
+>> +++ b/arch/arm/boot/dts/keystone.dtsi
+>> @@ -78,7 +78,9 @@
+>>   
+>>                  rstctrl: reset-controller {
+>>                          compatible = "ti,keystone-reset";
+>> -                       reg = <0x023100e8 4>;   /* pll reset control reg */
+>> +                       ti,syscon-pll = <&pllctrl>;
+>> +                       ti,syscon-dev = <&devctrl>;
+>> +                       ti,wdt_list = <0>;
+>>                  };
+>>   
+> I don't see a definition for the two labels, so this will cause a
+> build error. It makes sense to add them in the same patch.
+>
+> 	Arnd
 
-However, if the driver was 'depends on ARCH_SUNXI || COMPILE_TEST' as many
-others are nowadays, it would be a bug.
+Thanks,
 
-	Arnd
+I'll correct
+
+-- 
+Regards,
+Ivan Khoronzhuk
