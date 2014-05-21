@@ -1,82 +1,52 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 21 May 2014 18:09:54 +0100
-Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140521090037.GA19268@ulmo>
-References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
- <5612206.Fzsy1mf3q3@wuerfel> <20140521082606.GB11068@ulmo>
- <4367469.BqpJyVF8PT@wuerfel> <20140521090037.GA19268@ulmo>
-Message-ID: <20140521170954.GC3830@e103592.cambridge.arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 21 May 2014 19:15:32 +0200
+Subject: [PATCH v2] pinctrl/at91: Fix lockup when IRQ on PIOC and PIOD
+ occurs
+In-Reply-To: <536CAC87.9070007@atmel.com>
+References: <1398289203-2407-1-git-send-email-alexanders83@web.de>
+ <1398362139-25551-1-git-send-email-alexanders83@web.de>
+ <CACRpkdayBjvOnSfaRmcNenSG=MW0W+UFjqUjGoQwqDNFLQ9zEQ@mail.gmail.com>
+ <536CAC87.9070007@atmel.com>
+Message-ID: <20140521171532.GH3582@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 21, 2014 at 11:00:38AM +0200, Thierry Reding wrote:
-> On Wed, May 21, 2014 at 10:50:38AM +0200, Arnd Bergmann wrote:
-> > On Wednesday 21 May 2014 10:26:11 Thierry Reding wrote:
-> > > On Tue, May 20, 2014 at 10:26:12PM +0200, Arnd Bergmann wrote:
-> > > > On Tuesday 20 May 2014 16:24:59 Dave Martin wrote:
-> > > > > On Tue, May 20, 2014 at 02:41:18PM +0200, Arnd Bergmann wrote:
-> > > > > > On Tuesday 20 May 2014 14:02:43 Thierry Reding wrote:
-> > > [...]
-> > > > > > > Multiple-master IOMMU:
-> > > > > > > ----------------------
-> > > > > > > 
-> > > > > > > 	iommu {
-> > > > > > > 		/* the specifier represents the ID of the master */
-> > > > > > > 		#address-cells = <1>;
-> > > > > > > 		#size-cells = <0>;
-> > > > > 
-> > > > > How do we know the size of the input address to the IOMMU?  Do we
-> > > > > get cases for example where the IOMMU only accepts a 32-bit input
-> > > > > address, but some 64-bit capable masters are connected through it?
-> > > > 
-> > > > I was stuck on this question for a while before, but then I realized
-> > > > that it doesn't matter at all: It's the IOMMU driver itself that
-> > > > manages the address space, and it doesn't matter if a slave can
-> > > > address a larger range than the IOMMU can accept. If the IOMMU
-> > > > needs to deal with the opposite case (64-bit input addresses
-> > > > but a 32-bit master), that limitation can be put into the specifier.
-> > > 
-> > > Isn't this what DMA masks are for? Couldn't the IOMMU simply use the
-> > > master device's DMA mask to do the right thing here?
+Hi Linus,
+
+On 09/05/2014 at 12:23:03 +0200, Nicolas Ferre wrote :
+> On 25/04/2014 11:18, Linus Walleij :
+> > On Thu, Apr 24, 2014 at 7:55 PM, Alexander Stein <alexanders83@web.de> wrote:
 > > 
-> > Ah, yes. I guess that's the right way to do it.
+> >> With commit 80cc3732 (pinctrl/at91: convert driver to use gpiolib irqchip)
+> >> gpiochip_set_chained_irqchip is called for PIOC, PIOD and PIOE. The
+> >> associated GPIO chip for the IRQ chip is overwritten each time, because
+> >> they share the same hard IRQ line.
+> >> Thus if an IRQ occurs on PIOC or PIOD, gpio_irq_handler will only check on
+> >> PIOE (the assigned GPIO chip) where no event occured. Thus the IRQ will
+> >> not be cleared, retriggering the ISR.
+> >> Fix that (like done before) by only set the PIOC GPIO chip to the IRQ chip
+> >> and walk the list in the irq handler.
+> >>
+> >> Signed-off-by: Alexander Stein <alexanders83@web.de>
+> >> ---
+> >> Changes in v2:
+> >> * Fix git SHA1 in commit message (used local one)
+> >> * Switch to the next gpio_chip when walking the list
 > > 
-> > > > > For determining dma masks, it is the output address that it
-> > > > > important.  Santosh's code can probably be taught to handle this,
-> > > > > if given an additional traversal rule for following "iommus"
-> > > > > properties.  However, deploying an IOMMU whose output address size
-> > > > > is smaller than the 
-> > > > 
-> > > > Something seems to be missing here. I don't think we want to handle
-> > > > the case where the IOMMU output cannot the entire memory address
-> > > > space. If necessary, that would mean using both an IOMMU driver
-> > > > and swiotlb, but I think it's a reasonable assumption that hardware
-> > > > isn't /that/ crazy.
-> > > 
-> > > Similarily, should the IOMMU not be treated like any other device here?
-> > > Its DMA mask should determine what address range it can access.
-> > 
-> > Right. But for that we need a dma-ranges property in the parent of the
-> > iommu, just so the mask can be set correctly and we don't have to
-> > rely on the 32-bit fallback case.
+> > This v2 patch applied for next.
 > 
-> Shouldn't the IOMMU driver be the one to set the DMA mask for the device
-> in exactly the same way that other drivers override the 32-bit default?
+> Linus,
+> 
+> I do not see this patch in your "for-next" branch nor in linux-next. Did
+> I miss something?
 > 
 
-Are we confusing the "next-hop DMA mask" with the "end-to-end DMA mask"
-here?  The device has a next-hop mask which may be non-trivial.  The
-IOMMU also has a next-hop mask and/or remapping, but I think we agree
-that in sensible systems that will be trivial.  There might be other
-non-trivial remappings between the IOMMU and memory (but again, not
-in the common case).
+I don't see it either, I would prefer that we don't miss it for 3.16,
+can you check ?
 
-If we just use the same name for all these, we are liable to get
-confused.
+Thanks,
 
-To answer the question "what memory can the kernel allocate for DMA
-with this device", it is the end-to-end transformation that is
-important.
-
-Cheers
----Dave
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
