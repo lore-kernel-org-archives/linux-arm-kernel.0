@@ -1,36 +1,36 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Wed, 21 May 2014 18:28:06 +0300
-Subject: [PATCH v1 4/4] ARM: debug: qcom: Add APQ8084 DEBUG_LL UART support
-In-Reply-To: <4365639.JcFl1cP048@wuerfel>
-References: <1400684225-21381-1-git-send-email-gdjakov@mm-sol.com>
- <1400684225-21381-5-git-send-email-gdjakov@mm-sol.com>
- <4365639.JcFl1cP048@wuerfel>
-Message-ID: <1400686086.856.15.camel@iivanov-dev>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 21 May 2014 10:29:16 -0500
+Subject: [PATCH 00/10] ARM: Versatile irq and clock DT support
+In-Reply-To: <5859481.dtUsNDpXQt@wuerfel>
+References: <1400620176-7239-1-git-send-email-robherring2@gmail.com>
+ <5859481.dtUsNDpXQt@wuerfel>
+Message-ID: <CAL_JsqLXgi6+e=8GyHxt2Td3z3z8RWeTamNq+YCN1StT78zqiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, 
+On Wed, May 21, 2014 at 3:26 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 20 May 2014 16:09:26 Rob Herring wrote:
+>> From: Rob Herring <robh@kernel.org>
+>>
+>> This series is some preparation work to fully convert Versatile platform
+>> to DT. This converts the IRQ initialization to DT based init and adds
+>> clocks to the Versatile DT. This doesn't actually enable using common
+>> clock framework, but that is only a matter of removing the old clock
+>> code and enabling the appropriate Kconfig options. This will be done
+>> when Versatile can be completely converted over to DT boot. I have that
+>> working in my tree, but full DT conversion is also dependent on DT PCI
+>> support.
+>>
+>> I've tested under QEMU and Linus Walleij has tested an earlier version
+>> on Versatile AB h/w.
+>
+> Looks great to me.
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>
+> Should we merge it directly into arm-soc or are you planning to
+> send a pull request?
 
-On Wed, 2014-05-21 at 17:18 +0200, Arnd Bergmann wrote:
-> On Wednesday 21 May 2014 17:57:05 Georgi Djakov wrote:
+I'll do a pull req. I'll give it a few more days for review.
 
-> >  
-> > +#ifdef CONFIG_DEBUG_APQ8084_UART
-> > +#define MSM_DEBUG_UART_BASE    0xFA75E000
-> > +#define MSM_DEBUG_UART_PHYS    0xF995E000
-> > +#endif
-> > +
-
-> Maybe we should move debug/msm.S over to use
-> CONFIG_DEBUG_UART_PHYS/CONFIG_DEBUG_UART_VIRT now?
-> 
-
-There is patch which do this [1]. It was reviewed 
-by Stephen Boyd [2].
-
-Regards,
-Ivan
-
-
-[1] https://lkml.org/lkml/2014/4/14/312
-[2] https://lkml.org/lkml/2014/4/14/542
+Rob
