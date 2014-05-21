@@ -1,38 +1,63 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 21 May 2014 15:50:19 +0300
-Subject: [PATCH 0/6] AM43xx & OMAP5 DSS DT changes
-Message-ID: <1400676625-30078-1-git-send-email-tomi.valkeinen@ti.com>
+Date: Wed, 21 May 2014 15:50:20 +0300
+Subject: [PATCH 1/6] ARM: dts: am4372.dtsi: add DSS information
+In-Reply-To: <1400676625-30078-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1400676625-30078-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1400676625-30078-2-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Sathya Prakash M R <sathyap@ti.com>
 
-Here are the AM43xx and OMAP5 display DT changes again. I've sent the clock
-related changes separately, and I removed OMAP5's RFBI node, which depends on
-more clock changes. The RFBI driver doesn't work at the moment anyway, so
-removing the RFBI node should not be an issue.
+Add DT data for the display subsystem for AM4372. The DSS on AM4372 is
+basically OMAP3's DSS, without DSI and VENC blocks.
 
-Tony, if these look fine (the rfbi change is the only one compared to the
-previous versions), can you queue them for 3.16?
+Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ arch/arm/boot/dts/am4372.dtsi | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
- Tomi
-
-Sathya Prakash M R (2):
-  ARM: dts: am4372.dtsi: add DSS information
-  ARM: dts: am437x-gp-evm: add LCD data
-
-Tomi Valkeinen (4):
-  ARM: dts: am43x-epos-evm: add LCD data
-  ARM: dts: omap5.dtsi: add DSS nodes
-  ARM: dts: omap5-uevm.dts: add tca6424a
-  ARM: dts: omap5-uevm.dts: add display nodes
-
- arch/arm/boot/dts/am4372.dtsi        |  30 +++++++++++
- arch/arm/boot/dts/am437x-gp-evm.dts  |  97 +++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/am43x-epos-evm.dts | 101 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap5-uevm.dts     |  89 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap5.dtsi         |  61 +++++++++++++++++++++
- 5 files changed, 378 insertions(+)
-
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index d1f8707ff1df..8fd413d6d14b 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -735,6 +735,36 @@
+ 			#size-cells = <1>;
+ 			status = "disabled";
+ 		};
++
++		dss: dss at 4832a000 {
++			compatible = "ti,omap3-dss";
++			reg = <0x4832a000 0x200>;
++			status = "disabled";
++			ti,hwmods = "dss_core";
++			clocks = <&disp_clk>;
++			clock-names = "fck";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			dispc at 4832a400 {
++				compatible = "ti,omap3-dispc";
++				reg = <0x4832a400 0x400>;
++				interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
++				ti,hwmods = "dss_dispc";
++				clocks = <&disp_clk>;
++				clock-names = "fck";
++			};
++
++			rfbi: rfbi at 4832a800 {
++				compatible = "ti,omap3-rfbi";
++				reg = <0x4832a800 0x100>;
++				ti,hwmods = "dss_rfbi";
++				clocks = <&disp_clk>;
++				clock-names = "fck";
++			};
++
++		};
+ 	};
+ };
+ 
 -- 
 1.9.1
