@@ -1,72 +1,89 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 21 May 2014 10:17:51 +0100
-Subject: [PATCH V2] mfd: abx500-core: Fix compiler warning larger stack
- frame
-In-Reply-To: <537C447D.7070406@aurabindo.in>
-References: <536E1543.3090107@aurabindo.in> <20140520152054.GB24991@lee--X1>
- <537C447D.7070406@aurabindo.in>
-Message-ID: <20140521091751.GC6679@lee--X1>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 21 May 2014 11:16:27 +0200
+Subject: [PATCHv2 resend 00/11] improve PWM lookup support without device
+ tree
+In-Reply-To: <1400532162-29483-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1400532162-29483-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140521091626.GA21211@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Change from V1 -> V2: Fix a potential null pointer dereference as reported by kbuild test robot <fengguang.wu@intel.com>.
+On Mon, May 19, 2014 at 10:42:31PM +0200, Alexandre Belloni wrote:
+> Hi,
 > 
-> Inorder to report the kzalloc failure, I have just used a pr_debug statement. If it looks ugly, should I change the function's return value to int and give out an -ENOMEM ?
-
-Yes, please do that - and obviously add the checks to the calling code.
-
-> From 6615c7a995a6bb4dcf4c1e9ac59bca823ec821a5 Mon Sep 17 00:00:00 2001
-> From: Aurabindo J <mail@aurabindo.in>
-> Date: Wed, 21 May 2014 11:18:10 +0530
-> Subject: [PATCH] mfd: abx500-core: Fix compiler warning larger stack frame
+> Originally sent on Apr 14th, note that this series is blocking another 16
+> patches series, I would like it to be taken in 3.16 if we can agree on this
+> implementation.
 > 
-> On systems with CONFIG_FRAME_WARN=1024, compiler warns the allocation of
-> an object of struct device on stack. Make the allocation dynamically to
-> fix the warning.
+> A patch set as suggested by Thierry to make lookup with the lookup table
+> instead of device tree behave more like when using device tree.
 > 
-> Signed-off-by: Aurabindo J <mail@aurabindo.in>
-> ---
->  drivers/mfd/abx500-core.c | 19 ++++++++++++-------
->  1 file changed, 12 insertions(+), 7 deletions(-)
+> The first patch adds a period and a polarity member to the lookup table and use
+> those to set period and polarity.
 > 
-> diff --git a/drivers/mfd/abx500-core.c b/drivers/mfd/abx500-core.c
-> index f3a15aa..5e5098d 100644
-> --- a/drivers/mfd/abx500-core.c
-> +++ b/drivers/mfd/abx500-core.c
-> @@ -154,16 +154,21 @@ EXPORT_SYMBOL(abx500_startup_irq_enabled);
->  void abx500_dump_all_banks(void)
->  {
->  	struct abx500_ops *ops;
-> -	struct device dummy_child = {NULL};
-> +	struct device *dummy_child;
->  	struct abx500_device_entry *dev_entry;
->  
-> -	list_for_each_entry(dev_entry, &abx500_list, list) {
-> -		dummy_child.parent = dev_entry->dev;
-> -		ops = &dev_entry->ops;
-> +	dummy_child = kzalloc(sizeof(struct device), GFP_KERNEL);
-> +	if (dummy_child != NULL) {
-> +		list_for_each_entry(dev_entry, &abx500_list, list) {
-> +			dummy_child->parent = dev_entry->dev;
-> +			ops = &dev_entry->ops;
->  
-> -		if ((ops != NULL) && (ops->dump_all_banks != NULL))
-> -			ops->dump_all_banks(&dummy_child);
-> -	}
-> +			if ((ops != NULL) && (ops->dump_all_banks != NULL))
-> +				ops->dump_all_banks(dummy_child);
-> +		}
-> +		kfree(dummy_child);
-> +	} else
-> +		pr_debug("kzalloc failure in abx500_dump_all_banks\n");
->  }
->  EXPORT_SYMBOL(abx500_dump_all_banks);
->  
+> Patch 2, 4 and 5 are making use of those new members from the board files.
+> Patch 3 removes useless code since setting the polarity is now handled by the
+> PWM core.
+> 
+> I couldn't decide on a good name for the extended PWM_LOOKUP macro and I believe
+> we won't have to add members to that structure soon so:
+> Patch 6 modifies the PWM_LOOKUP macro to also initialize period and polarity
+> and
+> Patch 7-9 are making use of the new PWM_LOOKUP macro in the board files
+> 
+> Patch 10 and 11 are making the leds-pwm and pwm_bl drivers get the period from
+> the PWM before using pwm_period_ns if it is not already set.
+> 
+> Patch 10 will obviously conflict with the series of Russell reworking the
+> leds-pwm probing. I can rebase if necessary
+> 
+> The final goal would be to get rid of .pwm_period_ns in leds-pwm and pwm_bl
+> after moving all the remaining users (still around 25) to pwm_lookup.
+> 
+> Changes in v2:
+>  - correctly unlock the pwm_lookup_lock mutex before returning.
+>  - don't change PWM_LOOKUP atomically
+>  - remove tpu_pwm_platform_data and the associated header file
+>  - make the leds-pwm and pwm_bl drivers get the period from the PWM
+> 
+> Alexandre Belloni (11):
+>   pwm: add period and polarity to struct pwm_lookup
+>   ARM: shmobile: Armadillo 800 EVA: initialize all struct pwm_lookup
+>     members
+>   pwm: renesas-tpu: remove useless struct tpu_pwm_platform_data
+>   ARM: OMAP3: Beagle: initialize all the struct pwm_lookup members
+>   ARM: pxa: hx4700: initialize all the struct pwm_lookup members
+>   pwm: modify PWM_LOOKUP to initialize all struct pwm_lookup members
+>   ARM: OMAP3: Beagle: use PWM_LOOKUP to initialize struct pwm_lookup
+>   ARM: shmobile: Armadillo 800 EVA: use PWM_LOOKUP to initialize struct
+>     pwm_lookup
+>   ARM: pxa: hx4700: use PWM_LOOKUP to initialize struct pwm_lookup
+>   leds: leds-pwm: retrieve configured pwm period
+>   backlight: pwm_bl: retrieve configured pwm period
+> 
+>  Documentation/pwm.txt                          |  3 ++-
+>  arch/arm/mach-omap2/board-omap3beagle.c        |  3 ++-
+>  arch/arm/mach-pxa/hx4700.c                     |  3 ++-
+>  arch/arm/mach-shmobile/board-armadillo800eva.c | 14 +++-----------
+>  drivers/leds/leds-pwm.c                        |  5 ++++-
+>  drivers/pwm/core.c                             |  8 +++++++-
+>  drivers/pwm/pwm-renesas-tpu.c                  | 19 +++----------------
+>  drivers/video/backlight/pwm_bl.c               |  8 +++++---
+>  include/linux/platform_data/pwm-renesas-tpu.h  | 16 ----------------
+>  include/linux/pwm.h                            |  6 +++++-
+>  10 files changed, 33 insertions(+), 52 deletions(-)
+>  delete mode 100644 include/linux/platform_data/pwm-renesas-tpu.h
 
+I've applied this whole series with some minor fixups (mostly adding
+detail to commit messages). Test builds show no breakage, so I've pushed
+this to the for-next branch.
 
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/5061ccec/attachment.sig>
