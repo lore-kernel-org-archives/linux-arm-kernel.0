@@ -1,83 +1,102 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 21 May 2014 09:53:57 -0700
-Subject: [PATCH v5 2/6] dt-bindings: add mtk-timer bindings
-In-Reply-To: <1948139.7c1AZ80ZQt@phil>
-References: <1400689583-21119-1-git-send-email-matthias.bgg@gmail.com>
- <1400689583-21119-3-git-send-email-matthias.bgg@gmail.com>
- <63a3ee29-aa23-4137-9c0c-5b2bdd75a68f@BN1BFFO11FD014.protection.gbl>
- <1948139.7c1AZ80ZQt@phil>
-Message-ID: <3a9b6824-e088-4774-b125-7a33b5a895dc@BN1AFFO11FD022.protection.gbl>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 21 May 2014 11:06:44 -0600
+Subject: [PATCH v7 0/3] Add support for PCI in AArch64
+In-Reply-To: <20140521113421.GB13511@bart.dudau.co.uk>
+References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
+ <CA+sq2Ccok5wtKjCZUkBhhj3WsiqFAoMgHK7LY210aBtMku+8SA@mail.gmail.com>
+ <20140516132451.GK967@e106497-lin.cambridge.arm.com>
+ <CA+sq2CejJFg--0rS1arr4Sactp-ssENB8Y3g4b61JPGPBCms=A@mail.gmail.com>
+ <CA+sq2Ccp0_4hgbbWa27bkYcqiXY6Ckr8eckWnHwANvhWNo97fg@mail.gmail.com>
+ <20140521113421.GB13511@bart.dudau.co.uk>
+Message-ID: <20140521170644.GJ8775@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-05-21 at 06:54PM +0200, Heiko St?bner wrote:
-> Am Mittwoch, 21. Mai 2014, 09:34:10 schrieb S?ren Brinkmann:
-> > Hi Matthias,
+On Wed, May 21, 2014 at 12:34:21PM +0100, Liviu Dudau wrote:
+> On Wed, May 21, 2014 at 04:45:29PM +0530, Sunil Kovvuri wrote:
+> > Hi Liviu,
 > > 
-> > On Wed, 2014-05-21 at 06:26PM +0200, Matthias Brugger wrote:
-> > > Add binding documentation for the General Porpose Timer driver of
+> > Sorry for the trouble.
+> > I got why 'res->parent' is not set in my case.
+> > Basically my SR-IOV device has fixed resources, so resources will not
+> > be allocated/assigned and hence parent resource is not set.
+> > I will move the resource claiming to host controller driver as a fixup
+> > so that parent resource hierarchy is set.
 > > 
-> > Typo: Purpose
-> > 
-> > > the Mediatek SoCs.
-> > > 
-> > > Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> > > ---
-> > > 
-> > >  .../devicetree/bindings/timer/mediatek,mtk-timer.txt   | 18
-> > >  ++++++++++++++++++ 1 file changed, 18 insertions(+)
-> > >  create mode 100644
-> > >  Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt> 
-> > > diff --git
-> > > a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-> > > b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt new file
-> > > mode 100644
-> > > index 0000000..7d909f7
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-> > > @@ -0,0 +1,18 @@
-> > > +Mediatek MT6577, MT6572 and MT6589 Timers
-> > > +---------------------------------------
-> > > +
-> > > +Required properties:
-> > > +- compatible: Should be "mediatek,mtk6577-timer"
-> > > +- reg: Should contain location and length for timers register.
-> > > +- clocks: Clocks driving the timer hardware. This list shoud include two
-> > > +	clocks. The order is system clock and as second clock the RTC clock.
-> > > +
-> > > +Examples:
-> > > +
-> > > +	timer {
-> > 
-> > The node name should be timer at 0x10008000
+> > Thanks for the support.
 > 
-> I think the more commonly used variant is
-> 
-> 	timer at 10008000
-> 
-> without the 0x. While some dts files really use @0x they are in the minority.
+> Glad you worked out the cause for the problem. I will still at to my list of
+> ToDo things to investigate resource parenting with my patchset.
 
-You're right.
+We recently fixed some things in this area on mvebu. It is important
+to ensure that the aperature in the host driver has a proper resource
+associated with it, or the PCI core won't create sub resources.
 
-> 
-> 
-> > 
-> > > +		compatible = "mediatek,mtk6577-timer";
-> > > +		reg = <0x10008000 0x80>;
-> > > +		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
-> > > +		clocks = <&system_clk>, <&rtc_clk>;
-> > > +		clock-names = "system-clk", "rtc-clk";
-> > 
-> > I'm still not convinced that the timer IP calls its clock inputs this
-> > way, but well.
-> 
-> Maybe this might convince you ;-)
-> 
-> "The GPT includes 5 32-bit timers and one 64-bit timer. Each timer has 4 
-> operation modes, which are ONE-SHOT,  REPEAT,  KEEP-GO and  FREERUN, and can 
-> operate on one of the 2 clock sources, RTC clock (32.768kHz) and system clock 
-> (13MHz)."
+commit 2613ba480fb7b40c67eea36d03c9946977828623
+Author: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+Date:   Wed Feb 12 15:57:08 2014 -0700
 
-Is this copied from the timer data sheet or the SOC documentation?
+    PCI: mvebu: Call request_resource() on the apertures
+    
+    It is typical for host drivers to request a resource for the aperture; once
+    this is done the PCI core will properly populate resources for all BARs in
+    the system.
+    
+    With this patch cat /proc/iomem will now show:
+    
+      e0000000-efffffff : PCI MEM 0000
+        e0000000-e00fffff : PCI Bus 0000:01
+          e0000000-e001ffff : 0000:01:00.0
+    
+    Tested on Kirkwood.
+    
+    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+    Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+    Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-	S?ren
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 05e352889868..d3d1cfd51e09 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -101,7 +101,9 @@ struct mvebu_pcie {
+        struct mvebu_pcie_port *ports;
+        struct msi_chip *msi;
+        struct resource io;
++       char io_name[30];
+        struct resource realio;
++       char mem_name[30];
+        struct resource mem;
+        struct resource busn;
+        int nports;
+@@ -672,10 +674,30 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+ {
+        struct mvebu_pcie *pcie = sys_to_pcie(sys);
+        int i;
++       int domain = 0;
+ 
+-       if (resource_size(&pcie->realio) != 0)
++#ifdef CONFIG_PCI_DOMAINS
++       domain = sys->domain;
++#endif
++
++       snprintf(pcie->mem_name, sizeof(pcie->mem_name), "PCI MEM %04x",
++                domain);
++       pcie->mem.name = pcie->mem_name;
++
++       snprintf(pcie->io_name, sizeof(pcie->io_name), "PCI I/O %04x", domain);
++       pcie->realio.name = pcie->io_name;
++
++       if (request_resource(&iomem_resource, &pcie->mem))
++               return 0;
++
++       if (resource_size(&pcie->realio) != 0) {
++               if (request_resource(&ioport_resource, &pcie->realio)) {
++                       release_resource(&pcie->mem);
++                       return 0;
++               }
+                pci_add_resource_offset(&sys->resources, &pcie->realio,
+                                        sys->io_offset);
++       }
+        pci_add_resource_offset(&sys->resources, &pcie->mem, sys->mem_offset);
+        pci_add_resource(&sys->resources, &pcie->busn);
