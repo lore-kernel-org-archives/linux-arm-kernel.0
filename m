@@ -1,43 +1,147 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 21 May 2014 11:37:17 -0400
-Subject: [PATCH 03/10] irqchip: versatile-fpga: add pass-thru enable
- support
-In-Reply-To: <CAL_JsqJHernZ08vF6_a=Vz41dm1aAo7vZcK+G3pvVYhB7ytP9Q@mail.gmail.com>
-References: <1400620176-7239-1-git-send-email-robherring2@gmail.com>
- <1400620176-7239-4-git-send-email-robherring2@gmail.com>
- <20140521014146.GG8664@titan.lakedaemon.net>
- <CAL_JsqJHernZ08vF6_a=Vz41dm1aAo7vZcK+G3pvVYhB7ytP9Q@mail.gmail.com>
-Message-ID: <20140521153717.GI8664@titan.lakedaemon.net>
+From: tthayer.linux@gmail.com (Thor Thayer)
+Date: Wed, 21 May 2014 10:38:34 -0500
+Subject: [PATCHv5 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
+ controller
+In-Reply-To: <20140520144446.GJ949@pengutronix.de>
+References: <1400169891-29546-1-git-send-email-tthayer@altera.com>
+ <1400169891-29546-2-git-send-email-tthayer@altera.com>
+ <20140516075344.GF949@pengutronix.de>
+ <CAF03EBfOrBWsGVkwYHQt9Pm858LtkgUThkM6dFjksa93ETo_bw@mail.gmail.com>
+ <20140519191206.GH949@pengutronix.de>
+ <CAF03EBfwFC7bK=j0W3K+no9TK7xe2nF1ZXH9bMBRNzVErB5EjQ@mail.gmail.com>
+ <CANk1AXTdSheUkNtF2fSmtcYaUrd2CnTjBxGitmSy88H4VRVbnw@mail.gmail.com>
+ <20140520144446.GJ949@pengutronix.de>
+Message-ID: <CAF03EBe+G8EpZSU7vhu4QZ3E-Nq4WnHw7DRM7=EyxHkjzp5cqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 21, 2014 at 10:35:38AM -0500, Rob Herring wrote:
-> On Tue, May 20, 2014 at 8:41 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> > Rob,
-> >
-> > On Tue, May 20, 2014 at 04:09:29PM -0500, Rob Herring wrote:
-> >> From: Rob Herring <robh@kernel.org>
-> >>
-> >> Set the PIC_ENABLES register when the passthru-mask property is present.
-> >> This enables interrupts on the secondary controller to be passed thru
-> >> directly to the primary controller.
-> >>
-> >> Signed-off-by: Rob Herring <robh@kernel.org>
-> >> Cc: Thomas Gleixner <tglx@linutronix.de>
-> >> Cc: Jason Cooper <jason@lakedaemon.net>
-> >> ---
-> >>  drivers/irqchip/irq-versatile-fpga.c | 6 ++++++
-> >>  1 file changed, 6 insertions(+)
-> >
-> > Patches 3 and 4 are good to go.  Shall I take them, or are they a
-> > depended on by later patches?
-> 
-> Thanks. There are dependencies, so I plan to send it all thru arm-soc.
+On Tue, May 20, 2014 at 9:44 AM, Steffen Trumtrar
+<s.trumtrar@pengutronix.de> wrote:
+> Hi!
+>
+> On Tue, May 20, 2014 at 09:31:06AM -0500, Alan Tull wrote:
+>> On Mon, May 19, 2014 at 2:37 PM, Thor Thayer <tthayer.linux@gmail.com> wrote:
+>>
+>> >>> >> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+>> >>> >> new file mode 100644
+>> >>> >> index 0000000..8f8746b
+>> >>> >> --- /dev/null
+>> >>> >> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+>> >>> >> @@ -0,0 +1,11 @@
+>> >>> >> +Altera SOCFPGA SDRAM Controller
+>> >>> >> +
+>> >>> >> +Required properties:
+>> >>> >> +- compatible : "altr,sdr-ctl";
+>> >>> >> +- reg : Should contain 1 register ranges(address and length)
+>> >>> >> +
+>> >>> >> +Example:
+>> >>> >> +     sdrctl at ffc25000 {
+>> >>> >> +             compatible = "altr,sdr-ctl";
+>> >>> >> +             reg = <0xffc25000 0x1000>;
+>> >>> >> +     };
+>> >>> >> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+>> >>> >> index df43702..6ce912e 100644
+>> >>> >> --- a/arch/arm/boot/dts/socfpga.dtsi
+>> >>> >> +++ b/arch/arm/boot/dts/socfpga.dtsi
+>> >>> >> @@ -676,6 +676,11 @@
+>> >>> >>                       clocks = <&l4_sp_clk>;
+>> >>> >>               };
+>> >>> >>
+>> >>> >> +             sdrctl at ffc25000 {
+>> >>> >> +                     compatible = "altr,sdr-ctl", "syscon";
+>> >>> >                                                    ^^^^^^^^^^
+>> >>> >
+>> >>> > Get rid of that, too, please.
+>> >>>
+>> >>> Hi Steffan,
+>> >>>
+>> >>> I believe I need to keep the "syscon". The same register (ctrlcfg)
+>> >>> that has the ECC enable bitfield also includes the DRAM configuration
+>> >>> bitfields that other drivers will want to access (specifically the
+>> >>> FPGA bridge needs this information). Since this register will be
+>> >>> shared between drivers,  syscon seems like the best solution.
+>> >>>
+>> >>
+>> >> Hm, from looking at the documentation of the ctrlcfg I can't really
+>> >> understand which bits you would need for the FPGA brigde and why.
+>>
+>> Hi Steffen,
+>>
+>> Offset 0x80 in the sdr-ctl is the "fpgaportrst" register.  14 bits
+>> wide, defaults to 0.  When appropriate bits set to 1 in that reg, it
+>> allows an FPGA port to come out of reset (enables that port).  Has no
+>> other effect on SDRAM configuration.
+>>
+>> >> That all sounds like stuff you would want to set for the specific
+>> >> RAM you are dealing with on a specific board.
+>> >> What bridge are you talking about? The SDRAM bridge?
+>>
+>> Yes, the port allows the FPGA a direct path to the SDRAM.  This one
+>> register the only register in the sdr that the bridge driver needs.
+>>
+>
+> So, what I suggested down ...
+>
+>> >>
+>> >> I can see the problem with the ECC enable, though.
+>> >>
+>> >> Regards,
+>> >> Steffen
+>> >>
+>> >
+>> >>> >                 sdrctl at ffc25000 {
+>> >>> >                         compatible = "altr,sdr-ctl";
+>> >>> >                         reg = <0xffc25000 0x1000>;
+>> >>> >                         ranges;
+>> >>> >
+>> >>> >                         edac at ffc2502c {
+>> >>> >                                 compatible = "altr,sdram-edac";
+>> >>> >                                 reg = <0xffc2502c 0x50>;
+>> >>> >                                 interrupts = <0 39 4>;
+>> >>> >                         };
+>> >>> >                 };
+>> >>> >
+>> >>> > Then we can later add:
+>> >>> >
+>> >>> >                         sdr-ports: ports at ffc2507c {
+>> >>> >                                 #reset-cells = <1>;
+>> >>> >                                 compatible = "altr,sdr-ports";
+>> >>> >                                 reg = <0xffc2507c 0x10>;
+>> >>> >                                 clocks = <&ddr_dqs_clk>;
+>> >>> >                                 ...
+>> >>> >                         };
+>>
+>
+> ... here should work. No?! Just a simple driver that registers with the
+> reset-framework. I would add 0x7c to that driver and than that driver could
+> "configure" the port and let it out of reset.
+>
+> I have done the same thing for the other 3 bridges, but am not finished yet.
+> Especially the GPV-stuff needs to at least be able to be added later if not now.
+>
+> Regard,
+> Steffen
+>
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
 
-Very well.  For both:
+Hi Steffen!
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+I'm not clear on how the EDAC driver will interact with the registers
+allocated to the SDRAM controller. If the group of registers from
+0xffc25000 to 0xffc26000 is exclusively allocated to the SDRAM
+controller, how does the EDAC driver cleanly access that single
+register inside this range?
 
-thx,
+Is the solution that I don't use request_region() (and therefore not
+request exclusive access) when setting up the SDRAM controller?
 
-Jason.
+If you could point me to your drivers for the other bridges that you
+reference, your code may answer my question.
+
+Thanks for your comments and insight.
+
+Thor
