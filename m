@@ -1,37 +1,68 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 21 May 2014 10:26:56 +0200
-Subject: [PATCH 0/3] Exynos multi-platform support
-In-Reply-To: <1400655169-21683-1-git-send-email-sachin.kamat@linaro.org>
-References: <1400655169-21683-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <537C6350.2010707@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 21 May 2014 10:26:11 +0200
+Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <5612206.Fzsy1mf3q3@wuerfel>
+References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
+ <8663464.40PHEumOar@wuerfel>
+ <20140520152458.GB5041@e103592.cambridge.arm.com>
+ <5612206.Fzsy1mf3q3@wuerfel>
+Message-ID: <20140521082606.GB11068@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 21.05.2014 08:52, Sachin Kamat wrote:
-> The patches in this series were earlier sent as part of other
-> series. Now that the other patches have been merged, re-sending
-> these after rebasing them on linux-next (20140519).
-> Tested on Exynos4210, 4412, 5250 and 5420 based boards.
+On Tue, May 20, 2014 at 10:26:12PM +0200, Arnd Bergmann wrote:
+> On Tuesday 20 May 2014 16:24:59 Dave Martin wrote:
+> > On Tue, May 20, 2014 at 02:41:18PM +0200, Arnd Bergmann wrote:
+> > > On Tuesday 20 May 2014 14:02:43 Thierry Reding wrote:
+[...]
+> > > > Multiple-master IOMMU:
+> > > > ----------------------
+> > > > 
+> > > > 	iommu {
+> > > > 		/* the specifier represents the ID of the master */
+> > > > 		#address-cells = <1>;
+> > > > 		#size-cells = <0>;
+> > 
+> > How do we know the size of the input address to the IOMMU?  Do we
+> > get cases for example where the IOMMU only accepts a 32-bit input
+> > address, but some 64-bit capable masters are connected through it?
 > 
-> A particular change in this series is the removal of single platform
-> support for Exynos as suggested by Arnd and Olof (patch 2/3). With
-> this change certain features (drivers) which are not yet multi-platform
-> aware like cpufreq, devfreq and DRM based gscaler will not be available
-> now.
+> I was stuck on this question for a while before, but then I realized
+> that it doesn't matter at all: It's the IOMMU driver itself that
+> manages the address space, and it doesn't matter if a slave can
+> address a larger range than the IOMMU can accept. If the IOMMU
+> needs to deal with the opposite case (64-bit input addresses
+> but a 32-bit master), that limitation can be put into the specifier.
 
-I really don't like this. Well, I don't care too much for devfreq and
-DRM Gscaler, as the the first one doesn't even support DT and Gscaler is
-usually used through a V4L2 driver, which should be fine. However
-cpufreq is quite important feature and it will be a serious regression
-in terms of performance (most boards don't boot at maximum frequency)
-and power consumption (no ability to scale the CPU down).
+Isn't this what DMA masks are for? Couldn't the IOMMU simply use the
+master device's DMA mask to do the right thing here?
 
-So my proposal here is to hack the cpufreq driver with a minimal amount
-of changes needed to compile and use it on multi-platform builds. I'll
-send a patch later today to show what I mean. It would have to be merged
-as a prerequisite for this series, to keep the history bisectable.
+As such I don't think this information needs to be in device tree at
+all. The DMA mask should typically be set by the driver in the first
+place because it has knowledge about the capabilities of the device.
+A different way of saying that is that the DMA mask is implied by the
+device's compatible string.
 
-Best regards,
-Tomasz
+> > For determining dma masks, it is the output address that it
+> > important.  Santosh's code can probably be taught to handle this,
+> > if given an additional traversal rule for following "iommus"
+> > properties.  However, deploying an IOMMU whose output address size
+> > is smaller than the 
+> 
+> Something seems to be missing here. I don't think we want to handle
+> the case where the IOMMU output cannot the entire memory address
+> space. If necessary, that would mean using both an IOMMU driver
+> and swiotlb, but I think it's a reasonable assumption that hardware
+> isn't /that/ crazy.
+
+Similarily, should the IOMMU not be treated like any other device here?
+Its DMA mask should determine what address range it can access.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/7d8e7b76/attachment.sig>
