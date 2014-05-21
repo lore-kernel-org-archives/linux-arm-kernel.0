@@ -1,58 +1,62 @@
-From: arunks.linux@gmail.com (Arun KS)
-Date: Wed, 21 May 2014 09:52:37 +0530
-Subject: [PATCH 1/1] arm64: tlbflush.h: Clean up comment
-In-Reply-To: <1400645600-35973-2-git-send-email-ritesh.harjani@gmail.com>
-References: <1400645600-35973-1-git-send-email-ritesh.harjani@gmail.com>
- <1400645600-35973-2-git-send-email-ritesh.harjani@gmail.com>
-Message-ID: <CAKZGPAMhZZoSAs0LPpGJijCL3EM-ANoSWs0-yQPX2yL=nB-6DQ@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 20 May 2014 22:12:56 -0700
+Subject: [GIT PULL] Xilinx Zynq clk patches for v3.16
+In-Reply-To: <537B65CA.4070604@monstr.eu>
+References: <537B65CA.4070604@monstr.eu>
+Message-ID: <20140521051256.9521.88119@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ritesh,
+Quoting Michal Simek (2014-05-20 07:25:14)
+> Hi Mike,
+> 
+> please pull these 2 patches to your tree.
+> 
+> Thanks,
+> Michal
+> 
+> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+> 
+>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.xilinx.com/linux-xlnx.git tags/zynq-clk-for-3.16
+> 
+> for you to fetch changes up to 44731f5db44087f54d4e1ed6a460c75552fadcf7:
+> 
+>   clk: si570: Fix email address specifiction (2014-05-20 16:18:18 +0200)
 
-On Wed, May 21, 2014 at 9:43 AM,  <ritesh.harjani@gmail.com> wrote:
-> From: Ritesh Harjani <ritesh.harjani@gmail.com>
->
-> Clean up the undefined function name(flush_kern_tlb_page)
-> from the comment in tlbflush.h
->
-> Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
-> ---
->  arch/arm64/include/asm/tlbflush.h | 6 ------
->  1 file changed, 6 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-> index 8b48203..85e4f98 100644
-> --- a/arch/arm64/include/asm/tlbflush.h
-> +++ b/arch/arm64/include/asm/tlbflush.h
-> @@ -63,12 +63,6 @@ extern struct cpu_tlb_fns cpu_tlb;
->   *             - vaddr - virtual address (may not be aligned)
->   *             - vma   - vma_struct describing address range
->   *
-> - *     flush_kern_tlb_page(kaddr)
-> - *
-> - *             Invalidate the TLB entry for the specified page.  The address
-> - *             will be in the kernels virtual memory space.  Current uses
-> - *             only require the D-TLB to be invalidated.
-> - *             - kaddr - Kernel virtual memory address
->   */
->  static inline void flush_tlb_all(void)
+Pulled.
 
-Probably you can remove the following comment in same file as well.
-"The arch/arm64/mm/tlb.S files implement these methods."
+Regards,
+Mike
 
-arch/arm64/mm/tlb.S file is no more and all the methods are
-implemented in the current file.
-
-Thanks,
-Arun
-
->  {
-> --
-> 1.8.1.3
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> ----------------------------------------------------------------
+> arm: Xilinx Zynq clk patches for v3.16
+> 
+> - Keep debug clocks in bootup state
+> - Fix email address in si570
+> 
+> ----------------------------------------------------------------
+> Michal Simek (1):
+>       clk: si570: Fix email address specifiction
+> 
+> Soren Brinkmann (1):
+>       clk: zynq: Leave debug clocks in bootup state
+> 
+>  drivers/clk/clk-si570.c |  2 +-
+>  drivers/clk/zynq/clkc.c | 12 ++++++++++++
+>  2 files changed, 13 insertions(+), 1 deletion(-)
+> 
+> 
+> 
+> -- 
+> Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+> w: www.monstr.eu p: +42-0-721842854
+> Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+> Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+> Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+> 
+> 
