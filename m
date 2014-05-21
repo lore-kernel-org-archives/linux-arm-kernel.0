@@ -1,63 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 21 May 2014 10:23:20 +0200
-Subject: [PATCH v2] ARM: sun6i: Add MMC0 controller to the Colombus board
-Message-ID: <1400660600-29015-1-git-send-email-maxime.ripard@free-electrons.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 21 May 2014 11:26:10 +0300
+Subject: [PATCH] ARM: dts: duovero-parlor: Add HDMI output
+In-Reply-To: <537C6082.2000405@epfl.ch>
+References: <1400595946-1294-1-git-send-email-florian.vaussard@epfl.ch>
+ <CAGhQ9VxtJwrKzW77mo=y9_gvCRW_8TJEp90OVN+YPg2RpC=b_w@mail.gmail.com>
+ <537C6082.2000405@epfl.ch>
+Message-ID: <537C6322.2000101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Colombus has a full size SD slot wired to the MMC0 controller. In order to
-work, the MMC lines have to have the pull-ups enabled though.
+On 21/05/14 11:14, Florian Vaussard wrote:
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Reviewed-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes from v1:
-  - Deduplicated MMC pins
+>> I think Parlor has one and the "hdmi-connector" binding now supports
+>> it. See Tomi's 3.16/fbdev-omap branch.
+>>
+> 
+> Looking into the details, the HPD pin of the parlor board is connected
+> to the OMAP4 HDMI IP. The LINK_CONNECT and LINK_DISCONNECT events are
+> managed by hdmi_irq_handler() in hdmi4.c to turn on/off the PHY's power.
+> So there is no need to use the hgp-gpios binding of "hdmi-connector"
+> IMHO. Correct me if I am wrong, as the public TRM is pretty thin
+> regarding the OMAP4 HDMI IP.
 
- arch/arm/boot/dts/sun6i-a31-colombus.dts | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+The PHY's link-connect and disconnect are a separate thing, not really
+related to the HPD.
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-colombus.dts b/arch/arm/boot/dts/sun6i-a31-colombus.dts
-index 3898a7bce831..229e7922e4ec 100644
---- a/arch/arm/boot/dts/sun6i-a31-colombus.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-colombus.dts
-@@ -13,6 +13,7 @@
- 
- /dts-v1/;
- /include/ "sun6i-a31.dtsi"
-+/include/ "sunxi-common-regulators.dtsi"
- 
- / {
- 	model = "WITS A31 Colombus Evaluation Board";
-@@ -23,6 +24,29 @@
- 	};
- 
- 	soc at 01c00000 {
-+		mmc0: mmc at 01c0f000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_colombus>;
-+			vmmc-supply = <&reg_vcc3v0>;
-+			bus-width = <4>;
-+			cd-gpios = <&pio 0 8 0>; /* PA8 */
-+			cd-inverted;
-+			status = "okay";
-+		};
-+
-+		pio: pinctrl at 01c20800 {
-+			mmc0_pins_a: mmc0 at 0 {
-+				allwinner,pull = <1>;
-+			};
-+
-+			mmc0_cd_pin_colombus: mmc0_cd_pin at 0 {
-+				allwinner,pins = "PA8";
-+				allwinner,function = "gpio_in";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <1>;
-+			};
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
--- 
-1.9.3
+The hdmi_hpd pin on OMAP should be configured to GPIO mode, and the GPIO
+should be handled by the hdmi-connector.
+
+The HDMI driver doesn't have support for the HDMI IP's HPD, and if I
+recall right, the HDMI IP's HPD was not without problems. And afaik it
+doesn't really bring anything, a normal GPIO does the job just fine.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/24220845/attachment-0001.sig>
