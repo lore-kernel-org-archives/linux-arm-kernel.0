@@ -1,59 +1,32 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 May 2014 15:07:59 -0700
-Subject: [GIT PULL 3/3] ARM: tegra: defconfig updates for 3.16
-In-Reply-To: <1400264746-13106-3-git-send-email-swarren@wwwdotorg.org>
-References: <1400264746-13106-1-git-send-email-swarren@wwwdotorg.org>
- <1400264746-13106-3-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20140521220759.GL24972@quad.lixom.net>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 21 May 2014 19:47:32 -0300
+Subject: [RESEND/PATCH v4 0/9] Watchdog support for Armada 375/38x SoC
+In-Reply-To: <20140519130429.GP1484@spo001.leaseweb.com>
+References: <1397481813-4962-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140424045153.GU28159@titan.lakedaemon.net>
+ <20140424110636.GA1735@arch.cereza>
+ <20140506204242.GA26972@arch.cereza>
+ <20140507142705.GE1484@spo001.leaseweb.com>
+ <20140515124252.GA1893@arch.cereza>
+ <20140519123723.GB698@arch.cereza>
+ <20140519130429.GP1484@spo001.leaseweb.com>
+Message-ID: <20140521224732.GA24803@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 12:25:46PM -0600, Stephen Warren wrote:
-> AT24C EEPROM:
-> 
-> This is used for the board ID EEPROM on Jetson TK1, as well as likely
-> a whole slew of other NVIDIA reference boards; we simply haven't added
-> enabled the EEPROM in the DT files until now.
-> 
-> MTD_SPI_NOR:
-> 
-> This defconfig contains the CONFIG_M25P80 symbol, which is now
-> dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to satisfy
-> the new dependency.
-> 
-> FRAMEBUFFER_CONSOLE_ROTATION:
-> 
-> Needed for devices like Tegra Note 7 and NVIDIA SHIELD to get the boot
-> console in the expected orientation.
-> 
-> CAN*, RTC_DRV_DS1307:
-> 
-> Toradex Colibri Evaluation Board uses the DS1307 RTC and the MCP251x CAN
-> controller. The NVIDIA Tegra 3 based Colibri T30 module can be used on
-> this carrier board.
-> 
-> Furthermore the NVIDIA Tegra 3 based Apalis T30 module too contains two
-> MCP251x CAN controllers.
-> 
-> INPUT_JOYDEV:
-> 
-> NVIDIA SHIELD embeds a USB joystick device.
-> 
-> ----------------------------------------------------------------
-> 
-> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-> 
->   Linux 3.15-rc1
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tegra-for-3.16-defconfig
-> 
-> for you to fetch changes up to 9956dcc5d136248a415234381311543c8cdf869a:
-> 
->   ARM: tegra: tegra_defconfig updates
+Hi Wim,
 
-Merged, thanks!
+On 19 May 03:04 PM, Wim Van Sebroeck wrote:
+> 
+> will be added in the coming days, but I have 2 other deadlines to catch first...
+> 
 
+Sure, no problem. However, I must admit it worries me a bit not seeing this in
+linux-next, given -rc6 is already out. If you think we won't make it, don't
+hesitate to let me know and I'll try to find another route for the patches.
 
--Olof
+Thanks a lot,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
