@@ -1,85 +1,77 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 21 May 2014 10:58:29 +0200
-Subject: [PATCH v7] DMA: sun6i: Add driver for the Allwinner A31 DMA
- controller
-In-Reply-To: <20140521053105.GI21128@intel.com>
-References: <20140430070408.GR32284@intel.com>
- <20140513134258.GA29258@lukather>
- <20140521053105.GI21128@intel.com>
-Message-ID: <20140521085829.GP27329@lukather>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 21 May 2014 10:02:03 +0100
+Subject: [PATCH v9 14/14] virt: arm: support hip04 gic
+In-Reply-To: <CAD6h2NRv3hUa7vhbxVb1LhYi9K5OMVf01pyqp6yUC-+0zU8jkQ@mail.gmail.com>
+References: <1400591427-21922-1-git-send-email-haojian.zhuang@linaro.org>
+ <1400591427-21922-15-git-send-email-haojian.zhuang@linaro.org>
+ <20140520134441.GK5292@lvm>
+ <CAD6h2NQyG1GSneWMpHmYxD-dPS7w9w2fe8vDdj-f834T2yqn1w@mail.gmail.com>
+ <20140520140153.GL5292@lvm>
+ <CAD6h2NQZGBa5U0-tmj=wtsFpcqnV2tHx+_vESrx8+3r7dGpHjQ@mail.gmail.com>
+ <20140520150518.GA39503@lvm>
+ <CAD6h2NRv3hUa7vhbxVb1LhYi9K5OMVf01pyqp6yUC-+0zU8jkQ@mail.gmail.com>
+Message-ID: <20140521090203.GB39503@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 21, 2014 at 11:01:05AM +0530, Vinod Koul wrote:
-> On Tue, May 13, 2014 at 03:42:58PM +0200, Maxime Ripard wrote:
-> > Hi Vinod,
-> > 
-> > On Wed, Apr 30, 2014 at 12:34:08PM +0530, Vinod Koul wrote:
-> > > > +
-> > > > +static int sun6i_dma_terminate_all(struct sun6i_vchan *vchan)
-> > > > +{
-> > > > +	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(vchan->vc.chan.device);
-> > > > +	struct sun6i_pchan *pchan = vchan->phy;
-> > > > +	unsigned long flags;
-> > > > +	LIST_HEAD(head);
-> > > > +
-> > > > +	spin_lock(&sdev->lock);
-> > > > +	list_del_init(&vchan->node);
-> > > > +	spin_unlock(&sdev->lock);
-> > > > +
-> > > > +	spin_lock_irqsave(&vchan->vc.lock, flags);
-> > > > +
-> > > > +	vchan_get_all_descriptors(&vchan->vc, &head);
-> > > > +
-> > > > +	if (pchan) {
-> > > > +		writel(DMA_CHAN_ENABLE_STOP, pchan->base + DMA_CHAN_ENABLE);
-> > > > +		writel(DMA_CHAN_PAUSE_RESUME, pchan->base + DMA_CHAN_PAUSE);
-> > > > +
-> > > > +		vchan->phy = NULL;
-> > > > +		pchan->vchan = NULL;
-> > > > +		pchan->desc = NULL;
-> > > > +		pchan->done = NULL;
-> > > > +	}
-> > > > +
-> > > > +	spin_unlock_irqrestore(&vchan->vc.lock, flags);
-> > > > +
-> > > > +	vchan_dma_desc_free_list(&vchan->vc, &head);
-> > > 
-> > > shouldn't you kill the tasklet as well here?
-> > 
-> > Just to be clear, which tasklet? vchan's or the driver's?
-> You need to take care of both. But I suspect if we ensure irq is not triggered
-> and any pending ones are completed you can simply kill both of the tasklets
-> happily. See the fixes merged in dmaengine last cycle (hint: patchlog shows what
-> we need to do)
+On Tue, May 20, 2014 at 11:39:12PM +0800, Haojian Zhuang wrote:
+> On 20 May 2014 23:05, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> > On Tue, May 20, 2014 at 10:16:22PM +0800, Haojian Zhuang wrote:
+> >> On 20 May 2014 22:01, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> >> It's the implementation of gich_apr in arm32.
+> >>
+> >> We needn't add or change anything in struct vgic_cpu. And both the
+> >> assembly code and the code could be much easier.
+> >>
+> >
+> > But we do end up with an extra memory access from EL2 in the critical
+> > path, and I believe Marc's concern here is that if we cross a cache
+> > line, this might really hurt performance.
+> >
+> 
+> Sorry. Do we may cross a cache line or a TLB entry?
+> 
+> I think that you're concerning to cross TLB entries. The reason is in
+>  below.
+> 
+> 1. If the problem is on crossing cache line, it's caused by too much
+> instructions. Either the packing nr_lr or the gich_apr adds some
+> instructions. The packing nr_lr needs a little more instructions.
 
-I still don't get why I should kill the driver tasklet in terminate_all.
+I don't see why this argument is valid.  If you have a separate
+instruction and data cache, you may be loading from a different cache
+line when placing the static value close to your instructions.  If you
+add a variable to the vcpu struct, all of the fields may no longer fit
+in a single data cache line and you may cause the memory subsystem to
+have to fetch another cache line.  I believe the latter is Marc's
+concern, and I suspect he would be equally concerned about the former.
 
-The tasklet is common to all the channels, if you kill it, you'll
-prevent it from scheduling while other channels might have had a need
-for it to actually run.
+I'm not too concerned about a TLB entry here, that works at a 4K
+granularity and with the proper alignment of the struct and hyp code,
+that shouldn't be a concern.  Without it, of course, there's a risk of
+requiring another TLB entry as well.
 
-About the commits themselves, I guess you talk about 9068b032 and
-ccc7aad0. Both these commits only fix the remove path, not the
-terminate_all one, and both these drivers are not doing anything
-related to the tasklet in terminate_all.
 
-> Btw just noticed, you *should* use dmaengine: as the subsytem name on the patch
-> series...
+> 
+> 2. ldr instruction is a pseudo instruction. So it's parsed into operation
+> on PC register.
 
-Ok, I will.
+Eh, it just means that it does a load relative from the PC address, and
+if the offset is too far to be encoded in the immediate field, then it
+does an indirect load through a literal pool, if I understand what you
+are referring to.  In any case, there will be at least one actual ldr
+instruction issued on the PE.
 
-Thanks,
-Maxime
+> Now I put gich_apr in interrupts_head.S, it results
+> in gich_apr variable before __kvm_hyp_code_start. It may cross the
+> TLB entries.
+> How about to declare gich_apr after __kvm_cpu_return in interrupts.S?
+> Since save_vgic_state & restore_vgic_state is only used once, declaring
+> gich_apr just after the code could avoid crossing TLB entry.
+> 
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/e1823552/attachment.sig>
+Again, all the fields in the vcpu struct are quite likely to be aligned
+within a single data cache line, I don't believe that's the case if you
+stick some data in between the the hyp code.
+
+-Christoffer
