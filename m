@@ -1,52 +1,38 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 21 May 2014 19:15:32 +0200
-Subject: [PATCH v2] pinctrl/at91: Fix lockup when IRQ on PIOC and PIOD
- occurs
-In-Reply-To: <536CAC87.9070007@atmel.com>
-References: <1398289203-2407-1-git-send-email-alexanders83@web.de>
- <1398362139-25551-1-git-send-email-alexanders83@web.de>
- <CACRpkdayBjvOnSfaRmcNenSG=MW0W+UFjqUjGoQwqDNFLQ9zEQ@mail.gmail.com>
- <536CAC87.9070007@atmel.com>
-Message-ID: <20140521171532.GH3582@piout.net>
+From: heiko.stuebner@bq.com (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 21 May 2014 19:18:59 +0200
+Subject: [PATCH v5 2/6] dt-bindings: add mtk-timer bindings
+In-Reply-To: <3a9b6824-e088-4774-b125-7a33b5a895dc@BN1AFFO11FD022.protection.gbl>
+References: <1400689583-21119-1-git-send-email-matthias.bgg@gmail.com>
+ <1948139.7c1AZ80ZQt@phil>
+ <3a9b6824-e088-4774-b125-7a33b5a895dc@BN1AFFO11FD022.protection.gbl>
+Message-ID: <1615424.OJcNQb1ONt@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On 09/05/2014 at 12:23:03 +0200, Nicolas Ferre wrote :
-> On 25/04/2014 11:18, Linus Walleij :
-> > On Thu, Apr 24, 2014 at 7:55 PM, Alexander Stein <alexanders83@web.de> wrote:
+Am Mittwoch, 21. Mai 2014, 09:53:57 schrieb S?ren Brinkmann:
+> On Wed, 2014-05-21 at 06:54PM +0200, Heiko St?bner wrote:
+> > Am Mittwoch, 21. Mai 2014, 09:34:10 schrieb S?ren Brinkmann:
+> > > Hi Matthias,
+> > > 
+> > > On Wed, 2014-05-21 at 06:26PM +0200, Matthias Brugger wrote:
+> > > > +		compatible = "mediatek,mtk6577-timer";
+> > > > +		reg = <0x10008000 0x80>;
+> > > > +		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
+> > > > +		clocks = <&system_clk>, <&rtc_clk>;
+> > > > +		clock-names = "system-clk", "rtc-clk";
+> > > 
+> > > I'm still not convinced that the timer IP calls its clock inputs this
+> > > way, but well.
 > > 
-> >> With commit 80cc3732 (pinctrl/at91: convert driver to use gpiolib irqchip)
-> >> gpiochip_set_chained_irqchip is called for PIOC, PIOD and PIOE. The
-> >> associated GPIO chip for the IRQ chip is overwritten each time, because
-> >> they share the same hard IRQ line.
-> >> Thus if an IRQ occurs on PIOC or PIOD, gpio_irq_handler will only check on
-> >> PIOE (the assigned GPIO chip) where no event occured. Thus the IRQ will
-> >> not be cleared, retriggering the ISR.
-> >> Fix that (like done before) by only set the PIOC GPIO chip to the IRQ chip
-> >> and walk the list in the irq handler.
-> >>
-> >> Signed-off-by: Alexander Stein <alexanders83@web.de>
-> >> ---
-> >> Changes in v2:
-> >> * Fix git SHA1 in commit message (used local one)
-> >> * Switch to the next gpio_chip when walking the list
+> > Maybe this might convince you ;-)
 > > 
-> > This v2 patch applied for next.
+> > "The GPT includes 5 32-bit timers and one 64-bit timer. Each timer has 4
+> > operation modes, which are ONE-SHOT,  REPEAT,  KEEP-GO and  FREERUN, and
+> > can operate on one of the 2 clock sources, RTC clock (32.768kHz) and
+> > system clock (13MHz)."
 > 
-> Linus,
-> 
-> I do not see this patch in your "for-next" branch nor in linux-next. Did
-> I miss something?
-> 
+> Is this copied from the timer data sheet or the SOC documentation?
 
-I don't see it either, I would prefer that we don't miss it for 3.16,
-can you check ?
-
-Thanks,
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+That is from the processor datasheet containing the timer documentation.
+I don't think it's customary for soc vendors to provide additional individual 
+documentation for self-developed IPs contained in a SoC.
