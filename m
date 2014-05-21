@@ -1,38 +1,54 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 21 May 2014 18:17:10 +0300
-Subject: [PATCH 0/6] AM43xx & OMAP5 DSS DT changes
-In-Reply-To: <20140521150231.GH17417@atomide.com>
-References: <1400676625-30078-1-git-send-email-tomi.valkeinen@ti.com>
- <20140521150231.GH17417@atomide.com>
-Message-ID: <537CC376.5050501@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 May 2014 17:18:52 +0200
+Subject: [PATCH v1 4/4] ARM: debug: qcom: Add APQ8084 DEBUG_LL UART support
+In-Reply-To: <1400684225-21381-5-git-send-email-gdjakov@mm-sol.com>
+References: <1400684225-21381-1-git-send-email-gdjakov@mm-sol.com>
+ <1400684225-21381-5-git-send-email-gdjakov@mm-sol.com>
+Message-ID: <4365639.JcFl1cP048@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/05/14 18:02, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140521 05:51]:
->> Hi,
->>
->> Here are the AM43xx and OMAP5 display DT changes again. I've sent the clock
->> related changes separately, and I removed OMAP5's RFBI node, which depends on
->> more clock changes. The RFBI driver doesn't work at the moment anyway, so
->> removing the RFBI node should not be an issue.
->>
->> Tony, if these look fine (the rfbi change is the only one compared to the
->> previous versions), can you queue them for 3.16?
+On Wednesday 21 May 2014 17:57:05 Georgi Djakov wrote:
 > 
-> Probably best that you do a late branch again after arm-soc dts changes
-> have been merged. Sounds like you have at least that macro dependency
-> to omap-for-v3.16/dt-v2 so you should probably base your branch on
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index eab8ecb..91d5184 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -101,6 +101,15 @@ choice
+>                 bool "Kernel low-level debugging on 9263 and 9g45"
+>                 depends on HAVE_AT91_DBGU1
+>  
+> +       config DEBUG_APQ8084_UART
+> +               bool "Kernel low-level debugging messages via APQ8084 UART"
+> +               depends on ARCH_QCOM
+> +               select MSM_HAS_DEBUG_UART_HS
+> +               select DEBUG_MSM_UART
+> +               help
+> +                 Say Y here if you want the debug print routines to direct
+> +                 their output to the serial port on Qualcomm APQ8084 devices.
+> +
+>         config DEBUG_BCM2835
+>                 bool "Kernel low-level debugging on BCM2835 PL011 UART"
+>                 depends on ARCH_BCM2835
+> diff --git a/arch/arm/include/debug/msm.S b/arch/arm/include/debug/msm.S
+> index 9d653d4..178636d 100644
+> --- a/arch/arm/include/debug/msm.S
+> +++ b/arch/arm/include/debug/msm.S
+> @@ -36,6 +36,11 @@
+>  #define MSM_DEBUG_UART_PHYS    MSM_UART3_PHYS
+>  #endif
+>  
+> +#ifdef CONFIG_DEBUG_APQ8084_UART
+> +#define MSM_DEBUG_UART_BASE    0xFA75E000
+> +#define MSM_DEBUG_UART_PHYS    0xF995E000
+> +#endif
+> +
+>  #ifdef CONFIG_DEBUG_MSM8660_UART
+>  #define MSM_DEBUG_UART_BASE    0xF0040000
+>  #define MSM_DEBUG_UART_PHYS    0x19C40000
+> 
 
-There are no dependencies that I know of. Which macro dependency is that?
+Maybe we should move debug/msm.S over to use
+CONFIG_DEBUG_UART_PHYS/CONFIG_DEBUG_UART_VIRT now?
 
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/6b68bd54/attachment-0001.sig>
+	Arnd
