@@ -1,34 +1,60 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 21 May 2014 09:45:24 +0100
-Subject: [PATCH v2 3/3] ARM: sti: stih41x: Provide a proper header for this
- DTSI file
-In-Reply-To: <1400661924-10745-1-git-send-email-lee.jones@linaro.org>
-References: <1400661924-10745-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1400661924-10745-3-git-send-email-lee.jones@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 May 2014 10:50:38 +0200
+Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140521082606.GB11068@ulmo>
+References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
+ <5612206.Fzsy1mf3q3@wuerfel> <20140521082606.GB11068@ulmo>
+Message-ID: <4367469.BqpJyVF8PT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just a trivial commenting fix.  No functional changes.
+On Wednesday 21 May 2014 10:26:11 Thierry Reding wrote:
+> On Tue, May 20, 2014 at 10:26:12PM +0200, Arnd Bergmann wrote:
+> > On Tuesday 20 May 2014 16:24:59 Dave Martin wrote:
+> > > On Tue, May 20, 2014 at 02:41:18PM +0200, Arnd Bergmann wrote:
+> > > > On Tuesday 20 May 2014 14:02:43 Thierry Reding wrote:
+> [...]
+> > > > > Multiple-master IOMMU:
+> > > > > ----------------------
+> > > > > 
+> > > > > 	iommu {
+> > > > > 		/* the specifier represents the ID of the master */
+> > > > > 		#address-cells = <1>;
+> > > > > 		#size-cells = <0>;
+> > > 
+> > > How do we know the size of the input address to the IOMMU?  Do we
+> > > get cases for example where the IOMMU only accepts a 32-bit input
+> > > address, but some 64-bit capable masters are connected through it?
+> > 
+> > I was stuck on this question for a while before, but then I realized
+> > that it doesn't matter at all: It's the IOMMU driver itself that
+> > manages the address space, and it doesn't matter if a slave can
+> > address a larger range than the IOMMU can accept. If the IOMMU
+> > needs to deal with the opposite case (64-bit input addresses
+> > but a 32-bit master), that limitation can be put into the specifier.
+> 
+> Isn't this what DMA masks are for? Couldn't the IOMMU simply use the
+> master device's DMA mask to do the right thing here?
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stih41x.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+Ah, yes. I guess that's the right way to do it.
 
-diff --git a/arch/arm/boot/dts/stih41x.dtsi b/arch/arm/boot/dts/stih41x.dtsi
-index f5b9898..5cb0e63 100644
---- a/arch/arm/boot/dts/stih41x.dtsi
-+++ b/arch/arm/boot/dts/stih41x.dtsi
-@@ -1,3 +1,10 @@
-+/*
-+ * Copyright (C) 2014 STMicroelectronics Limited.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * publishhed by the Free Software Foundation.
-+ */
- / {
- 	#address-cells = <1>;
- 	#size-cells = <1>;
--- 
-1.8.3.2
+> > > For determining dma masks, it is the output address that it
+> > > important.  Santosh's code can probably be taught to handle this,
+> > > if given an additional traversal rule for following "iommus"
+> > > properties.  However, deploying an IOMMU whose output address size
+> > > is smaller than the 
+> > 
+> > Something seems to be missing here. I don't think we want to handle
+> > the case where the IOMMU output cannot the entire memory address
+> > space. If necessary, that would mean using both an IOMMU driver
+> > and swiotlb, but I think it's a reasonable assumption that hardware
+> > isn't /that/ crazy.
+> 
+> Similarily, should the IOMMU not be treated like any other device here?
+> Its DMA mask should determine what address range it can access.
+
+Right. But for that we need a dma-ranges property in the parent of the
+iommu, just so the mask can be set correctly and we don't have to
+rely on the 32-bit fallback case.
+
+	Arnd
