@@ -1,21 +1,54 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 21 May 2014 13:53:57 +0300
-Subject: pull request for Tegra clock fixes for 3.16
-In-Reply-To: <20140519134049.GA20109@tbergstrom-lnx.Nvidia.com>
-References: <20140519134049.GA20109@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20140521105357.GB15168@tbergstrom-lnx.Nvidia.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 21 May 2014 12:56:19 +0200
+Subject: + arm-move-arm_dma_limit-to-setup_dma_zone.patch added to -mm tree
+In-Reply-To: <CABV+yWt8vJK-ahGFhtoVbGLhkOOxy3-SLZQdaE5V1Oy+oQsh4w@mail.gmail.com>
+References: <CAKv+Gu_QCJn5UGyM4zEPLvkTPMnfwTM2qKYnBU42vEPwwt6-Dg@mail.gmail.com>
+ <CABV+yWt8vJK-ahGFhtoVbGLhkOOxy3-SLZQdaE5V1Oy+oQsh4w@mail.gmail.com>
+Message-ID: <CAKv+Gu9-h+cEPtHcYwdH5OVUFYAnqDtXgQYFA+Liy-+A4=mAdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 03:40:49PM +0200, Peter De Schrijver wrote:
-> Hi Mike,
-> 
-> A number of fixes which are needed by the upcoming XHCI and SATA drivers.
-> 
+On 21 May 2014 08:50, Vladimir Murzin <murzin.v@gmail.com> wrote:
+> Hi Ard
+>
+> On 5/19/14, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> Gents,
+>>
+>> I noticed this patch turning up in -next:
+>> http://ozlabs.org/~akpm/mmots/broken-out/arm-move-arm_dma_limit-to-setup_dma_zone.patch
+>>
+>> which I think is incorrect. More specifically, it replaces a reference
+>> to arm_dma_limit, which is defined as either
+>>
+>> arch/arm/mm/init.c:177:         arm_dma_limit = PHYS_OFFSET +
+>> arm_dma_zone_size - 1;
+>>
+>> or
+>>
+>> arch/arm/mm/init.c:179:         arm_dma_limit = 0xffffffff;
+>>
+>> with 'arm_dma_pfn_limit << PAGE_SHIFT', which means the bottom
+>> PAGE_SHIFT '1' bytes are lost.
+>>
+>
+> Do not we lost even more with
+> dma_contiguous_reserve
+>      dma_contiguous_reserve_area
+> ...
+>         /* Sanitise input arguments */
+>         alignment = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
+>         base = ALIGN(base, alignment);
+>         size = ALIGN(size, alignment);
+>         limit &= ~(alignment - 1);
+>
 
-Did you take this one already? If not, please ignore it. I will make a new one
-which includes the HDA clocks...
+That's interesting. It looks like there may be a mismatch here: we
+pass an inclusive limit where the callee expects it to be exclusive,
+resulting in the top 4 megabytes of the DMA zone to be lost (for
+pageblock_order == MAX_ORDER-1). I.e., if arm_dma_zone == SZ_64M, we
+will end up calling __memblock_alloc_base() with a limit of 60 megs.
 
-Cheers,
+@Russell: care to share your thought on this?
 
-Peter.
+-- 
+Ard.
