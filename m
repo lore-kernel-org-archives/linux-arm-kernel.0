@@ -1,33 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 May 2014 10:24:04 +0200
-Subject: [PATCH 07/10] dt/bindings: arm-boards: add binding for Versatile
- core module
-In-Reply-To: <1400620176-7239-8-git-send-email-robherring2@gmail.com>
-References: <1400620176-7239-1-git-send-email-robherring2@gmail.com>
- <1400620176-7239-8-git-send-email-robherring2@gmail.com>
-Message-ID: <7810339.hMuUdCPTp0@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 21 May 2014 10:23:20 +0200
+Subject: [PATCH v2] ARM: sun6i: Add MMC0 controller to the Colombus board
+Message-ID: <1400660600-29015-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 May 2014 16:09:33 Rob Herring wrote:
-> diff --git a/Documentation/devicetree/bindings/arm/arm-boards b/Documentation/devicetree/bindings/arm/arm-boards
-> index 3509707..3a950d9 100644
-> --- a/Documentation/devicetree/bindings/arm/arm-boards
-> +++ b/Documentation/devicetree/bindings/arm/arm-boards
-> @@ -86,3 +86,9 @@ Interrupt controllers:
->         compatible = "arm,versatile-sic";
->         interrupt-controller;
->         #interrupt-cells = <1>;
-> +
-> +Required nodes:
-> +
-> +- core-module: the root node to the Versatile platforms must have
-> +  a core-module with regs and the compatible string
-> +  "arm,core-module-versatile"
-> 
+The Colombus has a full size SD slot wired to the MMC0 controller. In order to
+work, the MMC lines have to have the pull-ups enabled though.
 
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes from v1:
+  - Deduplicated MMC pins
 
-Should we mark this compatible="syscon" as well, so we can move
-the accesses into syscon references later if we want to?
+ arch/arm/boot/dts/sun6i-a31-colombus.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-	ARnd
+diff --git a/arch/arm/boot/dts/sun6i-a31-colombus.dts b/arch/arm/boot/dts/sun6i-a31-colombus.dts
+index 3898a7bce831..229e7922e4ec 100644
+--- a/arch/arm/boot/dts/sun6i-a31-colombus.dts
++++ b/arch/arm/boot/dts/sun6i-a31-colombus.dts
+@@ -13,6 +13,7 @@
+ 
+ /dts-v1/;
+ /include/ "sun6i-a31.dtsi"
++/include/ "sunxi-common-regulators.dtsi"
+ 
+ / {
+ 	model = "WITS A31 Colombus Evaluation Board";
+@@ -23,6 +24,29 @@
+ 	};
+ 
+ 	soc at 01c00000 {
++		mmc0: mmc at 01c0f000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_colombus>;
++			vmmc-supply = <&reg_vcc3v0>;
++			bus-width = <4>;
++			cd-gpios = <&pio 0 8 0>; /* PA8 */
++			cd-inverted;
++			status = "okay";
++		};
++
++		pio: pinctrl at 01c20800 {
++			mmc0_pins_a: mmc0 at 0 {
++				allwinner,pull = <1>;
++			};
++
++			mmc0_cd_pin_colombus: mmc0_cd_pin at 0 {
++				allwinner,pins = "PA8";
++				allwinner,function = "gpio_in";
++				allwinner,drive = <0>;
++				allwinner,pull = <1>;
++			};
++		};
++
+ 		uart0: serial at 01c28000 {
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&uart0_pins_a>;
+-- 
+1.9.3
