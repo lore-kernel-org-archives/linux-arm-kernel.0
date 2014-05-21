@@ -1,56 +1,29 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 21 May 2014 10:24:17 -0700
-Subject: [PATCH v1 1/4] ARM: dts: qcom: Add APQ8084 SoC support
-In-Reply-To: <1400684225-21381-2-git-send-email-gdjakov@mm-sol.com>
-References: <1400684225-21381-1-git-send-email-gdjakov@mm-sol.com>
- <1400684225-21381-2-git-send-email-gdjakov@mm-sol.com>
-Message-ID: <537CE141.6010500@codeaurora.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 21 May 2014 19:43:30 +0200
+Subject: [PATCH 1/2] ARM: dts: sun7i: cubietruck: set mmc3 bus-width property
+Message-ID: <1400694211-29903-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/14 07:57, Georgi Djakov wrote:
-> +
-> +		L2: l2-cache {
-> +			compatible = "qcom,arch-cache";
-> +			cache-level = <2>;
-> +			interrupts = <0 2 0x4>;
+bus-width defaults to 1, and all 4 lines are hooked up at the cubietruck,
+properly set bus-width to 4.
 
-Let's leave out interrupts until the binding is accepted.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-> +			qcom,saw = <&saw_l2>;
-> +		};
-> +	};
-> +
-> +	cpu-pmu {
-> +		compatible = "qcom,krait-pmu";
-> +		interrupts = <1 7 0xf04>;
-> +	};
-> +
-> +	soc: soc {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +		compatible = "simple-bus";
-> +
-> +		intc: interrupt-controller at f9000000 {
-> +			compatible = "qcom,msm-qgic2";
-> +			interrupt-controller;
-> +			#interrupt-cells = <3>;
-> +			reg = <0xf9000000 0x1000>,
-> +			      <0xf9002000 0x1000>;
-> +		};
-> +
-> +		timer {
-> +			compatible = "arm,armv7-timer";
-> +			interrupts = <1 2 0xf08>,
-> +				     <1 3 0xf08>,
-> +				     <1 4 0xf08>,
-> +				     <1 1 0xf08>;
-> +			clock-frequency = <19200000>;
-> +		};
-
-Please move this timer node out of the soc container below the pmu.
-
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index 765191d..70271f6 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -34,6 +34,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&mmc3_pins_a>;
+ 			vmmc-supply = <&reg_vmmc3>;
++			bus-width = <4>;
+ 			non-removable;
+ 			status = "okay";
+ 		};
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.9.0
