@@ -1,60 +1,24 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Wed, 21 May 2014 19:05:21 +0300
-Subject: [Patch v4 4/5] ARM: dts: keystone: update reset node to work
- with reset driver
-In-Reply-To: <15259908.YoiO6LMEzV@wuerfel>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 May 2014 18:07:40 +0200
+Subject: [Patch v4 2/5] Power: reset: add bindings for keystone reset
+ driver
+In-Reply-To: <537CCE5A.7030909@ti.com>
 References: <1400682454-24535-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1400682454-24535-5-git-send-email-ivan.khoronzhuk@ti.com>
- <15259908.YoiO6LMEzV@wuerfel>
-Message-ID: <537CCEC1.1070801@ti.com>
+ <5023955.Vhmhn25HgF@wuerfel> <537CCE5A.7030909@ti.com>
+Message-ID: <13696681.6eGQ96hCX4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wednesday 21 May 2014 19:03:38 Ivan Khoronzhuk wrote:
+> 
+> I've slightly confused where should I add these bindings.
+> The main pll controller mostly used by clk driver....
+> As its register set is used also by reset driver it's logically to put 
+> it to bindings/mfd,
+> but pll controller in mfd it's strange....
+> 
+> Could you please help to decide where should it be?.
 
-On 05/21/2014 05:50 PM, Arnd Bergmann wrote:
-> On Wednesday 21 May 2014 17:27:33 Ivan Khoronzhuk wrote:
->> The keystone driver requires the next additional properties:
->>
->> "ti,syscon-pll" - syscon register range used to access pll controller
->>                    registers in order to use reset control registers.
->> "ti,syscon-dev" - syscon register range used to access device state
->>                    control registers in order to use mux block
->>                    registers for all watchdogs.
->>
->> "ti,wdt_list"   - option to declare what watchdog are used to reboot
->>                    the SoC, so set "0" WDT as default.
->>
->> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> Same comment as what I had for the binding: it's not a register range
-> any more, but a phandle for a device.
->
->> ---
->>   arch/arm/boot/dts/keystone.dtsi | 4 +++-
->>   1 file changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
->> index 8b899ba..783da60 100644
->> --- a/arch/arm/boot/dts/keystone.dtsi
->> +++ b/arch/arm/boot/dts/keystone.dtsi
->> @@ -78,7 +78,9 @@
->>   
->>                  rstctrl: reset-controller {
->>                          compatible = "ti,keystone-reset";
->> -                       reg = <0x023100e8 4>;   /* pll reset control reg */
->> +                       ti,syscon-pll = <&pllctrl>;
->> +                       ti,syscon-dev = <&devctrl>;
->> +                       ti,wdt_list = <0>;
->>                  };
->>   
-> I don't see a definition for the two labels, so this will cause a
-> build error. It makes sense to add them in the same patch.
->
-> 	Arnd
+Put it into Documentation/devicetree/bindings/clock/keystone-pll.txt
 
-Thanks,
-
-I'll correct
-
--- 
-Regards,
-Ivan Khoronzhuk
+	Arnd
