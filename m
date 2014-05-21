@@ -1,77 +1,60 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 21 May 2014 21:33:16 +0200
-Subject: [PATCH 2/2] ARM: sunxi: Add clocks node to the CPU nodes
-In-Reply-To: <1400700796-5763-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1400700796-5763-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1400700796-5763-3-git-send-email-maxime.ripard@free-electrons.com>
+From: gdjakov@mm-sol.com (Georgi Djakov)
+Date: Wed, 21 May 2014 23:16:09 +0300
+Subject: [PATCH v1 1/4] ARM: dts: qcom: Add APQ8084 SoC support
+In-Reply-To: <537CE141.6010500@codeaurora.org>
+References: <1400684225-21381-1-git-send-email-gdjakov@mm-sol.com>
+ <1400684225-21381-2-git-send-email-gdjakov@mm-sol.com>
+ <537CE141.6010500@codeaurora.org>
+Message-ID: <537D0989.6080108@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setting the clock will make the topology code work, and will remove the
-following error at boot
+On 21.05.14, 20:24, Stephen Boyd wrote:
+> On 05/21/14 07:57, Georgi Djakov wrote:
+>> +
+>> +		L2: l2-cache {
+>> +			compatible = "qcom,arch-cache";
+>> +			cache-level = <2>;
+>> +			interrupts = <0 2 0x4>;
+> 
+> Let's leave out interrupts until the binding is accepted.
+> 
+>> +			qcom,saw = <&saw_l2>;
+>> +		};
+>> +	};
+>> +
+>> +	cpu-pmu {
+>> +		compatible = "qcom,krait-pmu";
+>> +		interrupts = <1 7 0xf04>;
+>> +	};
+>> +
+>> +	soc: soc {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		ranges;
+>> +		compatible = "simple-bus";
+>> +
+>> +		intc: interrupt-controller at f9000000 {
+>> +			compatible = "qcom,msm-qgic2";
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <3>;
+>> +			reg = <0xf9000000 0x1000>,
+>> +			      <0xf9002000 0x1000>;
+>> +		};
+>> +
+>> +		timer {
+>> +			compatible = "arm,armv7-timer";
+>> +			interrupts = <1 2 0xf08>,
+>> +				     <1 3 0xf08>,
+>> +				     <1 4 0xf08>,
+>> +				     <1 1 0xf08>;
+>> +			clock-frequency = <19200000>;
+>> +		};
+> 
+> Please move this timer node out of the soc container below the pmu.
+> 
 
-[    0.097194] /cpus/cpu at 0 missing clock-frequency property
-[    0.103657] /cpus/cpu at 1 missing clock-frequency property
-[    0.110698] /cpus/cpu at 2 missing clock-frequency property
-[    0.117132] /cpus/cpu at 3 missing clock-frequency property
+Will do. Thanks for the comments!
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun6i-a31.dtsi | 4 ++++
- arch/arm/boot/dts/sun7i-a20.dtsi | 2 ++
- 2 files changed, 6 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 4155fc43ecff..6814a1c4759b 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -34,24 +34,28 @@
- 		cpu at 0 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-+			clocks = <&cpu>;
- 			reg = <0>;
- 		};
- 
- 		cpu at 1 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-+			clocks = <&cpu>;
- 			reg = <1>;
- 		};
- 
- 		cpu at 2 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-+			clocks = <&cpu>;
- 			reg = <2>;
- 		};
- 
- 		cpu at 3 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-+			clocks = <&cpu>;
- 			reg = <3>;
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 385933bac114..8402f33158bf 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -35,12 +35,14 @@
- 		cpu at 0 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-+			clocks = <&cpu>;
- 			reg = <0>;
- 		};
- 
- 		cpu at 1 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-+			clocks = <&cpu>;
- 			reg = <1>;
- 		};
- 	};
--- 
-1.9.3
+BR,
+Georgi
