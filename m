@@ -1,43 +1,80 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 21 May 2014 10:18:53 -0500
-Subject: [PATCH v1 3/4] ARM: qcom: Add APQ8084-MTP board to mach-qcom
-In-Reply-To: <1400684225-21381-4-git-send-email-gdjakov@mm-sol.com>
-References: <1400684225-21381-1-git-send-email-gdjakov@mm-sol.com>
- <1400684225-21381-4-git-send-email-gdjakov@mm-sol.com>
-Message-ID: <A6B00F86-FFD3-4FEF-B39E-EAA511565B80@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 21 May 2014 17:15:54 +0200
+Subject: [PATCH v8 0/2] Add support for the Allwinner A31 DMA Controller
+Message-ID: <1400685357-508-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On May 21, 2014, at 9:57 AM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
+This patchset adds support for the DMA controller found in the
+Allwinner A31 and A23 SoCs.
 
-> Add board compatibility string to the board machine descriptors.
-> 
-> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
-> ---
-> arch/arm/mach-qcom/board.c |    1 +
-> 1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-qcom/board.c b/arch/arm/mach-qcom/board.c
-> index bae617e..ae0a405 100644
-> --- a/arch/arm/mach-qcom/board.c
-> +++ b/arch/arm/mach-qcom/board.c
-> @@ -18,6 +18,7 @@ static const char * const qcom_dt_match[] __initconst = {
-> 	"qcom,msm8660-surf",
-> 	"qcom,msm8960-cdp",
-> 	"qcom,apq8074-dragonboard",
-> +	"qcom,apq8084-mtp",
-> 	NULL
-> };
-> 
-> -- 
-> 1.7.9.5
-> 
+This has been tested using the newly introduced SPI driver on an A31
+EVK. Support for DMA-driven SPI transfers will be the subject of
+another patch serie.
 
-Let?s just make this ?qcom,apq8084? to cover other future apq8084 based boards.
+Thanks,
+Maxime
 
-- k
+Changes from v7:
+  - select DMA_OF, since we're only relying on DT
+  - Properly kill the tasklet as suggested in 
+    https://lwn.net/Articles/588457/
+  - Split up the dt bindings documentation into a separate patch
+
+Changes from v6:
+  - Dropped the merged patches and the clock patches that are pretty
+    orthogonal to this driver
+
+Changes from v5:
+  - Rebased on top of 3.15-rc1
+
+Changes from v4:
+  - Removed the packed attribute on the LLI
+  - Switched to using a NULL device pointer in clk_get on PLL6 and
+    AHB1 mux to make explicit that we are getting global clocks
+  - Switched from spin_lock_irqsave to spin_lock in the interrupt
+    handler
+  - Various nitpicks from Andy Shevchenko:
+    + Switched to using %p printk formats for pointers
+    + Inverted some tests to lose a level of indentation
+    + Dropped ifdef DEBUG protecting calls to dev_dbg
+
+Changes from v3:
+  - A few other comments made by Andy Shevchenko were fixed:
+    + Used references in %pa* printk formats
+    + Used is_slave_direction in prep_slave_sg to make sure we were
+      actually called for something, and to avoid making assumptions
+      that we were actually called with the expected directions
+    + A few others minor fixes: s/pr_err/dev_err/, etc.
+
+Changes from v2:
+  - Removed the clk_put calls in the clock protection functions
+  - Splitted out the sunxi machines into several files
+  - Moved the clock protection code into these new machine files
+  - Moved the PLL6 reparenting to the DMA driver
+  - Addressed various comments from Andy Shevchenko: switched to using
+    devm_kcalloc, used correct printk formats for physical and DMA
+    addresses, etc.
+
+Changes from v1:
+  - Removed the clk_put call in the clocks protecting patches
+  - Minor fixes here and there as suggested by Andy Shevchenko: switch
+    to dmam_pool_create, switch to dev_dbg instead of pr_debug, etc.
+
+
+Maxime Ripard (2):
+  Documentation: dt: Add Allwinner A31 DMA controller bindings
+  dmaengine: sun6i: Add driver for the Allwinner A31 DMA controller
+
+ .../devicetree/bindings/dma/sun6i-dma.txt          |   45 +
+ drivers/dma/Kconfig                                |    9 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/sun6i-dma.c                            | 1058 ++++++++++++++++++++
+ 4 files changed, 1113 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/sun6i-dma.txt
+ create mode 100644 drivers/dma/sun6i-dma.c
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+1.9.3
