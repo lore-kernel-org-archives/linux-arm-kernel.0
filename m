@@ -1,90 +1,40 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 21 May 2014 15:50:23 +0300
-Subject: [PATCH 4/6] ARM: dts: omap5.dtsi: add DSS nodes
-In-Reply-To: <1400676625-30078-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1400676625-30078-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1400676625-30078-5-git-send-email-tomi.valkeinen@ti.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 21 May 2014 14:52:16 +0200
+Subject: [PATCH] clk: divider: Fix table round up function
+In-Reply-To: <CAOMZO5C9iqLj34mJdztqZsyLNR6oHztyN2GxDY0ORp+0xU1+LA@mail.gmail.com>
+References: <1399481332-9550-1-git-send-email-maxime.coquelin@st.com>
+ <CAOMZO5C9iqLj34mJdztqZsyLNR6oHztyN2GxDY0ORp+0xU1+LA@mail.gmail.com>
+Message-ID: <537CA180.4050907@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add OMAP5 DSS nodes to omap5.dtsi.
+Hi Mike,
 
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
- arch/arm/boot/dts/omap5.dtsi | 61 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
+On 05/15/2014 03:28 PM, Fabio Estevam wrote:
+> Hi Mike,
+>
+> On Wed, May 7, 2014 at 1:48 PM, Maxime COQUELIN <maxime.coquelin@st.com> wrote:
+>> Commit 1d9fe6b97 ("clk: divider: Fix best div calculation for power-of-two and
+>> table dividers") introduces a regression in its _table_round_up function.
+>>
+>> When the divider passed to this function is greater than the max divider
+>> available in the table, this function returns table's max divider.
+>> Problem is that it causes an infinite loop in clk_divider_bestdiv() because
+>> _next_div() will never return a value greater than maxdiv.
+>>
+>> Instead of returning table's max divider, this patch returns INT_MAX.
+>>
+>> Reported-by: Fabio Estevam <festevam@gmail.com>
+>> Reported-by: Shawn Guo <shawn.guo@freescale.com>
+>> Tested-by: Fabio Estevam <festevam@gmail.com>
+>> Cc: Mike Turquette <mike.turquette@linaro.org>
+>> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+>
+> Any comments on this one? It does fix a regression.
+>
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index f8c9855ce587..b80f4c5d0a5b 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -869,6 +869,67 @@
- 
- 			#thermal-sensor-cells = <1>;
- 		};
-+
-+		dss: dss at 58000000 {
-+			compatible = "ti,omap5-dss";
-+			reg = <0x58000000 0x80>;
-+			status = "disabled";
-+			ti,hwmods = "dss_core";
-+			clocks = <&dss_dss_clk>;
-+			clock-names = "fck";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			dispc at 58001000 {
-+				compatible = "ti,omap5-dispc";
-+				reg = <0x58001000 0x1000>;
-+				interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
-+				ti,hwmods = "dss_dispc";
-+				clocks = <&dss_dss_clk>;
-+				clock-names = "fck";
-+			};
-+
-+			dsi1: encoder at 58004000 {
-+				compatible = "ti,omap5-dsi";
-+				reg = <0x58004000 0x200>,
-+				      <0x58004200 0x40>,
-+				      <0x58004300 0x40>;
-+				reg-names = "proto", "phy", "pll";
-+				interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
-+				status = "disabled";
-+				ti,hwmods = "dss_dsi1";
-+				clocks = <&dss_dss_clk>, <&dss_sys_clk>;
-+				clock-names = "fck", "sys_clk";
-+			};
-+
-+			dsi2: encoder at 58005000 {
-+				compatible = "ti,omap5-dsi";
-+				reg = <0x58009000 0x200>,
-+				      <0x58009200 0x40>,
-+				      <0x58009300 0x40>;
-+				reg-names = "proto", "phy", "pll";
-+				interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
-+				status = "disabled";
-+				ti,hwmods = "dss_dsi2";
-+				clocks = <&dss_dss_clk>, <&dss_sys_clk>;
-+				clock-names = "fck", "sys_clk";
-+			};
-+
-+			hdmi: encoder at 58060000 {
-+				compatible = "ti,omap5-hdmi";
-+				reg = <0x58040000 0x400>,
-+				      <0x58040200 0x80>,
-+				      <0x58040300 0x80>,
-+				      <0x58060000 0x19000>;
-+				reg-names = "wp", "pll", "phy", "core";
-+				interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-+				status = "disabled";
-+				ti,hwmods = "dss_hdmi";
-+				clocks = <&dss_48mhz_clk>, <&dss_sys_clk>;
-+				clock-names = "fck", "sys_clk";
-+			};
-+		};
- 	};
- };
- 
--- 
-1.9.1
+This patch is important as it fixes a regression, could you review it 
+please?
+
+Thanks,
+Maxime
