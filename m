@@ -1,32 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 May 2014 10:26:40 +0200
-Subject: [PATCH 00/10] ARM: Versatile irq and clock DT support
-In-Reply-To: <1400620176-7239-1-git-send-email-robherring2@gmail.com>
-References: <1400620176-7239-1-git-send-email-robherring2@gmail.com>
-Message-ID: <5859481.dtUsNDpXQt@wuerfel>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 21 May 2014 10:26:56 +0200
+Subject: [PATCH 0/3] Exynos multi-platform support
+In-Reply-To: <1400655169-21683-1-git-send-email-sachin.kamat@linaro.org>
+References: <1400655169-21683-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <537C6350.2010707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 May 2014 16:09:26 Rob Herring wrote:
-> From: Rob Herring <robh@kernel.org>
+Hi,
+
+On 21.05.2014 08:52, Sachin Kamat wrote:
+> The patches in this series were earlier sent as part of other
+> series. Now that the other patches have been merged, re-sending
+> these after rebasing them on linux-next (20140519).
+> Tested on Exynos4210, 4412, 5250 and 5420 based boards.
 > 
-> This series is some preparation work to fully convert Versatile platform 
-> to DT. This converts the IRQ initialization to DT based init and adds 
-> clocks to the Versatile DT. This doesn't actually enable using common 
-> clock framework, but that is only a matter of removing the old clock 
-> code and enabling the appropriate Kconfig options. This will be done 
-> when Versatile can be completely converted over to DT boot. I have that 
-> working in my tree, but full DT conversion is also dependent on DT PCI 
-> support.
-> 
-> I've tested under QEMU and Linus Walleij has tested an earlier version 
-> on Versatile AB h/w.
+> A particular change in this series is the removal of single platform
+> support for Exynos as suggested by Arnd and Olof (patch 2/3). With
+> this change certain features (drivers) which are not yet multi-platform
+> aware like cpufreq, devfreq and DRM based gscaler will not be available
+> now.
 
-Looks great to me.
+I really don't like this. Well, I don't care too much for devfreq and
+DRM Gscaler, as the the first one doesn't even support DT and Gscaler is
+usually used through a V4L2 driver, which should be fine. However
+cpufreq is quite important feature and it will be a serious regression
+in terms of performance (most boards don't boot at maximum frequency)
+and power consumption (no ability to scale the CPU down).
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+So my proposal here is to hack the cpufreq driver with a minimal amount
+of changes needed to compile and use it on multi-platform builds. I'll
+send a patch later today to show what I mean. It would have to be merged
+as a prerequisite for this series, to keep the history bisectable.
 
-Should we merge it directly into arm-soc or are you planning to
-send a pull request?
-
-	Arnd
+Best regards,
+Tomasz
