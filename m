@@ -1,142 +1,423 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Wed, 21 May 2014 16:45:29 +0530
-Subject: [PATCH v7 0/3] Add support for PCI in AArch64
-In-Reply-To: <CA+sq2CejJFg--0rS1arr4Sactp-ssENB8Y3g4b61JPGPBCms=A@mail.gmail.com>
-References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
- <CA+sq2Ccok5wtKjCZUkBhhj3WsiqFAoMgHK7LY210aBtMku+8SA@mail.gmail.com>
- <20140516132451.GK967@e106497-lin.cambridge.arm.com>
- <CA+sq2CejJFg--0rS1arr4Sactp-ssENB8Y3g4b61JPGPBCms=A@mail.gmail.com>
-Message-ID: <CA+sq2Ccp0_4hgbbWa27bkYcqiXY6Ckr8eckWnHwANvhWNo97fg@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 21 May 2014 13:17:48 +0200
+Subject: [PATCH] cpufreq: exynos: Fix driver compilation with
+ ARCH_MULTIPLATFORM
+In-Reply-To: <1400670752-673-1-git-send-email-t.figa@samsung.com>
+References: <537C6350.2010707@gmail.com>
+ <1400670752-673-1-git-send-email-t.figa@samsung.com>
+Message-ID: <537C8B5C.3050401@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liviu,
+Forwarding to linux-samsung-soc ML, which was omitted by mistake. Sorry,
+for the noise.
 
-Sorry for the trouble.
-I got why 'res->parent' is not set in my case.
-Basically my SR-IOV device has fixed resources, so resources will not
-be allocated/assigned and hence parent resource is not set.
-I will move the resource claiming to host controller driver as a fixup
-so that parent resource hierarchy is set.
+Best regards,
+Tomasz
 
-Thanks for the support.
-
-Regards,
-Sunil.
-
-
-On Fri, May 16, 2014 at 11:12 PM, Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
-> Hi Liviu,
->
-> Issue may not be only with SR-IOV resources.
->
-> I am not an expert with Linux PCI core. But i am trying to understand
-> how even for a non SR-IOV capable device's resource, gets a parent
-> associated with it.
->
-> When a PCI device driver calls pci_enable_device() which inturn calls
-> 'arch/arm64/kernel/pci.c' pcibios_enable_device() which uses Linux PCI core
-> API 'pci_enable_resources'. This API checks 'res->parent' for all
-> valid resources
-> before enabling them, otherwise it fails.
->                 if (!r->parent) {
->                         dev_err(&dev->dev, "device not available "
->                                 "(can't reserve %pR)\n", r);
->                         return -EINVAL;
->                 }
->
-> Can you please let me know where this hierarchy is being set for
-> 'pcibios_enable_resources' to work.
->
-> I could only find request_resource() API which sets the parent and
-> pci_claim_resource() uses this.
->
-> Thanks,
-> Sunil.
->
-> On Fri, May 16, 2014 at 6:54 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
->> Hi Sunil,
->>
->> On Fri, May 16, 2014 at 11:33:04AM +0100, Sunil Kovvuri wrote:
->>> Hi Liviu,
->>>
->>> I am using your ARM64 PCIe patches to write a PCIe host controller
->>> driver for our SOC. I am facing an issue with SR-IOV capable device.
->>>
->>> Consider an PCI Express endpoint connected to a PCI Express
->>> Root Port.  The PCI Express endpoint provides PCI-SIG SR-IOV
->>> capabilities with a single physical function and a large number
->>> of virtual functions.  The Root Port contains a pci-pci bridge in
->>> between it and the SR-IOV device.
->>>
->>> When the SR-IOV capable device's driver tries to enable sriov
->>> (pci_enable_sriov()) it fails to create/add PCI device for each
->>> virtual function reporting  "not enough MMIO resources for SR-IOV".
->>>
->>> In sriov_enable() (drivers/pci/iov.c)
->>>
->>>  296        for (i = 0; i < PCI_SRIOV_NUM_BARS; i++) {
->>>  297                 bars |= (1 << (i + PCI_IOV_RESOURCES));
->>>  298                 res = dev->resource + PCI_IOV_RESOURCES + i;
->>>  299                 if (res->parent)
->>>  300                         nres++;
->>>  301         }
->>>  302         if (nres != iov->nres) {
->>>  303                 dev_err(&dev->dev, "not enough MMIO resources for
->>>  SR-IOV\n");
->>>  304                 return -ENOMEM;
->>>  305         }
->>>
->>> Here its checking if physical function's IOV resource has a parent or not.
->>> Which is pci-pci bridge in this case. Otherwise it doesn't consider
->>> that resource.
->>>
->>> Added below api to your patch.
->>> This will try to claim a resource while creating a PCI device which
->>> inturn sets 'res->parent'.
->>>
->>> Let me know if this is okay.
->>>
->>> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
->>> index 9f29c9a..fbfb48f 100644
->>> --- a/arch/arm64/kernel/pci.c
->>> +++ b/arch/arm64/kernel/pci.c
->>> @@ -125,6 +125,21 @@ resource_size_t pcibios_align_resource(void
->>> *data, const struct resource *res,
->>>         return res->start;
->>>  }
->>>
->>> +int pcibios_add_device(struct pci_dev *pdev)
->>> +{
->>> +        unsigned int i, type_mask = IORESOURCE_IO | IORESOURCE_MEM;
->>> +        struct resource *res;
->>> +
->>> +        for (i = 0; i < PCI_NUM_RESOURCES; i++) {
->>> +                res = &pdev->resource[i];
->>> +                if (res->parent || !(res->flags & type_mask))
->>> +                        continue;
->>> +                pci_claim_resource(pdev, i);
->>> +        }
->>> +
->>>
->>
->> I would like not to have to add your patch in this file as I am trying to
->> remove it entirely. I don't have an SR-IOV capable device in my setup so
->> I am not able to debug your problem, but could you have a go and try to
->> figure out why the SR-IOV resources do not get a parent associated with
->> when they get created?
->>
->> Many thanks,
->> Liviu
->>
->>
->> --
->> ====================
->> | I would like to |
->> | fix the world,  |
->> | but they're not |
->> | giving me the   |
->>  \ source code!  /
->>   ---------------
->>     ?\_(?)_/?
->>
+On 21.05.2014 13:12, Tomasz Figa wrote:
+> Currently Exynos cpufreq drivers rely on globally mapped clock
+> controller registers to configure frequency of CPU cores. This is
+> obviously wrong and will be removed in near future, but to enable
+> support for multi-platform builds without introducing a regression it
+> needs to be worked around.
+> 
+> This patch hacks the code to look for clock controller node in device
+> tree and map its registers using of_iomap(), instead of relying on
+> global mapping, so dependencies on platform headers are removed and the
+> driver can compile again with multiplatform support.
+> 
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+>  drivers/cpufreq/Kconfig.arm          |  6 +++---
+>  drivers/cpufreq/exynos-cpufreq.c     |  2 --
+>  drivers/cpufreq/exynos-cpufreq.h     | 30 ++++++++++++++----------------
+>  drivers/cpufreq/exynos4210-cpufreq.c | 31 +++++++++++++++++++++++++------
+>  drivers/cpufreq/exynos4x12-cpufreq.c | 32 ++++++++++++++++++++++++++------
+>  drivers/cpufreq/exynos5250-cpufreq.c | 35 +++++++++++++++++++++++++++--------
+>  6 files changed, 95 insertions(+), 41 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> index 6a7dd3e..2b7548f 100644
+> --- a/drivers/cpufreq/Kconfig.arm
+> +++ b/drivers/cpufreq/Kconfig.arm
+> @@ -31,7 +31,7 @@ config ARM_EXYNOS_CPUFREQ
+>  
+>  config ARM_EXYNOS4210_CPUFREQ
+>  	bool "SAMSUNG EXYNOS4210"
+> -	depends on CPU_EXYNOS4210 && !ARCH_MULTIPLATFORM
+> +	depends on CPU_EXYNOS4210
+>  	default y
+>  	select ARM_EXYNOS_CPUFREQ
+>  	help
+> @@ -42,7 +42,7 @@ config ARM_EXYNOS4210_CPUFREQ
+>  
+>  config ARM_EXYNOS4X12_CPUFREQ
+>  	bool "SAMSUNG EXYNOS4x12"
+> -	depends on (SOC_EXYNOS4212 || SOC_EXYNOS4412) && !ARCH_MULTIPLATFORM
+> +	depends on (SOC_EXYNOS4212 || SOC_EXYNOS4412)
+>  	default y
+>  	select ARM_EXYNOS_CPUFREQ
+>  	help
+> @@ -53,7 +53,7 @@ config ARM_EXYNOS4X12_CPUFREQ
+>  
+>  config ARM_EXYNOS5250_CPUFREQ
+>  	bool "SAMSUNG EXYNOS5250"
+> -	depends on SOC_EXYNOS5250 && !ARCH_MULTIPLATFORM
+> +	depends on SOC_EXYNOS5250
+>  	default y
+>  	select ARM_EXYNOS_CPUFREQ
+>  	help
+> diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
+> index 7c2a096..1e0ec57 100644
+> --- a/drivers/cpufreq/exynos-cpufreq.c
+> +++ b/drivers/cpufreq/exynos-cpufreq.c
+> @@ -19,8 +19,6 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/of.h>
+>  
+> -#include <plat/cpu.h>
+> -
+>  #include "exynos-cpufreq.h"
+>  
+>  static struct exynos_dvfs_info *exynos_info;
+> diff --git a/drivers/cpufreq/exynos-cpufreq.h b/drivers/cpufreq/exynos-cpufreq.h
+> index a28ee9d..8dfebac 100644
+> --- a/drivers/cpufreq/exynos-cpufreq.h
+> +++ b/drivers/cpufreq/exynos-cpufreq.h
+> @@ -50,6 +50,7 @@ struct exynos_dvfs_info {
+>  	struct cpufreq_frequency_table	*freq_table;
+>  	void (*set_freq)(unsigned int, unsigned int);
+>  	bool (*need_apll_change)(unsigned int, unsigned int);
+> +	void __iomem	*cmu_regs;
+>  };
+>  
+>  #ifdef CONFIG_ARM_EXYNOS4210_CPUFREQ
+> @@ -77,24 +78,21 @@ static inline int exynos5250_cpufreq_init(struct exynos_dvfs_info *info)
+>  }
+>  #endif
+>  
+> -#include <plat/cpu.h>
+> -#include <mach/map.h>
+> +#define EXYNOS4_CLKSRC_CPU			0x14200
+> +#define EXYNOS4_CLKMUX_STATCPU			0x14400
+>  
+> -#define EXYNOS4_CLKSRC_CPU			(S5P_VA_CMU + 0x14200)
+> -#define EXYNOS4_CLKMUX_STATCPU			(S5P_VA_CMU + 0x14400)
+> -
+> -#define EXYNOS4_CLKDIV_CPU			(S5P_VA_CMU + 0x14500)
+> -#define EXYNOS4_CLKDIV_CPU1			(S5P_VA_CMU + 0x14504)
+> -#define EXYNOS4_CLKDIV_STATCPU			(S5P_VA_CMU + 0x14600)
+> -#define EXYNOS4_CLKDIV_STATCPU1			(S5P_VA_CMU + 0x14604)
+> +#define EXYNOS4_CLKDIV_CPU			0x14500
+> +#define EXYNOS4_CLKDIV_CPU1			0x14504
+> +#define EXYNOS4_CLKDIV_STATCPU			0x14600
+> +#define EXYNOS4_CLKDIV_STATCPU1			0x14604
+>  
+>  #define EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT	(16)
+>  #define EXYNOS4_CLKMUX_STATCPU_MUXCORE_MASK	(0x7 << EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT)
+>  
+> -#define EXYNOS5_APLL_LOCK			(S5P_VA_CMU + 0x00000)
+> -#define EXYNOS5_APLL_CON0			(S5P_VA_CMU + 0x00100)
+> -#define EXYNOS5_CLKMUX_STATCPU			(S5P_VA_CMU + 0x00400)
+> -#define EXYNOS5_CLKDIV_CPU0			(S5P_VA_CMU + 0x00500)
+> -#define EXYNOS5_CLKDIV_CPU1			(S5P_VA_CMU + 0x00504)
+> -#define EXYNOS5_CLKDIV_STATCPU0			(S5P_VA_CMU + 0x00600)
+> -#define EXYNOS5_CLKDIV_STATCPU1			(S5P_VA_CMU + 0x00604)
+> +#define EXYNOS5_APLL_LOCK			0x00000
+> +#define EXYNOS5_APLL_CON0			0x00100
+> +#define EXYNOS5_CLKMUX_STATCPU			0x00400
+> +#define EXYNOS5_CLKDIV_CPU0			0x00500
+> +#define EXYNOS5_CLKDIV_CPU1			0x00504
+> +#define EXYNOS5_CLKDIV_STATCPU0			0x00600
+> +#define EXYNOS5_CLKDIV_STATCPU1			0x00604
+> diff --git a/drivers/cpufreq/exynos4210-cpufreq.c b/drivers/cpufreq/exynos4210-cpufreq.c
+> index 6384e5b..a412146 100644
+> --- a/drivers/cpufreq/exynos4210-cpufreq.c
+> +++ b/drivers/cpufreq/exynos4210-cpufreq.c
+> @@ -16,6 +16,8 @@
+>  #include <linux/io.h>
+>  #include <linux/slab.h>
+>  #include <linux/cpufreq.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+>  
+>  #include "exynos-cpufreq.h"
+>  
+> @@ -23,6 +25,7 @@ static struct clk *cpu_clk;
+>  static struct clk *moutcore;
+>  static struct clk *mout_mpll;
+>  static struct clk *mout_apll;
+> +static struct exynos_dvfs_info *cpufreq;
+>  
+>  static unsigned int exynos4210_volt_table[] = {
+>  	1250000, 1150000, 1050000, 975000, 950000,
+> @@ -60,20 +63,20 @@ static void exynos4210_set_clkdiv(unsigned int div_index)
+>  
+>  	tmp = apll_freq_4210[div_index].clk_div_cpu0;
+>  
+> -	__raw_writel(tmp, EXYNOS4_CLKDIV_CPU);
+> +	__raw_writel(tmp, cpufreq->cmu_regs + EXYNOS4_CLKDIV_CPU);
+>  
+>  	do {
+> -		tmp = __raw_readl(EXYNOS4_CLKDIV_STATCPU);
+> +		tmp = __raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKDIV_STATCPU);
+>  	} while (tmp & 0x1111111);
+>  
+>  	/* Change Divider - CPU1 */
+>  
+>  	tmp = apll_freq_4210[div_index].clk_div_cpu1;
+>  
+> -	__raw_writel(tmp, EXYNOS4_CLKDIV_CPU1);
+> +	__raw_writel(tmp, cpufreq->cmu_regs + EXYNOS4_CLKDIV_CPU1);
+>  
+>  	do {
+> -		tmp = __raw_readl(EXYNOS4_CLKDIV_STATCPU1);
+> +		tmp = __raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKDIV_STATCPU1);
+>  	} while (tmp & 0x11);
+>  }
+>  
+> @@ -85,7 +88,7 @@ static void exynos4210_set_apll(unsigned int index)
+>  	clk_set_parent(moutcore, mout_mpll);
+>  
+>  	do {
+> -		tmp = (__raw_readl(EXYNOS4_CLKMUX_STATCPU)
+> +		tmp = (__raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKMUX_STATCPU)
+>  			>> EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT);
+>  		tmp &= 0x7;
+>  	} while (tmp != 0x2);
+> @@ -96,7 +99,7 @@ static void exynos4210_set_apll(unsigned int index)
+>  	clk_set_parent(moutcore, mout_apll);
+>  
+>  	do {
+> -		tmp = __raw_readl(EXYNOS4_CLKMUX_STATCPU);
+> +		tmp = __raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKMUX_STATCPU);
+>  		tmp &= EXYNOS4_CLKMUX_STATCPU_MUXCORE_MASK;
+>  	} while (tmp != (0x1 << EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT));
+>  }
+> @@ -115,8 +118,22 @@ static void exynos4210_set_frequency(unsigned int old_index,
+>  
+>  int exynos4210_cpufreq_init(struct exynos_dvfs_info *info)
+>  {
+> +	struct device_node *np;
+>  	unsigned long rate;
+>  
+> +	np = of_find_compatible_node(NULL, NULL, "samsung,exynos4210-clock");
+> +	if (!np) {
+> +		pr_err("%s: failed to find clock controller DT node\n",
+> +			__func__);
+> +		return -ENODEV;
+> +	}
+> +
+> +	info->cmu_regs = of_iomap(np, 0);
+> +	if (!info->cmu_regs) {
+> +		pr_err("%s: failed to map CMU registers\n", __func__);
+> +		return -EFAULT;
+> +	}
+> +
+>  	cpu_clk = clk_get(NULL, "armclk");
+>  	if (IS_ERR(cpu_clk))
+>  		return PTR_ERR(cpu_clk);
+> @@ -143,6 +160,8 @@ int exynos4210_cpufreq_init(struct exynos_dvfs_info *info)
+>  	info->freq_table = exynos4210_freq_table;
+>  	info->set_freq = exynos4210_set_frequency;
+>  
+> +	cpufreq = info;
+> +
+>  	return 0;
+>  
+>  err_mout_apll:
+> diff --git a/drivers/cpufreq/exynos4x12-cpufreq.c b/drivers/cpufreq/exynos4x12-cpufreq.c
+> index 63a3907..aaeceb6 100644
+> --- a/drivers/cpufreq/exynos4x12-cpufreq.c
+> +++ b/drivers/cpufreq/exynos4x12-cpufreq.c
+> @@ -16,6 +16,8 @@
+>  #include <linux/io.h>
+>  #include <linux/slab.h>
+>  #include <linux/cpufreq.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+>  
+>  #include "exynos-cpufreq.h"
+>  
+> @@ -23,6 +25,7 @@ static struct clk *cpu_clk;
+>  static struct clk *moutcore;
+>  static struct clk *mout_mpll;
+>  static struct clk *mout_apll;
+> +static struct exynos_dvfs_info *cpufreq;
+>  
+>  static unsigned int exynos4x12_volt_table[] = {
+>  	1350000, 1287500, 1250000, 1187500, 1137500, 1087500, 1037500,
+> @@ -105,19 +108,20 @@ static void exynos4x12_set_clkdiv(unsigned int div_index)
+>  
+>  	tmp = apll_freq_4x12[div_index].clk_div_cpu0;
+>  
+> -	__raw_writel(tmp, EXYNOS4_CLKDIV_CPU);
+> +	__raw_writel(tmp, cpufreq->cmu_regs + EXYNOS4_CLKDIV_CPU);
+>  
+> -	while (__raw_readl(EXYNOS4_CLKDIV_STATCPU) & 0x11111111)
+> +	while (__raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKDIV_STATCPU)
+> +	       & 0x11111111)
+>  		cpu_relax();
+>  
+>  	/* Change Divider - CPU1 */
+>  	tmp = apll_freq_4x12[div_index].clk_div_cpu1;
+>  
+> -	__raw_writel(tmp, EXYNOS4_CLKDIV_CPU1);
+> +	__raw_writel(tmp, cpufreq->cmu_regs + EXYNOS4_CLKDIV_CPU1);
+>  
+>  	do {
+>  		cpu_relax();
+> -		tmp = __raw_readl(EXYNOS4_CLKDIV_STATCPU1);
+> +		tmp = __raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKDIV_STATCPU1);
+>  	} while (tmp != 0x0);
+>  }
+>  
+> @@ -130,7 +134,7 @@ static void exynos4x12_set_apll(unsigned int index)
+>  
+>  	do {
+>  		cpu_relax();
+> -		tmp = (__raw_readl(EXYNOS4_CLKMUX_STATCPU)
+> +		tmp = (__raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKMUX_STATCPU)
+>  			>> EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT);
+>  		tmp &= 0x7;
+>  	} while (tmp != 0x2);
+> @@ -142,7 +146,7 @@ static void exynos4x12_set_apll(unsigned int index)
+>  
+>  	do {
+>  		cpu_relax();
+> -		tmp = __raw_readl(EXYNOS4_CLKMUX_STATCPU);
+> +		tmp = __raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKMUX_STATCPU);
+>  		tmp &= EXYNOS4_CLKMUX_STATCPU_MUXCORE_MASK;
+>  	} while (tmp != (0x1 << EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT));
+>  }
+> @@ -161,8 +165,22 @@ static void exynos4x12_set_frequency(unsigned int old_index,
+>  
+>  int exynos4x12_cpufreq_init(struct exynos_dvfs_info *info)
+>  {
+> +	struct device_node *np;
+>  	unsigned long rate;
+>  
+> +	np = of_find_compatible_node(NULL, NULL, "samsung,exynos4412-clock");
+> +	if (!np) {
+> +		pr_err("%s: failed to find clock controller DT node\n",
+> +			__func__);
+> +		return -ENODEV;
+> +	}
+> +
+> +	info->cmu_regs = of_iomap(np, 0);
+> +	if (!info->cmu_regs) {
+> +		pr_err("%s: failed to map CMU registers\n", __func__);
+> +		return -EFAULT;
+> +	}
+> +
+>  	cpu_clk = clk_get(NULL, "armclk");
+>  	if (IS_ERR(cpu_clk))
+>  		return PTR_ERR(cpu_clk);
+> @@ -194,6 +212,8 @@ int exynos4x12_cpufreq_init(struct exynos_dvfs_info *info)
+>  	info->freq_table = exynos4x12_freq_table;
+>  	info->set_freq = exynos4x12_set_frequency;
+>  
+> +	cpufreq = info;
+> +
+>  	return 0;
+>  
+>  err_mout_apll:
+> diff --git a/drivers/cpufreq/exynos5250-cpufreq.c b/drivers/cpufreq/exynos5250-cpufreq.c
+> index 363a0b3..cbfbe30 100644
+> --- a/drivers/cpufreq/exynos5250-cpufreq.c
+> +++ b/drivers/cpufreq/exynos5250-cpufreq.c
+> @@ -16,8 +16,8 @@
+>  #include <linux/io.h>
+>  #include <linux/slab.h>
+>  #include <linux/cpufreq.h>
+> -
+> -#include <mach/map.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+>  
+>  #include "exynos-cpufreq.h"
+>  
+> @@ -25,6 +25,7 @@ static struct clk *cpu_clk;
+>  static struct clk *moutcore;
+>  static struct clk *mout_mpll;
+>  static struct clk *mout_apll;
+> +static struct exynos_dvfs_info *cpufreq;
+>  
+>  static unsigned int exynos5250_volt_table[] = {
+>  	1300000, 1250000, 1225000, 1200000, 1150000,
+> @@ -87,17 +88,18 @@ static void set_clkdiv(unsigned int div_index)
+>  
+>  	tmp = apll_freq_5250[div_index].clk_div_cpu0;
+>  
+> -	__raw_writel(tmp, EXYNOS5_CLKDIV_CPU0);
+> +	__raw_writel(tmp, cpufreq->cmu_regs + EXYNOS5_CLKDIV_CPU0);
+>  
+> -	while (__raw_readl(EXYNOS5_CLKDIV_STATCPU0) & 0x11111111)
+> +	while (__raw_readl(cpufreq->cmu_regs + EXYNOS5_CLKDIV_STATCPU0)
+> +	       & 0x11111111)
+>  		cpu_relax();
+>  
+>  	/* Change Divider - CPU1 */
+>  	tmp = apll_freq_5250[div_index].clk_div_cpu1;
+>  
+> -	__raw_writel(tmp, EXYNOS5_CLKDIV_CPU1);
+> +	__raw_writel(tmp, cpufreq->cmu_regs + EXYNOS5_CLKDIV_CPU1);
+>  
+> -	while (__raw_readl(EXYNOS5_CLKDIV_STATCPU1) & 0x11)
+> +	while (__raw_readl(cpufreq->cmu_regs + EXYNOS5_CLKDIV_STATCPU1) & 0x11)
+>  		cpu_relax();
+>  }
+>  
+> @@ -111,7 +113,8 @@ static void set_apll(unsigned int index)
+>  
+>  	do {
+>  		cpu_relax();
+> -		tmp = (__raw_readl(EXYNOS5_CLKMUX_STATCPU) >> 16);
+> +		tmp = (__raw_readl(cpufreq->cmu_regs + EXYNOS5_CLKMUX_STATCPU)
+> +			>> 16);
+>  		tmp &= 0x7;
+>  	} while (tmp != 0x2);
+>  
+> @@ -122,7 +125,7 @@ static void set_apll(unsigned int index)
+>  
+>  	do {
+>  		cpu_relax();
+> -		tmp = __raw_readl(EXYNOS5_CLKMUX_STATCPU);
+> +		tmp = __raw_readl(cpufreq->cmu_regs + EXYNOS5_CLKMUX_STATCPU);
+>  		tmp &= (0x7 << 16);
+>  	} while (tmp != (0x1 << 16));
+>  }
+> @@ -141,8 +144,22 @@ static void exynos5250_set_frequency(unsigned int old_index,
+>  
+>  int exynos5250_cpufreq_init(struct exynos_dvfs_info *info)
+>  {
+> +	struct device_node *np;
+>  	unsigned long rate;
+>  
+> +	np = of_find_compatible_node(NULL, NULL, "samsung,exynos5250-clock");
+> +	if (!np) {
+> +		pr_err("%s: failed to find clock controller DT node\n",
+> +			__func__);
+> +		return -ENODEV;
+> +	}
+> +
+> +	info->cmu_regs = of_iomap(np, 0);
+> +	if (!info->cmu_regs) {
+> +		pr_err("%s: failed to map CMU registers\n", __func__);
+> +		return -EFAULT;
+> +	}
+> +
+>  	cpu_clk = clk_get(NULL, "armclk");
+>  	if (IS_ERR(cpu_clk))
+>  		return PTR_ERR(cpu_clk);
+> @@ -169,6 +186,8 @@ int exynos5250_cpufreq_init(struct exynos_dvfs_info *info)
+>  	info->freq_table = exynos5250_freq_table;
+>  	info->set_freq = exynos5250_set_frequency;
+>  
+> +	cpufreq = info;
+> +
+>  	return 0;
+>  
+>  err_mout_apll:
+> 
