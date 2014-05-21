@@ -1,48 +1,101 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 21 May 2014 10:48:52 +0100
-Subject: [GIT PULL] mfd: Second IB for Mark (regulator)
-In-Reply-To: <1398295293-11033-1-git-send-email-mporter@linaro.org>
-References: <1398295293-11033-1-git-send-email-mporter@linaro.org>
-Message-ID: <20140521094852.GH6679@lee--X1>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 21 May 2014 10:55:41 +0100
+Subject: [PATCH v9 14/14] virt: arm: support hip04 gic
+In-Reply-To: <CAD6h2NQHqisW0_nYQ9XyHXrX57Z7mcxeVwyFMiSyCm7Tt8n8KA@mail.gmail.com>
+References: <1400591427-21922-1-git-send-email-haojian.zhuang@linaro.org>
+ <1400591427-21922-15-git-send-email-haojian.zhuang@linaro.org>
+ <20140520134441.GK5292@lvm>
+ <CAD6h2NQyG1GSneWMpHmYxD-dPS7w9w2fe8vDdj-f834T2yqn1w@mail.gmail.com>
+ <20140520140153.GL5292@lvm>
+ <CAD6h2NQZGBa5U0-tmj=wtsFpcqnV2tHx+_vESrx8+3r7dGpHjQ@mail.gmail.com>
+ <20140520150518.GA39503@lvm>
+ <CAD6h2NRv3hUa7vhbxVb1LhYi9K5OMVf01pyqp6yUC-+0zU8jkQ@mail.gmail.com>
+ <20140521090203.GB39503@lvm>
+ <CAD6h2NQHqisW0_nYQ9XyHXrX57Z7mcxeVwyFMiSyCm7Tt8n8KA@mail.gmail.com>
+Message-ID: <20140521095541.GC39503@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit a798c10faf62a505d24e5f6213fbaf904a39623f:
+On Wed, May 21, 2014 at 05:47:00PM +0800, Haojian Zhuang wrote:
+> On 21 May 2014 17:02, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> > On Tue, May 20, 2014 at 11:39:12PM +0800, Haojian Zhuang wrote:
+> >> On 20 May 2014 23:05, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> >> > On Tue, May 20, 2014 at 10:16:22PM +0800, Haojian Zhuang wrote:
+> >> >> On 20 May 2014 22:01, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> >> >> It's the implementation of gich_apr in arm32.
+> >> >>
+> >> >> We needn't add or change anything in struct vgic_cpu. And both the
+> >> >> assembly code and the code could be much easier.
+> >> >>
+> >> >
+> >> > But we do end up with an extra memory access from EL2 in the critical
+> >> > path, and I believe Marc's concern here is that if we cross a cache
+> >> > line, this might really hurt performance.
+> >> >
+> >>
+> >> Sorry. Do we may cross a cache line or a TLB entry?
+> >>
+> >> I think that you're concerning to cross TLB entries. The reason is in
+> >>  below.
+> >>
+> >> 1. If the problem is on crossing cache line, it's caused by too much
+> >> instructions. Either the packing nr_lr or the gich_apr adds some
+> >> instructions. The packing nr_lr needs a little more instructions.
+> >
+> > I don't see why this argument is valid.  If you have a separate
+> 
+> I want to make it clear what I missing.
+> 
+> > instruction and data cache, you may be loading from a different cache
+> > line when placing the static value close to your instructions.  If you
+> > add a variable to the vcpu struct, all of the fields may no longer fit
+> > in a single data cache line and you may cause the memory subsystem to
+> > have to fetch another cache line.  I believe the latter is Marc's
+> 
+> Yes, I forgot new gich_apr is the only variable in the assembly code.
+> So the gich_apr will be load from a different cache line.
+> 
+> Then let's come back to packing hw_cfg.
+> 
+> Now the high word is used to store the offset of GICH_APR. The
+> unpacking operation is too complex to calculate the register offset,
+> especially in arm64 implementation.
+> 
+> How about changing the packing mechanism?
+> 
+> 1. Add the definition of enconding in arm-gic.h.
+> 
+> #define HIP04_GIC             (1 << 16)
+> #define HIP04_GICH_APR   0x70
+> #define HIP04_GICH_LR0    0x80
+> 
+> 2. The code in save_vgic_state could be changed in below.
+> 
+>   ldr     r9, [r2, #GICH_ELRSR1]
+> +ldr     r10, [r3, #VGIC_CPU_HW_CFG]
+> +tst     r10, #HIP04_GIC
+> +ldreq  r10, [r2, #GICH_APR]
+> +ldrne  r10, [r2, #HIP04_GICH_APR]
+> 
+> Although I used the condition checking at here, the code could
+> be easier.
+> 
+> I think that the executing time on "ldr" and "ldreq" should be same,
+> because CPCS should be ready
+> 
+> Then calculation is avoid. Only three instructions are appended
+> for both GICH_APR & GICH_LR0. The implementation in arm64
+> should be same & simple.
+> 
+I think you misunderstood my point.
 
-  Linux 3.15-rc2 (2014-04-20 11:08:50 -0700)
+Keep the assembly code as is, store the APR and the NR_LR in the HW_CFG
+always, on all systems, and don't use any conditionals in the assembly
+code (code is difficult to read, instruction prefetching and speculative
+execution becomes difficult, etc.).
 
-are available in the git repository at:
+Only change something in the C-code.  Set a static variable there during
+vgic_hyp_init and get rid of all the local variable declarations that
+dereference the vgic_vcpu struct.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/mfd-regulator-v3.16-1
-
-for you to fetch changes up to c6466950e917890be3050171f6745ccb9d91d35f:
-
-  regulator: bcm590xx: Add support for regulators on secondary I2C slave (2014-05-21 10:40:16 +0100)
-
-----------------------------------------------------------------
-Immutable branch between MFD and Regulator due for v3.16 merge-window.
-
-----------------------------------------------------------------
-Doug Anderson (2):
-      mfd: tps65090: Don't tell child devices we have an IRQ if we don't
-      mfd: tps65090: Stop caching most registers
-
-Matt Porter (3):
-      mfd: bcm590xx: Update binding with additional BCM59056 regulators
-      mfd: bcm590xx: Add support for secondary I2C slave address
-      regulator: bcm590xx: Add support for regulators on secondary I2C slave
-
- Documentation/devicetree/bindings/mfd/bcm590xx.txt |  4 +-
- drivers/mfd/bcm590xx.c                             | 60 ++++++++++----
- drivers/mfd/tps65090.c                             | 41 ++++++----
- drivers/power/tps65090-charger.c                   | 11 ---
- drivers/regulator/bcm590xx-regulator.c             | 92 +++++++++++++++++++---
- include/linux/mfd/bcm590xx.h                       |  9 ++-
- include/linux/mfd/tps65090.h                       | 14 ++++
- 7 files changed, 176 insertions(+), 55 deletions(-)
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+-Christoffer
