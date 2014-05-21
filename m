@@ -1,84 +1,140 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 May 2014 21:47:20 +0900
-Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
-In-Reply-To: <CAJFHJrrb2XFDZqJh4OuLdFP=J0aR4pGe-WLWKZ7ZpMfUSPGd4Q@mail.gmail.com>
-References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
- <53752E25.9060604@gmail.com>
- <CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>
- <53753443.8010303@gmail.com>
- <CAD=FV=V8UZoeOqEwfx_E015pLM+amTt51LrUa+dk7mTdn=vKgA@mail.gmail.com>
- <53753C17.1090002@gmail.com>
- <CAD=FV=WGa7j_As_NpySxU7OEd_SzuGWK6oxU6UeiJ-4HsoWvvg@mail.gmail.com>
- <CAJFHJrrgWGc4XGQB0ysLufAg3Wouz-aYXu97Sy2Kp=HzK+akVQ@mail.gmail.com>
- <CAASgrz2Nr69tpfC8ka9gbs2OvjLEGsvgAj4vBCFxhsamuFum7w@mail.gmail.com>
- <53754CE2.3000905@gmail.com>
- <CAD=FV=UMoL7i9rg_QtBAqPwisSQyRqRmk8wQhneMXAiLBjTT1A@mail.gmail.com>
- <CAPz6YkU8GDrLj8UkqEQXxxqxWF5_p427wKSDgAp+QPR7WE7Ujg@mail.gmail.com>
- <CAJFHJrrb2XFDZqJh4OuLdFP=J0aR4pGe-WLWKZ7ZpMfUSPGd4Q@mail.gmail.com>
-Message-ID: <033a01cf74f2$d025ce80$70716b80$@samsung.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 21 May 2014 15:50:21 +0300
+Subject: [PATCH 2/6] ARM: dts: am437x-gp-evm: add LCD data
+In-Reply-To: <1400676625-30078-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1400676625-30078-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1400676625-30078-3-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chirantan Ekbote wrote:
-> 
-> >>> Anyway, I'm by no means opposed to switching to arch timers. They
-> >>> provide a well designed, generic interface and drivers shared by
-> >>> multiple platforms, which means more code sharing and possibly more eyes
-> >>> looking at the code, which is always good. However if they don't support
-> >>> low power states correctly, we can't just remove MCT.
-> >>
-> >> I think low power states aren't in mainline (right?).
-> >>
-> >> One solution that might work could be to leave the device tree entry
-> >> alone but change the MCT init code to simply act as a no-op if it sees
-> >> an arch timer is in the device tree and enabled.  Then when/if someone
-> >> got the low power states enabled we could just change source code
-> >> rather than dts files.
-> >>
-> Doug and I were talking about this and we think we may have a way to
-> have the mct and arch timers co-exist.  The main issue is that the mct
-> (and therefore arch timer) gets cleared once during boot and every
-> time we do a suspend / resume.  This happens in
-> exynos4_mct_frc_start() but it's not immediately clear to us why the
-> counter needs to be reset at all.  If we remove the lines that clear
-> the counter then there is no longer an issue with having both the mct
-> and the arch timers on at the same time.
-> 
-Yeah, actually we don't need to reset the count value after suspend/resume.
-So, how about following? I think, it should be fine to you.
+From: Sathya Prakash M R <sathyap@ti.com>
 
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 8d64200..d24db6f 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -157,12 +157,15 @@ static void exynos4_mct_frc_start(u32 hi, u32 lo)
- {
- 	u32 reg;
+Add DT data for am437x-gp-evm's LCD panel.
+
+Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ arch/arm/boot/dts/am437x-gp-evm.dts | 97 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 97 insertions(+)
+
+diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
+index df8798e8bd25..350e896a0d89 100644
+--- a/arch/arm/boot/dts/am437x-gp-evm.dts
++++ b/arch/arm/boot/dts/am437x-gp-evm.dts
+@@ -53,6 +53,48 @@
+ 				0x02000069      /* LEFT */
+ 				0x0201006c>;      /* DOWN */
+ 		};
++
++	aliases {
++		display0 = &lcd0;
++	};
++
++	lcd0: display {
++		compatible = "osddisplays,osd057T0559-34ts", "panel-dpi";
++		label = "lcd";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&lcd_pins>;
++
++		/*
++		 * SelLCDorHDMI, LOW to select HDMI. This is not really the
++		 * panel's enable GPIO, but we don't have HDMI driver support nor
++		 * support to switch between two displays, so using this gpio as
++		 * panel's enable should be safe.
++		 */
++		enable-gpios = <&gpio5 8 GPIO_ACTIVE_HIGH>;
++
++		panel-timing {
++			clock-frequency = <33000000>;
++			hactive = <800>;
++			vactive = <480>;
++			hfront-porch = <210>;
++			hback-porch = <16>;
++			hsync-len = <30>;
++			vback-porch = <10>;
++			vfront-porch = <22>;
++			vsync-len = <13>;
++			hsync-active = <0>;
++			vsync-active = <0>;
++			de-active = <1>;
++			pixelclk-active = <1>;
++		};
++
++		port {
++			lcd_in: endpoint {
++				remote-endpoint = <&dpi_out>;
++			};
++		};
++	};
+ };
  
--	exynos4_mct_write(lo, EXYNOS4_MCT_G_CNT_L);
--	exynos4_mct_write(hi, EXYNOS4_MCT_G_CNT_U);
--
- 	reg = __raw_readl(reg_base + EXYNOS4_MCT_G_TCON);
--	reg |= MCT_G_TCON_START;
--	exynos4_mct_write(reg, EXYNOS4_MCT_G_TCON);
+ &am43xx_pinmux {
+@@ -81,6 +123,47 @@
+ 			0x164 MUX_MODE0       /* eCAP0_in_PWM0_out.eCAP0_in_PWM0_out MODE0 */
+ 		>;
+ 	};
 +
-+	if (!(reg & MCT_G_TCON_START)) {
-+		exynos4_mct_write(lo, EXYNOS4_MCT_G_CNT_L);
-+		exynos4_mct_write(hi, EXYNOS4_MCT_G_CNT_U);
++	dss_pins: dss_pins {
++		pinctrl-single,pins = <
++			0x020 (PIN_OUTPUT_PULLUP | MUX_MODE1) /*gpmc ad 8 -> DSS DATA 23 */
++			0x024 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++			0x028 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++			0x02c (PIN_OUTPUT_PULLUP | MUX_MODE1)
++			0x030 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++			0x034 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++			0x038 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++			0x03c (PIN_OUTPUT_PULLUP | MUX_MODE1) /*gpmc ad 15 -> DSS DATA 16 */
++			0x0a0 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS DATA 0 */
++			0x0a4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++			0x0a8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++			0x0ac (PIN_OUTPUT_PULLUP | MUX_MODE0)
++			0x0b0 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++			0x0b4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++			0x0b8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++			0x0bc (PIN_OUTPUT_PULLUP | MUX_MODE0)
++			0x0c0 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++			0x0c4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++			0x0c8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++			0x0cc (PIN_OUTPUT_PULLUP | MUX_MODE0)
++			0x0d0 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++			0x0d4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++			0x0d8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++			0x0dc (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS DATA 15 */
++			0x0e0 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS VSYNC */
++			0x0e4 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS HSYNC */
++			0x0e8 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS PCLK */
++			0x0ec (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS AC BIAS EN */
 +
-+		reg |= MCT_G_TCON_START;
-+		exynos4_mct_write(reg, EXYNOS4_MCT_G_TCON);
-+	}
- }
-
-
-> Alternately, if there is some code that depends on the mct being reset
-> we could store an offset instead of clearing the counter and then
-> subtract that offset every time something reads it.  Doug has a patch
-> that does this at
-> https://chromium-review.googlesource.com/#/c/200298/.  Effectively the
-> visible behavior will not change.  Would either of these options work?
-> 
-Hmm...I cannot open the webpage :(
-
-- Kukjin
++		>;
++	};
++
++	lcd_pins: lcd_pins {
++		pinctrl-single,pins = <
++			/* GPIO 5_8 to select LCD / HDMI */
++			0x238 (PIN_OUTPUT_PULLUP | MUX_MODE7)
++		>;
++	};
+ };
+ 
+ &i2c0 {
+@@ -125,3 +208,17 @@
+ 	pinctrl-0 = <&mmc1_pins>;
+ 	cd-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
+ };
++
++&dss {
++	status = "ok";
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&dss_pins>;
++
++	port {
++		dpi_out: endpoint at 0 {
++			remote-endpoint = <&lcd_in>;
++			data-lines = <24>;
++		};
++	};
++};
+-- 
+1.9.1
