@@ -1,70 +1,71 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 20 May 2014 23:20:07 -0600
-Subject: [PATCHv3 1/3] ARM: mm: allow sub-architectures to override PCI
- I/O memory type
-In-Reply-To: <20140516095333.GE12341@arm.com>
-References: <1400145519-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <4972763.mtuLYh6sDH@wuerfel> <20140515153430.GM27594@arm.com>
- <11787153.NWVGbVfAPV@wuerfel> <20140516095333.GE12341@arm.com>
-Message-ID: <20140521052007.GA14888@obsidianresearch.com>
+From: ritesh.harjani@gmail.com (Ritesh Harjani)
+Date: Wed, 21 May 2014 11:08:48 +0530
+Subject: [PATCH 1/1] arm64: tlbflush.h: Clean up comment
+In-Reply-To: <CAKZGPAMhZZoSAs0LPpGJijCL3EM-ANoSWs0-yQPX2yL=nB-6DQ@mail.gmail.com>
+References: <1400645600-35973-1-git-send-email-ritesh.harjani@gmail.com>
+ <1400645600-35973-2-git-send-email-ritesh.harjani@gmail.com>
+ <CAKZGPAMhZZoSAs0LPpGJijCL3EM-ANoSWs0-yQPX2yL=nB-6DQ@mail.gmail.com>
+Message-ID: <CAD15agYEm3iUPEeA78cqd1tyfNz+ZFWXg57RP9M0ZBPiNDHg2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 10:53:33AM +0100, Will Deacon wrote:
+Ok thanks Arun,
 
-> > Correct. Assume a PCI device uses PIO and DMA. It sends a DMA to main memory
-> > and lets the CPU know about the data using a level (IntA as opposed to MSI)
-> > interrupt. The CPU performs an outl() operation to an I/O port to let the
-> > hardware know it has received the IRQ and the response of the outl() is
-> > guaranteed to flush the DMA transaction: by the time the outl() completes
-> > we know that the data in memory is valid because it is strongly ordered
-> > relative to the DMA.
+I didnt see this patch
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/252837.html
 
-Keep in mind that the IntA message itself is going to flush the DMA,
-no sane host bridge implementation should process the IntA until all
-prior DMA writes are completed, just like MSI.
+Will submit the correct patch then.
 
-Also, legacy non-MSI interrupts are always sharable, so the ISR must
-always start with a read of a device specific status reguster, which
-will also flush any DMA writes.
+Thanks
+Ritesh
 
-The simplest common scenario to show synchronous outl is this:
 
-void pci_isr()
-{
-   if (inl(status_reg) & INT_PENDING)
-      outl(ACK_INT,status_reg);
-}
-
-Where the outl is not expected to complete at the CPU until the device
-has lowered the level triggered interrupt line.
-
-If outl is not synchronous then a spurious interrupt will be caused.
-
-When converting a driver to MMIO you'd often have to do this:
-
-void pci_isr()
-{
-   if (readl(status_reg) & INT_PENDING) {
-      writel(ACK_INT,status_reg);
-      readl(status_reg); // Synchronizing read, flushes write.
-   }
-}
-
-Which is one of the software visible impacts of io vs mmio.
-
-> Hmm, when you say `guaranteed to flush the DMA transaction', is that a PCI
-> requirement? If so, whether or not that DMA data is then visible to the CPU
-> is really specific to the host-controller implementation. It could easily be
-> buffered somewhere between the host controller and memory, for example.
-
-PCI has the producer/consumer ordering model as part of the
-driving concept in the spec. Basically it wants to see the ordering
-model preserved right to the driver code itself.
-
-Realistically, way back, archs that couldn't do the synchronous IO
-(like my old MIPS design) had to convert their drivers to MMIO and run
-that way. It never worked 100% properly, or made sense to try an use an
-async outl, even though some systems provided it :)
-
-Jason
+On Wed, May 21, 2014 at 9:52 AM, Arun KS <arunks.linux@gmail.com> wrote:
+> Hi Ritesh,
+>
+> On Wed, May 21, 2014 at 9:43 AM,  <ritesh.harjani@gmail.com> wrote:
+>> From: Ritesh Harjani <ritesh.harjani@gmail.com>
+>>
+>> Clean up the undefined function name(flush_kern_tlb_page)
+>> from the comment in tlbflush.h
+>>
+>> Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
+>> ---
+>>  arch/arm64/include/asm/tlbflush.h | 6 ------
+>>  1 file changed, 6 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+>> index 8b48203..85e4f98 100644
+>> --- a/arch/arm64/include/asm/tlbflush.h
+>> +++ b/arch/arm64/include/asm/tlbflush.h
+>> @@ -63,12 +63,6 @@ extern struct cpu_tlb_fns cpu_tlb;
+>>   *             - vaddr - virtual address (may not be aligned)
+>>   *             - vma   - vma_struct describing address range
+>>   *
+>> - *     flush_kern_tlb_page(kaddr)
+>> - *
+>> - *             Invalidate the TLB entry for the specified page.  The address
+>> - *             will be in the kernels virtual memory space.  Current uses
+>> - *             only require the D-TLB to be invalidated.
+>> - *             - kaddr - Kernel virtual memory address
+>>   */
+>>  static inline void flush_tlb_all(void)
+>
+> Probably you can remove the following comment in same file as well.
+> "The arch/arm64/mm/tlb.S files implement these methods."
+>
+> arch/arm64/mm/tlb.S file is no more and all the methods are
+> implemented in the current file.
+>
+> Thanks,
+> Arun
+>
+>>  {
+>> --
+>> 1.8.1.3
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
