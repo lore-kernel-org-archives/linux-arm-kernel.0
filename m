@@ -1,39 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 May 2014 14:34:16 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC r7s72100-ccf Updates for v3.16
-In-Reply-To: <cover.1400201383.git.horms+renesas@verge.net.au>
-References: <cover.1400201383.git.horms+renesas@verge.net.au>
-Message-ID: <20140521213416.GC24972@quad.lixom.net>
+Date: Wed, 21 May 2014 14:35:35 -0700
+Subject: [GIT PULL] Allwinner core for 3.16
+In-Reply-To: <20140516112048.GA18800@lukather>
+References: <20140516112048.GA18800@lukather>
+Message-ID: <20140521213535.GD24972@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 09:58:33AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Fri, May 16, 2014 at 01:20:48PM +0200, Maxime Ripard wrote:
+> Hi Arnd, Kevin, Olof,
 > 
-> Please consider these Renesas ARM based SoC r7s72100-ccf updates for v3.16.
+> Here is the first of the Allwinner pull requests for the 3.16 merge
+> window.
 > 
-> This pull request is based on Renesas SoC Clock Cleanups for v3.16,
-> such requests, tagged as renesas-clock-cleanup2-for-v3.16,
-> which I have already sent a pull-request for.
+> Thanks!
+> Maxime
 > 
+> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 > 
-> This series includes dependencies that do not fit easily into the usual
-> inter-branch dependencies and as such I have grouped them together in a
-> single branch.
-> 
-> 
-> The following changes since commit c17fcfbcc0f6b4f3cae761149e1a6108dd6750e7:
-> 
->   ARM: shmobile: r7s72100: Switch to new style MTU2 device (2014-05-11 19:35:28 +0900)
+>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-r7s72100-ccf-for-v3.16
+>   https://github.com/mripard/linux.git tags/sunxi-core-for-3.16
+> 
+> for you to fetch changes up to 324da938cb7eb103a925817f9aacdcc1f0e22576:
+> 
+>   ARM: sunxi: select MFD_SUN6I_PRCM when sun6i arch support is enabled (2014-05-15 17:30:07 +0200)
 
-Seems like lots of stuff is ending up in next/boards now. That's OK. This
-branch too.
-
-Merged.
+Merged into next/soc. Thanks!
 
 
 -Olof
