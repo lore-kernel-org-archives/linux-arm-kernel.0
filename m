@@ -1,88 +1,89 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 21 May 2014 22:37:34 +0200
-Subject: [PATCH] PM / devfreq: remove checks for CONFIG_EXYNOS_ASV
-Message-ID: <1400704654.30334.22.camel@x220>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 May 2014 13:51:20 -0700
+Subject: [GIT PULL]]ARM: sirf: machine update for 3.16
+In-Reply-To: <CAGsJ_4wxaU5Sz9p3rb8wXuHeFs_kFx7BG-ThdQL0oiLHPqOb9w@mail.gmail.com>
+References: <CAGsJ_4yqTkKu+93Fo_D6NaZMyz4T6_EmKz4gZfyeQCi_uF-3dg@mail.gmail.com>
+ <CAGsJ_4wD=FqxNeuEs47f0D9V+Qhn8jyUQL67iv4rsZ3r2K_3vA@mail.gmail.com>
+ <CAGsJ_4y7gEQd9-Em6LW2kZ79qUOz5dSYzeWnBLbt8o8QsOSA6w@mail.gmail.com>
+ <20140520050740.GI18956@quad.lixom.net>
+ <CAGsJ_4wxaU5Sz9p3rb8wXuHeFs_kFx7BG-ThdQL0oiLHPqOb9w@mail.gmail.com>
+Message-ID: <20140521205120.GA24341@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Checks for CONFIG_EXYNOS_ASV were added in v3.3. But the related Kconfig
-symbol has never been added to the tree. Remove these checks, as they
-always evaluate to false.
+On Tue, May 20, 2014 at 01:39:20PM +0800, Barry Song wrote:
+> 2014-05-20 13:07 GMT+08:00 Olof Johansson <olof@lixom.net>:
+> > On Sun, May 18, 2014 at 08:07:14PM +0800, Barry Song wrote:
+> >> >> Bin Shi (2):
+> >> >>       clocksource: prima2: fix some minor checkpatch issues
+> >> >>       irqchip: sirf: fix one minor checkpatch issue
+> >> >>
+> >> >> Xianglong Du (1):
+> >> >>       ARM: prima2: rstc: fix some minor checkpatch issues
+> >> >>
+> >> >> Zhiwu Song (2):
+> >> >>       clocksource:sirf: remove the hardcode for the clk of timers
+> >> >>       clocksource: marco: fix the affinity set for local timer of CPU1
+> >> >
+> >> > as Daniel has applied this one "clocksource: marco: fix the affinity
+> >> > set for local timer of CPU1" to his clk tree, i'll rebuilt the tag by
+> >> > dropping this.
+> >>
+> >> hi Olof,
+> >> i did a force update to tags/sirf-soc-for-3.16 after dropping
+> >> "clocksource: marco: fix the affinity set for local timer of CPU1"
+> >> which has been in clk tree , the new request is as below:
+> >>
+> >> The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
+> >>
+> >>   Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
+> >> tags/sirf-soc-for-3.16
+> >>
+> >> for you to fetch changes up to c7cff54d5926e3f419c23eff2ebaf6f5e12da05d:
+> >>
+> >>   clocksource:sirf: remove the hardcode for the clk of timers
+> >> (2014-05-12 21:43:49 +0800)
+> >>
+> >> ----------------------------------------------------------------
+> >> ARM: sirf: machine update for 3.16
+> >>
+> >> most of them fix some minor checkpatch issues according to key customers'
+> >> requirement. And this patchset also cleanups the clk of clocksource: move
+> >> to get clk by dts properity.
+> >>
+> >
+> > Merged into next/cleanup. Thanks.
+> 
+> Olof,
+> i noticed today Daniel Lezcano applied two more clocksource patches
+> into his tree for 3.16 after i re-built the sirf-soc-for-3.16 tag. so
+> for this pull, there are only two left.
+> 
+> Bin Shi (2):
+>        clocksource: prima2: fix some minor checkpatch issues
+> 
+> Xianglong Du (1):
+>        ARM: prima2: rstc: fix some minor checkpatch issues
+> 
+> so i did a force push for tags/sirf-soc-for-3.16 again just now
+> including only these two.
+> 
+> very sorry for that!
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-0) Untested.
+Don't do this. If you need to add a patch to a branch, then you send us
+a revised pull request with the new patch on top. Also, don't just send a reply
+with "oh, I added some code". It makes it hard to use the diffstat to tell
+whether what I pulled from you was what was supposed to be there and nothing
+more (or less).
 
-1) I do not really care much for this patch. Two years is not very long
-for dead code to remain in the tree. There is, however, a trivial issue
-that makes this patch stand out from the other patches in my current
-sweep of the tree for Kconfig related problems.
+I have no idea what's in your branch now, nor what is supposed to be there.
+What's in our tree now is in our tree -- I suggest you take a look and send an
+updated pull request for the incremental contents, with a tag that describes
+the new contents (but not the old).
 
-See, here the use of an unknown Kconfig macro hides an obvious typo: it
-should either be "exynos_result_of_asv" or "exynos4_result_of_asv", but
-not both. Ie, this almost certainly wouldn't have compiled even if the
-Kconfig symbol EXYNOS_ASV would have been part of the tree.
 
-2) So this makes me wonder whether there are any guidelines for using
-Kconfig macros before the related Kconfig symbols are merged?
-
- drivers/devfreq/Kconfig              |  3 +--
- drivers/devfreq/exynos/exynos4_bus.c | 13 -------------
- 2 files changed, 1 insertion(+), 15 deletions(-)
-
-diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
-index 7d2f43550700..fd985630ad7d 100644
---- a/drivers/devfreq/Kconfig
-+++ b/drivers/devfreq/Kconfig
-@@ -75,8 +75,7 @@ config ARM_EXYNOS4_BUS_DEVFREQ
- 	  and Exynos4212/4412 memory interface and bus (vdd_mif + vdd_int).
- 	  It reads PPMU counters of memory controllers and adjusts
- 	  the operating frequencies and voltages with OPP support.
--	  To operate with optimal voltages, ASV support is required
--	  (CONFIG_EXYNOS_ASV).
-+	  This does net yet operate with optimal voltages.
- 
- config ARM_EXYNOS5_BUS_DEVFREQ
- 	bool "ARM Exynos5250 Bus DEVFREQ Driver"
-diff --git a/drivers/devfreq/exynos/exynos4_bus.c b/drivers/devfreq/exynos/exynos4_bus.c
-index e07b0c68c715..c12911a0915d 100644
---- a/drivers/devfreq/exynos/exynos4_bus.c
-+++ b/drivers/devfreq/exynos/exynos4_bus.c
-@@ -25,11 +25,6 @@
- #include <linux/regulator/consumer.h>
- #include <linux/module.h>
- 
--/* Exynos4 ASV has been in the mailing list, but not upstreamed, yet. */
--#ifdef CONFIG_EXYNOS_ASV
--extern unsigned int exynos_result_of_asv;
--#endif
--
- #include <mach/map.h>
- 
- #include "exynos4_bus.h"
-@@ -837,11 +832,7 @@ static int exynos4210_init_tables(struct busfreq_data *data)
- 		data->top_divtable[i] = tmp;
- 	}
- 
--#ifdef CONFIG_EXYNOS_ASV
--	tmp = exynos4_result_of_asv;
--#else
- 	tmp = 0; /* Max voltages for the reliability of the unknown */
--#endif
- 
- 	pr_debug("ASV Group of Exynos4 is %d\n", tmp);
- 	/* Use merged grouping for voltage */
-@@ -922,11 +913,7 @@ static int exynos4x12_init_tables(struct busfreq_data *data)
- 		data->dmc_divtable[i] = tmp;
- 	}
- 
--#ifdef CONFIG_EXYNOS_ASV
--	tmp = exynos4_result_of_asv;
--#else
- 	tmp = 0; /* Max voltages for the reliability of the unknown */
--#endif
- 
- 	if (tmp > 8)
- 		tmp = 0;
--- 
-1.9.0
+-Olof
