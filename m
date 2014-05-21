@@ -1,70 +1,53 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Wed, 21 May 2014 10:14:58 +0200
-Subject: [PATCH] ARM: dts: duovero-parlor: Add HDMI output
-In-Reply-To: <CAGhQ9VxtJwrKzW77mo=y9_gvCRW_8TJEp90OVN+YPg2RpC=b_w@mail.gmail.com>
-References: <1400595946-1294-1-git-send-email-florian.vaussard@epfl.ch>
- <CAGhQ9VxtJwrKzW77mo=y9_gvCRW_8TJEp90OVN+YPg2RpC=b_w@mail.gmail.com>
-Message-ID: <537C6082.2000405@epfl.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 May 2014 10:16:18 +0200
+Subject: [PATCH 2/3] ARM: EXYNOS: Enable multi-platform build support
+In-Reply-To: <1400655169-21683-3-git-send-email-sachin.kamat@linaro.org>
+References: <1400655169-21683-1-git-send-email-sachin.kamat@linaro.org>
+ <1400655169-21683-3-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <4352730.lnFJpo5XeV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 05/20/2014 08:09 PM, Joachim Eastwood wrote:
-> On 20 May 2014 16:25, Florian Vaussard <florian.vaussard@epfl.ch> wrote:
->> Add the necessary DTS nodes to enable the micro-HDMI output on Parlor
->> board.
->>
->> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
->> ---
->>  arch/arm/boot/dts/omap4-duovero-parlor.dts | 42 ++++++++++++++++++++++++++++++
->>  1 file changed, 42 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/omap4-duovero-parlor.dts b/arch/arm/boot/dts/omap4-duovero-parlor.dts
->> index 96f51d8..3b234b8 100644
->> --- a/arch/arm/boot/dts/omap4-duovero-parlor.dts
->> +++ b/arch/arm/boot/dts/omap4-duovero-parlor.dts
->> @@ -15,6 +15,10 @@
->>         model = "OMAP4430 Gumstix Duovero on Parlor";
->>         compatible = "gumstix,omap4-duovero-parlor", "gumstix,omap4-duovero", "ti,omap4430", "ti,omap4";
->>
->> +       aliases {
->> +               display0 = &hdmi0;
->> +       };
->> +
->>         leds {
->>                 compatible = "gpio-leds";
->>                 led0 {
->> @@ -35,6 +39,19 @@
->>                         gpio-key,wakeup;
->>                 };
->>         };
->> +
->> +       hdmi0: connector at 0 {
->> +               compatible = "hdmi-connector";
->> +               label = "hdmi";
->> +
->> +               type = "d";
->> +
->> +               port {
->> +                       hdmi_connector_in: endpoint {
->> +                               remote-endpoint = <&hdmi_out>;
->> +                       };
->> +               };
->> +       };
->>  };
-> 
-> No, HPD (hotplug) pin?
-> 
-> I think Parlor has one and the "hdmi-connector" binding now supports
-> it. See Tomi's 3.16/fbdev-omap branch.
+On Wednesday 21 May 2014 12:22:48 Sachin Kamat wrote:
+>  # Configuration options for the EXYNOS4
+>  
+> +config ARCH_EXYNOS
+> +       bool "Samsung EXYNOS" if ARCH_MULTI_V7
+> +       select ARCH_HAS_BANDGAP
+> +       select ARCH_HAS_CPUFREQ
+> +       select ARCH_HAS_HOLES_MEMORYMODEL
+> +       select ARCH_REQUIRE_GPIOLIB
+> +       select ARM_AMBA
+> +       select ARM_GIC
+> +       select CLKSRC_OF
+> +       select COMMON_CLK_SAMSUNG
+> +       select CPU_V7
+> +       select GENERIC_CLOCKEVENTS
+> +       select HAVE_ARM_SCU if SMP
+> +       select HAVE_S3C2410_I2C if I2C
+> +       select HAVE_S3C2410_WATCHDOG if WATCHDOG
+> +       select HAVE_S3C_RTC if RTC_CLASS
+> +       select HAVE_SMP
+> +       select PINCTRL
+> +       select PINCTRL_EXYNOS
+> +       select PM_GENERIC_DOMAINS if PM_RUNTIME
+> +       select S5P_DEV_MFC
+> +       select SAMSUNG_DMADEV
+> +       select SPARSE_IRQ
+> +       select SRAM
+> +       select USE_OF
+> +       help
+> +         Support for SAMSUNG EXYNOS SoCs (EXYNOS4/5)
+> +
 > 
 
-Looking into the details, the HPD pin of the parlor board is connected
-to the OMAP4 HDMI IP. The LINK_CONNECT and LINK_DISCONNECT events are
-managed by hdmi_irq_handler() in hdmi4.c to turn on/off the PHY's power.
-So there is no need to use the hgp-gpios binding of "hdmi-connector"
-IMHO. Correct me if I am wrong, as the public TRM is pretty thin
-regarding the OMAP4 HDMI IP.
+A number of these can be removed now: SPARSE_IRQ, USE_OF, GENERIC_CLOCKEVENTS,
+CLKSRC_OF, CPU_V7 and HAVE_SMP are implied by ARCH_MULTIPLATFORM or ARCH_MULTI_V7,
+so we shouldn't duplicate them here.
 
-Regards,
-Florian
+I believe SAMSUNG_DMADEV cannot work in multiplatform, but we also don't need
+it any more.
+
+The rest looks good.
+
+	Arnd
