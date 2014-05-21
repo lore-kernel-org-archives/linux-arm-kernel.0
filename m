@@ -1,26 +1,42 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 21 May 2014 11:41:25 +0530
-Subject: [PATCH 1/2] dmaengine: omap: hide filter_fn for built-in drivers
-In-Reply-To: <1399560990-1402858-1-git-send-email-arnd@arndb.de>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
-Message-ID: <20140521061125.GN21128@intel.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Wed, 21 May 2014 08:41:10 +0200
+Subject: [PATCH] ARM: dts: duovero-parlor: Add HDMI output
+In-Reply-To: <20140520143932.GA27830@atomide.com>
+References: <1400595946-1294-1-git-send-email-florian.vaussard@epfl.ch>
+ <20140520143932.GA27830@atomide.com>
+Message-ID: <537C4A86.1010507@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 04:56:12PM +0200, Arnd Bergmann wrote:
-> It is not possible to reference the omap_dma_filter_fn filter
-> function from a built-in driver if the dmaengine driver itself
-> is a loadable module, which is a valid configuration otherwise.
+
+On 05/20/2014 04:39 PM, Tony Lindgren wrote:
+> * Florian Vaussard <florian.vaussard@epfl.ch> [140520 07:26]:
+>> @@ -77,6 +94,15 @@
+>>  			0x30 (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_a24.gpio_48: amdix enabled */
+>>  		>;
+>>  	};
+>> +
+>> +	dss_hdmi_pins: pinmux_dss_hdmi_pins {
+>> +		pinctrl-single,pins = <
+>> +			0x58 (PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_hpd.hdmi_hpd */
+>> +			0x5a (PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_cec.hdmi_cec */
+>> +			0x5c (PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_ddc_scl.hdmi_ddc_scl */
+>> +			0x5e (PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_ddc_sda.hdmi_ddc_sda */
+>> +		>;
+>> +	};
+>>  };
+>>  
+>>  &i2c2 {
 > 
-> This provides only the dummy alternative if the function
-> is referenced by a built-in driver to allow a successful
-> build. The filter function is only required by ATAGS based
-> platforms, which will continue to be broken after this change
-> for the bogus configuration. When booting from DT, with the
-> dma channels correctly listed there, it will work fine.
+> This seems to apply with fuzz against omap-for-v3.16/dt-v2, but
+> should be updated against omap-for-v3.16/dt-v2 to use OMAP4_IOPAD
+> as omap4-duovero-parlor.dts is now using it. That makes checking
+> the muxing easier against the TRM. See commit 5efa994b0d49 for
+> the script Joachim used.
+> 
 
-Applied, both thanks
+It is based on Tomi's for-next, which is based on 3.15-rc4, so the fuzz
+is not surprising. I will update against omap-for-v3.16/dt-v2.
 
--- 
-~Vinod
+Regards,
+Florian
