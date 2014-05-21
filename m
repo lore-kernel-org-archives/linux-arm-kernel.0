@@ -1,62 +1,62 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 21 May 2014 13:50:06 +0530
-Subject: [PATCH 2/3] ARM: EXYNOS: Enable multi-platform build support
-In-Reply-To: <4352730.lnFJpo5XeV@wuerfel>
-References: <1400655169-21683-1-git-send-email-sachin.kamat@linaro.org>
- <1400655169-21683-3-git-send-email-sachin.kamat@linaro.org>
- <4352730.lnFJpo5XeV@wuerfel>
-Message-ID: <CAK9yfHxzvuPVt1pGdbt3f1i9g9mNzzL+Oa8oSRY+20xcNSMQ0A@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 21 May 2014 09:20:13 +0100
+Subject: [PATCH 1/3] ARM: sti: stih416: Add support for B2020 RevE
+Message-ID: <1400660415-14720-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 May 2014 13:46, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 21 May 2014 12:22:48 Sachin Kamat wrote:
->>  # Configuration options for the EXYNOS4
->>
->> +config ARCH_EXYNOS
->> +       bool "Samsung EXYNOS" if ARCH_MULTI_V7
->> +       select ARCH_HAS_BANDGAP
->> +       select ARCH_HAS_CPUFREQ
->> +       select ARCH_HAS_HOLES_MEMORYMODEL
->> +       select ARCH_REQUIRE_GPIOLIB
->> +       select ARM_AMBA
->> +       select ARM_GIC
->> +       select CLKSRC_OF
->> +       select COMMON_CLK_SAMSUNG
->> +       select CPU_V7
->> +       select GENERIC_CLOCKEVENTS
->> +       select HAVE_ARM_SCU if SMP
->> +       select HAVE_S3C2410_I2C if I2C
->> +       select HAVE_S3C2410_WATCHDOG if WATCHDOG
->> +       select HAVE_S3C_RTC if RTC_CLASS
->> +       select HAVE_SMP
->> +       select PINCTRL
->> +       select PINCTRL_EXYNOS
->> +       select PM_GENERIC_DOMAINS if PM_RUNTIME
->> +       select S5P_DEV_MFC
->> +       select SAMSUNG_DMADEV
->> +       select SPARSE_IRQ
->> +       select SRAM
->> +       select USE_OF
->> +       help
->> +         Support for SAMSUNG EXYNOS SoCs (EXYNOS4/5)
->> +
->>
->
-> A number of these can be removed now: SPARSE_IRQ, USE_OF, GENERIC_CLOCKEVENTS,
-> CLKSRC_OF, CPU_V7 and HAVE_SMP are implied by ARCH_MULTIPLATFORM or ARCH_MULTI_V7,
-> so we shouldn't duplicate them here.
+The B2020 RevE differs from the other B2020 boards in a few subtle ways;
+including the Ethernet reset GPIO which this patch adds support for and
+the LED wiring which will follow in a latter patch.  Without supplying
+these differences Ethernet and the board LEDs simply will not work.
 
-OK.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/Makefile               |  3 ++-
+ arch/arm/boot/dts/stih416-b2020-revE.dts | 21 +++++++++++++++++++++
+ 2 files changed, 23 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/stih416-b2020-revE.dts
 
->
-> I believe SAMSUNG_DMADEV cannot work in multiplatform, but we also don't need
-> it any more.
-
-Yes this is no longer needed now that we use generic DMA engine. Will
-remove this too.
-Thanks for the review.
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 35c146f..0f89cdf 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -338,7 +338,8 @@ dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
+ dtb-$(CONFIG_ARCH_STI)+= stih415-b2000.dtb \
+ 	stih416-b2000.dtb \
+ 	stih415-b2020.dtb \
+-	stih416-b2020.dtb
++	stih416-b2020.dtb \
++	stih416-b2020-revE.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += \
+ 	sun4i-a10-a1000.dtb \
+ 	sun4i-a10-cubieboard.dtb \
+diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
+new file mode 100644
+index 0000000..202919a
+--- /dev/null
++++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
+@@ -0,0 +1,21 @@
++/*
++ * Copyright (C) 2014 STMicroelectronics (R&D) Limited.
++ * Author: Lee Jones <lee.jones@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * publishhed by the Free Software Foundation.
++ */
++/dts-v1/;
++#include "stih416.dtsi"
++#include "stih41x-b2020.dtsi"
++/ {
++        model = "STiH416 B2020 REV-E";
++	compatible = "st,stih416-b2020", "st,stih416";
++
++	soc {
++		ethernet1: ethernet at fef08000 {
++			snps,reset-gpio = <&PIO0 7>;
++		};
++	};
++};
 -- 
-With warm regards,
-Sachin
+1.8.3.2
