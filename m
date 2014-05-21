@@ -1,66 +1,72 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 21 May 2014 14:56:07 +0800
-Subject: [PATCH v1 1/2] ARM: dts: imx6sl: add fec sleep pinctrl for pin
- PM state
-In-Reply-To: <1400568645-10214-2-git-send-email-b38611@freescale.com>
-References: <1400568645-10214-1-git-send-email-b38611@freescale.com>
- <1400568645-10214-2-git-send-email-b38611@freescale.com>
-Message-ID: <20140521065606.GC25299@dragon>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Wed, 21 May 2014 12:29:16 +0530
+Subject: [PATCH v8 1/2] can: Add xilinx CAN device tree bindings documentation.
+Message-ID: <59325214-bd7e-4b98-bc0f-c38a9104203b@BL2FFO11FD019.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 02:50:44PM +0800, Fugang Duan wrote:
-> when system suspend, need to set pins to low power state to
-> save IO power consumption, there are three states of pinctrl:
-> "default", "idle" and "sleep". Currently enet supports default
-> and sleep state.
-> 
-> Signed-off-by: Fugang Duan <B38611@freescale.com>
+Add xilinx CAN bindings documentation.
 
-I understand that this dts patch can be applied independently.  So
-patch applied, thanks.
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+---
+Changes for v8:
+- None.
+Changes for v7:
+- Split the devicetree bindings doc as a seperate patch
+---
+ .../devicetree/bindings/net/can/xilinx_can.txt     |   44 ++++++++++++++++++++
+ 1 files changed, 44 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/can/xilinx_can.txt
 
-Shawn
-
-> ---
->  arch/arm/boot/dts/imx6sl-evk.dts |   16 +++++++++++++++-
->  1 files changed, 15 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
-> index a8d9a93..050786d 100644
-> --- a/arch/arm/boot/dts/imx6sl-evk.dts
-> +++ b/arch/arm/boot/dts/imx6sl-evk.dts
-> @@ -116,8 +116,9 @@
->  };
->  
->  &fec {
-> -	pinctrl-names = "default";
-> +	pinctrl-names = "default", "sleep";
->  	pinctrl-0 = <&pinctrl_fec>;
-> +	pinctrl-1 = <&pinctrl_fec_sleep>;
->  	phy-mode = "rmii";
->  	status = "okay";
->  };
-> @@ -300,6 +301,19 @@
->  			>;
->  		};
->  
-> +		pinctrl_fec_sleep: fecgrp-sleep {
-> +			fsl,pins = <
-> +				MX6SL_PAD_FEC_MDC__GPIO4_IO23      0x3080
-> +				MX6SL_PAD_FEC_CRS_DV__GPIO4_IO25   0x3080
-> +				MX6SL_PAD_FEC_RXD0__GPIO4_IO17     0x3080
-> +				MX6SL_PAD_FEC_RXD1__GPIO4_IO18     0x3080
-> +				MX6SL_PAD_FEC_TX_EN__GPIO4_IO22    0x3080
-> +				MX6SL_PAD_FEC_TXD0__GPIO4_IO24     0x3080
-> +				MX6SL_PAD_FEC_TXD1__GPIO4_IO16     0x3080
-> +				MX6SL_PAD_FEC_REF_CLK__GPIO4_IO26  0x3080
-> +			>;
-> +		};
-> +
->  		pinctrl_i2c1: i2c1grp {
->  			fsl,pins = <
->  				MX6SL_PAD_I2C1_SCL__I2C1_SCL	0x4001b8b1
-> -- 
-> 1.7.8
-> 
+diff --git a/Documentation/devicetree/bindings/net/can/xilinx_can.txt b/Documentation/devicetree/bindings/net/can/xilinx_can.txt
+new file mode 100644
+index 0000000..fe38847
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/can/xilinx_can.txt
+@@ -0,0 +1,44 @@
++Xilinx Axi CAN/Zynq CANPS controller Device Tree Bindings
++---------------------------------------------------------
++
++Required properties:
++- compatible		: Should be "xlnx,zynq-can-1.0" for Zynq CAN
++			  controllers and "xlnx,axi-can-1.00.a" for Axi CAN
++			  controllers.
++- reg			: Physical base address and size of the Axi CAN/Zynq
++			  CANPS registers map.
++- interrupts		: Property with a value describing the interrupt
++			  number.
++- interrupt-parent	: Must be core interrupt controller
++- clock-names		: List of input clock names - "can_clk", "pclk"
++			  (For CANPS), "can_clk" , "s_axi_aclk"(For AXI CAN)
++			  (See clock bindings for details).
++- clocks		: Clock phandles (see clock bindings for details).
++- tx-fifo-depth		: Can Tx fifo depth.
++- rx-fifo-depth		: Can Rx fifo depth.
++
++
++Example:
++
++For Zynq CANPS Dts file:
++	zynq_can_0: can at e0008000 {
++			compatible = "xlnx,zynq-can-1.0";
++			clocks = <&clkc 19>, <&clkc 36>;
++			clock-names = "can_clk", "pclk";
++			reg = <0xe0008000 0x1000>;
++			interrupts = <0 28 4>;
++			interrupt-parent = <&intc>;
++			tx-fifo-depth = <0x40>;
++			rx-fifo-depth = <0x40>;
++		};
++For Axi CAN Dts file:
++	axi_can_0: axi-can at 40000000 {
++			compatible = "xlnx,axi-can-1.00.a";
++			clocks = <&clkc 0>, <&clkc 1>;
++			clock-names = "can_clk","s_axi_aclk" ;
++			reg = <0x40000000 0x10000>;
++			interrupt-parent = <&intc>;
++			interrupts = <0 59 1>;
++			tx-fifo-depth = <0x40>;
++			rx-fifo-depth = <0x40>;
++		};
+-- 
+1.7.4
