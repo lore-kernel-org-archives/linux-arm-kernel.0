@@ -1,35 +1,50 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 21 May 2014 13:49:22 +0200
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Wed, 21 May 2014 11:53:13 +0000
 Subject: [PATCH v8 2/2] can: xilinx CAN controller support.
-In-Reply-To: <72e9a444-0de4-42ce-a9d3-ee247948f0e6@BN1AFFO11FD030.protection.gbl>
+In-Reply-To: <537C92C2.4090204@pengutronix.de>
 References: <30fc07d6-4404-4745-8c03-1c5ae775e4f1@BY2FFO11FD047.protection.gbl>
  <537C8E00.404@pengutronix.de>
  <72e9a444-0de4-42ce-a9d3-ee247948f0e6@BN1AFFO11FD030.protection.gbl>
-Message-ID: <537C92C2.4090204@pengutronix.de>
+ <537C92C2.4090204@pengutronix.de>
+Message-ID: <e806ce16-917f-473d-9876-d7e85aa95bc7@BN1BFFO11FD029.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2014 01:32 PM, Appana Durga Kedareswara Rao wrote:
-> Hi Marc,
-> 
->         Yes for DT-bindings Rob already had given ack.
-> Sorry I forgot to add the Acked-by line in that patch.
+Hi Marc,
 
-You mean Rob Herring?
+> -----Original Message-----
+> From: Marc Kleine-Budde [mailto:mkl at pengutronix.de]
+> Sent: Wednesday, May 21, 2014 5:19 PM
+> To: Appana Durga Kedareswara Rao; wg at grandegger.com; Michal Simek;
+> grant.likely at linaro.org; robh+dt at kernel.org
+> Cc: linux-can at vger.kernel.org; netdev at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH v8 2/2] can: xilinx CAN controller support.
+>
+> On 05/21/2014 01:32 PM, Appana Durga Kedareswara Rao wrote:
+> > Hi Marc,
+> >
+> >         Yes for DT-bindings Rob already had given ack.
+> > Sorry I forgot to add the Acked-by line in that patch.
+>
+> You mean Rob Herring?
+>
 
-    Acked-by: Rob Herring <robh@kernel.org>
+Yes Rob Herring.
+In the version 5 patch he had given the ack.
 
-Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Regards,
+Kedar.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/da0691ec/attachment.sig>
+>     Acked-by: Rob Herring <robh@kernel.org>
+>
+> Marc
+> --
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
