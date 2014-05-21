@@ -1,47 +1,36 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 21 May 2014 17:50:35 +0200
-Subject: [PATCH v3] clk: shmobile: Add R8A7740-specific clock support
-In-Reply-To: <1768296.AYVfH6xHtk@avalon>
-References: <1400682086-5705-1-git-send-email-ulrich.hecht+renesas@gmail.com>
- <1768296.AYVfH6xHtk@avalon>
-Message-ID: <CAMuHMdUNpgn1ciHsvqWtEyn0RugxQTaCV+ki=S=5hUbmCjA6tg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 21 May 2014 17:55:51 +0200
+Subject: [PATCH v8 0/2] Add support for the Allwinner A31 DMA Controller
+In-Reply-To: <4828893.NoTbcUXQEt@wuerfel>
+References: <1400685357-508-1-git-send-email-maxime.ripard@free-electrons.com>
+ <4828893.NoTbcUXQEt@wuerfel>
+Message-ID: <20140521155551.GV27329@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Wed, May 21, 2014 at 05:23:41PM +0200, Arnd Bergmann wrote:
+> On Wednesday 21 May 2014 17:15:54 Maxime Ripard wrote:
+> > Changes from v7:
+> >   - select DMA_OF, since we're only relying on DT
+> > 
+> 
+> I missed the discussion about this issue, but it seems wrong to me.
+> DMA_OF is currently enabled if we have both DMAENGINE and OF turned on.
+> 
+> If OF is disabled but DMA_OF gets selected by DMA_SUN6I, what happens?
 
-On Wed, May 21, 2014 at 5:41 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
->> +cpg_clocks: cpg_clocks at e6150000 {
->> +        compatible = "renesas,r8a7740-cpg-clocks";
->> +        reg = <0xe6150000 0x10000>;
->
-> This range covers the MSTP registers. Unlike other Renesas SoCs with CCF
-> support in mainline, the MSTP registers are in the middle of the CPG address
-> space here, which is quite problematic.
+Is that even possible with a multiplatform-based platform?
 
-This is also the case for R-Car Gen2?!?
+Maxime
 
-                /* Special CPG clocks */
-                cpg_clocks: cpg_clocks at e6150000 {
-                        compatible = "renesas,r8a7791-cpg-clocks",
-                                     "renesas,rcar-gen2-cpg-clocks";
-                        reg = <0 0xe6150000 0 0x1000>;
-
-                mstp0_clks: mstp0_clks at e6150130 {
-                        compatible = "renesas,r8a7791-mstp-clocks",
-"renesas,cpg-mstp-clocks";
-                        reg = <0 0xe6150130 0 4>, <0 0xe6150030 0 4>;
-
-Or perhaps I am misunderstanding what you mean?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/b15f13b3/attachment.sig>
