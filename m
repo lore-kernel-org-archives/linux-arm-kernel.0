@@ -1,49 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 May 2014 18:01:06 +0200
-Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <CANEJEGvhEsC9wKqX_pYmOg7LwsQkoN9=jjXJuW0UeEa9XywSPw@mail.gmail.com>
-References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
- <11242680.PQytQQqlPJ@wuerfel>
- <CANEJEGvhEsC9wKqX_pYmOg7LwsQkoN9=jjXJuW0UeEa9XywSPw@mail.gmail.com>
-Message-ID: <4376848.aihqtRyYDl@wuerfel>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 21 May 2014 09:00:20 -0700
+Subject: [PATCH] i2c: cadence: fix Kconfig dependency
+In-Reply-To: <20140521082917.GG2708@katana>
+References: <1396811227-8851-1-git-send-email-wsa@the-dreams.de>
+ <1396852656.682914397@f273.i.mail.ru> <20140407065657.GO29751@pengutronix.de>
+ <1396854155.872298456@f287.i.mail.ru>
+ <4c4d2ba5-f5f6-4589-8a48-6a88d1c16098@VA3EHSMHS046.ehs.local>
+ <20140521082917.GG2708@katana>
+Message-ID: <78a702ca-5001-444a-b2df-a64de17ffcb6@BY2FFO11FD039.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 May 2014 08:44:42 Grant Grundler wrote:
-> On Wed, May 21, 2014 at 2:32 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 21 May 2014 11:02:45 Thierry Reding wrote:
-> >> On Wed, May 21, 2014 at 10:54:42AM +0200, Arnd Bergmann wrote:
-> >>
-> >> > Right. As long as we always unmap the buffers from the IOMMU after they
-> >> > have stopped being in use, it's very unlikely that even a broken device
-> >> > driver causes a DMA into some bus address that happens to be mapped for
-> >> > another device.
-> >>
-> >> I think that if buffers remain mapped in the IOMMU when they have been
-> >> deallocated that should be considered a bug.
+Hi Wolfram,
+
+On Wed, 2014-05-21 at 10:29AM +0200, Wolfram Sang wrote:
+> > I'd propose the below fix. The relaxed IO helpers are currently
+> > available on ARM only and the clock notifier used, depends on
+> > COMMON_CLK. I2C-related dependencies should be okay due to the location in
+> > Kconfig of this option.
 > 
-> There is currently no general requirement to tear down mappings immediately.
-> An option to enforce immediate tear down might be useful since I agree
-> Virtual Guests sharing host memory through shared physical devices
-> will want that. ie there should be no opportunity for a shared device
-> to be able to access another guests memory through "stale" (but live)
-> DMA mappings. I don't think that's the case but I'd ask someone like
-> Alex Williamson for a more certain answer.
-
-I believe powerpc has a boot-time option to enforce the immediate
-IOTLB flush, which is very useful for device driver debugging when
-something goes wrong with stale DMAs.
-
-> > Obviously you have to maintain the IO page tables correctly.
+> If somebody thinks an update is still needed, please resend against
+> latest i2c-next. Thanks.
 > 
-> To be clear, "Correctly" in this case just means until the IOTLB is
-> flushed, the given IOMMU Pdir entries are marked "in use" even though
-> the driver has handed "ownership" back to the IOMMU driver.
 
-I don't know what a Pdir is, but I guess strictly speaking we have
-to ensure that all IO page table entries that have been unmapped by
-a driver are marked as invalid at least by the time the IOTLB is flushed,
-plus we have to flush each entry before it gets reused for a different
-page.
+I think we're fine for now. Once the *_relaxed IO helpers are available
+on all archs it makes sense to revisit the COMPILE_TEST option. Until
+then we are restricted to ARM anyway and the additional Zynq restriction
+doesn't make a big difference, IMHO.
 
-	Arnd
+@Michal: Do you have an update on the IO helpers?
+
+	Thanks,
+	S?ren
