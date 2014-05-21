@@ -1,89 +1,66 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 21 May 2014 12:22:49 +0530
-Subject: [PATCH 3/3] ARM: multi_v7_defconfig: Enable Exynos platform
-In-Reply-To: <1400655169-21683-1-git-send-email-sachin.kamat@linaro.org>
-References: <1400655169-21683-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1400655169-21683-4-git-send-email-sachin.kamat@linaro.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 21 May 2014 14:56:07 +0800
+Subject: [PATCH v1 1/2] ARM: dts: imx6sl: add fec sleep pinctrl for pin
+ PM state
+In-Reply-To: <1400568645-10214-2-git-send-email-b38611@freescale.com>
+References: <1400568645-10214-1-git-send-email-b38611@freescale.com>
+ <1400568645-10214-2-git-send-email-b38611@freescale.com>
+Message-ID: <20140521065606.GC25299@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable Exynos platform and its related IPs.
+On Tue, May 20, 2014 at 02:50:44PM +0800, Fugang Duan wrote:
+> when system suspend, need to set pins to low power state to
+> save IO power consumption, there are three states of pinctrl:
+> "default", "idle" and "sleep". Currently enet supports default
+> and sleep state.
+> 
+> Signed-off-by: Fugang Duan <B38611@freescale.com>
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
----
- arch/arm/configs/multi_v7_defconfig |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+I understand that this dts patch can be applied independently.  So
+patch applied, thanks.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 2fbafc529624..b76e978a62ae 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -48,6 +48,7 @@ CONFIG_ARCH_SPEAR13XX=y
- CONFIG_MACH_SPEAR1310=y
- CONFIG_MACH_SPEAR1340=y
- CONFIG_ARCH_STI=y
-+CONFIG_ARCH_EXYNOS=y
- CONFIG_ARCH_SUNXI=y
- CONFIG_ARCH_SIRF=y
- CONFIG_ARCH_TEGRA=y
-@@ -72,6 +73,7 @@ CONFIG_PCI_MSI=y
- CONFIG_PCI_MVEBU=y
- CONFIG_PCI_TEGRA=y
- CONFIG_SMP=y
-+CONFIG_NR_CPUS=8
- CONFIG_HIGHPTE=y
- CONFIG_CMA=y
- CONFIG_ARM_APPENDED_DTB=y
-@@ -155,6 +157,8 @@ CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_DW=y
- CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-+CONFIG_SERIAL_SAMSUNG=y
-+CONFIG_SERIAL_SAMSUNG_CONSOLE=y
- CONFIG_SERIAL_SIRFSOC=y
- CONFIG_SERIAL_SIRFSOC_CONSOLE=y
- CONFIG_SERIAL_TEGRA=y
-@@ -178,6 +182,7 @@ CONFIG_I2C_MUX=y
- CONFIG_I2C_MUX_PCA954x=y
- CONFIG_I2C_MUX_PINCTRL=y
- CONFIG_I2C_DESIGNWARE_PLATFORM=y
-+CONFIG_I2C_EXYNOS5=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_SIRF=y
- CONFIG_I2C_TEGRA=y
-@@ -213,6 +218,7 @@ CONFIG_MFD_AS3722=y
- CONFIG_MFD_CROS_EC=y
- CONFIG_MFD_CROS_EC_SPI=y
- CONFIG_MFD_MAX8907=y
-+CONFIG_MFD_SEC_CORE=y
- CONFIG_MFD_PALMAS=y
- CONFIG_MFD_TPS65090=y
- CONFIG_MFD_TPS6586X=y
-@@ -223,6 +229,8 @@ CONFIG_REGULATOR_AS3722=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_MAX8907=y
- CONFIG_REGULATOR_PALMAS=y
-+CONFIG_REGULATOR_S2MPS11=y
-+CONFIG_REGULATOR_S5M8767=y
- CONFIG_REGULATOR_TPS51632=y
- CONFIG_REGULATOR_TPS62360=y
- CONFIG_REGULATOR_TPS65090=y
-@@ -279,12 +287,16 @@ CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_ESDHC_IMX=y
- CONFIG_MMC_SDHCI_PXAV3=y
- CONFIG_MMC_SDHCI_TEGRA=y
-+CONFIG_MMC_SDHCI_S3C=y
- CONFIG_MMC_SDHCI_DOVE=y
- CONFIG_MMC_SDHCI_SPEAR=y
-+CONFIG_MMC_SDHCI_S3C_DMA=y
- CONFIG_MMC_SDHCI_BCM_KONA=y
- CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
- CONFIG_MMC_MVSDIO=y
-+CONFIG_MMC_DW=y
-+CONFIG_MMC_DW_EXYNOS=y
- CONFIG_EDAC=y
- CONFIG_EDAC_MM_EDAC=y
- CONFIG_EDAC_HIGHBANK_MC=y
--- 
-1.7.9.5
+Shawn
+
+> ---
+>  arch/arm/boot/dts/imx6sl-evk.dts |   16 +++++++++++++++-
+>  1 files changed, 15 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
+> index a8d9a93..050786d 100644
+> --- a/arch/arm/boot/dts/imx6sl-evk.dts
+> +++ b/arch/arm/boot/dts/imx6sl-evk.dts
+> @@ -116,8 +116,9 @@
+>  };
+>  
+>  &fec {
+> -	pinctrl-names = "default";
+> +	pinctrl-names = "default", "sleep";
+>  	pinctrl-0 = <&pinctrl_fec>;
+> +	pinctrl-1 = <&pinctrl_fec_sleep>;
+>  	phy-mode = "rmii";
+>  	status = "okay";
+>  };
+> @@ -300,6 +301,19 @@
+>  			>;
+>  		};
+>  
+> +		pinctrl_fec_sleep: fecgrp-sleep {
+> +			fsl,pins = <
+> +				MX6SL_PAD_FEC_MDC__GPIO4_IO23      0x3080
+> +				MX6SL_PAD_FEC_CRS_DV__GPIO4_IO25   0x3080
+> +				MX6SL_PAD_FEC_RXD0__GPIO4_IO17     0x3080
+> +				MX6SL_PAD_FEC_RXD1__GPIO4_IO18     0x3080
+> +				MX6SL_PAD_FEC_TX_EN__GPIO4_IO22    0x3080
+> +				MX6SL_PAD_FEC_TXD0__GPIO4_IO24     0x3080
+> +				MX6SL_PAD_FEC_TXD1__GPIO4_IO16     0x3080
+> +				MX6SL_PAD_FEC_REF_CLK__GPIO4_IO26  0x3080
+> +			>;
+> +		};
+> +
+>  		pinctrl_i2c1: i2c1grp {
+>  			fsl,pins = <
+>  				MX6SL_PAD_I2C1_SCL__I2C1_SCL	0x4001b8b1
+> -- 
+> 1.7.8
+> 
