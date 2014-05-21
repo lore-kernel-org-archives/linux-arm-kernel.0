@@ -1,97 +1,53 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 May 2014 08:30:38 -0700
-Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
-In-Reply-To: <035001cf74f8$0aabdae0$200390a0$@samsung.com>
-References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
- <53752E25.9060604@gmail.com>
- <CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>
- <53753443.8010303@gmail.com>
- <CAD=FV=V8UZoeOqEwfx_E015pLM+amTt51LrUa+dk7mTdn=vKgA@mail.gmail.com>
- <53753C17.1090002@gmail.com>
- <CAD=FV=WGa7j_As_NpySxU7OEd_SzuGWK6oxU6UeiJ-4HsoWvvg@mail.gmail.com>
- <CAJFHJrrgWGc4XGQB0ysLufAg3Wouz-aYXu97Sy2Kp=HzK+akVQ@mail.gmail.com>
- <CAASgrz2Nr69tpfC8ka9gbs2OvjLEGsvgAj4vBCFxhsamuFum7w@mail.gmail.com>
- <53754CE2.3000905@gmail.com>
- <CAD=FV=UMoL7i9rg_QtBAqPwisSQyRqRmk8wQhneMXAiLBjTT1A@mail.gmail.com>
- <CAPz6YkU8GDrLj8UkqEQXxxqxWF5_p427wKSDgAp+QPR7WE7Ujg@mail.gmail.com>
- <CAJFHJrrb2XFDZqJh4OuLdFP=J0aR4pGe-WLWKZ7ZpMfUSPGd4Q@mail.gmail.com>
- <5376A726.4000106@samsung.com>
- <CAD=FV=VXSP1TM9qY8PxFuQ+Tq2Ju57VdpzpwsHXqHshQm_havQ@mail.gmail.com>
- <035001cf74f8$0aabdae0$200390a0$@samsung.com>
-Message-ID: <CAOesGMiZ1rk5R_hyqZe6ud+oKqD70_tS1vbRuJRLu+OJ8F7Cjw@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 21 May 2014 18:31:51 +0300
+Subject: [PATCH 0/6] AM43xx & OMAP5 DSS DT changes
+In-Reply-To: <20140521152613.GJ17417@atomide.com>
+References: <1400676625-30078-1-git-send-email-tomi.valkeinen@ti.com>
+ <20140521150231.GH17417@atomide.com> <537CC376.5050501@ti.com>
+ <20140521152613.GJ17417@atomide.com>
+Message-ID: <537CC6E7.6010103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 21, 2014 at 6:24 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Doug Anderson wrote:
+On 21/05/14 18:26, Tony Lindgren wrote:
+> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140521 08:18]:
+>> On 21/05/14 18:02, Tony Lindgren wrote:
+>>> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140521 05:51]:
+>>>> Hi,
+>>>>
+>>>> Here are the AM43xx and OMAP5 display DT changes again. I've sent the clock
+>>>> related changes separately, and I removed OMAP5's RFBI node, which depends on
+>>>> more clock changes. The RFBI driver doesn't work at the moment anyway, so
+>>>> removing the RFBI node should not be an issue.
+>>>>
+>>>> Tony, if these look fine (the rfbi change is the only one compared to the
+>>>> previous versions), can you queue them for 3.16?
+>>>
+>>> Probably best that you do a late branch again after arm-soc dts changes
+>>> have been merged. Sounds like you have at least that macro dependency
+>>> to omap-for-v3.16/dt-v2 so you should probably base your branch on
 >>
->> Kukjin,
->>
-> Hi Doug,
->
->> On Fri, May 16, 2014 at 5:02 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> > On 05/17/14 07:56, Chirantan Ekbote wrote:
->> >>>>>
->> >>>>> Anyway, I'm by no means opposed to switching to arch timers. They
->> >>>>> provide a well designed, generic interface and drivers shared by
->> >>>>> multiple platforms, which means more code sharing and possibly more
->> >>>>> eyes
->> >>>>> looking at the code, which is always good. However if they don't
->> >>>>> support
->> >>>>> low power states correctly, we can't just remove MCT.
->> >>>>
->> >>>>
->> >>>> I think low power states aren't in mainline (right?).
->> >>>>
->> >>>> One solution that might work could be to leave the device tree entry
->> >>>> alone but change the MCT init code to simply act as a no-op if it sees
->> >>>> an arch timer is in the device tree and enabled.  Then when/if someone
->> >>>> got the low power states enabled we could just change source code
->> >>>> rather than dts files.
->> >>>>
->> >>
->> >> Doug and I were talking about this and we think we may have a way to
->> >> have the mct and arch timers co-exist.  The main issue is that the mct
->> >> (and therefore arch timer) gets cleared once during boot and every
->> >> time we do a suspend / resume.  This happens in
->> >> exynos4_mct_frc_start() but it's not immediately clear to us why the
->> >> counter needs to be reset at all.  If we remove the lines that clear
->> >> the counter then there is no longer an issue with having both the mct
->> >> and the arch timers on at the same time.
->> >>
->> >> Alternately, if there is some code that depends on the mct being reset
->> >> we could store an offset instead of clearing the counter and then
->> >> subtract that offset every time something reads it.  Doug has a patch
->> >> that does this at
->> >> https://chromium-review.googlesource.com/#/c/200298/.  Effectively the
->> >> visible behavior will not change.  Would either of these options work?
->> >>
->> > Hi all,
->> >
->> > Even though I've heard something about the behavior of mct and arch
->> > timer...but I couldn't finish the talk to h/w guys yet. I need to talk
->> again
->> > in next week then I could provide some useful information. Sorry for late
->> > and can you please wait a minute before deciding whatever.
->>
->> I think we could wait a few days.  Note however, that Chirantan's
->> latest proposal keeps all existing functionality (can use both MCT and
->> arch timers).  It merely removes the unnecessary bit of the MCT init
->> code setting the timer.  No functionality is affected by that.
->>
-> Let me explain the behavior of MCT and arch timer.
->
-> Basically the two blocks are connected and the arch timer uses the count value from MCT for reference on exynos5250 so following in this mail thread is expected and it's true.
->
-> * If you read the MCT and the arch timer, they give the same value.
->
-> And as you know, usually the access to arch timer is faster than MCT because of APB bus access...but using MCT has some benefits sometimes it depends on use case of power management though. BTW, since exynos5260, exynos5420 and exynos5800 doesn't support arch timer, we have been using MCT on exynos5 SoCs.
+>> There are no dependencies that I know of. Which macro dependency is that?
+> 
+> Oh for the "[PATCH v2] ARM: dts: duovero-parlor: Add HDMI output" that
+> now uses the OMAP4_IOPAD macro.
 
-This I don't understand. What, _exactly_ are the benefits of MCT.
-You've been vague on this several times now and it is not helping us
-understand why Samsung (and you personally) prefer MCT. Details,
-please.
+Ok.
+
+But generally, isn't it better if the .dts changes go through your tree?
+None of the display related .dts changes have any dependencies to
+omapdss as such.
+
+I can collect the patches, as I've done, to let them mature a bit in my
+tree, but I'd rather get them merged via your dt branch.
+
+ Tomi
 
 
-
--Olof
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/59aee510/attachment.sig>
