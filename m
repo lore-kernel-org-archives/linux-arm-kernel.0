@@ -1,98 +1,43 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 21 May 2014 14:11:48 +0200
-Subject: [PATCH] cpufreq: exynos: Fix driver compilation with
- ARCH_MULTIPLATFORM
-In-Reply-To: <CAKohpo=4nzSiqcMzgOka_jDco7FZ+3PHPa3ZWv++Pf7EAera2Q@mail.gmail.com>
-References: <537C6350.2010707@gmail.com>
- <1400670752-673-1-git-send-email-t.figa@samsung.com>
- <537C8B5C.3050401@samsung.com>
- <CAKohpo=4nzSiqcMzgOka_jDco7FZ+3PHPa3ZWv++Pf7EAera2Q@mail.gmail.com>
-Message-ID: <537C9804.8030508@samsung.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 21 May 2014 15:16:11 +0300
+Subject: [PATCH 2/2] ARM: dts: am43xx-clocks.dtsi: add ti,
+ set-rate-parent to display clock path
+In-Reply-To: <1400674571-633-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1400674571-633-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1400674571-633-2-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+We need set-rate-parent flags for the display's clock path so that the
+DSS driver can change the clock rate of the PLL.
 
-Thanks for the review.
+This patchs adds the ti,set-rate-parent flag to disp_clk and
+dpll_disp_m2_ck clock nodes.
 
-On 21.05.2014 13:22, Viresh Kumar wrote:
-> On 21 May 2014 16:47, Tomasz Figa <t.figa@samsung.com> wrote:
-> 
-> Mostly nitpicks ..
-> 
->>> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
->>>  config ARM_EXYNOS4X12_CPUFREQ
->>>       bool "SAMSUNG EXYNOS4x12"
->>> -     depends on (SOC_EXYNOS4212 || SOC_EXYNOS4412) && !ARCH_MULTIPLATFORM
->>> +     depends on (SOC_EXYNOS4212 || SOC_EXYNOS4412)
-> 
-> Get rid of () as well..
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ arch/arm/boot/dts/am43xx-clocks.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Right.
-
-> 
->>> diff --git a/drivers/cpufreq/exynos-cpufreq.h b/drivers/cpufreq/exynos-cpufreq.h
->>> index a28ee9d..8dfebac 100644
->>> --- a/drivers/cpufreq/exynos-cpufreq.h
->>> +++ b/drivers/cpufreq/exynos-cpufreq.h
->>> @@ -50,6 +50,7 @@ struct exynos_dvfs_info {
->>>       struct cpufreq_frequency_table  *freq_table;
->>>       void (*set_freq)(unsigned int, unsigned int);
->>>       bool (*need_apll_change)(unsigned int, unsigned int);
->>> +     void __iomem    *cmu_regs;
-> 
-> s/tab/space ? before *cmu_regs ..
-
-Other fields in this struct have their names aligned with a tab as well.
-
-> 
->>> diff --git a/drivers/cpufreq/exynos4210-cpufreq.c b/drivers/cpufreq/exynos4210-cpufreq.c
->>> @@ -143,6 +160,8 @@ int exynos4210_cpufreq_init(struct exynos_dvfs_info *info)
->>>       info->freq_table = exynos4210_freq_table;
->>>       info->set_freq = exynos4210_set_frequency;
->>>
->>> +     cpufreq = info;
-> 
-> I couldn't find this variable .. i.e. 'cpufreq'
-
-It is a static global variable that is being added at the top of the file.
-
-> 
->>> +
->>>       return 0;
->>>
->>>  err_mout_apll:
->>> diff --git a/drivers/cpufreq/exynos4x12-cpufreq.c b/drivers/cpufreq/exynos4x12-cpufreq.c
-> 
->>>  int exynos4x12_cpufreq_init(struct exynos_dvfs_info *info)
->>>  {
->>> +     struct device_node *np;
->>>       unsigned long rate;
->>>
->>> +     np = of_find_compatible_node(NULL, NULL, "samsung,exynos4412-clock");
->>> +     if (!np) {
->>> +             pr_err("%s: failed to find clock controller DT node\n",
->>> +                     __func__);
->>> +             return -ENODEV;
->>> +     }
->>> +
->>> +     info->cmu_regs = of_iomap(np, 0);
->>> +     if (!info->cmu_regs) {
->>> +             pr_err("%s: failed to map CMU registers\n", __func__);
->>> +             return -EFAULT;
->>> +     }
->>> +
-> 
-> Don't replicate. Create a routine for all this..
-> 
-
-While I agree that all three drivers basically use the same look-up and
-mapping code replicated, this patch is a temporary hack, until all those
-three drivers are completely removed, most likely in 3.17, so I would
-prefer doing this in the most ugly way, so that people don't follow this.
-
-Still, I think a comment added before of_find_compatible_node() in each
-driver saying that this is a hack and why it is there would be nice, though.
-
-Best regards,
-Tomasz
+diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi b/arch/arm/boot/dts/am43xx-clocks.dtsi
+index 142009cc9332..a6f7ee74990f 100644
+--- a/arch/arm/boot/dts/am43xx-clocks.dtsi
++++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
+@@ -229,6 +229,7 @@
+ 		reg = <0x2e30>;
+ 		ti,index-starts-at-one;
+ 		ti,invert-autoidle-bit;
++		ti,set-rate-parent;
+ 	};
+ 
+ 	dpll_per_ck: dpll_per_ck {
+@@ -511,6 +512,7 @@
+ 		compatible = "ti,mux-clock";
+ 		clocks = <&dpll_disp_m2_ck>, <&dpll_core_m5_ck>, <&dpll_per_m2_ck>;
+ 		reg = <0x4244>;
++		ti,set-rate-parent;
+ 	};
+ 
+ 	dpll_extdev_ck: dpll_extdev_ck {
+-- 
+1.9.1
