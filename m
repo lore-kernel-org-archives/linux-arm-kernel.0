@@ -1,114 +1,153 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 21 May 2014 15:50:25 +0300
-Subject: [PATCH 6/6] ARM: dts: omap5-uevm.dts: add display nodes
+Date: Wed, 21 May 2014 15:50:22 +0300
+Subject: [PATCH 3/6] ARM: dts: am43x-epos-evm: add LCD data
 In-Reply-To: <1400676625-30078-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1400676625-30078-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1400676625-30078-7-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1400676625-30078-4-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap5-uevm has a single HDMI output. Add the necessary display
-information, including pinmuxing.
+Add DT data for am43x-epos-evm's LCD panel.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- arch/arm/boot/dts/omap5-uevm.dts | 82 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 82 insertions(+)
+ arch/arm/boot/dts/am43x-epos-evm.dts | 101 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 101 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-index 76877516f6df..9ffbe71b88c3 100644
---- a/arch/arm/boot/dts/omap5-uevm.dts
-+++ b/arch/arm/boot/dts/omap5-uevm.dts
-@@ -183,6 +183,19 @@
- 		>;
+diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
+index 167dbc8494de..9aa5af71f96f 100644
+--- a/arch/arm/boot/dts/am43x-epos-evm.dts
++++ b/arch/arm/boot/dts/am43x-epos-evm.dts
+@@ -19,6 +19,10 @@
+ 	model = "TI AM43x EPOS EVM";
+ 	compatible = "ti,am43x-epos-evm","ti,am4372","ti,am43";
+ 
++	aliases {
++		display0 = &lcd0;
++	};
++
+ 	vmmcsd_fixed: fixedregulator-sd {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vmmcsd_fixed";
+@@ -27,6 +31,44 @@
+ 		enable-active-high;
  	};
  
-+	dss_hdmi_pins: pinmux_dss_hdmi_pins {
-+		pinctrl-single,pins = <
-+			0x0fc (PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_cec.hdmi_cec */
-+			0x100 (PIN_INPUT | MUX_MODE0)	/* hdmi_ddc_scl.hdmi_ddc_scl */
-+			0x102 (PIN_INPUT | MUX_MODE0)	/* hdmi_ddc_sda.hdmi_ddc_sda */
-+		>;
-+	};
-+
-+	tpd12s015_pins: pinmux_tpd12s015_pins {
-+		pinctrl-single,pins = <
-+			0x0fe (PIN_INPUT_PULLDOWN | MUX_MODE6)	/* hdmi_hpd.gpio7_193 */
-+		>;
-+	};
- };
- 
- &omap5_pmx_wkup {
-@@ -498,3 +511,72 @@
- &cpu0 {
- 	cpu0-supply = <&smps123_reg>;
- };
-+
-+/ {
-+	aliases {
-+		display0 = &hdmi0;
-+	};
-+
-+	tpd12s015: encoder at 0 {
-+		compatible = "ti,tpd12s015";
++	lcd0: display {
++		compatible = "osddisplays,osd057T0559-34ts", "panel-dpi";
++		label = "lcd";
 +
 +		pinctrl-names = "default";
-+		pinctrl-0 = <&tpd12s015_pins>;
++		pinctrl-0 = <&lcd_pins>;
 +
-+		gpios = <&gpio9 0 GPIO_ACTIVE_HIGH>,	/* TCA6424A P01, CT CP HPD */
-+			<&gpio9 1 GPIO_ACTIVE_HIGH>,	/* TCA6424A P00, LS OE */
-+			<&gpio7 1 GPIO_ACTIVE_HIGH>;	/* GPIO 193, HPD */
++		/*
++		 * SelLCDorHDMI, LOW to select HDMI. This is not really the
++		 * panel's enable GPIO, but we don't have HDMI driver support nor
++		 * support to switch between two displays, so using this gpio as
++		 * panel's enable should be safe.
++		 */
++		enable-gpios = <&gpio2 1 GPIO_ACTIVE_HIGH>;
 +
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+
-+				tpd12s015_in: endpoint at 0 {
-+					remote-endpoint = <&hdmi_out>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+
-+				tpd12s015_out: endpoint at 0 {
-+					remote-endpoint = <&hdmi_connector_in>;
-+				};
-+			};
++		panel-timing {
++			clock-frequency = <33000000>;
++			hactive = <800>;
++			vactive = <480>;
++			hfront-porch = <210>;
++			hback-porch = <16>;
++			hsync-len = <30>;
++			vback-porch = <10>;
++			vfront-porch = <22>;
++			vsync-len = <13>;
++			hsync-active = <0>;
++			vsync-active = <0>;
++			de-active = <1>;
++			pixelclk-active = <1>;
 +		};
-+	};
-+
-+	hdmi0: connector at 0 {
-+		compatible = "hdmi-connector";
-+		label = "hdmi";
-+
-+		type = "b";
 +
 +		port {
-+			hdmi_connector_in: endpoint {
-+				remote-endpoint = <&tpd12s015_out>;
++			lcd_in: endpoint {
++				remote-endpoint = <&dpi_out>;
 +			};
 +		};
 +	};
++
+ 	am43xx_pinmux: pinmux at 44e10800 {
+ 		cpsw_default: cpsw_default {
+ 			pinctrl-single,pins = <
+@@ -138,6 +180,46 @@
+ 				0x160 (PIN_INPUT | MUX_MODE7) /* spi0_cs1.gpio0_6 */
+ 			>;
+ 		};
++
++		dss_pins: dss_pins {
++			pinctrl-single,pins = <
++				0x020 (PIN_OUTPUT_PULLUP | MUX_MODE1) /*gpmc ad 8 -> DSS DATA 23 */
++				0x024 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++				0x028 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++				0x02C (PIN_OUTPUT_PULLUP | MUX_MODE1)
++				0x030 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++				0x034 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++				0x038 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++				0x03C (PIN_OUTPUT_PULLUP | MUX_MODE1) /*gpmc ad 15 -> DSS DATA 16 */
++				0x0A0 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS DATA 0 */
++				0x0A4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0A8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0AC (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0B0 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0B4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0B8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0BC (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0C0 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0C4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0C8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0CC (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0D0 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0D4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0D8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0DC (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS DATA 15 */
++				0x0E0 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS VSYNC */
++				0x0E4 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS HSYNC */
++				0x0E8 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS PCLK */
++				0x0EC (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS AC BIAS EN */
++			>;
++		};
++
++		lcd_pins: lcd_pins {
++			pinctrl-single,pins = <
++				/* GPMC CLK -> GPIO 2_1 to select LCD / HDMI */
++				0x08C (PIN_OUTPUT_PULLUP | MUX_MODE7)
++			>;
++		};
+ 	};
+ 
+ 	matrix_keypad: matrix_keypad at 0 {
+@@ -260,6 +342,10 @@
+ 	status = "okay";
+ };
+ 
++&gpio5 {
++	status = "okay";
 +};
++
+ &elm {
+ 	status = "okay";
+ };
+@@ -367,3 +453,18 @@
+ 	pinctrl-0 = <&spi1_pins>;
+ 	status = "okay";
+ };
++
 +
 +&dss {
 +	status = "ok";
-+};
-+
-+&hdmi {
-+	status = "ok";
-+	vdda-supply = <&ldo4_reg>;
 +
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&dss_hdmi_pins>;
++	pinctrl-0 = <&dss_pins>;
 +
 +	port {
-+		hdmi_out: endpoint {
-+			remote-endpoint = <&tpd12s015_in>;
++		dpi_out: endpoint at 0 {
++			remote-endpoint = <&lcd_in>;
++			data-lines = <24>;
 +		};
 +	};
 +};
