@@ -1,85 +1,66 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 May 2014 22:54:10 +0900
-Subject: [PATCH V5 18/20] ARM: exynos: cpuidle: Pass the AFTR callback to
- the platform_data
-In-Reply-To: <11675203.TylGKV1VBZ@wuerfel>
-References: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
- <5375262C.10805@samsung.com> <537C5296.7050801@linaro.org>
- <11675203.TylGKV1VBZ@wuerfel>
-Message-ID: <036f01cf74fc$24654170$6d2fc450$@samsung.com>
+Date: Wed, 21 May 2014 23:01:04 +0900
+Subject: [PATCH V3 0/4] dts: Add usb2phy to Exynos 5250/5420
+In-Reply-To: <1400498356-26803-1-git-send-email-vikas.sajjan@samsung.com>
+References: <1400498356-26803-1-git-send-email-vikas.sajjan@samsung.com>
+Message-ID: <037c01cf74fd$1afaddb0$50f09910$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-
+Vikas Sajjan wrote:
 > 
-> On Wednesday 21 May 2014 09:15:34 Daniel Lezcano wrote:
-> > On 05/15/2014 10:40 PM, Kukjin Kim wrote:
-> >
-> > [ ... ]
-> >
-> > >>>> Exynos cpuidle is not a device on the SoC, so I don't think there
-> is
-> > >>>> any
-> > >>>> way to represent it in DT. The only thing I could see this is
-> matching
-> > >>>> root node with a central SoC driver that instantiates specific
-> > >>>> subdevices, such as cpufreq and cpuidle, but I don't see any
-> available
-> > >>>> infrastructure for this.
-> > >>>
-> > >>> There is a RFC for defining generic idle states [1].
-> > >>>
-> > >>> The idea behind using the platform driver framework is to unify the
-> code
-> > >>> across the different drivers and separate the PM / cpuidle code.
-> > >>>
-> > >>> By this way, we can move the different drivers to drivers/cpuidle
-> and
-> > >>> store them in a single place. That make easier the tracking, the
-> review
-> > >>> and the maintenance.
+> Based on 'for-next' branch of Kgene's linux-samsung tree.
+> These patches are as per discussions on the driver side patches
+> which have already been acked. [1]
 > 
-> Yes, that would be great. I only looked briefly at the series now, doesn't
-> that require the use of psci? That's not a bad idea of course, but it
-> doesn't solve the problem I raised here.
-> 
-> > >>> I am ok to by using platform_device_register_resndata() but I would
-> > >>> prefer to do that a bit later by converting the other drivers too.
-> That
-> > >>> will be easier if we have them grouped in a single directory (this
-> is
-> > >>> what does this patchset at the end).
-> > >>>
-> > >>> As there are some more work based on this patchset and the link
-> error
-> > >>> could be fixed as an independent patch, I would recommend to
-> > >>> re-integrate it in the tree as asked by Bartlomiej.
-> > >>
-> > >> In general, it would be nice to have everything done properly, but
-> I'd
-> > >> consider Daniel's series as a huge improvement already and a nice
-> > >> intermediate step towards further clean-up.
-> > >>
-> > >> So based on the comments quoted above, instead of stalling the
-> > >> development, I'd suggest to accept this series and then move forward.
-> > >>
-> > > I'm fine.
-> > >
-> > > Arnd, how about you?
-> > >
-> > > - Kukjin
-> >
-> > Arnd ?
-> 
-> Sorry for the delay. Yes, let's do it this way once more, but please
-> come up with something better for the future that doesn't tie the
-> cpuidle method to the root compatible string as this does.
-> 
-Good!
-
-I will include this series into for-next and 2nd round of samsung
-pull-request for 3.16.
+Sounds good. I will apply this whole series if dt guys have no objection to
+add the exynos5-sysreg dt binding.
 
 Thanks,
 Kukjin
+
+> Changes from v2:
+> 	- Addressed kukjin's comments to update DT binding documentation
+> for sysreg.
+> 	- removed the version for each patch. Made all patches version as
+> same.
+> 
+> Changes from v1:
+>  - Rebase on 'for-next' branch.
+>  - Removed 'phy-names' property as per discuusion in the driver patches.
+> [1]
+> 
+> V1 of this series was the next version for earlier patch-series:
+> [PATCH v7 0/2] dts: Add usb2phy to Exynos 5250 [2]
+> 
+> Changes from v7 series:
+>  - Added patches to enable usb 2.0 support on exynos5420;
+>    which include dt nodes for usb2phy as well as ehci and ohci
+>    controllers.
+> 
+> Changes from v6:
+>  - Splitted the patch into two:
+>     adding syscon nodes to Exynos5250 and Exynos5420 in first;
+>     and phy entry change in the second.
+>  - Changed the name of phandle for usb2phy from 'usb2_phy_new'
+>    to 'usb2_phy_gen' indicating generic phy.
+>  - Using clock macros in dt entries.
+> 
+> [1] http://www.spinics.net/lists/linux-usb/msg106908.html
+>     http://www.spinics.net/lists/linux-usb/msg106837.html
+> [2] http://www.spinics.net/lists/linux-usb/msg106427.html
+> 
+> Kamil Debski (1):
+>   ARM: dts: Add usb2phy to Exynos 5250
+> 
+> Vivek Gautam (3):
+>   ARM: dts: Add sysreg sytem controller node to exynos5250 and
+>     exynos5420
+>   ARM: dts: Add usb2phy support on exynos5420
+>   ARM: dts: Add usb 2.0 support on exynos5420
+> 
+>  .../devicetree/bindings/arm/samsung/sysreg.txt     |   11 ++++-
+>  arch/arm/boot/dts/exynos5250.dtsi                  |   27 ++++++++++++
+>  arch/arm/boot/dts/exynos5420.dtsi                  |   45
+++++++++++++++++++++
+>  3 files changed, 81 insertions(+), 2 deletions(-)
