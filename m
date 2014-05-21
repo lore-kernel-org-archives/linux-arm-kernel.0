@@ -1,32 +1,45 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 21 May 2014 15:00:43 +0200
-Subject: [PATCH] i2c: exynos5: Initialise Samsung High Speed I2C
- controller early
-In-Reply-To: <CAHfPSqCOnW4YGPfMfpBMbLSaiSxRN=CHJK6kYdkXMujKvNwAPA@mail.gmail.com>
-References: <1398350916-885-1-git-send-email-ch.naveen@samsung.com>
- <20140424162558.GB12304@sirena.org.uk>
- <CAHfPSqB5+mLiC07jbEpeUgW63pZVk700SkYGxToO7GRAsFm_nQ@mail.gmail.com>
- <20140509135153.GM12304@sirena.org.uk>
- <CAHfPSqDSTyQXPT-NCZ2hE01qpdmaR54tbWCUYC_zSDGFp58+7g@mail.gmail.com>
- <20140509145425.GP12304@sirena.org.uk>
- <20140521102515.GJ2708@katana>
- <CAHfPSqCOnW4YGPfMfpBMbLSaiSxRN=CHJK6kYdkXMujKvNwAPA@mail.gmail.com>
-Message-ID: <20140521130043.GA2628@katana>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 21 May 2014 09:01:47 -0400
+Subject: [PATCH 2/2] documentation/devicetree: Update GIC compat strings
+In-Reply-To: <20140521102439.GE17827@leverpostej>
+References: <1400664501-4208-1-git-send-email-Nikolay.Borisov@arm.com>
+ <1400664501-4208-3-git-send-email-Nikolay.Borisov@arm.com>
+ <20140521102439.GE17827@leverpostej>
+Message-ID: <20140521130147.GH8664@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Nikolay,
 
-> Kindly, suggest a workable approach for all the subsystems.
+On Wed, May 21, 2014 at 11:24:39AM +0100, Mark Rutland wrote:
+> [Adding devicetree at vger.kernel.org]
+> 
+> On Wed, May 21, 2014 at 10:28:21AM +0100, Nikolay Borisov wrote:
+> > Document the addition of 2 new, implementation-agnostic compatible
+> > strings. This allows for more flexibility such that new implementation 
+> > can either state whether they are an extension of an existing implementation,
+> > a brand new implementation or just that they conform to a standard revision
+> > of the GIC spec.
+> 
+> From my POV it makes sense to have these to make it possible to write
+> DTs with new GIC variants which are implementations of the standard
+> rather than extensions of existing implementations.
+> 
+> However, DTs using these should also state exactly what variant they
+> are, and those strings should be documented (even if not supported
+> directly by the driver). It would be nice to have that mentioned in the
+> commit message.
 
-Keep this patch out-of-tree? I know that probe ordering causes problems,
-and that it needs major efforts. Yet, I understood that adding more and
-more subsys_initcall to mainline is not going to help the process unless
-essential. Using subsys_initcall has issues, too.
+Please tweak the commit message as Mark suggested and resend, including
+me in the Cc.  I'll queue it up for tglx.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/59d62bb1/attachment.sig>
+> Otherwise:
+> 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> 
+
+Also, please include Mark's Acks.
+
+thx,
+
+Jason.
