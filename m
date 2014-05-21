@@ -1,47 +1,47 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 21 May 2014 14:14:29 -0500
-Subject: [PATCH v1 4/4] ARM: debug: qcom: Add APQ8084 DEBUG_LL UART support
-In-Reply-To: <1400686086.856.15.camel@iivanov-dev>
-References: <1400684225-21381-1-git-send-email-gdjakov@mm-sol.com>
- <1400684225-21381-5-git-send-email-gdjakov@mm-sol.com>
- <4365639.JcFl1cP048@wuerfel> <1400686086.856.15.camel@iivanov-dev>
-Message-ID: <A9A4B705-E550-407D-BDAD-91083417B356@codeaurora.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 21 May 2014 12:20:22 -0700
+Subject: pull request for Tegra clock fixes for 3.16
+In-Reply-To: <20140519134049.GA20109@tbergstrom-lnx.Nvidia.com>
+References: <20140519134049.GA20109@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20140521192022.9521.44214@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Quoting Peter De Schrijver (2014-05-19 06:40:49)
+> Hi Mike,
+> 
+> A number of fixes which are needed by the upcoming XHCI and SATA drivers.
+> 
+> Thanks,
+> 
+> Peter.
+> 
+> The following changes since commit d6d211db37e75de2ddc3a4f979038c40df7cc79c:
+> 
+>   Linux 3.15-rc5 (2014-05-09 13:10:52 -0700)
+> 
+> are available in the git repository at:
+>   git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git tegra-clk-v3.16
 
-On May 21, 2014, at 10:28 AM, Ivan T. Ivanov <iivanov@mm-sol.com> wrote:
+Pulled.
 
-> Hi, 
-> 
-> On Wed, 2014-05-21 at 17:18 +0200, Arnd Bergmann wrote:
->> On Wednesday 21 May 2014 17:57:05 Georgi Djakov wrote:
-> 
->>> 
->>> +#ifdef CONFIG_DEBUG_APQ8084_UART
->>> +#define MSM_DEBUG_UART_BASE    0xFA75E000
->>> +#define MSM_DEBUG_UART_PHYS    0xF995E000
->>> +#endif
->>> +
-> 
->> Maybe we should move debug/msm.S over to use
->> CONFIG_DEBUG_UART_PHYS/CONFIG_DEBUG_UART_VIRT now?
->> 
-> 
-> There is patch which do this [1]. It was reviewed 
-> by Stephen Boyd [2].
-> 
-> Regards,
-> Ivan
-> 
-> 
-> [1] https://lkml.org/lkml/2014/4/14/312
-> [2] https://lkml.org/lkml/2014/4/14/542
+Regards,
+Mike
 
-I?ll grab Ivan?s patch and send via my qcom tree to arm-soc.
-
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> 
+> Andrew Bresticker (2):
+>       clk: tegra: Fix xusb_hs_src clock hierarchy
+>       clk: tegra: Initialize xusb clocks
+> 
+> Jim Lin (2):
+>       clk: tegra: Enable hardware control of PLLE
+>       clk: tegra: Fix xusb_fs_src mux
+> 
+>  drivers/clk/tegra/clk-id.h               |    1 +
+>  drivers/clk/tegra/clk-pll.c              |   33 +++++++++++++++++++++++++++++-
+>  drivers/clk/tegra/clk-tegra-periph.c     |   10 ++++++++-
+>  drivers/clk/tegra/clk-tegra114.c         |   22 ++++++++++----------
+>  drivers/clk/tegra/clk-tegra124.c         |   21 ++++++++++---------
+>  include/dt-bindings/clock/tegra114-car.h |    3 +-
+>  include/dt-bindings/clock/tegra124-car.h |    3 +-
+>  7 files changed, 68 insertions(+), 25 deletions(-)
