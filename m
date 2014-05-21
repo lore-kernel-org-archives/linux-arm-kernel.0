@@ -1,65 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 May 2014 10:10:24 +0200
-Subject: [PATCH V5 18/20] ARM: exynos: cpuidle: Pass the AFTR callback to
- the platform_data
-In-Reply-To: <537C5296.7050801@linaro.org>
-References: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
- <5375262C.10805@samsung.com> <537C5296.7050801@linaro.org>
-Message-ID: <11675203.TylGKV1VBZ@wuerfel>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Wed, 21 May 2014 10:14:58 +0200
+Subject: [PATCH] ARM: dts: duovero-parlor: Add HDMI output
+In-Reply-To: <CAGhQ9VxtJwrKzW77mo=y9_gvCRW_8TJEp90OVN+YPg2RpC=b_w@mail.gmail.com>
+References: <1400595946-1294-1-git-send-email-florian.vaussard@epfl.ch>
+ <CAGhQ9VxtJwrKzW77mo=y9_gvCRW_8TJEp90OVN+YPg2RpC=b_w@mail.gmail.com>
+Message-ID: <537C6082.2000405@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 May 2014 09:15:34 Daniel Lezcano wrote:
-> On 05/15/2014 10:40 PM, Kukjin Kim wrote:
+
+On 05/20/2014 08:09 PM, Joachim Eastwood wrote:
+> On 20 May 2014 16:25, Florian Vaussard <florian.vaussard@epfl.ch> wrote:
+>> Add the necessary DTS nodes to enable the micro-HDMI output on Parlor
+>> board.
+>>
+>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>> ---
+>>  arch/arm/boot/dts/omap4-duovero-parlor.dts | 42 ++++++++++++++++++++++++++++++
+>>  1 file changed, 42 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/omap4-duovero-parlor.dts b/arch/arm/boot/dts/omap4-duovero-parlor.dts
+>> index 96f51d8..3b234b8 100644
+>> --- a/arch/arm/boot/dts/omap4-duovero-parlor.dts
+>> +++ b/arch/arm/boot/dts/omap4-duovero-parlor.dts
+>> @@ -15,6 +15,10 @@
+>>         model = "OMAP4430 Gumstix Duovero on Parlor";
+>>         compatible = "gumstix,omap4-duovero-parlor", "gumstix,omap4-duovero", "ti,omap4430", "ti,omap4";
+>>
+>> +       aliases {
+>> +               display0 = &hdmi0;
+>> +       };
+>> +
+>>         leds {
+>>                 compatible = "gpio-leds";
+>>                 led0 {
+>> @@ -35,6 +39,19 @@
+>>                         gpio-key,wakeup;
+>>                 };
+>>         };
+>> +
+>> +       hdmi0: connector at 0 {
+>> +               compatible = "hdmi-connector";
+>> +               label = "hdmi";
+>> +
+>> +               type = "d";
+>> +
+>> +               port {
+>> +                       hdmi_connector_in: endpoint {
+>> +                               remote-endpoint = <&hdmi_out>;
+>> +                       };
+>> +               };
+>> +       };
+>>  };
 > 
-> [ ... ]
+> No, HPD (hotplug) pin?
 > 
-> >>>> Exynos cpuidle is not a device on the SoC, so I don't think there is
-> >>>> any
-> >>>> way to represent it in DT. The only thing I could see this is matching
-> >>>> root node with a central SoC driver that instantiates specific
-> >>>> subdevices, such as cpufreq and cpuidle, but I don't see any available
-> >>>> infrastructure for this.
-> >>>
-> >>> There is a RFC for defining generic idle states [1].
-> >>>
-> >>> The idea behind using the platform driver framework is to unify the code
-> >>> across the different drivers and separate the PM / cpuidle code.
-> >>>
-> >>> By this way, we can move the different drivers to drivers/cpuidle and
-> >>> store them in a single place. That make easier the tracking, the review
-> >>> and the maintenance.
-
-Yes, that would be great. I only looked briefly at the series now, doesn't
-that require the use of psci? That's not a bad idea of course, but it
-doesn't solve the problem I raised here.
-
-> >>> I am ok to by using platform_device_register_resndata() but I would
-> >>> prefer to do that a bit later by converting the other drivers too. That
-> >>> will be easier if we have them grouped in a single directory (this is
-> >>> what does this patchset at the end).
-> >>>
-> >>> As there are some more work based on this patchset and the link error
-> >>> could be fixed as an independent patch, I would recommend to
-> >>> re-integrate it in the tree as asked by Bartlomiej.
-> >>
-> >> In general, it would be nice to have everything done properly, but I'd
-> >> consider Daniel's series as a huge improvement already and a nice
-> >> intermediate step towards further clean-up.
-> >>
-> >> So based on the comments quoted above, instead of stalling the
-> >> development, I'd suggest to accept this series and then move forward.
-> >>
-> > I'm fine.
-> >
-> > Arnd, how about you?
-> >
-> > - Kukjin
+> I think Parlor has one and the "hdmi-connector" binding now supports
+> it. See Tomi's 3.16/fbdev-omap branch.
 > 
-> Arnd ?
 
-Sorry for the delay. Yes, let's do it this way once more, but please
-come up with something better for the future that doesn't tie the
-cpuidle method to the root compatible string as this does.
+Looking into the details, the HPD pin of the parlor board is connected
+to the OMAP4 HDMI IP. The LINK_CONNECT and LINK_DISCONNECT events are
+managed by hdmi_irq_handler() in hdmi4.c to turn on/off the PHY's power.
+So there is no need to use the hgp-gpios binding of "hdmi-connector"
+IMHO. Correct me if I am wrong, as the public TRM is pretty thin
+regarding the OMAP4 HDMI IP.
 
-	Arnd
+Regards,
+Florian
