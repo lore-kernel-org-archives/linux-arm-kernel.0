@@ -1,93 +1,31 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 21 May 2014 13:05:13 +0200
-Subject: [PATCH] PM / Sleep: Fall back to subsystem level PM callbacks for
- PM domains
-In-Reply-To: <CAPDyKFrW3JTQCZGJjQ8132OFdN4TaE-_EdDEO7wcBMmVCjCyiQ@mail.gmail.com>
-References: <1398422695-2295-1-git-send-email-ulf.hansson@linaro.org>
- <CAPDyKFr_1CJZ3KAwAbrzeoW0me1SjqC221Kb=_4RnaXa8Uh_gA@mail.gmail.com>
- <CAPDyKFrW3JTQCZGJjQ8132OFdN4TaE-_EdDEO7wcBMmVCjCyiQ@mail.gmail.com>
-Message-ID: <8782716.aH7rWyWjl7@vostro.rjw.lan>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 21 May 2014 12:49:30 +0200
+Subject: [PATCH] i2c/nuc900: fix ancient build error
+In-Reply-To: <20140514191749.GA25709@katana>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-11-git-send-email-arnd@arndb.de>
+ <20140514162725.GG12911@katana> <4944869.eRrWyMmW4d@wuerfel>
+ <20140514191749.GA25709@katana>
+Message-ID: <20140521104929.GP2708@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, May 21, 2014 11:36:20 AM Ulf Hansson wrote:
-> On 30 April 2014 14:15, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> > On 30 April 2014 00:52, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> >> On Wednesday, April 30, 2014 12:47:28 AM Rafael J. Wysocki wrote:
-> >>> On Friday, April 25, 2014 12:44:55 PM Ulf Hansson wrote:
-> >>> > Previously once the PM core found a PM domain pointer for a device,
-> >>> > but which didn't have a valid PM callback, it falled back to try the
-> >>> > driver's PM callback.
-> >>> >
-> >>> > In this scenario, change the behavior of the PM core to try out the
-> >>> > other subsystem level PM callbacks, before it moves on to the driver.
-> >>> >
-> >>> > This gives provision for PM domains to easier re-use subsystem level
-> >>> > code to handle the needed operations.
-> >>> >
-> >>> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> >>>
-> >>> Are you sure this is not going to break the existing PM domains?
-> >
-> > I have checked the current implementations of the PM domains - all are
-> > providing the PM callbacks. So this should be safe.
-> >
-> >>
-> >> And even if it isn't, the idea behind PM domains was to provide a mechanism to
-> >> bypass the bus types' (etc) PM callbacks, so I'm not liking this patch at all.
-> >
-> > I understand your view, it's the current mindset we have of the
-> > hierarchy of handling the callbacks. I am wondering if it's time to
-> > reconsider. :-)
-> >
-> > To be clear, I don't want to prevent the PM domain from bypassing bus,
-> > types etc, that's should be up to each implementation to decide, and
-> > this patch won't affect that behaviour.
-> >
-> > I intend to only simplify for those PM domains that want to re-use the
-> > callbacks from bus, types. etc. Currently that's the most of them.
-> >
-> > a)
-> > Those ARM SOCs that implements PM domains, which don't use the generic
-> > power domain, cares only about platform devices attached to the
-> > platform_bus_type. These are copying the callbacks from the
-> > platform_bus_type (using the USE_PLATFORM_PM_SLEEP_OPS macro)  - I
-> > assume this is because they need to handle legacy suspend/resume.
-> >
-> > arch/arm/mach-davinci/pm_domain.c
-> > arch/arm/mach-keystone/pm_domain.c
-> > arch/arm/mach-omap1/pm_bus.c
-> > arch/arm/mach-omap2/omap_device.c
-> > drivers/sh/pm_runtime.c
-> >
-> > b)
-> > An actual copy of the bus' PM callbacks to the PM domain's callbacks also exist.
-> >
-> > drivers/gpu/vga/vga_switcheroo.c:
-> > vga_switcheroo_init_domain_pm_ops()
-> > vga_switcheroo_init_domain_pm_optimus_hdmi_audio()
-> >
-> > c)
-> > That leaves the generic power domain and acpi power domain, which
-> > don't re-use callbacks, but have their own set.
-> >
-> >
-> > The more complicated scenario have not yet been implemented - but I
-> > can see it coming. :-)
-> > That's when the PM domain wants to re-use callbacks for whatever bus,
-> > types etc, the device is attached to.
-> >
-> > To handle this, the PM domain will have to re-implement the code for
-> > walking the hierarchy of callbacks, which is a bit messy. This patch
-> > will make it possible for the PM domain to rely on the PM core to
-> > handle this instead.
-> >
+On Wed, May 14, 2014 at 09:17:49PM +0200, Wolfram Sang wrote:
 > 
-> Hi Rafael,
+> > For the moment, I'd leave this up to Wan ZongShun. He has in the past
+> > at least replied to emails about the platform, even though there hasn't
+> > been any new development.
 > 
-> Just wanted to understand if you are still considering this patch or
-> if think it's the wrong approach?
+> Agreed. Let's wait for his response. If there is none, I'll think about
+> removing the driver.
+> 
 
-I said I didn't like the approach IIRC.  I'm not considering it anyway.
+Wan ZongShun, final call before this driver gets removed next week.
 
-Rafael
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/b4c03acf/attachment.sig>
