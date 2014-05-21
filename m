@@ -1,65 +1,75 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 21 May 2014 11:01:05 +0530
-Subject: [PATCH v7] DMA: sun6i: Add driver for the Allwinner A31 DMA
- controller
-In-Reply-To: <20140513134258.GA29258@lukather>
-References: <20140430070408.GR32284@intel.com>
- <20140513134258.GA29258@lukather>
-Message-ID: <20140521053105.GI21128@intel.com>
+From: mail@aurabindo.in (Jay Aurabind)
+Date: Wed, 21 May 2014 11:45:25 +0530
+Subject: [PATCH V2] mfd: abx500-core: Fix compiler warning larger stack
+ frame
+In-Reply-To: <20140520152054.GB24991@lee--X1>
+References: <536E1543.3090107@aurabindo.in> <20140520152054.GB24991@lee--X1>
+Message-ID: <537C447D.7070406@aurabindo.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 03:42:58PM +0200, Maxime Ripard wrote:
-> Hi Vinod,
-> 
-> On Wed, Apr 30, 2014 at 12:34:08PM +0530, Vinod Koul wrote:
-> > > +
-> > > +static int sun6i_dma_terminate_all(struct sun6i_vchan *vchan)
-> > > +{
-> > > +	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(vchan->vc.chan.device);
-> > > +	struct sun6i_pchan *pchan = vchan->phy;
-> > > +	unsigned long flags;
-> > > +	LIST_HEAD(head);
-> > > +
-> > > +	spin_lock(&sdev->lock);
-> > > +	list_del_init(&vchan->node);
-> > > +	spin_unlock(&sdev->lock);
-> > > +
-> > > +	spin_lock_irqsave(&vchan->vc.lock, flags);
-> > > +
-> > > +	vchan_get_all_descriptors(&vchan->vc, &head);
-> > > +
-> > > +	if (pchan) {
-> > > +		writel(DMA_CHAN_ENABLE_STOP, pchan->base + DMA_CHAN_ENABLE);
-> > > +		writel(DMA_CHAN_PAUSE_RESUME, pchan->base + DMA_CHAN_PAUSE);
-> > > +
-> > > +		vchan->phy = NULL;
-> > > +		pchan->vchan = NULL;
-> > > +		pchan->desc = NULL;
-> > > +		pchan->done = NULL;
-> > > +	}
-> > > +
-> > > +	spin_unlock_irqrestore(&vchan->vc.lock, flags);
-> > > +
-> > > +	vchan_dma_desc_free_list(&vchan->vc, &head);
-> > 
-> > shouldn't you kill the tasklet as well here?
-> 
-> Just to be clear, which tasklet? vchan's or the driver's?
-You need to take care of both. But I suspect if we ensure irq is not triggered
-and any pending ones are completed you can simply kill both of the tasklets
-happily. See the fixes merged in dmaengine last cycle (hint: patchlog shows what
-we need to do)
+H1,
 
-Btw just noticed, you *should* use dmaengine: as the subsytem name on the patch
-series...
+Change from V1 -> V2: Fix a potential null pointer dereference as reported by kbuild test robot <fengguang.wu@intel.com>.
 
+Inorder to report the kzalloc failure, I have just used a pr_debug statement. If it looks ugly, should I change the function's return value to int and give out an -ENOMEM ?
+
+>From 6615c7a995a6bb4dcf4c1e9ac59bca823ec821a5 Mon Sep 17 00:00:00 2001
+From: Aurabindo J <mail@aurabindo.in>
+Date: Wed, 21 May 2014 11:18:10 +0530
+Subject: [PATCH] mfd: abx500-core: Fix compiler warning larger stack frame
+
+On systems with CONFIG_FRAME_WARN=1024, compiler warns the allocation of
+an object of struct device on stack. Make the allocation dynamically to
+fix the warning.
+
+Signed-off-by: Aurabindo J <mail@aurabindo.in>
+---
+ drivers/mfd/abx500-core.c | 19 ++++++++++++-------
+ 1 file changed, 12 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/mfd/abx500-core.c b/drivers/mfd/abx500-core.c
+index f3a15aa..5e5098d 100644
+--- a/drivers/mfd/abx500-core.c
++++ b/drivers/mfd/abx500-core.c
+@@ -154,16 +154,21 @@ EXPORT_SYMBOL(abx500_startup_irq_enabled);
+ void abx500_dump_all_banks(void)
+ {
+ 	struct abx500_ops *ops;
+-	struct device dummy_child = {NULL};
++	struct device *dummy_child;
+ 	struct abx500_device_entry *dev_entry;
+ 
+-	list_for_each_entry(dev_entry, &abx500_list, list) {
+-		dummy_child.parent = dev_entry->dev;
+-		ops = &dev_entry->ops;
++	dummy_child = kzalloc(sizeof(struct device), GFP_KERNEL);
++	if (dummy_child != NULL) {
++		list_for_each_entry(dev_entry, &abx500_list, list) {
++			dummy_child->parent = dev_entry->dev;
++			ops = &dev_entry->ops;
+ 
+-		if ((ops != NULL) && (ops->dump_all_banks != NULL))
+-			ops->dump_all_banks(&dummy_child);
+-	}
++			if ((ops != NULL) && (ops->dump_all_banks != NULL))
++				ops->dump_all_banks(dummy_child);
++		}
++		kfree(dummy_child);
++	} else
++		pr_debug("kzalloc failure in abx500_dump_all_banks\n");
+ }
+ EXPORT_SYMBOL(abx500_dump_all_banks);
+ 
 -- 
-~Vinod
+1.9.1
+
+
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/08470eac/attachment.sig>
+Size: 278 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/8791bd05/attachment.sig>
