@@ -1,40 +1,33 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 21 May 2014 14:52:16 +0200
-Subject: [PATCH] clk: divider: Fix table round up function
-In-Reply-To: <CAOMZO5C9iqLj34mJdztqZsyLNR6oHztyN2GxDY0ORp+0xU1+LA@mail.gmail.com>
-References: <1399481332-9550-1-git-send-email-maxime.coquelin@st.com>
- <CAOMZO5C9iqLj34mJdztqZsyLNR6oHztyN2GxDY0ORp+0xU1+LA@mail.gmail.com>
-Message-ID: <537CA180.4050907@st.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 21 May 2014 14:53:07 +0200
+Subject: [PATCH v8 1/2] can: Add xilinx CAN device tree bindings
+ documentation.
+In-Reply-To: <17489036-3743-4393-afc6-a9064325b4d5@BN1BFFO11FD053.protection.gbl>
+References: <17489036-3743-4393-afc6-a9064325b4d5@BN1BFFO11FD053.protection.gbl>
+Message-ID: <537CA1B3.6030603@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On 05/21/2014 01:41 PM, Kedareswara rao Appana wrote:
+> Add xilinx CAN bindings documentation.
+> 
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 
-On 05/15/2014 03:28 PM, Fabio Estevam wrote:
-> Hi Mike,
->
-> On Wed, May 7, 2014 at 1:48 PM, Maxime COQUELIN <maxime.coquelin@st.com> wrote:
->> Commit 1d9fe6b97 ("clk: divider: Fix best div calculation for power-of-two and
->> table dividers") introduces a regression in its _table_round_up function.
->>
->> When the divider passed to this function is greater than the max divider
->> available in the table, this function returns table's max divider.
->> Problem is that it causes an infinite loop in clk_divider_bestdiv() because
->> _next_div() will never return a value greater than maxdiv.
->>
->> Instead of returning table's max divider, this patch returns INT_MAX.
->>
->> Reported-by: Fabio Estevam <festevam@gmail.com>
->> Reported-by: Shawn Guo <shawn.guo@freescale.com>
->> Tested-by: Fabio Estevam <festevam@gmail.com>
->> Cc: Mike Turquette <mike.turquette@linaro.org>
->> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
->
-> Any comments on this one? It does fix a regression.
->
-
-This patch is important as it fixes a regression, could you review it 
-please?
+Applied both to can-next.
 
 Thanks,
-Maxime
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 242 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/c55b0027/attachment.sig>
