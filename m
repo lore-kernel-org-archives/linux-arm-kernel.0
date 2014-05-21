@@ -1,101 +1,96 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 21 May 2014 10:55:41 +0100
-Subject: [PATCH v9 14/14] virt: arm: support hip04 gic
-In-Reply-To: <CAD6h2NQHqisW0_nYQ9XyHXrX57Z7mcxeVwyFMiSyCm7Tt8n8KA@mail.gmail.com>
-References: <1400591427-21922-1-git-send-email-haojian.zhuang@linaro.org>
- <1400591427-21922-15-git-send-email-haojian.zhuang@linaro.org>
- <20140520134441.GK5292@lvm>
- <CAD6h2NQyG1GSneWMpHmYxD-dPS7w9w2fe8vDdj-f834T2yqn1w@mail.gmail.com>
- <20140520140153.GL5292@lvm>
- <CAD6h2NQZGBa5U0-tmj=wtsFpcqnV2tHx+_vESrx8+3r7dGpHjQ@mail.gmail.com>
- <20140520150518.GA39503@lvm>
- <CAD6h2NRv3hUa7vhbxVb1LhYi9K5OMVf01pyqp6yUC-+0zU8jkQ@mail.gmail.com>
- <20140521090203.GB39503@lvm>
- <CAD6h2NQHqisW0_nYQ9XyHXrX57Z7mcxeVwyFMiSyCm7Tt8n8KA@mail.gmail.com>
-Message-ID: <20140521095541.GC39503@lvm>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 21 May 2014 11:02:34 +0100
+Subject: [PATCH v7 06/15] ARM: hisi: enable MCPM implementation
+In-Reply-To: <CAD6h2NTku5zS5QONpOqdhAXgfFutGC4jyAAo-UGnAsc=Xan8dw@mail.gmail.com>
+References: <1399795571-17231-7-git-send-email-haojian.zhuang@linaro.org>
+ <1399981484-31628-1-git-send-email-haojian.zhuang@linaro.org>
+ <alpine.LFD.2.11.1405131449270.980@knanqh.ubzr>
+ <CAD6h2NRMzgsZWkP8MYbCHqo4JkojbJxjj-kZwSj65A1SNBNRyw@mail.gmail.com>
+ <alpine.LFD.2.11.1405151549330.17310@knanqh.ubzr>
+ <CAD6h2NTku5zS5QONpOqdhAXgfFutGC4jyAAo-UGnAsc=Xan8dw@mail.gmail.com>
+Message-ID: <20140521100234.GB3830@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 21, 2014 at 05:47:00PM +0800, Haojian Zhuang wrote:
-> On 21 May 2014 17:02, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > On Tue, May 20, 2014 at 11:39:12PM +0800, Haojian Zhuang wrote:
-> >> On 20 May 2014 23:05, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> >> > On Tue, May 20, 2014 at 10:16:22PM +0800, Haojian Zhuang wrote:
-> >> >> On 20 May 2014 22:01, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> >> >> It's the implementation of gich_apr in arm32.
-> >> >>
-> >> >> We needn't add or change anything in struct vgic_cpu. And both the
-> >> >> assembly code and the code could be much easier.
-> >> >>
-> >> >
-> >> > But we do end up with an extra memory access from EL2 in the critical
-> >> > path, and I believe Marc's concern here is that if we cross a cache
-> >> > line, this might really hurt performance.
-> >> >
-> >>
-> >> Sorry. Do we may cross a cache line or a TLB entry?
-> >>
-> >> I think that you're concerning to cross TLB entries. The reason is in
-> >>  below.
-> >>
-> >> 1. If the problem is on crossing cache line, it's caused by too much
-> >> instructions. Either the packing nr_lr or the gich_apr adds some
-> >> instructions. The packing nr_lr needs a little more instructions.
+On Tue, May 20, 2014 at 12:43:59PM +0800, Haojian Zhuang wrote:
+> On 16 May 2014 04:01, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Thu, 15 May 2014, Haojian Zhuang wrote:
 > >
-> > I don't see why this argument is valid.  If you have a separate
+> >> On 14 May 2014 03:43, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> >> > On Tue, 13 May 2014, Haojian Zhuang wrote:
+> >> >
+> >> >> +     data = readl_relaxed(fabric + FAB_SF_MODE);
+> >> >> +     if (on)
+> >> >> +             data |= 1 << cluster;
+> >> >> +     else
+> >> >> +             data &= ~(1 << cluster);
+> >> >> +     writel_relaxed(data, fabric + FAB_SF_MODE);
+> >> >> +     while (1) {
+> >> >> +             if (data == readl_relaxed(fabric + FAB_SF_MODE))
+> >> >> +                     break;
+> >> >> +     }
+> >> >> +}
+> >> >
+> >> > The above could be easily coded in assembly for the power_up_setup
+> >> > callback thusly:
+> >> >
+> >> > hip04_power_up_setup:
+> >> >
+> >> >         cmp     r0, #0                  @ check affinity level
+> >> >         bxeq    lr                      @ nothing to do at CPU level
+> >> >
+> >> >         mrc     p15, 0, r0, c0, c0, 5   @ get MPIDR
+> >> >         ubfx    r0, r0, #8, #8          @ extract cluster number
+> >> >
+> >> >         adr     r1, .LC0
+> >> >         ldmia   r1, {r2, r3}
+> >> >         sub     r2, r2, r1              @ virt_addr - phys_addr
+> >> >         ldr     r1, [r2, r3]            @ get fabric_phys_addr
+> >> >         mov     r2, #1
+> >> >         ldr     r3, [r1, #FAB_SF_MODE]  @ read "data"
+> >> >         orr     r3, r3, r2, lsl r0      @ set cluster bit
+> >> >         str     r3, [r1, #FAB_SF_MODE]  @ write it back
+> >> >
+> >> > 1:      ldr     r2, [r1, #FAB_SF_MODE]  @ read register content
+> >> >         cmp     r2, r3                  @ make sure it matches
+> >> >         bne     1b                      @ otherwise retry
+> >> >
+> >> >         bx      lr
+> >> >
+> >> > :LC0:   .word   .
+> >> >         .word   fabric_phys_addr - .LC0
+> >> >
+> >> > That should be it.
+> >> >
+> >>
+> >> No. These code should be executed before new CPU on. If I transfer
+> >> them to assembler code, it means that code will be executed after
+> >> new CPU on.
+> >
+> > Exact.
+> >
+> >> Then it results me failing to make new CPU online.
+> >
+> > The assembly code could be wrong as well.  Are you sure this is not the
+> > actual reason?
+> >
+> > Is there some documentation for this stuff?
+> >
 > 
-> I want to make it clear what I missing.
+> There's no problem in assembly code. I even rewrite your assembly code.
 > 
-> > instruction and data cache, you may be loading from a different cache
-> > line when placing the static value close to your instructions.  If you
-> > add a variable to the vcpu struct, all of the fields may no longer fit
-> > in a single data cache line and you may cause the memory subsystem to
-> > have to fetch another cache line.  I believe the latter is Marc's
+> If I keep my c code with assembly code, new CPU could be online right.
+> If I only use assembly code, I only get the kernel panic. So it's not
+> caused by assembly code. It's caused by executing code after new CPU
+> on.
 > 
-> Yes, I forgot new gich_apr is the only variable in the assembly code.
-> So the gich_apr will be load from a different cache line.
-> 
-> Then let's come back to packing hw_cfg.
-> 
-> Now the high word is used to store the offset of GICH_APR. The
-> unpacking operation is too complex to calculate the register offset,
-> especially in arm64 implementation.
-> 
-> How about changing the packing mechanism?
-> 
-> 1. Add the definition of enconding in arm-gic.h.
-> 
-> #define HIP04_GIC             (1 << 16)
-> #define HIP04_GICH_APR   0x70
-> #define HIP04_GICH_LR0    0x80
-> 
-> 2. The code in save_vgic_state could be changed in below.
-> 
->   ldr     r9, [r2, #GICH_ELRSR1]
-> +ldr     r10, [r3, #VGIC_CPU_HW_CFG]
-> +tst     r10, #HIP04_GIC
-> +ldreq  r10, [r2, #GICH_APR]
-> +ldrne  r10, [r2, #HIP04_GICH_APR]
-> 
-> Although I used the condition checking at here, the code could
-> be easier.
-> 
-> I think that the executing time on "ldr" and "ldreq" should be same,
-> because CPCS should be ready
-> 
-> Then calculation is avoid. Only three instructions are appended
-> for both GICH_APR & GICH_LR0. The implementation in arm64
-> should be same & simple.
-> 
-I think you misunderstood my point.
+> There's no documentation on this. They didn't prepare well on documents.
+> I think they'll improve it in the future.
 
-Keep the assembly code as is, store the APR and the NR_LR in the HW_CFG
-always, on all systems, and don't use any conditionals in the assembly
-code (code is difficult to read, instruction prefetching and speculative
-execution becomes difficult, etc.).
+It's essential to understand what the hardware is actually doing here.
 
-Only change something in the C-code.  Set a static variable there during
-vgic_hyp_init and get rid of all the local variable declarations that
-dereference the vgic_vcpu struct.
+If we don't understand exactly what toggling those bits in FAB_SF_MODE
+actually does, then it's impossible to judge on how to do it safely.
 
--Christoffer
+Cheers
+---Dave
