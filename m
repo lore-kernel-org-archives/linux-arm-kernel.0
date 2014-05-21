@@ -1,69 +1,88 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 21 May 2014 16:24:59 +0200
-Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
- support
-In-Reply-To: <537CA4B4.2040001@ti.com>
-References: <5375A8A8.7080306@ti.com> <20140516160717.GD22031@atomide.com>
- <20140516174158.GA11733@earth.universe>
- <20140516180154.GG22031@atomide.com>
- <20140516213907.GL12881@atomide.com> <5379D35F.8040207@ti.com>
- <20140519155732.GA4849@atomide.com> <537A540E.8070302@ti.com>
- <20140519195100.GB11945@atomide.com> <537CA4B4.2040001@ti.com>
-Message-ID: <20140521142459.GB27779@earth.universe>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 21 May 2014 16:26:46 +0200
+Subject: [PATCH] ARM: dts: Add audio subsystem nodes to exynos4.dtsi
+In-Reply-To: <1400239733-11782-1-git-send-email-s.nawrocki@samsung.com>
+References: <1400239733-11782-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <537CB7A6.3050202@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, May 21, 2014 at 04:05:56PM +0300, Tomi Valkeinen wrote:
-> I'll try and see how the other options work, which are:
+On 16/05/14 13:28, Sylwester Nawrocki wrote:
+> This patch adds the audio subsystem clock controller and the I2S
+> IP block nodes for Exynos4 SoC series.
 > 
-> - Bailing out from module_init in each display driver. The reason I
-> don't like this (although I haven't tried it) is that all the display
-> drivers need the modification, and because I need to catch the
-> module_init, I cannot use the helpers like module_platform_driver(), so
-> it adds multiple lines to every driver.
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-You could create your own omapdss_driver() define for that.
-This can be replaced more simply once no longer needed and
-creates less bloat.
+Can this still be applied in the coming merge window ?
 
-I see one more disadvantage for this approach:
-
-assumed situation (some future 3.16+x kernel):
- * The kernel has an common display framework (CDF)
- * The kernel has an panel driver using CDF
- * There also exists omapdss driver for the same panel
- * omapdss does not (yet) adopt CDF
- * CDF and omapdss are enabled in .config
- * Kernel is booted from an OMAP system
-
-This would result in both drivers being loaded using the same
-DT compatible string. The same scenario works using the rewriting
-method, since the common display framework would only see the
-rewritten compatible string.
-
-Of course this scenario only happens when omapdss is not adopted
-to the common display framework from the start on.
-
-> - Traveling the video graph, starting from omapdss. This one is possibly
-> better performance-wise than my original version, as we only need to
-> search for the omapdss node and can then follow the links. But the code
-> will be more complex.
-
-I think the main advantage is the missing lookup table/whitelist,
-which adds redundancy. Not having it has some advantages:
-
-* new drivers don't need to touch any existing files (making
-  rebasing etc. easier)
-* table can get out of sync (though that shouldn't happen anyway,
-  since the binding is supposed to be stable)
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/fae26241/attachment.sig>
+Thanks,
+Sylwester
+> ---
+>  arch/arm/boot/dts/exynos4.dtsi |   38 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+> index 58ff8e2..0eb768c 100644
+> --- a/arch/arm/boot/dts/exynos4.dtsi
+> +++ b/arch/arm/boot/dts/exynos4.dtsi
+> @@ -20,6 +20,7 @@
+>   */
+> 
+>  #include <dt-bindings/clock/exynos4.h>
+> +#include <dt-bindings/clock/exynos-audss-clk.h>
+>  #include "skeleton.dtsi"
+> 
+>  / {
+> @@ -45,6 +46,23 @@
+>  		fimc3 = &fimc_3;
+>  	};
+> 
+> +	clock_audss: clock-controller at 03810000 {
+> +		compatible = "samsung,exynos4210-audss-clock";
+> +		reg = <0x03810000 0x0C>;
+> +		#clock-cells = <1>;
+> +	};
+> +
+> +	i2s0: i2s at 03830000 {
+> +		compatible = "samsung,s5pv210-i2s";
+> +		reg = <0x03830000 0x100>;
+> +		clocks = <&clock_audss EXYNOS_I2S_BUS>;
+> +		clock-names = "iis";
+> +		dmas = <&pdma0 12>, <&pdma0 11>, <&pdma0 10>;
+> +		dma-names = "tx", "rx", "tx-sec";
+> +		samsung,idma-addr = <0x03000000>;
+> +		status = "disabled";
+> +	};
+> +
+>  	chipid at 10000000 {
+>  		compatible = "samsung,exynos4210-chipid";
+>  		reg = <0x10000000 0x100>;
+> @@ -289,6 +307,26 @@
+>  		status = "disabled";
+>  	};
+> 
+> +	i2s1: i2s at 13960000 {
+> +		compatible = "samsung,s5pv210-i2s";
+> +		reg = <0x13960000 0x100>;
+> +		clocks = <&clock CLK_I2S1>;
+> +		clock-names = "iis";
+> +		dmas = <&pdma1 12>, <&pdma1 11>;
+> +		dma-names = "tx", "rx";
+> +		status = "disabled";
+> +	};
+> +
+> +	i2s2: i2s at 13970000 {
+> +		compatible = "samsung,s5pv210-i2s";
+> +		reg = <0x13970000 0x100>;
+> +		clocks = <&clock CLK_I2S2>;
+> +		clock-names = "iis";
+> +		dmas = <&pdma0 14>, <&pdma0 13>;
+> +		dma-names = "tx", "rx";
+> +		status = "disabled";
+> +	};
+> +
+>  	mfc: codec at 13400000 {
+>  		compatible = "samsung,mfc-v5";
+>  		reg = <0x13400000 0x10000>;
+> --
+> 1.7.9.5
