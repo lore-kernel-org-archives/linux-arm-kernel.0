@@ -1,53 +1,38 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 21 May 2014 18:31:51 +0300
-Subject: [PATCH 0/6] AM43xx & OMAP5 DSS DT changes
-In-Reply-To: <20140521152613.GJ17417@atomide.com>
-References: <1400676625-30078-1-git-send-email-tomi.valkeinen@ti.com>
- <20140521150231.GH17417@atomide.com> <537CC376.5050501@ti.com>
- <20140521152613.GJ17417@atomide.com>
-Message-ID: <537CC6E7.6010103@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 21 May 2014 10:34:18 -0500
+Subject: [PATCH 07/10] dt/bindings: arm-boards: add binding for Versatile
+ core module
+In-Reply-To: <7810339.hMuUdCPTp0@wuerfel>
+References: <1400620176-7239-1-git-send-email-robherring2@gmail.com>
+ <1400620176-7239-8-git-send-email-robherring2@gmail.com>
+ <7810339.hMuUdCPTp0@wuerfel>
+Message-ID: <CAL_JsqJTuMu4jz5t39gSt+DQieVkrvCUNyrp01yGqW_+17uQtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/05/14 18:26, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140521 08:18]:
->> On 21/05/14 18:02, Tony Lindgren wrote:
->>> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140521 05:51]:
->>>> Hi,
->>>>
->>>> Here are the AM43xx and OMAP5 display DT changes again. I've sent the clock
->>>> related changes separately, and I removed OMAP5's RFBI node, which depends on
->>>> more clock changes. The RFBI driver doesn't work at the moment anyway, so
->>>> removing the RFBI node should not be an issue.
->>>>
->>>> Tony, if these look fine (the rfbi change is the only one compared to the
->>>> previous versions), can you queue them for 3.16?
->>>
->>> Probably best that you do a late branch again after arm-soc dts changes
->>> have been merged. Sounds like you have at least that macro dependency
->>> to omap-for-v3.16/dt-v2 so you should probably base your branch on
+On Wed, May 21, 2014 at 3:24 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 20 May 2014 16:09:33 Rob Herring wrote:
+>> diff --git a/Documentation/devicetree/bindings/arm/arm-boards b/Documentation/devicetree/bindings/arm/arm-boards
+>> index 3509707..3a950d9 100644
+>> --- a/Documentation/devicetree/bindings/arm/arm-boards
+>> +++ b/Documentation/devicetree/bindings/arm/arm-boards
+>> @@ -86,3 +86,9 @@ Interrupt controllers:
+>>         compatible = "arm,versatile-sic";
+>>         interrupt-controller;
+>>         #interrupt-cells = <1>;
+>> +
+>> +Required nodes:
+>> +
+>> +- core-module: the root node to the Versatile platforms must have
+>> +  a core-module with regs and the compatible string
+>> +  "arm,core-module-versatile"
 >>
->> There are no dependencies that I know of. Which macro dependency is that?
-> 
-> Oh for the "[PATCH v2] ARM: dts: duovero-parlor: Add HDMI output" that
-> now uses the OMAP4_IOPAD macro.
+>
+>
+> Should we mark this compatible="syscon" as well, so we can move
+> the accesses into syscon references later if we want to?
 
-Ok.
+Yes, probably so. That should be done on Integrator and Realview as
+well if not already.
 
-But generally, isn't it better if the .dts changes go through your tree?
-None of the display related .dts changes have any dependencies to
-omapdss as such.
-
-I can collect the patches, as I've done, to let them mature a bit in my
-tree, but I'd rather get them merged via your dt branch.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/59aee510/attachment.sig>
+Rob
