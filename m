@@ -1,34 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 May 2014 07:41:58 -0700
-Subject: [PATCH 5/7] mfd: twl4030-power: Add support for board specific
- configuration
-In-Reply-To: <20140521091857.GD6679@lee--X1>
-References: <1400031250-29542-1-git-send-email-tony@atomide.com>
- <1400031250-29542-6-git-send-email-tony@atomide.com>
- <20140520151722.GA24991@lee--X1>
- <20140521024552.GD17417@atomide.com>
- <20140521091857.GD6679@lee--X1>
-Message-ID: <20140521144158.GE17417@atomide.com>
+From: jiada_wang@mentor.com (jiada_wang at mentor.com)
+Date: Wed, 21 May 2014 07:47:50 -0700
+Subject: [PATCH 1/2] ARM: imx: unset pllv3 BYPASS and POWER sequentially
+In-Reply-To: <1400683671-19132-1-git-send-email-jiada_wang@mentor.com>
+References: <1400683671-19132-1-git-send-email-jiada_wang@mentor.com>
+Message-ID: <1400683671-19132-2-git-send-email-jiada_wang@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lee Jones <lee.jones@linaro.org> [140521 02:19]:
-> On Tue, 20 May 2014, Tony Lindgren wrote:
-> 
-> > * Lee Jones <lee.jones@linaro.org> [140520 08:18]:
-> > > 
-> > > Ah, I forgot to Ack this last time, didn't I?
-> > > 
-> > >   Acked-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > Yeah, here's this one updated with your ack.
-> 
-> Has the code changed at all, or are you just reposting with my Ack
-> applied?
+From: Dirk Behme <dirk.behme@de.bosch.com>
 
-No changes, I just reposted this with your ack as you
-seemed to prefer for some of the other patches :)
+Currently, POWER and BYPASS bits are set up in a single write to pllv3
+register. With commit 43c9b9e8a4c6 ("ARM: imx: set up pllv3 POWER and
+BYPASS sequentially") this has been changed in the prepare() function.
+Do the same for the unprepare().
 
-Regards,
+Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+---
+ arch/arm/mach-imx/clk-pllv3.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Tony
+diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
+index 6136405..36f2396 100644
+--- a/arch/arm/mach-imx/clk-pllv3.c
++++ b/arch/arm/mach-imx/clk-pllv3.c
+@@ -98,6 +98,8 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
+ 
+ 	val = readl_relaxed(pll->base);
+ 	val |= BM_PLL_BYPASS;
++	writel_relaxed(val, pll->base);
++
+ 	if (pll->powerup_set)
+ 		val &= ~BM_PLL_POWER;
+ 	else
+-- 
+1.7.9.5
