@@ -1,60 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 May 2014 10:50:38 +0200
-Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140521082606.GB11068@ulmo>
-References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
- <5612206.Fzsy1mf3q3@wuerfel> <20140521082606.GB11068@ulmo>
-Message-ID: <4367469.BqpJyVF8PT@wuerfel>
+From: ritesh.harjani@gmail.com (Ritesh Harjani)
+Date: Wed, 21 May 2014 14:22:39 +0530
+Subject: Cache maintenance in arm_iommu_alloc_attrs for iommu_coherent_ops
+Message-ID: <CAD15agav14RUb473+iCm24HM9eQfWYG8ytZOfpzm5j0e3EX3WQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 May 2014 10:26:11 Thierry Reding wrote:
-> On Tue, May 20, 2014 at 10:26:12PM +0200, Arnd Bergmann wrote:
-> > On Tuesday 20 May 2014 16:24:59 Dave Martin wrote:
-> > > On Tue, May 20, 2014 at 02:41:18PM +0200, Arnd Bergmann wrote:
-> > > > On Tuesday 20 May 2014 14:02:43 Thierry Reding wrote:
-> [...]
-> > > > > Multiple-master IOMMU:
-> > > > > ----------------------
-> > > > > 
-> > > > > 	iommu {
-> > > > > 		/* the specifier represents the ID of the master */
-> > > > > 		#address-cells = <1>;
-> > > > > 		#size-cells = <0>;
-> > > 
-> > > How do we know the size of the input address to the IOMMU?  Do we
-> > > get cases for example where the IOMMU only accepts a 32-bit input
-> > > address, but some 64-bit capable masters are connected through it?
-> > 
-> > I was stuck on this question for a while before, but then I realized
-> > that it doesn't matter at all: It's the IOMMU driver itself that
-> > manages the address space, and it doesn't matter if a slave can
-> > address a larger range than the IOMMU can accept. If the IOMMU
-> > needs to deal with the opposite case (64-bit input addresses
-> > but a 32-bit master), that limitation can be put into the specifier.
-> 
-> Isn't this what DMA masks are for? Couldn't the IOMMU simply use the
-> master device's DMA mask to do the right thing here?
+Hi All,
 
-Ah, yes. I guess that's the right way to do it.
+There is this path in arm dma-mapping.c with respect to iommu coherent
+buffer allocation:
 
-> > > For determining dma masks, it is the output address that it
-> > > important.  Santosh's code can probably be taught to handle this,
-> > > if given an additional traversal rule for following "iommus"
-> > > properties.  However, deploying an IOMMU whose output address size
-> > > is smaller than the 
-> > 
-> > Something seems to be missing here. I don't think we want to handle
-> > the case where the IOMMU output cannot the entire memory address
-> > space. If necessary, that would mean using both an IOMMU driver
-> > and swiotlb, but I think it's a reasonable assumption that hardware
-> > isn't /that/ crazy.
-> 
-> Similarily, should the IOMMU not be treated like any other device here?
-> Its DMA mask should determine what address range it can access.
+1. arm_iommu_alloc_attrs
+       -> __iommu_alloc_buffer
+                 -> __dma_clear_buffer
 
-Right. But for that we need a dma-ranges property in the parent of the
-iommu, just so the mask can be set correctly and we don't have to
-rely on the 32-bit fallback case.
 
-	Arnd
+__dma_clear_buffer zeros out the allocated pages but also flushes the
+cpu and the outer cache for coherent iommu ops.
+
+I think the above operation for coherent iommu ops should not include
+cache flush operation right ??
+Or I am missing something here ? Whether this is put intentional or
+its a mistake we can correct ?
+
+
+Thanks
+Ritesh
