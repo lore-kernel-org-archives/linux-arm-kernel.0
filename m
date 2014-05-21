@@ -1,52 +1,57 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Wed, 21 May 2014 17:57:22 +0530
-Subject: [PATCH] ARM: dts: move dp hpd gpio pin to pinctrl_0 for exynos5420
- peach_pit
-Message-ID: <1400675242-7423-1-git-send-email-rahul.sharma@samsung.com>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Wed, 21 May 2014 18:02:06 +0530
+Subject: [PATCH] cpufreq: exynos: Fix driver compilation with
+ ARCH_MULTIPLATFORM
+In-Reply-To: <537C9B81.5040301@samsung.com>
+References: <537C6350.2010707@gmail.com>
+ <1400670752-673-1-git-send-email-t.figa@samsung.com>
+ <7243145.22RNvZMdch@wuerfel> <537C9B81.5040301@samsung.com>
+Message-ID: <CAJuA9ajHAyB6eLe0nQiNcCAS1ojG7W+FTJ1EH62H3Ch-DP2bcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DP Hpd Gpio pin which is "gpx2-6" in Exynos 5420 based peach board,
-belongs to Pinctrl_0. It has moved to pinctrl_0 from pinctrl_3.
+On Wed, May 21, 2014 at 5:56 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> On 21.05.2014 14:21, Arnd Bergmann wrote:
+>> On Wednesday 21 May 2014 13:12:32 Tomasz Figa wrote:
+>>> Currently Exynos cpufreq drivers rely on globally mapped clock
+>>> controller registers to configure frequency of CPU cores. This is
+>>> obviously wrong and will be removed in near future, but to enable
+>>> support for multi-platform builds without introducing a regression it
+>>> needs to be worked around.
+>>>
+>>> This patch hacks the code to look for clock controller node in device
+>>> tree and map its registers using of_iomap(), instead of relying on
+>>> global mapping, so dependencies on platform headers are removed and the
+>>> driver can compile again with multiplatform support.
+>>>
+>>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>>> ---
+>>>  drivers/cpufreq/Kconfig.arm          |  6 +++---
+>>>  drivers/cpufreq/exynos-cpufreq.c     |  2 --
+>>>  drivers/cpufreq/exynos-cpufreq.h     | 30 ++++++++++++++----------------
+>>>  drivers/cpufreq/exynos4210-cpufreq.c | 31 +++++++++++++++++++++++++------
+>>>  drivers/cpufreq/exynos4x12-cpufreq.c | 32 ++++++++++++++++++++++++++------
+>>>  drivers/cpufreq/exynos5250-cpufreq.c | 35 +++++++++++++++++++++++++++--------
+>>>  6 files changed, 95 insertions(+), 41 deletions(-)
+>>
+>> Isn't this completely obsoleted by Thomas Abraham's work on cpufreq-cpu0
+>> support in Exynos? I thought that was going to make it for 3.16.
+>
+> That would be the best solution, but we need at least one more version
+> of that series and I'm not sure if it isn't already too late to merge it
+> for 3.16.
 
-Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
----
-Based on Kukjin's for-next branch.
+I have addressed most the comments on the v4 patches. I will post v5
+of the cpufreq consolidation patches a little later or early tomorrow.
 
- arch/arm/boot/dts/exynos5420-peach-pit.dts |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+Thanks,
+Thomas.
 
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index d4127b0..29f64de 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -117,6 +117,13 @@
- 		samsung,pin-pud = <1>;
- 		samsung,pin-drv = <0>;
- 	};
-+
-+	dp_hpd_gpio: dp_hpd_gpio {
-+		samsung,pins = "gpx2-6";
-+		samsung,pin-function = <0>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
- };
- 
- &pinctrl_3 {
-@@ -133,13 +140,6 @@
- 		samsung,pin-pud = <0>;
- 		samsung,pin-drv = <0>;
- 	};
--
--	dp_hpd_gpio: dp_hpd_gpio {
--		samsung,pins = "gpx2-6";
--		samsung,pin-function = <0>;
--		samsung,pin-pud = <3>;
--		samsung,pin-drv = <0>;
--	};
- };
- 
- &rtc {
--- 
-1.7.9.5
+>
+> Best regards,
+> Tomasz
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
