@@ -1,50 +1,64 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Wed, 21 May 2014 11:53:13 +0000
-Subject: [PATCH v8 2/2] can: xilinx CAN controller support.
-In-Reply-To: <537C92C2.4090204@pengutronix.de>
-References: <30fc07d6-4404-4745-8c03-1c5ae775e4f1@BY2FFO11FD047.protection.gbl>
- <537C8E00.404@pengutronix.de>
- <72e9a444-0de4-42ce-a9d3-ee247948f0e6@BN1AFFO11FD030.protection.gbl>
- <537C92C2.4090204@pengutronix.de>
-Message-ID: <e806ce16-917f-473d-9876-d7e85aa95bc7@BN1BFFO11FD029.protection.gbl>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 21 May 2014 17:28:02 +0530
+Subject: [PATCH 1/1] clk: exynos5420: Staticize local variables
+Message-ID: <1400673482-16287-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Local symbols are made static.
 
-> -----Original Message-----
-> From: Marc Kleine-Budde [mailto:mkl at pengutronix.de]
-> Sent: Wednesday, May 21, 2014 5:19 PM
-> To: Appana Durga Kedareswara Rao; wg at grandegger.com; Michal Simek;
-> grant.likely at linaro.org; robh+dt at kernel.org
-> Cc: linux-can at vger.kernel.org; netdev at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH v8 2/2] can: xilinx CAN controller support.
->
-> On 05/21/2014 01:32 PM, Appana Durga Kedareswara Rao wrote:
-> > Hi Marc,
-> >
-> >         Yes for DT-bindings Rob already had given ack.
-> > Sorry I forgot to add the Acked-by line in that patch.
->
-> You mean Rob Herring?
->
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+ drivers/clk/samsung/clk-exynos5420.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-Yes Rob Herring.
-In the version 5 patch he had given the ack.
-
-Regards,
-Kedar.
-
->     Acked-by: Rob Herring <robh@kernel.org>
->
-> Marc
-> --
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
-
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+index 9d7d7eed03fd..41b507baf5d6 100644
+--- a/drivers/clk/samsung/clk-exynos5420.c
++++ b/drivers/clk/samsung/clk-exynos5420.c
+@@ -474,7 +474,7 @@ static struct samsung_fixed_factor_clock
+ 	FFACTOR(0, "ff_dout_spll2", "mout_sclk_spll", 1, 2, 0),
+ };
+ 
+-struct samsung_mux_clock exynos5800_mux_clks[] __initdata = {
++static struct samsung_mux_clock exynos5800_mux_clks[] __initdata = {
+ 	MUX(0, "mout_aclk400_isp", mout_group3_5800_p, SRC_TOP0, 0, 3),
+ 	MUX(0, "mout_aclk400_mscl", mout_group3_5800_p, SRC_TOP0, 4, 3),
+ 	MUX(0, "mout_aclk400_wcore", mout_group2_5800_p, SRC_TOP0, 16, 3),
+@@ -523,7 +523,7 @@ struct samsung_mux_clock exynos5800_mux_clks[] __initdata = {
+ 	MUX(0, "mout_fimd1", mout_group2_p, SRC_DISP10, 4, 3),
+ };
+ 
+-struct samsung_div_clock exynos5800_div_clks[] __initdata = {
++static struct samsung_div_clock exynos5800_div_clks[] __initdata = {
+ 	DIV(0, "dout_aclk400_wcore", "mout_aclk400_wcore", DIV_TOP0, 16, 3),
+ 
+ 	DIV(0, "dout_aclk550_cam", "mout_aclk550_cam",
+@@ -539,14 +539,14 @@ struct samsung_div_clock exynos5800_div_clks[] __initdata = {
+ 	DIV(0, "dout_sclk_sw", "sclk_spll", DIV_TOP9, 24, 6),
+ };
+ 
+-struct samsung_gate_clock exynos5800_gate_clks[] __initdata = {
++static struct samsung_gate_clock exynos5800_gate_clks[] __initdata = {
+ 	GATE(CLK_ACLK550_CAM, "aclk550_cam", "mout_user_aclk550_cam",
+ 				GATE_BUS_TOP, 24, 0, 0),
+ 	GATE(CLK_ACLK432_SCALER, "aclk432_scaler", "mout_user_aclk432_scaler",
+ 				GATE_BUS_TOP, 27, 0, 0),
+ };
+ 
+-struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
++static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
+ 	MUX(0, "sclk_bpll", mout_bpll_p, TOP_SPARE2, 0, 1),
+ 	MUX(0, "mout_aclk400_wcore_bpll", mout_aclk400_wcore_bpll_p,
+ 				TOP_SPARE2, 4, 1),
+@@ -576,7 +576,7 @@ struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
+ 	MUX(0, "mout_fimd1", mout_group3_p, SRC_DISP10, 4, 1),
+ };
+ 
+-struct samsung_div_clock exynos5420_div_clks[] __initdata = {
++static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
+ 	DIV(0, "dout_aclk400_wcore", "mout_aclk400_wcore_bpll",
+ 			DIV_TOP0, 16, 3),
+ };
+-- 
+1.7.9.5
