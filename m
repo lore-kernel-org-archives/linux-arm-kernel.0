@@ -1,44 +1,35 @@
 From: Nikolay.Borisov@arm.com (Nikolay Borisov)
-Date: Wed, 21 May 2014 10:28:20 +0100
-Subject: [PATCH 1/2] irqchip: Add generic gic-v1/gic-v2 compat strings.
+Date: Wed, 21 May 2014 10:28:21 +0100
+Subject: [PATCH 2/2] documentation/devicetree: Update GIC compat strings
 In-Reply-To: <1400664501-4208-1-git-send-email-Nikolay.Borisov@arm.com>
 References: <1400664501-4208-1-git-send-email-Nikolay.Borisov@arm.com>
-Message-ID: <1400664501-4208-2-git-send-email-Nikolay.Borisov@arm.com>
+Message-ID: <1400664501-4208-3-git-send-email-Nikolay.Borisov@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current set of GIC compatible strings only contains specific
-implementations (e.g. arm,cortex-a9-gic) rather than revisions of the
-standard (e.g. arm,gic-v2), so each new implementation must either claim
-to be an extension of an existing implementation or have a new string
-added to the driver. This may be problematic when workarounds are
-required for bugs in particular implementations, as said workaround may
-end up targeting a wider set of implementations than intended.
-
-To prevent these issues, this patch adds compatible strings for the
-revisions of the GIC spec which all GIC implementations should be able
-to claim conformance to in addition to any particular implementation
-specific string, e.g.
-
-compatible = "$VENDOR,specific-gic-variant", "arm,gic-v2";
+Document the addition of 2 new, implementation-agnostic compatible
+strings. This allows for more flexibility such that new implementation 
+can either state whether they are an extension of an existing implementation,
+a brand new implementation or just that they conform to a standard revision
+of the GIC spec.
 
 Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
 ---
- drivers/irqchip/irq-gic.c | 2 ++
+ Documentation/devicetree/bindings/arm/gic.txt | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 57d165e..89e9b05 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -1073,6 +1073,8 @@ gic_of_init(struct device_node *node, struct device_node *parent)
- }
- IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
- IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
-+IRQCHIP_DECLARE(gic_v1, "arm,gic-v1", gic_of_init);
-+IRQCHIP_DECLARE(gic_v2, "arm,gic-v2", gic_of_init);
- IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
- IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
+diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+index 5573c08..223b4cc 100644
+--- a/Documentation/devicetree/bindings/arm/gic.txt
++++ b/Documentation/devicetree/bindings/arm/gic.txt
+@@ -12,6 +12,8 @@ Main node required properties:
  
+ - compatible : should be one of:
+ 	"arm,gic-400"
++	"arm,gic-v1"
++	"arm,gic-v2"
+ 	"arm,cortex-a15-gic"
+ 	"arm,cortex-a9-gic"
+ 	"arm,cortex-a7-gic"
 -- 
 1.8.1.5
