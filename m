@@ -1,77 +1,96 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 21 May 2014 10:02:03 +0100
-Subject: [PATCH v9 14/14] virt: arm: support hip04 gic
-In-Reply-To: <CAD6h2NRv3hUa7vhbxVb1LhYi9K5OMVf01pyqp6yUC-+0zU8jkQ@mail.gmail.com>
-References: <1400591427-21922-1-git-send-email-haojian.zhuang@linaro.org>
- <1400591427-21922-15-git-send-email-haojian.zhuang@linaro.org>
- <20140520134441.GK5292@lvm>
- <CAD6h2NQyG1GSneWMpHmYxD-dPS7w9w2fe8vDdj-f834T2yqn1w@mail.gmail.com>
- <20140520140153.GL5292@lvm>
- <CAD6h2NQZGBa5U0-tmj=wtsFpcqnV2tHx+_vESrx8+3r7dGpHjQ@mail.gmail.com>
- <20140520150518.GA39503@lvm>
- <CAD6h2NRv3hUa7vhbxVb1LhYi9K5OMVf01pyqp6yUC-+0zU8jkQ@mail.gmail.com>
-Message-ID: <20140521090203.GB39503@lvm>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 21 May 2014 11:02:29 +0200
+Subject: [PATCH V5 18/20] ARM: exynos: cpuidle: Pass the AFTR callback
+ to the platform_data
+In-Reply-To: <11675203.TylGKV1VBZ@wuerfel>
+References: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
+ <5375262C.10805@samsung.com> <537C5296.7050801@linaro.org>
+ <11675203.TylGKV1VBZ@wuerfel>
+Message-ID: <537C6BA5.5080909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 11:39:12PM +0800, Haojian Zhuang wrote:
-> On 20 May 2014 23:05, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > On Tue, May 20, 2014 at 10:16:22PM +0800, Haojian Zhuang wrote:
-> >> On 20 May 2014 22:01, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> >> It's the implementation of gich_apr in arm32.
-> >>
-> >> We needn't add or change anything in struct vgic_cpu. And both the
-> >> assembly code and the code could be much easier.
-> >>
-> >
-> > But we do end up with an extra memory access from EL2 in the critical
-> > path, and I believe Marc's concern here is that if we cross a cache
-> > line, this might really hurt performance.
-> >
-> 
-> Sorry. Do we may cross a cache line or a TLB entry?
-> 
-> I think that you're concerning to cross TLB entries. The reason is in
->  below.
-> 
-> 1. If the problem is on crossing cache line, it's caused by too much
-> instructions. Either the packing nr_lr or the gich_apr adds some
-> instructions. The packing nr_lr needs a little more instructions.
+On 05/21/2014 10:10 AM, Arnd Bergmann wrote:
+> On Wednesday 21 May 2014 09:15:34 Daniel Lezcano wrote:
+>> On 05/15/2014 10:40 PM, Kukjin Kim wrote:
+>>
+>> [ ... ]
+>>
+>>>>>> Exynos cpuidle is not a device on the SoC, so I don't think there is
+>>>>>> any
+>>>>>> way to represent it in DT. The only thing I could see this is matching
+>>>>>> root node with a central SoC driver that instantiates specific
+>>>>>> subdevices, such as cpufreq and cpuidle, but I don't see any available
+>>>>>> infrastructure for this.
+>>>>>
+>>>>> There is a RFC for defining generic idle states [1].
+>>>>>
+>>>>> The idea behind using the platform driver framework is to unify the code
+>>>>> across the different drivers and separate the PM / cpuidle code.
+>>>>>
+>>>>> By this way, we can move the different drivers to drivers/cpuidle and
+>>>>> store them in a single place. That make easier the tracking, the review
+>>>>> and the maintenance.
+>
+> Yes, that would be great. I only looked briefly at the series now, doesn't
+> that require the use of psci?
 
-I don't see why this argument is valid.  If you have a separate
-instruction and data cache, you may be loading from a different cache
-line when placing the static value close to your instructions.  If you
-add a variable to the vcpu struct, all of the fields may no longer fit
-in a single data cache line and you may cause the memory subsystem to
-have to fetch another cache line.  I believe the latter is Marc's
-concern, and I suspect he would be equally concerned about the former.
+No, because PSCI is for some specific platform (eg. calxeda), all the 
+other drivers are legacy and manually handling the PM via some low level 
+callbacks. This is why all drivers were implemented all over the place 
+making so difficult to maintain them. Little by little, we split the PM 
+callbacks from the idle algorithm so reducing the platform dependency 
+with the generic code.
 
-I'm not too concerned about a TLB entry here, that works at a 4K
-granularity and with the proper alignment of the struct and hyp code,
-that shouldn't be a concern.  Without it, of course, there's a risk of
-requiring another TLB entry as well.
+The PSCI implements such PM callbacks in the firmware directly and are 
+accessed through an API. PSCI is, let's say some kindof nextgen cpuidle. 
+It is similar than mwait on Intel. But if a new platform does not have 
+such firmware, then the cpuidle driver will have the legacy format.
 
+> That's not a bad idea of course, but it
+> doesn't solve the problem I raised here.
+>
+>>>>> I am ok to by using platform_device_register_resndata() but I would
+>>>>> prefer to do that a bit later by converting the other drivers too. That
+>>>>> will be easier if we have them grouped in a single directory (this is
+>>>>> what does this patchset at the end).
+>>>>>
+>>>>> As there are some more work based on this patchset and the link error
+>>>>> could be fixed as an independent patch, I would recommend to
+>>>>> re-integrate it in the tree as asked by Bartlomiej.
+>>>>
+>>>> In general, it would be nice to have everything done properly, but I'd
+>>>> consider Daniel's series as a huge improvement already and a nice
+>>>> intermediate step towards further clean-up.
+>>>>
+>>>> So based on the comments quoted above, instead of stalling the
+>>>> development, I'd suggest to accept this series and then move forward.
+>>>>
+>>> I'm fine.
+>>>
+>>> Arnd, how about you?
+>>>
+>>> - Kukjin
+>>
+>> Arnd ?
+>
+> Sorry for the delay.
 
-> 
-> 2. ldr instruction is a pseudo instruction. So it's parsed into operation
-> on PC register.
+No problem.
 
-Eh, it just means that it does a load relative from the PC address, and
-if the offset is too far to be encoded in the immediate field, then it
-does an indirect load through a literal pool, if I understand what you
-are referring to.  In any case, there will be at least one actual ldr
-instruction issued on the PE.
+> Yes, let's do it this way once more, but please
+> come up with something better for the future that doesn't tie the
+> cpuidle method to the root compatible string as this does.
 
-> Now I put gich_apr in interrupts_head.S, it results
-> in gich_apr variable before __kvm_hyp_code_start. It may cross the
-> TLB entries.
-> How about to declare gich_apr after __kvm_cpu_return in interrupts.S?
-> Since save_vgic_state & restore_vgic_state is only used once, declaring
-> gich_apr just after the code could avoid crossing TLB entry.
-> 
+ok.
 
-Again, all the fields in the vcpu struct are quite likely to be aligned
-within a single data cache line, I don't believe that's the case if you
-stick some data in between the the hyp code.
+Thanks
 
--Christoffer
+   -- Daniel
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
