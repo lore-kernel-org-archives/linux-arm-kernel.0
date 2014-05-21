@@ -1,43 +1,38 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Wed, 21 May 2014 11:04:17 +0200
-Subject: [PATCH] ARM: dts: duovero-parlor: Add HDMI output
-In-Reply-To: <537C6322.2000101@ti.com>
-References: <1400595946-1294-1-git-send-email-florian.vaussard@epfl.ch>
- <CAGhQ9VxtJwrKzW77mo=y9_gvCRW_8TJEp90OVN+YPg2RpC=b_w@mail.gmail.com>
- <537C6082.2000405@epfl.ch> <537C6322.2000101@ti.com>
-Message-ID: <537C6C11.8010808@epfl.ch>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 21 May 2014 11:04:24 +0200
+Subject: [PATCH v4 2/2] ARM: sunxi: dt: Convert to the new i2c compatibles
+In-Reply-To: <20140521075415.GB2708@katana>
+References: <1396270498-30703-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1396270498-30703-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20140521075415.GB2708@katana>
+Message-ID: <20140521090424.GQ27329@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 05/21/2014 10:26 AM, Tomi Valkeinen wrote:
-> On 21/05/14 11:14, Florian Vaussard wrote:
+On Wed, May 21, 2014 at 09:54:15AM +0200, Wolfram Sang wrote:
+> On Mon, Mar 31, 2014 at 02:54:58PM +0200, Maxime Ripard wrote:
+> > Switch the device tree to the new compatibles introduced in the i2c drivers
+> > to have a common pattern accross all Allwinner SoCs.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
->>> I think Parlor has one and the "hdmi-connector" binding now
->>> supports it. See Tomi's 3.16/fbdev-omap branch.
->>> 
->> 
->> Looking into the details, the HPD pin of the parlor board is
->> connected to the OMAP4 HDMI IP. The LINK_CONNECT and
->> LINK_DISCONNECT events are managed by hdmi_irq_handler() in
->> hdmi4.c to turn on/off the PHY's power. So there is no need to
->> use the hgp-gpios binding of "hdmi-connector" IMHO. Correct me if
->> I am wrong, as the public TRM is pretty thin regarding the OMAP4
->> HDMI IP.
-> 
-> The PHY's link-connect and disconnect are a separate thing, not
-> really related to the HPD.
-> 
-> The hdmi_hpd pin on OMAP should be configured to GPIO mode, and the
-> GPIO should be handled by the hdmi-connector.
-> 
-> The HDMI driver doesn't have support for the HDMI IP's HPD, and if
-> I recall right, the HDMI IP's HPD was not without problems. And
-> afaik it doesn't really bring anything, a normal GPIO does the job
-> just fine.
+> I usually don't take dts updates, but I guess it makes sense this time,
+> because we dropped the old binding?
 > 
 
-I see. I will use the pin as a GPIO, and post a v2.
+Either way is fine for me. It would be better to have the two patches
+in the same tree, but I don't have any issue with merging it.
 
-Regards,
-Florian
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/fa74be59/attachment.sig>
