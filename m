@@ -1,138 +1,70 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 21 May 2014 12:17:09 +0200
-Subject: [GIT PULL] at91: DT for 3.16 #2
-In-Reply-To: <20140520164746.GA601@quad.lixom.net>
-References: <1400059162-630-1-git-send-email-nicolas.ferre@atmel.com>
- <20140520055041.GO18956@quad.lixom.net> <537B727C.5080404@atmel.com>
- <20140520164746.GA601@quad.lixom.net>
-Message-ID: <537C7D25.6060705@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 21 May 2014 11:18:09 +0100
+Subject: [PATCH 4/4] arm64: Enable TEXT_OFFSET fuzzing
+In-Reply-To: <20140520160827.GK3663@leverpostej>
+References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
+ <1400233839-15140-5-git-send-email-mark.rutland@arm.com>
+ <20140516140606.GH5624@arm.com>
+ <20140516165548.GA14766@leverpostej>
+ <20140520141126.GA1752@bill-the-cat>
+ <20140520160827.GK3663@leverpostej>
+Message-ID: <20140521101809.GD17827@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/05/2014 18:47, Olof Johansson :
-> Hi,
+On Tue, May 20, 2014 at 05:08:27PM +0100, Mark Rutland wrote:
+
+[...]
+
+> > > The 16B increment is required due to some code in head.S (__turn_mmu_on)
+> > > requiring a minimum 16B alignment for the object.
+> > > 
+> > > The 2MB maximum comes from the fact we rely on the start of memory being
+> > > 2MB aligned. I'm not sure there's a compelling reason to limit the
+> > > randomization if enabled at all -- either you can handle it or you
+> > > can't. Are we ever likely to want an offset larger than the memory
+> > > alignment?
+> > 
+> > A reason to limit the randomization is to make it easier on the
+> > bootloaders to be able to rule of thumb initial loads.  It's not a big
+> > deal with Image if it gets loaded lower than the offset, we can start
+> > shifting data at the end.  But when we start looking at Image.gz (or xz
+> > or ...), in some cases we'll get the whole image read into memory (network
+> > booting for example), uncompress the first block so we can confirm a
+> > good Image header and see about text_offset/image_size.  If we know that
+> > text_offset is somewhere random inside of 2MB (or some other documented
+> > max), we can then go with saying an initial load should be at say +32MB
+> > (to mirror Documentation/arm/Booting).  If it can be anywhere, then
+> > things get hard, or at least annoying (error out and tell the user to
+> > re-load things because of a random value?  I can see testing frameworks
+> > being annoyed about that).
 > 
-> On Tue, May 20, 2014 at 05:19:24PM +0200, Nicolas Ferre wrote:
->> On 20/05/2014 07:50, Olof Johansson :
->>> On Wed, May 14, 2014 at 11:19:22AM +0200, Nicolas Ferre wrote:
->>>> Arnd, Olof, Kevin,
->>>>
->>>> More DT material for AT91. Some fixes that apply on what was merged for 3.15
->>>> but that are not very critical.
->>>> The other patches are feature additions to old or very recent product/board:
->>>> at91sam9261 or sama5d3 Xplained.
->>>>
->>>> Thanks, best regards,
->>>>
->>>> The following changes since commit 27a96a0364787d2b41d2a72d08143d95263e1b07:
->>>>
->>>>   ARM: at91: sama5d3: clock for ssc from rk pin (2014-04-18 22:43:44 +0200)
->>>>
->>>> are available in the git repository at:
->>>>
->>>>   git://github.com/at91linux/linux-at91.git tags/at91-dt2
->>>>
->>>> for you to fetch changes up to a93f9c88b7701d1c4c3b22d39d64a408f000a6ef:
->>>>
->>>>   ARM: at91/dt: at91-sama5d3_xplained: add the regulator device node (2014-05-12 16:48:54 +0200)
->>>
->>> Merged, but:
->>>
->>>>  arch/arm/boot/dts/at91-sama5d3_xplained.dts |  62 +++++++++++++++
->>>>  arch/arm/boot/dts/at91sam9261.dtsi          | 114 ++++++++++++++++++++++++++--
->>>>  arch/arm/boot/dts/at91sam9rl.dtsi           |   7 +-
->>>>  arch/arm/boot/dts/sama5d3.dtsi              |  78 +++++++++++++++++++
->>>
->>> Grmbl. I remember being somewhat annoyed that you didn't use at91 prefix
->>> when you introduced the sama5d3 dtsi files, but please don't start using
->>> it on a random board like this, especially when other boards just use
->>> the sama5d3_<board>.dts format.
->>
->> Well, I don't understand completely. Since our discussion during 3.10
->> merge window ([GIT PULL] at91: DT changes for 3.10 #2), I try to conform
->> to this rule:
->>
->> 1/ all pre-3.10 and 3.10 device tree file names stay unchanged
->> -> sama5d3.dti (SoC)
->> -> sama5d35ek.dts (board)
->>
->> 2/ all *SoC* DT files conform to their marking:
->> at91sam9263.dtsi
->> at91sam9rl.dtsi
->> sama5d3.dtsi, sama5d36.dtsi
->> sama5d4.dtsi, sama5d46.dtsi (maybe in the future, who knows...)
->>
->> 3/ all post-3.10 *boards* have the "at91-" prefix, whether they are
->> populated with sam9 or sama5:
->> at91-ariag25.dts (since 3.10, using a at91sam9g25)
->> at91-qil_a9260.dts (since 3.14, using at91sam9260)
->> at91-sama5d3_xplained.dts (since 3.14, using sama5d36)
->>
->> The rule for AT91 has never been to prefix the board DT filename with
->> the name of the SoC or SoC family.
+> Ouch, that is somewhat painful.
 > 
-> So, going back and looking at the discussion from a year ago, I think the
-> disconnect was in what consistency we were looking for. Yes, we would have
-> preferred to prefix the sama5d3* dts/dtsis with at91, and you even
-> offered to do it. ;-) But I think even more important for sanity is
-> to stay consistent with how we handle all platforms, which is that the
-> board dts files are prefixed with the SoC name.
+> I don't think we expect to see a text_offset larger than 2MB, and I
+> can't immediately see why we'd care about any particular text offset
+> assuming the page tables are at the end of the runtime image. That said,
+> I'm not completely clear on the history of the text_offset.
 > 
-> In the past, we've had cases where this didn't happen, but these days we have
-> tried to be very consistent on it. I.e. omap3*, exynos<##>*, etc.
-
-Okay, but once again, I tried to deal with the existing files, not break
-any user's habit, before any convention had been clearly established,
-and now... we are reaching a deadlock having to re-consider again our DT
-filenames?
-
-> So, if you have at91- as a prefix, have the SoC as the second component. But
-> that gets awkward too, so I would juts use the current SoC dtsi as the prefix
-> at91sam9263-<boardname>.dts, or sama5d35_<boardname>.dts.
+> > And we should document the range of the offset in
+> > Documentation/arm64/booting.txt as well.
 > 
->>> Care to fix this up in time for 3.16 merge window?
->>
->> Well, I do not know what to fix as the files were already present in
->> mainline before this kernel revision and that I am a little bit
->> reluctant to change file names after they are merged in mainline.
->>
->> Now, can we keep the current policy described above (somehow weird, I
->> admit) for future SoCs and boards?
+> As far as I am aware, we have a 64-bit field specifically to allow for
+> an arbitrarily large value, so placing limitations on that may be a
+> little difficult.
 > 
-> It is unfortunate that I didn't catch this for 3.14 so that name has been
-> there in a release. I guess the least disruptive thing for now would be
-> to change over to use the SoC dtsi prefix for any new board files from
-> here on out, and treat at91-sama5d3_xplained as a one-time thing.
+> As stated above, I don't think there'd be a reason for having a
+> text_offset larger than our memory alignment restriction (2MB), but
+> there may be something I've missed. If others are reasonably confident
+> with an upper limit, I'd be happy to go with it.
 
-That is not only about sama5d3, what about sam9-based boards? Several of
-them already have this "at91-" prefix (and not a soc prefix).
+Having thought about it a little more, the primary reason for having
+text_offset is to allow for memory below the kernel to be addressable.
+If we decouple the linear mapping from the kernel text mapping this
+would not be a problem -- we'd be able to load the kernel at any
+2MB-aligned address + text_offset and use memory below it.
 
-So this will introduce another temporary naming convention for these
-files which are actually used by people: everyone will be puzzled.
+So I think we could get away with limiting text_offset to 2MB.
 
-Okay, there are two ways to escape this situation:
-1/ change nothing and conform to what I stated above. It is more like
-   finding a rationale to an existing situation than a real neat
-   policy, but hey, "nobody's perfect".
-2/ change *everything* in AT91 DT file naming with a schema that
-   we will have to validate with care (<soc family> or <soc>,
-   "_" or "-", what about boards with modules, etc.).
-   That will certainly disturb many of our users without a real benefit.
-
-This directory is flat, the board names are chosen by companies and
-people that we do not control, a user tend to like finding his preferred
-board dtb file unchanged from a kernel revision to another...
-Well all this lead me to think that we don't have to loose too much time
-thinking about a new strict convention for this file naming or changing
-all this once again just for the sake of it.
-
-Other SoC maintainers beautifully designed from the beginning the naming
-scheme of their DT files, fine. AT91 did not and forgive me but when
-opening arch/arm/boot/dts/Makefile file and seeing some file names, I'm
-not ashamed. Moreover, now that I said to everybody since 3.10 to prefix
-their *board* name with "at91-", I have to say something else, I don't
-think it is worth it.
-
-Bye,
--- 
-Nicolas Ferre
+Cheers,
+Mark.
