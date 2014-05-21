@@ -1,20 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 May 2014 14:35:35 -0700
-Subject: [GIT PULL] Allwinner core for 3.16
-In-Reply-To: <20140516112048.GA18800@lukather>
-References: <20140516112048.GA18800@lukather>
-Message-ID: <20140521213535.GD24972@quad.lixom.net>
+Date: Wed, 21 May 2014 14:36:38 -0700
+Subject: [GIT PULL] Allwinner DT for 3.16
+In-Reply-To: <20140516120721.GA20433@lukather>
+References: <20140516120721.GA20433@lukather>
+Message-ID: <20140521213638.GE24972@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 16, 2014 at 01:20:48PM +0200, Maxime Ripard wrote:
+On Fri, May 16, 2014 at 02:07:21PM +0200, Maxime Ripard wrote:
 > Hi Arnd, Kevin, Olof,
 > 
-> Here is the first of the Allwinner pull requests for the 3.16 merge
-> window.
-> 
-> Thanks!
-> Maxime
+> Here is the pull request for the DT changes for the sunXi SoCs.
 > 
 > The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 > 
@@ -22,13 +18,13 @@ On Fri, May 16, 2014 at 01:20:48PM +0200, Maxime Ripard wrote:
 > 
 > are available in the git repository at:
 > 
->   https://github.com/mripard/linux.git tags/sunxi-core-for-3.16
+>   https://github.com/mripard/linux.git tags/sunxi-dt-for-3.16
 > 
-> for you to fetch changes up to 324da938cb7eb103a925817f9aacdcc1f0e22576:
+> for you to fetch changes up to 209394aed532c5de9bf549f4beac92bf1b80f887:
 > 
->   ARM: sunxi: select MFD_SUN6I_PRCM when sun6i arch support is enabled (2014-05-15 17:30:07 +0200)
+>   ARM: sunxi: dt: declare the r_pio pin controller for A31 SoC (2014-05-15 10:38:00 +0200)
 
-Merged into next/soc. Thanks!
+Merged into next/dt. Thanks!
 
 
 -Olof
