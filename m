@@ -1,102 +1,82 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 21 May 2014 11:06:44 -0600
-Subject: [PATCH v7 0/3] Add support for PCI in AArch64
-In-Reply-To: <20140521113421.GB13511@bart.dudau.co.uk>
-References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
- <CA+sq2Ccok5wtKjCZUkBhhj3WsiqFAoMgHK7LY210aBtMku+8SA@mail.gmail.com>
- <20140516132451.GK967@e106497-lin.cambridge.arm.com>
- <CA+sq2CejJFg--0rS1arr4Sactp-ssENB8Y3g4b61JPGPBCms=A@mail.gmail.com>
- <CA+sq2Ccp0_4hgbbWa27bkYcqiXY6Ckr8eckWnHwANvhWNo97fg@mail.gmail.com>
- <20140521113421.GB13511@bart.dudau.co.uk>
-Message-ID: <20140521170644.GJ8775@obsidianresearch.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 21 May 2014 18:09:54 +0100
+Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140521090037.GA19268@ulmo>
+References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
+ <5612206.Fzsy1mf3q3@wuerfel> <20140521082606.GB11068@ulmo>
+ <4367469.BqpJyVF8PT@wuerfel> <20140521090037.GA19268@ulmo>
+Message-ID: <20140521170954.GC3830@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 21, 2014 at 12:34:21PM +0100, Liviu Dudau wrote:
-> On Wed, May 21, 2014 at 04:45:29PM +0530, Sunil Kovvuri wrote:
-> > Hi Liviu,
+On Wed, May 21, 2014 at 11:00:38AM +0200, Thierry Reding wrote:
+> On Wed, May 21, 2014 at 10:50:38AM +0200, Arnd Bergmann wrote:
+> > On Wednesday 21 May 2014 10:26:11 Thierry Reding wrote:
+> > > On Tue, May 20, 2014 at 10:26:12PM +0200, Arnd Bergmann wrote:
+> > > > On Tuesday 20 May 2014 16:24:59 Dave Martin wrote:
+> > > > > On Tue, May 20, 2014 at 02:41:18PM +0200, Arnd Bergmann wrote:
+> > > > > > On Tuesday 20 May 2014 14:02:43 Thierry Reding wrote:
+> > > [...]
+> > > > > > > Multiple-master IOMMU:
+> > > > > > > ----------------------
+> > > > > > > 
+> > > > > > > 	iommu {
+> > > > > > > 		/* the specifier represents the ID of the master */
+> > > > > > > 		#address-cells = <1>;
+> > > > > > > 		#size-cells = <0>;
+> > > > > 
+> > > > > How do we know the size of the input address to the IOMMU?  Do we
+> > > > > get cases for example where the IOMMU only accepts a 32-bit input
+> > > > > address, but some 64-bit capable masters are connected through it?
+> > > > 
+> > > > I was stuck on this question for a while before, but then I realized
+> > > > that it doesn't matter at all: It's the IOMMU driver itself that
+> > > > manages the address space, and it doesn't matter if a slave can
+> > > > address a larger range than the IOMMU can accept. If the IOMMU
+> > > > needs to deal with the opposite case (64-bit input addresses
+> > > > but a 32-bit master), that limitation can be put into the specifier.
+> > > 
+> > > Isn't this what DMA masks are for? Couldn't the IOMMU simply use the
+> > > master device's DMA mask to do the right thing here?
 > > 
-> > Sorry for the trouble.
-> > I got why 'res->parent' is not set in my case.
-> > Basically my SR-IOV device has fixed resources, so resources will not
-> > be allocated/assigned and hence parent resource is not set.
-> > I will move the resource claiming to host controller driver as a fixup
-> > so that parent resource hierarchy is set.
+> > Ah, yes. I guess that's the right way to do it.
 > > 
-> > Thanks for the support.
+> > > > > For determining dma masks, it is the output address that it
+> > > > > important.  Santosh's code can probably be taught to handle this,
+> > > > > if given an additional traversal rule for following "iommus"
+> > > > > properties.  However, deploying an IOMMU whose output address size
+> > > > > is smaller than the 
+> > > > 
+> > > > Something seems to be missing here. I don't think we want to handle
+> > > > the case where the IOMMU output cannot the entire memory address
+> > > > space. If necessary, that would mean using both an IOMMU driver
+> > > > and swiotlb, but I think it's a reasonable assumption that hardware
+> > > > isn't /that/ crazy.
+> > > 
+> > > Similarily, should the IOMMU not be treated like any other device here?
+> > > Its DMA mask should determine what address range it can access.
+> > 
+> > Right. But for that we need a dma-ranges property in the parent of the
+> > iommu, just so the mask can be set correctly and we don't have to
+> > rely on the 32-bit fallback case.
 > 
-> Glad you worked out the cause for the problem. I will still at to my list of
-> ToDo things to investigate resource parenting with my patchset.
+> Shouldn't the IOMMU driver be the one to set the DMA mask for the device
+> in exactly the same way that other drivers override the 32-bit default?
+> 
 
-We recently fixed some things in this area on mvebu. It is important
-to ensure that the aperature in the host driver has a proper resource
-associated with it, or the PCI core won't create sub resources.
+Are we confusing the "next-hop DMA mask" with the "end-to-end DMA mask"
+here?  The device has a next-hop mask which may be non-trivial.  The
+IOMMU also has a next-hop mask and/or remapping, but I think we agree
+that in sensible systems that will be trivial.  There might be other
+non-trivial remappings between the IOMMU and memory (but again, not
+in the common case).
 
-commit 2613ba480fb7b40c67eea36d03c9946977828623
-Author: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-Date:   Wed Feb 12 15:57:08 2014 -0700
+If we just use the same name for all these, we are liable to get
+confused.
 
-    PCI: mvebu: Call request_resource() on the apertures
-    
-    It is typical for host drivers to request a resource for the aperture; once
-    this is done the PCI core will properly populate resources for all BARs in
-    the system.
-    
-    With this patch cat /proc/iomem will now show:
-    
-      e0000000-efffffff : PCI MEM 0000
-        e0000000-e00fffff : PCI Bus 0000:01
-          e0000000-e001ffff : 0000:01:00.0
-    
-    Tested on Kirkwood.
-    
-    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-    Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-    Acked-by: Jason Cooper <jason@lakedaemon.net>
+To answer the question "what memory can the kernel allocate for DMA
+with this device", it is the end-to-end transformation that is
+important.
 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 05e352889868..d3d1cfd51e09 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -101,7 +101,9 @@ struct mvebu_pcie {
-        struct mvebu_pcie_port *ports;
-        struct msi_chip *msi;
-        struct resource io;
-+       char io_name[30];
-        struct resource realio;
-+       char mem_name[30];
-        struct resource mem;
-        struct resource busn;
-        int nports;
-@@ -672,10 +674,30 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
- {
-        struct mvebu_pcie *pcie = sys_to_pcie(sys);
-        int i;
-+       int domain = 0;
- 
--       if (resource_size(&pcie->realio) != 0)
-+#ifdef CONFIG_PCI_DOMAINS
-+       domain = sys->domain;
-+#endif
-+
-+       snprintf(pcie->mem_name, sizeof(pcie->mem_name), "PCI MEM %04x",
-+                domain);
-+       pcie->mem.name = pcie->mem_name;
-+
-+       snprintf(pcie->io_name, sizeof(pcie->io_name), "PCI I/O %04x", domain);
-+       pcie->realio.name = pcie->io_name;
-+
-+       if (request_resource(&iomem_resource, &pcie->mem))
-+               return 0;
-+
-+       if (resource_size(&pcie->realio) != 0) {
-+               if (request_resource(&ioport_resource, &pcie->realio)) {
-+                       release_resource(&pcie->mem);
-+                       return 0;
-+               }
-                pci_add_resource_offset(&sys->resources, &pcie->realio,
-                                        sys->io_offset);
-+       }
-        pci_add_resource_offset(&sys->resources, &pcie->mem, sys->mem_offset);
-        pci_add_resource(&sys->resources, &pcie->busn);
+Cheers
+---Dave
