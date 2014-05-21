@@ -1,52 +1,83 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 May 2014 22:40:07 +0900
-Subject: [PATCH 2/3] ARM: EXYNOS: Enable multi-platform build support
-In-Reply-To: <CAK9yfHxj-z1bWQqiaWVwvL2yRotqZn86ecjKcoHcyMQHZCrVcA@mail.gmail.com>
-References: <1400655169-21683-1-git-send-email-sachin.kamat@linaro.org>
- <1400655169-21683-3-git-send-email-sachin.kamat@linaro.org>
- <1635304.bK37Q0Q4AO@amdc1032>
- <CAK9yfHxj-z1bWQqiaWVwvL2yRotqZn86ecjKcoHcyMQHZCrVcA@mail.gmail.com>
-Message-ID: <036c01cf74fa$2da9c320$88fd4960$@samsung.com>
+From: raghupv30@gmail.com (Raghu Pv)
+Date: Wed, 21 May 2014 14:40:16 +0100
+Subject: CLONE from pthread_create fails with ERESTARTNOINTR and application
+ crashes
+Message-ID: <CAGJAg9EHSgOg3trryA5Zb5ms8pfTX6Y7DF4s-mEP6YZmD8twVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sachin Kamat wrote:
-> 
-> Hi Bartlomiej,
-> 
-> On 21 May 2014 16:06, Bartlomiej Zolnierkiewicz
-> <b.zolnierkie@samsung.com> wrote:
-> >
-> > Hi,
-> >
-> > On Wednesday, May 21, 2014 12:22:48 PM Sachin Kamat wrote:
-> >> From: Arnd Bergmann <arnd@arndb.de>
-> >>
-> >> This makes it possible to enable the exynos platform as part of a
-> >> multiplatform kernel, in addition to keeping the single-platform
-> >> Exynos support.
-> >
-> > The patch description is wrong.  After this patch single-platform Exynos
-> > support is no longer available
-> 
-> Forgot to update the message while rebasing. Thanks for noticing.
-> 
-> > and it adds at least one serious regression
-> 
-> I have mentioned about this in the cover letter.
-> 
-> > (cpufreq) which should be fixed before merging this patch.  Moreover it
-> > seems that this patch (#2) should be merged with patch #3 to preserve
-> > bisectability.
-> 
-> At this point exynos_defconfig works.
-> 
-> >Please also note that exynos_defconfig is no longer useful
-> > after these changes and can be be removed.
-> 
-> Yes.
-> 
-Well, I think keeping the exynos_defconfig would be nice like other platform in multiplatforms...and I'm going to enable possible configs in exynos_defconfig for exynso SoCs then it can cover more for exynos...
+Overview:
 
-Thanks,
-Kukjin
+
+
+CLONE from pthread_create fails with ERESTARTNOINTR and application crashes
+
+
+
+Steps to reproduce:
+
+
+
+Executing a multithreaded application that creates and terminates
+threads and also there a lot of signals
+
+
+
+If a signal arrives during execution of clone(), clone is returning
+ERESTARTNOINTR to userspace.
+
+
+
+We see the following implementation that sets ERESTARTNOINTR:
+
+
+
+        /*
+
+         * Process group and session signals need to be delivered to just the
+
+         * parent before the fork or both the parent and the child after the
+
+         * fork. Restart if a signal comes in before we add the new process to
+
+         * it's process group.
+
+         * A fatal signal pending means that current will exit, so the new
+
+         * thread can't slip out of an OOM kill (or normal SIGKILL).
+
+         */
+
+        recalc_sigpending();
+
+        if (signal_pending(current)) {
+
+                spin_unlock(&current->sighand->siglock);
+
+                write_unlock_irq(&tasklist_lock);
+
+                retval = -ERESTARTNOINTR;
+
+                goto bad_fork_cleanup_namespace;
+
+        }
+
+
+
+
+
+Leaking ERESTARTNOINTR to userspace is a big concern because this a
+kernel internal error code.
+
+
+
+Immediately after that the application crashes.
+
+
+
+Actual result: Application crashes
+
+
+
+Expected Result: Application should not crash and clone system call
+should restart if clone is previously interrupted by a signal.
