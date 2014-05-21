@@ -1,28 +1,46 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 21 May 2014 10:29:17 +0200
-Subject: [PATCH] i2c: cadence: fix Kconfig dependency
-In-Reply-To: <4c4d2ba5-f5f6-4589-8a48-6a88d1c16098@VA3EHSMHS046.ehs.local>
-References: <1396811227-8851-1-git-send-email-wsa@the-dreams.de>
- <1396852656.682914397@f273.i.mail.ru>
- <20140407065657.GO29751@pengutronix.de>
- <1396854155.872298456@f287.i.mail.ru>
- <4c4d2ba5-f5f6-4589-8a48-6a88d1c16098@VA3EHSMHS046.ehs.local>
-Message-ID: <20140521082917.GG2708@katana>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 21 May 2014 10:32:38 +0200
+Subject: [PATCH 3/3] ARM: sti: stih41x: Provide a proper header for this
+ DTSI file
+In-Reply-To: <1400660415-14720-3-git-send-email-lee.jones@linaro.org>
+References: <1400660415-14720-1-git-send-email-lee.jones@linaro.org>
+ <1400660415-14720-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <537C64A6.4050409@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I'd propose the below fix. The relaxed IO helpers are currently
-> available on ARM only and the clock notifier used, depends on
-> COMMON_CLK. I2C-related dependencies should be okay due to the location in
-> Kconfig of this option.
+Hi Lee,
 
-If somebody thinks an update is still needed, please resend against
-latest i2c-next. Thanks.
+On 05/21/2014 10:20 AM, Lee Jones wrote:
+> Also explicitly include STiH416 Clk bindings instead of relying on
+> inheriting them from other DTSI files which we happen to include.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>   arch/arm/boot/dts/stih41x.dtsi | 8 ++++++++
+>   1 file changed, 8 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/stih41x.dtsi b/arch/arm/boot/dts/stih41x.dtsi
+> index f5b9898..32730e5 100644
+> --- a/arch/arm/boot/dts/stih41x.dtsi
+> +++ b/arch/arm/boot/dts/stih41x.dtsi
+> @@ -1,3 +1,11 @@
+> +/*
+> + * Copyright (C) 2014 STMicroelectronics Limited.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * publishhed by the Free Software Foundation.
+> + */
+> +#include "stih416-clock.dtsi"
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/25330a54/attachment.sig>
+Nack.
+As discussed on IRC, this dtsi file is included by stih415.dtsi.
+In this case, we want to include stih415-clocks.dtsi instead.
+
+Regards,
+Maxime
+>   / {
+>   	#address-cells = <1>;
+>   	#size-cells = <1>;
+>
