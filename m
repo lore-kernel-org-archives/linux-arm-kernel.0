@@ -1,55 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 May 2014 20:11:19 +0200
-Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140521170954.GC3830@e103592.cambridge.arm.com>
-References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
- <20140521090037.GA19268@ulmo>
- <20140521170954.GC3830@e103592.cambridge.arm.com>
-Message-ID: <4393962.rf2bYfTJVU@wuerfel>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 21 May 2014 22:18:59 +0400
+Subject: [Patch] ARM: dts: keystone: add pll controller syscon entry
+In-Reply-To: <1400681875-24432-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1400681875-24432-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <537CEE13.5040908@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 May 2014 18:09:54 Dave Martin wrote:
-> On Wed, May 21, 2014 at 11:00:38AM +0200, Thierry Reding wrote:
-> > On Wed, May 21, 2014 at 10:50:38AM +0200, Arnd Bergmann wrote:
-> > > On Wednesday 21 May 2014 10:26:11 Thierry Reding wrote:
-> > > > 
-> > > > Similarily, should the IOMMU not be treated like any other device here?
-> > > > Its DMA mask should determine what address range it can access.
-> > > 
-> > > Right. But for that we need a dma-ranges property in the parent of the
-> > > iommu, just so the mask can be set correctly and we don't have to
-> > > rely on the 32-bit fallback case.
-> > 
-> > Shouldn't the IOMMU driver be the one to set the DMA mask for the device
-> > in exactly the same way that other drivers override the 32-bit default?
-> > 
-> 
-> Are we confusing the "next-hop DMA mask" with the "end-to-end DMA mask"
-> here?  The device has a next-hop mask which may be non-trivial.  The
-> IOMMU also has a next-hop mask and/or remapping, but I think we agree
-> that in sensible systems that will be trivial.  There might be other
-> non-trivial remappings between the IOMMU and memory (but again, not
-> in the common case).
-> 
-> If we just use the same name for all these, we are liable to get
-> confused.
-> 
-> To answer the question "what memory can the kernel allocate for DMA
-> with this device", it is the end-to-end transformation that is
-> important.
+Hello.
 
-Yes, but that is not the same as the dma mask of the device. The DMA
-mask gets set by the device according to its capabilities, and may
-get limited by what the bus to either memory or to the iommu can do,
-if one is in use.
+On 05/21/2014 06:17 PM, Ivan Khoronzhuk wrote:
 
-Without an IOMMU, the mask is used for allocations, with an IOMMU,
-The iommu code makes the decision what to allocate without taking
-dev->dma_mask into account.
+> The pll controller register set includes sets of registers with
+> different purposes, so it's logically to add syscon entry to be able
+> to access them from appropriate places.
 
-As mentioned, this is currently not handled well for SCSI and network,
-where we use a smaller mask than necessary and can end up copying
-data.
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> ---
 
-	Arnd
+> Based on linux-next/master
+
+>   arch/arm/boot/dts/keystone.dtsi | 5 +++++
+>   1 file changed, 5 insertions(+)
+
+> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+> index d9f99e7..5e67c5b 100644
+> --- a/arch/arm/boot/dts/keystone.dtsi
+> +++ b/arch/arm/boot/dts/keystone.dtsi
+> @@ -66,6 +66,11 @@
+>   		ranges = <0x0 0x0 0x0 0xc0000000>;
+>   		dma-ranges = <0x80000000 0x8 0x00000000 0x80000000>;
+>
+> +		pllctrl: pll_controller {
+
+   I think it's better to follow the pattern established by "reset-controller" 
+and use hyphen ISO dash in the node name. This is also a common practice to 
+use hyphens in the device trees overall.
+
+> +			compatible = "ti,keystone-pllctrl", "syscon";
+> +			reg = <0x2310000 0x200>;
+> +		};
+> +
+>   		rstctrl: reset-controller {
+>   			compatible = "ti,keystone-reset";
+>   			reg = <0x023100e8 4>;	/* pll reset control reg */
+>
+
+WBR, Sergei
