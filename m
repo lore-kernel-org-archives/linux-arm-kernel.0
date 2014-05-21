@@ -1,33 +1,47 @@
 From: gdjakov@mm-sol.com (Georgi Djakov)
-Date: Wed, 21 May 2014 17:57:01 +0300
-Subject: [PATCH v1 0/4] Add Qualcomm APQ8084 SoC support
-Message-ID: <1400684225-21381-1-git-send-email-gdjakov@mm-sol.com>
+Date: Wed, 21 May 2014 17:57:03 +0300
+Subject: [PATCH v1 2/4] ARM: dts: qcom: Add APQ8084-MTP board support
+In-Reply-To: <1400684225-21381-1-git-send-email-gdjakov@mm-sol.com>
+References: <1400684225-21381-1-git-send-email-gdjakov@mm-sol.com>
+Message-ID: <1400684225-21381-3-git-send-email-gdjakov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds basic support for the Qualcomm Snapdragon 805 APQ8084 SoC.
+Add device-tree file for APQ8084-MTP board, which belongs
+to the Snapdragon 805 family.
 
-The first two patches add device-tree files for the SoC and the board, the
-second adds the board compatible string to the DT machine descriptor and the
-third patch adds the low-level debug UART base address and a Kconfig entry.
-
-Tested on APQ8084-MTP board.
-
-Georgi Djakov (4):
-  ARM: dts: qcom: Add APQ8084 SoC support
-  ARM: dts: qcom: Add APQ8084-MTP board support
-  ARM: qcom: Add APQ8084-MTP board to mach-qcom
-  ARM: debug: qcom: Add APQ8084 DEBUG_LL UART support
-
- arch/arm/Kconfig.debug                 |    9 ++
- arch/arm/boot/dts/Makefile             |    3 +-
- arch/arm/boot/dts/qcom-apq8084-mtp.dts |    6 ++
- arch/arm/boot/dts/qcom-apq8084.dtsi    |  180 ++++++++++++++++++++++++++++++++
- arch/arm/include/debug/msm.S           |    5 +
- arch/arm/mach-qcom/board.c             |    1 +
- 6 files changed, 203 insertions(+), 1 deletion(-)
+Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+---
+ arch/arm/boot/dts/Makefile             |    3 ++-
+ arch/arm/boot/dts/qcom-apq8084-mtp.dts |    6 ++++++
+ 2 files changed, 8 insertions(+), 1 deletion(-)
  create mode 100644 arch/arm/boot/dts/qcom-apq8084-mtp.dts
- create mode 100644 arch/arm/boot/dts/qcom-apq8084.dtsi
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 377b7c3..792f063 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -293,7 +293,8 @@ dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb
+ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+ dtb-$(CONFIG_ARCH_QCOM) += qcom-msm8660-surf.dtb \
+ 	qcom-msm8960-cdp.dtb \
+-	qcom-apq8074-dragonboard.dtb
++	qcom-apq8074-dragonboard.dtb \
++	qcom-apq8084-mtp.dtb
+ dtb-$(CONFIG_ARCH_S3C24XX) += s3c2416-smdk2416.dtb
+ dtb-$(CONFIG_ARCH_S3C64XX) += s3c6410-mini6410.dtb \
+ 	s3c6410-smdk6410.dtb
+diff --git a/arch/arm/boot/dts/qcom-apq8084-mtp.dts b/arch/arm/boot/dts/qcom-apq8084-mtp.dts
+new file mode 100644
+index 0000000..9dae387
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-apq8084-mtp.dts
+@@ -0,0 +1,6 @@
++#include "qcom-apq8084.dtsi"
++
++/ {
++	model = "Qualcomm APQ 8084-MTP";
++	compatible = "qcom,apq8084-mtp", "qcom,apq8084";
++};
 -- 
 1.7.9.5
