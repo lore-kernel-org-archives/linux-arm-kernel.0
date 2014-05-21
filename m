@@ -1,88 +1,56 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 21 May 2014 16:26:46 +0200
-Subject: [PATCH] ARM: dts: Add audio subsystem nodes to exynos4.dtsi
-In-Reply-To: <1400239733-11782-1-git-send-email-s.nawrocki@samsung.com>
-References: <1400239733-11782-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <537CB7A6.3050202@samsung.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Wed, 21 May 2014 17:27:29 +0300
+Subject: [Patch v4 0/5] Introduce keystone reset driver
+Message-ID: <1400682454-24535-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/05/14 13:28, Sylwester Nawrocki wrote:
-> This patch adds the audio subsystem clock controller and the I2S
-> IP block nodes for Exynos4 SoC series.
-> 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+These patches introduce keystone reset driver.
 
-Can this still be applied in the coming merge window ?
+The keystone SoC can be rebooted in several ways. By external reset
+pin, by soft and by watchdogs. This driver allows software reset and reset
+by one of the watchdogs. Also added opportunity to set soft/hard reset type.
 
-Thanks,
-Sylwester
-> ---
->  arch/arm/boot/dts/exynos4.dtsi |   38 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-> index 58ff8e2..0eb768c 100644
-> --- a/arch/arm/boot/dts/exynos4.dtsi
-> +++ b/arch/arm/boot/dts/exynos4.dtsi
-> @@ -20,6 +20,7 @@
->   */
-> 
->  #include <dt-bindings/clock/exynos4.h>
-> +#include <dt-bindings/clock/exynos-audss-clk.h>
->  #include "skeleton.dtsi"
-> 
->  / {
-> @@ -45,6 +46,23 @@
->  		fimc3 = &fimc_3;
->  	};
-> 
-> +	clock_audss: clock-controller at 03810000 {
-> +		compatible = "samsung,exynos4210-audss-clock";
-> +		reg = <0x03810000 0x0C>;
-> +		#clock-cells = <1>;
-> +	};
-> +
-> +	i2s0: i2s at 03830000 {
-> +		compatible = "samsung,s5pv210-i2s";
-> +		reg = <0x03830000 0x100>;
-> +		clocks = <&clock_audss EXYNOS_I2S_BUS>;
-> +		clock-names = "iis";
-> +		dmas = <&pdma0 12>, <&pdma0 11>, <&pdma0 10>;
-> +		dma-names = "tx", "rx", "tx-sec";
-> +		samsung,idma-addr = <0x03000000>;
-> +		status = "disabled";
-> +	};
-> +
->  	chipid at 10000000 {
->  		compatible = "samsung,exynos4210-chipid";
->  		reg = <0x10000000 0x100>;
-> @@ -289,6 +307,26 @@
->  		status = "disabled";
->  	};
-> 
-> +	i2s1: i2s at 13960000 {
-> +		compatible = "samsung,s5pv210-i2s";
-> +		reg = <0x13960000 0x100>;
-> +		clocks = <&clock CLK_I2S1>;
-> +		clock-names = "iis";
-> +		dmas = <&pdma1 12>, <&pdma1 11>;
-> +		dma-names = "tx", "rx";
-> +		status = "disabled";
-> +	};
-> +
-> +	i2s2: i2s at 13970000 {
-> +		compatible = "samsung,s5pv210-i2s";
-> +		reg = <0x13970000 0x100>;
-> +		clocks = <&clock CLK_I2S2>;
-> +		clock-names = "iis";
-> +		dmas = <&pdma0 14>, <&pdma0 13>;
-> +		dma-names = "tx", "rx";
-> +		status = "disabled";
-> +	};
-> +
->  	mfc: codec at 13400000 {
->  		compatible = "samsung,mfc-v5";
->  		reg = <0x13400000 0x10000>;
-> --
-> 1.7.9.5
+Based on linux-next/master
+
+v4..v3
+  Power: reset: keystone-reset: introduce keystone reset driver
+  	- change to use syscon framework
+  	- change to use regmap to access registers
+  Power: reset: add bindings for keystone reset driver
+  	- deleted properties "reg", "reg-names"
+	- added properties "ti,syscon-pll", "ti,syscon-dev"
+  ARM: dts: keystone: update reset node to work with reset driver
+  	- deleted properties "reg", "reg-names"
+	- added properties "ti,syscon-pll", "ti,syscon-dev"
+
+v2..v3
+  Power: reset: keystone-reset: introduce keystone reset driver
+	- no functional changes, only sanity
+  Power: reset: add bindings for keystone reset driver
+  	- corrected WDT numeration in examples
+	- extended description of wdt_list property
+
+v1..v2
+	- re basedon on v3.15-rc1 without changes
+
+Ivan Khoronzhuk (5):
+  Power: reset: keystone-reset: introduce keystone reset driver
+  Power: reset: add bindings for keystone reset driver
+  ARM: keystone: remove redundant reset stuff
+  ARM: dts: keystone: update reset node to work with reset driver
+  ARM: keystone: enable reset driver support
+
+ .../bindings/power/reset/keystone-reset.txt        |  66 +++++++++
+ arch/arm/boot/dts/keystone.dtsi                    |   4 +-
+ arch/arm/configs/keystone_defconfig                |   3 +
+ arch/arm/mach-keystone/keystone.c                  |  34 -----
+ drivers/power/reset/Kconfig                        |   8 ++
+ drivers/power/reset/Makefile                       |   1 +
+ drivers/power/reset/keystone-reset.c               | 153 +++++++++++++++++++++
+ 7 files changed, 234 insertions(+), 35 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/reset/keystone-reset.txt
+ create mode 100644 drivers/power/reset/keystone-reset.c
+
+-- 
+1.8.3.2
