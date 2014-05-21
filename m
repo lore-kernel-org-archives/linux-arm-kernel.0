@@ -1,149 +1,93 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 21 May 2014 12:36:07 +0200
-Subject: [PATCH 2/3] ARM: EXYNOS: Enable multi-platform build support
-In-Reply-To: <1400655169-21683-3-git-send-email-sachin.kamat@linaro.org>
-References: <1400655169-21683-1-git-send-email-sachin.kamat@linaro.org>
- <1400655169-21683-3-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1635304.bK37Q0Q4AO@amdc1032>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 21 May 2014 13:05:13 +0200
+Subject: [PATCH] PM / Sleep: Fall back to subsystem level PM callbacks for
+ PM domains
+In-Reply-To: <CAPDyKFrW3JTQCZGJjQ8132OFdN4TaE-_EdDEO7wcBMmVCjCyiQ@mail.gmail.com>
+References: <1398422695-2295-1-git-send-email-ulf.hansson@linaro.org>
+ <CAPDyKFr_1CJZ3KAwAbrzeoW0me1SjqC221Kb=_4RnaXa8Uh_gA@mail.gmail.com>
+ <CAPDyKFrW3JTQCZGJjQ8132OFdN4TaE-_EdDEO7wcBMmVCjCyiQ@mail.gmail.com>
+Message-ID: <8782716.aH7rWyWjl7@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-On Wednesday, May 21, 2014 12:22:48 PM Sachin Kamat wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
+On Wednesday, May 21, 2014 11:36:20 AM Ulf Hansson wrote:
+> On 30 April 2014 14:15, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> > On 30 April 2014 00:52, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> >> On Wednesday, April 30, 2014 12:47:28 AM Rafael J. Wysocki wrote:
+> >>> On Friday, April 25, 2014 12:44:55 PM Ulf Hansson wrote:
+> >>> > Previously once the PM core found a PM domain pointer for a device,
+> >>> > but which didn't have a valid PM callback, it falled back to try the
+> >>> > driver's PM callback.
+> >>> >
+> >>> > In this scenario, change the behavior of the PM core to try out the
+> >>> > other subsystem level PM callbacks, before it moves on to the driver.
+> >>> >
+> >>> > This gives provision for PM domains to easier re-use subsystem level
+> >>> > code to handle the needed operations.
+> >>> >
+> >>> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> >>>
+> >>> Are you sure this is not going to break the existing PM domains?
+> >
+> > I have checked the current implementations of the PM domains - all are
+> > providing the PM callbacks. So this should be safe.
+> >
+> >>
+> >> And even if it isn't, the idea behind PM domains was to provide a mechanism to
+> >> bypass the bus types' (etc) PM callbacks, so I'm not liking this patch at all.
+> >
+> > I understand your view, it's the current mindset we have of the
+> > hierarchy of handling the callbacks. I am wondering if it's time to
+> > reconsider. :-)
+> >
+> > To be clear, I don't want to prevent the PM domain from bypassing bus,
+> > types etc, that's should be up to each implementation to decide, and
+> > this patch won't affect that behaviour.
+> >
+> > I intend to only simplify for those PM domains that want to re-use the
+> > callbacks from bus, types. etc. Currently that's the most of them.
+> >
+> > a)
+> > Those ARM SOCs that implements PM domains, which don't use the generic
+> > power domain, cares only about platform devices attached to the
+> > platform_bus_type. These are copying the callbacks from the
+> > platform_bus_type (using the USE_PLATFORM_PM_SLEEP_OPS macro)  - I
+> > assume this is because they need to handle legacy suspend/resume.
+> >
+> > arch/arm/mach-davinci/pm_domain.c
+> > arch/arm/mach-keystone/pm_domain.c
+> > arch/arm/mach-omap1/pm_bus.c
+> > arch/arm/mach-omap2/omap_device.c
+> > drivers/sh/pm_runtime.c
+> >
+> > b)
+> > An actual copy of the bus' PM callbacks to the PM domain's callbacks also exist.
+> >
+> > drivers/gpu/vga/vga_switcheroo.c:
+> > vga_switcheroo_init_domain_pm_ops()
+> > vga_switcheroo_init_domain_pm_optimus_hdmi_audio()
+> >
+> > c)
+> > That leaves the generic power domain and acpi power domain, which
+> > don't re-use callbacks, but have their own set.
+> >
+> >
+> > The more complicated scenario have not yet been implemented - but I
+> > can see it coming. :-)
+> > That's when the PM domain wants to re-use callbacks for whatever bus,
+> > types etc, the device is attached to.
+> >
+> > To handle this, the PM domain will have to re-implement the code for
+> > walking the hierarchy of callbacks, which is a bit messy. This patch
+> > will make it possible for the PM domain to rely on the PM core to
+> > handle this instead.
+> >
 > 
-> This makes it possible to enable the exynos platform as part of a
-> multiplatform kernel, in addition to keeping the single-platform
-> Exynos support.
-
-The patch description is wrong.  After this patch single-platform Exynos
-support is no longer available and it adds at least one serious regression
-(cpufreq) which should be fixed before merging this patch.  Moreover it
-seems that this patch (#2) should be merged with patch #3 to preserve
-bisectability.  Please also note that exynos_defconfig is no longer useful
-after these changes and can be be removed.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> ---
->  arch/arm/Kconfig               |   30 ------------------------------
->  arch/arm/mach-exynos/Kconfig   |   28 ++++++++++++++++++++++++++++
->  arch/arm/mach-exynos/Makefile  |    2 ++
->  arch/arm/plat-samsung/Makefile |    3 +++
->  4 files changed, 33 insertions(+), 30 deletions(-)
+> Hi Rafael,
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 666b59b58ab0..26f2bae4d948 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -829,36 +829,6 @@ config ARCH_S5PV210
->  	help
->  	  Samsung S5PV210/S5PC110 series based systems
->  
-> -config ARCH_EXYNOS
-> -	bool "Samsung EXYNOS"
-> -	select ARCH_HAS_BANDGAP
-> -	select ARCH_HAS_CPUFREQ
-> -	select ARCH_HAS_HOLES_MEMORYMODEL
-> -	select ARCH_REQUIRE_GPIOLIB
-> -	select ARCH_SPARSEMEM_ENABLE
-> -	select ARM_AMBA
-> -	select ARM_GIC
-> -	select CLKSRC_OF
-> -	select COMMON_CLK_SAMSUNG
-> -	select CPU_V7
-> -	select GENERIC_CLOCKEVENTS
-> -	select HAVE_ARM_SCU if SMP
-> -	select HAVE_S3C2410_I2C if I2C
-> -	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-> -	select HAVE_S3C_RTC if RTC_CLASS
-> -	select HAVE_SMP
-> -	select NEED_MACH_MEMORY_H
-> -	select PINCTRL
-> -	select PINCTRL_EXYNOS
-> -	select PM_GENERIC_DOMAINS if PM_RUNTIME
-> -	select S5P_DEV_MFC
-> -	select SAMSUNG_DMADEV
-> -	select SPARSE_IRQ
-> -	select SRAM
-> -	select USE_OF
-> -	help
-> -	  Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
-> -
->  config ARCH_DAVINCI
->  	bool "TI DaVinci"
->  	select ARCH_HAS_HOLES_MEMORYMODEL
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index 138070e42aa9..46634175cf54 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -7,6 +7,34 @@
->  
->  # Configuration options for the EXYNOS4
->  
-> +config ARCH_EXYNOS
-> +	bool "Samsung EXYNOS" if ARCH_MULTI_V7
-> +	select ARCH_HAS_BANDGAP
-> +	select ARCH_HAS_CPUFREQ
-> +	select ARCH_HAS_HOLES_MEMORYMODEL
-> +	select ARCH_REQUIRE_GPIOLIB
-> +	select ARM_AMBA
-> +	select ARM_GIC
-> +	select CLKSRC_OF
-> +	select COMMON_CLK_SAMSUNG
-> +	select CPU_V7
-> +	select GENERIC_CLOCKEVENTS
-> +	select HAVE_ARM_SCU if SMP
-> +	select HAVE_S3C2410_I2C if I2C
-> +	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-> +	select HAVE_S3C_RTC if RTC_CLASS
-> +	select HAVE_SMP
-> +	select PINCTRL
-> +	select PINCTRL_EXYNOS
-> +	select PM_GENERIC_DOMAINS if PM_RUNTIME
-> +	select S5P_DEV_MFC
-> +	select SAMSUNG_DMADEV
-> +	select SPARSE_IRQ
-> +	select SRAM
-> +	select USE_OF
-> +	help
-> +	  Support for SAMSUNG EXYNOS SoCs (EXYNOS4/5)
-> +
->  if ARCH_EXYNOS
->  
->  menu "SAMSUNG EXYNOS SoCs Support"
-> diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-> index 2e0666d31e75..97af694291f1 100644
-> --- a/arch/arm/mach-exynos/Makefile
-> +++ b/arch/arm/mach-exynos/Makefile
-> @@ -5,6 +5,8 @@
->  #
->  # Licensed under GPLv2
->  
-> +ccflags-$(CONFIG_ARCH_MULTIPLATFORM) += -I$(srctree)/$(src)/include -I$(srctree)/arch/arm/plat-samsung/include
-> +
->  obj-y				:=
->  obj-m				:=
->  obj-n				:=
-> diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-> index 25c826ed3b65..5e5beaa9ae15 100644
-> --- a/arch/arm/plat-samsung/Makefile
-> +++ b/arch/arm/plat-samsung/Makefile
-> @@ -4,6 +4,9 @@
->  #
->  # Licensed under GPLv2
->  
-> +ccflags-$(CONFIG_ARCH_MULTI_V7) += -I$(srctree)/$(src)/include
-> +ccflags-$(CONFIG_ARCH_EXYNOS)	+= -I$(srctree)/arch/arm/mach-exynos/include
-> +
->  obj-y				:=
->  obj-m				:=
->  obj-n				:= dummy.o
+> Just wanted to understand if you are still considering this patch or
+> if think it's the wrong approach?
+
+I said I didn't like the approach IIRC.  I'm not considering it anyway.
+
+Rafael
