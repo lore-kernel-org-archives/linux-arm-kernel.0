@@ -1,83 +1,50 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 21 May 2014 11:35:49 +0530
-Subject: [PATCH 2/2] dmaengine: sa11x0: remove broken #ifdef
-In-Reply-To: <1399565317.9018.4.camel@smile.fi.intel.com>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-2-git-send-email-arnd@arndb.de>
- <1399565317.9018.4.camel@smile.fi.intel.com>
-Message-ID: <20140521060548.GM21128@intel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 21 May 2014 08:21:45 +0200
+Subject: [PATCH v2 00/20] ARM: imx: clean up i.MX5 support
+In-Reply-To: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
+References: <1400575538-21136-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20140521062145.GL5858@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 09:38:37PM +0530, Shevchenko, Andriy wrote:
-> On Thu, 2014-05-08 at 16:56 +0200, Arnd Bergmann wrote:
-> > The sa11x0_dma_pm_ops unconditionally reference sa11x0_dma_resume
-> > and sa11x0_dma_suspend, which currently breaks if CONFIG_PM_SLEEP
-> > is disabled.
-> > 
-> > There is probably a better way to remove the reference in this
-> > case, but the safe choice is to have the suspend/resume code always
-> > built in the driver.
+On Tue, May 20, 2014 at 04:45:18PM +0800, Shawn Guo wrote:
+> i.MX51 becomes a DT only platform, so a lot of legacy code which are
+> needed only by non-DT boot can be cleaned up now.  At the end of the
+> day, all the static mapping and defines are removed except of a couple
+> which were not defined in device tree in the first place.
 > 
-> Maybe you could create a macro in pm.h for *_noirq version of
-> suspend/resume? However, like we discussed with Vinod it's much better
-> to use suspend_late/resume_early for DMAC device drivers, though I have
-> no idea if it works for sa11x0.
-It should work as the guidance is not client/controller specfic. But I think
-thats not the point here as the fix is not related to how suspend is
-implemented..
+> Changes since v1:
+>  - Address review comments from Alexander Shiyan
+>  - Add more patches for a further cleanup
+> 
+> Shawn Guo (20):
+>   ARM: imx: move EHCI platform defines out of platform_data header
+>   ARM: imx5: move SOC_IMX5 and SOC_IMX51 into 'Device tree only'
+>   ARM: imx5: drop option MACH_IMX51_DT
+>   ARM: imx5: remove imx51 non-DT support files
+>   ARM: imx5: remove i.MX5 non-DT device registration helpers
+>   ARM: imx5: make mx51_clocks_init() a DT call
+>   ARM: imx5: drop arguments from mx5_clocks_common_init()
+>   ARM: imx5: tzic_init_irq() can directly be .init_irq hook
+>   ARM: imx5: remove function imx51_soc_init()
+>   ARM: imx5: call mxc_timer_init_dt() on imx51
+>   ARM: imx5: retrieve iim base from device tree
+>   ARM: imx5: remove header crm-regs-imx5.h
+>   ARM: imx5: use dynamic mapping for CCM block
+>   ARM: imx5: use dynamic mapping for DPLL block
+>   ARM: imx5: reuse clock CCM mapping in pm code
+>   ARM: imx5: use dynamic mapping for Cortex and GPC block
+>   ARM: imx5: move init hooks into mach-imx5x.c
+>   ARM: imx5: remove file mm-imx5.c
+>   ARM: imx5: clean function declarations in mx51.h
+>   ARM: imx5: remove mx51.h and mx53.h
+
+This is a very nice cleanup with a nice diffstat. Thanks Shawn.
+
+Sascha
 
 -- 
-~Vinod
-
-> 
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: dmaengine at vger.kernel.org
-> > Cc: Vinod Koul <vinod.koul@intel.com>
-> > Cc: Dan Williams <dan.j.williams@intel.com>
-> > ---
-> >  drivers/dma/sa11x0-dma.c | 4 ----
-> >  1 file changed, 4 deletions(-)
-> > 
-> > diff --git a/drivers/dma/sa11x0-dma.c b/drivers/dma/sa11x0-dma.c
-> > index ab26d46..5ebdfbc 100644
-> > --- a/drivers/dma/sa11x0-dma.c
-> > +++ b/drivers/dma/sa11x0-dma.c
-> > @@ -113,11 +113,9 @@ struct sa11x0_dma_phy {
-> >  	struct sa11x0_dma_desc	*txd_load;
-> >  	unsigned		sg_done;
-> >  	struct sa11x0_dma_desc	*txd_done;
-> > -#ifdef CONFIG_PM_SLEEP
-> >  	u32			dbs[2];
-> >  	u32			dbt[2];
-> >  	u32			dcsr;
-> > -#endif
-> >  };
-> >  
-> >  struct sa11x0_dma_dev {
-> > @@ -984,7 +982,6 @@ static int sa11x0_dma_remove(struct platform_device *pdev)
-> >  	return 0;
-> >  }
-> >  
-> > -#ifdef CONFIG_PM_SLEEP
-> >  static int sa11x0_dma_suspend(struct device *dev)
-> >  {
-> >  	struct sa11x0_dma_dev *d = dev_get_drvdata(dev);
-> > @@ -1054,7 +1051,6 @@ static int sa11x0_dma_resume(struct device *dev)
-> >  
-> >  	return 0;
-> >  }
-> > -#endif
-> >  
-> >  static const struct dev_pm_ops sa11x0_dma_pm_ops = {
-> >  	.suspend_noirq = sa11x0_dma_suspend,
-> 
-> 
-> -- 
-> Andy Shevchenko <andriy.shevchenko@intel.com>
-> Intel Finland Oy
-
--- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
