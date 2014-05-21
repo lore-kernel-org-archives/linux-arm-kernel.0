@@ -1,96 +1,72 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Wed, 21 May 2014 11:15:06 +0200
-Subject: [PATCH v2] ARM: dts: duovero-parlor: Add HDMI output
-Message-ID: <1400663706-24104-1-git-send-email-florian.vaussard@epfl.ch>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 21 May 2014 10:17:51 +0100
+Subject: [PATCH V2] mfd: abx500-core: Fix compiler warning larger stack
+ frame
+In-Reply-To: <537C447D.7070406@aurabindo.in>
+References: <536E1543.3090107@aurabindo.in> <20140520152054.GB24991@lee--X1>
+ <537C447D.7070406@aurabindo.in>
+Message-ID: <20140521091751.GC6679@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the necessary DTS nodes to enable the micro-HDMI output on Parlor
-board.
+> Change from V1 -> V2: Fix a potential null pointer dereference as reported by kbuild test robot <fengguang.wu@intel.com>.
+> 
+> Inorder to report the kzalloc failure, I have just used a pr_debug statement. If it looks ugly, should I change the function's return value to int and give out an -ENOMEM ?
 
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
----
-v1->v2:
-- Rebased on Tony's omap-for-v3.16/dt-v2
-- Use OMAP4_IOPAD macro
-- Use hpd pin as GPIO with hdmi-connector
+Yes, please do that - and obviously add the checks to the calling code.
 
- arch/arm/boot/dts/omap4-duovero-parlor.dts | 44 ++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+> From 6615c7a995a6bb4dcf4c1e9ac59bca823ec821a5 Mon Sep 17 00:00:00 2001
+> From: Aurabindo J <mail@aurabindo.in>
+> Date: Wed, 21 May 2014 11:18:10 +0530
+> Subject: [PATCH] mfd: abx500-core: Fix compiler warning larger stack frame
+> 
+> On systems with CONFIG_FRAME_WARN=1024, compiler warns the allocation of
+> an object of struct device on stack. Make the allocation dynamically to
+> fix the warning.
+> 
+> Signed-off-by: Aurabindo J <mail@aurabindo.in>
+> ---
+>  drivers/mfd/abx500-core.c | 19 ++++++++++++-------
+>  1 file changed, 12 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/mfd/abx500-core.c b/drivers/mfd/abx500-core.c
+> index f3a15aa..5e5098d 100644
+> --- a/drivers/mfd/abx500-core.c
+> +++ b/drivers/mfd/abx500-core.c
+> @@ -154,16 +154,21 @@ EXPORT_SYMBOL(abx500_startup_irq_enabled);
+>  void abx500_dump_all_banks(void)
+>  {
+>  	struct abx500_ops *ops;
+> -	struct device dummy_child = {NULL};
+> +	struct device *dummy_child;
+>  	struct abx500_device_entry *dev_entry;
+>  
+> -	list_for_each_entry(dev_entry, &abx500_list, list) {
+> -		dummy_child.parent = dev_entry->dev;
+> -		ops = &dev_entry->ops;
+> +	dummy_child = kzalloc(sizeof(struct device), GFP_KERNEL);
+> +	if (dummy_child != NULL) {
+> +		list_for_each_entry(dev_entry, &abx500_list, list) {
+> +			dummy_child->parent = dev_entry->dev;
+> +			ops = &dev_entry->ops;
+>  
+> -		if ((ops != NULL) && (ops->dump_all_banks != NULL))
+> -			ops->dump_all_banks(&dummy_child);
+> -	}
+> +			if ((ops != NULL) && (ops->dump_all_banks != NULL))
+> +				ops->dump_all_banks(dummy_child);
+> +		}
+> +		kfree(dummy_child);
+> +	} else
+> +		pr_debug("kzalloc failure in abx500_dump_all_banks\n");
+>  }
+>  EXPORT_SYMBOL(abx500_dump_all_banks);
+>  
 
-diff --git a/arch/arm/boot/dts/omap4-duovero-parlor.dts b/arch/arm/boot/dts/omap4-duovero-parlor.dts
-index cd53a64..6dc84d9 100644
---- a/arch/arm/boot/dts/omap4-duovero-parlor.dts
-+++ b/arch/arm/boot/dts/omap4-duovero-parlor.dts
-@@ -15,6 +15,10 @@
- 	model = "OMAP4430 Gumstix Duovero on Parlor";
- 	compatible = "gumstix,omap4-duovero-parlor", "gumstix,omap4-duovero", "ti,omap4430", "ti,omap4";
- 
-+	aliases {
-+		display0 = &hdmi0;
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 		led0 {
-@@ -35,6 +39,21 @@
- 			gpio-key,wakeup;
- 		};
- 	};
-+
-+	hdmi0: connector at 0 {
-+		compatible = "hdmi-connector";
-+		label = "hdmi";
-+
-+		type = "d";
-+
-+		hpd-gpios = <&gpio2 31 GPIO_ACTIVE_HIGH>;	/* gpio_63 */
-+
-+		port {
-+			hdmi_connector_in: endpoint {
-+				remote-endpoint = <&hdmi_out>;
-+			};
-+		};
-+	};
- };
- 
- &omap4_pmx_core {
-@@ -77,6 +96,15 @@
- 			OMAP4_IOPAD(0x070, PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_a24.gpio_48: amdix enabled */
- 		>;
- 	};
-+
-+	dss_hdmi_pins: pinmux_dss_hdmi_pins {
-+		pinctrl-single,pins = <
-+			OMAP4_IOPAD(0x098, PIN_INPUT | MUX_MODE3)		/* hdmi_hpd.gpio_63 */
-+			OMAP4_IOPAD(0x09a, PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_cec.hdmi_cec */
-+			OMAP4_IOPAD(0x09c, PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_ddc_scl.hdmi_ddc_scl */
-+			OMAP4_IOPAD(0x09e, PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_ddc_sda.hdmi_ddc_sda */
-+		>;
-+	};
- };
- 
- &i2c2 {
-@@ -143,4 +171,20 @@
- 	};
- };
- 
-+&dss {
-+	status = "ok";
-+};
-+
-+&hdmi {
-+	status = "ok";
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&dss_hdmi_pins>;
-+
-+	port {
-+		hdmi_out: endpoint {
-+			remote-endpoint = <&hdmi_connector_in>;
-+		};
-+	};
-+};
- 
+
+
 -- 
-1.8.3.2
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
