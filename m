@@ -1,73 +1,49 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 21 May 2014 08:58:10 -0700
-Subject: [RFC PATCH 2/5] clk: Introduce 'clk_round_rate_nearest()'
-In-Reply-To: <20140521073457.GD31687@pengutronix.de>
-References: <1400106655-22465-3-git-send-email-soren.brinkmann@xilinx.com>
- <20140515073816.GI16662@pengutronix.de>
- <91822600-39d0-4e71-b0f5-9eda35b76ec0@BN1AFFO11FD016.protection.gbl>
- <20140519161949.GG16662@pengutronix.de>
- <db8633e5-01a9-4d3a-80e8-74e23a456d52@BN1BFFO11FD051.protection.gbl>
- <20140520073358.GJ16662@pengutronix.de>
- <4bb5f44a-60bb-4e34-8f88-f91b8419be8d@BL2FFO11FD050.protection.gbl>
- <537B957B.5010001@codeaurora.org>
- <668683e3-856e-4f30-9b11-8f3e91e12d1d@BL2FFO11FD038.protection.gbl>
- <20140521073457.GD31687@pengutronix.de>
-Message-ID: <e9090453-ce40-4662-a3ea-fbdaffdb2aa4@BN1AFFO11FD046.protection.gbl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 May 2014 18:01:06 +0200
+Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <CANEJEGvhEsC9wKqX_pYmOg7LwsQkoN9=jjXJuW0UeEa9XywSPw@mail.gmail.com>
+References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
+ <11242680.PQytQQqlPJ@wuerfel>
+ <CANEJEGvhEsC9wKqX_pYmOg7LwsQkoN9=jjXJuW0UeEa9XywSPw@mail.gmail.com>
+Message-ID: <4376848.aihqtRyYDl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-05-21 at 09:34AM +0200, Uwe Kleine-K?nig wrote:
-> Hello,
+On Wednesday 21 May 2014 08:44:42 Grant Grundler wrote:
+> On Wed, May 21, 2014 at 2:32 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 21 May 2014 11:02:45 Thierry Reding wrote:
+> >> On Wed, May 21, 2014 at 10:54:42AM +0200, Arnd Bergmann wrote:
+> >>
+> >> > Right. As long as we always unmap the buffers from the IOMMU after they
+> >> > have stopped being in use, it's very unlikely that even a broken device
+> >> > driver causes a DMA into some bus address that happens to be mapped for
+> >> > another device.
+> >>
+> >> I think that if buffers remain mapped in the IOMMU when they have been
+> >> deallocated that should be considered a bug.
 > 
-> On Tue, May 20, 2014 at 02:48:20PM -0700, S?ren Brinkmann wrote:
-> > On Tue, 2014-05-20 at 10:48AM -0700, Stephen Boyd wrote:
-> > > On 05/20/14 09:01, S?ren Brinkmann wrote:
-> > > >
-> > > >>>>> +{
-> > > >>>>> +	unsigned long lower, upper, cur, lower_last, upper_last;
-> > > >>>>> +
-> > > >>>>> +	lower = clk_round_rate(clk, rate);
-> > > >>>>> +	if (lower >= rate)
-> > > >>>>> +		return lower;
-> > > >>>> Is the >-case worth a warning?
-> > > >>> No, it's correct behavior. If you request a rate that is way lower than what the
-> > > >>> clock can generate, returning something larger is perfectly valid, IMHO.
-> > > >>> Which reveals one problem in this whole discussion. The API does not
-> > > >>> require clk_round_rate() to round down. It is actually an implementation
-> > > >>> choice that had been made for clk-divider.
-> > > >> I'm sure it's more than an implementation choice for clk-divider. But I
-> > > >> don't find any respective documentation (but I didn't try hard).
-> > > > A similar discussion - without final conclusion:
-> > > > https://lkml.org/lkml/2010/7/14/260
-> > > >
-> > > >
-> > > 
-> > > Please call this new API something like clk_find_nearest_rate() or
-> > > something. clk_round_rate() is supposed to return the rate that will be
-> > > set if you call clk_set_rate() with the same arguments. It's up to the
-> > > implementation to decide if that means rounding the rate up or down or
-> > > to the nearest value.
-> > 
-> > Sounds good to me. Are there any cases of clocks that round up? I think
-> > that case would not be handled correctly. But I also don't see a use
-> > case for such an implementation.
-> I don't really care which semantic (i.e. round up, round down or round
-> closest) is picked, but I'd vote that all should pick up the same. I
-> think the least surprising definition is to choose rounding down and add
-> the function that is under discussion here to get a nearest match.
+> There is currently no general requirement to tear down mappings immediately.
+> An option to enforce immediate tear down might be useful since I agree
+> Virtual Guests sharing host memory through shared physical devices
+> will want that. ie there should be no opportunity for a shared device
+> to be able to access another guests memory through "stale" (but live)
+> DMA mappings. I don't think that's the case but I'd ask someone like
+> Alex Williamson for a more certain answer.
+
+I believe powerpc has a boot-time option to enforce the immediate
+IOTLB flush, which is very useful for device driver debugging when
+something goes wrong with stale DMAs.
+
+> > Obviously you have to maintain the IO page tables correctly.
 > 
-> So I suggest:
-> 
-> 	- if round_rate is given a rate that is smaller than the
-> 	  smallest available rate, return 0
-> 	- add WARN_ONCE to round_rate and set_rate if they return with a
-> 	  rate bigger than requested
+> To be clear, "Correctly" in this case just means until the IOTLB is
+> flushed, the given IOMMU Pdir entries are marked "in use" even though
+> the driver has handed "ownership" back to the IOMMU driver.
 
-Why do you think 0 is always valid? I think for a clock that can
-generate 40, 70, 120, clk_round_rate(20) should return 40.
+I don't know what a Pdir is, but I guess strictly speaking we have
+to ensure that all IO page table entries that have been unmapped by
+a driver are marked as invalid at least by the time the IOTLB is flushed,
+plus we have to flush each entry before it gets reused for a different
+page.
 
-> 	- change the return values to unsigned long
-
-Yep, I agree, this should happen.
-
-	S?ren
+	Arnd
