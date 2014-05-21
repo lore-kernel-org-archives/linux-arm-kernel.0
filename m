@@ -1,8 +1,8 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 21 May 2014 13:19:40 -0700
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 21 May 2014 13:33:00 -0700
 Subject: [RFC PATCH 2/5] clk: Introduce 'clk_round_rate_nearest()'
 In-Reply-To: <20140521182308.GN31687@pengutronix.de>
-References: <91822600-39d0-4e71-b0f5-9eda35b76ec0@BN1AFFO11FD016.protection.gbl>
+References: <20140515073816.GI16662@pengutronix.de>
  <20140519161949.GG16662@pengutronix.de>
  <db8633e5-01a9-4d3a-80e8-74e23a456d52@BN1BFFO11FD051.protection.gbl>
  <20140520073358.GJ16662@pengutronix.de>
@@ -12,11 +12,11 @@ References: <91822600-39d0-4e71-b0f5-9eda35b76ec0@BN1AFFO11FD016.protection.gbl>
  <20140521073457.GD31687@pengutronix.de>
  <e9090453-ce40-4662-a3ea-fbdaffdb2aa4@BN1AFFO11FD046.protection.gbl>
  <20140521182308.GN31687@pengutronix.de>
-Message-ID: <3ff23a63-f05f-4e46-835c-564e05e01048@BN1BFFO11FD016.protection.gbl>
+Message-ID: <20140521203300.9521.67546@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-05-21 at 08:23PM +0200, Uwe Kleine-K?nig wrote:
+Quoting Uwe Kleine-K?nig (2014-05-21 11:23:08)
 > Hello S?ren,
 > 
 > On Wed, May 21, 2014 at 08:58:10AM -0700, S?ren Brinkmann wrote:
@@ -26,11 +26,11 @@ On Wed, 2014-05-21 at 08:23PM +0200, Uwe Kleine-K?nig wrote:
 > > > > > On 05/20/14 09:01, S?ren Brinkmann wrote:
 > > > > > >
 > > > > > >>>>> +{
-> > > > > >>>>> +	unsigned long lower, upper, cur, lower_last, upper_last;
+> > > > > >>>>> + unsigned long lower, upper, cur, lower_last, upper_last;
 > > > > > >>>>> +
-> > > > > >>>>> +	lower = clk_round_rate(clk, rate);
-> > > > > >>>>> +	if (lower >= rate)
-> > > > > >>>>> +		return lower;
+> > > > > >>>>> + lower = clk_round_rate(clk, rate);
+> > > > > >>>>> + if (lower >= rate)
+> > > > > >>>>> +         return lower;
 > > > > > >>>> Is the >-case worth a warning?
 > > > > > >>> No, it's correct behavior. If you request a rate that is way lower than what the
 > > > > > >>> clock can generate, returning something larger is perfectly valid, IMHO.
@@ -60,19 +60,15 @@ On Wed, 2014-05-21 at 08:23PM +0200, Uwe Kleine-K?nig wrote:
 > > > 
 > > > So I suggest:
 > > > 
-> > > 	- if round_rate is given a rate that is smaller than the
-> > > 	  smallest available rate, return 0
-> > > 	- add WARN_ONCE to round_rate and set_rate if they return with a
-> > > 	  rate bigger than requested
+> > >     - if round_rate is given a rate that is smaller than the
+> > >       smallest available rate, return 0
+> > >     - add WARN_ONCE to round_rate and set_rate if they return with a
+> > >       rate bigger than requested
 > > 
 > > Why do you think 0 is always valid? I think for a clock that can
 > > generate 40, 70, 120, clk_round_rate(20) should return 40.
 > I didn't say it's a valid value. It just makes the it possible to check
 > for clk_round_rate(clk, rate) <= rate.
-
-But if the set_rate() doesn't set the rate to 0 in that case, the
-implementation was buggy.
-
 > 
 > I grepped a bit around and found da850_round_armrate which implements a
 > round_rate callback returning the best match.
@@ -80,15 +76,34 @@ implementation was buggy.
 > s3c2412_roundrate_usbsrc can return values that are bigger than
 > requested. (I wonder if that is a bug though.)
 > 
-> > > 	- change the return values to unsigned long
+> > >     - change the return values to unsigned long
 > > 
 > > Yep, I agree, this should happen.
 > And we're using 0 as error value? e.g. for the case where
 > omap1_clk_round_rate_ckctl_arm returns -EIO now?
 
-IMHO, there should always be a valid frequency be returned from these
-calls. The API says: return the frequency the clock provides when
-set_rate() is called with the same argument. This should never result in
-an error.
+No. clk_round_rate returns long for a reason, which is that we can
+provide an error code to the caller. From include/linux/clk.h:
 
-	S?ren
+/**
+ * clk_round_rate - adjust a rate to the exact rate a clock can provide
+ * @clk: clock source
+ * @rate: desired clock rate in Hz
+ *
+ * Returns rounded clock rate in Hz, or negative errno.
+ */
+
+This has the unfortunate side effect that the max value we can return
+safely is 2147483647 (~2GHz). So another issue here is converting clock
+rates to 64-bit values.
+
+Regards,
+Mike
+
+> 
+> Best regards
+> Uwe
+> 
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
