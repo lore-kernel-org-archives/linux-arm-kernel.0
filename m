@@ -1,154 +1,70 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 May 2014 14:11:05 -0700
-Subject: [GIT PULL] at91: DT for 3.16 #2
-In-Reply-To: <537C7D25.6060705@atmel.com>
-References: <1400059162-630-1-git-send-email-nicolas.ferre@atmel.com>
- <20140520055041.GO18956@quad.lixom.net>
- <537B727C.5080404@atmel.com> <20140520164746.GA601@quad.lixom.net>
- <537C7D25.6060705@atmel.com>
-Message-ID: <20140521211105.GD24341@quad.lixom.net>
+Date: Wed, 21 May 2014 14:25:26 -0700
+Subject: [GIT PULL] vexpress: defconfig update for 3.13
+In-Reply-To: <1400173119.29434.4.camel@hornet>
+References: <1400173119.29434.4.camel@hornet>
+Message-ID: <20140521212526.GA24972@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 21, 2014 at 12:17:09PM +0200, Nicolas Ferre wrote:
-> On 20/05/2014 18:47, Olof Johansson :
-> > Hi,
-> > 
-> > On Tue, May 20, 2014 at 05:19:24PM +0200, Nicolas Ferre wrote:
-> >> On 20/05/2014 07:50, Olof Johansson :
-> >>> On Wed, May 14, 2014 at 11:19:22AM +0200, Nicolas Ferre wrote:
-> >>>> Arnd, Olof, Kevin,
-> >>>>
-> >>>> More DT material for AT91. Some fixes that apply on what was merged for 3.15
-> >>>> but that are not very critical.
-> >>>> The other patches are feature additions to old or very recent product/board:
-> >>>> at91sam9261 or sama5d3 Xplained.
-> >>>>
-> >>>> Thanks, best regards,
-> >>>>
-> >>>> The following changes since commit 27a96a0364787d2b41d2a72d08143d95263e1b07:
-> >>>>
-> >>>>   ARM: at91: sama5d3: clock for ssc from rk pin (2014-04-18 22:43:44 +0200)
-> >>>>
-> >>>> are available in the git repository at:
-> >>>>
-> >>>>   git://github.com/at91linux/linux-at91.git tags/at91-dt2
-> >>>>
-> >>>> for you to fetch changes up to a93f9c88b7701d1c4c3b22d39d64a408f000a6ef:
-> >>>>
-> >>>>   ARM: at91/dt: at91-sama5d3_xplained: add the regulator device node (2014-05-12 16:48:54 +0200)
-> >>>
-> >>> Merged, but:
-> >>>
-> >>>>  arch/arm/boot/dts/at91-sama5d3_xplained.dts |  62 +++++++++++++++
-> >>>>  arch/arm/boot/dts/at91sam9261.dtsi          | 114 ++++++++++++++++++++++++++--
-> >>>>  arch/arm/boot/dts/at91sam9rl.dtsi           |   7 +-
-> >>>>  arch/arm/boot/dts/sama5d3.dtsi              |  78 +++++++++++++++++++
-> >>>
-> >>> Grmbl. I remember being somewhat annoyed that you didn't use at91 prefix
-> >>> when you introduced the sama5d3 dtsi files, but please don't start using
-> >>> it on a random board like this, especially when other boards just use
-> >>> the sama5d3_<board>.dts format.
-> >>
-> >> Well, I don't understand completely. Since our discussion during 3.10
-> >> merge window ([GIT PULL] at91: DT changes for 3.10 #2), I try to conform
-> >> to this rule:
-> >>
-> >> 1/ all pre-3.10 and 3.10 device tree file names stay unchanged
-> >> -> sama5d3.dti (SoC)
-> >> -> sama5d35ek.dts (board)
-> >>
-> >> 2/ all *SoC* DT files conform to their marking:
-> >> at91sam9263.dtsi
-> >> at91sam9rl.dtsi
-> >> sama5d3.dtsi, sama5d36.dtsi
-> >> sama5d4.dtsi, sama5d46.dtsi (maybe in the future, who knows...)
-> >>
-> >> 3/ all post-3.10 *boards* have the "at91-" prefix, whether they are
-> >> populated with sam9 or sama5:
-> >> at91-ariag25.dts (since 3.10, using a at91sam9g25)
-> >> at91-qil_a9260.dts (since 3.14, using at91sam9260)
-> >> at91-sama5d3_xplained.dts (since 3.14, using sama5d36)
-> >>
-> >> The rule for AT91 has never been to prefix the board DT filename with
-> >> the name of the SoC or SoC family.
-> > 
-> > So, going back and looking at the discussion from a year ago, I think the
-> > disconnect was in what consistency we were looking for. Yes, we would have
-> > preferred to prefix the sama5d3* dts/dtsis with at91, and you even
-> > offered to do it. ;-) But I think even more important for sanity is
-> > to stay consistent with how we handle all platforms, which is that the
-> > board dts files are prefixed with the SoC name.
-> > 
-> > In the past, we've had cases where this didn't happen, but these days we have
-> > tried to be very consistent on it. I.e. omap3*, exynos<##>*, etc.
+On Thu, May 15, 2014 at 05:58:39PM +0100, Pawel Moll wrote:
+> Hello Arnd, Kevin, Olof,
 > 
-> Okay, but once again, I tried to deal with the existing files, not break
-> any user's habit, before any convention had been clearly established,
-> and now... we are reaching a deadlock having to re-consider again our DT
-> filenames?
-
-I don't think we're at a deadlock here. We're trying to figure out the best way
-forward.
-
+> The series went through the a couple of review cycles (with the latest
+> here: thread.gmane.org/gmane.linux.ports.arm.kernel/320572/) and got set
+> of acks from almost all relevant subsystem maintainers.
 > 
-> > So, if you have at91- as a prefix, have the SoC as the second component. But
-> > that gets awkward too, so I would juts use the current SoC dtsi as the prefix
-> > at91sam9263-<boardname>.dts, or sama5d35_<boardname>.dts.
-> > 
-> >>> Care to fix this up in time for 3.16 merge window?
-> >>
-> >> Well, I do not know what to fix as the files were already present in
-> >> mainline before this kernel revision and that I am a little bit
-> >> reluctant to change file names after they are merged in mainline.
-> >>
-> >> Now, can we keep the current policy described above (somehow weird, I
-> >> admit) for future SoCs and boards?
-> > 
-> > It is unfortunate that I didn't catch this for 3.14 so that name has been
-> > there in a release. I guess the least disruptive thing for now would be
-> > to change over to use the SoC dtsi prefix for any new board files from
-> > here on out, and treat at91-sama5d3_xplained as a one-time thing.
+> The following changes since commit d6d211db37e75de2ddc3a4f979038c40df7cc79c:
 > 
-> That is not only about sama5d3, what about sam9-based boards? Several of
-> them already have this "at91-" prefix (and not a soc prefix).
+>   Linux 3.15-rc5 (2014-05-09 13:10:52 -0700)
 > 
-> So this will introduce another temporary naming convention for these
-> files which are actually used by people: everyone will be puzzled.
-
-Yes, everyone is already puzzled though.
-
-> Okay, there are two ways to escape this situation:
-> 1/ change nothing and conform to what I stated above. It is more like
->    finding a rationale to an existing situation than a real neat
->    policy, but hey, "nobody's perfect".
-> 2/ change *everything* in AT91 DT file naming with a schema that
->    we will have to validate with care (<soc family> or <soc>,
->    "_" or "-", what about boards with modules, etc.).
->    That will certainly disturb many of our users without a real benefit.
-
-I don't think it's worth renaming everything at this time.
-
-> This directory is flat, the board names are chosen by companies and
-> people that we do not control, a user tend to like finding his preferred
-> board dtb file unchanged from a kernel revision to another...
-> Well all this lead me to think that we don't have to loose too much time
-> thinking about a new strict convention for this file naming or changing
-> all this once again just for the sake of it.
+> are available in the git repository at:
 > 
-> Other SoC maintainers beautifully designed from the beginning the naming
-> scheme of their DT files, fine. AT91 did not and forgive me but when
-> opening arch/arm/boot/dts/Makefile file and seeing some file names, I'm
-> not ashamed. Moreover, now that I said to everybody since 3.10 to prefix
-> their *board* name with "at91-", I have to say something else, I don't
-> think it is worth it.
+>   git://git.linaro.org/people/pawel.moll/linux.git tags/vexpress/updates-for-3.16
+> 
+> for you to fetch changes up to 6b2c31c71d6fa8896c5f3f2354d790a5bd3f0a1e:
+> 
+>   ARM: vexpress: move HBI check to sysreg driver (2014-05-15 17:02:21 +0100)
+> 
+> ----------------------------------------------------------------
+> ARM Versatile Express updates for 3.16
+> 
+> This series reworks VE's platform configuration infrastructure by:
+> 
+> - making it possible to instantiate selected devices from the
+>   Device Tree, prior to massive population,
+> - converting custom "func" API into standard "regmap",
+> - splitting the existing MFD driver into smaller ones and placing
+>   them into relevant directories.
+> 
+> The common clock framework driver can now be selected individually
+> (mostly for arm64 sake, where some of them are not used at all).
+> 
+> It also simplifies the machine code, by:
+> 
+> - moving the shed clock info clocksource driver,
+> - simplifying SMP operations to base them entirely of the DT data,
+> - moving platform ID checks into relevant driver.
+> 
+> ----------------------------------------------------------------
+> Pawel Moll (8):
+>       of: Keep track of populated platform devices
+>       mfd: vexpress: Convert custom func API to regmap
+>       mfd: syscon: Add platform data with a regmap config name
+>       mfd: vexpress: Define the device as MFD cells
+>       clk: versatile: Split config options for sp810 and vexpress_osc
+>       clocksource: Sched clock source for Versatile Express
+>       ARM: vexpress: Simplify SMP operations for DT-powered system
+>       ARM: vexpress: move HBI check to sysreg driver
+> 
+> Sudeep KarkadaNagesha (1):
+>       ARM: vexpress: remove redundant vexpress_dt_cpus_num to get cpu count
 
-I don't agree with everything above, but it's not worth arguing for the
-sake of arguing. :) I think we can tweak what you're doing now and get
-things to work well by merging new dts files with at91-<soc>-board.dts
-as the name. As mentioned, don't worry about the existing files. This
-shouldn't be a significiant change to what you've been telling people
-since 3.10 to cause much confusion.
+
+Nice refactorings!
+
+I've merged this into next/cleanup -- I can't really find a better place for it
+and, well, it is definitely a huge cleanup branch in many ways. :)
 
 
 -Olof
