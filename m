@@ -1,85 +1,67 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 21 May 2014 11:02:45 +0200
-Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <4506822.XX7GrvtHhk@wuerfel>
-References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
- <5123714.0MpMQfsmcr@wuerfel> <20140521081608.GA11068@ulmo>
- <4506822.XX7GrvtHhk@wuerfel>
-Message-ID: <20140521090244.GB19268@ulmo>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Wed, 21 May 2014 18:05:33 +0900
+Subject: [PATCH] mmc: dw_mmc: Make sure we don't get stuck when we get an
+ error
+In-Reply-To: <CAD=FV=Vtpup1DaAnN1cO4R5CgxMKa0aosw53sj1eKcUPJsEoYg@mail.gmail.com>
+References: <1395901126-6141-1-git-send-email-yuvaraj.cd@samsung.com>
+ <CAKuRcOL_JVjOfLNspb14kRxcAXjpEwX4WkvmM+izryZbZBE4XA@mail.gmail.com>
+ <CAPz6YkVwT0PrcLP1MJy0vVRw811+_7PwsV_ggKxQkqrjOWeWWw@mail.gmail.com>
+ <002001cf6c59$b5b5e680$2121b380$%jun@samsung.com>
+ <CAD=FV=X=9cTvST5cM=H9H23SMD28cHSExXt3YR=v2AQ6dFJY5w@mail.gmail.com>
+ <001b01cf6e67$2183b400$648b1c00$%jun@samsung.com>
+ <003a01cf73cd$fa2ee160$ee8ca420$%jun@samsung.com>
+ <CAD=FV=Vtpup1DaAnN1cO4R5CgxMKa0aosw53sj1eKcUPJsEoYg@mail.gmail.com>
+Message-ID: <000f01cf74d3$d2938b40$77baa1c0$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 21, 2014 at 10:54:42AM +0200, Arnd Bergmann wrote:
-> On Wednesday 21 May 2014 10:16:09 Thierry Reding wrote:
-> > On Tue, May 20, 2014 at 10:31:29PM +0200, Arnd Bergmann wrote:
-> > > On Tuesday 20 May 2014 16:00:02 Thierry Reding wrote:
-> > > > On Tue, May 20, 2014 at 03:34:46PM +0200, Arnd Bergmann wrote:
-> > > > > On Tuesday 20 May 2014 15:17:43 Thierry Reding wrote:
-> > > > > > On Tue, May 20, 2014 at 02:41:18PM +0200, Arnd Bergmann wrote:
-> > > > > > > On Tuesday 20 May 2014 14:02:43 Thierry Reding wrote:
-> > > > > > [...]
-> > > > > > > > Couldn't a single-master IOMMU be windowed?
-> > > > > > > 
-> > > > > > > Ah, yes. That would actually be like an IBM pSeries, which has a windowed
-> > > > > > > IOMMU but uses one window per virtual machine. In that case, the window could
-> > > > > > > be a property of the iommu node though, rather than part of the address
-> > > > > > > in the link.
-> > > > > > 
-> > > > > > Does that mean that the IOMMU has one statically configured window which
-> > > > > > is the same for each virtual machine? That would require some other
-> > > > > > mechanism to assign separate address spaces to each virtual machine,
-> > > > > > wouldn't it? But I suspect that if the IOMMU allows that it could be
-> > > > > > allocated dynamically at runtime.
-> > > > > 
-> > > > > The way it works on pSeries is that upon VM creation, the guest is assigned
-> > > > > one 256MB window for use by assigned DMA capable devices. When the guest
-> > > > > creates a mapping, it uses a hypercall to associate a bus address in that
-> > > > > range with a guest physical address. The hypervisor checks that the bus
-> > > > > address is within the allowed range, and translates the guest physical
-> > > > > address into a host physical address, then enters both into the I/O page
-> > > > > table or I/O TLB.
-> > > > 
-> > > > So when a VM is booted it is passed a device tree with that DMA window?
-> > > 
-> > > Correct.
-> > > 
-> > > > Given what you describe above this seems to be more of a configuration
-> > > > option to restrict the IOMMU to a subset of the physical memory for
-> > > > purposes of virtualization. So I agree that this wouldn't be a good fit
-> > > > for what we're trying to achieve with iommus or dma-ranges in this
-> > > > binding.
-> > > 
-> > > Thinking about it again now, I wonder if there are any other use cases
-> > > for windowed IOMMUs. If this is the only one, there might be no use
-> > > in the #address-cells model I suggested instead of your original
-> > > #iommu-cells.
-> > 
-> > So in this case virtualization is the reason why we need the DMA window.
-> > The reason for that is that the guest has no other way of knowing what
-> > other guests might be using, so it's essentially a mechanism for the
-> > host to manage the DMA region and allocate subregions for each guest. If
-> > virtualization isn't an issue then it seems to me that the need for DMA
-> > windows goes away because the operating system will track DMA regions
-> > anyway.
-> > 
-> > The only reason I can think of why a windowed IOMMU would be useful is
-> > to prevent two or more devices from stepping on each others' toes. But
-> > that's a problem that the OS should already be handling during DMA
-> > buffer allocation, isn't it?
+On Wed, May 21, 2014, Doug Anderson wrote:
+> Seungwon,
 > 
-> Right. As long as we always unmap the buffers from the IOMMU after they
-> have stopped being in use, it's very unlikely that even a broken device
-> driver causes a DMA into some bus address that happens to be mapped for
-> another device.
+> On Mon, May 19, 2014 at 6:51 PM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+> >> > >> >> +                       } else {
+> >> > >> >> +                               /*
+> >> > >> >> +                                * If we don't have a command complete now we'll
+> >> > >> >> +                                * never get one since we just reset everything;
+> >> > >> >> +                                * better end the request.
+> >> > >> >> +                                *
+> >> > >> >> +                                * If we do have a command complete we'll fall
+> >> > >> >> +                                * through to the SENDING_STOP command and
+> >> > >> >> +                                * everything will be peachy keen.
+> >> > >> >> +                                *
+> >> > >> >> +                                * TODO: I guess we shouldn't send a stop?
+> >
+> > Please remove TODO:
+> 
+> OK
+> 
+> > We already reset controller in dw_mci_data_complete() through "mmc: dw_mmc: change to use
+> recommended reset procedure"?
+> > I guess it depends on that patch.
+> > Then, we don't need to stop sequence anymore.
+> 
+> Even without that patch we've still pretty much stopped everything in
+> dw_mci_fifo_reset(), so I'm not sure there's any strong dependency.
+> ...but in our tree this did land after the patch you mention, so you
+> could wait until it lands if you want.
+> 
+ciu-reset or stop/abort cmd is needed for recovery of controller FSM after getting error.
+dw_mci_fifo_reset eventually has ciu-reset from that patch.
+I think it's fine to apply after that.
 
-I think that if buffers remain mapped in the IOMMU when they have been
-deallocated that should be considered a bug.
+> 
+> NOTE: We found that on some machines we were getting warnings after
+> enabling tuning and using this patch.  The warnings were benign, but
+> we should probably squash the fix into this patch.  See
+> <https://chromium-review.googlesource.com/#/c/200652/> for details.
+Can it be accessible?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/5b719c8c/attachment.sig>
+Thanks,
+Seungwon Jeon
+
+> 
+> -Doug
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
