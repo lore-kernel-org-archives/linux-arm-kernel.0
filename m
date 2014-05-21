@@ -1,45 +1,96 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 21 May 2014 10:14:56 +0100
-Subject: [PATCH v6 0/7] mfd: AXP20x: Add support for AXP202 and AXP209
-In-Reply-To: <CAOQ7t2aBc5tFYk2MkfL9QqvFf5fcebwKtO97F3S=WdJ2uFE_jg@mail.gmail.com>
-References: <1400528868-5971-1-git-send-email-carlo@caione.org>
- <20140520222307.GK12304@sirena.org.uk>
- <CAOQ7t2aBc5tFYk2MkfL9QqvFf5fcebwKtO97F3S=WdJ2uFE_jg@mail.gmail.com>
-Message-ID: <20140521091456.GB6679@lee--X1>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Wed, 21 May 2014 11:15:06 +0200
+Subject: [PATCH v2] ARM: dts: duovero-parlor: Add HDMI output
+Message-ID: <1400663706-24104-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> This set of patches introduces the core driver and support for two different
-> >> subsystems:
-> >>       - Regulators
-> >
-> >>  .../ABI/testing/sysfs-driver-input-axp-pek         |  11 +
-> >>  Documentation/devicetree/bindings/mfd/axp20x.txt   |  93 +++++++
-> >>  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
-> >>  arch/arm/configs/multi_v7_defconfig                |   3 +
-> >>  arch/arm/configs/sunxi_defconfig                   |   4 +
-> >>  drivers/input/misc/Kconfig                         |  11 +
-> >>  drivers/input/misc/Makefile                        |   1 +
-> >>  drivers/input/misc/axp20x-pek.c                    | 281 +++++++++++++++++++++
-> >>  drivers/mfd/Kconfig                                |  12 +
-> >>  drivers/mfd/Makefile                               |   1 +
-> >>  drivers/mfd/axp20x.c                               | 258 +++++++++++++++++++
-> >>  include/linux/mfd/axp20x.h                         | 180 +++++++++++++
-> >>  12 files changed, 856 insertions(+)
-> >
-> > The regulator changes don't appear to be showing up in the diffstat or
-> > obviously in the series?
-> 
-> Right. Cut-and-paste error.
-> You have already applied the regulator patches so I didn't include
-> them here (in theory I posted this series to be picked up by Lee).
+Add the necessary DTS nodes to enable the micro-HDMI output on Parlor
+board.
 
-That's fine.  Just tell me which patches need to stay together and
-which are able to be applied through their respective subsystem trees
-separately.  Then, once I have all the Acks I can apply no problem.
+Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+---
+v1->v2:
+- Rebased on Tony's omap-for-v3.16/dt-v2
+- Use OMAP4_IOPAD macro
+- Use hpd pin as GPIO with hdmi-connector
 
+ arch/arm/boot/dts/omap4-duovero-parlor.dts | 44 ++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+
+diff --git a/arch/arm/boot/dts/omap4-duovero-parlor.dts b/arch/arm/boot/dts/omap4-duovero-parlor.dts
+index cd53a64..6dc84d9 100644
+--- a/arch/arm/boot/dts/omap4-duovero-parlor.dts
++++ b/arch/arm/boot/dts/omap4-duovero-parlor.dts
+@@ -15,6 +15,10 @@
+ 	model = "OMAP4430 Gumstix Duovero on Parlor";
+ 	compatible = "gumstix,omap4-duovero-parlor", "gumstix,omap4-duovero", "ti,omap4430", "ti,omap4";
+ 
++	aliases {
++		display0 = &hdmi0;
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		led0 {
+@@ -35,6 +39,21 @@
+ 			gpio-key,wakeup;
+ 		};
+ 	};
++
++	hdmi0: connector at 0 {
++		compatible = "hdmi-connector";
++		label = "hdmi";
++
++		type = "d";
++
++		hpd-gpios = <&gpio2 31 GPIO_ACTIVE_HIGH>;	/* gpio_63 */
++
++		port {
++			hdmi_connector_in: endpoint {
++				remote-endpoint = <&hdmi_out>;
++			};
++		};
++	};
+ };
+ 
+ &omap4_pmx_core {
+@@ -77,6 +96,15 @@
+ 			OMAP4_IOPAD(0x070, PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_a24.gpio_48: amdix enabled */
+ 		>;
+ 	};
++
++	dss_hdmi_pins: pinmux_dss_hdmi_pins {
++		pinctrl-single,pins = <
++			OMAP4_IOPAD(0x098, PIN_INPUT | MUX_MODE3)		/* hdmi_hpd.gpio_63 */
++			OMAP4_IOPAD(0x09a, PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_cec.hdmi_cec */
++			OMAP4_IOPAD(0x09c, PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_ddc_scl.hdmi_ddc_scl */
++			OMAP4_IOPAD(0x09e, PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_ddc_sda.hdmi_ddc_sda */
++		>;
++	};
+ };
+ 
+ &i2c2 {
+@@ -143,4 +171,20 @@
+ 	};
+ };
+ 
++&dss {
++	status = "ok";
++};
++
++&hdmi {
++	status = "ok";
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&dss_hdmi_pins>;
++
++	port {
++		hdmi_out: endpoint {
++			remote-endpoint = <&hdmi_connector_in>;
++		};
++	};
++};
+ 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.3.2
