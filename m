@@ -1,55 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 May 2014 08:41:54 -0700
-Subject: [PATCH 0/6] AM43xx & OMAP5 DSS DT changes
-In-Reply-To: <537CC6E7.6010103@ti.com>
-References: <1400676625-30078-1-git-send-email-tomi.valkeinen@ti.com>
- <20140521150231.GH17417@atomide.com> <537CC376.5050501@ti.com>
- <20140521152613.GJ17417@atomide.com> <537CC6E7.6010103@ti.com>
-Message-ID: <20140521154153.GK17417@atomide.com>
+From: grundler@chromium.org (Grant Grundler)
+Date: Wed, 21 May 2014 08:44:42 -0700
+Subject: [PATCH] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <11242680.PQytQQqlPJ@wuerfel>
+References: <1400242998-437-1-git-send-email-thierry.reding@gmail.com>
+ <4506822.XX7GrvtHhk@wuerfel> <20140521090244.GB19268@ulmo>
+ <11242680.PQytQQqlPJ@wuerfel>
+Message-ID: <CANEJEGvhEsC9wKqX_pYmOg7LwsQkoN9=jjXJuW0UeEa9XywSPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [140521 08:33]:
-> On 21/05/14 18:26, Tony Lindgren wrote:
-> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [140521 08:18]:
-> >> On 21/05/14 18:02, Tony Lindgren wrote:
-> >>> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140521 05:51]:
-> >>>> Hi,
-> >>>>
-> >>>> Here are the AM43xx and OMAP5 display DT changes again. I've sent the clock
-> >>>> related changes separately, and I removed OMAP5's RFBI node, which depends on
-> >>>> more clock changes. The RFBI driver doesn't work at the moment anyway, so
-> >>>> removing the RFBI node should not be an issue.
-> >>>>
-> >>>> Tony, if these look fine (the rfbi change is the only one compared to the
-> >>>> previous versions), can you queue them for 3.16?
-> >>>
-> >>> Probably best that you do a late branch again after arm-soc dts changes
-> >>> have been merged. Sounds like you have at least that macro dependency
-> >>> to omap-for-v3.16/dt-v2 so you should probably base your branch on
-> >>
-> >> There are no dependencies that I know of. Which macro dependency is that?
-> > 
-> > Oh for the "[PATCH v2] ARM: dts: duovero-parlor: Add HDMI output" that
-> > now uses the OMAP4_IOPAD macro.
-> 
-> Ok.
-> 
-> But generally, isn't it better if the .dts changes go through your tree?
-> None of the display related .dts changes have any dependencies to
-> omapdss as such.
+On Wed, May 21, 2014 at 2:32 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 21 May 2014 11:02:45 Thierry Reding wrote:
+>> On Wed, May 21, 2014 at 10:54:42AM +0200, Arnd Bergmann wrote:
+>>
+>> > Right. As long as we always unmap the buffers from the IOMMU after they
+>> > have stopped being in use, it's very unlikely that even a broken device
+>> > driver causes a DMA into some bus address that happens to be mapped for
+>> > another device.
+>>
+>> I think that if buffers remain mapped in the IOMMU when they have been
+>> deallocated that should be considered a bug.
 
-Yes in general, but it's getting very late for v3.16, and..
- 
-> I can collect the patches, as I've done, to let them mature a bit in my
-> tree, but I'd rather get them merged via your dt branch.
+There is currently no general requirement to tear down mappings immediately.
+An option to enforce immediate tear down might be useful since I agree
+Virtual Guests sharing host memory through shared physical devices
+will want that. ie there should be no opportunity for a shared device
+to be able to access another guests memory through "stale" (but live)
+DMA mappings. I don't think that's the case but I'd ask someone like
+Alex Williamson for a more certain answer.
 
-..I may not queue any more patches for v3.16. The branches I've sent have
-not yet been merged into arm-soc, so at minimum I'm going to wait for
-that. If we have -rc6 tagged today and no -rc7, I'm switching into fixes
-only mode. So in this case it's probably best that you merge them so
-we can get the display dependency out of the way for v3.16.
+> You could see it as a performance optimization in some cases, e.g. when you
+> cannot flush individual IOTLBs or doing so is expensive, and you just keep
+> assigning new addresses until every one has been used, then you do a global
+> IOTLB flush once.
 
-Regards,
+This is in fact exactly what several IOMMUs do - including the Intel
+IOMMU driver.
 
-Tony 
+IIRC, the Intel IOMMU driver collects 256 or so  entries to flush and
+then flushes them all at once and updates the metadata. I don't if it
+does this for ranges assigned to different virtual guests though or
+just within a given range.
+
+> Obviously you have to maintain the IO page tables correctly.
+
+To be clear, "Correctly" in this case just means until the IOTLB is
+flushed, the given IOMMU Pdir entries are marked "in use" even though
+the driver has handed "ownership" back to the IOMMU driver.
+
+cheers,
+grant
