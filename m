@@ -1,54 +1,43 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 20 May 2014 19:24:16 -0700
-Subject: [PATCH RESEND 2/2] Documentation: add Broadcom STB Level-2
- interrupt controller binding
-In-Reply-To: <20140521013027.GD8664@titan.lakedaemon.net>
-References: <1400613229-19049-1-git-send-email-f.fainelli@gmail.com>
- <1400613229-19049-3-git-send-email-f.fainelli@gmail.com>
- <20140521013027.GD8664@titan.lakedaemon.net>
-Message-ID: <537C0E50.4050409@gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 21 May 2014 09:09:47 +0800
+Subject: [PATCH 2/2 v2] serial: imx: remove the redundant code
+In-Reply-To: <1400633789-31979-2-git-send-email-b32955@freescale.com>
+References: <1400633789-31979-2-git-send-email-b32955@freescale.com>
+Message-ID: <1400634587-513-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 20/05/2014 18:30, Jason Cooper a ?crit :
-> On Tue, May 20, 2014 at 12:13:49PM -0700, Florian Fainelli wrote:
->> This patch adds the Device Tree binding document for the Broadcom
->> Set-top-box Level 2 interrupt controller hardware.
->>
->> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
->> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->> ---
->>   .../bindings/interrupt-controller/brcm,l2-intc.txt | 29 ++++++++++++++++++++++
->>   1 file changed, 29 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/interrupt-controller/brcm,l2-intc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/interrupt-controller/brcm,l2-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/brcm,l2-intc.txt
->> new file mode 100644
->> index 000000000000..448273a30a11
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/interrupt-controller/brcm,l2-intc.txt
->> @@ -0,0 +1,29 @@
->> +Broadcom Generic Level 2 Interrupt Controller
->> +
->> +Required properties:
->> +
->> +- compatible: should be "brcm,l2-intc"
->> +- reg: specifies the base physical address and size of the registers
->> +- interrupt-controller: identifies the node as an interrupt controller
->> +- #interrupt-cells: specifies the number of cells needed to encode an
->> +  interrupt source. Should be 1.
->> +- interrupt-parent: specifies the phandle to the parent interrupt controller
->> +  this controller is cacaded from
->> +- interrupts: specifies the interrupt line in the interrupt-parent irq space
->> +  to be used for cascading
->> +
->> +Optional properties:
->> +
->> +- brcm,irq-can-wake: If present, this means the L2 controller can be used as a
->> +  wakeup source for system suspend/resume.
->
-> Do we need a vendor-specific property here?  I'd much prefer to see a
-> generic implementation.
+In the imx_startup(), we will reset the uart port which will reset all
+the FIFOs, including the URXD.
 
-Is there an usable generic property? We came up with a custom one 
-because there is not a generic one AFAICT.
+So the code to clear the RX FIFO is redundant. Just remove it.
+
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+fix the typo.
+---
+ drivers/tty/serial/imx.c |    9 ---------
+ 1 files changed, 0 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 64901d0..febf400 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -1161,15 +1161,6 @@ static int imx_startup(struct uart_port *port)
+ 		temp |= UCR2_IRTS;
+ 	writel(temp, sport->port.membase + UCR2);
+ 
+-	if (USE_IRDA(sport)) {
+-		/* clear RX-FIFO */
+-		int i = 64;
+-		while ((--i > 0) &&
+-			(readl(sport->port.membase + URXD0) & URXD_CHARRDY)) {
+-			barrier();
+-		}
+-	}
+-
+ 	if (!is_imx1_uart(sport)) {
+ 		temp = readl(sport->port.membase + UCR3);
+ 		temp |= IMX21_UCR3_RXDMUXSEL;
+-- 
+1.7.8
