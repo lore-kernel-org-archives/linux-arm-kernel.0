@@ -1,71 +1,62 @@
-From: ritesh.harjani@gmail.com (Ritesh Harjani)
-Date: Wed, 21 May 2014 11:08:48 +0530
-Subject: [PATCH 1/1] arm64: tlbflush.h: Clean up comment
-In-Reply-To: <CAKZGPAMhZZoSAs0LPpGJijCL3EM-ANoSWs0-yQPX2yL=nB-6DQ@mail.gmail.com>
-References: <1400645600-35973-1-git-send-email-ritesh.harjani@gmail.com>
- <1400645600-35973-2-git-send-email-ritesh.harjani@gmail.com>
- <CAKZGPAMhZZoSAs0LPpGJijCL3EM-ANoSWs0-yQPX2yL=nB-6DQ@mail.gmail.com>
-Message-ID: <CAD15agYEm3iUPEeA78cqd1tyfNz+ZFWXg57RP9M0ZBPiNDHg2A@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 21 May 2014 10:59:01 +0530
+Subject: [PATCH v7] DMA: sun6i: Add driver for the Allwinner A31 DMA
+ controller
+In-Reply-To: <20140508031949.GQ7047@lukather>
+References: <20140430070408.GR32284@intel.com> <20140430215322.GH3000@lukather>
+ <20140502163429.GA32284@intel.com> <20140508031949.GQ7047@lukather>
+Message-ID: <20140521052901.GH21128@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ok thanks Arun,
+On Wed, May 07, 2014 at 10:19:49PM -0500, Maxime Ripard wrote:
+> On Fri, May 02, 2014 at 10:04:29PM +0530, Vinod Koul wrote:
+> > On Wed, Apr 30, 2014 at 02:53:22PM -0700, Maxime Ripard wrote:
+> > > Hi Vinod,
+> > > 
+> > > On Wed, Apr 30, 2014 at 12:34:08PM +0530, Vinod Koul wrote:
+> > > > On Thu, Apr 24, 2014 at 04:22:44PM +0200, Maxime Ripard wrote:
+> > > > > +static inline void sun6i_dma_free(struct sun6i_dma_dev *sdc)
+> > > > > +{
+> > > > > +	int i;
+> > > > > +
+> > > > > +	for (i = 0; i < NR_MAX_VCHANS; i++) {
+> > > > > +		struct sun6i_vchan *vchan = &sdc->vchans[i];
+> > > > > +
+> > > > > +		list_del(&vchan->vc.chan.device_node);
+> > > > > +		tasklet_kill(&vchan->vc.task);
+> > > > > +	}
+> > > > > +
+> > > > > +	tasklet_kill(&sdc->task);
+> > > > This is again not good. see http://lwn.net/Articles/588457/
+> > > > At this point HW can still generate interrupts or you can have irq running!
+> > > 
+> > > I'm not sure to fully understand the issue here, but what is not good?
+> > > the first or the second tasklet_kill calls, or both?
+> > > 
+> > > From what I understood, the issue is only there whenever you are
+> > > calling tasklet_disable without making sure that no one will schedule
+> > > your tasklet before disabling it.
+> > > 
+> > > But the point is I don't actually use either _enable/_disable. I might
+> > > be wrong in not using those functions, but I don't really see how I
+> > > can be impacted.
+> > 
+> > Well that was one part of it. How do you ensure the tasklet is not scheduled
+> > while and after you are killing it. You need to ensure irq is disabled and pending irqs
+> > have finished processing. I dont see that bit.
+> 
+> Ok. I'll change that.
+> 
+> Do you want me to use tasklet_enable and tasklet_disable as well?
+I dont think it will help in this usage.
 
-I didnt see this patch
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/252837.html
-
-Will submit the correct patch then.
-
-Thanks
-Ritesh
-
-
-On Wed, May 21, 2014 at 9:52 AM, Arun KS <arunks.linux@gmail.com> wrote:
-> Hi Ritesh,
->
-> On Wed, May 21, 2014 at 9:43 AM,  <ritesh.harjani@gmail.com> wrote:
->> From: Ritesh Harjani <ritesh.harjani@gmail.com>
->>
->> Clean up the undefined function name(flush_kern_tlb_page)
->> from the comment in tlbflush.h
->>
->> Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
->> ---
->>  arch/arm64/include/asm/tlbflush.h | 6 ------
->>  1 file changed, 6 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
->> index 8b48203..85e4f98 100644
->> --- a/arch/arm64/include/asm/tlbflush.h
->> +++ b/arch/arm64/include/asm/tlbflush.h
->> @@ -63,12 +63,6 @@ extern struct cpu_tlb_fns cpu_tlb;
->>   *             - vaddr - virtual address (may not be aligned)
->>   *             - vma   - vma_struct describing address range
->>   *
->> - *     flush_kern_tlb_page(kaddr)
->> - *
->> - *             Invalidate the TLB entry for the specified page.  The address
->> - *             will be in the kernels virtual memory space.  Current uses
->> - *             only require the D-TLB to be invalidated.
->> - *             - kaddr - Kernel virtual memory address
->>   */
->>  static inline void flush_tlb_all(void)
->
-> Probably you can remove the following comment in same file as well.
-> "The arch/arm64/mm/tlb.S files implement these methods."
->
-> arch/arm64/mm/tlb.S file is no more and all the methods are
-> implemented in the current file.
->
-> Thanks,
-> Arun
->
->>  {
->> --
->> 1.8.1.3
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+~Vinod
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/082dfe3b/attachment.sig>
