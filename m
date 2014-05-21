@@ -1,64 +1,52 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 21 May 2014 17:28:02 +0530
-Subject: [PATCH 1/1] clk: exynos5420: Staticize local variables
-Message-ID: <1400673482-16287-1-git-send-email-sachin.kamat@linaro.org>
+From: mporter@linaro.org (Matt Porter)
+Date: Wed, 21 May 2014 08:02:57 -0400
+Subject: [PATCH v2 4/4] ARM: dts: bcm590xx: add support for GPLDO and
+ VBUS regulators
+In-Reply-To: <20140521092913.GG6679@lee--X1>
+References: <1398295293-11033-1-git-send-email-mporter@linaro.org>
+ <1398295293-11033-5-git-send-email-mporter@linaro.org>
+ <20140521092913.GG6679@lee--X1>
+Message-ID: <20140521120257.GV32082@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Local symbols are made static.
+On Wed, May 21, 2014 at 10:29:13AM +0100, Lee Jones wrote:
+> > Adds additional nodes to support GPLDO1-6 and VBUS regulators which
+> > are now supported in the bcm590xx regulator driver.
+> > 
+> > Signed-off-by: Matt Porter <mporter@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/bcm59056.dtsi | 21 +++++++++++++++++++++
+> >  1 file changed, 21 insertions(+)
+> 
+> I'm not going to apply this with the rest of the set.  It will have to
+> go in via your normal arch/arm route.
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
----
- drivers/clk/samsung/clk-exynos5420.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Ok
 
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index 9d7d7eed03fd..41b507baf5d6 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -474,7 +474,7 @@ static struct samsung_fixed_factor_clock
- 	FFACTOR(0, "ff_dout_spll2", "mout_sclk_spll", 1, 2, 0),
- };
- 
--struct samsung_mux_clock exynos5800_mux_clks[] __initdata = {
-+static struct samsung_mux_clock exynos5800_mux_clks[] __initdata = {
- 	MUX(0, "mout_aclk400_isp", mout_group3_5800_p, SRC_TOP0, 0, 3),
- 	MUX(0, "mout_aclk400_mscl", mout_group3_5800_p, SRC_TOP0, 4, 3),
- 	MUX(0, "mout_aclk400_wcore", mout_group2_5800_p, SRC_TOP0, 16, 3),
-@@ -523,7 +523,7 @@ struct samsung_mux_clock exynos5800_mux_clks[] __initdata = {
- 	MUX(0, "mout_fimd1", mout_group2_p, SRC_DISP10, 4, 3),
- };
- 
--struct samsung_div_clock exynos5800_div_clks[] __initdata = {
-+static struct samsung_div_clock exynos5800_div_clks[] __initdata = {
- 	DIV(0, "dout_aclk400_wcore", "mout_aclk400_wcore", DIV_TOP0, 16, 3),
- 
- 	DIV(0, "dout_aclk550_cam", "mout_aclk550_cam",
-@@ -539,14 +539,14 @@ struct samsung_div_clock exynos5800_div_clks[] __initdata = {
- 	DIV(0, "dout_sclk_sw", "sclk_spll", DIV_TOP9, 24, 6),
- };
- 
--struct samsung_gate_clock exynos5800_gate_clks[] __initdata = {
-+static struct samsung_gate_clock exynos5800_gate_clks[] __initdata = {
- 	GATE(CLK_ACLK550_CAM, "aclk550_cam", "mout_user_aclk550_cam",
- 				GATE_BUS_TOP, 24, 0, 0),
- 	GATE(CLK_ACLK432_SCALER, "aclk432_scaler", "mout_user_aclk432_scaler",
- 				GATE_BUS_TOP, 27, 0, 0),
- };
- 
--struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
-+static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
- 	MUX(0, "sclk_bpll", mout_bpll_p, TOP_SPARE2, 0, 1),
- 	MUX(0, "mout_aclk400_wcore_bpll", mout_aclk400_wcore_bpll_p,
- 				TOP_SPARE2, 4, 1),
-@@ -576,7 +576,7 @@ struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
- 	MUX(0, "mout_fimd1", mout_group3_p, SRC_DISP10, 4, 1),
- };
- 
--struct samsung_div_clock exynos5420_div_clks[] __initdata = {
-+static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
- 	DIV(0, "dout_aclk400_wcore", "mout_aclk400_wcore_bpll",
- 			DIV_TOP0, 16, 3),
- };
--- 
-1.7.9.5
+> > diff --git a/arch/arm/boot/dts/bcm59056.dtsi b/arch/arm/boot/dts/bcm59056.dtsi
+> > index dfadaaa..066adfb 100644
+> > --- a/arch/arm/boot/dts/bcm59056.dtsi
+> > +++ b/arch/arm/boot/dts/bcm59056.dtsi
+> > @@ -70,5 +70,26 @@
+> >  
+> >  		vsr_reg: vsr {
+> >  		};
+> > +
+> > +		gpldo1_reg: gpldo1 {
+> > +		};
+> 
+> What do these empty nodes do in any case?
+
+They instantiate regulators. The bcm590xx binding specifies the
+allowable subnode names permitted here. This replaces the old method
+of specifying an index or the deprecated regulator-compatible property.
+The board-specific dts includes this dtsi and applies any board
+constraints to a subset of regulators that need them. Unused regulators
+are all disabled which is what we want.
+
+> Don't you at least need a status property in there or something?
+
+Not necessary for these subnodes.
+
+-Matt
