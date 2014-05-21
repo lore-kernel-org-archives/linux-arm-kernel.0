@@ -1,96 +1,56 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 21 May 2014 11:02:34 +0100
-Subject: [PATCH v7 06/15] ARM: hisi: enable MCPM implementation
-In-Reply-To: <CAD6h2NTku5zS5QONpOqdhAXgfFutGC4jyAAo-UGnAsc=Xan8dw@mail.gmail.com>
-References: <1399795571-17231-7-git-send-email-haojian.zhuang@linaro.org>
- <1399981484-31628-1-git-send-email-haojian.zhuang@linaro.org>
- <alpine.LFD.2.11.1405131449270.980@knanqh.ubzr>
- <CAD6h2NRMzgsZWkP8MYbCHqo4JkojbJxjj-kZwSj65A1SNBNRyw@mail.gmail.com>
- <alpine.LFD.2.11.1405151549330.17310@knanqh.ubzr>
- <CAD6h2NTku5zS5QONpOqdhAXgfFutGC4jyAAo-UGnAsc=Xan8dw@mail.gmail.com>
-Message-ID: <20140521100234.GB3830@e103592.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 21 May 2014 11:02:45 +0100
+Subject: [PATCH v4 6/6] ARM: dts: STiH407: Add B2120 board support
+In-Reply-To: <CAOesGMigF7CGtTmLMW4zbRemGaMbWs6NV6KLPFZQFYmnHc=HQw@mail.gmail.com>
+References: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>
+ <1394614210-15698-7-git-send-email-maxime.coquelin@st.com>
+ <CAOesGMg5Jk_XB3zdfKz8VxRObYbFO8OMuRyo7Ba-kavANbci1w@mail.gmail.com>
+ <20140520072048.GC20874@lee--X1>
+ <CAOesGMioLwX3jgGEsR=rHV0u6yR54b4x8BfyZ91vjJnMapUHew@mail.gmail.com>
+ <20140520074353.GD20874@lee--X1>
+ <CAOesGMigF7CGtTmLMW4zbRemGaMbWs6NV6KLPFZQFYmnHc=HQw@mail.gmail.com>
+Message-ID: <20140521100245.GI6679@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 12:43:59PM +0800, Haojian Zhuang wrote:
-> On 16 May 2014 04:01, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Thu, 15 May 2014, Haojian Zhuang wrote:
-> >
-> >> On 14 May 2014 03:43, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> >> > On Tue, 13 May 2014, Haojian Zhuang wrote:
+> >> >> > +       soc {
+> >> >> > +               sbc_serial0: serial at 9530000 {
+> >> >> > +                       status = "okay";
+> >> >> > +               };
+> >> >>
+> >> >> You might want to consider reference-based syntax here instead, so you
+> >> >> don't have to mimic the hierarchy. That'd be (at the root level of the
+> >> >> file, below this secion:
+> >> >>
+> >> >> &sbc_serial0: {
+> >> >>         status = "okay";
+> >> >> };
 > >> >
-> >> >> +     data = readl_relaxed(fabric + FAB_SF_MODE);
-> >> >> +     if (on)
-> >> >> +             data |= 1 << cluster;
-> >> >> +     else
-> >> >> +             data &= ~(1 << cluster);
-> >> >> +     writel_relaxed(data, fabric + FAB_SF_MODE);
-> >> >> +     while (1) {
-> >> >> +             if (data == readl_relaxed(fabric + FAB_SF_MODE))
-> >> >> +                     break;
-> >> >> +     }
-> >> >> +}
+> >> > I'm personally not keen on this scheme.  It's sometimes helpful to know
+> >> > the hierarchy and I don't think it's a large overhead to format the
+> >> > subordinate DTS files in this way.
 > >> >
-> >> > The above could be easily coded in assembly for the power_up_setup
-> >> > callback thusly:
-> >> >
-> >> > hip04_power_up_setup:
-> >> >
-> >> >         cmp     r0, #0                  @ check affinity level
-> >> >         bxeq    lr                      @ nothing to do at CPU level
-> >> >
-> >> >         mrc     p15, 0, r0, c0, c0, 5   @ get MPIDR
-> >> >         ubfx    r0, r0, #8, #8          @ extract cluster number
-> >> >
-> >> >         adr     r1, .LC0
-> >> >         ldmia   r1, {r2, r3}
-> >> >         sub     r2, r2, r1              @ virt_addr - phys_addr
-> >> >         ldr     r1, [r2, r3]            @ get fabric_phys_addr
-> >> >         mov     r2, #1
-> >> >         ldr     r3, [r1, #FAB_SF_MODE]  @ read "data"
-> >> >         orr     r3, r3, r2, lsl r0      @ set cluster bit
-> >> >         str     r3, [r1, #FAB_SF_MODE]  @ write it back
-> >> >
-> >> > 1:      ldr     r2, [r1, #FAB_SF_MODE]  @ read register content
-> >> >         cmp     r2, r3                  @ make sure it matches
-> >> >         bne     1b                      @ otherwise retry
-> >> >
-> >> >         bx      lr
-> >> >
-> >> > :LC0:   .word   .
-> >> >         .word   fabric_phys_addr - .LC0
-> >> >
-> >> > That should be it.
-> >> >
+> >> > Please consider not enforcing this.
 > >>
-> >> No. These code should be executed before new CPU on. If I transfer
-> >> them to assembler code, it means that code will be executed after
-> >> new CPU on.
+> >> Definitely not enforcing it, and I didn't use to like it either but it
+> >> has some real upsides.
+> >>
+> >> In particular, it saves a lot of grief when you're changing something
+> >> like the unit-id of a node in .dtsi and forget to do the same update
+> >> in the dts.
 > >
-> > Exact.
-> >
-> >> Then it results me failing to make new CPU online.
-> >
-> > The assembly code could be wrong as well.  Are you sure this is not the
-> > actual reason?
-> >
-> > Is there some documentation for this stuff?
-> >
+> > I'm not entirely sure what a unit-id is, but I can see that there
+> > would be benefits to using the referenced-based syntax as you call
+> > it.  If any of those benefits hold true here I won't push back, but I
+> > would personally like to see us default to the hierarchical scheme.
 > 
-> There's no problem in assembly code. I even rewrite your assembly code.
-> 
-> If I keep my c code with assembly code, new CPU could be online right.
-> If I only use assembly code, I only get the kernel panic. So it's not
-> caused by assembly code. It's caused by executing code after new CPU
-> on.
-> 
-> There's no documentation on this. They didn't prepare well on documents.
-> I think they'll improve it in the future.
+> Sorry, I meant unit-address. I.e. the portion that goes behind the @
+> in the node name.
 
-It's essential to understand what the hardware is actually doing here.
+Ah yes, makes sense now, thanks.
 
-If we don't understand exactly what toggling those bits in FAB_SF_MODE
-actually does, then it's impossible to judge on how to do it safely.
-
-Cheers
----Dave
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
