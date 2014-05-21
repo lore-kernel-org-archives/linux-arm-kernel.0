@@ -1,37 +1,50 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed, 21 May 2014 12:10:17 +0300
-Subject: [PATCH v2] s3cmci: port DMA code to dmaengine API
-In-Reply-To: <4563444.HLmgOoMRYe@wuerfel>
-References: <1400617259-6939-1-git-send-email-anarsoul@gmail.com>
- <4563444.HLmgOoMRYe@wuerfel>
-Message-ID: <CA+E=qVdt0jb0Cf72eFxJgJeih_rH4oH1TbtO7HR+WCpLh=kpoQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 21 May 2014 10:12:27 +0100
+Subject: [PATCH 3/3] ARM: sti: stih41x: Provide a proper header for this
+ DTSI file
+In-Reply-To: <537C64A6.4050409@st.com>
+References: <1400660415-14720-1-git-send-email-lee.jones@linaro.org>
+ <1400660415-14720-3-git-send-email-lee.jones@linaro.org>
+ <537C64A6.4050409@st.com>
+Message-ID: <20140521091227.GA6679@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 21, 2014 at 11:57 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 20 May 2014 23:20:59 Vasily Khoruzhick wrote:
->> index 1384f67..e70e4cf 100644
->> --- a/drivers/mmc/host/Kconfig
->> +++ b/drivers/mmc/host/Kconfig
->> @@ -420,6 +420,7 @@ config MMC_SPI
->>  config MMC_S3C
->>         tristate "Samsung S3C SD/MMC Card Interface support"
->>         depends on ARCH_S3C24XX
->> +       select S3C24XX_DMAC
->>         help
->>           This selects a driver for the MCI interface found in
->>            Samsung's S3C2410, S3C2412, S3C2440, S3C2442 CPUs.
->>
->
-> I think you should use 'depends on S3C24XX_DMAC' here.
->
-> Other than that,
+> >Also explicitly include STiH416 Clk bindings instead of relying on
+> >inheriting them from other DTSI files which we happen to include.
+> >
+> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >---
+> >  arch/arm/boot/dts/stih41x.dtsi | 8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> >
+> >diff --git a/arch/arm/boot/dts/stih41x.dtsi b/arch/arm/boot/dts/stih41x.dtsi
+> >index f5b9898..32730e5 100644
+> >--- a/arch/arm/boot/dts/stih41x.dtsi
+> >+++ b/arch/arm/boot/dts/stih41x.dtsi
+> >@@ -1,3 +1,11 @@
+> >+/*
+> >+ * Copyright (C) 2014 STMicroelectronics Limited.
+> >+ *
+> >+ * This program is free software; you can redistribute it and/or modify
+> >+ * it under the terms of the GNU General Public License version 2 as
+> >+ * publishhed by the Free Software Foundation.
+> >+ */
+> >+#include "stih416-clock.dtsi"
+> 
+> Nack.
+> As discussed on IRC, this dtsi file is included by stih415.dtsi.
+> In this case, we want to include stih415-clocks.dtsi instead.
 
-Ok, will send v3 tonight.
++1 resubmitted.
 
-Regards
-Vasily
+> >  / {
+> >  	#address-cells = <1>;
+> >  	#size-cells = <1>;
+> >
 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
->
->         Arnd
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
