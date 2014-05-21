@@ -1,42 +1,33 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 21 May 2014 14:25:16 +0300
-Subject: pull request for Tegra clock fixes for 3.16 with HDA clocks
-Message-ID: <20140521112516.GA22484@tbergstrom-lnx.Nvidia.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 21 May 2014 13:25:53 +0200
+Subject: [PATCH v2 1/3] ARM: sti: stih416: Add support for B2020 RevE
+In-Reply-To: <1400661924-10745-1-git-send-email-lee.jones@linaro.org>
+References: <1400661924-10745-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <537C8D41.7090403@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
 
-A number of fixes which are needed by the upcoming XHCI and SATA drivers and
-the HDA audio driver.
+
+On 05/21/2014 10:45 AM, Lee Jones wrote:
+> The B2020 RevE differs from the other B2020 boards in a few subtle ways;
+> including the Ethernet reset GPIO which this patch adds support for and
+> the LED wiring which will follow in a latter patch.  Without supplying
+> these differences Ethernet and the board LEDs simply will not work.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>   arch/arm/boot/dts/Makefile               |  3 ++-
+>   arch/arm/boot/dts/stih416-b2020-revE.dts | 21 +++++++++++++++++++++
+>   2 files changed, 23 insertions(+), 1 deletion(-)
+>   create mode 100644 arch/arm/boot/dts/stih416-b2020-revE.dts
+>
+
+
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
 Thanks,
+Maxime
 
-Peter.
 
-The following changes since commit d6d211db37e75de2ddc3a4f979038c40df7cc79c:
-
-  Linux 3.15-rc5 (2014-05-09 13:10:52 -0700)
-
-are available in the git repository at:
-  git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git tegra-clk-v3.16-1
-
-Andrew Bresticker (2):
-      clk: tegra: Fix xusb_hs_src clock hierarchy
-      clk: tegra: Initialize xusb clocks
-
-Dylan Reid (1):
-      clk: tegra124: Enable hda to hdmi clocks
-
-Jim Lin (2):
-      clk: tegra: Enable hardware control of PLLE
-      clk: tegra: Fix xusb_fs_src mux
-
- drivers/clk/tegra/clk-id.h               |    1 +
- drivers/clk/tegra/clk-pll.c              |   33 +++++++++++++++++++++++++++++-
- drivers/clk/tegra/clk-tegra-periph.c     |   10 ++++++++-
- drivers/clk/tegra/clk-tegra114.c         |   22 ++++++++++----------
- drivers/clk/tegra/clk-tegra124.c         |   26 ++++++++++++++---------
- include/dt-bindings/clock/tegra114-car.h |    3 +-
- include/dt-bindings/clock/tegra124-car.h |    3 +-
- 7 files changed, 73 insertions(+), 25 deletions(-)
+[...]
