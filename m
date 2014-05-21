@@ -1,44 +1,60 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 21 May 2014 14:30:38 +0100
-Subject: [PATCH v2 4/4] ARM: dts: bcm590xx: add support for GPLDO and
- VBUS regulators
-In-Reply-To: <20140521120257.GV32082@beef>
-References: <1398295293-11033-1-git-send-email-mporter@linaro.org>
- <1398295293-11033-5-git-send-email-mporter@linaro.org>
- <20140521092913.GG6679@lee--X1> <20140521120257.GV32082@beef>
-Message-ID: <20140521133038.GJ6679@lee--X1>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 21 May 2014 22:31:50 +0900
+Subject: [PATCH] cpufreq: exynos: Fix driver compilation with
+ ARCH_MULTIPLATFORM
+In-Reply-To: <CAJuA9ajHAyB6eLe0nQiNcCAS1ojG7W+FTJ1EH62H3Ch-DP2bcw@mail.gmail.com>
+References: <537C6350.2010707@gmail.com>
+ <1400670752-673-1-git-send-email-t.figa@samsung.com>
+ <7243145.22RNvZMdch@wuerfel> <537C9B81.5040301@samsung.com>
+ <CAJuA9ajHAyB6eLe0nQiNcCAS1ojG7W+FTJ1EH62H3Ch-DP2bcw@mail.gmail.com>
+Message-ID: <036901cf74f9$0562e640$1028b2c0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > diff --git a/arch/arm/boot/dts/bcm59056.dtsi b/arch/arm/boot/dts/bcm59056.dtsi
-> > > index dfadaaa..066adfb 100644
-> > > --- a/arch/arm/boot/dts/bcm59056.dtsi
-> > > +++ b/arch/arm/boot/dts/bcm59056.dtsi
-> > > @@ -70,5 +70,26 @@
-> > >  
-> > >  		vsr_reg: vsr {
-> > >  		};
-> > > +
-> > > +		gpldo1_reg: gpldo1 {
-> > > +		};
-> > 
-> > What do these empty nodes do in any case?
+Thomas Abraham wrote:
 > 
-> They instantiate regulators. The bcm590xx binding specifies the
-> allowable subnode names permitted here. This replaces the old method
-> of specifying an index or the deprecated regulator-compatible property.
-> The board-specific dts includes this dtsi and applies any board
-> constraints to a subset of regulators that need them. Unused regulators
-> are all disabled which is what we want.
+> On Wed, May 21, 2014 at 5:56 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> > On 21.05.2014 14:21, Arnd Bergmann wrote:
+> >> On Wednesday 21 May 2014 13:12:32 Tomasz Figa wrote:
+> >>> Currently Exynos cpufreq drivers rely on globally mapped clock
+> >>> controller registers to configure frequency of CPU cores. This is
+> >>> obviously wrong and will be removed in near future, but to enable
+> >>> support for multi-platform builds without introducing a regression it
+> >>> needs to be worked around.
+> >>>
+> >>> This patch hacks the code to look for clock controller node in device
+> >>> tree and map its registers using of_iomap(), instead of relying on
+> >>> global mapping, so dependencies on platform headers are removed and the
+> >>> driver can compile again with multiplatform support.
+> >>>
+> >>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> >>> ---
+> >>>  drivers/cpufreq/Kconfig.arm          |  6 +++---
+> >>>  drivers/cpufreq/exynos-cpufreq.c     |  2 --
+> >>>  drivers/cpufreq/exynos-cpufreq.h     | 30 ++++++++++++++----------------
+> >>>  drivers/cpufreq/exynos4210-cpufreq.c | 31 +++++++++++++++++++++++++----
+> --
+> >>>  drivers/cpufreq/exynos4x12-cpufreq.c | 32 ++++++++++++++++++++++++++---
+> ---
+> >>>  drivers/cpufreq/exynos5250-cpufreq.c | 35 +++++++++++++++++++++++++++--
+> ------
+> >>>  6 files changed, 95 insertions(+), 41 deletions(-)
+> >>
+> >> Isn't this completely obsoleted by Thomas Abraham's work on cpufreq-cpu0
+> >> support in Exynos? I thought that was going to make it for 3.16.
+> >
+> > That would be the best solution, but we need at least one more version
+> > of that series and I'm not sure if it isn't already too late to merge it
+> > for 3.16.
 > 
-> > Don't you at least need a status property in there or something?
+> I have addressed most the comments on the v4 patches. I will post v5
+> of the cpufreq consolidation patches a little later or early tomorrow.
 > 
-> Not necessary for these subnodes.
++1
 
-Very well, thanks for the clarification.
+If there is no comments more on Thomas P Abraham's series v4 ;-), I will take that series in this time with ack from Viresh.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Rafael already agreed that exynos related cpufreq is handled in samsung tree with Viresh's ack.
+
+Thanks,
+Kukjin
