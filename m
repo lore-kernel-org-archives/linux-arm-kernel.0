@@ -1,83 +1,38 @@
-From: raghupv30@gmail.com (Raghu Pv)
-Date: Wed, 21 May 2014 14:40:16 +0100
-Subject: CLONE from pthread_create fails with ERESTARTNOINTR and application
- crashes
-Message-ID: <CAGJAg9EHSgOg3trryA5Zb5ms8pfTX6Y7DF4s-mEP6YZmD8twVw@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 21 May 2014 15:44:56 +0200
+Subject: [PATCH 1/2] regulator: gpio-regulator: Add required
+ regulator-type property
+In-Reply-To: <20140513165921.GK12304@sirena.org.uk>
+References: <1385653493-9952-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2193707.R9XiqBsnU4@avalon> <20140513165921.GK12304@sirena.org.uk>
+Message-ID: <1885616.D9TNdZVfuO@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Overview:
+On Tuesday 13 May 2014 17:59:21 Mark Brown wrote:
+> On Tue, May 13, 2014 at 02:06:23AM +0200, Laurent Pinchart wrote:
+> > What's the status of this ? The gpio regulator driver now defaults to
+> > voltage regulator when the regulator-type property is not set. Should the
+> > DT bindings document the property as optional (I can submit a patch for
+> > that), or do you consider that the gpio regulator driver should support
+> > voltage regulators only when used with DT, and just keep the
+> > regulator-type property support in the driver for backward compatibility
+> > ?
+> 
+> I don't really care either way, I did write a patch for the bindings but
+> there was some language lawyering over it and I never cared enough to
+> get round to updating it.
 
+Could you please point me to the patch ?
 
+-- 
+Regards,
 
-CLONE from pthread_create fails with ERESTARTNOINTR and application crashes
-
-
-
-Steps to reproduce:
-
-
-
-Executing a multithreaded application that creates and terminates
-threads and also there a lot of signals
-
-
-
-If a signal arrives during execution of clone(), clone is returning
-ERESTARTNOINTR to userspace.
-
-
-
-We see the following implementation that sets ERESTARTNOINTR:
-
-
-
-        /*
-
-         * Process group and session signals need to be delivered to just the
-
-         * parent before the fork or both the parent and the child after the
-
-         * fork. Restart if a signal comes in before we add the new process to
-
-         * it's process group.
-
-         * A fatal signal pending means that current will exit, so the new
-
-         * thread can't slip out of an OOM kill (or normal SIGKILL).
-
-         */
-
-        recalc_sigpending();
-
-        if (signal_pending(current)) {
-
-                spin_unlock(&current->sighand->siglock);
-
-                write_unlock_irq(&tasklist_lock);
-
-                retval = -ERESTARTNOINTR;
-
-                goto bad_fork_cleanup_namespace;
-
-        }
-
-
-
-
-
-Leaking ERESTARTNOINTR to userspace is a big concern because this a
-kernel internal error code.
-
-
-
-Immediately after that the application crashes.
-
-
-
-Actual result: Application crashes
-
-
-
-Expected Result: Application should not crash and clone system call
-should restart if clone is previously interrupted by a signal.
+Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140521/2ea3bf88/attachment.sig>
