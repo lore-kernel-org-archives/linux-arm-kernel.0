@@ -1,67 +1,34 @@
-From: murzin.v@gmail.com (Vladimir Murzin)
-Date: Wed, 21 May 2014 07:50:52 +0100
-Subject: + arm-move-arm_dma_limit-to-setup_dma_zone.patch added to -mm tree
-In-Reply-To: <CAKv+Gu_QCJn5UGyM4zEPLvkTPMnfwTM2qKYnBU42vEPwwt6-Dg@mail.gmail.com>
-References: <CAKv+Gu_QCJn5UGyM4zEPLvkTPMnfwTM2qKYnBU42vEPwwt6-Dg@mail.gmail.com>
-Message-ID: <CABV+yWt8vJK-ahGFhtoVbGLhkOOxy3-SLZQdaE5V1Oy+oQsh4w@mail.gmail.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 21 May 2014 12:22:46 +0530
+Subject: [PATCH 0/3] Exynos multi-platform support
+Message-ID: <1400655169-21683-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard
+The patches in this series were earlier sent as part of other
+series. Now that the other patches have been merged, re-sending
+these after rebasing them on linux-next (20140519).
+Tested on Exynos4210, 4412, 5250 and 5420 based boards.
 
-On 5/19/14, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Gents,
->
-> I noticed this patch turning up in -next:
-> http://ozlabs.org/~akpm/mmots/broken-out/arm-move-arm_dma_limit-to-setup_dma_zone.patch
->
-> which I think is incorrect. More specifically, it replaces a reference
-> to arm_dma_limit, which is defined as either
->
-> arch/arm/mm/init.c:177:         arm_dma_limit = PHYS_OFFSET +
-> arm_dma_zone_size - 1;
->
-> or
->
-> arch/arm/mm/init.c:179:         arm_dma_limit = 0xffffffff;
->
-> with 'arm_dma_pfn_limit << PAGE_SHIFT', which means the bottom
-> PAGE_SHIFT '1' bytes are lost.
->
+A particular change in this series is the removal of single platform
+support for Exynos as suggested by Arnd and Olof (patch 2/3). With
+this change certain features (drivers) which are not yet multi-platform
+aware like cpufreq, devfreq and DRM based gscaler will not be available
+now.
 
-Do not we lost even more with
-dma_contiguous_reserve
-     dma_contiguous_reserve_area
-...
-        /* Sanitise input arguments */
-        alignment = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
-        base = ALIGN(base, alignment);
-        size = ALIGN(size, alignment);
-        limit &= ~(alignment - 1);
+Arnd Bergmann (1):
+  ARM: EXYNOS: Enable multi-platform build support
 
-Vladimir
+Sachin Kamat (2):
+  ARM: EXYNOS: Consolidate Kconfig entries
+  ARM: multi_v7_defconfig: Enable Exynos platform
 
-> Relevant part of patch quoted below.
->
-> Regards,
-> Ard.
->
->
->
->
-> diff -puN arch/arm/mm/init.c~arm-move-arm_dma_limit-to-setup_dma_zone
-> arch/arm/mm/init.c
-> --- a/arch/arm/mm/init.c~arm-move-arm_dma_limit-to-setup_dma_zone
-> +++ a/arch/arm/mm/init.c
-> @@ -328,7 +329,8 @@ void __init arm_memblock_init(struct mem
->   * reserve memory for DMA contigouos allocations,
->   * must come from DMA area inside low memory
->   */
-> - dma_contiguous_reserve(min(arm_dma_limit, arm_lowmem_limit));
-> +
-(min((phys_addr_t)arm_dma_pfn_limit << PAGE_SHIFT,
-> +   arm_lowmem_limit));
->
->   arm_memblock_steal_permitted = false;
->   memblock_dump_all();
->
+ arch/arm/Kconfig                    |   20 ----------
+ arch/arm/configs/multi_v7_defconfig |   12 ++++++
+ arch/arm/mach-exynos/Kconfig        |   73 +++++++++++++++--------------------
+ arch/arm/mach-exynos/Makefile       |    2 +
+ arch/arm/plat-samsung/Makefile      |    3 ++
+ 5 files changed, 49 insertions(+), 61 deletions(-)
+
+-- 
+1.7.9.5
