@@ -1,32 +1,56 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 22 May 2014 17:44:21 +0200
-Subject: Add SDHCI support for STMicroelectronics SoCs
-In-Reply-To: <1400771902-26553-1-git-send-email-peter.griffin@linaro.org>
-References: <1400771902-26553-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <537E1B55.1090807@st.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 22 May 2014 11:45:18 -0400
+Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.16 (incr. #2)
+Message-ID: <20140522154518.GS8664@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Guys,
 
-On 05/22/2014 05:18 PM, Peter Griffin wrote:
-> This series adds a SDHCI platform driver for ST SoCs, along with
-> the additional device tree bindings and configuration to enable
-> the controller to work properly.
->
-> Initially it supports the stih416 and stih415 SoCs, and has
-> been tested on a stih416-b2020 board.
+Here's the last round of SoC changes for v3.16.  They haven't been in
+-next as long as I would like, but they are needed for v3.16.
 
-In next version, could you also add  drivers/mmc/host/sdhci-st.c in the 
-ARM/STI ARCHITECTURE field of MAINTAINERS file?
+As usual, this is an incremental pull request from tags/mvebu-soc-3.16
+to tags/mvebu-soc-3.16-2 in the mvebu/soc branch.
 
+Please pull.
 
-Thanks,
-Maxime
+thx,
+
+Jason.
 
 
->
-> regards,
->
-> Peter.
->
+The following changes since commit 9f0affcf3e21fc56d8bce625bb3d5800b7a7d284:
+
+  ARM: mvebu: Fix pmsu compilation when ARMv6 is selected (2014-05-08 16:55:55 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-3.16-2
+
+for you to fetch changes up to 07ae144be1b2ac45f893bc1ed3fe1a49f7128e46:
+
+  ARM: mvebu: returns ll_get_cpuid() to ll_get_coherency_cpumask() (2014-05-22 14:26:30 +0000)
+
+----------------------------------------------------------------
+mvebu SoC changes for v3.16 (incremental #2)
+
+ - mvebu
+    - fix coherency on big-endian in -next
+    - hardware IO coherency
+    - L2/PCIe deadlock workaround
+    - small coherency cleanups
+
+----------------------------------------------------------------
+Thomas Petazzoni (7):
+      ARM: mvebu: use hardware I/O coherency also for PCI devices
+      ARM: mvebu: implement L2/PCIe deadlock workaround
+      ARM: mvebu: coherency: fix registration of PCI bus notifier when !PCI
+      ARM: mvebu: fix big endian booting after coherency code rework
+      ARM: mvebu: fix indentation of assembly instructions in coherency_ll.S
+      ARM: mvebu: improve comments in coherency_ll.S
+      ARM: mvebu: returns ll_get_cpuid() to ll_get_coherency_cpumask()
+
+ arch/arm/mach-mvebu/coherency.c    | 62 +++++++++++++++++++++++++++---
+ arch/arm/mach-mvebu/coherency_ll.S | 77 ++++++++++++++++++++++++--------------
+ 2 files changed, 106 insertions(+), 33 deletions(-)
