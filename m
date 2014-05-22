@@ -1,30 +1,43 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 22 May 2014 15:04:07 +0200
-Subject: [PATCH RESEND] mmc: dove: fix missing MACH_DOVE dependency
-In-Reply-To: <CAPDyKFo8CdyDbJEP0GkFTHdzpkyRBZEp-jAyrU4y8qi__zChkA@mail.gmail.com>
-References: <1400522571-10799-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <CAPDyKFo8CdyDbJEP0GkFTHdzpkyRBZEp-jAyrU4y8qi__zChkA@mail.gmail.com>
-Message-ID: <537DF5C7.3010009@gmail.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Thu, 22 May 2014 15:06:04 +0200
+Subject: [PATCH v2] ARM: socfpga: dts: add watchdog0+1
+Message-ID: <1400763964-19369-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2014 11:09 AM, Ulf Hansson wrote:
-> On 19 May 2014 20:02, Sebastian Hesselbarth
-> <sebastian.hesselbarth@gmail.com> wrote:
->> DT-enabled Dove moved over from ARCH_DOVE in mach-dove to MACH_DOVE in
->> mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
->> DT-only MACH_DOVE Kconfig. This slipped through the cracks and now is
->> a fix to allow to build Dove's SDHCI driver for mach-mvebu on v3.15-rc.
->>
->> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> Acked-by: Jason Cooper <jason@lakedaemon.net>
->
-> Thanks! Picked up for the PR I send to Chris.
+The SoCFPGA has two watchdog timers. Add them to the dtsi.
 
-Ulf, thanks for picking it up. I noticed it will now end up in v3.16
-and not as a fix for v3.15. I'll come back to it, if v3.15 will
-ever become a stable version ;)
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+ arch/arm/boot/dts/socfpga.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Anyway, great you are helping Chris to pre-select the mmc patches!
-
-Sebastian
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 56fc214..7bcd458 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -549,6 +549,22 @@
+ 			reg = <0xffd05000 0x1000>;
+ 		};
+ 
++		watchdog0: watchdog at ffd02000 {
++			compatible = "snps,dw-wdt";
++			reg = <0xffd02000 0x1000>;
++			interrupts = <0 171 0>;
++			clocks = <&osc1>;
++			status = "disabled";
++		};
++
++		watchdog1: watchdog at ffd03000 {
++			compatible = "snps,dw-wdt";
++			reg = <0xffd03000 0x1000>;
++			interrupts = <0 172 0>;
++			clocks = <&osc1>;
++			status = "disabled";
++		};
++
+ 		sysmgr: sysmgr at ffd08000 {
+ 			compatible = "altr,sys-mgr", "syscon";
+ 			reg = <0xffd08000 0x4000>;
+-- 
+2.0.0.rc0
