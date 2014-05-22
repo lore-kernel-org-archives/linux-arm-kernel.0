@@ -1,37 +1,52 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 22 May 2014 12:59:27 +0100
-Subject: [PATCH v2 08/10] mtd: st_spi_fsm: Provide documentation for boot
- device mask property
-In-Reply-To: <1400757848-18075-9-git-send-email-lee.jones@linaro.org>
-References: <1400757848-18075-1-git-send-email-lee.jones@linaro.org>
- <1400757848-18075-9-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140522115927.GY6679@lee--X1>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 22 May 2014 13:58:05 +0200
+Subject: [PATCH v8 0/2] Add support for the Allwinner A31 DMA Controller
+In-Reply-To: <5291281.0OW8pVdbhQ@wuerfel>
+References: <1400685357-508-1-git-send-email-maxime.ripard@free-electrons.com>
+ <4828893.NoTbcUXQEt@wuerfel> <20140521155551.GV27329@lukather>
+ <5291281.0OW8pVdbhQ@wuerfel>
+Message-ID: <20140522115805.GC27329@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mtd: st_spi_fsm: Provide documentation for boot device mask property
+On Wed, May 21, 2014 at 06:04:43PM +0200, Arnd Bergmann wrote:
+> On Wednesday 21 May 2014 17:55:51 Maxime Ripard wrote:
+> > On Wed, May 21, 2014 at 05:23:41PM +0200, Arnd Bergmann wrote:
+> > > On Wednesday 21 May 2014 17:15:54 Maxime Ripard wrote:
+> > > > Changes from v7:
+> > > >   - select DMA_OF, since we're only relying on DT
+> > > > 
+> > > 
+> > > I missed the discussion about this issue, but it seems wrong to me.
+> > > DMA_OF is currently enabled if we have both DMAENGINE and OF turned on.
+> > > 
+> > > If OF is disabled but DMA_OF gets selected by DMA_SUN6I, what happens?
+> > 
+> > Is that even possible with a multiplatform-based platform?
+> 
+> It's not possible for ARCH_SUNXI or any other that depends on
+> ARCH_MULTIPLATFORM. I just noticed that you have 'depends on ARCH_SUNXI',
+> so the 'select DMA_OF' statement is just redundant, not wrong.
+> 
+> However, if the driver was 'depends on ARCH_SUNXI || COMPILE_TEST' as many
+> others are nowadays, it would be a bug.
 
-The system configuration registers which display which device the system
-booted on are in the same place on all boards which support the FSM.
-However, the bits do shift every so slightly.  To combat these we're
-adding a new property which supplies the necessary mask used to abstract
-the required information.
+Ah, yes, I forgot about COMPILE_TEST.
 
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+I'll change this to remove the select, and add a dependency on
+COMPILE_TEST.
 
-diff --git a/Documentation/devicetree/bindings/mtd/st-fsm.txt b/Documentation/devicetree/bindings/mtd/st-fsm.txt
-index c248939..2ef9710 100644
---- a/Documentation/devicetree/bindings/mtd/st-fsm.txt
-+++ b/Documentation/devicetree/bindings/mtd/st-fsm.txt
-@@ -11,6 +11,10 @@ Optional properties:
-   - st,syscfg          : Phandle to boot-device system configuration registers
-   - st,boot-device-reg : Address of the aforementioned boot-device register(s)
-   - st,boot-device-spi : Expected boot-device value if booted via this device
-+  - st,boot-device-msk : Mask to use when extracting boot device from the
-+                        above system config registers
-+  NB: If any of the st,boot-device-* properties are missing, the driver falls
-+  back to the default assumption of 'booted from SPI'.
- 
- Example:
-        spifsm: spifsm at fe902000{
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140522/cc97d7ec/attachment.sig>
