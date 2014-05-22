@@ -1,65 +1,54 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 22 May 2014 11:51:55 +0100
-Subject: [PATCH] mfd: abx500-core: Remove unused function
- abx500_dump_all_banks()
-In-Reply-To: <537DD33B.6070401@gmail.com>
-References: <1400750311-15323-1-git-send-email-lee.jones@linaro.org>
- <537DD33B.6070401@gmail.com>
-Message-ID: <20140522105155.GR6679@lee--X1>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 22 May 2014 13:00:50 +0200
+Subject: [PATCH v2 1/3] mmc: tegra: disable UHS modes
+In-Reply-To: <86egzormf5.fsf@void.printf.net>
+References: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
+ <1397689719-28882-1-git-send-email-abrestic@chromium.org>
+ <1397689719-28882-2-git-send-email-abrestic@chromium.org>
+ <537B9022.20709@wwwdotorg.org> <86egzormf5.fsf@void.printf.net>
+Message-ID: <CAPDyKFqq-kjQoMiyKApDuTR+Fc-8WOuqXHFcgwgZNkg4Mm4Z=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > abx500_dump_all_banks() has no callers in the kernel, so it's probably
-> > safe to remove it.
-> > 
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/mfd/abx500-core.c | 20 --------------------
-> >  1 file changed, 20 deletions(-)
-> > 
-> > diff --git a/drivers/mfd/abx500-core.c b/drivers/mfd/abx500-core.c
-> > index d6d0ec4..fe41899 100644
-> > --- a/drivers/mfd/abx500-core.c
-> > +++ b/drivers/mfd/abx500-core.c
-> > @@ -151,26 +151,6 @@ int abx500_startup_irq_enabled(struct device *dev, unsigned int irq)
-> >  }
-> >  EXPORT_SYMBOL(abx500_startup_irq_enabled);
-> >  
-> > -int abx500_dump_all_banks(void)
-> > -{
-> > -	struct abx500_ops *ops;
-> > -	struct device *dummy_child;
-> > -	struct abx500_device_entry *dev_entry;
-> > -
-> > -	dummy_child = kzalloc(sizeof(struct device), GFP_KERNEL);
-> > -	if (!dummy_child)
-> > -		return -ENOMEM;
-> > -	list_for_each_entry(dev_entry, &abx500_list, list) {
-> > -		dummy_child->parent = dev_entry->dev;
-> > -		ops = &dev_entry->ops;
-> > -
-> > -		if ((ops != NULL) && (ops->dump_all_banks != NULL))
-> > -			ops->dump_all_banks(dummy_child);
-> > -	}
-> > -	kfree(dummy_child);
-> > -}
-> > -EXPORT_SYMBOL(abx500_dump_all_banks);
-> > -
-> >  MODULE_AUTHOR("Mattias Wallin <mattias.wallin@stericsson.com>");
-> >  MODULE_DESCRIPTION("ABX500 core driver");
-> >  MODULE_LICENSE("GPL");
-> > 
-> Sorry for top posting previously, I was using gmail web interface. Looks
-> like you forgot to remove this function's declaration from
-> include/linux/mfd/abx500.h
+On 21 May 2014 02:43, Chris Ball <chris@printf.net> wrote:
+> Hi Stephen,
+>
+> On Tue, May 20 2014, Stephen Warren wrote:
+>> On 04/16/2014 05:08 PM, Andrew Bresticker wrote:
+>>> Program TEGRA_SDHCI_VENDOR_MISC_CTRL so that UHS modes aren't advertised
+>>> in SDHCI_CAPABILITIES_1.  While the Tegra SDHCI controller does support
+>>> these modes, they require Tegra-specific tuning and calibration routines
+>>> which the driver does not support yet.
+>>
+>> What's the status of patches 1 and 2 in this series? I assumed they'd be
+>> applied to the MMC tree. I've had them applied to my local development
+>> tree for a while now, so in case this helps:
+>>
+>> Tested-by: Stephen Warren <swarren@nvidia.com>
+>> Acked-by: Stephen Warren <swarren@nvidia.com>
+>>
+>> (I thought I wrote that before, but I can't find it, so I must have
+>> forgotten to)
+>
+> We've been waiting for a very large sdhci patchset from Russell to
+> land before merging other sdhci patches, but I think we're running
+> out of time for that -- so we'll merge this one way or another within
+> a few days.
+>
+> Thanks,
+>
+> - Chris.
+> --
+> Chris Ball   <http://printf.net/>
 
-You're right, good spot.
 
-Will fix.
+Hi Stephen/Andrew,
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I tried to include the v2 of patch1 and patch2 in PR I just sent to
+Chris - but needed to omit them due to conflicts.
+
+Could you please re-base them on top of my PR and resend them? I
+suppose Chris can take them separately once he pulled my PR.
+
+Kind regards
+Ulf Hansson
