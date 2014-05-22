@@ -1,104 +1,96 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 22 May 2014 09:42:42 +0100
-Subject: [PATCH V2] mfd: abx500-core: Fix compiler warning larger stack
- frame
-In-Reply-To: <537CE03A.7060702@aurabindo.in>
-References: <536E1543.3090107@aurabindo.in> <20140520152054.GB24991@lee--X1>
- <537C447D.7070406@aurabindo.in> <20140521091751.GC6679@lee--X1>
- <537CE03A.7060702@aurabindo.in>
-Message-ID: <20140522084242.GN6679@lee--X1>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 22 May 2014 10:48:16 +0200
+Subject: [GIT PULL] at91: DT for 3.16 #2
+In-Reply-To: <CAOesGMgwW+zY-yyozEiCED+hryxBWPX7soqt78z0MBz1w-AVqw@mail.gmail.com>
+References: <1400059162-630-1-git-send-email-nicolas.ferre@atmel.com>	<20140520055041.GO18956@quad.lixom.net>	<537B727C.5080404@atmel.com>	<20140520164746.GA601@quad.lixom.net>	<537C7D25.6060705@atmel.com>	<20140521211105.GD24341@quad.lixom.net>	<20140521214255.GL3582@piout.net>
+ <CAOesGMgwW+zY-yyozEiCED+hryxBWPX7soqt78z0MBz1w-AVqw@mail.gmail.com>
+Message-ID: <537DB9D0.5010001@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> Inorder to report the kzalloc failure, I have just used a pr_debug statement. If it looks ugly, should I change the function's return value to int and give out an -ENOMEM ?
-> > 
-> > Yes, please do that - and obviously add the checks to the calling code.
+On 21/05/2014 23:51, Olof Johansson :
+> On Wed, May 21, 2014 at 2:42 PM, Alexandre Belloni
+> <alexandre.belloni@free-electrons.com> wrote:
+>> Hi,
+>>
+>> On 21/05/2014 at 14:11:05 -0700, Olof Johansson wrote :
+>>>> This directory is flat, the board names are chosen by companies and
+>>>> people that we do not control, a user tend to like finding his preferred
+>>>> board dtb file unchanged from a kernel revision to another...
+>>>> Well all this lead me to think that we don't have to loose too much time
+>>>> thinking about a new strict convention for this file naming or changing
+>>>> all this once again just for the sake of it.
+>>>>
+>>>> Other SoC maintainers beautifully designed from the beginning the naming
+>>>> scheme of their DT files, fine. AT91 did not and forgive me but when
+>>>> opening arch/arm/boot/dts/Makefile file and seeing some file names, I'm
+>>>> not ashamed. Moreover, now that I said to everybody since 3.10 to prefix
+>>>> their *board* name with "at91-", I have to say something else, I don't
+>>>> think it is worth it.
+>>>
+>>> I don't agree with everything above, but it's not worth arguing for the
+>>> sake of arguing. :) I think we can tweak what you're doing now and get
+>>> things to work well by merging new dts files with at91-<soc>-board.dts
+>>> as the name. As mentioned, don't worry about the existing files. This
+>>> shouldn't be a significiant change to what you've been telling people
+>>> since 3.10 to cause much confusion.
+>>>
+>>
+>> I'm not sure we should keep the at91 prefix. The sama5d3 series is not
+>> at91.
 > 
-> But I cannot find any calling code. At least thats what linux cross reference has to say.
+> *headdesk* It's part of mach-at91. For all intents and purposes, the label fits.
 
-Okay, thanks.
+*double facepalm* Alexandre... always teasing ;-)
 
-I've applied this patch and removed the other.
+(found "double facepalm" while searching for headdesk in google image,
+was fun...)
 
-> Change from V2 -> V3:
-> 	Change abx500_dump_all_banks to return int so as to account for error handling.
+>> I would suggest using <soc>-<vendor>-<board> in the future, like what is
+>> done for mvebu, berlin and some omap3 and freescale boards. I would
+>> however make an exception for the evaluation kits and keep the current
+>> "<soc>ek" name (else we would get sama5d3-atmel-sama5d3ek).
 > 
-> Change from V1 -> V2: 
-> 	Fix a potential null pointer dereference as reported by kbuild test robot <fengguang.wu@intel.com>.
+> Nack on this as a hard rule. As long as there's a vendor or (large
+> family) SoC prefix I don't care about the rest of the structure.
+> Really, let's not waste time on it at this time.
 > 
-> From 19d34af7240498b2e624e94b2d003f3d9928dee8 Mon Sep 17 00:00:00 2001
-> From: Aurabindo J <mail@aurabindo.in>
-> Date: Wed, 21 May 2014 22:27:30 +0530
-> Subject: [PATCH] mfd: abx500-core: Fix compiler warning larger stack frame
-> MIME-Version: 1.0
-> Content-Type: text/plain; charset=UTF-8
-> Content-Transfer-Encoding: 8bit
+>> I also got confused by the at91- prefix when looking for a few dts files
+>> but I think it is too late to rename now or maybe we could do it all at
+>> once for a long term release (provided we know which one it will be).
+>>
+>> For reference, the list of files that would need renaming:
+>> animeo_ip.dts
+>> at91-ariag25.dts
+>> at91-cosino.dtsi
+>> at91-cosino_mega2560.dts
+>> at91-foxg20.dts
+>> at91-qil_a9260.dts
+>> ethernut5.dts
+>> ge863-pro3.dtsi
+>> kizbox.dts
+>> mpa1600.dts
+>> pm9g45.dts
+>> tny_a9260.dts
+>> tny_a9263.dts
+>> tny_a9g20.dts
+>> usb_a9260.dts
+>> usb_a9263.dts
+>> usb_a9g20_common.dtsi
+>> aks-cdu.dts
+>> evk-pro3.dts
+>> at91-sama5d3_xplained.dts
 > 
-> On systems with CONFIG_FRAME_WARN=1024, compiler warns the allocation of
-> an object of struct device on stack. Make the allocation dynamically to
-> fix the warning. Also change the caller's return type to int so as to
-> account for error handling.
+> The DTS name is somewhat irritating in that installers and other
+> environments (my own tester included) rely on file names. There's been
+> a bunch of discussion about this in the past, but at the end of the
+> day, you end up irritating people when you rename the resulting dtbs.
 > 
-> drivers/mfd/abx500-core.c: In function ?abx500_dump_all_banks?:
-> drivers/mfd/abx500-core.c:167:1: warning: the frame size of 1032 bytes
-> is larger than 1024 bytes [-Wframe-larger-than=]
-> 
-> Signed-off-by: Aurabindo J <mail@aurabindo.in>
-> ---
->  drivers/mfd/abx500-core.c  | 12 ++++++++----
->  include/linux/mfd/abx500.h |  2 +-
->  2 files changed, 9 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/mfd/abx500-core.c b/drivers/mfd/abx500-core.c
-> index f3a15aa..d6d0ec4 100644
-> --- a/drivers/mfd/abx500-core.c
-> +++ b/drivers/mfd/abx500-core.c
-> @@ -151,19 +151,23 @@ int abx500_startup_irq_enabled(struct device *dev, unsigned int irq)
->  }
->  EXPORT_SYMBOL(abx500_startup_irq_enabled);
->  
-> -void abx500_dump_all_banks(void)
-> +int abx500_dump_all_banks(void)
->  {
->  	struct abx500_ops *ops;
-> -	struct device dummy_child = {NULL};
-> +	struct device *dummy_child;
->  	struct abx500_device_entry *dev_entry;
->  
-> +	dummy_child = kzalloc(sizeof(struct device), GFP_KERNEL);
-> +	if (!dummy_child)
-> +		return -ENOMEM;
->  	list_for_each_entry(dev_entry, &abx500_list, list) {
-> -		dummy_child.parent = dev_entry->dev;
-> +		dummy_child->parent = dev_entry->dev;
->  		ops = &dev_entry->ops;
->  
->  		if ((ops != NULL) && (ops->dump_all_banks != NULL))
-> -			ops->dump_all_banks(&dummy_child);
-> +			ops->dump_all_banks(dummy_child);
->  	}
-> +	kfree(dummy_child);
->  }
->  EXPORT_SYMBOL(abx500_dump_all_banks);
->  
-> diff --git a/include/linux/mfd/abx500.h b/include/linux/mfd/abx500.h
-> index 3301b20..df2508f 100644
-> --- a/include/linux/mfd/abx500.h
-> +++ b/include/linux/mfd/abx500.h
-> @@ -330,7 +330,7 @@ int abx500_mask_and_set_register_interruptible(struct device *dev, u8 bank,
->  int abx500_get_chip_id(struct device *dev);
->  int abx500_event_registers_startup_state_get(struct device *dev, u8 *event);
->  int abx500_startup_irq_enabled(struct device *dev, unsigned int irq);
-> -void abx500_dump_all_banks(void);
-> +int abx500_dump_all_banks(void);
->  
->  struct abx500_ops {
->  	int (*get_chip_id) (struct device *);
+> As long as we don't keep adding random names beyond those, we should be OK.
 
+I okay with all you said Olof. I'll try to keep this file naming
+sensible even with all the legacy that we already have.
 
-
+Bye,
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Nicolas Ferre
