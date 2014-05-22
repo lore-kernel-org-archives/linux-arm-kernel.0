@@ -1,124 +1,39 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 23 May 2014 01:08:04 +0200
-Subject: [PATCH 1/2] ARM: shmobile: r8a7779 dtsi: Correct
- #address-cells/#size-cells for clocks
-In-Reply-To: <1400761997-13512-2-git-send-email-geert+renesas@glider.be>
-References: <1400761997-13512-1-git-send-email-geert+renesas@glider.be>
- <1400761997-13512-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <155646478.xj0lyDQ1cd@avalon>
+From: stano@meduna.org (Stanislav Meduna)
+Date: Fri, 23 May 2014 01:09:52 +0200
+Subject: BUG: sleeping function called from invalid context (do_force_sig_info)
+Message-ID: <537E83C0.9040406@meduna.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi,
 
-Thank you for the patch.
+this is on a i.MX28 running a 3.12.19-rt30
 
-On Thursday 22 May 2014 14:33:16 Geert Uytterhoeven wrote:
-> Warning (ranges_format): /clocks has empty "ranges" property but its
-> #address-cells (2) differs from / (1) Warning (ranges_format): /clocks has
-> empty "ranges" property but its #size-cells (2) differs from / (1)
-> 
-> As r8a7779 doesn't support LPAE, change #address-cells and #size-cells from
-> "<2>" to "<1>" to fix this.
-> 
-> Also correct the unit-address for the cpg_clocks node, and add missing
-> unit-addresses for the mstp*_clks nodes.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
-> ---
-> Is it correct that r8a7779 doesn't support LPAE? I don't have the datasheet,
-> but the similar r8a7778 doesn't.
-> 
->  arch/arm/boot/dts/r8a7779.dtsi | 20 ++++++++++----------
->  1 file changed, 10 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-> index 038c16a18373..dc624e0d7506 100644
-> --- a/arch/arm/boot/dts/r8a7779.dtsi
-> +++ b/arch/arm/boot/dts/r8a7779.dtsi
-> @@ -284,8 +284,8 @@
->  	};
-> 
->  	clocks {
-> -		#address-cells = <2>;
-> -		#size-cells = <2>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
+[27284.008123] BUG: sleeping function called from invalid context at /home/nxtdev/Kernels/linux-stable-rt/kernel/rtmutex.c:673
+[27284.008143] in_atomic(): 0, irqs_disabled(): 128, pid: 1335, name: nxt
+[27284.008170] CPU: 0 PID: 1335 Comm: nxt Not tainted 3.12.19-rt30+ #178
+[27284.008255] [<c0014440>] (unwind_backtrace+0x0/0xf4) from [<c00124cc>] (show_stack+0x10/0x14)
+[27284.008306] [<c00124cc>] (show_stack+0x10/0x14) from [<c028b6a8>] (rt_spin_lock+0x18/0x2c)
+[27284.008348] [<c028b6a8>] (rt_spin_lock+0x18/0x2c) from [<c002a7ec>] (do_force_sig_info+0x20/0xd8)
+[27284.008387] [<c002a7ec>] (do_force_sig_info+0x20/0xd8) from [<c0016720>] (__do_user_fault+0x88/0xc8)
+[27284.008419] [<c0016720>] (__do_user_fault+0x88/0xc8) from [<c0016c2c>] (do_bad_area+0x64/0x70)
+[27284.008452] [<c0016c2c>] (do_bad_area+0x64/0x70) from [<c0016ca4>] (do_translation_fault+0x6c/0xa8)
+[27284.008483] [<c0016ca4>] (do_translation_fault+0x6c/0xa8) from [<c000867c>] (do_DataAbort+0x34/0x98)
+[27284.008520] [<c000867c>] (do_DataAbort+0x34/0x98) from [<c0012ebc>] (__dabt_usr+0x3c/0x40)
+[27284.008531] Exception stack(0xc1173fb0 to 0xc1173ff8)
+[27284.008554] 3fa0:                                     b6634b48 d6634b44 d6634a94 07ffffff
+[27284.008583] 3fc0: b6634c1c b6ef1160 b6ef1000 00000152 b6635460 b6ee6b34 00000000 b6634b4c
+[27284.008605] 3fe0: 00000152 b6634a80 001f813c 00203888 60000010 ffffffff
 
-This looks good to me.
+There are some changes to the stock 3.12.19-rt30 (added drivers) where
+I can not exclude that there is some bug lurking, and a bug in userspace
+is even more probable; I am just forwarding it because of the sleeping
+from invalid context thing.
 
->  		ranges;
-> 
->  		/* External root clock */
-> @@ -298,9 +298,9 @@
->  		};
-> 
->  		/* Special CPG clocks */
-> -		cpg_clocks: cpg_clocks at 0xe6150000 {
-> +		cpg_clocks: cpg_clocks at 0xffc80000 {
+After a reboot I am unfortunately not able to easily reproduce it. There
+was no core dump (they are enabled) and the application did not exit
+(there is no SEGV handler).
 
-No need for a 0x prefix.
-
->  			compatible = "renesas,r8a7779-cpg-clocks";
-> -			reg = <0 0xffc80000 0 0x30>;
-> +			reg = <0xffc80000 0x30>;
-
-This looks good.
-
->  			clocks = <&extal_clk>;
->  			#clock-cells = <1>;
->  			clock-output-names = "plla", "z", "zs", "s",
-> @@ -342,10 +342,10 @@
->  		};
-> 
->  		/* Gate clocks */
-> -		mstp0_clks: mstp0_clks {
-> +		mstp0_clks: mstp0_clks at ffc80030 {
-
-The @address is only mandatory to differentiate between nodes with identical 
-names. As the node name is supposed to describe the device function, maybe we 
-could rename it to clocks at ffc80030 ? As you modify the CPG node address above 
-it might make sense to rename it to clocks at ffc80000 too.
-
-I'm not advocating for a rename now, but as your patch touches the names, I 
-think they should be fixed properly (or not at all).
-
->  			compatible = "renesas,r8a7779-mstp-clocks",
->  			             "renesas,cpg-mstp-clocks";
-> -			reg = <0 0xffc80030 0 4>;
-> +			reg = <0xffc80030 4>;
->  			clocks = <&cpg_clocks R8A7779_CLK_S>,
->  			         <&cpg_clocks R8A7779_CLK_P>,
->  				 <&cpg_clocks R8A7779_CLK_P>,
-> @@ -379,10 +379,10 @@
->  				"scif1", "scif0", "i2c3", "i2c2", "i2c1",
->  				"i2c0";
->  		};
-> -		mstp1_clks: mstp1_clks {
-> +		mstp1_clks: mstp1_clks at ffc80034 {
->  			compatible = "renesas,r8a7779-mstp-clocks",
->  			             "renesas,cpg-mstp-clocks";
-> -			reg = <0 0xffc80034 0 4>, <0 0xffc80044 0 4>;
-> +			reg = <0xffc80034 4>, <0xffc80044 4>;
->  			clocks = <&cpg_clocks R8A7779_CLK_P>,
->  				 <&cpg_clocks R8A7779_CLK_P>,
->  				 <&cpg_clocks R8A7779_CLK_S>,
-> @@ -408,10 +408,10 @@
->  				"ether", "sata",
->  				"pcie", "vin3";
->  		};
-> -		mstp3_clks: mstp3_clks {
-> +		mstp3_clks: mstp3_clks at ffc8003c {
->  			compatible = "renesas,r8a7779-mstp-clocks",
->  			             "renesas,cpg-mstp-clocks";
-> -			reg = <0 0xffc8003c 0 4>;
-> +			reg = <0xffc8003c 4>;
->  			clocks = <&s4_clk>, <&s4_clk>, <&s4_clk>, <&s4_clk>,
->  				 <&s4_clk>, <&s4_clk>;
->  			#clock-cells = <1>;
-
+Thanks
 -- 
-Regards,
-
-Laurent Pinchart
+                                       Stano
