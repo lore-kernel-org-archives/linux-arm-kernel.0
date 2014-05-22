@@ -1,51 +1,36 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Thu, 22 May 2014 21:15:12 +0200
-Subject: [linux-sunxi] Re: [PATCH v6 0/7] mfd: AXP20x: Add support for
- AXP202 and AXP209
-In-Reply-To: <20140521091456.GB6679@lee--X1>
-References: <1400528868-5971-1-git-send-email-carlo@caione.org>
- <20140520222307.GK12304@sirena.org.uk>
- <CAOQ7t2aBc5tFYk2MkfL9QqvFf5fcebwKtO97F3S=WdJ2uFE_jg@mail.gmail.com>
- <20140521091456.GB6679@lee--X1>
-Message-ID: <CAOQ7t2bqeQ35WxXKCRgj1ijJic=2w8++9idip4-f_LnP6Ucb6A@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 22 May 2014 20:20:57 +0100
+Subject: [PATCH 3/4] clk: samsung: Add driver to control CLKOUT line on
+ Exynos SoCs
+In-Reply-To: <537DE714.1090407@samsung.com>
+References: <1400604211-9447-1-git-send-email-t.figa@samsung.com>
+ <1400604211-9447-4-git-send-email-t.figa@samsung.com>
+ <537D8788.8030904@linaro.org> <537DD2C0.4060802@samsung.com>
+ <CAHbNUh2gkpV-rt6S+-bUmFvYAuK_HNoXfyOStwYe29sZMJonUw@mail.gmail.com>
+ <537DE714.1090407@samsung.com>
+Message-ID: <20140522192057.GU12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 21, 2014 at 11:14 AM, Lee Jones <lee.jones@linaro.org> wrote:
->> >> This set of patches introduces the core driver and support for two different
->> >> subsystems:
->> >>       - Regulators
->> >
->> >>  .../ABI/testing/sysfs-driver-input-axp-pek         |  11 +
->> >>  Documentation/devicetree/bindings/mfd/axp20x.txt   |  93 +++++++
->> >>  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
->> >>  arch/arm/configs/multi_v7_defconfig                |   3 +
->> >>  arch/arm/configs/sunxi_defconfig                   |   4 +
->> >>  drivers/input/misc/Kconfig                         |  11 +
->> >>  drivers/input/misc/Makefile                        |   1 +
->> >>  drivers/input/misc/axp20x-pek.c                    | 281 +++++++++++++++++++++
->> >>  drivers/mfd/Kconfig                                |  12 +
->> >>  drivers/mfd/Makefile                               |   1 +
->> >>  drivers/mfd/axp20x.c                               | 258 +++++++++++++++++++
->> >>  include/linux/mfd/axp20x.h                         | 180 +++++++++++++
->> >>  12 files changed, 856 insertions(+)
->> >
->> > The regulator changes don't appear to be showing up in the diffstat or
->> > obviously in the series?
->>
->> Right. Cut-and-paste error.
->> You have already applied the regulator patches so I didn't include
->> them here (in theory I posted this series to be picked up by Lee).
->
-> That's fine.  Just tell me which patches need to stay together and
-> which are able to be applied through their respective subsystem trees
-> separately.  Then, once I have all the Acks I can apply no problem.
+On Thu, May 22, 2014 at 02:01:24PM +0200, Tomasz Figa wrote:
+> On 22.05.2014 13:44, Tushar Behera wrote:
 
-Hi Lee,
-I'd say #1 for the MFD tree, #4 for the input subsystem, #2 #3 and #5
-are documentations, #6 and #7 defconfigs add-on.
+> > I would be happy to get it done that way. I can see a patch from
+> > Sylwester regarding this, but there hasn't been a conclusion as of
+> > yet.
 
-Thanks,
+> > https://lkml.org/lkml/2014/4/9/173
 
--- 
-Carlo Caione
+> Have you mentioned your use case there? It might indicate that this is
+> indeed an important problem and that too much bikeshedding doesn't
+> really make us closer to the solution.
+
+I've certainly discussed the requirement for this feature with Mike in
+person a few times, I don't know if anyone else has been doing anything.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140522/69a5b06b/attachment.sig>
