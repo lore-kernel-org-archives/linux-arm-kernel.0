@@ -1,194 +1,112 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 22 May 2014 12:23:59 +0100
-Subject: [PATCH 01/10] mtd: st_spi_fsm: Extend fsm_clear_fifo to handle
- unwanted bytes
+Date: Thu, 22 May 2014 12:24:00 +0100
+Subject: [PATCH 02/10] mtd: st_spi_fsm: Obtain and use EMI clock if provided
 In-Reply-To: <1400757848-18075-1-git-send-email-lee.jones@linaro.org>
 References: <1400757848-18075-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1400757848-18075-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1400757848-18075-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Under certain conditions, the SPI-FSM Controller can be left in a state where
-the data FIFO is not entirely empty.  This can lead to problems where subsequent
-data transfers appear to have been shifted by a number of unidentified bytes.
+ST's Common Clk Framework is now available. This patch ensures the FSM
+makes use of it by obtaining and enabling the EMI clock if provided. If
+system fails to provide the EMI clock FSM uses its original default
+rate.
 
-One simple example would be an errant FSM sequence which loaded more data to the
-FIFO than was read by the host.  Another more interesting case results from an
-obscure artefact in the FSM Controller.  When switching from data transfers in
-x4 or x2 mode to data transfers in x1 mode, extraneous bytes will appear in the
-FIFO, unless the previous data transfer was a multiple of 32 cycles (i.e. 8
-bytes for x2, and 16 bytes for x4).  This applies equally whether FSM is being
-operated directly by a S/W driver, or by the SPI boot-controller in FSM-Boot
-mode.  Furthermore, data in the FIFO not only survive a transition between
-FSM-Boot and FSM, but also a S/W reset of IP block [1].
-
-By taking certain precautions, it is possible to prevent the driver from causing
-this type of problem (e.g. ensuring that the host and programmed sequence
-agree on the transfer size, and restricting transfer sizes to multiples of
-32-cycles [2]).  However, at the point the driver is loaded, no assumptions can be
-made regarding the state of the FIFO.  Even if previous S/W drivers have behaved
-correctly, it is impossible to control the number of transactions serviced by
-the controller operating in FSM-Boot.
-
-To address this problem, we ensure the FIFO is cleared during initialisation,
-before performing any FSM operations.  Previously, the fsm_clear_fifo() code was
-capable of detecting and clearing any unwanted 32-bit words from the FIFO.  This
-patch extends the capability to handle an arbitrary number of bytes present in
-the FIFO [3].  Now that the issue is better understood, we also remove the calls
-to fsm_clear_fifo() following the fsm_read() and fsm_write() operations.
-
-The process of actually clearing the FIFO deserves a mention.  While the FIFO
-may contain any number of bytes, the SPI_FAST_SEQ_STA register only reports the
-number of complete 32-bit words present.  Furthermore, data can only be drained
-from the FIFO by reading complete 32-bit words.  With this in mind, a two stage
-process is used to the clear the FIFO:
-
-    1. Read any complete 32-bit words from the FIFO, as reported by the
-           SPI_FAST_SEQ_STA register.
-
-    2. Mop up any remaining bytes.  At this point, it is not known if there
-           are 0, 1, 2, or 3 bytes in the FIFO.  To handle all cases, a dummy
-           FSM sequence is used to load one byte at a time, until a complete
-           32-bit word is formed; at most, 4 bytes will need to be loaded.
-
-[1] Although this issue has existed since early versions of the SPI-FSM
-    controller, its full extent only emerged recently as a consequence of the
-    targetpacks starting to use FSM-Boot(x4) as the default configuration.
-
-[2] The requirement to restrict transfers to multiples of 32 cycles was found
-    empirically back when DUAL and QUAD mode support was added.  The current
-    analysis now gives a satisfactory explanation for this requirement.
-
-[3] Theoretically, it is possible for the FIFO to contain an arbitrary number of
-    bits.  However, since there are no known use-cases that leave incomplete
-    bytes in the FIFO, only words and bytes are considered here.
-
-Signed-off-by: Angus Clark <angus.clark@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 96 +++++++++++++++++++++++++++++++++-------
- 1 file changed, 80 insertions(+), 16 deletions(-)
+ drivers/mtd/devices/st_spi_fsm.c | 45 ++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 43 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index f97fe14..aca4d72 100644
+index aca4d72..fe54533 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -663,6 +663,23 @@ static struct stfsm_seq stfsm_seq_write_status = {
- 		    SEQ_CFG_STARTSEQ),
- };
+@@ -24,6 +24,7 @@
+ #include <linux/delay.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
++#include <linux/clk.h>
  
-+/* Dummy sequence to read one byte of data from flash into the FIFO */
-+static const struct stfsm_seq stfsm_seq_load_fifo_byte = {
-+	.data_size = TRANSFER_SIZE(1),
-+	.seq_opc[0] = (SEQ_OPC_PADS_1 |
-+		       SEQ_OPC_CYCLES(8) |
-+		       SEQ_OPC_OPCODE(FLASH_CMD_RDID)),
-+	.seq = {
-+		STFSM_INST_CMD1,
-+		STFSM_INST_DATA_READ,
-+		STFSM_INST_STOP,
-+	},
-+	.seq_cfg = (SEQ_CFG_PADS_1 |
-+		    SEQ_CFG_READNOTWRITE |
-+		    SEQ_CFG_CSDEASSERT |
-+		    SEQ_CFG_STARTSEQ),
-+};
+ #include "serial_flash_cmds.h"
+ 
+@@ -262,6 +263,7 @@ struct stfsm {
+ 	struct mtd_info		mtd;
+ 	struct mutex		lock;
+ 	struct flash_info       *info;
++	struct clk              *clk;
+ 
+ 	uint32_t                configuration;
+ 	uint32_t                fifo_dir_delay;
+@@ -1907,8 +1909,13 @@ static void stfsm_set_freq(struct stfsm *fsm, uint32_t spi_freq)
+ 	uint32_t emi_freq;
+ 	uint32_t clk_div;
+ 
+-	/* TODO: Make this dynamic */
+-	emi_freq = STFSM_DEFAULT_EMI_FREQ;
++	if (!fsm->clk) {
++		dev_warn(fsm->dev,
++			 "No EMI clock available. Using default 100MHz.\n");
 +
- static int stfsm_n25q_en_32bit_addr_seq(struct stfsm_seq *seq)
- {
- 	seq->seq_opc[0] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
-@@ -695,22 +712,6 @@ static inline uint32_t stfsm_fifo_available(struct stfsm *fsm)
- 	return (readl(fsm->base + SPI_FAST_SEQ_STA) >> 5) & 0x7f;
- }
++		emi_freq = STFSM_DEFAULT_EMI_FREQ;
++	} else
++		emi_freq = clk_get_rate(fsm->clk);
  
--static void stfsm_clear_fifo(struct stfsm *fsm)
--{
--	uint32_t avail;
--
--	for (;;) {
--		avail = stfsm_fifo_available(fsm);
--		if (!avail)
--			break;
--
--		while (avail) {
--			readl(fsm->base + SPI_FAST_SEQ_DATA_REG);
--			avail--;
--		}
--	}
--}
--
- static inline void stfsm_load_seq(struct stfsm *fsm,
- 				  const struct stfsm_seq *seq)
- {
-@@ -772,6 +773,69 @@ static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf, uint32_t size)
+ 	/*
+ 	 * Calculate clk_div - values between 2 and 128
+@@ -2058,6 +2065,15 @@ static int stfsm_probe(struct platform_device *pdev)
+ 		return PTR_ERR(fsm->base);
  	}
+ 
++	fsm->clk = devm_clk_get(&pdev->dev, "emi_clk");
++	if (IS_ERR(fsm->clk)) {
++		dev_warn(fsm->dev, "Couldn't find EMI clock.\n");
++		fsm->clk = NULL;
++	} else if (clk_prepare_enable(fsm->clk)) {
++		dev_warn(fsm->dev, "Failed to enable EMI clock.\n");
++		fsm->clk = NULL;
++	}
++
+ 	mutex_init(&fsm->lock);
+ 
+ 	ret = stfsm_init(fsm);
+@@ -2122,6 +2138,30 @@ static int stfsm_remove(struct platform_device *pdev)
+ 	return mtd_device_unregister(&fsm->mtd);
  }
  
-+/*
-+ * Clear the data FIFO
-+ *
-+ * Typically, this is only required during driver initialisation, where no
-+ * assumptions can be made regarding the state of the FIFO.
-+ *
-+ * The process of clearing the FIFO is complicated by fact that while it is
-+ * possible for the FIFO to contain an arbitrary number of bytes [1], the
-+ * SPI_FAST_SEQ_STA register only reports the number of complete 32-bit words
-+ * present.  Furthermore, data can only be drained from the FIFO by reading
-+ * complete 32-bit words.
-+ *
-+ * With this in mind, a two stage process is used to the clear the FIFO:
-+ *
-+ *     1. Read any complete 32-bit words from the FIFO, as reported by the
-+ *        SPI_FAST_SEQ_STA register.
-+ *
-+ *     2. Mop up any remaining bytes.  At this point, it is not known if there
-+ *        are 0, 1, 2, or 3 bytes in the FIFO.  To handle all cases, a dummy FSM
-+ *        sequence is used to load one byte at a time, until a complete 32-bit
-+ *        word is formed; at most, 4 bytes will need to be loaded.
-+ *
-+ * [1] It is theoretically possible for the FIFO to contain an arbitrary number
-+ *     of bits.  However, since there are no known use-cases that leave
-+ *     incomplete bytes in the FIFO, only words and bytes are considered here.
-+ */
-+static void stfsm_clear_fifo(struct stfsm *fsm)
++#ifdef CONFIG_PM
++static int stfsmfsm_suspend(struct device *dev)
 +{
-+	const struct stfsm_seq *seq = &stfsm_seq_load_fifo_byte;
-+	uint32_t words;
-+	int i;
++	struct stfsm *fsm = dev_get_drvdata(dev);
 +
-+	/* 1. Clear any 32-bit words */
-+	words = stfsm_fifo_available(fsm);
-+	if (words) {
-+		for (i = 0; i < words; i++)
-+			readl(fsm->base + SPI_FAST_SEQ_DATA_REG);
-+		dev_dbg(fsm->dev, "cleared %d words from FIFO\n", words);
-+	}
++	if (fsm->clk)
++		clk_disable_unprepare(fsm->clk);
 +
-+	/*
-+	 * 2. Clear any remaining bytes
-+	 *    - Load the FIFO, one byte at a time, until a complete 32-bit word
-+	 *      is available.
-+	 */
-+	for (i = 0, words = 0; i < 4 && !words; i++) {
-+		stfsm_load_seq(fsm, seq);
-+		stfsm_wait_seq(fsm);
-+		words = stfsm_fifo_available(fsm);
-+	}
-+
-+	/*    - A single word must be available now */
-+	if (words != 1) {
-+		dev_err(fsm->dev, "failed to clear bytes from the data FIFO\n");
-+		return;
-+	}
-+
-+	/*    - Read the 32-bit word */
-+	readl(fsm->base + SPI_FAST_SEQ_DATA_REG);
-+
-+	dev_dbg(fsm->dev, "cleared %d byte(s) from the data FIFO\n", 4 - i);
++	return 0;
 +}
 +
- static int stfsm_write_fifo(struct stfsm *fsm, const uint32_t *buf,
- 			    uint32_t size)
- {
++static int stfsmfsm_resume(struct device *dev)
++{
++	struct stfsm *fsm = dev_get_drvdata(dev);
++
++	if (fsm->clk)
++		clk_prepare_enable(fsm->clk);
++
++	return 0;
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(stfsm_pm_ops, stfsmfsm_suspend, stfsmfsm_resume);
++
+ static struct of_device_id stfsm_match[] = {
+ 	{ .compatible = "st,spi-fsm", },
+ 	{},
+@@ -2135,6 +2175,7 @@ static struct platform_driver stfsm_driver = {
+ 		.name	= "st-spi-fsm",
+ 		.owner	= THIS_MODULE,
+ 		.of_match_table = stfsm_match,
++		.pm     = &stfsm_pm_ops,
+ 	},
+ };
+ module_platform_driver(stfsm_driver);
 -- 
 1.8.3.2
