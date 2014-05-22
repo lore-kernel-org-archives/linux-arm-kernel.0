@@ -1,31 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 May 2014 15:36:01 +0200
-Subject: [PATCH v2] ARM: realview: basic device tree implementation
-In-Reply-To: <CACRpkdaqsVUDA+6NC=EQmxcnDAnJEfPNYoptrEv=nq=eZEbA_g@mail.gmail.com>
-References: <1399586896-16906-1-git-send-email-linus.walleij@linaro.org>
- <CAL_JsqLN_f1uvrY6w7J7ZcR9pfM0_XKYMQ5YU8F4yAcMW+oDGw@mail.gmail.com>
- <CACRpkdaqsVUDA+6NC=EQmxcnDAnJEfPNYoptrEv=nq=eZEbA_g@mail.gmail.com>
-Message-ID: <5376959.IId6jNFDDg@wuerfel>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 22 May 2014 09:36:34 -0400
+Subject: RCU stall on panda
+In-Reply-To: <537DBC81.2090809@linaro.org>
+References: <53675C5F.10509@linaro.org>
+ <20140505180617.GM8754@linux.vnet.ibm.com>
+ <20140512212102.GF5668@atomide.com> <5371BD69.8010600@linaro.org>
+ <20140513153220.GC16837@atomide.com> <53747E6D.60500@linaro.org>
+ <53748371.5030704@linaro.org> <5374C07C.1070400@linaro.org>
+ <20140515183247.GF23659@atomide.com> <5375091D.3010607@ti.com>
+ <5375C145.6070904@linaro.org> <537614AF.50100@ti.com>
+ <537DBC81.2090809@linaro.org>
+Message-ID: <537DFD62.7040502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 May 2014 15:30:39 Linus Walleij wrote:
-> >> +       parent = soc_device_to_device(soc_dev);
-> >
-> > We really need to standardize this soc device stuff so that platforms
-> > always have a parent soc device or not.
+On Thursday 22 May 2014 04:59 AM, Alex Shi wrote:
+> On 05/16/2014 09:37 PM, Santosh Shilimkar wrote:
+>> On Friday 16 May 2014 03:41 AM, Alex Shi wrote:
+>>> On 05/16/2014 02:36 AM, Santosh Shilimkar wrote:
+>>>>>>>> yes.
+>>>>>>>> My board is panda ES. without this revert, it works.
+>>>>>>
+>>>>>> Care to specify what linux version you are testing against?
+>>>>>>
+>>>>>> Does it hang in idle always immediately on booting?
+>>>>>>
+>>>>>> Or does the serial console first hang with sysrq still
+>>>>>> working (ctrl-a h in minicom for help) with device
+>>>>>> eventually locking up hard?
+>>>>>>
+>>>> I just posted an updated patch Alex on other thread.
+>>>> Attaching here again for your reference. Please try
+>>>> it out and see if the you still get a hang.
+>>>
+>>> it does not hang this time.
+>>>
+>> This is good news and exactly what I expected.
+>>  
+>>> but I am not sure it can solve my problem, since RCU stall is not easy
+>>> to reproduce in short time.
+>>>
+>> You may want to run the system longer if you can. I suspect the RCU stall
+>> was also side effect of missing interrupts.
 > 
-> Arnds position is that the entire platform/board should not be
-> a "soc device" and that seems correct since the board is no SoC.
+> Sure. it do remove the RCU stall on my panda board.
 > 
-> So I will spin this off into a SoC driver and push under
-> drivers/soc and bind to the SoC node in the device tree.
-
-To be clear, this has nothing to do with whether this is strictly a SoC
-or not. I would still want to see all the internal components of the
-main chip under the soc node, and probably anything that is attached
-to one of its interfaces under those nodes. The parts that should not
-be under /soc are the ones that are not in the device hierarchy, such
-as external clock generators.
-
-	Arnd
+Thanks for confirming. Tony already send fix upstream so it should
+show up in next rc mostly
