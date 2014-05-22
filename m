@@ -1,57 +1,48 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 22 May 2014 19:30:23 +0300
-Subject: [Patch v5 3/7] mfd: ti-keystone-devctrl: add bindings for device
- state control
-In-Reply-To: <537E224E.3060601@ti.com>
-References: <1400766516-14537-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1400766516-14537-4-git-send-email-ivan.khoronzhuk@ti.com>
- <20140522141432.GA19747@lee--X1> <537E0A87.5010408@ti.com>
- <20140522153309.GB19747@lee--X1> <537E224E.3060601@ti.com>
-Message-ID: <537E261F.10401@ti.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 22 May 2014 11:32:28 -0500
+Subject: [PATCH v1 5/5] ARM: dts: qcom: Add APQ8084 serial port DT node
+In-Reply-To: <1400775885-10296-6-git-send-email-gdjakov@mm-sol.com>
+References: <1400775885-10296-1-git-send-email-gdjakov@mm-sol.com>
+ <1400775885-10296-6-git-send-email-gdjakov@mm-sol.com>
+Message-ID: <693A0E52-34CF-4A63-A8D0-A83780F969F0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 05/22/2014 07:14 PM, Ivan Khoronzhuk wrote:
->
-> On 05/22/2014 06:33 PM, Lee Jones wrote:
->>>> Why do I only have this patch?  Where is the rest of the set?  Also,
->>>> it's on v5 and I don't recall seeing the other 4 versions?
->>> It's strange I've sent whole series on
->>>
->>> linux-kernel at vger.kernel.org
->>> linux-arm-kernel at lists.infradead.org
->>> linux-doc at vger.kernel.org
->>> devicetree at vger.kernel.org
->>>
->>> v4 is also was sent to lists in question:
->>> https://lkml.org/lkml/2014/5/21/359
->> But did you send them to me?  I don't parse the list.
->>
->
-> Sorry.
-> Becouse /scripts/get_maintainer.pl  patches/reset_driver_v6/* hadn't 
-> been listed you
-> It's because there is no patch with "code" for the bindings you've 
-> comment.
->
-> I should check it by hand for mtd.
->
-> The bindings for mtd device_state_control were added only on v5
-> And it's added only to describe what is the node we've used in a 
-> keystone DT.
-> The node is planned to be used only via syscon phandle, there is no 
-> driver for it,
-> and compatible string for "ti,keystone-devctrl" added only to be 
-> matched by
-> a high-level device driver if needed.
->
-> I'll send new v6 series to you also.
-> Once again sorry.
->
+On May 22, 2014, at 11:24 AM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
 
-s/mtd/mfd
+> Add the necessary DT node to probe the serial driver on
+> APQ8084 platforms.
+> 
+> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+> ---
+> arch/arm/boot/dts/qcom-apq8084.dtsi |    7 +++++++
+> 1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
+> index 2dcd11e..c346549 100644
+> --- a/arch/arm/boot/dts/qcom-apq8084.dtsi
+> +++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
+> @@ -185,5 +185,12 @@
+> 			reg = <0xfc400000 0x4000>;
+> 		};
+> 
+> +		serial at f995e000 {
+
+Mark it disabled in the soc.dtsi and ?ok? in the board.
+
+> +			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
+> +			reg = <0xf995e000 0x1000>;
+> +			interrupts = <0 114 0x0>;
+> +			clocks = <&gcc GCC_BLSP2_UART2_APPS_CLK>, <&gcc GCC_BLSP2_AHB_CLK>;
+> +			clock-names = "core", "iface";
+> +		};
+> 	};
+> };
+> -- 
+> 1.7.9.5
+> 
 
 -- 
-Regards,
-Ivan Khoronzhuk
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
