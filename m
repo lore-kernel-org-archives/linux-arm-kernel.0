@@ -1,73 +1,150 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 22 May 2014 17:44:28 +0530
-Subject: [PATCH 3/4] clk: samsung: Add driver to control CLKOUT line on
- Exynos SoCs
-In-Reply-To: <537DE714.1090407@samsung.com>
-References: <1400604211-9447-1-git-send-email-t.figa@samsung.com>
- <1400604211-9447-4-git-send-email-t.figa@samsung.com>
- <537D8788.8030904@linaro.org> <537DD2C0.4060802@samsung.com>
- <CAHbNUh2gkpV-rt6S+-bUmFvYAuK_HNoXfyOStwYe29sZMJonUw@mail.gmail.com>
- <537DE714.1090407@samsung.com>
-Message-ID: <CAHbNUh2+tWdDiL0uLXW_fG4SdpQ3kEchsDkVeK9XkqO7tgcgYg@mail.gmail.com>
+From: baohua@kernel.org (Barry Song)
+Date: Thu, 22 May 2014 20:14:37 +0800
+Subject: [PATCH 65/97] ARM: l2c: prima2: convert to generic l2c
+ initialisation
+In-Reply-To: <E1WerHE-0001Y8-2Z@rmk-PC.arm.linux.org.uk>
+References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
+ <E1WerHE-0001Y8-2Z@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAGsJ_4xSerVN6A_NymMaRqjy9ZA3j542DVE=gvmz=DNF470H2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 May 2014 17:31, Tomasz Figa <t.figa@samsung.com> wrote:
-> On 22.05.2014 13:44, Tushar Behera wrote:
->> On 22 May 2014 16:04, Tomasz Figa <t.figa@samsung.com> wrote:
->>> On 22.05.2014 07:13, Tushar Behera wrote:
->>>> On 05/20/2014 10:13 PM, Tomasz Figa wrote:
->>>>> This patch introduces a driver that handles configuration of CLKOUT pin
->>>>> of Exynos SoCs that can be used to output certain clocks from inside of
->>>>> the SoC to a dedicated output pin.
->>>>>
->>>>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
->>>>> ---
->>>>>  .../devicetree/bindings/arm/samsung/pmu.txt        |  30 ++++
->>>>>  drivers/clk/samsung/Makefile                       |   1 +
->>>>>  drivers/clk/samsung/clk-exynos-clkout.c            | 153 +++++++++++++++++++++
->>>>>  3 files changed, 184 insertions(+)
->>>>>  create mode 100644 drivers/clk/samsung/clk-exynos-clkout.c
->>>>>
->>>>
->>>> [ ... ]
->>>>
->>>>> +    clkout->clk_table[0] = clk_register_composite(NULL, "clkout",
->>>>> +                            parent_names, parent_count, &clkout->mux.hw,
->>>>> +                            &clk_mux_ops, NULL, NULL, &clkout->gate.hw,
->>>>> +                            &clk_gate_ops, CLK_SET_RATE_PARENT
->>>>> +                            | CLK_SET_RATE_NO_REPARENT);
->>>>
->>>> Would you please remove CLK_SET_RATE_NO_REPARENT flag from here? Let me
->>>> know if you have reservations against this.
->>>
->>> The problem with clock reparenting is that there are certain parent
->>> clocks of CLKOUT, rate of which changes at runtime, e.g. clocks derived
->>> from APLL or bus clocks, which can be reconfigured by cpufreq or devfreq.
->>>
->>
->> +CC: Sylwester Nawrocki
->>
->> Okay. But in cases where there is only 1 valid parent clock provided
->> through DT (at the moment for Exynos5250/Exynos5420), would it be safe
->> to set that clock as the parent of CLKOUT?
+2014-04-29 3:31 GMT+08:00 Russell King <rmk+kernel@arm.linux.org.uk>:
+> Along with this change, we can delete l2x0.c from prima2.
 >
-> This is not something to rely on. I have simply omitted remaining CLKOUT
-> parents on Exynos 5 SoCs, as I don't have any board with them on which I
-> could test this. Eventually they will be added.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+if the information you want is l2c_aux_val, l2c_aux_mask for prima2 platform.
+
+it is (0, 0xfdffffff), you can cleary know that from the v1 i sent on
+April 15, which was much earlier than your this patch:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/247423.html
+
+and you gave many comments on that, and you read the (0, 0xFDFFFFFUL)
+and disliked the upper letter.
+
+but you just complained that i didn't provide any information to you
+and you felt "frustrated".
+
+i think that man who should fell frustrated is me not you. i feel very
+frustrated for the moment.
+
+> ---
+>  arch/arm/boot/dts/marco.dtsi  |  2 +-
+>  arch/arm/boot/dts/prima2.dtsi |  2 +-
+>  arch/arm/mach-prima2/Makefile |  1 -
+>  arch/arm/mach-prima2/common.c |  6 ++++++
+>  arch/arm/mach-prima2/l2x0.c   | 30 ------------------------------
+>  5 files changed, 8 insertions(+), 33 deletions(-)
+>  delete mode 100644 arch/arm/mach-prima2/l2x0.c
 >
->> Otherwise, this clock is
->> not usable ATM.
+> diff --git a/arch/arm/boot/dts/marco.dtsi b/arch/arm/boot/dts/marco.dtsi
+> index 0c9647d28765..fb354225740a 100644
+> --- a/arch/arm/boot/dts/marco.dtsi
+> +++ b/arch/arm/boot/dts/marco.dtsi
+> @@ -36,7 +36,7 @@
+>                 ranges = <0x40000000 0x40000000 0xa0000000>;
 >
-> On many boards it is already configured properly by the bootloader.
-> Although I don't see any reason why you couldn't reparent it in
-> (board-specific) sound card driver right now.
+>                 l2-cache-controller at c0030000 {
+> -                       compatible = "sirf,marco-pl310-cache", "arm,pl310-cache";
+> +                       compatible = "arm,pl310-cache";
+>                         reg = <0xc0030000 0x1000>;
+>                         interrupts = <0 59 0>;
+>                         arm,tag-latency = <1 1 1>;
+> diff --git a/arch/arm/boot/dts/prima2.dtsi b/arch/arm/boot/dts/prima2.dtsi
+> index 1e82571d6823..0d6588d549bf 100644
+> --- a/arch/arm/boot/dts/prima2.dtsi
+> +++ b/arch/arm/boot/dts/prima2.dtsi
+> @@ -48,7 +48,7 @@
+>                 ranges = <0x40000000 0x40000000 0x80000000>;
+>
+>                 l2-cache-controller at 80040000 {
+> -                       compatible = "arm,pl310-cache", "sirf,prima2-pl310-cache";
+> +                       compatible = "arm,pl310-cache";
+>                         reg = <0x80040000 0x1000>;
+>                         interrupts = <59>;
+>                         arm,tag-latency = <1 1 1>;
+> diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
+> index 7a6b4a323125..8846e7d87ea5 100644
+> --- a/arch/arm/mach-prima2/Makefile
+> +++ b/arch/arm/mach-prima2/Makefile
+> @@ -2,7 +2,6 @@ obj-y += rstc.o
+>  obj-y += common.o
+>  obj-y += rtciobrg.o
+>  obj-$(CONFIG_DEBUG_LL) += lluart.o
+> -obj-$(CONFIG_CACHE_L2X0) += l2x0.o
+>  obj-$(CONFIG_SUSPEND) += pm.o sleep.o
+>  obj-$(CONFIG_SMP) += platsmp.o headsmp.o
+>  obj-$(CONFIG_HOTPLUG_CPU)  += hotplug.o
+> diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
+> index 47c7819edb9b..a860ea27e8ae 100644
+> --- a/arch/arm/mach-prima2/common.c
+> +++ b/arch/arm/mach-prima2/common.c
+> @@ -34,6 +34,8 @@ static const char *atlas6_dt_match[] __initconst = {
+>
+>  DT_MACHINE_START(ATLAS6_DT, "Generic ATLAS6 (Flattened Device Tree)")
+>         /* Maintainer: Barry Song <baohua.song@csr.com> */
+> +       .l2c_aux_val    = 0,
+> +       .l2c_aux_mask   = ~0,
+>         .map_io         = sirfsoc_map_io,
+>         .init_late      = sirfsoc_init_late,
+>         .dt_compat      = atlas6_dt_match,
+> @@ -48,6 +50,8 @@ static const char *prima2_dt_match[] __initconst = {
+>
+>  DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
+>         /* Maintainer: Barry Song <baohua.song@csr.com> */
+> +       .l2c_aux_val    = 0,
+> +       .l2c_aux_mask   = ~0,
+>         .map_io         = sirfsoc_map_io,
+>         .dma_zone_size  = SZ_256M,
+>         .init_late      = sirfsoc_init_late,
+> @@ -63,6 +67,8 @@ static const char *marco_dt_match[] __initconst = {
+>
+>  DT_MACHINE_START(MARCO_DT, "Generic MARCO (Flattened Device Tree)")
+>         /* Maintainer: Barry Song <baohua.song@csr.com> */
+> +       .l2c_aux_val    = 0,
+> +       .l2c_aux_mask   = ~0,
+>         .smp            = smp_ops(sirfsoc_smp_ops),
+>         .map_io         = sirfsoc_map_io,
+>         .init_late      = sirfsoc_init_late,
+> diff --git a/arch/arm/mach-prima2/l2x0.c b/arch/arm/mach-prima2/l2x0.c
+> deleted file mode 100644
+> index dbd837bdb7f7..000000000000
+> --- a/arch/arm/mach-prima2/l2x0.c
+> +++ /dev/null
+> @@ -1,30 +0,0 @@
+> -/*
+> - * l2 cache initialization for CSR SiRFprimaII
+> - *
+> - * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
+> - *
+> - * Licensed under GPLv2 or later.
+> - */
+> -
+> -#include <linux/init.h>
+> -#include <linux/kernel.h>
+> -#include <linux/of.h>
+> -#include <asm/hardware/cache-l2x0.h>
+> -
+> -static const struct of_device_id sirf_l2x0_ids[] __initconst = {
+> -       { .compatible = "sirf,prima2-pl310-cache", .data = &prima2_l2x0_aux, },
+> -       { .compatible = "sirf,marco-pl310-cache", .data = &marco_l2x0_aux, },
+> -       {},
+> -};
+> -
+> -static int __init sirfsoc_l2x0_init(void)
+> -{
+> -       struct device_node *np;
+> -
+> -       np = of_find_matching_node(NULL, sirf_l2x0_ids);
+> -       if (np)
+> -               return l2x0_of_init(0, ~0);
+> -
+> -       return 0;
+> -}
+> -early_initcall(sirfsoc_l2x0_init);
+> --
+> 1.8.3.1
 >
 
-Mark,
-
-Is this (clock reparenting in sound card driver) an acceptable solution for you?
-
-
--- 
-Tushar Behera
+-barry
