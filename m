@@ -1,39 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 22 May 2014 20:23:57 +0100
-Subject: [PATCH v3 5/9] ASoC: simple-card: Support setting mclk via a
- fixed factor
-In-Reply-To: <20140522191013.GC24500@lunn.ch>
-References: <20140520221359.GF12304@sirena.org.uk>
- <1400772710-23523-1-git-send-email-andrew@lunn.ch>
- <20140522173919.GM12304@sirena.org.uk>
- <20140522175206.GA24500@lunn.ch>
- <20140522183054.GQ12304@sirena.org.uk>
- <20140522191013.GC24500@lunn.ch>
-Message-ID: <20140522192357.GV12304@sirena.org.uk>
+From: larry.bassel@linaro.org (Larry Bassel)
+Date: Thu, 22 May 2014 12:27:33 -0700
+Subject: [PATCH v4 0/2] context tracker support for arm64
+Message-ID: <1400786855-32656-1-git-send-email-larry.bassel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 09:10:13PM +0200, Andrew Lunn wrote:
+Implement and enable context tracking for arm64 (which is
+a prerequisite for FULL_NOHZ support). This patchset
+builds upon earlier work by Kevin Hilman and is based on
+Will Deacon's tree.
 
-> O.K, i will try to remember this as your way of doing things, when
-> submitting to you. The usb-serial maintainer does want replies
-> threading to his messages, etc. Takes a while to learn each
-> maintainers ways.
+Changes v3 to v4:
 
-I suspect you might find that's for things with an active thread.  I
-disagree on that one still but if you're sending new stuff it's a fairly
-standard rule to just send new things.
+* Rename parameter of ct_user_exit from save to restore
+* Rebased patch to Will Deacon's tree (branch remotes/origin/aarch64
+of git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git)
 
-> What you failed to say is if they will accept this one patch as is, or
-> if you want me to post a v4 containing all the patches?
+Changes v2 to v3:
 
-I've not looked at it yet, I got as far as seeing that it was patch 3
-and I didn't have patches 1 or 2 - I hadn't even registered what the
-patch was about.  Assuming it's just a rebase it should be fine.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140522/81b03296/attachment-0001.sig>
+* Save/restore necessary registers in ct_user_enter and ct_user_exit
+* Annotate "error paths" out of el0_sync with ct_user_exit
+
+Changes v1 to v2:
+
+* Save far_el1 in x26 temporarily
+
+Larry Bassel (2):
+  arm64: adjust el0_sync so that a function can be called
+  arm64: enable context tracking
+
+ arch/arm64/Kconfig                   |  1 +
+ arch/arm64/include/asm/thread_info.h |  1 +
+ arch/arm64/kernel/entry.S            | 72 ++++++++++++++++++++++++++++++++----
+ 3 files changed, 67 insertions(+), 7 deletions(-)
+
+-- 
+1.8.3.2
