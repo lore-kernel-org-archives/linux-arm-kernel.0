@@ -1,39 +1,96 @@
-From: stano@meduna.org (Stanislav Meduna)
-Date: Fri, 23 May 2014 01:09:52 +0200
-Subject: BUG: sleeping function called from invalid context (do_force_sig_info)
-Message-ID: <537E83C0.9040406@meduna.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 23 May 2014 01:18:31 +0200
+Subject: [PATCH v3] clk: shmobile: Add R8A7740-specific clock support
+In-Reply-To: <CANqRtoRKW=QyawwVoc31OdwkOowBXky4NtZgPVEW7CwuuR+M=g@mail.gmail.com>
+References: <1400682086-5705-1-git-send-email-ulrich.hecht+renesas@gmail.com>
+ <2463693.SJ3Ug7SyHp@avalon>
+ <CANqRtoRKW=QyawwVoc31OdwkOowBXky4NtZgPVEW7CwuuR+M=g@mail.gmail.com>
+Message-ID: <27468705.y8ueFQY9JC@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Magnus,
 
-this is on a i.MX28 running a 3.12.19-rt30
+On Thursday 22 May 2014 20:16:06 Magnus Damm wrote:
+> On Thu, May 22, 2014 at 7:22 PM, Laurent Pinchart wrote:
+> > On Thursday 22 May 2014 09:37:40 Magnus Damm wrote:
+> >> On Thu, May 22, 2014 at 12:41 AM, Laurent Pinchart wrote:
+> >> > On Wednesday 21 May 2014 16:21:26 Ulrich Hecht wrote:
+> >> >> Driver for the R8A7740's clocks that are too specific to be supported
+> >> >> by a generic driver.
+> >> >> 
+> >> >> Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+> >> > 
+> >> > The implementation looks globally sane to me. There's still quite a few
+> >> > missing clocks, but there's no hurry in adding support for them at the
+> >> > moment. I'd like to get the bindings reviewed by someone outside of our
+> >> > team, but that would require making the CPG documentation (or at least
+> >> > the block diagram) available. Magnus, is there a chance for that to
+> >> > happen ?
+> >> 
+> >> Regarding documentation, as much as I'd like to see this, in practice it
+> >> feels highly unlikely since I'm not in control of the actual data sheet
+> >> distribution policy. I believe Emma Mobile series data sheet are
+> >> available for public download, but the rest of the SoCs are not
+> >> unfortunately.
+> >> 
+> >> This issue with closed documentation is not specific to r8a7740 though,
+> >> so earlier developed CCF implementations included in upstream like
+> >> r8a7790, r8a7791, r7s72100 and r8a7779 are in the same state as r8a7740.
+> > 
+> > Yes they are, although the hardware is simpler in those cases, so there's
+> > less potential issues. I don't have a specific concern here, just a
+> > feeling of uneasiness coming from publishing DT bindings that can't be
+> > properly reviewed by someone out of our team. We're too familiar with the
+> > hardware to take a step back and see the bindings from an external point
+> > of view, which is why I'd like an external review before committing to
+> > any DT binding stability.
+>
+> I understand that you cannot vouch for the stability of this binding. =)
+> 
+> And I agree that external review would help in making it stabler quicker.
+> 
+> > There's of course no reason to delay this patch (well, except for all the
+> > other small comments I've made :-)), but if it were me I would mark the
+> > corresponding bindings with a big "EXPERIMENTAL" warning.
+> 
+> We can chose to treat it as relatively experimental if we want to. So
+> your warning is fine!
+> 
+> How long stabilization time would you recommend for this kind of
+> thing? I would guess half a year?
 
-[27284.008123] BUG: sleeping function called from invalid context at /home/nxtdev/Kernels/linux-stable-rt/kernel/rtmutex.c:673
-[27284.008143] in_atomic(): 0, irqs_disabled(): 128, pid: 1335, name: nxt
-[27284.008170] CPU: 0 PID: 1335 Comm: nxt Not tainted 3.12.19-rt30+ #178
-[27284.008255] [<c0014440>] (unwind_backtrace+0x0/0xf4) from [<c00124cc>] (show_stack+0x10/0x14)
-[27284.008306] [<c00124cc>] (show_stack+0x10/0x14) from [<c028b6a8>] (rt_spin_lock+0x18/0x2c)
-[27284.008348] [<c028b6a8>] (rt_spin_lock+0x18/0x2c) from [<c002a7ec>] (do_force_sig_info+0x20/0xd8)
-[27284.008387] [<c002a7ec>] (do_force_sig_info+0x20/0xd8) from [<c0016720>] (__do_user_fault+0x88/0xc8)
-[27284.008419] [<c0016720>] (__do_user_fault+0x88/0xc8) from [<c0016c2c>] (do_bad_area+0x64/0x70)
-[27284.008452] [<c0016c2c>] (do_bad_area+0x64/0x70) from [<c0016ca4>] (do_translation_fault+0x6c/0xa8)
-[27284.008483] [<c0016ca4>] (do_translation_fault+0x6c/0xa8) from [<c000867c>] (do_DataAbort+0x34/0x98)
-[27284.008520] [<c000867c>] (do_DataAbort+0x34/0x98) from [<c0012ebc>] (__dabt_usr+0x3c/0x40)
-[27284.008531] Exception stack(0xc1173fb0 to 0xc1173ff8)
-[27284.008554] 3fa0:                                     b6634b48 d6634b44 d6634a94 07ffffff
-[27284.008583] 3fc0: b6634c1c b6ef1160 b6ef1000 00000152 b6635460 b6ee6b34 00000000 b6634b4c
-[27284.008605] 3fe0: 00000152 b6634a80 001f813c 00203888 60000010 ffffffff
+I see several main reasons why DT bindings need time to stabilize.
 
-There are some changes to the stock 3.12.19-rt30 (added drivers) where
-I can not exclude that there is some bug lurking, and a bug in userspace
-is even more probable; I am just forwarding it because of the sleeping
-from invalid context thing.
+- When implementing support for currently unsupported features of the device 
+we could realize that the bindings were designed in a way that makes support 
+of new features difficult in a backward-compatible way.
 
-After a reboot I am unfortunately not able to easily reproduce it. There
-was no core dump (they are enabled) and the application did not exit
-(there is no SEGV handler).
+- When a new SoC comes out we could realize that device features or SoC 
+integration parameters that we thought were set in stone are actually not, and 
+don't play well with the current bindings.
 
-Thanks
+- When other vendors implement bindings for similar devices we could realize 
+that common needs would benefit from common bindings.
+
+At least the last reason advocates for experimental DT bindings being 
+committed to the mainline kernel, to make it possible for developers to 
+identify common needs between vendors.
+
+In this specific case I'm mostly concerned about the first reason, as I don't 
+expect our new SoCs to come out with a CPG nearly-but-not-quite-identical to 
+the r8a7740's. The stabilization time would thus depend entirely on our effort 
+to implement support for the currently missing features. Integration with MSTP 
+is the main one (the overlapping register ranges problem I've mentioned before 
+is a good example, even if it doesn't cause a real problem today), and support 
+for at least some of the missing clocks would be good as well. If we actively 
+maintain this driver I expect that one or two kernel releases should be enough 
+for the bindings to stabilize.
+
+Please feel free to also discuss the other reasons I've mentioned above and 
+how you would like to see them being handled.
+
 -- 
-                                       Stano
+Regards,
+
+Laurent Pinchart
