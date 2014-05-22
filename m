@@ -1,219 +1,108 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 22 May 2014 17:41:44 +0200
-Subject: [PATCH 1/8] mmc: sdhci-st: Intial support for ST SDHCI controller
-In-Reply-To: <1400771902-26553-2-git-send-email-peter.griffin@linaro.org>
-References: <1400771902-26553-1-git-send-email-peter.griffin@linaro.org>
- <1400771902-26553-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <537E1AB8.9000909@st.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 22 May 2014 17:37:24 +0200
+Subject: [PATCH] pinctrl: sunxi: fix pin numbers passed to register offset
+ helpers
+In-Reply-To: <1400772055-3852-1-git-send-email-wens@csie.org>
+References: <1400772055-3852-1-git-send-email-wens@csie.org>
+Message-ID: <537E19B4.6070005@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter
+Hello Chen-Yu,
 
-On 05/22/2014 05:18 PM, Peter Griffin wrote:
-> This platform driver adds initial support for the SDHCI host controller
-> found on STMicroelectronics SoCs.
+On 22/05/2014 17:20, Chen-Yu Tsai wrote:
+> The pin numbers passed to sunxi_*_reg helpers to get the correct
+> registers should be the pin offset for the PIO block, not the
+> absolute number we use that is based on the alphanumeric labels
+> Allwinner uses.
 >
-> It has been tested on STiH41x b2020 platforms currently.
+> This patch subtracts .pin_base from the pin number passed to these
+> functions, so the driver accesses the correct registers.
+
+Thanks for fixing this bug.
+
 >
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+
+Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
 > ---
->   drivers/mmc/host/Kconfig    |  12 +++
->   drivers/mmc/host/Makefile   |   1 +
->   drivers/mmc/host/sdhci-st.c | 244 ++++++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 257 insertions(+)
->   create mode 100644 drivers/mmc/host/sdhci-st.c
 >
+> Hi,
+>
+> This patch fixes the pinctrl driver failing to set pinmuxes for the R_PIO
+> block found on the A31 and A23. The problem was found while working on
+> bringing up the A23 SoC. The R_UART pins weren't properly muxed when
+> the bootloader didn't use them.
+>
+> A thank you to Boris who also verified the issue.
+>
+>
+> Cheers,
+> ChenYu
+>
+> ---
+>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 26 ++++++++++++++------------
+>  1 file changed, 14 insertions(+), 12 deletions(-)
+>
+> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> index f6522b5..59962fa 100644
+> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> @@ -280,6 +280,7 @@ static int sunxi_pconf_group_set(struct pinctrl_dev *pctldev,
+>  	struct sunxi_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
+>  	struct sunxi_pinctrl_group *g = &pctl->groups[group];
+>  	unsigned long flags;
+> +	unsigned pin = g->pin - pctl->desc->pin_base;
+>  	u32 val, mask;
+>  	u16 strength;
+>  	u8 dlevel;
+> @@ -303,23 +304,23 @@ static int sunxi_pconf_group_set(struct pinctrl_dev *pctldev,
+>  			 *   3: 40mA
+>  			 */
+>  			dlevel = strength / 10 - 1;
+> -			val = readl(pctl->membase + sunxi_dlevel_reg(g->pin));
+> -			mask = DLEVEL_PINS_MASK << sunxi_dlevel_offset(g->pin);
+> +			val = readl(pctl->membase + sunxi_dlevel_reg(pin));
+> +			mask = DLEVEL_PINS_MASK << sunxi_dlevel_offset(pin);
+>  			writel((val & ~mask)
+> -				| dlevel << sunxi_dlevel_offset(g->pin),
+> -				pctl->membase + sunxi_dlevel_reg(g->pin));
+> +				| dlevel << sunxi_dlevel_offset(pin),
+> +				pctl->membase + sunxi_dlevel_reg(pin));
+>  			break;
+>  		case PIN_CONFIG_BIAS_PULL_UP:
+> -			val = readl(pctl->membase + sunxi_pull_reg(g->pin));
+> -			mask = PULL_PINS_MASK << sunxi_pull_offset(g->pin);
+> -			writel((val & ~mask) | 1 << sunxi_pull_offset(g->pin),
+> -				pctl->membase + sunxi_pull_reg(g->pin));
+> +			val = readl(pctl->membase + sunxi_pull_reg(pin));
+> +			mask = PULL_PINS_MASK << sunxi_pull_offset(pin);
+> +			writel((val & ~mask) | 1 << sunxi_pull_offset(pin),
+> +				pctl->membase + sunxi_pull_reg(pin));
+>  			break;
+>  		case PIN_CONFIG_BIAS_PULL_DOWN:
+> -			val = readl(pctl->membase + sunxi_pull_reg(g->pin));
+> -			mask = PULL_PINS_MASK << sunxi_pull_offset(g->pin);
+> -			writel((val & ~mask) | 2 << sunxi_pull_offset(g->pin),
+> -				pctl->membase + sunxi_pull_reg(g->pin));
+> +			val = readl(pctl->membase + sunxi_pull_reg(pin));
+> +			mask = PULL_PINS_MASK << sunxi_pull_offset(pin);
+> +			writel((val & ~mask) | 2 << sunxi_pull_offset(pin),
+> +				pctl->membase + sunxi_pull_reg(pin));
+>  			break;
+>  		default:
+>  			break;
+> @@ -376,6 +377,7 @@ static void sunxi_pmx_set(struct pinctrl_dev *pctldev,
+>  
+>  	spin_lock_irqsave(&pctl->lock, flags);
+>  
+> +	pin -= pctl->desc->pin_base;
+>  	val = readl(pctl->membase + sunxi_mux_reg(pin));
+>  	mask = MUX_PINS_MASK << sunxi_mux_offset(pin);
+>  	writel((val & ~mask) | config << sunxi_mux_offset(pin),
 
-[...]
-
-> diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
-> new file mode 100644
-> index 0000000..1790fa7
-> --- /dev/null
-> +++ b/drivers/mmc/host/sdhci-st.c
-> @@ -0,0 +1,244 @@
-> +/*
-> + * Support for SDHCI on STMicroelectronics SoCs
-> + *
-> + * Copyright (C) 2014 STMicroelectronics Ltd
-> + * Author: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> + *
-> + * Based on sdhci-cns3xxx.c
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/module.h>
-> +#include <linux/err.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/mmc/host.h>
-> +#include <linux/reset.h>
-> +
-> +#include "sdhci-pltfm.h"
-> +
-> +struct st_mmc_platform_data {
-> +	struct  reset_control	*rstc;
-> +};
-Since it uses the generic reset framework, could we imagine moving the 
-reset to the sdhci_pltfm_host struct?
-Doing this, we could get rid of st_mmc_platform_data.
-
-
-> +
-> +static int sdhci_st_8bit_width(struct sdhci_host *host, int width)
-> +{
-> +	u8 ctrl;
-> +
-> +	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
-> +
-> +	switch (width) {
-> +	case MMC_BUS_WIDTH_8:
-> +		ctrl |= SDHCI_CTRL_8BITBUS;
-> +		ctrl &= ~SDHCI_CTRL_4BITBUS;
-> +		break;
-> +	case MMC_BUS_WIDTH_4:
-> +		ctrl |= SDHCI_CTRL_4BITBUS;
-> +		ctrl &= ~SDHCI_CTRL_8BITBUS;
-> +		break;
-> +	default:
-> +		ctrl &= ~(SDHCI_CTRL_8BITBUS | SDHCI_CTRL_4BITBUS);
-> +		break;
-You can remove the break here.
-
-> +	}
-> +
-> +	sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
-> +
-> +	return 0;
-> +}
-> +
-> +static unsigned int sdhci_st_get_max_clk(struct sdhci_host *host)
-> +{
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +
-> +	return clk_get_rate(pltfm_host->clk);
-> +}
-> +
-> +static u32 sdhci_st_readl(struct sdhci_host *host, int reg)
-> +{
-> +	u32 ret;
-> +
-> +	switch (reg) {
-> +	case SDHCI_CAPABILITIES:
-> +		ret = readl(host->ioaddr + reg);
-> +		/* Support 3.3V and 1.8V */
-> +		ret &= ~SDHCI_CAN_VDD_300;
-> +		break;
-> +	default:
-> +		ret = readl(host->ioaddr + reg);
-
-Could we use readl_relaxed?
-
-> +	}
-> +	return ret;
-> +}
-> +
-> +static const struct sdhci_ops sdhci_st_ops = {
-> +	.get_max_clock = sdhci_st_get_max_clk,
-> +	.platform_bus_width = sdhci_st_8bit_width,
-> +	.read_l = sdhci_st_readl,
-> +};
-> +
-> +static const struct sdhci_pltfm_data sdhci_st_pdata = {
-> +	.ops = &sdhci_st_ops,
-> +	.quirks = SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC |
-> +	    SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
-> +};
-> +
-> +
-> +static int sdhci_st_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct sdhci_host *host;
-> +	struct st_mmc_platform_data *pdata;
-> +	struct sdhci_pltfm_host *pltfm_host;
-> +	struct clk *clk;
-> +	int ret = 0;
-> +	u16 host_version;
-> +
-> +	dev_dbg(&pdev->dev, "SDHCI ST platform driver\n");
-You can remove this I think.
-
-> +
-> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> +	if (!pdata)
-> +		return -ENOMEM;
-> +
-> +	pdata->rstc = devm_reset_control_get(&pdev->dev, NULL);
-> +	if (IS_ERR(pdata->rstc))
-> +		pdata->rstc = NULL;
-> +	else
-> +		reset_control_deassert(pdata->rstc);
-> +
-> +	clk =  devm_clk_get(&pdev->dev, "mmc");
-> +	if (IS_ERR(clk)) {
-> +		dev_err(&pdev->dev, "Perpheral clk not found\n");
-> +		return PTR_ERR(clk);
-> +	}
-> +
-> +	host = sdhci_pltfm_init(pdev, &sdhci_st_pdata, 0);
-> +	if (IS_ERR(host)) {
-> +		dev_err(&pdev->dev, "Failed sdhci_pltfm_init\n");
-> +		return PTR_ERR(host);
-> +	}
-> +
-> +	clk_prepare_enable(clk);
-> +
-> +	host->mmc->caps |= MMC_CAP_8_BIT_DATA | MMC_CAP_BUS_WIDTH_TEST
-> +			| MMC_CAP_1_8V_DDR;
-> +
-> +	if (of_property_read_bool(np, "non-removable"))
-> +		host->mmc->caps |= MMC_CAP_NONREMOVABLE;
-> +
-> +	pltfm_host = sdhci_priv(host);
-> +	pltfm_host->clk = clk;
-> +
-> +	ret = sdhci_add_host(host);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Failed sdhci_add_host\n");
-> +		goto err_out;
-> +	}
-> +
-> +	pltfm_host->priv = pdata;
-> +
-> +	platform_set_drvdata(pdev, host);
-> +
-> +	host_version = readw_relaxed((host->ioaddr + SDHCI_HOST_VERSION));
-> +
-> +	dev_dbg(&pdev->dev, "SDHCI ST Initialised: Host Version: 0x%x Vendor Version 0x%x\n",
-> +		host_version, ((host_version & SDHCI_VENDOR_VER_MASK) >>
-> +			       SDHCI_VENDOR_VER_SHIFT));
-Maybe you could change to dev_info here. It might be interresting to 
-always have IP version.
-
-> +
-> +	return 0;
-> +
-> +err_out:
-> +	clk_disable_unprepare(clk);
-> +	sdhci_pltfm_free(pdev);
-> +
-> +	return ret;
-> +}
-
-[...]
-
-Regards,
-Maxime
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
