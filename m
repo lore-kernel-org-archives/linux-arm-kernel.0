@@ -1,50 +1,52 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 22 May 2014 12:30:42 +0200
-Subject: [PATCH 3/4] clk: samsung: Add driver to control CLKOUT line on
- Exynos SoCs
-In-Reply-To: <537D7CF4.6050305@linaro.org>
-References: <1400604211-9447-1-git-send-email-t.figa@samsung.com>
- <1400604211-9447-4-git-send-email-t.figa@samsung.com>
- <537D7CF4.6050305@linaro.org>
-Message-ID: <537DD1D2.9010107@samsung.com>
+From: riku.voipio@iki.fi (Riku Voipio)
+Date: Thu, 22 May 2014 11:12:02 +0300
+Subject: [PATCH RESEND] mmc: dove: fix missing MACH_DOVE dependency
+In-Reply-To: <1400522571-10799-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1400522571-10799-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140522081202.GA21151@afflict.kos.to>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.05.2014 06:28, Tushar Behera wrote:
-> On 05/20/2014 10:13 PM, Tomasz Figa wrote:
->> This patch introduces a driver that handles configuration of CLKOUT pin
->> of Exynos SoCs that can be used to output certain clocks from inside of
->> the SoC to a dedicated output pin.
->>
->> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
->> ---
->>  .../devicetree/bindings/arm/samsung/pmu.txt        |  30 ++++
->>  drivers/clk/samsung/Makefile                       |   1 +
->>  drivers/clk/samsung/clk-exynos-clkout.c            | 153 +++++++++++++++++++++
->>  3 files changed, 184 insertions(+)
->>  create mode 100644 drivers/clk/samsung/clk-exynos-clkout.c
->>
->> diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
->> index b562634..5ed94a9 100644
->> --- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
->> +++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
->> @@ -11,8 +11,38 @@ Properties:
->>  
->>   - reg : offset and length of the register set.
->>  
->> + - #clock-cells : must be <1>, since PMU requires once cell as clock specifier.
-> 
-> s/once/one
-> 
->> +		The single specifier cell is used as index to list of clocks
->> +		provided by PMU, which is currently:
->> +			0 : SoC clock output (CLKOUT pin)
-> 
-> Will it make more sense if we add a macro for this clock number that
-> would be referred in the device tree files?
+On Mon, May 19, 2014 at 08:02:51PM +0200, Sebastian Hesselbarth wrote:
+> DT-enabled Dove moved over from ARCH_DOVE in mach-dove to MACH_DOVE in
+> mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
+> DT-only MACH_DOVE Kconfig. This slipped through the cracks and now is
+> a fix to allow to build Dove's SDHCI driver for mach-mvebu on v3.15-rc.
 
-Right now, with just one clock, it doesn't make sense, but if further
-clocks show up with newer SoCs, then macros will have to be added.
+Dove cubox has usually rootfs on mmc, so this patch is very much needed
+for using multiplatform kernel on dove cubox.
 
-Best regards,
-Tomasz
+Tested-by: Riku Voipio <riku.voipio@iki.fi>
+
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> ---
+> Cc: Chris Ball <chris@printf.net>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: linux-mmc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/mmc/host/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> index 8aaf8c1f3f63..37665553ef33 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -168,7 +168,7 @@ config MMC_SDHCI_ESDHC_IMX
+>  
+>  config MMC_SDHCI_DOVE
+>  	tristate "SDHCI support on Marvell's Dove SoC"
+> -	depends on ARCH_DOVE
+> +	depends on ARCH_DOVE || MACH_DOVE
+>  	depends on MMC_SDHCI_PLTFM
+>  	select MMC_SDHCI_IO_ACCESSORS
+>  	help
+> -- 
+> 1.9.1
+> 
+> 
