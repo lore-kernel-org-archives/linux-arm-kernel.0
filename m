@@ -1,47 +1,80 @@
 From: gdjakov@mm-sol.com (Georgi Djakov)
-Date: Thu, 22 May 2014 19:24:44 +0300
-Subject: [PATCH v1 4/5] ARM: dts: qcom: Add APQ8084 Global Clock Controller DT
- node
+Date: Thu, 22 May 2014 19:24:42 +0300
+Subject: [PATCH v1 2/5] clk: qcom: Allow an override function to be passed as
+ data
 In-Reply-To: <1400775885-10296-1-git-send-email-gdjakov@mm-sol.com>
 References: <1400775885-10296-1-git-send-email-gdjakov@mm-sol.com>
-Message-ID: <1400775885-10296-5-git-send-email-gdjakov@mm-sol.com>
+Message-ID: <1400775885-10296-3-git-send-email-gdjakov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the necessary node to probe the global clock
-controller on APQ8084 platforms.
+The APQ8084 and MSM8974 SoCs share a lot of clock data. Instead of
+duplicating all the data, we can add the support for APQ8084 into
+the MSM8974 code and just describe the differences by using an
+override function.
+
+This patch applies to the clk-next tree and the following patchset
+on top of it: https://lkml.org/lkml/2014/5/16/666
 
 Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
 ---
- arch/arm/boot/dts/qcom-apq8084.dtsi |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/clk/qcom/gcc-msm8974.c |   27 +++++++++++++++------------
+ 1 file changed, 15 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
-index e3e009a..2dcd11e 100644
---- a/arch/arm/boot/dts/qcom-apq8084.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
-@@ -2,6 +2,8 @@
- 
- #include "skeleton.dtsi"
- 
-+#include <dt-bindings/clock/qcom,gcc-msm8974.h>
-+
- / {
- 	model = "Qualcomm APQ 8084";
- 	compatible = "qcom,apq8084";
-@@ -175,5 +177,13 @@
- 			compatible = "qcom,pshold";
- 			reg = <0xfc4ab000 0x4>;
- 		};
-+
-+		gcc: clock-controller at fc400000 {
-+			compatible = "qcom,gcc-apq8084";
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+			reg = <0xfc400000 0x4000>;
-+		};
-+
- 	};
+diff --git a/drivers/clk/qcom/gcc-msm8974.c b/drivers/clk/qcom/gcc-msm8974.c
+index 33eb051..58cb2f5 100644
+--- a/drivers/clk/qcom/gcc-msm8974.c
++++ b/drivers/clk/qcom/gcc-msm8974.c
+@@ -2674,14 +2674,6 @@ static const struct qcom_cc_desc gcc_msm8974_desc = {
+ 	.num_resets = ARRAY_SIZE(gcc_msm8974_resets),
  };
+ 
+-static const struct of_device_id gcc_msm8974_match_table[] = {
+-	{ .compatible = "qcom,gcc-msm8974" },
+-	{ .compatible = "qcom,gcc-msm8974pro" , .data = (void *)1UL },
+-	{ .compatible = "qcom,gcc-msm8974pro-ac", .data = (void *)1UL },
+-	{ }
+-};
+-MODULE_DEVICE_TABLE(of, gcc_msm8974_match_table);
+-
+ static void msm8974_pro_clock_override(void)
+ {
+ 	sdcc1_apps_clk_src_init.parent_names = gcc_xo_gpll0_gpll4;
+@@ -2697,20 +2689,31 @@ static void msm8974_pro_clock_override(void)
+ 		&gcc_sdcc1_cdccal_ff_clk.clkr;
+ }
+ 
++static const struct of_device_id gcc_msm8974_match_table[] = {
++	{ .compatible = "qcom,gcc-msm8974" },
++	{ .compatible = "qcom,gcc-msm8974pro",
++		.data =	&msm8974_pro_clock_override },
++	{ .compatible = "qcom,gcc-msm8974pro-ac",
++		.data = &msm8974_pro_clock_override },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, gcc_msm8974_match_table);
++
+ static int gcc_msm8974_probe(struct platform_device *pdev)
+ {
+ 	struct clk *clk;
+ 	struct device *dev = &pdev->dev;
+-	bool pro;
+ 	const struct of_device_id *id;
++	void (*overrides)(void);
+ 
+ 	id = of_match_device(gcc_msm8974_match_table, dev);
+ 	if (!id)
+ 		return -ENODEV;
+-	pro = !!(id->data);
+ 
+-	if (pro)
+-		msm8974_pro_clock_override();
++	if (id->data) {
++		overrides = id->data;
++		overrides();
++	}
+ 
+ 	/* Temporary until RPM clocks supported */
+ 	clk = clk_register_fixed_rate(dev, "xo", NULL, CLK_IS_ROOT, 19200000);
 -- 
 1.7.9.5
