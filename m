@@ -1,84 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 22 May 2014 10:07:02 +0100
-Subject: [PATCH RESEND 1/2] irqchip: Add generic gic-v1/gic-v2 compat
- strings.
-In-Reply-To: <CAL_JsqKpgWBQ6qFrDHt13wqRx1afPeapEz5z16enUyUX1fgUJg@mail.gmail.com>
-References: <1400680085-10430-1-git-send-email-Nikolay.Borisov@arm.com>
- <1400680085-10430-2-git-send-email-Nikolay.Borisov@arm.com>
- <CAL_JsqKpgWBQ6qFrDHt13wqRx1afPeapEz5z16enUyUX1fgUJg@mail.gmail.com>
-Message-ID: <20140522090702.GA23478@leverpostej>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 22 May 2014 11:09:03 +0200
+Subject: [PATCH RESEND] mmc: dove: fix missing MACH_DOVE dependency
+In-Reply-To: <1400522571-10799-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1400522571-10799-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <CAPDyKFo8CdyDbJEP0GkFTHdzpkyRBZEp-jAyrU4y8qi__zChkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 21, 2014 at 10:27:33PM +0100, Rob Herring wrote:
-> On Wed, May 21, 2014 at 8:48 AM, Nikolay Borisov
-> <Nikolay.Borisov@arm.com> wrote:
-> > The current set of GIC compatible strings only contains specific
-> > implementations (e.g. arm,cortex-a9-gic) rather than revisions of the
-> > standard (e.g. arm,gic-v2), so each new implementation must either claim
-> > to be an extension of an existing implementation or have a new string
-> > added to the driver. This may be problematic when workarounds are
-> > required for bugs in particular implementations, as said workaround may
-> > end up targeting a wider set of implementations than intended.
-> >
-> > To prevent these issues, this patch adds compatible strings for the
-> > revisions of the GIC spec which all GIC implementations should be able
-> > to claim conformance to in addition to any particular implementation
-> > specific string, e.g.
-> 
-> This just encourages not having specific properties which then also
-> prevents being able to add work-arounds later. SOCs using the a9 or
-> a15 string ONLY that are not an a9 or a15 are wrong. That's what we
-> should fix. Adding more generic strings is not going to help that. Do
-> you have a specific work-around you need to implement?
+On 19 May 2014 20:02, Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com> wrote:
+> DT-enabled Dove moved over from ARCH_DOVE in mach-dove to MACH_DOVE in
+> mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
+> DT-only MACH_DOVE Kconfig. This slipped through the cracks and now is
+> a fix to allow to build Dove's SDHCI driver for mach-mvebu on v3.15-rc.
+>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-AFAIK, we don't have a specific workaround required anywhere that these
-strings would help with. It's just that generic GIC strings had been
-brought up repeatedly with no particular conclusion.
+Thanks! Picked up for the PR I send to Chris.
 
-If we simply ensure that new DTS that feature a GIC have
-implementation-specific strings in addition to those we already support
-(e.g. "arm,cortex-a9-gic"), then I'm fine with that.
+Kind regards
+Ulf Hansson
 
-> Given that the GIC specs are obviously meaningless since we now have
-> GICv2 with 16 core support as well as the special exynos gics, I'm not
-> inclined to accept this.
-
-Arguably neither are "true" GICv2, but your point stands.
-
-Cheers,
-Mark.
-
-> 
-> Rob
-> 
-> > compatible = "$VENDOR,specific-gic-variant", "arm,gic-v2";
-> >
-> > Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
-> > Acked-by: Mark Rutland <Mark.Rutland@arm.com>
-> > ---
-> >  drivers/irqchip/irq-gic.c | 2 ++
-> >  1 file changed, 2 insertions(+)
-> >
-> > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> > index 57d165e..89e9b05 100644
-> > --- a/drivers/irqchip/irq-gic.c
-> > +++ b/drivers/irqchip/irq-gic.c
-> > @@ -1073,6 +1073,8 @@ gic_of_init(struct device_node *node, struct device_node *parent)
-> >  }
-> >  IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
-> >  IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
-> > +IRQCHIP_DECLARE(gic_v1, "arm,gic-v1", gic_of_init);
-> > +IRQCHIP_DECLARE(gic_v2, "arm,gic-v2", gic_of_init);
-> >  IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
-> >  IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
-> >
-> > --
-> > 1.8.1.5
-> >
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> ---
+> Cc: Chris Ball <chris@printf.net>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: linux-mmc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/mmc/host/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> index 8aaf8c1f3f63..37665553ef33 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -168,7 +168,7 @@ config MMC_SDHCI_ESDHC_IMX
+>
+>  config MMC_SDHCI_DOVE
+>         tristate "SDHCI support on Marvell's Dove SoC"
+> -       depends on ARCH_DOVE
+> +       depends on ARCH_DOVE || MACH_DOVE
+>         depends on MMC_SDHCI_PLTFM
+>         select MMC_SDHCI_IO_ACCESSORS
+>         help
+> --
+> 1.9.1
+>
