@@ -1,28 +1,26 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 22 May 2014 18:39:19 +0100
-Subject: [PATCH v3 5/9] ASoC: simple-card: Support setting mclk via a
- fixed factor
-In-Reply-To: <1400772710-23523-1-git-send-email-andrew@lunn.ch>
-References: <20140520221359.GF12304@sirena.org.uk>
- <1400772710-23523-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20140522173919.GM12304@sirena.org.uk>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 22 May 2014 14:45:05 -0300
+Subject: [PATCH] ARM: dts: imx51-babbage: Add PMIC RTC support
+Message-ID: <1400780705-19305-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 05:31:49PM +0200, Andrew Lunn wrote:
-> Some platforms require that the codecs mclk is a fixed multiplication
-> factor of the audio stream rate. Add a optional property to the
-> binding to hold this factor and implement a hw_params() function to
-> make use of it.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx51-babbage.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-I'm missing the rest of this series - what's the context, are there any
-interdependencies?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140522/2621fcdd/attachment.sig>
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index 6bc3243..ee51a10 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -203,6 +203,7 @@
+ 		reg = <0>;
+ 		interrupt-parent = <&gpio1>;
+ 		interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
++		fsl,mc13xxx-uses-rtc;
+ 
+ 		regulators {
+ 			sw1_reg: sw1 {
+-- 
+1.8.3.2
