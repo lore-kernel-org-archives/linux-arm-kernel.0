@@ -1,37 +1,51 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 22 May 2014 21:10:13 +0200
-Subject: [PATCH v3 5/9] ASoC: simple-card: Support setting mclk via a
- fixed factor
-In-Reply-To: <20140522183054.GQ12304@sirena.org.uk>
-References: <20140520221359.GF12304@sirena.org.uk>
- <1400772710-23523-1-git-send-email-andrew@lunn.ch>
- <20140522173919.GM12304@sirena.org.uk>
- <20140522175206.GA24500@lunn.ch>
- <20140522183054.GQ12304@sirena.org.uk>
-Message-ID: <20140522191013.GC24500@lunn.ch>
+From: carlo@caione.org (Carlo Caione)
+Date: Thu, 22 May 2014 21:15:12 +0200
+Subject: [linux-sunxi] Re: [PATCH v6 0/7] mfd: AXP20x: Add support for
+ AXP202 and AXP209
+In-Reply-To: <20140521091456.GB6679@lee--X1>
+References: <1400528868-5971-1-git-send-email-carlo@caione.org>
+ <20140520222307.GK12304@sirena.org.uk>
+ <CAOQ7t2aBc5tFYk2MkfL9QqvFf5fcebwKtO97F3S=WdJ2uFE_jg@mail.gmail.com>
+ <20140521091456.GB6679@lee--X1>
+Message-ID: <CAOQ7t2bqeQ35WxXKCRgj1ijJic=2w8++9idip4-f_LnP6Ucb6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 07:30:54PM +0100, Mark Brown wrote:
-> On Thu, May 22, 2014 at 07:52:06PM +0200, Andrew Lunn wrote:
-> > On Thu, May 22, 2014 at 06:39:19PM +0100, Mark Brown wrote:
-> 
-> > > I'm missing the rest of this series - what's the context, are there any
-> > > interdependencies?
-> 
-> > I threaded the patch to your request to respin this patch:
-> 
-> > http://patchwork.ozlabs.org/patch/345353/
-> 
-> Ugh, no - don't do this.  It's just confusing.
+On Wed, May 21, 2014 at 11:14 AM, Lee Jones <lee.jones@linaro.org> wrote:
+>> >> This set of patches introduces the core driver and support for two different
+>> >> subsystems:
+>> >>       - Regulators
+>> >
+>> >>  .../ABI/testing/sysfs-driver-input-axp-pek         |  11 +
+>> >>  Documentation/devicetree/bindings/mfd/axp20x.txt   |  93 +++++++
+>> >>  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+>> >>  arch/arm/configs/multi_v7_defconfig                |   3 +
+>> >>  arch/arm/configs/sunxi_defconfig                   |   4 +
+>> >>  drivers/input/misc/Kconfig                         |  11 +
+>> >>  drivers/input/misc/Makefile                        |   1 +
+>> >>  drivers/input/misc/axp20x-pek.c                    | 281 +++++++++++++++++++++
+>> >>  drivers/mfd/Kconfig                                |  12 +
+>> >>  drivers/mfd/Makefile                               |   1 +
+>> >>  drivers/mfd/axp20x.c                               | 258 +++++++++++++++++++
+>> >>  include/linux/mfd/axp20x.h                         | 180 +++++++++++++
+>> >>  12 files changed, 856 insertions(+)
+>> >
+>> > The regulator changes don't appear to be showing up in the diffstat or
+>> > obviously in the series?
+>>
+>> Right. Cut-and-paste error.
+>> You have already applied the regulator patches so I didn't include
+>> them here (in theory I posted this series to be picked up by Lee).
+>
+> That's fine.  Just tell me which patches need to stay together and
+> which are able to be applied through their respective subsystem trees
+> separately.  Then, once I have all the Acks I can apply no problem.
 
-O.K, i will try to remember this as your way of doing things, when
-submitting to you. The usb-serial maintainer does want replies
-threading to his messages, etc. Takes a while to learn each
-maintainers ways.
+Hi Lee,
+I'd say #1 for the MFD tree, #4 for the input subsystem, #2 #3 and #5
+are documentations, #6 and #7 defconfigs add-on.
 
-What you failed to say is if they will accept this one patch as is, or
-if you want me to post a v4 containing all the patches?
+Thanks,
 
-Thanks
-	Andrew
+-- 
+Carlo Caione
