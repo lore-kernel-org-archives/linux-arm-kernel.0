@@ -1,94 +1,25 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 22 May 2014 23:20:55 +0800
-Subject: [PATCH] pinctrl: sunxi: fix pin numbers passed to register offset
- helpers
-Message-ID: <1400772055-3852-1-git-send-email-wens@csie.org>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Thu, 22 May 2014 08:25:10 -0700
+Subject: [PATCH v2 1/3] mmc: tegra: disable UHS modes
+In-Reply-To: <CAPDyKFqq-kjQoMiyKApDuTR+Fc-8WOuqXHFcgwgZNkg4Mm4Z=Q@mail.gmail.com>
+References: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
+ <1397689719-28882-1-git-send-email-abrestic@chromium.org>
+ <1397689719-28882-2-git-send-email-abrestic@chromium.org>
+ <537B9022.20709@wwwdotorg.org> <86egzormf5.fsf@void.printf.net>
+ <CAPDyKFqq-kjQoMiyKApDuTR+Fc-8WOuqXHFcgwgZNkg4Mm4Z=Q@mail.gmail.com>
+Message-ID: <CAL1qeaH94cb+zYzUoCcM4+cNaFsPDEtK-xomE0QVw3gRP1jy6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pin numbers passed to sunxi_*_reg helpers to get the correct
-registers should be the pin offset for the PIO block, not the
-absolute number we use that is based on the alphanumeric labels
-Allwinner uses.
+> Hi Stephen/Andrew,
+>
+> I tried to include the v2 of patch1 and patch2 in PR I just sent to
+> Chris - but needed to omit them due to conflicts.
+>
+> Could you please re-base them on top of my PR and resend them? I
+> suppose Chris can take them separately once he pulled my PR.
 
-This patch subtracts .pin_base from the pin number passed to these
-functions, so the driver accesses the correct registers.
+Will do.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
-
-Hi,
-
-This patch fixes the pinctrl driver failing to set pinmuxes for the R_PIO
-block found on the A31 and A23. The problem was found while working on
-bringing up the A23 SoC. The R_UART pins weren't properly muxed when
-the bootloader didn't use them.
-
-A thank you to Boris who also verified the issue.
-
-
-Cheers,
-ChenYu
-
----
- drivers/pinctrl/sunxi/pinctrl-sunxi.c | 26 ++++++++++++++------------
- 1 file changed, 14 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-index f6522b5..59962fa 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-@@ -280,6 +280,7 @@ static int sunxi_pconf_group_set(struct pinctrl_dev *pctldev,
- 	struct sunxi_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
- 	struct sunxi_pinctrl_group *g = &pctl->groups[group];
- 	unsigned long flags;
-+	unsigned pin = g->pin - pctl->desc->pin_base;
- 	u32 val, mask;
- 	u16 strength;
- 	u8 dlevel;
-@@ -303,23 +304,23 @@ static int sunxi_pconf_group_set(struct pinctrl_dev *pctldev,
- 			 *   3: 40mA
- 			 */
- 			dlevel = strength / 10 - 1;
--			val = readl(pctl->membase + sunxi_dlevel_reg(g->pin));
--			mask = DLEVEL_PINS_MASK << sunxi_dlevel_offset(g->pin);
-+			val = readl(pctl->membase + sunxi_dlevel_reg(pin));
-+			mask = DLEVEL_PINS_MASK << sunxi_dlevel_offset(pin);
- 			writel((val & ~mask)
--				| dlevel << sunxi_dlevel_offset(g->pin),
--				pctl->membase + sunxi_dlevel_reg(g->pin));
-+				| dlevel << sunxi_dlevel_offset(pin),
-+				pctl->membase + sunxi_dlevel_reg(pin));
- 			break;
- 		case PIN_CONFIG_BIAS_PULL_UP:
--			val = readl(pctl->membase + sunxi_pull_reg(g->pin));
--			mask = PULL_PINS_MASK << sunxi_pull_offset(g->pin);
--			writel((val & ~mask) | 1 << sunxi_pull_offset(g->pin),
--				pctl->membase + sunxi_pull_reg(g->pin));
-+			val = readl(pctl->membase + sunxi_pull_reg(pin));
-+			mask = PULL_PINS_MASK << sunxi_pull_offset(pin);
-+			writel((val & ~mask) | 1 << sunxi_pull_offset(pin),
-+				pctl->membase + sunxi_pull_reg(pin));
- 			break;
- 		case PIN_CONFIG_BIAS_PULL_DOWN:
--			val = readl(pctl->membase + sunxi_pull_reg(g->pin));
--			mask = PULL_PINS_MASK << sunxi_pull_offset(g->pin);
--			writel((val & ~mask) | 2 << sunxi_pull_offset(g->pin),
--				pctl->membase + sunxi_pull_reg(g->pin));
-+			val = readl(pctl->membase + sunxi_pull_reg(pin));
-+			mask = PULL_PINS_MASK << sunxi_pull_offset(pin);
-+			writel((val & ~mask) | 2 << sunxi_pull_offset(pin),
-+				pctl->membase + sunxi_pull_reg(pin));
- 			break;
- 		default:
- 			break;
-@@ -376,6 +377,7 @@ static void sunxi_pmx_set(struct pinctrl_dev *pctldev,
- 
- 	spin_lock_irqsave(&pctl->lock, flags);
- 
-+	pin -= pctl->desc->pin_base;
- 	val = readl(pctl->membase + sunxi_mux_reg(pin));
- 	mask = MUX_PINS_MASK << sunxi_mux_offset(pin);
- 	writel((val & ~mask) | config << sunxi_mux_offset(pin),
--- 
-2.0.0.rc2
+Thanks,
+Andrew
