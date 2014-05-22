@@ -1,33 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 May 2014 00:35:49 +0200
-Subject: [PATCH v2] pinctrl: sunxi: Fix recursive dependency
-In-Reply-To: <1400770032-8774-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1400770032-8774-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CACRpkdZ2x_zvZ13kp7oJMd5D5dYcBR03hkR9oCC879-Bk+AZgA@mail.gmail.com>
+Date: Fri, 23 May 2014 00:27:55 +0200
+Subject: [PATCH v2] mfd: abx500-core: Remove unused function
+ abx500_dump_all_banks()
+In-Reply-To: <20140522113010.GT6679@lee--X1>
+References: <1400750311-15323-1-git-send-email-lee.jones@linaro.org>
+ <20140522113010.GT6679@lee--X1>
+Message-ID: <CACRpkdYLDt4nyJsMSuMLpa-4JBoGnRFAdcjzDu+km1Yv_qZkeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 4:47 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+On Thu, May 22, 2014 at 1:30 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> Fix the following configuration error:
-> drivers/pinctrl/sunxi/Kconfig:3:error: recursive dependency detected!
-> drivers/pinctrl/sunxi/Kconfig:3:        symbol PINCTRL_SUNXI is selected by PINCTRL_SUN4I_A10
-> drivers/pinctrl/sunxi/Kconfig:9:        symbol PINCTRL_SUN4I_A10 default value contains PINCTRL_SUNXI
+> abx500_dump_all_banks() has no callers in the kernel, so it's probably
+> safe to remove it.
 >
-> Add a new intermedia PINCTRL_SUNXI_COMMON, that superseeds the PINCTRL_SUNXI
-> one.
->
-> We still need to keep PINCTRL_SUNXI at the moment in order to preserve
-> bisectability. Indeed, during that merge window, we also introduced the
-> MACH_SUN* symbols. Since it's going through different trees, we can't rely on
-> the fact that the options will be there, while ARCH_SUNXI still select
-> PINCTRL_SUNXI.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Or bah, I just applied this then.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
