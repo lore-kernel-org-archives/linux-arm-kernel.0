@@ -1,56 +1,41 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 22 May 2014 10:02:01 -0400
-Subject: [Patch v5 0/7] Introduce keystone reset driver
-In-Reply-To: <5069120.YZWxxyxdrl@wuerfel>
-References: <1400766516-14537-1-git-send-email-ivan.khoronzhuk@ti.com>
- <537E011B.9090902@ti.com> <5069120.YZWxxyxdrl@wuerfel>
-Message-ID: <537E0359.10300@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 22 May 2014 10:08:38 -0400
+Subject: [PATCH v6 10/17] ARM: mvebu: add USB3 support for Armada 38x
+In-Reply-To: <537CAFD2.3080807@free-electrons.com>
+References: <1400149062-32661-1-git-send-email-gregory.clement@free-electrons.com>
+ <1400149062-32661-11-git-send-email-gregory.clement@free-electrons.com>
+ <20140516190729.GN27822@titan.lakedaemon.net>
+ <1400497768.2007.10.camel@x220>
+ <537CAFD2.3080807@free-electrons.com>
+Message-ID: <20140522140838.GM8664@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
-
-On Thursday 22 May 2014 09:54 AM, Arnd Bergmann wrote:
-> On Thursday 22 May 2014 09:52:27 Santosh Shilimkar wrote:
->> On Thursday 22 May 2014 09:48 AM, Ivan Khoronzhuk wrote:
->>> These patches introduce keystone reset driver.
->>>
->>> The keystone SoC can be rebooted in several ways. By external reset
->>> pin, by soft and by watchdogs. This driver allows software reset and reset
->>> by one of the watchdogs. Also added opportunity to set soft/hard reset type.
->>>
->>> Based on linux-next/master
->>>
->>> v5..v4
->>>   power: reset: keystone-reset: introduce keystone reset driver
->>>       - changed to get rsmux and rspll offsets from DT
->>>   clock: keystone-pllctrl: add bindings for keystone pll controller
->>>       - new patch
->>>   mfd: ti-keystone-devctrl: add bindings for device state control
->>>       - new patch
->>>   power: reset: add bindings for keystone reset driver
->>>       - corrected description of "ti,syscon-pll", "ti,syscon-dev" properties
->>>       - corrected examples
->>>   ARM: dts: keystone: update reset node to work with reset driver
->>>       - added nodes for pll-controller and device-state-controll
->>>       - added offsets to "ti,syscon-pll", "ti,syscon-dev" properties
->>>
->> Looks like you haven't collected Arnd's Reviewed-by tag on the patches.
->> Can be added later as well while applying.
->>
->>
+On Wed, May 21, 2014 at 03:53:22PM +0200, Gregory CLEMENT wrote:
+> On 19/05/2014 13:09, Paul Bolle wrote:
+> > On Fri, 2014-05-16 at 15:07 -0400, Jason Cooper wrote:
+> >> On Thu, May 15, 2014 at 12:17:35PM +0200, Gregory CLEMENT wrote:
+> >>> This patch adds the selection of the config symbol needed to build the
+> >>> USB3 support for Armada 38x into mvebu_v7_defconfig.
+> >>>
+> >>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> >>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> >>> ---
+> >>>  arch/arm/mach-mvebu/Kconfig | 1 +
+> >>>  1 file changed, 1 insertion(+)
+> >>
+> >> Patches 10 and 11 applied to mvebu/soc
+> > 
+> > These two just hit linux-next (in next-20140519). They're pointless, as
+> > config USB_ARCH_HAS_XHCI was dropped in commit b797b76fb464 ("usb: host:
+> > remove USB_ARCH_HAS_?HCI").
 > 
-> I was going to comment the same. Anyway here you have it for the remaining
-> patches:
+> Right! We didn't notice it.
 > 
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> 
-Thanks. Can we take this driver via arm-soc tree ? I asked the question on previous
-thread to drivers/reset/* folks whether they are ok to take the series via arm-soc
-or prefer to split the series. No responses so far.
+> Jason you can simply remove them from mvebu/soc when you will submit the pull request
 
-If possible I would like get this driver in current merge window since it ready now.
-It has been on the list for almost 3 merge windows including the upcoming.
+Now dropped from mvebu/soc.
 
-Regards,
-Snatosh
+thx,
+
+Jason.
