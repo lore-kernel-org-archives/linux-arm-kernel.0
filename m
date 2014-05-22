@@ -1,53 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 May 2014 22:25:23 +0200
-Subject: [PATCH v2] ARM: realview: basic device tree implementation
-In-Reply-To: <alpine.LFD.2.11.1405221431370.17310@knanqh.ubzr>
-References: <1399586896-16906-1-git-send-email-linus.walleij@linaro.org>
- <5233065.1vXjHiDqN2@wuerfel>
- <alpine.LFD.2.11.1405221431370.17310@knanqh.ubzr>
-Message-ID: <7651671.1Wa4i4TJsu@wuerfel>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 22 May 2014 16:29:19 -0400
+Subject: [PATCH v4 2/2] arm64: enable context tracking
+In-Reply-To: <1400786855-32656-3-git-send-email-larry.bassel@linaro.org>
+References: <1400786855-32656-1-git-send-email-larry.bassel@linaro.org>
+ <1400786855-32656-3-git-send-email-larry.bassel@linaro.org>
+Message-ID: <537E5E1F.3050605@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 May 2014 14:39:20 Nicolas Pitre wrote:
-> On Thu, 22 May 2014, Arnd Bergmann wrote:
-> 
-> > On Thursday 22 May 2014 14:09:52 Nicolas Pitre wrote:
-> > > On Thu, 22 May 2014, Arnd Bergmann wrote:
-> > > 
-> > > > On Thursday 22 May 2014 15:45:03 Catalin Marinas wrote:
-> > > > > By making the DMA memory Strongly Ordered, we avoid the
-> > > > > L220 write buffer. In addition to the above commit, we also had
-> > > > > 2503a5ecd86c (ARM: 6201/1: RealView: Do not use outer_sync() on
-> > > > > ARM11MPCore boards with L220).
-> > > > 
-> > > > Ah, so this also stands in the way of multiplatform realview 
-> > > 
-> > > Isn't the real value of a multiplatform realview in the ability to use 
-> > > it with Qemu?  Did Qemu go to the extreme of emulating all those cache 
-> > > issues?
-> > 
-> > The qemu developers have in the past always argued strongly that they
-> > want to run the same kernel that runs on real hardware. Having a kernel
-> > that runs only on the emulated version but not on actual hardware is
-> > clearly against that goal, and  we should use CONFIG_ARCH_VIRT for
-> > that purpose.
-> 
-> But the kernel that actually runs on the real hardware also runs on Qemu 
-> already.  It is just that, by some coincidence, a multi-platform kernel 
-> that pretends to have the same peripherals as a Realview board could 
-> also be used on Qemu.
-> 
-> Otherwise I really don't see the point in making the code more complex 
-> just to make a multi-platform kernel run on actual Realview hardware 
-> that is quite obsolete now and that very few people have access to.
+Hi Larry,
 
-The main reason is that out of principle I want to get to the point where
-every ARMv6 and ARMv7 machine is part of CONFIG_ARCH_MULTIPLATFORM.
+On 05/22/2014 03:27 PM, Larry Bassel wrote:
+> Make calls to ct_user_enter when the kernel is exited
+> and ct_user_exit when the kernel is entered (in el0_da,
+> el0_ia, el0_svc, el0_irq and all of the "error" paths).
+> 
+> These macros expand to function calls which will only work
+> properly if el0_sync and related code has been rearranged
+> (in a previous patch of this series).
+> 
+> The calls to ct_user_exit are made after hw debugging has been
+> enabled (enable_dbg_and_irq).
+> 
+> The call to ct_user_enter is made at the beginning of the
+> kernel_exit macro.
+> 
+> This patch is based on earlier work by Kevin Hilman.
+> Save/restore optimizations were also done by Kevin.
 
-Then again, once we introduce CONFIG_BROKEN_MULTIPLATFORM, we could
-have an option that depends on that, and turns on both
-ARM_DMA_MEM_BUFFERABLE as well as the hack to remove the outer_sync
-from mb() and wmb() for CONFIG_SMP.
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -30,6 +30,44 @@
+>  #include <asm/unistd32.h>
+>  
+>  /*
+> + * Context tracking subsystem.  Used to instrument transitions
+> + * between user and kernel mode.
+> + */
+> +	.macro ct_user_exit, restore = 0
+> +#ifdef CONFIG_CONTEXT_TRACKING
+> +	bl	context_tracking_user_exit
+> +	.if \restore == 1
+> +	/*
+> +	 * Save/restore needed during syscalls.  Restore syscall arguments from
+> +	 * the values already saved on stack during kernel_entry.
+> +	 */
+> +	ldp	x0, x1, [sp]
+> +	ldp	x2, x3, [sp, #S_X2]
+> +	ldp	x4, x5, [sp, #S_X4]
+> +	ldp	x6, x7, [sp, #S_X6]
+> +	.endif
+> +#endif
+> +	.endm
+> +
+> +	.macro ct_user_enter, save = 0
+> +#ifdef CONFIG_CONTEXT_TRACKING
+> +	.if \save == 1
+> +	/*
+> +	 * Save/restore only needed on syscall fastpath, which uses
+> +	 * x0-x2.
+> +	 */
+> +	push    x2, x3
 
-	Arnd
+Why is x3 saved?
+
+> +	push    x0, x1
+> +	.endif
+> +	bl	context_tracking_user_enter
+> +	.if \save == 1
+> +	pop     x0, x1
+> +	pop     x2, x3
+> +	.endif
+> +#endif
+> +	.endm
+
+Thanks,
+Christopher
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
