@@ -1,54 +1,27 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Thu, 22 May 2014 16:59:45 +0800
-Subject: RCU stall on panda
-In-Reply-To: <537614AF.50100@ti.com>
-References: <53675C5F.10509@linaro.org>
- <20140505180617.GM8754@linux.vnet.ibm.com>
- <20140512212102.GF5668@atomide.com> <5371BD69.8010600@linaro.org>
- <20140513153220.GC16837@atomide.com> <53747E6D.60500@linaro.org>
- <53748371.5030704@linaro.org> <5374C07C.1070400@linaro.org>
- <20140515183247.GF23659@atomide.com> <5375091D.3010607@ti.com>
- <5375C145.6070904@linaro.org> <537614AF.50100@ti.com>
-Message-ID: <537DBC81.2090809@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 22 May 2014 10:04:47 +0100
+Subject: CLONE from pthread_create fails with ERESTARTNOINTR and
+ application crashes
+In-Reply-To: <CAGJAg9EHSgOg3trryA5Zb5ms8pfTX6Y7DF4s-mEP6YZmD8twVw@mail.gmail.com>
+References: <CAGJAg9EHSgOg3trryA5Zb5ms8pfTX6Y7DF4s-mEP6YZmD8twVw@mail.gmail.com>
+Message-ID: <20140522090447.GA14641@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2014 09:37 PM, Santosh Shilimkar wrote:
-> On Friday 16 May 2014 03:41 AM, Alex Shi wrote:
->> On 05/16/2014 02:36 AM, Santosh Shilimkar wrote:
->>>>>>> yes.
->>>>>>> My board is panda ES. without this revert, it works.
->>>>>
->>>>> Care to specify what linux version you are testing against?
->>>>>
->>>>> Does it hang in idle always immediately on booting?
->>>>>
->>>>> Or does the serial console first hang with sysrq still
->>>>> working (ctrl-a h in minicom for help) with device
->>>>> eventually locking up hard?
->>>>>
->>> I just posted an updated patch Alex on other thread.
->>> Attaching here again for your reference. Please try
->>> it out and see if the you still get a hang.
->>
->> it does not hang this time.
->>
-> This is good news and exactly what I expected.
->  
->> but I am not sure it can solve my problem, since RCU stall is not easy
->> to reproduce in short time.
->>
-> You may want to run the system longer if you can. I suspect the RCU stall
-> was also side effect of missing interrupts.
+On Wed, May 21, 2014 at 02:40:16PM +0100, Raghu Pv wrote:
+> CLONE from pthread_create fails with ERESTARTNOINTR and application crashes
 
-Sure. it do remove the RCU stall on my panda board.
+[...]
 
-> 
-> Regards,
-> Santosh
-> 
+> Executing a multithreaded application that creates and terminates
+> threads and also there a lot of signals
 
+Do you have sample source for that?
 
--- 
-Thanks
-    Alex
+> If a signal arrives during execution of clone(), clone is returning
+> ERESTARTNOINTR to userspace.
+
+With which kernel version? Your quote from fork.c doesn't match mainline.
+Can you reproduce with -rc6?
+
+Will
