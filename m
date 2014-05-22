@@ -1,96 +1,66 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 22 May 2014 16:47:12 +0200
-Subject: [PATCH v2] pinctrl: sunxi: Fix recursive dependency
-Message-ID: <1400770032-8774-1-git-send-email-maxime.ripard@free-electrons.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Thu, 22 May 2014 09:50:53 -0500
+Subject: [PATCH v2] ARM: socfpga: dts: add watchdog0+1
+In-Reply-To: <20140522143950.GL949@pengutronix.de>
+References: <1400763964-19369-1-git-send-email-s.trumtrar@pengutronix.de>
+ <537E0B27.70305@gmail.com> <20140522143950.GL949@pengutronix.de>
+Message-ID: <537E0ECD.9090408@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following configuration error:
-drivers/pinctrl/sunxi/Kconfig:3:error: recursive dependency detected!
-drivers/pinctrl/sunxi/Kconfig:3:	symbol PINCTRL_SUNXI is selected by PINCTRL_SUN4I_A10
-drivers/pinctrl/sunxi/Kconfig:9:	symbol PINCTRL_SUN4I_A10 default value contains PINCTRL_SUNXI
 
-Add a new intermedia PINCTRL_SUNXI_COMMON, that superseeds the PINCTRL_SUNXI
-one.
+On 5/22/14 9:39 AM, Steffen Trumtrar wrote:
+> Hi Dinh!
+>
+> On Thu, May 22, 2014 at 09:35:19AM -0500, Dinh Nguyen wrote:
+>> Hi Steffen,
+>>
+>> On 5/22/14 8:06 AM, Steffen Trumtrar wrote:
+>>> The SoCFPGA has two watchdog timers. Add them to the dtsi.
+>>>
+>>> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>>> ---
+>>>  arch/arm/boot/dts/socfpga.dtsi | 16 ++++++++++++++++
+>>>  1 file changed, 16 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+>>> index 56fc214..7bcd458 100644
+>>> --- a/arch/arm/boot/dts/socfpga.dtsi
+>>> +++ b/arch/arm/boot/dts/socfpga.dtsi
+>>> @@ -549,6 +549,22 @@
+>>>  			reg = <0xffd05000 0x1000>;
+>>>  		};
+>>>  
+>>> +		watchdog0: watchdog at ffd02000 {
+>>> +			compatible = "snps,dw-wdt";
+>>> +			reg = <0xffd02000 0x1000>;
+>>> +			interrupts = <0 171 0>;
+>> This should be IRQ_TYPE_LEVEL_HIGH.
+>>> +			clocks = <&osc1>;
+>>> +			status = "disabled";
+>>> +		};
+>>> +
+>>> +		watchdog1: watchdog at ffd03000 {
+>>> +			compatible = "snps,dw-wdt";
+>>> +			reg = <0xffd03000 0x1000>;
+>>> +			interrupts = <0 172 0>;
+>> Same here..
+>>> +			clocks = <&osc1>;
+>>> +			status = "disabled";
+>>> +		};
+>>> +
+>>>  		sysmgr: sysmgr at ffd08000 {
+>>>  			compatible = "altr,sys-mgr", "syscon";
+>>>  			reg = <0xffd08000 0x4000>;
+> I wasn't aware that we started using the IRQ defines, but...
+You added the support to be able to do that ;). But what I really meant was
+you had the IRQ type set to 0(IRQ_TYPE_NONE), but it should be 4.
 
-We still need to keep PINCTRL_SUNXI at the moment in order to preserve
-bisectability. Indeed, during that merge window, we also introduced the
-MACH_SUN* symbols. Since it's going through different trees, we can't rely on
-the fact that the options will be there, while ARCH_SUNXI still select
-PINCTRL_SUNXI.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/pinctrl/sunxi/Kconfig  | 27 +++++++++++++++------------
- drivers/pinctrl/sunxi/Makefile |  2 +-
- 2 files changed, 16 insertions(+), 13 deletions(-)
-
-Changes from v1:
-  - introduce PINCTRL_SUNXI_COMMON in order to ease the cleanup once everything
-    will be merged.
-
-diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
-index 2007327e0c48..da1e83035789 100644
---- a/drivers/pinctrl/sunxi/Kconfig
-+++ b/drivers/pinctrl/sunxi/Kconfig
-@@ -2,31 +2,34 @@ if ARCH_SUNXI
- 
- config PINCTRL_SUNXI
- 	bool
-+
-+config PINCTRL_SUNXI_COMMON
-+	bool
- 	select PINMUX
- 	select GENERIC_PINCONF
- 
- config PINCTRL_SUN4I_A10
--       def_bool PINCTRL_SUNXI || MACH_SUN4I
--       select PINCTRL_SUNXI
-+	def_bool PINCTRL_SUNXI || MACH_SUN4I
-+	select PINCTRL_SUNXI_COMMON
- 
- config PINCTRL_SUN5I_A10S
--       def_bool PINCTRL_SUNXI || MACH_SUN5I
--       select PINCTRL_SUNXI
-+	def_bool PINCTRL_SUNXI || MACH_SUN5I
-+	select PINCTRL_SUNXI_COMMON
- 
- config PINCTRL_SUN5I_A13
--       def_bool PINCTRL_SUNXI || MACH_SUN5I
--       select PINCTRL_SUNXI
-+	def_bool PINCTRL_SUNXI || MACH_SUN5I
-+	select PINCTRL_SUNXI_COMMON
- 
- config PINCTRL_SUN6I_A31
--       def_bool PINCTRL_SUNXI || MACH_SUN6I
--       select PINCTRL_SUNXI
-+	def_bool PINCTRL_SUNXI || MACH_SUN6I
-+	select PINCTRL_SUNXI_COMMON
- 
- config PINCTRL_SUN6I_A31_R
--       def_bool PINCTRL_SUNXI || MACH_SUN6I
--       select PINCTRL_SUNXI
-+	def_bool PINCTRL_SUNXI || MACH_SUN6I
-+	select PINCTRL_SUNXI_COMMON
- 
- config PINCTRL_SUN7I_A20
--       def_bool PINCTRL_SUNXI || MACH_SUN7I
--       select PINCTRL_SUNXI
-+	def_bool PINCTRL_SUNXI || MACH_SUN7I
-+	select PINCTRL_SUNXI_COMMON
- 
- endif
-diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
-index 8e23a15e695d..0f4461cbe11d 100644
---- a/drivers/pinctrl/sunxi/Makefile
-+++ b/drivers/pinctrl/sunxi/Makefile
-@@ -1,5 +1,5 @@
- # Core
--obj-$(CONFIG_PINCTRL_SUNXI)	+= pinctrl-sunxi.o
-+obj-$(CONFIG_PINCTRL_SUNXI_COMMON)	+= pinctrl-sunxi.o
- 
- # SoC Drivers
- obj-$(CONFIG_PINCTRL_SUN4I_A10)		+= pinctrl-sun4i-a10.o
--- 
-1.9.3
+Dinh
+>
+>> No need to resend a patch, I'll apply with those changes.
+>>
+> ...great. Thanks.
+>
+> Steffen
+>
