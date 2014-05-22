@@ -1,59 +1,52 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 22 May 2014 11:31:16 -0400
-Subject: [GIT PULL] ARM: mvebu: fixes for v3.15 (incr. #2)
-Message-ID: <20140522153116.GR8664@titan.lakedaemon.net>
+From: agross@codeaurora.org (Andy Gross)
+Date: Thu, 22 May 2014 10:32:14 -0500
+Subject: [PATCH] dmaengine: qcom_bam_dma: Add descriptor flag APIs
+In-Reply-To: <537E1749.1030505@linaro.org>
+References: <1397772242-4048-1-git-send-email-agross@codeaurora.org>
+ <20140502162841.GZ32284@intel.com>
+ <20140502180827.GA9476@qualcomm.com>
+ <20140515173206.GA16858@qualcomm.com>
+ <20140522061049.GW21128@intel.com>
+ <20140522150906.GA22327@qualcomm.com> <537E1749.1030505@linaro.org>
+Message-ID: <20140522153214.GB22327@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+On Thu, May 22, 2014 at 04:27:05PM +0100, Srinivas Kandagatla wrote:
 
-In the interest of reducing the number of pull requests, I've merged
-mvebu/dt-fixes into mvebu/fixes.  The amount of fixes added since the
-last pull request for each was minimal and is reflected below.
+<snip>
 
-The mvebu-soc-id changes have been in -next for a while, and as usual,
-this is an incremental pull request from tags/mvebu-fixes-3.15 to
-tags/mvebu-fixes-3.15-2 in the mvebu/fixes branch.
+> >
+> >The EOT is not used for every transaction.  It is part of a handshaking
+> >protocol with the attached peripheral, much like the NWD (notify when done).  As
+> >near as I can tell today, no peripheral depends on the EOB, so we could drop it
+> >for now until it is needed and cross this bridge when we need to.
+> 
+> As EOT behaviour is totally dependent on the attached peripheral(or
+> channel), Can't we make this specific to channel by passing
+> additional flags in the DT dma channel descriptors? This will be
+> better abstraction for drivers as well.
 
-Please pull.
+Even for channels where you want to use EOT, you don't use it for every
+transaction.  So a global channel flag isn't going to work.  This is the same
+for NWD.  It is a per descriptor choice.
 
-thx,
+> 
+> I know that EOT flag is part of descriptor but still some channels
+> *must* have EOT to run there state-machine correctly. So making it
+> optional for those channels might be wrong.
+> 
+> Are there any use cases for particular *channel* where EOT
+> requirement changes dynamically?
 
-Jason.
+I2C is one example.  You place EOT on the last transaction that makes up a
+write/read transaction.  You may have multiple descriptors to send data, but the
+last one has EOT.  And for read transactions, you place NWD on the last read
+transaction.
 
+<snip>
 
-The following changes since commit 1cc9d48145b81e307fab94a5cf6ee66ec2f0de60:
-
-  ARM: orion5x: fix target ID for crypto SRAM window (2014-04-17 04:52:26 +0000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.15-2
-
-for you to fetch changes up to d903bc9ee9b67410d02923d98a8dd4ecf5a1bc69:
-
-  Merge branch 'mvebu/dt-fixes' into mvebu/fixes (2014-05-22 15:16:37 +0000)
-
-----------------------------------------------------------------
-
-mvebu fixes for v3.15 (incremental #2)
-
- - Armada 38x
-    - fix PCIe dt nodes for handling more interfaces
-
- - mvebu
-    - mvebu-soc-id: fix clock handling and PCIe interface disabling.
-
-----------------------------------------------------------------
-Jason Cooper (1):
-      Merge branch 'mvebu/dt-fixes' into mvebu/fixes
-
-Thomas Petazzoni (3):
-      ARM: mvebu: mvebu-soc-id: add missing clk_put() call
-      ARM: mvebu: mvebu-soc-id: keep clock enabled if PCIe unit is enabled
-      ARM: mvebu: fix definitions of PCIe interfaces on Armada 38x
-
- arch/arm/boot/dts/armada-380.dtsi                |  2 +-
- arch/arm/boot/dts/armada-385.dtsi                |  4 ++--
- arch/arm/mach-mvebu/mvebu-soc-id.c               | 13 ++++++++++++-
- 11 files changed, 48 insertions(+), 32 deletions(-)
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
