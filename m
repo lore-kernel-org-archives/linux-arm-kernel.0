@@ -1,59 +1,35 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 22 May 2014 16:17:38 +0200
-Subject: [PATCH 0/4] ARM: mvebu: Minor fixes and improvements to
- coherency_ll.S
-In-Reply-To: <1400762882-10116-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1400762882-10116-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <537E0702.7000102@free-electrons.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 22 May 2014 10:20:48 -0400
+Subject: [PATCH] ARM: mvebu: coherency: fix registration of PCI bus
+ notifier when !PCI
+In-Reply-To: <1400598783-706-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1400598783-706-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140522142048.GO8664@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On 22/05/2014 14:47, Thomas Petazzoni wrote:
-> Jason, Andrew, Gregory, Sebastian,
+On Tue, May 20, 2014 at 05:13:03PM +0200, Thomas Petazzoni wrote:
+> Commit b0063aad5dd8 ("ARM: mvebu: use hardware I/O coherency also for
+> PCI devices") added a reference to the pci_bus_type variable, but this
+> variable is only available when CONFIG_PCI is enabled. Therefore,
+> there is now a build failure in !CONFIG_PCI situations.
 > 
-> Here is a small set of patches making fixes and improvements to the
-> coherency_ll.S code.
+> This commit fixes that by enclosing the entire initcall into a
+> IS_ENABLED(CONFIG_PCI) condition.
 > 
-> The first patch is really important and fixes big endian booting in
-> -next. The regression was introduced by the cpuidle changes, which are
-> currently in -next.
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+> This applies on top of mvebu/soc. No need to push for 3.15-rc, the
+> patch being fixed is only for 3.16.
 > 
-> The other three patches are only improvements, mainly cosmetic, but I
-> believe they clarify a few things that took me a bit of time to
-> re-understand this morning.
-> 
-> The patches are based on top of mvebu/soc.
-> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/coherency.c | 2 ++
+>  1 file changed, 2 insertions(+)
 
-for the whole series:
+Applied to mvebu/soc
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+thx,
 
-
-Thanks,
-
-Gregory
-
-
-> Thanks,
-> 
-> Thomas
-> 
-> Thomas Petazzoni (4):
->   ARM: mvebu: fix big endian booting after coherency code rework
->   ARM: mvebu: fix indentation of assembly instructions in coherency_ll.S
->   ARM: mvebu: improve comments in coherency_ll.S
->   ARM: mvebu: returns ll_get_cpuid() to ll_get_coherency_cpumask()
-> 
->  arch/arm/mach-mvebu/coherency_ll.S | 77 ++++++++++++++++++++++++--------------
->  1 file changed, 49 insertions(+), 28 deletions(-)
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jason.
