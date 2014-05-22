@@ -1,88 +1,53 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 23 May 2014 00:34:43 +0200
-Subject: [PATCH v2] ARM: realview: basic device tree implementation
-In-Reply-To: <CACRpkdb8c=k3Ky=TisNdzycc3owJsNSQmSTu03RR5E0QvE0KZA@mail.gmail.com>
-References: <1399586896-16906-1-git-send-email-linus.walleij@linaro.org>
- <201405091244.02066.arnd@arndb.de>
- <CACRpkdb8c=k3Ky=TisNdzycc3owJsNSQmSTu03RR5E0QvE0KZA@mail.gmail.com>
-Message-ID: <537E7B83.4020900@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 22 May 2014 23:56:23 +0200
+Subject: [PATCH v3 6/7] Documentation: add the Marvell Berlin pinctrl
+ documentation
+In-Reply-To: <20140516164751.GA8406@kwain>
+References: <1399267649-20218-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1399267649-20218-7-git-send-email-antoine.tenart@free-electrons.com>
+ <CACRpkdaL9tzfUrY=wLjSR3dcD7JC1mUX3kdG+Wh5gDyxGY2Yqw@mail.gmail.com>
+ <20140516164751.GA8406@kwain>
+Message-ID: <CACRpkdbJvasUR2+gvLSCF=grgkofs-BaOFEzK1pE212LvVj1tA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2014 09:41 AM, Linus Walleij wrote:
-> On Fri, May 9, 2014 at 12:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> +++ b/arch/arm/boot/dts/arm-realview-pb1176.dts
+On Fri, May 16, 2014 at 6:47 PM, Antoine T?nart
+<antoine.tenart@free-electrons.com> wrote:
+> Linus,
+
+>> > +sm_pinctrl: pin-controller at 0 {
+>> > +       compatible = "marvell,berlin2q-sysmgr-pinctrl";
+>> > +       reg = <0xfc0000 0x44>;
+>> > +
+>> > +       uart0_pmux: uart0-pmux {
+>> > +               marvell,groups = "GSM12", "GSM13";
+>> > +               marvell,function = "uart0";
+>> > +       };
+>> > +}
 >>
->> Can you split this up into an arm-realview.dtsi file for the common parts and
->> a pb1176 specific file for the rest?
-> 
-> I wonder if that makes any kind of sense. The RealView platforms does not
-> really share much more than the name, sadly. For example: IP blocks
-> aren't even at the same address.
-> 
-> I could create a .dtsi file but it would be empty :-(
-> 
->>> +     soc {
->>> +             #address-cells = <1>;
->>> +             #size-cells = <1>;
->>> +             compatible = "simple-bus";
->>> +             ranges;
->>> +
->>> +             syscon: syscon at 10000000 {
->>> +                     compatible = "arm,realview-pb1176-syscon", "syscon";
->>> +                     reg = <0x10000000 0x1000>;
->>> +             };
+>> I feel like ... can't we just standardize that and make it a common
+>> pinctrl binding, and name the properties "groups" and "function"
+>> for a family of pin controllers just mapping N groups to 1 function?
 >>
->> Hmm, in order to have a proper reset driver, we probably want a separate
->> node for the reset controller. I believe the x-gene people have just
->> posted a generic reset driver based on syscon. Let's see if we can share
->> that.
-> 
-> I have looked at it. Patch titled
-> "power: reset: Add generic SYSCON register mapped reset"
-> 
-> Sadly it does not work for our case. This is because it assumes that
-> reboot will be triggered by writing one value to one register. The RealViews
-> need you to *first* write to a special unlock register, then write a magic
-> value to a magic register.
-> 
-> So of course we could extend the syscon regmap reset driver by
-> starting to encode a jam table such as a sequence of register writes
-> to a sequence of registers, but we have refused such code in the past
-> because as I recall Grant said, it is the beginning of a byte code
-> interpreter and then we could as well bite the bullet and start
-> implementing open firmware.
-> 
-> This is exactly the type of thing that ACPI AML code usually does
-> by the way so what he says makes a *lot* of sense.
-> 
-> So for now I keep to our special driver.
+>> I will merge the patches as are, but maybe we can make it generic
+>> on top of this before the merge window?
+>
+> Do you mean just changing:
+>
+> s/marvell,groups/groups/
+> s/marvell,function/function/
+>
+> and updating the documentation ?
 
-+1 for drivers/soc _and_ of_xlate for regmap instead of syscon.
+To the pinctrl.txt document as generic bindings.
+Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
 
-driven by Mike Turquette's request to join mach-berlin clock node into a
-single node, we currently use pinctrl driver (that must be somewhere in
-Linus inbox) as a crutch to register a regmap for other drivers.
+That and maybe moving some of the parsing into the pinctrl-utils.
 
-I also saw that Arnd requested to not chop chip registers into tiny
-pieces for Linux subsystems but rather have a single DT node and make
-the drivers use it.
+> If so, I can definitely do that.
 
-Mike also mentioned he is fine with different subsystem drivers reusing
-the same node property-wise, i.e. reset and clock in a single node.
+No big deal, we're a bit late on it. But if you like the looks of it,
+please send a patch like that.
 
-With Berlin (and other SoCs for sure) ultimately there will be a bunch
-of drivers that require the io resource and the node early and
-non-early. Now, using syscon would still require dummy nodes for each
-subsystem, as there will be only one driver registered to a single DT
-node.
-
-With a drivers/soc we'd have a good place for those messy, SoC-specific
-registers to put a driver that hooks up to a single node and takes care
-of registering e.g. pinctrl and reset the plain-old platform_device
-way. It will be a little bit like arm/mach-foo before, but maybe we
-have to admit that on SoCs there will always be some amount of
-very specific, non-probable, non-describable registers that simply need
-special treatment.
-
-Sebastian
+Yours,
+Linus Walleij
