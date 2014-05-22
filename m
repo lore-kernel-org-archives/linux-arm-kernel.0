@@ -1,97 +1,58 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 22 May 2014 10:11:52 +0530
-Subject: [PATCH 4/4] ARM: dts: exynos: Update PMU node with CLKOUT related
- data
-In-Reply-To: <1400604211-9447-5-git-send-email-t.figa@samsung.com>
-References: <1400604211-9447-1-git-send-email-t.figa@samsung.com>
- <1400604211-9447-5-git-send-email-t.figa@samsung.com>
-Message-ID: <537D8010.40109@linaro.org>
+From: gioh.kim@lge.com (Gioh Kim)
+Date: Thu, 22 May 2014 13:38:23 +0900
+Subject: [PATCH] arm: dma-mapping: add checking cma area initialized
+Message-ID: <1400733503-1302-1-git-send-email-gioh.kim@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/20/2014 10:13 PM, Tomasz Figa wrote:
+If CMA is turned on and CMA size is set to zero, kernel should
+behave as if CMA was not enabled at compile time.
+Every dma allocation should check existence of cma area
+before requesting memory.
 
-[...]
+Signed-off-by: Gioh Kim <gioh.kim@lge.com>
+Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Acked-by: Michal Nazarewicz <mina86@mina86.com>
+---
+ arch/arm/mm/dma-mapping.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-> index ee3001f..b7956cc 100644
-> --- a/arch/arm/boot/dts/exynos4210.dtsi
-> +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> @@ -31,6 +31,15 @@
->  		pinctrl2 = &pinctrl_2;
->  	};
->  
-> +	pmu_system_controller: system-controller at 10020000 {
-
-#clock-cells = <1>;
-
-> +		clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
-> +				"clkout4", "clkout8", "clkout9";
-> +		clocks = <&clock CLK_OUT_DMC>, <&clock CLK_OUT_TOP>,
-> +			<&clock CLK_OUT_LEFTBUS>, <&clock CLK_OUT_RIGHTBUS>,
-> +			<&clock CLK_OUT_CPU>, <&clock CLK_XXTI>,
-> +			<&clock CLK_XUSBXTI>;
-> +	};
-> +
->  	sysram at 02020000 {
->  		compatible = "mmio-sram";
->  		reg = <0x02020000 0x20000>;
-> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-> index 264a28f..d9651fa 100644
-> --- a/arch/arm/boot/dts/exynos4x12.dtsi
-> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
-> @@ -139,6 +139,12 @@
->  
->  	pmu_system_controller: system-controller at 10020000 {
->  		compatible = "samsung,exynos4212-pmu", "syscon";
-
-#clock-cells = <1>;
-
-> +		clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
-> +				"clkout4", "clkout5", "clkout8", "clkout9";
-> +		clocks = <&clock CLK_OUT_DMC>, <&clock CLK_OUT_TOP>,
-> +			<&clock CLK_OUT_LEFTBUS>, <&clock CLK_OUT_RIGHTBUS>,
-> +			<&clock CLK_OUT_CPU>, <&clock CLK_OUT_ISP>,
-> +			<&clock CLK_XXTI>, <&clock CLK_XUSBXTI>;
->  	};
->  
->  	g2d at 10800000 {
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index 68a3e6f..cb939ef 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -191,6 +191,9 @@
->  	pmu_system_controller: system-controller at 10040000 {
->  		compatible = "samsung,exynos5250-pmu", "syscon";
->  		reg = <0x10040000 0x5000>;
-> +		#clock-cells = <0>;
-
-#clock-cells = <1>;
-
-> +		clock-names = "clkout16";
-> +		clocks = <&clock CLK_FIN_PLL>;
->  	};
->  
->  	watchdog at 101D0000 {
-> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-> index 8e7e35c..23d0ebb 100644
-> --- a/arch/arm/boot/dts/exynos5420.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> @@ -723,6 +723,9 @@
->  	pmu_system_controller: system-controller at 10040000 {
->  		compatible = "samsung,exynos5420-pmu", "syscon";
->  		reg = <0x10040000 0x5000>;
-> +		#clock-cells = <0>;
-
-#clock-cells = <1>;
-
-> +		clock-names = "clkout16";
-> +		clocks = <&clock CLK_FIN_PLL>;
->  	};
->  
->  	tmu_cpu0: tmu at 10060000 {
-> 
-
-
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 18e98df..9173a13 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -390,12 +390,13 @@ static int __init atomic_pool_init(void)
+ 	if (!pages)
+ 		goto no_pages;
+ 
+-	if (IS_ENABLED(CONFIG_DMA_CMA))
++	if (dev_get_cma_area(NULL))
+ 		ptr = __alloc_from_contiguous(NULL, pool->size, prot, &page,
+ 					      atomic_pool_init);
+ 	else
+ 		ptr = __alloc_remap_buffer(NULL, pool->size, gfp, prot, &page,
+ 					   atomic_pool_init);
++
+ 	if (ptr) {
+ 		int i;
+ 
+@@ -701,7 +702,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+ 		addr = __alloc_simple_buffer(dev, size, gfp, &page);
+ 	else if (!(gfp & __GFP_WAIT))
+ 		addr = __alloc_from_pool(size, &page);
+-	else if (!IS_ENABLED(CONFIG_DMA_CMA))
++	else if (!dev_get_cma_area(dev))
+ 		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller);
+ 	else
+ 		addr = __alloc_from_contiguous(dev, size, prot, &page, caller);
+@@ -790,7 +791,7 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+ 		__dma_free_buffer(page, size);
+ 	} else if (__free_from_pool(cpu_addr, size)) {
+ 		return;
+-	} else if (!IS_ENABLED(CONFIG_DMA_CMA)) {
++	} else if (!dev_get_cma_area(dev)) {
+ 		__dma_free_remap(cpu_addr, size);
+ 		__dma_free_buffer(page, size);
+ 	} else {
 -- 
-Tushar Behera
+1.7.9.5
