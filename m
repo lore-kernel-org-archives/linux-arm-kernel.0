@@ -1,122 +1,123 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 22 May 2014 14:48:01 +0200
-Subject: [PATCH 3/4] ARM: mvebu: improve comments in coherency_ll.S
+Date: Thu, 22 May 2014 14:48:02 +0200
+Subject: [PATCH 4/4] ARM: mvebu: returns ll_get_cpuid() to
+ ll_get_coherency_cpumask()
 In-Reply-To: <1400762882-10116-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1400762882-10116-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1400762882-10116-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1400762882-10116-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit makes no functional change, it only improves a bit the
-various code comments in mach-mvebu/coherency_ll.S, by fixing a few
-typos and adding a few more details.
+In the refactoring of the coherency fabric assembly code, a function
+called ll_get_cpuid() was created to factorize common logic between
+functions adding CPU to the SMP coherency group, enabling and
+disabling the coherency.
+
+However, the name of the function is highly misleading: ll_get_cpuid()
+makes one think tat it returns the ID of the CPU, i.e 0 for CPU0, 1
+for CPU1, etc. In fact, this is not at all what this function returns:
+it returns a CPU mask for the current CPU, usable for the coherency
+fabric configuration and control registers.
+
+Therefore this commit renames this function to
+ll_get_coherency_cpumask(), and adds additional comments on top of the
+function to explain in more details what it does, and also how the
+endianess issue is handled.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/coherency_ll.S | 50 ++++++++++++++++++++++++--------------
- 1 file changed, 32 insertions(+), 18 deletions(-)
+ arch/arm/mach-mvebu/coherency_ll.S | 43 ++++++++++++++++++++++----------------
+ 1 file changed, 25 insertions(+), 18 deletions(-)
 
 diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
-index 7d1b5a5..311442a 100644
+index 311442a..510c29e 100644
 --- a/arch/arm/mach-mvebu/coherency_ll.S
 +++ b/arch/arm/mach-mvebu/coherency_ll.S
-@@ -24,26 +24,32 @@
- #include <asm/cp15.h>
- 
- 	.text
--/* Returns with the coherency address in r1 (r0 is untouched)*/
-+/* Returns the coherency base address in r1 (r0 is untouched) */
- ENTRY(ll_get_coherency_base)
- 	mrc	p15, 0, r1, c1, c0, 0
- 	tst	r1, #CR_M @ Check MMU bit enabled
- 	bne	1f
- 
--	/* use physical address of the coherency register */
-+	/*
-+	 * MMU is disabled, use the physical address of the coherency
-+	 * base address.
-+	 */
- 	adr	r1, 3f
- 	ldr	r3, [r1]
- 	ldr	r1, [r1, r3]
- 	b	2f
- 1:
--	/* use virtual address of the coherency register */
-+	/*
-+	 * MMU is enabled, use the virtual address of the coherency
-+	 * base address.
-+	 */
- 	ldr	r1, =coherency_base
- 	ldr	r1, [r1]
- 2:
+@@ -49,15 +49,22 @@ ENTRY(ll_get_coherency_base)
  	mov	pc, lr
  ENDPROC(ll_get_coherency_base)
  
--/* Returns with the CPU ID in r3 (r0 is untouched)*/
-+/* Returns the CPU ID in r3 (r0 is untouched) */
- ENTRY(ll_get_cpuid)
+-/* Returns the CPU ID in r3 (r0 is untouched) */
+-ENTRY(ll_get_cpuid)
++/*
++ * Returns the coherency CPU mask in r3 (r0 is untouched). This
++ * coherency CPU mask can be used with the coherency fabric
++ * configuration and control registers. Note that the mask is already
++ * endian-swapped as appropriate so that the calling functions do not
++ * have to care about endianness issues while accessing the coherency
++ * fabric registers
++ */
++ENTRY(ll_get_coherency_cpumask)
  	mrc	15, 0, r3, cr0, cr0, 5
  	and	r3, r3, #15
-@@ -53,18 +59,22 @@ ARM_BE8(rev	r3, r3)
+ 	mov	r2, #(1 << 24)
+ 	lsl	r3, r2, r3
+ ARM_BE8(rev	r3, r3)
  	mov	pc, lr
- ENDPROC(ll_get_cpuid)
+-ENDPROC(ll_get_cpuid)
++ENDPROC(ll_get_coherency_cpumask)
  
--/* ll_add_cpu_to_smp_group, ll_enable_coherency and
-- * ll_disable_coherency use strex/ldrex whereas MMU can be off. The
-- * Armada XP SoC has an exclusive monitor that can track transactions
-- * to Device and/or SO and as such also when MMU is disabled the
-- * exclusive transactions will be functional
-+/*
-+ * ll_add_cpu_to_smp_group(), ll_enable_coherency() and
-+ * ll_disable_coherency() use the strex/ldrex instructions while the
-+ * MMU can be disabled. The Armada XP SoC has an exclusive monitor
-+ * that tracks transactions to Device and/or SO memory and thanks to
-+ * that, exclusive transactions are functional even when the MMU is
-+ * disabled.
-  */
- 
+ /*
+  * ll_add_cpu_to_smp_group(), ll_enable_coherency() and
+@@ -71,14 +78,14 @@ ENDPROC(ll_get_cpuid)
  ENTRY(ll_add_cpu_to_smp_group)
  	/*
--	 * r0 being untouched in ll_get_coherency_base and
--	 * ll_get_cpuid, we can use it to save lr modifing it with the
--	 * following bl
-+	 * As r0 is not modified by ll_get_coherency_base() and
-+	 * ll_get_cpuid(), we use it to temporarly save lr and avoid
-+	 * it being modified by the branch and link calls. This
-+	 * function is used very early in the secondary CPU boot, and
-+	 * no stack is available at this point.
+ 	 * As r0 is not modified by ll_get_coherency_base() and
+-	 * ll_get_cpuid(), we use it to temporarly save lr and avoid
+-	 * it being modified by the branch and link calls. This
+-	 * function is used very early in the secondary CPU boot, and
+-	 * no stack is available at this point.
++	 * ll_get_coherency_cpumask(), we use it to temporarly save lr
++	 * and avoid it being modified by the branch and link
++	 * calls. This function is used very early in the secondary
++	 * CPU boot, and no stack is available at this point.
  	 */
  	mov 	r0, lr
  	bl	ll_get_coherency_base
-@@ -82,9 +92,11 @@ ENDPROC(ll_add_cpu_to_smp_group)
- 
+-	bl	ll_get_cpuid
++	bl	ll_get_coherency_cpumask
+ 	mov 	lr, r0
+ 	add	r0, r1, #ARMADA_XP_CFB_CFG_REG_OFFSET
+ 1:
+@@ -93,14 +100,14 @@ ENDPROC(ll_add_cpu_to_smp_group)
  ENTRY(ll_enable_coherency)
  	/*
--	 * r0 being untouched in ll_get_coherency_base and
--	 * ll_get_cpuid, we can use it to save lr modifing it with the
--	 * following bl
-+	 * As r0 is not modified by ll_get_coherency_base() and
-+	 * ll_get_cpuid(), we use it to temporarly save lr and avoid
-+	 * it being modified by the branch and link calls. This
-+	 * function is used very early in the secondary CPU boot, and
-+	 * no stack is available at this point.
+ 	 * As r0 is not modified by ll_get_coherency_base() and
+-	 * ll_get_cpuid(), we use it to temporarly save lr and avoid
+-	 * it being modified by the branch and link calls. This
+-	 * function is used very early in the secondary CPU boot, and
+-	 * no stack is available at this point.
++	 * ll_get_coherency_cpumask(), we use it to temporarly save lr
++	 * and avoid it being modified by the branch and link
++	 * calls. This function is used very early in the secondary
++	 * CPU boot, and no stack is available at this point.
  	 */
  	mov r0, lr
  	bl	ll_get_coherency_base
-@@ -104,9 +116,11 @@ ENDPROC(ll_enable_coherency)
- 
+-	bl	ll_get_cpuid
++	bl	ll_get_coherency_cpumask
+ 	mov lr, r0
+ 	add	r0, r1, #ARMADA_XP_CFB_CTL_REG_OFFSET
+ 1:
+@@ -117,14 +124,14 @@ ENDPROC(ll_enable_coherency)
  ENTRY(ll_disable_coherency)
  	/*
--	 * r0 being untouched in ll_get_coherency_base and
--	 * ll_get_cpuid, we can use it to save lr modifing it with the
--	 * following bl
-+	 * As r0 is not modified by ll_get_coherency_base() and
-+	 * ll_get_cpuid(), we use it to temporarly save lr and avoid
-+	 * it being modified by the branch and link calls. This
-+	 * function is used very early in the secondary CPU boot, and
-+	 * no stack is available at this point.
+ 	 * As r0 is not modified by ll_get_coherency_base() and
+-	 * ll_get_cpuid(), we use it to temporarly save lr and avoid
+-	 * it being modified by the branch and link calls. This
+-	 * function is used very early in the secondary CPU boot, and
+-	 * no stack is available at this point.
++	 * ll_get_coherency_cpumask(), we use it to temporarly save lr
++	 * and avoid it being modified by the branch and link
++	 * calls. This function is used very early in the secondary
++	 * CPU boot, and no stack is available@this point.
  	 */
  	mov 	r0, lr
  	bl	ll_get_coherency_base
+-	bl	ll_get_cpuid
++	bl	ll_get_coherency_cpumask
+ 	mov 	lr, r0
+ 	add	r0, r1, #ARMADA_XP_CFB_CTL_REG_OFFSET
+ 1:
 -- 
 1.9.3
