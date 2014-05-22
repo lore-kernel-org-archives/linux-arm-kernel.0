@@ -1,185 +1,109 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 23 May 2014 00:16:52 +0200
-Subject: [PATCH] mmc: sdhci-dove: use mmc_of_parse() and remove card_tasklet
- CD handler
-Message-ID: <1400797012-32106-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 22 May 2014 18:33:05 -0300
+Subject: [alsa-devel] The resume of sgtl5000 causes kernel Oops
+In-Reply-To: <20140522174818.GN12304@sirena.org.uk>
+References: <20140522145650.GD32184@dragon>
+ <20140522174818.GN12304@sirena.org.uk>
+Message-ID: <CAOMZO5CCFnZSz_jaipe4Fz0sTxXOajp7QRPiaM5f5wg_Di0ftA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit f8ec589b86f6
-  "mmc: sdhci-dove: allow GPIOs to be used for card detection on Dove"
-added a gpio based card detect interrupt handler that was hooked up
-into card_tasket.
+Hi Mark,
 
-Commit 3560db8e247a
-  "mmc: sdhci: push card_tasklet into threaded irq handler"
-now removed that very card_tasklet causing sdhci-dove to fail on build
-with:
-drivers/mmc/host/sdhci-dove.c: In function 'sdhci_dove_carddetect_irq':
-drivers/mmc/host/sdhci-dove.c:42:24: error: 'struct sdhci_host' has no member named 'card_tasklet'
+On Thu, May 22, 2014 at 2:48 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Thu, May 22, 2014 at 10:56:51PM +0800, Shawn Guo wrote:
+>> The suspend/resume test on imx51-babbage board discovers a kernel Oops
+>> caused by sgtl5000_resume().  I believe it happens due to commit
+>> e5d80e82e32e (ASoC: sgtl5000: Convert to use regmap directly).  After
+>> the commit, it seems that the codec->reg_cache in function
+>> sgtl5000_restore_regs() becomes invalid.  It looks that the register
+>> restoring in the function requires some strict sequence, I'm not sure
+>> what the correct fix is.
+>
+> Yes, reg_cache isn't there if we're not using ASoC level caching.  The
+> fix should just be to replace the direct cache references with
+> snd_soc_read()s which will end up in a cache lookup if the register is
+> cached.
 
-To fix both the build error and get a working gpio card detection without
-card_tasklet, replace sdhci_get_of_property() with more recent
-mmc_of_parse(). It takes care of gpio-based card detect passed through DT
-already and allows to remove the offending code sections dealing with
-removed card_tasklet.
+Do you mean like this?
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-This patch is based on todays mmc-next and fixes a build error there.
-
-Cc: Chris Ball <chris@printf.net>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: linux-mmc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/mmc/host/sdhci-dove.c | 74 +++----------------------------------------
- 1 file changed, 5 insertions(+), 69 deletions(-)
-
-diff --git a/drivers/mmc/host/sdhci-dove.c b/drivers/mmc/host/sdhci-dove.c
-index 0d315f4496c8..e6278ec007d7 100644
---- a/drivers/mmc/host/sdhci-dove.c
-+++ b/drivers/mmc/host/sdhci-dove.c
-@@ -21,28 +21,17 @@
- 
- #include <linux/clk.h>
- #include <linux/err.h>
--#include <linux/gpio.h>
- #include <linux/io.h>
- #include <linux/mmc/host.h>
- #include <linux/module.h>
- #include <linux/of.h>
--#include <linux/of_gpio.h>
- 
- #include "sdhci-pltfm.h"
- 
- struct sdhci_dove_priv {
- 	struct clk *clk;
--	int gpio_cd;
- };
- 
--static irqreturn_t sdhci_dove_carddetect_irq(int irq, void *data)
--{
--	struct sdhci_host *host = data;
--
--	tasklet_schedule(&host->card_tasklet);
--	return IRQ_HANDLED;
--}
--
- static u16 sdhci_dove_readw(struct sdhci_host *host, int reg)
+diff --git a/sound/soc/codecs/sgtl5000.c b/sound/soc/codecs/sgtl5000.c
+index 9626ee0..437751a 100644
+--- a/sound/soc/codecs/sgtl5000.c
++++ b/sound/soc/codecs/sgtl5000.c
+@@ -1075,7 +1075,6 @@ static int sgtl5000_suspend(struct snd_soc_codec *codec)
+  */
+ static int sgtl5000_restore_regs(struct snd_soc_codec *codec)
  {
- 	u16 ret;
-@@ -60,8 +49,6 @@ static u16 sdhci_dove_readw(struct sdhci_host *host, int reg)
- 
- static u32 sdhci_dove_readl(struct sdhci_host *host, int reg)
- {
--	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct sdhci_dove_priv *priv = pltfm_host->priv;
- 	u32 ret;
- 
- 	ret = readl(host->ioaddr + reg);
-@@ -71,14 +58,6 @@ static u32 sdhci_dove_readl(struct sdhci_host *host, int reg)
- 		/* Mask the support for 3.0V */
- 		ret &= ~SDHCI_CAN_VDD_300;
- 		break;
--	case SDHCI_PRESENT_STATE:
--		if (gpio_is_valid(priv->gpio_cd)) {
--			if (gpio_get_value(priv->gpio_cd) == 0)
--				ret |= SDHCI_CARD_PRESENT;
--			else
--				ret &= ~SDHCI_CARD_PRESENT;
--		}
--		break;
- 	}
- 	return ret;
+-    u16 *cache = codec->reg_cache;
+     u16 reg;
+
+     /* restore regular registers */
+@@ -1089,12 +1088,12 @@ static int sgtl5000_restore_regs(struct
+snd_soc_codec *codec)
+             reg == SGTL5000_CHIP_REF_CTRL)
+             continue;
+
+-        snd_soc_write(codec, reg, cache[reg]);
++        snd_soc_write(codec, reg, snd_soc_read(codec, reg));
+     }
+
+     /* restore dap registers */
+     for (reg = SGTL5000_DAP_REG_OFFSET; reg <
+SGTL5000_MAX_REG_OFFSET; reg += 2)
+-        snd_soc_write(codec, reg, cache[reg]);
++        snd_soc_write(codec, reg, snd_soc_read(codec, reg));
+
+     /*
+      * restore these regs according to the power setting sequence in
+@@ -1110,19 +1109,19 @@ static int sgtl5000_restore_regs(struct
+snd_soc_codec *codec)
+      *    prefer to resotre it after SGTL5000_CHIP_ANA_POWER restored
+      */
+     snd_soc_write(codec, SGTL5000_CHIP_LINREG_CTRL,
+-            cache[SGTL5000_CHIP_LINREG_CTRL]);
++            snd_soc_read(codec, SGTL5000_CHIP_LINREG_CTRL));
+
+     snd_soc_write(codec, SGTL5000_CHIP_ANA_POWER,
+-            cache[SGTL5000_CHIP_ANA_POWER]);
++            snd_soc_read(codec, SGTL5000_CHIP_ANA_POWER));
+
+     snd_soc_write(codec, SGTL5000_CHIP_CLK_CTRL,
+-            cache[SGTL5000_CHIP_CLK_CTRL]);
++            snd_soc_read(codec, SGTL5000_CHIP_CLK_CTRL));
+
+     snd_soc_write(codec, SGTL5000_CHIP_REF_CTRL,
+-            cache[SGTL5000_CHIP_REF_CTRL]);
++            snd_soc_read(codec, SGTL5000_CHIP_REF_CTRL));
+
+     snd_soc_write(codec, SGTL5000_CHIP_LINE_OUT_CTRL,
+-            cache[SGTL5000_CHIP_LINE_OUT_CTRL]);
++            snd_soc_read(codec, SGTL5000_CHIP_LINE_OUT_CTRL));
+     return 0;
  }
-@@ -117,28 +96,9 @@ static int sdhci_dove_probe(struct platform_device *pdev)
- 
- 	priv->clk = devm_clk_get(&pdev->dev, NULL);
- 
--	if (pdev->dev.of_node) {
--		priv->gpio_cd = of_get_named_gpio(pdev->dev.of_node,
--						  "cd-gpios", 0);
--	} else {
--		priv->gpio_cd = -EINVAL;
--	}
--
--	if (gpio_is_valid(priv->gpio_cd)) {
--		ret = gpio_request(priv->gpio_cd, "sdhci-cd");
--		if (ret) {
--			dev_err(&pdev->dev, "card detect gpio request failed: %d\n",
--				ret);
--			return ret;
--		}
--		gpio_direction_input(priv->gpio_cd);
--	}
--
- 	host = sdhci_pltfm_init(pdev, &sdhci_dove_pdata, 0);
--	if (IS_ERR(host)) {
--		ret = PTR_ERR(host);
--		goto err_sdhci_pltfm_init;
--	}
-+	if (IS_ERR(host))
-+		return PTR_ERR(host);
- 
- 	pltfm_host = sdhci_priv(host);
- 	pltfm_host->priv = priv;
-@@ -146,39 +106,20 @@ static int sdhci_dove_probe(struct platform_device *pdev)
- 	if (!IS_ERR(priv->clk))
- 		clk_prepare_enable(priv->clk);
- 
--	sdhci_get_of_property(pdev);
-+	ret = mmc_of_parse(host->mmc);
-+	if (ret)
-+		goto err_sdhci_add;
- 
- 	ret = sdhci_add_host(host);
- 	if (ret)
- 		goto err_sdhci_add;
- 
--	/*
--	 * We must request the IRQ after sdhci_add_host(), as the tasklet only
--	 * gets setup in sdhci_add_host() and we oops.
--	 */
--	if (gpio_is_valid(priv->gpio_cd)) {
--		ret = request_irq(gpio_to_irq(priv->gpio_cd),
--				  sdhci_dove_carddetect_irq,
--				  IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
--				  mmc_hostname(host->mmc), host);
--		if (ret) {
--			dev_err(&pdev->dev, "card detect irq request failed: %d\n",
--				ret);
--			goto err_request_irq;
--		}
--	}
--
- 	return 0;
- 
--err_request_irq:
--	sdhci_remove_host(host, 0);
- err_sdhci_add:
- 	if (!IS_ERR(priv->clk))
- 		clk_disable_unprepare(priv->clk);
- 	sdhci_pltfm_free(pdev);
--err_sdhci_pltfm_init:
--	if (gpio_is_valid(priv->gpio_cd))
--		gpio_free(priv->gpio_cd);
- 	return ret;
- }
- 
-@@ -190,11 +131,6 @@ static int sdhci_dove_remove(struct platform_device *pdev)
- 
- 	sdhci_pltfm_unregister(pdev);
- 
--	if (gpio_is_valid(priv->gpio_cd)) {
--		free_irq(gpio_to_irq(priv->gpio_cd), host);
--		gpio_free(priv->gpio_cd);
--	}
--
- 	if (!IS_ERR(priv->clk))
- 		clk_disable_unprepare(priv->clk);
- 
--- 
-1.9.1
+
+This avoids the crash in suspend, but I get different errors now:
+
+root@freescale /$ echo mem > /sys/power/state
+PM: Syncing filesystems ... done.
+Freezing user space processes ... (elapsed 0.001 seconds) done.
+Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
+Suspending console(s) (use no_console_suspend to debug)
+random: nonblocking pool is initialized
+PM: suspend of devices complete after 15.210 msecs
+PM: suspend devices took 0.010 seconds
+PM: late suspend of devices complete after 4.435 msecs
+PM: noirq suspend of devices complete after 4.691 msecs
+Disabling non-boot CPUs ...
+PM: noirq resume of devices complete after 3.931 msecs
+PM: early resume of devices complete after 5.724 msecs
+sgtl5000 1-000a: Failed to restore cache: -5
+sgtl5000 1-000a: Failed to restore cache: -5
+sgtl5000 1-000a: ASoC: Failed to turn on bias: -5
+sgtl5000 1-000a: Failed to restore cache: -5
+sgtl5000 1-000a: ASoC: Failed to turn on bias: -5
+sgtl5000 1-000a: Failed to restore cache: -5
+sgtl5000 1-000a: ASoC: Failed to turn on bias: -5
+PM: resume of devices complete after 62.349 msecs
+PM: resume devices took 0.060 seconds
+Restarting tasks ... done.
