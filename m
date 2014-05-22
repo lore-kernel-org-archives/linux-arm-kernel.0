@@ -1,50 +1,76 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 22 May 2014 19:14:06 +0300
-Subject: [Patch v5 3/7] mfd: ti-keystone-devctrl: add bindings for device
- state control
-In-Reply-To: <20140522153309.GB19747@lee--X1>
-References: <1400766516-14537-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1400766516-14537-4-git-send-email-ivan.khoronzhuk@ti.com>
- <20140522141432.GA19747@lee--X1> <537E0A87.5010408@ti.com>
- <20140522153309.GB19747@lee--X1>
-Message-ID: <537E224E.3060601@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 22 May 2014 18:24:55 +0200
+Subject: [GIT PULL] at91: DT for 3.16 at91-dt3 #3
+Message-ID: <1400775895-31183-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Arnd, Olof, Kevin,
 
-On 05/22/2014 06:33 PM, Lee Jones wrote:
->>> Why do I only have this patch?  Where is the rest of the set?  Also,
->>> it's on v5 and I don't recall seeing the other 4 versions?
->> It's strange I've sent whole series on
->>
->> linux-kernel at vger.kernel.org
->> linux-arm-kernel at lists.infradead.org
->> linux-doc at vger.kernel.org
->> devicetree at vger.kernel.org
->>
->> v4 is also was sent to lists in question:
->> https://lkml.org/lkml/2014/5/21/359
-> But did you send them to me?  I don't parse the list.
->
+Another AT91 DT pull-request for 3.16. This one is the conversion of two more
+SoC to Common Clock Framework (aka CCF). I identified it as a "DT" pull-request
+but it modifies slightly a couple of files in mach-at91 (use of a configuration
+option).
+This pull-request depends on:
+- the fixes that I already sent for 3.15 and that are present in the recent
+  3.15-rc6 tag.
+- the at91-cleanup tag that you integrated in your arm-soc/next/soc branch.
+So, as suggested by Arnd on IRC, I merged both of them to act as the base
+before adding the material for this pull-request.
 
-Sorry.
-Becouse /scripts/get_maintainer.pl  patches/reset_driver_v6/* hadn't 
-been listed you
-It's because there is no patch with "code" for the bindings you've comment.
+About the clock nodes that should be grouped in a "clocks" container or not,
+while waiting for a clear statement by the DT maintainers, I kept the clocks
+nodes as they had been written by Boris.
+As proposed by Olof, I plan to send you a comprehensive patch that fixes this
+when Mark gives his point of view.
 
-I should check it by hand for mtd.
+Thanks, best regards,
 
-The bindings for mtd device_state_control were added only on v5
-And it's added only to describe what is the node we've used in a 
-keystone DT.
-The node is planned to be used only via syscon phandle, there is no 
-driver for it,
-and compatible string for "ti,keystone-devctrl" added only to be matched by
-a high-level device driver if needed.
+The following changes since commit 6a84872a3c3090993be108f02f91b4de062a7d32:
 
-I'll send new v6 series to you also.
-Once again sorry.
+  Merge branch 'at91-3.16-cleanup' into at91-3.16-dt3 (2014-05-22 18:01:22 +0200)
+
+are available in the git repository at:
+
+
+  git://github.com/at91linux/linux-at91.git tags/at91-dt3
+
+for you to fetch changes up to b4a86b3810f5dc4b959ee69a3818c876752c88cd:
+
+  ARM: at91: move sam9n12 SoC to the CCF (2014-05-22 18:03:17 +0200)
+
+----------------------------------------------------------------
+3.16 third DT series:
+- move of both at91sam9n12 and at91sam9x5 to CCF
+
+----------------------------------------------------------------
+Boris BREZILLON (8):
+      ARM: at91: prepare common clk transition for sam9x5 SoCs
+      ARM: at91/dt: define sam9x5 clocks
+      ARM: at91/dt: define sam9x5ek's crystal frequencies
+      ARM: at91: move sam9x5 SoCs to the CCF
+      ARM: at91: prepare common clk transition for sam9n12 SoC
+      ARM: at91/dt: define sam9n12 clocks
+      ARM: at91/dt: define sam9n12ek crystal frequencies
+      ARM: at91: move sam9n12 SoC to the CCF
+
+ arch/arm/boot/dts/at91sam9n12.dtsi       | 348 +++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/at91sam9n12ek.dts      |   8 +
+ arch/arm/boot/dts/at91sam9x5.dtsi        | 355 ++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/at91sam9x5_can.dtsi    |  31 +++
+ arch/arm/boot/dts/at91sam9x5_isi.dtsi    |  26 +++
+ arch/arm/boot/dts/at91sam9x5_lcd.dtsi    |  26 +++
+ arch/arm/boot/dts/at91sam9x5_macb0.dtsi  |  11 +
+ arch/arm/boot/dts/at91sam9x5_macb1.dtsi  |  11 +
+ arch/arm/boot/dts/at91sam9x5_usart3.dtsi |  11 +
+ arch/arm/boot/dts/at91sam9x5cm.dtsi      |   8 +
+ arch/arm/mach-at91/Kconfig               |   2 -
+ arch/arm/mach-at91/at91sam9n12.c         |   6 +-
+ arch/arm/mach-at91/at91sam9x5.c          |   6 +-
+ 13 files changed, 842 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91sam9x5_can.dtsi
+ create mode 100644 arch/arm/boot/dts/at91sam9x5_isi.dtsi
+ create mode 100644 arch/arm/boot/dts/at91sam9x5_lcd.dtsi
 
 -- 
-Regards,
-Ivan Khoronzhuk
+Nicolas Ferre
