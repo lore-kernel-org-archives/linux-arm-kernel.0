@@ -1,77 +1,51 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 22 May 2014 17:32:39 +0300
-Subject: [Patch v5 3/7] mfd: ti-keystone-devctrl: add bindings for device
- state control
-In-Reply-To: <20140522141432.GA19747@lee--X1>
-References: <1400766516-14537-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1400766516-14537-4-git-send-email-ivan.khoronzhuk@ti.com>
- <20140522141432.GA19747@lee--X1>
-Message-ID: <537E0A87.5010408@ti.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Thu, 22 May 2014 09:35:19 -0500
+Subject: [PATCH v2] ARM: socfpga: dts: add watchdog0+1
+In-Reply-To: <1400763964-19369-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1400763964-19369-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <537E0B27.70305@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Steffen,
 
-On 05/22/2014 05:14 PM, Lee Jones wrote:
-> Why do I only have this patch?  Where is the rest of the set?  Also,
-> it's on v5 and I don't recall seeing the other 4 versions?
-
-It's strange I've sent whole series on
-
-linux-kernel at vger.kernel.org
-linux-arm-kernel at lists.infradead.org
-linux-doc at vger.kernel.org
-devicetree at vger.kernel.org
-
-v4 is also was sent to lists in question:
-https://lkml.org/lkml/2014/5/21/359
-
->> The Keystone II devices have a set of registers that are used to control
->> the status of its peripherals. This node is intended to allow access to
->> this functionality.
->>
->> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->> ---
->>   .../devicetree/bindings/mfd/ti-keystone-devctrl.txt   | 19 +++++++++++++++++++
->>   1 file changed, 19 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt b/Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt
->> new file mode 100644
->> index 0000000..35f7a66
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt
->> @@ -0,0 +1,19 @@
->> +* Device tree bindings for Texas Instruments keystone device state control
->> +
->> +The Keystone II devices have a set of registers that are used to control
->> +the status of its peripherals. This node is intended to allow access to
->> +this functionality.
->> +
->> +Required properties:
->> +
->> +- compatible:		"ti,keystone-devctrl", "syscon"
->> +
->> +- reg:			contains offset/length value for pll controller
->> +			registers space.
-> Why have you tabbed out all that way?
-
-I'll correct
-
+On 5/22/14 8:06 AM, Steffen Trumtrar wrote:
+> The SoCFPGA has two watchdog timers. Add them to the dtsi.
 >
->> +Example:
->> +
->> +devctrl: device-state-control {
-> This node needs an address:
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/socfpga.dtsi | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
 >
-> devctrl: device-state-control at 02620000 {
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> index 56fc214..7bcd458 100644
+> --- a/arch/arm/boot/dts/socfpga.dtsi
+> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> @@ -549,6 +549,22 @@
+>  			reg = <0xffd05000 0x1000>;
+>  		};
+>  
+> +		watchdog0: watchdog at ffd02000 {
+> +			compatible = "snps,dw-wdt";
+> +			reg = <0xffd02000 0x1000>;
+> +			interrupts = <0 171 0>;
+This should be IRQ_TYPE_LEVEL_HIGH.
+> +			clocks = <&osc1>;
+> +			status = "disabled";
+> +		};
+> +
+> +		watchdog1: watchdog at ffd03000 {
+> +			compatible = "snps,dw-wdt";
+> +			reg = <0xffd03000 0x1000>;
+> +			interrupts = <0 172 0>;
+Same here..
+> +			clocks = <&osc1>;
+> +			status = "disabled";
+> +		};
+> +
+>  		sysmgr: sysmgr at ffd08000 {
+>  			compatible = "altr,sys-mgr", "syscon";
+>  			reg = <0xffd08000 0x4000>;
+No need to resend a patch, I'll apply with those changes.
 
-Thanks!
-I will correct
-
->> +	compatible = "ti,keystone-devctrl", "syscon";
->> +	reg = <0x02620000 0x1000>;
->> +};
-
--- 
-Regards,
-Ivan Khoronzhuk
+Dinh
