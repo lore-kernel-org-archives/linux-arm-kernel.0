@@ -1,64 +1,57 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 22 May 2014 14:42:48 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC r7s72100-ccf
- Updates for v3.16
-In-Reply-To: <20140522050840.GA32618@quad.lixom.net>
-References: <cover.1400289483.git.horms+renesas@verge.net.au>
- <20140522050840.GA32618@quad.lixom.net>
-Message-ID: <20140522054246.GA6307@verge.net.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 May 2014 22:45:47 -0700
+Subject: [GIT PULL 4/5] Samsung DT updates for 3.16
+In-Reply-To: <014701cf73c8$752a65c0$5f7f3140$@samsung.com>
+References: <014701cf73c8$752a65c0$5f7f3140$@samsung.com>
+Message-ID: <20140522054547.GA4021@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 21, 2014 at 10:08:40PM -0700, Olof Johansson wrote:
-> On Sat, May 17, 2014 at 10:24:53AM +0900, Simon Horman wrote:
-> > Hi Olof, Hi Kevin, Hi Arnd,
-> > 
-> > Please consider these Second Round of
-> > Renesas ARM Based SoC r7s72100 CCF Updates for v3.16.
-> > 
-> > This pull request is based on the previous round of
-> > such requests, tagged as renesas-r7s72100-ccf-for-v3.16,
-> > which I have already sent a pull-request for.
-> > 
-> > This comprehensively addresses an oversight in patches included in
-> > the pull request that it depends on, specifically leaving broken
-> > non-multiplatform support in place for genmai-reference.
-> > 
-> > This pull request has some minor conflicts with other DT changes which I
-> > have previously sent pull requests for. These conflicts are in
-> > arch/arm/boot/dts/Makefile. A resolution can be found in the
-> > renesas-next-v3.15-rc1-20140517 tag if my renesas tree. In words:
-> > 
-> >     CONFIG_ARCH_SHMOBILE_LEGACY hunk:
-> >     * Remove emev2-kzm9d.dtb
-> >     * Remove r7s72100-genmai-reference.dtb
-> >     * Keep r7s72100-genmai.dtb
-> > 
-> 
-> Are you sure? Shouldn't the genmai board be covered by multi now? Or
-> are both multi and legacy driven by the same DTS now? Just making sure.
+On Tue, May 20, 2014 at 10:11:41AM +0900, Kukjin Kim wrote:
 
-Both multi and legacy are driven by the same DTS, r7s72100-genmai.dtb.
+> Sachin Kamat (4):
+>       ARM: EXYNOS: Map SYSRAM through generic DT bindings
 
-> > The following changes since commit 9fbb1ae01b878e2cce9626fa6fdc9e5dcefeb6b5:
-> > 
-> >   ARM: shmobile: r7s72100: use workaround for non DT-clocks (2014-05-14 11:42:55 +0900)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-r7s72100-ccf2-for-v3.16
-> > 
-> > for you to fetch changes up to a5176e0d9de31a54e08468f21c15dc08e006857f:
-> > 
-> >   ARM: shmobile: Remove Genmai reference DTS (2014-05-17 09:06:29 +0900)
-> > 
-> 
-> Pulled, thanks.
-> 
-> 
-> -Olof
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+This patch has a conflict with your own fixes. You should have based this
+branch on top of the fixes to avoid it.
+
+Not only that, but it seems to break 4212, which the other fix was meant to
+take care of.
+
+I think I've fixed it in my merge, please double check. You really have to
+be more careful than this in the future.
+
+My resolution is:
+
+index aa01c4222b40,483dfcd69065..000000000000
+--- a/arch/arm/mach-exynos/firmware.c
++++ b/arch/arm/mach-exynos/firmware.c
+@@@ -18,8 -18,7 +18,9 @@@
+  
+  #include <mach/map.h>
+  
+ +#include <plat/cpu.h>
+ +
++ #include "common.h"
+  #include "smc.h"
+  
+  static int exynos_do_idle(void)
+@@@ -44,10 -35,12 +45,15 @@@ static int exynos_cpu_boot(int cpu
+  
+  static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+  {
+-       void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
++       void __iomem *boot_reg;
++ 
++       if (!sysram_ns_base_addr)
++               return -ENODEV;
++ 
+ -      boot_reg = sysram_ns_base_addr + 0x1c + 4*cpu;
+++      boot_reg = sysram_ns_base_addr + 0x1c;
+ +
+ +      if (!soc_is_exynos4212())
+ +              boot_reg += 4*cpu;
+  
+
+
+-Olof
