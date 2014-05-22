@@ -1,36 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 May 2014 22:15:22 -0700
-Subject: [GIT PULL] SOCFPGA DTS updates for 3.16, take 2
-In-Reply-To: <1400471241-21456-1-git-send-email-dinguyen@altera.com>
-References: <1400471241-21456-1-git-send-email-dinguyen@altera.com>
-Message-ID: <20140522051522.GB32618@quad.lixom.net>
+Date: Wed, 21 May 2014 22:18:50 -0700
+Subject: [PATCH] ARM: imx: fix error handling in ipu device registration
+In-Reply-To: <1400483274-13680-1-git-send-email-shawn.guo@freescale.com>
+References: <1400483274-13680-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20140522051850.GC32618@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 18, 2014 at 10:47:21PM -0500, dinguyen at altera.com wrote:
-> Hi Arnd, Kevin and Olof,
+On Mon, May 19, 2014 at 03:07:54PM +0800, Shawn Guo wrote:
+> From: Emil Goode <emilgoode@gmail.com>
 > 
-> Please consider pulling in this patch for 3.16. This patch adds the DTS
-> entries for the GPIOs on the SOCFPGA platform.
+> If we fail to allocate struct platform_device pdev we
+> dereference it after the goto label err.
 > 
-> Olof had a question regarding how the GPIO node needed 2-layer approach.
+> This bug was found using coccinelle.
 > 
-> http://thread.gmane.org/gmane.linux.kernel/1671569/focus=1702208
+> Fixes: afa77ef (ARM: mx3: dynamically allocate "ipu-core" devices)
+> Signed-off-by: Emil Goode <emilgoode@gmail.com>
+> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+> Arnd, Olof,
 > 
-> I hope that Alan Tull was able to answer Olof's question.
-> 
-> Thanks,
-> 
-> The following changes since commit 2bfac3a551978c4953f659e1bd18d58c3c249f64:
-> 
->   Merge tag 'socfpga-dt-updates-for-3.16_v3' of git://git.rocketboards.org/linux-socfpga-next into next/dt (2014-05-16 16:07:37 -0700)
+> Please consider to apply this fix for 3.15.  Thanks.
 
-You can't base your branch on top of our next/dt. You should have based
-this on top of your previous branch, and not pulled down our contents
-for it.
+Applied, thanks.
 
-Please send a new pull request, or let me know if you prefer me to just
-cherry-pick over the one patch -- your choice.
+BTW, it was requested to use a 12-character SHA in the Fixes: tag, since in the
+future there might be a collision on the shortest one.
+
+You can update the default for your git repo by setting the core.abbrevlength
+config variable to 12.
 
 
 -Olof
