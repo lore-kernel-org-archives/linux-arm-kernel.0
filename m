@@ -1,55 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 22 May 2014 09:45:49 +0200
-Subject: [GIT PULL] Allwinner drivers for 3.16
-In-Reply-To: <20140521214438.GG24972@quad.lixom.net>
-References: <20140516124033.GA23014@lukather>
- <20140521214438.GG24972@quad.lixom.net>
-Message-ID: <20140522074549.GW27329@lukather>
+From: leela.krishna@linaro.org (Leela Krishna Amudala)
+Date: Thu, 22 May 2014 13:27:35 +0530
+Subject: [PATCH] ARM: EXYNOS: Use wfi macro in platform_do_lowpower
+Message-ID: <1400745455-27920-1-git-send-email-leela.krishna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 21, 2014 at 02:44:38PM -0700, Olof Johansson wrote:
-> On Fri, May 16, 2014 at 02:40:33PM +0200, Maxime Ripard wrote:
-> > Hi Arnd, Kevin, Olof,
-> > 
-> > Please pull the following pull-request for 3.16
-> > 
-> > Thanks,
-> > Maxime
-> > 
-> > The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-> > 
-> >   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   https://github.com/mripard/linux.git sunxi/drivers-for-3.16
-> > 
-> > for you to fetch changes up to cd90f0cf4454861a4f87bdfdcf01e8b98cc94869:
-> > 
-> >   reset: sunxi: allow MFD subdevices probe (2014-05-15 10:31:04 +0200)
-> > 
-> > ----------------------------------------------------------------
-> > Allwinner drivers changes for 3.16
-> > 
-> > Reset drivers for the A31, that have been merged with reset maintainer's Acked-by.
-> 
-> Merged, thanks. Looks like you generated the pull request before the tag was on
-> the server, since it's not part of the reference.
+This patch is originally based on commit b3377d186572 ("ARM: 7064/1:
+vexpress: Use wfi macro in platform_do_lowpower.")
 
-Grrr, I really should script this...
+Current Exynos CPU hotplug code includes a hardcoded WFI
+instruction, in ARM encoding.  When the kernel is compiled in Thumb-2
+mode, this is invalid and causes the machine to hang hard when a CPU
+is offlined.
 
-Thanks,
-Maxime
+Use wfi macro instead of the hardcoded WFI instruction.
 
+Signed-off-by: Leela Krishna Amudala <leela.krishna@linaro.org>
+---
+ arch/arm/mach-exynos/hotplug.c |    8 +-------
+ 1 file changed, 1 insertion(+), 7 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+index 69fa483..8a134d0 100644
+--- a/arch/arm/mach-exynos/hotplug.c
++++ b/arch/arm/mach-exynos/hotplug.c
+@@ -46,13 +46,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ 		if (cpu == 1)
+ 			exynos_cpu_power_down(cpu);
+ 
+-		/*
+-		 * here's the WFI
+-		 */
+-		asm(".word	0xe320f003\n"
+-		    :
+-		    :
+-		    : "memory", "cc");
++		wfi();
+ 
+ 		if (pen_release == cpu_logical_map(cpu)) {
+ 			/*
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140522/0c77323a/attachment.sig>
+1.7.9.5
