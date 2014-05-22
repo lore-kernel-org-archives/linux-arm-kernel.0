@@ -1,160 +1,159 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 22 May 2014 13:38:18 +0200
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in device
- tree
-In-Reply-To: <CAGb2v64VZac2KvAALrScecN89sRnBQoDrKxKMvkte+3G04NXeA@mail.gmail.com>
-References: <537DC832.3020006@redhat.com>
- <CAGb2v64VZac2KvAALrScecN89sRnBQoDrKxKMvkte+3G04NXeA@mail.gmail.com>
-Message-ID: <537DE1AA.5050606@redhat.com>
+From: baohua@kernel.org (Barry Song)
+Date: Thu, 22 May 2014 19:39:47 +0800
+Subject: [PATCH] ARM: l2c: prima2: only call l2x0_of_init() on matching
+ nodes
+In-Reply-To: <20140522112712.GT3693@n2100.arm.linux.org.uk>
+References: <1398644860-22973-1-git-send-email-mporter@linaro.org>
+ <20140428142950.GB30292@saruman.home> <20140428143709.GC7719@beef>
+ <20140428145223.GL26756@n2100.arm.linux.org.uk>
+ <CAGsJ_4x1+eePRDMP0-0WeTG6ZJdzmMkN_9USbKt8joY8AKsDdw@mail.gmail.com>
+ <20140429151433.GD26756@n2100.arm.linux.org.uk>
+ <CAGsJ_4yg2Dcwyj5cLc2DuYVOcWwmpkPzK_=BUZLqRLDyErBL=Q@mail.gmail.com>
+ <20140522093347.GS3693@n2100.arm.linux.org.uk>
+ <CAGsJ_4yCaK8w3_vOw9uSyEtUGq0suWssrMnBHbQSU8rK0ibyUQ@mail.gmail.com>
+ <20140522112712.GT3693@n2100.arm.linux.org.uk>
+Message-ID: <CAGsJ_4yc7ni9mgP-QL+73L5AbpejawWFePNLSdx1RCavjXf=9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2014-05-22 19:27 GMT+08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Thu, May 22, 2014 at 07:04:14PM +0800, Barry Song wrote:
+>> 2014-05-22 17:33 GMT+08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>> > On Tue, Apr 29, 2014 at 11:40:33PM +0800, Barry Song wrote:
+>> >> 2014-04-29 23:14 GMT+08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>> >> > On Tue, Apr 29, 2014 at 11:05:06PM +0800, Barry Song wrote:
+>> >> >> 2014-04-28 22:52 GMT+08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>> >> >> > On Mon, Apr 28, 2014 at 10:37:09AM -0400, Matt Porter wrote:
+>> >> >> >> The "fix" is tested against bcm281xx and bcm21664 as that is what the
+>> >> >> >> l2c cleanup breaks in -next. As mentioned, I don't have the sirfsoc h/w
+>> >> >> >> so this first attempt at a fix also breaks their platform. It can be
+>> >> >> >> addressed by adding those platform specific compatibles back to the dts,
+>> >> >> >> of course.
+>> >> >> >>
+>> >> >> >> I'd much prefer that the sirfsoc folks fix this...it's going to break
+>> >> >> >> other platforms in a multi v7 build.
+>> >> >> >
+>> >> >> > Well, it's about time we got rid of this from platform specific code
+>> >> >> > anyway, taking it away from platform maintainers to mess around with.
+>> >> >> > So that's what I'm doing.
+>> >> >> >
+>> >> >> > It's worth noting that if you build a single zImage with exynos also
+>> >> >> > enabled, then you also end up with an unconditional call from that
+>> >> >> > code to l2x0_of_init() with it's own magic numbers - and that applies
+>> >> >> > before my changes.
+>> >> >> >
+>> >> >> > So let's fix this properly and yank this crap from platform maintainers
+>> >> >> > fingers.
+>> >> >>
+>> >> >> i mentioned dropping specific dts compatible prop will break non-csr
+>> >> >> platforms in the mail thread "ARM: prima2: remove L2 cache size
+>> >> >> override" and i said i was going to send v2. you said you need it
+>> >> >> before rc6. now it has been sent, but i am sorry it is not against
+>> >> >> next-20140424.
+>> >> >
+>> >> > FFS.  IT HASN'T BEEN SENT.  All that I did was drop it into linux-next
+>> >> > so that more people would get off their fat backsides and test this
+>> >> > fscking patch set - something which hasn't happened because no one
+>> >> > pays attention to emails sent to mailing lists.
+>> >>
+>> >> so your point is people don't pay attention to your mails? or you are
+>> >> ignored? i think that is 100% not real. i think your opinions and
+>> >> mails are always respected as you are the chief arm linux expert.
+>> >>
+>> >> >
+>> >> > I also told you that this was what I was going to do.  But... is it
+>> >> > really on to hold up such a large patch set which impacts virtually
+>> >> > everyone because _you_ don't have time to sort out your small special
+>> >> > requirements - no it is not, that's just fscking selfish.
+>> >> >
+>> >> > Anyway, I've had it with dealing with platform maintainers, I've yanked
+>> >> > this patch set, and I'm no longer planning to do anything with it -
+>> >> > platform maintainers have destroyed my will to get any of this series
+>> >> > into the kernel.
+>> >>
+>> >> no, i am trying to follow your suggestion to make patch set merged and
+>> >> l2 codes cleaned.
+>> >> i have been trying to follow your will until now, and from the beginning.
+>> >>
+>> >> >
+>> >> > So, the L2 cache code is going to remain in its current state, and it's
+>> >> > going to rot because it's _FAR_ too much effort dealing with slow people
+>> >> > like yourselves, or people who want the series split up, or people who
+>> >> > whinge that there aren't any acks there (WELL GET OFF YOUR FAT BACKSIDES
+>> >> > AND SEND ME SOME IF YOU CARE ABOUT THIS - no, don't, I'm no longer pushing
+>> >> > this series.)
+>> >>
+>> >> people might be "selfish", but people might have some reasons to
+>> >> response slowly, like holiday or family issue.
+>> >> how about taking it easy? it doesn't prove you are not respected by
+>> >> platform maintainers.
+>> >>
+>> >> >
+>> >> > This is the last time I'm going to ever try cleaning up any core ARM code.
+>> >> > Core ARM maintanence is impossible in this environment with arm-soc split
+>> >> > from core ARM stuff, because core ARM stuff /always/ impacts on SoC
+>> >> > specific code.  You can't get away from that.
+>> >> >
+>> >> > My position in this community has been made impossible and obsolete by
+>> >> > Linaro.  I'm at the point of walking away from this crap.
+>> >>
+>> >> just fix the relationship and communication, that is good enough. you
+>> >> have done things so well, there is no reason to give up.
+>> >
+>> > So, just as I thought...
+>> >
+>> > -rc6 has now been released, and YOU have done NOTHING to resolve any of
+>> > the issues you have with this patch set - which is precisely on track
+>> > with how you have behaved towards this set of changes on the past - where
+>> > you promised imformation/patches and never delivered.
+>> >
+>> > Well, right now I'm just not going to *care* one bit about Prima2.  If
+>> > this patch set breaks it, tough.  You've had plenty of opportunity to
+>> > deal with this, but instead you've chosen to just whinge about it and
+>> > then do precisely nothing to assist.
+>>
+>> i have no idea why you are saying this. if you checked the email, i
+>> have sent a patch in last month.
+>>
+>> http://www.spinics.net/lists/arm-kernel/msg327151.html
+>>
+>> but i got no reply and you said you will not handle l2....
+>
+> I said I won't deal with this patch set anymore because I got *thoroughly*
+> frustrated with you and the lack of cooperation from many of the SoC people.
+> It seems that the only way to get things done around here is to railroad
+> them into linux-next and wait for people to notice the changes.  That's
+> really not an acceptable way of doing development, but it's the *only*
+> one which gets people's attention.  Sending emails does not work, because
+> people ignore them.
+>
+> Moreover, your patch is a total rewrite of several of my patches, and is
+> not an incremental set of changes.  Given that my patch set which was last
+> posted has the SoC changes done incrementally amongst the other changes,
+> this is just not an acceptable approach, so frankly the patch is useless
+> to me.
 
-On 05/22/2014 12:23 PM, Chen-Yu Tsai wrote:
-> Hi,
-> 
-> On Thu, May 22, 2014 at 5:49 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi All,
->>
->> Arend asked me to test these 2 patches for adding devicetree support to brcmfmac sdio devices:
->> "dt: bindings: add bindings for Broadcom bcm43xx sdio devices"
->> "brcmfmac: add device tree support for SDIO devices"
->> https://groups.google.com/forum/#!msg/linux-sunxi/Zph6zDTnAcw/_-wOO-gnIuQJ
->>
->> Getting this to do anything at all meant also adding this patch:
->>
->> "mmc: Add SDIO function devicetree subnode parsing"
->> https://lkml.org/lkml/2014/4/3/522
->>
->> So that the card / sdio-func devices would actually get their of_node
->> pointer set to the child node under the mmc controller describing
->> the sdio wifi module.
->>
->> But that does not solve the entire problem. Listing the oob-interrupt info
->> in the child node works fine. But listing the brcm,wlan-supply gpio does
->> not. Since these sdio wifi modules are typically soldered onto the
->> board, there mmc controller device tree node has non-removable; set,
->> so the mmc subsystem will try to initialize the sdio device as soon
->> as the mmc driver loads, and if that fails will never look at it again.
->>
->> So we need to have the brcm,wlan-supply gpio driven high *before* the mmc
->> host driver initializes. In case of the brcm,wlan-supply property, this
->> is actually a problem which we've already solved in a number of dts files
->> for allwinner boards, simply create a fixed-regulator with an enable/disable
->> gpio, and set that as vmmc-supply for the mmc-host for the sdio wifi.
->>
->> However the "brcmfmac: add device tree support for SDIO devices" patch
->> also adds support for 2 devicetree controlled clocks. Assuming these need
->> to be ungated before the sdio module will respond to mmc commands, we have
->> the same problem.
-> 
-> Olof posted an RFC series on this very matter:
-> 
->   http://www.spinics.net/lists/linux-mmc/msg24411.html
-> 
-> There was a lengthy discussion, however I don't think the matter was settled.
+in v1, you suggested me moving l2x0_init to init_irq, right? so this
+was done five days after your suggestion. but you choiced to ignore it
+and didn't say your real intention to me. i am a completely stupid man
+and i can't figure out what is your final choice if you didn't say
+anything and just complained stupid man like me didn't assist you.
 
-Phew that was a long read. Indeed it seems that the matter was not
-entirely settled.  It seems that the discussion did gravitate towards this
-information belonging in child nodes under the host controller node to represent
-the device.
+if the information you wanted from me is
 
-I think we need to do this step by step:
++       .l2c_aux_val
++       .l2c_aux_mask
 
-1) Right now, for my use case, I really only care about oob interrupts.
+it is clear that my v1 and v2 have exposed enought information for
+that. why are you saying i didn't provide information to you?
 
-If we can agree that we for additional info for sdio devices we will
-be using a child node under the mmc host with #address-cells = <1>;
-#size-cells = <0>; and reg == function number, iow go with Sacha's
-patch to attach an of node to sdio device functions, then that use case
-is covered.
+i have no idea what has been happening for the whole thing. i was
+asked to one thing in one way, then after one month, i was told it is
+useless.  i am totally confused.
 
-I think this will cover quite a few use-cases already. and it should not
-get in the way of adding fancier stuff, up to doing the entire device
-instantation statically based on the child node, later.
+>
+> --
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
 
-2) Note that my proposal for the clks is very much like Olof's proposal
-in that it tries to keep things KISS, but instead of adding the info
-to the mmc-host node it adds it to the sdio-func child nodes. We could
-ask someone who has an actual use case where power-sequencing with clks
-and/or resets is needed to first implement things along Olof's proposal,
-but then with the clks and resets using standardized properties inside the
-child nodes. This would keep things KISS, again without getting in the
-way of getting fancier later.
-
-3) If someone has a usecase where 2 does not work or become ugly, we can
-then ask that someone to come up with a proposal for something better.
-
-Regards,
-
-Hans
-
-
-
-> 
-> CC-ed everyone from that discussion.
-> 
->> I've been thinking a bit about this, and it is a non trivial problem since
->> sdio devices are normally instantiated when probed, unlike ie spi devices
->> which are instantiated from devicetree.
->>
->> Adding device tree instantiation of sdio devices seems like a bad idea, as
->> then we get 2 vastly different device instantiation paths. Still we need some
->> way to get power and clks setup before the mmc host initializes.
->>
->> Therefor I would like to suggest to add a number of standard properties to
->> mmc-bus child nodes. Making the dts for an mmc host with an sdio device which
->> needs clks setup before it will work look like this:
->>
->>                 mmc3: mmc at 01c12000 {
->>                         #address-cells = <1>;
->>                         #size-cells = <0>;
->>                         pinctrl-names = "default";
->>                         pinctrl-0 = <&mmc3_pins_a>;
->>                         vmmc-supply = <&reg_vmmc3>;
->>                         bus-width = <4>;
->>                         non-removable;
->>                         status = "okay";
->>
->>                         brcmf: bcrmf at 0 {
->>                                 reg = <0>;
->>                                 compatible = "brcm,bcm43xx-fmac";
->>                                 clocks = <&clk_out_a>, <&clk_out_b>;
->>                                 clock-frequency = <32768>, <26000000>;
->>                                 interrupt-parent = <&pio>;
->>                                 interrupts = <10 4>; /* PH10 / EINT10 */
->>                                 interrupt-names = "host-wake";
->>                                 status = "okay";
->>                         };
->>                 };
->>
->> Where the "clocks" and "clock-frequency" attributes would be something
->> which we standardize in Documentation/devicetree/bindings/mmc/mmc-bus.txt
->>
->> These standard properties would *not* be used by the driver for the
->> childnode device, so as to avoid the chicken and egg problem of that driver
->> needing to enable clks, and it only getting bound to the device after
->> the device has been discovered which requires those clocks.
->>
->> Instead these properties would be parsed by mmc_of_parse, and we will
->> get enabled automatically by mmc_add_host before doing any probing.
->>
->> If the optional clock-frequency property is also set, then mmc_add_host
->> will not only enable the clks but also set them to the specified
->> frequency.
->>
->> Note I've no boards which actually need the clocks, all 3 boards with
->> sdio wifi which I've use a 26MHz crystal directly attached to the module,
->> so once I get the oob interrupt working (this needs some work on
->> the allwinner side) we can merge Arend's patches with the clock bits
->> dropped for now.
->>
->> Still I want to get a discussion going on this, so that when the time
->> comes that we do need it we know how to deal with this, or ideally
->> already have code in place to deal with it.
-> 
-> 
-> Cheers
-> ChenYu
-> 
+-barry
