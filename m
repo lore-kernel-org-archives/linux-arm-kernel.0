@@ -1,72 +1,62 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 22 May 2014 08:17:21 +0200
-Subject: [PATCH] arm: dma-mapping: add checking cma area initialized
-In-Reply-To: <1400733503-1302-1-git-send-email-gioh.kim@lge.com>
-References: <1400733503-1302-1-git-send-email-gioh.kim@lge.com>
-Message-ID: <537D9671.6030505@samsung.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 22 May 2014 11:40:49 +0530
+Subject: [PATCH] dmaengine: qcom_bam_dma: Add descriptor flag APIs
+In-Reply-To: <20140515173206.GA16858@qualcomm.com>
+References: <1397772242-4048-1-git-send-email-agross@codeaurora.org>
+ <20140502162841.GZ32284@intel.com>
+ <20140502180827.GA9476@qualcomm.com>
+ <20140515173206.GA16858@qualcomm.com>
+Message-ID: <20140522061049.GW21128@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, May 15, 2014 at 12:32:06PM -0500, Andy Gross wrote:
+> On Fri, May 02, 2014 at 01:08:27PM -0500, Andy Gross wrote:
+> > On Fri, May 02, 2014 at 09:58:41PM +0530, Vinod Koul wrote:
+> > > On Thu, Apr 17, 2014 at 05:04:02PM -0500, Andy Gross wrote:
+> > > > This patch adds APIs that allow for BAM hardware flags to be set per
+> > > > descriptor.  Each one of the new flags informs the attached peripheral of a
+> > > > special behavior that is required.
+> > > > 
+> > > > The EOT flag requests that the peripheral assert an end of transaction interrupt
+> > > > when that descriptor is complete.  It also results in special signaling protocol
+> > > > that is used between the attached peripheral and the core using the DMA
+> > > > controller.
+> > > DMA_PREP_INTERRUPT ??
+> > 
+> > I have 3 different IRQs that can be asserted based on the bit I set in the
+> > hardware descriptor.  The normal IRQ is the INT bit.  However, in some cases the
+> > peripheral protocol requires the use of the EOT or EOB interrupt instead.  The
+> > DMA_PREP_INTERRUPT would only work if I had only 2 choices.
+> 
+> Thinking about this more, I could use the DMA_PREP_INTERRUPT to cover the EOT
+> flag.  However, I might get in a bind later if I need to support the EOB (end of
+> block) interrupt.
+Sorry for delay in this.
 
-On 2014-05-22 06:38, Gioh Kim wrote:
-> If CMA is turned on and CMA size is set to zero, kernel should
-> behave as if CMA was not enabled at compile time.
-> Every dma allocation should check existence of cma area
-> before requesting memory.
->
-> Signed-off-by: Gioh Kim <gioh.kim@lge.com>
-> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> Acked-by: Michal Nazarewicz <mina86@mina86.com>
+I think it would make sense to use DMA_PREP_INTERRUPT for EOB interrupt. The EOT
+should always be enabled for the cases where it is applicable instead of nomral
+irq.
 
-Thanks for this patch! The initial version was really ugly, but
-this one really does what should be there from the begging.
+That should genrically ocvery your cases, or did we miss anything here
+> 
+> > 
+> > > 
+> > > > 
+> > > > The NWD flag requests that the peripheral wait until the data has been fully
+> > > > processed before signaling an interrupt.
+> > > interrupt for transaction complete or DMA request?
+> > 
+> > This is a special signaling mechanism that holds off the DMA interrupt until the
+> > peripheral actually acks that the data has been processed completely.  This is
+> > required in many cases by the peripheral.  One example is the SPI controller.
+> > At the end of a transaction you are supposed to set the NWD so that the chip
+> > select is de-asserted.
+> 
+> I'm not sure what flag I could map this to... maybe DMA_CTRL_ACK?  or maybe the
+> DMA_PREP_FENCE?  I don't generally like overloading the flags and slightly
+> twisting their intent.  Could we add a flag to denote device ACK?
+Nope lets not override these...
 
-I've applied this patch with redundant empty line add removed.
-
-> ---
->   arch/arm/mm/dma-mapping.c |    7 ++++---
->   1 file changed, 4 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 18e98df..9173a13 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -390,12 +390,13 @@ static int __init atomic_pool_init(void)
->   	if (!pages)
->   		goto no_pages;
->   
-> -	if (IS_ENABLED(CONFIG_DMA_CMA))
-> +	if (dev_get_cma_area(NULL))
->   		ptr = __alloc_from_contiguous(NULL, pool->size, prot, &page,
->   					      atomic_pool_init);
->   	else
->   		ptr = __alloc_remap_buffer(NULL, pool->size, gfp, prot, &page,
->   					   atomic_pool_init);
-> +
->   	if (ptr) {
->   		int i;
->   
-> @@ -701,7 +702,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
->   		addr = __alloc_simple_buffer(dev, size, gfp, &page);
->   	else if (!(gfp & __GFP_WAIT))
->   		addr = __alloc_from_pool(size, &page);
-> -	else if (!IS_ENABLED(CONFIG_DMA_CMA))
-> +	else if (!dev_get_cma_area(dev))
->   		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller);
->   	else
->   		addr = __alloc_from_contiguous(dev, size, prot, &page, caller);
-> @@ -790,7 +791,7 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
->   		__dma_free_buffer(page, size);
->   	} else if (__free_from_pool(cpu_addr, size)) {
->   		return;
-> -	} else if (!IS_ENABLED(CONFIG_DMA_CMA)) {
-> +	} else if (!dev_get_cma_area(dev)) {
->   		__dma_free_remap(cpu_addr, size);
->   		__dma_free_buffer(page, size);
->   	} else {
-
-Best regards
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+~Vinod
