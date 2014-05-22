@@ -1,48 +1,48 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 22 May 2014 16:39:17 +0100
-Subject: [PATCH 7/8] ARM: STi: DT: Enable second sdhci controller for
- stih416 b2020 boards.
-In-Reply-To: <1400771902-26553-8-git-send-email-peter.griffin@linaro.org>
+Date: Thu, 22 May 2014 16:41:47 +0100
+Subject: [PATCH 6/8] ARM: STi: DT: Enable mmc0 for both stih415 and
+ stih416 SoCs
+In-Reply-To: <1400771902-26553-7-git-send-email-peter.griffin@linaro.org>
 References: <1400771902-26553-1-git-send-email-peter.griffin@linaro.org>
- <1400771902-26553-8-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20140522153917.GD19747@lee--X1>
+ <1400771902-26553-7-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20140522154147.GE19747@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 22 May 2014, Peter Griffin wrote:
 
-> The second controller is only present on the stih416 SoC. Also
-> mark this as non-removeable as its eMMC.
+> Because the first sdhci controller is present on both stih415 and
+> stih416 SoC which can both populate the b2020 board, it can be
+> enabled in the generic DT file.
 > 
 > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 > Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> ---
->  arch/arm/boot/dts/stih416-b2020.dts | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
-> index 4e2df66..6cde745 100644
-> --- a/arch/arm/boot/dts/stih416-b2020.dts
-> +++ b/arch/arm/boot/dts/stih416-b2020.dts
-> @@ -12,4 +12,12 @@
->  / {
->  	model = "STiH416 B2020";
->  	compatible = "st,stih416-b2020", "st,stih416";
-> +
-> +	soc {
-> +		mmc1: sdhci at fe81f000 {
-> +			status = "okay";
-> +			non-removable;
-> +		};
-> +	};
-> +
 
-Superfluous '\n'.
+These are the wrong way around.
 
->  };
+You can correct that when adding my:
 
-Once rectified you can add my:
   Acked-by: Lee Jones <lee.jones@linaro.org>
+
+> ---
+>  arch/arm/boot/dts/stih41x-b2020x.dtsi | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stih41x-b2020x.dtsi b/arch/arm/boot/dts/stih41x-b2020x.dtsi
+> index df01c12..f797a06 100644
+> --- a/arch/arm/boot/dts/stih41x-b2020x.dtsi
+> +++ b/arch/arm/boot/dts/stih41x-b2020x.dtsi
+> @@ -8,6 +8,10 @@
+>   */
+>  / {
+>  	soc {
+> +		mmc0: sdhci at fe81e000 {
+> +			status = "okay";
+> +		};
+> +
+>  		spifsm: spifsm at fe902000 {
+>  			#address-cells = <1>;
+>  			#size-cells    = <1>;
 
 -- 
 Lee Jones
