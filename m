@@ -1,117 +1,50 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 22 May 2014 18:23:58 +0800
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
- device tree
-In-Reply-To: <537DC832.3020006@redhat.com>
-References: <537DC832.3020006@redhat.com>
-Message-ID: <CAGb2v64VZac2KvAALrScecN89sRnBQoDrKxKMvkte+3G04NXeA@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 22 May 2014 12:30:42 +0200
+Subject: [PATCH 3/4] clk: samsung: Add driver to control CLKOUT line on
+ Exynos SoCs
+In-Reply-To: <537D7CF4.6050305@linaro.org>
+References: <1400604211-9447-1-git-send-email-t.figa@samsung.com>
+ <1400604211-9447-4-git-send-email-t.figa@samsung.com>
+ <537D7CF4.6050305@linaro.org>
+Message-ID: <537DD1D2.9010107@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 22.05.2014 06:28, Tushar Behera wrote:
+> On 05/20/2014 10:13 PM, Tomasz Figa wrote:
+>> This patch introduces a driver that handles configuration of CLKOUT pin
+>> of Exynos SoCs that can be used to output certain clocks from inside of
+>> the SoC to a dedicated output pin.
+>>
+>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>> ---
+>>  .../devicetree/bindings/arm/samsung/pmu.txt        |  30 ++++
+>>  drivers/clk/samsung/Makefile                       |   1 +
+>>  drivers/clk/samsung/clk-exynos-clkout.c            | 153 +++++++++++++++++++++
+>>  3 files changed, 184 insertions(+)
+>>  create mode 100644 drivers/clk/samsung/clk-exynos-clkout.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+>> index b562634..5ed94a9 100644
+>> --- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+>> +++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+>> @@ -11,8 +11,38 @@ Properties:
+>>  
+>>   - reg : offset and length of the register set.
+>>  
+>> + - #clock-cells : must be <1>, since PMU requires once cell as clock specifier.
+> 
+> s/once/one
+> 
+>> +		The single specifier cell is used as index to list of clocks
+>> +		provided by PMU, which is currently:
+>> +			0 : SoC clock output (CLKOUT pin)
+> 
+> Will it make more sense if we add a macro for this clock number that
+> would be referred in the device tree files?
 
-On Thu, May 22, 2014 at 5:49 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi All,
->
-> Arend asked me to test these 2 patches for adding devicetree support to brcmfmac sdio devices:
-> "dt: bindings: add bindings for Broadcom bcm43xx sdio devices"
-> "brcmfmac: add device tree support for SDIO devices"
-> https://groups.google.com/forum/#!msg/linux-sunxi/Zph6zDTnAcw/_-wOO-gnIuQJ
->
-> Getting this to do anything at all meant also adding this patch:
->
-> "mmc: Add SDIO function devicetree subnode parsing"
-> https://lkml.org/lkml/2014/4/3/522
->
-> So that the card / sdio-func devices would actually get their of_node
-> pointer set to the child node under the mmc controller describing
-> the sdio wifi module.
->
-> But that does not solve the entire problem. Listing the oob-interrupt info
-> in the child node works fine. But listing the brcm,wlan-supply gpio does
-> not. Since these sdio wifi modules are typically soldered onto the
-> board, there mmc controller device tree node has non-removable; set,
-> so the mmc subsystem will try to initialize the sdio device as soon
-> as the mmc driver loads, and if that fails will never look at it again.
->
-> So we need to have the brcm,wlan-supply gpio driven high *before* the mmc
-> host driver initializes. In case of the brcm,wlan-supply property, this
-> is actually a problem which we've already solved in a number of dts files
-> for allwinner boards, simply create a fixed-regulator with an enable/disable
-> gpio, and set that as vmmc-supply for the mmc-host for the sdio wifi.
->
-> However the "brcmfmac: add device tree support for SDIO devices" patch
-> also adds support for 2 devicetree controlled clocks. Assuming these need
-> to be ungated before the sdio module will respond to mmc commands, we have
-> the same problem.
+Right now, with just one clock, it doesn't make sense, but if further
+clocks show up with newer SoCs, then macros will have to be added.
 
-Olof posted an RFC series on this very matter:
-
-  http://www.spinics.net/lists/linux-mmc/msg24411.html
-
-There was a lengthy discussion, however I don't think the matter was settled.
-
-CC-ed everyone from that discussion.
-
-> I've been thinking a bit about this, and it is a non trivial problem since
-> sdio devices are normally instantiated when probed, unlike ie spi devices
-> which are instantiated from devicetree.
->
-> Adding device tree instantiation of sdio devices seems like a bad idea, as
-> then we get 2 vastly different device instantiation paths. Still we need some
-> way to get power and clks setup before the mmc host initializes.
->
-> Therefor I would like to suggest to add a number of standard properties to
-> mmc-bus child nodes. Making the dts for an mmc host with an sdio device which
-> needs clks setup before it will work look like this:
->
->                 mmc3: mmc at 01c12000 {
->                         #address-cells = <1>;
->                         #size-cells = <0>;
->                         pinctrl-names = "default";
->                         pinctrl-0 = <&mmc3_pins_a>;
->                         vmmc-supply = <&reg_vmmc3>;
->                         bus-width = <4>;
->                         non-removable;
->                         status = "okay";
->
->                         brcmf: bcrmf at 0 {
->                                 reg = <0>;
->                                 compatible = "brcm,bcm43xx-fmac";
->                                 clocks = <&clk_out_a>, <&clk_out_b>;
->                                 clock-frequency = <32768>, <26000000>;
->                                 interrupt-parent = <&pio>;
->                                 interrupts = <10 4>; /* PH10 / EINT10 */
->                                 interrupt-names = "host-wake";
->                                 status = "okay";
->                         };
->                 };
->
-> Where the "clocks" and "clock-frequency" attributes would be something
-> which we standardize in Documentation/devicetree/bindings/mmc/mmc-bus.txt
->
-> These standard properties would *not* be used by the driver for the
-> childnode device, so as to avoid the chicken and egg problem of that driver
-> needing to enable clks, and it only getting bound to the device after
-> the device has been discovered which requires those clocks.
->
-> Instead these properties would be parsed by mmc_of_parse, and we will
-> get enabled automatically by mmc_add_host before doing any probing.
->
-> If the optional clock-frequency property is also set, then mmc_add_host
-> will not only enable the clks but also set them to the specified
-> frequency.
->
-> Note I've no boards which actually need the clocks, all 3 boards with
-> sdio wifi which I've use a 26MHz crystal directly attached to the module,
-> so once I get the oob interrupt working (this needs some work on
-> the allwinner side) we can merge Arend's patches with the clock bits
-> dropped for now.
->
-> Still I want to get a discussion going on this, so that when the time
-> comes that we do need it we know how to deal with this, or ideally
-> already have code in place to deal with it.
-
-
-Cheers
-ChenYu
+Best regards,
+Tomasz
