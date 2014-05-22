@@ -1,34 +1,48 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 22 May 2014 16:36:50 +0100
-Subject: [PATCH 8/8] ARM: update multi_v7_defconfig for STI
-In-Reply-To: <1400771902-26553-9-git-send-email-peter.griffin@linaro.org>
+Date: Thu, 22 May 2014 16:39:17 +0100
+Subject: [PATCH 7/8] ARM: STi: DT: Enable second sdhci controller for
+ stih416 b2020 boards.
+In-Reply-To: <1400771902-26553-8-git-send-email-peter.griffin@linaro.org>
 References: <1400771902-26553-1-git-send-email-peter.griffin@linaro.org>
- <1400771902-26553-9-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20140522153650.GC19747@lee--X1>
+ <1400771902-26553-8-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20140522153917.GD19747@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This patch enables SDHCI STI platform driver.
+On Thu, 22 May 2014, Peter Griffin wrote:
+
+> The second controller is only present on the stih416 SoC. Also
+> mark this as non-removeable as its eMMC.
 > 
 > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
 > ---
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/boot/dts/stih416-b2020.dts | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
+> index 4e2df66..6cde745 100644
+> --- a/arch/arm/boot/dts/stih416-b2020.dts
+> +++ b/arch/arm/boot/dts/stih416-b2020.dts
+> @@ -12,4 +12,12 @@
+>  / {
+>  	model = "STiH416 B2020";
+>  	compatible = "st,stih416-b2020", "st,stih416";
+> +
+> +	soc {
+> +		mmc1: sdhci at fe81f000 {
+> +			status = "okay";
+> +			non-removable;
+> +		};
+> +	};
+> +
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Superfluous '\n'.
 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index d4e8a47..48951fc 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -277,6 +277,7 @@ CONFIG_MMC_SDHCI_TEGRA=y
->  CONFIG_MMC_SDHCI_DOVE=y
->  CONFIG_MMC_SDHCI_SPEAR=y
->  CONFIG_MMC_SDHCI_BCM_KONA=y
-> +CONFIG_MMC_SDHCI_ST=y
->  CONFIG_MMC_OMAP=y
->  CONFIG_MMC_OMAP_HS=y
->  CONFIG_MMC_MVSDIO=y
+>  };
+
+Once rectified you can add my:
+  Acked-by: Lee Jones <lee.jones@linaro.org>
 
 -- 
 Lee Jones
