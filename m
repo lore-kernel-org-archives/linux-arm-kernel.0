@@ -1,22 +1,31 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 22 May 2014 17:57:44 +0100
-Subject: [PATCH] ASoC: samsung: Handle errors when getting the op_clk clock
-In-Reply-To: <1400753452-6943-1-git-send-email-s.nawrocki@samsung.com>
-References: <1400753452-6943-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20140522165744.GK12304@sirena.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 22 May 2014 18:11:48 +0100
+Subject: [Patch v6 3/7] mfd: ti-keystone-devctrl: add bindings for device
+ state control
+In-Reply-To: <1400777062-19276-4-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1400777062-19276-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1400777062-19276-4-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <20140522171148.GL19747@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 12:10:52PM +0200, Sylwester Nawrocki wrote:
-> Ensure i2s->op_clk is not used when clk_get() for this clock fails.
-> This prevents working with an incorrectly configured clock in some
-> conditions.
+On Thu, 22 May 2014, Ivan Khoronzhuk wrote:
+
+> The Keystone II devices have a set of registers that are used to control
+> the status of its peripherals. This node is intended to allow access to
+> this functionality.
+> 
+> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> ---
+>  .../devicetree/bindings/mfd/ti-keystone-devctrl.txt   | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt
 
 Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140522/c62cae06/attachment.sig>
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
