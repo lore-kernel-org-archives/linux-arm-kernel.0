@@ -1,32 +1,29 @@
 From: gdjakov@mm-sol.com (Georgi Djakov)
-Date: Thu, 22 May 2014 19:24:41 +0300
-Subject: [PATCH v1 1/5] clk: qcom: Add APQ8084 Global Clock Controller
- documentation
-In-Reply-To: <1400775885-10296-1-git-send-email-gdjakov@mm-sol.com>
-References: <1400775885-10296-1-git-send-email-gdjakov@mm-sol.com>
-Message-ID: <1400775885-10296-2-git-send-email-gdjakov@mm-sol.com>
+Date: Thu, 22 May 2014 19:24:40 +0300
+Subject: [PATCH v1 0/5] clk: gcc: Add APQ8084 Global Clock Controller support
+Message-ID: <1400775885-10296-1-git-send-email-gdjakov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the compatible string for the APQ8084 global clock controller
-to the clock binding documentation.
+This patchset adds support for the global clock controller found on the
+APQ8084 based platforms.
 
-Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
----
+It applies to the clk-next tree and the following patchset on top of it:
+https://lkml.org/lkml/2014/5/16/666
+
+Georgi Djakov (5):
+  clk: qcom: Add APQ8084 Global Clock Controller documentation
+  clk: qcom: Allow an override function to be passed as data
+  clk: gcc: Add APQ8084 Global Clock Controller support
+  ARM: dts: qcom: Add APQ8084 Global Clock Controller DT node
+  ARM: dts: qcom: Add APQ8084 serial port DT node
+
  .../devicetree/bindings/clock/qcom,gcc.txt         |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/qcom-apq8084.dtsi                |   17 ++
+ drivers/clk/qcom/Kconfig                           |    4 +-
+ drivers/clk/qcom/gcc-msm8974.c                     |  174 ++++++++++++++++++--
+ include/dt-bindings/clock/qcom,gcc-msm8974.h       |    4 +
+ 5 files changed, 185 insertions(+), 15 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/qcom,gcc.txt b/Documentation/devicetree/bindings/clock/qcom,gcc.txt
-index 9cfcb4f..4f35042 100644
---- a/Documentation/devicetree/bindings/clock/qcom,gcc.txt
-+++ b/Documentation/devicetree/bindings/clock/qcom,gcc.txt
-@@ -5,6 +5,7 @@ Required properties :
- - compatible : shall contain only one of the following:
- 
- 			"qcom,gcc-apq8064"
-+			"qcom,gcc-apq8084"
- 			"qcom,gcc-msm8660"
- 			"qcom,gcc-msm8960"
- 			"qcom,gcc-msm8974"
 -- 
 1.7.9.5
