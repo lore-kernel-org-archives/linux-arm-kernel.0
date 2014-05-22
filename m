@@ -1,37 +1,61 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 22 May 2014 22:55:31 +0200
-Subject: [PATCH] mfd: db8500-prcmu: remove check for CONFIG_DBX500_PRCMU_DEBUG
-Message-ID: <1400792131.16407.33.camel@x220>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 22 May 2014 22:56:06 +0200
+Subject: [PATCH v2 1/6] wdt: sunxi: Move restart code to the watchdog
+ driver
+In-Reply-To: <20140522213943.7649e304@alan.etchedpixels.co.uk>
+References: <1399430664-29091-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399430664-29091-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20140507213318.GA2105@roeck-us.net>
+ <20140515091123.GQ29258@lukather> <20140519150422.GA27329@lukather>
+ <20140522203444.GE27329@lukather>
+ <20140522213943.7649e304@alan.etchedpixels.co.uk>
+Message-ID: <20140522205606.GF27329@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A check for CONFIG_DBX500_PRCMU_DEBUG was added in v3.6. But there's no
-Kconfig symbol DBX500_PRCMU_DEBUG. So remove this check.
+On Thu, May 22, 2014 at 09:39:43PM +0100, One Thousand Gnomes wrote:
+> On Thu, 22 May 2014 22:34:44 +0200
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > On Mon, May 19, 2014 at 05:04:22PM +0200, Maxime Ripard wrote:
+> > > On Thu, May 15, 2014 at 11:11:23AM +0200, Maxime Ripard wrote:
+> > > > On Wed, May 07, 2014 at 02:33:18PM -0700, Guenter Roeck wrote:
+> > > > > On Tue, May 06, 2014 at 09:44:19PM -0500, Maxime Ripard wrote:
+> > > > > > Most of the watchdog code is duplicated between the machine restart code and
+> > > > > > the watchdog driver. Add the restart hook to the watchdog driver, to be able to
+> > > > > > remove it from the machine code eventually.
+> > > > > > 
+> > > > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > > > > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > > > > 
+> > > > > Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> > > > 
+> > > > Wim, do you have any comment on this one?
+> > > 
+> > > Ping?
+> > > 
+> > > It would be really great to see this in 3.16, and we get quite close
+> > > to the end of ARM's merge window.
+> > 
+> > Ping?
+> > 
+> > Guenter, since you seem to be the only responsive, may I suggest that
+> > you start merging patches and do a pull request to either Wim or Linus
+> > directly during the merge window?
+> 
+> I've yet to see anyone explain why this is an improvement over the
+> current situation ?
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Untested. Note that db8500_prcmu_debug_dump() is nowhere to be found in
-the tree.
+"This" being ... ?
 
-This check has been in the tree for less than two years. Am I being
-impatient here?
-
- drivers/mfd/db8500-prcmu.c | 3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 7694e0700d34..c248bde367ab 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -2303,9 +2303,6 @@ int prcmu_ac_wake_req(void)
- 
- 	if (!wait_for_completion_timeout(&mb0_transfer.ac_wake_work,
- 			msecs_to_jiffies(5000))) {
--#if defined(CONFIG_DBX500_PRCMU_DEBUG)
--		db8500_prcmu_debug_dump(__func__, true, true);
--#endif
- 		pr_crit("prcmu: %s timed out (5 s) waiting for a reply.\n",
- 			__func__);
- 		ret = -EFAULT;
 -- 
-1.9.0
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140522/56d63281/attachment-0001.sig>
