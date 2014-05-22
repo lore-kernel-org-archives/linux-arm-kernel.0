@@ -1,46 +1,58 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 22 May 2014 14:39:20 -0400 (EDT)
-Subject: [PATCH v2] ARM: realview: basic device tree implementation
-In-Reply-To: <5233065.1vXjHiDqN2@wuerfel>
-References: <1399586896-16906-1-git-send-email-linus.walleij@linaro.org>
- <5057707.jNCXlqf9dH@wuerfel>
- <alpine.LFD.2.11.1405221406100.17310@knanqh.ubzr>
- <5233065.1vXjHiDqN2@wuerfel>
-Message-ID: <alpine.LFD.2.11.1405221431370.17310@knanqh.ubzr>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 22 May 2014 11:40:06 -0700
+Subject: [PATCH] ARM: remove ARM710 specific assembler code
+In-Reply-To: <4437236.32BrGIk46D@wuerfel>
+References: <1364507176.1345.45.camel@x61.thuisdomein>
+ <5053472.zFAHKQVpbv@wuerfel> <20140520160512.GE27830@atomide.com>
+ <4437236.32BrGIk46D@wuerfel>
+Message-ID: <20140522184005.GB29577@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 May 2014, Arnd Bergmann wrote:
-
-> On Thursday 22 May 2014 14:09:52 Nicolas Pitre wrote:
-> > On Thu, 22 May 2014, Arnd Bergmann wrote:
-> > 
-> > > On Thursday 22 May 2014 15:45:03 Catalin Marinas wrote:
-> > > > By making the DMA memory Strongly Ordered, we avoid the
-> > > > L220 write buffer. In addition to the above commit, we also had
-> > > > 2503a5ecd86c (ARM: 6201/1: RealView: Do not use outer_sync() on
-> > > > ARM11MPCore boards with L220).
+* Arnd Bergmann <arnd@arndb.de> [140520 13:10]:
+> On Tuesday 20 May 2014 09:05:13 Tony Lindgren wrote:
+> > * Arnd Bergmann <arnd@arndb.de> [140519 04:27]:
+> > > On Saturday 17 May 2014 10:56:02 Catalin Marinas wrote:
 > > > 
-> > > Ah, so this also stands in the way of multiplatform realview 
+> > > For the case of ARM710T, I think the last remaining user that can be
+> > > configured is mach-integrator, but I don't know if anybody even has that
+> > > CPU tile, or wants to keep using it. If Russell and Linus as the only
+> > > people that have cared about Integrator in the past years want to
+> > > cut down the number of supported CPUs, that would be a different matter:
+> > > quite a number of CPUs are not supported in any other platform.
+> > > Note that the integrator target in qemu does not support any ARM7, only
+> > > StrongARM, ARM9 or later. I also double-checked about mach-clps711x,
+> > > but I'm pretty sure those SoCs are all either ARM710a (no longer supported)
+> > > or ARM720T (quite active).
 > > 
-> > Isn't the real value of a multiplatform realview in the ability to use 
-> > it with Qemu?  Did Qemu go to the extreme of emulating all those cache 
-> > issues?
+> > Hmm I don't think mach-integrator is using ARM710T?
 > 
-> The qemu developers have in the past always argued strongly that they
-> want to run the same kernel that runs on real hardware. Having a kernel
-> that runs only on the emulated version but not on actual hardware is
-> clearly against that goal, and  we should use CONFIG_ARCH_VIRT for
-> that purpose.
+> I don't know, we don't have a separate Kconfig option, so ARM710T and ARM720T
+> use the same CONFIG_CPU_ARM720T symbol that can be enabled for integrator.
+> Without any further information, I assumed that both might potentially be used.
+> 
+> > The ARM710T was done by NEC and was used by the Psion MX hardware.
+> > It's very close to ARM720T as far as I remember so might as well keep
+> > the CPU support for it as that's just a few lines of code in the
+> > mainline kernel.
+> > 
+> > I don't think we have any mach directories using ARM710T, but I
+> > would not be surprised if somebody comes along with device tree
+> > based booting patches for Psion MX at some point.
+> 
+> Of course, if someone does this, the CPU support would be the least
+> of their work ;-)
 
-But the kernel that actually runs on the real hardware also runs on Qemu 
-already.  It is just that, by some coincidence, a multi-platform kernel 
-that pretends to have the same peripherals as a Realview board could 
-also be used on Qemu.
+Right :)
+ 
+> Just out of curiosity: was that NEC 710T a SoC that replaced the
+> CL/PS7110, or a standalone CPU that Psion combined with a custom
+> ASIC?
 
-Otherwise I really don't see the point in making the code more complex 
-just to make a multi-platform kernel run on actual Realview hardware 
-that is quite obsolete now and that very few people have access to.
+I think 710T was a pin compatible clone of CL/PS7110 by NEC. The
+device registers were different both from CL/PS7110 and 720T for
+most part.
 
+Regards,
 
-Nicolas
+Tony
