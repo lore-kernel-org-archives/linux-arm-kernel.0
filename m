@@ -1,37 +1,41 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 22 May 2014 14:00:09 -0700
-Subject: [PATCH 1/5] devicetree: bindings: Document micrel vendor prefix
+Date: Thu, 22 May 2014 14:00:13 -0700
+Subject: [PATCH 5/5] net: ks8851: Add of match table
 In-Reply-To: <1400792413-21618-1-git-send-email-sboyd@codeaurora.org>
 References: <1400792413-21618-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1400792413-21618-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1400792413-21618-6-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's one existing use of 'micrel' in the documentation so use
-'micrel' instead of the company's ticker symbol 'mcrl'.
+Users are currently just providing "ks8851" as the compatible for
+this driver in device tree. Add a compatible string that provides
+the vendor name along with the driver name to be more explicit.
 
-Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
+ drivers/net/ethernet/micrel/ks8851.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-This is mostly here as the first patch to make checkpatch quiet. I expect DT
-maintainers to pick this one up.
-
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 1bc2174e1a05..2fe06ad1d248 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -76,6 +76,7 @@ linux	Linux-specific binding
- lsi	LSI Corp. (LSI Logic)
- marvell	Marvell Technology Group Ltd.
- maxim	Maxim Integrated Products
-+micrel	Micrel Inc.
- microchip	Microchip Technology Inc.
- mosaixtech	Mosaix Technologies, Inc.
- moxa	Moxa
+diff --git a/drivers/net/ethernet/micrel/ks8851.c b/drivers/net/ethernet/micrel/ks8851.c
+index 3a322daba5ff..e72918970a58 100644
+--- a/drivers/net/ethernet/micrel/ks8851.c
++++ b/drivers/net/ethernet/micrel/ks8851.c
+@@ -1603,9 +1603,15 @@ static int ks8851_remove(struct spi_device *spi)
+ 	return 0;
+ }
+ 
++static const struct of_device_id ks8851_match_table[] = {
++	{ .compatible = "micrel,ks8851" },
++	{ }
++};
++
+ static struct spi_driver ks8851_driver = {
+ 	.driver = {
+ 		.name = "ks8851",
++		.of_match_table = ks8851_match_table,
+ 		.owner = THIS_MODULE,
+ 		.pm = &ks8851_pm_ops,
+ 	},
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
