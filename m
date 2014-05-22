@@ -1,53 +1,100 @@
-From: ritesh.harjani@gmail.com (Ritesh Harjani)
-Date: Thu, 22 May 2014 21:22:38 +0530
-Subject: Cache maintenance in arm_iommu_alloc_attrs for iommu_coherent_ops
-In-Reply-To: <537DB5F3.4090000@samsung.com>
-References: <CAD15agav14RUb473+iCm24HM9eQfWYG8ytZOfpzm5j0e3EX3WQ@mail.gmail.com>
- <CAD15agY8bBQZgcVqJjM2W8x5qHs5ozs-nVa1QJuzmiqHW2wFOg@mail.gmail.com>
- <537DB5F3.4090000@samsung.com>
-Message-ID: <CAD15agYLuZ9+4ZYdvS9S54xr=vvZQVtthQxjVeWG8zwUvEO3Gg@mail.gmail.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Thu, 22 May 2014 08:55:35 -0700
+Subject: [PATCH v3 1/2] mmc: tegra: disable UHS modes
+Message-ID: <1400774136-12396-1-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Marek,
+Program TEGRA_SDHCI_VENDOR_MISC_CTRL so that UHS modes aren't advertised
+in SDHCI_CAPABILITIES_1.  While the Tegra SDHCI controller does support
+these modes, they require Tegra-specific tuning and calibration routines
+which the driver does not support yet.
 
-I will push in the fixes soon.
+Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+Tested-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: Stephen Warren <swarren@nvidia.com>
+---
+Changes from v2:
+ - rebased on mmc-next
+No changes from v1
+---
+ drivers/mmc/host/sdhci-tegra.c | 30 +++++++++++++++++++++++-------
+ 1 file changed, 23 insertions(+), 7 deletions(-)
 
-Regards
-Ritesh
-
-
-On Thu, May 22, 2014 at 2:01 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hello,
->
->
-> On 2014-05-21 11:37, Ritesh Harjani wrote:
->>
->> arm_iommu_mmap_attrs function for iommu_coherent_ops(and also for
->> noncoherent iommu_ops) calls for __get_dma_pgprot.
->>
->>   628 static inline pgprot_t __get_dma_pgprot(struct dma_attrs *attrs,
->> pgprot_t prot)
->>   629 {
->>   630         prot = dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs) ?
->>   631                             pgprot_writecombine(prot) :
->>   632                             pgprot_dmacoherent(prot);
->>   633         return prot;
->>   634 }
->>
->> Now if someone calls for dma_mmap_coherent, then we should not be
->> changing the memory to be uncached always to make it coherent right
->> (from functino __get_dma_pgprot above) ??
->> It should be based on dma_map_ops, and if it is iommu_coherent_ops,
->> then we should not change the memory to be uncached ??
->
->
-> Once again you are right. This also need to be fixed.
->
->
-> Best regards
-> --
-> Marek Szyprowski, PhD
-> Samsung R&D Institute Poland
->
+diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
+index 9852476..4375cd4 100644
+--- a/drivers/mmc/host/sdhci-tegra.c
++++ b/drivers/mmc/host/sdhci-tegra.c
+@@ -32,11 +32,17 @@
+ 
+ /* Tegra SDHOST controller vendor register definitions */
+ #define SDHCI_TEGRA_VENDOR_MISC_CTRL		0x120
++#define SDHCI_MISC_CTRL_ENABLE_SDR104		0x8
++#define SDHCI_MISC_CTRL_ENABLE_SDR50		0x10
+ #define SDHCI_MISC_CTRL_ENABLE_SDHCI_SPEC_300	0x20
++#define SDHCI_MISC_CTRL_ENABLE_DDR50		0x200
+ 
+ #define NVQUIRK_FORCE_SDHCI_SPEC_200	BIT(0)
+ #define NVQUIRK_ENABLE_BLOCK_GAP_DET	BIT(1)
+ #define NVQUIRK_ENABLE_SDHCI_SPEC_300	BIT(2)
++#define NVQUIRK_DISABLE_SDR50		BIT(3)
++#define NVQUIRK_DISABLE_SDR104		BIT(4)
++#define NVQUIRK_DISABLE_DDR50		BIT(5)
+ 
+ struct sdhci_tegra_soc_data {
+ 	const struct sdhci_pltfm_data *pdata;
+@@ -100,20 +106,25 @@ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+ 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+ 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
++	u32 misc_ctrl;
+ 
+ 	sdhci_reset(host, mask);
+ 
+ 	if (!(mask & SDHCI_RESET_ALL))
+ 		return;
+ 
++	misc_ctrl = sdhci_readw(host, SDHCI_TEGRA_VENDOR_MISC_CTRL);
+ 	/* Erratum: Enable SDHCI spec v3.00 support */
+-	if (soc_data->nvquirks & NVQUIRK_ENABLE_SDHCI_SPEC_300) {
+-		u32 misc_ctrl;
+-
+-		misc_ctrl = sdhci_readb(host, SDHCI_TEGRA_VENDOR_MISC_CTRL);
++	if (soc_data->nvquirks & NVQUIRK_ENABLE_SDHCI_SPEC_300)
+ 		misc_ctrl |= SDHCI_MISC_CTRL_ENABLE_SDHCI_SPEC_300;
+-		sdhci_writeb(host, misc_ctrl, SDHCI_TEGRA_VENDOR_MISC_CTRL);
+-	}
++	/* Don't advertise UHS modes which aren't supported yet */
++	if (soc_data->nvquirks & NVQUIRK_DISABLE_SDR50)
++		misc_ctrl &= ~SDHCI_MISC_CTRL_ENABLE_SDR50;
++	if (soc_data->nvquirks & NVQUIRK_DISABLE_DDR50)
++		misc_ctrl &= ~SDHCI_MISC_CTRL_ENABLE_DDR50;
++	if (soc_data->nvquirks & NVQUIRK_DISABLE_SDR104)
++		misc_ctrl &= ~SDHCI_MISC_CTRL_ENABLE_SDR104;
++	sdhci_writew(host, misc_ctrl, SDHCI_TEGRA_VENDOR_MISC_CTRL);
+ }
+ 
+ static void tegra_sdhci_set_bus_width(struct sdhci_host *host, int bus_width)
+@@ -170,7 +181,9 @@ static const struct sdhci_pltfm_data sdhci_tegra30_pdata = {
+ 
+ static struct sdhci_tegra_soc_data soc_data_tegra30 = {
+ 	.pdata = &sdhci_tegra30_pdata,
+-	.nvquirks = NVQUIRK_ENABLE_SDHCI_SPEC_300,
++	.nvquirks = NVQUIRK_ENABLE_SDHCI_SPEC_300 |
++		    NVQUIRK_DISABLE_SDR50 |
++		    NVQUIRK_DISABLE_SDR104,
+ };
+ 
+ static const struct sdhci_pltfm_data sdhci_tegra114_pdata = {
+@@ -184,6 +197,9 @@ static const struct sdhci_pltfm_data sdhci_tegra114_pdata = {
+ 
+ static struct sdhci_tegra_soc_data soc_data_tegra114 = {
+ 	.pdata = &sdhci_tegra114_pdata,
++	.nvquirks = NVQUIRK_DISABLE_SDR50 |
++		    NVQUIRK_DISABLE_DDR50 |
++		    NVQUIRK_DISABLE_SDR104,
+ };
+ 
+ static const struct of_device_id sdhci_tegra_dt_match[] = {
+-- 
+1.9.1.423.g4596e3a
