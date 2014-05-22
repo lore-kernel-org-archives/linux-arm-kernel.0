@@ -1,37 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 May 2014 22:18:50 -0700
-Subject: [PATCH] ARM: imx: fix error handling in ipu device registration
-In-Reply-To: <1400483274-13680-1-git-send-email-shawn.guo@freescale.com>
-References: <1400483274-13680-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20140522051850.GC32618@quad.lixom.net>
+Date: Wed, 21 May 2014 22:19:59 -0700
+Subject: [GIT PULL] omap fixes for v3.15 -rc cycle
+In-Reply-To: <20140520003419.GA15793@atomide.com>
+References: <20140520003419.GA15793@atomide.com>
+Message-ID: <20140522051959.GD32618@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 03:07:54PM +0800, Shawn Guo wrote:
-> From: Emil Goode <emilgoode@gmail.com>
+On Mon, May 19, 2014 at 05:34:20PM -0700, Tony Lindgren wrote:
+> The following changes since commit 89ca3b881987f5a4be4c5dbaa7f0df12bbdde2fd:
 > 
-> If we fail to allocate struct platform_device pdev we
-> dereference it after the goto label err.
+>   Linux 3.15-rc4 (2014-05-04 18:14:42 -0700)
 > 
-> This bug was found using coccinelle.
+> are available in the git repository at:
 > 
-> Fixes: afa77ef (ARM: mx3: dynamically allocate "ipu-core" devices)
-> Signed-off-by: Emil Goode <emilgoode@gmail.com>
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
-> Arnd, Olof,
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/fixes-v3-signed
 > 
-> Please consider to apply this fix for 3.15.  Thanks.
+> for you to fetch changes up to 4b353a706a86598ba47307c47301c3c428b79e09:
+> 
+>   ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled (2014-05-19 11:20:38 -0700)
 
-Applied, thanks.
 
-BTW, it was requested to use a 12-character SHA in the Fixes: tag, since in the
-future there might be a collision on the shortest one.
-
-You can update the default for your git repo by setting the core.abbrevlength
-config variable to 12.
+Pulled, thanks!
 
 
 -Olof
