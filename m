@@ -1,58 +1,16 @@
-From: manuel.schoelling@gmx.de (=?UTF-8?q?Manuel=20Sch=C3=B6lling?=)
-Date: Thu, 22 May 2014 21:10:28 +0200
-Subject: [PATCH] xilinx: Use time_before_eq()
-Message-ID: <1400785828-1551-1-git-send-email-manuel.schoelling@gmx.de>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 22 May 2014 15:10:42 -0400 (EDT)
+Subject: [PATCH v1 0/2] net: fec: Add fec sleep pinctrl for pin PM state
+In-Reply-To: <1400568645-10214-1-git-send-email-b38611@freescale.com>
+References: <1400568645-10214-1-git-send-email-b38611@freescale.com>
+Message-ID: <20140522.151042.666672316134579103.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To be future-proof and for better readability the time comparisons are modified
-to use time_before_eq() instead of plain, error-prone math.
+From: Fugang Duan <b38611@freescale.com>
+Date: Tue, 20 May 2014 14:50:43 +0800
 
-Signed-off-by: Manuel Sch?lling <manuel.schoelling@gmx.de>
----
- drivers/net/ethernet/xilinx/ll_temac_main.c       |    2 +-
- drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c |    2 +-
- drivers/net/ethernet/xilinx/xilinx_emaclite.c     |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+> The two patches is to add fec sleep pinctrl for pin PM state in imx6sl
+> evk platform.
 
-diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
-index fa193c4..4ef818a 100644
---- a/drivers/net/ethernet/xilinx/ll_temac_main.c
-+++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
-@@ -75,7 +75,7 @@ int temac_indirect_busywait(struct temac_local *lp)
- 	long end = jiffies + 2;
- 
- 	while (!(temac_ior(lp, XTE_RDY0_OFFSET) & XTE_RDY0_HARD_ACS_RDY_MASK)) {
--		if (end - jiffies <= 0) {
-+		if (time_before_eq(end, jiffies)) {
- 			WARN_ON(1);
- 			return -ETIMEDOUT;
- 		}
-diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c b/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
-index 64b4639..d4abf47 100644
---- a/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
-@@ -22,7 +22,7 @@ int axienet_mdio_wait_until_ready(struct axienet_local *lp)
- 	long end = jiffies + 2;
- 	while (!(axienet_ior(lp, XAE_MDIO_MCR_OFFSET) &
- 		 XAE_MDIO_MCR_READY_MASK)) {
--		if (end - jiffies <= 0) {
-+		if (time_before_eq(end, jiffies)) {
- 			WARN_ON(1);
- 			return -ETIMEDOUT;
- 		}
-diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-index 0d87c67..8c4aed3 100644
---- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-@@ -702,7 +702,7 @@ static int xemaclite_mdio_wait(struct net_local *lp)
- 	*/
- 	while (__raw_readl(lp->base_addr + XEL_MDIOCTRL_OFFSET) &
- 			XEL_MDIOCTRL_MDIOSTS_MASK) {
--		if (end - jiffies <= 0) {
-+		if (time_before_eq(end, jiffies)) {
- 			WARN_ON(1);
- 			return -ETIMEDOUT;
- 		}
--- 
-1.7.10.4
+Patch #2 doesn't apply at all to the net tree.
