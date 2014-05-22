@@ -1,53 +1,69 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 22 May 2014 12:34:40 +0200
-Subject: [PATCH 3/4] clk: samsung: Add driver to control CLKOUT line on
- Exynos SoCs
-In-Reply-To: <537D8788.8030904@linaro.org>
-References: <1400604211-9447-1-git-send-email-t.figa@samsung.com>
- <1400604211-9447-4-git-send-email-t.figa@samsung.com>
- <537D8788.8030904@linaro.org>
-Message-ID: <537DD2C0.4060802@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 22 May 2014 11:35:51 +0100
+Subject: [PATCH 1/2] arm64: topology: Tell the scheduler about the
+ relative power of cores
+In-Reply-To: <alpine.LFD.2.11.1405201716460.17310@knanqh.ubzr>
+References: <1400545421-28067-1-git-send-email-broonie@kernel.org>
+ <20140520173727.GD28293@arm.com>
+ <alpine.LFD.2.11.1405201716460.17310@knanqh.ubzr>
+Message-ID: <20140522103550.GA24636@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.05.2014 07:13, Tushar Behera wrote:
-> On 05/20/2014 10:13 PM, Tomasz Figa wrote:
->> This patch introduces a driver that handles configuration of CLKOUT pin
->> of Exynos SoCs that can be used to output certain clocks from inside of
->> the SoC to a dedicated output pin.
->>
->> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
->> ---
->>  .../devicetree/bindings/arm/samsung/pmu.txt        |  30 ++++
->>  drivers/clk/samsung/Makefile                       |   1 +
->>  drivers/clk/samsung/clk-exynos-clkout.c            | 153 +++++++++++++++++++++
->>  3 files changed, 184 insertions(+)
->>  create mode 100644 drivers/clk/samsung/clk-exynos-clkout.c
->>
+On Tue, May 20, 2014 at 10:31:39PM +0100, Nicolas Pitre wrote:
+> On Tue, 20 May 2014, Catalin Marinas wrote:
 > 
-> [ ... ]
+> > On Tue, May 20, 2014 at 01:23:40AM +0100, Mark Brown wrote:
+> > > In heterogeneous systems like big.LITTLE systems the scheduler will be
+> > > able to make better use of the available cores if we provide power numbers
+> > > to it indicating their relative performance. Do this by parsing the CPU
+> > > nodes in the DT.
+> > 
+> > Last time we discussed these two patches, my understanding was that the
+> > mainline scheduler doesn't behave any better on big.LITTLE with this
+> > additional information, unless you also have additional out of tree b.L
+> > MP patches. Vincent is also cleaning up some of the cpu_power usage in
+> > the scheduler.
+> > 
+> > So unless there are clear benefits in providing such information to the
+> > mainline scheduler, I don't plan to merge them for the time being (I'm
+> > also not convinced of the numbers in the second patch, they need some
+> > benchmarking on real hardware).
 > 
->> +	clkout->clk_table[0] = clk_register_composite(NULL, "clkout",
->> +				parent_names, parent_count, &clkout->mux.hw,
->> +				&clk_mux_ops, NULL, NULL, &clkout->gate.hw,
->> +				&clk_gate_ops, CLK_SET_RATE_PARENT
->> +				| CLK_SET_RATE_NO_REPARENT);
-> 
-> Would you please remove CLK_SET_RATE_NO_REPARENT flag from here? Let me
-> know if you have reservations against this.
+> We are indeed in the process of working out how to use this information 
+> in the scheduler, submitting patches, etc.  Thing is, we risk seeing the 
+> scheduler maintainers saying: "unless there are clear users of those 
+> enhancements to the mainline scheduler, we don't plan to merge them for 
+> the time being."
 
-The problem with clock reparenting is that there are certain parent
-clocks of CLKOUT, rate of which changes at runtime, e.g. clocks derived
-from APLL or bus clocks, which can be reconfigured by cpufreq or devfreq.
+I'm pretty sure they know the big.LITTLE story and we can reiterate it's
+required for arm64 as well (though not sure they see it as different
+from arm in this context).
 
-> 
-> With RFC patches, I am able to do a clk_set_rate() on this clock to
-> get a 24MHz output to the codec clock. With this flag set, I again have
-> to rely on the default value set to this register in bootloader.
-> 
+I really appreciate the work you and Vincent are doing to clarify the
+cpu_power usage in the scheduler. But for the time being, its only use
+seems to be for SMT and rather problematic for big.LITTLE
+(https://lkml.org/lkml/2014/3/28/197).
 
-This problem should be handled by initializing clocks from DT. I'm not
-sure why it hasn't been implemented yet...
+I also think the arch_scale_freq_power() name is wrong in the maximum
+capacity context. What if we decide that we need frequency invariant
+task load you realise that you actually need arch_scale_freq_power() to
+vary with the CPU frequency for normalisation rather than the big.LITTLE
+performance differences? But I see you are already trying to clean this
+up as well (https://lkml.org/lkml/2014/5/14/625), which is good, but
+let's wait until these patches go in (and there is already an user,
+though the behaviour isn't correct until we get Vincent's patches in).
 
-Best regards,
-Tomasz
+> It might be more productive to merge _something_ first, and doing so on 
+> the architecture side is certainly the least intrusive initial move.
+
+You are already renaming the arm arch_scale_freq_power(), why would you
+want to create more work for you by having to re-write parts of arm64 as
+well once you get to a consensus on scheduler changes?
+
+Just to be clear, I'm not against Mark's patch but I don't see any value
+in pushing it into mainline now, given that it is likely to be changed
+in the future following the work you and Vincent are doing.
+
+-- 
+Catalin
