@@ -1,152 +1,52 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 22 May 2014 19:20:55 +0200
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in device
- tree
-In-Reply-To: <537DE1AA.5050606@redhat.com>
-References: <537DC832.3020006@redhat.com>
- <CAGb2v64VZac2KvAALrScecN89sRnBQoDrKxKMvkte+3G04NXeA@mail.gmail.com>
- <537DE1AA.5050606@redhat.com>
-Message-ID: <537E31F7.1030505@gmail.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Thu, 22 May 2014 22:51:55 +0530
+Subject: [PATCH RFC v2 0/7] Devfreq support for Exynos5250/5420
+Message-ID: <1400779322-4410-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patchset adds devfreq support on Exynos5250 and Exynos5420.
+The patches add the missing INT clock support for exynos5250 and
+also add a new 5420 driver. We also have patches which add the
+PPMU node and fix a typo in the exynos5250 driver.
 
+Changes since RFC v1:
+	- Exynos5420 support has been added to the existent Exynos5250
+	  driver itself.
+	- Rebased on Chanwoo Choi's devfreq consolidation patchset.
+	- Removed unused clocks from the clock list
+	- Used the PPMU nodes with different compatible strings to
+	  differentiate between exynos5250 and exynos5420.
 
-On 22.05.2014 13:38, Hans de Goede wrote:
-> On 05/22/2014 12:23 PM, Chen-Yu Tsai wrote:
->> On Thu, May 22, 2014 at 5:49 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+The patches have been tested on Exynos5250 based Snow board and Exynos5420
+based Peach-Pit boards. They have been prepared on linux-next(20140521) with
+the devfreq for-next branch merged. Also applied is the "devfreq resource
+management" series from Chanwoo Choi[1].
+[1] https://lkml.org/lkml/2014/4/25/826
 
-snip
+Abhilash Kesavan (3):
+  ARM: dts: Add PPMU device tree support for Exynos5250
+  ARM: dts: Add PPMU device tree support for Exynos5420
+  PM / devfreq: exynos: Fix typo in macro
 
->>> I've been thinking a bit about this, and it is a non trivial problem since
->>> sdio devices are normally instantiated when probed, unlike ie spi devices
->>> which are instantiated from devicetree.
->>>
->>> Adding device tree instantiation of sdio devices seems like a bad idea, as
->>> then we get 2 vastly different device instantiation paths. Still we need some
->>> way to get power and clks setup before the mmc host initializes.
+Andrew Bresticker (2):
+  clk: exynos5250: add aliases for clocks used by devfreq
+  PM / devfreq: exynos5250: migrate to common-clock
 
-What about introducing some extra callbacks to mmc drivers to build
-driver data and control power?
+Arjun.K.V (2):
+  clk: exynos5420: Add aliases for clocks used by devfreq
+  PM / devfreq: Add devfreq driver for Exynos5420
 
-struct mmc_legacy_device {
-	/* ... */
-	struct device_node *of_node;
-	void *driver_data;
-};
+ .../bindings/arm/exynos/ppmu-exynos5.txt           |   27 +
+ arch/arm/boot/dts/exynos5250.dtsi                  |    8 +
+ arch/arm/boot/dts/exynos5420.dtsi                  |    7 +
+ drivers/clk/samsung/clk-exynos5250.c               |   25 +-
+ drivers/clk/samsung/clk-exynos5420.c               |   73 ++-
+ drivers/devfreq/Kconfig                            |   10 +-
+ drivers/devfreq/exynos/exynos5_bus.c               |  665 +++++++++++++++++---
+ drivers/devfreq/exynos/exynos_ppmu.h               |    2 +-
+ 8 files changed, 703 insertions(+), 114 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/exynos/ppmu-exynos5.txt
 
-struct mmc_driver {
-	/* ... */
-	int (*prepare)(struct mmc_legacy_device *);
-	void (*unprepare)(struct mmc_legacy_device *);
-};
-
-static int my_wlan_prepare(struct mmc_legacy_device *dev)
-{
-	struct my_wlan_data *data;
-
-	data = kzalloc(...);
-	/* ... */
-
-	of_*();
-	clk_*();
-	regulator_*();
-	/* ... */
-
-	ret = my_wlan_power_on(data);
-	/* ... */
-
-	dev->driver_data = data;	
-}
-
-static void my_wlan_unprepare(struct mmc_legacy_device *dev)
-{
-	struct my_wlan_data *data;
-
-	data = dev->driver_data;
-
-	my_wlan_power_off(data);
-	/* ... */
-
-	dev->driver_data = NULL;
-	kfree(data);
-}
-
-I don't really like this, especially the fact that this would be highly
-MMC-specific, while there are other interfaces that also need this
-problem solved, e.g. USB/HSIC.
-
-I had proposed another solution that would require almost no changes in
-MMC core and could work for any data interface. You can find it
-somewhere in the thread mentioned by Chen-Yu. Unfortunately, for reasons
-that don't appeal to me, it wasn't positively received by MMC people.
-
->>>
->>> Therefor I would like to suggest to add a number of standard properties to
->>> mmc-bus child nodes. Making the dts for an mmc host with an sdio device which
->>> needs clks setup before it will work look like this:
->>>
->>>                 mmc3: mmc at 01c12000 {
->>>                         #address-cells = <1>;
->>>                         #size-cells = <0>;
->>>                         pinctrl-names = "default";
->>>                         pinctrl-0 = <&mmc3_pins_a>;
->>>                         vmmc-supply = <&reg_vmmc3>;
->>>                         bus-width = <4>;
->>>                         non-removable;
->>>                         status = "okay";
->>>
->>>                         brcmf: bcrmf at 0 {
->>>                                 reg = <0>;
->>>                                 compatible = "brcm,bcm43xx-fmac";
->>>                                 clocks = <&clk_out_a>, <&clk_out_b>;
->>>                                 clock-frequency = <32768>, <26000000>;
->>>                                 interrupt-parent = <&pio>;
->>>                                 interrupts = <10 4>; /* PH10 / EINT10 */
->>>                                 interrupt-names = "host-wake";
->>>                                 status = "okay";
->>>                         };
->>>                 };
->>>
->>> Where the "clocks" and "clock-frequency" attributes would be something
->>> which we standardize in Documentation/devicetree/bindings/mmc/mmc-bus.txt
-
-I like the binding. It has all properties defined where they belong.
-
->>>
->>> These standard properties would *not* be used by the driver for the
->>> childnode device, so as to avoid the chicken and egg problem of that driver
->>> needing to enable clks, and it only getting bound to the device after
->>> the device has been discovered which requires those clocks.
->>>
->>> Instead these properties would be parsed by mmc_of_parse, and we will
->>> get enabled automatically by mmc_add_host before doing any probing.
->>>
->>> If the optional clock-frequency property is also set, then mmc_add_host
->>> will not only enable the clks but also set them to the specified
->>> frequency.
->>>
-
-I don't like power control and parsing in MMC core, because they are
-highly chip-specific. Throwing this kind of knowledge to MMC subsystem
-violates separation and just won't scale as more different WLAN chips
-show up. However, this is at least not enforced by design of the
-bindings and so can be changed at any time in future, while having
-something already working.
-
-See above for my take on other ways of handling this.
-
->>> Note I've no boards which actually need the clocks, all 3 boards with
->>> sdio wifi which I've use a 26MHz crystal directly attached to the module,
->>> so once I get the oob interrupt working (this needs some work on
->>> the allwinner side) we can merge Arend's patches with the clock bits
->>> dropped for now.
-
-Exynos4210-based TRATS and Exynos4412-based TRATS2 boards already
-supported by mainline kernel have WLAN 32k clock driven by PMIC and
-needs to be ungated. For the 26M clock a normal crystal is used as well
-as in your case.
-
-Best regards,
-Tomasz
+-- 
+1.7.9.5
