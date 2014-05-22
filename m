@@ -1,49 +1,35 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 22 May 2014 09:36:34 -0400
-Subject: RCU stall on panda
-In-Reply-To: <537DBC81.2090809@linaro.org>
-References: <53675C5F.10509@linaro.org>
- <20140505180617.GM8754@linux.vnet.ibm.com>
- <20140512212102.GF5668@atomide.com> <5371BD69.8010600@linaro.org>
- <20140513153220.GC16837@atomide.com> <53747E6D.60500@linaro.org>
- <53748371.5030704@linaro.org> <5374C07C.1070400@linaro.org>
- <20140515183247.GF23659@atomide.com> <5375091D.3010607@ti.com>
- <5375C145.6070904@linaro.org> <537614AF.50100@ti.com>
- <537DBC81.2090809@linaro.org>
-Message-ID: <537DFD62.7040502@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 22 May 2014 15:38:14 +0200
+Subject: [PATCH v2] ARM: realview: basic device tree implementation
+In-Reply-To: <CACRpkdYE0Fb+HezqgDbVcqQmWwn7QL2+RWSRyAigv2qcMp2qFQ@mail.gmail.com>
+References: <1399586896-16906-1-git-send-email-linus.walleij@linaro.org>
+ <5678119.IM3FN0FlT6@wuerfel>
+ <CACRpkdYE0Fb+HezqgDbVcqQmWwn7QL2+RWSRyAigv2qcMp2qFQ@mail.gmail.com>
+Message-ID: <4386397.P7WlMhNVxk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 May 2014 04:59 AM, Alex Shi wrote:
-> On 05/16/2014 09:37 PM, Santosh Shilimkar wrote:
->> On Friday 16 May 2014 03:41 AM, Alex Shi wrote:
->>> On 05/16/2014 02:36 AM, Santosh Shilimkar wrote:
->>>>>>>> yes.
->>>>>>>> My board is panda ES. without this revert, it works.
->>>>>>
->>>>>> Care to specify what linux version you are testing against?
->>>>>>
->>>>>> Does it hang in idle always immediately on booting?
->>>>>>
->>>>>> Or does the serial console first hang with sysrq still
->>>>>> working (ctrl-a h in minicom for help) with device
->>>>>> eventually locking up hard?
->>>>>>
->>>> I just posted an updated patch Alex on other thread.
->>>> Attaching here again for your reference. Please try
->>>> it out and see if the you still get a hang.
->>>
->>> it does not hang this time.
->>>
->> This is good news and exactly what I expected.
->>  
->>> but I am not sure it can solve my problem, since RCU stall is not easy
->>> to reproduce in short time.
->>>
->> You may want to run the system longer if you can. I suspect the RCU stall
->> was also side effect of missing interrupts.
+On Thursday 22 May 2014 15:04:07 Linus Walleij wrote:
+> On Thu, May 22, 2014 at 10:31 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 22 May 2014 09:41:39 Linus Walleij wrote:
 > 
-> Sure. it do remove the RCU stall on my panda board.
+> >> The question can be rephrased like this:
+> >> Should we create drivers/soc?
+> >
+> > I think we just did, not sure if the patches have made it into linux-next
+> > already, but there were a couple of other platforms already that want this
+> > directory.
 > 
-Thanks for confirming. Tony already send fix upstream so it should
-show up in next rc mostly
+> Awesomeness. Can you give me the title of a patch or branch
+> from ARM SoC I should pull in to build on top of this? Then I can
+> split off all the SoC bus business and have the machine file real
+> small, nice and clean.
+
+I'd have to check again, it seems that as of today, there is no drivers/soc
+on arm-soc yet. I do remember that there were at least two platforms besides
+yours that want it though, so we have to coordinate it a bit.
+
+Then again, as I expect all of them to go through arm-soc, we can probably
+resolve the conflicts in our tree.
+
+	Arnd
