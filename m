@@ -1,237 +1,56 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Thu, 22 May 2014 16:00:43 +0200
-Subject: =?UTF-8?q?=5BPATCH=20v16=5D=20ARM=3A=20dts=3A=20imx25=3A=20mbimxsd25=3A=20Add=20displays=20support=2E?=
-Message-ID: <1400767243-31897-1-git-send-email-denis@eukrea.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 22 May 2014 10:02:01 -0400
+Subject: [Patch v5 0/7] Introduce keystone reset driver
+In-Reply-To: <5069120.YZWxxyxdrl@wuerfel>
+References: <1400766516-14537-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <537E011B.9090902@ti.com> <5069120.YZWxxyxdrl@wuerfel>
+Message-ID: <537E0359.10300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CMO-QVGA, DVI-VGA and DVI-SVGA displays were added.
+Arnd,
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v15->v16:
-- Added the dtb targets in the Makefile.
-- Removed the redundant enable-active-high.
-- Simplified the commit description.
+On Thursday 22 May 2014 09:54 AM, Arnd Bergmann wrote:
+> On Thursday 22 May 2014 09:52:27 Santosh Shilimkar wrote:
+>> On Thursday 22 May 2014 09:48 AM, Ivan Khoronzhuk wrote:
+>>> These patches introduce keystone reset driver.
+>>>
+>>> The keystone SoC can be rebooted in several ways. By external reset
+>>> pin, by soft and by watchdogs. This driver allows software reset and reset
+>>> by one of the watchdogs. Also added opportunity to set soft/hard reset type.
+>>>
+>>> Based on linux-next/master
+>>>
+>>> v5..v4
+>>>   power: reset: keystone-reset: introduce keystone reset driver
+>>>       - changed to get rsmux and rspll offsets from DT
+>>>   clock: keystone-pllctrl: add bindings for keystone pll controller
+>>>       - new patch
+>>>   mfd: ti-keystone-devctrl: add bindings for device state control
+>>>       - new patch
+>>>   power: reset: add bindings for keystone reset driver
+>>>       - corrected description of "ti,syscon-pll", "ti,syscon-dev" properties
+>>>       - corrected examples
+>>>   ARM: dts: keystone: update reset node to work with reset driver
+>>>       - added nodes for pll-controller and device-state-controll
+>>>       - added offsets to "ti,syscon-pll", "ti,syscon-dev" properties
+>>>
+>> Looks like you haven't collected Arnd's Reviewed-by tag on the patches.
+>> Can be added later as well while applying.
+>>
+>>
+> 
+> I was going to comment the same. Anyway here you have it for the remaining
+> patches:
+> 
+> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> 
+Thanks. Can we take this driver via arm-soc tree ? I asked the question on previous
+thread to drivers/reset/* folks whether they are ok to take the series via arm-soc
+or prefer to split the series. No responses so far.
 
-ChangeLog v14->v15:
-- Moved the Cc into git-send-email.
-- Added a reg property in the regulator at 0 node.
+If possible I would like get this driver in current merge window since it ready now.
+It has been on the list for almost 3 merge windows including the upcoming.
 
-ChangeLog v13->v14:
-- Remove people not concerned by this patch from the Cc list.
-- changed the fsl,pwmr lcdc property to fsl,lpccr,
-  to match the previous patches in that serie.
-
-ChangeLog v10->v13:
-- This patch is the display part splitted out from the patch adding
-  support for the cpuimx25(and its baseboard).
-- Shawn Guo was added to the Cc list.
-- The regulator part was updated to match the current style.
-- The new GPIO defines are now used in the dts(i).
----
- arch/arm/boot/dts/Makefile                         |    3 +
- .../imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts  |   72 ++++++++++++++++++++
- .../imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts  |   45 ++++++++++++
- .../imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts   |   45 ++++++++++++
- 4 files changed, 165 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts
- create mode 100644 arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts
- create mode 100644 arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index da711dc..33a6419 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -155,6 +155,9 @@ dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
- dtb-$(CONFIG_ARCH_MOXART) += moxart-uc7112lx.dtb
- dtb-$(CONFIG_ARCH_MXC) += \
- 	imx25-eukrea-mbimxsd25-baseboard.dtb \
-+	imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dtb \
-+	imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dtb \
-+	imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dtb \
- 	imx25-karo-tx25.dtb \
- 	imx25-pdk.dtb \
- 	imx27-apf27.dtb \
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts
-new file mode 100644
-index 0000000..9797280
---- /dev/null
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts
-@@ -0,0 +1,72 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx25-eukrea-mbimxsd25-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD25 with the CMO-QVGA Display";
-+	compatible = "eukrea,mbimxsd25-baseboard-cmo-qvga", "eukrea,mbimxsd25-baseboard", "eukrea,cpuimx25", "fsl,imx25";
-+
-+	cmo_qvga: display {
-+		model = "CMO-QVGA";
-+		bits-per-pixel = <16>;
-+		fsl,pcr = <0xcad08b80>;
-+		bus-width = <18>;
-+		native-mode = <&qvga_timings>;
-+		display-timings {
-+			qvga_timings: 320x240 {
-+				clock-frequency = <6500000>;
-+				hactive = <320>;
-+				vactive = <240>;
-+				hback-porch = <30>;
-+				hfront-porch = <38>;
-+				vback-porch = <20>;
-+				vfront-porch = <3>;
-+				hsync-len = <15>;
-+				vsync-len = <4>;
-+			};
-+		};
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_lcd_3v3: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_reg_lcd_3v3>;
-+			regulator-name = "lcd-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio1 26 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+};
-+
-+&iomuxc {
-+	imx25-eukrea-mbimxsd25-baseboard-cmo-qvga {
-+		pinctrl_reg_lcd_3v3: reg_lcd_3v3 {
-+			fsl,pins = <MX25_PAD_PWM__GPIO_1_26 0x80000000>;
-+		};
-+	};
-+};
-+
-+&lcdc {
-+	display = <&cmo_qvga>;
-+	fsl,lpccr = <0x00a903ff>;
-+	lcd-supply = <&reg_lcd_3v3>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts
-new file mode 100644
-index 0000000..8eee2f6
---- /dev/null
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts
-@@ -0,0 +1,45 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx25-eukrea-mbimxsd25-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD25 with the DVI-SVGA Display";
-+	compatible = "eukrea,mbimxsd25-baseboard-dvi-svga", "eukrea,mbimxsd25-baseboard", "eukrea,cpuimx25", "fsl,imx25";
-+
-+	dvi_svga: display {
-+		model = "DVI-SVGA";
-+		bits-per-pixel = <16>;
-+		fsl,pcr = <0xfa208b80>;
-+		bus-width = <18>;
-+		native-mode = <&dvi_svga_timings>;
-+		display-timings {
-+			dvi_svga_timings: 800x600 {
-+				clock-frequency = <40000000>;
-+				hactive = <800>;
-+				vactive = <600>;
-+				hback-porch = <75>;
-+				hfront-porch = <75>;
-+				vback-porch = <7>;
-+				vfront-porch = <75>;
-+				hsync-len = <7>;
-+				vsync-len = <7>;
-+			};
-+		};
-+	};
-+};
-+
-+&lcdc {
-+	display = <&dvi_svga>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts
-new file mode 100644
-index 0000000..447da62
---- /dev/null
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts
-@@ -0,0 +1,45 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx25-eukrea-mbimxsd25-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD25 with the DVI-VGA Display";
-+	compatible = "eukrea,mbimxsd25-baseboard-dvi-vga", "eukrea,mbimxsd25-baseboard", "eukrea,cpuimx25", "fsl,imx25";
-+
-+	dvi_vga: display {
-+		model = "DVI-VGA";
-+		bits-per-pixel = <16>;
-+		fsl,pcr = <0xfa208b80>;
-+		bus-width = <18>;
-+		native-mode = <&dvi_vga_timings>;
-+		display-timings {
-+			dvi_vga_timings: 640x480 {
-+				clock-frequency = <31250000>;
-+				hactive = <640>;
-+				vactive = <480>;
-+				hback-porch = <100>;
-+				hfront-porch = <100>;
-+				vback-porch = <7>;
-+				vfront-porch = <100>;
-+				hsync-len = <7>;
-+				vsync-len = <7>;
-+			};
-+		};
-+	};
-+};
-+
-+&lcdc {
-+	display = <&dvi_vga>;
-+	status = "okay";
-+};
--- 
-1.7.9.5
+Regards,
+Snatosh
