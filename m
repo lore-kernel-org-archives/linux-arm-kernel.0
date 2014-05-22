@@ -1,87 +1,126 @@
 From: tharvey@gateworks.com (Tim Harvey)
-Date: Wed, 21 May 2014 23:04:54 -0700
-Subject: [PATCH 2/3] ARM: dts: imx6: ventana: change sound device name
+Date: Wed, 21 May 2014 23:04:55 -0700
+Subject: [PATCH 3/3] ARM: dts: imx6: ventana: update model to reflect
+ Dual/Solo CPU types
 In-Reply-To: <1400738695-32663-1-git-send-email-tharvey@gateworks.com>
 References: <1400738695-32663-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <1400738695-32663-2-git-send-email-tharvey@gateworks.com>
+Message-ID: <1400738695-32663-3-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'model' property in the imx-audio-sgtl5000 binding specifies the
-user-visible name of the audio device. This should be something common and
-not baseboard specific.
+The imx6dl dts supports both DualLite and Solo CPU variants
+The imx6q dts supports both Dual and Quad CPU variants
 
 Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 ---
- arch/arm/boot/dts/imx6q-gw5400-a.dts  | 4 ++--
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 4 ++--
- arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 4 ++--
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 4 ++--
- 4 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/imx6dl-gw51xx.dts | 2 +-
+ arch/arm/boot/dts/imx6dl-gw52xx.dts | 2 +-
+ arch/arm/boot/dts/imx6dl-gw53xx.dts | 2 +-
+ arch/arm/boot/dts/imx6dl-gw54xx.dts | 2 +-
+ arch/arm/boot/dts/imx6q-gw51xx.dts  | 2 +-
+ arch/arm/boot/dts/imx6q-gw52xx.dts  | 2 +-
+ arch/arm/boot/dts/imx6q-gw53xx.dts  | 2 +-
+ arch/arm/boot/dts/imx6q-gw54xx.dts  | 2 +-
+ 8 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-gw5400-a.dts b/arch/arm/boot/dts/imx6q-gw5400-a.dts
-index e51bb3f..1ead807 100644
---- a/arch/arm/boot/dts/imx6q-gw5400-a.dts
-+++ b/arch/arm/boot/dts/imx6q-gw5400-a.dts
-@@ -115,9 +115,9 @@
- 	};
+diff --git a/arch/arm/boot/dts/imx6dl-gw51xx.dts b/arch/arm/boot/dts/imx6dl-gw51xx.dts
+index 4bd055f..b2bd022 100644
+--- a/arch/arm/boot/dts/imx6dl-gw51xx.dts
++++ b/arch/arm/boot/dts/imx6dl-gw51xx.dts
+@@ -14,6 +14,6 @@
+ #include "imx6qdl-gw51xx.dtsi"
  
- 	sound {
--		compatible = "fsl,imx6q-sabrelite-sgtl5000",
-+		compatible = "fsl,imx6q-ventana-sgtl5000",
- 			     "fsl,imx-audio-sgtl5000";
--		model = "imx6q-sabrelite-sgtl5000";
-+		model = "sgtl5000-audio";
- 		ssi-controller = <&ssi1>;
- 		audio-codec = <&codec>;
- 		audio-routing =
-diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-index 035d3a8..fd9f6b7 100644
---- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-@@ -114,9 +114,9 @@
- 	};
+ / {
+-	model = "Gateworks Ventana i.MX6 DualLite GW51XX";
++	model = "Gateworks Ventana i.MX6 DualLite/Solo GW51XX";
+ 	compatible = "gw,imx6dl-gw51xx", "gw,ventana", "fsl,imx6dl";
+ };
+diff --git a/arch/arm/boot/dts/imx6dl-gw52xx.dts b/arch/arm/boot/dts/imx6dl-gw52xx.dts
+index c913605..a2e0b73 100644
+--- a/arch/arm/boot/dts/imx6dl-gw52xx.dts
++++ b/arch/arm/boot/dts/imx6dl-gw52xx.dts
+@@ -14,6 +14,6 @@
+ #include "imx6qdl-gw52xx.dtsi"
  
- 	sound {
--		compatible = "fsl,imx6q-sabrelite-sgtl5000",
-+		compatible = "fsl,imx6q-ventana-sgtl5000",
- 			     "fsl,imx-audio-sgtl5000";
--		model = "imx6q-sabrelite-sgtl5000";
-+		model = "sgtl5000-audio";
- 		ssi-controller = <&ssi1>;
- 		audio-codec = <&codec>;
- 		audio-routing =
-diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-index c8e5ae0..4b9aeb1 100644
---- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-@@ -117,9 +117,9 @@
- 	};
+ / {
+-	model = "Gateworks Ventana i.MX6 DualLite GW52XX";
++	model = "Gateworks Ventana i.MX6 DualLite/Solo GW52XX";
+ 	compatible = "gw,imx6dl-gw52xx", "gw,ventana", "fsl,imx6dl";
+ };
+diff --git a/arch/arm/boot/dts/imx6dl-gw53xx.dts b/arch/arm/boot/dts/imx6dl-gw53xx.dts
+index 61818a1..6844b70 100644
+--- a/arch/arm/boot/dts/imx6dl-gw53xx.dts
++++ b/arch/arm/boot/dts/imx6dl-gw53xx.dts
+@@ -14,6 +14,6 @@
+ #include "imx6qdl-gw53xx.dtsi"
  
- 	sound {
--		compatible = "fsl,imx6q-sabrelite-sgtl5000",
-+		compatible = "fsl,imx6q-ventana-sgtl5000",
- 			     "fsl,imx-audio-sgtl5000";
--		model = "imx6q-sabrelite-sgtl5000";
-+		model = "sgtl5000-audio";
- 		ssi-controller = <&ssi1>;
- 		audio-codec = <&codec>;
- 		audio-routing =
-diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-index 2795dfc..8e1a869 100644
---- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-@@ -107,9 +107,9 @@
- 	};
+ / {
+-	model = "Gateworks Ventana i.MX6 DualLite GW53XX";
++	model = "Gateworks Ventana i.MX6 DualLite/Solo GW53XX";
+ 	compatible = "gw,imx6dl-gw53xx", "gw,ventana", "fsl,imx6dl";
+ };
+diff --git a/arch/arm/boot/dts/imx6dl-gw54xx.dts b/arch/arm/boot/dts/imx6dl-gw54xx.dts
+index ab38b67..be91541 100644
+--- a/arch/arm/boot/dts/imx6dl-gw54xx.dts
++++ b/arch/arm/boot/dts/imx6dl-gw54xx.dts
+@@ -14,6 +14,6 @@
+ #include "imx6qdl-gw54xx.dtsi"
  
- 	sound {
--		compatible = "fsl,imx6q-sabrelite-sgtl5000",
-+		compatible = "fsl,imx6q-ventana-sgtl5000",
- 			     "fsl,imx-audio-sgtl5000";
--		model = "imx6q-sabrelite-sgtl5000";
-+		model = "sgtl5000-audio";
- 		ssi-controller = <&ssi1>;
- 		audio-codec = <&codec>;
- 		audio-routing =
+ / {
+-	model = "Gateworks Ventana i.MX6 DualLite GW54XX";
++	model = "Gateworks Ventana i.MX6 DualLite/Solo GW54XX";
+ 	compatible = "gw,imx6dl-gw54xx", "gw,ventana", "fsl,imx6dl";
+ };
+diff --git a/arch/arm/boot/dts/imx6q-gw51xx.dts b/arch/arm/boot/dts/imx6q-gw51xx.dts
+index 0e1406e..8e8bcd8 100644
+--- a/arch/arm/boot/dts/imx6q-gw51xx.dts
++++ b/arch/arm/boot/dts/imx6q-gw51xx.dts
+@@ -14,6 +14,6 @@
+ #include "imx6qdl-gw51xx.dtsi"
+ 
+ / {
+-	model = "Gateworks Ventana i.MX6 Quad GW51XX";
++	model = "Gateworks Ventana i.MX6 Dual/Quad GW51XX";
+ 	compatible = "gw,imx6q-gw51xx", "gw,ventana", "fsl,imx6q";
+ };
+diff --git a/arch/arm/boot/dts/imx6q-gw52xx.dts b/arch/arm/boot/dts/imx6q-gw52xx.dts
+index 5f71ddb..a12c47e 100644
+--- a/arch/arm/boot/dts/imx6q-gw52xx.dts
++++ b/arch/arm/boot/dts/imx6q-gw52xx.dts
+@@ -14,7 +14,7 @@
+ #include "imx6qdl-gw52xx.dtsi"
+ 
+ / {
+-	model = "Gateworks Ventana i.MX6 Quad GW52XX";
++	model = "Gateworks Ventana i.MX6 Dual/Quad GW52XX";
+ 	compatible = "gw,imx6q-gw52xx", "gw,ventana", "fsl,imx6q";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6q-gw53xx.dts b/arch/arm/boot/dts/imx6q-gw53xx.dts
+index 360c316..d76aaa8 100644
+--- a/arch/arm/boot/dts/imx6q-gw53xx.dts
++++ b/arch/arm/boot/dts/imx6q-gw53xx.dts
+@@ -14,7 +14,7 @@
+ #include "imx6qdl-gw53xx.dtsi"
+ 
+ / {
+-	model = "Gateworks Ventana i.MX6 Quad GW53XX";
++	model = "Gateworks Ventana i.MX6 Dual/Quad GW53XX";
+ 	compatible = "gw,imx6q-gw53xx", "gw,ventana", "fsl,imx6q";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6q-gw54xx.dts b/arch/arm/boot/dts/imx6q-gw54xx.dts
+index ab518d6..6e8f53e 100644
+--- a/arch/arm/boot/dts/imx6q-gw54xx.dts
++++ b/arch/arm/boot/dts/imx6q-gw54xx.dts
+@@ -14,7 +14,7 @@
+ #include "imx6qdl-gw54xx.dtsi"
+ 
+ / {
+-	model = "Gateworks Ventana i.MX6 Quad GW54XX";
++	model = "Gateworks Ventana i.MX6 Dual/Quad GW54XX";
+ 	compatible = "gw,imx6q-gw54xx", "gw,ventana", "fsl,imx6q";
+ };
+ 
 -- 
 1.8.3.2
