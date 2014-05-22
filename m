@@ -1,27 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 May 2014 00:37:00 +0200
-Subject: [PATCH] pinctrl: sunxi: Fix multiple registration issue
-In-Reply-To: <1400768727-7338-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1400768727-7338-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CACRpkdao9RqUQaueN3B81snhXzRp692xDyps3CePoqiygnbmwg@mail.gmail.com>
+Date: Fri, 23 May 2014 00:38:09 +0200
+Subject: [PATCH] pinctrl: sunxi: fix pin numbers passed to register offset
+ helpers
+In-Reply-To: <1400772055-3852-1-git-send-email-wens@csie.org>
+References: <1400772055-3852-1-git-send-email-wens@csie.org>
+Message-ID: <CACRpkdb14bv83yu87aps6QhO-_Map87akt9Uc04VSr2a=ZzD3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 4:25 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+On Thu, May 22, 2014 at 5:20 PM, Chen-Yu Tsai <wens@csie.org> wrote:
 
-> When the support for the PRCM muxer on the A31 has been added, the global
-> static pinctl_desc definition has been left as is. Unfortunately, this
-> structure is used to register the pinctrl device, and prior to this
-> registration, we set the name and pins field.
+> The pin numbers passed to sunxi_*_reg helpers to get the correct
+> registers should be the pin offset for the PIO block, not the
+> absolute number we use that is based on the alphanumeric labels
+> Allwinner uses.
 >
-> Since this structure is shared across instances, that means that the latest
-> registered pinctrl device wins in setting the name, pins and pins numbers,
-> which is not really a good thing.
+> This patch subtracts .pin_base from the pin number passed to these
+> functions, so the driver accesses the correct registers.
 >
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Patch applied.
+Maxime, can I have your ACK on this patch, too?
 
 Yours,
 Linus Walleij
