@@ -1,86 +1,55 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 22 May 2014 14:53:38 +0100
-Subject: [PATCH 3/4] ARM: DT: STi: Add DT node for MiPHY365x
+Date: Thu, 22 May 2014 14:53:37 +0100
+Subject: [PATCH 2/4] phy: miphy365x: Add MiPHY365x header file for DT x Driver
+ defines
 In-Reply-To: <1400766819-22286-1-git-send-email-lee.jones@linaro.org>
 References: <1400766819-22286-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1400766819-22286-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1400766819-22286-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-devices. It has 2 ports which it can use for either; both SATA, both
-PCIe or one of each in any configuration.
+This provides the shared header file which will be reference from both
+the MiPHY365x driver and its associated Device Tree node(s).
 
-Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
 Acked-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih416-b2020-revE.dts |  5 +++++
- arch/arm/boot/dts/stih416-b2020.dts      |  6 ++++++
- arch/arm/boot/dts/stih416.dtsi           | 14 ++++++++++++++
- 3 files changed, 25 insertions(+)
+ include/dt-bindings/phy/phy-miphy365x.h | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+ create mode 100644 include/dt-bindings/phy/phy-miphy365x.h
 
-diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
-index ba0fa2c..0e2c870 100644
---- a/arch/arm/boot/dts/stih416-b2020-revE.dts
-+++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
-@@ -31,5 +31,10 @@
- 		ethernet1: dwmac at fef08000 {
- 			snps,reset-gpio = <&PIO0 7>;
- 		};
+diff --git a/include/dt-bindings/phy/phy-miphy365x.h b/include/dt-bindings/phy/phy-miphy365x.h
+new file mode 100644
+index 0000000..8757c02
+--- /dev/null
++++ b/include/dt-bindings/phy/phy-miphy365x.h
+@@ -0,0 +1,25 @@
++/*
++ * This header provides constants for the phy framework
++ * based on the STMicroelectronics miphy365x.
++ */
++#ifndef _DT_BINDINGS_PHY_MIPHY
++#define _DT_BINDINGS_PHY_MIPHY
 +
-+		miphy365x_phy: miphy365x at fe382000 {
-+			st,pcie-tx-pol-inv;
-+			st,sata-gen = <3>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
-index 276f28d..172f222 100644
---- a/arch/arm/boot/dts/stih416-b2020.dts
-+++ b/arch/arm/boot/dts/stih416-b2020.dts
-@@ -13,4 +13,10 @@
- 	model = "STiH416 B2020";
- 	compatible = "st,stih416", "st,stih416-b2020";
- 
-+	soc {
-+		miphy365x_phy: miphy365x at fe382000 {
-+			st,pcie-tx-pol-inv;
-+			st,sata-gen = <3>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index 78746d2..00b217a 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -9,6 +9,8 @@
- #include "stih41x.dtsi"
- #include "stih416-clock.dtsi"
- #include "stih416-pinctrl.dtsi"
++/* Supports 16 ports without a datatype change (u8 & 0xF0). */
++#define MIPHY_PORT_0			0
++#define MIPHY_PORT_1			1
++#define MIPHY_PORT_2			2
++#define MIPHY_PORT_3			3
 +
-+#include <dt-bindings/phy/phy-miphy365x.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/reset-controller/stih416-resets.h>
- / {
-@@ -224,5 +226,17 @@
- 
- 			status = "disabled";
- 		};
++/* Supports 16 types without a datatype change (u8 & 0x0F). */
++#define MIPHY_TYPE_SHIFT		4
++#define MIPHY_TYPE_SATA			(0 << MIPHY_TYPE_SHIFT)
++#define MIPHY_TYPE_PCIE			(1 << MIPHY_TYPE_SHIFT)
++#define MIPHY_TYPE_USB			(2 << MIPHY_TYPE_SHIFT)
 +
-+		miphy365x_phy: miphy365x at fe382000 {
-+			compatible      = "st,miphy365x-phy";
-+			reg        	= <0xfe382000 0x100>,
-+					  <0xfe38a000 0x100>,
-+					  <0xfe394000 0x100>,
-+					  <0xfe804000 0x100>;
-+			reg-names  	= "sata0", "sata1", "pcie0", "pcie1";
++#define MIPHY_SATA_PORT0		(MIPHY_TYPE_SATA) | (MIPHY_PORT_0)
++#define MIPHY_SATA_PORT1		(MIPHY_TYPE_SATA) | (MIPHY_PORT_1)
++#define MIPHY_PCIE_PORT0		(MIPHY_TYPE_PCIE) | (MIPHY_PORT_0)
++#define MIPHY_PCIE_PORT1		(MIPHY_TYPE_PCIE) | (MIPHY_PORT_1)
 +
-+			#phy-cells 	= <2>;
-+			st,syscfg  	= <&syscfg_rear>;
-+		};
- 	};
- };
++#endif /* _DT_BINDINGS_PHY_MIPHY */
 -- 
 1.8.3.2
