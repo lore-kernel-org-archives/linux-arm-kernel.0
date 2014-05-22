@@ -1,28 +1,75 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 22 May 2014 12:12:50 +1000
-Subject: linux-next: manual merge of the renesas tree with the arm-soc tree
-Message-ID: <20140522121250.0648dfec@canb.auug.org.au>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 22 May 2014 08:15:53 +0530
+Subject: [PATCH v3 00/13]  ARM/DT: edma: IP configuration from hardware
+ and cleanups
+In-Reply-To: <537B34C9.1020508@ti.com>
+References: <1400242640-9902-1-git-send-email-peter.ujfalusi@ti.com>
+ <537A01F2.2090107@ti.com> <537A36F9.40004@ti.com>
+ <537B34C9.1020508@ti.com>
+Message-ID: <20140522024553.GS21128@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Tue, May 20, 2014 at 04:26:09PM +0530, Sekhar Nori wrote:
+> On Monday 19 May 2014 10:23 PM, Peter Ujfalusi wrote:
+> > On 05/19/2014 04:06 PM, Sekhar Nori wrote:
+> >> On Friday 16 May 2014 05:47 PM, Peter Ujfalusi wrote:
+> >>> Hi,
+> >>>
+> >>> Changes since v2:
+> >>> - Comments from Sekhar and Arnd has been addressed best as I could.
+> >>> - Use the CCCFG information in all cases instead of pdata provided information
+> >>> - To achieve this I needed to do a bit more cleanup in this series
+> >>> - In the documentation patch, retrain the old properties for reference
+> >>> - Cleanups in the old davinci board files and removing edma_soc_info members
+> >>>
+> >>> Changes sicne v1:
+> >>> - added missing patch to remove the memset from edma_of_parse_dt()
+> >>>
+> >>> We are requesting redundant information via DT for the driver since the very same
+> >>> data is available in the HW: by reading and decoding the content of CCCFG
+> >>> register we can get:
+> >>> Number of channels: NUM_DMACH
+> >>> Number of regions: NUM_REGN
+> >>> Number of slots (PaRAM sets): NUM_PAENTRY
+> >>> Number of TC/EQ: NUM_EVQUE
+> >>>
+> >>> So these does not need to be provided by the DT binding.
+> >>>
+> >>> The driver will no longer look for these properties from DT and they can be
+> >>> removed from the binding documentation and from the dtsi files as well.
+> >>> The change will not introduce regression when new kernel is booted using older
+> >>> DTB (since we just ignore the mentioned properties).
+> >>
+> >> Applied all patches and pushed to branch v3.16/edma of:
+> >>
+> >> git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git
+> >>
+> >> Since the patches did not apply cleanly, please verify. I tested on
+> >> DA850 EVM using MMC/SD as EDMA user.
+> > 
+> > The patches in this series looks OK in your branch.
+> > However I can not find the following commits in there, which I have in linux-next:
+> > c689a7b79c28 Merge remote-tracking branch 'slave-dma/next'
+> > cdae05a0f0f7 dmaengine: edma: Make reading the position of active channels work
+> > cf7eb979116c ARM: common: edma: Fix xbar mapping
+> > 232b223d8281 dmaengine: edma: Set DMA_CYCLIC capability flag
+> > 7cf2af90cd51 arm: common: edma: Save the number of event queues/TCs
+> > 
+> > They might come via different route...
+> 
+> Vinod,
+> 
+> Do you have an immutable branch based on which I can send this patch
+> series to ARM-SoC? Some of the patches in the series depend on code that
+> went through your tree.
+yup, pls pull my topic/edma for these change. This branch will not be rebased.
 
-Today's linux-next merge of the renesas tree got a conflict in
-arch/arm/boot/dts/r8a7790-lager.dts between commit 637193b2f22c ("Merge
-branch 'next/boards' into for-next") from the arm-soc tree and commit
-2a3bd7497db1 ("Merge branch 'heads/dt-scif-for-v3.16' into next") from
-the renesas tree.
-
-I fixed it up (I used the latter since it kept the trailing semi-colon)
-and can carry the fix as necessary (no action is required).
+> Or if you are comfortable taking this series through your tree, thats
+> okay by me too. We are still waiting for acks from DT maintainers on the
+> binding change patches.
+Since these patchs are for ARM, I think they are best suited thru arm tree. If
+you run into issues with that I cna merge this but with right ACKs...
 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140522/fdd5631d/attachment.sig>
+~Vinod
