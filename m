@@ -1,50 +1,96 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 22 May 2014 15:45:03 +0100
-Subject: [PATCH v2] ARM: realview: basic device tree implementation
-In-Reply-To: <5678119.IM3FN0FlT6@wuerfel>
-References: <1399586896-16906-1-git-send-email-linus.walleij@linaro.org>
- <201405091244.02066.arnd@arndb.de>
- <CACRpkdb8c=k3Ky=TisNdzycc3owJsNSQmSTu03RR5E0QvE0KZA@mail.gmail.com>
- <5678119.IM3FN0FlT6@wuerfel>
-Message-ID: <20140522144503.GA27931@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 22 May 2014 16:47:12 +0200
+Subject: [PATCH v2] pinctrl: sunxi: Fix recursive dependency
+Message-ID: <1400770032-8774-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 09:31:37AM +0100, Arnd Bergmann wrote:
-> commit 42c4dafe803dcad82980fd8b0831a89032156f93
-> Author: Catalin Marinas <catalin.marinas@arm.com>
-> Date:   Thu Jul 1 13:22:48 2010 +0100
-> 
->     ARM: 6202/1: Do not ARM_DMA_MEM_BUFFERABLE on RealView boards with L210/L220
->     
->     RealView boards with certain revisions of the L210/L220 cache controller
->     may have issues (hardware deadlock) with the mandatory barriers (DSB
->     followed by an L2 cache sync) when ARM_DMA_MEM_BUFFERABLE is enabled.
->     The patch disables ARM_DMA_MEM_BUFFERABLE for these boards.
->     
->     Tested-by: Linus Walleij <linus.walleij@stericsson.com>
->     Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
->     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Fix the following configuration error:
+drivers/pinctrl/sunxi/Kconfig:3:error: recursive dependency detected!
+drivers/pinctrl/sunxi/Kconfig:3:	symbol PINCTRL_SUNXI is selected by PINCTRL_SUN4I_A10
+drivers/pinctrl/sunxi/Kconfig:9:	symbol PINCTRL_SUN4I_A10 default value contains PINCTRL_SUNXI
 
-Looking through the L220 errata document, I think this relates to 425331
-which says that a cache sync can deadlock the system if the write buffer
-is not empty. By making the DMA memory Strongly Ordered, we avoid the
-L220 write buffer. In addition to the above commit, we also had
-2503a5ecd86c (ARM: 6201/1: RealView: Do not use outer_sync() on
-ARM11MPCore boards with L220).
+Add a new intermedia PINCTRL_SUNXI_COMMON, that superseeds the PINCTRL_SUNXI
+one.
 
-The above only solves the issue for coherent DMA allocations. Streaming
-DMA requires additional changes to cache-l2x0.c but they are all weird
-and depend on how the L2x0 is wired (for example, using SWP to access
-the L2x0 registers works on one RealView board but not on another).
-Anyway, I don't think we have any streaming DMA used on these RealView
-boards.
+We still need to keep PINCTRL_SUNXI at the moment in order to preserve
+bisectability. Indeed, during that merge window, we also introduced the
+MACH_SUN* symbols. Since it's going through different trees, we can't rely on
+the fact that the options will be there, while ARCH_SUNXI still select
+PINCTRL_SUNXI.
 
-If we only use the DMA coherent buffers for CLCD on these boards, we
-don't really need the outer_sync() either so we could go back to
-bufferable DMA memory (strangely enough, this L2 cache workaround looks
-similar to Marvell's PCI+PL310 problem where we want to avoid
-outer_sync()).
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/pinctrl/sunxi/Kconfig  | 27 +++++++++++++++------------
+ drivers/pinctrl/sunxi/Makefile |  2 +-
+ 2 files changed, 16 insertions(+), 13 deletions(-)
 
+Changes from v1:
+  - introduce PINCTRL_SUNXI_COMMON in order to ease the cleanup once everything
+    will be merged.
+
+diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
+index 2007327e0c48..da1e83035789 100644
+--- a/drivers/pinctrl/sunxi/Kconfig
++++ b/drivers/pinctrl/sunxi/Kconfig
+@@ -2,31 +2,34 @@ if ARCH_SUNXI
+ 
+ config PINCTRL_SUNXI
+ 	bool
++
++config PINCTRL_SUNXI_COMMON
++	bool
+ 	select PINMUX
+ 	select GENERIC_PINCONF
+ 
+ config PINCTRL_SUN4I_A10
+-       def_bool PINCTRL_SUNXI || MACH_SUN4I
+-       select PINCTRL_SUNXI
++	def_bool PINCTRL_SUNXI || MACH_SUN4I
++	select PINCTRL_SUNXI_COMMON
+ 
+ config PINCTRL_SUN5I_A10S
+-       def_bool PINCTRL_SUNXI || MACH_SUN5I
+-       select PINCTRL_SUNXI
++	def_bool PINCTRL_SUNXI || MACH_SUN5I
++	select PINCTRL_SUNXI_COMMON
+ 
+ config PINCTRL_SUN5I_A13
+-       def_bool PINCTRL_SUNXI || MACH_SUN5I
+-       select PINCTRL_SUNXI
++	def_bool PINCTRL_SUNXI || MACH_SUN5I
++	select PINCTRL_SUNXI_COMMON
+ 
+ config PINCTRL_SUN6I_A31
+-       def_bool PINCTRL_SUNXI || MACH_SUN6I
+-       select PINCTRL_SUNXI
++	def_bool PINCTRL_SUNXI || MACH_SUN6I
++	select PINCTRL_SUNXI_COMMON
+ 
+ config PINCTRL_SUN6I_A31_R
+-       def_bool PINCTRL_SUNXI || MACH_SUN6I
+-       select PINCTRL_SUNXI
++	def_bool PINCTRL_SUNXI || MACH_SUN6I
++	select PINCTRL_SUNXI_COMMON
+ 
+ config PINCTRL_SUN7I_A20
+-       def_bool PINCTRL_SUNXI || MACH_SUN7I
+-       select PINCTRL_SUNXI
++	def_bool PINCTRL_SUNXI || MACH_SUN7I
++	select PINCTRL_SUNXI_COMMON
+ 
+ endif
+diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
+index 8e23a15e695d..0f4461cbe11d 100644
+--- a/drivers/pinctrl/sunxi/Makefile
++++ b/drivers/pinctrl/sunxi/Makefile
+@@ -1,5 +1,5 @@
+ # Core
+-obj-$(CONFIG_PINCTRL_SUNXI)	+= pinctrl-sunxi.o
++obj-$(CONFIG_PINCTRL_SUNXI_COMMON)	+= pinctrl-sunxi.o
+ 
+ # SoC Drivers
+ obj-$(CONFIG_PINCTRL_SUN4I_A10)		+= pinctrl-sun4i-a10.o
 -- 
-Catalin
+1.9.3
