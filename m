@@ -1,52 +1,57 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 22 May 2014 14:15:09 +0200
-Subject: [GIT PULL] MMC updates for mmc-next for 3.16, take 3
-In-Reply-To: <86zjiaqarn.fsf@void.printf.net>
-References: <CAPDyKFo44fucVebB3f_qby1iWqjyq5P4XPAyD6og5ZWpqgO4=A@mail.gmail.com>
- <86zjiaqarn.fsf@void.printf.net>
-Message-ID: <CAPDyKFqhsErJvw-GYFq=x0xQigt=Tr3Luw=-n12cL5o5D5eGNw@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 22 May 2014 14:25:50 +0200
+Subject: [PATCH 3/4] clk: samsung: Add driver to control CLKOUT line on
+ Exynos SoCs
+In-Reply-To: <537DE714.1090407@samsung.com>
+References: <1400604211-9447-1-git-send-email-t.figa@samsung.com>
+ <1400604211-9447-4-git-send-email-t.figa@samsung.com>
+ <537D8788.8030904@linaro.org> <537DD2C0.4060802@samsung.com>
+ <CAHbNUh2gkpV-rt6S+-bUmFvYAuK_HNoXfyOStwYe29sZMJonUw@mail.gmail.com>
+ <537DE714.1090407@samsung.com>
+Message-ID: <537DECCE.8000301@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 May 2014 14:05, Chris Ball <chris@printf.net> wrote:
-> Hi Ulf,
+On 22/05/14 14:01, Tomasz Figa wrote:
+>>>> >>> [ ... ]
+>>>> >>>
+>>>>> >>>> +    clkout->clk_table[0] = clk_register_composite(NULL, "clkout",
+>>>>> >>>> +                            parent_names, parent_count, &clkout->mux.hw,
+>>>>> >>>> +                            &clk_mux_ops, NULL, NULL, &clkout->gate.hw,
+>>>>> >>>> +                            &clk_gate_ops, CLK_SET_RATE_PARENT
+>>>>> >>>> +                            | CLK_SET_RATE_NO_REPARENT);
+>>>> >>>
+>>>> >>> Would you please remove CLK_SET_RATE_NO_REPARENT flag from here? Let me
+>>>> >>> know if you have reservations against this.
+>>> >>
+>>> >> The problem with clock reparenting is that there are certain parent
+>>> >> clocks of CLKOUT, rate of which changes at runtime, e.g. clocks derived
+>>> >> from APLL or bus clocks, which can be reconfigured by cpufreq or devfreq.
+>>> >>
+>> > 
+>> > +CC: Sylwester Nawrocki
+>> > 
+>> > Okay. But in cases where there is only 1 valid parent clock provided
+>> > through DT (at the moment for Exynos5250/Exynos5420), would it be safe
+>> > to set that clock as the parent of CLKOUT?
 >
-> On Thu, May 22 2014, Ulf Hansson wrote:
->> Here are a third and final collection of patches for 3.16.
->>
->> I have as you and I discussed (off list), collected the patches from
->> Russell's sdhci patchset. I needed to resolve some conflicts while
->> applying them, but it was manageable. I also omitted the patch which
->> was reported to caused problem with eMMC, (mmc: sdhci: hack up driver
->> to make it more compliant with UHS-1).
+> This is not something to rely on. I have simply omitted remaining CLKOUT
+> parents on Exynos 5 SoCs, as I don't have any board with them on which I
+> could test this. Eventually they will be added.
+> 
+>> > Otherwise, this clock is
+>> > not usable ATM.
 >
-> Pulled, but:
+> On many boards it is already configured properly by the bootloader.
+> Although I don't see any reason why you couldn't reparent it in
+> (board-specific) sound card driver right now.
 
-Great!
+This would require passing the parent's clock specifier in 'clocks'
+property of the sound card device node, which I assume is not something
+we're generally expected to do in mainline. Although some drivers
+happen to be doing it already I think that's a bad example. It sounds
+like an abuse of the current clock bindings.
 
->
-> drivers/mmc/host/sdhci.c: In function ?sdhci_set_uhs_signaling?:
-> drivers/mmc/host/sdhci.c:1432:12: error: ?ios? undeclared (first use
-> in this function)
->   else if ((ios->timing == MMC_TIMING_UHS_DDR50) ||
->             ^
-
-Seems like I manage to break it while I resolved the conflict for the
-below commit:
-
-"mmc: sdhci: convert sdhci_set_uhs_signaling() into a library function"
-
-The following lines...
-+       else if ((ios->timing == MMC_TIMING_UHS_DDR50) ||
-+                (ios->timing == MMC_TIMING_MMC_DDR52))
-+               ctrl_2 |= SDHCI_CTRL_UHS_DDR50;
-
-Should be replaced by;
-+       else if ((timing == MMC_TIMING_UHS_DDR50) ||
-+                (timing == MMC_TIMING_MMC_DDR52))
-+               ctrl_2 |= SDHCI_CTRL_UHS_DDR50;
-
-Can you update the code and amend the commit?
-
-Kind regards
-Uffe
+--
+Regards,
+Sylwester
