@@ -1,100 +1,63 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 22 May 2014 20:28:24 +0800
-Subject: [GIT PULL]]ARM: sirf: machine update for 3.16
-In-Reply-To: <20140521205120.GA24341@quad.lixom.net>
-References: <CAGsJ_4yqTkKu+93Fo_D6NaZMyz4T6_EmKz4gZfyeQCi_uF-3dg@mail.gmail.com>
- <CAGsJ_4wD=FqxNeuEs47f0D9V+Qhn8jyUQL67iv4rsZ3r2K_3vA@mail.gmail.com>
- <CAGsJ_4y7gEQd9-Em6LW2kZ79qUOz5dSYzeWnBLbt8o8QsOSA6w@mail.gmail.com>
- <20140520050740.GI18956@quad.lixom.net>
- <CAGsJ_4wxaU5Sz9p3rb8wXuHeFs_kFx7BG-ThdQL0oiLHPqOb9w@mail.gmail.com>
- <20140521205120.GA24341@quad.lixom.net>
-Message-ID: <CAGsJ_4wzZy+Q=sNofgxFt=_VEPqBqR0W=TdjxjOqdF+GrFpSHg@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 22 May 2014 14:32:33 +0200
+Subject: [PATCH 3/4] clk: samsung: Add driver to control CLKOUT line on
+ Exynos SoCs
+In-Reply-To: <537DECCE.8000301@samsung.com>
+References: <1400604211-9447-1-git-send-email-t.figa@samsung.com>
+ <1400604211-9447-4-git-send-email-t.figa@samsung.com>
+ <537D8788.8030904@linaro.org> <537DD2C0.4060802@samsung.com>
+ <CAHbNUh2gkpV-rt6S+-bUmFvYAuK_HNoXfyOStwYe29sZMJonUw@mail.gmail.com>
+ <537DE714.1090407@samsung.com> <537DECCE.8000301@samsung.com>
+Message-ID: <537DEE61.2050606@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-05-22 4:51 GMT+08:00 Olof Johansson <olof@lixom.net>:
-> On Tue, May 20, 2014 at 01:39:20PM +0800, Barry Song wrote:
->> 2014-05-20 13:07 GMT+08:00 Olof Johansson <olof@lixom.net>:
->> > On Sun, May 18, 2014 at 08:07:14PM +0800, Barry Song wrote:
->> >> >> Bin Shi (2):
->> >> >>       clocksource: prima2: fix some minor checkpatch issues
->> >> >>       irqchip: sirf: fix one minor checkpatch issue
->> >> >>
->> >> >> Xianglong Du (1):
->> >> >>       ARM: prima2: rstc: fix some minor checkpatch issues
->> >> >>
->> >> >> Zhiwu Song (2):
->> >> >>       clocksource:sirf: remove the hardcode for the clk of timers
->> >> >>       clocksource: marco: fix the affinity set for local timer of CPU1
->> >> >
->> >> > as Daniel has applied this one "clocksource: marco: fix the affinity
->> >> > set for local timer of CPU1" to his clk tree, i'll rebuilt the tag by
->> >> > dropping this.
->> >>
->> >> hi Olof,
->> >> i did a force update to tags/sirf-soc-for-3.16 after dropping
->> >> "clocksource: marco: fix the affinity set for local timer of CPU1"
->> >> which has been in clk tree , the new request is as below:
->> >>
->> >> The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
->> >>
->> >>   Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
->> >>
->> >> are available in the git repository at:
->> >>
->> >>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
->> >> tags/sirf-soc-for-3.16
->> >>
->> >> for you to fetch changes up to c7cff54d5926e3f419c23eff2ebaf6f5e12da05d:
->> >>
->> >>   clocksource:sirf: remove the hardcode for the clk of timers
->> >> (2014-05-12 21:43:49 +0800)
->> >>
->> >> ----------------------------------------------------------------
->> >> ARM: sirf: machine update for 3.16
->> >>
->> >> most of them fix some minor checkpatch issues according to key customers'
->> >> requirement. And this patchset also cleanups the clk of clocksource: move
->> >> to get clk by dts properity.
->> >>
->> >
->> > Merged into next/cleanup. Thanks.
->>
->> Olof,
->> i noticed today Daniel Lezcano applied two more clocksource patches
->> into his tree for 3.16 after i re-built the sirf-soc-for-3.16 tag. so
->> for this pull, there are only two left.
->>
->> Bin Shi (2):
->>        clocksource: prima2: fix some minor checkpatch issues
->>
->> Xianglong Du (1):
->>        ARM: prima2: rstc: fix some minor checkpatch issues
->>
->> so i did a force push for tags/sirf-soc-for-3.16 again just now
->> including only these two.
->>
->> very sorry for that!
->
-> Don't do this. If you need to add a patch to a branch, then you send us
-> a revised pull request with the new patch on top. Also, don't just send a reply
-> with "oh, I added some code". It makes it hard to use the diffstat to tell
-> whether what I pulled from you was what was supposed to be there and nothing
-> more (or less).
 
-Olof, i actually wanted to drop two patches in the patchset instead of
-adding more as the dropped patches have been applied in clocksource.
 
-i don't know whether REVISED PULL REQUEST can fix it or not?
+On 22.05.2014 14:25, Sylwester Nawrocki wrote:
+> On 22/05/14 14:01, Tomasz Figa wrote:
+>>>>>>>> [ ... ]
+>>>>>>>>
+>>>>>>>>>> +    clkout->clk_table[0] = clk_register_composite(NULL, "clkout",
+>>>>>>>>>> +                            parent_names, parent_count, &clkout->mux.hw,
+>>>>>>>>>> +                            &clk_mux_ops, NULL, NULL, &clkout->gate.hw,
+>>>>>>>>>> +                            &clk_gate_ops, CLK_SET_RATE_PARENT
+>>>>>>>>>> +                            | CLK_SET_RATE_NO_REPARENT);
+>>>>>>>>
+>>>>>>>> Would you please remove CLK_SET_RATE_NO_REPARENT flag from here? Let me
+>>>>>>>> know if you have reservations against this.
+>>>>>>
+>>>>>> The problem with clock reparenting is that there are certain parent
+>>>>>> clocks of CLKOUT, rate of which changes at runtime, e.g. clocks derived
+>>>>>> from APLL or bus clocks, which can be reconfigured by cpufreq or devfreq.
+>>>>>>
+>>>>
+>>>> +CC: Sylwester Nawrocki
+>>>>
+>>>> Okay. But in cases where there is only 1 valid parent clock provided
+>>>> through DT (at the moment for Exynos5250/Exynos5420), would it be safe
+>>>> to set that clock as the parent of CLKOUT?
+>>
+>> This is not something to rely on. I have simply omitted remaining CLKOUT
+>> parents on Exynos 5 SoCs, as I don't have any board with them on which I
+>> could test this. Eventually they will be added.
+>>
+>>>> Otherwise, this clock is
+>>>> not usable ATM.
+>>
+>> On many boards it is already configured properly by the bootloader.
+>> Although I don't see any reason why you couldn't reparent it in
+>> (board-specific) sound card driver right now.
+> 
+> This would require passing the parent's clock specifier in 'clocks'
+> property of the sound card device node, which I assume is not something
+> we're generally expected to do in mainline. Although some drivers
+> happen to be doing it already I think that's a bad example. It sounds
+> like an abuse of the current clock bindings.
 
->
-> I have no idea what's in your branch now, nor what is supposed to be there.
-> What's in our tree now is in our tree -- I suggest you take a look and send an
-> updated pull request for the incremental contents, with a tag that describes
-> the new contents (but not the old).
->
->
-> -Olof
->
+Well, an already board-specific driver might have some knowledge of the
+SoC, so it might not be a huge problem, but I agree that this is not an
+optimal solution.
 
--barry
+Best regards,
+Tomasz
