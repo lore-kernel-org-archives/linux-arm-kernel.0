@@ -1,108 +1,32 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 22 May 2014 17:37:24 +0200
-Subject: [PATCH] pinctrl: sunxi: fix pin numbers passed to register offset
- helpers
-In-Reply-To: <1400772055-3852-1-git-send-email-wens@csie.org>
-References: <1400772055-3852-1-git-send-email-wens@csie.org>
-Message-ID: <537E19B4.6070005@free-electrons.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Thu, 22 May 2014 17:44:21 +0200
+Subject: Add SDHCI support for STMicroelectronics SoCs
+In-Reply-To: <1400771902-26553-1-git-send-email-peter.griffin@linaro.org>
+References: <1400771902-26553-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <537E1B55.1090807@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Chen-Yu,
+Hi Peter,
 
-On 22/05/2014 17:20, Chen-Yu Tsai wrote:
-> The pin numbers passed to sunxi_*_reg helpers to get the correct
-> registers should be the pin offset for the PIO block, not the
-> absolute number we use that is based on the alphanumeric labels
-> Allwinner uses.
+On 05/22/2014 05:18 PM, Peter Griffin wrote:
+> This series adds a SDHCI platform driver for ST SoCs, along with
+> the additional device tree bindings and configuration to enable
+> the controller to work properly.
 >
-> This patch subtracts .pin_base from the pin number passed to these
-> functions, so the driver accesses the correct registers.
+> Initially it supports the stih416 and stih415 SoCs, and has
+> been tested on a stih416-b2020 board.
 
-Thanks for fixing this bug.
+In next version, could you also add  drivers/mmc/host/sdhci-st.c in the 
+ARM/STI ARCHITECTURE field of MAINTAINERS file?
+
+
+Thanks,
+Maxime
+
 
 >
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-
-Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-> ---
+> regards,
 >
-> Hi,
+> Peter.
 >
-> This patch fixes the pinctrl driver failing to set pinmuxes for the R_PIO
-> block found on the A31 and A23. The problem was found while working on
-> bringing up the A23 SoC. The R_UART pins weren't properly muxed when
-> the bootloader didn't use them.
->
-> A thank you to Boris who also verified the issue.
->
->
-> Cheers,
-> ChenYu
->
-> ---
->  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 26 ++++++++++++++------------
->  1 file changed, 14 insertions(+), 12 deletions(-)
->
-> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> index f6522b5..59962fa 100644
-> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> @@ -280,6 +280,7 @@ static int sunxi_pconf_group_set(struct pinctrl_dev *pctldev,
->  	struct sunxi_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
->  	struct sunxi_pinctrl_group *g = &pctl->groups[group];
->  	unsigned long flags;
-> +	unsigned pin = g->pin - pctl->desc->pin_base;
->  	u32 val, mask;
->  	u16 strength;
->  	u8 dlevel;
-> @@ -303,23 +304,23 @@ static int sunxi_pconf_group_set(struct pinctrl_dev *pctldev,
->  			 *   3: 40mA
->  			 */
->  			dlevel = strength / 10 - 1;
-> -			val = readl(pctl->membase + sunxi_dlevel_reg(g->pin));
-> -			mask = DLEVEL_PINS_MASK << sunxi_dlevel_offset(g->pin);
-> +			val = readl(pctl->membase + sunxi_dlevel_reg(pin));
-> +			mask = DLEVEL_PINS_MASK << sunxi_dlevel_offset(pin);
->  			writel((val & ~mask)
-> -				| dlevel << sunxi_dlevel_offset(g->pin),
-> -				pctl->membase + sunxi_dlevel_reg(g->pin));
-> +				| dlevel << sunxi_dlevel_offset(pin),
-> +				pctl->membase + sunxi_dlevel_reg(pin));
->  			break;
->  		case PIN_CONFIG_BIAS_PULL_UP:
-> -			val = readl(pctl->membase + sunxi_pull_reg(g->pin));
-> -			mask = PULL_PINS_MASK << sunxi_pull_offset(g->pin);
-> -			writel((val & ~mask) | 1 << sunxi_pull_offset(g->pin),
-> -				pctl->membase + sunxi_pull_reg(g->pin));
-> +			val = readl(pctl->membase + sunxi_pull_reg(pin));
-> +			mask = PULL_PINS_MASK << sunxi_pull_offset(pin);
-> +			writel((val & ~mask) | 1 << sunxi_pull_offset(pin),
-> +				pctl->membase + sunxi_pull_reg(pin));
->  			break;
->  		case PIN_CONFIG_BIAS_PULL_DOWN:
-> -			val = readl(pctl->membase + sunxi_pull_reg(g->pin));
-> -			mask = PULL_PINS_MASK << sunxi_pull_offset(g->pin);
-> -			writel((val & ~mask) | 2 << sunxi_pull_offset(g->pin),
-> -				pctl->membase + sunxi_pull_reg(g->pin));
-> +			val = readl(pctl->membase + sunxi_pull_reg(pin));
-> +			mask = PULL_PINS_MASK << sunxi_pull_offset(pin);
-> +			writel((val & ~mask) | 2 << sunxi_pull_offset(pin),
-> +				pctl->membase + sunxi_pull_reg(pin));
->  			break;
->  		default:
->  			break;
-> @@ -376,6 +377,7 @@ static void sunxi_pmx_set(struct pinctrl_dev *pctldev,
->  
->  	spin_lock_irqsave(&pctl->lock, flags);
->  
-> +	pin -= pctl->desc->pin_base;
->  	val = readl(pctl->membase + sunxi_mux_reg(pin));
->  	mask = MUX_PINS_MASK << sunxi_mux_offset(pin);
->  	writel((val & ~mask) | config << sunxi_mux_offset(pin),
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
