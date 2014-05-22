@@ -1,51 +1,47 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu, 22 May 2014 14:50:01 +0200
-Subject: [PATCH] ARM: socfpga: dts: add watchdog0+1
-In-Reply-To: <537DF210.50508@cogentembedded.com>
-References: <1400753977-11620-1-git-send-email-s.trumtrar@pengutronix.de>
- <537DF210.50508@cogentembedded.com>
-Message-ID: <20140522125001.GK949@pengutronix.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 22 May 2014 14:50:47 +0200
+Subject: [PATCH 2/2] ARM: shmobile: marzen dts: Remove superfluous include
+In-Reply-To: <1400761997-13512-3-git-send-email-geert+renesas@glider.be>
+References: <1400761997-13512-1-git-send-email-geert+renesas@glider.be>
+ <1400761997-13512-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <2352184.UXetcfavus@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 04:48:16PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 22-05-2014 14:19, Steffen Trumtrar wrote:
-> 
-> >The SoCFPGA has two watchdog timers. Add them to the dtsi.
-> 
-> >Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> >---
-> >  arch/arm/boot/dts/socfpga.dtsi | 16 ++++++++++++++++
-> >  1 file changed, 16 insertions(+)
-> 
-> >diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> >index 56fc214..ee10fa6 100644
-> >--- a/arch/arm/boot/dts/socfpga.dtsi
-> >+++ b/arch/arm/boot/dts/socfpga.dtsi
-> >@@ -549,6 +549,22 @@
-> [...]
-> >+		watchdog1: wd at ffd04000 {
-> 
->    Oh, and the unit-address part of the name should match the "reg" property.
-> 
+Hi Geert,
 
-Oops. Of course.
+Thank you for the patch.
 
-> >+			compatible = "snps,dw-wdt";
-> >+			reg = <0xffd03000 0x1000>;
-> >+			interrupts = <0 172 0>;
-> >+			clocks = <&osc1>;
-> >+			status = "disabled";
-> >+		};
-> >+
+On Thursday 22 May 2014 14:33:17 Geert Uytterhoeven wrote:
+> <dt-bindings/interrupt-controller/irq.h> is already included by
+> r8a7779.dtsi.
 
-Thanks,
-Steffen
+Isn't it better, like with C code, to explicitly include headers that provide 
+the macros you need, instead of relying on implicit #include's that could 
+change later ? OK, in this specific case, it's very unlikely that r8a7779.dtsi 
+would stop including <dt-bindings/interrupt-controller/irq.h>, but in the 
+general case I believe explicit includes to be good practice.
+
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>  arch/arm/boot/dts/r8a7779-marzen.dts | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts
+> b/arch/arm/boot/dts/r8a7779-marzen.dts index 321290828eee..649129906d6f
+> 100644
+> --- a/arch/arm/boot/dts/r8a7779-marzen.dts
+> +++ b/arch/arm/boot/dts/r8a7779-marzen.dts
+> @@ -12,7 +12,6 @@
+>  /dts-v1/;
+>  #include "r8a7779.dtsi"
+>  #include <dt-bindings/gpio/gpio.h>
+> -#include <dt-bindings/interrupt-controller/irq.h>
+> 
+>  / {
+>  	model = "marzen";
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+
+Laurent Pinchart
