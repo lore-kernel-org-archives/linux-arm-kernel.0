@@ -1,30 +1,38 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 22 May 2014 13:55:16 -0400 (EDT)
-Subject: [PATCH] ARM: EXYNOS: Use wfi macro in platform_do_lowpower
-In-Reply-To: <537DE530.3050205@linaro.org>
-References: <1400745455-27920-1-git-send-email-leela.krishna@linaro.org>
- <537DE530.3050205@linaro.org>
-Message-ID: <alpine.LFD.2.11.1405221353030.17310@knanqh.ubzr>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 22 May 2014 19:52:06 +0200
+Subject: [PATCH v3 5/9] ASoC: simple-card: Support setting mclk via a
+ fixed factor
+In-Reply-To: <20140522173919.GM12304@sirena.org.uk>
+References: <20140520221359.GF12304@sirena.org.uk>
+ <1400772710-23523-1-git-send-email-andrew@lunn.ch>
+ <20140522173919.GM12304@sirena.org.uk>
+Message-ID: <20140522175206.GA24500@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 May 2014, Daniel Lezcano wrote:
-
-> On 05/22/2014 09:57 AM, Leela Krishna Amudala wrote:
-> > This patch is originally based on commit b3377d186572 ("ARM: 7064/1:
-> > vexpress: Use wfi macro in platform_do_lowpower.")
-> >
-> > Current Exynos CPU hotplug code includes a hardcoded WFI
-> > instruction, in ARM encoding.  When the kernel is compiled in Thumb-2
-> > mode, this is invalid and causes the machine to hang hard when a CPU
-> > is offlined.
-> >
-> > Use wfi macro instead of the hardcoded WFI instruction.
+On Thu, May 22, 2014 at 06:39:19PM +0100, Mark Brown wrote:
+> On Thu, May 22, 2014 at 05:31:49PM +0200, Andrew Lunn wrote:
+> > Some platforms require that the codecs mclk is a fixed multiplication
+> > factor of the audio stream rate. Add a optional property to the
+> > binding to hold this factor and implement a hw_params() function to
+> > make use of it.
+> > 
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > 
-> Is it possible to change it for cpu_do_idle() ?
+> I'm missing the rest of this series - what's the context, are there any
+> interdependencies?
 
-Please let's not encourage every wfi() to be turned into cpu_do_idle().  
-They are not always equivalent.  And semantically they are not.
+I threaded the patch to your request to respin this patch:
 
+http://patchwork.ozlabs.org/patch/345353/
 
-Nicolas
+and the whole the v2 series is here:
+
+http://www.spinics.net/linux/lists/arm-kernel/msg328068.html
+
+You have already accepted patch 1, and Jason Cooper has taken 2, 3, 4,
+6, 7, 8, & 9.
+
+There are no build interdependences.
+
+      Andrew
