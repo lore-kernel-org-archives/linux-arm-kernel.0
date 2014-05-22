@@ -1,43 +1,30 @@
-From: leela.krishna@linaro.org (Leela Krishna Amudala)
-Date: Thu, 22 May 2014 13:27:35 +0530
-Subject: [PATCH] ARM: EXYNOS: Use wfi macro in platform_do_lowpower
-Message-ID: <1400745455-27920-1-git-send-email-leela.krishna@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 22 May 2014 10:21:18 +0200
+Subject: [PATCH] ARM: sun6i: Fix OHCI2 node name
+In-Reply-To: <1400587198-19668-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1400587198-19668-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140522082118.GY27329@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is originally based on commit b3377d186572 ("ARM: 7064/1:
-vexpress: Use wfi macro in platform_do_lowpower.")
+On Tue, May 20, 2014 at 01:59:58PM +0200, Maxime Ripard wrote:
+> The unit-address doesn't match the reg property. Since the reg property is
+> correct, change the unit-address accordingly.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Current Exynos CPU hotplug code includes a hardcoded WFI
-instruction, in ARM encoding.  When the kernel is compiled in Thumb-2
-mode, this is invalid and causes the machine to hang hard when a CPU
-is offlined.
+Applied,
 
-Use wfi macro instead of the hardcoded WFI instruction.
+Maxime
 
-Signed-off-by: Leela Krishna Amudala <leela.krishna@linaro.org>
----
- arch/arm/mach-exynos/hotplug.c |    8 +-------
- 1 file changed, 1 insertion(+), 7 deletions(-)
-
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index 69fa483..8a134d0 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -46,13 +46,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
- 		if (cpu == 1)
- 			exynos_cpu_power_down(cpu);
- 
--		/*
--		 * here's the WFI
--		 */
--		asm(".word	0xe320f003\n"
--		    :
--		    :
--		    : "memory", "cc");
-+		wfi();
- 
- 		if (pen_release == cpu_logical_map(cpu)) {
- 			/*
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140522/cfd8e9ec/attachment-0001.sig>
