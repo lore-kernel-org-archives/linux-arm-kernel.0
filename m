@@ -1,109 +1,88 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 22 May 2014 18:33:05 -0300
-Subject: [alsa-devel] The resume of sgtl5000 causes kernel Oops
-In-Reply-To: <20140522174818.GN12304@sirena.org.uk>
-References: <20140522145650.GD32184@dragon>
- <20140522174818.GN12304@sirena.org.uk>
-Message-ID: <CAOMZO5CCFnZSz_jaipe4Fz0sTxXOajp7QRPiaM5f5wg_Di0ftA@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 23 May 2014 00:34:43 +0200
+Subject: [PATCH v2] ARM: realview: basic device tree implementation
+In-Reply-To: <CACRpkdb8c=k3Ky=TisNdzycc3owJsNSQmSTu03RR5E0QvE0KZA@mail.gmail.com>
+References: <1399586896-16906-1-git-send-email-linus.walleij@linaro.org>
+ <201405091244.02066.arnd@arndb.de>
+ <CACRpkdb8c=k3Ky=TisNdzycc3owJsNSQmSTu03RR5E0QvE0KZA@mail.gmail.com>
+Message-ID: <537E7B83.4020900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 05/22/2014 09:41 AM, Linus Walleij wrote:
+> On Fri, May 9, 2014 at 12:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>> +++ b/arch/arm/boot/dts/arm-realview-pb1176.dts
+>>
+>> Can you split this up into an arm-realview.dtsi file for the common parts and
+>> a pb1176 specific file for the rest?
+> 
+> I wonder if that makes any kind of sense. The RealView platforms does not
+> really share much more than the name, sadly. For example: IP blocks
+> aren't even at the same address.
+> 
+> I could create a .dtsi file but it would be empty :-(
+> 
+>>> +     soc {
+>>> +             #address-cells = <1>;
+>>> +             #size-cells = <1>;
+>>> +             compatible = "simple-bus";
+>>> +             ranges;
+>>> +
+>>> +             syscon: syscon at 10000000 {
+>>> +                     compatible = "arm,realview-pb1176-syscon", "syscon";
+>>> +                     reg = <0x10000000 0x1000>;
+>>> +             };
+>>
+>> Hmm, in order to have a proper reset driver, we probably want a separate
+>> node for the reset controller. I believe the x-gene people have just
+>> posted a generic reset driver based on syscon. Let's see if we can share
+>> that.
+> 
+> I have looked at it. Patch titled
+> "power: reset: Add generic SYSCON register mapped reset"
+> 
+> Sadly it does not work for our case. This is because it assumes that
+> reboot will be triggered by writing one value to one register. The RealViews
+> need you to *first* write to a special unlock register, then write a magic
+> value to a magic register.
+> 
+> So of course we could extend the syscon regmap reset driver by
+> starting to encode a jam table such as a sequence of register writes
+> to a sequence of registers, but we have refused such code in the past
+> because as I recall Grant said, it is the beginning of a byte code
+> interpreter and then we could as well bite the bullet and start
+> implementing open firmware.
+> 
+> This is exactly the type of thing that ACPI AML code usually does
+> by the way so what he says makes a *lot* of sense.
+> 
+> So for now I keep to our special driver.
 
-On Thu, May 22, 2014 at 2:48 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Thu, May 22, 2014 at 10:56:51PM +0800, Shawn Guo wrote:
->> The suspend/resume test on imx51-babbage board discovers a kernel Oops
->> caused by sgtl5000_resume().  I believe it happens due to commit
->> e5d80e82e32e (ASoC: sgtl5000: Convert to use regmap directly).  After
->> the commit, it seems that the codec->reg_cache in function
->> sgtl5000_restore_regs() becomes invalid.  It looks that the register
->> restoring in the function requires some strict sequence, I'm not sure
->> what the correct fix is.
->
-> Yes, reg_cache isn't there if we're not using ASoC level caching.  The
-> fix should just be to replace the direct cache references with
-> snd_soc_read()s which will end up in a cache lookup if the register is
-> cached.
++1 for drivers/soc _and_ of_xlate for regmap instead of syscon.
 
-Do you mean like this?
+driven by Mike Turquette's request to join mach-berlin clock node into a
+single node, we currently use pinctrl driver (that must be somewhere in
+Linus inbox) as a crutch to register a regmap for other drivers.
 
-diff --git a/sound/soc/codecs/sgtl5000.c b/sound/soc/codecs/sgtl5000.c
-index 9626ee0..437751a 100644
---- a/sound/soc/codecs/sgtl5000.c
-+++ b/sound/soc/codecs/sgtl5000.c
-@@ -1075,7 +1075,6 @@ static int sgtl5000_suspend(struct snd_soc_codec *codec)
-  */
- static int sgtl5000_restore_regs(struct snd_soc_codec *codec)
- {
--    u16 *cache = codec->reg_cache;
-     u16 reg;
+I also saw that Arnd requested to not chop chip registers into tiny
+pieces for Linux subsystems but rather have a single DT node and make
+the drivers use it.
 
-     /* restore regular registers */
-@@ -1089,12 +1088,12 @@ static int sgtl5000_restore_regs(struct
-snd_soc_codec *codec)
-             reg == SGTL5000_CHIP_REF_CTRL)
-             continue;
+Mike also mentioned he is fine with different subsystem drivers reusing
+the same node property-wise, i.e. reset and clock in a single node.
 
--        snd_soc_write(codec, reg, cache[reg]);
-+        snd_soc_write(codec, reg, snd_soc_read(codec, reg));
-     }
+With Berlin (and other SoCs for sure) ultimately there will be a bunch
+of drivers that require the io resource and the node early and
+non-early. Now, using syscon would still require dummy nodes for each
+subsystem, as there will be only one driver registered to a single DT
+node.
 
-     /* restore dap registers */
-     for (reg = SGTL5000_DAP_REG_OFFSET; reg <
-SGTL5000_MAX_REG_OFFSET; reg += 2)
--        snd_soc_write(codec, reg, cache[reg]);
-+        snd_soc_write(codec, reg, snd_soc_read(codec, reg));
+With a drivers/soc we'd have a good place for those messy, SoC-specific
+registers to put a driver that hooks up to a single node and takes care
+of registering e.g. pinctrl and reset the plain-old platform_device
+way. It will be a little bit like arm/mach-foo before, but maybe we
+have to admit that on SoCs there will always be some amount of
+very specific, non-probable, non-describable registers that simply need
+special treatment.
 
-     /*
-      * restore these regs according to the power setting sequence in
-@@ -1110,19 +1109,19 @@ static int sgtl5000_restore_regs(struct
-snd_soc_codec *codec)
-      *    prefer to resotre it after SGTL5000_CHIP_ANA_POWER restored
-      */
-     snd_soc_write(codec, SGTL5000_CHIP_LINREG_CTRL,
--            cache[SGTL5000_CHIP_LINREG_CTRL]);
-+            snd_soc_read(codec, SGTL5000_CHIP_LINREG_CTRL));
-
-     snd_soc_write(codec, SGTL5000_CHIP_ANA_POWER,
--            cache[SGTL5000_CHIP_ANA_POWER]);
-+            snd_soc_read(codec, SGTL5000_CHIP_ANA_POWER));
-
-     snd_soc_write(codec, SGTL5000_CHIP_CLK_CTRL,
--            cache[SGTL5000_CHIP_CLK_CTRL]);
-+            snd_soc_read(codec, SGTL5000_CHIP_CLK_CTRL));
-
-     snd_soc_write(codec, SGTL5000_CHIP_REF_CTRL,
--            cache[SGTL5000_CHIP_REF_CTRL]);
-+            snd_soc_read(codec, SGTL5000_CHIP_REF_CTRL));
-
-     snd_soc_write(codec, SGTL5000_CHIP_LINE_OUT_CTRL,
--            cache[SGTL5000_CHIP_LINE_OUT_CTRL]);
-+            snd_soc_read(codec, SGTL5000_CHIP_LINE_OUT_CTRL));
-     return 0;
- }
-
-This avoids the crash in suspend, but I get different errors now:
-
-root@freescale /$ echo mem > /sys/power/state
-PM: Syncing filesystems ... done.
-Freezing user space processes ... (elapsed 0.001 seconds) done.
-Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
-Suspending console(s) (use no_console_suspend to debug)
-random: nonblocking pool is initialized
-PM: suspend of devices complete after 15.210 msecs
-PM: suspend devices took 0.010 seconds
-PM: late suspend of devices complete after 4.435 msecs
-PM: noirq suspend of devices complete after 4.691 msecs
-Disabling non-boot CPUs ...
-PM: noirq resume of devices complete after 3.931 msecs
-PM: early resume of devices complete after 5.724 msecs
-sgtl5000 1-000a: Failed to restore cache: -5
-sgtl5000 1-000a: Failed to restore cache: -5
-sgtl5000 1-000a: ASoC: Failed to turn on bias: -5
-sgtl5000 1-000a: Failed to restore cache: -5
-sgtl5000 1-000a: ASoC: Failed to turn on bias: -5
-sgtl5000 1-000a: Failed to restore cache: -5
-sgtl5000 1-000a: ASoC: Failed to turn on bias: -5
-PM: resume of devices complete after 62.349 msecs
-PM: resume devices took 0.060 seconds
-Restarting tasks ... done.
+Sebastian
