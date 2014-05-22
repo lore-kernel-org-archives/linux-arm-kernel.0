@@ -1,24 +1,31 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 22 May 2014 13:19:06 -0700
-Subject: [PATCH v4 0/2] context tracker support for arm64
-In-Reply-To: <1400786855-32656-1-git-send-email-larry.bassel@linaro.org>
- (Larry Bassel's message of "Thu, 22 May 2014 12:27:33 -0700")
-References: <1400786855-32656-1-git-send-email-larry.bassel@linaro.org>
-Message-ID: <7h7g5dlg79.fsf@paris.lan>
+From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
+Date: Thu, 22 May 2014 22:21:00 +0200
+Subject: [PATCH] sound: soc: samsung: dma.c: Fix to remove null pointer checks
+ that could never happen
+Message-ID: <1400790060-10977-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Larry Bassel <larry.bassel@linaro.org> writes:
+Removal of null pointer checks that could never happen
 
-> Implement and enable context tracking for arm64 (which is
-> a prerequisite for FULL_NOHZ support). This patchset
-> builds upon earlier work by Kevin Hilman and is based on
-> Will Deacon's tree.
+Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
+---
+ sound/soc/samsung/dma.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Tested-by: Kevin Hilman <khilman@linaro.org>
-
-Test this with NO_HZ_FULL on v3.15-rc5 merged with the aarch64 branch
-from Will's tree on the foundation model (with the DT modified so the
-arch timer doesn't enter C3_STOP mode.)
-
-Kevin
+diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
+index dc09b71..0f17ae0 100644
+--- a/sound/soc/samsung/dma.c
++++ b/sound/soc/samsung/dma.c
+@@ -124,8 +124,7 @@ static void audio_buffdone(void *data)
+ 		if (prtd->dma_pos >= prtd->dma_end)
+ 			prtd->dma_pos = prtd->dma_start;
+ 
+-		if (substream)
+-			snd_pcm_period_elapsed(substream);
++		snd_pcm_period_elapsed(substream);
+ 
+ 		spin_lock(&prtd->lock);
+ 		if (!samsung_dma_has_circular()) {
+-- 
+1.7.10.4
