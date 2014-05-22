@@ -1,31 +1,45 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 22 May 2014 17:50:49 +0200
-Subject: [PATCH 3/8] ARM: STi: DT: Add sdhci pins for stih416
-In-Reply-To: <1400771902-26553-4-git-send-email-peter.griffin@linaro.org>
-References: <1400771902-26553-1-git-send-email-peter.griffin@linaro.org>
- <1400771902-26553-4-git-send-email-peter.griffin@linaro.org>
-Message-ID: <537E1CD9.5020900@st.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 22 May 2014 11:51:23 -0400
+Subject: [GIT PULL] ARM: mvebu: defconfig changes for v3.16 (incr. #2)
+Message-ID: <20140522155123.GT8664@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Guys,
+
+last round of defconfig changes.  Nothing earth-shattering here.  :)
+
+Please pull.
+
+thx,
+
+Jason.
 
 
-On 05/22/2014 05:18 PM, Peter Griffin wrote:
-> This adds the required pin config for both SDHCI controllers on
-> the stih416 SoC.
->
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> ---
->   arch/arm/boot/dts/stih416-pinctrl.dtsi | 39 ++++++++++++++++++++++++++++++++++
->   1 file changed, 39 insertions(+)
->
+The following changes since commit 208f4e0d9bce775fbc7ab08c830d135d3da5777c:
 
+  ARM: multi_v5_defconfig: Enable sound modules needed for t5325 (2014-05-05 01:22:11 +0000)
 
-For all the DT patches, once Lee's comments taken into account, you can 
-add my:
+are available in the git repository at:
 
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-3.16-2
 
-Thanks!
-Maxime
+for you to fetch changes up to 0105c9990291587a3b1fecb576f4d9b6728f1191:
+
+  ARM: mvebu: enable MSI support in mvebu_v7_defconfig (2014-05-22 14:22:17 +0000)
+
+----------------------------------------------------------------
+mvebu defconfig changes for v3.16 (incremental #2)
+
+ - mvebu
+    - enable MSI and XHCI in mvebu_v7_defconfig
+
+----------------------------------------------------------------
+Gregory CLEMENT (1):
+      ARM: configs: enable XHCI mvebu support in mvebu_v7_defconfig
+
+Thomas Petazzoni (1):
+      ARM: mvebu: enable MSI support in mvebu_v7_defconfig
+
+ arch/arm/configs/mvebu_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
