@@ -1,72 +1,53 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 22 May 2014 16:23:53 -0400
-Subject: [PATCH v4 1/2] arm64: adjust el0_sync so that a function can
- be called
-In-Reply-To: <1400786855-32656-2-git-send-email-larry.bassel@linaro.org>
-References: <1400786855-32656-1-git-send-email-larry.bassel@linaro.org>
- <1400786855-32656-2-git-send-email-larry.bassel@linaro.org>
-Message-ID: <537E5CD9.80501@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 22 May 2014 22:25:23 +0200
+Subject: [PATCH v2] ARM: realview: basic device tree implementation
+In-Reply-To: <alpine.LFD.2.11.1405221431370.17310@knanqh.ubzr>
+References: <1399586896-16906-1-git-send-email-linus.walleij@linaro.org>
+ <5233065.1vXjHiDqN2@wuerfel>
+ <alpine.LFD.2.11.1405221431370.17310@knanqh.ubzr>
+Message-ID: <7651671.1Wa4i4TJsu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Larry,
-
-On 05/22/2014 03:27 PM, Larry Bassel wrote:
-> To implement the context tracker properly on arm64,
-> a function call needs to be made after debugging and
-> interrupts are turned on, but before the lr is changed
-> to point to ret_to_user(). If the function call
-> is made after the lr is changed the function will not
-> return to the correct place.
+On Thursday 22 May 2014 14:39:20 Nicolas Pitre wrote:
+> On Thu, 22 May 2014, Arnd Bergmann wrote:
 > 
-> For similar reasons, defer the setting of x0 so that
-> it doesn't need to be saved around the function call
-> (save far_el1 in x26 temporarily instead).
+> > On Thursday 22 May 2014 14:09:52 Nicolas Pitre wrote:
+> > > On Thu, 22 May 2014, Arnd Bergmann wrote:
+> > > 
+> > > > On Thursday 22 May 2014 15:45:03 Catalin Marinas wrote:
+> > > > > By making the DMA memory Strongly Ordered, we avoid the
+> > > > > L220 write buffer. In addition to the above commit, we also had
+> > > > > 2503a5ecd86c (ARM: 6201/1: RealView: Do not use outer_sync() on
+> > > > > ARM11MPCore boards with L220).
+> > > > 
+> > > > Ah, so this also stands in the way of multiplatform realview 
+> > > 
+> > > Isn't the real value of a multiplatform realview in the ability to use 
+> > > it with Qemu?  Did Qemu go to the extreme of emulating all those cache 
+> > > issues?
+> > 
+> > The qemu developers have in the past always argued strongly that they
+> > want to run the same kernel that runs on real hardware. Having a kernel
+> > that runs only on the emulated version but not on actual hardware is
+> > clearly against that goal, and  we should use CONFIG_ARCH_VIRT for
+> > that purpose.
 > 
-> Signed-off-by: Larry Bassel <larry.bassel@linaro.org>
-> ---
->  arch/arm64/kernel/entry.S | 24 +++++++++++++++++-------
->  1 file changed, 17 insertions(+), 7 deletions(-)
+> But the kernel that actually runs on the real hardware also runs on Qemu 
+> already.  It is just that, by some coincidence, a multi-platform kernel 
+> that pretends to have the same peripherals as a Realview board could 
+> also be used on Qemu.
 > 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index e8b23a3..20b336e 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -354,7 +354,6 @@ el0_sync:
->  	lsr	x24, x25, #ESR_EL1_EC_SHIFT	// exception class
->  	cmp	x24, #ESR_EL1_EC_SVC64		// SVC in 64-bit state
->  	b.eq	el0_svc
-> -	adr	lr, ret_to_user
->  	cmp	x24, #ESR_EL1_EC_DABT_EL0	// data abort in EL0
->  	b.eq	el0_da
->  	cmp	x24, #ESR_EL1_EC_IABT_EL0	// instruction abort in EL0
-> @@ -383,7 +382,6 @@ el0_sync_compat:
->  	lsr	x24, x25, #ESR_EL1_EC_SHIFT	// exception class
->  	cmp	x24, #ESR_EL1_EC_SVC32		// SVC in 32-bit state
->  	b.eq	el0_svc_compat
-> -	adr	lr, ret_to_user
->  	cmp	x24, #ESR_EL1_EC_DABT_EL0	// data abort in EL0
->  	b.eq	el0_da
->  	cmp	x24, #ESR_EL1_EC_IABT_EL0	// instruction abort in EL0
-> @@ -426,22 +424,26 @@ el0_da:
->  	/*
->  	 * Data abort handling
->  	 */
-> -	mrs	x0, far_el1
-> -	bic	x0, x0, #(0xff << 56)
-> +	mrs	x26, far_el1
->  	// enable interrupts before calling the main handler
->  	enable_dbg_and_irq
-> +	mov	x0, x26
-> +	bic	x0, x0, #(0xff << 56)
+> Otherwise I really don't see the point in making the code more complex 
+> just to make a multi-platform kernel run on actual Realview hardware 
+> that is quite obsolete now and that very few people have access to.
 
-Nit: I believe you can bit clear with x26 as the source register and omit the
-move instruction.
+The main reason is that out of principle I want to get to the point where
+every ARMv6 and ARMv7 machine is part of CONFIG_ARCH_MULTIPLATFORM.
 
-Regards,
-Christopher
+Then again, once we introduce CONFIG_BROKEN_MULTIPLATFORM, we could
+have an option that depends on that, and turns on both
+ARM_DMA_MEM_BUFFERABLE as well as the hack to remove the outer_sync
+from mb() and wmb() for CONFIG_SMP.
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+	Arnd
