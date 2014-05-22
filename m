@@ -1,69 +1,90 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 22 May 2014 11:26:17 -0400
-Subject: [PATCH RESEND 1/2] irqchip: Add generic gic-v1/gic-v2 compat
- strings.
-In-Reply-To: <20140522090702.GA23478@leverpostej>
-References: <1400680085-10430-1-git-send-email-Nikolay.Borisov@arm.com>
- <1400680085-10430-2-git-send-email-Nikolay.Borisov@arm.com>
- <CAL_JsqKpgWBQ6qFrDHt13wqRx1afPeapEz5z16enUyUX1fgUJg@mail.gmail.com>
- <20140522090702.GA23478@leverpostej>
-Message-ID: <537E1719.4050102@codeaurora.org>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 22 May 2014 16:27:05 +0100
+Subject: [PATCH] dmaengine: qcom_bam_dma: Add descriptor flag APIs
+In-Reply-To: <20140522150906.GA22327@qualcomm.com>
+References: <1397772242-4048-1-git-send-email-agross@codeaurora.org>
+ <20140502162841.GZ32284@intel.com> <20140502180827.GA9476@qualcomm.com>
+ <20140515173206.GA16858@qualcomm.com> <20140522061049.GW21128@intel.com>
+ <20140522150906.GA22327@qualcomm.com>
+Message-ID: <537E1749.1030505@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
 
-On 05/22/2014 05:07 AM, Mark Rutland wrote:
-> On Wed, May 21, 2014 at 10:27:33PM +0100, Rob Herring wrote:
->> On Wed, May 21, 2014 at 8:48 AM, Nikolay Borisov
->> <Nikolay.Borisov@arm.com> wrote:
->>> The current set of GIC compatible strings only contains specific
->>> implementations (e.g. arm,cortex-a9-gic) rather than revisions of the
->>> standard (e.g. arm,gic-v2), so each new implementation must either claim
->>> to be an extension of an existing implementation or have a new string
->>> added to the driver. This may be problematic when workarounds are
->>> required for bugs in particular implementations, as said workaround may
->>> end up targeting a wider set of implementations than intended.
+
+On 22/05/14 16:09, Andy Gross wrote:
+> On Thu, May 22, 2014 at 11:40:49AM +0530, Vinod Koul wrote:
+>
+> <snip>
+>
+>>>> I have 3 different IRQs that can be asserted based on the bit I set in the
+>>>> hardware descriptor.  The normal IRQ is the INT bit.  However, in some cases the
+>>>> peripheral protocol requires the use of the EOT or EOB interrupt instead.  The
+>>>> DMA_PREP_INTERRUPT would only work if I had only 2 choices.
 >>>
->>> To prevent these issues, this patch adds compatible strings for the
->>> revisions of the GIC spec which all GIC implementations should be able
->>> to claim conformance to in addition to any particular implementation
->>> specific string, e.g.
+>>> Thinking about this more, I could use the DMA_PREP_INTERRUPT to cover the EOT
+>>> flag.  However, I might get in a bind later if I need to support the EOB (end of
+>>> block) interrupt.
+>> Sorry for delay in this.
 >>
->> This just encourages not having specific properties which then also
->> prevents being able to add work-arounds later. SOCs using the a9 or
->> a15 string ONLY that are not an a9 or a15 are wrong. That's what we
->> should fix. Adding more generic strings is not going to help that. Do
->> you have a specific work-around you need to implement?
-> 
-> AFAIK, we don't have a specific workaround required anywhere that these
-> strings would help with. It's just that generic GIC strings had been
-> brought up repeatedly with no particular conclusion.
-> 
-> If we simply ensure that new DTS that feature a GIC have
-> implementation-specific strings in addition to those we already support
-> (e.g. "arm,cortex-a9-gic"), then I'm fine with that.
-> 
->> Given that the GIC specs are obviously meaningless since we now have
->> GICv2 with 16 core support as well as the special exynos gics, I'm not
->> inclined to accept this.
-> 
-> Arguably neither are "true" GICv2, but your point stands.
+>> I think it would make sense to use DMA_PREP_INTERRUPT for EOB interrupt. The EOT
+>> should always be enabled for the cases where it is applicable instead of nomral
+>> irq.
+>>
+>> That should genrically ocvery your cases, or did we miss anything here
+>
+> The EOT is not used for every transaction.  It is part of a handshaking
+> protocol with the attached peripheral, much like the NWD (notify when done).  As
+> near as I can tell today, no peripheral depends on the EOB, so we could drop it
+> for now until it is needed and cross this bridge when we need to.
 
-I think the generic string (in addition to the specific one) is a good thing,
-and I think it should be done for the PMU and any other specified/architected
-hardware as well. If we don't allow for them, a shortcut would be to
-masquerade hardware as something that's already supported. It seems like this
-needs to be discouraged just as much as omitting the specific string.
+As EOT behaviour is totally dependent on the attached peripheral(or 
+channel), Can't we make this specific to channel by passing additional 
+flags in the DT dma channel descriptors? This will be better abstraction 
+for drivers as well.
 
-The current behavior is that the driver will not run without a specific string
-present. What if this were preserved (or replaced with a warning) even with
-the addition of support for a generic string?
+I know that EOT flag is part of descriptor but still some channels 
+*must* have EOT to run there state-machine correctly. So making it 
+optional for those channels might be wrong.
 
-Thanks,
-Christopher
+Are there any use cases for particular *channel* where EOT requirement 
+changes dynamically?
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+
+
+--srini
+
+>
+>>>
+>>>>
+>>>>>
+>>>>>>
+>>>>>> The NWD flag requests that the peripheral wait until the data has been fully
+>>>>>> processed before signaling an interrupt.
+>>>>> interrupt for transaction complete or DMA request?
+>>>>
+>>>> This is a special signaling mechanism that holds off the DMA interrupt until the
+>>>> peripheral actually acks that the data has been processed completely.  This is
+>>>> required in many cases by the peripheral.  One example is the SPI controller.
+>>>> At the end of a transaction you are supposed to set the NWD so that the chip
+>>>> select is de-asserted.
+>>>
+>>> I'm not sure what flag I could map this to... maybe DMA_CTRL_ACK?  or maybe the
+>>> DMA_PREP_FENCE?  I don't generally like overloading the flags and slightly
+>>> twisting their intent.  Could we add a flag to denote device ACK?
+>> Nope lets not override these...
+>
+> Then I need to add a flag.  Something like DMA_PREP_DEVICE_ACK that denotes that the
+> attached device needs to ACK the transfer.
+>
+> Also, one thing I forgot.  For crypto and some of the other blocks, we have
+> something called command descriptors that can be transferred to the blocks to
+> provide programming or direction.  The DMA controller has a flag that tells the
+> attached peripheral that the incoming DMA contains command descriptors.  The dma
+> descriptors still point to a memory region to transfer, but the contents are
+> interpreted differently.  This is yet another flag in the descriptor flag
+> section.  I'd need another flag for this as well.  Something like DMA_PREP_CMD.
+>
+> We are actively working on upstreaming our crypto block and this will be
+> required for that to work properly.
+>
