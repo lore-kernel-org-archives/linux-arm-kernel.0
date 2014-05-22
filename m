@@ -1,38 +1,135 @@
 From: larry.bassel@linaro.org (Larry Bassel)
-Date: Thu, 22 May 2014 12:27:33 -0700
-Subject: [PATCH v4 0/2] context tracker support for arm64
-Message-ID: <1400786855-32656-1-git-send-email-larry.bassel@linaro.org>
+Date: Thu, 22 May 2014 12:27:34 -0700
+Subject: [PATCH v4 1/2] arm64: adjust el0_sync so that a function can be called
+In-Reply-To: <1400786855-32656-1-git-send-email-larry.bassel@linaro.org>
+References: <1400786855-32656-1-git-send-email-larry.bassel@linaro.org>
+Message-ID: <1400786855-32656-2-git-send-email-larry.bassel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement and enable context tracking for arm64 (which is
-a prerequisite for FULL_NOHZ support). This patchset
-builds upon earlier work by Kevin Hilman and is based on
-Will Deacon's tree.
+To implement the context tracker properly on arm64,
+a function call needs to be made after debugging and
+interrupts are turned on, but before the lr is changed
+to point to ret_to_user(). If the function call
+is made after the lr is changed the function will not
+return to the correct place.
 
-Changes v3 to v4:
+For similar reasons, defer the setting of x0 so that
+it doesn't need to be saved around the function call
+(save far_el1 in x26 temporarily instead).
 
-* Rename parameter of ct_user_exit from save to restore
-* Rebased patch to Will Deacon's tree (branch remotes/origin/aarch64
-of git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git)
+Signed-off-by: Larry Bassel <larry.bassel@linaro.org>
+---
+ arch/arm64/kernel/entry.S | 24 +++++++++++++++++-------
+ 1 file changed, 17 insertions(+), 7 deletions(-)
 
-Changes v2 to v3:
-
-* Save/restore necessary registers in ct_user_enter and ct_user_exit
-* Annotate "error paths" out of el0_sync with ct_user_exit
-
-Changes v1 to v2:
-
-* Save far_el1 in x26 temporarily
-
-Larry Bassel (2):
-  arm64: adjust el0_sync so that a function can be called
-  arm64: enable context tracking
-
- arch/arm64/Kconfig                   |  1 +
- arch/arm64/include/asm/thread_info.h |  1 +
- arch/arm64/kernel/entry.S            | 72 ++++++++++++++++++++++++++++++++----
- 3 files changed, 67 insertions(+), 7 deletions(-)
-
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index e8b23a3..20b336e 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -354,7 +354,6 @@ el0_sync:
+ 	lsr	x24, x25, #ESR_EL1_EC_SHIFT	// exception class
+ 	cmp	x24, #ESR_EL1_EC_SVC64		// SVC in 64-bit state
+ 	b.eq	el0_svc
+-	adr	lr, ret_to_user
+ 	cmp	x24, #ESR_EL1_EC_DABT_EL0	// data abort in EL0
+ 	b.eq	el0_da
+ 	cmp	x24, #ESR_EL1_EC_IABT_EL0	// instruction abort in EL0
+@@ -383,7 +382,6 @@ el0_sync_compat:
+ 	lsr	x24, x25, #ESR_EL1_EC_SHIFT	// exception class
+ 	cmp	x24, #ESR_EL1_EC_SVC32		// SVC in 32-bit state
+ 	b.eq	el0_svc_compat
+-	adr	lr, ret_to_user
+ 	cmp	x24, #ESR_EL1_EC_DABT_EL0	// data abort in EL0
+ 	b.eq	el0_da
+ 	cmp	x24, #ESR_EL1_EC_IABT_EL0	// instruction abort in EL0
+@@ -426,22 +424,26 @@ el0_da:
+ 	/*
+ 	 * Data abort handling
+ 	 */
+-	mrs	x0, far_el1
+-	bic	x0, x0, #(0xff << 56)
++	mrs	x26, far_el1
+ 	// enable interrupts before calling the main handler
+ 	enable_dbg_and_irq
++	mov	x0, x26
++	bic	x0, x0, #(0xff << 56)
+ 	mov	x1, x25
+ 	mov	x2, sp
++	adr	lr, ret_to_user
+ 	b	do_mem_abort
+ el0_ia:
+ 	/*
+ 	 * Instruction abort handling
+ 	 */
+-	mrs	x0, far_el1
++	mrs	x26, far_el1
+ 	// enable interrupts before calling the main handler
+ 	enable_dbg_and_irq
++	mov	x0, x26
+ 	orr	x1, x25, #1 << 24		// use reserved ISS bit for instruction aborts
+ 	mov	x2, sp
++	adr	lr, ret_to_user
+ 	b	do_mem_abort
+ el0_fpsimd_acc:
+ 	/*
+@@ -450,6 +452,7 @@ el0_fpsimd_acc:
+ 	enable_dbg
+ 	mov	x0, x25
+ 	mov	x1, sp
++	adr	lr, ret_to_user
+ 	b	do_fpsimd_acc
+ el0_fpsimd_exc:
+ 	/*
+@@ -458,16 +461,19 @@ el0_fpsimd_exc:
+ 	enable_dbg
+ 	mov	x0, x25
+ 	mov	x1, sp
++	adr	lr, ret_to_user
+ 	b	do_fpsimd_exc
+ el0_sp_pc:
+ 	/*
+ 	 * Stack or PC alignment exception handling
+ 	 */
+-	mrs	x0, far_el1
++	mrs	x26, far_el1
+ 	// enable interrupts before calling the main handler
+ 	enable_dbg_and_irq
++	mov	x0, x26
+ 	mov	x1, x25
+ 	mov	x2, sp
++	adr	lr, ret_to_user
+ 	b	do_sp_pc_abort
+ el0_undef:
+ 	/*
+@@ -476,23 +482,27 @@ el0_undef:
+ 	// enable interrupts before calling the main handler
+ 	enable_dbg_and_irq
+ 	mov	x0, sp
++	adr	lr, ret_to_user
+ 	b	do_undefinstr
+ el0_dbg:
+ 	/*
+ 	 * Debug exception handling
+ 	 */
+ 	tbnz	x24, #0, el0_inv		// EL0 only
+-	mrs	x0, far_el1
++	mrs	x26, far_el1
++	mov	x0, x26
+ 	mov	x1, x25
+ 	mov	x2, sp
+ 	bl	do_debug_exception
+ 	enable_dbg
++	mov	x0, x26
+ 	b	ret_to_user
+ el0_inv:
+ 	enable_dbg
+ 	mov	x0, sp
+ 	mov	x1, #BAD_SYNC
+ 	mrs	x2, esr_el1
++	adr	lr, ret_to_user
+ 	b	bad_mode
+ ENDPROC(el0_sync)
+ 
 -- 
 1.8.3.2
