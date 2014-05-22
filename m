@@ -1,41 +1,62 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 22 May 2014 10:08:38 -0400
-Subject: [PATCH v6 10/17] ARM: mvebu: add USB3 support for Armada 38x
-In-Reply-To: <537CAFD2.3080807@free-electrons.com>
-References: <1400149062-32661-1-git-send-email-gregory.clement@free-electrons.com>
- <1400149062-32661-11-git-send-email-gregory.clement@free-electrons.com>
- <20140516190729.GN27822@titan.lakedaemon.net>
- <1400497768.2007.10.camel@x220>
- <537CAFD2.3080807@free-electrons.com>
-Message-ID: <20140522140838.GM8664@titan.lakedaemon.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 22 May 2014 15:14:32 +0100
+Subject: [Patch v5 3/7] mfd: ti-keystone-devctrl: add bindings for device
+ state control
+In-Reply-To: <1400766516-14537-4-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1400766516-14537-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1400766516-14537-4-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <20140522141432.GA19747@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 21, 2014 at 03:53:22PM +0200, Gregory CLEMENT wrote:
-> On 19/05/2014 13:09, Paul Bolle wrote:
-> > On Fri, 2014-05-16 at 15:07 -0400, Jason Cooper wrote:
-> >> On Thu, May 15, 2014 at 12:17:35PM +0200, Gregory CLEMENT wrote:
-> >>> This patch adds the selection of the config symbol needed to build the
-> >>> USB3 support for Armada 38x into mvebu_v7_defconfig.
-> >>>
-> >>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> >>> ---
-> >>>  arch/arm/mach-mvebu/Kconfig | 1 +
-> >>>  1 file changed, 1 insertion(+)
-> >>
-> >> Patches 10 and 11 applied to mvebu/soc
-> > 
-> > These two just hit linux-next (in next-20140519). They're pointless, as
-> > config USB_ARCH_HAS_XHCI was dropped in commit b797b76fb464 ("usb: host:
-> > remove USB_ARCH_HAS_?HCI").
+Why do I only have this patch?  Where is the rest of the set?  Also,
+it's on v5 and I don't recall seeing the other 4 versions?
+
+> The Keystone II devices have a set of registers that are used to control
+> the status of its peripherals. This node is intended to allow access to
+> this functionality.
 > 
-> Right! We didn't notice it.
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> ---
+>  .../devicetree/bindings/mfd/ti-keystone-devctrl.txt   | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt
 > 
-> Jason you can simply remove them from mvebu/soc when you will submit the pull request
+> diff --git a/Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt b/Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt
+> new file mode 100644
+> index 0000000..35f7a66
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt
+> @@ -0,0 +1,19 @@
+> +* Device tree bindings for Texas Instruments keystone device state control
+> +
+> +The Keystone II devices have a set of registers that are used to control
+> +the status of its peripherals. This node is intended to allow access to
+> +this functionality.
+> +
+> +Required properties:
+> +
+> +- compatible:		"ti,keystone-devctrl", "syscon"
+> +
+> +- reg:			contains offset/length value for pll controller
+> +			registers space.
 
-Now dropped from mvebu/soc.
+Why have you tabbed out all that way?
 
-thx,
+> +Example:
+> +
+> +devctrl: device-state-control {
 
-Jason.
+This node needs an address:
+
+devctrl: device-state-control at 02620000 {
+
+> +	compatible = "ti,keystone-devctrl", "syscon";
+> +	reg = <0x02620000 0x1000>;
+> +};
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
