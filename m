@@ -1,36 +1,30 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 23 May 2014 01:14:59 +0200
-Subject: [PATCH v4 0/7] ARM: berlin: add pinctrl support
-In-Reply-To: <CACRpkda6-W6rNXtAbcTs6dgp4WLExXra6P_dqQbuYsRWi7MaOw@mail.gmail.com>
-References: <1400520995-27365-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <CACRpkda6-W6rNXtAbcTs6dgp4WLExXra6P_dqQbuYsRWi7MaOw@mail.gmail.com>
-Message-ID: <537E84F3.6020207@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 22 May 2014 15:18:12 -0700
+Subject: [RFC] ARM: tty: Move HVC DCC assembly to arch/arm
+In-Reply-To: <537E74C1.7020509@codeaurora.org>
+References: <1382120064-2459-1-git-send-email-cov@codeaurora.org>
+ <52617F22.6030900@codeaurora.org> <537E74C1.7020509@codeaurora.org>
+Message-ID: <537E77A4.908@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/2014 12:11 AM, Linus Walleij wrote:
-> On Mon, May 19, 2014 at 7:36 PM, Sebastian Hesselbarth
-> <sebastian.hesselbarth@gmail.com> wrote:
-> 
->> but can you please drop the Berlin pinctrl patches
->> and reconsider taking the reworked driver instead?
-> 
-> Sure I applied patches 1 thru 4 to the pin control tree.
-> The rest you need to carry in some ARM SoC tree or
-> similar.
+On 05/22/14 15:05, Christopher Covington wrote:
+> Hi Stephen,
+>
+> On 10/18/2013 02:34 PM, Stephen Boyd wrote:
+>> On 10/18/13 11:14, Christopher Covington wrote:
+>>> Put architecture-specific assembly code where it belongs,
+>>> allowing for support of additional architectures such as arm64 in
+>>> the future.
+>> Do you have that patch too? There was also a patch a year ago to add
+>> armv5/v4 support to this driver. Maybe we can resurrect that too.
+> I still haven't gotten around to testing that one.
 
-Great, thanks. Having it in is a huge benefit as future device
-drivers will depend on at least some pinctrl. Functionally it is
-ok, Mike's request for clock node rework smashed my time schedule.
+It would be nice if that patch was sent along with this one, or if you
+have some armv8 patch that works too. This patch by itself doesn't seem
+too useful because we're just moving code around in preparation for
+supporting this driver on multiple arches.
 
-> I don't mind the driver being half-merged like this, because
-> it means we can work on consolidating the utils code
-> in the next cycle.
-
-Sure, pinctrl properties consolidation is on my list for next
-cycle.
-
-Anyway, sorry for the late mess with it, I am still learning on
-the first real arm/mach-maintainer cycle.
-
-Sebastian
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
