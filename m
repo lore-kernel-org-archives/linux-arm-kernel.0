@@ -1,34 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 22 May 2014 12:52:16 +0100
-Subject: [PATCH 09/10] mtd: st_spi_fsm: Provide mask to obtain correct
- boot device pins
-In-Reply-To: <4231397.Nn7Rm5jh2O@wuerfel>
-References: <1400757848-18075-1-git-send-email-lee.jones@linaro.org>
- <1400757848-18075-10-git-send-email-lee.jones@linaro.org>
- <4231397.Nn7Rm5jh2O@wuerfel>
-Message-ID: <20140522115216.GV6679@lee--X1>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 22 May 2014 13:53:20 +0200
+Subject: [PATCH] ARM: EXYNOS: Use wfi macro in platform_do_lowpower
+In-Reply-To: <1400745455-27920-1-git-send-email-leela.krishna@linaro.org>
+References: <1400745455-27920-1-git-send-email-leela.krishna@linaro.org>
+Message-ID: <537DE530.3050205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thursday 22 May 2014 12:24:07 Lee Jones wrote:
-> > +       /* Mask to apply on boot_device_reg */
-> > +       ret = of_property_read_u32(np, "st,boot-device-msk", &boot_device_msk);
-> > +       if (ret)
-> > +               goto boot_device_fail;
-> > +
-> > 
-> 
-> The binding defines this property as "optional", but the driver fails
-> here if it's not provided. I suggest you add a default value here so you
-> can deal with existing dts. The default should be documented in
-> the binding as well.
+On 05/22/2014 09:57 AM, Leela Krishna Amudala wrote:
+> This patch is originally based on commit b3377d186572 ("ARM: 7064/1:
+> vexpress: Use wfi macro in platform_do_lowpower.")
+>
+> Current Exynos CPU hotplug code includes a hardcoded WFI
+> instruction, in ARM encoding.  When the kernel is compiled in Thumb-2
+> mode, this is invalid and causes the machine to hang hard when a CPU
+> is offlined.
+>
+> Use wfi macro instead of the hardcoded WFI instruction.
 
-The property is optional. It doesn't fail completely, merely skips the
-boot device check and falls back to using SPI.  I can update the
-documentation to this effect though, no problem.
+Is it possible to change it for cpu_do_idle() ?
+
+I guess, that should be backported to the previous kernel version, right 
+? (Cc stable@).
+
+Thanks
+   -- Daniel
+
+> Signed-off-by: Leela Krishna Amudala <leela.krishna@linaro.org>
+> ---
+>   arch/arm/mach-exynos/hotplug.c |    8 +-------
+>   1 file changed, 1 insertion(+), 7 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+> index 69fa483..8a134d0 100644
+> --- a/arch/arm/mach-exynos/hotplug.c
+> +++ b/arch/arm/mach-exynos/hotplug.c
+> @@ -46,13 +46,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+>   		if (cpu == 1)
+>   			exynos_cpu_power_down(cpu);
+>
+> -		/*
+> -		 * here's the WFI
+> -		 */
+> -		asm(".word	0xe320f003\n"
+> -		    :
+> -		    :
+> -		    : "memory", "cc");
+> +		wfi();
+>
+>   		if (pen_release == cpu_logical_map(cpu)) {
+>   			/*
+>
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
