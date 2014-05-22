@@ -1,136 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 May 2014 12:27:12 +0100
-Subject: [PATCH] ARM: l2c: prima2: only call l2x0_of_init() on matching
- nodes
-In-Reply-To: <CAGsJ_4yCaK8w3_vOw9uSyEtUGq0suWssrMnBHbQSU8rK0ibyUQ@mail.gmail.com>
-References: <1398644860-22973-1-git-send-email-mporter@linaro.org>
- <20140428142950.GB30292@saruman.home> <20140428143709.GC7719@beef>
- <20140428145223.GL26756@n2100.arm.linux.org.uk>
- <CAGsJ_4x1+eePRDMP0-0WeTG6ZJdzmMkN_9USbKt8joY8AKsDdw@mail.gmail.com>
- <20140429151433.GD26756@n2100.arm.linux.org.uk>
- <CAGsJ_4yg2Dcwyj5cLc2DuYVOcWwmpkPzK_=BUZLqRLDyErBL=Q@mail.gmail.com>
- <20140522093347.GS3693@n2100.arm.linux.org.uk>
- <CAGsJ_4yCaK8w3_vOw9uSyEtUGq0suWssrMnBHbQSU8rK0ibyUQ@mail.gmail.com>
-Message-ID: <20140522112712.GT3693@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 22 May 2014 12:30:10 +0100
+Subject: [PATCH v2] mfd: abx500-core: Remove unused function
+ abx500_dump_all_banks()
+In-Reply-To: <1400750311-15323-1-git-send-email-lee.jones@linaro.org>
+References: <1400750311-15323-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140522113010.GT6679@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 07:04:14PM +0800, Barry Song wrote:
-> 2014-05-22 17:33 GMT+08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > On Tue, Apr 29, 2014 at 11:40:33PM +0800, Barry Song wrote:
-> >> 2014-04-29 23:14 GMT+08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> >> > On Tue, Apr 29, 2014 at 11:05:06PM +0800, Barry Song wrote:
-> >> >> 2014-04-28 22:52 GMT+08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> >> >> > On Mon, Apr 28, 2014 at 10:37:09AM -0400, Matt Porter wrote:
-> >> >> >> The "fix" is tested against bcm281xx and bcm21664 as that is what the
-> >> >> >> l2c cleanup breaks in -next. As mentioned, I don't have the sirfsoc h/w
-> >> >> >> so this first attempt at a fix also breaks their platform. It can be
-> >> >> >> addressed by adding those platform specific compatibles back to the dts,
-> >> >> >> of course.
-> >> >> >>
-> >> >> >> I'd much prefer that the sirfsoc folks fix this...it's going to break
-> >> >> >> other platforms in a multi v7 build.
-> >> >> >
-> >> >> > Well, it's about time we got rid of this from platform specific code
-> >> >> > anyway, taking it away from platform maintainers to mess around with.
-> >> >> > So that's what I'm doing.
-> >> >> >
-> >> >> > It's worth noting that if you build a single zImage with exynos also
-> >> >> > enabled, then you also end up with an unconditional call from that
-> >> >> > code to l2x0_of_init() with it's own magic numbers - and that applies
-> >> >> > before my changes.
-> >> >> >
-> >> >> > So let's fix this properly and yank this crap from platform maintainers
-> >> >> > fingers.
-> >> >>
-> >> >> i mentioned dropping specific dts compatible prop will break non-csr
-> >> >> platforms in the mail thread "ARM: prima2: remove L2 cache size
-> >> >> override" and i said i was going to send v2. you said you need it
-> >> >> before rc6. now it has been sent, but i am sorry it is not against
-> >> >> next-20140424.
-> >> >
-> >> > FFS.  IT HASN'T BEEN SENT.  All that I did was drop it into linux-next
-> >> > so that more people would get off their fat backsides and test this
-> >> > fscking patch set - something which hasn't happened because no one
-> >> > pays attention to emails sent to mailing lists.
-> >>
-> >> so your point is people don't pay attention to your mails? or you are
-> >> ignored? i think that is 100% not real. i think your opinions and
-> >> mails are always respected as you are the chief arm linux expert.
-> >>
-> >> >
-> >> > I also told you that this was what I was going to do.  But... is it
-> >> > really on to hold up such a large patch set which impacts virtually
-> >> > everyone because _you_ don't have time to sort out your small special
-> >> > requirements - no it is not, that's just fscking selfish.
-> >> >
-> >> > Anyway, I've had it with dealing with platform maintainers, I've yanked
-> >> > this patch set, and I'm no longer planning to do anything with it -
-> >> > platform maintainers have destroyed my will to get any of this series
-> >> > into the kernel.
-> >>
-> >> no, i am trying to follow your suggestion to make patch set merged and
-> >> l2 codes cleaned.
-> >> i have been trying to follow your will until now, and from the beginning.
-> >>
-> >> >
-> >> > So, the L2 cache code is going to remain in its current state, and it's
-> >> > going to rot because it's _FAR_ too much effort dealing with slow people
-> >> > like yourselves, or people who want the series split up, or people who
-> >> > whinge that there aren't any acks there (WELL GET OFF YOUR FAT BACKSIDES
-> >> > AND SEND ME SOME IF YOU CARE ABOUT THIS - no, don't, I'm no longer pushing
-> >> > this series.)
-> >>
-> >> people might be "selfish", but people might have some reasons to
-> >> response slowly, like holiday or family issue.
-> >> how about taking it easy? it doesn't prove you are not respected by
-> >> platform maintainers.
-> >>
-> >> >
-> >> > This is the last time I'm going to ever try cleaning up any core ARM code.
-> >> > Core ARM maintanence is impossible in this environment with arm-soc split
-> >> > from core ARM stuff, because core ARM stuff /always/ impacts on SoC
-> >> > specific code.  You can't get away from that.
-> >> >
-> >> > My position in this community has been made impossible and obsolete by
-> >> > Linaro.  I'm at the point of walking away from this crap.
-> >>
-> >> just fix the relationship and communication, that is good enough. you
-> >> have done things so well, there is no reason to give up.
-> >
-> > So, just as I thought...
-> >
-> > -rc6 has now been released, and YOU have done NOTHING to resolve any of
-> > the issues you have with this patch set - which is precisely on track
-> > with how you have behaved towards this set of changes on the past - where
-> > you promised imformation/patches and never delivered.
-> >
-> > Well, right now I'm just not going to *care* one bit about Prima2.  If
-> > this patch set breaks it, tough.  You've had plenty of opportunity to
-> > deal with this, but instead you've chosen to just whinge about it and
-> > then do precisely nothing to assist.
-> 
-> i have no idea why you are saying this. if you checked the email, i
-> have sent a patch in last month.
-> 
-> http://www.spinics.net/lists/arm-kernel/msg327151.html
-> 
-> but i got no reply and you said you will not handle l2....
+abx500_dump_all_banks() has no callers in the kernel, so it's probably
+safe to remove it.
+    
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-I said I won't deal with this patch set anymore because I got *thoroughly*
-frustrated with you and the lack of cooperation from many of the SoC people.
-It seems that the only way to get things done around here is to railroad
-them into linux-next and wait for people to notice the changes.  That's
-really not an acceptable way of doing development, but it's the *only*
-one which gets people's attention.  Sending emails does not work, because
-people ignore them.
-
-Moreover, your patch is a total rewrite of several of my patches, and is
-not an incremental set of changes.  Given that my patch set which was last
-posted has the SoC changes done incrementally amongst the other changes,
-this is just not an acceptable approach, so frankly the patch is useless
-to me.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+diff --git a/drivers/mfd/abx500-core.c b/drivers/mfd/abx500-core.c
+index d6d0ec4..fe41899 100644
+--- a/drivers/mfd/abx500-core.c
++++ b/drivers/mfd/abx500-core.c
+@@ -151,26 +151,6 @@ int abx500_startup_irq_enabled(struct device *dev, unsigned int irq)
+ }
+ EXPORT_SYMBOL(abx500_startup_irq_enabled);
+ 
+-int abx500_dump_all_banks(void)
+-{
+-	struct abx500_ops *ops;
+-	struct device *dummy_child;
+-	struct abx500_device_entry *dev_entry;
+-
+-	dummy_child = kzalloc(sizeof(struct device), GFP_KERNEL);
+-	if (!dummy_child)
+-		return -ENOMEM;
+-	list_for_each_entry(dev_entry, &abx500_list, list) {
+-		dummy_child->parent = dev_entry->dev;
+-		ops = &dev_entry->ops;
+-
+-		if ((ops != NULL) && (ops->dump_all_banks != NULL))
+-			ops->dump_all_banks(dummy_child);
+-	}
+-	kfree(dummy_child);
+-}
+-EXPORT_SYMBOL(abx500_dump_all_banks);
+-
+ MODULE_AUTHOR("Mattias Wallin <mattias.wallin@stericsson.com>");
+ MODULE_DESCRIPTION("ABX500 core driver");
+ MODULE_LICENSE("GPL");
+diff --git a/include/linux/mfd/abx500.h b/include/linux/mfd/abx500.h
+index df2508f..552cc1d 100644
+--- a/include/linux/mfd/abx500.h
++++ b/include/linux/mfd/abx500.h
+@@ -330,7 +330,6 @@ int abx500_mask_and_set_register_interruptible(struct device *dev, u8 bank,
+ int abx500_get_chip_id(struct device *dev);
+ int abx500_event_registers_startup_state_get(struct device *dev, u8 *event);
+ int abx500_startup_irq_enabled(struct device *dev, unsigned int irq);
+-int abx500_dump_all_banks(void);
+ 
+ struct abx500_ops {
+ 	int (*get_chip_id) (struct device *);
