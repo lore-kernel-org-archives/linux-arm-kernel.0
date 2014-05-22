@@ -1,29 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 22 May 2014 18:48:18 +0100
-Subject: The resume of sgtl5000 causes kernel Oops
-In-Reply-To: <20140522145650.GD32184@dragon>
-References: <20140522145650.GD32184@dragon>
-Message-ID: <20140522174818.GN12304@sirena.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 22 May 2014 21:50:45 +0400
+Subject: [PATCH RFC v2 4/7] ARM: dts: Add PPMU device tree support for
+ Exynos5420
+In-Reply-To: <1400779322-4410-5-git-send-email-a.kesavan@samsung.com>
+References: <1400779322-4410-1-git-send-email-a.kesavan@samsung.com>
+ <1400779322-4410-5-git-send-email-a.kesavan@samsung.com>
+Message-ID: <537E38F5.4020200@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 10:56:51PM +0800, Shawn Guo wrote:
-> The suspend/resume test on imx51-babbage board discovers a kernel Oops
-> caused by sgtl5000_resume().  I believe it happens due to commit
-> e5d80e82e32e (ASoC: sgtl5000: Convert to use regmap directly).  After
-> the commit, it seems that the codec->reg_cache in function
-> sgtl5000_restore_regs() becomes invalid.  It looks that the register
-> restoring in the function requires some strict sequence, I'm not sure
-> what the correct fix is.
+On 05/22/2014 09:21 PM, Abhilash Kesavan wrote:
 
-Yes, reg_cache isn't there if we're not using ASoC level caching.  The
-fix should just be to replace the direct cache references with
-snd_soc_read()s which will end up in a cache lookup if the register is
-cached.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140522/6d4e05d8/attachment.sig>
+> PPMU is required by the exynos5420 devfreq driver. Add a device
+> tree node for it.
+
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> ---
+>   arch/arm/boot/dts/exynos5420.dtsi |    7 +++++++
+>   1 file changed, 7 insertions(+)
+
+> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+> index 8e7e35c..6ab7b03 100644
+> --- a/arch/arm/boot/dts/exynos5420.dtsi
+> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+> @@ -833,4 +833,11 @@
+>   		samsung,pmu-syscon = <&pmu_system_controller>;
+>   		#phy-cells = <1>;
+>   	};
+> +
+> +	ppmu {
+
+    Shouldn't it have the unit-address part, like "ppmu at 10d00000"?
+
+> +		compatible = "samsung,exynos5420-int-busfreq";
+> +		reg = <0x10D00000 0x2000	/* PPMU_DMC_0_0 */
+> +		       0x10D10000 0x2000	/* PPMU_DMC_0_1 */
+> +		       0x10D60000 0x2000>;	/* PPMU_DMC_1_0 */
+> +	};
+>   };
+
+WBR, Sergei
