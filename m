@@ -1,19 +1,64 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 22 May 2014 09:45:36 -0700
-Subject: [PATCH] mfd: axp20x: Remove unnecessary const qualifier from
- axp20x_supplies[]
-In-Reply-To: <20140522160856.GJ19747@lee--X1>
-References: <1400750311-15323-1-git-send-email-lee.jones@linaro.org>
- <1400750311-15323-2-git-send-email-lee.jones@linaro.org>
- <1400774373.21099.1.camel@joe-AO725> <20140522160856.GJ19747@lee--X1>
-Message-ID: <1400777136.21099.6.camel@joe-AO725>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Thu, 22 May 2014 19:44:21 +0300
+Subject: [Patch v6 6/7] ARM: dts: keystone: update reset node to work with
+ reset driver
+In-Reply-To: <1400777062-19276-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1400777062-19276-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <1400777062-19276-7-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-05-22 at 17:08 +0100, Lee Jones wrote:
-> To be frank, I've never known what the double const means.  Care to
-> enlighten?
+The pll controller register set and device state control registers
+include sets of registers with different purposes, so it's logically
+to add syscon entry to be able to access them from appropriate places.
 
-There's a nice table here:
+So added pll controller and device state control syscon entries.
 
-http://stackoverflow.com/questions/14562845/why-does-passing-char-as-const-char-generate-a-warning
+The keystone driver requires the next additional properties:
+
+"ti,syscon-pll" - phandle/offset pair. The phandle to syscon used to
+		  access pll controller registers and the offset to use
+		  reset control registers.
+
+"ti,syscon-dev" - phandle/offset pair. The phandle to syscon used to
+		  access device state control registers and the offset
+		  in order to use mux block registers for all watchdogs.
+
+"ti,wdt_list"	- option to declare what watchdogs are used to reboot
+		  the SoC, so set "0" WDT as default.
+
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+ arch/arm/boot/dts/keystone.dtsi | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+index d9f99e7..b05def6 100644
+--- a/arch/arm/boot/dts/keystone.dtsi
++++ b/arch/arm/boot/dts/keystone.dtsi
+@@ -66,9 +66,21 @@
+ 		ranges = <0x0 0x0 0x0 0xc0000000>;
+ 		dma-ranges = <0x80000000 0x8 0x00000000 0x80000000>;
+ 
++		pllctrl: pll-controller at 02310000 {
++			compatible = "ti,keystone-pllctrl", "syscon";
++			reg = <0x02310000 0x200>;
++		};
++
++		devctrl: device-state-control at 02620000 {
++			compatible = "ti,keystone-devctrl", "syscon";
++			reg = <0x02620000 0x1000>;
++		};
++
+ 		rstctrl: reset-controller {
+ 			compatible = "ti,keystone-reset";
+-			reg = <0x023100e8 4>;	/* pll reset control reg */
++			ti,syscon-pll = <&pllctrl 0xe4>;
++			ti,syscon-dev = <&devctrl 0x328>;
++			ti,wdt_list = <0>;
+ 		};
+ 
+ 		/include/ "keystone-clocks.dtsi"
+-- 
+1.8.3.2
