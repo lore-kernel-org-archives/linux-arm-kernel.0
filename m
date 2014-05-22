@@ -1,55 +1,54 @@
 From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 22 May 2014 08:59:22 +0530
-Subject: [PATCH 1/1] ARM: EXYNOS: Fix compilation warning
-In-Reply-To: <CAK9yfHyFEb3hchLLndfqW1xOHD59d_bsFMA4k5MLJ8Hgpx7Ekw@mail.gmail.com>
-References: <1399282008-9738-1-git-send-email-sachin.kamat@linaro.org>
- <CAK9yfHyFEb3hchLLndfqW1xOHD59d_bsFMA4k5MLJ8Hgpx7Ekw@mail.gmail.com>
-Message-ID: <537D6F12.7000201@linaro.org>
+Date: Thu, 22 May 2014 09:58:36 +0530
+Subject: [PATCH 3/4] clk: samsung: Add driver to control CLKOUT line on
+ Exynos SoCs
+In-Reply-To: <1400604211-9447-4-git-send-email-t.figa@samsung.com>
+References: <1400604211-9447-1-git-send-email-t.figa@samsung.com>
+ <1400604211-9447-4-git-send-email-t.figa@samsung.com>
+Message-ID: <537D7CF4.6050305@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2014 04:56 PM, Sachin Kamat wrote:
-> On 5 May 2014 14:56, Sachin Kamat <sachin.kamat@linaro.org> wrote:
->> of_get_flat_dt_prop return type is now const.
->> Fixes the following compilation warning introduced by commit 9d0c4dfedd96
->> ("of/fdt: update of_get_flat_dt_prop in prep for libfdt")
->>
->> arch/arm/mach-exynos/exynos.c:259:6: warning:
->> assignment discards ?const? qualifier from pointer target type [enabled by default]
->>
->> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
->> Cc: Rob Herring <robh@kernel.org>
->> ---
-
-Change looks good.
-
-Reviewed-by: Tushar Behera <tushar.behera@linaro.org>
-
->> Based on linux-next (20140505)
->> ---
->>  arch/arm/mach-exynos/exynos.c |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
->> index 77293d39dfc9..f356c67a1fa9 100644
->> --- a/arch/arm/mach-exynos/exynos.c
->> +++ b/arch/arm/mach-exynos/exynos.c
->> @@ -249,7 +249,7 @@ static int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
->>                                         int depth, void *data)
->>  {
->>         struct map_desc iodesc;
->> -       __be32 *reg;
->> +       const __be32 *reg;
->>         int len;
->>
->>         if (!of_flat_dt_is_compatible(node, "samsung,exynos4210-chipid") &&
->> --
->> 1.7.9.5
->>
+On 05/20/2014 10:13 PM, Tomasz Figa wrote:
+> This patch introduces a driver that handles configuration of CLKOUT pin
+> of Exynos SoCs that can be used to output certain clocks from inside of
+> the SoC to a dedicated output pin.
 > 
-> Ping. This warning is still seen in latest linux-next.
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+>  .../devicetree/bindings/arm/samsung/pmu.txt        |  30 ++++
+>  drivers/clk/samsung/Makefile                       |   1 +
+>  drivers/clk/samsung/clk-exynos-clkout.c            | 153 +++++++++++++++++++++
+>  3 files changed, 184 insertions(+)
+>  create mode 100644 drivers/clk/samsung/clk-exynos-clkout.c
 > 
+> diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+> index b562634..5ed94a9 100644
+> --- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+> +++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+> @@ -11,8 +11,38 @@ Properties:
+>  
+>   - reg : offset and length of the register set.
+>  
+> + - #clock-cells : must be <1>, since PMU requires once cell as clock specifier.
 
+s/once/one
+
+> +		The single specifier cell is used as index to list of clocks
+> +		provided by PMU, which is currently:
+> +			0 : SoC clock output (CLKOUT pin)
+
+Will it make more sense if we add a macro for this clock number that
+would be referred in the device tree files?
+
+> +Example of clock consumer :
+> +
+> +usb3503: usb3503 at 08 {
+> +	/* ... */
+> +	clock-names = "refclk";
+> +	clocks = <&pmu_system_controller 0>;
+> +	/* ... */
+>  };
 
 -- 
 Tushar Behera
