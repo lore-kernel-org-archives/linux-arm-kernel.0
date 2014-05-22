@@ -1,29 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
 Date: Thu, 22 May 2014 15:04:07 +0200
-Subject: [PATCH v2] ARM: realview: basic device tree implementation
-In-Reply-To: <5678119.IM3FN0FlT6@wuerfel>
-References: <1399586896-16906-1-git-send-email-linus.walleij@linaro.org>
- <201405091244.02066.arnd@arndb.de>
- <CACRpkdb8c=k3Ky=TisNdzycc3owJsNSQmSTu03RR5E0QvE0KZA@mail.gmail.com>
- <5678119.IM3FN0FlT6@wuerfel>
-Message-ID: <CACRpkdYE0Fb+HezqgDbVcqQmWwn7QL2+RWSRyAigv2qcMp2qFQ@mail.gmail.com>
+Subject: [PATCH RESEND] mmc: dove: fix missing MACH_DOVE dependency
+In-Reply-To: <CAPDyKFo8CdyDbJEP0GkFTHdzpkyRBZEp-jAyrU4y8qi__zChkA@mail.gmail.com>
+References: <1400522571-10799-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CAPDyKFo8CdyDbJEP0GkFTHdzpkyRBZEp-jAyrU4y8qi__zChkA@mail.gmail.com>
+Message-ID: <537DF5C7.3010009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 10:31 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 22 May 2014 09:41:39 Linus Walleij wrote:
-
->> The question can be rephrased like this:
->> Should we create drivers/soc?
+On 05/22/2014 11:09 AM, Ulf Hansson wrote:
+> On 19 May 2014 20:02, Sebastian Hesselbarth
+> <sebastian.hesselbarth@gmail.com> wrote:
+>> DT-enabled Dove moved over from ARCH_DOVE in mach-dove to MACH_DOVE in
+>> mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
+>> DT-only MACH_DOVE Kconfig. This slipped through the cracks and now is
+>> a fix to allow to build Dove's SDHCI driver for mach-mvebu on v3.15-rc.
+>>
+>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> Acked-by: Jason Cooper <jason@lakedaemon.net>
 >
-> I think we just did, not sure if the patches have made it into linux-next
-> already, but there were a couple of other platforms already that want this
-> directory.
+> Thanks! Picked up for the PR I send to Chris.
 
-Awesomeness. Can you give me the title of a patch or branch
-from ARM SoC I should pull in to build on top of this? Then I can
-split off all the SoC bus business and have the machine file real
-small, nice and clean.
+Ulf, thanks for picking it up. I noticed it will now end up in v3.16
+and not as a fix for v3.15. I'll come back to it, if v3.15 will
+ever become a stable version ;)
 
-Yours,
-Linus Walleij
+Anyway, great you are helping Chris to pre-select the mmc patches!
+
+Sebastian
