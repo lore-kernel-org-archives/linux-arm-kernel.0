@@ -1,43 +1,33 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 23 May 2014 03:35:56 +0900
-Subject: [PATCH V5 00/20] ARM: exynos: cpuidle: Move the driver to
- drivers/cpuidle
-In-Reply-To: <0b4201cf613f$80c91750$825b45f0$@samsung.com>
-References: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
- <534BA3CF.6030701@linaro.org> <535943B2.8030308@samsung.com>
- <0b4201cf613f$80c91750$825b45f0$@samsung.com>
-Message-ID: <537E438C.8060600@samsung.com>
+Date: Fri, 23 May 2014 03:37:27 +0900
+Subject: [PATCH 0/2] ARM: dts: add pmu syscon handle to exynos hdmi nodes
+In-Reply-To: <1400593129-21170-1-git-send-email-rahul.sharma@samsung.com>
+References: <1400593129-21170-1-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <537E43E7.407@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/14 20:05, Kukjin Kim wrote:
-> Tomasz Figa wrote:
->>
->> On 14.04.2014 11:01, Daniel Lezcano wrote:
->>>
->>> Hi Kukjin,
->>>
->>> I believe I addressed all the comments. Is it possible to take this
->>> patchset for next ?
->>
-> Sure ;-)
+On 05/20/14 22:38, Rahul Sharma wrote:
+> Add PMU syscon handle to HDMI dt node for controlling PHY
+> Enable/Disable bit.
 >
->> +1.
->>
->> Also when applying you might add
->>
->> Reviewed-by: Tomasz Figa<t.figa@samsung.com>
->>
->> to any patches that don't have it yet.
->>
-> Tomasz, thanks for your review.
+> Patch is dependent for following patch for approval on DT
+> Bindings:
+> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg31106.html
 >
-> I will take this series, "moving exynos-cpuidle into drivers/cpuidle" into samsung tree if Rafael is OK on that.
->
-Daniel,
+Yeah, I checked above.
 
-Can you please check/test the functionality your series with using my 
-for-next because there were merge conflicts with mcpm-exynos stuff...?
+Applied this series.
 
 Thanks,
 Kukjin
+
+> It is based on Kukjin's "for-next" branch.
+>
+> Rahul Sharma (2):
+>    ARM: dts: add pmu syscon handle to exynos5250 hdmi
+>    ARM: dts: add pmu syscon handle to exynos5420 hdmi
+>
+>   arch/arm/boot/dts/exynos5250.dtsi |    1 +
+>   arch/arm/boot/dts/exynos5420.dtsi |    1 +
+>   2 files changed, 2 insertions(+)
