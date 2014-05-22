@@ -1,42 +1,43 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 22 May 2014 12:10:52 +0200
-Subject: [PATCH] ASoC: samsung: Handle errors when getting the op_clk clock
-Message-ID: <1400753452-6943-1-git-send-email-s.nawrocki@samsung.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Thu, 22 May 2014 12:19:37 +0200
+Subject: [PATCH] ARM: socfpga: dts: add watchdog0+1
+Message-ID: <1400753977-11620-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure i2s->op_clk is not used when clk_get() for this clock fails.
-This prevents working with an incorrectly configured clock in some
-conditions.
+The SoCFPGA has two watchdog timers. Add them to the dtsi.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 ---
- sound/soc/samsung/i2s.c |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/socfpga.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index ae02811..a634a66 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -488,7 +488,7 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
- 			clk_id = 1;
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 56fc214..ee10fa6 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -549,6 +549,22 @@
+ 			reg = <0xffd05000 0x1000>;
+ 		};
  
- 		if (!any_active(i2s)) {
--			if (i2s->op_clk) {
-+			if (i2s->op_clk && !IS_ERR(i2s->op_clk)) {
- 				if ((clk_id && !(mod & MOD_IMS_SYSMUX)) ||
- 					(!clk_id && (mod & MOD_IMS_SYSMUX))) {
- 					clk_disable_unprepare(i2s->op_clk);
-@@ -506,6 +506,10 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
- 			else
- 				i2s->op_clk = clk_get(&i2s->pdev->dev,
- 						"i2s_opclk0");
++		watchdog0: wd at ffd02000 {
++			compatible = "snps,dw-wdt";
++			reg = <0xffd02000 0x1000>;
++			interrupts = <0 171 0>;
++			clocks = <&osc1>;
++			status = "disabled";
++		};
 +
-+			if (WARN_ON(IS_ERR(i2s->op_clk)))
-+				return PTR_ERR(i2s->op_clk);
++		watchdog1: wd at ffd04000 {
++			compatible = "snps,dw-wdt";
++			reg = <0xffd03000 0x1000>;
++			interrupts = <0 172 0>;
++			clocks = <&osc1>;
++			status = "disabled";
++		};
 +
- 			clk_prepare_enable(i2s->op_clk);
- 			i2s->rclk_srcrate = clk_get_rate(i2s->op_clk);
- 
+ 		sysmgr: sysmgr at ffd08000 {
+ 			compatible = "altr,sys-mgr", "syscon";
+ 			reg = <0xffd08000 0x4000>;
 -- 
-1.7.9.5
+2.0.0.rc0
