@@ -1,26 +1,32 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 22 May 2014 14:33:15 +0200
-Subject: [PATCH 0/2] ARM: shmobile: r8a7779/marzen CCF DT updates
-Message-ID: <1400761997-13512-1-git-send-email-geert+renesas@glider.be>
+From: chris@printf.net (Chris Ball)
+Date: Thu, 22 May 2014 13:34:41 +0100
+Subject: [GIT PULL] MMC updates for mmc-next for 3.16, take 3
+In-Reply-To: <CAPDyKFqhsErJvw-GYFq=x0xQigt=Tr3Luw=-n12cL5o5D5eGNw@mail.gmail.com>
+ (Ulf Hansson's message of "Thu, 22 May 2014 14:15:09 +0200")
+References: <CAPDyKFo44fucVebB3f_qby1iWqjyq5P4XPAyD6og5ZWpqgO4=A@mail.gmail.com>
+ <86zjiaqarn.fsf@void.printf.net>
+ <CAPDyKFqhsErJvw-GYFq=x0xQigt=Tr3Luw=-n12cL5o5D5eGNw@mail.gmail.com>
+Message-ID: <86sio2q9em.fsf@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon,
+Hi,
 
-Here are a few updates for r8a7779/marzen CCF DT:
-  - [1/2] ARM: shmobile: r8a7779 dtsi: Correct #address-cells/#size-cells
-          for clocks
-  - [2/2] ARM: shmobile: marzen dts: Remove superfluous include
+On Thu, May 22 2014, Ulf Hansson wrote:
+> "mmc: sdhci: convert sdhci_set_uhs_signaling() into a library function"
+>
+> The following lines...
+> +       else if ((ios->timing == MMC_TIMING_UHS_DDR50) ||
+> +                (ios->timing == MMC_TIMING_MMC_DDR52))
+> +               ctrl_2 |= SDHCI_CTRL_UHS_DDR50;
+>
+> Should be replaced by;
+> +       else if ((timing == MMC_TIMING_UHS_DDR50) ||
+> +                (timing == MMC_TIMING_MMC_DDR52))
+> +               ctrl_2 |= SDHCI_CTRL_UHS_DDR50;
 
-This was only compile-tested, due to lack of hardware.
+Done and pushed out, thanks.
 
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+- Chris.
+-- 
+Chris Ball   <http://printf.net/>
