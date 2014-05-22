@@ -1,72 +1,211 @@
 From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Thu, 22 May 2014 22:51:58 +0530
-Subject: [PATCH RFC v2 3/7] ARM: dts: Add PPMU device tree support for
- Exynos5250
+Date: Thu, 22 May 2014 22:52:00 +0530
+Subject: [PATCH RFC v2 5/7] PM / devfreq: exynos5250: migrate to common-clock
 In-Reply-To: <1400779322-4410-1-git-send-email-a.kesavan@samsung.com>
 References: <1400779322-4410-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1400779322-4410-4-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1400779322-4410-6-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PPMU is required by the exynos5250 devfreq driver. Add a device
-tree node for it.
+From: Andrew Bresticker <abrestic@chromium.org>
 
+Use the common-clock framework to scale frequencies for the various
+peripheral clocks on the Exynos5250.
+
+Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
 ---
- .../bindings/arm/exynos/ppmu-exynos5.txt           |   27 ++++++++++++++++++++
- arch/arm/boot/dts/exynos5250.dtsi                  |    8 ++++++
- 2 files changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/exynos/ppmu-exynos5.txt
+ drivers/devfreq/exynos/exynos5_bus.c |  131 ++++++++++++++++++++++++++++++----
+ 1 file changed, 119 insertions(+), 12 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/exynos/ppmu-exynos5.txt b/Documentation/devicetree/bindings/arm/exynos/ppmu-exynos5.txt
-new file mode 100644
-index 0000000..08a4aaf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/exynos/ppmu-exynos5.txt
-@@ -0,0 +1,27 @@
-+Exynos PPMU driver
-+-------------------
-+
-+Performance events are primitive values used to get performance data. These
-+events provide information about the behavior of the SoC that can be used
-+when analyzing system performance. These events are made visible using the
-+PPMU logic.
-+Exynos PPMU driver is used by the exynos5 devfreq drivers to control the
-+bus frequency/voltage.
-+
-+Required properties:
-+- compatible: "samsung,exynos5250-int-busfreq", "samsung,exynos5420-int-busfreq"
-+- reg:
-+	* physical base address of the PPMUs (e.g DDR, Right Bus, Left bus etc)
-+	and length of memory mapped region.
-+
-+Example:
-+--------
-+
-+	ppmu {
-+		compatible = "samsung,exynos5250-int-busfreq";
-+		reg = <0x10C40000 0x2000
-+		       0x10C50000 0x2000
-+		       0x10C60000 0x2000
-+		       0x10CB0000 0x2000
-+		       0x13660000 0x2000>;
-+	};
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 68a3e6f..f20355a 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -750,4 +750,12 @@
- 		clocks = <&clock 348>;
- 		clock-names = "secss";
- 	};
-+
-+	ppmu {
-+		compatible = "samsung,exynos5250-int-busfreq";
-+	            reg = <0x10C40000 0x2000	/* PPMU_DDR_C */
-+			   0x10C50000 0x2000	/* PPMU_DDR_L */
-+			   0x10CB0000 0x2000	/* PPMU_DDR_R */
-+			   0x13660000 0x2000>;	/* PPMU_RIGHT */
-+	};
+diff --git a/drivers/devfreq/exynos/exynos5_bus.c b/drivers/devfreq/exynos/exynos5_bus.c
+index 6cd0392..1196653 100644
+--- a/drivers/devfreq/exynos/exynos5_bus.c
++++ b/drivers/devfreq/exynos/exynos5_bus.c
+@@ -57,7 +57,6 @@ struct busfreq_data_int {
+ 	struct notifier_block pm_notifier;
+ 	struct mutex lock;
+ 	struct pm_qos_request int_req;
+-	struct clk *int_clk;
  };
+ 
+ struct int_bus_opp_table {
+@@ -66,6 +65,17 @@ struct int_bus_opp_table {
+ 	unsigned long volt;
+ };
+ 
++struct int_clk_table {
++	unsigned int idx;
++	unsigned long freq;
++};
++
++struct int_clk {
++	const char *clk_name;
++	struct clk *clk;
++	struct int_clk_table *freq_table;
++};
++
+ static struct int_bus_opp_table exynos5_int_opp_table[] = {
+ 	{LV_0, 266000, 1025000},
+ 	{LV_1, 200000, 1025000},
+@@ -75,6 +85,98 @@ static struct int_bus_opp_table exynos5_int_opp_table[] = {
+ 	{0, 0, 0},
+ };
+ 
++static struct int_clk_table aclk_166[] = {
++	{LV_0, 167000},
++	{LV_1, 111000},
++	{LV_2,  84000},
++	{LV_3,  84000},
++	{LV_4,  42000},
++};
++
++static struct int_clk_table aclk_200[] = {
++	{LV_0, 200000},
++	{LV_1, 160000},
++	{LV_2, 160000},
++	{LV_3, 134000},
++	{LV_4, 100000},
++};
++
++static struct int_clk_table aclk_266[] = {
++	{LV_0, 267000},
++	{LV_1, 200000},
++	{LV_2, 160000},
++	{LV_3, 134000},
++	{LV_4, 100000},
++};
++
++static struct int_clk_table aclk_333[] = {
++	{LV_0, 333000},
++	{LV_1, 167000},
++	{LV_2, 111000},
++	{LV_3, 111000},
++	{LV_4,  42000},
++};
++
++static struct int_clk_table aclk_300_disp1[] = {
++	{LV_0, 267000},
++	{LV_1, 267000},
++	{LV_2, 267000},
++	{LV_3, 267000},
++	{LV_4, 200000},
++};
++
++static struct int_clk_table aclk_300_gscl[] = {
++	{LV_0, 267000},
++	{LV_1, 267000},
++	{LV_2, 267000},
++	{LV_3, 200000},
++	{LV_4, 100000},
++};
++
++#define EXYNOS5_INT_CLK(name, tbl) {		\
++	.clk_name = name,			\
++	.freq_table = tbl,			\
++}
++
++static struct int_clk exynos5_int_clks[] = {
++	EXYNOS5_INT_CLK("aclk166_d", aclk_166),
++	EXYNOS5_INT_CLK("aclk200_d", aclk_200),
++	EXYNOS5_INT_CLK("aclk266_d", aclk_266),
++	EXYNOS5_INT_CLK("aclk333_d", aclk_333),
++	EXYNOS5_INT_CLK("aclk300_disp1_d", aclk_300_disp1),
++	EXYNOS5_INT_CLK("aclk300_gscl_d", aclk_300_gscl),
++};
++
++static int exynos5_int_set_rate(struct busfreq_data_int *data,
++				unsigned long rate)
++{
++	int index, i;
++
++	for (index = 0; index < ARRAY_SIZE(exynos5_int_opp_table); index++) {
++		if (exynos5_int_opp_table[index].clk == rate)
++			break;
++	}
++
++	if (index >= _LV_END)
++		return -EINVAL;
++
++	/* Change the system clock divider values */
++	for (i = 0; i < ARRAY_SIZE(exynos5_int_clks); i++) {
++		struct int_clk *clk_info = &exynos5_int_clks[i];
++		int ret;
++
++		ret = clk_set_rate(clk_info->clk,
++				clk_info->freq_table[index].freq * 1000);
++		if (ret) {
++			dev_err(data->dev, "Failed to set %s rate: %d\n",
++				clk_info->clk_name, ret);
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
+ static int exynos5_int_setvolt(struct busfreq_data_int *data,
+ 				unsigned long volt)
+ {
+@@ -126,7 +228,7 @@ static int exynos5_busfreq_int_target(struct device *dev, unsigned long *_freq,
+ 	if (err)
+ 		goto out;
+ 
+-	err = clk_set_rate(data->int_clk, freq * 1000);
++	err = exynos5_int_set_rate(data, freq);
+ 
+ 	if (err)
+ 		goto out;
+@@ -220,7 +322,7 @@ static int exynos5_busfreq_int_pm_notifier_event(struct notifier_block *this,
+ 		if (err)
+ 			goto unlock;
+ 
+-		err = clk_set_rate(data->int_clk, freq * 1000);
++		err = exynos5_int_set_rate(data, freq);
+ 
+ 		if (err)
+ 			goto unlock;
+@@ -300,10 +402,15 @@ static int exynos5_busfreq_int_probe(struct platform_device *pdev)
+ 		return PTR_ERR(data->vdd_int);
+ 	}
+ 
+-	data->int_clk = devm_clk_get(dev, "int_clk");
+-	if (IS_ERR(data->int_clk)) {
+-		dev_err(dev, "Cannot get clock \"int_clk\"\n");
+-		return PTR_ERR(data->int_clk);
++	for (i = 0; i < ARRAY_SIZE(exynos5_int_clks); i++) {
++		struct int_clk *clk_info = &exynos5_int_clks[i];
++
++		clk_info->clk = devm_clk_get(dev, clk_info->clk_name);
++		if (IS_ERR(clk_info->clk)) {
++			dev_err(dev, "Failed to get clock %s\n",
++				clk_info->clk_name);
++			return PTR_ERR(clk_info->clk);
++		}
+ 	}
+ 
+ 	rcu_read_lock();
+@@ -320,16 +427,16 @@ static int exynos5_busfreq_int_probe(struct platform_device *pdev)
+ 	rcu_read_unlock();
+ 	data->curr_freq = initial_freq;
+ 
+-	err = clk_set_rate(data->int_clk, initial_freq * 1000);
++	err = exynos5_int_setvolt(data, initial_volt);
++	if (err)
++		return err;
++
++	err = exynos5_int_set_rate(data, initial_freq);
+ 	if (err) {
+ 		dev_err(dev, "Failed to set initial frequency\n");
+ 		return err;
+ 	}
+ 
+-	err = exynos5_int_setvolt(data, initial_volt);
+-	if (err)
+-		return err;
+-
+ 	platform_set_drvdata(pdev, data);
+ 
+ 	busfreq_mon_reset(ppmu_data);
 -- 
 1.7.9.5
