@@ -1,37 +1,57 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 22 May 2014 12:24:06 +0100
-Subject: [PATCH 08/10] mtd: st_spi_fsm: Provide documentation for boot device
- mask property
+Date: Thu, 22 May 2014 12:24:07 +0100
+Subject: [PATCH 09/10] mtd: st_spi_fsm: Provide mask to obtain correct boot
+ device pins
 In-Reply-To: <1400757848-18075-1-git-send-email-lee.jones@linaro.org>
 References: <1400757848-18075-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1400757848-18075-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1400757848-18075-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The system configuration registers which display which device the system
-booted on are in the same place on all boards which support the FSM.
-However, the bits do shift every so slightly.  To combat these we're
-adding a new property which supplies the necessary mask used to abstract
-the required information.
+From: Christophe Kerello <christophe.kerello@st.com>
 
-Cc: devicetree at vger.kernel.org
+This patch adds a mask to be able to get the right boot device selection.
+
+For example:
+    for STiH415, value = SYSTEM_STATUS398[4:0]
+    for STiH416, value = SYSTEM_STATUS2598[4:0]
+    for STiH407, value = SYSTEM_STATUS5561[6:2]
+
+Signed-off-by: Christophe Kerello <christophe.kerello@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- Documentation/devicetree/bindings/mtd/st-fsm.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mtd/st-fsm.txt b/Documentation/devicetree/bindings/mtd/st-fsm.txt
-index c248939..0523fd4 100644
---- a/Documentation/devicetree/bindings/mtd/st-fsm.txt
-+++ b/Documentation/devicetree/bindings/mtd/st-fsm.txt
-@@ -11,6 +11,8 @@ Optional properties:
-   - st,syscfg          : Phandle to boot-device system configuration registers
-   - st,boot-device-reg : Address of the aforementioned boot-device register(s)
-   - st,boot-device-spi : Expected boot-device value if booted via this device
-+  - st,boot-device-msk : Mask to use when extracting boot device from the
-+			 above system config registers
+diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
+index 3f74e125..6d535d9 100644
+--- a/drivers/mtd/devices/st_spi_fsm.c
++++ b/drivers/mtd/devices/st_spi_fsm.c
+@@ -2125,6 +2125,7 @@ static void stfsm_fetch_platform_configs(struct platform_device *pdev)
+ 	struct regmap *regmap;
+ 	uint32_t boot_device_reg;
+ 	uint32_t boot_device_spi;
++	uint32_t boot_device_msk;
+ 	uint32_t boot_device;     /* Value we read from *boot_device_reg */
+ 	int ret;
  
- Example:
- 	spifsm: spifsm at fe902000{
+@@ -2149,10 +2150,17 @@ static void stfsm_fetch_platform_configs(struct platform_device *pdev)
+ 	if (ret)
+ 		goto boot_device_fail;
+ 
++	/* Mask to apply on boot_device_reg */
++	ret = of_property_read_u32(np, "st,boot-device-msk", &boot_device_msk);
++	if (ret)
++		goto boot_device_fail;
++
+ 	ret = regmap_read(regmap, boot_device_reg, &boot_device);
+ 	if (ret)
+ 		goto boot_device_fail;
+ 
++	boot_device &= boot_device_msk;
++
+ 	if (boot_device != boot_device_spi)
+ 		fsm->booted_from_spi = false;
+ 
 -- 
 1.8.3.2
