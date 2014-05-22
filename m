@@ -1,44 +1,84 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Thu, 22 May 2014 09:26:24 -0500
-Subject: [GIT PULL] SOCFPGA DTS updates for 3.16, take 2
-In-Reply-To: <20140522051522.GB32618@quad.lixom.net>
-References: <1400471241-21456-1-git-send-email-dinguyen@altera.com>
- <20140522051522.GB32618@quad.lixom.net>
-Message-ID: <537E0910.8010001@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 22 May 2014 16:25:27 +0200
+Subject: [PATCH] pinctrl: sunxi: Fix multiple registration issue
+Message-ID: <1400768727-7338-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When the support for the PRCM muxer on the A31 has been added, the global
+static pinctl_desc definition has been left as is. Unfortunately, this
+structure is used to register the pinctrl device, and prior to this
+registration, we set the name and pins field.
 
-On 5/22/14 12:15 AM, Olof Johansson wrote:
-> On Sun, May 18, 2014 at 10:47:21PM -0500, dinguyen at altera.com wrote:
->> Hi Arnd, Kevin and Olof,
->>
->> Please consider pulling in this patch for 3.16. This patch adds the DTS
->> entries for the GPIOs on the SOCFPGA platform.
->>
->> Olof had a question regarding how the GPIO node needed 2-layer approach.
->>
->> http://thread.gmane.org/gmane.linux.kernel/1671569/focus=1702208
->>
->> I hope that Alan Tull was able to answer Olof's question.
->>
->> Thanks,
->>
->> The following changes since commit 2bfac3a551978c4953f659e1bd18d58c3c249f64:
->>
->>   Merge tag 'socfpga-dt-updates-for-3.16_v3' of git://git.rocketboards.org/linux-socfpga-next into next/dt (2014-05-16 16:07:37 -0700)
-> You can't base your branch on top of our next/dt. You should have based
-> this on top of your previous branch, and not pulled down our contents
-> for it.
-Ah thanks, and sorry about that. So should my pull request start from
-v3.15-rc1(was the
-last rc in my branch) or the last commit that you pulled in?
->
-> Please send a new pull request, or let me know if you prefer me to just
-> cherry-pick over the one patch -- your choice.
-Let me send you a new pull request as there is another that just came in.
+Since this structure is shared across instances, that means that the latest
+registered pinctrl device wins in setting the name, pins and pins numbers,
+which is not really a good thing.
 
-Thanks,
-Dinh
->
-> -Olof
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 29 +++++++++++++++++------------
+ 1 file changed, 17 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index f6522b54ece9..6dfc172af9d3 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -436,12 +436,6 @@ static const struct pinmux_ops sunxi_pmx_ops = {
+ 	.gpio_set_direction	= sunxi_pmx_gpio_set_direction,
+ };
+ 
+-static struct pinctrl_desc sunxi_pctrl_desc = {
+-	.confops	= &sunxi_pconf_ops,
+-	.pctlops	= &sunxi_pctrl_ops,
+-	.pmxops		= &sunxi_pmx_ops,
+-};
+-
+ static int sunxi_pinctrl_gpio_request(struct gpio_chip *chip, unsigned offset)
+ {
+ 	return pinctrl_request_gpio(chip->base + offset);
+@@ -778,6 +772,7 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
+ 		       const struct sunxi_pinctrl_desc *desc)
+ {
+ 	struct device_node *node = pdev->dev.of_node;
++	struct pinctrl_desc *pctrl_desc;
+ 	struct pinctrl_pin_desc *pins;
+ 	struct sunxi_pinctrl *pctl;
+ 	struct resource *res;
+@@ -796,6 +791,7 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
+ 	if (IS_ERR(pctl->membase))
+ 		return PTR_ERR(pctl->membase);
+ 
++	pctl->dev = &pdev->dev;
+ 	pctl->desc = desc;
+ 
+ 	ret = sunxi_pinctrl_build_state(pdev);
+@@ -813,12 +809,21 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
+ 	for (i = 0; i < pctl->desc->npins; i++)
+ 		pins[i] = pctl->desc->pins[i].pin;
+ 
+-	sunxi_pctrl_desc.name = dev_name(&pdev->dev);
+-	sunxi_pctrl_desc.owner = THIS_MODULE;
+-	sunxi_pctrl_desc.pins = pins;
+-	sunxi_pctrl_desc.npins = pctl->desc->npins;
+-	pctl->dev = &pdev->dev;
+-	pctl->pctl_dev = pinctrl_register(&sunxi_pctrl_desc,
++	pctrl_desc = devm_kzalloc(&pdev->dev,
++				  sizeof(*pctrl_desc),
++				  GFP_KERNEL);
++	if (!pctrl_desc)
++		return -ENOMEM;
++
++	pctrl_desc->name = dev_name(&pdev->dev);
++	pctrl_desc->owner = THIS_MODULE;
++	pctrl_desc->pins = pins;
++	pctrl_desc->npins = pctl->desc->npins;
++	pctrl_desc->confops = &sunxi_pconf_ops;
++	pctrl_desc->pctlops = &sunxi_pctrl_ops;
++	pctrl_desc->pmxops =  &sunxi_pmx_ops;
++
++	pctl->pctl_dev = pinctrl_register(pctrl_desc,
+ 					  &pdev->dev, pctl);
+ 	if (!pctl->pctl_dev) {
+ 		dev_err(&pdev->dev, "couldn't register pinctrl driver\n");
+-- 
+1.9.3
