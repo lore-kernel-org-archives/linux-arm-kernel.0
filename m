@@ -1,75 +1,31 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 22 May 2014 15:32:41 +0200
-Subject: [PATCH] ARM AT91: clocksource tcb_clksrc.c: make tc_mode
- interrupt safe
-In-Reply-To: <1399543585-17016-1-git-send-email-david@protonic.nl>
-References: <1399543585-17016-1-git-send-email-david@protonic.nl>
-Message-ID: <20140522133241.GO3582@piout.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 22 May 2014 15:36:01 +0200
+Subject: [PATCH v2] ARM: realview: basic device tree implementation
+In-Reply-To: <CACRpkdaqsVUDA+6NC=EQmxcnDAnJEfPNYoptrEv=nq=eZEbA_g@mail.gmail.com>
+References: <1399586896-16906-1-git-send-email-linus.walleij@linaro.org>
+ <CAL_JsqLN_f1uvrY6w7J7ZcR9pfM0_XKYMQ5YU8F4yAcMW+oDGw@mail.gmail.com>
+ <CACRpkdaqsVUDA+6NC=EQmxcnDAnJEfPNYoptrEv=nq=eZEbA_g@mail.gmail.com>
+Message-ID: <5376959.IId6jNFDDg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2014 at 12:06:25 +0200, David Jander wrote :
-> tc_mode() can be called from interrupt context and thus must not call
-> clk_*prepare*() functions.
+On Thursday 22 May 2014 15:30:39 Linus Walleij wrote:
+> >> +       parent = soc_device_to_device(soc_dev);
+> >
+> > We really need to standardize this soc device stuff so that platforms
+> > always have a parent soc device or not.
 > 
-> Signed-off-by: David Jander <david@protonic.nl>
+> Arnds position is that the entire platform/board should not be
+> a "soc device" and that seems correct since the board is no SoC.
+> 
+> So I will spin this off into a SoC driver and push under
+> drivers/soc and bind to the SoC node in the device tree.
 
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+To be clear, this has nothing to do with whether this is strictly a SoC
+or not. I would still want to see all the internal components of the
+main chip under the soc node, and probably anything that is attached
+to one of its interfaces under those nodes. The parts that should not
+be under /soc are the ones that are not in the device hierarchy, such
+as external clock generators.
 
-> ---
->  drivers/clocksource/tcb_clksrc.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-> index 00fdd11..a8d7ea1 100644
-> --- a/drivers/clocksource/tcb_clksrc.c
-> +++ b/drivers/clocksource/tcb_clksrc.c
-> @@ -100,7 +100,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
->  			|| tcd->clkevt.mode == CLOCK_EVT_MODE_ONESHOT) {
->  		__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
->  		__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
-> -		clk_disable_unprepare(tcd->clk);
-> +		clk_disable(tcd->clk);
->  	}
->  
->  	switch (m) {
-> @@ -109,7 +109,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
->  	 * of oneshot, we get lower overhead and improved accuracy.
->  	 */
->  	case CLOCK_EVT_MODE_PERIODIC:
-> -		clk_prepare_enable(tcd->clk);
-> +		clk_enable(tcd->clk);
->  
->  		/* slow clock, count up to RC, then irq and restart */
->  		__raw_writel(timer_clock
-> @@ -126,7 +126,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
->  		break;
->  
->  	case CLOCK_EVT_MODE_ONESHOT:
-> -		clk_prepare_enable(tcd->clk);
-> +		clk_enable(tcd->clk);
->  
->  		/* slow clock, count up to RC, then irq and stop */
->  		__raw_writel(timer_clock | ATMEL_TC_CPCSTOP
-> @@ -194,7 +194,7 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
->  	ret = clk_prepare_enable(t2_clk);
->  	if (ret)
->  		return ret;
-> -	clk_disable_unprepare(t2_clk);
-> +	clk_disable(t2_clk);
->  
->  	clkevt.regs = tc->regs;
->  	clkevt.clk = t2_clk;
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	Arnd
