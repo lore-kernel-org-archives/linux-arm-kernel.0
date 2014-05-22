@@ -1,75 +1,31 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 22 May 2014 09:44:27 -0500
-Subject: [Ksummit-discuss] [TECH TOPIC] ARM legacy board DT conversion
- finalization
-In-Reply-To: <4921873.t2F8plV493@wuerfel>
-References: <20140511030009.GO12708@titan.lakedaemon.net>
- <4931877.zNfKfvcgox@wuerfel>
- <CAL_Jsq+kOu82okhJn0_ftwemE_m4nsTRawrF-fWAU2XTJ9xRcA@mail.gmail.com>
- <4921873.t2F8plV493@wuerfel>
-Message-ID: <CAL_JsqKfc82GT3BNQa0PJ3=kCHmYrZWQEuxjPxRfESR+5Ubj9g@mail.gmail.com>
+From: emilgoode@gmail.com (Emil Goode)
+Date: Thu, 22 May 2014 16:44:46 +0200
+Subject: [PATCH] ARM: imx: add missing kfree call in error paths
+In-Reply-To: <20140522135016.GK15585@mwanda>
+References: <1400764482-20147-1-git-send-email-emilgoode@gmail.com>
+ <20140522135016.GK15585@mwanda>
+Message-ID: <20140522144446.GA7348@lianli>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 3:08 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 19 May 2014 18:06:02 Rob Herring wrote:
->> > On Friday 16 May 2014 23:20:42 Ben Hutchings wrote:
->> >> On Fri, 2014-05-16 at 14:42 -0400, Jason Cooper wrote:
->> >> > On Fri, May 16, 2014 at 07:31:51PM +0100, Ben Hutchings wrote:
->> >> > > Our 'legacy' (which I take to mean pre-v7) configurations are now
->> >> > > kirkwood, mv78xx0, orion5x (all about to converge to mvebu) and
->> >> > > versatile.
->> >> >
->> >> > I'm not familiar with versatile, the others I've seen a few times.
->> >>
->> >> Versatile is one of ARM's own development boards, but more importantly
->> >> it's something QEMU can emulate.
->> >
->> > We should really have this in multiplatform soon, I think the last issue
->> > for versatile is common clock support, but Linus Walleij may have more
->> > details about what remains here.
->>
->> While not necessarily the same thing, but does move versatile in the
->> right direction, I've got patches in progress which fully move
->> versatile over to DT. The main issues there are:
->>
->> common clock
->> irq cntlr init from DT
->> Move PCI to DT and platform driver
->>
->> I'd like to do this all in one step to avoid doing things like non-DT
->> common clock init.
->
-> Sounds good, yes.
->
->> It's blocked on the common DT PCI code and my free
->> time.
->>
->> There are then a few bits related to mach/plat headers needed move
->> versatile to multiplatform. I think these issues are mostly the same
->> changes that have been done or are needed on integrator which is what
->> Linus has been working on.
->
-> Ah, right. I see these two includes from mach-versatile to plat/*.h headers:
->
-> arch/arm/mach-versatile/core.c:#include <plat/clcd.h>
-> arch/arm/mach-versatile/core.c:#include <plat/sched_clock.h>
->
-> We can deal with those by adding
->
-> ccflags-y := -I$(srctree)/arch/arm/plat-versatile/include
->
-> to mach-versatile/Makefile, or we can rearrange the code. The opposite
-> direction would be harder, but I don't see any remaining dependencies
-> there.
+Hello Dan,
 
-It looked like more work when I started this, but thanks to Linus's
-work on plat dir, it is pretty straight-forward to finish the
-conversion. Here's a branch that enables multi-platform for versatile:
+On Thu, May 22, 2014 at 04:50:16PM +0300, Dan Carpenter wrote:
+> On Thu, May 22, 2014 at 03:14:42PM +0200, Emil Goode wrote:
+> > We forgot to free pdev->dev.dma_mask as it is not freed
+> > by platform_device_put().
+> > 
+> 
+> Every function which calls imx31_alloc_mx3_camera() is buggy.  That
+> means that, at best, it is a 2 on Rusty's API rating.
+> http://sweng.the-davies.net/Home/rustys-api-design-manifesto
+> 
+> The correct fix is to introduce an imx31_free_mx3_camera() otherwise we
+> will just keep introducing these bugs.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git
-versatile-multiplatform
+I guess I could add this to arch/arm/mach-imx/devices/platform-ipu-core.c
+it would be a very small function though.
 
-So it is PCI and LEDs that have to be sorted out first.
+Best regards,
 
-Rob
+Emil Goode
