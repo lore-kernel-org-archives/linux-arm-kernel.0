@@ -1,60 +1,34 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 22 May 2014 09:36:46 -0700
-Subject: [PATCH v2 2/2] Documentation: add Broadcom STB Level-2 interrupt
- controller binding
-In-Reply-To: <1400776606-22427-1-git-send-email-f.fainelli@gmail.com>
-References: <1400776606-22427-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1400776606-22427-3-git-send-email-f.fainelli@gmail.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 22 May 2014 11:38:55 -0500
+Subject: [PATCH v1 3/5] clk: gcc: Add APQ8084 Global Clock Controller
+ support
+In-Reply-To: <1400775885-10296-4-git-send-email-gdjakov@mm-sol.com>
+References: <1400775885-10296-1-git-send-email-gdjakov@mm-sol.com>
+ <1400775885-10296-4-git-send-email-gdjakov@mm-sol.com>
+Message-ID: <DB9EC1F3-CA2B-47C5-A677-CC1222F05614@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the Device Tree binding document for the Broadcom
-Set-top-box Level 2 interrupt controller hardware.
 
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
-Changes in v2:
-- respin
+On May 22, 2014, at 11:24 AM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
 
- .../bindings/interrupt-controller/brcm,l2-intc.txt | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/brcm,l2-intc.txt
+> This patch adds support for the global clock controller found on
+> the APQ8084 based devices.
+> 
+> The APQ8084 and MSM8974 share a lot of clock data, so instead of
+> duplicating all the data, we add support to the MSM8974 code.
+> 
+> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+> ---
+> drivers/clk/qcom/Kconfig                     |    4 +-
+> drivers/clk/qcom/gcc-msm8974.c               |  151 +++++++++++++++++++++++++-
+> include/dt-bindings/clock/qcom,gcc-msm8974.h |    4 +
+> 3 files changed, 154 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/brcm,l2-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/brcm,l2-intc.txt
-new file mode 100644
-index 000000000000..448273a30a11
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/brcm,l2-intc.txt
-@@ -0,0 +1,29 @@
-+Broadcom Generic Level 2 Interrupt Controller
-+
-+Required properties:
-+
-+- compatible: should be "brcm,l2-intc"
-+- reg: specifies the base physical address and size of the registers
-+- interrupt-controller: identifies the node as an interrupt controller
-+- #interrupt-cells: specifies the number of cells needed to encode an
-+  interrupt source. Should be 1.
-+- interrupt-parent: specifies the phandle to the parent interrupt controller
-+  this controller is cacaded from
-+- interrupts: specifies the interrupt line in the interrupt-parent irq space
-+  to be used for cascading
-+
-+Optional properties:
-+
-+- brcm,irq-can-wake: If present, this means the L2 controller can be used as a
-+  wakeup source for system suspend/resume.
-+
-+Example:
-+
-+hif_intr2_intc: interrupt-controller at f0441000 {
-+	compatible = "brcm,l2-intc";
-+	reg = <0xf0441000 0x30>;
-+	interrupt-controller;
-+	#interrupt-cells = <1>;
-+	interrupt-parent = <&intc>;
-+	interrupts = <0x0 0x20 0x0>;
-+};
+What about differences in reset?
+
+- k
+
 -- 
-1.9.1
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
