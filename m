@@ -1,31 +1,58 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 22 May 2014 21:01:15 +0200
-Subject: [PATCH] ARM: EXYNOS: Use wfi macro in platform_do_lowpower
-In-Reply-To: <1400745455-27920-1-git-send-email-leela.krishna@linaro.org>
-References: <1400745455-27920-1-git-send-email-leela.krishna@linaro.org>
-Message-ID: <537E497B.9020404@linaro.org>
+From: manuel.schoelling@gmx.de (=?UTF-8?q?Manuel=20Sch=C3=B6lling?=)
+Date: Thu, 22 May 2014 21:10:28 +0200
+Subject: [PATCH] xilinx: Use time_before_eq()
+Message-ID: <1400785828-1551-1-git-send-email-manuel.schoelling@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2014 09:57 AM, Leela Krishna Amudala wrote:
-> This patch is originally based on commit b3377d186572 ("ARM: 7064/1:
-> vexpress: Use wfi macro in platform_do_lowpower.")
->
-> Current Exynos CPU hotplug code includes a hardcoded WFI
-> instruction, in ARM encoding.  When the kernel is compiled in Thumb-2
-> mode, this is invalid and causes the machine to hang hard when a CPU
-> is offlined.
->
-> Use wfi macro instead of the hardcoded WFI instruction.
->
-> Signed-off-by: Leela Krishna Amudala <leela.krishna@linaro.org>
+To be future-proof and for better readability the time comparisons are modified
+to use time_before_eq() instead of plain, error-prone math.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Manuel Sch?lling <manuel.schoelling@gmx.de>
+---
+ drivers/net/ethernet/xilinx/ll_temac_main.c       |    2 +-
+ drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c |    2 +-
+ drivers/net/ethernet/xilinx/xilinx_emaclite.c     |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-
+diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
+index fa193c4..4ef818a 100644
+--- a/drivers/net/ethernet/xilinx/ll_temac_main.c
++++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
+@@ -75,7 +75,7 @@ int temac_indirect_busywait(struct temac_local *lp)
+ 	long end = jiffies + 2;
+ 
+ 	while (!(temac_ior(lp, XTE_RDY0_OFFSET) & XTE_RDY0_HARD_ACS_RDY_MASK)) {
+-		if (end - jiffies <= 0) {
++		if (time_before_eq(end, jiffies)) {
+ 			WARN_ON(1);
+ 			return -ETIMEDOUT;
+ 		}
+diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c b/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
+index 64b4639..d4abf47 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
++++ b/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
+@@ -22,7 +22,7 @@ int axienet_mdio_wait_until_ready(struct axienet_local *lp)
+ 	long end = jiffies + 2;
+ 	while (!(axienet_ior(lp, XAE_MDIO_MCR_OFFSET) &
+ 		 XAE_MDIO_MCR_READY_MASK)) {
+-		if (end - jiffies <= 0) {
++		if (time_before_eq(end, jiffies)) {
+ 			WARN_ON(1);
+ 			return -ETIMEDOUT;
+ 		}
+diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+index 0d87c67..8c4aed3 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
++++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+@@ -702,7 +702,7 @@ static int xemaclite_mdio_wait(struct net_local *lp)
+ 	*/
+ 	while (__raw_readl(lp->base_addr + XEL_MDIOCTRL_OFFSET) &
+ 			XEL_MDIOCTRL_MDIOSTS_MASK) {
+-		if (end - jiffies <= 0) {
++		if (time_before_eq(end, jiffies)) {
+ 			WARN_ON(1);
+ 			return -ETIMEDOUT;
+ 		}
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.10.4
