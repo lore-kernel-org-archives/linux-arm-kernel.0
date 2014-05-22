@@ -1,58 +1,57 @@
-From: gioh.kim@lge.com (Gioh Kim)
-Date: Thu, 22 May 2014 13:38:23 +0900
-Subject: [PATCH] arm: dma-mapping: add checking cma area initialized
-Message-ID: <1400733503-1302-1-git-send-email-gioh.kim@lge.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 22 May 2014 06:58:43 +0200
+Subject: [PATCH] i2c: cadence: fix Kconfig dependency
+In-Reply-To: <78a702ca-5001-444a-b2df-a64de17ffcb6@BY2FFO11FD039.protection.gbl>
+References: <1396811227-8851-1-git-send-email-wsa@the-dreams.de>
+ <1396852656.682914397@f273.i.mail.ru> <20140407065657.GO29751@pengutronix.de>
+ <1396854155.872298456@f287.i.mail.ru>
+ <4c4d2ba5-f5f6-4589-8a48-6a88d1c16098@VA3EHSMHS046.ehs.local>
+ <20140521082917.GG2708@katana>
+ <78a702ca-5001-444a-b2df-a64de17ffcb6@BY2FFO11FD039.protection.gbl>
+Message-ID: <537D8403.60400@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CMA is turned on and CMA size is set to zero, kernel should
-behave as if CMA was not enabled at compile time.
-Every dma allocation should check existence of cma area
-before requesting memory.
+On 05/21/2014 06:00 PM, S?ren Brinkmann wrote:
+> Hi Wolfram,
+> 
+> On Wed, 2014-05-21 at 10:29AM +0200, Wolfram Sang wrote:
+>>> I'd propose the below fix. The relaxed IO helpers are currently
+>>> available on ARM only and the clock notifier used, depends on
+>>> COMMON_CLK. I2C-related dependencies should be okay due to the location in
+>>> Kconfig of this option.
+>>
+>> If somebody thinks an update is still needed, please resend against
+>> latest i2c-next. Thanks.
+>>
+> 
+> I think we're fine for now. Once the *_relaxed IO helpers are available
+> on all archs it makes sense to revisit the COMPILE_TEST option. Until
+> then we are restricted to ARM anyway and the additional Zynq restriction
+> doesn't make a big difference, IMHO.
+> 
+> @Michal: Do you have an update on the IO helpers?
 
-Signed-off-by: Gioh Kim <gioh.kim@lge.com>
-Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-Acked-by: Michal Nazarewicz <mina86@mina86.com>
----
- arch/arm/mm/dma-mapping.c |    7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+My patch was replaced by Will's one but I can't see it in linux-next
+that's why we should ask directly Will.
+Will: What's the status on it?
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 18e98df..9173a13 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -390,12 +390,13 @@ static int __init atomic_pool_init(void)
- 	if (!pages)
- 		goto no_pages;
- 
--	if (IS_ENABLED(CONFIG_DMA_CMA))
-+	if (dev_get_cma_area(NULL))
- 		ptr = __alloc_from_contiguous(NULL, pool->size, prot, &page,
- 					      atomic_pool_init);
- 	else
- 		ptr = __alloc_remap_buffer(NULL, pool->size, gfp, prot, &page,
- 					   atomic_pool_init);
-+
- 	if (ptr) {
- 		int i;
- 
-@@ -701,7 +702,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
- 		addr = __alloc_simple_buffer(dev, size, gfp, &page);
- 	else if (!(gfp & __GFP_WAIT))
- 		addr = __alloc_from_pool(size, &page);
--	else if (!IS_ENABLED(CONFIG_DMA_CMA))
-+	else if (!dev_get_cma_area(dev))
- 		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller);
- 	else
- 		addr = __alloc_from_contiguous(dev, size, prot, &page, caller);
-@@ -790,7 +791,7 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
- 		__dma_free_buffer(page, size);
- 	} else if (__free_from_pool(cpu_addr, size)) {
- 		return;
--	} else if (!IS_ENABLED(CONFIG_DMA_CMA)) {
-+	} else if (!dev_get_cma_area(dev)) {
- 		__dma_free_remap(cpu_addr, size);
- 		__dma_free_buffer(page, size);
- 	} else {
+Thanks,
+Michal
+
+
 -- 
-1.7.9.5
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140522/036b8ba4/attachment.sig>
