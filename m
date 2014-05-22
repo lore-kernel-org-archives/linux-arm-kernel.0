@@ -1,57 +1,29 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 May 2014 22:45:47 -0700
-Subject: [GIT PULL 4/5] Samsung DT updates for 3.16
-In-Reply-To: <014701cf73c8$752a65c0$5f7f3140$@samsung.com>
-References: <014701cf73c8$752a65c0$5f7f3140$@samsung.com>
-Message-ID: <20140522054547.GA4021@quad.lixom.net>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Wed, 21 May 2014 23:04:53 -0700
+Subject: [PATCH 1/3] ARM: dts: imx6: ventana: fix include typo
+Message-ID: <1400738695-32663-1-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 10:11:41AM +0900, Kukjin Kim wrote:
+Fix typo and include the right dtsi file for the gw51xx board.
 
-> Sachin Kamat (4):
->       ARM: EXYNOS: Map SYSRAM through generic DT bindings
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+---
+ arch/arm/boot/dts/imx6q-gw51xx.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This patch has a conflict with your own fixes. You should have based this
-branch on top of the fixes to avoid it.
-
-Not only that, but it seems to break 4212, which the other fix was meant to
-take care of.
-
-I think I've fixed it in my merge, please double check. You really have to
-be more careful than this in the future.
-
-My resolution is:
-
-index aa01c4222b40,483dfcd69065..000000000000
---- a/arch/arm/mach-exynos/firmware.c
-+++ b/arch/arm/mach-exynos/firmware.c
-@@@ -18,8 -18,7 +18,9 @@@
-  
-  #include <mach/map.h>
-  
- +#include <plat/cpu.h>
- +
-+ #include "common.h"
-  #include "smc.h"
-  
-  static int exynos_do_idle(void)
-@@@ -44,10 -35,12 +45,15 @@@ static int exynos_cpu_boot(int cpu
-  
-  static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
-  {
--       void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
-+       void __iomem *boot_reg;
-+ 
-+       if (!sysram_ns_base_addr)
-+               return -ENODEV;
-+ 
- -      boot_reg = sysram_ns_base_addr + 0x1c + 4*cpu;
-++      boot_reg = sysram_ns_base_addr + 0x1c;
- +
- +      if (!soc_is_exynos4212())
- +              boot_reg += 4*cpu;
-  
-
-
--Olof
+diff --git a/arch/arm/boot/dts/imx6q-gw51xx.dts b/arch/arm/boot/dts/imx6q-gw51xx.dts
+index af4929a..0e1406e 100644
+--- a/arch/arm/boot/dts/imx6q-gw51xx.dts
++++ b/arch/arm/boot/dts/imx6q-gw51xx.dts
+@@ -11,7 +11,7 @@
+ 
+ /dts-v1/;
+ #include "imx6q.dtsi"
+-#include "imx6qdl-gw54xx.dtsi"
++#include "imx6qdl-gw51xx.dtsi"
+ 
+ / {
+ 	model = "Gateworks Ventana i.MX6 Quad GW51XX";
+-- 
+1.8.3.2
