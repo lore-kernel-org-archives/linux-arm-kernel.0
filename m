@@ -1,55 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 May 2014 22:08:40 -0700
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC r7s72100-ccf
- Updates for v3.16
-In-Reply-To: <cover.1400289483.git.horms+renesas@verge.net.au>
-References: <cover.1400289483.git.horms+renesas@verge.net.au>
-Message-ID: <20140522050840.GA32618@quad.lixom.net>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Thu, 22 May 2014 10:43:44 +0530
+Subject: [PATCH 3/4] clk: samsung: Add driver to control CLKOUT line on
+ Exynos SoCs
+In-Reply-To: <1400604211-9447-4-git-send-email-t.figa@samsung.com>
+References: <1400604211-9447-1-git-send-email-t.figa@samsung.com>
+ <1400604211-9447-4-git-send-email-t.figa@samsung.com>
+Message-ID: <537D8788.8030904@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 17, 2014 at 10:24:53AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On 05/20/2014 10:13 PM, Tomasz Figa wrote:
+> This patch introduces a driver that handles configuration of CLKOUT pin
+> of Exynos SoCs that can be used to output certain clocks from inside of
+> the SoC to a dedicated output pin.
 > 
-> Please consider these Second Round of
-> Renesas ARM Based SoC r7s72100 CCF Updates for v3.16.
-> 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-r7s72100-ccf-for-v3.16,
-> which I have already sent a pull-request for.
-> 
-> This comprehensively addresses an oversight in patches included in
-> the pull request that it depends on, specifically leaving broken
-> non-multiplatform support in place for genmai-reference.
-> 
-> This pull request has some minor conflicts with other DT changes which I
-> have previously sent pull requests for. These conflicts are in
-> arch/arm/boot/dts/Makefile. A resolution can be found in the
-> renesas-next-v3.15-rc1-20140517 tag if my renesas tree. In words:
-> 
->     CONFIG_ARCH_SHMOBILE_LEGACY hunk:
->     * Remove emev2-kzm9d.dtb
->     * Remove r7s72100-genmai-reference.dtb
->     * Keep r7s72100-genmai.dtb
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+>  .../devicetree/bindings/arm/samsung/pmu.txt        |  30 ++++
+>  drivers/clk/samsung/Makefile                       |   1 +
+>  drivers/clk/samsung/clk-exynos-clkout.c            | 153 +++++++++++++++++++++
+>  3 files changed, 184 insertions(+)
+>  create mode 100644 drivers/clk/samsung/clk-exynos-clkout.c
 > 
 
-Are you sure? Shouldn't the genmai board be covered by multi now? Or
-are both multi and legacy driven by the same DTS now? Just making sure.
+[ ... ]
 
-> The following changes since commit 9fbb1ae01b878e2cce9626fa6fdc9e5dcefeb6b5:
-> 
->   ARM: shmobile: r7s72100: use workaround for non DT-clocks (2014-05-14 11:42:55 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-r7s72100-ccf2-for-v3.16
-> 
-> for you to fetch changes up to a5176e0d9de31a54e08468f21c15dc08e006857f:
-> 
->   ARM: shmobile: Remove Genmai reference DTS (2014-05-17 09:06:29 +0900)
-> 
+> +	clkout->clk_table[0] = clk_register_composite(NULL, "clkout",
+> +				parent_names, parent_count, &clkout->mux.hw,
+> +				&clk_mux_ops, NULL, NULL, &clkout->gate.hw,
+> +				&clk_gate_ops, CLK_SET_RATE_PARENT
+> +				| CLK_SET_RATE_NO_REPARENT);
 
-Pulled, thanks.
+Would you please remove CLK_SET_RATE_NO_REPARENT flag from here? Let me
+know if you have reservations against this.
 
+With RFC patches, I am able to do a clk_set_rate() on this clock to
+get a 24MHz output to the codec clock. With this flag set, I again have
+to rely on the default value set to this register in bootloader.
 
--Olof
+-- 
+Tushar Behera
