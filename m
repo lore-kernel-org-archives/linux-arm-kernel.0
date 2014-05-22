@@ -1,44 +1,77 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 22 May 2014 10:33:18 -0400
-Subject: [PATCH 0/4] ARM: mvebu: Minor fixes and improvements to
- coherency_ll.S
-In-Reply-To: <1400762882-10116-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1400762882-10116-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140522143318.GQ8664@titan.lakedaemon.net>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Thu, 22 May 2014 17:32:39 +0300
+Subject: [Patch v5 3/7] mfd: ti-keystone-devctrl: add bindings for device
+ state control
+In-Reply-To: <20140522141432.GA19747@lee--X1>
+References: <1400766516-14537-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1400766516-14537-4-git-send-email-ivan.khoronzhuk@ti.com>
+ <20140522141432.GA19747@lee--X1>
+Message-ID: <537E0A87.5010408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 02:47:58PM +0200, Thomas Petazzoni wrote:
-> Jason, Andrew, Gregory, Sebastian,
-> 
-> Here is a small set of patches making fixes and improvements to the
-> coherency_ll.S code.
-> 
-> The first patch is really important and fixes big endian booting in
-> -next. The regression was introduced by the cpuidle changes, which are
-> currently in -next.
-> 
-> The other three patches are only improvements, mainly cosmetic, but I
-> believe they clarify a few things that took me a bit of time to
-> re-understand this morning.
-> 
-> The patches are based on top of mvebu/soc.
-> 
-> Thanks,
-> 
-> Thomas
-> 
-> Thomas Petazzoni (4):
->   ARM: mvebu: fix big endian booting after coherency code rework
->   ARM: mvebu: fix indentation of assembly instructions in coherency_ll.S
->   ARM: mvebu: improve comments in coherency_ll.S
->   ARM: mvebu: returns ll_get_cpuid() to ll_get_coherency_cpumask()
-> 
->  arch/arm/mach-mvebu/coherency_ll.S | 77 ++++++++++++++++++++++++--------------
->  1 file changed, 49 insertions(+), 28 deletions(-)
 
-Whole series applied to mvebu/soc with Gregory's Ack.
+On 05/22/2014 05:14 PM, Lee Jones wrote:
+> Why do I only have this patch?  Where is the rest of the set?  Also,
+> it's on v5 and I don't recall seeing the other 4 versions?
 
-thx,
+It's strange I've sent whole series on
 
-Jason.
+linux-kernel at vger.kernel.org
+linux-arm-kernel at lists.infradead.org
+linux-doc at vger.kernel.org
+devicetree at vger.kernel.org
+
+v4 is also was sent to lists in question:
+https://lkml.org/lkml/2014/5/21/359
+
+>> The Keystone II devices have a set of registers that are used to control
+>> the status of its peripherals. This node is intended to allow access to
+>> this functionality.
+>>
+>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>> ---
+>>   .../devicetree/bindings/mfd/ti-keystone-devctrl.txt   | 19 +++++++++++++++++++
+>>   1 file changed, 19 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt b/Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt
+>> new file mode 100644
+>> index 0000000..35f7a66
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt
+>> @@ -0,0 +1,19 @@
+>> +* Device tree bindings for Texas Instruments keystone device state control
+>> +
+>> +The Keystone II devices have a set of registers that are used to control
+>> +the status of its peripherals. This node is intended to allow access to
+>> +this functionality.
+>> +
+>> +Required properties:
+>> +
+>> +- compatible:		"ti,keystone-devctrl", "syscon"
+>> +
+>> +- reg:			contains offset/length value for pll controller
+>> +			registers space.
+> Why have you tabbed out all that way?
+
+I'll correct
+
+>
+>> +Example:
+>> +
+>> +devctrl: device-state-control {
+> This node needs an address:
+>
+> devctrl: device-state-control at 02620000 {
+
+Thanks!
+I will correct
+
+>> +	compatible = "ti,keystone-devctrl", "syscon";
+>> +	reg = <0x02620000 0x1000>;
+>> +};
+
+-- 
+Regards,
+Ivan Khoronzhuk
