@@ -1,63 +1,23 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 22 May 2014 16:48:35 +0300
-Subject: [Patch v5 6/7] ARM: dts: keystone: update reset node to work with
- reset driver
-In-Reply-To: <1400766516-14537-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1400766516-14537-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1400766516-14537-7-git-send-email-ivan.khoronzhuk@ti.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Thu, 22 May 2014 16:50:16 +0300
+Subject: [PATCH] ARM: imx: add missing kfree call in error paths
+In-Reply-To: <1400764482-20147-1-git-send-email-emilgoode@gmail.com>
+References: <1400764482-20147-1-git-send-email-emilgoode@gmail.com>
+Message-ID: <20140522135016.GK15585@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pll controller register set and device state control registers
-include sets of registers with different purposes, so it's logically
-to add syscon entry to be able to access them from appropriate places.
+On Thu, May 22, 2014 at 03:14:42PM +0200, Emil Goode wrote:
+> We forgot to free pdev->dev.dma_mask as it is not freed
+> by platform_device_put().
+> 
 
-So added pll controller and device state control syscon entries.
+Every function which calls imx31_alloc_mx3_camera() is buggy.  That
+means that, at best, it is a 2 on Rusty's API rating.
+http://sweng.the-davies.net/Home/rustys-api-design-manifesto
 
-The keystone driver requires the next additional properties:
+The correct fix is to introduce an imx31_free_mx3_camera() otherwise we
+will just keep introducing these bugs.
 
-"ti,syscon-pll" - phandle/offset pair. The phandle to syscon used to
-		  access pll controller registers and the offset to use
-		  reset control registers.
-
-"ti,syscon-dev" - phandle/offset pair. The phandle to syscon used to
-		  access device state control registers and the offset
-		  in order to use mux block registers for all watchdogs.
-
-"ti,wdt_list"	- option to declare what watchdogs are used to reboot
-		  the SoC, so set "0" WDT as default.
-
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
- arch/arm/boot/dts/keystone.dtsi | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index d9f99e7..12f66dd 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -66,9 +66,21 @@
- 		ranges = <0x0 0x0 0x0 0xc0000000>;
- 		dma-ranges = <0x80000000 0x8 0x00000000 0x80000000>;
- 
-+		pllctrl: pll-controller {
-+			compatible = "ti,keystone-pllctrl", "syscon";
-+			reg = <0x02310000 0x200>;
-+		};
-+
-+		devctrl: device-state-control {
-+			compatible = "ti,keystone-devctrl", "syscon";
-+			reg = <0x02620000 0x1000>;
-+		};
-+
- 		rstctrl: reset-controller {
- 			compatible = "ti,keystone-reset";
--			reg = <0x023100e8 4>;	/* pll reset control reg */
-+			ti,syscon-pll = <&pllctrl 0xe4>;
-+			ti,syscon-dev = <&devctrl 0x328>;
-+			ti,wdt_list = <0>;
- 		};
- 
- 		/include/ "keystone-clocks.dtsi"
--- 
-1.8.3.2
+regards,
+dan carpenter
