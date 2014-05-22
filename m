@@ -1,38 +1,59 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 22 May 2014 10:15:56 -0400
-Subject: [PATCH] ARM: mvebu: fix definitions of PCIe interfaces on
- Armada 38x
-In-Reply-To: <1400597008-4148-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1400597008-4148-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140522141556.GN8664@titan.lakedaemon.net>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 22 May 2014 16:17:38 +0200
+Subject: [PATCH 0/4] ARM: mvebu: Minor fixes and improvements to
+ coherency_ll.S
+In-Reply-To: <1400762882-10116-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1400762882-10116-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <537E0702.7000102@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 04:43:28PM +0200, Thomas Petazzoni wrote:
-> Due a copy/paste error, the 'reg' values for the third PCIe interface
-> on Armada 380, and the third and fourth PCIe interfaces on Armada 385
-> are wrong: they are equal to the one of the second PCIe interface.
-> 
-> This patch fixes this by using the appropriate 'reg' values for those
-> PCIe interfaces.
-> 
-> Without this fix, the third and fourth PCIe interfaces are unusable on
-> those platforms.
-> 
-> Reported-by: Nadav Haklai <nadavh@marvell.com>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Fixes: 0d3d96ab0059 ("ARM: mvebu: add Device Tree description of the Armada 380/385 SoCs")
-> ---
-> This is based on mvebu/dt. It should be pushed to 3.15-rc.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-380.dtsi | 2 +-
->  arch/arm/boot/dts/armada-385.dtsi | 4 ++--
->  2 files changed, 3 insertions(+), 3 deletions(-)
+Hi Thomas,
 
-Applied to mvebu/dt-fixes.
+On 22/05/2014 14:47, Thomas Petazzoni wrote:
+> Jason, Andrew, Gregory, Sebastian,
+> 
+> Here is a small set of patches making fixes and improvements to the
+> coherency_ll.S code.
+> 
+> The first patch is really important and fixes big endian booting in
+> -next. The regression was introduced by the cpuidle changes, which are
+> currently in -next.
+> 
+> The other three patches are only improvements, mainly cosmetic, but I
+> believe they clarify a few things that took me a bit of time to
+> re-understand this morning.
+> 
+> The patches are based on top of mvebu/soc.
+> 
 
-thx,
+for the whole series:
 
-Jason.
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+
+Thanks,
+
+Gregory
+
+
+> Thanks,
+> 
+> Thomas
+> 
+> Thomas Petazzoni (4):
+>   ARM: mvebu: fix big endian booting after coherency code rework
+>   ARM: mvebu: fix indentation of assembly instructions in coherency_ll.S
+>   ARM: mvebu: improve comments in coherency_ll.S
+>   ARM: mvebu: returns ll_get_cpuid() to ll_get_coherency_cpumask()
+> 
+>  arch/arm/mach-mvebu/coherency_ll.S | 77 ++++++++++++++++++++++++--------------
+>  1 file changed, 49 insertions(+), 28 deletions(-)
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
