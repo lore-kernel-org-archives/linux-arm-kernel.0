@@ -1,48 +1,85 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 22 May 2014 11:32:28 -0500
-Subject: [PATCH v1 5/5] ARM: dts: qcom: Add APQ8084 serial port DT node
-In-Reply-To: <1400775885-10296-6-git-send-email-gdjakov@mm-sol.com>
-References: <1400775885-10296-1-git-send-email-gdjakov@mm-sol.com>
- <1400775885-10296-6-git-send-email-gdjakov@mm-sol.com>
-Message-ID: <693A0E52-34CF-4A63-A8D0-A83780F969F0@codeaurora.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 22 May 2014 18:33:40 +0200
+Subject: [PATCH] ARM AT91: clocksource tcb_clksrc.c: make tc_mode interrupt
+ safe
+In-Reply-To: <20140522133241.GO3582@piout.net>
+References: <1399543585-17016-1-git-send-email-david@protonic.nl>
+ <20140522133241.GO3582@piout.net>
+Message-ID: <537E26E4.9050602@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On May 22, 2014, at 11:24 AM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
-
-> Add the necessary DT node to probe the serial driver on
-> APQ8084 platforms.
+On 22/05/2014 15:32, Alexandre Belloni :
+> On 08/05/2014 at 12:06:25 +0200, David Jander wrote :
+>> tc_mode() can be called from interrupt context and thus must not call
+>> clk_*prepare*() functions.
+>>
+>> Signed-off-by: David Jander <david@protonic.nl>
 > 
-> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
-> ---
-> arch/arm/boot/dts/qcom-apq8084.dtsi |    7 +++++++
-> 1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
-> index 2dcd11e..c346549 100644
-> --- a/arch/arm/boot/dts/qcom-apq8084.dtsi
-> +++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
-> @@ -185,5 +185,12 @@
-> 			reg = <0xfc400000 0x4000>;
-> 		};
-> 
-> +		serial at f995e000 {
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Mark it disabled in the soc.dtsi and ?ok? in the board.
+Ok, indeed. We keep the clocks prepared for the system lifetime.
 
-> +			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-> +			reg = <0xf995e000 0x1000>;
-> +			interrupts = <0 114 0x0>;
-> +			clocks = <&gcc GCC_BLSP2_UART2_APPS_CLK>, <&gcc GCC_BLSP2_AHB_CLK>;
-> +			clock-names = "core", "iface";
-> +		};
-> 	};
-> };
-> -- 
-> 1.7.9.5
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Daniel, can you please take this fix (do you want me to re-send it)?
+
+Bye,
+
+>> ---
+>>  drivers/clocksource/tcb_clksrc.c | 8 ++++----
+>>  1 file changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+>> index 00fdd11..a8d7ea1 100644
+>> --- a/drivers/clocksource/tcb_clksrc.c
+>> +++ b/drivers/clocksource/tcb_clksrc.c
+>> @@ -100,7 +100,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+>>  			|| tcd->clkevt.mode == CLOCK_EVT_MODE_ONESHOT) {
+>>  		__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
+>>  		__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
+>> -		clk_disable_unprepare(tcd->clk);
+>> +		clk_disable(tcd->clk);
+>>  	}
+>>  
+>>  	switch (m) {
+>> @@ -109,7 +109,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+>>  	 * of oneshot, we get lower overhead and improved accuracy.
+>>  	 */
+>>  	case CLOCK_EVT_MODE_PERIODIC:
+>> -		clk_prepare_enable(tcd->clk);
+>> +		clk_enable(tcd->clk);
+>>  
+>>  		/* slow clock, count up to RC, then irq and restart */
+>>  		__raw_writel(timer_clock
+>> @@ -126,7 +126,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+>>  		break;
+>>  
+>>  	case CLOCK_EVT_MODE_ONESHOT:
+>> -		clk_prepare_enable(tcd->clk);
+>> +		clk_enable(tcd->clk);
+>>  
+>>  		/* slow clock, count up to RC, then irq and stop */
+>>  		__raw_writel(timer_clock | ATMEL_TC_CPCSTOP
+>> @@ -194,7 +194,7 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+>>  	ret = clk_prepare_enable(t2_clk);
+>>  	if (ret)
+>>  		return ret;
+>> -	clk_disable_unprepare(t2_clk);
+>> +	clk_disable(t2_clk);
+>>  
+>>  	clkevt.regs = tc->regs;
+>>  	clkevt.clk = t2_clk;
+>> -- 
+>> 1.9.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
+
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Nicolas Ferre
