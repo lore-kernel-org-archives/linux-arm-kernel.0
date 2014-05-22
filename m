@@ -1,52 +1,57 @@
-From: riku.voipio@iki.fi (Riku Voipio)
-Date: Thu, 22 May 2014 11:12:02 +0300
-Subject: [PATCH RESEND] mmc: dove: fix missing MACH_DOVE dependency
-In-Reply-To: <1400522571-10799-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1400522571-10799-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140522081202.GA21151@afflict.kos.to>
+From: emilgoode@gmail.com (Emil Goode)
+Date: Thu, 22 May 2014 12:32:40 +0200
+Subject: [PATCH 2/2] ARM: imx: convert camera init to use
+ platform_device_register_full()
+In-Reply-To: <20140519062722.GE16662@pengutronix.de>
+References: <1400446261-27085-1-git-send-email-emilgoode@gmail.com>
+ <1400446261-27085-3-git-send-email-emilgoode@gmail.com>
+ <20140519062722.GE16662@pengutronix.de>
+Message-ID: <20140522103240.GB4804@lianli>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 08:02:51PM +0200, Sebastian Hesselbarth wrote:
-> DT-enabled Dove moved over from ARCH_DOVE in mach-dove to MACH_DOVE in
-> mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
-> DT-only MACH_DOVE Kconfig. This slipped through the cracks and now is
-> a fix to allow to build Dove's SDHCI driver for mach-mvebu on v3.15-rc.
+Hello Uwe,
 
-Dove cubox has usually rootfs on mmc, so this patch is very much needed
-for using multiplatform kernel on dove cubox.
+On Mon, May 19, 2014 at 08:27:22AM +0200, Uwe Kleine-K?nig wrote:
+> Hello Emil,
+> 
+> thanks for your effort.
+> 
+> On Sun, May 18, 2014 at 10:51:00PM +0200, Emil Goode wrote:
+> > This converts the imx camera allocation and initialization functions
+> > to use platform_device_register_full() thus simplifying the code.
+> > 
+> > Signed-off-by: Emil Goode <emilgoode@gmail.com>
+> > ---
+> > Only build tested, unfortunately I currently don't have the hardware.
+> > 
+> >  arch/arm/mach-imx/devices/platform-ipu-core.c |   43 +++++++++----------------
+> >  arch/arm/mach-imx/mach-mx31_3ds.c             |    5 ++-
+> >  arch/arm/mach-imx/mach-mx31moboard.c          |    6 ++--
+> >  arch/arm/mach-imx/mach-mx35_3ds.c             |    5 ++-
+> >  arch/arm/mach-imx/mach-pcm037.c               |    5 ++-
+> >  5 files changed, 23 insertions(+), 41 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
+> > index 6bd7c3f..13ea542 100644
+> > --- a/arch/arm/mach-imx/devices/platform-ipu-core.c
+> > +++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
+> > @@ -69,42 +69,29 @@ struct platform_device *__init imx_alloc_mx3_camera(
+> IMHO you should better rename the function because now it doesn't only
+> allocate the device, but also registers it.
+> 
+> Also I doubt that it's OK to call dma_declare_coherent_memory after the
+> device is added. In this case maybe extend
+> platform_device_register_full? And also add a warning to
+> dma_declare_coherent_memory if it is called for an already added device?
+> (Added a few people to Cc: that might be able to comment this. I don't
+> even know if there is a reliable way to check if a device is already
+> added.)
 
-Tested-by: Riku Voipio <riku.voipio@iki.fi>
+According to the documentation dma_declare_coherent_memory() is only used
+in unlikely corner cases, so I concluded that it is probably better not to
+include it in platform_device_register_full().
 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> ---
-> Cc: Chris Ball <chris@printf.net>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: linux-mmc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/mmc/host/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index 8aaf8c1f3f63..37665553ef33 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -168,7 +168,7 @@ config MMC_SDHCI_ESDHC_IMX
->  
->  config MMC_SDHCI_DOVE
->  	tristate "SDHCI support on Marvell's Dove SoC"
-> -	depends on ARCH_DOVE
-> +	depends on ARCH_DOVE || MACH_DOVE
->  	depends on MMC_SDHCI_PLTFM
->  	select MMC_SDHCI_IO_ACCESSORS
->  	help
-> -- 
-> 1.9.1
-> 
-> 
+Best regards,
+
+Emil Goode
