@@ -1,41 +1,72 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Fri, 23 May 2014 09:16:58 -0400
-Subject: [GIT PULL] ARM: mach-bcm: dt updates for 3.16
-Message-ID: <20140523131658.GA24244@beef>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Fri, 23 May 2014 15:21:34 +0200
+Subject: RFC: representing sdio devices oob interrupt, clks, etc. in device
+ tree
+In-Reply-To: <537F3610.3050104@redhat.com>
+References: <537DC832.3020006@redhat.com>
+ <CAGb2v64VZac2KvAALrScecN89sRnBQoDrKxKMvkte+3G04NXeA@mail.gmail.com>
+ <537DE1AA.5050606@redhat.com> <537E31F7.1030505@gmail.com>
+ <537F1148.3010102@redhat.com> <20140523112239.GB12304@sirena.org.uk>
+ <537F3610.3050104@redhat.com>
+Message-ID: <537F4B5E.80306@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please consider pulling the following mach-bcm dt updates for 3.16.
+On 05/23/14 13:50, Hans de Goede wrote:
+> Hi,
+>
+> On 05/23/2014 01:22 PM, Mark Brown wrote:
+>> On Fri, May 23, 2014 at 11:13:44AM +0200, Hans de Goede wrote:
+>>
+>>> Thinking more about this, I would like to make one change to my
+>>> proposal, the mmc-core should only do power up of child-nodes if
+>>> they have a compatible of: "simple-sdio-powerup". This way
+>>> when we add something more complex, we can keep the simple powerup
+>>> code in the mmc core, keeping what we've already using this working
+>>> and the mmc core won't respond to the child nodes for more complex
+>>> devices, so it won't conflict with more complex power-up handling
+>>> handled by some other driver.
+>>
+>> Would it not be better to have this be something in the driver struct
+>> rather than in the device tree?  Putting a compatible in there would be
+>> encoding details of the Linux implementation in the DT which doesn't
+>> seem right especially since these are details we're thinking of changing
+>> later on.
+>
+> The compatible is not a Linux specific thing, it is a marking saying
+> that something needs to take care of enabling the clks (and whatever
+> else we will make part of the binding for this compatible), before
+> scanning the mmc bus.
+>
+>> Something like have the driver set flags saying if it wants
+>> to do complicated things.
+>
+> Chicken<->  egg, we won't know which driver to use before we've probed
+> the mmc bus, and we cannot probe the bus before enabling the clks, etc.
 
--Matt
+The approach I took with brcmfmac is that upon module init I search the 
+DT for "brcm,bcm43xx-fmac" compatible and get the clock and/or gpio 
+resource and enable them before registering the sdio driver. The 
+difficulty is probably when using the driver built-in as the clocks and 
+gpios may not be available yet and we can not rely on deferred probing 
+in module init stage.
 
-The following changes since commit a798c10faf62a505d24e5f6213fbaf904a39623f:
+Regards,
+Arend
 
-  Linux 3.15-rc2 (2014-04-20 11:08:50 -0700)
-
-are available in the git repository at:
-
-  git://github.com/broadcom/mach-bcm tags/for-3.16/bcm-dt
-
-for you to fetch changes up to de9bd52f21b5677a18a205c2a931c87254dabdeb:
-
-  ARM: dts: bcm590xx: add support for GPLDO and VBUS regulators (2014-05-23 08:07:01 -0400)
-
-----------------------------------------------------------------
-mach-bcm dt updates for 3.16:
-
-* Add PWM support to bcm281xx and bcm28155 ap board
-* Add gpldo and vbus regulators to bcm590xx
-
-----------------------------------------------------------------
-Matt Porter (1):
-      ARM: dts: bcm590xx: add support for GPLDO and VBUS regulators
-
-Tim Kryger (2):
-      ARM: dts: Declare the PWM for bcm11351 (bcm281xx)
-      ARM: dts: Enable the PWM for bcm28155 AP board
-
- arch/arm/boot/dts/bcm11351.dtsi   |  8 ++++++++
- arch/arm/boot/dts/bcm28155-ap.dts |  4 ++++
- arch/arm/boot/dts/bcm59056.dtsi   | 21 +++++++++++++++++++++
- 3 files changed, 33 insertions(+)
+>>> FWIW if we ever get truely complex cases I think modeling the
+>>> power-up hardware as a pmic platform device is not a bad idea,
+>>> we would then need to have a generic mmc-host pmic property, which
+>>> would be used both to do the initial powerup before scanning, as
+>>> well as for the sdio device driver to get a handle to the pmic,
+>>> for run time power-management (if desired).
+>>
+>> I don't know if this will ever apply to SDIO but with other buses the
+>> complicated bits come when the driver wants to take over some of the
+>> power management do things like turn some of the supplies or clocks on
+>> and off independently at runtime for low power modes.
+>
+> Hmm, good point in that case actually having these things in the
+> child node makes most sense, because then the driver can find them
+> their. Note that the mmc core enabling things does not mean that
+> the driver cannot later disable them if needed.
