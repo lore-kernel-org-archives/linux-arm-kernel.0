@@ -1,43 +1,56 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 23 May 2014 11:10:56 +0100
-Subject: [PATCH] mfd: db8500-prcmu: remove check for
- CONFIG_DBX500_PRCMU_DEBUG
-In-Reply-To: <1400792131.16407.33.camel@x220>
-References: <1400792131.16407.33.camel@x220>
-Message-ID: <20140523101056.GR19747@lee--X1>
+Date: Fri, 23 May 2014 11:12:36 +0100
+Subject: [linux-sunxi] Re: [PATCH v6 0/7] mfd: AXP20x: Add support for
+ AXP202 and AXP209
+In-Reply-To: <20140522195523.GB7708@core.coreip.homeip.net>
+References: <1400528868-5971-1-git-send-email-carlo@caione.org>
+ <20140520222307.GK12304@sirena.org.uk>
+ <CAOQ7t2aBc5tFYk2MkfL9QqvFf5fcebwKtO97F3S=WdJ2uFE_jg@mail.gmail.com>
+ <20140521091456.GB6679@lee--X1>
+ <CAOQ7t2bqeQ35WxXKCRgj1ijJic=2w8++9idip4-f_LnP6Ucb6A@mail.gmail.com>
+ <20140522195523.GB7708@core.coreip.homeip.net>
+Message-ID: <20140523101236.GS19747@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> A check for CONFIG_DBX500_PRCMU_DEBUG was added in v3.6. But there's no
-> Kconfig symbol DBX500_PRCMU_DEBUG. So remove this check.
+> > >> >> This set of patches introduces the core driver and support for two different
+> > >> >> subsystems:
+> > >> >>       - Regulators
+> > >> >
+> > >> >>  .../ABI/testing/sysfs-driver-input-axp-pek         |  11 +
+> > >> >>  Documentation/devicetree/bindings/mfd/axp20x.txt   |  93 +++++++
+> > >> >>  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+> > >> >>  arch/arm/configs/multi_v7_defconfig                |   3 +
+> > >> >>  arch/arm/configs/sunxi_defconfig                   |   4 +
+> > >> >>  drivers/input/misc/Kconfig                         |  11 +
+> > >> >>  drivers/input/misc/Makefile                        |   1 +
+> > >> >>  drivers/input/misc/axp20x-pek.c                    | 281 +++++++++++++++++++++
+> > >> >>  drivers/mfd/Kconfig                                |  12 +
+> > >> >>  drivers/mfd/Makefile                               |   1 +
+> > >> >>  drivers/mfd/axp20x.c                               | 258 +++++++++++++++++++
+> > >> >>  include/linux/mfd/axp20x.h                         | 180 +++++++++++++
+> > >> >>  12 files changed, 856 insertions(+)
+> > >> >
+> > >> > The regulator changes don't appear to be showing up in the diffstat or
+> > >> > obviously in the series?
+> > >>
+> > >> Right. Cut-and-paste error.
+> > >> You have already applied the regulator patches so I didn't include
+> > >> them here (in theory I posted this series to be picked up by Lee).
+> > >
+> > > That's fine.  Just tell me which patches need to stay together and
+> > > which are able to be applied through their respective subsystem trees
+> > > separately.  Then, once I have all the Acks I can apply no problem.
+> > 
+> > Hi Lee,
+> > I'd say #1 for the MFD tree, #4 for the input subsystem, #2 #3 and #5
+> > are documentations, #6 and #7 defconfigs add-on.
 > 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
-> Untested. Note that db8500_prcmu_debug_dump() is nowhere to be found in
-> the tree.
-> 
-> This check has been in the tree for less than two years. Am I being
-> impatient here?
-> 
->  drivers/mfd/db8500-prcmu.c | 3 ---
->  1 file changed, 3 deletions(-)
+> I am fine with the input piece going through MFD tree, no need to split
+> it from the rest.
 
-Applied, thanks.
-
-> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-> index 7694e0700d34..c248bde367ab 100644
-> --- a/drivers/mfd/db8500-prcmu.c
-> +++ b/drivers/mfd/db8500-prcmu.c
-> @@ -2303,9 +2303,6 @@ int prcmu_ac_wake_req(void)
->  
->  	if (!wait_for_completion_timeout(&mb0_transfer.ac_wake_work,
->  			msecs_to_jiffies(5000))) {
-> -#if defined(CONFIG_DBX500_PRCMU_DEBUG)
-> -		db8500_prcmu_debug_dump(__func__, true, true);
-> -#endif
->  		pr_crit("prcmu: %s timed out (5 s) waiting for a reply.\n",
->  			__func__);
->  		ret = -EFAULT;
+Do you want a pull-request i.e. will this cause conflicts when Linus
+merges it with your tree, or is it okay for me to just apply it?
 
 -- 
 Lee Jones
