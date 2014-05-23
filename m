@@ -1,32 +1,48 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Fri, 23 May 2014 21:41:28 +0300
-Subject: [Patch v7 2/7] clock: keystone-pllctrl: add bindings for keystone
- pll controller
-In-Reply-To: <20140523183218.23136.51518@quantum>
-References: <1400859812-5761-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1400859812-5761-3-git-send-email-ivan.khoronzhuk@ti.com>
- <20140523183218.23136.51518@quantum>
-Message-ID: <537F9658.1040507@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 23 May 2014 11:52:24 -0700
+Subject: [Patch v2 3/4] soc: qcom: Add GSBI driver
+In-Reply-To: <1398357082-5102-4-git-send-email-agross@codeaurora.org>
+References: <1398357082-5102-1-git-send-email-agross@codeaurora.org>
+ <1398357082-5102-4-git-send-email-agross@codeaurora.org>
+Message-ID: <537F98E8.6050203@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/24/14 09:31, Andy Gross wrote:
+> +
+> +static const struct of_device_id gsbi_dt_match[] = {
+> +	{ .compatible = "qcom,gsbi-v1.0.0", },
+> +};
 
-On 05/23/2014 09:32 PM, Mike Turquette wrote:
-> Quoting Ivan Khoronzhuk (2014-05-23 08:43:27)
->> The main pll controller used to drive theC66x CorePacs, the switch fabric,
->> and a majority of the peripheral clocks (all but the ARM CorePacs, DDR3 and
->> the NETCP modules) requires a PLL Controller to manage the various clock
->> divisions, gating, and synchronization.
->>
->> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> Acked-by: Mike Turquette <mturquette@linaro.org>
->
-> Regards,
-> Mike
+Eek. This isn't NULL terminated.
 
-Thanks!
+
+-----8<---
+
+From: Stephen Boyd <sboyd@codeaurora.org>
+Subject: [PATCH] soc: qcom: Terminate gsbi of match table
+
+Failure to terminate this match table can lead to boot failures
+depending on where the compiler places the match table.
+
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/soc/qcom/qcom_gsbi.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/soc/qcom/qcom_gsbi.c b/drivers/soc/qcom/qcom_gsbi.c
+index 061dd0632dbd..ab7b441c9980 100644
+--- a/drivers/soc/qcom/qcom_gsbi.c
++++ b/drivers/soc/qcom/qcom_gsbi.c
+@@ -64,6 +64,7 @@ static int gsbi_probe(struct platform_device *pdev)
+ 
+ static const struct of_device_id gsbi_dt_match[] = {
+ 	{ .compatible = "qcom,gsbi-v1.0.0", },
++	{ }
+ };
+ 
+ MODULE_DEVICE_TABLE(of, gsbi_dt_match);
 
 -- 
-Regards,
-Ivan Khoronzhuk
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
