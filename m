@@ -1,364 +1,109 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:12 +0200
-Subject: [PATCH 32/71] clocksource: sh_tmu: Add support for multiple channels
- per device
+Date: Fri, 23 May 2014 12:31:23 +0200
+Subject: [PATCH 43/71] clocksource: sh_mtu2: Add index to struct
+ sh_mtu2_channel
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-32-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-43-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-TMU hardware devices can support multiple channels, with global
-registers and per-channel registers. The sh_tmu driver currently models
-the hardware with one Linux device per channel. This model makes it
-difficult to handle global registers in a clean way.
-
-Add support for a new model that uses one Linux device per timer with
-multiple channels per device. This requires changes to platform data,
-add new channel configuration fields.
-
-Support for the legacy model is kept and will be removed after all
-platforms switch to the new model.
+Use the index as the timer start/stop bit and when printing messages to
+identify the channel.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Tested-by: Wolfram Sang <wsa@sang-engineering.com>
 ---
- drivers/clocksource/sh_tmu.c |  213 ++++++++++++++++++++++++++++++------------
- 1 file changed, 152 insertions(+), 61 deletions(-)
+ drivers/clocksource/sh_mtu2.c |   22 +++++++++++++---------
+ 1 file changed, 13 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
-index fec9bed..0306d31 100644
---- a/drivers/clocksource/sh_tmu.c
-+++ b/drivers/clocksource/sh_tmu.c
-@@ -35,6 +35,12 @@
- #include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
+diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
+index 97714ce..61827c6 100644
+--- a/drivers/clocksource/sh_mtu2.c
++++ b/drivers/clocksource/sh_mtu2.c
+@@ -38,6 +38,7 @@ struct sh_mtu2_device;
  
-+enum sh_tmu_model {
-+	SH_TMU_LEGACY,
-+	SH_TMU,
-+	SH_TMU_SH3,
-+};
-+
- struct sh_tmu_device;
+ struct sh_mtu2_channel {
+ 	struct sh_mtu2_device *mtu;
++	unsigned int index;
  
- struct sh_tmu_channel {
-@@ -58,8 +64,13 @@ struct sh_tmu_device {
- 	void __iomem *mapbase;
- 	struct clk *clk;
+ 	void __iomem *base;
+ 	int irq;
+@@ -110,7 +111,6 @@ static inline void sh_mtu2_write(struct sh_mtu2_channel *ch, int reg_nr,
  
-+	enum sh_tmu_model model;
-+
- 	struct sh_tmu_channel *channels;
- 	unsigned int num_channels;
-+
-+	bool has_clockevent;
-+	bool has_clocksource;
- };
- 
- static DEFINE_RAW_SPINLOCK(sh_tmu_lock);
-@@ -82,8 +93,16 @@ static inline unsigned long sh_tmu_read(struct sh_tmu_channel *ch, int reg_nr)
+ static void sh_mtu2_start_stop_ch(struct sh_mtu2_channel *ch, int start)
  {
- 	unsigned long offs;
+-	struct sh_timer_config *cfg = ch->mtu->pdev->dev.platform_data;
+ 	unsigned long flags, value;
  
--	if (reg_nr == TSTR)
--		return ioread8(ch->tmu->mapbase);
-+	if (reg_nr == TSTR) {
-+		switch (ch->tmu->model) {
-+		case SH_TMU_LEGACY:
-+			return ioread8(ch->tmu->mapbase);
-+		case SH_TMU_SH3:
-+			return ioread8(ch->tmu->mapbase + 2);
-+		case SH_TMU:
-+			return ioread8(ch->tmu->mapbase + 4);
-+		}
-+	}
+ 	/* start stop register shared by multiple timer channels */
+@@ -118,9 +118,9 @@ static void sh_mtu2_start_stop_ch(struct sh_mtu2_channel *ch, int start)
+ 	value = sh_mtu2_read(ch, TSTR);
  
- 	offs = reg_nr << 2;
- 
-@@ -99,8 +118,14 @@ static inline void sh_tmu_write(struct sh_tmu_channel *ch, int reg_nr,
- 	unsigned long offs;
- 
- 	if (reg_nr == TSTR) {
--		iowrite8(value, ch->tmu->mapbase);
--		return;
-+		switch (ch->tmu->model) {
-+		case SH_TMU_LEGACY:
-+			return iowrite8(value, ch->tmu->mapbase);
-+		case SH_TMU_SH3:
-+			return iowrite8(value, ch->tmu->mapbase + 2);
-+		case SH_TMU:
-+			return iowrite8(value, ch->tmu->mapbase + 4);
-+		}
- 	}
- 
- 	offs = reg_nr << 2;
-@@ -435,31 +460,49 @@ static void sh_tmu_register_clockevent(struct sh_tmu_channel *ch,
- static int sh_tmu_register(struct sh_tmu_channel *ch, const char *name,
- 			   bool clockevent, bool clocksource)
- {
--	if (clockevent)
-+	if (clockevent) {
-+		ch->tmu->has_clockevent = true;
- 		sh_tmu_register_clockevent(ch, name);
--	else if (clocksource)
-+	} else if (clocksource) {
-+		ch->tmu->has_clocksource = true;
- 		sh_tmu_register_clocksource(ch, name);
-+	}
- 
- 	return 0;
- }
- 
--static int sh_tmu_channel_setup(struct sh_tmu_channel *ch,
-+static int sh_tmu_channel_setup(struct sh_tmu_channel *ch, unsigned int index,
-+				bool clockevent, bool clocksource,
- 				struct sh_tmu_device *tmu)
- {
--	struct sh_timer_config *cfg = tmu->pdev->dev.platform_data;
-+	/* Skip unused channels. */
-+	if (!clockevent && !clocksource)
-+		return 0;
- 
- 	ch->tmu = tmu;
- 
--	/*
--	 * The SH3 variant (SH770x, SH7705, SH7710 and SH7720) maps channel
--	 * registers blocks at base + 2 + 12 * index, while all other variants
--	 * map them at base + 4 + 12 * index. We can compute the index by just
--	 * dividing by 12, the 2 bytes or 4 bytes offset being hidden by the
--	 * integer division.
--	 */
--	ch->index = cfg->channel_offset / 12;
-+	if (tmu->model == SH_TMU_LEGACY) {
-+		struct sh_timer_config *cfg = tmu->pdev->dev.platform_data;
-+
-+		/*
-+		 * The SH3 variant (SH770x, SH7705, SH7710 and SH7720) maps
-+		 * channel registers blocks at base + 2 + 12 * index, while all
-+		 * other variants map them at base + 4 + 12 * index. We can
-+		 * compute the index by just dividing by 12, the 2 bytes or 4
-+		 * bytes offset being hidden by the integer division.
-+		 */
-+		ch->index = cfg->channel_offset / 12;
-+		ch->base = tmu->mapbase + cfg->channel_offset;
-+	} else {
-+		ch->index = index;
-+
-+		if (tmu->model == SH_TMU_SH3)
-+			ch->base = tmu->mapbase + 4 + ch->index * 12;
-+		else
-+			ch->base = tmu->mapbase + 8 + ch->index * 12;
-+	}
- 
--	ch->irq = platform_get_irq(tmu->pdev, 0);
-+	ch->irq = platform_get_irq(tmu->pdev, ch->index);
- 	if (ch->irq < 0) {
- 		dev_err(&tmu->pdev->dev, "ch%u: failed to get irq\n",
- 			ch->index);
-@@ -470,88 +513,127 @@ static int sh_tmu_channel_setup(struct sh_tmu_channel *ch,
- 	ch->enable_count = 0;
- 
- 	return sh_tmu_register(ch, dev_name(&tmu->pdev->dev),
--			       cfg->clockevent_rating != 0,
--			       cfg->clocksource_rating != 0);
-+			       clockevent, clocksource);
- }
- 
--static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
-+static int sh_tmu_map_memory(struct sh_tmu_device *tmu)
- {
--	struct sh_timer_config *cfg = pdev->dev.platform_data;
- 	struct resource *res;
--	void __iomem *base;
--	int ret;
--	ret = -ENXIO;
--
--	tmu->pdev = pdev;
--
--	if (!cfg) {
--		dev_err(&tmu->pdev->dev, "missing platform data\n");
--		goto err0;
--	}
--
--	platform_set_drvdata(pdev, tmu);
- 
- 	res = platform_get_resource(tmu->pdev, IORESOURCE_MEM, 0);
- 	if (!res) {
- 		dev_err(&tmu->pdev->dev, "failed to get I/O memory\n");
--		goto err0;
-+		return -ENXIO;
- 	}
- 
-+	tmu->mapbase = ioremap_nocache(res->start, resource_size(res));
-+	if (tmu->mapbase == NULL)
-+		return -ENXIO;
-+
- 	/*
--	 * Map memory, let base point to our channel and mapbase to the
--	 * start/stop shared register.
-+	 * In legacy platform device configuration (with one device per channel)
-+	 * the resource points to the channel base address.
- 	 */
--	base = ioremap_nocache(res->start, resource_size(res));
--	if (base == NULL) {
--		dev_err(&tmu->pdev->dev, "failed to remap I/O memory\n");
--		goto err0;
-+	if (tmu->model == SH_TMU_LEGACY) {
-+		struct sh_timer_config *cfg = tmu->pdev->dev.platform_data;
-+		tmu->mapbase -= cfg->channel_offset;
- 	}
- 
--	tmu->mapbase = base - cfg->channel_offset;
-+	return 0;
-+}
- 
--	/* get hold of clock */
-+static void sh_tmu_unmap_memory(struct sh_tmu_device *tmu)
-+{
-+	if (tmu->model == SH_TMU_LEGACY) {
-+		struct sh_timer_config *cfg = tmu->pdev->dev.platform_data;
-+		tmu->mapbase += cfg->channel_offset;
-+	}
-+
-+	iounmap(tmu->mapbase);
-+}
-+
-+static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
-+{
-+	struct sh_timer_config *cfg = pdev->dev.platform_data;
-+	const struct platform_device_id *id = pdev->id_entry;
-+	unsigned int i;
-+	int ret;
-+
-+	if (!cfg) {
-+		dev_err(&tmu->pdev->dev, "missing platform data\n");
-+		return -ENXIO;
-+	}
-+
-+	tmu->pdev = pdev;
-+	tmu->model = id->driver_data;
-+
-+	/* Get hold of clock. */
- 	tmu->clk = clk_get(&tmu->pdev->dev, "tmu_fck");
- 	if (IS_ERR(tmu->clk)) {
- 		dev_err(&tmu->pdev->dev, "cannot get clock\n");
--		ret = PTR_ERR(tmu->clk);
--		goto err1;
-+		return PTR_ERR(tmu->clk);
- 	}
- 
- 	ret = clk_prepare(tmu->clk);
- 	if (ret < 0)
--		goto err2;
-+		goto err_clk_put;
-+
-+	/* Map the memory resource. */
-+	ret = sh_tmu_map_memory(tmu);
-+	if (ret < 0) {
-+		dev_err(&tmu->pdev->dev, "failed to remap I/O memory\n");
-+		goto err_clk_unprepare;
-+	}
- 
--	tmu->channels = kzalloc(sizeof(*tmu->channels), GFP_KERNEL);
-+	/* Allocate and setup the channels. */
-+	if (tmu->model == SH_TMU_LEGACY)
-+		tmu->num_channels = 1;
-+	else
-+		tmu->num_channels = hweight8(cfg->channels_mask);
-+
-+	tmu->channels = kzalloc(sizeof(*tmu->channels) * tmu->num_channels,
-+				GFP_KERNEL);
- 	if (tmu->channels == NULL) {
- 		ret = -ENOMEM;
--		goto err3;
-+		goto err_unmap;
- 	}
- 
--	tmu->num_channels = 1;
--
--	tmu->channels[0].base = base;
-+	if (tmu->model == SH_TMU_LEGACY) {
-+		ret = sh_tmu_channel_setup(&tmu->channels[0], 0,
-+					   cfg->clockevent_rating != 0,
-+					   cfg->clocksource_rating != 0, tmu);
-+		if (ret < 0)
-+			goto err_unmap;
-+	} else {
-+		/*
-+		 * Use the first channel as a clock event device and the second
-+		 * channel as a clock source.
-+		 */
-+		for (i = 0; i < tmu->num_channels; ++i) {
-+			ret = sh_tmu_channel_setup(&tmu->channels[i], i,
-+						   i == 0, i == 1, tmu);
-+			if (ret < 0)
-+				goto err_unmap;
-+		}
-+	}
- 
--	ret = sh_tmu_channel_setup(&tmu->channels[0], tmu);
--	if (ret < 0)
--		goto err3;
-+	platform_set_drvdata(pdev, tmu);
- 
- 	return 0;
- 
-- err3:
-+err_unmap:
- 	kfree(tmu->channels);
-+	sh_tmu_unmap_memory(tmu);
-+err_clk_unprepare:
- 	clk_unprepare(tmu->clk);
-- err2:
-+err_clk_put:
- 	clk_put(tmu->clk);
-- err1:
--	iounmap(base);
-- err0:
- 	return ret;
- }
- 
- static int sh_tmu_probe(struct platform_device *pdev)
- {
- 	struct sh_tmu_device *tmu = platform_get_drvdata(pdev);
--	struct sh_timer_config *cfg = pdev->dev.platform_data;
- 	int ret;
- 
- 	if (!is_early_platform_device(pdev)) {
-@@ -580,7 +662,7 @@ static int sh_tmu_probe(struct platform_device *pdev)
- 		return 0;
- 
-  out:
--	if (cfg->clockevent_rating || cfg->clocksource_rating)
-+	if (tmu->has_clockevent || tmu->has_clocksource)
- 		pm_runtime_irq_safe(&pdev->dev);
+ 	if (start)
+-		value |= 1 << cfg->timer_bit;
++		value |= 1 << ch->index;
  	else
- 		pm_runtime_idle(&pdev->dev);
-@@ -593,12 +675,21 @@ static int sh_tmu_remove(struct platform_device *pdev)
- 	return -EBUSY; /* cannot unregister clockevent and clocksource */
+-		value &= ~(1 << cfg->timer_bit);
++		value &= ~(1 << ch->index);
+ 
+ 	sh_mtu2_write(ch, TSTR, value);
+ 	raw_spin_unlock_irqrestore(&sh_mtu2_lock, flags);
+@@ -138,7 +138,8 @@ static int sh_mtu2_enable(struct sh_mtu2_channel *ch)
+ 	/* enable clock */
+ 	ret = clk_enable(ch->mtu->clk);
+ 	if (ret) {
+-		dev_err(&ch->mtu->pdev->dev, "cannot enable clock\n");
++		dev_err(&ch->mtu->pdev->dev, "ch%u: cannot enable clock\n",
++			ch->index);
+ 		return ret;
+ 	}
+ 
+@@ -211,7 +212,7 @@ static void sh_mtu2_clock_event_mode(enum clock_event_mode mode,
+ 	switch (mode) {
+ 	case CLOCK_EVT_MODE_PERIODIC:
+ 		dev_info(&ch->mtu->pdev->dev,
+-			 "used for periodic clock events\n");
++			 "ch%u: used for periodic clock events\n", ch->index);
+ 		sh_mtu2_enable(ch);
+ 		break;
+ 	case CLOCK_EVT_MODE_UNUSED:
+@@ -250,15 +251,16 @@ static void sh_mtu2_register_clockevent(struct sh_mtu2_channel *ch,
+ 	ced->suspend = sh_mtu2_clock_event_suspend;
+ 	ced->resume = sh_mtu2_clock_event_resume;
+ 
+-	dev_info(&ch->mtu->pdev->dev, "used for clock events\n");
++	dev_info(&ch->mtu->pdev->dev, "ch%u: used for clock events\n",
++		 ch->index);
+ 	clockevents_register_device(ced);
+ 
+ 	ret = request_irq(ch->irq, sh_mtu2_interrupt,
+ 			  IRQF_TIMER | IRQF_IRQPOLL | IRQF_NOBALANCING,
+ 			  dev_name(&ch->mtu->pdev->dev), ch);
+ 	if (ret) {
+-		dev_err(&ch->mtu->pdev->dev, "failed to request irq %d\n",
+-			ch->irq);
++		dev_err(&ch->mtu->pdev->dev, "ch%u: failed to request irq %d\n",
++			ch->index, ch->irq);
+ 		return;
+ 	}
  }
+@@ -279,10 +281,12 @@ static int sh_mtu2_setup_channel(struct sh_mtu2_channel *ch,
  
-+static const struct platform_device_id sh_tmu_id_table[] = {
-+	{ "sh_tmu", SH_TMU_LEGACY },
-+	{ "sh-tmu", SH_TMU },
-+	{ "sh-tmu-sh3", SH_TMU_SH3 },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(platform, sh_tmu_id_table);
-+
- static struct platform_driver sh_tmu_device_driver = {
- 	.probe		= sh_tmu_probe,
- 	.remove		= sh_tmu_remove,
- 	.driver		= {
- 		.name	= "sh_tmu",
--	}
-+	},
-+	.id_table	= sh_tmu_id_table,
- };
+ 	memset(ch, 0, sizeof(*ch));
+ 	ch->mtu = mtu;
++	ch->index = cfg->timer_bit;
  
- static int __init sh_tmu_init(void)
+ 	ch->irq = platform_get_irq(mtu->pdev, 0);
+ 	if (ch->irq < 0) {
+-		dev_err(&mtu->pdev->dev, "failed to get irq\n");
++		dev_err(&mtu->pdev->dev, "ch%u: failed to get irq\n",
++			ch->index);
+ 		return ch->irq;
+ 	}
+ 
 -- 
 1.7.9.5
