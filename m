@@ -1,49 +1,76 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 23 May 2014 12:22:39 +0100
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
- device tree
-In-Reply-To: <537F1148.3010102@redhat.com>
-References: <537DC832.3020006@redhat.com>
- <CAGb2v64VZac2KvAALrScecN89sRnBQoDrKxKMvkte+3G04NXeA@mail.gmail.com>
- <537DE1AA.5050606@redhat.com> <537E31F7.1030505@gmail.com>
- <537F1148.3010102@redhat.com>
-Message-ID: <20140523112239.GB12304@sirena.org.uk>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 23 May 2014 12:26:02 +0100
+Subject: [PATCH] arm: use cpu_online_mask when using forced
+ irq_set_affinity
+In-Reply-To: <1399653640-21559-1-git-send-email-sudeep.holla@arm.com>
+References: <1399653640-21559-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <537F304A.1040909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 11:13:44AM +0200, Hans de Goede wrote:
+Hi Russell,
 
-> Thinking more about this, I would like to make one change to my
-> proposal, the mmc-core should only do power up of child-nodes if
-> they have a compatible of: "simple-sdio-powerup". This way
-> when we add something more complex, we can keep the simple powerup
-> code in the mmc core, keeping what we've already using this working
-> and the mmc core won't respond to the child nodes for more complex
-> devices, so it won't conflict with more complex power-up handling
-> handled by some other driver.
+On 09/05/14 17:40, Sudeep Holla wrote:
+> From: Sudeep Holla <sudeep.holla@arm.com>
+>
+> Commit 01f8fa4f01d8("genirq: Allow forcing cpu affinity of interrupts")
+> enabled the forced irq_set_affinity which previously refused to route an
+> interrupt to an offline cpu.
+>
+> Commit ffde1de64012("irqchip: Gic: Support forced affinity setting")
+> implements this force logic and disables the cpu online check for GIC
+> interrupt controller.
+>
+> When __cpu_disable calls migrate_irqs, it disables the current cpu in
+> cpu_online_mask and uses forced irq_set_affinity to migrate the IRQs
+> away from the cpu but passes affinity mask with the cpu being offlined
+> also included in it.
+>
+> When calling irq_set_affinity with force == true in a cpu hotplug path,
+> the caller must ensure that the cpu being offlined is not present in the
+> affinity mask or it may be selected as the target CPU, leading to the
+> interrupt not being migrated.
+>
+> This patch uses cpu_online_mask when using forced irq_set_affinity so
+> that the IRQs are properly migrated away.
+>
+> Tested on TC2 hotpluging CPU0 in and out. Without this patch the system
+> locks up as the IRQs are not migrated away from CPU0.
+>
 
-Would it not be better to have this be something in the driver struct
-rather than in the device tree?  Putting a compatible in there would be
-encoding details of the Linux implementation in the DT which doesn't
-seem right especially since these are details we're thinking of changing
-later on.  Something like have the driver set flags saying if it wants
-to do complicated things.
+If you are fine with this change, can I put this in the patch tracker?
 
-> FWIW if we ever get truely complex cases I think modeling the
-> power-up hardware as a pmic platform device is not a bad idea,
-> we would then need to have a generic mmc-host pmic property, which
-> would be used both to do the initial powerup before scanning, as
-> well as for the sdio device driver to get a handle to the pmic,
-> for run time power-management (if desired).
+Regards,
+Sudeep
 
-I don't know if this will ever apply to SDIO but with other buses the
-complicated bits come when the driver wants to take over some of the
-power management do things like turn some of the supplies or clocks on
-and off independently at runtime for low power modes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140523/7f8f7960/attachment.sig>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>   arch/arm/kernel/irq.c | 10 +++++++---
+>   1 file changed, 7 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+> index 9723d17..1f216a5 100644
+> --- a/arch/arm/kernel/irq.c
+> +++ b/arch/arm/kernel/irq.c
+> @@ -155,11 +155,15 @@ static bool migrate_one_irq(struct irq_desc *desc)
+>   	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
+>   		return false;
+>
+> -	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
+> -		affinity = cpu_online_mask;
+> +	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids)
+>   		ret = true;
+> -	}
+>
+> +	/*
+> +	 * when using forced irq_set_affinity we must ensure that the cpu
+> +	 * being offlined is not present in the affinity mask, it may be
+> +	 * selected as the target CPU otherwise
+> +	 */
+> +	affinity = cpu_online_mask;
+>   	c = irq_data_get_irq_chip(d);
+>   	if (!c->irq_set_affinity)
+>   		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+>
