@@ -1,440 +1,118 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 23 May 2014 17:22:13 +0200
-Subject: [PATCH v2] cpufreq: exynos: Fix driver compilation with
- ARCH_MULTIPLATFORM
-In-Reply-To: <1400670752-673-1-git-send-email-t.figa@samsung.com>
-References: <1400670752-673-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1400858533-4327-1-git-send-email-t.figa@samsung.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 23 May 2014 17:32:18 +0200
+Subject: [PATCH V5 00/20] ARM: exynos: cpuidle: Move the driver to
+ drivers/cpuidle
+In-Reply-To: <537E438C.8060600@samsung.com>
+References: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
+ <534BA3CF.6030701@linaro.org> <535943B2.8030308@samsung.com>
+ <0b4201cf613f$80c91750$825b45f0$@samsung.com> <537E438C.8060600@samsung.com>
+Message-ID: <537F6A02.2040606@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently Exynos cpufreq drivers rely on globally mapped clock
-controller registers to configure frequency of CPU cores. This is
-obviously wrong and will be removed in near future, but to enable
-support for multi-platform builds without introducing a regression it
-needs to be worked around.
+On 05/22/2014 08:35 PM, Kukjin Kim wrote:
+> On 04/26/14 20:05, Kukjin Kim wrote:
+>> Tomasz Figa wrote:
+>>>
+>>> On 14.04.2014 11:01, Daniel Lezcano wrote:
+>>>>
+>>>> Hi Kukjin,
+>>>>
+>>>> I believe I addressed all the comments. Is it possible to take this
+>>>> patchset for next ?
+>>>
+>> Sure ;-)
+>>
+>>> +1.
+>>>
+>>> Also when applying you might add
+>>>
+>>> Reviewed-by: Tomasz Figa<t.figa@samsung.com>
+>>>
+>>> to any patches that don't have it yet.
+>>>
+>> Tomasz, thanks for your review.
+>>
+>> I will take this series, "moving exynos-cpuidle into drivers/cpuidle"
+>> into samsung tree if Rafael is OK on that.
+>>
+> Daniel,
+>
+> Can you please check/test the functionality your series with using my
+> for-next because there were merge conflicts with mcpm-exynos stuff...?
 
-This patch hacks the code to look for clock controller node in device
-tree and map its registers using of_iomap(), instead of relying on
-global mapping, so dependencies on platform headers are removed and the
-driver can compile again with multiplatform support.
+Hi Kukjin,
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
----
- drivers/cpufreq/Kconfig.arm          |  6 ++---
- drivers/cpufreq/exynos-cpufreq.c     |  2 --
- drivers/cpufreq/exynos-cpufreq.h     | 30 ++++++++++++-------------
- drivers/cpufreq/exynos4210-cpufreq.c | 39 +++++++++++++++++++++++++++-----
- drivers/cpufreq/exynos4x12-cpufreq.c | 40 ++++++++++++++++++++++++++++-----
- drivers/cpufreq/exynos5250-cpufreq.c | 43 +++++++++++++++++++++++++++++-------
- 6 files changed, 119 insertions(+), 41 deletions(-)
+I tested the latest tree. Unfortunately it panics when unplugging cpu1:
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 6a7dd3e..36d20d0 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -31,7 +31,7 @@ config ARM_EXYNOS_CPUFREQ
- 
- config ARM_EXYNOS4210_CPUFREQ
- 	bool "SAMSUNG EXYNOS4210"
--	depends on CPU_EXYNOS4210 && !ARCH_MULTIPLATFORM
-+	depends on CPU_EXYNOS4210
- 	default y
- 	select ARM_EXYNOS_CPUFREQ
- 	help
-@@ -42,7 +42,7 @@ config ARM_EXYNOS4210_CPUFREQ
- 
- config ARM_EXYNOS4X12_CPUFREQ
- 	bool "SAMSUNG EXYNOS4x12"
--	depends on (SOC_EXYNOS4212 || SOC_EXYNOS4412) && !ARCH_MULTIPLATFORM
-+	depends on SOC_EXYNOS4212 || SOC_EXYNOS4412
- 	default y
- 	select ARM_EXYNOS_CPUFREQ
- 	help
-@@ -53,7 +53,7 @@ config ARM_EXYNOS4X12_CPUFREQ
- 
- config ARM_EXYNOS5250_CPUFREQ
- 	bool "SAMSUNG EXYNOS5250"
--	depends on SOC_EXYNOS5250 && !ARCH_MULTIPLATFORM
-+	depends on SOC_EXYNOS5250
- 	default y
- 	select ARM_EXYNOS_CPUFREQ
- 	help
-diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
-index 7c2a096..1e0ec57 100644
---- a/drivers/cpufreq/exynos-cpufreq.c
-+++ b/drivers/cpufreq/exynos-cpufreq.c
-@@ -19,8 +19,6 @@
- #include <linux/platform_device.h>
- #include <linux/of.h>
- 
--#include <plat/cpu.h>
--
- #include "exynos-cpufreq.h"
- 
- static struct exynos_dvfs_info *exynos_info;
-diff --git a/drivers/cpufreq/exynos-cpufreq.h b/drivers/cpufreq/exynos-cpufreq.h
-index a28ee9d..8dfebac 100644
---- a/drivers/cpufreq/exynos-cpufreq.h
-+++ b/drivers/cpufreq/exynos-cpufreq.h
-@@ -50,6 +50,7 @@ struct exynos_dvfs_info {
- 	struct cpufreq_frequency_table	*freq_table;
- 	void (*set_freq)(unsigned int, unsigned int);
- 	bool (*need_apll_change)(unsigned int, unsigned int);
-+	void __iomem	*cmu_regs;
- };
- 
- #ifdef CONFIG_ARM_EXYNOS4210_CPUFREQ
-@@ -77,24 +78,21 @@ static inline int exynos5250_cpufreq_init(struct exynos_dvfs_info *info)
- }
- #endif
- 
--#include <plat/cpu.h>
--#include <mach/map.h>
-+#define EXYNOS4_CLKSRC_CPU			0x14200
-+#define EXYNOS4_CLKMUX_STATCPU			0x14400
- 
--#define EXYNOS4_CLKSRC_CPU			(S5P_VA_CMU + 0x14200)
--#define EXYNOS4_CLKMUX_STATCPU			(S5P_VA_CMU + 0x14400)
--
--#define EXYNOS4_CLKDIV_CPU			(S5P_VA_CMU + 0x14500)
--#define EXYNOS4_CLKDIV_CPU1			(S5P_VA_CMU + 0x14504)
--#define EXYNOS4_CLKDIV_STATCPU			(S5P_VA_CMU + 0x14600)
--#define EXYNOS4_CLKDIV_STATCPU1			(S5P_VA_CMU + 0x14604)
-+#define EXYNOS4_CLKDIV_CPU			0x14500
-+#define EXYNOS4_CLKDIV_CPU1			0x14504
-+#define EXYNOS4_CLKDIV_STATCPU			0x14600
-+#define EXYNOS4_CLKDIV_STATCPU1			0x14604
- 
- #define EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT	(16)
- #define EXYNOS4_CLKMUX_STATCPU_MUXCORE_MASK	(0x7 << EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT)
- 
--#define EXYNOS5_APLL_LOCK			(S5P_VA_CMU + 0x00000)
--#define EXYNOS5_APLL_CON0			(S5P_VA_CMU + 0x00100)
--#define EXYNOS5_CLKMUX_STATCPU			(S5P_VA_CMU + 0x00400)
--#define EXYNOS5_CLKDIV_CPU0			(S5P_VA_CMU + 0x00500)
--#define EXYNOS5_CLKDIV_CPU1			(S5P_VA_CMU + 0x00504)
--#define EXYNOS5_CLKDIV_STATCPU0			(S5P_VA_CMU + 0x00600)
--#define EXYNOS5_CLKDIV_STATCPU1			(S5P_VA_CMU + 0x00604)
-+#define EXYNOS5_APLL_LOCK			0x00000
-+#define EXYNOS5_APLL_CON0			0x00100
-+#define EXYNOS5_CLKMUX_STATCPU			0x00400
-+#define EXYNOS5_CLKDIV_CPU0			0x00500
-+#define EXYNOS5_CLKDIV_CPU1			0x00504
-+#define EXYNOS5_CLKDIV_STATCPU0			0x00600
-+#define EXYNOS5_CLKDIV_STATCPU1			0x00604
-diff --git a/drivers/cpufreq/exynos4210-cpufreq.c b/drivers/cpufreq/exynos4210-cpufreq.c
-index 6384e5b..61a5431 100644
---- a/drivers/cpufreq/exynos4210-cpufreq.c
-+++ b/drivers/cpufreq/exynos4210-cpufreq.c
-@@ -16,6 +16,8 @@
- #include <linux/io.h>
- #include <linux/slab.h>
- #include <linux/cpufreq.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
- 
- #include "exynos-cpufreq.h"
- 
-@@ -23,6 +25,7 @@ static struct clk *cpu_clk;
- static struct clk *moutcore;
- static struct clk *mout_mpll;
- static struct clk *mout_apll;
-+static struct exynos_dvfs_info *cpufreq;
- 
- static unsigned int exynos4210_volt_table[] = {
- 	1250000, 1150000, 1050000, 975000, 950000,
-@@ -60,20 +63,20 @@ static void exynos4210_set_clkdiv(unsigned int div_index)
- 
- 	tmp = apll_freq_4210[div_index].clk_div_cpu0;
- 
--	__raw_writel(tmp, EXYNOS4_CLKDIV_CPU);
-+	__raw_writel(tmp, cpufreq->cmu_regs + EXYNOS4_CLKDIV_CPU);
- 
- 	do {
--		tmp = __raw_readl(EXYNOS4_CLKDIV_STATCPU);
-+		tmp = __raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKDIV_STATCPU);
- 	} while (tmp & 0x1111111);
- 
- 	/* Change Divider - CPU1 */
- 
- 	tmp = apll_freq_4210[div_index].clk_div_cpu1;
- 
--	__raw_writel(tmp, EXYNOS4_CLKDIV_CPU1);
-+	__raw_writel(tmp, cpufreq->cmu_regs + EXYNOS4_CLKDIV_CPU1);
- 
- 	do {
--		tmp = __raw_readl(EXYNOS4_CLKDIV_STATCPU1);
-+		tmp = __raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKDIV_STATCPU1);
- 	} while (tmp & 0x11);
- }
- 
-@@ -85,7 +88,7 @@ static void exynos4210_set_apll(unsigned int index)
- 	clk_set_parent(moutcore, mout_mpll);
- 
- 	do {
--		tmp = (__raw_readl(EXYNOS4_CLKMUX_STATCPU)
-+		tmp = (__raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKMUX_STATCPU)
- 			>> EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT);
- 		tmp &= 0x7;
- 	} while (tmp != 0x2);
-@@ -96,7 +99,7 @@ static void exynos4210_set_apll(unsigned int index)
- 	clk_set_parent(moutcore, mout_apll);
- 
- 	do {
--		tmp = __raw_readl(EXYNOS4_CLKMUX_STATCPU);
-+		tmp = __raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKMUX_STATCPU);
- 		tmp &= EXYNOS4_CLKMUX_STATCPU_MUXCORE_MASK;
- 	} while (tmp != (0x1 << EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT));
- }
-@@ -115,8 +118,30 @@ static void exynos4210_set_frequency(unsigned int old_index,
- 
- int exynos4210_cpufreq_init(struct exynos_dvfs_info *info)
- {
-+	struct device_node *np;
- 	unsigned long rate;
- 
-+	/*
-+	 * HACK: This is a temporary workaround to get access to clock
-+	 * controller registers directly and remove static mappings and
-+	 * dependencies on platform headers. It is necessary to enable
-+	 * Exynos multi-platform support and will be removed together with
-+	 * this whole driver as soon as Exynos gets migrated to use
-+	 * cpufreq-cpu0 driver.
-+	 */
-+	np = of_find_compatible_node(NULL, NULL, "samsung,exynos4210-clock");
-+	if (!np) {
-+		pr_err("%s: failed to find clock controller DT node\n",
-+			__func__);
-+		return -ENODEV;
-+	}
-+
-+	info->cmu_regs = of_iomap(np, 0);
-+	if (!info->cmu_regs) {
-+		pr_err("%s: failed to map CMU registers\n", __func__);
-+		return -EFAULT;
-+	}
-+
- 	cpu_clk = clk_get(NULL, "armclk");
- 	if (IS_ERR(cpu_clk))
- 		return PTR_ERR(cpu_clk);
-@@ -143,6 +168,8 @@ int exynos4210_cpufreq_init(struct exynos_dvfs_info *info)
- 	info->freq_table = exynos4210_freq_table;
- 	info->set_freq = exynos4210_set_frequency;
- 
-+	cpufreq = info;
-+
- 	return 0;
- 
- err_mout_apll:
-diff --git a/drivers/cpufreq/exynos4x12-cpufreq.c b/drivers/cpufreq/exynos4x12-cpufreq.c
-index 63a3907..351a207 100644
---- a/drivers/cpufreq/exynos4x12-cpufreq.c
-+++ b/drivers/cpufreq/exynos4x12-cpufreq.c
-@@ -16,6 +16,8 @@
- #include <linux/io.h>
- #include <linux/slab.h>
- #include <linux/cpufreq.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
- 
- #include "exynos-cpufreq.h"
- 
-@@ -23,6 +25,7 @@ static struct clk *cpu_clk;
- static struct clk *moutcore;
- static struct clk *mout_mpll;
- static struct clk *mout_apll;
-+static struct exynos_dvfs_info *cpufreq;
- 
- static unsigned int exynos4x12_volt_table[] = {
- 	1350000, 1287500, 1250000, 1187500, 1137500, 1087500, 1037500,
-@@ -105,19 +108,20 @@ static void exynos4x12_set_clkdiv(unsigned int div_index)
- 
- 	tmp = apll_freq_4x12[div_index].clk_div_cpu0;
- 
--	__raw_writel(tmp, EXYNOS4_CLKDIV_CPU);
-+	__raw_writel(tmp, cpufreq->cmu_regs + EXYNOS4_CLKDIV_CPU);
- 
--	while (__raw_readl(EXYNOS4_CLKDIV_STATCPU) & 0x11111111)
-+	while (__raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKDIV_STATCPU)
-+	       & 0x11111111)
- 		cpu_relax();
- 
- 	/* Change Divider - CPU1 */
- 	tmp = apll_freq_4x12[div_index].clk_div_cpu1;
- 
--	__raw_writel(tmp, EXYNOS4_CLKDIV_CPU1);
-+	__raw_writel(tmp, cpufreq->cmu_regs + EXYNOS4_CLKDIV_CPU1);
- 
- 	do {
- 		cpu_relax();
--		tmp = __raw_readl(EXYNOS4_CLKDIV_STATCPU1);
-+		tmp = __raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKDIV_STATCPU1);
- 	} while (tmp != 0x0);
- }
- 
-@@ -130,7 +134,7 @@ static void exynos4x12_set_apll(unsigned int index)
- 
- 	do {
- 		cpu_relax();
--		tmp = (__raw_readl(EXYNOS4_CLKMUX_STATCPU)
-+		tmp = (__raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKMUX_STATCPU)
- 			>> EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT);
- 		tmp &= 0x7;
- 	} while (tmp != 0x2);
-@@ -142,7 +146,7 @@ static void exynos4x12_set_apll(unsigned int index)
- 
- 	do {
- 		cpu_relax();
--		tmp = __raw_readl(EXYNOS4_CLKMUX_STATCPU);
-+		tmp = __raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKMUX_STATCPU);
- 		tmp &= EXYNOS4_CLKMUX_STATCPU_MUXCORE_MASK;
- 	} while (tmp != (0x1 << EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT));
- }
-@@ -161,8 +165,30 @@ static void exynos4x12_set_frequency(unsigned int old_index,
- 
- int exynos4x12_cpufreq_init(struct exynos_dvfs_info *info)
- {
-+	struct device_node *np;
- 	unsigned long rate;
- 
-+	/*
-+	 * HACK: This is a temporary workaround to get access to clock
-+	 * controller registers directly and remove static mappings and
-+	 * dependencies on platform headers. It is necessary to enable
-+	 * Exynos multi-platform support and will be removed together with
-+	 * this whole driver as soon as Exynos gets migrated to use
-+	 * cpufreq-cpu0 driver.
-+	 */
-+	np = of_find_compatible_node(NULL, NULL, "samsung,exynos4412-clock");
-+	if (!np) {
-+		pr_err("%s: failed to find clock controller DT node\n",
-+			__func__);
-+		return -ENODEV;
-+	}
-+
-+	info->cmu_regs = of_iomap(np, 0);
-+	if (!info->cmu_regs) {
-+		pr_err("%s: failed to map CMU registers\n", __func__);
-+		return -EFAULT;
-+	}
-+
- 	cpu_clk = clk_get(NULL, "armclk");
- 	if (IS_ERR(cpu_clk))
- 		return PTR_ERR(cpu_clk);
-@@ -194,6 +220,8 @@ int exynos4x12_cpufreq_init(struct exynos_dvfs_info *info)
- 	info->freq_table = exynos4x12_freq_table;
- 	info->set_freq = exynos4x12_set_frequency;
- 
-+	cpufreq = info;
-+
- 	return 0;
- 
- err_mout_apll:
-diff --git a/drivers/cpufreq/exynos5250-cpufreq.c b/drivers/cpufreq/exynos5250-cpufreq.c
-index 363a0b3..c91ce69 100644
---- a/drivers/cpufreq/exynos5250-cpufreq.c
-+++ b/drivers/cpufreq/exynos5250-cpufreq.c
-@@ -16,8 +16,8 @@
- #include <linux/io.h>
- #include <linux/slab.h>
- #include <linux/cpufreq.h>
--
--#include <mach/map.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
- 
- #include "exynos-cpufreq.h"
- 
-@@ -25,6 +25,7 @@ static struct clk *cpu_clk;
- static struct clk *moutcore;
- static struct clk *mout_mpll;
- static struct clk *mout_apll;
-+static struct exynos_dvfs_info *cpufreq;
- 
- static unsigned int exynos5250_volt_table[] = {
- 	1300000, 1250000, 1225000, 1200000, 1150000,
-@@ -87,17 +88,18 @@ static void set_clkdiv(unsigned int div_index)
- 
- 	tmp = apll_freq_5250[div_index].clk_div_cpu0;
- 
--	__raw_writel(tmp, EXYNOS5_CLKDIV_CPU0);
-+	__raw_writel(tmp, cpufreq->cmu_regs + EXYNOS5_CLKDIV_CPU0);
- 
--	while (__raw_readl(EXYNOS5_CLKDIV_STATCPU0) & 0x11111111)
-+	while (__raw_readl(cpufreq->cmu_regs + EXYNOS5_CLKDIV_STATCPU0)
-+	       & 0x11111111)
- 		cpu_relax();
- 
- 	/* Change Divider - CPU1 */
- 	tmp = apll_freq_5250[div_index].clk_div_cpu1;
- 
--	__raw_writel(tmp, EXYNOS5_CLKDIV_CPU1);
-+	__raw_writel(tmp, cpufreq->cmu_regs + EXYNOS5_CLKDIV_CPU1);
- 
--	while (__raw_readl(EXYNOS5_CLKDIV_STATCPU1) & 0x11)
-+	while (__raw_readl(cpufreq->cmu_regs + EXYNOS5_CLKDIV_STATCPU1) & 0x11)
- 		cpu_relax();
- }
- 
-@@ -111,7 +113,8 @@ static void set_apll(unsigned int index)
- 
- 	do {
- 		cpu_relax();
--		tmp = (__raw_readl(EXYNOS5_CLKMUX_STATCPU) >> 16);
-+		tmp = (__raw_readl(cpufreq->cmu_regs + EXYNOS5_CLKMUX_STATCPU)
-+			>> 16);
- 		tmp &= 0x7;
- 	} while (tmp != 0x2);
- 
-@@ -122,7 +125,7 @@ static void set_apll(unsigned int index)
- 
- 	do {
- 		cpu_relax();
--		tmp = __raw_readl(EXYNOS5_CLKMUX_STATCPU);
-+		tmp = __raw_readl(cpufreq->cmu_regs + EXYNOS5_CLKMUX_STATCPU);
- 		tmp &= (0x7 << 16);
- 	} while (tmp != (0x1 << 16));
- }
-@@ -141,8 +144,30 @@ static void exynos5250_set_frequency(unsigned int old_index,
- 
- int exynos5250_cpufreq_init(struct exynos_dvfs_info *info)
- {
-+	struct device_node *np;
- 	unsigned long rate;
- 
-+	/*
-+	 * HACK: This is a temporary workaround to get access to clock
-+	 * controller registers directly and remove static mappings and
-+	 * dependencies on platform headers. It is necessary to enable
-+	 * Exynos multi-platform support and will be removed together with
-+	 * this whole driver as soon as Exynos gets migrated to use
-+	 * cpufreq-cpu0 driver.
-+	 */
-+	np = of_find_compatible_node(NULL, NULL, "samsung,exynos5250-clock");
-+	if (!np) {
-+		pr_err("%s: failed to find clock controller DT node\n",
-+			__func__);
-+		return -ENODEV;
-+	}
-+
-+	info->cmu_regs = of_iomap(np, 0);
-+	if (!info->cmu_regs) {
-+		pr_err("%s: failed to map CMU registers\n", __func__);
-+		return -EFAULT;
-+	}
-+
- 	cpu_clk = clk_get(NULL, "armclk");
- 	if (IS_ERR(cpu_clk))
- 		return PTR_ERR(cpu_clk);
-@@ -169,6 +194,8 @@ int exynos5250_cpufreq_init(struct exynos_dvfs_info *info)
- 	info->freq_table = exynos5250_freq_table;
- 	info->set_freq = exynos5250_set_frequency;
- 
-+	cpufreq = info;
-+
- 	return 0;
- 
- err_mout_apll:
+[    3.124189] Unable to handle kernel paging request at virtual address 
+f8400024
+[    3.129950] pgd = c0004000
+[    3.132626] [f8400024] *pgd=6f7f7841, *pte=00000000, *ppte=00000000
+[    3.138877] Internal error: Oops: 827 [#1] PREEMPT SMP ARM
+[    3.192782] r3 : f8400024  r2 : f8180800  r1 : ee836e44  r0 : f8400024
+[    3.199293] Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM 
+Segment kernel
+[    3.206673] Control: 10c5387d  Table: 6e37c04a  DAC: 00000015
+[    3.212398] Process swapper/0 (pid: 0, stack limit = 0xc0510240)
+[    3.218388] Stack: (0xc0511ef4 to 0xc0512000)
+[    3.222728] 1ee0: 00000030 c02b20f8 ee836e40
+[    3.230894] 1f00: c001234c 6e880000 c0511f34 40018a80 00000000 
+00000000 00000000 00000015
+[    3.239053] 1f20: 4000404a 10c5387d 00000041 00f00000 00000000 
+00000000 c02b20e4 edc4a540
+[    3.247212] 1f40: c038dacc eefc5cf8 c050ecf0 c0543210 00000000 
+c0012460 00000001 c0543210
+[    3.255371] 1f60: eefc5cf8 c02b2148 b9f92927 00000000 c054326c 
+c02b0968 b9f92927 00000000
+[    3.263530] 1f80: c0510000 c0518480 c038dacc c0510000 c0510000 
+c0518480 c038dacc eefc5cf8
+[    3.271689] 1fa0: c0543210 c004e990 c0511fb4 c03873b8 00000000 
+c04f90c8 00000000 c04d4b18
+[    3.279848] 1fc0: ffffffff ffffffff c04d457c 00000000 00000000 
+c04f90c8 00000000 10c5387d
+[    3.288007] 1fe0: c0518410 c04f90c4 c051bd5c 4000406a 00000000 
+40008074 00000000 00000000
+[    3.296184] [<c0019c5c>] (exynos_enter_aftr) from [<c02b20f8>] 
+(idle_finisher+0x14/0x20)
+[    3.304247] [<c02b20f8>] (idle_finisher) from [<c001234c>] 
+(cpu_suspend_abort+0x0/0x14)
+[    3.312226] [<c001234c>] (cpu_suspend_abort) from [<00000000>] (  (null))
+[    3.318994] Code: e34f3840 e3500010 11a00002 01a00003 (e5804000)
+[    3.325069] ---[ end trace fca911f75a18c040 ]---
+
+
+After git bisecting I falls on this commit:
+
+commit b3205dea8fbf6db9b1e46a0dad19a0712fdff44f
+Author: Sachin Kamat <sachin.kamat@linaro.org>
+Date:   Tue May 13 07:13:44 2014 +0900
+
+     ARM: EXYNOS: Map SYSRAM through generic DT bindings
+
+     Instead of hardcoding the SYSRAM details for each SoC,
+     pass this information through device tree (DT) and make
+     the code SoC agnostic. Generic DT SRAM bindings are
+     used for achieving this.
+
+     Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+     Acked-by: Arnd Bergmann <arnd@arndb.de>
+     Acked-by: Heiko Stuebner <heiko@sntech.de>
+     Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+     Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+
+
+... which is before my series is applied.
+
+So I am not able to tell yet if my series is correctly rebased or not.
+
+And before someone asks me, yes I updated the dtb :)
+
+
+
 -- 
-1.9.3
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
