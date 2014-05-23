@@ -1,39 +1,22 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 23 May 2014 12:13:59 -0700
-Subject: [PATCH 10/10] clk: versatile: add versatile OSC support
-In-Reply-To: <CACRpkdbjAa6Y-EVwK=D9eiA6JoW+pgxtnHCsrZSTZOY5uozMpw@mail.gmail.com>
-References: <1400620176-7239-1-git-send-email-robherring2@gmail.com>
- <1400620176-7239-11-git-send-email-robherring2@gmail.com>
- <CACRpkdbjAa6Y-EVwK=D9eiA6JoW+pgxtnHCsrZSTZOY5uozMpw@mail.gmail.com>
-Message-ID: <20140523191359.23136.57893@quantum>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 23 May 2014 15:15:02 -0400 (EDT)
+Subject: [PATCH 0/5] ks8851 DT updates
+In-Reply-To: <1400792413-21618-1-git-send-email-sboyd@codeaurora.org>
+References: <1400792413-21618-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140523.151502.1106354754894891974.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Linus Walleij (2014-05-23 06:31:26)
-> On Tue, May 20, 2014 at 11:09 PM, Rob Herring <robherring2@gmail.com> wrote:
-> 
-> > From: Rob Herring <robh@kernel.org>
-> >
-> > Versatile platforms share the same OSC programming model as Integrator
-> > platforms. Add the necessary parameters and init functions for Versatile.
-> >
-> > Signed-off-by: Rob Herring <robh@kernel.org>
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > ---
-> >  drivers/clk/versatile/Makefile         |  3 +--
-> >  drivers/clk/versatile/clk-integrator.c | 35 ++++++++++++++++++++++++++++++++--
-> 
-> So then this is a good opportunity to rename that file from clk-integrator.c
-> to something else, right? Usually we use "versatile" to refer to the
-> whole family of boards but other names are possible I guess.
-> 
-> Apart from that it looks good :-)
+From: Stephen Boyd <sboyd@codeaurora.org>
+Date: Thu, 22 May 2014 14:00:08 -0700
 
-Looks good to me too. Rob will you incorporate the file name change?
+> This set of patches properly documents the micrel ks8851 spi ethernet
+> controller, converts to devm_regulator_get_optional() to make error
+> paths slightly simpler, and finally adds supports for another
+> optional regulator and a reset gpio.
 
-Regards,
-Mike
+Please do not submit patch sets that you expect different trees to
+integrate, this is painful for maintainers to deal with.
 
-> 
-> Yours,
-> Linus Walleij
+Instead, submit the changes separately.  One series for one
+maintainer's tree, another for the other maintainer's tree.
