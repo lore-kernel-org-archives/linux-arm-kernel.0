@@ -1,23 +1,79 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 23 May 2014 12:11:31 +0100
-Subject: [PATCH 2/2] ASoC: samsung: Add machine driver for odroidx2
-In-Reply-To: <0E.BA.03708.FFFAE735@epcpsbgx1.samsung.com>
-References: <0E.BA.03708.FFFAE735@epcpsbgx1.samsung.com>
-Message-ID: <20140523111131.GZ12304@sirena.org.uk>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 23 May 2014 14:21:16 +0300
+Subject: [PATCH 0/3] ARM: OMAP5+: Support Duty Cycle Correction(DCC)
+In-Reply-To: <1400237160-25125-1-git-send-email-nm@ti.com>
+References: <1400237160-25125-1-git-send-email-nm@ti.com>
+Message-ID: <537F2F2C.3070202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 02:18:39AM +0000, Zhen Chen wrote:
-> <HTML xmlns:o = "urn:schemas-microsoft-com:office:office"><HEAD><TITLE>Samsung Enterprise Portal mySingle</TITLE>
-> <META content=IE=5 http-equiv=X-UA-Compatible>
-> <META content="text/html; charset=windows-1252" http-equiv=Content-Type>
+On 05/16/2014 01:45 PM, Nishanth Menon wrote:
+> Hi,
+>
+> This patch series has been carried over in vendor kernel for quiet
+> few years now.
+>
+> Unfortunately, it was very recently re-discovered and upstream kernel
+> is noticed to be broken for OMAP5 1.5GHz - at least we are operating
+> DPLL at frequency higher than what it was intended to be when CPUFreq
+> is enabled. Thankfully, with nominal voltage(we dont use AVS yet in
+> upstream for the mentioned platforms) and margins in trimming, we
+> have so far not crashed - but I strongly suspect this might be some
+> boundary case survival.
+>
+> Verified on the following impacted platforms using 3.15-rc4 based
+> vendor kernel.
+>
+> Before:
+> OMAP5432: http://slexy.org/view/s20cs0qQFg
+> DRA72x: http://slexy.org/view/s2TXtSa6mH (refused to lock)
+> DRA75x: http://slexy.org/view/s20AW8MU5c
+> After:
+> OMAP5432: http://slexy.org/view/s21iAfWxpu
+> DRA72x: http://slexy.org/view/s2hwsvGLmC (locks properly)
+> DRA75x: http://slexy.org/view/s21ehw8WQn
+>
+> Hopefully, we can get these into some kernel revision in some form.
 
-Please fix your mail configuration to send in plain text, I can't read
-this - it's not even got a multipart/alternative plain text bit.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140523/90898491/attachment-0001.sig>
+Thanks, queued for 3.16/ti-clk-drv. Anybody on the delivery feel free to 
+yell if you got any complaints.
+
+-Tero
+
+>
+> NOTE: Support for 4470(which is the only other platform requiring
+> DCC) is not present in upstream kernel and there are no plans to
+> support that SoC, even if it is added at a later point, support can be
+> extended as needed.
+>
+> Series based on v3.15-rc5 tag.
+> Also available on my tree:
+> 	https://github.com/nmenon/linux-2.6-playground/
+> 	branch:  push/clock/dcc
+> 	
+> 	weblink: https://github.com/nmenon/linux-2.6-playground/commits/push/clock/dcc
+>
+> Verification:
+> 3.15-rc4 based kernel - DRA75x-evm, 72x-evm, OMAP5uevm
+> 3.15-rc5 - OMAP5uEVM(only one supporting 1.5GHz atm)
+>
+> Andrii Tseglytskyi (1):
+>    ARM: OMAP5+: dpll: support Duty Cycle Correction(DCC)
+>
+> Nishanth Menon (2):
+>    clk: dpll: support OMAP5 MPU DPLL that need special handling for
+>      higher frequencies
+>    ARM: dts: OMAP5/DRA7: use omap5-mpu-dpll-clock capable of dealing
+>      with higher frequencies
+>
+>   .../devicetree/bindings/clock/ti/dpll.txt          |    1 +
+>   arch/arm/boot/dts/dra7xx-clocks.dtsi               |    2 +-
+>   arch/arm/boot/dts/omap54xx-clocks.dtsi             |    2 +-
+>   arch/arm/mach-omap2/dpll3xxx.c                     |    9 +++++++++
+>   drivers/clk/ti/dpll.c                              |   21 ++++++++++++++++++++
+>   include/linux/clk/ti.h                             |    4 ++++
+>   6 files changed, 37 insertions(+), 2 deletions(-)
+>
+> Regards,
+> Nishanth Menon
+>
