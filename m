@@ -1,58 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 May 2014 17:35:34 +0200
-Subject: [RESEND PATCH v5 3/5] ARM: Conceal DEBUG_LL_UART_NONE from
- unsupported platforms
-In-Reply-To: <1400857819-7975-4-git-send-email-daniel.thompson@linaro.org>
-References: <1398355246-29571-1-git-send-email-daniel.thompson@linaro.org>
- <1400857819-7975-1-git-send-email-daniel.thompson@linaro.org>
- <1400857819-7975-4-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <5013253.K6sZTxep7b@wuerfel>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Fri, 23 May 2014 16:45:51 +0100
+Subject: EFI_STUB fails to boot non-EFI on arm64
+In-Reply-To: <CAKv+Gu-4ExoNfGVJzUK4v06XD5V3nYfRetoefY0RuFsN1CUOzg@mail.gmail.com>
+References: <20140523094513.GC9252@arm.com>
+ <20140523131656.GR4179@bivouac.eciton.net>
+ <20140523134720.GA9256@arm.com>
+ <20140523150331.GS4179@bivouac.eciton.net>
+ <CAKv+Gu-4ExoNfGVJzUK4v06XD5V3nYfRetoefY0RuFsN1CUOzg@mail.gmail.com>
+Message-ID: <20140523154551.GT4179@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 May 2014 16:10:17 Daniel Thompson wrote:
-> Only a small handful of platforms support DEBUG_LL_UART_NONE but it
-> lurks in the menus of every single platform config ready to break the
-> build. This is an especial problem for defconfigs since it is often
-> selected by default.
+On Fri, May 23, 2014 at 05:17:39PM +0200, Ard Biesheuvel wrote:
+> >> Can we add another of detecting whether it's an EFI application and
+> >> avoid calling efi_init()? I can see x86 sets some efi_loader_signature
+> >> string in exit_boot() and checks against it later when calling
+> >> efi_init().
+> >
+> > Well, I agree that we shouldn't be spewing error messages for expected
+> > operation, but efi_init() is the function we call to determine
+> > whether we _are_ booting via UEFI - and it sets flags accordingly for
+> > the efi_enabled() macro.
+> >
 > 
-> This patch limit this choice only to platforms capable of supporting it.
+> Considering that
 > 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> ---
->  arch/arm/Kconfig.debug | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
+> a) the raw Image loader and the stub enter the kernel through
+> different entry points (i.e., offset #0 and whatever entry point is
+> specified in the PE/COFF header, respectively), and
+> b) there is no decompressor etc involved so we jump straight into the
+> kernel startup code
+> c) head.S already deals with a similar problem, i.e., storing the CPU boot mode
 > 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index eab8ecb..4c8d7db 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -842,7 +842,18 @@ choice
->  
->  	config DEBUG_LL_UART_NONE
->  		bool "No low-level debugging UART"
-> -		depends on !ARCH_MULTIPLATFORM
-> +		depends on ARCH_AT91 || \
-> +			ARCH_CLPS711X || \
-> +			ARCH_FOOTBRIDGE || \
-> +			ARCH_KS8695 || \
-> +			ARCH_NETX || \
-> +			ARCH_OMAP1 || \
-> +			ARCH_SA1100 || \
-> +			ARCH_S3C24XX || \
-> +			ARCH_S3C64XX || \
-> +			ARCH_S5P64X0 || \
-> +			ARCH_S5PC100 || \
-> +			ARCH_S5PV210
->  		help
->  		  Say Y here if your platform doesn't provide a UART option
->  		  above. This relies on your platform choosing the right UART
+> I would assume it shouldn't be so difficult to set a bit somewhere
+> indicating which case we are dealing with?
 
-ARCH_S3C24XX has been moved over in linux-next to use debug/s3c24xx.S.
-A few others will likely move soon (AT91, CLPS711x, S5PV210), as the
-platforms get moved to ARCH_MULTIPLATFORM.
+That would certainly be possible, but what would be the benefit of
+having two separate mechanisms for determining whether we are booting
+via UEFI - which could potentially end up disagreeing?
 
-As an alternative to your patch, we could decide to move the remaining
-files as well.
-
-	Arnd
+/
+    Leif
