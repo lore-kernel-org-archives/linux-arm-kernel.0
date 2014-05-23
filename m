@@ -1,45 +1,23 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 May 2014 15:08:37 +0200
-Subject: linux-next: manual merge of the arm-soc tree with the arm tree
-In-Reply-To: <20140523104534.467b452b@canb.auug.org.au>
-References: <20140523104534.467b452b@canb.auug.org.au>
-Message-ID: <537F4855.70201@free-electrons.com>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Fri, 23 May 2014 10:09:01 -0300
+Subject: [PATCH 07/22] clk: sunxi: Fix PLL6 calculation on sun6i
+In-Reply-To: <1400831485-28576-8-git-send-email-wens@csie.org>
+References: <1400831485-28576-1-git-send-email-wens@csie.org>
+ <1400831485-28576-8-git-send-email-wens@csie.org>
+Message-ID: <537F486D.9060900@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi,
 
-On 23/05/2014 02:45, Stephen Rothwell wrote:
-> Hi all,
-> 
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> arch/arm/mach-mvebu/board-v7.c between commit 8ae2473d96f1 ("ARM: l2c:
-> mvebu: convert to generic l2c OF initialisation") from the arm tree and
-> commit 5686a1e5aa43 ("bus: mvebu: pass the coherency availability
-> information at init time") from the arm-soc tree.
-> 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
-> 
+El 23/05/14 04:51, Chen-Yu Tsai escribi?:
+> The N factor for PLL6 counts from 1 to 32, as specified in the A23
+> manual, and shown in Allwinner's original code.
 
-This fix seems to be the good thing to do.
+Are you sure about this? The A23 manual I'm looking at has a 5-bit field 
+(so 0-31) on 12:8, and the examples count from 0 (eg Factor=0 N=1 ... 
+Factor=31 N=32).
 
-Thanks,
+Cheers,
 
-Gregory
-
-
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Emilio
