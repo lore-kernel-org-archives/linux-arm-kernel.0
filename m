@@ -1,115 +1,38 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 23 May 2014 17:51:52 +0100
-Subject: [PATCH v7 1/4] ARM: kconfig: allow PCI support to be selected with
- ARCH_MULTIPLATFORM
-In-Reply-To: <1400863915-24135-1-git-send-email-will.deacon@arm.com>
-References: <1400863915-24135-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1400863915-24135-2-git-send-email-will.deacon@arm.com>
+Date: Fri, 23 May 2014 17:55:54 +0100
+Subject: [PATCH RESEND 0/7] Fix backtrace support in THUMB2 mode
+In-Reply-To: <1400837196-22339-1-git-send-email-Nikolay.Borisov@arm.com>
+References: <1400837196-22339-1-git-send-email-Nikolay.Borisov@arm.com>
+Message-ID: <20140523165554.GB22176@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When targetting ARCH_MULTIPLATFORM, we may include support for SoCs with
-PCI-capable devices (e.g. mach-virt with virtio-pci).
+On Fri, May 23, 2014 at 10:26:29AM +0100, Nikolay Borisov wrote:
+> Currently all the code which deals with backtrace support assumes that R11 
+> is the frame-pointer. While this is the case for ARM mode and is explicitly 
+> documented in the AAPCS, this is not the case for THUMB2 mode. 
+> 
+> There is no official document requiring that R11 has to be the frame pointer 
+> and GCC uses R7 as FP and given that R7's usage is so intertwined within GCC's
+> mechanics it is unlikely to change, so fixing backtrace in THUMB2 mode seems
+> in order.
+> 
+> This patch series rectifies the problem by first fixing the 
+> thread_save_fp macro to reference the correct register. Furthermore, there
+> a lot of repetetive sequences of code such as :
+> 
+> stackframe.fp = pt_regs->ARM_fp
+> stackframe.lr = pt_regs->ARM_lr
+> 
+> so introducing a function arm_get_current_stack_frame which both 
+> hides this repetition and also utilizes teh frame_pointer(regs) macro
+> to reference the correct register depending on the mode. 
+> 
+> Finally, change all the call sites so that they utilize the new routine.
 
-This patch allows PCI support to be selected for these SoCs by selecting
-CONFIG_MIGHT_HAVE_PCI when CONFIG_ARCH_MULTIPLATFORM=y and removes the
-individual selections from multi-platform enabled SoCs.
+For everything apart from patch 2 (where Robert pointed out that
+arm_get_current_stackframe would be better inline):
 
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/Kconfig               | 1 +
- arch/arm/mach-bcm/Kconfig      | 1 -
- arch/arm/mach-cns3xxx/Kconfig  | 1 -
- arch/arm/mach-imx/Kconfig      | 1 -
- arch/arm/mach-mvebu/Kconfig    | 1 -
- arch/arm/mach-shmobile/Kconfig | 1 -
- arch/arm/mach-tegra/Kconfig    | 1 -
- 7 files changed, 1 insertion(+), 6 deletions(-)
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index db3c5414223e..860bea828ac4 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -314,6 +314,7 @@ config ARCH_MULTIPLATFORM
- 	select CLKSRC_OF
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
-+	select MIGHT_HAVE_PCI
- 	select MULTI_IRQ_HANDLER
- 	select SPARSE_IRQ
- 	select USE_OF
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 49c914cd9c7a..764c129b5eee 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -55,7 +55,6 @@ config ARCH_BCM_5301X
- 	select GENERIC_CLOCKEVENTS
- 	select ARM_GLOBAL_TIMER
- 	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
--	select MIGHT_HAVE_PCI
- 	help
- 	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
- 
-diff --git a/arch/arm/mach-cns3xxx/Kconfig b/arch/arm/mach-cns3xxx/Kconfig
-index dce8decd5d46..66838f42037f 100644
---- a/arch/arm/mach-cns3xxx/Kconfig
-+++ b/arch/arm/mach-cns3xxx/Kconfig
-@@ -1,7 +1,6 @@
- config ARCH_CNS3XXX
- 	bool "Cavium Networks CNS3XXX family" if ARCH_MULTI_V6
- 	select ARM_GIC
--	select MIGHT_HAVE_PCI
- 	select PCI_DOMAINS if PCI
- 	help
- 	  Support for Cavium Networks CNS3XXX platform.
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 5740296dc429..50bb546b893a 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -796,7 +796,6 @@ config SOC_IMX6Q
- 	select ARM_ERRATA_764369 if SMP
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
--	select MIGHT_HAVE_PCI
- 	select PCI_DOMAINS if PCI
- 	select PINCTRL_IMX6Q
- 	select SOC_IMX6
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 3f73eecbcfb0..120301ebd324 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -9,7 +9,6 @@ config ARCH_MVEBU
- 	select MVEBU_MBUS
- 	select ZONE_DMA if ARM_LPAE
- 	select ARCH_REQUIRE_GPIOLIB
--	select MIGHT_HAVE_PCI
- 	select PCI_QUIRKS if PCI
- 	select OF_ADDRESS_PCI
- 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 0f92ba8e7884..905003898913 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -8,7 +8,6 @@ config ARCH_SHMOBILE_MULTI
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
- 	select ARM_GIC
--	select MIGHT_HAVE_PCI
- 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
- 	select NO_IOPORT_MAP
- 	select PINCTRL
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 55b305d51669..e16999e5b735 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -7,7 +7,6 @@ config ARCH_TEGRA
- 	select CLKSRC_MMIO
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
--	select MIGHT_HAVE_PCI
- 	select PINCTRL
- 	select ARCH_HAS_RESET_CONTROLLER
- 	select RESET_CONTROLLER
--- 
-1.9.2
+Will
