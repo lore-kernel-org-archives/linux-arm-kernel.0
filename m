@@ -1,355 +1,199 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 19:39:24 +0200
-Subject: [PATCH v5 1/6] clocksource: Add support for the Mediatek SoCs
-In-Reply-To: <1400689583-21119-2-git-send-email-matthias.bgg@gmail.com>
-References: <1400689583-21119-1-git-send-email-matthias.bgg@gmail.com>
- <1400689583-21119-2-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <537F87CC.7090705@linaro.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 23 May 2014 10:51:08 -0700
+Subject: [PATCH] pci: Allow very large resource windows
+In-Reply-To: <20140519202853.GA1371@google.com> (Bjorn Helgaas's message of
+ "Mon, 19 May 2014 14:28:53 -0600")
+References: <20140519130255.15364.49358.stgit@alan.etchedpixels.co.uk>
+ <20140519202853.GA1371@google.com>
+Message-ID: <7h38g0e643.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2014 06:26 PM, Matthias Brugger wrote:
-> This patch adds a clock source and clock event for the timer found
-> on the Mediatek SoCs.
+Hi Bjorn,
+
+Bjorn Helgaas <bhelgaas@google.com> writes:
+
+> On Mon, May 19, 2014 at 02:03:14PM +0100, Alan wrote:
+>> From: Alan <alan@linux.intel.com>
+>> 
+>> This is needed for some of the Xeon Phi type systems.
+>> 
+>> Signed-off-by: Alan Cox <alan@linux.intel.com>
 >
-> The Mediatek General Porpose Timer block provides five 32 bit timers and
+> I applied this to my pci/resource branch for v3.16.  Nikhil
+> posted essentially the same patch a couple years ago, so I added
+> his signed-off-by and adopted his use of ARRAY_SIZE() to connect the
+> "order > 13" test with the aligns[] declaration.
 
-s/Porpose/Purpose
+This patch (with the ARRAY_SIZE changes) has hit next-20140253 (in the
+form of commit 272c5a886c57) and according to my bisect, is the cause of
+a new boot failure on a 32-bit ARM platform (Marvell Armada 370,
+Mirabox, boot log excerpt down below[2].)
 
-> one 64 bit timer.
->
-> Two 32 bit timers are used:
-> TIMER1: clock events supporting periodic and oneshot events
-> TIMER2: clock source configured as a free running counter
->
-> The General Porpose Timer block can be run with two clocks. A 13 MHz system
+While debugging, I found that Alan's original patch (without the
+ARRAY_SIZE change) booted just fine so I started looking closely at the
+ARRAY_SIZE() change.  After some high-tech printk debugging, I noticed
+that order was negative when doing the compare, and found that this hack
+got things booting again:
 
-s/Porpose/Purpose
+diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
+index 47482b27fa12..792db3477fd5 100644
+--- a/drivers/pci/setup-bus.c
++++ b/drivers/pci/setup-bus.c
+@@ -966,7 +966,7 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask,
+ 			/* For bridges size != alignment */
+ 			align = pci_resource_alignment(dev, r);
+ 			order = __ffs(align) - 20;
+-			if (order >= ARRAY_SIZE(aligns)) {
++			if (order >= (int)ARRAY_SIZE(aligns)) {
+ 				dev_warn(&dev->dev, "disabling BAR %d: %pR "
+ 					 "(bad alignment %#llx)\n", i, r,
+ 					 (unsigned long long) align);
 
-> clock and the RTC clock running at 32 KHz. This implementation uses the system
-> clock.
+which led me to realize that the ARRAY_SIZE() change converted the >=
+into an unsigned compare where before it was a signed one, and as an
+unsigned compare, it was always true, resulting in those BARs being
+disabled.
 
-As it is a new driver, could you elaborate a bit the description of this 
-driver please ? Behavior, some oddities, etc ...
+Below is a patch[1] which fixes the problem for me, and attempts a more
+detailed description of the problem in the changelog.
 
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> ---
->   drivers/clocksource/Kconfig     |   4 +
->   drivers/clocksource/Makefile    |   1 +
->   drivers/clocksource/mtk_timer.c | 263 ++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 268 insertions(+)
->   create mode 100644 drivers/clocksource/mtk_timer.c
->
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index 96918e1..1f73740 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -144,6 +144,10 @@ config VF_PIT_TIMER
->   config SYS_SUPPORTS_SH_CMT
->           bool
->
-> +config MTK_TIMER
-> +	select CLKSRC_MMIO
-> +	bool
-> +
->   config SYS_SUPPORTS_SH_MTU2
->           bool
->
-> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> index 98cb6c5..619d302 100644
-> --- a/drivers/clocksource/Makefile
-> +++ b/drivers/clocksource/Makefile
-> @@ -33,6 +33,7 @@ obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
->   obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
->   obj-$(CONFIG_VF_PIT_TIMER)	+= vf_pit_timer.o
->   obj-$(CONFIG_CLKSRC_QCOM)	+= qcom-timer.o
-> +obj-$(CONFIG_MTK_TIMER)		+= mtk_timer.o
->
->   obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
->   obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
-> diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-> new file mode 100644
-> index 0000000..f86b5080
-> --- /dev/null
-> +++ b/drivers/clocksource/mtk_timer.c
-> @@ -0,0 +1,263 @@
-> +/*
-> + * Mediatek SoCs General-Purpose Timer handling.
-> + *
-> + * Copyright (C) 2014 Matthias Brugger
-> + *
-> + * Matthias Brugger <matthias.bgg@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/clockchips.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqreturn.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/slab.h>
-> +
-> +#define GPT_IRQ_EN_REG		0x00
-> +#define GPT_IRQ_ENABLE(val)	BIT(val-1)
-> +#define GPT_IRQ_ST_REG		0x04
-> +#define GPT_IRQ_ACK_REG		0x08
-> +#define GPT_IRQ_ACK(val)	BIT(val-1)
-> +
-> +#define TIMER_CTRL_REG(val)	(0x10 * val)
-> +#define TIMER_CTRL_OP(val)	(((val) & 0x3) << 4)
-> +#define TIMER_CTRL_OP_ONESHOT	(0)
-> +#define TIMER_CTRL_OP_REPEAT	(1)
-> +#define TIMER_CTRL_OP_KEEPGO	(2)
-> +#define TIMER_CTRL_OP_FREERUN	(3)
-> +#define TIMER_CTRL_CLEAR	(2)
-> +#define TIMER_CTRL_ENABLE	(1)
-> +#define TIMER_CTRL_DISABLE	(0)
-> +
-> +#define TIMER_CLK_REG(val)	(0x04 + (0x10 * val))
-> +#define TIMER_CLK_SRC(val)	(((val) & 0x1) << 4)
-> +#define TIMER_CLK_SRC_SYS13M	(0)
-> +#define TIMER_CLK_SRC_RTC32K	(1)
-> +#define TIMER_CLK_DIV1		(0x0)
-> +#define TIMER_CLK_DIV2		(0x1)
-> +#define TIMER_CLK_DIV3		(0x2)
-> +#define TIMER_CLK_DIV4		(0x3)
-> +#define TIMER_CLK_DIV5		(0x4)
-> +#define TIMER_CLK_DIV6		(0x5)
-> +#define TIMER_CLK_DIV7		(0x6)
-> +#define TIMER_CLK_DIV8		(0x7)
-> +#define TIMER_CLK_DIV9		(0x8)
-> +#define TIMER_CLK_DIV10		(0x9)
-> +#define TIMER_CLK_DIV11		(0xA)
-> +#define TIMER_CLK_DIV12		(0xB)
-> +#define TIMER_CLK_DIV13		(0xC)
-> +#define TIMER_CLK_DIV16		(0xD)
-> +#define TIMER_CLK_DIV32		(0xE)
-> +#define TIMER_CLK_DIV64		(0xF)
-> +
-> +#define TIMER_CNT_REG(val)	(0x08 + (0x10 * val))
-> +#define TIMER_CMP_REG(val)	(0x0C + (0x10 * val))
+Kevin
 
-Please remove unused macros.
+[1]
+>From 386d39a22e586fc1b060ad18c79247a50f2c0f8c Mon Sep 17 00:00:00 2001
+From: Kevin Hilman <khilman@linaro.org>
+Date: Fri, 23 May 2014 10:24:40 -0700
+Subject: [PATCH] PCI: pbus_mem_size(): don't disable small BAR windows
 
-> +
-> +#define GPT_CLK_EVT	1
-> +#define GPT_CLK_SRC	2
-> +
-> +
-> +
+Since commit 272c5a886c57 (PCI: Support BAR sizes up to 8GB), small
+BAR windows get disabled.
 
-extra lines.
+For small BAR sizes, order (as computed by __ffs(align) - 20) may be
+negative.  If order is negative, when checking if it's >=
+ARRAY_SIZE(aligns) will always be true (since the result of
+ARRAY_SIZE() is unsigned) and so those BARs will be disabled.
 
-> +struct mtk_clock_event_device {
-> +	void __iomem *gpt_base;
-> +	u32 ticks_per_jiffy;
-> +	struct clock_event_device dev;
-> +};
-> +
-> +static inline struct mtk_clock_event_device *to_mtk_clk(
-> +				struct clock_event_device *c)
-> +{
-> +	return container_of(c, struct mtk_clock_event_device, dev);
-> +}
-> +
-> +static void mtk_clkevt_time_stop(struct mtk_clock_event_device *evt, u8 timer)
-> +{
-> +	u32 val = readl(evt->gpt_base + TIMER_CTRL_REG(timer));
-> +	writel(val & ~TIMER_CTRL_ENABLE, evt->gpt_base +
-> +			TIMER_CTRL_REG(timer));
-> +}
-> +
-> +static void mtk_clkevt_time_setup(struct mtk_clock_event_device *evt,
-> +				unsigned long delay, u8 timer)
-> +{
-> +	writel(delay, evt->gpt_base + TIMER_CMP_REG(timer));
-> +}
-> +
-> +static void mtk_clkevt_time_start(struct mtk_clock_event_device *evt,
-> +		bool periodic, u8 timer)
-> +{
-> +	u32 val;
-> +
-> +	/* Acknowledge interrupt */
-> +	writel(GPT_IRQ_ACK(timer), evt->gpt_base + GPT_IRQ_ACK_REG);
-> +
-> +	val = readl(evt->gpt_base + TIMER_CTRL_REG(timer));
-> +
-> +	/* Clear 2 bit timer operation mode field */
-> +	val &= ~TIMER_CTRL_OP(0x3);
-> +
-> +	if (periodic)
-> +		val |= TIMER_CTRL_OP(TIMER_CTRL_OP_REPEAT);
-> +	else
-> +		val |= TIMER_CTRL_OP(TIMER_CTRL_OP_ONESHOT);
-> +
-> +	writel(val | TIMER_CTRL_ENABLE | TIMER_CTRL_CLEAR,
-> +	       evt->gpt_base + TIMER_CTRL_REG(timer));
-> +}
-> +
-> +static void mtk_clkevt_mode(enum clock_event_mode mode,
-> +				struct clock_event_device *clk)
-> +{
-> +	struct mtk_clock_event_device *evt = to_mtk_clk(clk);
-> +
-> +	mtk_clkevt_time_stop(evt, GPT_CLK_EVT);
-> +
-> +	switch (mode) {
-> +	case CLOCK_EVT_MODE_PERIODIC:
-> +		mtk_clkevt_time_setup(evt, evt->ticks_per_jiffy, GPT_CLK_EVT);
-> +		mtk_clkevt_time_start(evt, true, GPT_CLK_EVT);
-> +		break;
-> +	case CLOCK_EVT_MODE_ONESHOT:
-> +		mtk_clkevt_time_start(evt, false, GPT_CLK_EVT);
-> +		break;
-> +	case CLOCK_EVT_MODE_UNUSED:
-> +	case CLOCK_EVT_MODE_SHUTDOWN:
-> +	default:
-> +		/* No more interrupts will occur as source is disabled */
-> +		break;
-> +	}
-> +}
-> +
-> +static int mtk_clkevt_next_event(unsigned long event,
-> +				   struct clock_event_device *clk)
-> +{
-> +	struct mtk_clock_event_device *evt = to_mtk_clk(clk);
-> +
-> +	mtk_clkevt_time_stop(evt, GPT_CLK_EVT);
-> +	mtk_clkevt_time_setup(evt, event, GPT_CLK_EVT);
-> +	mtk_clkevt_time_start(evt, false, GPT_CLK_EVT);
-> +
-> +	return 0;
-> +}
-> +
-> +static irqreturn_t mtk_timer_interrupt(int irq, void *dev_id)
-> +{
-> +	struct mtk_clock_event_device *evt = dev_id;
-> +
-> +	/* Acknowledge timer0 irq */
-> +	writel(GPT_IRQ_ACK(GPT_CLK_EVT), evt->gpt_base + GPT_IRQ_ACK_REG);
-> +	evt->dev.event_handler(&evt->dev);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
-> +{
-> +	/* Disable all interrupts */
-> +	writel(0x0, evt->gpt_base + GPT_IRQ_EN_REG);
-> +	/* Acknowledge all interrupts */
-> +	writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
-> +}
-> +
-> +static void mtk_timer_reset(struct mtk_clock_event_device *evt, u8 timer)
-> +{
-> +	writel(TIMER_CTRL_CLEAR | TIMER_CTRL_DISABLE,
-> +		evt->gpt_base + TIMER_CTRL_REG(timer));
-> +	writel(0x0, evt->gpt_base + TIMER_CMP_REG(timer));
-> +}
-> +
-> +static void __init mtk_timer_init(struct device_node *node)
-> +{
-> +	struct mtk_clock_event_device *evt;
-> +	struct resource res;
-> +	unsigned long rate = 0;
-> +	struct clk *clk;
-> +	int ret;
-> +	u32 val;
-> +
-> +	evt = kzalloc(sizeof(*evt), GFP_KERNEL);
-> +	if (!evt)
-> +		panic("Can't allocate mtk clock event driver struct");
-> +
-> +	evt->dev.name = "mtk_tick";
-> +	evt->dev.rating = 300;
-> +	evt->dev.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
-> +	evt->dev.set_mode = mtk_clkevt_mode;
-> +	evt->dev.set_next_event = mtk_clkevt_next_event;
-> +	evt->dev.cpumask = cpu_possible_mask;
-> +
-> +	if (of_address_to_resource(node, 0, &res))
-> +		panic("Failed to parse resource\n");
-> +
-> +	if (!request_mem_region(res.start, resource_size(&res), "mtk-timer"))
-> +		panic("Registers are a busy IO resource");
-> +
-> +	evt->gpt_base = ioremap(res.start, resource_size(&res));
-> +	if (!evt->gpt_base)
-> +		panic("Can't map registers");
-> +
-> +	evt->dev.irq = irq_of_parse_and_map(node, 0);
-> +	if (evt->dev.irq <= 0)
-> +		panic("Can't parse IRQ");
-> +
-> +	clk = of_clk_get(node, 0);
-> +	if (IS_ERR(clk))
-> +		panic("Can't get timer clock");
-> +
-> +	clk_prepare_enable(clk);
-> +	rate = clk_get_rate(clk);
-> +
-> +	mtk_timer_global_reset(evt);
-> +
-> +	/* Configure clock source */
-> +	mtk_timer_reset(evt, GPT_CLK_SRC);
-> +
-> +	writel(TIMER_CLK_SRC(TIMER_CLK_SRC_SYS13M) | TIMER_CLK_DIV1,
-> +			evt->gpt_base + TIMER_CLK_REG(GPT_CLK_SRC));
-> +
-> +	writel(TIMER_CTRL_OP(TIMER_CTRL_OP_FREERUN) | TIMER_CTRL_ENABLE,
-> +			evt->gpt_base + TIMER_CTRL_REG(GPT_CLK_SRC));
-> +
-> +	clocksource_mmio_init(evt->gpt_base + TIMER_CNT_REG(GPT_CLK_SRC),
-> +			node->name, rate, 300, 32, clocksource_mmio_readl_up);
-> +
-> +	evt->ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
-> +
-> +	/* Configure clock event */
-> +	mtk_timer_reset(evt, GPT_CLK_EVT);
-> +
-> +	writel(TIMER_CLK_SRC(TIMER_CLK_SRC_SYS13M) | TIMER_CLK_DIV1,
-> +			evt->gpt_base + TIMER_CLK_REG(GPT_CLK_EVT));
-> +	writel(0, evt->gpt_base + TIMER_CMP_REG(GPT_CLK_EVT));
-> +
-> +	writel(TIMER_CTRL_OP(TIMER_CTRL_OP_REPEAT) | TIMER_CTRL_ENABLE,
-> +			evt->gpt_base + TIMER_CTRL_REG(GPT_CLK_EVT));
-> +
-> +	ret = request_irq(evt->dev.irq, mtk_timer_interrupt,
-> +			IRQF_TIMER | IRQF_IRQPOLL, "mtk_timer", evt);
-> +	if (ret)
-> +		pr_warn("failed to setup irq %d\n", evt->dev.irq);
-> +
-> +	/* Enable timer0 interrupt */
-> +	val = readl(evt->gpt_base + GPT_IRQ_EN_REG);
-> +	writel(val | GPT_IRQ_ENABLE(GPT_CLK_EVT),
-> +			evt->gpt_base + GPT_IRQ_EN_REG);
+It doesn't make sense for order to be negative, and the code already
+converts it to non-negative later on, so to fix this bug, ensure that
+order is non-negative before comapring with ARRAY_SIZE().
 
-Could you encapsulate in well named functions the different 'writel' above ?
+NOTE: Before commit 272c5a886c57, this worked just fine because order
+      wasn't compared with ARRAY_SIZE() but with a hard-coded int, so
+      the resulting signed compare worked fine.
 
-> +	clockevents_config_and_register(&evt->dev, rate, 0x3,
-> +					0xffffffff);
-> +}
-> +CLOCKSOURCE_OF_DECLARE(mtk_mt6589, "mediatek,mtk6577-timer", mtk_timer_init);
-> +
->
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+ drivers/pci/setup-bus.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-
+diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
+index 47482b27fa12..a4152566f531 100644
+--- a/drivers/pci/setup-bus.c
++++ b/drivers/pci/setup-bus.c
+@@ -966,6 +966,8 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask,
+ 			/* For bridges size != alignment */
+ 			align = pci_resource_alignment(dev, r);
+ 			order = __ffs(align) - 20;
++			if (order < 0)
++				order = 0;
+ 			if (order >= ARRAY_SIZE(aligns)) {
+ 				dev_warn(&dev->dev, "disabling BAR %d: %pR "
+ 					 "(bad alignment %#llx)\n", i, r,
+@@ -974,8 +976,6 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask,
+ 				continue;
+ 			}
+ 			size += r_size;
+-			if (order < 0)
+-				order = 0;
+ 			/* Exclude ranges with size > align from
+ 			   calculation of the alignment. */
+ 			if (r_size == align)
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+1.9.2
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+
+
+[2]
+[...]
+mvebu-pcie pcie-controller.3: PCI host bridge to bus 0000:00
+pci_bus 0000:00: root bus resource [io  0x1000-0xfffff]
+pci_bus 0000:00: root bus resource [mem 0xf8000000-0xffdfffff]
+pci_bus 0000:00: root bus resource [bus 00-ff]
+pci 0000:00:01.0: [11ab:6710] type 01 class 0x060400
+pci 0000:00:02.0: [11ab:6710] type 01 class 0x060400
+PCI: bus0: Fast back to back transfers disabled
+pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+pci 0000:00:02.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+PCI: bus1: Fast back to back transfers enabled
+pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
+pci 0000:02:00.0: [1b73:1009] type 00 class 0x0c0330
+pci 0000:02:00.0: reg 0x10: [mem 0x42000000-0x4200ffff 64bit]
+pci 0000:02:00.0: reg 0x18: [mem 0x42010000-0x42010fff 64bit]
+pci 0000:02:00.0: reg 0x20: [mem 0x42011000-0x42011fff 64bit]
+pci 0000:02:00.0: supports D1
+pci 0000:02:00.0: PME# supported from D0 D1 D3hot
+PCI: bus2: Fast back to back transfers disabled
+pci_bus 0000:02: busn_res: [bus 02-ff] end is updated to 02
+pci 0000:02:00.0: disabling BAR 0: [mem 0x42000000-0x4200ffff 64bit] (bad alignment 0x10000)
+pci 0000:02:00.0: disabling BAR 2: [mem 0x42010000-0x42010fff 64bit] (bad alignment 0x1000)
+pci 0000:02:00.0: disabling BAR 4: [mem 0x42011000-0x42011fff 64bit] (bad alignment 0x1000)
+pci 0000:00:01.0: PCI bridge to [bus 01]
+pci 0000:00:02.0: PCI bridge to [bus 02]
+Unhandled fault: external abort on non-linefetch (0x1008) at 0xf0080010
+Internal error: : 1008 [#1] SMP ARM
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.15.0-rc6-next-20140523-08540-gefd7e9bf5d99 #45
+task: ee81ab80 ti: ee83a000 task.ti: ee83a000
+PC is at quirk_usb_early_handoff+0x348/0x7dc
+LR is at ioremap_page_range+0xfc/0x1b4
+pc : [<c0297f54>]    lr : [<c01886d8>]    psr: a0000153
+sp : ee83bd48  ip : c0019a20  fp : c0620964
+r10: 00000100  r9 : ee83bdd0  r8 : 00010000
+r7 : f0080000  r6 : c0607e20  r5 : eeb7a800  r4 : eeb7a800
+r3 : 00000146  r2 : 00000000  r1 : f0090000  r0 : f0080000
+Flags: NzCv  IRQs on  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
+Control: 10c5387d  Table: 00004019  DAC: 00000015
+Process swapper/0 (pid: 1, stack limit = 0xee83a248)
+Stack: (0xee83bd48 to 0xee83c000)
+bd40:                   c04428d4 ee83bd80 c062ae30 c053ab4c eeb7a800 c0607e20
+bd60: c053ab4c 0000ffff ee83bdd0 00000100 c0620964 c01bc3a0 00000000 c01eda18
+bd80: eeb7a800 eeb78814 eeb78800 00000001 00010000 c01ab390 eeb7a800 c01ab534
+bda0: eeb7ac00 eeb78e14 eeb78e00 c01ab57c eeb77f80 eeb78e00 ee83be28 c0012d98
+bdc0: f0074000 c0007fc8 feef0000 00000000 eeb77f80 eeb77f80 ee8e3410 c0303450
+bde0: c01be984 c01be9cc ee83be24 00010100 00000002 00000021 00000000 c01bfb68
+be00: eea1a0b8 000007cb 00000065 00000000 eeff2cb4 ee8e3410 ee83be24 10624dd3
+be20: 00000000 eea18210 c05e69c8 00000001 ee83be24 c01be9cc c01be984 00000000
+be40: 00000000 00000000 c0303450 c01bf794 c01be818 00000000 00000000 ee8e3410
+be60: c05e6984 00000000 c05e6984 00000000 00000000 ee83a000 00000000 c01f05b0
+be80: c01f0598 ee8e3410 c062c548 c01ef280 ee8e3410 c05e6984 ee8e3444 00000000
+bea0: c059f558 c01ef434 00000000 c05e6984 c01ef3a8 c01eda80 ee80965c ee8d47b4
+bec0: c05e6984 eeb1a000 c05edcc8 c01eea48 c0505490 c05c6de8 c05e6984 c05e6984
+bee0: c05d5198 eeb70f40 c0607e00 c01efa74 00000000 c05d5198 c05d5198 c0008984
+bf00: c0610304 ee82bc00 c042e950 00000010 c0607e00 c0563398 00000000 c00f5a90
+bf20: 00000000 c05d84a4 60000153 00000001 ef7fce1b c04403d0 000000a2 c00366c0
+bf40: c0562978 00000006 ef7fce26 00000006 c05d8474 c05c6de8 00000006 c05b5f30
+bf60: c0607e00 000000a2 c05b5f3c c058b5a4 00000000 c058bd14 00000006 00000006
+bf80: c058b5a4 00000000 00000000 c0422ffc 00000000 00000000 00000000 00000000
+bfa0: 00000000 c0423004 00000000 c000e5b8 00000000 00000000 00000000 00000000
+bfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+bfe0: 00000000 00000000 00000000 00000000 00000013 00000000 00000000 00000000
+[<c0297f54>] (quirk_usb_early_handoff) from [<c01bc3a0>] (pci_fixup_device+0xd4/0x184)
+[<c01bc3a0>] (pci_fixup_device) from [<c01ab390>] (pci_bus_add_device+0x14/0x64)
+[<c01ab390>] (pci_bus_add_device) from [<c01ab534>] (pci_bus_add_devices+0x3c/0x9c)
+[<c01ab534>] (pci_bus_add_devices) from [<c01ab57c>] (pci_bus_add_devices+0x84/0x9c)
+[<c01ab57c>] (pci_bus_add_devices) from [<c0012d98>] (pci_common_init_dev+0x184/0x2dc)
+[<c0012d98>] (pci_common_init_dev) from [<c01bfb68>] (mvebu_pcie_probe+0x3ac/0x604)
+[<c01bfb68>] (mvebu_pcie_probe) from [<c01f05b0>] (platform_drv_probe+0x18/0x48)
+[<c01f05b0>] (platform_drv_probe) from [<c01ef280>] (driver_probe_device+0x100/0x228)
+[<c01ef280>] (driver_probe_device) from [<c01ef434>] (__driver_attach+0x8c/0x90)
+[<c01ef434>] (__driver_attach) from [<c01eda80>] (bus_for_each_dev+0x54/0x88)
+[<c01eda80>] (bus_for_each_dev) from [<c01eea48>] (bus_add_driver+0xd4/0x1d0)
+[<c01eea48>] (bus_add_driver) from [<c01efa74>] (driver_register+0x78/0xf4)
+[<c01efa74>] (driver_register) from [<c0008984>] (do_one_initcall+0x80/0x1b8)
+[<c0008984>] (do_one_initcall) from [<c058bd14>] (kernel_init_freeable+0xfc/0x1c8)
+[<c058bd14>] (kernel_init_freeable) from [<c0423004>] (kernel_init+0x8/0xec)
+[<c0423004>] (kernel_init) from [<c000e5b8>] (ret_from_fork+0x14/0x3c)
+Code: e3a02000 ebf5fd27 e2507000 0affff59 (e5973010) 
+---[ end trace 20c08b6c6486c9b6 ]---
+Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
