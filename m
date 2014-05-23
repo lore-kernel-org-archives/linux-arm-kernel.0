@@ -1,34 +1,57 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 23 May 2014 15:51:06 +0800
-Subject: [PATCH 03/22] clk: sunxi: add "pll6" to sun6i protected clock list
+Date: Fri, 23 May 2014 15:51:21 +0800
+Subject: [PATCH 18/22] ARM: sunxi: Introduce Allwinner A23 support
 In-Reply-To: <1400831485-28576-1-git-send-email-wens@csie.org>
 References: <1400831485-28576-1-git-send-email-wens@csie.org>
-Message-ID: <1400831485-28576-4-git-send-email-wens@csie.org>
+Message-ID: <1400831485-28576-19-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PLL6 is used by some important but undocumented module, most likely
-memory related, such as mbus or the actual memory controller. As we
-do not have a driver for that, add pll6 to the list of protected
-clocks, so that it won't be disabled and leave us with a non-responsive
-system.
+The Allwinner A23 is a dual-core Cortex-A7-based SoC. It re-uses most of
+the IPs found in previous SoCs, notably the A31.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi/clk-sunxi.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-sunxi/Kconfig |  8 ++++++++
+ arch/arm/mach-sunxi/sunxi.c | 12 ++++++++++++
+ 2 files changed, 20 insertions(+)
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index e0e24d5..3e33bc1 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -1229,6 +1229,7 @@ CLK_OF_DECLARE(sun7i_a20_clk_init, "allwinner,sun7i-a20", sun5i_init_clocks);
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index 0fbd4f1..6434e3b 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -35,4 +35,12 @@ config MACH_SUN7I
+ 	select HAVE_ARM_ARCH_TIMER
+ 	select SUN5I_HSTIMER
  
- static const char *sun6i_critical_clocks[] __initdata = {
- 	"cpu",
-+	"pll6", /* something we don't know about uses pll6 */
- 	"ahb1_sdram",
- };
- 
++config MACH_SUN8I
++	bool "Allwinner A23 (sun8i) SoCs support"
++	default ARCH_SUNXI
++	select ARCH_HAS_RESET_CONTROLLER
++	select ARM_GIC
++	select MFD_SUN6I_PRCM
++	select RESET_CONTROLLER
++
+ endif
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index df906e3..a43b295 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -159,3 +159,15 @@ DT_MACHINE_START(SUN7I_DT, "Allwinner sun7i (A20) Family")
+ 	.dt_compat	= sun7i_board_dt_compat,
+ 	.restart	= sun4i_restart,
+ MACHINE_END
++
++static const char * const sun8i_board_dt_compat[] = {
++	"allwinner,sun8i-a23",
++	NULL,
++};
++
++DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23) Family")
++	.init_machine	= sunxi_dt_init,
++	.init_time	= sun6i_timer_init,
++	.dt_compat	= sun8i_board_dt_compat,
++	.restart	= sun6i_restart,
++MACHINE_END
 -- 
 2.0.0.rc2
