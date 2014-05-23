@@ -1,125 +1,82 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:30:46 +0200
-Subject: [PATCH 06/71] clocksource: sh_cmt: Rename mapbase/mapbase_str to
- mapbase_ch/mapbase
+Date: Fri, 23 May 2014 12:30:47 +0200
+Subject: [PATCH 07/71] clocksource: sh_cmt: Add memory base to sh_cmt_channel
+ structure
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-6-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-7-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The mapbase variable points to the mapped base address of the channel,
-rename it to mapbase_sh. mapbase_str points to the mapped base address
-of the CMT device, rename it to mapbase.
+The channel memory base is channel-specific, add it to the channel
+structure in preparation for support of multiple channels per device.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/clocksource/sh_cmt.c |   34 +++++++++++++++++-----------------
- 1 file changed, 17 insertions(+), 17 deletions(-)
+ drivers/clocksource/sh_cmt.c |   13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
-index febd6bf..eb93b88 100644
+index eb93b88..4fcb05d 100644
 --- a/drivers/clocksource/sh_cmt.c
 +++ b/drivers/clocksource/sh_cmt.c
-@@ -55,8 +55,8 @@ struct sh_cmt_channel {
- struct sh_cmt_device {
- 	struct platform_device *pdev;
+@@ -40,6 +40,8 @@ struct sh_cmt_device;
+ struct sh_cmt_channel {
+ 	struct sh_cmt_device *cmt;
  
-+	void __iomem *mapbase_ch;
- 	void __iomem *mapbase;
--	void __iomem *mapbase_str;
- 	struct clk *clk;
- 
- 	struct sh_cmt_channel channel;
-@@ -125,41 +125,41 @@ static void sh_cmt_write32(void __iomem *base, unsigned long offs,
- 
- static inline unsigned long sh_cmt_read_cmstr(struct sh_cmt_channel *ch)
- {
--	return ch->cmt->read_control(ch->cmt->mapbase_str, 0);
-+	return ch->cmt->read_control(ch->cmt->mapbase, 0);
- }
++	void __iomem *base;
++
+ 	unsigned long flags;
+ 	unsigned long match_value;
+ 	unsigned long next_match_value;
+@@ -130,12 +132,12 @@ static inline unsigned long sh_cmt_read_cmstr(struct sh_cmt_channel *ch)
  
  static inline unsigned long sh_cmt_read_cmcsr(struct sh_cmt_channel *ch)
  {
--	return ch->cmt->read_control(ch->cmt->mapbase, CMCSR);
-+	return ch->cmt->read_control(ch->cmt->mapbase_ch, CMCSR);
+-	return ch->cmt->read_control(ch->cmt->mapbase_ch, CMCSR);
++	return ch->cmt->read_control(ch->base, CMCSR);
  }
  
  static inline unsigned long sh_cmt_read_cmcnt(struct sh_cmt_channel *ch)
  {
--	return ch->cmt->read_count(ch->cmt->mapbase, CMCNT);
-+	return ch->cmt->read_count(ch->cmt->mapbase_ch, CMCNT);
+-	return ch->cmt->read_count(ch->cmt->mapbase_ch, CMCNT);
++	return ch->cmt->read_count(ch->base, CMCNT);
  }
  
  static inline void sh_cmt_write_cmstr(struct sh_cmt_channel *ch,
- 				      unsigned long value)
- {
--	ch->cmt->write_control(ch->cmt->mapbase_str, 0, value);
-+	ch->cmt->write_control(ch->cmt->mapbase, 0, value);
- }
- 
+@@ -147,19 +149,19 @@ static inline void sh_cmt_write_cmstr(struct sh_cmt_channel *ch,
  static inline void sh_cmt_write_cmcsr(struct sh_cmt_channel *ch,
  				      unsigned long value)
  {
--	ch->cmt->write_control(ch->cmt->mapbase, CMCSR, value);
-+	ch->cmt->write_control(ch->cmt->mapbase_ch, CMCSR, value);
+-	ch->cmt->write_control(ch->cmt->mapbase_ch, CMCSR, value);
++	ch->cmt->write_control(ch->base, CMCSR, value);
  }
  
  static inline void sh_cmt_write_cmcnt(struct sh_cmt_channel *ch,
  				      unsigned long value)
  {
--	ch->cmt->write_count(ch->cmt->mapbase, CMCNT, value);
-+	ch->cmt->write_count(ch->cmt->mapbase_ch, CMCNT, value);
+-	ch->cmt->write_count(ch->cmt->mapbase_ch, CMCNT, value);
++	ch->cmt->write_count(ch->base, CMCNT, value);
  }
  
  static inline void sh_cmt_write_cmcor(struct sh_cmt_channel *ch,
  				      unsigned long value)
  {
--	ch->cmt->write_count(ch->cmt->mapbase, CMCOR, value);
-+	ch->cmt->write_count(ch->cmt->mapbase_ch, CMCOR, value);
+-	ch->cmt->write_count(ch->cmt->mapbase_ch, CMCOR, value);
++	ch->cmt->write_count(ch->base, CMCOR, value);
  }
  
  static unsigned long sh_cmt_get_counter(struct sh_cmt_channel *ch,
-@@ -761,18 +761,18 @@ static int sh_cmt_setup(struct sh_cmt_device *cmt, struct platform_device *pdev)
- 	/* optional resource for the shared timer start/stop register */
- 	res2 = platform_get_resource(cmt->pdev, IORESOURCE_MEM, 1);
+@@ -702,6 +704,7 @@ static int sh_cmt_setup_channel(struct sh_cmt_channel *ch,
  
--	/* map memory, let mapbase point to our channel */
--	cmt->mapbase = ioremap_nocache(res->start, resource_size(res));
--	if (cmt->mapbase == NULL) {
-+	/* map memory, let mapbase_ch point to our channel */
-+	cmt->mapbase_ch = ioremap_nocache(res->start, resource_size(res));
-+	if (cmt->mapbase_ch == NULL) {
- 		dev_err(&cmt->pdev->dev, "failed to remap I/O memory\n");
- 		goto err0;
- 	}
+ 	memset(ch, 0, sizeof(*ch));
+ 	ch->cmt = cmt;
++	ch->base = cmt->mapbase_ch;
  
- 	/* map second resource for CMSTR */
--	cmt->mapbase_str = ioremap_nocache(res2 ? res2->start :
--					   res->start - cfg->channel_offset,
--					   res2 ? resource_size(res2) : 2);
--	if (cmt->mapbase_str == NULL) {
-+	cmt->mapbase = ioremap_nocache(res2 ? res2->start :
-+				       res->start - cfg->channel_offset,
-+				       res2 ? resource_size(res2) : 2);
-+	if (cmt->mapbase == NULL) {
- 		dev_err(&cmt->pdev->dev, "failed to remap I/O second memory\n");
- 		goto err1;
- 	}
-@@ -824,9 +824,9 @@ err4:
- err3:
- 	clk_put(cmt->clk);
- err2:
--	iounmap(cmt->mapbase_str);
--err1:
- 	iounmap(cmt->mapbase);
-+err1:
-+	iounmap(cmt->mapbase_ch);
- err0:
- 	return ret;
- }
+ 	irq = platform_get_irq(cmt->pdev, 0);
+ 	if (irq < 0) {
 -- 
 1.7.9.5
