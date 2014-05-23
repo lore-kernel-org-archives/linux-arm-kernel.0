@@ -1,31 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 May 2014 07:28:30 -0700
-Subject: [PATCH v3 0/3] ARM: dts: overo: Add panel support
-In-Reply-To: <537F0441.50507@ti.com>
-References: <1400594337-5096-1-git-send-email-florian.vaussard@epfl.ch>
- <537EF413.5050600@epfl.ch> <537F0441.50507@ti.com>
-Message-ID: <20140523142830.GA2321@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 23 May 2014 15:29:33 +0100
+Subject: [PATCHv2 0/6] arm64:lib: the optimized string library routines
+ for armv8 processors
+In-Reply-To: <5375F8C6.1030907@linaro.org>
+References: <1398661895-5559-1-git-send-email-zhichang.yuan@linaro.org>
+ <20140509125617.GD7950@arm.com> <5375F8C6.1030907@linaro.org>
+Message-ID: <20140523142933.GM9252@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [140523 01:19]:
-> On 23/05/14 10:09, Florian Vaussard wrote:
-> > Hi Tomi,
-> > 
-> > On 05/20/2014 03:58 PM, Florian Vaussard wrote:
-> >> Hi,
-> >>
-> >> This series enables the DVI and LCD panels present on some of
-> >> the Overo expansion boards.
-> >>
-> > 
-> > Do you have any more comments on these? If no, do you want to pull them
-> > through your tree for 3.16, as discussed with Tony?
+On Fri, May 16, 2014 at 12:38:46PM +0100, zhichang.yuan wrote:
+> On 2014?05?09? 20:56, Catalin Marinas wrote:
+> > On Mon, Apr 28, 2014 at 06:11:28AM +0100, zhichang.yuan at linaro.org wrote:
+> >> * Done LTP on big-endian and little-endian system according to
+> >> maintianers' requirement. The test results can be found at
+> >> https://wiki.linaro.org/WorkingGroups/Kernel/ARMv8/CortexStringsTests.
+> > It's not clear to me from the above page but have you done a compat
+> > (AArch32) LTP test as well?
 > 
-> Yes, I can take these.
+> O, i missed the LTP test on compatible Aarch32 mode.
+> At the moment, i have supplement these LTP tests. The LTP tests were OK.
 > 
-> Tony, do I have your ack on this series?
+> According to the new test result, I rewrote the test report at
+> https://wiki.linaro.org/WorkingGroups/Kernel/ARMv8/CortexStringsTests .
 
-Yes please go ahead and queue these:
+Thanks. I merged the patches and should appear in -next in the following
+days. We'll run some tests as well to make sure.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+BTW, I'm off for a week, so if there are any issues please talk to Will.
+
+-- 
+Catalin
