@@ -1,42 +1,52 @@
-From: chris@printf.net (Chris Ball)
-Date: Fri, 23 May 2014 13:53:29 +0100
-Subject: [PATCH v3 2/2] mmc: tegra: fix reporting of base clock frequency
-In-Reply-To: <CAPDyKFqBcp7PZQ-04s02Jrqscna0UVex2DEbVPYghmRR8g9HnA@mail.gmail.com>
- (Ulf Hansson's message of "Fri, 23 May 2014 09:04:12 +0200")
-References: <1400774136-12396-1-git-send-email-abrestic@chromium.org>
- <1400774136-12396-2-git-send-email-abrestic@chromium.org>
- <CAPDyKFqBcp7PZQ-04s02Jrqscna0UVex2DEbVPYghmRR8g9HnA@mail.gmail.com>
-Message-ID: <86bnuor706.fsf@void.printf.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 23 May 2014 14:56:07 +0200
+Subject: [PATCH 03/10] irqchip: versatile-fpga: add pass-thru enable
+ support
+In-Reply-To: <1400620176-7239-4-git-send-email-robherring2@gmail.com>
+References: <1400620176-7239-1-git-send-email-robherring2@gmail.com>
+ <1400620176-7239-4-git-send-email-robherring2@gmail.com>
+Message-ID: <CACRpkdbarWMjn6cVSeWCFO7v9Qj_np5gL+7=NMB7NHkoMEPovA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, May 20, 2014 at 11:09 PM, Rob Herring <robherring2@gmail.com> wrote:
 
-On Fri, May 23 2014, Ulf Hansson wrote:
-> On 22 May 2014 17:55, Andrew Bresticker <abrestic@chromium.org> wrote:
->> Tegra SDHCI controllers, by default, report a base clock frequency
->> of 208Mhz in SDHCI_CAPABILTIES which may or may not be equal to the
->> actual base clock frequency.  This is because the clock rate is
->> configured by the clock controller, which is external to the SD/MMC
->> controller.  Since the SD/MMC controller has no knowledge of how this
->> clock is configured, it will simply report the maximum frequency.
->> While the reported value can be overridden by setting BASE_CLK_FREQ in
->> VENDOR_CLOCK_CTRL on Tegra30 and later SoCs, just set CAP_CLOCK_BASE_BROKEN
->> and supply sdhci_pltfm_clk_get_max_clock(), which simply does a
->> clk_get_rate(), as the get_max_clock() callback.
->>
->> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
->> Tested-by: Stephen Warren <swarren@nvidia.com>
->> Acked-by: Stephen Warren <swarren@nvidia.com>
+> From: Rob Herring <robh@kernel.org>
 >
-> Thanks Andrew!
+> Set the PIC_ENABLES register when the passthru-mask property is present.
+> This enables interrupts on the secondary controller to be passed thru
+> directly to the primary controller.
 >
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->
-> Chris, can you pick this up?
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
 
-Thanks, pushed to mmc-next for 3.16.
+(...)
 
-- Chris.
--- 
-Chris Ball   <http://printf.net/>
+> +#define PIC_ENABLES             0x20   /* set interrupt pass through bits */
+
+What register is this? In this hardware register 0x20 is
+#define FIQ_STATUS              0x20
+
+Do you mean that this FPGA IRQ controller is an augmented version
+with the FIQ portions removed and instead it has some special
+routing register at 0x20?
+
+In that case it should have a different compatible-string should it not?
+
+I was under the impression that this was just a simple cascaded
+IRQ controller cascaded off bit 31 of the VIC, which is much simpler
+to handle, maybe in the manner of commits
+e641b987c20832dfaaa51d7792ed928c2b2d2dbf
+"irqchip: support cascaded VICs"
+f6da9fe45c3074b909084ae9da5f55034ebffeb4
+"irqchip: vic: Properly chain the cascaded IRQs"
+
+But for the fpga IRQ driver. Atleast that is how the comments in
+the device tree says it should work so something is odd
+here :-/
+
+I really want to know how this special register works.
+
+Yours,
+Linus Walleij
