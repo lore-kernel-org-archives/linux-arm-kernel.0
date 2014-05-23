@@ -1,66 +1,64 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 23 May 2014 13:50:14 +0200
-Subject: [PATCH v2] ARM: at91: #if 0 out ISI code for AT91SAM9263
-In-Reply-To: <F4C251BF-666E-4E89-A6F7-3D96A669A8D8@jcrosoft.com>
-References: <1400142868.20469.12.camel@x220>
- <F4C251BF-666E-4E89-A6F7-3D96A669A8D8@jcrosoft.com>
-Message-ID: <1400845814.31526.29.camel@x220>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 23 May 2014 13:50:40 +0200
+Subject: RFC: representing sdio devices oob interrupt, clks, etc. in device
+ tree
+In-Reply-To: <20140523112239.GB12304@sirena.org.uk>
+References: <537DC832.3020006@redhat.com>
+ <CAGb2v64VZac2KvAALrScecN89sRnBQoDrKxKMvkte+3G04NXeA@mail.gmail.com>
+ <537DE1AA.5050606@redhat.com> <537E31F7.1030505@gmail.com>
+ <537F1148.3010102@redhat.com> <20140523112239.GB12304@sirena.org.uk>
+Message-ID: <537F3610.3050104@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In v2.6.25 code was added for an Image Sensor Interface (ISI) for
-AT91SAM9263. That code depended on the Kconfig macro
-CONFIG_VIDEO_AT91_ISI and its MODULE variant. The related Kconfig symbol
-has never been added to the tree. The net effect of this was that
-at91_add_device_isi() was a NOP. No one noticed because no callers of
-that function were added to the tree at that time.
+Hi,
 
-The first caller of a function with that name was added in v3.4. But
-that caller apparently only called the function defined for AT91SAM9G45.
-(that function was also added in v3.4). So even then AT91SAM9263's NOP
-version of at91_add_device_isi() remained unused.
+On 05/23/2014 01:22 PM, Mark Brown wrote:
+> On Fri, May 23, 2014 at 11:13:44AM +0200, Hans de Goede wrote:
+> 
+>> Thinking more about this, I would like to make one change to my
+>> proposal, the mmc-core should only do power up of child-nodes if
+>> they have a compatible of: "simple-sdio-powerup". This way
+>> when we add something more complex, we can keep the simple powerup
+>> code in the mmc core, keeping what we've already using this working
+>> and the mmc core won't respond to the child nodes for more complex
+>> devices, so it won't conflict with more complex power-up handling
+>> handled by some other driver.
+> 
+> Would it not be better to have this be something in the driver struct
+> rather than in the device tree?  Putting a compatible in there would be
+> encoding details of the Linux implementation in the DT which doesn't
+> seem right especially since these are details we're thinking of changing
+> later on.
 
-This means that the ISI code for AT91SAM9263 could be removed. But,
-since it can be useful for future reference, let's "#if 0" it instead.
+The compatible is not a Linux specific thing, it is a marking saying
+that something needs to take care of enabling the clks (and whatever
+else we will make part of the binding for this compatible), before
+scanning the mmc bus.
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-v2: Jean-Christophe would like to keep the information currently hidden
-behind "#if defined(CONFIG_VIDEO_AT91_ISI) [...]". I'd like the
-reference to that Kconfig macro dropped. Using "#if 0" will do both, so
-that makes for a nice compromise, I'd say.
+> Something like have the driver set flags saying if it wants
+> to do complicated things.
 
-Josh verified that this definition of at91_add_device_isi() never will
-be called. Thanks!
+Chicken <-> egg, we won't know which driver to use before we've probed
+the mmc bus, and we cannot probe the bus before enabling the clks, etc.
 
-Still untested!
+>> FWIW if we ever get truely complex cases I think modeling the
+>> power-up hardware as a pmic platform device is not a bad idea,
+>> we would then need to have a generic mmc-host pmic property, which
+>> would be used both to do the initial powerup before scanning, as
+>> well as for the sdio device driver to get a handle to the pmic,
+>> for run time power-management (if desired).
+> 
+> I don't know if this will ever apply to SDIO but with other buses the
+> complicated bits come when the driver wants to take over some of the
+> power management do things like turn some of the supplies or clocks on
+> and off independently at runtime for low power modes.
 
- arch/arm/mach-at91/at91sam9263_devices.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+Hmm, good point in that case actually having these things in the
+child node makes most sense, because then the driver can find them
+their. Note that the mmc core enabling things does not mean that
+the driver cannot later disable them if needed.
 
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index 43d53d6156dd..30af3048ade5 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -900,8 +900,7 @@ void __init at91_add_device_lcdc(struct atmel_lcdfb_pdata *data) {}
-  *  Image Sensor Interface
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_VIDEO_AT91_ISI) || defined(CONFIG_VIDEO_AT91_ISI_MODULE)
--
-+#if 0 /* keep for future reference */
- struct resource isi_resources[] = {
- 	[0] = {
- 		.start	= AT91SAM9263_BASE_ISI,
-@@ -947,9 +946,6 @@ void __init at91_add_device_isi(struct isi_platform_data *data,
- 		/* TODO: register the PCK for ISI_MCK and set its parent */
- 	}
- }
--#else
--void __init at91_add_device_isi(struct isi_platform_data *data,
--		bool use_pck_as_mck) {}
- #endif
- 
- 
--- 
-1.9.0
+Regards,
+
+Hans
