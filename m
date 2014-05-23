@@ -1,44 +1,56 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Fri, 23 May 2014 09:23:32 +0900
-Subject: [PATCH RESEND] ARM: trusted_foundations: fix compile error on non-SMP
-Message-ID: <1400804612-11876-1-git-send-email-acourbot@nvidia.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 23 May 2014 10:45:34 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+Message-ID: <20140523104534.467b452b@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The setup_max_cpus variable is only defined if CONFIG_SMP is set. Add
-a preprocessor condition to avoid the following compilation error if
-CONFIG_SMP is not set:
+Hi all,
 
-    arch/arm/include/asm/trusted_foundations.h: In function 'register_trusted_foundations':
-    arch/arm/include/asm/trusted_foundations.h:57:2: error: 'setup_max_cpus' undeclared (first use in this function)
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-mvebu/board-v7.c between commit 8ae2473d96f1 ("ARM: l2c:
+mvebu: convert to generic l2c OF initialisation") from the arm tree and
+commit 5686a1e5aa43 ("bus: mvebu: pass the coherency availability
+information at init time") from the arm-soc tree.
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-Hi Stephen,
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-This patch has been originally submitted through Russell's patch tracker,
-where it has stayed untouched for ~3 weeks now. Considering that this
-fixes a compilation error and should thus be made available quickly, and
-that Tegra is the only user of Trusted Foundations, would you agree to take
-it into your tree?
-
- arch/arm/include/asm/trusted_foundations.h | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
-index b5f7705..624e1d4 100644
---- a/arch/arm/include/asm/trusted_foundations.h
-+++ b/arch/arm/include/asm/trusted_foundations.h
-@@ -54,7 +54,9 @@ static inline void register_trusted_foundations(
- 	 */
- 	pr_err("No support for Trusted Foundations, continuing in degraded mode.\n");
- 	pr_err("Secondary processors as well as CPU PM will be disabled.\n");
-+#if IS_ENABLED(CONFIG_SMP)
- 	setup_max_cpus = 0;
-+#endif
- 	cpu_idle_poll_ctrl(true);
- }
- 
 -- 
-1.9.2
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-mvebu/board-v7.c
+index 48169caa56ea,01cfce6ac20b..000000000000
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@@ -57,8 -75,10 +75,9 @@@ static void __init mvebu_timer_and_clk_
+  {
+  	of_clk_init(NULL);
+  	clocksource_of_init();
++ 	mvebu_scu_enable();
+  	coherency_init();
+- 	BUG_ON(mvebu_mbus_dt_init());
++ 	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
+ -	l2x0_of_init(0, ~0UL);
+  
+  	if (of_machine_is_compatible("marvell,armada375"))
+  		hook_fault_code(16 + 6, armada_375_external_abort_wa, SIGBUS, 0,
+@@@ -121,9 -195,8 +196,10 @@@ static const char * const armada_375_dt
+  };
+  
+  DT_MACHINE_START(ARMADA_375_DT, "Marvell Armada 375 (Device Tree)")
+ +	.l2c_aux_val	= 0,
+ +	.l2c_aux_mask	= ~0,
+  	.init_time	= mvebu_timer_and_clk_init,
++ 	.init_machine	= mvebu_dt_init,
+  	.restart	= mvebu_restart,
+  	.dt_compat	= armada_375_dt_compat,
+  MACHINE_END
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140523/0f19e078/attachment.sig>
