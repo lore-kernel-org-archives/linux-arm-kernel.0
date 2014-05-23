@@ -1,14 +1,14 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 23 May 2014 14:57:57 +0100
-Subject: [RFC v2 09/10] serial: amba-pl011: Pass on FIQ information to KGDB.
+Date: Fri, 23 May 2014 14:57:58 +0100
+Subject: [RFC v2 10/10] serial: asc: Add support for KGDB's FIQ/NMI mode
 In-Reply-To: <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
 References: <1400083125-1464-1-git-send-email-daniel.thompson@linaro.org>
  <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1400853478-5824-10-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1400853478-5824-11-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the AMBA bus has provided the pl011 with a FIQ resource (i.e. a
+If the platform bus has provided the st-asc with a FIQ resource (i.e. a
 second IRQ) then speculatively register it with KGDB when the polling
 driver is initialized.
 
@@ -16,173 +16,92 @@ By providing this information to KGDB the serial driver offers
 "permission" for KGDB to route the UART interrupt signal from the
 drivers own handler to KGDBs FIQ handler (which will eventually use the
 UART's polled I/O callbacks to interact with the user). This permission
-also implies the amba-pl011 driver has already unmasked RX interrupts
-(otherwise the FIQ handler will never trigger).
+also implies the st-asc driver has already unmasked RX interrupts
+(otherwise the FIQ handler will never trigger). This unmask is copied
+from similar code in amba-pl011.c .
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+Cc: Maxime Coquelin <maxime.coquelin@st.com>
+Cc: Patrice Chotard <patrice.chotard@st.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: Jiri Slaby <jslaby@suse.cz>
+Cc: kernel at stlinux.com
 Cc: linux-serial at vger.kernel.org
 ---
- drivers/tty/serial/amba-pl011.c | 101 ++++++++++++++++++++++++----------------
- 1 file changed, 60 insertions(+), 41 deletions(-)
+ drivers/tty/serial/st-asc.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index dacf0a0..d34c72c 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -58,6 +58,7 @@
- #include <linux/pinctrl/consumer.h>
- #include <linux/sizes.h>
- #include <linux/io.h>
+diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
+index c7f61ac..328720f 100644
+--- a/drivers/tty/serial/st-asc.c
++++ b/drivers/tty/serial/st-asc.c
+@@ -30,6 +30,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/serial_core.h>
+ #include <linux/clk.h>
 +#include <linux/kgdb.h>
  
- #define UART_NR			14
- 
-@@ -158,6 +159,7 @@ struct uart_amba_port {
- 	unsigned int		old_cr;		/* state during shutdown */
- 	bool			autorts;
- 	char			type[12];
-+	int			fiq;
- #ifdef CONFIG_DMA_ENGINE
- 	/* DMA stuff */
- 	bool			using_tx_dma;
-@@ -1416,8 +1418,63 @@ static void pl011_break_ctl(struct uart_port *port, int break_state)
- 	spin_unlock_irqrestore(&uap->port.lock, flags);
+ #define DRIVER_NAME "st-asc"
+ #define ASC_SERIAL_NAME "ttyAS"
+@@ -39,6 +40,7 @@
+ struct asc_port {
+ 	struct uart_port port;
+ 	struct clk *clk;
++	int fiq;
+ 	unsigned int hw_flow_control:1;
+ 	unsigned int force_m1:1;
+ };
+@@ -613,6 +615,26 @@ asc_verify_port(struct uart_port *port, struct serial_struct *ser)
  }
  
-+static int pl011_hwinit(struct uart_port *port)
-+{
-+	struct uart_amba_port *uap = (struct uart_amba_port *)port;
-+	int retval;
-+
-+	/* Optionaly enable pins to be muxed in and configured */
-+	pinctrl_pm_select_default_state(port->dev);
-+
-+	/*
-+	 * Try to enable the clock producer.
-+	 */
-+	retval = clk_prepare_enable(uap->clk);
-+	if (retval)
-+		goto out;
-+
-+	uap->port.uartclk = clk_get_rate(uap->clk);
-+
-+	/* Clear pending error and receive interrupts */
-+	writew(UART011_OEIS | UART011_BEIS | UART011_PEIS | UART011_FEIS |
-+	       UART011_RTIS | UART011_RXIS, uap->port.membase + UART011_ICR);
-+
-+	/*
-+	 * Save interrupts enable mask, and enable RX interrupts in case if
-+	 * the interrupt is used for NMI entry.
-+	 */
-+	uap->im = readw(uap->port.membase + UART011_IMSC);
-+	writew(UART011_RTIM | UART011_RXIM, uap->port.membase + UART011_IMSC);
-+
-+	if (dev_get_platdata(uap->port.dev)) {
-+		struct amba_pl011_data *plat;
-+
-+		plat = dev_get_platdata(uap->port.dev);
-+		if (plat->init)
-+			plat->init();
-+	}
-+	return 0;
-+ out:
-+	return retval;
-+}
-+
  #ifdef CONFIG_CONSOLE_POLL
- 
-+static int pl011_poll_init(struct uart_port *port)
-+{
-+	struct uart_amba_port *uap = (struct uart_amba_port *)port;
-+	int retval;
-+
-+	retval = pl011_hwinit(port);
 +
 +#ifdef CONFIG_KGDB_FIQ
-+	if (retval == 0 && uap->fiq > 0)
-+		kgdb_register_fiq(uap->fiq);
-+#endif
++/*
++ * Prepare the UART to be used from kgdb's NMI support.
++ */
++static int asc_poll_init(struct uart_port *port)
++{
++	struct asc_port *ascport = container_of(port, struct asc_port, port);
 +
-+	return retval;
++	/* register the FIQ with kgdb */
++	if (ascport->fiq >= 0)
++		kgdb_register_fiq(ascport->fiq);
++
++	/* enable RX interrupts in case the interrupt is used for NMI entry. */
++	asc_enable_rx_interrupts(port);
++
++	return 0;
 +}
++#endif /* CONFIG_KGDB_FIQ */
 +
- static void pl011_quiesce_irqs(struct uart_port *port)
- {
- 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
-@@ -1471,46 +1528,6 @@ static void pl011_put_poll_char(struct uart_port *port,
- 
- #endif /* CONFIG_CONSOLE_POLL */
- 
--static int pl011_hwinit(struct uart_port *port)
--{
--	struct uart_amba_port *uap = (struct uart_amba_port *)port;
--	int retval;
--
--	/* Optionaly enable pins to be muxed in and configured */
--	pinctrl_pm_select_default_state(port->dev);
--
--	/*
--	 * Try to enable the clock producer.
--	 */
--	retval = clk_prepare_enable(uap->clk);
--	if (retval)
--		goto out;
--
--	uap->port.uartclk = clk_get_rate(uap->clk);
--
--	/* Clear pending error and receive interrupts */
--	writew(UART011_OEIS | UART011_BEIS | UART011_PEIS | UART011_FEIS |
--	       UART011_RTIS | UART011_RXIS, uap->port.membase + UART011_ICR);
--
--	/*
--	 * Save interrupts enable mask, and enable RX interrupts in case if
--	 * the interrupt is used for NMI entry.
--	 */
--	uap->im = readw(uap->port.membase + UART011_IMSC);
--	writew(UART011_RTIM | UART011_RXIM, uap->port.membase + UART011_IMSC);
--
--	if (dev_get_platdata(uap->port.dev)) {
--		struct amba_pl011_data *plat;
--
--		plat = dev_get_platdata(uap->port.dev);
--		if (plat->init)
--			plat->init();
--	}
--	return 0;
-- out:
--	return retval;
--}
--
- static void pl011_write_lcr_h(struct uart_amba_port *uap, unsigned int lcr_h)
- {
- 	writew(lcr_h, uap->port.membase + uap->lcrh_rx);
-@@ -1890,7 +1907,7 @@ static struct uart_ops amba_pl011_pops = {
- 	.config_port	= pl011_config_port,
- 	.verify_port	= pl011_verify_port,
+ /*
+  * Console polling routines for writing and reading from the uart while
+  * in an interrupt or debug context (i.e. kgdb).
+@@ -656,11 +678,15 @@ static struct uart_ops asc_uart_ops = {
+ 	.verify_port	= asc_verify_port,
+ 	.pm		= asc_pm,
  #ifdef CONFIG_CONSOLE_POLL
--	.poll_init     = pl011_hwinit,
-+	.poll_init     = pl011_poll_init,
- 	.poll_get_char = pl011_get_poll_char,
- 	.poll_put_char = pl011_put_poll_char,
- #endif
-@@ -2139,6 +2156,7 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 	uap->port.membase = base;
- 	uap->port.iotype = UPIO_MEM;
- 	uap->port.irq = dev->irq[0];
-+	uap->fiq = dev->irq[1];
- 	uap->port.fifosize = uap->fifosize;
- 	uap->port.ops = &amba_pl011_pops;
- 	uap->port.flags = UPF_BOOT_AUTOCONF;
-@@ -2169,6 +2187,7 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 		uart_unregister_driver(&amba_reg);
- 		pl011_dma_remove(uap);
- 	}
++#ifdef CONFIG_KGDB_FIQ
++	.poll_init     = asc_poll_init,
++#endif /* CONFIG_KGDB_FIQ */
+ 	.poll_get_char = asc_get_poll_char,
+ 	.poll_put_char = asc_put_poll_char,
+ #endif /* CONFIG_CONSOLE_POLL */
+ };
+ 
 +
-  out:
- 	return ret;
- }
+ static int asc_init_port(struct asc_port *ascport,
+ 			  struct platform_device *pdev)
+ {
+@@ -673,6 +699,7 @@ static int asc_init_port(struct asc_port *ascport,
+ 	port->fifosize	= ASC_FIFO_SIZE;
+ 	port->dev	= &pdev->dev;
+ 	port->irq	= platform_get_irq(pdev, 0);
++	ascport->fiq    = platform_get_irq(pdev, 1);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	port->membase = devm_ioremap_resource(&pdev->dev, res);
 -- 
 1.9.0
