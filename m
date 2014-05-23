@@ -1,60 +1,109 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 23 May 2014 15:51:13 +0800
-Subject: [PATCH 10/22] clk: sunxi: Add support for PLL6 pre-divider on AHB1
- clock
+Date: Fri, 23 May 2014 15:51:17 +0800
+Subject: [PATCH 14/22] clk: sunxi: Add A23 APB0 support to sun6i-a31-apb0-clk
 In-Reply-To: <1400831485-28576-1-git-send-email-wens@csie.org>
 References: <1400831485-28576-1-git-send-email-wens@csie.org>
-Message-ID: <1400831485-28576-11-git-send-email-wens@csie.org>
+Message-ID: <1400831485-28576-15-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the A31 and A23, the PLL6 input to the AHB1 clock has a 2 bit wide
-pre-divider. This was verified from the A23 user manual and A31/A23 SDK
-sources.
+The A23 has an almost identical PRCM clock tree. The difference in
+the APB0 clock is the smallest divisor is 1, instead of 2.
+
+This patch extends the sun6i-a31-apb0-clk driver to take divider
+tables associated to compatibles, and adds a compatible for the A23
+variant.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt | 2 ++
- drivers/clk/sunxi/clk-sunxi.c                     | 7 +++++++
- 2 files changed, 9 insertions(+)
+ Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+ drivers/clk/sunxi/clk-sun6i-apb0.c                | 28 ++++++++++++++++++-----
+ 2 files changed, 23 insertions(+), 6 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index b9ec668..ae18ec1 100644
+index fa927ba..ae94bbf 100644
 --- a/Documentation/devicetree/bindings/clock/sunxi.txt
 +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -21,6 +21,8 @@ Required properties:
- 	"allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
- 	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
- 	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
-+	"allwinner,sun6i-a31-ahb1-pll6-clk" - for the PLL6 pre-divider to
-+					      AHB1 on A31
- 	"allwinner,sun6i-a31-ahb1-mux-clk" - for the AHB1 multiplexer on A31
- 	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+@@ -29,6 +29,7 @@ Required properties:
+ 	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
  	"allwinner,sun4i-a10-apb0-clk" - for the APB0 clock
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 339cabc..89eadbc 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -686,6 +686,12 @@ static const struct div_data sun4i_apb0_data __initconst = {
- 	.width	= 2,
+ 	"allwinner,sun6i-a31-apb0-clk" - for the APB0 clock on A31
++	"allwinner,sun8i-a23-apb0-clk" - for the APB0 clock on A23
+ 	"allwinner,sun4i-a10-apb0-gates-clk" - for the APB0 gates on A10
+ 	"allwinner,sun5i-a13-apb0-gates-clk" - for the APB0 gates on A13
+ 	"allwinner,sun5i-a10s-apb0-gates-clk" - for the APB0 gates on A10s
+diff --git a/drivers/clk/sunxi/clk-sun6i-apb0.c b/drivers/clk/sunxi/clk-sun6i-apb0.c
+index 11f17c3..2197ac7 100644
+--- a/drivers/clk/sunxi/clk-sun6i-apb0.c
++++ b/drivers/clk/sunxi/clk-sun6i-apb0.c
+@@ -11,6 +11,7 @@
+ #include <linux/clk-provider.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/platform_device.h>
+ 
+ /*
+@@ -28,6 +29,21 @@ static const struct clk_div_table sun6i_a31_apb0_divs[] = {
+ 	{ /* sentinel */ },
  };
  
-+static const struct div_data sun6i_a31_ahb1_pll6_data __initconst = {
-+	.shift	= 6,
-+	.pow	= 0,
-+	.width	= 2,
++/* The A23 APB0 clock has a standard power of 2 divisor */
++static const struct clk_div_table sun8i_a23_apb0_divs[] = {
++	{ .val = 0, .div = 1, },
++	{ .val = 1, .div = 2, },
++	{ .val = 2, .div = 4, },
++	{ .val = 3, .div = 8, },
++	{ /* sentinel */ },
 +};
 +
- static const struct div_data sun6i_a31_apb2_div_data __initconst = {
- 	.shift	= 0,
- 	.pow	= 0,
-@@ -1128,6 +1134,7 @@ static const struct of_device_id clk_div_match[] __initconst = {
- 	{.compatible = "allwinner,sun4i-a10-axi-clk", .data = &sun4i_axi_data,},
- 	{.compatible = "allwinner,sun4i-a10-ahb-clk", .data = &sun4i_ahb_data,},
- 	{.compatible = "allwinner,sun4i-a10-apb0-clk", .data = &sun4i_apb0_data,},
-+	{.compatible = "allwinner,sun6i-a31-ahb1-pll6-clk", .data = &sun6i_a31_ahb1_pll6_data,},
- 	{.compatible = "allwinner,sun6i-a31-apb2-div-clk", .data = &sun6i_a31_apb2_div_data,},
- 	{}
- };
++const struct of_device_id sun6i_a31_apb0_clk_dt_ids[] = {
++	{ .compatible = "allwinner,sun6i-a31-apb0-clk", .data = &sun6i_a31_apb0_divs },
++	{ .compatible = "allwinner,sun8i-a23-apb0-clk", .data = &sun8i_a23_apb0_divs },
++	{ /* sentinel */ }
++};
++
+ static int sun6i_a31_apb0_clk_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+@@ -36,12 +52,17 @@ static int sun6i_a31_apb0_clk_probe(struct platform_device *pdev)
+ 	struct resource *r;
+ 	void __iomem *reg;
+ 	struct clk *clk;
++	const struct of_device_id *device;
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	reg = devm_ioremap_resource(&pdev->dev, r);
+ 	if (IS_ERR(reg))
+ 		return PTR_ERR(reg);
+ 
++	device = of_match_device(sun6i_a31_apb0_clk_dt_ids, &pdev->dev);
++	if (!device)
++		return -EINVAL;
++
+ 	clk_parent = of_clk_get_parent_name(np, 0);
+ 	if (!clk_parent)
+ 		return -EINVAL;
+@@ -49,7 +70,7 @@ static int sun6i_a31_apb0_clk_probe(struct platform_device *pdev)
+ 	of_property_read_string(np, "clock-output-names", &clk_name);
+ 
+ 	clk = clk_register_divider_table(&pdev->dev, clk_name, clk_parent,
+-					 0, reg, 0, 2, 0, sun6i_a31_apb0_divs,
++					 0, reg, 0, 2, 0, device->data,
+ 					 NULL);
+ 	if (IS_ERR(clk))
+ 		return PTR_ERR(clk);
+@@ -57,11 +78,6 @@ static int sun6i_a31_apb0_clk_probe(struct platform_device *pdev)
+ 	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
+ }
+ 
+-const struct of_device_id sun6i_a31_apb0_clk_dt_ids[] = {
+-	{ .compatible = "allwinner,sun6i-a31-apb0-clk" },
+-	{ /* sentinel */ }
+-};
+-
+ static struct platform_driver sun6i_a31_apb0_clk_driver = {
+ 	.driver = {
+ 		.name = "sun6i-a31-apb0-clk",
 -- 
 2.0.0.rc2
