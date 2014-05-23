@@ -1,33 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 May 2014 10:19:47 +0200
-Subject: [PATCH 01/22] serial: 8250_dw: Add optional reset control support
-In-Reply-To: <1400831485-28576-2-git-send-email-wens@csie.org>
-References: <1400831485-28576-1-git-send-email-wens@csie.org>
- <1400831485-28576-2-git-send-email-wens@csie.org>
-Message-ID: <8689536.mXHvcWVbGA@wuerfel>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 23 May 2014 11:20:39 +0300
+Subject: [PATCH v3 2/3] ARM: dts: oma3-gta04: Add display support
+In-Reply-To: <1399580212-5183-3-git-send-email-marek@goldelico.com>
+References: <1399580212-5183-1-git-send-email-marek@goldelico.com>
+ <1399580212-5183-3-git-send-email-marek@goldelico.com>
+Message-ID: <537F04D7.4000201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 May 2014 15:51:04 Chen-Yu Tsai wrote:
->                 p->regshift = val;
->  
-> +       data->rst = devm_reset_control_get_optional(p->dev, NULL);
-> +
->         /* clock got configured through clk api, all done */
->         if (p->uartclk)
->                 return 0;
-> @@ -362,6 +366,9 @@ static int dw8250_probe(struct platform_device *pdev)
->                 return -ENODEV;
->         }
->  
-> +       if (!IS_ERR_OR_NULL(data->rst))
-> +               reset_control_deassert(data->rst);
-> +
+On 08/05/14 23:16, Marek Belisko wrote:
+> This patch add support for lcd display on gta04 board. Display control
+> is connected to spi (used spi bitbang driver).
+> 
+> Signed-off-by: Marek Belisko <marek@goldelico.com>
+> ---
+>  arch/arm/boot/dts/omap3-gta04.dts | 87 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 87 insertions(+)
 
-You should basically never use IS_ERR_OR_NULL(). devm_reset_control_get_optional()
-doesn't return NULL, so IS_ERR() should be safe.
+I can take this via my tree.
 
-Alternatively, change the code above to set data->rst to NULL if there
-is no reset line or error out if you get a different error (e.g. EPROBE_DEFER).
+Tony, can I have your ack on this?
 
-	Arnd
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140523/74a029ad/attachment.sig>
