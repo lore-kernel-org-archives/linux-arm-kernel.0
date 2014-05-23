@@ -1,73 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 23 May 2014 17:27:18 +0100
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
- device tree
-In-Reply-To: <537F3610.3050104@redhat.com>
-References: <537DC832.3020006@redhat.com>
- <CAGb2v64VZac2KvAALrScecN89sRnBQoDrKxKMvkte+3G04NXeA@mail.gmail.com>
- <537DE1AA.5050606@redhat.com> <537E31F7.1030505@gmail.com>
- <537F1148.3010102@redhat.com>
- <20140523112239.GB12304@sirena.org.uk>
- <537F3610.3050104@redhat.com>
-Message-ID: <20140523162718.GE22111@sirena.org.uk>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 23 May 2014 18:39:39 +0200
+Subject: [PATCH v2 4/4] ARM: debug: qcom: add UART addresses to Kconfig
+ help
+In-Reply-To: <1400857952-6963-5-git-send-email-gdjakov@mm-sol.com>
+References: <1400857952-6963-1-git-send-email-gdjakov@mm-sol.com>
+ <1400857952-6963-5-git-send-email-gdjakov@mm-sol.com>
+Message-ID: <CABuKBe+B_Ga-w4aA4dApDTa26rCuhetRTJku27Madm+fHtDcLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 01:50:40PM +0200, Hans de Goede wrote:
-> On 05/23/2014 01:22 PM, Mark Brown wrote:
+2014-05-23 17:12 GMT+02:00 Georgi Djakov <gdjakov@mm-sol.com>:
+> Add information about the APQ8084 debug UART physical and virtual
+> addresses in the DEBUG_QCOM_UARTDM Kconfig help section.
+> Requires: https://lkml.org/lkml/2014/4/14/312
+>
+> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+> ---
+>  arch/arm/Kconfig.debug |    1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 40ee328..e71723d 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -376,6 +376,7 @@ choice
+>                   their output to the serial port on Qualcomm devices.
+>
+>                   ARCH      DEBUG_UART_PHYS   DEBUG_UART_BASE
+> +                 APQ8084   0xf995e000        0xfa75e000
+>                   MSM8X60   0x19c40000        0xf0040000
+>                   MSM8960   0x16440000        0xf0040000
+>                   MSM8974   0xf991e000        0xfa71e000
 
-> > Would it not be better to have this be something in the driver struct
-> > rather than in the device tree?  Putting a compatible in there would be
-> > encoding details of the Linux implementation in the DT which doesn't
-> > seem right especially since these are details we're thinking of changing
-> > later on.
+You don't have any uart defined in your dts. You should add them
+before any adding low level debug support.
+Otherwise there might be problems in booting a multi-platform kernel.
 
-> The compatible is not a Linux specific thing, it is a marking saying
-> that something needs to take care of enabling the clks (and whatever
-> else we will make part of the binding for this compatible), before
-> scanning the mmc bus.
+Regards,
+Matthias
 
-We could just say that the mere presence of a child node with the right
-properties is sufficient to trigger the bus to do the startup?
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-> > Something like have the driver set flags saying if it wants
-> > to do complicated things.
 
-> Chicken <-> egg, we won't know which driver to use before we've probed
-> the mmc bus, and we cannot probe the bus before enabling the clks, etc.
 
-If the device is sufficiently complicated to need a special power up
-sequence I'd expect we'd be able to have a compatible string which would
-provide enough information for us to figure things out.
-
-> >> FWIW if we ever get truely complex cases I think modeling the
-> >> power-up hardware as a pmic platform device is not a bad idea,
-> >> we would then need to have a generic mmc-host pmic property, which
-> >> would be used both to do the initial powerup before scanning, as
-> >> well as for the sdio device driver to get a handle to the pmic,
-> >> for run time power-management (if desired).
-
-> > I don't know if this will ever apply to SDIO but with other buses the
-> > complicated bits come when the driver wants to take over some of the
-> > power management do things like turn some of the supplies or clocks on
-> > and off independently at runtime for low power modes.
-
-> Hmm, good point in that case actually having these things in the
-> child node makes most sense, because then the driver can find them
-> their. Note that the mmc core enabling things does not mean that
-> the driver cannot later disable them if needed.
-
-Right, that's good idea for solving the problem - the child device can
-either share the reference with the bus or have some way of getting at
-the object the bus requested depending on what's sensible.  Only
-potentia complication I can think of with that approach is a device with
-multiple bus interfaces (I'm mainly thinking of SDIO vs SPI) but it
-doesn't seem to hard to deal with that in the bus adaption layers of the
-drivers.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140523/1c798047/attachment.sig>
+-- 
+motzblog.wordpress.com
