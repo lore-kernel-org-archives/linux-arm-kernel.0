@@ -1,88 +1,62 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 23 May 2014 19:20:06 +0200
-Subject: [PATCH 3/4] edac: Add APM X-Gene SoC EDAC driver
-In-Reply-To: <CAPw-ZTkOYhWT_5QFJvGBM-aHOOH-1cqsMgnhOVEirRdG9FEosw@mail.gmail.com>
-References: <1399590199-12256-1-git-send-email-lho@apm.com>
- <1399590199-12256-2-git-send-email-lho@apm.com>
- <1399590199-12256-3-git-send-email-lho@apm.com>
- <1399590199-12256-4-git-send-email-lho@apm.com>
- <20140520193930.GA23070@pd.tnic>
- <CAPw-ZTkOYhWT_5QFJvGBM-aHOOH-1cqsMgnhOVEirRdG9FEosw@mail.gmail.com>
-Message-ID: <20140523172006.GA6440@pd.tnic>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 23 May 2014 19:23:34 +0200
+Subject: [GIT PULL] Allwinner core additions for 3.16, take 2
+Message-ID: <20140523172334.GA8620@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 09:26:12AM -0700, Loc Ho wrote:
-> Hi,
-> 
-> >> +static int xgene_edac_mc_is_active(struct xgene_edac_mc_ctx *ctx, int mc_idx)
-> >> +{
-> >> +     u32 reg;
-> >> +     u32 mcu_mask;
-> >> +
-> >> +     reg = readl(ctx->csw_csr + CSW_CSWCR);
-> >> +     if (reg & CSW_CSWCR_DUALMCB_MASK) {
-> >> +             /*
-> >> +              * Dual MCB active - Determine if all 4 activie or just MCU0
-> >
-> > Spellcheck: "activie"
-> 
-> The proper spelling is "active" from online dictionary.
+Hi Arnd, Kevin, Olof,
 
-Oh really?! Thanks for teaching me that. Let me try again, this time
-with pointers:
+Here is the last core pull request for the upcoming merge window.
 
-> >> +              * Dual MCB active - Determine if all 4 activie or just MCU0
-							     ^
-							     |
-							     |
----------WRONG SPELLING HERE---------------------------------+
+It comes on top of the previous pull request.
 
-You need to open this with an editor that doesn't damage whitespace to
-see where the arrow points at.
+Thanks!
+Maxime
 
-> Are you sure about this? With dev_err, it prints the device node info
-> as well. This allows one to determine which instance that has issue.
-> X-Gene has 4 instance of memory controllers.
+The following changes since commit 324da938cb7eb103a925817f9aacdcc1f0e22576:
 
-Ok, we don't have a corresponding functionality in edac for that.
+  ARM: sunxi: select MFD_SUN6I_PRCM when sun6i arch support is enabled (2014-05-15 17:30:07 +0200)
 
-> >> +
-> >> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 4);
-> >> +     ctx->mcu_csr = devm_ioremap_resource(&pdev->dev, res);
-> >> +     if (IS_ERR(ctx->mcu_csr)) {
-> >> +             dev_err(&pdev->dev, "no MCU resource address\n");
-> >> +             rc = PTR_ERR(ctx->mcu_csr);
-> >> +             goto err_free;
-> >> +     }
-> >> +     /* Ignore non-active MCU */
-> >> +     if (!xgene_edac_mc_is_active(ctx, ((res->start >> 16) & 0xF) / 4)) {
-> >> +             rc = -ENODEV;
-> >> +             goto err_free;
-> >> +     }
-> >
-> > You could move edac_mc_alloc() here, after the resources have been
-> > collected successfully and simplify the unwinding path.
-> 
-> I need the ctx pointer which is part of the edac_mc_alloc. Can't move it here.
+are available in the git repository at:
 
-Of course you can - you can use a local ctx and copy it.
+  https://github.com/mripard/linux.git tags/sunxi-core-for-3.16-2
 
-edac_mc_alloc is a heavy call and I'd keep it after the lighter
-platform_get_resource() have completed successfully so that you don't
-have to undo it with edac_mc_del_mc.
+for you to fetch changes up to 5e669ec583e2687d3512d965cf2e209095f70c62:
 
-But hey, this is your driver so it's your decision in the end.
+  ARM: sunxi: Remove init_machine callback (2014-05-23 10:39:10 +0200)
 
-Which reminds me, I'd need an entry for MAINTAINERS from you or someone
-who's going to take care of this driver and whom I should direct bug
-reports to.
+----------------------------------------------------------------
+Allwinner Core additions for 3.16, take 2
 
-Thanks.
+  - Convert the A31 SMP operations to the CPU_METHOD_OF_DECLARE mechanism
+  - Remove the reset code from the machine definition, that removes pretty much
+    all the code left in mach-sunxi
+
+----------------------------------------------------------------
+Maxime Ripard (6):
+      Documentation: dt: bindings: Document ARM PSCI enable method
+      ARM: sun6i: Use CPU_METHOD_OF_DECLARE
+      Documentation: dt: bindings: Document Allwinner A31 enable method
+      ARM: sun6i: Retire the smp field in A31 machine
+      ARM: sunxi: Remove reset code from the platform
+      ARM: sunxi: Remove init_machine callback
+
+ Documentation/devicetree/bindings/arm/cpus.txt |   2 +
+ arch/arm/mach-sunxi/common.h                   |  19 -----
+ arch/arm/mach-sunxi/platsmp.c                  |   3 +-
+ arch/arm/mach-sunxi/sunxi.c                    | 110 -------------------------
+ 4 files changed, 3 insertions(+), 131 deletions(-)
+ delete mode 100644 arch/arm/mach-sunxi/common.h
 
 -- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140523/d60198f1/attachment-0001.sig>
