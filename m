@@ -1,51 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 23 May 2014 14:47:20 +0100
-Subject: EFI_STUB fails to boot non-EFI on arm64
-In-Reply-To: <20140523131656.GR4179@bivouac.eciton.net>
-References: <20140523094513.GC9252@arm.com>
- <20140523131656.GR4179@bivouac.eciton.net>
-Message-ID: <20140523134720.GA9256@arm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 23 May 2014 09:47:52 -0400
+Subject: [GIT PULL 1/2] ARM: Keystone SOC updates for 3.16
+In-Reply-To: <537B5B57.2050202@ti.com>
+References: <1399912877-29595-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140520051507.GJ18956@quad.lixom.net> <537B5B57.2050202@ti.com>
+Message-ID: <537F5188.90000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 02:16:56PM +0100, Leif Lindholm wrote:
-> Subject: [PATCH] arm64: efi: only attempt efi map setup if booting via EFI
+Olof,
+
+On Tuesday 20 May 2014 09:40 AM, Santosh Shilimkar wrote:
+> On Tuesday 20 May 2014 01:15 AM, Olof Johansson wrote:
+>> On Mon, May 12, 2014 at 12:41:17PM -0400, Santosh Shilimkar wrote:
+>>> Hi Arm-soc folks,
+>>>
+>>> Please pull below keystone SOC updates for 3.16. It merges cleanly with
+>>> arm-soc 'next/soc' head. As already discussed, the $subject pull request
+>>> has a depedency with DT dma-properties pull request [1] I sent last week
+>>> to be pulled into arm-soc.
+>>
+>> Hi,
+>>
+>> I didn't see a reply from Russell on that pull request yet, so I haven't
+>> brought it in as a dependency in case he has comments and it needs to be
+>> respun.
+>>
+> I pinged RMK to pull the series. After that you can pull the dependent
+> pull request as well as subject series. Just for wider testing purpose,
+> I have included the dma series in my next branch and it sitting in
+> linux-next for more than 2 weeks now.
 > 
-> Booting a kernel with CONFIG_EFI enabled on a non-EFI system caused
-> an oops with the current UEFI support code.
-> Add the required test to prevent this.
+>> If this branch is dependent on that code, then you really need to base it on
+>> top of it, or else you will break bisectability. Essentially you might end up
+>> in a state with bisect where only these patches are applied and not the
+>> dependent ones.
+>>
+> I thought about that. The git objects as they exist now in pull request will
+> ensure that the $subject series patches appears after the dependent series.
+> I wanted to avoid SOC stuff to be mixed with the dma series. 
 > 
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> ---
->  arch/arm64/kernel/efi.c |    3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index 7bfd650..14db1f6 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -333,6 +333,9 @@ void __init efi_init(void)
->  
->  void __init efi_idmap_init(void)
->  {
-> +	if (!efi_enabled(EFI_BOOT))
-> +		return;
-> +
+I see RMK has merged [1] 'dt-dma-properties-for-arm' in his 'devel-stable'
+and 'for-next' branch (Thanks Russell).
 
-That's a first (possibly temporary) step and I think it's fine:
+Can you please pull[1] and $subject into arm-soc tree now ?
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Thanks !!
 
-But we need some further tweaking to the way we call efi_init().
-Currently it doesn't matter whether Linux booted as an EFI application
-or not and efi_init() is always called, causing some pr_err() in
-fdt_find_uefi_params(). It's not really an error as we support the same
-image booting non-EFI as well.
-
-Can we add another of detecting whether it's an EFI application and
-avoid calling efi_init()? I can see x86 sets some efi_loader_signature
-string in exit_boot() and checks against it later when calling
-efi_init().
-
--- 
-Catalin
+Regards,
+Santosh
+[1] https://lkml.org/lkml/2014/5/7/368
