@@ -1,22 +1,23 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 23 May 2014 15:15:02 -0400 (EDT)
-Subject: [PATCH 0/5] ks8851 DT updates
-In-Reply-To: <1400792413-21618-1-git-send-email-sboyd@codeaurora.org>
-References: <1400792413-21618-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140523.151502.1106354754894891974.davem@davemloft.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 May 2014 21:17:12 +0200
+Subject: [PATCH v2 0/3] Exynos multi-platform support
+In-Reply-To: <1400858369-14357-1-git-send-email-sachin.kamat@linaro.org>
+References: <1400858369-14357-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <201405232117.12348.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
-Date: Thu, 22 May 2014 14:00:08 -0700
+On Friday 23 May 2014, Sachin Kamat wrote:
+> The patches in this series were earlier sent as part of other
+> series. Now that the other patches have been merged, re-sending
+> these after rebasing them on linux-next (20140523).
+> Tested on Exynos4210, 4412, 5250 and 5420 based boards.
+> 
+> A particular change in this series is the removal of single platform
+> support for Exynos as suggested by Arnd and Olof (patch 2/3). With
+> this change certain features (drivers) which are not yet multi-platform
+> aware like cpufreq, devfreq and DRM based gscaler will not be available
+> now.
 
-> This set of patches properly documents the micrel ks8851 spi ethernet
-> controller, converts to devm_regulator_get_optional() to make error
-> paths slightly simpler, and finally adds supports for another
-> optional regulator and a reset gpio.
 
-Please do not submit patch sets that you expect different trees to
-integrate, this is painful for maintainers to deal with.
-
-Instead, submit the changes separately.  One series for one
-maintainer's tree, another for the other maintainer's tree.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
