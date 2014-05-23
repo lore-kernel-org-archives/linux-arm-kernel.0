@@ -1,72 +1,24 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 23 May 2014 10:44:56 +0200
-Subject: [PATCH 2/2] ASoC: samsung: Add machine driver for odroidx2
-In-Reply-To: <20140522185334.GT12304@sirena.org.uk>
-References: <1400759708-25831-1-git-send-email-s.nawrocki@samsung.com>
- <1400759708-25831-2-git-send-email-s.nawrocki@samsung.com>
- <20140522185334.GT12304@sirena.org.uk>
-Message-ID: <537F0A88.8000904@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 23 May 2014 17:03:22 +0800
+Subject: [PATCH v2] pwm: imx: set can_sleep flag for imx_pwm
+In-Reply-To: <20140523084359.GD20155@pengutronix.de>
+References: <1400834488-2660-1-git-send-email-shawn.guo@freescale.com>
+ <20140523084359.GD20155@pengutronix.de>
+Message-ID: <20140523090321.GA2650@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/05/14 20:53, Mark Brown wrote:
-> On Thu, May 22, 2014 at 01:55:08PM +0200, Sylwester Nawrocki wrote:
->> From: Chen Zhen <zhen1.chen@samsung.com>
->>
->> This machine driver primary defines the audio path, the supported
->> data formats and sample frequency.
-> 
-> I guess it can't yet, it would have been good to explain that in the
-> changelog for the bindings (and include the binding in this patch...).
+On Fri, May 23, 2014 at 10:43:59AM +0200, Uwe Kleine-K?nig wrote:
+> On Fri, May 23, 2014 at 04:41:28PM +0800, Shawn Guo wrote:
+> > The .config() hook imx_pwm_config() calls clk APIs like clk_prepare()
+> > and clk_get_rate(), which might sleep, so we need to set can_sleep flag
+> > on pwm_chip.
+> Wasn't there a bug that was fixed or at least made more obvious with
+> this change? Is it worth mentioning in the commit log?
 
-Thanks for the review, I'm still rather inexperienced in the ASoC stuff,
-I've obviously overlooked there is actually no routing handling. I'd rather
-add those bits.
-As for the DT binding documentation patch, I thought we're supposed to keep
-documentation in separate patches, so processes of separating it from the
-kernel is easier ?
+The bug should be the one same as what we fixed on pwm-mxs[1].  But I
+did not try to trigger it on pwm-imx myself, because it's obvious.
 
->> +	ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_I2S
->> +					| SND_SOC_DAIFMT_NB_NF
->> +					| SND_SOC_DAIFMT_CBM_CFM);
->> +	if (ret < 0)
->> +		return ret;
->> +
->> +	ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_I2S
->> +					| SND_SOC_DAIFMT_NB_NF
->> +					| SND_SOC_DAIFMT_CBM_CFM);
->> +	if (ret < 0)
->> +		return ret;
-> 
-> These are constant, set these in the dai_link.
-> 
->> +
->> +	ret = snd_soc_dai_set_sysclk(codec_dai, 3, MAX98090_MCLK_FREQ,
->> +				     SND_SOC_CLOCK_IN);
->> +	if (ret < 0) {
->> +		dev_err(codec_dai->dev,
->> +			"Unable to switch to FLL1: %d\n", ret);
->> +		return ret;
->> +	}
-> 
-> So's this - also what is 3?  Set it on init.
+Shawn
 
-OK, will move it. I'm not sure why 3, it seems to be ignored by the codec
-anyway. Chen, can you confirm the second argument is actually a don't care
-value ?
-
->> +	ret = snd_soc_dai_set_sysclk(cpu_dai, SAMSUNG_I2S_OPCLK,
->> +					0, MOD_OPCLK_PCLK);
-> 
-> Similarly for the rest of the function.
-> 
->> +	return snd_soc_register_card(card);
-> 
-> devm_snd_soc_register_card().
-
-Thanks for the suggestions, I'll amend that.
-
-
---
-Regards,
-Sylwester
+[1] http://article.gmane.org/gmane.linux.pwm/570
