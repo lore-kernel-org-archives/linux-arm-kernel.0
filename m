@@ -1,84 +1,131 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:04 +0200
-Subject: [PATCH 24/71] clocksource: sh_tmu: Split channel setup to separate
- function
+Date: Fri, 23 May 2014 12:31:07 +0200
+Subject: [PATCH 27/71] clocksource: sh_tmu: Add index to struct sh_tmu_channel
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-24-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-27-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Move the channel setup code from sh_tmu_setup to a new
-sh_tmu_setup_channel function and call it from sh_tmu_setup.
+Use the index as the timer start/stop bit and when printing messages to
+identify the channel.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/clocksource/sh_tmu.c |   36 +++++++++++++++++++++++-------------
- 1 file changed, 23 insertions(+), 13 deletions(-)
+ drivers/clocksource/sh_tmu.c |   35 ++++++++++++++++++++++++-----------
+ 1 file changed, 24 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
-index 7013790..4779c97 100644
+index a464ed8..e304304 100644
 --- a/drivers/clocksource/sh_tmu.c
 +++ b/drivers/clocksource/sh_tmu.c
-@@ -436,6 +436,28 @@ static int sh_tmu_register(struct sh_tmu_channel *ch, char *name,
- 	return 0;
- }
+@@ -39,6 +39,7 @@ struct sh_tmu_device;
  
-+static int sh_tmu_channel_setup(struct sh_tmu_channel *ch,
-+				struct sh_tmu_device *tmu)
-+{
-+	struct sh_timer_config *cfg = tmu->pdev->dev.platform_data;
-+
-+	memset(ch, 0, sizeof(*ch));
-+	ch->tmu = tmu;
-+
-+	ch->irq = platform_get_irq(tmu->pdev, 0);
-+	if (ch->irq < 0) {
-+		dev_err(&tmu->pdev->dev, "failed to get irq\n");
-+		return ch->irq;
-+	}
-+
-+	ch->cs_enabled = false;
-+	ch->enable_count = 0;
-+
-+	return sh_tmu_register(ch, (char *)dev_name(&tmu->pdev->dev),
-+			       cfg->clockevent_rating,
-+			       cfg->clocksource_rating);
-+}
-+
- static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
+ struct sh_tmu_channel {
+ 	struct sh_tmu_device *tmu;
++	unsigned int index;
+ 
+ 	void __iomem *base;
+ 	int irq;
+@@ -102,7 +103,6 @@ static inline void sh_tmu_write(struct sh_tmu_channel *ch, int reg_nr,
+ 
+ static void sh_tmu_start_stop_ch(struct sh_tmu_channel *ch, int start)
  {
- 	struct sh_timer_config *cfg = pdev->dev.platform_data;
-@@ -459,12 +481,6 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
- 		goto err0;
+-	struct sh_timer_config *cfg = ch->tmu->pdev->dev.platform_data;
+ 	unsigned long flags, value;
+ 
+ 	/* start stop register shared by multiple timer channels */
+@@ -110,9 +110,9 @@ static void sh_tmu_start_stop_ch(struct sh_tmu_channel *ch, int start)
+ 	value = sh_tmu_read(ch, TSTR);
+ 
+ 	if (start)
+-		value |= 1 << cfg->timer_bit;
++		value |= 1 << ch->index;
+ 	else
+-		value &= ~(1 << cfg->timer_bit);
++		value &= ~(1 << ch->index);
+ 
+ 	sh_tmu_write(ch, TSTR, value);
+ 	raw_spin_unlock_irqrestore(&sh_tmu_lock, flags);
+@@ -125,7 +125,8 @@ static int __sh_tmu_enable(struct sh_tmu_channel *ch)
+ 	/* enable clock */
+ 	ret = clk_enable(ch->tmu->clk);
+ 	if (ret) {
+-		dev_err(&ch->tmu->pdev->dev, "cannot enable clock\n");
++		dev_err(&ch->tmu->pdev->dev, "ch%u: cannot enable clock\n",
++			ch->index);
+ 		return ret;
  	}
  
--	tmu->channel.irq = platform_get_irq(tmu->pdev, 0);
--	if (tmu->channel.irq < 0) {
--		dev_err(&tmu->pdev->dev, "failed to get irq\n");
--		goto err0;
--	}
--
- 	/* map memory, let mapbase point to our channel */
- 	tmu->mapbase = ioremap_nocache(res->start, resource_size(res));
- 	if (tmu->mapbase == NULL) {
-@@ -484,13 +500,7 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
- 	if (ret < 0)
- 		goto err2;
+@@ -303,7 +304,8 @@ static int sh_tmu_register_clocksource(struct sh_tmu_channel *ch,
+ 	cs->mask = CLOCKSOURCE_MASK(32);
+ 	cs->flags = CLOCK_SOURCE_IS_CONTINUOUS;
  
--	tmu->channel.cs_enabled = false;
--	tmu->channel.enable_count = 0;
--	tmu->channel.tmu = tmu;
--
--	ret = sh_tmu_register(&tmu->channel, (char *)dev_name(&tmu->pdev->dev),
--			      cfg->clockevent_rating,
--			      cfg->clocksource_rating);
-+	ret = sh_tmu_channel_setup(&tmu->channel, tmu);
- 	if (ret < 0)
- 		goto err3;
+-	dev_info(&ch->tmu->pdev->dev, "used as clock source\n");
++	dev_info(&ch->tmu->pdev->dev, "ch%u: used as clock source\n",
++		 ch->index);
+ 
+ 	/* Register with dummy 1 Hz value, gets updated in ->enable() */
+ 	clocksource_register_hz(cs, 1);
+@@ -349,12 +351,12 @@ static void sh_tmu_clock_event_mode(enum clock_event_mode mode,
+ 	switch (mode) {
+ 	case CLOCK_EVT_MODE_PERIODIC:
+ 		dev_info(&ch->tmu->pdev->dev,
+-			 "used for periodic clock events\n");
++			 "ch%u: used for periodic clock events\n", ch->index);
+ 		sh_tmu_clock_event_start(ch, 1);
+ 		break;
+ 	case CLOCK_EVT_MODE_ONESHOT:
+ 		dev_info(&ch->tmu->pdev->dev,
+-			 "used for oneshot clock events\n");
++			 "ch%u: used for oneshot clock events\n", ch->index);
+ 		sh_tmu_clock_event_start(ch, 0);
+ 		break;
+ 	case CLOCK_EVT_MODE_UNUSED:
+@@ -407,7 +409,8 @@ static void sh_tmu_register_clockevent(struct sh_tmu_channel *ch,
+ 	ced->suspend = sh_tmu_clock_event_suspend;
+ 	ced->resume = sh_tmu_clock_event_resume;
+ 
+-	dev_info(&ch->tmu->pdev->dev, "used for clock events\n");
++	dev_info(&ch->tmu->pdev->dev, "ch%u: used for clock events\n",
++		 ch->index);
+ 
+ 	clockevents_config_and_register(ced, 1, 0x300, 0xffffffff);
+ 
+@@ -415,8 +418,8 @@ static void sh_tmu_register_clockevent(struct sh_tmu_channel *ch,
+ 			  IRQF_TIMER | IRQF_IRQPOLL | IRQF_NOBALANCING,
+ 			  dev_name(&ch->tmu->pdev->dev), ch);
+ 	if (ret) {
+-		dev_err(&ch->tmu->pdev->dev, "failed to request irq %d\n",
+-			ch->irq);
++		dev_err(&ch->tmu->pdev->dev, "ch%u: failed to request irq %d\n",
++			ch->index, ch->irq);
+ 		return;
+ 	}
+ }
+@@ -441,9 +444,19 @@ static int sh_tmu_channel_setup(struct sh_tmu_channel *ch,
+ 	memset(ch, 0, sizeof(*ch));
+ 	ch->tmu = tmu;
+ 
++	/*
++	 * The SH3 variant (SH770x, SH7705, SH7710 and SH7720) maps channel
++	 * registers blocks at base + 2 + 12 * index, while all other variants
++	 * map them at base + 4 + 12 * index. We can compute the index by just
++	 * dividing by 12, the 2 bytes or 4 bytes offset being hidden by the
++	 * integer division.
++	 */
++	ch->index = cfg->channel_offset / 12;
++
+ 	ch->irq = platform_get_irq(tmu->pdev, 0);
+ 	if (ch->irq < 0) {
+-		dev_err(&tmu->pdev->dev, "failed to get irq\n");
++		dev_err(&tmu->pdev->dev, "ch%u: failed to get irq\n",
++			ch->index);
+ 		return ch->irq;
+ 	}
  
 -- 
 1.7.9.5
