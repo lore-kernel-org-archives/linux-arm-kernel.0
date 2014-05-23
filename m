@@ -1,30 +1,87 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 23 May 2014 14:32:59 +0200
-Subject: [PATCH] MMC: use mmc_of_parse in sdhci-esdhc-imx
-Message-ID: <1400848384-3226-1-git-send-email-s.hauer@pengutronix.de>
+Date: Fri, 23 May 2014 14:33:01 +0200
+Subject: [PATCH 2/5] mmc: sdhci-esdhc-imx: introduce function for parsing
+ platform_data
+In-Reply-To: <1400848384-3226-1-git-send-email-s.hauer@pengutronix.de>
+References: <1400848384-3226-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1400848384-3226-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following series changes the sdhci-esdhc-imx to use mmc_of_parse
-to profit from the generic devicetree parser. Unfortunately this
-is not straight forward because the driver parses all devicetree
-data into platform_data instead of directly into the mmc host, so
-we have to refactor the parsing and move platform_data parsing out
-of the way for the devicetree path first.
+As a first step to separate the platform_data code from the
+devicetree code add a function to parse the boarddata. Also
+change the argument of the dt probe function from
+struct esdhc_platform_data * to struct pltfm_imx_data *imx_data
+which makes it possible to get struct esdhc_platform_data out
+of the devicetree probing path.
 
-The last patch fixes the card/write protection for the babbage board
-and can be taken independently of the rest by Shawn.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/mmc/host/sdhci-esdhc-imx.c | 31 ++++++++++++++++++++++---------
+ 1 file changed, 22 insertions(+), 9 deletions(-)
 
-Sascha
-
-----------------------------------------------------------------
-Sascha Hauer (5):
-      mmc: sdhci-esdhc-imx: add f_max field to private data
-      mmc: sdhci-esdhc-imx: introduce function for parsing platform_data
-      mmc: sdhci-esdhc-imx: straighten SDHCI_QUIRK_BROKEN_CARD_DETECTION flag
-      mmc: sdhci-esdhc-imx: use mmc_of_parse
-      ARM: dts: imx51-babbage: Fix esdhc setup
-
- arch/arm/boot/dts/imx51-babbage.dts |  14 +--
- drivers/mmc/host/sdhci-esdhc-imx.c  | 205 +++++++++++++++++++-----------------
- 2 files changed, 118 insertions(+), 101 deletions(-)
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index d530820..f6f7a45 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -901,8 +901,9 @@ static const struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
+ #ifdef CONFIG_OF
+ static int
+ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
+-			 struct esdhc_platform_data *boarddata)
++			 struct pltfm_imx_data *imx_data)
+ {
++	struct esdhc_platform_data *boarddata = &imx_data->boarddata;
+ 	struct device_node *np = pdev->dev.of_node;
+ 
+ 	if (!np)
+@@ -942,12 +943,28 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
+ #else
+ static inline int
+ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
+-			 struct esdhc_platform_data *boarddata)
++			 struct pltfm_imx_data *imx_data)
+ {
+ 	return -ENODEV;
+ }
+ #endif
+ 
++static int
++sdhci_esdhc_imx_probe_boarddata(struct platform_device *pdev,
++			 struct pltfm_imx_data *imx_data)
++{
++	struct esdhc_platform_data *pdata = pdev->dev.platform_data;
++
++	if (!pdata) {
++		dev_err(&pdev->dev, "no boarddata\n");
++		return -EINVAL;
++	}
++
++	imx_data->boarddata = *pdata;
++
++	return 0;
++}
++
+ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+ {
+ 	const struct of_device_id *of_id =
+@@ -1037,14 +1054,10 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+ 			host->ioaddr + ESDHC_TUNING_CTRL);
+ 
+ 	boarddata = &imx_data->boarddata;
+-	if (sdhci_esdhc_imx_probe_dt(pdev, boarddata) < 0) {
+-		if (!host->mmc->parent->platform_data) {
+-			dev_err(mmc_dev(host->mmc), "no board data!\n");
+-			err = -EINVAL;
++	if (sdhci_esdhc_imx_probe_dt(pdev, imx_data) < 0) {
++		err = sdhci_esdhc_imx_probe_boarddata(pdev, imx_data);
++		if (err)
+ 			goto disable_clk;
+-		}
+-		imx_data->boarddata = *((struct esdhc_platform_data *)
+-					host->mmc->parent->platform_data);
+ 	}
+ 
+ 	imx_data->f_max = clk_get_rate(imx_data->clk_per);
+-- 
+2.0.0.rc0
