@@ -1,52 +1,37 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 24 May 2014 00:48:01 +0200
-Subject: [PATCH v10 1/3] ARM: EXYNOS: Add support for EXYNOS5410 SoC
-In-Reply-To: <CANhyOUd8Q2nzh_bF6LZNuv8keVUB3F45PocYrLP_B=D_Q3tWuQ@mail.gmail.com>
-References: <1400841343-6016-1-git-send-email-t.dakhran@samsung.com>	<1400841343-6016-2-git-send-email-t.dakhran@samsung.com>	<537FB995.5070604@gmail.com>
- <CANhyOUd8Q2nzh_bF6LZNuv8keVUB3F45PocYrLP_B=D_Q3tWuQ@mail.gmail.com>
-Message-ID: <537FD021.2020808@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 24 May 2014 00:48:06 +0200
+Subject: [GIT PULL] ARM: mach-bcm: cleanups for 3.16
+In-Reply-To: <20140523130105.GA23742@beef>
+References: <20140523130105.GA23742@beef>
+Message-ID: <201405240048.06638.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.05.2014 00:44, Tarek Dakhran wrote:
-> Hi Tomazs,
+On Friday 23 May 2014, Matt Porter wrote:
+> Please consider pulling the following cleanups for 3.16.
 > 
-> On Sat, May 24, 2014 at 1:11 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> Hi Tarek,
->>
->> With v2 of the series I mentioned in review of previous version [1],
->> this patch can be skipped.
->>
->> [1] http://www.spinics.net/lists/linux-samsung-soc/msg31258.html
->>
->> Best regards,
->> Tomasz
->>
->> On 23.05.2014 12:35, Tarek Dakhran wrote:
-> [snip]
->>> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
->>> index 739bdc8..971baf0 100644
->>> --- a/arch/arm/mach-exynos/firmware.c
->>> +++ b/arch/arm/mach-exynos/firmware.c
->>> @@ -50,7 +50,7 @@ static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
->>>
->>>       boot_reg = sysram_ns_base_addr + 0x1c;
->>>
->>> -     if (!soc_is_exynos4212())
->>> +     if (!soc_is_exynos4212() && !soc_is_exynos5410())
->>>               boot_reg += 4*cpu;
->>>
->>>       __raw_writel(boot_addr, boot_reg);
->>>
+> -Matt
 > 
-> I need to define SoC type to set correct bootreg in firmware,
-> otherwise only one cpu can be booted.
-> So, this stuff is needed.
+> The following changes since commit a798c10faf62a505d24e5f6213fbaf904a39623f:
+> 
+>   Linux 3.15-rc2 (2014-04-20 11:08:50 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/broadcom/mach-bcm tags/for-3.16/bcm-cleanup
+> 
+> for you to fetch changes up to eeda4cb92ee0fb63a5917738e107b0bc8168079e:
+> 
+>   ARM: bcm: rename "kona.h" and "kona.c" (2014-04-25 08:51:38 -0400)
+> 
+> ----------------------------------------------------------------
+> mach-bcm mobile SoC cleanups
+> 
+> * Clean up mach-bcm config and build targets
+> * Clean up bcm281xx/21664 SMC code
+> * Clean up bcm281xx/21664 L2C code
+> 
 
-The patch I referred to in my previous reply changes this condition from
-!soc_is_exynos4212() to soc_is_exynos4412(), which makes the 4*cpu
-offset being added only in case of Exynos4412 (and so not being added
-for Exynos5410). What else is needed?
+Merged into next/cleanup, thanks
 
-Best regards,
-Tomasz
+	Arnd
