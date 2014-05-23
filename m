@@ -1,39 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 May 2014 18:14:47 +0200
-Subject: [GIT PULL] at91: fixes for 3.15 #2
-In-Reply-To: <1400780084-12085-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1400780084-12085-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <201405231814.47539.arnd@arndb.de>
+From: wbx@openadk.org (Waldemar Brodkorb)
+Date: Fri, 23 May 2014 18:17:57 +0200
+Subject: oops on cubox-i (v3.15-rc4)
+In-Reply-To: <20140523154453.GY3693@n2100.arm.linux.org.uk>
+References: <20140509144438.GW14063@waldemar-brodkorb.de>
+ <20140511002506.GN12708@titan.lakedaemon.net>
+ <20140523101751.GH618@waldemar-brodkorb.de>
+ <20140523143845.GD8664@titan.lakedaemon.net>
+ <20140523154453.GY3693@n2100.arm.linux.org.uk>
+Message-ID: <20140523161757.GI618@waldemar-brodkorb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 May 2014, Nicolas Ferre wrote:
-> Arnd, Olof, Kevin,
-> 
-> Two more fixes for AT91 dealing with iio ADC triggers on
-> at91sam9260/at91sam9g20. These fixes are not critical as the option is not
-> widely used. But as they are pretty tiny, it might be interesting to include
-> them now.
-> 
-> Thanks, best regards,
-> 
-> The following changes since commit 35d35aae817706800a4913711d563a99e1dc380a:
-> 
->   dt-bindings: clock: Move at91.h to dt-bindigs/clock (2014-04-18 23:44:52 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/at91linux/linux-at91.git tags/at91-fixes2
-> 
-> for you to fetch changes up to 13984e9bb15528f70059bbbbda3f9028157eebf6:
-> 
->   ARM: at91: sam9260: fix compilation issues (2014-05-22 18:39:34 +0200)
-> 
-> ----------------------------------------------------------------
-> Second 3.15 fixes for AT91
-> - two fixes concerning iio ADC triggers for at91sam9260 and at91sam9g20
->   one for the "device" file, the other for the DT.
+Hi Russell,
+Russell King - ARM Linux wrote,
 
-Pulled into fixes branch, thanks!
+> > Can you get an oops from when it's on ext4?  It looks like this is going
+> > through fuse which opens a whole can of unknown worms.
+> 
+> Waldemar mentioned ext4.
+> 
+> I don't think there's anything specific about it to the Cubox-i, and I'd
+> also suggest that it's got nothing to do with ARM either - the iMX6 are
+> PIPT data caches so there can't be any issues with D-cache aliasing with
+> fuse.
+> 
+> It must be a bug in generic code.
 
-	Arnd
+I think this, too. I observed a crash in a similar configuration
+with my Mikrotik RB532 (mips32). I just couldn't get a kernel Oops yet,
+because I fighted against some PCI and serial output problems on
+this device.
+http://www.linux-mips.org/archives/linux-mips/2014-05/msg00124.html
+http://www.linux-mips.org/archives/linux-mips/2014-05/msg00074.html
+May be I can get an oops on Monday.
+ 
+> > > > > Booting Linux on physical CPU 0x0
+> > > > > Linux version 3.15.0-rc4 (wbx at kop-brodkorbw) (gcc version 4.8.2 (GCC) ) #1 SMP Fri May 9 12:58:45 CEST 2014
+> > > > > CPU: ARMv7 Processor [412fc09a] revision 10 (ARMv7), cr=10c53c7d
+> > > > > CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+> > > > > Machine model: SolidRun Cubox-i Dual/Quad
+> > > > > Truncating RAM at 10000000-4fffffff to -3f7fffff (vmalloc region overlap).
+> 
+> Also worth noting that 1/4 of the RAM is not used because highmem is not
+> enabled.  Also L2 cache is disabled (so it's running slower than it
+> should...)
+
+Thanks for the hint. I thought I only need HIGHMEM for cubox-i4pro
+with 2 GB. Will enable it for my cubox-i2ultra.
+ 
+best regards
+ Waldemar
