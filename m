@@ -1,210 +1,82 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 23 May 2014 19:02:59 +0200
-Subject: [PATCH v10 3/3] ARM: dts: Add initial device tree support for
- EXYNOS5410
-In-Reply-To: <1400841343-6016-4-git-send-email-t.dakhran@samsung.com>
-References: <1400841343-6016-1-git-send-email-t.dakhran@samsung.com>
- <1400841343-6016-4-git-send-email-t.dakhran@samsung.com>
-Message-ID: <CABuKBeKgva6gbN1GkVeZNPuagewrw09uz8Fqb8-qKOgaSg4oZw@mail.gmail.com>
+From: larry.bassel@linaro.org (Larry Bassel)
+Date: Fri, 23 May 2014 10:04:30 -0700
+Subject: [PATCH v4 1/2] arm64: adjust el0_sync so that a function can
+ be called
+In-Reply-To: <20140523144457.GN9252@arm.com>
+References: <1400786855-32656-1-git-send-email-larry.bassel@linaro.org>
+ <1400786855-32656-2-git-send-email-larry.bassel@linaro.org>
+ <537E5CD9.80501@codeaurora.org> <20140522223520.GA7953@ubuette>
+ <20140523144457.GN9252@arm.com>
+Message-ID: <20140523170430.GB7953@ubuette>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-05-23 12:35 GMT+02:00 Tarek Dakhran <t.dakhran@samsung.com>:
-> Add initial device tree nodes for EXYNOS5410 SoC and SMDK5410 board.
->
-> Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
-> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
-> ---
->  arch/arm/boot/dts/Makefile                |    1 +
->  arch/arm/boot/dts/exynos5410-smdk5410.dts |   82 ++++++++++++
->  arch/arm/boot/dts/exynos5410.dtsi         |  206 +++++++++++++++++++++++++++++
->  3 files changed, 289 insertions(+)
->  create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
->  create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index cd399a2..709f862 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -73,6 +73,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
->         exynos5250-smdk5250.dtb \
->         exynos5250-snow.dtb \
->         exynos5260-xyref5260.dtb \
-> +       exynos5410-smdk5410.dtb \
->         exynos5420-arndale-octa.dtb \
->         exynos5420-peach-pit.dtb \
->         exynos5420-smdk5420.dtb \
-> diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-> new file mode 100644
-> index 0000000..7275bbd
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-> @@ -0,0 +1,82 @@
-> +/*
-> + * SAMSUNG SMDK5410 board device tree source
-> + *
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + *             http://www.samsung.com
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +/dts-v1/;
-> +#include "exynos5410.dtsi"
-> +/ {
-> +       model = "Samsung SMDK5410 board based on EXYNOS5410";
-> +       compatible = "samsung,smdk5410", "samsung,exynos5410", "samsung,exynos5";
-> +
-> +       memory {
-> +               reg = <0x40000000 0x80000000>;
-> +       };
-> +
-> +       chosen {
-> +               bootargs = "console=ttySAC2,115200";
-> +       };
-> +
-> +       fin_pll: xxti {
-> +               compatible = "fixed-clock";
-> +               clock-frequency = <24000000>;
-> +               clock-output-names = "fin_pll";
-> +               #clock-cells = <0>;
-> +       };
-> +
-> +       firmware at 02037000 {
-> +               compatible = "samsung,secure-firmware";
-> +               reg = <0x02037000 0x1000>;
-> +       };
-> +
-> +};
-> +
-> +&mmc_0 {
-> +       status = "okay";
-> +       num-slots = <1>;
-> +       supports-highspeed;
-> +       broken-cd;
-> +       card-detect-delay = <200>;
-> +       samsung,dw-mshc-ciu-div = <3>;
-> +       samsung,dw-mshc-sdr-timing = <2 3>;
-> +       samsung,dw-mshc-ddr-timing = <1 2>;
-> +
-> +       slot at 0 {
-> +               reg = <0>;
-> +               bus-width = <8>;
-> +       };
-> +};
-> +
-> +&mmc_2 {
-> +       status = "okay";
-> +       num-slots = <1>;
-> +       supports-highspeed;
-> +       card-detect-delay = <200>;
-> +       samsung,dw-mshc-ciu-div = <3>;
-> +       samsung,dw-mshc-sdr-timing = <2 3>;
-> +       samsung,dw-mshc-ddr-timing = <1 2>;
-> +
-> +       slot at 0 {
-> +               reg = <0>;
-> +               bus-width = <4>;
-> +               disable-wp;
-> +       };
-> +};
-> +
-> +&uart0 {
-> +               status = "okay";
-> +};
-> +
-> +&uart1 {
-> +               status = "okay";
-> +};
-> +
-> +&uart2 {
-> +               status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-> new file mode 100644
-> index 0000000..3839c26
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/exynos5410.dtsi
-> @@ -0,0 +1,206 @@
-> +/*
-> + * SAMSUNG EXYNOS5410 SoC device tree source
-> + *
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + *             http://www.samsung.com
-> + *
-> + * SAMSUNG EXYNOS5410 SoC device nodes are listed in this file.
-> + * EXYNOS5410 based board files can include this file and provide
-> + * values for board specfic bindings.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include "skeleton.dtsi"
-> +#include <dt-bindings/clock/exynos5410.h>
-> +
-> +/ {
-> +       compatible = "samsung,exynos5410", "samsung,exynos5";
-> +       interrupt-parent = <&gic>;
-> +
-> +       cpus {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               CPU0: cpu at 0 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a15";
-> +                       reg = <0x0>;
-> +               };
-> +
-> +               CPU1: cpu at 1 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a15";
-> +                       reg = <0x1>;
-> +               };
-> +
-> +               CPU2: cpu at 2 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a15";
-> +                       reg = <0x2>;
-> +               };
-> +
-> +               CPU3: cpu at 3 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a15";
-> +                       reg = <0x3>;
-> +               };
-> +       };
-> +
-> +       soc: soc {
-> +               compatible = "simple-bus";
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               ranges;
-> +
-> +               combiner: interrupt-controller at 10440000 {
-> +                       compatible = "samsung,exynos4210-combiner";
-> +                       #interrupt-cells = <2>;
-> +                       interrupt-controller;
-> +                       samsung,combiner-nr = <32>;
-> +                       reg = <0x10440000 0x1000>;
-> +                       interrupts =    <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
-> +                                       <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
-> +                                       <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
-> +                                       <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
-> +                                       <0 16 0>, <0 17 0>, <0 18 0>, <0 19 0>,
-> +                                       <0 20 0>, <0 21 0>, <0 22 0>, <0 23 0>,
-> +                                       <0 24 0>, <0 25 0>, <0 26 0>, <0 27 0>,
-> +                                       <0 28 0>, <0 29 0>, <0 30 0>, <0 31 0>;
-> +               };
-> +
-> +               gic: interrupt-controller at 10481000 {
-> +                       compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+On 23 May 14 15:44, Catalin Marinas wrote:
+> On Thu, May 22, 2014 at 11:35:20PM +0100, Larry Bassel wrote:
+> > > On 05/22/2014 03:27 PM, Larry Bassel wrote:
+> > > > To implement the context tracker properly on arm64,
+> > > > a function call needs to be made after debugging and
+> > > > interrupts are turned on, but before the lr is changed
+> > > > to point to ret_to_user(). If the function call
+> > > > is made after the lr is changed the function will not
+> > > > return to the correct place.
+> > > > 
+> > > > For similar reasons, defer the setting of x0 so that
+> > > > it doesn't need to be saved around the function call
+> > > > (save far_el1 in x26 temporarily instead).
+> > > > 
+> > > > Signed-off-by: Larry Bassel <larry.bassel@linaro.org>
+> > > > ---
+> > > >  arch/arm64/kernel/entry.S | 24 +++++++++++++++++-------
+> > > >  1 file changed, 17 insertions(+), 7 deletions(-)
+> > > > 
+> > > > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> > > > index e8b23a3..20b336e 100644
+> > > > --- a/arch/arm64/kernel/entry.S
+> > > > +++ b/arch/arm64/kernel/entry.S
+> > > > @@ -354,7 +354,6 @@ el0_sync:
+> > > >  	lsr	x24, x25, #ESR_EL1_EC_SHIFT	// exception class
+> > > >  	cmp	x24, #ESR_EL1_EC_SVC64		// SVC in 64-bit state
+> > > >  	b.eq	el0_svc
+> > > > -	adr	lr, ret_to_user
+> > > >  	cmp	x24, #ESR_EL1_EC_DABT_EL0	// data abort in EL0
+> > > >  	b.eq	el0_da
+> > > >  	cmp	x24, #ESR_EL1_EC_IABT_EL0	// instruction abort in EL0
+> > > > @@ -383,7 +382,6 @@ el0_sync_compat:
+> > > >  	lsr	x24, x25, #ESR_EL1_EC_SHIFT	// exception class
+> > > >  	cmp	x24, #ESR_EL1_EC_SVC32		// SVC in 32-bit state
+> > > >  	b.eq	el0_svc_compat
+> > > > -	adr	lr, ret_to_user
+> > > >  	cmp	x24, #ESR_EL1_EC_DABT_EL0	// data abort in EL0
+> > > >  	b.eq	el0_da
+> > > >  	cmp	x24, #ESR_EL1_EC_IABT_EL0	// instruction abort in EL0
+> > > > @@ -426,22 +424,26 @@ el0_da:
+> > > >  	/*
+> > > >  	 * Data abort handling
+> > > >  	 */
+> > > > -	mrs	x0, far_el1
+> > > > -	bic	x0, x0, #(0xff << 56)
+> > > > +	mrs	x26, far_el1
+> > > >  	// enable interrupts before calling the main handler
+> > > >  	enable_dbg_and_irq
+> > > > +	mov	x0, x26
+> > > > +	bic	x0, x0, #(0xff << 56)
+> > > 
+> > > Nit: I believe you can bit clear with x26 as the source register and omit the
+> > > move instruction.
+> > 
+> > Is that really an improvement (assuming it works)? Are we saving
+> > any cycles here? If so, does it matter? It is easy to see what
+> > the move instruction is doing.
+> 
+> Even if it's not noticeable, I would still reduce the number of lines by
+> one. BIC with immediate is just an alias for AND and it supports
+> different source and destination.
 
-shouldn't it be just "arm,cortex-a15-gic", as this is your SoC architecture?
+Ack.
 
-Cheers,
-Matthias
+> 
+> -- 
+> Catalin
+
+Larry
