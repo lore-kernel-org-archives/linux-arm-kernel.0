@@ -1,48 +1,52 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 24 May 2014 04:43:22 +0900
-Subject: [GIT PULL] Samsung 2nd fixes for 3.15
-Message-ID: <537FA4DA.3090600@samsung.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 23 May 2014 21:43:46 +0200
+Subject: EFI_STUB fails to boot non-EFI on arm64
+In-Reply-To: <20140523154551.GT4179@bivouac.eciton.net>
+References: <20140523094513.GC9252@arm.com>
+ <20140523131656.GR4179@bivouac.eciton.net>
+ <20140523134720.GA9256@arm.com>
+ <20140523150331.GS4179@bivouac.eciton.net>
+ <CAKv+Gu-4ExoNfGVJzUK4v06XD5V3nYfRetoefY0RuFsN1CUOzg@mail.gmail.com>
+ <20140523154551.GT4179@bivouac.eciton.net>
+Message-ID: <CAKv+Gu-AqJ7wYFOr4_3NJO7B-wAk+CGiwfuHvmvdz8L4ZBTjFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 23 May 2014 17:45, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+>
+> On Fri, May 23, 2014 at 05:17:39PM +0200, Ard Biesheuvel wrote:
+> > >> Can we add another of detecting whether it's an EFI application and
+> > >> avoid calling efi_init()? I can see x86 sets some efi_loader_signature
+> > >> string in exit_boot() and checks against it later when calling
+> > >> efi_init().
+> > >
+> > > Well, I agree that we shouldn't be spewing error messages for expected
+> > > operation, but efi_init() is the function we call to determine
+> > > whether we _are_ booting via UEFI - and it sets flags accordingly for
+> > > the efi_enabled() macro.
+> > >
+> >
+> > Considering that
+> >
+> > a) the raw Image loader and the stub enter the kernel through
+> > different entry points (i.e., offset #0 and whatever entry point is
+> > specified in the PE/COFF header, respectively), and
+> > b) there is no decompressor etc involved so we jump straight into the
+> > kernel startup code
+> > c) head.S already deals with a similar problem, i.e., storing the CPU boot mode
+> >
+> > I would assume it shouldn't be so difficult to set a bit somewhere
+> > indicating which case we are dealing with?
+>
+> That would certainly be possible, but what would be the benefit of
+> having two separate mechanisms for determining whether we are booting
+> via UEFI - which could potentially end up disagreeing?
+>
 
-Here is 2nd samsung fixes for 3.15, actually it happened before 3.14 but 
-would be better if this could be merged into 3.15.
+Yeah, you're right. Also, the ARM requirements are sufficiently
+different (as Roy points out) that the presence of the FDT nodes is
+the most reliable indicator of whether you can proceed booting in EFI
+mode.
 
-Thanks,
-Kukjin
-
-
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-
-   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/samsung-fixes-2nd-tag
-
-for you to fetch changes up to 68d0e40298f064a5cff40670caded0480274d4b2:
-
-   ARM: dts: Keep LDO4 always ON for exynos5250-arndale board 
-(2014-05-20 01:15:46 +0900)
-
-----------------------------------------------------------------
-Samsung-fixes-2 for 3.15
-- keep LD04 always on for exynos5250-arndale
-- fix spi interrupt numbers for exynos5420
-- fix ak8975 compatible for exynos4412-trats2
-
-----------------------------------------------------------------
-Beomho Seo (1):
-       ARM: dts: fix incorrect ak8975 compatible for exynos4412-trats2 board
-
-Sachin Kamat (2):
-       ARM: dts: Fix SPI interrupt numbers for exynos5420
-       ARM: dts: Keep LDO4 always ON for exynos5250-arndale board
-
-  arch/arm/boot/dts/exynos4412-trats2.dts  | 2 +-
-  arch/arm/boot/dts/exynos5250-arndale.dts | 1 +
-  arch/arm/boot/dts/exynos5420.dtsi        | 6 +++---
-  3 files changed, 5 insertions(+), 4 deletions(-)
+-- 
+Ard.
