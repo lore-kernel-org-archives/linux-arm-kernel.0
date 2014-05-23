@@ -1,52 +1,33 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 May 2014 23:25:05 +0200
-Subject: [PATCH 2/5] Documentation: dt-bindings: document the Armada 375
- USB cluster binding
-In-Reply-To: <20140523135943.GC31314@lunn.ch>
-References: <1400257376-13251-1-git-send-email-gregory.clement@free-electrons.com>
- <1400257376-13251-2-git-send-email-gregory.clement@free-electrons.com>
- <537F13B2.6070500@ti.com> <20140523132145.GA31314@lunn.ch>
- <20140523133608.GB31314@lunn.ch> <537F52B0.5030204@ti.com>
- <20140523135943.GC31314@lunn.ch>
-Message-ID: <537FBCB1.5010207@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 May 2014 23:27:51 +0200
+Subject: [GIT PULL] at91: DT for 3.16 at91-dt3 #3
+In-Reply-To: <1400775895-31183-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1400775895-31183-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <201405232327.52312.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/2014 15:59, Andrew Lunn wrote:
-> On Fri, May 23, 2014 at 07:22:48PM +0530, Kishon Vijay Abraham I wrote:
->> hI,
->>
->> On Friday 23 May 2014 07:06 PM, Andrew Lunn wrote:
->>>> Do you want one .txt file per driver, or can we combine binding
->>>> documentations into one file? There should already be a mvebu-phy.txt,
->>>> which contains the sata phy usable on some of the Armada SoC families.
->>>> This binding could be appended to it.
->>>
->>> Ah. Humm, well! It seems the patch adding the mvebu-phy.txt fell
->>> through a crack when adding the driver.
->>>
->>> Kishon could you take
->>> http://www.spinics.net/lists/devicetree/msg17018.html into your tree?
->>> It should of been taken the same time you took the actual driver,
->>> http://www.spinics.net/lists/devicetree/msg17011.html into your tree.
->>>
->>> I can resend that one missing patch if you want.
->>
->> yes please. But it's already too late to go in the next merge window.
+On Thursday 22 May 2014, Nicolas Ferre wrote:
+> Another AT91 DT pull-request for 3.16. This one is the conversion of two more
+> SoC to Common Clock Framework (aka CCF). I identified it as a "DT" pull-request
+> but it modifies slightly a couple of files in mach-at91 (use of a configuration
+> option).
+
+Four done, four more to go? Nice progress!
+
+> This pull-request depends on:
+> - the fixes that I already sent for 3.15 and that are present in the recent
+>   3.15-rc6 tag.
+> - the at91-cleanup tag that you integrated in your arm-soc/next/soc branch.
+> So, as suggested by Arnd on IRC, I merged both of them to act as the base
+> before adding the material for this pull-request.
 > 
-> Gregory, could you pick it up and append your 375 binding to it? We
-> can avoid merge conflicts that way.
+> About the clock nodes that should be grouped in a "clocks" container or not,
+> while waiting for a clear statement by the DT maintainers, I kept the clocks
+> nodes as they had been written by Boris.
+> As proposed by Olof, I plan to send you a comprehensive patch that fixes this
+> when Mark gives his point of view.
 
-yes sure, I will do it
+Ok. I've merged it into next/dt now.
 
-> 
-> Thanks
-> 	Andrew
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
