@@ -1,98 +1,68 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 23 May 2014 17:53:02 +0200
-Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
+Date: Fri, 23 May 2014 17:53:03 +0200
+Subject: [PATCH v2 09/11] sched: test the cpu's capacity in wake affine
 In-Reply-To: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
 References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1400860385-14555-10-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Monitor the activity level of each group of each sched_domain level. The
-activity is the amount of cpu_power that is currently used on a CPU or group
-of CPUs. We use the runnable_avg_sum and _period to evaluate this activity
-level. In the special use case where the CPU is fully loaded by more than 1
-task, the activity level is set above the cpu_power in order to reflect the
-overload of the CPU
+Currently the task always wakes affine on this_cpu if the latter is idle.
+Before waking up the task on this_cpu, we check that this_cpu capacity is not
+significantly reduced because of RT tasks or irq activity.
+
+Use case where the number of irq and the time spent under irq is important
+will take benefit of this because the task that is woken up by irq or softirq
+will not use the same CPU than irq (and softirq) but a idle one which share
+its LLC.
 
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- kernel/sched/fair.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ kernel/sched/fair.c | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
 
 diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index b7c51be..c01d8b6 100644
+index c01d8b6..e8a30f9 100644
 --- a/kernel/sched/fair.c
 +++ b/kernel/sched/fair.c
-@@ -4044,6 +4044,11 @@ static unsigned long power_of(int cpu)
- 	return cpu_rq(cpu)->cpu_power;
- }
- 
-+static unsigned long power_orig_of(int cpu)
-+{
-+	return cpu_rq(cpu)->cpu_power_orig;
-+}
-+
- static unsigned long cpu_avg_load_per_task(int cpu)
+@@ -4241,6 +4241,7 @@ static int wake_wide(struct task_struct *p)
+ static int wake_affine(struct sched_domain *sd, struct task_struct *p, int sync)
  {
- 	struct rq *rq = cpu_rq(cpu);
-@@ -4438,6 +4443,18 @@ done:
- 	return target;
- }
- 
-+static int get_cpu_activity(int cpu)
-+{
-+	struct rq *rq = cpu_rq(cpu);
-+	u32 sum = rq->avg.runnable_avg_sum;
-+	u32 period = rq->avg.runnable_avg_period;
+ 	s64 this_load, load;
++	s64 this_eff_load, prev_eff_load;
+ 	int idx, this_cpu, prev_cpu;
+ 	struct task_group *tg;
+ 	unsigned long weight;
+@@ -4284,21 +4285,21 @@ static int wake_affine(struct sched_domain *sd, struct task_struct *p, int sync)
+ 	 * Otherwise check if either cpus are near enough in load to allow this
+ 	 * task to be woken on this_cpu.
+ 	 */
+-	if (this_load > 0) {
+-		s64 this_eff_load, prev_eff_load;
++	this_eff_load = 100;
++	this_eff_load *= power_of(prev_cpu);
 +
-+	if (sum >= period)
-+		return power_orig_of(cpu) + rq->nr_running - 1;
++	prev_eff_load = 100 + (sd->imbalance_pct - 100) / 2;
++	prev_eff_load *= power_of(this_cpu);
+ 
+-		this_eff_load = 100;
+-		this_eff_load *= power_of(prev_cpu);
++	if (this_load > 0) {
+ 		this_eff_load *= this_load +
+ 			effective_load(tg, this_cpu, weight, weight);
+ 
+-		prev_eff_load = 100 + (sd->imbalance_pct - 100) / 2;
+-		prev_eff_load *= power_of(this_cpu);
+ 		prev_eff_load *= load + effective_load(tg, prev_cpu, 0, weight);
++	}
 +
-+	return (sum * power_orig_of(cpu)) / period;
-+}
-+
- /*
-  * select_task_rq_fair: Select target runqueue for the waking task in domains
-  * that have the 'sd_flag' flag set. In practice, this is SD_BALANCE_WAKE,
-@@ -5518,6 +5535,7 @@ struct sg_lb_stats {
- 	unsigned long sum_weighted_load; /* Weighted load of group's tasks */
- 	unsigned long load_per_task;
- 	unsigned long group_power;
-+	unsigned long group_activity; /* Total activity of the group */
- 	unsigned int sum_nr_running; /* Nr tasks running in the group */
- 	unsigned int group_capacity;
- 	unsigned int idle_cpus;
-@@ -5538,6 +5556,7 @@ struct sd_lb_stats {
- 	struct sched_group *busiest;	/* Busiest group in this sd */
- 	struct sched_group *local;	/* Local group in this sd */
- 	unsigned long total_load;	/* Total load of all groups in sd */
-+	unsigned long total_activity;  /* Total activity of all groups in sd */
- 	unsigned long total_pwr;	/* Total power of all groups in sd */
- 	unsigned long avg_load;	/* Average load across all groups in sd */
++	balanced = this_eff_load <= prev_eff_load;
  
-@@ -5557,6 +5576,7 @@ static inline void init_sd_lb_stats(struct sd_lb_stats *sds)
- 		.busiest = NULL,
- 		.local = NULL,
- 		.total_load = 0UL,
-+		.total_activity = 0UL,
- 		.total_pwr = 0UL,
- 		.busiest_stat = {
- 			.avg_load = 0UL,
-@@ -5876,6 +5896,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
- 			load = source_load(i, load_idx);
+-		balanced = this_eff_load <= prev_eff_load;
+-	} else
+-		balanced = true;
+ 	schedstat_inc(p, se.statistics.nr_wakeups_affine_attempts);
  
- 		sgs->group_load += load;
-+		sgs->group_activity += get_cpu_activity(i);
- 		sgs->sum_nr_running += rq->cfs.h_nr_running;
- #ifdef CONFIG_NUMA_BALANCING
- 		sgs->nr_numa_running += rq->nr_numa_running;
-@@ -6034,6 +6055,7 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
- next_group:
- 		/* Now, start updating sd_lb_stats */
- 		sds->total_load += sgs->group_load;
-+		sds->total_activity += sgs->group_activity;
- 		sds->total_pwr += sgs->group_power;
- 
- 		sg = sg->next;
+ 	if (!balanced)
 -- 
 1.9.1
