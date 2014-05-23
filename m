@@ -1,71 +1,67 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 22 May 2014 23:15:28 -0400 (EDT)
-Subject: [PATCH] ARM: zImage: add DSB and ISB barriers after relocating
- code
-In-Reply-To: <537EB8F2.3090401@gmail.com>
-References: <1400808472-401-1-git-send-email-marc.ceeeee@gmail.com>
- <alpine.LFD.2.11.1405222155240.17310@knanqh.ubzr>
- <537EB8F2.3090401@gmail.com>
-Message-ID: <alpine.LFD.2.11.1405222305310.17310@knanqh.ubzr>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Fri, 23 May 2014 11:15:18 +0800
+Subject: [PATCH v2 2/3] [media] atmel-isi: convert the pdata from pointer
+ to structure
+In-Reply-To: <Pine.LNX.4.64.1405182255540.23804@axis700.grange>
+References: <1395744087-5753-1-git-send-email-josh.wu@atmel.com>
+ <1395744087-5753-3-git-send-email-josh.wu@atmel.com>
+ <Pine.LNX.4.64.1405182255540.23804@axis700.grange>
+Message-ID: <537EBD46.6030406@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 May 2014, Marc Carino wrote:
+Hi, Guennadi
 
-> Hi Nicolas,
-> 
-> > Beware... This statement isn't true in most cases.
-> 
-> Ah, yes - I do have to reword that bit. (Per the booting document, the
-> I-cache can either be on or off upon entry, correct?)
+On 5/19/2014 4:59 AM, Guennadi Liakhovetski wrote:
+> Hi Josh,
+>
+> I'm still waiting for an update of Ben's patches to then also apply yours,
+> but I decided to have a look at yours now to see if I find anything, that
+> might be worth changing. A small note to this one below.
+>
+> On Tue, 25 Mar 2014, Josh Wu wrote:
+>
+>> Now the platform data is initialized by allocation of isi
+>> structure. In the future, we use pdata to store the dt parameters.
+>>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> ---
+>> v1 --> v2:
+>>   no change.
+>>
+>>   drivers/media/platform/soc_camera/atmel-isi.c |   22 +++++++++++-----------
+>>   1 file changed, 11 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+>> index 9d977c5..f4add0a 100644
+>> --- a/drivers/media/platform/soc_camera/atmel-isi.c
+>> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+> [snip]
+>
+>> @@ -912,7 +912,7 @@ static int atmel_isi_probe(struct platform_device *pdev)
+>>   	if (IS_ERR(isi->pclk))
+>>   		return PTR_ERR(isi->pclk);
+>>   
+>> -	isi->pdata = pdata;
+>> +	memcpy(&isi->pdata, pdata, sizeof(struct isi_platform_data));
+> I think it'd be better to use
+>
+> +	memcpy(&isi->pdata, pdata, sizeof(isi->pdata));
+>
+> This way if the type of the pdata changes at any time in the future this
+> line will not have to be changed. If you don't mind I can make this change
+> myself, so you don't have to make a new version just for this.
 
-Ah, yes.
+Thanks for pointing it out.  I think I will sent out a new version of 
+patch (include bus-width parsing) then I will included with this fix.
 
-> > Are you sure of that?  When the MMU is off, memory access is strongly
-> > ordered.  I'm wondering if instruction prefetching applies in that
-> > case.
-> 
-> I'm unable to find a statement in the ARM architecture reference manual
-> (ARM ARM) supporting the need for the DSB, so upon second glance I think
-> I'll eliminate it.
-> 
-> Anyway, you are correct. While the MMU is off, data accesses are
-> assigned the strongly-ordered memory type. However for instruction
-> fetches, memory is assigned the Normal memory type (B3.2.1). Further,
-> the architecture allows for prefetching of instructions within the
-> current and subsequent 4K page from the currently-executing program
-> counter (B3.2.3).
-> 
-> Furthermore, I've encountered the "self-modifying code" example within
-> the ARM ARM, which implies that a pipeline flush is needed after
-> performing stores memory that is a part of the instruction stream.
+Best Regards,
+Josh Wu
 
-I assume that invalidating the i-cache would be a good thing to do in 
-all cases.
-
-> Another interesting tidbit is that there id no specification of
-> coherency order between data and instructions for _any_ memory type
-> (A3.9.3). It is expected that the programmer to insert an ISB to ensure
-> instruction fetches are synced-up with the most-recent view of memory.
-> 
-> > Also, is this a problem that you actually experienced in practice?
-> 
-> Yes.
-
-Good to know.
-
-I'm curious though: at what address do you load your zImage, and what 
-address does RAM start?
-
-> > Are you sure those CP15 accesses are fine on all the CPU variants
-> > that may execute this code?  Officially we still support back to
-> > ARMv4 implementations.
-> 
-> No. I suppose I would have to leverage a lookup table scheme as is done
-> with the cache maintenance operations in order for this patch to be
-> portable?
-
-I would think so.
-
-
-Nicolas
+>
+> Thanks
+> Guennadi
+> ---
+> Guennadi Liakhovetski, Ph.D.
+> Freelance Open-Source Software Developer
+> http://www.open-technology.de/
