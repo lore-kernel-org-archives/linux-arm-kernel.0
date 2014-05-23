@@ -1,85 +1,29 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 23 May 2014 15:51:07 +0100
-Subject: [PATCH v4 2/2] arm64: enable context tracking
-In-Reply-To: <7hd2f5icat.fsf@paris.lan>
-References: <1400786855-32656-1-git-send-email-larry.bassel@linaro.org>
- <1400786855-32656-3-git-send-email-larry.bassel@linaro.org>
- <537E5E1F.3050605@codeaurora.org> <7hd2f5icat.fsf@paris.lan>
-Message-ID: <20140523145107.GO9252@arm.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 23 May 2014 16:52:19 +0200
+Subject: [PATCH] cpufreq: exynos: Fix driver compilation with
+ ARCH_MULTIPLATFORM
+In-Reply-To: <CAKohpomrv77TE=eH5jiN8YuhhaDZtg0B20GmbWB2ryHcYSwKNg@mail.gmail.com>
+References: <537C6350.2010707@gmail.com>
+ <1400670752-673-1-git-send-email-t.figa@samsung.com>
+ <7243145.22RNvZMdch@wuerfel> <537C9B81.5040301@samsung.com>
+ <CAJuA9ajHAyB6eLe0nQiNcCAS1ojG7W+FTJ1EH62H3Ch-DP2bcw@mail.gmail.com>
+ <036901cf74f9$0562e640$1028b2c0$@samsung.com>
+ <CAKohpomrv77TE=eH5jiN8YuhhaDZtg0B20GmbWB2ryHcYSwKNg@mail.gmail.com>
+Message-ID: <537F60A3.6010808@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 01:11:38AM +0100, Kevin Hilman wrote:
-> Christopher Covington <cov@codeaurora.org> writes:
-> > On 05/22/2014 03:27 PM, Larry Bassel wrote:
-> >> Make calls to ct_user_enter when the kernel is exited
-> >> and ct_user_exit when the kernel is entered (in el0_da,
-> >> el0_ia, el0_svc, el0_irq and all of the "error" paths).
-> >> 
-> >> These macros expand to function calls which will only work
-> >> properly if el0_sync and related code has been rearranged
-> >> (in a previous patch of this series).
-> >> 
-> >> The calls to ct_user_exit are made after hw debugging has been
-> >> enabled (enable_dbg_and_irq).
-> >> 
-> >> The call to ct_user_enter is made at the beginning of the
-> >> kernel_exit macro.
-> >> 
-> >> This patch is based on earlier work by Kevin Hilman.
-> >> Save/restore optimizations were also done by Kevin.
-> >
-> >> --- a/arch/arm64/kernel/entry.S
-> >> +++ b/arch/arm64/kernel/entry.S
-> >> @@ -30,6 +30,44 @@
-> >>  #include <asm/unistd32.h>
-> >>  
-> >>  /*
-> >> + * Context tracking subsystem.  Used to instrument transitions
-> >> + * between user and kernel mode.
-> >> + */
-> >> +	.macro ct_user_exit, restore = 0
-> >> +#ifdef CONFIG_CONTEXT_TRACKING
-> >> +	bl	context_tracking_user_exit
-> >> +	.if \restore == 1
-> >> +	/*
-> >> +	 * Save/restore needed during syscalls.  Restore syscall arguments from
-> >> +	 * the values already saved on stack during kernel_entry.
-> >> +	 */
-> >> +	ldp	x0, x1, [sp]
-> >> +	ldp	x2, x3, [sp, #S_X2]
-> >> +	ldp	x4, x5, [sp, #S_X4]
-> >> +	ldp	x6, x7, [sp, #S_X6]
-> >> +	.endif
-> >> +#endif
-> >> +	.endm
-> >> +
-> >> +	.macro ct_user_enter, save = 0
-> >> +#ifdef CONFIG_CONTEXT_TRACKING
-> >> +	.if \save == 1
-> >> +	/*
-> >> +	 * Save/restore only needed on syscall fastpath, which uses
-> >> +	 * x0-x2.
-> >> +	 */
-> >> +	push    x2, x3
-> >
-> > Why is x3 saved?
+On 21.05.2014 16:05, Viresh Kumar wrote:
+> On 21 May 2014 19:01, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> If there is no comments more on Thomas P Abraham's series v4 ;-), I will take that series in this time with ack from Viresh.
 > 
-> I'll respond here since I worked with Larry on the context save/restore
-> part.
+> @Thomas: Please post V5 quickly, let close it ASAP :)
 > 
-> [insert rather embarassing disclamer of ignorance of arm64 assembly]
-> 
-> Based on my reading of the code, I figured only x0-x2 needed to be
-> saved.  However, based on some experiments with intentionally clobbering
-> the registers[1] (as suggested by Mark Rutland) in order to make sure
-> we're saving/restoring the right things, I discovered x3 was needed too
-> (I missed updating the comment to mention x0-x3.)
-> 
-> Maybe Will/Catalin/Mark R. can shed some light here?
 
-I haven't checked all the code paths but at least for pushing onto the
-stack we must keep it 16-bytes aligned (architecture requirement).
+Well, as far as I can see, the DT binding is not yet acked by DT
+maintainers, so IMHO the best solution for this release would be to
+apply my patch to avoid regression. New version with some of Viresh's
+comments addressed is on the way.
 
--- 
-Catalin
+Best regards,
+Tomasz
