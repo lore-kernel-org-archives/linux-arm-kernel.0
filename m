@@ -1,56 +1,30 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 May 2014 15:24:28 +0200
-Subject: [PATCH 2/5] Documentation: dt-bindings: document the Armada 375
- USB cluster binding
-In-Reply-To: <537F13B2.6070500@ti.com>
-References: <1400257376-13251-1-git-send-email-gregory.clement@free-electrons.com>
- <1400257376-13251-2-git-send-email-gregory.clement@free-electrons.com>
- <537F13B2.6070500@ti.com>
-Message-ID: <537F4C0C.1080901@free-electrons.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Fri, 23 May 2014 14:24:57 +0100
+Subject: EFI_STUB fails to boot non-EFI on arm64
+In-Reply-To: <20140523131656.GR4179@bivouac.eciton.net>
+References: <20140523094513.GC9252@arm.com>
+ <20140523131656.GR4179@bivouac.eciton.net>
+Message-ID: <20140523132457.GA23963@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
-
-On 23/05/2014 11:24, Kishon Vijay Abraham I wrote:
-> Hi,
+On Fri, 23 May, at 02:16:56PM, Leif Lindholm wrote:
+> On Fri, May 23, 2014 at 10:45:13AM +0100, Catalin Marinas wrote:
+> > As the EFI_STUB for arm64 got into tip and soon into -next, I thought
+> > about giving it a try (tip/arm64/efi). Using my boot-wrapper (non-EFI)
+> > is still supposed to work but I get the trace below. It looks like
+> > memmap.map is NULL but the code still assumes the kernel was started as
+> > an EFI app.
+> > 
+> > Have you guys tested these patches properly?
 > 
-> On Friday 16 May 2014 09:52 PM, Gregory CLEMENT wrote:
->> Armada 375 comes with an USB2 host and device controller and an USB3
->> controller. The USB cluster control register allows to manage common
->> features of both USB controllers. This commit adds the Device Tree
->> binding documentation for this piece of hardware.
+> Apparently not sufficuently...
+> Sorry about that.
 > 
-> Pls re-order so that the Documentation patch comes before the driver patch..
+> Fix appended:
 
-OK I will do it
-
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  .../bindings/phy/armada-375-usb-phy-cluster.txt      | 20 ++++++++++++++++++++
->>  1 file changed, 20 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/phy/armada-375-usb-phy-cluster.txt
->>
->> diff --git a/Documentation/devicetree/bindings/phy/armada-375-usb-phy-cluster.txt b/Documentation/devicetree/bindings/phy/armada-375-usb-phy-cluster.txt
-> 
-> simpler file name? armada-phy?
-
-I can remove the "cluster" part but not the 375, there are many SoCs
-from Marvell called Armada, and some of then have nearly nothing in
-common, so I prefer keep this name. If your intent is to have a file
-with all the PHY binding related to an SoC family, then we should call it
-mvebu-phy.
-
-
-Thanks for your review,
-
-Gregory
-
-
+This looks pretty straight forward. I've picked it up and shoved it on
+my arm64-efi branch.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Matt Fleming, Intel Open Source Technology Center
