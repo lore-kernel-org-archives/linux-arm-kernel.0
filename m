@@ -1,52 +1,32 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 23 May 2014 21:43:46 +0200
-Subject: EFI_STUB fails to boot non-EFI on arm64
-In-Reply-To: <20140523154551.GT4179@bivouac.eciton.net>
-References: <20140523094513.GC9252@arm.com>
- <20140523131656.GR4179@bivouac.eciton.net>
- <20140523134720.GA9256@arm.com>
- <20140523150331.GS4179@bivouac.eciton.net>
- <CAKv+Gu-4ExoNfGVJzUK4v06XD5V3nYfRetoefY0RuFsN1CUOzg@mail.gmail.com>
- <20140523154551.GT4179@bivouac.eciton.net>
-Message-ID: <CAKv+Gu-AqJ7wYFOr4_3NJO7B-wAk+CGiwfuHvmvdz8L4ZBTjFw@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 24 May 2014 04:48:32 +0900
+Subject: [PATCH v2 0/3] Exynos multi-platform support
+In-Reply-To: <201405232117.12348.arnd@arndb.de>
+References: <1400858369-14357-1-git-send-email-sachin.kamat@linaro.org>
+ <201405232117.12348.arnd@arndb.de>
+Message-ID: <537FA610.6050609@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 May 2014 17:45, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+On 05/24/14 04:17, Arnd Bergmann wrote:
+> On Friday 23 May 2014, Sachin Kamat wrote:
+>> The patches in this series were earlier sent as part of other
+>> series. Now that the other patches have been merged, re-sending
+>> these after rebasing them on linux-next (20140523).
+>> Tested on Exynos4210, 4412, 5250 and 5420 based boards.
+>>
+>> A particular change in this series is the removal of single platform
+>> support for Exynos as suggested by Arnd and Olof (patch 2/3). With
+>> this change certain features (drivers) which are not yet multi-platform
+>> aware like cpufreq, devfreq and DRM based gscaler will not be available
+>> now.
 >
-> On Fri, May 23, 2014 at 05:17:39PM +0200, Ard Biesheuvel wrote:
-> > >> Can we add another of detecting whether it's an EFI application and
-> > >> avoid calling efi_init()? I can see x86 sets some efi_loader_signature
-> > >> string in exit_boot() and checks against it later when calling
-> > >> efi_init().
-> > >
-> > > Well, I agree that we shouldn't be spewing error messages for expected
-> > > operation, but efi_init() is the function we call to determine
-> > > whether we _are_ booting via UEFI - and it sets flags accordingly for
-> > > the efi_enabled() macro.
-> > >
-> >
-> > Considering that
-> >
-> > a) the raw Image loader and the stub enter the kernel through
-> > different entry points (i.e., offset #0 and whatever entry point is
-> > specified in the PE/COFF header, respectively), and
-> > b) there is no decompressor etc involved so we jump straight into the
-> > kernel startup code
-> > c) head.S already deals with a similar problem, i.e., storing the CPU boot mode
-> >
-> > I would assume it shouldn't be so difficult to set a bit somewhere
-> > indicating which case we are dealing with?
 >
-> That would certainly be possible, but what would be the benefit of
-> having two separate mechanisms for determining whether we are booting
-> via UEFI - which could potentially end up disagreeing?
->
+> Acked-by: Arnd Bergmann<arnd@arndb.de>
 
-Yeah, you're right. Also, the ARM requirements are sufficiently
-different (as Roy points out) that the presence of the FDT nodes is
-the most reliable indicator of whether you can proceed booting in EFI
-mode.
+Yes, it's time to move on exynos multiplatform and we can't wait for 
+more perfect something. Anyway if any problems, let's fix them after 
+this. Will apply this whole series.
 
--- 
-Ard.
+Thanks,
+Kukjin
