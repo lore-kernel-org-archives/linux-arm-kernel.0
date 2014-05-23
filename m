@@ -1,112 +1,71 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Fri, 23 May 2014 11:12:35 +0800
-Subject: [PATCH v2 3/3] [media] atmel-isi: add primary DT support
-In-Reply-To: <Pine.LNX.4.64.1405182308110.23804@axis700.grange>
-References: <1395744087-5753-1-git-send-email-josh.wu@atmel.com>
- <1395744320-15025-1-git-send-email-josh.wu@atmel.com>
- <Pine.LNX.4.64.1405182308110.23804@axis700.grange>
-Message-ID: <537EBCA3.8020701@atmel.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 22 May 2014 23:15:28 -0400 (EDT)
+Subject: [PATCH] ARM: zImage: add DSB and ISB barriers after relocating
+ code
+In-Reply-To: <537EB8F2.3090401@gmail.com>
+References: <1400808472-401-1-git-send-email-marc.ceeeee@gmail.com>
+ <alpine.LFD.2.11.1405222155240.17310@knanqh.ubzr>
+ <537EB8F2.3090401@gmail.com>
+Message-ID: <alpine.LFD.2.11.1405222305310.17310@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Guennadi
+On Thu, 22 May 2014, Marc Carino wrote:
 
-On 5/19/2014 5:51 AM, Guennadi Liakhovetski wrote:
-> On Tue, 25 Mar 2014, Josh Wu wrote:
->
->> This patch add the DT support for Atmel ISI driver.
->> It use the same v4l2 DT interface that defined in video-interfaces.txt.
->>
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> Cc: devicetree at vger.kernel.org
->> ---
->> v1 --> v2:
->>   refine the binding document.
->>   add port node description.
->>   removed the optional property.
->>
->>   .../devicetree/bindings/media/atmel-isi.txt        |   50 ++++++++++++++++++++
->>   drivers/media/platform/soc_camera/atmel-isi.c      |   31 +++++++++++-
->>   2 files changed, 79 insertions(+), 2 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/media/atmel-isi.txt
-> [snip]
->
->> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
->> index f4add0a..d6a1f7b 100644
->> --- a/drivers/media/platform/soc_camera/atmel-isi.c
->> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-> [snip]
->
->> @@ -885,6 +887,20 @@ static int atmel_isi_remove(struct platform_device *pdev)
->>   	return 0;
->>   }
->>   
->> +static int atmel_isi_probe_dt(struct atmel_isi *isi,
->> +			struct platform_device *pdev)
->> +{
->> +	struct device_node *node = pdev->dev.of_node;
->> +
->> +	/* Default settings for ISI */
->> +	isi->pdata.full_mode = 1;
->> +	isi->pdata.mck_hz = ISI_DEFAULT_MCLK_FREQ;
->> +	isi->pdata.frate = ISI_CFG1_FRATE_CAPTURE_ALL;
-> The above flags eventually should probably partially be added as new
-> driver-specific DT properties, partially derived from DT clock bindings.
-> But I'm ok to have them fixed like this in the initial version.
->
->> +	isi->pdata.data_width_flags = ISI_DATAWIDTH_8 | ISI_DATAWIDTH_10;
-> Whereas these flags, I think, should already now be derived from the
-> bus-width standard property?
+> Hi Nicolas,
+> 
+> > Beware... This statement isn't true in most cases.
+> 
+> Ah, yes - I do have to reword that bit. (Per the booting document, the
+> I-cache can either be on or off upon entry, correct?)
 
-yes. I agree.
+Ah, yes.
 
-> v4l2_of_parse_parallel_bus() will extract
-> them for you and I just asked Ben to add a call to
-> v4l2_of_parse_endpoint() to his patch.
+> > Are you sure of that?  When the MMU is off, memory access is strongly
+> > ordered.  I'm wondering if instruction prefetching applies in that
+> > case.
+> 
+> I'm unable to find a statement in the ARM architecture reference manual
+> (ARM ARM) supporting the need for the DSB, so upon second glance I think
+> I'll eliminate it.
+> 
+> Anyway, you are correct. While the MMU is off, data accesses are
+> assigned the strongly-ordered memory type. However for instruction
+> fetches, memory is assigned the Normal memory type (B3.2.1). Further,
+> the architecture allows for prefetching of instructions within the
+> current and subsequent 4K page from the currently-executing program
+> counter (B3.2.3).
+> 
+> Furthermore, I've encountered the "self-modifying code" example within
+> the ARM ARM, which implies that a pipeline flush is needed after
+> performing stores memory that is a part of the instruction stream.
 
-Is it better to call v4l2_of_parse_endpoint() in the atmel-isi driver? I 
-think the dt parsing stuff should be done by host driver and sensor 
-driver itself. No need to call v4l2_of_parse_endpoint() in soc-camera.c.
+I assume that invalidating the i-cache would be a good thing to do in 
+all cases.
 
-> Consequently you'll have to
-> rearrange bus-width interpretation in isi_camera_try_bus_param() a bit and
-> use OF parsing results there directly if available? Or maybe you find a
-> better way. It would certainly be better to extend your probing code and
-> just use OF results to initialise isi->width_flags, but that might be
-> impossible, because OF parsing would be performed inside
-> soc_camera_host_register() and your isi_camera_try_bus_param() can also be
-> called immediately from it if all required I2C devices are already
-> available?
+> Another interesting tidbit is that there id no specification of
+> coherency order between data and instructions for _any_ memory type
+> (A3.9.3). It is expected that the programmer to insert an ISB to ensure
+> instruction fetches are synced-up with the most-recent view of memory.
+> 
+> > Also, is this a problem that you actually experienced in practice?
+> 
+> Yes.
 
-I am little bit confuse here. I don't see any issue in above case. Since 
-atmel_isi_probe_dt() will always be called earlier then 
-soc_camera_host_register().
-That means when soc_camera_host_register() called 
-isi_camera_try_bus_param(), the isi->width_flags are already initialized 
-in a valid value by atmel_isi_probe_dt().
-Am I missing anything here?
+Good to know.
 
-> If your I2C subdevice drivers defer probing until the host has
-> probed, then you could initialise .width_flags after
-> soc_camera_host_register(), but you cannot rely on that.
+I'm curious though: at what address do you load your zImage, and what 
+address does RAM start?
 
-I tested these two cases without any issue:
-1. In dtb, the i2c sensor dt node probe earlier than atmel-isi dt node.
-     i2c sensor will do a defer probe here as mclk is not found until 
-atmel-isi driver probed and call soc_camera_host_register().
-2. In dtb, the atmel-isi dt node is probed earlier than i2c sensor.
+> > Are you sure those CP15 accesses are fine on all the CPU variants
+> > that may execute this code?  Officially we still support back to
+> > ARMv4 implementations.
+> 
+> No. I suppose I would have to leverage a lookup table scheme as is done
+> with the cache maintenance operations in order for this patch to be
+> portable?
 
-Best Regards,
-Josh Wu
+I would think so.
 
->
-> Thanks
-> Guennadi
-> ---
-> Guennadi Liakhovetski, Ph.D.
-> Freelance Open-Source Software Developer
-> http://www.open-technology.de/
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Nicolas
