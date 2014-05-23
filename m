@@ -1,32 +1,65 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 24 May 2014 04:48:32 +0900
-Subject: [PATCH v2 0/3] Exynos multi-platform support
-In-Reply-To: <201405232117.12348.arnd@arndb.de>
-References: <1400858369-14357-1-git-send-email-sachin.kamat@linaro.org>
- <201405232117.12348.arnd@arndb.de>
-Message-ID: <537FA610.6050609@samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 23 May 2014 12:57:18 -0700
+Subject: [PATCH v2 2/4] net: ks8851: Use devm_regulator_get_optional()
+In-Reply-To: <1400875040-13269-1-git-send-email-sboyd@codeaurora.org>
+References: <1400875040-13269-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1400875040-13269-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/24/14 04:17, Arnd Bergmann wrote:
-> On Friday 23 May 2014, Sachin Kamat wrote:
->> The patches in this series were earlier sent as part of other
->> series. Now that the other patches have been merged, re-sending
->> these after rebasing them on linux-next (20140523).
->> Tested on Exynos4210, 4412, 5250 and 5420 based boards.
->>
->> A particular change in this series is the removal of single platform
->> support for Exynos as suggested by Arnd and Olof (patch 2/3). With
->> this change certain features (drivers) which are not yet multi-platform
->> aware like cpufreq, devfreq and DRM based gscaler will not be available
->> now.
->
->
-> Acked-by: Arnd Bergmann<arnd@arndb.de>
+This simplifies error paths and removes the need to
+regulator_put().
 
-Yes, it's time to move on exynos multiplatform and we can't wait for 
-more perfect something. Anyway if any problems, let's fix them after 
-this. Will apply this whole series.
+Cc: Nishanth Menon <nm@ti.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/net/ethernet/micrel/ks8851.c | 11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
 
-Thanks,
-Kukjin
+diff --git a/drivers/net/ethernet/micrel/ks8851.c b/drivers/net/ethernet/micrel/ks8851.c
+index 13767eb36a48..f2bfc708880c 100644
+--- a/drivers/net/ethernet/micrel/ks8851.c
++++ b/drivers/net/ethernet/micrel/ks8851.c
+@@ -1417,7 +1417,7 @@ static int ks8851_probe(struct spi_device *spi)
+ 	ks->spidev = spi;
+ 	ks->tx_space = 6144;
+ 
+-	ks->vdd_reg = regulator_get_optional(&spi->dev, "vdd");
++	ks->vdd_reg = devm_regulator_get_optional(&spi->dev, "vdd");
+ 	if (IS_ERR(ks->vdd_reg)) {
+ 		ret = PTR_ERR(ks->vdd_reg);
+ 		if (ret == -EPROBE_DEFER)
+@@ -1427,7 +1427,7 @@ static int ks8851_probe(struct spi_device *spi)
+ 		if (ret) {
+ 			dev_err(&spi->dev, "regulator enable fail: %d\n",
+ 				ret);
+-			goto err_reg_en;
++			goto err_reg;
+ 		}
+ 	}
+ 
+@@ -1530,9 +1530,6 @@ err_irq:
+ err_id:
+ 	if (!IS_ERR(ks->vdd_reg))
+ 		regulator_disable(ks->vdd_reg);
+-err_reg_en:
+-	if (!IS_ERR(ks->vdd_reg))
+-		regulator_put(ks->vdd_reg);
+ err_reg:
+ 	free_netdev(ndev);
+ 	return ret;
+@@ -1547,10 +1544,8 @@ static int ks8851_remove(struct spi_device *spi)
+ 
+ 	unregister_netdev(priv->netdev);
+ 	free_irq(spi->irq, priv);
+-	if (!IS_ERR(priv->vdd_reg)) {
++	if (!IS_ERR(priv->vdd_reg))
+ 		regulator_disable(priv->vdd_reg);
+-		regulator_put(priv->vdd_reg);
+-	}
+ 	free_netdev(priv->netdev);
+ 
+ 	return 0;
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
