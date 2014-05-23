@@ -1,53 +1,41 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Fri, 23 May 2014 14:16:56 +0100
-Subject: EFI_STUB fails to boot non-EFI on arm64
-In-Reply-To: <20140523094513.GC9252@arm.com>
-References: <20140523094513.GC9252@arm.com>
-Message-ID: <20140523131656.GR4179@bivouac.eciton.net>
+From: mporter@linaro.org (Matt Porter)
+Date: Fri, 23 May 2014 09:16:58 -0400
+Subject: [GIT PULL] ARM: mach-bcm: dt updates for 3.16
+Message-ID: <20140523131658.GA24244@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 10:45:13AM +0100, Catalin Marinas wrote:
-> As the EFI_STUB for arm64 got into tip and soon into -next, I thought
-> about giving it a try (tip/arm64/efi). Using my boot-wrapper (non-EFI)
-> is still supposed to work but I get the trace below. It looks like
-> memmap.map is NULL but the code still assumes the kernel was started as
-> an EFI app.
-> 
-> Have you guys tested these patches properly?
+Please consider pulling the following mach-bcm dt updates for 3.16.
 
-Apparently not sufficuently...
-Sorry about that.
+-Matt
 
-Fix appended:
+The following changes since commit a798c10faf62a505d24e5f6213fbaf904a39623f:
 
->From 98433920394730d835f0061474832909c0740f29 Mon Sep 17 00:00:00 2001
-From: Leif Lindholm <leif.lindholm@linaro.org>
-Date: Fri, 23 May 2014 11:23:23 +0100
-Subject: [PATCH] arm64: efi: only attempt efi map setup if booting via EFI
+  Linux 3.15-rc2 (2014-04-20 11:08:50 -0700)
 
-Booting a kernel with CONFIG_EFI enabled on a non-EFI system caused
-an oops with the current UEFI support code.
-Add the required test to prevent this.
+are available in the git repository at:
 
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
----
- arch/arm64/kernel/efi.c |    3 +++
- 1 file changed, 3 insertions(+)
+  git://github.com/broadcom/mach-bcm tags/for-3.16/bcm-dt
 
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 7bfd650..14db1f6 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -333,6 +333,9 @@ void __init efi_init(void)
- 
- void __init efi_idmap_init(void)
- {
-+	if (!efi_enabled(EFI_BOOT))
-+		return;
-+
- 	/* boot time idmap_pg_dir is incomplete, so fill in missing parts */
- 	efi_setup_idmap();
- }
--- 
-1.7.10.4
+for you to fetch changes up to de9bd52f21b5677a18a205c2a931c87254dabdeb:
+
+  ARM: dts: bcm590xx: add support for GPLDO and VBUS regulators (2014-05-23 08:07:01 -0400)
+
+----------------------------------------------------------------
+mach-bcm dt updates for 3.16:
+
+* Add PWM support to bcm281xx and bcm28155 ap board
+* Add gpldo and vbus regulators to bcm590xx
+
+----------------------------------------------------------------
+Matt Porter (1):
+      ARM: dts: bcm590xx: add support for GPLDO and VBUS regulators
+
+Tim Kryger (2):
+      ARM: dts: Declare the PWM for bcm11351 (bcm281xx)
+      ARM: dts: Enable the PWM for bcm28155 AP board
+
+ arch/arm/boot/dts/bcm11351.dtsi   |  8 ++++++++
+ arch/arm/boot/dts/bcm28155-ap.dts |  4 ++++
+ arch/arm/boot/dts/bcm59056.dtsi   | 21 +++++++++++++++++++++
+ 3 files changed, 33 insertions(+)
