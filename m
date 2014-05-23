@@ -1,68 +1,63 @@
-From: lho@apm.com (Loc Ho)
-Date: Fri, 23 May 2014 09:26:12 -0700
-Subject: [PATCH 3/4] edac: Add APM X-Gene SoC EDAC driver
-In-Reply-To: <20140520193930.GA23070@pd.tnic>
-References: <1399590199-12256-1-git-send-email-lho@apm.com>
- <1399590199-12256-2-git-send-email-lho@apm.com>
- <1399590199-12256-3-git-send-email-lho@apm.com>
- <1399590199-12256-4-git-send-email-lho@apm.com>
- <20140520193930.GA23070@pd.tnic>
-Message-ID: <CAPw-ZTkOYhWT_5QFJvGBM-aHOOH-1cqsMgnhOVEirRdG9FEosw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 23 May 2014 09:26:50 -0700
+Subject: [PATCH RESEND] mmc: dove: fix missing MACH_DOVE dependency
+In-Reply-To: <20140523134152.GA8664@titan.lakedaemon.net>
+References: <1400522571-10799-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CAPDyKFo8CdyDbJEP0GkFTHdzpkyRBZEp-jAyrU4y8qi__zChkA@mail.gmail.com>
+ <CAOesGMjyk=n7MyVisfjYze9UuEb7XNv5O+c1Tndc+q1Q=PEetQ@mail.gmail.com>
+ <CAPDyKFp7Sf0sdReOyC8V_-F6ozB6Vh8CEbc+R7eoe6H4t-OmYA@mail.gmail.com>
+ <20140523134152.GA8664@titan.lakedaemon.net>
+Message-ID: <CAOesGMig6YGLsNvnJx-4FM=Q1sen7xU=5Ejpwdu-FzK2D+zd+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
->> +static int xgene_edac_mc_is_active(struct xgene_edac_mc_ctx *ctx, int mc_idx)
->> +{
->> +     u32 reg;
->> +     u32 mcu_mask;
->> +
->> +     reg = readl(ctx->csw_csr + CSW_CSWCR);
->> +     if (reg & CSW_CSWCR_DUALMCB_MASK) {
->> +             /*
->> +              * Dual MCB active - Determine if all 4 activie or just MCU0
+On Fri, May 23, 2014 at 6:41 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> On Fri, May 23, 2014 at 09:40:55AM +0200, Ulf Hansson wrote:
+>> On 23 May 2014 09:16, Olof Johansson <olof@lixom.net> wrote:
+>> > On Thu, May 22, 2014 at 2:09 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> >> On 19 May 2014 20:02, Sebastian Hesselbarth
+>> >> <sebastian.hesselbarth@gmail.com> wrote:
+>> >>> DT-enabled Dove moved over from ARCH_DOVE in mach-dove to MACH_DOVE in
+>> >>> mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
+>> >>> DT-only MACH_DOVE Kconfig. This slipped through the cracks and now is
+>> >>> a fix to allow to build Dove's SDHCI driver for mach-mvebu on v3.15-rc.
+>> >>>
+>> >>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> >>> Acked-by: Jason Cooper <jason@lakedaemon.net>
+>> >>
+>> >> Thanks! Picked up for the PR I send to Chris.
+>> >
+>> > Ulf, you might consider adding your tree to linux-next if this is
+>> > going to be a common work flow for you guys.
+>>
+>> That's done already. :-) There are patches which makes this visible in
+>> the MAINTAINERS as well, queued for 3.16.
+>>
+>> git://git.linaro.org/people/ulf.hansson/mmc.git next
+>>
+>> Though due to merge conflicts, during this release cycle, I didn't
+>> want to queue any patches besides for the mmci host driver.
+>>
+>> >
+>> > It's partially up to Chris though, if he's OK with patches going into
+>> > your branch more or less being guaranteed to make it into his as well.
+>> >
+>>
+>> Yes, we need to figure out a good work flow when using two separate
+>> trees. Thanks for bringing this up!
 >
-> Spellcheck: "activie"
-
-The proper spelling is "active" from online dictionary.
-
->> +     ctx = mci->pvt_info;
->> +     ctx->name = "xgene_edac_mc_err";
->> +     mci->pdev = &pdev->dev;
->> +     dev_set_drvdata(mci->pdev, mci);
->> +     mci->ctl_name = ctx->name;
->> +     mci->dev_name = ctx->name;
->> +
->> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +     ctx->pcp_csr = devm_ioremap(&pdev->dev, res->start,
->> +                                 resource_size(res));
->> +     if (IS_ERR(ctx->pcp_csr)) {
->> +             dev_err(&pdev->dev, "no PCP resource address\n");
+> If you have any questions, please ask.  mvebu has been doing this for
+> several release cycles now, and I'm also doing it for irqchip now.
 >
-> edac_printk(KERN_ERR, "X-Gene", ... Ditto for all other dev_err calls.
+> The biggest rule is that once you sign a tag and send a pull-request for
+> it, the branch is immutable up to and including that tag.
 
-Are you sure about this? With dev_err, it prints the device node info
-as well. This allows one to determine which instance that has issue.
-X-Gene has 4 instance of memory controllers.
+...unless you get asked to respin based on review from the person
+you're sending the request to.
 
->> +
->> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 4);
->> +     ctx->mcu_csr = devm_ioremap_resource(&pdev->dev, res);
->> +     if (IS_ERR(ctx->mcu_csr)) {
->> +             dev_err(&pdev->dev, "no MCU resource address\n");
->> +             rc = PTR_ERR(ctx->mcu_csr);
->> +             goto err_free;
->> +     }
->> +     /* Ignore non-active MCU */
->> +     if (!xgene_edac_mc_is_active(ctx, ((res->start >> 16) & 0xF) / 4)) {
->> +             rc = -ENODEV;
->> +             goto err_free;
->> +     }
->
-> You could move edac_mc_alloc() here, after the resources have been
-> collected successfully and simplify the unwinding path.
+This is the main problem with multi-level maintainer trees: It's hard
+to run a stable non-rebasing tree as a downstream tree since there's
+no actual guarantee that it'll go in as-is.
 
-I need the ctx pointer which is part of the edac_mc_alloc. Can't move it here.
 
--Loc
+-Olof
