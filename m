@@ -1,73 +1,31 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Fri, 23 May 2014 09:11:34 +0200
-Subject: [RFC PATCH 1/3] mfd: AXP22x: add support for APX221 PMIC
-In-Reply-To: <20140520074810.GE20874@lee--X1>
-References: <1400176305-22737-1-git-send-email-boris.brezillon@free-electrons.com>
- <1400176305-22737-2-git-send-email-boris.brezillon@free-electrons.com>
- <20140519172817.GE20435@lee--X1> <537A4324.4060905@free-electrons.com>
- <537B06A0.3040706@redhat.com> <20140520074810.GE20874@lee--X1>
-Message-ID: <537EF4A6.2050405@free-electrons.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 23 May 2014 00:16:55 -0700
+Subject: [PATCH RESEND] mmc: dove: fix missing MACH_DOVE dependency
+In-Reply-To: <CAPDyKFo8CdyDbJEP0GkFTHdzpkyRBZEp-jAyrU4y8qi__zChkA@mail.gmail.com>
+References: <1400522571-10799-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CAPDyKFo8CdyDbJEP0GkFTHdzpkyRBZEp-jAyrU4y8qi__zChkA@mail.gmail.com>
+Message-ID: <CAOesGMjyk=n7MyVisfjYze9UuEb7XNv5O+c1Tndc+q1Q=PEetQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lee
-On 20/05/2014 09:48, Lee Jones wrote:
->>>>> This patch introduces preliminary support for the X-Powers AXP221 PMIC.
->>>>> The AXP221 is typically used on boards using Allwinner's A31 SoC.
->>>>>
->>>>> At the moment, this driver only exposes regulator devices, but other
->>>>> subdevices.
->>>>>
->>>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
->>>>> ---
->>>>>  drivers/mfd/Kconfig        |  12 +++
->>>>>  drivers/mfd/Makefile       |   1 +
->>>>>  drivers/mfd/axp22x.c       | 237 +++++++++++++++++++++++++++++++++++++++++++++
->>>>>  include/linux/mfd/axp22x.h | 149 ++++++++++++++++++++++++++++
->>>>>  4 files changed, 399 insertions(+)
->>>>>  create mode 100644 drivers/mfd/axp22x.c
->>>>>  create mode 100644 include/linux/mfd/axp22x.h
->>>> Not a chance.
->>>>
->>>> Farrrr, too much common code with axp20x.c - please merge into one file.
->>>>
->>> This was one of the questions I asked in my cover letter (could you take
->>> a look at it and tell me what's your prefered solution ?) ;-).
->>>
->>> I first tried to reuse the axp20x drivers, but ended up copying almost
->>> all definitions, hence I decided to first do a different driver and ask
->>> for advices.
->> I've just taken a good look at this (I'm planning on doing an axp152 driver
->> myself), and it seems that using a single mfd driver for the 20x and 221 should
->> be quite feasible:
+On Thu, May 22, 2014 at 2:09 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 19 May 2014 20:02, Sebastian Hesselbarth
+> <sebastian.hesselbarth@gmail.com> wrote:
+>> DT-enabled Dove moved over from ARCH_DOVE in mach-dove to MACH_DOVE in
+>> mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
+>> DT-only MACH_DOVE Kconfig. This slipped through the cracks and now is
+>> a fix to allow to build Dove's SDHCI driver for mach-mvebu on v3.15-rc.
 >>
->> - axp20x.h would get some new register defines for registers which are
->>   different (or unique) to the 221 prefixed with aXP221
->> - An axp20x_writeable_ranges would need
->>   to be extended with a third range going from AXP221_BAT_CAP1 (0xe0)
->>   to AXP221_BAT_LOW_THRESH (0xe6)
->> - axp20x_writeable_table would get .n_yes_ranges set to 2, and a new
->>   apx22x_writeable_table would be introduced with n_yes_ranges set to 3.
->> - add a new axp221_supplies array
->> - add a new axp221_cells array
->> - and finally use the proper structs in axp20x_i2c_probe depending on the type
->>
->> Note that this means sharing ie the interrupt table, which is ok since they
->> are the same, except that the 221 has a couple of interrupts missing, but
->> the ones which are shared are all at the same place.
-> Exactly.  As .probe() is identical, you only require some device
-> matching and some extra structs where the data actually differs
-> between devices.
+>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> Acked-by: Jason Cooper <jason@lakedaemon.net>
 >
+> Thanks! Picked up for the PR I send to Chris.
 
-I think you've applied this patch on your for-next tree by mistake.
-As stated above, this driver should be merged with the axp20x one.
+Ulf, you might consider adding your tree to linux-next if this is
+going to be a common work flow for you guys.
 
-Best Regards,
+It's partially up to Chris though, if he's OK with patches going into
+your branch more or less being guaranteed to make it into his as well.
 
-Boris
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+-Olof
