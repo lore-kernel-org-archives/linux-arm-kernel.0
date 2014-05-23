@@ -1,35 +1,117 @@
 From: gdjakov@mm-sol.com (Georgi Djakov)
-Date: Fri, 23 May 2014 17:18:40 +0300
+Date: Fri, 23 May 2014 17:20:23 +0300
 Subject: [PATCH v1 3/5] clk: gcc: Add APQ8084 Global Clock Controller
  support
-In-Reply-To: <DB9EC1F3-CA2B-47C5-A677-CC1222F05614@codeaurora.org>
+In-Reply-To: <537E3263.7090706@codeaurora.org>
 References: <1400775885-10296-1-git-send-email-gdjakov@mm-sol.com>
  <1400775885-10296-4-git-send-email-gdjakov@mm-sol.com>
- <DB9EC1F3-CA2B-47C5-A677-CC1222F05614@codeaurora.org>
-Message-ID: <537F58C0.6090006@mm-sol.com>
+ <537E3263.7090706@codeaurora.org>
+Message-ID: <537F5927.1050403@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2014 07:38 PM, Kumar Gala wrote:
->
-> On May 22, 2014, at 11:24 AM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
->
->> This patch adds support for the global clock controller found on
->> the APQ8084 based devices.
+On 05/22/2014 08:22 PM, Stephen Boyd wrote:
+> On 05/22/14 09:24, Georgi Djakov wrote:
+>> diff --git a/drivers/clk/qcom/gcc-msm8974.c b/drivers/clk/qcom/gcc-msm8974.c
+>> index 58cb2f5..c2a8d77 100644
+>> --- a/drivers/clk/qcom/gcc-msm8974.c
+>> +++ b/drivers/clk/qcom/gcc-msm8974.c
+>> @@ -204,6 +204,12 @@ static const struct freq_tbl ftbl_gcc_blsp1_2_qup1_6_i2c_apps_clk[] = {
+>>   	{ }
+>>   };
 >>
->> The APQ8084 and MSM8974 share a lot of clock data, so instead of
->> duplicating all the data, we add support to the MSM8974 code.
->>
->> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
->> ---
->> drivers/clk/qcom/Kconfig                     |    4 +-
->> drivers/clk/qcom/gcc-msm8974.c               |  151 +++++++++++++++++++++++++-
->> include/dt-bindings/clock/qcom,gcc-msm8974.h |    4 +
->> 3 files changed, 154 insertions(+), 5 deletions(-)
+>> +static const struct freq_tbl ftbl_gcc_blsp1_2_qup1_6_i2c_apps_clk_apq8084[] = {
+>> +	F(19200000, P_XO, 1, 0, 0),
+>> +	F(50000000, P_GPLL0, 12, 0, 0),
+>> +	{ }
+>> +};
+>> +
 >
-> What about differences in reset?
+> Just merge this with the other blsp1_2_qup table.
+>
+>>   static struct clk_rcg2 blsp1_qup1_i2c_apps_clk_src = {
+>>   	.cmd_rcgr = 0x0660,
+>>   	.hid_width = 5,
+>> @@ -768,6 +774,27 @@ static struct clk_rcg2 ce2_clk_src = {
+>>   	},
+>>   };
+>>
+>> +static const struct freq_tbl ftbl_gcc_ce3_clk_apq8084[] = {
+>> +	F(50000000, P_GPLL0, 12, 0, 0),
+>> +	F(85710000, P_GPLL0, 7, 0, 0),
+>> +	F(100000000, P_GPLL0, 6, 0, 0),
+>> +	F(171430000, P_GPLL0, 3.5, 0, 0),
+>> +	{ }
+>> +};
+>> +
+>
+> Ditto.
+>
+>> +static struct clk_rcg2 ce3_clk_src_apq8084 = {
+>
+> Please drop all the _apq8084 stuff. I imagine if we support other chips
+> in this same driver this won't make any sense.
+>
+>> +	.cmd_rcgr = 0x1d10,
+>> +	.hid_width = 5,
+>> +	.parent_map = gcc_xo_gpll0_map,
+>> +	.freq_tbl = ftbl_gcc_ce3_clk_apq8084,
+>> +	.clkr.hw.init = &(struct clk_init_data){
+>> +		.name = "ce3_clk_src",
+>> +		.parent_names = gcc_xo_gpll0,
+>> +		.num_parents = 2,
+>> +		.ops = &clk_rcg2_ops,
+>> +	},
+>> +};
+>> +
+>>   static const struct freq_tbl ftbl_gcc_gp_clk[] = {
+>>   	F(4800000, P_XO, 4, 0, 0),
+>>   	F(6000000, P_GPLL0, 10, 1, 10),
+>> @@ -780,6 +807,12 @@ static const struct freq_tbl ftbl_gcc_gp_clk[] = {
+>>   	{ }
+>>   };
+>>
+>> +static const struct freq_tbl ftbl_gcc_gp_clk_apq8084[] = {
+>> +	F(19200000, P_XO, 1, 0, 0),
+>> +	F(100000000, P_GPLL0, 6, 0, 0),
+>> +	F(200000000, P_GPLL0, 3, 0, 0),
+>> +	{ }
+>> +};
+>
+> Merge with other GP table?
+>
+>>
+>>   static struct clk_rcg2 gp1_clk_src = {
+>>   	.cmd_rcgr = 0x1904,
+>> @@ -966,6 +999,11 @@ static const struct freq_tbl ftbl_gcc_usb_hs_system_clk[] = {
+>>   	{ }
+>>   };
+>>
+>> +static const struct freq_tbl ftbl_gcc_usb_hs_system_clk_apq8084[] = {
+>> +	F(75000000, P_GPLL0, 8, 0, 0),
+>> +	{ }
+>> +};
+>> +
+>
+> ditto.
+>
+>>   static struct clk_rcg2 usb_hs_system_clk_src = {
+>>   	.cmd_rcgr = 0x0490,
+>>   	.hid_width = 5,
+>> @@ -1029,6 +1067,11 @@ static const struct freq_tbl ftbl_gcc_usb_hsic_system_clk[] = {
+>>   	{ }
+>>   };
+>>
+>> +static const struct freq_tbl ftbl_gcc_usb_hsic_system_clk_apq8084[] = {
+>> +	F(75000000, P_GPLL0, 8, 0, 0),
+>> +	{ }
+>> +};
+>> +
+>
+> ditto.
+>
 
-Oops, will add this too. Thanks!
+Thanks for all the comments, Stephen. I will make the appropriate changes.
 
 BR,
 Georgi
