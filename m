@@ -1,64 +1,122 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 May 2014 14:46:41 +0200
-Subject: [PATCH 01/10] dt/bindings: add passthru-mask property to
- versatile-fpga-irq
-In-Reply-To: <1400620176-7239-2-git-send-email-robherring2@gmail.com>
-References: <1400620176-7239-1-git-send-email-robherring2@gmail.com>
- <1400620176-7239-2-git-send-email-robherring2@gmail.com>
-Message-ID: <CACRpkdZGevG9YaUPUs98pQidcGz7MxbxjuSxBn=cqaOYGhWegw@mail.gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 23 May 2014 17:03:33 +0900
+Subject: [PATCH v1] of/irq: do irq resolution in platform_get_irq_byname()
+In-Reply-To: <1400582523-22684-1-git-send-email-grygorii.strashko@ti.com>
+References: <1400582523-22684-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20140523080333.66720C4176E@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 11:09 PM, Rob Herring <robherring2@gmail.com> wrote:
+On Tue, 20 May 2014 13:42:02 +0300, Grygorii Strashko <grygorii.strashko@ti.com> wrote:
+> The commit 9ec36cafe43bf835f8f29273597a5b0cbc8267ef
+> "of/irq: do irq resolution in platform_get_irq" from Rob Herring -
+> moves resolving of the interrupt resources in platform_get_irq().
+> But this solution isn't complete because platform_get_irq_byname()
+> need to be modified the same way.
+> 
+> Hence, fix it by adding interrupt resolution code at the
+> platform_get_irq_byname() function too.
+> 
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> 
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
-> From: Rob Herring <robh@kernel.org>
->
-> Add a passthru-mask property for setting interrupts which are passed
-> through directly to a primary controller.
->
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
+Applied, Thanks.
+
+g.
+
 > ---
->  Documentation/devicetree/bindings/arm/versatile-fpga-irq.txt | 3 +++
->  1 file changed, 3 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/arm/versatile-fpga-irq.txt b/Documentation/devicetree/bindings/arm/versatile-fpga-irq.txt
-> index c9cf605..956b71d 100644
-> --- a/Documentation/devicetree/bindings/arm/versatile-fpga-irq.txt
-> +++ b/Documentation/devicetree/bindings/arm/versatile-fpga-irq.txt
-> @@ -34,3 +34,6 @@ Optional properties:
->  - interrupts: if the FPGA IRQ controller is cascaded, i.e. if its IRQ
->    output is simply connected to the input of another IRQ controller,
->    then the parent IRQ shall be specified in this property.
-> +- passthru-mask: a u32 number representing a bit mas determining which of
-
-bit mask
-
-(speling)
-
-> +  the interrupts are directly passed through to the primary interrupt
-> +  controller.
-
-This is very confusing on the Integrators. The FPGA IRQ controller
-*is* the primary interrupt controller on these.
-
-(Further on Integrators with an IM-PD1 expansion board the
-VIC is actually the secondary controller visavis the FPGA
-IRQ controller which is the primary one.)
-
-So on the versatile the FPGA IRQ controller is *not* cascaded
-off one line of the VIC but rather connected in parallel or
-something?
-
-Care to elaborate a bit on how things are cascaded here?
-And specify that this is for some special usecase or
-something?
-
-I'll read through the patches and see if I can wrap my head
-around this.
-
-Yours,
-Linus Walleij
+> Changes in v1:
+> - use of_property_match_string() to get IRQ index by name
+> - minor comments fixed
+> 
+> RFC:
+>  https://lkml.org/lkml/2014/5/19/325
+> 
+>  drivers/base/platform.c |    7 +++++--
+>  drivers/of/irq.c        |   22 ++++++++++++++++++++++
+>  include/linux/of_irq.h  |    5 +++++
+>  3 files changed, 32 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+> index 5b47210..9e9227e 100644
+> --- a/drivers/base/platform.c
+> +++ b/drivers/base/platform.c
+> @@ -131,9 +131,12 @@ EXPORT_SYMBOL_GPL(platform_get_resource_byname);
+>   */
+>  int platform_get_irq_byname(struct platform_device *dev, const char *name)
+>  {
+> -	struct resource *r = platform_get_resource_byname(dev, IORESOURCE_IRQ,
+> -							  name);
+> +	struct resource *r;
+> +
+> +	if (IS_ENABLED(CONFIG_OF_IRQ) && dev->dev.of_node)
+> +		return of_irq_get_byname(dev->dev.of_node, name);
+>  
+> +	r = platform_get_resource_byname(dev, IORESOURCE_IRQ, name);
+>  	return r ? r->start : -ENXIO;
+>  }
+>  EXPORT_SYMBOL_GPL(platform_get_irq_byname);
+> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> index 5aeb894..3e06a69 100644
+> --- a/drivers/of/irq.c
+> +++ b/drivers/of/irq.c
+> @@ -406,6 +406,28 @@ int of_irq_get(struct device_node *dev, int index)
+>  }
+>  
+>  /**
+> + * of_irq_get_byname - Decode a node's IRQ and return it as a Linux irq number
+> + * @dev: pointer to device tree node
+> + * @name: irq name
+> + *
+> + * Returns Linux irq number on success, or -EPROBE_DEFER if the irq domain
+> + * is not yet created, or error code in case of any other failure.
+> + */
+> +int of_irq_get_byname(struct device_node *dev, const char *name)
+> +{
+> +	int index;
+> +
+> +	if (unlikely(!name))
+> +		return -EINVAL;
+> +
+> +	index = of_property_match_string(dev, "interrupt-names", name);
+> +	if (index < 0)
+> +		return index;
+> +
+> +	return of_irq_get(dev, index);
+> +}
+> +
+> +/**
+>   * of_irq_count - Count the number of IRQs a node uses
+>   * @dev: pointer to device tree node
+>   */
+> diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
+> index 6404253..bfec136 100644
+> --- a/include/linux/of_irq.h
+> +++ b/include/linux/of_irq.h
+> @@ -45,6 +45,7 @@ extern void of_irq_init(const struct of_device_id *matches);
+>  #ifdef CONFIG_OF_IRQ
+>  extern int of_irq_count(struct device_node *dev);
+>  extern int of_irq_get(struct device_node *dev, int index);
+> +extern int of_irq_get_byname(struct device_node *dev, const char *name);
+>  #else
+>  static inline int of_irq_count(struct device_node *dev)
+>  {
+> @@ -54,6 +55,10 @@ static inline int of_irq_get(struct device_node *dev, int index)
+>  {
+>  	return 0;
+>  }
+> +static inline int of_irq_get_byname(struct device_node *dev, const char *name)
+> +{
+> +	return 0;
+> +}
+>  #endif
+>  
+>  #if defined(CONFIG_OF)
+> -- 
+> 1.7.9.5
+> 
