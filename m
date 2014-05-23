@@ -1,439 +1,350 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:51 +0200
-Subject: [PATCH 71/71] clocksource: Add Freescale FlexTimer Module (FTM) timer
- support
-In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-References: <537F214C.8000700@linaro.org>
- <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-71-git-send-email-daniel.lezcano@linaro.org>
+From: t.dakhran@samsung.com (Tarek Dakhran)
+Date: Fri, 23 May 2014 14:35:42 +0400
+Subject: [PATCH v10 2/3] clk: exynos5410: register clocks using common clock
+ framework
+In-Reply-To: <1400841343-6016-1-git-send-email-t.dakhran@samsung.com>
+References: <1400841343-6016-1-git-send-email-t.dakhran@samsung.com>
+Message-ID: <1400841343-6016-3-git-send-email-t.dakhran@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xiubo Li <Li.Xiubo@freescale.com>
+The EXYNOS5410 clocks are statically listed and registered
+using the Samsung specific common clock helper functions.
 
-The Freescale FlexTimer Module time reference is a 16-bit counter
-that can be used as an unsigned or signed increase counter.
-
-CNTIN defines the starting value of the count and MOD defines the
-final value of the count. The value of CNTIN is loaded into the FTM
-counter, and the counter increments until the value of MOD is reached,
-at which point the counter is reloaded with the value of CNTIN. That's
-also when an overflow interrupt will be generated.
-
-Here using the 'evt' prefix or postfix as clock event device and
-the 'src' as clock source device.
-
-Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Jingchang Lu <b35083@freescale.com>
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
+Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
 ---
- drivers/clocksource/Kconfig         |    5 +
- drivers/clocksource/Makefile        |    1 +
- drivers/clocksource/fsl_ftm_timer.c |  367 +++++++++++++++++++++++++++++++++++
- 3 files changed, 373 insertions(+)
- create mode 100644 drivers/clocksource/fsl_ftm_timer.c
+ .../devicetree/bindings/clock/exynos5410-clock.txt |   51 +++++
+ drivers/clk/samsung/Makefile                       |    1 +
+ drivers/clk/samsung/clk-exynos5410.c               |  209 ++++++++++++++++++++
+ include/dt-bindings/clock/exynos5410.h             |   33 ++++
+ 4 files changed, 294 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-clock.txt
+ create mode 100644 drivers/clk/samsung/clk-exynos5410.c
+ create mode 100644 include/dt-bindings/clock/exynos5410.h
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 96918e1..0437767 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -136,6 +136,11 @@ config CLKSRC_SAMSUNG_PWM
- 	  for all devicetree enabled platforms. This driver will be
- 	  needed only on systems that do not have the Exynos MCT available.
- 
-+config FSL_FTM_TIMER
-+	bool
-+	help
-+	  Support for Freescale FlexTimer Module (FTM) timer.
-+
- config VF_PIT_TIMER
- 	bool
- 	help
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 98cb6c5..0770916 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -31,6 +31,7 @@ obj-$(CONFIG_CADENCE_TTC_TIMER)	+= cadence_ttc_timer.o
- obj-$(CONFIG_CLKSRC_EFM32)	+= time-efm32.o
- obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
- obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
-+obj-$(CONFIG_FSL_FTM_TIMER)	+= fsl_ftm_timer.o
- obj-$(CONFIG_VF_PIT_TIMER)	+= vf_pit_timer.o
- obj-$(CONFIG_CLKSRC_QCOM)	+= qcom-timer.o
- 
-diff --git a/drivers/clocksource/fsl_ftm_timer.c b/drivers/clocksource/fsl_ftm_timer.c
+diff --git a/Documentation/devicetree/bindings/clock/exynos5410-clock.txt b/Documentation/devicetree/bindings/clock/exynos5410-clock.txt
 new file mode 100644
-index 0000000..454227d
+index 0000000..82337c4
 --- /dev/null
-+++ b/drivers/clocksource/fsl_ftm_timer.c
-@@ -0,0 +1,367 @@
++++ b/Documentation/devicetree/bindings/clock/exynos5410-clock.txt
+@@ -0,0 +1,51 @@
++* Samsung Exynos5410 Clock Controller
++
++The Exynos5410 clock controller generates and supplies clock to various
++controllers within the Exynos5410 SoC.
++
++Required Properties:
++
++- compatible: should be "samsung,exynos5410-clock"
++
++- reg: physical base address of the controller and length of memory mapped
++  region.
++
++- #clock-cells: should be 1.
++
++All available clocks are defined as preprocessor macros in
++dt-bindings/clock/exynos5410.h header and can be used in device
++tree sources.
++
++External clock:
++There is clock that is generated outside the SoC. It is expected
++that it is defined using standard clock bindings with following
++ - compatible: should be "samsung,exynos5410-oscclk"
++
++Example 1: An example of a clock controller node is listed below.
++
++	clock: clock-controller at 0x10010000 {
++		compatible = "samsung,exynos5410-clock";
++		reg = <0x10010000 0x30000>;
++		#clock-cells = <1>;
++	};
++
++Example 2: Required external clock.
++
++	fixed-rate-clocks {
++		oscclk {
++			compatible = "samsung,exynos5410-oscclk";
++			clock-frequency = <24000000>;
++		};
++	};
++
++Example 3: UART controller node that consumes the clock generated by the clock
++	   controller. Refer to the standard clock bindings for information
++	   about 'clocks' and 'clock-names' property.
++
++	serial at 12C20000 {
++		compatible = "samsung,exynos4210-uart";
++		reg = <0x12C00000 0x100>;
++		interrupts = <0 51 0>;
++		clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
++		clock-names = "uart", "clk_uart_baud0";
++	};
+diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
+index 25646c6..69e8177 100644
+--- a/drivers/clk/samsung/Makefile
++++ b/drivers/clk/samsung/Makefile
+@@ -7,6 +7,7 @@ obj-$(CONFIG_SOC_EXYNOS3250)	+= clk-exynos3250.o
+ obj-$(CONFIG_ARCH_EXYNOS4)	+= clk-exynos4.o
+ obj-$(CONFIG_SOC_EXYNOS5250)	+= clk-exynos5250.o
+ obj-$(CONFIG_SOC_EXYNOS5260)	+= clk-exynos5260.o
++obj-$(CONFIG_SOC_EXYNOS5410)	+= clk-exynos5410.o
+ obj-$(CONFIG_SOC_EXYNOS5420)	+= clk-exynos5420.o
+ obj-$(CONFIG_SOC_EXYNOS5440)	+= clk-exynos5440.o
+ obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-audss.o
+diff --git a/drivers/clk/samsung/clk-exynos5410.c b/drivers/clk/samsung/clk-exynos5410.c
+new file mode 100644
+index 0000000..c9505ab
+--- /dev/null
++++ b/drivers/clk/samsung/clk-exynos5410.c
+@@ -0,0 +1,209 @@
 +/*
-+ * Freescale FlexTimer Module (FTM) timer driver.
++ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
++ * Author: Tarek Dakhran <t.dakhran@samsung.com>
 + *
-+ * Copyright 2014 Freescale Semiconductor, Inc.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ */
++ * Common Clock Framework support for Exynos5410 SoC.
++*/
++
++#include <dt-bindings/clock/exynos5410.h>
 +
 +#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/clocksource.h>
-+#include <linux/err.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
++#include <linux/clkdev.h>
++#include <linux/clk-provider.h>
++#include <linux/of.h>
 +#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/sched_clock.h>
-+#include <linux/slab.h>
 +
-+#define FTM_SC		0x00
-+#define FTM_SC_CLK_SHIFT	3
-+#define FTM_SC_CLK_MASK	(0x3 << FTM_SC_CLK_SHIFT)
-+#define FTM_SC_CLK(c)	((c) << FTM_SC_CLK_SHIFT)
-+#define FTM_SC_PS_MASK	0x7
-+#define FTM_SC_TOIE	BIT(6)
-+#define FTM_SC_TOF	BIT(7)
++#include "clk.h"
 +
-+#define FTM_CNT		0x04
-+#define FTM_MOD		0x08
-+#define FTM_CNTIN	0x4C
++#define APLL_LOCK               0x0
++#define APLL_CON0               0x100
++#define CPLL_LOCK               0x10020
++#define CPLL_CON0               0x10120
++#define MPLL_LOCK               0x4000
++#define MPLL_CON0               0x4100
++#define BPLL_LOCK               0x20010
++#define BPLL_CON0               0x20110
++#define KPLL_LOCK               0x28000
++#define KPLL_CON0               0x28100
 +
-+#define FTM_PS_MAX	7
++#define SRC_CPU			0x200
++#define DIV_CPU0		0x500
++#define SRC_CPERI1		0x4204
++#define DIV_TOP0		0x10510
++#define DIV_TOP1		0x10514
++#define DIV_FSYS1		0x1054c
++#define DIV_FSYS2		0x10550
++#define DIV_PERIC0		0x10558
++#define SRC_TOP0		0x10210
++#define SRC_TOP1		0x10214
++#define SRC_TOP2		0x10218
++#define SRC_FSYS		0x10244
++#define SRC_PERIC0		0x10250
++#define SRC_MASK_FSYS		0x10340
++#define SRC_MASK_PERIC0		0x10350
++#define GATE_BUS_FSYS0		0x10740
++#define GATE_IP_FSYS		0x10944
++#define GATE_IP_PERIC		0x10950
++#define GATE_IP_PERIS		0x10960
++#define SRC_CDREX		0x20200
++#define SRC_KFC			0x28200
++#define DIV_KFC0		0x28500
 +
-+struct ftm_clock_device {
-+	void __iomem *clksrc_base;
-+	void __iomem *clkevt_base;
-+	unsigned long periodic_cyc;
-+	unsigned long ps;
-+	bool big_endian;
++/* list of PLLs */
++enum exynos5410_plls {
++	apll, cpll, mpll,
++	bpll, kpll,
++	nr_plls                 /* number of PLLs */
 +};
 +
-+static struct ftm_clock_device *priv;
++/* list of all parent clocks */
++PNAME(apll_p)		= { "fin_pll", "fout_apll", };
++PNAME(bpll_p)		= { "fin_pll", "fout_bpll", };
++PNAME(cpll_p)		= { "fin_pll", "fout_cpll" };
++PNAME(mpll_p)		= { "fin_pll", "fout_mpll", };
++PNAME(kpll_p)		= { "fin_pll", "fout_kpll", };
 +
-+static inline u32 ftm_readl(void __iomem *addr)
-+{
-+	if (priv->big_endian)
-+		return ioread32be(addr);
-+	else
-+		return ioread32(addr);
-+}
++PNAME(mout_cpu_p)	= { "mout_apll", "sclk_mpll", };
++PNAME(mout_kfc_p)	= { "mout_kpll", "sclk_mpll", };
 +
-+static inline void ftm_writel(u32 val, void __iomem *addr)
-+{
-+	if (priv->big_endian)
-+		iowrite32be(val, addr);
-+	else
-+		iowrite32(val, addr);
-+}
++PNAME(mpll_user_p)	= { "fin_pll", "sclk_mpll", };
++PNAME(bpll_user_p)	= { "fin_pll", "sclk_bpll", };
++PNAME(mpll_bpll_p)	= { "sclk_mpll_muxed", "sclk_bpll_muxed", };
 +
-+static inline void ftm_counter_enable(void __iomem *base)
-+{
-+	u32 val;
++PNAME(group2_p)		= { "fin_pll", "fin_pll", "none", "none",
++			"none", "none", "sclk_mpll_bpll",
++			 "none", "none", "sclk_cpll" };
 +
-+	/* select and enable counter clock source */
-+	val = ftm_readl(base + FTM_SC);
-+	val &= ~(FTM_SC_PS_MASK | FTM_SC_CLK_MASK);
-+	val |= priv->ps | FTM_SC_CLK(1);
-+	ftm_writel(val, base + FTM_SC);
-+}
++static struct samsung_mux_clock exynos5410_mux_clks[] __initdata = {
++	MUX(0, "mout_apll", apll_p, SRC_CPU, 0, 1),
++	MUX(0, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1),
 +
-+static inline void ftm_counter_disable(void __iomem *base)
-+{
-+	u32 val;
++	MUX(0, "mout_kpll", kpll_p, SRC_KFC, 0, 1),
++	MUX(0, "mout_kfc", mout_kfc_p, SRC_KFC, 16, 1),
 +
-+	/* disable counter clock source */
-+	val = ftm_readl(base + FTM_SC);
-+	val &= ~(FTM_SC_PS_MASK | FTM_SC_CLK_MASK);
-+	ftm_writel(val, base + FTM_SC);
-+}
++	MUX(0, "sclk_mpll", mpll_p, SRC_CPERI1, 8, 1),
++	MUX(0, "sclk_mpll_muxed", mpll_user_p, SRC_TOP2, 20, 1),
 +
-+static inline void ftm_irq_acknowledge(void __iomem *base)
-+{
-+	u32 val;
++	MUX(0, "sclk_bpll", bpll_p, SRC_CDREX, 0, 1),
++	MUX(0, "sclk_bpll_muxed", bpll_user_p, SRC_TOP2, 24, 1),
 +
-+	val = ftm_readl(base + FTM_SC);
-+	val &= ~FTM_SC_TOF;
-+	ftm_writel(val, base + FTM_SC);
-+}
++	MUX(0, "sclk_cpll", cpll_p, SRC_TOP2, 8, 1),
 +
-+static inline void ftm_irq_enable(void __iomem *base)
-+{
-+	u32 val;
++	MUX(0, "sclk_mpll_bpll", mpll_bpll_p, SRC_TOP1, 20, 1),
 +
-+	val = ftm_readl(base + FTM_SC);
-+	val |= FTM_SC_TOIE;
-+	ftm_writel(val, base + FTM_SC);
-+}
++	MUX(0, "mout_mmc0", group2_p, SRC_FSYS, 0, 4),
++	MUX(0, "mout_mmc1", group2_p, SRC_FSYS, 4, 4),
++	MUX(0, "mout_mmc2", group2_p, SRC_FSYS, 8, 4),
 +
-+static inline void ftm_irq_disable(void __iomem *base)
-+{
-+	u32 val;
++	MUX(0, "mout_uart0", group2_p, SRC_PERIC0, 0, 4),
++	MUX(0, "mout_uart1", group2_p, SRC_PERIC0, 4, 4),
++	MUX(0, "mout_uart2", group2_p, SRC_PERIC0, 8, 4),
 +
-+	val = ftm_readl(base + FTM_SC);
-+	val &= ~FTM_SC_TOIE;
-+	ftm_writel(val, base + FTM_SC);
-+}
-+
-+static inline void ftm_reset_counter(void __iomem *base)
-+{
-+	/*
-+	 * The CNT register contains the FTM counter value.
-+	 * Reset clears the CNT register. Writing any value to COUNT
-+	 * updates the counter with its initial value, CNTIN.
-+	 */
-+	ftm_writel(0x00, base + FTM_CNT);
-+}
-+
-+static u64 ftm_read_sched_clock(void)
-+{
-+	return ftm_readl(priv->clksrc_base + FTM_CNT);
-+}
-+
-+static int ftm_set_next_event(unsigned long delta,
-+				struct clock_event_device *unused)
-+{
-+	/*
-+	 * The CNNIN and MOD are all double buffer registers, writing
-+	 * to the MOD register latches the value into a buffer. The MOD
-+	 * register is updated with the value of its write buffer with
-+	 * the following scenario:
-+	 * a, the counter source clock is diabled.
-+	 */
-+	ftm_counter_disable(priv->clkevt_base);
-+
-+	/* Force the value of CNTIN to be loaded into the FTM counter */
-+	ftm_reset_counter(priv->clkevt_base);
-+
-+	/*
-+	 * The counter increments until the value of MOD is reached,
-+	 * at which point the counter is reloaded with the value of CNTIN.
-+	 * The TOF (the overflow flag) bit is set when the FTM counter
-+	 * changes from MOD to CNTIN. So we should using the delta - 1.
-+	 */
-+	ftm_writel(delta - 1, priv->clkevt_base + FTM_MOD);
-+
-+	ftm_counter_enable(priv->clkevt_base);
-+
-+	ftm_irq_enable(priv->clkevt_base);
-+
-+	return 0;
-+}
-+
-+static void ftm_set_mode(enum clock_event_mode mode,
-+				struct clock_event_device *evt)
-+{
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		ftm_set_next_event(priv->periodic_cyc, evt);
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		ftm_counter_disable(priv->clkevt_base);
-+		break;
-+	default:
-+		return;
-+	}
-+}
-+
-+static irqreturn_t ftm_evt_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = dev_id;
-+
-+	ftm_irq_acknowledge(priv->clkevt_base);
-+
-+	if (likely(evt->mode == CLOCK_EVT_MODE_ONESHOT)) {
-+		ftm_irq_disable(priv->clkevt_base);
-+		ftm_counter_disable(priv->clkevt_base);
-+	}
-+
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct clock_event_device ftm_clockevent = {
-+	.name		= "Freescale ftm timer",
-+	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.set_mode	= ftm_set_mode,
-+	.set_next_event	= ftm_set_next_event,
-+	.rating		= 300,
++	MUX(0, "mout_aclk200", mpll_bpll_p, SRC_TOP0, 12, 1),
++	MUX(0, "mout_aclk400", mpll_bpll_p, SRC_TOP0, 20, 1),
 +};
 +
-+static struct irqaction ftm_timer_irq = {
-+	.name		= "Freescale ftm timer",
-+	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler	= ftm_evt_interrupt,
-+	.dev_id		= &ftm_clockevent,
++static struct samsung_div_clock exynos5410_div_clks[] __initdata = {
++	DIV(0, "div_arm", "mout_cpu", DIV_CPU0, 0, 3),
++	DIV(0, "div_arm2", "div_arm", DIV_CPU0, 28, 3),
++
++	DIV(0, "div_acp", "div_arm2", DIV_CPU0, 8, 3),
++	DIV(0, "div_cpud", "div_arm2", DIV_CPU0, 4, 3),
++	DIV(0, "div_atb", "div_arm2", DIV_CPU0, 16, 3),
++	DIV(0, "pclk_dbg", "div_arm2", DIV_CPU0, 20, 3),
++
++	DIV(0, "div_kfc", "mout_kfc", DIV_KFC0, 0, 3),
++	DIV(0, "div_aclk", "div_kfc", DIV_KFC0, 4, 3),
++	DIV(0, "div_pclk", "div_kfc", DIV_KFC0, 20, 3),
++
++	DIV(0, "aclk66_pre", "sclk_mpll_muxed", DIV_TOP1, 24, 3),
++	DIV(0, "aclk66", "aclk66_pre", DIV_TOP0, 0, 3),
++
++	DIV(0, "div_mmc0", "mout_mmc0", DIV_FSYS1, 0, 4),
++	DIV(0, "div_mmc1", "mout_mmc1", DIV_FSYS1, 16, 4),
++	DIV(0, "div_mmc2", "mout_mmc2", DIV_FSYS2, 0, 4),
++
++	DIV_F(0, "div_mmc_pre0", "div_mmc0",
++			DIV_FSYS1, 8, 8, CLK_SET_RATE_PARENT, 0),
++	DIV_F(0, "div_mmc_pre1", "div_mmc1",
++			DIV_FSYS1, 24, 8, CLK_SET_RATE_PARENT, 0),
++	DIV_F(0, "div_mmc_pre2", "div_mmc2",
++			DIV_FSYS2, 8, 8, CLK_SET_RATE_PARENT, 0),
++
++	DIV(0, "div_uart0", "mout_uart0", DIV_PERIC0, 0, 4),
++	DIV(0, "div_uart1", "mout_uart1", DIV_PERIC0, 4, 4),
++	DIV(0, "div_uart2", "mout_uart2", DIV_PERIC0, 8, 4),
++	DIV(0, "div_uart3", "mout_uart3", DIV_PERIC0, 12, 4),
++
++	DIV(0, "aclk200", "mout_aclk200", DIV_TOP0, 12, 3),
++	DIV(0, "aclk400", "mout_aclk400", DIV_TOP0, 24, 3),
 +};
 +
-+static int __init ftm_clockevent_init(unsigned long freq, int irq)
++static struct samsung_gate_clock exynos5410_gate_clks[] __initdata = {
++	GATE(CLK_MCT, "mct", "aclk66", GATE_IP_PERIS, 18, 0, 0),
++
++	GATE(CLK_SCLK_MMC0, "sclk_mmc0", "div_mmc_pre0",
++			SRC_MASK_FSYS, 0, CLK_SET_RATE_PARENT, 0),
++	GATE(CLK_SCLK_MMC1, "sclk_mmc1", "div_mmc_pre1",
++			SRC_MASK_FSYS, 4, CLK_SET_RATE_PARENT, 0),
++	GATE(CLK_SCLK_MMC2, "sclk_mmc2", "div_mmc_pre2",
++			SRC_MASK_FSYS, 8, CLK_SET_RATE_PARENT, 0),
++
++	GATE(CLK_MMC0, "sdmmc0", "aclk200", GATE_BUS_FSYS0, 12, 0, 0),
++	GATE(CLK_MMC1, "sdmmc1", "aclk200", GATE_BUS_FSYS0, 13, 0, 0),
++	GATE(CLK_MMC2, "sdmmc2", "aclk200", GATE_BUS_FSYS0, 14, 0, 0),
++
++	GATE(CLK_UART0, "uart0", "aclk66", GATE_IP_PERIC, 0, 0, 0),
++	GATE(CLK_UART1, "uart1", "aclk66", GATE_IP_PERIC, 1, 0, 0),
++	GATE(CLK_UART2, "uart2", "aclk66", GATE_IP_PERIC, 2, 0, 0),
++
++	GATE(CLK_SCLK_UART0, "sclk_uart0", "div_uart0",
++			SRC_MASK_PERIC0, 0, CLK_SET_RATE_PARENT, 0),
++	GATE(CLK_SCLK_UART1, "sclk_uart1", "div_uart1",
++			SRC_MASK_PERIC0, 4, CLK_SET_RATE_PARENT, 0),
++	GATE(CLK_SCLK_UART2, "sclk_uart2", "div_uart2",
++			SRC_MASK_PERIC0, 8, CLK_SET_RATE_PARENT, 0),
++};
++
++static struct samsung_pll_clock exynos5410_plls[nr_plls] __initdata = {
++	[apll] = PLL(pll_35xx, CLK_FOUT_APLL, "fout_apll", "fin_pll", APLL_LOCK,
++		APLL_CON0, NULL),
++	[cpll] = PLL(pll_35xx, CLK_FOUT_CPLL, "fout_cpll", "fin_pll", CPLL_LOCK,
++		CPLL_CON0, NULL),
++	[mpll] = PLL(pll_35xx, CLK_FOUT_MPLL, "fout_mpll", "fin_pll", MPLL_LOCK,
++		MPLL_CON0, NULL),
++	[bpll] = PLL(pll_35xx, CLK_FOUT_BPLL, "fout_bpll", "fin_pll", BPLL_LOCK,
++		BPLL_CON0, NULL),
++	[kpll] = PLL(pll_35xx, CLK_FOUT_KPLL, "fout_kpll", "fin_pll", KPLL_LOCK,
++		KPLL_CON0, NULL),
++};
++
++/* register exynos5410 clocks */
++static void __init exynos5410_clk_init(struct device_node *np)
 +{
-+	int err;
++	struct samsung_clk_provider *ctx;
++	void __iomem *reg_base;
 +
-+	ftm_writel(0x00, priv->clkevt_base + FTM_CNTIN);
-+	ftm_writel(~0UL, priv->clkevt_base + FTM_MOD);
++	reg_base = of_iomap(np, 0);
++	if (!reg_base)
++		panic("%s: failed to map registers\n", __func__);
 +
-+	ftm_reset_counter(priv->clkevt_base);
++	ctx = samsung_clk_init(np, reg_base, CLK_NR_CLKS);
 +
-+	err = setup_irq(irq, &ftm_timer_irq);
-+	if (err) {
-+		pr_err("ftm: setup irq failed: %d\n", err);
-+		return err;
-+	}
++	samsung_clk_register_pll(ctx, exynos5410_plls,
++			ARRAY_SIZE(exynos5410_plls), reg_base);
 +
-+	ftm_clockevent.cpumask = cpumask_of(0);
-+	ftm_clockevent.irq = irq;
++	samsung_clk_register_mux(ctx, exynos5410_mux_clks,
++			ARRAY_SIZE(exynos5410_mux_clks));
++	samsung_clk_register_div(ctx, exynos5410_div_clks,
++			ARRAY_SIZE(exynos5410_div_clks));
++	samsung_clk_register_gate(ctx, exynos5410_gate_clks,
++			ARRAY_SIZE(exynos5410_gate_clks));
 +
-+	clockevents_config_and_register(&ftm_clockevent,
-+					freq / (1 << priv->ps),
-+					1, 0xffff);
-+
-+	ftm_counter_enable(priv->clkevt_base);
-+
-+	return 0;
++	pr_debug("Exynos5410: clock setup completed.\n");
 +}
++CLK_OF_DECLARE(exynos5410_clk, "samsung,exynos5410-clock", exynos5410_clk_init);
+diff --git a/include/dt-bindings/clock/exynos5410.h b/include/dt-bindings/clock/exynos5410.h
+new file mode 100644
+index 0000000..9b180f0
+--- /dev/null
++++ b/include/dt-bindings/clock/exynos5410.h
+@@ -0,0 +1,33 @@
++#ifndef _DT_BINDINGS_CLOCK_EXYNOS_5410_H
++#define _DT_BINDINGS_CLOCK_EXYNOS_5410_H
 +
-+static int __init ftm_clocksource_init(unsigned long freq)
-+{
-+	int err;
++/* core clocks */
++#define CLK_FIN_PLL 1
++#define CLK_FOUT_APLL 2
++#define CLK_FOUT_CPLL 3
++#define CLK_FOUT_MPLL 4
++#define CLK_FOUT_BPLL 5
++#define CLK_FOUT_KPLL 6
 +
-+	ftm_writel(0x00, priv->clksrc_base + FTM_CNTIN);
-+	ftm_writel(~0UL, priv->clksrc_base + FTM_MOD);
++/* gate for special clocks (sclk) */
++#define CLK_SCLK_UART0 128
++#define CLK_SCLK_UART1 129
++#define CLK_SCLK_UART2 130
++#define CLK_SCLK_UART3 131
++#define CLK_SCLK_MMC0 132
++#define CLK_SCLK_MMC1 133
++#define CLK_SCLK_MMC2 134
 +
-+	ftm_reset_counter(priv->clksrc_base);
++/* gate clocks */
++#define CLK_UART0 257
++#define CLK_UART1 258
++#define CLK_UART2 259
++#define CLK_UART3 260
++#define CLK_MCT 315
++#define CLK_MMC0 351
++#define CLK_MMC1 352
++#define CLK_MMC2 353
 +
-+	sched_clock_register(ftm_read_sched_clock, 16, freq / (1 << priv->ps));
-+	err = clocksource_mmio_init(priv->clksrc_base + FTM_CNT, "fsl-ftm",
-+				    freq / (1 << priv->ps), 300, 16,
-+				    clocksource_mmio_readl_up);
-+	if (err) {
-+		pr_err("ftm: init clock source mmio failed: %d\n", err);
-+		return err;
-+	}
++#define CLK_NR_CLKS 512
 +
-+	ftm_counter_enable(priv->clksrc_base);
-+
-+	return 0;
-+}
-+
-+static int __init __ftm_clk_init(struct device_node *np, char *cnt_name,
-+				 char *ftm_name)
-+{
-+	struct clk *clk;
-+	int err;
-+
-+	clk = of_clk_get_by_name(np, cnt_name);
-+	if (IS_ERR(clk)) {
-+		pr_err("ftm: Cannot get \"%s\": %ld\n", cnt_name, PTR_ERR(clk));
-+		return PTR_ERR(clk);
-+	}
-+	err = clk_prepare_enable(clk);
-+	if (err) {
-+		pr_err("ftm: clock failed to prepare+enable \"%s\": %d\n",
-+			cnt_name, err);
-+		return err;
-+	}
-+
-+	clk = of_clk_get_by_name(np, ftm_name);
-+	if (IS_ERR(clk)) {
-+		pr_err("ftm: Cannot get \"%s\": %ld\n", ftm_name, PTR_ERR(clk));
-+		return PTR_ERR(clk);
-+	}
-+	err = clk_prepare_enable(clk);
-+	if (err)
-+		pr_err("ftm: clock failed to prepare+enable \"%s\": %d\n",
-+			ftm_name, err);
-+
-+	return clk_get_rate(clk);
-+}
-+
-+static unsigned long __init ftm_clk_init(struct device_node *np)
-+{
-+	unsigned long freq;
-+
-+	freq = __ftm_clk_init(np, "ftm-evt-counter-en", "ftm-evt");
-+	if (freq <= 0)
-+		return 0;
-+
-+	freq = __ftm_clk_init(np, "ftm-src-counter-en", "ftm-src");
-+	if (freq <= 0)
-+		return 0;
-+
-+	return freq;
-+}
-+
-+static int __init ftm_calc_closest_round_cyc(unsigned long freq)
-+{
-+	priv->ps = 0;
-+
-+	/* The counter register is only using the lower 16 bits, and
-+	 * if the 'freq' value is to big here, then the periodic_cyc
-+	 * may exceed 0xFFFF.
-+	 */
-+	do {
-+		priv->periodic_cyc = DIV_ROUND_CLOSEST(freq,
-+						HZ * (1 << priv->ps++));
-+	} while (priv->periodic_cyc > 0xFFFF);
-+
-+	if (priv->ps > FTM_PS_MAX) {
-+		pr_err("ftm: the prescaler is %lu > %d\n",
-+				priv->ps, FTM_PS_MAX);
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static void __init ftm_timer_init(struct device_node *np)
-+{
-+	unsigned long freq;
-+	int irq;
-+
-+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return;
-+
-+	priv->clkevt_base = of_iomap(np, 0);
-+	if (!priv->clkevt_base) {
-+		pr_err("ftm: unable to map event timer registers\n");
-+		goto err;
-+	}
-+
-+	priv->clksrc_base = of_iomap(np, 1);
-+	if (!priv->clksrc_base) {
-+		pr_err("ftm: unable to map source timer registers\n");
-+		goto err;
-+	}
-+
-+	irq = irq_of_parse_and_map(np, 0);
-+	if (irq <= 0) {
-+		pr_err("ftm: unable to get IRQ from DT, %d\n", irq);
-+		goto err;
-+	}
-+
-+	priv->big_endian = of_property_read_bool(np, "big-endian");
-+
-+	freq = ftm_clk_init(np);
-+	if (!freq)
-+		goto err;
-+
-+	if (ftm_calc_closest_round_cyc(freq))
-+		goto err;
-+
-+	if (ftm_clocksource_init(freq))
-+		goto err;
-+
-+	if (ftm_clockevent_init(freq, irq))
-+		goto err;
-+
-+	return;
-+
-+err:
-+	kfree(priv);
-+}
-+CLOCKSOURCE_OF_DECLARE(flextimer, "fsl,ftm-timer", ftm_timer_init);
++#endif /* _DT_BINDINGS_CLOCK_EXYNOS_5410_H */
 -- 
 1.7.9.5
