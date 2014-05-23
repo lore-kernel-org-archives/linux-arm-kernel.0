@@ -1,46 +1,48 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:30 +0200
-Subject: [PATCH 50/71] clocksource: sh_mtu2: Rename clock to "fck" in the
- non-legacy case
+Date: Fri, 23 May 2014 12:31:33 +0200
+Subject: [PATCH 53/71] clocksource: arm_global_timer: Only check for unusable
+ timer on A9
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-50-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-53-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Matthew Leach <matthew.leach@arm.com>
 
-The sh_mtu2 driver gets the MTU2 functional clock using a connection ID
-of "mtu2_fck". While all SH SoCs create clock lookup entries with a NULL
-device ID and a "mtu2_fck" connection ID, the ARM SoCs use the device ID
-only with a NULL connection ID. This works on legacy platforms but will
-break on ARM with DT boot.
+The check for a usable global timer in the probe code does not enquire
+which CPU we are currently running on. This can cause the driver to
+incorrectly assume we have an unusable global timer if we are running
+on a CPU other than A9.
 
-Fix the situation by using a connection ID of "fck" in the non-legacy
-platform data case. Clock lookup entries will be renamed to use the
-device ID as well as the connection ID as platforms get moved to new
-platform data. The legacy code will eventually be dropped, leaving us
-with device ID based clock lookup, compatible with DT boot.
+Before checking the CPU revision, ensure we are running on an A9 CPU.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Tested-by: Wolfram Sang <wsa@sang-engineering.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Matthew Leach <matthew.leach@arm.com>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/sh_mtu2.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clocksource/arm_global_timer.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
-index 7cc6d942..3a37857 100644
---- a/drivers/clocksource/sh_mtu2.c
-+++ b/drivers/clocksource/sh_mtu2.c
-@@ -465,7 +465,7 @@ static int sh_mtu2_setup(struct sh_mtu2_device *mtu,
- 	}
+diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+index 0fc31d0..60e5a170 100644
+--- a/drivers/clocksource/arm_global_timer.c
++++ b/drivers/clocksource/arm_global_timer.c
+@@ -246,11 +246,12 @@ static void __init global_timer_of_register(struct device_node *np)
+ 	int err = 0;
  
- 	/* Get hold of clock. */
--	mtu->clk = clk_get(&mtu->pdev->dev, "mtu2_fck");
-+	mtu->clk = clk_get(&mtu->pdev->dev, mtu->legacy ? "mtu2_fck" : "fck");
- 	if (IS_ERR(mtu->clk)) {
- 		dev_err(&mtu->pdev->dev, "cannot get clock\n");
- 		return PTR_ERR(mtu->clk);
+ 	/*
+-	 * In r2p0 the comparators for each processor with the global timer
++	 * In A9 r2p0 the comparators for each processor with the global timer
+ 	 * fire when the timer value is greater than or equal to. In previous
+ 	 * revisions the comparators fired when the timer value was equal to.
+ 	 */
+-	if ((read_cpuid_id() & 0xf0000f) < 0x200000) {
++	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9
++	    && (read_cpuid_id() & 0xf0000f) < 0x200000) {
+ 		pr_warn("global-timer: non support for this cpu version.\n");
+ 		return;
+ 	}
 -- 
 1.7.9.5
