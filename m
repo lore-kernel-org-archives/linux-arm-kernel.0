@@ -1,31 +1,116 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 24 May 2014 01:00:32 +0200
-Subject: [PATCH RESEND v2 0/3] bus: add Broadcom GISB bus arbiter
- timeout/error handler
-In-Reply-To: <1400529962-9612-1-git-send-email-f.fainelli@gmail.com>
-References: <1400529962-9612-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <201405240100.32725.arnd@arndb.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 23 May 2014 16:18:49 -0700
+Subject: [PATCH] clk: bcm/kona: implement determine_rate()
+In-Reply-To: <1400592297-22171-1-git-send-email-elder@linaro.org>
+References: <1400592297-22171-1-git-send-email-elder@linaro.org>
+Message-ID: <20140523231849.23136.70991@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 May 2014, Florian Fainelli wrote:
-> Hi all,
+Quoting Alex Elder (2014-05-20 06:24:57)
+> Implement the clk->determine_rate method for Broadcom Kona peripheral
+> clocks.  This allows a peripheral clock to be re-parented in order to
+> satisfy a rate change request.  This takes the place of the previous
+> kona_peri_clk_round_rate() functionality, though that function remains
+> because it is used by the new one.
 > 
-> This patch adds support for the Broadcom GISB bus arbiter timeout/error handler.
-> GISB is a custom and proprietary bus used in the Broadcom Set Top Box devices
-> exclusively. The bus arbiter offers the possibly to decode faulting masters as
-> well as masters that are timing out on the bus.
+> The parent clock that allows the peripheral clock to produce a rate
+> closest to the one requested is the one selected, though the current
+> parent is used by default.
 > 
-> V2 addresses some comments made by Arnd, and widens the audience by posting
-> on linux-arm-kernel as well.
+> Signed-off-by: Alex Elder <elder@linaro.org>
+> ---
+> This patch is based on Mike Turquette's current "clk-next" branch.
+>     6ed8eb5 Merge tag 'clk-hisi-for-v3.16' of https://git.kern...
 > 
-> These patches should be merged via the 'arm-soc' tree. I am resending those
-> such that every mailing-list has them in copy.
+> It is available here:
+>     http://git.linaro.org/landing-teams/working/broadcom/kernel.git
+>     Branch review/bcm-determine-rate
 > 
-> Thank you!
+>  drivers/clk/bcm/clk-kona.c | 53 +++++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 52 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
+> index d603c4e..1a4eccc 100644
+> --- a/drivers/clk/bcm/clk-kona.c
+> +++ b/drivers/clk/bcm/clk-kona.c
+> @@ -1031,6 +1031,57 @@ static long kona_peri_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+>                                 rate ? rate : 1, *parent_rate, NULL);
+>  }
+>  
+> +static long kona_peri_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
+> +               unsigned long *best_parent_rate, struct clk **best_parent)
+> +{
+> +       struct kona_clk *bcm_clk = to_kona_clk(hw);
+> +       struct clk *clk = hw->clk;
+> +       struct clk *current_parent;
+> +       unsigned long parent_rate;
+> +       unsigned long best_delta;
+> +       unsigned long best_rate;
+> +       u32 parent_count;
+> +       u32 which;
+> +
+> +       /*
+> +        * If there is no other parent to choose, use the current one.
+> +        * Note:  We don't honor (or use) CLK_SET_RATE_NO_REPARENT.
+> +        */
 
-Applied to the next/drivers branch now. I've changed the Kconfig and Makefile
-slightly to maintain alphabetical ordering, which helps avoid a merge conflict
-with the vexpress drivers.
+A WARN_ONCE is appropriate upon detection of CLK_SET_RATE_NO_REPARENT.
+It will certainly help someone that is debugging why that flag has no
+effect.
 
-	Arnd
+Otherwise the patch looks good to me.
+
+Regards,
+Mike
+
+> +       parent_count = (u32)bcm_clk->init_data.num_parents;
+> +       if (parent_count < 2)
+> +               return kona_peri_clk_round_rate(hw, rate, best_parent_rate);
+> +
+> +       /* Unless we can do better, stick with current parent */
+> +       current_parent = clk_get_parent(clk);
+> +       parent_rate = __clk_get_rate(current_parent);
+> +       best_rate = kona_peri_clk_round_rate(hw, rate, &parent_rate);
+> +       best_delta = abs(best_rate - rate);
+> +
+> +       /* Check whether any other parent clock can produce a better result */
+> +       for (which = 0; which < parent_count; which++) {
+> +               struct clk *parent = clk_get_parent_by_index(clk, which);
+> +               unsigned long delta;
+> +               unsigned long other_rate;
+> +
+> +               BUG_ON(!parent);
+> +               if (parent == current_parent)
+> +                       continue;
+> +
+> +               /* We don't support CLK_SET_RATE_PARENT */
+> +               parent_rate = __clk_get_rate(parent);
+> +               other_rate = kona_peri_clk_round_rate(hw, rate, &parent_rate);
+> +               delta = abs(other_rate - rate);
+> +               if (delta < best_delta) {
+> +                       best_delta = delta;
+> +                       best_rate = other_rate;
+> +                       *best_parent = parent;
+> +                       *best_parent_rate = parent_rate;
+> +               }
+> +       }
+> +
+> +       return best_rate;
+> +}
+> +
+>  static int kona_peri_clk_set_parent(struct clk_hw *hw, u8 index)
+>  {
+>         struct kona_clk *bcm_clk = to_kona_clk(hw);
+> @@ -1135,7 +1186,7 @@ struct clk_ops kona_peri_clk_ops = {
+>         .disable = kona_peri_clk_disable,
+>         .is_enabled = kona_peri_clk_is_enabled,
+>         .recalc_rate = kona_peri_clk_recalc_rate,
+> -       .round_rate = kona_peri_clk_round_rate,
+> +       .determine_rate = kona_peri_clk_determine_rate,
+>         .set_parent = kona_peri_clk_set_parent,
+>         .get_parent = kona_peri_clk_get_parent,
+>         .set_rate = kona_peri_clk_set_rate,
+> -- 
+> 1.9.1
+> 
