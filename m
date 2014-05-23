@@ -1,59 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 23 May 2014 11:12:36 +0100
-Subject: [linux-sunxi] Re: [PATCH v6 0/7] mfd: AXP20x: Add support for
- AXP202 and AXP209
-In-Reply-To: <20140522195523.GB7708@core.coreip.homeip.net>
-References: <1400528868-5971-1-git-send-email-carlo@caione.org>
- <20140520222307.GK12304@sirena.org.uk>
- <CAOQ7t2aBc5tFYk2MkfL9QqvFf5fcebwKtO97F3S=WdJ2uFE_jg@mail.gmail.com>
- <20140521091456.GB6679@lee--X1>
- <CAOQ7t2bqeQ35WxXKCRgj1ijJic=2w8++9idip4-f_LnP6Ucb6A@mail.gmail.com>
- <20140522195523.GB7708@core.coreip.homeip.net>
-Message-ID: <20140523101236.GS19747@lee--X1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 May 2014 12:19:34 +0200
+Subject: [PATCH] pinctrl: sunxi: Enable the pinctrl Kconfig options by
+ default
+In-Reply-To: <CACRpkdb2gzpftp3PWkr40v1CZm2J=SmnY9Mb=5S-AJr+YXgkNg@mail.gmail.com>
+References: <1399994597-15177-1-git-send-email-maxime.ripard@free-electrons.com>
+ <CACRpkdb2gzpftp3PWkr40v1CZm2J=SmnY9Mb=5S-AJr+YXgkNg@mail.gmail.com>
+Message-ID: <201405231219.35061.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > >> >> This set of patches introduces the core driver and support for two different
-> > >> >> subsystems:
-> > >> >>       - Regulators
-> > >> >
-> > >> >>  .../ABI/testing/sysfs-driver-input-axp-pek         |  11 +
-> > >> >>  Documentation/devicetree/bindings/mfd/axp20x.txt   |  93 +++++++
-> > >> >>  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
-> > >> >>  arch/arm/configs/multi_v7_defconfig                |   3 +
-> > >> >>  arch/arm/configs/sunxi_defconfig                   |   4 +
-> > >> >>  drivers/input/misc/Kconfig                         |  11 +
-> > >> >>  drivers/input/misc/Makefile                        |   1 +
-> > >> >>  drivers/input/misc/axp20x-pek.c                    | 281 +++++++++++++++++++++
-> > >> >>  drivers/mfd/Kconfig                                |  12 +
-> > >> >>  drivers/mfd/Makefile                               |   1 +
-> > >> >>  drivers/mfd/axp20x.c                               | 258 +++++++++++++++++++
-> > >> >>  include/linux/mfd/axp20x.h                         | 180 +++++++++++++
-> > >> >>  12 files changed, 856 insertions(+)
-> > >> >
-> > >> > The regulator changes don't appear to be showing up in the diffstat or
-> > >> > obviously in the series?
-> > >>
-> > >> Right. Cut-and-paste error.
-> > >> You have already applied the regulator patches so I didn't include
-> > >> them here (in theory I posted this series to be picked up by Lee).
-> > >
-> > > That's fine.  Just tell me which patches need to stay together and
-> > > which are able to be applied through their respective subsystem trees
-> > > separately.  Then, once I have all the Acks I can apply no problem.
-> > 
-> > Hi Lee,
-> > I'd say #1 for the MFD tree, #4 for the input subsystem, #2 #3 and #5
-> > are documentations, #6 and #7 defconfigs add-on.
+On Friday 16 May 2014, Linus Walleij wrote:
+> On Tue, May 13, 2014 at 5:23 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
 > 
-> I am fine with the input piece going through MFD tree, no need to split
-> it from the rest.
+> > Enable the freshly introduced Kconfig options whenever their matching
+> > architecture is enabled.
+> >
+> > Since the Kconfig symbols for these machines are going through a different
+> > tree, keep PINCTRL_SUNXI around for the moment to avoid breaking the defconfig.
+> > It should be removed eventually.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> OK patch applied.
 
-Do you want a pull-request i.e. will this cause conflicts when Linus
-merges it with your tree, or is it okay for me to just apply it?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I stumbled over this build error now:
+
+/git/arm-soc/drivers/phy/phy-sun4i-usb.c: In function 'sun4i_usb_phy_probe':
+/git/arm-soc/drivers/phy/phy-sun4i-usb.c:282:3: error: implicit declaration of function 'devm_reset_control_get' [-Werror=implicit-function-declaration]
+   phy->reset = devm_reset_control_get(dev, name);
+   ^
+/git/arm-soc/drivers/phy/phy-sun4i-usb.c:282:14: warning: assignment makes pointer from integer without a cast [enabled by default]
+   phy->reset = devm_reset_control_get(dev, name);
+              ^
+cc1: some warnings being treated as errors
+make[4]: *** [drivers/phy/phy-sun4i-usb.o] Error 1
+/git/arm-soc/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c: In function 'sun6i_a31_r_pinctrl_probe':
+/git/arm-soc/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c:103:2: error: implicit declaration of function 'devm_reset_control_get' [-Werror=implicit-function-declaration]
+  rstc = devm_reset_control_get(&pdev->dev, NULL);
+  ^
+/git/arm-soc/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c:103:7: warning: assignment makes pointer from integer without a cast [enabled by default]
+  rstc = devm_reset_control_get(&pdev->dev, NULL);
+       ^
+cc1: some warnings being treated as errors
+
+
+It seems both the phy and the pinctrl driver actually depend on the
+reset controller framework, but this is not reflected in Kconfig.
+
+I guess these should either use devm_reset_control_get_optional
+or have 'depends on RESET_CONTROLLER' in Kconfig.
+
+	Arnd
