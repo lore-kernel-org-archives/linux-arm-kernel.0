@@ -1,59 +1,34 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Fri, 23 May 2014 08:09:16 -0400
-Subject: [PATCH v2 4/4] ARM: dts: bcm590xx: add support for GPLDO and
- VBUS regulators
-In-Reply-To: <1398295293-11033-5-git-send-email-mporter@linaro.org>
-References: <1398295293-11033-1-git-send-email-mporter@linaro.org>
- <1398295293-11033-5-git-send-email-mporter@linaro.org>
-Message-ID: <20140523120916.GY32082@beef>
+From: rric@kernel.org (Robert Richter)
+Date: Fri, 23 May 2014 14:11:35 +0200
+Subject: [PATCH RESEND 2/7] ARM: Introduce arm_get_current_stack_frame()
+In-Reply-To: <1400837196-22339-3-git-send-email-Nikolay.Borisov@arm.com>
+References: <1400837196-22339-1-git-send-email-Nikolay.Borisov@arm.com>
+ <1400837196-22339-3-git-send-email-Nikolay.Borisov@arm.com>
+Message-ID: <20140523121135.GV27560@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 07:21:33PM -0400, Matt Porter wrote:
-> Adds additional nodes to support GPLDO1-6 and VBUS regulators which
-> are now supported in the bcm590xx regulator driver.
+On 23.05.14 10:26:31, Nikolay Borisov wrote:
 
-Applied to mach-bcm for-3.16/dt
+> +#define frame_pointer(regs)				  \
+> +	IS_ENABLED(CONFIG_THUMB2_KERNEL) ? (regs)->ARM_r7 \
+> +	: (regs)->ARM_fp				  \
 
->  arch/arm/boot/dts/bcm59056.dtsi | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/bcm59056.dtsi b/arch/arm/boot/dts/bcm59056.dtsi
-> index dfadaaa..066adfb 100644
-> --- a/arch/arm/boot/dts/bcm59056.dtsi
-> +++ b/arch/arm/boot/dts/bcm59056.dtsi
-> @@ -70,5 +70,26 @@
->  
->  		vsr_reg: vsr {
->  		};
-> +
-> +		gpldo1_reg: gpldo1 {
-> +		};
-> +
-> +		gpldo2_reg: gpldo2 {
-> +		};
-> +
-> +		gpldo3_reg: gpldo3 {
-> +		};
-> +
-> +		gpldo4_reg: gpldo4 {
-> +		};
-> +
-> +		gpldo5_reg: gpldo5 {
-> +		};
-> +
-> +		gpldo6_reg: gpldo6 {
-> +		};
-> +
-> +		vbus_reg: vbus {
-> +		};
->  	};
->  };
-> -- 
-> 1.8.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+#ifdef CONFIG_THUMB2_KERNEL
+
+... is better here, this is booleon, not tristate, better to read, and
+no mixed c and macro statements either.
+
+> +void arm_get_current_stackframe(struct pt_regs *regs, struct stackframe *frame)
+> +{
+> +		frame->fp = frame_pointer(regs);
+> +		frame->sp = regs->ARM_sp;
+> +		frame->lr = regs->ARM_lr;
+> +		frame->pc = regs->ARM_pc;
+> +}
+> +EXPORT_SYMBOL_GPL(arm_get_current_stackframe);
+
+I am wondering if this should be better implemented as inline function
+as this is in the hot path.
+
+-Robert
