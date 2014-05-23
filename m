@@ -1,76 +1,57 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 23 May 2014 08:00:40 -0500
-Subject: [PATCH 01/10] dt/bindings: add passthru-mask property to
- versatile-fpga-irq
-In-Reply-To: <CACRpkdZGevG9YaUPUs98pQidcGz7MxbxjuSxBn=cqaOYGhWegw@mail.gmail.com>
-References: <1400620176-7239-1-git-send-email-robherring2@gmail.com>
- <1400620176-7239-2-git-send-email-robherring2@gmail.com>
- <CACRpkdZGevG9YaUPUs98pQidcGz7MxbxjuSxBn=cqaOYGhWegw@mail.gmail.com>
-Message-ID: <CAL_JsqJYzMvhWng7YUdQbKdFxVwUXZkB-h_kq7yZAOzi1biiPw@mail.gmail.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Fri, 23 May 2014 09:01:05 -0400
+Subject: [GIT PULL] ARM: mach-bcm: cleanups for 3.16
+Message-ID: <20140523130105.GA23742@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 7:46 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Tue, May 20, 2014 at 11:09 PM, Rob Herring <robherring2@gmail.com> wrote:
->
->> From: Rob Herring <robh@kernel.org>
->>
->> Add a passthru-mask property for setting interrupts which are passed
->> through directly to a primary controller.
->>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> Cc: Pawel Moll <pawel.moll@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
->> Cc: Kumar Gala <galak@codeaurora.org>
->> ---
->>  Documentation/devicetree/bindings/arm/versatile-fpga-irq.txt | 3 +++
->>  1 file changed, 3 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/versatile-fpga-irq.txt b/Documentation/devicetree/bindings/arm/versatile-fpga-irq.txt
->> index c9cf605..956b71d 100644
->> --- a/Documentation/devicetree/bindings/arm/versatile-fpga-irq.txt
->> +++ b/Documentation/devicetree/bindings/arm/versatile-fpga-irq.txt
->> @@ -34,3 +34,6 @@ Optional properties:
->>  - interrupts: if the FPGA IRQ controller is cascaded, i.e. if its IRQ
->>    output is simply connected to the input of another IRQ controller,
->>    then the parent IRQ shall be specified in this property.
->> +- passthru-mask: a u32 number representing a bit mas determining which of
->
-> bit mask
->
-> (speling)
->
->> +  the interrupts are directly passed through to the primary interrupt
->> +  controller.
->
-> This is very confusing on the Integrators. The FPGA IRQ controller
-> *is* the primary interrupt controller on these.
+Please consider pulling the following cleanups for 3.16.
 
-Yes. Really, the h/w is not the same and we should have different
-compatible strings. Unfortunately, it is Integrator that should
-change.
+-Matt
 
->
-> (Further on Integrators with an IM-PD1 expansion board the
-> VIC is actually the secondary controller visavis the FPGA
-> IRQ controller which is the primary one.)
->
-> So on the versatile the FPGA IRQ controller is *not* cascaded
-> off one line of the VIC but rather connected in parallel or
-> something?
+The following changes since commit a798c10faf62a505d24e5f6213fbaf904a39623f:
 
-See figure in 3.10 of the user guide:
+  Linux 3.15-rc2 (2014-04-20 11:08:50 -0700)
 
-http://infocenter.arm.com/help/topic/com.arm.doc.dui0225d/DUI0225D_versatile_application_baseboard_arm926ej_s_ug.pdf
+are available in the git repository at:
 
-It is both chained and direct connection. I guess we could just use
-chained mode to simplify things.
+  git://github.com/broadcom/mach-bcm tags/for-3.16/bcm-cleanup
 
-> Care to elaborate a bit on how things are cascaded here?
-> And specify that this is for some special usecase or
-> something?
+for you to fetch changes up to eeda4cb92ee0fb63a5917738e107b0bc8168079e:
 
-I'll add a reference to the user guide to the binding.
+  ARM: bcm: rename "kona.h" and "kona.c" (2014-04-25 08:51:38 -0400)
 
-Rob
+----------------------------------------------------------------
+mach-bcm mobile SoC cleanups
+
+* Clean up mach-bcm config and build targets
+* Clean up bcm281xx/21664 SMC code
+* Clean up bcm281xx/21664 L2C code
+
+----------------------------------------------------------------
+Alex Elder (11):
+      ARM: bcm: clean up config and build targets
+      ARM: bcm: use memory accessors for ioremapped area
+      ARM: bcm: err, don't BUG() on SMC init failures
+      ARM: bcm: clean up SMC code
+      ARM: bcm: have bcm_kona_smc() return request result
+      ARM: bcm: don't special-case CPU 0 in bcm_kona_smc()
+      ARM: bcm: config option for l2 cache support
+      ARM: bcm: tidy up a few includes
+      ARM: bcm: use inline assembly for "smc" request
+      ARM: bcm: rewrite commentary for bcm_kona_do_smc()
+      ARM: bcm: rename "kona.h" and "kona.c"
+
+ arch/arm/mach-bcm/Kconfig                     |  40 +++++++-
+ arch/arm/mach-bcm/Makefile                    |  21 +++-
+ arch/arm/mach-bcm/bcm_kona_smc.c              | 136 +++++++++++++++++++-------
+ arch/arm/mach-bcm/bcm_kona_smc.h              |  52 +---------
+ arch/arm/mach-bcm/bcm_kona_smc_asm.S          |  41 --------
+ arch/arm/mach-bcm/board_bcm21664.c            |   5 +-
+ arch/arm/mach-bcm/board_bcm281xx.c            |   2 +-
+ arch/arm/mach-bcm/{kona.c => kona_l2_cache.c} |  16 +--
+ arch/arm/mach-bcm/{kona.h => kona_l2_cache.h} |   6 +-
+ 9 files changed, 170 insertions(+), 149 deletions(-)
+ delete mode 100644 arch/arm/mach-bcm/bcm_kona_smc_asm.S
+ rename arch/arm/mach-bcm/{kona.c => kona_l2_cache.c} (80%)
+ rename arch/arm/mach-bcm/{kona.h => kona_l2_cache.h} (80%)
