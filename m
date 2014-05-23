@@ -1,126 +1,51 @@
-From: elder@linaro.org (Alex Elder)
-Date: Fri, 23 May 2014 18:24:31 -0500
-Subject: [PATCH] clk: bcm/kona: implement determine_rate()
-In-Reply-To: <20140523231849.23136.70991@quantum>
-References: <1400592297-22171-1-git-send-email-elder@linaro.org>
- <20140523231849.23136.70991@quantum>
-Message-ID: <537FD8AF.8060004@linaro.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 23 May 2014 16:41:47 -0700
+Subject: [PATCH] scripts/dtc: pad DTBs to facilitate later modification
+Message-ID: <1400888507-11637-1-git-send-email-khilman@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/2014 06:18 PM, Mike Turquette wrote:
-> Quoting Alex Elder (2014-05-20 06:24:57)
->> Implement the clk->determine_rate method for Broadcom Kona peripheral
->> clocks.  This allows a peripheral clock to be re-parented in order to
->> satisfy a rate change request.  This takes the place of the previous
->> kona_peri_clk_round_rate() functionality, though that function remains
->> because it is used by the new one.
->>
->> The parent clock that allows the peripheral clock to produce a rate
->> closest to the one requested is the one selected, though the current
->> parent is used by default.
->>
->> Signed-off-by: Alex Elder <elder@linaro.org>
->> ---
->> This patch is based on Mike Turquette's current "clk-next" branch.
->>     6ed8eb5 Merge tag 'clk-hisi-for-v3.16' of https://git.kern...
->>
->> It is available here:
->>     http://git.linaro.org/landing-teams/working/broadcom/kernel.git
->>     Branch review/bcm-determine-rate
->>
->>  drivers/clk/bcm/clk-kona.c | 53 +++++++++++++++++++++++++++++++++++++++++++++-
->>  1 file changed, 52 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
->> index d603c4e..1a4eccc 100644
->> --- a/drivers/clk/bcm/clk-kona.c
->> +++ b/drivers/clk/bcm/clk-kona.c
->> @@ -1031,6 +1031,57 @@ static long kona_peri_clk_round_rate(struct clk_hw *hw, unsigned long rate,
->>                                 rate ? rate : 1, *parent_rate, NULL);
->>  }
->>  
->> +static long kona_peri_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
->> +               unsigned long *best_parent_rate, struct clk **best_parent)
->> +{
->> +       struct kona_clk *bcm_clk = to_kona_clk(hw);
->> +       struct clk *clk = hw->clk;
->> +       struct clk *current_parent;
->> +       unsigned long parent_rate;
->> +       unsigned long best_delta;
->> +       unsigned long best_rate;
->> +       u32 parent_count;
->> +       u32 which;
->> +
->> +       /*
->> +        * If there is no other parent to choose, use the current one.
->> +        * Note:  We don't honor (or use) CLK_SET_RATE_NO_REPARENT.
->> +        */
-> 
-> A WARN_ONCE is appropriate upon detection of CLK_SET_RATE_NO_REPARENT.
-> It will certainly help someone that is debugging why that flag has no
-> effect.
+By default, add some padding to the DT blobs to facilitate later
+patching.
 
-I'll add that.
+An example need for DTB patching is the need to modifiy the command
+line on platforms where ATAGS are not (or cannot) be used to pass the
+commandline.  For example, we do not support a big-endian kernel
+reading ATAGS from a little-endian u-boot, so the only way to pass a
+command line in the DT.
 
-> Otherwise the patch looks good to me.
+Also, without ATAG support (or if u-boot was built without
+CONFIG_INITRD_TAG) the only way to pass an initrd is by adding an
+initrd= option to command line (in the DT).
 
-Would you like me to send an updated patch as a pull request?
+Therefore, to facilitate adding to the DT command line directly in the
+DTB, add some padding.
 
-Thanks.
+Cc: Nicolas Pitre <nico@linaro.org>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+I kinda pulled 64 bytes out of the air here since it's enough to add
+some common things to the commandline like debug, earlyprink
+initrd=<addr>,<size>, etc., but I'm certainlly not opposed to more
+padding.
 
-					-Alex
+ scripts/Makefile.lib | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Regards,
-> Mike
-> 
->> +       parent_count = (u32)bcm_clk->init_data.num_parents;
->> +       if (parent_count < 2)
->> +               return kona_peri_clk_round_rate(hw, rate, best_parent_rate);
->> +
->> +       /* Unless we can do better, stick with current parent */
->> +       current_parent = clk_get_parent(clk);
->> +       parent_rate = __clk_get_rate(current_parent);
->> +       best_rate = kona_peri_clk_round_rate(hw, rate, &parent_rate);
->> +       best_delta = abs(best_rate - rate);
->> +
->> +       /* Check whether any other parent clock can produce a better result */
->> +       for (which = 0; which < parent_count; which++) {
->> +               struct clk *parent = clk_get_parent_by_index(clk, which);
->> +               unsigned long delta;
->> +               unsigned long other_rate;
->> +
->> +               BUG_ON(!parent);
->> +               if (parent == current_parent)
->> +                       continue;
->> +
->> +               /* We don't support CLK_SET_RATE_PARENT */
->> +               parent_rate = __clk_get_rate(parent);
->> +               other_rate = kona_peri_clk_round_rate(hw, rate, &parent_rate);
->> +               delta = abs(other_rate - rate);
->> +               if (delta < best_delta) {
->> +                       best_delta = delta;
->> +                       best_rate = other_rate;
->> +                       *best_parent = parent;
->> +                       *best_parent_rate = parent_rate;
->> +               }
->> +       }
->> +
->> +       return best_rate;
->> +}
->> +
->>  static int kona_peri_clk_set_parent(struct clk_hw *hw, u8 index)
->>  {
->>         struct kona_clk *bcm_clk = to_kona_clk(hw);
->> @@ -1135,7 +1186,7 @@ struct clk_ops kona_peri_clk_ops = {
->>         .disable = kona_peri_clk_disable,
->>         .is_enabled = kona_peri_clk_is_enabled,
->>         .recalc_rate = kona_peri_clk_recalc_rate,
->> -       .round_rate = kona_peri_clk_round_rate,
->> +       .determine_rate = kona_peri_clk_determine_rate,
->>         .set_parent = kona_peri_clk_set_parent,
->>         .get_parent = kona_peri_clk_get_parent,
->>         .set_rate = kona_peri_clk_set_rate,
->> -- 
->> 1.9.1
->>
+diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+index 6a5b0decb797..d7a57c2620f3 100644
+--- a/scripts/Makefile.lib
++++ b/scripts/Makefile.lib
+@@ -264,7 +264,7 @@ $(obj)/%.dtb.S: $(obj)/%.dtb
+ 
+ quiet_cmd_dtc = DTC     $@
+ cmd_dtc = $(CPP) $(dtc_cpp_flags) -x assembler-with-cpp -o $(dtc-tmp) $< ; \
+-	$(objtree)/scripts/dtc/dtc -O dtb -o $@ -b 0 \
++	$(objtree)/scripts/dtc/dtc -O dtb -o $@ -b 0 -p 64 \
+ 		-i $(dir $<) $(DTC_FLAGS) \
+ 		-d $(depfile).dtc.tmp $(dtc-tmp) ; \
+ 	cat $(depfile).pre.tmp $(depfile).dtc.tmp > $(depfile)
+-- 
+1.9.2
