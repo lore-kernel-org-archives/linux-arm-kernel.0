@@ -1,49 +1,51 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 23 May 2014 16:10:19 +0100
-Subject: [RESEND PATCH v5 5/5] arm: Fix DEBUG_LL for multi-platform kernels
- (without PL01X)
-In-Reply-To: <1400857819-7975-1-git-send-email-daniel.thompson@linaro.org>
-References: <1398355246-29571-1-git-send-email-daniel.thompson@linaro.org>
- <1400857819-7975-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1400857819-7975-6-git-send-email-daniel.thompson@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 23 May 2014 08:11:40 -0700
+Subject: Accessing GPIOs from userspace using recent kernels
+In-Reply-To: <CACRpkdYTa+_zAsbwU+XYSWnsN4i4Xkfm28S1=vcC5=oz0TH3Gg@mail.gmail.com>
+References: <3385f19f3e1427613732f6d5c9f8513d@net2air.co>
+ <CABxcv=mFV3nJf1eqNhTbh1KWwe8Z6Z62JtFn5KZbHnGprk1_bg@mail.gmail.com>
+ <7bd3dbc0c3217f43eefc8d228995690f@net2air.co>
+ <CABxcv=nTV23Un91fSUmkixsF5uywoisCOi1qhPqVvZb+RvikDA@mail.gmail.com>
+ <ea43ccacfe4caf1f51f9e5a5c8bbdd5e@net2air.co>
+ <CACRpkdYTa+_zAsbwU+XYSWnsN4i4Xkfm28S1=vcC5=oz0TH3Gg@mail.gmail.com>
+Message-ID: <20140523151140.GF2321@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building a multi_v7_defconfig kernel it is not possible to configure
-DEBUG_LL to use any serial device except a ARM Primecell PL01X, or more
-accurately and worse, it is possible to configure a different serial
-device but KConfig does not honour this request. In fact this also
-overrides the user selection for some of the single platform kernels, for
-example I don't think DEBUG_LL can be targetted at ICE or semihosted
-supervisor for ARCH_VERSATILE.
+* Linus Walleij <linus.walleij@linaro.org> [140523 04:36]:
+> On Fri, May 16, 2014 at 12:15 PM, Peter TB Brett <peter@peter-b.co.uk> wrote:
+> > The current call chain seems to be: gpiod_export() --> gpiod_request() -->
+> > omap_gpio_request().  Looking at other GPIO drivers, it seems like
+> > omap_gpio_request() should eventually call pinctrl_request_gpio().  Would be
+> > useful if someone who knows about OMAP4/gpio/pinctrl could take a look at
+> > this.
 
-This happens because DEBUG_UART_PL01X is automatically enabled by
-some architectures and this means user decisions made regarding
-the DEBUG_LL backend will be overriden. Problem is fixed by removing the
-automatic enabling of this option.
+If we do this, we also need a solution to prevent automatic remuxing
+of GPIO pins from happending. For wake-up events, some drivers need
+to remux a rx pin to GPIO input for the duration of idle, and then
+back to device rx pin. This is needed on some other platforms too
+AFAIK.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm/Kconfig.debug | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+For the drivers needing GPIO wake-up events, request_gpio is done in
+the driver after drivers/base/pinctrl.c has already muxed the device
+pin to rx. At minimum we would get warnings about reserved pins if
+we tried to automatically mux them to GPIO.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 468cb3b..6a2bcfd 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -996,12 +996,7 @@ config DEBUG_LL_INCLUDE
- 
- # Compatibility options for PL01x
- config DEBUG_UART_PL01X
--	def_bool ARCH_EP93XX || \
--		ARCH_INTEGRATOR || \
--		ARCH_SPEAR3XX || \
--		ARCH_SPEAR6XX || \
--		ARCH_SPEAR13XX || \
--		ARCH_VERSATILE
-+	bool
- 
- # Compatibility options for 8250
- config DEBUG_UART_8250
--- 
-1.9.0
+We may be able to use some GPIO specific property to prevent
+automatic remuxing as we discussed in the #armlinux few days ago.
+
+Related to automatic remuxing of GPIO pins, there are also other
+needs for pinctrl and GPIO interaction. We need to remux GPIO output
+pins to input + pull + safe_mode to prevent the GPIO pins losing
+value briefly during off-idle. That's the gpio errata 1.158 at as
+shown at least at [1]. Because the GPIO to pinctrl mapping is
+sparse and SoC specific, there's currently now obvious way to do
+that. And we would need few new GPIO functions to tell pinctrl
+subsystem about the change.
+
+Regards,
+
+Tony
+
+
+[1] https://www.gitorious.org/rowboat/kernel/commit/86b15f21298b749a9d8216ff1839d33ad542464e?format=patch
