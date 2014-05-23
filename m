@@ -1,307 +1,174 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:18 +0200
-Subject: [PATCH 38/71] clocksource: sh_mtu2: Split channel fields from
- sh_mtu2_priv
+Date: Fri, 23 May 2014 12:31:19 +0200
+Subject: [PATCH 39/71] clocksource: sh_mtu2: Rename struct sh_mtu2_priv to
+ sh_mtu2_device
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-38-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-39-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Create a new sh_mtu2_channel structure to hold the channel-specific
-fields in preparation for multiple channels per device support.
+Channel data is private as well, rename priv to device to make the
+distrinction between the core device and the channels clearer.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Tested-by: Wolfram Sang <wsa@sang-engineering.com>
 ---
- drivers/clocksource/sh_mtu2.c |  125 +++++++++++++++++++++++------------------
- 1 file changed, 69 insertions(+), 56 deletions(-)
+ drivers/clocksource/sh_mtu2.c |   65 +++++++++++++++++++++--------------------
+ 1 file changed, 33 insertions(+), 32 deletions(-)
 
 diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
-index 6668455..e509f41 100644
+index e509f41..256621c 100644
 --- a/drivers/clocksource/sh_mtu2.c
 +++ b/drivers/clocksource/sh_mtu2.c
-@@ -34,12 +34,21 @@
+@@ -34,15 +34,15 @@
  #include <linux/pm_domain.h>
  #include <linux/pm_runtime.h>
  
-+struct sh_mtu2_priv;
-+
-+struct sh_mtu2_channel {
-+	struct sh_mtu2_priv *mtu;
-+	int irq;
-+	struct clock_event_device ced;
-+};
-+
- struct sh_mtu2_priv {
-+	struct platform_device *pdev;
-+
+-struct sh_mtu2_priv;
++struct sh_mtu2_device;
+ 
+ struct sh_mtu2_channel {
+-	struct sh_mtu2_priv *mtu;
++	struct sh_mtu2_device *mtu;
+ 	int irq;
+ 	struct clock_event_device ced;
+ };
+ 
+-struct sh_mtu2_priv {
++struct sh_mtu2_device {
+ 	struct platform_device *pdev;
+ 
  	void __iomem *mapbase;
- 	struct clk *clk;
--	int irq;
--	struct platform_device *pdev;
--	struct clock_event_device ced;
-+
-+	struct sh_mtu2_channel channel;
- };
- 
- static DEFINE_RAW_SPINLOCK(sh_mtu2_lock);
-@@ -63,10 +72,10 @@ static unsigned long mtu2_reg_offs[] = {
- 	[TGR] = 8,
- };
- 
--static inline unsigned long sh_mtu2_read(struct sh_mtu2_priv *p, int reg_nr)
-+static inline unsigned long sh_mtu2_read(struct sh_mtu2_channel *ch, int reg_nr)
- {
--	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
--	void __iomem *base = p->mapbase;
-+	struct sh_timer_config *cfg = ch->mtu->pdev->dev.platform_data;
-+	void __iomem *base = ch->mtu->mapbase;
- 	unsigned long offs;
- 
- 	if (reg_nr == TSTR)
-@@ -80,11 +89,11 @@ static inline unsigned long sh_mtu2_read(struct sh_mtu2_priv *p, int reg_nr)
- 		return ioread8(base + offs);
- }
- 
--static inline void sh_mtu2_write(struct sh_mtu2_priv *p, int reg_nr,
-+static inline void sh_mtu2_write(struct sh_mtu2_channel *ch, int reg_nr,
- 				unsigned long value)
- {
--	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
--	void __iomem *base = p->mapbase;
-+	struct sh_timer_config *cfg = ch->mtu->pdev->dev.platform_data;
-+	void __iomem *base = ch->mtu->mapbase;
- 	unsigned long offs;
- 
- 	if (reg_nr == TSTR) {
-@@ -100,100 +109,100 @@ static inline void sh_mtu2_write(struct sh_mtu2_priv *p, int reg_nr,
- 		iowrite8(value, base + offs);
- }
- 
--static void sh_mtu2_start_stop_ch(struct sh_mtu2_priv *p, int start)
-+static void sh_mtu2_start_stop_ch(struct sh_mtu2_channel *ch, int start)
- {
--	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
-+	struct sh_timer_config *cfg = ch->mtu->pdev->dev.platform_data;
- 	unsigned long flags, value;
- 
- 	/* start stop register shared by multiple timer channels */
- 	raw_spin_lock_irqsave(&sh_mtu2_lock, flags);
--	value = sh_mtu2_read(p, TSTR);
-+	value = sh_mtu2_read(ch, TSTR);
- 
- 	if (start)
- 		value |= 1 << cfg->timer_bit;
- 	else
- 		value &= ~(1 << cfg->timer_bit);
- 
--	sh_mtu2_write(p, TSTR, value);
-+	sh_mtu2_write(ch, TSTR, value);
- 	raw_spin_unlock_irqrestore(&sh_mtu2_lock, flags);
- }
- 
--static int sh_mtu2_enable(struct sh_mtu2_priv *p)
-+static int sh_mtu2_enable(struct sh_mtu2_channel *ch)
- {
- 	unsigned long periodic;
- 	unsigned long rate;
- 	int ret;
- 
--	pm_runtime_get_sync(&p->pdev->dev);
--	dev_pm_syscore_device(&p->pdev->dev, true);
-+	pm_runtime_get_sync(&ch->mtu->pdev->dev);
-+	dev_pm_syscore_device(&ch->mtu->pdev->dev, true);
- 
- 	/* enable clock */
--	ret = clk_enable(p->clk);
-+	ret = clk_enable(ch->mtu->clk);
- 	if (ret) {
--		dev_err(&p->pdev->dev, "cannot enable clock\n");
-+		dev_err(&ch->mtu->pdev->dev, "cannot enable clock\n");
- 		return ret;
- 	}
- 
- 	/* make sure channel is disabled */
--	sh_mtu2_start_stop_ch(p, 0);
-+	sh_mtu2_start_stop_ch(ch, 0);
- 
--	rate = clk_get_rate(p->clk) / 64;
-+	rate = clk_get_rate(ch->mtu->clk) / 64;
- 	periodic = (rate + HZ/2) / HZ;
- 
- 	/* "Periodic Counter Operation" */
--	sh_mtu2_write(p, TCR, 0x23); /* TGRA clear, divide clock by 64 */
--	sh_mtu2_write(p, TIOR, 0);
--	sh_mtu2_write(p, TGR, periodic);
--	sh_mtu2_write(p, TCNT, 0);
--	sh_mtu2_write(p, TMDR, 0);
--	sh_mtu2_write(p, TIER, 0x01);
-+	sh_mtu2_write(ch, TCR, 0x23); /* TGRA clear, divide clock by 64 */
-+	sh_mtu2_write(ch, TIOR, 0);
-+	sh_mtu2_write(ch, TGR, periodic);
-+	sh_mtu2_write(ch, TCNT, 0);
-+	sh_mtu2_write(ch, TMDR, 0);
-+	sh_mtu2_write(ch, TIER, 0x01);
- 
- 	/* enable channel */
--	sh_mtu2_start_stop_ch(p, 1);
-+	sh_mtu2_start_stop_ch(ch, 1);
- 
+@@ -273,75 +273,76 @@ static int sh_mtu2_register(struct sh_mtu2_channel *ch, char *name,
  	return 0;
  }
  
--static void sh_mtu2_disable(struct sh_mtu2_priv *p)
-+static void sh_mtu2_disable(struct sh_mtu2_channel *ch)
+-static int sh_mtu2_setup(struct sh_mtu2_priv *p, struct platform_device *pdev)
++static int sh_mtu2_setup(struct sh_mtu2_device *mtu,
++			 struct platform_device *pdev)
  {
- 	/* disable channel */
--	sh_mtu2_start_stop_ch(p, 0);
-+	sh_mtu2_start_stop_ch(ch, 0);
- 
- 	/* stop clock */
--	clk_disable(p->clk);
-+	clk_disable(ch->mtu->clk);
- 
--	dev_pm_syscore_device(&p->pdev->dev, false);
--	pm_runtime_put(&p->pdev->dev);
-+	dev_pm_syscore_device(&ch->mtu->pdev->dev, false);
-+	pm_runtime_put(&ch->mtu->pdev->dev);
- }
- 
- static irqreturn_t sh_mtu2_interrupt(int irq, void *dev_id)
- {
--	struct sh_mtu2_priv *p = dev_id;
-+	struct sh_mtu2_channel *ch = dev_id;
- 
- 	/* acknowledge interrupt */
--	sh_mtu2_read(p, TSR);
--	sh_mtu2_write(p, TSR, 0xfe);
-+	sh_mtu2_read(ch, TSR);
-+	sh_mtu2_write(ch, TSR, 0xfe);
- 
- 	/* notify clockevent layer */
--	p->ced.event_handler(&p->ced);
-+	ch->ced.event_handler(&ch->ced);
- 	return IRQ_HANDLED;
- }
- 
--static struct sh_mtu2_priv *ced_to_sh_mtu2(struct clock_event_device *ced)
-+static struct sh_mtu2_channel *ced_to_sh_mtu2(struct clock_event_device *ced)
- {
--	return container_of(ced, struct sh_mtu2_priv, ced);
-+	return container_of(ced, struct sh_mtu2_channel, ced);
- }
- 
- static void sh_mtu2_clock_event_mode(enum clock_event_mode mode,
- 				    struct clock_event_device *ced)
- {
--	struct sh_mtu2_priv *p = ced_to_sh_mtu2(ced);
-+	struct sh_mtu2_channel *ch = ced_to_sh_mtu2(ced);
- 	int disabled = 0;
- 
- 	/* deal with old setting first */
- 	switch (ced->mode) {
- 	case CLOCK_EVT_MODE_PERIODIC:
--		sh_mtu2_disable(p);
-+		sh_mtu2_disable(ch);
- 		disabled = 1;
- 		break;
- 	default:
-@@ -202,12 +211,13 @@ static void sh_mtu2_clock_event_mode(enum clock_event_mode mode,
- 
- 	switch (mode) {
- 	case CLOCK_EVT_MODE_PERIODIC:
--		dev_info(&p->pdev->dev, "used for periodic clock events\n");
--		sh_mtu2_enable(p);
-+		dev_info(&ch->mtu->pdev->dev,
-+			 "used for periodic clock events\n");
-+		sh_mtu2_enable(ch);
- 		break;
- 	case CLOCK_EVT_MODE_UNUSED:
- 		if (!disabled)
--			sh_mtu2_disable(p);
-+			sh_mtu2_disable(ch);
- 		break;
- 	case CLOCK_EVT_MODE_SHUTDOWN:
- 	default:
-@@ -217,18 +227,18 @@ static void sh_mtu2_clock_event_mode(enum clock_event_mode mode,
- 
- static void sh_mtu2_clock_event_suspend(struct clock_event_device *ced)
- {
--	pm_genpd_syscore_poweroff(&ced_to_sh_mtu2(ced)->pdev->dev);
-+	pm_genpd_syscore_poweroff(&ced_to_sh_mtu2(ced)->mtu->pdev->dev);
- }
- 
- static void sh_mtu2_clock_event_resume(struct clock_event_device *ced)
- {
--	pm_genpd_syscore_poweron(&ced_to_sh_mtu2(ced)->pdev->dev);
-+	pm_genpd_syscore_poweron(&ced_to_sh_mtu2(ced)->mtu->pdev->dev);
- }
- 
--static void sh_mtu2_register_clockevent(struct sh_mtu2_priv *p,
-+static void sh_mtu2_register_clockevent(struct sh_mtu2_channel *ch,
- 				       char *name, unsigned long rating)
- {
--	struct clock_event_device *ced = &p->ced;
-+	struct clock_event_device *ced = &ch->ced;
+ 	struct sh_timer_config *cfg = pdev->dev.platform_data;
+ 	struct resource *res;
  	int ret;
+ 	ret = -ENXIO;
  
- 	memset(ced, 0, sizeof(*ced));
-@@ -241,23 +251,24 @@ static void sh_mtu2_register_clockevent(struct sh_mtu2_priv *p,
- 	ced->suspend = sh_mtu2_clock_event_suspend;
- 	ced->resume = sh_mtu2_clock_event_resume;
+-	memset(p, 0, sizeof(*p));
+-	p->pdev = pdev;
++	memset(mtu, 0, sizeof(*mtu));
++	mtu->pdev = pdev;
  
--	dev_info(&p->pdev->dev, "used for clock events\n");
-+	dev_info(&ch->mtu->pdev->dev, "used for clock events\n");
- 	clockevents_register_device(ced);
- 
--	ret = request_irq(p->irq, sh_mtu2_interrupt,
-+	ret = request_irq(ch->irq, sh_mtu2_interrupt,
- 			  IRQF_TIMER | IRQF_IRQPOLL | IRQF_NOBALANCING,
--			  dev_name(&p->pdev->dev), p);
-+			  dev_name(&ch->mtu->pdev->dev), ch);
- 	if (ret) {
--		dev_err(&p->pdev->dev, "failed to request irq %d\n", p->irq);
-+		dev_err(&ch->mtu->pdev->dev, "failed to request irq %d\n",
-+			ch->irq);
- 		return;
- 	}
- }
- 
--static int sh_mtu2_register(struct sh_mtu2_priv *p, char *name,
-+static int sh_mtu2_register(struct sh_mtu2_channel *ch, char *name,
- 			    unsigned long clockevent_rating)
- {
- 	if (clockevent_rating)
--		sh_mtu2_register_clockevent(p, name, clockevent_rating);
-+		sh_mtu2_register_clockevent(ch, name, clockevent_rating);
- 
- 	return 0;
- }
-@@ -285,8 +296,8 @@ static int sh_mtu2_setup(struct sh_mtu2_priv *p, struct platform_device *pdev)
+ 	if (!cfg) {
+-		dev_err(&p->pdev->dev, "missing platform data\n");
++		dev_err(&mtu->pdev->dev, "missing platform data\n");
  		goto err0;
  	}
  
--	p->irq = platform_get_irq(p->pdev, 0);
--	if (p->irq < 0) {
-+	p->channel.irq = platform_get_irq(p->pdev, 0);
-+	if (p->channel.irq < 0) {
- 		dev_err(&p->pdev->dev, "failed to get irq\n");
+-	platform_set_drvdata(pdev, p);
++	platform_set_drvdata(pdev, mtu);
+ 
+-	res = platform_get_resource(p->pdev, IORESOURCE_MEM, 0);
++	res = platform_get_resource(mtu->pdev, IORESOURCE_MEM, 0);
+ 	if (!res) {
+-		dev_err(&p->pdev->dev, "failed to get I/O memory\n");
++		dev_err(&mtu->pdev->dev, "failed to get I/O memory\n");
  		goto err0;
  	}
-@@ -310,7 +321,9 @@ static int sh_mtu2_setup(struct sh_mtu2_priv *p, struct platform_device *pdev)
+ 
+-	p->channel.irq = platform_get_irq(p->pdev, 0);
+-	if (p->channel.irq < 0) {
+-		dev_err(&p->pdev->dev, "failed to get irq\n");
++	mtu->channel.irq = platform_get_irq(mtu->pdev, 0);
++	if (mtu->channel.irq < 0) {
++		dev_err(&mtu->pdev->dev, "failed to get irq\n");
+ 		goto err0;
+ 	}
+ 
+ 	/* map memory, let mapbase point to our channel */
+-	p->mapbase = ioremap_nocache(res->start, resource_size(res));
+-	if (p->mapbase == NULL) {
+-		dev_err(&p->pdev->dev, "failed to remap I/O memory\n");
++	mtu->mapbase = ioremap_nocache(res->start, resource_size(res));
++	if (mtu->mapbase == NULL) {
++		dev_err(&mtu->pdev->dev, "failed to remap I/O memory\n");
+ 		goto err0;
+ 	}
+ 
+ 	/* get hold of clock */
+-	p->clk = clk_get(&p->pdev->dev, "mtu2_fck");
+-	if (IS_ERR(p->clk)) {
+-		dev_err(&p->pdev->dev, "cannot get clock\n");
+-		ret = PTR_ERR(p->clk);
++	mtu->clk = clk_get(&mtu->pdev->dev, "mtu2_fck");
++	if (IS_ERR(mtu->clk)) {
++		dev_err(&mtu->pdev->dev, "cannot get clock\n");
++		ret = PTR_ERR(mtu->clk);
+ 		goto err1;
+ 	}
+ 
+-	ret = clk_prepare(p->clk);
++	ret = clk_prepare(mtu->clk);
  	if (ret < 0)
  		goto err2;
  
--	ret = sh_mtu2_register(p, (char *)dev_name(&p->pdev->dev),
-+	p->channel.mtu = p;
-+
-+	ret = sh_mtu2_register(&p->channel, (char *)dev_name(&p->pdev->dev),
+-	p->channel.mtu = p;
++	mtu->channel.mtu = mtu;
+ 
+-	ret = sh_mtu2_register(&p->channel, (char *)dev_name(&p->pdev->dev),
++	ret = sh_mtu2_register(&mtu->channel, (char *)dev_name(&mtu->pdev->dev),
  			       cfg->clockevent_rating);
  	if (ret < 0)
  		goto err3;
+ 
+ 	return 0;
+  err3:
+-	clk_unprepare(p->clk);
++	clk_unprepare(mtu->clk);
+  err2:
+-	clk_put(p->clk);
++	clk_put(mtu->clk);
+  err1:
+-	iounmap(p->mapbase);
++	iounmap(mtu->mapbase);
+  err0:
+ 	return ret;
+ }
+ 
+ static int sh_mtu2_probe(struct platform_device *pdev)
+ {
+-	struct sh_mtu2_priv *p = platform_get_drvdata(pdev);
++	struct sh_mtu2_device *mtu = platform_get_drvdata(pdev);
+ 	struct sh_timer_config *cfg = pdev->dev.platform_data;
+ 	int ret;
+ 
+@@ -350,20 +351,20 @@ static int sh_mtu2_probe(struct platform_device *pdev)
+ 		pm_runtime_enable(&pdev->dev);
+ 	}
+ 
+-	if (p) {
++	if (mtu) {
+ 		dev_info(&pdev->dev, "kept as earlytimer\n");
+ 		goto out;
+ 	}
+ 
+-	p = kmalloc(sizeof(*p), GFP_KERNEL);
+-	if (p == NULL) {
++	mtu = kmalloc(sizeof(*mtu), GFP_KERNEL);
++	if (mtu == NULL) {
+ 		dev_err(&pdev->dev, "failed to allocate driver data\n");
+ 		return -ENOMEM;
+ 	}
+ 
+-	ret = sh_mtu2_setup(p, pdev);
++	ret = sh_mtu2_setup(mtu, pdev);
+ 	if (ret) {
+-		kfree(p);
++		kfree(mtu);
+ 		pm_runtime_idle(&pdev->dev);
+ 		return ret;
+ 	}
 -- 
 1.7.9.5
