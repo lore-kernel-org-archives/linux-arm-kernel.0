@@ -1,359 +1,399 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 23 May 2014 11:28:36 -0700
-Subject: [PATCH v10 2/3] clk: exynos5410: register clocks using common
- clock framework
-In-Reply-To: <1400841343-6016-3-git-send-email-t.dakhran@samsung.com>
-References: <1400841343-6016-1-git-send-email-t.dakhran@samsung.com>
- <1400841343-6016-3-git-send-email-t.dakhran@samsung.com>
-Message-ID: <20140523182836.23136.84115@quantum>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Fri, 23 May 2014 20:32:08 +0200
+Subject: [PATCH v3 2/4] ARM: Kirkwood: Add DT descriptions for net2big
+ and net5big.
+In-Reply-To: <1399839712-2416-3-git-send-email-andrew@lunn.ch>
+References: <1399839712-2416-1-git-send-email-andrew@lunn.ch>
+ <1399839712-2416-3-git-send-email-andrew@lunn.ch>
+Message-ID: <20140523183208.GN6755@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tarek Dakhran (2014-05-23 03:35:42)
-> The EXYNOS5410 clocks are statically listed and registered
-> using the Samsung specific common clock helper functions.
+On Sun, May 11, 2014 at 10:21:50PM +0200, Andrew Lunn wrote:
+> Describe LaCie 2Big and 5Big Network v2 using device tree.
 > 
-> Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
-> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
-
-Quick glance over it. Looks good to me.
-
-Regards,
-Mike
-
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > ---
->  .../devicetree/bindings/clock/exynos5410-clock.txt |   51 +++++
->  drivers/clk/samsung/Makefile                       |    1 +
->  drivers/clk/samsung/clk-exynos5410.c               |  209 ++++++++++++++++++++
->  include/dt-bindings/clock/exynos5410.h             |   33 ++++
->  4 files changed, 294 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-clock.txt
->  create mode 100644 drivers/clk/samsung/clk-exynos5410.c
->  create mode 100644 include/dt-bindings/clock/exynos5410.h
+> v1->v2
+> Fix size of memory
+> Clean up ethernet nodes
+> s/at/atmel/
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/exynos5410-clock.txt b/Documentation/devicetree/bindings/clock/exynos5410-clock.txt
+> v2->v3
+> gpio_poweroff->gpio-poweroff
+> gpio_key->gpio-key
+> s/ok/okay
+> Remove spi pinctrl properties.
+> ---
+>  arch/arm/boot/dts/Makefile              |   2 +
+>  arch/arm/boot/dts/kirkwood-net2big.dts  |  30 ++++++
+>  arch/arm/boot/dts/kirkwood-net5big.dts  |  83 ++++++++++++++++
+>  arch/arm/boot/dts/kirkwood-netxbig.dtsi | 166 ++++++++++++++++++++++++++++++++
+>  4 files changed, 281 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/kirkwood-net2big.dts
+>  create mode 100644 arch/arm/boot/dts/kirkwood-net5big.dts
+>  create mode 100644 arch/arm/boot/dts/kirkwood-netxbig.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 629eee22e606..facbf0cc2fca 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -118,6 +118,8 @@ kirkwood := \
+>  	kirkwood-lsxhl.dtb \
+>  	kirkwood-mplcec4.dtb \
+>  	kirkwood-mv88f6281gtw-ge.dtb \
+> +	kirkwood-net2big.dtb \
+> +	kirkwood-net5big.dtb \
+>  	kirkwood-netgear_readynas_duo_v2.dtb \
+>  	kirkwood-netgear_readynas_nv+_v2.dtb \
+>  	kirkwood-ns2.dtb \
+> diff --git a/arch/arm/boot/dts/kirkwood-net2big.dts b/arch/arm/boot/dts/kirkwood-net2big.dts
 > new file mode 100644
-> index 0000000..82337c4
+> index 000000000000..c3f5281a52f5
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/exynos5410-clock.txt
-> @@ -0,0 +1,51 @@
-> +* Samsung Exynos5410 Clock Controller
-> +
-> +The Exynos5410 clock controller generates and supplies clock to various
-> +controllers within the Exynos5410 SoC.
-> +
-> +Required Properties:
-> +
-> +- compatible: should be "samsung,exynos5410-clock"
-> +
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +
-> +- #clock-cells: should be 1.
-> +
-> +All available clocks are defined as preprocessor macros in
-> +dt-bindings/clock/exynos5410.h header and can be used in device
-> +tree sources.
-> +
-> +External clock:
-> +There is clock that is generated outside the SoC. It is expected
-> +that it is defined using standard clock bindings with following
-> + - compatible: should be "samsung,exynos5410-oscclk"
-> +
-> +Example 1: An example of a clock controller node is listed below.
-> +
-> +       clock: clock-controller at 0x10010000 {
-> +               compatible = "samsung,exynos5410-clock";
-> +               reg = <0x10010000 0x30000>;
-> +               #clock-cells = <1>;
-> +       };
-> +
-> +Example 2: Required external clock.
-> +
-> +       fixed-rate-clocks {
-> +               oscclk {
-> +                       compatible = "samsung,exynos5410-oscclk";
-> +                       clock-frequency = <24000000>;
-> +               };
-> +       };
-> +
-> +Example 3: UART controller node that consumes the clock generated by the clock
-> +          controller. Refer to the standard clock bindings for information
-> +          about 'clocks' and 'clock-names' property.
-> +
-> +       serial at 12C20000 {
-> +               compatible = "samsung,exynos4210-uart";
-> +               reg = <0x12C00000 0x100>;
-> +               interrupts = <0 51 0>;
-> +               clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
-> +               clock-names = "uart", "clk_uart_baud0";
-> +       };
-> diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
-> index 25646c6..69e8177 100644
-> --- a/drivers/clk/samsung/Makefile
-> +++ b/drivers/clk/samsung/Makefile
-> @@ -7,6 +7,7 @@ obj-$(CONFIG_SOC_EXYNOS3250)    += clk-exynos3250.o
->  obj-$(CONFIG_ARCH_EXYNOS4)     += clk-exynos4.o
->  obj-$(CONFIG_SOC_EXYNOS5250)   += clk-exynos5250.o
->  obj-$(CONFIG_SOC_EXYNOS5260)   += clk-exynos5260.o
-> +obj-$(CONFIG_SOC_EXYNOS5410)   += clk-exynos5410.o
->  obj-$(CONFIG_SOC_EXYNOS5420)   += clk-exynos5420.o
->  obj-$(CONFIG_SOC_EXYNOS5440)   += clk-exynos5440.o
->  obj-$(CONFIG_ARCH_EXYNOS)      += clk-exynos-audss.o
-> diff --git a/drivers/clk/samsung/clk-exynos5410.c b/drivers/clk/samsung/clk-exynos5410.c
-> new file mode 100644
-> index 0000000..c9505ab
-> --- /dev/null
-> +++ b/drivers/clk/samsung/clk-exynos5410.c
-> @@ -0,0 +1,209 @@
+> +++ b/arch/arm/boot/dts/kirkwood-net2big.dts
+> @@ -0,0 +1,30 @@
 > +/*
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + * Author: Tarek Dakhran <t.dakhran@samsung.com>
+> + * Device Tree file for LaCie 2Big Network v2
 > + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
+> + * Copyright (C) 2014
 > + *
-> + * Common Clock Framework support for Exynos5410 SoC.
+> + * Andrew Lunn <andrew@lunn.ch>
+> + *
+> + * Based on netxbig_v2-setup.c,
+> + * Copyright (C) 2010 Simon Guinot <sguinot@lacie.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
 > +*/
 > +
-> +#include <dt-bindings/clock/exynos5410.h>
+> +/dts-v1/;
 > +
-> +#include <linux/clk.h>
-> +#include <linux/clkdev.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
+> +#include "kirkwood.dtsi"
+> +#include "kirkwood-6281.dtsi"
+> +#include "kirkwood-netxbig.dtsi"
 > +
-> +#include "clk.h"
+> +/ {
+> +	model = "LaCie 2Big Network v2";
+> +	compatible = "lacie,net2big", "lacie,netxbig", "marvell,kirkwood-88f6192", "marvell,kirkwood";
+
+While the file name kirkwood-net2big.dtsi is correct (thanks to the
+kirkwood prefix), "lacie,net2big" is not. It refers to the 2Big Network
+board (Orion based). Even if there is no DT support for the net2big yet,
+it could be added latter. Then, I think we should add a _v2 prefix here,
+just to avoid the confusion.
+
+Also, you should replace the compatible string marvell,kirkwood-88f6192"
+with "marvell,kirkwood-88f6281".
+
 > +
-> +#define APLL_LOCK               0x0
-> +#define APLL_CON0               0x100
-> +#define CPLL_LOCK               0x10020
-> +#define CPLL_CON0               0x10120
-> +#define MPLL_LOCK               0x4000
-> +#define MPLL_CON0               0x4100
-> +#define BPLL_LOCK               0x20010
-> +#define BPLL_CON0               0x20110
-> +#define KPLL_LOCK               0x28000
-> +#define KPLL_CON0               0x28100
-> +
-> +#define SRC_CPU                        0x200
-> +#define DIV_CPU0               0x500
-> +#define SRC_CPERI1             0x4204
-> +#define DIV_TOP0               0x10510
-> +#define DIV_TOP1               0x10514
-> +#define DIV_FSYS1              0x1054c
-> +#define DIV_FSYS2              0x10550
-> +#define DIV_PERIC0             0x10558
-> +#define SRC_TOP0               0x10210
-> +#define SRC_TOP1               0x10214
-> +#define SRC_TOP2               0x10218
-> +#define SRC_FSYS               0x10244
-> +#define SRC_PERIC0             0x10250
-> +#define SRC_MASK_FSYS          0x10340
-> +#define SRC_MASK_PERIC0                0x10350
-> +#define GATE_BUS_FSYS0         0x10740
-> +#define GATE_IP_FSYS           0x10944
-> +#define GATE_IP_PERIC          0x10950
-> +#define GATE_IP_PERIS          0x10960
-> +#define SRC_CDREX              0x20200
-> +#define SRC_KFC                        0x28200
-> +#define DIV_KFC0               0x28500
-> +
-> +/* list of PLLs */
-> +enum exynos5410_plls {
-> +       apll, cpll, mpll,
-> +       bpll, kpll,
-> +       nr_plls                 /* number of PLLs */
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x10000000>;
+> +	};
 > +};
-> +
-> +/* list of all parent clocks */
-> +PNAME(apll_p)          = { "fin_pll", "fout_apll", };
-> +PNAME(bpll_p)          = { "fin_pll", "fout_bpll", };
-> +PNAME(cpll_p)          = { "fin_pll", "fout_cpll" };
-> +PNAME(mpll_p)          = { "fin_pll", "fout_mpll", };
-> +PNAME(kpll_p)          = { "fin_pll", "fout_kpll", };
-> +
-> +PNAME(mout_cpu_p)      = { "mout_apll", "sclk_mpll", };
-> +PNAME(mout_kfc_p)      = { "mout_kpll", "sclk_mpll", };
-> +
-> +PNAME(mpll_user_p)     = { "fin_pll", "sclk_mpll", };
-> +PNAME(bpll_user_p)     = { "fin_pll", "sclk_bpll", };
-> +PNAME(mpll_bpll_p)     = { "sclk_mpll_muxed", "sclk_bpll_muxed", };
-> +
-> +PNAME(group2_p)                = { "fin_pll", "fin_pll", "none", "none",
-> +                       "none", "none", "sclk_mpll_bpll",
-> +                        "none", "none", "sclk_cpll" };
-> +
-> +static struct samsung_mux_clock exynos5410_mux_clks[] __initdata = {
-> +       MUX(0, "mout_apll", apll_p, SRC_CPU, 0, 1),
-> +       MUX(0, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1),
-> +
-> +       MUX(0, "mout_kpll", kpll_p, SRC_KFC, 0, 1),
-> +       MUX(0, "mout_kfc", mout_kfc_p, SRC_KFC, 16, 1),
-> +
-> +       MUX(0, "sclk_mpll", mpll_p, SRC_CPERI1, 8, 1),
-> +       MUX(0, "sclk_mpll_muxed", mpll_user_p, SRC_TOP2, 20, 1),
-> +
-> +       MUX(0, "sclk_bpll", bpll_p, SRC_CDREX, 0, 1),
-> +       MUX(0, "sclk_bpll_muxed", bpll_user_p, SRC_TOP2, 24, 1),
-> +
-> +       MUX(0, "sclk_cpll", cpll_p, SRC_TOP2, 8, 1),
-> +
-> +       MUX(0, "sclk_mpll_bpll", mpll_bpll_p, SRC_TOP1, 20, 1),
-> +
-> +       MUX(0, "mout_mmc0", group2_p, SRC_FSYS, 0, 4),
-> +       MUX(0, "mout_mmc1", group2_p, SRC_FSYS, 4, 4),
-> +       MUX(0, "mout_mmc2", group2_p, SRC_FSYS, 8, 4),
-> +
-> +       MUX(0, "mout_uart0", group2_p, SRC_PERIC0, 0, 4),
-> +       MUX(0, "mout_uart1", group2_p, SRC_PERIC0, 4, 4),
-> +       MUX(0, "mout_uart2", group2_p, SRC_PERIC0, 8, 4),
-> +
-> +       MUX(0, "mout_aclk200", mpll_bpll_p, SRC_TOP0, 12, 1),
-> +       MUX(0, "mout_aclk400", mpll_bpll_p, SRC_TOP0, 20, 1),
-> +};
-> +
-> +static struct samsung_div_clock exynos5410_div_clks[] __initdata = {
-> +       DIV(0, "div_arm", "mout_cpu", DIV_CPU0, 0, 3),
-> +       DIV(0, "div_arm2", "div_arm", DIV_CPU0, 28, 3),
-> +
-> +       DIV(0, "div_acp", "div_arm2", DIV_CPU0, 8, 3),
-> +       DIV(0, "div_cpud", "div_arm2", DIV_CPU0, 4, 3),
-> +       DIV(0, "div_atb", "div_arm2", DIV_CPU0, 16, 3),
-> +       DIV(0, "pclk_dbg", "div_arm2", DIV_CPU0, 20, 3),
-> +
-> +       DIV(0, "div_kfc", "mout_kfc", DIV_KFC0, 0, 3),
-> +       DIV(0, "div_aclk", "div_kfc", DIV_KFC0, 4, 3),
-> +       DIV(0, "div_pclk", "div_kfc", DIV_KFC0, 20, 3),
-> +
-> +       DIV(0, "aclk66_pre", "sclk_mpll_muxed", DIV_TOP1, 24, 3),
-> +       DIV(0, "aclk66", "aclk66_pre", DIV_TOP0, 0, 3),
-> +
-> +       DIV(0, "div_mmc0", "mout_mmc0", DIV_FSYS1, 0, 4),
-> +       DIV(0, "div_mmc1", "mout_mmc1", DIV_FSYS1, 16, 4),
-> +       DIV(0, "div_mmc2", "mout_mmc2", DIV_FSYS2, 0, 4),
-> +
-> +       DIV_F(0, "div_mmc_pre0", "div_mmc0",
-> +                       DIV_FSYS1, 8, 8, CLK_SET_RATE_PARENT, 0),
-> +       DIV_F(0, "div_mmc_pre1", "div_mmc1",
-> +                       DIV_FSYS1, 24, 8, CLK_SET_RATE_PARENT, 0),
-> +       DIV_F(0, "div_mmc_pre2", "div_mmc2",
-> +                       DIV_FSYS2, 8, 8, CLK_SET_RATE_PARENT, 0),
-> +
-> +       DIV(0, "div_uart0", "mout_uart0", DIV_PERIC0, 0, 4),
-> +       DIV(0, "div_uart1", "mout_uart1", DIV_PERIC0, 4, 4),
-> +       DIV(0, "div_uart2", "mout_uart2", DIV_PERIC0, 8, 4),
-> +       DIV(0, "div_uart3", "mout_uart3", DIV_PERIC0, 12, 4),
-> +
-> +       DIV(0, "aclk200", "mout_aclk200", DIV_TOP0, 12, 3),
-> +       DIV(0, "aclk400", "mout_aclk400", DIV_TOP0, 24, 3),
-> +};
-> +
-> +static struct samsung_gate_clock exynos5410_gate_clks[] __initdata = {
-> +       GATE(CLK_MCT, "mct", "aclk66", GATE_IP_PERIS, 18, 0, 0),
-> +
-> +       GATE(CLK_SCLK_MMC0, "sclk_mmc0", "div_mmc_pre0",
-> +                       SRC_MASK_FSYS, 0, CLK_SET_RATE_PARENT, 0),
-> +       GATE(CLK_SCLK_MMC1, "sclk_mmc1", "div_mmc_pre1",
-> +                       SRC_MASK_FSYS, 4, CLK_SET_RATE_PARENT, 0),
-> +       GATE(CLK_SCLK_MMC2, "sclk_mmc2", "div_mmc_pre2",
-> +                       SRC_MASK_FSYS, 8, CLK_SET_RATE_PARENT, 0),
-> +
-> +       GATE(CLK_MMC0, "sdmmc0", "aclk200", GATE_BUS_FSYS0, 12, 0, 0),
-> +       GATE(CLK_MMC1, "sdmmc1", "aclk200", GATE_BUS_FSYS0, 13, 0, 0),
-> +       GATE(CLK_MMC2, "sdmmc2", "aclk200", GATE_BUS_FSYS0, 14, 0, 0),
-> +
-> +       GATE(CLK_UART0, "uart0", "aclk66", GATE_IP_PERIC, 0, 0, 0),
-> +       GATE(CLK_UART1, "uart1", "aclk66", GATE_IP_PERIC, 1, 0, 0),
-> +       GATE(CLK_UART2, "uart2", "aclk66", GATE_IP_PERIC, 2, 0, 0),
-> +
-> +       GATE(CLK_SCLK_UART0, "sclk_uart0", "div_uart0",
-> +                       SRC_MASK_PERIC0, 0, CLK_SET_RATE_PARENT, 0),
-> +       GATE(CLK_SCLK_UART1, "sclk_uart1", "div_uart1",
-> +                       SRC_MASK_PERIC0, 4, CLK_SET_RATE_PARENT, 0),
-> +       GATE(CLK_SCLK_UART2, "sclk_uart2", "div_uart2",
-> +                       SRC_MASK_PERIC0, 8, CLK_SET_RATE_PARENT, 0),
-> +};
-> +
-> +static struct samsung_pll_clock exynos5410_plls[nr_plls] __initdata = {
-> +       [apll] = PLL(pll_35xx, CLK_FOUT_APLL, "fout_apll", "fin_pll", APLL_LOCK,
-> +               APLL_CON0, NULL),
-> +       [cpll] = PLL(pll_35xx, CLK_FOUT_CPLL, "fout_cpll", "fin_pll", CPLL_LOCK,
-> +               CPLL_CON0, NULL),
-> +       [mpll] = PLL(pll_35xx, CLK_FOUT_MPLL, "fout_mpll", "fin_pll", MPLL_LOCK,
-> +               MPLL_CON0, NULL),
-> +       [bpll] = PLL(pll_35xx, CLK_FOUT_BPLL, "fout_bpll", "fin_pll", BPLL_LOCK,
-> +               BPLL_CON0, NULL),
-> +       [kpll] = PLL(pll_35xx, CLK_FOUT_KPLL, "fout_kpll", "fin_pll", KPLL_LOCK,
-> +               KPLL_CON0, NULL),
-> +};
-> +
-> +/* register exynos5410 clocks */
-> +static void __init exynos5410_clk_init(struct device_node *np)
-> +{
-> +       struct samsung_clk_provider *ctx;
-> +       void __iomem *reg_base;
-> +
-> +       reg_base = of_iomap(np, 0);
-> +       if (!reg_base)
-> +               panic("%s: failed to map registers\n", __func__);
-> +
-> +       ctx = samsung_clk_init(np, reg_base, CLK_NR_CLKS);
-> +
-> +       samsung_clk_register_pll(ctx, exynos5410_plls,
-> +                       ARRAY_SIZE(exynos5410_plls), reg_base);
-> +
-> +       samsung_clk_register_mux(ctx, exynos5410_mux_clks,
-> +                       ARRAY_SIZE(exynos5410_mux_clks));
-> +       samsung_clk_register_div(ctx, exynos5410_div_clks,
-> +                       ARRAY_SIZE(exynos5410_div_clks));
-> +       samsung_clk_register_gate(ctx, exynos5410_gate_clks,
-> +                       ARRAY_SIZE(exynos5410_gate_clks));
-> +
-> +       pr_debug("Exynos5410: clock setup completed.\n");
-> +}
-> +CLK_OF_DECLARE(exynos5410_clk, "samsung,exynos5410-clock", exynos5410_clk_init);
-> diff --git a/include/dt-bindings/clock/exynos5410.h b/include/dt-bindings/clock/exynos5410.h
+> diff --git a/arch/arm/boot/dts/kirkwood-net5big.dts b/arch/arm/boot/dts/kirkwood-net5big.dts
 > new file mode 100644
-> index 0000000..9b180f0
+> index 000000000000..20abe7e37ca2
 > --- /dev/null
-> +++ b/include/dt-bindings/clock/exynos5410.h
-> @@ -0,0 +1,33 @@
-> +#ifndef _DT_BINDINGS_CLOCK_EXYNOS_5410_H
-> +#define _DT_BINDINGS_CLOCK_EXYNOS_5410_H
+> +++ b/arch/arm/boot/dts/kirkwood-net5big.dts
+> @@ -0,0 +1,83 @@
+> +/*
+> + * Device Tree file for LaCie 5Big Network v2
+> + *
+> + * Copyright (C) 2014
+> + *
+> + * Andrew Lunn <andrew@lunn.ch>
+> + *
+> + * Based on netxbig_v2-setup.c,
+> + * Copyright (C) 2010 Simon Guinot <sguinot@lacie.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> +*/
 > +
-> +/* core clocks */
-> +#define CLK_FIN_PLL 1
-> +#define CLK_FOUT_APLL 2
-> +#define CLK_FOUT_CPLL 3
-> +#define CLK_FOUT_MPLL 4
-> +#define CLK_FOUT_BPLL 5
-> +#define CLK_FOUT_KPLL 6
+> +/dts-v1/;
 > +
-> +/* gate for special clocks (sclk) */
-> +#define CLK_SCLK_UART0 128
-> +#define CLK_SCLK_UART1 129
-> +#define CLK_SCLK_UART2 130
-> +#define CLK_SCLK_UART3 131
-> +#define CLK_SCLK_MMC0 132
-> +#define CLK_SCLK_MMC1 133
-> +#define CLK_SCLK_MMC2 134
+> +#include "kirkwood.dtsi"
+> +#include "kirkwood-6281.dtsi"
+> +#include "kirkwood-netxbig.dtsi"
 > +
-> +/* gate clocks */
-> +#define CLK_UART0 257
-> +#define CLK_UART1 258
-> +#define CLK_UART2 259
-> +#define CLK_UART3 260
-> +#define CLK_MCT 315
-> +#define CLK_MMC0 351
-> +#define CLK_MMC1 352
-> +#define CLK_MMC2 353
+> +/ {
+> +	model = "LaCie 5Big Network v2";
+> +	compatible = "lacie,net2big", "lacie,netxbig", "marvell,kirkwood-88f6192", "marvell,kirkwood";
+
+Same comments here.
+
 > +
-> +#define CLK_NR_CLKS 512
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x20000000>;
+> +	};
 > +
-> +#endif /* _DT_BINDINGS_CLOCK_EXYNOS_5410_H */
-> -- 
-> 1.7.9.5
-> 
+> +};
+> +
+> +&regulators {
+> +	regulator at 3 {
+> +		compatible = "regulator-fixed";
+> +		reg = <3>;
+> +		regulator-name = "hdd2power";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		enable-active-high;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +		gpio = <&gpio0 19 GPIO_ACTIVE_HIGH>;
+> +	};
+> +
+> +	regulator at 4 {
+> +		compatible = "regulator-fixed";
+> +		reg = <4>;
+> +		regulator-name = "hdd3power";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		enable-active-high;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +		gpio = <&gpio0 20 GPIO_ACTIVE_HIGH>;
+> +	};
+> +
+> +	regulator at 5 {
+> +		compatible = "regulator-fixed";
+> +		reg = <5>;
+> +		regulator-name = "hdd4power";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		enable-active-high;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +		gpio = <&gpio0 21 GPIO_ACTIVE_HIGH>;
+> +	};
+> +};
+> +
+> +&mdio {
+> +	ethphy1: ethernet-phy at 1 {
+> +		reg = <0>;
+> +	};
+> +};
+> +
+> +&eth1 {
+> +	status = "okay";
+> +	ethernet1-port at 0 {
+> +		phy-handle = <&ethphy1>;
+> +	};
+> +};
+> +
+> diff --git a/arch/arm/boot/dts/kirkwood-netxbig.dtsi b/arch/arm/boot/dts/kirkwood-netxbig.dtsi
+> new file mode 100644
+> index 000000000000..eca522316560
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/kirkwood-netxbig.dtsi
+> @@ -0,0 +1,166 @@
+> +/*
+> + * Device Tree common file for LaCie 2Big and 5Big Network v2
+> + *
+> + * Copyright (C) 2014
+> + *
+> + * Andrew Lunn <andrew@lunn.ch>
+> + *
+> + * Based on netxbig_v2-setup.c,
+> + * Copyright (C) 2010 Simon Guinot <sguinot@lacie.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> +*/
+> +
+> +#include "kirkwood.dtsi"
+> +#include "kirkwood-6281.dtsi"
+> +
+> +/ {
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200n8";
+> +		stdout-path = &uart0;
+
+Note that I had to comment the line above to build this file with Linux
+3.15-rc6. The uart alias is missing. I guess it is not an issue with the
+-mvebu or -next trees.
+
+> +	};
+> +
+> +	ocp at f1000000 {
+> +		serial at 12000 {
+> +			status = "okay";
+> +		};
+> +
+> +		spi at 10600 {
+> +			status = "okay";
+> +
+> +			flash at 0 {
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				compatible = "mxicy,mx25l4005a";
+> +				reg = <0>;
+> +				spi-max-frequency = <20000000>;
+> +				mode = <0>;
+> +
+> +				partition at 0 {
+> +					reg = <0x0 0x80000>;
+> +					label = "u-boot";
+> +				};
+> +			};
+> +		};
+> +
+> +		sata at 80000 {
+> +			status = "okay";
+> +			nr-ports = <2>;
+> +		};
+> +
+> +	};
+> +
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		/*
+> +		 * button at 1 and button at 2 represent a three position rocker
+> +		 * switch. Thus the conventional KEY_POWER does not fit
+> +		 */
+> +		button at 1 {
+> +			label = "Back power switch (on|auto)";
+> +			linux,code = <KEY_ESC>;
+> +			linux,input-type = <5>;
+> +			gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
+> +		};
+> +		button at 2 {
+> +			label = "Back power switch (auto|off)";
+> +			linux,code = <KEY_1>;
+> +			linux,input-type = <5>;
+> +			gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
+> +		};
+> +		button at 3 {
+> +			label = "Function button";
+> +			linux,code = <KEY_OPTION>;
+> +			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
+> +		};
+> +
+> +	};
+> +
+> +	gpio-poweroff {
+> +		compatible = "gpio-poweroff";
+> +		gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>;
+> +	};
+> +
+
+Alignment and indentation looks wrong for the regulators node below.
+
+> +       	regulators: regulators {
+> +                status = "okay";
+> +                compatible = "simple-bus";
+> +                #address-cells = <1>;
+> +                #size-cells = <0>;
+> +                pinctrl-names = "default";
+> +
+> +                regulator at 1 {
+> +                        compatible = "regulator-fixed";
+> +                        reg = <1>;
+> +                        regulator-name = "hdd0power";
+> +                        regulator-min-microvolt = <5000000>;
+> +                        regulator-max-microvolt = <5000000>;
+> +                        enable-active-high;
+> +                        regulator-always-on;
+> +                        regulator-boot-on;
+> +                        gpio = <&gpio0 16 GPIO_ACTIVE_HIGH>;
+> +                };
+> +
+> +                regulator at 2 {
+> +                        compatible = "regulator-fixed";
+> +                        reg = <2>;
+> +                        regulator-name = "hdd1power";
+> +                        regulator-min-microvolt = <5000000>;
+> +                        regulator-max-microvolt = <5000000>;
+> +                        enable-active-high;
+> +                        regulator-always-on;
+> +                        regulator-boot-on;
+> +                        gpio = <&gpio0 17 GPIO_ACTIVE_HIGH>;
+> +                };
+> +        };
+> +};
+> +
+> +&mdio {
+> +	status = "okay";
+> +
+> +	ethphy0: ethernet-phy at 0 {
+> +		reg = <8>;
+> +	};
+> +
+> +	ethphy1: ethernet-phy at 1 {
+> +		reg = <0>;
+> +	};
+> +};
+> +
+> +&eth0 {
+> +	status = "okay";
+> +	ethernet0-port at 0 {
+> +		phy-handle = <&ethphy0>;
+> +	};
+> +};
+> +
+> +&pinctrl {
+> +	pinctrl-names = "default";
+> +
+> +	pmx_button_function: pmx-button-function {
+> +		marvell,pins = "mpp34";
+> +		marvell,function = "gpio";
+> +	};
+> +	pmx_button_power_off: pmx-button-power-off {
+> +		marvell,pins = "mpp15";
+> +		marvell,function = "gpio";
+> +	};
+> +	pmx_button_power_on: pmx-button-power-on {
+> +		marvell,pins = "mpp13";
+> +		marvell,function = "gpio";
+> +	};
+> +};
+> +
+> +&i2c0 {
+> +	status = "okay";
+> +
+> +	eeprom at 50 {
+> +		compatible = "atmel,24c04";
+> +		pagesize = <16>;
+> +		reg = <0x50>;
+> +	};
+
+While we are at it, maybe you could add the following node here:
+
+	g762 at 3e {
+		compatible = "gmt,g762";
+		reg = <0x3e>;
+		clocks = <&g762_clk>;
+	};
+
+With, in the ocp at f1000000 node:
+
+	clocks {
+		g761_clk: g762-oscillator {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <32768>;
+		};
+	};
+
+This will provide fan support for both 2Big and 5Big Network v2. And yes
+I feel a little bit ashamed about that :)
+
+Thanks,
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140523/4bea0ebf/attachment.sig>
