@@ -1,40 +1,35 @@
 From: gdjakov@mm-sol.com (Georgi Djakov)
-Date: Fri, 23 May 2014 17:17:45 +0300
-Subject: [PATCH v1 5/5] ARM: dts: qcom: Add APQ8084 serial port DT node
-In-Reply-To: <693A0E52-34CF-4A63-A8D0-A83780F969F0@codeaurora.org>
+Date: Fri, 23 May 2014 17:18:40 +0300
+Subject: [PATCH v1 3/5] clk: gcc: Add APQ8084 Global Clock Controller
+ support
+In-Reply-To: <DB9EC1F3-CA2B-47C5-A677-CC1222F05614@codeaurora.org>
 References: <1400775885-10296-1-git-send-email-gdjakov@mm-sol.com>
- <1400775885-10296-6-git-send-email-gdjakov@mm-sol.com>
- <693A0E52-34CF-4A63-A8D0-A83780F969F0@codeaurora.org>
-Message-ID: <537F5889.5080902@mm-sol.com>
+ <1400775885-10296-4-git-send-email-gdjakov@mm-sol.com>
+ <DB9EC1F3-CA2B-47C5-A677-CC1222F05614@codeaurora.org>
+Message-ID: <537F58C0.6090006@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2014 07:32 PM, Kumar Gala wrote:
+On 05/22/2014 07:38 PM, Kumar Gala wrote:
 >
 > On May 22, 2014, at 11:24 AM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
 >
->> Add the necessary DT node to probe the serial driver on
->> APQ8084 platforms.
+>> This patch adds support for the global clock controller found on
+>> the APQ8084 based devices.
+>>
+>> The APQ8084 and MSM8974 share a lot of clock data, so instead of
+>> duplicating all the data, we add support to the MSM8974 code.
 >>
 >> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
 >> ---
->> arch/arm/boot/dts/qcom-apq8084.dtsi |    7 +++++++
->> 1 file changed, 7 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
->> index 2dcd11e..c346549 100644
->> --- a/arch/arm/boot/dts/qcom-apq8084.dtsi
->> +++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
->> @@ -185,5 +185,12 @@
->> 			reg = <0xfc400000 0x4000>;
->> 		};
->>
->> +		serial at f995e000 {
+>> drivers/clk/qcom/Kconfig                     |    4 +-
+>> drivers/clk/qcom/gcc-msm8974.c               |  151 +++++++++++++++++++++++++-
+>> include/dt-bindings/clock/qcom,gcc-msm8974.h |    4 +
+>> 3 files changed, 154 insertions(+), 5 deletions(-)
 >
-> Mark it disabled in the soc.dtsi and ?ok? in the board.
->
+> What about differences in reset?
 
-Oh, of course!
+Oops, will add this too. Thanks!
 
-Thanks,
+BR,
 Georgi
