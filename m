@@ -1,53 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 May 2014 11:32:29 -0700
-Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
-In-Reply-To: <20140523144425.GB2321@atomide.com>
-References: <20140516212942.GK12881@atomide.com> <537A3544.1050307@linaro.org>
- <20140519172338.GJ4849@atomide.com> <537A408F.7070301@ti.com>
- <20140519175157.GK4849@atomide.com> <537A4827.30604@linaro.org>
- <20140519193622.GA11945@atomide.com> <537A5F5B.6050403@linaro.org>
- <537A7522.30007@math.uni-bielefeld.de>
- <20140523144425.GB2321@atomide.com>
-Message-ID: <20140523183228.GH2321@atomide.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Fri, 23 May 2014 20:33:53 +0200
+Subject: [PATCH v3 3/4] ARM: mvebu: Add LaCie 2Big and 5Big Network v2
+In-Reply-To: <1399839712-2416-4-git-send-email-andrew@lunn.ch>
+References: <1399839712-2416-1-git-send-email-andrew@lunn.ch>
+ <1399839712-2416-4-git-send-email-andrew@lunn.ch>
+Message-ID: <20140523183353.GO6755@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [140523 07:45]:
-> * Tobias Jakobi <tjakobi@math.uni-bielefeld.de> [140519 14:19]:
-> > 
-> > But even if I don't connect via WiFi at all, just boot and let me system
-> > run with serial console connected, after some time I get a kernel 'WARNING':
-> > http://www.math.uni-bielefeld.de/~tjakobi/archive/dmesg.1.log
+On Sun, May 11, 2014 at 10:21:51PM +0200, Andrew Lunn wrote:
+> Enable building LaCie 2Big and 5Big Network v2 in the mvebu v5 kernel.
 > 
-> BTW, care to update the bugzilla page with the second warning
-> in this log?
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/configs/mvebu_v5_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> That's the WARNING: CPU: 1 PID: 0 at kernel/timer.c:1147 that's
-> at 238 seconds.
+> diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
+> index 27c732fdf21e..e999bb97be79 100644
+> --- a/arch/arm/configs/mvebu_v5_defconfig
+> +++ b/arch/arm/configs/mvebu_v5_defconfig
+> @@ -12,6 +12,7 @@ CONFIG_MODULE_UNLOAD=y
+>  # CONFIG_ARCH_MULTI_V7 is not set
+>  CONFIG_ARCH_MVEBU=y
+>  CONFIG_MACH_KIRKWOOD=y
+> +CONFIG_MACH_NETXBIG=y
+>  # CONFIG_CPU_FEROCEON_OLD_ID is not set
+>  CONFIG_PCI_MVEBU=y
+>  CONFIG_PREEMPT=y
 
-Also, with Santosh's fix applied, can you also try disabling one
-or more of the idle states for cpuidle and see if that helps?
-
-Something like this patch below. If that helps with the WARNING
-above you're getting it narrows down the problem down quite a bit.
-
-Regards,
-
-Tony
-
---- a/arch/arm/mach-omap2/cpuidle44xx.c
-+++ b/arch/arm/mach-omap2/cpuidle44xx.c
-@@ -44,11 +44,13 @@ static struct idle_statedata omap4_idle_data[] = {
- 		.mpu_state = PWRDM_POWER_RET,
- 		.mpu_logic_state = PWRDM_POWER_RET,
- 	},
-+#if 0
- 	{
- 		.cpu_state = PWRDM_POWER_OFF,
- 		.mpu_state = PWRDM_POWER_RET,
- 		.mpu_logic_state = PWRDM_POWER_OFF,
- 	},
-+#endif
- };
- 
- static struct powerdomain *mpu_pd, *cpu_pd[MAX_CPUS];
+If you add the DT fan node, then you want CONFIG_SENSORS_G762=y here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140523/255d2a0f/attachment.sig>
