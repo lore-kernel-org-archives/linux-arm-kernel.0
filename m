@@ -1,43 +1,53 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Fri, 23 May 2014 09:11:43 -0400
-Subject: [GIT PULL] ARM: mach-bcm: soc updates for 3.16
-Message-ID: <20140523131143.GA24064@beef>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Fri, 23 May 2014 14:16:56 +0100
+Subject: EFI_STUB fails to boot non-EFI on arm64
+In-Reply-To: <20140523094513.GC9252@arm.com>
+References: <20140523094513.GC9252@arm.com>
+Message-ID: <20140523131656.GR4179@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please consider pulling the following mach-bcm soc updates for 3.16.
+On Fri, May 23, 2014 at 10:45:13AM +0100, Catalin Marinas wrote:
+> As the EFI_STUB for arm64 got into tip and soon into -next, I thought
+> about giving it a try (tip/arm64/efi). Using my boot-wrapper (non-EFI)
+> is still supposed to work but I get the trace below. It looks like
+> memmap.map is NULL but the code still assumes the kernel was started as
+> an EFI app.
+> 
+> Have you guys tested these patches properly?
 
--Matt
+Apparently not sufficuently...
+Sorry about that.
 
-The following changes since commit eeda4cb92ee0fb63a5917738e107b0bc8168079e:
+Fix appended:
 
-  ARM: bcm: rename "kona.h" and "kona.c" (2014-04-25 08:51:38 -0400)
+>From 98433920394730d835f0061474832909c0740f29 Mon Sep 17 00:00:00 2001
+From: Leif Lindholm <leif.lindholm@linaro.org>
+Date: Fri, 23 May 2014 11:23:23 +0100
+Subject: [PATCH] arm64: efi: only attempt efi map setup if booting via EFI
 
-are available in the git repository at:
+Booting a kernel with CONFIG_EFI enabled on a non-EFI system caused
+an oops with the current UEFI support code.
+Add the required test to prevent this.
 
-  git://github.com/broadcom/mach-bcm tags/for-3.16/bcm-soc
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+---
+ arch/arm64/kernel/efi.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-for you to fetch changes up to 387468d190f0ba72e239c11e9663cfeaeaf9ae2d:
-
-  ARM: bcm_defconfig: Enable PWM and Backlight (2014-04-28 11:10:29 -0400)
-
-----------------------------------------------------------------
-mach-bcm 3.16 soc updates:
-
-* only show ARCH_BCM in multi v6/v7 configs
-* enable ARM erratum 775420
-* bcm_defconfig updates for pwm
-
-----------------------------------------------------------------
-Alexander Shiyan (1):
-      ARM: bcm: Restrict ARCH_BCM selection to ARCH_MULTI_V6_V7
-
-Scott Branden (1):
-      ARM: mach-bcm: add ARM_ERRATA_775420
-
-Tim Kryger (1):
-      ARM: bcm_defconfig: Enable PWM and Backlight
-
- arch/arm/configs/bcm_defconfig |  3 +++
- arch/arm/mach-bcm/Kconfig      | 12 ++++--------
- 2 files changed, 7 insertions(+), 8 deletions(-)
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 7bfd650..14db1f6 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -333,6 +333,9 @@ void __init efi_init(void)
+ 
+ void __init efi_idmap_init(void)
+ {
++	if (!efi_enabled(EFI_BOOT))
++		return;
++
+ 	/* boot time idmap_pg_dir is incomplete, so fill in missing parts */
+ 	efi_setup_idmap();
+ }
+-- 
+1.7.10.4
