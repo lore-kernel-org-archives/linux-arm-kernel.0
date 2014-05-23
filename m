@@ -1,20 +1,55 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 23 May 2014 18:55:39 +0100
-Subject: [PATCH] regulator: Constify the pointer to alias name array
-In-Reply-To: <1400859850-24505-1-git-send-email-lee.jones@linaro.org>
-References: <1400859850-24505-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140523175539.GJ22111@sirena.org.uk>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Fri, 23 May 2014 11:03:01 -0700
+Subject: EFI_STUB fails to boot non-EFI on arm64
+In-Reply-To: <20140523154551.GT4179@bivouac.eciton.net>
+References: <20140523094513.GC9252@arm.com>
+ <20140523131656.GR4179@bivouac.eciton.net>
+ <20140523134720.GA9256@arm.com>
+ <20140523150331.GS4179@bivouac.eciton.net>
+ <CAKv+Gu-4ExoNfGVJzUK4v06XD5V3nYfRetoefY0RuFsN1CUOzg@mail.gmail.com>
+ <20140523154551.GT4179@bivouac.eciton.net>
+Message-ID: <CAFECyb9AMzpQNyFqzMyud2LqFWuy3PC8Fx==znfg5_Fq017J7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 04:44:10PM +0100, Lee Jones wrote:
-> Toughen-up checks for read-only regulator names.
+On Fri, May 23, 2014 at 8:45 AM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> On Fri, May 23, 2014 at 05:17:39PM +0200, Ard Biesheuvel wrote:
+>> >> Can we add another of detecting whether it's an EFI application and
+>> >> avoid calling efi_init()? I can see x86 sets some efi_loader_signature
+>> >> string in exit_boot() and checks against it later when calling
+>> >> efi_init().
+>> >
+>> > Well, I agree that we shouldn't be spewing error messages for expected
+>> > operation, but efi_init() is the function we call to determine
+>> > whether we _are_ booting via UEFI - and it sets flags accordingly for
+>> > the efi_enabled() macro.
+>> >
+>>
+>> Considering that
+>>
+>> a) the raw Image loader and the stub enter the kernel through
+>> different entry points (i.e., offset #0 and whatever entry point is
+>> specified in the PE/COFF header, respectively), and
+>> b) there is no decompressor etc involved so we jump straight into the
+>> kernel startup code
+>> c) head.S already deals with a similar problem, i.e., storing the CPU boot mode
+>>
+>> I would assume it shouldn't be so difficult to set a bit somewhere
+>> indicating which case we are dealing with?
+>
+> That would certainly be possible, but what would be the benefit of
+> having two separate mechanisms for determining whether we are booting
+> via UEFI - which could potentially end up disagreeing?
+>
+> /
+>     Leif
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140523/4b2b2935/attachment-0001.sig>
+Also, for arm32 the decompressor is still used, so the kernel proper
+only knows that it was started via the stub
+based on device tree entries.  In the arm32 case the stub load the
+initrd and sets up the device tree for the compressed
+kernel just like any linux loader.
+
+(I had a previous response to Ard's message that was html and got bounced.)
+
+Roy
