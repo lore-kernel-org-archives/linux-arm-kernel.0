@@ -1,29 +1,67 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 23 May 2014 16:52:19 +0200
-Subject: [PATCH] cpufreq: exynos: Fix driver compilation with
- ARCH_MULTIPLATFORM
-In-Reply-To: <CAKohpomrv77TE=eH5jiN8YuhhaDZtg0B20GmbWB2ryHcYSwKNg@mail.gmail.com>
-References: <537C6350.2010707@gmail.com>
- <1400670752-673-1-git-send-email-t.figa@samsung.com>
- <7243145.22RNvZMdch@wuerfel> <537C9B81.5040301@samsung.com>
- <CAJuA9ajHAyB6eLe0nQiNcCAS1ojG7W+FTJ1EH62H3Ch-DP2bcw@mail.gmail.com>
- <036901cf74f9$0562e640$1028b2c0$@samsung.com>
- <CAKohpomrv77TE=eH5jiN8YuhhaDZtg0B20GmbWB2ryHcYSwKNg@mail.gmail.com>
-Message-ID: <537F60A3.6010808@samsung.com>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Fri, 23 May 2014 16:54:59 +0200
+Subject: RFC: representing sdio devices oob interrupt, clks, etc. in device
+ tree
+In-Reply-To: <537F4CE5.10707@redhat.com>
+References: <537DC832.3020006@redhat.com>
+ <CAGb2v64VZac2KvAALrScecN89sRnBQoDrKxKMvkte+3G04NXeA@mail.gmail.com>
+ <537DE1AA.5050606@redhat.com> <537E31F7.1030505@gmail.com>
+ <537F1148.3010102@redhat.com> <20140523112239.GB12304@sirena.org.uk>
+ <537F3610.3050104@redhat.com> <537F4B5E.80306@broadcom.com>
+ <537F4CE5.10707@redhat.com>
+Message-ID: <537F6143.3050703@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.05.2014 16:05, Viresh Kumar wrote:
-> On 21 May 2014 19:01, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> If there is no comments more on Thomas P Abraham's series v4 ;-), I will take that series in this time with ack from Viresh.
-> 
-> @Thomas: Please post V5 quickly, let close it ASAP :)
-> 
+On 05/23/14 15:28, Hans de Goede wrote:
+> Hi,
+>
+> On 05/23/2014 03:21 PM, Arend van Spriel wrote:
+>> On 05/23/14 13:50, Hans de Goede wrote:
+>>> Hi,
+>>>
+>>> On 05/23/2014 01:22 PM, Mark Brown wrote:
+>>>> On Fri, May 23, 2014 at 11:13:44AM +0200, Hans de Goede wrote:
+>>>>
+>>>>> Thinking more about this, I would like to make one change to my
+>>>>> proposal, the mmc-core should only do power up of child-nodes if
+>>>>> they have a compatible of: "simple-sdio-powerup". This way
+>>>>> when we add something more complex, we can keep the simple powerup
+>>>>> code in the mmc core, keeping what we've already using this working
+>>>>> and the mmc core won't respond to the child nodes for more complex
+>>>>> devices, so it won't conflict with more complex power-up handling
+>>>>> handled by some other driver.
+>>>>
+>>>> Would it not be better to have this be something in the driver struct
+>>>> rather than in the device tree?  Putting a compatible in there would be
+>>>> encoding details of the Linux implementation in the DT which doesn't
+>>>> seem right especially since these are details we're thinking of changing
+>>>> later on.
+>>>
+>>> The compatible is not a Linux specific thing, it is a marking saying
+>>> that something needs to take care of enabling the clks (and whatever
+>>> else we will make part of the binding for this compatible), before
+>>> scanning the mmc bus.
+>>>
+>>>> Something like have the driver set flags saying if it wants
+>>>> to do complicated things.
+>>>
+>>> Chicken<->   egg, we won't know which driver to use before we've probed
+>>> the mmc bus, and we cannot probe the bus before enabling the clks, etc.
+>>
+>> The approach I took with brcmfmac is that upon module init I search the DT for "brcm,bcm43xx-fmac" compatible and get the clock and/or gpio resource and enable them before registering the sdio driver. The difficulty is probably when using the driver built-in as the clocks and gpios may not be available yet and we can not rely on deferred probing in module init stage.
+>
+> I know, and that approach does not work, by the time the brcmfmac loads,
+> the mmc core has long probed the mmc bus and decided no one is home.
 
-Well, as far as I can see, the DT binding is not yet acked by DT
-maintainers, so IMHO the best solution for this release would be to
-apply my patch to avoid regression. New version with some of Viresh's
-comments addressed is on the way.
+Ok. That is due to the non-removable property, right? I assumed a mmc 
+rescan, which is (supposedly) triggered upon sdio driver registration, 
+would subsequently find the device.
 
-Best regards,
-Tomasz
+Regards,
+Arend
+
+> Regards,
+>
+> Hans
+>
