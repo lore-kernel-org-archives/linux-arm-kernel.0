@@ -1,50 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 May 2014 21:23:11 +0200
-Subject: [PATCH v1 3/5] phy: pci serdes phy driver for keystone
-In-Reply-To: <537F81D8.2080005@ti.com>
-References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
- <9550746.D1ri3H0uvi@wuerfel> <537F81D8.2080005@ti.com>
-Message-ID: <9828919.7tZBgbvqj4@wuerfel>
+Date: Fri, 23 May 2014 21:25:03 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes for v3.15 (incr. #2)
+In-Reply-To: <20140522153116.GR8664@titan.lakedaemon.net>
+References: <20140522153116.GR8664@titan.lakedaemon.net>
+Message-ID: <201405232125.03482.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 May 2014 13:14:00 Murali Karicheri wrote:
-> On 5/15/2014 12:14 PM, Arnd Bergmann wrote:
-> > On Thursday 15 May 2014 12:01:30 Murali Karicheri wrote:
-> >> +static struct serdes_config ks_100mhz_pcie_5gbps_serdes[] = {
-> >> +       {0x0000, 0x00000800, 0x0000ff00},
-> >> +       {0x0060, 0x00041c5c, 0x00ffffff},
-> >> +       {0x0064, 0x0343c700, 0xffffff00},
-> >> +       {0x006c, 0x00000012, 0x000000ff},
-> >> +       {0x0068, 0x00070000, 0x00ff0000},
-> >> +       {0x0078, 0x0000c000, 0x0000ff00},
-> > It looks like the PHY is generic, but the configuration above is
-> > PCI specific. If this is true, you should have #phy-cells=<1>
-> > and document the possible modes, adding a lookup table here to
-> > pick the configuration based on the argument. It's fine to just
-> > implement pcie-5ghz initially, but the binding should list all
-> > the modes that the PHY can support.
+On Thursday 22 May 2014, Jason Cooper wrote:
+> Guys,
 > 
-> The PCIE name needs to be dropped and as you correctly guessed, this SERDES
-> is generic.
+> In the interest of reducing the number of pull requests, I've merged
+> mvebu/dt-fixes into mvebu/fixes.  The amount of fixes added since the
+> last pull request for each was minimal and is reflected below.
+> 
+> The mvebu-soc-id changes have been in -next for a while, and as usual,
+> this is an incremental pull request from tags/mvebu-fixes-3.15 to
+> tags/mvebu-fixes-3.15-2 in the mvebu/fixes branch.
 
-Ok, good.
-
-> > Also, please list the exact name of the phy if you can find it
-> > out. You mention that you don't know the register descriptions,
-> > but you should at least be able to let us know what phy this
-> > is, in case some other SoC reuses the same thing.
->
-> Unfortunately there is a NDA restriction that prevents us from using the
-> actual Phy name and keystone phy is the name what we can usel at the 
-> moment. I am checking
-> this with our IP team and if original name can  be used, I will update 
-> the driver to reflect the same.
-
-Can you please check the phy drivers that we already have in linux-next
-to see if any of those are for the same hardware then?
-
-I guess it's our best hope to catch duplications by inspecting all
-other phy drivers as they get merged then.
+Pulled into fixes branch, thanks!
 
 	Arnd
