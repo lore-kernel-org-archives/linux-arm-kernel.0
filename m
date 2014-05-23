@@ -1,59 +1,49 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:30:59 +0200
-Subject: [PATCH 19/71] clocksource: sh_cmt: Sort headers alphabetically
-In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-References: <537F214C.8000700@linaro.org>
- <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-19-git-send-email-daniel.lezcano@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 23 May 2014 12:22:39 +0100
+Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
+ device tree
+In-Reply-To: <537F1148.3010102@redhat.com>
+References: <537DC832.3020006@redhat.com>
+ <CAGb2v64VZac2KvAALrScecN89sRnBQoDrKxKMvkte+3G04NXeA@mail.gmail.com>
+ <537DE1AA.5050606@redhat.com> <537E31F7.1030505@gmail.com>
+ <537F1148.3010102@redhat.com>
+Message-ID: <20140523112239.GB12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+On Fri, May 23, 2014 at 11:13:44AM +0200, Hans de Goede wrote:
 
-This helps locating duplicates and inserting new headers.
+> Thinking more about this, I would like to make one change to my
+> proposal, the mmc-core should only do power up of child-nodes if
+> they have a compatible of: "simple-sdio-powerup". This way
+> when we add something more complex, we can keep the simple powerup
+> code in the mmc core, keeping what we've already using this working
+> and the mmc core won't respond to the child nodes for more complex
+> devices, so it won't conflict with more complex power-up handling
+> handled by some other driver.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- drivers/clocksource/sh_cmt.c |   20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+Would it not be better to have this be something in the driver struct
+rather than in the device tree?  Putting a compatible in there would be
+encoding details of the Linux implementation in the DT which doesn't
+seem right especially since these are details we're thinking of changing
+later on.  Something like have the driver set flags saying if it wants
+to do complicated things.
 
-diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
-index 399e952..9f215e7 100644
---- a/drivers/clocksource/sh_cmt.c
-+++ b/drivers/clocksource/sh_cmt.c
-@@ -13,23 +13,23 @@
-  * GNU General Public License for more details.
-  */
- 
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/clocksource.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
- #include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/spinlock.h>
- #include <linux/interrupt.h>
--#include <linux/ioport.h>
- #include <linux/io.h>
--#include <linux/clk.h>
-+#include <linux/ioport.h>
- #include <linux/irq.h>
--#include <linux/err.h>
--#include <linux/delay.h>
--#include <linux/clocksource.h>
--#include <linux/clockchips.h>
--#include <linux/sh_timer.h>
--#include <linux/slab.h>
- #include <linux/module.h>
-+#include <linux/platform_device.h>
- #include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
-+#include <linux/sh_timer.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
- 
- struct sh_cmt_device;
- 
--- 
-1.7.9.5
+> FWIW if we ever get truely complex cases I think modeling the
+> power-up hardware as a pmic platform device is not a bad idea,
+> we would then need to have a generic mmc-host pmic property, which
+> would be used both to do the initial powerup before scanning, as
+> well as for the sdio device driver to get a handle to the pmic,
+> for run time power-management (if desired).
+
+I don't know if this will ever apply to SDIO but with other buses the
+complicated bits come when the driver wants to take over some of the
+power management do things like turn some of the supplies or clocks on
+and off independently at runtime for low power modes.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140523/7f8f7960/attachment.sig>
