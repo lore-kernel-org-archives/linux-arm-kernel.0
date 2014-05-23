@@ -1,49 +1,72 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 23 May 2014 10:43:59 +0200
-Subject: [PATCH v2] pwm: imx: set can_sleep flag for imx_pwm
-In-Reply-To: <1400834488-2660-1-git-send-email-shawn.guo@freescale.com>
-References: <1400834488-2660-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20140523084359.GD20155@pengutronix.de>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 23 May 2014 10:44:56 +0200
+Subject: [PATCH 2/2] ASoC: samsung: Add machine driver for odroidx2
+In-Reply-To: <20140522185334.GT12304@sirena.org.uk>
+References: <1400759708-25831-1-git-send-email-s.nawrocki@samsung.com>
+ <1400759708-25831-2-git-send-email-s.nawrocki@samsung.com>
+ <20140522185334.GT12304@sirena.org.uk>
+Message-ID: <537F0A88.8000904@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 04:41:28PM +0800, Shawn Guo wrote:
-> The .config() hook imx_pwm_config() calls clk APIs like clk_prepare()
-> and clk_get_rate(), which might sleep, so we need to set can_sleep flag
-> on pwm_chip.
-Wasn't there a bug that was fixed or at least made more obvious with
-this change? Is it worth mentioning in the commit log?
+On 22/05/14 20:53, Mark Brown wrote:
+> On Thu, May 22, 2014 at 01:55:08PM +0200, Sylwester Nawrocki wrote:
+>> From: Chen Zhen <zhen1.chen@samsung.com>
+>>
+>> This machine driver primary defines the audio path, the supported
+>> data formats and sample frequency.
+> 
+> I guess it can't yet, it would have been good to explain that in the
+> changelog for the bindings (and include the binding in this patch...).
 
-Otherwise
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Thanks for the review, I'm still rather inexperienced in the ASoC stuff,
+I've obviously overlooked there is actually no routing handling. I'd rather
+add those bits.
+As for the DT binding documentation patch, I thought we're supposed to keep
+documentation in separate patches, so processes of separating it from the
+kernel is easier ?
 
-Uwe
+>> +	ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_I2S
+>> +					| SND_SOC_DAIFMT_NB_NF
+>> +					| SND_SOC_DAIFMT_CBM_CFM);
+>> +	if (ret < 0)
+>> +		return ret;
+>> +
+>> +	ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_I2S
+>> +					| SND_SOC_DAIFMT_NB_NF
+>> +					| SND_SOC_DAIFMT_CBM_CFM);
+>> +	if (ret < 0)
+>> +		return ret;
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
-> Changes since v1:
->  - Set can_sleep flag for both imx_pwm_v1 and imx_pwm_v2
+> These are constant, set these in the dai_link.
 > 
->  drivers/pwm/pwm-imx.c | 1 +
->  1 file changed, 1 insertion(+)
+>> +
+>> +	ret = snd_soc_dai_set_sysclk(codec_dai, 3, MAX98090_MCLK_FREQ,
+>> +				     SND_SOC_CLOCK_IN);
+>> +	if (ret < 0) {
+>> +		dev_err(codec_dai->dev,
+>> +			"Unable to switch to FLL1: %d\n", ret);
+>> +		return ret;
+>> +	}
 > 
-> diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
-> index d797c7b84c3f..5449d9150d40 100644
-> --- a/drivers/pwm/pwm-imx.c
-> +++ b/drivers/pwm/pwm-imx.c
-> @@ -262,6 +262,7 @@ static int imx_pwm_probe(struct platform_device *pdev)
->  	imx->chip.dev = &pdev->dev;
->  	imx->chip.base = -1;
->  	imx->chip.npwm = 1;
-> +	imx->chip.can_sleep = true;
->  
->  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	imx->mmio_base = devm_ioremap_resource(&pdev->dev, r);
-> -- 
-> 1.8.3.2
-> 
-> 
+> So's this - also what is 3?  Set it on init.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+OK, will move it. I'm not sure why 3, it seems to be ignored by the codec
+anyway. Chen, can you confirm the second argument is actually a don't care
+value ?
+
+>> +	ret = snd_soc_dai_set_sysclk(cpu_dai, SAMSUNG_I2S_OPCLK,
+>> +					0, MOD_OPCLK_PCLK);
+> 
+> Similarly for the rest of the function.
+> 
+>> +	return snd_soc_register_card(card);
+> 
+> devm_snd_soc_register_card().
+
+Thanks for the suggestions, I'll amend that.
+
+
+--
+Regards,
+Sylwester
