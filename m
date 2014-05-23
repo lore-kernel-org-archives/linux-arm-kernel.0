@@ -1,56 +1,47 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Fri, 23 May 2014 08:10:36 +0200
-Subject: [PATCH 2/2] serial: imx: disable the receiver ready interrupt
- for imx_stop_rx
-In-Reply-To: <1400819575-20435-2-git-send-email-b32955@freescale.com>
-References: <1400819575-20435-1-git-send-email-b32955@freescale.com>
- <1400819575-20435-2-git-send-email-b32955@freescale.com>
-Message-ID: <537EE65C.5010700@de.bosch.com>
+From: leela.krishna@linaro.org (Leela Krishna Amudala)
+Date: Fri, 23 May 2014 11:43:30 +0530
+Subject: [PATCH] ARM: EXYNOS: Use wfi macro in platform_do_lowpower
+In-Reply-To: <537E497B.9020404@linaro.org>
+References: <1400745455-27920-1-git-send-email-leela.krishna@linaro.org>
+ <537E497B.9020404@linaro.org>
+Message-ID: <CAM7CM0kG-fWcAo9rTwRj1iPD7EFSDVZWaPc93XmLVE=s_ePDpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.05.2014 06:32, Huang Shijie wrote:
-> This patch disables the receiver ready interrupt for imx_stop_rx.
-> It reduces the interrupt numbers when the uart is going to close
-> or suspend.
+Hi Kgene,
+
+
+On Fri, May 23, 2014 at 12:31 AM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On 05/22/2014 09:57 AM, Leela Krishna Amudala wrote:
+>>
+>> This patch is originally based on commit b3377d186572 ("ARM: 7064/1:
+>> vexpress: Use wfi macro in platform_do_lowpower.")
+>>
+>> Current Exynos CPU hotplug code includes a hardcoded WFI
+>> instruction, in ARM encoding.  When the kernel is compiled in Thumb-2
+>> mode, this is invalid and causes the machine to hang hard when a CPU
+>> is offlined.
+>>
+>> Use wfi macro instead of the hardcoded WFI instruction.
+>>
+>> Signed-off-by: Leela Krishna Amudala <leela.krishna@linaro.org>
 >
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->   drivers/tty/serial/imx.c |    4 ++++
->   1 files changed, 4 insertions(+), 0 deletions(-)
 >
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index ed6cdf7..6026101 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -440,6 +440,10 @@ static void imx_stop_rx(struct uart_port *port)
+> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 >
->   	temp = readl(sport->port.membase + UCR2);
->   	writel(temp & ~UCR2_RXEN, sport->port.membase + UCR2);
-> +
-> +	/* disable the `Receiver Ready Interrrupt` */
-> +	temp = readl(sport->port.membase + UCR1);
-> +	writel(temp & ~UCR1_RRDYEN, sport->port.membase + UCR1);
->   }
 
-While this is about the RX irq, I've a slightly off-topic general 
-question regarding the usage of the *TX* irq in TX DMA mode:
+Can you please take action on this patch.
 
-It seems to me that the TX irq is kept enabled while the TX DMA is 
-running/enabled? Looking e.g. into the amba-pl011.c there it seems there 
-the logic is:
+Best Regards,
+Leela Krishna.
 
-- Set up/start the TX DMA
-- Disable the TX irq while the TX DMA is running (only waiting for the 
-TX DMA callback, then)
-- Re-enable the TX irq in the TX DMA callback
-- Let the TX irq fire, then. And if there are still data, set up the TX 
-DMA again.
-
-This sounds quite more logical than the implementation in imx.c.
-
-Or is my understanding completely wrong, here?
-
-Thanks
-
-Dirk
+>
+>
+> --
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+>
