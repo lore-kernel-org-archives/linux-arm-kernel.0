@@ -1,133 +1,70 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:30:52 +0200
-Subject: [PATCH 12/71] clocksource: sh_cmt: Replace hardcoded register values
- with macros
+Date: Fri, 23 May 2014 12:30:53 +0200
+Subject: [PATCH 13/71] clocksource: sh_cmt: Set cpumask to cpu_possible_mask
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-12-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-13-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Define symbolic macros for all used registers bits.
+The CMT is a global timer not restricted to a single CPU. It has a lower
+rating than the TMU or ARM architected timer, but is still useful on
+systems where the other timers are stopped during CPU sleep.
+
+When multiple timers are available the timers core selects which timer
+to use based on timer ratings.
+
+On SMP systems where timer broadcasting is required, one dummy timer is
+instantiated per CPU with a rating of 100. On those systems the CMT
+timer has a rating of 80, which makes the dummy timer selected by
+default on all CPUs. The CMT is then available, and will be used as a
+broadcast timer.
+
+On UP systems no dummy timer is instantiated. The CMT timer has a rating
+of 125 on those systems and is used directly as a clock event device for
+CPU0 without broadcasting.
+
+The CMT rating shouldn't depend on whether we boot a UP or SMP system.
+We can't raise the CMT rating to 125 on SMP systems. This would select
+CMT as the clock event device for CPU0 as its rating is higher than the
+dummy timer rating, and would leave the system without a broadcast
+timer. We could instead lower the rating to 80 on all systems, but that
+wouldn't reflect reality as ratings between 1 and 99 are documented as
+"unfit for real use".
+
+We should raise the rating above 99 and still have the CMT selected as a
+broadcast timer. This can be done by changing the cpumask from
+cpumask_of(0) to cpu_possible_mask. In that case the timer selection
+logic will prefer the previously probed and already selected dummy timer
+for all CPUs based on the fact that already selected per-cpu timers are
+preferred over new global timers, regardless of their respective
+ratings. This also better reflects reality, as the CMT is not tied to
+the boot CPU.
+
+Ideally the timer selection logic should realize that the CMT needs to
+be used as a broadcast timer on SMP systems as no other broadcast timer
+is available, regardless of the cpumask and rating.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/clocksource/sh_cmt.c |   56 +++++++++++++++++++++++++++++++++---------
- 1 file changed, 44 insertions(+), 12 deletions(-)
+ drivers/clocksource/sh_cmt.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
-index 879b8c2..ce00baa 100644
+index ce00baa..926abe2 100644
 --- a/drivers/clocksource/sh_cmt.c
 +++ b/drivers/clocksource/sh_cmt.c
-@@ -114,6 +114,34 @@ struct sh_cmt_device {
- 	unsigned int num_channels;
- };
- 
-+#define SH_CMT16_CMCSR_CMF		(1 << 7)
-+#define SH_CMT16_CMCSR_CMIE		(1 << 6)
-+#define SH_CMT16_CMCSR_CKS8		(0 << 0)
-+#define SH_CMT16_CMCSR_CKS32		(1 << 0)
-+#define SH_CMT16_CMCSR_CKS128		(2 << 0)
-+#define SH_CMT16_CMCSR_CKS512		(3 << 0)
-+#define SH_CMT16_CMCSR_CKS_MASK		(3 << 0)
-+
-+#define SH_CMT32_CMCSR_CMF		(1 << 15)
-+#define SH_CMT32_CMCSR_OVF		(1 << 14)
-+#define SH_CMT32_CMCSR_WRFLG		(1 << 13)
-+#define SH_CMT32_CMCSR_STTF		(1 << 12)
-+#define SH_CMT32_CMCSR_STPF		(1 << 11)
-+#define SH_CMT32_CMCSR_SSIE		(1 << 10)
-+#define SH_CMT32_CMCSR_CMS		(1 << 9)
-+#define SH_CMT32_CMCSR_CMM		(1 << 8)
-+#define SH_CMT32_CMCSR_CMTOUT_IE	(1 << 7)
-+#define SH_CMT32_CMCSR_CMR_NONE		(0 << 4)
-+#define SH_CMT32_CMCSR_CMR_DMA		(1 << 4)
-+#define SH_CMT32_CMCSR_CMR_IRQ		(2 << 4)
-+#define SH_CMT32_CMCSR_CMR_MASK		(3 << 4)
-+#define SH_CMT32_CMCSR_DBGIVD		(1 << 3)
-+#define SH_CMT32_CMCSR_CKS_RCLK8	(4 << 0)
-+#define SH_CMT32_CMCSR_CKS_RCLK32	(5 << 0)
-+#define SH_CMT32_CMCSR_CKS_RCLK128	(6 << 0)
-+#define SH_CMT32_CMCSR_CKS_RCLK1	(7 << 0)
-+#define SH_CMT32_CMCSR_CKS_MASK		(7 << 0)
-+
- static unsigned long sh_cmt_read16(void __iomem *base, unsigned long offs)
- {
- 	return ioread16(base + (offs << 1));
-@@ -140,8 +168,8 @@ static const struct sh_cmt_info sh_cmt_info[] = {
- 	[SH_CMT_16BIT] = {
- 		.model = SH_CMT_16BIT,
- 		.width = 16,
--		.overflow_bit = 0x80,
--		.clear_bits = ~0x80,
-+		.overflow_bit = SH_CMT16_CMCSR_CMF,
-+		.clear_bits = ~SH_CMT16_CMCSR_CMF,
- 		.read_control = sh_cmt_read16,
- 		.write_control = sh_cmt_write16,
- 		.read_count = sh_cmt_read16,
-@@ -150,8 +178,8 @@ static const struct sh_cmt_info sh_cmt_info[] = {
- 	[SH_CMT_32BIT] = {
- 		.model = SH_CMT_32BIT,
- 		.width = 32,
--		.overflow_bit = 0x8000,
--		.clear_bits = ~0xc000,
-+		.overflow_bit = SH_CMT32_CMCSR_CMF,
-+		.clear_bits = ~(SH_CMT32_CMCSR_CMF | SH_CMT32_CMCSR_OVF),
- 		.read_control = sh_cmt_read16,
- 		.write_control = sh_cmt_write16,
- 		.read_count = sh_cmt_read32,
-@@ -160,8 +188,8 @@ static const struct sh_cmt_info sh_cmt_info[] = {
- 	[SH_CMT_32BIT_FAST] = {
- 		.model = SH_CMT_32BIT_FAST,
- 		.width = 32,
--		.overflow_bit = 0x8000,
--		.clear_bits = ~0xc000,
-+		.overflow_bit = SH_CMT32_CMCSR_CMF,
-+		.clear_bits = ~(SH_CMT32_CMCSR_CMF | SH_CMT32_CMCSR_OVF),
- 		.read_control = sh_cmt_read16,
- 		.write_control = sh_cmt_write16,
- 		.read_count = sh_cmt_read32,
-@@ -170,8 +198,8 @@ static const struct sh_cmt_info sh_cmt_info[] = {
- 	[SH_CMT_48BIT] = {
- 		.model = SH_CMT_48BIT,
- 		.width = 32,
--		.overflow_bit = 0x8000,
--		.clear_bits = ~0xc000,
-+		.overflow_bit = SH_CMT32_CMCSR_CMF,
-+		.clear_bits = ~(SH_CMT32_CMCSR_CMF | SH_CMT32_CMCSR_OVF),
- 		.read_control = sh_cmt_read32,
- 		.write_control = sh_cmt_write32,
- 		.read_count = sh_cmt_read32,
-@@ -180,8 +208,8 @@ static const struct sh_cmt_info sh_cmt_info[] = {
- 	[SH_CMT_48BIT_GEN2] = {
- 		.model = SH_CMT_48BIT_GEN2,
- 		.width = 32,
--		.overflow_bit = 0x8000,
--		.clear_bits = ~0xc000,
-+		.overflow_bit = SH_CMT32_CMCSR_CMF,
-+		.clear_bits = ~(SH_CMT32_CMCSR_CMF | SH_CMT32_CMCSR_OVF),
- 		.read_control = sh_cmt_read32,
- 		.write_control = sh_cmt_write32,
- 		.read_count = sh_cmt_read32,
-@@ -295,10 +323,14 @@ static int sh_cmt_enable(struct sh_cmt_channel *ch, unsigned long *rate)
- 	/* configure channel, periodic mode and maximum timeout */
- 	if (ch->cmt->info->width == 16) {
- 		*rate = clk_get_rate(ch->cmt->clk) / 512;
--		sh_cmt_write_cmcsr(ch, 0x43);
-+		sh_cmt_write_cmcsr(ch, SH_CMT16_CMCSR_CMIE |
-+				   SH_CMT16_CMCSR_CKS512);
- 	} else {
- 		*rate = clk_get_rate(ch->cmt->clk) / 8;
--		sh_cmt_write_cmcsr(ch, 0x01a4);
-+		sh_cmt_write_cmcsr(ch, SH_CMT32_CMCSR_CMM |
-+				   SH_CMT32_CMCSR_CMTOUT_IE |
-+				   SH_CMT32_CMCSR_CMR_IRQ |
-+				   SH_CMT32_CMCSR_CKS_RCLK8);
- 	}
- 
- 	sh_cmt_write_cmcor(ch, 0xffffffff);
+@@ -776,7 +776,7 @@ static void sh_cmt_register_clockevent(struct sh_cmt_channel *ch,
+ 	ced->features = CLOCK_EVT_FEAT_PERIODIC;
+ 	ced->features |= CLOCK_EVT_FEAT_ONESHOT;
+ 	ced->rating = rating;
+-	ced->cpumask = cpumask_of(0);
++	ced->cpumask = cpu_possible_mask;
+ 	ced->set_next_event = sh_cmt_clock_event_next;
+ 	ced->set_mode = sh_cmt_clock_event_mode;
+ 	ced->suspend = sh_cmt_clock_event_suspend;
 -- 
 1.7.9.5
