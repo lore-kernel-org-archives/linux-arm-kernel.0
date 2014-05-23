@@ -1,41 +1,39 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:46 +0200
-Subject: [PATCH 66/71] clocksource: sh_cmt: Remove unnecessary OOM messages
+Date: Fri, 23 May 2014 12:31:41 +0200
+Subject: [PATCH 61/71] clocksource: sh_tmu: Fix channel IRQ retrieval in
+ legacy case
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-66-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-61-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jingoo Han <jg1.han@samsung.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The site-specific OOM messages are unnecessary, because they
-duplicate the MM subsystem generic OOM message.
+In the legacy platform data case each TMU platform device handles a
+single channel with a single IRQ for the platform device. Retrieve the
+IRQ using the logical channel number instead of the hardware channel
+number.
 
-[dlezcano] : refreshed against latest modifications: kmalloc -> kzalloc
-
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/sh_cmt.c |    4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/clocksource/sh_tmu.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
-index bc8d025..dfa7803 100644
---- a/drivers/clocksource/sh_cmt.c
-+++ b/drivers/clocksource/sh_cmt.c
-@@ -1106,10 +1106,8 @@ static int sh_cmt_probe(struct platform_device *pdev)
+diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
+index 4ba2c0f..ec34095 100644
+--- a/drivers/clocksource/sh_tmu.c
++++ b/drivers/clocksource/sh_tmu.c
+@@ -498,7 +498,7 @@ static int sh_tmu_channel_setup(struct sh_tmu_channel *ch, unsigned int index,
+ 			ch->base = tmu->mapbase + 8 + ch->index * 12;
  	}
  
- 	cmt = kzalloc(sizeof(*cmt), GFP_KERNEL);
--	if (cmt == NULL) {
--		dev_err(&pdev->dev, "failed to allocate driver data\n");
-+	if (cmt == NULL)
- 		return -ENOMEM;
--	}
- 
- 	ret = sh_cmt_setup(cmt, pdev);
- 	if (ret) {
+-	ch->irq = platform_get_irq(tmu->pdev, ch->index);
++	ch->irq = platform_get_irq(tmu->pdev, index);
+ 	if (ch->irq < 0) {
+ 		dev_err(&tmu->pdev->dev, "ch%u: failed to get irq\n",
+ 			ch->index);
 -- 
 1.7.9.5
