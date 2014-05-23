@@ -1,39 +1,40 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 23 May 2014 15:59:43 +0200
-Subject: [PATCH 2/5] Documentation: dt-bindings: document the Armada 375
- USB cluster binding
-In-Reply-To: <537F52B0.5030204@ti.com>
-References: <1400257376-13251-1-git-send-email-gregory.clement@free-electrons.com>
- <1400257376-13251-2-git-send-email-gregory.clement@free-electrons.com>
- <537F13B2.6070500@ti.com> <20140523132145.GA31314@lunn.ch>
- <20140523133608.GB31314@lunn.ch> <537F52B0.5030204@ti.com>
-Message-ID: <20140523135943.GC31314@lunn.ch>
+From: gdjakov@mm-sol.com (Georgi Djakov)
+Date: Fri, 23 May 2014 17:17:45 +0300
+Subject: [PATCH v1 5/5] ARM: dts: qcom: Add APQ8084 serial port DT node
+In-Reply-To: <693A0E52-34CF-4A63-A8D0-A83780F969F0@codeaurora.org>
+References: <1400775885-10296-1-git-send-email-gdjakov@mm-sol.com>
+ <1400775885-10296-6-git-send-email-gdjakov@mm-sol.com>
+ <693A0E52-34CF-4A63-A8D0-A83780F969F0@codeaurora.org>
+Message-ID: <537F5889.5080902@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 07:22:48PM +0530, Kishon Vijay Abraham I wrote:
-> hI,
-> 
-> On Friday 23 May 2014 07:06 PM, Andrew Lunn wrote:
-> >> Do you want one .txt file per driver, or can we combine binding
-> >> documentations into one file? There should already be a mvebu-phy.txt,
-> >> which contains the sata phy usable on some of the Armada SoC families.
-> >> This binding could be appended to it.
-> > 
-> > Ah. Humm, well! It seems the patch adding the mvebu-phy.txt fell
-> > through a crack when adding the driver.
-> > 
-> > Kishon could you take
-> > http://www.spinics.net/lists/devicetree/msg17018.html into your tree?
-> > It should of been taken the same time you took the actual driver,
-> > http://www.spinics.net/lists/devicetree/msg17011.html into your tree.
-> > 
-> > I can resend that one missing patch if you want.
-> 
-> yes please. But it's already too late to go in the next merge window.
+On 05/22/2014 07:32 PM, Kumar Gala wrote:
+>
+> On May 22, 2014, at 11:24 AM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
+>
+>> Add the necessary DT node to probe the serial driver on
+>> APQ8084 platforms.
+>>
+>> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+>> ---
+>> arch/arm/boot/dts/qcom-apq8084.dtsi |    7 +++++++
+>> 1 file changed, 7 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
+>> index 2dcd11e..c346549 100644
+>> --- a/arch/arm/boot/dts/qcom-apq8084.dtsi
+>> +++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
+>> @@ -185,5 +185,12 @@
+>> 			reg = <0xfc400000 0x4000>;
+>> 		};
+>>
+>> +		serial at f995e000 {
+>
+> Mark it disabled in the soc.dtsi and ?ok? in the board.
+>
 
-Gregory, could you pick it up and append your 375 binding to it? We
-can avoid merge conflicts that way.
+Oh, of course!
 
-Thanks
-	Andrew
+Thanks,
+Georgi
