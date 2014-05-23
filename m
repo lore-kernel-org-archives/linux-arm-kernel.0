@@ -1,174 +1,47 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:19 +0200
-Subject: [PATCH 39/71] clocksource: sh_mtu2: Rename struct sh_mtu2_priv to
- sh_mtu2_device
-In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-References: <537F214C.8000700@linaro.org>
- <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-39-git-send-email-daniel.lezcano@linaro.org>
+From: t.dakhran@samsung.com (Tarek Dakhran)
+Date: Fri, 23 May 2014 14:35:40 +0400
+Subject: [PATCH v10 0/3] Exynos 5410 support
+Message-ID: <1400841343-6016-1-git-send-email-t.dakhran@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+The series of patches represent support of Exynos 5410 SoC
 
-Channel data is private as well, rename priv to device to make the
-distrinction between the core device and the channels clearer.
+The Exynos 5410 is the first Samsung SoC based on big.LITTLE architecture
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Tested-by: Wolfram Sang <wsa@sang-engineering.com>
----
- drivers/clocksource/sh_mtu2.c |   65 +++++++++++++++++++++--------------------
- 1 file changed, 33 insertions(+), 32 deletions(-)
+Patches add new platform description, support of clock controller and device
+tree for Exynos 5410.
 
-diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
-index e509f41..256621c 100644
---- a/drivers/clocksource/sh_mtu2.c
-+++ b/drivers/clocksource/sh_mtu2.c
-@@ -34,15 +34,15 @@
- #include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
- 
--struct sh_mtu2_priv;
-+struct sh_mtu2_device;
- 
- struct sh_mtu2_channel {
--	struct sh_mtu2_priv *mtu;
-+	struct sh_mtu2_device *mtu;
- 	int irq;
- 	struct clock_event_device ced;
- };
- 
--struct sh_mtu2_priv {
-+struct sh_mtu2_device {
- 	struct platform_device *pdev;
- 
- 	void __iomem *mapbase;
-@@ -273,75 +273,76 @@ static int sh_mtu2_register(struct sh_mtu2_channel *ch, char *name,
- 	return 0;
- }
- 
--static int sh_mtu2_setup(struct sh_mtu2_priv *p, struct platform_device *pdev)
-+static int sh_mtu2_setup(struct sh_mtu2_device *mtu,
-+			 struct platform_device *pdev)
- {
- 	struct sh_timer_config *cfg = pdev->dev.platform_data;
- 	struct resource *res;
- 	int ret;
- 	ret = -ENXIO;
- 
--	memset(p, 0, sizeof(*p));
--	p->pdev = pdev;
-+	memset(mtu, 0, sizeof(*mtu));
-+	mtu->pdev = pdev;
- 
- 	if (!cfg) {
--		dev_err(&p->pdev->dev, "missing platform data\n");
-+		dev_err(&mtu->pdev->dev, "missing platform data\n");
- 		goto err0;
- 	}
- 
--	platform_set_drvdata(pdev, p);
-+	platform_set_drvdata(pdev, mtu);
- 
--	res = platform_get_resource(p->pdev, IORESOURCE_MEM, 0);
-+	res = platform_get_resource(mtu->pdev, IORESOURCE_MEM, 0);
- 	if (!res) {
--		dev_err(&p->pdev->dev, "failed to get I/O memory\n");
-+		dev_err(&mtu->pdev->dev, "failed to get I/O memory\n");
- 		goto err0;
- 	}
- 
--	p->channel.irq = platform_get_irq(p->pdev, 0);
--	if (p->channel.irq < 0) {
--		dev_err(&p->pdev->dev, "failed to get irq\n");
-+	mtu->channel.irq = platform_get_irq(mtu->pdev, 0);
-+	if (mtu->channel.irq < 0) {
-+		dev_err(&mtu->pdev->dev, "failed to get irq\n");
- 		goto err0;
- 	}
- 
- 	/* map memory, let mapbase point to our channel */
--	p->mapbase = ioremap_nocache(res->start, resource_size(res));
--	if (p->mapbase == NULL) {
--		dev_err(&p->pdev->dev, "failed to remap I/O memory\n");
-+	mtu->mapbase = ioremap_nocache(res->start, resource_size(res));
-+	if (mtu->mapbase == NULL) {
-+		dev_err(&mtu->pdev->dev, "failed to remap I/O memory\n");
- 		goto err0;
- 	}
- 
- 	/* get hold of clock */
--	p->clk = clk_get(&p->pdev->dev, "mtu2_fck");
--	if (IS_ERR(p->clk)) {
--		dev_err(&p->pdev->dev, "cannot get clock\n");
--		ret = PTR_ERR(p->clk);
-+	mtu->clk = clk_get(&mtu->pdev->dev, "mtu2_fck");
-+	if (IS_ERR(mtu->clk)) {
-+		dev_err(&mtu->pdev->dev, "cannot get clock\n");
-+		ret = PTR_ERR(mtu->clk);
- 		goto err1;
- 	}
- 
--	ret = clk_prepare(p->clk);
-+	ret = clk_prepare(mtu->clk);
- 	if (ret < 0)
- 		goto err2;
- 
--	p->channel.mtu = p;
-+	mtu->channel.mtu = mtu;
- 
--	ret = sh_mtu2_register(&p->channel, (char *)dev_name(&p->pdev->dev),
-+	ret = sh_mtu2_register(&mtu->channel, (char *)dev_name(&mtu->pdev->dev),
- 			       cfg->clockevent_rating);
- 	if (ret < 0)
- 		goto err3;
- 
- 	return 0;
-  err3:
--	clk_unprepare(p->clk);
-+	clk_unprepare(mtu->clk);
-  err2:
--	clk_put(p->clk);
-+	clk_put(mtu->clk);
-  err1:
--	iounmap(p->mapbase);
-+	iounmap(mtu->mapbase);
-  err0:
- 	return ret;
- }
- 
- static int sh_mtu2_probe(struct platform_device *pdev)
- {
--	struct sh_mtu2_priv *p = platform_get_drvdata(pdev);
-+	struct sh_mtu2_device *mtu = platform_get_drvdata(pdev);
- 	struct sh_timer_config *cfg = pdev->dev.platform_data;
- 	int ret;
- 
-@@ -350,20 +351,20 @@ static int sh_mtu2_probe(struct platform_device *pdev)
- 		pm_runtime_enable(&pdev->dev);
- 	}
- 
--	if (p) {
-+	if (mtu) {
- 		dev_info(&pdev->dev, "kept as earlytimer\n");
- 		goto out;
- 	}
- 
--	p = kmalloc(sizeof(*p), GFP_KERNEL);
--	if (p == NULL) {
-+	mtu = kmalloc(sizeof(*mtu), GFP_KERNEL);
-+	if (mtu == NULL) {
- 		dev_err(&pdev->dev, "failed to allocate driver data\n");
- 		return -ENOMEM;
- 	}
- 
--	ret = sh_mtu2_setup(p, pdev);
-+	ret = sh_mtu2_setup(mtu, pdev);
- 	if (ret) {
--		kfree(p);
-+		kfree(mtu);
- 		pm_runtime_idle(&pdev->dev);
- 		return ret;
- 	}
+Has been build on Samsung Linux Kernel
+  (branch: for-next, commit: 19307a0 Merge branch 'v3.16-next/dt-samsung-2' into for-next)
+Has been tested on: 1) Exynos 5410 reference board (exynos_defconfig)
+		    2) Odroid-XU board (exynos_defconfig)
+
+Many thanks for reviewing to Tomasz Figa.
+
+Tarek.
+
+Tarek Dakhran (3):
+  ARM: EXYNOS: Add support for EXYNOS5410 SoC
+  clk: exynos5410: register clocks using common clock framework
+  ARM: dts: Add initial device tree support for EXYNOS5410
+
+ .../devicetree/bindings/clock/exynos5410-clock.txt |   51 +++++
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/exynos5410-smdk5410.dts          |   82 ++++++++
+ arch/arm/boot/dts/exynos5410.dtsi                  |  206 +++++++++++++++++++
+ arch/arm/mach-exynos/Kconfig                       |    8 +
+ arch/arm/mach-exynos/common.h                      |   11 +-
+ arch/arm/mach-exynos/firmware.c                    |    2 +-
+ drivers/clk/samsung/Makefile                       |    1 +
+ drivers/clk/samsung/clk-exynos5410.c               |  209 ++++++++++++++++++++
+ include/dt-bindings/clock/exynos5410.h             |   33 ++++
+ 10 files changed, 602 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-clock.txt
+ create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
+ create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
+ create mode 100644 drivers/clk/samsung/clk-exynos5410.c
+ create mode 100644 include/dt-bindings/clock/exynos5410.h
+
 -- 
 1.7.9.5
