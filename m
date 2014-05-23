@@ -1,29 +1,66 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 23 May 2014 12:43:41 +0100
-Subject: [PATCH] mfd: axp20x: Remove unnecessary const qualifier from
- axp20x_supplies[]
-In-Reply-To: <1400777136.21099.6.camel@joe-AO725>
-References: <1400750311-15323-1-git-send-email-lee.jones@linaro.org>
- <1400750311-15323-2-git-send-email-lee.jones@linaro.org>
- <1400774373.21099.1.camel@joe-AO725>
- <20140522160856.GJ19747@lee--X1>
- <1400777136.21099.6.camel@joe-AO725>
-Message-ID: <20140523114341.GX19747@lee--X1>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 23 May 2014 13:50:14 +0200
+Subject: [PATCH v2] ARM: at91: #if 0 out ISI code for AT91SAM9263
+In-Reply-To: <F4C251BF-666E-4E89-A6F7-3D96A669A8D8@jcrosoft.com>
+References: <1400142868.20469.12.camel@x220>
+ <F4C251BF-666E-4E89-A6F7-3D96A669A8D8@jcrosoft.com>
+Message-ID: <1400845814.31526.29.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > To be frank, I've never known what the double const means.  Care to
-> > enlighten?
-> 
-> There's a nice table here:
-> 
-> http://stackoverflow.com/questions/14562845/why-does-passing-char-as-const-char-generate-a-warning
+In v2.6.25 code was added for an Image Sensor Interface (ISI) for
+AT91SAM9263. That code depended on the Kconfig macro
+CONFIG_VIDEO_AT91_ISI and its MODULE variant. The related Kconfig symbol
+has never been added to the tree. The net effect of this was that
+at91_add_device_isi() was a NOP. No one noticed because no callers of
+that function were added to the tree at that time.
 
-Okay, I get it. I think you're right, I'll make the change and see
-what else breaks and try to fix that too.
+The first caller of a function with that name was added in v3.4. But
+that caller apparently only called the function defined for AT91SAM9G45.
+(that function was also added in v3.4). So even then AT91SAM9263's NOP
+version of at91_add_device_isi() remained unused.
 
+This means that the ISI code for AT91SAM9263 could be removed. But,
+since it can be useful for future reference, let's "#if 0" it instead.
+
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+v2: Jean-Christophe would like to keep the information currently hidden
+behind "#if defined(CONFIG_VIDEO_AT91_ISI) [...]". I'd like the
+reference to that Kconfig macro dropped. Using "#if 0" will do both, so
+that makes for a nice compromise, I'd say.
+
+Josh verified that this definition of at91_add_device_isi() never will
+be called. Thanks!
+
+Still untested!
+
+ arch/arm/mach-at91/at91sam9263_devices.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+index 43d53d6156dd..30af3048ade5 100644
+--- a/arch/arm/mach-at91/at91sam9263_devices.c
++++ b/arch/arm/mach-at91/at91sam9263_devices.c
+@@ -900,8 +900,7 @@ void __init at91_add_device_lcdc(struct atmel_lcdfb_pdata *data) {}
+  *  Image Sensor Interface
+  * -------------------------------------------------------------------- */
+ 
+-#if defined(CONFIG_VIDEO_AT91_ISI) || defined(CONFIG_VIDEO_AT91_ISI_MODULE)
+-
++#if 0 /* keep for future reference */
+ struct resource isi_resources[] = {
+ 	[0] = {
+ 		.start	= AT91SAM9263_BASE_ISI,
+@@ -947,9 +946,6 @@ void __init at91_add_device_isi(struct isi_platform_data *data,
+ 		/* TODO: register the PCK for ISI_MCK and set its parent */
+ 	}
+ }
+-#else
+-void __init at91_add_device_isi(struct isi_platform_data *data,
+-		bool use_pck_as_mck) {}
+ #endif
+ 
+ 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.0
