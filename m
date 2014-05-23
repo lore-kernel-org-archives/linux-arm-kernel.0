@@ -1,52 +1,68 @@
-From: wbx@openadk.org (Waldemar Brodkorb)
-Date: Fri, 23 May 2014 18:17:57 +0200
-Subject: oops on cubox-i (v3.15-rc4)
-In-Reply-To: <20140523154453.GY3693@n2100.arm.linux.org.uk>
-References: <20140509144438.GW14063@waldemar-brodkorb.de>
- <20140511002506.GN12708@titan.lakedaemon.net>
- <20140523101751.GH618@waldemar-brodkorb.de>
- <20140523143845.GD8664@titan.lakedaemon.net>
- <20140523154453.GY3693@n2100.arm.linux.org.uk>
-Message-ID: <20140523161757.GI618@waldemar-brodkorb.de>
+From: lho@apm.com (Loc Ho)
+Date: Fri, 23 May 2014 09:26:12 -0700
+Subject: [PATCH 3/4] edac: Add APM X-Gene SoC EDAC driver
+In-Reply-To: <20140520193930.GA23070@pd.tnic>
+References: <1399590199-12256-1-git-send-email-lho@apm.com>
+ <1399590199-12256-2-git-send-email-lho@apm.com>
+ <1399590199-12256-3-git-send-email-lho@apm.com>
+ <1399590199-12256-4-git-send-email-lho@apm.com>
+ <20140520193930.GA23070@pd.tnic>
+Message-ID: <CAPw-ZTkOYhWT_5QFJvGBM-aHOOH-1cqsMgnhOVEirRdG9FEosw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-Russell King - ARM Linux wrote,
+Hi,
 
-> > Can you get an oops from when it's on ext4?  It looks like this is going
-> > through fuse which opens a whole can of unknown worms.
-> 
-> Waldemar mentioned ext4.
-> 
-> I don't think there's anything specific about it to the Cubox-i, and I'd
-> also suggest that it's got nothing to do with ARM either - the iMX6 are
-> PIPT data caches so there can't be any issues with D-cache aliasing with
-> fuse.
-> 
-> It must be a bug in generic code.
+>> +static int xgene_edac_mc_is_active(struct xgene_edac_mc_ctx *ctx, int mc_idx)
+>> +{
+>> +     u32 reg;
+>> +     u32 mcu_mask;
+>> +
+>> +     reg = readl(ctx->csw_csr + CSW_CSWCR);
+>> +     if (reg & CSW_CSWCR_DUALMCB_MASK) {
+>> +             /*
+>> +              * Dual MCB active - Determine if all 4 activie or just MCU0
+>
+> Spellcheck: "activie"
 
-I think this, too. I observed a crash in a similar configuration
-with my Mikrotik RB532 (mips32). I just couldn't get a kernel Oops yet,
-because I fighted against some PCI and serial output problems on
-this device.
-http://www.linux-mips.org/archives/linux-mips/2014-05/msg00124.html
-http://www.linux-mips.org/archives/linux-mips/2014-05/msg00074.html
-May be I can get an oops on Monday.
- 
-> > > > > Booting Linux on physical CPU 0x0
-> > > > > Linux version 3.15.0-rc4 (wbx at kop-brodkorbw) (gcc version 4.8.2 (GCC) ) #1 SMP Fri May 9 12:58:45 CEST 2014
-> > > > > CPU: ARMv7 Processor [412fc09a] revision 10 (ARMv7), cr=10c53c7d
-> > > > > CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-> > > > > Machine model: SolidRun Cubox-i Dual/Quad
-> > > > > Truncating RAM at 10000000-4fffffff to -3f7fffff (vmalloc region overlap).
-> 
-> Also worth noting that 1/4 of the RAM is not used because highmem is not
-> enabled.  Also L2 cache is disabled (so it's running slower than it
-> should...)
+The proper spelling is "active" from online dictionary.
 
-Thanks for the hint. I thought I only need HIGHMEM for cubox-i4pro
-with 2 GB. Will enable it for my cubox-i2ultra.
- 
-best regards
- Waldemar
+>> +     ctx = mci->pvt_info;
+>> +     ctx->name = "xgene_edac_mc_err";
+>> +     mci->pdev = &pdev->dev;
+>> +     dev_set_drvdata(mci->pdev, mci);
+>> +     mci->ctl_name = ctx->name;
+>> +     mci->dev_name = ctx->name;
+>> +
+>> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +     ctx->pcp_csr = devm_ioremap(&pdev->dev, res->start,
+>> +                                 resource_size(res));
+>> +     if (IS_ERR(ctx->pcp_csr)) {
+>> +             dev_err(&pdev->dev, "no PCP resource address\n");
+>
+> edac_printk(KERN_ERR, "X-Gene", ... Ditto for all other dev_err calls.
+
+Are you sure about this? With dev_err, it prints the device node info
+as well. This allows one to determine which instance that has issue.
+X-Gene has 4 instance of memory controllers.
+
+>> +
+>> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 4);
+>> +     ctx->mcu_csr = devm_ioremap_resource(&pdev->dev, res);
+>> +     if (IS_ERR(ctx->mcu_csr)) {
+>> +             dev_err(&pdev->dev, "no MCU resource address\n");
+>> +             rc = PTR_ERR(ctx->mcu_csr);
+>> +             goto err_free;
+>> +     }
+>> +     /* Ignore non-active MCU */
+>> +     if (!xgene_edac_mc_is_active(ctx, ((res->start >> 16) & 0xF) / 4)) {
+>> +             rc = -ENODEV;
+>> +             goto err_free;
+>> +     }
+>
+> You could move edac_mc_alloc() here, after the resources have been
+> collected successfully and simplify the unwinding path.
+
+I need the ctx pointer which is part of the edac_mc_alloc. Can't move it here.
+
+-Loc
