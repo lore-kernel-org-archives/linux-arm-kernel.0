@@ -1,101 +1,41 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 May 2014 16:55:44 +0100
-Subject: [PATCH v4 2/2] arm64: enable context tracking
-In-Reply-To: <20140523145107.GO9252@arm.com>
-References: <1400786855-32656-1-git-send-email-larry.bassel@linaro.org>
- <1400786855-32656-3-git-send-email-larry.bassel@linaro.org>
- <537E5E1F.3050605@codeaurora.org> <7hd2f5icat.fsf@paris.lan>
- <20140523145107.GO9252@arm.com>
-Message-ID: <20140523155544.GA24994@leverpostej>
+From: imrehg@gmail.com (Gergely Imreh)
+Date: Sat, 24 May 2014 00:10:58 +0800
+Subject: [RFC] ARM: vt8500: cleanup start
+Message-ID: <CAJ3iQco9qu8Z7Gm0AtcvV3OPc6C39Hdqjq6tVKMYy5qV2=ASwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 03:51:07PM +0100, Catalin Marinas wrote:
-> On Fri, May 23, 2014 at 01:11:38AM +0100, Kevin Hilman wrote:
-> > Christopher Covington <cov@codeaurora.org> writes:
-> > > On 05/22/2014 03:27 PM, Larry Bassel wrote:
-> > >> Make calls to ct_user_enter when the kernel is exited
-> > >> and ct_user_exit when the kernel is entered (in el0_da,
-> > >> el0_ia, el0_svc, el0_irq and all of the "error" paths).
-> > >> 
-> > >> These macros expand to function calls which will only work
-> > >> properly if el0_sync and related code has been rearranged
-> > >> (in a previous patch of this series).
-> > >> 
-> > >> The calls to ct_user_exit are made after hw debugging has been
-> > >> enabled (enable_dbg_and_irq).
-> > >> 
-> > >> The call to ct_user_enter is made at the beginning of the
-> > >> kernel_exit macro.
-> > >> 
-> > >> This patch is based on earlier work by Kevin Hilman.
-> > >> Save/restore optimizations were also done by Kevin.
-> > >
-> > >> --- a/arch/arm64/kernel/entry.S
-> > >> +++ b/arch/arm64/kernel/entry.S
-> > >> @@ -30,6 +30,44 @@
-> > >>  #include <asm/unistd32.h>
-> > >>  
-> > >>  /*
-> > >> + * Context tracking subsystem.  Used to instrument transitions
-> > >> + * between user and kernel mode.
-> > >> + */
-> > >> +	.macro ct_user_exit, restore = 0
-> > >> +#ifdef CONFIG_CONTEXT_TRACKING
-> > >> +	bl	context_tracking_user_exit
-> > >> +	.if \restore == 1
-> > >> +	/*
-> > >> +	 * Save/restore needed during syscalls.  Restore syscall arguments from
-> > >> +	 * the values already saved on stack during kernel_entry.
-> > >> +	 */
-> > >> +	ldp	x0, x1, [sp]
-> > >> +	ldp	x2, x3, [sp, #S_X2]
-> > >> +	ldp	x4, x5, [sp, #S_X4]
-> > >> +	ldp	x6, x7, [sp, #S_X6]
-> > >> +	.endif
-> > >> +#endif
-> > >> +	.endm
-> > >> +
-> > >> +	.macro ct_user_enter, save = 0
-> > >> +#ifdef CONFIG_CONTEXT_TRACKING
-> > >> +	.if \save == 1
-> > >> +	/*
-> > >> +	 * Save/restore only needed on syscall fastpath, which uses
-> > >> +	 * x0-x2.
-> > >> +	 */
-> > >> +	push    x2, x3
-> > >
-> > > Why is x3 saved?
-> > 
-> > I'll respond here since I worked with Larry on the context save/restore
-> > part.
-> > 
-> > [insert rather embarassing disclamer of ignorance of arm64 assembly]
-> > 
-> > Based on my reading of the code, I figured only x0-x2 needed to be
-> > saved.  However, based on some experiments with intentionally clobbering
-> > the registers[1] (as suggested by Mark Rutland) in order to make sure
-> > we're saving/restoring the right things, I discovered x3 was needed too
-> > (I missed updating the comment to mention x0-x3.)
-> > 
-> > Maybe Will/Catalin/Mark R. can shed some light here?
-> 
-> I haven't checked all the code paths but at least for pushing onto the
-> stack we must keep it 16-bytes aligned (architecture requirement).
+Hi,
 
-Sure -- if modifying the stack we need to push/pop pairs of registers to
-keep it aligned. It might be better to use xzr as the dummy value in
-that case to make it clear that the value doesn't really matter.
+This is my first post on the list. I'm preparing to contribute to the
+Kernel some of
+the current SoCs and boards from VIA Embedded.
 
-That said, ct_user_enter is only called in kernel_exit before we restore
-the values off the stack, and the only register I can spot that we need
-to preserve is x0 for the syscall return value. I can't see x1 or x2
-being used any more specially than the rest of the remaining registers.
-Am I missing something, or would it be sufficient to do the following?
+That being a big task (understatement), I'm just starting off with a
+checking existing
+things out around the vt8500 areas, and other SoCs to learn the style.
 
-push	x0, xzr
-bl	context_tacking_user_enter
-pop	x0, xzr
+The style of march-v8500 is not quite like the ones I've seen in e.g.
+Thomas Petazzoni
+& Free Electrons' (very cool) guides, and started off with updating
+things according
+to that a bit. I'm just not sure whether this warrant any patches on
+their own, hence the
+Request for Comments.
+
+The changes I've made (breaking out the #define sections into a
+header, and doing
+explicit typecast for the vt8500 map_desc) are in this repo with via-header tag.
+
+https://github.com/viaembedded/arm-soc/tree/via-header
+
+Should this be part of a larger patchset later on, or is it okay just
+to send any time like
+this? Are these changes worth doing if the functionality itself did
+not really change,
+just probably the style improves?
+
+Would appreciate any kind of feedback.
 
 Cheers,
-Mark.
+   Greg
