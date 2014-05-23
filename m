@@ -1,30 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 24 May 2014 00:06:33 +0200
-Subject: [GIT PULL] ARM: mvebu: defconfig changes for v3.16 (incr. #2)
-In-Reply-To: <20140522155123.GT8664@titan.lakedaemon.net>
-References: <20140522155123.GT8664@titan.lakedaemon.net>
-Message-ID: <201405240006.33940.arnd@arndb.de>
+Date: Sat, 24 May 2014 00:08:22 +0200
+Subject: [GIT PULL] Allwinner defconfig changes for 3.16, take 2
+In-Reply-To: <20140523181505.GA9674@lukather>
+References: <20140523181505.GA9674@lukather>
+Message-ID: <201405240008.22342.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 May 2014, Jason Cooper wrote:
-> The following changes since commit 208f4e0d9bce775fbc7ab08c830d135d3da5777c:
+On Friday 23 May 2014, Maxime Ripard wrote:
+> Here is the last bunch of defconfig changes for the 3.16 merge
+> window.
 > 
->   ARM: multi_v5_defconfig: Enable sound modules needed for t5325 (2014-05-05 01:22:11 +0000)
+> It comes on top of the previous defconfig pull request.
+> 
+> The following changes since commit 5659e3bcbcb5d454fa183351362e852321784f7c:
+> 
+>   ARM: sunxi: drop CONFIG_COMMON_CLK_DEBUG (2014-05-10 12:07:50 -0400)
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-3.16-2
+>   https://github.com/mripard/linux.git tags/sunxi-defconfig-for-3.16-2
 > 
-> for you to fetch changes up to 0105c9990291587a3b1fecb576f4d9b6728f1191:
+> for you to fetch changes up to e397a78589e03ce920e0b4e5f8cc2cfa49027058:
 > 
->   ARM: mvebu: enable MSI support in mvebu_v7_defconfig (2014-05-22 14:22:17 +0000)
+>   ARM: multi_v7: Add Allwinner reset drivers to multi_v7_defconfig (2014-05-23 10:39:49 +0200)
 
-As discussed with Olof, I'm starting a new next/defconfig branch separate
-from next/boards now, and have merged this one into the new branch.
-
-Still need to figure out how to separate the defconfig changes that are
-already in next/boards from the rest there, but since this one includes
-the other changes, we're good for mvebu.
+Pulled into next/defconfig, thanks!
 
 	Arnd
