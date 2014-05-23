@@ -1,80 +1,74 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 23 May 2014 11:36:51 +0200
-Subject: [PATCH v2 2/2] ARM: shmobile: r8a7779 dtsi: Update unit-addresses
- for clocks
-In-Reply-To: <1400831180-20409-3-git-send-email-geert+renesas@glider.be>
-References: <1400831180-20409-1-git-send-email-geert+renesas@glider.be>
- <1400831180-20409-3-git-send-email-geert+renesas@glider.be>
-Message-ID: <11119685.9RVVTTLT6z@avalon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 23 May 2014 10:45:13 +0100
+Subject: EFI_STUB fails to boot non-EFI on arm64
+Message-ID: <20140523094513.GC9252@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi,
 
-Thank you for the patch.
+As the EFI_STUB for arm64 got into tip and soon into -next, I thought
+about giving it a try (tip/arm64/efi). Using my boot-wrapper (non-EFI)
+is still supposed to work but I get the trace below. It looks like
+memmap.map is NULL but the code still assumes the kernel was started as
+an EFI app.
 
-On Friday 23 May 2014 09:46:20 Geert Uytterhoeven wrote:
->   - Correct the unit-address for the "cpg_clocks" node,
->   - Add missing unit-addresses for the "mstp*_clks" nodes,
->   - Rename "cpg_clocks" and "mstp*_clks" nodes to the more generic
->     "clocks".
-> 
-> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Have you guys tested these patches properly?
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-> ---
-> v2:
->   - Spun-off from "ARM: shmobile: r8a7779 dtsi: Correct #address-cells/
->     #size-cells for clocks".
->   - Removed "0x" prefix from cpg_clocks unit-address,
->   - Renamed cpg_clocks and mstp*_clks nodes to the more generic "clocks".
-> 
->  arch/arm/boot/dts/r8a7779.dtsi | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-> index 395a611e2b5a..61d08f42456c 100644
-> --- a/arch/arm/boot/dts/r8a7779.dtsi
-> +++ b/arch/arm/boot/dts/r8a7779.dtsi
-> @@ -298,7 +298,7 @@
->  		};
-> 
->  		/* Special CPG clocks */
-> -		cpg_clocks: cpg_clocks at 0xe6150000 {
-> +		cpg_clocks: clocks at ffc80000 {
->  			compatible = "renesas,r8a7779-cpg-clocks";
->  			reg = <0xffc80000 0x30>;
->  			clocks = <&extal_clk>;
-> @@ -342,7 +342,7 @@
->  		};
-> 
->  		/* Gate clocks */
-> -		mstp0_clks: mstp0_clks {
-> +		mstp0_clks: clocks at ffc80030 {
->  			compatible = "renesas,r8a7779-mstp-clocks",
->  			             "renesas,cpg-mstp-clocks";
->  			reg = <0xffc80030 4>;
-> @@ -379,7 +379,7 @@
->  				"scif1", "scif0", "i2c3", "i2c2", "i2c1",
->  				"i2c0";
->  		};
-> -		mstp1_clks: mstp1_clks {
-> +		mstp1_clks: clocks at ffc80034 {
->  			compatible = "renesas,r8a7779-mstp-clocks",
->  			             "renesas,cpg-mstp-clocks";
->  			reg = <0xffc80034 4>, <0xffc80044 4>;
-> @@ -408,7 +408,7 @@
->  				"ether", "sata",
->  				"pcie", "vin3";
->  		};
-> -		mstp3_clks: mstp3_clks {
-> +		mstp3_clks: clocks at ffc8003c {
->  			compatible = "renesas,r8a7779-mstp-clocks",
->  			             "renesas,cpg-mstp-clocks";
->  			reg = <0xffc8003c 4>;
+Linux version 3.15.0-rc1+ (cmarinas at e102109-lin) (gcc version 4.8.3 20140401 (prerelease) (0.12.310) ) #451 SMP PREEMPT Fri May 23 10:40:10 BST 2014
+CPU: AArch64 Processor [410fd0f0] revision 0
+bootconsole [earlycon0] enabled
+efi: Getting parameters from FDT:
+efi: Can't find System Table in device tree!
+cma: CMA: reserved 16 MiB at 8ff000000
+Trying ::1...
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+Unable to handle kernel NULL pointer dereference at virtual address 00000020
+pgd = ffffffc00007d000
+[00000020] *pgd=0000000000000000
+Internal error: Oops: 96000005 [#1] PREEMPT SMP
+Modules linked in:
+CPU: 0 PID: 0 Comm: swapper Not tainted 3.15.0-rc1+ #451
+task: ffffffc0005f4890 ti: ffffffc0005e8000 task.ti: ffffffc0005e8000
+PC is at efi_idmap_init+0x74/0xc8
+LR is at efi_idmap_init+0x4c/0xc8
+pc : [<ffffffc0005b7f54>] lr : [<ffffffc0005b7f2c>] pstate: 600002c5
+sp : ffffffc0005ebee0
+x29: ffffffc0005ebee0 x28: 0000004080000000 
+x27: ffffffc0005f60c8 x26: ffffffc0005f6000 
+x25: ffffffc00053f618 x24: ffffffc0005f8fa8 
+x23: ffffffc000600000 x22: ffffffc000629000 
+x21: ffffffc000600000 x20: ffffffc000629338 
+x19: 0000000000000000 x18: 0000000000000000 
+x17: ffffffc000635d48 x16: 0000000000000001 
+x15: 000000000000000a x14: 0000000900000000 
+x13: 0000000000000018 x12: 0000000880000000 
+x11: ffffffc000000000 x10: 0000004000000000 
+x9 : 02c0000000000713 x8 : 0000000040000000 
+x7 : 00000008ffffffff x6 : ffffffc000629390 
+x5 : ffffffc000629000 x4 : 0000000000000000 
+x3 : 00000008ffe00711 x2 : 0000000000000000 
+x1 : 0000000000000000 x0 : 0000000000000000 
 
--- 
-Regards,
-
-Laurent Pinchart
+Process swapper (pid: 0, stack limit = 0xffffffc0005e8058)
+Stack: (0xffffffc0005ebee0 to 0xffffffc0005ec000)
+bee0: 005ebf10 ffffffc0 005b667c ffffffc0 7effdf80 ffffffc8 00635d78 ffffffc0
+bf00: 005f6108 ffffffc0 005b65ec ffffffc0 005ebfa0 ffffffc0 005b4528 ffffffc0
+bf20: 00629000 ffffffc0 00000001 00000000 005d7fd8 ffffffc0 410fd0f0 00000000
+bf40: 805f6000 00000000 80000000 00000000 8007b000 00000000 8007d000 00000000
+bf60: 00080590 ffffffc0 0044d088 ffffffc0 00000001 00000000 88000000 00000000
+bf80: 0062f278 ffffffc0 00000002 00000000 0062ee32 ffffffc0 00000000 00000000
+bfa0: 00000000 00000000 80080330 00000000 00000000 00000000 00000e12 00000000
+bfc0: 88000000 00000000 410fd0f0 00000000 805f6000 00000000 00000000 00000000
+bfe0: 00000000 00000000 005d7fd8 ffffffc0 00000000 00000000 00000000 00000000
+Call trace:
+[<ffffffc0005b7f54>] efi_idmap_init+0x74/0xc8
+[<ffffffc0005b6678>] setup_arch+0x3d4/0x57c
+[<ffffffc0005b4524>] start_kernel+0x88/0x364
+Code: f9401a80 cb000020 eb00027f 54000248 (f9401260) 
+---[ end trace f3ac502fe4422ad7 ]---
+Kernel panic - not syncing: Attempted to kill the idle task!
+---[ end Kernel panic - not syncing: Attempted to kill the idle task!
