@@ -1,90 +1,96 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:11 +0200
-Subject: [PATCH 31/71] clocksource: sh_tmu: Hardcode TMU clock event and
- source ratings to 200
+Date: Fri, 23 May 2014 12:31:09 +0200
+Subject: [PATCH 29/71] clocksource: sh_tmu: Allocate channels dynamically
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-31-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-29-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-All boards use clock event and clock source ratings of 200 for the TMU,
-hardcode it in the driver.
+This prepares the driver for multi-channel support.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/clocksource/sh_tmu.c |   23 +++++++++++------------
- 1 file changed, 11 insertions(+), 12 deletions(-)
+ drivers/clocksource/sh_tmu.c |   27 ++++++++++++++++++++-------
+ 1 file changed, 20 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
-index 63ed92d..fec9bed 100644
+index 26a9f7d..55b7a37 100644
 --- a/drivers/clocksource/sh_tmu.c
 +++ b/drivers/clocksource/sh_tmu.c
-@@ -300,12 +300,12 @@ static void sh_tmu_clocksource_resume(struct clocksource *cs)
- }
+@@ -58,7 +58,8 @@ struct sh_tmu_device {
+ 	void __iomem *mapbase;
+ 	struct clk *clk;
  
- static int sh_tmu_register_clocksource(struct sh_tmu_channel *ch,
--				       const char *name, unsigned long rating)
-+				       const char *name)
+-	struct sh_tmu_channel channel;
++	struct sh_tmu_channel *channels;
++	unsigned int num_channels;
+ };
+ 
+ static DEFINE_RAW_SPINLOCK(sh_tmu_lock);
+@@ -469,6 +470,7 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
  {
- 	struct clocksource *cs = &ch->cs;
- 
- 	cs->name = name;
--	cs->rating = rating;
-+	cs->rating = 200;
- 	cs->read = sh_tmu_clocksource_read;
- 	cs->enable = sh_tmu_clocksource_enable;
- 	cs->disable = sh_tmu_clocksource_disable;
-@@ -402,7 +402,7 @@ static void sh_tmu_clock_event_resume(struct clock_event_device *ced)
- }
- 
- static void sh_tmu_register_clockevent(struct sh_tmu_channel *ch,
--				       const char *name, unsigned long rating)
-+				       const char *name)
- {
- 	struct clock_event_device *ced = &ch->ced;
+ 	struct sh_timer_config *cfg = pdev->dev.platform_data;
+ 	struct resource *res;
++	void __iomem *base;
  	int ret;
-@@ -410,7 +410,7 @@ static void sh_tmu_register_clockevent(struct sh_tmu_channel *ch,
- 	ced->name = name;
- 	ced->features = CLOCK_EVT_FEAT_PERIODIC;
- 	ced->features |= CLOCK_EVT_FEAT_ONESHOT;
--	ced->rating = rating;
-+	ced->rating = 200;
- 	ced->cpumask = cpumask_of(0);
- 	ced->set_next_event = sh_tmu_clock_event_next;
- 	ced->set_mode = sh_tmu_clock_event_mode;
-@@ -433,13 +433,12 @@ static void sh_tmu_register_clockevent(struct sh_tmu_channel *ch,
- }
+ 	ret = -ENXIO;
  
- static int sh_tmu_register(struct sh_tmu_channel *ch, const char *name,
--		    unsigned long clockevent_rating,
--		    unsigned long clocksource_rating)
-+			   bool clockevent, bool clocksource)
- {
--	if (clockevent_rating)
--		sh_tmu_register_clockevent(ch, name, clockevent_rating);
--	else if (clocksource_rating)
--		sh_tmu_register_clocksource(ch, name, clocksource_rating);
-+	if (clockevent)
-+		sh_tmu_register_clockevent(ch, name);
-+	else if (clocksource)
-+		sh_tmu_register_clocksource(ch, name);
+@@ -488,16 +490,16 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
+ 	}
+ 
+ 	/*
+-	 * Map memory, let channel.base point to our channel and mapbase to the
++	 * Map memory, let base point to our channel and mapbase to the
+ 	 * start/stop shared register.
+ 	 */
+-	tmu->channel.base = ioremap_nocache(res->start, resource_size(res));
+-	if (tmu->channel.base == NULL) {
++	base = ioremap_nocache(res->start, resource_size(res));
++	if (base == NULL) {
+ 		dev_err(&tmu->pdev->dev, "failed to remap I/O memory\n");
+ 		goto err0;
+ 	}
+ 
+-	tmu->mapbase = tmu->channel.base - cfg->channel_offset;
++	tmu->mapbase = base - cfg->channel_offset;
+ 
+ 	/* get hold of clock */
+ 	tmu->clk = clk_get(&tmu->pdev->dev, "tmu_fck");
+@@ -511,18 +513,29 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
+ 	if (ret < 0)
+ 		goto err2;
+ 
+-	ret = sh_tmu_channel_setup(&tmu->channel, tmu);
++	tmu->channels = kzalloc(sizeof(*tmu->channels), GFP_KERNEL);
++	if (tmu->channels == NULL) {
++		ret = -ENOMEM;
++		goto err3;
++	}
++
++	tmu->num_channels = 1;
++
++	tmu->channels[0].base = base;
++
++	ret = sh_tmu_channel_setup(&tmu->channels[0], tmu);
+ 	if (ret < 0)
+ 		goto err3;
  
  	return 0;
- }
-@@ -471,8 +470,8 @@ static int sh_tmu_channel_setup(struct sh_tmu_channel *ch,
- 	ch->enable_count = 0;
  
- 	return sh_tmu_register(ch, dev_name(&tmu->pdev->dev),
--			       cfg->clockevent_rating,
--			       cfg->clocksource_rating);
-+			       cfg->clockevent_rating != 0,
-+			       cfg->clocksource_rating != 0);
+  err3:
++	kfree(tmu->channels);
+ 	clk_unprepare(tmu->clk);
+  err2:
+ 	clk_put(tmu->clk);
+  err1:
+-	iounmap(tmu->channel.base);
++	iounmap(base);
+  err0:
+ 	return ret;
  }
- 
- static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
 -- 
 1.7.9.5
