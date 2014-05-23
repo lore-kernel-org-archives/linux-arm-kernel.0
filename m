@@ -1,52 +1,29 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 23 May 2014 09:47:52 -0400
-Subject: [GIT PULL 1/2] ARM: Keystone SOC updates for 3.16
-In-Reply-To: <537B5B57.2050202@ti.com>
-References: <1399912877-29595-1-git-send-email-santosh.shilimkar@ti.com>
- <20140520051507.GJ18956@quad.lixom.net> <537B5B57.2050202@ti.com>
-Message-ID: <537F5188.90000@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 23 May 2014 15:48:17 +0200
+Subject: [Ksummit-discuss] [TECH TOPIC] ARM legacy board DT conversion
+ finalization
+In-Reply-To: <4921873.t2F8plV493@wuerfel>
+References: <20140511030009.GO12708@titan.lakedaemon.net>
+ <4931877.zNfKfvcgox@wuerfel>
+ <CAL_Jsq+kOu82okhJn0_ftwemE_m4nsTRawrF-fWAU2XTJ9xRcA@mail.gmail.com>
+ <4921873.t2F8plV493@wuerfel>
+Message-ID: <CACRpkdZ6oAO0sx-OwA-31FCPVWYeGH7zxmiog7OooMw_2_jzFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof,
+On Tue, May 20, 2014 at 10:08 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-On Tuesday 20 May 2014 09:40 AM, Santosh Shilimkar wrote:
-> On Tuesday 20 May 2014 01:15 AM, Olof Johansson wrote:
->> On Mon, May 12, 2014 at 12:41:17PM -0400, Santosh Shilimkar wrote:
->>> Hi Arm-soc folks,
->>>
->>> Please pull below keystone SOC updates for 3.16. It merges cleanly with
->>> arm-soc 'next/soc' head. As already discussed, the $subject pull request
->>> has a depedency with DT dma-properties pull request [1] I sent last week
->>> to be pulled into arm-soc.
->>
->> Hi,
->>
->> I didn't see a reply from Russell on that pull request yet, so I haven't
->> brought it in as a dependency in case he has comments and it needs to be
->> respun.
->>
-> I pinged RMK to pull the series. After that you can pull the dependent
-> pull request as well as subject series. Just for wider testing purpose,
-> I have included the dma series in my next branch and it sitting in
-> linux-next for more than 2 weeks now.
-> 
->> If this branch is dependent on that code, then you really need to base it on
->> top of it, or else you will break bisectability. Essentially you might end up
->> in a state with bisect where only these patches are applied and not the
->> dependent ones.
->>
-> I thought about that. The git objects as they exist now in pull request will
-> ensure that the $subject series patches appears after the dependent series.
-> I wanted to avoid SOC stuff to be mixed with the dma series. 
-> 
-I see RMK has merged [1] 'dt-dma-properties-for-arm' in his 'devel-stable'
-and 'for-next' branch (Thanks Russell).
+> Ah, right. I see these two includes from mach-versatile to plat/*.h headers:
+>
+> arch/arm/mach-versatile/core.c:#include <plat/clcd.h>
 
-Can you please pull[1] and $subject into arm-soc tree now ?
+I have a patch for this one.
 
-Thanks !!
+> arch/arm/mach-versatile/core.c:#include <plat/sched_clock.h>
 
-Regards,
-Santosh
-[1] https://lkml.org/lkml/2014/5/7/368
+In the Integrator I solved this by inlining that code into the
+machine. After the introduction of sched_clock_register()
+this becomes very few lines of code really.
+
+Yours,
+Linus Walleij
