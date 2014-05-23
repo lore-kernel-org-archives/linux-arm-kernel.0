@@ -1,112 +1,63 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:06 +0200
-Subject: [PATCH 26/71] clocksource: sh_tmu: Add memory base to sh_tmu_channel
- structure
+Date: Fri, 23 May 2014 12:31:05 +0200
+Subject: [PATCH 25/71] clocksource: sh_tmu: Constify name argument to
+ sh_tmu_register()
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-26-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-25-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The channel memory base is channel-specific, add it to the channel
-structure in preparation for support of multiple channels per device.
+The name argument is assigned to const structure fields only, constify
+it.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/clocksource/sh_tmu.c |   30 ++++++++++++++++--------------
- 1 file changed, 16 insertions(+), 14 deletions(-)
+ drivers/clocksource/sh_tmu.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
-index 2c64e3f..a464ed8 100644
+index 4779c97..2c64e3f 100644
 --- a/drivers/clocksource/sh_tmu.c
 +++ b/drivers/clocksource/sh_tmu.c
-@@ -40,6 +40,7 @@ struct sh_tmu_device;
- struct sh_tmu_channel {
- 	struct sh_tmu_device *tmu;
- 
-+	void __iomem *base;
- 	int irq;
- 
- 	unsigned long rate;
-@@ -68,39 +69,35 @@ static DEFINE_RAW_SPINLOCK(sh_tmu_lock);
- 
- static inline unsigned long sh_tmu_read(struct sh_tmu_channel *ch, int reg_nr)
- {
--	struct sh_timer_config *cfg = ch->tmu->pdev->dev.platform_data;
--	void __iomem *base = ch->tmu->mapbase;
- 	unsigned long offs;
- 
- 	if (reg_nr == TSTR)
--		return ioread8(base - cfg->channel_offset);
-+		return ioread8(ch->tmu->mapbase);
- 
- 	offs = reg_nr << 2;
- 
- 	if (reg_nr == TCR)
--		return ioread16(base + offs);
-+		return ioread16(ch->base + offs);
- 	else
--		return ioread32(base + offs);
-+		return ioread32(ch->base + offs);
+@@ -292,7 +292,7 @@ static void sh_tmu_clocksource_resume(struct clocksource *cs)
  }
  
- static inline void sh_tmu_write(struct sh_tmu_channel *ch, int reg_nr,
- 				unsigned long value)
+ static int sh_tmu_register_clocksource(struct sh_tmu_channel *ch,
+-				       char *name, unsigned long rating)
++				       const char *name, unsigned long rating)
  {
--	struct sh_timer_config *cfg = ch->tmu->pdev->dev.platform_data;
--	void __iomem *base = ch->tmu->mapbase;
- 	unsigned long offs;
+ 	struct clocksource *cs = &ch->cs;
  
- 	if (reg_nr == TSTR) {
--		iowrite8(value, base - cfg->channel_offset);
-+		iowrite8(value, ch->tmu->mapbase);
- 		return;
- 	}
- 
- 	offs = reg_nr << 2;
- 
- 	if (reg_nr == TCR)
--		iowrite16(value, base + offs);
-+		iowrite16(value, ch->base + offs);
- 	else
--		iowrite32(value, base + offs);
-+		iowrite32(value, ch->base + offs);
+@@ -393,7 +393,7 @@ static void sh_tmu_clock_event_resume(struct clock_event_device *ced)
  }
  
- static void sh_tmu_start_stop_ch(struct sh_tmu_channel *ch, int start)
-@@ -481,13 +478,18 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
- 		goto err0;
+ static void sh_tmu_register_clockevent(struct sh_tmu_channel *ch,
+-				       char *name, unsigned long rating)
++				       const char *name, unsigned long rating)
+ {
+ 	struct clock_event_device *ced = &ch->ced;
+ 	int ret;
+@@ -424,7 +424,7 @@ static void sh_tmu_register_clockevent(struct sh_tmu_channel *ch,
  	}
+ }
  
--	/* map memory, let mapbase point to our channel */
--	tmu->mapbase = ioremap_nocache(res->start, resource_size(res));
--	if (tmu->mapbase == NULL) {
-+	/*
-+	 * Map memory, let channel.base point to our channel and mapbase to the
-+	 * start/stop shared register.
-+	 */
-+	tmu->channel.base = ioremap_nocache(res->start, resource_size(res));
-+	if (tmu->channel.base == NULL) {
- 		dev_err(&tmu->pdev->dev, "failed to remap I/O memory\n");
- 		goto err0;
- 	}
+-static int sh_tmu_register(struct sh_tmu_channel *ch, char *name,
++static int sh_tmu_register(struct sh_tmu_channel *ch, const char *name,
+ 		    unsigned long clockevent_rating,
+ 		    unsigned long clocksource_rating)
+ {
+@@ -453,7 +453,7 @@ static int sh_tmu_channel_setup(struct sh_tmu_channel *ch,
+ 	ch->cs_enabled = false;
+ 	ch->enable_count = 0;
  
-+	tmu->mapbase = tmu->channel.base - cfg->channel_offset;
-+
- 	/* get hold of clock */
- 	tmu->clk = clk_get(&tmu->pdev->dev, "tmu_fck");
- 	if (IS_ERR(tmu->clk)) {
-@@ -511,7 +513,7 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
-  err2:
- 	clk_put(tmu->clk);
-  err1:
--	iounmap(tmu->mapbase);
-+	iounmap(tmu->channel.base);
-  err0:
- 	return ret;
+-	return sh_tmu_register(ch, (char *)dev_name(&tmu->pdev->dev),
++	return sh_tmu_register(ch, dev_name(&tmu->pdev->dev),
+ 			       cfg->clockevent_rating,
+ 			       cfg->clocksource_rating);
  }
 -- 
 1.7.9.5
