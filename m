@@ -1,40 +1,146 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Fri, 23 May 2014 16:19:45 +0100
-Subject: [PATCH] efi: arm64: memory node handling cleanup
-Message-ID: <1400858385-32079-1-git-send-email-leif.lindholm@linaro.org>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 23 May 2014 17:20:30 +0200
+Subject: [PATCH] ARM: EXYNOS: Fix core ID used by platsmp and hotplug code
+Message-ID: <1400858430-4278-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove unused variable, and convert strncmp() to strcmp(), since the
-former is not available in arm zImage.
+When CPU topology is specified in device tree, cpu_logical_map() does
+not return core ID anymore, but rather full MPIDR value. This breaks
+existing calculation of PMU register offsets on Exynos SoCs.
 
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+This patch fixes the problem by adjusting the code to use only core ID
+bits of the value returned by cpu_logical_map() to allow CPU topology to
+be specified in device tree on Exynos SoCs.
+
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- drivers/firmware/efi/fdt.c |    7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ arch/arm/mach-exynos/hotplug.c | 10 ++++++----
+ arch/arm/mach-exynos/platsmp.c | 34 +++++++++++++++++++---------------
+ 2 files changed, 25 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/firmware/efi/fdt.c b/drivers/firmware/efi/fdt.c
-index 5c6a8e8..ab12870 100644
---- a/drivers/firmware/efi/fdt.c
-+++ b/drivers/firmware/efi/fdt.c
-@@ -63,15 +63,14 @@ static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 	 */
- 	prev = 0;
+diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+index 69fa483..5644dac 100644
+--- a/arch/arm/mach-exynos/hotplug.c
++++ b/arch/arm/mach-exynos/hotplug.c
+@@ -40,11 +40,13 @@ static inline void cpu_leave_lowpower(void)
+ 
+ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ {
++	u32 mpidr = cpu_logical_map(cpu);
++	u32 core_id = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++
  	for (;;) {
--		const char *type, *name;
--		int len;
-+		const char *type;
  
- 		node = fdt_next_node(fdt, prev, NULL);
- 		if (node < 0)
- 			break;
+-		/* make cpu1 to be turned off at next WFI command */
+-		if (cpu == 1)
+-			exynos_cpu_power_down(cpu);
++		/* Turn the CPU off on next WFI instruction. */
++		exynos_cpu_power_down(core_id);
  
--		type = fdt_getprop(fdt, node, "device_type", &len);
--		if (type && strncmp(type, "memory", len) == 0) {
-+		type = fdt_getprop(fdt, node, "device_type", NULL);
-+		if (type && strcmp(type, "memory") == 0) {
- 			fdt_del_node(fdt, node);
- 			continue;
+ 		/*
+ 		 * here's the WFI
+@@ -54,7 +56,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ 		    :
+ 		    : "memory", "cc");
+ 
+-		if (pen_release == cpu_logical_map(cpu)) {
++		if (pen_release == core_id) {
+ 			/*
+ 			 * OK, proper wakeup, we're done
+ 			 */
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 9c16da2..8429c0e 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -112,7 +112,8 @@ static void exynos_secondary_init(unsigned int cpu)
+ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	unsigned long timeout;
+-	unsigned long phys_cpu = cpu_logical_map(cpu);
++	u32 mpidr = cpu_logical_map(cpu);
++	u32 core_id = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+ 	int ret = -ENOSYS;
+ 
+ 	/*
+@@ -126,17 +127,18 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * the holding pen - release it, then wait for it to flag
+ 	 * that it has been released by resetting pen_release.
+ 	 *
+-	 * Note that "pen_release" is the hardware CPU ID, whereas
++	 * Note that "pen_release" is the hardware CPU core ID, whereas
+ 	 * "cpu" is Linux's internal ID.
+ 	 */
+-	write_pen_release(phys_cpu);
++	write_pen_release(core_id);
+ 
+-	if (!exynos_cpu_power_state(cpu)) {
+-		exynos_cpu_power_up(cpu);
++	if (!exynos_cpu_power_state(core_id)) {
++		exynos_cpu_power_up(core_id);
+ 		timeout = 10;
+ 
+ 		/* wait max 10 ms until cpu1 is on */
+-		while (exynos_cpu_power_state(cpu) != S5P_CORE_LOCAL_PWR_EN) {
++		while (exynos_cpu_power_state(core_id)
++		       != S5P_CORE_LOCAL_PWR_EN) {
+ 			if (timeout-- == 0)
+ 				break;
+ 
+@@ -167,20 +169,20 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 		 * Try to set boot address using firmware first
+ 		 * and fall back to boot register if it fails.
+ 		 */
+-		ret = call_firmware_op(set_cpu_boot_addr, phys_cpu, boot_addr);
++		ret = call_firmware_op(set_cpu_boot_addr, core_id, boot_addr);
+ 		if (ret && ret != -ENOSYS)
+ 			goto fail;
+ 		if (ret == -ENOSYS) {
+-			void __iomem *boot_reg = cpu_boot_reg(phys_cpu);
++			void __iomem *boot_reg = cpu_boot_reg(core_id);
+ 
+ 			if (IS_ERR(boot_reg)) {
+ 				ret = PTR_ERR(boot_reg);
+ 				goto fail;
+ 			}
+-			__raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
++			__raw_writel(boot_addr, cpu_boot_reg(core_id));
  		}
+ 
+-		call_firmware_op(cpu_boot, phys_cpu);
++		call_firmware_op(cpu_boot, core_id);
+ 
+ 		arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+ 
+@@ -249,22 +251,24 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+ 	 * boot register if it fails.
+ 	 */
+ 	for (i = 1; i < max_cpus; ++i) {
+-		unsigned long phys_cpu;
+ 		unsigned long boot_addr;
++		u32 mpidr;
++		u32 core_id;
+ 		int ret;
+ 
+-		phys_cpu = cpu_logical_map(i);
++		mpidr = cpu_logical_map(i);
++		core_id = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+ 		boot_addr = virt_to_phys(exynos4_secondary_startup);
+ 
+-		ret = call_firmware_op(set_cpu_boot_addr, phys_cpu, boot_addr);
++		ret = call_firmware_op(set_cpu_boot_addr, core_id, boot_addr);
+ 		if (ret && ret != -ENOSYS)
+ 			break;
+ 		if (ret == -ENOSYS) {
+-			void __iomem *boot_reg = cpu_boot_reg(phys_cpu);
++			void __iomem *boot_reg = cpu_boot_reg(core_id);
+ 
+ 			if (IS_ERR(boot_reg))
+ 				break;
+-			__raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
++			__raw_writel(boot_addr, cpu_boot_reg(core_id));
+ 		}
+ 	}
+ }
 -- 
-1.7.10.4
+1.9.3
