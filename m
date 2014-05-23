@@ -1,48 +1,39 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 23 May 2014 11:52:24 -0700
-Subject: [Patch v2 3/4] soc: qcom: Add GSBI driver
-In-Reply-To: <1398357082-5102-4-git-send-email-agross@codeaurora.org>
-References: <1398357082-5102-1-git-send-email-agross@codeaurora.org>
- <1398357082-5102-4-git-send-email-agross@codeaurora.org>
-Message-ID: <537F98E8.6050203@codeaurora.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 23 May 2014 12:13:59 -0700
+Subject: [PATCH 10/10] clk: versatile: add versatile OSC support
+In-Reply-To: <CACRpkdbjAa6Y-EVwK=D9eiA6JoW+pgxtnHCsrZSTZOY5uozMpw@mail.gmail.com>
+References: <1400620176-7239-1-git-send-email-robherring2@gmail.com>
+ <1400620176-7239-11-git-send-email-robherring2@gmail.com>
+ <CACRpkdbjAa6Y-EVwK=D9eiA6JoW+pgxtnHCsrZSTZOY5uozMpw@mail.gmail.com>
+Message-ID: <20140523191359.23136.57893@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/14 09:31, Andy Gross wrote:
-> +
-> +static const struct of_device_id gsbi_dt_match[] = {
-> +	{ .compatible = "qcom,gsbi-v1.0.0", },
-> +};
+Quoting Linus Walleij (2014-05-23 06:31:26)
+> On Tue, May 20, 2014 at 11:09 PM, Rob Herring <robherring2@gmail.com> wrote:
+> 
+> > From: Rob Herring <robh@kernel.org>
+> >
+> > Versatile platforms share the same OSC programming model as Integrator
+> > platforms. Add the necessary parameters and init functions for Versatile.
+> >
+> > Signed-off-by: Rob Herring <robh@kernel.org>
+> > Cc: Mike Turquette <mturquette@linaro.org>
+> > ---
+> >  drivers/clk/versatile/Makefile         |  3 +--
+> >  drivers/clk/versatile/clk-integrator.c | 35 ++++++++++++++++++++++++++++++++--
+> 
+> So then this is a good opportunity to rename that file from clk-integrator.c
+> to something else, right? Usually we use "versatile" to refer to the
+> whole family of boards but other names are possible I guess.
+> 
+> Apart from that it looks good :-)
 
-Eek. This isn't NULL terminated.
+Looks good to me too. Rob will you incorporate the file name change?
 
+Regards,
+Mike
 
------8<---
-
-From: Stephen Boyd <sboyd@codeaurora.org>
-Subject: [PATCH] soc: qcom: Terminate gsbi of match table
-
-Failure to terminate this match table can lead to boot failures
-depending on where the compiler places the match table.
-
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/soc/qcom/qcom_gsbi.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/soc/qcom/qcom_gsbi.c b/drivers/soc/qcom/qcom_gsbi.c
-index 061dd0632dbd..ab7b441c9980 100644
---- a/drivers/soc/qcom/qcom_gsbi.c
-+++ b/drivers/soc/qcom/qcom_gsbi.c
-@@ -64,6 +64,7 @@ static int gsbi_probe(struct platform_device *pdev)
- 
- static const struct of_device_id gsbi_dt_match[] = {
- 	{ .compatible = "qcom,gsbi-v1.0.0", },
-+	{ }
- };
- 
- MODULE_DEVICE_TABLE(of, gsbi_dt_match);
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> 
+> Yours,
+> Linus Walleij
