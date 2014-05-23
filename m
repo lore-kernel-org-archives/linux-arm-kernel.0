@@ -1,49 +1,55 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:39 +0200
-Subject: [PATCH 59/71] ARM: sun6i: a31: Add support for the High Speed Timers
+Date: Fri, 23 May 2014 12:31:21 +0200
+Subject: [PATCH 41/71] clocksource: sh_mtu2: Constify name argument to
+ sh_mtu2_register()
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-59-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-41-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@free-electrons.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The Allwinner A31 has support for four high speed timers. Apart for the
-number of timers (4 vs 2), it's basically the same logic than the high
-speed timers found in the sun5i chips.
+The name argument is assigned to const structure fields only, constify
+it.
 
-Now that we have a driver to support it, we can enable them in the
-device tree.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Tested-by: Wolfram Sang <wsa@sang-engineering.com>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/clocksource/sh_mtu2.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index d45efa7..8cee8a1 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -428,6 +428,17 @@
- 			status = "disabled";
- 		};
+diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
+index 8fd7059..2fe3ab4c 100644
+--- a/drivers/clocksource/sh_mtu2.c
++++ b/drivers/clocksource/sh_mtu2.c
+@@ -236,7 +236,7 @@ static void sh_mtu2_clock_event_resume(struct clock_event_device *ced)
+ }
  
-+		timer at 01c60000 {
-+			compatible = "allwinner,sun6i-a31-hstimer", "allwinner,sun7i-a20-hstimer";
-+			reg = <0x01c60000 0x1000>;
-+			interrupts = <0 51 4>,
-+				     <0 52 4>,
-+				     <0 53 4>,
-+				     <0 54 4>;
-+			clocks = <&ahb1_gates 19>;
-+			resets = <&ahb1_rst 19>;
-+		};
-+
- 		spi0: spi at 01c68000 {
- 			compatible = "allwinner,sun6i-a31-spi";
- 			reg = <0x01c68000 0x1000>;
+ static void sh_mtu2_register_clockevent(struct sh_mtu2_channel *ch,
+-				       char *name, unsigned long rating)
++					const char *name, unsigned long rating)
+ {
+ 	struct clock_event_device *ced = &ch->ced;
+ 	int ret;
+@@ -264,7 +264,7 @@ static void sh_mtu2_register_clockevent(struct sh_mtu2_channel *ch,
+ 	}
+ }
+ 
+-static int sh_mtu2_register(struct sh_mtu2_channel *ch, char *name,
++static int sh_mtu2_register(struct sh_mtu2_channel *ch, const char *name,
+ 			    unsigned long clockevent_rating)
+ {
+ 	if (clockevent_rating)
+@@ -287,7 +287,7 @@ static int sh_mtu2_setup_channel(struct sh_mtu2_channel *ch,
+ 		return ch->irq;
+ 	}
+ 
+-	return sh_mtu2_register(ch, (char *)dev_name(&mtu->pdev->dev),
++	return sh_mtu2_register(ch, dev_name(&mtu->pdev->dev),
+ 				cfg->clockevent_rating);
+ }
+ 
 -- 
 1.7.9.5
