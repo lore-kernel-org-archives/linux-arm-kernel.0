@@ -1,41 +1,29 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 23 May 2014 12:57:20 -0700
-Subject: [PATCH v2 4/4] net: ks8851: Add of match table
-In-Reply-To: <1400875040-13269-1-git-send-email-sboyd@codeaurora.org>
-References: <1400875040-13269-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1400875040-13269-5-git-send-email-sboyd@codeaurora.org>
+Date: Fri, 23 May 2014 12:57:16 -0700
+Subject: [PATCH v2 0/4] ks8851 DT/regulator/gpio updates
+Message-ID: <1400875040-13269-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Users are currently just providing "ks8851" as the compatible for
-this driver in device tree. Add a compatible string that provides
-the vendor name along with the device name to be more explicit.
+This set of patches properly documents the micrel ks8851 spi ethernet
+controller, converts to devm_regulator_get_optional() to make error
+paths slightly simpler, and finally adds supports for another
+optional regulator and a reset gpio. This allows me to use the ks8851
+on my MSM8960 CDP board.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/net/ethernet/micrel/ks8851.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Changes since v1:
+ * Dropped vendor prefix patch as that should go through DT tree
 
-diff --git a/drivers/net/ethernet/micrel/ks8851.c b/drivers/net/ethernet/micrel/ks8851.c
-index 3a322daba5ff..e72918970a58 100644
---- a/drivers/net/ethernet/micrel/ks8851.c
-+++ b/drivers/net/ethernet/micrel/ks8851.c
-@@ -1603,9 +1603,15 @@ static int ks8851_remove(struct spi_device *spi)
- 	return 0;
- }
- 
-+static const struct of_device_id ks8851_match_table[] = {
-+	{ .compatible = "micrel,ks8851" },
-+	{ }
-+};
-+
- static struct spi_driver ks8851_driver = {
- 	.driver = {
- 		.name = "ks8851",
-+		.of_match_table = ks8851_match_table,
- 		.owner = THIS_MODULE,
- 		.pm = &ks8851_pm_ops,
- 	},
+Stephen Boyd (4):
+  devicetree: bindings: Properly document micrel ks8851 SPI chips
+  net: ks8851: Use devm_regulator_get_optional()
+  net: ks8851: Add optional vdd_io regulator and reset gpio
+  net: ks8851: Add of match table
+
+ .../devicetree/bindings/net/micrel-ks8851.txt      | 15 ++++-
+ drivers/net/ethernet/micrel/ks8851.c               | 71 +++++++++++++++++++---
+ 2 files changed, 74 insertions(+), 12 deletions(-)
+
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
