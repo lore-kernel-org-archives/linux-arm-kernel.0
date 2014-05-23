@@ -1,63 +1,48 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 23 May 2014 14:05:57 +0300
-Subject: [PATCH] ARM: dts: AM4372: clk: efuse based crystal frequency
- detect
-In-Reply-To: <062e8a534b1e372db7ed3daa3df7e3c5b885ffab.1400062517.git.nsekhar@ti.com>
-References: <062e8a534b1e372db7ed3daa3df7e3c5b885ffab.1400062517.git.nsekhar@ti.com>
-Message-ID: <537F2B95.1010808@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 23 May 2014 12:05:44 +0100
+Subject: [PATCH 2/2] ASoC: samsung: Add machine driver for odroidx2
+In-Reply-To: <537F0A88.8000904@samsung.com>
+References: <1400759708-25831-1-git-send-email-s.nawrocki@samsung.com>
+ <1400759708-25831-2-git-send-email-s.nawrocki@samsung.com>
+ <20140522185334.GT12304@sirena.org.uk>
+ <537F0A88.8000904@samsung.com>
+Message-ID: <20140523110544.GY12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2014 02:36 PM, Sekhar Nori wrote:
-> From: Afzal Mohammed <afzal@ti.com>
->
-> Currently oscillator frequency is determined based on sysboot settings,
-> it may not be the case always. To determine it properly, efuse settings
-> also has to be read. CONTROL_STATUS register holds this information.
-> Bit 31:	if 0, frequency to be determined based on sysboot
-> 	if 1, frequency to be determined based on efuse
-> Bit 29,30 - for efuse detection of frequency
-> Bit 22,23 - for sysboot detection of frequency
->
-> Add clock nodes (mux) to determine oscillator frequency as above.
->
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> Acked-by: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+On Fri, May 23, 2014 at 10:44:56AM +0200, Sylwester Nawrocki wrote:
+> On 22/05/14 20:53, Mark Brown wrote:
 
-Thanks, queued for 3.16.
+> As for the DT binding documentation patch, I thought we're supposed to keep
+> documentation in separate patches, so processes of separating it from the
+> kernel is easier ?
 
--Tero
+I'm not sure what the current theory is - they should definitely be
+separate if they're part of a multi-patch series but for a single patch
+I don't remember what the current taste is.  If you're sending to the
+same recipients anyway splitting isn't going to accomplish much, the
+idea was to only send the DT binding to the DT maintainers and list and
+not the code.
 
-> ---
->   arch/arm/boot/dts/am43xx-clocks.dtsi |   16 ++++++++++++++++
->   1 file changed, 16 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi b/arch/arm/boot/dts/am43xx-clocks.dtsi
-> index 142009c..71b029c 100644
-> --- a/arch/arm/boot/dts/am43xx-clocks.dtsi
-> +++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
-> @@ -11,6 +11,22 @@
->   	sys_clkin_ck: sys_clkin_ck {
->   		#clock-cells = <0>;
->   		compatible = "ti,mux-clock";
-> +		clocks = <&sysboot_freq_sel_ck>, <&crystal_freq_sel_ck>;
-> +		ti,bit-shift = <31>;
-> +		reg = <0x0040>;
-> +	};
-> +
-> +	crystal_freq_sel_ck: crystal_freq_sel_ck {
-> +		#clock-cells = <0>;
-> +		compatible = "ti,mux-clock";
-> +		clocks = <&virt_19200000_ck>, <&virt_24000000_ck>, <&virt_25000000_ck>, <&virt_26000000_ck>;
-> +		ti,bit-shift = <29>;
-> +		reg = <0x0040>;
-> +	};
-> +
-> +	sysboot_freq_sel_ck: sysboot_freq_sel_ck at 44e10040 {
-> +		#clock-cells = <0>;
-> +		compatible = "ti,mux-clock";
->   		clocks = <&virt_19200000_ck>, <&virt_24000000_ck>, <&virt_25000000_ck>, <&virt_26000000_ck>;
->   		ti,bit-shift = <22>;
->   		reg = <0x0040>;
->
+> >> +	ret = snd_soc_dai_set_sysclk(codec_dai, 3, MAX98090_MCLK_FREQ,
+> >> +				     SND_SOC_CLOCK_IN);
+> >> +	if (ret < 0) {
+> >> +		dev_err(codec_dai->dev,
+> >> +			"Unable to switch to FLL1: %d\n", ret);
+> >> +		return ret;
+> >> +	}
+
+> > So's this - also what is 3?  Set it on init.
+
+> OK, will move it. I'm not sure why 3, it seems to be ignored by the codec
+> anyway. Chen, can you confirm the second argument is actually a don't care
+> value ?
+
+If it's don't care supply 0 instead.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140523/35883507/attachment.sig>
