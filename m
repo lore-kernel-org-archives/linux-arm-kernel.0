@@ -1,33 +1,52 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 23 May 2014 23:15:38 +0200
-Subject: [PATCH v10 3/3] ARM: dts: Add initial device tree support for
- EXYNOS5410
-In-Reply-To: <1400841343-6016-4-git-send-email-t.dakhran@samsung.com>
-References: <1400841343-6016-1-git-send-email-t.dakhran@samsung.com>
- <1400841343-6016-4-git-send-email-t.dakhran@samsung.com>
-Message-ID: <537FBA7A.3000605@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 23 May 2014 23:25:05 +0200
+Subject: [PATCH 2/5] Documentation: dt-bindings: document the Armada 375
+ USB cluster binding
+In-Reply-To: <20140523135943.GC31314@lunn.ch>
+References: <1400257376-13251-1-git-send-email-gregory.clement@free-electrons.com>
+ <1400257376-13251-2-git-send-email-gregory.clement@free-electrons.com>
+ <537F13B2.6070500@ti.com> <20140523132145.GA31314@lunn.ch>
+ <20140523133608.GB31314@lunn.ch> <537F52B0.5030204@ti.com>
+ <20140523135943.GC31314@lunn.ch>
+Message-ID: <537FBCB1.5010207@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tarek,
-
-On 23.05.2014 12:35, Tarek Dakhran wrote:
-> Add initial device tree nodes for EXYNOS5410 SoC and SMDK5410 board.
+On 23/05/2014 15:59, Andrew Lunn wrote:
+> On Fri, May 23, 2014 at 07:22:48PM +0530, Kishon Vijay Abraham I wrote:
+>> hI,
+>>
+>> On Friday 23 May 2014 07:06 PM, Andrew Lunn wrote:
+>>>> Do you want one .txt file per driver, or can we combine binding
+>>>> documentations into one file? There should already be a mvebu-phy.txt,
+>>>> which contains the sata phy usable on some of the Armada SoC families.
+>>>> This binding could be appended to it.
+>>>
+>>> Ah. Humm, well! It seems the patch adding the mvebu-phy.txt fell
+>>> through a crack when adding the driver.
+>>>
+>>> Kishon could you take
+>>> http://www.spinics.net/lists/devicetree/msg17018.html into your tree?
+>>> It should of been taken the same time you took the actual driver,
+>>> http://www.spinics.net/lists/devicetree/msg17011.html into your tree.
+>>>
+>>> I can resend that one missing patch if you want.
+>>
+>> yes please. But it's already too late to go in the next merge window.
 > 
-> Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
-> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
-> ---
->  arch/arm/boot/dts/Makefile                |    1 +
->  arch/arm/boot/dts/exynos5410-smdk5410.dts |   82 ++++++++++++
->  arch/arm/boot/dts/exynos5410.dtsi         |  206 +++++++++++++++++++++++++++++
->  3 files changed, 289 insertions(+)
->  create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
->  create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
+> Gregory, could you pick it up and append your 375 binding to it? We
+> can avoid merge conflicts that way.
 
-Looks good. Hopefully we can have this patch applied soon, so it won't
-get outdated again.
+yes sure, I will do it
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> 
+> Thanks
+> 	Andrew
+> 
 
-Best regards,
-Tomasz
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
