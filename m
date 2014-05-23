@@ -1,63 +1,197 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 23 May 2014 08:47:46 +0200
-Subject: [PATCH v3] clk: shmobile: Add R8A7740-specific clock support
-In-Reply-To: <93388596.mpU9e50d0D@avalon>
-References: <1400682086-5705-1-git-send-email-ulrich.hecht+renesas@gmail.com>
- <1768296.AYVfH6xHtk@avalon>
- <CAMuHMdUNpgn1ciHsvqWtEyn0RugxQTaCV+ki=S=5hUbmCjA6tg@mail.gmail.com>
- <93388596.mpU9e50d0D@avalon>
-Message-ID: <CAMuHMdW6=Axo8s2Jy9cdBkLczDc41Tk0JnORpv4h3oaO3kC13Q@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 23 May 2014 08:48:00 +0200
+Subject: [PATCH] mmc: sdhci-dove: use mmc_of_parse() and remove
+ card_tasklet CD handler
+In-Reply-To: <1400797012-32106-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1400797012-32106-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <CAPDyKFoF77fhYVaLX=nSS1A+mi9BUWHszkKA-stcutcOKovMXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On Fri, May 23, 2014 at 12:42 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Wednesday 21 May 2014 17:50:35 Geert Uytterhoeven wrote:
->> On Wed, May 21, 2014 at 5:41 PM, Laurent Pinchart wrote:
->> >> +cpg_clocks: cpg_clocks at e6150000 {
->> >> +        compatible = "renesas,r8a7740-cpg-clocks";
->> >> +        reg = <0xe6150000 0x10000>;
->> >
->> > This range covers the MSTP registers. Unlike other Renesas SoCs with CCF
->> > support in mainline, the MSTP registers are in the middle of the CPG
->> > address space here, which is quite problematic.
->>
->> This is also the case for R-Car Gen2?!?
->>
->>                 /* Special CPG clocks */
->>                 cpg_clocks: cpg_clocks at e6150000 {
->>                         compatible = "renesas,r8a7791-cpg-clocks",
->>                                      "renesas,rcar-gen2-cpg-clocks";
->>                         reg = <0 0xe6150000 0 0x1000>;
->>
->>                 mstp0_clks: mstp0_clks at e6150130 {
->>                         compatible = "renesas,r8a7791-mstp-clocks",
->> "renesas,cpg-mstp-clocks";
->>                         reg = <0 0xe6150130 0 4>, <0 0xe6150030 0 4>;
+On 23 May 2014 00:16, Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com> wrote:
+> Commit f8ec589b86f6
+>   "mmc: sdhci-dove: allow GPIOs to be used for card detection on Dove"
+> added a gpio based card detect interrupt handler that was hooked up
+> into card_tasket.
 >
-> Indeed :-/ It looks like we're just lucky that of_iomap() doesn't request the
-> memory resource.
+> Commit 3560db8e247a
+>   "mmc: sdhci: push card_tasklet into threaded irq handler"
+> now removed that very card_tasklet causing sdhci-dove to fail on build
+> with:
+> drivers/mmc/host/sdhci-dove.c: In function 'sdhci_dove_carddetect_irq':
+> drivers/mmc/host/sdhci-dove.c:42:24: error: 'struct sdhci_host' has no member named 'card_tasklet'
 >
-> Do you think it would make sense to move the MSTP nodes inside the CPG node to
-> better describe the hardware, and avoid future breakages if of_iomap() starts
-> calling request_resource() tomorrow ?
+> To fix both the build error and get a working gpio card detection without
+> card_tasklet, replace sdhci_get_of_property() with more recent
+> mmc_of_parse(). It takes care of gpio-based card detect passed through DT
+> already and allows to remove the offending code sections dealing with
+> removed card_tasklet.
+>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-That indeed makes sense.
+Thanks Sebastian!
 
-In general (not limited to r8a7740), I think we should move a few more nodes.
-Currently we have almost all device nodes at the top level, while they should be
-under a bus node. Or in a tree of bus nodes, matching the block diagram
-in the datasheet.
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Gr{oetje,eeting}s,
+Chris, can you pick this up?
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus TorvaldsH
+> ---
+> This patch is based on todays mmc-next and fixes a build error there.
+>
+> Cc: Chris Ball <chris@printf.net>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: linux-mmc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/mmc/host/sdhci-dove.c | 74 +++----------------------------------------
+>  1 file changed, 5 insertions(+), 69 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-dove.c b/drivers/mmc/host/sdhci-dove.c
+> index 0d315f4496c8..e6278ec007d7 100644
+> --- a/drivers/mmc/host/sdhci-dove.c
+> +++ b/drivers/mmc/host/sdhci-dove.c
+> @@ -21,28 +21,17 @@
+>
+>  #include <linux/clk.h>
+>  #include <linux/err.h>
+> -#include <linux/gpio.h>
+>  #include <linux/io.h>
+>  #include <linux/mmc/host.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> -#include <linux/of_gpio.h>
+>
+>  #include "sdhci-pltfm.h"
+>
+>  struct sdhci_dove_priv {
+>         struct clk *clk;
+> -       int gpio_cd;
+>  };
+>
+> -static irqreturn_t sdhci_dove_carddetect_irq(int irq, void *data)
+> -{
+> -       struct sdhci_host *host = data;
+> -
+> -       tasklet_schedule(&host->card_tasklet);
+> -       return IRQ_HANDLED;
+> -}
+> -
+>  static u16 sdhci_dove_readw(struct sdhci_host *host, int reg)
+>  {
+>         u16 ret;
+> @@ -60,8 +49,6 @@ static u16 sdhci_dove_readw(struct sdhci_host *host, int reg)
+>
+>  static u32 sdhci_dove_readl(struct sdhci_host *host, int reg)
+>  {
+> -       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> -       struct sdhci_dove_priv *priv = pltfm_host->priv;
+>         u32 ret;
+>
+>         ret = readl(host->ioaddr + reg);
+> @@ -71,14 +58,6 @@ static u32 sdhci_dove_readl(struct sdhci_host *host, int reg)
+>                 /* Mask the support for 3.0V */
+>                 ret &= ~SDHCI_CAN_VDD_300;
+>                 break;
+> -       case SDHCI_PRESENT_STATE:
+> -               if (gpio_is_valid(priv->gpio_cd)) {
+> -                       if (gpio_get_value(priv->gpio_cd) == 0)
+> -                               ret |= SDHCI_CARD_PRESENT;
+> -                       else
+> -                               ret &= ~SDHCI_CARD_PRESENT;
+> -               }
+> -               break;
+>         }
+>         return ret;
+>  }
+> @@ -117,28 +96,9 @@ static int sdhci_dove_probe(struct platform_device *pdev)
+>
+>         priv->clk = devm_clk_get(&pdev->dev, NULL);
+>
+> -       if (pdev->dev.of_node) {
+> -               priv->gpio_cd = of_get_named_gpio(pdev->dev.of_node,
+> -                                                 "cd-gpios", 0);
+> -       } else {
+> -               priv->gpio_cd = -EINVAL;
+> -       }
+> -
+> -       if (gpio_is_valid(priv->gpio_cd)) {
+> -               ret = gpio_request(priv->gpio_cd, "sdhci-cd");
+> -               if (ret) {
+> -                       dev_err(&pdev->dev, "card detect gpio request failed: %d\n",
+> -                               ret);
+> -                       return ret;
+> -               }
+> -               gpio_direction_input(priv->gpio_cd);
+> -       }
+> -
+>         host = sdhci_pltfm_init(pdev, &sdhci_dove_pdata, 0);
+> -       if (IS_ERR(host)) {
+> -               ret = PTR_ERR(host);
+> -               goto err_sdhci_pltfm_init;
+> -       }
+> +       if (IS_ERR(host))
+> +               return PTR_ERR(host);
+>
+>         pltfm_host = sdhci_priv(host);
+>         pltfm_host->priv = priv;
+> @@ -146,39 +106,20 @@ static int sdhci_dove_probe(struct platform_device *pdev)
+>         if (!IS_ERR(priv->clk))
+>                 clk_prepare_enable(priv->clk);
+>
+> -       sdhci_get_of_property(pdev);
+> +       ret = mmc_of_parse(host->mmc);
+> +       if (ret)
+> +               goto err_sdhci_add;
+>
+>         ret = sdhci_add_host(host);
+>         if (ret)
+>                 goto err_sdhci_add;
+>
+> -       /*
+> -        * We must request the IRQ after sdhci_add_host(), as the tasklet only
+> -        * gets setup in sdhci_add_host() and we oops.
+> -        */
+> -       if (gpio_is_valid(priv->gpio_cd)) {
+> -               ret = request_irq(gpio_to_irq(priv->gpio_cd),
+> -                                 sdhci_dove_carddetect_irq,
+> -                                 IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
+> -                                 mmc_hostname(host->mmc), host);
+> -               if (ret) {
+> -                       dev_err(&pdev->dev, "card detect irq request failed: %d\n",
+> -                               ret);
+> -                       goto err_request_irq;
+> -               }
+> -       }
+> -
+>         return 0;
+>
+> -err_request_irq:
+> -       sdhci_remove_host(host, 0);
+>  err_sdhci_add:
+>         if (!IS_ERR(priv->clk))
+>                 clk_disable_unprepare(priv->clk);
+>         sdhci_pltfm_free(pdev);
+> -err_sdhci_pltfm_init:
+> -       if (gpio_is_valid(priv->gpio_cd))
+> -               gpio_free(priv->gpio_cd);
+>         return ret;
+>  }
+>
+> @@ -190,11 +131,6 @@ static int sdhci_dove_remove(struct platform_device *pdev)
+>
+>         sdhci_pltfm_unregister(pdev);
+>
+> -       if (gpio_is_valid(priv->gpio_cd)) {
+> -               free_irq(gpio_to_irq(priv->gpio_cd), host);
+> -               gpio_free(priv->gpio_cd);
+> -       }
+> -
+>         if (!IS_ERR(priv->clk))
+>                 clk_disable_unprepare(priv->clk);
+>
+> --
+> 1.9.1
+>
