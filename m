@@ -1,336 +1,55 @@
-From: t.dakhran@samsung.com (Tarek Dakhran)
-Date: Fri, 23 May 2014 14:35:43 +0400
-Subject: [PATCH v10 3/3] ARM: dts: Add initial device tree support for
- EXYNOS5410
-In-Reply-To: <1400841343-6016-1-git-send-email-t.dakhran@samsung.com>
-References: <1400841343-6016-1-git-send-email-t.dakhran@samsung.com>
-Message-ID: <1400841343-6016-4-git-send-email-t.dakhran@samsung.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 23 May 2014 12:40:09 +0200
+Subject: [GIT PULL] clockevents: fixes for 3.15
+Message-ID: <537F2589.5050807@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial device tree nodes for EXYNOS5410 SoC and SMDK5410 board.
 
-Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
-Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
----
- arch/arm/boot/dts/Makefile                |    1 +
- arch/arm/boot/dts/exynos5410-smdk5410.dts |   82 ++++++++++++
- arch/arm/boot/dts/exynos5410.dtsi         |  206 +++++++++++++++++++++++++++++
- 3 files changed, 289 insertions(+)
- create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
- create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
+Hi Thomas, Ingo,
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index cd399a2..709f862 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -73,6 +73,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
- 	exynos5250-smdk5250.dtb \
- 	exynos5250-snow.dtb \
- 	exynos5260-xyref5260.dtb \
-+	exynos5410-smdk5410.dtb \
- 	exynos5420-arndale-octa.dtb \
- 	exynos5420-peach-pit.dtb \
- 	exynos5420-smdk5420.dtb \
-diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-new file mode 100644
-index 0000000..7275bbd
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-@@ -0,0 +1,82 @@
-+/*
-+ * SAMSUNG SMDK5410 board device tree source
-+ *
-+ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+/dts-v1/;
-+#include "exynos5410.dtsi"
-+/ {
-+	model = "Samsung SMDK5410 board based on EXYNOS5410";
-+	compatible = "samsung,smdk5410", "samsung,exynos5410", "samsung,exynos5";
-+
-+	memory {
-+		reg = <0x40000000 0x80000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttySAC2,115200";
-+	};
-+
-+	fin_pll: xxti {
-+		compatible = "fixed-clock";
-+		clock-frequency = <24000000>;
-+		clock-output-names = "fin_pll";
-+		#clock-cells = <0>;
-+	};
-+
-+	firmware at 02037000 {
-+		compatible = "samsung,secure-firmware";
-+		reg = <0x02037000 0x1000>;
-+	};
-+
-+};
-+
-+&mmc_0 {
-+	status = "okay";
-+	num-slots = <1>;
-+	supports-highspeed;
-+	broken-cd;
-+	card-detect-delay = <200>;
-+	samsung,dw-mshc-ciu-div = <3>;
-+	samsung,dw-mshc-sdr-timing = <2 3>;
-+	samsung,dw-mshc-ddr-timing = <1 2>;
-+
-+	slot at 0 {
-+		reg = <0>;
-+		bus-width = <8>;
-+	};
-+};
-+
-+&mmc_2 {
-+	status = "okay";
-+	num-slots = <1>;
-+	supports-highspeed;
-+	card-detect-delay = <200>;
-+	samsung,dw-mshc-ciu-div = <3>;
-+	samsung,dw-mshc-sdr-timing = <2 3>;
-+	samsung,dw-mshc-ddr-timing = <1 2>;
-+
-+	slot at 0 {
-+		reg = <0>;
-+		bus-width = <4>;
-+		disable-wp;
-+	};
-+};
-+
-+&uart0 {
-+		status = "okay";
-+};
-+
-+&uart1 {
-+		status = "okay";
-+};
-+
-+&uart2 {
-+		status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-new file mode 100644
-index 0000000..3839c26
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos5410.dtsi
-@@ -0,0 +1,206 @@
-+/*
-+ * SAMSUNG EXYNOS5410 SoC device tree source
-+ *
-+ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * SAMSUNG EXYNOS5410 SoC device nodes are listed in this file.
-+ * EXYNOS5410 based board files can include this file and provide
-+ * values for board specfic bindings.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include "skeleton.dtsi"
-+#include <dt-bindings/clock/exynos5410.h>
-+
-+/ {
-+	compatible = "samsung,exynos5410", "samsung,exynos5";
-+	interrupt-parent = <&gic>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		CPU0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x0>;
-+		};
-+
-+		CPU1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x1>;
-+		};
-+
-+		CPU2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x2>;
-+		};
-+
-+		CPU3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x3>;
-+		};
-+	};
-+
-+	soc: soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		combiner: interrupt-controller at 10440000 {
-+			compatible = "samsung,exynos4210-combiner";
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			samsung,combiner-nr = <32>;
-+			reg = <0x10440000 0x1000>;
-+			interrupts =	<0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
-+					<0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
-+					<0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
-+					<0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
-+					<0 16 0>, <0 17 0>, <0 18 0>, <0 19 0>,
-+					<0 20 0>, <0 21 0>, <0 22 0>, <0 23 0>,
-+					<0 24 0>, <0 25 0>, <0 26 0>, <0 27 0>,
-+					<0 28 0>, <0 29 0>, <0 30 0>, <0 31 0>;
-+		};
-+
-+		gic: interrupt-controller at 10481000 {
-+			compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
-+			#interrupt-cells = <3>;
-+			interrupt-controller;
-+			reg =	<0x10481000 0x1000>,
-+				<0x10482000 0x1000>,
-+				<0x10484000 0x2000>,
-+				<0x10486000 0x2000>;
-+			interrupts = <1 9 0xf04>;
-+		};
-+
-+		chipid at 10000000 {
-+			compatible = "samsung,exynos4210-chipid";
-+			reg = <0x10000000 0x100>;
-+		};
-+
-+		mct: mct at 101C0000 {
-+			compatible = "samsung,exynos4210-mct";
-+			reg = <0x101C0000 0xB00>;
-+			interrupt-parent = <&interrupt_map>;
-+			interrupts = <0>, <1>, <2>, <3>,
-+				<4>, <5>, <6>, <7>,
-+				<8>, <9>, <10>, <11>;
-+			clocks = <&fin_pll>, <&clock CLK_MCT>;
-+			clock-names = "fin_pll", "mct";
-+
-+			interrupt_map: interrupt-map {
-+				#interrupt-cells = <1>;
-+				#address-cells = <0>;
-+				#size-cells = <0>;
-+				interrupt-map = <0 &combiner 23 3>,
-+						<1 &combiner 23 4>,
-+						<2 &combiner 25 2>,
-+						<3 &combiner 25 3>,
-+						<4 &gic 0 120 0>,
-+						<5 &gic 0 121 0>,
-+						<6 &gic 0 122 0>,
-+						<7 &gic 0 123 0>,
-+						<8 &gic 0 128 0>,
-+						<9 &gic 0 129 0>,
-+						<10 &gic 0 130 0>,
-+						<11 &gic 0 131 0>;
-+			};
-+		};
-+
-+		sysram at 02020000 {
-+			compatible = "mmio-sram";
-+			reg = <0x02020000 0x54000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0x02020000 0x54000>;
-+
-+			smp-sysram at 0 {
-+				compatible = "samsung,exynos4210-sysram";
-+				reg = <0x0 0x1000>;
-+			};
-+
-+			smp-sysram at 53000 {
-+				compatible = "samsung,exynos4210-sysram-ns";
-+				reg = <0x53000 0x1000>;
-+			};
-+		};
-+
-+		clock: clock-controller at 10010000 {
-+			compatible = "samsung,exynos5410-clock";
-+			reg = <0x10010000 0x30000>;
-+			#clock-cells = <1>;
-+		};
-+
-+		mmc_0: mmc at 12200000 {
-+			compatible = "samsung,exynos5250-dw-mshc";
-+			reg = <0x12200000 0x1000>;
-+			interrupts = <0 75 0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			clocks = <&clock CLK_MMC0>, <&clock CLK_SCLK_MMC0>;
-+			clock-names = "biu", "ciu";
-+			fifo-depth = <0x80>;
-+			status = "disabled";
-+		};
-+
-+		mmc_1: mmc at 12210000 {
-+			compatible = "samsung,exynos5250-dw-mshc";
-+			reg = <0x12210000 0x1000>;
-+			interrupts = <0 76 0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			clocks = <&clock CLK_MMC1>, <&clock CLK_SCLK_MMC1>;
-+			clock-names = "biu", "ciu";
-+			fifo-depth = <0x80>;
-+			status = "disabled";
-+		};
-+
-+		mmc_2: mmc at 12220000 {
-+			compatible = "samsung,exynos5250-dw-mshc";
-+			reg = <0x12220000 0x1000>;
-+			interrupts = <0 77 0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			clocks = <&clock CLK_MMC2>, <&clock CLK_SCLK_MMC2>;
-+			clock-names = "biu", "ciu";
-+			fifo-depth = <0x80>;
-+			status = "disabled";
-+		};
-+
-+		uart0: serial at 12C00000 {
-+			compatible = "samsung,exynos4210-uart";
-+			reg = <0x12C00000 0x100>;
-+			interrupts = <0 51 0>;
-+			clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
-+			clock-names = "uart", "clk_uart_baud0";
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 12C10000 {
-+			compatible = "samsung,exynos4210-uart";
-+			reg = <0x12C10000 0x100>;
-+			interrupts = <0 52 0>;
-+			clocks = <&clock CLK_UART1>, <&clock CLK_SCLK_UART1>;
-+			clock-names = "uart", "clk_uart_baud0";
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at 12C20000 {
-+			compatible = "samsung,exynos4210-uart";
-+			reg = <0x12C20000 0x100>;
-+			interrupts = <0 53 0>;
-+			clocks = <&clock CLK_UART2>, <&clock CLK_SCLK_UART2>;
-+			clock-names = "uart", "clk_uart_baud0";
-+			status = "disabled";
-+		};
-+	};
-+};
+this pull request contains a couple of fixes:
+
+  * David Jander fixed the calls to clk_disable/clk_enable in the 
+tc_mode function as this could be called in an interrupt context
+
+  * Zhiwu Song forces the irq affinity on the marco timer as the 
+initialization can happen before the cpu to affine is up
+
+Thanks
+   -- Daniel
+
+
+The following changes since commit 84ea7fe37908254c3bd90910921f6e1045c1747a:
+
+   hrtimer: Set expiry time before switch_hrtimer_base() (2014-05-12 
+10:47:39 +0200)
+
+are available in the git repository at:
+
+   git://git.linaro.org/people/daniel.lezcano/linux.git 
+clockevents/3.15-fixes
+
+for you to fetch changes up to acbf6d21ac81195071b97ebb114b0b37bd9fcc86:
+
+   clocksource: tcb_clksrc: Make tc_mode interrupt safe (2014-05-22 
+18:54:58 +0200)
+
+----------------------------------------------------------------
+David Jander (1):
+       clocksource: tcb_clksrc: Make tc_mode interrupt safe
+
+Zhiwu Song (1):
+       clocksource: marco: Fix the affinity set for local timer of CPU1
+
+  drivers/clocksource/tcb_clksrc.c  |    8 ++++----
+  drivers/clocksource/timer-marco.c |    2 +-
+  2 files changed, 5 insertions(+), 5 deletions(-)
+
+
 -- 
-1.7.9.5
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
