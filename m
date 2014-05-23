@@ -1,41 +1,58 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:31 +0200
-Subject: [PATCH 51/71] clocksource: sh_mtu2: Remove FSF mail address from GPL
- notice
+Date: Fri, 23 May 2014 12:31:32 +0200
+Subject: [PATCH 52/71] clocksource: sh_mtu2: Sort headers alphabetically
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-51-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-52-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Do not include the paragraph about writing to the Free Software
-Foundation's mailing address from the sample GPL notice. The FSF has
-changed addresses in the past, and may do so again. Linux already
-includes a copy of the GPL.
+This helps locating duplicates and inserting new headers.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Tested-by: Wolfram Sang <wsa@sang-engineering.com>
 ---
- drivers/clocksource/sh_mtu2.c |    4 ----
- 1 file changed, 4 deletions(-)
+ drivers/clocksource/sh_mtu2.c |   18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
-index 3a37857..510bd32 100644
+index 510bd32..f2c1c36 100644
 --- a/drivers/clocksource/sh_mtu2.c
 +++ b/drivers/clocksource/sh_mtu2.c
-@@ -11,10 +11,6 @@
-  * but WITHOUT ANY WARRANTY; without even the implied warranty of
-  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+@@ -13,22 +13,22 @@
   * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
   */
  
++#include <linux/clk.h>
++#include <linux/clockchips.h>
++#include <linux/delay.h>
++#include <linux/err.h>
  #include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/spinlock.h>
+ #include <linux/interrupt.h>
+-#include <linux/ioport.h>
+-#include <linux/delay.h>
+ #include <linux/io.h>
+-#include <linux/clk.h>
++#include <linux/ioport.h>
+ #include <linux/irq.h>
+-#include <linux/err.h>
+-#include <linux/clockchips.h>
+-#include <linux/sh_timer.h>
+-#include <linux/slab.h>
+ #include <linux/module.h>
++#include <linux/platform_device.h>
+ #include <linux/pm_domain.h>
+ #include <linux/pm_runtime.h>
++#include <linux/sh_timer.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
+ 
+ struct sh_mtu2_device;
+ 
 -- 
 1.7.9.5
