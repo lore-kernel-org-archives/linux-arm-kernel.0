@@ -1,39 +1,52 @@
 From: Nikolay.Borisov@arm.com (Nikolay Borisov)
-Date: Fri, 23 May 2014 10:26:34 +0100
-Subject: [PATCH RESEND 5/7] ARM: unwind: Use arm_get_current_stackframe
-In-Reply-To: <1400837196-22339-1-git-send-email-Nikolay.Borisov@arm.com>
-References: <1400837196-22339-1-git-send-email-Nikolay.Borisov@arm.com>
-Message-ID: <1400837196-22339-6-git-send-email-Nikolay.Borisov@arm.com>
+Date: Fri, 23 May 2014 10:26:29 +0100
+Subject: [PATCH RESEND 0/7] Fix backtrace support in THUMB2 mode
+Message-ID: <1400837196-22339-1-git-send-email-Nikolay.Borisov@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the unwind code use the correct API so that the frame pointer
-is extracted from the correct register.
+Currently all the code which deals with backtrace support assumes that R11 
+is the frame-pointer. While this is the case for ARM mode and is explicitly 
+documented in the AAPCS, this is not the case for THUMB2 mode. 
 
-Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
----
- arch/arm/kernel/unwind.c | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+There is no official document requiring that R11 has to be the frame pointer 
+and GCC uses R7 as FP and given that R7's usage is so intertwined within GCC's
+mechanics it is unlikely to change, so fixing backtrace in THUMB2 mode seems
+in order.
 
-diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-index 3c21769..7aaec44 100644
---- a/arch/arm/kernel/unwind.c
-+++ b/arch/arm/kernel/unwind.c
-@@ -479,12 +479,10 @@ void unwind_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 		tsk = current;
- 
- 	if (regs) {
--		frame.fp = regs->ARM_fp;
--		frame.sp = regs->ARM_sp;
--		frame.lr = regs->ARM_lr;
-+		arm_get_current_stackframe(regs, &frame);
- 		/* PC might be corrupted, use LR in that case. */
--		frame.pc = kernel_text_address(regs->ARM_pc)
--			 ? regs->ARM_pc : regs->ARM_lr;
-+		if (!kernel_text_address(regs->ARM_pc))
-+			frame.pc = regs->ARM_lr;
- 	} else if (tsk == current) {
- 		frame.fp = (unsigned long)__builtin_frame_address(0);
- 		frame.sp = current_sp;
+This patch series rectifies the problem by first fixing the 
+thread_save_fp macro to reference the correct register. Furthermore, there
+a lot of repetetive sequences of code such as :
+
+stackframe.fp = pt_regs->ARM_fp
+stackframe.lr = pt_regs->ARM_lr
+
+so introducing a function arm_get_current_stack_frame which both 
+hides this repetition and also utilizes teh frame_pointer(regs) macro
+to reference the correct register depending on the mode. 
+
+Finally, change all the call sites so that they utilize the new routine.
+
+
+Nikolay Borisov (7):
+  ARM: Make thread_save_fp macro aware of THUMB2 mode
+  ARM: Introduce arm_get_current_stack_frame()
+  ARM: perf: Make perf use arm_get_current_stackframe
+  ARM: time: Make use of arm_get_current_stackframe
+  ARM: unwind: Use arm_get_current_stackframe
+  ARM: traps: Make use of the frame_pointer macro
+  ARM: oprofile: Use of arm_get_current_stackframe
+
+ arch/arm/include/asm/ptrace.h      | 3 +++
+ arch/arm/include/asm/stacktrace.h  | 5 +++++
+ arch/arm/include/asm/thread_info.h | 6 ++++++
+ arch/arm/kernel/perf_event.c       | 5 +----
+ arch/arm/kernel/stacktrace.c       | 9 +++++++++
+ arch/arm/kernel/time.c             | 5 +----
+ arch/arm/kernel/traps.c            | 6 ++++--
+ arch/arm/kernel/unwind.c           | 8 +++-----
+ arch/arm/oprofile/common.c         | 5 +----
+ 9 files changed, 33 insertions(+), 19 deletions(-)
+
 -- 
 1.8.1.5
