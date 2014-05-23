@@ -1,32 +1,37 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 23 May 2014 15:51:05 +0800
-Subject: [PATCH 02/22] clk: sunxi: register clock gates with clkdev
-In-Reply-To: <1400831485-28576-1-git-send-email-wens@csie.org>
-References: <1400831485-28576-1-git-send-email-wens@csie.org>
-Message-ID: <1400831485-28576-3-git-send-email-wens@csie.org>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 23 May 2014 11:18:09 +0300
+Subject: [PATCH v3 0/3] ARM: dts: overo: Add panel support
+In-Reply-To: <537EF413.5050600@epfl.ch>
+References: <1400594337-5096-1-git-send-email-florian.vaussard@epfl.ch>
+ <537EF413.5050600@epfl.ch>
+Message-ID: <537F0441.50507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new important clock protect code requires the clocks be
-registered with clkdev. This was missing for sunxi_gates
-type clocks.
+On 23/05/14 10:09, Florian Vaussard wrote:
+> Hi Tomi,
+> 
+> On 05/20/2014 03:58 PM, Florian Vaussard wrote:
+>> Hi,
+>>
+>> This series enables the DVI and LCD panels present on some of
+>> the Overo expansion boards.
+>>
+> 
+> Do you have any more comments on these? If no, do you want to pull them
+> through your tree for 3.16, as discussed with Tony?
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/clk/sunxi/clk-sunxi.c | 1 +
- 1 file changed, 1 insertion(+)
+Yes, I can take these.
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 96ba00c..e0e24d5 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -899,6 +899,7 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
- 						      reg + 4 * (i/32), i % 32,
- 						      0, &clk_lock);
- 		WARN_ON(IS_ERR(clk_data->clks[i]));
-+		clk_register_clkdev(clks[i], clk_name, NULL);
- 
- 		j++;
- 	}
--- 
-2.0.0.rc2
+Tony, do I have your ack on this series?
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140523/d1517875/attachment-0001.sig>
