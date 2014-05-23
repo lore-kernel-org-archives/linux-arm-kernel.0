@@ -1,85 +1,53 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 22 May 2014 23:05:39 -0300
-Subject: [alsa-devel] The resume of sgtl5000 causes kernel Oops
-In-Reply-To: <CAOMZO5CCFnZSz_jaipe4Fz0sTxXOajp7QRPiaM5f5wg_Di0ftA@mail.gmail.com>
-References: <20140522145650.GD32184@dragon>
- <20140522174818.GN12304@sirena.org.uk>
- <CAOMZO5CCFnZSz_jaipe4Fz0sTxXOajp7QRPiaM5f5wg_Di0ftA@mail.gmail.com>
-Message-ID: <CAOMZO5D8u9BmQH6K-oGcNA77o-WbmTtSEcWuVYrBTx5vbimkiA@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 22 May 2014 22:11:28 -0400 (EDT)
+Subject: [PATCH] ARM: zImage: add DSB and ISB barriers after relocating
+ code
+In-Reply-To: <1400808472-401-1-git-send-email-marc.ceeeee@gmail.com>
+References: <1400808472-401-1-git-send-email-marc.ceeeee@gmail.com>
+Message-ID: <alpine.LFD.2.11.1405222155240.17310@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 6:33 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> sgtl5000 1-000a: Failed to restore cache: -5
-> sgtl5000 1-000a: Failed to restore cache: -5
-> sgtl5000 1-000a: ASoC: Failed to turn on bias: -5
-> sgtl5000 1-000a: Failed to restore cache: -5
-> sgtl5000 1-000a: ASoC: Failed to turn on bias: -5
-> sgtl5000 1-000a: Failed to restore cache: -5
-> sgtl5000 1-000a: ASoC: Failed to turn on bias: -5
+On Thu, 22 May 2014, Marc Carino wrote:
 
-These errors are gone if on top of the previous change I add:
+> The zImage loader will relocate the image if it determines that
+> decompression will overwrite its current location. Since the act
+> of relocation is basically a form of code self-modification, we
+> need to ensure that the CPU fetches the updated instruction stream.
+> 
+> Since cache maintenance is skipped during the relocation phase (the
+> MMUs and caches are off), 
 
---- a/sound/soc/codecs/sgtl5000.c
-+++ b/sound/soc/codecs/sgtl5000.c
-@@ -36,29 +36,55 @@
+Beware... This statement isn't true in most cases.
 
- /* default value of sgtl5000 registers */
- static const struct reg_default sgtl5000_reg_defaults[] = {
--    { SGTL5000_CHIP_CLK_CTRL,        0x0008 },
--    { SGTL5000_CHIP_I2S_CTRL,        0x0010 },
--    { SGTL5000_CHIP_SSS_CTRL,        0x0010 },
-+    { SGTL5000_CHIP_DIG_POWER,         0x0000 },
-+    { SGTL5000_CHIP_CLK_CTRL,         0x0008 },
-+    { SGTL5000_CHIP_I2S_CTRL,         0x0010 },
-+    { SGTL5000_CHIP_SSS_CTRL,         0x0010 },
-+    { SGTL5000_CHIP_ADCDAC_CTRL,         0x020c },
-     { SGTL5000_CHIP_DAC_VOL,        0x3c3c },
-     { SGTL5000_CHIP_PAD_STRENGTH,        0x015f },
--    { SGTL5000_CHIP_ANA_HP_CTRL,        0x1818 },
-+    { SGTL5000_CHIP_ANA_ADC_CTRL,        0x0000 },
-+    { SGTL5000_CHIP_ANA_HP_CTRL,         0x1818 },
-     { SGTL5000_CHIP_ANA_CTRL,        0x0111 },
-+    { SGTL5000_CHIP_LINREG_CTRL,        0x0000 },
-+    { SGTL5000_CHIP_REF_CTRL,        0x0000 },
-+    { SGTL5000_CHIP_MIC_CTRL,        0x0000 },
-+    { SGTL5000_CHIP_LINE_OUT_CTRL,        0x0000 },
-     { SGTL5000_CHIP_LINE_OUT_VOL,        0x0404 },
-     { SGTL5000_CHIP_ANA_POWER,        0x7060 },
-     { SGTL5000_CHIP_PLL_CTRL,        0x5000 },
-+    { SGTL5000_CHIP_CLK_TOP_CTRL,        0x0000 },
-+    { SGTL5000_CHIP_ANA_STATUS,        0x0000 },
-+    { SGTL5000_CHIP_SHORT_CTRL,        0x0000 },
-+    { SGTL5000_CHIP_ANA_TEST2,        0x0000 },
-+    { SGTL5000_DAP_CTRL,            0x0000 },
-+    { SGTL5000_DAP_PEQ,            0x0000 },
-     { SGTL5000_DAP_BASS_ENHANCE,        0x0040 },
-     { SGTL5000_DAP_BASS_ENHANCE_CTRL,    0x051f },
-+    { SGTL5000_DAP_AUDIO_EQ,        0x0000 },
-     { SGTL5000_DAP_SURROUND,        0x0040 },
-+    { SGTL5000_DAP_FLT_COEF_ACCESS,        0x0000 },
-+    { SGTL5000_DAP_COEF_WR_B0_MSB,        0x0000 },
-+    { SGTL5000_DAP_COEF_WR_B0_LSB,        0x0000 },
-     { SGTL5000_DAP_EQ_BASS_BAND0,        0x002f },
-     { SGTL5000_DAP_EQ_BASS_BAND1,        0x002f },
-     { SGTL5000_DAP_EQ_BASS_BAND2,        0x002f },
-     { SGTL5000_DAP_EQ_BASS_BAND3,        0x002f },
--    { SGTL5000_DAP_EQ_BASS_BAND4,        0x002f },
-+    { SGTL5000_DAP_EQ_BASS_BAND4,        0x002f },
-     { SGTL5000_DAP_MAIN_CHAN,        0x8000 },
-+    { SGTL5000_DAP_MIX_CHAN,        0x0000 },
-     { SGTL5000_DAP_AVC_CTRL,        0x0510 },
-     { SGTL5000_DAP_AVC_THRESHOLD,        0x1473 },
-     { SGTL5000_DAP_AVC_ATTACK,        0x0028 },
-     { SGTL5000_DAP_AVC_DECAY,        0x0050 },
-+    { SGTL5000_DAP_COEF_WR_B1_MSB,        0x0000 },
-+    { SGTL5000_DAP_COEF_WR_B1_LSB,        0x0000 },
-+    { SGTL5000_DAP_COEF_WR_B2_MSB,        0x0000 },
-+    { SGTL5000_DAP_COEF_WR_B2_LSB,        0x0000 },
-+    { SGTL5000_DAP_COEF_WR_A1_MSB,        0x0000 },
-+    { SGTL5000_DAP_COEF_WR_A1_LSB,        0x0000 },
-+    { SGTL5000_DAP_COEF_WR_A2_MSB,        0x0000 },
-+    { SGTL5000_DAP_COEF_WR_A2_LSB,        0x0000 },
- };
+> we need to execute both a data sync
+> and instruction sync barrier prior to jumping to the relocated code.
+> Skipping the barriers can result in execution of stale prefetched
+> code, leading to hangs or an UNDEFINED INSTRUCTION exception.
 
-,but now I am not able to play audio again after suspend/resume.
+Are you sure of that?  When the MMU is off, memory access is strongly 
+ordered.  I'm wondering if instruction prefetching applies in that case.
+
+Also, is this a problem that you actually experienced in practice?
+
+> @@ -400,8 +400,16 @@ dtb_check_done:
+>  		add	sp, sp, r6
+>  #endif
+>  
+> +		/*
+> +		 * Perform cache maintenance if caches were enabled earlier.
+> +		 * Otherwise, execute data and instruction barriers prior to
+> +		 * jumping to the newly-written code.
+> +		 */
+>  		tst	r4, #1
+>  		bleq	cache_clean_flush
+> +		movne	r0, #0
+> +		mcrne	p15, 0, r0, c7, c10, 4	@ DSB
+> +		mcrne	p15, 0, r0, c7, c5, 4	@ ISB
+
+Are you sure those CP15 accesses are fine on all the CPU variants that 
+may execute this code?  Officially we still support back to ARMv4 
+implementations.
+
+
+Nicolas
