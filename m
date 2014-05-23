@@ -1,62 +1,178 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 22 May 2014 18:35:46 -0700
-Subject: [PATCH/RFC V6 2/2] clk: Add handling of clk parent and rate
- assigned from DT
-In-Reply-To: <1400520171-6698-3-git-send-email-s.nawrocki@samsung.com>
-References: <1400520171-6698-1-git-send-email-s.nawrocki@samsung.com>
- <1400520171-6698-3-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20140523013546.9521.55361@quantum>
+Date: Thu, 22 May 2014 18:37:32 -0700
+Subject: [RFC PATCH 2/5] clk: Introduce 'clk_round_rate_nearest()'
+In-Reply-To: <a86642cb-855f-455f-b07c-a52bc6aa426f@BN1BFFO11FD050.protection.gbl>
+References: <537B957B.5010001@codeaurora.org>
+ <20140521073457.GD31687@pengutronix.de>
+ <e9090453-ce40-4662-a3ea-fbdaffdb2aa4@BN1AFFO11FD046.protection.gbl>
+ <20140521182308.GN31687@pengutronix.de> <20140521203300.9521.67546@quantum>
+ <ac335a38-b0f4-4d95-b111-56c05e1a6234@BN1BFFO11FD045.protection.gbl>
+ <20140522182040.GB20155@pengutronix.de>
+ <6612b069-1228-488f-81f7-ea8839f6c468@BN1BFFO11FD029.protection.gbl>
+ <20140522210328.9521.34889@quantum>
+ <a86642cb-855f-455f-b07c-a52bc6aa426f@BN1BFFO11FD050.protection.gbl>
+Message-ID: <20140523013732.9521.70820@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sylwester Nawrocki (2014-05-19 10:22:51)
-> diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> index 700e7aa..bee649b 100644
-> --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> @@ -132,3 +132,35 @@ clock signal, and a UART.
->    ("pll" and "pll-switched").
->  * The UART has its baud clock connected the external oscillator and its
->    register clock connected to the PLL clock (the "pll-switched" signal)
-> +
-> +==Assigned clock parents and rates==
-> +
-> +Some platforms require static initial configuration of default parent clocks
-> +and clock frequecies. Such a configuration can be specified in a device node
+Quoting S?ren Brinkmann (2014-05-22 16:44:53)
+> On Thu, 2014-05-22 at 02:03PM -0700, Mike Turquette wrote:
+> > Quoting S?ren Brinkmann (2014-05-22 13:32:09)
+> > > On Thu, 2014-05-22 at 08:20PM +0200, Uwe Kleine-K?nig wrote:
+> > > > Hello S?ren,
+> > > > 
+> > > > On Thu, May 22, 2014 at 11:03:00AM -0700, S?ren Brinkmann wrote:
+> > > > > On Wed, 2014-05-21 at 01:33PM -0700, Mike Turquette wrote:
+> > > > > > Quoting Uwe Kleine-K?nig (2014-05-21 11:23:08)
+> > > > > > > Hello S?ren,
+> > > > > > > 
+> > > > > > > On Wed, May 21, 2014 at 08:58:10AM -0700, S?ren Brinkmann wrote:
+> > > > > > > > On Wed, 2014-05-21 at 09:34AM +0200, Uwe Kleine-K?nig wrote:
+> > > > > > > > > On Tue, May 20, 2014 at 02:48:20PM -0700, S?ren Brinkmann wrote:
+> > > > > > > > > > On Tue, 2014-05-20 at 10:48AM -0700, Stephen Boyd wrote:
+> > > > > > > > > > > On 05/20/14 09:01, S?ren Brinkmann wrote:
+> > > > > > > > > > > >
+> > > > > > > > > > > >>>>> +{
+> > > > > > > > > > > >>>>> + unsigned long lower, upper, cur, lower_last, upper_last;
+> > > > > > > > > > > >>>>> +
+> > > > > > > > > > > >>>>> + lower = clk_round_rate(clk, rate);
+> > > > > > > > > > > >>>>> + if (lower >= rate)
+> > > > > > > > > > > >>>>> +         return lower;
+> > > > > > > > > > > >>>> Is the >-case worth a warning?
+> > > > > > > > > > > >>> No, it's correct behavior. If you request a rate that is way lower than what the
+> > > > > > > > > > > >>> clock can generate, returning something larger is perfectly valid, IMHO.
+> > > > > > > > > > > >>> Which reveals one problem in this whole discussion. The API does not
+> > > > > > > > > > > >>> require clk_round_rate() to round down. It is actually an implementation
+> > > > > > > > > > > >>> choice that had been made for clk-divider.
+> > > > > > > > > > > >> I'm sure it's more than an implementation choice for clk-divider. But I
+> > > > > > > > > > > >> don't find any respective documentation (but I didn't try hard).
+> > > > > > > > > > > > A similar discussion - without final conclusion:
+> > > > > > > > > > > > https://lkml.org/lkml/2010/7/14/260
+> > > > > > > > > > > >
+> > > > > > > > > > > >
+> > > > > > > > > > > 
+> > > > > > > > > > > Please call this new API something like clk_find_nearest_rate() or
+> > > > > > > > > > > something. clk_round_rate() is supposed to return the rate that will be
+> > > > > > > > > > > set if you call clk_set_rate() with the same arguments. It's up to the
+> > > > > > > > > > > implementation to decide if that means rounding the rate up or down or
+> > > > > > > > > > > to the nearest value.
+> > > > > > > > > > 
+> > > > > > > > > > Sounds good to me. Are there any cases of clocks that round up? I think
+> > > > > > > > > > that case would not be handled correctly. But I also don't see a use
+> > > > > > > > > > case for such an implementation.
+> > > > > > > > > I don't really care which semantic (i.e. round up, round down or round
+> > > > > > > > > closest) is picked, but I'd vote that all should pick up the same. I
+> > > > > > > > > think the least surprising definition is to choose rounding down and add
+> > > > > > > > > the function that is under discussion here to get a nearest match.
+> > > > > > > > > 
+> > > > > > > > > So I suggest:
+> > > > > > > > > 
+> > > > > > > > >     - if round_rate is given a rate that is smaller than the
+> > > > > > > > >       smallest available rate, return 0
+> > > > > > > > >     - add WARN_ONCE to round_rate and set_rate if they return with a
+> > > > > > > > >       rate bigger than requested
+> > > > > > > > 
+> > > > > > > > Why do you think 0 is always valid? I think for a clock that can
+> > > > > > > > generate 40, 70, 120, clk_round_rate(20) should return 40.
+> > > > > > > I didn't say it's a valid value. It just makes the it possible to check
+> > > > > > > for clk_round_rate(clk, rate) <= rate.
+> > > > > > > 
+> > > > > > > I grepped a bit around and found da850_round_armrate which implements a
+> > > > > > > round_rate callback returning the best match.
+> > > > > > > omap1_clk_round_rate_ckctl_arm can return a value < 0.
+> > > > > > > s3c2412_roundrate_usbsrc can return values that are bigger than
+> > > > > > > requested. (I wonder if that is a bug though.)
+> > > > > > > 
+> > > > > > > > >     - change the return values to unsigned long
+> > > > > > > > 
+> > > > > > > > Yep, I agree, this should happen.
+> > > > > > > And we're using 0 as error value? e.g. for the case where
+> > > > > > > omap1_clk_round_rate_ckctl_arm returns -EIO now?
+> > > > > > 
+> > > > > > No. clk_round_rate returns long for a reason, which is that we can
+> > > > > > provide an error code to the caller. From include/linux/clk.h:
+> > > > > > 
+> > > > > > /**
+> > > > > >  * clk_round_rate - adjust a rate to the exact rate a clock can provide
+> > > > > >  * @clk: clock source
+> > > > > >  * @rate: desired clock rate in Hz
+> > > > > >  *
+> > > > > >  * Returns rounded clock rate in Hz, or negative errno.
+> > > > > >  */
+> > > > > > 
+> > > > > > This has the unfortunate side effect that the max value we can return
+> > > > > > safely is 2147483647 (~2GHz). So another issue here is converting clock
+> > > > > > rates to 64-bit values.
+> > > > > 
+> > > > > So, let's assume
+> > > > >  - a clock does either of these
+> > > > >    - round down
+> > > > >    - round nearest
+> > > > >    - round up (is there any such case? I don't see a use-case for this)
+> > > > >  - or return an error
+> > > > > 
+> > > > > I think my latest try handles such cases, with the limitation of
+> > > > > for a clock that rounds up, the up-rounded value is found instead of the
+> > > > > nearest.
+> > > > > 
+> > > > > 
+> > > > > static long clk_find_nearest_rate(struct clk *clk, unsigned long rate)
+> > > > > {
+> > > > >     long ret;
+> > > > >     unsigned long lower, upper;
+> > > > > 
+> > > > >     clk_prepare_lock();
+> > > > > 
+> > > > >     lower = __clk_round_rate(clk, rate);
+> > > > this is CCF specific while I don't see a need for it. (But yes, a
+> > > > lock-less clk_find_nearest_rate is of course racy.)
+> > > Do we have to support non-CCF implementations? Isn't switching to the
+> > > CCF encouraged?
+> > 
+> > No we don't. If you check out the ifdeffery in include/linux/clk.h
+> > you'll see more function declarations for CONFIG_COMMON_CLK then for
+> > !CONFIG_COMMON_CLK, so we're not breaking any ground here.
+> > 
+> > > 
+> > > > 
+> > > > >     if (lower >= rate || (long)lower < 0) {
+> > > > If you made lower and upper a signed long, you could drop the casting
+> > > > here. BTW, why does __clk_round_rate return an unsigned long??
+> > > > There seem to be several more type mismatches in that area.
+> > > > Maybe we should add a waring if rate is > LONG_MAX?
+> > > > 
+> > > > (And ISTR that the C standard doesn't specify what the result of
+> > > > (long)lower is given that lower is of type unsigned long and holding a
+> > > > value > LONG_MAX.)
+> > > Looks like you're right. This probably needs some polishing to get types
+> > > sorted out.
+> > > Mike/Russel: As Uwe pointed out, shouldn't __clk_round_rate return a
+> > > long as well?
+> 
+> Sorry, Russell, of course.
+> 
+> > 
+> > Yeah. The strange thing is that .round_rate and .determine_rate both
+> > return long. I think I was asleep at the wheel on this one.
+> > 
+> > I count about a dozen call sites that need to be fixed up for this
+> > change to happen. As we approach 3.15-rc6 I'm a bit nervous about
+> > introducing this change. How do you feel about dropping this change in
+> > first thing after 3.16-rc1 and layering in your new clk_find_*_rate
+> > stuff on top of it?
+> > 
+> > I'll take a stab at fixing up __clk_round_rate early next week.
+> 
+> Yeah, at some point this 'fix cpufreq stats'-series grew a little out of
+> control. Targeting the 3.16 cycle sounds reasonable. Then we could probably
+> also look at moving from (unsigned) long to some 64-bit type as well ;)
 
-s/frequecies/frequencies/
+Agreed on the 64-bit thing.
 
-> +through clock-parents and clock-rates DT properties. The former should contain
-> +a list of parent clocks in form of phandle and clock specifier pairs, the
-> +latter the list of assigned clock frequency values (one cell each).
-> +To skip setting parent or rate of a clock its corresponding entry should be
-> +set to 0, or can be omitted if it is not followed by any non-zero entry.
-> +
-> +    uart at a000 {
-> +        compatible = "fsl,imx-uart";
-> +        reg = <0xa000 0x1000>;
-> +        ...
-> +        clocks = <&clkcon 0>, <&clkcon 3>;
-> +        clock-names = "baud", "mux";
-> +
-> +        clock-parents = <0>, <&pll 1>;
-> +        clock-rates = <460800>;
-> +    };
-> +
-> +In this example the pll is set as parent of "mux" clock and frequency of
-> +"baud" clock is specified as 460800 Hz.
-> +
-> +Configuring a clock's parent and rate through the device node that consumes
-> +the clock can be done only for clocks that have a single user. Specifying
-> +conflicting parent or rate configuration in multiple consumer nodes for
-> +a shared clock is forbidden.
-> +
-> +Configuration of common clocks, which affect multiple consumer devices can
-> +be similarly specified in the clock provider node.
-
-Is it worthwhile to show an example of this? I guess the outcome will
-depend on whether or not we support "assigned-clocks" property, which I
-just revisited in the V5 thread.
-
-Regards,
+Thanks,
 Mike
+
+> 
+>         Thanks,
+>         S?ren
+> 
