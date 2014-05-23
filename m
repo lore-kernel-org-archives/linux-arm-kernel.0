@@ -1,98 +1,72 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 23 May 2014 17:52:56 +0200
-Subject: [PATCH v2 02/11] sched: remove a wake_affine condition
+Date: Fri, 23 May 2014 17:52:58 +0200
+Subject: [PATCH v2 04/11] sched: Allow all archs to set the power_orig
 In-Reply-To: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
 References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1400860385-14555-3-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1400860385-14555-5-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have tried to understand the meaning of the condition :
- (this_load <= load &&
-  this_load + target_load(prev_cpu, idx) <= tl_per_task)
-but i failed to find a use case that can take advantage of it and i haven't
-found description of it in the previous commits' log.
-Futhermore, the comment of the condition refers to task_hot function that was
-used before being replaced by the current condition:
-/*
- * This domain has SD_WAKE_AFFINE and
- * p is cache cold in this domain, and
- * there is no bad imbalance.
- */
+power_orig is only changed for system with a SMT sched_domain level in order to
+reflect the lower capacity of CPUs. Heterogenous system also have to reflect an
+original capacity that is different from the default value.
 
-If we look more deeply the below condition
- this_load + target_load(prev_cpu, idx) <= tl_per_task
+Create a more generic function arch_scale_cpu_power that can be also used by
+non SMT platform to set power_orig.
 
-When sync is clear, we have :
- tl_per_task = runnable_load_avg / nr_running
- this_load = max(runnable_load_avg, cpuload[idx])
- target_load =  max(runnable_load_avg', cpuload'[idx])
-
-It implies that runnable_load_avg' == 0 and nr_running <= 1 in order to match the
-condition. This implies that runnable_load_avg == 0 too because of the
-condition: this_load <= load
-but if this _load is null, balanced is already set and the test is redundant.
-
-If sync is set, it's not as straight forward as above (especially if cgroup
-are involved) but the policy should be similar as we have removed a task that's
-going to sleep in order to get a more accurate load and this_load values.
+The weak behavior of arch_scale_cpu_power is the previous SMT one in order to
+keep backward compatibility in the use of power_orig.
 
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- kernel/sched/fair.c | 25 +++++++------------------
- 1 file changed, 7 insertions(+), 18 deletions(-)
+ kernel/sched/fair.c | 24 ++++++++++++++++--------
+ 1 file changed, 16 insertions(+), 8 deletions(-)
 
 diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index 9587ed1..30240ab 100644
+index 6a84114..6dc05f7 100644
 --- a/kernel/sched/fair.c
 +++ b/kernel/sched/fair.c
-@@ -4238,7 +4238,6 @@ static int wake_affine(struct sched_domain *sd, struct task_struct *p, int sync)
- {
- 	s64 this_load, load;
- 	int idx, this_cpu, prev_cpu;
--	unsigned long tl_per_task;
- 	struct task_group *tg;
- 	unsigned long weight;
- 	int balanced;
-@@ -4296,32 +4295,22 @@ static int wake_affine(struct sched_domain *sd, struct task_struct *p, int sync)
- 		balanced = this_eff_load <= prev_eff_load;
- 	} else
- 		balanced = true;
-+	schedstat_inc(p, se.statistics.nr_wakeups_affine_attempts);
- 
-+	if (!balanced)
-+		return 0;
- 	/*
- 	 * If the currently running task will sleep within
- 	 * a reasonable amount of time then attract this newly
- 	 * woken task:
- 	 */
--	if (sync && balanced)
-+	if (sync)
- 		return 1;
- 
--	schedstat_inc(p, se.statistics.nr_wakeups_affine_attempts);
--	tl_per_task = cpu_avg_load_per_task(this_cpu);
--
--	if (balanced ||
--	    (this_load <= load &&
--	     this_load + target_load(prev_cpu, idx) <= tl_per_task)) {
--		/*
--		 * This domain has SD_WAKE_AFFINE and
--		 * p is cache cold in this domain, and
--		 * there is no bad imbalance.
--		 */
--		schedstat_inc(sd, ttwu_move_affine);
--		schedstat_inc(p, se.statistics.nr_wakeups_affine);
-+	schedstat_inc(sd, ttwu_move_affine);
-+	schedstat_inc(p, se.statistics.nr_wakeups_affine);
- 
--		return 1;
--	}
--	return 0;
-+	return 1;
+@@ -5618,6 +5618,20 @@ unsigned long __weak arch_scale_smt_power(struct sched_domain *sd, int cpu)
+ 	return default_scale_smt_power(sd, cpu);
  }
  
- /*
++unsigned long __weak arch_scale_cpu_power(struct sched_domain *sd, int cpu)
++{
++	unsigned long weight = sd->span_weight;
++
++	if ((sd->flags & SD_SHARE_CPUPOWER) && weight > 1) {
++		if (sched_feat(ARCH_POWER))
++			return arch_scale_smt_power(sd, cpu);
++		else
++			return default_scale_smt_power(sd, cpu);
++	}
++
++	return SCHED_POWER_SCALE;
++}
++
+ static unsigned long scale_rt_power(int cpu)
+ {
+ 	struct rq *rq = cpu_rq(cpu);
+@@ -5654,18 +5668,12 @@ static unsigned long scale_rt_power(int cpu)
+ 
+ static void update_cpu_power(struct sched_domain *sd, int cpu)
+ {
+-	unsigned long weight = sd->span_weight;
+ 	unsigned long power = SCHED_POWER_SCALE;
+ 	struct sched_group *sdg = sd->groups;
+ 
+-	if ((sd->flags & SD_SHARE_CPUPOWER) && weight > 1) {
+-		if (sched_feat(ARCH_POWER))
+-			power *= arch_scale_smt_power(sd, cpu);
+-		else
+-			power *= default_scale_smt_power(sd, cpu);
++	power *= arch_scale_cpu_power(sd, cpu);
+ 
+-		power >>= SCHED_POWER_SHIFT;
+-	}
++	power >>= SCHED_POWER_SHIFT;
+ 
+ 	sdg->sgp->power_orig = power;
+ 
 -- 
 1.9.1
