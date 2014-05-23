@@ -1,44 +1,51 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 23 May 2014 20:33:39 +0200
-Subject: [PATCH RESEND v4 0/8] Add Allwinner A31 USB support
-In-Reply-To: <20140514160520.GA4679@kroah.com>
-References: <20140514160520.GA4679@kroah.com>
-Message-ID: <20140523183339.GC10768@lukather>
+Date: Fri, 23 May 2014 20:45:26 +0200
+Subject: [PATCH] pinctrl: sunxi: Enable the pinctrl Kconfig options by
+ default
+In-Reply-To: <201405231219.35061.arnd@arndb.de>
+References: <1399994597-15177-1-git-send-email-maxime.ripard@free-electrons.com>
+ <CACRpkdb2gzpftp3PWkr40v1CZm2J=SmnY9Mb=5S-AJr+YXgkNg@mail.gmail.com>
+ <201405231219.35061.arnd@arndb.de>
+Message-ID: <20140523184526.GD10768@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Hi Arnd,
 
-On Wed, May 14, 2014 at 06:05:20PM +0200, Greg Kroah-Hartman wrote:
-> On Wed, May 14, 2014 at 02:34:19PM +0200, Maxime Ripard wrote:
-> > On Tue, May 13, 2014 at 05:44:14PM +0200, Maxime Ripard wrote:
-> > > Hi everyone,
-> > > 
-> > > This patchset adds support for the USB controllers found in the
-> > > Allwinner A31.
-> > > 
-> > > While the design is similar to the earlier Allwinner SoCs that are
-> > > already supported, a few details here and there change, like the fact
-> > > that the PHYs now have one clock per phy, while it used to be only one
-> > > for all the PHYs.
-> > > 
-> > > Resent adding Alan Stern's Acked-by and puting Greg KH in the
-> > > recipients this time...
-> > 
-> > Applied patches 2, 7 and 8.
+On Fri, May 23, 2014 at 12:19:34PM +0200, Arnd Bergmann wrote:
+> I stumbled over this build error now:
 > 
-> Feel free to apply patches 5 and 6 to your tree, as your branch needs
-> these, with my:
+> /git/arm-soc/drivers/phy/phy-sun4i-usb.c: In function 'sun4i_usb_phy_probe':
+> /git/arm-soc/drivers/phy/phy-sun4i-usb.c:282:3: error: implicit declaration of function 'devm_reset_control_get' [-Werror=implicit-function-declaration]
+>    phy->reset = devm_reset_control_get(dev, name);
+>    ^
+> /git/arm-soc/drivers/phy/phy-sun4i-usb.c:282:14: warning: assignment makes pointer from integer without a cast [enabled by default]
+>    phy->reset = devm_reset_control_get(dev, name);
+>               ^
+> cc1: some warnings being treated as errors
+> make[4]: *** [drivers/phy/phy-sun4i-usb.o] Error 1
+> /git/arm-soc/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c: In function 'sun6i_a31_r_pinctrl_probe':
+> /git/arm-soc/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c:103:2: error: implicit declaration of function 'devm_reset_control_get' [-Werror=implicit-function-declaration]
+>   rstc = devm_reset_control_get(&pdev->dev, NULL);
+>   ^
+> /git/arm-soc/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c:103:7: warning: assignment makes pointer from integer without a cast [enabled by default]
+>   rstc = devm_reset_control_get(&pdev->dev, NULL);
+>        ^
+> cc1: some warnings being treated as errors
+
+Grrrr :(
+
+> It seems both the phy and the pinctrl driver actually depend on the
+> reset controller framework, but this is not reflected in Kconfig.
 > 
-> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> 
-> Or, if you want me to take them, just let me know and I will.
+> I guess these should either use devm_reset_control_get_optional
+> or have 'depends on RESET_CONTROLLER' in Kconfig.
 
-It looks like it's still not in your tree (or at least, I haven't
-received the usual mail notifications).
+Yeah, we should have a depends on.
 
-Is this expected?
+I'll send some patches.
 
+Thanks!
 Maxime
 
 -- 
@@ -51,4 +58,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140523/714dbe89/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140523/7573f8fb/attachment.sig>
