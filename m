@@ -1,52 +1,73 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 23 May 2014 11:54:31 +0200
-Subject: [PATCH 1/2] doc: dt bindings: Document Odroid X2/U3 audio
- subsystem bindings
-In-Reply-To: <20140522184656.GS12304@sirena.org.uk>
-References: <1400759708-25831-1-git-send-email-s.nawrocki@samsung.com>
- <20140522184656.GS12304@sirena.org.uk>
-Message-ID: <537F1AD7.1070808@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 23 May 2014 11:03:39 +0100
+Subject: [RFC PATCH 1/3] mfd: AXP22x: add support for APX221 PMIC
+In-Reply-To: <537EF4A6.2050405@free-electrons.com>
+References: <1400176305-22737-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1400176305-22737-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20140519172817.GE20435@lee--X1>
+ <537A4324.4060905@free-electrons.com> <537B06A0.3040706@redhat.com>
+ <20140520074810.GE20874@lee--X1>
+ <537EF4A6.2050405@free-electrons.com>
+Message-ID: <20140523100339.GO19747@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/05/14 20:46, Mark Brown wrote:
-> On Thu, May 22, 2014 at 01:55:07PM +0200, Sylwester Nawrocki wrote:
+> >>>>> This patch introduces preliminary support for the X-Powers AXP221 PMIC.
+> >>>>> The AXP221 is typically used on boards using Allwinner's A31 SoC.
+> >>>>>
+> >>>>> At the moment, this driver only exposes regulator devices, but other
+> >>>>> subdevices.
+> >>>>>
+> >>>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> >>>>> ---
+> >>>>>  drivers/mfd/Kconfig        |  12 +++
+> >>>>>  drivers/mfd/Makefile       |   1 +
+> >>>>>  drivers/mfd/axp22x.c       | 237 +++++++++++++++++++++++++++++++++++++++++++++
+> >>>>>  include/linux/mfd/axp22x.h | 149 ++++++++++++++++++++++++++++
+> >>>>>  4 files changed, 399 insertions(+)
+> >>>>>  create mode 100644 drivers/mfd/axp22x.c
+> >>>>>  create mode 100644 include/linux/mfd/axp22x.h
+> >>>> Not a chance.
+> >>>>
+> >>>> Farrrr, too much common code with axp20x.c - please merge into one file.
+> >>>>
+> >>> This was one of the questions I asked in my cover letter (could you take
+> >>> a look at it and tell me what's your prefered solution ?) ;-).
+> >>>
+> >>> I first tried to reuse the axp20x drivers, but ended up copying almost
+> >>> all definitions, hence I decided to first do a different driver and ask
+> >>> for advices.
+> >> I've just taken a good look at this (I'm planning on doing an axp152 driver
+> >> myself), and it seems that using a single mfd driver for the 20x and 221 should
+> >> be quite feasible:
+> >>
+> >> - axp20x.h would get some new register defines for registers which are
+> >>   different (or unique) to the 221 prefixed with aXP221
+> >> - An axp20x_writeable_ranges would need
+> >>   to be extended with a third range going from AXP221_BAT_CAP1 (0xe0)
+> >>   to AXP221_BAT_LOW_THRESH (0xe6)
+> >> - axp20x_writeable_table would get .n_yes_ranges set to 2, and a new
+> >>   apx22x_writeable_table would be introduced with n_yes_ranges set to 3.
+> >> - add a new axp221_supplies array
+> >> - add a new axp221_cells array
+> >> - and finally use the proper structs in axp20x_i2c_probe depending on the type
+> >>
+> >> Note that this means sharing ie the interrupt table, which is ok since they
+> >> are the same, except that the 221 has a couple of interrupts missing, but
+> >> the ones which are shared are all at the same place.
+> > Exactly.  As .probe() is identical, you only require some device
+> > matching and some extra structs where the data actually differs
+> > between devices.
+> >
 > 
->> +	sound {
->> +		compatible = "samsung,odroidx2-audio";
->> +		samsung,i2s-controller = <&i2s0>;
->> +		samsung,audio-codec = <&max98090>;
->> +	};
-> 
-> Can this not use simple-card?
+> I think you've applied this patch on your for-next tree by mistake.
+> As stated above, this driver should be merged with the axp20x one.
 
-I dug into that and it seems it almost could, but there is one
-thing I'm not sure how to cover with the simple-card DT bindings
-and the related driver.
-
-There are these two calls:
-
-+	ret = snd_soc_dai_set_sysclk(cpu_dai, SAMSUNG_I2S_OPCLK,
-+					0, MOD_OPCLK_PCLK);
-
-
-+	/* Set the cpu DAI configuration in order to use CDCLK */
-+	ret = snd_soc_dai_set_sysclk(cpu_dai, SAMSUNG_I2S_CDCLK,
-+					0, SND_SOC_CLOCK_OUT);
-
-This changes clocks routing so that the CPU DAI in slave mode generates
-master clock for the codec, on the SoC's CDCLK pin. Then this is
-a reference clock for the codec's PLL, which is a source of the I2S
-interface clocks.
-
-It's done this way to avoid changing at runtime frequency of the EPLL
-clock, which may be parent of other clocks than the sound subsystem,
-e.g. MMC.
-
-simple-card just calls set_sysclk once for the CPU DAI and CODEC with
-the second and last argument set to 0.
-I'll try and see again if there is some way to use simple-card.
+You're right, I added it for testing, but removed it soon after.  I've
+now re-pushed the branch, so it should be gone now.
 
 -- 
-Thanks,
-Sylwester
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
