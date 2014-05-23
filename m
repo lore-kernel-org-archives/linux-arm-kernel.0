@@ -1,329 +1,109 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 22 May 2014 21:26:37 -0700
-Subject: [PATCH v4] clk: shmobile: Add R8A7740-specific clock support
-In-Reply-To: <2421371.DIYxRydMzK@avalon>
-References: <1400768623-20076-1-git-send-email-ulrich.hecht+renesas@gmail.com>
- <2421371.DIYxRydMzK@avalon>
-Message-ID: <20140523042637.9521.42796@quantum>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 23 May 2014 13:38:06 +0900
+Subject: [PATCH RFC] mmc: add slot argument to mmc_of_parse
+In-Reply-To: <CAPDyKFqeunnWmguTH89byNc5Yy+CBY4avMeeon3ZSfNMmGJa9Q@mail.gmail.com>
+References: <1399457217-22846-1-git-send-email-ludovic.desroches@atmel.com>
+ <CAPDyKFqeunnWmguTH89byNc5Yy+CBY4avMeeon3ZSfNMmGJa9Q@mail.gmail.com>
+Message-ID: <537ED0AE.7040901@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Laurent Pinchart (2014-05-22 16:29:41)
-> Hi Ulrich,
-> 
-> Thank you for the patch.
-> 
-> On Thursday 22 May 2014 16:23:43 Ulrich Hecht wrote:
-> > Driver for the R8A7740's clocks that are too specific to be supported by a
-> > generic driver.
-> > 
-> > Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-> 
-> This looks good enough to me. However, as I've mentioned before, I think the 
-> bindings should be marked as experimental until we integrate MSTP clocks 
-> support (and see how we could fix the overlapping reg ranges issue) and add 
-> support for at least some of the remaining clocks.
-> 
-> If that's not an issue, provided we mark the bindings experimental,
-> 
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Hi, All.
 
-I'm always happy to not commit to ABI stability for DT bindings ;-)
+This patch is working on progress?
+I want to merge this patch for fixing dw-mmc controller problem.
 
-Ulrich, will you send a V5 with this change?
+If this patch didn't work on progress, i will send the patch based-on this patch.
 
-Thanks,
-Mike
+Best Regards,
+Jaehoon Chung
 
+On 05/14/2014 06:53 PM, Ulf Hansson wrote:
+> On 7 May 2014 12:06, Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
+>> Some hosts manage several slots. In these case information such as the bus
+>> width, chip detect and others are into the slot node. So we have to parse
+>> child nodes. If not NULL, slot node will be used instead of the device
+>> node.
+>>
+>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+>> ---
+>>
+>> Hi,
+>>
+>> Since this patch is only a RFC, I have not yet updated drivers using this
+>> function.
+>>
+>> I would like to use mmc_of_parse to reduce code duplication. My issue is that
+>> atmel mci is a bit different from others mci host since it can provide
+>> several slots, so it allocates several mmc hosts. By the way, it is not the
+>> only one.
+>>
+>> When calling mmc_alloc_host, host->parent is set to &pdev->dev. mmc_of_parse
+>> uses host->parent->of_node but in my case settings are in the slot nodes so in
+>> the child nodes. That's why I would like to have a way to tell which node I
+>> want to use.
 > 
-> > ---
-> > Changes since v3:
-> > - removed excess element in struct initializer
-> > - use of_clk_get_parent_name() instead of hardcoding extal2
-> > - fixed wrong parent index for extalr
-> > - reformatted register addresses
-> > 
-> > Changes since v2:
-> > - added missing clock extal2
-> > - removed redundant divider mask
-> > 
-> > Changes since v1:
-> > - reshuffled to include DT bindings and Makefile changes
-> > 
-> >  .../bindings/clock/renesas,r8a7740-cpg-clocks.txt  |  39 ++++
-> >  drivers/clk/shmobile/Makefile                      |   1 +
-> >  drivers/clk/shmobile/clk-r8a7740.c                 | 199 ++++++++++++++++++
-> >  3 files changed, 239 insertions(+)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/clock/renesas,r8a7740-cpg-clocks.txt
-> > create mode 100644 drivers/clk/shmobile/clk-r8a7740.c
-> > 
-> > diff --git
-> > a/Documentation/devicetree/bindings/clock/renesas,r8a7740-cpg-clocks.txt
-> > b/Documentation/devicetree/bindings/clock/renesas,r8a7740-cpg-clocks.txt
-> > new file mode 100644
-> > index 0000000..8432e00
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/clock/renesas,r8a7740-cpg-clocks.txt
-> > @@ -0,0 +1,39 @@
-> > +* Renesas R8A7740  Clock Pulse Generator (CPG)
-> > +
-> > +The CPG generates core clocks for the R8A7740 SoC. It includes three PLLs
-> > +and several fixed ratio and variable ratio dividers.
-> > +
-> > +Required Properties:
-> > +
-> > +  - compatible: Must be "renesas,r8a7740-cpg-clocks"
-> > +
-> > +  - reg: Base address and length of the memory resource used by the CPG
-> > +
-> > +  - clocks: Reference to the three parent clocks
-> > +  - #clock-cells: Must be 1
-> > +  - clock-output-names: The names of the clocks. Supported clocks are
-> > +    "system", "pllc0", "pllc1", "pllc2", "r", "usb24s", "i", "zg", "b",
-> > +    "m1", "hp", "hpp", "usbp", "s", "zb", "m3", and "cp".
-> > +
-> > +  - renesas,mode: board-specific settings of the MD_CK* bits
-> > +
-> > +
-> > +Example
-> > +-------
-> > +
-> > +cpg_clocks: cpg_clocks at e6150000 {
-> > +        compatible = "renesas,r8a7740-cpg-clocks";
-> > +        reg = <0xe6150000 0x10000>;
-> > +        clocks = <&extal1_clk>, <&extal2_clk>, <&extalr_clk>;
-> > +        #clock-cells = <1>;
-> > +        clock-output-names = "system", "pllc0", "pllc1",
-> > +                             "pllc2", "r",
-> > +                             "usb24s",
-> > +                             "i", "zg", "b", "m1", "hp",
-> > +                             "hpp", "usbp", "s", "zb", "m3",
-> > +                             "cp";
-> > +};
-> > +
-> > +&cpg_clocks {
-> > +     renesas,mode = <0x05>;
-> > +};
-> > diff --git a/drivers/clk/shmobile/Makefile b/drivers/clk/shmobile/Makefile
-> > index 5404cb9..20388e8 100644
-> > --- a/drivers/clk/shmobile/Makefile
-> > +++ b/drivers/clk/shmobile/Makefile
-> > @@ -1,5 +1,6 @@
-> >  obj-$(CONFIG_ARCH_EMEV2)             += clk-emev2.o
-> >  obj-$(CONFIG_ARCH_R7S72100)          += clk-rz.o
-> > +obj-$(CONFIG_ARCH_R8A7740)           += clk-r8a7740.o
-> >  obj-$(CONFIG_ARCH_R8A7790)           += clk-rcar-gen2.o
-> >  obj-$(CONFIG_ARCH_R8A7791)           += clk-rcar-gen2.o
-> >  obj-$(CONFIG_ARCH_SHMOBILE_MULTI)    += clk-div6.o
-> > diff --git a/drivers/clk/shmobile/clk-r8a7740.c
-> > b/drivers/clk/shmobile/clk-r8a7740.c new file mode 100644
-> > index 0000000..1e2eaae
-> > --- /dev/null
-> > +++ b/drivers/clk/shmobile/clk-r8a7740.c
-> > @@ -0,0 +1,199 @@
-> > +/*
-> > + * r8a7740 Core CPG Clocks
-> > + *
-> > + * Copyright (C) 2014  Ulrich Hecht
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; version 2 of the License.
-> > + */
-> > +
-> > +#include <linux/clk-provider.h>
-> > +#include <linux/clkdev.h>
-> > +#include <linux/clk/shmobile.h>
-> > +#include <linux/init.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/spinlock.h>
-> > +
-> > +struct r8a7740_cpg {
-> > +     struct clk_onecell_data data;
-> > +     spinlock_t lock;
-> > +     void __iomem *reg;
-> > +};
-> > +
-> > +#define CPG_FRQCRA   0x00
-> > +#define CPG_FRQCRB   0x04
-> > +#define CPG_PLLC2CR  0x2c
-> > +#define CPG_USBCKCR  0x8c
-> > +#define CPG_FRQCRC   0xe0
-> > +
-> > +#define CLK_ENABLE_ON_INIT BIT(0)
-> > +
-> > +struct div4_clk {
-> > +     const char *name;
-> > +     unsigned int reg;
-> > +     unsigned int shift;
-> > +     int flags;
-> > +};
-> > +
-> > +static struct div4_clk div4_clks[] = {
-> > +     { "i", CPG_FRQCRA, 20, CLK_ENABLE_ON_INIT },
-> > +     { "zg", CPG_FRQCRA, 16, CLK_ENABLE_ON_INIT },
-> > +     { "b", CPG_FRQCRA,  8, CLK_ENABLE_ON_INIT },
-> > +     { "m1", CPG_FRQCRA,  4, CLK_ENABLE_ON_INIT },
-> > +     { "hp", CPG_FRQCRB,  4, 0 },
-> > +     { "hpp", CPG_FRQCRC, 20, 0 },
-> > +     { "usbp", CPG_FRQCRC, 16, 0 },
-> > +     { "s", CPG_FRQCRC, 12, 0 },
-> > +     { "zb", CPG_FRQCRC,  8, 0 },
-> > +     { "m3", CPG_FRQCRC,  4, 0 },
-> > +     { "cp", CPG_FRQCRC,  0, 0 },
-> > +     { NULL, 0, 0, 0 },
-> > +};
-> > +
-> > +static const struct clk_div_table div4_div_table[] = {
-> > +     { 0, 2 }, { 1, 3 }, { 2, 4 }, { 3, 6 }, { 4, 8 }, { 5, 12 },
-> > +     { 6, 16 }, { 7, 18 }, { 8, 24 }, { 9, 32 }, { 10, 36 }, { 11, 48 },
-> > +     { 13, 72 }, { 14, 96 }, { 0, 0 }
-> > +};
-> > +
-> > +static u32 cpg_mode __initdata;
-> > +
-> > +static struct clk * __init
-> > +r8a7740_cpg_register_clock(struct device_node *np, struct r8a7740_cpg *cpg,
-> > +                          const char *name)
-> > +{
-> > +     const struct clk_div_table *table = NULL;
-> > +     const char *parent_name;
-> > +     unsigned int shift, reg;
-> > +     unsigned int mult = 1;
-> > +     unsigned int div = 1;
-> > +
-> > +     if (!strcmp(name, "r")) {
-> > +             switch (cpg_mode & (BIT(2) | BIT(1))) {
-> > +             case BIT(1) | BIT(2):
-> > +                     /* extal1 */
-> > +                     parent_name = of_clk_get_parent_name(np, 0);
-> > +                     div = 2048;
-> > +                     break;
-> > +             case BIT(2):
-> > +                     /* extal1 */
-> > +                     parent_name = of_clk_get_parent_name(np, 0);
-> > +                     div = 1024;
-> > +                     break;
-> > +             default:
-> > +                     /* extalr */
-> > +                     parent_name = of_clk_get_parent_name(np, 2);
-> > +                     break;
-> > +             }
-> > +     } else if (!strcmp(name, "system")) {
-> > +             parent_name = of_clk_get_parent_name(np, 0);
-> > +             if (cpg_mode & BIT(1))
-> > +                     div = 2;
-> > +     } else if (!strcmp(name, "pllc0")) {
-> > +             /* PLLC0/1 are configurable multiplier clocks. Register them as
-> > +              * fixed factor clocks for now as there's no generic multiplier
-> > +              * clock implementation and we currently have no need to change
-> > +              * the multiplier value.
-> > +              */
-> > +             u32 value = clk_readl(cpg->reg + CPG_FRQCRC);
-> > +             parent_name = "system";
-> > +             mult = ((value >> 24) & 0x7f) + 1;
-> > +     } else if (!strcmp(name, "pllc1")) {
-> > +             u32 value = clk_readl(cpg->reg + CPG_FRQCRA);
-> > +             parent_name = "system";
-> > +             mult = ((value >> 24) & 0x7f) + 1;
-> > +             div = 2;
-> > +     } else if (!strcmp(name, "pllc2")) {
-> > +             u32 value = clk_readl(cpg->reg + CPG_PLLC2CR);
-> > +             parent_name = "system";
-> > +             mult = ((value >> 24) & 0x3f) + 1;
-> > +     } else if (!strcmp(name, "usb24s")) {
-> > +             u32 value = clk_readl(cpg->reg + CPG_USBCKCR);
-> > +             if (value & BIT(7))
-> > +                     /* extal2 */
-> > +                     parent_name = of_clk_get_parent_name(np, 1);
-> > +             else
-> > +                     parent_name = "system";
-> > +             if (!(value & BIT(6)))
-> > +                     div = 2;
-> > +     } else {
-> > +             struct div4_clk *c;
-> > +             for (c = div4_clks; c->name; c++) {
-> > +                     if (!strcmp(name, c->name)) {
-> > +                             parent_name = "pllc1";
-> > +                             table = div4_div_table;
-> > +                             reg = c->reg;
-> > +                             shift = c->shift;
-> > +                             break;
-> > +                     }
-> > +             }
-> > +             if (!c->name)
-> > +                     return ERR_PTR(-EINVAL);
-> > +     }
-> > +
-> > +     if (!table) {
-> > +             return clk_register_fixed_factor(NULL, name, parent_name, 0,
-> > +                                              mult, div);
-> > +     } else {
-> > +             return clk_register_divider_table(NULL, name, parent_name, 0,
-> > +                                               cpg->reg + reg, shift, 4, 0,
-> > +                                               table, &cpg->lock);
-> > +     }
-> > +}
-> > +
-> > +static void __init r8a7740_cpg_clocks_init(struct device_node *np)
-> > +{
-> > +     struct r8a7740_cpg *cpg;
-> > +     struct clk **clks;
-> > +     unsigned int i;
-> > +     int num_clks;
-> > +
-> > +     if (of_property_read_u32(np, "renesas,mode", &cpg_mode))
-> > +             pr_warn("%s: missing renesas,mode property\n", __func__);
-> > +
-> > +     num_clks = of_property_count_strings(np, "clock-output-names");
-> > +     if (num_clks < 0) {
-> > +             pr_err("%s: failed to count clocks\n", __func__);
-> > +             return;
-> > +     }
-> > +
-> > +     cpg = kzalloc(sizeof(*cpg), GFP_KERNEL);
-> > +     clks = kzalloc(num_clks * sizeof(*clks), GFP_KERNEL);
-> > +     if (cpg == NULL || clks == NULL) {
-> > +             /* We're leaking memory on purpose, there's no point in cleaning
-> > +              * up as the system won't boot anyway.
-> > +              */
-> > +             return;
-> > +     }
-> > +
-> > +     spin_lock_init(&cpg->lock);
-> > +
-> > +     cpg->data.clks = clks;
-> > +     cpg->data.clk_num = num_clks;
-> > +
-> > +     cpg->reg = of_iomap(np, 0);
-> > +     if (WARN_ON(cpg->reg == NULL))
-> > +             return;
-> > +
-> > +     for (i = 0; i < num_clks; ++i) {
-> > +             const char *name;
-> > +             struct clk *clk;
-> > +
-> > +             of_property_read_string_index(np, "clock-output-names", i,
-> > +                                           &name);
-> > +
-> > +             clk = r8a7740_cpg_register_clock(np, cpg, name);
-> > +             if (IS_ERR(clk))
-> > +                     pr_err("%s: failed to register %s %s clock (%ld)\n",
-> > +                            __func__, np->name, name, PTR_ERR(clk));
-> > +             else
-> > +                     cpg->data.clks[i] = clk;
-> > +     }
-> > +
-> > +     of_clk_add_provider(np, of_clk_src_onecell_get, &cpg->data);
-> > +}
-> > +CLK_OF_DECLARE(r8a7740_cpg_clks, "renesas,r8a7740-cpg-clocks",
-> > +            r8a7740_cpg_clocks_init);
+> Seems reasonable, thanks for working on this!
 > 
-> -- 
-> Regards,
+>>
+>>
+>> Regards
+>>
+>> Ludovic
+>>
+>>
+>>
+>>  drivers/mmc/core/host.c |    9 +++++++--
+>>  1 file changed, 7 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+>> index fdea825..ed6cea5 100644
+>> --- a/drivers/mmc/core/host.c
+>> +++ b/drivers/mmc/core/host.c
+>> @@ -300,13 +300,15 @@ static inline void mmc_host_clk_sysfs_init(struct mmc_host *host)
+>>  /**
+>>   *     mmc_of_parse() - parse host's device-tree node
+>>   *     @host: host whose node should be parsed.
+>> + *     @slot: some devices provide several slots so the node to parse
+>> + *     is not the host one.
+>>   *
+>>   * To keep the rest of the MMC subsystem unaware of whether DT has been
+>>   * used to to instantiate and configure this host instance or not, we
+>>   * parse the properties and set respective generic mmc-host flags and
+>>   * parameters.
+>>   */
+>> -int mmc_of_parse(struct mmc_host *host)
+>> +int mmc_of_parse(struct mmc_host *host, struct device_node *slot)
+>>  {
+>>         struct device_node *np;
+>>         u32 bus_width;
+>> @@ -317,7 +319,10 @@ int mmc_of_parse(struct mmc_host *host)
+>>         if (!host->parent || !host->parent->of_node)
+>>                 return 0;
+>>
+>> -       np = host->parent->of_node;
+>> +       if (slot)
+>> +               np = slot;
+>> +       else
+>> +               np = host->parent->of_node;
+>>
+>>         /* "bus-width" is translated to MMC_CAP_*_BIT_DATA flags */
+>>         if (of_property_read_u32(np, "bus-width", &bus_width) < 0) {
+>> --
+>> 1.7.9.5
+>>
 > 
-> Laurent Pinchart
+> How about adding a new API, __mmc_of_parse((struct mmc_host *host,
+> struct device_node *slot)
+> Then let the old API mmc_of_parse() remain as is, but let it call the
+> new API with slot == NULL.
+> 
+> Atmel can then use the new API, but the other drivers can remain as is.
+> 
+> Kind regards
+> Ulf Hansson
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
