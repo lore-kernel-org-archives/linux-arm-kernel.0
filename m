@@ -1,33 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 May 2014 23:27:51 +0200
-Subject: [GIT PULL] at91: DT for 3.16 at91-dt3 #3
-In-Reply-To: <1400775895-31183-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1400775895-31183-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <201405232327.52312.arnd@arndb.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 23 May 2014 17:28:10 -0400
+Subject: [Patch v7 0/7] Introduce keystone reset driver
+In-Reply-To: <1400859812-5761-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1400859812-5761-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <537FBD6A.9040308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 May 2014, Nicolas Ferre wrote:
-> Another AT91 DT pull-request for 3.16. This one is the conversion of two more
-> SoC to Common Clock Framework (aka CCF). I identified it as a "DT" pull-request
-> but it modifies slightly a couple of files in mach-at91 (use of a configuration
-> option).
-
-Four done, four more to go? Nice progress!
-
-> This pull-request depends on:
-> - the fixes that I already sent for 3.15 and that are present in the recent
->   3.15-rc6 tag.
-> - the at91-cleanup tag that you integrated in your arm-soc/next/soc branch.
-> So, as suggested by Arnd on IRC, I merged both of them to act as the base
-> before adding the material for this pull-request.
+On Friday 23 May 2014 11:43 AM, Ivan Khoronzhuk wrote:
+> These patches introduce keystone reset driver.
 > 
-> About the clock nodes that should be grouped in a "clocks" container or not,
-> while waiting for a clear statement by the DT maintainers, I kept the clocks
-> nodes as they had been written by Boris.
-> As proposed by Olof, I plan to send you a comprehensive patch that fixes this
-> when Mark gives his point of view.
+> The keystone SoC can be rebooted in several ways. By external reset
+> pin, by soft and by watchdogs. This driver allows software reset and reset
+> by one of the watchdogs. Also added opportunity to set soft/hard reset type.
+> 
+> Based on linux-next/master
+> 
+> v7..v6
+>   power: reset: keystone-reset: introduce keystone reset driver
+>   power: reset: add bindings for keystone reset driver
+>   ARM: dts: keystone: update reset node to work with reset driver
+> 	- s/wdt_list/wdt-list/g
+> 
 
-Ok. I've merged it into next/dt now.
+I dropped patch 3/7 since its already queued up in mfd tree. Rest
+of the patches with minor commit edits queued for 3.16. Pull request
+to follow.
 
-	Arnd
+Regards,
+Santosh
