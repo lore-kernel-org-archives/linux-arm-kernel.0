@@ -1,48 +1,41 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:33 +0200
-Subject: [PATCH 53/71] clocksource: arm_global_timer: Only check for unusable
- timer on A9
+Date: Fri, 23 May 2014 12:31:31 +0200
+Subject: [PATCH 51/71] clocksource: sh_mtu2: Remove FSF mail address from GPL
+ notice
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-53-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-51-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthew Leach <matthew.leach@arm.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The check for a usable global timer in the probe code does not enquire
-which CPU we are currently running on. This can cause the driver to
-incorrectly assume we have an unusable global timer if we are running
-on a CPU other than A9.
+Do not include the paragraph about writing to the Free Software
+Foundation's mailing address from the sample GPL notice. The FSF has
+changed addresses in the past, and may do so again. Linux already
+includes a copy of the GPL.
 
-Before checking the CPU revision, ensure we are running on an A9 CPU.
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Matthew Leach <matthew.leach@arm.com>
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Tested-by: Wolfram Sang <wsa@sang-engineering.com>
 ---
- drivers/clocksource/arm_global_timer.c |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/clocksource/sh_mtu2.c |    4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
-index 0fc31d0..60e5a170 100644
---- a/drivers/clocksource/arm_global_timer.c
-+++ b/drivers/clocksource/arm_global_timer.c
-@@ -246,11 +246,12 @@ static void __init global_timer_of_register(struct device_node *np)
- 	int err = 0;
+diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
+index 3a37857..510bd32 100644
+--- a/drivers/clocksource/sh_mtu2.c
++++ b/drivers/clocksource/sh_mtu2.c
+@@ -11,10 +11,6 @@
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
  
- 	/*
--	 * In r2p0 the comparators for each processor with the global timer
-+	 * In A9 r2p0 the comparators for each processor with the global timer
- 	 * fire when the timer value is greater than or equal to. In previous
- 	 * revisions the comparators fired when the timer value was equal to.
- 	 */
--	if ((read_cpuid_id() & 0xf0000f) < 0x200000) {
-+	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9
-+	    && (read_cpuid_id() & 0xf0000f) < 0x200000) {
- 		pr_warn("global-timer: non support for this cpu version.\n");
- 		return;
- 	}
+ #include <linux/init.h>
 -- 
 1.7.9.5
