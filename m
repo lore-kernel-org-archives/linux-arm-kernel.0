@@ -1,60 +1,81 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:08 +0200
-Subject: [PATCH 28/71] clocksource: sh_tmu: Replace kmalloc + memset with
- kzalloc
+Date: Fri, 23 May 2014 12:31:10 +0200
+Subject: [PATCH 30/71] clocksource: sh_tmu: Replace hardcoded register values
+ with macros
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-28-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-30-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-One kzalloc a day keeps the bugs away.
+Define symbolic macros for all used registers bits.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/clocksource/sh_tmu.c |    6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+ drivers/clocksource/sh_tmu.c |   19 ++++++++++++++-----
+ 1 file changed, 14 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
-index e304304..26a9f7d 100644
+index 55b7a37..63ed92d 100644
 --- a/drivers/clocksource/sh_tmu.c
 +++ b/drivers/clocksource/sh_tmu.c
-@@ -397,8 +397,6 @@ static void sh_tmu_register_clockevent(struct sh_tmu_channel *ch,
- 	struct clock_event_device *ced = &ch->ced;
- 	int ret;
+@@ -69,6 +69,15 @@ static DEFINE_RAW_SPINLOCK(sh_tmu_lock);
+ #define TCNT 1 /* channel register */
+ #define TCR 2 /* channel register */
  
--	memset(ced, 0, sizeof(*ced));
--
- 	ced->name = name;
- 	ced->features = CLOCK_EVT_FEAT_PERIODIC;
- 	ced->features |= CLOCK_EVT_FEAT_ONESHOT;
-@@ -441,7 +439,6 @@ static int sh_tmu_channel_setup(struct sh_tmu_channel *ch,
++#define TCR_UNF			(1 << 8)
++#define TCR_UNIE		(1 << 5)
++#define TCR_TPSC_CLK4		(0 << 0)
++#define TCR_TPSC_CLK16		(1 << 0)
++#define TCR_TPSC_CLK64		(2 << 0)
++#define TCR_TPSC_CLK256		(3 << 0)
++#define TCR_TPSC_CLK1024	(4 << 0)
++#define TCR_TPSC_MASK		(7 << 0)
++
+ static inline unsigned long sh_tmu_read(struct sh_tmu_channel *ch, int reg_nr)
  {
- 	struct sh_timer_config *cfg = tmu->pdev->dev.platform_data;
+ 	unsigned long offs;
+@@ -140,7 +149,7 @@ static int __sh_tmu_enable(struct sh_tmu_channel *ch)
  
--	memset(ch, 0, sizeof(*ch));
- 	ch->tmu = tmu;
+ 	/* configure channel to parent clock / 4, irq off */
+ 	ch->rate = clk_get_rate(ch->tmu->clk) / 4;
+-	sh_tmu_write(ch, TCR, 0x0000);
++	sh_tmu_write(ch, TCR, TCR_TPSC_CLK4);
  
- 	/*
-@@ -475,7 +472,6 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
- 	int ret;
- 	ret = -ENXIO;
+ 	/* enable channel */
+ 	sh_tmu_start_stop_ch(ch, 1);
+@@ -165,7 +174,7 @@ static void __sh_tmu_disable(struct sh_tmu_channel *ch)
+ 	sh_tmu_start_stop_ch(ch, 0);
  
--	memset(tmu, 0, sizeof(*tmu));
- 	tmu->pdev = pdev;
+ 	/* disable interrupts in TMU block */
+-	sh_tmu_write(ch, TCR, 0x0000);
++	sh_tmu_write(ch, TCR, TCR_TPSC_CLK4);
  
- 	if (!cfg) {
-@@ -547,7 +543,7 @@ static int sh_tmu_probe(struct platform_device *pdev)
- 		goto out;
- 	}
+ 	/* stop clock */
+ 	clk_disable(ch->tmu->clk);
+@@ -195,7 +204,7 @@ static void sh_tmu_set_next(struct sh_tmu_channel *ch, unsigned long delta,
+ 	sh_tmu_read(ch, TCR);
  
--	tmu = kmalloc(sizeof(*tmu), GFP_KERNEL);
-+	tmu = kzalloc(sizeof(*tmu), GFP_KERNEL);
- 	if (tmu == NULL) {
- 		dev_err(&pdev->dev, "failed to allocate driver data\n");
- 		return -ENOMEM;
+ 	/* enable interrupt */
+-	sh_tmu_write(ch, TCR, 0x0020);
++	sh_tmu_write(ch, TCR, TCR_UNIE | TCR_TPSC_CLK4);
+ 
+ 	/* reload delta value in case of periodic timer */
+ 	if (periodic)
+@@ -215,9 +224,9 @@ static irqreturn_t sh_tmu_interrupt(int irq, void *dev_id)
+ 
+ 	/* disable or acknowledge interrupt */
+ 	if (ch->ced.mode == CLOCK_EVT_MODE_ONESHOT)
+-		sh_tmu_write(ch, TCR, 0x0000);
++		sh_tmu_write(ch, TCR, TCR_TPSC_CLK4);
+ 	else
+-		sh_tmu_write(ch, TCR, 0x0020);
++		sh_tmu_write(ch, TCR, TCR_UNIE | TCR_TPSC_CLK4);
+ 
+ 	/* notify clockevent layer */
+ 	ch->ced.event_handler(&ch->ced);
 -- 
 1.7.9.5
