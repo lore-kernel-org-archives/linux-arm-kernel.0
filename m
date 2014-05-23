@@ -1,49 +1,33 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 23 May 2014 16:10:17 +0100
-Subject: [RESEND PATCH v5 3/5] ARM: Conceal DEBUG_LL_UART_NONE from
- unsupported platforms
+Date: Fri, 23 May 2014 16:10:16 +0100
+Subject: [RESEND PATCH v5 2/5] ARM: ep93xx: Enable DEBUG_LL_UART_PL01X
 In-Reply-To: <1400857819-7975-1-git-send-email-daniel.thompson@linaro.org>
 References: <1398355246-29571-1-git-send-email-daniel.thompson@linaro.org>
  <1400857819-7975-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1400857819-7975-4-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1400857819-7975-3-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only a small handful of platforms support DEBUG_LL_UART_NONE but it
-lurks in the menus of every single platform config ready to break the
-build. This is an especial problem for defconfigs since it is often
-selected by default.
-
-This patch limit this choice only to platforms capable of supporting it.
+This defconfig already enables DEBUG_LL and by default DEBUG_LL_UART_NONE
+will be selected (but due to some back compability magic I'd like to
+remove is not actually honoured). DEBUG_LL_UART_PL01X is a much saner
+default.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 ---
- arch/arm/Kconfig.debug | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+ arch/arm/configs/ep93xx_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index eab8ecb..4c8d7db 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -842,7 +842,18 @@ choice
- 
- 	config DEBUG_LL_UART_NONE
- 		bool "No low-level debugging UART"
--		depends on !ARCH_MULTIPLATFORM
-+		depends on ARCH_AT91 || \
-+			ARCH_CLPS711X || \
-+			ARCH_FOOTBRIDGE || \
-+			ARCH_KS8695 || \
-+			ARCH_NETX || \
-+			ARCH_OMAP1 || \
-+			ARCH_SA1100 || \
-+			ARCH_S3C24XX || \
-+			ARCH_S3C64XX || \
-+			ARCH_S5P64X0 || \
-+			ARCH_S5PC100 || \
-+			ARCH_S5PV210
- 		help
- 		  Say Y here if your platform doesn't provide a UART option
- 		  above. This relies on your platform choosing the right UART
+diff --git a/arch/arm/configs/ep93xx_defconfig b/arch/arm/configs/ep93xx_defconfig
+index 6ac5ea7..ff70784 100644
+--- a/arch/arm/configs/ep93xx_defconfig
++++ b/arch/arm/configs/ep93xx_defconfig
+@@ -108,5 +108,6 @@ CONFIG_DEBUG_SPINLOCK=y
+ CONFIG_DEBUG_MUTEXES=y
+ CONFIG_DEBUG_USER=y
+ CONFIG_DEBUG_LL=y
++CONFIG_DEBUG_LL_UART_PL01X=y
+ # CONFIG_CRYPTO_ANSI_CPRNG is not set
+ CONFIG_LIBCRC32C=y
 -- 
 1.9.0
