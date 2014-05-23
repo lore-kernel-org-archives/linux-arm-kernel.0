@@ -1,48 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 May 2014 15:46:09 +0200
-Subject: [Ksummit-discuss] [TECH TOPIC] ARM legacy board DT conversion
- finalization
-In-Reply-To: <CAL_Jsq+kOu82okhJn0_ftwemE_m4nsTRawrF-fWAU2XTJ9xRcA@mail.gmail.com>
-References: <20140511030009.GO12708@titan.lakedaemon.net>
- <20140516184205.GL27822@titan.lakedaemon.net>
- <1400278842.2647.62.camel@deadeye.wl.decadent.org.uk>
- <4931877.zNfKfvcgox@wuerfel>
- <CAL_Jsq+kOu82okhJn0_ftwemE_m4nsTRawrF-fWAU2XTJ9xRcA@mail.gmail.com>
-Message-ID: <CACRpkdaPStOjWeH9SgHKjcyrOfebbnvs_p5rWueNBdt9oBBMzg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 23 May 2014 14:47:20 +0100
+Subject: EFI_STUB fails to boot non-EFI on arm64
+In-Reply-To: <20140523131656.GR4179@bivouac.eciton.net>
+References: <20140523094513.GC9252@arm.com>
+ <20140523131656.GR4179@bivouac.eciton.net>
+Message-ID: <20140523134720.GA9256@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 1:06 AM, Rob Herring <robh@kernel.org> wrote:
-> On Mon, May 19, 2014 at 7:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Fri, May 23, 2014 at 02:16:56PM +0100, Leif Lindholm wrote:
+> Subject: [PATCH] arm64: efi: only attempt efi map setup if booting via EFI
+> 
+> Booting a kernel with CONFIG_EFI enabled on a non-EFI system caused
+> an oops with the current UEFI support code.
+> Add the required test to prevent this.
+> 
+> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> ---
+>  arch/arm64/kernel/efi.c |    3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index 7bfd650..14db1f6 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -333,6 +333,9 @@ void __init efi_init(void)
+>  
+>  void __init efi_idmap_init(void)
+>  {
+> +	if (!efi_enabled(EFI_BOOT))
+> +		return;
+> +
 
->> We should really have this in multiplatform soon, I think the last issue
->> for versatile is common clock support, but Linus Walleij may have more
->> details about what remains here.
->
-> While not necessarily the same thing, but does move versatile in the
-> right direction, I've got patches in progress which fully move
-> versatile over to DT.
+That's a first (possibly temporary) step and I think it's fine:
 
-Doing this two-stage rocket:
-Legacy -> DT -> multiplatform
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Is usually the smoothest. That is what I did on U300, U8500
-and will do on the Integrator.
+But we need some further tweaking to the way we call efi_init().
+Currently it doesn't matter whether Linux booted as an EFI application
+or not and efi_init() is always called, causing some pr_err() in
+fdt_find_uefi_params(). It's not really an error as we support the same
+image booting non-EFI as well.
 
-> I'd like to do this all in one step to avoid doing things like non-DT
-> common clock init. It's blocked on the common DT PCI code and my free
-> time.
+Can we add another of detecting whether it's an EFI application and
+avoid calling efi_init()? I can see x86 sets some efi_loader_signature
+string in exit_boot() and checks against it later when calling
+efi_init().
 
-I agree. And invariably this will confuse a lot of QEMU users
-until they figure out how to boot their new image with a device
-tree. But that is business as usual I guess.
-
-> There are then a few bits related to mach/plat headers needed move
-> versatile to multiplatform. I think these issues are mostly the same
-> changes that have been done or are needed on integrator which is what
-> Linus has been working on.
-
-I'm onto these as part of both Integrator and RealView modernization.
-
-Yours,
-Linus Walleij
+-- 
+Catalin
