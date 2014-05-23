@@ -1,96 +1,60 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:25 +0200
-Subject: [PATCH 45/71] clocksource: sh_mtu2: Allocate channels dynamically
+Date: Fri, 23 May 2014 12:31:08 +0200
+Subject: [PATCH 28/71] clocksource: sh_tmu: Replace kmalloc + memset with
+ kzalloc
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-45-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-28-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-This prepares the driver for multi-channel support.
+One kzalloc a day keeps the bugs away.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Tested-by: Wolfram Sang <wsa@sang-engineering.com>
 ---
- drivers/clocksource/sh_mtu2.c |   27 ++++++++++++++++++++-------
- 1 file changed, 20 insertions(+), 7 deletions(-)
+ drivers/clocksource/sh_tmu.c |    6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
-index 94a5342..45e1e85 100644
---- a/drivers/clocksource/sh_mtu2.c
-+++ b/drivers/clocksource/sh_mtu2.c
-@@ -52,7 +52,8 @@ struct sh_mtu2_device {
- 	void __iomem *mapbase;
- 	struct clk *clk;
+diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
+index e304304..26a9f7d 100644
+--- a/drivers/clocksource/sh_tmu.c
++++ b/drivers/clocksource/sh_tmu.c
+@@ -397,8 +397,6 @@ static void sh_tmu_register_clockevent(struct sh_tmu_channel *ch,
+ 	struct clock_event_device *ced = &ch->ced;
+ 	int ret;
  
--	struct sh_mtu2_channel channel;
-+	struct sh_mtu2_channel *channels;
-+	unsigned int num_channels;
- };
- 
- static DEFINE_RAW_SPINLOCK(sh_mtu2_lock);
-@@ -296,6 +297,7 @@ static int sh_mtu2_setup(struct sh_mtu2_device *mtu,
+-	memset(ced, 0, sizeof(*ced));
+-
+ 	ced->name = name;
+ 	ced->features = CLOCK_EVT_FEAT_PERIODIC;
+ 	ced->features |= CLOCK_EVT_FEAT_ONESHOT;
+@@ -441,7 +439,6 @@ static int sh_tmu_channel_setup(struct sh_tmu_channel *ch,
  {
- 	struct sh_timer_config *cfg = pdev->dev.platform_data;
- 	struct resource *res;
-+	void __iomem *base;
+ 	struct sh_timer_config *cfg = tmu->pdev->dev.platform_data;
+ 
+-	memset(ch, 0, sizeof(*ch));
+ 	ch->tmu = tmu;
+ 
+ 	/*
+@@ -475,7 +472,6 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
  	int ret;
  	ret = -ENXIO;
  
-@@ -315,16 +317,16 @@ static int sh_mtu2_setup(struct sh_mtu2_device *mtu,
+-	memset(tmu, 0, sizeof(*tmu));
+ 	tmu->pdev = pdev;
+ 
+ 	if (!cfg) {
+@@ -547,7 +543,7 @@ static int sh_tmu_probe(struct platform_device *pdev)
+ 		goto out;
  	}
  
- 	/*
--	 * Map memory, let channel.base point to our channel and mapbase to the
-+	 * Map memory, let base point to our channel and mapbase to the
- 	 * start/stop shared register.
- 	 */
--	mtu->channel.base = ioremap_nocache(res->start, resource_size(res));
--	if (mtu->channel.base == NULL) {
-+	base = ioremap_nocache(res->start, resource_size(res));
-+	if (base == NULL) {
- 		dev_err(&mtu->pdev->dev, "failed to remap I/O memory\n");
- 		goto err0;
- 	}
- 
--	mtu->mapbase = mtu->channel.base + cfg->channel_offset;
-+	mtu->mapbase = base + cfg->channel_offset;
- 
- 	/* get hold of clock */
- 	mtu->clk = clk_get(&mtu->pdev->dev, "mtu2_fck");
-@@ -338,17 +340,28 @@ static int sh_mtu2_setup(struct sh_mtu2_device *mtu,
- 	if (ret < 0)
- 		goto err2;
- 
--	ret = sh_mtu2_setup_channel(&mtu->channel, mtu);
-+	mtu->channels = kzalloc(sizeof(*mtu->channels), GFP_KERNEL);
-+	if (mtu->channels == NULL) {
-+		ret = -ENOMEM;
-+		goto err3;
-+	}
-+
-+	mtu->num_channels = 1;
-+
-+	mtu->channels[0].base = base;
-+
-+	ret = sh_mtu2_setup_channel(&mtu->channels[0], mtu);
- 	if (ret < 0)
- 		goto err3;
- 
- 	return 0;
-  err3:
-+	kfree(mtu->channels);
- 	clk_unprepare(mtu->clk);
-  err2:
- 	clk_put(mtu->clk);
-  err1:
--	iounmap(mtu->channel.base);
-+	iounmap(base);
-  err0:
- 	return ret;
- }
+-	tmu = kmalloc(sizeof(*tmu), GFP_KERNEL);
++	tmu = kzalloc(sizeof(*tmu), GFP_KERNEL);
+ 	if (tmu == NULL) {
+ 		dev_err(&pdev->dev, "failed to allocate driver data\n");
+ 		return -ENOMEM;
 -- 
 1.7.9.5
