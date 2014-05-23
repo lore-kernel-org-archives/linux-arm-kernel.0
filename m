@@ -1,122 +1,180 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:00 +0200
-Subject: [PATCH 20/71] clocksource: sh_cmt: Request IRQ for clock event device
- only
+Date: Fri, 23 May 2014 12:31:03 +0200
+Subject: [PATCH 23/71] clocksource: sh_tmu: Rename struct sh_tmu_priv to
+ sh_tmu_device
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-20-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-23-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Clock sources don't need an IRQ, request the IRQ only for channels used
-as clock event devices.
+Channel data is private as well, rename priv to device to make the
+distrinction between the core device and the channels clearer.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/clocksource/sh_cmt.c |   51 ++++++++++++++++++++++--------------------
- 1 file changed, 27 insertions(+), 24 deletions(-)
+ drivers/clocksource/sh_tmu.c |   68 +++++++++++++++++++++---------------------
+ 1 file changed, 34 insertions(+), 34 deletions(-)
 
-diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
-index 9f215e7..bc8d025 100644
---- a/drivers/clocksource/sh_cmt.c
-+++ b/drivers/clocksource/sh_cmt.c
-@@ -785,10 +785,28 @@ static void sh_cmt_clock_event_resume(struct clock_event_device *ced)
- 	pm_genpd_syscore_poweron(&ch->cmt->pdev->dev);
- }
+diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
+index 26457e1..7013790 100644
+--- a/drivers/clocksource/sh_tmu.c
++++ b/drivers/clocksource/sh_tmu.c
+@@ -35,10 +35,10 @@
+ #include <linux/pm_domain.h>
+ #include <linux/pm_runtime.h>
  
--static void sh_cmt_register_clockevent(struct sh_cmt_channel *ch,
--				       const char *name)
-+static int sh_cmt_register_clockevent(struct sh_cmt_channel *ch,
-+				      const char *name)
- {
- 	struct clock_event_device *ced = &ch->ced;
-+	int irq;
-+	int ret;
-+
-+	irq = platform_get_irq(ch->cmt->pdev, ch->cmt->legacy ? 0 : ch->index);
-+	if (irq < 0) {
-+		dev_err(&ch->cmt->pdev->dev, "ch%u: failed to get irq\n",
-+			ch->index);
-+		return irq;
-+	}
-+
-+	ret = request_irq(irq, sh_cmt_interrupt,
-+			  IRQF_TIMER | IRQF_IRQPOLL | IRQF_NOBALANCING,
-+			  dev_name(&ch->cmt->pdev->dev), ch);
-+	if (ret) {
-+		dev_err(&ch->cmt->pdev->dev, "ch%u: failed to request irq %d\n",
-+			ch->index, irq);
-+		return ret;
-+	}
+-struct sh_tmu_priv;
++struct sh_tmu_device;
  
- 	ced->name = name;
- 	ced->features = CLOCK_EVT_FEAT_PERIODIC;
-@@ -803,14 +821,20 @@ static void sh_cmt_register_clockevent(struct sh_cmt_channel *ch,
- 	dev_info(&ch->cmt->pdev->dev, "ch%u: used for clock events\n",
- 		 ch->index);
- 	clockevents_register_device(ced);
-+
-+	return 0;
- }
+ struct sh_tmu_channel {
+-	struct sh_tmu_priv *tmu;
++	struct sh_tmu_device *tmu;
  
- static int sh_cmt_register(struct sh_cmt_channel *ch, const char *name,
- 			   bool clockevent, bool clocksource)
- {
-+	int ret;
-+
- 	if (clockevent) {
- 		ch->cmt->has_clockevent = true;
--		sh_cmt_register_clockevent(ch, name);
-+		ret = sh_cmt_register_clockevent(ch, name);
-+		if (ret < 0)
-+			return ret;
- 	}
+ 	int irq;
  
- 	if (clocksource) {
-@@ -825,7 +849,6 @@ static int sh_cmt_setup_channel(struct sh_cmt_channel *ch, unsigned int index,
- 				unsigned int hwidx, bool clockevent,
- 				bool clocksource, struct sh_cmt_device *cmt)
- {
--	int irq;
- 	int ret;
+@@ -50,7 +50,7 @@ struct sh_tmu_channel {
+ 	unsigned int enable_count;
+ };
  
- 	/* Skip unused channels. */
-@@ -869,17 +892,6 @@ static int sh_cmt_setup_channel(struct sh_cmt_channel *ch, unsigned int index,
- 		}
- 	}
+-struct sh_tmu_priv {
++struct sh_tmu_device {
+ 	struct platform_device *pdev;
  
--	if (cmt->legacy)
--		irq = platform_get_irq(cmt->pdev, 0);
--	else
--		irq = platform_get_irq(cmt->pdev, ch->index);
--
--	if (irq < 0) {
--		dev_err(&cmt->pdev->dev, "ch%u: failed to get irq\n",
--			ch->index);
--		return irq;
--	}
--
- 	if (cmt->info->width == (sizeof(ch->max_match_value) * 8))
- 		ch->max_match_value = ~0;
- 	else
-@@ -904,15 +916,6 @@ static int sh_cmt_setup_channel(struct sh_cmt_channel *ch, unsigned int index,
- 	}
- 	ch->cs_enabled = false;
- 
--	ret = request_irq(irq, sh_cmt_interrupt,
--			  IRQF_TIMER | IRQF_IRQPOLL | IRQF_NOBALANCING,
--			  dev_name(&cmt->pdev->dev), ch);
--	if (ret) {
--		dev_err(&cmt->pdev->dev, "ch%u: failed to request irq %d\n",
--			ch->index, irq);
--		return ret;
--	}
--
+ 	void __iomem *mapbase;
+@@ -436,59 +436,59 @@ static int sh_tmu_register(struct sh_tmu_channel *ch, char *name,
  	return 0;
  }
  
+-static int sh_tmu_setup(struct sh_tmu_priv *p, struct platform_device *pdev)
++static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
+ {
+ 	struct sh_timer_config *cfg = pdev->dev.platform_data;
+ 	struct resource *res;
+ 	int ret;
+ 	ret = -ENXIO;
+ 
+-	memset(p, 0, sizeof(*p));
+-	p->pdev = pdev;
++	memset(tmu, 0, sizeof(*tmu));
++	tmu->pdev = pdev;
+ 
+ 	if (!cfg) {
+-		dev_err(&p->pdev->dev, "missing platform data\n");
++		dev_err(&tmu->pdev->dev, "missing platform data\n");
+ 		goto err0;
+ 	}
+ 
+-	platform_set_drvdata(pdev, p);
++	platform_set_drvdata(pdev, tmu);
+ 
+-	res = platform_get_resource(p->pdev, IORESOURCE_MEM, 0);
++	res = platform_get_resource(tmu->pdev, IORESOURCE_MEM, 0);
+ 	if (!res) {
+-		dev_err(&p->pdev->dev, "failed to get I/O memory\n");
++		dev_err(&tmu->pdev->dev, "failed to get I/O memory\n");
+ 		goto err0;
+ 	}
+ 
+-	p->channel.irq = platform_get_irq(p->pdev, 0);
+-	if (p->channel.irq < 0) {
+-		dev_err(&p->pdev->dev, "failed to get irq\n");
++	tmu->channel.irq = platform_get_irq(tmu->pdev, 0);
++	if (tmu->channel.irq < 0) {
++		dev_err(&tmu->pdev->dev, "failed to get irq\n");
+ 		goto err0;
+ 	}
+ 
+ 	/* map memory, let mapbase point to our channel */
+-	p->mapbase = ioremap_nocache(res->start, resource_size(res));
+-	if (p->mapbase == NULL) {
+-		dev_err(&p->pdev->dev, "failed to remap I/O memory\n");
++	tmu->mapbase = ioremap_nocache(res->start, resource_size(res));
++	if (tmu->mapbase == NULL) {
++		dev_err(&tmu->pdev->dev, "failed to remap I/O memory\n");
+ 		goto err0;
+ 	}
+ 
+ 	/* get hold of clock */
+-	p->clk = clk_get(&p->pdev->dev, "tmu_fck");
+-	if (IS_ERR(p->clk)) {
+-		dev_err(&p->pdev->dev, "cannot get clock\n");
+-		ret = PTR_ERR(p->clk);
++	tmu->clk = clk_get(&tmu->pdev->dev, "tmu_fck");
++	if (IS_ERR(tmu->clk)) {
++		dev_err(&tmu->pdev->dev, "cannot get clock\n");
++		ret = PTR_ERR(tmu->clk);
+ 		goto err1;
+ 	}
+ 
+-	ret = clk_prepare(p->clk);
++	ret = clk_prepare(tmu->clk);
+ 	if (ret < 0)
+ 		goto err2;
+ 
+-	p->channel.cs_enabled = false;
+-	p->channel.enable_count = 0;
+-	p->channel.tmu = p;
++	tmu->channel.cs_enabled = false;
++	tmu->channel.enable_count = 0;
++	tmu->channel.tmu = tmu;
+ 
+-	ret = sh_tmu_register(&p->channel, (char *)dev_name(&p->pdev->dev),
++	ret = sh_tmu_register(&tmu->channel, (char *)dev_name(&tmu->pdev->dev),
+ 			      cfg->clockevent_rating,
+ 			      cfg->clocksource_rating);
+ 	if (ret < 0)
+@@ -497,18 +497,18 @@ static int sh_tmu_setup(struct sh_tmu_priv *p, struct platform_device *pdev)
+ 	return 0;
+ 
+  err3:
+-	clk_unprepare(p->clk);
++	clk_unprepare(tmu->clk);
+  err2:
+-	clk_put(p->clk);
++	clk_put(tmu->clk);
+  err1:
+-	iounmap(p->mapbase);
++	iounmap(tmu->mapbase);
+  err0:
+ 	return ret;
+ }
+ 
+ static int sh_tmu_probe(struct platform_device *pdev)
+ {
+-	struct sh_tmu_priv *p = platform_get_drvdata(pdev);
++	struct sh_tmu_device *tmu = platform_get_drvdata(pdev);
+ 	struct sh_timer_config *cfg = pdev->dev.platform_data;
+ 	int ret;
+ 
+@@ -517,20 +517,20 @@ static int sh_tmu_probe(struct platform_device *pdev)
+ 		pm_runtime_enable(&pdev->dev);
+ 	}
+ 
+-	if (p) {
++	if (tmu) {
+ 		dev_info(&pdev->dev, "kept as earlytimer\n");
+ 		goto out;
+ 	}
+ 
+-	p = kmalloc(sizeof(*p), GFP_KERNEL);
+-	if (p == NULL) {
++	tmu = kmalloc(sizeof(*tmu), GFP_KERNEL);
++	if (tmu == NULL) {
+ 		dev_err(&pdev->dev, "failed to allocate driver data\n");
+ 		return -ENOMEM;
+ 	}
+ 
+-	ret = sh_tmu_setup(p, pdev);
++	ret = sh_tmu_setup(tmu, pdev);
+ 	if (ret) {
+-		kfree(p);
++		kfree(tmu);
+ 		pm_runtime_idle(&pdev->dev);
+ 		return ret;
+ 	}
 -- 
 1.7.9.5
