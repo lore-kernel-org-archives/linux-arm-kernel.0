@@ -1,51 +1,31 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 22 May 2014 22:36:47 -0700
-Subject: pull request for Tegra clock fixes for 3.16 with HDA clocks
-In-Reply-To: <20140521112516.GA22484@tbergstrom-lnx.Nvidia.com>
-References: <20140521112516.GA22484@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20140523053647.23136.40842@quantum>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 23 May 2014 13:48:34 +0800
+Subject: [PATCH] pwm: imx: set can_sleep flag for imx_pwm_v2
+Message-ID: <1400824114-27148-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter De Schrijver (2014-05-21 04:25:16)
-> Hi Mike,
-> 
-> A number of fixes which are needed by the upcoming XHCI and SATA drivers and
-> the HDA audio driver.
-> 
-> Thanks,
-> 
-> Peter.
+The .config() hook of imx_pwm_data_v2 calls clk_get_rate() which might
+sleep, so we need to set can_sleep flag on it.
 
-Pulled.
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ drivers/pwm/pwm-imx.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Regards,
-Mike
-
-> 
-> The following changes since commit d6d211db37e75de2ddc3a4f979038c40df7cc79c:
-> 
->   Linux 3.15-rc5 (2014-05-09 13:10:52 -0700)
-> 
-> are available in the git repository at:
->   git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git tegra-clk-v3.16-1
-> 
-> Andrew Bresticker (2):
->       clk: tegra: Fix xusb_hs_src clock hierarchy
->       clk: tegra: Initialize xusb clocks
-> 
-> Dylan Reid (1):
->       clk: tegra124: Enable hda to hdmi clocks
-> 
-> Jim Lin (2):
->       clk: tegra: Enable hardware control of PLLE
->       clk: tegra: Fix xusb_fs_src mux
-> 
->  drivers/clk/tegra/clk-id.h               |    1 +
->  drivers/clk/tegra/clk-pll.c              |   33 +++++++++++++++++++++++++++++-
->  drivers/clk/tegra/clk-tegra-periph.c     |   10 ++++++++-
->  drivers/clk/tegra/clk-tegra114.c         |   22 ++++++++++----------
->  drivers/clk/tegra/clk-tegra124.c         |   26 ++++++++++++++---------
->  include/dt-bindings/clock/tegra114-car.h |    3 +-
->  include/dt-bindings/clock/tegra124-car.h |    3 +-
->  7 files changed, 73 insertions(+), 25 deletions(-)
+diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+index d797c7b84c3f..ab3809fb36a7 100644
+--- a/drivers/pwm/pwm-imx.c
++++ b/drivers/pwm/pwm-imx.c
+@@ -272,6 +272,9 @@ static int imx_pwm_probe(struct platform_device *pdev)
+ 	imx->config = data->config;
+ 	imx->set_enable = data->set_enable;
+ 
++	if (data == &imx_pwm_data_v2)
++		imx->chip.can_sleep = true;
++
+ 	ret = pwmchip_add(&imx->chip);
+ 	if (ret < 0)
+ 		return ret;
+-- 
+1.8.3.2
