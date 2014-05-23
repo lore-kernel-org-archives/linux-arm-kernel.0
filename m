@@ -1,31 +1,120 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 23 May 2014 13:48:34 +0800
-Subject: [PATCH] pwm: imx: set can_sleep flag for imx_pwm_v2
-Message-ID: <1400824114-27148-1-git-send-email-shawn.guo@freescale.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 23 May 2014 12:32:53 +0800
+Subject: [PATCH 1/2] serial: imx: remove the DMA wait queue
+Message-ID: <1400819575-20435-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The .config() hook of imx_pwm_data_v2 calls clk_get_rate() which might
-sleep, so we need to set can_sleep flag on it.
+The DMA wait queue makes the code very complicated:
+  For RX, the @->stop_rx hook does not really stop the RX;
+  For TX, the @->stop_tx hook does not really stop the TX.
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+The above make the imx_shutdown has to wait the RX/TX DMA to be finished.
+
+In order to make code more simple, this patch removes the DMA wait queue.
+By calling the dmaengine_terminate_all, this patch makes the RX stops
+immediately after we call the @->stop_rx hook, so does the TX.
+
+Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- drivers/pwm/pwm-imx.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/tty/serial/imx.c |   42 ++++++++++++++----------------------------
+ 1 files changed, 14 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
-index d797c7b84c3f..ab3809fb36a7 100644
---- a/drivers/pwm/pwm-imx.c
-+++ b/drivers/pwm/pwm-imx.c
-@@ -272,6 +272,9 @@ static int imx_pwm_probe(struct platform_device *pdev)
- 	imx->config = data->config;
- 	imx->set_enable = data->set_enable;
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index d1f16d3..ed6cdf7 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -225,7 +225,6 @@ struct imx_port {
+ 	void			*rx_buf;
+ 	unsigned int		tx_bytes;
+ 	unsigned int		dma_tx_nents;
+-	wait_queue_head_t	dma_wait;
+ 	unsigned int            saved_reg[11];
+ };
  
-+	if (data == &imx_pwm_data_v2)
-+		imx->chip.can_sleep = true;
+@@ -417,12 +416,10 @@ static void imx_stop_tx(struct uart_port *port)
+ 		return;
+ 	}
+ 
+-	/*
+-	 * We are maybe in the SMP context, so if the DMA TX thread is running
+-	 * on other cpu, we have to wait for it to finish.
+-	 */
+-	if (sport->dma_is_enabled && sport->dma_is_txing)
+-		return;
++	if (sport->dma_is_enabled && sport->dma_is_txing) {
++		dmaengine_terminate_all(sport->dma_chan_tx);
++		sport->dma_is_txing = 0;
++	}
+ 
+ 	temp = readl(sport->port.membase + UCR1);
+ 	writel(temp & ~UCR1_TXMPTYEN, sport->port.membase + UCR1);
+@@ -436,12 +433,10 @@ static void imx_stop_rx(struct uart_port *port)
+ 	struct imx_port *sport = (struct imx_port *)port;
+ 	unsigned long temp;
+ 
+-	/*
+-	 * We are maybe in the SMP context, so if the DMA TX thread is running
+-	 * on other cpu, we have to wait for it to finish.
+-	 */
+-	if (sport->dma_is_enabled && sport->dma_is_rxing)
+-		return;
++	if (sport->dma_is_enabled && sport->dma_is_rxing) {
++		dmaengine_terminate_all(sport->dma_chan_rx);
++		sport->dma_is_rxing = 0;
++	}
+ 
+ 	temp = readl(sport->port.membase + UCR2);
+ 	writel(temp & ~UCR2_RXEN, sport->port.membase + UCR2);
+@@ -498,12 +493,6 @@ static void dma_tx_callback(void *data)
+ 	dev_dbg(sport->port.dev, "we finish the TX DMA.\n");
+ 
+ 	uart_write_wakeup(&sport->port);
+-
+-	if (waitqueue_active(&sport->dma_wait)) {
+-		wake_up(&sport->dma_wait);
+-		dev_dbg(sport->port.dev, "exit in %s.\n", __func__);
+-		return;
+-	}
+ }
+ 
+ static void imx_dma_tx(struct imx_port *sport)
+@@ -876,10 +865,6 @@ static void imx_rx_dma_done(struct imx_port *sport)
+ 	writel(temp, sport->port.membase + UCR1);
+ 
+ 	sport->dma_is_rxing = 0;
+-
+-	/* Is the shutdown waiting for us? */
+-	if (waitqueue_active(&sport->dma_wait))
+-		wake_up(&sport->dma_wait);
+ }
+ 
+ /*
+@@ -1026,8 +1011,6 @@ static void imx_enable_dma(struct imx_port *sport)
+ {
+ 	unsigned long temp;
+ 
+-	init_waitqueue_head(&sport->dma_wait);
+-
+ 	/* set UCR1 */
+ 	temp = readl(sport->port.membase + UCR1);
+ 	temp |= UCR1_RDMAEN | UCR1_TDMAEN | UCR1_ATDMAEN |
+@@ -1219,10 +1202,13 @@ static void imx_shutdown(struct uart_port *port)
+ 	unsigned long flags;
+ 
+ 	if (sport->dma_is_enabled) {
+-		/* We have to wait for the DMA to finish. */
+-		wait_event(sport->dma_wait,
+-			!sport->dma_is_rxing && !sport->dma_is_txing);
++		/*
++		 * The upper layer may does not call the @->stop_tx and
++		 * @->stop_rx, so we call them ourselves.
++		 */
++		imx_stop_tx(port);
+ 		imx_stop_rx(port);
 +
- 	ret = pwmchip_add(&imx->chip);
- 	if (ret < 0)
- 		return ret;
+ 		imx_disable_dma(sport);
+ 		imx_uart_dma_exit(sport);
+ 	}
 -- 
-1.8.3.2
+1.7.8
