@@ -1,23 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 May 2014 21:17:12 +0200
-Subject: [PATCH v2 0/3] Exynos multi-platform support
-In-Reply-To: <1400858369-14357-1-git-send-email-sachin.kamat@linaro.org>
-References: <1400858369-14357-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <201405232117.12348.arnd@arndb.de>
+Date: Fri, 23 May 2014 21:19:23 +0200
+Subject: [PATCH v7 0/4] Support for Generic PCI Host Controller
+In-Reply-To: <1400863915-24135-1-git-send-email-will.deacon@arm.com>
+References: <1400863915-24135-1-git-send-email-will.deacon@arm.com>
+Message-ID: <201405232119.23891.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 May 2014, Sachin Kamat wrote:
-> The patches in this series were earlier sent as part of other
-> series. Now that the other patches have been merged, re-sending
-> these after rebasing them on linux-next (20140523).
-> Tested on Exynos4210, 4412, 5250 and 5420 based boards.
+On Friday 23 May 2014, Will Deacon wrote:
+>   - Removed redundant MIGHT_HAVE_PCI selections from multiplatform-enabled
+>     SoCs
 > 
-> A particular change in this series is the removal of single platform
-> support for Exynos as suggested by Arnd and Olof (patch 2/3). With
-> this change certain features (drivers) which are not yet multi-platform
-> aware like cpufreq, devfreq and DRM based gscaler will not be available
-> now.
+>   - Included patch from Srikanth for generic Configuration Space access to
+>     be factored out and used by other drivers
+> 
+>   - Fixed minor issue in I/O port allocation (I had a >= instead of a >)
+> 
 
+It seems strange that you include the patch from Srikanth but then use
+a separate copy of the same code in patch 2. Is that intentional?
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+	Arnd
