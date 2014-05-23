@@ -1,34 +1,48 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 23 May 2014 15:37:36 -0400 (EDT)
-Subject: [PATCH 0/5] ks8851 DT updates
-In-Reply-To: <537FA2A9.6050309@codeaurora.org>
-References: <1400792413-21618-1-git-send-email-sboyd@codeaurora.org>
- <20140523.151502.1106354754894891974.davem@davemloft.net>
- <537FA2A9.6050309@codeaurora.org>
-Message-ID: <20140523.153736.705710213824474686.davem@davemloft.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 24 May 2014 04:43:22 +0900
+Subject: [GIT PULL] Samsung 2nd fixes for 3.15
+Message-ID: <537FA4DA.3090600@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
-Date: Fri, 23 May 2014 12:34:01 -0700
+Hi,
 
-> On 05/23/14 12:15, David Miller wrote:
->> From: Stephen Boyd <sboyd@codeaurora.org>
->> Date: Thu, 22 May 2014 14:00:08 -0700
->>
->>> This set of patches properly documents the micrel ks8851 spi ethernet
->>> controller, converts to devm_regulator_get_optional() to make error
->>> paths slightly simpler, and finally adds supports for another
->>> optional regulator and a reset gpio.
->> Please do not submit patch sets that you expect different trees to
->> integrate, this is painful for maintainers to deal with.
->>
->> Instead, submit the changes separately.  One series for one
->> maintainer's tree, another for the other maintainer's tree.
->>
-> 
-> Ok. Shall I resend this series with the proper separation? Or can you
-> ignore the first patch? There isn't any functional dependency, more just
-> a checkpatch dependency which is not really all that important.
+Here is 2nd samsung fixes for 3.15, actually it happened before 3.14 but 
+would be better if this could be merged into 3.15.
 
-To avoid all ambiguity please resubmit the new series.
+Thanks,
+Kukjin
+
+
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+
+   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+tags/samsung-fixes-2nd-tag
+
+for you to fetch changes up to 68d0e40298f064a5cff40670caded0480274d4b2:
+
+   ARM: dts: Keep LDO4 always ON for exynos5250-arndale board 
+(2014-05-20 01:15:46 +0900)
+
+----------------------------------------------------------------
+Samsung-fixes-2 for 3.15
+- keep LD04 always on for exynos5250-arndale
+- fix spi interrupt numbers for exynos5420
+- fix ak8975 compatible for exynos4412-trats2
+
+----------------------------------------------------------------
+Beomho Seo (1):
+       ARM: dts: fix incorrect ak8975 compatible for exynos4412-trats2 board
+
+Sachin Kamat (2):
+       ARM: dts: Fix SPI interrupt numbers for exynos5420
+       ARM: dts: Keep LDO4 always ON for exynos5250-arndale board
+
+  arch/arm/boot/dts/exynos4412-trats2.dts  | 2 +-
+  arch/arm/boot/dts/exynos5250-arndale.dts | 1 +
+  arch/arm/boot/dts/exynos5420.dtsi        | 6 +++---
+  3 files changed, 5 insertions(+), 4 deletions(-)
