@@ -1,33 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 May 2014 21:22:18 +0200
-Subject: [PATCH v7 4/4] PCI: Generic Configuration Access Mechanism support
-In-Reply-To: <1400863915-24135-5-git-send-email-will.deacon@arm.com>
-References: <1400863915-24135-1-git-send-email-will.deacon@arm.com>
- <1400863915-24135-5-git-send-email-will.deacon@arm.com>
-Message-ID: <201405232122.18995.arnd@arndb.de>
+Date: Fri, 23 May 2014 21:23:11 +0200
+Subject: [PATCH v1 3/5] phy: pci serdes phy driver for keystone
+In-Reply-To: <537F81D8.2080005@ti.com>
+References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
+ <9550746.D1ri3H0uvi@wuerfel> <537F81D8.2080005@ti.com>
+Message-ID: <9828919.7tZBgbvqj4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 May 2014, Will Deacon wrote:
-> +static void __iomem *pci_cfg_map_bus_ecam(struct pci_bus *bus,
-> +                                         unsigned int devfn,
-> +                                         int where)
-> +{
-> +       struct pci_sys_data *sys = bus->sysdata;
-> +       struct pci_cfg_windows *cfg = sys->private_data;
-> +       resource_size_t idx = bus->number - cfg->bus_range.start;
-> +
-> +       return cfg->win[idx] + ((devfn << PCI_CFG_ECAM_DEV_NUM) | where);
-> +}
+On Friday 23 May 2014 13:14:00 Murali Karicheri wrote:
+> On 5/15/2014 12:14 PM, Arnd Bergmann wrote:
+> > On Thursday 15 May 2014 12:01:30 Murali Karicheri wrote:
+> >> +static struct serdes_config ks_100mhz_pcie_5gbps_serdes[] = {
+> >> +       {0x0000, 0x00000800, 0x0000ff00},
+> >> +       {0x0060, 0x00041c5c, 0x00ffffff},
+> >> +       {0x0064, 0x0343c700, 0xffffff00},
+> >> +       {0x006c, 0x00000012, 0x000000ff},
+> >> +       {0x0068, 0x00070000, 0x00ff0000},
+> >> +       {0x0078, 0x0000c000, 0x0000ff00},
+> > It looks like the PHY is generic, but the configuration above is
+> > PCI specific. If this is true, you should have #phy-cells=<1>
+> > and document the possible modes, adding a lookup table here to
+> > pick the configuration based on the argument. It's fine to just
+> > implement pcie-5ghz initially, but the binding should list all
+> > the modes that the PHY can support.
+> 
+> The PCIE name needs to be dropped and as you correctly guessed, this SERDES
+> is generic.
 
-I just noticed that this function makes the code rather non-generic, because
-struct pci_sys_data is the ARM specific structure that doesn't exist elsewhere,
-and sys->private_data wouldn't typically point to struct pci_cfg_windows on
-anything other than your generic PCI host.
+Ok, good.
 
-I'd say let's drop this for now. I know it was my idea to do it like this,
-but it seems it's more complex than I had hoped to get this right, and
-I'd really prefer to merge the other three patches for 3.16 if possible.
-We can factor it out later if we get more users.
+> > Also, please list the exact name of the phy if you can find it
+> > out. You mention that you don't know the register descriptions,
+> > but you should at least be able to let us know what phy this
+> > is, in case some other SoC reuses the same thing.
+>
+> Unfortunately there is a NDA restriction that prevents us from using the
+> actual Phy name and keystone phy is the name what we can usel at the 
+> moment. I am checking
+> this with our IP team and if original name can  be used, I will update 
+> the driver to reflect the same.
+
+Can you please check the phy drivers that we already have in linux-next
+to see if any of those are for the same hardware then?
+
+I guess it's our best hope to catch duplications by inspecting all
+other phy drivers as they get merged then.
 
 	Arnd
