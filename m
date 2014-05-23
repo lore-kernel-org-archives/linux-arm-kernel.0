@@ -1,35 +1,39 @@
 From: Nikolay.Borisov@arm.com (Nikolay Borisov)
-Date: Fri, 23 May 2014 10:26:33 +0100
-Subject: [PATCH RESEND 4/7] ARM: time: Make use of arm_get_current_stackframe
+Date: Fri, 23 May 2014 10:26:34 +0100
+Subject: [PATCH RESEND 5/7] ARM: unwind: Use arm_get_current_stackframe
 In-Reply-To: <1400837196-22339-1-git-send-email-Nikolay.Borisov@arm.com>
 References: <1400837196-22339-1-git-send-email-Nikolay.Borisov@arm.com>
-Message-ID: <1400837196-22339-5-git-send-email-Nikolay.Borisov@arm.com>
+Message-ID: <1400837196-22339-6-git-send-email-Nikolay.Borisov@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make use of the arm_get_current_stackframe api so that
-the frame pointer is correctly referenced in THUMB2 mode
+Make the unwind code use the correct API so that the frame pointer
+is extracted from the correct register.
 
 Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
 ---
- arch/arm/kernel/time.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ arch/arm/kernel/unwind.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
-index 829a96d..0cc7e58 100644
---- a/arch/arm/kernel/time.c
-+++ b/arch/arm/kernel/time.c
-@@ -50,10 +50,7 @@ unsigned long profile_pc(struct pt_regs *regs)
- 	if (!in_lock_functions(regs->ARM_pc))
- 		return regs->ARM_pc;
+diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+index 3c21769..7aaec44 100644
+--- a/arch/arm/kernel/unwind.c
++++ b/arch/arm/kernel/unwind.c
+@@ -479,12 +479,10 @@ void unwind_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 		tsk = current;
  
--	frame.fp = regs->ARM_fp;
--	frame.sp = regs->ARM_sp;
--	frame.lr = regs->ARM_lr;
--	frame.pc = regs->ARM_pc;
-+	arm_get_current_stackframe(regs, &frame);
- 	do {
- 		int ret = unwind_frame(&frame);
- 		if (ret < 0)
+ 	if (regs) {
+-		frame.fp = regs->ARM_fp;
+-		frame.sp = regs->ARM_sp;
+-		frame.lr = regs->ARM_lr;
++		arm_get_current_stackframe(regs, &frame);
+ 		/* PC might be corrupted, use LR in that case. */
+-		frame.pc = kernel_text_address(regs->ARM_pc)
+-			 ? regs->ARM_pc : regs->ARM_lr;
++		if (!kernel_text_address(regs->ARM_pc))
++			frame.pc = regs->ARM_lr;
+ 	} else if (tsk == current) {
+ 		frame.fp = (unsigned long)__builtin_frame_address(0);
+ 		frame.sp = current_sp;
 -- 
 1.8.1.5
