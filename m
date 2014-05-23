@@ -1,33 +1,103 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 May 2014 21:28:51 +0200
-Subject: [PATCH RESEND] ARM: trusted_foundations: fix compile error on
- non-SMP
-In-Reply-To: <537F7E1F.4020706@wwwdotorg.org>
-References: <1400804612-11876-1-git-send-email-acourbot@nvidia.com>
- <537F7E1F.4020706@wwwdotorg.org>
-Message-ID: <201405232128.51247.arnd@arndb.de>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 23 May 2014 21:33:23 +0200
+Subject: [PATCH v3 01/11] clk: composite: support determine_rate using
+ rate_ops->round_rate + mux_ops->set_parent
+In-Reply-To: <1621067.VASjIdzoSl@phil>
+References: <1621067.VASjIdzoSl@phil>
+Message-ID: <17737873.r3cte6TEQ5@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 May 2014, Stephen Warren wrote:
-> On 05/22/2014 06:23 PM, Alexandre Courbot wrote:
-> > The setup_max_cpus variable is only defined if CONFIG_SMP is set. Add
-> > a preprocessor condition to avoid the following compilation error if
-> > CONFIG_SMP is not set:
-> > 
-> >     arch/arm/include/asm/trusted_foundations.h: In function 'register_trusted_foundations':
-> >     arch/arm/include/asm/trusted_foundations.h:57:2: error: 'setup_max_cpus' undeclared (first use in this function)
-> > 
-> > Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> > Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> I spoke to Olof and IRC, and he said arm-soc would be OK taking this
-> patch, since they applied the original code this fixes. IIUC, they'll
-> pick this up directly.
-> 
-> Acked-by: Stephen Warren <swarren@nvidia.com>
-> 
+From: Boris BREZILLON <b.brezillon@overkiz.com>
 
-Pulled into the fixes branch now, thanks!
+In case the rate_hw does not implement determine_rate, but only round_rate
+we fallback to best_parent selection if mux_hw is present and support
+reparenting.
 
-	Arnd
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+
+This also fixes a rate calculation problem when using the standard div and
+mux ops, as in this case currently only the mux->determine_rate is used
+in the composite rate calculation.
+[fixed the output to actually return a rate instead of the diff]
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/clk/clk-composite.c | 51 ++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 50 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+index 57a078e..0a4cd21 100644
+--- a/drivers/clk/clk-composite.c
++++ b/drivers/clk/clk-composite.c
+@@ -64,11 +64,59 @@ static long clk_composite_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 	const struct clk_ops *mux_ops = composite->mux_ops;
+ 	struct clk_hw *rate_hw = composite->rate_hw;
+ 	struct clk_hw *mux_hw = composite->mux_hw;
++	struct clk *parent;
++	unsigned long parent_rate;
++	long tmp_rate, best_rate;
++	unsigned long rate_diff;
++	unsigned long best_rate_diff = ULONG_MAX;
++	int i;
+ 
+ 	if (rate_hw && rate_ops && rate_ops->determine_rate) {
+ 		rate_hw->clk = hw->clk;
+ 		return rate_ops->determine_rate(rate_hw, rate, best_parent_rate,
+ 						best_parent_p);
++	} else if (rate_hw && rate_ops && rate_ops->round_rate &&
++		   mux_hw && mux_ops && mux_ops->set_parent) {
++		*best_parent_p = NULL;
++
++		if (__clk_get_flags(hw->clk) & CLK_SET_RATE_NO_REPARENT) {
++			*best_parent_p = clk_get_parent(mux_hw->clk);
++			*best_parent_rate = __clk_get_rate(*best_parent_p);
++
++			return rate_ops->round_rate(rate_hw, rate,
++						    best_parent_rate);
++		}
++
++		for (i = 0; i < __clk_get_num_parents(mux_hw->clk); i++) {
++			parent = clk_get_parent_by_index(mux_hw->clk, i);
++			if (!parent)
++				continue;
++
++			parent_rate = __clk_get_rate(parent);
++
++			tmp_rate = rate_ops->round_rate(rate_hw, rate,
++							&parent_rate);
++			if (tmp_rate < 0)
++				continue;
++
++			if (tmp_rate < rate)
++				rate_diff = rate - tmp_rate;
++			else
++				rate_diff = tmp_rate - rate;
++
++			if (!rate_diff || !*best_parent_p
++				       || best_rate_diff > rate_diff) {
++				*best_parent_p = parent;
++				*best_parent_rate = parent_rate;
++				best_rate_diff = rate_diff;
++				best_rate = tmp_rate;
++			}
++
++			if (!rate_diff)
++				return rate;
++		}
++
++		return best_rate;
+ 	} else if (mux_hw && mux_ops && mux_ops->determine_rate) {
+ 		mux_hw->clk = hw->clk;
+ 		return mux_ops->determine_rate(mux_hw, rate, best_parent_rate,
+@@ -196,7 +244,8 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+ 		composite->rate_hw = rate_hw;
+ 		composite->rate_ops = rate_ops;
+ 		clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
+-		if (rate_ops->determine_rate)
++		if (rate_ops->determine_rate ||
++		    (rate_ops->round_rate && clk_composite_ops->set_parent))
+ 			clk_composite_ops->determine_rate = clk_composite_determine_rate;
+ 	}
+ 
+-- 
+1.9.0
