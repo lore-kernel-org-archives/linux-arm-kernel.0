@@ -1,58 +1,52 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:32 +0200
-Subject: [PATCH 52/71] clocksource: sh_mtu2: Sort headers alphabetically
+Date: Fri, 23 May 2014 12:31:35 +0200
+Subject: [PATCH 55/71] dts: ca5: add the global timer for the A5
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-52-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-55-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Matthew Leach <matthew.leach@arm.com>
 
-This helps locating duplicates and inserting new headers.
+The Cortex A5 contains a global timer: add the appropriate device tree
+node.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Tested-by: Wolfram Sang <wsa@sang-engineering.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Matthew Leach <matthew.leach@arm.com>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/sh_mtu2.c |   18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/vexpress-v2p-ca5s.dts |   10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
-index 510bd32..f2c1c36 100644
---- a/drivers/clocksource/sh_mtu2.c
-+++ b/drivers/clocksource/sh_mtu2.c
-@@ -13,22 +13,22 @@
-  * GNU General Public License for more details.
-  */
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+index c544a55..d2709b7 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+@@ -88,6 +88,14 @@
+ 		interrupts = <1 13 0x304>;
+ 	};
  
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
- #include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/spinlock.h>
- #include <linux/interrupt.h>
--#include <linux/ioport.h>
--#include <linux/delay.h>
- #include <linux/io.h>
--#include <linux/clk.h>
-+#include <linux/ioport.h>
- #include <linux/irq.h>
--#include <linux/err.h>
--#include <linux/clockchips.h>
--#include <linux/sh_timer.h>
--#include <linux/slab.h>
- #include <linux/module.h>
-+#include <linux/platform_device.h>
- #include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
-+#include <linux/sh_timer.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
++	timer at 2c000200 {
++		compatible = "arm,cortex-a5-global-timer",
++		             "arm,cortex-a9-global-timer";
++		reg = <0x2c000200 0x20>;
++		interrupts = <1 11 0x304>;
++		clocks = <&oscclk0>;
++	};
++
+ 	watchdog at 2c000620 {
+ 		compatible = "arm,cortex-a5-twd-wdt";
+ 		reg = <0x2c000620 0x20>;
+@@ -120,7 +128,7 @@
+ 		compatible = "arm,vexpress,config-bus";
+ 		arm,vexpress,config-bridge = <&v2m_sysreg>;
  
- struct sh_mtu2_device;
- 
+-		osc at 0 {
++		oscclk0: osc at 0 {
+ 			/* CPU and internal AXI reference clock */
+ 			compatible = "arm,vexpress-osc";
+ 			arm,vexpress-sysreg,func = <1 0>;
 -- 
 1.7.9.5
