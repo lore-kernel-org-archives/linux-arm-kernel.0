@@ -1,52 +1,112 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Fri, 23 May 2014 08:40:32 +0530
-Subject: [PATCH] sound: soc: samsung: dma.c: Fix to remove null pointer
- checks that could never happen
-In-Reply-To: <1400790060-10977-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-References: <1400790060-10977-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-Message-ID: <CAHbNUh0cdV3-o+gQaKF3xKH77SRQLJkLGJTr660Bze8kQNDUfw@mail.gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Fri, 23 May 2014 11:12:35 +0800
+Subject: [PATCH v2 3/3] [media] atmel-isi: add primary DT support
+In-Reply-To: <Pine.LNX.4.64.1405182308110.23804@axis700.grange>
+References: <1395744087-5753-1-git-send-email-josh.wu@atmel.com>
+ <1395744320-15025-1-git-send-email-josh.wu@atmel.com>
+ <Pine.LNX.4.64.1405182308110.23804@axis700.grange>
+Message-ID: <537EBCA3.8020701@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 May 2014 01:51, Rickard Strandqvist
-<rickard_strandqvist@spectrumdigital.se> wrote:
-> Removal of null pointer checks that could never happen
+Hi, Guennadi
+
+On 5/19/2014 5:51 AM, Guennadi Liakhovetski wrote:
+> On Tue, 25 Mar 2014, Josh Wu wrote:
 >
-> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
+>> This patch add the DT support for Atmel ISI driver.
+>> It use the same v4l2 DT interface that defined in video-interfaces.txt.
+>>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> Cc: devicetree at vger.kernel.org
+>> ---
+>> v1 --> v2:
+>>   refine the binding document.
+>>   add port node description.
+>>   removed the optional property.
+>>
+>>   .../devicetree/bindings/media/atmel-isi.txt        |   50 ++++++++++++++++++++
+>>   drivers/media/platform/soc_camera/atmel-isi.c      |   31 +++++++++++-
+>>   2 files changed, 79 insertions(+), 2 deletions(-)
+>>   create mode 100644 Documentation/devicetree/bindings/media/atmel-isi.txt
+> [snip]
+>
+>> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+>> index f4add0a..d6a1f7b 100644
+>> --- a/drivers/media/platform/soc_camera/atmel-isi.c
+>> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+> [snip]
+>
+>> @@ -885,6 +887,20 @@ static int atmel_isi_remove(struct platform_device *pdev)
+>>   	return 0;
+>>   }
+>>   
+>> +static int atmel_isi_probe_dt(struct atmel_isi *isi,
+>> +			struct platform_device *pdev)
+>> +{
+>> +	struct device_node *node = pdev->dev.of_node;
+>> +
+>> +	/* Default settings for ISI */
+>> +	isi->pdata.full_mode = 1;
+>> +	isi->pdata.mck_hz = ISI_DEFAULT_MCLK_FREQ;
+>> +	isi->pdata.frate = ISI_CFG1_FRATE_CAPTURE_ALL;
+> The above flags eventually should probably partially be added as new
+> driver-specific DT properties, partially derived from DT clock bindings.
+> But I'm ok to have them fixed like this in the initial version.
+>
+>> +	isi->pdata.data_width_flags = ISI_DATAWIDTH_8 | ISI_DATAWIDTH_10;
+> Whereas these flags, I think, should already now be derived from the
+> bus-width standard property?
+
+yes. I agree.
+
+> v4l2_of_parse_parallel_bus() will extract
+> them for you and I just asked Ben to add a call to
+> v4l2_of_parse_endpoint() to his patch.
+
+Is it better to call v4l2_of_parse_endpoint() in the atmel-isi driver? I 
+think the dt parsing stuff should be done by host driver and sensor 
+driver itself. No need to call v4l2_of_parse_endpoint() in soc-camera.c.
+
+> Consequently you'll have to
+> rearrange bus-width interpretation in isi_camera_try_bus_param() a bit and
+> use OF parsing results there directly if available? Or maybe you find a
+> better way. It would certainly be better to extend your probing code and
+> just use OF results to initialise isi->width_flags, but that might be
+> impossible, because OF parsing would be performed inside
+> soc_camera_host_register() and your isi_camera_try_bus_param() can also be
+> called immediately from it if all required I2C devices are already
+> available?
+
+I am little bit confuse here. I don't see any issue in above case. Since 
+atmel_isi_probe_dt() will always be called earlier then 
+soc_camera_host_register().
+That means when soc_camera_host_register() called 
+isi_camera_try_bus_param(), the isi->width_flags are already initialized 
+in a valid value by atmel_isi_probe_dt().
+Am I missing anything here?
+
+> If your I2C subdevice drivers defer probing until the host has
+> probed, then you could initialise .width_flags after
+> soc_camera_host_register(), but you cannot rely on that.
+
+I tested these two cases without any issue:
+1. In dtb, the i2c sensor dt node probe earlier than atmel-isi dt node.
+     i2c sensor will do a defer probe here as mclk is not found until 
+atmel-isi driver probed and call soc_camera_host_register().
+2. In dtb, the atmel-isi dt node is probed earlier than i2c sensor.
+
+Best Regards,
+Josh Wu
+
+>
+> Thanks
+> Guennadi
 > ---
-
-The subject should probably be (at least should start with "ASoC: samsung:")
-"ASoC: samsung: Remove redundant null pointer check from dma.c"
-
-With that change,
-Reviewed-by: Tushar Behera <tushar.behera@linaro.org>
-
->  sound/soc/samsung/dma.c |    3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
->
-> diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
-> index dc09b71..0f17ae0 100644
-> --- a/sound/soc/samsung/dma.c
-> +++ b/sound/soc/samsung/dma.c
-> @@ -124,8 +124,7 @@ static void audio_buffdone(void *data)
->                 if (prtd->dma_pos >= prtd->dma_end)
->                         prtd->dma_pos = prtd->dma_start;
->
-> -               if (substream)
-> -                       snd_pcm_period_elapsed(substream);
-> +               snd_pcm_period_elapsed(substream);
->
->                 spin_lock(&prtd->lock);
->                 if (!samsung_dma_has_circular()) {
+> Guennadi Liakhovetski, Ph.D.
+> Freelance Open-Source Software Developer
+> http://www.open-technology.de/
 > --
-> 1.7.10.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-
--- 
-Tushar Behera
