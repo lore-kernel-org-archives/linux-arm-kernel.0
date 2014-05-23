@@ -1,148 +1,61 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:26 +0200
-Subject: [PATCH 46/71] clocksource: sh_mtu2: Replace hardcoded register values
- with macros
+Date: Fri, 23 May 2014 12:31:24 +0200
+Subject: [PATCH 44/71] clocksource: sh_mtu2: Replace kmalloc + memset with
+ kzalloc
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-46-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-44-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Define symbolic macros for all used registers bits.
+One kzalloc a day keeps the bugs away.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Tested-by: Wolfram Sang <wsa@sang-engineering.com>
 ---
- drivers/clocksource/sh_mtu2.c |   98 ++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 92 insertions(+), 6 deletions(-)
+ drivers/clocksource/sh_mtu2.c |    6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
 diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
-index 45e1e85..2cf0048 100644
+index 61827c6..94a5342 100644
 --- a/drivers/clocksource/sh_mtu2.c
 +++ b/drivers/clocksource/sh_mtu2.c
-@@ -67,6 +67,88 @@ static DEFINE_RAW_SPINLOCK(sh_mtu2_lock);
- #define TCNT 5 /* channel register */
- #define TGR  6 /* channel register */
+@@ -241,8 +241,6 @@ static void sh_mtu2_register_clockevent(struct sh_mtu2_channel *ch,
+ 	struct clock_event_device *ced = &ch->ced;
+ 	int ret;
  
-+#define TCR_CCLR_NONE		(0 << 5)
-+#define TCR_CCLR_TGRA		(1 << 5)
-+#define TCR_CCLR_TGRB		(2 << 5)
-+#define TCR_CCLR_SYNC		(3 << 5)
-+#define TCR_CCLR_TGRC		(5 << 5)
-+#define TCR_CCLR_TGRD		(6 << 5)
-+#define TCR_CCLR_MASK		(7 << 5)
-+#define TCR_CKEG_RISING		(0 << 3)
-+#define TCR_CKEG_FALLING	(1 << 3)
-+#define TCR_CKEG_BOTH		(2 << 3)
-+#define TCR_CKEG_MASK		(3 << 3)
-+/* Values 4 to 7 are channel-dependent */
-+#define TCR_TPSC_P1		(0 << 0)
-+#define TCR_TPSC_P4		(1 << 0)
-+#define TCR_TPSC_P16		(2 << 0)
-+#define TCR_TPSC_P64		(3 << 0)
-+#define TCR_TPSC_CH0_TCLKA	(4 << 0)
-+#define TCR_TPSC_CH0_TCLKB	(5 << 0)
-+#define TCR_TPSC_CH0_TCLKC	(6 << 0)
-+#define TCR_TPSC_CH0_TCLKD	(7 << 0)
-+#define TCR_TPSC_CH1_TCLKA	(4 << 0)
-+#define TCR_TPSC_CH1_TCLKB	(5 << 0)
-+#define TCR_TPSC_CH1_P256	(6 << 0)
-+#define TCR_TPSC_CH1_TCNT2	(7 << 0)
-+#define TCR_TPSC_CH2_TCLKA	(4 << 0)
-+#define TCR_TPSC_CH2_TCLKB	(5 << 0)
-+#define TCR_TPSC_CH2_TCLKC	(6 << 0)
-+#define TCR_TPSC_CH2_P1024	(7 << 0)
-+#define TCR_TPSC_CH34_P256	(4 << 0)
-+#define TCR_TPSC_CH34_P1024	(5 << 0)
-+#define TCR_TPSC_CH34_TCLKA	(6 << 0)
-+#define TCR_TPSC_CH34_TCLKB	(7 << 0)
-+#define TCR_TPSC_MASK		(7 << 0)
-+
-+#define TMDR_BFE		(1 << 6)
-+#define TMDR_BFB		(1 << 5)
-+#define TMDR_BFA		(1 << 4)
-+#define TMDR_MD_NORMAL		(0 << 0)
-+#define TMDR_MD_PWM_1		(2 << 0)
-+#define TMDR_MD_PWM_2		(3 << 0)
-+#define TMDR_MD_PHASE_1		(4 << 0)
-+#define TMDR_MD_PHASE_2		(5 << 0)
-+#define TMDR_MD_PHASE_3		(6 << 0)
-+#define TMDR_MD_PHASE_4		(7 << 0)
-+#define TMDR_MD_PWM_SYNC	(8 << 0)
-+#define TMDR_MD_PWM_COMP_CREST	(13 << 0)
-+#define TMDR_MD_PWM_COMP_TROUGH	(14 << 0)
-+#define TMDR_MD_PWM_COMP_BOTH	(15 << 0)
-+#define TMDR_MD_MASK		(15 << 0)
-+
-+#define TIOC_IOCH(n)		((n) << 4)
-+#define TIOC_IOCL(n)		((n) << 0)
-+#define TIOR_OC_RETAIN		(0 << 0)
-+#define TIOR_OC_0_CLEAR		(1 << 0)
-+#define TIOR_OC_0_SET		(2 << 0)
-+#define TIOR_OC_0_TOGGLE	(3 << 0)
-+#define TIOR_OC_1_CLEAR		(5 << 0)
-+#define TIOR_OC_1_SET		(6 << 0)
-+#define TIOR_OC_1_TOGGLE	(7 << 0)
-+#define TIOR_IC_RISING		(8 << 0)
-+#define TIOR_IC_FALLING		(9 << 0)
-+#define TIOR_IC_BOTH		(10 << 0)
-+#define TIOR_IC_TCNT		(12 << 0)
-+#define TIOR_MASK		(15 << 0)
-+
-+#define TIER_TTGE		(1 << 7)
-+#define TIER_TTGE2		(1 << 6)
-+#define TIER_TCIEU		(1 << 5)
-+#define TIER_TCIEV		(1 << 4)
-+#define TIER_TGIED		(1 << 3)
-+#define TIER_TGIEC		(1 << 2)
-+#define TIER_TGIEB		(1 << 1)
-+#define TIER_TGIEA		(1 << 0)
-+
-+#define TSR_TCFD		(1 << 7)
-+#define TSR_TCFU		(1 << 5)
-+#define TSR_TCFV		(1 << 4)
-+#define TSR_TGFD		(1 << 3)
-+#define TSR_TGFC		(1 << 2)
-+#define TSR_TGFB		(1 << 1)
-+#define TSR_TGFA		(1 << 0)
-+
- static unsigned long mtu2_reg_offs[] = {
- 	[TCR] = 0,
- 	[TMDR] = 1,
-@@ -150,13 +232,17 @@ static int sh_mtu2_enable(struct sh_mtu2_channel *ch)
- 	rate = clk_get_rate(ch->mtu->clk) / 64;
- 	periodic = (rate + HZ/2) / HZ;
+-	memset(ced, 0, sizeof(*ced));
+-
+ 	ced->name = name;
+ 	ced->features = CLOCK_EVT_FEAT_PERIODIC;
+ 	ced->rating = rating;
+@@ -279,7 +277,6 @@ static int sh_mtu2_setup_channel(struct sh_mtu2_channel *ch,
+ {
+ 	struct sh_timer_config *cfg = mtu->pdev->dev.platform_data;
  
--	/* "Periodic Counter Operation" */
--	sh_mtu2_write(ch, TCR, 0x23); /* TGRA clear, divide clock by 64 */
--	sh_mtu2_write(ch, TIOR, 0);
-+	/*
-+	 * "Periodic Counter Operation"
-+	 * Clear on TGRA compare match, divide clock by 64.
-+	 */
-+	sh_mtu2_write(ch, TCR, TCR_CCLR_TGRA | TCR_TPSC_P64);
-+	sh_mtu2_write(ch, TIOR, TIOC_IOCH(TIOR_OC_0_CLEAR) |
-+		      TIOC_IOCL(TIOR_OC_0_CLEAR));
- 	sh_mtu2_write(ch, TGR, periodic);
- 	sh_mtu2_write(ch, TCNT, 0);
--	sh_mtu2_write(ch, TMDR, 0);
--	sh_mtu2_write(ch, TIER, 0x01);
-+	sh_mtu2_write(ch, TMDR, TMDR_MD_NORMAL);
-+	sh_mtu2_write(ch, TIER, TIER_TGIEA);
+-	memset(ch, 0, sizeof(*ch));
+ 	ch->mtu = mtu;
+ 	ch->index = cfg->timer_bit;
  
- 	/* enable channel */
- 	sh_mtu2_start_stop_ch(ch, 1);
-@@ -182,7 +268,7 @@ static irqreturn_t sh_mtu2_interrupt(int irq, void *dev_id)
+@@ -302,7 +299,6 @@ static int sh_mtu2_setup(struct sh_mtu2_device *mtu,
+ 	int ret;
+ 	ret = -ENXIO;
  
- 	/* acknowledge interrupt */
- 	sh_mtu2_read(ch, TSR);
--	sh_mtu2_write(ch, TSR, 0xfe);
-+	sh_mtu2_write(ch, TSR, ~TSR_TGFA);
+-	memset(mtu, 0, sizeof(*mtu));
+ 	mtu->pdev = pdev;
  
- 	/* notify clockevent layer */
- 	ch->ced.event_handler(&ch->ced);
+ 	if (!cfg) {
+@@ -373,7 +369,7 @@ static int sh_mtu2_probe(struct platform_device *pdev)
+ 		goto out;
+ 	}
+ 
+-	mtu = kmalloc(sizeof(*mtu), GFP_KERNEL);
++	mtu = kzalloc(sizeof(*mtu), GFP_KERNEL);
+ 	if (mtu == NULL) {
+ 		dev_err(&pdev->dev, "failed to allocate driver data\n");
+ 		return -ENOMEM;
 -- 
 1.7.9.5
