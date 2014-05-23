@@ -1,59 +1,88 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 23 May 2014 13:14:00 -0400
-Subject: [PATCH v1 3/5] phy: pci serdes phy driver for keystone
-In-Reply-To: <9550746.D1ri3H0uvi@wuerfel>
-References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
- <1400169692-9677-4-git-send-email-m-karicheri2@ti.com>
- <9550746.D1ri3H0uvi@wuerfel>
-Message-ID: <537F81D8.2080005@ti.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 23 May 2014 19:20:06 +0200
+Subject: [PATCH 3/4] edac: Add APM X-Gene SoC EDAC driver
+In-Reply-To: <CAPw-ZTkOYhWT_5QFJvGBM-aHOOH-1cqsMgnhOVEirRdG9FEosw@mail.gmail.com>
+References: <1399590199-12256-1-git-send-email-lho@apm.com>
+ <1399590199-12256-2-git-send-email-lho@apm.com>
+ <1399590199-12256-3-git-send-email-lho@apm.com>
+ <1399590199-12256-4-git-send-email-lho@apm.com>
+ <20140520193930.GA23070@pd.tnic>
+ <CAPw-ZTkOYhWT_5QFJvGBM-aHOOH-1cqsMgnhOVEirRdG9FEosw@mail.gmail.com>
+Message-ID: <20140523172006.GA6440@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/15/2014 12:14 PM, Arnd Bergmann wrote:
-> On Thursday 15 May 2014 12:01:30 Murali Karicheri wrote:
->> +static struct serdes_config ks_100mhz_pcie_5gbps_serdes[] = {
->> +       {0x0000, 0x00000800, 0x0000ff00},
->> +       {0x0060, 0x00041c5c, 0x00ffffff},
->> +       {0x0064, 0x0343c700, 0xffffff00},
->> +       {0x006c, 0x00000012, 0x000000ff},
->> +       {0x0068, 0x00070000, 0x00ff0000},
->> +       {0x0078, 0x0000c000, 0x0000ff00},
-> It looks like the PHY is generic, but the configuration above is
-> PCI specific. If this is true, you should have #phy-cells=<1>
-> and document the possible modes, adding a lookup table here to
-> pick the configuration based on the argument. It's fine to just
-> implement pcie-5ghz initially, but the binding should list all
-> the modes that the PHY can support.
+On Fri, May 23, 2014 at 09:26:12AM -0700, Loc Ho wrote:
+> Hi,
+> 
+> >> +static int xgene_edac_mc_is_active(struct xgene_edac_mc_ctx *ctx, int mc_idx)
+> >> +{
+> >> +     u32 reg;
+> >> +     u32 mcu_mask;
+> >> +
+> >> +     reg = readl(ctx->csw_csr + CSW_CSWCR);
+> >> +     if (reg & CSW_CSWCR_DUALMCB_MASK) {
+> >> +             /*
+> >> +              * Dual MCB active - Determine if all 4 activie or just MCU0
+> >
+> > Spellcheck: "activie"
+> 
+> The proper spelling is "active" from online dictionary.
 
-The PCIE name needs to be dropped and as you correctly guessed, this SERDES
-is generic.
->
-> Also, please list the exact name of the phy if you can find it
-> out. You mention that you don't know the register descriptions,
-> but you should at least be able to let us know what phy this
-> is, in case some other SoC reuses the same thing.
-Unfortunately there is a NDA restriction that prevents us from using the
-actual Phy name and keystone phy is the name what we can usel at the 
-moment. I am checking
-this with our IP team and if original name can  be used, I will update 
-the driver to reflect the same.
->> +static int ks_phy_init(struct phy *phy)
->> +{
->> +       struct serdes_config *p;
->> +       struct phy_keystone *ks_phy = phy_get_drvdata(phy);
->> +
->> +       int i;
->> +
->> +       for (i = 0, p = &ks_100mhz_pcie_5gbps_serdes[0];
->> +               i < ARRAY_SIZE(ks_100mhz_pcie_5gbps_serdes);
->> +               i++, p++) {
->> +               reg_rmw((ks_phy->base + p->reg), p->val, p->mask);
->> +               reg_dump((ks_phy->base + p->reg), p->mask);
->> +       }
->> +       udelay(2000);
-> This should probably be msleep(2);
-Fine.
+Oh really?! Thanks for teaching me that. Let me try again, this time
+with pointers:
 
-Murali
->
-> 	Arnd
+> >> +              * Dual MCB active - Determine if all 4 activie or just MCU0
+							     ^
+							     |
+							     |
+---------WRONG SPELLING HERE---------------------------------+
+
+You need to open this with an editor that doesn't damage whitespace to
+see where the arrow points at.
+
+> Are you sure about this? With dev_err, it prints the device node info
+> as well. This allows one to determine which instance that has issue.
+> X-Gene has 4 instance of memory controllers.
+
+Ok, we don't have a corresponding functionality in edac for that.
+
+> >> +
+> >> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 4);
+> >> +     ctx->mcu_csr = devm_ioremap_resource(&pdev->dev, res);
+> >> +     if (IS_ERR(ctx->mcu_csr)) {
+> >> +             dev_err(&pdev->dev, "no MCU resource address\n");
+> >> +             rc = PTR_ERR(ctx->mcu_csr);
+> >> +             goto err_free;
+> >> +     }
+> >> +     /* Ignore non-active MCU */
+> >> +     if (!xgene_edac_mc_is_active(ctx, ((res->start >> 16) & 0xF) / 4)) {
+> >> +             rc = -ENODEV;
+> >> +             goto err_free;
+> >> +     }
+> >
+> > You could move edac_mc_alloc() here, after the resources have been
+> > collected successfully and simplify the unwinding path.
+> 
+> I need the ctx pointer which is part of the edac_mc_alloc. Can't move it here.
+
+Of course you can - you can use a local ctx and copy it.
+
+edac_mc_alloc is a heavy call and I'd keep it after the lighter
+platform_get_resource() have completed successfully so that you don't
+have to undo it with edac_mc_del_mc.
+
+But hey, this is your driver so it's your decision in the end.
+
+Which reminds me, I'd need an entry for MAINTAINERS from you or someone
+who's going to take care of this driver and whom I should direct bug
+reports to.
+
+Thanks.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Sent from a fat crate under my desk. Formatting is fine.
+--
