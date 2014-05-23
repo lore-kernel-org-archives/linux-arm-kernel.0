@@ -1,116 +1,63 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:22 +0200
-Subject: [PATCH 42/71] clocksource: sh_mtu2: Add memory base to
- sh_mtu2_channel structure
+Date: Fri, 23 May 2014 12:31:17 +0200
+Subject: [PATCH 37/71] clocksource: sh_mtu2: Turn sh_mtu2_priv fields into
+ local variables
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-42-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-37-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The channel memory base is channel-specific, add it to the channel
-structure in preparation for support of multiple channels per device.
+The rate and periodic fields are used in a single function only, as
+local variables. Remove them from the structure.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Tested-by: Wolfram Sang <wsa@sang-engineering.com>
 ---
- drivers/clocksource/sh_mtu2.c |   32 ++++++++++++++++++--------------
- 1 file changed, 18 insertions(+), 14 deletions(-)
+ drivers/clocksource/sh_mtu2.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
-index 2fe3ab4c..97714ce 100644
+index 77992e0..6668455 100644
 --- a/drivers/clocksource/sh_mtu2.c
 +++ b/drivers/clocksource/sh_mtu2.c
-@@ -38,7 +38,10 @@ struct sh_mtu2_device;
- 
- struct sh_mtu2_channel {
- 	struct sh_mtu2_device *mtu;
-+
-+	void __iomem *base;
+@@ -39,8 +39,6 @@ struct sh_mtu2_priv {
+ 	struct clk *clk;
  	int irq;
-+
+ 	struct platform_device *pdev;
+-	unsigned long rate;
+-	unsigned long periodic;
  	struct clock_event_device ced;
  };
  
-@@ -74,39 +77,35 @@ static unsigned long mtu2_reg_offs[] = {
+@@ -122,6 +120,8 @@ static void sh_mtu2_start_stop_ch(struct sh_mtu2_priv *p, int start)
  
- static inline unsigned long sh_mtu2_read(struct sh_mtu2_channel *ch, int reg_nr)
+ static int sh_mtu2_enable(struct sh_mtu2_priv *p)
  {
--	struct sh_timer_config *cfg = ch->mtu->pdev->dev.platform_data;
--	void __iomem *base = ch->mtu->mapbase;
- 	unsigned long offs;
++	unsigned long periodic;
++	unsigned long rate;
+ 	int ret;
  
- 	if (reg_nr == TSTR)
--		return ioread8(base + cfg->channel_offset);
-+		return ioread8(ch->mtu->mapbase);
+ 	pm_runtime_get_sync(&p->pdev->dev);
+@@ -137,13 +137,13 @@ static int sh_mtu2_enable(struct sh_mtu2_priv *p)
+ 	/* make sure channel is disabled */
+ 	sh_mtu2_start_stop_ch(p, 0);
  
- 	offs = mtu2_reg_offs[reg_nr];
+-	p->rate = clk_get_rate(p->clk) / 64;
+-	p->periodic = (p->rate + HZ/2) / HZ;
++	rate = clk_get_rate(p->clk) / 64;
++	periodic = (rate + HZ/2) / HZ;
  
- 	if ((reg_nr == TCNT) || (reg_nr == TGR))
--		return ioread16(base + offs);
-+		return ioread16(ch->base + offs);
- 	else
--		return ioread8(base + offs);
-+		return ioread8(ch->base + offs);
- }
- 
- static inline void sh_mtu2_write(struct sh_mtu2_channel *ch, int reg_nr,
- 				unsigned long value)
- {
--	struct sh_timer_config *cfg = ch->mtu->pdev->dev.platform_data;
--	void __iomem *base = ch->mtu->mapbase;
- 	unsigned long offs;
- 
- 	if (reg_nr == TSTR) {
--		iowrite8(value, base + cfg->channel_offset);
-+		iowrite8(value, ch->mtu->mapbase);
- 		return;
- 	}
- 
- 	offs = mtu2_reg_offs[reg_nr];
- 
- 	if ((reg_nr == TCNT) || (reg_nr == TGR))
--		iowrite16(value, base + offs);
-+		iowrite16(value, ch->base + offs);
- 	else
--		iowrite8(value, base + offs);
-+		iowrite8(value, ch->base + offs);
- }
- 
- static void sh_mtu2_start_stop_ch(struct sh_mtu2_channel *ch, int start)
-@@ -315,13 +314,18 @@ static int sh_mtu2_setup(struct sh_mtu2_device *mtu,
- 		goto err0;
- 	}
- 
--	/* map memory, let mapbase point to our channel */
--	mtu->mapbase = ioremap_nocache(res->start, resource_size(res));
--	if (mtu->mapbase == NULL) {
-+	/*
-+	 * Map memory, let channel.base point to our channel and mapbase to the
-+	 * start/stop shared register.
-+	 */
-+	mtu->channel.base = ioremap_nocache(res->start, resource_size(res));
-+	if (mtu->channel.base == NULL) {
- 		dev_err(&mtu->pdev->dev, "failed to remap I/O memory\n");
- 		goto err0;
- 	}
- 
-+	mtu->mapbase = mtu->channel.base + cfg->channel_offset;
-+
- 	/* get hold of clock */
- 	mtu->clk = clk_get(&mtu->pdev->dev, "mtu2_fck");
- 	if (IS_ERR(mtu->clk)) {
-@@ -344,7 +348,7 @@ static int sh_mtu2_setup(struct sh_mtu2_device *mtu,
-  err2:
- 	clk_put(mtu->clk);
-  err1:
--	iounmap(mtu->mapbase);
-+	iounmap(mtu->channel.base);
-  err0:
- 	return ret;
- }
+ 	/* "Periodic Counter Operation" */
+ 	sh_mtu2_write(p, TCR, 0x23); /* TGRA clear, divide clock by 64 */
+ 	sh_mtu2_write(p, TIOR, 0);
+-	sh_mtu2_write(p, TGR, p->periodic);
++	sh_mtu2_write(p, TGR, periodic);
+ 	sh_mtu2_write(p, TCNT, 0);
+ 	sh_mtu2_write(p, TMDR, 0);
+ 	sh_mtu2_write(p, TIER, 0x01);
 -- 
 1.7.9.5
