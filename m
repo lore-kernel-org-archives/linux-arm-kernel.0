@@ -1,29 +1,44 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 23 May 2014 23:55:44 +0200
-Subject: [GIT PULL] at91: DT for 3.16 at91-dt3 #3
-In-Reply-To: <201405232327.52312.arnd@arndb.de>
-References: <1400775895-31183-1-git-send-email-nicolas.ferre@atmel.com>
- <201405232327.52312.arnd@arndb.de>
-Message-ID: <20140523215544.GI13642@piout.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 24 May 2014 00:00:56 +0200
+Subject: [GIT PULL] Samsung 2nd fixes for 3.15
+In-Reply-To: <537FA4DA.3090600@samsung.com>
+References: <537FA4DA.3090600@samsung.com>
+Message-ID: <201405240000.56933.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/2014 at 23:27:51 +0200, Arnd Bergmann wrote :
-> On Thursday 22 May 2014, Nicolas Ferre wrote:
-> > Another AT91 DT pull-request for 3.16. This one is the conversion of two more
-> > SoC to Common Clock Framework (aka CCF). I identified it as a "DT" pull-request
-> > but it modifies slightly a couple of files in mach-at91 (use of a configuration
-> > option).
+On Friday 23 May 2014, Kukjin Kim wrote:
+> Hi,
 > 
-> Four done, four more to go? Nice progress!
+> Here is 2nd samsung fixes for 3.15, actually it happened before 3.14 but 
+> would be better if this could be merged into 3.15.
 > 
+> Thanks,
+> Kukjin
+> 
+> 
+> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+> 
+>    Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+> 
+> are available in the git repository at:
+> 
+>    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+> tags/samsung-fixes-2nd-tag
+> 
+> for you to fetch changes up to 68d0e40298f064a5cff40670caded0480274d4b2:
+> 
+>    ARM: dts: Keep LDO4 always ON for exynos5250-arndale board 
+> (2014-05-20 01:15:46 +0900)
+> 
+> ----------------------------------------------------------------
+> Samsung-fixes-2 for 3.15
+> - keep LD04 always on for exynos5250-arndale
+> - fix spi interrupt numbers for exynos5420
+> - fix ak8975 compatible for exynos4412-trats2
 
-I'm on it ;) I actually have two more almost ready but I will submit the
-remaining four for 3.17. I don't think this is urgent enough to rush it
-and I'd like to test it enough before we start removing the old clock
-implementation and board files.
+Pulled into fixes branch.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Should these have been marked 'Cc: stable'?
+
+	Arnd
