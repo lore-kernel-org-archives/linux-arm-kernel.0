@@ -1,45 +1,51 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 23 May 2014 23:02:57 +0200
-Subject: [PATCH v2 0/3] Exynos multi-platform support
-In-Reply-To: <537FA610.6050609@samsung.com>
-References: <1400858369-14357-1-git-send-email-sachin.kamat@linaro.org>
- <201405232117.12348.arnd@arndb.de> <537FA610.6050609@samsung.com>
-Message-ID: <537FB781.8050501@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 23 May 2014 20:15:05 +0200
+Subject: [GIT PULL] Allwinner defconfig changes for 3.16, take 2
+Message-ID: <20140523181505.GA9674@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Hi,
 
-On 23.05.2014 21:48, Kukjin Kim wrote:
-> On 05/24/14 04:17, Arnd Bergmann wrote:
->> On Friday 23 May 2014, Sachin Kamat wrote:
->>> The patches in this series were earlier sent as part of other
->>> series. Now that the other patches have been merged, re-sending
->>> these after rebasing them on linux-next (20140523).
->>> Tested on Exynos4210, 4412, 5250 and 5420 based boards.
->>>
->>> A particular change in this series is the removal of single platform
->>> support for Exynos as suggested by Arnd and Olof (patch 2/3). With
->>> this change certain features (drivers) which are not yet multi-platform
->>> aware like cpufreq, devfreq and DRM based gscaler will not be available
->>> now.
->>
->>
->> Acked-by: Arnd Bergmann<arnd@arndb.de>
-> 
-> Yes, it's time to move on exynos multiplatform and we can't wait for
-> more perfect something. Anyway if any problems, let's fix them after
-> this. Will apply this whole series.
+Here is the last bunch of defconfig changes for the 3.16 merge
+window.
 
-I have tested v1 of this series on Exynos4210-TRATS and
-Exynos4412-TRATS2 boards and they seemed to work fine with added two
-patches that are already on the ML:
- - [PATCH v2] cpufreq: exynos: Fix driver compilation with
-ARCH_MULTIPLATFORM,
- - [PATCH] drm/exynos/fimd: allow multiplatform configuration.
+It comes on top of the previous defconfig pull request.
 
-Not tested too extensively, but primary features (boot, display, USB
-gadget, cpufreq) seem to work at first glance with the above patches.
+The following changes since commit 5659e3bcbcb5d454fa183351362e852321784f7c:
 
-Best regards,
-Tomasz
+  ARM: sunxi: drop CONFIG_COMMON_CLK_DEBUG (2014-05-10 12:07:50 -0400)
+
+are available in the git repository at:
+
+  https://github.com/mripard/linux.git tags/sunxi-defconfig-for-3.16-2
+
+for you to fetch changes up to e397a78589e03ce920e0b4e5f8cc2cfa49027058:
+
+  ARM: multi_v7: Add Allwinner reset drivers to multi_v7_defconfig (2014-05-23 10:39:49 +0200)
+
+----------------------------------------------------------------
+Allwinner defconfig changes, take 2
+
+Add the A31 reset driver to the sunxi-related defconfigs
+
+----------------------------------------------------------------
+Maxime Ripard (2):
+      ARM: sunxi: Add A31 reset driver to sunxi_defconfig
+      ARM: multi_v7: Add Allwinner reset drivers to multi_v7_defconfig
+
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ arch/arm/configs/sunxi_defconfig    | 3 +++
+ 2 files changed, 5 insertions(+)
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140523/5fc49dda/attachment.sig>
