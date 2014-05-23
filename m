@@ -1,88 +1,47 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 23 May 2014 09:04:12 +0200
-Subject: [PATCH v3 2/2] mmc: tegra: fix reporting of base clock frequency
-In-Reply-To: <1400774136-12396-2-git-send-email-abrestic@chromium.org>
-References: <1400774136-12396-1-git-send-email-abrestic@chromium.org>
- <1400774136-12396-2-git-send-email-abrestic@chromium.org>
-Message-ID: <CAPDyKFqBcp7PZQ-04s02Jrqscna0UVex2DEbVPYghmRR8g9HnA@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 23 May 2014 15:05:07 +0800
+Subject: [PATCH] pwm: imx: set can_sleep flag for imx_pwm_v2
+In-Reply-To: <537EED44.7030906@freescale.com>
+References: <1400824114-27148-1-git-send-email-shawn.guo@freescale.com>
+ <537EED44.7030906@freescale.com>
+Message-ID: <20140523070501.GE32184@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 May 2014 17:55, Andrew Bresticker <abrestic@chromium.org> wrote:
-> Tegra SDHCI controllers, by default, report a base clock frequency
-> of 208Mhz in SDHCI_CAPABILTIES which may or may not be equal to the
-> actual base clock frequency.  This is because the clock rate is
-> configured by the clock controller, which is external to the SD/MMC
-> controller.  Since the SD/MMC controller has no knowledge of how this
-> clock is configured, it will simply report the maximum frequency.
-> While the reported value can be overridden by setting BASE_CLK_FREQ in
-> VENDOR_CLOCK_CTRL on Tegra30 and later SoCs, just set CAP_CLOCK_BASE_BROKEN
-> and supply sdhci_pltfm_clk_get_max_clock(), which simply does a
-> clk_get_rate(), as the get_max_clock() callback.
->
-> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-> Tested-by: Stephen Warren <swarren@nvidia.com>
-> Acked-by: Stephen Warren <swarren@nvidia.com>
+On Fri, May 23, 2014 at 02:40:04PM +0800, Liu Ying wrote:
+> Hi Shawn,
+> 
+> On 05/23/2014 01:48 PM, Shawn Guo wrote:
+> > The .config() hook of imx_pwm_data_v2 calls clk_get_rate() which might
+> > sleep, so we need to set can_sleep flag on it.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > ---
+> >  drivers/pwm/pwm-imx.c | 3 +++
+> >  1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+> > index d797c7b84c3f..ab3809fb36a7 100644
+> > --- a/drivers/pwm/pwm-imx.c
+> > +++ b/drivers/pwm/pwm-imx.c
+> > @@ -272,6 +272,9 @@ static int imx_pwm_probe(struct platform_device *pdev)
+> >  	imx->config = data->config;
+> >  	imx->set_enable = data->set_enable;
+> >  
+> > +	if (data == &imx_pwm_data_v2)
+> > +		imx->chip.can_sleep = true;
+> > +
+> >  	ret = pwmchip_add(&imx->chip);
+> >  	if (ret < 0)
+> >  		return ret;
+> > 
+> 
+> clk_prepare_enable()/clk_disable_unprepare() called in imx_pwm_config() may sleep.
+> 
+> So, the can_sleep flag should be true for both i.MX PWM v1 and v2, right?
 
-Thanks Andrew!
+Yes, you're right.  I missed that.  Thanks for pointing it out.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Will send v2 shortly.
 
-Chris, can you pick this up?
-
-Kind regards
-Ulf Hansson
-
-> ---
-> Changes from v2:
->  - rebased on mmc-next
-> Changes from v1:
->  - fixed up commit message per Stephen's suggestions
-> ---
->  drivers/mmc/host/sdhci-tegra.c | 10 +++++++---
->  1 file changed, 7 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
-> index 4375cd4..d93a063 100644
-> --- a/drivers/mmc/host/sdhci-tegra.c
-> +++ b/drivers/mmc/host/sdhci-tegra.c
-> @@ -154,13 +154,15 @@ static const struct sdhci_ops tegra_sdhci_ops = {
->         .set_bus_width = tegra_sdhci_set_bus_width,
->         .reset      = tegra_sdhci_reset,
->         .set_uhs_signaling = sdhci_set_uhs_signaling,
-> +       .get_max_clock = sdhci_pltfm_clk_get_max_clock,
->  };
->
->  static const struct sdhci_pltfm_data sdhci_tegra20_pdata = {
->         .quirks = SDHCI_QUIRK_BROKEN_TIMEOUT_VAL |
->                   SDHCI_QUIRK_SINGLE_POWER_WRITE |
->                   SDHCI_QUIRK_NO_HISPD_BIT |
-> -                 SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC,
-> +                 SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC |
-> +                 SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
->         .ops  = &tegra_sdhci_ops,
->  };
->
-> @@ -175,7 +177,8 @@ static const struct sdhci_pltfm_data sdhci_tegra30_pdata = {
->                   SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
->                   SDHCI_QUIRK_SINGLE_POWER_WRITE |
->                   SDHCI_QUIRK_NO_HISPD_BIT |
-> -                 SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC,
-> +                 SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC |
-> +                 SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
->         .ops  = &tegra_sdhci_ops,
->  };
->
-> @@ -191,7 +194,8 @@ static const struct sdhci_pltfm_data sdhci_tegra114_pdata = {
->                   SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
->                   SDHCI_QUIRK_SINGLE_POWER_WRITE |
->                   SDHCI_QUIRK_NO_HISPD_BIT |
-> -                 SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC,
-> +                 SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC |
-> +                 SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
->         .ops  = &tegra_sdhci_ops,
->  };
->
-> --
-> 1.9.1.423.g4596e3a
->
+Shawn
