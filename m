@@ -1,29 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 May 2014 07:44:26 -0700
-Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
-In-Reply-To: <537A7522.30007@math.uni-bielefeld.de>
-References: <537615EA.3020809@ti.com> <20140516212942.GK12881@atomide.com>
- <537A3544.1050307@linaro.org> <20140519172338.GJ4849@atomide.com>
- <537A408F.7070301@ti.com> <20140519175157.GK4849@atomide.com>
- <537A4827.30604@linaro.org> <20140519193622.GA11945@atomide.com>
- <537A5F5B.6050403@linaro.org>
- <537A7522.30007@math.uni-bielefeld.de>
-Message-ID: <20140523144425.GB2321@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 23 May 2014 15:44:57 +0100
+Subject: [PATCH v4 1/2] arm64: adjust el0_sync so that a function can be
+ called
+In-Reply-To: <20140522223520.GA7953@ubuette>
+References: <1400786855-32656-1-git-send-email-larry.bassel@linaro.org>
+ <1400786855-32656-2-git-send-email-larry.bassel@linaro.org>
+ <537E5CD9.80501@codeaurora.org> <20140522223520.GA7953@ubuette>
+Message-ID: <20140523144457.GN9252@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tobias Jakobi <tjakobi@math.uni-bielefeld.de> [140519 14:19]:
+On Thu, May 22, 2014 at 11:35:20PM +0100, Larry Bassel wrote:
+> > On 05/22/2014 03:27 PM, Larry Bassel wrote:
+> > > To implement the context tracker properly on arm64,
+> > > a function call needs to be made after debugging and
+> > > interrupts are turned on, but before the lr is changed
+> > > to point to ret_to_user(). If the function call
+> > > is made after the lr is changed the function will not
+> > > return to the correct place.
+> > > 
+> > > For similar reasons, defer the setting of x0 so that
+> > > it doesn't need to be saved around the function call
+> > > (save far_el1 in x26 temporarily instead).
+> > > 
+> > > Signed-off-by: Larry Bassel <larry.bassel@linaro.org>
+> > > ---
+> > >  arch/arm64/kernel/entry.S | 24 +++++++++++++++++-------
+> > >  1 file changed, 17 insertions(+), 7 deletions(-)
+> > > 
+> > > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> > > index e8b23a3..20b336e 100644
+> > > --- a/arch/arm64/kernel/entry.S
+> > > +++ b/arch/arm64/kernel/entry.S
+> > > @@ -354,7 +354,6 @@ el0_sync:
+> > >  	lsr	x24, x25, #ESR_EL1_EC_SHIFT	// exception class
+> > >  	cmp	x24, #ESR_EL1_EC_SVC64		// SVC in 64-bit state
+> > >  	b.eq	el0_svc
+> > > -	adr	lr, ret_to_user
+> > >  	cmp	x24, #ESR_EL1_EC_DABT_EL0	// data abort in EL0
+> > >  	b.eq	el0_da
+> > >  	cmp	x24, #ESR_EL1_EC_IABT_EL0	// instruction abort in EL0
+> > > @@ -383,7 +382,6 @@ el0_sync_compat:
+> > >  	lsr	x24, x25, #ESR_EL1_EC_SHIFT	// exception class
+> > >  	cmp	x24, #ESR_EL1_EC_SVC32		// SVC in 32-bit state
+> > >  	b.eq	el0_svc_compat
+> > > -	adr	lr, ret_to_user
+> > >  	cmp	x24, #ESR_EL1_EC_DABT_EL0	// data abort in EL0
+> > >  	b.eq	el0_da
+> > >  	cmp	x24, #ESR_EL1_EC_IABT_EL0	// instruction abort in EL0
+> > > @@ -426,22 +424,26 @@ el0_da:
+> > >  	/*
+> > >  	 * Data abort handling
+> > >  	 */
+> > > -	mrs	x0, far_el1
+> > > -	bic	x0, x0, #(0xff << 56)
+> > > +	mrs	x26, far_el1
+> > >  	// enable interrupts before calling the main handler
+> > >  	enable_dbg_and_irq
+> > > +	mov	x0, x26
+> > > +	bic	x0, x0, #(0xff << 56)
+> > 
+> > Nit: I believe you can bit clear with x26 as the source register and omit the
+> > move instruction.
 > 
-> But even if I don't connect via WiFi at all, just boot and let me system
-> run with serial console connected, after some time I get a kernel 'WARNING':
-> http://www.math.uni-bielefeld.de/~tjakobi/archive/dmesg.1.log
+> Is that really an improvement (assuming it works)? Are we saving
+> any cycles here? If so, does it matter? It is easy to see what
+> the move instruction is doing.
 
-BTW, care to update the bugzilla page with the second warning
-in this log?
+Even if it's not noticeable, I would still reduce the number of lines by
+one. BIC with immediate is just an alias for AND and it supports
+different source and destination.
 
-That's the WARNING: CPU: 1 PID: 0 at kernel/timer.c:1147 that's
-at 238 seconds.
-
-Regards,
-
-Tony
+-- 
+Catalin
