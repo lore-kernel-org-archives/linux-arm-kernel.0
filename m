@@ -1,59 +1,53 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 23 May 2014 11:32:18 -0700
-Subject: [Patch v7 2/7] clock: keystone-pllctrl: add bindings for keystone
- pll controller
-In-Reply-To: <1400859812-5761-3-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1400859812-5761-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1400859812-5761-3-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <20140523183218.23136.51518@quantum>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 23 May 2014 11:32:29 -0700
+Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
+In-Reply-To: <20140523144425.GB2321@atomide.com>
+References: <20140516212942.GK12881@atomide.com> <537A3544.1050307@linaro.org>
+ <20140519172338.GJ4849@atomide.com> <537A408F.7070301@ti.com>
+ <20140519175157.GK4849@atomide.com> <537A4827.30604@linaro.org>
+ <20140519193622.GA11945@atomide.com> <537A5F5B.6050403@linaro.org>
+ <537A7522.30007@math.uni-bielefeld.de>
+ <20140523144425.GB2321@atomide.com>
+Message-ID: <20140523183228.GH2321@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Ivan Khoronzhuk (2014-05-23 08:43:27)
-> The main pll controller used to drive theC66x CorePacs, the switch fabric,
-> and a majority of the peripheral clocks (all but the ARM CorePacs, DDR3 and
-> the NETCP modules) requires a PLL Controller to manage the various clock
-> divisions, gating, and synchronization.
+* Tony Lindgren <tony@atomide.com> [140523 07:45]:
+> * Tobias Jakobi <tjakobi@math.uni-bielefeld.de> [140519 14:19]:
+> > 
+> > But even if I don't connect via WiFi at all, just boot and let me system
+> > run with serial console connected, after some time I get a kernel 'WARNING':
+> > http://www.math.uni-bielefeld.de/~tjakobi/archive/dmesg.1.log
 > 
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> BTW, care to update the bugzilla page with the second warning
+> in this log?
+> 
+> That's the WARNING: CPU: 1 PID: 0 at kernel/timer.c:1147 that's
+> at 238 seconds.
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+Also, with Santosh's fix applied, can you also try disabling one
+or more of the idle states for cpuidle and see if that helps?
+
+Something like this patch below. If that helps with the WARNING
+above you're getting it narrows down the problem down quite a bit.
 
 Regards,
-Mike
 
-> ---
->  .../bindings/clock/ti-keystone-pllctrl.txt           | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/ti-keystone-pllctrl.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/ti-keystone-pllctrl.txt b/Documentation/devicetree/bindings/clock/ti-keystone-pllctrl.txt
-> new file mode 100644
-> index 0000000..3e6a81e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/ti-keystone-pllctrl.txt
-> @@ -0,0 +1,20 @@
-> +* Device tree bindings for Texas Instruments keystone pll controller
-> +
-> +The main pll controller used to drive theC66x CorePacs, the switch fabric,
-> +and a majority of the peripheral clocks (all but the ARM CorePacs, DDR3 and
-> +the NETCP modules) requires a PLL Controller to manage the various clock
-> +divisions, gating, and synchronization.
-> +
-> +Required properties:
-> +
-> +- compatible:          "ti,keystone-pllctrl", "syscon"
-> +
-> +- reg:                 contains offset/length value for pll controller
-> +                       registers space.
-> +
-> +Example:
-> +
-> +pllctrl: pll-controller at 0x02310000 {
-> +       compatible = "ti,keystone-pllctrl", "syscon";
-> +       reg = <0x02310000 0x200>;
-> +};
-> -- 
-> 1.8.3.2
-> 
+Tony
+
+--- a/arch/arm/mach-omap2/cpuidle44xx.c
++++ b/arch/arm/mach-omap2/cpuidle44xx.c
+@@ -44,11 +44,13 @@ static struct idle_statedata omap4_idle_data[] = {
+ 		.mpu_state = PWRDM_POWER_RET,
+ 		.mpu_logic_state = PWRDM_POWER_RET,
+ 	},
++#if 0
+ 	{
+ 		.cpu_state = PWRDM_POWER_OFF,
+ 		.mpu_state = PWRDM_POWER_RET,
+ 		.mpu_logic_state = PWRDM_POWER_OFF,
+ 	},
++#endif
+ };
+ 
+ static struct powerdomain *mpu_pd, *cpu_pd[MAX_CPUS];
