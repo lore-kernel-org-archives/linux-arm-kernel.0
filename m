@@ -1,40 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 May 2014 15:13:34 -0700
-Subject: [GIT PULL] ARM: mvebu: defconfig changes for v3.16 (incr. #2)
-In-Reply-To: <201405240006.33940.arnd@arndb.de>
-References: <20140522155123.GT8664@titan.lakedaemon.net>
- <201405240006.33940.arnd@arndb.de>
-Message-ID: <CAOesGMg88KrBBpBGzqH-b4sOi-7X=2x3BQBoDqqrMZs+va6ztg@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sat, 24 May 2014 07:19:40 +0900
+Subject: [PATCH RESEND v4 0/8] Add Allwinner A31 USB support
+In-Reply-To: <20140523183339.GC10768@lukather>
+References: <20140514160520.GA4679@kroah.com> <20140523183339.GC10768@lukather>
+Message-ID: <20140523221940.GB18106@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 3:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 22 May 2014, Jason Cooper wrote:
->> The following changes since commit 208f4e0d9bce775fbc7ab08c830d135d3da5777c:
->>
->>   ARM: multi_v5_defconfig: Enable sound modules needed for t5325 (2014-05-05 01:22:11 +0000)
->>
->> are available in the git repository at:
->>
->>   git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-3.16-2
->>
->> for you to fetch changes up to 0105c9990291587a3b1fecb576f4d9b6728f1191:
->>
->>   ARM: mvebu: enable MSI support in mvebu_v7_defconfig (2014-05-22 14:22:17 +0000)
->
-> As discussed with Olof, I'm starting a new next/defconfig branch separate
-> from next/boards now, and have merged this one into the new branch.
->
-> Still need to figure out how to separate the defconfig changes that are
-> already in next/boards from the rest there, but since this one includes
-> the other changes, we're good for mvebu.
+On Fri, May 23, 2014 at 08:33:39PM +0200, Maxime Ripard wrote:
+> Hi Greg,
+> 
+> On Wed, May 14, 2014 at 06:05:20PM +0200, Greg Kroah-Hartman wrote:
+> > On Wed, May 14, 2014 at 02:34:19PM +0200, Maxime Ripard wrote:
+> > > On Tue, May 13, 2014 at 05:44:14PM +0200, Maxime Ripard wrote:
+> > > > Hi everyone,
+> > > > 
+> > > > This patchset adds support for the USB controllers found in the
+> > > > Allwinner A31.
+> > > > 
+> > > > While the design is similar to the earlier Allwinner SoCs that are
+> > > > already supported, a few details here and there change, like the fact
+> > > > that the PHYs now have one clock per phy, while it used to be only one
+> > > > for all the PHYs.
+> > > > 
+> > > > Resent adding Alan Stern's Acked-by and puting Greg KH in the
+> > > > recipients this time...
+> > > 
+> > > Applied patches 2, 7 and 8.
+> > 
+> > Feel free to apply patches 5 and 6 to your tree, as your branch needs
+> > these, with my:
+> > 
+> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > 
+> > Or, if you want me to take them, just let me know and I will.
+> 
+> It looks like it's still not in your tree (or at least, I haven't
+> received the usual mail notifications).
+> 
+> Is this expected?
 
-I don't think we need to bother too much with separating them, we just
-make this change going forward from here. It's not perfectly sorted
-that way but it turns out we usually have a few things that don't sort
-well more or less every release cycle and nobody complains all that
-much. :)
+Given that I haven't applied any USB patches in a week or so, yes, it is
+expected...
 
+Give me a week or so to catch up, I've been on the road for a month
+now, and am finally home.
 
-
--Olof
+greg k-h
