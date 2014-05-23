@@ -1,20 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 May 2014 22:46:43 +0200
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.16 (incr. #2)
-In-Reply-To: <20140522155911.GU8664@titan.lakedaemon.net>
-References: <20140522155911.GU8664@titan.lakedaemon.net>
-Message-ID: <201405232246.43660.arnd@arndb.de>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 23 May 2014 22:58:53 +0200
+Subject: [PATCH] clk: samsung: clk-s3c2410-dlck: do not use PNAME macro as it
+ declares __initdata
+Message-ID: <4598341.WkbLY9yLfe@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 May 2014, Jason Cooper wrote:
-> Guys,
-> 
-> Here's the last round DT changes for v3.16.  Nothing controversial, been
-> in -next a while.  This is an incremental pull request from
-> tags/mvebu-dt-3.16 to tags/mvebu-dt-3.16-2 in mvebu/dt.
-> 
+The originally used PNAME macro from the core samsung clock infrastructure
+declares the created array as initdata, creating section mismatch warnings
+in the dclk driver.
 
-Pulled into next/dt, thanks!
+Thus declare them directly, removing these warning.
 
-	Arnd
+Reported-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+This should probably go though the samsung tree / arm-soc, as the
+offending patch is also in there.
+
+ drivers/clk/samsung/clk-s3c2410-dclk.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/clk/samsung/clk-s3c2410-dclk.c b/drivers/clk/samsung/clk-s3c2410-dclk.c
+index 8d8dff0..c1726f4 100644
+--- a/drivers/clk/samsung/clk-s3c2410-dclk.c
++++ b/drivers/clk/samsung/clk-s3c2410-dclk.c
+@@ -135,26 +135,26 @@ struct s3c24xx_dclk {
+ #define to_s3c24xx_dclk1(x) \
+ 		container_of(x, struct s3c24xx_dclk, dclk1_div_change_nb)
+ 
+-PNAME(dclk_s3c2410_p) = { "pclk", "uclk" };
+-PNAME(clkout0_s3c2410_p) = { "mpll", "upll", "fclk", "hclk", "pclk",
++static const char *dclk_s3c2410_p[] = { "pclk", "uclk" };
++static const char *clkout0_s3c2410_p[] = { "mpll", "upll", "fclk", "hclk", "pclk",
+ 			     "gate_dclk0" };
+-PNAME(clkout1_s3c2410_p) = { "mpll", "upll", "fclk", "hclk", "pclk",
++static const char *clkout1_s3c2410_p[] = { "mpll", "upll", "fclk", "hclk", "pclk",
+ 			     "gate_dclk1" };
+ 
+-PNAME(clkout0_s3c2412_p) = { "mpll", "upll", "rtc_clkout",
++static const char *clkout0_s3c2412_p[] = { "mpll", "upll", "rtc_clkout",
+ 			     "hclk", "pclk", "gate_dclk0" };
+-PNAME(clkout1_s3c2412_p) = { "xti", "upll", "fclk", "hclk", "pclk",
++static const char *clkout1_s3c2412_p) = { "xti", "upll", "fclk", "hclk", "pclk",
+ 			     "gate_dclk1" };
+ 
+-PNAME(clkout0_s3c2440_p) = { "xti", "upll", "fclk", "hclk", "pclk",
++static const char *clkout0_s3c2440_p[] = { "xti", "upll", "fclk", "hclk", "pclk",
+ 			     "gate_dclk0" };
+-PNAME(clkout1_s3c2440_p) = { "mpll", "upll", "rtc_clkout",
++static const char *clkout1_s3c2440_p[] = { "mpll", "upll", "rtc_clkout",
+ 			     "hclk", "pclk", "gate_dclk1" };
+ 
+-PNAME(dclk_s3c2443_p) = { "pclk", "epll" };
+-PNAME(clkout0_s3c2443_p) = { "xti", "epll", "armclk", "hclk", "pclk",
++static const char *dclk_s3c2443_p[] = { "pclk", "epll" };
++static const char *clkout0_s3c2443_p[] = { "xti", "epll", "armclk", "hclk", "pclk",
+ 			     "gate_dclk0" };
+-PNAME(clkout1_s3c2443_p) = { "dummy", "epll", "rtc_clkout",
++static const char *clkout1_s3c2443_p[] = { "dummy", "epll", "rtc_clkout",
+ 			     "hclk", "pclk", "gate_dclk1" };
+ 
+ #define DCLKCON_DCLK_DIV_MASK		0xf
+-- 
+1.9.0
