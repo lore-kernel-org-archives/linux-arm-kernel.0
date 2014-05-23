@@ -1,32 +1,21 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 24 May 2014 02:29:35 +0400
-Subject: [PATCH v2 2/2] ARM: shmobile: lager: enable USB PHY
-In-Reply-To: <201405240226.27820.sergei.shtylyov@cogentembedded.com>
-References: <201405240226.27820.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201405240229.36579.sergei.shtylyov@cogentembedded.com>
+Date: Sat, 24 May 2014 02:34:46 +0400
+Subject: [PATCH v2 0/3] Add USB PHY DT support for R8A7791/Koelsch/Henninger
+ board
+Message-ID: <201405240234.47303.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable USB PHY device for the Lager board. 
+Hello.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+   Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-v3.14-20140521' tag plus R8A7791/Koelsch/Henninger PCI USB
+support patches that I posted earlier. Here we add the USB PHY device tree
+support on the R8A7791/Koelsch/Henninger boards. The patchset requires the USB
+PHY driver (just re-posted) in order to work.
 
----
-Changes in version 2:
-- refreshed the patch.
+[1/3] ARM: shmobile: r8a7791: add USB PHY DT support
+[2/3] ARM: shmobile: koelsch: enable USB PHY
+[3/3] ARM: shmobile: henninger: enable USB PHY
 
- arch/arm/boot/dts/r8a7790-lager.dts |    4 ++++
- 1 file changed, 4 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7790-lager.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7790-lager.dts
-+++ renesas/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -350,3 +350,7 @@
- 	pinctrl-0 = <&usb2_pins>;
- 	pinctrl-names = "default";
- };
-+
-+&usbphy {
-+	status = "okay";
-+};
+WBR, Sergei
