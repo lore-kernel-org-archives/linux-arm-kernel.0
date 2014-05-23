@@ -1,52 +1,90 @@
 From: Nikolay.Borisov@arm.com (Nikolay Borisov)
-Date: Fri, 23 May 2014 10:26:29 +0100
-Subject: [PATCH RESEND 0/7] Fix backtrace support in THUMB2 mode
-Message-ID: <1400837196-22339-1-git-send-email-Nikolay.Borisov@arm.com>
+Date: Fri, 23 May 2014 10:26:31 +0100
+Subject: [PATCH RESEND 2/7] ARM: Introduce arm_get_current_stack_frame()
+In-Reply-To: <1400837196-22339-1-git-send-email-Nikolay.Borisov@arm.com>
+References: <1400837196-22339-1-git-send-email-Nikolay.Borisov@arm.com>
+Message-ID: <1400837196-22339-3-git-send-email-Nikolay.Borisov@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently all the code which deals with backtrace support assumes that R11 
-is the frame-pointer. While this is the case for ARM mode and is explicitly 
-documented in the AAPCS, this is not the case for THUMB2 mode. 
+Currently there are numerous places where "struct pt_regs" are used to
+populate "struct stackframe", however all of those location do not
+consider the situation where the kernel might be compiled in THUMB2
+mode, in which case the framepointer member of pt_regs become ARM_r7
+instead of ARM_fp (r11). Document this idiosyncracy in the
+definition of "struct stackframe"
 
-There is no official document requiring that R11 has to be the frame pointer 
-and GCC uses R7 as FP and given that R7's usage is so intertwined within GCC's
-mechanics it is unlikely to change, so fixing backtrace in THUMB2 mode seems
-in order.
+The easiest solution is to introduce a new function (in the spirit of
+https://groups.google.com/forum/#!topic/linux.kernel/dA2YuUcSpZ4)
+which would hide the complexity of initializing the stackframe struct
+from pt_regs.
 
-This patch series rectifies the problem by first fixing the 
-thread_save_fp macro to reference the correct register. Furthermore, there
-a lot of repetetive sequences of code such as :
+Also implement a macro frame_pointer(regs) that would return the correct
+register so that we can use it in cases where we just require the frame
+pointer and not a whole struct stackframe
 
-stackframe.fp = pt_regs->ARM_fp
-stackframe.lr = pt_regs->ARM_lr
+Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
+---
+ arch/arm/include/asm/ptrace.h     | 3 +++
+ arch/arm/include/asm/stacktrace.h | 5 +++++
+ arch/arm/kernel/stacktrace.c      | 9 +++++++++
+ 3 files changed, 17 insertions(+)
 
-so introducing a function arm_get_current_stack_frame which both 
-hides this repetition and also utilizes teh frame_pointer(regs) macro
-to reference the correct register depending on the mode. 
-
-Finally, change all the call sites so that they utilize the new routine.
-
-
-Nikolay Borisov (7):
-  ARM: Make thread_save_fp macro aware of THUMB2 mode
-  ARM: Introduce arm_get_current_stack_frame()
-  ARM: perf: Make perf use arm_get_current_stackframe
-  ARM: time: Make use of arm_get_current_stackframe
-  ARM: unwind: Use arm_get_current_stackframe
-  ARM: traps: Make use of the frame_pointer macro
-  ARM: oprofile: Use of arm_get_current_stackframe
-
- arch/arm/include/asm/ptrace.h      | 3 +++
- arch/arm/include/asm/stacktrace.h  | 5 +++++
- arch/arm/include/asm/thread_info.h | 6 ++++++
- arch/arm/kernel/perf_event.c       | 5 +----
- arch/arm/kernel/stacktrace.c       | 9 +++++++++
- arch/arm/kernel/time.c             | 5 +----
- arch/arm/kernel/traps.c            | 6 ++++--
- arch/arm/kernel/unwind.c           | 8 +++-----
- arch/arm/oprofile/common.c         | 5 +----
- 9 files changed, 33 insertions(+), 19 deletions(-)
-
+diff --git a/arch/arm/include/asm/ptrace.h b/arch/arm/include/asm/ptrace.h
+index c877654..863acec 100644
+--- a/arch/arm/include/asm/ptrace.h
++++ b/arch/arm/include/asm/ptrace.h
+@@ -83,6 +83,9 @@ static inline long regs_return_value(struct pt_regs *regs)
+ }
+ 
+ #define instruction_pointer(regs)	(regs)->ARM_pc
++#define frame_pointer(regs)				  \
++	IS_ENABLED(CONFIG_THUMB2_KERNEL) ? (regs)->ARM_r7 \
++	: (regs)->ARM_fp				  \
+ 
+ static inline void instruction_pointer_set(struct pt_regs *regs,
+ 					   unsigned long val)
+diff --git a/arch/arm/include/asm/stacktrace.h b/arch/arm/include/asm/stacktrace.h
+index 4d0a164..9cbdf36 100644
+--- a/arch/arm/include/asm/stacktrace.h
++++ b/arch/arm/include/asm/stacktrace.h
+@@ -2,12 +2,17 @@
+ #define __ASM_STACKTRACE_H
+ 
+ struct stackframe {
++	/* FP member should hold R7 when CONFIG_THUMB2_KERNEL is enabled.
++	 * and R11 otherwise
++	 */
+ 	unsigned long fp;
+ 	unsigned long sp;
+ 	unsigned long lr;
+ 	unsigned long pc;
+ };
+ 
++extern void arm_get_current_stackframe(struct pt_regs *regs, struct stackframe
++		*frame);
+ extern int unwind_frame(struct stackframe *frame);
+ extern void walk_stackframe(struct stackframe *frame,
+ 			    int (*fn)(struct stackframe *, void *), void *data);
+diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
+index af4e8c8..5d6ac4d 100644
+--- a/arch/arm/kernel/stacktrace.c
++++ b/arch/arm/kernel/stacktrace.c
+@@ -43,6 +43,15 @@ int notrace unwind_frame(struct stackframe *frame)
+ }
+ #endif
+ 
++void arm_get_current_stackframe(struct pt_regs *regs, struct stackframe *frame)
++{
++		frame->fp = frame_pointer(regs);
++		frame->sp = regs->ARM_sp;
++		frame->lr = regs->ARM_lr;
++		frame->pc = regs->ARM_pc;
++}
++EXPORT_SYMBOL_GPL(arm_get_current_stackframe);
++
+ void notrace walk_stackframe(struct stackframe *frame,
+ 		     int (*fn)(struct stackframe *, void *), void *data)
+ {
 -- 
 1.8.1.5
