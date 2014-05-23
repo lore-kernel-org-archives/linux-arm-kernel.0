@@ -1,31 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 24 May 2014 00:48:52 +0200
-Subject: [GIT PULL] qcom driver changes for v3.16
-In-Reply-To: <alpine.DEB.2.00.1405231342160.15680@galak-ubuntu.qualcomm.com>
-References: <alpine.DEB.2.00.1405231342160.15680@galak-ubuntu.qualcomm.com>
-Message-ID: <201405240048.52555.arnd@arndb.de>
+Date: Sat, 24 May 2014 00:49:15 +0200
+Subject: [GIT PULL] Allwinner drivers changes for 3.16, take 2
+In-Reply-To: <20140523210507.GA18497@lukather>
+References: <20140523210507.GA18497@lukather>
+Message-ID: <201405240049.15790.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 May 2014, Kumar Gala wrote:
-> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+On Friday 23 May 2014, Maxime Ripard wrote:
+> Hi Arnd, Kevin, Olof,
 > 
->    Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+> Here is the last pull request for the driver additions of the
+> Allwinner stuff for the 3.16 merge window.
+> 
+> The following changes since commit cd90f0cf4454861a4f87bdfdcf01e8b98cc94869:
+> 
+>   reset: sunxi: allow MFD subdevices probe (2014-05-15 10:31:04 +0200)
 > 
 > are available in the git repository at:
 > 
->    git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-drivers-for-3.16
+>   https://github.com/mripard/linux.git tags/sunxi-drivers-for-3.16-2
 > 
-> for you to fetch changes up to 5d144e36b7c51612922fa05d37ff3a869261cc82:
+> for you to fetch changes up to 1be7f5520a3885747174008d2905ae551f74ea78:
 > 
->    soc: qcom: Add GSBI driver (2014-05-23 11:38:04 -0500)
+>   power: reset: Add Allwinner A31 reset code (2014-05-23 10:40:34 +0200)
 > 
 > ----------------------------------------------------------------
-> Qualcomm ARM Based driver Updates for v3.16
+> Allwinner drivers changes for 3.16, take 2
 > 
-> * Introduce drivers/soc directory for misc SoC specific code
-> * Add driver to configure GSBI device
+> Add reset driver for the A31
+> 
 
-Merged into next/drivers, thanks
-
+Merged into next/drivers, thanks!
+	
 	Arnd
