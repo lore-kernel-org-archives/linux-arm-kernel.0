@@ -1,67 +1,92 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Fri, 23 May 2014 16:54:59 +0200
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in device
- tree
-In-Reply-To: <537F4CE5.10707@redhat.com>
-References: <537DC832.3020006@redhat.com>
- <CAGb2v64VZac2KvAALrScecN89sRnBQoDrKxKMvkte+3G04NXeA@mail.gmail.com>
- <537DE1AA.5050606@redhat.com> <537E31F7.1030505@gmail.com>
- <537F1148.3010102@redhat.com> <20140523112239.GB12304@sirena.org.uk>
- <537F3610.3050104@redhat.com> <537F4B5E.80306@broadcom.com>
- <537F4CE5.10707@redhat.com>
-Message-ID: <537F6143.3050703@broadcom.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Fri, 23 May 2014 16:03:31 +0100
+Subject: EFI_STUB fails to boot non-EFI on arm64
+In-Reply-To: <20140523134720.GA9256@arm.com>
+References: <20140523094513.GC9252@arm.com>
+ <20140523131656.GR4179@bivouac.eciton.net>
+ <20140523134720.GA9256@arm.com>
+Message-ID: <20140523150331.GS4179@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/14 15:28, Hans de Goede wrote:
-> Hi,
->
-> On 05/23/2014 03:21 PM, Arend van Spriel wrote:
->> On 05/23/14 13:50, Hans de Goede wrote:
->>> Hi,
->>>
->>> On 05/23/2014 01:22 PM, Mark Brown wrote:
->>>> On Fri, May 23, 2014 at 11:13:44AM +0200, Hans de Goede wrote:
->>>>
->>>>> Thinking more about this, I would like to make one change to my
->>>>> proposal, the mmc-core should only do power up of child-nodes if
->>>>> they have a compatible of: "simple-sdio-powerup". This way
->>>>> when we add something more complex, we can keep the simple powerup
->>>>> code in the mmc core, keeping what we've already using this working
->>>>> and the mmc core won't respond to the child nodes for more complex
->>>>> devices, so it won't conflict with more complex power-up handling
->>>>> handled by some other driver.
->>>>
->>>> Would it not be better to have this be something in the driver struct
->>>> rather than in the device tree?  Putting a compatible in there would be
->>>> encoding details of the Linux implementation in the DT which doesn't
->>>> seem right especially since these are details we're thinking of changing
->>>> later on.
->>>
->>> The compatible is not a Linux specific thing, it is a marking saying
->>> that something needs to take care of enabling the clks (and whatever
->>> else we will make part of the binding for this compatible), before
->>> scanning the mmc bus.
->>>
->>>> Something like have the driver set flags saying if it wants
->>>> to do complicated things.
->>>
->>> Chicken<->   egg, we won't know which driver to use before we've probed
->>> the mmc bus, and we cannot probe the bus before enabling the clks, etc.
->>
->> The approach I took with brcmfmac is that upon module init I search the DT for "brcm,bcm43xx-fmac" compatible and get the clock and/or gpio resource and enable them before registering the sdio driver. The difficulty is probably when using the driver built-in as the clocks and gpios may not be available yet and we can not rely on deferred probing in module init stage.
->
-> I know, and that approach does not work, by the time the brcmfmac loads,
-> the mmc core has long probed the mmc bus and decided no one is home.
+On Fri, May 23, 2014 at 02:47:20PM +0100, Catalin Marinas wrote:
+> That's a first (possibly temporary) step and I think it's fine:
+> 
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> But we need some further tweaking to the way we call efi_init().
+> Currently it doesn't matter whether Linux booted as an EFI application
+> or not and efi_init() is always called, causing some pr_err() in
+> fdt_find_uefi_params(). It's not really an error as we support the same
+> image booting non-EFI as well.
 
-Ok. That is due to the non-removable property, right? I assumed a mmc 
-rescan, which is (supposedly) triggered upon sdio driver registration, 
-would subsequently find the device.
+OK.
 
-Regards,
-Arend
+> Can we add another of detecting whether it's an EFI application and
+> avoid calling efi_init()? I can see x86 sets some efi_loader_signature
+> string in exit_boot() and checks against it later when calling
+> efi_init().
 
-> Regards,
->
-> Hans
->
+Well, I agree that we shouldn't be spewing error messages for expected
+operation, but efi_init() is the function we call to determine
+whether we _are_ booting via UEFI - and it sets flags accordingly for
+the efi_enabled() macro.
+
+My view is that this should be fixed in fdt_find_uefi_params(). A
+single info message that we can't find evidence of UEFI should be
+printed in the non-error case.
+
+Like below?
+
+/
+    Leif
+
+>From 67283e60923c14c024460b4512c49563a92acce7 Mon Sep 17 00:00:00 2001
+From: Leif Lindholm <leif.lindholm@linaro.org>
+Date: Fri, 23 May 2014 15:50:51 +0100
+Subject: [PATCH] efi: fdt: Drop error messages for non-error case
+
+Change fdt_find_uefi_params() to only write error messages if actual
+error encountered, rather than if no UEFI information is encountered.
+For the non-error case, print a single info message.
+
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+---
+ drivers/firmware/efi/efi.c |   15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+index cd36deb..4bb42e1e 100644
+--- a/drivers/firmware/efi/efi.c
++++ b/drivers/firmware/efi/efi.c
+@@ -366,11 +366,8 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+ 
+ 	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
+ 		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
+-		if (!prop) {
+-			pr_err("Can't find %s in device tree!\n",
+-			       dt_params[i].name);
+-			return 0;
+-		}
++		if (!prop)
++			goto fail;
+ 		dest = info->params + dt_params[i].offset;
+ 
+ 		val = of_read_number(prop, len / sizeof(u32));
+@@ -385,6 +382,14 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+ 				dt_params[i].size * 2, val);
+ 	}
+ 	return 1;
++
++	fail:
++	if (i == 0)
++		pr_info("  UEFI not found.\n");
++	else
++		pr_err("Can't find %s in device tree!\n", dt_params[i].name);
++
++	return 0;
+ }
+ 
+ int __init efi_get_fdt_params(struct efi_fdt_params *params, int verbose)
+-- 
+1.7.10.4
