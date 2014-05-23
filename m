@@ -1,109 +1,96 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 May 2014 12:31:23 +0200
-Subject: [PATCH 43/71] clocksource: sh_mtu2: Add index to struct
- sh_mtu2_channel
+Date: Fri, 23 May 2014 12:31:25 +0200
+Subject: [PATCH 45/71] clocksource: sh_mtu2: Allocate channels dynamically
 In-Reply-To: <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
 References: <537F214C.8000700@linaro.org>
  <1400841111-6683-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1400841111-6683-43-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1400841111-6683-45-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Use the index as the timer start/stop bit and when printing messages to
-identify the channel.
+This prepares the driver for multi-channel support.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Tested-by: Wolfram Sang <wsa@sang-engineering.com>
 ---
- drivers/clocksource/sh_mtu2.c |   22 +++++++++++++---------
- 1 file changed, 13 insertions(+), 9 deletions(-)
+ drivers/clocksource/sh_mtu2.c |   27 ++++++++++++++++++++-------
+ 1 file changed, 20 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
-index 97714ce..61827c6 100644
+index 94a5342..45e1e85 100644
 --- a/drivers/clocksource/sh_mtu2.c
 +++ b/drivers/clocksource/sh_mtu2.c
-@@ -38,6 +38,7 @@ struct sh_mtu2_device;
+@@ -52,7 +52,8 @@ struct sh_mtu2_device {
+ 	void __iomem *mapbase;
+ 	struct clk *clk;
  
- struct sh_mtu2_channel {
- 	struct sh_mtu2_device *mtu;
-+	unsigned int index;
+-	struct sh_mtu2_channel channel;
++	struct sh_mtu2_channel *channels;
++	unsigned int num_channels;
+ };
  
- 	void __iomem *base;
- 	int irq;
-@@ -110,7 +111,6 @@ static inline void sh_mtu2_write(struct sh_mtu2_channel *ch, int reg_nr,
- 
- static void sh_mtu2_start_stop_ch(struct sh_mtu2_channel *ch, int start)
+ static DEFINE_RAW_SPINLOCK(sh_mtu2_lock);
+@@ -296,6 +297,7 @@ static int sh_mtu2_setup(struct sh_mtu2_device *mtu,
  {
--	struct sh_timer_config *cfg = ch->mtu->pdev->dev.platform_data;
- 	unsigned long flags, value;
+ 	struct sh_timer_config *cfg = pdev->dev.platform_data;
+ 	struct resource *res;
++	void __iomem *base;
+ 	int ret;
+ 	ret = -ENXIO;
  
- 	/* start stop register shared by multiple timer channels */
-@@ -118,9 +118,9 @@ static void sh_mtu2_start_stop_ch(struct sh_mtu2_channel *ch, int start)
- 	value = sh_mtu2_read(ch, TSTR);
- 
- 	if (start)
--		value |= 1 << cfg->timer_bit;
-+		value |= 1 << ch->index;
- 	else
--		value &= ~(1 << cfg->timer_bit);
-+		value &= ~(1 << ch->index);
- 
- 	sh_mtu2_write(ch, TSTR, value);
- 	raw_spin_unlock_irqrestore(&sh_mtu2_lock, flags);
-@@ -138,7 +138,8 @@ static int sh_mtu2_enable(struct sh_mtu2_channel *ch)
- 	/* enable clock */
- 	ret = clk_enable(ch->mtu->clk);
- 	if (ret) {
--		dev_err(&ch->mtu->pdev->dev, "cannot enable clock\n");
-+		dev_err(&ch->mtu->pdev->dev, "ch%u: cannot enable clock\n",
-+			ch->index);
- 		return ret;
+@@ -315,16 +317,16 @@ static int sh_mtu2_setup(struct sh_mtu2_device *mtu,
  	}
  
-@@ -211,7 +212,7 @@ static void sh_mtu2_clock_event_mode(enum clock_event_mode mode,
- 	switch (mode) {
- 	case CLOCK_EVT_MODE_PERIODIC:
- 		dev_info(&ch->mtu->pdev->dev,
--			 "used for periodic clock events\n");
-+			 "ch%u: used for periodic clock events\n", ch->index);
- 		sh_mtu2_enable(ch);
- 		break;
- 	case CLOCK_EVT_MODE_UNUSED:
-@@ -250,15 +251,16 @@ static void sh_mtu2_register_clockevent(struct sh_mtu2_channel *ch,
- 	ced->suspend = sh_mtu2_clock_event_suspend;
- 	ced->resume = sh_mtu2_clock_event_resume;
- 
--	dev_info(&ch->mtu->pdev->dev, "used for clock events\n");
-+	dev_info(&ch->mtu->pdev->dev, "ch%u: used for clock events\n",
-+		 ch->index);
- 	clockevents_register_device(ced);
- 
- 	ret = request_irq(ch->irq, sh_mtu2_interrupt,
- 			  IRQF_TIMER | IRQF_IRQPOLL | IRQF_NOBALANCING,
- 			  dev_name(&ch->mtu->pdev->dev), ch);
- 	if (ret) {
--		dev_err(&ch->mtu->pdev->dev, "failed to request irq %d\n",
--			ch->irq);
-+		dev_err(&ch->mtu->pdev->dev, "ch%u: failed to request irq %d\n",
-+			ch->index, ch->irq);
- 		return;
+ 	/*
+-	 * Map memory, let channel.base point to our channel and mapbase to the
++	 * Map memory, let base point to our channel and mapbase to the
+ 	 * start/stop shared register.
+ 	 */
+-	mtu->channel.base = ioremap_nocache(res->start, resource_size(res));
+-	if (mtu->channel.base == NULL) {
++	base = ioremap_nocache(res->start, resource_size(res));
++	if (base == NULL) {
+ 		dev_err(&mtu->pdev->dev, "failed to remap I/O memory\n");
+ 		goto err0;
  	}
+ 
+-	mtu->mapbase = mtu->channel.base + cfg->channel_offset;
++	mtu->mapbase = base + cfg->channel_offset;
+ 
+ 	/* get hold of clock */
+ 	mtu->clk = clk_get(&mtu->pdev->dev, "mtu2_fck");
+@@ -338,17 +340,28 @@ static int sh_mtu2_setup(struct sh_mtu2_device *mtu,
+ 	if (ret < 0)
+ 		goto err2;
+ 
+-	ret = sh_mtu2_setup_channel(&mtu->channel, mtu);
++	mtu->channels = kzalloc(sizeof(*mtu->channels), GFP_KERNEL);
++	if (mtu->channels == NULL) {
++		ret = -ENOMEM;
++		goto err3;
++	}
++
++	mtu->num_channels = 1;
++
++	mtu->channels[0].base = base;
++
++	ret = sh_mtu2_setup_channel(&mtu->channels[0], mtu);
+ 	if (ret < 0)
+ 		goto err3;
+ 
+ 	return 0;
+  err3:
++	kfree(mtu->channels);
+ 	clk_unprepare(mtu->clk);
+  err2:
+ 	clk_put(mtu->clk);
+  err1:
+-	iounmap(mtu->channel.base);
++	iounmap(base);
+  err0:
+ 	return ret;
  }
-@@ -279,10 +281,12 @@ static int sh_mtu2_setup_channel(struct sh_mtu2_channel *ch,
- 
- 	memset(ch, 0, sizeof(*ch));
- 	ch->mtu = mtu;
-+	ch->index = cfg->timer_bit;
- 
- 	ch->irq = platform_get_irq(mtu->pdev, 0);
- 	if (ch->irq < 0) {
--		dev_err(&mtu->pdev->dev, "failed to get irq\n");
-+		dev_err(&mtu->pdev->dev, "ch%u: failed to get irq\n",
-+			ch->index);
- 		return ch->irq;
- 	}
- 
 -- 
 1.7.9.5
