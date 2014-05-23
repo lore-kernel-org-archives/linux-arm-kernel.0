@@ -1,47 +1,72 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 23 May 2014 15:05:07 +0800
-Subject: [PATCH] pwm: imx: set can_sleep flag for imx_pwm_v2
-In-Reply-To: <537EED44.7030906@freescale.com>
-References: <1400824114-27148-1-git-send-email-shawn.guo@freescale.com>
- <537EED44.7030906@freescale.com>
-Message-ID: <20140523070501.GE32184@dragon>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Fri, 23 May 2014 09:09:07 +0200
+Subject: [PATCH v3 0/3] ARM: dts: overo: Add panel support
+In-Reply-To: <1400594337-5096-1-git-send-email-florian.vaussard@epfl.ch>
+References: <1400594337-5096-1-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <537EF413.5050600@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 02:40:04PM +0800, Liu Ying wrote:
-> Hi Shawn,
-> 
-> On 05/23/2014 01:48 PM, Shawn Guo wrote:
-> > The .config() hook of imx_pwm_data_v2 calls clk_get_rate() which might
-> > sleep, so we need to set can_sleep flag on it.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > ---
-> >  drivers/pwm/pwm-imx.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
-> > index d797c7b84c3f..ab3809fb36a7 100644
-> > --- a/drivers/pwm/pwm-imx.c
-> > +++ b/drivers/pwm/pwm-imx.c
-> > @@ -272,6 +272,9 @@ static int imx_pwm_probe(struct platform_device *pdev)
-> >  	imx->config = data->config;
-> >  	imx->set_enable = data->set_enable;
-> >  
-> > +	if (data == &imx_pwm_data_v2)
-> > +		imx->chip.can_sleep = true;
-> > +
-> >  	ret = pwmchip_add(&imx->chip);
-> >  	if (ret < 0)
-> >  		return ret;
-> > 
-> 
-> clk_prepare_enable()/clk_disable_unprepare() called in imx_pwm_config() may sleep.
-> 
-> So, the can_sleep flag should be true for both i.MX PWM v1 and v2, right?
+Hi Tomi,
 
-Yes, you're right.  I missed that.  Thanks for pointing it out.
+On 05/20/2014 03:58 PM, Florian Vaussard wrote:
+> Hi,
+> 
+> This series enables the DVI and LCD panels present on some of
+> the Overo expansion boards.
+> 
 
-Will send v2 shortly.
+Do you have any more comments on these? If no, do you want to pull them
+through your tree for 3.16, as discussed with Tony?
 
-Shawn
+Regards,
+
+Florian
+
+> DVI output:
+> - Tobi
+> - Summit
+> 
+> LCD (3.5''):
+> - Alto35
+> 
+> LCD (4.3''):
+> - Chestnut43
+> - Palo43
+> - Gallop43
+> 
+> I tested on Tobi, Alto35 and Gallop43.
+> 
+> This series depends on several patches from Tomi [1][2][3] targeting 3.16.
+> 
+> Regards,
+> Florian
+> 
+> Since v2:
+> - Use gpio-backlight
+> Since v1:
+> - Rebased on 3.15-rc4 + recent patches from Tomi
+> 
+> [1] http://thread.gmane.org/gmane.linux.ports.arm.omap/114572
+> [2] http://thread.gmane.org/gmane.linux.ports.arm.omap/114560
+> [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-January/227101.html
+> 
+> Florian Vaussard (3):
+>   ARM: dts: overo: Add support for DVI output
+>   ARM: dts: overo: Add support for 4.3'' LCD output
+>   ARM: dts: overo: Add support for 3.5'' LCD output
+> 
+>  arch/arm/boot/dts/omap3-overo-alto35-common.dtsi   |   1 +
+>  .../boot/dts/omap3-overo-chestnut43-common.dtsi    |   1 +
+>  arch/arm/boot/dts/omap3-overo-common-dvi.dtsi      | 111 +++++++++++++
+>  arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi    | 165 +++++++++++++++++++
+>  arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi    | 178 +++++++++++++++++++++
+>  arch/arm/boot/dts/omap3-overo-gallop43-common.dtsi |   1 +
+>  arch/arm/boot/dts/omap3-overo-palo43-common.dtsi   |   1 +
+>  arch/arm/boot/dts/omap3-overo-summit-common.dtsi   |   1 +
+>  arch/arm/boot/dts/omap3-overo-tobi-common.dtsi     |   1 +
+>  9 files changed, 460 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/omap3-overo-common-dvi.dtsi
+>  create mode 100644 arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi
+>  create mode 100644 arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi
+> 
