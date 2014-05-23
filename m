@@ -1,82 +1,59 @@
-From: larry.bassel@linaro.org (Larry Bassel)
-Date: Fri, 23 May 2014 10:04:30 -0700
-Subject: [PATCH v4 1/2] arm64: adjust el0_sync so that a function can
- be called
-In-Reply-To: <20140523144457.GN9252@arm.com>
-References: <1400786855-32656-1-git-send-email-larry.bassel@linaro.org>
- <1400786855-32656-2-git-send-email-larry.bassel@linaro.org>
- <537E5CD9.80501@codeaurora.org> <20140522223520.GA7953@ubuette>
- <20140523144457.GN9252@arm.com>
-Message-ID: <20140523170430.GB7953@ubuette>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 23 May 2014 13:14:00 -0400
+Subject: [PATCH v1 3/5] phy: pci serdes phy driver for keystone
+In-Reply-To: <9550746.D1ri3H0uvi@wuerfel>
+References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
+ <1400169692-9677-4-git-send-email-m-karicheri2@ti.com>
+ <9550746.D1ri3H0uvi@wuerfel>
+Message-ID: <537F81D8.2080005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 May 14 15:44, Catalin Marinas wrote:
-> On Thu, May 22, 2014 at 11:35:20PM +0100, Larry Bassel wrote:
-> > > On 05/22/2014 03:27 PM, Larry Bassel wrote:
-> > > > To implement the context tracker properly on arm64,
-> > > > a function call needs to be made after debugging and
-> > > > interrupts are turned on, but before the lr is changed
-> > > > to point to ret_to_user(). If the function call
-> > > > is made after the lr is changed the function will not
-> > > > return to the correct place.
-> > > > 
-> > > > For similar reasons, defer the setting of x0 so that
-> > > > it doesn't need to be saved around the function call
-> > > > (save far_el1 in x26 temporarily instead).
-> > > > 
-> > > > Signed-off-by: Larry Bassel <larry.bassel@linaro.org>
-> > > > ---
-> > > >  arch/arm64/kernel/entry.S | 24 +++++++++++++++++-------
-> > > >  1 file changed, 17 insertions(+), 7 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> > > > index e8b23a3..20b336e 100644
-> > > > --- a/arch/arm64/kernel/entry.S
-> > > > +++ b/arch/arm64/kernel/entry.S
-> > > > @@ -354,7 +354,6 @@ el0_sync:
-> > > >  	lsr	x24, x25, #ESR_EL1_EC_SHIFT	// exception class
-> > > >  	cmp	x24, #ESR_EL1_EC_SVC64		// SVC in 64-bit state
-> > > >  	b.eq	el0_svc
-> > > > -	adr	lr, ret_to_user
-> > > >  	cmp	x24, #ESR_EL1_EC_DABT_EL0	// data abort in EL0
-> > > >  	b.eq	el0_da
-> > > >  	cmp	x24, #ESR_EL1_EC_IABT_EL0	// instruction abort in EL0
-> > > > @@ -383,7 +382,6 @@ el0_sync_compat:
-> > > >  	lsr	x24, x25, #ESR_EL1_EC_SHIFT	// exception class
-> > > >  	cmp	x24, #ESR_EL1_EC_SVC32		// SVC in 32-bit state
-> > > >  	b.eq	el0_svc_compat
-> > > > -	adr	lr, ret_to_user
-> > > >  	cmp	x24, #ESR_EL1_EC_DABT_EL0	// data abort in EL0
-> > > >  	b.eq	el0_da
-> > > >  	cmp	x24, #ESR_EL1_EC_IABT_EL0	// instruction abort in EL0
-> > > > @@ -426,22 +424,26 @@ el0_da:
-> > > >  	/*
-> > > >  	 * Data abort handling
-> > > >  	 */
-> > > > -	mrs	x0, far_el1
-> > > > -	bic	x0, x0, #(0xff << 56)
-> > > > +	mrs	x26, far_el1
-> > > >  	// enable interrupts before calling the main handler
-> > > >  	enable_dbg_and_irq
-> > > > +	mov	x0, x26
-> > > > +	bic	x0, x0, #(0xff << 56)
-> > > 
-> > > Nit: I believe you can bit clear with x26 as the source register and omit the
-> > > move instruction.
-> > 
-> > Is that really an improvement (assuming it works)? Are we saving
-> > any cycles here? If so, does it matter? It is easy to see what
-> > the move instruction is doing.
-> 
-> Even if it's not noticeable, I would still reduce the number of lines by
-> one. BIC with immediate is just an alias for AND and it supports
-> different source and destination.
+On 5/15/2014 12:14 PM, Arnd Bergmann wrote:
+> On Thursday 15 May 2014 12:01:30 Murali Karicheri wrote:
+>> +static struct serdes_config ks_100mhz_pcie_5gbps_serdes[] = {
+>> +       {0x0000, 0x00000800, 0x0000ff00},
+>> +       {0x0060, 0x00041c5c, 0x00ffffff},
+>> +       {0x0064, 0x0343c700, 0xffffff00},
+>> +       {0x006c, 0x00000012, 0x000000ff},
+>> +       {0x0068, 0x00070000, 0x00ff0000},
+>> +       {0x0078, 0x0000c000, 0x0000ff00},
+> It looks like the PHY is generic, but the configuration above is
+> PCI specific. If this is true, you should have #phy-cells=<1>
+> and document the possible modes, adding a lookup table here to
+> pick the configuration based on the argument. It's fine to just
+> implement pcie-5ghz initially, but the binding should list all
+> the modes that the PHY can support.
 
-Ack.
+The PCIE name needs to be dropped and as you correctly guessed, this SERDES
+is generic.
+>
+> Also, please list the exact name of the phy if you can find it
+> out. You mention that you don't know the register descriptions,
+> but you should at least be able to let us know what phy this
+> is, in case some other SoC reuses the same thing.
+Unfortunately there is a NDA restriction that prevents us from using the
+actual Phy name and keystone phy is the name what we can usel at the 
+moment. I am checking
+this with our IP team and if original name can  be used, I will update 
+the driver to reflect the same.
+>> +static int ks_phy_init(struct phy *phy)
+>> +{
+>> +       struct serdes_config *p;
+>> +       struct phy_keystone *ks_phy = phy_get_drvdata(phy);
+>> +
+>> +       int i;
+>> +
+>> +       for (i = 0, p = &ks_100mhz_pcie_5gbps_serdes[0];
+>> +               i < ARRAY_SIZE(ks_100mhz_pcie_5gbps_serdes);
+>> +               i++, p++) {
+>> +               reg_rmw((ks_phy->base + p->reg), p->val, p->mask);
+>> +               reg_dump((ks_phy->base + p->reg), p->mask);
+>> +       }
+>> +       udelay(2000);
+> This should probably be msleep(2);
+Fine.
 
-> 
-> -- 
-> Catalin
-
-Larry
+Murali
+>
+> 	Arnd
