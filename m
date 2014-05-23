@@ -1,54 +1,31 @@
-From: t.dakhran@gmail.com (Tarek Dakhran)
-Date: Sat, 24 May 2014 02:48:31 +0400
-Subject: [PATCH v10 1/3] ARM: EXYNOS: Add support for EXYNOS5410 SoC
-In-Reply-To: <CANhyOUd8Q2nzh_bF6LZNuv8keVUB3F45PocYrLP_B=D_Q3tWuQ@mail.gmail.com>
-References: <1400841343-6016-1-git-send-email-t.dakhran@samsung.com>
- <1400841343-6016-2-git-send-email-t.dakhran@samsung.com>
- <537FB995.5070604@gmail.com>
- <CANhyOUd8Q2nzh_bF6LZNuv8keVUB3F45PocYrLP_B=D_Q3tWuQ@mail.gmail.com>
-Message-ID: <CANhyOUfp1AL6wJ1Q9kWj=v-n9e2CyxkQOPb8_50M5bY_JN2f9A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 24 May 2014 00:48:52 +0200
+Subject: [GIT PULL] qcom driver changes for v3.16
+In-Reply-To: <alpine.DEB.2.00.1405231342160.15680@galak-ubuntu.qualcomm.com>
+References: <alpine.DEB.2.00.1405231342160.15680@galak-ubuntu.qualcomm.com>
+Message-ID: <201405240048.52555.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, only now catch it!
-I agree, this patch is not needed anymore, except Kconfig option.
-config SOC_EXYNOS5410 is needed to build clock stuff.
-What is your opinion, Tomasz?
+On Friday 23 May 2014, Kumar Gala wrote:
+> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+> 
+>    Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+> 
+> are available in the git repository at:
+> 
+>    git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-drivers-for-3.16
+> 
+> for you to fetch changes up to 5d144e36b7c51612922fa05d37ff3a869261cc82:
+> 
+>    soc: qcom: Add GSBI driver (2014-05-23 11:38:04 -0500)
+> 
+> ----------------------------------------------------------------
+> Qualcomm ARM Based driver Updates for v3.16
+> 
+> * Introduce drivers/soc directory for misc SoC specific code
+> * Add driver to configure GSBI device
 
-On Sat, May 24, 2014 at 2:44 AM, Tarek Dakhran <t.dakhran@gmail.com> wrote:
-> Hi Tomazs,
->
-> On Sat, May 24, 2014 at 1:11 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> Hi Tarek,
->>
->> With v2 of the series I mentioned in review of previous version [1],
->> this patch can be skipped.
->>
->> [1] http://www.spinics.net/lists/linux-samsung-soc/msg31258.html
->>
->> Best regards,
->> Tomasz
->>
->> On 23.05.2014 12:35, Tarek Dakhran wrote:
-> [snip]
->>> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
->>> index 739bdc8..971baf0 100644
->>> --- a/arch/arm/mach-exynos/firmware.c
->>> +++ b/arch/arm/mach-exynos/firmware.c
->>> @@ -50,7 +50,7 @@ static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
->>>
->>>       boot_reg = sysram_ns_base_addr + 0x1c;
->>>
->>> -     if (!soc_is_exynos4212())
->>> +     if (!soc_is_exynos4212() && !soc_is_exynos5410())
->>>               boot_reg += 4*cpu;
->>>
->>>       __raw_writel(boot_addr, boot_reg);
->>>
->
-> I need to define SoC type to set correct bootreg in firmware,
-> otherwise only one cpu can be booted.
-> So, this stuff is needed.
->
-> Best regards,
->      Tarek
+Merged into next/drivers, thanks
+
+	Arnd
