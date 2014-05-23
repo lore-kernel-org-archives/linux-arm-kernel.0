@@ -1,33 +1,55 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 23 May 2014 14:54:02 +0530
-Subject: [PATCH 2/5] Documentation: dt-bindings: document the Armada 375
- USB cluster binding
-In-Reply-To: <1400257376-13251-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1400257376-13251-1-git-send-email-gregory.clement@free-electrons.com>
- <1400257376-13251-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <537F13B2.6070500@ti.com>
+From: Nikolay.Borisov@arm.com (Nikolay Borisov)
+Date: Fri, 23 May 2014 10:26:35 +0100
+Subject: [PATCH RESEND 6/7] ARM: traps: Make use of the frame_pointer macro
+In-Reply-To: <1400837196-22339-1-git-send-email-Nikolay.Borisov@arm.com>
+References: <1400837196-22339-1-git-send-email-Nikolay.Borisov@arm.com>
+Message-ID: <1400837196-22339-7-git-send-email-Nikolay.Borisov@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Use the newly-introduced frame_pointer macro to extract
+the correct FP based on whether we are in THUMB2 mode or not.
 
-On Friday 16 May 2014 09:52 PM, Gregory CLEMENT wrote:
-> Armada 375 comes with an USB2 host and device controller and an USB3
-> controller. The USB cluster control register allows to manage common
-> features of both USB controllers. This commit adds the Device Tree
-> binding documentation for this piece of hardware.
+Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
+---
+ arch/arm/kernel/traps.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-Pls re-order so that the Documentation patch comes before the driver patch..
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  .../bindings/phy/armada-375-usb-phy-cluster.txt      | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/armada-375-usb-phy-cluster.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/armada-375-usb-phy-cluster.txt b/Documentation/devicetree/bindings/phy/armada-375-usb-phy-cluster.txt
-
-simpler file name? armada-phy?
-
-Thanks
-Kishon
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index abd2fc0..c8e4bb7 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -31,11 +31,13 @@
+ #include <asm/exception.h>
+ #include <asm/unistd.h>
+ #include <asm/traps.h>
++#include <asm/ptrace.h>
+ #include <asm/unwind.h>
+ #include <asm/tls.h>
+ #include <asm/system_misc.h>
+ #include <asm/opcodes.h>
+ 
++
+ static const char *handler[]= {
+ 	"prefetch abort",
+ 	"data abort",
+@@ -184,7 +186,7 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 		tsk = current;
+ 
+ 	if (regs) {
+-		fp = regs->ARM_fp;
++		fp = frame_pointer(regs);
+ 		mode = processor_mode(regs);
+ 	} else if (tsk != current) {
+ 		fp = thread_saved_fp(tsk);
+@@ -719,7 +721,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
+ 		dump_instr("", regs);
+ 		if (user_mode(regs)) {
+ 			__show_regs(regs);
+-			c_backtrace(regs->ARM_fp, processor_mode(regs));
++			c_backtrace(frame_pointer(regs), processor_mode(regs));
+ 		}
+ 	}
+ #endif
+-- 
+1.8.1.5
