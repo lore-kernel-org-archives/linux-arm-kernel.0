@@ -1,52 +1,33 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sat, 24 May 2014 15:16:35 +0200
-Subject: [PATCH] acornscsi: remove linked command support
-In-Reply-To: <1400933617.6956.34.camel@dabdike.int.hansenpartnership.com>
-References: <1400926433.31526.89.camel@x220> <538075E0.4080001@suse.de>
- <1400933617.6956.34.camel@dabdike.int.hansenpartnership.com>
-Message-ID: <1400937395.22523.55.camel@x220>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat, 24 May 2014 11:17:08 -0300
+Subject: [PATCH for v3.15 0/2] ARM: mvebu Specificy ECC scheme for A375/385
+ boards
+Message-ID: <1400941030-2123-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2014-05-24 at 16:13 +0400, James Bottomley wrote:
-> Wait, no, that's not a good idea.  We leave obsolete drivers to bitrot.
-> Particularly we try not to touch them unless we have to because there
-> might be a few people still using them and the more we tamper, the
-> greater the risk that something gets broken.
+Last minute fixes, which help prevent any inconsistencies between the ECC
+scheme expected by the bootloader, and the one expected by the kernel.
 
-Which is also a way to notice whether people still use those obsolete
-drivers.
+Until now, the kernel was using the ONFI-provided "datasheet ECC requirement",
+and assume the bootloader did the same thing. However, this is not the case
+for these boards, where the vendor provided a bootloader with an ECC strength
+that's weaker than the required.
 
-> On that principle, since
-> there's no real reason to remove the code,
+After the introduction of the NAND ECC devicetree binding, and its support
+in the pxa3xx-nand driver, we can set these values and expect them to work.
 
-(Unless one carries the hope that any check, treewide, for a CONFIG_*
-macro can be linked to a proper Kconfig symbol.)
+I hope it's not too late for v3.15 already.
 
-> it should stay ... until the
-> whole driver bitrots to the extent that we can no-longer compile it.
+Ezequiel Garcia (2):
+  ARM: dts: Specify the NAND ECC scheme explicitly on Armada 375 DB
+    board
+  ARM: dts: Specify the NAND ECC scheme explicitly on Armada 385 DB
+    board
 
-I've run into this depreciation policy before. With aic7xxx_old (which I
-eventually convinced Fedora to disable, a few relases before it was
-removed from the tree). With aic94xx (which I also convinced Fedora to
-disable). I also tried multiple times to shut up advansys' compile
-time[1]. It seems SCSI might risk not to notice their bitrot, because
-eventually everybody stops compiling these obsolete drivers, leaving
-SCSI without feedback on their state.
+ arch/arm/boot/dts/armada-375-db.dts | 2 ++
+ arch/arm/boot/dts/armada-385-db.dts | 2 ++
+ 2 files changed, 4 insertions(+)
 
-Anyhow, SCSI seems to be the only subsystem that uses this subcategory
-of not-really-maintained drivers. Other subsystems appear to allow
-anything to be fixed, even trivialities, which are what I tend to fix,
-and only stop allowing fixes if the drivers involved are going to be
-removed anyway. But maybe I just never ran into that category in other
-subsystems.
-
-> However, I'll do this if the Maintainer (rmk) acks ... because if it
-> breaks he gets to fix it.
-
-
-Paul Bolle
-
-[1] advansys prints a pointless compile time warning, on purpose.
-Clearly no one cares about its "wide board" support, but for some reason
-that warning needs to stay in. (Fedora declined to disable that driver.)
+-- 
+1.9.1
