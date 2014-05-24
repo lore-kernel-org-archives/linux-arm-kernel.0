@@ -1,44 +1,36 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 24 May 2014 21:59:30 +0200
-Subject: [PATCH 1/3] dt: Add DT bindings documentation for SUNXI Security
- System
-In-Reply-To: <5380F85F.7020601@gmail.com>
-References: <1400771396-9686-1-git-send-email-clabbe.montjoie@gmail.com>
- <201405242143.42693.marex@denx.de> <5380F85F.7020601@gmail.com>
-Message-ID: <201405242159.30505.marex@denx.de>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sat, 24 May 2014 13:05:00 -0700
+Subject: [PATCH] ARM: imx: introduce function imx_free_mx3_camera
+In-Reply-To: <20140524152200.GA4666@lianli>
+References: <1400781080-6117-1-git-send-email-emilgoode@gmail.com>
+ <20140522181024.GA20155@pengutronix.de>
+ <20140524152200.GA4666@lianli>
+Message-ID: <20140524200500.GB1023@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, May 24, 2014 at 09:51:59 PM, Tomasz Figa wrote:
-[...]
-> >>> Why sun7i-a20 ? Is the crypto unit different in other sunxi chips ? Can
-> >>> that not be described by DT props ?
-> >> 
-> >> A widely used convention is to define compatible strings after first
-> >> SoCs on which particular IP blocks appear. It is quite common among IP
-> >> blocks for which there is no well defined versioning scheme.
-> > 
-> > Well yeah, that's fine. But in this case, "sun7i" is the entire group of
-> > CPUs manufactured by AW. I find that information redundant, the
-> > "allwinner,a20- crypto" would suffice. But I wonder if that IP block
-> > might have appeared even earlier ? Or if it is CPU family specific, thus
-> > "allwinner,sun7i-crypto" would be a better string ?
+On Sat, May 24, 2014 at 05:22:00PM +0200, Emil Goode wrote:
+> Hello Uwe and Greg,
 > 
-> I'm not aware of Allwinner naming schemes too much, so please correct me
-> if I'm wrong, but if A20 implies sun7i, then "allwinner,a20-crypto"
-> would be better indeed.
+> > You'd do a better deed if you picked up
+> > http://thread.gmane.org/gmane.linux.kernel/1613364/focus=1635995
+> 
+> Since there is nothing wrong with the last version of the patch in
+> the above thread, I feel strange about picking it up and just splitting
+> it into two patches. However it would be good to have it applied.
+> 
+> I think the reason why the author didn't resend is that the object file
+> and data structure layout information in the changelog depend on the
+> changes to both .name and .dma_mask and by splitting the patch this
+> information would not apply to any one of the resulting two patches.
+> 
+> Perhaps keeping this information in the changelog is a good reason for
+> applying the patch as it is?
 
-True.
+If you read the thread, I explained why I didn't want to take the patch
+as-is.  Please feel free to break it up as asked for and I'll be glad to
+consider it then.
 
-> Whether it was really the first SoC is another thing. Obviously this
-> needs to be checked, although it isn't really that important. For this
-> particular naming scheme you need to specify all the SoCs for which
-> given compatible string can be used for this IP anyway, because there is
-> usually no other source of information about this available (except
-> directly comparing two datasheets...).
+thanks,
 
-Better get the DT stuff correctly right from the start. That's why I'm asking 
-what chips contains the IP block, so we can guess the right name.
-
-Best regards,
-Marek Vasut
+greg k-h
