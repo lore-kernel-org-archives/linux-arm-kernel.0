@@ -1,22 +1,20 @@
-From: davem@davemloft.net (David Miller)
-Date: Sat, 24 May 2014 14:03:58 -0400 (EDT)
-Subject: [PATCH v2 0/4] ks8851 DT/regulator/gpio updates
-In-Reply-To: <1400875040-13269-1-git-send-email-sboyd@codeaurora.org>
-References: <1400875040-13269-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140524.140358.1963098926345179335.davem@davemloft.net>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Sat, 24 May 2014 11:56:28 -0700
+Subject: [PATCH 21/24] ARM64:ILP32: The native siginfo is used instead
+ of the compat siginfo.
+In-Reply-To: <1400914939-9708-22-git-send-email-apinski@cavium.com>
+References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
+ <1400914939-9708-22-git-send-email-apinski@cavium.com>
+Message-ID: <5380EB5C.7060903@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
-Date: Fri, 23 May 2014 12:57:16 -0700
+On 05/24/2014 12:02 AM, Andrew Pinski wrote:
+>  
+> +/* ILP32 uses the native siginfo and not the compat struct */
+> +#define COMPAT_USE_NATIVE_SIGINFO	!is_a32_compat_task()
+> +
 
-> This set of patches properly documents the micrel ks8851 spi ethernet
-> controller, converts to devm_regulator_get_optional() to make error
-> paths slightly simpler, and finally adds supports for another
-> optional regulator and a reset gpio. This allows me to use the ks8851
-> on my MSM8960 CDP board.
-> 
-> Changes since v1:
->  * Dropped vendor prefix patch as that should go through DT tree
+<nitpick> Probably want parens around that expression? </nitpick>
 
-Series applied, thanks Stephen!
+	-hpa
