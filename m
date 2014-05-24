@@ -1,9 +1,9 @@
 From: apinski@cavium.com (Andrew Pinski)
-Date: Sat, 24 May 2014 00:01:23 -0700
+Date: Sat, 24 May 2014 00:01:57 -0700
 Subject: [PATCH 02/24] ARM64: Rename COMPAT to AARCH32_EL0 in Kconfig.
-In-Reply-To: <1400914905-9594-1-git-send-email-apinski@cavium.com>
-References: <1400914905-9594-1-git-send-email-apinski@cavium.com>
-Message-ID: <1400914905-9594-3-git-send-email-apinski@cavium.com>
+In-Reply-To: <1400914939-9708-1-git-send-email-apinski@cavium.com>
+References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
+Message-ID: <1400914939-9708-3-git-send-email-apinski@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
