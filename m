@@ -1,76 +1,100 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Sat, 24 May 2014 15:13:32 +0530
-Subject: [GIT PULL 01/02] DaVinci EDMA clean-up for v3.16
-Message-ID: <1400924613-24451-1-git-send-email-nsekhar@ti.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 24 May 2014 12:06:30 +0200
+Subject: RFC: representing sdio devices oob interrupt, clks, etc. in device
+ tree
+In-Reply-To: <20140523162718.GE22111@sirena.org.uk>
+References: <537DC832.3020006@redhat.com>
+ <CAGb2v64VZac2KvAALrScecN89sRnBQoDrKxKMvkte+3G04NXeA@mail.gmail.com>
+ <537DE1AA.5050606@redhat.com> <537E31F7.1030505@gmail.com>
+ <537F1148.3010102@redhat.com> <20140523112239.GB12304@sirena.org.uk>
+ <537F3610.3050104@redhat.com> <20140523162718.GE22111@sirena.org.uk>
+Message-ID: <53806F26.6050706@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Kevin, Arnd,
+Hi,
 
-These patches introduce a change to EDMA bindings. They
-deprecate some bindings but new kernel will continue
-to work with older DTBs since the information is now
-read from hardware instead. I have not been able to
-get an Ack/response from DT folks on this. Since it
-has been close to two weeks since the patches were first
-posted, I am asking for the patches to be merged so
-we dont miss the merge window.
+On 05/23/2014 06:27 PM, Mark Brown wrote:
+> On Fri, May 23, 2014 at 01:50:40PM +0200, Hans de Goede wrote:
+>> On 05/23/2014 01:22 PM, Mark Brown wrote:
+> 
+>>> Would it not be better to have this be something in the driver struct
+>>> rather than in the device tree?  Putting a compatible in there would be
+>>> encoding details of the Linux implementation in the DT which doesn't
+>>> seem right especially since these are details we're thinking of changing
+>>> later on.
+> 
+>> The compatible is not a Linux specific thing, it is a marking saying
+>> that something needs to take care of enabling the clks (and whatever
+>> else we will make part of the binding for this compatible), before
+>> scanning the mmc bus.
+> 
+> We could just say that the mere presence of a child node with the right
+> properties is sufficient to trigger the bus to do the startup?
 
-This pull request is on top of Vinod's topic/edma branch
-which he has guaranteed will not be rebased before going
-to Linus. This was needed because of dependency with some
-patches he has queued.
+Yes, except that most involved property names are standardized, ie clocks,
+and we want to be able to opt out of the KISS mmc core code for
+(future) complex power on sequences.
 
-This series introduces a trivial merge conflict with
-Linux-next because of a bug fix which went in after
-Vinod's branch was built.
+> 
+>>> Something like have the driver set flags saying if it wants
+>>> to do complicated things.
+> 
+>> Chicken <-> egg, we won't know which driver to use before we've probed
+>> the mmc bus, and we cannot probe the bus before enabling the clks, etc.
+> 
+> If the device is sufficiently complicated to need a special power up
+> sequence I'd expect we'd be able to have a compatible string which would
+> provide enough information for us to figure things out.
 
-Thanks,
-Sekhar
+Hmm, so what you're suggesting is indeed more of an opt out then my initial
+opt-in to KISS powerup idea. So to be clear what you're suggesting is:
 
-The following changes since commit b0cce4ca3e740b5224d75634aa9d9abe9dfceabb:
+mmc core walks host mmc-child nodes. Loads drivers based on compatibles
+there. The checks a flag field in the driver to see if the driver wants to
+opt-out of the KISS powerup code. The problem with this is that it won't
+work reliable with modules, think the mmc probe being done from the ramdisk,
+and the driver in question only being available from the rootfs. I really
+believe that using opt-in with a compatible such as simple-sdio-powerup
+is by far the safest thing to do, and as an added advantage we don't need
+to worry about how to deal with the future complex power on cases at all,
+we leave all the room in the world for various future scenarios. since as
+soon as the simple-sdio-powerup compatible is not there the mmc core will
+behave as it does today.
 
-  dmaengine: edma: update DMA memcpy to use new param element (2014-04-30 10:36:57 +0530)
 
-are available in the git repository at:
+> 
+>>>> FWIW if we ever get truely complex cases I think modeling the
+>>>> power-up hardware as a pmic platform device is not a bad idea,
+>>>> we would then need to have a generic mmc-host pmic property, which
+>>>> would be used both to do the initial powerup before scanning, as
+>>>> well as for the sdio device driver to get a handle to the pmic,
+>>>> for run time power-management (if desired).
+> 
+>>> I don't know if this will ever apply to SDIO but with other buses the
+>>> complicated bits come when the driver wants to take over some of the
+>>> power management do things like turn some of the supplies or clocks on
+>>> and off independently at runtime for low power modes.
+> 
+>> Hmm, good point in that case actually having these things in the
+>> child node makes most sense, because then the driver can find them
+>> their. Note that the mmc core enabling things does not mean that
+>> the driver cannot later disable them if needed.
+> 
+> Right, that's good idea for solving the problem - the child device can
+> either share the reference with the bus or have some way of getting at
+> the object the bus requested depending on what's sensible.  Only
+> potentia complication I can think of with that approach is a device with
+> multiple bus interfaces (I'm mainly thinking of SDIO vs SPI) but it
+> doesn't seem to hard to deal with that in the bus adaption layers of the
+> drivers.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.16/edma
+I don't think there is a need to share references, ie for clks multiple drivers
+can hold a reference and they can be enabled / disabled multiple times, only
+when the last enable is countered by a disable the clock will really be disabled,
+iow this should all just work. Anyways these are all implementation details
+lets focus on the bindings bit first.
 
-for you to fetch changes up to 903ed4913c7fe78d2746445564634264291c7493:
+Regards,
 
-  ARM: edma: Remove redundant/unused parameters from edma_soc_info (2014-05-22 14:55:25 +0530)
-
-----------------------------------------------------------------
-This series makes edma use configuration
-information available within the IP instead
-of reading it from platform data or DT. Some
-other useful clean-ups are included too.
-
-----------------------------------------------------------------
-Peter Ujfalusi (14):
-      ARM: edma: Clean up and simplify the code around irq request
-      ARM: edma: No need to clean the pdata in edma_of_parse_dt()
-      ARM: edma: Take the number of tc from edma_soc_info (pdata)
-      ARM: edma: Do not change TC -> Queue mapping, leave it to default.
-      ARM: davinci: Remove eDMA3 queue_tc_mapping data from edma_soc_info
-      ARM: edma: Remove queue_tc_mapping data from edma_soc_info
-      ARM: edma: Remove num_cc member from struct edma
-      ARM: edma: Save number of regions from pdata to struct edma
-      ARM: edma: Get IP configuration from HW (number of channels, tc, etc)
-      dt/bindings: ti,edma: Remove redundant properties from documentation
-      ARM: dts: am33xx: Remove obsolete properties from edma node
-      ARM: dts: am4372: Remove obsolete properties from edma node
-      ARM: davinci: Remove redundant/unused parameters for edma
-      ARM: edma: Remove redundant/unused parameters from edma_soc_info
-
- Documentation/devicetree/bindings/dma/ti-edma.txt |   13 +-
- arch/arm/boot/dts/am33xx.dtsi                     |    3 -
- arch/arm/boot/dts/am4372.dtsi                     |    3 -
- arch/arm/common/edma.c                            |  175 ++++++++++-----------
- arch/arm/mach-davinci/devices-da8xx.c             |   31 ----
- arch/arm/mach-davinci/dm355.c                     |   14 --
- arch/arm/mach-davinci/dm365.c                     |   16 --
- arch/arm/mach-davinci/dm644x.c                    |   14 --
- arch/arm/mach-davinci/dm646x.c                    |   16 --
- include/linux/platform_data/edma.h                |    8 -
- 10 files changed, 93 insertions(+), 200 deletions(-)
+Hans
