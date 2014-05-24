@@ -1,63 +1,46 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 23 May 2014 17:57:34 -0700
-Subject: [PATCH] spi: Set cs-gpios to output direction
-Message-ID: <1400893054-16126-1-git-send-email-sboyd@codeaurora.org>
+From: lho@apm.com (Loc Ho)
+Date: Fri, 23 May 2014 19:21:03 -0600
+Subject: No subject
+Message-ID: <1400894467-1585-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some gpios used for cs-gpios may not be configured for output by
-default. In these cases gpio_set_value() won't have any effect
-and so the chip select line won't toggle. Request the cs-gpios
-and set them to output direction once we know if the chip select
-is default high or default low.
+This patch adds support for the APM X-Gene SoC EDAC driver.
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Richard Genoud <richard.genoud@gmail.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+v2:
+* Add EDAC entry in MAINTAINERS for APM EDAC driver
+* Remove the MC scrub patch
+* Remove the word 'Caches' from Kconfig
+* Change all MASK defines to use BIT(x)
+* Update comment or remove them
+* Wrap error injection code around CONFIG_EDAC_DEBUG
+* Change function name xgene_edac_mc_hw_init to xgene_edac_mc_irq_ctl
+* Change all function XXX_hw_init to XXX_hw_ctl
+* Fix typo 'activie'
+* Move calling function edac_mc_alloc after resource retrieval
+* Check for NULL on platform_get_resource return if reference directly
+* Add documentation for struct xgene_edac_pmd_ctx
+* Move L1 and L2 check out of function xgene_edac_pmd_check to its own
+  functions
+* Use for loop for configure each CPU of an PMD
+* Replace /2 by >> 1
+* Remove unnecessary comment on edac_device_add_device failure
+* Make mem_err_ip static const
+* Unwind EDAC register correctly if failed
 ---
+Loc Ho (4):
+  MAINTAINERS: Add entry for APM X-Gene SoC EDAC driver
+  Documentation: Add documentation for the APM X-Gene SoC EDAC DTS
+    binding
+  edac: Add APM X-Gene SoC EDAC driver
+  arm64: Add APM X-Gene SoC EDAC DTS entries
 
-I wonder if we should request the gpios when the master controller
-probes or when a spi device is added? We only know what the default
-value should be when the spi device is added. On the other hand,
-we should probably fail probe if the gpio controller isn't ready when
-the spi master controller probes.
-
-Also, is it better to convert this over to the gpiod interfaces?
-
- drivers/spi/spi.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
-index 074f55f5d5ec..00f6365b3f87 100644
---- a/drivers/spi/spi.c
-+++ b/drivers/spi/spi.c
-@@ -431,8 +431,10 @@ int spi_add_device(struct spi_device *spi)
- 		goto done;
- 	}
- 
--	if (master->cs_gpios)
-+	if (master->cs_gpios) {
- 		spi->cs_gpio = master->cs_gpios[spi->chip_select];
-+		gpio_direction_output(spi->cs_gpio, !(spi->mode & SPI_CS_HIGH));
-+	}
- 
- 	/* Drivers may modify this initial i/o setup, but will
- 	 * normally rely on the device being setup.  Devices
-@@ -1512,8 +1514,11 @@ static int of_spi_register_master(struct spi_master *master)
- 	for (i = 0; i < master->num_chipselect; i++)
- 		cs[i] = -ENOENT;
- 
--	for (i = 0; i < nb; i++)
-+	for (i = 0; i < nb; i++) {
- 		cs[i] = of_get_named_gpio(np, "cs-gpios", i);
-+		devm_gpio_request(&master->dev, cs[i], "spi-cs");
-+	}
-+
- 
- 	return 0;
- }
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+ .../devicetree/bindings/edac/apm-xgene-edac.txt    |   70 +
+ MAINTAINERS                                        |    8 +
+ arch/arm64/boot/dts/apm-storm.dtsi                 |   89 +
+ drivers/edac/Kconfig                               |    9 +-
+ drivers/edac/Makefile                              |    3 +
+ drivers/edac/xgene_edac.c                          | 1993 ++++++++++++++++++++
+ 6 files changed, 2171 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+ create mode 100644 drivers/edac/xgene_edac.c
