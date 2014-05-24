@@ -1,40 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 24 May 2014 13:48:58 +0100
-Subject: [PATCH v2 1/4] devicetree: bindings: Properly document micrel
- ks8851 SPI chips
-In-Reply-To: <1400875040-13269-2-git-send-email-sboyd@codeaurora.org>
-References: <1400875040-13269-1-git-send-email-sboyd@codeaurora.org>
- <1400875040-13269-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140524124858.GR22111@sirena.org.uk>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Sat, 24 May 2014 15:16:35 +0200
+Subject: [PATCH] acornscsi: remove linked command support
+In-Reply-To: <1400933617.6956.34.camel@dabdike.int.hansenpartnership.com>
+References: <1400926433.31526.89.camel@x220> <538075E0.4080001@suse.de>
+ <1400933617.6956.34.camel@dabdike.int.hansenpartnership.com>
+Message-ID: <1400937395.22523.55.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 12:57:17PM -0700, Stephen Boyd wrote:
+On Sat, 2014-05-24 at 16:13 +0400, James Bottomley wrote:
+> Wait, no, that's not a good idea.  We leave obsolete drivers to bitrot.
+> Particularly we try not to touch them unless we have to because there
+> might be a few people still using them and the more we tamper, the
+> greater the risk that something gets broken.
 
->  Optional properties:
-> -- vdd-supply:	supply for Ethernet mac
-> +- vdd-supply: analog 3.3V supply for Ethernet mac
-> +- vdd-io-supply: digital 1.8V IO supply for Ethernet mac
+Which is also a way to notice whether people still use those obsolete
+drivers.
 
-So, according to the datasheet I managed to find this device has a
-supply VDD_IO (so normally written vdd-io-supply here), some other
-supplies which are tied to VDD_IO (so can probably be omitted) and a
-supply VDD_A3.3 none of which are optional.  There is an internal
-regulator which can be used to drop a higher voltage VDD_IO down for
-some of the supplies tied to it but that's essentially a noop from
-software as far as I can tell.  None of these supplies are obviously
-optional, though I've not read the datasheet in detail so I may have
-missed something here.
+> On that principle, since
+> there's no real reason to remove the code,
 
-That said it looks like this is intended to be a supply for an external
-PHY rather than the device itself, but even so my original question
-about it being able to operate without power still applies.  Looking at
-the code it's certainly not doing any of the handling of a missing
-supply that I would associate with using _optional().
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140524/6b0d3e8c/attachment-0001.sig>
+(Unless one carries the hope that any check, treewide, for a CONFIG_*
+macro can be linked to a proper Kconfig symbol.)
+
+> it should stay ... until the
+> whole driver bitrots to the extent that we can no-longer compile it.
+
+I've run into this depreciation policy before. With aic7xxx_old (which I
+eventually convinced Fedora to disable, a few relases before it was
+removed from the tree). With aic94xx (which I also convinced Fedora to
+disable). I also tried multiple times to shut up advansys' compile
+time[1]. It seems SCSI might risk not to notice their bitrot, because
+eventually everybody stops compiling these obsolete drivers, leaving
+SCSI without feedback on their state.
+
+Anyhow, SCSI seems to be the only subsystem that uses this subcategory
+of not-really-maintained drivers. Other subsystems appear to allow
+anything to be fixed, even trivialities, which are what I tend to fix,
+and only stop allowing fixes if the drivers involved are going to be
+removed anyway. But maybe I just never ran into that category in other
+subsystems.
+
+> However, I'll do this if the Maintainer (rmk) acks ... because if it
+> breaks he gets to fix it.
+
+
+Paul Bolle
+
+[1] advansys prints a pointless compile time warning, on purpose.
+Clearly no one cares about its "wide board" support, but for some reason
+that warning needs to stay in. (Fedora declined to disable that driver.)
