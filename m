@@ -1,66 +1,40 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Sat, 24 May 2014 21:40:31 +0900
-Subject: [PATCH] PM / devfreq: remove checks for CONFIG_EXYNOS_ASV
-In-Reply-To: <7638065.14871400820762911.JavaMail.weblogic@epml08>
-References: <7638065.14871400820762911.JavaMail.weblogic@epml08>
-Message-ID: <CAJ0PZbS_Xcu=OJuiy=xs7k_A1=ajp34KEdi4KGC3e-y8t3EUGw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 24 May 2014 13:48:58 +0100
+Subject: [PATCH v2 1/4] devicetree: bindings: Properly document micrel
+ ks8851 SPI chips
+In-Reply-To: <1400875040-13269-2-git-send-email-sboyd@codeaurora.org>
+References: <1400875040-13269-1-git-send-email-sboyd@codeaurora.org>
+ <1400875040-13269-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140524124858.GR22111@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 1:52 PM, MyungJoo Ham <myungjoo.ham@samsung.com> wrote:
-> On Thu, May 22, 2014 at 5:37 AM, Paul Bolle <pebolle@tiscali.nl> wrote:
->> Checks for CONFIG_EXYNOS_ASV were added in v3.3. But the related Kconfig
->> symbol has never been added to the tree. Remove these checks, as they
->> always evaluate to false.
->>
->> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
->
-> Thanks for pointing this out.
->
-> ASV was supposed to be merged, but it appears it failed or never attempted.
->
-> I will merge with the next batch (this week).
->
->
-> Cheers,
-> MyungJoo.
+On Fri, May 23, 2014 at 12:57:17PM -0700, Stephen Boyd wrote:
 
-Uh.. ASV itself affects the power efficiency; thus, I'd like to keep
-it alive, but not as the current form.
+>  Optional properties:
+> -- vdd-supply:	supply for Ethernet mac
+> +- vdd-supply: analog 3.3V supply for Ethernet mac
+> +- vdd-io-supply: digital 1.8V IO supply for Ethernet mac
 
-For 3.16, I'll correct the name following your report. (not going for
-3.15RCx anyway)
+So, according to the datasheet I managed to find this device has a
+supply VDD_IO (so normally written vdd-io-supply here), some other
+supplies which are tied to VDD_IO (so can probably be omitted) and a
+supply VDD_A3.3 none of which are optional.  There is an internal
+regulator which can be used to drop a higher voltage VDD_IO down for
+some of the supplies tied to it but that's essentially a noop from
+software as far as I can tell.  None of these supplies are obviously
+optional, though I've not read the datasheet in detail so I may have
+missed something here.
 
-
-Then, I'll let it merged into struct busfreq_data for later RCx.
-
-
-Cheers,
-MyungJoo.
-
->
->> ---
->> 0) Untested.
->>
->> 1) I do not really care much for this patch. Two years is not very long
->> for dead code to remain in the tree. There is, however, a trivial issue
->> that makes this patch stand out from the other patches in my current
->> sweep of the tree for Kconfig related problems.
->>
->> See, here the use of an unknown Kconfig macro hides an obvious typo: it
->> should either be "exynos_result_of_asv" or "exynos4_result_of_asv", but
->> not both. Ie, this almost certainly wouldn't have compiled even if the
->> Kconfig symbol EXYNOS_ASV would have been part of the tree.
->>
->> 2) So this makes me wonder whether there are any guidelines for using
->> Kconfig macros before the related Kconfig symbols are merged?
->>
->>  drivers/devfreq/Kconfig              |  3 +--
->>  drivers/devfreq/exynos/exynos4_bus.c | 13 -------------
->>  2 files changed, 1 insertion(+), 15 deletions(-)
-
-
-
--- 
-MyungJoo Ham, Ph.D.
-System S/W Lab, S/W Center, Samsung Electronics
+That said it looks like this is intended to be a supply for an external
+PHY rather than the device itself, but even so my original question
+about it being able to operate without power still applies.  Looking at
+the code it's certainly not doing any of the handling of a missing
+supply that I would associate with using _optional().
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140524/6b0d3e8c/attachment-0001.sig>
