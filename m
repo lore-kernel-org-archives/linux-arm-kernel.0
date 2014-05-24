@@ -1,36 +1,48 @@
 From: apinski@cavium.com (Andrew Pinski)
-Date: Sat, 24 May 2014 00:02:09 -0700
-Subject: [PATCH 14/24] ARM64:ILP32: COMPAT_USE_64BIT_TIME is true for ILP32
- tasks.
+Date: Sat, 24 May 2014 00:02:06 -0700
+Subject: [PATCH 11/24] ARM64: Add ARM64_ILP32 to Kconfig.
 In-Reply-To: <1400914939-9708-1-git-send-email-apinski@cavium.com>
 References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
-Message-ID: <1400914939-9708-15-git-send-email-apinski@cavium.com>
+Message-ID: <1400914939-9708-12-git-send-email-apinski@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since __kernel_long_t (time_t) is long long, we need to tell the rest of kernel that we use 64bit time_t for compat when the task is not an AARCH32 task.  The reason why we check AARCH32 rather than ILP32 here is because if we don't have AARCH32 compiled in (which is going to be the common case due to AARCH32 requiring 4k pages).
+This patch adds the config option for ILP32.
 
 Thanks,
 Andrew Pinski
 
 Signed-off-by: Andrew Pinski <apinski@cavium.com>
 ---
- arch/arm64/include/asm/compat.h |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm64/Kconfig |    9 ++++++++-
+ 1 files changed, 8 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-index 85f945c..c77fc0f 100644
---- a/arch/arm64/include/asm/compat.h
-+++ b/arch/arm64/include/asm/compat.h
-@@ -76,6 +76,9 @@ struct compat_timeval {
- 	s32		tv_usec;
- };
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 032c712..92577da 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -288,7 +288,7 @@ source "fs/Kconfig.binfmt"
  
-+/* ILP32 uses 64bit time_t and not the above compat structures */
-+#define COMPAT_USE_64BIT_TIME !is_a32_compat_task()
+ config COMPAT
+ 	def_bool y
+-	depends on AARCH32_EL0
++	depends on AARCH32_EL0 || ARM64_ILP32
+ 	select COMPAT_BINFMT_ELF
+ 
+ config AARCH32_EL0
+@@ -305,6 +305,13 @@ config AARCH32_EL0
+ 
+ 	  If you want to execute 32-bit userspace applications, say Y.
+ 
++config ARM64_ILP32
++	bool "Kernel support for ILP32"
++	help
++	  This option enables support for AArch64 ILP32 user space.  ILP32
++	  is an ABI where long and pointers are 32bits but it uses the AARCH64
++	  instruction set.
 +
- struct compat_stat {
- #ifdef __AARCH64EB__
- 	short		st_dev;
+ config SYSVIPC_COMPAT
+ 	def_bool y
+ 	depends on AARCH32_EL0 && SYSVIPC
 -- 
 1.7.2.5
