@@ -1,34 +1,66 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 24 May 2014 11:17:10 -0300
-Subject: [PATCH 2/2] ARM: dts: Specify the NAND ECC scheme explicitly on
- Armada 385 DB board
-In-Reply-To: <1400941030-2123-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1400941030-2123-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1400941030-2123-3-git-send-email-ezequiel.garcia@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 24 May 2014 17:09:41 +0200
+Subject: [PATCH RESEND v4 0/8] Add Allwinner A31 USB support
+In-Reply-To: <20140523221940.GB18106@kroah.com>
+References: <20140514160520.GA4679@kroah.com> <20140523183339.GC10768@lukather>
+ <20140523221940.GB18106@kroah.com>
+Message-ID: <20140524150941.GG10768@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The factory bootloader on A385-DB boards expect the ECC strength to be
-4 bits over 512 bytes. Hence, we need to specify this in the devicetree,
-to prevent the kernel from assuming any different ECC scheme.
+On Sat, May 24, 2014 at 07:19:40AM +0900, Greg Kroah-Hartman wrote:
+> On Fri, May 23, 2014 at 08:33:39PM +0200, Maxime Ripard wrote:
+> > Hi Greg,
+> > 
+> > On Wed, May 14, 2014 at 06:05:20PM +0200, Greg Kroah-Hartman wrote:
+> > > On Wed, May 14, 2014 at 02:34:19PM +0200, Maxime Ripard wrote:
+> > > > On Tue, May 13, 2014 at 05:44:14PM +0200, Maxime Ripard wrote:
+> > > > > Hi everyone,
+> > > > > 
+> > > > > This patchset adds support for the USB controllers found in the
+> > > > > Allwinner A31.
+> > > > > 
+> > > > > While the design is similar to the earlier Allwinner SoCs that are
+> > > > > already supported, a few details here and there change, like the fact
+> > > > > that the PHYs now have one clock per phy, while it used to be only one
+> > > > > for all the PHYs.
+> > > > > 
+> > > > > Resent adding Alan Stern's Acked-by and puting Greg KH in the
+> > > > > recipients this time...
+> > > > 
+> > > > Applied patches 2, 7 and 8.
+> > > 
+> > > Feel free to apply patches 5 and 6 to your tree, as your branch needs
+> > > these, with my:
+> > > 
+> > > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > > 
+> > > Or, if you want me to take them, just let me know and I will.
+> > 
+> > It looks like it's still not in your tree (or at least, I haven't
+> > received the usual mail notifications).
+> > 
+> > Is this expected?
+> 
+> Given that I haven't applied any USB patches in a week or so, yes, it is
+> expected...
+> 
+> Give me a week or so to catch up, I've been on the road for a month
+> now, and am finally home.
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/boot/dts/armada-385-db.dts | 2 ++
- 1 file changed, 2 insertions(+)
+Ok, thanks, I was just trying to make sure they weren't
+lost/forgotten.
 
-diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
-index 8b004fe..0d4327b 100644
---- a/arch/arm/boot/dts/armada-385-db.dts
-+++ b/arch/arm/boot/dts/armada-385-db.dts
-@@ -98,6 +98,8 @@
- 				marvell,nand-keep-config;
- 				marvell,nand-enable-arbiter;
- 				nand-on-flash-bbt;
-+				nand-ecc-strength = <4>;
-+				nand-ecc-step-size = <512>;
- 
- 				partition at 0 {
- 					label = "U-Boot";
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140524/dcafa87f/attachment.sig>
