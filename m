@@ -1,136 +1,55 @@
 From: apinski@cavium.com (Andrew Pinski)
-Date: Sat, 24 May 2014 00:02:01 -0700
-Subject: [PATCH 06/24] Allow for some signal structures to be the same between
- a 32bit ABI and the 64bit ABI.
+Date: Sat, 24 May 2014 00:01:59 -0700
+Subject: [PATCH 04/24] ARM64:ILP32: Set kernel_long to long long so we can
+ reuse most of the same syscalls as LP64.
 In-Reply-To: <1400914939-9708-1-git-send-email-apinski@cavium.com>
 References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
-Message-ID: <1400914939-9708-7-git-send-email-apinski@cavium.com>
+Message-ID: <1400914939-9708-5-git-send-email-apinski@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In ARM64, we want to allow the signal related structures to be same between the 32bit (ILP32) and the 64bit ABIs (LP64).  We still want to use the generic include files so we need some new defines that are used in UAPI; they default to the same as it is before.
+Since we want time_t and some other userland types to be the same between ILP32 and LP64, we define __kernel_long_t to be long long. 
 
 Thanks,
 Andrew Pinski
 
+
 Signed-off-by: Andrew Pinski <apinski@cavium.com>
 ---
- include/uapi/asm-generic/siginfo.h |   17 +++++++++++++----
- include/uapi/asm-generic/signal.h  |   27 +++++++++++++++++++++++----
- 2 files changed, 36 insertions(+), 8 deletions(-)
+ arch/arm64/include/asm/Kbuild             |    1 -
+ arch/arm64/include/uapi/asm/posix_types.h |   12 ++++++++++++
+ 2 files changed, 12 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm64/include/uapi/asm/posix_types.h
 
-diff --git a/include/uapi/asm-generic/siginfo.h b/include/uapi/asm-generic/siginfo.h
-index ba5be7f..553aca9 100644
---- a/include/uapi/asm-generic/siginfo.h
-+++ b/include/uapi/asm-generic/siginfo.h
-@@ -4,9 +4,17 @@
- #include <linux/compiler.h>
- #include <linux/types.h>
- 
-+#ifndef __SIGINFO_VOIDPOINTER
-+#define __SIGINFO_VOIDPOINTER(field) void __user *field
+diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+index 83f71b3..f06a9c2 100644
+--- a/arch/arm64/include/asm/Kbuild
++++ b/arch/arm64/include/asm/Kbuild
+@@ -30,7 +30,6 @@ generic-y += msgbuf.h
+ generic-y += mutex.h
+ generic-y += pci.h
+ generic-y += poll.h
+-generic-y += posix_types.h
+ generic-y += preempt.h
+ generic-y += resource.h
+ generic-y += rwsem.h
+diff --git a/arch/arm64/include/uapi/asm/posix_types.h b/arch/arm64/include/uapi/asm/posix_types.h
+new file mode 100644
+index 0000000..53b15e6
+--- /dev/null
++++ b/arch/arm64/include/uapi/asm/posix_types.h
+@@ -0,0 +1,12 @@
++#ifndef __ASM_POSIX_TYPES_H
++#define __ASM_POSIX_TYPES_H
++
++#ifndef __LP64__	/* ILP32 */
++typedef long long __kernel_long_t;
++typedef unsigned long long __kernel_ulong_t;
++#define __kernel_long_t __kernel_long_t
 +#endif
 +
-+#ifndef __SIGINFO_BAND
-+#define __SIGINFO_BAND(field) __ARCH_SI_BAND_T field
-+#endif
++#include <asm-generic/posix_types.h>
 +
- typedef union sigval {
- 	int sival_int;
--	void __user *sival_ptr;
-+	__SIGINFO_VOIDPOINTER(sival_ptr);
- } sigval_t;
- 
- /*
-@@ -86,7 +94,7 @@ typedef struct siginfo {
- 
- 		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
- 		struct {
--			void __user *_addr; /* faulting insn/memory ref. */
-+			__SIGINFO_VOIDPOINTER(_addr); /* faulting insn/memory ref. */
- #ifdef __ARCH_SI_TRAPNO
- 			int _trapno;	/* TRAP # which caused the signal */
- #endif
-@@ -95,13 +103,13 @@ typedef struct siginfo {
- 
- 		/* SIGPOLL */
- 		struct {
--			__ARCH_SI_BAND_T _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
-+			__SIGINFO_BAND(_band);	/* POLL_IN, POLL_OUT, POLL_MSG */
- 			int _fd;
- 		} _sigpoll;
- 
- 		/* SIGSYS */
- 		struct {
--			void __user *_call_addr; /* calling user insn */
-+			__SIGINFO_VOIDPOINTER(_call_addr); /* calling user insn */
- 			int _syscall;	/* triggering system call number */
- 			unsigned int _arch;	/* AUDIT_ARCH_* of syscall */
- 		} _sigsys;
-@@ -283,6 +291,7 @@ typedef struct sigevent {
- 		int _pad[SIGEV_PAD_SIZE];
- 		 int _tid;
- 
-+		/* Note these two are handled only in userspace */
- 		struct {
- 			void (*_function)(sigval_t);
- 			void *_attribute;	/* really pthread_attr_t */
-diff --git a/include/uapi/asm-generic/signal.h b/include/uapi/asm-generic/signal.h
-index 9df61f1..c4ce238 100644
---- a/include/uapi/asm-generic/signal.h
-+++ b/include/uapi/asm-generic/signal.h
-@@ -4,7 +4,9 @@
- #include <linux/types.h>
- 
- #define _NSIG		64
-+#ifndef _NSIG_BPW
- #define _NSIG_BPW	__BITS_PER_LONG
-+#endif
- #define _NSIG_WORDS	(_NSIG / _NSIG_BPW)
- 
- #define SIGHUP		 1
-@@ -83,9 +85,13 @@
- #define MINSIGSTKSZ	2048
- #define SIGSTKSZ	8192
- 
-+#ifndef __SIGSET_INNER_TYPE
-+#define __SIGSET_INNER_TYPE unsigned long
-+#endif
-+
- #ifndef __ASSEMBLY__
- typedef struct {
--	unsigned long sig[_NSIG_WORDS];
-+	__SIGSET_INNER_TYPE sig[_NSIG_WORDS];
- } sigset_t;
- 
- /* not actually used, but required for linux/syscalls.h */
-@@ -98,11 +104,24 @@ typedef unsigned long old_sigset_t;
- #endif
- 
- #ifndef __KERNEL__
-+
-+#ifndef __SIGACTION_HANDLER
-+#define __SIGACTION_HANDLER(field)	__sighandler_t field
-+#endif
-+
-+#ifndef __SIGACTION_FLAGS
-+#define __SIGACTION_FLAGS(field)	unsigned long field
-+#endif
-+
-+#ifndef __SIGACTION_RESTORER
-+#define __SIGACTION_RESTORER(field)	__sigrestore_t field
-+#endif
-+
- struct sigaction {
--	__sighandler_t sa_handler;
--	unsigned long sa_flags;
-+	__SIGACTION_HANDLER(sa_handler);
-+	__SIGACTION_FLAGS(sa_flags);
- #ifdef SA_RESTORER
--	__sigrestore_t sa_restorer;
-+	__SIGACTION_RESTORER(sa_restorer);
- #endif
- 	sigset_t sa_mask;		/* mask last for extensibility */
- };
++#endif /* __ASM_POSIX_TYPES_H */
 -- 
 1.7.2.5
