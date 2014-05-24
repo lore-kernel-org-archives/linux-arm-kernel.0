@@ -1,59 +1,130 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 23 May 2014 17:40:54 -0700
-Subject: [PATCH v3 2/2] Documentation: add Broadcom STB Level-2 interrupt
- controller binding
-In-Reply-To: <1400892054-24457-1-git-send-email-f.fainelli@gmail.com>
-References: <1400892054-24457-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1400892054-24457-3-git-send-email-f.fainelli@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 23 May 2014 17:53:58 -0700
+Subject: [PATCH v2 2/5] clk: bcm281xx: implement prerequisite clocks
+In-Reply-To: <1400590362-11177-3-git-send-email-elder@linaro.org>
+References: <1400590362-11177-1-git-send-email-elder@linaro.org>
+ <1400590362-11177-3-git-send-email-elder@linaro.org>
+Message-ID: <20140524005358.23136.8918@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the Device Tree binding document for the Broadcom
-Set-top-box Level 2 interrupt controller hardware.
+Quoting Alex Elder (2014-05-20 05:52:39)
+> @@ -743,11 +746,16 @@ struct clk *kona_clk_setup(struct kona_clk *bcm_clk)
+>         clk = clk_register(NULL, &bcm_clk->hw);
+>         if (IS_ERR(clk)) {
+>                 pr_err("%s: error registering clock %s (%ld)\n", __func__,
+> -                       init_data->name, PTR_ERR(clk));
+> +                       name, PTR_ERR(clk));
+>                 goto out_teardown;
+>         }
+>         BUG_ON(!clk);
+>  
+> +       /*  Make it so we can look the clock up using clk_find() */
 
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
-No changes in v2 or v3, respin
+s/clk_find/clk_get/ ?
 
- .../bindings/interrupt-controller/brcm,l2-intc.txt | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/brcm,l2-intc.txt
+> +       bcm_clk->cl.con_id = name;
+> +       bcm_clk->cl.clk = clk;
+> +       clkdev_add(&bcm_clk->cl);
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/brcm,l2-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/brcm,l2-intc.txt
-new file mode 100644
-index 000000000000..448273a30a11
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/brcm,l2-intc.txt
-@@ -0,0 +1,29 @@
-+Broadcom Generic Level 2 Interrupt Controller
+This is not so nice. I'll explain more below.
+
+> +
+>         return clk;
+>  out_teardown:
+>         bcm_clk_teardown(bcm_clk);
+> diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
+> index d8a7f38..fd070d6 100644
+> --- a/drivers/clk/bcm/clk-kona.c
+> +++ b/drivers/clk/bcm/clk-kona.c
+> @@ -1195,6 +1195,48 @@ static bool __peri_clk_init(struct kona_clk *bcm_clk)
+>         return true;
+>  }
+>  
+> +static bool __kona_clk_init(struct kona_clk *bcm_clk);
+> +static bool __kona_prereq_init(struct kona_clk *bcm_clk)
+> +{
+> +       struct clk *clk;
+> +       struct clk_hw *hw;
+> +       struct kona_clk *prereq;
+> +
+> +       BUG_ON(clk_is_initialized(bcm_clk));
+> +
+> +       if (!bcm_clk->p.prereq)
+> +               return true;
+> +
+> +       clk = clk_get(NULL, bcm_clk->p.prereq);
+
+The clkdev global namespace is getting polluted with all of these new
+prereq clocks. If there was an associated struct device *dev with them
+then it wouldn't be a problem, but you might get collisions with other
+clock drivers that also use NULL for the device.
+
+It would be a lot nicer for the clocks that require a prereq clock to
+just use clk_get(dev, "well_known_name"); in the same way that drivers
+use it, without considering it a special case.
+
+> +       if (IS_ERR(clk)) {
+> +               pr_err("%s: unable to get prereq clock %s for %s\n",
+> +                       __func__, bcm_clk->p.prereq, bcm_clk->init_data.name);
+> +               return false;
+> +       }
+> +       hw = __clk_get_hw(clk);
+> +       if (!hw) {
+> +               pr_err("%s: null hw pointer for clock %s\n", __func__,
+> +                       bcm_clk->init_data.name);
+> +               return false;
+> +       }
+> +       prereq = to_kona_clk(hw);
+> +       if (prereq->ccu != bcm_clk->ccu) {
+> +               pr_err("%s: prereq clock %s CCU different for clock %s\n",
+> +                       __func__, bcm_clk->p.prereq, bcm_clk->init_data.name);
+> +               return false;
+> +       }
+> +
+> +       /* Initialize the prerequisite clock first */
+> +       if (!__kona_clk_init(prereq)) {
+> +               pr_err("%s: failed to init prereq %s for clock %s\n",
+> +                       __func__, bcm_clk->p.prereq, bcm_clk->init_data.name);
+> +               return false;
+> +       }
+> +       bcm_clk->p.prereq_clk = clk;
+
+The above seems like a lot effort to go to. Why not skip all of this and
+just implement the prerequisite logic in the .enable & .disable
+callbacks? E.g. your kona clk .enable callback would look like:
+
+diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
+index d603c4e..51f35b4 100644
+--- a/drivers/clk/bcm/clk-kona.c
++++ b/drivers/clk/bcm/clk-kona.c
+@@ -987,6 +987,12 @@ static int kona_peri_clk_enable(struct clk_hw *hw)
+ {
+ 	struct kona_clk *bcm_clk = to_kona_clk(hw);
+ 	struct bcm_clk_gate *gate = &bcm_clk->u.peri->gate;
++	int ret;
 +
-+Required properties:
++	hw->prereq_bus_clk = clk_get(hw->ccu, hw->prereq);
++	ret = clk_enable(prereq_bus_clk);
++	if (ret)
++		return ret;
+ 
+ 	return clk_gate(bcm_clk->ccu, bcm_clk->init_data.name, gate, true);
+ }
+@@ -997,6 +1003,9 @@ static void kona_peri_clk_disable(struct clk_hw *hw)
+ 	struct bcm_clk_gate *gate = &bcm_clk->u.peri->gate;
+ 
+ 	(void)clk_gate(bcm_clk->ccu, bcm_clk->init_data.name, gate, false);
 +
-+- compatible: should be "brcm,l2-intc"
-+- reg: specifies the base physical address and size of the registers
-+- interrupt-controller: identifies the node as an interrupt controller
-+- #interrupt-cells: specifies the number of cells needed to encode an
-+  interrupt source. Should be 1.
-+- interrupt-parent: specifies the phandle to the parent interrupt controller
-+  this controller is cacaded from
-+- interrupts: specifies the interrupt line in the interrupt-parent irq space
-+  to be used for cascading
-+
-+Optional properties:
-+
-+- brcm,irq-can-wake: If present, this means the L2 controller can be used as a
-+  wakeup source for system suspend/resume.
-+
-+Example:
-+
-+hif_intr2_intc: interrupt-controller at f0441000 {
-+	compatible = "brcm,l2-intc";
-+	reg = <0xf0441000 0x30>;
-+	interrupt-controller;
-+	#interrupt-cells = <1>;
-+	interrupt-parent = <&intc>;
-+	interrupts = <0x0 0x20 0x0>;
-+};
--- 
-1.9.1
++	clk_disable(hw->prereq_bus_clk);
++	clk_put(hw->prereq_bus_clk);
+ }
+ 
+ static int kona_peri_clk_is_enabled(struct clk_hw *hw)
+
+
+I guess it might take some trickery to get clk_get to work like that.
+Let me know if I've completely lost the plot.
+
+Regards,
+Mike
