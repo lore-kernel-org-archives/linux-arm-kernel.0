@@ -1,23 +1,21 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 25 May 2014 20:18:55 +0200
-Subject: [PATCH 09/16] ARM/ARM64: KVM: Emulate PSCI v0.2 MIGRATE_INFO_TYPE and
- related functions
+Date: Sun, 25 May 2014 20:18:53 +0200
+Subject: [PATCH 07/16] ARM/ARM64: KVM: Emulate PSCI v0.2 SYSTEM_OFF and
+ SYSTEM_RESET
 In-Reply-To: <1401041942-23471-1-git-send-email-christoffer.dall@linaro.org>
 References: <1401041942-23471-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1401041942-23471-10-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1401041942-23471-8-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Anup Patel <anup.patel@linaro.org>
 
-This patch adds emulation of PSCI v0.2 MIGRATE, MIGRATE_INFO_TYPE, and
-MIGRATE_INFO_UP_CPU function calls for KVM ARM/ARM64.
+The PSCI v0.2 SYSTEM_OFF and SYSTEM_RESET functions are system-level
+functions hence cannot be fully emulated by in-kernel PSCI emulation code.
 
-KVM ARM/ARM64 being a hypervisor (and not a Trusted OS), we cannot provide
-this functions hence we emulate these functions in following way:
-1. MIGRATE - Returns "Not Supported"
-2. MIGRATE_INFO_TYPE - Return 2 i.e. Trusted OS is not present
-3. MIGRATE_INFO_UP_CPU - Returns "Not Supported"
+To tackle this, we forward PSCI v0.2 SYSTEM_OFF and SYSTEM_RESET function
+calls from vcpu to user space (i.e. QEMU or KVMTOOL) via kvm_run structure
+using KVM_EXIT_SYSTEM_EVENT exit reasons.
 
 Signed-off-by: Anup Patel <anup.patel@linaro.org>
 Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
@@ -25,48 +23,91 @@ Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/psci.c | 21 ++++++++++++++++-----
- 1 file changed, 16 insertions(+), 5 deletions(-)
+ arch/arm/kvm/psci.c | 46 +++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 43 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 3b6a0cf..cce901a 100644
+index 14e6fa6..5936213 100644
 --- a/arch/arm/kvm/psci.c
 +++ b/arch/arm/kvm/psci.c
-@@ -182,6 +182,22 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 	case PSCI_0_2_FN64_AFFINITY_INFO:
- 		val = kvm_psci_vcpu_affinity_info(vcpu);
+@@ -85,6 +85,23 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+ 	return PSCI_RET_SUCCESS;
+ }
+ 
++static void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
++{
++	memset(&vcpu->run->system_event, 0, sizeof(vcpu->run->system_event));
++	vcpu->run->system_event.type = type;
++	vcpu->run->exit_reason = KVM_EXIT_SYSTEM_EVENT;
++}
++
++static void kvm_psci_system_off(struct kvm_vcpu *vcpu)
++{
++	kvm_prepare_system_event(vcpu, KVM_SYSTEM_EVENT_SHUTDOWN);
++}
++
++static void kvm_psci_system_reset(struct kvm_vcpu *vcpu)
++{
++	kvm_prepare_system_event(vcpu, KVM_SYSTEM_EVENT_RESET);
++}
++
+ int kvm_psci_version(struct kvm_vcpu *vcpu)
+ {
+ 	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
+@@ -95,6 +112,7 @@ int kvm_psci_version(struct kvm_vcpu *vcpu)
+ 
+ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+ {
++	int ret = 1;
+ 	unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+ 	unsigned long val;
+ 
+@@ -114,13 +132,35 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+ 	case PSCI_0_2_FN64_CPU_ON:
+ 		val = kvm_psci_vcpu_on(vcpu);
  		break;
-+	case PSCI_0_2_FN_MIGRATE:
-+	case PSCI_0_2_FN64_MIGRATE:
-+		val = PSCI_RET_NOT_SUPPORTED;
-+		break;
-+	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
++	case PSCI_0_2_FN_SYSTEM_OFF:
++		kvm_psci_system_off(vcpu);
 +		/*
-+		 * Trusted OS is MP hence does not require migration
-+	         * or
-+		 * Trusted OS is not present
++		 * We should'nt be going back to guest VCPU after
++		 * receiving SYSTEM_OFF request.
++		 *
++		 * If user space accidently/deliberately resumes
++		 * guest VCPU after SYSTEM_OFF request then guest
++		 * VCPU should see internal failure from PSCI return
++		 * value. To achieve this, we preload r0 (or x0) with
++		 * PSCI return value INTERNAL_FAILURE.
 +		 */
-+		val = PSCI_0_2_TOS_MP;
++		val = PSCI_RET_INTERNAL_FAILURE;
++		ret = 0;
 +		break;
-+	case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
-+	case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
-+		val = PSCI_RET_NOT_SUPPORTED;
++	case PSCI_0_2_FN_SYSTEM_RESET:
++		kvm_psci_system_reset(vcpu);
++		/*
++		 * Same reason as SYSTEM_OFF for preloading r0 (or x0)
++		 * with PSCI return value INTERNAL_FAILURE.
++		 */
++		val = PSCI_RET_INTERNAL_FAILURE;
++		ret = 0;
 +		break;
- 	case PSCI_0_2_FN_SYSTEM_OFF:
- 		kvm_psci_system_off(vcpu);
- 		/*
-@@ -207,12 +223,7 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 		ret = 0;
- 		break;
  	case PSCI_0_2_FN_CPU_SUSPEND:
--	case PSCI_0_2_FN_MIGRATE:
--	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
--	case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+ 	case PSCI_0_2_FN_AFFINITY_INFO:
+ 	case PSCI_0_2_FN_MIGRATE:
+ 	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+ 	case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+-	case PSCI_0_2_FN_SYSTEM_OFF:
+-	case PSCI_0_2_FN_SYSTEM_RESET:
  	case PSCI_0_2_FN64_CPU_SUSPEND:
--	case PSCI_0_2_FN64_MIGRATE:
--	case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
- 		val = PSCI_RET_NOT_SUPPORTED;
- 		break;
- 	default:
+ 	case PSCI_0_2_FN64_AFFINITY_INFO:
+ 	case PSCI_0_2_FN64_MIGRATE:
+@@ -132,7 +172,7 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+ 	}
+ 
+ 	*vcpu_reg(vcpu, 0) = val;
+-	return 1;
++	return ret;
+ }
+ 
+ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
 -- 
 1.8.5.2
