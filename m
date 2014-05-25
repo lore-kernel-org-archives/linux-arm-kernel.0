@@ -1,108 +1,106 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 25 May 2014 21:39:55 +0200
-Subject: [PATCH 22/22] ARM: sun8i: dt: Add Ippo-q8h v5 support
-In-Reply-To: <1400831485-28576-23-git-send-email-wens@csie.org>
+Date: Sun, 25 May 2014 21:26:52 +0200
+Subject: [PATCH 20/22] ARM: sun8i: Add SMP support for the Allwinner A23
+In-Reply-To: <1400831485-28576-21-git-send-email-wens@csie.org>
 References: <1400831485-28576-1-git-send-email-wens@csie.org>
- <1400831485-28576-23-git-send-email-wens@csie.org>
-Message-ID: <20140525193955.GB10768@lukather>
+ <1400831485-28576-21-git-send-email-wens@csie.org>
+Message-ID: <20140525192652.GZ10768@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 03:51:25PM +0800, Chen-Yu Tsai wrote:
-> The Ippo-q8h is a tablet circiut board commonly found in cheap Android
-> tablets with A23 SoCs. There are at least 2 versions of the board, with
-> different peripherals, such as WiFi chips.
-> 
-> This patch add supports for v5 of such boards, which has a ESP8089 WiFi
-> chip (not supported) connected to mmc1.
+On Fri, May 23, 2014 at 03:51:23PM +0800, Chen-Yu Tsai wrote:
+> The A23 is a dual Cortex-A7. Add the logic to use the IPs used to
+> control the CPU configuration and the CPU power so that we can
+> bring up secondary CPUs at boot.
 > 
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  arch/arm/boot/dts/Makefile                  |  2 ++
->  arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts | 51 +++++++++++++++++++++++++++++
->  2 files changed, 53 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
+>  arch/arm/mach-sunxi/platsmp.c | 69 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 69 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 6967393..f809a53 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -354,6 +354,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
->  	sun7i-a20-cubietruck.dtb \
->  	sun7i-a20-i12-tvbox.dtb \
->  	sun7i-a20-olinuxino-micro.dtb
-> +dtb-$(CONFIG_MACH_SUN8I) += \
-> +	sun8i-a23-ippo-q8h-v5.dtb
->  dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
->  	tegra20-iris-512.dtb \
->  	tegra20-medcom-wide.dtb \
-> diff --git a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-> new file mode 100644
-> index 0000000..7d0bd97
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-> @@ -0,0 +1,51 @@
-> +/*
-> + * Copyright 2014 Chen-Yu Tsai
-> + *
-> + * Chen-Yu Tsai <wens@csie.org>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
+> diff --git a/arch/arm/mach-sunxi/platsmp.c b/arch/arm/mach-sunxi/platsmp.c
+> index c53077b..688faaf 100644
+> --- a/arch/arm/mach-sunxi/platsmp.c
+> +++ b/arch/arm/mach-sunxi/platsmp.c
+> @@ -121,3 +121,72 @@ struct smp_operations sun6i_smp_ops __initdata = {
+>  	.smp_boot_secondary	= sun6i_smp_boot_secondary,
+>  };
+>  CPU_METHOD_OF_DECLARE(sun6i_smp, "allwinner,sun6i-a31", &sun6i_smp_ops);
 > +
-> +/dts-v1/;
-> +/include/ "sun8i-a23.dtsi"
+> +static void __init sun8i_smp_prepare_cpus(unsigned int max_cpus)
+> +{
+> +	struct device_node *node;
 > +
-> +/ {
-> +	model = "Ippo Q8H Dual Core Tablet (v5)";
-> +	compatible = "ippo,q8h-v5", "allwinner,sun8i-a23";
+> +	node = of_find_compatible_node(NULL, NULL, "allwinner,sun8i-a23-prcm");
+> +	if (!node) {
+> +		pr_err("Missing A23 PRCM node in the device tree\n");
+> +		return;
+> +	}
 > +
-> +	chosen {
-> +		bootargs = "earlyprintk console=ttyS0,115200";
-> +	};
-
-You should probably add the memory node here too.
-
+> +	prcm_membase = of_iomap(node, 0);
+> +	if (!prcm_membase) {
+> +		pr_err("Couldn't map A23 PRCM registers\n");
+> +		return;
+> +	}
 > +
-> +	soc at 01c00000 {
-> +		uart0: serial at 01c28000 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&uart0_pins_a>;
-> +			status = "okay";
-> +		};
+> +	node = of_find_compatible_node(NULL, NULL,
+> +				       "allwinner,sun8i-a23-cpuconfig");
+> +	if (!node) {
+> +		pr_err("Missing A23 CPU config node in the device tree\n");
+> +		return;
+> +	}
 > +
-> +		i2c0: i2c at 01c2ac00 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c0_pins_a>;
-> +			status = "okay";
-> +		};
+> +	cpucfg_membase = of_iomap(node, 0);
+> +	if (!cpucfg_membase)
+> +		pr_err("Couldn't map A23 CPU config registers\n");
 > +
-> +		i2c1: i2c at 01c2b000 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c1_pins_a>;
-> +			status = "okay";
-> +		};
-
-What are the two i2c busses wired to?
-
-> +		r_uart: serial at 01f02800 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&r_uart_pins_a>;
-> +			status = "okay";
-> +		};
-> +	};
+> +}
+> +
+> +static int sun8i_smp_boot_secondary(unsigned int cpu,
+> +				    struct task_struct *idle)
+> +{
+> +	u32 reg;
+> +
+> +	if (!(prcm_membase && cpucfg_membase))
+> +		return -EFAULT;
+> +
+> +	spin_lock(&cpu_lock);
+> +
+> +	/* Set CPU boot address */
+> +	writel(virt_to_phys(secondary_startup),
+> +	       cpucfg_membase + CPUCFG_PRIVATE0_REG);
+> +
+> +	/* Assert the CPU core in reset */
+> +	writel(0, cpucfg_membase + CPUCFG_CPU_RST_CTRL_REG(cpu));
+> +
+> +	/* Assert the L1 cache in reset */
+> +	reg = readl(cpucfg_membase + CPUCFG_GEN_CTRL_REG);
+> +	writel(reg & ~BIT(cpu), cpucfg_membase + CPUCFG_GEN_CTRL_REG);
+> +
+> +	/* Clear CPU power-off gating */
+> +	reg = readl(prcm_membase + PRCM_CPU_PWROFF_REG);
+> +	writel(reg & ~BIT(cpu), prcm_membase + PRCM_CPU_PWROFF_REG);
+> +	mdelay(1);
+> +
+> +	/* Deassert the CPU core reset */
+> +	writel(3, cpucfg_membase + CPUCFG_CPU_RST_CTRL_REG(cpu));
+> +
+> +	spin_unlock(&cpu_lock);
+> +
+> +	return 0;
+> +}
+> +
+> +struct smp_operations sun8i_smp_ops __initdata = {
+> +	.smp_prepare_cpus	= sun8i_smp_prepare_cpus,
+> +	.smp_boot_secondary	= sun8i_smp_boot_secondary,
 > +};
-> +
-> -- 
-> 2.0.0.rc2
-> 
+> +CPU_METHOD_OF_DECLARE(sun8i_smp, "allwinner,sun8i-a23", &sun8i_smp_ops);
 
-Thanks,
+You forgot to document the new enable-method.
+
+Also, is there any plan to hae a working u-boot? I'd much prefer to
+use PSCI if possible.
+
 Maxime
 
 -- 
@@ -115,4 +113,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140525/e907aa93/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140525/6a950130/attachment-0001.sig>
