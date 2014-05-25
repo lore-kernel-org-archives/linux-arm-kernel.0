@@ -1,44 +1,55 @@
-From: vincent.stehle@laposte.net (=?UTF-8?q?Vincent=20Stehl=C3=A9?=)
-Date: Sun, 25 May 2014 23:13:05 +0200
-Subject: [PATCH] serial: efm32: add module_exit
-Message-ID: <1401052385-3786-1-git-send-email-vincent.stehle@laposte.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 26 May 2014 06:33:25 +0900
+Subject: [PATCH v2 0/3] Exynos multi-platform support
+In-Reply-To: <537FB781.8050501@gmail.com>
+References: <1400858369-14357-1-git-send-email-sachin.kamat@linaro.org>
+ <201405232117.12348.arnd@arndb.de> <537FA610.6050609@samsung.com>
+ <537FB781.8050501@gmail.com>
+Message-ID: <538261A5.60107@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing specification of efm32_uart_exit as module_exit.
-
-This fixes the following compilation warning:
-
-  drivers/tty/serial/efm32-uart.c:840:123: warning: ?efm32_uart_exit? defined but not used [-Wunused-function]
-
-Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
-Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Greg Kroah-Hartman <gregkh@suse.de>
-Cc: Jiri Slaby <jslaby@suse.cz>
----
-
+On 05/24/14 06:02, Tomasz Figa wrote:
+> Hi Kukjin,
+>
 Hi,
 
-This can be seen with e.g. arm allmodconfig.
+> On 23.05.2014 21:48, Kukjin Kim wrote:
+>> On 05/24/14 04:17, Arnd Bergmann wrote:
+>>> On Friday 23 May 2014, Sachin Kamat wrote:
+>>>> The patches in this series were earlier sent as part of other
+>>>> series. Now that the other patches have been merged, re-sending
+>>>> these after rebasing them on linux-next (20140523).
+>>>> Tested on Exynos4210, 4412, 5250 and 5420 based boards.
+>>>>
+>>>> A particular change in this series is the removal of single platform
+>>>> support for Exynos as suggested by Arnd and Olof (patch 2/3). With
+>>>> this change certain features (drivers) which are not yet multi-platform
+>>>> aware like cpufreq, devfreq and DRM based gscaler will not be available
+>>>> now.
+>>>
+>>>
+>>> Acked-by: Arnd Bergmann<arnd@arndb.de>
+>>
+>> Yes, it's time to move on exynos multiplatform and we can't wait for
+>> more perfect something. Anyway if any problems, let's fix them after
+>> this. Will apply this whole series.
+>
+> I have tested v1 of this series on Exynos4210-TRATS and
+> Exynos4412-TRATS2 boards and they seemed to work fine with added two
+> patches that are already on the ML:
+>   - [PATCH v2] cpufreq: exynos: Fix driver compilation with
+> ARCH_MULTIPLATFORM,
 
-Best regards,
+Hmm...yeah, Thomas re-submitted v5 but the patches are depending on 
+others which are not yet decided to apply for 3.16...maybe it can be 
+upstreamed in 3.17?...
 
-V.
+>   - [PATCH] drm/exynos/fimd: allow multiplatform configuration.
+>
+> Not tested too extensively, but primary features (boot, display, USB
+> gadget, cpufreq) seem to work at first glance with the above patches.
+>
+Thanks for your test and OK, I'll queue this with multiplatform patches.
 
- drivers/tty/serial/efm32-uart.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/tty/serial/efm32-uart.c b/drivers/tty/serial/efm32-uart.c
-index c167a71..b373f64 100644
---- a/drivers/tty/serial/efm32-uart.c
-+++ b/drivers/tty/serial/efm32-uart.c
-@@ -842,6 +842,7 @@ static void __exit efm32_uart_exit(void)
- 	platform_driver_unregister(&efm32_uart_driver);
- 	uart_unregister_driver(&efm32_uart_reg);
- }
-+module_exit(efm32_uart_exit);
- 
- MODULE_AUTHOR("Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>");
- MODULE_DESCRIPTION("EFM32 UART/USART driver");
--- 
-2.0.0.rc2
+- Kukjin
