@@ -1,17 +1,24 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 25 May 2014 20:18:54 +0200
-Subject: [PATCH 08/16] ARM/ARM64: KVM: Emulate PSCI v0.2 AFFINITY_INFO
+Date: Sun, 25 May 2014 20:18:56 +0200
+Subject: [PATCH 10/16] ARM/ARM64: KVM: Fix CPU_ON emulation for PSCI v0.2
 In-Reply-To: <1401041942-23471-1-git-send-email-christoffer.dall@linaro.org>
 References: <1401041942-23471-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1401041942-23471-9-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1401041942-23471-11-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Anup Patel <anup.patel@linaro.org>
 
-This patch adds emulation of PSCI v0.2 AFFINITY_INFO function call
-for KVM ARM/ARM64. This is a VCPU-level function call which will be
-used to determine current state of given affinity level.
+As-per PSCI v0.2, the source CPU provides physical address of
+"entry point" and "context id" for starting a target CPU. Also,
+if target CPU is already running then we should return ALREADY_ON.
+
+Current emulation of CPU_ON function does not consider physical
+address of "context id" and returns INVALID_PARAMETERS if target
+CPU is already running.
+
+This patch updates kvm_psci_vcpu_on() such that it works for both
+PSCI v0.1 and PSCI v0.2.
 
 Signed-off-by: Anup Patel <anup.patel@linaro.org>
 Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
@@ -19,96 +26,51 @@ Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/psci.c | 52 ++++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 50 insertions(+), 2 deletions(-)
+ arch/arm/kvm/psci.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 5936213..3b6a0cf 100644
+index cce901a..1067579 100644
 --- a/arch/arm/kvm/psci.c
 +++ b/arch/arm/kvm/psci.c
-@@ -27,6 +27,16 @@
-  * as described in ARM document number ARM DEN 0022A.
-  */
- 
-+#define AFFINITY_MASK(level)	~((0x1UL << ((level) * MPIDR_LEVEL_BITS)) - 1)
-+
-+static unsigned long psci_affinity_mask(unsigned long affinity_level)
-+{
-+	if (affinity_level <= 3)
-+		return MPIDR_HWID_BITMASK & AFFINITY_MASK(affinity_level);
-+
-+	return 0;
-+}
-+
- static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
- {
- 	vcpu->arch.pause = true;
-@@ -85,6 +95,42 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
- 	return PSCI_RET_SUCCESS;
- }
- 
-+static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
-+{
-+	int i;
-+	unsigned long mpidr;
-+	unsigned long target_affinity;
-+	unsigned long target_affinity_mask;
-+	unsigned long lowest_affinity_level;
-+	struct kvm *kvm = vcpu->kvm;
-+	struct kvm_vcpu *tmp;
-+
-+	target_affinity = *vcpu_reg(vcpu, 1);
-+	lowest_affinity_level = *vcpu_reg(vcpu, 2);
-+
-+	/* Determine target affinity mask */
-+	target_affinity_mask = psci_affinity_mask(lowest_affinity_level);
-+	if (!target_affinity_mask)
-+		return PSCI_RET_INVALID_PARAMS;
-+
-+	/* Ignore other bits of target affinity */
-+	target_affinity &= target_affinity_mask;
-+
-+	/*
-+	 * If one or more VCPU matching target affinity are running
-+	 * then ON else OFF
-+	 */
-+	kvm_for_each_vcpu(i, tmp, kvm) {
-+		mpidr = kvm_vcpu_get_mpidr(tmp);
-+		if (((mpidr & target_affinity_mask) == target_affinity) &&
-+		    !tmp->arch.pause) {
-+			return PSCI_0_2_AFFINITY_LEVEL_ON;
-+		}
+@@ -48,6 +48,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+ 	struct kvm_vcpu *vcpu = NULL, *tmp;
+ 	wait_queue_head_t *wq;
+ 	unsigned long cpu_id;
++	unsigned long context_id;
+ 	unsigned long mpidr;
+ 	phys_addr_t target_pc;
+ 	int i;
+@@ -68,10 +69,17 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+ 	 * Make sure the caller requested a valid CPU and that the CPU is
+ 	 * turned off.
+ 	 */
+-	if (!vcpu || !vcpu->arch.pause)
++	if (!vcpu)
+ 		return PSCI_RET_INVALID_PARAMS;
++	if (!vcpu->arch.pause) {
++		if (kvm_psci_version(source_vcpu) != KVM_ARM_PSCI_0_1)
++			return PSCI_RET_ALREADY_ON;
++		else
++			return PSCI_RET_INVALID_PARAMS;
 +	}
-+
-+	return PSCI_0_2_AFFINITY_LEVEL_OFF;
-+}
-+
- static void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
- {
- 	memset(&vcpu->run->system_event, 0, sizeof(vcpu->run->system_event));
-@@ -132,6 +178,10 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 	case PSCI_0_2_FN64_CPU_ON:
- 		val = kvm_psci_vcpu_on(vcpu);
- 		break;
-+	case PSCI_0_2_FN_AFFINITY_INFO:
-+	case PSCI_0_2_FN64_AFFINITY_INFO:
-+		val = kvm_psci_vcpu_affinity_info(vcpu);
-+		break;
- 	case PSCI_0_2_FN_SYSTEM_OFF:
- 		kvm_psci_system_off(vcpu);
- 		/*
-@@ -157,12 +207,10 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 		ret = 0;
- 		break;
- 	case PSCI_0_2_FN_CPU_SUSPEND:
--	case PSCI_0_2_FN_AFFINITY_INFO:
- 	case PSCI_0_2_FN_MIGRATE:
- 	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
- 	case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
- 	case PSCI_0_2_FN64_CPU_SUSPEND:
--	case PSCI_0_2_FN64_AFFINITY_INFO:
- 	case PSCI_0_2_FN64_MIGRATE:
- 	case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
- 		val = PSCI_RET_NOT_SUPPORTED;
+ 
+ 	target_pc = *vcpu_reg(source_vcpu, 2);
++	context_id = *vcpu_reg(source_vcpu, 3);
+ 
+ 	kvm_reset_vcpu(vcpu);
+ 
+@@ -86,6 +94,11 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+ 		kvm_vcpu_set_be(vcpu);
+ 
+ 	*vcpu_pc(vcpu) = target_pc;
++	/*
++	 * NOTE: We always update r0 (or x0) because for PSCI v0.1
++	 * the general puspose registers are undefined upon CPU_ON.
++	 */
++	*vcpu_reg(vcpu, 0) = context_id;
+ 	vcpu->arch.pause = false;
+ 	smp_mb();		/* Make sure the above is visible */
+ 
 -- 
 1.8.5.2
