@@ -1,109 +1,109 @@
-From: bay@hackerdom.ru (Alexander Bersenev)
-Date: Mon, 26 May 2014 04:26:45 +0600
-Subject: [PATCH v8 3/3] ARM: sunxi: Add IR controller support in DT on A20
-In-Reply-To: <1401056805-2218-1-git-send-email-bay@hackerdom.ru>
-References: <1401056805-2218-1-git-send-email-bay@hackerdom.ru>
-Message-ID: <1401056805-2218-4-git-send-email-bay@hackerdom.ru>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 26 May 2014 07:50:02 +0900
+Subject: [PATCH v5 0/7] cpufreq: use cpufreq-cpu0 driver for exynos based
+ platforms
+In-Reply-To: <1400855260-6807-1-git-send-email-thomas.ab@samsung.com>
+References: <1400855260-6807-1-git-send-email-thomas.ab@samsung.com>
+Message-ID: <5382739A.60800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds IR controller in A20 Device-Tree:
-- Two IR devices found in A20 user manual
-- Pins for two devices
-- One IR device physically found on Cubieboard 2
-- One IR device physically found on Cubietruck
+On 05/23/14 23:27, Thomas Abraham wrote:
+> Changes since v4:
+> - Various changes in clock code suggested by Tomasz Figa<t.figa@samsung.com>
+> - This series depends on mutiple other patches
+>    [a] patch that introduces read-only attribute for clock dividers.
+>        - http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/259264.html
+>    [b] the series "PM / OPP: move cpufreq specific helpers out of OPP layer"
+>        - https://www.mail-archive.com/linux-omap at vger.kernel.org/msg104610.html
+>    [c] the series "cpufreq: opp: Add device tree based lookup of boost mode frequency"
+>        - http://www.spinics.net/lists/arm-kernel/msg334336.html
+>
+This series looks good to me after quick loking at but as I replied on 
+other thread, I'm not sure above changes are ready for 3.16 or not...
 
-Signed-off-by: Alexander Bersenev <bay@hackerdom.ru>
-Signed-off-by: Alexsey Shestacov <wingrime@linux-sunxi.org>
----
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts |  6 ++++++
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts  |  6 ++++++
- arch/arm/boot/dts/sun7i-a20.dtsi            | 32 +++++++++++++++++++++++++++++
- 3 files changed, 44 insertions(+)
+Maybe we can revisit this series for 3.17?...hmm...
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-index feeff64..b44d61b 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-@@ -65,6 +65,12 @@
- 			};
- 		};
- 
-+		ir0: ir at 01c21800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&ir0_pins_a>;
-+			status = "okay";
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index e288562..5f5c31d 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -121,6 +121,12 @@
- 			};
- 		};
- 
-+		ir0: ir at 01c21800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&ir0_pins_a>;
-+			status = "okay";
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 0ae2b77..fe1f8ff 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -724,6 +724,20 @@
- 				allwinner,drive = <2>;
- 				allwinner,pull = <0>;
- 			};
-+
-+			ir0_pins_a: ir0 at 0 {
-+				    allwinner,pins = "PB3","PB4";
-+				    allwinner,function = "ir0";
-+				    allwinner,drive = <0>;
-+				    allwinner,pull = <0>;
-+			};
-+
-+			ir1_pins_a: ir1 at 0 {
-+				    allwinner,pins = "PB22","PB23";
-+				    allwinner,function = "ir1";
-+				    allwinner,drive = <0>;
-+				    allwinner,pull = <0>;
-+			};
- 		};
- 
- 		timer at 01c20c00 {
-@@ -749,6 +763,24 @@
- 			interrupts = <0 24 4>;
- 		};
- 
-+		ir0: ir at 01c21800 {
-+			compatible = "allwinner,sun7i-a20-ir";
-+			clocks = <&apb0_gates 6>, <&ir0_clk>;
-+			clock-names = "apb", "ir";
-+			interrupts = <0 5 4>;
-+			reg = <0x01c21800 0x40>;
-+			status = "disabled";
-+		};
-+
-+		ir1: ir at 01c21c00 {
-+			compatible = "allwinner,sun7i-a20-ir";
-+			clocks = <&apb0_gates 7>, <&ir1_clk>;
-+			clock-names = "apb", "ir";
-+			interrupts = <0 6 4>;
-+			reg = <0x01c21c00 0x40>;
-+			status = "disabled";
-+		};
-+
- 		lradc: lradc at 01c22800 {
- 			compatible = "allwinner,sun4i-lradc-keys";
- 			reg = <0x01c22800 0x100>;
--- 
-1.9.3
+- Kukjin
+
+> Changes since v3:
+> - Addressed comments from Tomasz Figa<t.figa@samsung.com>
+>    [http://www.spinics.net/lists/cpufreq/msg09290.html]
+> - Rebased to v3.15-rc4
+>
+> Changes since v2:
+> - Safe operating voltage is not required while switching APLL frequency
+>    since the temporary parent's clock is divided down to keep armclk within
+>    permissible limits. Thanks to Heiko Stuebner<heiko@sntech.de>  for
+>    suggesting this.
+> - Rob had suggested to use max frequency for each of the divider clock
+>    outputs instead of divider values. But due to certain SoC specific
+>    characteristics, the divider values corresponding to the input clock
+>    frequency for the CMU_CPU clock blocks have to be used.
+>
+> Changes since v1:
+> - Removes Exynos4x12 and Exynos5250 cpufreq driver also.
+> - Device tree based clock configuration lookup as suggested by Lukasz
+>    Majewski and Tomasz Figa.
+> - safe operating point binding reworked as suggested by Shawn Guo.
+>
+> The patch series removes the use of Exynos specific cpufreq driver and enables
+> the use of cpufreq-cpu0 driver for Exynos4210, Exynos4x12 and Exynos5250 based
+> platforms. This is being done for few reasons.
+>
+> (a) The Exynos cpufreq driver reads/writes clock controller registers
+>      bypassing the Exynos CCF driver which is sort of problematic.
+> (b) Removes the need for having clock controller register definitions
+>      in the cpufreq driver and also removes the need for statically
+>      io-remapping clock controller address space (helps in moving towards
+>      multiplatform kernel).
+>
+> Thomas Abraham (7):
+>    cpufreq: cpufreq-cpu0: allow use of optional boost mode frequencies
+>    clk: samsung: add infrastructure to register cpu clocks
+>    Documentation: devicetree: add cpu clock configuration data binding for Exynos4/5
+>    clk: exynos: use cpu-clock provider type to represent arm clock
+>    ARM: dts: Exynos: add cpu nodes, opp and cpu clock configuration data
+>    ARM: Exynos: switch to using generic cpufreq-cpu0 driver
+>    cpufreq: exynos: remove all exynos specific cpufreq driver support
+>
+>   .../devicetree/bindings/clock/exynos4-clock.txt    |   37 ++
+>   .../devicetree/bindings/clock/exynos5250-clock.txt |   36 ++
+>   .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |    2 +
+>   arch/arm/boot/dts/exynos4210-origen.dts            |    6 +
+>   arch/arm/boot/dts/exynos4210-trats.dts             |    6 +
+>   arch/arm/boot/dts/exynos4210-universal_c210.dts    |    6 +
+>   arch/arm/boot/dts/exynos4210.dtsi                  |   35 ++
+>   arch/arm/boot/dts/exynos4212.dtsi                  |   18 +
+>   arch/arm/boot/dts/exynos4412-odroidx.dts           |    6 +
+>   arch/arm/boot/dts/exynos4412-origen.dts            |    6 +
+>   arch/arm/boot/dts/exynos4412-trats2.dts            |    6 +
+>   arch/arm/boot/dts/exynos4412.dtsi                  |   31 ++
+>   arch/arm/boot/dts/exynos4x12.dtsi                  |   36 ++
+>   arch/arm/boot/dts/exynos5250-arndale.dts           |    6 +
+>   arch/arm/boot/dts/exynos5250-cros-common.dtsi      |    6 +
+>   arch/arm/boot/dts/exynos5250-smdk5250.dts          |    6 +
+>   arch/arm/boot/dts/exynos5250.dtsi                  |   41 ++
+>   arch/arm/mach-exynos/exynos.c                      |    4 +-
+>   drivers/clk/samsung/Makefile                       |    2 +-
+>   drivers/clk/samsung/clk-cpu.c                      |  448 ++++++++++++++++++++
+>   drivers/clk/samsung/clk-exynos4.c                  |   25 +-
+>   drivers/clk/samsung/clk-exynos5250.c               |   16 +-
+>   drivers/clk/samsung/clk.h                          |    4 +
+>   drivers/cpufreq/Kconfig                            |    1 +
+>   drivers/cpufreq/Kconfig.arm                        |   52 ---
+>   drivers/cpufreq/Makefile                           |    4 -
+>   drivers/cpufreq/cpufreq-cpu0.c                     |    3 +
+>   drivers/cpufreq/exynos-cpufreq.c                   |  218 ----------
+>   drivers/cpufreq/exynos-cpufreq.h                   |   99 -----
+>   drivers/cpufreq/exynos4210-cpufreq.c               |  157 -------
+>   drivers/cpufreq/exynos4x12-cpufreq.c               |  208 ---------
+>   drivers/cpufreq/exynos5250-cpufreq.c               |  183 --------
+>   include/dt-bindings/clock/exynos5250.h             |    1 +
+>   33 files changed, 779 insertions(+), 936 deletions(-)
+>   create mode 100644 drivers/clk/samsung/clk-cpu.c
+>   delete mode 100644 drivers/cpufreq/exynos-cpufreq.c
+>   delete mode 100644 drivers/cpufreq/exynos-cpufreq.h
+>   delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
+>   delete mode 100644 drivers/cpufreq/exynos4x12-cpufreq.c
+>   delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
