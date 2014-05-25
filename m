@@ -1,55 +1,50 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 26 May 2014 06:33:25 +0900
-Subject: [PATCH v2 0/3] Exynos multi-platform support
-In-Reply-To: <537FB781.8050501@gmail.com>
-References: <1400858369-14357-1-git-send-email-sachin.kamat@linaro.org>
- <201405232117.12348.arnd@arndb.de> <537FA610.6050609@samsung.com>
- <537FB781.8050501@gmail.com>
-Message-ID: <538261A5.60107@samsung.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Sun, 25 May 2014 14:35:09 -0700
+Subject: [PATCH for v3.15 0/2] ARM: mvebu Specificy ECC scheme for
+ A375/385 boards
+In-Reply-To: <20140525172906.GL8664@titan.lakedaemon.net>
+References: <1400941030-2123-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140525172906.GL8664@titan.lakedaemon.net>
+Message-ID: <20140525213509.GA5241@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/24/14 06:02, Tomasz Figa wrote:
-> Hi Kukjin,
->
-Hi,
+On Sun, May 25, 2014 at 01:29:06PM -0400, Jason Cooper wrote:
+> On Sat, May 24, 2014 at 11:17:08AM -0300, Ezequiel Garcia wrote:
+> > Last minute fixes, which help prevent any inconsistencies between the ECC
+> > scheme expected by the bootloader, and the one expected by the kernel.
+> > 
+> > Until now, the kernel was using the ONFI-provided "datasheet ECC requirement",
+> > and assume the bootloader did the same thing. However, this is not the case
+> > for these boards, where the vendor provided a bootloader with an ECC strength
+> > that's weaker than the required.
+> > 
+> > After the introduction of the NAND ECC devicetree binding, and its support
+> > in the pxa3xx-nand driver, we can set these values and expect them to work.
+> > 
+> > I hope it's not too late for v3.15 already.
+> > 
+> > Ezequiel Garcia (2):
+> >   ARM: dts: Specify the NAND ECC scheme explicitly on Armada 375 DB
+> >     board
+> >   ARM: dts: Specify the NAND ECC scheme explicitly on Armada 385 DB
+> >     board
+> > 
+> >  arch/arm/boot/dts/armada-375-db.dts | 2 ++
+> >  arch/arm/boot/dts/armada-385-db.dts | 2 ++
+> >  2 files changed, 4 insertions(+)
 
-> On 23.05.2014 21:48, Kukjin Kim wrote:
->> On 05/24/14 04:17, Arnd Bergmann wrote:
->>> On Friday 23 May 2014, Sachin Kamat wrote:
->>>> The patches in this series were earlier sent as part of other
->>>> series. Now that the other patches have been merged, re-sending
->>>> these after rebasing them on linux-next (20140523).
->>>> Tested on Exynos4210, 4412, 5250 and 5420 based boards.
->>>>
->>>> A particular change in this series is the removal of single platform
->>>> support for Exynos as suggested by Arnd and Olof (patch 2/3). With
->>>> this change certain features (drivers) which are not yet multi-platform
->>>> aware like cpufreq, devfreq and DRM based gscaler will not be available
->>>> now.
->>>
->>>
->>> Acked-by: Arnd Bergmann<arnd@arndb.de>
->>
->> Yes, it's time to move on exynos multiplatform and we can't wait for
->> more perfect something. Anyway if any problems, let's fix them after
->> this. Will apply this whole series.
->
-> I have tested v1 of this series on Exynos4210-TRATS and
-> Exynos4412-TRATS2 boards and they seemed to work fine with added two
-> patches that are already on the ML:
->   - [PATCH v2] cpufreq: exynos: Fix driver compilation with
-> ARCH_MULTIPLATFORM,
+For the series:
 
-Hmm...yeah, Thomas re-submitted v5 but the patches are depending on 
-others which are not yet decided to apply for 3.16...maybe it can be 
-upstreamed in 3.17?...
+Acked-by: Brian Norris <computersforpeace@gmail.com>
 
->   - [PATCH] drm/exynos/fimd: allow multiplatform configuration.
->
-> Not tested too extensively, but primary features (boot, display, USB
-> gadget, cpufreq) seem to work at first glance with the above patches.
->
-Thanks for your test and OK, I'll queue this with multiplatform patches.
+> As discussed on irc, I'm pushing this for v3.16 right now.  If we later
+> determine that it needs to be in v3.15, we can send a stable request for
+> these patches.
 
-- Kukjin
+Not sure what went into the discussion, but for one, the binding is only
+used in the pxa3xx_nand driver in the for-3.16 development branch, so it
+doesn't quite seem urgent to me.
+
+Regards,
+Brian
