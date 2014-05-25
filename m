@@ -1,34 +1,44 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Sun, 25 May 2014 11:43:59 +0100
-Subject: [PATCH v7 0/4] Support for Generic PCI Host Controller
-In-Reply-To: <201405232119.23891.arnd@arndb.de>
+Date: Sun, 25 May 2014 11:48:15 +0100
+Subject: [PATCH v7 4/4] PCI: Generic Configuration Access Mechanism support
+In-Reply-To: <201405232122.18995.arnd@arndb.de>
 References: <1400863915-24135-1-git-send-email-will.deacon@arm.com>
- <201405232119.23891.arnd@arndb.de>
-Message-ID: <20140525104359.GA2343@arm.com>
+ <1400863915-24135-5-git-send-email-will.deacon@arm.com>
+ <201405232122.18995.arnd@arndb.de>
+Message-ID: <20140525104815.GB2343@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Fri, May 23, 2014 at 08:19:23PM +0100, Arnd Bergmann wrote:
+On Fri, May 23, 2014 at 08:22:18PM +0100, Arnd Bergmann wrote:
 > On Friday 23 May 2014, Will Deacon wrote:
-> >   - Removed redundant MIGHT_HAVE_PCI selections from multiplatform-enabled
-> >     SoCs
-> > 
-> >   - Included patch from Srikanth for generic Configuration Space access to
-> >     be factored out and used by other drivers
-> > 
-> >   - Fixed minor issue in I/O port allocation (I had a >= instead of a >)
-> > 
+> > +static void __iomem *pci_cfg_map_bus_ecam(struct pci_bus *bus,
+> > +                                         unsigned int devfn,
+> > +                                         int where)
+> > +{
+> > +       struct pci_sys_data *sys = bus->sysdata;
+> > +       struct pci_cfg_windows *cfg = sys->private_data;
+> > +       resource_size_t idx = bus->number - cfg->bus_range.start;
+> > +
+> > +       return cfg->win[idx] + ((devfn << PCI_CFG_ECAM_DEV_NUM) | where);
+> > +}
 > 
-> It seems strange that you include the patch from Srikanth but then use
-> a separate copy of the same code in patch 2. Is that intentional?
+> I just noticed that this function makes the code rather non-generic, because
+> struct pci_sys_data is the ARM specific structure that doesn't exist elsewhere,
+> and sys->private_data wouldn't typically point to struct pci_cfg_windows on
+> anything other than your generic PCI host.
 
-That was a combination of me not being sure about the status of Srikanth's
-patch (the review didn't seem to conclude) but also then forgetting to move
-over to using it.
+Indeed. That's what I was refering to initially when I suggested some
+potential alignment on the private_data across host controller drivers
+trying to use this.
 
-However, judging by your most recent comments, I'm glad I didn't spend any
-time on it!
+> I'd say let's drop this for now. I know it was my idea to do it like this,
+> but it seems it's more complex than I had hoped to get this right, and
+> I'd really prefer to merge the other three patches for 3.16 if possible.
+> We can factor it out later if we get more users.
+
+Sure, I think we all had good intentions. I'll send a pull for the first
+three patches -- should it go via arm-soc or Bjorn's PCI tree?
+
+Cheers,
 
 Will
