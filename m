@@ -1,206 +1,78 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 25 May 2014 20:19:01 +0200
-Subject: [PATCH 15/16] ARM: Check if a CPU has gone offline
+Date: Sun, 25 May 2014 20:19:02 +0200
+Subject: [PATCH 16/16] arm64: KVM: Enable minimalistic support for Cortex-A53
 In-Reply-To: <1401041942-23471-1-git-send-email-christoffer.dall@linaro.org>
 References: <1401041942-23471-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1401041942-23471-16-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1401041942-23471-17-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-PSCIv0.2 adds a new function called AFFINITY_INFO, which
-can be used to query if a specified CPU has actually gone
-offline. Calling this function via cpu_kill ensures that
-a CPU has quiesced after a call to cpu_die. This helps
-prevent the CPU from doing arbitrary bad things when data
-or instructions are clobbered (as happens with kexec)
-in the window between a CPU announcing that it is dead
-and said CPU leaving the kernel.
+In order to allow KVM to run on Cortex-A53 implementations, wire the
+minimal support required.
 
-Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kernel/psci_smp.c       | 33 +++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/cpu_ops.h |  2 ++
- arch/arm64/kernel/psci.c         | 31 +++++++++++++++++++++++++++++++
- arch/arm64/kernel/smp.c          | 22 ++++++++++++++++++++++
- 4 files changed, 88 insertions(+)
+ arch/arm64/include/asm/cputype.h     | 1 +
+ arch/arm64/include/uapi/asm/kvm.h    | 3 ++-
+ arch/arm64/kvm/guest.c               | 2 ++
+ arch/arm64/kvm/sys_regs_generic_v8.c | 2 ++
+ 4 files changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
-index 570a48c..28a1db4 100644
---- a/arch/arm/kernel/psci_smp.c
-+++ b/arch/arm/kernel/psci_smp.c
-@@ -16,6 +16,8 @@
- #include <linux/init.h>
- #include <linux/smp.h>
- #include <linux/of.h>
-+#include <linux/delay.h>
-+#include <uapi/linux/psci.h>
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index c404fb0..27f54a7 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -41,6 +41,7 @@
  
- #include <asm/psci.h>
- #include <asm/smp_plat.h>
-@@ -66,6 +68,36 @@ void __ref psci_cpu_die(unsigned int cpu)
-        /* We should never return */
-        panic("psci: cpu %d failed to shutdown\n", cpu);
- }
-+
-+int __ref psci_cpu_kill(unsigned int cpu)
-+{
-+	int err, i;
-+
-+	if (!psci_ops.affinity_info)
-+		return 1;
-+	/*
-+	 * cpu_kill could race with cpu_die and we can
-+	 * potentially end up declaring this cpu undead
-+	 * while it is dying. So, try again a few times.
-+	 */
-+
-+	for (i = 0; i < 10; i++) {
-+		err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
-+		if (err == PSCI_0_2_AFFINITY_LEVEL_OFF) {
-+			pr_info("CPU%d killed.\n", cpu);
-+			return 1;
-+		}
-+
-+		msleep(10);
-+		pr_info("Retrying again to check for CPU kill\n");
-+	}
-+
-+	pr_warn("CPU%d may not have shut down cleanly (AFFINITY_INFO reports %d)\n",
-+			cpu, err);
-+	/* Make platform_cpu_kill() fail. */
-+	return 0;
-+}
-+
- #endif
+ #define ARM_CPU_PART_AEM_V8	0xD0F0
+ #define ARM_CPU_PART_FOUNDATION	0xD000
++#define ARM_CPU_PART_CORTEX_A53	0xD030
+ #define ARM_CPU_PART_CORTEX_A57	0xD070
  
- bool __init psci_smp_available(void)
-@@ -78,5 +110,6 @@ struct smp_operations __initdata psci_smp_ops = {
- 	.smp_boot_secondary	= psci_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_die		= psci_cpu_die,
-+	.cpu_kill		= psci_cpu_kill,
- #endif
- };
-diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
-index 1524130..d7b4b38 100644
---- a/arch/arm64/include/asm/cpu_ops.h
-+++ b/arch/arm64/include/asm/cpu_ops.h
-@@ -39,6 +39,7 @@ struct device_node;
-  * 		from the cpu to be killed.
-  * @cpu_die:	Makes a cpu leave the kernel. Must not fail. Called from the
-  *		cpu being killed.
-+ * @cpu_kill:  Ensures a cpu has left the kernel. Called from another cpu.
-  * @cpu_suspend: Suspends a cpu and saves the required context. May fail owing
-  *               to wrong parameters or error conditions. Called from the
-  *               CPU being suspended. Must be called with IRQs disabled.
-@@ -52,6 +53,7 @@ struct cpu_operations {
- #ifdef CONFIG_HOTPLUG_CPU
- 	int		(*cpu_disable)(unsigned int cpu);
- 	void		(*cpu_die)(unsigned int cpu);
-+	int		(*cpu_kill)(unsigned int cpu);
- #endif
- #ifdef CONFIG_ARM64_CPU_SUSPEND
- 	int		(*cpu_suspend)(unsigned long);
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index 90df6e6..9e9798f 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -20,6 +20,7 @@
- #include <linux/smp.h>
- #include <linux/reboot.h>
- #include <linux/pm.h>
-+#include <linux/delay.h>
- #include <uapi/linux/psci.h>
+ #define APM_CPU_PART_POTENZA	0x0000
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index e6471da..e633ff8 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -57,8 +57,9 @@ struct kvm_regs {
+ #define KVM_ARM_TARGET_FOUNDATION_V8	1
+ #define KVM_ARM_TARGET_CORTEX_A57	2
+ #define KVM_ARM_TARGET_XGENE_POTENZA	3
++#define KVM_ARM_TARGET_CORTEX_A53	4
  
- #include <asm/compiler.h>
-@@ -403,6 +404,35 @@ static void cpu_psci_cpu_die(unsigned int cpu)
+-#define KVM_ARM_NUM_TARGETS		4
++#define KVM_ARM_NUM_TARGETS		5
  
- 	pr_crit("unable to power off CPU%u (%d)\n", cpu, ret);
- }
-+
-+static int cpu_psci_cpu_kill(unsigned int cpu)
-+{
-+	int err, i;
-+
-+	if (!psci_ops.affinity_info)
-+		return 1;
-+	/*
-+	 * cpu_kill could race with cpu_die and we can
-+	 * potentially end up declaring this cpu undead
-+	 * while it is dying. So, try again a few times.
-+	 */
-+
-+	for (i = 0; i < 10; i++) {
-+		err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
-+		if (err == PSCI_0_2_AFFINITY_LEVEL_OFF) {
-+			pr_info("CPU%d killed.\n", cpu);
-+			return 1;
-+		}
-+
-+		msleep(10);
-+		pr_info("Retrying again to check for CPU kill\n");
-+	}
-+
-+	pr_warn("CPU%d may not have shut down cleanly (AFFINITY_INFO reports %d)\n",
-+			cpu, err);
-+	/* Make op_cpu_kill() fail. */
-+	return 0;
-+}
- #endif
- 
- const struct cpu_operations cpu_psci_ops = {
-@@ -413,6 +443,7 @@ const struct cpu_operations cpu_psci_ops = {
- #ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_disable	= cpu_psci_cpu_disable,
- 	.cpu_die	= cpu_psci_cpu_die,
-+	.cpu_kill	= cpu_psci_cpu_kill,
- #endif
- };
- 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index f0a141d..c3cb160 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -228,6 +228,19 @@ int __cpu_disable(void)
- 	return 0;
- }
- 
-+static int op_cpu_kill(unsigned int cpu)
-+{
-+	/*
-+	 * If we have no means of synchronising with the dying CPU, then assume
-+	 * that it is really dead. We can only wait for an arbitrary length of
-+	 * time and hope that it's dead, so let's skip the wait and just hope.
-+	 */
-+	if (!cpu_ops[cpu]->cpu_kill)
-+		return 1;
-+
-+	return cpu_ops[cpu]->cpu_kill(cpu);
-+}
-+
- static DECLARE_COMPLETION(cpu_died);
- 
- /*
-@@ -241,6 +254,15 @@ void __cpu_die(unsigned int cpu)
- 		return;
- 	}
- 	pr_notice("CPU%u: shutdown\n", cpu);
-+
-+	/*
-+	 * Now that the dying CPU is beyond the point of no return w.r.t.
-+	 * in-kernel synchronisation, try to get the firwmare to help us to
-+	 * verify that it has really left the kernel before we consider
-+	 * clobbering anything it might still be using.
-+	 */
-+	if (!op_cpu_kill(cpu))
-+		pr_warn("CPU%d may not have shut down cleanly\n", cpu);
- }
- 
- /*
+ /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
+ #define KVM_ARM_DEVICE_TYPE_SHIFT	0
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 0874557..60b5c31 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -214,6 +214,8 @@ int __attribute_const__ kvm_target_cpu(void)
+ 			return KVM_ARM_TARGET_AEM_V8;
+ 		case ARM_CPU_PART_FOUNDATION:
+ 			return KVM_ARM_TARGET_FOUNDATION_V8;
++		case ARM_CPU_PART_CORTEX_A53:
++			return KVM_ARM_TARGET_CORTEX_A53;
+ 		case ARM_CPU_PART_CORTEX_A57:
+ 			return KVM_ARM_TARGET_CORTEX_A57;
+ 		};
+diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
+index 8fe6f76..475fd29 100644
+--- a/arch/arm64/kvm/sys_regs_generic_v8.c
++++ b/arch/arm64/kvm/sys_regs_generic_v8.c
+@@ -88,6 +88,8 @@ static int __init sys_reg_genericv8_init(void)
+ 					  &genericv8_target_table);
+ 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_FOUNDATION_V8,
+ 					  &genericv8_target_table);
++	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A53,
++					  &genericv8_target_table);
+ 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A57,
+ 					  &genericv8_target_table);
+ 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_XGENE_POTENZA,
 -- 
 1.8.5.2
