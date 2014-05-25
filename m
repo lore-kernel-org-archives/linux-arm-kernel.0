@@ -1,56 +1,21 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 25 May 2014 16:36:29 +0100
-Subject: [PATCH v2 9/9] arm64: KVM: enable trapping of all debug registers
-In-Reply-To: <1400604945-25247-10-git-send-email-marc.zyngier@arm.com>
+Date: Sun, 25 May 2014 16:34:32 +0100
+Subject: [PATCH v2 1/9] arm64: KVM: rename pm_fake handler to trap_raz_wi
+In-Reply-To: <1400604945-25247-2-git-send-email-marc.zyngier@arm.com>
 References: <1400604945-25247-1-git-send-email-marc.zyngier@arm.com>
- <1400604945-25247-10-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140525153629.GJ3866@lvm>
+ <1400604945-25247-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140525153432.GB3866@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 05:55:45PM +0100, Marc Zyngier wrote:
-> Enable trapping of the debug registers, preventing the guests to
-> mess with the host state (and allowing guests to use the debug
-> infrastructure as well).
+On Tue, May 20, 2014 at 05:55:37PM +0100, Marc Zyngier wrote:
+> pm_fake doesn't quite describe what the handler does (ignoring writes
+> and returning 0 for reads).
+> 
+> As we're about to use it (a lot) in a different context, rename it
+> with a (admitedly cryptic) name that make sense for all users.
 > 
 > Reviewed-by: Anup Patel <anup.patel@linaro.org>
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/hyp.S | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> index 73ec5c4..72ed0bf8 100644
-> --- a/arch/arm64/kvm/hyp.S
-> +++ b/arch/arm64/kvm/hyp.S
-> @@ -777,6 +777,14 @@ __kvm_hyp_code_start:
->  	mrs	x2, mdcr_el2
->  	and	x2, x2, #MDCR_EL2_HPMN_MASK
->  	orr	x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
-> +	orr	x2, x2, #(MDCR_EL2_TDRA | MDCR_EL2_TDOSA)
-
-so we unconditionally trap on the OS register access, but we don't
-properly emulate these do we?  What's the rationale?  (atmittedly,
-again, I'm not 100% clear on how the OS lock thingy is supposed to
-work/be used).
-
-> +
-> +	// Check for KVM_ARM64_DEBUG_DIRTY, and set to debug to trap
-> +	// if not dirty.
-
-s/set to debug to trap/set debug to trap/ ??
-
-> +	ldr	x3, [x0, #VCPU_DEBUG_FLAGS]
-> +	tbnz	x3, #KVM_ARM64_DEBUG_DIRTY_SHIFT, 1f
-> +	orr	x2, x2,  #MDCR_EL2_TDA
-> +1:
->  	msr	mdcr_el2, x2
->  .endm
->  
-> -- 
-> 1.8.3.4
-> 
-
-as per the functionality in this patch otherwise:
 
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
