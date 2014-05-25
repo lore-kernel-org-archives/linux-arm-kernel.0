@@ -1,106 +1,35 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 25 May 2014 21:20:52 +0200
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in device
- tree
-In-Reply-To: <20140525123452.GS22111@sirena.org.uk>
-References: <537DC832.3020006@redhat.com>
- <CAGb2v64VZac2KvAALrScecN89sRnBQoDrKxKMvkte+3G04NXeA@mail.gmail.com>
- <537DE1AA.5050606@redhat.com> <537E31F7.1030505@gmail.com>
- <537F1148.3010102@redhat.com> <20140523112239.GB12304@sirena.org.uk>
- <537F3610.3050104@redhat.com> <20140523162718.GE22111@sirena.org.uk>
- <53806F26.6050706@redhat.com> <20140525123452.GS22111@sirena.org.uk>
-Message-ID: <53824294.1090609@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 25 May 2014 20:43:51 +0200
+Subject: [PATCH 06/22] clk: sunxi: Support factor clocks with N
+ multiplier factor starting from 1
+In-Reply-To: <1400831485-28576-7-git-send-email-wens@csie.org>
+References: <1400831485-28576-1-git-send-email-wens@csie.org>
+ <1400831485-28576-7-git-send-email-wens@csie.org>
+Message-ID: <20140525184351.GM10768@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, May 23, 2014 at 03:51:09PM +0800, Chen-Yu Tsai wrote:
+> The PLLs on newer Allwinner SoC's, such as the A31 and A23, have a
+> N multiplier factor that starts from 1, not 0.
+> 
+> This patch adds an option to the clock driver's config data structures
+> to define the difference.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-On 05/25/2014 02:34 PM, Mark Brown wrote:
-> On Sat, May 24, 2014 at 12:06:30PM +0200, Hans de Goede wrote:
->> On 05/23/2014 06:27 PM, Mark Brown wrote:
->>> On Fri, May 23, 2014 at 01:50:40PM +0200, Hans de Goede wrote:
->>>> On 05/23/2014 01:22 PM, Mark Brown wrote:
-> 
->>>> The compatible is not a Linux specific thing, it is a marking saying
->>>> that something needs to take care of enabling the clks (and whatever
->>>> else we will make part of the binding for this compatible), before
->>>> scanning the mmc bus.
-> 
->>> We could just say that the mere presence of a child node with the right
->>> properties is sufficient to trigger the bus to do the startup?
-> 
->> Yes, except that most involved property names are standardized, ie clocks,
->> and we want to be able to opt out of the KISS mmc core code for
->> (future) complex power on sequences.
-> 
-> This is why I'm suggesting keying off the specific compatible strings
-> for drivers that want to opt out of the helpers rather than having a
-> compatible string to enable the helpers (which may depend on the
-> particular Linux version if the feature sets of drivers change for
-> example).
-> 
->>> If the device is sufficiently complicated to need a special power up
->>> sequence I'd expect we'd be able to have a compatible string which would
->>> provide enough information for us to figure things out.
-> 
->> Hmm, so what you're suggesting is indeed more of an opt out then my initial
->> opt-in to KISS powerup idea. So to be clear what you're suggesting is:
-> 
->> mmc core walks host mmc-child nodes. Loads drivers based on compatibles
->> there. The checks a flag field in the driver to see if the driver wants to
->> opt-out of the KISS powerup code. The problem with this is that it won't
-> 
-> Yes.
-> 
->> work reliable with modules, think the mmc probe being done from the ramdisk,
->> and the driver in question only being available from the rootfs. I really
-> 
-> Why is that a problem - if we have no driver for the device there is no
-> point in powering it up in the first place is there?
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Well the driver may show up later, so if we only do the power-up once we have
-a driver, this means we need to re-check if we need to do the powerup later.
+Maxime
 
-Also the mmc people are very much against specifying a driver, as that is
-something which should be probed not specified. I agree with them I've
-already seen boards were more or less standardized sdio modules from different
-vendors are used, they have various standard sdio powerup related things, like
-an enable signal in standard places, but different editions of the boards
-have different sdio modules soldered on, using different drivers.
-
-I expect that with some care we can make all variants of these boards work with
-a single dts file, by using a simple sdio wifi powerup mechanism, and after
-that letting the mmc core figure out which module is actually soldered on.
-
->> believe that using opt-in with a compatible such as simple-sdio-powerup
->> is by far the safest thing to do, and as an added advantage we don't need
->> to worry about how to deal with the future complex power on cases at all,
->> we leave all the room in the world for various future scenarios. since as
->> soon as the simple-sdio-powerup compatible is not there the mmc core will
->> behave as it does today.
-> 
-> Please remember that the DT is *supposed* to be an ABI - systems are
-> supposed to be able to ship with a fixed DT and have it work with random
-> operating systems they have no knowledge of (and may not even exist at
-> the time the DT is being created).  This means we can't rely on removing
-> a compatible string later on.
-
-I know that the DT is an ABI, and I'm not arguing for removing support for
-the simple-sdio-powerup compatible from the kernel when a more complex
-case arrives, nor am I arguing to remove it from the DT for existing working
-boards. The idea behind the simple-sdio-powerup compatible is that it makes
-the simple powerup behavior opt-in. So if a new board comes along which
-requires something more complex, the people working on this can do what ever
-they want / need without the simple powerup code getting in the way, as
-long as they don't *add* the simple-sdio-powerup compatible to their *new*
-DT file.
-
-Basically the idea behind the simple-sdio-powerup compatible is to make
-the worst case scenario for more complex boards to be the scenario which
-we have today, i.e. no support for sdio powerup at all, rather then having
-something in place which actually may get in the way, making things worse
-then they are today.
-
-Regards,
-
-Hans
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140525/3f1f39c0/attachment.sig>
