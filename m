@@ -1,30 +1,18 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 25 May 2014 20:18:57 +0200
-Subject: [PATCH 11/16] ARM/ARM64: KVM: Emulate PSCI v0.2 CPU_SUSPEND
+Date: Sun, 25 May 2014 20:18:58 +0200
+Subject: [PATCH 12/16] ARM/ARM64: KVM: Advertise KVM_CAP_ARM_PSCI_0_2 to user
+ space
 In-Reply-To: <1401041942-23471-1-git-send-email-christoffer.dall@linaro.org>
 References: <1401041942-23471-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1401041942-23471-12-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1401041942-23471-13-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Anup Patel <anup.patel@linaro.org>
 
-This patch adds emulation of PSCI v0.2 CPU_SUSPEND function call for
-KVM ARM/ARM64. This is a CPU-level function call which can suspend
-current CPU or current CPU cluster. We don't have VCPU clusters in
-KVM so we only suspend the current VCPU.
-
-The CPU_SUSPEND emulation is not tested much because currently there
-is no CPUIDLE driver in Linux kernel that uses PSCI CPU_SUSPEND. The
-PSCI CPU_SUSPEND implementation in ARM64 kernel was tested using a
-Simple CPUIDLE driver which is not published due to unstable DT-bindings
-for PSCI.
-(For more info, http://lwn.net/Articles/574950/)
-
-For simplicity, we implement CPU_SUSPEND emulation similar to WFI
-(Wait-for-interrupt) emulation and we also treat power-down request
-to be same as stand-by request. This is consistent with section
-5.4.1 and section 5.4.2 of PSCI v0.2 specification.
+We have PSCI v0.2 emulation available in KVM ARM/ARM64
+hence advertise this to user space (i.e. QEMU or KVMTOOL)
+via KVM_CHECK_EXTENSION ioctl.
 
 Signed-off-by: Anup Patel <anup.patel@linaro.org>
 Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
@@ -32,61 +20,20 @@ Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/psci.c | 28 ++++++++++++++++++++++++----
- 1 file changed, 24 insertions(+), 4 deletions(-)
+ arch/arm/kvm/arm.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 1067579..09cf377 100644
---- a/arch/arm/kvm/psci.c
-+++ b/arch/arm/kvm/psci.c
-@@ -37,6 +37,26 @@ static unsigned long psci_affinity_mask(unsigned long affinity_level)
- 	return 0;
- }
- 
-+static unsigned long kvm_psci_vcpu_suspend(struct kvm_vcpu *vcpu)
-+{
-+	/*
-+	 * NOTE: For simplicity, we make VCPU suspend emulation to be
-+	 * same-as WFI (Wait-for-interrupt) emulation.
-+	 *
-+	 * This means for KVM the wakeup events are interrupts and
-+	 * this is consistent with intended use of StateID as described
-+	 * in section 5.4.1 of PSCI v0.2 specification (ARM DEN 0022A).
-+	 *
-+	 * Further, we also treat power-down request to be same as
-+	 * stand-by request as-per section 5.4.2 clause 3 of PSCI v0.2
-+	 * specification (ARM DEN 0022A). This means all suspend states
-+	 * for KVM will preserve the register state.
-+	 */
-+	kvm_vcpu_block(vcpu);
-+
-+	return PSCI_RET_SUCCESS;
-+}
-+
- static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
- {
- 	vcpu->arch.pause = true;
-@@ -183,6 +203,10 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 		 */
- 		val = 2;
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index f0e50a0..3c82b37 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -197,6 +197,7 @@ int kvm_dev_ioctl_check_extension(long ext)
+ 	case KVM_CAP_DESTROY_MEMORY_REGION_WORKS:
+ 	case KVM_CAP_ONE_REG:
+ 	case KVM_CAP_ARM_PSCI:
++	case KVM_CAP_ARM_PSCI_0_2:
+ 		r = 1;
  		break;
-+	case PSCI_0_2_FN_CPU_SUSPEND:
-+	case PSCI_0_2_FN64_CPU_SUSPEND:
-+		val = kvm_psci_vcpu_suspend(vcpu);
-+		break;
- 	case PSCI_0_2_FN_CPU_OFF:
- 		kvm_psci_vcpu_off(vcpu);
- 		val = PSCI_RET_SUCCESS;
-@@ -235,10 +259,6 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 		val = PSCI_RET_INTERNAL_FAILURE;
- 		ret = 0;
- 		break;
--	case PSCI_0_2_FN_CPU_SUSPEND:
--	case PSCI_0_2_FN64_CPU_SUSPEND:
--		val = PSCI_RET_NOT_SUPPORTED;
--		break;
- 	default:
- 		return -EINVAL;
- 	}
+ 	case KVM_CAP_COALESCED_MMIO:
 -- 
 1.8.5.2
