@@ -1,39 +1,44 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 26 May 2014 05:09:30 +0900
-Subject: [PATCH v10 3/3] ARM: dts: Add initial device tree support for
- EXYNOS5410
-In-Reply-To: <537FBA7A.3000605@gmail.com>
-References: <1400841343-6016-1-git-send-email-t.dakhran@samsung.com>
- <1400841343-6016-4-git-send-email-t.dakhran@samsung.com>
- <537FBA7A.3000605@gmail.com>
-Message-ID: <53824DFA.3020407@samsung.com>
+From: vincent.stehle@laposte.net (=?UTF-8?q?Vincent=20Stehl=C3=A9?=)
+Date: Sun, 25 May 2014 23:13:05 +0200
+Subject: [PATCH] serial: efm32: add module_exit
+Message-ID: <1401052385-3786-1-git-send-email-vincent.stehle@laposte.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/24/14 06:15, Tomasz Figa wrote:
-> Hi Tarek,
->
-> On 23.05.2014 12:35, Tarek Dakhran wrote:
->> Add initial device tree nodes for EXYNOS5410 SoC and SMDK5410 board.
->>
->> Signed-off-by: Tarek Dakhran<t.dakhran@samsung.com>
->> Signed-off-by: Vyacheslav Tyrtov<v.tyrtov@samsung.com>
->> ---
->>   arch/arm/boot/dts/Makefile                |    1 +
->>   arch/arm/boot/dts/exynos5410-smdk5410.dts |   82 ++++++++++++
->>   arch/arm/boot/dts/exynos5410.dtsi         |  206 +++++++++++++++++++++++++++++
->>   3 files changed, 289 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
->>   create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
->
-> Looks good. Hopefully we can have this patch applied soon, so it won't
-> get outdated again.
->
-Yes.
+Add missing specification of efm32_uart_exit as module_exit.
 
-Tarek, please respin as soon as possible.
+This fixes the following compilation warning:
 
-> Reviewed-by: Tomasz Figa<t.figa@samsung.com>
->
+  drivers/tty/serial/efm32-uart.c:840:123: warning: ?efm32_uart_exit? defined but not used [-Wunused-function]
 
-- Kukjin
+Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
+Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Greg Kroah-Hartman <gregkh@suse.de>
+Cc: Jiri Slaby <jslaby@suse.cz>
+---
+
+Hi,
+
+This can be seen with e.g. arm allmodconfig.
+
+Best regards,
+
+V.
+
+ drivers/tty/serial/efm32-uart.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/tty/serial/efm32-uart.c b/drivers/tty/serial/efm32-uart.c
+index c167a71..b373f64 100644
+--- a/drivers/tty/serial/efm32-uart.c
++++ b/drivers/tty/serial/efm32-uart.c
+@@ -842,6 +842,7 @@ static void __exit efm32_uart_exit(void)
+ 	platform_driver_unregister(&efm32_uart_driver);
+ 	uart_unregister_driver(&efm32_uart_reg);
+ }
++module_exit(efm32_uart_exit);
+ 
+ MODULE_AUTHOR("Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>");
+ MODULE_DESCRIPTION("EFM32 UART/USART driver");
+-- 
+2.0.0.rc2
