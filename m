@@ -1,63 +1,106 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 25 May 2014 21:22:50 +0200
-Subject: [PATCH 18/22] ARM: sunxi: Introduce Allwinner A23 support
-In-Reply-To: <1400831485-28576-19-git-send-email-wens@csie.org>
+Date: Sun, 25 May 2014 21:39:55 +0200
+Subject: [PATCH 22/22] ARM: sun8i: dt: Add Ippo-q8h v5 support
+In-Reply-To: <1400831485-28576-23-git-send-email-wens@csie.org>
 References: <1400831485-28576-1-git-send-email-wens@csie.org>
- <1400831485-28576-19-git-send-email-wens@csie.org>
-Message-ID: <20140525192250.GY10768@lukather>
+ <1400831485-28576-23-git-send-email-wens@csie.org>
+Message-ID: <20140525193955.GB10768@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 03:51:21PM +0800, Chen-Yu Tsai wrote:
-> The Allwinner A23 is a dual-core Cortex-A7-based SoC. It re-uses most of
-> the IPs found in previous SoCs, notably the A31.
+On Fri, May 23, 2014 at 03:51:25PM +0800, Chen-Yu Tsai wrote:
+> The Ippo-q8h is a tablet circiut board commonly found in cheap Android
+> tablets with A23 SoCs. There are at least 2 versions of the board, with
+> different peripherals, such as WiFi chips.
+> 
+> This patch add supports for v5 of such boards, which has a ESP8089 WiFi
+> chip (not supported) connected to mmc1.
 > 
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  arch/arm/mach-sunxi/Kconfig |  8 ++++++++
->  arch/arm/mach-sunxi/sunxi.c | 12 ++++++++++++
->  2 files changed, 20 insertions(+)
+>  arch/arm/boot/dts/Makefile                  |  2 ++
+>  arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts | 51 +++++++++++++++++++++++++++++
+>  2 files changed, 53 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
 > 
-> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-> index 0fbd4f1..6434e3b 100644
-> --- a/arch/arm/mach-sunxi/Kconfig
-> +++ b/arch/arm/mach-sunxi/Kconfig
-> @@ -35,4 +35,12 @@ config MACH_SUN7I
->  	select HAVE_ARM_ARCH_TIMER
->  	select SUN5I_HSTIMER
->  
-> +config MACH_SUN8I
-> +	bool "Allwinner A23 (sun8i) SoCs support"
-> +	default ARCH_SUNXI
-> +	select ARCH_HAS_RESET_CONTROLLER
-> +	select ARM_GIC
-> +	select MFD_SUN6I_PRCM
-> +	select RESET_CONTROLLER
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 6967393..f809a53 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -354,6 +354,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+>  	sun7i-a20-cubietruck.dtb \
+>  	sun7i-a20-i12-tvbox.dtb \
+>  	sun7i-a20-olinuxino-micro.dtb
+> +dtb-$(CONFIG_MACH_SUN8I) += \
+> +	sun8i-a23-ippo-q8h-v5.dtb
+>  dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+>  	tegra20-iris-512.dtb \
+>  	tegra20-medcom-wide.dtb \
+> diff --git a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
+> new file mode 100644
+> index 0000000..7d0bd97
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
+> @@ -0,0 +1,51 @@
+> +/*
+> + * Copyright 2014 Chen-Yu Tsai
+> + *
+> + * Chen-Yu Tsai <wens@csie.org>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
 > +
->  endif
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> index df906e3..a43b295 100644
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -159,3 +159,15 @@ DT_MACHINE_START(SUN7I_DT, "Allwinner sun7i (A20) Family")
->  	.dt_compat	= sun7i_board_dt_compat,
->  	.restart	= sun4i_restart,
->  MACHINE_END
+> +/dts-v1/;
+> +/include/ "sun8i-a23.dtsi"
 > +
-> +static const char * const sun8i_board_dt_compat[] = {
-> +	"allwinner,sun8i-a23",
-> +	NULL,
+> +/ {
+> +	model = "Ippo Q8H Dual Core Tablet (v5)";
+> +	compatible = "ippo,q8h-v5", "allwinner,sun8i-a23";
+> +
+> +	chosen {
+> +		bootargs = "earlyprintk console=ttyS0,115200";
+> +	};
+
+You should probably add the memory node here too.
+
+> +
+> +	soc at 01c00000 {
+> +		uart0: serial at 01c28000 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&uart0_pins_a>;
+> +			status = "okay";
+> +		};
+> +
+> +		i2c0: i2c at 01c2ac00 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&i2c0_pins_a>;
+> +			status = "okay";
+> +		};
+> +
+> +		i2c1: i2c at 01c2b000 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&i2c1_pins_a>;
+> +			status = "okay";
+> +		};
+
+What are the two i2c busses wired to?
+
+> +		r_uart: serial at 01f02800 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&r_uart_pins_a>;
+> +			status = "okay";
+> +		};
+> +	};
 > +};
 > +
-> +DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23) Family")
-> +	.init_machine	= sunxi_dt_init,
-> +	.init_time	= sun6i_timer_init,
-> +	.dt_compat	= sun8i_board_dt_compat,
-> +	.restart	= sun6i_restart,
-> +MACHINE_END
-
-You should rebase on top of the latest changes that got merged into
-arm-soc, or sunxi-next, most of these functions are gone now.
+> -- 
+> 2.0.0.rc2
+> 
 
 Thanks,
 Maxime
@@ -72,4 +115,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140525/8f107019/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140525/e907aa93/attachment-0001.sig>
