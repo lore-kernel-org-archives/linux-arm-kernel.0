@@ -1,59 +1,52 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 25 May 2014 15:09:31 +0200
-Subject: [PATCH 1/3] dt: Add DT bindings documentation for SUNXI Security
- System
-In-Reply-To: <201405242159.30505.marex@denx.de>
-References: <1400771396-9686-1-git-send-email-clabbe.montjoie@gmail.com>
- <201405242143.42693.marex@denx.de> <5380F85F.7020601@gmail.com>
- <201405242159.30505.marex@denx.de>
-Message-ID: <20140525130931.GI10768@lukather>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Sun, 25 May 2014 18:52:04 +0530
+Subject: [PATCH v2 05/11] ARM: topology: use new cpu_power interface
+In-Reply-To: <1400860385-14555-6-git-send-email-vincent.guittot@linaro.org>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-6-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <5381EE7C.9010809@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 24, 2014 at 09:59:30PM +0200, Marek Vasut wrote:
-> On Saturday, May 24, 2014 at 09:51:59 PM, Tomasz Figa wrote:
-> [...]
-> > >>> Why sun7i-a20 ? Is the crypto unit different in other sunxi chips ? Can
-> > >>> that not be described by DT props ?
-> > >> 
-> > >> A widely used convention is to define compatible strings after first
-> > >> SoCs on which particular IP blocks appear. It is quite common among IP
-> > >> blocks for which there is no well defined versioning scheme.
-> > > 
-> > > Well yeah, that's fine. But in this case, "sun7i" is the entire group of
-> > > CPUs manufactured by AW. I find that information redundant, the
-> > > "allwinner,a20- crypto" would suffice. But I wonder if that IP block
-> > > might have appeared even earlier ? Or if it is CPU family specific, thus
-> > > "allwinner,sun7i-crypto" would be a better string ?
-> > 
-> > I'm not aware of Allwinner naming schemes too much, so please correct me
-> > if I'm wrong, but if A20 implies sun7i, then "allwinner,a20-crypto"
-> > would be better indeed.
-> 
-> True.
-> 
-> > Whether it was really the first SoC is another thing. Obviously this
-> > needs to be checked, although it isn't really that important. For this
-> > particular naming scheme you need to specify all the SoCs for which
-> > given compatible string can be used for this IP anyway, because there is
-> > usually no other source of information about this available (except
-> > directly comparing two datasheets...).
-> 
-> Better get the DT stuff correctly right from the start. That's why I'm asking 
-> what chips contains the IP block, so we can guess the right name.
+Hi Vincent,
 
-The name is fine, please stop this bikeshedding.
+Why do we have two interfaces arch_scale_freq_power() and
+arch_scale_cpu_power()? Does it make sense to consolidate them now ?
 
-Maxime
+Regards
+Preeti U Murthy
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140525/20612c5e/attachment.sig>
+
+On 05/23/2014 09:22 PM, Vincent Guittot wrote:
+> Use the new arch_scale_cpu_power in order to reflect the original capacity of
+> a CPU instead of arch_scale_freq_power which is more linked to a scaling of
+> the capacity linked to the frequency.
+> 
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> ---
+>  arch/arm/kernel/topology.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+> index 71e1fec..6cc25a8 100644
+> --- a/arch/arm/kernel/topology.c
+> +++ b/arch/arm/kernel/topology.c
+> @@ -42,7 +42,7 @@
+>   */
+>  static DEFINE_PER_CPU(unsigned long, cpu_scale);
+> 
+> -unsigned long arch_scale_freq_power(struct sched_domain *sd, int cpu)
+> +unsigned long arch_scale_cpu_power(struct sched_domain *sd, int cpu)
+>  {
+>  	return per_cpu(cpu_scale, cpu);
+>  }
+> @@ -166,7 +166,7 @@ static void update_cpu_power(unsigned int cpu)
+>  	set_power_scale(cpu, cpu_capacity(cpu) / middle_capacity);
+> 
+>  	printk(KERN_INFO "CPU%u: update cpu_power %lu\n",
+> -		cpu, arch_scale_freq_power(NULL, cpu));
+> +		cpu, arch_scale_cpu_power(NULL, cpu));
+>  }
+> 
+>  #else
+> 
