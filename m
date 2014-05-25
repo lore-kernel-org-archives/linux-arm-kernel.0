@@ -1,28 +1,81 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 25 May 2014 23:57:56 +0200
-Subject: [PATCH] serial: efm32: add module_exit
-In-Reply-To: <1401052385-3786-1-git-send-email-vincent.stehle@laposte.net>
-References: <1401052385-3786-1-git-send-email-vincent.stehle@laposte.net>
-Message-ID: <20140525215756.GA18901@pengutronix.de>
+From: bay@hackerdom.ru (Alexander Bersenev)
+Date: Mon, 26 May 2014 04:26:42 +0600
+Subject: [PATCH v8 0/3] ARM: sunxi: Add support for consumer infrared devices
+Message-ID: <1401056805-2218-1-git-send-email-bay@hackerdom.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 25, 2014 at 11:13:05PM +0200, Vincent Stehl? wrote:
-> Add missing specification of efm32_uart_exit as module_exit.
-> 
-> This fixes the following compilation warning:
-> 
->   drivers/tty/serial/efm32-uart.c:840:123: warning: ?efm32_uart_exit? defined but not used [-Wunused-function]
-This warning doesn't occur in my builds, probably because I have
-MODULES=n. I can reproduce it on allmodconfig though.
- 
-> Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+This patch introduces Consumer IR(CIR) support for sunxi boards.
 
-Thanks
-Uwe
+This is based on Alexsey Shestacov's work based on the original driver 
+supplied by Allwinner.
+
+Signed-off-by: Alexander Bersenev <bay@hackerdom.ru>
+Signed-off-by: Alexsey Shestacov <wingrime@linux-sunxi.org>
+
+---
+Changes since version 1: 
+ - Fix timer memory leaks 
+ - Fix race condition when driver unloads while interrupt handler is active
+ - Support Cubieboard 2(need testing)
+
+Changes since version 2:
+- More reliable keydown events
+- Documentation fixes
+- Rename registers accurding to A20 user manual
+- Remove some includes, order includes alphabetically
+- Use BIT macro
+- Typo fixes
+
+Changes since version 3:
+- Split the patch on smaller parts
+- More documentation fixes
+- Add clock-names in DT
+- Use devm_clk_get function to get the clocks
+- Removed gpios property from ir's DT
+- Changed compatible from allwinner,sunxi-ir to allwinner,sun7i-a20-ir in DT
+- Use spin_lock_irq instead spin_lock_irqsave in interrupt handler
+- Add myself in the copyright ;)
+- Coding style and indentation fixes
+
+Changes since version 4:
+- Try to fix indentation errors by sending patches with git send-mail
+
+Changes since version 5:
+- More indentation fixes
+- Make patches pass checkpatch with --strict option
+- Replaced magic numbers with defines(patch by Priit Laes)
+- Fixed oops on loading(patch by Hans de Goede)
+
+Changes since version 6:
+- Removed constants from code
+- Better errrors handling on loading
+- Renamed sunxi-ir.c to sunxi-cir.c
+- Changed description of second commit
+- Order entries in dts and dtsi by register address
+- Code style fixes
+
+Changes since version 7:
+- Removed a couple of blank lines in code
+- Delay interrupts init until we are ready to handle them
+- Increased the reported duration of each pulse by one
+- Refactored defines
+
+Alexander Bersenev (3):
+  ARM: sunxi: Add documentation for sunxi consumer infrared devices
+  [media] rc: add sunxi-ir driver
+  ARM: sunxi: Add IR controller support in DT on A20
+
+ .../devicetree/bindings/media/sunxi-ir.txt         |  23 ++
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        |   6 +
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |   6 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |  32 +++
+ drivers/media/rc/Kconfig                           |  10 +
+ drivers/media/rc/Makefile                          |   1 +
+ drivers/media/rc/sunxi-cir.c                       | 313 +++++++++++++++++++++
+ 7 files changed, 391 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/sunxi-ir.txt
+ create mode 100644 drivers/media/rc/sunxi-cir.c
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.9.3
