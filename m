@@ -1,43 +1,52 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 25 May 2014 13:29:06 -0400
-Subject: [PATCH for v3.15 0/2] ARM: mvebu Specificy ECC scheme for
- A375/385 boards
-In-Reply-To: <1400941030-2123-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1400941030-2123-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140525172906.GL8664@titan.lakedaemon.net>
+Date: Sun, 25 May 2014 13:36:37 -0400
+Subject: [GIT PULL] ARM: mvebu: DT fix for v3.16-rc1
+Message-ID: <20140525173637.GM8664@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 24, 2014 at 11:17:08AM -0300, Ezequiel Garcia wrote:
-> Last minute fixes, which help prevent any inconsistencies between the ECC
-> scheme expected by the bootloader, and the one expected by the kernel.
-> 
-> Until now, the kernel was using the ONFI-provided "datasheet ECC requirement",
-> and assume the bootloader did the same thing. However, this is not the case
-> for these boards, where the vendor provided a bootloader with an ECC strength
-> that's weaker than the required.
-> 
-> After the introduction of the NAND ECC devicetree binding, and its support
-> in the pxa3xx-nand driver, we can set these values and expect them to work.
-> 
-> I hope it's not too late for v3.15 already.
-> 
-> Ezequiel Garcia (2):
->   ARM: dts: Specify the NAND ECC scheme explicitly on Armada 375 DB
->     board
->   ARM: dts: Specify the NAND ECC scheme explicitly on Armada 385 DB
->     board
-> 
->  arch/arm/boot/dts/armada-375-db.dts | 2 ++
->  arch/arm/boot/dts/armada-385-db.dts | 2 ++
->  2 files changed, 4 insertions(+)
+Guys,
 
-As discussed on irc, I'm pushing this for v3.16 right now.  If we later
-determine that it needs to be in v3.15, we can send a stable request for
-these patches.
+This is a small fix for some new code going in to v3.16.  Apparently,
+there's a mis-match between what the bootloader assumes wrt NAND ECC
+settings and what the ONFI spec says.  To prevent woe and discontent, we
+need to explicitly state the ECC settings in the dts files.
 
-Applied to mvebu/dt for v3.16
+At the time of this writing, this hasn't been in -next yet.  I imagine
+it'll be a few days before you pull this, so I wanted you to be aware
+asap.  These changes are set to be in -next from tonight onwards.
+
+As usual, this is an incremental pull request from tags/mvebu-dt-3.16-2
+up to tags/mvebu-dt-3.16-3 in the mvebu/dt branch.
+
+Please pull.
 
 thx,
 
 Jason.
+
+The following changes since commit 599a136e5f4a7c3ca324fb2749ca235cd90c9d51:
+
+  ARM: dts: kirkwood: add kirkwood-km_fixedeth DTS file (2014-05-16 17:57:27 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.16-3
+
+for you to fetch changes up to 54aab8845c46b0f87947107cdc67c8ed7062a5bb:
+
+  ARM: dts: Specify the NAND ECC scheme explicitly on Armada 385 DB board (2014-05-25 17:14:37 +0000)
+
+----------------------------------------------------------------
+mvebu DT changes for v3.16 (incremental #3)
+
+ - Armada 375/38x NAND ECC fix for v3.16-rc1
+
+----------------------------------------------------------------
+Ezequiel Garcia (2):
+      ARM: dts: Specify the NAND ECC scheme explicitly on Armada 375 DB board
+      ARM: dts: Specify the NAND ECC scheme explicitly on Armada 385 DB board
+
+ arch/arm/boot/dts/armada-375-db.dts | 2 ++
+ arch/arm/boot/dts/armada-385-db.dts | 2 ++
+ 2 files changed, 4 insertions(+)
