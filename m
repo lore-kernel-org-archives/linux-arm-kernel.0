@@ -1,35 +1,42 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 25 May 2014 13:12:11 -0400
-Subject: [PATCH v3 0/2] irqchip: Broadcom Set Top Box Level-2 interrupt
- controller
-In-Reply-To: <1400892054-24457-1-git-send-email-f.fainelli@gmail.com>
-References: <1400892054-24457-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20140525171211.GK8664@titan.lakedaemon.net>
+Date: Sun, 25 May 2014 13:29:06 -0400
+Subject: [PATCH for v3.15 0/2] ARM: mvebu Specificy ECC scheme for
+ A375/385 boards
+In-Reply-To: <1400941030-2123-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1400941030-2123-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140525172906.GL8664@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 05:40:52PM -0700, Florian Fainelli wrote:
-> Hi Thomas, Jason,
+On Sat, May 24, 2014 at 11:17:08AM -0300, Ezequiel Garcia wrote:
+> Last minute fixes, which help prevent any inconsistencies between the ECC
+> scheme expected by the bootloader, and the one expected by the kernel.
 > 
-> This patch set adds an irqchip driver for the Broadcom Set Top Box Level-2
-> interrupt controller hardware, as well as a corresponding Device Tree binding
-> document.
+> Until now, the kernel was using the ONFI-provided "datasheet ECC requirement",
+> and assume the bootloader did the same thing. However, this is not the case
+> for these boards, where the vendor provided a bootloader with an ECC strength
+> that's weaker than the required.
 > 
-> Thanks!
+> After the introduction of the NAND ECC devicetree binding, and its support
+> in the pxa3xx-nand driver, we can set these values and expect them to work.
 > 
-> Florian Fainelli (2):
->   irqchip: add Broadcom Set Top Box Level-2 interrupt controller
->   Documentation: add Broadcom STB Level-2 interrupt controller binding
+> I hope it's not too late for v3.15 already.
 > 
->  .../bindings/interrupt-controller/brcm,l2-intc.txt |  29 +++
->  drivers/irqchip/Kconfig                            |   6 +
->  drivers/irqchip/Makefile                           |   1 +
->  drivers/irqchip/irq-brcmstb-l2.c                   | 231 +++++++++++++++++++++
->  4 files changed, 267 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/brcm,l2-intc.txt
->  create mode 100644 drivers/irqchip/irq-brcmstb-l2.c
+> Ezequiel Garcia (2):
+>   ARM: dts: Specify the NAND ECC scheme explicitly on Armada 375 DB
+>     board
+>   ARM: dts: Specify the NAND ECC scheme explicitly on Armada 385 DB
+>     board
+> 
+>  arch/arm/boot/dts/armada-375-db.dts | 2 ++
+>  arch/arm/boot/dts/armada-385-db.dts | 2 ++
+>  2 files changed, 4 insertions(+)
 
-Applied to irqchip/core
+As discussed on irc, I'm pushing this for v3.16 right now.  If we later
+determine that it needs to be in v3.15, we can send a stable request for
+these patches.
+
+Applied to mvebu/dt for v3.16
 
 thx,
 
