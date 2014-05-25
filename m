@@ -1,550 +1,1174 @@
-From: clabbe.montjoie@gmail.com (Corentin LABBE)
-Date: Sun, 25 May 2014 13:58:39 +0200
-Subject: [PATCH 3/3] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <201405241400.03456.marex@denx.de>
-References: <1400771396-9686-1-git-send-email-clabbe.montjoie@gmail.com>
- <1400771396-9686-4-git-send-email-clabbe.montjoie@gmail.com>
- <201405241400.03456.marex@denx.de>
-Message-ID: <5381DAEF.20007@gmail.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Sun, 25 May 2014 20:25:27 +0800
+Subject: [PATCH 3/3] net: hisilicon: add hix5hd2 mac driver
+In-Reply-To: <1400504227-12047-4-git-send-email-zhangfei.gao@linaro.org>
+References: <1400504227-12047-1-git-send-email-zhangfei.gao@linaro.org>
+ <1400504227-12047-4-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <5381E137.50902@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 24/05/2014 14:00, Marek Vasut a ?crit :
-> On Thursday, May 22, 2014 at 05:09:56 PM, LABBE Corentin wrote:
-> 
-> Do I have to repeat myself ? :)
 
-No, sorry for the commit message, I begin to use git
-Generally I agree all your remarks with some comments below.
+Any comments, thanks a lot.
 
-> 
->> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
->> ---
->>  drivers/crypto/Kconfig    |   49 ++
->>  drivers/crypto/Makefile   |    1 +
->>  drivers/crypto/sunxi-ss.c | 1476
->> +++++++++++++++++++++++++++++++++++++++++++++ 3 files changed, 1526
->> insertions(+)
->>  create mode 100644 drivers/crypto/sunxi-ss.c
->>
->> diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
->> index 03ccdb0..5ea0922 100644
->> --- a/drivers/crypto/Kconfig
->> +++ b/drivers/crypto/Kconfig
->> @@ -418,4 +418,53 @@ config CRYPTO_DEV_MXS_DCP
->>  	  To compile this driver as a module, choose M here: the module
->>  	  will be called mxs-dcp.
->>
->> +config CRYPTO_DEV_SUNXI_SS
->> +        tristate "Support for Allwinner Security System cryptographic
->> accelerator" +        depends on ARCH_SUNXI
->> +        help
->> +          Some Allwinner processors have a crypto accelerator named
->> +          Security System. Select this if you want to use it.
->> +
->> +          To compile this driver as a module, choose M here: the module
->> +          will be called sunxi-ss.
->> +
->> +if CRYPTO_DEV_SUNXI_SS
->> +config CRYPTO_DEV_SUNXI_SS_PRNG
->> +	bool "Security System PRNG"
->> +	select CRYPTO_RNG2
->> +	help
->> +	  If you enable this option, the SS will provide a pseudo random
->> +	  number generator.
->> +config CRYPTO_DEV_SUNXI_SS_MD5
->> +	bool "Security System MD5"
->> +	select CRYPTO_MD5
->> +	help
->> +	  If you enable this option, the SS will provide MD5 hardware
->> +	  acceleration.
-> 
-> This is one IP block and it provides 5 algorithms. Put it under one config 
-> option please.
-
-I want to let the user choose what it want to be used. Someone could want only to accelerate md5 and to not use the PRNG.
-Lots of other hw crypto driver do the same.
-
-> 
-> Also, just shorted this to CONFIG_CRYPTO_SUNXI_SS , the _DEV stuff in the name 
-> is useless.
-
-I think not, most of cryptographic hardware driver begin with CRYPTO_DEV (CRYPTO_DEV_PADLOCK, CRYPTO_DEV_GEODE, CRYPTO_DEV_TALITOS etc...), only S390 does not have a _DEV.
-
-,
-> 
-> [...]
-> 
->> diff --git a/drivers/crypto/sunxi-ss.c b/drivers/crypto/sunxi-ss.c
->> new file mode 100644
->> index 0000000..bbf57bc
->> --- /dev/null
->> +++ b/drivers/crypto/sunxi-ss.c
->> @@ -0,0 +1,1476 @@
->> +/*
->> + * sunxi-ss.c - hardware cryptographic accelerator for Allwinner A20 SoC
-> 
-> Why can this not be generic Allwinner-all-chips driver ? Does the IP block 
-> change that dramatically between the chips?
-
-As I said in my introduction email, lots of allwinner chips seems to have the same crypto device.
-But since I do not own any of those hardware, and in most case does not have a datasheet, I only assume support for A20.
-I will add this comment in the header of the driver.
-
-> 
-> [...]
-> 
->> +#ifdef CONFIG_CRYPTO_DEV_SUNXI_SS_MD5
->> +#include <crypto/md5.h>
->> +#define SUNXI_SS_HASH_COMMON
->> +#endif
->> +#ifdef CONFIG_CRYPTO_DEV_SUNXI_SS_SHA1
->> +#include <crypto/sha.h>
->> +#define SUNXI_SS_HASH_COMMON
->> +#endif
->> +#ifdef SUNXI_SS_HASH_COMMON
->> +#include <crypto/hash.h>
->> +#include <crypto/internal/hash.h>
->> +#endif
->> +#ifdef CONFIG_CRYPTO_DEV_SUNXI_SS_AES
->> +#include <crypto/aes.h>
->> +#endif
->> +
->> +#ifdef CONFIG_CRYPTO_DEV_SUNXI_SS_3DES
->> +#define SUNXI_SS_DES
->> +#endif
->> +#ifdef CONFIG_CRYPTO_DEV_SUNXI_SS_DES
->> +#define SUNXI_SS_DES
->> +#endif
->> +#ifdef SUNXI_SS_DES
->> +#include <crypto/des.h>
->> +#endif
-> 
-> Please discard this mayhem when getting rid of all the configuration option.
-> 
->> +#ifdef CONFIG_CRYPTO_DEV_SUNXI_SS_PRNG
->> +#include <crypto/internal/rng.h>
->> +
->> +struct prng_context {
->> +	u8 seed[192/8];
->> +	unsigned int slen;
->> +};
->> +#endif
->> +
->> +#define SUNXI_SS_CTL            0x00
->> +#define SUNXI_SS_KEY0           0x04
->> +#define SUNXI_SS_KEY1           0x08
->> +#define SUNXI_SS_KEY2           0x0C
->> +#define SUNXI_SS_KEY3           0x10
->> +#define SUNXI_SS_KEY4           0x14
->> +#define SUNXI_SS_KEY5           0x18
->> +#define SUNXI_SS_KEY6           0x1C
->> +#define SUNXI_SS_KEY7           0x20
->> +
->> +#define SUNXI_SS_IV0            0x24
->> +#define SUNXI_SS_IV1            0x28
->> +#define SUNXI_SS_IV2            0x2C
->> +#define SUNXI_SS_IV3            0x30
->> +
->> +#define SUNXI_SS_CNT0           0x34
->> +#define SUNXI_SS_CNT1           0x38
->> +#define SUNXI_SS_CNT2           0x3C
->> +#define SUNXI_SS_CNT3           0x40
->> +
->> +#define SUNXI_SS_FCSR           0x44
->> +#define SUNXI_SS_ICSR           0x48
->> +
->> +#define SUNXI_SS_MD0            0x4C
->> +#define SUNXI_SS_MD1            0x50
->> +#define SUNXI_SS_MD2            0x54
->> +#define SUNXI_SS_MD3            0x58
->> +#define SUNXI_SS_MD4            0x5C
->> +
->> +#define SS_RXFIFO         0x200
->> +#define SS_TXFIFO         0x204
-> 
-> You don't have much consistency in the register naming scheme, please fix this 
-> somehow. I suppose renaming the SS_[RT]XFIFO registers to SUNXI_SS_[RT]XFIFO is 
-> a good idea.
-> 
->> +/* SUNXI_SS_CTL configuration values */
->> +
->> +/* AES/DES/3DES key select - bits 24-27 */
->> +#define SUNXI_SS_KEYSELECT_KEYN		(0 << 24)
-> 
-> Uh oh , you ORR some values with this flag, which is always zero. This seems 
-> broken.
-> 
-> [...]
-> 
->> +/* SS Method - bits 4-6 */
->> +#define SUNXI_OP_AES                    (0 << 4)
->> +#define SUNXI_OP_DES                    (1 << 4)
->> +#define SUNXI_OP_3DES                   (2 << 4)
->> +#define SUNXI_OP_SHA1                   (3 << 4)
->> +#define SUNXI_OP_MD5                    (4 << 4)
->> +#define SUNXI_OP_PRNG                   (5 << 4)
->> +
->> +/* Data end bit - bit 2 */
->> +#define SUNXI_SS_DATA_END               BIT(2)
-> 
-> Please use the BIT() macros in consistent fashion. Either use it or don't use it 
-> (I'd much rather see it not used), but don't mix the stuff :-(
-> 
-> [...]
-> 
->> +/* General notes:
->> + * I cannot use a key/IV cache because each time one of these change ALL
->> stuff + * need to be re-writed.
->> + * And for example, with dm-crypt IV changes on each request.
->> + *
->> + * After each request the device must be disabled.
-> 
-> This really isn't quite clear, can you please expand the comment so it's more 
-> understandtable ?
-> 
->> + * For performance reason, we use writel_relaxed/read_relaxed for all
->> + * operations on RX and TX FIFO.
->> + * For all other registers, we use writel.
->> + * See http://permalink.gmane.org/gmane.linux.ports.arm.kernel/117644
->> + * and http://permalink.gmane.org/gmane.linux.ports.arm.kernel/117640
->> + * */
-> 
-> I will not review the algos, they need to be AHASH/ABLKCIPHER algos. See the 
-> reasoning further down below.
-> 
-> [...]
-> 
->> +/*========================================================================
->> ====*/
->> +/*=======================================================================
->> =====*/ +static struct crypto_alg sunxi_des3_alg = {
->> +	.cra_name = "cbc(des3_ede)",
->> +	.cra_driver_name = "cbc-des3-sunxi-ss",
->> +	.cra_priority = 300,
->> +	.cra_blocksize = DES3_EDE_BLOCK_SIZE,
->> +	.cra_flags = CRYPTO_ALG_TYPE_BLKCIPHER,
-> 
-> This must be rewritten to be ABLKCIPHER.
-> 
->> +	.cra_ctxsize = sizeof(struct sunxi_req_ctx),
->> +	.cra_module = THIS_MODULE,
->> +	.cra_type = &crypto_blkcipher_type,
->> +	.cra_init = sunxi_des_init,
->> +	.cra_exit = sunxi_des_exit,
->> +	.cra_alignmask = 3,
->> +	.cra_u.blkcipher = {
->> +		.min_keysize    = DES3_EDE_KEY_SIZE,
->> +		.max_keysize    = DES3_EDE_KEY_SIZE,
->> +		.ivsize         = 8,
->> +		.setkey         = sunxi_des3_setkey,
->> +		.encrypt        = sunxi_des3_cbc_encrypt,
->> +		.decrypt        = sunxi_des3_cbc_decrypt,
->> +	}
->> +};
->> +
->> +#endif /* CONFIG_CRYPTO_DEV_SUNXI_SS_3DES */
->> +
->> +#ifdef CONFIG_CRYPTO_DEV_SUNXI_SS_PRNG
->> +/*========================================================================
->> ====*/
->> +/*=======================================================================
->> =====*/ +static int sunxi_ss_rng_get_random(struct crypto_rng *tfm, u8
->> *rdata, +		unsigned int dlen)
->> +{
->> +	struct prng_context *ctx = crypto_tfm_ctx((struct crypto_tfm *)tfm);
-> 
-> Use crypto_rng_ctx() here . The cast is plain wrong. I know it works due to how 
-> the structures are defined, but this is not right.
-> 
->> +	unsigned int i;
->> +	u32 mode = 0;
->> +	u32 v;
->> +
->> +	dev_dbg(ss_ctx->dev, "DEBUG %s dlen=%u\n", __func__, dlen);
->> +
->> +	if (dlen == 0 || rdata == NULL)
->> +		return 0;
-> 
-> Return -EINVAL or somesuch here, no?
-> 
->> +	mode |= SUNXI_OP_PRNG;
->> +	mode |= SUNXI_PRNG_ONESHOT;
->> +	mode |= SUNXI_SS_ENABLED;
->> +
->> +	mutex_lock(&lock);
->> +	writel(mode, ss_ctx->base + SUNXI_SS_CTL);
->> +
->> +	for (i = 0; i < ctx->slen; i += 4) {
->> +		v = *(u32 *)(ctx->seed + i);
-> 
-> Define the .seed field as u32 if you actually want to access it as u32. You are 
-> very lucky you didn't trigger alignment faults with this yet.
-> 
->> +		dev_dbg(ss_ctx->dev, "DEBUG Seed %d %x\n", i, v);
->> +	}
-> 
-> But this debug instrumentation looks quite useless anyway.
-
-As I said in my introduction mail, I cannot get PRNG to work, so it is the reason of lots of dev_dbg()
-Anyway, I will remove them.
-
-> 
->> +	for (i = 0; i < ctx->slen && i < 192/8 && i < 16; i += 4) {
->> +		v = *(u32 *)(ctx->seed + i);
->> +		dev_dbg(ss_ctx->dev, "DEBUG Seed %d %x\n", i, v);
->> +		writel(v, ss_ctx->base + SUNXI_SS_KEY0 + i);
->> +	}
->> +
->> +	mode |= SUNXI_PRNG_START;
->> +	writel(mode, ss_ctx->base + SUNXI_SS_CTL);
->> +	for (i = 0; i < 4; i++) {
->> +		v = readl(ss_ctx->base + SUNXI_SS_CTL);
->> +		dev_dbg(ss_ctx->dev, "DEBUG CTL %x %x\n", mode, v);
->> +	}
->> +	for (i = 0; i < dlen && i < 160 / 8; i += 4) {
->> +		v = readl(ss_ctx->base + SUNXI_SS_MD0 + i);
->> +		*(u32 *)(rdata + i) = v;
->> +		dev_dbg(ss_ctx->dev, "DEBUG MD%d %x\n", i, v);
->> +	}
-> 
-> Drop the debug instrumentation and define the seed buffer as u32.
-> 
->> +	writel(0, ss_ctx->base + SUNXI_SS_CTL);
->> +	mutex_unlock(&lock);
->> +	return dlen;
->> +}
->> +
->> +/*========================================================================
->> ====*/
->> +/*=======================================================================
->> =====*/ +static int sunxi_ss_rng_reset(struct crypto_rng *tfm, u8 *seed,
->> +		unsigned int slen)
->> +{
->> +	struct prng_context *ctx = crypto_tfm_ctx((struct crypto_tfm *)tfm);
-> 
-> Use crypto_rng_ctx() here . The cast is plain wrong.
-> 
->> +	dev_dbg(ss_ctx->dev, "DEBUG %s slen=%u\n", __func__, slen);
->> +	memcpy(ctx->seed, seed, slen);
->> +	ctx->slen = slen;
->> +	return 0;
->> +}
-> 
-> [...]
-> 
->> +static int sunxi_ss_probe(struct platform_device *pdev)
->> +{
->> +	struct resource *res;
->> +	u32 v;
->> +	int err;
->> +	unsigned long cr;
->> +
->> +	if (!pdev->dev.of_node)
->> +		return -ENODEV;
->> +
->> +	memset(ss_ctx, 0, sizeof(struct sunxi_ss_ctx));
-> 
-> Static data are always zeroed out by default, no ?
-> 
-> If you just so accidentally happen to probe() this driver twice, you will get 
-> some seriously ugly surprise here, since you zero the data out without checking 
-> if the device might have already been probed. A much better idea would be to
-> define a static struct sunxi_ss_ctx *ss_ctx; and then
-> 
->  if (ss_ctx) {
->   dev_err(&pdev->dev, "Only one instance allowed");
->   return -ENODEV;
->  }
->  ss_ctx = devm_kzalloc(&pdev->dev, sizeof(*ss_ctx), GFP_KERNEL);
-> 
-> Also note the use of sizeof(*ss_ctx), this will allow for this line to not be 
-> changed in case the type of *ss_ctx ever changes in the future. So use it.
-> 
->> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	if (res == NULL) {
->> +		dev_err(&pdev->dev, "Cannot get the MMIO ressource\n");
->> +		/* TODO PTR_ERR ? */
-> 
-> Fix the TODOs .
-> 
->> +		return -ENXIO;
->> +	}
->> +	ss_ctx->base = devm_ioremap_resource(&pdev->dev, res);
->> +	if (IS_ERR(ss_ctx->base)) {
->> +		dev_err(&pdev->dev, "Cannot request MMIO\n");
->> +		return PTR_ERR(ss_ctx->base);
->> +	}
-> 
-> Actually, this is the pattern. You don't need to check for IS_ERR(res) before 
-> calling devm_ioremap_resource().
-> 
-> res = platform_get_resource();
-> base = devm_ioremap_resource(&pdev->dev, res)
-> if (IS_ERR(base))
->  return PTR_ERR(base);
-> 
->> +	/* TODO Does this information could be usefull ? */
->> +	writel(SUNXI_SS_ENABLED, ss_ctx->base + SUNXI_SS_CTL);
->> +	v = readl(ss_ctx->base + SUNXI_SS_CTL);
->> +	v >>= 16;
->> +	v &= 0x07;
->> +	dev_info(&pdev->dev, "Die ID %d\n", v);
->> +	writel(0, ss_ctx->base + SUNXI_SS_CTL);
-> 
-> You are configuring hardware before enabling clock for that hardware. That does 
-> not seem right.
-> 
->> +	ss_ctx->ssclk = devm_clk_get(&pdev->dev, "mod");
->> +	if (IS_ERR(ss_ctx->ssclk)) {
->> +		err = PTR_ERR(ss_ctx->ssclk);
->> +		dev_err(&pdev->dev, "Cannot get SS clock err=%d\n", err);
->> +		return err;
->> +	}
->> +	dev_dbg(&pdev->dev, "clock ss acquired\n");
->> +
->> +	ss_ctx->busclk = devm_clk_get(&pdev->dev, "ahb");
->> +	if (IS_ERR(ss_ctx->busclk)) {
->> +		err = PTR_ERR(ss_ctx->busclk);
->> +		dev_err(&pdev->dev, "Cannot get AHB SS clock err=%d\n", err);
->> +		return err;
->> +	}
->> +	dev_dbg(&pdev->dev, "clock ahb_ss acquired\n");
-> 
-> These dev_dbg() aren't really useful.
-> 
->> +	/* Enable the clocks */
->> +	err = clk_prepare_enable(ss_ctx->busclk);
->> +	if (err != 0) {
->> +		dev_err(&pdev->dev, "Cannot prepare_enable busclk\n");
->> +		return err;
->> +	}
->> +	err = clk_prepare_enable(ss_ctx->ssclk);
->> +	if (err != 0) {
->> +		dev_err(&pdev->dev, "Cannot prepare_enable ssclk\n");
->> +		clk_disable_unprepare(ss_ctx->busclk);
->> +		return err;
->> +	}
->> +
->> +#define	SUNXI_SS_CLOCK_RATE_BUS (24 * 1000 * 1000)
->> +#define	SUNXI_SS_CLOCK_RATE_SS (150 * 1000 * 1000)
-> 
-> Make this const unsigned long or somesuch, the define is horrid and not 
-> typesafe.
-> 
->> +	/* Check that clock have the correct rates gived in the datasheet */
->> +	cr = clk_get_rate(ss_ctx->busclk);
->> +	if (cr >= SUNXI_SS_CLOCK_RATE_BUS)
->> +		dev_dbg(&pdev->dev, "Clock bus %lu (%lu MHz) (must be >= %u)\n",
->> +				cr, cr / 1000000, SUNXI_SS_CLOCK_RATE_BUS);
->> +	else
->> +		dev_warn(&pdev->dev, "Clock bus %lu (%lu MHz) (must be >= 
-> %u)\n",
->> +				cr, cr / 1000000, SUNXI_SS_CLOCK_RATE_BUS);
->> +	cr = clk_get_rate(ss_ctx->ssclk);
->> +	if (cr == SUNXI_SS_CLOCK_RATE_SS)
->> +		dev_dbg(&pdev->dev, "Clock ss %lu (%lu MHz) (must be <= %u)\n",
->> +				cr, cr / 1000000, SUNXI_SS_CLOCK_RATE_SS);
->> +	else {
->> +		dev_warn(&pdev->dev, "Clock ss is at %lu (%lu MHz) (must be <= 
-> %u)\n",
->> +				cr, cr / 1000000, SUNXI_SS_CLOCK_RATE_SS);
->> +		/* Try to set the clock to the maximum allowed */
->> +		err = clk_set_rate(ss_ctx->ssclk, SUNXI_SS_CLOCK_RATE_SS);
->> +		if (err != 0) {
->> +			dev_err(&pdev->dev, "Cannot set clock rate to ssclk\n");
->> +			goto label_error_clock;
->> +		}
->> +		cr = clk_get_rate(ss_ctx->ssclk);
->> +		dev_info(&pdev->dev, "Clock ss set to %lu (%lu MHz) (must be >= 
-> %u)\n",
->> +				cr, cr / 1000000, SUNXI_SS_CLOCK_RATE_BUS);
->> +	}
-> 
-> Just run clk_set_rate() for both and be done with it.
-> 
->> +	ss_ctx->buf_in = NULL;
->> +	ss_ctx->buf_in_size = 0;
->> +	ss_ctx->buf_out = NULL;
->> +	ss_ctx->buf_out_size = 0;
-> 
-> This is useless, you already did that with devm_kzalloc() above.
-> 
->> +	ss_ctx->dev = &pdev->dev;
->> +
->> +	mutex_init(&lock);
->> +
->> +#ifdef CONFIG_CRYPTO_DEV_SUNXI_SS_PRNG
->> +	err = crypto_register_alg(&sunxi_ss_prng);
-> 
-> Use crypto_register_algs() when you get rid of those useless #defines for each 
-> algo.
-> 
->> +	if (err) {
->> +		dev_err(&pdev->dev, "crypto_register_alg error\n");
->> +		goto label_error_prng;
->> +	} else {
->> +		dev_info(&pdev->dev, "Registred PRNG\n");
-> 
-> This is useless, you can always check that the thing was probed via /proc/crypto 
-> . Please remove this dev_into().
-> 
->> +	}
->> +#endif
->> +
->> +#ifdef CONFIG_CRYPTO_DEV_SUNXI_SS_MD5
->> +	err = crypto_register_shash(&sunxi_md5_alg);
-> 
-> Do not use shash for such device. This is clearly and ahash (and async in 
-> general) device. The rule of a thumb here is that you use sync algos only for 
-> devices which have dedicated instructions for computing the transformation. For 
-> devices which are attached to some kind of bus, you use async algos (ahash etc).
-> 
->> +	if (err) {
->> +		dev_err(&pdev->dev, "Fail to register MD5\n");
->> +		goto label_error_md5;
->> +	} else {
->> +		dev_info(&pdev->dev, "Registred MD5\n");
->> +	}
->> +#endif
->> +#ifdef CONFIG_CRYPTO_DEV_SUNXI_SS_SHA1
->> +	err = crypto_register_shash(&sunxi_sha1_alg);
-> 
-> DTTO.
-> 
-> I am preparing a document for the crypto API, drop me a PM if you want the 
-> preliminary version. I don't want to release it until it's more complete as it 
-> will only produce more confusion throughout the crypto API than there already 
-> is.
-> 
-> [...]
-> 
->> +static const struct of_device_id a20ss_crypto_of_match_table[] = {
->> +	{ .compatible = "allwinner,sun7i-a20-crypto" },
->> +	{}
->> +};
->> +MODULE_DEVICE_TABLE(of, a20ss_crypto_of_match_table);
-> 
-> If possible, scrub the a20 nonsense.
-> 
->> +static struct platform_driver sunxi_ss_driver = {
->> +	.probe          = sunxi_ss_probe,
->> +	.remove         = sunxi_ss_remove,
->> +	.driver         = {
->> +		.owner          = THIS_MODULE,
->> +		.name           = "sunxi-ss",
->> +		.of_match_table	= a20ss_crypto_of_match_table,
->> +	},
->> +};
->> +
->> +module_platform_driver(sunxi_ss_driver);
->> +
->> +MODULE_DESCRIPTION("Allwinner Security System crypto accelerator");
->> +MODULE_LICENSE("GPL");
->> +MODULE_AUTHOR("Corentin LABBE <clabbe.montjoie@gmail.com>");
-> 
-> MODULE_ALIAS is missing I think.
-> 
-
-Thanks for your review.
+On 05/19/2014 08:57 PM, Zhangfei Gao wrote:
+> Add support for the hix5hd2 XGMAC 1Gb ethernet device.
+> The controller requires two queues for tx and two queues for rx.
+> Controller fetch buffer from free queue and then push to used queue.
+> Diver should prepare free queue and free buffer from used queue.
+>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> ---
+>   drivers/net/ethernet/Kconfig             |    1 +
+>   drivers/net/ethernet/Makefile            |    1 +
+>   drivers/net/ethernet/hisilicon/Kconfig   |   27 +
+>   drivers/net/ethernet/hisilicon/Makefile  |    5 +
+>   drivers/net/ethernet/hisilicon/hix5hd2.c | 1068 ++++++++++++++++++++++++++++++
+>   5 files changed, 1102 insertions(+)
+>   create mode 100644 drivers/net/ethernet/hisilicon/Kconfig
+>   create mode 100644 drivers/net/ethernet/hisilicon/Makefile
+>   create mode 100644 drivers/net/ethernet/hisilicon/hix5hd2.c
+>
+> diff --git a/drivers/net/ethernet/Kconfig b/drivers/net/ethernet/Kconfig
+> index 39b26fe..0fbdeb1 100644
+> --- a/drivers/net/ethernet/Kconfig
+> +++ b/drivers/net/ethernet/Kconfig
+> @@ -55,6 +55,7 @@ source "drivers/net/ethernet/neterion/Kconfig"
+>   source "drivers/net/ethernet/faraday/Kconfig"
+>   source "drivers/net/ethernet/freescale/Kconfig"
+>   source "drivers/net/ethernet/fujitsu/Kconfig"
+> +source "drivers/net/ethernet/hisilicon/Kconfig"
+>   source "drivers/net/ethernet/hp/Kconfig"
+>   source "drivers/net/ethernet/ibm/Kconfig"
+>   source "drivers/net/ethernet/intel/Kconfig"
+> diff --git a/drivers/net/ethernet/Makefile b/drivers/net/ethernet/Makefile
+> index 545d0b3..dc78996 100644
+> --- a/drivers/net/ethernet/Makefile
+> +++ b/drivers/net/ethernet/Makefile
+> @@ -30,6 +30,7 @@ obj-$(CONFIG_NET_VENDOR_EXAR) += neterion/
+>   obj-$(CONFIG_NET_VENDOR_FARADAY) += faraday/
+>   obj-$(CONFIG_NET_VENDOR_FREESCALE) += freescale/
+>   obj-$(CONFIG_NET_VENDOR_FUJITSU) += fujitsu/
+> +obj-$(CONFIG_NET_VENDOR_HISILICON) += hisilicon/
+>   obj-$(CONFIG_NET_VENDOR_HP) += hp/
+>   obj-$(CONFIG_NET_VENDOR_IBM) += ibm/
+>   obj-$(CONFIG_NET_VENDOR_INTEL) += intel/
+> diff --git a/drivers/net/ethernet/hisilicon/Kconfig b/drivers/net/ethernet/hisilicon/Kconfig
+> new file mode 100644
+> index 0000000..da144fc
+> --- /dev/null
+> +++ b/drivers/net/ethernet/hisilicon/Kconfig
+> @@ -0,0 +1,27 @@
+> +#
+> +# HISILICON device configuration
+> +#
+> +
+> +config NET_VENDOR_HISILICON
+> +	bool "Hisilicon devices"
+> +	default y
+> +	depends on ARM
+> +	---help---
+> +	  If you have a network (Ethernet) card belonging to this class, say Y
+> +	  and read the Ethernet-HOWTO, available from
+> +	  <http://www.tldp.org/docs.html#howto>.
+> +
+> +	  Note that the answer to this question doesn't directly affect the
+> +	  kernel: saying N will just cause the configurator to skip all
+> +	  the questions about Hisilicon devices. If you say Y, you will be asked
+> +	  for your specific card in the following questions.
+> +
+> +if NET_VENDOR_HISILICON
+> +
+> +config HIX5HD2_GMAC
+> +	tristate "Hisilicon X5HD2 Family Network Device Support"
+> +	select PHYLIB
+> +	help
+> +	  This selects the hix5hd2 mac family network device.
+> +
+> +endif # NET_VENDOR_HISILICON
+> diff --git a/drivers/net/ethernet/hisilicon/Makefile b/drivers/net/ethernet/hisilicon/Makefile
+> new file mode 100644
+> index 0000000..9f6e71a
+> --- /dev/null
+> +++ b/drivers/net/ethernet/hisilicon/Makefile
+> @@ -0,0 +1,5 @@
+> +#
+> +# Makefile for the HISILICON network device drivers.
+> +#
+> +
+> +obj-$(CONFIG_HIX5HD2_GMAC) += hix5hd2.o
+> diff --git a/drivers/net/ethernet/hisilicon/hix5hd2.c b/drivers/net/ethernet/hisilicon/hix5hd2.c
+> new file mode 100644
+> index 0000000..f37e893
+> --- /dev/null
+> +++ b/drivers/net/ethernet/hisilicon/hix5hd2.c
+> @@ -0,0 +1,1068 @@
+> +/* Copyright (c) 2014 Linaro Ltd.
+> + * Copyright (c) 2014 Hisilicon Limited.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/etherdevice.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/of_net.h>
+> +#include <linux/of_mdio.h>
+> +#include <linux/clk.h>
+> +#include <linux/circ_buf.h>
+> +
+> +#define STATION_ADDR_LOW		0x0000
+> +#define STATION_ADDR_HIGH		0x0004
+> +#define MAC_DUPLEX_HALF_CTRL		0x0008
+> +#define MAX_FRM_SIZE			0x003c
+> +#define PORT_MODE			0x0040
+> +#define PORT_EN				0x0044
+> +#define BITS_TX_EN			BIT(2)
+> +#define BITS_RX_EN			BIT(1)
+> +#define REC_FILT_CONTROL		0x0064
+> +#define BIT_CRC_ERR_PASS		BIT(5)
+> +#define BIT_PAUSE_FRM_PASS		BIT(4)
+> +#define BIT_VLAN_DROP_EN		BIT(3)
+> +#define BIT_BC_DROP_EN			BIT(2)
+> +#define BIT_MC_MATCH_EN			BIT(1)
+> +#define BIT_UC_MATCH_EN			BIT(0)
+> +#define PORT_MC_ADDR_LOW		0x0068
+> +#define PORT_MC_ADDR_HIGH		0x006C
+> +#define CF_CRC_STRIP			0x01b0
+> +#define MODE_CHANGE_EN			0x01b4
+> +#define BIT_MODE_CHANGE_EN		BIT(0)
+> +#define COL_SLOT_TIME			0x01c0
+> +#define RECV_CONTROL			0x01e0
+> +#define BIT_STRIP_PAD_EN		BIT(3)
+> +#define BIT_RUNT_PKT_EN			BIT(4)
+> +#define CONTROL_WORD			0x0214
+> +#define MDIO_SINGLE_CMD			0x03c0
+> +#define MDIO_SINGLE_DATA		0x03c4
+> +#define MDIO_CTRL			0x03cc
+> +#define MDIO_RDATA_STATUS		0x03d0
+> +
+> +#define MDIO_START			BIT(20)
+> +#define MDIO_R_VALID			BIT(0)
+> +#define MDIO_READ			(BIT(17) | MDIO_START)
+> +#define MDIO_WRITE			(BIT(16) | MDIO_START)
+> +
+> +#define RX_FQ_START_ADDR		0x0500
+> +#define RX_FQ_DEPTH			0x0504
+> +#define RX_FQ_WR_ADDR			0x0508
+> +#define RX_FQ_RD_ADDR			0x050c
+> +#define RX_FQ_VLDDESC_CNT		0x0510
+> +#define RX_FQ_ALEMPTY_TH		0x0514
+> +#define RX_FQ_REG_EN			0x0518
+> +#define BITS_RX_FQ_START_ADDR_EN	BIT(2)
+> +#define BITS_RX_FQ_DEPTH_EN		BIT(1)
+> +#define BITS_RX_FQ_RD_ADDR_EN		BIT(0)
+> +#define RX_FQ_ALFULL_TH			0x051c
+> +#define RX_BQ_START_ADDR		0x0520
+> +#define RX_BQ_DEPTH			0x0524
+> +#define RX_BQ_WR_ADDR			0x0528
+> +#define RX_BQ_RD_ADDR			0x052c
+> +#define RX_BQ_FREE_DESC_CNT		0x0530
+> +#define RX_BQ_ALEMPTY_TH		0x0534
+> +#define RX_BQ_REG_EN			0x0538
+> +#define BITS_RX_BQ_START_ADDR_EN	BIT(2)
+> +#define BITS_RX_BQ_DEPTH_EN		BIT(1)
+> +#define BITS_RX_BQ_WR_ADDR_EN		BIT(0)
+> +#define RX_BQ_ALFULL_TH			0x053c
+> +#define TX_BQ_START_ADDR		0x0580
+> +#define TX_BQ_DEPTH			0x0584
+> +#define TX_BQ_WR_ADDR			0x0588
+> +#define TX_BQ_RD_ADDR			0x058c
+> +#define TX_BQ_VLDDESC_CNT		0x0590
+> +#define TX_BQ_ALEMPTY_TH		0x0594
+> +#define TX_BQ_REG_EN			0x0598
+> +#define BITS_TX_BQ_START_ADDR_EN	BIT(2)
+> +#define BITS_TX_BQ_DEPTH_EN		BIT(1)
+> +#define BITS_TX_BQ_RD_ADDR_EN		BIT(0)
+> +#define TX_BQ_ALFULL_TH			0x059c
+> +#define TX_RQ_START_ADDR		0x05a0
+> +#define TX_RQ_DEPTH			0x05a4
+> +#define TX_RQ_WR_ADDR			0x05a8
+> +#define TX_RQ_RD_ADDR			0x05ac
+> +#define TX_RQ_FREE_DESC_CNT		0x05b0
+> +#define TX_RQ_ALEMPTY_TH		0x05b4
+> +#define TX_RQ_REG_EN			0x05b8
+> +#define BITS_TX_RQ_START_ADDR_EN	BIT(2)
+> +#define BITS_TX_RQ_DEPTH_EN		BIT(1)
+> +#define BITS_TX_RQ_WR_ADDR_EN		BIT(0)
+> +#define TX_RQ_ALFULL_TH			0x05bc
+> +#define RAW_PMU_INT			0x05c0
+> +#define ENA_PMU_INT			0x05c4
+> +#define STATUS_PMU_INT			0x05c8
+> +#define MAC_FIFO_ERR_IN			BIT(30)
+> +#define TX_RQ_IN_TIMEOUT_INT		BIT(29)
+> +#define RX_BQ_IN_TIMEOUT_INT		BIT(28)
+> +#define TXOUTCFF_FULL_INT		BIT(27)
+> +#define TXOUTCFF_EMPTY_INT		BIT(26)
+> +#define TXCFF_FULL_INT			BIT(25)
+> +#define TXCFF_EMPTY_INT			BIT(24)
+> +#define RXOUTCFF_FULL_INT		BIT(23)
+> +#define RXOUTCFF_EMPTY_INT		BIT(22)
+> +#define RXCFF_FULL_INT			BIT(21)
+> +#define RXCFF_EMPTY_INT			BIT(20)
+> +#define TX_RQ_IN_INT			BIT(19)
+> +#define TX_BQ_OUT_INT			BIT(18)
+> +#define RX_BQ_IN_INT			BIT(17)
+> +#define RX_FQ_OUT_INT			BIT(16)
+> +#define TX_RQ_EMPTY_INT			BIT(15)
+> +#define TX_RQ_FULL_INT			BIT(14)
+> +#define TX_RQ_ALEMPTY_INT		BIT(13)
+> +#define TX_RQ_ALFULL_INT		BIT(12)
+> +#define TX_BQ_EMPTY_INT			BIT(11)
+> +#define TX_BQ_FULL_INT			BIT(10)
+> +#define TX_BQ_ALEMPTY_INT		BIT(9)
+> +#define TX_BQ_ALFULL_INT		BIT(8)
+> +#define RX_BQ_EMPTY_INT			BIT(7)
+> +#define RX_BQ_FULL_INT			BIT(6)
+> +#define RX_BQ_ALEMPTY_INT		BIT(5)
+> +#define RX_BQ_ALFULL_INT		BIT(4)
+> +#define RX_FQ_EMPTY_INT			BIT(3)
+> +#define RX_FQ_FULL_INT			BIT(2)
+> +#define RX_FQ_ALEMPTY_INT		BIT(1)
+> +#define RX_FQ_ALFULL_INT		BIT(0)
+> +
+> +#define DEF_INT_MASK			(RX_BQ_IN_INT | RX_BQ_IN_TIMEOUT_INT | \
+> +					TX_RQ_IN_INT | TX_RQ_IN_TIMEOUT_INT)
+> +
+> +#define DESC_WR_RD_ENA			0x05cc
+> +#define IN_QUEUE_TH			0x05d8
+> +#define OUT_QUEUE_TH			0x05dc
+> +#define QUEUE_TX_BQ_SHIFT		16
+> +#define QUEUE_RX_FQ_SHIFT		0
+> +#define RX_BQ_IN_TIMEOUT_TH		0x05e0
+> +#define TX_RQ_IN_TIMEOUT_TH		0x05e4
+> +#define STOP_CMD			0x05e8
+> +#define BITS_TX_STOP			BIT(1)
+> +#define BITS_RX_STOP			BIT(0)
+> +#define FLUSH_CMD			0x05eC
+> +#define BITS_TX_FLUSH_CMD		BIT(5)
+> +#define BITS_RX_FLUSH_CMD		BIT(4)
+> +#define BITS_TX_FLUSH_FLAG_DOWN		BIT(3)
+> +#define BITS_TX_FLUSH_FLAG_UP		BIT(2)
+> +#define BITS_RX_FLUSH_FLAG_DOWN		BIT(1)
+> +#define BITS_RX_FLUSH_FLAG_UP		BIT(0)
+> +#define RX_CFF_NUM_REG			0x05f0
+> +#define PMU_FSM_REG			0x05f8
+> +#define RX_FIFO_PKT_IN_NUM		0x05fc
+> +#define RX_FIFO_PKT_OUT_NUM		0x0600
+> +
+> +#define RGMII_SPEED_1000		0x2c
+> +#define RGMII_SPEED_100			0x2f
+> +#define RGMII_SPEED_10			0x2d
+> +#define MII_SPEED_100			0x0f
+> +#define MII_SPEED_10			0x0d
+> +#define GMAC_SPEED_1000			0x05
+> +#define GMAC_SPEED_100			0x01
+> +#define GMAC_SPEED_10			0x00
+> +#define GMAC_FULL_DUPLEX		BIT(4)
+> +
+> +#define RX_BQ_INT_THRESHOLD		0x01
+> +#define TX_RQ_INT_THRESHOLD		0x01
+> +#define RX_BQ_IN_TIMEOUT		0x10000
+> +#define TX_RQ_IN_TIMEOUT		0x50000
+> +
+> +#define MAC_MAX_FRAME_SIZE		1600
+> +#define DESC_SIZE			32
+> +#define RX_DESC_NUM			1024
+> +#define TX_DESC_NUM			1024
+> +
+> +#define DESC_VLD_FREE			0
+> +#define DESC_VLD_BUSY			1
+> +#define DESC_FL_MID			0
+> +#define DESC_FL_LAST			1
+> +#define DESC_FL_FIRST			2
+> +#define DESC_FL_FULL			3
+> +
+> +/* DMA descriptor ring helpers */
+> +#define dma_ring_incr(n, s)		(((n) + 1) & ((s) - 1))
+> +#define dma_cnt(n)			((n) >> 5)
+> +#define dma_byte(n)			((n) << 5)
+> +
+> +struct hix5hd2_desc {
+> +	__le32 buff_addr;
+> +	__le32 buff_len:11;
+> +	__le32 reserve2:5;
+> +	__le32 data_len:11;
+> +	__le32 reserve1:2;
+> +	__le32 fl:2;
+> +	__le32 descvid:1;
+> +} __aligned(32);
+> +
+> +struct hix5hd2_desc_sw {
+> +	struct hix5hd2_desc *desc;
+> +	dma_addr_t	phys_addr;
+> +	unsigned int	count;
+> +	unsigned int	size;
+> +};
+> +
+> +#define QUEUE_NUMS	4
+> +struct hix5hd2_priv {
+> +	struct hix5hd2_desc_sw pool[QUEUE_NUMS];
+> +#define rx_fq		pool[0]
+> +#define rx_bq		pool[1]
+> +#define tx_bq		pool[2]
+> +#define tx_rq		pool[3]
+> +
+> +	void __iomem *base;
+> +	void __iomem *ctrl_base;
+> +
+> +	struct sk_buff *tx_skb[TX_DESC_NUM];
+> +	struct sk_buff *rx_skb[RX_DESC_NUM];
+> +
+> +	struct device *dev;
+> +	struct net_device *netdev;
+> +
+> +	struct phy_device *phy;
+> +	struct device_node *phy_node;
+> +	phy_interface_t	phy_mode;
+> +
+> +	unsigned int speed;
+> +	unsigned int duplex;
+> +
+> +	struct clk *clk;
+> +	struct mii_bus *bus;
+> +	struct napi_struct napi;
+> +	struct work_struct tx_timeout_task;
+> +};
+> +
+> +static void hix5hd2_config_port(struct net_device *dev, u32 speed, u32 duplex)
+> +{
+> +	struct hix5hd2_priv *priv = netdev_priv(dev);
+> +	u32 val;
+> +
+> +	priv->speed = speed;
+> +	priv->duplex = duplex;
+> +
+> +	switch (priv->phy_mode) {
+> +	case PHY_INTERFACE_MODE_RGMII:
+> +		if (speed == SPEED_1000)
+> +			val = RGMII_SPEED_1000;
+> +		else if (speed == SPEED_100)
+> +			val = RGMII_SPEED_100;
+> +		else
+> +			val = RGMII_SPEED_10;
+> +		break;
+> +	case PHY_INTERFACE_MODE_MII:
+> +		if (speed == SPEED_100)
+> +			val = MII_SPEED_100;
+> +		else
+> +			val = MII_SPEED_10;
+> +		break;
+> +	default:
+> +		netdev_warn(dev, "not supported mode\n");
+> +		val = MII_SPEED_10;
+> +		break;
+> +	}
+> +
+> +	if (duplex)
+> +		val |= GMAC_FULL_DUPLEX;
+> +	writel_relaxed(val, priv->ctrl_base);
+> +
+> +	writel_relaxed(BIT_MODE_CHANGE_EN, priv->base + MODE_CHANGE_EN);
+> +	if (speed == SPEED_1000)
+> +		val = GMAC_SPEED_1000;
+> +	else if (speed == SPEED_100)
+> +		val = GMAC_SPEED_100;
+> +	else
+> +		val = GMAC_SPEED_10;
+> +	writel_relaxed(val, priv->base + PORT_MODE);
+> +	writel_relaxed(0, priv->base + MODE_CHANGE_EN);
+> +	writel_relaxed(duplex, priv->base + MAC_DUPLEX_HALF_CTRL);
+> +}
+> +
+> +static void hix5hd2_set_desc_depth(struct hix5hd2_priv *priv, int rx, int tx)
+> +{
+> +	writel_relaxed(BITS_RX_FQ_DEPTH_EN, priv->base + RX_FQ_REG_EN);
+> +	writel_relaxed(rx << 3, priv->base + RX_FQ_DEPTH);
+> +	writel_relaxed(0, priv->base + RX_FQ_REG_EN);
+> +
+> +	writel_relaxed(BITS_RX_BQ_DEPTH_EN, priv->base + RX_BQ_REG_EN);
+> +	writel_relaxed(rx << 3, priv->base + RX_BQ_DEPTH);
+> +	writel_relaxed(0, priv->base + RX_BQ_REG_EN);
+> +
+> +	writel_relaxed(BITS_TX_BQ_DEPTH_EN, priv->base + TX_BQ_REG_EN);
+> +	writel_relaxed(tx << 3, priv->base + TX_BQ_DEPTH);
+> +	writel_relaxed(0, priv->base + TX_BQ_REG_EN);
+> +
+> +	writel_relaxed(BITS_TX_RQ_DEPTH_EN, priv->base + TX_RQ_REG_EN);
+> +	writel_relaxed(tx << 3, priv->base + TX_RQ_DEPTH);
+> +	writel_relaxed(0, priv->base + TX_RQ_REG_EN);
+> +}
+> +
+> +static void hix5hd2_set_rx_fq(struct hix5hd2_priv *priv, dma_addr_t phy_addr)
+> +{
+> +	writel_relaxed(BITS_RX_FQ_START_ADDR_EN, priv->base + RX_FQ_REG_EN);
+> +	writel_relaxed(phy_addr, priv->base + RX_FQ_START_ADDR);
+> +	writel_relaxed(0, priv->base + RX_FQ_REG_EN);
+> +}
+> +
+> +static void hix5hd2_set_rx_bq(struct hix5hd2_priv *priv, dma_addr_t phy_addr)
+> +{
+> +	writel_relaxed(BITS_RX_BQ_START_ADDR_EN, priv->base + RX_BQ_REG_EN);
+> +	writel_relaxed(phy_addr, priv->base + RX_BQ_START_ADDR);
+> +	writel_relaxed(0, priv->base + RX_BQ_REG_EN);
+> +}
+> +
+> +static void hix5hd2_set_tx_bq(struct hix5hd2_priv *priv, dma_addr_t phy_addr)
+> +{
+> +	writel_relaxed(BITS_TX_BQ_START_ADDR_EN, priv->base + TX_BQ_REG_EN);
+> +	writel_relaxed(phy_addr, priv->base + TX_BQ_START_ADDR);
+> +	writel_relaxed(0, priv->base + TX_BQ_REG_EN);
+> +}
+> +
+> +static void hix5hd2_set_tx_rq(struct hix5hd2_priv *priv, dma_addr_t phy_addr)
+> +{
+> +	writel_relaxed(BITS_TX_RQ_START_ADDR_EN, priv->base + TX_RQ_REG_EN);
+> +	writel_relaxed(phy_addr, priv->base + TX_RQ_START_ADDR);
+> +	writel_relaxed(0, priv->base + TX_RQ_REG_EN);
+> +}
+> +
+> +static void hix5hd2_set_desc_addr(struct hix5hd2_priv *priv)
+> +{
+> +	hix5hd2_set_rx_fq(priv, priv->rx_fq.phys_addr);
+> +	hix5hd2_set_rx_bq(priv, priv->rx_bq.phys_addr);
+> +	hix5hd2_set_tx_rq(priv, priv->tx_rq.phys_addr);
+> +	hix5hd2_set_tx_bq(priv, priv->tx_bq.phys_addr);
+> +}
+> +
+> +static void hix5hd2_hw_init(struct hix5hd2_priv *priv)
+> +{
+> +	u32 val;
+> +
+> +	/* disable and clear all interrupts */
+> +	writel_relaxed(0, priv->base + ENA_PMU_INT);
+> +	writel_relaxed(~0, priv->base + RAW_PMU_INT);
+> +
+> +	writel_relaxed(BIT_CRC_ERR_PASS, priv->base + REC_FILT_CONTROL);
+> +	writel_relaxed(MAC_MAX_FRAME_SIZE, priv->base + CONTROL_WORD);
+> +	writel_relaxed(0, priv->base + COL_SLOT_TIME);
+> +
+> +	val = RX_BQ_INT_THRESHOLD << QUEUE_RX_FQ_SHIFT |
+> +		TX_RQ_INT_THRESHOLD << QUEUE_TX_BQ_SHIFT;
+> +	writel_relaxed(val, priv->base + IN_QUEUE_TH);
+> +
+> +	writel_relaxed(RX_BQ_IN_TIMEOUT, priv->base + RX_BQ_IN_TIMEOUT_TH);
+> +	writel_relaxed(TX_RQ_IN_TIMEOUT, priv->base + TX_RQ_IN_TIMEOUT_TH);
+> +
+> +	hix5hd2_set_desc_depth(priv, RX_DESC_NUM, TX_DESC_NUM);
+> +	hix5hd2_set_desc_addr(priv);
+> +}
+> +
+> +static void hix5hd2_irq_enable(struct hix5hd2_priv *priv)
+> +{
+> +	writel_relaxed(DEF_INT_MASK, priv->base + ENA_PMU_INT);
+> +}
+> +
+> +static void hix5hd2_irq_disable(struct hix5hd2_priv *priv)
+> +{
+> +	writel_relaxed(0, priv->base + ENA_PMU_INT);
+> +}
+> +
+> +static void hix5hd2_port_enable(struct hix5hd2_priv *priv)
+> +{
+> +	writel_relaxed(0xf, priv->base + DESC_WR_RD_ENA);
+> +	writel_relaxed(BITS_RX_EN | BITS_TX_EN, priv->base + PORT_EN);
+> +}
+> +
+> +static void hix5hd2_port_disable(struct hix5hd2_priv *priv)
+> +{
+> +	writel_relaxed(~(BITS_RX_EN | BITS_TX_EN), priv->base + PORT_EN);
+> +	writel_relaxed(0, priv->base + DESC_WR_RD_ENA);
+> +}
+> +
+> +static void hix5hd2_hw_set_mac_addr(struct net_device *dev)
+> +{
+> +	struct hix5hd2_priv *priv = netdev_priv(dev);
+> +	unsigned char *mac = dev->dev_addr;
+> +	u32 val;
+> +
+> +	val = mac[1] | (mac[0] << 8);
+> +	writel_relaxed(val, priv->base + STATION_ADDR_HIGH);
+> +
+> +	val = mac[5] | (mac[4] << 8) | (mac[3] << 16) | (mac[2] << 24);
+> +	writel_relaxed(val, priv->base + STATION_ADDR_LOW);
+> +}
+> +
+> +static int hix5hd2_net_set_mac_address(struct net_device *dev, void *p)
+> +{
+> +	int ret;
+> +
+> +	ret = eth_mac_addr(dev, p);
+> +	if (!ret)
+> +		hix5hd2_hw_set_mac_addr(dev);
+> +
+> +	return ret;
+> +}
+> +
+> +static void hix5hd2_adjust_link(struct net_device *dev)
+> +{
+> +	struct hix5hd2_priv *priv = netdev_priv(dev);
+> +	struct phy_device *phy = priv->phy;
+> +
+> +	if ((priv->speed != phy->speed) || (priv->duplex != phy->duplex)) {
+> +		hix5hd2_config_port(dev, phy->speed, phy->duplex);
+> +		phy_print_status(phy);
+> +	}
+> +}
+> +
+> +static void hix5hd2_rx_refill(struct hix5hd2_priv *priv)
+> +{
+> +	struct hix5hd2_desc *desc;
+> +	struct sk_buff *skb;
+> +	u32 start, end, num, pos, i;
+> +
+> +	/* software write pointer */
+> +	start = dma_cnt(readl_relaxed(priv->base + RX_FQ_WR_ADDR));
+> +	/* logic read pointer */
+> +	end = dma_cnt(readl_relaxed(priv->base + RX_FQ_RD_ADDR));
+> +	num = CIRC_SPACE(start, end, RX_DESC_NUM);
+> +
+> +	for (i = 0, pos = start; i < num; i++) {
+> +		if (priv->rx_skb[pos])
+> +			break;
+> +		else {
+> +			skb = netdev_alloc_skb_ip_align(priv->netdev,
+> +				MAC_MAX_FRAME_SIZE);
+> +			if (unlikely(skb == NULL))
+> +				break;
+> +		}
+> +
+> +		desc = priv->rx_fq.desc + pos;
+> +		desc->buff_addr =
+> +			dma_map_single(priv->dev, skb->data,
+> +					MAC_MAX_FRAME_SIZE, DMA_FROM_DEVICE);
+> +		if (dma_mapping_error(priv->dev, desc->buff_addr)) {
+> +			dev_kfree_skb_any(skb);
+> +			break;
+> +		}
+> +
+> +		priv->rx_skb[pos] = skb;
+> +		desc->buff_len = MAC_MAX_FRAME_SIZE - 1;
+> +		desc->data_len = 0;
+> +		desc->fl = 0;
+> +		desc->descvid = DESC_VLD_FREE;
+> +		pos = dma_ring_incr(pos, RX_DESC_NUM);
+> +	}
+> +
+> +	if (pos != start)
+> +		writel(dma_byte(pos), priv->base + RX_FQ_WR_ADDR);
+> +}
+> +
+> +static int hix5hd2_rx(struct net_device *dev, int limit)
+> +{
+> +	struct hix5hd2_priv *priv = netdev_priv(dev);
+> +	struct sk_buff *skb;
+> +	struct hix5hd2_desc *desc;
+> +	dma_addr_t dma_addr;
+> +	u32 start, end, num, pos, i, len;
+> +
+> +	/* software read pointer */
+> +	start = dma_cnt(readl_relaxed(priv->base + RX_BQ_RD_ADDR));
+> +	/* logic write pointer */
+> +	end = dma_cnt(readl_relaxed(priv->base + RX_BQ_WR_ADDR));
+> +	num = CIRC_CNT(end, start, RX_DESC_NUM);
+> +	if (num > limit)
+> +		num = limit;
+> +
+> +	for (i = 0, pos = start; i < num; i++) {
+> +		skb = priv->rx_skb[pos];
+> +		if (unlikely(!skb)) {
+> +			netdev_err(dev, "inconsistent rx_skb\n");
+> +			break;
+> +		}
+> +		priv->rx_skb[pos] = NULL;
+> +
+> +		desc = priv->rx_bq.desc + pos;
+> +		len = desc->data_len;
+> +		dma_addr = desc->buff_addr;
+> +		dma_unmap_single(priv->dev, dma_addr, MAC_MAX_FRAME_SIZE,
+> +				DMA_FROM_DEVICE);
+> +
+> +		skb_put(skb, len);
+> +		if (skb->len > MAC_MAX_FRAME_SIZE) {
+> +			netdev_err(dev, "rcv len err, len = %d\n", skb->len);
+> +			dev->stats.rx_errors++;
+> +			dev->stats.rx_length_errors++;
+> +			dev_kfree_skb_any(skb);
+> +			goto next;
+> +		}
+> +
+> +		skb->protocol = eth_type_trans(skb, dev);
+> +		napi_gro_receive(&priv->napi, skb);
+> +		dev->stats.rx_packets++;
+> +		dev->stats.rx_bytes += skb->len;
+> +		dev->last_rx = jiffies;
+> +next:
+> +		pos = dma_ring_incr(pos, RX_DESC_NUM);
+> +	}
+> +
+> +	if (pos != start)
+> +		writel(dma_byte(pos), priv->base + RX_BQ_RD_ADDR);
+> +
+> +	hix5hd2_rx_refill(priv);
+> +
+> +	return num;
+> +}
+> +
+> +static void hix5hd2_xmit_reclaim(struct net_device *dev)
+> +{
+> +	struct sk_buff *skb;
+> +	struct hix5hd2_desc *desc;
+> +	dma_addr_t dma_addr;
+> +	struct hix5hd2_priv *priv = netdev_priv(dev);
+> +	unsigned int bytes_compl = 0, pkts_compl = 0;
+> +	u32 start, end, num, pos, i;
+> +
+> +	netif_tx_lock(dev);
+> +
+> +	/* software read */
+> +	start = dma_cnt(readl_relaxed(priv->base + TX_RQ_RD_ADDR));
+> +	/* logic write */
+> +	end = dma_cnt(readl_relaxed(priv->base + TX_RQ_WR_ADDR));
+> +	num = CIRC_CNT(end, start, TX_DESC_NUM);
+> +
+> +	for (i = 0, pos = start; i < num; i++) {
+> +		skb = priv->tx_skb[pos];
+> +		if (unlikely(!skb)) {
+> +			netdev_err(dev, "inconsistent tx_skb\n");
+> +			break;
+> +		}
+> +
+> +		pkts_compl++;
+> +		bytes_compl += skb->len;
+> +		desc = priv->tx_rq.desc + pos;
+> +		dma_addr = desc->buff_addr;
+> +		dma_unmap_single(priv->dev, dma_addr, skb->len, DMA_TO_DEVICE);
+> +		priv->tx_skb[pos] = NULL;
+> +		dev_consume_skb_any(skb);
+> +		pos = dma_ring_incr(pos, TX_DESC_NUM);
+> +	}
+> +
+> +	if (pos != start)
+> +		writel(dma_byte(pos), priv->base + TX_RQ_RD_ADDR);
+> +
+> +	netif_tx_unlock(dev);
+> +
+> +	if (pkts_compl || bytes_compl)
+> +		netdev_completed_queue(dev, pkts_compl, bytes_compl);
+> +
+> +	if (unlikely(netif_queue_stopped(priv->netdev)) && pkts_compl)
+> +		netif_wake_queue(priv->netdev);
+> +}
+> +
+> +static int hix5hd2_poll(struct napi_struct *napi, int budget)
+> +{
+> +	struct hix5hd2_priv *priv = container_of(napi,
+> +				struct hix5hd2_priv, napi);
+> +	struct net_device *dev = priv->netdev;
+> +	int work_done = 0, task = budget;
+> +	int ints, num;
+> +
+> +	do {
+> +		hix5hd2_xmit_reclaim(dev);
+> +		num = hix5hd2_rx(dev, task);
+> +		work_done += num;
+> +		task -= num;
+> +		if ((work_done >= budget) || (num == 0))
+> +			break;
+> +
+> +		ints = readl_relaxed(priv->base + RAW_PMU_INT);
+> +		writel_relaxed(ints, priv->base + RAW_PMU_INT);
+> +	} while (ints & DEF_INT_MASK);
+> +
+> +	if (work_done < budget) {
+> +		napi_complete(napi);
+> +		hix5hd2_irq_enable(priv);
+> +	}
+> +
+> +	return work_done;
+> +}
+> +
+> +static irqreturn_t hix5hd2_interrupt(int irq, void *dev_id)
+> +{
+> +	struct net_device *dev = (struct net_device *)dev_id;
+> +	struct hix5hd2_priv *priv = netdev_priv(dev);
+> +	int ints = readl_relaxed(priv->base + RAW_PMU_INT);
+> +
+> +	writel_relaxed(ints, priv->base + RAW_PMU_INT);
+> +	if (likely(ints & DEF_INT_MASK)) {
+> +		hix5hd2_irq_disable(priv);
+> +		napi_schedule(&priv->napi);
+> +	}
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int hix5hd2_net_xmit(struct sk_buff *skb, struct net_device *dev)
+> +{
+> +	struct hix5hd2_priv *priv = netdev_priv(dev);
+> +	struct hix5hd2_desc *desc;
+> +	u32 pos;
+> +
+> +	/* software write pointer */
+> +	pos = dma_cnt(readl_relaxed(priv->base + TX_BQ_WR_ADDR));
+> +	if (unlikely(priv->tx_skb[pos])) {
+> +		dev->stats.tx_dropped++;
+> +		dev->stats.tx_fifo_errors++;
+> +		netif_stop_queue(dev);
+> +		return NETDEV_TX_BUSY;
+> +	}
+> +
+> +	desc = priv->tx_bq.desc + pos;
+> +	desc->buff_addr =
+> +		dma_map_single(priv->dev, skb->data, skb->len, DMA_TO_DEVICE);
+> +	if (dma_mapping_error(priv->dev, desc->buff_addr)) {
+> +		dev_kfree_skb_any(skb);
+> +		return NETDEV_TX_OK;
+> +	}
+> +
+> +	priv->tx_skb[pos] = skb;
+> +	desc->buff_len = skb->len;
+> +	desc->data_len = skb->len;
+> +	desc->fl = DESC_FL_FULL;
+> +	desc->descvid = DESC_VLD_BUSY;
+> +
+> +	pos = dma_ring_incr(pos, TX_DESC_NUM);
+> +	writel(dma_byte(pos), priv->base + TX_BQ_WR_ADDR);
+> +
+> +	dev->trans_start = jiffies;
+> +	dev->stats.tx_packets++;
+> +	dev->stats.tx_bytes += skb->len;
+> +	netdev_sent_queue(dev, skb->len);
+> +
+> +	return NETDEV_TX_OK;
+> +}
+> +
+> +static void hix5hd2_free_dma_desc_rings(struct hix5hd2_priv *priv)
+> +{
+> +	struct hix5hd2_desc *desc;
+> +	int i;
+> +
+> +	for (i = 0; i < RX_DESC_NUM; i++) {
+> +		struct sk_buff *skb = priv->rx_skb[i];
+> +		if (skb == NULL)
+> +			continue;
+> +
+> +		desc = priv->rx_fq.desc + i;
+> +		dma_unmap_single(priv->dev, desc->buff_addr,
+> +				 MAC_MAX_FRAME_SIZE, DMA_FROM_DEVICE);
+> +		dev_kfree_skb_any(skb);
+> +		priv->rx_skb[i] = NULL;
+> +	}
+> +
+> +	for (i = 0; i < TX_DESC_NUM; i++) {
+> +		struct sk_buff *skb = priv->tx_skb[i];
+> +		if (skb == NULL)
+> +			continue;
+> +
+> +		desc = priv->tx_rq.desc + i;
+> +		dma_unmap_single(priv->dev, desc->buff_addr,
+> +				 skb->len, DMA_TO_DEVICE);
+> +		dev_kfree_skb_any(skb);
+> +		priv->tx_skb[i] = NULL;
+> +	}
+> +}
+> +
+> +static int hix5hd2_net_open(struct net_device *dev)
+> +{
+> +	struct hix5hd2_priv *priv = netdev_priv(dev);
+> +	int ret;
+> +
+> +	ret = clk_prepare_enable(priv->clk);
+> +	if (ret < 0) {
+> +		netdev_err(dev, "failed to enable clk %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	priv->phy = of_phy_connect(dev, priv->phy_node,
+> +		&hix5hd2_adjust_link, 0, priv->phy_mode);
+> +	if (!priv->phy)
+> +		return -ENODEV;
+> +
+> +	phy_start(priv->phy);
+> +	hix5hd2_hw_init(priv);
+> +	hix5hd2_rx_refill(priv);
+> +
+> +	netdev_reset_queue(dev);
+> +	netif_start_queue(dev);
+> +	napi_enable(&priv->napi);
+> +
+> +	hix5hd2_port_enable(priv);
+> +	hix5hd2_irq_enable(priv);
+> +
+> +	return 0;
+> +}
+> +
+> +static int hix5hd2_net_close(struct net_device *dev)
+> +{
+> +	struct hix5hd2_priv *priv = netdev_priv(dev);
+> +
+> +	hix5hd2_port_disable(priv);
+> +	hix5hd2_irq_disable(priv);
+> +	napi_disable(&priv->napi);
+> +	netif_stop_queue(dev);
+> +	hix5hd2_free_dma_desc_rings(priv);
+> +
+> +	if (priv->phy) {
+> +		phy_stop(priv->phy);
+> +		phy_disconnect(priv->phy);
+> +	}
+> +
+> +	clk_disable_unprepare(priv->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static void hix5hd2_tx_timeout_task(struct work_struct *work)
+> +{
+> +	struct hix5hd2_priv *priv;
+> +
+> +	priv = container_of(work, struct hix5hd2_priv, tx_timeout_task);
+> +	hix5hd2_net_close(priv->netdev);
+> +	hix5hd2_net_open(priv->netdev);
+> +}
+> +
+> +static void hix5hd2_net_timeout(struct net_device *dev)
+> +{
+> +	struct hix5hd2_priv *priv = netdev_priv(dev);
+> +
+> +	schedule_work(&priv->tx_timeout_task);
+> +}
+> +
+> +static struct net_device_stats *hix5hd2_net_get_stats(struct net_device *dev)
+> +{
+> +	return &dev->stats;
+> +}
+> +
+> +static const struct net_device_ops hix5hd2_netdev_ops = {
+> +	.ndo_open		= hix5hd2_net_open,
+> +	.ndo_stop		= hix5hd2_net_close,
+> +	.ndo_start_xmit		= hix5hd2_net_xmit,
+> +	.ndo_tx_timeout		= hix5hd2_net_timeout,
+> +	.ndo_set_mac_address	= hix5hd2_net_set_mac_address,
+> +	.ndo_get_stats		= hix5hd2_net_get_stats,
+> +};
+> +
+> +static int hix5hd2_get_settings(struct net_device *net_dev,
+> +		struct ethtool_cmd *cmd)
+> +{
+> +	struct hix5hd2_priv *priv = netdev_priv(net_dev);
+> +
+> +	if (!priv->phy)
+> +		return -ENODEV;
+> +
+> +	return phy_ethtool_gset(priv->phy, cmd);
+> +}
+> +
+> +static int hix5hd2_set_settings(struct net_device *net_dev,
+> +		struct ethtool_cmd *cmd)
+> +{
+> +	struct hix5hd2_priv *priv = netdev_priv(net_dev);
+> +
+> +	if (!priv->phy)
+> +		return -ENODEV;
+> +
+> +	return phy_ethtool_sset(priv->phy, cmd);
+> +}
+> +
+> +static struct ethtool_ops hix5hd2_ethtools_ops = {
+> +	.get_link		= ethtool_op_get_link,
+> +	.get_settings		= hix5hd2_get_settings,
+> +	.set_settings		= hix5hd2_set_settings,
+> +};
+> +
+> +static int hix5hd2_mdio_wait_ready(struct mii_bus *bus)
+> +{
+> +	struct hix5hd2_priv *priv = bus->priv;
+> +	void __iomem *base = priv->base;
+> +	int i, timeout = 10000;
+> +
+> +	for (i = 0; readl_relaxed(base + MDIO_SINGLE_CMD) & MDIO_START; i++) {
+> +		if (i == timeout)
+> +			return -ETIMEDOUT;
+> +		udelay(1);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int hix5hd2_mdio_read(struct mii_bus *bus, int phy, int reg)
+> +{
+> +	struct hix5hd2_priv *priv = bus->priv;
+> +	void __iomem *base = priv->base;
+> +	int val, ret;
+> +
+> +	ret = hix5hd2_mdio_wait_ready(bus);
+> +	if (ret < 0)
+> +		goto out;
+> +
+> +	writel_relaxed(MDIO_READ | phy << 8 | reg, base + MDIO_SINGLE_CMD);
+> +	ret = hix5hd2_mdio_wait_ready(bus);
+> +	if (ret < 0)
+> +		goto out;
+> +
+> +	val = readl_relaxed(base + MDIO_RDATA_STATUS);
+> +	if (val & MDIO_R_VALID) {
+> +		dev_err(bus->parent, "SMI bus read not valid\n");
+> +		ret = -ENODEV;
+> +		goto out;
+> +	}
+> +
+> +	val = readl_relaxed(priv->base + MDIO_SINGLE_DATA);
+> +	ret = (val >> 16) & 0xFFFF;
+> +out:
+> +	return ret;
+> +}
+> +
+> +static int hix5hd2_mdio_write(struct mii_bus *bus, int phy, int reg, u16 val)
+> +{
+> +	struct hix5hd2_priv *priv = bus->priv;
+> +	void __iomem *base = priv->base;
+> +	int ret;
+> +
+> +	ret = hix5hd2_mdio_wait_ready(bus);
+> +	if (ret < 0)
+> +		goto out;
+> +
+> +	writel_relaxed(val, base + MDIO_SINGLE_DATA);
+> +	writel_relaxed(MDIO_WRITE | phy << 8 | reg, base + MDIO_SINGLE_CMD);
+> +	ret = hix5hd2_mdio_wait_ready(bus);
+> +out:
+> +	return ret;
+> +}
+> +
+> +static void hix5hd2_destroy_hw_desc_queue(struct hix5hd2_priv *priv)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < QUEUE_NUMS; i++) {
+> +		if (priv->pool[i].desc) {
+> +			dma_free_coherent(priv->dev, priv->pool[i].size,
+> +					priv->pool[i].desc,
+> +					priv->pool[i].phys_addr);
+> +			priv->pool[i].desc = NULL;
+> +		}
+> +	}
+> +}
+> +
+> +static int hix5hd2_init_hw_desc_queue(struct hix5hd2_priv *priv)
+> +{
+> +	struct device *dev = priv->dev;
+> +	struct hix5hd2_desc *virt_addr;
+> +	dma_addr_t phys_addr;
+> +	int size, i;
+> +
+> +	priv->rx_fq.count = RX_DESC_NUM;
+> +	priv->rx_bq.count = RX_DESC_NUM;
+> +	priv->tx_bq.count = TX_DESC_NUM;
+> +	priv->tx_rq.count = TX_DESC_NUM;
+> +
+> +	for (i = 0; i < QUEUE_NUMS; i++) {
+> +		size = priv->pool[i].count * sizeof(struct hix5hd2_desc);
+> +		virt_addr = dma_alloc_coherent(dev, size, &phys_addr,
+> +				GFP_KERNEL);
+> +		if (virt_addr == NULL)
+> +			goto error_free_pool;
+> +
+> +		memset(virt_addr, 0, size);
+> +		priv->pool[i].size = size;
+> +		priv->pool[i].desc = virt_addr;
+> +		priv->pool[i].phys_addr = phys_addr;
+> +	}
+> +	return 0;
+> +
+> +error_free_pool:
+> +	hix5hd2_destroy_hw_desc_queue(priv);
+> +
+> +	return -ENOMEM;
+> +}
+> +
+> +static int hix5hd2_dev_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *node = dev->of_node;
+> +	struct net_device *ndev;
+> +	struct hix5hd2_priv *priv;
+> +	struct resource *res;
+> +	struct mii_bus *bus;
+> +	const char *mac_addr;
+> +	int ret;
+> +
+> +	ndev = alloc_etherdev(sizeof(struct hix5hd2_priv));
+> +	if (!ndev)
+> +		return -ENOMEM;
+> +
+> +	platform_set_drvdata(pdev, ndev);
+> +
+> +	priv = netdev_priv(ndev);
+> +	priv->dev = dev;
+> +	priv->netdev = ndev;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	priv->base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(priv->base)) {
+> +		ret = PTR_ERR(priv->base);
+> +		goto out_free_netdev;
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +	priv->ctrl_base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(priv->ctrl_base)) {
+> +		ret = PTR_ERR(priv->ctrl_base);
+> +		goto out_free_netdev;
+> +	}
+> +
+> +	priv->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(priv->clk)) {
+> +		netdev_err(ndev, "failed to get clk\n");
+> +		ret = -ENODEV;
+> +		goto out_free_netdev;
+> +	}
+> +
+> +	ret = clk_prepare_enable(priv->clk);
+> +	if (ret < 0) {
+> +		netdev_err(ndev, "failed to enable clk %d\n", ret);
+> +		goto out_free_netdev;
+> +	}
+> +
+> +	bus = mdiobus_alloc();
+> +	if (bus == NULL) {
+> +		ret = -ENOMEM;
+> +		goto out_free_netdev;
+> +	}
+> +
+> +	bus->priv = priv;
+> +	bus->name = "hix5hd2_mii_bus";
+> +	bus->read = hix5hd2_mdio_read;
+> +	bus->write = hix5hd2_mdio_write;
+> +	bus->parent = &pdev->dev;
+> +	snprintf(bus->id, MII_BUS_ID_SIZE, "%s-mii", dev_name(&pdev->dev));
+> +	priv->bus = bus;
+> +
+> +	ret = of_mdiobus_register(bus, node);
+> +	if (ret)
+> +		goto err_free_mdio;
+> +
+> +	priv->phy_mode = of_get_phy_mode(node);
+> +	if (priv->phy_mode < 0) {
+> +		netdev_err(ndev, "not find phy-mode\n");
+> +		ret = -EINVAL;
+> +		goto err_mdiobus;
+> +	}
+> +
+> +	priv->phy_node = of_parse_phandle(node, "phy-handle", 0);
+> +	if (!priv->phy_node) {
+> +		netdev_err(ndev, "not find phy-handle\n");
+> +		ret = -EINVAL;
+> +		goto err_mdiobus;
+> +	}
+> +
+> +	ndev->irq = platform_get_irq(pdev, 0);
+> +	if (ndev->irq <= 0) {
+> +		netdev_err(ndev, "No irq resource\n");
+> +		ret = -EINVAL;
+> +		goto out_phy_node;
+> +	}
+> +
+> +	ret = devm_request_irq(dev, ndev->irq, hix5hd2_interrupt,
+> +				0, pdev->name, ndev);
+> +	if (ret) {
+> +		netdev_err(ndev, "devm_request_irq failed\n");
+> +		goto out_phy_node;
+> +	}
+> +
+> +	mac_addr = of_get_mac_address(node);
+> +	if (mac_addr)
+> +		ether_addr_copy(ndev->dev_addr, mac_addr);
+> +	if (!is_valid_ether_addr(ndev->dev_addr)) {
+> +		eth_hw_addr_random(ndev);
+> +		netdev_warn(ndev, "using random MAC address %pM\n",
+> +			 ndev->dev_addr);
+> +	}
+> +
+> +	INIT_WORK(&priv->tx_timeout_task, hix5hd2_tx_timeout_task);
+> +	ether_setup(ndev);
+> +	ndev->watchdog_timeo = 6 * HZ;
+> +	ndev->priv_flags |= IFF_UNICAST_FLT;
+> +	ndev->netdev_ops = &hix5hd2_netdev_ops;
+> +	ndev->ethtool_ops = &hix5hd2_ethtools_ops;
+> +	SET_NETDEV_DEV(ndev, dev);
+> +
+> +	ret = hix5hd2_init_hw_desc_queue(priv);
+> +	if (ret)
+> +		goto out_phy_node;
+> +
+> +	netif_napi_add(ndev, &priv->napi, hix5hd2_poll, NAPI_POLL_WEIGHT);
+> +	ret = register_netdev(priv->netdev);
+> +	if (ret) {
+> +		netdev_err(ndev, "register_netdev failed!");
+> +		goto out_destroy_queue;
+> +	}
+> +
+> +	clk_disable_unprepare(priv->clk);
+> +
+> +	return ret;
+> +
+> +out_destroy_queue:
+> +	netif_napi_del(&priv->napi);
+> +	hix5hd2_destroy_hw_desc_queue(priv);
+> +out_phy_node:
+> +	of_node_put(priv->phy_node);
+> +err_mdiobus:
+> +	mdiobus_unregister(bus);
+> +err_free_mdio:
+> +	mdiobus_free(bus);
+> +out_free_netdev:
+> +	free_netdev(ndev);
+> +
+> +	return ret;
+> +}
+> +
+> +static int hix5hd2_dev_remove(struct platform_device *pdev)
+> +{
+> +	struct net_device *ndev = platform_get_drvdata(pdev);
+> +	struct hix5hd2_priv *priv = netdev_priv(ndev);
+> +
+> +	netif_napi_del(&priv->napi);
+> +	unregister_netdev(ndev);
+> +	mdiobus_unregister(priv->bus);
+> +	mdiobus_free(priv->bus);
+> +
+> +	hix5hd2_destroy_hw_desc_queue(priv);
+> +	of_node_put(priv->phy_node);
+> +	cancel_work_sync(&priv->tx_timeout_task);
+> +	free_netdev(ndev);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id hix5hd2_of_match[] = {
+> +	{.compatible = "hisilicon,hix5hd2-mac",},
+> +	{},
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, hix5hd2_of_match);
+> +
+> +static struct platform_driver hix5hd2_dev_driver = {
+> +	.driver = {
+> +		.name = "hix5hd2-mac",
+> +		.of_match_table = hix5hd2_of_match,
+> +	},
+> +	.probe = hix5hd2_dev_probe,
+> +	.remove = hix5hd2_dev_remove,
+> +};
+> +
+> +module_platform_driver(hix5hd2_dev_driver);
+> +
+> +MODULE_DESCRIPTION("HISILICON X5HD2 Ethernet driver");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_ALIAS("platform:hix5hd2-ether");
+>
