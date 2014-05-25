@@ -1,38 +1,39 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 26 May 2014 04:51:49 +0900
-Subject: [PATCH] ARM: exynos: Fix kernel panic when unplugging CPU1 on 4210
-In-Reply-To: <5380D77C.2020104@linaro.org>
-References: <537FBE42.7050608@gmail.com>
- <1400952255-13750-1-git-send-email-daniel.lezcano@linaro.org>
- <5380D77C.2020104@linaro.org>
-Message-ID: <538249D5.3040503@samsung.com>
+Date: Mon, 26 May 2014 05:09:30 +0900
+Subject: [PATCH v10 3/3] ARM: dts: Add initial device tree support for
+ EXYNOS5410
+In-Reply-To: <537FBA7A.3000605@gmail.com>
+References: <1400841343-6016-1-git-send-email-t.dakhran@samsung.com>
+ <1400841343-6016-4-git-send-email-t.dakhran@samsung.com>
+ <537FBA7A.3000605@gmail.com>
+Message-ID: <53824DFA.3020407@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/25/14 02:31, Daniel Lezcano wrote:
-> On 05/24/2014 07:24 PM, Daniel Lezcano wrote:
->> A look at the code reveals use of S5P_VA_SYSRAM macro, in case of
->> certain SoC
->> revisions, which is not valid any longer, after SYSRAM started to be
->> mapped
->> dynamically. The new dynamic mapping is stored in sysram_base_addr
->> variable,
->> which is declared static in platsmp.c
+On 05/24/14 06:15, Tomasz Figa wrote:
+> Hi Tarek,
+>
+> On 23.05.2014 12:35, Tarek Dakhran wrote:
+>> Add initial device tree nodes for EXYNOS5410 SoC and SMDK5410 board.
 >>
->> This fix makes sysram_base_addr non-static, declared it in common.h
->> and used
->> in pm.c instead of S5P_VA_SYSRAM.
->>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Suggested-by: Tomasz Figa <t.figa@samsung.com>
+>> Signed-off-by: Tarek Dakhran<t.dakhran@samsung.com>
+>> Signed-off-by: Vyacheslav Tyrtov<v.tyrtov@samsung.com>
+>> ---
+>>   arch/arm/boot/dts/Makefile                |    1 +
+>>   arch/arm/boot/dts/exynos5410-smdk5410.dts |   82 ++++++++++++
+>>   arch/arm/boot/dts/exynos5410.dtsi         |  206 +++++++++++++++++++++++++++++
+>>   3 files changed, 289 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
+>>   create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
 >
-> Hi Kukjin,
+> Looks good. Hopefully we can have this patch applied soon, so it won't
+> get outdated again.
 >
-> with this fix I confirm cpuidle is working well with the AFTR state on
-> the exynos 4210.
->
-Thanks a lot.
+Yes.
 
-I've applied this fix on top of cpuidle-exynos branch.
+Tarek, please respin as soon as possible.
+
+> Reviewed-by: Tomasz Figa<t.figa@samsung.com>
+>
 
 - Kukjin
