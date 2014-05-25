@@ -1,191 +1,81 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Sun, 25 May 2014 16:35:47 +0900
-Subject: [PATCH 1/3] gpio: Add APM X-Gene SoC GPIO controller support
-In-Reply-To: <CAL85gmDjVszNd3TB51BGa+78wEEZmJfBOLNKOpTEvMTGU2VdBA@mail.gmail.com>
-References: <1400263432-922-1-git-send-email-fkan@apm.com>
- <1400263432-922-2-git-send-email-fkan@apm.com>
- <CAAVeFu+TOfjfvisinv3oJ9PobdV9HcNJhr+3VYneSJ54uGwiAg@mail.gmail.com>
- <CAL85gmDjVszNd3TB51BGa+78wEEZmJfBOLNKOpTEvMTGU2VdBA@mail.gmail.com>
-Message-ID: <CAAVeFuKw+6OfkrjJ3Xx7zbspptTirYGnF2a-rEHw=y9RBnkjDQ@mail.gmail.com>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Sun, 25 May 2014 11:42:51 +0400
+Subject: [PATCH] acornscsi: remove linked command support
+In-Reply-To: <1400937395.22523.55.camel@x220>
+References: <1400926433.31526.89.camel@x220> <538075E0.4080001@suse.de>
+ <1400933617.6956.34.camel@dabdike.int.hansenpartnership.com>
+ <1400937395.22523.55.camel@x220>
+Message-ID: <1401003771.2322.33.camel@dabdike.int.hansenpartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 21, 2014 at 8:54 AM, Feng Kan <fkan@apm.com> wrote:
->> +static void xgene_gpio_set(struct gpio_chip *gc, unsigned int gpio, int val)
->> +{
->> +       struct xgene_gpio_bank *bank =
->> +                       container_of(gc, struct xgene_gpio_bank, chip);
->> +       unsigned long flags;
->> +       u32 data;
->> +
->> +       spin_lock_irqsave(&bank->lock, flags);
->> +
->> +       data = ioread32(bank->set_dr);
->> +       data = val ? data | GPIO_SET_MASK(gpio) : data & ~GPIO_SET_MASK(gpio);
->
->>Couldn't you use set_bit() / clear_bit() instead here?
-> Set_bit/clear_bit seems a bit heavy, I can use the non atomic methods
-> of _set_bit/clear_bit
-> if you agree? In which case I will rewrite all the other method in
-> likewise fashion.
+On Sat, 2014-05-24 at 15:16 +0200, Paul Bolle wrote:
+> On Sat, 2014-05-24 at 16:13 +0400, James Bottomley wrote:
+> > Wait, no, that's not a good idea.  We leave obsolete drivers to bitrot.
+> > Particularly we try not to touch them unless we have to because there
+> > might be a few people still using them and the more we tamper, the
+> > greater the risk that something gets broken.
+> 
+> Which is also a way to notice whether people still use those obsolete
+> drivers.
 
-Sounds good.
+Really, no.  We don't deliberately break old drivers to see if anyone
+notices.  Usually the feedback loop is months to years for the long tail
+to notice and by that time fixing the problem becomes a real pain if you
+allow driver churn.
 
->
->
->>> +       bank = &gpio->banks[offs];
->>> +       bank->gpio = gpio;
->>> +       spin_lock_init(&bank->lock);
->>> +
->>> +       if (of_property_read_u32(bank_np, "ngpios", &ngpio))
->>> +               ngpio = 16;
->>
->> Here I think you want to distinguish between "property not defined"
->> (-EINVAL) and "property has no value" (-ENODATA) and other possible
->> errors. In the later cases you will want to signal the error and
->> return from here.
->
-> I kinda messed up here a bit, I am trying to support ACPI booting but other
-> properties are also affected. I will rewrite this part so minimum of_ access
-> methods are required.
->
->
->>
->>> +
->>> +       if ((ngpio > 16) || (ngpio < 1)) {
->>> +               dev_info(gpio->dev, "Incorrect number of gpio specified: %s\n",
->>> +                        bank_np->full_name);
->>> +               return -EINVAL;
->>> +       }
->>> +
->>> +       bank->data = gpio->regs + GPIO_DATA + (bank_idx * GPIO_DATA_OFFSET);
->>> +       bank->od = gpio->regs + GPIO_OD + (bank_idx * GPIO_OD_OFFSET);
->>> +       bank->mux = gpio->regs + GPIO_MUX + (bank_idx * GPIO_MUX_OFFSET);
->>> +       bank->set_dr = gpio->regs + GPIO_SET_DR
->>> +                               + (bank_idx * GPIO_SET_DR_OFFSET);
->>> +
->>> +       bank->chip.direction_input = xgene_gpio_dir_in;
->>> +       bank->chip.direction_output = xgene_gpio_dir_out;
->>> +       bank->chip.get = xgene_gpio_get;
->>> +       bank->chip.set = xgene_gpio_set;
->>> +
->>> +       if (!of_property_read_u32(bank_np, "odcfg", &odcfg))
->>> +               iowrite32(odcfg, bank->od);
->>> +
->>> +       bank->chip.ngpio = ngpio;
->>> +       bank->chip.of_node = bank_np;
->>> +       bank->chip.base = bank_idx * ngpio;
->>> +
->>> +       err = gpiochip_add(&bank->chip);
->>> +       if (err)
->>> +               dev_err(gpio->dev, "failed to register gpiochip for %s\n",
->>> +                       bank_np->full_name);
->>> +
->>> +       return err;
->>> +}
->>> +
->>> +static int xgene_gpio_probe(struct platform_device *pdev)
->>> +{
->>> +       struct device_node *np = pdev->dev.of_node;
->>> +       struct resource *res;
->>> +       struct xgene_gpio *gpio;
->>> +       int err;
->>> +       unsigned int offs = 0;
->>> +
->>> +       gpio = devm_kzalloc(&pdev->dev, sizeof(*gpio), GFP_KERNEL);
->>> +       if (!gpio)
->>> +               return -ENOMEM;
->>> +       gpio->dev = &pdev->dev;
->>> +
->>> +       gpio->nr_banks = of_get_child_count(pdev->dev.of_node);
->>> +       if (!gpio->nr_banks) {
->>> +               err = -EINVAL;
->>> +               goto err;
->>> +       }
->>
->> Might be worth checking whether nr_banks >= XGENE_GPIO_MAX_PORTS and
->> return an error here.
->>
->>> +
->>> +       gpio->banks = devm_kzalloc(&pdev->dev, gpio->nr_banks *
->>> +                                  sizeof(*gpio->banks), GFP_KERNEL);
->>> +       if (!gpio->banks) {
->>> +               err = -ENOMEM;
->>> +               goto err;
->>> +       }
->>
->> I'm fine with printing the error status the way you do, but could you
->> also do the same for the first kzalloc too?
->>
->> Or maybe you could put your banks member at the end of the xgene_gpio
->> struct as a flexible array member and perform only one kzalloc of size
->> (sizeof(*gpio) + (sizeof(*gpio->banks) * gpio->nr_banks))?
->>
->>> +
->>> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>> +       gpio->regs = devm_ioremap_resource(&pdev->dev, res);
->>> +       if (IS_ERR(gpio->regs)) {
->>> +               err = PTR_ERR(gpio->regs);
->>> +               goto err;
->>> +       }
->>> +
->>> +       for_each_child_of_node(pdev->dev.of_node, np) {
->>> +               err = xgene_gpio_add_bank(gpio, np, offs++);
->>> +               if (err)
->>> +                       goto err;
->>> +       }
->>> +
->>> +       platform_set_drvdata(pdev, gpio);
->>> +
->>> +       dev_info(&pdev->dev, "X-Gene GPIO driver registered\n");
->>> +       return 0;
->>> +err:
->>> +       dev_err(&pdev->dev, "X-Gene GPIO driver registration failed\n");
->>> +       return err;
->>> +}
->>> +
->>> +static const struct of_device_id xgene_gpio_of_match[] = {
->>> +       { .compatible = "apm,xgene-gpio", },
->>> +       {},
->>> +};
->>> +MODULE_DEVICE_TABLE(of, xgene_gpio_of_match);
->>> +
->>> +static struct platform_driver xgene_gpio_driver = {
->>> +       .driver = {
->>> +               .name = "xgene-gpio",
->>> +               .owner = THIS_MODULE,
->>> +               .of_match_table = xgene_gpio_of_match,
->>> +       },
->>> +       .probe = xgene_gpio_probe,
->>> +};
->>> +
->>> +static int __init xgene_gpio_init(void)
->>> +{
->>> +       return platform_driver_register(&xgene_gpio_driver);
->>> +}
->>> +postcore_initcall(xgene_gpio_init);
->>> +
->>> +MODULE_AUTHOR("AppliedMicro");
->>> +MODULE_DESCRIPTION("APM X-Gene GPIO driver");
->>> +MODULE_LICENSE("GPL");
->>> --
->>> 1.9.1
->>>
->>
->> Globally the driver looks well-written, but I don't understand the
->> need to have one gpio_chip per bank. Could you elaborate on the
->> reasons for this design?
-> I see each bank as separate gpio chip. It is a simple way to
-> abstract the banks since they can operate independently. It also
-> provided me a way to fix the sysfs gpio base number, regardless if
-> a particular bank node is pulled out. This is also done in similar way
-> in some other gpio drivers such as the dwapb gpio driver.
+We keep old drivers that compile until there's a problem caused usually
+by something like API changes.
 
-I'd like to see what Linus thinks about this, but if there is
-precedence, and the banks can work independently, then I agree it may
-make sense to have it that way. In that case you should probably have
-each bank appearing as its own, independent node in the device tree,
-and be probed directly by this driver instead of going through a
-higher-level device which only practical use is to provide the number
-of banks in your GPIO chip. I.e. if your bank are independent GPIO
-devices, let the driver also reflect that fact.
+> > On that principle, since
+> > there's no real reason to remove the code,
+> 
+> (Unless one carries the hope that any check, treewide, for a CONFIG_*
+> macro can be linked to a proper Kconfig symbol.)
+
+The check can be fixed.  If you look at what Fengguang Wu does, he has a
+list of expected problems which he diffs.  Don't churn the tree to match
+the checker, make the checker match the tree.
+
+> > it should stay ... until the
+> > whole driver bitrots to the extent that we can no-longer compile it.
+> 
+> I've run into this depreciation policy before. With aic7xxx_old (which I
+> eventually convinced Fedora to disable, a few relases before it was
+> removed from the tree). With aic94xx (which I also convinced Fedora to
+> disable). I also tried multiple times to shut up advansys' compile
+> time[1]. It seems SCSI might risk not to notice their bitrot, because
+> eventually everybody stops compiling these obsolete drivers, leaving
+> SCSI without feedback on their state.
+
+Why would we care?  If it compiles that's fine, it's not causing a
+problem and it might just be useful to somebody.
+
+The time obsolete drivers cause problems is tree or subsystem wide API
+changes.  Then we look at the amount of work required and sometimes
+remove them or do hack fixes. 
+
+> Anyhow, SCSI seems to be the only subsystem that uses this subcategory
+> of not-really-maintained drivers. Other subsystems appear to allow
+> anything to be fixed, even trivialities, which are what I tend to fix,
+> and only stop allowing fixes if the drivers involved are going to be
+> removed anyway. But maybe I just never ran into that category in other
+> subsystems.
+
+Try ide ... they have the same policy.
+
+Try to understand the reason: we have a long tail of people using
+obsolete systems who we try not to break.  Any change to an unmaintained
+driver which can't be tested risks that ... and I'm the one who would
+have to try to sort out the problem when it's noticed, hence the
+caution.  If we allow trivial churn, by the time the breakage is noticed
+(usually months to years later), the driver will have picked up a ton of
+changes and finding the problem one becomes really hard.  So
+unmaintained drivers get a default deep freeze maintenance policy.
+
+Even for a maintained driver, if the maintainer has little access to the
+hardware and few users they may also choose a deep freeze maintenance
+policy for the same reasons above; that's why no changes without
+maintainer ack.
+
+James
