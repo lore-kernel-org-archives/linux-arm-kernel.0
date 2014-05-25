@@ -1,78 +1,53 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 25 May 2014 20:19:02 +0200
-Subject: [PATCH 16/16] arm64: KVM: Enable minimalistic support for Cortex-A53
-In-Reply-To: <1401041942-23471-1-git-send-email-christoffer.dall@linaro.org>
-References: <1401041942-23471-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1401041942-23471-17-git-send-email-christoffer.dall@linaro.org>
+Date: Sun, 25 May 2014 20:26:01 +0200
+Subject: [PATCH v3 13/14] ARM64: KVM: set and get of sys registers in BE
+ case
+In-Reply-To: <CAA3XUr0PigqiPwxUEMLvFoOaA8EzJfSteavqU4X1WoXSP2F4eA@mail.gmail.com>
+References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
+ <1399997646-4716-14-git-send-email-victor.kamensky@linaro.org>
+ <87lhu4hhou.fsf@approximate.cambridge.arm.com>
+ <CAA3XUr0PigqiPwxUEMLvFoOaA8EzJfSteavqU4X1WoXSP2F4eA@mail.gmail.com>
+Message-ID: <20140525182601.GA23711@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+On Wed, May 14, 2014 at 07:18:26AM -0700, Victor Kamensky wrote:
+> On 14 May 2014 01:45, Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-In order to allow KVM to run on Cortex-A53 implementations, wire the
-minimal support required.
+[...]
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm64/include/asm/cputype.h     | 1 +
- arch/arm64/include/uapi/asm/kvm.h    | 3 ++-
- arch/arm64/kvm/guest.c               | 2 ++
- arch/arm64/kvm/sys_regs_generic_v8.c | 2 ++
- 4 files changed, 7 insertions(+), 1 deletion(-)
+> >>
+> >> -static int reg_from_user(void *val, const void __user *uaddr, u64 id)
+> >> +static int reg_from_user(u64 *val, const void __user *uaddr, u64 id)
+> >>  {
+> >> -     /* This Just Works because we are little endian. */
+> >> -     if (copy_from_user(val, uaddr, KVM_REG_SIZE(id)) != 0)
+> >> +     unsigned long regsize = KVM_REG_SIZE(id);
+> >> +
+> >> +     BUG_ON(regsize != 8);
+> >
+> > I haven't had time to review this series just yet, but this bit just
+> > sends chivers down my spine.
+> >
+> > regsize is derived from id, which comes from a struct one_reg, which is
+> > directly provided by userspace. Here, you're trusting the luser to give
+> > you 8 as a size, and panic the kernel if not.
+> >
+> > As much as I'd like to qualify this as only being a slightly undesirable
+> > effect, I think it deserves a NAK.
+> 
+> Fair enough. I agree. Good catch! I was following on Christoffer's comments
+> at [1], but I have not thought it through. Please advise should I come back to
+> previous version as in [2] or just ignore any sizes other than 8 without
+> having BUG_ON?
+> 
+> Thanks,
+> Victor
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241815.html
+> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/231891.html
+> 
+If the ABI doesn't define an ID for your arch (which is what I was
+saying in my comment), simply return -EINVAL, but don't do BUG_ON(...).
 
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index c404fb0..27f54a7 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -41,6 +41,7 @@
- 
- #define ARM_CPU_PART_AEM_V8	0xD0F0
- #define ARM_CPU_PART_FOUNDATION	0xD000
-+#define ARM_CPU_PART_CORTEX_A53	0xD030
- #define ARM_CPU_PART_CORTEX_A57	0xD070
- 
- #define APM_CPU_PART_POTENZA	0x0000
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index e6471da..e633ff8 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -57,8 +57,9 @@ struct kvm_regs {
- #define KVM_ARM_TARGET_FOUNDATION_V8	1
- #define KVM_ARM_TARGET_CORTEX_A57	2
- #define KVM_ARM_TARGET_XGENE_POTENZA	3
-+#define KVM_ARM_TARGET_CORTEX_A53	4
- 
--#define KVM_ARM_NUM_TARGETS		4
-+#define KVM_ARM_NUM_TARGETS		5
- 
- /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
- #define KVM_ARM_DEVICE_TYPE_SHIFT	0
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 0874557..60b5c31 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -214,6 +214,8 @@ int __attribute_const__ kvm_target_cpu(void)
- 			return KVM_ARM_TARGET_AEM_V8;
- 		case ARM_CPU_PART_FOUNDATION:
- 			return KVM_ARM_TARGET_FOUNDATION_V8;
-+		case ARM_CPU_PART_CORTEX_A53:
-+			return KVM_ARM_TARGET_CORTEX_A53;
- 		case ARM_CPU_PART_CORTEX_A57:
- 			return KVM_ARM_TARGET_CORTEX_A57;
- 		};
-diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
-index 8fe6f76..475fd29 100644
---- a/arch/arm64/kvm/sys_regs_generic_v8.c
-+++ b/arch/arm64/kvm/sys_regs_generic_v8.c
-@@ -88,6 +88,8 @@ static int __init sys_reg_genericv8_init(void)
- 					  &genericv8_target_table);
- 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_FOUNDATION_V8,
- 					  &genericv8_target_table);
-+	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A53,
-+					  &genericv8_target_table);
- 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A57,
- 					  &genericv8_target_table);
- 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_XGENE_POTENZA,
--- 
-1.8.5.2
+-Christoffer
