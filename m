@@ -1,54 +1,65 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 26 May 2014 15:46:51 +0800
-Subject: [PATCH] ARM: clk: imx: remove the CLK_SET_RATE_NO_REPARENT for
- imx_clk_mux_flags
-In-Reply-To: <1401095002.3400.5.camel@paszta.hi.pengutronix.de>
-References: <1401089474-14346-1-git-send-email-b32955@freescale.com>
- <1401095002.3400.5.camel@paszta.hi.pengutronix.de>
-Message-ID: <20140526074649.GA29075@shlinux1.ap.freescale.net>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Mon, 26 May 2014 11:08:01 +0200
+Subject: RFC: representing sdio devices oob interrupt, clks, etc. in device
+ tree
+In-Reply-To: <5382F651.9010506@redhat.com>
+References: <537DC832.3020006@redhat.com>
+ <CAGb2v64VZac2KvAALrScecN89sRnBQoDrKxKMvkte+3G04NXeA@mail.gmail.com>
+ <537DE1AA.5050606@redhat.com> <537E31F7.1030505@gmail.com>
+ <537F1148.3010102@redhat.com> <20140523112239.GB12304@sirena.org.uk>
+ <537F3610.3050104@redhat.com> <20140523162718.GE22111@sirena.org.uk>
+ <53806F26.6050706@redhat.com> <20140525123452.GS22111@sirena.org.uk>
+ <53824294.1090609@redhat.com> <5382F276.8090305@broadcom.com>
+ <CAGb2v64Siixnds9fXGWfTotjq0zGmeqNa-52FNNOcbxFcCjkCg@mail.gmail.com>
+ <5382F651.9010506@redhat.com>
+Message-ID: <53830471.3040301@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 11:03:22AM +0200, Philipp Zabel wrote:
-> Am Montag, den 26.05.2014, 15:31 +0800 schrieb Huang Shijie:
-> > The clocks for Quadspi controller may be different when different
-> > NOR flashes are connected to the board.
-> > 
-> > But the CLK_SET_RATE_NO_REPARENT flag in the current imx_clk_mux_flags
-> > makes the clock do not have the re-parent capability.
-> > 
-> > This patch removes the CLK_SET_RATE_NO_REPARENT for imx_clk_mux_flags.
-> > It makes the Quadspi happy.
-> > 
-> > Signed-off-by: Huang Shijie <b32955@freescale.com>
-> > ---
-> >  arch/arm/mach-imx/clk.h |    3 +--
-> >  1 files changed, 1 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-> > index e29f6eb..32d6253 100644
-> > --- a/arch/arm/mach-imx/clk.h
-> > +++ b/arch/arm/mach-imx/clk.h
-> > @@ -108,8 +108,7 @@ static inline struct clk *imx_clk_mux_flags(const char *name,
-> >  		int num_parents, unsigned long flags)
-> >  {
-> >  	return clk_register_mux(NULL, name, parents, num_parents,
-> > -			flags | CLK_SET_RATE_NO_REPARENT, reg, shift, width, 0,
-> > -			&imx_ccm_lock);
-> > +			flags, reg, shift, width, 0, &imx_ccm_lock);
-> >  }
-> >  
-> >  static inline struct clk *imx_clk_fixed_factor(const char *name,
-> 
-> We need CLK_SET_RATE_NO_REPARENT on the audio/video multiplexers.
-> I think this change is the right thing for imx_clk_mux_flags, but at the
-> same you should make sure not to drop this flag where we want to control
-> a video PLL through the mux.
-thanks for the quick response.
+On 05/26/14 10:07, Hans de Goede wrote:
+> Hi,
+>
+> On 05/26/2014 09:59 AM, Chen-Yu Tsai wrote:
+>> On Mon, May 26, 2014 at 3:51 PM, Arend van Spriel<arend@broadcom.com>  wrote:
+>>> + Russell
+>
+> <snip>
+>
+>>> Hi Hans,
+>>>
+>>> I recalled a recent patchset from Russell King. He was working on i.MX6
+>>> platform with brcmfmac device and ended reworking sdhci/mmc host controller
+>>> code in a series of patches [1]. Patch 34 might be similar to what you are
+>>> trying to accomplish.
+>>
+>> I believe that is a resend of Olof's patch I mentioned early in this
+>> discussion. :)
 
-Could you tell me the clocks the audio/video used?
+Ok,
 
-we can add the CLK_SET_RATE_NO_REPARENT to them.
+I meant to refer to this thread [1]. Indeed, the patch is from Olof.
 
-thanks
-Huang Shijie
+Regards,
+Arend
+
+[1] http://thread.gmane.org/gmane.linux.documentation/22805
+
+> Ok, assuming that is the case, then it seems to me that we are all moving
+> somewhat in the same direction, which is good :)
+>
+> What I would like to propose is to move forward with Olof's patch with
+> 2 changes made to it:
+>
+> 1) Store the clocks / resets / whatever in childnodes of the mmc host node,
+> with the childnodes using the addressing scheme described in the patch
+> from Sascha Hauer titled: "mmc: Add SDIO function devicetree subnode parsing",
+> as this is where they really belong (and in some cases the sdio function driver
+> may need access to them too).
+>
+> 2) Make Olof's code only do the powerup if the child node has a compatible of
+> "simple-sdio-powerup", to avoid it getting in the way of more complex poweron
+> scenarios (which may require a separate pmic driver or some such) later.
+>
+> Regards,
+>
+> Hans
