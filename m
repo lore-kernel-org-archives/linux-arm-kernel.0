@@ -1,32 +1,47 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 26 May 2014 11:59:09 +0530
-Subject: [RFC PATCH 2/5] clk: Introduce 'clk_round_rate_nearest()'
-In-Reply-To: <00f65d1c-a375-40e7-b30a-cd8cb3ca87fc@BN1BFFO11FD020.protection.gbl>
-References: <20140521073457.GD31687@pengutronix.de>
- <e9090453-ce40-4662-a3ea-fbdaffdb2aa4@BN1AFFO11FD046.protection.gbl>
- <20140521182308.GN31687@pengutronix.de>
- <20140521203300.9521.67546@quantum>
- <ac335a38-b0f4-4d95-b111-56c05e1a6234@BN1BFFO11FD045.protection.gbl>
- <20140522182040.GB20155@pengutronix.de>
- <6612b069-1228-488f-81f7-ea8839f6c468@BN1BFFO11FD029.protection.gbl>
- <20140522210328.9521.34889@quantum>
- <a86642cb-855f-455f-b07c-a52bc6aa426f@BN1BFFO11FD050.protection.gbl>
- <20140523013732.9521.70820@quantum>
- <00f65d1c-a375-40e7-b30a-cd8cb3ca87fc@BN1BFFO11FD020.protection.gbl>
-Message-ID: <CAKohpomb+h6ZNDgJ8AwJ_J9DjMB7AP_v-cp8coG3CACo5Wt4vQ@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 26 May 2014 15:29:36 +0900
+Subject: [PATCH] ARM: dts: Add pmu sysreg node to Exynos3250
+Message-ID: <1401085776-14212-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 May 2014 21:44, S?ren Brinkmann <soren.brinkmann@xilinx.com> wrote:
-> Viresh: Could you imagine something similar for cpufreq? You suggested
-> migrating to Hz resolution. I guess that would ideally mean to follow
-> the CCF to a 64-bit type for frequencies and increasing the resolution.
-> I have a messy patch migrating cpufreq and OPP to Hz and unsigned long
-> that works on Zynq. But cpufreq has so many users that it would become
-> quite an undertaking.
-> And we'd need some new/amended OPP DT binding.
+This patch add pmusysreg node for Exynos3250 to access PMU (Power Management Unit)
+register in a centralized way using syscon driver.
 
-If we are going to migrate to Hz from KHz, I think we must consider the
-64 bit stuff right now, otherwise it will bite us later.
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ Documentation/devicetree/bindings/arm/samsung/pmu.txt | 1 +
+ arch/arm/boot/dts/exynos3250.dtsi                     | 5 +++++
+ 2 files changed, 6 insertions(+)
 
-@Rafael: What do you think?
+diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+index b562634..2a4ab04 100644
+--- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
++++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+@@ -2,6 +2,7 @@ SAMSUNG Exynos SoC series PMU Registers
+ 
+ Properties:
+  - compatible : should contain two values. First value must be one from following list:
++		   - "samsung,exynos3250-pmu" - for Exynos3250 SoC,
+ 		   - "samsung,exynos4210-pmu" - for Exynos4210 SoC,
+ 		   - "samsung,exynos4212-pmu" - for Exynos4212 SoC,
+ 		   - "samsung,exynos4412-pmu" - for Exynos4412 SoC,
+diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+index ca28eac..3e678fa 100644
+--- a/arch/arm/boot/dts/exynos3250.dtsi
++++ b/arch/arm/boot/dts/exynos3250.dtsi
+@@ -125,6 +125,11 @@
+ 			reg = <0x10010000 0x400>;
+ 		};
+ 
++		pmu_system_controller: system-controller at 10020000 {
++			compatible = "samsung,exynos3250-pmu", "syscon";
++			reg = <0x10020000 0x4000>;
++		};
++
+ 		pd_cam: cam-power-domain at 10023C00 {
+ 			compatible = "samsung,exynos4210-pd";
+ 			reg = <0x10023C00 0x20>;
+-- 
+1.8.0
