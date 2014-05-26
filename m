@@ -1,38 +1,40 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 27 May 2014 07:06:10 +0900
-Subject: [PATCH v2] cpufreq: exynos: Fix driver compilation with
- ARCH_MULTIPLATFORM
-In-Reply-To: <CAKohpo=b=Jm4vZfgS2YPA740QfvktgVExXXzOdSUmQjGWhzrhg@mail.gmail.com>
-References: <1400670752-673-1-git-send-email-t.figa@samsung.com>	<1400858533-4327-1-git-send-email-t.figa@samsung.com>	<53826377.8060709@samsung.com>
- <CAKohpo=b=Jm4vZfgS2YPA740QfvktgVExXXzOdSUmQjGWhzrhg@mail.gmail.com>
-Message-ID: <5383BAD2.6020406@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 26 May 2014 15:08:23 -0700
+Subject: [GIT PULL] SOCFPGA DTS updates for 3.16, take 2-version 2
+In-Reply-To: <1400858173-7741-1-git-send-email-dinguyen@altera.com>
+References: <1400858173-7741-1-git-send-email-dinguyen@altera.com>
+Message-ID: <20140526220823.GX27093@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/14 14:40, Viresh Kumar wrote:
-> On 26 May 2014 03:11, Kukjin Kim<kgene.kim@samsung.com>  wrote:
->> I'm not sure Thomas' v5 cpufreq-cpu0 driver can be upstreamed for 3.16
->> because of dependency with others, some of them got ack though...
->>
->> * "PM / OPP: move cpufreq specific helpers out of OPP layer"
->> - https://www.mail-archive.com/linux-omap at vger.kernel.org/msg104610.html
->
-> This is already lying in Rafael's tree.
->
-Good.
+On Fri, May 23, 2014 at 10:16:13AM -0500, dinguyen at altera.com wrote:
+> Hi Arnd, Kevin and Olof,
+> 
+> Please consider pulling in these 2 patches for 3.16.
+> 
+> Thanks,
+> 
+> The following changes since commit 8cb289ed60668d3350dda5aa19b4fa1dce1c07f1:
+> 
+>   ARM: socfpga: dts: Add div-reg to the main_pll clocks (2014-05-05 22:33:18 -0500)
+> 
+> are available in the git repository at:
+> 
+>   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_dt_updates-for-3.16_take_2_version_2
+> 
+> for you to fetch changes up to a98b60571938ed5cc79992dacb09460f15b6a175:
+> 
+>   ARM: socfpga: dts: add watchdog0+1 (2014-05-22 16:45:31 -0500)
 
->> * "cpufreq: opp: Add device tree based lookup of boost mode frequency"
->> - http://www.spinics.net/lists/arm-kernel/msg334336.html
->>
-Probably need more time?
+Merged, thanks!
 
->> So firstly, I've queued this instead with exynos-multiplatform series...
->>
->> How do you think?
->
-> Looks fine to me. Thanks.
 
-OK, I applied with your ack.
+> Confidentiality Notice.
+> This message may contain information that is confidential or otherwise protected from disclosure. If you are not the intended recipient, you are hereby notified that any use, disclosure, dissemination, distribution, or copying of this message, or any attachments, is strictly prohibited. If you have received this message in error, please advise the sender by reply e-mail, and delete the message and any attachments. Thank you.
 
-Thanks,
-- Kukjin
+I'm going to ignore this footer for now, but you should probably check
+the configuration of your mailer for them. Some people get upset when
+upstream/mailing list emails get these footers.
+
+
+-Olof
