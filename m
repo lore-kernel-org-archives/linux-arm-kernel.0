@@ -1,39 +1,45 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Mon, 26 May 2014 16:48:39 +0300
-Subject: [GIT PULL] qcom SoC changes for v3.16
+From: gdjakov@mm-sol.com (Georgi Djakov)
+Date: Mon, 26 May 2014 16:58:53 +0300
+Subject: [PATCH] ARM: msm: Update the references to DEBUG_MSM_UARTx
 In-Reply-To: <1401108595.6068.5.camel@x220>
-References: <alpine.DEB.2.00.1405231339340.15680@galak-ubuntu.qualcomm.com>
- <1401108595.6068.5.camel@x220>
-Message-ID: <1401112119.856.37.camel@iivanov-dev>
+References: <1401108595.6068.5.camel@x220>
+Message-ID: <1401112733-23649-1-git-send-email-gdjakov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-05-26 at 14:49 +0200, Paul Bolle wrote:
-> On Fri, 2014-05-23 at 13:42 -0500, Kumar Gala wrote:
-> > Ivan T. Ivanov (1):
-> >        ARM: debug: qcom: make UART address selection configuration option
-> 
-> This one just landed in linux-next (next-20140526).
-> 
-> It removed the Kconfig options DEBUG_MSM_UART1, DEBUG_MSM_UART3, and
-> DEBUG_MSM_UART3. It did not touch these references to their macros:
->     arch/arm/mach-msm/io.c:60:#if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
->     arch/arm/mach-msm/io.c:61:                defined(CONFIG_DEBUG_MSM_UART3)
->     arch/arm/mach-msm/io.c:79:#if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
->     arch/arm/mach-msm/io.c:80:                defined(CONFIG_DEBUG_MSM_UART3)
-> 
-> Is a patch to fix this queued somewhere?
-> 
+The Kconfig options DEBUG_MSM_UART1, DEBUG_MSM_UART2 and DEBUG_MSM_UART3
+are removed, but they are still referenced in arch/arm/mach-msm/io.c
+Fix this by updating the reference to the new Kconfig option.
 
-Hm, there was some conflicts, which where resolved by Stephen
-Rothwell [1], but maybe there is still something wrong. Have to check.
+Reported-by: Paul Bolle <pebolle@tiscali.nl>
+Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+---
+ arch/arm/mach-msm/io.c |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-Regards,
-Ivan
-
-[1] https://lkml.org/lkml/2014/5/25/147
-
-
-> 
-> Paul Bolle
-> 
+diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
+index 34e0947..b042dca 100644
+--- a/arch/arm/mach-msm/io.c
++++ b/arch/arm/mach-msm/io.c
+@@ -57,8 +57,7 @@ static struct map_desc msm_io_desc[] __initdata = {
+ 		.length =   MSM_SHARED_RAM_SIZE,
+ 		.type =     MT_DEVICE,
+ 	},
+-#if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
+-		defined(CONFIG_DEBUG_MSM_UART3)
++#if defined(CONFIG_DEBUG_MSM_UART)
+ 	{
+ 		/* Must be last: virtual and pfn filled in by debug_ll_addr() */
+ 		.length = SZ_4K,
+@@ -76,8 +75,7 @@ void __init msm_map_common_io(void)
+ 	 * pages are peripheral interface or not.
+ 	 */
+ 	asm("mcr p15, 0, %0, c15, c2, 4" : : "r" (0));
+-#if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
+-		defined(CONFIG_DEBUG_MSM_UART3)
++#if defined(CONFIG_DEBUG_MSM_UART)
+ #ifdef CONFIG_MMU
+ 	debug_ll_addr(&msm_io_desc[size - 1].pfn,
+ 		      &msm_io_desc[size - 1].virtual);
+-- 
+1.7.9.5
