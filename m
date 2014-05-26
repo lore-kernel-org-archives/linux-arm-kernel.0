@@ -1,34 +1,80 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 26 May 2014 17:11:48 +0800
-Subject: [PATCH] ARM: clk: imx: remove the CLK_SET_RATE_NO_REPARENT for
- imx_clk_mux_flags
-In-Reply-To: <1401095002.3400.5.camel@paszta.hi.pengutronix.de>
-References: <1401089474-14346-1-git-send-email-b32955@freescale.com>
- <1401095002.3400.5.camel@paszta.hi.pengutronix.de>
-Message-ID: <20140526091147.GG2650@dragon>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Mon, 26 May 2014 14:46:14 +0530
+Subject: [PATCH v2 01/11] sched: fix imbalance flag reset
+In-Reply-To: <CAKfTPtDBZyrJJpUHPZcG9Jf4egneyqQ7TR3QXiR0Wff8ZBkHAw@mail.gmail.com>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-2-git-send-email-vincent.guittot@linaro.org>
+ <5381C70E.3030605@linux.vnet.ibm.com>
+ <CAKfTPtDBZyrJJpUHPZcG9Jf4egneyqQ7TR3QXiR0Wff8ZBkHAw@mail.gmail.com>
+Message-ID: <5383065E.9030601@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 11:03:22AM +0200, Philipp Zabel wrote:
-> > @@ -108,8 +108,7 @@ static inline struct clk *imx_clk_mux_flags(const char *name,
-> >  		int num_parents, unsigned long flags)
-> >  {
-> >  	return clk_register_mux(NULL, name, parents, num_parents,
-> > -			flags | CLK_SET_RATE_NO_REPARENT, reg, shift, width, 0,
-> > -			&imx_ccm_lock);
-> > +			flags, reg, shift, width, 0, &imx_ccm_lock);
-> >  }
-> >  
-> >  static inline struct clk *imx_clk_fixed_factor(const char *name,
+On 05/26/2014 01:19 PM, Vincent Guittot wrote:
+> On 25 May 2014 12:33, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
+>> Hi Vincent,
+>>
+>> On 05/23/2014 09:22 PM, Vincent Guittot wrote:
+>>> The imbalance flag can stay set whereas there is no imbalance.
+>>>
+>>> Let assume that we have 3 tasks that run on a dual cores /dual cluster system.
+>>> We will have some idle load balance which are triggered during tick.
+>>> Unfortunately, the tick is also used to queue background work so we can reach
+>>> the situation where short work has been queued on a CPU which already runs a
+>>> task. The load balance will detect this imbalance (2 tasks on 1 CPU and an idle
+>>> CPU) and will try to pull the waiting task on the idle CPU. The waiting task is
+>>> a worker thread that is pinned on a CPU so an imbalance due to pinned task is
+>>> detected and the imbalance flag is set.
+>>> Then, we will not be able to clear the flag because we have at most 1 task on
+>>> each CPU but the imbalance flag will trig to useless active load balance
+>>> between the idle CPU and the busy CPU.
+>>
+>> Why do we do active balancing today when there is at-most 1 task on the
+>> busiest cpu? Shouldn't we be skipping load balancing altogether? If we
+>> do active balancing when the number of tasks = 1, it will lead to a ping
+>> pong right?
 > 
-> We need CLK_SET_RATE_NO_REPARENT on the audio/video multiplexers.
-> I think this change is the right thing for imx_clk_mux_flags, but at the
-> same you should make sure not to drop this flag where we want to control
-> a video PLL through the mux.
+> That's the purpose of the patch to prevent this useless active load
+> balance. When the imbalance flag is set, an active load balance is
+> triggered whatever the load balance is because of pinned tasks that
+> prevents a balance state.
 
-Philipp,
+No I mean this:
 
-Are you saying that you see a different clock tree topology after this
-change?
+sched:Do not continue load balancing when the busiest cpu has one
+running task
 
-Shawn
+From: Preeti U Murthy <preeti@linux.vnet.ibm.com>
+
+
+---
+ kernel/sched/fair.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index c9617b7..b175333 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -6626,6 +6626,8 @@ more_balance:
+ 			}
+ 			goto out_balanced;
+ 		}
++	} else {
++		goto out;
+ 	}
+
+ 	if (!ld_moved) {
+
+
+}
+
+Regards
+Preeti U Murthy
+> 
+> Vincent
+> 
+>>
+>> Regards
+>> Preeti U Murthy
+>>
+> 
