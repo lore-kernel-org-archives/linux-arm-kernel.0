@@ -1,52 +1,42 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 26 May 2014 17:05:11 +0200
-Subject: [PATCH] ARM: mvebu: mark armada_370_xp_pmsu_idle_prepare() as
- static
-In-Reply-To: <1401116474-31221-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1401116474-31221-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <53835827.80101@free-electrons.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 26 May 2014 17:07:05 +0200
+Subject: [GIT PULL] clockevents: new material for 3.16
+In-Reply-To: <20140526134052.GA3790@lukather>
+References: <537F214C.8000700@linaro.org>
+ <20140526194512.032c6630@canb.auug.org.au> <53830ED9.9060001@linaro.org>
+ <20140526134052.GA3790@lukather>
+Message-ID: <1401116825.3400.27.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/05/2014 17:01, Thomas Petazzoni wrote:
-> The armada_370_xp_pmsu_idle_prepare() function is only used internally
-> to pmsu.c, so there's no reason to not use the static qualifier.
+Hi Maxime,
 
-Indeed, it was exported in the 1st version of the series, and then I forgot
-to make it static later.
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-
-Thanks,
-
-Gregory
-
-
+Am Montag, den 26.05.2014, 15:40 +0200 schrieb Maxime Ripard:
+> On Mon, May 26, 2014 at 11:52:25AM +0200, Daniel Lezcano wrote:
+> > On 05/26/2014 11:45 AM, Stephen Rothwell wrote:
+> > >Hi all,
+> > >
+> > >On Fri, 23 May 2014 12:22:04 +0200 Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> > >>
+> > >>        clocksource: sun5i: Add support for reset controller
+> > >
+> > >This commit caused a build failure on arm in linux-next today ...
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/mach-mvebu/pmsu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> It's weird... of_reset_control_get has been merged in 3.15 by this
+> commit fc0a5921561c71be2c334a335c1680f7930434d7 ("reset: Add
+> of_reset_control_get"), and then the commit
+> b424080a9e086e683ad5fdc624a7cf3c024e0c0f ("reset: Add optional resets
+> and stubs") removed it, still in 3.15 (probably a mismerge).
 > 
-> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-> index 53a55c8..6e83d32 100644
-> --- a/arch/arm/mach-mvebu/pmsu.c
-> +++ b/arch/arm/mach-mvebu/pmsu.c
-> @@ -148,7 +148,7 @@ static void armada_370_xp_cpu_resume(void)
->  }
->  
->  /* No locking is needed because we only access per-CPU registers */
-> -void armada_370_xp_pmsu_idle_prepare(bool deepidle)
-> +static void armada_370_xp_pmsu_idle_prepare(bool deepidle)
->  {
->  	unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
->  	u32 reg;
+> Finally, Hans de Goede introduced it back in the following patch:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/246738.html
 > 
+> That should have shown up in one of 3.15-rc's according to:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/252317.html
+> 
+> Philipp, what's going on?
 
+I have sent a pull request now.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+regards
+Philipp
