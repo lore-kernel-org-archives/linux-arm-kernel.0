@@ -1,72 +1,67 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 27 May 2014 02:18:28 +0400
-Subject: [PATCH v2] ARM: shmobile: r8a7791: link PCI USB devices to USB PHY
-Message-ID: <201405270218.30040.sergei.shtylyov@cogentembedded.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 26 May 2014 15:29:30 -0700
+Subject: [GIT PULL 4th 1/2] Samsung Exynos multiplatform for 3.16
+In-Reply-To: <5383BC62.6040005@samsung.com>
+References: <5383BC62.6040005@samsung.com>
+Message-ID: <CAOesGMiM=Yc__EoWUPwyV3YRuQ83CSK8v8W==yt2Z9zoPNSwRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the PCI USB devices that are behind the PCI bridges, adding necessary
-links to the USB PHY device.
+On Mon, May 26, 2014 at 3:12 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Hi Arnd, Olof, Kevin
+>
+> Sorry for late support multiplatform on exynos and now it's possible. Thanks
+> for many guys' effort and time :-)
+>
+> BRs,
+> Kukjin
+>
+> The following changes since commit dfacdfef06090ca0c131f45dfd3f3ca3452a8ed3:
+>
+>   Merge branch 'v3.16-next/dt-samsung' into v3.16-next/multiplatform
+> (2014-05-26 06:19:01 +0900)
+>
+> are available in the git repository at:
+>
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/exynos-multiplatform
+>
+> for you to fetch changes up to 43baa7dcb5fa0c95b1e443d2a739c14de1fbbe07:
+>
+>   cpufreq: exynos: Fix driver compilation with ARCH_MULTIPLATFORM
+> (2014-05-27 06:22:53 +0900)
+>
+> ----------------------------------------------------------------
+> Exynos mutiplatform support for 3.16
+>
+> Here is enabling the exynos platform as part of a multiplatform
+> kernel. This is including ARCH_EXYNOS related Kconfig entries
+> consolidation and update multi_v7_defconfig accordingly. And
+> fixes exynos-cpufreq driver compilation with ARCH_MULTIPLATFORM.
+>
+> Note that this is based on tags/exynos-soc. And tags/samsung-dt,
+> tags/samsung-clk are merged on top of that.
+>
+> ----------------------------------------------------------------
+> Arnd Bergmann (1):
+>       ARM: EXYNOS: Enable multi-platform build support
+>
+> Sachin Kamat (2):
+>       ARM: EXYNOS: Consolidate Kconfig entries
+>       ARM: multi_v7_defconfig: Enable Exynos platform
+>
+> Tomasz Figa (1):
+>       cpufreq: exynos: Fix driver compilation with ARCH_MULTIPLATFORM
+>
+>  arch/arm/Kconfig                     | 20 ---------
+>  arch/arm/configs/multi_v7_defconfig  | 12 ++++++
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Please send multi_v7_defconfig updates as patches to arm at kernel.org,
+and don't include them in branches. They often conflict and we want to
+apply them directly for that reason.
 
----
-This patch is against 'renesas-devel-v3.15-rc7-20140526' tag of Simon Horman's
-'renesas.git' repo plus R8A7791/Koelsch/Henninger PCI and USB PHY support
-patches posted before.  The patch requires the internal PCI DT support, USB PHY
-driver, and USB HCD generic PHY support (also already posted) in order to work.
 
-Changes in version 2:
-- renamed the PCI OHCI/EHCI device nodes to comply with the PCI binding;
-- changed the PHY specifier in the PCI#1 node to reflect that channel #1 support
-  was dropped;
-- resolved rejects.
+Thanks,
 
- arch/arm/boot/dts/r8a7791.dtsi |   28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7791.dtsi
-@@ -923,6 +923,20 @@
- 		interrupt-map = <0x0000 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
- 			      	 0x0800 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
- 			      	 0x1000 0 0 2 &gic 0 108 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		usb at 0,1 {
-+			reg = <0x800 0 0 0 0>;
-+			device_type = "pci";
-+			phys = <&usbphy 0 0>;
-+			phy-names = "usb";
-+		};
-+
-+		usb at 0,2 {
-+			reg = <0x1000 0 0 0 0>;
-+			device_type = "pci";
-+			phys = <&usbphy 0 0>;
-+			phy-names = "usb";
-+		};
- 	};
- 
- 	pci1: pci at ee0d0000 {
-@@ -941,5 +955,19 @@
- 		interrupt-map = <0x0000 0 0 1 &gic 0 113 IRQ_TYPE_LEVEL_HIGH
- 			      	 0x0800 0 0 1 &gic 0 113 IRQ_TYPE_LEVEL_HIGH
- 			      	 0x1000 0 0 2 &gic 0 113 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		usb at 0,1 {
-+			reg = <0x800 0 0 0 0>;
-+			device_type = "pci";
-+			phys = <&usbphy 1 0>;
-+			phy-names = "usb";
-+		};
-+
-+		usb at 0,2 {
-+			reg = <0x1000 0 0 0 0>;
-+			device_type = "pci";
-+			phys = <&usbphy 1 0>;
-+			phy-names = "usb";
-+		};
- 	};
- };
+-Olof
