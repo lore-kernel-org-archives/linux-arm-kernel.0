@@ -1,37 +1,90 @@
-From: jdelvare@suse.de (Jean Delvare)
-Date: Mon, 26 May 2014 17:34:01 +0200
-Subject: [PATCH] gpio: pch: include linux/slab.h
-In-Reply-To: <8665687.jWqf6bo4lM@wuerfel>
-References: <8665687.jWqf6bo4lM@wuerfel>
-Message-ID: <20140526173401.770af4a9@endymion.delvare>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 26 May 2014 17:34:24 +0200
+Subject: [PATCH] ARM: vexpress: refine dependencies for new code
+Message-ID: <6862654.ZzBrnrRESe@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 26 May 2014 17:04:24 +0200, Arnd Bergmann wrote:
-> The gpio-pch driver was recently enabled for compile-tests,
-> which revealed that it is missing an include for linux/slab.h,
-> which on ARM is not implied by any of the other headers.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/drivers/gpio/gpio-pch.c b/drivers/gpio/gpio-pch.c
-> index 83a1563..d6eac9b 100644
-> --- a/drivers/gpio/gpio-pch.c
-> +++ b/drivers/gpio/gpio-pch.c
-> @@ -20,6 +20,7 @@
->  #include <linux/gpio.h>
->  #include <linux/interrupt.h>
->  #include <linux/irq.h>
-> +#include <linux/slab.h>
->  
->  #define PCH_EDGE_FALLING	0
->  #define PCH_EDGE_RISING		BIT(0)
-> 
+The versatile express changes for 3.16 introduced a number of
+build regressions for randconfig kernels by not tracking dependencies
+between the components right.
 
-Good catch, thanks Arnd.
+This patch tries to rectify that:
 
-Reviewed-by: Jean Delvare <jdelvare@suse.de>
+* the mach-vexpress code cannot link without the syscfg driver,
+  which in turn needs MFD_VEXPRESS_SYSREG
+* various drivers call devm_regmap_init_vexpress_config(), which
+  has to be exported so it can be used by loadable modules
+* the configuration bus uses OF DT helper functions that are not
+  available to platforms disable CONFIG_OF
+* The sysreg driver exports GPIOs through gpiolib, which can
+  be disabled on some platforms.
+* The clocksource code cannot be built on platforms that don't
+  use modern timekeeping but rely on gettimeoffset.
 
--- 
-Jean Delvare
-SUSE L3 Support
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index e0726e4..2cc994e 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -18,6 +18,8 @@ menuconfig ARCH_VEXPRESS
+ 	select POWER_SUPPLY
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 	select VEXPRESS_CONFIG
++	select VEXPRESS_SYSCFG
++	select MFD_VEXPRESS_SYSREG
+ 	help
+ 	  This option enables support for systems using Cortex processor based
+ 	  ARM core and logic (FPGA) tiles on the Versatile Express motherboard,
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index 827f8a5..1f37d98 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -54,6 +54,7 @@ config VEXPRESS_CONFIG
+ 	bool "Versatile Express configuration bus"
+ 	default y if ARCH_VEXPRESS
+ 	depends on ARM || ARM64
++	depends on OF
+ 	select REGMAP
+ 	help
+ 	  Platform configuration infrastructure for the ARM Ltd.
+diff --git a/drivers/bus/vexpress-config.c b/drivers/bus/vexpress-config.c
+index 27a07df..a64763b 100644
+--- a/drivers/bus/vexpress-config.c
++++ b/drivers/bus/vexpress-config.c
+@@ -118,7 +118,7 @@ struct regmap *devm_regmap_init_vexpress_config(struct device *dev)
+ 
+ 	return regmap;
+ }
+-
++EXPORT_SYMBOL_GPL(devm_regmap_init_vexpress_config);
+ 
+ struct device *vexpress_config_bridge_register(struct device *parent,
+ 		struct vexpress_config_bridge_ops *ops, void *context)
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 2c27b02..43f1acf 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -194,7 +194,7 @@ config CLKSRC_QCOM
+ 
+ config CLKSRC_VERSATILE
+ 	bool "ARM Versatile (Express) reference platforms clock source"
+-	depends on GENERIC_SCHED_CLOCK
++	depends on GENERIC_SCHED_CLOCK && !ARCH_USES_GETTIMEOFFSET
+ 	select CLKSRC_OF
+ 	default y if MFD_VEXPRESS_SYSREG
+ 	help
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index a3987af..6cc4b6a 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -1261,7 +1261,7 @@ endmenu
+ 
+ config MFD_VEXPRESS_SYSREG
+ 	bool "Versatile Express System Registers"
+-	depends on VEXPRESS_CONFIG
++	depends on VEXPRESS_CONFIG && GPIOLIB
+ 	default y
+ 	select CLKSRC_MMIO
+ 	select GPIO_GENERIC_PLATFORM
