@@ -1,34 +1,24 @@
-From: emilgoode@gmail.com (Emil Goode)
-Date: Mon, 26 May 2014 21:40:06 +0200
-Subject: [PATCH 1/3] driver core/platform: don't leak memory allocated
- for dma_mask
-In-Reply-To: <20140526193046.GJ15585@mwanda>
-References: <1401122483-31603-1-git-send-email-emilgoode@gmail.com>
- <20140526193046.GJ15585@mwanda>
-Message-ID: <20140526194006.GB23964@lianli>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 26 May 2014 12:59:39 -0700
+Subject: [GIT PULL 1/4] omap soc changes for v3.16 merge window
+In-Reply-To: <20140520013030.GE15793@atomide.com>
+References: <20140520013030.GE15793@atomide.com>
+Message-ID: <20140526195939.GE27093@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Mon, May 26, 2014 at 10:30:46PM +0300, Dan Carpenter wrote:
-> On Mon, May 26, 2014 at 06:41:21PM +0200, Emil Goode wrote:
-> > diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-> > index 9e9227e..dd1fa07 100644
-> > --- a/drivers/base/platform.c
-> > +++ b/drivers/base/platform.c
-> > @@ -166,6 +166,7 @@ EXPORT_SYMBOL_GPL(platform_add_devices);
-> >  struct platform_object {
-> >  	struct platform_device pdev;
-> >  	char name[1];
-> > +	u64 dma_mask;
-> >  };
+On Mon, May 19, 2014 at 06:30:31PM -0700, Tony Lindgren wrote:
+> Looks like I'm still having trouble sending out some pull requests,
+> so apologies you're seeing these as duplicates.
 > 
-> Heh.  No this doesn't work as patch #1.  You have to have name at the
-> end of the struct.
+> The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
+> 
+>   Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/soc-signed
 
-Yes I missed that one, obviously the order is important here.
+Merged into next/soc. Thanks!
 
-Best regards,
-
-Emil Goode
+-Olof
