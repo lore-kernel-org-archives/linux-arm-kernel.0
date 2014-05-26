@@ -1,29 +1,64 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 26 May 2014 11:10:35 +0530
-Subject: [PATCH v2] cpufreq: exynos: Fix driver compilation with
- ARCH_MULTIPLATFORM
-In-Reply-To: <53826377.8060709@samsung.com>
-References: <1400670752-673-1-git-send-email-t.figa@samsung.com>
- <1400858533-4327-1-git-send-email-t.figa@samsung.com>
- <53826377.8060709@samsung.com>
-Message-ID: <CAKohpo=b=Jm4vZfgS2YPA740QfvktgVExXXzOdSUmQjGWhzrhg@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 26 May 2014 15:43:31 +1000
+Subject: linux-next: manual merge of the clockevents tree with the arm-soc tree
+Message-ID: <20140526154331.7fc6b30c@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 May 2014 03:11, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> I'm not sure Thomas' v5 cpufreq-cpu0 driver can be upstreamed for 3.16
-> because of dependency with others, some of them got ack though...
->
-> * "PM / OPP: move cpufreq specific helpers out of OPP layer"
-> - https://www.mail-archive.com/linux-omap at vger.kernel.org/msg104610.html
+Hi Daniel,
 
-This is already lying in Rafael's tree.
+Today's linux-next merge of the clockevents tree got a conflict in
+arch/arm/boot/dts/vf610.dtsi between commit 0517fe6aa880 ("ARM: dts:
+vf610-twr: Add support for sdhc1") from the arm-soc tree and commit
+07513e1330a9 ("ARM: dts: vf610: Add Freescale FlexTimer Module timer
+node") from the clockevents tree.
 
-> * "cpufreq: opp: Add device tree based lookup of boost mode frequency"
-> - http://www.spinics.net/lists/arm-kernel/msg334336.html
->
-> So firstly, I've queued this instead with exynos-multiplatform series...
->
-> How do you think?
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-Looks fine to me. Thanks.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/boot/dts/vf610.dtsi
+index 73355ddc5186,3c91b84066a1..000000000000
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@@ -360,17 -347,19 +360,30 @@@
+  				status = "disabled";
+  			};
+  
+ +			esdhc1: esdhc at 400b2000 {
+ +				compatible = "fsl,imx53-esdhc";
+ +				reg = <0x400b2000 0x4000>;
+ +				interrupts = <0 28 0x04>;
+ +				clocks = <&clks VF610_CLK_IPG_BUS>,
+ +					<&clks VF610_CLK_PLATFORM_BUS>,
+ +					<&clks VF610_CLK_ESDHC1>;
+ +				clock-names = "ipg", "ahb", "per";
+ +				status = "disabled";
+ +			};
+ +
++ 			ftm: ftm at 400b8000 {
++ 				compatible = "fsl,ftm-timer";
++ 				reg = <0x400b8000 0x1000 0x400b9000 0x1000>;
++ 				interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>;
++ 				clock-names = "ftm-evt", "ftm-src",
++ 					"ftm-evt-counter-en", "ftm-src-counter-en";
++ 				clocks = <&clks VF610_CLK_FTM2>,
++ 					<&clks VF610_CLK_FTM3>,
++ 					<&clks VF610_CLK_FTM2_EXT_FIX_EN>,
++ 					<&clks VF610_CLK_FTM3_EXT_FIX_EN>;
++ 				status = "disabled";
++ 			};
++ 
+  			fec0: ethernet at 400d0000 {
+  				compatible = "fsl,mvf600-fec";
+  				reg = <0x400d0000 0x1000>;
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140526/e2592070/attachment.sig>
