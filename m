@@ -1,109 +1,69 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 26 May 2014 07:50:02 +0900
-Subject: [PATCH v5 0/7] cpufreq: use cpufreq-cpu0 driver for exynos based
- platforms
-In-Reply-To: <1400855260-6807-1-git-send-email-thomas.ab@samsung.com>
-References: <1400855260-6807-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <5382739A.60800@samsung.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 26 May 2014 10:17:41 +1000
+Subject: linux-next: manual merge of the samsung tree with the arm-soc tree
+Message-ID: <20140526101741.102768b2@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/14 23:27, Thomas Abraham wrote:
-> Changes since v4:
-> - Various changes in clock code suggested by Tomasz Figa<t.figa@samsung.com>
-> - This series depends on mutiple other patches
->    [a] patch that introduces read-only attribute for clock dividers.
->        - http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/259264.html
->    [b] the series "PM / OPP: move cpufreq specific helpers out of OPP layer"
->        - https://www.mail-archive.com/linux-omap at vger.kernel.org/msg104610.html
->    [c] the series "cpufreq: opp: Add device tree based lookup of boost mode frequency"
->        - http://www.spinics.net/lists/arm-kernel/msg334336.html
->
-This series looks good to me after quick loking at but as I replied on 
-other thread, I'm not sure above changes are ready for 3.16 or not...
+Hi Kukjin,
 
-Maybe we can revisit this series for 3.17?...hmm...
+Today's linux-next merge of the samsung tree got a conflict in
+arch/arm/Kconfig.debug between commit 7098cff2a3f4 ("ARM: debug: qcom:
+make UART address selection configuration option") from the arm-soc
+tree and commit 1899de289497 ("ARM: S3C24XX: use generic
+DEBUG_UART_PHY/_VIRT in debug macro") from the samsung tree.
 
-- Kukjin
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-> Changes since v3:
-> - Addressed comments from Tomasz Figa<t.figa@samsung.com>
->    [http://www.spinics.net/lists/cpufreq/msg09290.html]
-> - Rebased to v3.15-rc4
->
-> Changes since v2:
-> - Safe operating voltage is not required while switching APLL frequency
->    since the temporary parent's clock is divided down to keep armclk within
->    permissible limits. Thanks to Heiko Stuebner<heiko@sntech.de>  for
->    suggesting this.
-> - Rob had suggested to use max frequency for each of the divider clock
->    outputs instead of divider values. But due to certain SoC specific
->    characteristics, the divider values corresponding to the input clock
->    frequency for the CMU_CPU clock blocks have to be used.
->
-> Changes since v1:
-> - Removes Exynos4x12 and Exynos5250 cpufreq driver also.
-> - Device tree based clock configuration lookup as suggested by Lukasz
->    Majewski and Tomasz Figa.
-> - safe operating point binding reworked as suggested by Shawn Guo.
->
-> The patch series removes the use of Exynos specific cpufreq driver and enables
-> the use of cpufreq-cpu0 driver for Exynos4210, Exynos4x12 and Exynos5250 based
-> platforms. This is being done for few reasons.
->
-> (a) The Exynos cpufreq driver reads/writes clock controller registers
->      bypassing the Exynos CCF driver which is sort of problematic.
-> (b) Removes the need for having clock controller register definitions
->      in the cpufreq driver and also removes the need for statically
->      io-remapping clock controller address space (helps in moving towards
->      multiplatform kernel).
->
-> Thomas Abraham (7):
->    cpufreq: cpufreq-cpu0: allow use of optional boost mode frequencies
->    clk: samsung: add infrastructure to register cpu clocks
->    Documentation: devicetree: add cpu clock configuration data binding for Exynos4/5
->    clk: exynos: use cpu-clock provider type to represent arm clock
->    ARM: dts: Exynos: add cpu nodes, opp and cpu clock configuration data
->    ARM: Exynos: switch to using generic cpufreq-cpu0 driver
->    cpufreq: exynos: remove all exynos specific cpufreq driver support
->
->   .../devicetree/bindings/clock/exynos4-clock.txt    |   37 ++
->   .../devicetree/bindings/clock/exynos5250-clock.txt |   36 ++
->   .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |    2 +
->   arch/arm/boot/dts/exynos4210-origen.dts            |    6 +
->   arch/arm/boot/dts/exynos4210-trats.dts             |    6 +
->   arch/arm/boot/dts/exynos4210-universal_c210.dts    |    6 +
->   arch/arm/boot/dts/exynos4210.dtsi                  |   35 ++
->   arch/arm/boot/dts/exynos4212.dtsi                  |   18 +
->   arch/arm/boot/dts/exynos4412-odroidx.dts           |    6 +
->   arch/arm/boot/dts/exynos4412-origen.dts            |    6 +
->   arch/arm/boot/dts/exynos4412-trats2.dts            |    6 +
->   arch/arm/boot/dts/exynos4412.dtsi                  |   31 ++
->   arch/arm/boot/dts/exynos4x12.dtsi                  |   36 ++
->   arch/arm/boot/dts/exynos5250-arndale.dts           |    6 +
->   arch/arm/boot/dts/exynos5250-cros-common.dtsi      |    6 +
->   arch/arm/boot/dts/exynos5250-smdk5250.dts          |    6 +
->   arch/arm/boot/dts/exynos5250.dtsi                  |   41 ++
->   arch/arm/mach-exynos/exynos.c                      |    4 +-
->   drivers/clk/samsung/Makefile                       |    2 +-
->   drivers/clk/samsung/clk-cpu.c                      |  448 ++++++++++++++++++++
->   drivers/clk/samsung/clk-exynos4.c                  |   25 +-
->   drivers/clk/samsung/clk-exynos5250.c               |   16 +-
->   drivers/clk/samsung/clk.h                          |    4 +
->   drivers/cpufreq/Kconfig                            |    1 +
->   drivers/cpufreq/Kconfig.arm                        |   52 ---
->   drivers/cpufreq/Makefile                           |    4 -
->   drivers/cpufreq/cpufreq-cpu0.c                     |    3 +
->   drivers/cpufreq/exynos-cpufreq.c                   |  218 ----------
->   drivers/cpufreq/exynos-cpufreq.h                   |   99 -----
->   drivers/cpufreq/exynos4210-cpufreq.c               |  157 -------
->   drivers/cpufreq/exynos4x12-cpufreq.c               |  208 ---------
->   drivers/cpufreq/exynos5250-cpufreq.c               |  183 --------
->   include/dt-bindings/clock/exynos5250.h             |    1 +
->   33 files changed, 779 insertions(+), 936 deletions(-)
->   create mode 100644 drivers/clk/samsung/clk-cpu.c
->   delete mode 100644 drivers/cpufreq/exynos-cpufreq.c
->   delete mode 100644 drivers/cpufreq/exynos-cpufreq.h
->   delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
->   delete mode 100644 drivers/cpufreq/exynos4x12-cpufreq.c
->   delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/Kconfig.debug
+index 6ff3dc661fdd,4678870f8ee8..000000000000
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@@ -966,10 -1007,10 +1003,11 @@@ config DEBUG_LL_INCLUD
+  				 DEBUG_IMX51_UART || \
+  				 DEBUG_IMX53_UART ||\
+  				 DEBUG_IMX6Q_UART || \
+ -				 DEBUG_IMX6SL_UART
+ -	default "debug/msm.S" if DEBUG_MSM_UART
+ +				 DEBUG_IMX6SL_UART || \
+ +				 DEBUG_IMX6SX_UART
+ +	default "debug/msm.S" if DEBUG_MSM_UART || DEBUG_QCOM_UARTDM
+  	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
++ 	default "debug/s3c24xx.S" if DEBUG_S3C24XX_UART
+  	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1 || DEBUG_SIRFMARCO_UART1
+  	default "debug/sti.S" if DEBUG_STI_UART
+  	default "debug/tegra.S" if DEBUG_TEGRA_UART
+@@@ -1057,8 -1102,7 +1101,8 @@@ config DEBUG_UART_PHY
+  	default 0xfffff700 if ARCH_IOP33X
+  	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+  		DEBUG_LL_UART_EFM32 || \
+- 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
+ -		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_S3C24XX_UART
+++		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_S3C24XX_UART \
+ +		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM
+  
+  config DEBUG_UART_VIRT
+  	hex "Virtual base address of debug UART"
+@@@ -1118,8 -1166,7 +1168,8 @@@
+  	default 0xff003000 if DEBUG_U300_UART
+  	default DEBUG_UART_PHYS if !MMU
+  	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+- 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
+ -		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_S3C24XX_UART
+++		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_S3C24XX_UART \
+ +		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM
+  
+  config DEBUG_UART_8250_SHIFT
+  	int "Register offset shift for the 8250 debug UART"
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140526/70d34985/attachment.sig>
