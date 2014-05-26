@@ -1,33 +1,30 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 26 May 2014 20:52:02 +0530
-Subject: [PATCH 2/4] cpufreq: add i.MX5 cpufreq driver
-In-Reply-To: <1401112697.4829.56.camel@weser.hi.pengutronix.de>
-References: <1401099308-9658-1-git-send-email-l.stach@pengutronix.de>
- <1401099308-9658-2-git-send-email-l.stach@pengutronix.de>
- <CAKohpoksbFHyX=r0=URMedJNi68c3xAX4OrXzSFqgf1-bCm4+Q@mail.gmail.com>
- <1401101131.4829.29.camel@weser.hi.pengutronix.de>
- <CAKohponTUsYLf-8_iSnttwK8oXyJEZVWpF+a=vLC7r_jZ8AzOQ@mail.gmail.com>
- <1401107748.4829.39.camel@weser.hi.pengutronix.de>
- <CAKohpo=ncHUmtJOEw4FZG1BWUSuiQK4n+ETEMJWJj9UoPz2cnw@mail.gmail.com>
- <1401109863.4829.46.camel@weser.hi.pengutronix.de>
- <CAKohponzJma6yNueMef2Q4k+qT-n7boV0tx0pCqjFmuQWj6TXg@mail.gmail.com>
- <1401112697.4829.56.camel@weser.hi.pengutronix.de>
-Message-ID: <CAKohponvWLVfBL06HURnTq4nmdKjROV-bd4pVcbNmsAUYYC+nA@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 26 May 2014 17:28:14 +0200
+Subject: [PATCH v3 03/14] ARM: KVM: handle 64bit values passed to mrcc or
+ from mcrr instructions in BE case
+In-Reply-To: <1399997646-4716-4-git-send-email-victor.kamensky@linaro.org>
+References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
+ <1399997646-4716-4-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20140526152814.GB31431@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 May 2014 19:28, Lucas Stach <l.stach@pengutronix.de> wrote:
-> Right, the OPP in my example define the minimum required voltage for
-> each frequency. This is in accordance to the OPP binding. But for this
-> chip the datasheet explicitly says that it is ok to power the cpu rail
-> with up to 1.4V, regardless of the current operating frequency. So this
-> 1.4V is really the upper bound I would like to pass to the regulator
-> framework. This ensures that the driver still works properly even if the
-> external regulator can't scale down to the minimum (or in other words
-> optimal) voltage.
+On Tue, May 13, 2014 at 09:13:55AM -0700, Victor Kamensky wrote:
+> In some cases the mcrr and mrrc instructions in combination with the ldrd
+> and strd instructions need to deal with 64bit value in memory. The ldrd
+> and strd instructions already handle endianness within word (register)
+> boundaries but to get effect of the whole 64bit value represented correctly,
+> rr_lo_hi macro is introduced and is used to swap registers positions when
+> the mcrr and mrrc instructions are used. That has the effect of swapping
+> two words.
 
-One more query. You have mentioned earlier and I just wanted to confirm
-this. In your platform/board regulator only supports one voltage, i.e. 1.4 uV,
-and it we can't get lower values out of regulator ?
+So in this version you decided to keep the ordering of the TTBRX and
+TTBRX_high bits (high being most significant).  I assume this is because
+of the trapping of VM registers introduced by mark and to maintain
+access_vm_reg()?
 
-If that's the case, why are you looking to use regulator at all?
+Any other changes since the last version?
+
+If none, then for the content of this patch:
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
