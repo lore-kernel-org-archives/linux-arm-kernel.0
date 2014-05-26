@@ -1,30 +1,34 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 26 May 2014 17:01:14 +0200
-Subject: [PATCH] ARM: mvebu: mark armada_370_xp_pmsu_idle_prepare() as static
-Message-ID: <1401116474-31221-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 26 May 2014 17:01:22 +0200
+Subject: [GIT PULL] Reset controller fixes for v3.15
+Message-ID: <1401116482.3400.23.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The armada_370_xp_pmsu_idle_prepare() function is only used internally
-to pmsu.c, so there's no reason to not use the static qualifier.
+Hi Olof, Arnd,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-mvebu/pmsu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The following change since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 53a55c8..6e83d32 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -148,7 +148,7 @@ static void armada_370_xp_cpu_resume(void)
- }
- 
- /* No locking is needed because we only access per-CPU registers */
--void armada_370_xp_pmsu_idle_prepare(bool deepidle)
-+static void armada_370_xp_pmsu_idle_prepare(bool deepidle)
- {
- 	unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
- 	u32 reg;
--- 
-1.9.3
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+
+is available in the git repository at:
+
+  git://git.pengutronix.de/git/pza/linux.git reset/fixes
+
+for you to fetch at e3ec0a8c6eea4f22d5468f01c065caca4dd1ecca:
+
+  reset: Add of_reset_control_get to reset.h (2014-04-14 16:47:28 +0200)
+
+This patch fixes an erroneous revert that slipped in with commit
+b424080a9e086e683ad5fdc624a7cf3c024e0c0f reset: Add optional resets and stubs
+Without it, we get build failures in linux-next.
+
+----------------------------------------------------------------
+Hans de Goede (1):
+      reset: Add of_reset_control_get to reset.h
+
+ include/linux/reset.h | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+regards
+Philipp
