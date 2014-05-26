@@ -1,42 +1,44 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Mon, 26 May 2014 12:19:54 +0530
-Subject: [PATCH] arm: exynos: Fix "allmodconfig" build errors in mcpm and
- hotplug
-In-Reply-To: <1401083696-25702-1-git-send-email-a.kesavan@samsung.com>
-References: <1401083696-25702-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <CAK9yfHzNkVZX6pMkFmdeubTgoZdRhd=U0oMtUDHr9bvZZYQYbQ@mail.gmail.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 26 May 2014 10:54:52 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzJdIEFSTTogY2xrOiBpbXg6IGFkZCBhIG5ldyBoZWxw?=
+ =?UTF-8?B?ZXIgd2hpY2ggY2FuIHJlLXBhcmVudCB0aGUgY2xvY2s=?=
+In-Reply-To: <1401081633-12190-1-git-send-email-b32955@freescale.com>
+References: <1401081633-12190-1-git-send-email-b32955@freescale.com>
+Message-ID: <1401087292.925679327@f35.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Abhilash.
+Mon, 26 May 2014 13:20:32 +0800 ?? Huang Shijie <b32955@freescale.com>:
+> The clocks for Quadspi controller may be different when different
+> NOR flashes are connected to the board.
+> 
+> This patch adds a new helper to register the clock which needs the
+> re-parent capability.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  arch/arm/mach-imx/clk.h |   10 ++++++++++
+>  1 files changed, 10 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
+> index e29f6eb..2e3c4fe 100644
+> --- a/arch/arm/mach-imx/clk.h
+> +++ b/arch/arm/mach-imx/clk.h
+> @@ -112,6 +112,16 @@ static inline struct clk *imx_clk_mux_flags(const char *name,
+>  			&imx_ccm_lock);
+>  }
+>  
+> +/* we can use this helper to register the clock which needs the re-parent. */
+> +static inline struct clk *imx_clk_mux_flags_reparent(const char *name,
+> +		void __iomem *reg, u8 shift, u8 width, const char **parents,
+> +		int num_parents, unsigned long flags)
+> +{
+> +	return clk_register_mux(NULL, name, parents, num_parents,
+> +			flags, reg, shift, width, 0,
+> +			&imx_ccm_lock);
+> +}
 
-On 26 May 2014 11:24, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
-> This fixes the following build errors:
->
-> /tmp/ccRbZlaA.s: Assembler messages:
-> /tmp/ccRbZlaA.s:69: Error: selected processor does not support ARM mode `isb '
-> /tmp/ccRbZlaA.s:75: Error: selected processor does not support ARM mode `isb '
-> /tmp/ccRbZlaA.s:76: Error: selected processor does not support ARM mode `dsb '
-> make[1]: *** [arch/arm/mach-exynos/hotplug.o] Error 1
->
-> /tmp/ccJEg4jw.s: Assembler messages:
-> /tmp/ccJEg4jw.s:454: Error: selected processor does not support ARM mode `isb'
-> /tmp/ccJEg4jw.s:455: Error: selected processor does not support ARM mode `dsb'
-> /tmp/ccJEg4jw.s:465: Error: selected processor does not support ARM mode `isb'
-> /tmp/ccJEg4jw.s:474: Error: selected processor does not support ARM mode `isb'
-> /tmp/ccJEg4jw.s:475: Error: selected processor does not support ARM mode `dsb'
-> /tmp/ccJEg4jw.s:516: Error: selected processor does not support ARM mode `isb'
-> /tmp/ccJEg4jw.s:525: Error: selected processor does not support ARM mode `isb'
-> /tmp/ccJEg4jw.s:526: Error: selected processor does not support ARM mode `dsb'
-> make[1]: *** [arch/arm/mach-exynos/mcpm-exynos.o] Error 1
->
-> Reported-by: Sachin Kamat <sachin.kamat@linaro.org>
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+So you can use CLK_SET_RATE_PARENT for flags here and completely remove
+flags parameter for this call. Is not it?
 
-This patch fixes the above reported issues.
-
-Tested-by: Sachin Kamat <sachin.kamat@linaro.org>
-
--- 
-With warm regards,
-Sachin
+---
