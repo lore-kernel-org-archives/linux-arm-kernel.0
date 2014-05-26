@@ -1,39 +1,31 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 May 2014 13:25:26 -0700
-Subject: [GIT PULL 2/3] omap pm changes for v3.16 merge window, resend
-In-Reply-To: <20140520021151.GL15793@atomide.com>
-References: <20140520021151.GL15793@atomide.com>
-Message-ID: <20140526202526.GJ27093@quad.lixom.net>
+Date: Mon, 26 May 2014 13:23:37 -0700
+Subject: [GIT PULL 1/3] omap non urgent fixes for v3.16 merge window,
+ resend
+In-Reply-To: <20140520021029.GK15793@atomide.com>
+References: <20140520021029.GK15793@atomide.com>
+Message-ID: <20140526202337.GI27093@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 07:11:52PM -0700, Tony Lindgren wrote:
-> The following changes since commit 89ca3b881987f5a4be4c5dbaa7f0df12bbdde2fd:
+On Mon, May 19, 2014 at 07:10:30PM -0700, Tony Lindgren wrote:
+> Hi,
 > 
->   Linux 3.15-rc4 (2014-05-04 18:14:42 -0700)
+> Here are three pull requests that never made the lists
+> on the 8th of May as I have something still wrong with
+> my scripts it seems. Anyways, these should be fine pulled
+> out of order, if in doubt see my temporary merge branch
+> at omap-for-v3.16/tmp-merge-2014-05-19.
+> 
+> The following changes since commit fb677ef70b65e22cd4401d31b700a8b4041efae1:
+> 
+>   ARM: OMAP2+: Fix GPMC remap for devices using an offset (2014-04-23 11:09:22 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/pm-signed
-> 
-> for you to fetch changes up to 57b05572267581c2320462e9b606709fa6da4c5a:
-> 
->   ARM: OMAP2+: Enable CPUidle in omap2plus_defconfig (2014-05-06 15:45:15 -0700)
-> 
-> ----------------------------------------------------------------
-> PM related fixes for omap3 that were discovered during omap3
-> conversion to device tree. This series sets up the PMIC signaling
-> in a way where we can test for PM regressions easily by
-> looking at state of the the sys_clkreq and sys_off_mode pins.
-> 
-> Note that this series alone does not make omap3 PM to cut
-> off core voltage during off-idle, changes to twl4030-power.c
-> configurations are still needed. Those will be posted
-> separately.
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/fixes-not-urgent-signed
 
-Merged into next/soc.
+Pulled, thanks.
 
-
-Thanks,
 
 -Olof
