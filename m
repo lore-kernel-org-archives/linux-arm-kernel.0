@@ -1,31 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 May 2014 13:23:37 -0700
-Subject: [GIT PULL 1/3] omap non urgent fixes for v3.16 merge window,
- resend
-In-Reply-To: <20140520021029.GK15793@atomide.com>
-References: <20140520021029.GK15793@atomide.com>
-Message-ID: <20140526202337.GI27093@quad.lixom.net>
+Date: Mon, 26 May 2014 13:30:15 -0700
+Subject: [GIT PULL 3/3] omap l3-noc bus driver changes for v3.16 merge
+ window, resend
+In-Reply-To: <20140520021300.GM15793@atomide.com>
+References: <20140520021300.GM15793@atomide.com>
+Message-ID: <20140526203015.GK27093@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 07:10:30PM -0700, Tony Lindgren wrote:
-> Hi,
+On Mon, May 19, 2014 at 07:13:00PM -0700, Tony Lindgren wrote:
+> The following changes since commit 455c6fdbd219161bd09b1165f11699d6d73de11c:
 > 
-> Here are three pull requests that never made the lists
-> on the 8th of May as I have something still wrong with
-> my scripts it seems. Anyways, these should be fine pulled
-> out of order, if in doubt see my temporary merge branch
-> at omap-for-v3.16/tmp-merge-2014-05-19.
-> 
-> The following changes since commit fb677ef70b65e22cd4401d31b700a8b4041efae1:
-> 
->   ARM: OMAP2+: Fix GPMC remap for devices using an offset (2014-04-23 11:09:22 -0700)
+>   Linux 3.14 (2014-03-30 20:40:15 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/fixes-not-urgent-signed
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/l3-noc-signed
+> 
+> for you to fetch changes up to 27b7d5f3cc49f2e5cd6c005d73696058b7140c5c:
+> 
+>   bus: omap_l3_noc: Add AM4372 interconnect error data (2014-05-05 14:34:37 -0500)
 
-Pulled, thanks.
+Pulled into next/drivers. Thanks.
 
 
 -Olof
