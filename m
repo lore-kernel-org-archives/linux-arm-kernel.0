@@ -1,41 +1,78 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 26 May 2014 11:23:11 +0200
-Subject: [PATCH v2 02/10] iommu/ipmmu-vmsa: Cleanup failures of ARM
- mapping creation or attachment
-In-Reply-To: <1400150451-13469-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1400150451-13469-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1400150451-13469-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20140526092310.GA11299@8bytes.org>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Mon, 26 May 2014 14:49:03 +0530
+Subject: [PATCH v2 05/11] ARM: topology: use new cpu_power interface
+In-Reply-To: <CAKfTPtC_vXvf6gUtbrunn+-Zzk8-11AyKF3asjdH5=pejL69Lg@mail.gmail.com>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-6-git-send-email-vincent.guittot@linaro.org>
+ <5381EE7C.9010809@linux.vnet.ibm.com>
+ <CAKfTPtC_vXvf6gUtbrunn+-Zzk8-11AyKF3asjdH5=pejL69Lg@mail.gmail.com>
+Message-ID: <53830707.5020001@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 12:40:43PM +0200, Laurent Pinchart wrote:
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->  drivers/iommu/ipmmu-vmsa.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+On 05/26/2014 01:55 PM, Vincent Guittot wrote:
+> On 25 May 2014 15:22, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
+>> Hi Vincent,
+>>
+>> Why do we have two interfaces arch_scale_freq_power() and
+>> arch_scale_cpu_power()? Does it make sense to consolidate them now ?
+> Hi Preeti,
 > 
-> diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
-> index 49e00f7..49dbedd 100644
-> --- a/drivers/iommu/ipmmu-vmsa.c
-> +++ b/drivers/iommu/ipmmu-vmsa.c
-> @@ -917,7 +917,8 @@ static int ipmmu_add_device(struct device *dev)
->  							SZ_1G, SZ_2G);
->  		if (IS_ERR(mapping)) {
->  			dev_err(mmu->dev, "failed to create ARM IOMMU mapping\n");
-> -			return PTR_ERR(mapping);
-> +			ret = PTR_ERR(mapping);
-> +			goto error;
->  		}
->  
->  		mmu->mapping = mapping;
-> @@ -933,6 +934,7 @@ static int ipmmu_add_device(struct device *dev)
->  	return 0;
->  
->  error:
-> +	arm_iommu_release_mapping(mmu->mapping);
->  	kfree(dev->archdata.iommu);
->  	dev->archdata.iommu = NULL;
->  	iommu_group_remove_device(dev);
+> They don't have the same purpose. arch_scale_cpu_power set the max
+> capacity of your CPU whereas arch_scale_freq_power can be used to give
+> the current capacity. ARM platform were using arch_scale_freq_power
+> because it was the only one available for non SMT system but this
+> induces some misunderstanding and some limitation in the
+> characterization of a CPUs. This consolidation is a necessary step so
+> we can now have the max capacity of a CPU and let
+> arch_scale_freq_power for other purpose (or even remove it if
+> useless).
 
-Skipped this one because it didn't apply. The others are applied.
+Ah ok! Thanks :) This was insightful :)
+
+Regards
+Preeti U Murthy
+> 
+> Regards,
+> Vincent
+> 
+>>
+>> Regards
+>> Preeti U Murthy
+>>
+>>
+>> On 05/23/2014 09:22 PM, Vincent Guittot wrote:
+>>> Use the new arch_scale_cpu_power in order to reflect the original capacity of
+>>> a CPU instead of arch_scale_freq_power which is more linked to a scaling of
+>>> the capacity linked to the frequency.
+>>>
+>>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>>> ---
+>>>  arch/arm/kernel/topology.c | 4 ++--
+>>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+>>> index 71e1fec..6cc25a8 100644
+>>> --- a/arch/arm/kernel/topology.c
+>>> +++ b/arch/arm/kernel/topology.c
+>>> @@ -42,7 +42,7 @@
+>>>   */
+>>>  static DEFINE_PER_CPU(unsigned long, cpu_scale);
+>>>
+>>> -unsigned long arch_scale_freq_power(struct sched_domain *sd, int cpu)
+>>> +unsigned long arch_scale_cpu_power(struct sched_domain *sd, int cpu)
+>>>  {
+>>>       return per_cpu(cpu_scale, cpu);
+>>>  }
+>>> @@ -166,7 +166,7 @@ static void update_cpu_power(unsigned int cpu)
+>>>       set_power_scale(cpu, cpu_capacity(cpu) / middle_capacity);
+>>>
+>>>       printk(KERN_INFO "CPU%u: update cpu_power %lu\n",
+>>> -             cpu, arch_scale_freq_power(NULL, cpu));
+>>> +             cpu, arch_scale_cpu_power(NULL, cpu));
+>>>  }
+>>>
+>>>  #else
+>>>
+>>
+> 
