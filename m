@@ -1,40 +1,54 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 26 May 2014 14:47:46 +0800
-Subject: [PATCH 1/2] ARM: clk: imx: add a new helper which can
- re-parent the clock
-In-Reply-To: <20140526080120.GE2650@dragon>
-References: <1401081633-12190-1-git-send-email-b32955@freescale.com>
- <20140526080120.GE2650@dragon>
-Message-ID: <20140526064745.GA31472@shlinux1.ap.freescale.net>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 26 May 2014 10:07:45 +0200
+Subject: RFC: representing sdio devices oob interrupt, clks, etc. in device
+ tree
+In-Reply-To: <CAGb2v64Siixnds9fXGWfTotjq0zGmeqNa-52FNNOcbxFcCjkCg@mail.gmail.com>
+References: <537DC832.3020006@redhat.com>
+ <CAGb2v64VZac2KvAALrScecN89sRnBQoDrKxKMvkte+3G04NXeA@mail.gmail.com>
+ <537DE1AA.5050606@redhat.com> <537E31F7.1030505@gmail.com>
+ <537F1148.3010102@redhat.com> <20140523112239.GB12304@sirena.org.uk>
+ <537F3610.3050104@redhat.com> <20140523162718.GE22111@sirena.org.uk>
+ <53806F26.6050706@redhat.com> <20140525123452.GS22111@sirena.org.uk>
+ <53824294.1090609@redhat.com> <5382F276.8090305@broadcom.com>
+ <CAGb2v64Siixnds9fXGWfTotjq0zGmeqNa-52FNNOcbxFcCjkCg@mail.gmail.com>
+Message-ID: <5382F651.9010506@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 04:01:21PM +0800, Shawn Guo wrote:
-> On Mon, May 26, 2014 at 01:20:32PM +0800, Huang Shijie wrote:
-> > The clocks for Quadspi controller may be different when different
-> > NOR flashes are connected to the board.
-> > 
-> > This patch adds a new helper to register the clock which needs the
-> > re-parent capability.
-> > 
-> > Signed-off-by: Huang Shijie <b32955@freescale.com>
+Hi,
+
+On 05/26/2014 09:59 AM, Chen-Yu Tsai wrote:
+> On Mon, May 26, 2014 at 3:51 PM, Arend van Spriel <arend@broadcom.com> wrote:
+>> + Russell
+
+<snip>
+
+>> Hi Hans,
+>>
+>> I recalled a recent patchset from Russell King. He was working on i.MX6
+>> platform with brcmfmac device and ended reworking sdhci/mmc host controller
+>> code in a series of patches [1]. Patch 34 might be similar to what you are
+>> trying to accomplish.
 > 
-> So what you need is to register a mux clock without
-> CLK_SET_RATE_NO_REPARENT flag, right?
-yes.
+> I believe that is a resend of Olof's patch I mentioned early in this
+> discussion. :)
 
-Without this fixed flag, I can pass the CLK_SET_RATE_PARENT in the "flags".
+Ok, assuming that is the case, then it seems to me that we are all moving
+somewhat in the same direction, which is good :)
 
+What I would like to propose is to move forward with Olof's patch with
+2 changes made to it:
 
-> 
-> I'm think about just dropping the flag from imx_clk_mux() and
-> imx_clk_mux_flags(), since this is the default behavior of basic mux
-> clock, and I doubt dropping the flag will cause problem for mux clocks
-> on i.MX.
-this is what i was worry about.
+1) Store the clocks / resets / whatever in childnodes of the mmc host node,
+with the childnodes using the addressing scheme described in the patch
+from Sascha Hauer titled: "mmc: Add SDIO function devicetree subnode parsing",
+as this is where they really belong (and in some cases the sdio function driver
+may need access to them too).
 
-So i do not change the imx_clk_mux/imx_clk_mux_flags, and add new helper which
-has the minimum impact to the current code.
+2) Make Olof's code only do the powerup if the child node has a compatible of
+"simple-sdio-powerup", to avoid it getting in the way of more complex poweron
+scenarios (which may require a separate pmic driver or some such) later.
 
-thanks
-Huang Shijie
+Regards,
+
+Hans
