@@ -1,127 +1,71 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 26 May 2014 11:28:59 +0530
-Subject: [PATCH v4 1/2] cpufreq / OPP: Allow boost frequency to be looked
- up from device tree
-In-Reply-To: <1400852262-6290-2-git-send-email-thomas.ab@samsung.com>
-References: <1400852262-6290-1-git-send-email-thomas.ab@samsung.com>
- <1400852262-6290-2-git-send-email-thomas.ab@samsung.com>
-Message-ID: <CAKohpom02xmubyNMMmH9J59i8KCoAXpZoX+Gj9NP9gQ8B9qB3w@mail.gmail.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Mon, 26 May 2014 06:03:38 +0000
+Subject: linux-next: manual merge of the clockevents tree with the
+ arm-soc tree
+In-Reply-To: <20140526154331.7fc6b30c@canb.auug.org.au>
+References: <20140526154331.7fc6b30c@canb.auug.org.au>
+Message-ID: <8c52af4f7de64210bb4e37e265e9e827@DM2PR03MB509.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 May 2014 19:07, Thomas Abraham <thomas.ab@samsung.com> wrote:
-> From: Thomas Abraham <thomas.ab@samsung.com>
->
-> Commit 6f19efc0 ("cpufreq: Add boost frequency support in core") adds
-> support for CPU boost mode. This patch adds support for finding available
-> boost frequencies from device tree and marking them as usable in boost mode.
->
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Lukasz Majewski <l.majewski@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  drivers/cpufreq/cpufreq_opp.c |   44 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
->
-> diff --git a/drivers/cpufreq/cpufreq_opp.c b/drivers/cpufreq/cpufreq_opp.c
-> index c0c6f4a..2b3905b 100644
-> --- a/drivers/cpufreq/cpufreq_opp.c
-> +++ b/drivers/cpufreq/cpufreq_opp.c
-> @@ -19,6 +19,7 @@
->  #include <linux/pm_opp.h>
->  #include <linux/rcupdate.h>
->  #include <linux/slab.h>
-> +#include <linux/of.h>
->
->  /**
->   * dev_pm_opp_init_cpufreq_table() - create a cpufreq table for a device
-> @@ -51,6 +52,10 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
->         struct cpufreq_frequency_table *freq_table = NULL;
->         int i, max_opps, ret = 0;
->         unsigned long rate;
-> +#ifdef CONFIG_CPU_FREQ_BOOST_SW
-> +       int j, len;
-> +       u32 *boost_freqs = NULL;
-> +#endif
->
->         rcu_read_lock();
->
-> @@ -82,6 +87,45 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
->
->         *table = &freq_table[0];
->
-> +#ifdef CONFIG_CPU_FREQ_BOOST_SW
-> +       if (of_find_property(dev->of_node, "boost-frequencies", &len)) {
+> Subject: linux-next: manual merge of the clockevents tree with the arm-soc
+> tree
+> 
+> Hi Daniel,
+> 
+> Today's linux-next merge of the clockevents tree got a conflict in
+> arch/arm/boot/dts/vf610.dtsi between commit 0517fe6aa880 ("ARM: dts:
+> vf610-twr: Add support for sdhc1") from the arm-soc tree and commit
+> 07513e1330a9 ("ARM: dts: vf610: Add Freescale FlexTimer Module timer
+> node") from the clockevents tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
+> 
 
-Maybe:
-if(!of_find_property(...))
-        goto out;
+Acked-by: Xiubo Li <Li.Xiubo@freescale.com>
 
-To get rid of extra indentation levels below..
+Thanks,
 
-> +               struct cpufreq_frequency_table *ft;
+BRs
+Xiubo
 
-Declare at the top with boost_freqs, etc..
-
-> +               if (len == 0 || (len & (sizeof(u32) - 1)) != 0) {
-
-s/len == 0/!len
-
-And use IS_ALIGNED() instead of the right hand side of ||
-
-> +                       dev_err(dev, "%s: invalid boost frequency\n", __func__);
-> +                       ret = -EINVAL;
-> +                       goto out;
-> +               }
-> +
-> +               boost_freqs = kzalloc(len, GFP_KERNEL);
-
-Can we do a devm_kzalloc instead? And why not kmalloc BTW ?
-
-> +               if (!boost_freqs) {
-> +                       dev_warn(dev, "%s: no memory for boost freq table\n",
-
-dev_err ?
-
-> +                                       __func__);
-> +                       ret = -ENOMEM;
-> +                       goto out;
-> +               }
-> +               of_property_read_u32_array(dev->of_node, "boost-frequencies",
-> +                       boost_freqs, len / sizeof(u32));
-
-
-Create int count = len / sizeof(u32) instead.. You have used this
-multiple times.
-
-> +               for (j = 0; j < len / sizeof(u32); j++) {
-> +                       ft = *table;
-> +                       for (i = 0; ft->frequency != CPUFREQ_TABLE_END; i++) {
-
-See if new macros can be used here instead. cpufreq_for_each_valid_entry().
-
-> +                               if (boost_freqs[j] == ft->frequency) {
-> +                                       ft->flags |= CPUFREQ_BOOST_FREQ;
-> +                                       break;
-> +                               }
-> +                               ft++;
-> +                       }
-> +
-> +                       if (ft->frequency == CPUFREQ_TABLE_END)
-> +                               pr_err("%s: invalid boost frequency %d\n",
-> +                                       __func__, boost_freqs[j]);
-
-Maybe a pr_debug on the else part as well ? With boost freqs ..
-
-> +               }
-> +       }
-> +
-> +       kfree(boost_freqs);
-> +#endif
-> +
->  out:
->         rcu_read_unlock();
->         if (ret)
 > --
-> 1.7.9.5
->
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
+> 
+> diff --cc arch/arm/boot/dts/vf610.dtsi
+> index 73355ddc5186,3c91b84066a1..000000000000
+> --- a/arch/arm/boot/dts/vf610.dtsi
+> +++ b/arch/arm/boot/dts/vf610.dtsi
+> @@@ -360,17 -347,19 +360,30 @@@
+>   				status = "disabled";
+>   			};
+> 
+>  +			esdhc1: esdhc at 400b2000 {
+>  +				compatible = "fsl,imx53-esdhc";
+>  +				reg = <0x400b2000 0x4000>;
+>  +				interrupts = <0 28 0x04>;
+>  +				clocks = <&clks VF610_CLK_IPG_BUS>,
+>  +					<&clks VF610_CLK_PLATFORM_BUS>,
+>  +					<&clks VF610_CLK_ESDHC1>;
+>  +				clock-names = "ipg", "ahb", "per";
+>  +				status = "disabled";
+>  +			};
+>  +
+> + 			ftm: ftm at 400b8000 {
+> + 				compatible = "fsl,ftm-timer";
+> + 				reg = <0x400b8000 0x1000 0x400b9000 0x1000>;
+> + 				interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>;
+> + 				clock-names = "ftm-evt", "ftm-src",
+> + 					"ftm-evt-counter-en", "ftm-src-counter-en";
+> + 				clocks = <&clks VF610_CLK_FTM2>,
+> + 					<&clks VF610_CLK_FTM3>,
+> + 					<&clks VF610_CLK_FTM2_EXT_FIX_EN>,
+> + 					<&clks VF610_CLK_FTM3_EXT_FIX_EN>;
+> + 				status = "disabled";
+> + 			};
+> +
+>   			fec0: ethernet at 400d0000 {
+>   				compatible = "fsl,mvf600-fec";
+>   				reg = <0x400d0000 0x1000>;
