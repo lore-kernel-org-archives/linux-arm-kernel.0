@@ -1,38 +1,31 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 26 May 2014 17:14:26 +0100
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
- device tree
-In-Reply-To: <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
-References: <537F3610.3050104@redhat.com>
- <20140523162718.GE22111@sirena.org.uk>
- <53806F26.6050706@redhat.com>
- <20140525123452.GS22111@sirena.org.uk>
- <53824294.1090609@redhat.com>
- <20140526103807.GV22111@sirena.org.uk>
- <538321AB.4050006@redhat.com>
- <20140526142225.GF22111@sirena.org.uk>
- <538356DA.7090302@redhat.com>
- <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
-Message-ID: <20140526161426.GK22111@sirena.org.uk>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 26 May 2014 21:52:21 +0530
+Subject: [PATCH 2/4] cpufreq: add i.MX5 cpufreq driver
+In-Reply-To: <1401119853.4829.65.camel@weser.hi.pengutronix.de>
+References: <1401099308-9658-1-git-send-email-l.stach@pengutronix.de>
+ <1401099308-9658-2-git-send-email-l.stach@pengutronix.de>
+ <CAKohpoksbFHyX=r0=URMedJNi68c3xAX4OrXzSFqgf1-bCm4+Q@mail.gmail.com>
+ <1401101131.4829.29.camel@weser.hi.pengutronix.de>
+ <CAKohponTUsYLf-8_iSnttwK8oXyJEZVWpF+a=vLC7r_jZ8AzOQ@mail.gmail.com>
+ <1401107748.4829.39.camel@weser.hi.pengutronix.de>
+ <CAKohpo=ncHUmtJOEw4FZG1BWUSuiQK4n+ETEMJWJj9UoPz2cnw@mail.gmail.com>
+ <1401109863.4829.46.camel@weser.hi.pengutronix.de>
+ <CAKohponzJma6yNueMef2Q4k+qT-n7boV0tx0pCqjFmuQWj6TXg@mail.gmail.com>
+ <1401112697.4829.56.camel@weser.hi.pengutronix.de>
+ <CAKohponvWLVfBL06HURnTq4nmdKjROV-bd4pVcbNmsAUYYC+nA@mail.gmail.com>
+ <1401118115.4829.60.camel@weser.hi.pengutronix.de>
+ <CAKohpo=yShVa+5On0cPU68ooQGO8dFXP+amPHf3taP_aYYe1Qg@mail.gmail.com>
+ <1401119853.4829.65.camel@weser.hi.pengutronix.de>
+Message-ID: <CAKohpo=0VoOEz=SmvU+m6rX3beJ_nMpCUCx504Hsw2jRj2_QSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 06:07:18PM +0200, Ulf Hansson wrote:
+On 26 May 2014 21:27, Lucas Stach <l.stach@pengutronix.de> wrote:
+> No, we need the regulator to determine which OPPs are actually useable.
+> If the regulator is only supplying 1.1V we can only scale to 800MHz max,
+> which is the case for some of the industrial i.MX53 versions.
 
-> >> I'm not sure I'm buying the idea that we have a powerup driver that's
-> >> meaningfully not part of the main device driver.
+Go and add another binding for this max-volt.. And lets see how others
+respond.
 
-> I am having a bit hard to follow the terminology here. :-) What is a
-> "powerup driver" and what is a "main device driver" in this context?
-
-Yes, that's mostly what I'm saying as well.  The main device driver is
-the driver that will bind to the SDIO device and control it, the powerup
-driver is the separate bit of code which will ensure that device is
-powered up - calling it a device driver seems a bit of a misnomer to me.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140526/c44629f8/attachment.sig>
+You can give a link to this discussion as others might find this very helpful.
