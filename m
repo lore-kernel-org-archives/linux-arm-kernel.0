@@ -1,31 +1,26 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 26 May 2014 14:42:56 +0200
-Subject: [PATCH] ARM: dts: pfla02: Add ethernet phy supply regulator
-Message-ID: <1401108176-25105-1-git-send-email-p.zabel@pengutronix.de>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 26 May 2014 14:49:55 +0200
+Subject: [GIT PULL] qcom SoC changes for v3.16
+In-Reply-To: <alpine.DEB.2.00.1405231339340.15680@galak-ubuntu.qualcomm.com>
+References: <alpine.DEB.2.00.1405231339340.15680@galak-ubuntu.qualcomm.com>
+Message-ID: <1401108595.6068.5.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 2.5V VDD_ETH_IO voltage supplied by the DA9063 LDO4 is used
-to power the KSZ9031 PHY DVDDH input and to pull the necessary
-pins (including bootstrap pins) high.
-It also powers the i.MX6 NVCC_RGMII and NVCC_ENET inputs.
+On Fri, 2014-05-23 at 13:42 -0500, Kumar Gala wrote:
+> Ivan T. Ivanov (1):
+>        ARM: debug: qcom: make UART address selection configuration option
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+This one just landed in linux-next (next-20140526).
 
-diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-index 56b38cd..2d1fd11 100644
---- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-@@ -322,6 +322,7 @@
- 	pinctrl-0 = <&pinctrl_enet>;
- 	phy-mode = "rgmii";
- 	phy-reset-gpios = <&gpio3 23 GPIO_ACTIVE_LOW>;
-+	phy-supply = <&vdd_eth_io_reg>;
- 	status = "disabled";
- };
- 
--- 
-2.0.0.rc2
+It removed the Kconfig options DEBUG_MSM_UART1, DEBUG_MSM_UART3, and
+DEBUG_MSM_UART3. It did not touch these references to their macros:
+    arch/arm/mach-msm/io.c:60:#if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
+    arch/arm/mach-msm/io.c:61:                defined(CONFIG_DEBUG_MSM_UART3)
+    arch/arm/mach-msm/io.c:79:#if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
+    arch/arm/mach-msm/io.c:80:                defined(CONFIG_DEBUG_MSM_UART3)
+
+Is a patch to fix this queued somewhere?
+
+
+Paul Bolle
