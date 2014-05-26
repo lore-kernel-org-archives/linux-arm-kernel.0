@@ -1,47 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 26 May 2014 21:15:20 +0200
-Subject: [PATCH v2] ALSA: hda: fix tegra build
-Message-ID: <4369871.VRtaiA22pI@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 26 May 2014 21:20:15 +0200
+Subject: [PATCH v2] ARM: rockchip: convert smp bringup to
+ CPU_METHOD_OF_DECLARE
+In-Reply-To: <20140526181315.GA27093@quad.lixom.net>
+References: <1632873.urGeGsUMPH@diego> <1878147.CvhHSZhTas@diego>
+ <20140526181315.GA27093@quad.lixom.net>
+Message-ID: <77845932.xlUTKoJDWT@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_PM is disabled, the CONFIG_SND_HDA_POWER_SAVE_DEFAULT symbol
-does not get defined, which causes a build error for the hda-tegra driver:
+Am Montag, 26. Mai 2014, 11:13:15 schrieb Olof Johansson:
+> On Thu, Mar 27, 2014 at 01:06:32AM +0100, Heiko St?bner wrote:
+> > With the newly introduced CPU_METHOD_OF_DECLARE is not necessary anymore
+> > to reference the relevant smp_ops in the board file, but instead it can
+> > simply be set by the enable-method property of the cpu nodes.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> 
+> Applied, however:
+> > ---
+> > 
+> > changes since v1:
+> >   - add a short description to the enable-method binding
+> >  
+> >  Documentation/devicetree/bindings/arm/cpus.txt | 2 ++
+> >  arch/arm/boot/dts/rk3066a.dtsi                 | 1 +
+> >  arch/arm/boot/dts/rk3188.dtsi                  | 1 +
+> >  arch/arm/mach-rockchip/core.h                  | 2 --
+> >  arch/arm/mach-rockchip/platsmp.c               | 3 ++-
+> >  arch/arm/mach-rockchip/rockchip.c              | 1 -
+> >  6 files changed, 6 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/cpus.txt
+> > b/Documentation/devicetree/bindings/arm/cpus.txt index 333f4ae..f52a9ac
+> > 100644
+> > --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> > +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> > @@ -185,6 +185,8 @@ nodes to be present and contain the properties
+> > described below.> 
+> >  			    "qcom,gcc-msm8660"
+> >  			    "qcom,kpss-acc-v1"
+> >  			    "qcom,kpss-acc-v2"
+> > 
+> > +			    "rockchip,rk3066-smp" - cpu-core handling of Socs
+> > +					from Rockchip starting with rk3066
+> 
+> Nobody else has a comment here, so I removed this one.
+> 
+> I noticed that the list is unsorted, in particular the new marvell entries
+> were appended instead of inserted at the right location, which caused a
+> merge conflict. Sigh. I'll do a separate commit on top to sort the list,
+> since we seem to have the new out-of-order additions in our tree.
 
-hda/hda_tegra.c:80:25: error: 'CONFIG_SND_HDA_POWER_SAVE_DEFAULT' undeclared here (not in a function)
- static int power_save = CONFIG_SND_HDA_POWER_SAVE_DEFAULT;
-                         ^
-/git/arm-soc/sound/pci/hda/hda_tegra.c:235:13: warning: 'hda_tegra_disable_clocks' defined but not used [-Wunused-function]
- static void hda_tegra_disable_clocks(struct hda_tegra *data)
-             ^
+I added the comment after Mark Rutland noted:
 
-This works around the problem by not referencing that macro
-when CONFIG_PM is disabled. Instead, we assume that it's disabled
-unconditionally and cannot be enabled at runtime.
+"We should document what what these actually mean, so as to be a hardware
+description and not a Linux internals description."
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Dylan Reid <dgreid@chromium.org>
-Cc: Stephen Warren <swarren@nvidia.com>
-Cc: Takashi Iwai <tiwai@suse.de>
----
-Same patch, but this time with correct Signed-off-by line.
+But I'm fine with it either way :-)
 
-diff --git a/sound/pci/hda/hda_tegra.c b/sound/pci/hda/hda_tegra.c
-index 086fd06..a366ba9 100644
---- a/sound/pci/hda/hda_tegra.c
-+++ b/sound/pci/hda/hda_tegra.c
-@@ -77,10 +77,14 @@ struct hda_tegra {
- 	void __iomem *regs;
- };
- 
-+#ifdef CONFIG_PM
- static int power_save = CONFIG_SND_HDA_POWER_SAVE_DEFAULT;
- module_param(power_save, bint, 0644);
- MODULE_PARM_DESC(power_save,
- 		 "Automatic power-saving timeout (in seconds, 0 = disable).");
-+#else
-+static int power_save = 0;
-+#endif
- 
- /*
-  * DMA page allocation ops.
+
+Heiko
