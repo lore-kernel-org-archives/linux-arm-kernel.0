@@ -1,59 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 26 May 2014 17:35:56 +0100
-Subject: [PATCH RFCv2 3/5] ARM: allow CONFIG_SMP_ON_UP on non-SMP
- configurations
-In-Reply-To: <1400600105-3013-4-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1400600105-3013-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1400600105-3013-4-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140526163556.GC3693@n2100.arm.linux.org.uk>
+From: gdjakov@mm-sol.com (Georgi Djakov)
+Date: Mon, 26 May 2014 19:37:40 +0300
+Subject: [PATCH v2] ARM: msm: Update the references to DEBUG_MSM_UARTx
+In-Reply-To: <1401116287.6068.15.camel@x220>
+References: <1401116287.6068.15.camel@x220>
+Message-ID: <1401122260-12002-1-git-send-email-gdjakov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 05:35:03PM +0200, Thomas Petazzoni wrote:
-> Currently CONFIG_SMP_ON_UP is used when CONFIG_SMP is enabled to allow
-> a SMP kernel to boot on UP platforms that do not support certain
-> aspects of SMP platforms.
-> 
-> However, some of the SMP characteristics are needed on platforms that
-> have SMP capabilities but are single core, and use their SMP
-> capabilities to provide hardware I/O coherency. This is for example
-> the case on Marvell Armada platforms.
-> 
-> Instead of special casing these platforms to enable the SMP and TLB
-> broadcast bit and use shareable pages, this patch proposes to simply
-> allow CONFIG_SMP_ON_UP to be enabled even on non-SMP
-> configurations. When CONFIG_SMP_ON_UP is enabled in a !CONFIG_SMP
-> configuration, it will check that the processor is SMP capable, and if
-> yes use all the SMP characteristics (SMP and TLB broadcast bit,
-> shareable pages, etc.). It will not support multiprocessing of course,
-> but it will have sufficient capabilities to allow hardware I/O
-> coherency to work.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
-> Of course, the name of CONFIG_SMP_ON_UP is maybe no longer
-> appropriate. Suggestions are welcome to change this: this patch is
-> really the minimal set of changes to get things to work.
-> 
-> We could also decide to completely get rid of CONFIG_SMP_ON_UP and
-> make it always on. Suggestions welcome.
+The Kconfig options DEBUG_MSM_UART1, DEBUG_MSM_UART2, DEBUG_MSM_UART3,
+MSM_DEBUG_UART1, MSM_DEBUG_UART2 and MSM_DEBUG_UART3 are removed, but 
+they are still referenced in the following files:
+	arch/arm/mach-msm/io.c,
+	arch/arm/mach-msm/board-trout.c
+	arch/arm/mach-msm/board-trout-gpio.c
 
-This feels very wrong - while you may need a SCU for coherency, which
-implies that you have a SMP capable CPU, this feels very much like
-overloading a currently well-defined facility with a well-defined
-purpose (which gets used for a lot of things) with a new purpose, which
-is going to be painful in the future if we ever need to separate the
-two things.  So no, I really don't like this.
+Fix this by updating the reference to the new Kconfig option.
 
-If we need to change things here, make the change properly even if it
-means that it takes more time, and don't do quick sticky-plasters like
-this - the quick sticky-plaster method ultimately makes stuff less
-maintainable.
+Reported-by: Paul Bolle <pebolle@tiscali.nl>
+Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+---
 
-Secondly, doesn't this make your first patch redundant - if you need the
-SMP instructions, then is_smp() returns true, which then forces WBWA
-cache mode.
+Changes since v1:
+ - Fixed similar issue in board-trout.c and board-trout-gpio.c
 
+ Applies to next-20140526.
+
+ arch/arm/mach-msm/board-trout-gpio.c |    2 +-
+ arch/arm/mach-msm/board-trout.c      |    2 +-
+ arch/arm/mach-msm/io.c               |    6 ++----
+ 3 files changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-msm/board-trout-gpio.c b/arch/arm/mach-msm/board-trout-gpio.c
+index 87e1d01..e24930e 100644
+--- a/arch/arm/mach-msm/board-trout-gpio.c
++++ b/arch/arm/mach-msm/board-trout-gpio.c
+@@ -94,7 +94,7 @@ static int trout_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+ 	}
+ 
+ static struct msm_gpio_chip msm_gpio_banks[] = {
+-#if defined(CONFIG_MSM_DEBUG_UART1)
++#if defined(CONFIG_DEBUG_MSM_UART) && (CONFIG_DEBUG_UART_PHYS == 0xa9a00000)
+ 	/* H2W pins <-> UART1 */
+ 	TROUT_GPIO_BANK("MISC2", 0x00,   TROUT_GPIO_MISC2_BASE, 0x40),
+ #else
+diff --git a/arch/arm/mach-msm/board-trout.c b/arch/arm/mach-msm/board-trout.c
+index 015d544..8369dfd 100644
+--- a/arch/arm/mach-msm/board-trout.c
++++ b/arch/arm/mach-msm/board-trout.c
+@@ -90,7 +90,7 @@ static void __init trout_map_io(void)
+ 	msm_map_common_io();
+ 	iotable_init(trout_io_desc, ARRAY_SIZE(trout_io_desc));
+ 
+-#ifdef CONFIG_MSM_DEBUG_UART3
++#if defined(CONFIG_DEBUG_MSM_UART) && (CONFIG_DEBUG_UART_PHYS == 0xa9c00000)
+ 	/* route UART3 to the "H2W" extended usb connector */
+ 	writeb(0x80, TROUT_CPLD_BASE + 0x00);
+ #endif
+diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
+index 34e0947..b042dca 100644
+--- a/arch/arm/mach-msm/io.c
++++ b/arch/arm/mach-msm/io.c
+@@ -57,8 +57,7 @@ static struct map_desc msm_io_desc[] __initdata = {
+ 		.length =   MSM_SHARED_RAM_SIZE,
+ 		.type =     MT_DEVICE,
+ 	},
+-#if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
+-		defined(CONFIG_DEBUG_MSM_UART3)
++#if defined(CONFIG_DEBUG_MSM_UART)
+ 	{
+ 		/* Must be last: virtual and pfn filled in by debug_ll_addr() */
+ 		.length = SZ_4K,
+@@ -76,8 +75,7 @@ void __init msm_map_common_io(void)
+ 	 * pages are peripheral interface or not.
+ 	 */
+ 	asm("mcr p15, 0, %0, c15, c2, 4" : : "r" (0));
+-#if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
+-		defined(CONFIG_DEBUG_MSM_UART3)
++#if defined(CONFIG_DEBUG_MSM_UART)
+ #ifdef CONFIG_MMU
+ 	debug_ll_addr(&msm_io_desc[size - 1].pfn,
+ 		      &msm_io_desc[size - 1].virtual);
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.7.9.5
