@@ -1,50 +1,113 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 26 May 2014 17:31:32 -0600
-Subject: [PATCH v1 5/5] pci: keystone: add pcie driver based on
- designware core driver
-In-Reply-To: <537E7823.5060609@ti.com>
-References: <5374FD24.8000806@ti.com> <22200719.Jb5jnJylJH@wuerfel>
- <20140515183919.GC11650@obsidianresearch.com>
- <53751DDF.40304@ti.com>
- <20140515205210.GB14722@obsidianresearch.com>
- <3E54258959B69E4282D79E01AB1F32B704742133@DFLE11.ent.ti.com>
- <20140520170221.GA5130@obsidianresearch.com>
- <537D37AA.5030303@ti.com>
- <20140522005506.GB17244@obsidianresearch.com>
- <537E7823.5060609@ti.com>
-Message-ID: <20140526233132.GA12179@obsidianresearch.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 27 May 2014 07:53:17 +0800
+Subject: [GIT PULL]]ARM: sirf: machine update for 3.16
+In-Reply-To: <20140526220537.GW27093@quad.lixom.net>
+References: <CAGsJ_4yqTkKu+93Fo_D6NaZMyz4T6_EmKz4gZfyeQCi_uF-3dg@mail.gmail.com>
+ <CAGsJ_4wD=FqxNeuEs47f0D9V+Qhn8jyUQL67iv4rsZ3r2K_3vA@mail.gmail.com>
+ <CAGsJ_4y7gEQd9-Em6LW2kZ79qUOz5dSYzeWnBLbt8o8QsOSA6w@mail.gmail.com>
+ <20140520050740.GI18956@quad.lixom.net>
+ <CAGsJ_4wxaU5Sz9p3rb8wXuHeFs_kFx7BG-ThdQL0oiLHPqOb9w@mail.gmail.com>
+ <20140521205120.GA24341@quad.lixom.net>
+ <CAGsJ_4wzZy+Q=sNofgxFt=_VEPqBqR0W=TdjxjOqdF+GrFpSHg@mail.gmail.com>
+ <20140526220537.GW27093@quad.lixom.net>
+Message-ID: <CAGsJ_4xK3m-T357MfgNB74sPcK4WASs0dVtVQ=4Z5nXx8Wj1YA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 06:20:19PM -0400, Murali Karicheri wrote:
+2014-05-27 6:05 GMT+08:00 Olof Johansson <olof@lixom.net>:
+> On Thu, May 22, 2014 at 08:28:24PM +0800, Barry Song wrote:
+>> 2014-05-22 4:51 GMT+08:00 Olof Johansson <olof@lixom.net>:
+>> > On Tue, May 20, 2014 at 01:39:20PM +0800, Barry Song wrote:
+>> >> 2014-05-20 13:07 GMT+08:00 Olof Johansson <olof@lixom.net>:
+>> >> > On Sun, May 18, 2014 at 08:07:14PM +0800, Barry Song wrote:
+>> >> >> >> Bin Shi (2):
+>> >> >> >>       clocksource: prima2: fix some minor checkpatch issues
+>> >> >> >>       irqchip: sirf: fix one minor checkpatch issue
+>> >> >> >>
+>> >> >> >> Xianglong Du (1):
+>> >> >> >>       ARM: prima2: rstc: fix some minor checkpatch issues
+>> >> >> >>
+>> >> >> >> Zhiwu Song (2):
+>> >> >> >>       clocksource:sirf: remove the hardcode for the clk of timers
+>> >> >> >>       clocksource: marco: fix the affinity set for local timer of CPU1
+>> >> >> >
+>> >> >> > as Daniel has applied this one "clocksource: marco: fix the affinity
+>> >> >> > set for local timer of CPU1" to his clk tree, i'll rebuilt the tag by
+>> >> >> > dropping this.
+>> >> >>
+>> >> >> hi Olof,
+>> >> >> i did a force update to tags/sirf-soc-for-3.16 after dropping
+>> >> >> "clocksource: marco: fix the affinity set for local timer of CPU1"
+>> >> >> which has been in clk tree , the new request is as below:
+>> >> >>
+>> >> >> The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
+>> >> >>
+>> >> >>   Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
+>> >> >>
+>> >> >> are available in the git repository at:
+>> >> >>
+>> >> >>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
+>> >> >> tags/sirf-soc-for-3.16
+>> >> >>
+>> >> >> for you to fetch changes up to c7cff54d5926e3f419c23eff2ebaf6f5e12da05d:
+>> >> >>
+>> >> >>   clocksource:sirf: remove the hardcode for the clk of timers
+>> >> >> (2014-05-12 21:43:49 +0800)
+>> >> >>
+>> >> >> ----------------------------------------------------------------
+>> >> >> ARM: sirf: machine update for 3.16
+>> >> >>
+>> >> >> most of them fix some minor checkpatch issues according to key customers'
+>> >> >> requirement. And this patchset also cleanups the clk of clocksource: move
+>> >> >> to get clk by dts properity.
+>> >> >>
+>> >> >
+>> >> > Merged into next/cleanup. Thanks.
+>> >>
+>> >> Olof,
+>> >> i noticed today Daniel Lezcano applied two more clocksource patches
+>> >> into his tree for 3.16 after i re-built the sirf-soc-for-3.16 tag. so
+>> >> for this pull, there are only two left.
+>> >>
+>> >> Bin Shi (2):
+>> >>        clocksource: prima2: fix some minor checkpatch issues
+>> >>
+>> >> Xianglong Du (1):
+>> >>        ARM: prima2: rstc: fix some minor checkpatch issues
+>> >>
+>> >> so i did a force push for tags/sirf-soc-for-3.16 again just now
+>> >> including only these two.
+>> >>
+>> >> very sorry for that!
+>> >
+>> > Don't do this. If you need to add a patch to a branch, then you send us
+>> > a revised pull request with the new patch on top. Also, don't just send a reply
+>> > with "oh, I added some code". It makes it hard to use the diffstat to tell
+>> > whether what I pulled from you was what was supposed to be there and nothing
+>> > more (or less).
+>>
+>> Olof, i actually wanted to drop two patches in the patchset instead of
+>> adding more as the dropped patches have been applied in clocksource.
+>>
+>> i don't know whether REVISED PULL REQUEST can fix it or not?
+>
+> If you dropped patches then there's no good way of amending in a new pull
+> request, no.
+>
+> Are these patches bad? If so, we can revert them. If they need fixups because
+> of problems then we can take those as bugfixes on top. Let me know and I can do
+> either -- but I can't really drop the branch now since it will require me to
+> rebuild a big part of our tree.
+>
+> So, I'll be happy to revert a couple of patches if needed, or take fixes on
+> top.
 
->> What is the MPSS?
-> 
->    MPS published in DEV CAP is 1 (256 bytes). In our IP for some reason,
->    mrss is set to 2 though IP
->    support only 256 bytes. I am trying to resolve this with IP team. If
->    this is an IP issue, then
->    software will overwrite this to 1.
+Olof, you don't need to do anything as Daniel has reverted them in his
+clocksource tree according to my request, i CCed you in another email,
+it seems you missed the mail :-)
 
-The MRSS of the root port bridge is very rarely used, it is OK to be
-larger than the MPS, but I'm not sure it makes much sense as a
-default.
+>
+>
+> -Olof
 
->    So the mps  will not get written to mrss for performance mode. So the
->    check seems not right. It should be changed to
-
-So, looking at this more closely, the MRRS does not *have* to be
-smaller than the MPS, but it probably performs better if it is.
-
-I think that reflects what the code is doing.
-
-The fact your root complex can't segment replies is a serious defect,
-and there is no infrastructure to support that in the kernel.
-
-Adding something to this generic code might be your best option to
-cover the majority of cases.
-
-It would also be good to know for sure that it can correctly segment a
-256 byte read into 128 byte packets, and that only 512 is mishandled.
-
-Jason
+-barry
