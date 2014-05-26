@@ -1,119 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 26 May 2014 15:22:25 +0100
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
- device tree
-In-Reply-To: <538321AB.4050006@redhat.com>
-References: <537E31F7.1030505@gmail.com> <537F1148.3010102@redhat.com>
- <20140523112239.GB12304@sirena.org.uk>
- <537F3610.3050104@redhat.com>
- <20140523162718.GE22111@sirena.org.uk>
- <53806F26.6050706@redhat.com>
- <20140525123452.GS22111@sirena.org.uk>
- <53824294.1090609@redhat.com>
- <20140526103807.GV22111@sirena.org.uk>
- <538321AB.4050006@redhat.com>
-Message-ID: <20140526142225.GF22111@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 26 May 2014 16:51:15 +0200
+Subject: [PATCH 3/3] net: hisilicon: add hix5hd2 mac driver
+In-Reply-To: <1400504227-12047-4-git-send-email-zhangfei.gao@linaro.org>
+References: <1400504227-12047-1-git-send-email-zhangfei.gao@linaro.org>
+ <1400504227-12047-4-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <201405261651.15998.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 01:12:43PM +0200, Hans de Goede wrote:
-> On 05/26/2014 12:38 PM, Mark Brown wrote:
-> > On Sun, May 25, 2014 at 09:20:52PM +0200, Hans de Goede wrote:
+On Monday 19 May 2014, Zhangfei Gao wrote:
 
-> > until we've powered up and enumerated.  The only time that there's a
-> > problem and would need to specify exactly what the device is in the DTS
-> > is if we need the custom sequence prior to being able to do that at
-> > which point I don't see much option.
+I only noticed one real issue with the driver:
 
-> Specified != driver available. Determining whether or not we should power
-> up based purely on there being a compatible string is not going to work, as
-> even when using simple powerup we still need compatible strings for non
-> powerup settings like sdio signal drive strength, oob irq, etc.
+> +struct hix5hd2_desc {
+> +	__le32 buff_addr;
+> +	__le32 buff_len:11;
+> +	__le32 reserve2:5;
+> +	__le32 data_len:11;
+> +	__le32 reserve1:2;
+> +	__le32 fl:2;
+> +	__le32 descvid:1;
+> +} __aligned(32);
+> +
 
-If there are compatible strings but not one we've heard of then we're
-back in the situation where we may as well not bother powering up in the
-first place since we've no idea what to do with the device once it's
-powered.  If we fall down a list of compatibles and decide that the
-only thing we know about the device is that we can power it up (this is
-distinct from the case where we probe the device) I'd expect the device
-to be turned off.
+You should generall not use bitfields in hardware data structures, as that is
+not endian safe and will prevent running a big-endian kernel on this machine.
+Better convert this to a set of __le32 fields and explicit shifts and masks.
 
-> So the only way this will work is if we delay powerup until we've a driver
-> available, which may be never if the module is not build, or whatever,
-> and without powerup the user is never going to figure out he is missing
-> a module. Basically adding a driver flag for blacklisting from the simple
-> power up logic means inserting an unnecessary initialization ordering issue,
-> which we really don't need as each ordering dependency is usually one too many.
+Two smaller things you should think about, I'm not entirely sure about these:
 
-I'm afraid I'm really not seeing a substantial problem either way here,
-powering up the device isn't going to help us find a driver for it and
-the UI around reporting that the device is there without a driver should
-hopefully be unaffected by its power state.
+> +static int hix5hd2_rx(struct net_device *dev, int limit)
+> +{
+> +	struct hix5hd2_priv *priv = netdev_priv(dev);
+> +	struct sk_buff *skb;
+> +	struct hix5hd2_desc *desc;
+> +	dma_addr_t dma_addr;
+> +	u32 start, end, num, pos, i, len;
+> +
+> +	/* software read pointer */
+> +	start = dma_cnt(readl_relaxed(priv->base + RX_BQ_RD_ADDR));
+> +	/* logic write pointer */
+> +	end = dma_cnt(readl_relaxed(priv->base + RX_BQ_WR_ADDR));
 
-> > I don't understand why not powering the device up would be a sensible
-> > default or why other OSs would also choose to implement things that way.
+I think one of these needs to be readl() instead of readl_relaxed(),
+to ensure the data is correctly ordered with regard to the pointer
+access.
 
-> Because if we are not 100% sure that our simple power up logic will do the
-> job properly (i.e. in the right order), then the SAFE thing to do is to
-> not power up.
+> +	if (pos != start)
+> +		writel(dma_byte(pos), priv->base + TX_RQ_RD_ADDR);
 
-So long as we've got a clear way of saying that we might need to do
-something special I don't think we should have an issue either way;
-it's mostly a case of how we specify.
+While this looks like it could be writel_relaxed().
 
-> What if a user takes an older distro kernel, where the driver does not
-> set the opt-out flag you're suggesting since at that time it did not
-> have its own power logic, then tries to boot that with a dtb file written
-> for a newer kernel (where the driver does have the opt out flag), and we
-> start powering up things in the wrong order and let the magic smoke out
-> of various components on the board ?
-
-Conversely what if someone fixes a bug in the standard power up sequence
-in a newer version of the kernel but then tries to run older software?
-There's plenty of ways things can go wrong with this stuff.
-
-> Also note that this is a perfectly standard use of compatibles, compatibles
-> are typically used to indicate which driver should be used, in this case
-> the compatible indicates that the simple powerup driver should be used,
-> where as if another powerup driver should be used another compatbile will
-> be there instead.
-
-We don't typically actually bind multiple compatibles for a single
-device.  We've got a bunch of options we can choose from but we
-generally pick the one that matches best and ignore the others.
-
-> Where as what you're suggesting is to always pick driver foo, unless
-> driver bar is available and has a special flag saying to not use foo, this
-> is a whole new way to use compatibles really, and not one which I think
-> we want to introduce.
-
-I'm not sure I'm buying the idea that we have a powerup driver that's
-meaningfully not part of the main device driver.
-
-> > Well, if things aren't going to work either way for these devices
-> > without extra stuff it seems it doesn't much matter but it helps the
-> > simple case to have things default to working.
-
-> The simple case still needs a child node describing the needed resources,
-> adding a compatible = "simple-sdio-powerup" to that at the same as creating
-> the child node in the first place really is no extra effort at all.
-
->From where I'm sitting it's more effort since instead of just putting
-the device in there (and possibly also some other devices that are
-software compatible) we have to put in another compatible string which
-is really just a boolean flag to be used in conjunction with the others.
-That's harder to think about and we clearly don't want to go through the
-compatible list, decide that we don't know how to handle the device
-except power it up so go and do that.
-
-If it were done as something like "set boolean property X or
-powerup-method = Y in the card description" or whatever it'd seem a bit
-annoying but not a big deal, I think it's the fact that it's getting put
-into the compatible list that's really concerning me.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140526/bd24f785/attachment.sig>
+	Arnd
