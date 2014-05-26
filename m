@@ -1,90 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 26 May 2014 17:34:24 +0200
-Subject: [PATCH] ARM: vexpress: refine dependencies for new code
-Message-ID: <6862654.ZzBrnrRESe@wuerfel>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 26 May 2014 21:05:38 +0530
+Subject: [PATCH 2/4] cpufreq: add i.MX5 cpufreq driver
+In-Reply-To: <1401118115.4829.60.camel@weser.hi.pengutronix.de>
+References: <1401099308-9658-1-git-send-email-l.stach@pengutronix.de>
+ <1401099308-9658-2-git-send-email-l.stach@pengutronix.de>
+ <CAKohpoksbFHyX=r0=URMedJNi68c3xAX4OrXzSFqgf1-bCm4+Q@mail.gmail.com>
+ <1401101131.4829.29.camel@weser.hi.pengutronix.de>
+ <CAKohponTUsYLf-8_iSnttwK8oXyJEZVWpF+a=vLC7r_jZ8AzOQ@mail.gmail.com>
+ <1401107748.4829.39.camel@weser.hi.pengutronix.de>
+ <CAKohpo=ncHUmtJOEw4FZG1BWUSuiQK4n+ETEMJWJj9UoPz2cnw@mail.gmail.com>
+ <1401109863.4829.46.camel@weser.hi.pengutronix.de>
+ <CAKohponzJma6yNueMef2Q4k+qT-n7boV0tx0pCqjFmuQWj6TXg@mail.gmail.com>
+ <1401112697.4829.56.camel@weser.hi.pengutronix.de>
+ <CAKohponvWLVfBL06HURnTq4nmdKjROV-bd4pVcbNmsAUYYC+nA@mail.gmail.com>
+ <1401118115.4829.60.camel@weser.hi.pengutronix.de>
+Message-ID: <CAKohpo=yShVa+5On0cPU68ooQGO8dFXP+amPHf3taP_aYYe1Qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The versatile express changes for 3.16 introduced a number of
-build regressions for randconfig kernels by not tracking dependencies
-between the components right.
+On 26 May 2014 20:58, Lucas Stach <l.stach@pengutronix.de> wrote:
+> The platform I'm working on supports cpu rail voltage regulation just
+> fine.
 
-This patch tries to rectify that:
+So, the regulator can be scaled to support all values from your dts
+and we can work without MAX-volt parameter here..
 
-* the mach-vexpress code cannot link without the syscfg driver,
-  which in turn needs MFD_VEXPRESS_SYSREG
-* various drivers call devm_regmap_init_vexpress_config(), which
-  has to be exported so it can be used by loadable modules
-* the configuration bus uses OF DT helper functions that are not
-  available to platforms disable CONFIG_OF
-* The sysreg driver exports GPIOs through gpiolib, which can
-  be disabled on some platforms.
-* The clocksource code cannot be built on platforms that don't
-  use modern timekeeping but rely on gettimeoffset.
+> I just want to make sure that the driver works properly on platforms
+> where this isn't the case.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index e0726e4..2cc994e 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -18,6 +18,8 @@ menuconfig ARCH_VEXPRESS
- 	select POWER_SUPPLY
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 	select VEXPRESS_CONFIG
-+	select VEXPRESS_SYSCFG
-+	select MFD_VEXPRESS_SYSREG
- 	help
- 	  This option enables support for systems using Cortex processor based
- 	  ARM core and logic (FPGA) tiles on the Versatile Express motherboard,
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index 827f8a5..1f37d98 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -54,6 +54,7 @@ config VEXPRESS_CONFIG
- 	bool "Versatile Express configuration bus"
- 	default y if ARCH_VEXPRESS
- 	depends on ARM || ARM64
-+	depends on OF
- 	select REGMAP
- 	help
- 	  Platform configuration infrastructure for the ARM Ltd.
-diff --git a/drivers/bus/vexpress-config.c b/drivers/bus/vexpress-config.c
-index 27a07df..a64763b 100644
---- a/drivers/bus/vexpress-config.c
-+++ b/drivers/bus/vexpress-config.c
-@@ -118,7 +118,7 @@ struct regmap *devm_regmap_init_vexpress_config(struct device *dev)
- 
- 	return regmap;
- }
--
-+EXPORT_SYMBOL_GPL(devm_regmap_init_vexpress_config);
- 
- struct device *vexpress_config_bridge_register(struct device *parent,
- 		struct vexpress_config_bridge_ops *ops, void *context)
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 2c27b02..43f1acf 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -194,7 +194,7 @@ config CLKSRC_QCOM
- 
- config CLKSRC_VERSATILE
- 	bool "ARM Versatile (Express) reference platforms clock source"
--	depends on GENERIC_SCHED_CLOCK
-+	depends on GENERIC_SCHED_CLOCK && !ARCH_USES_GETTIMEOFFSET
- 	select CLKSRC_OF
- 	default y if MFD_VEXPRESS_SYSREG
- 	help
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index a3987af..6cc4b6a 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -1261,7 +1261,7 @@ endmenu
- 
- config MFD_VEXPRESS_SYSREG
- 	bool "Versatile Express System Registers"
--	depends on VEXPRESS_CONFIG
-+	depends on VEXPRESS_CONFIG && GPIOLIB
- 	default y
- 	select CLKSRC_MMIO
- 	select GPIO_GENERIC_PLATFORM
+Can we just take care of this simply by not adding any regulators at
+all? In that case cpufreq-cpu0 will try working without a regulator..
