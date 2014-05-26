@@ -1,39 +1,52 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 26 May 2014 17:49:59 +0200
-Subject: [PATCH v3 00/14] ARM/ARM64: KVM: big endian host support
-In-Reply-To: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
-References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20140526154959.GD31431@lvm>
+From: santosh.shukla@linaro.org (Santosh Shukla)
+Date: Mon, 26 May 2014 21:23:45 +0530
+Subject: [PATCH] ARM: Exynos : Fix build error with thumb2
+Message-ID: <1401119625-11309-1-git-send-email-santosh.shukla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 09:13:52AM -0700, Victor Kamensky wrote:
-> Hi,
-> 
-> Here is updated patches to address KVM host support in big endian
-> ARM V7/V8.
-> 
-> Changes since previous version [1] and [2]:
-> 
-> x) joined both v7 [1] and v8 [2] series into one
-> 
-> x) addressed, nearly all, Christoffer's comments to previous
-> patch series
-> 
-> x) Fixed few issues in 'ARM: KVM: handle 64bit values passed to
-> mrcc or from mcrr instructions in BE case' that got discovered
-> after moving to the latest v3.15-rc5 kernel
+From: santosh shukla <santosh.shukla@linaro.org>
 
-What were the issues?
+Add non-global symbol .LLl2x0_regs_phys to avoid build break in thumb2 mode.
 
-> 
-> x) Fixed issue in supporting 32bit guest by V8 BE KVM host
+IIUC, arm assembler fail to load value of "global" variable
+l2xo_regs_phys for thum2 mode and wrapping it in non-global symbol like
+.Ll2x0_regs_phys solves the build break issue.
 
-Is this changes only from v2 to v3 or?
+arch/arm/mach-exynos/sleep.S: Assembler messages:
+arch/arm/mach-exynos/sleep.S:57: Error: invalid immediate for address
+calculation (value = 0x00000004)
 
-Consider using the common format for changelogs, see here for an
-example:
-https://lists.cs.columbia.edu/pipermail/kvmarm/2014-May/009468.html
+fix inspired from [1]
 
-Thanks,
--Christoffer
+[1] https://lkml.org/lkml/2010/3/31/235
+
+Signed-off-by: santosh shukla <santosh.shukla@linaro.org>
+---
+ arch/arm/mach-exynos/sleep.S |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-exynos/sleep.S b/arch/arm/mach-exynos/sleep.S
+index a2613e9..dc8c6b6 100644
+--- a/arch/arm/mach-exynos/sleep.S
++++ b/arch/arm/mach-exynos/sleep.S
+@@ -54,7 +54,7 @@ ENTRY(exynos_cpu_resume)
+ 	ldr	r1, =CPU_CORTEX_A9
+ 	cmp	r0, r1
+ 	bne	skip_l2_resume
+-	adr	r0, l2x0_regs_phys
++	adr	r0, .Ll2x0_regs_phys
+ 	ldr	r0, [r0]
+ 	cmp	r0, #0
+ 	beq	skip_l2_resume
+@@ -79,6 +79,8 @@ skip_l2_resume:
+ 	b	cpu_resume
+ ENDPROC(exynos_cpu_resume)
+ #ifdef CONFIG_CACHE_L2X0
++
++.Ll2x0_regs_phys:
+ 	.globl l2x0_regs_phys
+ l2x0_regs_phys:
+ 	.long	0
+-- 
+1.7.9.5
