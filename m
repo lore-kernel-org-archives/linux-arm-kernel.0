@@ -1,48 +1,48 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Mon, 26 May 2014 14:45:27 +0100
-Subject: [PATCH 1/2] arm: dts: Fix missing device_type="memory" for
- ste-ccu8540
-In-Reply-To: <1401111769-5334-1-git-send-email-grant.likely@linaro.org>
-References: <1401111769-5334-1-git-send-email-grant.likely@linaro.org>
-Message-ID: <CACxGe6simd9e8zvrNdM1AG_i201TzvZM1gutB5odqwjg9DY7KA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 26 May 2014 15:40:52 +0200
+Subject: [GIT PULL] clockevents: new material for 3.16
+In-Reply-To: <53830ED9.9060001@linaro.org>
+References: <537F214C.8000700@linaro.org>
+ <20140526194512.032c6630@canb.auug.org.au>
+ <53830ED9.9060001@linaro.org>
+Message-ID: <20140526134052.GA3790@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oops, sent this series out by mistake. Sorry for the noise.
+On Mon, May 26, 2014 at 11:52:25AM +0200, Daniel Lezcano wrote:
+> On 05/26/2014 11:45 AM, Stephen Rothwell wrote:
+> >Hi all,
+> >
+> >On Fri, 23 May 2014 12:22:04 +0200 Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> >>
+> >>        clocksource: sun5i: Add support for reset controller
+> >
+> >This commit caused a build failure on arm in linux-next today ...
 
-g.
+It's weird... of_reset_control_get has been merged in 3.15 by this
+commit fc0a5921561c71be2c334a335c1680f7930434d7 ("reset: Add
+of_reset_control_get"), and then the commit
+b424080a9e086e683ad5fdc624a7cf3c024e0c0f ("reset: Add optional resets
+and stubs") removed it, still in 3.15 (probably a mismerge).
 
-On Mon, May 26, 2014 at 2:42 PM, Grant Likely <grant.likely@linaro.org> wrote:
-> From: Leif Lindholm <leif.lindholm@linaro.org>
->
-> The current .dts for ste-ccu8540 lacks a 'device_type = "memory"' for
-> its memory node, relying on an old ppc quirk in order to discover its
-> memory. Fix the data so that all parsing code can handle it correctly.
->
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree at vger.kernel.org
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Grant Likely <grant.likely@linaro.org>
-> ---
->  arch/arm/boot/dts/ste-ccu8540.dts | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/boot/dts/ste-ccu8540.dts b/arch/arm/boot/dts/ste-ccu8540.dts
-> index 7f3baf51a3a9..32dd55e5f4e6 100644
-> --- a/arch/arm/boot/dts/ste-ccu8540.dts
-> +++ b/arch/arm/boot/dts/ste-ccu8540.dts
-> @@ -18,6 +18,7 @@
->         compatible = "st-ericsson,ccu8540", "st-ericsson,u8540";
->
->         memory at 0 {
-> +               device_type = "memory";
->                 reg = <0x20000000 0x1f000000>, <0xc0000000 0x3f000000>;
->         };
->
-> --
-> 1.9.1
->
+Finally, Hans de Goede introduced it back in the following patch:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/246738.html
+
+That should have shown up in one of 3.15-rc's according to:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/252317.html
+
+Philipp, what's going on?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140526/3d498f0f/attachment.sig>
