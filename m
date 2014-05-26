@@ -1,35 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 26 May 2014 11:26:42 +0200
-Subject: [PATCH] arm: Set hardirq tracing to on when idling
-In-Reply-To: <1401045323-7116-1-git-send-email-minyard@acm.org>
-References: <1401045323-7116-1-git-send-email-minyard@acm.org>
-Message-ID: <4559339.apo3Fd10HK@wuerfel>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 26 May 2014 11:40:03 +0200
+Subject: [PATCH] ARM: dts: imx6qdl-gw5xxx: Fix Linear Technology vendor
+ prefix
+In-Reply-To: <20140526110830.72eab28a@ipc1.ka-ro>
+References: <1401093631-18467-1-git-send-email-p.zabel@pengutronix.de>
+ <20140526110830.72eab28a@ipc1.ka-ro>
+Message-ID: <1401097203.3400.8.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 25 May 2014 14:15:23 minyard at acm.org wrote:
-> From: Corey Minyard <cminyard@mvista.com>
-> 
-> The CPU will go to idle with interrupts off, but the interrupts
-> will wake up the idle.  This was causing very long irqsoff trace
-> values because, basically, the whole idle time was traces with
-> irqs off, even though they weren't really off.  Rework the idle
-> code to turn hardirq tracing to on befor calling idle.
-> 
-> Signed-off-by: Corey Minyard <cminyard@mvista.com>
-> ---
->  arch/arm/kernel/process.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> I'm not sure this is correct for all ARM boards, but it fixes the
-> issue for the Vexpress board I have.  No more 4 second irqsoff
-> times.
+Hi Lothar,
 
-If this patch is correct for ARM, I wonder if it should be done
-in architecture independent code instead. Do you see the same
-thing on x86? If not, do you know what's different?
+Am Montag, den 26.05.2014, 11:08 +0200 schrieb Lothar Wa?mann:
+> Hi,
+> 
+> Philipp Zabel wrote:
+> > The vendor prefix for Linear Technology should be lltc,
+> > same as the NASDAQ symbol.
+> > 
+> The vendor prefix seems to be missing in
+> Documentation/devictree/bindins/vendor-prefixes.txt, or am I missing
+> something?
 
-It seems like the right thing to do, I just don't understand
-why nobody hit this before.
+I have sent the documentation patches together with the ltc3589
+regulator driver:
+https://lkml.org/lkml/2014/5/26/98
 
-	Arnd
+regards
+Philipp
