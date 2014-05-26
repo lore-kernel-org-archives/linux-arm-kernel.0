@@ -1,32 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 May 2014 13:03:04 -0700
-Subject: [GIT PULL 4/4] omap dt changes for v3.16 merge window, part 2
-In-Reply-To: <20140520013125.GH15793@atomide.com>
-References: <20140520013125.GH15793@atomide.com>
-Message-ID: <20140526200304.GH27093@quad.lixom.net>
+Date: Mon, 26 May 2014 13:25:26 -0700
+Subject: [GIT PULL 2/3] omap pm changes for v3.16 merge window, resend
+In-Reply-To: <20140520021151.GL15793@atomide.com>
+References: <20140520021151.GL15793@atomide.com>
+Message-ID: <20140526202526.GJ27093@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 19, 2014 at 06:31:25PM -0700, Tony Lindgren wrote:
-> The following changes since commit 3fdb77174a2c173e0e69f2499b836a0e412f6c4d:
+On Mon, May 19, 2014 at 07:11:52PM -0700, Tony Lindgren wrote:
+> The following changes since commit 89ca3b881987f5a4be4c5dbaa7f0df12bbdde2fd:
 > 
->   ARM: dts: omap3-n900: use MATRIX_KEY for keymap (2014-05-06 10:22:51 -0700)
+>   Linux 3.15-rc4 (2014-05-04 18:14:42 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/dt-part2-v2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/pm-signed
 > 
-> for you to fetch changes up to d712ff63b18309c939396f593510fbcccbafb9e4:
+> for you to fetch changes up to 57b05572267581c2320462e9b606709fa6da4c5a:
 > 
->   ARM: dts: Enable mcpdm and mcbsp1 on DuoVero (2014-05-19 17:20:31 -0700)
+>   ARM: OMAP2+: Enable CPUidle in omap2plus_defconfig (2014-05-06 15:45:15 -0700)
 > 
 > ----------------------------------------------------------------
-> Device tree related changes for omaps.
+> PM related fixes for omap3 that were discovered during omap3
+> conversion to device tree. This series sets up the PMIC signaling
+> in a way where we can test for PM regressions easily by
+> looking at state of the the sys_clkreq and sys_off_mode pins.
+> 
+> Note that this series alone does not make omap3 PM to cut
+> off core voltage during off-idle, changes to twl4030-power.c
+> configurations are still needed. Those will be posted
+> separately.
 
-Merged into next/dt.
+Merged into next/soc.
 
-I'd appreciate a bit more verbose tag messages though -- a very brief
-overview of what's new in here, etc. I think you used to do them in the past?
 
+Thanks,
 
 -Olof
