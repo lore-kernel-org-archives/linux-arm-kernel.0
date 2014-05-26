@@ -1,28 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 May 2014 14:44:09 -0700
-Subject: [GIT PULL 02/02] DaVinci board changes for v3.16
-In-Reply-To: <1400924613-24451-2-git-send-email-nsekhar@ti.com>
-References: <1400924613-24451-1-git-send-email-nsekhar@ti.com>
- <1400924613-24451-2-git-send-email-nsekhar@ti.com>
-Message-ID: <20140526214409.GS27093@quad.lixom.net>
+Date: Mon, 26 May 2014 14:52:52 -0700
+Subject: [GIT PULL] Xilinx Zynq changes for v3.16
+In-Reply-To: <392166a3-2314-442d-86e3-91a1d01fed7e@BN1AFFO11FD041.protection.gbl>
+References: <392166a3-2314-442d-86e3-91a1d01fed7e@BN1AFFO11FD041.protection.gbl>
+Message-ID: <20140526215252.GT27093@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 24, 2014 at 03:13:33PM +0530, Sekhar Nori wrote:
+On Mon, May 26, 2014 at 06:50:32AM +0200, Michal Simek wrote:
+> Hi guys,
+> 
+> please pull these changes to your arm-soc tree.
+> Based on my discussion with Arnd regarding SOC-BUS here
+> "http://www.spinics.net/lists/arm-kernel/msg325629.html"
+> I have also added this patch.
+> 
+> Thanks,
+> Michal
+> 
+> 
 > The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 > 
 >   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.16/board
+>   git://git.xilinx.com/linux-xlnx.git tags/zynq-cleanup-for-3.16
 > 
-> for you to fetch changes up to ea56785629494394b9e567c0a43690d6c972e137:
+> for you to fetch changes up to eb28d0bb857f01ff972f8b359c962eef9ecf1b64:
 > 
->   ARM: davinci: remove checks for CONFIG_USB_MUSB_PERIPHERAL (2014-05-22 16:29:08 +0530)
+>   ARM: zynq: Enable big-endian (2014-05-20 16:17:13 +0200)
 
-Merged into next/boards.
-
+Merged into next/soc.
 
 Thanks,
 
