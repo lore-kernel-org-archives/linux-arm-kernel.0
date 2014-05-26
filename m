@@ -1,122 +1,45 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 26 May 2014 11:24:44 +0200
-Subject: [PATCH v3 01/11] clk: composite: support determine_rate using
- rate_ops->round_rate + mux_ops->set_parent
-In-Reply-To: <17737873.r3cte6TEQ5@phil>
-References: <1621067.VASjIdzoSl@phil> <17737873.r3cte6TEQ5@phil>
-Message-ID: <5383085C.1060804@free-electrons.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 26 May 2014 17:25:43 +0800
+Subject: [PATCH 19/22] ARM: sunxi: Add earlyprintk support using R_UART
+ (sun6i/sun8i)
+In-Reply-To: <20140525184636.GN10768@lukather>
+References: <1400831485-28576-1-git-send-email-wens@csie.org>
+ <1400831485-28576-20-git-send-email-wens@csie.org>
+ <20140525184636.GN10768@lukather>
+Message-ID: <CAGb2v66jL5-rmSy0W38og6bLiNkGu0wekEZfOuh0Fn2oOsJpaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Heiko,
-
-On 23/05/2014 21:33, Heiko St?bner wrote:
-> From: Boris BREZILLON <b.brezillon@overkiz.com>
+On Mon, May 26, 2014 at 2:46 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
 >
-> In case the rate_hw does not implement determine_rate, but only round_rate
-> we fallback to best_parent selection if mux_hw is present and support
-> reparenting.
+> On Fri, May 23, 2014 at 03:51:22PM +0800, Chen-Yu Tsai wrote:
+>> sun6i/sun8i have a UART in the RTC block group, which can be used
+>> as an early console. This is most useful on sun8i as UART0 is muxed
+>> with MMC0, which is not available if we boot from MMC.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  arch/arm/Kconfig.debug | 10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>>
+>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>> index eab8ecb..9e22708 100644
+>> --- a/arch/arm/Kconfig.debug
+>> +++ b/arch/arm/Kconfig.debug
+>> @@ -694,6 +694,14 @@ choice
+>>                 Say Y here if you want kernel low-level debugging support
+>>                 on Allwinner A1X based platforms on the UART1.
+>>
+>> +     config DEBUG_SUNXI_R_UART
+>> +             bool "Kernel low-level debugging messages via sunXi R_UART"
+>> +             depends on ARCH_SUNXI
 >
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->
-> This also fixes a rate calculation problem when using the standard div and
-> mux ops, as in this case currently only the mux->determine_rate is used
-> in the composite rate calculation.
-> [fixed the output to actually return a rate instead of the diff]
-Sorry for the delay and thanks for fixing this.
+> It should rather depend on MACH_SUN8I.
 
-Anyway, when I first proposed this patch, Emilio (added in Cc) told me
-this should not be automatically done by the composite clk driver, and
-the driver should instead provide the determine_rate function.
-
-Mike, any opinion on this patch ?
-
-Best Regards,
-
-Boris
-
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/clk/clk-composite.c | 51 ++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 50 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-> index 57a078e..0a4cd21 100644
-> --- a/drivers/clk/clk-composite.c
-> +++ b/drivers/clk/clk-composite.c
-> @@ -64,11 +64,59 @@ static long clk_composite_determine_rate(struct clk_hw *hw, unsigned long rate,
->  	const struct clk_ops *mux_ops = composite->mux_ops;
->  	struct clk_hw *rate_hw = composite->rate_hw;
->  	struct clk_hw *mux_hw = composite->mux_hw;
-> +	struct clk *parent;
-> +	unsigned long parent_rate;
-> +	long tmp_rate, best_rate;
-> +	unsigned long rate_diff;
-> +	unsigned long best_rate_diff = ULONG_MAX;
-> +	int i;
->  
->  	if (rate_hw && rate_ops && rate_ops->determine_rate) {
->  		rate_hw->clk = hw->clk;
->  		return rate_ops->determine_rate(rate_hw, rate, best_parent_rate,
->  						best_parent_p);
-> +	} else if (rate_hw && rate_ops && rate_ops->round_rate &&
-> +		   mux_hw && mux_ops && mux_ops->set_parent) {
-> +		*best_parent_p = NULL;
-> +
-> +		if (__clk_get_flags(hw->clk) & CLK_SET_RATE_NO_REPARENT) {
-> +			*best_parent_p = clk_get_parent(mux_hw->clk);
-> +			*best_parent_rate = __clk_get_rate(*best_parent_p);
-> +
-> +			return rate_ops->round_rate(rate_hw, rate,
-> +						    best_parent_rate);
-> +		}
-> +
-> +		for (i = 0; i < __clk_get_num_parents(mux_hw->clk); i++) {
-> +			parent = clk_get_parent_by_index(mux_hw->clk, i);
-> +			if (!parent)
-> +				continue;
-> +
-> +			parent_rate = __clk_get_rate(parent);
-> +
-> +			tmp_rate = rate_ops->round_rate(rate_hw, rate,
-> +							&parent_rate);
-> +			if (tmp_rate < 0)
-> +				continue;
-> +
-> +			if (tmp_rate < rate)
-> +				rate_diff = rate - tmp_rate;
-> +			else
-> +				rate_diff = tmp_rate - rate;
-> +
-> +			if (!rate_diff || !*best_parent_p
-> +				       || best_rate_diff > rate_diff) {
-> +				*best_parent_p = parent;
-> +				*best_parent_rate = parent_rate;
-> +				best_rate_diff = rate_diff;
-> +				best_rate = tmp_rate;
-> +			}
-> +
-> +			if (!rate_diff)
-> +				return rate;
-> +		}
-> +
-> +		return best_rate;
->  	} else if (mux_hw && mux_ops && mux_ops->determine_rate) {
->  		mux_hw->clk = hw->clk;
->  		return mux_ops->determine_rate(mux_hw, rate, best_parent_rate,
-> @@ -196,7 +244,8 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
->  		composite->rate_hw = rate_hw;
->  		composite->rate_ops = rate_ops;
->  		clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
-> -		if (rate_ops->determine_rate)
-> +		if (rate_ops->determine_rate ||
-> +		    (rate_ops->round_rate && clk_composite_ops->set_parent))
->  			clk_composite_ops->determine_rate = clk_composite_determine_rate;
->  	}
->  
+I assume no sun6i devices would use it, or have pads available for it?
+If so, then MACH_SUN8I makes sense.
 
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+ChenYu
