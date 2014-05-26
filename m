@@ -1,111 +1,44 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 26 May 2014 18:14:09 +0200
-Subject: [PATCH] ARM: mvebu: fix cpuidle implementation to work on big-endian
- systems
-Message-ID: <1401120849-2164-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 26 May 2014 18:14:21 +0200
+Subject: [PATCH] ALSA: hda: fix tegra build
+Message-ID: <4769804.MRZYg8zfIB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Marvell Armada XP, when a CPU comes back from deep idle state of
-cpuidle, it restarts its execution at armada_370_xp_cpu_resume(),
-which puts back the CPU into the coherency, and then calls the generic
-cpu_resume() function.
+When CONFIG_PM is disabled, the CONFIG_SND_HDA_POWER_SAVE_DEFAULT symbol
+does not get defined, which causes a build error for the hda-tegra driver:
 
-While this works on little-endian configurations, it doesn't work on
-big-endian configurations because the CPU restarts in little-endian,
-and therefore must be switched back to big-endian to operate
-properly. To achieve this, a 'setend be' instruction must be executed
-in big-endian configurations. However, the ARM_BE8() macro that is
-used to implement nice compile-time conditional for ARM LE vs. ARM BE8
-is not easily usable in inline assembly.
+hda/hda_tegra.c:80:25: error: 'CONFIG_SND_HDA_POWER_SAVE_DEFAULT' undeclared here (not in a function)
+ static int power_save = CONFIG_SND_HDA_POWER_SAVE_DEFAULT;
+                         ^
+/git/arm-soc/sound/pci/hda/hda_tegra.c:235:13: warning: 'hda_tegra_disable_clocks' defined but not used [-Wunused-function]
+ static void hda_tegra_disable_clocks(struct hda_tegra *data)
+             ^
 
-Therefore, this patch moves the armada_370_xp_cpu_resume() C function,
-which was anyway just a block of inline assembly, into a proper
-pmsu_ll.S file, and adds the appropriate ARM_BE8(setend be)
-instruction.
+This works around the problem by not referencing that macro
+when CONFIG_PM is disabled. Instead, we assume that it's disabled
+unconditionally and cannot be enabled at runtime.
 
-Without this patch, an Armada XP big endian configuration with cpuidle
-enabled fails to boot, as it hangs as soon as one of the CPU hits the
-deep idle state.
+Signed-off-by: Dylan Reid <dgreid@chromium.org>
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Takashi Iwai <tiwai@suse.de>
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-mvebu/Makefile  |  2 +-
- arch/arm/mach-mvebu/pmsu.c    |  9 ++-------
- arch/arm/mach-mvebu/pmsu_ll.S | 25 +++++++++++++++++++++++++
- 3 files changed, 28 insertions(+), 8 deletions(-)
- create mode 100644 arch/arm/mach-mvebu/pmsu_ll.S
-
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index 2ecb828..1636cdb 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -7,7 +7,7 @@ CFLAGS_pmsu.o			:= -march=armv7-a
- obj-y				 += system-controller.o mvebu-soc-id.o
- 
- ifeq ($(CONFIG_MACH_MVEBU_V7),y)
--obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o
-+obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o pmsu_ll.o
- obj-$(CONFIG_SMP)		 += platsmp.o headsmp.o platsmp-a9.o headsmp-a9.o
- obj-$(CONFIG_HOTPLUG_CPU)	 += hotplug.o
- endif
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 6e83d32..daf52ff 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -66,6 +66,8 @@ static void __iomem *pmsu_mp_base;
- extern void ll_disable_coherency(void);
- extern void ll_enable_coherency(void);
- 
-+extern void armada_370_xp_cpu_resume(void);
-+
- static struct platform_device armada_xp_cpuidle_device = {
- 	.name = "cpuidle-armada-370-xp",
+diff --git a/sound/pci/hda/hda_tegra.c b/sound/pci/hda/hda_tegra.c
+index 086fd06..a366ba9 100644
+--- a/sound/pci/hda/hda_tegra.c
++++ b/sound/pci/hda/hda_tegra.c
+@@ -77,10 +77,14 @@ struct hda_tegra {
+ 	void __iomem *regs;
  };
-@@ -140,13 +142,6 @@ static void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void)
- 	writel(reg, pmsu_mp_base + L2C_NFABRIC_PM_CTL);
- }
  
--static void armada_370_xp_cpu_resume(void)
--{
--	asm volatile("bl    ll_add_cpu_to_smp_group\n\t"
--		     "bl    ll_enable_coherency\n\t"
--		     "b	    cpu_resume\n\t");
--}
--
- /* No locking is needed because we only access per-CPU registers */
- static void armada_370_xp_pmsu_idle_prepare(bool deepidle)
- {
-diff --git a/arch/arm/mach-mvebu/pmsu_ll.S b/arch/arm/mach-mvebu/pmsu_ll.S
-new file mode 100644
-index 0000000..fc3de68
---- /dev/null
-+++ b/arch/arm/mach-mvebu/pmsu_ll.S
-@@ -0,0 +1,25 @@
-+/*
-+ * Copyright (C) 2014 Marvell
-+ *
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ * Gregory Clement <gregory.clement@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+
-+/*
-+ * This is the entry point through which CPUs exiting cpuidle deep
-+ * idle state are going.
-+ */
-+ENTRY(armada_370_xp_cpu_resume)
-+ARM_BE8(setend	be )			@ go BE8 if entered LE
-+	bl	ll_add_cpu_to_smp_group
-+	bl	ll_enable_coherency
-+	b	cpu_resume
-+ENDPROC(armada_370_xp_cpu_resume)
-+
--- 
-1.9.3
++#ifdef CONFIG_PM
+ static int power_save = CONFIG_SND_HDA_POWER_SAVE_DEFAULT;
+ module_param(power_save, bint, 0644);
+ MODULE_PARM_DESC(power_save,
+ 		 "Automatic power-saving timeout (in seconds, 0 = disable).");
++#else
++static int power_save = 0;
++#endif
+ 
+ /*
+  * DMA page allocation ops.
