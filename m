@@ -1,34 +1,25 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 26 May 2014 17:01:22 +0200
-Subject: [GIT PULL] Reset controller fixes for v3.15
-Message-ID: <1401116482.3400.23.camel@paszta.hi.pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 26 May 2014 17:04:24 +0200
+Subject: [PATCH] gpio: pch: include linux/slab.h
+Message-ID: <8665687.jWqf6bo4lM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd,
+The gpio-pch driver was recently enabled for compile-tests,
+which revealed that it is missing an include for linux/slab.h,
+which on ARM is not implied by any of the other headers.
 
-The following change since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-
-is available in the git repository at:
-
-  git://git.pengutronix.de/git/pza/linux.git reset/fixes
-
-for you to fetch at e3ec0a8c6eea4f22d5468f01c065caca4dd1ecca:
-
-  reset: Add of_reset_control_get to reset.h (2014-04-14 16:47:28 +0200)
-
-This patch fixes an erroneous revert that slipped in with commit
-b424080a9e086e683ad5fdc624a7cf3c024e0c0f reset: Add optional resets and stubs
-Without it, we get build failures in linux-next.
-
-----------------------------------------------------------------
-Hans de Goede (1):
-      reset: Add of_reset_control_get to reset.h
-
- include/linux/reset.h | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-regards
-Philipp
+diff --git a/drivers/gpio/gpio-pch.c b/drivers/gpio/gpio-pch.c
+index 83a1563..d6eac9b 100644
+--- a/drivers/gpio/gpio-pch.c
++++ b/drivers/gpio/gpio-pch.c
+@@ -20,6 +20,7 @@
+ #include <linux/gpio.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
++#include <linux/slab.h>
+ 
+ #define PCH_EDGE_FALLING	0
+ #define PCH_EDGE_RISING		BIT(0)
