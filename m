@@ -1,31 +1,43 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 26 May 2014 21:52:21 +0530
-Subject: [PATCH 2/4] cpufreq: add i.MX5 cpufreq driver
-In-Reply-To: <1401119853.4829.65.camel@weser.hi.pengutronix.de>
-References: <1401099308-9658-1-git-send-email-l.stach@pengutronix.de>
- <1401099308-9658-2-git-send-email-l.stach@pengutronix.de>
- <CAKohpoksbFHyX=r0=URMedJNi68c3xAX4OrXzSFqgf1-bCm4+Q@mail.gmail.com>
- <1401101131.4829.29.camel@weser.hi.pengutronix.de>
- <CAKohponTUsYLf-8_iSnttwK8oXyJEZVWpF+a=vLC7r_jZ8AzOQ@mail.gmail.com>
- <1401107748.4829.39.camel@weser.hi.pengutronix.de>
- <CAKohpo=ncHUmtJOEw4FZG1BWUSuiQK4n+ETEMJWJj9UoPz2cnw@mail.gmail.com>
- <1401109863.4829.46.camel@weser.hi.pengutronix.de>
- <CAKohponzJma6yNueMef2Q4k+qT-n7boV0tx0pCqjFmuQWj6TXg@mail.gmail.com>
- <1401112697.4829.56.camel@weser.hi.pengutronix.de>
- <CAKohponvWLVfBL06HURnTq4nmdKjROV-bd4pVcbNmsAUYYC+nA@mail.gmail.com>
- <1401118115.4829.60.camel@weser.hi.pengutronix.de>
- <CAKohpo=yShVa+5On0cPU68ooQGO8dFXP+amPHf3taP_aYYe1Qg@mail.gmail.com>
- <1401119853.4829.65.camel@weser.hi.pengutronix.de>
-Message-ID: <CAKohpo=0VoOEz=SmvU+m6rX3beJ_nMpCUCx504Hsw2jRj2_QSg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 26 May 2014 17:26:43 +0100
+Subject: [PATCH RFCv2 1/5] ARM: use write allocate by default on ARMv6+
+In-Reply-To: <1400600105-3013-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1400600105-3013-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1400600105-3013-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140526162643.GB3693@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 May 2014 21:27, Lucas Stach <l.stach@pengutronix.de> wrote:
-> No, we need the regulator to determine which OPPs are actually useable.
-> If the regulator is only supplying 1.1V we can only scale to 800MHz max,
-> which is the case for some of the industrial i.MX53 versions.
+On Tue, May 20, 2014 at 05:35:01PM +0200, Thomas Petazzoni wrote:
+> Currently, the default cache policy for ARMv6+ platform is writeback
+> in UP mode and write allocate in SMP mode
+> 
+> Some platforms that provide hardware I/O coherency capabilities (such
+> as Marvell Armada 370/XP/375/38x) require the cache policy to be write
+> allocate even in UP mode. This is especially true on Armada 370, which
+> is a single core processor, so even with CONFIG_SMP=y, is_smp()
+> returns false and the cache policy remains defined to writeback.
+> 
+> As suggested by Catalin Marinas and Rob Herring, there is in fact no
+> good reason to keep using writeback by default on ARMv6+, and we could
+> switch to write allocate by default for all ARMv6+ platforms instead
+> of special-casing the Marvell platforms.
 
-Go and add another binding for this max-volt.. And lets see how others
-respond.
+Firstly, whether write allocate is beneficial or detrimental depends on
+the workload being executed, and I'm not about to change this based on
+such loose reasoning.
 
-You can give a link to this discussion as others might find this very helpful.
+Secondly, we're losing information.  SMP uses write-allocate not due to
+some kind of default, not because of some policy reason, but because SMP
+is *required* architecturally to use write-allocate and this must never
+allowed to be overridden.  You break this by allowing SMP to specify
+writeback read-allocate.
+
+Thirdly, you remove the possiblity of using writeback write-allocate on
+ARMv5.  There are ARMv5 CPUs which have caches capable of that.
+
+So, I think this is rather broken.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
