@@ -1,67 +1,58 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 26 May 2014 19:17:55 +0200
-Subject: [PATCH v2 4/4] ARM: debug: qcom: add UART addresses to Kconfig
- help
-In-Reply-To: <53834578.9090305@mm-sol.com>
-References: <1400857952-6963-1-git-send-email-gdjakov@mm-sol.com>
- <1400857952-6963-5-git-send-email-gdjakov@mm-sol.com>
- <CABuKBe+B_Ga-w4aA4dApDTa26rCuhetRTJku27Madm+fHtDcLA@mail.gmail.com>
- <53834578.9090305@mm-sol.com>
-Message-ID: <CABuKBeJXqSi=6XY5Fg7mg_daQ4D8ornS-kn7NDPktCtro7yNNw@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 26 May 2014 19:35:44 +0200
+Subject: [PATCH v3 12/14] ARM64: KVM: vgic_elrsr and vgic_eisr need to be
+ byteswapped in BE case
+In-Reply-To: <1399997646-4716-13-git-send-email-victor.kamensky@linaro.org>
+References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
+ <1399997646-4716-13-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20140526173544.GE31431@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-05-26 15:45 GMT+02:00 Georgi Djakov <gdjakov@mm-sol.com>:
-> On 23.05.14, 19:39, Matthias Brugger wrote:
->>
->> 2014-05-23 17:12 GMT+02:00 Georgi Djakov <gdjakov@mm-sol.com>:
->>>
->>> Add information about the APQ8084 debug UART physical and virtual
->>> addresses in the DEBUG_QCOM_UARTDM Kconfig help section.
->>> Requires: https://lkml.org/lkml/2014/4/14/312
->>>
->>> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
->>> ---
->>>  arch/arm/Kconfig.debug |    1 +
->>>  1 file changed, 1 insertion(+)
->>>
->>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->>> index 40ee328..e71723d 100644
->>> --- a/arch/arm/Kconfig.debug
->>> +++ b/arch/arm/Kconfig.debug
->>> @@ -376,6 +376,7 @@ choice
->>>                   their output to the serial port on Qualcomm devices.
->>>
->>>                   ARCH      DEBUG_UART_PHYS   DEBUG_UART_BASE
->>> +                 APQ8084   0xf995e000        0xfa75e000
->>>                   MSM8X60   0x19c40000        0xf0040000
->>>                   MSM8960   0x16440000        0xf0040000
->>>                   MSM8974   0xf991e000        0xfa71e000
->>
->>
->> You don't have any uart defined in your dts. You should add them
->> before any adding low level debug support.
->> Otherwise there might be problems in booting a multi-platform kernel.
->>
->
-> Thanks for the comment! As the uart depends on clocks, i am adding it to the
-> dts as part of my global clock controller patchset [1].
-> In this patch i am just adding some information to the help section.
-> Do you see any problem with this?
+On Tue, May 13, 2014 at 09:14:04AM -0700, Victor Kamensky wrote:
+> On arm64 'u32 vgic_eisr[2];' and 'u32 vgic_elrsr[2]' are accessed as
+> one 'unsigned long *' bit fields, which has 64bit size. So we need to
+> swap least significant word with most significant word when code reads
+> those registers from h/w.
+> 
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> ---
+>  arch/arm64/kvm/hyp.S | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> index 0620691..5035b41 100644
+> --- a/arch/arm64/kvm/hyp.S
+> +++ b/arch/arm64/kvm/hyp.S
+> @@ -415,10 +415,17 @@ CPU_BE(	rev	w11, w11 )
+>  	str	w4, [x3, #VGIC_CPU_HCR]
+>  	str	w5, [x3, #VGIC_CPU_VMCR]
+>  	str	w6, [x3, #VGIC_CPU_MISR]
+> +#ifndef CONFIG_CPU_BIG_ENDIAN
+>  	str	w7, [x3, #VGIC_CPU_EISR]
+>  	str	w8, [x3, #(VGIC_CPU_EISR + 4)]
+>  	str	w9, [x3, #VGIC_CPU_ELRSR]
+>  	str	w10, [x3, #(VGIC_CPU_ELRSR + 4)]
+> +#else
+> +	str	w7, [x3, #(VGIC_CPU_EISR + 4)]
+> +	str	w8, [x3, #VGIC_CPU_EISR]
+> +	str	w9, [x3, #(VGIC_CPU_ELRSR + 4)]
+> +	str	w10, [x3, #VGIC_CPU_ELRSR]
+> +#endif
+>  	str	w11, [x3, #VGIC_CPU_APR]
+>  
+>  	/* Clear GICH_HCR */
+> -- 
+> 1.8.1.4
+> 
+Hmm, the data structure doesn't actually clearly define this as bitmap,
+but the architecture clearly defines this as two registers.  It feels
+like this critical code is getting over complicated to cater for the
+fact that we can use a convenient for_each_set_bit() function when we
+process a maintenance interrupt.
 
-Are the patches for the clock controller applied already?
-If not, I would consider to add this patch to clock controller series.
+Marc, what are your thoughts on this?  Change vgic_process_maintenance
+and clearly document the array on struct vgic_cpu, or go ahead with this
+change?
 
-Cheers,
-Matthias
-
->
-> [1] https://lkml.org/lkml/2014/5/22/422
->
-> Thanks,
-> Georgi
-
-
-
--- 
-motzblog.wordpress.com
+-Christoffer
