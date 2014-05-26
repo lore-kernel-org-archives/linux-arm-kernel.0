@@ -1,53 +1,170 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 May 2014 11:13:15 -0700
-Subject: [PATCH v2] ARM: rockchip: convert smp bringup to
- CPU_METHOD_OF_DECLARE
-In-Reply-To: <1878147.CvhHSZhTas@diego>
-References: <1632873.urGeGsUMPH@diego>
- <20140326110024.GR10341@e106331-lin.cambridge.arm.com>
- <2151573.evmqdkWnet@diego> <1878147.CvhHSZhTas@diego>
-Message-ID: <20140526181315.GA27093@quad.lixom.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 26 May 2014 20:14:24 +0200
+Subject: [PATCH 1/3] driver core/platform: don't leak memory allocated
+ for dma_mask
+In-Reply-To: <1401122483-31603-1-git-send-email-emilgoode@gmail.com>
+References: <1401122483-31603-1-git-send-email-emilgoode@gmail.com>
+Message-ID: <20140526181424.GN20155@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 27, 2014 at 01:06:32AM +0100, Heiko St?bner wrote:
-> With the newly introduced CPU_METHOD_OF_DECLARE is not necessary anymore
-> to reference the relevant smp_ops in the board file, but instead it can
-> simply be set by the enable-method property of the cpu nodes.
+On Mon, May 26, 2014 at 06:41:21PM +0200, Emil Goode wrote:
+> From: Yann Droneaud <ydroneaud@opteya.com>
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-
-Applied, however:
-
+> Since commit 01dcc60a7cb8, platform_device_register_full() is
+> available to allocate and register a platform device.
+> 
+> If a dma_mask is provided as part of platform_device_info,
+> platform_device_register_full() allocate memory for a u64 using
+> kmalloc().
+> 
+> A comment in the code state that "[t]his memory isn't freed when the
+> device is put".
+> 
+> It's never a good thing to leak memory, but there's only very few
+> users of platform_device_info's dma_mask, and those are mostly
+> "static" devices that are not going to be plugged/unplugged often.
+> 
+> So memory leak is not really an issue, but allocating 8 bytes through
+> kmalloc() seems overkill.
+> 
+> To address this issue, this patch adds dma_mask to struct platform_object
+> and when using platform_device_alloc() or platform_device_register_full()
+> the .dma_mask pointer of struct device is assigned the address of this new
+> dma_mask member of struct platform_object.  And since it's within struct
+> platform_object, dma_mask won't be leaked anymore when struct platform_device
+> get released.
+> 
+> No more memory leak, no small allocation and a slight reduction in code
+> size.
+> 
+> Built on Debian jessie, using GCC 4.8, for ARM and x86_64 architectures,
+> the size of the object file and the data structure layout are updated
+> as follows, produced with commands:
+> 
+> $ size drivers/base/platform.o
+> $ pahole drivers/base/platform.o \
+> 	--recursive		 \
+> 	--class_name device,pdev_archdata,platform_device,platform_object
+> 
+> -- size+pahole_3.15-rc6_ARM
+> ++ size+pahole_3.15-rc6_ARM+
+> @@ -2,7 +2,7 @@
+>     text	   data	    bss	    dec	    hex	filename
+> -   6530	   1008	      8	   7546	   1d7a	drivers/base/platform.o
+> +   6482	   1008	      8	   7498	   1d4a	drivers/base/platform.o
+> 
+> @@ -93,8 +93,13 @@ struct platform_object {
+>  	/* --- cacheline 12 boundary (768 bytes) was 40 bytes ago --- */
+>  	char                       name[1];            /*   808     1 */
+> 
+> -	/* size: 816, cachelines: 13, members: 2 */
+> -	/* padding: 7 */
+> +	/* XXX 7 bytes hole, try to pack */
+> 
+> +	u64                        dma_mask;           /*   816     8 */
+> 
+> +	/* size: 824, cachelines: 13, members: 3 */
+> +	/* sum members: 817, holes: 1, sum holes: 7 */
+>  	/* paddings: 1, sum paddings: 4 */
+> -	/* last cacheline: 48 bytes */
+> +	/* last cacheline: 56 bytes */
+>  };
+> 
+> -- size+pahole_3.15-rc6_x86_64
+> ++ size+pahole_3.15-rc6_x86_64+
+> @@ -2,7 +2,7 @@
+>     text	   data	    bss	    dec	    hex	filename
+> -   8570	   5032	   3424	  17026	   4282	drivers/base/platform.o
+> +   8509	   5032	   3408	  16949	   4235	drivers/base/platform.o
+> 
+> @@ -95,7 +95,11 @@ struct platform_object {
+>  	/* --- cacheline 22 boundary (1408 bytes) was 32 bytes ago --- */
+>  	char                       name[1];             /*  1440     1 */
+> 
+> -	/* size: 1448, cachelines: 23, members: 2 */
+> -	/* padding: 7 */
+> -	/* last cacheline: 40 bytes */
+> +	/* XXX 7 bytes hole, try to pack */
+> 
+> +	u64                        dma_mask;            /*  1448     8 */
+> 
+> +	/* size: 1456, cachelines: 23, members: 3 */
+> +	/* sum members: 1449, holes: 1, sum holes: 7 */
+> +	/* last cacheline: 48 bytes */
+>  };
+> 
+> Changes from v4 [1]:
+> - Split v4 of the patch into two separate patches.
+> - Generated new object file size and data structure layout info.
+> - Updated the changelog message.
+> 
+> Changes from v3 [2]:
+> - fixed commit message so that git am doesn't fail.
+> 
+> Changes from v2 [3]:
+> - move 'dma_mask' to platform_object so that it's always
+>   allocated and won't leak on release; remove all previously
+>   added support functions.
+> - use C99 flexible array member for 'name' to remove padding
+>   at the end of platform_object.
+> 
+> Changes from v1 [4]:
+> - remove unneeded kfree() from error path
+> - add reference to author/commit adding allocation of dmamask
+> 
+> Changes from v0 [5]:
+> - small rewrite to squeeze the patch to a bare minimal
+> 
+> [1] http://lkml.kernel.org/r/1390817152-30898-1-git-send-email-ydroneaud at opteya.com
+>     https://patchwork.kernel.org/patch/3541871/
+> 
+> [2] http://lkml.kernel.org/r/1390771138-28348-1-git-send-email-ydroneaud at opteya.com
+>     https://patchwork.kernel.org/patch/3540081/
+> 
+> [3] http://lkml.kernel.org/r/1389683909-17495-1-git-send-email-ydroneaud at opteya.com
+>     https://patchwork.kernel.org/patch/3484411/
+> 
+> [4] http://lkml.kernel.org/r/1389649085-7365-1-git-send-email-ydroneaud at opteya.com
+>     https://patchwork.kernel.org/patch/3480961/
+> 
+> [5] http://lkml.kernel.org/r/1386886207-2735-1-git-send-email-ydroneaud at opteya.com
+> 
+> Cc: Yann Droneaud <ydroneaud@opteya.com>
+> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Yann Droneaud <ydroneaud@opteya.com>
+> [Emil: split v4 of the patch in two and updated changelog]
+> Signed-off-by: Emil Goode <emilgoode@gmail.com>
 > ---
-> changes since v1:
->   - add a short description to the enable-method binding
+> Hello Greg,
 > 
->  Documentation/devicetree/bindings/arm/cpus.txt | 2 ++
->  arch/arm/boot/dts/rk3066a.dtsi                 | 1 +
->  arch/arm/boot/dts/rk3188.dtsi                  | 1 +
->  arch/arm/mach-rockchip/core.h                  | 2 --
->  arch/arm/mach-rockchip/platsmp.c               | 3 ++-
->  arch/arm/mach-rockchip/rockchip.c              | 1 -
->  6 files changed, 6 insertions(+), 4 deletions(-)
+> The first two patches in the series are created from v4 of the
+> original patch, since I have not changed how the code works I think
+> it is correct to keep the original author and Signed-off-by line.
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index 333f4ae..f52a9ac 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -185,6 +185,8 @@ nodes to be present and contain the properties described below.
->  			    "qcom,gcc-msm8660"
->  			    "qcom,kpss-acc-v1"
->  			    "qcom,kpss-acc-v2"
-> +			    "rockchip,rk3066-smp" - cpu-core handling of Socs
-> +					from Rockchip starting with rk3066
+> Best regards,
+> 
+> Emil Goode
+> 
+>  drivers/base/platform.c |   13 +++++--------
+>  1 file changed, 5 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+> index 9e9227e..dd1fa07 100644
+> --- a/drivers/base/platform.c
+> +++ b/drivers/base/platform.c
+> @@ -166,6 +166,7 @@ EXPORT_SYMBOL_GPL(platform_add_devices);
+>  struct platform_object {
+>  	struct platform_device pdev;
+>  	char name[1];
+> +	u64 dma_mask;
+This is broken. .name is used as flexible array, so .name and dma_mask
+overlap.
 
-Nobody else has a comment here, so I removed this one.
+Uwe
 
-I noticed that the list is unsorted, in particular the new marvell entries were
-appended instead of inserted at the right location, which caused a merge
-conflict. Sigh. I'll do a separate commit on top to sort the list, since
-we seem to have the new out-of-order additions in our tree.
-
-
--Olof
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
