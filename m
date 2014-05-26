@@ -1,49 +1,27 @@
-From: emilgoode@gmail.com (Emil Goode)
-Date: Mon, 26 May 2014 18:41:23 +0200
-Subject: [PATCH 3/3] ARM: imx: don't allocate memory for .dma_mask of struct
- device
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 26 May 2014 17:51:05 +0100
+Subject: [PATCH 1/3] driver core/platform: don't leak memory allocated
+ for dma_mask
 In-Reply-To: <1401122483-31603-1-git-send-email-emilgoode@gmail.com>
 References: <1401122483-31603-1-git-send-email-emilgoode@gmail.com>
-Message-ID: <1401122483-31603-3-git-send-email-emilgoode@gmail.com>
+Message-ID: <20140526165105.GD3693@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first patch in this series changed the platform_device_alloc
-function to assign the u64 .dma_mask pointer of struct device to
-the address of a u64 .dma_mask member of struct platform_object.
+On Mon, May 26, 2014 at 06:41:21PM +0200, Emil Goode wrote:
+> @@ -211,6 +215,7 @@ struct platform_device *platform_device_alloc(const char *name, int id)
+>  		strcpy(pa->name, name);
+>  		pa->pdev.name = pa->name;
+>  		pa->pdev.id = id;
+> +		pa->pdev.dev.dma_mask = &pa->dma_mask;
 
-This means that we no longer should allocate memory for the .dma_mask
-pointer of struct device when using platform_device_alloc() and the
-u64 .dma_mask of struct platform_object that it points to will be freed
-when the release callback function platform_device_release is called.
+There is code in the kernel which, rightly or wrongly, checks whether
+dev->dma_mask is NULL to determine whether the device can do any kind
+of DMA.  The above results in devices allocated via this interface
+always having this member set, which is a change of core kernel behaviour.
 
-Signed-off-by: Emil Goode <emilgoode@gmail.com>
----
- arch/arm/mach-imx/devices/platform-ipu-core.c |    5 -----
- 1 file changed, 5 deletions(-)
+How sure are you that this will not break anything?
 
-diff --git a/arch/arm/mach-imx/devices/platform-ipu-core.c b/arch/arm/mach-imx/devices/platform-ipu-core.c
-index 6bd7c3f..4499a7d 100644
---- a/arch/arm/mach-imx/devices/platform-ipu-core.c
-+++ b/arch/arm/mach-imx/devices/platform-ipu-core.c
-@@ -79,10 +79,6 @@ struct platform_device *__init imx_alloc_mx3_camera(
- 	if (!pdev)
- 		return ERR_PTR(-ENOMEM);
- 
--	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
--	if (!pdev->dev.dma_mask)
--		goto err;
--
- 	*pdev->dev.dma_mask = DMA_BIT_MASK(32);
- 	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
- 
-@@ -96,7 +92,6 @@ struct platform_device *__init imx_alloc_mx3_camera(
- 		ret = platform_device_add_data(pdev, pdata, sizeof(*pdata));
- 		if (ret) {
- err:
--			kfree(pdev->dev.dma_mask);
- 			platform_device_put(pdev);
- 			return ERR_PTR(-ENODEV);
- 		}
 -- 
-1.7.10.4
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
