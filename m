@@ -1,27 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 May 2014 12:10:09 -0700
-Subject: [PATCH] clk: samsung: clk-s3c2410-dlck: do not use PNAME macro
- as it declares __initdata
-In-Reply-To: <4598341.WkbLY9yLfe@phil>
-References: <4598341.WkbLY9yLfe@phil>
-Message-ID: <20140526191009.GC27093@quad.lixom.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 26 May 2014 21:10:30 +0200
+Subject: [PATCH] ALSA: hda: fix tegra build
+In-Reply-To: <s5h61ksjybu.wl%tiwai@suse.de>
+References: <4769804.MRZYg8zfIB@wuerfel> <s5h61ksjybu.wl%tiwai@suse.de>
+Message-ID: <201405262110.31143.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 10:58:53PM +0200, Heiko St?bner wrote:
-> The originally used PNAME macro from the core samsung clock infrastructure
-> declares the created array as initdata, creating section mismatch warnings
-> in the dclk driver.
+On Monday 26 May 2014, Takashi Iwai wrote:
+> At Mon, 26 May 2014 18:14:21 +0200,
+> Arnd Bergmann wrote:
+> > 
+> > When CONFIG_PM is disabled, the CONFIG_SND_HDA_POWER_SAVE_DEFAULT symbol
+> > does not get defined, which causes a build error for the hda-tegra driver:
+> > 
+> > hda/hda_tegra.c:80:25: error: 'CONFIG_SND_HDA_POWER_SAVE_DEFAULT' undeclared here (not in a function)
+> >  static int power_save = CONFIG_SND_HDA_POWER_SAVE_DEFAULT;
+> >                          ^
+> > /git/arm-soc/sound/pci/hda/hda_tegra.c:235:13: warning: 'hda_tegra_disable_clocks' defined but not used [-Wunused-function]
+> >  static void hda_tegra_disable_clocks(struct hda_tegra *data)
+> >              ^
+> > 
+> > This works around the problem by not referencing that macro
+> > when CONFIG_PM is disabled. Instead, we assume that it's disabled
+> > unconditionally and cannot be enabled at runtime.
+> > 
+> > Signed-off-by: Dylan Reid <dgreid@chromium.org>
+> > Reviewed-by: Stephen Warren <swarren@nvidia.com>
+> > Signed-off-by: Takashi Iwai <tiwai@suse.de>
 > 
-> Thus declare them directly, removing these warning.
+> Oh, you cloned me?
 > 
-> Reported-by: Olof Johansson <olof@lixom.net>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> This should probably go though the samsung tree / arm-soc, as the
-> offending patch is also in there.
 
-Applied on top of next/cleanup.
+Damn, copy-paste error on my side. All three are wrong and should be Cc:,
+also my Signed-off-by is missing.
 
+Let me resend.
 
--Olof
+	Arnd
