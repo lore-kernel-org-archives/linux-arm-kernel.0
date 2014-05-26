@@ -1,36 +1,29 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 26 May 2014 11:10:02 +0530
+Date: Mon, 26 May 2014 11:10:35 +0530
 Subject: [PATCH v2] cpufreq: exynos: Fix driver compilation with
  ARCH_MULTIPLATFORM
-In-Reply-To: <1400858533-4327-1-git-send-email-t.figa@samsung.com>
+In-Reply-To: <53826377.8060709@samsung.com>
 References: <1400670752-673-1-git-send-email-t.figa@samsung.com>
  <1400858533-4327-1-git-send-email-t.figa@samsung.com>
-Message-ID: <CAKohponMVKg118YxGHohqcHGmnnZmU3G2-=EJqz+RD0hH5o4tA@mail.gmail.com>
+ <53826377.8060709@samsung.com>
+Message-ID: <CAKohpo=b=Jm4vZfgS2YPA740QfvktgVExXXzOdSUmQjGWhzrhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 May 2014 20:52, Tomasz Figa <t.figa@samsung.com> wrote:
-> Currently Exynos cpufreq drivers rely on globally mapped clock
-> controller registers to configure frequency of CPU cores. This is
-> obviously wrong and will be removed in near future, but to enable
-> support for multi-platform builds without introducing a regression it
-> needs to be worked around.
+On 26 May 2014 03:11, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> I'm not sure Thomas' v5 cpufreq-cpu0 driver can be upstreamed for 3.16
+> because of dependency with others, some of them got ack though...
 >
-> This patch hacks the code to look for clock controller node in device
-> tree and map its registers using of_iomap(), instead of relying on
-> global mapping, so dependencies on platform headers are removed and the
-> driver can compile again with multiplatform support.
+> * "PM / OPP: move cpufreq specific helpers out of OPP layer"
+> - https://www.mail-archive.com/linux-omap at vger.kernel.org/msg104610.html
+
+This is already lying in Rafael's tree.
+
+> * "cpufreq: opp: Add device tree based lookup of boost mode frequency"
+> - http://www.spinics.net/lists/arm-kernel/msg334336.html
 >
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  drivers/cpufreq/Kconfig.arm          |  6 ++---
->  drivers/cpufreq/exynos-cpufreq.c     |  2 --
->  drivers/cpufreq/exynos-cpufreq.h     | 30 ++++++++++++-------------
->  drivers/cpufreq/exynos4210-cpufreq.c | 39 +++++++++++++++++++++++++++-----
->  drivers/cpufreq/exynos4x12-cpufreq.c | 40 ++++++++++++++++++++++++++++-----
->  drivers/cpufreq/exynos5250-cpufreq.c | 43 +++++++++++++++++++++++++++++-------
->  6 files changed, 119 insertions(+), 41 deletions(-)
+> So firstly, I've queued this instead with exynos-multiplatform series...
+>
+> How do you think?
 
-Looks fine..
-
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Looks fine to me. Thanks.
