@@ -1,55 +1,93 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 26 May 2014 12:08:37 +0200
-Subject: [PATCH v2 02/10] iommu/ipmmu-vmsa: Cleanup failures of ARM
- mapping creation or attachment
-In-Reply-To: <20140526092310.GA11299@8bytes.org>
-References: <1400150451-13469-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1400150451-13469-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20140526092310.GA11299@8bytes.org>
-Message-ID: <9405311.lnqBdrCsyu@avalon>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 26 May 2014 12:14:22 +0200
+Subject: [PATCH v2 01/11] sched: fix imbalance flag reset
+In-Reply-To: <5383065E.9030601@linux.vnet.ibm.com>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-2-git-send-email-vincent.guittot@linaro.org>
+ <5381C70E.3030605@linux.vnet.ibm.com>
+ <CAKfTPtDBZyrJJpUHPZcG9Jf4egneyqQ7TR3QXiR0Wff8ZBkHAw@mail.gmail.com>
+ <5383065E.9030601@linux.vnet.ibm.com>
+Message-ID: <CAKfTPtAQHR7aBs8yPuvMn-L_u=qVyNh1aabL4CFPW1JW103eFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On 26 May 2014 11:16, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
+> On 05/26/2014 01:19 PM, Vincent Guittot wrote:
+>> On 25 May 2014 12:33, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
+>>> Hi Vincent,
+>>>
+>>> On 05/23/2014 09:22 PM, Vincent Guittot wrote:
+>>>> The imbalance flag can stay set whereas there is no imbalance.
+>>>>
+>>>> Let assume that we have 3 tasks that run on a dual cores /dual cluster system.
+>>>> We will have some idle load balance which are triggered during tick.
+>>>> Unfortunately, the tick is also used to queue background work so we can reach
+>>>> the situation where short work has been queued on a CPU which already runs a
+>>>> task. The load balance will detect this imbalance (2 tasks on 1 CPU and an idle
+>>>> CPU) and will try to pull the waiting task on the idle CPU. The waiting task is
+>>>> a worker thread that is pinned on a CPU so an imbalance due to pinned task is
+>>>> detected and the imbalance flag is set.
+>>>> Then, we will not be able to clear the flag because we have at most 1 task on
+>>>> each CPU but the imbalance flag will trig to useless active load balance
+>>>> between the idle CPU and the busy CPU.
+>>>
+>>> Why do we do active balancing today when there is at-most 1 task on the
+>>> busiest cpu? Shouldn't we be skipping load balancing altogether? If we
+>>> do active balancing when the number of tasks = 1, it will lead to a ping
+>>> pong right?
+>>
+>> That's the purpose of the patch to prevent this useless active load
+>> balance. When the imbalance flag is set, an active load balance is
+>> triggered whatever the load balance is because of pinned tasks that
+>> prevents a balance state.
+>
+> No I mean this:
+>
+> sched:Do not continue load balancing when the busiest cpu has one
+> running task
 
-On Monday 26 May 2014 11:23:11 Joerg Roedel wrote:
-> On Thu, May 15, 2014 at 12:40:43PM +0200, Laurent Pinchart wrote:
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
-> > ---
-> > 
-> >  drivers/iommu/ipmmu-vmsa.c | 4 +++-
-> >  1 file changed, 3 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
-> > index 49e00f7..49dbedd 100644
-> > --- a/drivers/iommu/ipmmu-vmsa.c
-> > +++ b/drivers/iommu/ipmmu-vmsa.c
-> > @@ -917,7 +917,8 @@ static int ipmmu_add_device(struct device *dev)
-> >  							SZ_1G, SZ_2G);
-> >  		if (IS_ERR(mapping)) {
-> >  			dev_err(mmu->dev, "failed to create ARM IOMMU mapping\n");
-> > -			return PTR_ERR(mapping);
-> > +			ret = PTR_ERR(mapping);
-> > +			goto error;
-> >  		}
-> >  		
-> >  		mmu->mapping = mapping;
-> > @@ -933,6 +934,7 @@ static int ipmmu_add_device(struct device *dev)
-> >  	return 0;
-> >  
-> >  error:
-> > +	arm_iommu_release_mapping(mmu->mapping);
-> >  	kfree(dev->archdata.iommu);
-> >  	dev->archdata.iommu = NULL;
-> >  	iommu_group_remove_device(dev);
-> 
-> Skipped this one because it didn't apply. The others are applied.
+But you can have situation where you have to migrate the task even if
+the busiest CPU has only 1 task. The use of imbalance flag is one
+example. You can also be in a situation where the busiest group has
+too much load compared to the local group and the busiest CPU even
+with 1 task (at this instant) has been selected to move task away from
+the busiest group
 
-Thank you. I'll rebase the patch on top of your tree as soon as you publish 
-the related branch and resubmit.
+Vincent
 
--- 
-Regards,
-
-Laurent Pinchart
+>
+> From: Preeti U Murthy <preeti@linux.vnet.ibm.com>
+>
+>
+> ---
+>  kernel/sched/fair.c |    2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> index c9617b7..b175333 100644
+> --- a/kernel/sched/fair.c
+> +++ b/kernel/sched/fair.c
+> @@ -6626,6 +6626,8 @@ more_balance:
+>                         }
+>                         goto out_balanced;
+>                 }
+> +       } else {
+> +               goto out;
+>         }
+>
+>         if (!ld_moved) {
+>
+>
+> }
+>
+> Regards
+> Preeti U Murthy
+>>
+>> Vincent
+>>
+>>>
+>>> Regards
+>>> Preeti U Murthy
+>>>
+>>
+>
