@@ -1,83 +1,39 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 26 May 2014 10:37:15 +1000
-Subject: linux-next: manual merge of the samsung tree with the arm-soc tree
-In-Reply-To: <20140526101741.102768b2@canb.auug.org.au>
-References: <20140526101741.102768b2@canb.auug.org.au>
-Message-ID: <20140526103715.09c491e3@canb.auug.org.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 26 May 2014 09:41:27 +0900
+Subject: [PATCH v3 REPOST] serial: sh-sci: Add device tree support for r8a7779
+Message-ID: <20140526004127.GB31096@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Simply document a new compat string.
+There appears to be no need for a driver updates.
 
-On Mon, 26 May 2014 10:17:41 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->
-> Today's linux-next merge of the samsung tree got a conflict in
-> arch/arm/Kconfig.debug between commit 7098cff2a3f4 ("ARM: debug: qcom:
-> make UART address selection configuration option") from the arm-soc
-> tree and commit 1899de289497 ("ARM: S3C24XX: use generic
-> DEBUG_UART_PHY/_VIRT in debug macro") from the samsung tree.
-> 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
-> 
-> -- 
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
-> 
-> diff --cc arch/arm/Kconfig.debug
-> index 6ff3dc661fdd,4678870f8ee8..000000000000
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@@ -966,10 -1007,10 +1003,11 @@@ config DEBUG_LL_INCLUD
->   				 DEBUG_IMX51_UART || \
->   				 DEBUG_IMX53_UART ||\
->   				 DEBUG_IMX6Q_UART || \
->  -				 DEBUG_IMX6SL_UART
->  -	default "debug/msm.S" if DEBUG_MSM_UART
->  +				 DEBUG_IMX6SL_UART || \
->  +				 DEBUG_IMX6SX_UART
->  +	default "debug/msm.S" if DEBUG_MSM_UART || DEBUG_QCOM_UARTDM
->   	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
-> + 	default "debug/s3c24xx.S" if DEBUG_S3C24XX_UART
->   	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1 || DEBUG_SIRFMARCO_UART1
->   	default "debug/sti.S" if DEBUG_STI_UART
->   	default "debug/tegra.S" if DEBUG_TEGRA_UART
-> @@@ -1057,8 -1102,7 +1101,8 @@@ config DEBUG_UART_PHY
->   	default 0xfffff700 if ARCH_IOP33X
->   	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
->   		DEBUG_LL_UART_EFM32 || \
-> - 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
->  -		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_S3C24XX_UART
-> ++		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_S3C24XX_UART \
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-I forgot the || at the end, sorry.  I fixed this up.
+---
+v3
+* Keep lists sorted by SoC number
+* Added Ack from Laurent Pinchart
 
->  +		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM
->   
->   config DEBUG_UART_VIRT
->   	hex "Virtual base address of debug UART"
-> @@@ -1118,8 -1166,7 +1168,8 @@@
->   	default 0xff003000 if DEBUG_U300_UART
->   	default DEBUG_UART_PHYS if !MMU
->   	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
-> - 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
->  -		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_S3C24XX_UART
-> ++		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_S3C24XX_UART \
+v2
+* Do not update the driver to set SCSCR_CKE1.
+  Instead DT may provide the P clock as the clock for the SCIF devices.
+---
+ Documentation/devicetree/bindings/serial/renesas,sci-serial.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Same here.
-
->  +		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM
->   
->   config DEBUG_UART_8250_SHIFT
->   	int "Register offset shift for the 8250 debug UART"
-
+diff --git a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
+index 53e6c17..64fd7de 100644
+--- a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
++++ b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
+@@ -4,6 +4,7 @@ Required properties:
+ 
+   - compatible: Must contain one of the following:
+ 
++    - "renesas,scif-r8a7779" for R8A7779 (R-Car H1) SCIF compatible UART.
+     - "renesas,scif-r8a7790" for R8A7790 (R-Car H2) SCIF compatible UART.
+     - "renesas,scifa-r8a7790" for R8A7790 (R-Car H2) SCIFA compatible UART.
+     - "renesas,scifb-r8a7790" for R8A7790 (R-Car H2) SCIFB compatible UART.
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140526/304a0839/attachment.sig>
+1.8.5.2
