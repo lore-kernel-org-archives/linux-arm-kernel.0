@@ -1,38 +1,65 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 26 May 2014 15:31:14 +0800
-Subject: [PATCH] ARM: clk: imx: remove the CLK_SET_RATE_NO_REPARENT for
- imx_clk_mux_flags
-Message-ID: <1401089474-14346-1-git-send-email-b32955@freescale.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 26 May 2014 11:01:11 +0200
+Subject: [PATCH] ARM: mvebu: rename ARM_ERRATA_753970
+In-Reply-To: <1396805315.7723.8.camel@x220>
+References: <201404052101.19381.arnd@arndb.de>
+ <201404052104.11363.arnd@arndb.de> <1396777049.30640.9.camel@x220>
+ <53418889.2050002@free-electrons.com> <1396805315.7723.8.camel@x220>
+Message-ID: <1401094871.25902.20.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clocks for Quadspi controller may be different when different
-NOR flashes are connected to the board.
+ARM_ERRATA_753970 was renamed to PL310_ERRATA_753970 in v3.2, through
+commit fa0ce4035d48 ("ARM: 7162/1: errata: tidy up Kconfig options for
+PL310 errata workarounds"). Two selects were added in v3.15-rc1 that
+still use the previous name. Rename these.
 
-But the CLK_SET_RATE_NO_REPARENT flag in the current imx_clk_mux_flags
-makes the clock do not have the re-parent capability.
+Make these statements depend on CACHE_PL310, like all other selects of
+PL310_ERRATA_753970. That way it will only be selected if its dependency
+is met.
 
-This patch removes the CLK_SET_RATE_NO_REPARENT for imx_clk_mux_flags.
-It makes the Quadspi happy.
-
-Signed-off-by: Huang Shijie <b32955@freescale.com>
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 ---
- arch/arm/mach-imx/clk.h |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+I reported this before v3.15-rc1. I don't know whether any fixes are
+pending. None are in linux-next. And ignoring an errata were one
+apparently could be needed sounds, well, scary. Perhaps it is not.
+Anyhow, to make sure this gets fixed, hopefully before v3.15, I'm
+submitting this (untested!) patch.
 
-diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-index e29f6eb..32d6253 100644
---- a/arch/arm/mach-imx/clk.h
-+++ b/arch/arm/mach-imx/clk.h
-@@ -108,8 +108,7 @@ static inline struct clk *imx_clk_mux_flags(const char *name,
- 		int num_parents, unsigned long flags)
- {
- 	return clk_register_mux(NULL, name, parents, num_parents,
--			flags | CLK_SET_RATE_NO_REPARENT, reg, shift, width, 0,
--			&imx_ccm_lock);
-+			flags, reg, shift, width, 0, &imx_ccm_lock);
- }
- 
- static inline struct clk *imx_clk_fixed_factor(const char *name,
+A related observation. There are three PL310 errata options: one depends
+on CACHE_PL310, three depend on CACHE_L2X0. The one depending on
+CACHE_PL310 is selected only if CACHE_PL310 is set.
+
+But the three depending on CACHE_L2X0 are selected a few times if
+CACHE_L2X0 is set, in other cases if CACHE_PL310 is set, and in some
+cases always. There may be good reasons for this, but it looks odd. I
+know nothing about the PL310 cache and its erratas, so I haven't looked
+into this any further.
+
+ arch/arm/mach-mvebu/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 3f73eecbcfb0..501d0f42e7b2 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -35,7 +35,7 @@ config MACH_ARMADA_370
+ config MACH_ARMADA_375
+ 	bool "Marvell Armada 375 boards" if ARCH_MULTI_V7
+ 	select ARM_ERRATA_720789
+-	select ARM_ERRATA_753970
++	select PL310_ERRATA_753970 if CACHE_PL310
+ 	select ARM_GIC
+ 	select ARMADA_375_CLK
+ 	select CPU_V7
+@@ -48,7 +48,7 @@ config MACH_ARMADA_375
+ config MACH_ARMADA_38X
+ 	bool "Marvell Armada 380/385 boards" if ARCH_MULTI_V7
+ 	select ARM_ERRATA_720789
+-	select ARM_ERRATA_753970
++	select PL310_ERRATA_753970 if CACHE_PL310
+ 	select ARM_GIC
+ 	select ARMADA_38X_CLK
+ 	select CPU_V7
 -- 
-1.7.8
+1.9.0
