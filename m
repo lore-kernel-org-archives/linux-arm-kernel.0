@@ -1,61 +1,65 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Mon, 26 May 2014 09:31:56 +0200
-Subject: [PATCH] clk: divider: Fix table round up function
-In-Reply-To: <20140523213915.23136.16939@quantum>
-References: <1399481332-9550-1-git-send-email-maxime.coquelin@st.com>
- <20140523213915.23136.16939@quantum>
-Message-ID: <5382EDEC.9040503@st.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 26 May 2014 11:42:44 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzJdIEFSTTogY2xrOiBpbXg6IGFkZCBhIG5ldyBoZWxw?=
+ =?UTF-8?B?ZXIgd2hpY2ggY2FuIHJlLXBhcmVudCB0aGUgY2xvY2s=?=
+In-Reply-To: <20140526060349.GA11074@shlinux1.ap.freescale.net>
+References: <1401081633-12190-1-git-send-email-b32955@freescale.com>
+ <1401087292.925679327@f35.i.mail.ru>
+ <20140526060349.GA11074@shlinux1.ap.freescale.net>
+Message-ID: <1401090164.941960946@f35.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Mon, 26 May 2014 14:03:51 +0800 ?? Huang Shijie <b32955@freescale.com>:
+> On Mon, May 26, 2014 at 10:54:52AM +0400, Alexander Shiyan wrote:
+> > Mon, 26 May 2014 13:20:32 +0800 ?? Huang Shijie <b32955@freescale.com>:
+> > > The clocks for Quadspi controller may be different when different
+> > > NOR flashes are connected to the board.
+> > > 
+> > > This patch adds a new helper to register the clock which needs the
+> > > re-parent capability.
+> > > 
+> > > Signed-off-by: Huang Shijie <b32955@freescale.com>
+> > > ---
+> > >  arch/arm/mach-imx/clk.h |   10 ++++++++++
+> > >  1 files changed, 10 insertions(+), 0 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
+> > > index e29f6eb..2e3c4fe 100644
+> > > --- a/arch/arm/mach-imx/clk.h
+> > > +++ b/arch/arm/mach-imx/clk.h
+> > > @@ -112,6 +112,16 @@ static inline struct clk *imx_clk_mux_flags(const char *name,
+> > >  			&imx_ccm_lock);
+> > >  }
+> > >  
+> > > +/* we can use this helper to register the clock which needs the re-parent. */
+> > > +static inline struct clk *imx_clk_mux_flags_reparent(const char *name,
+> > > +		void __iomem *reg, u8 shift, u8 width, const char **parents,
+> > > +		int num_parents, unsigned long flags)
+> > > +{
+> > > +	return clk_register_mux(NULL, name, parents, num_parents,
+> > > +			flags, reg, shift, width, 0,
+> > > +			&imx_ccm_lock);
+> > > +}
+> > 
+> > So you can use CLK_SET_RATE_PARENT for flags here and completely remove
+> > flags parameter for this call. Is not it?
+> Do you mean make the code like this :
+> 
+> ----------------------------------------------------------------
+> 	return clk_register_mux(NULL, name, parents, num_parents,
+> 			CLK_SET_RATE_PARENT, reg, shift, width, 0,
+> 			&imx_ccm_lock);
+> ----------------------------------------------------------------
 
+Yes.
 
-On 05/23/2014 11:39 PM, Mike Turquette wrote:
-> Quoting Maxime COQUELIN (2014-05-07 09:48:52)
->> Commit 1d9fe6b97 ("clk: divider: Fix best div calculation for power-of-two and
->> table dividers") introduces a regression in its _table_round_up function.
->>
->> When the divider passed to this function is greater than the max divider
->> available in the table, this function returns table's max divider.
->> Problem is that it causes an infinite loop in clk_divider_bestdiv() because
->> _next_div() will never return a value greater than maxdiv.
->>
->> Instead of returning table's max divider, this patch returns INT_MAX.
->>
->> Reported-by: Fabio Estevam <festevam@gmail.com>
->> Reported-by: Shawn Guo <shawn.guo@freescale.com>
->> Tested-by: Fabio Estevam <festevam@gmail.com>
->> Cc: Mike Turquette <mike.turquette@linaro.org>
->> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
->
-> Pulled into clk-fixes for -rc7.
+> Without the "flags" argument, the helper is too specific.
 
-Thanks Mike.
+Or let's just OR with CLK_SET_RATE_PARENT, like as:
 
-Regards,
-Maxime
+return clk_register_mux(NULL, name, parents, num_parents,
+ 			flags | CLK_SET_RATE_PARENT, reg, shift, width, 0,
+			&imx_ccm_lock);
 
->
-> Regards,
-> Mike
->
->> ---
->>   drivers/clk/clk-divider.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
->> index b3c8396..cf9114a 100644
->> --- a/drivers/clk/clk-divider.c
->> +++ b/drivers/clk/clk-divider.c
->> @@ -158,7 +158,7 @@ static bool _is_valid_div(struct clk_divider *divider, unsigned int div)
->>   static int _round_up_table(const struct clk_div_table *table, int div)
->>   {
->>          const struct clk_div_table *clkt;
->> -       int up = _get_table_maxdiv(table);
->> +       int up = INT_MAX;
->>
->>          for (clkt = table; clkt->div; clkt++) {
->>                  if (clkt->div == div)
->> --
->> 1.9.1
->>
+---
