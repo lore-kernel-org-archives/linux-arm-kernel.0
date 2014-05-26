@@ -1,253 +1,48 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 26 May 2014 17:29:20 +0200
-Subject: [PATCH v2 1/5] mfd: axp20x: add AXP221 PMIC support
-In-Reply-To: <1401116292-24066-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1401116292-24066-1-git-send-email-boris.brezillon@free-electrons.com>
- <1401116292-24066-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <53835DD0.2040509@free-electrons.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 26 May 2014 17:28:35 +0200
+Subject: [PATCH 2/4] cpufreq: add i.MX5 cpufreq driver
+In-Reply-To: <CAKohponvWLVfBL06HURnTq4nmdKjROV-bd4pVcbNmsAUYYC+nA@mail.gmail.com>
+References: <1401099308-9658-1-git-send-email-l.stach@pengutronix.de>
+ <1401099308-9658-2-git-send-email-l.stach@pengutronix.de>
+ <CAKohpoksbFHyX=r0=URMedJNi68c3xAX4OrXzSFqgf1-bCm4+Q@mail.gmail.com>
+ <1401101131.4829.29.camel@weser.hi.pengutronix.de>
+ <CAKohponTUsYLf-8_iSnttwK8oXyJEZVWpF+a=vLC7r_jZ8AzOQ@mail.gmail.com>
+ <1401107748.4829.39.camel@weser.hi.pengutronix.de>
+ <CAKohpo=ncHUmtJOEw4FZG1BWUSuiQK4n+ETEMJWJj9UoPz2cnw@mail.gmail.com>
+ <1401109863.4829.46.camel@weser.hi.pengutronix.de>
+ <CAKohponzJma6yNueMef2Q4k+qT-n7boV0tx0pCqjFmuQWj6TXg@mail.gmail.com>
+ <1401112697.4829.56.camel@weser.hi.pengutronix.de>
+ <CAKohponvWLVfBL06HURnTq4nmdKjROV-bd4pVcbNmsAUYYC+nA@mail.gmail.com>
+Message-ID: <1401118115.4829.60.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am Montag, den 26.05.2014, 20:52 +0530 schrieb Viresh Kumar:
+> On 26 May 2014 19:28, Lucas Stach <l.stach@pengutronix.de> wrote:
+> > Right, the OPP in my example define the minimum required voltage for
+> > each frequency. This is in accordance to the OPP binding. But for this
+> > chip the datasheet explicitly says that it is ok to power the cpu rail
+> > with up to 1.4V, regardless of the current operating frequency. So this
+> > 1.4V is really the upper bound I would like to pass to the regulator
+> > framework. This ensures that the driver still works properly even if the
+> > external regulator can't scale down to the minimum (or in other words
+> > optimal) voltage.
+> 
+> One more query. You have mentioned earlier and I just wanted to confirm
+> this. In your platform/board regulator only supports one voltage, i.e. 1.4 uV,
+> and it we can't get lower values out of regulator ?
+> 
+> If that's the case, why are you looking to use regulator at all?
 
-On 26/05/2014 16:58, Boris BREZILLON wrote:
-> Add support for the AXP221 PMIC device to the existing AXP20x driver.
->
-> The AXP221 defines a new set of registers, power supplies and regulators,
-> but most of the API is similar to the AXP20x ones.
-> The AXP20x irq chip definition is reused, though some interrupts are not
-> available in the AXP221.
->
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->  drivers/mfd/axp20x.c       | 58 +++++++++++++++++++++++++++++++++++++++++++---
->  include/linux/mfd/axp20x.h | 56 ++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 111 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index dee6539..ca9fe2e 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -33,6 +33,11 @@ static const struct regmap_range axp20x_writeable_ranges[] = {
->  	regmap_reg_range(AXP20X_DCDC_MODE, AXP20X_FG_RES),
->  };
->  
-> +static const struct regmap_range axp22x_writeable_ranges[] = {
-> +	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
-> +	regmap_reg_range(AXP20X_DCDC_MODE, AXP22X_BATLOW_THRES1),
-> +};
-> +
->  static const struct regmap_range axp20x_volatile_ranges[] = {
->  	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
->  };
-> @@ -42,6 +47,11 @@ static const struct regmap_access_table axp20x_writeable_table = {
->  	.n_yes_ranges	= ARRAY_SIZE(axp20x_writeable_ranges),
->  };
->  
-> +static const struct regmap_access_table axp22x_writeable_table = {
-> +	.yes_ranges	= axp22x_writeable_ranges,
-> +	.n_yes_ranges	= ARRAY_SIZE(axp22x_writeable_ranges),
-> +};
-> +
->  static const struct regmap_access_table axp20x_volatile_table = {
->  	.yes_ranges	= axp20x_volatile_ranges,
->  	.n_yes_ranges	= ARRAY_SIZE(axp20x_volatile_ranges),
-> @@ -70,6 +80,15 @@ static const struct regmap_config axp20x_regmap_config = {
->  	.cache_type	= REGCACHE_RBTREE,
->  };
->  
-> +static const struct regmap_config axp22x_regmap_config = {
-> +	.reg_bits	= 8,
-> +	.val_bits	= 8,
-> +	.wr_table	= &axp22x_writeable_table,
-> +	.volatile_table	= &axp20x_volatile_table,
-> +	.max_register	= AXP22X_BATLOW_THRES1,
-> +	.cache_type	= REGCACHE_RBTREE,
-> +};
-> +
->  #define AXP20X_IRQ(_irq, _off, _mask) \
->  	[AXP20X_IRQ_##_irq] = { .reg_offset = (_off), .mask = BIT(_mask) }
->  
-> @@ -116,6 +135,7 @@ static const struct regmap_irq axp20x_regmap_irqs[] = {
->  static const struct of_device_id axp20x_of_match[] = {
->  	{ .compatible = "x-powers,axp202", .data = (void *) AXP202_ID },
->  	{ .compatible = "x-powers,axp209", .data = (void *) AXP209_ID },
-> +	{ .compatible = "x-powers,axp221", .data = (void *) AXP221_ID },
->  	{ },
->  };
->  MODULE_DEVICE_TABLE(of, axp20x_of_match);
-> @@ -149,6 +169,21 @@ static const char * const axp20x_supplies[] = {
->  	"ldo5in",
->  };
->  
-> +static const char *axp22x_supplies[] = {
-> +	"vbus",
-> +	"acin",
-> +	"vin1",
-> +	"vin2",
-> +	"vin3",
-> +	"vin4",
-> +	"vin5",
-> +	"aldoin",
-> +	"dldoin",
-> +	"eldoin",
-> +	"ldoioin",
-> +	"rtcldoin",
-> +};
-> +
->  static struct mfd_cell axp20x_cells[] = {
->  	{
->  		.name			= "axp20x-pek",
-> @@ -161,6 +196,14 @@ static struct mfd_cell axp20x_cells[] = {
->  	},
->  };
->  
-> +static struct mfd_cell axp22x_cells[] = {
-> +	{
-> +		.name			= "axp20x-regulator",
-> +		.parent_supplies	= axp22x_supplies,
-> +		.num_parent_supplies	= ARRAY_SIZE(axp22x_supplies),
-> +	},
-> +};
-> +
->  static struct axp20x_dev *axp20x_pm_power_off;
->  static void axp20x_power_off(void)
->  {
-> @@ -190,7 +233,12 @@ static int axp20x_i2c_probe(struct i2c_client *i2c,
->  	axp20x->dev = &i2c->dev;
->  	dev_set_drvdata(axp20x->dev, axp20x);
->  
-> -	axp20x->regmap = devm_regmap_init_i2c(i2c, &axp20x_regmap_config);
-> +	if (axp20x->variant == AXP221_ID)
-> +		axp20x->regmap = devm_regmap_init_i2c(i2c,
-> +						      &axp22x_regmap_config);
-> +	else
-> +		axp20x->regmap = devm_regmap_init_i2c(i2c,
-> +						      &axp20x_regmap_config);
->  	if (IS_ERR(axp20x->regmap)) {
->  		ret = PTR_ERR(axp20x->regmap);
->  		dev_err(&i2c->dev, "regmap init failed: %d\n", ret);
-> @@ -206,8 +254,12 @@ static int axp20x_i2c_probe(struct i2c_client *i2c,
->  		return ret;
->  	}
->  
-> -	ret = mfd_add_devices(axp20x->dev, -1, axp20x_cells,
-> -			      ARRAY_SIZE(axp20x_cells), NULL, 0, NULL);
-> +	if (axp20x->variant == AXP221_ID)
-> +		ret = mfd_add_devices(axp20x->dev, -1, axp22x_cells,
-> +				      ARRAY_SIZE(axp20x_cells), NULL, 0, NULL);
+The platform I'm working on supports cpu rail voltage regulation just
+fine.
+I just want to make sure that the driver works properly on platforms
+where this isn't the case. As the datasheet explicitly allows this case
+I want to make sure to not introduce a software only restriction, where
+there isn't any in hardware.
 
-Copy/paste error here: this should be ARRAY_SIZE(axp22x_cells).
-
-> +	else
-> +		ret = mfd_add_devices(axp20x->dev, -1, axp20x_cells,
-> +				      ARRAY_SIZE(axp20x_cells), NULL, 0, NULL);
->  
->  	if (ret) {
->  		dev_err(&i2c->dev, "failed to add MFD devices: %d\n", ret);
-> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-> index d0e31a2..8a8ce02 100644
-> --- a/include/linux/mfd/axp20x.h
-> +++ b/include/linux/mfd/axp20x.h
-> @@ -14,6 +14,7 @@
->  enum {
->  	AXP202_ID = 0,
->  	AXP209_ID,
-> +	AXP221_ID,
->  };
->  
->  #define AXP20X_DATACACHE(m)		(0x04 + (m))
-> @@ -43,6 +44,28 @@ enum {
->  #define AXP20X_V_LTF_DISCHRG		0x3c
->  #define AXP20X_V_HTF_DISCHRG		0x3d
->  
-> +#define AXP22X_PWR_OUT_CTRL1		0x10
-> +#define AXP22X_PWR_OUT_CTRL2		0x12
-> +#define AXP22X_PWR_OUT_CTRL3		0x13
-> +#define AXP22X_DLDO1_V_OUT		0x15
-> +#define AXP22X_DLDO2_V_OUT		0x16
-> +#define AXP22X_DLDO3_V_OUT		0x17
-> +#define AXP22X_DLDO4_V_OUT		0x18
-> +#define AXP22X_ELDO1_V_OUT		0x19
-> +#define AXP22X_ELDO2_V_OUT		0x1a
-> +#define AXP22X_ELDO3_V_OUT		0x1b
-> +#define AXP22X_DC5LDO_V_OUT		0x1c
-> +#define AXP22X_DCDC1_V_OUT		0x21
-> +#define AXP22X_DCDC2_V_OUT		0x22
-> +#define AXP22X_DCDC3_V_OUT		0x23
-> +#define AXP22X_DCDC4_V_OUT		0x24
-> +#define AXP22X_DCDC5_V_OUT		0x25
-> +#define AXP22X_DCDC23_V_RAMP_CTRL	0x27
-> +#define AXP22X_ALDO1_V_OUT		0x28
-> +#define AXP22X_ALDO2_V_OUT		0x29
-> +#define AXP22X_ALDO3_V_OUT		0x2a
-> +#define AXP22X_CHRG_CTRL3		0x35
-> +
->  /* Interrupt */
->  #define AXP20X_IRQ1_EN			0x40
->  #define AXP20X_IRQ2_EN			0x41
-> @@ -96,6 +119,9 @@ enum {
->  #define AXP20X_VBUS_MON			0x8b
->  #define AXP20X_OVER_TMP			0x8f
->  
-> +#define AXP22X_PWREN_CTRL1		0x8c
-> +#define AXP22X_PWREN_CTRL2		0x8d
-> +
->  /* GPIO */
->  #define AXP20X_GPIO0_CTRL		0x90
->  #define AXP20X_LDO5_V_OUT		0x91
-> @@ -104,6 +130,11 @@ enum {
->  #define AXP20X_GPIO20_SS		0x94
->  #define AXP20X_GPIO3_CTRL		0x95
->  
-> +#define AXP22X_LDO_IO0_V_OUT		0x91
-> +#define AXP22X_LDO_IO1_V_OUT		0x93
-> +#define AXP22X_GPIO_STATE		0x94
-> +#define AXP22X_GPIO_PULL_DOWN		0x95
-> +
->  /* Battery */
->  #define AXP20X_CHRG_CC_31_24		0xb0
->  #define AXP20X_CHRG_CC_23_16		0xb1
-> @@ -116,6 +147,8 @@ enum {
->  #define AXP20X_CC_CTRL			0xb8
->  #define AXP20X_FG_RES			0xb9
->  
-> +#define AXP22X_BATLOW_THRES1		0xe6
-> +
->  /* Regulators IDs */
->  enum {
->  	AXP20X_LDO1 = 0,
-> @@ -128,6 +161,29 @@ enum {
->  	AXP20X_REG_ID_MAX,
->  };
->  
-> +enum {
-> +	AXP22X_DCDC1 = 0,
-> +	AXP22X_DCDC2,
-> +	AXP22X_DCDC3,
-> +	AXP22X_DCDC4,
-> +	AXP22X_DCDC5,
-> +	AXP22X_DC5LDO,
-> +	AXP22X_ALDO1,
-> +	AXP22X_ALDO2,
-> +	AXP22X_ALDO3,
-> +	AXP22X_ELDO1,
-> +	AXP22X_ELDO2,
-> +	AXP22X_ELDO3,
-> +	AXP22X_DLDO1,
-> +	AXP22X_DLDO2,
-> +	AXP22X_DLDO3,
-> +	AXP22X_DLDO4,
-> +	AXP22X_RTC_LDO,
-> +	AXP22X_LDO_IO0,
-> +	AXP22X_LDO_IO1,
-> +	AXP22X_REG_ID_MAX,
-> +};
-> +
->  /* IRQs */
->  enum {
->  	AXP20X_IRQ_ACIN_OVER_V = 1,
-
+Regards,
+Lucas
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
