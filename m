@@ -1,50 +1,127 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Mon, 26 May 2014 11:24:56 +0530
-Subject: [PATCH] arm: exynos: Fix "allmodconfig" build errors in mcpm and
- hotplug
-Message-ID: <1401083696-25702-1-git-send-email-a.kesavan@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 26 May 2014 11:28:59 +0530
+Subject: [PATCH v4 1/2] cpufreq / OPP: Allow boost frequency to be looked
+ up from device tree
+In-Reply-To: <1400852262-6290-2-git-send-email-thomas.ab@samsung.com>
+References: <1400852262-6290-1-git-send-email-thomas.ab@samsung.com>
+ <1400852262-6290-2-git-send-email-thomas.ab@samsung.com>
+Message-ID: <CAKohpom02xmubyNMMmH9J59i8KCoAXpZoX+Gj9NP9gQ8B9qB3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the following build errors:
+On 23 May 2014 19:07, Thomas Abraham <thomas.ab@samsung.com> wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
+>
+> Commit 6f19efc0 ("cpufreq: Add boost frequency support in core") adds
+> support for CPU boost mode. This patch adds support for finding available
+> boost frequencies from device tree and marking them as usable in boost mode.
+>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Lukasz Majewski <l.majewski@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> ---
+>  drivers/cpufreq/cpufreq_opp.c |   44 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+>
+> diff --git a/drivers/cpufreq/cpufreq_opp.c b/drivers/cpufreq/cpufreq_opp.c
+> index c0c6f4a..2b3905b 100644
+> --- a/drivers/cpufreq/cpufreq_opp.c
+> +++ b/drivers/cpufreq/cpufreq_opp.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/pm_opp.h>
+>  #include <linux/rcupdate.h>
+>  #include <linux/slab.h>
+> +#include <linux/of.h>
+>
+>  /**
+>   * dev_pm_opp_init_cpufreq_table() - create a cpufreq table for a device
+> @@ -51,6 +52,10 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+>         struct cpufreq_frequency_table *freq_table = NULL;
+>         int i, max_opps, ret = 0;
+>         unsigned long rate;
+> +#ifdef CONFIG_CPU_FREQ_BOOST_SW
+> +       int j, len;
+> +       u32 *boost_freqs = NULL;
+> +#endif
+>
+>         rcu_read_lock();
+>
+> @@ -82,6 +87,45 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+>
+>         *table = &freq_table[0];
+>
+> +#ifdef CONFIG_CPU_FREQ_BOOST_SW
+> +       if (of_find_property(dev->of_node, "boost-frequencies", &len)) {
 
-/tmp/ccRbZlaA.s: Assembler messages:
-/tmp/ccRbZlaA.s:69: Error: selected processor does not support ARM mode `isb '
-/tmp/ccRbZlaA.s:75: Error: selected processor does not support ARM mode `isb '
-/tmp/ccRbZlaA.s:76: Error: selected processor does not support ARM mode `dsb '
-make[1]: *** [arch/arm/mach-exynos/hotplug.o] Error 1
+Maybe:
+if(!of_find_property(...))
+        goto out;
 
-/tmp/ccJEg4jw.s: Assembler messages:
-/tmp/ccJEg4jw.s:454: Error: selected processor does not support ARM mode `isb'
-/tmp/ccJEg4jw.s:455: Error: selected processor does not support ARM mode `dsb'
-/tmp/ccJEg4jw.s:465: Error: selected processor does not support ARM mode `isb'
-/tmp/ccJEg4jw.s:474: Error: selected processor does not support ARM mode `isb'
-/tmp/ccJEg4jw.s:475: Error: selected processor does not support ARM mode `dsb'
-/tmp/ccJEg4jw.s:516: Error: selected processor does not support ARM mode `isb'
-/tmp/ccJEg4jw.s:525: Error: selected processor does not support ARM mode `isb'
-/tmp/ccJEg4jw.s:526: Error: selected processor does not support ARM mode `dsb'
-make[1]: *** [arch/arm/mach-exynos/mcpm-exynos.o] Error 1
+To get rid of extra indentation levels below..
 
-Reported-by: Sachin Kamat <sachin.kamat@linaro.org>
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
----
- arch/arm/mach-exynos/Makefile |    2 ++
- 1 file changed, 2 insertions(+)
+> +               struct cpufreq_frequency_table *ft;
 
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 6f36086..788f26d 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -22,8 +22,10 @@ obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
- obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
- 
- obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
-+CFLAGS_hotplug.o		+= -march=armv7-a
- 
- plus_sec := $(call as-instr,.arch_extension sec,+sec)
- AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
- 
- obj-$(CONFIG_EXYNOS5420_MCPM)	+= mcpm-exynos.o
-+CFLAGS_mcpm-exynos.o		+= -march=armv7-a
--- 
-1.7.9.5
+Declare at the top with boost_freqs, etc..
+
+> +               if (len == 0 || (len & (sizeof(u32) - 1)) != 0) {
+
+s/len == 0/!len
+
+And use IS_ALIGNED() instead of the right hand side of ||
+
+> +                       dev_err(dev, "%s: invalid boost frequency\n", __func__);
+> +                       ret = -EINVAL;
+> +                       goto out;
+> +               }
+> +
+> +               boost_freqs = kzalloc(len, GFP_KERNEL);
+
+Can we do a devm_kzalloc instead? And why not kmalloc BTW ?
+
+> +               if (!boost_freqs) {
+> +                       dev_warn(dev, "%s: no memory for boost freq table\n",
+
+dev_err ?
+
+> +                                       __func__);
+> +                       ret = -ENOMEM;
+> +                       goto out;
+> +               }
+> +               of_property_read_u32_array(dev->of_node, "boost-frequencies",
+> +                       boost_freqs, len / sizeof(u32));
+
+
+Create int count = len / sizeof(u32) instead.. You have used this
+multiple times.
+
+> +               for (j = 0; j < len / sizeof(u32); j++) {
+> +                       ft = *table;
+> +                       for (i = 0; ft->frequency != CPUFREQ_TABLE_END; i++) {
+
+See if new macros can be used here instead. cpufreq_for_each_valid_entry().
+
+> +                               if (boost_freqs[j] == ft->frequency) {
+> +                                       ft->flags |= CPUFREQ_BOOST_FREQ;
+> +                                       break;
+> +                               }
+> +                               ft++;
+> +                       }
+> +
+> +                       if (ft->frequency == CPUFREQ_TABLE_END)
+> +                               pr_err("%s: invalid boost frequency %d\n",
+> +                                       __func__, boost_freqs[j]);
+
+Maybe a pr_debug on the else part as well ? With boost freqs ..
+
+> +               }
+> +       }
+> +
+> +       kfree(boost_freqs);
+> +#endif
+> +
+>  out:
+>         rcu_read_unlock();
+>         if (ret)
+> --
+> 1.7.9.5
+>
