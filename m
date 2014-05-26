@@ -1,54 +1,45 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 26 May 2014 16:58:07 +0200
-Subject: [PATCH] ARM: msm: Update the references to DEBUG_MSM_UARTx
-In-Reply-To: <1401112733-23649-1-git-send-email-gdjakov@mm-sol.com>
-References: <1401108595.6068.5.camel@x220>
- <1401112733-23649-1-git-send-email-gdjakov@mm-sol.com>
-Message-ID: <1401116287.6068.15.camel@x220>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 26 May 2014 16:58:11 +0200
+Subject: [PATCH v2 4/5] regulator: axp20x: reset probe data before each probe
+In-Reply-To: <1401116292-24066-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1401116292-24066-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1401116292-24066-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Georgi,
+The init_data and of_node fields of the axp2xx_matches tables are filled
+at each device probe by the axp20x_regulator_parse_dt function (which then
+calls the of_regulator_match function).
+This means we can probe a new device and consider data initialized during
+the probe of another device as valid.
 
-On Mon, 2014-05-26 at 16:58 +0300, Georgi Djakov wrote:
-> The Kconfig options DEBUG_MSM_UART1, DEBUG_MSM_UART2 and DEBUG_MSM_UART3
-> are removed, but they are still referenced in arch/arm/mach-msm/io.c
-> Fix this by updating the reference to the new Kconfig option.
-> 
-> Reported-by: Paul Bolle <pebolle@tiscali.nl>
-> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
-> ---
->  arch/arm/mach-msm/io.c |    6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
-> index 34e0947..b042dca 100644
-> --- a/arch/arm/mach-msm/io.c
-> +++ b/arch/arm/mach-msm/io.c
-> @@ -57,8 +57,7 @@ static struct map_desc msm_io_desc[] __initdata = {
->  		.length =   MSM_SHARED_RAM_SIZE,
->  		.type =     MT_DEVICE,
->  	},
-> -#if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
-> -		defined(CONFIG_DEBUG_MSM_UART3)
-> +#if defined(CONFIG_DEBUG_MSM_UART)
->  	{
->  		/* Must be last: virtual and pfn filled in by debug_ll_addr() */
->  		.length = SZ_4K,
-> @@ -76,8 +75,7 @@ void __init msm_map_common_io(void)
->  	 * pages are peripheral interface or not.
->  	 */
->  	asm("mcr p15, 0, %0, c15, c2, 4" : : "r" (0));
-> -#if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
-> -		defined(CONFIG_DEBUG_MSM_UART3)
-> +#if defined(CONFIG_DEBUG_MSM_UART)
->  #ifdef CONFIG_MMU
->  	debug_ll_addr(&msm_io_desc[size - 1].pfn,
->  		      &msm_io_desc[size - 1].virtual);
+Reset init_data and of_node field to NULL before each probe in order to
+avoid this kind of issue.
 
-Should I now redo https://lkml.org/lkml/2014/5/15/249 by making the
-(outdated) checks in arch/arm/mach-msm/board-trout.c and
-arch/arm/mach-msm/board-trout-gpio.c also use CONFIG_DEBUG_MSM_UART?
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+ drivers/regulator/axp20x-regulator.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-
-Paul Bolle
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index feaa0b5..4486517 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -323,6 +323,15 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 		nregulators = AXP20X_REG_ID_MAX;
+ 	}
+ 
++	/*
++	 * Reset matches table (this table might have been modified by a
++	 * previous AXP2xx device probe).
++	 */
++	for (i = 0; i < nmatches; i++) {
++		matches[i].init_data = NULL;
++		matches[i].of_node = NULL;
++	}
++
+ 	ret = axp20x_regulator_parse_dt(pdev, matches, nmatches);
+ 	if (ret)
+ 		return ret;
+-- 
+1.8.3.2
