@@ -1,40 +1,67 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Mon, 26 May 2014 16:51:43 +0200
-Subject: [PATCH v5 2/7] Documentation: bindings: add the Berlin SATA PHY
-In-Reply-To: <1401115908-2742-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1401115908-2742-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1401115908-2742-3-git-send-email-antoine.tenart@free-electrons.com>
+Date: Mon, 26 May 2014 16:51:41 +0200
+Subject: [PATCH v5 0/7] ARM: berlin: add AHCI support
+Message-ID: <1401115908-2742-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Berlin SATA PHY drives the PHY related to the SATA interface. Add
-the corresponding documentation.
+This series adds the support for Berlin SoC AHCI controller. The
+controller allows to use the SATA host interface and, for example, the
+eSATA port on the BG2Q.
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
----
- Documentation/devicetree/bindings/phy/berlin-sata-phy.txt | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+The series adds a PHY driver to control the two SATA ports available,
+and adds a generic compatible to use the existing ahci_platform driver.
+
+Also enable the eSATA interface on the BG2Q DMP.
+
+Changes since v4:
+        - updated PHY driver as tristate
+        - handled the case were no SATA port is enabled
+        - updated the compatible to a generic one
+        - cosmetic fixups
+
+Changes since v3:
+        - moved all PHY operations to the PHY driver
+        - removed PHY sub-nodes
+        - removed the custom Berlin AHCI driver and switched to
+          ahci_platform
+        - added multiple PHYs support to the libahci_platform
+
+Changes since v2:
+        - modeled each PHY as a sub-node
+        - cosmetic fixups
+
+Changes since v1:
+        - added a PHY driver, allowing to enable each port
+          individually and removed the 'force-port-map' property
+        - made the drivers a bit less magic :)
+        - wrote a function to select and configure registers in the
+          AHCI driver
+        - removed BG2 / BG2CD nodes
+
+Antoine T?nart (7):
+  phy: add a driver for the Berlin SATA PHY
+  Documentation: bindings: add the Berlin SATA PHY
+  ata: libahci: allow to use multiple PHYs
+  ata: ahci_platform: add a generic AHCI compatible
+  Documentation: bindings: document the sub-nodes AHCI bindings
+  ARM: berlin: add the AHCI node for the BG2Q
+  ARM: berlin: enable the eSATA interface on the BG2Q DMP
+
+ .../devicetree/bindings/ata/ahci-platform.txt      |  38 +++-
+ .../devicetree/bindings/phy/berlin-sata-phy.txt    |  14 ++
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |   8 +
+ arch/arm/boot/dts/berlin2q.dtsi                    |  27 +++
+ drivers/ata/ahci.h                                 |   3 +-
+ drivers/ata/ahci_platform.c                        |   2 +
+ drivers/ata/libahci.c                              |   7 +
+ drivers/ata/libahci_platform.c                     | 170 +++++++++++----
+ drivers/phy/Kconfig                                |   7 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-berlin-sata.c                      | 232 +++++++++++++++++++++
+ 11 files changed, 472 insertions(+), 37 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
+ create mode 100644 drivers/phy/phy-berlin-sata.c
 
-diff --git a/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt b/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
-new file mode 100644
-index 000000000000..72646db2f5fc
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
-@@ -0,0 +1,14 @@
-+Berlin SATA PHY
-+---------------
-+
-+Required properties:
-+- compatible: "marvell,berlin-sata-phy"
-+- phy-cells: from the generic PHY bindings, must be 1
-+- reg: address and length of the register
-+
-+Example:
-+	sata_phy: phy at f7e900a0 {
-+		compatible = "marvell,berlin-sata-phy";
-+		reg = <0xf7e900a0 0x200>;
-+		#phy-cells = <1>;
-+	};
 -- 
 1.9.1
