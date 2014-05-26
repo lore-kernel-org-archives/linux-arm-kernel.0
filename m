@@ -1,38 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 May 2014 13:40:21 -0700
-Subject: [GIT PULL 1/2] ARM: berlin: DT changes for v3.16
-In-Reply-To: <1400565694-1568-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Mon, 26 May 2014 13:41:36 -0700
+Subject: [GIT PULL 2/2] ARM: berlin: SoC changes for v3.16
+In-Reply-To: <1400565694-1568-2-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1400565694-1568-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140526204021.GL27093@quad.lixom.net>
+ <1400565694-1568-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140526204136.GM27093@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 08:01:33AM +0200, Sebastian Hesselbarth wrote:
+On Tue, May 20, 2014 at 08:01:34AM +0200, Sebastian Hesselbarth wrote:
 > Arnd, Kevin, Olof,
 > 
-> these are the DT related changes for Berlin SoCs. The first real PR after
-> the initial support, I hope it is not too late for v3.16.
-
-Not too late -- I've taken my time to merge it in though.
-
-> We had some late but valuable clock binding changes that are killing my
-> time schedule as they had some influence on pinctrl too. Anyway, pipelining
-> the arm-soc PR is my last option, I either end up with a broken mach-berlin
-> or with useless subsystem drivers. I guess it is just the lesson I had to
-> learn.
-
-Bootstrapping new platforms might take a couple of releases, and as long
-as progress is done in the right direction without new breakage I don't
-think there's too much to worry about w.r.t. making sure that everything
-lands together. Especially if you can do it without regressions for the
-cases where the platform might already have picked up downstream users.
-
-> Anyway, with this in, it should allow us to use a whole bunch of existing
-> drivers for common IP in the next cycle.
+> these are the SoC related changes for Berlin SoCs. Alexandre Belloni and
+> Antoine Tenart picked up work on quad-core Cortex A9 BG2Q SoC and provided
+> valuable drivers for pinctrl and clocks. The corresponding drivers should
+> go to the submaintainer's trees, this is what is left to do on the
+> mach-berlin side.
 > 
 > Please pull.
+> 
+> Thanks,
+>   Sebastian
+> 
+> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+> 
+>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/shesselba/linux-berlin.git tags/berlin-soc-3.16
+> 
 
-Merged into next/dt.
+Merged into next/soc. Thanks!
 
 
 -Olof
