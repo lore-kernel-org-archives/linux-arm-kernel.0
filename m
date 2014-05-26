@@ -1,47 +1,50 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Mon, 26 May 2014 18:25:16 -0500
-Subject: [GIT PULL] SOCFPGA DTS updates for 3.16, take 2-version 2
-In-Reply-To: <20140526220823.GX27093@quad.lixom.net>
-References: <1400858173-7741-1-git-send-email-dinguyen@altera.com>
- <20140526220823.GX27093@quad.lixom.net>
-Message-ID: <5383CD5C.5090407@gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 26 May 2014 17:31:32 -0600
+Subject: [PATCH v1 5/5] pci: keystone: add pcie driver based on
+ designware core driver
+In-Reply-To: <537E7823.5060609@ti.com>
+References: <5374FD24.8000806@ti.com> <22200719.Jb5jnJylJH@wuerfel>
+ <20140515183919.GC11650@obsidianresearch.com>
+ <53751DDF.40304@ti.com>
+ <20140515205210.GB14722@obsidianresearch.com>
+ <3E54258959B69E4282D79E01AB1F32B704742133@DFLE11.ent.ti.com>
+ <20140520170221.GA5130@obsidianresearch.com>
+ <537D37AA.5030303@ti.com>
+ <20140522005506.GB17244@obsidianresearch.com>
+ <537E7823.5060609@ti.com>
+Message-ID: <20140526233132.GA12179@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, May 22, 2014 at 06:20:19PM -0400, Murali Karicheri wrote:
 
-On 5/26/14 5:08 PM, Olof Johansson wrote:
-> On Fri, May 23, 2014 at 10:16:13AM -0500, dinguyen at altera.com wrote:
->> Hi Arnd, Kevin and Olof,
->>
->> Please consider pulling in these 2 patches for 3.16.
->>
->> Thanks,
->>
->> The following changes since commit 8cb289ed60668d3350dda5aa19b4fa1dce1c07f1:
->>
->>   ARM: socfpga: dts: Add div-reg to the main_pll clocks (2014-05-05 22:33:18 -0500)
->>
->> are available in the git repository at:
->>
->>   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_dt_updates-for-3.16_take_2_version_2
->>
->> for you to fetch changes up to a98b60571938ed5cc79992dacb09460f15b6a175:
->>
->>   ARM: socfpga: dts: add watchdog0+1 (2014-05-22 16:45:31 -0500)
-> Merged, thanks!
->
->
->> Confidentiality Notice.
->> This message may contain information that is confidential or otherwise protected from disclosure. If you are not the intended recipient, you are hereby notified that any use, disclosure, dissemination, distribution, or copying of this message, or any attachments, is strictly prohibited. If you have received this message in error, please advise the sender by reply e-mail, and delete the message and any attachments. Thank you.
-> I'm going to ignore this footer for now, but you should probably check
-> the configuration of your mailer for them. Some people get upset when
-> upstream/mailing list emails get these footers.
+>> What is the MPSS?
+> 
+>    MPS published in DEV CAP is 1 (256 bytes). In our IP for some reason,
+>    mrss is set to 2 though IP
+>    support only 256 bytes. I am trying to resolve this with IP team. If
+>    this is an IP issue, then
+>    software will overwrite this to 1.
 
-Sigh...it appears that my backdoor method around our IT dept's
-insistance of adding this footer has been
-thwarted.
+The MRSS of the root port bridge is very rarely used, it is OK to be
+larger than the MPS, but I'm not sure it makes much sense as a
+default.
 
-Thanks,
-Dinh
->
-> -Olof
+>    So the mps  will not get written to mrss for performance mode. So the
+>    check seems not right. It should be changed to
+
+So, looking at this more closely, the MRRS does not *have* to be
+smaller than the MPS, but it probably performs better if it is.
+
+I think that reflects what the code is doing.
+
+The fact your root complex can't segment replies is a serious defect,
+and there is no infrastructure to support that in the kernel.
+
+Adding something to this generic code might be your best option to
+cover the majority of cases.
+
+It would also be good to know for sure that it can correctly segment a
+256 byte read into 128 byte packets, and that only 512 is mishandled.
+
+Jason
