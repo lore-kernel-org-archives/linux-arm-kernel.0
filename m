@@ -1,86 +1,111 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 26 May 2014 18:07:18 +0200
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
- device tree
-In-Reply-To: <538356DA.7090302@redhat.com>
-References: <537E31F7.1030505@gmail.com> <537F1148.3010102@redhat.com>
- <20140523112239.GB12304@sirena.org.uk>
- <537F3610.3050104@redhat.com>
- <20140523162718.GE22111@sirena.org.uk>
- <53806F26.6050706@redhat.com>
- <20140525123452.GS22111@sirena.org.uk>
- <53824294.1090609@redhat.com>
- <20140526103807.GV22111@sirena.org.uk>
- <538321AB.4050006@redhat.com>
- <20140526142225.GF22111@sirena.org.uk>
- <538356DA.7090302@redhat.com>
-Message-ID: <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 26 May 2014 18:14:09 +0200
+Subject: [PATCH] ARM: mvebu: fix cpuidle implementation to work on big-endian
+ systems
+Message-ID: <1401120849-2164-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[snip]
+On Marvell Armada XP, when a CPU comes back from deep idle state of
+cpuidle, it restarts its execution at armada_370_xp_cpu_resume(),
+which puts back the CPU into the coherency, and then calls the generic
+cpu_resume() function.
 
->>
->> We don't typically actually bind multiple compatibles for a single
->> device.  We've got a bunch of options we can choose from but we
->> generally pick the one that matches best and ignore the others.
->>
->>> Where as what you're suggesting is to always pick driver foo, unless
->>> driver bar is available and has a special flag saying to not use foo, this
->>> is a whole new way to use compatibles really, and not one which I think
->>> we want to introduce.
->>
->> I'm not sure I'm buying the idea that we have a powerup driver that's
->> meaningfully not part of the main device driver.
+While this works on little-endian configurations, it doesn't work on
+big-endian configurations because the CPU restarts in little-endian,
+and therefore must be switched back to big-endian to operate
+properly. To achieve this, a 'setend be' instruction must be executed
+in big-endian configurations. However, the ARM_BE8() macro that is
+used to implement nice compile-time conditional for ARM LE vs. ARM BE8
+is not easily usable in inline assembly.
 
-I am having a bit hard to follow the terminology here. :-) What is a
-"powerup driver" and what is a "main device driver" in this context?
+Therefore, this patch moves the armada_370_xp_cpu_resume() C function,
+which was anyway just a block of inline assembly, into a proper
+pmsu_ll.S file, and adds the appropriate ARM_BE8(setend be)
+instruction.
 
-I had a slide which I used at a mmc subsystem crash course recently,
-please have a look - hopefully this will help us to sort out this.
+Without this patch, an Armada XP big endian configuration with cpuidle
+enabled fails to boot, as it hangs as soon as one of the CPU hits the
+deep idle state.
 
-https://drive.google.com/file/d/0B2ePGK-iqMupbDQ2S0o5b3Bhek0/edit?usp=sharing
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/Makefile  |  2 +-
+ arch/arm/mach-mvebu/pmsu.c    |  9 ++-------
+ arch/arm/mach-mvebu/pmsu_ll.S | 25 +++++++++++++++++++++++++
+ 3 files changed, 28 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm/mach-mvebu/pmsu_ll.S
 
->
-> Well, if we merge some variant of Olof's code, we will have a powerup driver
-> that is part of the mmc core, and thus not of the sdio function driver.
->
->>>> Well, if things aren't going to work either way for these devices
->>>> without extra stuff it seems it doesn't much matter but it helps the
->>>> simple case to have things default to working.
->>
->>> The simple case still needs a child node describing the needed resources,
->>> adding a compatible = "simple-sdio-powerup" to that at the same as creating
->>> the child node in the first place really is no extra effort at all.
->>
->> From where I'm sitting it's more effort since instead of just putting
->> the device in there (and possibly also some other devices that are
->> software compatible) we have to put in another compatible string which
->> is really just a boolean flag to be used in conjunction with the others.
->> That's harder to think about and we clearly don't want to go through the
->> compatible list, decide that we don't know how to handle the device
->> except power it up so go and do that.
->>
->> If it were done as something like "set boolean property X or
->> powerup-method = Y in the card description" or whatever it'd seem a bit
->> annoying but not a big deal, I think it's the fact that it's getting put
->> into the compatible list that's really concerning me.
->
-> Ok, so lets switch it over to a boolean, options for the name I see are:
->
-> linux,mmc-host-powerup  (opt in to powerup being dealt with by the mmc core, implementation specific)
-> simple-powerup          (platform neutral opt in to say just enable all resources and be done with it)
-> custom-powerup          (platform neutral opt out version of simple-powerup)
-> linux,custom-powerup    (same, but consider this something linux specific)
-
-This seems reasonable to me.
-
-Well, I don't like the "simple-powerup", because I think a simple
-powerup sequence is to me already supported by the mmc core, through
-the regular host interface (->set_ios()).
-
-If I understand correctly, this binding is supposed to be configured
-per host device and thus also per host device slots?
-
-Kind regards
-Ulf Hansson
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index 2ecb828..1636cdb 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -7,7 +7,7 @@ CFLAGS_pmsu.o			:= -march=armv7-a
+ obj-y				 += system-controller.o mvebu-soc-id.o
+ 
+ ifeq ($(CONFIG_MACH_MVEBU_V7),y)
+-obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o
++obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o pmsu_ll.o
+ obj-$(CONFIG_SMP)		 += platsmp.o headsmp.o platsmp-a9.o headsmp-a9.o
+ obj-$(CONFIG_HOTPLUG_CPU)	 += hotplug.o
+ endif
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index 6e83d32..daf52ff 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -66,6 +66,8 @@ static void __iomem *pmsu_mp_base;
+ extern void ll_disable_coherency(void);
+ extern void ll_enable_coherency(void);
+ 
++extern void armada_370_xp_cpu_resume(void);
++
+ static struct platform_device armada_xp_cpuidle_device = {
+ 	.name = "cpuidle-armada-370-xp",
+ };
+@@ -140,13 +142,6 @@ static void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void)
+ 	writel(reg, pmsu_mp_base + L2C_NFABRIC_PM_CTL);
+ }
+ 
+-static void armada_370_xp_cpu_resume(void)
+-{
+-	asm volatile("bl    ll_add_cpu_to_smp_group\n\t"
+-		     "bl    ll_enable_coherency\n\t"
+-		     "b	    cpu_resume\n\t");
+-}
+-
+ /* No locking is needed because we only access per-CPU registers */
+ static void armada_370_xp_pmsu_idle_prepare(bool deepidle)
+ {
+diff --git a/arch/arm/mach-mvebu/pmsu_ll.S b/arch/arm/mach-mvebu/pmsu_ll.S
+new file mode 100644
+index 0000000..fc3de68
+--- /dev/null
++++ b/arch/arm/mach-mvebu/pmsu_ll.S
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (C) 2014 Marvell
++ *
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ * Gregory Clement <gregory.clement@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++
++/*
++ * This is the entry point through which CPUs exiting cpuidle deep
++ * idle state are going.
++ */
++ENTRY(armada_370_xp_cpu_resume)
++ARM_BE8(setend	be )			@ go BE8 if entered LE
++	bl	ll_add_cpu_to_smp_group
++	bl	ll_enable_coherency
++	b	cpu_resume
++ENDPROC(armada_370_xp_cpu_resume)
++
+-- 
+1.9.3
