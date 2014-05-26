@@ -1,51 +1,140 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 26 May 2014 15:11:03 +0200
-Subject: [PATCH 2/4] cpufreq: add i.MX5 cpufreq driver
-In-Reply-To: <CAKohpo=ncHUmtJOEw4FZG1BWUSuiQK4n+ETEMJWJj9UoPz2cnw@mail.gmail.com>
-References: <1401099308-9658-1-git-send-email-l.stach@pengutronix.de>
- <1401099308-9658-2-git-send-email-l.stach@pengutronix.de>
- <CAKohpoksbFHyX=r0=URMedJNi68c3xAX4OrXzSFqgf1-bCm4+Q@mail.gmail.com>
- <1401101131.4829.29.camel@weser.hi.pengutronix.de>
- <CAKohponTUsYLf-8_iSnttwK8oXyJEZVWpF+a=vLC7r_jZ8AzOQ@mail.gmail.com>
- <1401107748.4829.39.camel@weser.hi.pengutronix.de>
- <CAKohpo=ncHUmtJOEw4FZG1BWUSuiQK4n+ETEMJWJj9UoPz2cnw@mail.gmail.com>
-Message-ID: <1401109863.4829.46.camel@weser.hi.pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 26 May 2014 15:26:18 +0200
+Subject: [PATCH 4/4] ARM: mvebu: returns ll_get_cpuid() to
+ ll_get_coherency_cpumask()
+In-Reply-To: <1400762882-10116-5-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1400762882-10116-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1400762882-10116-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140526152618.39c088ae@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 26.05.2014, 18:26 +0530 schrieb Viresh Kumar:
-> On 26 May 2014 18:05, Lucas Stach <l.stach@pengutronix.de> wrote:
-[...]
-> 
-> > 2. Usage of a fixed max voltage, rather than a voltage-tolerance. i.MX5
-> > has a fixed maximum voltage, which is valid across all operating points.
-> > I'm really opposed to using a tolerance value, where we instead could
-> > have a well defined range. So for merging imx5-cpufreq into cpufreq-cpu0
-> > this driver really need to handle this case.
-> > Does adding a separate property for this, while keeping the
-> > voltage-tolerance for the existing users, sound like a change you would
-> > accept?
-> 
-> It looks you can just send voltage-tolerance to "zero" and this should work
-> for you.. No need of another field.
-> 
-No, setting voltage-tolerance to zero means I don't accept any tolerance
-at all. Though in practice I have a variable tolerance as I just have a
-fixed maximum voltage for the chip.
+Hello Jason,
 
-For example the i.MX53 has a fixed maximum voltage of 1.4V on the cpu
-rail, so for the slowest OPP the acceptable voltage range is 0.8V to
-1.4V, for the fastest OPP the range is 1.3V to 1.4V.
+There is a typo in the title of this commit: s/returns/rename/.
 
-So if someone connects a fixed 1.3V regulator, I want to still be able
-to use all OPPs, even though the slowest OPP wants 0.8V ideally. If I
-were to use a tolerance I would have to set is to some relatively strict
-value, in order to not exceed the maximum voltage at the highest OPP,
-but this would mean I could not use the slowest OPP because it's out of
-the tolerance range.
+Should I respin this patch, or can you fix directly in mvebu/soc ?
 
-Regards,
-Lucas
+Thanks, and sorry for the mess :/
+
+Thomas
+
+On Thu, 22 May 2014 14:48:02 +0200, Thomas Petazzoni wrote:
+> In the refactoring of the coherency fabric assembly code, a function
+> called ll_get_cpuid() was created to factorize common logic between
+> functions adding CPU to the SMP coherency group, enabling and
+> disabling the coherency.
+> 
+> However, the name of the function is highly misleading: ll_get_cpuid()
+> makes one think tat it returns the ID of the CPU, i.e 0 for CPU0, 1
+> for CPU1, etc. In fact, this is not at all what this function returns:
+> it returns a CPU mask for the current CPU, usable for the coherency
+> fabric configuration and control registers.
+> 
+> Therefore this commit renames this function to
+> ll_get_coherency_cpumask(), and adds additional comments on top of the
+> function to explain in more details what it does, and also how the
+> endianess issue is handled.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/coherency_ll.S | 43 ++++++++++++++++++++++----------------
+>  1 file changed, 25 insertions(+), 18 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+> index 311442a..510c29e 100644
+> --- a/arch/arm/mach-mvebu/coherency_ll.S
+> +++ b/arch/arm/mach-mvebu/coherency_ll.S
+> @@ -49,15 +49,22 @@ ENTRY(ll_get_coherency_base)
+>  	mov	pc, lr
+>  ENDPROC(ll_get_coherency_base)
+>  
+> -/* Returns the CPU ID in r3 (r0 is untouched) */
+> -ENTRY(ll_get_cpuid)
+> +/*
+> + * Returns the coherency CPU mask in r3 (r0 is untouched). This
+> + * coherency CPU mask can be used with the coherency fabric
+> + * configuration and control registers. Note that the mask is already
+> + * endian-swapped as appropriate so that the calling functions do not
+> + * have to care about endianness issues while accessing the coherency
+> + * fabric registers
+> + */
+> +ENTRY(ll_get_coherency_cpumask)
+>  	mrc	15, 0, r3, cr0, cr0, 5
+>  	and	r3, r3, #15
+>  	mov	r2, #(1 << 24)
+>  	lsl	r3, r2, r3
+>  ARM_BE8(rev	r3, r3)
+>  	mov	pc, lr
+> -ENDPROC(ll_get_cpuid)
+> +ENDPROC(ll_get_coherency_cpumask)
+>  
+>  /*
+>   * ll_add_cpu_to_smp_group(), ll_enable_coherency() and
+> @@ -71,14 +78,14 @@ ENDPROC(ll_get_cpuid)
+>  ENTRY(ll_add_cpu_to_smp_group)
+>  	/*
+>  	 * As r0 is not modified by ll_get_coherency_base() and
+> -	 * ll_get_cpuid(), we use it to temporarly save lr and avoid
+> -	 * it being modified by the branch and link calls. This
+> -	 * function is used very early in the secondary CPU boot, and
+> -	 * no stack is available at this point.
+> +	 * ll_get_coherency_cpumask(), we use it to temporarly save lr
+> +	 * and avoid it being modified by the branch and link
+> +	 * calls. This function is used very early in the secondary
+> +	 * CPU boot, and no stack is available at this point.
+>  	 */
+>  	mov 	r0, lr
+>  	bl	ll_get_coherency_base
+> -	bl	ll_get_cpuid
+> +	bl	ll_get_coherency_cpumask
+>  	mov 	lr, r0
+>  	add	r0, r1, #ARMADA_XP_CFB_CFG_REG_OFFSET
+>  1:
+> @@ -93,14 +100,14 @@ ENDPROC(ll_add_cpu_to_smp_group)
+>  ENTRY(ll_enable_coherency)
+>  	/*
+>  	 * As r0 is not modified by ll_get_coherency_base() and
+> -	 * ll_get_cpuid(), we use it to temporarly save lr and avoid
+> -	 * it being modified by the branch and link calls. This
+> -	 * function is used very early in the secondary CPU boot, and
+> -	 * no stack is available at this point.
+> +	 * ll_get_coherency_cpumask(), we use it to temporarly save lr
+> +	 * and avoid it being modified by the branch and link
+> +	 * calls. This function is used very early in the secondary
+> +	 * CPU boot, and no stack is available at this point.
+>  	 */
+>  	mov r0, lr
+>  	bl	ll_get_coherency_base
+> -	bl	ll_get_cpuid
+> +	bl	ll_get_coherency_cpumask
+>  	mov lr, r0
+>  	add	r0, r1, #ARMADA_XP_CFB_CTL_REG_OFFSET
+>  1:
+> @@ -117,14 +124,14 @@ ENDPROC(ll_enable_coherency)
+>  ENTRY(ll_disable_coherency)
+>  	/*
+>  	 * As r0 is not modified by ll_get_coherency_base() and
+> -	 * ll_get_cpuid(), we use it to temporarly save lr and avoid
+> -	 * it being modified by the branch and link calls. This
+> -	 * function is used very early in the secondary CPU boot, and
+> -	 * no stack is available at this point.
+> +	 * ll_get_coherency_cpumask(), we use it to temporarly save lr
+> +	 * and avoid it being modified by the branch and link
+> +	 * calls. This function is used very early in the secondary
+> +	 * CPU boot, and no stack is available at this point.
+>  	 */
+>  	mov 	r0, lr
+>  	bl	ll_get_coherency_base
+> -	bl	ll_get_cpuid
+> +	bl	ll_get_coherency_cpumask
+>  	mov 	lr, r0
+>  	add	r0, r1, #ARMADA_XP_CFB_CTL_REG_OFFSET
+>  1:
+
+
+
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
