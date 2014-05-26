@@ -1,65 +1,33 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 26 May 2014 11:42:44 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzJdIEFSTTogY2xrOiBpbXg6IGFkZCBhIG5ldyBoZWxw?=
- =?UTF-8?B?ZXIgd2hpY2ggY2FuIHJlLXBhcmVudCB0aGUgY2xvY2s=?=
-In-Reply-To: <20140526060349.GA11074@shlinux1.ap.freescale.net>
-References: <1401081633-12190-1-git-send-email-b32955@freescale.com>
- <1401087292.925679327@f35.i.mail.ru>
- <20140526060349.GA11074@shlinux1.ap.freescale.net>
-Message-ID: <1401090164.941960946@f35.i.mail.ru>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 26 May 2014 09:47:55 +0200
+Subject: [PATCH 00/11] sdio wifi oob irq support for sunxi
+Message-ID: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mon, 26 May 2014 14:03:51 +0800 ?? Huang Shijie <b32955@freescale.com>:
-> On Mon, May 26, 2014 at 10:54:52AM +0400, Alexander Shiyan wrote:
-> > Mon, 26 May 2014 13:20:32 +0800 ?? Huang Shijie <b32955@freescale.com>:
-> > > The clocks for Quadspi controller may be different when different
-> > > NOR flashes are connected to the board.
-> > > 
-> > > This patch adds a new helper to register the clock which needs the
-> > > re-parent capability.
-> > > 
-> > > Signed-off-by: Huang Shijie <b32955@freescale.com>
-> > > ---
-> > >  arch/arm/mach-imx/clk.h |   10 ++++++++++
-> > >  1 files changed, 10 insertions(+), 0 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-> > > index e29f6eb..2e3c4fe 100644
-> > > --- a/arch/arm/mach-imx/clk.h
-> > > +++ b/arch/arm/mach-imx/clk.h
-> > > @@ -112,6 +112,16 @@ static inline struct clk *imx_clk_mux_flags(const char *name,
-> > >  			&imx_ccm_lock);
-> > >  }
-> > >  
-> > > +/* we can use this helper to register the clock which needs the re-parent. */
-> > > +static inline struct clk *imx_clk_mux_flags_reparent(const char *name,
-> > > +		void __iomem *reg, u8 shift, u8 width, const char **parents,
-> > > +		int num_parents, unsigned long flags)
-> > > +{
-> > > +	return clk_register_mux(NULL, name, parents, num_parents,
-> > > +			flags, reg, shift, width, 0,
-> > > +			&imx_ccm_lock);
-> > > +}
-> > 
-> > So you can use CLK_SET_RATE_PARENT for flags here and completely remove
-> > flags parameter for this call. Is not it?
-> Do you mean make the code like this :
-> 
-> ----------------------------------------------------------------
-> 	return clk_register_mux(NULL, name, parents, num_parents,
-> 			CLK_SET_RATE_PARENT, reg, shift, width, 0,
-> 			&imx_ccm_lock);
-> ----------------------------------------------------------------
+Hi All,
 
-Yes.
+Here is a patch series adding support for oob irqs for the ap6210 sdio wifi
+modules found on various Allwinner A20 boards.
 
-> Without the "flags" argument, the helper is too specific.
+A lot of it is ground work which should be useful for adding oob irq support
+to other sdio wifi models too.
 
-Or let's just OR with CLK_SET_RATE_PARENT, like as:
+The first 5 patches are sunxi pinctrl patches and should go upstream through
+the pinctrl tree.
 
-return clk_register_mux(NULL, name, parents, num_parents,
- 			flags | CLK_SET_RATE_PARENT, reg, shift, width, 0,
-			&imx_ccm_lock);
+Patch 6 adds generic support for having per sdio function child nodes in
+devicetree and should go upstream through the mmc tree.
 
----
+Patch 7 and 8 add oob irq support to the brcmfmac driver. Patch 9 pokes some
+magic bits needed to enable the oob irq, this was taken from an android code
+dump and good do with a good review from someone from Broadcom, Arend ?
+
+Patch 10 and 11 add the necessary dts bits to actually enable the sdio irq
+and should go upstream through Maxime's dt tree.
+
+Please review / merge.
+
+Thanks & Regards,
+
+Hans
