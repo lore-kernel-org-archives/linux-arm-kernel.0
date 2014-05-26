@@ -1,48 +1,31 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 26 May 2014 15:40:52 +0200
-Subject: [GIT PULL] clockevents: new material for 3.16
-In-Reply-To: <53830ED9.9060001@linaro.org>
-References: <537F214C.8000700@linaro.org>
- <20140526194512.032c6630@canb.auug.org.au>
- <53830ED9.9060001@linaro.org>
-Message-ID: <20140526134052.GA3790@lukather>
+From: gdjakov@mm-sol.com (Georgi Djakov)
+Date: Mon, 26 May 2014 16:47:28 +0300
+Subject: [GIT PULL] qcom SoC changes for v3.16
+In-Reply-To: <1401108595.6068.5.camel@x220>
+References: <alpine.DEB.2.00.1405231339340.15680@galak-ubuntu.qualcomm.com>
+ <1401108595.6068.5.camel@x220>
+Message-ID: <538345F0.40605@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 11:52:25AM +0200, Daniel Lezcano wrote:
-> On 05/26/2014 11:45 AM, Stephen Rothwell wrote:
-> >Hi all,
-> >
-> >On Fri, 23 May 2014 12:22:04 +0200 Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> >>
-> >>        clocksource: sun5i: Add support for reset controller
-> >
-> >This commit caused a build failure on arm in linux-next today ...
+On 05/26/2014 03:49 PM, Paul Bolle wrote:
+> On Fri, 2014-05-23 at 13:42 -0500, Kumar Gala wrote:
+>> Ivan T. Ivanov (1):
+>>         ARM: debug: qcom: make UART address selection configuration option
+>
+> This one just landed in linux-next (next-20140526).
+>
+> It removed the Kconfig options DEBUG_MSM_UART1, DEBUG_MSM_UART3, and
+> DEBUG_MSM_UART3. It did not touch these references to their macros:
+>      arch/arm/mach-msm/io.c:60:#if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
+>      arch/arm/mach-msm/io.c:61:                defined(CONFIG_DEBUG_MSM_UART3)
+>      arch/arm/mach-msm/io.c:79:#if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
+>      arch/arm/mach-msm/io.c:80:                defined(CONFIG_DEBUG_MSM_UART3)
+>
+> Is a patch to fix this queued somewhere?
+>
 
-It's weird... of_reset_control_get has been merged in 3.15 by this
-commit fc0a5921561c71be2c334a335c1680f7930434d7 ("reset: Add
-of_reset_control_get"), and then the commit
-b424080a9e086e683ad5fdc624a7cf3c024e0c0f ("reset: Add optional resets
-and stubs") removed it, still in 3.15 (probably a mismerge).
+Not yet, but I'll send one in a minute.
 
-Finally, Hans de Goede introduced it back in the following patch:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/246738.html
-
-That should have shown up in one of 3.15-rc's according to:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/252317.html
-
-Philipp, what's going on?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140526/3d498f0f/attachment.sig>
+Thanks,
+Georgi
