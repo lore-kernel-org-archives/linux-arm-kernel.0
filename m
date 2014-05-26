@@ -1,58 +1,38 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 26 May 2014 10:40:31 +0200
-Subject: [PATCH] ARM: dts: imx6qdl-gw5xxx: Fix Linear Technology vendor prefix
-Message-ID: <1401093631-18467-1-git-send-email-p.zabel@pengutronix.de>
+From: b32955@freescale.com (Huang Shijie)
+Date: Mon, 26 May 2014 15:31:14 +0800
+Subject: [PATCH] ARM: clk: imx: remove the CLK_SET_RATE_NO_REPARENT for
+ imx_clk_mux_flags
+Message-ID: <1401089474-14346-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vendor prefix for Linear Technology should be lltc,
-same as the NASDAQ symbol.
+The clocks for Quadspi controller may be different when different
+NOR flashes are connected to the board.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+But the CLK_SET_RATE_NO_REPARENT flag in the current imx_clk_mux_flags
+makes the clock do not have the re-parent capability.
+
+This patch removes the CLK_SET_RATE_NO_REPARENT for imx_clk_mux_flags.
+It makes the Quadspi happy.
+
+Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- arch/arm/boot/dts/imx6qdl-gw51xx.dtsi | 2 +-
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 2 +-
- arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-imx/clk.h |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
-index 98a4221..642d909 100644
---- a/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
-@@ -156,7 +156,7 @@
- 	status = "okay";
+diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
+index e29f6eb..32d6253 100644
+--- a/arch/arm/mach-imx/clk.h
++++ b/arch/arm/mach-imx/clk.h
+@@ -108,8 +108,7 @@ static inline struct clk *imx_clk_mux_flags(const char *name,
+ 		int num_parents, unsigned long flags)
+ {
+ 	return clk_register_mux(NULL, name, parents, num_parents,
+-			flags | CLK_SET_RATE_NO_REPARENT, reg, shift, width, 0,
+-			&imx_ccm_lock);
++			flags, reg, shift, width, 0, &imx_ccm_lock);
+ }
  
- 	pmic: ltc3676 at 3c {
--		compatible = "ltc,ltc3676";
-+		compatible = "lltc,ltc3676";
- 		reg = <0x3c>;
- 
- 		regulators {
-diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-index 8e99c9a..f5adbd2 100644
---- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-@@ -208,7 +208,7 @@
- 	};
- 
- 	pmic: ltc3676 at 3c {
--		compatible = "ltc,ltc3676";
-+		compatible = "lltc,ltc3676";
- 		reg = <0x3c>;
- 
- 		regulators {
-diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-index c8e5ae0..c371ba1 100644
---- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-@@ -222,7 +222,7 @@
- 	};
- 
- 	pmic: ltc3676 at 3c {
--		compatible = "ltc,ltc3676";
-+		compatible = "lltc,ltc3676";
- 		reg = <0x3c>;
- 
- 		regulators {
+ static inline struct clk *imx_clk_fixed_factor(const char *name,
 -- 
-2.0.0.rc2
+1.7.8
