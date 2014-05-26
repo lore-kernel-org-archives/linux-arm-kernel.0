@@ -1,57 +1,122 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 26 May 2014 13:11:19 +0200
-Subject: [PATCH v11 0/3] Exynos 5410 support
-In-Reply-To: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>
-References: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>
-Message-ID: <53832157.2020502@gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 26 May 2014 13:12:43 +0200
+Subject: RFC: representing sdio devices oob interrupt, clks, etc. in device
+ tree
+In-Reply-To: <20140526103807.GV22111@sirena.org.uk>
+References: <CAGb2v64VZac2KvAALrScecN89sRnBQoDrKxKMvkte+3G04NXeA@mail.gmail.com>
+ <537DE1AA.5050606@redhat.com> <537E31F7.1030505@gmail.com>
+ <537F1148.3010102@redhat.com> <20140523112239.GB12304@sirena.org.uk>
+ <537F3610.3050104@redhat.com> <20140523162718.GE22111@sirena.org.uk>
+ <53806F26.6050706@redhat.com> <20140525123452.GS22111@sirena.org.uk>
+ <53824294.1090609@redhat.com> <20140526103807.GV22111@sirena.org.uk>
+Message-ID: <538321AB.4050006@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 26.05.2014 05:23, Tarek Dakhran wrote:
-> The series of patches represent support of Exynos 5410 SoC
-> 
-> The Exynos 5410 is the first Samsung SoC based on big.LITTLE architecture
-> 
-> Patches add new platform description, support of clock controller and device
-> tree for Exynos 5410.
-> 
-> Has been build on Samsung Linux Kernel
->   (branch: for-next, commit: 97eae6c Merge branch 'v3.16-next/multiplatform' into for-next)
-> 
-> Has been tested on: 1) Exynos 5410 reference board (exynos_defconfig)
-> 		    2) Exynos 5410 reference board (multi_v7_defconfig)
-> 		    3) Odroid-XU board (exynos_defconfig)
-> 		    4) Odroid-XU board (multi_v7_defconfig)
-> 
-> I hope this is clean and would be applied.
-> 
-> Tarek.
-> 
-> Tarek Dakhran (3):
->   ARM: EXYNOS: Add support for EXYNOS5410 SoC
->   clk: exynos5410: register clocks using common clock framework
->   ARM: dts: Add initial device tree support for EXYNOS5410
-> 
->  .../devicetree/bindings/clock/exynos5410-clock.txt |   45 +++++
->  arch/arm/boot/dts/Makefile                         |    1 +
->  arch/arm/boot/dts/exynos5410-smdk5410.dts          |   82 ++++++++
->  arch/arm/boot/dts/exynos5410.dtsi                  |  206 +++++++++++++++++++
->  arch/arm/mach-exynos/Kconfig                       |    5 +
->  arch/arm/mach-exynos/common.h                      |   12 +-
->  drivers/clk/samsung/Makefile                       |    1 +
->  drivers/clk/samsung/clk-exynos5410.c               |  209 ++++++++++++++++++++
->  include/dt-bindings/clock/exynos5410.h             |   33 ++++
->  9 files changed, 592 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-clock.txt
->  create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
->  create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
->  create mode 100644 drivers/clk/samsung/clk-exynos5410.c
->  create mode 100644 include/dt-bindings/clock/exynos5410.h
-> 
+On 05/26/2014 12:38 PM, Mark Brown wrote:
+> On Sun, May 25, 2014 at 09:20:52PM +0200, Hans de Goede wrote:
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+<snip>
 
-Best regards,
-Tomasz
+>> Also the mmc people are very much against specifying a driver, as that is
+>> something which should be probed not specified. I agree with them I've
+>> already seen boards were more or less standardized sdio modules from different
+>> vendors are used, they have various standard sdio powerup related things, like
+>> an enable signal in standard places, but different editions of the boards
+>> have different sdio modules soldered on, using different drivers.
+> 
+> If the device isn't specified then presumably it'll power up with the
+> default sequence so we shouldn't need to worry about overriding anything
+> until we've powered up and enumerated.  The only time that there's a
+> problem and would need to specify exactly what the device is in the DTS
+> is if we need the custom sequence prior to being able to do that at
+> which point I don't see much option.
+
+Specified != driver available. Determining whether or not we should power
+up based purely on there being a compatible string is not going to work, as
+even when using simple powerup we still need compatible strings for non
+powerup settings like sdio signal drive strength, oob irq, etc.
+
+So the only way this will work is if we delay powerup until we've a driver
+available, which may be never if the module is not build, or whatever,
+and without powerup the user is never going to figure out he is missing
+a module. Basically adding a driver flag for blacklisting from the simple
+power up logic means inserting an unnecessary initialization ordering issue,
+which we really don't need as each ordering dependency is usually one too many.
+
+> 
+>> I know that the DT is an ABI, and I'm not arguing for removing support for
+>> the simple-sdio-powerup compatible from the kernel when a more complex
+>> case arrives, nor am I arguing to remove it from the DT for existing working
+>> boards. The idea behind the simple-sdio-powerup compatible is that it makes
+>> the simple powerup behavior opt-in. So if a new board comes along which
+>> requires something more complex, the people working on this can do what ever
+>> they want / need without the simple powerup code getting in the way, as
+>> long as they don't *add* the simple-sdio-powerup compatible to their *new*
+>> DT file.
+> 
+> I don't understand why not powering the device up would be a sensible
+> default or why other OSs would also choose to implement things that way.
+
+Because if we are not 100% sure that our simple power up logic will do the
+job properly (i.e. in the right order), then the SAFE thing to do is to
+not power up.
+
+> It would seem more natural that we would have the custom override in
+> place for things that need special handling, not the other way around -
+> I think that's really the difference between what we're saying.
+
+Normally I would agree with you, but doing powerup the wrong way is not
+necessarily safe, so we really should not go and enable stuff just
+because it is there (most of it will used standardized properties even for
+custom power up sequences).
+
+What if a user takes an older distro kernel, where the driver does not
+set the opt-out flag you're suggesting since at that time it did not
+have its own power logic, then tries to boot that with a dtb file written
+for a newer kernel (where the driver does have the opt out flag), and we
+start powering up things in the wrong order and let the magic smoke out
+of various components on the board ?
+
+> My expectation would be that we do the standard case by default and then
+> have the complex cases override rather than the other way around, that
+> way the standard case just works with no effort.
+
+Adding "compatible = "simple-sdio-powerup" to the child node which has
+the properties specifying which clks, etc. to enable really is no effort,
+esp. since this will be done at the same time as creating the child nodes
+in the first place.
+
+Also note that this is a perfectly standard use of compatibles, compatibles
+are typically used to indicate which driver should be used, in this case
+the compatible indicates that the simple powerup driver should be used,
+where as if another powerup driver should be used another compatbile will
+be there instead.
+
+Where as what you're suggesting is to always pick driver foo, unless
+driver bar is available and has a special flag saying to not use foo, this
+is a whole new way to use compatibles really, and not one which I think
+we want to introduce.
+
+
+
+> 
+>> Basically the idea behind the simple-sdio-powerup compatible is to make
+>> the worst case scenario for more complex boards to be the scenario which
+>> we have today, i.e. no support for sdio powerup at all, rather then having
+>> something in place which actually may get in the way, making things worse
+>> then they are today.
+> 
+> Well, if things aren't going to work either way for these devices
+> without extra stuff it seems it doesn't much matter but it helps the
+> simple case to have things default to working.
+
+The simple case still needs a child node describing the needed resources,
+adding a compatible = "simple-sdio-powerup" to that at the same as creating
+the child node in the first place really is no extra effort at all.
+
+Regards,
+
+Hans
