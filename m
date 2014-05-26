@@ -1,78 +1,122 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Mon, 26 May 2014 14:49:03 +0530
-Subject: [PATCH v2 05/11] ARM: topology: use new cpu_power interface
-In-Reply-To: <CAKfTPtC_vXvf6gUtbrunn+-Zzk8-11AyKF3asjdH5=pejL69Lg@mail.gmail.com>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-6-git-send-email-vincent.guittot@linaro.org>
- <5381EE7C.9010809@linux.vnet.ibm.com>
- <CAKfTPtC_vXvf6gUtbrunn+-Zzk8-11AyKF3asjdH5=pejL69Lg@mail.gmail.com>
-Message-ID: <53830707.5020001@linux.vnet.ibm.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 26 May 2014 11:24:44 +0200
+Subject: [PATCH v3 01/11] clk: composite: support determine_rate using
+ rate_ops->round_rate + mux_ops->set_parent
+In-Reply-To: <17737873.r3cte6TEQ5@phil>
+References: <1621067.VASjIdzoSl@phil> <17737873.r3cte6TEQ5@phil>
+Message-ID: <5383085C.1060804@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/2014 01:55 PM, Vincent Guittot wrote:
-> On 25 May 2014 15:22, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
->> Hi Vincent,
->>
->> Why do we have two interfaces arch_scale_freq_power() and
->> arch_scale_cpu_power()? Does it make sense to consolidate them now ?
-> Hi Preeti,
-> 
-> They don't have the same purpose. arch_scale_cpu_power set the max
-> capacity of your CPU whereas arch_scale_freq_power can be used to give
-> the current capacity. ARM platform were using arch_scale_freq_power
-> because it was the only one available for non SMT system but this
-> induces some misunderstanding and some limitation in the
-> characterization of a CPUs. This consolidation is a necessary step so
-> we can now have the max capacity of a CPU and let
-> arch_scale_freq_power for other purpose (or even remove it if
-> useless).
+Hello Heiko,
 
-Ah ok! Thanks :) This was insightful :)
+On 23/05/2014 21:33, Heiko St?bner wrote:
+> From: Boris BREZILLON <b.brezillon@overkiz.com>
+>
+> In case the rate_hw does not implement determine_rate, but only round_rate
+> we fallback to best_parent selection if mux_hw is present and support
+> reparenting.
+>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>
+> This also fixes a rate calculation problem when using the standard div and
+> mux ops, as in this case currently only the mux->determine_rate is used
+> in the composite rate calculation.
+> [fixed the output to actually return a rate instead of the diff]
+Sorry for the delay and thanks for fixing this.
 
-Regards
-Preeti U Murthy
-> 
-> Regards,
-> Vincent
-> 
->>
->> Regards
->> Preeti U Murthy
->>
->>
->> On 05/23/2014 09:22 PM, Vincent Guittot wrote:
->>> Use the new arch_scale_cpu_power in order to reflect the original capacity of
->>> a CPU instead of arch_scale_freq_power which is more linked to a scaling of
->>> the capacity linked to the frequency.
->>>
->>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->>> ---
->>>  arch/arm/kernel/topology.c | 4 ++--
->>>  1 file changed, 2 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
->>> index 71e1fec..6cc25a8 100644
->>> --- a/arch/arm/kernel/topology.c
->>> +++ b/arch/arm/kernel/topology.c
->>> @@ -42,7 +42,7 @@
->>>   */
->>>  static DEFINE_PER_CPU(unsigned long, cpu_scale);
->>>
->>> -unsigned long arch_scale_freq_power(struct sched_domain *sd, int cpu)
->>> +unsigned long arch_scale_cpu_power(struct sched_domain *sd, int cpu)
->>>  {
->>>       return per_cpu(cpu_scale, cpu);
->>>  }
->>> @@ -166,7 +166,7 @@ static void update_cpu_power(unsigned int cpu)
->>>       set_power_scale(cpu, cpu_capacity(cpu) / middle_capacity);
->>>
->>>       printk(KERN_INFO "CPU%u: update cpu_power %lu\n",
->>> -             cpu, arch_scale_freq_power(NULL, cpu));
->>> +             cpu, arch_scale_cpu_power(NULL, cpu));
->>>  }
->>>
->>>  #else
->>>
->>
-> 
+Anyway, when I first proposed this patch, Emilio (added in Cc) told me
+this should not be automatically done by the composite clk driver, and
+the driver should instead provide the determine_rate function.
+
+Mike, any opinion on this patch ?
+
+Best Regards,
+
+Boris
+
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  drivers/clk/clk-composite.c | 51 ++++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 50 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+> index 57a078e..0a4cd21 100644
+> --- a/drivers/clk/clk-composite.c
+> +++ b/drivers/clk/clk-composite.c
+> @@ -64,11 +64,59 @@ static long clk_composite_determine_rate(struct clk_hw *hw, unsigned long rate,
+>  	const struct clk_ops *mux_ops = composite->mux_ops;
+>  	struct clk_hw *rate_hw = composite->rate_hw;
+>  	struct clk_hw *mux_hw = composite->mux_hw;
+> +	struct clk *parent;
+> +	unsigned long parent_rate;
+> +	long tmp_rate, best_rate;
+> +	unsigned long rate_diff;
+> +	unsigned long best_rate_diff = ULONG_MAX;
+> +	int i;
+>  
+>  	if (rate_hw && rate_ops && rate_ops->determine_rate) {
+>  		rate_hw->clk = hw->clk;
+>  		return rate_ops->determine_rate(rate_hw, rate, best_parent_rate,
+>  						best_parent_p);
+> +	} else if (rate_hw && rate_ops && rate_ops->round_rate &&
+> +		   mux_hw && mux_ops && mux_ops->set_parent) {
+> +		*best_parent_p = NULL;
+> +
+> +		if (__clk_get_flags(hw->clk) & CLK_SET_RATE_NO_REPARENT) {
+> +			*best_parent_p = clk_get_parent(mux_hw->clk);
+> +			*best_parent_rate = __clk_get_rate(*best_parent_p);
+> +
+> +			return rate_ops->round_rate(rate_hw, rate,
+> +						    best_parent_rate);
+> +		}
+> +
+> +		for (i = 0; i < __clk_get_num_parents(mux_hw->clk); i++) {
+> +			parent = clk_get_parent_by_index(mux_hw->clk, i);
+> +			if (!parent)
+> +				continue;
+> +
+> +			parent_rate = __clk_get_rate(parent);
+> +
+> +			tmp_rate = rate_ops->round_rate(rate_hw, rate,
+> +							&parent_rate);
+> +			if (tmp_rate < 0)
+> +				continue;
+> +
+> +			if (tmp_rate < rate)
+> +				rate_diff = rate - tmp_rate;
+> +			else
+> +				rate_diff = tmp_rate - rate;
+> +
+> +			if (!rate_diff || !*best_parent_p
+> +				       || best_rate_diff > rate_diff) {
+> +				*best_parent_p = parent;
+> +				*best_parent_rate = parent_rate;
+> +				best_rate_diff = rate_diff;
+> +				best_rate = tmp_rate;
+> +			}
+> +
+> +			if (!rate_diff)
+> +				return rate;
+> +		}
+> +
+> +		return best_rate;
+>  	} else if (mux_hw && mux_ops && mux_ops->determine_rate) {
+>  		mux_hw->clk = hw->clk;
+>  		return mux_ops->determine_rate(mux_hw, rate, best_parent_rate,
+> @@ -196,7 +244,8 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+>  		composite->rate_hw = rate_hw;
+>  		composite->rate_ops = rate_ops;
+>  		clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
+> -		if (rate_ops->determine_rate)
+> +		if (rate_ops->determine_rate ||
+> +		    (rate_ops->round_rate && clk_composite_ops->set_parent))
+>  			clk_composite_ops->determine_rate = clk_composite_determine_rate;
+>  	}
+>  
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
