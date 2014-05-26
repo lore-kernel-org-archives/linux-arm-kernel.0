@@ -1,72 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 May 2014 14:32:30 -0700
-Subject: [PATCH v3 01/10] platform_data: edma: Be precise with the paRAM
- struct
-In-Reply-To: <1397475725-5036-2-git-send-email-peter.ujfalusi@ti.com>
-References: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>
- <1397475725-5036-2-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <CAOesGMg43jT6D_ot2tKfRXXgAgwqs5Pu_tAFKc35yxLAczrzGQ@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 26 May 2014 23:33:28 +0200
+Subject: [PATCH 1/2] dt-binding: add vendor prefix for SolidRun
+Message-ID: <1401140009-31505-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+SolidRun is a company from Israel producing small-sized home-media
+computers like the Marvell Dove based CuBox and Freescale IMX based
+CuBox-i. Document the missing vendor prefix.
 
-On Mon, Apr 14, 2014 at 4:41 AM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
-> The edmacc_param struct should follow the layout of the paRAM area in the
-> HW. Be explicit on the size of the fields (u32) and also mark the struct
-> as packed to avoid any padding on non 32bit architectures.
->
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Acked-by: Joel Fernandes <joelf@ti.com>
-> ---
->  include/linux/platform_data/edma.h | 18 +++++++++---------
->  1 file changed, 9 insertions(+), 9 deletions(-)
->
-> diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
-> index f50821cb64be..923f8a3e4ce0 100644
-> --- a/include/linux/platform_data/edma.h
-> +++ b/include/linux/platform_data/edma.h
-> @@ -43,15 +43,15 @@
->
->  /* PaRAM slots are laid out like this */
->  struct edmacc_param {
-> -       unsigned int opt;
-> -       unsigned int src;
-> -       unsigned int a_b_cnt;
-> -       unsigned int dst;
-> -       unsigned int src_dst_bidx;
-> -       unsigned int link_bcntrld;
-> -       unsigned int src_dst_cidx;
-> -       unsigned int ccnt;
-> -};
-> +       u32 opt;
-> +       u32 src;
-> +       u32 a_b_cnt;
-> +       u32 dst;
-> +       u32 src_dst_bidx;
-> +       u32 link_bcntrld;
-> +       u32 src_dst_cidx;
-> +       u32 ccnt;
-> +} __packed;
->
->  /* fields in edmacc_param.opt */
->  #define SAM            BIT(0)
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Randy Dunlap <rdunlap@infradead.org>
+Cc: devicetree at vger.kernel.org
+Cc: linux-doc at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-I came across this patch when I was looking at a pull request from
-Sekhar for EDMA cleanups, and it made me look closer at the contents
-of this file.
-
-The include/linux/platform_data/ directory is meant to hold
-platform_data definitions for drivers, and nothing more.
-platform_data/edma.h also contains a whole bunch of interface
-definitions for the driver. They do not belong there, and should be
-moved to a different include file.
-
-That also includes the above struct, because as far as I can tell it's
-a runtime state structure, not something that is passed in with
-platform data.
-
-Can someone please clean this up? Thanks.
-
-
--Olof
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 0f01c9bf19c8..f0c046aff55b 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -102,6 +102,7 @@ sii	Seiko Instruments, Inc.
+ sirf	SiRF Technology, Inc.
+ smsc	Standard Microsystems Corporation
+ snps 	Synopsys, Inc.
++solidrun	SolidRun
+ spansion	Spansion Inc.
+ st	STMicroelectronics
+ ste	ST-Ericsson
+-- 
+1.9.1
