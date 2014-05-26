@@ -1,70 +1,58 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 26 May 2014 10:25:41 +0200
-Subject: [PATCH v2 05/11] ARM: topology: use new cpu_power interface
-In-Reply-To: <5381EE7C.9010809@linux.vnet.ibm.com>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-6-git-send-email-vincent.guittot@linaro.org>
- <5381EE7C.9010809@linux.vnet.ibm.com>
-Message-ID: <CAKfTPtC_vXvf6gUtbrunn+-Zzk8-11AyKF3asjdH5=pejL69Lg@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 26 May 2014 10:40:31 +0200
+Subject: [PATCH] ARM: dts: imx6qdl-gw5xxx: Fix Linear Technology vendor prefix
+Message-ID: <1401093631-18467-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 May 2014 15:22, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
-> Hi Vincent,
->
-> Why do we have two interfaces arch_scale_freq_power() and
-> arch_scale_cpu_power()? Does it make sense to consolidate them now ?
-Hi Preeti,
+The vendor prefix for Linear Technology should be lltc,
+same as the NASDAQ symbol.
 
-They don't have the same purpose. arch_scale_cpu_power set the max
-capacity of your CPU whereas arch_scale_freq_power can be used to give
-the current capacity. ARM platform were using arch_scale_freq_power
-because it was the only one available for non SMT system but this
-induces some misunderstanding and some limitation in the
-characterization of a CPUs. This consolidation is a necessary step so
-we can now have the max capacity of a CPU and let
-arch_scale_freq_power for other purpose (or even remove it if
-useless).
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6qdl-gw51xx.dtsi | 2 +-
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 2 +-
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-Regards,
-Vincent
-
->
-> Regards
-> Preeti U Murthy
->
->
-> On 05/23/2014 09:22 PM, Vincent Guittot wrote:
->> Use the new arch_scale_cpu_power in order to reflect the original capacity of
->> a CPU instead of arch_scale_freq_power which is more linked to a scaling of
->> the capacity linked to the frequency.
->>
->> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->> ---
->>  arch/arm/kernel/topology.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
->> index 71e1fec..6cc25a8 100644
->> --- a/arch/arm/kernel/topology.c
->> +++ b/arch/arm/kernel/topology.c
->> @@ -42,7 +42,7 @@
->>   */
->>  static DEFINE_PER_CPU(unsigned long, cpu_scale);
->>
->> -unsigned long arch_scale_freq_power(struct sched_domain *sd, int cpu)
->> +unsigned long arch_scale_cpu_power(struct sched_domain *sd, int cpu)
->>  {
->>       return per_cpu(cpu_scale, cpu);
->>  }
->> @@ -166,7 +166,7 @@ static void update_cpu_power(unsigned int cpu)
->>       set_power_scale(cpu, cpu_capacity(cpu) / middle_capacity);
->>
->>       printk(KERN_INFO "CPU%u: update cpu_power %lu\n",
->> -             cpu, arch_scale_freq_power(NULL, cpu));
->> +             cpu, arch_scale_cpu_power(NULL, cpu));
->>  }
->>
->>  #else
->>
->
+diff --git a/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
+index 98a4221..642d909 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
+@@ -156,7 +156,7 @@
+ 	status = "okay";
+ 
+ 	pmic: ltc3676 at 3c {
+-		compatible = "ltc,ltc3676";
++		compatible = "lltc,ltc3676";
+ 		reg = <0x3c>;
+ 
+ 		regulators {
+diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+index 8e99c9a..f5adbd2 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+@@ -208,7 +208,7 @@
+ 	};
+ 
+ 	pmic: ltc3676 at 3c {
+-		compatible = "ltc,ltc3676";
++		compatible = "lltc,ltc3676";
+ 		reg = <0x3c>;
+ 
+ 		regulators {
+diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+index c8e5ae0..c371ba1 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+@@ -222,7 +222,7 @@
+ 	};
+ 
+ 	pmic: ltc3676 at 3c {
+-		compatible = "ltc,ltc3676";
++		compatible = "lltc,ltc3676";
+ 		reg = <0x3c>;
+ 
+ 		regulators {
+-- 
+2.0.0.rc2
