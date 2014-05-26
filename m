@@ -1,41 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 May 2014 14:02:13 -0700
-Subject: [GIT PULL] Xilinx Zynq dt changes for v3.16
-In-Reply-To: <20140526204348.GN27093@quad.lixom.net>
-References: <537B6569.2010005@monstr.eu>
- <20140526204348.GN27093@quad.lixom.net>
-Message-ID: <20140526210213.GO27093@quad.lixom.net>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 26 May 2014 18:04:28 -0300
+Subject: [RESEND/PATCH v4 0/9] Watchdog support for Armada 375/38x SoC
+In-Reply-To: <20140526205305.GA23347@spo001.leaseweb.com>
+References: <1397481813-4962-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140424045153.GU28159@titan.lakedaemon.net>
+ <20140424110636.GA1735@arch.cereza>
+ <20140526205305.GA23347@spo001.leaseweb.com>
+Message-ID: <20140526210428.GA14190@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 01:43:48PM -0700, Olof Johansson wrote:
-> On Tue, May 20, 2014 at 04:23:37PM +0200, Michal Simek wrote:
-> > Hi guys,
+On 26 May 10:53 PM, Wim Van Sebroeck wrote:
+> > On Apr 24, Jason Cooper wrote:
+> > > On Mon, Apr 14, 2014 at 10:23:24AM -0300, Ezequiel Garcia wrote:
+> > > > 
+> > > > Tested on A375-DB, A385-DB, A370-RD and Dove Cubox. Sebastian did more tests
+> > > > on Dove, and Jason Gunthorpe on Kirkwood.
+> > > 
+> > > Applied patches 7 and 8 to mvebu/dt.  For the rest,
+> > > 
+> > > Acked-by: Jason Cooper <jason@lakedaemon.net>
+> > > 
 > > 
-> > please pull these 3 patches to your tree.
+> > Wim,
 > > 
-> > Thanks,
-> > Michal
-> > 
-> > 
-> > The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
-> > 
-> >   Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.xilinx.com/linux-xlnx.git tags/zynq-dt-for-3.16
-> > 
-> > for you to fetch changes up to e1e22df1380d689209ddfab061847cc541941667:
-> > 
-> >   ARM: zynq: dt: Add a fixed regulator for CPU voltage (2014-05-16 14:54:14 +0200)
+> > Can you take the rest of the patches throught your tree, with Jason's ack?
 > 
-> Merged into next/dt. Thanks.
+> Done. It's in linux-watchdog-next now.
+> 
 
-Please either don't cc the internal Xilinx list, or educate your coworkers to
-not send automated OoO replies on a mailing list posting. I got no less than
-5 separate OOO emails as replies to the above email. :(
-
-(git at xilinx.com removed as cc on this email for that reason)
-
--Olof
+Great. Much appreciated!
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
