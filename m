@@ -1,83 +1,139 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 26 May 2014 19:52:25 +0200
-Subject: [PATCH v3 14/14] ARM64: KVM: fix big endian issue in
- access_vm_reg for 32bit guest
-In-Reply-To: <1399997646-4716-15-git-send-email-victor.kamensky@linaro.org>
-References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
- <1399997646-4716-15-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20140526175225.GF31431@lvm>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 26 May 2014 19:55:47 +0200
+Subject: RFC: representing sdio devices oob interrupt, clks, etc. in device
+ tree
+In-Reply-To: <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
+References: <537E31F7.1030505@gmail.com>	<537F1148.3010102@redhat.com>	<20140523112239.GB12304@sirena.org.uk>	<537F3610.3050104@redhat.com>	<20140523162718.GE22111@sirena.org.uk>	<53806F26.6050706@redhat.com>	<20140525123452.GS22111@sirena.org.uk>	<53824294.1090609@redhat.com>	<20140526103807.GV22111@sirena.org.uk>	<538321AB.4050006@redhat.com>	<20140526142225.GF22111@sirena.org.uk>	<538356DA.7090302@redhat.com>
+ <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
+Message-ID: <53838023.2080807@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 09:14:06AM -0700, Victor Kamensky wrote:
-> Fix isssue with 32bit guests running on top of BE KVM host. Guest
-> state is retored with double word read operations. Within the high
+Hi,
 
-restored (spell check should catch this).
-
-"Guest state is restored with double word read operations."  I don't
-know what this sentence is supposed to tell me.
-
-> and low word data is already byteswap. This code effectively swaps
-
-"data is already byteswap" is not English.  data is already byteswapped?
-
-> two words within 64bit value.
+On 05/26/2014 06:07 PM, Ulf Hansson wrote:
+> [snip]
 > 
-> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 14 ++++++++++++--
->  1 file changed, 12 insertions(+), 2 deletions(-)
+>>>
+>>> We don't typically actually bind multiple compatibles for a single
+>>> device.  We've got a bunch of options we can choose from but we
+>>> generally pick the one that matches best and ignore the others.
+>>>
+>>>> Where as what you're suggesting is to always pick driver foo, unless
+>>>> driver bar is available and has a special flag saying to not use foo, this
+>>>> is a whole new way to use compatibles really, and not one which I think
+>>>> we want to introduce.
+>>>
+>>> I'm not sure I'm buying the idea that we have a powerup driver that's
+>>> meaningfully not part of the main device driver.
 > 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 060c3a9..4438b47 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -51,6 +51,16 @@ static u32 cache_levels;
->  /* CSSELR values; used to index KVM_REG_ARM_DEMUX_ID_CCSIDR */
->  #define CSSELR_MAX 12
->  
-> +/* Word access indexes for 64bit vm accessor */
-> +#ifdef CONFIG_CPU_BIG_ENDIAN
-> +#define CP15_REG_MSW_INDEX 0
-> +#define CP15_REG_LSW_INDEX 1
-> +#else
-> +#define CP15_REG_MSW_INDEX 1
-> +#define CP15_REG_LSW_INDEX 0
-> +#endif
-> +
-> +
->  /* Which cache CCSIDR represents depends on CSSELR value. */
->  static u32 get_ccsidr(u32 csselr)
->  {
-> @@ -137,9 +147,9 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
->  	if (!p->is_aarch32) {
->  		vcpu_sys_reg(vcpu, r->reg) = val;
->  	} else {
-> -		vcpu_cp15(vcpu, r->reg) = val & 0xffffffffUL;
-> +		vcpu_cp15(vcpu, r->reg + CP15_REG_LSW_INDEX) = val & 0xffffffffUL;
->  		if (!p->is_32bit)
-> -			vcpu_cp15(vcpu, r->reg + 1) = val >> 32;
-> +			vcpu_cp15(vcpu, r->reg + CP15_REG_MSW_INDEX) = val >> 32;
->  	}
->  	return true;
->  }
-> -- 
-> 1.8.1.4
+> I am having a bit hard to follow the terminology here. :-) What is a
+> "powerup driver" and what is a "main device driver" in this context?
 > 
-I really don't like this. If anything I feel like it should be
-abstracted inside vcpu_cp15, but wouldn't it be cleaner to do something
-along the lines of:
+> I had a slide which I used at a mmc subsystem crash course recently,
+> please have a look - hopefully this will help us to sort out this.
+> 
+> https://drive.google.com/file/d/0B2ePGK-iqMupbDQ2S0o5b3Bhek0/edit?usp=sharing
 
-u64 *regstore = (u64 *)vcpu->arch.ctxt.cp15[r->reg];
-if (p->is_32bit)
-	val &= 0xffffffffUL;
-*regstore = val;
+Right, the problem is that in the case(s) we're talking about before the sdio
+device in question can be probed the sdio device may need to have several clk
+signals enables, reset signal deasserted, etc.
 
-But I think the thing that bothers me in general with all these patches
-is that they deal specially with a lot of situations where the data
-structure was designed specifically to make the code easy to read, and
-now it just becomes a really complicated mess.  Have you carefully
-considered other options, redesigning the data structure layout etc.?
+Some piece of code needs to do that, the proposal so far has been to let the
+mmc-core deal with this, which will likely work fine for 90% of the cases
+were we need any form of "powerup", but in some more complex case this may need
+to happen in a specific order / with specific delays, etc. In this case some
+separate piece of board and/or sdio device specific code would need to take
+care of this, hence I was talking about a "powerup-driver", which I agree is
+not the best name. So lets just forget about the power-driver nomenclature
+completely.
 
--Christoffer
+> 
+>>
+>> Well, if we merge some variant of Olof's code, we will have a powerup driver
+>> that is part of the mmc core, and thus not of the sdio function driver.
+>>
+>>>>> Well, if things aren't going to work either way for these devices
+>>>>> without extra stuff it seems it doesn't much matter but it helps the
+>>>>> simple case to have things default to working.
+>>>
+>>>> The simple case still needs a child node describing the needed resources,
+>>>> adding a compatible = "simple-sdio-powerup" to that at the same as creating
+>>>> the child node in the first place really is no extra effort at all.
+>>>
+>>> From where I'm sitting it's more effort since instead of just putting
+>>> the device in there (and possibly also some other devices that are
+>>> software compatible) we have to put in another compatible string which
+>>> is really just a boolean flag to be used in conjunction with the others.
+>>> That's harder to think about and we clearly don't want to go through the
+>>> compatible list, decide that we don't know how to handle the device
+>>> except power it up so go and do that.
+>>>
+>>> If it were done as something like "set boolean property X or
+>>> powerup-method = Y in the card description" or whatever it'd seem a bit
+>>> annoying but not a big deal, I think it's the fact that it's getting put
+>>> into the compatible list that's really concerning me.
+>>
+>> Ok, so lets switch it over to a boolean, options for the name I see are:
+>>
+>> linux,mmc-host-powerup  (opt in to powerup being dealt with by the mmc core, implementation specific)
+>> simple-powerup          (platform neutral opt in to say just enable all resources and be done with it)
+>> custom-powerup          (platform neutral opt out version of simple-powerup)
+>> linux,custom-powerup    (same, but consider this something linux specific)
+> 
+> This seems reasonable to me.
+
+This being the last option ?
+
+> Well, I don't like the "simple-powerup", because I think a simple
+> powerup sequence is to me already supported by the mmc core, through
+> the regular host interface (->set_ios()).
+> 
+> If I understand correctly, this binding is supposed to be configured
+> per host device and thus also per host device slots?
+
+Yes, although I must admit that have not thought about how to deal with
+slots, I've no experience with the mmc slots concept at all, or is slot
+just a different name for sdio function ?
+
+Thinking more about this, maybe we can solve the problem of people
+worrying about complex power-on scenarios coming around later, by
+also encoding the sequence in dt, e.g. something like:
+
+                mmc3: mmc at 01c12000 {
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+
+                        pinctrl-names = "default";
+                        pinctrl-0 = <&mmc3_pins_a>;
+                        vmmc-supply = <&reg_vmmc3>;
+                        bus-width = <4>;
+                        non-removable;
+                        status = "okay";
+
+                        brcmf: bcrmf at 1 {
+                                reg = <1>;
+                                compatible = "brcm,bcm43xx-fmac";
+                                interrupt-parent = <&pio>;
+                                interrupts = <10 8>; /* PH10 / EINT10 */
+                                interrupt-names = "host-wake";
+				clocks = <&clk_out_a>;
+				clock-names = "clk_32khz";
+				gpios = <&pio 7 24 0>;
+				gpio-names = "gpio_reg_enable";
+				power-on-seq = "gpio_reg_enable", "usleep 1000", "clk_32khz", "usleep 200";
+                                status = "okay";				
+                        };
+                };
+
+Where power-on-seq would tell the mmc-core exactly how to bring up the sdio
+device, using standard prefixes so that the mmc-core knows that something is
+a clock / gpio / reset / whatever.
+
+This should pretty much work for everything, and if something comes around which
+really needs some custom bit of code to bring it up, the mmc-core powerup stuff
+can simply be opted-out by leaving out the power-on-seq property.
+
+Regards,
+
+Hans
