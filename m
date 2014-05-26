@@ -1,25 +1,45 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 26 May 2014 15:49:15 +0800
-Subject: linux-next: manual merge of the clockevents tree with the
- arm-soc tree
-In-Reply-To: <20140526154331.7fc6b30c@canb.auug.org.au>
-References: <20140526154331.7fc6b30c@canb.auug.org.au>
-Message-ID: <20140526074913.GD2650@dragon>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 26 May 2014 09:49:18 +0200
+Subject: [PATCH v2 01/11] sched: fix imbalance flag reset
+In-Reply-To: <5381C70E.3030605@linux.vnet.ibm.com>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-2-git-send-email-vincent.guittot@linaro.org>
+ <5381C70E.3030605@linux.vnet.ibm.com>
+Message-ID: <CAKfTPtDBZyrJJpUHPZcG9Jf4egneyqQ7TR3QXiR0Wff8ZBkHAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On 25 May 2014 12:33, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
+> Hi Vincent,
+>
+> On 05/23/2014 09:22 PM, Vincent Guittot wrote:
+>> The imbalance flag can stay set whereas there is no imbalance.
+>>
+>> Let assume that we have 3 tasks that run on a dual cores /dual cluster system.
+>> We will have some idle load balance which are triggered during tick.
+>> Unfortunately, the tick is also used to queue background work so we can reach
+>> the situation where short work has been queued on a CPU which already runs a
+>> task. The load balance will detect this imbalance (2 tasks on 1 CPU and an idle
+>> CPU) and will try to pull the waiting task on the idle CPU. The waiting task is
+>> a worker thread that is pinned on a CPU so an imbalance due to pinned task is
+>> detected and the imbalance flag is set.
+>> Then, we will not be able to clear the flag because we have at most 1 task on
+>> each CPU but the imbalance flag will trig to useless active load balance
+>> between the idle CPU and the busy CPU.
+>
+> Why do we do active balancing today when there is at-most 1 task on the
+> busiest cpu? Shouldn't we be skipping load balancing altogether? If we
+> do active balancing when the number of tasks = 1, it will lead to a ping
+> pong right?
 
-On Mon, May 26, 2014 at 03:43:31PM +1000, Stephen Rothwell wrote:
-> Hi Daniel,
-> 
-> Today's linux-next merge of the clockevents tree got a conflict in
-> arch/arm/boot/dts/vf610.dtsi between commit 0517fe6aa880 ("ARM: dts:
-> vf610-twr: Add support for sdhc1") from the arm-soc tree and commit
-> 07513e1330a9 ("ARM: dts: vf610: Add Freescale FlexTimer Module timer
-> node") from the clockevents tree.
+That's the purpose of the patch to prevent this useless active load
+balance. When the imbalance flag is set, an active load balance is
+triggered whatever the load balance is because of pinned tasks that
+prevents a balance state.
 
-Next time, please leave the dts patches to go via arch tree, so that we
-can save such conflicts.
+Vincent
 
-Shawn
+>
+> Regards
+> Preeti U Murthy
+>
