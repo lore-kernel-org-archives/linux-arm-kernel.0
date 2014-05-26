@@ -1,61 +1,35 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Mon, 26 May 2014 10:10:12 +0530
-Subject: [PATCH v6 0/6] add cpuidle support for Exynos5420
-In-Reply-To: <CANuQgHH1_O-8XHhRREdu5WjOwz1oeASdVf7TQFdGxjr0WDSvhQ@mail.gmail.com>
-References: <CANuQgHGSA+R__raSa_tzrgpceqLD2SZw+s0XQUHGF4wscgh6Kg@mail.gmail.com>
- <1400227438-27155-1-git-send-email-chander.kashyap@linaro.org>
- <CANuQgHH1_O-8XHhRREdu5WjOwz1oeASdVf7TQFdGxjr0WDSvhQ@mail.gmail.com>
-Message-ID: <CANuQgHFeDXozQH4LRuidKBOvmhPn8afTpdUg0U4csbsbsyz-OA@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 26 May 2014 12:47:30 +0800
+Subject: [PATCH 03/22] clk: sunxi: add "pll6" to sun6i protected clock list
+In-Reply-To: <20140525184808.GP10768@lukather>
+References: <1400831485-28576-1-git-send-email-wens@csie.org>
+ <1400831485-28576-4-git-send-email-wens@csie.org>
+ <20140525184808.GP10768@lukather>
+Message-ID: <CAGb2v643UmK6GfuDVfywVUeo_g7FpdZC_7SgeY-UMZ_k_-2N9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 May 2014 11:10, Chander Kashyap <chander.kashyap@linaro.org> wrote:
-> Hi Daniel/Kgene,
+On Mon, May 26, 2014 at 2:48 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Fri, May 23, 2014 at 03:51:06PM +0800, Chen-Yu Tsai wrote:
+>> PLL6 is used by some important but undocumented module, most likely
+>> memory related, such as mbus or the actual memory controller. As we
+>> do not have a driver for that, add pll6 to the list of protected
+>> clocks, so that it won't be disabled and leave us with a non-responsive
+>> system.
 >
-> On 16 May 2014 13:33, Chander Kashyap <chander.kashyap@linaro.org> wrote:
->> Exynos5420 is a big-little Soc from Samsung. It has 4 A15 and 4 A7 cores.
->>
->> This patchset adds cpuidle support for Exynos5420 SoC based on
->> generic big.little cpuidle driver.
->>
->> Tested on SMDK5420.
->>
->> This patch set depends on:
->>         1. [PATCH 0/5] MCPM backend for Exynos5420
->>            http://www.spinics.net/lists/arm-kernel/msg331100.html
->> Changelog is in respective patches.
->> Chander Kashyap (5):
->>   driver: cpuidle-big-little: add of_device_id structure
->>   arm: exynos: add generic function to calculate cpu number
->>   cpuidle: config: Add ARCH_EXYNOS entry to select cpuidle-big-little
->>     driver
->>   driver: cpuidle: cpuidle-big-little: init driver for Exynos5420
->>   exynos: cpuidle: do not allow cpuidle registration for Exynos5420
->>   mcpm: exynos: populate suspend and powered_up callbacks
->>
->>  arch/arm/mach-exynos/exynos.c        |    4 +++-
->>  arch/arm/mach-exynos/mcpm-exynos.c   |   36 ++++++++++++++++++++++++++++++++++
->>  arch/arm/mach-exynos/regs-pmu.h      |    9 +++++++++
->>  drivers/cpuidle/Kconfig.arm          |    2 +-
->>  drivers/cpuidle/cpuidle-big_little.c |   12 +++++++++++-
->>  5 files changed, 60 insertions(+), 3 deletions(-)
->>
->> --
->> 1.7.9.5
->>
->
-> As dependency patches are merged. If their are no further comment, can
-> these patches be taken?
->
+> What issue have you seen?
 
-ping
+Completely unresponsive after PLL6 is gated (on the A23).
 
-> --
-> with warm regards,
-> Chander Kashyap
+> The system actually works pretty great on the A31.
+
+Does it work when there aren't any other PLL6 consumers?
+Maybe the boot0 on A31 and A23 setup some DRAM-related modules differently.
+
+If the A31 works without protecting PLL6, I'll add a separate list
+for the A23.
 
 
-
--- 
-with warm regards,
-Chander Kashyap
+Thanks,
+ChenYu
