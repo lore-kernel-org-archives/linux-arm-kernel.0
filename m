@@ -1,30 +1,29 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 26 May 2014 11:52:25 +0200
-Subject: [GIT PULL] clockevents: new material for 3.16
-In-Reply-To: <20140526194512.032c6630@canb.auug.org.au>
-References: <537F214C.8000700@linaro.org>
- <20140526194512.032c6630@canb.auug.org.au>
-Message-ID: <53830ED9.9060001@linaro.org>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 26 May 2014 17:52:32 +0800
+Subject: [PATCH] PCI: Turn pcibios_penalize_isa_irq() into __weak function
+In-Reply-To: <4534160.Diq8cthzci@wuerfel>
+References: <1399346992-6584-1-git-send-email-hanjun.guo@linaro.org>
+ <4534160.Diq8cthzci@wuerfel>
+Message-ID: <53830EE0.1070700@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/2014 11:45 AM, Stephen Rothwell wrote:
-> Hi all,
->
-> On Fri, 23 May 2014 12:22:04 +0200 Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+On 2014-5-6 15:26, Arnd Bergmann wrote:
+> On Tuesday 06 May 2014 11:29:52 Hanjun Guo wrote:
+>> pcibios_penalize_isa_irq() is only useful for x86 now, and
+>> legacy ISA is not used by some architectures, so make
+>> pcibios_penalize_isa_irq() as __weak function to simplify
+>> the code, this will prevent new platform from introducing
+>> dummy stub function for pcibios_penalize_isa_irq() too.
 >>
->>         clocksource: sun5i: Add support for reset controller
->
-> This commit caused a build failure on arm in linux-next today ...
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
 
-Thanks Stephen.
+Hi Bjorn,
 
-Maxime ?
+Any comments on this patch?
 
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Thanks
+Hanjun
