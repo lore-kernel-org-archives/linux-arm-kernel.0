@@ -1,21 +1,67 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 26 May 2014 14:09:31 -0300
-Subject: [PATCH] ahci: imx: PLL clock needs 100us to settle down
-In-Reply-To: <20140525064043.GC2650@dragon>
-References: <1400330761-2432-1-git-send-email-shawn.guo@freescale.com>
- <CAOMZO5AUFkRY2VJYdTNQvs=vTagFQBaYBynpBRj5e_DsD2EXqQ@mail.gmail.com>
- <20140525064043.GC2650@dragon>
-Message-ID: <CAOMZO5DnSVgn+Y_i6b-cSgThh8xmG60Hd70-YrR7ELRNGJ1piQ@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 26 May 2014 19:17:55 +0200
+Subject: [PATCH v2 4/4] ARM: debug: qcom: add UART addresses to Kconfig
+ help
+In-Reply-To: <53834578.9090305@mm-sol.com>
+References: <1400857952-6963-1-git-send-email-gdjakov@mm-sol.com>
+ <1400857952-6963-5-git-send-email-gdjakov@mm-sol.com>
+ <CABuKBe+B_Ga-w4aA4dApDTa26rCuhetRTJku27Madm+fHtDcLA@mail.gmail.com>
+ <53834578.9090305@mm-sol.com>
+Message-ID: <CABuKBeJXqSi=6XY5Fg7mg_daQ4D8ornS-kn7NDPktCtro7yNNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 25, 2014 at 3:40 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+2014-05-26 15:45 GMT+02:00 Georgi Djakov <gdjakov@mm-sol.com>:
+> On 23.05.14, 19:39, Matthias Brugger wrote:
+>>
+>> 2014-05-23 17:12 GMT+02:00 Georgi Djakov <gdjakov@mm-sol.com>:
+>>>
+>>> Add information about the APQ8084 debug UART physical and virtual
+>>> addresses in the DEBUG_QCOM_UARTDM Kconfig help section.
+>>> Requires: https://lkml.org/lkml/2014/4/14/312
+>>>
+>>> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+>>> ---
+>>>  arch/arm/Kconfig.debug |    1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>>> index 40ee328..e71723d 100644
+>>> --- a/arch/arm/Kconfig.debug
+>>> +++ b/arch/arm/Kconfig.debug
+>>> @@ -376,6 +376,7 @@ choice
+>>>                   their output to the serial port on Qualcomm devices.
+>>>
+>>>                   ARCH      DEBUG_UART_PHYS   DEBUG_UART_BASE
+>>> +                 APQ8084   0xf995e000        0xfa75e000
+>>>                   MSM8X60   0x19c40000        0xf0040000
+>>>                   MSM8960   0x16440000        0xf0040000
+>>>                   MSM8974   0xf991e000        0xfa71e000
+>>
+>>
+>> You don't have any uart defined in your dts. You should add them
+>> before any adding low level debug support.
+>> Otherwise there might be problems in booting a multi-platform kernel.
+>>
+>
+> Thanks for the comment! As the uart depends on clocks, i am adding it to the
+> dts as part of my global clock controller patchset [1].
+> In this patch i am just adding some information to the help section.
+> Do you see any problem with this?
 
-> Hmm, I haven't seen this?  How do I reproduce it on imx6q?
+Are the patches for the clock controller applied already?
+If not, I would consider to add this patch to clock controller series.
 
-Run linux-next on a mx6qsabresd with no SATA disk connected and then:
+Cheers,
+Matthias
 
-$ echo enabled > /sys/class/tty/ttymxc0/power/wakeup
-$ echo mem > /sys/power/state
+>
+> [1] https://lkml.org/lkml/2014/5/22/422
+>
+> Thanks,
+> Georgi
 
-Hit any key in console and then you will get the warning from ahci_imx suspend.
+
+
+-- 
+motzblog.wordpress.com
