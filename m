@@ -1,104 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 May 2014 15:05:37 -0700
-Subject: [GIT PULL]]ARM: sirf: machine update for 3.16
-In-Reply-To: <CAGsJ_4wzZy+Q=sNofgxFt=_VEPqBqR0W=TdjxjOqdF+GrFpSHg@mail.gmail.com>
-References: <CAGsJ_4yqTkKu+93Fo_D6NaZMyz4T6_EmKz4gZfyeQCi_uF-3dg@mail.gmail.com>
- <CAGsJ_4wD=FqxNeuEs47f0D9V+Qhn8jyUQL67iv4rsZ3r2K_3vA@mail.gmail.com>
- <CAGsJ_4y7gEQd9-Em6LW2kZ79qUOz5dSYzeWnBLbt8o8QsOSA6w@mail.gmail.com>
- <20140520050740.GI18956@quad.lixom.net>
- <CAGsJ_4wxaU5Sz9p3rb8wXuHeFs_kFx7BG-ThdQL0oiLHPqOb9w@mail.gmail.com>
- <20140521205120.GA24341@quad.lixom.net>
- <CAGsJ_4wzZy+Q=sNofgxFt=_VEPqBqR0W=TdjxjOqdF+GrFpSHg@mail.gmail.com>
-Message-ID: <20140526220537.GW27093@quad.lixom.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 27 May 2014 07:06:10 +0900
+Subject: [PATCH v2] cpufreq: exynos: Fix driver compilation with
+ ARCH_MULTIPLATFORM
+In-Reply-To: <CAKohpo=b=Jm4vZfgS2YPA740QfvktgVExXXzOdSUmQjGWhzrhg@mail.gmail.com>
+References: <1400670752-673-1-git-send-email-t.figa@samsung.com>	<1400858533-4327-1-git-send-email-t.figa@samsung.com>	<53826377.8060709@samsung.com>
+ <CAKohpo=b=Jm4vZfgS2YPA740QfvktgVExXXzOdSUmQjGWhzrhg@mail.gmail.com>
+Message-ID: <5383BAD2.6020406@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 08:28:24PM +0800, Barry Song wrote:
-> 2014-05-22 4:51 GMT+08:00 Olof Johansson <olof@lixom.net>:
-> > On Tue, May 20, 2014 at 01:39:20PM +0800, Barry Song wrote:
-> >> 2014-05-20 13:07 GMT+08:00 Olof Johansson <olof@lixom.net>:
-> >> > On Sun, May 18, 2014 at 08:07:14PM +0800, Barry Song wrote:
-> >> >> >> Bin Shi (2):
-> >> >> >>       clocksource: prima2: fix some minor checkpatch issues
-> >> >> >>       irqchip: sirf: fix one minor checkpatch issue
-> >> >> >>
-> >> >> >> Xianglong Du (1):
-> >> >> >>       ARM: prima2: rstc: fix some minor checkpatch issues
-> >> >> >>
-> >> >> >> Zhiwu Song (2):
-> >> >> >>       clocksource:sirf: remove the hardcode for the clk of timers
-> >> >> >>       clocksource: marco: fix the affinity set for local timer of CPU1
-> >> >> >
-> >> >> > as Daniel has applied this one "clocksource: marco: fix the affinity
-> >> >> > set for local timer of CPU1" to his clk tree, i'll rebuilt the tag by
-> >> >> > dropping this.
-> >> >>
-> >> >> hi Olof,
-> >> >> i did a force update to tags/sirf-soc-for-3.16 after dropping
-> >> >> "clocksource: marco: fix the affinity set for local timer of CPU1"
-> >> >> which has been in clk tree , the new request is as below:
-> >> >>
-> >> >> The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
-> >> >>
-> >> >>   Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
-> >> >>
-> >> >> are available in the git repository at:
-> >> >>
-> >> >>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
-> >> >> tags/sirf-soc-for-3.16
-> >> >>
-> >> >> for you to fetch changes up to c7cff54d5926e3f419c23eff2ebaf6f5e12da05d:
-> >> >>
-> >> >>   clocksource:sirf: remove the hardcode for the clk of timers
-> >> >> (2014-05-12 21:43:49 +0800)
-> >> >>
-> >> >> ----------------------------------------------------------------
-> >> >> ARM: sirf: machine update for 3.16
-> >> >>
-> >> >> most of them fix some minor checkpatch issues according to key customers'
-> >> >> requirement. And this patchset also cleanups the clk of clocksource: move
-> >> >> to get clk by dts properity.
-> >> >>
-> >> >
-> >> > Merged into next/cleanup. Thanks.
-> >>
-> >> Olof,
-> >> i noticed today Daniel Lezcano applied two more clocksource patches
-> >> into his tree for 3.16 after i re-built the sirf-soc-for-3.16 tag. so
-> >> for this pull, there are only two left.
-> >>
-> >> Bin Shi (2):
-> >>        clocksource: prima2: fix some minor checkpatch issues
-> >>
-> >> Xianglong Du (1):
-> >>        ARM: prima2: rstc: fix some minor checkpatch issues
-> >>
-> >> so i did a force push for tags/sirf-soc-for-3.16 again just now
-> >> including only these two.
-> >>
-> >> very sorry for that!
-> >
-> > Don't do this. If you need to add a patch to a branch, then you send us
-> > a revised pull request with the new patch on top. Also, don't just send a reply
-> > with "oh, I added some code". It makes it hard to use the diffstat to tell
-> > whether what I pulled from you was what was supposed to be there and nothing
-> > more (or less).
-> 
-> Olof, i actually wanted to drop two patches in the patchset instead of
-> adding more as the dropped patches have been applied in clocksource.
-> 
-> i don't know whether REVISED PULL REQUEST can fix it or not?
+On 05/26/14 14:40, Viresh Kumar wrote:
+> On 26 May 2014 03:11, Kukjin Kim<kgene.kim@samsung.com>  wrote:
+>> I'm not sure Thomas' v5 cpufreq-cpu0 driver can be upstreamed for 3.16
+>> because of dependency with others, some of them got ack though...
+>>
+>> * "PM / OPP: move cpufreq specific helpers out of OPP layer"
+>> - https://www.mail-archive.com/linux-omap at vger.kernel.org/msg104610.html
+>
+> This is already lying in Rafael's tree.
+>
+Good.
 
-If you dropped patches then there's no good way of amending in a new pull
-request, no.
+>> * "cpufreq: opp: Add device tree based lookup of boost mode frequency"
+>> - http://www.spinics.net/lists/arm-kernel/msg334336.html
+>>
+Probably need more time?
 
-Are these patches bad? If so, we can revert them. If they need fixups because
-of problems then we can take those as bugfixes on top. Let me know and I can do
-either -- but I can't really drop the branch now since it will require me to
-rebuild a big part of our tree.
+>> So firstly, I've queued this instead with exynos-multiplatform series...
+>>
+>> How do you think?
+>
+> Looks fine to me. Thanks.
 
-So, I'll be happy to revert a couple of patches if needed, or take fixes on
-top.
+OK, I applied with your ack.
 
-
--Olof
+Thanks,
+- Kukjin
