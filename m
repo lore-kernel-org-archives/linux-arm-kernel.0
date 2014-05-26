@@ -1,35 +1,72 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 May 2014 14:26:05 -0700
-Subject: [GIT PULL] ARM: Keystone reset driver 3.16
-In-Reply-To: <1400880597-7516-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1400880597-7516-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20140526212605.GQ27093@quad.lixom.net>
+Date: Mon, 26 May 2014 14:32:30 -0700
+Subject: [PATCH v3 01/10] platform_data: edma: Be precise with the paRAM
+ struct
+In-Reply-To: <1397475725-5036-2-git-send-email-peter.ujfalusi@ti.com>
+References: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>
+ <1397475725-5036-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <CAOesGMg43jT6D_ot2tKfRXXgAgwqs5Pu_tAFKc35yxLAczrzGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 05:29:57PM -0400, Santosh Shilimkar wrote:
-> Hi Arm-soc folks,
-> 
-> Please pull below keystone reset driver for 3.16 . To avoid merge conflict
-> with earlier keystone-soc pull request[1], I have based the subject pull
-> request on top of it. It merges cleanly with arm-soc 'next/soc2' head. Please
-> apply it against 'next/soc2'. Thanks 
-
 Hi,
 
-I notice this driver doesn't have an ack from Philipp Zabel (cc:d here). That
-would be appropriate. (Philipp, should there be a MAINTAINERS entry for you so
-that get_maintainer works as expected here?)
+On Mon, Apr 14, 2014 at 4:41 AM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
+> The edmacc_param struct should follow the layout of the paRAM area in the
+> HW. Be explicit on the size of the fields (u32) and also mark the struct
+> as packed to avoid any padding on non 32bit architectures.
+>
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Acked-by: Joel Fernandes <joelf@ti.com>
+> ---
+>  include/linux/platform_data/edma.h | 18 +++++++++---------
+>  1 file changed, 9 insertions(+), 9 deletions(-)
+>
+> diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
+> index f50821cb64be..923f8a3e4ce0 100644
+> --- a/include/linux/platform_data/edma.h
+> +++ b/include/linux/platform_data/edma.h
+> @@ -43,15 +43,15 @@
+>
+>  /* PaRAM slots are laid out like this */
+>  struct edmacc_param {
+> -       unsigned int opt;
+> -       unsigned int src;
+> -       unsigned int a_b_cnt;
+> -       unsigned int dst;
+> -       unsigned int src_dst_bidx;
+> -       unsigned int link_bcntrld;
+> -       unsigned int src_dst_cidx;
+> -       unsigned int ccnt;
+> -};
+> +       u32 opt;
+> +       u32 src;
+> +       u32 a_b_cnt;
+> +       u32 dst;
+> +       u32 src_dst_bidx;
+> +       u32 link_bcntrld;
+> +       u32 src_dst_cidx;
+> +       u32 ccnt;
+> +} __packed;
+>
+>  /* fields in edmacc_param.opt */
+>  #define SAM            BIT(0)
 
-I'd also prefer to see the driver and the other changes split up since we tend
-to merge them through different branches. I think it's OK to just split in
-those two for this merge.
+I came across this patch when I was looking at a pull request from
+Sekhar for EDMA cleanups, and it made me look closer at the contents
+of this file.
 
-I could do it for you (i.e. merge the first patch into next/drivers and the
-rest into next/soc2 with the driver patch included on the bottom), but that
-still wouldn't cover the ack from Philipp. If he replies to this email and says
-he's ok with it going in I can still do it that way though. Philipp?
+The include/linux/platform_data/ directory is meant to hold
+platform_data definitions for drivers, and nothing more.
+platform_data/edma.h also contains a whole bunch of interface
+definitions for the driver. They do not belong there, and should be
+moved to a different include file.
 
+That also includes the above struct, because as far as I can tell it's
+a runtime state structure, not something that is passed in with
+platform data.
+
+Can someone please clean this up? Thanks.
 
 
 -Olof
