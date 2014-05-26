@@ -1,170 +1,28 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 26 May 2014 20:14:24 +0200
-Subject: [PATCH 1/3] driver core/platform: don't leak memory allocated
- for dma_mask
-In-Reply-To: <1401122483-31603-1-git-send-email-emilgoode@gmail.com>
-References: <1401122483-31603-1-git-send-email-emilgoode@gmail.com>
-Message-ID: <20140526181424.GN20155@pengutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 26 May 2014 19:17:34 +0100
+Subject: [PATCH v2 5/5] regulator: axp20x: resolve self dependency issue
+In-Reply-To: <53837298.5080705@free-electrons.com>
+References: <1401116292-24066-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1401116292-24066-6-git-send-email-boris.brezillon@free-electrons.com>
+ <20140526154356.GZ22111@sirena.org.uk>
+ <53837298.5080705@free-electrons.com>
+Message-ID: <20140526181734.GI12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 06:41:21PM +0200, Emil Goode wrote:
-> From: Yann Droneaud <ydroneaud@opteya.com>
-> 
-> Since commit 01dcc60a7cb8, platform_device_register_full() is
-> available to allocate and register a platform device.
-> 
-> If a dma_mask is provided as part of platform_device_info,
-> platform_device_register_full() allocate memory for a u64 using
-> kmalloc().
-> 
-> A comment in the code state that "[t]his memory isn't freed when the
-> device is put".
-> 
-> It's never a good thing to leak memory, but there's only very few
-> users of platform_device_info's dma_mask, and those are mostly
-> "static" devices that are not going to be plugged/unplugged often.
-> 
-> So memory leak is not really an issue, but allocating 8 bytes through
-> kmalloc() seems overkill.
-> 
-> To address this issue, this patch adds dma_mask to struct platform_object
-> and when using platform_device_alloc() or platform_device_register_full()
-> the .dma_mask pointer of struct device is assigned the address of this new
-> dma_mask member of struct platform_object.  And since it's within struct
-> platform_object, dma_mask won't be leaked anymore when struct platform_device
-> get released.
-> 
-> No more memory leak, no small allocation and a slight reduction in code
-> size.
-> 
-> Built on Debian jessie, using GCC 4.8, for ARM and x86_64 architectures,
-> the size of the object file and the data structure layout are updated
-> as follows, produced with commands:
-> 
-> $ size drivers/base/platform.o
-> $ pahole drivers/base/platform.o \
-> 	--recursive		 \
-> 	--class_name device,pdev_archdata,platform_device,platform_object
-> 
-> -- size+pahole_3.15-rc6_ARM
-> ++ size+pahole_3.15-rc6_ARM+
-> @@ -2,7 +2,7 @@
->     text	   data	    bss	    dec	    hex	filename
-> -   6530	   1008	      8	   7546	   1d7a	drivers/base/platform.o
-> +   6482	   1008	      8	   7498	   1d4a	drivers/base/platform.o
-> 
-> @@ -93,8 +93,13 @@ struct platform_object {
->  	/* --- cacheline 12 boundary (768 bytes) was 40 bytes ago --- */
->  	char                       name[1];            /*   808     1 */
-> 
-> -	/* size: 816, cachelines: 13, members: 2 */
-> -	/* padding: 7 */
-> +	/* XXX 7 bytes hole, try to pack */
-> 
-> +	u64                        dma_mask;           /*   816     8 */
-> 
-> +	/* size: 824, cachelines: 13, members: 3 */
-> +	/* sum members: 817, holes: 1, sum holes: 7 */
->  	/* paddings: 1, sum paddings: 4 */
-> -	/* last cacheline: 48 bytes */
-> +	/* last cacheline: 56 bytes */
->  };
-> 
-> -- size+pahole_3.15-rc6_x86_64
-> ++ size+pahole_3.15-rc6_x86_64+
-> @@ -2,7 +2,7 @@
->     text	   data	    bss	    dec	    hex	filename
-> -   8570	   5032	   3424	  17026	   4282	drivers/base/platform.o
-> +   8509	   5032	   3408	  16949	   4235	drivers/base/platform.o
-> 
-> @@ -95,7 +95,11 @@ struct platform_object {
->  	/* --- cacheline 22 boundary (1408 bytes) was 32 bytes ago --- */
->  	char                       name[1];             /*  1440     1 */
-> 
-> -	/* size: 1448, cachelines: 23, members: 2 */
-> -	/* padding: 7 */
-> -	/* last cacheline: 40 bytes */
-> +	/* XXX 7 bytes hole, try to pack */
-> 
-> +	u64                        dma_mask;            /*  1448     8 */
-> 
-> +	/* size: 1456, cachelines: 23, members: 3 */
-> +	/* sum members: 1449, holes: 1, sum holes: 7 */
-> +	/* last cacheline: 48 bytes */
->  };
-> 
-> Changes from v4 [1]:
-> - Split v4 of the patch into two separate patches.
-> - Generated new object file size and data structure layout info.
-> - Updated the changelog message.
-> 
-> Changes from v3 [2]:
-> - fixed commit message so that git am doesn't fail.
-> 
-> Changes from v2 [3]:
-> - move 'dma_mask' to platform_object so that it's always
->   allocated and won't leak on release; remove all previously
->   added support functions.
-> - use C99 flexible array member for 'name' to remove padding
->   at the end of platform_object.
-> 
-> Changes from v1 [4]:
-> - remove unneeded kfree() from error path
-> - add reference to author/commit adding allocation of dmamask
-> 
-> Changes from v0 [5]:
-> - small rewrite to squeeze the patch to a bare minimal
-> 
-> [1] http://lkml.kernel.org/r/1390817152-30898-1-git-send-email-ydroneaud at opteya.com
->     https://patchwork.kernel.org/patch/3541871/
-> 
-> [2] http://lkml.kernel.org/r/1390771138-28348-1-git-send-email-ydroneaud at opteya.com
->     https://patchwork.kernel.org/patch/3540081/
-> 
-> [3] http://lkml.kernel.org/r/1389683909-17495-1-git-send-email-ydroneaud at opteya.com
->     https://patchwork.kernel.org/patch/3484411/
-> 
-> [4] http://lkml.kernel.org/r/1389649085-7365-1-git-send-email-ydroneaud at opteya.com
->     https://patchwork.kernel.org/patch/3480961/
-> 
-> [5] http://lkml.kernel.org/r/1386886207-2735-1-git-send-email-ydroneaud at opteya.com
-> 
-> Cc: Yann Droneaud <ydroneaud@opteya.com>
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Yann Droneaud <ydroneaud@opteya.com>
-> [Emil: split v4 of the patch in two and updated changelog]
-> Signed-off-by: Emil Goode <emilgoode@gmail.com>
-> ---
-> Hello Greg,
-> 
-> The first two patches in the series are created from v4 of the
-> original patch, since I have not changed how the code works I think
-> it is correct to keep the original author and Signed-off-by line.
-> 
-> Best regards,
-> 
-> Emil Goode
-> 
->  drivers/base/platform.c |   13 +++++--------
->  1 file changed, 5 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-> index 9e9227e..dd1fa07 100644
-> --- a/drivers/base/platform.c
-> +++ b/drivers/base/platform.c
-> @@ -166,6 +166,7 @@ EXPORT_SYMBOL_GPL(platform_add_devices);
->  struct platform_object {
->  	struct platform_device pdev;
->  	char name[1];
-> +	u64 dma_mask;
-This is broken. .name is used as flexible array, so .name and dma_mask
-overlap.
+On Mon, May 26, 2014 at 06:58:00PM +0200, Boris BREZILLON wrote:
 
-Uwe
+> AFAIU, we could factorize it by the mean of an helper function (say
+> devm_regulators_register), which would take a matches table and a
+> regulator desc table and do pretty much what I'm doing in this patch.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Is that what you had in mind ?
+
+Yes.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140526/471e35e4/attachment.sig>
