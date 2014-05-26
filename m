@@ -1,75 +1,41 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Mon, 26 May 2014 11:20:54 +0200
-Subject: [PATCH 09/11] brcmfmac: Fix OOB interrupt not working for BCM43362
-In-Reply-To: <1401090486-4414-10-git-send-email-hdegoede@redhat.com>
-References: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>
- <1401090486-4414-10-git-send-email-hdegoede@redhat.com>
-Message-ID: <53830776.1030308@broadcom.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 26 May 2014 11:23:11 +0200
+Subject: [PATCH v2 02/10] iommu/ipmmu-vmsa: Cleanup failures of ARM
+ mapping creation or attachment
+In-Reply-To: <1400150451-13469-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1400150451-13469-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1400150451-13469-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20140526092310.GA11299@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/14 09:48, Hans de Goede wrote:
-> It has taken me a long long time to get the OOB interrupt working on the
-> AP6210 sdio wifi/bt module found on various Allwinner A20 boards. In the
-> end I found these magic register pokes in the cubietruck kernel tree:
-> https://github.com/cubieboard2/linux-sunxi/commit/7f08ba395617d17e7a711507503d89a50406fe7a
->
-> I'm not entirely sure if this specific to the AP6210 module, or if this
-> should be done for all BCM43362 sdio devices.
-
-This magic is not in our host drivers so my guess is that it is board 
-specific. This means the nvram file provided to the firmware should have 
-this specified. Can you send me yours?
-
-Regards,
-Arend
-
-> Signed-off-by: Hans de Goede<hdegoede@redhat.com>
+On Thu, May 15, 2014 at 12:40:43PM +0200, Laurent Pinchart wrote:
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 > ---
->   drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c | 18 ++++++++++++++++++
->   1 file changed, 18 insertions(+)
->
-> diff --git a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
-> index 0fc707c..2369a0f 100644
-> --- a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
-> +++ b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
-> @@ -39,7 +39,9 @@
->   #include<brcm_hw_ids.h>
->   #include<brcmu_utils.h>
->   #include<brcmu_wifi.h>
-> +#include<chipcommon.h>
->   #include<soc.h>
-> +#include "chip.h"
->   #include "dhd_bus.h"
->   #include "dhd_dbg.h"
->   #include "sdio_host.h"
-> @@ -119,6 +121,7 @@ int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev)
->   {
->   	int ret = 0;
->   	u8 data;
-> +	u32 addr, gpiocontrol;
->   	unsigned long flags;
->
->   	if ((sdiodev->pdata)&&  (sdiodev->pdata->oob_irq_supported)) {
-> @@ -148,6 +151,21 @@ int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev)
->
->   		sdio_claim_host(sdiodev->func[1]);
->
-> +		if (sdiodev->bus_if->chip == BCM43362_CHIP_ID) {
-> +			addr = CORE_CC_REG(SI_ENUM_BASE, gpiocontrol);
-> +			gpiocontrol = brcmf_sdiod_regrl(sdiodev, addr,&ret);
-> +			gpiocontrol |= 0x2;
-> +			brcmf_sdiod_regwl(sdiodev, addr, gpiocontrol,&ret);
-> +
-> +			/* SPROM_ADDR_HIGH ? perhaps the defines name is off */
-> +			brcmf_sdiod_regwb(sdiodev, SBSDIO_SPROM_ADDR_HIGH, 0xf,
-> +					&ret);
-> +			brcmf_sdiod_regwb(sdiodev, SBSDIO_CHIP_CTRL_DATA, 0,
-> +					&ret);
-> +			brcmf_sdiod_regwb(sdiodev, SBSDIO_CHIP_CTRL_EN, 0x2,
-> +					&ret);
-> +		}
-> +
->   		/* must configure SDIO_CCCR_IENx to enable irq */
->   		data = brcmf_sdiod_regrb(sdiodev, SDIO_CCCR_IENx,&ret);
->   		data |= 1<<  SDIO_FUNC_1 | 1<<  SDIO_FUNC_2 | 1;
+>  drivers/iommu/ipmmu-vmsa.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
+> index 49e00f7..49dbedd 100644
+> --- a/drivers/iommu/ipmmu-vmsa.c
+> +++ b/drivers/iommu/ipmmu-vmsa.c
+> @@ -917,7 +917,8 @@ static int ipmmu_add_device(struct device *dev)
+>  							SZ_1G, SZ_2G);
+>  		if (IS_ERR(mapping)) {
+>  			dev_err(mmu->dev, "failed to create ARM IOMMU mapping\n");
+> -			return PTR_ERR(mapping);
+> +			ret = PTR_ERR(mapping);
+> +			goto error;
+>  		}
+>  
+>  		mmu->mapping = mapping;
+> @@ -933,6 +934,7 @@ static int ipmmu_add_device(struct device *dev)
+>  	return 0;
+>  
+>  error:
+> +	arm_iommu_release_mapping(mmu->mapping);
+>  	kfree(dev->archdata.iommu);
+>  	dev->archdata.iommu = NULL;
+>  	iommu_group_remove_device(dev);
+
+Skipped this one because it didn't apply. The others are applied.
