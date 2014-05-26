@@ -1,36 +1,43 @@
-From: emilgoode@gmail.com (Emil Goode)
-Date: Mon, 26 May 2014 20:31:55 +0200
-Subject: [PATCH 1/3] driver core/platform: don't leak memory allocated
- for dma_mask
-In-Reply-To: <20140526165105.GD3693@n2100.arm.linux.org.uk>
-References: <1401122483-31603-1-git-send-email-emilgoode@gmail.com>
- <20140526165105.GD3693@n2100.arm.linux.org.uk>
-Message-ID: <20140526183155.GA1312@lianli>
+From: larry.bassel@linaro.org (Larry Bassel)
+Date: Mon, 26 May 2014 11:56:11 -0700
+Subject: [PATCH v5 0/2] context tracker support for arm64
+Message-ID: <1401130573-7443-1-git-send-email-larry.bassel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+Implement and enable context tracking for arm64 (which is
+a prerequisite for FULL_NOHZ support). This patchset
+builds upon earlier work by Kevin Hilman and is based on
+Will Deacon's tree.
 
-On Mon, May 26, 2014 at 05:51:05PM +0100, Russell King - ARM Linux wrote:
-> On Mon, May 26, 2014 at 06:41:21PM +0200, Emil Goode wrote:
-> > @@ -211,6 +215,7 @@ struct platform_device *platform_device_alloc(const char *name, int id)
-> >  		strcpy(pa->name, name);
-> >  		pa->pdev.name = pa->name;
-> >  		pa->pdev.id = id;
-> > +		pa->pdev.dev.dma_mask = &pa->dma_mask;
-> 
-> There is code in the kernel which, rightly or wrongly, checks whether
-> dev->dma_mask is NULL to determine whether the device can do any kind
-> of DMA.  The above results in devices allocated via this interface
-> always having this member set, which is a change of core kernel behaviour.
-> 
-> How sure are you that this will not break anything?
+Changes v4 to v5:
 
-Thank you for pointing this out, considering the number of calls made to
-platform_device_alloc it would be easy to miss an occurrance of this problem.
-I would say that the risk heavily outweighs the gain and it's better to 
-not apply this series.
+* Improvement to code restoring far_el1 (suggested by Christopher Covington)
+* Improvement to register save/restore in ct_user_enter
 
-Best regards,
+Changes v3 to v4:
 
-Emil Goode
+* Rename parameter of ct_user_exit from save to restore
+* Rebased patch to Will Deacon's tree (branch remotes/origin/aarch64
+of git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git)
+
+Changes v2 to v3:
+
+* Save/restore necessary registers in ct_user_enter and ct_user_exit
+* Annotate "error paths" out of el0_sync with ct_user_exit
+
+Changes v1 to v2:
+
+* Save far_el1 in x26 temporarily
+
+Larry Bassel (2):
+  arm64: adjust el0_sync so that a function can be called
+  arm64: enable context tracking
+
+ arch/arm64/Kconfig                   |  1 +
+ arch/arm64/include/asm/thread_info.h |  1 +
+ arch/arm64/kernel/entry.S            | 69 ++++++++++++++++++++++++++++++++----
+ 3 files changed, 64 insertions(+), 7 deletions(-)
+
+-- 
+1.8.3.2
