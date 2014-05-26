@@ -1,47 +1,27 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 26 May 2014 12:29:41 +0200
-Subject: [PATCH v6 0/6] add cpuidle support for Exynos5420
-In-Reply-To: <1400227438-27155-1-git-send-email-chander.kashyap@linaro.org>
-References: <CANuQgHGSA+R__raSa_tzrgpceqLD2SZw+s0XQUHGF4wscgh6Kg@mail.gmail.com>
- <1400227438-27155-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <53831795.9070006@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 26 May 2014 16:02:56 +0530
+Subject: [PATCH 2/4] cpufreq: add i.MX5 cpufreq driver
+In-Reply-To: <1401099308-9658-2-git-send-email-l.stach@pengutronix.de>
+References: <1401099308-9658-1-git-send-email-l.stach@pengutronix.de>
+ <1401099308-9658-2-git-send-email-l.stach@pengutronix.de>
+Message-ID: <CAKohpoksbFHyX=r0=URMedJNi68c3xAX4OrXzSFqgf1-bCm4+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chander,
+On 26 May 2014 15:45, Lucas Stach <l.stach@pengutronix.de> wrote:
+> SoC specific driver to be able to handle PLL reprogramming
+> for exact OPP frequencies and additional power saving.
+>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  .../devicetree/bindings/cpufreq/cpufreq-imx5.txt   |  43 +++
+>  drivers/cpufreq/Kconfig.arm                        |   8 +
+>  drivers/cpufreq/Makefile                           |   1 +
+>  drivers/cpufreq/imx5-cpufreq.c                     | 302 +++++++++++++++++++++
+>  4 files changed, 354 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-imx5.txt
+>  create mode 100644 drivers/cpufreq/imx5-cpufreq.c
 
-On 16.05.2014 10:03, Chander Kashyap wrote:
-> Exynos5420 is a big-little Soc from Samsung. It has 4 A15 and 4 A7 cores.
-> 
-> This patchset adds cpuidle support for Exynos5420 SoC based on
-> generic big.little cpuidle driver.
-> 
-> Tested on SMDK5420.
-> 
-> This patch set depends on:
-> 	1. [PATCH 0/5] MCPM backend for Exynos5420
-> 	   http://www.spinics.net/lists/arm-kernel/msg331100.html
-> Changelog is in respective patches.
-> Chander Kashyap (5):
->   driver: cpuidle-big-little: add of_device_id structure
->   arm: exynos: add generic function to calculate cpu number
->   cpuidle: config: Add ARCH_EXYNOS entry to select cpuidle-big-little
->     driver
->   driver: cpuidle: cpuidle-big-little: init driver for Exynos5420
->   exynos: cpuidle: do not allow cpuidle registration for Exynos5420
->   mcpm: exynos: populate suspend and powered_up callbacks
-> 
->  arch/arm/mach-exynos/exynos.c        |    4 +++-
->  arch/arm/mach-exynos/mcpm-exynos.c   |   36 ++++++++++++++++++++++++++++++++++
->  arch/arm/mach-exynos/regs-pmu.h      |    9 +++++++++
->  drivers/cpuidle/Kconfig.arm          |    2 +-
->  drivers/cpuidle/cpuidle-big_little.c |   12 +++++++++++-
->  5 files changed, 60 insertions(+), 3 deletions(-)
-> 
-
-For the whole series,
-
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-
-Best regards,
-Tomasz
+What stops you to use cpufreq-cpu0 driver with a CPU clock
+driver? Its highly discouraged to add a new driver here if you
+can reuse it.. Which is more or less confirmed from a broad look..
