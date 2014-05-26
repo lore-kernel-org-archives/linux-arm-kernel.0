@@ -1,40 +1,65 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 May 2014 15:08:23 -0700
-Subject: [GIT PULL] SOCFPGA DTS updates for 3.16, take 2-version 2
-In-Reply-To: <1400858173-7741-1-git-send-email-dinguyen@altera.com>
-References: <1400858173-7741-1-git-send-email-dinguyen@altera.com>
-Message-ID: <20140526220823.GX27093@quad.lixom.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 27 May 2014 07:08:21 +0900
+Subject: [PATCH v11 0/3] Exynos 5410 support
+In-Reply-To: <53832157.2020502@gmail.com>
+References: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>
+ <53832157.2020502@gmail.com>
+Message-ID: <5383BB55.9070606@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 10:16:13AM -0500, dinguyen at altera.com wrote:
-> Hi Arnd, Kevin and Olof,
-> 
-> Please consider pulling in these 2 patches for 3.16.
-> 
-> Thanks,
-> 
-> The following changes since commit 8cb289ed60668d3350dda5aa19b4fa1dce1c07f1:
-> 
->   ARM: socfpga: dts: Add div-reg to the main_pll clocks (2014-05-05 22:33:18 -0500)
-> 
-> are available in the git repository at:
-> 
->   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_dt_updates-for-3.16_take_2_version_2
-> 
-> for you to fetch changes up to a98b60571938ed5cc79992dacb09460f15b6a175:
-> 
->   ARM: socfpga: dts: add watchdog0+1 (2014-05-22 16:45:31 -0500)
+On 05/26/14 20:11, Tomasz Figa wrote:
+> Hi,
+>
+Hi
 
-Merged, thanks!
+> On 26.05.2014 05:23, Tarek Dakhran wrote:
+>> The series of patches represent support of Exynos 5410 SoC
+>>
+>> The Exynos 5410 is the first Samsung SoC based on big.LITTLE architecture
+>>
+>> Patches add new platform description, support of clock controller and device
+>> tree for Exynos 5410.
+>>
+>> Has been build on Samsung Linux Kernel
+>>    (branch: for-next, commit: 97eae6c Merge branch 'v3.16-next/multiplatform' into for-next)
+>>
+>> Has been tested on: 1) Exynos 5410 reference board (exynos_defconfig)
+>> 		    2) Exynos 5410 reference board (multi_v7_defconfig)
+>> 		    3) Odroid-XU board (exynos_defconfig)
+>> 		    4) Odroid-XU board (multi_v7_defconfig)
+>>
+Thanks for your test with exynos_defconfig and multi_v7_defconfig.
 
+>> I hope this is clean and would be applied.
+>>
+>> Tarek.
+>>
+>> Tarek Dakhran (3):
+>>    ARM: EXYNOS: Add support for EXYNOS5410 SoC
+>>    clk: exynos5410: register clocks using common clock framework
+>>    ARM: dts: Add initial device tree support for EXYNOS5410
+>>
+>>   .../devicetree/bindings/clock/exynos5410-clock.txt |   45 +++++
+>>   arch/arm/boot/dts/Makefile                         |    1 +
+>>   arch/arm/boot/dts/exynos5410-smdk5410.dts          |   82 ++++++++
+>>   arch/arm/boot/dts/exynos5410.dtsi                  |  206 +++++++++++++++++++
+>>   arch/arm/mach-exynos/Kconfig                       |    5 +
+>>   arch/arm/mach-exynos/common.h                      |   12 +-
+>>   drivers/clk/samsung/Makefile                       |    1 +
+>>   drivers/clk/samsung/clk-exynos5410.c               |  209 ++++++++++++++++++++
+>>   include/dt-bindings/clock/exynos5410.h             |   33 ++++
+>>   9 files changed, 592 insertions(+), 2 deletions(-)
+>>   create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-clock.txt
+>>   create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
+>>   create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
+>>   create mode 100644 drivers/clk/samsung/clk-exynos5410.c
+>>   create mode 100644 include/dt-bindings/clock/exynos5410.h
+>>
+>
+> Reviewed-by: Tomasz Figa<t.figa@samsung.com>
+>
+Applied this whole series.
 
-> Confidentiality Notice.
-> This message may contain information that is confidential or otherwise protected from disclosure. If you are not the intended recipient, you are hereby notified that any use, disclosure, dissemination, distribution, or copying of this message, or any attachments, is strictly prohibited. If you have received this message in error, please advise the sender by reply e-mail, and delete the message and any attachments. Thank you.
-
-I'm going to ignore this footer for now, but you should probably check
-the configuration of your mailer for them. Some people get upset when
-upstream/mailing list emails get these footers.
-
-
--Olof
+Thanks,
+Kukjin
