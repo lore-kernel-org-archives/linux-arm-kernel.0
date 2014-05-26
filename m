@@ -1,99 +1,47 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 27 May 2014 02:46:17 +0400
-Subject: [PATCH v2] ARM: shmobile: r8a7790: link PCI USB devices to USB PHY
-In-Reply-To: <CANqRtoT+xKmK7wkayiD9yCmUqFNKWxpeSgkGTiCqc+THYE0sVw@mail.gmail.com>
-References: <201405270217.33057.sergei.shtylyov@cogentembedded.com>
- <CANqRtoT+xKmK7wkayiD9yCmUqFNKWxpeSgkGTiCqc+THYE0sVw@mail.gmail.com>
-Message-ID: <5383C439.1080808@cogentembedded.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Mon, 26 May 2014 18:25:16 -0500
+Subject: [GIT PULL] SOCFPGA DTS updates for 3.16, take 2-version 2
+In-Reply-To: <20140526220823.GX27093@quad.lixom.net>
+References: <1400858173-7741-1-git-send-email-dinguyen@altera.com>
+ <20140526220823.GX27093@quad.lixom.net>
+Message-ID: <5383CD5C.5090407@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
 
-On 05/27/2014 02:36 AM, Magnus Damm wrote:
-
->> Describe the PCI USB devices that are behind the PCI bridges, adding necessary
->> links to the USB PHY device.
-
->> Based on the original work by Ben Dooks <ben.dooks@codethink.co.uk>.
-
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
->> ---
->> This patch is against 'renesas-devel-v3.15-rc7-20140526' tag of Simon Horman's
->> 'renesas.git' repo plus R8A7790/Lager PCI and USB PHY support patches posted
->> before. The patch requires the internal PCI DT support, USB PHY driver, and
->> USB HCD generic PHY support (also already posted) in order to work.
-
->> Changes in version 2:
->> - renamed the PCI OHCI/EHCI device nodes to comply with the PCI binding;
->> - changed the PHY specifier in the PCI#2 node to reflect that channel #1 support
->>    was dropped;
->> - resolved rejects, refreshed the patch.
-
->>   arch/arm/boot/dts/r8a7790.dtsi |   28 ++++++++++++++++++++++++++++
->>   1 file changed, 28 insertions(+)
-
->> Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
->> ===================================================================
->> --- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
->> +++ renesas/arch/arm/boot/dts/r8a7790.dtsi
->> @@ -919,6 +919,20 @@
->>                  interrupt-map = <0x0000 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
->>                                   0x0800 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
->>                                   0x1000 0 0 2 &gic 0 108 IRQ_TYPE_LEVEL_HIGH>;
->> +
->> +               usb at 0,1 {
->> +                       reg = <0x800 0 0 0 0>;
->> +                       device_type = "pci";
->> +                       phys = <&usbphy 0 0>;
->> +                       phy-names = "usb";
->> +               };
->> +
->> +               usb at 0,2 {
->> +                       reg = <0x1000 0 0 0 0>;
->> +                       device_type = "pci";
->> +                       phys = <&usbphy 0 0>;
->> +                       phy-names = "usb";
->> +               };
->>          };
+On 5/26/14 5:08 PM, Olof Johansson wrote:
+> On Fri, May 23, 2014 at 10:16:13AM -0500, dinguyen at altera.com wrote:
+>> Hi Arnd, Kevin and Olof,
 >>
->>          pci1: pci at ee0b0000 {
->> @@ -955,5 +969,19 @@
->>                  interrupt-map = <0x0000 0 0 1 &gic 0 113 IRQ_TYPE_LEVEL_HIGH
->>                                   0x0800 0 0 1 &gic 0 113 IRQ_TYPE_LEVEL_HIGH
->>                                   0x1000 0 0 2 &gic 0 113 IRQ_TYPE_LEVEL_HIGH>;
->> +
->> +               usb at 0,1 {
->> +                       reg = <0x800 0 0 0 0>;
->> +                       device_type = "pci";
->> +                       phys = <&usbphy 1 0>;
->> +                       phy-names = "usb";
->> +               };
->> +
->> +               usb at 0,2 {
->> +                       reg = <0x1000 0 0 0 0>;
->> +                       device_type = "pci";
->> +                       phys = <&usbphy 1 0>;
->> +                       phy-names = "usb";
->> +               };
->>          };
->>   };
+>> Please consider pulling in these 2 patches for 3.16.
+>>
+>> Thanks,
+>>
+>> The following changes since commit 8cb289ed60668d3350dda5aa19b4fa1dce1c07f1:
+>>
+>>   ARM: socfpga: dts: Add div-reg to the main_pll clocks (2014-05-05 22:33:18 -0500)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_dt_updates-for-3.16_take_2_version_2
+>>
+>> for you to fetch changes up to a98b60571938ed5cc79992dacb09460f15b6a175:
+>>
+>>   ARM: socfpga: dts: add watchdog0+1 (2014-05-22 16:45:31 -0500)
+> Merged, thanks!
+>
+>
+>> Confidentiality Notice.
+>> This message may contain information that is confidential or otherwise protected from disclosure. If you are not the intended recipient, you are hereby notified that any use, disclosure, dissemination, distribution, or copying of this message, or any attachments, is strictly prohibited. If you have received this message in error, please advise the sender by reply e-mail, and delete the message and any attachments. Thank you.
+> I'm going to ignore this footer for now, but you should probably check
+> the configuration of your mailer for them. Some people get upset when
+> upstream/mailing list emails get these footers.
 
-> Hi Sergei,
+Sigh...it appears that my backdoor method around our IT dept's
+insistance of adding this footer has been
+thwarted.
 
-> Above I see two hunks of DTS code but my r8a7790 data sheet contains
-> three USB PCI devices. Perhaps my understanding is wrong, or may there
-
-    You probably wanted to say 6 (OHCI and EHCI are 2 different PCI devices).
-
-> is some other patch available to enable all USB PCI devices included
-> in the SoC?
-
-    This patch doesn't enable USB devices, it just links them to the PHY where 
-it makes sense (for USB channel #1 it doesn't).
-
-> Thanks,
-> / magnus
-
-WBR, Sergei
+Thanks,
+Dinh
+>
+> -Olof
