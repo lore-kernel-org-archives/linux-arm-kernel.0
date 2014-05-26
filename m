@@ -1,45 +1,35 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 26 May 2014 17:25:43 +0800
-Subject: [PATCH 19/22] ARM: sunxi: Add earlyprintk support using R_UART
- (sun6i/sun8i)
-In-Reply-To: <20140525184636.GN10768@lukather>
-References: <1400831485-28576-1-git-send-email-wens@csie.org>
- <1400831485-28576-20-git-send-email-wens@csie.org>
- <20140525184636.GN10768@lukather>
-Message-ID: <CAGb2v66jL5-rmSy0W38og6bLiNkGu0wekEZfOuh0Fn2oOsJpaQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 26 May 2014 11:26:42 +0200
+Subject: [PATCH] arm: Set hardirq tracing to on when idling
+In-Reply-To: <1401045323-7116-1-git-send-email-minyard@acm.org>
+References: <1401045323-7116-1-git-send-email-minyard@acm.org>
+Message-ID: <4559339.apo3Fd10HK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 2:46 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Fri, May 23, 2014 at 03:51:22PM +0800, Chen-Yu Tsai wrote:
->> sun6i/sun8i have a UART in the RTC block group, which can be used
->> as an early console. This is most useful on sun8i as UART0 is muxed
->> with MMC0, which is not available if we boot from MMC.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  arch/arm/Kconfig.debug | 10 ++++++++++
->>  1 file changed, 10 insertions(+)
->>
->> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->> index eab8ecb..9e22708 100644
->> --- a/arch/arm/Kconfig.debug
->> +++ b/arch/arm/Kconfig.debug
->> @@ -694,6 +694,14 @@ choice
->>                 Say Y here if you want kernel low-level debugging support
->>                 on Allwinner A1X based platforms on the UART1.
->>
->> +     config DEBUG_SUNXI_R_UART
->> +             bool "Kernel low-level debugging messages via sunXi R_UART"
->> +             depends on ARCH_SUNXI
->
-> It should rather depend on MACH_SUN8I.
+On Sunday 25 May 2014 14:15:23 minyard at acm.org wrote:
+> From: Corey Minyard <cminyard@mvista.com>
+> 
+> The CPU will go to idle with interrupts off, but the interrupts
+> will wake up the idle.  This was causing very long irqsoff trace
+> values because, basically, the whole idle time was traces with
+> irqs off, even though they weren't really off.  Rework the idle
+> code to turn hardirq tracing to on befor calling idle.
+> 
+> Signed-off-by: Corey Minyard <cminyard@mvista.com>
+> ---
+>  arch/arm/kernel/process.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> I'm not sure this is correct for all ARM boards, but it fixes the
+> issue for the Vexpress board I have.  No more 4 second irqsoff
+> times.
 
-I assume no sun6i devices would use it, or have pads available for it?
-If so, then MACH_SUN8I makes sense.
+If this patch is correct for ARM, I wonder if it should be done
+in architecture independent code instead. Do you see the same
+thing on x86? If not, do you know what's different?
 
+It seems like the right thing to do, I just don't understand
+why nobody hit this before.
 
-ChenYu
+	Arnd
