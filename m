@@ -1,93 +1,36 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 26 May 2014 12:14:22 +0200
-Subject: [PATCH v2 01/11] sched: fix imbalance flag reset
-In-Reply-To: <5383065E.9030601@linux.vnet.ibm.com>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-2-git-send-email-vincent.guittot@linaro.org>
- <5381C70E.3030605@linux.vnet.ibm.com>
- <CAKfTPtDBZyrJJpUHPZcG9Jf4egneyqQ7TR3QXiR0Wff8ZBkHAw@mail.gmail.com>
- <5383065E.9030601@linux.vnet.ibm.com>
-Message-ID: <CAKfTPtAQHR7aBs8yPuvMn-L_u=qVyNh1aabL4CFPW1JW103eFQ@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 26 May 2014 12:15:07 +0200
+Subject: [PATCH 3/4] ARM: imx53: instanciate cpufreq device
+In-Reply-To: <1401099308-9658-1-git-send-email-l.stach@pengutronix.de>
+References: <1401099308-9658-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1401099308-9658-3-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 May 2014 11:16, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
-> On 05/26/2014 01:19 PM, Vincent Guittot wrote:
->> On 25 May 2014 12:33, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
->>> Hi Vincent,
->>>
->>> On 05/23/2014 09:22 PM, Vincent Guittot wrote:
->>>> The imbalance flag can stay set whereas there is no imbalance.
->>>>
->>>> Let assume that we have 3 tasks that run on a dual cores /dual cluster system.
->>>> We will have some idle load balance which are triggered during tick.
->>>> Unfortunately, the tick is also used to queue background work so we can reach
->>>> the situation where short work has been queued on a CPU which already runs a
->>>> task. The load balance will detect this imbalance (2 tasks on 1 CPU and an idle
->>>> CPU) and will try to pull the waiting task on the idle CPU. The waiting task is
->>>> a worker thread that is pinned on a CPU so an imbalance due to pinned task is
->>>> detected and the imbalance flag is set.
->>>> Then, we will not be able to clear the flag because we have at most 1 task on
->>>> each CPU but the imbalance flag will trig to useless active load balance
->>>> between the idle CPU and the busy CPU.
->>>
->>> Why do we do active balancing today when there is at-most 1 task on the
->>> busiest cpu? Shouldn't we be skipping load balancing altogether? If we
->>> do active balancing when the number of tasks = 1, it will lead to a ping
->>> pong right?
->>
->> That's the purpose of the patch to prevent this useless active load
->> balance. When the imbalance flag is set, an active load balance is
->> triggered whatever the load balance is because of pinned tasks that
->> prevents a balance state.
->
-> No I mean this:
->
-> sched:Do not continue load balancing when the busiest cpu has one
-> running task
+Instanciate the platform device for the i.MX5 specific
+cpufreq driver.
 
-But you can have situation where you have to migrate the task even if
-the busiest CPU has only 1 task. The use of imbalance flag is one
-example. You can also be in a situation where the busiest group has
-too much load compared to the local group and the busiest CPU even
-with 1 task (at this instant) has been selected to move task away from
-the busiest group
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ arch/arm/mach-imx/mach-imx53.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Vincent
-
->
-> From: Preeti U Murthy <preeti@linux.vnet.ibm.com>
->
->
-> ---
->  kernel/sched/fair.c |    2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-> index c9617b7..b175333 100644
-> --- a/kernel/sched/fair.c
-> +++ b/kernel/sched/fair.c
-> @@ -6626,6 +6626,8 @@ more_balance:
->                         }
->                         goto out_balanced;
->                 }
-> +       } else {
-> +               goto out;
->         }
->
->         if (!ld_moved) {
->
->
-> }
->
-> Regards
-> Preeti U Murthy
->>
->> Vincent
->>
->>>
->>> Regards
->>> Preeti U Murthy
->>>
->>
->
+diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
+index 65850908a4b4..ca90967c10b7 100644
+--- a/arch/arm/mach-imx/mach-imx53.c
++++ b/arch/arm/mach-imx/mach-imx53.c
+@@ -26,9 +26,12 @@
+ 
+ static void __init imx53_dt_init(void)
+ {
++	struct platform_device_info devinfo = { .name = "imx5-cpufreq", };
++
+ 	mxc_arch_reset_init_dt();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	platform_device_register_full(&devinfo);
+ }
+ 
+ static const char *imx53_dt_board_compat[] __initconst = {
+-- 
+2.0.0.rc2
