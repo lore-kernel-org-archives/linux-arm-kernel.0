@@ -1,98 +1,51 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 26 May 2014 09:47:21 +0900
-Subject: [PATCH v2 1/2] ARM: shmobile: r8a7779 dtsi: Correct
- #address-cells/#size-cells for clocks
-In-Reply-To: <1821194.NVbl22FVTm@avalon>
-References: <1400831180-20409-1-git-send-email-geert+renesas@glider.be>
- <1400831180-20409-2-git-send-email-geert+renesas@glider.be>
- <1821194.NVbl22FVTm@avalon>
-Message-ID: <20140526004720.GD31096@verge.net.au>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 26 May 2014 03:12:25 +0200
+Subject: [PATCH v5 0/7] cpufreq: use cpufreq-cpu0 driver for exynos based
+ platforms
+In-Reply-To: <5382739A.60800@samsung.com>
+References: <1400855260-6807-1-git-send-email-thomas.ab@samsung.com>
+ <5382739A.60800@samsung.com>
+Message-ID: <538294F9.2060508@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 11:36:16AM +0200, Laurent Pinchart wrote:
-> Hi Geert,
-> 
-> Thank you for the patch.
-> 
-> On Friday 23 May 2014 09:46:19 Geert Uytterhoeven wrote:
-> > Warning (ranges_format): /clocks has empty "ranges" property but its
-> > #address-cells (2) differs from / (1) Warning (ranges_format): /clocks has
-> > empty "ranges" property but its #size-cells (2) differs from / (1)
-> > 
-> > As r8a7779 doesn't support LPAE, change #address-cells and #size-cells from
-> > "<2>" to "<1>", and update the affected "reg" properties to fix this.
-> > 
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Hi Kukjin,
 
-Thanks, I will queue this up.
+On 26.05.2014 00:50, Kukjin Kim wrote:
+> On 05/23/14 23:27, Thomas Abraham wrote:
+>> Changes since v4:
+>> - Various changes in clock code suggested by Tomasz
+>> Figa<t.figa@samsung.com>
+>> - This series depends on mutiple other patches
+>>    [a] patch that introduces read-only attribute for clock dividers.
+>>        -
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/259264.html
+>>
+>>    [b] the series "PM / OPP: move cpufreq specific helpers out of OPP
+>> layer"
+>>        -
+>> https://www.mail-archive.com/linux-omap at vger.kernel.org/msg104610.html
+>>    [c] the series "cpufreq: opp: Add device tree based lookup of boost
+>> mode frequency"
+>>        - http://www.spinics.net/lists/arm-kernel/msg334336.html
+>>
+> This series looks good to me after quick loking at but as I replied on
+> other thread, I'm not sure above changes are ready for 3.16 or not...
+> 
+> Maybe we can revisit this series for 3.17?...hmm...
 
-> > ---
-> > Is it correct that r8a7779 doesn't support LPAE? I don't have the datasheet,
-> > but the similar r8a7778 doesn't.
-> > 
-> > v2:
-> >   - Spin off unit-addresses updates into a separate patch.
-> > 
-> >  arch/arm/boot/dts/r8a7779.dtsi | 12 ++++++------
-> >  1 file changed, 6 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-> > index 038c16a18373..395a611e2b5a 100644
-> > --- a/arch/arm/boot/dts/r8a7779.dtsi
-> > +++ b/arch/arm/boot/dts/r8a7779.dtsi
-> > @@ -284,8 +284,8 @@
-> >  	};
-> > 
-> >  	clocks {
-> > -		#address-cells = <2>;
-> > -		#size-cells = <2>;
-> > +		#address-cells = <1>;
-> > +		#size-cells = <1>;
-> >  		ranges;
-> > 
-> >  		/* External root clock */
-> > @@ -300,7 +300,7 @@
-> >  		/* Special CPG clocks */
-> >  		cpg_clocks: cpg_clocks at 0xe6150000 {
-> >  			compatible = "renesas,r8a7779-cpg-clocks";
-> > -			reg = <0 0xffc80000 0 0x30>;
-> > +			reg = <0xffc80000 0x30>;
-> >  			clocks = <&extal_clk>;
-> >  			#clock-cells = <1>;
-> >  			clock-output-names = "plla", "z", "zs", "s",
-> > @@ -345,7 +345,7 @@
-> >  		mstp0_clks: mstp0_clks {
-> >  			compatible = "renesas,r8a7779-mstp-clocks",
-> >  			             "renesas,cpg-mstp-clocks";
-> > -			reg = <0 0xffc80030 0 4>;
-> > +			reg = <0xffc80030 4>;
-> >  			clocks = <&cpg_clocks R8A7779_CLK_S>,
-> >  			         <&cpg_clocks R8A7779_CLK_P>,
-> >  				 <&cpg_clocks R8A7779_CLK_P>,
-> > @@ -382,7 +382,7 @@
-> >  		mstp1_clks: mstp1_clks {
-> >  			compatible = "renesas,r8a7779-mstp-clocks",
-> >  			             "renesas,cpg-mstp-clocks";
-> > -			reg = <0 0xffc80034 0 4>, <0 0xffc80044 0 4>;
-> > +			reg = <0xffc80034 4>, <0xffc80044 4>;
-> >  			clocks = <&cpg_clocks R8A7779_CLK_P>,
-> >  				 <&cpg_clocks R8A7779_CLK_P>,
-> >  				 <&cpg_clocks R8A7779_CLK_S>,
-> > @@ -411,7 +411,7 @@
-> >  		mstp3_clks: mstp3_clks {
-> >  			compatible = "renesas,r8a7779-mstp-clocks",
-> >  			             "renesas,cpg-mstp-clocks";
-> > -			reg = <0 0xffc8003c 0 4>;
-> > +			reg = <0xffc8003c 4>;
-> >  			clocks = <&s4_clk>, <&s4_clk>, <&s4_clk>, <&s4_clk>,
-> >  				 <&s4_clk>, <&s4_clk>;
-> >  			#clock-cells = <1>;
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
+Also two more issues:
+
+1) DT bindings are not acked by DT maintainers,
+2) there are my comments to DT bindings from v4 not addressed.
+
+There are also several comments about the code of v4 not addressed, but
+this is not that important, as opposed to DT bindings which are supposed
+to be stable ABI.
+
+Still, I don't think this is a big deal anymore, as we can have cpufreq
+working with multiplatform with my hack patch and polish the
+implementation of this series without any hurry.
+
+Best regards,
+Tomasz
