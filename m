@@ -1,44 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 26 May 2014 18:14:21 +0200
-Subject: [PATCH] ALSA: hda: fix tegra build
-Message-ID: <4769804.MRZYg8zfIB@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 26 May 2014 17:14:26 +0100
+Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
+ device tree
+In-Reply-To: <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
+References: <537F3610.3050104@redhat.com>
+ <20140523162718.GE22111@sirena.org.uk>
+ <53806F26.6050706@redhat.com>
+ <20140525123452.GS22111@sirena.org.uk>
+ <53824294.1090609@redhat.com>
+ <20140526103807.GV22111@sirena.org.uk>
+ <538321AB.4050006@redhat.com>
+ <20140526142225.GF22111@sirena.org.uk>
+ <538356DA.7090302@redhat.com>
+ <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
+Message-ID: <20140526161426.GK22111@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_PM is disabled, the CONFIG_SND_HDA_POWER_SAVE_DEFAULT symbol
-does not get defined, which causes a build error for the hda-tegra driver:
+On Mon, May 26, 2014 at 06:07:18PM +0200, Ulf Hansson wrote:
 
-hda/hda_tegra.c:80:25: error: 'CONFIG_SND_HDA_POWER_SAVE_DEFAULT' undeclared here (not in a function)
- static int power_save = CONFIG_SND_HDA_POWER_SAVE_DEFAULT;
-                         ^
-/git/arm-soc/sound/pci/hda/hda_tegra.c:235:13: warning: 'hda_tegra_disable_clocks' defined but not used [-Wunused-function]
- static void hda_tegra_disable_clocks(struct hda_tegra *data)
-             ^
+> >> I'm not sure I'm buying the idea that we have a powerup driver that's
+> >> meaningfully not part of the main device driver.
 
-This works around the problem by not referencing that macro
-when CONFIG_PM is disabled. Instead, we assume that it's disabled
-unconditionally and cannot be enabled at runtime.
+> I am having a bit hard to follow the terminology here. :-) What is a
+> "powerup driver" and what is a "main device driver" in this context?
 
-Signed-off-by: Dylan Reid <dgreid@chromium.org>
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
-Signed-off-by: Takashi Iwai <tiwai@suse.de>
-
-diff --git a/sound/pci/hda/hda_tegra.c b/sound/pci/hda/hda_tegra.c
-index 086fd06..a366ba9 100644
---- a/sound/pci/hda/hda_tegra.c
-+++ b/sound/pci/hda/hda_tegra.c
-@@ -77,10 +77,14 @@ struct hda_tegra {
- 	void __iomem *regs;
- };
- 
-+#ifdef CONFIG_PM
- static int power_save = CONFIG_SND_HDA_POWER_SAVE_DEFAULT;
- module_param(power_save, bint, 0644);
- MODULE_PARM_DESC(power_save,
- 		 "Automatic power-saving timeout (in seconds, 0 = disable).");
-+#else
-+static int power_save = 0;
-+#endif
- 
- /*
-  * DMA page allocation ops.
+Yes, that's mostly what I'm saying as well.  The main device driver is
+the driver that will bind to the SDIO device and control it, the powerup
+driver is the separate bit of code which will ensure that device is
+powered up - calling it a device driver seems a bit of a misnomer to me.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140526/c44629f8/attachment.sig>
