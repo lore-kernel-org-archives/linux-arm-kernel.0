@@ -1,89 +1,54 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Mon, 26 May 2014 16:51:46 +0200
-Subject: [PATCH v5 5/7] Documentation: bindings: document the sub-nodes AHCI
- bindings
-In-Reply-To: <1401115908-2742-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1401115908-2742-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1401115908-2742-6-git-send-email-antoine.tenart@free-electrons.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 26 May 2014 16:58:07 +0200
+Subject: [PATCH] ARM: msm: Update the references to DEBUG_MSM_UARTx
+In-Reply-To: <1401112733-23649-1-git-send-email-gdjakov@mm-sol.com>
+References: <1401108595.6068.5.camel@x220>
+ <1401112733-23649-1-git-send-email-gdjakov@mm-sol.com>
+Message-ID: <1401116287.6068.15.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The libahci now allows to use multiple PHYs and to represent each port
-as a sub-node. Add these bindings to the documentation.
+Hi Georgi,
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
----
- .../devicetree/bindings/ata/ahci-platform.txt      | 38 +++++++++++++++++++++-
- 1 file changed, 37 insertions(+), 1 deletion(-)
+On Mon, 2014-05-26 at 16:58 +0300, Georgi Djakov wrote:
+> The Kconfig options DEBUG_MSM_UART1, DEBUG_MSM_UART2 and DEBUG_MSM_UART3
+> are removed, but they are still referenced in arch/arm/mach-msm/io.c
+> Fix this by updating the reference to the new Kconfig option.
+> 
+> Reported-by: Paul Bolle <pebolle@tiscali.nl>
+> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+> ---
+>  arch/arm/mach-msm/io.c |    6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
+> index 34e0947..b042dca 100644
+> --- a/arch/arm/mach-msm/io.c
+> +++ b/arch/arm/mach-msm/io.c
+> @@ -57,8 +57,7 @@ static struct map_desc msm_io_desc[] __initdata = {
+>  		.length =   MSM_SHARED_RAM_SIZE,
+>  		.type =     MT_DEVICE,
+>  	},
+> -#if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
+> -		defined(CONFIG_DEBUG_MSM_UART3)
+> +#if defined(CONFIG_DEBUG_MSM_UART)
+>  	{
+>  		/* Must be last: virtual and pfn filled in by debug_ll_addr() */
+>  		.length = SZ_4K,
+> @@ -76,8 +75,7 @@ void __init msm_map_common_io(void)
+>  	 * pages are peripheral interface or not.
+>  	 */
+>  	asm("mcr p15, 0, %0, c15, c2, 4" : : "r" (0));
+> -#if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
+> -		defined(CONFIG_DEBUG_MSM_UART3)
+> +#if defined(CONFIG_DEBUG_MSM_UART)
+>  #ifdef CONFIG_MMU
+>  	debug_ll_addr(&msm_io_desc[size - 1].pfn,
+>  		      &msm_io_desc[size - 1].virtual);
 
-diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-index 48b285ffa3a6..14089f94100d 100644
---- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-+++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-@@ -3,11 +3,16 @@
- SATA nodes are defined to describe on-chip Serial ATA controllers.
- Each SATA controller should have its own node.
- 
-+It is possible, but not required, to represent each port as a sub-node.
-+It allows to enable each port independently when dealing with multiple
-+PHYs.
-+
- Required properties:
- - compatible        : compatible list, one of "snps,spear-ahci",
-                       "snps,exynos5440-ahci", "ibm,476gtr-ahci",
-                       "allwinner,sun4i-a10-ahci", "fsl,imx53-ahci"
--                      "fsl,imx6q-ahci" or "snps,dwc-ahci"
-+                      "fsl,imx6q-ahci", "snps,dwc-ahci" or
-+                      "generic-ahci"
- - interrupts        : <interrupt mapping for SATA IRQ>
- - reg               : <registers mapping>
- 
-@@ -15,11 +20,23 @@ Optional properties:
- - dma-coherent      : Present if dma operations are coherent
- - clocks            : a list of phandle + clock specifier pairs
- - target-supply     : regulator for SATA target power
-+- phys              : reference to the SATA PHY node
-+- phy-names         : must be "sata-phy"
- 
- "fsl,imx53-ahci", "fsl,imx6q-ahci" required properties:
- - clocks            : must contain the sata, sata_ref and ahb clocks
- - clock-names       : must contain "ahb" for the ahb clock
- 
-+Required properties when using sub-nodes:
-+- #address-cells    : number of cells to encode an address
-+- #size-cells       : number of cells representing the size of an address
-+
-+
-+Sub-nodes required properties:
-+- reg               : the port number
-+- phys              : reference to the SATA PHY node
-+
-+
- Examples:
-         sata at ffe08000 {
- 		compatible = "snps,spear-ahci";
-@@ -34,3 +51,22 @@ Examples:
- 		clocks = <&pll6 0>, <&ahb_gates 25>;
- 		target-supply = <&reg_ahci_5v>;
- 	};
-+
-+With sub-nodes:
-+	sata at f7e90000 {
-+		compatible = "generic-ahci";
-+		reg = <0xe90000 0x1000>;
-+		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		sata0: sata-port at 0 {
-+			reg = <0>;
-+			phys = <&sata_phy 0>;
-+		};
-+
-+		sata1: sata-port at 1 {
-+			reg = <1>;
-+			phys = <&sata_phy 1>;
-+		};
-+	};
--- 
-1.9.1
+Should I now redo https://lkml.org/lkml/2014/5/15/249 by making the
+(outdated) checks in arch/arm/mach-msm/board-trout.c and
+arch/arm/mach-msm/board-trout-gpio.c also use CONFIG_DEBUG_MSM_UART?
+
+
+Paul Bolle
