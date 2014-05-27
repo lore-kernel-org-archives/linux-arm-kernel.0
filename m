@@ -1,39 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 May 2014 16:16:39 +0200
-Subject: [GIT PULL] ARM: Keystone reset driver 3.16
-In-Reply-To: <53849C05.8090004@ti.com>
-References: <1400880597-7516-1-git-send-email-santosh.shilimkar@ti.com>
- <1401175584.4090.22.camel@paszta.hi.pengutronix.de> <53849C05.8090004@ti.com>
-Message-ID: <4799350.My62BxqHfR@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 27 May 2014 16:18:29 +0200
+Subject: [PATCH 03/11] pinctrl: sunxi: Move setting of mux to irq type
+ from unmask to set_type
+In-Reply-To: <1401090486-4414-4-git-send-email-hdegoede@redhat.com>
+References: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>
+ <1401090486-4414-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <CACRpkdZcGJTXfcxN_sogm+hYHM56d_VxtuZqth0t-c2mgAJ0vA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 May 2014 10:07:01 Santosh Shilimkar wrote:
-> 
-> On Tuesday 27 May 2014 03:26 AM, Philipp Zabel wrote:
-> > Hi Olof, Santosh,
-> > 
-> > Am Montag, den 26.05.2014, 14:26 -0700 schrieb Olof Johansson:
-> >> On Fri, May 23, 2014 at 05:29:57PM -0400, Santosh Shilimkar wrote:
-> >>> Hi Arm-soc folks,
-> >>>
-> >>> Please pull below keystone reset driver for 3.16 . To avoid merge conflict
-> >>> with earlier keystone-soc pull request[1], I have based the subject pull
-> >>> request on top of it. It merges cleanly with arm-soc 'next/soc2' head. Please
-> >>> apply it against 'next/soc2'. Thanks 
-> >>
-> >> Hi,
-> >>
-> >> I notice this driver doesn't have an ack from Philipp Zabel (cc:d here). That
-> >> would be appropriate.
-> >
-> We asked about ack, split series options from reset folks but didn't hear back.
-> Since the series has been on the list for almost 3 merge windows now, I asked
-> Arnd how to go about it and he suggested to send it via arm-soc. Should have
-> clarified it in pull request.
+On Mon, May 26, 2014 at 9:47 AM, Hans de Goede <hdegoede@redhat.com> wrote:
 
-Olof, note that this is a driver for system reset, i.e. drivers/power/reset, not
-for resetting individual devices as drivers/reset does. Philipp maintains the
-latter, but AFAIK he's not involved in the drivers/power stuff.
+> With level triggered interrupt mask / unmask will get called for each
+> interrupt, doing the somewhat expensive mux setting on each unmask thus is
+> not a good idea. Instead move it to the set_type callback, which is typically
+> done only once for each irq.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-	Arnd
+Yes move it out of mask/unmask but no, not into set_type().
+
+Can you not use the irqchip startup()/shutdown() callbacks
+instead?
+
+And how come we have no clean separation between gpiochip
+and the pinmux parts here, why cant we just call
+pinctrl_request_gpio() and pinctrl_free_gpio() here instead?
+Or maybe pinctrl_gpio_direction_input() and have that set
+up the muxing in the pinctrl driver side?
+
+It looks slightly convoluted.
+
+Yours,
+Linus Walleij
