@@ -1,48 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 27 May 2014 16:43:03 +0100
-Subject: PXA 2xx devictree port and clock infrastructure
-In-Reply-To: <201405271717.48783.arnd@arndb.de>
-References: <87zji3cr3d.fsf@free.fr>
- <201405271717.48783.arnd@arndb.de>
-Message-ID: <20140527154303.GA6835@leverpostej>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 27 May 2014 16:47:48 +0100
+Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
+ device tree
+In-Reply-To: <53838023.2080807@redhat.com>
+References: <20140523162718.GE22111@sirena.org.uk>
+ <53806F26.6050706@redhat.com>
+ <20140525123452.GS22111@sirena.org.uk>
+ <53824294.1090609@redhat.com>
+ <20140526103807.GV22111@sirena.org.uk>
+ <538321AB.4050006@redhat.com>
+ <20140526142225.GF22111@sirena.org.uk>
+ <538356DA.7090302@redhat.com>
+ <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
+ <53838023.2080807@redhat.com>
+Message-ID: <20140527154748.GX12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 04:17:48PM +0100, Arnd Bergmann wrote:
-> On Tuesday 27 May 2014, Robert Jarzmik wrote:
-> > I'm playing with devicetree to port the mioa701 machine code to devicetree (or
-> > rather to eliminate the mioa701 machine code).
-> > 
-> > While porting the pxa2xx device drivers, I came to a question about the clock
-> > infrastructure, and I'd need a bit of guidance.
-> > 
-> > Many drivers, in their probe code are doing something like :
-> >         1) regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >         2) irq = platform_get_irq(pdev, 0);
-> >         3) clk = clk_get(&pdev->dev, NULL);
-> > 
-> > Points 1 and 2 are straightforward with DT. Point 3 is not so obvious to me.
-> > 
-> > As there is no platform data anymore, the clock infrastructure wants to match
-> > the OF device (in my case udc at 40600000) with the registered
-> > clocks. Unfortunately, the registered clock is named "pxa27x-udc", which works
-> > well in "platform data" devices, but not in devicetree populated devices.
-> > 
-> > Therefore, I'd like to know what to do, and an example in another platform would
-> > be great. Should I create a clkdev driver in drivers/clk, or is there another
-> > ... faster way ? And Daniel, you probably solved it already for
-> > arch/arm/mach-pxa/pxa-dt.c, didn't you ?
-> 
-> There are generally three ways of doing this:
-> 
-> a) use an auxdata table to reassign the device names to what they
->    used to be
-> b) change the clkdev lookup to also include the new names (e.g. "40600000.udc")
-> c) write a DT-aware clock driver and list all clocks in DT
+On Mon, May 26, 2014 at 07:55:47PM +0200, Hans de Goede wrote:
 
-Out of these, c would be my preferred solution. It would match the
-solutions for problems 1 and 2, and it's almost inevitable that later
-we'll want DT clocks anyway...
+> 				power-on-seq = "gpio_reg_enable", "usleep 1000", "clk_32khz", "usleep 200";
 
-Cheers,
-Mark.
+...
+
+> Where power-on-seq would tell the mmc-core exactly how to bring up the sdio
+> device, using standard prefixes so that the mmc-core knows that something is
+> a clock / gpio / reset / whatever.
+
+There was some work on such generic power on sequences in DT from 
+Alexandre Courbot a while ago, search for "Runtime Interpreter Power
+Sequences".  It ground to a halt IIRC mainly because it was never clear
+that this should ever be encoded outside of the driver for a device but
+the binding was pretty good and well reviewed, it's a good place to
+start if there's a desire to do things like this.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140527/b99e7b44/attachment.sig>
