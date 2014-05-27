@@ -1,161 +1,79 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Tue, 27 May 2014 18:19:40 +0800
-Subject: [PATCH v4] pwm: i.MX: Avoid sample FIFO overflow for i.MX PWM version2
-In-Reply-To: <1401185980-29536-1-git-send-email-Ying.Liu@freescale.com>
-References: <1401185980-29536-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1401185980-29536-2-git-send-email-Ying.Liu@freescale.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 27 May 2014 13:22:49 +0300
+Subject: [PATCH v3 01/10] platform_data: edma: Be precise with the paRAM
+ struct
+In-Reply-To: <CAOesGMg43jT6D_ot2tKfRXXgAgwqs5Pu_tAFKc35yxLAczrzGQ@mail.gmail.com>
+References: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>	<1397475725-5036-2-git-send-email-peter.ujfalusi@ti.com>
+ <CAOesGMg43jT6D_ot2tKfRXXgAgwqs5Pu_tAFKc35yxLAczrzGQ@mail.gmail.com>
+Message-ID: <53846779.4070204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX PWM version2 is embedded in several i.MX SoCs,
-such as i.MX27, i.MX51 and i.MX6SL.  There is a 4-word(16bit)
-sample FIFO in this IP.  Each FIFO slot determines the duty
-period of a PWM waveform in one full cycle.  The IP spec
-mentions that we should not write a fourth sample because
-the FIFO will become full and triggers a FIFO write error
-(FWE) which will prevent the PWM from starting once it is
-enabled.  In order to avoid any sample FIFO overflow issue,
-this patch clears all sample FIFO by doing software reset
-in the configuration hook when the controller is disabled
-or waits for a full PWM cycle to get a relinquished FIFO
-slot when the controller is enabled and the FIFO is fully
-loaded.
+On 05/27/2014 12:32 AM, Olof Johansson wrote:
+> Hi,
+> 
+> On Mon, Apr 14, 2014 at 4:41 AM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
+>> The edmacc_param struct should follow the layout of the paRAM area in the
+>> HW. Be explicit on the size of the fields (u32) and also mark the struct
+>> as packed to avoid any padding on non 32bit architectures.
+>>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> Acked-by: Joel Fernandes <joelf@ti.com>
+>> ---
+>>  include/linux/platform_data/edma.h | 18 +++++++++---------
+>>  1 file changed, 9 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
+>> index f50821cb64be..923f8a3e4ce0 100644
+>> --- a/include/linux/platform_data/edma.h
+>> +++ b/include/linux/platform_data/edma.h
+>> @@ -43,15 +43,15 @@
+>>
+>>  /* PaRAM slots are laid out like this */
+>>  struct edmacc_param {
+>> -       unsigned int opt;
+>> -       unsigned int src;
+>> -       unsigned int a_b_cnt;
+>> -       unsigned int dst;
+>> -       unsigned int src_dst_bidx;
+>> -       unsigned int link_bcntrld;
+>> -       unsigned int src_dst_cidx;
+>> -       unsigned int ccnt;
+>> -};
+>> +       u32 opt;
+>> +       u32 src;
+>> +       u32 a_b_cnt;
+>> +       u32 dst;
+>> +       u32 src_dst_bidx;
+>> +       u32 link_bcntrld;
+>> +       u32 src_dst_cidx;
+>> +       u32 ccnt;
+>> +} __packed;
+>>
+>>  /* fields in edmacc_param.opt */
+>>  #define SAM            BIT(0)
+> 
+> I came across this patch when I was looking at a pull request from
+> Sekhar for EDMA cleanups, and it made me look closer at the contents
+> of this file.
+> 
+> The include/linux/platform_data/ directory is meant to hold
+> platform_data definitions for drivers, and nothing more.
+> platform_data/edma.h also contains a whole bunch of interface
+> definitions for the driver. They do not belong there, and should be
+> moved to a different include file.
+> 
+> That also includes the above struct, because as far as I can tell it's
+> a runtime state structure, not something that is passed in with
+> platform data.
+> 
+> Can someone please clean this up? Thanks.
 
-The FIFO overflow issue can be reproduced by the following
-commands on the i.MX6SL EVK platform, assuming we use PWM2
-for the debug LED which is driven by the pin HSIC_STROBE
-and the maximal brightness is 255.
-echo 0   > /sys/class/leds/user/brightness
-echo 0   > /sys/class/leds/user/brightness
-echo 0   > /sys/class/leds/user/brightness
-echo 0   > /sys/class/leds/user/brightness
-echo 255 > /sys/class/leds/user/brightness
-Here, FWE happens(PWMSR register reads 0x58) and the LED
-can not be lighten.
+I think Joel is working on to move/merge the code from arch/arm/common/edma.c
+to drivers/dma/edma.c
+I'm sure within this work he is going to clean up the header file as well.
+As a first step I think the non platform_data content can be moved as
+include/linux/edma.h or probably as ti-edma.h?
 
-Another way to reproduce the FIFO overflow issue is to run
-this script:
-while true;
-	do echo 255 > /sys/class/leds/user/brightness;
-done
-
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@freescale.com>
-Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-Cc: linux-pwm at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
----
-v3->v4:
-* To address Sascha's comment, drop the rollover event approach
-  and wait for a full PWM cycle to get a relinquished FIFO slot
-  when the controller is enabled and the FIFO is fully loaded.
-* Update commit message accordlingly, includling a new way to
-  reproduce the FIFO overflow issue.
-
-v2->v3:
-* Wait for a rollover event before configuration when PWM
-  is active with non-zero duty period.  And, update commit
-  message for that.
-* Fix some typos in commit head and message(fifo -> FIFO,
-  pwm -> PWM, etc).
-* Cc linux-kernel at vger.kernel.org.
-
-v1->v2:
-* To address Lothar Wa?mann's comment, add a timeout mechanism
-  instead of endless polling the SWR bit to be cleared by the
-  hardware.
-
- drivers/pwm/pwm-imx.c |   45 +++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 43 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
-index 0784554..13c24a0 100644
---- a/drivers/pwm/pwm-imx.c
-+++ b/drivers/pwm/pwm-imx.c
-@@ -14,6 +14,7 @@
- #include <linux/slab.h>
- #include <linux/err.h>
- #include <linux/clk.h>
-+#include <linux/delay.h>
- #include <linux/io.h>
- #include <linux/pwm.h>
- #include <linux/of.h>
-@@ -30,6 +31,7 @@
- /* i.MX27, i.MX31, i.MX35 share the same PWM function block: */
- 
- #define MX3_PWMCR			0x00    /* PWM Control Register */
-+#define MX3_PWMSR			0x04    /* PWM Status Register */
- #define MX3_PWMSAR			0x0C    /* PWM Sample Register */
- #define MX3_PWMPR			0x10    /* PWM Period Register */
- #define MX3_PWMCR_PRESCALER(x)		(((x - 1) & 0xFFF) << 4)
-@@ -38,7 +40,12 @@
- #define MX3_PWMCR_DBGEN			(1 << 22)
- #define MX3_PWMCR_CLKSRC_IPG_HIGH	(2 << 16)
- #define MX3_PWMCR_CLKSRC_IPG		(1 << 16)
-+#define MX3_PWMCR_SWR			(1 << 3)
- #define MX3_PWMCR_EN			(1 << 0)
-+#define MX3_PWMSR_FIFOAV_4WORDS		0x4
-+#define MX3_PWMSR_FIFOAV_MASK		0x7
-+
-+#define MX3_PWM_SWR_LOOP		5
- 
- struct imx_chip {
- 	struct clk	*clk_per;
-@@ -103,9 +110,43 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
- 		struct pwm_device *pwm, int duty_ns, int period_ns)
- {
- 	struct imx_chip *imx = to_imx_chip(chip);
-+	struct device *dev = chip->dev;
- 	unsigned long long c;
- 	unsigned long period_cycles, duty_cycles, prescale;
--	u32 cr;
-+	unsigned int period_ms;
-+	bool enable = test_bit(PWMF_ENABLED, &pwm->flags);
-+	int wait_count = 0, fifoav;
-+	u32 cr, sr;
-+
-+	/*
-+	 * i.MX PWMv2 has a 4-word sample FIFO.
-+	 * In order to avoid FIFO overflow issue, we do software reset
-+	 * to clear all sample FIFO if the controller is disabled or
-+	 * wait for a full PWM cycle to get a relinquished FIFO slot
-+	 * when the controller is enabled and the FIFO is fully loaded.
-+	 */
-+	if (enable) {
-+		sr = readl(imx->mmio_base + MX3_PWMSR);
-+		fifoav = sr & MX3_PWMSR_FIFOAV_MASK;
-+		if (fifoav == MX3_PWMSR_FIFOAV_4WORDS) {
-+			period_ms = DIV_ROUND_UP(pwm->period, NSEC_PER_MSEC);
-+			msleep(period_ms);
-+
-+			sr = readl(imx->mmio_base + MX3_PWMSR);
-+			if (fifoav == (sr & MX3_PWMSR_FIFOAV_MASK))
-+				dev_warn(dev, "there is no free FIFO slot\n");
-+		}
-+	} else {
-+		writel(MX3_PWMCR_SWR, imx->mmio_base + MX3_PWMCR);
-+		do {
-+			usleep_range(200, 1000);
-+			cr = readl(imx->mmio_base + MX3_PWMCR);
-+		} while ((cr & MX3_PWMCR_SWR) &&
-+			 (wait_count++ < MX3_PWM_SWR_LOOP));
-+
-+		if (cr & MX3_PWMCR_SWR)
-+			dev_warn(dev, "software reset timeout\n");
-+	}
- 
- 	c = clk_get_rate(imx->clk_per);
- 	c = c * period_ns;
-@@ -135,7 +176,7 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
- 		MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN |
- 		MX3_PWMCR_DBGEN | MX3_PWMCR_CLKSRC_IPG_HIGH;
- 
--	if (test_bit(PWMF_ENABLED, &pwm->flags))
-+	if (enable)
- 		cr |= MX3_PWMCR_EN;
- 
- 	writel(cr, imx->mmio_base + MX3_PWMCR);
 -- 
-1.7.9.5
+P?ter
