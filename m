@@ -1,67 +1,68 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 27 May 2014 13:34:52 -0700
-Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
-In-Reply-To: <CAKnoXLxj42veWCbRjX98iT3FNAb92J4yR+UAL716JFSOb=pcrQ@mail.gmail.com>
-References: <20140519172338.GJ4849@atomide.com> <537A408F.7070301@ti.com>
- <20140519175157.GK4849@atomide.com> <537A4827.30604@linaro.org>
- <20140519193622.GA11945@atomide.com> <537A5F5B.6050403@linaro.org>
- <537A7522.30007@math.uni-bielefeld.de>
- <20140523144425.GB2321@atomide.com>
- <20140523183228.GH2321@atomide.com>
- <CAKnoXLxj42veWCbRjX98iT3FNAb92J4yR+UAL716JFSOb=pcrQ@mail.gmail.com>
-Message-ID: <20140527203452.GA32336@atomide.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 27 May 2014 22:37:48 +0200
+Subject: [PATCH v11 0/3] Exynos 5410 support
+In-Reply-To: <CANhyOUcGTbbQLxYWsAZG00ENSDa4pj+MP2i7Rx=PfyqN1CY6WQ@mail.gmail.com>
+References: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>	<7hr43f9mmn.fsf@paris.lan>	<7hd2ez9kvr.fsf@paris.lan>
+ <CANhyOUcGTbbQLxYWsAZG00ENSDa4pj+MP2i7Rx=PfyqN1CY6WQ@mail.gmail.com>
+Message-ID: <5384F79C.6000204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Daniel Lezcano <daniel.lezcano@linaro.org> [140523 13:53]:
-> On 23 May 2014 20:32, Tony Lindgren <tony@atomide.com> wrote:
+On 27.05.2014 22:17, Tarek Dakhran wrote:
+> Hi,
 > 
-> > * Tony Lindgren <tony@atomide.com> [140523 07:45]:
-> > > * Tobias Jakobi <tjakobi@math.uni-bielefeld.de> [140519 14:19]:
-> > > >
-> > > > But even if I don't connect via WiFi at all, just boot and let me
-> > system
-> > > > run with serial console connected, after some time I get a kernel
-> > 'WARNING':
-> > > > http://www.math.uni-bielefeld.de/~tjakobi/archive/dmesg.1.log
-> > >
-> > > BTW, care to update the bugzilla page with the second warning
-> > > in this log?
-> > >
-> > > That's the WARNING: CPU: 1 PID: 0 at kernel/timer.c:1147 that's
-> > > at 238 seconds.
-> >
-> > Also, with Santosh's fix applied, can you also try disabling one
-> > or more of the idle states for cpuidle and see if that helps?
-> >
-> > Something like this patch below. If that helps with the WARNING
-> > above you're getting it narrows down the problem down quite a bit.
-> >
-> > Regards,
-> >
-> > Tony
-> >
-> > --- a/arch/arm/mach-omap2/cpuidle44xx.c
-> > +++ b/arch/arm/mach-omap2/cpuidle44xx.c
-> > @@ -44,11 +44,13 @@ static struct idle_statedata omap4_idle_data[] = {
-> >                 .mpu_state = PWRDM_POWER_RET,
-> >                 .mpu_logic_state = PWRDM_POWER_RET,
-> >         },
-> > +#if 0
-> >         {
-> >                 .cpu_state = PWRDM_POWER_OFF,
-> >                 .mpu_state = PWRDM_POWER_RET,
-> >                 .mpu_logic_state = PWRDM_POWER_OFF,
-> >         },
-> > +#endif
-> >
+> On Tue, May 27, 2014 at 9:44 PM, Kevin Hilman <khilman@linaro.org> wrote:
+>> Kevin Hilman <khilman@linaro.org> writes:
+>>
+>>> Tarek Dakhran <t.dakhran@samsung.com> writes:
+>>>
+>>>> The series of patches represent support of Exynos 5410 SoC
+>>>>
+>>>> The Exynos 5410 is the first Samsung SoC based on big.LITTLE architecture
+>>>>
+>>>> Patches add new platform description, support of clock controller and device
+>>>> tree for Exynos 5410.
+>>>>
+>>>> Has been build on Samsung Linux Kernel
+>>>>   (branch: for-next, commit: 97eae6c Merge branch 'v3.16-next/multiplatform' into for-next)
+>>>>
+>>>> Has been tested on: 1) Exynos 5410 reference board (exynos_defconfig)
+>>>>                  2) Exynos 5410 reference board (multi_v7_defconfig)
+>>>>                  3) Odroid-XU board (exynos_defconfig)
+>>>>                  4) Odroid-XU board (multi_v7_defconfig)
+>>>
+>>> Tested-by: Kevin Hilman <khilman@linaro.org>
+>>>
+>>> FYI, I boot tested this on an odroid-xu (exynos_defconfig and
+>>> multi_v7_defconfig.)
+>>
+>> Oops, I may have spoke to soon.  There seem to be some problems with
+>> multi_v7_defconfig.
+>>
+>> Applying this series directly on the commit mentioned above and testing,
+>> it works just fine using multi_v7_defconfig.
 > 
-> Hmm, I am afraid that will lead to a fault. Safer to set the state_count =
-> 2 instead.
+> Thank you for testing.
+> 
+>> However, if I directly test the current contents of the samsung for-next
+>> branch (where this series has been merged) it no longer boots on the
+>> odroid-xu.
+>> A quick diff shows that there are some other changes to
+>> multi_v7_defconfig in the samsung/for-next branch that may be causing
+>> problems here.
+> 
+> Yes. Right you are. There is no ARCH_EXYNOS defined in multi_v7_defconfig
+> at current state (branch: for-next commit: ca610da Merge branch
+> 'v3.16-next/dt-samsung-3' into for-next).
+> So booting kernel on 5410 SoC is not possible with multi_v7_defconfig.
+> Please use exynos_defconfig.
 
-Hmm don't we have state_count = ARRAY_SIZE(omap4_idle_data) or am I
-missing something?
+I wonder if this patch isn't maybe the missing part:
 
-Regards,
+http://thread.gmane.org/gmane.linux.kernel.samsung-soc/32414
 
-Tony
+Olof asked Kukjin to separate it from his pull requests, so it can be
+applied directly to ARM SoC tree to avoid conflicts.
+
+Best regards,
+Tomasz
