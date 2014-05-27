@@ -1,32 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 27 May 2014 19:00:47 +0100
-Subject: [PATCH RFC 02/11] sound: ASoC: kirkwood: Remove unused drivers
-In-Reply-To: <20140527164530.GJ26379@lunn.ch>
-References: <1400163836-9831-1-git-send-email-andrew@lunn.ch>
- <1400163836-9831-5-git-send-email-andrew@lunn.ch>
- <20140526155901.GF22111@sirena.org.uk>
- <20140527164530.GJ26379@lunn.ch>
-Message-ID: <20140527180047.GA12304@sirena.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 27 May 2014 11:05:04 -0700
+Subject: [PATCH 3/3] ARM: config: Update msm_defconfig
+In-Reply-To: <318973D9-95B5-4D53-B774-D4239FD9AECB@codeaurora.org>
+References: <1393467394-10907-1-git-send-email-sboyd@codeaurora.org>
+ <1393467394-10907-4-git-send-email-sboyd@codeaurora.org>
+ <20140227221458.GA5334@codeaurora.org>
+ <318973D9-95B5-4D53-B774-D4239FD9AECB@codeaurora.org>
+Message-ID: <20140527180504.GC26141@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 06:45:30PM +0200, Andrew Lunn wrote:
+On Thu, Feb 27, 2014 at 06:22:37PM -0600, Kumar Gala wrote:
+> 
+> On Feb 27, 2014, at 4:14 PM, David Brown <davidb@codeaurora.org> wrote:
+> 
+> > On Wed, Feb 26, 2014 at 06:16:34PM -0800, Stephen Boyd wrote:
+> >> Now that DT based platforms are split out of mach-msm into
+> >> mach-qcom, put back a non-DT based SoC into the msm_defconfig and
+> >> stop selecting unsupported drivers.
+> >> 
+> >> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> >> ---
+> >> arch/arm/configs/msm_defconfig | 25 +++----------------------
+> >> 1 file changed, 3 insertions(+), 22 deletions(-)
+> > 
+> > Acked-by: David Brown <davidb@codeaurora.org>
+> > 
+> > Kumar, can you just pull this in with the other qcom changes from
+> > Sephen?
+> 
+> sure
 
-> This is an RFC patch, as it says in the Subject line, and the cover
-> note. It is not intended to be applied yet. Please unapply it, and the
-> other one in the series you have applied.
+I didn't see 2/3 land in our tree through branches from you. Should I
+just apply it directly by now?
 
-Eh?  I thought the discussion was that everything was OK and we were
-going to go ahead with this approach.  Or to put it another way what's
-wrong with this and what's expected to change?  The only issue you
-identified in the cover letter was me applying some patches I'd already
-applied (BTW, please always include plain text descriptions of external
-things you're referring to in mails - this applies to links as much as
-it does to commit IDs).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140527/5562d3cb/attachment.sig>
+
+-Olof
