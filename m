@@ -1,67 +1,29 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 27 May 2014 13:45:31 +0200
-Subject: [PATCH v4 0/2] i2c: sunxi: add P2WI controller support
-In-Reply-To: <1399715163-11291-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1399715163-11291-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <53847ADB.9080707@free-electrons.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Tue, 27 May 2014 17:14:35 +0530
+Subject: [PATCH 1/1] ARM: mvebu: Staticize armada_375_smp_cpu1_enable_wa
+Message-ID: <1401191075-26807-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wolfram,
+'armada_375_smp_cpu1_enable_wa' is local to this file.
 
-No news from you regarding this patch series.
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+ arch/arm/mach-mvebu/platsmp-a9.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Is there anything you want me to fix ?
-
-Otherwise It would be great to have this series merged, because the PMIC
-used on Allwinner's A31 boards are connected through this P2WI bus.
-
-Best Regards,
-
-Boris
-
-On 10/05/2014 11:46, Boris BREZILLON wrote:
-> Hello,
->
-> This series adds support for the P2WI block used by some Allwinner
-> boards to interface with the AXP221 PMIC.
->
-> Best Regards,
->
-> Boris
->
-> Changes since v3:
-> - update the DT bindings doc
-> - fix a comment that was no longer true
->
-> Changes since v2:
-> - drop the initialization (switch from I2C to P2WI mode) part
-> - print devm_ioremap_resource err code
->
-> Changes since v1:
-> - implement P2WI initilization
-> - implement P2WI bus frequency configuration
-> - implement address consistency check
-> - fix devm_request_and_ioremap return check
-> - rework the macro definitions
-> - fix typos
->
-> [1] http://www.spinics.net/lists/linux-i2c/msg15066.html
-> [2] http://comments.gmane.org/gmane.comp.hardware.netbook.arm.sunxi/8947
-> Boris BREZILLON (2):
->   i2c: sunxi: add P2WI DT bindings documentation
->   i2c: sunxi: add P2WI (Push/Pull 2 Wire Interface) controller support
->
->  .../devicetree/bindings/i2c/i2c-sunxi-p2wi.txt     |  41 +++
->  drivers/i2c/busses/Kconfig                         |  12 +
->  drivers/i2c/busses/Makefile                        |   1 +
->  drivers/i2c/busses/i2c-sun6i-p2wi.c                | 349 +++++++++++++++++++++
->  4 files changed, 403 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-sunxi-p2wi.txt
->  create mode 100644 drivers/i2c/busses/i2c-sun6i-p2wi.c
->
-
+diff --git a/arch/arm/mach-mvebu/platsmp-a9.c b/arch/arm/mach-mvebu/platsmp-a9.c
+index 96c2c59e34b6..abe02b15c9a3 100644
+--- a/arch/arm/mach-mvebu/platsmp-a9.c
++++ b/arch/arm/mach-mvebu/platsmp-a9.c
+@@ -33,7 +33,7 @@
+ extern unsigned char armada_375_smp_cpu1_enable_code_end;
+ extern unsigned char armada_375_smp_cpu1_enable_code_start;
+ 
+-void armada_375_smp_cpu1_enable_wa(void)
++static void armada_375_smp_cpu1_enable_wa(void)
+ {
+ 	void __iomem *sram_virt_base;
+ 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.7.9.5
