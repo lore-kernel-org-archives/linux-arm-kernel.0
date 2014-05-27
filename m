@@ -1,49 +1,37 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 27 May 2014 17:00:21 +0100
-Subject: [PATCH v6 5/5] arm: Fix DEBUG_LL for multi-platform kernels (without
- PL01X)
+Date: Tue, 27 May 2014 17:00:20 +0100
+Subject: [PATCH v6 4/5] arm: Seperate DEBUG_UART_PHYS from DEBUG_LL on EP93XX
 In-Reply-To: <1401206421-29832-1-git-send-email-daniel.thompson@linaro.org>
 References: <1400857819-7975-1-git-send-email-daniel.thompson@linaro.org>
  <1401206421-29832-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1401206421-29832-6-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1401206421-29832-5-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building a multi_v7_defconfig kernel it is not possible to configure
-DEBUG_LL to use any serial device except a ARM Primecell PL01X, or more
-accurately and worse, it is possible to configure a different serial
-device but KConfig does not honour this request. In fact this also
-overrides the user selection for some of the single platform kernels, for
-example I don't think DEBUG_LL can be targetted at ICE or semihosted
-supervisor for ARCH_VERSATILE.
+On EP93XX uncompress.h uses CONFIG_DEBUG_UART_PHYS instead of a hard
+coded serial port. This means the build breaks when DEBUG_LL
+(and DEBUG_LL_UART_PL01X) is not enabled.
 
-This happens because DEBUG_UART_PL01X is automatically enabled by
-some architectures and this means user decisions made regarding
-the DEBUG_LL backend will be overriden. Problem is fixed by removing the
-automatic enabling of this option.
+This is fixed by adding a new dependancy.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 ---
- arch/arm/Kconfig.debug | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+ arch/arm/Kconfig.debug | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 9a391f7..de67f7e 100644
+index 33f0b38..9a391f7 100644
 --- a/arch/arm/Kconfig.debug
 +++ b/arch/arm/Kconfig.debug
-@@ -985,12 +985,7 @@ config DEBUG_LL_INCLUDE
+@@ -1058,7 +1058,8 @@ config DEBUG_UART_PHYS
+ 	default 0xfffff700 if ARCH_IOP33X
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+ 		DEBUG_LL_UART_EFM32 || \
+-		DEBUG_UART_8250 || DEBUG_UART_PL01X
++		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
++		ARCH_EP93XX
  
- # Compatibility options for PL01x
- config DEBUG_UART_PL01X
--	def_bool ARCH_EP93XX || \
--		ARCH_INTEGRATOR || \
--		ARCH_SPEAR3XX || \
--		ARCH_SPEAR6XX || \
--		ARCH_SPEAR13XX || \
--		ARCH_VERSATILE
-+	bool
- 
- # Compatibility options for 8250
- config DEBUG_UART_8250
+ config DEBUG_UART_VIRT
+ 	hex "Virtual base address of debug UART"
 -- 
 1.9.0
