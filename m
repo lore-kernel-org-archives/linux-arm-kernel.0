@@ -1,78 +1,37 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 27 May 2014 10:52:48 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the arm tree
-Message-ID: <20140527105248.546d95bf@canb.auug.org.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 26 May 2014 19:47:41 -0700
+Subject: [GIT PULL 4/4] omap dt changes for v3.16 merge window, part 2
+In-Reply-To: <20140526200304.GH27093@quad.lixom.net>
+References: <20140520013125.GH15793@atomide.com>
+ <20140526200304.GH27093@quad.lixom.net>
+Message-ID: <20140527024741.GA4662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+* Olof Johansson <olof@lixom.net> [140526 13:03]:
+> On Mon, May 19, 2014 at 06:31:25PM -0700, Tony Lindgren wrote:
+> > The following changes since commit 3fdb77174a2c173e0e69f2499b836a0e412f6c4d:
+> > 
+> >   ARM: dts: omap3-n900: use MATRIX_KEY for keymap (2014-05-06 10:22:51 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/dt-part2-v2
+> > 
+> > for you to fetch changes up to d712ff63b18309c939396f593510fbcccbafb9e4:
+> > 
+> >   ARM: dts: Enable mcpdm and mcbsp1 on DuoVero (2014-05-19 17:20:31 -0700)
+> > 
+> > ----------------------------------------------------------------
+> > Device tree related changes for omaps.
+> 
+> Merged into next/dt.
+> 
+> I'd appreciate a bit more verbose tag messages though -- a very brief
+> overview of what's new in here, etc. I think you used to do them in the past?
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-zynq/common.c between commit e1e4ccb5b1b6 ("ARM: l2c:
-zynq: convert to generic l2c OF initialisation") from the arm tree and
-commit 00f7dc636366 ("ARM: zynq: Add support for SOC_BUS") from the
-arm-soc tree.
+Just laziness.. I'll have more verbose overview next time.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+Thanks,
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/mach-zynq/common.c
-index d1e992e6403e,edbd9d83f407..000000000000
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@@ -66,8 -105,43 +105,38 @@@ static int __init zynq_get_revision(voi
-  static void __init zynq_init_machine(void)
-  {
-  	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", };
-+ 	struct soc_device_attribute *soc_dev_attr;
-+ 	struct soc_device *soc_dev;
-+ 	struct device *parent = NULL;
-+ 
- -	/*
- -	 * 64KB way size, 8-way associativity, parity disabled
- -	 */
- -	l2x0_of_init(0x02060000, 0xF0F0FFFF);
- -
-+ 	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-+ 	if (!soc_dev_attr)
-+ 		goto out;
-+ 
-+ 	system_rev = zynq_get_revision();
-+ 
-+ 	soc_dev_attr->family = kasprintf(GFP_KERNEL, "Xilinx Zynq");
-+ 	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "0x%x", system_rev);
-+ 	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "0x%x",
-+ 					 zynq_slcr_get_device_id());
-+ 
-+ 	soc_dev = soc_device_register(soc_dev_attr);
-+ 	if (IS_ERR(soc_dev)) {
-+ 		kfree(soc_dev_attr->family);
-+ 		kfree(soc_dev_attr->revision);
-+ 		kfree(soc_dev_attr->soc_id);
-+ 		kfree(soc_dev_attr);
-+ 		goto out;
-+ 	}
-+ 
-+ 	parent = soc_device_to_device(soc_dev);
-  
-- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+ out:
-+ 	/*
-+ 	 * Finished with the static registrations now; fill in the missing
-+ 	 * devices
-+ 	 */
-+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
-  
-  	platform_device_register(&zynq_cpuidle_device);
-  	platform_device_register_full(&devinfo);
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140527/29b40634/attachment.sig>
+Tony
