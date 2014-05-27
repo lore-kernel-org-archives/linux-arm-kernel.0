@@ -1,41 +1,35 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 27 May 2014 10:24:22 +0200
-Subject: [PATCH v5 5/8] ASoC: fsl-ssi: Set framerate divider correctly for i2s
- master mode
-In-Reply-To: <1401179065-31195-1-git-send-email-mpa@pengutronix.de>
-References: <1401179065-31195-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1401179065-31195-6-git-send-email-mpa@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 27 May 2014 10:25:54 +0200
+Subject: [PATCH 1/3] gpio: Add APM X-Gene SoC GPIO controller support
+In-Reply-To: <CAL85gmDjVszNd3TB51BGa+78wEEZmJfBOLNKOpTEvMTGU2VdBA@mail.gmail.com>
+References: <1400263432-922-1-git-send-email-fkan@apm.com>
+ <1400263432-922-2-git-send-email-fkan@apm.com>
+ <CAAVeFu+TOfjfvisinv3oJ9PobdV9HcNJhr+3VYneSJ54uGwiAg@mail.gmail.com>
+ <CAL85gmDjVszNd3TB51BGa+78wEEZmJfBOLNKOpTEvMTGU2VdBA@mail.gmail.com>
+Message-ID: <CACRpkdaVYXU9GN5OymuP3JRsQO3unkRGb5vZN3Jb2nWSnkh1SQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+On Wed, May 21, 2014 at 1:54 AM, Feng Kan <fkan@apm.com> wrote:
 
-In i2s master mode the fsl_ssi driver depends on someone calling
-.set_tdm_slot correctly. In this mode though only a DC value of
-2 is allowed, so set it in this case and no longer depend on
-.set_tdm_slot.
+> I see each bank as separate gpio chip. It is a simple way to
+> abstract the banks since they can operate independently.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Tested-By: Michael Grzeschik <mgr@pengutronix.de>
----
- sound/soc/fsl/fsl_ssi.c | 4 ++++
- 1 file changed, 4 insertions(+)
+I think they should also be separate devices, and separate nodes
+in the device tree.
 
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index b3033d9..dbcde10 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -709,6 +709,10 @@ static int _fsl_ssi_set_dai_fmt(struct fsl_ssi_private *ssi_private,
- 		switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
- 		case SND_SOC_DAIFMT_CBS_CFS:
- 			ssi_private->i2s_mode |= CCSR_SSI_SCR_I2S_MODE_MASTER;
-+			write_ssi_mask(&ssi->stccr, CCSR_SSI_SxCCR_DC_MASK,
-+				CCSR_SSI_SxCCR_DC(2));
-+			write_ssi_mask(&ssi->srccr, CCSR_SSI_SxCCR_DC_MASK,
-+				CCSR_SSI_SxCCR_DC(2));
- 			break;
- 		case SND_SOC_DAIFMT_CBM_CFM:
- 			ssi_private->i2s_mode |= CCSR_SSI_SCR_I2S_MODE_SLAVE;
--- 
-2.0.0.rc2
+> It also
+> provided me a way to fix the sysfs gpio base number, regardless if
+> a particular bank node is pulled out.
+
+The GPIO sysfs is unpredictable for this and many other
+reasons and should not be relied upon.
+
+> This is also done in similar way
+> in some other gpio drivers such as the dwapb gpio driver.
+
+I think the dwapb has it's registers mingled while your banks
+seem to be separate chunks.
+
+Yours,
+Linus Walleij
