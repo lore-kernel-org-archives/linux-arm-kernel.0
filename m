@@ -1,59 +1,53 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Tue, 27 May 2014 10:03:07 -0500
-Subject: [PATCH v3 01/10] platform_data: edma: Be precise with the paRAM
- struct
-In-Reply-To: <53846779.4070204@ti.com>
-References: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>	<1397475725-5036-2-git-send-email-peter.ujfalusi@ti.com>
- <CAOesGMg43jT6D_ot2tKfRXXgAgwqs5Pu_tAFKc35yxLAczrzGQ@mail.gmail.com>
- <53846779.4070204@ti.com>
-Message-ID: <5384A92B.4080606@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 27 May 2014 16:07:50 +0100
+Subject: [PATCH v3 05/14] ARM: KVM: vgic mmio should hold data as LE bytes
+ array in BE case
+In-Reply-To: <1399997646-4716-6-git-send-email-victor.kamensky@linaro.org>
+References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
+ <1399997646-4716-6-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <5384AA46.7050304@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/2014 05:22 AM, Peter Ujfalusi wrote:
-> On 05/27/2014 12:32 AM, Olof Johansson wrote:
-[..]
->>
->> I came across this patch when I was looking at a pull request from
->> Sekhar for EDMA cleanups, and it made me look closer at the contents
->> of this file.
->>
->> The include/linux/platform_data/ directory is meant to hold
->> platform_data definitions for drivers, and nothing more.
->> platform_data/edma.h also contains a whole bunch of interface
->> definitions for the driver. They do not belong there, and should be
->> moved to a different include file.
->>
->> That also includes the above struct, because as far as I can tell it's
->> a runtime state structure, not something that is passed in with
->> platform data.
->>
->> Can someone please clean this up? Thanks.
+On 13/05/14 17:13, Victor Kamensky wrote:
+> According to recent clarifications of mmio.data array meaning -
+> the mmio.data array should hold bytes as they would appear in
+> memory. Vgic is little endian device. And in case of BE image
+> kernel side that emulates vgic, holds data in BE form. So we
+> need to byteswap cpu<->le32 vgic registers when we read/write them
+> from mmio.data[].
 > 
-> I think Joel is working on to move/merge the code from arch/arm/common/edma.c
-> to drivers/dma/edma.c
-
-Yes, I am planning to work on that soon. But there is an issue, more on
-that discussed below..
-
-> I'm sure within this work he is going to clean up the header file as well.
-
-Agreed. The private API should not be expored in any header and should
-be exclusive for the EDMA dmaengine driver ideally.
-
-> As a first step I think the non platform_data content can be moved as
-> include/linux/edma.h or probably as ti-edma.h?
+> Change has no effect in LE case because cpu already runs in le32.
+> 
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  virt/kvm/arm/vgic.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 56ff9be..529c336 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -241,12 +241,12 @@ static void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq)
+>  
+>  static u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
+>  {
+> -	return *((u32 *)mmio->data) & mask;
+> +	return le32_to_cpu(*((u32 *)mmio->data)) & mask;
+>  }
+>  
+>  static void mmio_data_write(struct kvm_exit_mmio *mmio, u32 mask, u32 value)
+>  {
+> -	*((u32 *)mmio->data) = value & mask;
+> +	*((u32 *)mmio->data) = cpu_to_le32(value) & mask;
+>  }
+>  
+>  /**
 > 
 
-sound/soc/davinci/davinci-pcm.c: This still uses the EDMA private API in
-arch/arm/common/edma.c. Peter, any idea when the private usage will be
-removed fully, and we switch to dmaengine for ASoC? Before that can
-happen, we can't clean up or do any merges.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-What I'd like to do is fold the private API into the dmaengine driver
-and eliminate the need to expose the private API, thus also getting rid
-of the interface declarations Olof referred to.
-
-thanks,
-
--Joel
+	M.
+-- 
+Jazz is not dead. It just smells funny...
