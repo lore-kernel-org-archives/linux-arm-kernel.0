@@ -1,86 +1,51 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 27 May 2014 10:30:21 +0200
-Subject: [PATCH 17/22] mfd: sun6i-prcm: Add support for Allwinner A23 PRCM
-In-Reply-To: <CAGb2v66cV_nRpHhrtDUYzncO5wimx+vRBW6BFcU0Kz=bKkNs+g@mail.gmail.com>
+Date: Tue, 27 May 2014 10:34:50 +0200
+Subject: [PATCH 19/22] ARM: sunxi: Add earlyprintk support using R_UART
+ (sun6i/sun8i)
+In-Reply-To: <CAGb2v66jL5-rmSy0W38og6bLiNkGu0wekEZfOuh0Fn2oOsJpaQ@mail.gmail.com>
 References: <1400831485-28576-1-git-send-email-wens@csie.org>
- <1400831485-28576-18-git-send-email-wens@csie.org>
- <20140525191434.GX10768@lukather>
- <CAGb2v66cV_nRpHhrtDUYzncO5wimx+vRBW6BFcU0Kz=bKkNs+g@mail.gmail.com>
-Message-ID: <20140527083021.GE4730@lukather>
+ <1400831485-28576-20-git-send-email-wens@csie.org>
+ <20140525184636.GN10768@lukather>
+ <CAGb2v66jL5-rmSy0W38og6bLiNkGu0wekEZfOuh0Fn2oOsJpaQ@mail.gmail.com>
+Message-ID: <20140527083450.GG4730@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 12:36:38PM +0800, Chen-Yu Tsai wrote:
-> On Mon, May 26, 2014 at 3:14 AM, Maxime Ripard
+On Mon, May 26, 2014 at 05:25:43PM +0800, Chen-Yu Tsai wrote:
+> On Mon, May 26, 2014 at 2:46 AM, Maxime Ripard
 > <maxime.ripard@free-electrons.com> wrote:
-> > On Fri, May 23, 2014 at 03:51:20PM +0800, Chen-Yu Tsai wrote:
-> >> The Allwinner A23 SoC has a PRCM unit like the previous A31 SoC.
-> >> The differences are the AR100 clock can no longer be modified,
-> >> and the APB0 clock has different divisors.
-> >>
-> >> This patch adds a compatible with a modified subdevice list for
-> >> the A23.
+> > Hi,
+> >
+> > On Fri, May 23, 2014 at 03:51:22PM +0800, Chen-Yu Tsai wrote:
+> >> sun6i/sun8i have a UART in the RTC block group, which can be used
+> >> as an early console. This is most useful on sun8i as UART0 is muxed
+> >> with MMC0, which is not available if we boot from MMC.
 > >>
 > >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > >> ---
-> >>  .../devicetree/bindings/mfd/sun6i-prcm.txt         |  2 +-
-> >>  drivers/mfd/sun6i-prcm.c                           | 30 ++++++++++++++++++++++
-> >>  2 files changed, 31 insertions(+), 1 deletion(-)
+> >>  arch/arm/Kconfig.debug | 10 ++++++++++
+> >>  1 file changed, 10 insertions(+)
 > >>
-> >> diff --git a/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt b/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
-> >> index 1f5a31f..03c5a55 100644
-> >> --- a/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
-> >> +++ b/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
-> >> @@ -4,7 +4,7 @@ PRCM is an MFD device exposing several Power Management related devices
-> >>  (like clks and reset controllers).
+> >> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> >> index eab8ecb..9e22708 100644
+> >> --- a/arch/arm/Kconfig.debug
+> >> +++ b/arch/arm/Kconfig.debug
+> >> @@ -694,6 +694,14 @@ choice
+> >>                 Say Y here if you want kernel low-level debugging support
+> >>                 on Allwinner A1X based platforms on the UART1.
 > >>
-> >>  Required properties:
-> >> - - compatible: "allwinner,sun6i-a31-prcm"
-> >> + - compatible: "allwinner,sun6i-a31-prcm" or "allwinner,sun8i-a23-prcm"
-> >>   - reg: The PRCM registers range
-> >>
-> >>  The prcm node may contain several subdevices definitions:
-> >> diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
-> >> index 718fc4d..c96bb6c 100644
-> >> --- a/drivers/mfd/sun6i-prcm.c
-> >> +++ b/drivers/mfd/sun6i-prcm.c
-> >> @@ -76,16 +76,46 @@ static const struct mfd_cell sun6i_a31_prcm_subdevs[] = {
-> >>       },
-> >>  };
-> >>
-> >> +static const struct mfd_cell sun8i_a23_prcm_subdevs[] = {
-> >> +     {
-> >> +             .name = "sun6i-a31-apb0-clk",
-> >> +             .of_compatible = "allwinner,sun8i-a23-apb0-clk",
-> >> +             .num_resources = ARRAY_SIZE(sun6i_a31_apb0_clk_res),
-> >> +             .resources = sun6i_a31_apb0_clk_res,
-> >> +     },
-> >> +     {
-> >> +             .name = "sun6i-a31-apb0-gates-clk",
-> >> +             .of_compatible = "allwinner,sun6i-a31-apb0-gates-clk",
-> >> +             .num_resources = ARRAY_SIZE(sun6i_a31_apb0_gates_clk_res),
-> >> +             .resources = sun6i_a31_apb0_gates_clk_res,
-> >> +     },
+> >> +     config DEBUG_SUNXI_R_UART
+> >> +             bool "Kernel low-level debugging messages via sunXi R_UART"
+> >> +             depends on ARCH_SUNXI
 > >
-> > Did I just have a brainfart, or didn't you just introduced an
-> > sun8i-a23-apb0-gates-clk driver?
+> > It should rather depend on MACH_SUN8I.
 > 
-> My bad, I missed this one. The one in the DT is correct.
-> It actually works, so I'm a bit confused here.
-> Which one does the driver core actually use?
+> I assume no sun6i devices would use it, or have pads available for
+> it?  If so, then MACH_SUN8I makes sense.
 
-Actually, it will use both, and will match the of_compatible string
-try to match it against the mfd-sub-nodes compatibles. If nothing
-matches, it won't fill the dev.of_node field.
+Then a depends on MACH_SUN6I || MACH_SUN8I.
 
-> 
-> > And there's no ar100 and ahb0 clocks ?
-> 
-> The ahb0 is a fixed-factor (1:1) clock. There are no controls for it.
-> The ar100 clock on the A23 has no controls either, so fixed-factor
-> clock again.
-
-Ack.
+Maxime
 
 -- 
 Maxime Ripard, Free Electrons
@@ -92,4 +57,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140527/55781620/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140527/9c9eaf70/attachment.sig>
