@@ -1,48 +1,28 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 27 May 2014 19:34:28 +0100
-Subject: [PATCH v3 10/14] ARM64: KVM: store kvm_vcpu_fault_info est_el2
- as word
-In-Reply-To: <1399997646-4716-11-git-send-email-victor.kamensky@linaro.org>
-References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
- <1399997646-4716-11-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <5384DAB4.4020903@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 May 2014 20:36:32 +0200
+Subject: [PATCH v1 3/5] phy: pci serdes phy driver for keystone
+In-Reply-To: <5384C17E.5060806@ti.com>
+References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
+ <9828919.7tZBgbvqj4@wuerfel> <5384C17E.5060806@ti.com>
+Message-ID: <4735720.XlAWNkHzF3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/05/14 17:14, Victor Kamensky wrote:
-> esr_el2 field of struct kvm_vcpu_fault_info has u32 type.
-> It should be stored as word. Current code works in LE case
-> because existing puts least significant word of x1 into
-> esr_el2, and it puts most significant work of x1 into next
-                                        word
-> field, which accidentally is OK because it is updated again
-> by next instruction. But existing code breaks in BE case.
+On Tuesday 27 May 2014 12:46:54 Murali Karicheri wrote:
+> I have checked the register set of the following drivers under 
+> drivers/phy from the
+> master branch (v3.15-rc6) using the registers set available with us 
+> internally and
+> I can't find a match.
 > 
-> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm64/kvm/hyp.S | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> phy-exynos5250-sata.c  phy-exynos-mipi-video.c  phy-omap-usb2.c 
+> phy-sun4i-usb.c
+> phy-xgene.c phy-exynos4210-usb2.c  phy-exynos5250-usb2.c phy-mvebu-sata.c
+> phy-samsung-usb2.c  phy-ti-pipe3.c phy-bcm-kona-usb2.c phy-exynos4x12-usb2.c
+>   phy-exynos-dp-video.c  phy-omap-control.c  phy-twl4030-usb.c
 > 
-> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> index 2c56012..0620691 100644
-> --- a/arch/arm64/kvm/hyp.S
-> +++ b/arch/arm64/kvm/hyp.S
-> @@ -824,7 +824,7 @@ el1_trap:
->  	mrs	x2, far_el2
->  
->  2:	mrs	x0, tpidr_el2
-> -	str	x1, [x0, #VCPU_ESR_EL2]
-> +	str	w1, [x0, #VCPU_ESR_EL2]
->  	str	x2, [x0, #VCPU_FAR_EL2]
->  	str	x3, [x0, #VCPU_HPFAR_EL2]
->  
-> 
+> So there is no duplication.
 
-Nice catch! :-)
+Ok, thanks a lot for checking!
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	Arnd
