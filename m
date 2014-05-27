@@ -1,55 +1,110 @@
-From: fkan@apm.com (Feng Kan)
-Date: Tue, 27 May 2014 09:59:02 -0700
-Subject: [PATCH 1/3] gpio: Add APM X-Gene SoC GPIO controller support
-In-Reply-To: <CACRpkdaVYXU9GN5OymuP3JRsQO3unkRGb5vZN3Jb2nWSnkh1SQ@mail.gmail.com>
-References: <1400263432-922-1-git-send-email-fkan@apm.com>
- <1400263432-922-2-git-send-email-fkan@apm.com>
- <CAAVeFu+TOfjfvisinv3oJ9PobdV9HcNJhr+3VYneSJ54uGwiAg@mail.gmail.com>
- <CAL85gmDjVszNd3TB51BGa+78wEEZmJfBOLNKOpTEvMTGU2VdBA@mail.gmail.com>
- <CACRpkdaVYXU9GN5OymuP3JRsQO3unkRGb5vZN3Jb2nWSnkh1SQ@mail.gmail.com>
-Message-ID: <CAL85gmCZD90UUZgC0-X4hui2L1V5TuH++o3fA20pRF_ZQEpDQw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 27 May 2014 16:59:16 +0000 (UTC)
+Subject: OMAP baseline test results for v3.15-rc7
+Message-ID: <alpine.DEB.2.02.1405271657050.28436@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 1:25 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, May 21, 2014 at 1:54 AM, Feng Kan <fkan@apm.com> wrote:
->
->> I see each bank as separate gpio chip. It is a simple way to
->> abstract the banks since they can operate independently.
->
-> I think they should also be separate devices, and separate nodes
-> in the device tree.
->
->> It also
->> provided me a way to fix the sysfs gpio base number, regardless if
->> a particular bank node is pulled out.
->
-> The GPIO sysfs is unpredictable for this and many other
-> reasons and should not be relied upon.
->
->> This is also done in similar way
->> in some other gpio drivers such as the dwapb gpio driver.
->
-> I think the dwapb has it's registers mingled while your banks
-> seem to be separate chunks.
 
-Thanks for the comments, I will fix these problems. Just some details
-in terms of the register layout. I will break out the gpio to separate
-device nodes as instructed, I will have to use the reg attribute to offset
-bank registers. Please let me know if it is acceptable.
+Here are some basic OMAP test results for Linux v3.15-rc7.
+Logs and other details at:
 
-gfc_gpio_fl0              GFC42'h1701c00c
-gfc_gpio_fl0_mux      GFC42'h1701c010
-gfc_gpio_fl1              GFC42'h1701c018
-gfc_gpio_fl1_mux      GFC42'h1701c01c
-gfc_gpio_fl2              GFC42'h1701c024
-gfc_gpio_fl2_mux      GFC42'h1701c028
-gfc_gpio_fl0_od        GFC42'h1701c030
-gfc_gpio_fl1_od        GFC42'h1701c034
-gfc_gpio_fl2_od        GFC42'h1701c038
+    http://www.pwsan.com/omap/testlogs/test_v3.15-rc7/20140526221127/
 
 
+Test summary
+------------
 
->
-> Yours,
-> Linus Walleij
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Build: uImage+dtb:
+    Pass ( 9/ 9): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig/omap4-var-som
+
+Build: zImage:
+    Pass (14/14): multi_v7_defconfig, omap2plus_defconfig,
+		  omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig
+
+Boot to userspace:
+    FAIL ( 2/12): 2430sdp, cmt3517
+    skip ( 2/12): 5912osk, 4460varsomom
+    Pass ( 8/12): 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
+		  4430es2panda, 4460pandaes, am335xbone, am335xbonelt
+
+PM: chip retention via suspend:
+    skip ( 1/ 7): 4460varsomom
+    FAIL ( 2/ 7): 2430sdp, 4430es2panda
+    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
+
+PM: chip retention via dynamic idle:
+    skip ( 1/ 7): 4460varsomom
+    FAIL ( 6/ 7): 2430sdp, 3530es3beagle, 3730beaglexm, 37xxevm,
+		  4430es2panda, 4460pandaes
+
+PM: chip off except CORE via suspend:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    skip ( 1/ 5): 4460varsomom
+    FAIL ( 4/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes
+
+PM: chip off via dynamic idle:
+    skip ( 1/ 5): 4460varsomom
+    FAIL ( 4/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes
+
+
+vmlinux object size
+(delta in bytes from test_v3.15-rc6 (4b660a7f5c8099d88d1a43d8ae138965112592c7)):
+   text     data      bss    total  kernel
+      0        0        0        0  omap1_defconfig
+      0        0        0        0  omap1_defconfig_1510innovator_only
+      0        0        0        0  omap1_defconfig_5912osk_only
+      0        0        0        0  multi_v7_defconfig
+      0        0        0        0  omap2plus_defconfig
+      0        0        0        0  omap2plus_defconfig_2430sdp_only
+      0        0        0        0  omap2plus_defconfig_am33xx_only
+      0        0        0        0  omap2plus_defconfig_am43xx_only
+      0        0        0        0  omap2plus_defconfig_cpupm
+      0        0        0        0  omap2plus_defconfig_dra7xx_only
+      0        0        0        0  omap2plus_defconfig_n800_multi_omap2xxx
+      0        0        0        0  omap2plus_defconfig_n800_only_a
+      0        0        0        0  omap2plus_defconfig_no_pm
+      0        0        0        0  omap2plus_defconfig_omap2_4_only
+      0        0        0        0  omap2plus_defconfig_omap3_4_only
+      0        0        0        0  omap2plus_defconfig_omap5_only
+      0        0        0        0  rmk_omap3430_ldp_allnoconfig
+      0        0        0        0  rmk_omap3430_ldp_oldconfig
+      0        0        0        0  rmk_omap4430_sdp_allnoconfig
+      0        0        0        0  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.15-rc6 (4b660a7f5c8099d88d1a43d8ae138965112592c7))
+  avail  rsrvd   high  freed  board          kconfig
+  (no differences)
+
+
+Started attempting to test-boot the CM-T3517 again.  It's currently set 
+to try MMC root, but it never manages to initialize the card, so doesn't 
+make it to userspace.  NFS-root also doesn't seem to work.
