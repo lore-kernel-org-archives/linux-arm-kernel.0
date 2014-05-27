@@ -1,90 +1,31 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 27 May 2014 17:19:02 +0200
-Subject: [PATCH v2 02/11] sched: remove a wake_affine condition
-In-Reply-To: <20140527124848.GQ30445@twins.programming.kicks-ass.net>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-3-git-send-email-vincent.guittot@linaro.org>
- <20140527124848.GQ30445@twins.programming.kicks-ass.net>
-Message-ID: <CAKfTPtAbnDdQ=C6oABtwUPr7ADhHo1qsdzt5GFsuVMncA9Q=Qw@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 27 May 2014 17:19:59 +0200
+Subject: [PATCH] ARM: dts: pfla02: Add ethernet phy supply regulator
+Message-ID: <1401203999-4344-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 May 2014 14:48, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Fri, May 23, 2014 at 05:52:56PM +0200, Vincent Guittot wrote:
->> I have tried to understand the meaning of the condition :
->>  (this_load <= load &&
->>   this_load + target_load(prev_cpu, idx) <= tl_per_task)
->> but i failed to find a use case that can take advantage of it and i haven't
->> found description of it in the previous commits' log.
->
-> commit 2dd73a4f09beacadde827a032cf15fd8b1fa3d48
->
->     int try_to_wake_up():
->
->     in this function the value SCHED_LOAD_BALANCE is used to represent the load
->     contribution of a single task in various calculations in the code that
->     decides which CPU to put the waking task on.  While this would be a valid
->     on a system where the nice values for the runnable tasks were distributed
->     evenly around zero it will lead to anomalous load balancing if the
->     distribution is skewed in either direction.  To overcome this problem
->     SCHED_LOAD_SCALE has been replaced by the load_weight for the relevant task
->     or by the average load_weight per task for the queue in question (as
->     appropriate).
->
->                         if ((tl <= load &&
-> -                               tl + target_load(cpu, idx) <= SCHED_LOAD_SCALE) ||
-> -                               100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
-> +                               tl + target_load(cpu, idx) <= tl_per_task) ||
-> +                               100*(tl + p->load_weight) <= imbalance*load) {
+The 2.5V VDD_ETH_IO voltage supplied by the DA9063 LDO4 is used
+to power the KSZ9031 PHY DVDDH input and to pull the necessary
+pins (including bootstrap pins) high.
+It also powers the i.MX6 NVCC_RGMII and NVCC_ENET inputs.
 
-The oldest patch i had found was: https://lkml.org/lkml/2005/2/24/34
-where task_hot had been replaced by
-+ if ((tl <= load &&
-+ tl + target_load(cpu, idx) <= SCHED_LOAD_SCALE) ||
-+ 100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-but as explained, i haven't found a clear explanation of this condition
-
->
->
-> commit a3f21bce1fefdf92a4d1705e888d390b10f3ac6f
->
->
-> +                       if ((tl <= load &&
-> +                               tl + target_load(cpu, idx) <= SCHED_LOAD_SCALE) ||
-> +                               100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
->
->
-> So back when the code got introduced, it read:
->
->         target_load(prev_cpu, idx) - sync*SCHED_LOAD_SCALE < source_load(this_cpu, idx) &&
->         target_load(prev_cpu, idx) - sync*SCHED_LOAD_SCALE + target_load(this_cpu, idx) < SCHED_LOAD_SCALE
->
-> So while the first line makes some sense, the second line is still
-> somewhat challenging.
->
-> I read the second line something like: if there's less than one full
-> task running on the combined cpus.
-
-ok. your explanation makes sense
-
->
-> Now for idx==0 this is hard, because even when sync=1 you can only make
-> it true if both cpus are completely idle, in which case you really want
-> to move to the waking cpu I suppose.
-
-This use case is already taken into account by
-
-if (this_load > 0)
-..
-else
- balance = true
-
->
-> One task running will have it == SCHED_LOAD_SCALE.
->
-> But for idx>0 this can trigger in all kinds of situations of light load.
-
-target_load is the max between load for idx == 0 and load for the
-selected idx so we have even less chance to match the condition : both
-cpu are completely idle
+diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+index faa3494..2694aa8 100644
+--- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+@@ -301,6 +301,7 @@
+ 	pinctrl-0 = <&pinctrl_enet>;
+ 	phy-mode = "rgmii";
+ 	phy-reset-gpios = <&gpio3 23 GPIO_ACTIVE_LOW>;
++	phy-supply = <&vdd_eth_io_reg>;
+ 	status = "disabled";
+ };
+ 
+-- 
+2.0.0.rc2
