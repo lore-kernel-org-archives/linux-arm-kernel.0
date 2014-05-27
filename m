@@ -1,65 +1,32 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 27 May 2014 12:46:54 -0400
-Subject: [PATCH v1 3/5] phy: pci serdes phy driver for keystone
-In-Reply-To: <9828919.7tZBgbvqj4@wuerfel>
-References: <1400169692-9677-1-git-send-email-m-karicheri2@ti.com>
- <9550746.D1ri3H0uvi@wuerfel> <537F81D8.2080005@ti.com>
- <9828919.7tZBgbvqj4@wuerfel>
-Message-ID: <5384C17E.5060806@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 27 May 2014 18:45:30 +0200
+Subject: [PATCH RFC 02/11] sound: ASoC: kirkwood: Remove unused drivers
+In-Reply-To: <20140526155901.GF22111@sirena.org.uk>
+References: <1400163836-9831-1-git-send-email-andrew@lunn.ch>
+ <1400163836-9831-5-git-send-email-andrew@lunn.ch>
+ <20140526155901.GF22111@sirena.org.uk>
+Message-ID: <20140527164530.GJ26379@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/23/2014 3:23 PM, Arnd Bergmann wrote:
-> On Friday 23 May 2014 13:14:00 Murali Karicheri wrote:
->> On 5/15/2014 12:14 PM, Arnd Bergmann wrote:
->>> On Thursday 15 May 2014 12:01:30 Murali Karicheri wrote:
->>>> +static struct serdes_config ks_100mhz_pcie_5gbps_serdes[] = {
->>>> +       {0x0000, 0x00000800, 0x0000ff00},
->>>> +       {0x0060, 0x00041c5c, 0x00ffffff},
->>>> +       {0x0064, 0x0343c700, 0xffffff00},
->>>> +       {0x006c, 0x00000012, 0x000000ff},
->>>> +       {0x0068, 0x00070000, 0x00ff0000},
->>>> +       {0x0078, 0x0000c000, 0x0000ff00},
->>> It looks like the PHY is generic, but the configuration above is
->>> PCI specific. If this is true, you should have #phy-cells=<1>
->>> and document the possible modes, adding a lookup table here to
->>> pick the configuration based on the argument. It's fine to just
->>> implement pcie-5ghz initially, but the binding should list all
->>> the modes that the PHY can support.
->> The PCIE name needs to be dropped and as you correctly guessed, this SERDES
->> is generic.
-> Ok, good.
->
->>> Also, please list the exact name of the phy if you can find it
->>> out. You mention that you don't know the register descriptions,
->>> but you should at least be able to let us know what phy this
->>> is, in case some other SoC reuses the same thing.
->> Unfortunately there is a NDA restriction that prevents us from using the
->> actual Phy name and keystone phy is the name what we can usel at the
->> moment. I am checking
->> this with our IP team and if original name can  be used, I will update
->> the driver to reflect the same.
-> Can you please check the phy drivers that we already have in linux-next
-> to see if any of those are for the same hardware then?
->
-> I guess it's our best hope to catch duplications by inspecting all
-> other phy drivers as they get merged then.
->
-> 	Arnd
-Arnd,
+On Mon, May 26, 2014 at 04:59:01PM +0100, Mark Brown wrote:
+> On Thu, May 15, 2014 at 04:23:45PM +0200, Andrew Lunn wrote:
+> > Both kirkwood-openrd and kirkwood-t5325 drivers have been replaced
+> > with DT based simple-card equivelents.
+> 
+> Applied, thanks.
 
-I have checked the register set of the following drivers under 
-drivers/phy from the
-master branch (v3.15-rc6) using the registers set available with us 
-internally and
-I can't find a match.
+Hi Mark
 
-phy-exynos5250-sata.c  phy-exynos-mipi-video.c  phy-omap-usb2.c 
-phy-sun4i-usb.c
-phy-xgene.c phy-exynos4210-usb2.c  phy-exynos5250-usb2.c phy-mvebu-sata.c
-phy-samsung-usb2.c  phy-ti-pipe3.c phy-bcm-kona-usb2.c phy-exynos4x12-usb2.c
-  phy-exynos-dp-video.c  phy-omap-control.c  phy-twl4030-usb.c
+This is an RFC patch, as it says in the Subject line, and the cover
+note. It is not intended to be applied yet. Please unapply it, and the
+other one in the series you have applied.
 
-So there is no duplication.
+> Please do try to use subject lines matching the style for the
+> subsystem.
 
-Murali
+O.K, i will fix this when i send the real, not RFC, to be applied,
+patches.
+
+Thanks
+	Andrew
