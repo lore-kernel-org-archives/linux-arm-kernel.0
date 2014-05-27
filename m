@@ -1,43 +1,42 @@
-From: linville@tuxdriver.com (John W. Linville)
-Date: Tue, 27 May 2014 11:26:14 -0400
-Subject: [PATCH 00/11] sdio wifi oob irq support for sunxi
-In-Reply-To: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>
-References: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140527152614.GB5694@tuxdriver.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 28 May 2014 00:33:53 +0900
+Subject: [PATCH] ARM: EXYNOS: Use wfi macro in platform_do_lowpower
+In-Reply-To: <CAM7CM0kG-fWcAo9rTwRj1iPD7EFSDVZWaPc93XmLVE=s_ePDpw@mail.gmail.com>
+References: <1400745455-27920-1-git-send-email-leela.krishna@linaro.org>
+ <537E497B.9020404@linaro.org>
+ <CAM7CM0kG-fWcAo9rTwRj1iPD7EFSDVZWaPc93XmLVE=s_ePDpw@mail.gmail.com>
+Message-ID: <5384B061.7070507@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 09:47:55AM +0200, Hans de Goede wrote:
-> Hi All,
-> 
-> Here is a patch series adding support for oob irqs for the ap6210 sdio wifi
-> modules found on various Allwinner A20 boards.
-> 
-> A lot of it is ground work which should be useful for adding oob irq support
-> to other sdio wifi models too.
-> 
-> The first 5 patches are sunxi pinctrl patches and should go upstream through
-> the pinctrl tree.
-> 
-> Patch 6 adds generic support for having per sdio function child nodes in
-> devicetree and should go upstream through the mmc tree.
-> 
-> Patch 7 and 8 add oob irq support to the brcmfmac driver. Patch 9 pokes some
-> magic bits needed to enable the oob irq, this was taken from an android code
-> dump and good do with a good review from someone from Broadcom, Arend ?
+On 05/23/14 15:13, Leela Krishna Amudala wrote:
+> Hi Kgene,
+>
+Hi,
 
-If Arend approves, I'm fine with these going through another appropriate tree.
+>
+> On Fri, May 23, 2014 at 12:31 AM, Daniel Lezcano
+> <daniel.lezcano@linaro.org>  wrote:
+>> On 05/22/2014 09:57 AM, Leela Krishna Amudala wrote:
+>>>
+>>> This patch is originally based on commit b3377d186572 ("ARM: 7064/1:
+>>> vexpress: Use wfi macro in platform_do_lowpower.")
+>>>
+>>> Current Exynos CPU hotplug code includes a hardcoded WFI
+>>> instruction, in ARM encoding.  When the kernel is compiled in Thumb-2
+>>> mode, this is invalid and causes the machine to hang hard when a CPU
+>>> is offlined.
+>>>
+>>> Use wfi macro instead of the hardcoded WFI instruction.
+>>>
+>>> Signed-off-by: Leela Krishna Amudala<leela.krishna@linaro.org>
+>>
+>>
+>> Acked-by: Daniel Lezcano<daniel.lezcano@linaro.org>
+>>
+>
+> Can you please take action on this patch.
+>
+Applied, thanks.
 
-> Patch 10 and 11 add the necessary dts bits to actually enable the sdio irq
-> and should go upstream through Maxime's dt tree.
-> 
-> Please review / merge.
-> 
-> Thanks & Regards,
-> 
-> Hans
-> 
-
--- 
-John W. Linville		Someday the world will need a hero, and you
-linville at tuxdriver.com			might be all we have.  Be ready.
+- Kukjin
