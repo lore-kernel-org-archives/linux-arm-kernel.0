@@ -1,49 +1,82 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 27 May 2014 15:23:16 +0100
-Subject: [PATCH v3 01/14] ARM: KVM: switch hypervisor into BE mode in
- case of BE host
-In-Reply-To: <1399997646-4716-2-git-send-email-victor.kamensky@linaro.org>
+Date: Tue, 27 May 2014 15:24:27 +0100
+Subject: [PATCH v3 02/14] ARM: KVM: fix vgic V7 assembler code to work
+ in BE image
+In-Reply-To: <1399997646-4716-3-git-send-email-victor.kamensky@linaro.org>
 References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
- <1399997646-4716-2-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <53849FD4.6060604@arm.com>
+ <1399997646-4716-3-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <5384A01B.8050902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 13/05/14 17:13, Victor Kamensky wrote:
-> Switch hypervisor to run in BE mode if image is compiled
-> with CONFIG_CPU_BIG_ENDIAN.
+> The vgic h/w registers are little endian; when BE asm code
+> reads/writes from/to them, it needs to do byteswap after/before.
+> Byteswap code uses ARM_BE8 wrapper to add swap only if
+> CONFIG_CPU_BIG_ENDIAN is configured.
 > 
 > Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
 > Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
->  arch/arm/kvm/init.S | 3 +++
->  1 file changed, 3 insertions(+)
+>  arch/arm/kvm/interrupts_head.S | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
 > 
-> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-> index 1b9844d..74f0718 100644
-> --- a/arch/arm/kvm/init.S
-> +++ b/arch/arm/kvm/init.S
-> @@ -22,6 +22,7 @@
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_arm.h>
->  #include <asm/kvm_mmu.h>
+> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+> index 76af9302..e627858 100644
+> --- a/arch/arm/kvm/interrupts_head.S
+> +++ b/arch/arm/kvm/interrupts_head.S
+> @@ -1,4 +1,5 @@
+>  #include <linux/irqchip/arm-gic.h>
 > +#include <asm/assembler.h>
 >  
->  /********************************************************************
->   * Hypervisor initialization
-> @@ -70,6 +71,8 @@ __do_hyp_init:
->  	cmp	r0, #0			@ We have a SP?
->  	bne	phase2			@ Yes, second stage init
+>  #define VCPU_USR_REG(_reg_nr)	(VCPU_USR_REGS + (_reg_nr * 4))
+>  #define VCPU_USR_SP		(VCPU_USR_REG(13))
+> @@ -420,6 +421,14 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+>  	ldr	r8, [r2, #GICH_ELRSR0]
+>  	ldr	r9, [r2, #GICH_ELRSR1]
+>  	ldr	r10, [r2, #GICH_APR]
+> +ARM_BE8(rev	r3, r3	)
+> +ARM_BE8(rev	r4, r4	)
+> +ARM_BE8(rev	r5, r5	)
+> +ARM_BE8(rev	r6, r6	)
+> +ARM_BE8(rev	r7, r7	)
+> +ARM_BE8(rev	r8, r8	)
+> +ARM_BE8(rev	r9, r9	)
+> +ARM_BE8(rev	r10, r10	)
 >  
-> +ARM_BE8(setend	be) @ Switch to Big Endian mode if needed
-> +
->  	@ Set the HTTBR to point to the hypervisor PGD pointer passed
->  	mcrr	p15, 4, r2, r3, c2
+>  	str	r3, [r11, #VGIC_CPU_HCR]
+>  	str	r4, [r11, #VGIC_CPU_VMCR]
+> @@ -439,6 +448,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+>  	add	r3, r11, #VGIC_CPU_LR
+>  	ldr	r4, [r11, #VGIC_CPU_NR_LR]
+>  1:	ldr	r6, [r2], #4
+> +ARM_BE8(rev	r6, r6	)
+>  	str	r6, [r3], #4
+>  	subs	r4, r4, #1
+>  	bne	1b
+> @@ -466,6 +476,9 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+>  	ldr	r3, [r11, #VGIC_CPU_HCR]
+>  	ldr	r4, [r11, #VGIC_CPU_VMCR]
+>  	ldr	r8, [r11, #VGIC_CPU_APR]
+> +ARM_BE8(rev	r3, r3	)
+> +ARM_BE8(rev	r4, r4	)
+> +ARM_BE8(rev	r8, r8	)
 >  
+>  	str	r3, [r2, #GICH_HCR]
+>  	str	r4, [r2, #GICH_VMCR]
+> @@ -476,6 +489,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+>  	add	r3, r11, #VGIC_CPU_LR
+>  	ldr	r4, [r11, #VGIC_CPU_NR_LR]
+>  1:	ldr	r6, [r3], #4
+> +ARM_BE8(rev	r6, r6  )
+>  	str	r6, [r2], #4
+>  	subs	r4, r4, #1
+>  	bne	1b
 > 
 
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
 	M.
+
 -- 
 Jazz is not dead. It just smells funny...
