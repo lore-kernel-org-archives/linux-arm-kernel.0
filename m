@@ -1,31 +1,55 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 27 May 2014 17:19:59 +0200
-Subject: [PATCH] ARM: dts: pfla02: Add ethernet phy supply regulator
-Message-ID: <1401203999-4344-1-git-send-email-p.zabel@pengutronix.de>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 27 May 2014 17:20:10 +0200
+Subject: [PATCH v2 02/11] sched: remove a wake_affine condition
+In-Reply-To: <20140527134542.GB11074@laptop.programming.kicks-ass.net>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-3-git-send-email-vincent.guittot@linaro.org>
+ <20140527134542.GB11074@laptop.programming.kicks-ass.net>
+Message-ID: <CAKfTPtAGX2_=z5EHAqn7Tz7vVEeK673TONSwQ-4JUwURsn=ueA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 2.5V VDD_ETH_IO voltage supplied by the DA9063 LDO4 is used
-to power the KSZ9031 PHY DVDDH input and to pull the necessary
-pins (including bootstrap pins) high.
-It also powers the i.MX6 NVCC_RGMII and NVCC_ENET inputs.
+On 27 May 2014 15:45, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Fri, May 23, 2014 at 05:52:56PM +0200, Vincent Guittot wrote:
+>> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+>> index 9587ed1..30240ab 100644
+>> --- a/kernel/sched/fair.c
+>> +++ b/kernel/sched/fair.c
+>> @@ -4238,7 +4238,6 @@ static int wake_affine(struct sched_domain *sd, struct task_struct *p, int sync)
+>>  {
+>>       s64 this_load, load;
+>>       int idx, this_cpu, prev_cpu;
+>> -     unsigned long tl_per_task;
+>>       struct task_group *tg;
+>>       unsigned long weight;
+>>       int balanced;
+>> @@ -4296,32 +4295,22 @@ static int wake_affine(struct sched_domain *sd, struct task_struct *p, int sync)
+>>               balanced = this_eff_load <= prev_eff_load;
+>>       } else
+>>               balanced = true;
+>> +     schedstat_inc(p, se.statistics.nr_wakeups_affine_attempts);
+>>
+>> +     if (!balanced)
+>> +             return 0;
+>>       /*
+>>        * If the currently running task will sleep within
+>>        * a reasonable amount of time then attract this newly
+>>        * woken task:
+>>        */
+>> +     if (sync)
+>>               return 1;
+>>
+>> +     schedstat_inc(sd, ttwu_move_affine);
+>> +     schedstat_inc(p, se.statistics.nr_wakeups_affine);
+>>
+>> +     return 1;
+>>  }
+>
+> So I'm not usually one for schedstat nitpicking, but should we fix it in
+> the sync case? That is, for sync we return 1 but do no inc
+> nr_wakeups_affine, even though its going to be an affine wakeup.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ok, i'm going to move schedstat update at the right place
 
-diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-index faa3494..2694aa8 100644
---- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-@@ -301,6 +301,7 @@
- 	pinctrl-0 = <&pinctrl_enet>;
- 	phy-mode = "rgmii";
- 	phy-reset-gpios = <&gpio3 23 GPIO_ACTIVE_LOW>;
-+	phy-supply = <&vdd_eth_io_reg>;
- 	status = "disabled";
- };
- 
--- 
-2.0.0.rc2
+>
+>
