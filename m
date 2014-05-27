@@ -1,80 +1,42 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 27 May 2014 17:09:23 -0600
-Subject: [PATCH v8 0/3] R-Car Gen2 PCIe host driver
-In-Reply-To: <1399892270-25021-1-git-send-email-phil.edworthy@renesas.com>
-References: <1399892270-25021-1-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <20140527230923.GG11907@google.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 28 May 2014 01:20:00 +0200
+Subject: PXA 2xx devictree port and clock infrastructure
+In-Reply-To: <4580668.Rz95HmpxUr@wuerfel> (Arnd Bergmann's message of "Tue, 27
+ May 2014 17:49:46 +0200")
+References: <87zji3cr3d.fsf@free.fr> <201405271717.48783.arnd@arndb.de>
+ <20140527154303.GA6835@leverpostej> <4580668.Rz95HmpxUr@wuerfel>
+Message-ID: <87vbsqdd27.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 12, 2014 at 11:57:47AM +0100, Phil Edworthy wrote:
-> This is version 8 of a PCIe Host driver for the R-Car Gen2 devices,
-> i.e. R-Car H2 (r8a7790) and R-Car M2 (r8a7791).
+Arnd Bergmann <arnd@arndb.de> writes:
 
-How do we want to handle maintenance of this new file (pcie-rcar.c)?
-MAINTAINERS currently contains drivers/pci/host/*rcar*, which matches it
-and says Simon maintains it.  If he wants it, I'd like an ack from him
-before merging it.  If not, I'd like to update MAINTAINERS to show who I
-should look for acks from.
+> Right, that is the general recommendation at least. I'm always a bit cautious
+> when it comes to PXA because I don't expect that platform to fully get
+> converted to DT in the long run, and very little new work is going on there.
+>
+> OTOH, if people like Robert and Daniel do this for fun, it's definitely
+> great to see the full solution.
 
-I don't care either way; I just don't know what to do with this right now.
+OK, so let's suppose I go for (c), and :
+ - create drivers/clk/clk-pxa2xx.c
+   => OF clock driver
+ - amend the mach-pxa accordingly to move all clock stuff to this driver
 
-Bjorn
+Is there a clean way for the transition phase, where devicetree pxa-dt machine
+will have to exist with non-DT machine code ? ie. is there around a clock driver
+I can look at where both OF *and* non-OF are working ?
 
-> v8:
->  - Platform changes removed from this patch set
->  - Moved header file contents into c file
->  - Formatting cleaned up
->  - Remove bus/dev/func range checks for config access
->  - Add comment about config access serialization
->  - Made rcar_pcie_setup_window() return void as no errors possible
->  - Remove unused register definitions
->  - Removed __init markers to fix section mismatches
->  - Add explicit bus number range
->  - Get the root bus nr from config writes instead of sys->busnr
->  - Use PCI domains
->  - Removed unused variable in rcar_msi_free()
->  - Split interrupt bindings into separate cells
-> 
-> v7:
->  - Change binding description of clocks to 'clock specifiers'
-> 
-> v6:
->  - Correct DT bindings description for reg and clocks
->  - Split device and board DT changes
->  - Add shmobile to subject for shmobile DT patches
->  - Don't check MSI irq number is valid, as upper level checks this
->  - Change "Unexpected MSI" msg to debug level
->  - Reword "Unexpected MSI" comment so that it's one line
->  - Remove patch that adds HAVE_ARM_ARCH_TIMER to koelsch defconfig as not needed
-> 
-> v5:
->  - Use module_platform_driver instead of subsys_initcall
->  - Use the of_device_id data field for HW init function
->  - Init hw_pci struct in declaration
->  - Renesas SoC compatible string has peripheral before device name
->  - Add PCIe bus clock reference
->  - Use dma-ranges property to specify inbound memory regions
->  - Support multiple IO windows and correct resources
->  - Return IRQ_NONE from MSI isr when there is no pending MSI
->  - Add additional interrupt bindings
-> 
-> v4:
->  - Use runtime PM properly
-> 
-> Phil Edworthy (3):
->   PCI: host: rcar: Add Renesas R-Car PCIe driver
->   PCI: host: rcar: Add MSI support
->   dt-bindings: pci: rcar pcie device tree bindings
-> 
->  Documentation/devicetree/bindings/pci/rcar-pci.txt |   47 +
->  drivers/pci/host/Kconfig                           |    6 +
->  drivers/pci/host/Makefile                          |    1 +
->  drivers/pci/host/pcie-rcar.c                       | 1008 ++++++++++++++++++++
->  4 files changed, 1062 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/rcar-pci.txt
->  create mode 100644 drivers/pci/host/pcie-rcar.c
-> 
-> -- 
-> 1.9.1
-> 
+Ah, and given that PXA clocks are very simple :
+ - their rate is almost always constant, and not changeable
+ - only one register exists to enable/disable all the clocks (bitmask of 32
+ possible clock enables)
+
+Isn't there already a skeleton to handle this type of clocks ? It looks to me
+pretty generic, yet I haven't found it in drivers/clk. Maybe I missed something
+?
+
+Cheers.
+
+--
+Robert
