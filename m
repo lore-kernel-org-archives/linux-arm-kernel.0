@@ -1,53 +1,46 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 27 May 2014 11:09:17 +0200
-Subject: [PATCH 02/11] pinctrl: sunxi: add IRQCHIP_SKIP_SET_WAKE flag
- for pinctrl irq chip
-In-Reply-To: <20140527080746.GB4730@lukather>
-References: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>
- <1401090486-4414-3-git-send-email-hdegoede@redhat.com>
- <20140527080746.GB4730@lukather>
-Message-ID: <5384563D.2000000@redhat.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 27 May 2014 11:13:56 +0200
+Subject: [PATCH v2] pinctrl/at91: Fix lockup when IRQ on PIOC and PIOD
+ occurs
+In-Reply-To: <536CAC87.9070007@atmel.com>
+References: <1398289203-2407-1-git-send-email-alexanders83@web.de>
+ <1398362139-25551-1-git-send-email-alexanders83@web.de>
+ <CACRpkdayBjvOnSfaRmcNenSG=MW0W+UFjqUjGoQwqDNFLQ9zEQ@mail.gmail.com>
+ <536CAC87.9070007@atmel.com>
+Message-ID: <CACRpkdaWt7yLz=qk5smbbdA+vCPF=r-SnMPhiuzORvbNmpMBrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 05/27/2014 10:07 AM, Maxime Ripard wrote:
-> On Mon, May 26, 2014 at 09:47:57AM +0200, Hans de Goede wrote:
->> From: Chen-Yu Tsai <wens@csie.org>
+On Fri, May 9, 2014 at 12:23 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> On 25/04/2014 11:18, Linus Walleij :
+>> On Thu, Apr 24, 2014 at 7:55 PM, Alexander Stein <alexanders83@web.de> wrote:
 >>
->> The sunxi pinctrl irq chip driver does not support wakeup at the
->> moment. Adding IRQCHIP_SKIP_SET_WAKE lets the irqs work with drivers
->> using wakeup.
+>>> With commit 80cc3732 (pinctrl/at91: convert driver to use gpiolib irqchip)
+>>> gpiochip_set_chained_irqchip is called for PIOC, PIOD and PIOE. The
+>>> associated GPIO chip for the IRQ chip is overwritten each time, because
+>>> they share the same hard IRQ line.
+>>> Thus if an IRQ occurs on PIOC or PIOD, gpio_irq_handler will only check on
+>>> PIOE (the assigned GPIO chip) where no event occured. Thus the IRQ will
+>>> not be cleared, retriggering the ISR.
+>>> Fix that (like done before) by only set the PIOC GPIO chip to the IRQ chip
+>>> and walk the list in the irq handler.
+>>>
+>>> Signed-off-by: Alexander Stein <alexanders83@web.de>
+>>> ---
+>>> Changes in v2:
+>>> * Fix git SHA1 in commit message (used local one)
+>>> * Switch to the next gpio_chip when walking the list
 >>
->> Also add a name to the irq chip.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->> index db9ccd6..ec60c2e 100644
->> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->> @@ -646,6 +646,8 @@ static struct irq_chip sunxi_pinctrl_irq_chip = {
->>  	.irq_mask_ack	= sunxi_pinctrl_irq_mask_ack,
->>  	.irq_unmask	= sunxi_pinctrl_irq_unmask,
->>  	.irq_set_type	= sunxi_pinctrl_irq_set_type,
->> +	.name		= "sunxi-pio",
->> +	.flags		= IRQCHIP_SKIP_SET_WAKE,
-> 
-> I'd rather see the name set to dev_name() or something like that. This
-> will not work that great with multiple pin controller supporting
-> interrupts.
+>> This v2 patch applied for next.
+>
+> Linus,
+>
+> I do not see this patch in your "for-next" branch nor in linux-next. Did
+> I miss something?
 
-That would require moving the irq_chip struct to become a member of the
-sunxi_pinctrl struct. Not undoable, but that seems like something which
-should be done in a separate patch. So shall I just drop the .name part
-of this patch for now ?
+I screwed up somehow :-/
 
-Regards,
+Patch applied *now*.
 
-Hans
+Yours,
+Linus Walleij
