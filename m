@@ -1,43 +1,82 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Tue, 27 May 2014 16:56:51 +0300
-Subject: [PATCH 1/1] ARM: keystone: Staticize keystone_restart
-In-Reply-To: <1401189824-19814-1-git-send-email-sachin.kamat@linaro.org>
-References: <1401189824-19814-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <538499A3.7090602@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 27 May 2014 14:57:27 +0100
+Subject: [PATCH v2 2/2] net: hisilicon: add hix5hd2 mac driver
+In-Reply-To: <1401194667-14445-3-git-send-email-zhangfei.gao@linaro.org>
+References: <1401194667-14445-1-git-send-email-zhangfei.gao@linaro.org>
+ <1401194667-14445-3-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20140527135727.GC6969@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 05/27/2014 02:23 PM, Sachin Kamat wrote:
-> 'keystone_restart' is used only in this file.
->
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+On Tue, May 27, 2014 at 01:44:27PM +0100, Zhangfei Gao wrote:
+> Add support for the hix5hd2 XGMAC 1Gb ethernet device.
+> The controller requires two queues for tx and two queues for rx.
+> Controller fetch buffer from free queue and then push to used queue.
+> Diver should prepare free queue and free buffer from used queue.
+> 
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 > ---
->   arch/arm/mach-keystone/keystone.c |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
-> index 59b8383cbdb0..4ac124b7e4e8 100644
-> --- a/arch/arm/mach-keystone/keystone.c
-> +++ b/arch/arm/mach-keystone/keystone.c
-> @@ -123,7 +123,7 @@ static const char *keystone_match[] __initconst = {
->   	NULL,
->   };
->   
-> -void keystone_restart(enum reboot_mode mode, const char *cmd)
-> +static void keystone_restart(enum reboot_mode mode, const char *cmd)
->   {
->   	u32 val;
->   
+>  drivers/net/ethernet/Kconfig                  |    1 +
+>  drivers/net/ethernet/Makefile                 |    1 +
+>  drivers/net/ethernet/hisilicon/Kconfig        |   27 +
+>  drivers/net/ethernet/hisilicon/Makefile       |    5 +
+>  drivers/net/ethernet/hisilicon/hix5hd2_gmac.c | 1057 +++++++++++++++++++++++++
+>  5 files changed, 1091 insertions(+)
+>  create mode 100644 drivers/net/ethernet/hisilicon/Kconfig
+>  create mode 100644 drivers/net/ethernet/hisilicon/Makefile
+>  create mode 100644 drivers/net/ethernet/hisilicon/hix5hd2_gmac.c
 
-Hi Sachin,
+[...]
 
-The function keystone_restart() has been deleted in the following series:
-[Patch v7 0/7] Introduce keystone reset driver
-https://lkml.org/lkml/2014/5/23/588
+> +struct hix5hd2_desc {
+> +       __le32 buff_addr;
+> +       __le32 cmd;
+> +} __aligned(32);
 
-So, there is no reason to correct it.
+[...]
 
--- 
-Regards,
-Ivan Khoronzhuk
+> +static void hix5hd2_rx_refill(struct hix5hd2_priv *priv)
+> +{
+> +       struct hix5hd2_desc *desc;
+> +       struct sk_buff *skb;
+> +       u32 start, end, num, pos, i;
+> +
+> +       /* software write pointer */
+> +       start = dma_cnt(readl_relaxed(priv->base + RX_FQ_WR_ADDR));
+> +       /* logic read pointer */
+> +       end = dma_cnt(readl_relaxed(priv->base + RX_FQ_RD_ADDR));
+> +       num = CIRC_SPACE(start, end, RX_DESC_NUM);
+> +
+> +       for (i = 0, pos = start; i < num; i++) {
+> +               if (priv->rx_skb[pos])
+> +                       break;
+> +               else {
+> +                       skb = netdev_alloc_skb_ip_align(priv->netdev,
+> +                               MAC_MAX_FRAME_SIZE);
+> +                       if (unlikely(skb == NULL))
+> +                               break;
+> +               }
+> +
+> +               desc = priv->rx_fq.desc + pos;
+> +               desc->buff_addr =
+> +                       dma_map_single(priv->dev, skb->data,
+> +                                       MAC_MAX_FRAME_SIZE, DMA_FROM_DEVICE);
+
+buff_addr was declared as an __le32, but here we're pasting values of
+the kernel's native endianness (which might not be little). You will
+need to carefully convert the endianness of this value when dealing with
+it.
+
+> +               if (dma_mapping_error(priv->dev, desc->buff_addr)) {
+> +                       dev_kfree_skb_any(skb);
+> +                       break;
+> +               }
+> +
+> +               priv->rx_skb[pos] = skb;
+> +               desc->cmd = (MAC_MAX_FRAME_SIZE - 1) | DESC_VLD_FREE;
+
+Likewise cmd was described as an __le32 and needs to be converted
+appropriately.
+
+Cheers,
+Mark.
