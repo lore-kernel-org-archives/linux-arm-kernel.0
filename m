@@ -1,77 +1,55 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 27 May 2014 18:53:26 +0100
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
- device tree
-In-Reply-To: <CAPDyKFpg_2RQabM044C1hsNTcuxdVVOvw0ZONVRdysk=eom8UA@mail.gmail.com>
-References: <53806F26.6050706@redhat.com>
- <20140525123452.GS22111@sirena.org.uk>
- <53824294.1090609@redhat.com>
- <20140526103807.GV22111@sirena.org.uk>
- <538321AB.4050006@redhat.com>
- <20140526142225.GF22111@sirena.org.uk>
- <538356DA.7090302@redhat.com>
- <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
- <53838023.2080807@redhat.com>
- <CAPDyKFpg_2RQabM044C1hsNTcuxdVVOvw0ZONVRdysk=eom8UA@mail.gmail.com>
-Message-ID: <20140527175326.GZ12304@sirena.org.uk>
+From: tthayer.linux@gmail.com (Thor Thayer)
+Date: Tue, 27 May 2014 12:58:15 -0500
+Subject: [PATCHv5 3/3] edac: altera: Add EDAC support for Altera SoC SDRAM
+ Controller
+In-Reply-To: <20140526095730.GC25732@pd.tnic>
+References: <1400169891-29546-1-git-send-email-tthayer@altera.com>
+ <1400169891-29546-4-git-send-email-tthayer@altera.com>
+ <20140526095730.GC25732@pd.tnic>
+Message-ID: <CAF03EBd+B5F_UOMOcn+pCE4dOL_24KZku4pweGym=Bip+H_-Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 03:50:33PM +0200, Ulf Hansson wrote:
+On Mon, May 26, 2014 at 4:57 AM, Borislav Petkov <bp@alien8.de> wrote:
+> On Thu, May 15, 2014 at 11:04:51AM -0500, tthayer at altera.com wrote:
+>> From: Thor Thayer <tthayer@altera.com>
+>>
+>> v2: Use the SDRAM controller registers to calculate memory size
+>>     instead of the Device Tree. Update To & Cc list. Add maintainer
+>>     information.
+>>
+>> v3: EDAC driver cleanup based on comments from Mailing list.
+>>
+>> v4: Panic on DBE. Add macro around inject-error reads to prevent
+>>     them from being optimized out. Remove of_match_ptr since this
+>>     will always use Device Tree.
+>>
+>> v5: Addition of printk to trigger function to ensure read vars
+>>     are not optimized out.
+>
+> Yeah, you could turn those vX: messages into a real commit message -
+> much better than none at all :-)
+>
+> Other than that, the edac bits look ok. I'll wait out until you guys've
+> sorted the devicetree issues so ping me when it is ready to pick up.
+>
+> Thanks.
+>
+> --
+> Regards/Gruss,
+>     Boris.
+>
+> Sent from a fat crate under my desk. Formatting is fine.
+> --
 
-> To describe the HW in DT, the embedded SDIO card (actually it could be
-> any type of embedded card) shall be modelled as a child node to the
-> mmc host in DT. Similar to what you have proposed, but with the
-> difference that the child node _must_ contain a DT compatible string,
-> which means a "powerup-driver" can be probed.
+Hi Boris,
 
-> Yes, I understand we might need one DT compatible string per board,
-> but that's because we need to model the hardware - and it differs.
+Sorry about the commit message - I thought I'd fixed it. It will be
+fixed in the next version.
 
-> To clarify my view, we do need a "powerup-driver" and the primary
-> reason is that we must not model "power up sequences" within DT.
-> Typically I see the "powerup-driver" as a simple platform driver
-> attached to the platform bus, but I that could of course differ.
+I think Steffen and I have worked out how the devicetree should look.
+I'll submit the changes soon.
 
-This then either conflicts with cases where we need to describe the
-actual contents of the slot with a compatible string or means that the
-SDIO driver needs to handle powerup sequencing since we should be
-binding to the first compatible we find.  If the host controller driver
-and/or subsystem is going to deal with the powering up it's not clear
-that it specifically needs to be the compatible property that's used
-to determine the powerup method, it could just be a boolean or a
-'power-method = blah' property (where blah is one of a series of strings
-defining methods).  Alternatively we could have separate nodes for the
-slot and SDIO device but that feels meh.  What's the hard requirement
-for it to specifically be a compatible property?
+Thanks,
 
-> The slot will be the first level of child node under the mmc host,
-> then each slot may have a child node which models the embedded card.
-> But, let's leave that discussion for now. :-)
-
-OK, that's the separate node for the slot and device.
-
-> Powerup driver's ->probe():
-> Typically the "powerup driver" will need to register a few callback
-> functions towards the mmc core. Typically at mmc_of_parse(), those
-> callbacks will have to be connected to a particular mmc host.
-
-> I would like to see three different callbacks, mirroring each of the
-> mmc_ios power_mode states MMC_POWER_OFF|UP|ON.
-
-> The power up sequence, performed by the mmc core:
-> The mmc_power_up|off functions, will invoke the registered "powerup
-> driver's" callbacks if they exists for the particular host it operates
-> on.
-
-There's also the need for the SDIO device to be able to get at the
-resources provided and actively work with them at runtime if it wants to
-manage things more actively (partial poweroff for low power states or
-managing clock rates for example).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140527/4a1b1382/attachment-0001.sig>
+Thor
