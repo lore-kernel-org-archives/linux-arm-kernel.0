@@ -1,227 +1,79 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 27 May 2014 09:10:19 -0400
-Subject: [for-next][PATCH] ftrace: Make CALLER_ADDRx macros more generic
-In-Reply-To: <535E3040.7090402@linaro.org>
-References: <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
- <1394862353-28963-7-git-send-email-takahiro.akashi@linaro.org>
- <20140416135217.GF1001@arm.com> <535E3040.7090402@linaro.org>
-Message-ID: <20140527091019.54a8d2d6@gandalf.local.home>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 27 May 2014 14:13:32 +0100
+Subject: [RESEND PATCH v5 3/5] ARM: Conceal DEBUG_LL_UART_NONE from
+ unsupported platforms
+In-Reply-To: <6624276.NBS809VbNB@wuerfel>
+References: <1398355246-29571-1-git-send-email-daniel.thompson@linaro.org>
+ <1400857819-7975-4-git-send-email-daniel.thompson@linaro.org>
+ <5013253.K6sZTxep7b@wuerfel> <6624276.NBS809VbNB@wuerfel>
+Message-ID: <53848F7C.6020508@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
+On 26/05/14 14:39, Arnd Bergmann wrote:
+>>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>>> index eab8ecb..4c8d7db 100644
+>>> --- a/arch/arm/Kconfig.debug
+>>> +++ b/arch/arm/Kconfig.debug
+>>> @@ -842,7 +842,18 @@ choice
+>>>  
+>>>       config DEBUG_LL_UART_NONE
+>>>               bool "No low-level debugging UART"
+>>> -             depends on !ARCH_MULTIPLATFORM
+>>> +             depends on ARCH_AT91 || \
+>>> +                     ARCH_CLPS711X || \
+>>> +                     ARCH_FOOTBRIDGE || \
+>>> +                     ARCH_KS8695 || \
+>>> +                     ARCH_NETX || \
+>>> +                     ARCH_OMAP1 || \
+>>> +                     ARCH_SA1100 || \
+>>> +                     ARCH_S3C24XX || \
+>>> +                     ARCH_S3C64XX || \
+>>> +                     ARCH_S5P64X0 || \
+>>> +                     ARCH_S5PC100 || \
+>>> +                     ARCH_S5PV210
+>>>               help
+>>>                 Say Y here if your platform doesn't provide a UART option
+>>>                 above. This relies on your platform choosing the right UART
+>>
+>> ARCH_S3C24XX has been moved over in linux-next to use debug/s3c24xx.S.
+>> A few others will likely move soon (AT91, CLPS711x, S5PV210), as the
+>> platforms get moved to ARCH_MULTIPLATFORM.
 
-I made a separate branch called ftrace/arm64 as shown below. You can
-pull that branch to base the rest of Akashi-san's patches on top of it.
-The branch is based on top of v3.15-rc5.
+The list in my patch came from:
 
--- Steve
+sundance$ find arch/arm -name "debug-macro.S"
+arch/arm/mach-at91/include/mach/debug-macro.S
+arch/arm/mach-clps711x/include/mach/debug-macro.S
+arch/arm/mach-footbridge/include/mach/debug-macro.S
+arch/arm/mach-ks8695/include/mach/debug-macro.S
+arch/arm/mach-netx/include/mach/debug-macro.S
+arch/arm/mach-omap1/include/mach/debug-macro.S
+arch/arm/mach-s3c64xx/include/mach/debug-macro.S
+arch/arm/mach-s5p64x0/include/mach/debug-macro.S
+arch/arm/mach-s5pc100/include/mach/debug-macro.S
+arch/arm/mach-s5pv210/include/mach/debug-macro.S
+arch/arm/mach-sa1100/include/mach/debug-macro.S
+
+In other words this patch lists of all platforms where
+DEBUG_LL_UART_NONE should not result in failure to compile the kernel.
+
+This list doesn't seem to have changed in linux-next.
+
+>> As an alternative to your patch, we could decide to move the remaining
+>> files as well.
+> 
+> Follow-up: I also noticed that AT91, CLPS711X, FOOTBRIDGE and all the SAMSUNG
+> platforms already have an entry in the list, so DEBUG_LL_UART_NONE is redundant
+> for them. The below change should be enough.
+> 
+> For AT91 this is actually better because the old AT91X40 support doesn't
+> have working DEBUG_LL support. This gets handled correctly by 
+> AT91_DEBUG_LL_DBGU0/AT91_DEBUG_LL_DBGU1, but not DEBUG_LL_UART_NONE.
+
+I'm very happy to update my patch to follow this one. However since it
+will render the corresponding debug-macro.S unreachable by KBuild I like
+to nuke the file as well. Good idea?
 
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/rostedt/linux-trace.git
-ftrace/arm64
-
-Head SHA1: eed542d6962ba33a689b4007a389f466e407bd74
-
-
-AKASHI Takahiro (1):
-      ftrace: Make CALLER_ADDRx macros more generic
-
-----
- arch/arm/include/asm/ftrace.h      | 10 +---------
- arch/blackfin/include/asm/ftrace.h | 11 +----------
- arch/parisc/include/asm/ftrace.h   | 10 +---------
- arch/sh/include/asm/ftrace.h       | 10 +---------
- arch/xtensa/include/asm/ftrace.h   | 14 ++++----------
- include/linux/ftrace.h             | 34 ++++++++++++++++++----------------
- 6 files changed, 26 insertions(+), 63 deletions(-)
----------------------------
-commit eed542d6962ba33a689b4007a389f466e407bd74
-Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Date:   Tue May 20 20:31:04 2014 +0900
-
-    ftrace: Make CALLER_ADDRx macros more generic
-    
-    Most archs with HAVE_ARCH_CALLER_ADDR have pretty much the same
-    definitions of CALLER_ADDRx(n). Instead of duplicating the code for all
-    the archs, define a ftrace_return_address0() and
-    ftrace_return_address(n) that can be overwritten by the archs if they
-    need to do something different. Instead of 7 macros in every arch, we
-    now only have at most 2 (and actually only 1 as
-    ftrace_return_address0() should be the same for all archs).
-    
-    The CALLER_ADDRx(n) will now be defined in linux/ftrace.h and use the
-    ftrace_return_address*(n?) macros. This removes a lot of the duplicate
-    code.
-    
-    Link: http://lkml.kernel.org/p/1400585464-30333-1-git-send-email-takahiro.akashi at linaro.org
-    
-    Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-    Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
-
-diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
-index f89515adac60..eb577f4f5f70 100644
---- a/arch/arm/include/asm/ftrace.h
-+++ b/arch/arm/include/asm/ftrace.h
-@@ -52,15 +52,7 @@ extern inline void *return_address(unsigned int level)
- 
- #endif
- 
--#define HAVE_ARCH_CALLER_ADDR
--
--#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
--#define CALLER_ADDR1 ((unsigned long)return_address(1))
--#define CALLER_ADDR2 ((unsigned long)return_address(2))
--#define CALLER_ADDR3 ((unsigned long)return_address(3))
--#define CALLER_ADDR4 ((unsigned long)return_address(4))
--#define CALLER_ADDR5 ((unsigned long)return_address(5))
--#define CALLER_ADDR6 ((unsigned long)return_address(6))
-+#define ftrace_return_addr(n) return_address(n)
- 
- #endif /* ifndef __ASSEMBLY__ */
- 
-diff --git a/arch/blackfin/include/asm/ftrace.h b/arch/blackfin/include/asm/ftrace.h
-index 8a029505d7b7..2f1c3c2657ad 100644
---- a/arch/blackfin/include/asm/ftrace.h
-+++ b/arch/blackfin/include/asm/ftrace.h
-@@ -66,16 +66,7 @@ extern inline void *return_address(unsigned int level)
- 
- #endif /* CONFIG_FRAME_POINTER */
- 
--#define HAVE_ARCH_CALLER_ADDR
--
--/* inline function or macro may lead to unexpected result */
--#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
--#define CALLER_ADDR1 ((unsigned long)return_address(1))
--#define CALLER_ADDR2 ((unsigned long)return_address(2))
--#define CALLER_ADDR3 ((unsigned long)return_address(3))
--#define CALLER_ADDR4 ((unsigned long)return_address(4))
--#define CALLER_ADDR5 ((unsigned long)return_address(5))
--#define CALLER_ADDR6 ((unsigned long)return_address(6))
-+#define ftrace_return_address(n) return_address(n)
- 
- #endif /* __ASSEMBLY__ */
- 
-diff --git a/arch/parisc/include/asm/ftrace.h b/arch/parisc/include/asm/ftrace.h
-index 72c0fafaa039..544ed8ef87eb 100644
---- a/arch/parisc/include/asm/ftrace.h
-+++ b/arch/parisc/include/asm/ftrace.h
-@@ -24,15 +24,7 @@ extern void return_to_handler(void);
- 
- extern unsigned long return_address(unsigned int);
- 
--#define HAVE_ARCH_CALLER_ADDR
--
--#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
--#define CALLER_ADDR1 return_address(1)
--#define CALLER_ADDR2 return_address(2)
--#define CALLER_ADDR3 return_address(3)
--#define CALLER_ADDR4 return_address(4)
--#define CALLER_ADDR5 return_address(5)
--#define CALLER_ADDR6 return_address(6)
-+#define ftrace_return_address(n) return_address(n)
- 
- #endif /* __ASSEMBLY__ */
- 
-diff --git a/arch/sh/include/asm/ftrace.h b/arch/sh/include/asm/ftrace.h
-index 13e9966464c2..e79fb6ebaa42 100644
---- a/arch/sh/include/asm/ftrace.h
-+++ b/arch/sh/include/asm/ftrace.h
-@@ -40,15 +40,7 @@ static inline unsigned long ftrace_call_adjust(unsigned long addr)
- /* arch/sh/kernel/return_address.c */
- extern void *return_address(unsigned int);
- 
--#define HAVE_ARCH_CALLER_ADDR
--
--#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
--#define CALLER_ADDR1 ((unsigned long)return_address(1))
--#define CALLER_ADDR2 ((unsigned long)return_address(2))
--#define CALLER_ADDR3 ((unsigned long)return_address(3))
--#define CALLER_ADDR4 ((unsigned long)return_address(4))
--#define CALLER_ADDR5 ((unsigned long)return_address(5))
--#define CALLER_ADDR6 ((unsigned long)return_address(6))
-+#define ftrace_return_address(n) return_address(n)
- 
- #endif /* __ASSEMBLY__ */
- 
-diff --git a/arch/xtensa/include/asm/ftrace.h b/arch/xtensa/include/asm/ftrace.h
-index 736b9d214d80..6c6d9a9f185f 100644
---- a/arch/xtensa/include/asm/ftrace.h
-+++ b/arch/xtensa/include/asm/ftrace.h
-@@ -12,24 +12,18 @@
- 
- #include <asm/processor.h>
- 
--#define HAVE_ARCH_CALLER_ADDR
- #ifndef __ASSEMBLY__
--#define CALLER_ADDR0 ({ unsigned long a0, a1; \
-+#define ftrace_return_address0 ({ unsigned long a0, a1; \
- 		__asm__ __volatile__ ( \
- 			"mov %0, a0\n" \
- 			"mov %1, a1\n" \
- 			: "=r"(a0), "=r"(a1)); \
- 		MAKE_PC_FROM_RA(a0, a1); })
-+
- #ifdef CONFIG_FRAME_POINTER
- extern unsigned long return_address(unsigned level);
--#define CALLER_ADDR1 return_address(1)
--#define CALLER_ADDR2 return_address(2)
--#define CALLER_ADDR3 return_address(3)
--#else /* CONFIG_FRAME_POINTER */
--#define CALLER_ADDR1 (0)
--#define CALLER_ADDR2 (0)
--#define CALLER_ADDR3 (0)
--#endif /* CONFIG_FRAME_POINTER */
-+#define ftrace_return_address(n) return_address(n)
-+#endif
- #endif /* __ASSEMBLY__ */
- 
- #ifdef CONFIG_FUNCTION_TRACER
-diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
-index ae9504b4b67d..2018751cad9e 100644
---- a/include/linux/ftrace.h
-+++ b/include/linux/ftrace.h
-@@ -616,25 +616,27 @@ static inline void __ftrace_enabled_restore(int enabled)
- #endif
- }
- 
--#ifndef HAVE_ARCH_CALLER_ADDR
-+/* All archs should have this, but we define it for consistency */
-+#ifndef ftrace_return_address0
-+# define ftrace_return_address0 __builtin_return_address(0)
-+#endif
-+
-+/* Archs may use other ways for ADDR1 and beyond */
-+#ifndef ftrace_return_address
- # ifdef CONFIG_FRAME_POINTER
--#  define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
--#  define CALLER_ADDR1 ((unsigned long)__builtin_return_address(1))
--#  define CALLER_ADDR2 ((unsigned long)__builtin_return_address(2))
--#  define CALLER_ADDR3 ((unsigned long)__builtin_return_address(3))
--#  define CALLER_ADDR4 ((unsigned long)__builtin_return_address(4))
--#  define CALLER_ADDR5 ((unsigned long)__builtin_return_address(5))
--#  define CALLER_ADDR6 ((unsigned long)__builtin_return_address(6))
-+#  define ftrace_return_address(n) __builtin_return_address(n)
- # else
--#  define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
--#  define CALLER_ADDR1 0UL
--#  define CALLER_ADDR2 0UL
--#  define CALLER_ADDR3 0UL
--#  define CALLER_ADDR4 0UL
--#  define CALLER_ADDR5 0UL
--#  define CALLER_ADDR6 0UL
-+#  define ftrace_return_address(n) 0UL
- # endif
--#endif /* ifndef HAVE_ARCH_CALLER_ADDR */
-+#endif
-+
-+#define CALLER_ADDR0 ((unsigned long)ftrace_return_address0)
-+#define CALLER_ADDR1 ((unsigned long)ftrace_return_address(1))
-+#define CALLER_ADDR2 ((unsigned long)ftrace_return_address(2))
-+#define CALLER_ADDR3 ((unsigned long)ftrace_return_address(3))
-+#define CALLER_ADDR4 ((unsigned long)ftrace_return_address(4))
-+#define CALLER_ADDR5 ((unsigned long)ftrace_return_address(5))
-+#define CALLER_ADDR6 ((unsigned long)ftrace_return_address(6))
- 
- #ifdef CONFIG_IRQSOFF_TRACER
-   extern void time_hardirqs_on(unsigned long a0, unsigned long a1);
+Daniel.
