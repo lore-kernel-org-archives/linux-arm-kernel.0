@@ -1,37 +1,46 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 27 May 2014 11:08:54 -0700
-Subject: [PATCH v3 0/6] mfd: twl4030-power: Enable off-idle configuration when
- booted with device tree
-Message-ID: <1401214140-9828-1-git-send-email-tony@atomide.com>
+Date: Tue, 27 May 2014 11:08:55 -0700
+Subject: [PATCH 1/6] mfd: twl4030-power: Fix hang on reboot if sleep
+ configuration was loaded earlier
+In-Reply-To: <1401214140-9828-1-git-send-email-tony@atomide.com>
+References: <1401214140-9828-1-git-send-email-tony@atomide.com>
+Message-ID: <1401214140-9828-2-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Looks like we can still hit the issue of wrong load order of
+twl4030 configuration. If we have a sleep configuration loaded,
+and do a warm reset, the device can hang while initializing the
+wakeup12 sequence. We do have a warning message about wrong order
+of twl4030 configuration, but in this case it does not help as
+the sleep configuration was loaded during the previous boot and
+the state of twl4030 is maintained throughout the warm reset.
 
-Here are these patches for you again as you requested.
-I left out the last patch in the series containing the
-related .dts changes to enable these features as
-that I can apply separately.
+Fix the issue by clearing any existing sleep configuration
+before we load the warm reset configuration.
 
-Regards,
+Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ drivers/mfd/twl4030-power.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Tony
-
-
-Tony Lindgren (6):
-  mfd: twl4030-power: Fix hang on reboot if sleep configuration was
-    loaded earlier
-  mfd: twl4030-power: Fix some defines for SW_EVENTS
-  mfd: twl4030-power: Add generic reset configuration
-  mfd: twl4030-power: Add recommended idle configuration
-  mfd: twl4030-power: Add support for board specific configuration
-  mfd: twl4030-power: Add a configuration to turn off oscillator during
-    off-idle
-
- .../devicetree/bindings/mfd/twl4030-power.txt      |  17 +-
- drivers/mfd/twl4030-power.c                        | 286 +++++++++++++++++++--
- include/linux/i2c/twl.h                            |   4 +
- 3 files changed, 281 insertions(+), 26 deletions(-)
-
+diff --git a/drivers/mfd/twl4030-power.c b/drivers/mfd/twl4030-power.c
+index 96162b6..1b30d8a 100644
+--- a/drivers/mfd/twl4030-power.c
++++ b/drivers/mfd/twl4030-power.c
+@@ -421,6 +421,12 @@ static int load_twl4030_script(struct twl4030_script *tscript,
+ 			goto out;
+ 	}
+ 	if (tscript->flags & TWL4030_WAKEUP12_SCRIPT) {
++		/* Reset any existing sleep script to avoid hangs on reboot */
++		err = twl_i2c_write_u8(TWL_MODULE_PM_MASTER, END_OF_SCRIPT,
++				       R_SEQ_ADD_A2S);
++		if (err)
++			goto out;
++
+ 		err = twl4030_config_wakeup12_sequence(address);
+ 		if (err)
+ 			goto out;
 -- 
 1.8.1.1
