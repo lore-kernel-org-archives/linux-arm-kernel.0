@@ -1,46 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 27 May 2014 20:52:12 +0100
-Subject: [PATCH RFC 02/11] sound: ASoC: kirkwood: Remove unused drivers
-In-Reply-To: <20140527181818.GK26379@lunn.ch>
-References: <1400163836-9831-1-git-send-email-andrew@lunn.ch>
- <1400163836-9831-5-git-send-email-andrew@lunn.ch>
- <20140526155901.GF22111@sirena.org.uk>
- <20140527164530.GJ26379@lunn.ch>
- <20140527180047.GA12304@sirena.org.uk>
- <20140527181818.GK26379@lunn.ch>
-Message-ID: <20140527195212.GE12304@sirena.org.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 27 May 2014 21:58:03 +0200
+Subject: [PATCH v6 2/4] live migration support for initial write protect
+ of VM
+In-Reply-To: <1400178451-4984-3-git-send-email-m.smarduch@samsung.com>
+References: <1400178451-4984-1-git-send-email-m.smarduch@samsung.com>
+ <1400178451-4984-3-git-send-email-m.smarduch@samsung.com>
+Message-ID: <20140527195803.GB16428@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 08:18:18PM +0200, Andrew Lunn wrote:
-> On Tue, May 27, 2014 at 07:00:47PM +0100, Mark Brown wrote:
-> > On Tue, May 27, 2014 at 06:45:30PM +0200, Andrew Lunn wrote:
+On Thu, May 15, 2014 at 11:27:29AM -0700, Mario Smarduch wrote:
+> Patch adds memslot support for initial write protection and split up of huge 
+> pages
 
-> > > This is an RFC patch, as it says in the Subject line, and the cover
-> > > note. It is not intended to be applied yet. Please unapply it, and the
-> > > other one in the series you have applied.
+I lost track of where we are with these patches, but I see a lot of
+issues in this patch that I believe I already commented on (but I may
+not have had time to comment before you sent out v6).
 
-> > Eh?  I thought the discussion was that everything was OK and we were
-> > going to go ahead with this approach.  Or to put it another way what's
-> > wrong with this and what's expected to change?
+In any case, I'm going to wait with reviewing things carefully until you
+send out a v7, but for v7:
+ - Please document the rationale and design behind what you're doing in
+   the commit text of each patch.  Each of these patches are quite
+   large, but the commit messages are barely two lines.  I suggest you
+   take a look at 'git log arch/arm/kvm' for example to get a feel for
+   what I'm looking for.
 
-> What is wrong is that the merge path for the first patch, which
-> removes the boards making use of these drivers, has already closed for
-> patches.  So we now have boards left in the tree with broken audio. We
-> can leave it that way, because these boards are actually in the tree
-> twice. One using DT, which will work as things are now, and old style
-> board file boards which are broken.
+ - There is nothing specific in the interface to KVM discussing
+   migration or live migration, it is only used as an example for
+   features in trying to stay generic.  Please use similar generic
+   concepts in the kernel to make things coherent.  'git grep
+   migration arch/x86/kvm' also tells you that x86 gets away with full
+   support for live migration without referring to migration except as
+   examples of how features might be useful.
 
-OK, so another part of this is that you didn't send the first patch to
-me so I didn't realise that the boards were still there.  TBH I'd have
-expected that removal to just be going in independently of cleaning up
-the drivers.
+Thanks for the work, looking forward to seeing a new revision.
 
-Anyway, I dropped the patches.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140527/a5aa8568/attachment.sig>
+-Christoffer
