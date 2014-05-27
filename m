@@ -1,80 +1,33 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Tue, 27 May 2014 19:03:00 +0200
-Subject: [PATCH 09/11] brcmfmac: Fix OOB interrupt not working for BCM43362
-In-Reply-To: <1401090486-4414-10-git-send-email-hdegoede@redhat.com>
-References: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>
- <1401090486-4414-10-git-send-email-hdegoede@redhat.com>
-Message-ID: <5384C544.9000903@broadcom.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 27 May 2014 10:06:56 -0700
+Subject: [PATCH v11 0/3] Exynos 5410 support
+In-Reply-To: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com> (Tarek
+ Dakhran's message of "Mon, 26 May 2014 07:23:30 +0400")
+References: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>
+Message-ID: <7hr43f9mmn.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/14 09:48, Hans de Goede wrote:
-> It has taken me a long long time to get the OOB interrupt working on the
-> AP6210 sdio wifi/bt module found on various Allwinner A20 boards. In the
-> end I found these magic register pokes in the cubietruck kernel tree:
-> https://github.com/cubieboard2/linux-sunxi/commit/7f08ba395617d17e7a711507503d89a50406fe7a
->
-> I'm not entirely sure if this specific to the AP6210 module, or if this
-> should be done for all BCM43362 sdio devices.
+Tarek Dakhran <t.dakhran@samsung.com> writes:
 
-Let keep it as this for now. I added some remarks below.
-
-Regards,
-Arend
-
-> Signed-off-by: Hans de Goede<hdegoede@redhat.com>
-> ---
->   drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c | 18 ++++++++++++++++++
->   1 file changed, 18 insertions(+)
+> The series of patches represent support of Exynos 5410 SoC
 >
-> diff --git a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
-> index 0fc707c..2369a0f 100644
-> --- a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
-> +++ b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
-> @@ -39,7 +39,9 @@
->   #include<brcm_hw_ids.h>
->   #include<brcmu_utils.h>
->   #include<brcmu_wifi.h>
-> +#include<chipcommon.h>
->   #include<soc.h>
-> +#include "chip.h"
->   #include "dhd_bus.h"
->   #include "dhd_dbg.h"
->   #include "sdio_host.h"
-> @@ -119,6 +121,7 @@ int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev)
->   {
->   	int ret = 0;
->   	u8 data;
-> +	u32 addr, gpiocontrol;
->   	unsigned long flags;
+> The Exynos 5410 is the first Samsung SoC based on big.LITTLE architecture
 >
->   	if ((sdiodev->pdata)&&  (sdiodev->pdata->oob_irq_supported)) {
-> @@ -148,6 +151,21 @@ int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev)
+> Patches add new platform description, support of clock controller and device
+> tree for Exynos 5410.
 >
->   		sdio_claim_host(sdiodev->func[1]);
+> Has been build on Samsung Linux Kernel
+>   (branch: for-next, commit: 97eae6c Merge branch 'v3.16-next/multiplatform' into for-next)
 >
-> +		if (sdiodev->bus_if->chip == BCM43362_CHIP_ID) {
-+			/* assign GPIO to SDIO core */
-> +			addr = CORE_CC_REG(SI_ENUM_BASE, gpiocontrol);
-> +			gpiocontrol = brcmf_sdiod_regrl(sdiodev, addr,&ret);
-> +			gpiocontrol |= 0x2;
-> +			brcmf_sdiod_regwl(sdiodev, addr, gpiocontrol,&ret);
-> +
-> +			/* SPROM_ADDR_HIGH ? perhaps the defines name is off */
+> Has been tested on: 1) Exynos 5410 reference board (exynos_defconfig)
+> 		    2) Exynos 5410 reference board (multi_v7_defconfig)
+> 		    3) Odroid-XU board (exynos_defconfig)
+> 		    4) Odroid-XU board (multi_v7_defconfig)
 
-These names are all off. These should be:
-SBSDIO_SPROM_ADDR_HIGH = SBSDIO_GPIO_SELECT
-SBSDIO_CHIP_CTRL_DATA = SBSDIO_GPIO_OUT
-SBSDIO_CHIP_CTRL_EN = SBSDIO_GPIO_EN
+Tested-by: Kevin Hilman <khilman@linaro.org>
 
-> +			brcmf_sdiod_regwb(sdiodev, SBSDIO_SPROM_ADDR_HIGH, 0xf,
-> +					&ret);
-> +			brcmf_sdiod_regwb(sdiodev, SBSDIO_CHIP_CTRL_DATA, 0,
-> +					&ret);
-> +			brcmf_sdiod_regwb(sdiodev, SBSDIO_CHIP_CTRL_EN, 0x2,
-> +					&ret);
-> +		}
-> +
->   		/* must configure SDIO_CCCR_IENx to enable irq */
->   		data = brcmf_sdiod_regrb(sdiodev, SDIO_CCCR_IENx,&ret);
->   		data |= 1<<  SDIO_FUNC_1 | 1<<  SDIO_FUNC_2 | 1;
+FYI, I boot tested this on an odroid-xu (exynos_defconfig and
+multi_v7_defconfig.)
+
+Kevin
