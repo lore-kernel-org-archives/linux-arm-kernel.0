@@ -1,84 +1,58 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 27 May 2014 13:52:16 +0200
-Subject: [PATCH RFCv2 1/5] ARM: use write allocate by default on ARMv6+
-In-Reply-To: <20140527094749.GE3693@n2100.arm.linux.org.uk>
-References: <1400600105-3013-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1400600105-3013-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140526162643.GB3693@n2100.arm.linux.org.uk>
- <20140527111542.6a49833f@free-electrons.com>
- <20140527094749.GE3693@n2100.arm.linux.org.uk>
-Message-ID: <20140527135216.7eaf3b3f@free-electrons.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Tue, 27 May 2014 17:24:10 +0530
+Subject: [PATCH 1/1] ARM: mvebu: Staticize local variables
+In-Reply-To: <20140527135108.1642833b@free-electrons.com>
+References: <1401190629-24559-1-git-send-email-sachin.kamat@linaro.org>
+ <20140527135108.1642833b@free-electrons.com>
+Message-ID: <CAK9yfHxm27Rg3YcXTfSff7LAmYsj-VFBgBKXBXiD8SXGGYfFzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+Hi Thomas,
 
-On Tue, 27 May 2014 10:47:49 +0100, Russell King - ARM Linux wrote:
+On 27 May 2014 17:21, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Dear Sachin Kamat,
+>
+> On Tue, 27 May 2014 17:07:09 +0530, Sachin Kamat wrote:
+>> Symbols local to this file are made static.
+>>
+>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>> ---
+>>  arch/arm/mach-mvebu/pmsu.c |    4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+>> index 53a55c8520bf..950105871480 100644
+>> --- a/arch/arm/mach-mvebu/pmsu.c
+>> +++ b/arch/arm/mach-mvebu/pmsu.c
+>> @@ -148,7 +148,7 @@ static void armada_370_xp_cpu_resume(void)
+>>  }
+>>
+>>  /* No locking is needed because we only access per-CPU registers */
+>> -void armada_370_xp_pmsu_idle_prepare(bool deepidle)
+>> +static void armada_370_xp_pmsu_idle_prepare(bool deepidle)
+>
+> I already submitted a patch for this one yesterday:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/259849.html.
 
-> > Absolutely. Just like it is *required* for hardware I/O coherency on
-> > Marvell Armada platforms, even those that are non-SMP like Armada
-> > 370 or Armada 380.
-> 
-> What this boils down to is this statement:
-> 
-> 	If we require hardware coherency between any other master and
-> 	a CPU, we require the caches to be in write allocate mode.
-> 
-> whether "any other master" is another CPU or a device.  So, SMP is
-> just a specific case of the general case, and we should treat the
-> selection of this as per the generic case.
+I missed this. Sorry.
 
-Right. However, remember that I have to support hardware I/O coherency
-on processors for which is_smp() returns false, even when CONFIG_SMP=y
-and CONFIG_SMP_ON_UP=y. The Armada 370 is in this case.
+>
+>>  {
+>>       unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
+>>       u32 reg;
+>> @@ -263,7 +263,7 @@ static struct notifier_block
+>> armada_370_xp_cpu_pm_notifier = { .notifier_call =
+>> armada_370_xp_cpu_pm_notify, };
+>>
+>> -int __init armada_370_xp_cpu_pm_init(void)
+>> +static int __init armada_370_xp_cpu_pm_init(void)
+>
+> Indeed, this one needs to be fixed.
 
-> > > You break this by allowing SMP to specify writeback read-allocate.
-> > 
-> > I am certainly not very familiar with the code in mm/mmu.c, but I'm
-> > not sure to see why I allow SMP to specify writeback read-allocate.
-> > What the code does is:
-> 
-> @@ -408,14 +408,14 @@ static void __init build_mem_type_table(void)
->                 if (cachepolicy > CPOLICY_WRITETHROUGH)
->                         cachepolicy = CPOLICY_WRITETHROUGH;
->  #endif
-> +               if (cachepolicy > CPOLICY_WRITEBACK)
-> +                       cachepolicy = CPOLICY_WRITEBACK;
->         }
-> 
-> and the rest of this hunk.
+How do you want me to handle this?
 
-If specific hunk is inside a:
-
-	if (cpu_arch < CPU_ARCH_ARMv6) {
-
-and as far as I'm aware, there are no ARMv5 or earlier platforms that
-are SMP-capable. Are there any?
-
-> >  * In early_cachepolicy(), if a specific cachepolicy= argument is
-> >    passed to the kernel, we use it, except for >= ARMv6, where
-> >    CPOLICY_WRITEALLOC is forced.
-> 
-> What if you want to run ARMv6 UP (non-coherent) in read-allocate mode
-> (which is the way it is today?)
-
-That's indeed no longer possible with my patch, but we could allow
-that with a default on write-allocate, but a possibility of using
-cachepolicy=writeback to get back the previous default cache policy.
-Would that work for you?
-
-However, how to verify that cachepolicy=writeback doesn't contradict
-the need for write-allocate policy for SMP or hardware I/O coherency?
-
-Again, switching to use write-allocate by default was Catalin and Rob
-suggestion. My original suggestion was to make it a per-platform
-choice, through flags in machine_desc (see my PATCH RFCv1 at
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/325200/).
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+With warm regards,
+Sachin
