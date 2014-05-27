@@ -1,198 +1,52 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 27 May 2014 15:50:33 +0200
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
- device tree
-In-Reply-To: <53838023.2080807@redhat.com>
-References: <537E31F7.1030505@gmail.com> <537F1148.3010102@redhat.com>
- <20140523112239.GB12304@sirena.org.uk>
- <537F3610.3050104@redhat.com>
- <20140523162718.GE22111@sirena.org.uk>
- <53806F26.6050706@redhat.com>
- <20140525123452.GS22111@sirena.org.uk>
- <53824294.1090609@redhat.com>
- <20140526103807.GV22111@sirena.org.uk>
- <538321AB.4050006@redhat.com>
- <20140526142225.GF22111@sirena.org.uk>
- <538356DA.7090302@redhat.com>
- <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
- <53838023.2080807@redhat.com>
-Message-ID: <CAPDyKFpg_2RQabM044C1hsNTcuxdVVOvw0ZONVRdysk=eom8UA@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 27 May 2014 14:52:33 +0100
+Subject: [RESEND PATCH v5 3/5] ARM: Conceal DEBUG_LL_UART_NONE from
+ unsupported platforms
+In-Reply-To: <8143025.UYbkItXldM@wuerfel>
+References: <1398355246-29571-1-git-send-email-daniel.thompson@linaro.org>
+ <6624276.NBS809VbNB@wuerfel> <53848F7C.6020508@linaro.org>
+ <8143025.UYbkItXldM@wuerfel>
+Message-ID: <538498A1.4030006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[snip]
+On 27/05/14 14:37, Arnd Bergmann wrote:
+>> I'm very happy to update my patch to follow this one. However since it
+>> will render the corresponding debug-macro.S unreachable by KBuild I like
+>> to nuke the file as well. Good idea?
+> 
+> No. See the description under config DEBUG_LL_UART_NONE:
+> 
+>                   Say Y here if your platform doesn't provide a UART option
+>                   above. This relies on your platform choosing the right UART
+>                   definition internally in order for low-level debugging to
+>                   work.
+> 
+> The platforms I listed do have "a UART option above", e.g.
+> 
+>         config AT91_DEBUG_LL_DBGU0
+>                 bool "Kernel low-level debugging on rm9200, 9260/9g20, 9261/9g10 and 9rl"
+>                 depends on HAVE_AT91_DBGU0
+> 
+> Most of the platforms that have an option like this put the file into
+> include/debug, as is required for ARCH_MULTIPLATFORM. The ones that are
+> not converted to ARCH_MULTIPLATFORM can have it in either place, see
+> 
+> config DEBUG_LL_INCLUDE
+>         string
+>         default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
+>         default "debug/pl01x.S" if DEBUG_LL_UART_PL01X || DEBUG_UART_PL01X
+> 	...
+>         default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
+>         default "mach/debug-macro.S"
+> 
+> Anything that is not explicitly listed under DEBUG_LL_INCLUDE will default
+> to "mach/debug-macro.S", and the list does not (have to) match the choice
+> statements in "Kernel low-level debugging port".
 
->> I am having a bit hard to follow the terminology here. :-) What is a
->> "powerup driver" and what is a "main device driver" in this context?
->>
->> I had a slide which I used at a mmc subsystem crash course recently,
->> please have a look - hopefully this will help us to sort out this.
->>
->> https://drive.google.com/file/d/0B2ePGK-iqMupbDQ2S0o5b3Bhek0/edit?usp=sharing
->
-> Right, the problem is that in the case(s) we're talking about before the sdio
-> device in question can be probed the sdio device may need to have several clk
-> signals enables, reset signal deasserted, etc.
+Ok. Thanks.
 
-Yes. That's an important point.
-
->
-> Some piece of code needs to do that, the proposal so far has been to let the
-> mmc-core deal with this, which will likely work fine for 90% of the cases
-> were we need any form of "powerup", but in some more complex case this may need
-> to happen in a specific order / with specific delays, etc. In this case some
-> separate piece of board and/or sdio device specific code would need to take
-> care of this, hence I was talking about a "powerup-driver", which I agree is
-> not the best name. So lets just forget about the power-driver nomenclature
-> completely.
-
-I have now given this a serious thought, sorry for not doing this
-earlier. Please consider the following ideas and statements. Feel free
-to shoot them down. :-)
-
-DT is supposed to described the hardware. Encoding power up sequences
-within DT, to for example let the mmc core handle this means we are
-touching the concept of open firmware. This is not what DT should be
-used for.
-
-To describe the HW in DT, the embedded SDIO card (actually it could be
-any type of embedded card) shall be modelled as a child node to the
-mmc host in DT. Similar to what you have proposed, but with the
-difference that the child node _must_ contain a DT compatible string,
-which means a "powerup-driver" can be probed.
-
-Yes, I understand we might need one DT compatible string per board,
-but that's because we need to model the hardware - and it differs.
-
-To clarify my view, we do need a "powerup-driver" and the primary
-reason is that we must not model "power up sequences" within DT.
-Typically I see the "powerup-driver" as a simple platform driver
-attached to the platform bus, but I that could of course differ.
-
-[snip]
-
->>>
->>> Ok, so lets switch it over to a boolean, options for the name I see are:
->>>
->>> linux,mmc-host-powerup  (opt in to powerup being dealt with by the mmc core, implementation specific)
->>> simple-powerup          (platform neutral opt in to say just enable all resources and be done with it)
->>> custom-powerup          (platform neutral opt out version of simple-powerup)
->>> linux,custom-powerup    (same, but consider this something linux specific)
->>
->> This seems reasonable to me.
->
-> This being the last option ?
-
-Sorry for the confusion here. As stated above, we need a compatible string.
-
->
->> Well, I don't like the "simple-powerup", because I think a simple
->> powerup sequence is to me already supported by the mmc core, through
->> the regular host interface (->set_ios()).
->>
->> If I understand correctly, this binding is supposed to be configured
->> per host device and thus also per host device slots?
->
-> Yes, although I must admit that have not thought about how to deal with
-> slots, I've no experience with the mmc slots concept at all, or is slot
-> just a different name for sdio function ?
-
-Some mmc hosts may support more than one slot. Thus they can operate
-on more than one card.
-
-Currently, there are no support for this in the mmc core. There can
-only be one card per host, but that's due to software limitation of
-the mmc stack.  Following your suggestion; modelling the card as child
-node under the mmc host, can easily be extended to support more than
-one slot.
-
-The slot will be the first level of child node under the mmc host,
-then each slot may have a child node which models the embedded card.
-But, let's leave that discussion for now. :-)
-
->
-> Thinking more about this, maybe we can solve the problem of people
-> worrying about complex power-on scenarios coming around later, by
-> also encoding the sequence in dt, e.g. something like:
->
->                 mmc3: mmc at 01c12000 {
->                         #address-cells = <1>;
->                         #size-cells = <0>;
->
->                         pinctrl-names = "default";
->                         pinctrl-0 = <&mmc3_pins_a>;
->                         vmmc-supply = <&reg_vmmc3>;
->                         bus-width = <4>;
->                         non-removable;
->                         status = "okay";
->
->                         brcmf: bcrmf at 1 {
->                                 reg = <1>;
->                                 compatible = "brcm,bcm43xx-fmac";
->                                 interrupt-parent = <&pio>;
->                                 interrupts = <10 8>; /* PH10 / EINT10 */
->                                 interrupt-names = "host-wake";
->                                 clocks = <&clk_out_a>;
->                                 clock-names = "clk_32khz";
->                                 gpios = <&pio 7 24 0>;
->                                 gpio-names = "gpio_reg_enable";
->                                 power-on-seq = "gpio_reg_enable", "usleep 1000", "clk_32khz", "usleep 200";
->                                 status = "okay";
->                         };
->                 };
->
-> Where power-on-seq would tell the mmc-core exactly how to bring up the sdio
-> device, using standard prefixes so that the mmc-core knows that something is
-> a clock / gpio / reset / whatever.
-
-I suppose I already made my point here. I don't think this is not a good idea.
-
->
-> This should pretty much work for everything, and if something comes around which
-> really needs some custom bit of code to bring it up, the mmc-core powerup stuff
-> can simply be opted-out by leaving out the power-on-seq property.
->
-> Regards,
->
-> Hans
-
-Here are some more thoughts of how this should be implemented.
-
-Synchronization point:
-My idea is to let the mmc_of_parse() function act as the
-synchronization point, to make sure we are able to perform a full
-power up of the card - before we actually start initialization of it.
-
-If the mmc host has a child node to model the card, mmc_of_parse()
-needs to verify that a struct device is created for it and that it's
-corresponding "powerup driver" has been probed successfully.
-
-If the mmc_of_parse() returns -EPROBE_DEFER, the mmc host driver will
-return the same error code from it's ->probe(). This provides us with
-the ability of waiting for the "powerup driver" to be probed.
-
-If the mmc_of_parse() returns another error code, due to that the
-"powerup driver" failed to be probed, the mmc host driver's ->probe()
-will return the same error code and consequentially no power up of the
-card will be performed at all.
+I'll refresh the patch shortly.
 
 
-Powerup driver's ->probe():
-Typically the "powerup driver" will need to register a few callback
-functions towards the mmc core. Typically at mmc_of_parse(), those
-callbacks will have to be connected to a particular mmc host.
-
-I would like to see three different callbacks, mirroring each of the
-mmc_ios power_mode states MMC_POWER_OFF|UP|ON.
-
-
-The power up sequence, performed by the mmc core:
-The mmc_power_up|off functions, will invoke the registered "powerup
-driver's" callbacks if they exists for the particular host it operates
-on.
-
-
-Comments are of course welcome! :-)
-
-Kind regards
-Ulf Hansson
+Daniel.
