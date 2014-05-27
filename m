@@ -1,27 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 27 May 2014 11:44:06 -0700
-Subject: [PATCH 2/3] ARM: msm: Silence readb/writeb warnings due to
- missing IOMEM()
-In-Reply-To: <1393467394-10907-3-git-send-email-sboyd@codeaurora.org>
-References: <1393467394-10907-1-git-send-email-sboyd@codeaurora.org>
- <1393467394-10907-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140527184406.GA27420@quad.lixom.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 May 2014 20:49:27 +0200
+Subject: [PATCH] arm: Set hardirq tracing to on when idling
+In-Reply-To: <5384BF89.6010509@meduna.org>
+References: <1401045323-7116-1-git-send-email-minyard@acm.org>
+ <4559339.apo3Fd10HK@wuerfel> <5384BF89.6010509@meduna.org>
+Message-ID: <4475199.26Fs5MKAfh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 06:16:33PM -0800, Stephen Boyd wrote:
-> TROUT_CPLD_BASE needs the IOMEM() treatment to avoid warnings
-> from the read/writeb functions.
+On Tuesday 27 May 2014 18:38:33 Stanislav Meduna wrote:
+> On 26.05.2014 11:26, Arnd Bergmann wrote:
 > 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/mach-msm/board-trout-gpio.c | 2 +-
->  arch/arm/mach-msm/board-trout.c      | 2 +-
->  arch/arm/mach-msm/board-trout.h      | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
+> > It seems like the right thing to do, I just don't understand
+> > why nobody hit this before.
 > 
+> Looks like this is what I did hit a month ago and
+> was not able to find the culprit:
+> http://www.spinics.net/lists/linux-rt-users/msg11656.html
 
-Applied to next/fixes-non-critical.
+Ok, so you get a 2.2ms latency on i.mx28 here, which comes
+from exactly the same code location, and is quite alarming
+by itself, but much less so than the 4 second latency that
+Corey is seeing. This could just be an artifact of i.mx28
+not staying idle for as long as vexpress.
 
+> > How exactly do you see this manifest? If it's clear
+> > that the trace comes from the idle function, maybe
+> > everybody just ignores it?
+> 
+> That was definitely what I did 
 
--Olof
+You also commented in that thread about stop_critical_timings()/
+start_critical_timings(). Corey, can you look at that, too? I
+think it's designed to avoid the issue you are seeing but
+for some reason doesn't.
+
+Maybe the problem is that the tracing infrastructure gets confused
+when the irq_disable() happens in a different function from
+irq_enable().
+
+	Arnd
