@@ -1,66 +1,65 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 27 May 2014 12:14:18 +0200
-Subject: [PATCH v3 1/6] mfd: axp20x: add AXP221 PMIC support
-In-Reply-To: <20140527100540.GJ5875@lee--X1>
-References: <1401183535-31003-1-git-send-email-boris.brezillon@free-electrons.com>
- <1401183535-31003-2-git-send-email-boris.brezillon@free-electrons.com>
- <20140527100540.GJ5875@lee--X1>
-Message-ID: <5384657A.3030207@free-electrons.com>
+From: Ying.Liu@freescale.com (Liu Ying)
+Date: Tue, 27 May 2014 18:19:39 +0800
+Subject: [PATCH] pwm: i.MX: Cleanup indentation for register definitions
+Message-ID: <1401185980-29536-1-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch contains no logic change to cleanup indentation
+for register definitions only.
 
-On 27/05/2014 12:05, Lee Jones wrote:
->> Add support for the AXP221 PMIC device to the existing AXP20x driver.
->>
->> The AXP221 defines a new set of registers, power supplies and regulators,
->> but most of the API is similar to the AXP20x ones.
->> The AXP20x irq chip definition is reused, though some interrupts are not
->> available in the AXP221.
->>
->> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
->> ---
->>  drivers/mfd/axp20x.c       | 58 +++++++++++++++++++++++++++++++++++++++++++---
-> Quite a difference from 237 lines, eh?
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@freescale.com>
+Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+Cc: linux-pwm at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+---
+ drivers/pwm/pwm-imx.c |   26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
 
-Yep.
-
-I never said my RFC was using the best approach, I actually asked how
-code sharing should be done in my cover letter ;-).
-
->>  include/linux/mfd/axp20x.h | 56 ++++++++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 111 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
->> index dee6539..119a7ed 100644
->> --- a/drivers/mfd/axp20x.c
->> +++ b/drivers/mfd/axp20x.c
-> [...]
->
->> @@ -190,7 +233,12 @@ static int axp20x_i2c_probe(struct i2c_client *i2c,
->>  	axp20x->dev = &i2c->dev;
->>  	dev_set_drvdata(axp20x->dev, axp20x);
->>  
->> -	axp20x->regmap = devm_regmap_init_i2c(i2c, &axp20x_regmap_config);
->> +	if (axp20x->variant == AXP221_ID)
->> +		axp20x->regmap = devm_regmap_init_i2c(i2c,
->> +						      &axp22x_regmap_config);
->> +	else
->> +		axp20x->regmap = devm_regmap_init_i2c(i2c,
->> +						      &axp20x_regmap_config);
-> Better to put these into a variable and have one instance of
-> devm_regmap_init_i2c() where you pass said variable as the second
-> parameter.
-
-Sure, I'll change that.
-
-Thanks for your review.
-
-Best Regards,
-
-Boris
-
+diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+index cc47733..0784554 100644
+--- a/drivers/pwm/pwm-imx.c
++++ b/drivers/pwm/pwm-imx.c
+@@ -21,24 +21,24 @@
+ 
+ /* i.MX1 and i.MX21 share the same PWM function block: */
+ 
+-#define MX1_PWMC    0x00   /* PWM Control Register */
+-#define MX1_PWMS    0x04   /* PWM Sample Register */
+-#define MX1_PWMP    0x08   /* PWM Period Register */
++#define MX1_PWMC			0x00   /* PWM Control Register */
++#define MX1_PWMS			0x04   /* PWM Sample Register */
++#define MX1_PWMP			0x08   /* PWM Period Register */
+ 
+-#define MX1_PWMC_EN		(1 << 4)
++#define MX1_PWMC_EN			(1 << 4)
+ 
+ /* i.MX27, i.MX31, i.MX35 share the same PWM function block: */
+ 
+-#define MX3_PWMCR                 0x00    /* PWM Control Register */
+-#define MX3_PWMSAR                0x0C    /* PWM Sample Register */
+-#define MX3_PWMPR                 0x10    /* PWM Period Register */
+-#define MX3_PWMCR_PRESCALER(x)    (((x - 1) & 0xFFF) << 4)
+-#define MX3_PWMCR_DOZEEN                (1 << 24)
+-#define MX3_PWMCR_WAITEN                (1 << 23)
++#define MX3_PWMCR			0x00    /* PWM Control Register */
++#define MX3_PWMSAR			0x0C    /* PWM Sample Register */
++#define MX3_PWMPR			0x10    /* PWM Period Register */
++#define MX3_PWMCR_PRESCALER(x)		(((x - 1) & 0xFFF) << 4)
++#define MX3_PWMCR_DOZEEN		(1 << 24)
++#define MX3_PWMCR_WAITEN		(1 << 23)
+ #define MX3_PWMCR_DBGEN			(1 << 22)
+-#define MX3_PWMCR_CLKSRC_IPG_HIGH (2 << 16)
+-#define MX3_PWMCR_CLKSRC_IPG      (1 << 16)
+-#define MX3_PWMCR_EN              (1 << 0)
++#define MX3_PWMCR_CLKSRC_IPG_HIGH	(2 << 16)
++#define MX3_PWMCR_CLKSRC_IPG		(1 << 16)
++#define MX3_PWMCR_EN			(1 << 0)
+ 
+ struct imx_chip {
+ 	struct clk	*clk_per;
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.7.9.5
