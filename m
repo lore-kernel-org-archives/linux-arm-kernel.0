@@ -1,258 +1,126 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 27 May 2014 10:24:18 +0200
-Subject: [PATCH v5 1/8] ASoC: fsl-ssi: introduce SoC specific data
-In-Reply-To: <1401179065-31195-1-git-send-email-mpa@pengutronix.de>
-References: <1401179065-31195-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1401179065-31195-2-git-send-email-mpa@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 27 May 2014 10:22:16 +0200
+Subject: [PATCH 22/22] ARM: sun8i: dt: Add Ippo-q8h v5 support
+In-Reply-To: <CAGb2v64EHLsj-cy13yf28K8vkTJUCv95q=x-7c2yiHQ=uBm-sw@mail.gmail.com>
+References: <1400831485-28576-1-git-send-email-wens@csie.org>
+ <1400831485-28576-23-git-send-email-wens@csie.org>
+ <20140525193955.GB10768@lukather>
+ <CAGb2v64EHLsj-cy13yf28K8vkTJUCv95q=x-7c2yiHQ=uBm-sw@mail.gmail.com>
+Message-ID: <20140527082216.GD4730@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+On Mon, May 26, 2014 at 12:23:09PM +0800, Chen-Yu Tsai wrote:
+> On Mon, May 26, 2014 at 3:39 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Fri, May 23, 2014 at 03:51:25PM +0800, Chen-Yu Tsai wrote:
+> >> The Ippo-q8h is a tablet circiut board commonly found in cheap Android
+> >> tablets with A23 SoCs. There are at least 2 versions of the board, with
+> >> different peripherals, such as WiFi chips.
+> >>
+> >> This patch add supports for v5 of such boards, which has a ESP8089 WiFi
+> >> chip (not supported) connected to mmc1.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >>  arch/arm/boot/dts/Makefile                  |  2 ++
+> >>  arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts | 51 +++++++++++++++++++++++++++++
+> >>  2 files changed, 53 insertions(+)
+> >>  create mode 100644 arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
+> >>
+> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >> index 6967393..f809a53 100644
+> >> --- a/arch/arm/boot/dts/Makefile
+> >> +++ b/arch/arm/boot/dts/Makefile
+> >> @@ -354,6 +354,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+> >>       sun7i-a20-cubietruck.dtb \
+> >>       sun7i-a20-i12-tvbox.dtb \
+> >>       sun7i-a20-olinuxino-micro.dtb
+> >> +dtb-$(CONFIG_MACH_SUN8I) += \
+> >> +     sun8i-a23-ippo-q8h-v5.dtb
+> >>  dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+> >>       tegra20-iris-512.dtb \
+> >>       tegra20-medcom-wide.dtb \
+> >> diff --git a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
+> >> new file mode 100644
+> >> index 0000000..7d0bd97
+> >> --- /dev/null
+> >> +++ b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
+> >> @@ -0,0 +1,51 @@
+> >> +/*
+> >> + * Copyright 2014 Chen-Yu Tsai
+> >> + *
+> >> + * Chen-Yu Tsai <wens@csie.org>
+> >> + *
+> >> + * The code contained herein is licensed under the GNU General Public
+> >> + * License. You may obtain a copy of the GNU General Public License
+> >> + * Version 2 or later at the following locations:
+> >> + *
+> >> + * http://www.opensource.org/licenses/gpl-license.html
+> >> + * http://www.gnu.org/copyleft/gpl.html
+> >> + */
+> >> +
+> >> +/dts-v1/;
+> >> +/include/ "sun8i-a23.dtsi"
+> >> +
+> >> +/ {
+> >> +     model = "Ippo Q8H Dual Core Tablet (v5)";
+> >> +     compatible = "ippo,q8h-v5", "allwinner,sun8i-a23";
+> >> +
+> >> +     chosen {
+> >> +             bootargs = "earlyprintk console=ttyS0,115200";
+> >> +     };
+> >
+> > You should probably add the memory node here too.
+> 
+> OK.
+> 
+> >> +
+> >> +     soc at 01c00000 {
+> >> +             uart0: serial at 01c28000 {
+> >> +                     pinctrl-names = "default";
+> >> +                     pinctrl-0 = <&uart0_pins_a>;
+> >> +                     status = "okay";
+> >> +             };
+> >> +
+> >> +             i2c0: i2c at 01c2ac00 {
+> >> +                     pinctrl-names = "default";
+> >> +                     pinctrl-0 = <&i2c0_pins_a>;
+> >> +                     status = "okay";
+> >> +             };
+> >> +
+> >> +             i2c1: i2c at 01c2b000 {
+> >> +                     pinctrl-names = "default";
+> >> +                     pinctrl-0 = <&i2c1_pins_a>;
+> >> +                     status = "okay";
+> >> +             };
+> >
+> > What are the two i2c busses wired to?
+> 
+> i2c0 has the capacitive touch panel controller gsl1680 @ 0x40.
+> 
+> i2c1 has something (gsensor maybe) connected @ 0x15.
+> The FEX file lists the gsensor on i2c1, but with the address as 0x18.
+> I may need to boot back to stock Android to figure it out.
+> 
+> i2c2 has the camera sensor (GC0309) control connected to it @ 0x66.
+> I didn't list it because I overlooked it, and i2cdetect hangs.
+> It seems to need AXP PMIC support to activate the regulators.
+> 
+> AFAIK, the kernel doesn't have drivers for these devices,
+> so how would we list them?
 
-Introduce a SoC data struct which contains the differences between
-the different SoCs this driver supports. This makes it easy to support
-more differences without having to introduce a new switch/case each
-time.
+We don't need to list them yet. We can just wait for the drivers, it
+was just out of curiosity.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Tested-By: Michael Grzeschik <mgr@pengutronix.de>
----
- sound/soc/fsl/fsl_ssi.c | 125 ++++++++++++++++++++++--------------------------
- 1 file changed, 57 insertions(+), 68 deletions(-)
-
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index ef50425..fa65011 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -132,6 +132,12 @@ struct fsl_ssi_rxtx_reg_val {
- 	struct fsl_ssi_reg_val tx;
- };
- 
-+struct fsl_ssi_soc_data {
-+	bool imx;
-+	bool offline_config;
-+	u32 sisr_write_mask;
-+};
-+
- /**
-  * fsl_ssi_private: per-SSI private data
-  *
-@@ -153,7 +159,6 @@ struct fsl_ssi_private {
- 	struct platform_device *pdev;
- 	unsigned int dai_fmt;
- 
--	enum fsl_ssi_type hw_type;
- 	bool use_dma;
- 	bool baudclk_locked;
- 	bool use_dual_fifo;
-@@ -168,35 +173,9 @@ struct fsl_ssi_private {
- 	struct fsl_ssi_rxtx_reg_val rxtx_reg_val;
- 
- 	struct fsl_ssi_dbg dbg_stats;
--};
- 
--static const struct of_device_id fsl_ssi_ids[] = {
--	{ .compatible = "fsl,mpc8610-ssi", .data = (void *) FSL_SSI_MCP8610},
--	{ .compatible = "fsl,imx51-ssi", .data = (void *) FSL_SSI_MX51},
--	{ .compatible = "fsl,imx35-ssi", .data = (void *) FSL_SSI_MX35},
--	{ .compatible = "fsl,imx21-ssi", .data = (void *) FSL_SSI_MX21},
--	{}
-+	const struct fsl_ssi_soc_data *soc;
- };
--MODULE_DEVICE_TABLE(of, fsl_ssi_ids);
--
--static bool fsl_ssi_is_ac97(struct fsl_ssi_private *ssi_private)
--{
--	return !!(ssi_private->dai_fmt & SND_SOC_DAIFMT_AC97);
--}
--
--static bool fsl_ssi_on_imx(struct fsl_ssi_private *ssi_private)
--{
--	switch (ssi_private->hw_type) {
--	case FSL_SSI_MX21:
--	case FSL_SSI_MX35:
--	case FSL_SSI_MX51:
--		return true;
--	case FSL_SSI_MCP8610:
--		return false;
--	}
--
--	return false;
--}
- 
- /*
-  * imx51 and later SoCs have a slightly different IP that allows the
-@@ -213,18 +192,48 @@ static bool fsl_ssi_on_imx(struct fsl_ssi_private *ssi_private)
-  * while the SSI unit is running (SSIEN). So we support the necessary
-  * online configuration of fsl-ssi starting at imx51.
-  */
--static bool fsl_ssi_offline_config(struct fsl_ssi_private *ssi_private)
--{
--	switch (ssi_private->hw_type) {
--	case FSL_SSI_MCP8610:
--	case FSL_SSI_MX21:
--	case FSL_SSI_MX35:
--		return true;
--	case FSL_SSI_MX51:
--		return false;
--	}
- 
--	return true;
-+static struct fsl_ssi_soc_data fsl_ssi_mpc8610 = {
-+	.imx = false,
-+	.offline_config = true,
-+	.sisr_write_mask = CCSR_SSI_SISR_RFRC | CCSR_SSI_SISR_TFRC |
-+			CCSR_SSI_SISR_ROE0 | CCSR_SSI_SISR_ROE1 |
-+			CCSR_SSI_SISR_TUE0 | CCSR_SSI_SISR_TUE1,
-+};
-+
-+static struct fsl_ssi_soc_data fsl_ssi_imx21 = {
-+	.imx = true,
-+	.offline_config = true,
-+	.sisr_write_mask = 0,
-+};
-+
-+static struct fsl_ssi_soc_data fsl_ssi_imx35 = {
-+	.imx = true,
-+	.offline_config = true,
-+	.sisr_write_mask = CCSR_SSI_SISR_RFRC | CCSR_SSI_SISR_TFRC |
-+			CCSR_SSI_SISR_ROE0 | CCSR_SSI_SISR_ROE1 |
-+			CCSR_SSI_SISR_TUE0 | CCSR_SSI_SISR_TUE1,
-+};
-+
-+static struct fsl_ssi_soc_data fsl_ssi_imx51 = {
-+	.imx = true,
-+	.offline_config = false,
-+	.sisr_write_mask = CCSR_SSI_SISR_ROE0 | CCSR_SSI_SISR_ROE1 |
-+		CCSR_SSI_SISR_TUE0 | CCSR_SSI_SISR_TUE1,
-+};
-+
-+static const struct of_device_id fsl_ssi_ids[] = {
-+	{ .compatible = "fsl,mpc8610-ssi", .data = &fsl_ssi_mpc8610 },
-+	{ .compatible = "fsl,imx51-ssi", .data = &fsl_ssi_imx51 },
-+	{ .compatible = "fsl,imx35-ssi", .data = &fsl_ssi_imx35 },
-+	{ .compatible = "fsl,imx21-ssi", .data = &fsl_ssi_imx21 },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, fsl_ssi_ids);
-+
-+static bool fsl_ssi_is_ac97(struct fsl_ssi_private *ssi_private)
-+{
-+	return !!(ssi_private->dai_fmt & SND_SOC_DAIFMT_AC97);
- }
- 
- /**
-@@ -245,25 +254,6 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
- 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
- 	__be32 sisr;
- 	__be32 sisr2;
--	__be32 sisr_write_mask = 0;
--
--	switch (ssi_private->hw_type) {
--	case FSL_SSI_MX21:
--		sisr_write_mask = 0;
--		break;
--
--	case FSL_SSI_MCP8610:
--	case FSL_SSI_MX35:
--		sisr_write_mask = CCSR_SSI_SISR_RFRC | CCSR_SSI_SISR_TFRC |
--			CCSR_SSI_SISR_ROE0 | CCSR_SSI_SISR_ROE1 |
--			CCSR_SSI_SISR_TUE0 | CCSR_SSI_SISR_TUE1;
--		break;
--
--	case FSL_SSI_MX51:
--		sisr_write_mask = CCSR_SSI_SISR_ROE0 | CCSR_SSI_SISR_ROE1 |
--			CCSR_SSI_SISR_TUE0 | CCSR_SSI_SISR_TUE1;
--		break;
--	}
- 
- 	/* We got an interrupt, so read the status register to see what we
- 	   were interrupted for.  We mask it with the Interrupt Enable register
-@@ -271,7 +261,7 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
- 	 */
- 	sisr = read_ssi(&ssi->sisr);
- 
--	sisr2 = sisr & sisr_write_mask;
-+	sisr2 = sisr & ssi_private->soc->sisr_write_mask;
- 	/* Clear the bits that we set */
- 	if (sisr2)
- 		write_ssi(sisr2, &ssi->sisr);
-@@ -359,7 +349,7 @@ static void fsl_ssi_config(struct fsl_ssi_private *ssi_private, bool enable,
- 	 * reconfiguration, so we have to enable all necessary flags at once
- 	 * even if we do not use them later (capture and playback configuration)
- 	 */
--	if (fsl_ssi_offline_config(ssi_private)) {
-+	if (ssi_private->soc->offline_config) {
- 		if ((enable && !nr_active_streams) ||
- 				(!enable && !keep_active))
- 			fsl_ssi_rxtx_config(ssi_private, enable);
-@@ -915,7 +905,7 @@ static int fsl_ssi_dai_probe(struct snd_soc_dai *dai)
- {
- 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(dai);
- 
--	if (fsl_ssi_on_imx(ssi_private) && ssi_private->use_dma) {
-+	if (ssi_private->soc->imx && ssi_private->use_dma) {
- 		dai->playback_dma_data = &ssi_private->dma_params_tx;
- 		dai->capture_dma_data = &ssi_private->dma_params_rx;
- 	}
-@@ -1141,7 +1131,6 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 	int ret = 0;
- 	struct device_node *np = pdev->dev.of_node;
- 	const struct of_device_id *of_id;
--	enum fsl_ssi_type hw_type;
- 	const char *p, *sprop;
- 	const uint32_t *iprop;
- 	struct resource res;
-@@ -1156,9 +1145,8 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 
- 	of_id = of_match_device(fsl_ssi_ids, &pdev->dev);
--	if (!of_id)
-+	if (!of_id || !of_id->data)
- 		return -EINVAL;
--	hw_type = (enum fsl_ssi_type) of_id->data;
- 
- 	sprop = of_get_property(np, "fsl,mode", NULL);
- 	if (!sprop) {
-@@ -1175,9 +1163,10 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
-+	ssi_private->soc = of_id->data;
-+
- 	ssi_private->use_dma = !of_property_read_bool(np,
- 			"fsl,fiq-stream-filter");
--	ssi_private->hw_type = hw_type;
- 
- 	if (ac97) {
- 		memcpy(&ssi_private->cpu_dai_drv, &fsl_ssi_ac97_dai,
-@@ -1232,7 +1221,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 
- 	dev_set_drvdata(&pdev->dev, ssi_private);
- 
--	if (fsl_ssi_on_imx(ssi_private)) {
-+	if (ssi_private->soc->imx) {
- 		ret = fsl_ssi_imx_probe(pdev, ssi_private, ssi_private->ssi);
- 		if (ret)
- 			goto error_irqmap;
-@@ -1299,7 +1288,7 @@ error_irq:
- 	snd_soc_unregister_component(&pdev->dev);
- 
- error_asoc_register:
--	if (fsl_ssi_on_imx(ssi_private))
-+	if (ssi_private->soc->imx)
- 		fsl_ssi_imx_clean(pdev, ssi_private);
- 
- error_irqmap:
-@@ -1319,7 +1308,7 @@ static int fsl_ssi_remove(struct platform_device *pdev)
- 		platform_device_unregister(ssi_private->pdev);
- 	snd_soc_unregister_component(&pdev->dev);
- 
--	if (fsl_ssi_on_imx(ssi_private))
-+	if (ssi_private->soc->imx)
- 		fsl_ssi_imx_clean(pdev, ssi_private);
- 
- 	if (ssi_private->use_dma)
 -- 
-2.0.0.rc2
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140527/48aa0138/attachment-0001.sig>
