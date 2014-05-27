@@ -1,46 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 27 May 2014 23:40:51 +0100
-Subject: [GIT PULL] Generic PCI host controller driver for 3.16
-Message-ID: <20140527224051.GA13786@arm.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 28 May 2014 08:45:23 +1000
+Subject: Request inclusion of HYP mode cpu_resume fix into linux-next
+In-Reply-To: <20140527102732.GA18476@e102568-lin.cambridge.arm.com>
+References: <20140306184303.GA31279@e102568-lin.cambridge.arm.com>
+ <20140527102732.GA18476@e102568-lin.cambridge.arm.com>
+Message-ID: <20140528084523.534449a9@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi Lorenzo,
 
-Please can you pull my generic PCI host controller driver for 3.16?
+On Tue, 27 May 2014 11:27:32 +0100 Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+>
+> On Thu, Mar 06, 2014 at 06:43:03PM +0000, Lorenzo Pieralisi wrote:
+> > Hi Stephen,
+> > 
+> > can I ask you please to include the following branch into linux-next:
+> > 
+> > git://linux-arm.org/linux-2.6-lp.git arm-kvm-cpuresume
+> > 
+> > It contains a patch touching ARM PM core code that requires wider testing
+> > coverage before I request a pull. It has been already publicly posted,
+> > reviewed and tested.
+> 
+> Patch now queued for mainline, please drop the branch from -next, it
+> will reappear soon through the ARM tree.
 
-It's been doing the rounds on the lists for some time and things have
-settled down now, despite a recent failed attempt at factoring out the
-configuration space accessors.
-
+Removed from today.
+-- 
 Cheers,
-
-Will
-
---->8
-
-The following changes since commit d6d211db37e75de2ddc3a4f979038c40df7cc79c:
-
-  Linux 3.15-rc5 (2014-05-09 13:10:52 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-bjorn/pci-host-generic
-
-for you to fetch changes up to 97725ee5aef64b2056c10eabafc92ff89994733d:
-
-  MAINTAINERS: add entry for generic PCI host controller driver (2014-05-27 23:18:09 +0100)
-
-----------------------------------------------------------------
-Will Deacon (2):
-      PCI: ARM: add support for generic PCI host controller
-      MAINTAINERS: add entry for generic PCI host controller driver
-
- .../devicetree/bindings/pci/host-generic-pci.txt   | 100 ++++++
- MAINTAINERS                                        |   8 +
- drivers/pci/host/Kconfig                           |   7 +
- drivers/pci/host/Makefile                          |   1 +
- drivers/pci/host/pci-host-generic.c                | 388 +++++++++++++++++++++
- 5 files changed, 504 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/host-generic-pci.txt
- create mode 100644 drivers/pci/host/pci-host-generic.c
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140528/10afaea0/attachment.sig>
