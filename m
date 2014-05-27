@@ -1,69 +1,71 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 27 May 2014 14:47:43 +0200
-Subject: [PATCH RFCv2 3/5] ARM: allow CONFIG_SMP_ON_UP on non-SMP
- configurations
-In-Reply-To: <20140527122254.GG3693@n2100.arm.linux.org.uk>
-References: <1400600105-3013-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1400600105-3013-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140526163556.GC3693@n2100.arm.linux.org.uk>
- <20140527135918.66a3803f@free-electrons.com>
- <20140527122254.GG3693@n2100.arm.linux.org.uk>
-Message-ID: <20140527144743.571131a0@free-electrons.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 27 May 2014 14:48:48 +0200
+Subject: [PATCH v2 02/11] sched: remove a wake_affine condition
+In-Reply-To: <1400860385-14555-3-git-send-email-vincent.guittot@linaro.org>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-3-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20140527124848.GQ30445@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On Fri, May 23, 2014 at 05:52:56PM +0200, Vincent Guittot wrote:
+> I have tried to understand the meaning of the condition :
+>  (this_load <= load &&
+>   this_load + target_load(prev_cpu, idx) <= tl_per_task)
+> but i failed to find a use case that can take advantage of it and i haven't
+> found description of it in the previous commits' log.
 
-On Tue, 27 May 2014 13:22:54 +0100, Russell King - ARM Linux wrote:
-> On Tue, May 27, 2014 at 01:59:18PM +0200, Thomas Petazzoni wrote:
-> > No, because the Armada 370 (single core processor) needs the
-> > write-allocate cache policy to provide hardware I/O coherency, but its
-> > MPIDR does not indicate it's a SMP-capable processor. So even with
-> > CONFIG_SMP_ON_UP=y, is_smp() returns false on Armada 370, and the kernel
-> > continues to use the WB cache mode.
-> 
-> So what's the point of enabling SMP_ON_UP?  If is_smp() returns false
-> with SMP=y and SMP_ON_UP=y on Armada 370, then you get none of the
-> SMP instructions either.  So I now start to question what the point of
-> _this_ patch is, which enables SMP_ON_UP on !SMP capable kernels.
-> 
-> A SMP kernel will select the non-SMP instructions for a UP CPU, and
-> is_smp() will return false.  A UP kernel will compile in the non-SMP
-> instructions and is_smp() will be false.  A UP kernel with SMP_ON_UP=y
-> will select the non-SMP instructions for your CPU and is_smp() will
-> return false.  So what's the point?
+commit 2dd73a4f09beacadde827a032cf15fd8b1fa3d48
 
-The point is this particular patch that allows CONFIG_SMP_ON_UP
-on !CONFIG_SMP is to have hardware I/O coherency working in !CONFIG_SMP
-configurations for Armada XP, Armada 375 and Armada 38x. The main
-reason is that Armada 380 (not 385) is a single core processor, so
-people want to run !CONFIG_SMP configurations on it.
+    int try_to_wake_up():
+    
+    in this function the value SCHED_LOAD_BALANCE is used to represent the load
+    contribution of a single task in various calculations in the code that
+    decides which CPU to put the waking task on.  While this would be a valid
+    on a system where the nice values for the runnable tasks were distributed
+    evenly around zero it will lead to anomalous load balancing if the
+    distribution is skewed in either direction.  To overcome this problem
+    SCHED_LOAD_SCALE has been replaced by the load_weight for the relevant task
+    or by the average load_weight per task for the queue in question (as
+    appropriate).
 
-However, even when CONFIG_SMP is *disabled*, we want to be able to
-provide hardware I/O coherency on Armada 380 (and potentially also
-Armada XP and 375, even though those processors have multiple cores, so
-the usefulness of running !CONFIG_SMP kernels on these is quite
-limited). Note that Armada 380, despite being single core, is
-recognized as being SMP-capable, so is_smp() will return true when
-!CONFIG_SMP + CONFIG_SMP_ON_UP=y.
+                        if ((tl <= load &&
+-                               tl + target_load(cpu, idx) <= SCHED_LOAD_SCALE) ||
+-                               100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
++                               tl + target_load(cpu, idx) <= tl_per_task) ||
++                               100*(tl + p->load_weight) <= imbalance*load) {
 
-In order to provide hardware I/O coherency on these Armada XP, 375
-and 38x processors, we need:
 
- * Write-allocate policy, as is required on Armada 370.
- * SMP bit set in ACTLR
- * Shareable pages
+commit a3f21bce1fefdf92a4d1705e888d390b10f3ac6f
 
-See again the cover letter for this patch series, it really
-exhaustively lists all the requirements we need for hardware I/O
-coherency to work on the various processors.
 
-Thanks again for your feedback, definitely very useful!
++                       if ((tl <= load &&
++                               tl + target_load(cpu, idx) <= SCHED_LOAD_SCALE) ||
++                               100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
 
-Best regards,
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+So back when the code got introduced, it read:
+
+	target_load(prev_cpu, idx) - sync*SCHED_LOAD_SCALE < source_load(this_cpu, idx) &&
+	target_load(prev_cpu, idx) - sync*SCHED_LOAD_SCALE + target_load(this_cpu, idx) < SCHED_LOAD_SCALE
+
+So while the first line makes some sense, the second line is still
+somewhat challenging.
+
+I read the second line something like: if there's less than one full
+task running on the combined cpus.
+
+Now for idx==0 this is hard, because even when sync=1 you can only make
+it true if both cpus are completely idle, in which case you really want
+to move to the waking cpu I suppose.
+
+One task running will have it == SCHED_LOAD_SCALE.
+
+But for idx>0 this can trigger in all kinds of situations of light load.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140527/a5ffa29b/attachment.sig>
