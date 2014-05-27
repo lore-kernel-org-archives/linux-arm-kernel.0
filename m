@@ -1,127 +1,105 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 27 May 2014 14:40:15 -0700
-Subject: [PATCH v2 1/4] devicetree: bindings: Properly document micrel
- ks8851 SPI chips
-In-Reply-To: <20140524124858.GR22111@sirena.org.uk>
-References: <1400875040-13269-1-git-send-email-sboyd@codeaurora.org>
- <1400875040-13269-2-git-send-email-sboyd@codeaurora.org>
- <20140524124858.GR22111@sirena.org.uk>
-Message-ID: <5385063F.30407@codeaurora.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 27 May 2014 23:50:29 +0200
+Subject: [PATCH 2/2] ARM: dts: mvebu: split SolidRun CuBox into variants
+In-Reply-To: <20140527213549.GU8664@titan.lakedaemon.net>
+References: <1401140009-31505-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1401140009-31505-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140527161143.GS8664@titan.lakedaemon.net> <5384CB29.1090204@gmail.com>
+ <20140527213549.GU8664@titan.lakedaemon.net>
+Message-ID: <538508A5.2010809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/24/14 05:48, Mark Brown wrote:
-> On Fri, May 23, 2014 at 12:57:17PM -0700, Stephen Boyd wrote:
->
->>  Optional properties:
->> -- vdd-supply:	supply for Ethernet mac
->> +- vdd-supply: analog 3.3V supply for Ethernet mac
->> +- vdd-io-supply: digital 1.8V IO supply for Ethernet mac
-> So, according to the datasheet I managed to find this device has a
-> supply VDD_IO (so normally written vdd-io-supply here), some other
-> supplies which are tied to VDD_IO (so can probably be omitted) and a
-> supply VDD_A3.3 none of which are optional.  There is an internal
-> regulator which can be used to drop a higher voltage VDD_IO down for
-> some of the supplies tied to it but that's essentially a noop from
-> software as far as I can tell.  None of these supplies are obviously
-> optional, though I've not read the datasheet in detail so I may have
-> missed something here.
->
-> That said it looks like this is intended to be a supply for an external
-> PHY rather than the device itself, but even so my original question
-> about it being able to operate without power still applies.  Looking at
-> the code it's certainly not doing any of the handling of a missing
-> supply that I would associate with using _optional().
+On 05/27/2014 11:35 PM, Jason Cooper wrote:
+> On Tue, May 27, 2014 at 07:28:09PM +0200, Sebastian Hesselbarth wrote:
+>> On 05/27/2014 06:11 PM, Jason Cooper wrote:
+>>> On Mon, May 26, 2014 at 11:33:29PM +0200, Sebastian Hesselbarth wrote:
+>>>> As Mainlining effort for SolidRun CuBox has been carried out on the
+>>>> Engineering Sample, the board DTS was reflecting this. Actually,
+>>>> SolidRun CuBox comes in three different variants: Engineering Sample (ES),
+>>>> production with 1GB RAM (1G), and production with 2GB RAM (2G).
+>>>>
+>>>> Therefore, we split the current dove-cubox.dts into a common board include
+>>>> and one board dts for each of the above variants.
+>>>>
+>>>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>>> ---
+>> [...]
+>>>> ---
+>>>>  arch/arm/boot/dts/Makefile                         |  4 +++-
+>>>>  arch/arm/boot/dts/dove-cubox-1g.dts                | 17 ++++++++++++++++
+>>>>  arch/arm/boot/dts/dove-cubox-2g.dts                | 17 ++++++++++++++++
+>>>>  arch/arm/boot/dts/dove-cubox-es.dts                | 23 ++++++++++++++++++++++
+>>>>  .../boot/dts/{dove-cubox.dts => dove-cubox.dtsi}   | 17 ----------------
+>>>>  5 files changed, 60 insertions(+), 18 deletions(-)
+>>>>  create mode 100644 arch/arm/boot/dts/dove-cubox-1g.dts
+>>>>  create mode 100644 arch/arm/boot/dts/dove-cubox-2g.dts
+>>>>  create mode 100644 arch/arm/boot/dts/dove-cubox-es.dts
+>>>>  rename arch/arm/boot/dts/{dove-cubox.dts => dove-cubox.dtsi} (86%)
+>>>>
+>> [...]
+>>>> diff --git a/arch/arm/boot/dts/dove-cubox-2g.dts b/arch/arm/boot/dts/dove-cubox-2g.dts
+>>>> new file mode 100644
+>>>> index 000000000000..513b6a68eba3
+>>>> --- /dev/null
+>>>> +++ b/arch/arm/boot/dts/dove-cubox-2g.dts
+>>>> @@ -0,0 +1,17 @@
+>>>> +/dts-v1/;
+>>>> +
+>>>> +#include "dove-cubox.dtsi"
+>>>> +
+>>>> +/ {
+>>>> +	model = "SolidRun CuBox (2G)";
+>>>> +	compatible = "solidrun,cubox-2g", "solidrun,cubox", "marvell,dove";
+>>>> +
+>>>> +	memory {
+>>>> +		device_type = "memory";
+>>>> +		reg = <0x00000000 0x80000000>;
+>>>
+>>> Do you anticipate any other differences between the 1G and the 2G?
+>>> Otherwise, I'm inclined to just have a "solidrun,cubox".  The bootloader
+>>> should be setting the amount of RAM at boottime anyway.
+>>
+>> Given the minor differences between ES and production, instead of
+>>
+>> dove-cubox-common.dtsi
+>> +--> dove-cubox.dts (production)
+>> +--> dove-cubos-es.dts (engineering sample)
+>>
+>> we could also just have an "overlay" for the ES like
+>>
+>> dove-cubox.dts (production)
+>> +--> dove-cubox-es.dts (engineering sample)
+>>
+>> It is not used commonly until now, maybe just a matter of taste.
+>>
+>> Is there any version you prefer?
+> 
+> iiuc, overlays were intended for daughterboard (capes, etc) specific
 
-I agree, both supplies don't look optional. Unfortunately
-efm32gg-dk3750.dts doesn't look to be listing any supply, and this
-driver only recently got support for the VDD_A3.3 supply that the omap
-board uses (adding Uwe for any comments on efm setup). I presume on
-these boards VDD_IO is tied to some always on power source that software
-doesn't want to deal with. Nishant, what's VDD_IO connected to on omap?
+Oh, ok. I guess "overlay" was misleading here. I did not mean dynamic
+loading/unloading of dtb but including a dts from another dts.
 
-What's the proper solution here? Should we use regulator_get() and check
-for EPROBE_DEFER and ignore other errors?
+> info.  It may be useful here, but I'd like to hear from the DT
+> maintainers how they want it used.  eg: most popular first, like you
+> have it, or oldest first
+> 
+> dove-cubox-es.dts
+> +--> dove-cubox.dts
 
-By the way, the documentation for regulator_get_optional() and
-regulator_get_exclusive() are confusing. It looks like we copy/pasted
-the exclusive text (typo and all).
+In the cubox case, this is not possible. ES has a misrouted
+card-detection for sdhci, this requires an additional property.
+There is no way to remove a property once it is written down in
+any of the files included. But you know about that already.
 
- * regulator_get_optional - obtain optional access to a regulator.
- * @dev: device for regulator "consumer"
- * @id: Supply name or regulator ID.
- *
- * Returns a struct regulator corresponding to the regulator producer,
- * or IS_ERR() condition containing errno.  Other consumers will be
- * unable to obtain this reference is held and the use count for the
- * regulator will be initialised to reflect the current state of the
- * regulator.
+> There's also what to do with the older files using #include...
+> 
+> In short, I'd prefer to stick to the old method until we have a good
+> reason to move to overlays and a recommended way to execute that.*
 
+Ok, the old method is straight forward and I keep that in mind. I'll
+send a v2 of this using the approach we just talked about to eliminate
+any misinterpretations. Just have a look and feel free to request an
+"old-method" v3 immediately :P
 
-vs.
-
- * regulator_get_exclusive - obtain exclusive access to a regulator.
- * @dev: device for regulator "consumer"
- * @id: Supply name or regulator ID.
- *
- * Returns a struct regulator corresponding to the regulator producer,
- * or IS_ERR() condition containing errno.  Other consumers will be
- * unable to obtain this reference is held and the use count for the
- * regulator will be initialised to reflect the current state of the
- * regulator.
-
-
-Should the get_optional() variant just drop the "Other consumers will
-be... " part and should the get_exclusive() variant say "obtain this
-regulator while this reference is held" ?
-
-
-----8<----
-
-From: Stephen Boyd <sboyd@codeaurora.org>
-Subject: [PATCH] regulator: Fix regulator_get_{optional,exclusive}()
- documentation
-
-regulator_get_optional() doesn't hold an exclusive reference to
-the regulator. Fix the documentation and reword the exclusive
-documentation to fix the grammatical error "this reference is
-held".
-
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/regulator/core.c | 11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index b97ffd2365d3..2fae21a9d0e5 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -1430,9 +1430,9 @@ EXPORT_SYMBOL_GPL(regulator_get);
-  *
-  * Returns a struct regulator corresponding to the regulator producer,
-  * or IS_ERR() condition containing errno.  Other consumers will be
-- * unable to obtain this reference is held and the use count for the
-- * regulator will be initialised to reflect the current state of the
-- * regulator.
-+ * unable to obtain this regulator while this reference is held and the
-+ * use count for the regulator will be initialised to reflect the current
-+ * state of the regulator.
-  *
-  * This is intended for use by consumers which cannot tolerate shared
-  * use of the regulator such as those which need to force the
-@@ -1456,10 +1456,7 @@ EXPORT_SYMBOL_GPL(regulator_get_exclusive);
-  * @id: Supply name or regulator ID.
-  *
-  * Returns a struct regulator corresponding to the regulator producer,
-- * or IS_ERR() condition containing errno.  Other consumers will be
-- * unable to obtain this reference is held and the use count for the
-- * regulator will be initialised to reflect the current state of the
-- * regulator.
-+ * or IS_ERR() condition containing errno.
-  *
-  * This is intended for use by consumers for devices which can have
-  * some supplies unconnected in normal use, such as some MMC devices.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Sebastian
