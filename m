@@ -1,50 +1,34 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 27 May 2014 08:21:24 +0200
-Subject: [PATCH v4 08/17] ASoC: fsl-ssi: introduce SoC specific data
-In-Reply-To: <20140520220213.GZ12304@sirena.org.uk>
-References: <1398682498-24357-1-git-send-email-mpa@pengutronix.de>
- <1398682498-24357-9-git-send-email-mpa@pengutronix.de>
- <20140520220213.GZ12304@sirena.org.uk>
-Message-ID: <20140527062124.GB20989@pengutronix.de>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 27 May 2014 15:27:40 +0900
+Subject: [PATCH] bus: brcmstb_gisb: Use devm_ioremap_resource()
+Message-ID: <000901cf7974$c27ddf30$47799d90$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Use devm_ioremap_resource() because devm_request_and_ioremap() is
+obsoleted by devm_ioremap_resource().
 
-On Tue, May 20, 2014 at 11:02:13PM +0100, Mark Brown wrote:
-> On Mon, Apr 28, 2014 at 12:54:49PM +0200, Markus Pargmann wrote:
-> > From: Sascha Hauer <s.hauer@pengutronix.de>
-> > 
-> > Introduce a SoC data struct which contains the differences between
-> > the different SoCs this driver supports. This makes it easy to support
-> > more differences without having to introduce a new switch/case each
-> > time.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> 
-> Applied everything before this patch, thanks.  I've not applied this one
-> since you didn't sign it off - please make sure when forwarding patches
-> for other people that you add your signoff at the bottom, this is needed
-> for legal reasons (see SubmittingPatches).
+Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+---
+ drivers/bus/brcmstb_gisb.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Ok, thanks, I will resubmit the remaining patches.
-
-Best Regards,
-
-Markus
-
-
-
+diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
+index 6159b77..f2cd6a2d 100644
+--- a/drivers/bus/brcmstb_gisb.c
++++ b/drivers/bus/brcmstb_gisb.c
+@@ -212,9 +212,9 @@ static int brcmstb_gisb_arb_probe(struct platform_device *pdev)
+ 	mutex_init(&gdev->lock);
+ 	INIT_LIST_HEAD(&gdev->next);
+ 
+-	gdev->base = devm_request_and_ioremap(&pdev->dev, r);
+-	if (!gdev->base)
+-		return -ENOMEM;
++	gdev->base = devm_ioremap_resource(&pdev->dev, r);
++	if (IS_ERR(gdev->base))
++		return PTR_ERR(gdev->base);
+ 
+ 	err = devm_request_irq(&pdev->dev, timeout_irq,
+ 				brcmstb_gisb_timeout_handler, 0, pdev->name,
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140527/c72bd2b1/attachment.sig>
+1.7.10.4
