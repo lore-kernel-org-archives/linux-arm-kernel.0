@@ -1,55 +1,58 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 27 May 2014 17:20:10 +0200
-Subject: [PATCH v2 02/11] sched: remove a wake_affine condition
-In-Reply-To: <20140527134542.GB11074@laptop.programming.kicks-ass.net>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-3-git-send-email-vincent.guittot@linaro.org>
- <20140527134542.GB11074@laptop.programming.kicks-ass.net>
-Message-ID: <CAKfTPtAGX2_=z5EHAqn7Tz7vVEeK673TONSwQ-4JUwURsn=ueA@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 27 May 2014 17:26:37 +0200
+Subject: [PATCH] ARM: dts: imx6qdl: Add CSI device tree port nodes for IPU1
+ and IPU2
+Message-ID: <1401204397-24592-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 May 2014 15:45, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Fri, May 23, 2014 at 05:52:56PM +0200, Vincent Guittot wrote:
->> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
->> index 9587ed1..30240ab 100644
->> --- a/kernel/sched/fair.c
->> +++ b/kernel/sched/fair.c
->> @@ -4238,7 +4238,6 @@ static int wake_affine(struct sched_domain *sd, struct task_struct *p, int sync)
->>  {
->>       s64 this_load, load;
->>       int idx, this_cpu, prev_cpu;
->> -     unsigned long tl_per_task;
->>       struct task_group *tg;
->>       unsigned long weight;
->>       int balanced;
->> @@ -4296,32 +4295,22 @@ static int wake_affine(struct sched_domain *sd, struct task_struct *p, int sync)
->>               balanced = this_eff_load <= prev_eff_load;
->>       } else
->>               balanced = true;
->> +     schedstat_inc(p, se.statistics.nr_wakeups_affine_attempts);
->>
->> +     if (!balanced)
->> +             return 0;
->>       /*
->>        * If the currently running task will sleep within
->>        * a reasonable amount of time then attract this newly
->>        * woken task:
->>        */
->> +     if (sync)
->>               return 1;
->>
->> +     schedstat_inc(sd, ttwu_move_affine);
->> +     schedstat_inc(p, se.statistics.nr_wakeups_affine);
->>
->> +     return 1;
->>  }
->
-> So I'm not usually one for schedstat nitpicking, but should we fix it in
-> the sync case? That is, for sync we return 1 but do no inc
-> nr_wakeups_affine, even though its going to be an affine wakeup.
+This patch adds CSI subnodes for IPU1 and IPU2 that will contain
+ports and endpoints connecting to external elements in the video
+pipeline.
 
-ok, i'm going to move schedstat update at the right place
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6q.dtsi   | 8 ++++++++
+ arch/arm/boot/dts/imx6qdl.dtsi | 8 ++++++++
+ 2 files changed, 16 insertions(+)
 
->
->
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index fcfbac2..919a18a 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -157,6 +157,14 @@
+ 			clock-names = "bus", "di0", "di1";
+ 			resets = <&src 4>;
+ 
++			ipu2_csi0: port at 0 {
++				reg = <0>;
++			};
++
++			ipu2_csi1: port at 1 {
++				reg = <1>;
++			};
++
+ 			ipu2_di0: port at 2 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 43a10e3..8fba7fc 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1038,6 +1038,14 @@
+ 			clock-names = "bus", "di0", "di1";
+ 			resets = <&src 2>;
+ 
++			ipu1_csi0: port at 0 {
++				reg = <0>;
++			};
++
++			ipu1_csi1: port at 1 {
++				reg = <1>;
++			};
++
+ 			ipu1_di0: port at 2 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+-- 
+2.0.0.rc2
