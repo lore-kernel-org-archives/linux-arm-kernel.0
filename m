@@ -1,106 +1,46 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 27 May 2014 14:18:30 +0100
-Subject: [PATCHv2 4/4] arm64: Enable TEXT_OFFSET fuzzing
-In-Reply-To: <1401196710-6290-1-git-send-email-mark.rutland@arm.com>
-References: <1401196710-6290-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1401196710-6290-5-git-send-email-mark.rutland@arm.com>
+From: cminyard@mvista.com (Corey Minyard)
+Date: Tue, 27 May 2014 08:21:43 -0500
+Subject: [PATCH] arm: Set hardirq tracing to on when idling
+In-Reply-To: <4559339.apo3Fd10HK@wuerfel>
+References: <1401045323-7116-1-git-send-email-minyard@acm.org>
+ <4559339.apo3Fd10HK@wuerfel>
+Message-ID: <53849167.1000309@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 Image header contains a text_offset field which bootloaders
-are supposed to read to determine the offset (from a 2MB aligned "start
-of memory" per booting.txt) at which to load the kernel. The offset is
-not well respected by bootloaders at present, and due to the lack of
-variation there is little incentive to support it. This is unfortunate
-for the sake of future kernels where we may wish to vary the text offset
-(even zeroing it).
+On 05/26/2014 04:26 AM, Arnd Bergmann wrote:
+> On Sunday 25 May 2014 14:15:23 minyard at acm.org wrote:
+>> From: Corey Minyard <cminyard@mvista.com>
+>>
+>> The CPU will go to idle with interrupts off, but the interrupts
+>> will wake up the idle.  This was causing very long irqsoff trace
+>> values because, basically, the whole idle time was traces with
+>> irqs off, even though they weren't really off.  Rework the idle
+>> code to turn hardirq tracing to on befor calling idle.
+>>
+>> Signed-off-by: Corey Minyard <cminyard@mvista.com>
+>> ---
+>>  arch/arm/kernel/process.c | 3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> I'm not sure this is correct for all ARM boards, but it fixes the
+>> issue for the Vexpress board I have.  No more 4 second irqsoff
+>> times.
+> If this patch is correct for ARM, I wonder if it should be done
+> in architecture independent code instead. Do you see the same
+> thing on x86? If not, do you know what's different?
 
-This patch adds options to arm64 to enable fuzz-testing of text_offset.
-CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET forces the text offset to a random
-16-byte aligned value value in the range [0..2MB) upon a build of the
-kernel. It is recommended that distribution kernels enable randomization
-to test bootloaders such that any compliance issues can be fixed early.
+MIPS doesn't idle with IRQs disabled.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm64/Kconfig.debug        | 16 ++++++++++++++++
- arch/arm64/Makefile             |  4 ++++
- arch/arm64/kernel/head.S        |  8 ++++++--
- arch/arm64/kernel/vmlinux.lds.S |  5 +++++
- 4 files changed, 31 insertions(+), 2 deletions(-)
+x86 calls trace_cpu_idle_rcuidle, but it doesn't re-enable interrupts at
+the end of the idle routine.  Adding those trace calls to ARM doesn't
+seem to make any difference, though.
 
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index d10ec33..d757875 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -37,4 +37,20 @@ config PID_IN_CONTEXTIDR
- 	  instructions during context switch. Say Y here only if you are
- 	  planning to use hardware trace tools with this kernel.
- 
-+config ARM64_RANDOMIZE_TEXT_OFFSET
-+	bool "Randomize TEXT_OFFSET at build time (EXPERIMENTAL)"
-+	default N
-+	help
-+	  Say Y here if you want the image load offset (AKA TEXT_OFFSET)
-+	  of the kernel to be randomized at build-time. When selected,
-+	  this option will cause TEXT_OFFSET to be randomized upon any
-+	  build of the kernel, and the offset will be reflected in the
-+	  text_offset field of the resulting Image. This can be used to
-+	  fuzz-test bootloaders which respect text_offset.
-+
-+	  This option is intended for bootloader and/or kernel testing
-+	  only. Bootloaders must make no assumptions regarding the value
-+	  of TEXT_OFFSET and platforms must not require a specific
-+	  value.
-+
- endmenu
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 2fceb71..4bde6f1 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -38,7 +38,11 @@ CHECKFLAGS	+= -D__aarch64__
- head-y		:= arch/arm64/kernel/head.o
- 
- # The byte offset of the kernel image in RAM from the start of RAM.
-+ifeq ($(CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET), y)
-+TEXT_OFFSET := $(shell awk 'BEGIN {srand(); printf "0x%04x0\n", int(65535 * rand())}')
-+else
- TEXT_OFFSET := 0x00080000
-+endif
- 
- export	TEXT_OFFSET GZFLAGS
- 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 2c13d3b..3bbad33 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -37,8 +37,12 @@
- 
- #define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
- 
--#if (KERNEL_RAM_VADDR & 0xfffff) != 0x80000
--#error KERNEL_RAM_VADDR must start at 0xXXX80000
-+#if (TEXT_OFFSET & 0xf) != 0
-+#error TEXT_OFFSET must be at least 16B aligned
-+#elif (PAGE_OFFSET & 0xfffff) != 0
-+#error PAGE_OFFSET must be at least 2MB aligned
-+#elif TEXT_OFFSET > 0xfffff
-+#error TEXT_OFFSET must be less than 2MB
- #endif
- 
- 	.macro	pgtbl, ttb0, ttb1, virt_to_phys
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 21a8ad1..05fc047 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -149,3 +149,8 @@ SECTIONS
-  */
- ASSERT(((__hyp_idmap_text_start + PAGE_SIZE) > __hyp_idmap_text_end),
-        "HYP init code too big")
-+
-+/*
-+ * If padding is applied before .head.text, virt<->phys conversions will fail.
-+ */
-+ASSERT(_text == (PAGE_OFFSET + TEXT_OFFSET), "HEAD is misaligned")
--- 
-1.9.1
+> It seems like the right thing to do, I just don't understand
+> why nobody hit this before.
+
+Yeah, I'm a little confused by that, too.  The RT guys use ARM
+extensively, why haven't they seen this?  Of course, if you run your RT
+tests under heavy load, you won't see this since you will never go idle.
+
+-corey
