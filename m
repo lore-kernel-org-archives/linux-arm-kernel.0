@@ -1,53 +1,31 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 28 May 2014 07:07:54 +0900
-Subject: [GIT PULL 4th 2/2 v2] Samsung Exynos 2nd SoC updates for 3.16
-Message-ID: <53850CBA.2000000@samsung.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 28 May 2014 00:24:58 +0200
+Subject: [PATCH 2/2] ARM: dts: mvebu: split SolidRun CuBox into variants
+In-Reply-To: <538508A5.2010809@gmail.com>
+References: <1401140009-31505-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140527213549.GU8664@titan.lakedaemon.net> <538508A5.2010809@gmail.com>
+Message-ID: <32589428.8iAxtgFCnl@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f7b163d16d412e14be49f47240ffaba328aaab6c:
+Am Dienstag, 27. Mai 2014, 23:50:29 schrieb Sebastian Hesselbarth:
+> On 05/27/2014 11:35 PM, Jason Cooper wrote:
+> > On Tue, May 27, 2014 at 07:28:09PM +0200, Sebastian Hesselbarth wrote:
+> >> On 05/27/2014 06:11 PM, Jason Cooper wrote:
+> >>> On Mon, May 26, 2014 at 11:33:29PM +0200, Sebastian Hesselbarth wrote:
+> > info.  It may be useful here, but I'd like to hear from the DT
+> > maintainers how they want it used.  eg: most popular first, like you
+> > have it, or oldest first
+> > 
+> > dove-cubox-es.dts
+> > +--> dove-cubox.dts
+> 
+> In the cubox case, this is not possible. ES has a misrouted
+> card-detection for sdhci, this requires an additional property.
+> There is no way to remove a property once it is written down in
+> any of the files included. But you know about that already.
 
-   cpufreq: exynos: Fix driver compilation with ARCH_MULTIPLATFORM 
-(2014-05-27 23:52:50 +0900)
+dtc knows "/delete-property/" [0], but I may be missing something here.
 
-are available in the git repository at:
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/exynos-soc-2-2nd
-
-for you to fetch changes up to 179147bc72cf803da6d29ce7a5a6606c48debcea:
-
-   ARM: dts: Add initial device tree support for EXYNOS5410 (2014-05-27 
-23:55:48 +0900)
-
-----------------------------------------------------------------
-Exynos 2nd new SoC support for 3.16
-
-- Add support for exynos5410 and exynos5410-smdk5410.
-   Tested with exynos_defconfig and multi_v7_defconfig
-   and it works fine.
-
-----------------------------------------------------------------
-Tarek Dakhran (3):
-       ARM: EXYNOS: Add support for EXYNOS5410 SoC
-       clk: exynos5410: register clocks using common clock framework
-       ARM: dts: Add initial device tree support for EXYNOS5410
-
-  .../devicetree/bindings/clock/exynos5410-clock.txt |  45 +++++
-  arch/arm/boot/dts/Makefile                         |   1 +
-  arch/arm/boot/dts/exynos5410-smdk5410.dts          |  82 ++++++++
-  arch/arm/boot/dts/exynos5410.dtsi                  | 206 
-++++++++++++++++++++
-  arch/arm/mach-exynos/Kconfig                       |   5 +
-  arch/arm/mach-exynos/common.h                      |  12 +-
-  drivers/clk/samsung/Makefile                       |   1 +
-  drivers/clk/samsung/clk-exynos5410.c               | 209 
-+++++++++++++++++++++
-  include/dt-bindings/clock/exynos5410.h             |  33 ++++
-  9 files changed, 592 insertions(+), 2 deletions(-)
-  create mode 100644 
-Documentation/devicetree/bindings/clock/exynos5410-clock.txt
-  create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
-  create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
-  create mode 100644 drivers/clk/samsung/clk-exynos5410.c
-  create mode 100644 include/dt-bindings/clock/exynos5410.h
+[0] https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-August/018169.html
