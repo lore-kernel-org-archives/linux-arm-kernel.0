@@ -1,47 +1,56 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 27 May 2014 11:18:49 +0200
-Subject: [PATCH 13/16] PSCI: Add initial support for PSCIv0.2 functions
-In-Reply-To: <20140527074455.GA7834@dragon>
-References: <1401041942-23471-1-git-send-email-christoffer.dall@linaro.org>
- <1401041942-23471-14-git-send-email-christoffer.dall@linaro.org>
- <20140527074455.GA7834@dragon>
-Message-ID: <20140527091849.GH31431@lvm>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 27 May 2014 10:24:28 +0100
+Subject: [Patch v7 3/7] mfd: ti-keystone-devctrl: add bindings for device
+ state control
+In-Reply-To: <1400859812-5761-4-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1400859812-5761-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1400859812-5761-4-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <20140527092428.GH5875@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 03:44:55PM +0800, Shawn Guo wrote:
-> On Sun, May 25, 2014 at 08:18:59PM +0200, Christoffer Dall wrote:
-> > diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
-> > index c4ae171..b93e34a 100644
-> > --- a/arch/arm/include/asm/psci.h
-> > +++ b/arch/arm/include/asm/psci.h
-> > @@ -29,16 +29,19 @@ struct psci_operations {
-> >  	int (*cpu_off)(struct psci_power_state state);
-> >  	int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
-> >  	int (*migrate)(unsigned long cpuid);
-> > +	int (*affinity_info)(unsigned long target_affinity,
-> > +			unsigned long lowest_affinity_level);
-> > +	int (*migrate_info_type)(void);
-> >  };
-> >  
-> >  extern struct psci_operations psci_ops;
-> >  extern struct smp_operations psci_smp_ops;
-> >  
-> >  #ifdef CONFIG_ARM_PSCI
-> > -void psci_init(void);
-> > +int psci_init(void);
-> >  bool psci_smp_available(void);
-> >  #else
-> > -static inline void psci_init(void) { }
-> > +static inline int psci_init(void) { }
+> The Keystone II devices have a set of registers that are used to control
+> the status of its peripherals. This node is intended to allow access to
+> this functionality.
 > 
-> The change introduces the following compile warning on
-> imx_v6_v7_defconfig build.
-> 
-> In file included from ../arch/arm/kernel/setup.c:40:0:
-> ../arch/arm/include/asm/psci.h: In function ?psci_init?:
-> ../arch/arm/include/asm/psci.h:44:1: warning: no return statement in function returning non-void [-Wreturn-type]
-> 
-Thanks for  noticing, I just sent a fixup patch.
+> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 
--Christoffer
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+> ---
+>  .../devicetree/bindings/mfd/ti-keystone-devctrl.txt   | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt b/Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt
+> new file mode 100644
+> index 0000000..20963c7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt
+> @@ -0,0 +1,19 @@
+> +* Device tree bindings for Texas Instruments keystone device state control
+> +
+> +The Keystone II devices have a set of registers that are used to control
+> +the status of its peripherals. This node is intended to allow access to
+> +this functionality.
+> +
+> +Required properties:
+> +
+> +- compatible:		"ti,keystone-devctrl", "syscon"
+> +
+> +- reg:			contains offset/length value for device state control
+> +			registers space.
+> +
+> +Example:
+> +
+> +devctrl: device-state-control at 0x02620000 {
+> +	compatible = "ti,keystone-devctrl", "syscon";
+> +	reg = <0x02620000 0x1000>;
+> +};
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
