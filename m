@@ -1,48 +1,30 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 27 May 2014 11:01:03 +0200
-Subject: [PATCH 03/11] pinctrl: sunxi: Move setting of mux to irq type
- from unmask to set_type
-In-Reply-To: <20140527080952.GC4730@lukather>
-References: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>
- <1401090486-4414-4-git-send-email-hdegoede@redhat.com>
- <20140527080952.GC4730@lukather>
-Message-ID: <5384544F.6000806@redhat.com>
+From: fugang.duan@freescale.com (fugang.duan at freescale.com)
+Date: Tue, 27 May 2014 09:04:38 +0000
+Subject: [PATCH v1 0/2] net: fec: Add fec sleep pinctrl for pin PM state
+In-Reply-To: <20140522.151042.666672316134579103.davem@davemloft.net>
+References: <1400568645-10214-1-git-send-email-b38611@freescale.com>
+ <20140522.151042.666672316134579103.davem@davemloft.net>
+Message-ID: <11233fa404764116995194dc29484092@BY2PR03MB377.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, David,
 
-On 05/27/2014 10:09 AM, Maxime Ripard wrote:
-> On Mon, May 26, 2014 at 09:47:58AM +0200, Hans de Goede wrote:
->> With level triggered interrupt mask / unmask will get called for each
->> interrupt, doing the somewhat expensive mux setting on each unmask thus is
->> not a good idea. Instead move it to the set_type callback, which is typically
->> done only once for each irq.
-> 
-> *This* is the bad idea. Nothing prevents you from calling
-> gpio_get_value whenever you just got your interrupt, that will change
-> the muxing, and never change it back, effectively breaking the
-> interrupts.
+From: David Miller <davem@davemloft.net> Data: Friday, May 23, 2014 3:11 AM
+>To: Duan Fugang-B38611
+>Cc: Guo Shawn-R65073; linux-arm-kernel at lists.infradead.org;
+>netdev at vger.kernel.org; kernel at pengutronix.de; Li Frank-B20596
+>Subject: Re: [PATCH v1 0/2] net: fec: Add fec sleep pinctrl for pin PM
+>state
+>
+>From: Fugang Duan <b38611@freescale.com>
+>Date: Tue, 20 May 2014 14:50:43 +0800
+>
+>> The two patches is to add fec sleep pinctrl for pin PM state in imx6sl
+>> evk platform.
+>
+>Patch #2 doesn't apply at all to the net tree.
+The previous patch is based on next, now I resend the patch base your tree.
 
-Hmm, interesting point, but your assuming 2 things which are both not true:
-
-1) That calling gpiod_get_value changes the muxing, which is not true, all
-gpiod_get_value variants end up in drivers/gpio/gpiolib.c _gpiod_get_raw_value()
-which does no such thing
-
-2) That unmask will always get called after the gpio_get_value to restore the mux
-setting for us, which is not guaranteed at all. Before this patch set pinctrl-sunxi.c
-was using handle_simple_irq which does not mask / unmask at all.
-
-And even with an irq-handler which masks / unmasks, what if the irq wakes up
-a thread and that thread then does the gpio_get_value ?
-
-Note this is *exactly* what e.g. the mmc gpio card-detect code does, it uses
-a thread to read the gpio for debouncing.
-
-Luckily 2. is not a problem, since 1. means that the mux won't get changed at all
-so we don't need to change it back.
-
-Regards,
-
-Hans
+Thanks,
+Andy
