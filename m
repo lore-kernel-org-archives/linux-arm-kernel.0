@@ -1,32 +1,50 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 27 May 2014 18:45:30 +0200
-Subject: [PATCH RFC 02/11] sound: ASoC: kirkwood: Remove unused drivers
-In-Reply-To: <20140526155901.GF22111@sirena.org.uk>
-References: <1400163836-9831-1-git-send-email-andrew@lunn.ch>
- <1400163836-9831-5-git-send-email-andrew@lunn.ch>
- <20140526155901.GF22111@sirena.org.uk>
-Message-ID: <20140527164530.GJ26379@lunn.ch>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Tue, 27 May 2014 18:50:38 +0200
+Subject: [PATCH 00/11] sdio wifi oob irq support for sunxi
+In-Reply-To: <20140527152614.GB5694@tuxdriver.com>
+References: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>
+ <20140527152614.GB5694@tuxdriver.com>
+Message-ID: <5384C25E.70505@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 04:59:01PM +0100, Mark Brown wrote:
-> On Thu, May 15, 2014 at 04:23:45PM +0200, Andrew Lunn wrote:
-> > Both kirkwood-openrd and kirkwood-t5325 drivers have been replaced
-> > with DT based simple-card equivelents.
-> 
-> Applied, thanks.
+On 05/27/14 17:26, John W. Linville wrote:
+> On Mon, May 26, 2014 at 09:47:55AM +0200, Hans de Goede wrote:
+>> Hi All,
+>>
+>> Here is a patch series adding support for oob irqs for the ap6210 sdio wifi
+>> modules found on various Allwinner A20 boards.
+>>
+>> A lot of it is ground work which should be useful for adding oob irq support
+>> to other sdio wifi models too.
+>>
+>> The first 5 patches are sunxi pinctrl patches and should go upstream through
+>> the pinctrl tree.
+>>
+>> Patch 6 adds generic support for having per sdio function child nodes in
+>> devicetree and should go upstream through the mmc tree.
+>>
+>> Patch 7 and 8 add oob irq support to the brcmfmac driver. Patch 9 pokes some
+>> magic bits needed to enable the oob irq, this was taken from an android code
+>> dump and good do with a good review from someone from Broadcom, Arend ?
+>
+> If Arend approves, I'm fine with these going through another appropriate tree.
 
-Hi Mark
+Not sure in what tree these patches were created (assume some sunxi 
+tree), but if it conflicts with wireless-next I am pretty sure Stephen 
+will find that. I am fine with any tree. Patch 9 indeed has some magic 
+bits that need some clarification, but I will sort that out with Hans.
 
-This is an RFC patch, as it says in the Subject line, and the cover
-note. It is not intended to be applied yet. Please unapply it, and the
-other one in the series you have applied.
+Regards,
+Arend
 
-> Please do try to use subject lines matching the style for the
-> subsystem.
-
-O.K, i will fix this when i send the real, not RFC, to be applied,
-patches.
-
-Thanks
-	Andrew
+>> Patch 10 and 11 add the necessary dts bits to actually enable the sdio irq
+>> and should go upstream through Maxime's dt tree.
+>>
+>> Please review / merge.
+>>
+>> Thanks&  Regards,
+>>
+>> Hans
+>>
+>
