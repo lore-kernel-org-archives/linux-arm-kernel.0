@@ -1,53 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 May 2014 15:30:33 +0200
-Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
-In-Reply-To: <20140527125655.63A46C40FCB@trevor.secretlab.ca>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
- <5279118.J5305KQNjB@wuerfel> <20140527125655.63A46C40FCB@trevor.secretlab.ca>
-Message-ID: <5840140.8yGnd4Ycx3@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 27 May 2014 14:34:23 +0100
+Subject: [PATCH v2 1/2] Documentation: add Device tree bindings for
+ Hisilicon hix5hd2 ethernet
+In-Reply-To: <1401194667-14445-2-git-send-email-zhangfei.gao@linaro.org>
+References: <1401194667-14445-1-git-send-email-zhangfei.gao@linaro.org>
+ <1401194667-14445-2-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20140527133423.GB6969@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 May 2014 13:56:55 Grant Likely wrote:
-> On Fri, 02 May 2014 11:58:30 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 01 May 2014 14:12:10 Grant Likely wrote:
-> > > > > I've got two concerns here. of_dma_get_range() retrieves only the first
-> > > > > tuple from the dma-ranges property, but it is perfectly valid for
-> > > > > dma-ranges to contain multiple tuples. How should we handle it if a
-> > > > > device has multiple ranges it can DMA from?
-> > > > > 
-> > > > 
-> > > > We've not found any cases in current Linux where more than one dma-ranges
-> > > > would be used. Moreover, The MM (definitely for ARM) isn't supported such
-> > > > cases at all (if i understand everything right).
-> > > > - there are only one arm_dma_pfn_limit
-> > > > - there is only one MM zone is used for ARM
-> > > > - some arches like x86,mips can support 2 zones (per arch - not per device or bus)
-> > > >   DMA & DMA32, but they configured once and forever per arch.
-> > > 
-> > > Okay. If anyone ever does implement multiple ranges then this code will
-> > > need to be revisited.
-> > 
-> > I wonder if it's needed for platforms implementing the standard "ARM memory map" [1].
-> > The document only talks about addresses as seen from the CPU, and I can see
-> > two logical interpretations how the RAM is supposed to be visible from a device:
-> > either all RAM would be visible contiguously at DMA address zero, or everything
-> > would be visible at the same physical address as the CPU sees it.
-> > 
-> > If anyone picks the first interpretation, we will have to implement that
-> > in Linux. We can of course hope that all hardware designs follow the second
-> > interpretation, which would be more convenient for us here.
+On Tue, May 27, 2014 at 01:44:26PM +0100, Zhangfei Gao wrote:
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> ---
+>  .../bindings/net/hisilicon-hix5hd2-gmac.txt        |   36 ++++++++++++++++++++
+>  1 file changed, 36 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
 > 
-> Indeed. Hope though we might, I would not be surprised to see a platform
-> that does the first. In that case we could probably handle it with a
-> ranges property that is DMA-controller facing instead of device facing.
-> That would be able to handle the translation between CPU addressing and
-> DMA addressing.
+> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt b/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
+> new file mode 100644
+> index 0000000..5fe3835
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
+> @@ -0,0 +1,36 @@
+> +Hisilicon hix5hd2 gmac controller
+
+Just to clarify, is the SoC name "hix5hd2", or is the 'x' a wildcard?
+
+> +
+> +Required properties:
+> +- compatible: should be "hisilicon,hix5hd2-gmac".
+> +- reg: specifies base physical address(s) and size of the device registers.
+> +  The first region is the MAC register base and size.
+> +  The second region is external interface control register.
+
+Single registers? Are these not part of a larger block?
+
+> +- interrupts: should contain the MAC interrupts
+
+How many, in which order?
+
+> +- #address-cells: must be <1>.
+> +- #size-cells: must be <0>.
+> +- phy-mode: see ethernet.txt [1].
+> +- phy-handle: see ethernet.txt [1].
+> +- mac-address: see ethernet.txt [1].
+> +- clocks: clock phandle and specifier pair.
+
+Is this the only clock input to the gmac block?
+
+Is the clock input named in any documentation?
+
+Cheers,
+Mark.
+
+> +
+> +- PHY subnode: inherits from phy binding [2]
+> +
+> +[1] Documentation/devicetree/bindings/net/ethernet.txt
+> +[2] Documentation/devicetree/bindings/net/phy.txt
+> +
+> +Example:
+> +	gmac0: ethernet at f9840000 {
+> +		compatible = "hisilicon,hix5hd2-gmac";
+> +		reg = <0xf9840000 0x1000>,<0xf984300c 0x4>;
+> +		interrupts = <0 71 4>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		phy-mode = "mii";
+> +		phy-handle = <&phy2>;
+> +		mac-address = [00 00 00 00 00 00];
+> +		clocks = <&clock HIX5HD2_MAC0_CLK>;
+> +
+> +		phy2: ethernet-phy at 2 {
+> +			reg = <2>;
+> +		};
+> +	};
+> -- 
+> 1.7.9.5
 > 
-> Come to think of it, doesn't PCI DMA have to deal with that situation if
-> the PCI window is not 1:1 mapped into the CPU address space?
-
-I think all PCI buses we support so far only need a single entry in the
-dma-ranges property.
-
-	Arnd
+> 
