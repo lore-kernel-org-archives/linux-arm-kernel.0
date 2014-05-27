@@ -1,38 +1,64 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 27 May 2014 10:40:41 +0200
-Subject: [PATCH] ARM: sunxi: allow building without reset controller
-In-Reply-To: <4307148.6KkdViVLZk@wuerfel>
-References: <4307148.6KkdViVLZk@wuerfel>
-Message-ID: <20140527084041.GH4730@lukather>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 27 May 2014 14:25:43 +0530
+Subject: [PATCH] arm: dts: dra7xx-clocks: Fix the l3 and l4 clock rates
+Message-ID: <1401180943-14296-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Without the patch:
+/debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck # cat clk_rate
+532000000
+/debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck/l3_iclk_div # cat clk_rate
+532000000
+/debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck/l3_iclk_div/l4_root_clk_div # cat clk_rate
+532000000
 
-On Mon, May 26, 2014 at 05:19:03PM +0200, Arnd Bergmann wrote:
-> The sunxi reset controller code is only used with sun6i (a31).
-> After the platform has been split up into per-soc options, it's
-> now possible to build it without the reset controller code, so
-> the base platform init must not call into the reset driver
-> if that is turned off at compile time.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+With the patch:
+/debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck # cat clk_rate
+532000000
+/debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck/l3_iclk_div # cat clk_rate
+266000000
+/debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck/l3_iclk_div/l4_root_clk_div # cat clk_rate
+133000000
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+The l3 clock derived from core DPLL is actually a divider clock,
+with the default divider set to 2. l4 then derived from l3 is a fixed factor
+clock, but the fixed divider is 2 and not 1. Which means the l3 clock is
+half of core DPLLs h12x2 and l4 is half of l3 (as seen with this patch)
 
-Can you apply it directly in arm-soc?
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/boot/dts/dra7xx-clocks.dtsi |   10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-Thanks,
-Maxime
-
+diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+index cfb8fc7..a14c99b 100644
+--- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
++++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+@@ -673,10 +673,12 @@
+ 
+ 	l3_iclk_div: l3_iclk_div {
+ 		#clock-cells = <0>;
+-		compatible = "fixed-factor-clock";
++		compatible = "ti,divider-clock";
++		ti,max-div = <2>;
++		ti,bit-shift = <4>;
++		reg = <0x0100>;
+ 		clocks = <&dpll_core_h12x2_ck>;
+-		clock-mult = <1>;
+-		clock-div = <1>;
++		ti,index-power-of-two;
+ 	};
+ 
+ 	l4_root_clk_div: l4_root_clk_div {
+@@ -684,7 +686,7 @@
+ 		compatible = "fixed-factor-clock";
+ 		clocks = <&l3_iclk_div>;
+ 		clock-mult = <1>;
+-		clock-div = <1>;
++		clock-div = <2>;
+ 	};
+ 
+ 	video1_clk2_div: video1_clk2_div {
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140527/62394c7a/attachment.sig>
+1.7.9.5
