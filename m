@@ -1,139 +1,104 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 27 May 2014 10:24:20 +0200
-Subject: [PATCH v5 3/8] ASoC: fsl-ssi: set bitclock in master mode from
- hw_params
+Date: Tue, 27 May 2014 10:24:24 +0200
+Subject: [PATCH v5 7/8] ASoC: fsl-ssi: reorder and document fsl_ssi_private
 In-Reply-To: <1401179065-31195-1-git-send-email-mpa@pengutronix.de>
 References: <1401179065-31195-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1401179065-31195-4-git-send-email-mpa@pengutronix.de>
+Message-ID: <1401179065-31195-8-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+Reorder all variables in struct fsl_ssi_private to have groups that make
+sense together. The patch also updates the struct documentation.
 
-The fsl_ssi driver uses the .set_sysclk callback to configure the
-bitclock for master mode. This is unnecessary since the bitclock
-is known in hw_params. This patch configures the bitclock from .hw_params.
-.set_dai_sysclk now sets a bitclock frequency which is preferred over
-the default calculated bitclock frequency.
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 Tested-By: Michael Grzeschik <mgr@pengutronix.de>
 ---
-
-Notes:
-    Changes in v5:
-     - Added .set_dai_sysclk again to set a bitclock frequency manually
-
- sound/soc/fsl/fsl_ssi.c | 40 ++++++++++++++++++++++++++++++++++++----
- 1 file changed, 36 insertions(+), 4 deletions(-)
+ sound/soc/fsl/fsl_ssi.c | 58 ++++++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 43 insertions(+), 15 deletions(-)
 
 diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 18eacf5..930095b 100644
+index ac78660..9fe3a10 100644
 --- a/sound/soc/fsl/fsl_ssi.c
 +++ b/sound/soc/fsl/fsl_ssi.c
-@@ -166,6 +166,7 @@ struct fsl_ssi_private {
- 	spinlock_t baudclk_lock;
- 	struct clk *baudclk;
+@@ -141,36 +141,64 @@ struct fsl_ssi_soc_data {
+ /**
+  * fsl_ssi_private: per-SSI private data
+  *
+- * @ssi: pointer to the SSI's registers
+- * @ssi_phys: physical address of the SSI registers
++ * @ssi: Pointer to the memory area
+  * @irq: IRQ of this SSI
+- * @playback: the number of playback streams opened
+- * @capture: the number of capture streams opened
+- * @cpu_dai: the CPU DAI for this device
+- * @dev_attr: the sysfs device attribute structure
+- * @stats: SSI statistics
++ * @cpu_dai_drv: CPU DAI driver for this device
++ *
++ * @dai_fmt: DAI configuration this device is currently used with
++ * @i2s_mode: i2s and network mode configuration of the device. Is used to
++ * switch between normal and i2s/network mode
++ * mode depending on the number of channels
++ * @use_dma: DMA is used or FIQ with stream filter
++ * @use_dual_fifo: DMA with support for both FIFOs used
++ * @fifo_deph: Depth of the SSI FIFOs
++ * @rxtx_reg_val: Specific register settings for receive/transmit configuration
++ *
++ * @clk: SSI clock
++ * @baudclk: SSI baud clock for master mode
++ * @baudclk_streams: Active streams that are using baudclk
++ * @bitclk_freq: bitclock frequency set by .set_dai_sysclk
++ *
++ * @dma_params_tx: DMA transmit parameters
++ * @dma_params_rx: DMA receive parameters
++ * @ssi_phys: physical address of the SSI registers
++ *
++ * @fiq_params: FIQ stream filtering parameters
++ *
++ * @pdev: Pointer to pdev used for deprecated fsl-ssi sound card
++ *
++ * @dbg_stats: Debugging statistics
++ *
++ * @soc: SoC specifc data
+  */
+ struct fsl_ssi_private {
+ 	struct ccsr_ssi __iomem *ssi;
+-	dma_addr_t ssi_phys;
+ 	unsigned int irq;
+-	unsigned int fifo_depth;
+ 	struct snd_soc_dai_driver cpu_dai_drv;
+-	struct platform_device *pdev;
+-	unsigned int dai_fmt;
+ 
++	unsigned int dai_fmt;
++	u8 i2s_mode;
+ 	bool use_dma;
+ 	bool use_dual_fifo;
+-	u8 i2s_mode;
+-	struct clk *baudclk;
++	unsigned int fifo_depth;
++	struct fsl_ssi_rxtx_reg_val rxtx_reg_val;
++
  	struct clk *clk;
-+	unsigned int bitclk_freq;
++	struct clk *baudclk;
+ 	unsigned int baudclk_streams;
+ 	unsigned int bitclk_freq;
++
++	/* DMA params */
  	struct snd_dmaengine_dai_dma_data dma_params_tx;
  	struct snd_dmaengine_dai_dma_data dma_params_rx;
++	dma_addr_t ssi_phys;
++
++	/* params for non-dma FIQ stream filtered mode */
  	struct imx_pcm_fiq_params fiq_params;
-@@ -236,6 +237,12 @@ static bool fsl_ssi_is_ac97(struct fsl_ssi_private *ssi_private)
- 	return !!(ssi_private->dai_fmt & SND_SOC_DAIFMT_AC97);
- }
- 
-+static bool fsl_ssi_is_i2s_master(struct fsl_ssi_private *ssi_private)
-+{
-+	return (ssi_private->dai_fmt & SND_SOC_DAIFMT_MASTER_MASK) ==
-+		SND_SOC_DAIFMT_CBS_CFS;
-+}
+-	/* Register values for rx/tx configuration */
+-	struct fsl_ssi_rxtx_reg_val rxtx_reg_val;
 +
- /**
-  * fsl_ssi_isr: SSI interrupt handler
-  *
-@@ -509,7 +516,7 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
- }
++	/* Used when using fsl-ssi as sound-card. This is only used by ppc and
++	 * should be replaced with simple-sound-card. */
++	struct platform_device *pdev;
  
- /**
-- * fsl_ssi_set_dai_sysclk - configure Digital Audio Interface bit clock
-+ * fsl_ssi_set_bclk - configure Digital Audio Interface bit clock
-  *
-  * Note: This function can be only called when using SSI as DAI master
-  *
-@@ -517,8 +524,9 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
-  * freq: Output BCLK frequency = samplerate * 32 (fixed) * channels
-  * dir: SND_SOC_CLOCK_OUT -> TxBCLK, SND_SOC_CLOCK_IN -> RxBCLK.
-  */
--static int fsl_ssi_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
--				  int clk_id, unsigned int freq, int dir)
-+static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
-+		struct snd_soc_dai *cpu_dai,
-+		struct snd_pcm_hw_params *hw_params)
- {
- 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(cpu_dai);
- 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
-@@ -526,6 +534,13 @@ static int fsl_ssi_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
- 	u32 pm = 999, div2, psr, stccr, mask, afreq, factor, i;
- 	unsigned long flags, clkrate, baudrate, tmprate;
- 	u64 sub, savesub = 100000;
-+	unsigned int freq;
-+
-+	/* Prefer the explicitly set bitclock frequency */
-+	if (ssi_private->bitclk_freq)
-+		freq = ssi_private->bitclk_freq;
-+	else
-+		freq = params_channels(hw_params) * 32 * params_rate(hw_params);
+ 	struct fsl_ssi_dbg dbg_stats;
  
- 	/* Don't apply it to any non-baudclk circumstance */
- 	if (IS_ERR(ssi_private->baudclk))
-@@ -583,7 +598,7 @@ static int fsl_ssi_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
- 	mask = CCSR_SSI_SxCCR_PM_MASK | CCSR_SSI_SxCCR_DIV2 |
- 		CCSR_SSI_SxCCR_PSR;
- 
--	if (dir == SND_SOC_CLOCK_OUT || synchronous)
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK || synchronous)
- 		write_ssi_mask(&ssi->stccr, mask, stccr);
- 	else
- 		write_ssi_mask(&ssi->srccr, mask, stccr);
-@@ -604,6 +619,16 @@ static int fsl_ssi_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
- 	return 0;
- }
- 
-+static int fsl_ssi_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
-+		int clk_id, unsigned int freq, int dir)
-+{
-+	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(cpu_dai);
-+
-+	ssi_private->bitclk_freq = freq;
-+
-+	return 0;
-+}
-+
- /**
-  * fsl_ssi_hw_params - program the sample size
-  *
-@@ -627,6 +652,7 @@ static int fsl_ssi_hw_params(struct snd_pcm_substream *substream,
- 		snd_pcm_format_width(params_format(hw_params));
- 	u32 wl = CCSR_SSI_SxCCR_WL(sample_size);
- 	int enabled = read_ssi(&ssi->scr) & CCSR_SSI_SCR_SSIEN;
-+	int ret;
- 
- 	/*
- 	 * If we're in synchronous mode, and the SSI is already enabled,
-@@ -635,6 +661,12 @@ static int fsl_ssi_hw_params(struct snd_pcm_substream *substream,
- 	if (enabled && ssi_private->cpu_dai_drv.symmetric_rates)
- 		return 0;
- 
-+	if (fsl_ssi_is_i2s_master(ssi_private)) {
-+		ret = fsl_ssi_set_bclk(substream, cpu_dai, hw_params);
-+		if (ret)
-+			return ret;
-+	}
-+
- 	/*
- 	 * FIXME: The documentation says that SxCCR[WL] should not be
- 	 * modified while the SSI is enabled.  The only time this can
 -- 
 2.0.0.rc2
