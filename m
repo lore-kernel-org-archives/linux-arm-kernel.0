@@ -1,32 +1,61 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 27 May 2014 11:02:31 -0300
-Subject: [PATCH 0/8] i.MX6 PCIe binding change and MSI support
-In-Reply-To: <1399885183.5016.4.camel@weser.hi.pengutronix.de>
-References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
- <20140424175844.GD29593@google.com>
- <1398421265.4657.25.camel@weser.hi.pengutronix.de>
- <CAErSpo7Boi8d+apAUC3TmmE33LuRMYJ6J+TEPLRbeyZyU3O8RQ@mail.gmail.com>
- <1398774686.4677.12.camel@weser.hi.pengutronix.de>
- <1399885183.5016.4.camel@weser.hi.pengutronix.de>
-Message-ID: <CAOMZO5BAcZi5dKvitPxqcWnB=J1LY7sDRxiDcxRAjZmSpGZBEA@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 27 May 2014 16:02:41 +0200
+Subject: [PATCH v6 6/7] arm64: KVM: Set physical address size related
+ factors in runtime
+In-Reply-To: <20140527135349.GJ31431@lvm>
+References: <000501cf6dc6$44fac0f0$cef042d0$@samsung.com>
+ <20140527135349.GJ31431@lvm>
+Message-ID: <20140527140241.GA13967@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On Tue, May 27, 2014 at 03:53:49PM +0200, Christoffer Dall wrote:
+> On Mon, May 12, 2014 at 06:40:54PM +0900, Jungseok Lee wrote:
+> > This patch sets TCR_EL2.PS, VTCR_EL2.T0SZ and vttbr_baddr_mask in runtime,
+> > not compile time.
+> > 
+> > In ARMv8, EL2 physical address size (TCR_EL2.PS) and stage2 input address
+> > size (VTCR_EL2.T0SZE) cannot be determined in compile time since they
+> > depends on hardware capability.
+> 
+> s/depends/depend/
+> 
+> > 
+> > According to Table D4-23 and Table D4-25 in ARM DDI 0487A.b document,
+> > vttbr_x is calculated using different hard-coded values with consideration
+> 
+> super nit: I guess this is fixed values, and not hard-coded values
+> 
+> > of T0SZ, granule size and the level of translation tables. Therefore,
+> > vttbr_baddr_mask should be determined dynamically.
+> 
+> so I think there's a deeper issue here, which is that we're not
+> currently considering that for a given supported physical address size
+> (run-time) and given page granularity (compile-time), we may have some
+> flexibility in choosing the VTCR_EL2.SL0 field, and thereby the size of
+> the initial stage2 pgd, by concatinating the initial level page tables.
+> 
+> Additionally, the combinations of the givens may also force us to choose
+> a specific SL0 value.
+> 
+> Policy-wise, I would say we should concatenate as many initial level page
+> tables as possible when using 4K pages, iow. always set VTCR_EL2.SL0 to
+> the lowest possible value given the PARange and page size config we have
+> at hand.  That should always provide increased performance for VMs at
+> the cost of maximum 16 concatenated tables, which is a 64K contiguous
+> allocation and alignment, for 4K pages.
+> 
+> For 64K pages, it becomes a 256K alignment and contiguous allocation
+> requirement.  One could argue that if this is not possible on your
+> system, then you have no business runninng VMs on there, but I want to
+> leave this open for comments...
+> 
+Just had a brief chat with Marc, and he made me think of the fact that
+we cannot decide this freely, because the code in kvm_mmu.c assumes that
+the stage-2 page tables have the same number of levels etc. as the host
+kernel (we re-use functions like pud_offset, pud_addr_end, etc. etc.).
 
-On Mon, May 12, 2014 at 5:59 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> Hi Bjorn,
->
-> just a friendly reminder. It would be nice if you could pull those in.
->
-> Shawn already pulled the DT change and as it is a binding change this
-> means PCIe on i.MX6 is broken in -next, as long as the remaining patches
-> are missing.
+I'm not sure this can always be aligned, so we may have to write our own
+kvm_... versions of these to accomodate the best policy for KVM.
 
-We still have imx6q pcie broken in linux-next:
-
-imx6q-pcie 1ffc000.pcie: lvds_gate clock select missing or invalid
-imx6q-pcie: probe of 1ffc000.pcie failed with error -2
-
-
-Could you please apply Lucas' series?
+-Christoffer
