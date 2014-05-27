@@ -1,46 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 May 2014 11:13:56 +0200
-Subject: [PATCH v2] pinctrl/at91: Fix lockup when IRQ on PIOC and PIOD
- occurs
-In-Reply-To: <536CAC87.9070007@atmel.com>
-References: <1398289203-2407-1-git-send-email-alexanders83@web.de>
- <1398362139-25551-1-git-send-email-alexanders83@web.de>
- <CACRpkdayBjvOnSfaRmcNenSG=MW0W+UFjqUjGoQwqDNFLQ9zEQ@mail.gmail.com>
- <536CAC87.9070007@atmel.com>
-Message-ID: <CACRpkdaWt7yLz=qk5smbbdA+vCPF=r-SnMPhiuzORvbNmpMBrg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 27 May 2014 11:13:37 +0200
+Subject: [PATCH v8 3/3] ARM: sunxi: Add IR controller support in DT on A20
+In-Reply-To: <1401056805-2218-4-git-send-email-bay@hackerdom.ru>
+References: <1401056805-2218-1-git-send-email-bay@hackerdom.ru>
+ <1401056805-2218-4-git-send-email-bay@hackerdom.ru>
+Message-ID: <20140527091337.GJ4730@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 9, 2014 at 12:23 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> On 25/04/2014 11:18, Linus Walleij :
->> On Thu, Apr 24, 2014 at 7:55 PM, Alexander Stein <alexanders83@web.de> wrote:
->>
->>> With commit 80cc3732 (pinctrl/at91: convert driver to use gpiolib irqchip)
->>> gpiochip_set_chained_irqchip is called for PIOC, PIOD and PIOE. The
->>> associated GPIO chip for the IRQ chip is overwritten each time, because
->>> they share the same hard IRQ line.
->>> Thus if an IRQ occurs on PIOC or PIOD, gpio_irq_handler will only check on
->>> PIOE (the assigned GPIO chip) where no event occured. Thus the IRQ will
->>> not be cleared, retriggering the ISR.
->>> Fix that (like done before) by only set the PIOC GPIO chip to the IRQ chip
->>> and walk the list in the irq handler.
->>>
->>> Signed-off-by: Alexander Stein <alexanders83@web.de>
->>> ---
->>> Changes in v2:
->>> * Fix git SHA1 in commit message (used local one)
->>> * Switch to the next gpio_chip when walking the list
->>
->> This v2 patch applied for next.
->
-> Linus,
->
-> I do not see this patch in your "for-next" branch nor in linux-next. Did
-> I miss something?
+On Mon, May 26, 2014 at 04:26:45AM +0600, Alexander Bersenev wrote:
+> This patch adds IR controller in A20 Device-Tree:
+> - Two IR devices found in A20 user manual
+> - Pins for two devices
+> - One IR device physically found on Cubieboard 2
+> - One IR device physically found on Cubietruck
+> 
+> Signed-off-by: Alexander Bersenev <bay@hackerdom.ru>
+> Signed-off-by: Alexsey Shestacov <wingrime@linux-sunxi.org>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts |  6 ++++++
+>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts  |  6 ++++++
+>  arch/arm/boot/dts/sun7i-a20.dtsi            | 32 +++++++++++++++++++++++++++++
 
-I screwed up somehow :-/
+I told you numerous times already that I wanted this patch to be split
+into at least three of them:
+  - One to add the device to the DTSI.
+  - One to add the pins
+  - and one to enable the devices in the DTS.
 
-Patch applied *now*.
+Please address this comment.
 
-Yours,
-Linus Walleij
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140527/77793e0e/attachment.sig>
