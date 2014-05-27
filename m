@@ -1,50 +1,52 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Tue, 27 May 2014 18:50:38 +0200
-Subject: [PATCH 00/11] sdio wifi oob irq support for sunxi
-In-Reply-To: <20140527152614.GB5694@tuxdriver.com>
-References: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>
- <20140527152614.GB5694@tuxdriver.com>
-Message-ID: <5384C25E.70505@broadcom.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 27 May 2014 17:52:34 +0100
+Subject: [PATCH v2 0/7] mfd: twl4030-power: Enable off-idle configuration
+ when booted with device tree
+In-Reply-To: <1400031250-29542-1-git-send-email-tony@atomide.com>
+References: <1400031250-29542-1-git-send-email-tony@atomide.com>
+Message-ID: <20140527165234.GF4227@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/14 17:26, John W. Linville wrote:
-> On Mon, May 26, 2014 at 09:47:55AM +0200, Hans de Goede wrote:
->> Hi All,
->>
->> Here is a patch series adding support for oob irqs for the ap6210 sdio wifi
->> modules found on various Allwinner A20 boards.
->>
->> A lot of it is ground work which should be useful for adding oob irq support
->> to other sdio wifi models too.
->>
->> The first 5 patches are sunxi pinctrl patches and should go upstream through
->> the pinctrl tree.
->>
->> Patch 6 adds generic support for having per sdio function child nodes in
->> devicetree and should go upstream through the mmc tree.
->>
->> Patch 7 and 8 add oob irq support to the brcmfmac driver. Patch 9 pokes some
->> magic bits needed to enable the oob irq, this was taken from an android code
->> dump and good do with a good review from someone from Broadcom, Arend ?
->
-> If Arend approves, I'm fine with these going through another appropriate tree.
+> Here's an updated set of patches to enable low-power idle modes
+> for some omap3 boards when booted with device tree.
+> 
+> This series when applied on top of the patches in tread                                                                                                       
+> "[PATCH 00/11] Fixes for omap PM for making omap3 DT only",
+> or omap-for-v3.16/pm branch.
+> 
+> Lee, if these patches look OK to you, please feel free to 
+> pick them, preferrably to the immutable branch you already
+> have set up so I can also merge them in to be able to have
+> things working in my branch properly for PM.
 
-Not sure in what tree these patches were created (assume some sunxi 
-tree), but if it conflicts with wireless-next I am pretty sure Stephen 
-will find that. I am fine with any tree. Patch 9 indeed has some magic 
-bits that need some clarification, but I will sort that out with Hans.
+Whoops, nearly forgot about this patchset.
 
-Regards,
-Arend
+Tony, can you resend it with all your fix-ups please.  The 8< doesn't
+work well with my patch application 'system'.
 
->> Patch 10 and 11 add the necessary dts bits to actually enable the sdio irq
->> and should go upstream through Maxime's dt tree.
->>
->> Please review / merge.
->>
->> Thanks&  Regards,
->>
->> Hans
->>
->
+> Tony Lindgren (7):
+>   mfd: twl4030-power: Fix hang on reboot if sleep configuration was
+>     loaded earlier
+>   mfd: twl4030-power: Fix some defines for SW_EVENTS
+>   mfd: twl4030-power: Add generic reset configuration
+>   mfd: twl4030-power: Add recommended idle configuration
+>   mfd: twl4030-power: Add support for board specific configuration
+>   mfd: twl4030power: Add a configuration to turn off oscillator during
+>     off-idle
+>   ARM: dts: Enable twl4030 off-idle configuration for selected omaps
+> 
+>  .../devicetree/bindings/mfd/twl4030-power.txt      |  17 +-
+>  arch/arm/boot/dts/omap3-beagle-xm.dts              |   6 +
+>  arch/arm/boot/dts/omap3-evm-common.dtsi            |   7 +
+>  arch/arm/boot/dts/omap3-n900.dts                   |   5 +
+>  drivers/mfd/twl4030-power.c                        | 269 +++++++++++++++++++--
+>  include/linux/i2c/twl.h                            |   4 +
+>  6 files changed, 284 insertions(+), 24 deletions(-)
+> 
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
