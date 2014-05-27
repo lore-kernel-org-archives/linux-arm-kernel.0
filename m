@@ -1,32 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 27 May 2014 19:49:40 +0100
-Subject: [for-next][PATCH] ftrace: Make CALLER_ADDRx macros more generic
-In-Reply-To: <20140527091019.54a8d2d6@gandalf.local.home>
-References: <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
- <1394862353-28963-7-git-send-email-takahiro.akashi@linaro.org>
- <20140416135217.GF1001@arm.com> <535E3040.7090402@linaro.org>
- <20140527091019.54a8d2d6@gandalf.local.home>
-Message-ID: <20140527184940.GA26035@arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 27 May 2014 11:53:59 -0700
+Subject: [PATCH] arm: Set hardirq tracing to on when idling
+In-Reply-To: <4475199.26Fs5MKAfh@wuerfel>
+References: <1401045323-7116-1-git-send-email-minyard@acm.org>
+ <4559339.apo3Fd10HK@wuerfel> <5384BF89.6010509@meduna.org>
+ <4475199.26Fs5MKAfh@wuerfel>
+Message-ID: <5384DF47.2070904@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 02:10:19PM +0100, Steven Rostedt wrote:
-> Will,
-> 
-> I made a separate branch called ftrace/arm64 as shown below. You can
-> pull that branch to base the rest of Akashi-san's patches on top of it.
-> The branch is based on top of v3.15-rc5.
+On 05/27/14 11:49, Arnd Bergmann wrote:
+>
+> You also commented in that thread about stop_critical_timings()/
+> start_critical_timings(). Corey, can you look at that, too? I
+> think it's designed to avoid the issue you are seeing but
+> for some reason doesn't.
 
-Thanks Steve, I'll pull that in.
+I sent a patch last week to "solve" this problem. I'm not sure if it's
+right but it works for me.
 
-Akashi: please can you re-send your series, based on the branch below and
-including the acks/reviewed-by tags you got for v6 of the patches?
+https://lkml.org/lkml/2014/5/19/607
 
-Cheers,
-
-Will
-
->   git://git.kernel.org/pub/scm/linux/kernel/git/rostedt/linux-trace.git
-> ftrace/arm64
-> 
-> Head SHA1: eed542d6962ba33a689b4007a389f466e407bd74
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
