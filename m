@@ -1,104 +1,113 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 27 May 2014 10:24:24 +0200
-Subject: [PATCH v5 7/8] ASoC: fsl-ssi: reorder and document fsl_ssi_private
+Date: Tue, 27 May 2014 10:24:19 +0200
+Subject: [PATCH v5 2/8] ASoC: fsl-ssi: make fsl,mode property optional
 In-Reply-To: <1401179065-31195-1-git-send-email-mpa@pengutronix.de>
 References: <1401179065-31195-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1401179065-31195-8-git-send-email-mpa@pengutronix.de>
+Message-ID: <1401179065-31195-3-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reorder all variables in struct fsl_ssi_private to have groups that make
-sense together. The patch also updates the struct documentation.
+The simple soundcard binding has its own way for specifying the dai
+format. To be able to use this binding we have to make the fsl,mode
+property optional. As the property is used in existing devicetrees
+keep the option around for compatibility reasons.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 Tested-By: Michael Grzeschik <mgr@pengutronix.de>
 ---
- sound/soc/fsl/fsl_ssi.c | 58 ++++++++++++++++++++++++++++++++++++-------------
- 1 file changed, 43 insertions(+), 15 deletions(-)
+ sound/soc/fsl/fsl_ssi.c | 41 ++++++++++++++++++++++++++---------------
+ 1 file changed, 26 insertions(+), 15 deletions(-)
 
 diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index ac78660..9fe3a10 100644
+index fa65011..18eacf5 100644
 --- a/sound/soc/fsl/fsl_ssi.c
 +++ b/sound/soc/fsl/fsl_ssi.c
-@@ -141,36 +141,64 @@ struct fsl_ssi_soc_data {
+@@ -660,12 +660,9 @@ static int fsl_ssi_hw_params(struct snd_pcm_substream *substream,
+ 	return 0;
+ }
+ 
+-/**
+- * fsl_ssi_set_dai_fmt - configure Digital Audio Interface Format.
+- */
+-static int fsl_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
++static int _fsl_ssi_set_dai_fmt(struct fsl_ssi_private *ssi_private,
++		unsigned int fmt)
+ {
+-	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(cpu_dai);
+ 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
+ 	u32 strcr = 0, stcr, srcr, scr, mask;
+ 	u8 wm;
+@@ -804,6 +801,17 @@ static int fsl_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
+ 		fsl_ssi_setup_ac97(ssi_private);
+ 
+ 	return 0;
++
++}
++
++/**
++ * fsl_ssi_set_dai_fmt - configure Digital Audio Interface Format.
++ */
++static int fsl_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
++{
++	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(cpu_dai);
++
++	return _fsl_ssi_set_dai_fmt(ssi_private, fmt);
+ }
+ 
  /**
-  * fsl_ssi_private: per-SSI private data
-  *
-- * @ssi: pointer to the SSI's registers
-- * @ssi_phys: physical address of the SSI registers
-+ * @ssi: Pointer to the memory area
-  * @irq: IRQ of this SSI
-- * @playback: the number of playback streams opened
-- * @capture: the number of capture streams opened
-- * @cpu_dai: the CPU DAI for this device
-- * @dev_attr: the sysfs device attribute structure
-- * @stats: SSI statistics
-+ * @cpu_dai_drv: CPU DAI driver for this device
-+ *
-+ * @dai_fmt: DAI configuration this device is currently used with
-+ * @i2s_mode: i2s and network mode configuration of the device. Is used to
-+ * switch between normal and i2s/network mode
-+ * mode depending on the number of channels
-+ * @use_dma: DMA is used or FIQ with stream filter
-+ * @use_dual_fifo: DMA with support for both FIFOs used
-+ * @fifo_deph: Depth of the SSI FIFOs
-+ * @rxtx_reg_val: Specific register settings for receive/transmit configuration
-+ *
-+ * @clk: SSI clock
-+ * @baudclk: SSI baud clock for master mode
-+ * @baudclk_streams: Active streams that are using baudclk
-+ * @bitclk_freq: bitclock frequency set by .set_dai_sysclk
-+ *
-+ * @dma_params_tx: DMA transmit parameters
-+ * @dma_params_rx: DMA receive parameters
-+ * @ssi_phys: physical address of the SSI registers
-+ *
-+ * @fiq_params: FIQ stream filtering parameters
-+ *
-+ * @pdev: Pointer to pdev used for deprecated fsl-ssi sound card
-+ *
-+ * @dbg_stats: Debugging statistics
-+ *
-+ * @soc: SoC specifc data
-  */
- struct fsl_ssi_private {
- 	struct ccsr_ssi __iomem *ssi;
--	dma_addr_t ssi_phys;
- 	unsigned int irq;
--	unsigned int fifo_depth;
- 	struct snd_soc_dai_driver cpu_dai_drv;
--	struct platform_device *pdev;
--	unsigned int dai_fmt;
+@@ -1135,7 +1143,6 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 	const uint32_t *iprop;
+ 	struct resource res;
+ 	char name[64];
+-	bool ac97 = false;
  
-+	unsigned int dai_fmt;
-+	u8 i2s_mode;
- 	bool use_dma;
- 	bool use_dual_fifo;
--	u8 i2s_mode;
--	struct clk *baudclk;
-+	unsigned int fifo_depth;
-+	struct fsl_ssi_rxtx_reg_val rxtx_reg_val;
-+
- 	struct clk *clk;
-+	struct clk *baudclk;
- 	unsigned int baudclk_streams;
- 	unsigned int bitclk_freq;
-+
-+	/* DMA params */
- 	struct snd_dmaengine_dai_dma_data dma_params_tx;
- 	struct snd_dmaengine_dai_dma_data dma_params_rx;
-+	dma_addr_t ssi_phys;
-+
-+	/* params for non-dma FIQ stream filtered mode */
- 	struct imx_pcm_fiq_params fiq_params;
--	/* Register values for rx/tx configuration */
--	struct fsl_ssi_rxtx_reg_val rxtx_reg_val;
-+
-+	/* Used when using fsl-ssi as sound-card. This is only used by ppc and
-+	 * should be replaced with simple-sound-card. */
-+	struct platform_device *pdev;
+ 	/* SSIs that are not connected on the board should have a
+ 	 *      status = "disabled"
+@@ -1148,14 +1155,6 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 	if (!of_id || !of_id->data)
+ 		return -EINVAL;
  
- 	struct fsl_ssi_dbg dbg_stats;
+-	sprop = of_get_property(np, "fsl,mode", NULL);
+-	if (!sprop) {
+-		dev_err(&pdev->dev, "fsl,mode property is necessary\n");
+-		return -EINVAL;
+-	}
+-	if (!strcmp(sprop, "ac97-slave"))
+-		ac97 = true;
+-
+ 	ssi_private = devm_kzalloc(&pdev->dev, sizeof(*ssi_private),
+ 			GFP_KERNEL);
+ 	if (!ssi_private) {
+@@ -1165,10 +1164,19 @@ static int fsl_ssi_probe(struct platform_device *pdev)
  
+ 	ssi_private->soc = of_id->data;
+ 
++	sprop = of_get_property(np, "fsl,mode", NULL);
++	if (sprop) {
++		if (!strcmp(sprop, "ac97-slave"))
++			ssi_private->dai_fmt = SND_SOC_DAIFMT_AC97;
++		else if (!strcmp(sprop, "i2s-slave"))
++			ssi_private->dai_fmt = SND_SOC_DAIFMT_I2S |
++				SND_SOC_DAIFMT_CBM_CFM;
++	}
++
+ 	ssi_private->use_dma = !of_property_read_bool(np,
+ 			"fsl,fiq-stream-filter");
+ 
+-	if (ac97) {
++	if (fsl_ssi_is_ac97(ssi_private)) {
+ 		memcpy(&ssi_private->cpu_dai_drv, &fsl_ssi_ac97_dai,
+ 				sizeof(fsl_ssi_ac97_dai));
+ 
+@@ -1279,6 +1287,9 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 	}
+ 
+ done:
++	if (ssi_private->dai_fmt)
++		_fsl_ssi_set_dai_fmt(ssi_private, ssi_private->dai_fmt);
++
+ 	return 0;
+ 
+ error_sound_card:
 -- 
 2.0.0.rc2
