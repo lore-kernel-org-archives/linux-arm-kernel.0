@@ -1,126 +1,109 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 27 May 2014 10:22:16 +0200
-Subject: [PATCH 22/22] ARM: sun8i: dt: Add Ippo-q8h v5 support
-In-Reply-To: <CAGb2v64EHLsj-cy13yf28K8vkTJUCv95q=x-7c2yiHQ=uBm-sw@mail.gmail.com>
-References: <1400831485-28576-1-git-send-email-wens@csie.org>
- <1400831485-28576-23-git-send-email-wens@csie.org>
- <20140525193955.GB10768@lukather>
- <CAGb2v64EHLsj-cy13yf28K8vkTJUCv95q=x-7c2yiHQ=uBm-sw@mail.gmail.com>
-Message-ID: <20140527082216.GD4730@lukather>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 27 May 2014 10:24:21 +0200
+Subject: [PATCH v5 4/8] ASoC: fsl-ssi: remove unnecessary spinlock
+In-Reply-To: <1401179065-31195-1-git-send-email-mpa@pengutronix.de>
+References: <1401179065-31195-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1401179065-31195-5-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 12:23:09PM +0800, Chen-Yu Tsai wrote:
-> On Mon, May 26, 2014 at 3:39 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Fri, May 23, 2014 at 03:51:25PM +0800, Chen-Yu Tsai wrote:
-> >> The Ippo-q8h is a tablet circiut board commonly found in cheap Android
-> >> tablets with A23 SoCs. There are at least 2 versions of the board, with
-> >> different peripherals, such as WiFi chips.
-> >>
-> >> This patch add supports for v5 of such boards, which has a ESP8089 WiFi
-> >> chip (not supported) connected to mmc1.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >>  arch/arm/boot/dts/Makefile                  |  2 ++
-> >>  arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts | 51 +++++++++++++++++++++++++++++
-> >>  2 files changed, 53 insertions(+)
-> >>  create mode 100644 arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-> >>
-> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> >> index 6967393..f809a53 100644
-> >> --- a/arch/arm/boot/dts/Makefile
-> >> +++ b/arch/arm/boot/dts/Makefile
-> >> @@ -354,6 +354,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
-> >>       sun7i-a20-cubietruck.dtb \
-> >>       sun7i-a20-i12-tvbox.dtb \
-> >>       sun7i-a20-olinuxino-micro.dtb
-> >> +dtb-$(CONFIG_MACH_SUN8I) += \
-> >> +     sun8i-a23-ippo-q8h-v5.dtb
-> >>  dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
-> >>       tegra20-iris-512.dtb \
-> >>       tegra20-medcom-wide.dtb \
-> >> diff --git a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-> >> new file mode 100644
-> >> index 0000000..7d0bd97
-> >> --- /dev/null
-> >> +++ b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-> >> @@ -0,0 +1,51 @@
-> >> +/*
-> >> + * Copyright 2014 Chen-Yu Tsai
-> >> + *
-> >> + * Chen-Yu Tsai <wens@csie.org>
-> >> + *
-> >> + * The code contained herein is licensed under the GNU General Public
-> >> + * License. You may obtain a copy of the GNU General Public License
-> >> + * Version 2 or later at the following locations:
-> >> + *
-> >> + * http://www.opensource.org/licenses/gpl-license.html
-> >> + * http://www.gnu.org/copyleft/gpl.html
-> >> + */
-> >> +
-> >> +/dts-v1/;
-> >> +/include/ "sun8i-a23.dtsi"
-> >> +
-> >> +/ {
-> >> +     model = "Ippo Q8H Dual Core Tablet (v5)";
-> >> +     compatible = "ippo,q8h-v5", "allwinner,sun8i-a23";
-> >> +
-> >> +     chosen {
-> >> +             bootargs = "earlyprintk console=ttyS0,115200";
-> >> +     };
-> >
-> > You should probably add the memory node here too.
-> 
-> OK.
-> 
-> >> +
-> >> +     soc at 01c00000 {
-> >> +             uart0: serial at 01c28000 {
-> >> +                     pinctrl-names = "default";
-> >> +                     pinctrl-0 = <&uart0_pins_a>;
-> >> +                     status = "okay";
-> >> +             };
-> >> +
-> >> +             i2c0: i2c at 01c2ac00 {
-> >> +                     pinctrl-names = "default";
-> >> +                     pinctrl-0 = <&i2c0_pins_a>;
-> >> +                     status = "okay";
-> >> +             };
-> >> +
-> >> +             i2c1: i2c at 01c2b000 {
-> >> +                     pinctrl-names = "default";
-> >> +                     pinctrl-0 = <&i2c1_pins_a>;
-> >> +                     status = "okay";
-> >> +             };
-> >
-> > What are the two i2c busses wired to?
-> 
-> i2c0 has the capacitive touch panel controller gsl1680 @ 0x40.
-> 
-> i2c1 has something (gsensor maybe) connected @ 0x15.
-> The FEX file lists the gsensor on i2c1, but with the address as 0x18.
-> I may need to boot back to stock Android to figure it out.
-> 
-> i2c2 has the camera sensor (GC0309) control connected to it @ 0x66.
-> I didn't list it because I overlooked it, and i2cdetect hangs.
-> It seems to need AXP PMIC support to activate the regulators.
-> 
-> AFAIK, the kernel doesn't have drivers for these devices,
-> so how would we list them?
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
-We don't need to list them yet. We can just wait for the drivers, it
-was just out of curiosity.
+The baudclock_locked variable is only used in functions which
+are serialized anyway from the core. No need to have a lock
+around the variable, so remove it.
 
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Tested-By: Michael Grzeschik <mgr@pengutronix.de>
+---
+ sound/soc/fsl/fsl_ssi.c | 21 ++++-----------------
+ 1 file changed, 4 insertions(+), 17 deletions(-)
+
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index 930095b..b3033d9 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -163,7 +163,6 @@ struct fsl_ssi_private {
+ 	bool baudclk_locked;
+ 	bool use_dual_fifo;
+ 	u8 i2s_mode;
+-	spinlock_t baudclk_lock;
+ 	struct clk *baudclk;
+ 	struct clk *clk;
+ 	unsigned int bitclk_freq;
+@@ -495,13 +494,9 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+ 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+ 	struct fsl_ssi_private *ssi_private =
+ 		snd_soc_dai_get_drvdata(rtd->cpu_dai);
+-	unsigned long flags;
+ 
+-	if (!dai->active && !fsl_ssi_is_ac97(ssi_private)) {
+-		spin_lock_irqsave(&ssi_private->baudclk_lock, flags);
++	if (!dai->active && !fsl_ssi_is_ac97(ssi_private))
+ 		ssi_private->baudclk_locked = false;
+-		spin_unlock_irqrestore(&ssi_private->baudclk_lock, flags);
+-	}
+ 
+ 	/* When using dual fifo mode, it is safer to ensure an even period
+ 	 * size. If appearing to an odd number while DMA always starts its
+@@ -532,7 +527,7 @@ static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
+ 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
+ 	int synchronous = ssi_private->cpu_dai_drv.symmetric_rates, ret;
+ 	u32 pm = 999, div2, psr, stccr, mask, afreq, factor, i;
+-	unsigned long flags, clkrate, baudrate, tmprate;
++	unsigned long clkrate, baudrate, tmprate;
+ 	u64 sub, savesub = 100000;
+ 	unsigned int freq;
+ 
+@@ -603,18 +598,14 @@ static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
+ 	else
+ 		write_ssi_mask(&ssi->srccr, mask, stccr);
+ 
+-	spin_lock_irqsave(&ssi_private->baudclk_lock, flags);
+ 	if (!ssi_private->baudclk_locked) {
+ 		ret = clk_set_rate(ssi_private->baudclk, baudrate);
+ 		if (ret) {
+-			spin_unlock_irqrestore(&ssi_private->baudclk_lock,
+-					flags);
+ 			dev_err(cpu_dai->dev, "failed to set baudclk rate\n");
+ 			return -EINVAL;
+ 		}
+ 		ssi_private->baudclk_locked = true;
+ 	}
+-	spin_unlock_irqrestore(&ssi_private->baudclk_lock, flags);
+ 
+ 	return 0;
+ }
+@@ -899,7 +890,6 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
+ 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+ 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(rtd->cpu_dai);
+ 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
+-	unsigned long flags;
+ 
+ 	switch (cmd) {
+ 	case SNDRV_PCM_TRIGGER_START:
+@@ -920,11 +910,9 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
+ 			fsl_ssi_rx_config(ssi_private, false);
+ 
+ 		if (!fsl_ssi_is_ac97(ssi_private) && (read_ssi(&ssi->scr) &
+-					(CCSR_SSI_SCR_TE | CCSR_SSI_SCR_RE)) == 0) {
+-			spin_lock_irqsave(&ssi_private->baudclk_lock, flags);
++					(CCSR_SSI_SCR_TE | CCSR_SSI_SCR_RE)) == 0)
+ 			ssi_private->baudclk_locked = false;
+-			spin_unlock_irqrestore(&ssi_private->baudclk_lock, flags);
+-		}
++
+ 		break;
+ 
+ 	default:
+@@ -1257,7 +1245,6 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 		ssi_private->fifo_depth = 8;
+ 
+ 	ssi_private->baudclk_locked = false;
+-	spin_lock_init(&ssi_private->baudclk_lock);
+ 
+ 	dev_set_drvdata(&pdev->dev, ssi_private);
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140527/48aa0138/attachment-0001.sig>
+2.0.0.rc2
