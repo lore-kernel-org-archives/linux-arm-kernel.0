@@ -1,37 +1,83 @@
-From: cengelma@gmx.at (Christian Engelmayer)
-Date: Tue, 27 May 2014 23:20:47 +0200
-Subject: [PATCH] ARM: psci: fix warning on psci_init if ARM_PSCI is undefined
-Message-ID: <1401225647-8299-1-git-send-email-cengelma@gmx.at>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 27 May 2014 23:28:57 +0200
+Subject: [PATCH 09/11] brcmfmac: Fix OOB interrupt not working for BCM43362
+In-Reply-To: <5384C544.9000903@broadcom.com>
+References: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>
+ <1401090486-4414-10-git-send-email-hdegoede@redhat.com>
+ <5384C544.9000903@broadcom.com>
+Message-ID: <53850399.9000708@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit e71246a (PSCI: Add initial support for PSCIv0.2 functions) changed the
-return type of function psci_init() from void to int, but left the static
-inline stub used if CONFIG_ARM_PSCI is not defined otherwise untouched. This
-results in minor compile warning "warning: no return statement in function
-returning non-void [-Wreturn-type]". The return value is currently not
-evaluated by the only caller anyway.
+Hi,
 
-Signed-off-by: Christian Engelmayer <cengelma@gmx.at>
----
-Compile tested only. Applies against branch next in tree
-git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git
----
- arch/arm/include/asm/psci.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 05/27/2014 07:03 PM, Arend van Spriel wrote:
+> On 05/26/14 09:48, Hans de Goede wrote:
+>> It has taken me a long long time to get the OOB interrupt working on the
+>> AP6210 sdio wifi/bt module found on various Allwinner A20 boards. In the
+>> end I found these magic register pokes in the cubietruck kernel tree:
+>> https://github.com/cubieboard2/linux-sunxi/commit/7f08ba395617d17e7a711507503d89a50406fe7a
+>>
+>> I'm not entirely sure if this specific to the AP6210 module, or if this
+>> should be done for all BCM43362 sdio devices.
+>
+> Let keep it as this for now. I added some remarks below.
+>
+> Regards,
+> Arend
+>
+>> Signed-off-by: Hans de Goede<hdegoede@redhat.com>
+>> ---
+>>   drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c | 18 ++++++++++++++++++
+>>   1 file changed, 18 insertions(+)
+>>
+>> diff --git a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
+>> index 0fc707c..2369a0f 100644
+>> --- a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
+>> +++ b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
+>> @@ -39,7 +39,9 @@
+>>   #include<brcm_hw_ids.h>
+>>   #include<brcmu_utils.h>
+>>   #include<brcmu_wifi.h>
+>> +#include<chipcommon.h>
+>>   #include<soc.h>
+>> +#include "chip.h"
+>>   #include "dhd_bus.h"
+>>   #include "dhd_dbg.h"
+>>   #include "sdio_host.h"
+>> @@ -119,6 +121,7 @@ int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev)
+>>   {
+>>       int ret = 0;
+>>       u8 data;
+>> +    u32 addr, gpiocontrol;
+>>       unsigned long flags;
+>>
+>>       if ((sdiodev->pdata)&&  (sdiodev->pdata->oob_irq_supported)) {
+>> @@ -148,6 +151,21 @@ int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev)
+>>
+>>           sdio_claim_host(sdiodev->func[1]);
+>>
+>> +        if (sdiodev->bus_if->chip == BCM43362_CHIP_ID) {
+> +            /* assign GPIO to SDIO core */
+>> +            addr = CORE_CC_REG(SI_ENUM_BASE, gpiocontrol);
+>> +            gpiocontrol = brcmf_sdiod_regrl(sdiodev, addr,&ret);
+>> +            gpiocontrol |= 0x2;
+>> +            brcmf_sdiod_regwl(sdiodev, addr, gpiocontrol,&ret);
+>> +
+>> +            /* SPROM_ADDR_HIGH ? perhaps the defines name is off */
+>
+> These names are all off. These should be:
+> SBSDIO_SPROM_ADDR_HIGH = SBSDIO_GPIO_SELECT
+> SBSDIO_CHIP_CTRL_DATA = SBSDIO_GPIO_OUT
+> SBSDIO_CHIP_CTRL_EN = SBSDIO_GPIO_EN
 
-diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
-index b93e34a..c25ef3e 100644
---- a/arch/arm/include/asm/psci.h
-+++ b/arch/arm/include/asm/psci.h
-@@ -41,7 +41,7 @@ extern struct smp_operations psci_smp_ops;
- int psci_init(void);
- bool psci_smp_available(void);
- #else
--static inline int psci_init(void) { }
-+static inline int psci_init(void) { return 0; }
- static inline bool psci_smp_available(void) { return false; }
- #endif
- 
--- 
-1.9.1
+Ok, so I guess I should do a pre-patch adding defines for these, should
+these replace the existing defines for these addresses in:
+drivers/net/wireless/brcm80211/brcmfmac/sdio_host.h
+
+Or should the pre-patch add defines with the new names and keep the old
+ones ?
+
+Regards,
+
+Hans
