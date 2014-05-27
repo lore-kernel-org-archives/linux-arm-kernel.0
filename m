@@ -1,29 +1,24 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue, 27 May 2014 16:58:27 +0530
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 27 May 2014 13:38:51 +0200
 Subject: [PATCH 1/1] ARM: mvebu: Staticize mvebu_cpu_reset_init
-Message-ID: <1401190107-21359-1-git-send-email-sachin.kamat@linaro.org>
+In-Reply-To: <1401190107-21359-1-git-send-email-sachin.kamat@linaro.org>
+References: <1401190107-21359-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <20140527133851.2672f626@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'mvebu_cpu_reset_init' is local to this file.
+Dear Sachin Kamat,
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
----
- arch/arm/mach-mvebu/cpu-reset.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Tue, 27 May 2014 16:58:27 +0530, Sachin Kamat wrote:
+> 'mvebu_cpu_reset_init' is local to this file.
+> 
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> ---
+>  arch/arm/mach-mvebu/cpu-reset.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mvebu/cpu-reset.c b/arch/arm/mach-mvebu/cpu-reset.c
-index 4a8f9eebebea..60fb53787004 100644
---- a/arch/arm/mach-mvebu/cpu-reset.c
-+++ b/arch/arm/mach-mvebu/cpu-reset.c
-@@ -67,7 +67,7 @@ static int mvebu_cpu_reset_map(struct device_node *np, int res_idx)
- 	return 0;
- }
- 
--int __init mvebu_cpu_reset_init(void)
-+static int __init mvebu_cpu_reset_init(void)
- {
- 	struct device_node *np;
- 	int res_idx;
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 -- 
-1.7.9.5
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
