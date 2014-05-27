@@ -1,33 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 May 2014 16:11:09 +0200
-Subject: [PATCH 01/11] pinctrl: sunxi: create irq/pin mapping during init
-In-Reply-To: <1401090486-4414-2-git-send-email-hdegoede@redhat.com>
-References: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>
- <1401090486-4414-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <CACRpkdZpy2aT_kFp01bnrviVB3SOggiNUJB46wbWAY_bqW8=gg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 May 2014 16:16:39 +0200
+Subject: [GIT PULL] ARM: Keystone reset driver 3.16
+In-Reply-To: <53849C05.8090004@ti.com>
+References: <1400880597-7516-1-git-send-email-santosh.shilimkar@ti.com>
+ <1401175584.4090.22.camel@paszta.hi.pengutronix.de> <53849C05.8090004@ti.com>
+Message-ID: <4799350.My62BxqHfR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 9:47 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+On Tuesday 27 May 2014 10:07:01 Santosh Shilimkar wrote:
+> 
+> On Tuesday 27 May 2014 03:26 AM, Philipp Zabel wrote:
+> > Hi Olof, Santosh,
+> > 
+> > Am Montag, den 26.05.2014, 14:26 -0700 schrieb Olof Johansson:
+> >> On Fri, May 23, 2014 at 05:29:57PM -0400, Santosh Shilimkar wrote:
+> >>> Hi Arm-soc folks,
+> >>>
+> >>> Please pull below keystone reset driver for 3.16 . To avoid merge conflict
+> >>> with earlier keystone-soc pull request[1], I have based the subject pull
+> >>> request on top of it. It merges cleanly with arm-soc 'next/soc2' head. Please
+> >>> apply it against 'next/soc2'. Thanks 
+> >>
+> >> Hi,
+> >>
+> >> I notice this driver doesn't have an ack from Philipp Zabel (cc:d here). That
+> >> would be appropriate.
+> >
+> We asked about ack, split series options from reset folks but didn't hear back.
+> Since the series has been on the list for almost 3 merge windows now, I asked
+> Arnd how to go about it and he suggested to send it via arm-soc. Should have
+> clarified it in pull request.
 
-> From: Chen-Yu Tsai <wens@csie.org>
->
-> The irq/pin mapping is used to lookup the pin to mux to the irq
-> function when the irq is enabled. It is created when gpio_to_irq
-> is called. Creating the mapping during init allows us to map the
-> interrupts directly from the device tree.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Olof, note that this is a driver for system reset, i.e. drivers/power/reset, not
+for resetting individual devices as drivers/reset does. Philipp maintains the
+latter, but AFAIK he's not involved in the drivers/power stuff.
 
-This is exactly correct. Patch applied.
-
-I tried to hack the sunxi driver to even use the gpiolib
-irqchip helpers but exactly this complex map thing in
-->irq_array[] git me stuck. If any of you guys could be so
-nice to take a stab at this (compare to other commits
-converting drivers to use gpiolibs irqchip helpers) then
-I'd be very happy.
-
-Yours,
-Linus Walleij
+	Arnd
