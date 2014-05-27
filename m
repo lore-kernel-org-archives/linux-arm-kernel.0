@@ -1,24 +1,30 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 27 May 2014 13:38:51 +0200
-Subject: [PATCH 1/1] ARM: mvebu: Staticize mvebu_cpu_reset_init
-In-Reply-To: <1401190107-21359-1-git-send-email-sachin.kamat@linaro.org>
-References: <1401190107-21359-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <20140527133851.2672f626@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue, 27 May 2014 13:39:28 +0200
+Subject: [PATCH] MAINTAINERS: add AT91 Clock Support entry
+Message-ID: <1401190768-3932-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sachin Kamat,
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+ MAINTAINERS | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-On Tue, 27 May 2014 16:58:27 +0530, Sachin Kamat wrote:
-> 'mvebu_cpu_reset_init' is local to this file.
-> 
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> ---
->  arch/arm/mach-mvebu/cpu-reset.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 1066264..40c5580 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -808,6 +808,11 @@ F:	arch/arm/boot/dts/at91*.dtsi
+ F:	arch/arm/boot/dts/sama*.dts
+ F:	arch/arm/boot/dts/sama*.dtsi
+ 
++ARM/ATMEL AT91 Clock Support
++M:	Boris Brezillon <boris.brezillon@free-electrons.com>
++S:	Maintained
++F:	drivers/clk/at91
++
+ ARM/CALXEDA HIGHBANK ARCHITECTURE
+ M:	Rob Herring <robh@kernel.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.8.3.2
