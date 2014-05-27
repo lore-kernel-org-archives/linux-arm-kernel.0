@@ -1,217 +1,41 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 27 May 2014 21:42:28 +0200
-Subject: [PATCHv5 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
- controller
-In-Reply-To: <CANk1AXTMHuWeaxn_hVi+AH=aXbbSNov=894YmSYfvfvpWM+eSg@mail.gmail.com>
-References: <1400169891-29546-2-git-send-email-tthayer@altera.com>
- <20140516075344.GF949@pengutronix.de>
- <CAF03EBfOrBWsGVkwYHQt9Pm858LtkgUThkM6dFjksa93ETo_bw@mail.gmail.com>
- <20140519191206.GH949@pengutronix.de>
- <CAF03EBfwFC7bK=j0W3K+no9TK7xe2nF1ZXH9bMBRNzVErB5EjQ@mail.gmail.com>
- <CANk1AXTdSheUkNtF2fSmtcYaUrd2CnTjBxGitmSy88H4VRVbnw@mail.gmail.com>
- <20140520144446.GJ949@pengutronix.de>
- <CAF03EBe+G8EpZSU7vhu4QZ3E-Nq4WnHw7DRM7=EyxHkjzp5cqg@mail.gmail.com>
- <20140527071157.GC20695@pengutronix.de>
- <CANk1AXTMHuWeaxn_hVi+AH=aXbbSNov=894YmSYfvfvpWM+eSg@mail.gmail.com>
-Message-ID: <20140527194228.GB13172@pengutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 27 May 2014 20:49:32 +0100
+Subject: [PATCH v3 0/6] mfd: axp20x: add AXP221 PMIC support
+In-Reply-To: <1401183535-31003-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1401183535-31003-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140527194932.GD12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 02:12:17PM -0500, Alan Tull wrote:
-> On Tue, May 27, 2014 at 2:11 AM, Steffen Trumtrar
-> <s.trumtrar@pengutronix.de> wrote:
-> > On Wed, May 21, 2014 at 10:38:34AM -0500, Thor Thayer wrote:
-> >> On Tue, May 20, 2014 at 9:44 AM, Steffen Trumtrar
-> >> <s.trumtrar@pengutronix.de> wrote:
-> >> > Hi!
-> >> >
-> >> > On Tue, May 20, 2014 at 09:31:06AM -0500, Alan Tull wrote:
-> >> >> On Mon, May 19, 2014 at 2:37 PM, Thor Thayer <tthayer.linux@gmail.com> wrote:
-> >> >>
-> >> >> >>> >> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
-> >> >> >>> >> new file mode 100644
-> >> >> >>> >> index 0000000..8f8746b
-> >> >> >>> >> --- /dev/null
-> >> >> >>> >> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
-> >> >> >>> >> @@ -0,0 +1,11 @@
-> >> >> >>> >> +Altera SOCFPGA SDRAM Controller
-> >> >> >>> >> +
-> >> >> >>> >> +Required properties:
-> >> >> >>> >> +- compatible : "altr,sdr-ctl";
-> >> >> >>> >> +- reg : Should contain 1 register ranges(address and length)
-> >> >> >>> >> +
-> >> >> >>> >> +Example:
-> >> >> >>> >> +     sdrctl at ffc25000 {
-> >> >> >>> >> +             compatible = "altr,sdr-ctl";
-> >> >> >>> >> +             reg = <0xffc25000 0x1000>;
-> >> >> >>> >> +     };
-> >> >> >>> >> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> >> >> >>> >> index df43702..6ce912e 100644
-> >> >> >>> >> --- a/arch/arm/boot/dts/socfpga.dtsi
-> >> >> >>> >> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> >> >> >>> >> @@ -676,6 +676,11 @@
-> >> >> >>> >>                       clocks = <&l4_sp_clk>;
-> >> >> >>> >>               };
-> >> >> >>> >>
-> >> >> >>> >> +             sdrctl at ffc25000 {
-> >> >> >>> >> +                     compatible = "altr,sdr-ctl", "syscon";
-> >> >> >>> >                                                    ^^^^^^^^^^
-> >> >> >>> >
-> >> >> >>> > Get rid of that, too, please.
-> >> >> >>>
-> >> >> >>> Hi Steffan,
-> >> >> >>>
-> >> >> >>> I believe I need to keep the "syscon". The same register (ctrlcfg)
-> >> >> >>> that has the ECC enable bitfield also includes the DRAM configuration
-> >> >> >>> bitfields that other drivers will want to access (specifically the
-> >> >> >>> FPGA bridge needs this information). Since this register will be
-> >> >> >>> shared between drivers,  syscon seems like the best solution.
-> >> >> >>>
-> >> >> >>
-> >> >> >> Hm, from looking at the documentation of the ctrlcfg I can't really
-> >> >> >> understand which bits you would need for the FPGA brigde and why.
-> >> >>
-> >> >> Hi Steffen,
-> >> >>
-> >> >> Offset 0x80 in the sdr-ctl is the "fpgaportrst" register.  14 bits
-> >> >> wide, defaults to 0.  When appropriate bits set to 1 in that reg, it
-> >> >> allows an FPGA port to come out of reset (enables that port).  Has no
-> >> >> other effect on SDRAM configuration.
-> >> >>
-> >> >> >> That all sounds like stuff you would want to set for the specific
-> >> >> >> RAM you are dealing with on a specific board.
-> >> >> >> What bridge are you talking about? The SDRAM bridge?
-> >> >>
-> >> >> Yes, the port allows the FPGA a direct path to the SDRAM.  This one
-> >> >> register the only register in the sdr that the bridge driver needs.
-> >> >>
-> >> >
-> >> > So, what I suggested down ...
-> >> >
-> >> >> >>
-> >> >> >> I can see the problem with the ECC enable, though.
-> >> >> >>
-> >> >> >> Regards,
-> >> >> >> Steffen
-> >> >> >>
-> >> >> >
-> >> >> >>> >                 sdrctl at ffc25000 {
-> >> >> >>> >                         compatible = "altr,sdr-ctl";
-> >> >> >>> >                         reg = <0xffc25000 0x1000>;
-> >> >> >>> >                         ranges;
-> >> >> >>> >
-> >> >> >>> >                         edac at ffc2502c {
-> >> >> >>> >                                 compatible = "altr,sdram-edac";
-> >> >> >>> >                                 reg = <0xffc2502c 0x50>;
-> >> >> >>> >                                 interrupts = <0 39 4>;
-> >> >> >>> >                         };
-> >> >> >>> >                 };
-> >> >> >>> >
-> >> >> >>> > Then we can later add:
-> >> >> >>> >
-> >> >> >>> >                         sdr-ports: ports at ffc2507c {
-> >> >> >>> >                                 #reset-cells = <1>;
-> >> >> >>> >                                 compatible = "altr,sdr-ports";
-> >> >> >>> >                                 reg = <0xffc2507c 0x10>;
-> >> >> >>> >                                 clocks = <&ddr_dqs_clk>;
-> >> >> >>> >                                 ...
-> >> >> >>> >                         };
-> >> >>
-> >> >
-> >> > ... here should work. No?! Just a simple driver that registers with the
-> >> > reset-framework. I would add 0x7c to that driver and than that driver could
-> >> > "configure" the port and let it out of reset.
-> >> >
-> >> > I have done the same thing for the other 3 bridges, but am not finished yet.
-> >> > Especially the GPV-stuff needs to at least be able to be added later if not now.
-> >> >
-> >
-> > Hi Thor!
-> >
-> >> I'm not clear on how the EDAC driver will interact with the registers
-> >> allocated to the SDRAM controller. If the group of registers from
-> >> 0xffc25000 to 0xffc26000 is exclusively allocated to the SDRAM
-> >> controller, how does the EDAC driver cleanly access that single
-> >> register inside this range?
-> >>
-> >
-> > The compatible in the example is wrong. I didn't mean to map the whole address space
-> > to some driver.
-> > I think for the configuration register syscon is the right approach. It is a
-> > bag of bits that don't necessitate an own driver, so syscon is perfect.
-> >
-> > So, let me change my proposal to
-> >
-> >         sdr-ctl: sdram at ffc25000 {
-> >                 compatible = "altr,sdr-ctl", "syscon";
-> >                 reg = <0xffc25000 0x1>;
-> >         };
-> >
-> >         edac: edac at ffc2502c {
-> >                 compatible = "altr,sdram-edac";
-> >                 reg = <0xffc2502c 0x50>;
-> >                 interrupts = <0 39 4>;
-> >                 config = <&sdr-ctl>;
-> >                 ...
-> >         };
-> >
-> >         sdr-ports: ports at ffc2507c {
-> >                 compatible = "altr,sdr-ports";
-> >                 reg = <0xffc2507c 0x10>;
-> >                 clocks = <&ddr_dqs_clk>;
-> >                 ...
-> >         };
-> >
-> > Maybe we can just skip the outer node that combines all the others.
-> > So, if we do it like that, you can still use syscon, but only for the register
-> > that needs it. And the EDAC definitely needs access to the config register, so
-> > all is good.
-> >
-> >> Is the solution that I don't use request_region() (and therefore not
-> >> request exclusive access) when setting up the SDRAM controller?
-> >>
-> >> If you could point me to your drivers for the other bridges that you
-> >> reference, your code may answer my question.
-> >>
-> >
-> > The other bridges don't need access to any SDRAM controller registers and
-> > I haven't even started to implement the GPV-stuff with the lw2hps-bridge :-(
-> >
-> > Regards,
-> > Steffen
-> >
-> > --
-> > Pengutronix e.K.                           |                             |
-> > Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> > Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> 
-> OK now I understand.  For register offset 0x0, that's all stuff set up
-> in the bootloader.  We won't be touching that register except for the
-> EDAC.  So syscon isn't needed here.
-> 
-> Each driver that uses some sdr registers can specify which registers
-> it uses in the device tree.  So far we don't have any cases of two
-> drivers that share a register.
-> 
-> The ECC driver will need two ranges: offset 0x00 and 0x38 through 0x50.
-> The fpga bridges just needs offset 0x80.
-> 
+On Tue, May 27, 2014 at 11:38:49AM +0200, Boris BREZILLON wrote:
 
-Well, almost ;-)
-Use syscon for 0x0 and reference that in the ECC driver, which only is
-responsible for 0x38 to 0x50. Then flip the two EDAC bits via the syscon-phandle.
-Then a bootloader can probe with the same dts and have a driver match on the
-config-register and one for all the DRAM setup (< 0x38), which we don't need in
-the kernel. On the other hand the EDAC seems unneccessary for the bootloader.
-And this all matches the partitioning of the SDR register space, so I think it
-is also a correct hardware description.
+> I'm still waiting for inputs regarding the ipsout regulator representation:
 
-Regards,
-Steffen
+If you've got questions you need an answer to urgently it's possibly
+best to highlight them outside of a series like this doing that helps
+make it more obvious.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>  * The ipsout regulator is currently represented as a fixed regulator
+>    providing a 5v output, and this is not exactly the case.
+>    AFAIU (here's is the datasheet traduction if you want to check [1]), the
+>    ipsout output is a multiplexer that choose among vbus (5V), acin (12V
+>    which is then converted to 5V) and the battery power supply (3,5 -> 4,2 V).
+>    This means the output voltage of ipsout vary between 3,5V and 5V.
+>    How can we express this kind of muxer in the regulator framework (is there
+>    already something available ?) ?
+>    Note that the power supply selection is automatic, though we could force
+>    one power supply, but then we loose the ability to unplug one power supply
+>    without impacting the system.
+
+This sounds like it may as well just be represented as an unregulated
+supply - it's just the system root supply really.  Nothing can rely on
+the voltage anyway as it's going to vary randomly depending on what the
+user does power wise and typically it'd only be used as a supply for
+things that don't care about the specific voltage.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140527/0a89a4cc/attachment.sig>
