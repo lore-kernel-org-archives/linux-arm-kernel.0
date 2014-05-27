@@ -1,46 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 27 May 2014 09:35:36 -0700
-Subject: [GIT PULL] ARM: Keystone reset driver 3.16
-In-Reply-To: <4799350.My62BxqHfR@wuerfel>
-References: <1400880597-7516-1-git-send-email-santosh.shilimkar@ti.com>
- <1401175584.4090.22.camel@paszta.hi.pengutronix.de>
- <53849C05.8090004@ti.com> <4799350.My62BxqHfR@wuerfel>
-Message-ID: <CAOesGMg1RajZRXkZuu0PEOyJisGdkUAwQ2OPRfJwH9cSqSy4CQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 27 May 2014 12:38:11 -0400
+Subject: [PATCH 2/2] ARM: dts: mvebu: split SolidRun CuBox into variants
+In-Reply-To: <5384BDB1.6000107@gmail.com>
+References: <1401140009-31505-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1401140009-31505-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140527161143.GS8664@titan.lakedaemon.net>
+ <5384BDB1.6000107@gmail.com>
+Message-ID: <20140527163811.GT8664@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 7:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 27 May 2014 10:07:01 Santosh Shilimkar wrote:
->>
->> On Tuesday 27 May 2014 03:26 AM, Philipp Zabel wrote:
->> > Hi Olof, Santosh,
->> >
->> > Am Montag, den 26.05.2014, 14:26 -0700 schrieb Olof Johansson:
->> >> On Fri, May 23, 2014 at 05:29:57PM -0400, Santosh Shilimkar wrote:
->> >>> Hi Arm-soc folks,
->> >>>
->> >>> Please pull below keystone reset driver for 3.16 . To avoid merge conflict
->> >>> with earlier keystone-soc pull request[1], I have based the subject pull
->> >>> request on top of it. It merges cleanly with arm-soc 'next/soc2' head. Please
->> >>> apply it against 'next/soc2'. Thanks
->> >>
->> >> Hi,
->> >>
->> >> I notice this driver doesn't have an ack from Philipp Zabel (cc:d here). That
->> >> would be appropriate.
->> >
->> We asked about ack, split series options from reset folks but didn't hear back.
->> Since the series has been on the list for almost 3 merge windows now, I asked
->> Arnd how to go about it and he suggested to send it via arm-soc. Should have
->> clarified it in pull request.
->
-> Olof, note that this is a driver for system reset, i.e. drivers/power/reset, not
-> for resetting individual devices as drivers/reset does. Philipp maintains the
-> latter, but AFAIK he's not involved in the drivers/power stuff.
+On Tue, May 27, 2014 at 06:30:41PM +0200, Sebastian Hesselbarth wrote:
+...
+> About the board specific compatibles, I am not so sure if we should
+> keep them at all. "solidrun,cubox" for all three variants should be
+> enough. checkpatch is already choking on every unknown compatible it
+> sees and documenting each individual board clearly doesn't scale well.
 
-Ah, yes, of course. Anyway, Santosh split up the two branches which is
-what I wanted the most. I'll take a look through the driver myself
-when I merge as well (later today).
+Yeah, I saw that conversation.  I'm inclined to keep the board
+compatible strings because they are a useful human readable globally
+unique board identifier.  I suggest we fix checkpatch to not barf on the
+board compatible strings.
 
+thx,
 
--Olof
+Jason.
