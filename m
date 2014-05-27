@@ -1,105 +1,105 @@
-From: elder@linaro.org (Alex Elder)
-Date: Tue, 27 May 2014 11:56:56 -0500
-Subject: [PATCH v2] clk: bcm/kona: implement determine_rate()
-Message-ID: <1401209816-24953-1-git-send-email-elder@linaro.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 27 May 2014 16:57:04 +0000 (UTC)
+Subject: OMAP baseline test results for v3.15-rc6
+Message-ID: <alpine.DEB.2.02.1405271655310.28436@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the clk->determine_rate method for Broadcom Kona peripheral
-clocks.  This allows a peripheral clock to be re-parented in order to
-satisfy a rate change request.  This takes the place of the previous
-kona_peri_clk_round_rate() functionality, though that function remains
-because it is used by the new one.
 
-The parent clock that allows the peripheral clock to produce a rate
-closest to the one requested is the one selected, though the current
-parent is used by default.
+Here are some basic OMAP test results for Linux v3.15-rc6.
+Logs and other details at:
 
-Signed-off-by: Alex Elder <elder@linaro.org>
----
-v2: Added WARN_ON_ONCE() call as suggested.
+    http://www.pwsan.com/omap/testlogs/test_v3.15-rc6/20140526200257/
 
-This patch is based on Mike Turquette's current "clk-next" branch.
-    42dd880 Merge branch 'clk-fixes' into clk-next
 
-It is available here:
-    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
-    Branch review/bcm-determine-rate-v2
+Test summary
+------------
 
- drivers/clk/bcm/clk-kona.c | 54 +++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 53 insertions(+), 1 deletion(-)
+Build: zImage:
+    Pass (14/14): multi_v7_defconfig, omap2plus_defconfig,
+		  omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig
 
-diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
-index d603c4e..95af2e6 100644
---- a/drivers/clk/bcm/clk-kona.c
-+++ b/drivers/clk/bcm/clk-kona.c
-@@ -1031,6 +1031,58 @@ static long kona_peri_clk_round_rate(struct clk_hw *hw, unsigned long rate,
- 				rate ? rate : 1, *parent_rate, NULL);
- }
- 
-+static long kona_peri_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
-+		unsigned long *best_parent_rate, struct clk **best_parent)
-+{
-+	struct kona_clk *bcm_clk = to_kona_clk(hw);
-+	struct clk *clk = hw->clk;
-+	struct clk *current_parent;
-+	unsigned long parent_rate;
-+	unsigned long best_delta;
-+	unsigned long best_rate;
-+	u32 parent_count;
-+	u32 which;
-+
-+	/*
-+	 * If there is no other parent to choose, use the current one.
-+	 * Note:  We don't honor (or use) CLK_SET_RATE_NO_REPARENT.
-+	 */
-+	WARN_ON_ONCE(bcm_clk->init_data.flags & CLK_SET_RATE_NO_REPARENT);
-+	parent_count = (u32)bcm_clk->init_data.num_parents;
-+	if (parent_count < 2)
-+		return kona_peri_clk_round_rate(hw, rate, best_parent_rate);
-+
-+	/* Unless we can do better, stick with current parent */
-+	current_parent = clk_get_parent(clk);
-+	parent_rate = __clk_get_rate(current_parent);
-+	best_rate = kona_peri_clk_round_rate(hw, rate, &parent_rate);
-+	best_delta = abs(best_rate - rate);
-+
-+	/* Check whether any other parent clock can produce a better result */
-+	for (which = 0; which < parent_count; which++) {
-+		struct clk *parent = clk_get_parent_by_index(clk, which);
-+		unsigned long delta;
-+		unsigned long other_rate;
-+
-+		BUG_ON(!parent);
-+		if (parent == current_parent)
-+			continue;
-+
-+		/* We don't support CLK_SET_RATE_PARENT */
-+		parent_rate = __clk_get_rate(parent);
-+		other_rate = kona_peri_clk_round_rate(hw, rate, &parent_rate);
-+		delta = abs(other_rate - rate);
-+		if (delta < best_delta) {
-+			best_delta = delta;
-+			best_rate = other_rate;
-+			*best_parent = parent;
-+			*best_parent_rate = parent_rate;
-+		}
-+	}
-+
-+	return best_rate;
-+}
-+
- static int kona_peri_clk_set_parent(struct clk_hw *hw, u8 index)
- {
- 	struct kona_clk *bcm_clk = to_kona_clk(hw);
-@@ -1135,7 +1187,7 @@ struct clk_ops kona_peri_clk_ops = {
- 	.disable = kona_peri_clk_disable,
- 	.is_enabled = kona_peri_clk_is_enabled,
- 	.recalc_rate = kona_peri_clk_recalc_rate,
--	.round_rate = kona_peri_clk_round_rate,
-+	.determine_rate = kona_peri_clk_determine_rate,
- 	.set_parent = kona_peri_clk_set_parent,
- 	.get_parent = kona_peri_clk_get_parent,
- 	.set_rate = kona_peri_clk_set_rate,
--- 
-1.9.1
+Build: uImage+dtb:
+    Pass ( 9/ 9): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig/omap4-var-som
+
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Boot to userspace:
+    FAIL ( 1/12): 2430sdp
+    skip ( 3/12): 5912osk, cmt3517, 4460varsomom
+    Pass ( 8/12): 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
+		  4430es2panda, 4460pandaes, am335xbone, am335xbonelt
+
+PM: chip retention via suspend:
+    skip ( 1/ 7): 4460varsomom
+    FAIL ( 2/ 7): 2430sdp, 4430es2panda
+    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
+
+PM: chip retention via dynamic idle:
+    skip ( 1/ 7): 4460varsomom
+    FAIL ( 6/ 7): 2430sdp, 3530es3beagle, 3730beaglexm, 37xxevm,
+		  4430es2panda, 4460pandaes
+
+PM: chip off except CORE via suspend:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    skip ( 1/ 5): 4460varsomom
+    FAIL ( 4/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes
+
+PM: chip off via dynamic idle:
+    skip ( 1/ 5): 4460varsomom
+    FAIL ( 4/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes
+
+
+vmlinux object size
+(delta in bytes from test_v3.15-rc5 (d6d211db37e75de2ddc3a4f979038c40df7cc79c)):
+   text     data      bss    total  kernel
+   +240        0        0     +240  omap1_defconfig
+   +208        0        0     +208  omap1_defconfig_1510innovator_only
+   +240        0        0     +240  omap1_defconfig_5912osk_only
+  +1484     -392        0    +1092  multi_v7_defconfig
+   +696        0        0     +696  omap2plus_defconfig
+   +472        0        0     +472  omap2plus_defconfig_2430sdp_only
+   +696        0        0     +696  omap2plus_defconfig_am33xx_only
+   +760        0        0     +760  omap2plus_defconfig_am43xx_only
+   +696        0        0     +696  omap2plus_defconfig_cpupm
+   +696        0        0     +696  omap2plus_defconfig_dra7xx_only
+   +488        0        0     +488  omap2plus_defconfig_n800_multi_omap2xxx
+   +456        0        0     +456  omap2plus_defconfig_n800_only_a
+   +760        0        0     +760  omap2plus_defconfig_no_pm
+   +696        0        0     +696  omap2plus_defconfig_omap2_4_only
+   +696        0        0     +696  omap2plus_defconfig_omap3_4_only
+   +760        0        0     +760  omap2plus_defconfig_omap5_only
+   +364        0        0     +364  rmk_omap3430_ldp_allnoconfig
+  +4736        0        0    +4736  rmk_omap3430_ldp_oldconfig
+   +348        0      +16     +364  rmk_omap4430_sdp_allnoconfig
+   +608        0        0     +608  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.15-rc5 (d6d211db37e75de2ddc3a4f979038c40df7cc79c))
+  avail  rsrvd   high  freed  board          kconfig
+  (no differences)
