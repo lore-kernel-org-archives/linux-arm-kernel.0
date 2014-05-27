@@ -1,84 +1,69 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 27 May 2014 11:55:35 -0700
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
- device tree
-In-Reply-To: <20140527175326.GZ12304@sirena.org.uk>
-References: <20140525123452.GS22111@sirena.org.uk>
- <53824294.1090609@redhat.com>
- <20140526103807.GV22111@sirena.org.uk>
- <538321AB.4050006@redhat.com>
- <20140526142225.GF22111@sirena.org.uk>
- <538356DA.7090302@redhat.com>
- <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
- <53838023.2080807@redhat.com>
- <CAPDyKFpg_2RQabM044C1hsNTcuxdVVOvw0ZONVRdysk=eom8UA@mail.gmail.com>
- <20140527175326.GZ12304@sirena.org.uk>
-Message-ID: <20140527185535.GB27420@quad.lixom.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 27 May 2014 20:11:17 +0100
+Subject: [PATCH v3 12/14] ARM64: KVM: vgic_elrsr and vgic_eisr need to
+ be byteswapped in BE case
+In-Reply-To: <20140526173544.GE31431@lvm>
+References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
+ <1399997646-4716-13-git-send-email-victor.kamensky@linaro.org>
+ <20140526173544.GE31431@lvm>
+Message-ID: <5384E355.70100@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 06:53:26PM +0100, Mark Brown wrote:
-> On Tue, May 27, 2014 at 03:50:33PM +0200, Ulf Hansson wrote:
+On 26/05/14 18:35, Christoffer Dall wrote:
+> On Tue, May 13, 2014 at 09:14:04AM -0700, Victor Kamensky wrote:
+>> On arm64 'u32 vgic_eisr[2];' and 'u32 vgic_elrsr[2]' are accessed as
+>> one 'unsigned long *' bit fields, which has 64bit size. So we need to
+>> swap least significant word with most significant word when code reads
+>> those registers from h/w.
+>>
+>> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+>> ---
+>>  arch/arm64/kvm/hyp.S | 7 +++++++
+>>  1 file changed, 7 insertions(+)
+>>
+>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+>> index 0620691..5035b41 100644
+>> --- a/arch/arm64/kvm/hyp.S
+>> +++ b/arch/arm64/kvm/hyp.S
+>> @@ -415,10 +415,17 @@ CPU_BE(	rev	w11, w11 )
+>>  	str	w4, [x3, #VGIC_CPU_HCR]
+>>  	str	w5, [x3, #VGIC_CPU_VMCR]
+>>  	str	w6, [x3, #VGIC_CPU_MISR]
+>> +#ifndef CONFIG_CPU_BIG_ENDIAN
+>>  	str	w7, [x3, #VGIC_CPU_EISR]
+>>  	str	w8, [x3, #(VGIC_CPU_EISR + 4)]
+>>  	str	w9, [x3, #VGIC_CPU_ELRSR]
+>>  	str	w10, [x3, #(VGIC_CPU_ELRSR + 4)]
+>> +#else
+>> +	str	w7, [x3, #(VGIC_CPU_EISR + 4)]
+>> +	str	w8, [x3, #VGIC_CPU_EISR]
+>> +	str	w9, [x3, #(VGIC_CPU_ELRSR + 4)]
+>> +	str	w10, [x3, #VGIC_CPU_ELRSR]
+>> +#endif
+>>  	str	w11, [x3, #VGIC_CPU_APR]
+>>  
+>>  	/* Clear GICH_HCR */
+>> -- 
+>> 1.8.1.4
+>>
+> Hmm, the data structure doesn't actually clearly define this as bitmap,
+> but the architecture clearly defines this as two registers.  It feels
+> like this critical code is getting over complicated to cater for the
+> fact that we can use a convenient for_each_set_bit() function when we
+> process a maintenance interrupt.
 > 
-> > To describe the HW in DT, the embedded SDIO card (actually it could be
-> > any type of embedded card) shall be modelled as a child node to the
-> > mmc host in DT. Similar to what you have proposed, but with the
-> > difference that the child node _must_ contain a DT compatible string,
-> > which means a "powerup-driver" can be probed.
-> 
-> > Yes, I understand we might need one DT compatible string per board,
-> > but that's because we need to model the hardware - and it differs.
-> 
-> > To clarify my view, we do need a "powerup-driver" and the primary
-> > reason is that we must not model "power up sequences" within DT.
-> > Typically I see the "powerup-driver" as a simple platform driver
-> > attached to the platform bus, but I that could of course differ.
-> 
-> This then either conflicts with cases where we need to describe the
-> actual contents of the slot with a compatible string or means that the
-> SDIO driver needs to handle powerup sequencing since we should be
-> binding to the first compatible we find.  If the host controller driver
-> and/or subsystem is going to deal with the powering up it's not clear
-> that it specifically needs to be the compatible property that's used
-> to determine the powerup method, it could just be a boolean or a
-> 'power-method = blah' property (where blah is one of a series of strings
-> defining methods).  Alternatively we could have separate nodes for the
-> slot and SDIO device but that feels meh.  What's the hard requirement
-> for it to specifically be a compatible property?
+> Marc, what are your thoughts on this?  Change vgic_process_maintenance
+> and clearly document the array on struct vgic_cpu, or go ahead with this
+> change?
 
-+1. Just because we have a subnode in a device tree, we don't have to have
-a driver bind against it. The MMC core code could go down into the subnodes,
-find a "power-method = <foo>" property and go ahead and parse the rest of it.
-There's no requirement that we do this through the Linux driver model of
-probe(), etc.
+So I've already started abstracting access to ELRSR and EISR in my GICv3
+patches, and we could perfectly stick the code swapping code in the
+accessors, letting the world switch alone.
 
-> > The slot will be the first level of child node under the mmc host,
-> > then each slot may have a child node which models the embedded card.
-> > But, let's leave that discussion for now. :-)
-> 
-> OK, that's the separate node for the slot and device.
-> 
-> > Powerup driver's ->probe():
-> > Typically the "powerup driver" will need to register a few callback
-> > functions towards the mmc core. Typically at mmc_of_parse(), those
-> > callbacks will have to be connected to a particular mmc host.
-> 
-> > I would like to see three different callbacks, mirroring each of the
-> > mmc_ios power_mode states MMC_POWER_OFF|UP|ON.
-> 
-> > The power up sequence, performed by the mmc core:
-> > The mmc_power_up|off functions, will invoke the registered "powerup
-> > driver's" callbacks if they exists for the particular host it operates
-> > on.
-> 
-> There's also the need for the SDIO device to be able to get at the
-> resources provided and actively work with them at runtime if it wants to
-> manage things more actively (partial poweroff for low power states or
-> managing clock rates for example).
+These changes could easily be lifter from the series, and adapted. This
+would also make the "bitmap-ification" more obvious.
 
-Again, I think it gets overly complicated by using a full driver for the
-power management. Abstracted out into something separate and scalable
-as number of devices grow? Sure, definitely. As a driver? Not convinced.
-
-
--Olof
+	M.
+-- 
+Jazz is not dead. It just smells funny...
