@@ -1,104 +1,46 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 27 May 2014 18:30:41 +0200
-Subject: [PATCH 2/2] ARM: dts: mvebu: split SolidRun CuBox into variants
-In-Reply-To: <20140527161143.GS8664@titan.lakedaemon.net>
-References: <1401140009-31505-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1401140009-31505-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140527161143.GS8664@titan.lakedaemon.net>
-Message-ID: <5384BDB1.6000107@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 27 May 2014 09:35:36 -0700
+Subject: [GIT PULL] ARM: Keystone reset driver 3.16
+In-Reply-To: <4799350.My62BxqHfR@wuerfel>
+References: <1400880597-7516-1-git-send-email-santosh.shilimkar@ti.com>
+ <1401175584.4090.22.camel@paszta.hi.pengutronix.de>
+ <53849C05.8090004@ti.com> <4799350.My62BxqHfR@wuerfel>
+Message-ID: <CAOesGMg1RajZRXkZuu0PEOyJisGdkUAwQ2OPRfJwH9cSqSy4CQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/2014 06:11 PM, Jason Cooper wrote:
-> On Mon, May 26, 2014 at 11:33:29PM +0200, Sebastian Hesselbarth wrote:
->> As Mainlining effort for SolidRun CuBox has been carried out on the
->> Engineering Sample, the board DTS was reflecting this. Actually,
->> SolidRun CuBox comes in three different variants: Engineering Sample (ES),
->> production with 1GB RAM (1G), and production with 2GB RAM (2G).
+On Tue, May 27, 2014 at 7:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 27 May 2014 10:07:01 Santosh Shilimkar wrote:
 >>
->> Therefore, we split the current dove-cubox.dts into a common board include
->> and one board dts for each of the above variants.
->>
->> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> ---
-[...]
->> diff --git a/arch/arm/boot/dts/dove-cubox-1g.dts b/arch/arm/boot/dts/dove-cubox-1g.dts
->> new file mode 100644
->> index 000000000000..eebd3f7ca7e6
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/dove-cubox-1g.dts
->> @@ -0,0 +1,17 @@
->> +/dts-v1/;
->> +
->> +#include "dove-cubox.dtsi"
->> +
->> +/ {
->> +	model = "SolidRun CuBox (1G)";
->> +	compatible = "solidrun,cubox-1g", "solidrun,cubox", "marvell,dove";
->> +
->> +	memory {
->> +		device_type = "memory";
->> +		reg = <0x00000000 0x40000000>;
->> +	};
->> +
->> +	chosen {
->> +		bootargs = "console=ttyS0,115200n8 earlyprintk";
->> +	};
->> +};
->> diff --git a/arch/arm/boot/dts/dove-cubox-2g.dts b/arch/arm/boot/dts/dove-cubox-2g.dts
->> new file mode 100644
->> index 000000000000..513b6a68eba3
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/dove-cubox-2g.dts
->> @@ -0,0 +1,17 @@
->> +/dts-v1/;
->> +
->> +#include "dove-cubox.dtsi"
->> +
->> +/ {
->> +	model = "SolidRun CuBox (2G)";
->> +	compatible = "solidrun,cubox-2g", "solidrun,cubox", "marvell,dove";
->> +
->> +	memory {
->> +		device_type = "memory";
->> +		reg = <0x00000000 0x80000000>;
+>> On Tuesday 27 May 2014 03:26 AM, Philipp Zabel wrote:
+>> > Hi Olof, Santosh,
+>> >
+>> > Am Montag, den 26.05.2014, 14:26 -0700 schrieb Olof Johansson:
+>> >> On Fri, May 23, 2014 at 05:29:57PM -0400, Santosh Shilimkar wrote:
+>> >>> Hi Arm-soc folks,
+>> >>>
+>> >>> Please pull below keystone reset driver for 3.16 . To avoid merge conflict
+>> >>> with earlier keystone-soc pull request[1], I have based the subject pull
+>> >>> request on top of it. It merges cleanly with arm-soc 'next/soc2' head. Please
+>> >>> apply it against 'next/soc2'. Thanks
+>> >>
+>> >> Hi,
+>> >>
+>> >> I notice this driver doesn't have an ack from Philipp Zabel (cc:d here). That
+>> >> would be appropriate.
+>> >
+>> We asked about ack, split series options from reset folks but didn't hear back.
+>> Since the series has been on the list for almost 3 merge windows now, I asked
+>> Arnd how to go about it and he suggested to send it via arm-soc. Should have
+>> clarified it in pull request.
 >
-> Do you anticipate any other differences between the 1G and the 2G?
-> Otherwise, I'm inclined to just have a "solidrun,cubox".  The bootloader
-> should be setting the amount of RAM at boottime anyway.
+> Olof, note that this is a driver for system reset, i.e. drivers/power/reset, not
+> for resetting individual devices as drivers/reset does. Philipp maintains the
+> latter, but AFAIK he's not involved in the drivers/power stuff.
 
-No, there is no known difference between 1G and 2G except doubled RAM.
-I'll squash the two back into a single non-ES dts.
+Ah, yes, of course. Anyway, Santosh split up the two branches which is
+what I wanted the most. I'll take a look through the driver myself
+when I merge as well (later today).
 
-About the board specific compatibles, I am not so sure if we should
-keep them at all. "solidrun,cubox" for all three variants should be
-enough. checkpatch is already choking on every unknown compatible it
-sees and documenting each individual board clearly doesn't scale well.
 
->> +	};
->> +
->> +	chosen {
->> +		bootargs = "console=ttyS0,115200n8 earlyprintk";
->> +	};
->> +};
->> diff --git a/arch/arm/boot/dts/dove-cubox-es.dts b/arch/arm/boot/dts/dove-cubox-es.dts
->> new file mode 100644
->> index 000000000000..5fc17ce34c98
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/dove-cubox-es.dts
->> @@ -0,0 +1,23 @@
->> +/dts-v1/;
->> +
->> +#include "dove-cubox.dtsi"
->> +
->> +/ {
->> +	model = "SolidRun CuBox (ES)";
->
-> "Engineering Sample" ?
-
-Hmm, I guess those who have it know about ES=="Engineering Sample" but
-as I have to do a v2 anyway, I'll fix it up.
-
-Thanks!
-
-Sebastian
+-Olof
