@@ -1,172 +1,117 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 27 May 2014 11:38:52 +0200
-Subject: [PATCH v3 3/6] regulator: axp20x: add support for AXP221 regulators
+Date: Tue, 27 May 2014 11:38:55 +0200
+Subject: [PATCH v3 6/6] regulator: axp20x: make use of
+ devm_regulator_set_register
 In-Reply-To: <1401183535-31003-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1401183535-31003-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1401183535-31003-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1401183535-31003-7-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add AXP221 regulator definitions and choose the appropriate definitions
-according to the variant id passed by the MFD device.
+Make use of the devm_regulator_set_register instead of registering each
+regulator provided by the PMIC.
+
+This also solves a self dependency issue where one regulator of the PMIC
+is used as a supply for anoher regulator provided by the same PMIC.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- drivers/regulator/axp20x-regulator.c | 98 +++++++++++++++++++++++++++++++++---
- 1 file changed, 90 insertions(+), 8 deletions(-)
+ drivers/regulator/axp20x-regulator.c | 59 ++++++++++++++----------------------
+ 1 file changed, 23 insertions(+), 36 deletions(-)
 
 diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index 5a59982..feaa0b5 100644
+index 4486517..c799827 100644
 --- a/drivers/regulator/axp20x-regulator.c
 +++ b/drivers/regulator/axp20x-regulator.c
-@@ -27,6 +27,9 @@
- #define AXP20X_IO_ENABLED		0x03
- #define AXP20X_IO_DISABLED		0x07
+@@ -300,66 +300,53 @@ static int axp20x_set_dcdc_workmode(struct regulator_dev *rdev, int id, u32 work
  
-+#define AXP22X_IO_ENABLED		0x04
-+#define AXP22X_IO_DISABLED		0x03
-+
- #define AXP20X_WORKMODE_DCDC2_MASK	BIT(2)
- #define AXP20X_WORKMODE_DCDC3_MASK	BIT(1)
- 
-@@ -143,6 +146,48 @@ static const struct regulator_desc axp20x_regulators[] = {
- 		       AXP20X_IO_DISABLED),
- };
- 
-+static const struct regulator_desc axp22x_regulators[] = {
-+	AXP_DESC(AXP22X, DCDC1, "vin1", 1600, 3400, 100, AXP22X_DCDC1_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL1, BIT(1)),
-+	AXP_DESC(AXP22X, DCDC2, "vin2", 600, 1540, 20, AXP22X_DCDC2_V_OUT, 0x3f,
-+		    AXP22X_PWR_OUT_CTRL1, BIT(2)),
-+	AXP_DESC(AXP22X, DCDC3, "vin3", 600, 1860, 20, AXP22X_DCDC3_V_OUT, 0x3f,
-+		    AXP22X_PWR_OUT_CTRL1, BIT(3)),
-+	AXP_DESC(AXP22X, DCDC4, "vin4", 600, 1540, 20, AXP22X_DCDC4_V_OUT, 0x3f,
-+		    AXP22X_PWR_OUT_CTRL1, BIT(3)),
-+	AXP_DESC(AXP22X, DCDC5, "vin5", 1000, 2550, 50, AXP22X_DCDC5_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL1, BIT(4)),
-+	AXP_DESC(AXP22X, DC5LDO, "vin5", 700, 1400, 100, AXP22X_DC5LDO_V_OUT, 0x7,
-+		    AXP22X_PWR_OUT_CTRL1, BIT(0)),
-+	AXP_DESC(AXP22X, ALDO1, "aldoin", 700, 3300, 100, AXP22X_ALDO1_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL1, BIT(6)),
-+	AXP_DESC(AXP22X, ALDO2, "aldoin", 700, 3300, 100, AXP22X_ALDO2_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL1, BIT(7)),
-+	AXP_DESC(AXP22X, ALDO3, "aldoin", 700, 3300, 100, AXP22X_ALDO3_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL3, BIT(7)),
-+	AXP_DESC(AXP22X, DLDO1, "dldoin", 700, 3300, 100, AXP22X_DLDO1_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL2, BIT(3)),
-+	AXP_DESC(AXP22X, DLDO2, "dldoin", 700, 3300, 100, AXP22X_DLDO2_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL2, BIT(4)),
-+	AXP_DESC(AXP22X, DLDO3, "dldoin", 700, 3300, 100, AXP22X_DLDO3_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL2, BIT(5)),
-+	AXP_DESC(AXP22X, DLDO4, "dldoin", 700, 3300, 100, AXP22X_DLDO4_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL2, BIT(6)),
-+	AXP_DESC(AXP22X, ELDO1, "eldoin", 700, 3300, 100, AXP22X_ELDO1_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL2, BIT(0)),
-+	AXP_DESC(AXP22X, ELDO2, "eldoin", 700, 3300, 100, AXP22X_ELDO2_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL2, BIT(1)),
-+	AXP_DESC(AXP22X, ELDO3, "eldoin", 700, 3300, 100, AXP22X_ELDO3_V_OUT, 0x1f,
-+		    AXP22X_PWR_OUT_CTRL2, BIT(2)),
-+	AXP_DESC_IO(AXP22X, LDO_IO0, "ldoioin", 1800, 3300, 100, AXP22X_LDO_IO0_V_OUT,
-+		       0x1f, AXP20X_GPIO0_CTRL, 0x07, AXP22X_IO_ENABLED,
-+		       AXP22X_IO_DISABLED),
-+	AXP_DESC_IO(AXP22X, LDO_IO1, "ldoioin", 1800, 3300, 100, AXP22X_LDO_IO1_V_OUT,
-+		       0x1f, AXP20X_GPIO1_CTRL, 0x07, AXP22X_IO_ENABLED,
-+		       AXP22X_IO_DISABLED),
-+	AXP_DESC_FIXED(AXP22X, RTC_LDO, "rtcldoin", 3000),
-+};
-+
- #define AXP_MATCH(_family, _name, _id) \
- 	[_family##_##_id] = { \
- 		.name		= #_name, \
-@@ -159,6 +204,28 @@ static struct of_regulator_match axp20x_matches[] = {
- 	AXP_MATCH(AXP20X, ldo5, LDO5),
- };
- 
-+static struct of_regulator_match axp22x_matches[] = {
-+	AXP_MATCH(AXP22X, dcdc1, DCDC1),
-+	AXP_MATCH(AXP22X, dcdc2, DCDC2),
-+	AXP_MATCH(AXP22X, dcdc3, DCDC3),
-+	AXP_MATCH(AXP22X, dcdc4, DCDC4),
-+	AXP_MATCH(AXP22X, dcdc5, DCDC5),
-+	AXP_MATCH(AXP22X, dc5ldo, DC5LDO),
-+	AXP_MATCH(AXP22X, aldo1, ALDO1),
-+	AXP_MATCH(AXP22X, aldo2, ALDO2),
-+	AXP_MATCH(AXP22X, aldo3, ALDO3),
-+	AXP_MATCH(AXP22X, dldo1, DLDO1),
-+	AXP_MATCH(AXP22X, dldo2, DLDO2),
-+	AXP_MATCH(AXP22X, dldo3, DLDO3),
-+	AXP_MATCH(AXP22X, dldo4, DLDO4),
-+	AXP_MATCH(AXP22X, eldo1, ELDO1),
-+	AXP_MATCH(AXP22X, eldo2, ELDO2),
-+	AXP_MATCH(AXP22X, eldo3, ELDO3),
-+	AXP_MATCH(AXP22X, ldo_io0, LDO_IO0),
-+	AXP_MATCH(AXP22X, ldo_io1, LDO_IO1),
-+	AXP_MATCH(AXP22X, rtc_ldo, RTC_LDO),
-+};
-+
- static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
+ static int axp20x_regulator_probe(struct platform_device *pdev)
  {
+-	struct regulator_dev *rdev;
++	struct regulator_set *rset;
  	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
-@@ -237,37 +304,52 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
- 	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
- 	struct regulator_config config = { };
- 	struct regulator_init_data *init_data;
-+	struct of_regulator_match *matches;
-+	int nmatches;
-+	const struct regulator_desc *regulators;
-+	int nregulators;
+-	struct regulator_config config = { };
+-	struct regulator_init_data *init_data;
++	struct regulator_set_config config;
+ 	struct of_regulator_match *matches;
+-	int nmatches;
+-	const struct regulator_desc *regulators;
+-	int nregulators;
  	int ret, i;
  	u32 workmode;
  
--	ret = axp20x_regulator_parse_dt(pdev, axp20x_matches,
--					ARRAY_SIZE(axp20x_matches));
-+	if (axp20x->variant == AXP221_ID) {
-+		matches = axp22x_matches;
-+		nmatches = ARRAY_SIZE(axp22x_matches);
-+		regulators = axp22x_regulators;
-+		nregulators = AXP22X_REG_ID_MAX;
-+	} else {
-+		matches = axp20x_matches;
-+		nmatches = ARRAY_SIZE(axp20x_matches);
-+		regulators = axp20x_regulators;
-+		nregulators = AXP20X_REG_ID_MAX;
-+	}
-+
-+	ret = axp20x_regulator_parse_dt(pdev, matches, nmatches);
++	memset(&config, 0, sizeof(config));
++	config.dev = &pdev->dev;
++	config.regmap = axp20x->regmap;
+ 	if (axp20x->variant == AXP221_ID) {
+ 		matches = axp22x_matches;
+-		nmatches = ARRAY_SIZE(axp22x_matches);
+-		regulators = axp22x_regulators;
+-		nregulators = AXP22X_REG_ID_MAX;
++		config.descs = axp22x_regulators;
++		config.nregulators = AXP22X_REG_ID_MAX;
+ 	} else {
+ 		matches = axp20x_matches;
+-		nmatches = ARRAY_SIZE(axp20x_matches);
+-		regulators = axp20x_regulators;
+-		nregulators = AXP20X_REG_ID_MAX;
++		config.descs = axp20x_regulators;
++		config.nregulators = AXP20X_REG_ID_MAX;
+ 	}
++	config.matches = matches;
+ 
+ 	/*
+ 	 * Reset matches table (this table might have been modified by a
+ 	 * previous AXP2xx device probe).
+ 	 */
+-	for (i = 0; i < nmatches; i++) {
++	for (i = 0; i < config.nregulators; i++) {
+ 		matches[i].init_data = NULL;
+ 		matches[i].of_node = NULL;
+ 	}
+ 
+-	ret = axp20x_regulator_parse_dt(pdev, matches, nmatches);
++	ret = axp20x_regulator_parse_dt(pdev, matches,
++					config.nregulators);
  	if (ret)
  		return ret;
  
- 	for (i = 0; i < AXP20X_REG_ID_MAX; i++) {
--		init_data = axp20x_matches[i].init_data;
-+		init_data = matches[i].init_data;
+-	for (i = 0; i < AXP20X_REG_ID_MAX; i++) {
+-		init_data = matches[i].init_data;
++	rset = devm_regulator_set_register(&pdev->dev, &config);
++	if (IS_ERR(rset))
++		return PTR_ERR(rset);
  
- 		config.dev = &pdev->dev;
- 		config.init_data = init_data;
- 		config.regmap = axp20x->regmap;
--		config.of_node = axp20x_matches[i].of_node;
-+		config.of_node = matches[i].of_node;
- 
--		rdev = devm_regulator_register(&pdev->dev, &axp20x_regulators[i],
-+		rdev = devm_regulator_register(&pdev->dev, &regulators[i],
- 					       &config);
- 		if (IS_ERR(rdev)) {
- 			dev_err(&pdev->dev, "Failed to register %s\n",
--				axp20x_regulators[i].name);
-+				regulators[i].name);
- 
- 			return PTR_ERR(rdev);
- 		}
- 
--		ret = of_property_read_u32(axp20x_matches[i].of_node, "x-powers,dcdc-workmode",
-+		ret = of_property_read_u32(matches[i].of_node, "x-powers,dcdc-workmode",
+-		config.dev = &pdev->dev;
+-		config.init_data = init_data;
+-		config.regmap = axp20x->regmap;
+-		config.of_node = matches[i].of_node;
+-
+-		rdev = devm_regulator_register(&pdev->dev, &regulators[i],
+-					       &config);
+-		if (IS_ERR(rdev)) {
+-			dev_err(&pdev->dev, "Failed to register %s\n",
+-				regulators[i].name);
+-
+-			return PTR_ERR(rdev);
+-		}
+-
+-		ret = of_property_read_u32(matches[i].of_node, "x-powers,dcdc-workmode",
++	for (i = 0; i < rset->nregulators; i++) {
++		ret = of_property_read_u32(config.matches[i].of_node,
++					   "x-powers,dcdc-workmode",
  					   &workmode);
- 		if (!ret) {
- 			if (axp20x_set_dcdc_workmode(rdev, i, workmode))
- 				dev_err(&pdev->dev, "Failed to set workmode on %s\n",
--					axp20x_regulators[i].name);
-+					regulators[i].name);
- 		}
+-		if (!ret) {
+-			if (axp20x_set_dcdc_workmode(rdev, i, workmode))
+-				dev_err(&pdev->dev, "Failed to set workmode on %s\n",
+-					regulators[i].name);
+-		}
++		if (!ret &&
++		    axp20x_set_dcdc_workmode(rset->regulators[i], i, workmode))
++			dev_err(&pdev->dev, "Failed to set workmode on %s\n",
++				config.descs[i].name);
  	}
  
+ 	return 0;
 -- 
 1.8.3.2
