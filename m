@@ -1,35 +1,49 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 May 2014 10:25:54 +0200
-Subject: [PATCH 1/3] gpio: Add APM X-Gene SoC GPIO controller support
-In-Reply-To: <CAL85gmDjVszNd3TB51BGa+78wEEZmJfBOLNKOpTEvMTGU2VdBA@mail.gmail.com>
+Date: Tue, 27 May 2014 10:27:04 +0200
+Subject: [PATCH 2/3] arm64:dts: Add APM X-Gene SoC GPIO controller DTS
+ entries
+In-Reply-To: <1400263432-922-3-git-send-email-fkan@apm.com>
 References: <1400263432-922-1-git-send-email-fkan@apm.com>
- <1400263432-922-2-git-send-email-fkan@apm.com>
- <CAAVeFu+TOfjfvisinv3oJ9PobdV9HcNJhr+3VYneSJ54uGwiAg@mail.gmail.com>
- <CAL85gmDjVszNd3TB51BGa+78wEEZmJfBOLNKOpTEvMTGU2VdBA@mail.gmail.com>
-Message-ID: <CACRpkdaVYXU9GN5OymuP3JRsQO3unkRGb5vZN3Jb2nWSnkh1SQ@mail.gmail.com>
+ <1400263432-922-3-git-send-email-fkan@apm.com>
+Message-ID: <CACRpkdaGj9pHFr=-HN65agpkhXphJy45yZREdEZvvuFzyuuo7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 21, 2014 at 1:54 AM, Feng Kan <fkan@apm.com> wrote:
+On Fri, May 16, 2014 at 8:03 PM, Feng Kan <fkan@apm.com> wrote:
 
-> I see each bank as separate gpio chip. It is a simple way to
-> abstract the banks since they can operate independently.
+> Add gpio dts node for APM X-Gene SoC platform.
+>
+> Signed-off-by: Feng Kan <fkan@apm.com>
+(...)
+> +               gpio: gpio at 1701c000 {
+> +                       compatible = "apm,xgene-gpio";
+> +                       reg = <0x0 0x1701c000 0x0 0x1000>;
+> +
+> +                       banka: gpio-controller at 0 {
+> +                               compatible = "apm,xgene-gpio-port";
+> +                               gpio-controller;
+> +                               #gpio-cells = <2>;
+> +                               ngpios = <16>;
+> +                               bank = <0>;
+> +                       };
+> +                       bankb: gpio-controller at 1 {
+> +                               compatible = "apm,xgene-gpio-port";
+> +                               gpio-controller;
+> +                               #gpio-cells = <2>;
+> +                               ngpios = <16>;
+> +                               bank = <1>;
+> +                       };
+> +                       bankc: gpio-controller at 2 {
+> +                               compatible = "apm,xgene-gpio-port";
+> +                               gpio-controller;
+> +                               #gpio-cells = <2>;
+> +                               ngpios = <16>;
+> +                               bank = <2>;
+> +                       };
+> +               };
 
-I think they should also be separate devices, and separate nodes
-in the device tree.
-
-> It also
-> provided me a way to fix the sysfs gpio base number, regardless if
-> a particular bank node is pulled out.
-
-The GPIO sysfs is unpredictable for this and many other
-reasons and should not be relied upon.
-
-> This is also done in similar way
-> in some other gpio drivers such as the dwapb gpio driver.
-
-I think the dwapb has it's registers mingled while your banks
-seem to be separate chunks.
+NAK, please construct this with one gpio per bank and
+three independent entries instead of sub-banks.
 
 Yours,
 Linus Walleij
