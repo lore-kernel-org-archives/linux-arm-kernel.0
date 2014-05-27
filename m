@@ -1,50 +1,60 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 27 May 2014 10:44:40 -0700
-Subject: [PATCH v11 0/3] Exynos 5410 support
-In-Reply-To: <7hr43f9mmn.fsf@paris.lan> (Kevin Hilman's message of "Tue, 27
- May 2014 10:06:56 -0700")
-References: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>
- <7hr43f9mmn.fsf@paris.lan>
-Message-ID: <7hd2ez9kvr.fsf@paris.lan>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 27 May 2014 10:49:32 -0700
+Subject: linux-next: manual merge of the arm-soc tree with the  tree
+In-Reply-To: <20140527104526.5c6f819e@canb.auug.org.au>
+References: <20140527104526.5c6f819e@canb.auug.org.au>
+Message-ID: <20140527174932.GB18063@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@linaro.org> writes:
+* Stephen Rothwell <sfr@canb.auug.org.au> [140526 17:46]:
+> Hi all,
+> 
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> arch/arm/mach-omap2/omap-mpuss-lowpower.c between commit 4e4bb5c72f6b
+> ("ARM: l2c: omap2: avoid reading directly from the L2 registers in
+> platform code") from the arm tree and commit edfaf05c2fcb ("ARM:
+> OMAP2+: raw read and write endian fix") from the arm-soc tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
 
-> Tarek Dakhran <t.dakhran@samsung.com> writes:
->
->> The series of patches represent support of Exynos 5410 SoC
->>
->> The Exynos 5410 is the first Samsung SoC based on big.LITTLE architecture
->>
->> Patches add new platform description, support of clock controller and device
->> tree for Exynos 5410.
->>
->> Has been build on Samsung Linux Kernel
->>   (branch: for-next, commit: 97eae6c Merge branch 'v3.16-next/multiplatform' into for-next)
->>
->> Has been tested on: 1) Exynos 5410 reference board (exynos_defconfig)
->> 		    2) Exynos 5410 reference board (multi_v7_defconfig)
->> 		    3) Odroid-XU board (exynos_defconfig)
->> 		    4) Odroid-XU board (multi_v7_defconfig)
->
-> Tested-by: Kevin Hilman <khilman@linaro.org>
->
-> FYI, I boot tested this on an odroid-xu (exynos_defconfig and
-> multi_v7_defconfig.)
+OK thanks. FYI, looks like for this one the subject is missing which
+tree it conflicts with.
 
-Oops, I may have spoke to soon.  There seem to be some problems with
-multi_v7_defconfig.
+Regards,
 
-Applying this series directly on the commit mentioned above and testing,
-it works just fine using multi_v7_defconfig.
-
-However, if I directly test the current contents of the samsung for-next
-branch (where this series has been merged) it no longer boots on the
-odroid-xu.
-
-A quick diff shows that there are some other changes to
-multi_v7_defconfig in the samsung/for-next branch that may be causing
-problems here.
-
-Kevin
+Tony
+ 
+> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> @@@ -187,15 -187,19 +187,15 @@@ static void l2x0_pwrst_prepare(unsigne
+>    * in every restore MPUSS OFF path.
+>    */
+>   #ifdef CONFIG_CACHE_L2X0
+>  -static void save_l2x0_context(void)
+>  +static void __init save_l2x0_context(void)
+>   {
+> - 	__raw_writel(l2x0_saved_regs.aux_ctrl,
+> - 		     sar_base + L2X0_AUXCTRL_OFFSET);
+> - 	__raw_writel(l2x0_saved_regs.prefetch_ctrl,
+> - 		     sar_base + L2X0_PREFETCH_CTRL_OFFSET);
+>  -	u32 val;
+>  -	void __iomem *l2x0_base = omap4_get_l2cache_base();
+>  -	if (l2x0_base) {
+>  -		val = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+>  -		writel_relaxed(val, sar_base + L2X0_AUXCTRL_OFFSET);
+>  -		val = readl_relaxed(l2x0_base + L2X0_PREFETCH_CTRL);
+>  -		writel_relaxed(val, sar_base + L2X0_PREFETCH_CTRL_OFFSET);
+>  -	}
+> ++	writel_relaxed(l2x0_saved_regs.aux_ctrl,
+> ++		       sar_base + L2X0_AUXCTRL_OFFSET);
+> ++	writel_relaxed(l2x0_saved_regs.prefetch_ctrl,
+> ++		       sar_base + L2X0_PREFETCH_CTRL_OFFSET);
+>   }
+>   #else
+>  -static void save_l2x0_context(void)
+>  +static void __init save_l2x0_context(void)
+>   {}
+>   #endif
+>   
