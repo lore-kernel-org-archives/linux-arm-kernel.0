@@ -1,27 +1,59 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 27 May 2014 11:51:34 -0400
-Subject: [PATCH 4/4] ARM: mvebu: returns ll_get_cpuid() to
- ll_get_coherency_cpumask()
-In-Reply-To: <20140526152618.39c088ae@free-electrons.com>
-References: <1400762882-10116-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1400762882-10116-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140526152618.39c088ae@free-electrons.com>
-Message-ID: <20140527155134.GQ8664@titan.lakedaemon.net>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 27 May 2014 17:00:16 +0100
+Subject: [PATCH v6 0/5] arm: Fix DEBUG_LL for multi-platform kernels (without
+ PL01X)
+In-Reply-To: <1400857819-7975-1-git-send-email-daniel.thompson@linaro.org>
+References: <1400857819-7975-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1401206421-29832-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 03:26:18PM +0200, Thomas Petazzoni wrote:
-> Hello Jason,
-> 
-> There is a typo in the title of this commit: s/returns/rename/.
-> 
-> Should I respin this patch, or can you fix directly in mvebu/soc ?
+This patchset removes some single-platform compatibility tricks related
+to DEBUG_LL and, as a result, allows multi_v7_defconfig derived builds
+to enable DEBUG_LL without forcibly selecting of the PL01X's DEBUG_LL
+implementation (which doesn't work on some platforms).
 
-Sorry, it's too late.  It's already in arm-soc. And with the final rush
-of work for arm-soc, I'm not inclined to go through the pain of
-coordinating a branch drop and resend for a typo, as annoying as it is.
-:)
+- Tidy a couple of existing defconfig's so they continue to issue
+  DEBUG_LL messages to PL01X when the subsequent changes come along.
+- Limit DEBUG_LL_UART_NONE to platforms that support it
+- Fix a potential build problem on EP93XX
+- Get rid of the compatibility code that causes us to forcibly enable
+  DEBUG_UART_PL01X 
 
-sorry,
+Changes since v5:
 
-Jason.
+- Shortened the list of platforms that can select DEBUG_LL_UART_NONE
+  (changes Arnd Bergmann)
+- Rebased on latest mainline (v3.15rc7).
+
+Changes since v4:
+
+- Rebased to latest mainline (and tested again). No functional changes.
+
+Changes since v3:
+
+- Converted from a single patch to a series.
+- Tested defconfig builds of all impacted platforms.
+
+Changes since v2:
+
+- Switch from def_bool to bool (thanks Russell King)
+
+Changes since v1:
+
+- Remove pointless single platform support (thanks Arnd Bergmann)
+
+Daniel Thompson (5):
+  ARM: versatile: Enable DEBUG_LL_UART_PL01X
+  ARM: ep93xx: Enable DEBUG_LL_UART_PL01X
+  ARM: Hide DEBUG_LL_UART_NONE from unsupported platforms
+  arm: Seperate DEBUG_UART_PHYS from DEBUG_LL on EP93XX
+  arm: Fix DEBUG_LL for multi-platform kernels (without PL01X)
+
+ arch/arm/Kconfig.debug               | 12 ++++--------
+ arch/arm/configs/ep93xx_defconfig    |  1 +
+ arch/arm/configs/versatile_defconfig |  1 +
+ 3 files changed, 6 insertions(+), 8 deletions(-)
+
+-- 
+1.9.0
