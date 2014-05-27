@@ -1,22 +1,106 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 May 2014 15:19:42 +0200
-Subject: [PATCH] pinctrl: sunxi: depend on RESET_CONTROLLER
-In-Reply-To: <1400871043-16409-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1400871043-16409-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CACRpkdZ89CQNC2=cgKLLbxHaxfDMLLNKfpcJu6B1yG43xvxRaw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 27 May 2014 14:18:30 +0100
+Subject: [PATCHv2 4/4] arm64: Enable TEXT_OFFSET fuzzing
+In-Reply-To: <1401196710-6290-1-git-send-email-mark.rutland@arm.com>
+References: <1401196710-6290-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1401196710-6290-5-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 8:50 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+The arm64 Image header contains a text_offset field which bootloaders
+are supposed to read to determine the offset (from a 2MB aligned "start
+of memory" per booting.txt) at which to load the kernel. The offset is
+not well respected by bootloaders at present, and due to the lack of
+variation there is little incentive to support it. This is unfortunate
+for the sake of future kernels where we may wish to vary the text offset
+(even zeroing it).
 
-> The A31 R_PIO driver depends on the reset framework in a mandatory way. Express
-> this by adding a depends on the reset framework in Kconfig
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
+This patch adds options to arm64 to enable fuzz-testing of text_offset.
+CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET forces the text offset to a random
+16-byte aligned value value in the range [0..2MB) upon a build of the
+kernel. It is recommended that distribution kernels enable randomization
+to test bootloaders such that any compliance issues can be fixed early.
 
-Patch applied.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm64/Kconfig.debug        | 16 ++++++++++++++++
+ arch/arm64/Makefile             |  4 ++++
+ arch/arm64/kernel/head.S        |  8 ++++++--
+ arch/arm64/kernel/vmlinux.lds.S |  5 +++++
+ 4 files changed, 31 insertions(+), 2 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index d10ec33..d757875 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -37,4 +37,20 @@ config PID_IN_CONTEXTIDR
+ 	  instructions during context switch. Say Y here only if you are
+ 	  planning to use hardware trace tools with this kernel.
+ 
++config ARM64_RANDOMIZE_TEXT_OFFSET
++	bool "Randomize TEXT_OFFSET at build time (EXPERIMENTAL)"
++	default N
++	help
++	  Say Y here if you want the image load offset (AKA TEXT_OFFSET)
++	  of the kernel to be randomized at build-time. When selected,
++	  this option will cause TEXT_OFFSET to be randomized upon any
++	  build of the kernel, and the offset will be reflected in the
++	  text_offset field of the resulting Image. This can be used to
++	  fuzz-test bootloaders which respect text_offset.
++
++	  This option is intended for bootloader and/or kernel testing
++	  only. Bootloaders must make no assumptions regarding the value
++	  of TEXT_OFFSET and platforms must not require a specific
++	  value.
++
+ endmenu
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 2fceb71..4bde6f1 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -38,7 +38,11 @@ CHECKFLAGS	+= -D__aarch64__
+ head-y		:= arch/arm64/kernel/head.o
+ 
+ # The byte offset of the kernel image in RAM from the start of RAM.
++ifeq ($(CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET), y)
++TEXT_OFFSET := $(shell awk 'BEGIN {srand(); printf "0x%04x0\n", int(65535 * rand())}')
++else
+ TEXT_OFFSET := 0x00080000
++endif
+ 
+ export	TEXT_OFFSET GZFLAGS
+ 
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 2c13d3b..3bbad33 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -37,8 +37,12 @@
+ 
+ #define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
+ 
+-#if (KERNEL_RAM_VADDR & 0xfffff) != 0x80000
+-#error KERNEL_RAM_VADDR must start at 0xXXX80000
++#if (TEXT_OFFSET & 0xf) != 0
++#error TEXT_OFFSET must be at least 16B aligned
++#elif (PAGE_OFFSET & 0xfffff) != 0
++#error PAGE_OFFSET must be at least 2MB aligned
++#elif TEXT_OFFSET > 0xfffff
++#error TEXT_OFFSET must be less than 2MB
+ #endif
+ 
+ 	.macro	pgtbl, ttb0, ttb1, virt_to_phys
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 21a8ad1..05fc047 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -149,3 +149,8 @@ SECTIONS
+  */
+ ASSERT(((__hyp_idmap_text_start + PAGE_SIZE) > __hyp_idmap_text_end),
+        "HYP init code too big")
++
++/*
++ * If padding is applied before .head.text, virt<->phys conversions will fail.
++ */
++ASSERT(_text == (PAGE_OFFSET + TEXT_OFFSET), "HEAD is misaligned")
+-- 
+1.9.1
