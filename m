@@ -1,122 +1,73 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 27 May 2014 18:14:22 +0200
-Subject: [PATCH v2 02/11] sched: remove a wake_affine condition
-In-Reply-To: <20140527153937.GE19143@laptop.programming.kicks-ass.net>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-3-git-send-email-vincent.guittot@linaro.org>
- <20140527124848.GQ30445@twins.programming.kicks-ass.net>
- <CAKfTPtAbnDdQ=C6oABtwUPr7ADhHo1qsdzt5GFsuVMncA9Q=Qw@mail.gmail.com>
- <20140527153937.GE19143@laptop.programming.kicks-ass.net>
-Message-ID: <CAKfTPtCZx4i5HFnma3EFYjxVHojUAkezSS7jL7KDTgwvKEVFwQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 May 2014 18:16:11 +0200
+Subject: [PATCH] arm: Set hardirq tracing to on when idling
+In-Reply-To: <53849167.1000309@mvista.com>
+References: <1401045323-7116-1-git-send-email-minyard@acm.org>
+ <4559339.apo3Fd10HK@wuerfel> <53849167.1000309@mvista.com>
+Message-ID: <201405271816.11998.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 May 2014 17:39, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Tue, May 27, 2014 at 05:19:02PM +0200, Vincent Guittot wrote:
->> On 27 May 2014 14:48, Peter Zijlstra <peterz@infradead.org> wrote:
->> > On Fri, May 23, 2014 at 05:52:56PM +0200, Vincent Guittot wrote:
->> >> I have tried to understand the meaning of the condition :
->> >>  (this_load <= load &&
->> >>   this_load + target_load(prev_cpu, idx) <= tl_per_task)
->> >> but i failed to find a use case that can take advantage of it and i haven't
->> >> found description of it in the previous commits' log.
->> >
->> > commit 2dd73a4f09beacadde827a032cf15fd8b1fa3d48
->> >
->> >     int try_to_wake_up():
->> >
->> >     in this function the value SCHED_LOAD_BALANCE is used to represent the load
->> >     contribution of a single task in various calculations in the code that
->> >     decides which CPU to put the waking task on.  While this would be a valid
->> >     on a system where the nice values for the runnable tasks were distributed
->> >     evenly around zero it will lead to anomalous load balancing if the
->> >     distribution is skewed in either direction.  To overcome this problem
->> >     SCHED_LOAD_SCALE has been replaced by the load_weight for the relevant task
->> >     or by the average load_weight per task for the queue in question (as
->> >     appropriate).
->> >
->> >                         if ((tl <= load &&
->> > -                               tl + target_load(cpu, idx) <= SCHED_LOAD_SCALE) ||
->> > -                               100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
->> > +                               tl + target_load(cpu, idx) <= tl_per_task) ||
->> > +                               100*(tl + p->load_weight) <= imbalance*load) {
->>
->> The oldest patch i had found was: https://lkml.org/lkml/2005/2/24/34
->> where task_hot had been replaced by
->> + if ((tl <= load &&
->> + tl + target_load(cpu, idx) <= SCHED_LOAD_SCALE) ||
->> + 100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
->>
->> but as explained, i haven't found a clear explanation of this condition
->
-> Yeah, that's the commit I had below; but I suppose we could ask Nick if
-> we really want, I've heard he still replies to email, even though he's
-> locked up in a basement somewhere :-)
+On Tuesday 27 May 2014, Corey Minyard wrote:
+> On 05/26/2014 04:26 AM, Arnd Bergmann wrote:
+> > On Sunday 25 May 2014 14:15:23 minyard at acm.org wrote:
+> >> From: Corey Minyard <cminyard@mvista.com>
+> >>
+> >> The CPU will go to idle with interrupts off, but the interrupts
+> >> will wake up the idle.  This was causing very long irqsoff trace
+> >> values because, basically, the whole idle time was traces with
+> >> irqs off, even though they weren't really off.  Rework the idle
+> >> code to turn hardirq tracing to on befor calling idle.
+> >>
+> >> Signed-off-by: Corey Minyard <cminyard@mvista.com>
+> >> ---
+> >>  arch/arm/kernel/process.c | 3 ++-
+> >>  1 file changed, 2 insertions(+), 1 deletion(-)
+> >>
+> >> I'm not sure this is correct for all ARM boards, but it fixes the
+> >> issue for the Vexpress board I have.  No more 4 second irqsoff
+> >> times.
+> > If this patch is correct for ARM, I wonder if it should be done
+> > in architecture independent code instead. Do you see the same
+> > thing on x86? If not, do you know what's different?
+> 
+> MIPS doesn't idle with IRQs disabled.
 
-ok, I have added him in the list
+Looking at the mips code, I see a couple of variants of the idle function:
 
-Nick,
+* r3081_wait(), r39xx_wait(), and rm7k_wait_irqoff() correctly sleep
+  before enabling the IRQs
 
-While doing some rework on the wake affine part of the scheduler, i
-failed to catch the use case that takes advantage of a condition that
-you added some while ago with the commit
-a3f21bce1fefdf92a4d1705e888d390b10f3ac6f
+* r4k_wait first enables the IRQs and then waits, while a second
+  r4k_wait_irqoff() variant does the opposite, and a comment
+  explains that the first is wrong but the second may be broken
+  on some implementations.
 
-Could you help us to clarify the 2 first lines of the test that you added ?
+* can't tell what au1k_wait() does, but it also seems to sleep first.
 
-+                       if ((tl <= load &&
-+                               tl + target_load(cpu, idx) <=
-SCHED_LOAD_SCALE) ||
-+                               100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
+> x86 calls trace_cpu_idle_rcuidle, but it doesn't re-enable interrupts at
+> the end of the idle routine.  Adding those trace calls to ARM doesn't
+> seem to make any difference, though.
 
-Regards,
-Vincent
+trace_cpu_idle_rcuidle() is unrelated, I also checked that.
 
->
->> > commit a3f21bce1fefdf92a4d1705e888d390b10f3ac6f
->> >
->> >
->> > +                       if ((tl <= load &&
->> > +                               tl + target_load(cpu, idx) <= SCHED_LOAD_SCALE) ||
->> > +                               100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
->> >
->> >
->> > So back when the code got introduced, it read:
->> >
->> >         target_load(prev_cpu, idx) - sync*SCHED_LOAD_SCALE < source_load(this_cpu, idx) &&
->> >         target_load(prev_cpu, idx) - sync*SCHED_LOAD_SCALE + target_load(this_cpu, idx) < SCHED_LOAD_SCALE
->> >
->> > So while the first line makes some sense, the second line is still
->> > somewhat challenging.
->> >
->> > I read the second line something like: if there's less than one full
->> > task running on the combined cpus.
->>
->> ok. your explanation makes sense
->
-> Maybe, its still slightly weird :-)
->
->> >
->> > Now for idx==0 this is hard, because even when sync=1 you can only make
->> > it true if both cpus are completely idle, in which case you really want
->> > to move to the waking cpu I suppose.
->>
->> This use case is already taken into account by
->>
->> if (this_load > 0)
->> ..
->> else
->>  balance = true
->
-> Agreed.
->
->> > One task running will have it == SCHED_LOAD_SCALE.
->> >
->> > But for idx>0 this can trigger in all kinds of situations of light load.
->>
->> target_load is the max between load for idx == 0 and load for the
->> selected idx so we have even less chance to match the condition : both
->> cpu are completely idle
->
-> Ah, yes, I forgot to look at the target_load() thing and missed the max,
-> yes that all makes it entirely less likely.
+The comment in x86 arch_safe_halt() says "Used in the idle loop; sti
+takes one instruction cycle" and the implementation is "sti; hlt",
+where "sti" enables the interrupts at the same time as "hlt"
+puts the cpu in low-power mode.
+
+I don't understand what happens when ACPI is used, but I would
+it also ends up calling mwait or hlt with IRQs off. Can you try
+booting an x86 machine with acpi=off?
+
+> > It seems like the right thing to do, I just don't understand
+> > why nobody hit this before.
+> 
+> Yeah, I'm a little confused by that, too.  The RT guys use ARM
+> extensively, why haven't they seen this?  Of course, if you run your RT
+> tests under heavy load, you won't see this since you will never go idle.
+
+How exactly do you see this manifest? If it's clear that the
+trace comes from the idle function, maybe everybody just ignores it?
+
+	Arnd
