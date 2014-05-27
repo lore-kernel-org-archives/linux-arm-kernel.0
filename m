@@ -1,38 +1,29 @@
 From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue, 27 May 2014 17:33:51 +0530
-Subject: [PATCH 1/1] ARM: mvebu: Staticize local variables
-In-Reply-To: <20140527140149.177dc810@free-electrons.com>
-References: <1401190629-24559-1-git-send-email-sachin.kamat@linaro.org>
- <20140527135108.1642833b@free-electrons.com>
- <CAK9yfHxm27Rg3YcXTfSff7LAmYsj-VFBgBKXBXiD8SXGGYfFzQ@mail.gmail.com>
- <20140527140149.177dc810@free-electrons.com>
-Message-ID: <CAK9yfHymhviBqOEEVHyNnbKxMCom58YL2o9ThwxFKGjBcPQs0w@mail.gmail.com>
+Date: Tue, 27 May 2014 17:33:08 +0530
+Subject: [PATCH 1/1] ARM: ux500: Staticize ux500_soc_attr
+Message-ID: <1401192188-10936-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 May 2014 17:31, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> Dear Sachin Kamat,
->
-> On Tue, 27 May 2014 17:24:10 +0530, Sachin Kamat wrote:
->
->> >>       unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
->> >>       u32 reg;
->> >> @@ -263,7 +263,7 @@ static struct notifier_block
->> >> armada_370_xp_cpu_pm_notifier = { .notifier_call =
->> >> armada_370_xp_cpu_pm_notify, };
->> >>
->> >> -int __init armada_370_xp_cpu_pm_init(void)
->> >> +static int __init armada_370_xp_cpu_pm_init(void)
->> >
->> > Indeed, this one needs to be fixed.
->>
->> How do you want me to handle this?
->
-> Maybe send a new patch that fixes just that one?
+'ux500_soc_attr' is local to this file.
 
-Sounds good. Thanks.
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+ arch/arm/mach-ux500/cpu.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
+index db16b5a04ad5..4dfa04a96f4d 100644
+--- a/arch/arm/mach-ux500/cpu.c
++++ b/arch/arm/mach-ux500/cpu.c
+@@ -125,7 +125,7 @@ static void __init soc_info_populate(struct soc_device_attribute *soc_dev_attr,
+ 	soc_dev_attr->revision = ux500_get_revision();
+ }
+ 
+-struct device_attribute ux500_soc_attr =
++static struct device_attribute ux500_soc_attr =
+ 	__ATTR(process,  S_IRUGO, ux500_get_process,  NULL);
+ 
+ struct device * __init ux500_soc_device_init(const char *soc_id)
 -- 
-With warm regards,
-Sachin
+1.7.9.5
