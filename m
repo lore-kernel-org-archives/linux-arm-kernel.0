@@ -1,183 +1,69 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 27 May 2014 09:11:57 +0200
-Subject: [PATCHv5 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
- controller
-In-Reply-To: <CAF03EBe+G8EpZSU7vhu4QZ3E-Nq4WnHw7DRM7=EyxHkjzp5cqg@mail.gmail.com>
-References: <1400169891-29546-1-git-send-email-tthayer@altera.com>
- <1400169891-29546-2-git-send-email-tthayer@altera.com>
- <20140516075344.GF949@pengutronix.de>
- <CAF03EBfOrBWsGVkwYHQt9Pm858LtkgUThkM6dFjksa93ETo_bw@mail.gmail.com>
- <20140519191206.GH949@pengutronix.de>
- <CAF03EBfwFC7bK=j0W3K+no9TK7xe2nF1ZXH9bMBRNzVErB5EjQ@mail.gmail.com>
- <CANk1AXTdSheUkNtF2fSmtcYaUrd2CnTjBxGitmSy88H4VRVbnw@mail.gmail.com>
- <20140520144446.GJ949@pengutronix.de>
- <CAF03EBe+G8EpZSU7vhu4QZ3E-Nq4WnHw7DRM7=EyxHkjzp5cqg@mail.gmail.com>
-Message-ID: <20140527071157.GC20695@pengutronix.de>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 27 May 2014 09:19:23 +0200
+Subject: [PATCH] clk: samsung: clk-s3c2410-dlck: do not use PNAME macro as
+ it declares __initdata
+In-Reply-To: <20140526212119.GP27093@quad.lixom.net>
+References: <4598341.WkbLY9yLfe@phil> <20140526212119.GP27093@quad.lixom.net>
+Message-ID: <4853638.CjtZR7iKXH@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 21, 2014 at 10:38:34AM -0500, Thor Thayer wrote:
-> On Tue, May 20, 2014 at 9:44 AM, Steffen Trumtrar
-> <s.trumtrar@pengutronix.de> wrote:
-> > Hi!
-> >
-> > On Tue, May 20, 2014 at 09:31:06AM -0500, Alan Tull wrote:
-> >> On Mon, May 19, 2014 at 2:37 PM, Thor Thayer <tthayer.linux@gmail.com> wrote:
-> >>
-> >> >>> >> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
-> >> >>> >> new file mode 100644
-> >> >>> >> index 0000000..8f8746b
-> >> >>> >> --- /dev/null
-> >> >>> >> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
-> >> >>> >> @@ -0,0 +1,11 @@
-> >> >>> >> +Altera SOCFPGA SDRAM Controller
-> >> >>> >> +
-> >> >>> >> +Required properties:
-> >> >>> >> +- compatible : "altr,sdr-ctl";
-> >> >>> >> +- reg : Should contain 1 register ranges(address and length)
-> >> >>> >> +
-> >> >>> >> +Example:
-> >> >>> >> +     sdrctl at ffc25000 {
-> >> >>> >> +             compatible = "altr,sdr-ctl";
-> >> >>> >> +             reg = <0xffc25000 0x1000>;
-> >> >>> >> +     };
-> >> >>> >> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> >> >>> >> index df43702..6ce912e 100644
-> >> >>> >> --- a/arch/arm/boot/dts/socfpga.dtsi
-> >> >>> >> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> >> >>> >> @@ -676,6 +676,11 @@
-> >> >>> >>                       clocks = <&l4_sp_clk>;
-> >> >>> >>               };
-> >> >>> >>
-> >> >>> >> +             sdrctl at ffc25000 {
-> >> >>> >> +                     compatible = "altr,sdr-ctl", "syscon";
-> >> >>> >                                                    ^^^^^^^^^^
-> >> >>> >
-> >> >>> > Get rid of that, too, please.
-> >> >>>
-> >> >>> Hi Steffan,
-> >> >>>
-> >> >>> I believe I need to keep the "syscon". The same register (ctrlcfg)
-> >> >>> that has the ECC enable bitfield also includes the DRAM configuration
-> >> >>> bitfields that other drivers will want to access (specifically the
-> >> >>> FPGA bridge needs this information). Since this register will be
-> >> >>> shared between drivers,  syscon seems like the best solution.
-> >> >>>
-> >> >>
-> >> >> Hm, from looking at the documentation of the ctrlcfg I can't really
-> >> >> understand which bits you would need for the FPGA brigde and why.
-> >>
-> >> Hi Steffen,
-> >>
-> >> Offset 0x80 in the sdr-ctl is the "fpgaportrst" register.  14 bits
-> >> wide, defaults to 0.  When appropriate bits set to 1 in that reg, it
-> >> allows an FPGA port to come out of reset (enables that port).  Has no
-> >> other effect on SDRAM configuration.
-> >>
-> >> >> That all sounds like stuff you would want to set for the specific
-> >> >> RAM you are dealing with on a specific board.
-> >> >> What bridge are you talking about? The SDRAM bridge?
-> >>
-> >> Yes, the port allows the FPGA a direct path to the SDRAM.  This one
-> >> register the only register in the sdr that the bridge driver needs.
-> >>
-> >
-> > So, what I suggested down ...
-> >
-> >> >>
-> >> >> I can see the problem with the ECC enable, though.
-> >> >>
-> >> >> Regards,
-> >> >> Steffen
-> >> >>
-> >> >
-> >> >>> >                 sdrctl at ffc25000 {
-> >> >>> >                         compatible = "altr,sdr-ctl";
-> >> >>> >                         reg = <0xffc25000 0x1000>;
-> >> >>> >                         ranges;
-> >> >>> >
-> >> >>> >                         edac at ffc2502c {
-> >> >>> >                                 compatible = "altr,sdram-edac";
-> >> >>> >                                 reg = <0xffc2502c 0x50>;
-> >> >>> >                                 interrupts = <0 39 4>;
-> >> >>> >                         };
-> >> >>> >                 };
-> >> >>> >
-> >> >>> > Then we can later add:
-> >> >>> >
-> >> >>> >                         sdr-ports: ports at ffc2507c {
-> >> >>> >                                 #reset-cells = <1>;
-> >> >>> >                                 compatible = "altr,sdr-ports";
-> >> >>> >                                 reg = <0xffc2507c 0x10>;
-> >> >>> >                                 clocks = <&ddr_dqs_clk>;
-> >> >>> >                                 ...
-> >> >>> >                         };
-> >>
-> >
-> > ... here should work. No?! Just a simple driver that registers with the
-> > reset-framework. I would add 0x7c to that driver and than that driver could
-> > "configure" the port and let it out of reset.
-> >
-> > I have done the same thing for the other 3 bridges, but am not finished yet.
-> > Especially the GPV-stuff needs to at least be able to be added later if not now.
-> >
-
-Hi Thor!
-
-> I'm not clear on how the EDAC driver will interact with the registers
-> allocated to the SDRAM controller. If the group of registers from
-> 0xffc25000 to 0xffc26000 is exclusively allocated to the SDRAM
-> controller, how does the EDAC driver cleanly access that single
-> register inside this range?
+Am Montag, 26. Mai 2014, 14:21:19 schrieb Olof Johansson:
+> On Fri, May 23, 2014 at 10:58:53PM +0200, Heiko St?bner wrote:
+> > The originally used PNAME macro from the core samsung clock infrastructure
+> > declares the created array as initdata, creating section mismatch warnings
+> > in the dclk driver.
+> > 
+> > Thus declare them directly, removing these warning.
+> > 
+> > Reported-by: Olof Johansson <olof@lixom.net>
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> > This should probably go though the samsung tree / arm-soc, as the
+> > offending patch is also in there.
+> > 
+> >  drivers/clk/samsung/clk-s3c2410-dclk.c | 20 ++++++++++----------
+> >  1 file changed, 10 insertions(+), 10 deletions(-)
+> > 
+> > diff --git a/drivers/clk/samsung/clk-s3c2410-dclk.c
+> > b/drivers/clk/samsung/clk-s3c2410-dclk.c index 8d8dff0..c1726f4 100644
+> > --- a/drivers/clk/samsung/clk-s3c2410-dclk.c
+> > +++ b/drivers/clk/samsung/clk-s3c2410-dclk.c
+> > @@ -135,26 +135,26 @@ struct s3c24xx_dclk {
+> > 
+> >  #define to_s3c24xx_dclk1(x) \
+> >  
+> >  		container_of(x, struct s3c24xx_dclk, dclk1_div_change_nb)
+> > 
+> > -PNAME(dclk_s3c2410_p) = { "pclk", "uclk" };
+> > -PNAME(clkout0_s3c2410_p) = { "mpll", "upll", "fclk", "hclk", "pclk",
+> > +static const char *dclk_s3c2410_p[] = { "pclk", "uclk" };
+> > +static const char *clkout0_s3c2410_p[] = { "mpll", "upll", "fclk",
+> > "hclk", "pclk",> 
+> >  			     "gate_dclk0" };
+> > 
+> > -PNAME(clkout1_s3c2410_p) = { "mpll", "upll", "fclk", "hclk", "pclk",
+> > +static const char *clkout1_s3c2410_p[] = { "mpll", "upll", "fclk",
+> > "hclk", "pclk",> 
+> >  			     "gate_dclk1" };
+> > 
+> > -PNAME(clkout0_s3c2412_p) = { "mpll", "upll", "rtc_clkout",
+> > +static const char *clkout0_s3c2412_p[] = { "mpll", "upll", "rtc_clkout",
+> > 
+> >  			     "hclk", "pclk", "gate_dclk0" };
+> > 
+> > -PNAME(clkout1_s3c2412_p) = { "xti", "upll", "fclk", "hclk", "pclk",
+> > +static const char *clkout1_s3c2412_p) = { "xti", "upll", "fclk", "hclk",
+> > "pclk",> 
+> >  			     "gate_dclk1" };
 > 
-
-The compatible in the example is wrong. I didn't mean to map the whole address space
-to some driver.
-I think for the configuration register syscon is the right approach. It is a
-bag of bits that don't necessitate an own driver, so syscon is perfect.
-
-So, let me change my proposal to
-
-	sdr-ctl: sdram at ffc25000 {
-		compatible = "altr,sdr-ctl", "syscon";
-		reg = <0xffc25000 0x1>;
-	};
-
-	edac: edac at ffc2502c {
-		compatible = "altr,sdram-edac";
-		reg = <0xffc2502c 0x50>;
-		interrupts = <0 39 4>;
-		config = <&sdr-ctl>;
-		...
-	};
-
-	sdr-ports: ports at ffc2507c {
-		compatible = "altr,sdr-ports";
-		reg = <0xffc2507c 0x10>;
-		clocks = <&ddr_dqs_clk>;
-		...
-	};
-
-Maybe we can just skip the outer node that combines all the others.
-So, if we do it like that, you can still use syscon, but only for the register
-that needs it. And the EDAC definitely needs access to the config register, so
-all is good.
-
-> Is the solution that I don't use request_region() (and therefore not
-> request exclusive access) when setting up the SDRAM controller?
+> Fixed up this error in a separate commit, since it caused a build failure.
 > 
-> If you could point me to your drivers for the other bridges that you
-> reference, your code may answer my question.
->
+> In other words, please build test your fixes before you send them. :)
 
-The other bridges don't need access to any SDRAM controller registers and
-I haven't even started to implement the GPV-stuff with the lw2hps-bridge :-(
+sorry about that. I was so sure I did build test it, but when checking again 
+now it in fact didn't build.
 
-Regards,
-Steffen
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+So sorry again
+Heiko
