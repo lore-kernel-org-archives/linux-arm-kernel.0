@@ -1,69 +1,44 @@
 From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Tue, 27 May 2014 16:29:58 -0400
-Subject: [RFC 1/2] ACPI: Add support for Platform Communication Channel
+Date: Tue, 27 May 2014 16:29:59 -0400
+Subject: [RFC 2/2] PCC Test driver
 In-Reply-To: <1401222599-12416-1-git-send-email-ashwin.chaugule@linaro.org>
 References: <1401222599-12416-1-git-send-email-ashwin.chaugule@linaro.org>
-Message-ID: <1401222599-12416-2-git-send-email-ashwin.chaugule@linaro.org>
+Message-ID: <1401222599-12416-3-git-send-email-ashwin.chaugule@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPI 5.0a+ spec defines a generic mode of communication
-between the OS and a platform such as the BMC. This medium
-(PCC) is typically used by CPPC (ACPI CPU Performance management),
-RAS (ACPI reliability protocol) and MPST (ACPI Memory power
-states).
+Opens a node in /proc/pcc_test.
 
-This patch adds initial support for PCC to be usable by the
-aforementioned PCC clients.
+Echo 0 for PCC read
+Echo 1 for PCC write
+Echo 2 for read base addr of PCC channel
 
 Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
 ---
- drivers/acpi/Kconfig  |  10 +++
- drivers/acpi/Makefile |   2 +-
- drivers/acpi/pcc.c    | 192 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 203 insertions(+), 1 deletion(-)
- create mode 100644 drivers/acpi/pcc.c
+ drivers/acpi/Makefile   |   2 +-
+ drivers/acpi/pcc-test.c | 172 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 173 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/acpi/pcc-test.c
 
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index ff5c83c..8f40e52 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -352,6 +352,16 @@ config ACPI_REDUCED_HARDWARE_ONLY
- 
- 	If you are unsure what to do, do not enable this option.
- 
-+config ACPI_PCC
-+	bool "ACPI Platform Communication Channel"
-+	def_bool n
-+	depends on ACPI
-+	help
-+	Enable this option if your platform supports PCC as defined in the
-+	ACPI spec 5.0a+. PCC is a generic mechanism for the OS to communicate
-+	with a platform such as a BMC. PCC is typically used by CPPC, RAS
-+	and MPST.
-+
- source "drivers/acpi/apei/Kconfig"
- 
- config ACPI_EXTLOG
 diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-index fc133d4..d8aa613 100644
+index d8aa613..f7bbbe9 100644
 --- a/drivers/acpi/Makefile
 +++ b/drivers/acpi/Makefile
 @@ -74,7 +74,7 @@ obj-$(CONFIG_ACPI_HED)		+= hed.o
  obj-$(CONFIG_ACPI_EC_DEBUGFS)	+= ec_sys.o
  obj-$(CONFIG_ACPI_CUSTOM_METHOD)+= custom_method.o
  obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
--
-+obj-$(CONFIG_ACPI_PCC)		+= pcc.o
+-obj-$(CONFIG_ACPI_PCC)		+= pcc.o
++obj-$(CONFIG_ACPI_PCC)		+= pcc.o pcc-test.o
  # processor has its own "processor." module_param namespace
  processor-y			:= processor_driver.o processor_throttling.o
  processor-y			+= processor_idle.o processor_thermal.o
-diff --git a/drivers/acpi/pcc.c b/drivers/acpi/pcc.c
+diff --git a/drivers/acpi/pcc-test.c b/drivers/acpi/pcc-test.c
 new file mode 100644
-index 0000000..328ca93
+index 0000000..cb6ee10
 --- /dev/null
-+++ b/drivers/acpi/pcc.c
-@@ -0,0 +1,192 @@
++++ b/drivers/acpi/pcc-test.c
+@@ -0,0 +1,172 @@
 +/*
 + *	Copyright (C) 2014 Linaro Ltd.
 + *	Author:	Ashwin Chaugule <ashwin.chaugule@linaro.org>
@@ -85,176 +60,156 @@ index 0000000..328ca93
 +#include <linux/uaccess.h>
 +#include <linux/init.h>
 +#include <linux/cpufreq.h>
-+#include <linux/delay.h>
-+#include <linux/ioctl.h>
-+#include <linux/vmalloc.h>
++#include <linux/proc_fs.h>
++#include <linux/seq_file.h>
++#include <asm/uaccess.h>
 +
 +#include <acpi/actbl.h>
 +
-+#define MAX_PCC_SUBSPACES	256
-+#define PCCS_SS_SIG_MAGIC	0x50434300
-+#define PCC_CMD_COMPLETE	0x1
-+#define PCC_VERSION			"0.1"
++static u64 pcc_comm_base_addr;	/* Returned by the Subspace structure */
++static u64 *comm_base_addr; 	/* For use after ioremap */
 +
-+struct pcc_ss_desc {
-+	struct acpi_pcct_subspace *pcc_ss_ptr;
-+	raw_spinlock_t lock;
++extern int get_pcc_comm_channel(u32 ss_idx, u64* addr, int *len);
++extern u16 send_pcc_cmd(u8 cmd, u8 sci, u32 ss_idx, u64 * __iomem base_addr);
++
++/* XXX: The PCC Subspace id is hard coded here only for test purposes.
++ * In reality it should be parsed from the PCC package as described
++ * in the PCC client table. e.g. CPC for CPPC 
++ */
++#define PCC_SUBSPACE_IDX 	0
++#define CMD_COMPLETE    	1
++
++enum ppc_cmds {
++	CMD_READ,
++	CMD_WRITE,
++	RESERVED,
 +};
 +
-+/* Array of Type 0 PCC Subspace descriptors */
-+struct pcc_ss_desc pcc_ss_arr[MAX_PCC_SUBSPACES];
++static u64 reg1, reg2;
 +
-+/* Total number of subspaces detected in PCCT. */
-+static int total_ss;
-+
-+/*
-+ * PCC clients call this function to get a base address of their
-+ * Communication channel
-+ */
-+int get_pcc_comm_channel(u32 ss_idx, u64 __iomem *addr, int *len)
++static void run_pcc_test_read(void)
 +{
-+	struct acpi_pcct_subspace *pcct_subspace =
-+		pcc_ss_arr[ss_idx].pcc_ss_ptr;
++	u16 pcc_status;
++	u64 reg1_addr = comm_base_addr + 8;
++	u64 reg2_addr = comm_base_addr + 16;
 +
-+	if (pcct_subspace) {
-+		*addr = pcct_subspace->base_address;
-+		*len = pcct_subspace->length;
++	/* READ part of the test */
++	pr_info("Sending PCC read req from Channel base addr: %llx\n", pcc_comm_base_addr);
++	pcc_status = send_pcc_cmd(CMD_READ, 0, PCC_SUBSPACE_IDX, &pcc_comm_base_addr);
++	if (pcc_status & CMD_COMPLETE) {
++		pr_info("Read updated values from Platform.\n");
++		reg1 = iorea32(&reg1_addr);
++		reg2 = ioread32(&reg2_addr);
++		pr_info("updated value of reg1:%llx\n", reg1);
++		pr_info("updated value of reg2:%llx\n", reg2);
 +	} else
-+		return -EINVAL;
-+
-+	return 0;
++		pr_err("Failed to read PCC parameters\n");
 +}
 +
-+/* Send PCC cmd on behalf of this (subspace id) PCC client */
-+u16 send_pcc_cmd(u8 cmd, u8 sci, u32 ss_idx, u64 __iomem *base_addr)
++static void run_pcc_test_write(void)
 +{
-+	struct acpi_pcct_subspace *pcct_subspace =
-+		pcc_ss_arr[ss_idx].pcc_ss_ptr;
-+	struct acpi_pcct_shared_memory *generic_comm_base =
-+		(struct acpi_pcct_shared_memory *)base_addr;
-+	struct acpi_generic_address doorbell;
-+	u64 doorbell_preserve;
-+	u64 doorbell_val;
-+	u64 doorbell_write;
-+	/*
-+	 * Min time in usec that OSPM is expected to wait
-+	 * before sending the next PCC cmd.
-+	 */
-+	u16 cmd_delay = pcct_subspace->min_turnaround_time;
++	u16 pcc_status;
++	u64 reg1_addr = comm_base_addr + 8;
++	u64 reg2_addr = comm_base_addr + 16;
 +
-+	if (!generic_comm_base) {
-+		pr_err("No Generic Communication Channel provided.\n");
-+		return -EINVAL;
-+	}
++	/* WRITE part of the test */
++	reg1++;
++	reg2++;
 +
-+	raw_spin_lock(&pcc_ss_arr[ss_idx].lock);
++	iowrite32(reg1,  &reg1_addr);
++	iowrite32(reg2,  &reg2_addr);
 +
-+	/* Get doorbell details for this subspace. */
-+	doorbell = pcct_subspace->doorbell_register;
-+	doorbell_preserve = pcct_subspace->preserve_mask;
-+	doorbell_write = pcct_subspace->write_mask;
-+
-+	/* Loop until CMD complete bit is set. For prev cmds. */
-+	while (!(ioread16(&generic_comm_base->status) & PCC_CMD_COMPLETE))
-+		udelay(cmd_delay);
-+
-+	/* Write to the shared comm region. */
-+	iowrite16(cmd, &generic_comm_base->command);
-+
-+	/* Write Subspace MAGIC value so platform can identify destination. */
-+	iowrite32((PCCS_SS_SIG_MAGIC | ss_idx), &generic_comm_base->signature);
-+
-+	/* Flip CMD COMPLETE bit */
-+	iowrite16(0, &generic_comm_base->status);
-+
-+	/* Sync notification from OSPM to Platform. */
-+	acpi_read(&doorbell_val, &doorbell);
-+	acpi_write((doorbell_val & doorbell_preserve) | doorbell_write,
-+			&doorbell);
-+
-+	/* Wait for Platform to consume. */
-+	while (!(ioread16(&generic_comm_base->status) & PCC_CMD_COMPLETE))
-+		udelay(cmd_delay);
-+
-+	raw_spin_unlock(&pcc_ss_arr[ss_idx].lock);
-+
-+	return generic_comm_base->status;
++	pr_info("Sending PCC write req from Channel base addr: %p\n", comm_base_addr);
++	pcc_status = send_pcc_cmd(CMD_WRITE, 0, PCC_SUBSPACE_IDX, comm_base_addr);
++	if (pcc_status & CMD_COMPLETE)
++		pr_info("OSPM successfully sent PCC read cmd to platform\n");
++	else
++		pr_err("Failed to write PCC parameters. \n");
 +}
 +
-+static int parse_pcc_subspace(struct acpi_subtable_header *header,
-+		const unsigned long end)
++void get_pcc_comm(void)
 +{
-+	struct acpi_pcct_subspace *pcct_ss;
++	int ret, len;
 +
-+	if (total_ss <= MAX_PCC_SUBSPACES) {
-+		pcct_ss = (struct acpi_pcct_subspace *) header;
++	ret = get_pcc_comm_channel(PCC_SUBSPACE_IDX, &pcc_comm_base_addr, &len);
 +
-+		if (pcct_ss->header.type != ACPI_PCCT_TYPE_GENERIC_SUBSPACE) {
-+			pr_err("Incorrect PCC Subspace type detected\n");
-+			return -EINVAL;
-+		}
-+
-+		pcc_ss_arr[total_ss].pcc_ss_ptr = pcct_ss;
-+		raw_spin_lock_init(&pcc_ss_arr[total_ss].lock);
-+
-+		total_ss++;
-+	} else {
-+		pr_err("No more space for PCC subspaces.\n");
-+		return -ENOSPC;
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init pcc_probe(void)
-+{
-+	acpi_status status = AE_OK;
-+	acpi_size pcct_tbl_header_size;
-+	struct acpi_table_pcct *pcct_tbl;
-+
-+	/* Search for PCCT */
-+	status = acpi_get_table_with_size(ACPI_SIG_PCCT, 0,
-+			(struct acpi_table_header **)&pcct_tbl,
-+			&pcct_tbl_header_size);
-+
-+	if (ACPI_SUCCESS(status) && !pcct_tbl) {
-+		pr_warn("PCCT header not found.\n");
-+		status = AE_NOT_FOUND;
++	if (ret) {
++		pr_err("No PCC Communication channel found\n");
 +		goto out_err;
 +	}
 +
-+	status = acpi_table_parse_entries(ACPI_SIG_PCCT,
-+			sizeof(struct acpi_table_pcct),
-+			ACPI_PCCT_TYPE_GENERIC_SUBSPACE,
-+			parse_pcc_subspace, MAX_PCC_SUBSPACES);
++	comm_base_addr = ioremap_nocache(pcc_comm_base_addr, len);
 +
-+	if (ACPI_SUCCESS(status))
-+		pr_err("Error parsing PCC subspaces from PCCT\n");
++	if (!comm_base_addr)
++		pr_err("Could not map PCC communicate channel\n");
 +
-+	pr_info("Detected %d PCC Subspaces\n", total_ss);
++	pr_info("Acquired PCC comm channel base addr: %llx\n", pcc_comm_base_addr);
 +
 +out_err:
-+	return ACPI_SUCCESS(status) ? 1 : 0;
++	return;
 +}
 +
-+static int __init pcc_init(void)
++static ssize_t pcc_test_write(struct file *file, const char __user *buf,
++		size_t count, loff_t *offs)
 +{
-+	int ret;
++	char ctl[2];
 +
-+	if (acpi_disabled)
-+		return -ENODEV;
-+
-+	/* Check if PCC support is available. */
-+	ret = pcc_probe();
-+
-+	if (ret) {
-+		pr_debug("PCC probe failed.\n");
++	if (count != 2 || *offs)
 +		return -EINVAL;
++
++	if (copy_from_user(ctl, buf, count))
++		return -EFAULT;
++
++	switch (ctl[0]) {
++		case '0':
++			/* PCC read */
++			run_pcc_test_read();
++			break;
++		case '1':
++			/* PCC write */
++			run_pcc_test_write();
++			break;
++		case '2':
++			/* Get PCC channel */
++			get_pcc_comm();
++			break;
++		default:
++			pr_err("Unknown val\n");
++			break;
 +	}
 +
-+	return ret;
++	return count;
 +}
 +
-+device_initcall(pcc_init);
++static int pcc_test_open(struct inode *inode, struct file *filp)
++{
++	return 0;
++}
++
++static int pcc_test_release(struct inode *inode, struct file *filp)
++{
++	return 0;
++}
++
++static const struct file_operations pcc_test_fops = {
++	.open		= pcc_test_open,
++//	.read		= seq_read,
++	.write		= pcc_test_write,
++	.release	= pcc_test_release,
++};
++
++static int __init pcc_test(void)
++{
++	struct proc_dir_entry *pe;
++
++	pe = proc_create("pcc_test", 0644, NULL, &pcc_test_fops);
++
++	if (!pe)
++		return -ENOMEM;
++
++	return 0;
++}
++
++late_initcall(pcc_test);
 -- 
 1.8.3.2
