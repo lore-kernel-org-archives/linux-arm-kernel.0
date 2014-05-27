@@ -1,30 +1,60 @@
 From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Tue, 27 May 2014 20:44:25 +0800
-Subject: [PATCH v2 0/2] add hix5hd2 mac driver
-Message-ID: <1401194667-14445-1-git-send-email-zhangfei.gao@linaro.org>
+Date: Tue, 27 May 2014 20:44:26 +0800
+Subject: [PATCH v2 1/2] Documentation: add Device tree bindings for Hisilicon
+ hix5hd2 ethernet
+In-Reply-To: <1401194667-14445-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1401194667-14445-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <1401194667-14445-2-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2:
-Update binding accoring to Sergei comments
-Update descriptor as Arnd's suggestion
-
-Zhangfei Gao (2):
-  Documentation: add Device tree bindings for Hisilicon hix5hd2
-    ethernet
-  net: hisilicon: add hix5hd2 mac driver
-
- .../bindings/net/hisilicon-hix5hd2-gmac.txt        |   36 +
- drivers/net/ethernet/Kconfig                       |    1 +
- drivers/net/ethernet/Makefile                      |    1 +
- drivers/net/ethernet/hisilicon/Kconfig             |   27 +
- drivers/net/ethernet/hisilicon/Makefile            |    5 +
- drivers/net/ethernet/hisilicon/hix5hd2_gmac.c      | 1062 ++++++++++++++++++++
- 6 files changed, 1132 insertions(+)
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+---
+ .../bindings/net/hisilicon-hix5hd2-gmac.txt        |   36 ++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
- create mode 100644 drivers/net/ethernet/hisilicon/Kconfig
- create mode 100644 drivers/net/ethernet/hisilicon/Makefile
- create mode 100644 drivers/net/ethernet/hisilicon/hix5hd2_gmac.c
 
+diff --git a/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt b/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
+new file mode 100644
+index 0000000..5fe3835
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
+@@ -0,0 +1,36 @@
++Hisilicon hix5hd2 gmac controller
++
++Required properties:
++- compatible: should be "hisilicon,hix5hd2-gmac".
++- reg: specifies base physical address(s) and size of the device registers.
++  The first region is the MAC register base and size.
++  The second region is external interface control register.
++- interrupts: should contain the MAC interrupts
++- #address-cells: must be <1>.
++- #size-cells: must be <0>.
++- phy-mode: see ethernet.txt [1].
++- phy-handle: see ethernet.txt [1].
++- mac-address: see ethernet.txt [1].
++- clocks: clock phandle and specifier pair.
++
++- PHY subnode: inherits from phy binding [2]
++
++[1] Documentation/devicetree/bindings/net/ethernet.txt
++[2] Documentation/devicetree/bindings/net/phy.txt
++
++Example:
++	gmac0: ethernet at f9840000 {
++		compatible = "hisilicon,hix5hd2-gmac";
++		reg = <0xf9840000 0x1000>,<0xf984300c 0x4>;
++		interrupts = <0 71 4>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		phy-mode = "mii";
++		phy-handle = <&phy2>;
++		mac-address = [00 00 00 00 00 00];
++		clocks = <&clock HIX5HD2_MAC0_CLK>;
++
++		phy2: ethernet-phy at 2 {
++			reg = <2>;
++		};
++	};
 -- 
 1.7.9.5
