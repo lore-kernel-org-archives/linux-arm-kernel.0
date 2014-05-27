@@ -1,53 +1,91 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 27 May 2014 16:07:50 +0100
-Subject: [PATCH v3 05/14] ARM: KVM: vgic mmio should hold data as LE bytes
- array in BE case
-In-Reply-To: <1399997646-4716-6-git-send-email-victor.kamensky@linaro.org>
-References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
- <1399997646-4716-6-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <5384AA46.7050304@arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 28 May 2014 00:14:10 +0900
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable Exynos platform
+Message-ID: <1401203650-17813-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/05/14 17:13, Victor Kamensky wrote:
-> According to recent clarifications of mmio.data array meaning -
-> the mmio.data array should hold bytes as they would appear in
-> memory. Vgic is little endian device. And in case of BE image
-> kernel side that emulates vgic, holds data in BE form. So we
-> need to byteswap cpu<->le32 vgic registers when we read/write them
-> from mmio.data[].
-> 
-> Change has no effect in LE case because cpu already runs in le32.
-> 
-> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/vgic.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 56ff9be..529c336 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -241,12 +241,12 @@ static void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq)
->  
->  static u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
->  {
-> -	return *((u32 *)mmio->data) & mask;
-> +	return le32_to_cpu(*((u32 *)mmio->data)) & mask;
->  }
->  
->  static void mmio_data_write(struct kvm_exit_mmio *mmio, u32 mask, u32 value)
->  {
-> -	*((u32 *)mmio->data) = value & mask;
-> +	*((u32 *)mmio->data) = cpu_to_le32(value) & mask;
->  }
->  
->  /**
-> 
+From: Sachin Kamat <sachin.kamat@linaro.org>
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Enable Exynos platform and its related IPs for multi_v7_defconfig.
 
-	M.
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index d4e8a47..1996463 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -47,6 +47,7 @@ CONFIG_ARCH_SPEAR13XX=y
+ CONFIG_MACH_SPEAR1310=y
+ CONFIG_MACH_SPEAR1340=y
+ CONFIG_ARCH_STI=y
++CONFIG_ARCH_EXYNOS=y
+ CONFIG_ARCH_SUNXI=y
+ CONFIG_ARCH_SIRF=y
+ CONFIG_ARCH_TEGRA=y
+@@ -71,6 +72,7 @@ CONFIG_PCI_MSI=y
+ CONFIG_PCI_MVEBU=y
+ CONFIG_PCI_TEGRA=y
+ CONFIG_SMP=y
++CONFIG_NR_CPUS=8
+ CONFIG_HIGHPTE=y
+ CONFIG_CMA=y
+ CONFIG_ARM_APPENDED_DTB=y
+@@ -153,6 +155,8 @@ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_DW=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++CONFIG_SERIAL_SAMSUNG=y
++CONFIG_SERIAL_SAMSUNG_CONSOLE=y
+ CONFIG_SERIAL_SIRFSOC=y
+ CONFIG_SERIAL_SIRFSOC_CONSOLE=y
+ CONFIG_SERIAL_TEGRA=y
+@@ -176,6 +180,7 @@ CONFIG_I2C_MUX=y
+ CONFIG_I2C_MUX_PCA954x=y
+ CONFIG_I2C_MUX_PINCTRL=y
+ CONFIG_I2C_DESIGNWARE_PLATFORM=y
++CONFIG_I2C_EXYNOS5=y
+ CONFIG_I2C_MV64XXX=y
+ CONFIG_I2C_SIRF=y
+ CONFIG_I2C_TEGRA=y
+@@ -210,6 +215,7 @@ CONFIG_MFD_AS3722=y
+ CONFIG_MFD_CROS_EC=y
+ CONFIG_MFD_CROS_EC_SPI=y
+ CONFIG_MFD_MAX8907=y
++CONFIG_MFD_SEC_CORE=y
+ CONFIG_MFD_PALMAS=y
+ CONFIG_MFD_TPS65090=y
+ CONFIG_MFD_TPS6586X=y
+@@ -220,6 +226,8 @@ CONFIG_REGULATOR_AS3722=y
+ CONFIG_REGULATOR_GPIO=y
+ CONFIG_REGULATOR_MAX8907=y
+ CONFIG_REGULATOR_PALMAS=y
++CONFIG_REGULATOR_S2MPS11=y
++CONFIG_REGULATOR_S5M8767=y
+ CONFIG_REGULATOR_TPS51632=y
+ CONFIG_REGULATOR_TPS62360=y
+ CONFIG_REGULATOR_TPS65090=y
+@@ -274,12 +282,16 @@ CONFIG_MMC_ARMMMCI=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_ESDHC_IMX=y
+ CONFIG_MMC_SDHCI_TEGRA=y
++CONFIG_MMC_SDHCI_S3C=y
+ CONFIG_MMC_SDHCI_DOVE=y
+ CONFIG_MMC_SDHCI_SPEAR=y
++CONFIG_MMC_SDHCI_S3C_DMA=y
+ CONFIG_MMC_SDHCI_BCM_KONA=y
+ CONFIG_MMC_OMAP=y
+ CONFIG_MMC_OMAP_HS=y
+ CONFIG_MMC_MVSDIO=y
++CONFIG_MMC_DW=y
++CONFIG_MMC_DW_EXYNOS=y
+ CONFIG_EDAC=y
+ CONFIG_EDAC_MM_EDAC=y
+ CONFIG_EDAC_HIGHBANK_MC=y
 -- 
-Jazz is not dead. It just smells funny...
+1.8.2.1.339.g52a3e01
