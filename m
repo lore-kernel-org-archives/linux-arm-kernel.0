@@ -1,59 +1,33 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 27 May 2014 17:00:16 +0100
-Subject: [PATCH v6 0/5] arm: Fix DEBUG_LL for multi-platform kernels (without
- PL01X)
-In-Reply-To: <1400857819-7975-1-git-send-email-daniel.thompson@linaro.org>
+Date: Tue, 27 May 2014 17:00:17 +0100
+Subject: [PATCH v6 1/5] ARM: versatile: Enable DEBUG_LL_UART_PL01X
+In-Reply-To: <1401206421-29832-1-git-send-email-daniel.thompson@linaro.org>
 References: <1400857819-7975-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1401206421-29832-1-git-send-email-daniel.thompson@linaro.org>
+ <1401206421-29832-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1401206421-29832-2-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset removes some single-platform compatibility tricks related
-to DEBUG_LL and, as a result, allows multi_v7_defconfig derived builds
-to enable DEBUG_LL without forcibly selecting of the PL01X's DEBUG_LL
-implementation (which doesn't work on some platforms).
+This defconfig already enables DEBUG_LL and by default DEBUG_LL_UART_NONE
+will be selected (but due to some back compability magic I'd like to
+remove is not actually honoured). DEBUG_LL_UART_PL01X is a much saner
+default.
 
-- Tidy a couple of existing defconfig's so they continue to issue
-  DEBUG_LL messages to PL01X when the subsequent changes come along.
-- Limit DEBUG_LL_UART_NONE to platforms that support it
-- Fix a potential build problem on EP93XX
-- Get rid of the compatibility code that causes us to forcibly enable
-  DEBUG_UART_PL01X 
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+---
+ arch/arm/configs/versatile_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Changes since v5:
-
-- Shortened the list of platforms that can select DEBUG_LL_UART_NONE
-  (changes Arnd Bergmann)
-- Rebased on latest mainline (v3.15rc7).
-
-Changes since v4:
-
-- Rebased to latest mainline (and tested again). No functional changes.
-
-Changes since v3:
-
-- Converted from a single patch to a series.
-- Tested defconfig builds of all impacted platforms.
-
-Changes since v2:
-
-- Switch from def_bool to bool (thanks Russell King)
-
-Changes since v1:
-
-- Remove pointless single platform support (thanks Arnd Bergmann)
-
-Daniel Thompson (5):
-  ARM: versatile: Enable DEBUG_LL_UART_PL01X
-  ARM: ep93xx: Enable DEBUG_LL_UART_PL01X
-  ARM: Hide DEBUG_LL_UART_NONE from unsupported platforms
-  arm: Seperate DEBUG_UART_PHYS from DEBUG_LL on EP93XX
-  arm: Fix DEBUG_LL for multi-platform kernels (without PL01X)
-
- arch/arm/Kconfig.debug               | 12 ++++--------
- arch/arm/configs/ep93xx_defconfig    |  1 +
- arch/arm/configs/versatile_defconfig |  1 +
- 3 files changed, 6 insertions(+), 8 deletions(-)
-
+diff --git a/arch/arm/configs/versatile_defconfig b/arch/arm/configs/versatile_defconfig
+index 073541a..5a51397 100644
+--- a/arch/arm/configs/versatile_defconfig
++++ b/arch/arm/configs/versatile_defconfig
+@@ -79,5 +79,6 @@ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_KERNEL=y
+ CONFIG_DEBUG_USER=y
+ CONFIG_DEBUG_LL=y
++CONFIG_DEBUG_LL_UART_PL01X=y
+ CONFIG_FONTS=y
+ CONFIG_FONT_ACORN_8x8=y
 -- 
 1.9.0
