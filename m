@@ -1,74 +1,45 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 27 May 2014 14:14:07 -0400
-Subject: [GIT PULL] ARM: Keystone reset driver 3.16
-In-Reply-To: <20140527181233.GA26552@quad.lixom.net>
-References: <1400880597-7516-1-git-send-email-santosh.shilimkar@ti.com>
- <20140526212605.GQ27093@quad.lixom.net>
- <1401175584.4090.22.camel@paszta.hi.pengutronix.de> <53849C05.8090004@ti.com>
- <20140527181233.GA26552@quad.lixom.net>
-Message-ID: <5384D5EF.9030309@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 27 May 2014 20:18:18 +0200
+Subject: [PATCH RFC 02/11] sound: ASoC: kirkwood: Remove unused drivers
+In-Reply-To: <20140527180047.GA12304@sirena.org.uk>
+References: <1400163836-9831-1-git-send-email-andrew@lunn.ch>
+ <1400163836-9831-5-git-send-email-andrew@lunn.ch>
+ <20140526155901.GF22111@sirena.org.uk>
+ <20140527164530.GJ26379@lunn.ch>
+ <20140527180047.GA12304@sirena.org.uk>
+Message-ID: <20140527181818.GK26379@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 May 2014 02:12 PM, Olof Johansson wrote:
-> On Tue, May 27, 2014 at 10:07:01AM -0400, Santosh Shilimkar wrote:
->> Olof,
->>
->> On Tuesday 27 May 2014 03:26 AM, Philipp Zabel wrote:
->>> Hi Olof, Santosh,
->>>
->>> Am Montag, den 26.05.2014, 14:26 -0700 schrieb Olof Johansson:
->>>> On Fri, May 23, 2014 at 05:29:57PM -0400, Santosh Shilimkar wrote:
->>>>> Hi Arm-soc folks,
->>>>>
->>>>> Please pull below keystone reset driver for 3.16 . To avoid merge conflict
->>>>> with earlier keystone-soc pull request[1], I have based the subject pull
->>>>> request on top of it. It merges cleanly with arm-soc 'next/soc2' head. Please
->>>>> apply it against 'next/soc2'. Thanks 
->>>>
->>>> Hi,
->>>>
->>>> I notice this driver doesn't have an ack from Philipp Zabel (cc:d here). That
->>>> would be appropriate.
->>>
->> We asked about ack, split series options from reset folks but didn't hear back.
->> Since the series has been on the list for almost 3 merge windows now, I asked
->> Arnd how to go about it and he suggested to send it via arm-soc. Should have
->> clarified it in pull request.
->>
->>  
->>> I don't think this driver needs my ack, see below, ...
->>>
->>>> (Philipp, should there be a MAINTAINERS entry for you so
->>>> that get_maintainer works as expected here?)
->>>
->>> ... but that is a good idea to keep me in the loop. I will send a patch.
->>>
->>>> I'd also prefer to see the driver and the other changes split up since we tend
->>>> to merge them through different branches. I think it's OK to just split in
->>>> those two for this merge.
->>>>
->> Agree. I have split the series and created another two tags as below. If you
->> are ok, please pull them accordingly. If you want me to repost the pull requests
->> in separate emails, I can do that as well. Do let me know.
->>
->> 1] Reset driver. Contains only driver and binding documentation.
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
->> tags/keystone-reset-driver
->>
->> 2]Keystone mach updates which needs to applied on top of earlier soc
->> pull request. i.e on top of arm-soc 'next/soc2'. I have left 1 dts
->> patch in the same instead of creating another pull request for dts
->> change. 
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
->> tags/keystone-soc-2
+On Tue, May 27, 2014 at 07:00:47PM +0100, Mark Brown wrote:
+> On Tue, May 27, 2014 at 06:45:30PM +0200, Andrew Lunn wrote:
 > 
-> Merged. Since the branches were short I could easily review by hand, so full
-> pull requests weren't as critical.
+> > This is an RFC patch, as it says in the Subject line, and the cover
+> > note. It is not intended to be applied yet. Please unapply it, and the
+> > other one in the series you have applied.
 > 
-Thanks Olof !!
+> Eh?  I thought the discussion was that everything was OK and we were
+> going to go ahead with this approach.  Or to put it another way what's
+> wrong with this and what's expected to change?
 
-Regards,
-Santosh
+Hi Mark
+
+What is wrong is that the merge path for the first patch, which
+removes the boards making use of these drivers, has already closed for
+patches.  So we now have boards left in the tree with broken audio. We
+can leave it that way, because these boards are actually in the tree
+twice. One using DT, which will work as things are now, and old style
+board file boards which are broken.
+
+> The only issue you identified in the cover letter was me applying
+> some patches I'd already applied
+
+That was my error. I should of also added that you need to apply those
+patches before arm-soc closes, so we have time to feed in these
+patches. arm-soc generally closes around rc6/rc7, with the mvebu
+maintainer closing a little before that.
+
+Since we are past that now, i planned to send these patches next
+cycle, without the RFC tag.
+
+       Andrew
