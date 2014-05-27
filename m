@@ -1,55 +1,35 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Tue, 27 May 2014 10:04:28 -0700
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable Zynq peripheral drivers
-Message-ID: <1401210268-20729-1-git-send-email-soren.brinkmann@xilinx.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 27 May 2014 10:13:52 -0700
+Subject: [PATCH v2 0/7] mfd: twl4030-power: Enable off-idle configuration
+ when booted with device tree
+In-Reply-To: <20140527165234.GF4227@lee--X1>
+References: <1400031250-29542-1-git-send-email-tony@atomide.com>
+ <20140527165234.GF4227@lee--X1>
+Message-ID: <20140527171351.GA18063@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A few drivers for Zynq peripherals made it into mainline recently.
-Enable them in the defconfig. The following devices are enabled:
- - Cadence Macb Ethernet controller
- - Cadence I2C controller
- - Arasan SDHCI
+* Lee Jones <lee.jones@linaro.org> [140527 09:53]:
+> > Here's an updated set of patches to enable low-power idle modes
+> > for some omap3 boards when booted with device tree.
+> > 
+> > This series when applied on top of the patches in tread                                                                                                       
+> > "[PATCH 00/11] Fixes for omap PM for making omap3 DT only",
+> > or omap-for-v3.16/pm branch.
+> > 
+> > Lee, if these patches look OK to you, please feel free to 
+> > pick them, preferrably to the immutable branch you already
+> > have set up so I can also merge them in to be able to have
+> > things working in my branch properly for PM.
+> 
+> Whoops, nearly forgot about this patchset.
+> 
+> Tony, can you resend it with all your fix-ups please.  The 8< doesn't
+> work well with my patch application 'system'.
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-After quite a while I gave the defonfig a shot again. At first try it
-directly booted my Zynq board to a usable login prompt, and with this
-patch even some peripherals work out of the box.
+Sure I'll do that. FYI, these kind of patches should apply just
+fine when piped to git-am --scissors.
 
-	Thanks,
-	S?ren
----
- arch/arm/configs/multi_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+Regards,
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index d4e8a47a2f7c..763054810ccf 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -121,6 +121,7 @@ CONFIG_SATA_HIGHBANK=y
- CONFIG_SATA_MV=y
- CONFIG_NETDEVICES=y
- CONFIG_SUN4I_EMAC=y
-+CONFIG_MACB=y
- CONFIG_NET_CALXEDA_XGMAC=y
- CONFIG_MV643XX_ETH=y
- CONFIG_MVNETA=y
-@@ -175,6 +176,7 @@ CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_MUX=y
- CONFIG_I2C_MUX_PCA954x=y
- CONFIG_I2C_MUX_PINCTRL=y
-+CONFIG_I2C_CADENCE=y
- CONFIG_I2C_DESIGNWARE_PLATFORM=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_SIRF=y
-@@ -272,6 +274,7 @@ CONFIG_MMC=y
- CONFIG_MMC_BLOCK_MINORS=16
- CONFIG_MMC_ARMMMCI=y
- CONFIG_MMC_SDHCI=y
-+CONFIG_MMC_SDHCI_OF_ARASAN=y
- CONFIG_MMC_SDHCI_ESDHC_IMX=y
- CONFIG_MMC_SDHCI_TEGRA=y
- CONFIG_MMC_SDHCI_DOVE=y
--- 
-1.9.3.1.ga73a6ad
+Tony
