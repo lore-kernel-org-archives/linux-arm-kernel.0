@@ -1,27 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 27 May 2014 12:38:11 -0400
-Subject: [PATCH 2/2] ARM: dts: mvebu: split SolidRun CuBox into variants
-In-Reply-To: <5384BDB1.6000107@gmail.com>
-References: <1401140009-31505-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1401140009-31505-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140527161143.GS8664@titan.lakedaemon.net>
- <5384BDB1.6000107@gmail.com>
-Message-ID: <20140527163811.GT8664@titan.lakedaemon.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 27 May 2014 09:46:18 -0700
+Subject: [PATCH] ARM: at91/defconfig: sama5_defconfig: updated
+In-Reply-To: <1401194721-22586-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1401194721-22586-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20140527164618.GA21482@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 06:30:41PM +0200, Sebastian Hesselbarth wrote:
-...
-> About the board specific compatibles, I am not so sure if we should
-> keep them at all. "solidrun,cubox" for all three variants should be
-> enough. checkpatch is already choking on every unknown compatible it
-> sees and documenting each individual board clearly doesn't scale well.
+On Tue, May 27, 2014 at 02:45:21PM +0200, Nicolas Ferre wrote:
+> From: Wenyou Yang <wenyou.yang@atmel.com>
+> 
+> due to enabling
+> 	-- CONFIG_REGULATOR
+> 	-- CONFIG_REGULATOR_ACT8865
+> 
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> [nicolas.ferre at atmel.com: move added entries to proper location within file]
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+> Hi Arnd, Olof, Kevin,
+> 
+> I have this little patch lying around without other updates to AT91
+> defconfig files so far. Is it possible to take this patch in arm-soc
+> without a pull-request?
 
-Yeah, I saw that conversation.  I'm inclined to keep the board
-compatible strings because they are a useful human readable globally
-unique board identifier.  I suggest we fix checkpatch to not barf on the
-board compatible strings.
+Certainly. Applied to next/defconfig.
 
-thx,
 
-Jason.
+-Olof
