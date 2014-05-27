@@ -1,130 +1,46 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 27 May 2014 12:11:44 -0400
-Subject: [PATCH 2/2] ARM: dts: mvebu: split SolidRun CuBox into variants
-In-Reply-To: <1401140009-31505-2-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1401140009-31505-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1401140009-31505-2-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140527161143.GS8664@titan.lakedaemon.net>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 27 May 2014 18:14:31 +0200
+Subject: [PATCH 02/11] pinctrl: sunxi: add IRQCHIP_SKIP_SET_WAKE flag
+ for pinctrl irq chip
+In-Reply-To: <20140527080746.GB4730@lukather>
+References: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>
+ <1401090486-4414-3-git-send-email-hdegoede@redhat.com>
+ <20140527080746.GB4730@lukather>
+Message-ID: <5384B9E7.1070405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 11:33:29PM +0200, Sebastian Hesselbarth wrote:
-> As Mainlining effort for SolidRun CuBox has been carried out on the
-> Engineering Sample, the board DTS was reflecting this. Actually,
-> SolidRun CuBox comes in three different variants: Engineering Sample (ES),
-> production with 1GB RAM (1G), and production with 2GB RAM (2G).
+On 27.05.2014 10:07, Maxime Ripard wrote:
+> On Mon, May 26, 2014 at 09:47:57AM +0200, Hans de Goede wrote:
+>> From: Chen-Yu Tsai <wens@csie.org>
+>> 
+>> The sunxi pinctrl irq chip driver does not support wakeup at the 
+>> moment. Adding IRQCHIP_SKIP_SET_WAKE lets the irqs work with
+>> drivers using wakeup.
+>> 
+>> Also add a name to the irq chip.
+>> 
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org> Signed-off-by: Hans
+>> de Goede <hdegoede@redhat.com> --- 
+>> drivers/pinctrl/sunxi/pinctrl-sunxi.c | 2 ++ 1 file changed, 2
+>> insertions(+)
+>> 
+>> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>> b/drivers/pinctrl/sunxi/pinctrl-sunxi.c index db9ccd6..ec60c2e
+>> 100644 --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c +++
+>> b/drivers/pinctrl/sunxi/pinctrl-sunxi.c @@ -646,6 +646,8 @@
+>> static struct irq_chip sunxi_pinctrl_irq_chip = { .irq_mask_ack	=
+>> sunxi_pinctrl_irq_mask_ack, .irq_unmask	=
+>> sunxi_pinctrl_irq_unmask, .irq_set_type	=
+>> sunxi_pinctrl_irq_set_type, +	.name		= "sunxi-pio", +	.flags		=
+>> IRQCHIP_SKIP_SET_WAKE,
 > 
-> Therefore, we split the current dove-cubox.dts into a common board include
-> and one board dts for each of the above variants.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/boot/dts/Makefile                         |  4 +++-
->  arch/arm/boot/dts/dove-cubox-1g.dts                | 17 ++++++++++++++++
->  arch/arm/boot/dts/dove-cubox-2g.dts                | 17 ++++++++++++++++
->  arch/arm/boot/dts/dove-cubox-es.dts                | 23 ++++++++++++++++++++++
->  .../boot/dts/{dove-cubox.dts => dove-cubox.dtsi}   | 17 ----------------
->  5 files changed, 60 insertions(+), 18 deletions(-)
->  create mode 100644 arch/arm/boot/dts/dove-cubox-1g.dts
->  create mode 100644 arch/arm/boot/dts/dove-cubox-2g.dts
->  create mode 100644 arch/arm/boot/dts/dove-cubox-es.dts
->  rename arch/arm/boot/dts/{dove-cubox.dts => dove-cubox.dtsi} (86%)
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 35c146f31e46..40a008539c0c 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -404,7 +404,9 @@ dtb-$(CONFIG_MACH_ARMADA_XP) += \
->  	armada-xp-matrix.dtb \
->  	armada-xp-openblocks-ax3-4.dtb
->  dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
-> -	dove-cubox.dtb \
-> +	dove-cubox-1g.dtb \
-> +	dove-cubox-2g.dtb \
-> +	dove-cubox-es.dtb \
->  	dove-d2plug.dtb \
->  	dove-d3plug.dtb \
->  	dove-dove-db.dtb
-> diff --git a/arch/arm/boot/dts/dove-cubox-1g.dts b/arch/arm/boot/dts/dove-cubox-1g.dts
-> new file mode 100644
-> index 000000000000..eebd3f7ca7e6
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/dove-cubox-1g.dts
-> @@ -0,0 +1,17 @@
-> +/dts-v1/;
-> +
-> +#include "dove-cubox.dtsi"
-> +
-> +/ {
-> +	model = "SolidRun CuBox (1G)";
-> +	compatible = "solidrun,cubox-1g", "solidrun,cubox", "marvell,dove";
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x40000000>;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200n8 earlyprintk";
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/dove-cubox-2g.dts b/arch/arm/boot/dts/dove-cubox-2g.dts
-> new file mode 100644
-> index 000000000000..513b6a68eba3
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/dove-cubox-2g.dts
-> @@ -0,0 +1,17 @@
-> +/dts-v1/;
-> +
-> +#include "dove-cubox.dtsi"
-> +
-> +/ {
-> +	model = "SolidRun CuBox (2G)";
-> +	compatible = "solidrun,cubox-2g", "solidrun,cubox", "marvell,dove";
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x80000000>;
+> I'd rather see the name set to dev_name() or something like that.
+> This will not work that great with multiple pin controller
+> supporting interrupts.
 
-Do you anticipate any other differences between the 1G and the 2G?
-Otherwise, I'm inclined to just have a "solidrun,cubox".  The bootloader
-should be setting the amount of RAM at boottime anyway.
+Correct me if I'm wrong, but I've always thought that struct irq_chip
+describes a class of IRQ controllers, not particular instances.
 
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200n8 earlyprintk";
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/dove-cubox-es.dts b/arch/arm/boot/dts/dove-cubox-es.dts
-> new file mode 100644
-> index 000000000000..5fc17ce34c98
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/dove-cubox-es.dts
-> @@ -0,0 +1,23 @@
-> +/dts-v1/;
-> +
-> +#include "dove-cubox.dtsi"
-> +
-> +/ {
-> +	model = "SolidRun CuBox (ES)";
-
-"Engineering Sample" ?
-
-thx,
-
-Jason.
+Best regards,
+Tomasz
