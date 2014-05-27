@@ -1,76 +1,77 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 27 May 2014 09:04:46 +0900
-Subject: [GIT PULL 4th 1/2] Samsung Exynos multiplatform for 3.16
-In-Reply-To: <CAOesGMiM=Yc__EoWUPwyV3YRuQ83CSK8v8W==yt2Z9zoPNSwRA@mail.gmail.com>
-References: <5383BC62.6040005@samsung.com>
- <CAOesGMiM=Yc__EoWUPwyV3YRuQ83CSK8v8W==yt2Z9zoPNSwRA@mail.gmail.com>
-Message-ID: <00ed01cf793f$4722d780$d5688680$@samsung.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 27 May 2014 08:09:19 +0800
+Subject: Fwd: [GIT PULL]]ARM: sirf: dts update for 3.16
+In-Reply-To: <20140526220355.GV27093@quad.lixom.net>
+References: <CAGsJ_4waeAPJjnKiuXBJXXF-bYud=uO_j1hrS9auBAGr8KcFiQ@mail.gmail.com>
+ <CAGsJ_4zahocmgi0iJauaaXKBM6A8UCC86r5TLUj3AH68PrTwFA@mail.gmail.com>
+ <20140526220355.GV27093@quad.lixom.net>
+Message-ID: <CAGsJ_4y0txOXqgS6yDeoN=XZjWe6Z7MtL8gF4hF1fshK2+oAdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
-> 
-> On Mon, May 26, 2014 at 3:12 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Hi Arnd, Olof, Kevin
-> >
-> > Sorry for late support multiplatform on exynos and now it's possible.
-> Thanks
-> > for many guys' effort and time :-)
-> >
-> > BRs,
-> > Kukjin
-> >
-> > The following changes since commit
-> dfacdfef06090ca0c131f45dfd3f3ca3452a8ed3:
-> >
-> >   Merge branch 'v3.16-next/dt-samsung' into v3.16-next/multiplatform
-> > (2014-05-26 06:19:01 +0900)
-> >
-> > are available in the git repository at:
-> >
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > tags/exynos-multiplatform
-> >
-> > for you to fetch changes up to 43baa7dcb5fa0c95b1e443d2a739c14de1fbbe07:
-> >
-> >   cpufreq: exynos: Fix driver compilation with ARCH_MULTIPLATFORM
-> > (2014-05-27 06:22:53 +0900)
-> >
-> > ----------------------------------------------------------------
-> > Exynos mutiplatform support for 3.16
-> >
-> > Here is enabling the exynos platform as part of a multiplatform
-> > kernel. This is including ARCH_EXYNOS related Kconfig entries
-> > consolidation and update multi_v7_defconfig accordingly. And
-> > fixes exynos-cpufreq driver compilation with ARCH_MULTIPLATFORM.
-> >
-> > Note that this is based on tags/exynos-soc. And tags/samsung-dt,
-> > tags/samsung-clk are merged on top of that.
-> >
-> > ----------------------------------------------------------------
-> > Arnd Bergmann (1):
-> >       ARM: EXYNOS: Enable multi-platform build support
-> >
-> > Sachin Kamat (2):
-> >       ARM: EXYNOS: Consolidate Kconfig entries
-> >       ARM: multi_v7_defconfig: Enable Exynos platform
-> >
-> > Tomasz Figa (1):
-> >       cpufreq: exynos: Fix driver compilation with ARCH_MULTIPLATFORM
-> >
-> >  arch/arm/Kconfig                     | 20 ---------
-> >  arch/arm/configs/multi_v7_defconfig  | 12 ++++++
-> 
-> Please send multi_v7_defconfig updates as patches to arm at kernel.org,
-> and don't include them in branches. They often conflict and we want to
-> apply them directly for that reason.
-> 
-Oh, I see.
+2014-05-27 6:03 GMT+08:00 Olof Johansson <olof@lixom.net>:
+> On Sat, May 24, 2014 at 07:07:47AM +0800, Barry Song wrote:
+>> Hi Arnd/Olof,
+>> hope you don't mind i send a mail to you. is this one missed?
+>
+> Yeah, it's common that I miss pull requests sent directly to me and not cc:d to
+> arm at kernel.org. I normally base most of my merges on the arm at kernel.org email
+> folder contents.
 
-So please kindly ignore this (4th) pull-request 1/2 and 2/2 for samsung-3.16, because 2/2 is based on this (1/2).
+yes. arm at kernel.org should always be cc:d.
 
-I will re-sort them out then will send it tonight in my time. Unfortunately I can't push anything in my office...
+>
+>> From: Barry Song <21cnbao@gmail.com>
+>> Date: 2014-05-09 21:53 GMT+08:00
+>> Subject: [GIT PULL]]ARM: sirf: dts update for 3.16
+>> To: Arnd Bergmann <arnd@arndb.de>, Olof Johansson <olof@lixom.net>,
+>> Kevin Hilman <khilman@linaro.org>,
+>> "linux-arm-kernel at lists.infradead.org"
+>> <linux-arm-kernel@lists.infradead.org>
+>> ??? DL-SHA-WorkGroupLinux <workgroup.linux@csr.com>
+>>
+>>
+>> Hi Arnd, Olof, Kevin,
+>>
+>> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+>>
+>>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
+>> tags/sirf-dts-for-3.16
+>>
+>> for you to fetch changes up to b01c5905c29d7d5748a24267bb2486e4a1605fda:
+>>
+>>   ARM: dts: sirf: add resets for dspif, gps and dsp nodes (2014-05-08
+>> 14:13:08 +0800)
+>>
+>> ----------------------------------------------------------------
+>> some minor cleanup and add some missed nodes:
+>> 1. move dma channel descriptions to generic dma properity;
+>
+> Does the driver handle older bindings still, or did you remove support for
+> that? We're trying to move to a model where newer kernels work with older
+> device trees, so drivers need to still handle the old descriptions.
+>
 
-Thanks,
-Kukjin
+i have been moving clients driver and dts to use new bindings.
+
+> If there's no downstream users of the old description you're free to remove it,
+> but it can sometimes be hard to tell if there are or not. As maintainer for
+> your platform you're the one who is most likely to know, so I'll leave it to
+> you. :)
+
+we will not support old binding as no sirf user uses old dts for new kernel.
+
+>
+>> 2. add resets properity for some nodes;
+>> 3. add missed pinctrl groups.
+>
+> Merged into next/dt. Thanks!
+>
+
+thanks, Olof.
+
+-barry
