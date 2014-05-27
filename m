@@ -1,42 +1,69 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 27 May 2014 16:47:48 +0100
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
- device tree
-In-Reply-To: <53838023.2080807@redhat.com>
-References: <20140523162718.GE22111@sirena.org.uk>
- <53806F26.6050706@redhat.com>
- <20140525123452.GS22111@sirena.org.uk>
- <53824294.1090609@redhat.com>
- <20140526103807.GV22111@sirena.org.uk>
- <538321AB.4050006@redhat.com>
- <20140526142225.GF22111@sirena.org.uk>
- <538356DA.7090302@redhat.com>
- <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
- <53838023.2080807@redhat.com>
-Message-ID: <20140527154748.GX12304@sirena.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 27 May 2014 16:49:59 +0100
+Subject: [PATCH v3 06/14] ARM: KVM: MMIO support BE host running LE code
+In-Reply-To: <1399997646-4716-7-git-send-email-victor.kamensky@linaro.org>
+References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
+ <1399997646-4716-7-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <5384B427.1090007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 07:55:47PM +0200, Hans de Goede wrote:
+On 13/05/14 17:13, Victor Kamensky wrote:
+> In case of status register E bit is not set (LE mode) and host runs in
+> BE mode we need byteswap data, so read/write is emulated correctly.
+> 
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm/include/asm/kvm_emulate.h | 22 ++++++++++++++++++----
+>  1 file changed, 18 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+> index 0fa90c9..69b7469 100644
+> --- a/arch/arm/include/asm/kvm_emulate.h
+> +++ b/arch/arm/include/asm/kvm_emulate.h
+> @@ -185,9 +185,16 @@ static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
+>  		default:
+>  			return be32_to_cpu(data);
+>  		}
+> +	} else {
+> +		switch (len) {
+> +		case 1:
+> +			return data & 0xff;
+> +		case 2:
+> +			return le16_to_cpu(data & 0xffff);
+> +		default:
+> +			return le32_to_cpu(data);
+> +		}
+>  	}
+> -
+> -	return data;		/* Leave LE untouched */
+>  }
+>  
+>  static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+> @@ -203,9 +210,16 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+>  		default:
+>  			return cpu_to_be32(data);
+>  		}
+> +	} else {
+> +		switch (len) {
+> +		case 1:
+> +			return data & 0xff;
+> +		case 2:
+> +			return cpu_to_le16(data & 0xffff);
+> +		default:
+> +			return cpu_to_le32(data);
+> +		}
+>  	}
+> -
+> -	return data;		/* Leave LE untouched */
+>  }
+>  
+>  #endif /* __ARM_KVM_EMULATE_H__ */
+> 
 
-> 				power-on-seq = "gpio_reg_enable", "usleep 1000", "clk_32khz", "usleep 200";
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-...
-
-> Where power-on-seq would tell the mmc-core exactly how to bring up the sdio
-> device, using standard prefixes so that the mmc-core knows that something is
-> a clock / gpio / reset / whatever.
-
-There was some work on such generic power on sequences in DT from 
-Alexandre Courbot a while ago, search for "Runtime Interpreter Power
-Sequences".  It ground to a halt IIRC mainly because it was never clear
-that this should ever be encoded outside of the driver for a device but
-the binding was pretty good and well reviewed, it's a good place to
-start if there's a desire to do things like this.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140527/b99e7b44/attachment.sig>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
