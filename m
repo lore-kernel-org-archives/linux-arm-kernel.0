@@ -1,37 +1,47 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 27 May 2014 11:18:17 +0200
-Subject: [PATCH] arm: Fix compile warning for psci
-Message-ID: <1401182297-10347-1-git-send-email-christoffer.dall@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 27 May 2014 10:18:36 +0100
+Subject: [PATCH] ARM: vexpress: refine dependencies for new code
+In-Reply-To: <6862654.ZzBrnrRESe@wuerfel>
+References: <6862654.ZzBrnrRESe@wuerfel>
+Message-ID: <20140527091836.GE5875@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit e71246a23acbc89e9cb4ebf1558d60e65733479f changes psci_init from a
-function returning a void to an int, but does not change the non
-CONFIG_ARM_PSCI implementation to return a value, which causes a compile
-warning.  Just return 0.
+> The versatile express changes for 3.16 introduced a number of
+> build regressions for randconfig kernels by not tracking dependencies
+> between the components right.
+> 
+> This patch tries to rectify that:
+> 
+> * the mach-vexpress code cannot link without the syscfg driver,
+>   which in turn needs MFD_VEXPRESS_SYSREG
+> * various drivers call devm_regmap_init_vexpress_config(), which
+>   has to be exported so it can be used by loadable modules
+> * the configuration bus uses OF DT helper functions that are not
+>   available to platforms disable CONFIG_OF
+> * The sysreg driver exports GPIOs through gpiolib, which can
+>   be disabled on some platforms.
+> * The clocksource code cannot be built on platforms that don't
+>   use modern timekeeping but rely on gettimeoffset.
 
-Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-Cc: Shawn Guo <shawn.guo@freescale.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
-Paolo, can you apply this directly after applying my pull request from
-yesterday?
----
- arch/arm/include/asm/psci.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Where's the diff?
 
-diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
-index b93e34a..c25ef3e 100644
---- a/arch/arm/include/asm/psci.h
-+++ b/arch/arm/include/asm/psci.h
-@@ -41,7 +41,7 @@ extern struct smp_operations psci_smp_ops;
- int psci_init(void);
- bool psci_smp_available(void);
- #else
--static inline int psci_init(void) { }
-+static inline int psci_init(void) { return 0; }
- static inline bool psci_smp_available(void) { return false; }
- #endif
- 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+[...]
+
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+
+For the MFD part:
+
+  Acked-by: Lee Jones <lee.jones@linaro.org>
+
+This patch has a high chance of creating conflicts.  Can someone apply
+this to a branch, tag it and sent out a pull-request to the other
+maintainers please?
+
 -- 
-1.8.5.2
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
