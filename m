@@ -1,60 +1,77 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 27 May 2014 10:49:32 -0700
-Subject: linux-next: manual merge of the arm-soc tree with the  tree
-In-Reply-To: <20140527104526.5c6f819e@canb.auug.org.au>
-References: <20140527104526.5c6f819e@canb.auug.org.au>
-Message-ID: <20140527174932.GB18063@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 27 May 2014 18:53:26 +0100
+Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
+ device tree
+In-Reply-To: <CAPDyKFpg_2RQabM044C1hsNTcuxdVVOvw0ZONVRdysk=eom8UA@mail.gmail.com>
+References: <53806F26.6050706@redhat.com>
+ <20140525123452.GS22111@sirena.org.uk>
+ <53824294.1090609@redhat.com>
+ <20140526103807.GV22111@sirena.org.uk>
+ <538321AB.4050006@redhat.com>
+ <20140526142225.GF22111@sirena.org.uk>
+ <538356DA.7090302@redhat.com>
+ <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
+ <53838023.2080807@redhat.com>
+ <CAPDyKFpg_2RQabM044C1hsNTcuxdVVOvw0ZONVRdysk=eom8UA@mail.gmail.com>
+Message-ID: <20140527175326.GZ12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Rothwell <sfr@canb.auug.org.au> [140526 17:46]:
-> Hi all,
-> 
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> arch/arm/mach-omap2/omap-mpuss-lowpower.c between commit 4e4bb5c72f6b
-> ("ARM: l2c: omap2: avoid reading directly from the L2 registers in
-> platform code") from the arm tree and commit edfaf05c2fcb ("ARM:
-> OMAP2+: raw read and write endian fix") from the arm-soc tree.
-> 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
+On Tue, May 27, 2014 at 03:50:33PM +0200, Ulf Hansson wrote:
 
-OK thanks. FYI, looks like for this one the subject is missing which
-tree it conflicts with.
+> To describe the HW in DT, the embedded SDIO card (actually it could be
+> any type of embedded card) shall be modelled as a child node to the
+> mmc host in DT. Similar to what you have proposed, but with the
+> difference that the child node _must_ contain a DT compatible string,
+> which means a "powerup-driver" can be probed.
 
-Regards,
+> Yes, I understand we might need one DT compatible string per board,
+> but that's because we need to model the hardware - and it differs.
 
-Tony
- 
-> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> @@@ -187,15 -187,19 +187,15 @@@ static void l2x0_pwrst_prepare(unsigne
->    * in every restore MPUSS OFF path.
->    */
->   #ifdef CONFIG_CACHE_L2X0
->  -static void save_l2x0_context(void)
->  +static void __init save_l2x0_context(void)
->   {
-> - 	__raw_writel(l2x0_saved_regs.aux_ctrl,
-> - 		     sar_base + L2X0_AUXCTRL_OFFSET);
-> - 	__raw_writel(l2x0_saved_regs.prefetch_ctrl,
-> - 		     sar_base + L2X0_PREFETCH_CTRL_OFFSET);
->  -	u32 val;
->  -	void __iomem *l2x0_base = omap4_get_l2cache_base();
->  -	if (l2x0_base) {
->  -		val = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
->  -		writel_relaxed(val, sar_base + L2X0_AUXCTRL_OFFSET);
->  -		val = readl_relaxed(l2x0_base + L2X0_PREFETCH_CTRL);
->  -		writel_relaxed(val, sar_base + L2X0_PREFETCH_CTRL_OFFSET);
->  -	}
-> ++	writel_relaxed(l2x0_saved_regs.aux_ctrl,
-> ++		       sar_base + L2X0_AUXCTRL_OFFSET);
-> ++	writel_relaxed(l2x0_saved_regs.prefetch_ctrl,
-> ++		       sar_base + L2X0_PREFETCH_CTRL_OFFSET);
->   }
->   #else
->  -static void save_l2x0_context(void)
->  +static void __init save_l2x0_context(void)
->   {}
->   #endif
->   
+> To clarify my view, we do need a "powerup-driver" and the primary
+> reason is that we must not model "power up sequences" within DT.
+> Typically I see the "powerup-driver" as a simple platform driver
+> attached to the platform bus, but I that could of course differ.
+
+This then either conflicts with cases where we need to describe the
+actual contents of the slot with a compatible string or means that the
+SDIO driver needs to handle powerup sequencing since we should be
+binding to the first compatible we find.  If the host controller driver
+and/or subsystem is going to deal with the powering up it's not clear
+that it specifically needs to be the compatible property that's used
+to determine the powerup method, it could just be a boolean or a
+'power-method = blah' property (where blah is one of a series of strings
+defining methods).  Alternatively we could have separate nodes for the
+slot and SDIO device but that feels meh.  What's the hard requirement
+for it to specifically be a compatible property?
+
+> The slot will be the first level of child node under the mmc host,
+> then each slot may have a child node which models the embedded card.
+> But, let's leave that discussion for now. :-)
+
+OK, that's the separate node for the slot and device.
+
+> Powerup driver's ->probe():
+> Typically the "powerup driver" will need to register a few callback
+> functions towards the mmc core. Typically at mmc_of_parse(), those
+> callbacks will have to be connected to a particular mmc host.
+
+> I would like to see three different callbacks, mirroring each of the
+> mmc_ios power_mode states MMC_POWER_OFF|UP|ON.
+
+> The power up sequence, performed by the mmc core:
+> The mmc_power_up|off functions, will invoke the registered "powerup
+> driver's" callbacks if they exists for the particular host it operates
+> on.
+
+There's also the need for the SDIO device to be able to get at the
+resources provided and actively work with them at runtime if it wants to
+manage things more actively (partial poweroff for low power states or
+managing clock rates for example).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140527/4a1b1382/attachment-0001.sig>
