@@ -1,44 +1,52 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 27 May 2014 15:53:18 -0700
-Subject: [PATCH RESEND v4 0/8] Add Allwinner A31 USB support
-In-Reply-To: <20140515091438.GR29258@lukather>
-References: <1399995862-17788-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140514123419.GK29258@lukather> <20140514160520.GA4679@kroah.com>
- <20140515091438.GR29258@lukather>
-Message-ID: <20140527225318.GA21602@kroah.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 27 May 2014 16:54:22 -0600
+Subject: [PATCH] pci: rcar host needs OF
+In-Reply-To: <1399560990-1402858-14-git-send-email-arnd@arndb.de>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-14-git-send-email-arnd@arndb.de>
+Message-ID: <20140527225422.GE11907@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 11:14:38AM +0200, Maxime Ripard wrote:
-> Hi Greg,
+On Thu, May 08, 2014 at 04:56:25PM +0200, Arnd Bergmann wrote:
+> The pci-rcar driver is enabled for compile tests, and this has
+> now shown that the driver cannot build without CONFIG_OF,
+> following the inclusion of f8f2fe7355fb "PCI: rcar: Use new OF
+> interrupt mapping when possible":
 > 
-> On Wed, May 14, 2014 at 06:05:20PM +0200, Greg Kroah-Hartman wrote:
-> > On Wed, May 14, 2014 at 02:34:19PM +0200, Maxime Ripard wrote:
-> > > On Tue, May 13, 2014 at 05:44:14PM +0200, Maxime Ripard wrote:
-> > > > Hi everyone,
-> > > > 
-> > > > This patchset adds support for the USB controllers found in the
-> > > > Allwinner A31.
-> > > > 
-> > > > While the design is similar to the earlier Allwinner SoCs that are
-> > > > already supported, a few details here and there change, like the fact
-> > > > that the PHYs now have one clock per phy, while it used to be only one
-> > > > for all the PHYs.
-> > > > 
-> > > > Resent adding Alan Stern's Acked-by and puting Greg KH in the
-> > > > recipients this time...
-> > > 
-> > > Applied patches 2, 7 and 8.
-> > 
-> > Feel free to apply patches 5 and 6 to your tree, as your branch needs
-> > these, with my:
-> > 
-> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > 
-> > Or, if you want me to take them, just let me know and I will.
+> drivers/built-in.o: In function `rcar_pci_map_irq':
+> :(.text+0x1cc7c): undefined reference to `of_irq_parse_and_map_pci'
 > 
-> You can merge them, I don't need them in any of my branch.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Magnus Damm <damm@opensource.se>
+> Cc: linux-pci at vger.kernel.org
+> Cc: linux-sh at vger.kernel.org
 
-Now applied, thanks.
+If I understand correctly, this patch was superceded by this one:
 
-greg k-h
+    "[PATCH] of/irq: provide int of_irq_parse_and_map_pci wrapper"
+
+and you aren't expecting me to do anything.  Let me know if otherwise.
+
+> ---
+>  drivers/pci/host/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index fbbef0b..4675f47 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -27,7 +27,7 @@ config PCI_TEGRA
+>  
+>  config PCI_RCAR_GEN2
+>  	bool "Renesas R-Car Gen2 Internal PCI controller"
+> -	depends on ARCH_SHMOBILE || (ARM && COMPILE_TEST)
+> +	depends on ARCH_SHMOBILE || (ARM && OF && COMPILE_TEST)
+>  	help
+>  	  Say Y here if you want internal PCI support on R-Car Gen2 SoC.
+>  	  There are 3 internal PCI controllers available with a single
+> -- 
+> 1.8.3.2
+> 
