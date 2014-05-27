@@ -1,13 +1,13 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 27 May 2014 13:14:54 +0100
+Date: Tue, 27 May 2014 13:15:16 +0100
 Subject: [PATCH 1/1] ARM: ux500: Staticize ux500_soc_attr
 In-Reply-To: <1401192188-10936-1-git-send-email-sachin.kamat@linaro.org>
 References: <1401192188-10936-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <20140527121454.GA26391@lee--X1>
+Message-ID: <20140527121516.GB26391@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 May 2014, Sachin Kamat wrote:
+Don't forget to CC LKML.
 
 > 'ux500_soc_attr' is local to this file.
 > 
@@ -26,9 +26,6 @@ On Tue, 27 May 2014, Sachin Kamat wrote:
 >  
 > -struct device_attribute ux500_soc_attr =
 > +static struct device_attribute ux500_soc_attr =
-
-Should probably be const too.
-
 >  	__ATTR(process,  S_IRUGO, ux500_get_process,  NULL);
 >  
 >  struct device * __init ux500_soc_device_init(const char *soc_id)
