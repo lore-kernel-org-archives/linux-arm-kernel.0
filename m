@@ -1,64 +1,48 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 27 May 2014 14:25:43 +0530
-Subject: [PATCH] arm: dts: dra7xx-clocks: Fix the l3 and l4 clock rates
-Message-ID: <1401180943-14296-1-git-send-email-rnayak@ti.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 27 May 2014 11:01:03 +0200
+Subject: [PATCH 03/11] pinctrl: sunxi: Move setting of mux to irq type
+ from unmask to set_type
+In-Reply-To: <20140527080952.GC4730@lukather>
+References: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>
+ <1401090486-4414-4-git-send-email-hdegoede@redhat.com>
+ <20140527080952.GC4730@lukather>
+Message-ID: <5384544F.6000806@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without the patch:
-/debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck # cat clk_rate
-532000000
-/debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck/l3_iclk_div # cat clk_rate
-532000000
-/debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck/l3_iclk_div/l4_root_clk_div # cat clk_rate
-532000000
+Hi,
 
-With the patch:
-/debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck # cat clk_rate
-532000000
-/debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck/l3_iclk_div # cat clk_rate
-266000000
-/debug/.../dpll_core_x2_ck/dpll_core_h12x2_ck/l3_iclk_div/l4_root_clk_div # cat clk_rate
-133000000
+On 05/27/2014 10:09 AM, Maxime Ripard wrote:
+> On Mon, May 26, 2014 at 09:47:58AM +0200, Hans de Goede wrote:
+>> With level triggered interrupt mask / unmask will get called for each
+>> interrupt, doing the somewhat expensive mux setting on each unmask thus is
+>> not a good idea. Instead move it to the set_type callback, which is typically
+>> done only once for each irq.
+> 
+> *This* is the bad idea. Nothing prevents you from calling
+> gpio_get_value whenever you just got your interrupt, that will change
+> the muxing, and never change it back, effectively breaking the
+> interrupts.
 
-The l3 clock derived from core DPLL is actually a divider clock,
-with the default divider set to 2. l4 then derived from l3 is a fixed factor
-clock, but the fixed divider is 2 and not 1. Which means the l3 clock is
-half of core DPLLs h12x2 and l4 is half of l3 (as seen with this patch)
+Hmm, interesting point, but your assuming 2 things which are both not true:
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/boot/dts/dra7xx-clocks.dtsi |   10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+1) That calling gpiod_get_value changes the muxing, which is not true, all
+gpiod_get_value variants end up in drivers/gpio/gpiolib.c _gpiod_get_raw_value()
+which does no such thing
 
-diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index cfb8fc7..a14c99b 100644
---- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -673,10 +673,12 @@
- 
- 	l3_iclk_div: l3_iclk_div {
- 		#clock-cells = <0>;
--		compatible = "fixed-factor-clock";
-+		compatible = "ti,divider-clock";
-+		ti,max-div = <2>;
-+		ti,bit-shift = <4>;
-+		reg = <0x0100>;
- 		clocks = <&dpll_core_h12x2_ck>;
--		clock-mult = <1>;
--		clock-div = <1>;
-+		ti,index-power-of-two;
- 	};
- 
- 	l4_root_clk_div: l4_root_clk_div {
-@@ -684,7 +686,7 @@
- 		compatible = "fixed-factor-clock";
- 		clocks = <&l3_iclk_div>;
- 		clock-mult = <1>;
--		clock-div = <1>;
-+		clock-div = <2>;
- 	};
- 
- 	video1_clk2_div: video1_clk2_div {
--- 
-1.7.9.5
+2) That unmask will always get called after the gpio_get_value to restore the mux
+setting for us, which is not guaranteed at all. Before this patch set pinctrl-sunxi.c
+was using handle_simple_irq which does not mask / unmask at all.
+
+And even with an irq-handler which masks / unmasks, what if the irq wakes up
+a thread and that thread then does the gpio_get_value ?
+
+Note this is *exactly* what e.g. the mmc gpio card-detect code does, it uses
+a thread to read the gpio for debouncing.
+
+Luckily 2. is not a problem, since 1. means that the mux won't get changed at all
+so we don't need to change it back.
+
+Regards,
+
+Hans
