@@ -1,47 +1,47 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 27 May 2014 10:18:36 +0100
-Subject: [PATCH] ARM: vexpress: refine dependencies for new code
-In-Reply-To: <6862654.ZzBrnrRESe@wuerfel>
-References: <6862654.ZzBrnrRESe@wuerfel>
-Message-ID: <20140527091836.GE5875@lee--X1>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 27 May 2014 11:18:49 +0200
+Subject: [PATCH 13/16] PSCI: Add initial support for PSCIv0.2 functions
+In-Reply-To: <20140527074455.GA7834@dragon>
+References: <1401041942-23471-1-git-send-email-christoffer.dall@linaro.org>
+ <1401041942-23471-14-git-send-email-christoffer.dall@linaro.org>
+ <20140527074455.GA7834@dragon>
+Message-ID: <20140527091849.GH31431@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The versatile express changes for 3.16 introduced a number of
-> build regressions for randconfig kernels by not tracking dependencies
-> between the components right.
+On Tue, May 27, 2014 at 03:44:55PM +0800, Shawn Guo wrote:
+> On Sun, May 25, 2014 at 08:18:59PM +0200, Christoffer Dall wrote:
+> > diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
+> > index c4ae171..b93e34a 100644
+> > --- a/arch/arm/include/asm/psci.h
+> > +++ b/arch/arm/include/asm/psci.h
+> > @@ -29,16 +29,19 @@ struct psci_operations {
+> >  	int (*cpu_off)(struct psci_power_state state);
+> >  	int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
+> >  	int (*migrate)(unsigned long cpuid);
+> > +	int (*affinity_info)(unsigned long target_affinity,
+> > +			unsigned long lowest_affinity_level);
+> > +	int (*migrate_info_type)(void);
+> >  };
+> >  
+> >  extern struct psci_operations psci_ops;
+> >  extern struct smp_operations psci_smp_ops;
+> >  
+> >  #ifdef CONFIG_ARM_PSCI
+> > -void psci_init(void);
+> > +int psci_init(void);
+> >  bool psci_smp_available(void);
+> >  #else
+> > -static inline void psci_init(void) { }
+> > +static inline int psci_init(void) { }
 > 
-> This patch tries to rectify that:
+> The change introduces the following compile warning on
+> imx_v6_v7_defconfig build.
 > 
-> * the mach-vexpress code cannot link without the syscfg driver,
->   which in turn needs MFD_VEXPRESS_SYSREG
-> * various drivers call devm_regmap_init_vexpress_config(), which
->   has to be exported so it can be used by loadable modules
-> * the configuration bus uses OF DT helper functions that are not
->   available to platforms disable CONFIG_OF
-> * The sysreg driver exports GPIOs through gpiolib, which can
->   be disabled on some platforms.
-> * The clocksource code cannot be built on platforms that don't
->   use modern timekeeping but rely on gettimeoffset.
+> In file included from ../arch/arm/kernel/setup.c:40:0:
+> ../arch/arm/include/asm/psci.h: In function ?psci_init?:
+> ../arch/arm/include/asm/psci.h:44:1: warning: no return statement in function returning non-void [-Wreturn-type]
+> 
+Thanks for  noticing, I just sent a fixup patch.
 
-Where's the diff?
-
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-[...]
-
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-
-For the MFD part:
-
-  Acked-by: Lee Jones <lee.jones@linaro.org>
-
-This patch has a high chance of creating conflicts.  Can someone apply
-this to a branch, tag it and sent out a pull-request to the other
-maintainers please?
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+-Christoffer
