@@ -1,61 +1,57 @@
-From: gdjakov@mm-sol.com (Georgi Djakov)
-Date: Tue, 27 May 2014 15:05:53 +0300
-Subject: [PATCH v2 4/4] ARM: debug: qcom: add UART addresses to Kconfig
- help
-In-Reply-To: <CABuKBeJXqSi=6XY5Fg7mg_daQ4D8ornS-kn7NDPktCtro7yNNw@mail.gmail.com>
-References: <1400857952-6963-1-git-send-email-gdjakov@mm-sol.com>	<1400857952-6963-5-git-send-email-gdjakov@mm-sol.com>	<CABuKBe+B_Ga-w4aA4dApDTa26rCuhetRTJku27Madm+fHtDcLA@mail.gmail.com>	<53834578.9090305@mm-sol.com>
- <CABuKBeJXqSi=6XY5Fg7mg_daQ4D8ornS-kn7NDPktCtro7yNNw@mail.gmail.com>
-Message-ID: <53847FA1.60509@mm-sol.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 May 2014 14:05:39 +0200
+Subject: [PATCH 1/1] ARM: vt8500: Staticize local symbols
+In-Reply-To: <1401191863-9404-1-git-send-email-sachin.kamat@linaro.org>
+References: <1401191863-9404-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <4308955.HrfvHXcbAr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/2014 08:17 PM, Matthias Brugger wrote:
-> 2014-05-26 15:45 GMT+02:00 Georgi Djakov <gdjakov@mm-sol.com>:
->> On 23.05.14, 19:39, Matthias Brugger wrote:
->>>
->>> 2014-05-23 17:12 GMT+02:00 Georgi Djakov <gdjakov@mm-sol.com>:
->>>>
->>>> Add information about the APQ8084 debug UART physical and virtual
->>>> addresses in the DEBUG_QCOM_UARTDM Kconfig help section.
->>>> Requires: https://lkml.org/lkml/2014/4/14/312
->>>>
->>>> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
->>>> ---
->>>>  arch/arm/Kconfig.debug |    1 +
->>>>  1 file changed, 1 insertion(+)
->>>>
->>>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->>>> index 40ee328..e71723d 100644
->>>> --- a/arch/arm/Kconfig.debug
->>>> +++ b/arch/arm/Kconfig.debug
->>>> @@ -376,6 +376,7 @@ choice
->>>>                   their output to the serial port on Qualcomm devices.
->>>>
->>>>                   ARCH      DEBUG_UART_PHYS   DEBUG_UART_BASE
->>>> +                 APQ8084   0xf995e000        0xfa75e000
->>>>                   MSM8X60   0x19c40000        0xf0040000
->>>>                   MSM8960   0x16440000        0xf0040000
->>>>                   MSM8974   0xf991e000        0xfa71e000
->>>
->>>
->>> You don't have any uart defined in your dts. You should add them
->>> before any adding low level debug support.
->>> Otherwise there might be problems in booting a multi-platform kernel.
->>>
->>
->> Thanks for the comment! As the uart depends on clocks, i am adding it to the
->> dts as part of my global clock controller patchset [1].
->> In this patch i am just adding some information to the help section.
->> Do you see any problem with this?
+On Tuesday 27 May 2014 17:27:43 Sachin Kamat wrote:
+> Variables local to this file are made static.
 > 
-> Are the patches for the clock controller applied already?
-> If not, I would consider to add this patch to clock controller series.
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> ---
+>  arch/arm/mach-vt8500/vt8500.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+Looks good to me, but you forgot to take the maintainer on Cc.
+
+How should we handle this patch? I guess this is the only one
+for vt8500 in 3.16, so I can pick it up directly with Tony's
+Ack.
+
+> diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
+> index 4a73464cb11b..2da7be31e7e2 100644
+> --- a/arch/arm/mach-vt8500/vt8500.c
+> +++ b/arch/arm/mach-vt8500/vt8500.c
+> @@ -44,7 +44,7 @@
+>  
+>  static void __iomem *pmc_base;
+>  
+> -void vt8500_restart(enum reboot_mode mode, const char *cmd)
+> +static void vt8500_restart(enum reboot_mode mode, const char *cmd)
+>  {
+>  	if (pmc_base)
+>  		writel(1, pmc_base + VT8500_PMSR_REG);
+> @@ -60,7 +60,7 @@ static struct map_desc vt8500_io_desc[] __initdata = {
+>  	},
+>  };
+>  
+> -void __init vt8500_map_io(void)
+> +static void __init vt8500_map_io(void)
+>  {
+>  	iotable_init(vt8500_io_desc, ARRAY_SIZE(vt8500_io_desc));
+>  }
+> @@ -72,7 +72,7 @@ static void vt8500_power_off(void)
+>  	asm("mcr%? p15, 0, %0, c7, c0, 4" : : "r" (0));
+>  }
+>  
+> -void __init vt8500_init(void)
+> +static void __init vt8500_init(void)
+>  {
+>  	struct device_node *np;
+>  #if defined(CONFIG_FB_VT8500) || defined(CONFIG_FB_WM8505)
 > 
-
-No, they are not applied yet. The uart dts definition depends on clocks, but the
-DEBUG_LL support does not. And the DEBUG_LL support is already there as it is 
-common with other SoCs. I am sorry, but i don't see dependency between the dts
-definition and this patch. Could you explain please?
-
-Thanks,
-Georgi
