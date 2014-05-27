@@ -1,68 +1,53 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 28 May 2014 07:07:41 +0900
-Subject: [GIT PULL 4th 1/2 v2] Samsung Exynos multiplatform for 3.16
-Message-ID: <53850CAD.6080102@samsung.com>
+Date: Wed, 28 May 2014 07:07:54 +0900
+Subject: [GIT PULL 4th 2/2 v2] Samsung Exynos 2nd SoC updates for 3.16
+Message-ID: <53850CBA.2000000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-I sorted out the branch as per Olof's suggestion and sending v2 
-pull-request for that (4th pull-request). Also sent multi_v7_defconfig 
-update patch to arm at kernel.org.
-
-Please pull this for 3.16.
-If any problems, please kindly let me know.
-
-Thanks,
-Kukjin
-
-The following changes since commit dfacdfef06090ca0c131f45dfd3f3ca3452a8ed3:
-
-   Merge branch 'v3.16-next/dt-samsung' into v3.16-next/multiplatform 
-(2014-05-26 06:19:01 +0900)
-
-are available in the git repository at:
-
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/exynos-multiplatform-v2
-
-for you to fetch changes up to f7b163d16d412e14be49f47240ffaba328aaab6c:
+The following changes since commit f7b163d16d412e14be49f47240ffaba328aaab6c:
 
    cpufreq: exynos: Fix driver compilation with ARCH_MULTIPLATFORM 
 (2014-05-27 23:52:50 +0900)
 
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+tags/exynos-soc-2-2nd
+
+for you to fetch changes up to 179147bc72cf803da6d29ce7a5a6606c48debcea:
+
+   ARM: dts: Add initial device tree support for EXYNOS5410 (2014-05-27 
+23:55:48 +0900)
+
 ----------------------------------------------------------------
-Exynos mutiplatform support for 3.16
+Exynos 2nd new SoC support for 3.16
 
-Here is enabling the exynos platform as part of a multiplatform
-kernel. This is including ARCH_EXYNOS related Kconfig entries
-consolidation. And fixes exynos-cpufreq driver compilation with
-ARCH_MULTIPLATFORM.
-
-Note that this is based on tags/exynos-soc. And tags/samsung-dt,
-tags/samsung-clk are merged on top of that.
+- Add support for exynos5410 and exynos5410-smdk5410.
+   Tested with exynos_defconfig and multi_v7_defconfig
+   and it works fine.
 
 ----------------------------------------------------------------
-Arnd Bergmann (1):
-       ARM: EXYNOS: Enable multi-platform build support
+Tarek Dakhran (3):
+       ARM: EXYNOS: Add support for EXYNOS5410 SoC
+       clk: exynos5410: register clocks using common clock framework
+       ARM: dts: Add initial device tree support for EXYNOS5410
 
-Sachin Kamat (1):
-       ARM: EXYNOS: Consolidate Kconfig entries
-
-Tomasz Figa (1):
-       cpufreq: exynos: Fix driver compilation with ARCH_MULTIPLATFORM
-
-  arch/arm/Kconfig                     | 20 ---------
-  arch/arm/mach-exynos/Kconfig         | 81 
-++++++++++++------------------------
-  arch/arm/mach-exynos/Makefile        |  2 +
-  arch/arm/plat-samsung/Makefile       |  3 ++
-  drivers/cpufreq/Kconfig.arm          |  6 +--
-  drivers/cpufreq/exynos-cpufreq.c     |  2 -
-  drivers/cpufreq/exynos-cpufreq.h     | 30 +++++++------
-  drivers/cpufreq/exynos4210-cpufreq.c | 39 ++++++++++++++---
-  drivers/cpufreq/exynos4x12-cpufreq.c | 40 +++++++++++++++---
-  drivers/cpufreq/exynos5250-cpufreq.c | 43 +++++++++++++++----
-  10 files changed, 151 insertions(+), 115 deletions(-)
+  .../devicetree/bindings/clock/exynos5410-clock.txt |  45 +++++
+  arch/arm/boot/dts/Makefile                         |   1 +
+  arch/arm/boot/dts/exynos5410-smdk5410.dts          |  82 ++++++++
+  arch/arm/boot/dts/exynos5410.dtsi                  | 206 
+++++++++++++++++++++
+  arch/arm/mach-exynos/Kconfig                       |   5 +
+  arch/arm/mach-exynos/common.h                      |  12 +-
+  drivers/clk/samsung/Makefile                       |   1 +
+  drivers/clk/samsung/clk-exynos5410.c               | 209 
++++++++++++++++++++++
+  include/dt-bindings/clock/exynos5410.h             |  33 ++++
+  9 files changed, 592 insertions(+), 2 deletions(-)
+  create mode 100644 
+Documentation/devicetree/bindings/clock/exynos5410-clock.txt
+  create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
+  create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
+  create mode 100644 drivers/clk/samsung/clk-exynos5410.c
+  create mode 100644 include/dt-bindings/clock/exynos5410.h
