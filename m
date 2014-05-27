@@ -1,75 +1,38 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 27 May 2014 19:28:09 +0200
-Subject: [PATCH 2/2] ARM: dts: mvebu: split SolidRun CuBox into variants
-In-Reply-To: <20140527161143.GS8664@titan.lakedaemon.net>
-References: <1401140009-31505-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1401140009-31505-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140527161143.GS8664@titan.lakedaemon.net>
-Message-ID: <5384CB29.1090204@gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 27 May 2014 19:32:29 +0200
+Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
+In-Reply-To: <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20140527173229.GF19143@laptop.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/2014 06:11 PM, Jason Cooper wrote:
-> On Mon, May 26, 2014 at 11:33:29PM +0200, Sebastian Hesselbarth wrote:
->> As Mainlining effort for SolidRun CuBox has been carried out on the
->> Engineering Sample, the board DTS was reflecting this. Actually,
->> SolidRun CuBox comes in three different variants: Engineering Sample (ES),
->> production with 1GB RAM (1G), and production with 2GB RAM (2G).
->>
->> Therefore, we split the current dove-cubox.dts into a common board include
->> and one board dts for each of the above variants.
->>
->> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> ---
-[...]
->> ---
->>  arch/arm/boot/dts/Makefile                         |  4 +++-
->>  arch/arm/boot/dts/dove-cubox-1g.dts                | 17 ++++++++++++++++
->>  arch/arm/boot/dts/dove-cubox-2g.dts                | 17 ++++++++++++++++
->>  arch/arm/boot/dts/dove-cubox-es.dts                | 23 ++++++++++++++++++++++
->>  .../boot/dts/{dove-cubox.dts => dove-cubox.dtsi}   | 17 ----------------
->>  5 files changed, 60 insertions(+), 18 deletions(-)
->>  create mode 100644 arch/arm/boot/dts/dove-cubox-1g.dts
->>  create mode 100644 arch/arm/boot/dts/dove-cubox-2g.dts
->>  create mode 100644 arch/arm/boot/dts/dove-cubox-es.dts
->>  rename arch/arm/boot/dts/{dove-cubox.dts => dove-cubox.dtsi} (86%)
->>
-[...]
->> diff --git a/arch/arm/boot/dts/dove-cubox-2g.dts b/arch/arm/boot/dts/dove-cubox-2g.dts
->> new file mode 100644
->> index 000000000000..513b6a68eba3
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/dove-cubox-2g.dts
->> @@ -0,0 +1,17 @@
->> +/dts-v1/;
->> +
->> +#include "dove-cubox.dtsi"
->> +
->> +/ {
->> +	model = "SolidRun CuBox (2G)";
->> +	compatible = "solidrun,cubox-2g", "solidrun,cubox", "marvell,dove";
->> +
->> +	memory {
->> +		device_type = "memory";
->> +		reg = <0x00000000 0x80000000>;
+On Fri, May 23, 2014 at 05:53:02PM +0200, Vincent Guittot wrote:
+> Monitor the activity level of each group of each sched_domain level. The
+> activity is the amount of cpu_power that is currently used on a CPU or group
+> of CPUs. We use the runnable_avg_sum and _period to evaluate this activity
+> level. In the special use case where the CPU is fully loaded by more than 1
+> task, the activity level is set above the cpu_power in order to reflect the
+> overload of the CPU
 > 
-> Do you anticipate any other differences between the 1G and the 2G?
-> Otherwise, I'm inclined to just have a "solidrun,cubox".  The bootloader
-> should be setting the amount of RAM at boottime anyway.
 
-Given the minor differences between ES and production, instead of
+> +static int get_cpu_activity(int cpu)
+> +{
+> +	struct rq *rq = cpu_rq(cpu);
+> +	u32 sum = rq->avg.runnable_avg_sum;
+> +	u32 period = rq->avg.runnable_avg_period;
+> +
+> +	if (sum >= period)
+> +		return power_orig_of(cpu) + rq->nr_running - 1;
+> +
+> +	return (sum * power_orig_of(cpu)) / period;
+> +}
 
-dove-cubox-common.dtsi
-+--> dove-cubox.dts (production)
-+--> dove-cubos-es.dts (engineering sample)
+While I appreciate the need to signify the overload situation, I don't
+think adding nr_running makes sense. The amount of tasks has no bearing
+on the amount of overload.
 
-we could also just have an "overlay" for the ES like
-
-dove-cubox.dts (production)
-+--> dove-cubox-es.dts (engineering sample)
-
-It is not used commonly until now, maybe just a matter of taste.
-
-Is there any version you prefer?
-
-Sebastian
+Also, and note I've not yet seen the use, it strikes me as odd to use
+the orig power here. I would've thought the current capacity (not the
+max capacity) is relevant to balancing.
