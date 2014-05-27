@@ -1,200 +1,34 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 27 May 2014 14:16:50 +0200
-Subject: [PATCH] ARM: update Allwinner defconfig
-Message-ID: <1401193010-31051-1-git-send-email-maxime.ripard@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 May 2014 13:22:54 +0100
+Subject: [PATCH RFCv2 3/5] ARM: allow CONFIG_SMP_ON_UP on non-SMP
+ configurations
+In-Reply-To: <20140527135918.66a3803f@free-electrons.com>
+References: <1400600105-3013-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1400600105-3013-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140526163556.GC3693@n2100.arm.linux.org.uk>
+ <20140527135918.66a3803f@free-electrons.com>
+Message-ID: <20140527122254.GG3693@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update sunxi_defconfig and multi_v7 with all the latest Allwinner additions.
+On Tue, May 27, 2014 at 01:59:18PM +0200, Thomas Petazzoni wrote:
+> No, because the Armada 370 (single core processor) needs the
+> write-allocate cache policy to provide hardware I/O coherency, but its
+> MPIDR does not indicate it's a SMP-capable processor. So even with
+> CONFIG_SMP_ON_UP=y, is_smp() returns false on Armada 370, and the kernel
+> continues to use the WB cache mode.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
-Hi Arnd, Kevin, Olof,
+So what's the point of enabling SMP_ON_UP?  If is_smp() returns false
+with SMP=y and SMP_ON_UP=y on Armada 370, then you get none of the
+SMP instructions either.  So I now start to question what the point of
+_this_ patch is, which enables SMP_ON_UP on !SMP capable kernels.
 
-If possible, it would be great if you could apply this patch directly on top of
-arm-soc for the upcoming merge window.
+A SMP kernel will select the non-SMP instructions for a UP CPU, and
+is_smp() will return false.  A UP kernel will compile in the non-SMP
+instructions and is_smp() will be false.  A UP kernel with SMP_ON_UP=y
+will select the non-SMP instructions for your CPU and is_smp() will
+return false.  So what's the point?
 
-Thanks,
-Maxime
-
- arch/arm/configs/multi_v7_defconfig | 10 +++++++++
- arch/arm/configs/sunxi_defconfig    | 45 ++++++++++++++++++++++++++++++++-----
- 2 files changed, 50 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 960187ac35e0..24c40666a47f 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -5,6 +5,7 @@ CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_EMBEDDED=y
-+CONFIG_PERF_EVENTS=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- CONFIG_PARTITION_ADVANCED=y
-@@ -112,11 +113,13 @@ CONFIG_BLK_DEV_LOOP=y
- CONFIG_ICS932S401=y
- CONFIG_APDS9802ALS=y
- CONFIG_ISL29003=y
-+CONFIG_EEPROM_SUNXI_SID=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_BLK_DEV_SR=y
- CONFIG_SCSI_MULTI_LUN=y
- CONFIG_ATA=y
- CONFIG_SATA_AHCI_PLATFORM=y
-+CONFIG_AHCI_SUNXI=y
- CONFIG_SATA_HIGHBANK=y
- CONFIG_SATA_MV=y
- CONFIG_NETDEVICES=y
-@@ -184,6 +187,8 @@ CONFIG_SPI_OMAP24XX=y
- CONFIG_SPI_ORION=y
- CONFIG_SPI_PL022=y
- CONFIG_SPI_SIRF=y
-+CONFIG_SPI_SUN4I=y
-+CONFIG_SPI_SUN6I=y
- CONFIG_SPI_TEGRA114=y
- CONFIG_SPI_TEGRA20_SFLASH=y
- CONFIG_SPI_TEGRA20_SLINK=y
-@@ -259,6 +264,8 @@ CONFIG_USB_XHCI_HCD=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_TEGRA=y
- CONFIG_USB_EHCI_HCD_PLATFORM=y
-+CONFIG_USB_OHCI_HCD=y
-+CONFIG_USB_OHCI_HCD_PLATFORM=y
- CONFIG_USB_ISP1760_HCD=y
- CONFIG_USB_STORAGE=y
- CONFIG_USB_CHIPIDEA=y
-@@ -279,6 +286,7 @@ CONFIG_MMC_SDHCI_TEGRA=y
- CONFIG_MMC_SDHCI_DOVE=y
- CONFIG_MMC_SDHCI_SPEAR=y
- CONFIG_MMC_SDHCI_BCM_KONA=y
-+CONFIG_MMC_SUNXI=y
- CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
- CONFIG_MMC_MVSDIO=y
-@@ -297,6 +305,7 @@ CONFIG_RTC_DRV_EM3027=y
- CONFIG_RTC_DRV_PL031=y
- CONFIG_RTC_DRV_VT8500=y
- CONFIG_RTC_DRV_MV=y
-+CONFIG_RTC_DRV_SUNXI=y
- CONFIG_RTC_DRV_TEGRA=y
- CONFIG_DMADEVICES=y
- CONFIG_DW_DMAC=y
-@@ -330,6 +339,7 @@ CONFIG_PWM=y
- CONFIG_PWM_TEGRA=y
- CONFIG_PWM_VT8500=y
- CONFIG_OMAP_USB2=y
-+CONFIG_PHY_SUN4I_USB=y
- CONFIG_EXT4_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index 5a69fd13a67b..5e031c928bdc 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -1,13 +1,18 @@
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_BLK_DEV_INITRD=y
-+CONFIG_PERF_EVENTS=y
- CONFIG_ARCH_SUNXI=y
-+# CONFIG_CACHE_L2X0 is not set
- CONFIG_SMP=y
- CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
- CONFIG_HIGHPTE=y
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_VFP=y
- CONFIG_NEON=y
-+CONFIG_PM_RUNTIME=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -25,8 +30,14 @@ CONFIG_IP_PNP_BOOTP=y
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_EEPROM_SUNXI_SID=y
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_ATA=y
-+# CONFIG_ATA_VERBOSE_ERROR is not set
-+# CONFIG_SATA_PMP is not set
-+CONFIG_AHCI_SUNXI=y
- CONFIG_NETDEVICES=y
- CONFIG_SUN4I_EMAC=y
-+# CONFIG_NET_VENDOR_ARC is not set
- # CONFIG_NET_CADENCE is not set
- # CONFIG_NET_VENDOR_BROADCOM is not set
- # CONFIG_NET_VENDOR_CIRRUS is not set
-@@ -34,22 +45,30 @@ CONFIG_SUN4I_EMAC=y
- # CONFIG_NET_VENDOR_INTEL is not set
- # CONFIG_NET_VENDOR_MARVELL is not set
- # CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_MICROCHIP is not set
- # CONFIG_NET_VENDOR_NATSEMI is not set
-+# CONFIG_NET_VENDOR_SAMSUNG is not set
- # CONFIG_NET_VENDOR_SEEQ is not set
- # CONFIG_NET_VENDOR_SMSC is not set
- CONFIG_STMMAC_ETH=y
-+# CONFIG_NET_VENDOR_VIA is not set
- # CONFIG_NET_VENDOR_WIZNET is not set
- # CONFIG_WLAN is not set
-+# CONFIG_INPUT_MOUSEDEV is not set
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_NR_UARTS=8
- CONFIG_SERIAL_8250_RUNTIME_UARTS=8
- CONFIG_SERIAL_8250_DW=y
-+CONFIG_SERIAL_OF_PLATFORM=y
-+# CONFIG_HW_RANDOM is not set
- CONFIG_I2C=y
--# CONFIG_I2C_COMPAT is not set
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_SPI=y
-+CONFIG_SPI_SUN4I=y
- CONFIG_SPI_SUN6I=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_POWER_SUPPLY=y
-@@ -58,16 +77,32 @@ CONFIG_POWER_RESET_SUN6I=y
- # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
- CONFIG_SUNXI_WATCHDOG=y
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_MFD_AXP20X=y
-+CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
-+CONFIG_REGULATOR_GPIO=y
-+CONFIG_USB=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_HCD_PLATFORM=y
-+CONFIG_USB_OHCI_HCD=y
-+CONFIG_USB_OHCI_HCD_PLATFORM=y
-+CONFIG_MMC=y
-+CONFIG_MMC_SUNXI=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
- CONFIG_LEDS_TRIGGERS=y
--CONFIG_LEDS_TRIGGER_HEARTBEAT=y
--CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
-+CONFIG_RTC_CLASS=y
-+# CONFIG_RTC_INTF_SYSFS is not set
-+# CONFIG_RTC_INTF_PROC is not set
-+CONFIG_RTC_DRV_SUNXI=y
- # CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_PHY_SUN4I_USB=y
-+CONFIG_EXT4_FS=y
-+CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_NFS_FS=y
-+CONFIG_NFS_V3_ACL=y
-+CONFIG_NFS_V4=y
- CONFIG_ROOT_NFS=y
--CONFIG_NLS=y
- CONFIG_PRINTK_TIME=y
-+CONFIG_DEBUG_FS=y
 -- 
-1.9.3
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
