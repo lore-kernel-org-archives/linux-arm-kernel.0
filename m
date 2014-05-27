@@ -1,79 +1,27 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 27 May 2014 13:22:49 +0300
-Subject: [PATCH v3 01/10] platform_data: edma: Be precise with the paRAM
- struct
-In-Reply-To: <CAOesGMg43jT6D_ot2tKfRXXgAgwqs5Pu_tAFKc35yxLAczrzGQ@mail.gmail.com>
-References: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>	<1397475725-5036-2-git-send-email-peter.ujfalusi@ti.com>
- <CAOesGMg43jT6D_ot2tKfRXXgAgwqs5Pu_tAFKc35yxLAczrzGQ@mail.gmail.com>
-Message-ID: <53846779.4070204@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 27 May 2014 11:27:32 +0100
+Subject: Request inclusion of HYP mode cpu_resume fix into linux-next
+In-Reply-To: <20140306184303.GA31279@e102568-lin.cambridge.arm.com>
+References: <20140306184303.GA31279@e102568-lin.cambridge.arm.com>
+Message-ID: <20140527102732.GA18476@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/2014 12:32 AM, Olof Johansson wrote:
-> Hi,
-> 
-> On Mon, Apr 14, 2014 at 4:41 AM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
->> The edmacc_param struct should follow the layout of the paRAM area in the
->> HW. Be explicit on the size of the fields (u32) and also mark the struct
->> as packed to avoid any padding on non 32bit architectures.
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> Acked-by: Joel Fernandes <joelf@ti.com>
->> ---
->>  include/linux/platform_data/edma.h | 18 +++++++++---------
->>  1 file changed, 9 insertions(+), 9 deletions(-)
->>
->> diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
->> index f50821cb64be..923f8a3e4ce0 100644
->> --- a/include/linux/platform_data/edma.h
->> +++ b/include/linux/platform_data/edma.h
->> @@ -43,15 +43,15 @@
->>
->>  /* PaRAM slots are laid out like this */
->>  struct edmacc_param {
->> -       unsigned int opt;
->> -       unsigned int src;
->> -       unsigned int a_b_cnt;
->> -       unsigned int dst;
->> -       unsigned int src_dst_bidx;
->> -       unsigned int link_bcntrld;
->> -       unsigned int src_dst_cidx;
->> -       unsigned int ccnt;
->> -};
->> +       u32 opt;
->> +       u32 src;
->> +       u32 a_b_cnt;
->> +       u32 dst;
->> +       u32 src_dst_bidx;
->> +       u32 link_bcntrld;
->> +       u32 src_dst_cidx;
->> +       u32 ccnt;
->> +} __packed;
->>
->>  /* fields in edmacc_param.opt */
->>  #define SAM            BIT(0)
-> 
-> I came across this patch when I was looking at a pull request from
-> Sekhar for EDMA cleanups, and it made me look closer at the contents
-> of this file.
-> 
-> The include/linux/platform_data/ directory is meant to hold
-> platform_data definitions for drivers, and nothing more.
-> platform_data/edma.h also contains a whole bunch of interface
-> definitions for the driver. They do not belong there, and should be
-> moved to a different include file.
-> 
-> That also includes the above struct, because as far as I can tell it's
-> a runtime state structure, not something that is passed in with
-> platform data.
-> 
-> Can someone please clean this up? Thanks.
+Hi Stephen,
 
-I think Joel is working on to move/merge the code from arch/arm/common/edma.c
-to drivers/dma/edma.c
-I'm sure within this work he is going to clean up the header file as well.
-As a first step I think the non platform_data content can be moved as
-include/linux/edma.h or probably as ti-edma.h?
+On Thu, Mar 06, 2014 at 06:43:03PM +0000, Lorenzo Pieralisi wrote:
+> Hi Stephen,
+> 
+> can I ask you please to include the following branch into linux-next:
+> 
+> git://linux-arm.org/linux-2.6-lp.git arm-kvm-cpuresume
+> 
+> It contains a patch touching ARM PM core code that requires wider testing
+> coverage before I request a pull. It has been already publicly posted,
+> reviewed and tested.
 
--- 
-P?ter
+Patch now queued for mainline, please drop the branch from -next, it
+will reappear soon through the ARM tree.
+
+Thanks,
+Lorenzo
