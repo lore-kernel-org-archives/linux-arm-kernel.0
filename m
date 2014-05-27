@@ -1,33 +1,38 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 27 May 2014 17:00:18 +0100
-Subject: [PATCH v6 2/5] ARM: ep93xx: Enable DEBUG_LL_UART_PL01X
+Date: Tue, 27 May 2014 17:00:19 +0100
+Subject: [PATCH v6 3/5] ARM: Hide DEBUG_LL_UART_NONE from unsupported platforms
 In-Reply-To: <1401206421-29832-1-git-send-email-daniel.thompson@linaro.org>
 References: <1400857819-7975-1-git-send-email-daniel.thompson@linaro.org>
  <1401206421-29832-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1401206421-29832-3-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1401206421-29832-4-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This defconfig already enables DEBUG_LL and by default DEBUG_LL_UART_NONE
-will be selected (but due to some back compability magic I'd like to
-remove is not actually honoured). DEBUG_LL_UART_PL01X is a much saner
-default.
+Only a small handful of platforms support DEBUG_LL_UART_NONE but it
+lurks in the menus of every single platform config ready to break the
+build. This is an especial problem for defconfigs since it is often
+selected by default.
+
+This patch limits this choice only to platforms which offer no other
+means to use DEBUG_LL.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 ---
- arch/arm/configs/ep93xx_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/Kconfig.debug | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/ep93xx_defconfig b/arch/arm/configs/ep93xx_defconfig
-index 6ac5ea7..ff70784 100644
---- a/arch/arm/configs/ep93xx_defconfig
-+++ b/arch/arm/configs/ep93xx_defconfig
-@@ -108,5 +108,6 @@ CONFIG_DEBUG_SPINLOCK=y
- CONFIG_DEBUG_MUTEXES=y
- CONFIG_DEBUG_USER=y
- CONFIG_DEBUG_LL=y
-+CONFIG_DEBUG_LL_UART_PL01X=y
- # CONFIG_CRYPTO_ANSI_CPRNG is not set
- CONFIG_LIBCRC32C=y
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index eab8ecb..33f0b38 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -842,7 +842,7 @@ choice
+ 
+ 	config DEBUG_LL_UART_NONE
+ 		bool "No low-level debugging UART"
+-		depends on !ARCH_MULTIPLATFORM
++		depends on ARCH_KS8695 || ARCH_NETX || ARCH_OMAP1 || ARCH_SA1100
+ 		help
+ 		  Say Y here if your platform doesn't provide a UART option
+ 		  above. This relies on your platform choosing the right UART
 -- 
 1.9.0
