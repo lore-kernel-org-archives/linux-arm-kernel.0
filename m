@@ -1,63 +1,21 @@
-From: t.dakhran@gmail.com (Tarek Dakhran)
-Date: Wed, 28 May 2014 00:17:51 +0400
-Subject: [PATCH v11 0/3] Exynos 5410 support
-In-Reply-To: <7hd2ez9kvr.fsf@paris.lan>
-References: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>
- <7hr43f9mmn.fsf@paris.lan> <7hd2ez9kvr.fsf@paris.lan>
-Message-ID: <CANhyOUcGTbbQLxYWsAZG00ENSDa4pj+MP2i7Rx=PfyqN1CY6WQ@mail.gmail.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Tue, 27 May 2014 23:17:52 +0300
+Subject: OMAP baseline test results for v3.15-rc7
+In-Reply-To: <alpine.DEB.2.02.1405271657050.28436@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1405271657050.28436@utopia.booyaka.com>
+Message-ID: <20140527201752.GD14191@drone.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Paul,
 
-On Tue, May 27, 2014 at 9:44 PM, Kevin Hilman <khilman@linaro.org> wrote:
-> Kevin Hilman <khilman@linaro.org> writes:
->
->> Tarek Dakhran <t.dakhran@samsung.com> writes:
->>
->>> The series of patches represent support of Exynos 5410 SoC
->>>
->>> The Exynos 5410 is the first Samsung SoC based on big.LITTLE architecture
->>>
->>> Patches add new platform description, support of clock controller and device
->>> tree for Exynos 5410.
->>>
->>> Has been build on Samsung Linux Kernel
->>>   (branch: for-next, commit: 97eae6c Merge branch 'v3.16-next/multiplatform' into for-next)
->>>
->>> Has been tested on: 1) Exynos 5410 reference board (exynos_defconfig)
->>>                  2) Exynos 5410 reference board (multi_v7_defconfig)
->>>                  3) Odroid-XU board (exynos_defconfig)
->>>                  4) Odroid-XU board (multi_v7_defconfig)
->>
->> Tested-by: Kevin Hilman <khilman@linaro.org>
->>
->> FYI, I boot tested this on an odroid-xu (exynos_defconfig and
->> multi_v7_defconfig.)
->
-> Oops, I may have spoke to soon.  There seem to be some problems with
-> multi_v7_defconfig.
->
-> Applying this series directly on the commit mentioned above and testing,
-> it works just fine using multi_v7_defconfig.
+On Tue, May 27, 2014 at 04:59:16PM +0000, Paul Walmsley wrote:
+> Here are some basic OMAP test results for Linux v3.15-rc7.
+> Logs and other details at:
+> 
+>     http://www.pwsan.com/omap/testlogs/test_v3.15-rc7/20140526221127/
 
-Thank you for testing.
+This is great stuff, as always, but just curious, why are the N800 booting
+results not reported? Based on your logs you are still booting it...?
 
-> However, if I directly test the current contents of the samsung for-next
-> branch (where this series has been merged) it no longer boots on the
-> odroid-xu.
-> A quick diff shows that there are some other changes to
-> multi_v7_defconfig in the samsung/for-next branch that may be causing
-> problems here.
-
-Yes. Right you are. There is no ARCH_EXYNOS defined in multi_v7_defconfig
-at current state (branch: for-next commit: ca610da Merge branch
-'v3.16-next/dt-samsung-3' into for-next).
-So booting kernel on 5410 SoC is not possible with multi_v7_defconfig.
-Please use exynos_defconfig.
-
->
-> Kevin
-
-Best regards,
-     Tarek
+A.
