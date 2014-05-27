@@ -1,110 +1,106 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 27 May 2014 16:59:16 +0000 (UTC)
-Subject: OMAP baseline test results for v3.15-rc7
-Message-ID: <alpine.DEB.2.02.1405271657050.28436@utopia.booyaka.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 27 May 2014 10:02:30 -0700
+Subject: [PATCH 2/2] ARM: dts: mvebu: split SolidRun CuBox into variants
+In-Reply-To: <5384BDB1.6000107@gmail.com>
+References: <1401140009-31505-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1401140009-31505-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140527161143.GS8664@titan.lakedaemon.net>
+ <5384BDB1.6000107@gmail.com>
+Message-ID: <CAOesGMjGAey+Tjj9iyz2CL+H59ssj12wUP8nT=gehF6qYx_OdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, May 27, 2014 at 9:30 AM, Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com> wrote:
+> On 05/27/2014 06:11 PM, Jason Cooper wrote:
+>>
+>> On Mon, May 26, 2014 at 11:33:29PM +0200, Sebastian Hesselbarth wrote:
+>>>
+>>> As Mainlining effort for SolidRun CuBox has been carried out on the
+>>> Engineering Sample, the board DTS was reflecting this. Actually,
+>>> SolidRun CuBox comes in three different variants: Engineering Sample
+>>> (ES),
+>>> production with 1GB RAM (1G), and production with 2GB RAM (2G).
+>>>
+>>> Therefore, we split the current dove-cubox.dts into a common board
+>>> include
+>>> and one board dts for each of the above variants.
+>>>
+>>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>> ---
+>
+> [...]
+>
+>>> diff --git a/arch/arm/boot/dts/dove-cubox-1g.dts
+>>> b/arch/arm/boot/dts/dove-cubox-1g.dts
+>>> new file mode 100644
+>>> index 000000000000..eebd3f7ca7e6
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/dove-cubox-1g.dts
+>>> @@ -0,0 +1,17 @@
+>>> +/dts-v1/;
+>>> +
+>>> +#include "dove-cubox.dtsi"
+>>> +
+>>> +/ {
+>>> +       model = "SolidRun CuBox (1G)";
+>>> +       compatible = "solidrun,cubox-1g", "solidrun,cubox",
+>>> "marvell,dove";
+>>> +
+>>> +       memory {
+>>> +               device_type = "memory";
+>>> +               reg = <0x00000000 0x40000000>;
+>>> +       };
+>>> +
+>>> +       chosen {
+>>> +               bootargs = "console=ttyS0,115200n8 earlyprintk";
+>>> +       };
+>>> +};
+>>> diff --git a/arch/arm/boot/dts/dove-cubox-2g.dts
+>>> b/arch/arm/boot/dts/dove-cubox-2g.dts
+>>> new file mode 100644
+>>> index 000000000000..513b6a68eba3
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/dove-cubox-2g.dts
+>>> @@ -0,0 +1,17 @@
+>>> +/dts-v1/;
+>>> +
+>>> +#include "dove-cubox.dtsi"
+>>> +
+>>> +/ {
+>>> +       model = "SolidRun CuBox (2G)";
+>>> +       compatible = "solidrun,cubox-2g", "solidrun,cubox",
+>>> "marvell,dove";
+>>> +
+>>> +       memory {
+>>> +               device_type = "memory";
+>>> +               reg = <0x00000000 0x80000000>;
+>>
+>>
+>> Do you anticipate any other differences between the 1G and the 2G?
+>> Otherwise, I'm inclined to just have a "solidrun,cubox".  The bootloader
+>> should be setting the amount of RAM at boottime anyway.
+>
+>
+> No, there is no known difference between 1G and 2G except doubled RAM.
+> I'll squash the two back into a single non-ES dts.
+>
+> About the board specific compatibles, I am not so sure if we should
+> keep them at all. "solidrun,cubox" for all three variants should be
+> enough. checkpatch is already choking on every unknown compatible it
+> sees and documenting each individual board clearly doesn't scale well.
 
-Here are some basic OMAP test results for Linux v3.15-rc7.
-Logs and other details at:
+Yeah, I agree -- but I'd say the scaling problem is with checkpatch.
+It's silly to require every single small board variant to be
+documented, especially in cases where the dts is self-documenting such
+as this. If anything, there should be a script that can be used to
+scrape this info and build the docs from compat+model info.
 
-    http://www.pwsan.com/omap/testlogs/test_v3.15-rc7/20140526221127/
-
-
-Test summary
-------------
-
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build: uImage+dtb:
-    Pass ( 9/ 9): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig/omap4-var-som
-
-Build: zImage:
-    Pass (14/14): multi_v7_defconfig, omap2plus_defconfig,
-		  omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig
-
-Boot to userspace:
-    FAIL ( 2/12): 2430sdp, cmt3517
-    skip ( 2/12): 5912osk, 4460varsomom
-    Pass ( 8/12): 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
-		  4430es2panda, 4460pandaes, am335xbone, am335xbonelt
-
-PM: chip retention via suspend:
-    skip ( 1/ 7): 4460varsomom
-    FAIL ( 2/ 7): 2430sdp, 4430es2panda
-    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
-
-PM: chip retention via dynamic idle:
-    skip ( 1/ 7): 4460varsomom
-    FAIL ( 6/ 7): 2430sdp, 3530es3beagle, 3730beaglexm, 37xxevm,
-		  4430es2panda, 4460pandaes
-
-PM: chip off except CORE via suspend:
-    FAIL ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    FAIL ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    skip ( 1/ 5): 4460varsomom
-    FAIL ( 4/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes
-
-PM: chip off via dynamic idle:
-    skip ( 1/ 5): 4460varsomom
-    FAIL ( 4/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes
-
-
-vmlinux object size
-(delta in bytes from test_v3.15-rc6 (4b660a7f5c8099d88d1a43d8ae138965112592c7)):
-   text     data      bss    total  kernel
-      0        0        0        0  omap1_defconfig
-      0        0        0        0  omap1_defconfig_1510innovator_only
-      0        0        0        0  omap1_defconfig_5912osk_only
-      0        0        0        0  multi_v7_defconfig
-      0        0        0        0  omap2plus_defconfig
-      0        0        0        0  omap2plus_defconfig_2430sdp_only
-      0        0        0        0  omap2plus_defconfig_am33xx_only
-      0        0        0        0  omap2plus_defconfig_am43xx_only
-      0        0        0        0  omap2plus_defconfig_cpupm
-      0        0        0        0  omap2plus_defconfig_dra7xx_only
-      0        0        0        0  omap2plus_defconfig_n800_multi_omap2xxx
-      0        0        0        0  omap2plus_defconfig_n800_only_a
-      0        0        0        0  omap2plus_defconfig_no_pm
-      0        0        0        0  omap2plus_defconfig_omap2_4_only
-      0        0        0        0  omap2plus_defconfig_omap3_4_only
-      0        0        0        0  omap2plus_defconfig_omap5_only
-      0        0        0        0  rmk_omap3430_ldp_allnoconfig
-      0        0        0        0  rmk_omap3430_ldp_oldconfig
-      0        0        0        0  rmk_omap4430_sdp_allnoconfig
-      0        0        0        0  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.15-rc6 (4b660a7f5c8099d88d1a43d8ae138965112592c7))
-  avail  rsrvd   high  freed  board          kconfig
-  (no differences)
+It's not a bad idea to add a more specific compatible. if you think
+you want a separate model string, then you should probably have a
+separate compatible (but keep lower-order ones so that there's no
+difference from the kernel point of view which will just match the
+more generic one).
 
 
-Started attempting to test-boot the CM-T3517 again.  It's currently set 
-to try MMC root, but it never manages to initialize the card, so doesn't 
-make it to userspace.  NFS-root also doesn't seem to work.
+-Olof
