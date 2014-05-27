@@ -1,122 +1,59 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Tue, 27 May 2014 07:16:25 +0000
-Subject: [PATCH 4/5] [RFC] ARM: OMAP2+: gpmc: fix gpmc_hwecc_bch_capable
-In-Reply-To: <1400799986-20043-5-git-send-email-chf.fritz@googlemail.com>
-References: <1400799986-20043-1-git-send-email-chf.fritz@googlemail.com>
- <1400799986-20043-5-git-send-email-chf.fritz@googlemail.com>
-Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EAEA346@DBDE04.ent.ti.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 27 May 2014 09:26:24 +0200
+Subject: [GIT PULL] ARM: Keystone reset driver 3.16
+In-Reply-To: <20140526212605.GQ27093@quad.lixom.net>
+References: <1400880597-7516-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140526212605.GQ27093@quad.lixom.net>
+Message-ID: <1401175584.4090.22.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From: Christoph Fritz [mailto:chf.fritz at googlemail.com]
->
->Most dt omap3 boards configure nand-ecc-opt as bch8. Due
->to lack of hardware elm support, bch8 software implementation
->gets set.
->
->Since commit 0611c41934ab35ce84dea "ARM: OMAP2+: gpmc: update
->gpmc_hwecc_bch_capable() for new platforms and ECC schemes",
->nand support stops working.
->
->This patch allows ecc software fallback.
+Hi Olof, Santosh,
 
-Pleas add following tag at top of commit message.
+Am Montag, den 26.05.2014, 14:26 -0700 schrieb Olof Johansson:
+> On Fri, May 23, 2014 at 05:29:57PM -0400, Santosh Shilimkar wrote:
+> > Hi Arm-soc folks,
+> > 
+> > Please pull below keystone reset driver for 3.16 . To avoid merge conflict
+> > with earlier keystone-soc pull request[1], I have based the subject pull
+> > request on top of it. It merges cleanly with arm-soc 'next/soc2' head. Please
+> > apply it against 'next/soc2'. Thanks 
+> 
+> Hi,
+> 
+> I notice this driver doesn't have an ack from Philipp Zabel (cc:d here). That
+> would be appropriate.
 
-Fixes: commit 0611c41934ab35ce84dea34ab291897ad3cbc7be
-ARM: OMAP2+: gpmc: update gpmc_hwecc_bch_capable() for new platforms and ECC schemes
+I don't think this driver needs my ack, see below, ...
 
-And please mark it for 3.15 stable if this gets accepted after 3.15-rcx.
-Cc: <stable@vger.kernel.org> # 3.15.x+ 
+> (Philipp, should there be a MAINTAINERS entry for you so
+> that get_maintainer works as expected here?)
 
+... but that is a good idea to keep me in the loop. I will send a patch.
 
->---
-> arch/arm/mach-omap2/gpmc-nand.c |   16 ++++++----------
-> 1 file changed, 6 insertions(+), 10 deletions(-)
->
->diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
->index 4349e82..52c4834 100644
->--- a/arch/arm/mach-omap2/gpmc-nand.c
->+++ b/arch/arm/mach-omap2/gpmc-nand.c
->@@ -43,13 +43,17 @@ static struct platform_device gpmc_nand_device = {
-> 	.resource	= gpmc_nand_resource,
-> };
->
->-static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
->+static bool gpmc_ecc_bch_capable(enum omap_ecc ecc_opt)
+> I'd also prefer to see the driver and the other changes split up since we tend
+> to merge them through different branches. I think it's OK to just split in
+> those two for this merge.
+> 
+> I could do it for you (i.e. merge the first patch into next/drivers and the
+> rest into next/soc2 with the driver patch included on the bottom), but that
+> still wouldn't cover the ack from Philipp. If he replies to this email and says
+> he's ok with it going in I can still do it that way though. Philipp?
 
-I don't think this renaming is really required with this fix, so please
-drop it and just keep it simple only for OMAP3 fix.
+This keystone reset driver handles the CPU/SoC reset via soft reset bit.
+This does not directly concern the reset controller framework, as it is
+not used by this driver.
+The reset framework is intended mainly to control reset lines to
+peripheral devices that don't stop execution as soon as they are
+asserted.
+Of course rsctrl_restart() could be modeled as a reset controller using
+the framework instead, but I don't think it has to. There already is
+other (older) reset code similar to this in various places (such as
+arch/arm/mach-pxa/reset.c).
 
+Of course the overlap in terminology (complete system reset vs
+peripheral resets) is a bit unfortunate, but I'm not sure what we can do
+about this.
 
-> {
-> 	/* platforms which support all ECC schemes */
-> 	if (soc_is_am33xx() || cpu_is_omap44xx() ||
-> 		 soc_is_omap54xx() || soc_is_dra7xx())
-> 		return 1;
->
->+	if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW_DETECTION_SW) ||
->+		(ecc_opt == OMAP_ECC_BCH8_CODE_HW_DETECTION_SW))
->+		return 1;
->+
-
-Note: Some very old legacy platforms have initial version of GPMC engine
-which only supports Hamming ECC, and not BCH ECC scheme, so lets
-filter them out to maintain backward compatibility.
-
-(1) As per TRM, OMAP2 platform does not support BCH ECC schemes,
-      So please filter out OMAP2 devices from this check ...
-
-(2) I don't know the history but below comment says:
-"* For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1"
-
-if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW_DETECTION_SW) ||
-	 (ecc_opt == OMAP_ECC_BCH8_CODE_HW_DETECTION_SW))  {
-	if (cpu_is_omap24xx())
-		return 0;
-	else if (cpu_is_omap3630() && (GET_OMAP_REVISION() == 0))
-		return 0;
-	else
-		return 1;
-}
-
-
-> 	/* OMAP3xxx do not have ELM engine, so cannot support ECC schemes
-> 	 * which require H/W based ECC error detection */
-> 	if ((cpu_is_omap34xx() || cpu_is_omap3630()) &&
->@@ -57,14 +61,6 @@ static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
-> 		 (ecc_opt == OMAP_ECC_BCH8_CODE_HW)))
-> 		return 0;
->
->-	/*
->-	 * For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1
->-	 * and AM33xx derivates. Other chips may be added if confirmed to work.
->-	 */
->-	if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW_DETECTION_SW) &&
->-	    (!cpu_is_omap3630() || (GET_OMAP_REVISION() == 0)))
->-		return 0;
->-
-Thanks for removing this, I too wasn't confident of this either.
-
-
-> 	/* legacy platforms support only HAM1 (1-bit Hamming) ECC scheme */
-> 	if (ecc_opt == OMAP_ECC_HAM1_CODE_HW)
-> 		return 1;
->@@ -140,7 +136,7 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
->
-> 	gpmc_update_nand_reg(&gpmc_nand_data->reg, gpmc_nand_data->cs);
->
->-	if (!gpmc_hwecc_bch_capable(gpmc_nand_data->ecc_opt)) {
->+	if (!gpmc_ecc_bch_capable(gpmc_nand_data->ecc_opt)) {
-
-Please drop this renaming from this patch.
-
-> 		dev_err(dev, "Unsupported NAND ECC scheme selected\n");
-> 		return -EINVAL;
-> 	}
->--
->1.7.10.4
-
-You may send this patch separately apart from the series, so that
-this gets accepted in current 3.15-rcx.
-
-with regards, pekon
+regards
+Philipp
