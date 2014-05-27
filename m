@@ -1,35 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 27 May 2014 10:13:52 -0700
-Subject: [PATCH v2 0/7] mfd: twl4030-power: Enable off-idle configuration
- when booted with device tree
-In-Reply-To: <20140527165234.GF4227@lee--X1>
-References: <1400031250-29542-1-git-send-email-tony@atomide.com>
- <20140527165234.GF4227@lee--X1>
-Message-ID: <20140527171351.GA18063@atomide.com>
+From: marc.ceeeee@gmail.com (Marc Carino)
+Date: Tue, 27 May 2014 10:15:25 -0700
+Subject: [PATCH] ARM: zImage: add DSB and ISB barriers after relocating
+ code
+In-Reply-To: <alpine.LFD.2.11.1405222305310.17310@knanqh.ubzr>
+References: <1400808472-401-1-git-send-email-marc.ceeeee@gmail.com>
+ <alpine.LFD.2.11.1405222155240.17310@knanqh.ubzr>
+ <537EB8F2.3090401@gmail.com>
+ <alpine.LFD.2.11.1405222305310.17310@knanqh.ubzr>
+Message-ID: <5384C82D.1050506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lee Jones <lee.jones@linaro.org> [140527 09:53]:
-> > Here's an updated set of patches to enable low-power idle modes
-> > for some omap3 boards when booted with device tree.
-> > 
-> > This series when applied on top of the patches in tread                                                                                                       
-> > "[PATCH 00/11] Fixes for omap PM for making omap3 DT only",
-> > or omap-for-v3.16/pm branch.
-> > 
-> > Lee, if these patches look OK to you, please feel free to 
-> > pick them, preferrably to the immutable branch you already
-> > have set up so I can also merge them in to be able to have
-> > things working in my branch properly for PM.
-> 
-> Whoops, nearly forgot about this patchset.
-> 
-> Tony, can you resend it with all your fix-ups please.  The 8< doesn't
-> work well with my patch application 'system'.
+Hello Nicolas,
 
-Sure I'll do that. FYI, these kind of patches should apply just
-fine when piped to git-am --scissors.
+> I assume that invalidating the i-cache would be a good thing to do in
+> all cases.
 
-Regards,
+Great! It looks like I'll be able to augment the existing cache function
+lookup table with an additional I-cache invalidate operation.
 
-Tony
+> I'm curious though: at what address do you load your zImage, and what
+> address does RAM start?
+
+On our platform, we load the kernel zImage at address PA:0x8000. The
+start of physical memory is at PA:0x0.
+
+Thank you,
+Marc
