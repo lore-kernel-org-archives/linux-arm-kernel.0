@@ -1,69 +1,122 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 27 May 2014 09:19:23 +0200
-Subject: [PATCH] clk: samsung: clk-s3c2410-dlck: do not use PNAME macro as
- it declares __initdata
-In-Reply-To: <20140526212119.GP27093@quad.lixom.net>
-References: <4598341.WkbLY9yLfe@phil> <20140526212119.GP27093@quad.lixom.net>
-Message-ID: <4853638.CjtZR7iKXH@phil>
+From: pekon@ti.com (Gupta, Pekon)
+Date: Tue, 27 May 2014 07:16:25 +0000
+Subject: [PATCH 4/5] [RFC] ARM: OMAP2+: gpmc: fix gpmc_hwecc_bch_capable
+In-Reply-To: <1400799986-20043-5-git-send-email-chf.fritz@googlemail.com>
+References: <1400799986-20043-1-git-send-email-chf.fritz@googlemail.com>
+ <1400799986-20043-5-git-send-email-chf.fritz@googlemail.com>
+Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EAEA346@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 26. Mai 2014, 14:21:19 schrieb Olof Johansson:
-> On Fri, May 23, 2014 at 10:58:53PM +0200, Heiko St?bner wrote:
-> > The originally used PNAME macro from the core samsung clock infrastructure
-> > declares the created array as initdata, creating section mismatch warnings
-> > in the dclk driver.
-> > 
-> > Thus declare them directly, removing these warning.
-> > 
-> > Reported-by: Olof Johansson <olof@lixom.net>
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > This should probably go though the samsung tree / arm-soc, as the
-> > offending patch is also in there.
-> > 
-> >  drivers/clk/samsung/clk-s3c2410-dclk.c | 20 ++++++++++----------
-> >  1 file changed, 10 insertions(+), 10 deletions(-)
-> > 
-> > diff --git a/drivers/clk/samsung/clk-s3c2410-dclk.c
-> > b/drivers/clk/samsung/clk-s3c2410-dclk.c index 8d8dff0..c1726f4 100644
-> > --- a/drivers/clk/samsung/clk-s3c2410-dclk.c
-> > +++ b/drivers/clk/samsung/clk-s3c2410-dclk.c
-> > @@ -135,26 +135,26 @@ struct s3c24xx_dclk {
-> > 
-> >  #define to_s3c24xx_dclk1(x) \
-> >  
-> >  		container_of(x, struct s3c24xx_dclk, dclk1_div_change_nb)
-> > 
-> > -PNAME(dclk_s3c2410_p) = { "pclk", "uclk" };
-> > -PNAME(clkout0_s3c2410_p) = { "mpll", "upll", "fclk", "hclk", "pclk",
-> > +static const char *dclk_s3c2410_p[] = { "pclk", "uclk" };
-> > +static const char *clkout0_s3c2410_p[] = { "mpll", "upll", "fclk",
-> > "hclk", "pclk",> 
-> >  			     "gate_dclk0" };
-> > 
-> > -PNAME(clkout1_s3c2410_p) = { "mpll", "upll", "fclk", "hclk", "pclk",
-> > +static const char *clkout1_s3c2410_p[] = { "mpll", "upll", "fclk",
-> > "hclk", "pclk",> 
-> >  			     "gate_dclk1" };
-> > 
-> > -PNAME(clkout0_s3c2412_p) = { "mpll", "upll", "rtc_clkout",
-> > +static const char *clkout0_s3c2412_p[] = { "mpll", "upll", "rtc_clkout",
-> > 
-> >  			     "hclk", "pclk", "gate_dclk0" };
-> > 
-> > -PNAME(clkout1_s3c2412_p) = { "xti", "upll", "fclk", "hclk", "pclk",
-> > +static const char *clkout1_s3c2412_p) = { "xti", "upll", "fclk", "hclk",
-> > "pclk",> 
-> >  			     "gate_dclk1" };
-> 
-> Fixed up this error in a separate commit, since it caused a build failure.
-> 
-> In other words, please build test your fixes before you send them. :)
+>From: Christoph Fritz [mailto:chf.fritz at googlemail.com]
+>
+>Most dt omap3 boards configure nand-ecc-opt as bch8. Due
+>to lack of hardware elm support, bch8 software implementation
+>gets set.
+>
+>Since commit 0611c41934ab35ce84dea "ARM: OMAP2+: gpmc: update
+>gpmc_hwecc_bch_capable() for new platforms and ECC schemes",
+>nand support stops working.
+>
+>This patch allows ecc software fallback.
 
-sorry about that. I was so sure I did build test it, but when checking again 
-now it in fact didn't build.
+Pleas add following tag at top of commit message.
+
+Fixes: commit 0611c41934ab35ce84dea34ab291897ad3cbc7be
+ARM: OMAP2+: gpmc: update gpmc_hwecc_bch_capable() for new platforms and ECC schemes
+
+And please mark it for 3.15 stable if this gets accepted after 3.15-rcx.
+Cc: <stable@vger.kernel.org> # 3.15.x+ 
 
 
-So sorry again
-Heiko
+>---
+> arch/arm/mach-omap2/gpmc-nand.c |   16 ++++++----------
+> 1 file changed, 6 insertions(+), 10 deletions(-)
+>
+>diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
+>index 4349e82..52c4834 100644
+>--- a/arch/arm/mach-omap2/gpmc-nand.c
+>+++ b/arch/arm/mach-omap2/gpmc-nand.c
+>@@ -43,13 +43,17 @@ static struct platform_device gpmc_nand_device = {
+> 	.resource	= gpmc_nand_resource,
+> };
+>
+>-static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
+>+static bool gpmc_ecc_bch_capable(enum omap_ecc ecc_opt)
+
+I don't think this renaming is really required with this fix, so please
+drop it and just keep it simple only for OMAP3 fix.
+
+
+> {
+> 	/* platforms which support all ECC schemes */
+> 	if (soc_is_am33xx() || cpu_is_omap44xx() ||
+> 		 soc_is_omap54xx() || soc_is_dra7xx())
+> 		return 1;
+>
+>+	if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW_DETECTION_SW) ||
+>+		(ecc_opt == OMAP_ECC_BCH8_CODE_HW_DETECTION_SW))
+>+		return 1;
+>+
+
+Note: Some very old legacy platforms have initial version of GPMC engine
+which only supports Hamming ECC, and not BCH ECC scheme, so lets
+filter them out to maintain backward compatibility.
+
+(1) As per TRM, OMAP2 platform does not support BCH ECC schemes,
+      So please filter out OMAP2 devices from this check ...
+
+(2) I don't know the history but below comment says:
+"* For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1"
+
+if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW_DETECTION_SW) ||
+	 (ecc_opt == OMAP_ECC_BCH8_CODE_HW_DETECTION_SW))  {
+	if (cpu_is_omap24xx())
+		return 0;
+	else if (cpu_is_omap3630() && (GET_OMAP_REVISION() == 0))
+		return 0;
+	else
+		return 1;
+}
+
+
+> 	/* OMAP3xxx do not have ELM engine, so cannot support ECC schemes
+> 	 * which require H/W based ECC error detection */
+> 	if ((cpu_is_omap34xx() || cpu_is_omap3630()) &&
+>@@ -57,14 +61,6 @@ static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
+> 		 (ecc_opt == OMAP_ECC_BCH8_CODE_HW)))
+> 		return 0;
+>
+>-	/*
+>-	 * For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1
+>-	 * and AM33xx derivates. Other chips may be added if confirmed to work.
+>-	 */
+>-	if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW_DETECTION_SW) &&
+>-	    (!cpu_is_omap3630() || (GET_OMAP_REVISION() == 0)))
+>-		return 0;
+>-
+Thanks for removing this, I too wasn't confident of this either.
+
+
+> 	/* legacy platforms support only HAM1 (1-bit Hamming) ECC scheme */
+> 	if (ecc_opt == OMAP_ECC_HAM1_CODE_HW)
+> 		return 1;
+>@@ -140,7 +136,7 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
+>
+> 	gpmc_update_nand_reg(&gpmc_nand_data->reg, gpmc_nand_data->cs);
+>
+>-	if (!gpmc_hwecc_bch_capable(gpmc_nand_data->ecc_opt)) {
+>+	if (!gpmc_ecc_bch_capable(gpmc_nand_data->ecc_opt)) {
+
+Please drop this renaming from this patch.
+
+> 		dev_err(dev, "Unsupported NAND ECC scheme selected\n");
+> 		return -EINVAL;
+> 	}
+>--
+>1.7.10.4
+
+You may send this patch separately apart from the series, so that
+this gets accepted in current 3.15-rcx.
+
+with regards, pekon
