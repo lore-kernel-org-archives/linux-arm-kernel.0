@@ -1,49 +1,46 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 27 May 2014 13:22:40 -0700
-Subject: [PATCH] arm: Set hardirq tracing to on when idling
-In-Reply-To: <10128642.DD2TJ8Ps9I@wuerfel>
-References: <1401045323-7116-1-git-send-email-minyard@acm.org>
- <6082113.tHepRBe99K@wuerfel> <5384E892.90808@codeaurora.org>
- <10128642.DD2TJ8Ps9I@wuerfel>
-Message-ID: <5384F410.6000604@codeaurora.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 27 May 2014 13:23:40 -0700
+Subject: [PATCH v1] of/irq: do irq resolution in platform_get_irq_byname()
+In-Reply-To: <20140523080333.66720C4176E@trevor.secretlab.ca>
+References: <1400582523-22684-1-git-send-email-grygorii.strashko@ti.com>
+ <20140523080333.66720C4176E@trevor.secretlab.ca>
+Message-ID: <CAGa+x85mOHtNAj-UHgK2_z8zWAF=qwFcRcUgHTR-byNiX7heHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/14 12:39, Arnd Bergmann wrote:
-> On Tuesday 27 May 2014 12:33:38 Stephen Boyd wrote:
->> On 05/27/14 12:27, Arnd Bergmann wrote:
->>> On Tuesday 27 May 2014 11:53:59 Stephen Boyd wrote:
->>>> On 05/27/14 11:49, Arnd Bergmann wrote:
->>>>> You also commented in that thread about stop_critical_timings()/
->>>>> start_critical_timings(). Corey, can you look at that, too? I
->>>>> think it's designed to avoid the issue you are seeing but
->>>>> for some reason doesn't.
->>>> I sent a patch last week to "solve" this problem. I'm not sure if it's
->>>> right but it works for me.
->>>>
->>>> https://lkml.org/lkml/2014/5/19/607
->>> I think that one was also wrong, as the intention of the existing
->>> stop_critical_timings() function is already to do the same that
->>> Corey's patch does, i.e. stop the trace before we go to idle as
->>> if we were turning IRQs on.
->> stop_critical_timings() is called in the generic idle loop. It looks
->> like stop_critical_timings() just isn't written correctly. All it does
->> is turn off the tracer, but it doesn't prevent future calls to
->> spinlocks, etc. from causing the tracer to turn on again between calls
->> to stop/start_critical_timings(). It seems better to prevent any more
->> tracing from happening between a call to stop_critical_timings() and
->> start_critical_timings() so we don't have to litter calls to that
->> function throughout the idle path.
-> But are there any such calls in the idle function? I understand what
-> you are doing in your patch, but I don't see why you have to actually
-> do it.
+On Fri, May 23, 2014 at 1:03 AM, Grant Likely <grant.likely@linaro.org> wrote:
+> On Tue, 20 May 2014 13:42:02 +0300, Grygorii Strashko <grygorii.strashko@ti.com> wrote:
+>> The commit 9ec36cafe43bf835f8f29273597a5b0cbc8267ef
+>> "of/irq: do irq resolution in platform_get_irq" from Rob Herring -
+>> moves resolving of the interrupt resources in platform_get_irq().
+>> But this solution isn't complete because platform_get_irq_byname()
+>> need to be modified the same way.
+>>
+>> Hence, fix it by adding interrupt resolution code at the
+>> platform_get_irq_byname() function too.
+>>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Rob Herring <robh@kernel.org>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Grant Likely <grant.likely@linaro.org>
+>> Cc: Thierry Reding <thierry.reding@gmail.com>
+>>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 >
+> Applied, Thanks.
 
-Yes in my build it happens immediately after in rcu_enter_idle(). It
-would also happen if you had a cpuidle driver that notified the core
-that the timers stop during idle (FEAT_C3_STOP). In that case we would
-call clockevents_notify() which will call raw_spin_lock_irqsave().
+As of next-20150526, the ST u8500 Snowball board has been failing boot
+in linux-next, and was bisected down to this patch (commit
+ad69674e73a1 in -next).   Full boot failure attached.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+I have not dug any deeper, but can confirm that next-20140526 with
+this patch reverted boots again on the snowball board.
+
+Kevin
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: boot-ste-snowball.log
+Type: text/x-log
+Size: 41500 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140527/c1b80b03/attachment-0001.bin>
