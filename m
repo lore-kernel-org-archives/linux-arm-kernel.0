@@ -1,156 +1,123 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Tue, 27 May 2014 11:17:57 +0530
-Subject: [PATCH v2 00/11] sched: consolidation of cpu_power
-In-Reply-To: <CAKfTPtDZKmnWfSsmBJY5RrnP_9bE-7dX_yhU5mZSuahUfiQ5rQ@mail.gmail.com>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <53830D09.4010209@linux.vnet.ibm.com>
- <CAKfTPtA4mvor+NOrA6=WdaLenNUiUo3uRHamQP6r7wc84TLcHQ@mail.gmail.com>
- <CAKfTPtDZKmnWfSsmBJY5RrnP_9bE-7dX_yhU5mZSuahUfiQ5rQ@mail.gmail.com>
-Message-ID: <5384270D.8070100@linux.vnet.ibm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 27 May 2014 11:41:09 +0530
+Subject: [PATCH 03/17] phy: ti-pipe3: add external clock support for PCIe
+ PHY
+In-Reply-To: <5374B409.3000607@ti.com>
+References: <1399383244-14556-1-git-send-email-kishon@ti.com>	<1399383244-14556-4-git-send-email-kishon@ti.com>	<53736CBC.2060702@ti.com>	<5373897C.6080504@ti.com>	<CAGo_u6qw1OomEw_ueb3x+xT+qZLAfGv7Se1K=o725aOoD3ankQ@mail.gmail.com>	<5374859F.5080902@ti.com>	<53748819.8060705@ti.com>	<CAGo_u6qbbdAbdvrB3AFXSH1qD5MaBkJbi6oJJvvTWW4xfbmd_Q@mail.gmail.com>	<5374AC0A.7070709@ti.com>
+ <CAGo_u6r8XtGHOvsfJKQMZ2ghFRz8x8_UhzyKE9jnwO6mJ2HYpQ@mail.gmail.com>
+ <5374B09F.2080803@ti.com> <5374B409.3000607@ti.com>
+Message-ID: <53842C7D.6050106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/2014 09:24 PM, Vincent Guittot wrote:
-> Hi Preeti,
-> 
-> I have done ebizzy tests on my platforms but doesn't have similar
-> results than you (my results below). It seems to be linked to SMT. I'm
-> going to look at that part more deeply and try to find a more suitable
-> HW for tests.
+Hi,
 
-You are right Vincent. I tested this in smt-off mode and the regression
-was not seen. But the regression was of the order 27% with higher number
-of threads in smt-on mode. What is interesting is that the regression
-increases in the range N=1 to N=24 and then it dips to 0 at N=48 on a 6
-core, SMT 8 machine. Let me dig this further.
+On Thursday 15 May 2014 06:03 PM, Nishanth Menon wrote:
+> On 05/15/2014 07:18 AM, Kishon Vijay Abraham I wrote:
+>> Hi,
+>>
+>> On Thursday 15 May 2014 05:42 PM, Nishanth Menon wrote:
+>>> On Thu, May 15, 2014 at 6:59 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>>> Hi Nishant,
+>>>>
+>>>> On Thursday 15 May 2014 05:16 PM, Nishanth Menon wrote:
+>>>>> On Thu, May 15, 2014 at 4:25 AM, Roger Quadros <rogerq@ti.com> wrote:
+>>>>>> On 05/15/2014 12:15 PM, Kishon Vijay Abraham I wrote:
+>>>>>>> Hi Nishanth,
+>>>>>>>
+>>>>>>> On Wednesday 14 May 2014 09:04 PM, Nishanth Menon wrote:
+>>>>>>>> On Wed, May 14, 2014 at 10:19 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>>>>>>>> Hi Roger,
+>>>>>>>>>
+>>>>>>>>> On Wednesday 14 May 2014 06:46 PM, Roger Quadros wrote:
+>>>>>>>>>> Hi Kishon,
+>>>>>>>>>>
+>>>>>>>>>> On 05/06/2014 04:33 PM, Kishon Vijay Abraham I wrote:
+>>>>>>>>>>> APLL used by PCIE phy can either use external clock as input or the clock
+>>>>>>>>>>> from DPLL. Added support for the APLL to use external clock as input here.
+>>>>>>>>>>>
+>>>>>>>>>>> Cc: Rajendra Nayak <rnayak@ti.com>
+>>>>>>>>>>> Cc: Tero Kristo <t-kristo@ti.com>
+>>>>>>>>>>> Cc: Paul Walmsley <paul@pwsan.com>
+>>>>>>>>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>>>>>>>>>> ---
+>>>>>>>>>>>  Documentation/devicetree/bindings/phy/ti-phy.txt |    4 ++
+>>>>>>>>>>>  drivers/phy/phy-ti-pipe3.c                       |   75 ++++++++++++++--------
+>>>>>>>>>>>  2 files changed, 52 insertions(+), 27 deletions(-)
+>>>>>>>>>>>
+>>>>>>>>>>> diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
+>>>>>>>>>>> index bc9afb5..d50f8ee 100644
+>>>>>>>>>>> --- a/Documentation/devicetree/bindings/phy/ti-phy.txt
+>>>>>>>>>>> +++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
+>>>>>>>>>>> @@ -76,6 +76,10 @@ Required properties:
+>>>>>>>>>>>     * "dpll_ref_m2" - external dpll ref clk
+>>>>>>>>>>>     * "phy-div" - divider for apll
+>>>>>>>>>>>     * "div-clk" - apll clock
+>>>>>>>>>>> +   * "apll_mux" - mux for pcie apll
+>>>>>>>>>>> +   * "refclk_ext" - external reference clock for pcie apll
+>>>>>>>>>>> + - ti,ext-clk: To specifiy if PCIE apll should use external clock. Applicable
+>>>>>>>>>>> +   only to PCIE PHY.
+>>>>>>>>>>
+>>>>>>>>>> Instead of specifying both clock sources "dpll_ref_clock", "refclk_ext" and then specifying a 3rd control option "ti,ext-clk" to select one of the 2 sources, why can't the DT just supply one clock source, i.e. the one that is being used in the board instance? The driver should then just configure the clock rate that is needed at that node. Shouldn't the clock framework automatically take care of muxing and parent rates?
+>>>>>>>>>
+>>>>>>>>> Want the dt to have all the clocks used by the controller. "ti,ext-clk" should
+>>>>>>>>> go in the board dt file (suggested by Nishanth).
+>>>>>>>>> The point is at some point later if some one wants to change the clock source,
+>>>>>>>>> it should be a simple enabling "ti,ext-clk" flag instead of finding the clock
+>>>>>>>>> phandle etc..
+>>>>>>>>
+>>>>>>>> Wonder if that is implicit by the presence of  "refclk_ext" in the
+>>>>>>>> clocks provided?
+>>>>>>>
+>>>>>>> IMO the presence of "refclk_ext" is useless unless the board indicates it
+>>>>>>> provides the clock source.
+>>>>>>>
+>>>>>>> refclk_ext holds phandle for *fixed-clock*, so irrespective of whether the
+>>>>>>> board provides a clock or not, it can have that handle for configuring in PRCM.
+>>>>>>> However if the board does not provide the clock source, configuring refclk_ext
+>>>>>>> in PRCM is useless.
+>>>>>>
+>>>>>> I think what Nishant meant is that if "refclk_ext" is provided it means that the driver
+>>>>>> should use that over "dpll_ref_clock" so no need of a separate "ti,ext-clk" flag.
+>>>>>
+>>>>> yes, thank you for clarifying - it does indeed redundant to have
+>>>>> "ti,ext-clk". and apologies on being a little obscure in the comment.
+>>>>
+>>>> Irrespective of whether external reference clock is used or not, all DRA7
+>>>> (apll) has an input for external reference clock (and also a PRCM register for
+>>>> programming it) and it has to be specified in dt no?
+>>>
+>>> Why is that a binding for ti-phy? that is a problem for the APLL clock
+>>> driver (selecting it's own source). PHY properties should describe
+>>> itself -> let the bindings of the APLL describe itself. please dont
+>>> mix the two up.
+>>
+>> The apll clock node is like this
+>>
+>> apll_pcie_in_clk_mux: apll_pcie_in_clk_mux at 4ae06118 {
+>>         compatible = "mux-clock";
+>>         clocks = <&dpll_pcie_ref_m2ldo_ck>, <&pciesref_acs_clk_ck>;
+>>         #clock-cells = <0>;
+>>         reg = <0x4a00821c 0x4>;
+>>         bit-mask = <0x80>;
+>> };
+>>
+>> The external reference clock is denoted by *pciesref_acs_clk_ck*.
+>>
+>> refclk_ext holds the phandle to *pciesref_acs_clk_ck* and is used in
+>> "clk_set_parent" to set the parent of apll mux.
+> 
+> So, How about this: if refclk_ext is not defined, dont do setparent,
+> if it is defined, do setparent.
+> in short:
+> Optional Properties:
+> * "refclk_ext" - external reference clock for pcie apll - if defined,
+> used as the parent to "apll_mux"
 
-Let me dig further.
+just realized, refclk_ext is not a property by itself but just one of the
+phandle for clocks/clock-names. Since we want to indicate if we are using
+external clock from *board* dts file, I'm not sure if there is a way to
+*append* a property.
 
-Regards
-Preeti U Murthy
-> 
-> ebizzy -t N -S 20
-> Quad cores
->  N  tip                 +patchset
->  1  100.00% (+/- 0.30%)  97.00% (+/- 0.42%)
->  2  100.00% (+/- 0.80%) 100.48% (+/- 0.88%)
->  4  100.00% (+/- 1.18%)  99.32% (+/- 1.05%)
->  6  100.00% (+/- 8.54%)  98.84% (+/- 1.39%)
->  8  100.00% (+/- 0.45%)  98.89% (+/- 0.91%)
-> 10  100.00% (+/- 0.32%)  99.25% (+/- 0.31%)
-> 12  100.00% (+/- 0.15%)  99.20% (+/- 0.86%)
-> 14  100.00% (+/- 0.58%)  99.44% (+/- 0.55%)
-> 
-> Dual cores
->  N  tip                 +patchset
->  1  100.00% (+/- 1.70%)  99.35% (+/- 2.82%)
->  2  100.00% (+/- 2.75%) 100.48% (+/- 1.51%)
->  4  100.00% (+/- 2.37%) 102.63% (+/- 2.35%)
->  6  100.00% (+/- 3.11%)  97.65% (+/- 1.02%)
->  8  100.00% (+/- 0.26%) 103.68% (+/- 5.90%)
-> 10  100.00% (+/- 0.30%) 106.71% (+/- 10.85%)
-> 12  100.00% (+/- 1.18%)  98.95% (+/- 0.75%)
-> 14  100.00% (+/- 1.82%) 102.89% (+/- 2.32%)
-> 
-> Regards,
-> Vincent
-> 
-> On 26 May 2014 12:04, Vincent Guittot <vincent.guittot@linaro.org> wrote:
->> On 26 May 2014 11:44, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
->>> Hi Vincent,
->>>
->>> I conducted test runs of ebizzy on a Power8 box which had 48 cpus.
->>> 6 cores with SMT-8 to be precise. Its a single socket box. The results
->>> are as below.
->>>
->>> On 05/23/2014 09:22 PM, Vincent Guittot wrote:
->>>> Part of this patchset was previously part of the larger tasks packing patchset
->>>> [1]. I have splitted the latter in 3 different patchsets (at least) to make the
->>>> thing easier.
->>>> -configuration of sched_domain topology [2]
->>>> -update and consolidation of cpu_power (this patchset)
->>>> -tasks packing algorithm
->>>>
->>>> SMT system is no more the only system that can have a CPUs with an original
->>>> capacity that is different from the default value. We need to extend the use of
->>>> cpu_power_orig to all kind of platform so the scheduler will have both the
->>>> maximum capacity (cpu_power_orig/power_orig) and the current capacity
->>>> (cpu_power/power) of CPUs and sched_groups. A new function arch_scale_cpu_power
->>>> has been created and replace arch_scale_smt_power, which is SMT specifc in the
->>>> computation of the capapcity of a CPU.
->>>>
->>>> During load balance, the scheduler evaluates the number of tasks that a group
->>>> of CPUs can handle. The current method assumes that tasks have a fix load of
->>>> SCHED_LOAD_SCALE and CPUs have a default capacity of SCHED_POWER_SCALE.
->>>> This assumption generates wrong decision by creating ghost cores and by
->>>> removing real ones when the original capacity of CPUs is different from the
->>>> default SCHED_POWER_SCALE.
->>>>
->>>> Now that we have the original capacity of a CPUS and its activity/utilization,
->>>> we can evaluate more accuratly the capacity of a group of CPUs.
->>>>
->>>> This patchset mainly replaces the old capacity method by a new one and has kept
->>>> the policy almost unchanged whereas we can certainly take advantage of this new
->>>> statistic in several other places of the load balance.
->>>>
->>>> TODO:
->>>>  - align variable's and field's name with the renaming [3]
->>>>
->>>> Tests results:
->>>> I have put below results of 2 tests:
->>>> - hackbench -l 500 -s 4096
->>>> - scp of 100MB file on the platform
->>>>
->>>> on a dual cortex-A7
->>>>                   hackbench        scp
->>>> tip/master        25.75s(+/-0.25)  5.16MB/s(+/-1.49)
->>>> + patches 1,2     25.89s(+/-0.31)  5.18MB/s(+/-1.45)
->>>> + patches 3-10    25.68s(+/-0.22)  7.00MB/s(+/-1.88)
->>>> + irq accounting  25.80s(+/-0.25)  8.06MB/s(+/-0.05)
->>>>
->>>> on a quad cortex-A15
->>>>                   hackbench        scp
->>>> tip/master        15.69s(+/-0.16)  9.70MB/s(+/-0.04)
->>>> + patches 1,2     15.53s(+/-0.13)  9.72MB/s(+/-0.05)
->>>> + patches 3-10    15.56s(+/-0.22)  9.88MB/s(+/-0.05)
->>>> + irq accounting  15.99s(+/-0.08) 10.37MB/s(+/-0.03)
->>>>
->>>> The improvement of scp bandwidth happens when tasks and irq are using
->>>> different CPU which is a bit random without irq accounting config
->>>
->>> N -> Number of threads of ebizzy
->>>
->>> Each 'N' run was for 30 seconds with multiple iterations and averaging them.
->>>
->>> N          %change in number of records
->>>            read after patching
->>> ------------------------------------------
->>> 1          + 0.0038
->>> 4          -17.6429
->>> 8          -26.3989
->>> 12         -29.5070
->>> 16         -38.4842
->>> 20         -44.5747
->>> 24         -51.9792
->>> 28         -34.1863
->>> 32         -38.4029
->>> 38         -22.2490
->>> 42          -7.4843
->>> 47         -0.69676
->>>
->>> Let me profile it and check where the cause of this degradation is.
->>
->> Hi Preeti,
->>
->> Thanks for the test and the help to find the root cause of the
->> degration. I'm going to run the test on my platforms too and see if i
->> have similar results with my platforms
->>
->> Regards
->> Vincent
->>>
->>>
->>> Regards
->>> Preeti U Murthy
->>>
-> 
+Thanks
+Kishon
