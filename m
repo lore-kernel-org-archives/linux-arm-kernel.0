@@ -1,89 +1,33 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Wed, 28 May 2014 11:07:29 +0200
-Subject: [PATCH 09/11] brcmfmac: Fix OOB interrupt not working for BCM43362
-In-Reply-To: <53850399.9000708@redhat.com>
-References: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>
- <1401090486-4414-10-git-send-email-hdegoede@redhat.com>
- <5384C544.9000903@broadcom.com> <53850399.9000708@redhat.com>
-Message-ID: <5385A751.6090609@broadcom.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 28 May 2014 11:07:33 +0200
+Subject: [PATCH v2 1/1] ARM: ux500: Staticize ux500_soc_attr
+In-Reply-To: <1401247907-8366-1-git-send-email-sachin.kamat@linaro.org>
+References: <1401247907-8366-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <CACRpkdYx+-vNS_fbW=2XD8iX9TGo9V+L5prcokmNpq57DNebBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/14 23:28, Hans de Goede wrote:
-> Hi,
->
-> On 05/27/2014 07:03 PM, Arend van Spriel wrote:
->> On 05/26/14 09:48, Hans de Goede wrote:
->>> It has taken me a long long time to get the OOB interrupt working on the
->>> AP6210 sdio wifi/bt module found on various Allwinner A20 boards. In the
->>> end I found these magic register pokes in the cubietruck kernel tree:
->>> https://github.com/cubieboard2/linux-sunxi/commit/7f08ba395617d17e7a711507503d89a50406fe7a
->>>
->>>
->>> I'm not entirely sure if this specific to the AP6210 module, or if this
->>> should be done for all BCM43362 sdio devices.
->>
->> Let keep it as this for now. I added some remarks below.
->>
->> Regards,
->> Arend
->>
->>> Signed-off-by: Hans de Goede<hdegoede@redhat.com>
->>> ---
->>> drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c | 18 ++++++++++++++++++
->>> 1 file changed, 18 insertions(+)
->>>
->>> diff --git a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
->>> b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
->>> index 0fc707c..2369a0f 100644
->>> --- a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
->>> +++ b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
->>> @@ -39,7 +39,9 @@
->>> #include<brcm_hw_ids.h>
->>> #include<brcmu_utils.h>
->>> #include<brcmu_wifi.h>
->>> +#include<chipcommon.h>
->>> #include<soc.h>
->>> +#include "chip.h"
->>> #include "dhd_bus.h"
->>> #include "dhd_dbg.h"
->>> #include "sdio_host.h"
->>> @@ -119,6 +121,7 @@ int brcmf_sdiod_intr_register(struct
->>> brcmf_sdio_dev *sdiodev)
->>> {
->>> int ret = 0;
->>> u8 data;
->>> + u32 addr, gpiocontrol;
->>> unsigned long flags;
->>>
->>> if ((sdiodev->pdata)&& (sdiodev->pdata->oob_irq_supported)) {
->>> @@ -148,6 +151,21 @@ int brcmf_sdiod_intr_register(struct
->>> brcmf_sdio_dev *sdiodev)
->>>
->>> sdio_claim_host(sdiodev->func[1]);
->>>
->>> + if (sdiodev->bus_if->chip == BCM43362_CHIP_ID) {
->> + /* assign GPIO to SDIO core */
->>> + addr = CORE_CC_REG(SI_ENUM_BASE, gpiocontrol);
->>> + gpiocontrol = brcmf_sdiod_regrl(sdiodev, addr,&ret);
->>> + gpiocontrol |= 0x2;
->>> + brcmf_sdiod_regwl(sdiodev, addr, gpiocontrol,&ret);
->>> +
->>> + /* SPROM_ADDR_HIGH ? perhaps the defines name is off */
->>
->> These names are all off. These should be:
->> SBSDIO_SPROM_ADDR_HIGH = SBSDIO_GPIO_SELECT
->> SBSDIO_CHIP_CTRL_DATA = SBSDIO_GPIO_OUT
->> SBSDIO_CHIP_CTRL_EN = SBSDIO_GPIO_EN
->
-> Ok, so I guess I should do a pre-patch adding defines for these, should
-> these replace the existing defines for these addresses in:
-> drivers/net/wireless/brcm80211/brcmfmac/sdio_host.h
->
-> Or should the pre-patch add defines with the new names and keep the old
-> ones ?
+On Wed, May 28, 2014 at 5:31 AM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
 
-These defines are not used in the code so go ahead and replace them. It 
-needs some more cleanup, but I can do a subsequent patch for that.
+> 'ux500_soc_attr' is local to this file. While at it also make it
+> const to match the argument list of device_create_file.
+>
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> ---
+> Made ux500_soc_attr const as suggested by Lee Jones.
+(...)
+> -struct device_attribute ux500_soc_attr =
+> +static const struct device_attribute ux500_soc_attr =
+>         __ATTR(process,  S_IRUGO, ux500_get_process,  NULL);
 
-Gr. AvS
+I alrerady have queued a patch from Thierry Reding switching this
+to static.
+http://marc.info/?l=linux-arm-kernel&m=139642578413650&w=2
+
+However that patch does not switch it to const.
+
+I'll just augment Thierry's patch to do that too, this is too much
+fuzz to have a separate patch for constifying.
+
+Yours,
+Linus Walleij
