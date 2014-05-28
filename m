@@ -1,77 +1,125 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 28 May 2014 19:40:43 +0100
-Subject: EFI_STUB fails to boot non-EFI on arm64
-In-Reply-To: <20140528180525.GU4179@bivouac.eciton.net>
-References: <20140523094513.GC9252@arm.com>
- <20140523131656.GR4179@bivouac.eciton.net>
- <20140523134720.GA9256@arm.com>
- <20140523150331.GS4179@bivouac.eciton.net>
- <20140528155931.GA20523@arm.com>
- <20140528180525.GU4179@bivouac.eciton.net>
-Message-ID: <20140528184043.GB20523@arm.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 28 May 2014 11:44:50 -0700
+Subject: [PATCH v3 2/5] misc: tda8026: Add NXP TDA8026 PHY driver
+In-Reply-To: <1401267437-22489-3-git-send-email-satish.patel@ti.com>
+References: <1401267437-22489-1-git-send-email-satish.patel@ti.com>
+ <1401267437-22489-3-git-send-email-satish.patel@ti.com>
+Message-ID: <20140528184450.GD30031@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 07:05:26PM +0100, Leif Lindholm wrote:
-> On Wed, May 28, 2014 at 04:59:31PM +0100, Will Deacon wrote:
-> > > > Can we add another of detecting whether it's an EFI application and
-> > > > avoid calling efi_init()? I can see x86 sets some efi_loader_signature
-> > > > string in exit_boot() and checks against it later when calling
-> > > > efi_init().
-> > > 
-> > > Well, I agree that we shouldn't be spewing error messages for expected
-> > > operation, but efi_init() is the function we call to determine
-> > > whether we _are_ booting via UEFI - and it sets flags accordingly for
-> > > the efi_enabled() macro.
-> > > 
-> > > My view is that this should be fixed in fdt_find_uefi_params(). A
-> > > single info message that we can't find evidence of UEFI should be
-> > > printed in the non-error case.
-> > > 
-> > > Like below?
-> > 
-> > Why not move the efi_get_fdt_params call out of efi_init and into
-> > setup_arch via a wrapper? Then efi_get_fdt_params and efi_init can have
-> > useful return values, which allow us to distinguish between "My DT doesn't
-> > have the necessary UEFI properties" and "UEFI failed to initialise" without
-> > having to make some printks pr_info and others pr_err within efi_init
-> > itself..
+On Wed, May 28, 2014 at 02:27:14PM +0530, Satish Patel wrote:
+> TDA8026 is a SmartCard PHY from NXP.
 > 
-> Well, but (for the output part) my patch already did that?
-> If the "Getting parameters from FDT:\n" was too verbose, we could
-> just drop it, and have the same effect on output.
-
-It's the pr_err which is annoying, not the "Getting parameters from FDT:\n"
-message. Why should I have an error logged to my console when I was never
-intending to boot using EFI anyway?
-
-> Thing is - there is not really any error case available anywhere
-> during the execution of efi_init() and its branches other than:
-> - Information required for UEFI boot cannot be found.
-> - Information exists, but is invalid.
-> - Failed to early_memremap some UEFI regions into the kernel.
-> which all amounts to "UEFI not available or something went wrong",
-> rather than "UEFI failed to initialise".
-
-Fine, but in this case the DT had the relevant properties which is a good
-indication that the user was at least *trying* to boot using EFI, no?
-
-> If efi_init returns successfully, EFI_BOOT is set, and testable using
-> the efi_enabled() macro.
+> The PHY interfaces with the main processor over the
+> I2C interface and acts as a slave device.
 > 
-> The proper "UEFI failed to initialise" bit does not come until the
-> early_initcall arm64_enter_virtual_mode(), and is indicated not by
-> a return value, but by setting the flag indicating that
-> EFI_RUNTIME_SERVICES are available, which is checked later in core
-> code using the efi_enabled() macro.
+> The driver also exposes the phy interface
+> (defined at include/linux/sc_phy.h) for SmartCard controller.
+> Controller uses this interface to communicate with smart card
+> inserted to the phy's slot.
+> 
+> Note: gpio irq is not validated as I do not have device with that.
+> I have validated interrupt with dedicated interrupt line on my device.
+> 
+> Signed-off-by: Satish Patel <satish.patel@ti.com>
+> ---
+>  Documentation/devicetree/bindings/misc/tda8026.txt |   19 +
+>  drivers/misc/Kconfig                               |    7 +
+>  drivers/misc/Makefile                              |    1 +
+>  drivers/misc/tda8026.c                             | 1258 ++++++++++++++++++++
+>  4 files changed, 1285 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/misc/tda8026.txt
+>  create mode 100644 drivers/misc/tda8026.c
+> 
+> diff --git a/Documentation/devicetree/bindings/misc/tda8026.txt b/Documentation/devicetree/bindings/misc/tda8026.txt
+> new file mode 100644
+> index 0000000..f115c9c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/misc/tda8026.txt
+> @@ -0,0 +1,19 @@
+> +TDA8026 smart card slot interface
+> +
+> +This is an i2c based smart card interface device forming the electrical
+> +interface between a microcontroller and smart cards. This device supports
+> +asynchronous cards (micro controller-based IC cards) as well as synchronous
+> +cards (mainly memory cards)
+> +
+> +Required properties:
+> +- compatible: "nxp,tda8026"
+> +- shutdown-gpio = GPIO pin mapping for SDWNN pin
+> +- reg = i2c interface address
+> +
+> +
+> +Example:
+> +tda8026: tda8026 at 48 {
+> +		 compatible = "nxp,tda8026";
+> +		 reg = <0x48>;
+> +		 shutdown-gpio = <&gpio5 19 GPIO_ACTIVE_HIGH>;/* Bank5, pin19 */
+> +	 };
+> diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+> index 8baff0e..80b21d7 100644
+> --- a/drivers/misc/Kconfig
+> +++ b/drivers/misc/Kconfig
+> @@ -515,6 +515,13 @@ config SRAM
+>  	  the genalloc API. It is supposed to be used for small on-chip SRAM
+>  	  areas found on many SoCs.
+>  
+> +config NXP_TDA8026_PHY
+> +        tristate "NXP PHY Driver for Smart Card PHY"
+> +        depends on I2C=y
+> +        help
+> +          If you say yes here you get support for the TDA8026 Smart card PHY
+> +	  with I2C interface.
+> +
+>  source "drivers/misc/c2port/Kconfig"
+>  source "drivers/misc/eeprom/Kconfig"
+>  source "drivers/misc/cb710/Kconfig"
+> diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
+> index 7eb4b69..f262c0b 100644
+> --- a/drivers/misc/Makefile
+> +++ b/drivers/misc/Makefile
+> @@ -55,3 +55,4 @@ obj-$(CONFIG_SRAM)		+= sram.o
+>  obj-y				+= mic/
+>  obj-$(CONFIG_GENWQE)		+= genwqe/
+>  obj-$(CONFIG_ECHO)		+= echo/
+> +obj-$(CONFIG_NXP_TDA8026_PHY)	+= tda8026.o
+> diff --git a/drivers/misc/tda8026.c b/drivers/misc/tda8026.c
+> new file mode 100644
+> index 0000000..38df33e
+> --- /dev/null
+> +++ b/drivers/misc/tda8026.c
+> @@ -0,0 +1,1258 @@
+> +/*
+> + * tda8026.c - TDA8026 PHY driver for NXP Smart card PHY
+> + *
+> + *
+> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation version 2.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/moduleparam.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/init.h>
+> +#include <linux/slab.h>
+> +#include <linux/gpio.h>
+> +#include <linux/i2c.h>
+> +#include <linux/mfd/core.h>
+> +#include <linux/notifier.h>
+> +#include <linux/sc_phy.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/of_device.h>
+> +#include <linux/delay.h>
 
-Sorry, I naively assumed that with a name like efi_init it might, you know,
-initialise EFI? ;)
+I think you just broke the build if this driver is enabled now right?
 
-> So moving the call to efi_get_fdt_params() would have little effect
-> other than adding a third call site for UEFI bits in setup_arch().
-
-I don't mind having the extra call site if it allows us to distinguish
-errors from information.
-
-Will
+Not good :(
