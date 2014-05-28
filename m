@@ -1,53 +1,98 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 28 May 2014 08:18:55 +0100
-Subject: [PATCH v1] of/irq: do irq resolution in platform_get_irq_byname()
-In-Reply-To: <CAL_JsqLm3wfVS+au+JUbhBhxz=LuVpepH6GxabCQhPowhbw77g@mail.gmail.com>
-References: <1400582523-22684-1-git-send-email-grygorii.strashko@ti.com>
- <20140523080333.66720C4176E@trevor.secretlab.ca>
- <CAGa+x85mOHtNAj-UHgK2_z8zWAF=qwFcRcUgHTR-byNiX7heHA@mail.gmail.com>
- <CAL_JsqLm3wfVS+au+JUbhBhxz=LuVpepH6GxabCQhPowhbw77g@mail.gmail.com>
-Message-ID: <20140528071855.GJ4227@lee--X1>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 28 May 2014 00:22:40 -0700
+Subject: [PATCH v11 2/3] clk: exynos5410: register clocks using common
+ clock framework
+In-Reply-To: <01a201cf7a30$41ecca90$c5c65fb0$@samsung.com>
+References: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>
+ <1401074613-29227-3-git-send-email-t.dakhran@samsung.com>
+ <20140528004116.7816.69646@quantum>
+ <01a201cf7a30$41ecca90$c5c65fb0$@samsung.com>
+Message-ID: <20140528072240.10062.16890@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 May 2014, Rob Herring wrote:
+Quoting Kukjin Kim (2014-05-27 21:49:49)
+> Mike Turquette wrote:
+> > 
+> > Quoting Tarek Dakhran (2014-05-25 20:23:32)
+> > > The EXYNOS5410 clocks are statically listed and registered
+> > > using the Samsung specific common clock helper functions.
+> > >
+> > > Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
+> > > Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
+> > > ---
+> > >  .../devicetree/bindings/clock/exynos5410-clock.txt |   45 +++++
+> > >  drivers/clk/samsung/Makefile                       |    1 +
+> > >  drivers/clk/samsung/clk-exynos5410.c               |  209
+> > ++++++++++++++++++++
+> > >  include/dt-bindings/clock/exynos5410.h             |   33 ++++
+> > >  4 files changed, 288 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-
+> > clock.txt
+> > >  create mode 100644 drivers/clk/samsung/clk-exynos5410.c
+> > >  create mode 100644 include/dt-bindings/clock/exynos5410.h
+> > >
+> > > diff --git a/Documentation/devicetree/bindings/clock/exynos5410-
+> > clock.txt b/Documentation/devicetree/bindings/clock/exynos5410-clock.txt
+> > > new file mode 100644
+> > > index 0000000..aeab635
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/clock/exynos5410-clock.txt
+> > > @@ -0,0 +1,45 @@
+> > > +* Samsung Exynos5410 Clock Controller
+> > > +
+> > > +The Exynos5410 clock controller generates and supplies clock to various
+> > > +controllers within the Exynos5410 SoC.
+> > > +
+> > > +Required Properties:
+> > > +
+> > > +- compatible: should be "samsung,exynos5410-clock"
+> > > +
+> > > +- reg: physical base address of the controller and length of memory
+> > mapped
+> > > +  region.
+> > > +
+> > > +- #clock-cells: should be 1.
+> > > +
+> > > +All available clocks are defined as preprocessor macros in
+> > > +dt-bindings/clock/exynos5410.h header and can be used in device
+> > > +tree sources.
+> > > +
+> > > +External clock:
+> > > +
+> > > +There is clock that is generated outside the SoC. It
+> > > +is expected that it is defined using standard clock bindings
+> > > +with following clock-output-name:
+> > > +
+> > > + - "fin_pll" - PLL input clock from XXTI
+> > 
+> > Does fin_pll feed into the exynos5410-clock controller? If so, should
+> > the example clock-controller node below have a clocks and clock-names
+> > property?
+> > 
+> Well, it is fixed clocks and generated outside of the SoC...so maybe the properties are not required?
 
-> On Tue, May 27, 2014 at 3:23 PM, Kevin Hilman <khilman@linaro.org> wrote:
-> > On Fri, May 23, 2014 at 1:03 AM, Grant Likely <grant.likely@linaro.org> wrote:
-> >> On Tue, 20 May 2014 13:42:02 +0300, Grygorii Strashko <grygorii.strashko@ti.com> wrote:
-> >>> The commit 9ec36cafe43bf835f8f29273597a5b0cbc8267ef
-> >>> "of/irq: do irq resolution in platform_get_irq" from Rob Herring -
-> >>> moves resolving of the interrupt resources in platform_get_irq().
-> >>> But this solution isn't complete because platform_get_irq_byname()
-> >>> need to be modified the same way.
-> >>>
-> >>> Hence, fix it by adding interrupt resolution code at the
-> >>> platform_get_irq_byname() function too.
-> >>>
-> >>> Cc: Russell King <linux@arm.linux.org.uk>
-> >>> Cc: Rob Herring <robh@kernel.org>
-> >>> Cc: Tony Lindgren <tony@atomide.com>
-> >>> Cc: Grant Likely <grant.likely@linaro.org>
-> >>> Cc: Thierry Reding <thierry.reding@gmail.com>
-> >>>
-> >>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> >>
-> >> Applied, Thanks.
-> >
-> > As of next-20150526, the ST u8500 Snowball board has been failing boot
-> > in linux-next, and was bisected down to this patch (commit
-> > ad69674e73a1 in -next).   Full boot failure attached.
-> >
-> > I have not dug any deeper, but can confirm that next-20140526 with
-> > this patch reverted boots again on the snowball board.
+I guess the fin_pll parts of the binding description are not needed
+then. This isn't a big issue, but I think that someone reading that
+binding (like myself) might conclude that there is some relationship
+between the clock controller and the external clock, which seems not to
+be the case.
+
 > 
-> There's a patch on the list which fixes it. The problem is stmmac
-> driver was expecting only one error code.
+> BTW, I've applied this series with Tomasz Figa's reviewed tag and sent out to arm-soc today so if any concerns on this, please let me know immediately.
 
-Does Snowball even use stmmac?
+As far as I can tell the fin_pll paragraph can be removed at a later
+date. It isn't part of any real DT binding description such as a
+property or definition. So no need to cause havoc for your existing pull
+request.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Mike
+
+> 
+> > Otherwise patch looks good.
+> > 
+> 
+> Thanks,
+> Kukjin
+> 
