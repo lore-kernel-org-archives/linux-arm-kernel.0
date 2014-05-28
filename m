@@ -1,55 +1,106 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 28 May 2014 10:42:05 +0200
-Subject: [PATCH v6 1/2] clk: shmobile: r8a7779: Add clocks support
-In-Reply-To: <20140528010850.GH7374@verge.net.au>
-References: <1397775951-30992-1-git-send-email-horms+renesas@verge.net.au>
- <1397775951-30992-2-git-send-email-horms+renesas@verge.net.au>
- <201405271131.42301.arnd@arndb.de>
- <20140528010850.GH7374@verge.net.au>
-Message-ID: <CAMuHMdVgUXOvi-Msd6qWDBVS_Wfh_5F-F7DUUMD+hhan3ReXTQ@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 28 May 2014 10:43:30 +0200
+Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
+ device tree
+In-Reply-To: <20140527185535.GB27420@quad.lixom.net>
+References: <20140525123452.GS22111@sirena.org.uk>
+ <53824294.1090609@redhat.com>
+ <20140526103807.GV22111@sirena.org.uk>
+ <538321AB.4050006@redhat.com>
+ <20140526142225.GF22111@sirena.org.uk>
+ <538356DA.7090302@redhat.com>
+ <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
+ <53838023.2080807@redhat.com>
+ <CAPDyKFpg_2RQabM044C1hsNTcuxdVVOvw0ZONVRdysk=eom8UA@mail.gmail.com>
+ <20140527175326.GZ12304@sirena.org.uk>
+ <20140527185535.GB27420@quad.lixom.net>
+Message-ID: <CAPDyKFoPvFOoYvpwNZTxPa_tox5-E2c4O6EA1ZEH4fZowU0Mww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Wed, May 28, 2014 at 3:08 AM, Simon Horman <horms@verge.net.au> wrote:
->> > +#include <dt-bindings/clock/r8a7779-clock.h>
+On 27 May 2014 20:55, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, May 27, 2014 at 06:53:26PM +0100, Mark Brown wrote:
+>> On Tue, May 27, 2014 at 03:50:33PM +0200, Ulf Hansson wrote:
 >>
->> This currently causes a build error in Linux-next, since the header file
->> has not been merged along with the driver.
+>> > To describe the HW in DT, the embedded SDIO card (actually it could be
+>> > any type of embedded card) shall be modelled as a child node to the
+>> > mmc host in DT. Similar to what you have proposed, but with the
+>> > difference that the child node _must_ contain a DT compatible string,
+>> > which means a "powerup-driver" can be probed.
+>>
+>> > Yes, I understand we might need one DT compatible string per board,
+>> > but that's because we need to model the hardware - and it differs.
+>>
+>> > To clarify my view, we do need a "powerup-driver" and the primary
+>> > reason is that we must not model "power up sequences" within DT.
+>> > Typically I see the "powerup-driver" as a simple platform driver
+>> > attached to the platform bus, but I that could of course differ.
+>>
+>> This then either conflicts with cases where we need to describe the
+>> actual contents of the slot with a compatible string or means that the
+>> SDIO driver needs to handle powerup sequencing since we should be
+>> binding to the first compatible we find.  If the host controller driver
+>> and/or subsystem is going to deal with the powering up it's not clear
+>> that it specifically needs to be the compatible property that's used
+>> to determine the powerup method, it could just be a boolean or a
+>> 'power-method = blah' property (where blah is one of a series of strings
+>> defining methods).  Alternatively we could have separate nodes for the
+>> slot and SDIO device but that feels meh.  What's the hard requirement
+>> for it to specifically be a compatible property?
 >
-> Hi Arnd,
+> +1. Just because we have a subnode in a device tree, we don't have to have
+> a driver bind against it. The MMC core code could go down into the subnodes,
+> find a "power-method = <foo>" property and go ahead and parse the rest of it.
+> There's no requirement that we do this through the Linux driver model of
+> probe(), etc.
+
+Using "power-method" might work.
+
+It's would simplify things quite a bit regarding the synchronization
+point, in the mmc_of_parse().
+
+But... does it prevent us from handling fine grained power management
+through runtime PM? See more comments below.
+
 >
-> I'm a little unsure what combination of Kernel config options you
-> are using to compile this driver in linux-next but I do agree
-> that the header is missing and that would cause the compile to fail.
-> I apologise for that oversight.
+>> > The slot will be the first level of child node under the mmc host,
+>> > then each slot may have a child node which models the embedded card.
+>> > But, let's leave that discussion for now. :-)
+>>
+>> OK, that's the separate node for the slot and device.
+>>
+>> > Powerup driver's ->probe():
+>> > Typically the "powerup driver" will need to register a few callback
+>> > functions towards the mmc core. Typically at mmc_of_parse(), those
+>> > callbacks will have to be connected to a particular mmc host.
+>>
+>> > I would like to see three different callbacks, mirroring each of the
+>> > mmc_ios power_mode states MMC_POWER_OFF|UP|ON.
+>>
+>> > The power up sequence, performed by the mmc core:
+>> > The mmc_power_up|off functions, will invoke the registered "powerup
+>> > driver's" callbacks if they exists for the particular host it operates
+>> > on.
+>>
+>> There's also the need for the SDIO device to be able to get at the
+>> resources provided and actively work with them at runtime if it wants to
+>> manage things more actively (partial poweroff for low power states or
+>> managing clock rates for example).
 >
-> I believe that a good fix is to add the header, which I already have queued-up
-> in the renesas tree for v3.17. I wonder if Mike would consider taking
-> the following patch for v3.16. Alternatively I would be happy to send
-> it it to arm-soc as a fix for v3.16.
+> Again, I think it gets overly complicated by using a full driver for the
+> power management. Abstracted out into something separate and scalable
+> as number of devices grow? Sure, definitely. As a driver? Not convinced.
 
-IIUIC, the only reason the driver source needs the header file is:
+To handle the fine grained power management, runtime PM is for sure
+what we should use here. So, then we need a struct device to be
+created to represent the power-method.
 
-#define CPG_NUM_CLOCKS                  (R8A7779_CLK_OUT + 1)
+Now, if we don't implement this through a "powerup driver" which may
+have runtime PM callbacks set up - how do we handle this?
 
-Why not
+I suppose we could register a specific "mmc power bus", and create/add
+the struct device representing the power-method to it. Would that
+work?
 
-#define CPG_NUM_CLOCKS                  8
-
-and drop the include?
-
-Or better, use "num_clks" (from of_property_count_strings(np,
-"clock-output-names")), like the other R-Car drivers do.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Kind regards
+Ulf Hansson
