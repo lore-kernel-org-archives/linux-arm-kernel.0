@@ -1,31 +1,43 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Wed, 28 May 2014 11:42:00 -0700
-Subject: [PATCH v6 4/4] add 2nd stage page fault handling during live
- migration
-In-Reply-To: <5386232A.3050602@samsung.com>
-References: <1400178451-4984-1-git-send-email-m.smarduch@samsung.com>
- <1400178451-4984-5-git-send-email-m.smarduch@samsung.com>
- <20140527201945.GD16428@lvm> <53853C2F.8080003@samsung.com>
- <20140528080957.GH16428@lvm> <5386232A.3050602@samsung.com>
-Message-ID: <53862DF8.80709@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 28 May 2014 19:47:52 +0100
+Subject: [PATCH 0/5] regulator: Enhance AXP209 DT support
+In-Reply-To: <1401297069-7423-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1401297069-7423-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140528184752.GA22488@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, May 28, 2014 at 07:11:04PM +0200, Maxime Ripard wrote:
 
->emslot dirty_bitmap during and after write protect.
-> 
->>
->> -Christoffer
+> This patchset modifies the regulator core and axp209 regulator driver
+> to be able to set in each regulators sub-node the supply, that should
+> be possible, given that it's documented as such in the bindings, but
 
-Regarding huge pud that's causing some design problems, should huge PUD
-pages be considered at all?
+It is?  We should fix that.
 
-Thanks,
-  Mario
->>
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
-> 
+> is not at the moment, since whenever looking up the supply in the DT,
+> of_get_regulator will always look into the parent's device of_node
+> pointer.
+
+> This leads to a common pattern accross the regulators to have multiple
+> supply in the main device node, while it would be more intuitive yet
+> follow the documented bindings to look into the regulator sub-nodes
+> first.
+
+No, we've been round this loop several times before.  This reduces
+consistency in how we map supplies since the user has to work out which
+subnode the supply is associated with and what it's called there instead
+of being able to just look at the schematic and translate the supply
+name into a property name.  It also means you have to map supplies into
+multiple child nodes if the same supply is used in multiple places.
+
+The idea is that supplies that happen to be used to supply a regulator
+don't get treated any differently to any other supply and that we do
+that at the physical package level.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140528/3f997023/attachment.sig>
