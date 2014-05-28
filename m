@@ -1,37 +1,42 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 28 May 2014 12:06:51 -0700
-Subject: [PATCH v5] clk: shmobile: Add R8A7740-specific clock support
-In-Reply-To: <20140526003716.GA730@verge.net.au>
-References: <1400851635-27116-1-git-send-email-ulrich.hecht+renesas@gmail.com>
- <20140523203900.23136.74970@quantum> <20140526003716.GA730@verge.net.au>
-Message-ID: <20140528190651.10062.74327@quantum>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 28 May 2014 21:10:24 +0200
+Subject: [PATCH 1/3] gpio: Add APM X-Gene SoC GPIO controller support
+In-Reply-To: <CAL85gmCZD90UUZgC0-X4hui2L1V5TuH++o3fA20pRF_ZQEpDQw@mail.gmail.com>
+References: <1400263432-922-1-git-send-email-fkan@apm.com>
+ <1400263432-922-2-git-send-email-fkan@apm.com>
+ <CAAVeFu+TOfjfvisinv3oJ9PobdV9HcNJhr+3VYneSJ54uGwiAg@mail.gmail.com>
+ <CAL85gmDjVszNd3TB51BGa+78wEEZmJfBOLNKOpTEvMTGU2VdBA@mail.gmail.com>
+ <CACRpkdaVYXU9GN5OymuP3JRsQO3unkRGb5vZN3Jb2nWSnkh1SQ@mail.gmail.com>
+ <CAL85gmCZD90UUZgC0-X4hui2L1V5TuH++o3fA20pRF_ZQEpDQw@mail.gmail.com>
+Message-ID: <CACRpkdYoebS-SzCPBnssjNMN_-mxd2GoPwiXHfZUL9HwMeGVzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Simon Horman (2014-05-25 17:37:16)
-> [ Cc ARM-SoC Maintainers <arm@kernel.org> ]
-> 
-> On Fri, May 23, 2014 at 01:39:00PM -0700, Mike Turquette wrote:
-> > Quoting Ulrich Hecht (2014-05-23 06:27:15)
-> > > Driver for the R8A7740's clocks that are too specific to be supported by a
-> > > generic driver.
-> > > 
-> > > Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-> > > Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> > > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > 
-> > Taken into clk-next.
-> 
-> Thanks Mike!
-> 
-> I would like to queue-up integration patches that depend on this one.
-> Ideally for v3.17.
-> 
-> Do you expect this patch to appear in v3.16-rc1?  If not would it be
-> possible for you to provide a branch with stable commit ids that I could
-> use as a base?
+On Tue, May 27, 2014 at 6:59 PM, Feng Kan <fkan@apm.com> wrote:
 
-I will submit this patch towards 3.16-rc1 when the merge window opens.
+> I will break out the gpio to separate
+> device nodes as instructed, I will have to use the reg attribute to offset
+> bank registers. Please let me know if it is acceptable.
 
-Regards,
-Mike
+Yeah sure regs = <a>, <b>, <c> for a single node is OK if that's what
+you mean.
+
+> gfc_gpio_fl0              GFC42'h1701c00c
+> gfc_gpio_fl0_mux      GFC42'h1701c010
+> gfc_gpio_fl1              GFC42'h1701c018
+> gfc_gpio_fl1_mux      GFC42'h1701c01c
+> gfc_gpio_fl2              GFC42'h1701c024
+> gfc_gpio_fl2_mux      GFC42'h1701c028
+> gfc_gpio_fl0_od        GFC42'h1701c030
+> gfc_gpio_fl1_od        GFC42'h1701c034
+> gfc_gpio_fl2_od        GFC42'h1701c038
+
+Strange syntax in the last line there. GFC42'h uhm.
+
+But that looks a bit mingled actually. However I think you will be
+much happier if you split it into individual devices as I wanted to.
+It will be easier to maintain and simpler code even if the device tree
+may look a bit strange.
+
+Yours,
+Linus Walleij
