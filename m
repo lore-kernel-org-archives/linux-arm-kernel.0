@@ -1,52 +1,231 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 May 2014 15:20:03 +0100
-Subject: [PATCH v3 14/14] ARM64: KVM: fix big endian issue in access_vm_reg
- for 32bit guest
-In-Reply-To: <20140528140915.GB38250@lvm>
-References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
- <1399997646-4716-15-git-send-email-victor.kamensky@linaro.org>
- <20140526175225.GF31431@lvm>
- <CAA3XUr15fJu3vRU3Hq=fajiRCd1gvkdmvJfsa3Te4N-3puwcWA@mail.gmail.com>
- <20140528091438.GL16428@lvm>
- <CAA3XUr3=jeNqP6FMSki8Mij-ENu7X+nBRrQ2p_bUODw_9jmgog@mail.gmail.com>
- <20140528140915.GB38250@lvm>
-Message-ID: <5385F093.7020405@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 28 May 2014 16:22:56 +0200
+Subject: [PATCH v2] arm/arm64: KVM: Fix and refactor unmap_range
+Message-ID: <1401286977-59260-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/05/14 15:09, Christoffer Dall wrote:
-> On Wed, May 28, 2014 at 06:56:44AM -0700, Victor Kamensky wrote:
->> On 28 May 2014 02:14, Christoffer Dall <christoffer.dall@linaro.org> wrote:
->>
->> They cannot be separate it is the same data with two ways
->> to access: as 64bit value or low word 32bit value. Typically it is LPAE
->> cp15 memory related registers like TTBR0, as in mcrr, mcr example
->> in my previous response. mcrr will update high and low word values
->> of TTBR0, mcr will update only low word of it.
->>
-> You just have to decide whether you want to represent a 64-bit register as
-> a concatenation of two u32's or a 32-bit register access as a part
-> of the 64-bit register value.
-> 
-> I think the architecture, at least for 32-bit register views on ARMv8,
-> defines the 32-bit accesses as a view on the 64-bit register.
+unmap_range() was utterly broken, to quote Marc, and broke in all sorts
+of situations.  It was also quite complicated to follow and didn't
+follow the usual scheme of having a separate iterating function for each
+level of page tables.
 
-Indeed, and that's how KVM implements it.
+Address this by refactoring the code and introduce a pgd_clear()
+function.
 
-> You should of course only store those registers once, but instead of
-> storing them in an array of u32's you could store the 64-bit wide
-> registers in a separate array of u64's.  32-bit accesses to those
-> registers would look in the array of u64's for such a value.
-> 
-> I didn't try it out, so not sure how it looks like, just saying it's an
-> option worth considering.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+Changes since v2:
+ - Don't define custom __unused but reuse __maybe_unused
 
-I think that's the best idea so far. If the access is 64bit, use the
-64bit version of the union (going through the corresponding
-vcpu_sys_reg() interface).
+ arch/arm/include/asm/kvm_mmu.h   |  12 ++++
+ arch/arm/kvm/mmu.c               | 122 ++++++++++++++++++++++-----------------
+ arch/arm64/include/asm/kvm_mmu.h |  15 +++++
+ 3 files changed, 95 insertions(+), 54 deletions(-)
 
-This should be a very minimal refactor.
-
-	M.
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 5c7aa3c..5cc0b0f 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -127,6 +127,18 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+ 	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
+ })
+ 
++static inline bool kvm_page_empty(void *ptr)
++{
++	struct page *ptr_page = virt_to_page(ptr);
++	return page_count(ptr_page) == 1;
++}
++
++
++#define kvm_pte_table_empty(ptep) kvm_page_empty(ptep)
++#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
++#define kvm_pud_table_empty(pudp) (0)
++
++
+ struct kvm;
+ 
+ #define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 16f8049..6ee6e06 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -90,10 +90,13 @@ static void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
+ 	return p;
+ }
+ 
+-static bool page_empty(void *ptr)
++static void clear_pgd_entry(struct kvm *kvm, pgd_t *pgd, phys_addr_t addr)
+ {
+-	struct page *ptr_page = virt_to_page(ptr);
+-	return page_count(ptr_page) == 1;
++	pud_t *pud_table __maybe_unused = pud_offset(pgd, 0);
++	pgd_clear(pgd);
++	kvm_tlb_flush_vmid_ipa(kvm, addr);
++	pud_free(NULL, pud_table);
++	put_page(virt_to_page(pgd));
+ }
+ 
+ static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
+@@ -124,70 +127,81 @@ static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
+ 	put_page(virt_to_page(pmd));
+ }
+ 
+-static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
++static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
++		       unsigned long long addr, unsigned long long end)
+ {
+-	if (pte_present(*pte)) {
+-		kvm_set_pte(pte, __pte(0));
+-		put_page(virt_to_page(pte));
+-		kvm_tlb_flush_vmid_ipa(kvm, addr);
+-	}
++	pte_t *pte, *start_pte;
++	unsigned long long start_addr = addr;
++
++	start_pte = pte = pte_offset_kernel(pmd, addr);
++	do {
++		if (!pte_none(*pte)) {
++			kvm_set_pte(pte, __pte(0));
++			put_page(virt_to_page(pte));
++			kvm_tlb_flush_vmid_ipa(kvm, addr);
++		}
++	} while (pte++, addr += PAGE_SIZE, addr != end);
++
++	if (kvm_pte_table_empty(start_pte))
++		clear_pmd_entry(kvm, pmd, start_addr);
+ }
+ 
+-static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+-			unsigned long long start, u64 size)
++static void unmap_pmds(struct kvm *kvm, pud_t *pud,
++		       unsigned long long addr, unsigned long long end)
+ {
+-	pgd_t *pgd;
+-	pud_t *pud;
+-	pmd_t *pmd;
+-	pte_t *pte;
+-	unsigned long long addr = start, end = start + size;
+-	u64 next;
+-
+-	while (addr < end) {
+-		pgd = pgdp + pgd_index(addr);
+-		pud = pud_offset(pgd, addr);
+-		pte = NULL;
+-		if (pud_none(*pud)) {
+-			addr = kvm_pud_addr_end(addr, end);
+-			continue;
+-		}
++	unsigned long long next, start_addr = addr;
++	pmd_t *pmd, *start_pmd;
+ 
+-		if (pud_huge(*pud)) {
+-			/*
+-			 * If we are dealing with a huge pud, just clear it and
+-			 * move on.
+-			 */
+-			clear_pud_entry(kvm, pud, addr);
+-			addr = kvm_pud_addr_end(addr, end);
+-			continue;
++	start_pmd = pmd = pmd_offset(pud, addr);
++	do {
++		next = kvm_pmd_addr_end(addr, end);
++		if (!pmd_none(*pmd)) {
++			if (kvm_pmd_huge(*pmd))
++				clear_pmd_entry(kvm, pmd, addr);
++			else
++				unmap_ptes(kvm, pmd, addr, next);
+ 		}
++	} while (pmd++, addr = next, addr != end);
+ 
+-		pmd = pmd_offset(pud, addr);
+-		if (pmd_none(*pmd)) {
+-			addr = kvm_pmd_addr_end(addr, end);
+-			continue;
+-		}
++	if (kvm_pmd_table_empty(start_pmd))
++		clear_pud_entry(kvm, pud, start_addr);
++}
+ 
+-		if (!kvm_pmd_huge(*pmd)) {
+-			pte = pte_offset_kernel(pmd, addr);
+-			clear_pte_entry(kvm, pte, addr);
+-			next = addr + PAGE_SIZE;
+-		}
++static void unmap_puds(struct kvm *kvm, pgd_t *pgd,
++		       unsigned long long addr, unsigned long long end)
++{
++	unsigned long long next, start_addr = addr;
++	pud_t *pud, *start_pud;
+ 
+-		/*
+-		 * If the pmd entry is to be cleared, walk back up the ladder
+-		 */
+-		if (kvm_pmd_huge(*pmd) || (pte && page_empty(pte))) {
+-			clear_pmd_entry(kvm, pmd, addr);
+-			next = kvm_pmd_addr_end(addr, end);
+-			if (page_empty(pmd) && !page_empty(pud)) {
++	start_pud = pud = pud_offset(pgd, addr);
++	do {
++		next = kvm_pud_addr_end(addr, end);
++		if (!pud_none(*pud)) {
++			if (pud_huge(*pid)) {
+ 				clear_pud_entry(kvm, pud, addr);
+-				next = kvm_pud_addr_end(addr, end);
++			} else {
++				unmap_pmds(kvm, pud, addr, next);
+ 			}
+ 		}
++	} while (pud++, addr = next, addr != end);
+ 
+-		addr = next;
+-	}
++	if (kvm_pud_table_empty(start_pud))
++		clear_pgd_entry(kvm, pgd, start_addr);
++}
++
++
++static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
++			unsigned long long start, u64 size)
++{
++	pgd_t *pgd;
++	unsigned long long addr = start, end = start + size;
++	unsigned long long next;
++
++	pgd = pgdp + pgd_index(addr);
++	do {
++		next = kvm_pgd_addr_end(addr, end);
++		unmap_puds(kvm, pgd, addr, next);
++	} while (pgd++, addr = next, addr != end);
+ }
+ 
+ static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 7d29847..8e138c7 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -125,6 +125,21 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+ #define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
+ #define kvm_pmd_addr_end(addr, end)	pmd_addr_end(addr, end)
+ 
++static inline bool kvm_page_empty(void *ptr)
++{
++	struct page *ptr_page = virt_to_page(ptr);
++	return page_count(ptr_page) == 1;
++}
++
++#define kvm_pte_table_empty(ptep) kvm_page_empty(ptep)
++#ifndef CONFIG_ARM64_64K_PAGES
++#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
++#else
++#define kvm_pmd_table_empty(pmdp) (0)
++#endif
++#define kvm_pud_table_empty(pudp) (0)
++
++
+ struct kvm;
+ 
+ #define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
 -- 
-Jazz is not dead. It just smells funny...
+1.8.5.2
