@@ -1,16 +1,16 @@
 From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 27 May 2014 23:19:59 -0700
+Date: Tue, 27 May 2014 23:23:34 -0700
 Subject: [PATCH v3 07/14] ARM: KVM: one_reg coproc set and get BE fixes
-In-Reply-To: <20140525191426.GA23912@lvm>
+In-Reply-To: <5384D800.6030701@arm.com>
 References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
  <1399997646-4716-8-git-send-email-victor.kamensky@linaro.org>
- <20140525191426.GA23912@lvm>
-Message-ID: <CAA3XUr0BKSYNTwv88YBQxeewJ4kLRza2qGmJj_iYVmDmJQFPQg@mail.gmail.com>
+ <5384D800.6030701@arm.com>
+Message-ID: <CAA3XUr3ZVf-Rv5xwW-rzes4C-hk6PQBuQzkHqwGvQfQtSwPbeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 May 2014 12:14, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Tue, May 13, 2014 at 09:13:59AM -0700, Victor Kamensky wrote:
+On 27 May 2014 11:22, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 13/05/14 17:13, Victor Kamensky wrote:
 >> Fix code that handles KVM_SET_ONE_REG, KVM_GET_ONE_REG ioctls to work in BE
 >> image. Before this fix get/set_one_reg functions worked correctly only in
 >> LE case - reg_from_user was taking 'void *' kernel address that actually could
@@ -69,12 +69,6 @@ On 25 May 2014 12:14, Christoffer Dall <christoffer.dall@linaro.org> wrote:
 >> + * 4 bytes value will be copied into least significant word. Or register
 >> + * size could be 8 bytes, so function works as regular copy.
 >> + */
->
-> Reads a register value from a userspace address to a kernel u64
-> variable.  Note that the id may still encode a register size of 4 bytes,
-> in which case only 4 bytes will be copied from userspace into the least
-> significant word of *val.
->
 >> +static int reg_from_user_to_u64(u64 *val, const void __user *uaddr, u64 id)
 >> +{
 >> +     unsigned long regsize = KVM_REG_SIZE(id);
@@ -103,12 +97,6 @@ On 25 May 2014 12:14, Christoffer Dall <christoffer.dall@linaro.org> wrote:
 >> + * when used with register which size is 8 bytes (for example V7 64
 >> + * bit registers like TTBR0/TTBR1).
 >> + */
->
-> Reads a register value from a userspace address to a kernel u32 variable
-> or a kernel array of two u32 values.  That is, it may really copy two
-> u32 registers when used with registers defined by the ABI to be 8 bytes
-> long (e.g. TTBR0/TTBR1).
->
 >> +static int reg_from_user_to_u32(u32 *val, const void __user *uaddr, u64 id)
 >>  {
 >> -     /* This Just Works because we are little endian. */
@@ -124,12 +112,6 @@ On 25 May 2014 12:14, Christoffer Dall <christoffer.dall@linaro.org> wrote:
 >> + * bytes from least significant word will by copied into uaddr address.
 >> + * In case of 8 bytes sized register it works as regular copy.
 >> + */
->
-> Writes a register value to a userspace address from a kernel u64 value.
-> Note that the register size could be only 4 bytes, in which case only
-> the least significant 4 bytes will be copied into to the userspace
-> address.
->
 >> +static int reg_to_user_from_u64(void __user *uaddr, const u64 *val, u64 id)
 >> +{
 >> +     unsigned long regsize = KVM_REG_SIZE(id);
@@ -158,12 +140,6 @@ On 25 May 2014 12:14, Christoffer Dall <christoffer.dall@linaro.org> wrote:
 >> + * when used with register which size is 8 bytes (for example V7 64
 >> + * bit registers like TTBR0/TTBR1).
 >> + */
->
-> Writes a register value to a userspace address from a kernel u32 variable
-> or a kernel array of two u32 values.  That is, it may really copy two
-> u32 registers when used with registers defined by the ABI to be 8 bytes
-> long (e.g. TTBR0/TTBR1).
->
 >> +static int reg_to_user_from_u32(void __user *uaddr, const u32 *val, u64 id)
 >>  {
 >> -     /* This Just Works because we are little endian. */
@@ -294,32 +270,27 @@ On 25 May 2014 12:14, Christoffer Dall <christoffer.dall@linaro.org> wrote:
 >>  }
 >>
 >>  static unsigned int num_demux_regs(void)
->> --
->> 1.8.1.4
 >>
 >
-> It's definitely an improvement with the new naming, and I do appreciate
-> you taking the time to write comments.  (Apologies for suggesting a raw
-> rewrite, but there were a number of language issues with the proposed
-> versions and it felt overly burdensome on you to ask you to address all
-> of them).
->
-> However, I'm still not crazy about this overall approach (see separate
-> mail on the old thread).
->
-> I'm curious, how many special cases are there really, and how many
-> places would we have to introduce a conditional on the calling side?
+> I really dislike this patch because of the asymmetric behaviour. Why
+> can't we always use the "_u64" version?
 
-I've just posted as RFC updated version of the patch. And yes, you
-are right u64 regsize 4 access happens only in one place, I fixed as
-you suggested and got rid of regsize == 4 in _u64 functions.
+Kernel target type could be u32. It code passes it as pointer
+to u64 it will do wrong things.
 
-Reading/wring array of two u32 values as regsize == 8 still remains
-I don't know how to handle it more cleanly.
+I've sent the most recent version of BE coproc handling patches
+as RFC, let's discuss it there. I think I addressed your
+questions/concerns in cover letter.
 
 Thanks,
 Victor
 
-> Thanks,
-> -Christoffer
 >
+> Actually, why don't we use a construct similar to what we have for
+> mmio_{read,write}_buf? This would give us a unified access method.
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
