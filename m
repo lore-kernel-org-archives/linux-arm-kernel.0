@@ -1,93 +1,49 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 28 May 2014 18:37:41 +0200
-Subject: [PATCH] ahci: imx: manage only sata_ref_clk in
- imx_sata_enable[disable]
-In-Reply-To: <CAOMZO5BkdkU-_s8G5CqVMzfkMgxdUg8bx0JJnqC8dPyFMK=Ocw@mail.gmail.com>
-References: <1401289539-3485-1-git-send-email-shawn.guo@freescale.com>	<5386026C.1010603@redhat.com>
- <CAOMZO5BkdkU-_s8G5CqVMzfkMgxdUg8bx0JJnqC8dPyFMK=Ocw@mail.gmail.com>
-Message-ID: <538610D5.7070908@redhat.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 28 May 2014 11:38:48 -0500
+Subject: [PATCH v2 1/4] devicetree: bindings: Properly document micrel
+ ks8851 SPI chips
+In-Reply-To: <20140528151646.GU20155@pengutronix.de>
+References: <1400875040-13269-1-git-send-email-sboyd@codeaurora.org>
+ <1400875040-13269-2-git-send-email-sboyd@codeaurora.org>
+ <20140524124858.GR22111@sirena.org.uk>
+ <5385063F.30407@codeaurora.org>
+ <20140528151646.GU20155@pengutronix.de>
+Message-ID: <CAL_Jsq+P2UJ8GMmGHX9FVs-a2o_3C-8wPTy653xcB-s8T+q1+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, May 28, 2014 at 10:16 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> Hello Stephen,
+>
+> On Tue, May 27, 2014 at 02:40:15PM -0700, Stephen Boyd wrote:
+>> On 05/24/14 05:48, Mark Brown wrote:
+>> > On Fri, May 23, 2014 at 12:57:17PM -0700, Stephen Boyd wrote:
+>> >
+>> >>  Optional properties:
+>> >> -- vdd-supply:     supply for Ethernet mac
+>> >> +- vdd-supply: analog 3.3V supply for Ethernet mac
+>> >> +- vdd-io-supply: digital 1.8V IO supply for Ethernet mac
+>> > So, according to the datasheet I managed to find this device has a
+>> > supply VDD_IO (so normally written vdd-io-supply here), some other
+>> > supplies which are tied to VDD_IO (so can probably be omitted) and a
+>> > supply VDD_A3.3 none of which are optional.  There is an internal
+>> > regulator which can be used to drop a higher voltage VDD_IO down for
+>> > some of the supplies tied to it but that's essentially a noop from
+>> > software as far as I can tell.  None of these supplies are obviously
+>> > optional, though I've not read the datasheet in detail so I may have
+>> > missed something here.
+> There is a difference between the supply being optional for the hardware
+> to work and the need to specify it in the device tree, isn't it? My
+> expectation is that when it's not specified there is just nothing the
+> the software needs to care for.
 
-On 05/28/2014 05:59 PM, Fabio Estevam wrote:
-> Hans,
-> 
-> On Wed, May 28, 2014 at 12:36 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> 
->> The proper fix is obvious, if we've shutdown everything due to there
->> not being a device present at the initial probe, don't call
->> ahci_platform_resume_host on resume, as is done in the attached patch.
-> 
-> I tested your attached patch. It does not build as it lacks to add the
-> definition of imxpriv inside the suspend/resume functions. After
-> fixing it I get:
-> 
-> root at freescale /$ echo mem > /sys/power/state
-> PM: Syncing filesystems ... done.
-> Freezing user space processes ... (elapsed 0.002 seconds) done.
-> Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
-> PM: suspend of devices complete after 91.109 msecs
-> PM: suspend devices took 0.100 seconds
-> PM: late suspend of devices complete after 9.086 msecs
-> PM: noirq suspend of devices complete after 8.780 msecs
-> Disabling non-boot CPUs ...
-> CPU1: shutdown
-> CPU2: shutdown
-> CPU3: shutdown
-> Enabling non-boot CPUs ...
-> CPU1: Booted secondary processor
-> CPU1 is up
-> CPU2: Booted secondary processor
-> CPU2 is up
-> CPU3: Booted secondary processor
-> CPU3 is up
-> PM: noirq resume of devices complete after 6.914 msecs
-> PM: early resume of devices complete after 5.160 msecs
-> PM: resume of devices complete after 167.025 msecs
-> PM: resume devices took 0.180 seconds
-> Restarting tasks ... done.
-> ata1: failed to resume link (SControl 2003)
-> random: nonblocking pool is initialized
-> root at freescale /$ ata1: softreset failed (1st FIS failed)
-> ata1: failed to resume link (SControl 2003)
-> ata1: softreset failed (1st FIS failed)
-> ata1: failed to resume link (SControl 2003)
-> ata1: softreset failed (1st FIS failed)
-> ata1: limiting SATA link speed to 1.5 Gbps
-> ata1: failed to resume link (SControl 2003)
-> ata1: softreset failed (1st FIS failed)
-> ata1: reset failed, giving up
-> 
-> With Shawn's version I  do not get the suspend error messages:
-> ...
-> CPU1: Booted secondary processor
-> CPU1 is up
-> CPU2: Booted secondary processor
-> CPU2 is up
-> CPU3: Booted secondary processor
-> CPU3 is up
-> PM: noirq resume of devices complete after 5.836 msecs
-> PM: early resume of devices complete after 5.334 msecs
-> PM: resume of devices complete after 176.763 msecs
-> PM: resume devices took 0.190 seconds
-> Restarting tasks ... done.
-> ata1: SATA link down (SStatus 0 SControl 300)
-> random: nonblocking pool is initialized
-> 
+Yes, agreed.
 
-Ah yes I see, the ahci_imx suspend/resume handler now no longer
-touches the controller, but the ata core is still trying to use it.
+Of course you could have cases where a supply at the h/w level is
+optional like if a supply can be powered externally or via an internal
+regulator. Those cases will have to be made clear in the binding, but
+a heading "Optional properties" in a binding doc means properties
+which are optional to specify in DT.
 
-Ok, in that case I agree that your original patch is the best
-solution.
-
-Your original patch is:
-
-Acked-by: Hans de Goede <hdegoede@redhat.com>
-
-
-Regards,
-
-Hans
+Rob
