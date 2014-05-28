@@ -1,30 +1,69 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 28 May 2014 18:49:09 +0100
-Subject: [PATCH v3 0/6] mfd: axp20x: add AXP221 PMIC support
-In-Reply-To: <9ed19670-7a2e-4324-a201-6d3c8514bdb3@googlegroups.com>
-References: <1401183535-31003-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140527194932.GD12304@sirena.org.uk>
- <9ed19670-7a2e-4324-a201-6d3c8514bdb3@googlegroups.com>
-Message-ID: <20140528174909.GH5099@sirena.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 28 May 2014 18:49:45 +0100
+Subject: [PATCH] arm64: mm: fix pmd_write CoW brokenness
+In-Reply-To: <1401296836-16837-1-git-send-email-will.deacon@arm.com>
+References: <1401296836-16837-1-git-send-email-will.deacon@arm.com>
+Message-ID: <538621B9.9090503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 09:00:17AM -0700, Dimitar Penev wrote:
-> Hi Mark,
+Hi Will,
 
-Don't top post and if you are addressing someone please put them in the
-To: rather than Ccs - I very nearly just deleted this since it's a MFD
-mail not directly addressed to me.
+On 28/05/14 18:07, Will Deacon wrote:
+> Commit 9c7e535fcc17 ("arm64: mm: Route pmd thp functions through pte
+> equivalents") changed the pmd manipulator and accessor functions to
+> convert the target pmd to a pte, process it with the pte functions, then
+> convert it back. Along the way, we gained support for PTE_WRITE, however
+> this is completely ignored by set_pmd_at, and so we fail to set the
+> PMD_SECT_RDONLY for PMDs, resulting in all sorts of lovely failures (like
+> CoW not working).
+> 
+> Partially reverting the offending commit (by making use of
+> PMD_SECT_RDONLY explicitly for pmd_{write,wrprotect,mkwrite} functions)
+> leads to further issues because pmd_write can then return potentially
+> incorrect values for page table entries marked as RDONLY, leading to
+> BUG_ON(pmd_write(entry)) tripping under some THP workloads.
+> 
+> This patch fixes the issue by routing set_pmd_at through set_pte_at,
+> which correctly takes the PTE_WRITE flag into account. Given that
+> THP mappings are always anonymous, the additional cache-flushing code
+> in __sync_icache_dcache won't impose any significant overhead as the
+> flush will be skipped.
+> 
+> Cc: Steve Capper <steve.capper@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> 
+> Whilst this is a fairly scary change at this point in the cycle, I can't get
+> through an LTP run without it. Furthermore, spurious CoW failures for tasks
+> that happen to get transparent hugepages are a pretty significant regression.
+> 
+>  arch/arm64/include/asm/pgtable.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index 90c811f05a2e..20785f9da95c 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -266,7 +266,7 @@ static inline pmd_t pte_pmd(pte_t pte)
+>  
+>  #define pmd_page(pmd)           pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
+>  
+> -#define set_pmd_at(mm, addr, pmdp, pmd)	set_pmd(pmdp, pmd)
+> +#define set_pmd_at(mm, addr, pmdp, pmd)	set_pte_at(mm, addr, pmdp, pmd_pte(pmd))
+>  
+>  static inline int has_transparent_hugepage(void)
+>  {
+> 
 
-> I plan to use AXP221 on A20 based system as I require more switchers than 
-> the recommended AXP209 has.
-> Do you see any obstacles which I may be missing now?
+I managed to reliably reproduce the failure on my favourite arm64 board
+running a KVM guest with THP enabled. Adding this patch to the guest
+kernel made it behave correctly.
 
-I'm afraid I don't really understand your question, sorry.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140528/bc8bf0da/attachment.sig>
+So FWIW:
+Tested-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
