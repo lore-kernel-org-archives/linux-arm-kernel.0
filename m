@@ -1,91 +1,320 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 28 May 2014 13:31:48 +0300
-Subject: [PATCH v3 01/10] platform_data: edma: Be precise with the paRAM
- struct
-In-Reply-To: <5384A92B.4080606@ti.com>
-References: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>	<1397475725-5036-2-git-send-email-peter.ujfalusi@ti.com>
- <CAOesGMg43jT6D_ot2tKfRXXgAgwqs5Pu_tAFKc35yxLAczrzGQ@mail.gmail.com>
- <53846779.4070204@ti.com> <5384A92B.4080606@ti.com>
-Message-ID: <5385BB14.9010804@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 28 May 2014 11:34:46 +0100
+Subject: [PATCH v2 4/9] arm64: KVM: common infrastructure for handling
+ AArch32 CP14/CP15
+In-Reply-To: <20140525153459.GE3866@lvm>
+References: <1400604945-25247-1-git-send-email-marc.zyngier@arm.com>
+ <1400604945-25247-5-git-send-email-marc.zyngier@arm.com>
+ <20140525153459.GE3866@lvm>
+Message-ID: <5385BBC6.9040703@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/2014 06:03 PM, Joel Fernandes wrote:
-> On 05/27/2014 05:22 AM, Peter Ujfalusi wrote:
->> On 05/27/2014 12:32 AM, Olof Johansson wrote:
-> [..]
->>>
->>> I came across this patch when I was looking at a pull request from
->>> Sekhar for EDMA cleanups, and it made me look closer at the contents
->>> of this file.
->>>
->>> The include/linux/platform_data/ directory is meant to hold
->>> platform_data definitions for drivers, and nothing more.
->>> platform_data/edma.h also contains a whole bunch of interface
->>> definitions for the driver. They do not belong there, and should be
->>> moved to a different include file.
->>>
->>> That also includes the above struct, because as far as I can tell it's
->>> a runtime state structure, not something that is passed in with
->>> platform data.
->>>
->>> Can someone please clean this up? Thanks.
+On 25/05/14 16:34, Christoffer Dall wrote:
+> On Tue, May 20, 2014 at 05:55:40PM +0100, Marc Zyngier wrote:
+>> As we're about to trap a bunch of CP14 registers, let's rework
+>> the CP15 handling so it can be generalized and work with multiple
+>> tables.
 >>
->> I think Joel is working on to move/merge the code from arch/arm/common/edma.c
->> to drivers/dma/edma.c
+>> Reviewed-by: Anup Patel <anup.patel@linaro.org>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/include/asm/kvm_asm.h    |   2 +-
+>>  arch/arm64/include/asm/kvm_coproc.h |   3 +-
+>>  arch/arm64/include/asm/kvm_host.h   |   9 ++-
+>>  arch/arm64/kvm/handle_exit.c        |   4 +-
+>>  arch/arm64/kvm/sys_regs.c           | 121 +++++++++++++++++++++++++++++-------
+>>  5 files changed, 111 insertions(+), 28 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+>> index e6b159a..12f9dd7 100644
+>> --- a/arch/arm64/include/asm/kvm_asm.h
+>> +++ b/arch/arm64/include/asm/kvm_asm.h
+>> @@ -93,7 +93,7 @@
+>>  #define c10_AMAIR0	(AMAIR_EL1 * 2)	/* Aux Memory Attr Indirection Reg */
+>>  #define c10_AMAIR1	(c10_AMAIR0 + 1)/* Aux Memory Attr Indirection Reg */
+>>  #define c14_CNTKCTL	(CNTKCTL_EL1 * 2) /* Timer Control Register (PL1) */
+>> -#define NR_CP15_REGS	(NR_SYS_REGS * 2)
+>> +#define NR_COPRO_REGS	(NR_SYS_REGS * 2)
+>>  
+>>  #define ARM_EXCEPTION_IRQ	  0
+>>  #define ARM_EXCEPTION_TRAP	  1
+>> diff --git a/arch/arm64/include/asm/kvm_coproc.h b/arch/arm64/include/asm/kvm_coproc.h
+>> index 9a59301..0b52377 100644
+>> --- a/arch/arm64/include/asm/kvm_coproc.h
+>> +++ b/arch/arm64/include/asm/kvm_coproc.h
+>> @@ -39,7 +39,8 @@ void kvm_register_target_sys_reg_table(unsigned int target,
+>>  				       struct kvm_sys_reg_target_table *table);
+>>  
+>>  int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>> -int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>> +int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>> +int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>>  int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>>  int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>>  int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> index 4737961..31cff7a 100644
+>> --- a/arch/arm64/include/asm/kvm_host.h
+>> +++ b/arch/arm64/include/asm/kvm_host.h
+>> @@ -86,7 +86,7 @@ struct kvm_cpu_context {
+>>  	struct kvm_regs	gp_regs;
+>>  	union {
+>>  		u64 sys_regs[NR_SYS_REGS];
+>> -		u32 cp15[NR_CP15_REGS];
+>> +		u32 copro[NR_COPRO_REGS];
+>>  	};
+>>  };
+>>  
+>> @@ -141,7 +141,12 @@ struct kvm_vcpu_arch {
+>>  
+>>  #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
+>>  #define vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
+>> -#define vcpu_cp15(v,r)		((v)->arch.ctxt.cp15[(r)])
+>> +/*
+>> + * CP14 and CP15 live in the same array, as they are backed by the
+>> + * same system registers.
+>> + */
+>> +#define vcpu_cp14(v,r)		((v)->arch.ctxt.copro[(r)])
+>> +#define vcpu_cp15(v,r)		((v)->arch.ctxt.copro[(r)])
+>>  
+>>  struct kvm_vm_stat {
+>>  	u32 remote_tlb_flush;
+>> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+>> index 7bc41ea..f0ca49f 100644
+>> --- a/arch/arm64/kvm/handle_exit.c
+>> +++ b/arch/arm64/kvm/handle_exit.c
+>> @@ -69,9 +69,9 @@ static exit_handle_fn arm_exit_handlers[] = {
+>>  	[ESR_EL2_EC_WFI]	= kvm_handle_wfx,
+>>  	[ESR_EL2_EC_CP15_32]	= kvm_handle_cp15_32,
+>>  	[ESR_EL2_EC_CP15_64]	= kvm_handle_cp15_64,
+>> -	[ESR_EL2_EC_CP14_MR]	= kvm_handle_cp14_access,
+>> +	[ESR_EL2_EC_CP14_MR]	= kvm_handle_cp14_32,
+>>  	[ESR_EL2_EC_CP14_LS]	= kvm_handle_cp14_load_store,
+>> -	[ESR_EL2_EC_CP14_64]	= kvm_handle_cp14_access,
+>> +	[ESR_EL2_EC_CP14_64]	= kvm_handle_cp14_64,
+>>  	[ESR_EL2_EC_HVC32]	= handle_hvc,
+>>  	[ESR_EL2_EC_SMC32]	= handle_smc,
+>>  	[ESR_EL2_EC_HVC64]	= handle_hvc,
+>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+>> index d46a965..429e38c 100644
+>> --- a/arch/arm64/kvm/sys_regs.c
+>> +++ b/arch/arm64/kvm/sys_regs.c
+>> @@ -474,6 +474,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>>  	  NULL, reset_val, FPEXC32_EL2, 0x70 },
+>>  };
+>>  
+>> +/* Trapped cp14 registers */
+>> +static const struct sys_reg_desc cp14_regs[] = {
+>> +};
+>> +
+>>  /*
+>>   * Trapped cp15 registers. TTBR0/TTBR1 get a double encoding,
+>>   * depending on the way they are accessed (as a 32bit or a 64bit
+>> @@ -581,26 +585,19 @@ int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  	return 1;
+>>  }
+>>  
+>> -int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> -{
+>> -	kvm_inject_undefined(vcpu);
+>> -	return 1;
+>> -}
+>> -
+>> -static void emulate_cp15(struct kvm_vcpu *vcpu,
+>> -			 const struct sys_reg_params *params)
 > 
-> Yes, I am planning to work on that soon. But there is an issue, more on
-> that discussed below..
+> document the return value please?
+
+Sure.
+
+>> +static int emulate_cp(struct kvm_vcpu *vcpu,
+>> +		      const struct sys_reg_params *params,
+>> +		      const struct sys_reg_desc *table,
+>> +		      size_t num)
+>>  {
+>> -	size_t num;
+>> -	const struct sys_reg_desc *table, *r;
+>> +	const struct sys_reg_desc *r;
+>>  
+>> -	table = get_target_table(vcpu->arch.target, false, &num);
+>> +	if (!table)
+>> +		return -1;	/* Not handled */
+>>  
+>> -	/* Search target-specific then generic table. */
+>>  	r = find_reg(params, table, num);
+>> -	if (!r)
+>> -		r = find_reg(params, cp15_regs, ARRAY_SIZE(cp15_regs));
+>>  
+>> -	if (likely(r)) {
+>> +	if (r) {
+>>  		/*
+>>  		 * Not having an accessor means that we have
+>>  		 * configured a trap that we don't know how to
 > 
->> I'm sure within this work he is going to clean up the header file as well.
+> This is making me think: Do we really want that BUG_ON?  It's certainly
+> a KVM bug, but not something that compromises the host kernel state is
+> it?  We can safely just kill the VM and exit with an internal error
+> could we not?  Do we care?
+
+Fair enough. Should be pretty easy to fix indeed.
+
+> Anyway, something we can fix independently.
+
+OK.
+
+>> @@ -612,12 +609,37 @@ static void emulate_cp15(struct kvm_vcpu *vcpu,
+>>  		if (likely(r->access(vcpu, params, r))) {
+>>  			/* Skip instruction, since it was emulated */
+>>  			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+>> -			return;
+>>  		}
+>> -		/* If access function fails, it should complain. */
+>> +
+>> +		/* Handled */
+>> +		return 0;
+>>  	}
+>>  
+>> -	kvm_err("Unsupported guest CP15 access at: %08lx\n", *vcpu_pc(vcpu));
+>> +	/* Not handled */
+>> +	return -1;
+>> +}
+>> +
+>> +static void unhandled_cp_access(struct kvm_vcpu *vcpu,
+>> +				struct sys_reg_params *params)
+>> +{
+>> +	u8 hsr_ec = kvm_vcpu_trap_get_class(vcpu);
+>> +	int cp;
+>> +
+>> +	switch(hsr_ec) {
+>> +	case ESR_EL2_EC_CP15_32:
+>> +	case ESR_EL2_EC_CP15_64:
+>> +		cp = 15;
+>> +		break;
+>> +	case ESR_EL2_EC_CP14_MR:
+>> +	case ESR_EL2_EC_CP14_64:
+>> +		cp = 14;
+>> +		break;
+>> +	default:
+>> +		WARN_ON((cp = -1));
+>> +	}
+>> +
+>> +	kvm_err("Unsupported guest CP%d access at: %08lx\n",
+>> +		cp, *vcpu_pc(vcpu));
+>>  	print_sys_reg_instr(params);
+>>  	kvm_inject_undefined(vcpu);
+>>  }
+>> @@ -627,7 +649,11 @@ static void emulate_cp15(struct kvm_vcpu *vcpu,
+>>   * @vcpu: The VCPU pointer
+>>   * @run:  The kvm_run struct
+>>   */
+>> -int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> +static int kvm_handle_cp_64(struct kvm_vcpu *vcpu,
+>> +			    const struct sys_reg_desc *global,
+>> +			    size_t nr_global,
+>> +			    const struct sys_reg_desc *target_specific,
+>> +			    size_t nr_specific)
+>>  {
+>>  	struct sys_reg_params params;
+>>  	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+>> @@ -656,8 +682,14 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  		*vcpu_reg(vcpu, params.Rt) = val;
+>>  	}
+>>  
+>> -	emulate_cp15(vcpu, &params);
+>> +	if (!emulate_cp(vcpu, &params, target_specific, nr_specific))
+>> +		goto out;
+>> +	if (!emulate_cp(vcpu, &params, global, nr_global))
+>> +		goto out;
+>> +
+>> +	unhandled_cp_access(vcpu, &params);
+>>  
+>> +out:
+>>  	/* Do the opposite hack for the read side */
+>>  	if (!params.is_write) {
+>>  		u64 val = *vcpu_reg(vcpu, params.Rt);
+>> @@ -673,7 +705,11 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>   * @vcpu: The VCPU pointer
+>>   * @run:  The kvm_run struct
+>>   */
 > 
-> Agreed. The private API should not be expored in any header and should
-> be exclusive for the EDMA dmaengine driver ideally.
-> 
->> As a first step I think the non platform_data content can be moved as
->> include/linux/edma.h or probably as ti-edma.h?
+> I think you forgot to modify the kdcos function name
+
+Indeed.
+
+>> -int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> +static int kvm_handle_cp_32(struct kvm_vcpu *vcpu,
+>> +			    const struct sys_reg_desc *global,
+>> +			    size_t nr_global,
+>> +			    const struct sys_reg_desc *target_specific,
+>> +			    size_t nr_specific)
+>>  {
+>>  	struct sys_reg_params params;
+>>  	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+>> @@ -688,10 +724,51 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  	params.Op1 = (hsr >> 14) & 0x7;
+>>  	params.Op2 = (hsr >> 17) & 0x7;
+>>  
+>> -	emulate_cp15(vcpu, &params);
+>> +	if (!emulate_cp(vcpu, &params, target_specific, nr_specific))
+>> +		return 1;
+>> +	if (!emulate_cp(vcpu, &params, global, nr_global))
+>> +		return 1;
+>> +
+>> +	unhandled_cp_access(vcpu, &params);
+>>  	return 1;
+>>  }
+>>  
+>> +int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> +{
+>> +	const struct sys_reg_desc *target_specific;
+>> +	size_t num;
+>> +
+>> +	target_specific = get_target_table(vcpu->arch.target, false, &num);
+>> +	return kvm_handle_cp_64(vcpu,
+>> +				cp15_regs, ARRAY_SIZE(cp15_regs),
+>> +				target_specific, num);
+>> +}
+>> +
+>> +int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> +{
+>> +	const struct sys_reg_desc *target_specific;
+>> +	size_t num;
+>> +
+>> +	target_specific = get_target_table(vcpu->arch.target, false, &num);
+>> +	return kvm_handle_cp_32(vcpu,
+>> +				cp15_regs, ARRAY_SIZE(cp15_regs),
+>> +				target_specific, num);
+>> +}
+>> +
+>> +int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> +{
+>> +	return kvm_handle_cp_64(vcpu,
+>> +				cp14_regs, ARRAY_SIZE(cp14_regs),
+>> +				NULL, 0);
+>> +}
+>> +
+>> +int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> +{
+>> +	return kvm_handle_cp_32(vcpu,
+>> +				cp14_regs, ARRAY_SIZE(cp14_regs),
+>> +				NULL, 0);
+>> +}
+>> +
+>>  static int emulate_sys_reg(struct kvm_vcpu *vcpu,
+>>  			   const struct sys_reg_params *params)
+>>  {
+>> -- 
+>> 1.8.3.4
 >>
 > 
-> sound/soc/davinci/davinci-pcm.c: This still uses the EDMA private API in
-> arch/arm/common/edma.c. Peter, any idea when the private usage will be
-> removed fully, and we switch to dmaengine for ASoC? Before that can
-> happen, we can't clean up or do any merges.
-
-We have the edma-pcm platform driver upstream already which I'm using locally
-for a long time now on AM335x/AM437x. I'm planning to send a patch to do the
-same upstream after the 3.16 window closes.
-But, davinci-pcm has a mode called 'ping-pong' which is not available via
-dmaengine and this mode is used by several daVinci SoCs to overcome buffer
-underflow/overflow issues. This mode essentially means in playback case:
-      dma_ch1       dma_ch2
-SDRAM -------> SRAM -------> McASP
-
-ch1 is to move a block of samples to SRAM from where ch2 will copy the samples
-word by word to McASP.
-
-If we move all davinci SoCs to use the edma-pcm, we are going to loose this
-mode. As a note: the edma-pcm is confirmed to work fine on the tested daVinci
-boards.
-I think what we need to do first: find a board which is using ping-pong mode,
-put under stress test in:
-- davinci-pcm, ping-pong mode
-- davinci-pcm, no ping-pong mode
-- edma-pcm
-
-and see how edma-pcm behaves compared to the davinci-pcm. One of the issue
-with davinci-pcm is that in non ping-pong mode it reconfigures the eDMA after
-every period, which is a bad thing. The dmaengine implementation does not need
-to do that, so we might be fine there.
-
-> What I'd like to do is fold the private API into the dmaengine driver
-> and eliminate the need to expose the private API, thus also getting rid
-> of the interface declarations Olof referred to.
+> Besides the nit:
 > 
-> thanks,
-> 
-> -Joel
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 > 
 
+Thanks,
 
+	M.
 -- 
-P?ter
+Jazz is not dead. It just smells funny...
