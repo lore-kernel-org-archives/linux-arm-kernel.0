@@ -1,33 +1,70 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 29 May 2014 01:19:43 +0200
-Subject: [PATCH] misc: atmel_pwm: only build for supported platforms
-In-Reply-To: <20140528184217.GB30031@kroah.com>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-17-git-send-email-arnd@arndb.de>
- <536CA80A.60201@atmel.com> <1401279867.22486.6.camel@x220>
- <20140528155916.GA9793@piout.net> <1401293383.22486.18.camel@x220>
- <20140528175439.GA18470@piout.net> <1401299948.22486.51.camel@x220>
- <20140528184217.GB30031@kroah.com>
-Message-ID: <20140528231940.GC18470@piout.net>
+Date: Thu, 29 May 2014 01:20:04 +0200
+Subject: [PATCHv2 01/15] ARM: at91: at91sam9g45: switch to generic PWM
+ framework
+In-Reply-To: <1401319218-16772-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1401319218-16772-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1401319218-16772-2-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/05/2014 at 11:42:17 -0700, Greg Kroah-Hartman wrote :
-> On Wed, May 28, 2014 at 07:59:08PM +0200, Paul Bolle wrote:
-> > So the patch we're discussing here will never be included in a release?
-> 
+Switch to the pwm/pwm-atmel driver instead of misc/atmel_pwm
 
-As it hit linux-next, I guess it will be in 3.16
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/at91sam9g45.c         |  1 +
+ arch/arm/mach-at91/at91sam9g45_devices.c | 11 ++---------
+ 2 files changed, 3 insertions(+), 9 deletions(-)
 
-> So, should I just remove it right now?  I like deleting files :)
-> 
-
-I also like doing that, let me resend my series, rebased on linux-next
-because of the dependency on the PWM tree. Then I will let you and
-Nicolas decide what you want to do with it.
-
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 9d3d544ac19c..7300523da6ea 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -251,6 +251,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID(NULL, "atmel_sha", &aestdessha_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "atmel_tdes", &aestdessha_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "atmel_aes", &aestdessha_clk),
++	CLKDEV_CON_DEV_ID(NULL, "at91sam9rl-pwm", &pwm_clk),
+ 	/* more usart lookup table for DT entries */
+ 	CLKDEV_CON_DEV_ID("usart", "ffffee00.serial", &mck),
+ 	CLKDEV_CON_DEV_ID("usart", "fff8c000.serial", &usart0_clk),
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index d943363c1845..c2cebaa60d7e 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -1334,9 +1334,7 @@ static void __init at91_add_device_watchdog(void) {}
+  *  PWM
+  * --------------------------------------------------------------------*/
+ 
+-#if defined(CONFIG_ATMEL_PWM) || defined(CONFIG_ATMEL_PWM_MODULE)
+-static u32 pwm_mask;
+-
++#if IS_ENABLED(CONFIG_PWM_ATMEL)
+ static struct resource pwm_resources[] = {
+ 	[0] = {
+ 		.start	= AT91SAM9G45_BASE_PWMC,
+@@ -1351,11 +1349,8 @@ static struct resource pwm_resources[] = {
+ };
+ 
+ static struct platform_device at91sam9g45_pwm0_device = {
+-	.name	= "atmel_pwm",
++	.name	= "at91sam9rl-pwm",
+ 	.id	= -1,
+-	.dev	= {
+-		.platform_data		= &pwm_mask,
+-	},
+ 	.resource	= pwm_resources,
+ 	.num_resources	= ARRAY_SIZE(pwm_resources),
+ };
+@@ -1374,8 +1369,6 @@ void __init at91_add_device_pwm(u32 mask)
+ 	if (mask & (1 << AT91_PWM3))
+ 		at91_set_B_periph(AT91_PIN_PD0, 1);	/* enable PWM3 */
+ 
+-	pwm_mask = mask;
+-
+ 	platform_device_register(&at91sam9g45_pwm0_device);
+ }
+ #else
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.9.1
