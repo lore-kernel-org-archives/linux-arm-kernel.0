@@ -1,104 +1,81 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 28 May 2014 10:19:11 +0200
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
- device tree
-In-Reply-To: <20140527175326.GZ12304@sirena.org.uk>
-References: <53806F26.6050706@redhat.com>
- <20140525123452.GS22111@sirena.org.uk>
- <53824294.1090609@redhat.com>
- <20140526103807.GV22111@sirena.org.uk>
- <538321AB.4050006@redhat.com>
- <20140526142225.GF22111@sirena.org.uk>
- <538356DA.7090302@redhat.com>
- <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
- <53838023.2080807@redhat.com>
- <CAPDyKFpg_2RQabM044C1hsNTcuxdVVOvw0ZONVRdysk=eom8UA@mail.gmail.com>
- <20140527175326.GZ12304@sirena.org.uk>
-Message-ID: <CAPDyKFqCwSfnbXJffQeMUMLEgZPcqjEMhbTXxi4HKOKqExQ70g@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 28 May 2014 10:23:09 +0200
+Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
+In-Reply-To: <5840140.8yGnd4Ycx3@wuerfel>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+ <5279118.J5305KQNjB@wuerfel>
+ <20140527125655.63A46C40FCB@trevor.secretlab.ca>
+ <5840140.8yGnd4Ycx3@wuerfel>
+Message-ID: <CACRpkdZjEVYgq7tKEfmZC0Fu4n=JuUues=pAAtquLahkex=pkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 May 2014 19:53, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, May 27, 2014 at 03:50:33PM +0200, Ulf Hansson wrote:
->
->> To describe the HW in DT, the embedded SDIO card (actually it could be
->> any type of embedded card) shall be modelled as a child node to the
->> mmc host in DT. Similar to what you have proposed, but with the
->> difference that the child node _must_ contain a DT compatible string,
->> which means a "powerup-driver" can be probed.
->
->> Yes, I understand we might need one DT compatible string per board,
->> but that's because we need to model the hardware - and it differs.
->
->> To clarify my view, we do need a "powerup-driver" and the primary
->> reason is that we must not model "power up sequences" within DT.
->> Typically I see the "powerup-driver" as a simple platform driver
->> attached to the platform bus, but I that could of course differ.
->
-> This then either conflicts with cases where we need to describe the
-> actual contents of the slot with a compatible string or means that the
-> SDIO driver needs to handle powerup sequencing since we should be
-> binding to the first compatible we find.  If the host controller driver
-> and/or subsystem is going to deal with the powering up it's not clear
-> that it specifically needs to be the compatible property that's used
-> to determine the powerup method, it could just be a boolean or a
-> 'power-method = blah' property (where blah is one of a series of strings
-> defining methods).  Alternatively we could have separate nodes for the
-> slot and SDIO device but that feels meh.  What's the hard requirement
-> for it to specifically be a compatible property?
+On Tue, May 27, 2014 at 3:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 27 May 2014 13:56:55 Grant Likely wrote:
 
-Since the sdio bus is a discoverable bus, we must leave the "SDIO card
-device id" outside the information of the DT child node. Instead the
-"SDIO card device id" will be fetched once the card has been properly
-powered and initialized. From sdio bus' ->match(), the "SDIO func
-driver id" will be matched with the "SDIO card device id".
-
-What we need to describe in the child node is only what "powerup
-driver" to use (an obviously it's resources). I don't see why there
-should be a conflict in using a compatible property, but I might be
-missing your point.
-
+>> Come to think of it, doesn't PCI DMA have to deal with that situation if
+>> the PCI window is not 1:1 mapped into the CPU address space?
 >
->> The slot will be the first level of child node under the mmc host,
->> then each slot may have a child node which models the embedded card.
->> But, let's leave that discussion for now. :-)
->
-> OK, that's the separate node for the slot and device.
->
->> Powerup driver's ->probe():
->> Typically the "powerup driver" will need to register a few callback
->> functions towards the mmc core. Typically at mmc_of_parse(), those
->> callbacks will have to be connected to a particular mmc host.
->
->> I would like to see three different callbacks, mirroring each of the
->> mmc_ios power_mode states MMC_POWER_OFF|UP|ON.
->
->> The power up sequence, performed by the mmc core:
->> The mmc_power_up|off functions, will invoke the registered "powerup
->> driver's" callbacks if they exists for the particular host it operates
->> on.
->
-> There's also the need for the SDIO device to be able to get at the
-> resources provided and actively work with them at runtime if it wants to
-> manage things more actively (partial poweroff for low power states or
-> managing clock rates for example).
+> I think all PCI buses we support so far only need a single entry in the
+> dma-ranges property.
 
-Yes, that's is also a reason to why I thought it would make sense to
-have a "powerup driver". Typically this driver should support runtime
-PM to handle these kind of fine grained power management.
+Here is the patch I've cooked for the Integrator (PCIv3), identical
+to the keystone:
 
-The SDIO func driver will have access (through the struct
-mmc_card|host) to the "powerup driver's" struct device, and can use
-pm_runtime_get|put() for it, to tell the "powerup driver" when it may
-go into power save state.
+commit b326b94a58ff476fca2b57cf7912b00bec1363c0
+Author: Linus Walleij <linus.walleij@linaro.org>
+Date:   Fri Feb 14 10:26:15 2014 +0100
 
-This kind of fine grained power management is not related directly to
-the SDIO specification, and should not be a part of the mmc core in my
-opinion.
+    ARM: integrator: get rid of <mach/memory.h>
 
-If we don't have a compatible string in the DT child node of the mmc
-host, but just a DT property - is there a way to achieve the above
-anyway?
+    The Integrator has a custom <mach/memory.h> header defining the
+    BUS_OFFSET for *_to_bus and bus_to_* operations as offset from
+    0x80000000.
 
-Kind regards
-Ulf Hansson
+    This switches the Integrator over to using the mechanism
+    introduced for the Keystone to provide the same offset using
+    the device tree, deletes <mach/memory.h> and augments the
+    Integrator device tree to provide the bus offset.
+
+    Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+    Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+    Cc: Will Deacon <will.deacon@arm.com>
+    Cc: Jonathan Austin <jonathan.austin@arm.com>
+    Cc: Russell King <linux@arm.linux.org.uk>
+    Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ab438cb5af55..2b29a1a7f26f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -329,7 +329,6 @@ config ARCH_INTEGRATOR
+        select HAVE_TCM
+        select ICST
+        select MULTI_IRQ_HANDLER
+-       select NEED_MACH_MEMORY_H
+        select PLAT_VERSATILE
+        select SPARSE_IRQ
+        select USE_OF
+diff --git a/arch/arm/boot/dts/integratorap.dts
+b/arch/arm/boot/dts/integratorap.dts
+index b10e6351da53..f0c397fd45c5 100644
+--- a/arch/arm/boot/dts/integratorap.dts
++++ b/arch/arm/boot/dts/integratorap.dts
+@@ -8,6 +8,7 @@
+ / {
+        model = "ARM Integrator/AP";
+        compatible = "arm,integrator-ap";
++       dma-ranges = <0x80000000 0x8 0x00000000 0x80000000>;
+
+        aliases {
+                arm,timer-primary = &timer2;
+diff --git a/arch/arm/mach-integrator/include/mach/memory.h
+b/arch/arm/mach-integrator/include/mach/memory.h
+deleted file mode 100644
+index 334d5e271889..000000000000
+--- a/arch/arm/mach-integrator/include/mach/memory.h
++++ /dev/null
+(...)
+
+Yours,
+Linus Walleij
