@@ -1,61 +1,107 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 28 May 2014 10:37:47 +0900
-Subject: [PATCH] pci: rcar host needs OF
-In-Reply-To: <20140527225422.GE11907@google.com>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-14-git-send-email-arnd@arndb.de>
- <20140527225422.GE11907@google.com>
-Message-ID: <002401cf7a15$6e25d9f0$4a718dd0$%han@samsung.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 28 May 2014 10:52:34 +0900
+Subject: [PATCH] ARM: shmobile: r8a7779: Add clock index macros for DT sources
+Message-ID: <1401241954-12646-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, May 28, 2014 7:54 AM, Bjorn Helgaas wrote:
-> On Thu, May 08, 2014 at 04:56:25PM +0200, Arnd Bergmann wrote:
-> > The pci-rcar driver is enabled for compile tests, and this has
-> > now shown that the driver cannot build without CONFIG_OF,
-> > following the inclusion of f8f2fe7355fb "PCI: rcar: Use new OF
-> > interrupt mapping when possible":
-> >
-> > drivers/built-in.o: In function `rcar_pci_map_irq':
-> > :(.text+0x1cc7c): undefined reference to `of_irq_parse_and_map_pci'
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Magnus Damm <damm@opensource.se>
-> > Cc: linux-pci at vger.kernel.org
-> > Cc: linux-sh at vger.kernel.org
-> 
-> If I understand correctly, this patch was superceded by this one:
-> 
->     "[PATCH] of/irq: provide int of_irq_parse_and_map_pci wrapper"
-> 
-> and you aren't expecting me to do anything.  Let me know if otherwise.
+Add macros usable by device tree sources to reference r8a7779 clocks by
+index.
 
-Yes, right. I checked that the build error was resolved by the above
-mentioned patch.
+Based on work for the r8a7791 SoC by Laurent Pinchart.
 
-Best regards,
-Jingoo Han
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ include/dt-bindings/clock/r8a7779-clock.h | 64 +++++++++++++++++++++++++++++++
+ 1 file changed, 64 insertions(+)
+ create mode 100644 include/dt-bindings/clock/r8a7779-clock.h
 
-> 
-> > ---
-> >  drivers/pci/host/Kconfig | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> > index fbbef0b..4675f47 100644
-> > --- a/drivers/pci/host/Kconfig
-> > +++ b/drivers/pci/host/Kconfig
-> > @@ -27,7 +27,7 @@ config PCI_TEGRA
-> >
-> >  config PCI_RCAR_GEN2
-> >  	bool "Renesas R-Car Gen2 Internal PCI controller"
-> > -	depends on ARCH_SHMOBILE || (ARM && COMPILE_TEST)
-> > +	depends on ARCH_SHMOBILE || (ARM && OF && COMPILE_TEST)
-> >  	help
-> >  	  Say Y here if you want internal PCI support on R-Car Gen2 SoC.
-> >  	  There are 3 internal PCI controllers available with a single
-> > --
-> > 1.8.3.2
-> >
+Hi Mike,
+
+as discussed elsewhere please consider this for v3.16.
+It resolves the build-breakage caused by
+7b42a99 ("clk: shmobile: r8a7779: Add clocks support").
+
+I have tested that this does resolve the build problem
+reported by Arnd by applying it on top of clk-next whose
+current head is 42dd880 ("Merge branch 'clk-fixes' into clk-next").
+
+As I am a little unsure of how to enable ARCH_R8A7779 and
+ARCH_SHMOBILE_MULTI in clk-next I compiled it my modifying
+drivers/clk/shmobile/Makefile to compile the driver if ARCH_R8A7790
+is set and then compiled using the shmobile_defconfig.
+
+
+diff --git a/include/dt-bindings/clock/r8a7779-clock.h b/include/dt-bindings/clock/r8a7779-clock.h
+new file mode 100644
+index 0000000..381a611
+--- /dev/null
++++ b/include/dt-bindings/clock/r8a7779-clock.h
+@@ -0,0 +1,64 @@
++/*
++ * Copyright (C) 2013  Horms Solutions Ltd.
++ *
++ * Contact: Simon Horman <horms@verge.net.au>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef __DT_BINDINGS_CLOCK_R8A7779_H__
++#define __DT_BINDINGS_CLOCK_R8A7779_H__
++
++/* CPG */
++#define R8A7779_CLK_PLLA	0
++#define R8A7779_CLK_Z		1
++#define R8A7779_CLK_ZS		2
++#define R8A7779_CLK_S		3
++#define R8A7779_CLK_S1		4
++#define R8A7779_CLK_P		5
++#define R8A7779_CLK_B		6
++#define R8A7779_CLK_OUT		7
++
++/* MSTP 0 */
++#define R8A7779_CLK_HSPI	7
++#define R8A7779_CLK_TMU2	14
++#define R8A7779_CLK_TMU1	15
++#define R8A7779_CLK_TMU0	16
++#define R8A7779_CLK_HSCIF1	18
++#define R8A7779_CLK_HSCIF0	19
++#define R8A7779_CLK_SCIF5	21
++#define R8A7779_CLK_SCIF4	22
++#define R8A7779_CLK_SCIF3	23
++#define R8A7779_CLK_SCIF2	24
++#define R8A7779_CLK_SCIF1	25
++#define R8A7779_CLK_SCIF0	26
++#define R8A7779_CLK_I2C3	27
++#define R8A7779_CLK_I2C2	28
++#define R8A7779_CLK_I2C1	29
++#define R8A7779_CLK_I2C0	30
++
++/* MSTP 1 */
++#define R8A7779_CLK_USB01	0
++#define R8A7779_CLK_USB2	1
++#define R8A7779_CLK_DU		3
++#define R8A7779_CLK_VIN2	8
++#define R8A7779_CLK_VIN1	9
++#define R8A7779_CLK_VIN0	10
++#define R8A7779_CLK_ETHER	14
++#define R8A7779_CLK_SATA	15
++#define R8A7779_CLK_PCIE	16
++#define R8A7779_CLK_VIN3	20
++
++/* MSTP 3 */
++#define R8A7779_CLK_SDHI3	20
++#define R8A7779_CLK_SDHI2	21
++#define R8A7779_CLK_SDHI1	22
++#define R8A7779_CLK_SDHI0	23
++#define R8A7779_CLK_MMC1	30
++#define R8A7779_CLK_MMC0	31
++
++
++#endif /* __DT_BINDINGS_CLOCK_R8A7779_H__ */
+-- 
+1.8.5.2
