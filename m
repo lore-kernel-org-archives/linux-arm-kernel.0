@@ -1,26 +1,40 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 28 May 2014 13:48:54 -0300
-Subject: [PATCH] ahci: imx: manage only sata_ref_clk in
- imx_sata_enable[disable]
-In-Reply-To: <538610D5.7070908@redhat.com>
-References: <1401289539-3485-1-git-send-email-shawn.guo@freescale.com>
- <5386026C.1010603@redhat.com>
- <CAOMZO5BkdkU-_s8G5CqVMzfkMgxdUg8bx0JJnqC8dPyFMK=Ocw@mail.gmail.com>
- <538610D5.7070908@redhat.com>
-Message-ID: <CAOMZO5Az_JR58a3cwGYK1_vcJ_twz4sEq+NHXv2SZ6yuN=wjGQ@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 28 May 2014 10:58:56 -0600
+Subject: [PATCH] ARM: pci: add call to pcie_bus_configure_settings()
+In-Reply-To: <1401287176-4986-1-git-send-email-m-karicheri2@ti.com>
+References: <1401287176-4986-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <20140528165856.GA20193@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 1:37 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+On Wed, May 28, 2014 at 10:26:16AM -0400, Murali Karicheri wrote:
+> PCI core supports PCIE_BUS_SAFE and PCIE_BUS_PERFORMANCE modes.
+> PCI controllers may not be able to handle pay load size higher
+> than MPS and also read data size higher than MRSS. So limit the
+> max to the least common supported payload size by calling
+> pcie_bus_configure_settings(). Using pci=pcie_bus_safe do a walk
+> and set the MPS to least common value used by devices on the bus.
+> pci=pcie_bus_perf does do a walk and set MRSS to MPS.
 
-> Ah yes I see, the ahci_imx suspend/resume handler now no longer
-> touches the controller, but the ata core is still trying to use it.
->
-> Ok, in that case I agree that your original patch is the best
-> solution.
->
-> Your original patch is:
->
-> Acked-by: Hans de Goede <hdegoede@redhat.com>
+This text doesn't make much sense.. Calling
+pcie_bus_configure_settings is just a good thing to do, the fact it
+helps avoid a HW defect in a specific PCI-E implementation is not the
+main reason to add this to the core ARM code.
 
-I think you meant Shawn's patch, not mine :-)
+ Call pcie_bus_configure_settings on ARM, like for other
+ platforms. pcie_bus_configure_settings makes sure the MPS across the
+ bus is uniform and provides the ability to tune the MRSS and MPS to
+ higher performance values.
+
+ This is particularly important for embedded where there is no
+ firmware to program these PCI-E settings for the OS.
+
+> +
+> +			list_for_each_entry(child, &bus->children, node)
+> +			pcie_bus_configure_settings(child);
+                  ^^^^^^^^^^^^^^^
+
+Missing indent.
+
+Regards,
+Jason
