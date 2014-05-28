@@ -1,62 +1,37 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 28 May 2014 19:05:26 +0100
-Subject: EFI_STUB fails to boot non-EFI on arm64
-In-Reply-To: <20140528155931.GA20523@arm.com>
-References: <20140523094513.GC9252@arm.com>
- <20140523131656.GR4179@bivouac.eciton.net>
- <20140523134720.GA9256@arm.com>
- <20140523150331.GS4179@bivouac.eciton.net>
- <20140528155931.GA20523@arm.com>
-Message-ID: <20140528180525.GU4179@bivouac.eciton.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 28 May 2014 11:06:07 -0700
+Subject: [GIT PULL] mfd: Immutable branch between MFD and OMAP, due for
+ v3.16
+In-Reply-To: <20140528071313.GH4227@lee--X1>
+References: <1401214140-9828-1-git-send-email-tony@atomide.com>
+ <20140528071313.GH4227@lee--X1>
+Message-ID: <20140528180607.GB4707@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 04:59:31PM +0100, Will Deacon wrote:
-> > > Can we add another of detecting whether it's an EFI application and
-> > > avoid calling efi_init()? I can see x86 sets some efi_loader_signature
-> > > string in exit_boot() and checks against it later when calling
-> > > efi_init().
-> > 
-> > Well, I agree that we shouldn't be spewing error messages for expected
-> > operation, but efi_init() is the function we call to determine
-> > whether we _are_ booting via UEFI - and it sets flags accordingly for
-> > the efi_enabled() macro.
-> > 
-> > My view is that this should be fixed in fdt_find_uefi_params(). A
-> > single info message that we can't find evidence of UEFI should be
-> > printed in the non-error case.
-> > 
-> > Like below?
+* Lee Jones <lee.jones@linaro.org> [140528 00:14]:
+> Thanks Tony, here's the pull-request:
 > 
-> Why not move the efi_get_fdt_params call out of efi_init and into
-> setup_arch via a wrapper? Then efi_get_fdt_params and efi_init can have
-> useful return values, which allow us to distinguish between "My DT doesn't
-> have the necessary UEFI properties" and "UEFI failed to initialise" without
-> having to make some printks pr_info and others pr_err within efi_init
-> itself..
+> The following changes since commit 455c6fdbd219161bd09b1165f11699d6d73de11c:
+> 
+>   Linux 3.14 (2014-03-30 20:40:15 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/mfd-omap-v3.16-1
+> 
+> for you to fetch changes up to 43fef47f94a1ae46fb2720dada32fa3b5547bee2:
+> 
+>   mfd: twl4030-power: Add a configuration to turn off oscillator during off-idle (2014-05-28 08:06:18 +0100)
+> 
+> ----------------------------------------------------------------
+> Second immutable branch between MFD and OMAP due for the v3.16 merge window.
 
-Well, but (for the output part) my patch already did that?
-If the "Getting parameters from FDT:\n" was too verbose, we could
-just drop it, and have the same effect on output.
+Thanks a lot, this will make it easier for me to chase down potential
+PM related regressions ;) I'm merging this for testing only into the
+linux-omap master branch, no need for me to include it into any
+of my upstream heading branches.
 
-Thing is - there is not really any error case available anywhere
-during the execution of efi_init() and its branches other than:
-- Information required for UEFI boot cannot be found.
-- Information exists, but is invalid.
-- Failed to early_memremap some UEFI regions into the kernel.
-which all amounts to "UEFI not available or something went wrong",
-rather than "UEFI failed to initialise".
-If efi_init returns successfully, EFI_BOOT is set, and testable using
-the efi_enabled() macro.
+Regards,
 
-The proper "UEFI failed to initialise" bit does not come until the
-early_initcall arm64_enter_virtual_mode(), and is indicated not by
-a return value, but by setting the flag indicating that
-EFI_RUNTIME_SERVICES are available, which is checked later in core
-code using the efi_enabled() macro.
-
-So moving the call to efi_get_fdt_params() would have little effect
-other than adding a third call site for UEFI bits in setup_arch().
-
-/
-	Leif
+Tony
