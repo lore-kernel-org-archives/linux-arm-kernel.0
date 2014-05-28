@@ -1,125 +1,57 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 28 May 2014 08:49:39 +0200
-Subject: [PATCH v2 02/11] sched: remove a wake_affine condition
-In-Reply-To: <CAKfTPtCZx4i5HFnma3EFYjxVHojUAkezSS7jL7KDTgwvKEVFwQ@mail.gmail.com>
+Date: Wed, 28 May 2014 09:01:04 +0200
+Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
+In-Reply-To: <20140527173229.GF19143@laptop.programming.kicks-ass.net>
 References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-3-git-send-email-vincent.guittot@linaro.org>
- <20140527124848.GQ30445@twins.programming.kicks-ass.net>
- <CAKfTPtAbnDdQ=C6oABtwUPr7ADhHo1qsdzt5GFsuVMncA9Q=Qw@mail.gmail.com>
- <20140527153937.GE19143@laptop.programming.kicks-ass.net>
- <CAKfTPtCZx4i5HFnma3EFYjxVHojUAkezSS7jL7KDTgwvKEVFwQ@mail.gmail.com>
-Message-ID: <CAKfTPtB_4bQxBOUJ4tCFRVqzHDRVXj3YPkyzyTv_h-sgm8NwEQ@mail.gmail.com>
+ <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
+ <20140527173229.GF19143@laptop.programming.kicks-ass.net>
+Message-ID: <CAKfTPtBVuoXKa02OCGgzNZ0Dx5gwY6AywYNP=i5izcBxpuzM1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using another email address for Nick
-
-On 27 May 2014 18:14, Vincent Guittot <vincent.guittot@linaro.org> wrote:
-> On 27 May 2014 17:39, Peter Zijlstra <peterz@infradead.org> wrote:
->> On Tue, May 27, 2014 at 05:19:02PM +0200, Vincent Guittot wrote:
->>> On 27 May 2014 14:48, Peter Zijlstra <peterz@infradead.org> wrote:
->>> > On Fri, May 23, 2014 at 05:52:56PM +0200, Vincent Guittot wrote:
->>> >> I have tried to understand the meaning of the condition :
->>> >>  (this_load <= load &&
->>> >>   this_load + target_load(prev_cpu, idx) <= tl_per_task)
->>> >> but i failed to find a use case that can take advantage of it and i haven't
->>> >> found description of it in the previous commits' log.
->>> >
->>> > commit 2dd73a4f09beacadde827a032cf15fd8b1fa3d48
->>> >
->>> >     int try_to_wake_up():
->>> >
->>> >     in this function the value SCHED_LOAD_BALANCE is used to represent the load
->>> >     contribution of a single task in various calculations in the code that
->>> >     decides which CPU to put the waking task on.  While this would be a valid
->>> >     on a system where the nice values for the runnable tasks were distributed
->>> >     evenly around zero it will lead to anomalous load balancing if the
->>> >     distribution is skewed in either direction.  To overcome this problem
->>> >     SCHED_LOAD_SCALE has been replaced by the load_weight for the relevant task
->>> >     or by the average load_weight per task for the queue in question (as
->>> >     appropriate).
->>> >
->>> >                         if ((tl <= load &&
->>> > -                               tl + target_load(cpu, idx) <= SCHED_LOAD_SCALE) ||
->>> > -                               100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
->>> > +                               tl + target_load(cpu, idx) <= tl_per_task) ||
->>> > +                               100*(tl + p->load_weight) <= imbalance*load) {
->>>
->>> The oldest patch i had found was: https://lkml.org/lkml/2005/2/24/34
->>> where task_hot had been replaced by
->>> + if ((tl <= load &&
->>> + tl + target_load(cpu, idx) <= SCHED_LOAD_SCALE) ||
->>> + 100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
->>>
->>> but as explained, i haven't found a clear explanation of this condition
+On 27 May 2014 19:32, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Fri, May 23, 2014 at 05:53:02PM +0200, Vincent Guittot wrote:
+>> Monitor the activity level of each group of each sched_domain level. The
+>> activity is the amount of cpu_power that is currently used on a CPU or group
+>> of CPUs. We use the runnable_avg_sum and _period to evaluate this activity
+>> level. In the special use case where the CPU is fully loaded by more than 1
+>> task, the activity level is set above the cpu_power in order to reflect the
+>> overload of the CPU
 >>
->> Yeah, that's the commit I had below; but I suppose we could ask Nick if
->> we really want, I've heard he still replies to email, even though he's
->> locked up in a basement somewhere :-)
-
-ok, I have added him in the list
-
-Nick,
-
-While doing some rework on the wake affine part of the scheduler, i
-failed to catch the use case that takes advantage of a condition that
-you added some while ago with the commit
-a3f21bce1fefdf92a4d1705e888d390b10f3ac6f
-
-Could you help us to clarify the 2 first lines of the test that you added ?
-+                       if ((tl <= load &&
-+                               tl + target_load(cpu, idx) <=
-SCHED_LOAD_SCALE) ||
-+                               100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
-
-Regards,
-Vincent
 >
->>
->>> > commit a3f21bce1fefdf92a4d1705e888d390b10f3ac6f
->>> >
->>> >
->>> > +                       if ((tl <= load &&
->>> > +                               tl + target_load(cpu, idx) <= SCHED_LOAD_SCALE) ||
->>> > +                               100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
->>> >
->>> >
->>> > So back when the code got introduced, it read:
->>> >
->>> >         target_load(prev_cpu, idx) - sync*SCHED_LOAD_SCALE < source_load(this_cpu, idx) &&
->>> >         target_load(prev_cpu, idx) - sync*SCHED_LOAD_SCALE + target_load(this_cpu, idx) < SCHED_LOAD_SCALE
->>> >
->>> > So while the first line makes some sense, the second line is still
->>> > somewhat challenging.
->>> >
->>> > I read the second line something like: if there's less than one full
->>> > task running on the combined cpus.
->>>
->>> ok. your explanation makes sense
->>
->> Maybe, its still slightly weird :-)
->>
->>> >
->>> > Now for idx==0 this is hard, because even when sync=1 you can only make
->>> > it true if both cpus are completely idle, in which case you really want
->>> > to move to the waking cpu I suppose.
->>>
->>> This use case is already taken into account by
->>>
->>> if (this_load > 0)
->>> ..
->>> else
->>>  balance = true
->>
->> Agreed.
->>
->>> > One task running will have it == SCHED_LOAD_SCALE.
->>> >
->>> > But for idx>0 this can trigger in all kinds of situations of light load.
->>>
->>> target_load is the max between load for idx == 0 and load for the
->>> selected idx so we have even less chance to match the condition : both
->>> cpu are completely idle
->>
->> Ah, yes, I forgot to look at the target_load() thing and missed the max,
->> yes that all makes it entirely less likely.
+>> +static int get_cpu_activity(int cpu)
+>> +{
+>> +     struct rq *rq = cpu_rq(cpu);
+>> +     u32 sum = rq->avg.runnable_avg_sum;
+>> +     u32 period = rq->avg.runnable_avg_period;
+>> +
+>> +     if (sum >= period)
+>> +             return power_orig_of(cpu) + rq->nr_running - 1;
+>> +
+>> +     return (sum * power_orig_of(cpu)) / period;
+>> +}
+>
+> While I appreciate the need to signify the overload situation, I don't
+> think adding nr_running makes sense. The amount of tasks has no bearing
+> on the amount of overload.
+
+I agree that it's not the best way to evaluate overload but it's the
+only simple one that is available without additional computation. I'm
+going to try to find a better metric or come back the solution which
+only adds +1  and compute the overload somewhere else
+
+>
+> Also, and note I've not yet seen the use, it strikes me as odd to use
+> the orig power here. I would've thought the current capacity (not the
+> max capacity) is relevant to balancing.
+
+activity also measures the non cfs tasks activity whereas current
+capacity removes the capacity used by non cfs tasks. So as long as
+arch_scale_cpu_freq is not used (which is the case for now), original
+capacity is ok but we might need a 3rd metric so we would have:
+original capacity (max capacity that can provide a CPU)
+usable capacity (new value that reflects current capacity available
+for any kind of processing rt tasks, irq, cfs tasks)
+current capacity (capacity available for cfs tasks)
+
+Vincent
