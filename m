@@ -1,110 +1,58 @@
-From: elder@linaro.org (Alex Elder)
-Date: Wed, 28 May 2014 08:58:13 -0500
-Subject: [PATCH v4 1/5] devicetree: bindings: document Broadcom CPU enable
- method
-In-Reply-To: <20140528133428.GB29219@e102568-lin.cambridge.arm.com>
-References: <1400607830-10989-1-git-send-email-elder@linaro.org>
- <1400607830-10989-2-git-send-email-elder@linaro.org>
- <20140527114958.GC18476@e102568-lin.cambridge.arm.com>
- <53855867.7050800@linaro.org>
- <20140528103625.GA29219@e102568-lin.cambridge.arm.com>
- <5385D4EE.2040304@linaro.org>
- <20140528133428.GB29219@e102568-lin.cambridge.arm.com>
-Message-ID: <5385EB75.4090202@linaro.org>
+From: santosh.shukla@linaro.org (Santosh Shukla)
+Date: Wed, 28 May 2014 19:33:28 +0530
+Subject: [PATCH] ARM: Exynos : Fix build error with thumb2
+In-Reply-To: <1401119625-11309-1-git-send-email-santosh.shukla@linaro.org>
+References: <1401119625-11309-1-git-send-email-santosh.shukla@linaro.org>
+Message-ID: <CA+iXiiNWFa+K73vrXhy2bUV2rUpEb7FWdCBcAVpak=Asy6s4LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2014 08:34 AM, Lorenzo Pieralisi wrote:
-> On Wed, May 28, 2014 at 01:22:06PM +0100, Alex Elder wrote:
->> On 05/28/2014 05:36 AM, Lorenzo Pieralisi wrote:
->>> On Wed, May 28, 2014 at 04:30:47AM +0100, Alex Elder wrote:
->>>> On 05/27/2014 06:49 AM, Lorenzo Pieralisi wrote:
->>>>> On Tue, May 20, 2014 at 06:43:46PM +0100, Alex Elder wrote:
->>>>>> Broadcom mobile SoCs use a ROM-implemented holding pen for
->>>>>> controlled boot of secondary cores.  A special register is
->>>>>> used to communicate to the ROM that a secondary core should
->>>>>> start executing kernel code.  This enable method is currently
->>>>>> used for members of the bcm281xx and bcm21664 SoC families.
->>>>>>
->>>>>> The use of an enable method also allows the SMP operation vector to
->>>>>> be assigned as a result of device tree content for these SoCs.
->>>>>>
->>>>>> Signed-off-by: Alex Elder <elder@linaro.org>
->>>>>
->>>>> This is getting out of control, it is absolutely ghastly. I wonder how
->>>>> I can manage to keep cpus.txt updated if anyone with a boot method
->>>>> du jour adds into cpus.txt, and honestly in this specific case it is even
->>>>> hard to understand why.
->>>>
->>>> OK, in this message I'll focus on the particulars of this
->>>> proposed binding.
->>>>
->>>>> Can't it be done with bindings for the relative register address space
->>>>> (regmap ?) and platform code just calls the registers driver to set-up the
->>>>> jump address ? It is platform specific code anyway there is no way you
->>>>> can make this generic.
->>>>
->>>> I want to clarify what you're after here.
->>>>
->>>> My aim is to add SMP support for a class of Broadcom SMP
->>>> machines.  To do so, I'm told I need to use the technique
->>>> of assigning the SMP operations vector as a result of
->>>> identifying an enable method in the DT.
->>>>
->>>> For 32-bit ARM, there are no generic "enable-method" values.
->>>> (I did attempt to create one for "spin-table" but that was
->>>> rejected by Russell King.)  For the machines I'm trying to
->>>> enable, secondary CPUS start out spinning in a ROM-based
->>>> holding pen, and there is no need for a kernel-based one.
->>>>
->>>> However, like a spin-table/holding pen enable method, a
->>>> memory location is required for coordination between the
->>>> boot CPU running kernel code and secondary CPUs running ROM
->>>> code.  My proposal specifies it using a special numeric
->>>> property value named "secondary-boot-reg" in the "cpus"
->>>> node in the DT.
->>>>
->>>> And as I understand it, the issue you have relates to how
->>>> this memory location is specified.
->>>
->>> The issue I have relates to cluttering cpus.txt with all
->>> sorts of platform specific SMP boot hacks.
->>
->> OK, as I mentioned in my other message, I totally
->> agree with you here.  It's a total (and building)
->> mess.  I discussed this with Mark Rutland at ELC
->> last month and suggested splitting that stuff out
->> of "cpus.txt", which I have now proposed with a
->> patch.
->>     https://lkml.org/lkml/2014/5/8/545
-> 
-> I think this makes sense, I will review that patchset, and with this
-> approach agreed I am ok with adding a platform specific boot method,
-> since it is split up "nicely", do not bother adding a specific driver
-> to poke a register (it will be fun to see the number of files we have
-> to add to /cpu-enable-method though, big fun).
+ping!
 
-Great!
-
-I used the existing documentation and the code as a guide in
-crafting the text of those descriptions.  Some of them I had
-to speculate though--especially for ARM64 (for which there is
-documentation but nothing in the tree that uses it).  So it
-needs some informed feedback.
-
-> I still think that it is high time we started pushing back on these
-> platform hacks and move towards a common interface like PSCI to boot
-> (and suspend) ARM processors, there is no reason whatsoever why this
-> can't be done on the platforms you are trying to get merged unless I am
-> missing something.
-
-We have no need for anything other than SMP startup at this point
-on this platform.  If the framework were there for me to use I
-would have used it.
-
-Thanks again for working through this with me.
-
-					-Alex
-
-> Lorenzo
-> 
+On 26 May 2014 21:23, Santosh Shukla <santosh.shukla@linaro.org> wrote:
+> From: santosh shukla <santosh.shukla@linaro.org>
+>
+> Add non-global symbol .LLl2x0_regs_phys to avoid build break in thumb2 mode.
+>
+> IIUC, arm assembler fail to load value of "global" variable
+> l2xo_regs_phys for thum2 mode and wrapping it in non-global symbol like
+> .Ll2x0_regs_phys solves the build break issue.
+>
+> arch/arm/mach-exynos/sleep.S: Assembler messages:
+> arch/arm/mach-exynos/sleep.S:57: Error: invalid immediate for address
+> calculation (value = 0x00000004)
+>
+> fix inspired from [1]
+>
+> [1] https://lkml.org/lkml/2010/3/31/235
+>
+> Signed-off-by: santosh shukla <santosh.shukla@linaro.org>
+> ---
+>  arch/arm/mach-exynos/sleep.S |    4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-exynos/sleep.S b/arch/arm/mach-exynos/sleep.S
+> index a2613e9..dc8c6b6 100644
+> --- a/arch/arm/mach-exynos/sleep.S
+> +++ b/arch/arm/mach-exynos/sleep.S
+> @@ -54,7 +54,7 @@ ENTRY(exynos_cpu_resume)
+>         ldr     r1, =CPU_CORTEX_A9
+>         cmp     r0, r1
+>         bne     skip_l2_resume
+> -       adr     r0, l2x0_regs_phys
+> +       adr     r0, .Ll2x0_regs_phys
+>         ldr     r0, [r0]
+>         cmp     r0, #0
+>         beq     skip_l2_resume
+> @@ -79,6 +79,8 @@ skip_l2_resume:
+>         b       cpu_resume
+>  ENDPROC(exynos_cpu_resume)
+>  #ifdef CONFIG_CACHE_L2X0
+> +
+> +.Ll2x0_regs_phys:
+>         .globl l2x0_regs_phys
+>  l2x0_regs_phys:
+>         .long   0
+> --
+> 1.7.9.5
+>
