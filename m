@@ -1,37 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 28 May 2014 11:06:07 -0700
-Subject: [GIT PULL] mfd: Immutable branch between MFD and OMAP, due for
- v3.16
-In-Reply-To: <20140528071313.GH4227@lee--X1>
-References: <1401214140-9828-1-git-send-email-tony@atomide.com>
- <20140528071313.GH4227@lee--X1>
-Message-ID: <20140528180607.GB4707@atomide.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 28 May 2014 18:25:43 +0000 (UTC)
+Subject: OMAP baseline test results for v3.15-rc7
+In-Reply-To: <20140527201752.GD14191@drone.musicnaut.iki.fi>
+References: <alpine.DEB.2.02.1405271657050.28436@utopia.booyaka.com>
+ <20140527201752.GD14191@drone.musicnaut.iki.fi>
+Message-ID: <alpine.DEB.2.02.1405281823460.1280@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lee Jones <lee.jones@linaro.org> [140528 00:14]:
-> Thanks Tony, here's the pull-request:
-> 
-> The following changes since commit 455c6fdbd219161bd09b1165f11699d6d73de11c:
-> 
->   Linux 3.14 (2014-03-30 20:40:15 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/mfd-omap-v3.16-1
-> 
-> for you to fetch changes up to 43fef47f94a1ae46fb2720dada32fa3b5547bee2:
-> 
->   mfd: twl4030-power: Add a configuration to turn off oscillator during off-idle (2014-05-28 08:06:18 +0100)
-> 
-> ----------------------------------------------------------------
-> Second immutable branch between MFD and OMAP due for the v3.16 merge window.
+Hi Aaro,
 
-Thanks a lot, this will make it easier for me to chase down potential
-PM related regressions ;) I'm merging this for testing only into the
-linux-omap master branch, no need for me to include it into any
-of my upstream heading branches.
+On Tue, 27 May 2014, Aaro Koskinen wrote:
 
-Regards,
+> Hi Paul,
+> 
+> On Tue, May 27, 2014 at 04:59:16PM +0000, Paul Walmsley wrote:
+> > Here are some basic OMAP test results for Linux v3.15-rc7.
+> > Logs and other details at:
+> > 
+> >     http://www.pwsan.com/omap/testlogs/test_v3.15-rc7/20140526221127/
+> 
+> This is great stuff, as always, but just curious, why are the N800 booting
+> results not reported? Based on your logs you are still booting it...?
 
-Tony
+That test run was broken.  Not only did it omit the N800 test, it also 
+tested v3.15-rc6, rather than v3.15-rc7 - hence the 0 difference in the 
+size report from v3.15-rc6.
+
+The tests are being rerun and will be reposted.
+
+Thanks for the sharp-eyed attention -
+
+- Paul
