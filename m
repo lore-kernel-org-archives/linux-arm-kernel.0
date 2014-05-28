@@ -1,134 +1,184 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 28 May 2014 11:08:34 +0200
-Subject: [PATCH v6 3/4] live migration support for VM dirty log management
-In-Reply-To: <538509C9.8070403@samsung.com>
-References: <1400178451-4984-1-git-send-email-m.smarduch@samsung.com>
- <1400178451-4984-4-git-send-email-m.smarduch@samsung.com>
- <20140527201244.GC16428@lvm> <538509C9.8070403@samsung.com>
-Message-ID: <20140528090834.GK16428@lvm>
+Date: Wed, 28 May 2014 11:14:38 +0200
+Subject: [PATCH v3 14/14] ARM64: KVM: fix big endian issue in
+ access_vm_reg for 32bit guest
+In-Reply-To: <CAA3XUr15fJu3vRU3Hq=fajiRCd1gvkdmvJfsa3Te4N-3puwcWA@mail.gmail.com>
+References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
+ <1399997646-4716-15-git-send-email-victor.kamensky@linaro.org>
+ <20140526175225.GF31431@lvm>
+ <CAA3XUr15fJu3vRU3Hq=fajiRCd1gvkdmvJfsa3Te4N-3puwcWA@mail.gmail.com>
+Message-ID: <20140528091438.GL16428@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 02:55:21PM -0700, Mario Smarduch wrote:
-> On 05/27/2014 01:12 PM, Christoffer Dall wrote:
-> > On Thu, May 15, 2014 at 11:27:30AM -0700, Mario Smarduch wrote:
+On Tue, May 27, 2014 at 11:11:57PM -0700, Victor Kamensky wrote:
+> On 26 May 2014 10:52, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> > On Tue, May 13, 2014 at 09:14:06AM -0700, Victor Kamensky wrote:
+> >> Fix isssue with 32bit guests running on top of BE KVM host. Guest
+> >> state is retored with double word read operations. Within the high
+> >
+> > restored (spell check should catch this).
+> >
+> > "Guest state is restored with double word read operations."  I don't
+> > know what this sentence is supposed to tell me.
+> >
+> >> and low word data is already byteswap. This code effectively swaps
+> >
+> > "data is already byteswap" is not English.  data is already byteswapped?
+> >
+> >> two words within 64bit value.
+> >>
+> >> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> >> ---
+> >>  arch/arm64/kvm/sys_regs.c | 14 ++++++++++++--
+> >>  1 file changed, 12 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> >> index 060c3a9..4438b47 100644
+> >> --- a/arch/arm64/kvm/sys_regs.c
+> >> +++ b/arch/arm64/kvm/sys_regs.c
+> >> @@ -51,6 +51,16 @@ static u32 cache_levels;
+> >>  /* CSSELR values; used to index KVM_REG_ARM_DEMUX_ID_CCSIDR */
+> >>  #define CSSELR_MAX 12
+> >>
+> >> +/* Word access indexes for 64bit vm accessor */
+> >> +#ifdef CONFIG_CPU_BIG_ENDIAN
+> >> +#define CP15_REG_MSW_INDEX 0
+> >> +#define CP15_REG_LSW_INDEX 1
+> >> +#else
+> >> +#define CP15_REG_MSW_INDEX 1
+> >> +#define CP15_REG_LSW_INDEX 0
+> >> +#endif
+> >> +
+> >> +
+> >>  /* Which cache CCSIDR represents depends on CSSELR value. */
+> >>  static u32 get_ccsidr(u32 csselr)
+> >>  {
+> >> @@ -137,9 +147,9 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
+> >>       if (!p->is_aarch32) {
+> >>               vcpu_sys_reg(vcpu, r->reg) = val;
+> >>       } else {
+> >> -             vcpu_cp15(vcpu, r->reg) = val & 0xffffffffUL;
+> >> +             vcpu_cp15(vcpu, r->reg + CP15_REG_LSW_INDEX) = val & 0xffffffffUL;
+> >>               if (!p->is_32bit)
+> >> -                     vcpu_cp15(vcpu, r->reg + 1) = val >> 32;
+> >> +                     vcpu_cp15(vcpu, r->reg + CP15_REG_MSW_INDEX) = val >> 32;
+> >>       }
+> >>       return true;
+> >>  }
+> >> --
+> >> 1.8.1.4
+> >>
+> > I really don't like this. If anything I feel like it should be
+> > abstracted inside vcpu_cp15,
+> 
+> good point, please see revised proposal below
+> 
+> > but wouldn't it be cleaner to do something
+> > along the lines of:
+> >
+> > u64 *regstore = (u64 *)vcpu->arch.ctxt.cp15[r->reg];
+> > if (p->is_32bit)
+> >         val &= 0xffffffffUL;
+> > *regstore = val;
+> 
+> I don't think above will be correct. The way I read
+> it the following hypothetical instructions sequence
+> 
+> mcrr    p15, 0, r6, r7, c2    @ TTBR 0
+> mcr    p15, 0, r6, c2, c0, 0 @ 32bit TTBR 0
+> 
+> will get TTBR 0 high word to 0, when mrc instruction executes, but
+> it should be left unchanged in case of 'p->is_32bit'
+> 
+> How about something like following? Is it move into right direction?
+> 
+> From b0a7793b03d9c62f7b9c53a317cb2d19a75c935b Mon Sep 17 00:00:00 2001
+> From: Victor Kamensky <victor.kamensky@linaro.org>
+> Date: Mon, 12 May 2014 13:57:21 -0700
+> Subject: [PATCH] ARM64: KVM: fix big endian issue in access_vm_reg for 32bit
+>  guest
+> 
+> Fix issue with 32bit guests running on top of BE KVM host.
+> Indexes of high and low words of 64bit cp15 register are
+> swapped in case of big endian code, since 64bit cp15 state is
+> restored or saved with double word write or read instruction.
+> 
+> Define helper macros to access high low words of 64bit cp15
+> register.
+> 
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> ---
+>  arch/arm64/include/asm/kvm_host.h | 8 ++++++++
+>  arch/arm64/kvm/sys_regs.c         | 4 ++--
+>  2 files changed, 10 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_host.h
+> b/arch/arm64/include/asm/kvm_host.h
+> index 0a1d697..e9d2e11 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -140,6 +140,14 @@ struct kvm_vcpu_arch {
+>  #define vcpu_sys_reg(v,r)    ((v)->arch.ctxt.sys_regs[(r)])
+>  #define vcpu_cp15(v,r)        ((v)->arch.ctxt.cp15[(r)])
+> 
+> +#ifdef CONFIG_CPU_BIG_ENDIAN
+> +#define vcpu_cp15_64_high(v,r) ((v)->arch.ctxt.cp15[((r) + 0)])
+> +#define vcpu_cp15_64_low(v,r) ((v)->arch.ctxt.cp15[((r) + 1)])
+> +#else
+> +#define vcpu_cp15_64_high(v,r) ((v)->arch.ctxt.cp15[((r) + 1)])
+> +#define vcpu_cp15_64_low(v,r) ((v)->arch.ctxt.cp15[((r) + 0)])
+> +#endif
+> +
+>  struct kvm_vm_stat {
+>      u32 remote_tlb_flush;
+>  };
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index a13e7e7..b243e07 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -137,9 +137,9 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
+>      if (!p->is_aarch32) {
+>          vcpu_sys_reg(vcpu, r->reg) = val;
+>      } else {
+> -        vcpu_cp15(vcpu, r->reg) = val & 0xffffffffUL;
+> +        vcpu_cp15_64_low(vcpu, r->reg) = val & 0xffffffffUL;
+>          if (!p->is_32bit)
+> -            vcpu_cp15(vcpu, r->reg + 1) = val >> 32;
+> +            vcpu_cp15_64_high(vcpu, r->reg) = val >> 32;
+>      }
+>      return true;
+>  }
+> -- 
+> 1.8.1.4
 
-[...]
+This is definitely much better than the original patch.
 
-> >> +
-> >> +	/* If pgd, pud, pmd not present and you cross pmd range check next
-> >> +	 * index.
-> >> +	 */
-> >> +	pgd = pgdp + pgd_index(ipa);
-> >> +	if (unlikely(crosses_pmd && !pgd_present(*pgd))) {
-> >> +		pgd = pgdp + pgd_index(next);
-> >> +		if (!pgd_present(*pgd))
-> >> +			return;
-> >> +	}
-> >> +
-> >> +	pud = pud_offset(pgd, ipa);
-> >> +	if (unlikely(crosses_pmd && !pud_present(*pud))) {
-> >> +		pud = pud_offset(pgd, next);
-> >> +		if (!pud_present(*pud))
-> >> +			return;
-> >> +	}
-> >> +
-> >> +	pmd = pmd_offset(pud, ipa);
-> >> +	if (unlikely(crosses_pmd && !pmd_present(*pmd))) {
-> >> +		pmd = pmd_offset(pud, next);
-> >> +		if (!pmd_present(*pmd))
-> >> +			return;
-> >> +	}
-> >> +
-> >> +	for (;;) {
-> >> +		pte = pte_offset_kernel(pmd, ipa);
-> >> +		if (!pte_present(*pte))
-> >> +			goto next_ipa;
-> >> +
-> >> +		if (kvm_s2pte_readonly(pte))
-> >> +			goto next_ipa;
-> >> +		kvm_set_s2pte_readonly(pte);
-> >> +next_ipa:
-> >> +		mask &= mask - 1;
-> >> +		if (!mask)
-> >> +			break;
-> >> +
-> >> +		/* find next page */
-> >> +		ipa = (gfnofst + __ffs(mask)) << PAGE_SHIFT;
-> >> +
-> >> +		/* skip upper page table lookups */
-> >> +		if (!crosses_pmd)
-> >> +			continue;
-> >> +
-> >> +		pgd = pgdp + pgd_index(ipa);
-> >> +		if (unlikely(!pgd_present(*pgd)))
-> >> +			goto next_ipa;
-> >> +		pud = pud_offset(pgd, ipa);
-> >> +		if (unlikely(!pud_present(*pud)))
-> >> +			goto next_ipa;
-> >> +		pmd = pmd_offset(pud, ipa);
-> >> +		if (unlikely(!pmd_present(*pmd)))
-> >> +			goto next_ipa;
-> >> +	}
-> > 
-> > So I think the reason this is done separately on x86 is that they have
-> > an rmap structure for their gfn mappings so that they can quickly lookup
-> > ptes based on a gfn and write-protect it without having to walk the
-> > stage-2 page tables.
 > 
-> Yes, they also use rmapps for mmu notifiers, invalidations on huge VMs and 
-> large ranges resulted in excessive times. 
-> > 
-> > Unless you want to introduce this on ARM, I think you will be much
+> > But I think the thing that bothers me in general with all these patches
+> > is that they deal specially with a lot of situations where the data
+> > structure was designed specifically to make the code easy to read, and
+> > now it just becomes a really complicated mess.  Have you carefully
+> > considered other options, redesigning the data structure layout etc.?
 > 
-> Eventually yes but that would also require reworking mmu notifiers.  I had 
-> two step approach in mind. Initially get the dirty page marking to work, 
-> TLB flushing, GIC/arch-timer migration, validate migration under various 
-> stress loads (page reclaim) with mmu notifiers, test several VMs and migration 
-> times. 
+> I have considered different options and I am open for
+> suggestions. Bytesswaps quite often could be done in different
+> places but achieve the same result. In several cases I initially
+> developed patch that deals with BE issue in one way and
+> reworked to make it more compact less intrusive. For example
+> in this particular case order of high and low words of 64bit cp15
+> register could be kept the same in BE/LE cases but code that
+> save/restore it could be changed to do byteswap. My opinion
+> that proposed option is more clean.
 > 
-> Then get rmapp (or something similar) working - eventually for huge VMs it's
-> needed. In short two phases.
-> 
-> > better off just having a single (properly written) iterating
-> > write-protect function, that takes a start and end IPA and a bitmap for
-> > which pages to actually write-protect, which can then handle the generic
-> > case (either NULL or all-ones bitmap) or a specific case, which just
-> > traverses the IPA range given as input.  Such a function should follow
-> > the model of page table walk functions discussed previously
-> > (separate functions: wp_pgd_enties(), wp_pud_entries(),
-> > wp_pmd_entries(), wp_pte_entries()).
-> > 
-> > However, you may want to verify my assumption above with the x86 people
-> > and look at sharing the rmap logic between architectures.
-> > 
-> > In any case, this code is very difficult to read and understand, and it
-> > doesn't look at all like the other code we have to walk page tables.  I
-> > understand you are trying to optimize for performance (by skipping some
-> > intermediate page table level lookups), but you never declare that goal
-> > anywhere in the code or in the commit message.
-> 
-> Marc's comment noticed I was walking a small range (128k), using upper table
-> iterations that covered 1G, 2MB ranges. As you mention the code tries to
-> optimize upper table lookups. Yes the function is too bulky, but I'm not sure how 
-> to remove the upper table checks since page tables may change between the 
-> time pages are marked dirty and the log is retrieved. And if a memory slot 
-> is very dirty walking upper tables will impact performance. I'll think some 
-> more on this function.
-> 
-I think you should aim at the simplest possible implementation that
-functionally works, first.  Let's verify that this thing works, have
-clean working code that implementation-wise is as minimal as possible.
+What I was thinking is to avoid packing 64-bit values as two 32-bit
+values, so for example having two separate arrays on the kvm_cpu_context
+struct, one for 32-bit coprocessor registers and one for 64-bit
+coprocessor registers.
 
-Then we can run perf on that and see if our migrations are very slow,
-where we are actually spending time, and only then optimize it.
+That would sort of follow Benjamin Herrenschmidt's manatra about always
+using the correctly typed values everywhere to avoid endianness issues.
 
-The solution to this specific problem for the time being appears quite
-clear to me: Follow the exact same scheme as for unmap_range (the one I
-sent out here:
-https://lists.cs.columbia.edu/pipermail/kvmarm/2014-May/009592.html, the
-diff is hard to read, so I recommend you apply the patch and look at the
-resulting code).  Have a similar scheme, call it wp_ipa_range() or
-something like that, and use that for now.
+Did you look at that approach?  Does it blow up?
 
 -Christoffer
