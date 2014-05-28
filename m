@@ -1,61 +1,54 @@
-From: fkan@apm.com (Feng Kan)
-Date: Wed, 28 May 2014 10:01:21 -0700
-Subject: [PATCH 1/3] gpio: Add APM X-Gene SoC GPIO controller support
-In-Reply-To: <CAL85gmCZD90UUZgC0-X4hui2L1V5TuH++o3fA20pRF_ZQEpDQw@mail.gmail.com>
-References: <1400263432-922-1-git-send-email-fkan@apm.com>
- <1400263432-922-2-git-send-email-fkan@apm.com>
- <CAAVeFu+TOfjfvisinv3oJ9PobdV9HcNJhr+3VYneSJ54uGwiAg@mail.gmail.com>
- <CAL85gmDjVszNd3TB51BGa+78wEEZmJfBOLNKOpTEvMTGU2VdBA@mail.gmail.com>
- <CACRpkdaVYXU9GN5OymuP3JRsQO3unkRGb5vZN3Jb2nWSnkh1SQ@mail.gmail.com>
- <CAL85gmCZD90UUZgC0-X4hui2L1V5TuH++o3fA20pRF_ZQEpDQw@mail.gmail.com>
-Message-ID: <CAL85gmCH4pwScDxhTRFvKYgHqdfG+9x5XWoxZyoNDXbsq-=o4w@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 28 May 2014 18:07:16 +0100
+Subject: [PATCH] arm64: mm: fix pmd_write CoW brokenness
+Message-ID: <1401296836-16837-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 9:59 AM, Feng Kan <fkan@apm.com> wrote:
-> On Tue, May 27, 2014 at 1:25 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Wed, May 21, 2014 at 1:54 AM, Feng Kan <fkan@apm.com> wrote:
->>
->>> I see each bank as separate gpio chip. It is a simple way to
->>> abstract the banks since they can operate independently.
->>
->> I think they should also be separate devices, and separate nodes
->> in the device tree.
->>
->>> It also
->>> provided me a way to fix the sysfs gpio base number, regardless if
->>> a particular bank node is pulled out.
->>
->> The GPIO sysfs is unpredictable for this and many other
->> reasons and should not be relied upon.
->>
->>> This is also done in similar way
->>> in some other gpio drivers such as the dwapb gpio driver.
->>
->> I think the dwapb has it's registers mingled while your banks
->> seem to be separate chunks.
->
-> Thanks for the comments, I will fix these problems. Just some details
-> in terms of the register layout. I will break out the gpio to separate
-> device nodes as instructed, I will have to use the reg attribute to offset
-> bank registers. Please let me know if it is acceptable.
->
-> gfc_gpio_fl0              GFC42'h1701c00c
-> gfc_gpio_fl0_mux      GFC42'h1701c010
-> gfc_gpio_fl1              GFC42'h1701c018
-> gfc_gpio_fl1_mux      GFC42'h1701c01c
-> gfc_gpio_fl2              GFC42'h1701c024
-> gfc_gpio_fl2_mux      GFC42'h1701c028
-> gfc_gpio_fl0_od        GFC42'h1701c030
-> gfc_gpio_fl1_od        GFC42'h1701c034
-> gfc_gpio_fl2_od        GFC42'h1701c038
+Commit 9c7e535fcc17 ("arm64: mm: Route pmd thp functions through pte
+equivalents") changed the pmd manipulator and accessor functions to
+convert the target pmd to a pte, process it with the pte functions, then
+convert it back. Along the way, we gained support for PTE_WRITE, however
+this is completely ignored by set_pmd_at, and so we fail to set the
+PMD_SECT_RDONLY for PMDs, resulting in all sorts of lovely failures (like
+CoW not working).
 
-Please kindly give some guidance on this, as you can see the individual
-gpio bank is interleaved in the address space, it is not likely to break this
-into multiple device nodes.
->
->
->
->>
->> Yours,
->> Linus Walleij
+Partially reverting the offending commit (by making use of
+PMD_SECT_RDONLY explicitly for pmd_{write,wrprotect,mkwrite} functions)
+leads to further issues because pmd_write can then return potentially
+incorrect values for page table entries marked as RDONLY, leading to
+BUG_ON(pmd_write(entry)) tripping under some THP workloads.
+
+This patch fixes the issue by routing set_pmd_at through set_pte_at,
+which correctly takes the PTE_WRITE flag into account. Given that
+THP mappings are always anonymous, the additional cache-flushing code
+in __sync_icache_dcache won't impose any significant overhead as the
+flush will be skipped.
+
+Cc: Steve Capper <steve.capper@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+
+Whilst this is a fairly scary change at this point in the cycle, I can't get
+through an LTP run without it. Furthermore, spurious CoW failures for tasks
+that happen to get transparent hugepages are a pretty significant regression.
+
+ arch/arm64/include/asm/pgtable.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 90c811f05a2e..20785f9da95c 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -266,7 +266,7 @@ static inline pmd_t pte_pmd(pte_t pte)
+ 
+ #define pmd_page(pmd)           pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
+ 
+-#define set_pmd_at(mm, addr, pmdp, pmd)	set_pmd(pmdp, pmd)
++#define set_pmd_at(mm, addr, pmdp, pmd)	set_pte_at(mm, addr, pmdp, pmd_pte(pmd))
+ 
+ static inline int has_transparent_hugepage(void)
+ {
+-- 
+1.9.2
