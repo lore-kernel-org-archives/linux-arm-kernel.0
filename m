@@ -1,155 +1,157 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 28 May 2014 15:58:04 +0100
-Subject: [PATCH v2 1/2] Documentation: add Device tree bindings for
- Hisilicon hix5hd2 ethernet
-In-Reply-To: <5385E3CC.9050700@linaro.org>
-References: <1401194667-14445-1-git-send-email-zhangfei.gao@linaro.org>
- <1401194667-14445-2-git-send-email-zhangfei.gao@linaro.org>
- <20140527133423.GB6969@leverpostej> <53857714.3070603@linaro.org>
- <20140528125354.GA2092@leverpostej> <5385E3CC.9050700@linaro.org>
-Message-ID: <20140528145804.GA16088@leverpostej>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 28 May 2014 23:05:39 +0800
+Subject: [PATCH] ahci: imx: manage only sata_ref_clk in
+ imx_sata_enable[disable]
+Message-ID: <1401289539-3485-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 02:25:32PM +0100, zhangfei wrote:
-> 
-> 
-> On 05/28/2014 08:53 PM, Mark Rutland wrote:
-> > On Wed, May 28, 2014 at 06:41:40AM +0100, zhangfei wrote:
-> >> Dear Mark
-> >>
-> >> On 05/27/2014 09:34 PM, Mark Rutland wrote:
-> >>> On Tue, May 27, 2014 at 01:44:26PM +0100, Zhangfei Gao wrote:
-> >>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> >>>> ---
-> >>>>    .../bindings/net/hisilicon-hix5hd2-gmac.txt        |   36 ++++++++++++++++++++
-> >>>>    1 file changed, 36 insertions(+)
-> >>>>    create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
-> >>>>
-> >>>> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt b/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
-> >>>> new file mode 100644
-> >>>> index 0000000..5fe3835
-> >>>> --- /dev/null
-> >>>> +++ b/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
-> >>>> @@ -0,0 +1,36 @@
-> >>>> +Hisilicon hix5hd2 gmac controller
-> >>>
-> >>> Just to clarify, is the SoC name "hix5hd2", or is the 'x' a wildcard?
-> >> "hix5hd2" is Soc name, which contains a series of similar chips.
-> >
-> > How similar are they?
-> >
-> > It's preferable to have a precise name, even when used as a fallback for
-> > other similar devices.
-> 
-> The soc name "hix5hd2" is provided by hisilicon.
-> In fact, they have considered a lot and discussed long time for this name :)
+Doing suspend/resume on imx6q and imx53 boards with no SATA disk
+attached will trigger the following warning.
 
-Sure, I would not expect hisilicon to rebrand their SoC family due to my
-comments on a mailing list.
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 661 at drivers/ata/libahci.c:224 ahci_enable_ahci+0x74/0x8)
+Modules linked in:
+CPU: 0 PID: 661 Comm: sh Tainted: G        W     3.15.0-rc5-next-20140521-000027
+Backtrace:
+[<80011c90>] (dump_backtrace) from [<80011e2c>] (show_stack+0x18/0x1c)
+ r6:803a22f4 r5:00000000 r4:00000000 r3:00000000
+[<80011e14>] (show_stack) from [<80661e60>] (dump_stack+0x88/0xa4)
+[<80661dd8>] (dump_stack) from [<80028fdc>] (warn_slowpath_common+0x70/0x94)
+ r5:00000009 r4:00000000
+[<80028f6c>] (warn_slowpath_common) from [<80029024>] (warn_slowpath_null+0x24/)
+ r8:808f68c4 r7:00000000 r6:00000000 r5:00000000 r4:e0810004
+[<80029000>] (warn_slowpath_null) from [<803a22f4>] (ahci_enable_ahci+0x74/0x80)
+[<803a2280>] (ahci_enable_ahci) from [<803a2324>] (ahci_reset_controller+0x24/0)
+ r8:ddcd9410 r7:80351178 r6:ddcd9444 r5:dde8b850 r4:e0810000 r3:ddf35e90
+[<803a2300>] (ahci_reset_controller) from [<803a2c68>] (ahci_platform_resume_ho)
+ r7:80351178 r6:ddcd9444 r5:dde8b850 r4:ddcd9410
+[<803a2c30>] (ahci_platform_resume_host) from [<803a38f0>] (imx_ahci_resume+0x2)
+ r5:00000000 r4:ddcd9410
+[<803a38c4>] (imx_ahci_resume) from [<803511ac>] (platform_pm_resume+0x34/0x54)
+....
 
-w.r.t. naming in the kernel I could only find an unanswered query [1]
-from Olof Johansson earlier this month, and no rationale for the change.
+The reason is that the SATA controller has no working clock at this
+point, and thus ahci_enable_ahci() fails to enable the controller.  In
+case that there is no SATA disk attached, the imx_sata_disable() gets
+called in ahci_imx_error_handler(), and both sata_clk and sata_ref_clk
+will be disabled there.  Because all the imx_sata_enable() calls
+afterward will return immediately due to imxpriv->no_device check, the
+SATA controller working clock sata_clk will never get any chance to be
+enabled again.
 
-I tried searching online for "hix5hd2" and didn't find much other than a
-suggestion it's also known as "Hi3716cv200". I assume this means the
-Hi371 range in general, which covers a few variants on the hisilicon
-website [2]. The names there are far more specific than "hix5hd2".
+This is a regression caused by commit 90870d79d4f2 (ahci-imx: Port to
+library-ised ahci_platform).  Before the commit, only sata_ref_clk is
+managed by the driver in enable/disable function.  But after the commit,
+all the clocks are enabled/disabled in a row by ahci platform helpers
+ahci_platform_enable[disable]_clks.  Since ahb_clk is a bus clock which
+does not have gate at all, and i.MX low-power hardware module already
+manages sata_clk across suspend/resume cycle, the only clock that needs
+to be managed by software is sata_ref_clk.
 
-We've been bitten in the past when generic SoC family names are used in
-DT bindings without also having specific strings. It's usually better to
-choose a particular variant as the base, and have others claim
-compatibility with that (with additional more specific compatible
-strings).
+So instead of using ahci_platform_enable[disable]_clks to manage all
+the clocks in a row from imx_sata_enable[disable], we should manage
+only sata_ref_clk in there.
 
-The key issue is how similar the SoC variants are. If they are identical
-w.r.t. this block and the blocks it is attached to, then the compatible
-string you propose is likely to be fine. However, subtle differences in
-integration across variants might cause issues for which we want
-targeted workarounds, or we might be able to make better use of
-particular variants based on information that we cannot probe from the
-HW. For that we need very specific compatible strings, and in general it
-is better to add those and not need them than to need them but not have
-them.
+Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
+Fixes: 90870d79d4f2 (ahci-imx: Port to library-ised ahci_platform)
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ drivers/ata/ahci_imx.c | 35 +++++++++++++++++++++++++++++++----
+ 1 file changed, 31 insertions(+), 4 deletions(-)
 
-> >
-> >>>
-> >>>> +
-> >>>> +Required properties:
-> >>>> +- compatible: should be "hisilicon,hix5hd2-gmac".
-> >>>> +- reg: specifies base physical address(s) and size of the device registers.
-> >>>> +  The first region is the MAC register base and size.
-> >>>> +  The second region is external interface control register.
-> >>>
-> >>> Single registers? Are these not part of a larger block?
-> >> It is a single register, outside of the memory region.
-> >> gmac0: reg = <0xf9840000 0x1000>,<0xf984300c 0x4>;
-> >> gmac1: reg = <0xf9841000 0x1000>,<0xf9843010 0x4>;
-> >>
-> >> The register is controlling interface mode, duplex etc.
-> >> In fact it is rather a bug fix to the silicon, when it is added with
-> >> intension of not touching the original ip design.
-> >>
-> >> It may be moved to the memory region in the future silicon design.
-> >> However, currently without such register, it can not work.
-> >
-> > I see. Is it possible that a future revision might have this fixed, such
-> > that the second reg entry would become optional?
-> 
-> We have given this feedback to the silicon team, and they admit this 
-> should be fixed.
-> However, not sure it can be fixed soon since the product pressure.
-> Can we keep this first since it is required currently.
-
-I'm not asking for its removal, I'm just trying to find out if in future
-we might need to support a DTB without the second entry.
-
-> 
-> >
-> >>>
-> >>>> +- interrupts: should contain the MAC interrupts
-> >>>
-> >>> How many, in which order?
-> >> There is only one interrrupt.
-> >> How about:
-> >> - interrupts: interrupt for the device
-> >
-> > The original wording is OK, all you need to do is change the original
-> > wording to get rid of the trailing 's':
-> >
-> > - interrupts: should contain the MAC interrupt
-> OK, thanks
-> 
-> >
-> >>
-> >>>
-> >>>> +- #address-cells: must be <1>.
-> >>>> +- #size-cells: must be <0>.
-> >>>> +- phy-mode: see ethernet.txt [1].
-> >>>> +- phy-handle: see ethernet.txt [1].
-> >>>> +- mac-address: see ethernet.txt [1].
-> >>>> +- clocks: clock phandle and specifier pair.
-> >>>
-> >>> Is this the only clock input to the gmac block?
-> >>>
-> >>> Is the clock input named in any documentation?
-> >>
-> >> We have abstract only ONE mac clock input, which is in other patch for
-> >> drivers/clk/hisilicon/clk-hix5hd2.c
-> >> The clock input name is in include/dt-bindings/clock/hix5hd2-clock.h,
-> >> described in "Documentation/devicetree/bindings/clock/hix5hd2-clock.txt"
-> >
-> > If you have only one physical clock input in the GMAC block, that's
-> > fine. Is there a name for that input line from the POV of the GMAC
-> > block?
-> 
-> There is no name, and since it is only one clock, no name required.
-
-Ok. That's fine then, assuming we don't expect variants with different
-clock input lines wired up.
-
-Cheers,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/255195.html
-[2] http://www.hisilicon.com/products/digital.html
+diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
+index 3a901520c62b..4384a7d72133 100644
+--- a/drivers/ata/ahci_imx.c
++++ b/drivers/ata/ahci_imx.c
+@@ -58,6 +58,8 @@ enum ahci_imx_type {
+ struct imx_ahci_priv {
+ 	struct platform_device *ahci_pdev;
+ 	enum ahci_imx_type type;
++	struct clk *sata_clk;
++	struct clk *sata_ref_clk;
+ 	struct clk *ahb_clk;
+ 	struct regmap *gpr;
+ 	bool no_device;
+@@ -224,7 +226,7 @@ static int imx_sata_enable(struct ahci_host_priv *hpriv)
+ 			return ret;
+ 	}
+ 
+-	ret = ahci_platform_enable_clks(hpriv);
++	ret = clk_prepare_enable(imxpriv->sata_ref_clk);
+ 	if (ret < 0)
+ 		goto disable_regulator;
+ 
+@@ -291,7 +293,7 @@ static void imx_sata_disable(struct ahci_host_priv *hpriv)
+ 				   !IMX6Q_GPR13_SATA_MPLL_CLK_EN);
+ 	}
+ 
+-	ahci_platform_disable_clks(hpriv);
++	clk_disable_unprepare(imxpriv->sata_ref_clk);
+ 
+ 	if (hpriv->target_pwr)
+ 		regulator_disable(hpriv->target_pwr);
+@@ -385,6 +387,19 @@ static int imx_ahci_probe(struct platform_device *pdev)
+ 	imxpriv->no_device = false;
+ 	imxpriv->first_time = true;
+ 	imxpriv->type = (enum ahci_imx_type)of_id->data;
++
++	imxpriv->sata_clk = devm_clk_get(dev, "sata");
++	if (IS_ERR(imxpriv->sata_clk)) {
++		dev_err(dev, "can't get sata clock.\n");
++		return PTR_ERR(imxpriv->sata_clk);
++	}
++
++	imxpriv->sata_ref_clk = devm_clk_get(dev, "sata_ref");
++	if (IS_ERR(imxpriv->sata_ref_clk)) {
++		dev_err(dev, "can't get sata_ref clock.\n");
++		return PTR_ERR(imxpriv->sata_ref_clk);
++	}
++
+ 	imxpriv->ahb_clk = devm_clk_get(dev, "ahb");
+ 	if (IS_ERR(imxpriv->ahb_clk)) {
+ 		dev_err(dev, "can't get ahb clock.\n");
+@@ -407,10 +422,14 @@ static int imx_ahci_probe(struct platform_device *pdev)
+ 
+ 	hpriv->plat_data = imxpriv;
+ 
+-	ret = imx_sata_enable(hpriv);
++	ret = clk_prepare_enable(imxpriv->sata_clk);
+ 	if (ret)
+ 		return ret;
+ 
++	ret = imx_sata_enable(hpriv);
++	if (ret)
++		goto disable_clk;
++
+ 	/*
+ 	 * Configure the HWINIT bits of the HOST_CAP and HOST_PORTS_IMPL,
+ 	 * and IP vendor specific register IMX_TIMER1MS.
+@@ -435,16 +454,24 @@ static int imx_ahci_probe(struct platform_device *pdev)
+ 	ret = ahci_platform_init_host(pdev, hpriv, &ahci_imx_port_info,
+ 				      0, 0, 0);
+ 	if (ret)
+-		imx_sata_disable(hpriv);
++		goto disable_sata;
++
++	return 0;
+ 
++disable_sata:
++	imx_sata_disable(hpriv);
++disable_clk:
++	clk_disable_unprepare(imxpriv->sata_clk);
+ 	return ret;
+ }
+ 
+ static void ahci_imx_host_stop(struct ata_host *host)
+ {
+ 	struct ahci_host_priv *hpriv = host->private_data;
++	struct imx_ahci_priv *imxpriv = hpriv->plat_data;
+ 
+ 	imx_sata_disable(hpriv);
++	clk_disable_unprepare(imxpriv->sata_clk);
+ }
+ 
+ #ifdef CONFIG_PM_SLEEP
+-- 
+1.8.3.2
