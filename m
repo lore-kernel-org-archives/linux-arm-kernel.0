@@ -1,76 +1,77 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 28 May 2014 12:49:01 +0300
-Subject: [PATCH v1] of/irq: do irq resolution in platform_get_irq_byname()
-In-Reply-To: <CAL_JsqLm3wfVS+au+JUbhBhxz=LuVpepH6GxabCQhPowhbw77g@mail.gmail.com>
-References: <1400582523-22684-1-git-send-email-grygorii.strashko@ti.com>	<20140523080333.66720C4176E@trevor.secretlab.ca>	<CAGa+x85mOHtNAj-UHgK2_z8zWAF=qwFcRcUgHTR-byNiX7heHA@mail.gmail.com>
- <CAL_JsqLm3wfVS+au+JUbhBhxz=LuVpepH6GxabCQhPowhbw77g@mail.gmail.com>
-Message-ID: <5385B10D.3020207@ti.com>
+From: satish.patel@ti.com (Satish Patel)
+Date: Wed, 28 May 2014 14:30:06 +0530
+Subject: [PATCH v2 0/5] Smart Card(SC) interface, TI USIM & NxP SC phy
+ driver
+In-Reply-To: <20140528004147.GA9699@kroah.com>
+References: <1390192434-19386-1-git-send-email-satish.patel@ti.com>
+ <52E9E8B0.2020000@ti.com> <20140130130515.GC23970@kroah.com>
+ <537589A2.8060802@ti.com> <20140528004147.GA9699@kroah.com>
+Message-ID: <5385A596.4040508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
 
-On 05/28/2014 03:37 AM, Rob Herring wrote:
-> On Tue, May 27, 2014 at 3:23 PM, Kevin Hilman <khilman@linaro.org> wrote:
->> On Fri, May 23, 2014 at 1:03 AM, Grant Likely <grant.likely@linaro.org> wrote:
->>> On Tue, 20 May 2014 13:42:02 +0300, Grygorii Strashko <grygorii.strashko@ti.com> wrote:
->>>> The commit 9ec36cafe43bf835f8f29273597a5b0cbc8267ef
->>>> "of/irq: do irq resolution in platform_get_irq" from Rob Herring -
->>>> moves resolving of the interrupt resources in platform_get_irq().
->>>> But this solution isn't complete because platform_get_irq_byname()
->>>> need to be modified the same way.
->>>>
->>>> Hence, fix it by adding interrupt resolution code at the
->>>> platform_get_irq_byname() function too.
->>>>
->>>> Cc: Russell King <linux@arm.linux.org.uk>
->>>> Cc: Rob Herring <robh@kernel.org>
->>>> Cc: Tony Lindgren <tony@atomide.com>
->>>> Cc: Grant Likely <grant.likely@linaro.org>
->>>> Cc: Thierry Reding <thierry.reding@gmail.com>
->>>>
->>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>>
->>> Applied, Thanks.
+
+On 5/28/2014 6:11 AM, Greg KH wrote:
+> On Fri, May 16, 2014 at 09:14:34AM +0530, Satish Patel wrote:
 >>
->> As of next-20150526, the ST u8500 Snowball board has been failing boot
->> in linux-next, and was bisected down to this patch (commit
->> ad69674e73a1 in -next).   Full boot failure attached.
->>
->> I have not dug any deeper, but can confirm that next-20140526 with
->> this patch reverted boots again on the snowball board.
-> 
-> There's a patch on the list which fixes it. The problem is stmmac
-> driver was expecting only one error code.
-> 
-
-Seems root cause of problem is hidden inside MFD ab8500-core.c :(
-And it's related to simulations supporting of DT and non-DT devices.
-
-For example:
------ Log file contains lines
-[    0.919677] ab8500-debug ab8500-debug.0: First irq not found, err -22
-[    0.926147] ab8500-debug: probe of ab8500-debug.0 failed with error -22
-
-DT definition of ab8500-debug is specified as following (ste-dbx5x0.dtsi):
-	ab8500-debugfs {
-		compatible = "stericsson,ab8500-debug";
-	};
-
-In code ab8500-debug is created using mfd_add_devices() API which fills
-device's resources manually, but, in same time, It links ab8500-debug device
-to DT node because MFD cell has of_compatible property set to:
- 		.of_compatible = "stericsson,ab8500-debug",
-
-
-Problem: both new versions of APIs platform_get_irq_byname() and
-platform_get_irq() will fail to get IRQ.
-
-
-Another problem is:
-[    1.038909] abx5x0-usb ab8500-usb.0: Link status irq not found
-- looking on it now - it should work
-
-
-Best regards,
--grygorii
+>> On 1/30/2014 6:35 PM, Greg KH wrote:
+>>> On Thu, Jan 30, 2014 at 11:22:48AM +0530, Satish Patel wrote:
+>>>> On 1/20/2014 10:03 AM, Satish Patel wrote:
+>>>>> Changes from v1:
+>>>>> * RFC(v1) comments are fixed
+>>>>>
+>>>>> ** removed "gpio_to_irq" as GPIO controller process  cell from DT and
+>>>>> give it to DT node
+>>>>> ** comments on documentation
+>>>>> ** few other comments on null checks are resolved
+>>>>>
+>>>>> * BWT timing configuration is added to ti-usim driver
+>>>>>
+>>>>> v1 cover letter link#
+>>>>> https://lkml.org/lkml/2014/1/6/250
+>>>>>
+>>>>> Satish Patel (5):
+>>>>>    sc_phy:SmartCard(SC) PHY interface to SC controller
+>>>>>    misc: tda8026: Add NXP TDA8026 PHY driver
+>>>>>    char: ti-usim: Add driver for USIM module on AM43xx
+>>>>>    ARM: dts: AM43xx: DT entries added for ti-usim
+>>>>>    ARM: dts: AM43xx-epos-evm: DT entries  for ti-usim and phy
+>>>>>
+>>>>>   Documentation/devicetree/bindings/misc/tda8026.txt |   19 +
+>>>>>   .../devicetree/bindings/ti-usim/ti-usim.txt        |   31 +
+>>>>>   Documentation/sc_phy.txt                           |  171 ++
+>>>>>   arch/arm/boot/dts/am4372.dtsi                      |   10 +
+>>>>>   arch/arm/boot/dts/am43x-epos-evm.dts               |   43 +
+>>>>>   drivers/char/Kconfig                               |    7 +
+>>>>>   drivers/char/Makefile                              |    1 +
+>>>>>   drivers/char/ti-usim-hw.h                          |  863 +++++++++
+>>>>>   drivers/char/ti-usim.c                             | 1859 ++++++++++++++++++++
+>>>>>   drivers/misc/Kconfig                               |    7 +
+>>>>>   drivers/misc/Makefile                              |    1 +
+>>>>>   drivers/misc/tda8026.c                             | 1255 +++++++++++++
+>>>>>   include/linux/sc_phy.h                             |  132 ++
+>>>>>   include/linux/ti-usim.h                            |   98 +
+>>>>>   14 files changed, 4497 insertions(+), 0 deletions(-)
+>>>>>   create mode 100644 Documentation/devicetree/bindings/misc/tda8026.txt
+>>>>>   create mode 100644 Documentation/devicetree/bindings/ti-usim/ti-usim.txt
+>>>>>   create mode 100644 Documentation/sc_phy.txt
+>>>>>   create mode 100644 drivers/char/ti-usim-hw.h
+>>>>>   create mode 100644 drivers/char/ti-usim.c
+>>>>>   create mode 100644 drivers/misc/tda8026.c
+>>>>>   create mode 100644 include/linux/sc_phy.h
+>>>>>   create mode 100644 include/linux/ti-usim.h
+>>>> Any comments on this patch series ?
+>>>>
+>>>> If not,
+>>>> Can you accept these patches for next merge window
+>>> It's the middle of this merge window, and I can't accept any patches
+>>> until after 3.14-rc1 is out, at which point I'll start to work on my
+>>> patch backlog.
+>> Are these to be consider for next submission ? Or you want me to start
+>> review cycle one more time.
+>
+> I don't have them in my queue, so please resend.
+I have resent patches for review. could you consider the same for next 
+merge window ?
+>
