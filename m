@@ -1,50 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 May 2014 17:10:02 +0100
-Subject: [PATCH v2 9/9] arm64: KVM: enable trapping of all debug registers
-In-Reply-To: <20140525153629.GJ3866@lvm>
-References: <1400604945-25247-1-git-send-email-marc.zyngier@arm.com>
- <1400604945-25247-10-git-send-email-marc.zyngier@arm.com>
- <20140525153629.GJ3866@lvm>
-Message-ID: <53860A5A.8030009@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 28 May 2014 11:18:56 -0500
+Subject: [PATCH 1/5] devicetree: bindings: Document micrel vendor prefix
+In-Reply-To: <1400792413-21618-2-git-send-email-sboyd@codeaurora.org>
+References: <1400792413-21618-1-git-send-email-sboyd@codeaurora.org>
+ <1400792413-21618-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CAL_JsqK1wkXMkJCag5g72enGcss2Cr1fYjEo--KkgQBDGuqyEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/05/14 16:36, Christoffer Dall wrote:
-> On Tue, May 20, 2014 at 05:55:45PM +0100, Marc Zyngier wrote:
->> Enable trapping of the debug registers, preventing the guests to
->> mess with the host state (and allowing guests to use the debug
->> infrastructure as well).
->>
->> Reviewed-by: Anup Patel <anup.patel@linaro.org>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/kvm/hyp.S | 8 ++++++++
->>  1 file changed, 8 insertions(+)
->>
->> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
->> index 73ec5c4..72ed0bf8 100644
->> --- a/arch/arm64/kvm/hyp.S
->> +++ b/arch/arm64/kvm/hyp.S
->> @@ -777,6 +777,14 @@ __kvm_hyp_code_start:
->>  	mrs	x2, mdcr_el2
->>  	and	x2, x2, #MDCR_EL2_HPMN_MASK
->>  	orr	x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
->> +	orr	x2, x2, #(MDCR_EL2_TDRA | MDCR_EL2_TDOSA)
-> 
-> so we unconditionally trap on the OS register access, but we don't
-> properly emulate these do we?  What's the rationale?  (atmittedly,
-> again, I'm not 100% clear on how the OS lock thingy is supposed to
-> work/be used).
+On Thu, May 22, 2014 at 4:00 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> There's one existing use of 'micrel' in the documentation so use
+> 'micrel' instead of the company's ticker symbol 'mcrl'.
+>
+> Cc: <devicetree@vger.kernel.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-The rational is that we don't want the guest to mess with the host
-state, which may have decided to use the OSlock thing (we don't use it
-at all, but who knows...). So we trap it, discard whatever the guest
-wants to put there, and carry on.
+Applied for 3.16.
 
-I'm not sure if this would confuse any guest (we only have Linux so far,
-so I'm not too worried). Should a more adventurous guest show up, we can
-revisit this.
+Rob
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> ---
+>
+> This is mostly here as the first patch to make checkpatch quiet. I expect DT
+> maintainers to pick this one up.
+>
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 1bc2174e1a05..2fe06ad1d248 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -76,6 +76,7 @@ linux Linux-specific binding
+>  lsi    LSI Corp. (LSI Logic)
+>  marvell        Marvell Technology Group Ltd.
+>  maxim  Maxim Integrated Products
+> +micrel Micrel Inc.
+>  microchip      Microchip Technology Inc.
+>  mosaixtech     Mosaix Technologies, Inc.
+>  moxa   Moxa
+> --
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+>
