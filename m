@@ -1,152 +1,162 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Tue, 27 May 2014 18:30:23 -0700
-Subject: [PATCH v6 4/4] add 2nd stage page fault handling during live
- migration
-In-Reply-To: <20140527201945.GD16428@lvm>
-References: <1400178451-4984-1-git-send-email-m.smarduch@samsung.com>
- <1400178451-4984-5-git-send-email-m.smarduch@samsung.com>
- <20140527201945.GD16428@lvm>
-Message-ID: <53853C2F.8080003@samsung.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 27 May 2014 18:32:39 -0700
+Subject: [PATCH v6 1/2] clk: shmobile: r8a7779: Add clocks support
+In-Reply-To: <20140528010850.GH7374@verge.net.au>
+References: <1397775951-30992-1-git-send-email-horms+renesas@verge.net.au>
+ <1397775951-30992-2-git-send-email-horms+renesas@verge.net.au>
+ <201405271131.42301.arnd@arndb.de> <20140528010850.GH7374@verge.net.au>
+Message-ID: <20140528013239.7816.54045@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/2014 01:19 PM, Christoffer Dall wrote:
-> On Thu, May 15, 2014 at 11:27:31AM -0700, Mario Smarduch wrote:
->> This patch adds support for handling 2nd stage page faults during migration,
->> it disables faulting in huge pages, and splits up existing huge pages.
->>
->> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->> ---
->>  arch/arm/kvm/mmu.c |   36 ++++++++++++++++++++++++++++++++++--
->>  1 file changed, 34 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> index b939312..10e7bf6 100644
->> --- a/arch/arm/kvm/mmu.c
->> +++ b/arch/arm/kvm/mmu.c
->> @@ -1002,6 +1002,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>  	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
->>  	struct vm_area_struct *vma;
->>  	pfn_t pfn;
->> +	bool migration_active;
->>  
->>  	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
->>  	if (fault_status == FSC_PERM && !write_fault) {
->> @@ -1053,12 +1054,23 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>  		return -EFAULT;
->>  
->>  	spin_lock(&kvm->mmu_lock);
->> +
->> +	/*
->> +	 * Place inside lock to prevent race condition when whole VM is being
->> +	 * write proteced. Prevent race of huge page install when migration is
->> +	 * active.
->> +	 */
->> +	migration_active = vcpu->kvm->arch.migration_in_progress;
->> +
->>  	if (mmu_notifier_retry(kvm, mmu_seq))
->>  		goto out_unlock;
->> -	if (!hugetlb && !force_pte)
->> +
->> +	/* When migrating don't spend cycles coalescing huge pages */
->> +	if (!hugetlb && !force_pte && !migration_active)
->>  		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
->>  
->> -	if (hugetlb) {
->> +	/* During migration don't install huge pages */
+Quoting Simon Horman (2014-05-27 18:08:50)
+> On Tue, May 27, 2014 at 11:31:42AM +0200, Arnd Bergmann wrote:
+> > On Friday 18 April 2014, Simon Horman wrote:
+> > > diff --git a/drivers/clk/shmobile/clk-r8a7779.c b/drivers/clk/shmobile/clk-r8a7779.c
+> > > new file mode 100644
+> > > index 0000000..652ecac
+> > > --- /dev/null
+> > > +++ b/drivers/clk/shmobile/clk-r8a7779.c
+> > > @@ -0,0 +1,180 @@
+> > > +/*
+> > > + * r8a7779 Core CPG Clocks
+> > > + *
+> > > + * Copyright (C) 2013, 2014 Horms Solutions Ltd.
+> > > + *
+> > > + * Contact: Simon Horman <horms@verge.net.au>
+> > > + *
+> > > + * This program is free software; you can redistribute it and/or modify
+> > > + * it under the terms of the GNU General Public License as published by
+> > > + * the Free Software Foundation; version 2 of the License.
+> > > + */
+> > > +
+> > > +#include <linux/clk-provider.h>
+> > > +#include <linux/clkdev.h>
+> > > +#include <linux/clk/shmobile.h>
+> > > +#include <linux/init.h>
+> > > +#include <linux/kernel.h>
+> > > +#include <linux/of.h>
+> > > +#include <linux/of_address.h>
+> > > +#include <linux/spinlock.h>
+> > > +
+> > > +#include <dt-bindings/clock/r8a7779-clock.h>
+> > 
+> > This currently causes a build error in Linux-next, since the header file
+> > has not been merged along with the driver.
 > 
-> again, all this is not about migration per se, it's about when logging
-> dirty pages, (which may be commonly used for migration).
+> Hi Arnd,
 > 
-
-Yes that's true , I'll update but until recently (new RFC on qemu list) where
-dirty logging is used for getting VM RSS or hot memory regions, I don't see any
-other use case.
-
->> +	if (hugetlb && !migration_active) {
->>  		pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
->>  		new_pmd = pmd_mkhuge(new_pmd);
->>  		if (writable) {
->> @@ -1069,6 +1081,23 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>  		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
->>  	} else {
->>  		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
->> +
->> +		/*
->> +		 * If pmd is  mapping a huge page then split it up into
->> +		 * small pages, when doing live migration.
->> +		 */
->> +		if (migration_active) {
->> +			pmd_t *pmd;
->> +			if (hugetlb) {
->> +				pfn += pte_index(fault_ipa);
->> +				gfn = fault_ipa >> PAGE_SHIFT;
->> +			}
+> I'm a little unsure what combination of Kernel config options you
+> are using to compile this driver in linux-next but I do agree
+> that the header is missing and that would cause the compile to fail.
+> I apologise for that oversight.
 > 
-> how can you have hugetlb when we entered this else-clause conditional on
-> having !hugetlb?
+> I believe that a good fix is to add the header, which I already have queued-up
+> in the renesas tree for v3.17. I wonder if Mike would consider taking
+> the following patch for v3.16. Alternatively I would be happy to send
+> it it to arm-soc as a fix for v3.16.
+
+I'm happy to take it for 3.16. I can't squash/rebase my tree so there
+will still be the potential for bisect badness, but that's just the way
+it goes.
+
+Can you send the patch separately after testing it against the current
+clk-next tree?
+
+Thanks,
+Mike
+
 > 
-- if(hugetlb && !migration_active)
-
-forces all page faults to enter here while in migration. Huge page entries
-are cleared and stage2_set_pte() splits the huge page, and installs the pte
-for the fault_ipa. I placed that there since it flows with installing 
-a pte as well as splitting a huge page. But your comment on performance
-split up huge page vs. deferred  page faulting should move it out of here. 
-
-
->> +			new_pte = pfn_pte(pfn, PAGE_S2);
->> +			pmd = stage2_get_pmd(kvm, NULL, fault_ipa);
->> +			if (pmd && kvm_pmd_huge(*pmd))
->> +				clear_pmd_entry(kvm, pmd, fault_ipa);
+> Naturally I will drop it from my v3.17 queue if it its accepted for v3.16
+> one way or another.
 > 
-> If we have a huge pmd entry, how did we take a fault on there?  Would
-> that be if a different CPU inserted a huge page entry since we got here,
-> is this what you're trying to handle?
+> From: Simon Horman <horms+renesas@verge.net.au>
 > 
-> I'm confused.
+> [PATCH] ARM: shmobile: r8a7779: Add clock index macros for DT sources
 > 
-
-I thing this related to the above.
-
->> +		}
->> +
->>  		if (writable) {
->>  			kvm_set_s2pte_writable(&new_pte);
->>  			kvm_set_pfn_dirty(pfn);
->> @@ -1077,6 +1106,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>  		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
->>  	}
->>  
->> +	/* Assuming 4k pages, set one bit/page in memslot dirty_bitmap[] */
+> Add macros usable by device tree sources to reference r8a7779 clocks by
+> index.
 > 
-> Assuming? this makes me nervous.  The point is probably that it's
-> harmless if we're not logging dirty pages, because then nobody reads teh
-> data structure, and if we are logging, then we are mapping everything
-> using 4K pages?
+> Based on work for the r8a7791 SoC by Laurent Pinchart.
 > 
-> It's probably clearer code-wise to condition this on whether or not we
-> are logging dirty page, and the branch is also likely to be much faster
-> than the function call to mark_page_dirty.
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  include/dt-bindings/clock/r8a7779-clock.h | 64 +++++++++++++++++++++++++++++++
+>  1 file changed, 64 insertions(+)
+>  create mode 100644 include/dt-bindings/clock/r8a7779-clock.h
 > 
-
-I'm not sure I get the point. The call is always safe, you either 
-have old copy or new copy of memory slot with dirty_bitmap set or not set.
-The log read is done while holding kvm slots_lock.
-
-Is the comment related to performance, not supporting multiple page sizes,
-or it's unsafe to call mark_page_dirty() under all circumstances, or 
-something else? 
-
-
->> +	if (writable)
->> +		mark_page_dirty(kvm, gfn);
->>  
->>  out_unlock:
->>  	spin_unlock(&kvm->mmu_lock);
->> -- 
->> 1.7.9.5
->>
+> diff --git a/include/dt-bindings/clock/r8a7779-clock.h b/include/dt-bindings/clock/r8a7779-clock.h
+> new file mode 100644
+> index 0000000..381a611
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/r8a7779-clock.h
+> @@ -0,0 +1,64 @@
+> +/*
+> + * Copyright (C) 2013  Horms Solutions Ltd.
+> + *
+> + * Contact: Simon Horman <horms@verge.net.au>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#ifndef __DT_BINDINGS_CLOCK_R8A7779_H__
+> +#define __DT_BINDINGS_CLOCK_R8A7779_H__
+> +
+> +/* CPG */
+> +#define R8A7779_CLK_PLLA       0
+> +#define R8A7779_CLK_Z          1
+> +#define R8A7779_CLK_ZS         2
+> +#define R8A7779_CLK_S          3
+> +#define R8A7779_CLK_S1         4
+> +#define R8A7779_CLK_P          5
+> +#define R8A7779_CLK_B          6
+> +#define R8A7779_CLK_OUT                7
+> +
+> +/* MSTP 0 */
+> +#define R8A7779_CLK_HSPI       7
+> +#define R8A7779_CLK_TMU2       14
+> +#define R8A7779_CLK_TMU1       15
+> +#define R8A7779_CLK_TMU0       16
+> +#define R8A7779_CLK_HSCIF1     18
+> +#define R8A7779_CLK_HSCIF0     19
+> +#define R8A7779_CLK_SCIF5      21
+> +#define R8A7779_CLK_SCIF4      22
+> +#define R8A7779_CLK_SCIF3      23
+> +#define R8A7779_CLK_SCIF2      24
+> +#define R8A7779_CLK_SCIF1      25
+> +#define R8A7779_CLK_SCIF0      26
+> +#define R8A7779_CLK_I2C3       27
+> +#define R8A7779_CLK_I2C2       28
+> +#define R8A7779_CLK_I2C1       29
+> +#define R8A7779_CLK_I2C0       30
+> +
+> +/* MSTP 1 */
+> +#define R8A7779_CLK_USB01      0
+> +#define R8A7779_CLK_USB2       1
+> +#define R8A7779_CLK_DU         3
+> +#define R8A7779_CLK_VIN2       8
+> +#define R8A7779_CLK_VIN1       9
+> +#define R8A7779_CLK_VIN0       10
+> +#define R8A7779_CLK_ETHER      14
+> +#define R8A7779_CLK_SATA       15
+> +#define R8A7779_CLK_PCIE       16
+> +#define R8A7779_CLK_VIN3       20
+> +
+> +/* MSTP 3 */
+> +#define R8A7779_CLK_SDHI3      20
+> +#define R8A7779_CLK_SDHI2      21
+> +#define R8A7779_CLK_SDHI1      22
+> +#define R8A7779_CLK_SDHI0      23
+> +#define R8A7779_CLK_MMC1       30
+> +#define R8A7779_CLK_MMC0       31
+> +
+> +
+> +#endif /* __DT_BINDINGS_CLOCK_R8A7779_H__ */
+> -- 
+> 1.8.5.2
 > 
-> -Christoffer
 > 
