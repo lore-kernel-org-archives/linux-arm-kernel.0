@@ -1,79 +1,120 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 28 May 2014 13:49:49 +0900
-Subject: [PATCH v11 2/3] clk: exynos5410: register clocks using common
- clock framework
-In-Reply-To: <20140528004116.7816.69646@quantum>
-References: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>
- <1401074613-29227-3-git-send-email-t.dakhran@samsung.com>
- <20140528004116.7816.69646@quantum>
-Message-ID: <01a201cf7a30$41ecca90$c5c65fb0$@samsung.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Wed, 28 May 2014 13:17:33 +0800
+Subject: [PATCH 3/3] net: hisilicon: add hix5hd2 mac driver
+In-Reply-To: <201405271525.46356.arnd@arndb.de>
+References: <1400504227-12047-1-git-send-email-zhangfei.gao@linaro.org>
+ <201405261651.15998.arnd@arndb.de> <53840D40.3000600@linaro.org>
+ <201405271525.46356.arnd@arndb.de>
+Message-ID: <5385716D.9010308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike Turquette wrote:
-> 
-> Quoting Tarek Dakhran (2014-05-25 20:23:32)
-> > The EXYNOS5410 clocks are statically listed and registered
-> > using the Samsung specific common clock helper functions.
-> >
-> > Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
-> > Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
-> > ---
-> >  .../devicetree/bindings/clock/exynos5410-clock.txt |   45 +++++
-> >  drivers/clk/samsung/Makefile                       |    1 +
-> >  drivers/clk/samsung/clk-exynos5410.c               |  209
-> ++++++++++++++++++++
-> >  include/dt-bindings/clock/exynos5410.h             |   33 ++++
-> >  4 files changed, 288 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-
-> clock.txt
-> >  create mode 100644 drivers/clk/samsung/clk-exynos5410.c
-> >  create mode 100644 include/dt-bindings/clock/exynos5410.h
-> >
-> > diff --git a/Documentation/devicetree/bindings/clock/exynos5410-
-> clock.txt b/Documentation/devicetree/bindings/clock/exynos5410-clock.txt
-> > new file mode 100644
-> > index 0000000..aeab635
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/clock/exynos5410-clock.txt
-> > @@ -0,0 +1,45 @@
-> > +* Samsung Exynos5410 Clock Controller
-> > +
-> > +The Exynos5410 clock controller generates and supplies clock to various
-> > +controllers within the Exynos5410 SoC.
-> > +
-> > +Required Properties:
-> > +
-> > +- compatible: should be "samsung,exynos5410-clock"
-> > +
-> > +- reg: physical base address of the controller and length of memory
-> mapped
-> > +  region.
-> > +
-> > +- #clock-cells: should be 1.
-> > +
-> > +All available clocks are defined as preprocessor macros in
-> > +dt-bindings/clock/exynos5410.h header and can be used in device
-> > +tree sources.
-> > +
-> > +External clock:
-> > +
-> > +There is clock that is generated outside the SoC. It
-> > +is expected that it is defined using standard clock bindings
-> > +with following clock-output-name:
-> > +
-> > + - "fin_pll" - PLL input clock from XXTI
-> 
-> Does fin_pll feed into the exynos5410-clock controller? If so, should
-> the example clock-controller node below have a clocks and clock-names
-> property?
-> 
-Well, it is fixed clocks and generated outside of the SoC...so maybe the properties are not required?
 
-BTW, I've applied this series with Tomasz Figa's reviewed tag and sent out to arm-soc today so if any concerns on this, please let me know immediately.
 
-> Otherwise patch looks good.
-> 
+On 05/27/2014 09:25 PM, Arnd Bergmann wrote:
+> On Tuesday 27 May 2014, zhangfei wrote:
+>> On 05/26/2014 10:51 PM, Arnd Bergmann wrote:
+>>> On Monday 19 May 2014, Zhangfei Gao wrote:
+>>>
+>>> I only noticed one real issue with the driver:
+>>>
+>>>> +struct hix5hd2_desc {
+>>>> +    __le32 buff_addr;
+>>>> +    __le32 buff_len:11;
+>>>> +    __le32 reserve2:5;
+>>>> +    __le32 data_len:11;
+>>>> +    __le32 reserve1:2;
+>>>> +    __le32 fl:2;
+>>>> +    __le32 descvid:1;
+>>>> +} __aligned(32);
+>>>> +
+>>>
+>>> You should generall not use bitfields in hardware data structures, as that is
+>>> not endian safe and will prevent running a big-endian kernel on this machine.
+>>> Better convert this to a set of __le32 fields and explicit shifts and masks.
+>>
+>> Got it, will update.
+>>
+>> More knowledge about big-endian kernel is appreciated, in which case we
+>> should consider such kernel.
+>> Can we only consider this driver is only running on arm, which is
+>> little-endian.
+>
+> The main user of big-endian kernels that I know of are network infrastructure
+> people that have a ton of legacy user-space code written in non-portable
+> big-endian style.
+>
+> There is no real technical advantage in running one endianess or the other
+> on ARM, so generally everyone uses little-endian because that is what their
+> user space is, except for the few people that have ported over their
+> code from PowerPC or MIPSeb.
+>
+>>> Two smaller things you should think about, I'm not entirely sure about these:
+>>>
+>>>> +static int hix5hd2_rx(struct net_device *dev, int limit)
+>>>> +{
+>>>> +    struct hix5hd2_priv *priv = netdev_priv(dev);
+>>>> +    struct sk_buff *skb;
+>>>> +    struct hix5hd2_desc *desc;
+>>>> +    dma_addr_t dma_addr;
+>>>> +    u32 start, end, num, pos, i, len;
+>>>> +
+>>>> +    /* software read pointer */
+>>>> +    start = dma_cnt(readl_relaxed(priv->base + RX_BQ_RD_ADDR));
+>>>> +    /* logic write pointer */
+>>>> +    end = dma_cnt(readl_relaxed(priv->base + RX_BQ_WR_ADDR));
+>>>
+>>> I think one of these needs to be readl() instead of readl_relaxed(),
+>>> to ensure the data is correctly ordered with regard to the pointer
+>>> access.
+>> readl_relaxed can ensure the sequence.
+>>
+>>>
+>>>> +    if (pos != start)
+>>>> +            writel(dma_byte(pos), priv->base + TX_RQ_RD_ADDR);
+>>>
+>>> While this looks like it could be writel_relaxed().
+>>>
+>> En, I think all three cases can use xxx_relaxed.
+>> These accesses are just update pointer used by internal logic and get
+>> pointer updated by internal logic.
+>
+> You always need a barrier between the access to a buffer from the kernel
+> and the register access communicating with the hardware about that
+> buffer:
+>
+> For tx:
+>
+> 	a) write to DMA descriptor
+> 	b) wmb()
+> 	c) writel_relaxed(register)
+>
+> writel() is the short form of b+c. If you omit the __iowmb(), the decriptor
+> access may still be inside of the CPU write buffer (or the cache on coherent
+> systems) by the time the hardware reads the descriptor.
+>
+> for rx:
+>
+> 	a) readl_relaxed(register)
+> 	b) rmb()
+> 	c) read from descriptor or skb data
+>
+> If you leave out the __iormb() here, it's possible that the CPU can prefetch
+> the access to the descriptor while waiting for the register data, and read
+> stale data.
+>
+> If your particular machine doesn't need rmb() or wmb() (e.g. for
+> non-SMP ARMv6 or older), the build process should replace them with
+> do{}while(0) them automatically.
 
-Thanks,
-Kukjin
+Thanks Arnd,
+Yes, understand, barrier still required.
+
+What I thought was the dma in this controller keeps running and not need 
+desc to trigger, only update pointer, so no need barrier.
+Even so, desc still need to be sync via barrier, otherwise, desc with 
+stale info may be used.
+
+Will add barrier accordingly.
+
+Thanks
