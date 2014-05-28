@@ -1,24 +1,39 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Wed, 28 May 2014 02:55:44 -0700
-Subject: [PATCH 12/12] scsi/NCR5380: merge sun3_scsi_vme.c into sun3_scsi.c
-In-Reply-To: <20140318004216.172443207@telegraphics.com.au>
-References: <20140318004212.612472697@telegraphics.com.au>
- <20140318004216.172443207@telegraphics.com.au>
-Message-ID: <20140528095544.GL26617@infradead.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 28 May 2014 10:56:45 +0100
+Subject: [PATCH v2 0/9] arm64: KVM: debug infrastructure support
+In-Reply-To: <20140525153421.GA3866@lvm>
+References: <1400604945-25247-1-git-send-email-marc.zyngier@arm.com>
+ <20140525153421.GA3866@lvm>
+Message-ID: <5385B2DD.8090200@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 11:42:24AM +1100, Finn Thain wrote:
-> The sun3 drivers suffer from a whole bunch of duplicated code. Fix this
-> by following the g_NCR5380_mmio example. (Notionally, sun3_scsi relates to
-> sun3_scsi_vme in the same way that g_NCR5380 relates to g_NCR5380_mmio.)
+On 25/05/14 16:34, Christoffer Dall wrote:
+> On Tue, May 20, 2014 at 05:55:36PM +0100, Marc Zyngier wrote:
+>> This patch series adds debug support, a key feature missing from the
+>> KVM/arm64 port.
+>>
+>> The main idea is to keep track of whether the debug registers are
+>> "dirty" (changed by the guest) or not. In this case, perform the usual
+>> save/restore dance, for one run only. It means we only have a penalty
+>> if a guest is actively using the debug registers.
+>>
+>> The amount of registers is properly frightening, but CPUs actually
+>> only implement a subset of them. Also, there is a number of registers
+>> we don't bother emulating (things having to do with external debug and
+>> OSlock).
 > 
-> Dead code is also removed: we now have working debug macros so
-> SUN3_SCSI_DEBUG is undesirable. Dead code within #ifdef OLD_DMA is also
-> dropped, consistent with sun3_scsi_vme.c.
-> 
-> Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+> What is the rationale about not having to deal with external debug and
+> OSlock?
 
-Looks good,
+External debug is when you actually plug a physical JTAG into the CPU.
+OSlock is a way to prevent "other software" to play with the debug
+registers. My understanding is that it is only useful in combination
+with the external debug.
 
-Reviewed-by: Christoph Hellwig <hch@lst.de>
+In both case, implementing support for this is probably not worth the
+effort, at least for the time being.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
