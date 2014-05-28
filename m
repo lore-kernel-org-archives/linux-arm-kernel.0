@@ -1,71 +1,77 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 28 May 2014 11:44:08 -0700
-Subject: [PATCH v3 1/5] sc_phy:SmartCard(SC) PHY interface to SC controller
-In-Reply-To: <1401267437-22489-2-git-send-email-satish.patel@ti.com>
-References: <1401267437-22489-1-git-send-email-satish.patel@ti.com>
- <1401267437-22489-2-git-send-email-satish.patel@ti.com>
-Message-ID: <20140528184408.GC30031@kroah.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 28 May 2014 19:40:43 +0100
+Subject: EFI_STUB fails to boot non-EFI on arm64
+In-Reply-To: <20140528180525.GU4179@bivouac.eciton.net>
+References: <20140523094513.GC9252@arm.com>
+ <20140523131656.GR4179@bivouac.eciton.net>
+ <20140523134720.GA9256@arm.com>
+ <20140523150331.GS4179@bivouac.eciton.net>
+ <20140528155931.GA20523@arm.com>
+ <20140528180525.GU4179@bivouac.eciton.net>
+Message-ID: <20140528184043.GB20523@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 02:27:13PM +0530, Satish Patel wrote:
-> +/**
-> + * struct sc_phy - The basic smart card phy structure
-> + *
-> + * @dev: phy device
-> + * @pdata: pointer to phy's private data structure
-> + * @set_config: called to set phy's configuration
-> + * @get_config: called to get phy's configuration
-> + * @activate_card: perform smart card activation
-> + * @deactivate_card: perform smart card de-activation
-> + * @warm_reset: execute smart card warm reset sequence
-> + * @register_card_activity_cb: register call back to phy device.
-> + * This call back will be called on card insert or remove event
-> + *
-> + * smart card controller uses this interface to communicate with
-> + * smart card via phy.Some smart card phy has multiple slots for
-> + * cards. This inerface also enables controller to communicate with
-> + * one or more smart card connected over phy.
-> + */
-> +struct sc_phy {
-> +	/* phy's device pointer */
-> +	struct device *dev;
+On Wed, May 28, 2014 at 07:05:26PM +0100, Leif Lindholm wrote:
+> On Wed, May 28, 2014 at 04:59:31PM +0100, Will Deacon wrote:
+> > > > Can we add another of detecting whether it's an EFI application and
+> > > > avoid calling efi_init()? I can see x86 sets some efi_loader_signature
+> > > > string in exit_boot() and checks against it later when calling
+> > > > efi_init().
+> > > 
+> > > Well, I agree that we shouldn't be spewing error messages for expected
+> > > operation, but efi_init() is the function we call to determine
+> > > whether we _are_ booting via UEFI - and it sets flags accordingly for
+> > > the efi_enabled() macro.
+> > > 
+> > > My view is that this should be fixed in fdt_find_uefi_params(). A
+> > > single info message that we can't find evidence of UEFI should be
+> > > printed in the non-error case.
+> > > 
+> > > Like below?
+> > 
+> > Why not move the efi_get_fdt_params call out of efi_init and into
+> > setup_arch via a wrapper? Then efi_get_fdt_params and efi_init can have
+> > useful return values, which allow us to distinguish between "My DT doesn't
+> > have the necessary UEFI properties" and "UEFI failed to initialise" without
+> > having to make some printks pr_info and others pr_err within efi_init
+> > itself..
+> 
+> Well, but (for the output part) my patch already did that?
+> If the "Getting parameters from FDT:\n" was too verbose, we could
+> just drop it, and have the same effect on output.
 
-So this is the "parent", right?  Why not embed a struct device into this
-structure as well, further streaching out the device tree.
+It's the pr_err which is annoying, not the "Getting parameters from FDT:\n"
+message. Why should I have an error logged to my console when I was never
+intending to boot using EFI anyway?
 
-> +
-> +	/* phy's private data */
-> +	void *pdata;
+> Thing is - there is not really any error case available anywhere
+> during the execution of efi_init() and its branches other than:
+> - Information required for UEFI boot cannot be found.
+> - Information exists, but is invalid.
+> - Failed to early_memremap some UEFI regions into the kernel.
+> which all amounts to "UEFI not available or something went wrong",
+> rather than "UEFI failed to initialise".
 
-If you do the above, then this pointer is not needed.
+Fine, but in this case the DT had the relevant properties which is a good
+indication that the user was at least *trying* to boot using EFI, no?
 
+> If efi_init returns successfully, EFI_BOOT is set, and testable using
+> the efi_enabled() macro.
+> 
+> The proper "UEFI failed to initialise" bit does not come until the
+> early_initcall arm64_enter_virtual_mode(), and is indicated not by
+> a return value, but by setting the flag indicating that
+> EFI_RUNTIME_SERVICES are available, which is checked later in core
+> code using the efi_enabled() macro.
 
-> +
-> +	/* notify data, passed by interface user as a part of
-> +	 * register_notify API. Data should be passed back when
-> +	 * notification raised to the interface user
-> +	 */
-> +	void *notify_data;
+Sorry, I naively assumed that with a name like efi_init it might, you know,
+initialise EFI? ;)
 
-What makes this different from the pdata?
+> So moving the call to efi_get_fdt_params() would have little effect
+> other than adding a third call site for UEFI bits in setup_arch().
 
+I don't mind having the extra call site if it allows us to distinguish
+errors from information.
 
-> +
-> +	int	(*set_config)(struct sc_phy *phy, u8 slot,
-> +			enum sc_phy_config attr, int value);
-> +	int	(*get_config)(struct sc_phy *phy, u8 slot, enum
-> +			sc_phy_config attr);
-> +	int	(*activate_card)(struct sc_phy *phy, u8 slot);
-> +	int	(*deactivate_card)(struct sc_phy *phy, u8 slot);
-> +	int	(*get_syncatr)(struct sc_phy *phy, u8 slot, u8 len, char *atr);
-> +	int	(*warm_reset)(struct sc_phy *phy, u8 slot);
-> +	int	(*register_notify)(struct sc_phy *phy,
-> +			 struct	notifier_block *nb, void *notify_data);
-> +	int	(*unregister_notify)(struct sc_phy *phy,
-> +			struct	notifier_block *nb);
-> +};
-> +
-> +#endif /* __SC_PHY_H__ */
-> -- 
-> 1.7.9.5
+Will
