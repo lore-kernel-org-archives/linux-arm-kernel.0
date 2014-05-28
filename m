@@ -1,95 +1,49 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 28 May 2014 16:49:47 +0800
-Subject: [PATCH v1] of/irq: do irq resolution in platform_get_irq_byname()
-In-Reply-To: <CACRpkdYgkEOjLamYu5uKSgs3iTNJ-w5XkbeygKjRdR-bNdETfg@mail.gmail.com>
-References: <1400582523-22684-1-git-send-email-grygorii.strashko@ti.com>
- <20140523080333.66720C4176E@trevor.secretlab.ca>
- <CAGa+x85mOHtNAj-UHgK2_z8zWAF=qwFcRcUgHTR-byNiX7heHA@mail.gmail.com>
- <CAL_JsqLm3wfVS+au+JUbhBhxz=LuVpepH6GxabCQhPowhbw77g@mail.gmail.com>
- <20140528071855.GJ4227@lee--X1>
- <CACRpkdYgkEOjLamYu5uKSgs3iTNJ-w5XkbeygKjRdR-bNdETfg@mail.gmail.com>
-Message-ID: <CAGb2v64f8Wju6dtVuVN2x=9YVGA-=RXozzhpJZNspKZ05f=jtA@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 28 May 2014 17:50:08 +0900
+Subject: [PATCH v6 1/2] clk: shmobile: r8a7779: Add clocks support
+In-Reply-To: <CAMuHMdVgUXOvi-Msd6qWDBVS_Wfh_5F-F7DUUMD+hhan3ReXTQ@mail.gmail.com>
+References: <1397775951-30992-1-git-send-email-horms+renesas@verge.net.au>
+ <1397775951-30992-2-git-send-email-horms+renesas@verge.net.au>
+ <201405271131.42301.arnd@arndb.de>
+ <20140528010850.GH7374@verge.net.au>
+ <CAMuHMdVgUXOvi-Msd6qWDBVS_Wfh_5F-F7DUUMD+hhan3ReXTQ@mail.gmail.com>
+Message-ID: <20140528085008.GA6561@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 4:25 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, May 28, 2014 at 9:18 AM, Lee Jones <lee.jones@linaro.org> wrote:
->> On Tue, 27 May 2014, Rob Herring wrote:
->>
->>> On Tue, May 27, 2014 at 3:23 PM, Kevin Hilman <khilman@linaro.org> wrote:
->>> > On Fri, May 23, 2014 at 1:03 AM, Grant Likely <grant.likely@linaro.org> wrote:
->>> >> On Tue, 20 May 2014 13:42:02 +0300, Grygorii Strashko <grygorii.strashko@ti.com> wrote:
->>> >>> The commit 9ec36cafe43bf835f8f29273597a5b0cbc8267ef
->>> >>> "of/irq: do irq resolution in platform_get_irq" from Rob Herring -
->>> >>> moves resolving of the interrupt resources in platform_get_irq().
->>> >>> But this solution isn't complete because platform_get_irq_byname()
->>> >>> need to be modified the same way.
->>> >>>
->>> >>> Hence, fix it by adding interrupt resolution code at the
->>> >>> platform_get_irq_byname() function too.
->>> >>>
->>> >>> Cc: Russell King <linux@arm.linux.org.uk>
->>> >>> Cc: Rob Herring <robh@kernel.org>
->>> >>> Cc: Tony Lindgren <tony@atomide.com>
->>> >>> Cc: Grant Likely <grant.likely@linaro.org>
->>> >>> Cc: Thierry Reding <thierry.reding@gmail.com>
->>> >>>
->>> >>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>> >>
->>> >> Applied, Thanks.
->>> >
->>> > As of next-20150526, the ST u8500 Snowball board has been failing boot
->>> > in linux-next, and was bisected down to this patch (commit
->>> > ad69674e73a1 in -next).   Full boot failure attached.
->>> >
->>> > I have not dug any deeper, but can confirm that next-20140526 with
->>> > this patch reverted boots again on the snowball board.
->>>
->>> There's a patch on the list which fixes it. The problem is stmmac
->>> driver was expecting only one error code.
->>
->> Does Snowball even use stmmac?
->
-> No.
->
-> I don't get this...
+On Wed, May 28, 2014 at 10:42:05AM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Wed, May 28, 2014 at 3:08 AM, Simon Horman <horms@verge.net.au> wrote:
+> >> > +#include <dt-bindings/clock/r8a7779-clock.h>
+> >>
+> >> This currently causes a build error in Linux-next, since the header file
+> >> has not been merged along with the driver.
+> >
+> > Hi Arnd,
+> >
+> > I'm a little unsure what combination of Kernel config options you
+> > are using to compile this driver in linux-next but I do agree
+> > that the header is missing and that would cause the compile to fail.
+> > I apologise for that oversight.
+> >
+> > I believe that a good fix is to add the header, which I already have queued-up
+> > in the renesas tree for v3.17. I wonder if Mike would consider taking
+> > the following patch for v3.16. Alternatively I would be happy to send
+> > it it to arm-soc as a fix for v3.16.
+> 
+> IIUIC, the only reason the driver source needs the header file is:
+> 
+> #define CPG_NUM_CLOCKS                  (R8A7779_CLK_OUT + 1)
+> 
+> Why not
+> 
+> #define CPG_NUM_CLOCKS                  8
+> 
+> and drop the include?
+> 
+> Or better, use "num_clks" (from of_property_count_strings(np,
+> "clock-output-names")), like the other R-Car drivers do.
 
-Log says musb is wrestling control over some pins with some other driver:
-
-[    1.441497] pinctrl-nomadik soc:pinctrl: pin GPIO256_AF28 already
-requested by a03e0000.usb_per5; cannot claim for musb-hdrc.0.auto
-[    1.453369] pinctrl-nomadik soc:pinctrl: pin-256 (musb-hdrc.0.auto)
-status -22
-[    1.460571] pinctrl-nomadik soc:pinctrl: could not request pin 256
-(GPIO256_AF28) from group usb_a_1  on device pinctrl-nomadik
-[    1.472076] musb-hdrc musb-hdrc.0.auto: Error applying setting,
-reverse things back
-[    1.479827] HS USB OTG: no transceiver configured
-[    1.484558] musb-hdrc musb-hdrc.0.auto: musb_init_controller failed
-with status -517
-[    1.492309] platform musb-hdrc.0.auto: Driver musb-hdrc requests
-probe deferral
-[    1.500183] pinctrl-nomadik soc:pinctrl: pin GPIO256_AF28 already
-requested by a03e0000.usb_per5; cannot claim for musb-hdrc.0.auto
-[    1.512023] pinctrl-nomadik soc:pinctrl: pin-256 (musb-hdrc.0.auto)
-status -22
-[    1.519226] pinctrl-nomadik soc:pinctrl: could not request pin 256
-(GPIO256_AF28) from group usb_a_1  on device pinctrl-nomadik
-[    1.530731] musb-ux500 musb-hdrc.0.auto: Error applying setting,
-reverse things back
-[    1.539184] pinctrl-nomadik soc:pinctrl: pin GPIO256_AF28 already
-requested by a03e0000.usb_per5; cannot claim for musb-hdrc.1.auto
-[    1.551025] pinctrl-nomadik soc:pinctrl: pin-256 (musb-hdrc.1.auto)
-status -22
-[    1.558258] pinctrl-nomadik soc:pinctrl: could not request pin 256
-(GPIO256_AF28) from group usb_a_1  on device pinctrl-nomadik
-[    1.569732] musb-hdrc musb-hdrc.1.auto: Error applying setting,
-reverse things back
-[    1.577453] HS USB OTG: no transceiver configured
-
-[ .. repeats until the end .. ]
-
-I think this is not related to this patch.
-
-
-ChenYu
+The latter I like. But I don't see any harm in fixing
+the immediate problem using a patch that has already been reviewed.
