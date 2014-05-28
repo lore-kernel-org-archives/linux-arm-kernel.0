@@ -1,7 +1,7 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 28 May 2014 10:37:55 -0700
+Date: Wed, 28 May 2014 10:38:56 -0700
 Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
-In-Reply-To: <CAD=FV=WGa7j_As_NpySxU7OEd_SzuGWK6oxU6UeiJ-4HsoWvvg@mail.gmail.com>
+In-Reply-To: <CAJFHJrpdVQ6G=-h5J_EgBT8+XSiyvPnNGR2yBDV27i8TDQ7jRg@mail.gmail.com>
 References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
  <53752E25.9060604@gmail.com>
  <CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>
@@ -9,80 +9,45 @@ References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
  <CAD=FV=V8UZoeOqEwfx_E015pLM+amTt51LrUa+dk7mTdn=vKgA@mail.gmail.com>
  <53753C17.1090002@gmail.com>
  <CAD=FV=WGa7j_As_NpySxU7OEd_SzuGWK6oxU6UeiJ-4HsoWvvg@mail.gmail.com>
-Message-ID: <CAD=FV=WfE8hubR8uaY5-1a=0cFQz-OLsLT0dWGyJhS60YNqPVg@mail.gmail.com>
+ <CAJFHJrrgWGc4XGQB0ysLufAg3Wouz-aYXu97Sy2Kp=HzK+akVQ@mail.gmail.com>
+ <CAASgrz2Nr69tpfC8ka9gbs2OvjLEGsvgAj4vBCFxhsamuFum7w@mail.gmail.com>
+ <53754CE2.3000905@gmail.com>
+ <CAD=FV=UMoL7i9rg_QtBAqPwisSQyRqRmk8wQhneMXAiLBjTT1A@mail.gmail.com>
+ <CAPz6YkU8GDrLj8UkqEQXxxqxWF5_p427wKSDgAp+QPR7WE7Ujg@mail.gmail.com>
+ <CAJFHJrrb2XFDZqJh4OuLdFP=J0aR4pGe-WLWKZ7ZpMfUSPGd4Q@mail.gmail.com>
+ <5376A726.4000106@samsung.com>
+ <CAD=FV=VXSP1TM9qY8PxFuQ+Tq2Ju57VdpzpwsHXqHshQm_havQ@mail.gmail.com>
+ <035001cf74f8$0aabdae0$200390a0$@samsung.com>
+ <537CD235.2020304@samsung.com>
+ <CAJFHJrpdVQ6G=-h5J_EgBT8+XSiyvPnNGR2yBDV27i8TDQ7jRg@mail.gmail.com>
+Message-ID: <CAD=FV=WjaKLFjs4RbruJq_RRGpjVkbS+755u6ZBq2L1CMAFh5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz,
+Kukjin,
 
-On Thu, May 15, 2014 at 3:44 PM, Doug Anderson <dianders@chromium.org> wrote:
-> Tomasz,
->
-> On Thu, May 15, 2014 at 3:13 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->>> NOTE: if for some reason we need to keep the MCT around, we're
->>> definitely going to need to account for the fact that tweaking it
->>> affects the arch timer.  ...and having the arch timer is really nice
->>> since:
+On Wed, May 21, 2014 at 11:34 AM, Chirantan Ekbote
+<chirantan@chromium.org> wrote:
+> On Wed, May 21, 2014 at 9:20 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+>> On 21.05.2014 15:24, Kukjin Kim wrote:
 >>
->> [Let me reorder the points below to make it easier to comment:]
+>>> BTW, since
+>>> exynos5260, exynos5420 and exynos5800 doesn't support arch timer, we
+>>> have been using MCT on exynos5 SoCs.
 >>
->>> * it's faster to access.
->>> * it is accessible from userspace for really fast access.
+>> Hmm, I thought arch timer was a core feature of ARM Cortex A15 (and A7)
+>> cores. Also you mention Exynos5420, while Chirantan's patch removing MCT
+>> node from exynos5420.dtsi, would suggest that it worked for him fine. (I
+>> assume it was tested.)
 >>
->> Do you have some data on whether it is a significant difference,
->> especially considering real use cases?
 >
-> I know that Chrome makes _a lot_ of calls to gettimeofday() for
-> profiling purposes, enough that it showed up on benchmarks.  In fact,
-> we made a change to the MCT to make accesses faster and there's a
-> small mention of the benchmarking that was done at:
->
-> https://chromium-review.googlesource.com/#/c/32190/
->
-> ...that change probably should be sent upstream, actually.
->
-> I'll let Chirantan comment on how much faster arch timers were.
-> ...and I think David Riley (also CCed now) may be able to comment on
-> the benefits of userspace timers.
->
->
->>> * it implements the bits needed for udelay() to use it.
->>
->> Hmm, do you know what bits are those? On Exynos4 MCT is the only option
->> and it would be nice to let udelay() use it.
->
-> Look for register_current_timer_delay().  It seems like we could do
-> this for MCT, but I've never done the investigation because we were
-> always planning to move to arch timers.  ;)
+> I was able to boot both 5420 and 5800 with just the arch timers on our
+> 3.8 based franken-kernel.  The upstream kernel doesn't boot on those
+> systems with or without the mct so I wasn't able to test there.
+> Although looking at the upstream device tree now I see that there is
+> no entry for the arch timer in exynos5420.dtsi.  Maybe it should be
+> added in?
 
-If you're planning to add support for MCT as a source for udelay, let
-me know.  It sounds like there's a chance that we won't be able to use
-the ARCH timers on 5420 so we may be interested in these patches as
-well.
-
-Also note that it appears that MCT upstream is also not used as a
-scheduler clock.  Perhaps you would want those patches, too?  I think
-Chirantan said that it will cause problems on systems that have both
-MCT and arch timers though, since the system didn't like two scheduler
-clocks to be registered (?).
-
-
-In summary, we've got the following MCT patches proposed to go upstream:
-
-1. MCT scheduler clock: <http://crosreview.com/56363> and
-<http://crosreview.com/56364>
-2. Speed MCT access: <http://crosreview.com/56365>.  I wonder if we
-could also speed it up further with a 64-bit read.
-3. Use MCT for udelay: yet to be written.
-
-...does someone want to claim the task of sending those things up?
-
-
-Oh, actually it looks like (93bfb76 clocksource: exynos_mct: register
-sched_clock callback) in linuxnext adds a partial version of the first
-patch but isn't as complete as what's in our tree (it's missing the
-KConfig change we have locally as well as the notrace so it probably
-breaks ftrace?).  Adding Vincent.
-
+A gentle reminder to respond here about the status of MCT on 5420 and 5800.
 
 -Doug
