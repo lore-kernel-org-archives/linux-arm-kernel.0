@@ -1,49 +1,33 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 28 May 2014 17:50:50 -0500
-Subject: [PATCH 1/2] dt-binding: add vendor prefix for SolidRun
-In-Reply-To: <1401140009-31505-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1401140009-31505-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CAL_JsqK-iWc8J6qeZ5LLsS-2-9UP2od6bZwGDUMqpaB7EUEs0A@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 29 May 2014 01:19:43 +0200
+Subject: [PATCH] misc: atmel_pwm: only build for supported platforms
+In-Reply-To: <20140528184217.GB30031@kroah.com>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-17-git-send-email-arnd@arndb.de>
+ <536CA80A.60201@atmel.com> <1401279867.22486.6.camel@x220>
+ <20140528155916.GA9793@piout.net> <1401293383.22486.18.camel@x220>
+ <20140528175439.GA18470@piout.net> <1401299948.22486.51.camel@x220>
+ <20140528184217.GB30031@kroah.com>
+Message-ID: <20140528231940.GC18470@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 4:33 PM, Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com> wrote:
-> SolidRun is a company from Israel producing small-sized home-media
-> computers like the Marvell Dove based CuBox and Freescale IMX based
-> CuBox-i. Document the missing vendor prefix.
->
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Randy Dunlap <rdunlap@infradead.org>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-doc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
+On 28/05/2014 at 11:42:17 -0700, Greg Kroah-Hartman wrote :
+> On Wed, May 28, 2014 at 07:59:08PM +0200, Paul Bolle wrote:
+> > So the patch we're discussing here will never be included in a release?
+> 
 
-Acked-by: Rob Herring <robh@kernel.org>
+As it hit linux-next, I guess it will be in 3.16
 
-> ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 0f01c9bf19c8..f0c046aff55b 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -102,6 +102,7 @@ sii Seiko Instruments, Inc.
->  sirf   SiRF Technology, Inc.
->  smsc   Standard Microsystems Corporation
->  snps   Synopsys, Inc.
-> +solidrun       SolidRun
->  spansion       Spansion Inc.
->  st     STMicroelectronics
->  ste    ST-Ericsson
-> --
-> 1.9.1
->
+> So, should I just remove it right now?  I like deleting files :)
+> 
+
+I also like doing that, let me resend my series, rebased on linux-next
+because of the dependency on the PWM tree. Then I will let you and
+Nicolas decide what you want to do with it.
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
