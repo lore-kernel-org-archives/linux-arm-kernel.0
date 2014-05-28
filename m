@@ -1,68 +1,199 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 28 May 2014 13:47:50 +0200
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in device
- tree
-In-Reply-To: <5385AF94.90004@redhat.com>
-References: <537E31F7.1030505@gmail.com>	<537F1148.3010102@redhat.com>	<20140523112239.GB12304@sirena.org.uk>	<537F3610.3050104@redhat.com>	<20140523162718.GE22111@sirena.org.uk>	<53806F26.6050706@redhat.com>	<20140525123452.GS22111@sirena.org.uk>	<53824294.1090609@redhat.com>	<20140526103807.GV22111@sirena.org.uk>	<538321AB.4050006@redhat.com>	<20140526142225.GF22111@sirena.org.uk>	<538356DA.7090302@redhat.com>	<CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>	<53838023.2080807@redhat.com>
- <CAPDyKFpg_2RQabM044C1hsNTcuxdVVOvw0ZONVRdysk=eom8UA@mail.gmail.com>
- <5385AF94.90004@redhat.com>
-Message-ID: <5385CCE6.9070204@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 28 May 2014 20:04:00 +0800
+Subject: [PATCH 5/5] pinctrl: sunxi: Implement multiple interrupt banks
+ support
+In-Reply-To: <CAGb2v65KU9UYU9Vn7X0b4-hE7WJchPxuF1UQDeECqc=-147gsA@mail.gmail.com>
+References: <1401272851-15873-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1401272851-15873-6-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v65KU9UYU9Vn7X0b4-hE7WJchPxuF1UQDeECqc=-147gsA@mail.gmail.com>
+Message-ID: <CAGb2v65-3ddhaiF-CMdem9NHHibboQYaqXC1axDX+VcpWSLPxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm following this discussion continuously, but (un)fortunately I'm on
-vacation right now and don't have much time to work on this, so sorry
-for a very selective reply.
-
-On 28.05.2014 11:42, Hans de Goede wrote:
+On Wed, May 28, 2014 at 7:47 PM, Chen-Yu Tsai <wens@csie.org> wrote:
 > Hi,
-> 
-> On 05/27/2014 03:50 PM, Ulf Hansson wrote:
->> [snip]
+>
+> On Wed, May 28, 2014 at 6:27 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> The A23 and A31 support multiple interrupt banks. Support it by adding a linear
+>> domain covering all the banks. It's trickier than it should because there's an
+>> interrupt per bank, so we have multiple interrupts using the same domain.
 >>
->> Powerup driver's ->probe():
->> Typically the "powerup driver" will need to register a few callback
->> functions towards the mmc core. Typically at mmc_of_parse(), those
->> callbacks will have to be connected to a particular mmc host.
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> ---
+>>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 62 +++++++++++++++++++++++++++--------
+>>  drivers/pinctrl/sunxi/pinctrl-sunxi.h | 11 +++++--
+>>  2 files changed, 57 insertions(+), 16 deletions(-)
 >>
->> I would like to see three different callbacks, mirroring each of the
->> mmc_ios power_mode states MMC_POWER_OFF|UP|ON.
-> 
-> Hmm, can't we do something with runtime pm here instead? I would be
-> nice if we could use the platform bus for this instead of inventing
-> a new bus for this. Both from not needing to add extra count pov, but
-> also from the pov of having a solution which other subsystems can
-> later easily copy. I can even envision the parts of mmc_of_parse
-> dealing with this being a separate function taking a child node as
-> argument from day one, which can then hopefully later be moved out
-> of the mmc subsys and be used elsewhere too (*).
+>> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>> index 71d6cd10d56f..69b58aacc636 100644
+>> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>> @@ -635,17 +635,25 @@ static void sunxi_pinctrl_irq_handler(unsigned irq, struct irq_desc *desc)
+>>  {
+>>         struct irq_chip *chip = irq_get_chip(irq);
+>>         struct sunxi_pinctrl *pctl = irq_get_handler_data(irq);
+>> -       const unsigned long reg = readl(pctl->membase + IRQ_STATUS_REG);
+>> +       unsigned long bank, reg, val;
+>> +
+>> +       for (bank = 0; bank < pctl->desc->irq_banks; bank++)
+>> +               if (irq == pctl->irq[bank])
+>> +                       break;
+>
+> bail out or BUG_ON(bank == pctl->desc->irq_banks)?
+> (dumb question: would this even happen?)
+>
+>> +
+>> +       reg = sunxi_irq_status_reg_from_bank(bank);
+>> +       val = readl(pctl->membase + reg);
+>>
+>>         /* Clear all interrupts */
+>> -       writel(reg, pctl->membase + IRQ_STATUS_REG);
+>> +       writel(val, pctl->membase + reg);
+>>
+>> -       if (reg) {
+>> +       if (val) {
+>>                 int irqoffset;
+>>
+>>                 chained_irq_enter(chip, desc);
+>> -               for_each_set_bit(irqoffset, &reg, SUNXI_IRQ_NUMBER) {
+>> -                       int pin_irq = irq_find_mapping(pctl->domain, irqoffset);
+>> +               for_each_set_bit(irqoffset, &val, SUNXI_IRQ_NUMBER) {
+>> +                       int pin_irq = irq_find_mapping(pctl->domain,
+>> +                                                      bank * SUNXI_IRQ_NUMBER + irqoffset);
+>>                         generic_handle_irq(pin_irq);
+>>                 }
+>>                 chained_irq_exit(chip, desc);
+>> @@ -713,8 +721,11 @@ static int sunxi_pinctrl_build_state(struct platform_device *pdev)
+>>
+>>                 while (func->name) {
+>>                         /* Create interrupt mapping while we're at it */
+>> -                       if (!strcmp(func->name, "irq"))
+>> -                               pctl->irq_array[func->irqnum] = pin->pin.number;
+>> +                       if (!strcmp(func->name, "irq")) {
+>> +                               int irqnum = func->irqnum + func->irqbank * SUNXI_IRQ_NUMBER;
+>> +                               pctl->irq_array[irqnum] = pin->pin.number;
+>> +                       }
+>> +
+>>                         sunxi_pinctrl_add_function(pctl, func->name);
+>>                         func++;
+>>                 }
+>> @@ -784,6 +795,13 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
+>>         pctl->dev = &pdev->dev;
+>>         pctl->desc = desc;
+>>
+>> +       pctl->irq_array = devm_kcalloc(&pdev->dev,
+>> +                                      SUNXI_IRQ_NUMBER * pctl->desc->irq_banks,
+>> +                                      sizeof(*pctl->irq_array),
+>> +                                      GFP_KERNEL);
+>> +       if (!pctl->irq_array)
+>> +               return -ENOMEM;
+>> +
+>>         ret = sunxi_pinctrl_build_state(pdev);
+>>         if (ret) {
+>>                 dev_err(&pdev->dev, "dt probe failed: %d\n", ret);
+>> @@ -868,21 +886,34 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
+>>         if (ret)
+>>                 goto gpiochip_error;
+>>
+>> -       pctl->irq = irq_of_parse_and_map(node, 0);
+>> +       pctl->irq = devm_kcalloc(&pdev->dev,
+>> +                                pctl->desc->irq_banks,
+>> +                                sizeof(*pctl->irq),
+>> +                                GFP_KERNEL);
+>>         if (!pctl->irq) {
+>> -               ret = -EINVAL;
+>> +               ret = -ENOMEM;
+>>                 goto clk_error;
+>>         }
+>>
+>> -       pctl->domain = irq_domain_add_linear(node, SUNXI_IRQ_NUMBER,
+>> -                                            &irq_domain_simple_ops, NULL);
+>> +       for (i = 0; i < pctl->desc->irq_banks; i++) {
+>> +               pctl->irq[i] = platform_get_irq(pdev, i);
+>> +               if (pctl->irq[i] < 0) {
+>> +                       ret = pctl->irq[i];
+>> +                       goto clk_error;
+>> +               }
+>> +       }
+>> +
+>> +       pctl->domain = irq_domain_add_linear(node,
+>> +                                            pctl->desc->irq_banks * SUNXI_IRQ_NUMBER,
+>> +                                            &irq_domain_simple_ops,
+>> +                                            NULL);
+>>         if (!pctl->domain) {
+>>                 dev_err(&pdev->dev, "Couldn't register IRQ domain\n");
+>>                 ret = -ENOMEM;
+>>                 goto clk_error;
+>>         }
+>>
+>> -       for (i = 0; i < SUNXI_IRQ_NUMBER; i++) {
+>> +       for (i = 0; i < (pctl->desc->irq_banks * SUNXI_IRQ_NUMBER); i++) {
+>>                 int irqno = irq_create_mapping(pctl->domain, i);
+>>
+>>                 irq_set_chip_and_handler(irqno, &sunxi_pinctrl_irq_chip,
+>> @@ -890,8 +921,11 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
+>>                 irq_set_chip_data(irqno, pctl);
+>>         };
+>>
+>> -       irq_set_chained_handler(pctl->irq, sunxi_pinctrl_irq_handler);
+>> -       irq_set_handler_data(pctl->irq, pctl);
+>> +       for (i = 0; i < pctl->desc->irq_banks; i++) {
+>> +               irq_set_chained_handler(pctl->irq[i],
+>> +                                       sunxi_pinctrl_irq_handler);
+>> +               irq_set_handler_data(pctl->irq[i], pctl);
+>> +       }
+>>
+>>         dev_info(&pdev->dev, "initialized sunXi PIO driver\n");
+>>
+>> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+>> index 7ddcce0f3c27..e4a808e66fd2 100644
+>> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+>> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+>> @@ -68,6 +68,8 @@
+>>  #define IRQ_STATUS_IRQ_BITS            1
+>>  #define IRQ_STATUS_IRQ_MASK            ((1 << IRQ_STATUS_IRQ_BITS) - 1)
+>>
+>> +#define IRQ_MEM_SIZE           0x20
+>> +
+>>  #define IRQ_EDGE_RISING                0x00
+>>  #define IRQ_EDGE_FALLING       0x01
+>>  #define IRQ_LEVEL_HIGH         0x02
+>> @@ -115,8 +117,8 @@ struct sunxi_pinctrl {
+>>         unsigned                        nfunctions;
+>>         struct sunxi_pinctrl_group      *groups;
+>>         unsigned                        ngroups;
+>> -       int                             irq;
+>> -       int                             irq_array[SUNXI_IRQ_NUMBER];
+>> +       int                             *irq;
+>> +       unsigned                        *irq_array;
+>>         spinlock_t                      lock;
+>>         struct pinctrl_dev              *pctl_dev;
+>>  };
+>> @@ -250,6 +252,11 @@ static inline u32 sunxi_irq_ctrl_offset(u16 irq)
+>>         return irq_num * IRQ_CTRL_IRQ_BITS;
+>>  }
+>>
+>> +static inline u32 sunxi_irq_status_reg_from_bank(u8 bank)
+>> +{
+>> +       return IRQ_STATUS_REG + bank * IRQ_MEM_SIZE;
+>> +}
+>> +
+>>  static inline u32 sunxi_irq_status_reg(u16 irq)
+>>  {
+>>         u8 reg = irq / IRQ_STATUS_IRQ_PER_REG * 0x04;
 
-This is actually a real use case, because we already have HSIC (USB with
-heavily stripped down physical layer) modems on certain Samsung boards
-and similarly to the kind of SDIO devices being discussed here they
-can't be discovered until a certain power up sequence is done.
-Analogically, the modem chip uses OOB interrupts and certain GPIO lines
-for various purposes and they need to be provided by DT.
+Sorry, missed this. You should also change 0x04 to IRQ_MEM_SIZE
+(I believe that was the original intention?) for sunxi_irq_*_reg.
 
-Moreover, there are already WLAN chips available that can use HSIC as
-their host interface and I'm not talking here about some exotic
-products, but rather widely recognized products of Broadcom (BCM4335),
-Marvell (88W8797) or Qualcomm Atheros (AR6004).
+This should fix the mask/unmask/set_type callbacks.
 
-My conclusion is that I see the discussion here being too much focused
-on MMC, especially considering the fact that the whole problem doesn't
-have anything to do with MMC, which is just used as (one of possible)
-host interface.
-
-IMHO, all we need here is a way to tell the MMC (or HSIC) core when to
-look for a new device and when not (e.g. power down the host controller
-completely). Anything else, including proper power sequencing is up to
-the platform driver of such non-discoverable device - it's only its host
-interface that is discoverable when enabled. I believe this simplistic
-approach would lead to much less new code added, better reusability of
-code (power sequencing independent of host interface) and no need to
-create overly generic code, which usually turns out to be not generic
-enough.
-
-Best regards,
-Tomasz
+>> --
+>> 1.9.3
+>>
+>
+> The rest looks good. Thanks for making it happen!
+>
+>
+> Cheers
+> ChenYu
