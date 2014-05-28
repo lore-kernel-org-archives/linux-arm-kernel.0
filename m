@@ -1,87 +1,83 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 28 May 2014 12:03:51 +0100
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
- device tree
-In-Reply-To: <CAPDyKFqCwSfnbXJffQeMUMLEgZPcqjEMhbTXxi4HKOKqExQ70g@mail.gmail.com>
-References: <53824294.1090609@redhat.com>
- <20140526103807.GV22111@sirena.org.uk>
- <538321AB.4050006@redhat.com>
- <20140526142225.GF22111@sirena.org.uk>
- <538356DA.7090302@redhat.com>
- <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
- <53838023.2080807@redhat.com>
- <CAPDyKFpg_2RQabM044C1hsNTcuxdVVOvw0ZONVRdysk=eom8UA@mail.gmail.com>
- <20140527175326.GZ12304@sirena.org.uk>
- <CAPDyKFqCwSfnbXJffQeMUMLEgZPcqjEMhbTXxi4HKOKqExQ70g@mail.gmail.com>
-Message-ID: <20140528110351.GI12304@sirena.org.uk>
+From: gabriel.fernandez@st.com (Gabriel Fernandez)
+Date: Wed, 28 May 2014 13:07:46 +0200
+Subject: [PATCH v3 01/11] clk: composite: support determine_rate using
+ rate_ops->round_rate + mux_ops->set_parent
+In-Reply-To: <27477814.I92OqiDuKt@phil>
+References: <1621067.VASjIdzoSl@phil> <17737873.r3cte6TEQ5@phil>
+ <5383085C.1060804@free-electrons.com> <27477814.I92OqiDuKt@phil>
+Message-ID: <5385C382.4080208@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 10:19:11AM +0200, Ulf Hansson wrote:
-> On 27 May 2014 19:53, Mark Brown <broonie@kernel.org> wrote:
+Hi Heiko,
 
-> > This then either conflicts with cases where we need to describe the
-> > actual contents of the slot with a compatible string or means that the
-> > SDIO driver needs to handle powerup sequencing since we should be
-> > binding to the first compatible we find.  If the host controller driver
-> > and/or subsystem is going to deal with the powering up it's not clear
-> > that it specifically needs to be the compatible property that's used
-> > to determine the powerup method, it could just be a boolean or a
-> > 'power-method = blah' property (where blah is one of a series of strings
-> > defining methods).  Alternatively we could have separate nodes for the
-> > slot and SDIO device but that feels meh.  What's the hard requirement
-> > for it to specifically be a compatible property?
+On 05/26/2014 12:27 PM, Heiko St?bner wrote:
+> Am Montag, 26. Mai 2014, 11:24:44 schrieb Boris BREZILLON:
+>> Hello Heiko,
+>>
+>> On 23/05/2014 21:33, Heiko St?bner wrote:
+>>> From: Boris BREZILLON <b.brezillon@overkiz.com>
+>>>
+>>> In case the rate_hw does not implement determine_rate, but only round_rate
+>>> we fallback to best_parent selection if mux_hw is present and support
+>>> reparenting.
+>>>
+>>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>>>
+>>> This also fixes a rate calculation problem when using the standard div and
+>>> mux ops, as in this case currently only the mux->determine_rate is used
+>>> in the composite rate calculation.
+>>> [fixed the output to actually return a rate instead of the diff]
+>> Sorry for the delay and thanks for fixing this.
+>>
+>> Anyway, when I first proposed this patch, Emilio (added in Cc) told me
+>> this should not be automatically done by the composite clk driver, and
+>> the driver should instead provide the determine_rate function.
+> Just to point out, as I'm not sure if it comes across correctly from my
+> description above, it looks like the composite behaviour is currently broken
+> when using the standard mux and div ops for it.
+>
+> As only mux_ops provides a determine rate callback, it will always only run
+> 	mux_ops->determine_rate
+> thus returning the parent rate as the target rate.
 
-> Since the sdio bus is a discoverable bus, we must leave the "SDIO card
-> device id" outside the information of the DT child node. Instead the
-> "SDIO card device id" will be fetched once the card has been properly
-> powered and initialized. From sdio bus' ->match(), the "SDIO func
-> driver id" will be matched with the "SDIO card device id".
+YesI saw this regression for me later, i had planned to propose a correction
+this patch is therefore highly welcome.
+Thanks !
 
-> What we need to describe in the child node is only what "powerup
-> driver" to use (an obviously it's resources). I don't see why there
-> should be a conflict in using a compatible property, but I might be
-> missing your point.
+> So when the parents are 600 and 891 MHz and you want 75MHz [which the divider
+> can provide], the clock would always be set to 600MHz, which may be way out of
+> spec - as seen on my rk3188 clock tree.
+>
+>
+> When looking at the other composite users, only st/clkgen-mux.c uses the same
+> pattern with both the standard mux and div operations. I've added Gabriel,
+> maybe he can check what happens on his arch, when an affected clock is changed.
 
-I wouldn't assume that the SDIO bus will always be accurately
-discoverable - hardware engineers can always repurpose things for other
-purposes.
+I tested this use case with the patch, the good parent is selected (600 
+Mhz) and make the
+division to have 75 Mhz.
 
-> > There's also the need for the SDIO device to be able to get at the
-> > resources provided and actively work with them at runtime if it wants to
-> > manage things more actively (partial poweroff for low power states or
-> > managing clock rates for example).
+But if CLK_SET_RATE_PARENT is set, it will take the 981 Mhz clock and 
+recalculate the parent rate
+(because the diff rate is equal or a little better than the 600 Mhz clock)
 
-> Yes, that's is also a reason to why I thought it would make sense to
-> have a "powerup driver". Typically this driver should support runtime
-> PM to handle these kind of fine grained power management.
+Which is a shame, all child clocks are affected.
 
-No, runtime PM isn't really fine grained - I'm talking about things
-like starting and stopping individual resources or configuring them.
+It was the best choice to choose other parent
+and do just a division (not recalculate the parent rate)
 
-> The SDIO func driver will have access (through the struct
-> mmc_card|host) to the "powerup driver's" struct device, and can use
-> pm_runtime_get|put() for it, to tell the "powerup driver" when it may
-> go into power save state.
+Best Regards
 
-> This kind of fine grained power management is not related directly to
-> the SDIO specification, and should not be a part of the mmc core in my
-> opinion.
+Gabriel.
 
-> If we don't have a compatible string in the DT child node of the mmc
-> host, but just a DT property - is there a way to achieve the above
-> anyway?
 
-I don't see any relationship between having compatible strings and the
-ability to achieve things like that to be honest.  Having compatible
-strings has no real impact on what we can implement, the power driver
-you're talking about can easily be library code or a feature of part of
-the code that already exists - so long as we know what hardware is there
-it's up to us how we interpret that.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140528/580648d8/attachment.sig>
+
+
+>
+>> Mike, any opinion on this patch ?
+>>
+>> Best Regards,
+>>
+>> Boris
+>>
