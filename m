@@ -1,248 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 May 2014 17:00:48 +0100
-Subject: [PATCH v2 7/9] arm64: KVM: add trap handlers for AArch32 debug
- registers
-In-Reply-To: <20140525153546.GH3866@lvm>
-References: <1400604945-25247-1-git-send-email-marc.zyngier@arm.com>
- <1400604945-25247-8-git-send-email-marc.zyngier@arm.com>
- <20140525153546.GH3866@lvm>
-Message-ID: <53860830.4080707@arm.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 28 May 2014 18:09:43 +0200
+Subject: [PATCH] misc: atmel_pwm: only build for supported platforms
+In-Reply-To: <20140528155916.GA9793@piout.net>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-17-git-send-email-arnd@arndb.de>
+ <536CA80A.60201@atmel.com> <1401279867.22486.6.camel@x220>
+ <20140528155916.GA9793@piout.net>
+Message-ID: <1401293383.22486.18.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/05/14 16:35, Christoffer Dall wrote:
-> On Tue, May 20, 2014 at 05:55:43PM +0100, Marc Zyngier wrote:
->> Add handlers for all the AArch32 debug registers that are accessible
->> from EL0 or EL1. The code follow the same strategy as the AArch64
->> counterpart with regards to tracking the dirty state of the debug
->> registers.
->>
->> Reviewed-by: Anup Patel <anup.patel@linaro.org>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/include/asm/kvm_asm.h |   9 +++
->>  arch/arm64/kvm/sys_regs.c        | 137 ++++++++++++++++++++++++++++++++++++++-
->>  2 files changed, 145 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
->> index 12f9dd7..993a7db 100644
->> --- a/arch/arm64/include/asm/kvm_asm.h
->> +++ b/arch/arm64/include/asm/kvm_asm.h
->> @@ -93,6 +93,15 @@
->>  #define c10_AMAIR0	(AMAIR_EL1 * 2)	/* Aux Memory Attr Indirection Reg */
->>  #define c10_AMAIR1	(c10_AMAIR0 + 1)/* Aux Memory Attr Indirection Reg */
->>  #define c14_CNTKCTL	(CNTKCTL_EL1 * 2) /* Timer Control Register (PL1) */
->> +
->> +#define cp14_DBGDSCRext	(MDSCR_EL1 * 2)
->> +#define cp14_DBGBCR0	(DBGBCR0_EL1 * 2)
->> +#define cp14_DBGBVR0	(DBGBVR0_EL1 * 2)
->> +#define cp14_DBGBXVR0	(cp14_DBGBVR0 + 1)
->> +#define cp14_DBGWCR0	(DBGWCR0_EL1 * 2)
->> +#define cp14_DBGWVR0	(DBGWVR0_EL1 * 2)
->> +#define cp14_DBGDCCINT	(MDCCINT_EL1 * 2)
->> +
->>  #define NR_COPRO_REGS	(NR_SYS_REGS * 2)
->>  
->>  #define ARM_EXCEPTION_IRQ	  0
->> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->> index 98d60d1..5960d5b 100644
->> --- a/arch/arm64/kvm/sys_regs.c
->> +++ b/arch/arm64/kvm/sys_regs.c
->> @@ -474,12 +474,148 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->>  	  NULL, reset_val, FPEXC32_EL2, 0x70 },
->>  };
->>  
->> +static bool trap_dbgidr(struct kvm_vcpu *vcpu,
->> +			const struct sys_reg_params *p,
->> +			const struct sys_reg_desc *r)
->> +{
->> +	if (p->is_write) {
->> +		return ignore_write(vcpu, p);
->> +	} else {
->> +		u64 dfr = read_cpuid(ID_AA64DFR0_EL1);
->> +		u64 pfr = read_cpuid(ID_AA64PFR0_EL1);
->> +		u32 el3 = !!((pfr >> 12) & 0xf);
->> +
->> +		*vcpu_reg(vcpu, p->Rt) = ((((dfr >> 20) & 0xf) << 28) |
->> +					  (((dfr >> 12) & 0xf) << 24) |
->> +					  (((dfr >> 28) & 0xf) << 20) |
->> +					  (6 << 16) | (el3 << 14) | (el3 << 12));
->> +		return true;
->> +	}
->> +}
->> +
->> +static bool trap_debug32(struct kvm_vcpu *vcpu,
->> +			 const struct sys_reg_params *p,
->> +			 const struct sys_reg_desc *r)
->> +{
->> +	if (p->is_write) {
->> +		vcpu_cp14(vcpu, r->reg) = *vcpu_reg(vcpu, p->Rt);
->> +		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
->> +	} else {
->> +		*vcpu_reg(vcpu, p->Rt) = vcpu_cp14(vcpu, r->reg);
->> +	}
->> +
->> +	return true;
->> +}
->> +
->> +#define DBG_BCR_BVR_WCR_WVR(n)					\
->> +	/* DBGBCRn */						\
->> +	{ Op1( 0), CRn( 0), CRm((n)), Op2( 4), trap_debug32,	\
->> +	  NULL, (cp14_DBGBCR0 + (n) * 2) },			\
->> +	/* DBGBVRn */						\
->> +	{ Op1( 0), CRn( 0), CRm((n)), Op2( 5), trap_debug32,	\
->> +	  NULL, (cp14_DBGBVR0 + (n) * 2) },			\
+On Wed, 2014-05-28 at 17:59 +0200, Alexandre Belloni wrote:
+> On 28/05/2014 at 14:24:27 +0200, Paul Bolle wrote :
+> > > >  config ATMEL_PWM
+> > > >  	tristate "Atmel AT32/AT91 PWM support"
+> > > > -	depends on HAVE_CLK && (AVR32 || ARCH_AT91 || COMPILE_TEST)
+> > > > +	depends on HAVE_CLK
+> > > > +	depends on AVR32 || AT91SAM9263 || AT91SAM9RL || AT91SAM9G45
+> > 
+> > Symbols AT91SAM9263, AT91SAM9RL, and AT91SAM9G45 do not seem to exist in
+> > next-20140528. Should these perhaps be SOC_AT91SAM9263, SOC_AT91SAM9RL,
+> > and SOC_AT91SAM9G45 and/or ARCH_AT91SAM9263, ARCH_AT91SAM9RL, and
+> > ARCH_AT91SAM9G45?
 > 
-> I think you switched the order of DBGBCRn and DBGBVRn here?  Opc2==4 is
-> the DBGBVR and Opc2==5 is the DBGBCR0.
+> I wouldn't bother too much fixing that, this will definitely be remove
+> in 3.17. 
 
-I can't get it right, can I? It's amazing that it worked...
+Are you talking about: 1) the problem this patch tried to fix; or 2) the
+problem it created?
 
->> +	/* DBGWVRn */						\
->> +	{ Op1( 0), CRn( 0), CRm((n)), Op2( 6), trap_debug32,	\
->> +	  NULL, (cp14_DBGWVR0 + (n) * 2) },			\
->> +	/* DBGWCRn */						\
->> +	{ Op1( 0), CRn( 0), CRm((n)), Op2( 7), trap_debug32,	\
->> +	  NULL, (cp14_DBGWCR0 + (n) * 2) }
->> +
->> +#define DBGBXVR(n)						\
->> +	{ Op1( 0), CRn( 1), CRm((n)), Op2( 1), trap_debug32,	\
->> +	  NULL, cp14_DBGBXVR0 + n * 2 }
->> +
->>  /* Trapped cp14 registers */
->>  static const struct sys_reg_desc cp14_regs[] = {
->> +	/* DBGIDR */
->> +	{ Op1( 0), CRn( 0), CRm( 0), Op2( 0), trap_dbgidr },
->> +	/* DBGDTRRXext */
->> +	{ Op1( 0), CRn( 0), CRm( 0), Op2( 2), trap_raz_wi },
->> +
->> +	DBG_BCR_BVR_WCR_WVR(0),
->> +	/* DBGDSCRint */
->> +	{ Op1( 0), CRn( 0), CRm( 1), Op2( 0), trap_raz_wi },
->> +	DBG_BCR_BVR_WCR_WVR(1),
->> +	/* DBGDCCINT */
->> +	{ Op1( 0), CRn( 0), CRm( 2), Op2( 0), trap_debug32 },
->> +	/* DBGDSCRext */
->> +	{ Op1( 0), CRn( 0), CRm( 2), Op2( 2), trap_debug32 },
->> +	DBG_BCR_BVR_WCR_WVR(2),
->> +	/* DBGDTRTXext */
->> +	{ Op1( 0), CRn( 0), CRm( 3), Op2( 2), trap_raz_wi },
->> +	DBG_BCR_BVR_WCR_WVR(3),
->> +	DBG_BCR_BVR_WCR_WVR(4),
-> 
-> So we don't have a handler for the TRRX_int (nor the TRRX_EL0).  I
-> understand that it doesn't make sense to keep state for them or
-> context-switch them, but do we never trap on these and if we do, is it
-> then always valid to inject an undefined exception?
+> I was too late for 3.16 because my series was waiting on
+> another patch set.
 
-TRRXint has clearly been forgotten (Linux doesn't use it). TRRX_EL0 is
-actually handled (see the comment that says DBGDTR[TR]X_EL0 in patch 3).
-
->> +	DBG_BCR_BVR_WCR_WVR(5),
->> +	/* DBGWFAR */
->> +	{ Op1( 0), CRn( 0), CRm( 6), Op2( 0), trap_raz_wi },
->> +	/* DBGOSECCR */
->> +	{ Op1( 0), CRn( 0), CRm( 6), Op2( 2), trap_raz_wi },
-> 
-> So it seems that we generally ignore everything related to external
-> debug state, but we don't really document anywhere what our behavior is
-> and what is and what is not supported towards the guest...
-
-Happy to document that.
-
->> +	DBG_BCR_BVR_WCR_WVR(6),
->> +	/* DBGVCR */
->> +	{ Op1( 0), CRn( 0), CRm( 7), Op2( 0), trap_debug32 },
->> +	DBG_BCR_BVR_WCR_WVR(7),
->> +	DBG_BCR_BVR_WCR_WVR(8),
->> +	DBG_BCR_BVR_WCR_WVR(9),
->> +	DBG_BCR_BVR_WCR_WVR(10),
->> +	DBG_BCR_BVR_WCR_WVR(11),
->> +	DBG_BCR_BVR_WCR_WVR(12),
->> +	DBG_BCR_BVR_WCR_WVR(13),
->> +	DBG_BCR_BVR_WCR_WVR(14),
->> +	DBG_BCR_BVR_WCR_WVR(15),
->> +
->> +	/* DBGDRAR (32bit) */
->> +	{ Op1( 0), CRn( 1), CRm( 0), Op2( 0), trap_raz_wi },
->> +
->> +	DBGBXVR(0),
->> +	/* DBGOSLAR */
->> +	{ Op1( 0), CRn( 1), CRm( 0), Op2( 4), trap_raz_wi },
->> +	DBGBXVR(1),
->> +	/* DBGOSLSR */
->> +	{ Op1( 0), CRn( 1), CRm( 1), Op2( 4), trap_oslsr_el1 },
->> +	DBGBXVR(2),
->> +	DBGBXVR(3),
->> +	/* DBGOSDLR */
->> +	{ Op1( 0), CRn( 1), CRm( 3), Op2( 4), trap_raz_wi },
->> +	DBGBXVR(4),
->> +	/* DBGPRCR */
->> +	{ Op1( 0), CRn( 1), CRm( 4), Op2( 4), trap_raz_wi },
->> +	DBGBXVR(5),
->> +	DBGBXVR(6),
->> +	DBGBXVR(7),
->> +	DBGBXVR(8),
->> +	DBGBXVR(9),
->> +	DBGBXVR(10),
->> +	DBGBXVR(11),
->> +	DBGBXVR(12),
->> +	DBGBXVR(13),
->> +	DBGBXVR(14),
->> +	DBGBXVR(15),
->> +
->> +	/* DBGDSAR (32bit) */
->> +	{ Op1( 0), CRn( 2), CRm( 0), Op2( 0), trap_raz_wi },
->> +
-> 
-> we don't handle access to any implementation defined debug registers?
-> Did we actually check what would be implemented for the cores we
-> support?
-
-No. So far, I've stuck with what the ARM ARM describe. Unless you're
-thinking of a particular register I may ignored?
-
->> +	/* DBGDEVID2 */
->> +	{ Op1( 0), CRn( 7), CRm( 0), Op2( 7), trap_raz_wi },
->> +	/* DBGDEVID1 */
->> +	{ Op1( 0), CRn( 7), CRm( 1), Op2( 7), trap_raz_wi },
->> +	/* DBGDEVID */
->> +	{ Op1( 0), CRn( 7), CRm( 2), Op2( 7), trap_raz_wi },
->> +	/* DBGCLAIMSET */
->> +	{ Op1( 0), CRn( 7), CRm( 8), Op2( 6), trap_raz_wi },
->> +	/* DBGCLAIMCLR */
->> +	{ Op1( 0), CRn( 7), CRm( 9), Op2( 6), trap_raz_wi },
->> +
-> 
-> nit: why the sudden blank line?
-> 
->> +	/* DBGAUTHSTATUS */
->> +	{ Op1( 0), CRn( 7), CRm(14), Op2( 6), trap_dbgauthstatus_el1 },
->>  };
->>  
->>  /* Trapped cp14 64bit registers */
->>  static const struct sys_reg_desc cp14_64_regs[] = {
->> +	/* DBGDRAR (64bit) */
->> +	{ Op1( 0), CRm( 1), .access = trap_raz_wi },
->> +
->> +	/* DBGDSAR (64bit) */
->> +	{ Op1( 0), CRm( 2), .access = trap_raz_wi },
->>  };
->>  
->>  /*
->> @@ -527,7 +663,6 @@ static const struct sys_reg_desc cp15_regs[] = {
->>  	{ Op1( 0), CRn(10), CRm( 3), Op2( 0), access_vm_reg, NULL, c10_AMAIR0 },
->>  	{ Op1( 0), CRn(10), CRm( 3), Op2( 1), access_vm_reg, NULL, c10_AMAIR1 },
->>  	{ Op1( 0), CRn(13), CRm( 0), Op2( 1), access_vm_reg, NULL, c13_CID },
->> -
->>  };
->>  
->>  static const struct sys_reg_desc cp15_64_regs[] = {
->> -- 
->> 1.8.3.4
->>
-> 
+We're already too late to fix stuff for v3.16-rc1 (which will probably
+only be released about three to four weeks from now)? Is that correct?
 
 
--- 
-Jazz is not dead. It just smells funny...
+Paul Bolle
