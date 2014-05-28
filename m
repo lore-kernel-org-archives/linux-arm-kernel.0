@@ -1,141 +1,62 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Wed, 28 May 2014 10:59:51 -0700
-Subject: [PATCH v6 3/4] live migration support for VM dirty log management
-In-Reply-To: <20140528090834.GK16428@lvm>
-References: <1400178451-4984-1-git-send-email-m.smarduch@samsung.com>
- <1400178451-4984-4-git-send-email-m.smarduch@samsung.com>
- <20140527201244.GC16428@lvm> <538509C9.8070403@samsung.com>
- <20140528090834.GK16428@lvm>
-Message-ID: <53862417.9040107@samsung.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 28 May 2014 19:05:26 +0100
+Subject: EFI_STUB fails to boot non-EFI on arm64
+In-Reply-To: <20140528155931.GA20523@arm.com>
+References: <20140523094513.GC9252@arm.com>
+ <20140523131656.GR4179@bivouac.eciton.net>
+ <20140523134720.GA9256@arm.com>
+ <20140523150331.GS4179@bivouac.eciton.net>
+ <20140528155931.GA20523@arm.com>
+Message-ID: <20140528180525.GU4179@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2014 02:08 AM, Christoffer Dall wrote:
-> On Tue, May 27, 2014 at 02:55:21PM -0700, Mario Smarduch wrote:
->> On 05/27/2014 01:12 PM, Christoffer Dall wrote:
->>> On Thu, May 15, 2014 at 11:27:30AM -0700, Mario Smarduch wrote:
+On Wed, May 28, 2014 at 04:59:31PM +0100, Will Deacon wrote:
+> > > Can we add another of detecting whether it's an EFI application and
+> > > avoid calling efi_init()? I can see x86 sets some efi_loader_signature
+> > > string in exit_boot() and checks against it later when calling
+> > > efi_init().
+> > 
+> > Well, I agree that we shouldn't be spewing error messages for expected
+> > operation, but efi_init() is the function we call to determine
+> > whether we _are_ booting via UEFI - and it sets flags accordingly for
+> > the efi_enabled() macro.
+> > 
+> > My view is that this should be fixed in fdt_find_uefi_params(). A
+> > single info message that we can't find evidence of UEFI should be
+> > printed in the non-error case.
+> > 
+> > Like below?
 > 
-> [...]
-> 
->>>> +
->>>> +	/* If pgd, pud, pmd not present and you cross pmd range check next
->>>> +	 * index.
->>>> +	 */
->>>> +	pgd = pgdp + pgd_index(ipa);
->>>> +	if (unlikely(crosses_pmd && !pgd_present(*pgd))) {
->>>> +		pgd = pgdp + pgd_index(next);
->>>> +		if (!pgd_present(*pgd))
->>>> +			return;
->>>> +	}
->>>> +
->>>> +	pud = pud_offset(pgd, ipa);
->>>> +	if (unlikely(crosses_pmd && !pud_present(*pud))) {
->>>> +		pud = pud_offset(pgd, next);
->>>> +		if (!pud_present(*pud))
->>>> +			return;
->>>> +	}
->>>> +
->>>> +	pmd = pmd_offset(pud, ipa);
->>>> +	if (unlikely(crosses_pmd && !pmd_present(*pmd))) {
->>>> +		pmd = pmd_offset(pud, next);
->>>> +		if (!pmd_present(*pmd))
->>>> +			return;
->>>> +	}
->>>> +
->>>> +	for (;;) {
->>>> +		pte = pte_offset_kernel(pmd, ipa);
->>>> +		if (!pte_present(*pte))
->>>> +			goto next_ipa;
->>>> +
->>>> +		if (kvm_s2pte_readonly(pte))
->>>> +			goto next_ipa;
->>>> +		kvm_set_s2pte_readonly(pte);
->>>> +next_ipa:
->>>> +		mask &= mask - 1;
->>>> +		if (!mask)
->>>> +			break;
->>>> +
->>>> +		/* find next page */
->>>> +		ipa = (gfnofst + __ffs(mask)) << PAGE_SHIFT;
->>>> +
->>>> +		/* skip upper page table lookups */
->>>> +		if (!crosses_pmd)
->>>> +			continue;
->>>> +
->>>> +		pgd = pgdp + pgd_index(ipa);
->>>> +		if (unlikely(!pgd_present(*pgd)))
->>>> +			goto next_ipa;
->>>> +		pud = pud_offset(pgd, ipa);
->>>> +		if (unlikely(!pud_present(*pud)))
->>>> +			goto next_ipa;
->>>> +		pmd = pmd_offset(pud, ipa);
->>>> +		if (unlikely(!pmd_present(*pmd)))
->>>> +			goto next_ipa;
->>>> +	}
->>>
->>> So I think the reason this is done separately on x86 is that they have
->>> an rmap structure for their gfn mappings so that they can quickly lookup
->>> ptes based on a gfn and write-protect it without having to walk the
->>> stage-2 page tables.
->>
->> Yes, they also use rmapps for mmu notifiers, invalidations on huge VMs and 
->> large ranges resulted in excessive times. 
->>>
->>> Unless you want to introduce this on ARM, I think you will be much
->>
->> Eventually yes but that would also require reworking mmu notifiers.  I had 
->> two step approach in mind. Initially get the dirty page marking to work, 
->> TLB flushing, GIC/arch-timer migration, validate migration under various 
->> stress loads (page reclaim) with mmu notifiers, test several VMs and migration 
->> times. 
->>
->> Then get rmapp (or something similar) working - eventually for huge VMs it's
->> needed. In short two phases.
->>
->>> better off just having a single (properly written) iterating
->>> write-protect function, that takes a start and end IPA and a bitmap for
->>> which pages to actually write-protect, which can then handle the generic
->>> case (either NULL or all-ones bitmap) or a specific case, which just
->>> traverses the IPA range given as input.  Such a function should follow
->>> the model of page table walk functions discussed previously
->>> (separate functions: wp_pgd_enties(), wp_pud_entries(),
->>> wp_pmd_entries(), wp_pte_entries()).
->>>
->>> However, you may want to verify my assumption above with the x86 people
->>> and look at sharing the rmap logic between architectures.
->>>
->>> In any case, this code is very difficult to read and understand, and it
->>> doesn't look at all like the other code we have to walk page tables.  I
->>> understand you are trying to optimize for performance (by skipping some
->>> intermediate page table level lookups), but you never declare that goal
->>> anywhere in the code or in the commit message.
->>
->> Marc's comment noticed I was walking a small range (128k), using upper table
->> iterations that covered 1G, 2MB ranges. As you mention the code tries to
->> optimize upper table lookups. Yes the function is too bulky, but I'm not sure how 
->> to remove the upper table checks since page tables may change between the 
->> time pages are marked dirty and the log is retrieved. And if a memory slot 
->> is very dirty walking upper tables will impact performance. I'll think some 
->> more on this function.
->>
-> I think you should aim at the simplest possible implementation that
-> functionally works, first.  Let's verify that this thing works, have
-> clean working code that implementation-wise is as minimal as possible.
-> 
-> Then we can run perf on that and see if our migrations are very slow,
-> where we are actually spending time, and only then optimize it.
-> 
-> The solution to this specific problem for the time being appears quite
-> clear to me: Follow the exact same scheme as for unmap_range (the one I
-> sent out here:
-> https://lists.cs.columbia.edu/pipermail/kvmarm/2014-May/009592.html, the
-> diff is hard to read, so I recommend you apply the patch and look at the
-> resulting code).  Have a similar scheme, call it wp_ipa_range() or
-> something like that, and use that for now.
+> Why not move the efi_get_fdt_params call out of efi_init and into
+> setup_arch via a wrapper? Then efi_get_fdt_params and efi_init can have
+> useful return values, which allow us to distinguish between "My DT doesn't
+> have the necessary UEFI properties" and "UEFI failed to initialise" without
+> having to make some printks pr_info and others pr_err within efi_init
+> itself..
 
-Ok I'll reuse that code. I'll need to apply that patch given I need
-to test various host conditions during migration.
+Well, but (for the output part) my patch already did that?
+If the "Getting parameters from FDT:\n" was too verbose, we could
+just drop it, and have the same effect on output.
 
-> 
-> -Christoffer
-> 
+Thing is - there is not really any error case available anywhere
+during the execution of efi_init() and its branches other than:
+- Information required for UEFI boot cannot be found.
+- Information exists, but is invalid.
+- Failed to early_memremap some UEFI regions into the kernel.
+which all amounts to "UEFI not available or something went wrong",
+rather than "UEFI failed to initialise".
+If efi_init returns successfully, EFI_BOOT is set, and testable using
+the efi_enabled() macro.
+
+The proper "UEFI failed to initialise" bit does not come until the
+early_initcall arm64_enter_virtual_mode(), and is indicated not by
+a return value, but by setting the flag indicating that
+EFI_RUNTIME_SERVICES are available, which is checked later in core
+code using the efi_enabled() macro.
+
+So moving the call to efi_get_fdt_params() would have little effect
+other than adding a third call site for UEFI bits in setup_arch().
+
+/
+	Leif
