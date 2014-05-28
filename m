@@ -1,55 +1,93 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 28 May 2014 11:30:04 -0500
-Subject: [PATCH 0/6] DT early console initialization
-In-Reply-To: <20140514142644.1C922C4153D@trevor.secretlab.ca>
-References: <1399587823-17701-1-git-send-email-robherring2@gmail.com>
- <20140514142644.1C922C4153D@trevor.secretlab.ca>
-Message-ID: <CAL_JsqK9nifPWW5jnzYifsMuvRjhD9wTT+YbE0sPM6N4xaj1yA@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 28 May 2014 18:37:41 +0200
+Subject: [PATCH] ahci: imx: manage only sata_ref_clk in
+ imx_sata_enable[disable]
+In-Reply-To: <CAOMZO5BkdkU-_s8G5CqVMzfkMgxdUg8bx0JJnqC8dPyFMK=Ocw@mail.gmail.com>
+References: <1401289539-3485-1-git-send-email-shawn.guo@freescale.com>	<5386026C.1010603@redhat.com>
+ <CAOMZO5BkdkU-_s8G5CqVMzfkMgxdUg8bx0JJnqC8dPyFMK=Ocw@mail.gmail.com>
+Message-ID: <538610D5.7070908@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 14, 2014 at 9:26 AM, Grant Likely <grant.likely@linaro.org> wrote:
-> On Thu,  8 May 2014 17:23:37 -0500, Rob Herring <robherring2@gmail.com> wrote:
->> From: Rob Herring <robh@kernel.org>
->>
->> This series adds support for early serial console initialization using
->> DT. This enables determining the serial port type and address using the
->> FDT and allows enabling the console before platform specific
->> initialization runs. I've tested this on arm64. ARM support is dependent
->> on adding fixmap support.
->>
->> Currently, the earlycon is only enabled if "earlycon" is present on the
->> kernel command line. The FDT needs to have /chosen/stdout-path set to
->> the path of the serial port.
->>
->> This series is dependent on generic earlycon[1], libfdt support[2], and
->> vmlinux.lds.h clean-ups[3]. The first 2 are in linux-next already. A git
->> branch is available here:
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git earlycon-dt
->
-> Nice. For the whole series:
->
-> Acked-by: Grant Likely <grant.likely@linaro.org>
->
-> I haven't tested it though.
->>
->> Rob
->>
->> [1] https://lkml.org/lkml/2014/4/18/573
->> [2] https://lkml.org/lkml/2014/4/22/1202
->> [3] https://lkml.org/lkml/2014/3/27/285
->>
->> Rob Herring (6):
->>   of: align RESERVEDMEM_OF_DECLARE function callbacks to other callbacks
->>   of: consolidate linker section OF match table declarations
->>   serial: earlycon: add DT support
->>   of/fdt: add FDT address translation support
->>   of/fdt: add FDT serial scanning for earlycon
->>   tty/serial: pl011: add DT based earlycon support
+Hi,
 
-Greg, I plan to take this series thru the DT tree for 3.16 unless you
-have any objections. It has dependencies on both the tty-next and the
-DT trees.
+On 05/28/2014 05:59 PM, Fabio Estevam wrote:
+> Hans,
+> 
+> On Wed, May 28, 2014 at 12:36 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> 
+>> The proper fix is obvious, if we've shutdown everything due to there
+>> not being a device present at the initial probe, don't call
+>> ahci_platform_resume_host on resume, as is done in the attached patch.
+> 
+> I tested your attached patch. It does not build as it lacks to add the
+> definition of imxpriv inside the suspend/resume functions. After
+> fixing it I get:
+> 
+> root at freescale /$ echo mem > /sys/power/state
+> PM: Syncing filesystems ... done.
+> Freezing user space processes ... (elapsed 0.002 seconds) done.
+> Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
+> PM: suspend of devices complete after 91.109 msecs
+> PM: suspend devices took 0.100 seconds
+> PM: late suspend of devices complete after 9.086 msecs
+> PM: noirq suspend of devices complete after 8.780 msecs
+> Disabling non-boot CPUs ...
+> CPU1: shutdown
+> CPU2: shutdown
+> CPU3: shutdown
+> Enabling non-boot CPUs ...
+> CPU1: Booted secondary processor
+> CPU1 is up
+> CPU2: Booted secondary processor
+> CPU2 is up
+> CPU3: Booted secondary processor
+> CPU3 is up
+> PM: noirq resume of devices complete after 6.914 msecs
+> PM: early resume of devices complete after 5.160 msecs
+> PM: resume of devices complete after 167.025 msecs
+> PM: resume devices took 0.180 seconds
+> Restarting tasks ... done.
+> ata1: failed to resume link (SControl 2003)
+> random: nonblocking pool is initialized
+> root at freescale /$ ata1: softreset failed (1st FIS failed)
+> ata1: failed to resume link (SControl 2003)
+> ata1: softreset failed (1st FIS failed)
+> ata1: failed to resume link (SControl 2003)
+> ata1: softreset failed (1st FIS failed)
+> ata1: limiting SATA link speed to 1.5 Gbps
+> ata1: failed to resume link (SControl 2003)
+> ata1: softreset failed (1st FIS failed)
+> ata1: reset failed, giving up
+> 
+> With Shawn's version I  do not get the suspend error messages:
+> ...
+> CPU1: Booted secondary processor
+> CPU1 is up
+> CPU2: Booted secondary processor
+> CPU2 is up
+> CPU3: Booted secondary processor
+> CPU3 is up
+> PM: noirq resume of devices complete after 5.836 msecs
+> PM: early resume of devices complete after 5.334 msecs
+> PM: resume of devices complete after 176.763 msecs
+> PM: resume devices took 0.190 seconds
+> Restarting tasks ... done.
+> ata1: SATA link down (SStatus 0 SControl 300)
+> random: nonblocking pool is initialized
+> 
 
-Rob
+Ah yes I see, the ahci_imx suspend/resume handler now no longer
+touches the controller, but the ata core is still trying to use it.
+
+Ok, in that case I agree that your original patch is the best
+solution.
+
+Your original patch is:
+
+Acked-by: Hans de Goede <hdegoede@redhat.com>
+
+
+Regards,
+
+Hans
