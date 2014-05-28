@@ -1,51 +1,82 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 29 May 2014 01:20:11 +0200
-Subject: [PATCHv2 08/15] avr32/at32ap: switch to the generic PWM framework
+Date: Thu, 29 May 2014 01:20:12 +0200
+Subject: [PATCHv2 09/15] avr32: MRMT: use generic leds_pwm driver
 In-Reply-To: <1401319218-16772-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1401319218-16772-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1401319218-16772-9-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1401319218-16772-10-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to the pwm/pwm-atmel driver instead of misc/atmel_pwm
+Switch to the generic leds_pwm driver instead of leds-atmel-pwm.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
 ---
- arch/avr32/mach-at32ap/at32ap700x.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+ arch/avr32/boards/atngw100/mrmt.c | 34 ++++++++++++++++++++++------------
+ 1 file changed, 22 insertions(+), 12 deletions(-)
 
-diff --git a/arch/avr32/mach-at32ap/at32ap700x.c b/arch/avr32/mach-at32ap/at32ap700x.c
-index a1f4d1e91b52..db85b5ec3351 100644
---- a/arch/avr32/mach-at32ap/at32ap700x.c
-+++ b/arch/avr32/mach-at32ap/at32ap700x.c
-@@ -1553,7 +1553,7 @@ static struct resource atmel_pwm0_resource[] __initdata = {
- 	IRQ(24),
+diff --git a/arch/avr32/boards/atngw100/mrmt.c b/arch/avr32/boards/atngw100/mrmt.c
+index 1ba09e4c02b1..91146b416cdb 100644
+--- a/arch/avr32/boards/atngw100/mrmt.c
++++ b/arch/avr32/boards/atngw100/mrmt.c
+@@ -17,6 +17,8 @@
+ #include <linux/types.h>
+ #include <linux/fb.h>
+ #include <linux/leds.h>
++#include <linux/pwm.h>
++#include <linux/leds_pwm.h>
+ #include <linux/input.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/atmel_serial.h>
+@@ -155,21 +157,28 @@ static struct platform_device rmt_ts_device = {
+ 
+ #ifdef CONFIG_BOARD_MRMT_BL_PWM
+ /* PWM LEDs: LCD Backlight, etc */
+-static struct gpio_led rmt_pwm_led[] = {
+-	/* here the "gpio" is actually a PWM channel */
+-	{ .name = "backlight",	.gpio = PWM_CH_BL, },
++static struct pwm_lookup pwm_lookup[] = {
++	PWM_LOOKUP("at91sam9rl-pwm", PWM_CH_BL, "leds_pwm", "ds1",
++		   5000, PWM_POLARITY_INVERSED),
  };
- static struct clk atmel_pwm0_mck = {
--	.name		= "pwm_clk",
-+	.name		= "at91sam9rl-pwm",
- 	.parent		= &pbb_clk,
- 	.mode		= pbb_clk_mode,
- 	.get_rate	= pbb_clk_get_rate,
-@@ -1568,7 +1568,7 @@ struct platform_device *__init at32_add_device_pwm(u32 mask)
- 	if (!mask)
- 		return NULL;
  
--	pdev = platform_device_alloc("atmel_pwm", 0);
-+	pdev = platform_device_alloc("at91sam9rl-pwm", 0);
- 	if (!pdev)
- 		return NULL;
+-static struct gpio_led_platform_data rmt_pwm_led_data = {
+-	.num_leds	= ARRAY_SIZE(rmt_pwm_led),
+-	.leds		= rmt_pwm_led,
++static struct led_pwm pwm_leds[] = {
++	{
++		.name = "backlight",
++		.max_brightness = 255,
++	},
++};
++
++static struct led_pwm_platform_data pwm_data = {
++	.num_leds       = ARRAY_SIZE(pwm_leds),
++	.leds           = pwm_leds,
+ };
  
-@@ -1576,9 +1576,6 @@ struct platform_device *__init at32_add_device_pwm(u32 mask)
- 				ARRAY_SIZE(atmel_pwm0_resource)))
- 		goto out_free_pdev;
- 
--	if (platform_device_add_data(pdev, &mask, sizeof(mask)))
--		goto out_free_pdev;
--
- 	pin_mask = 0;
- 	if (mask & (1 << 0))
- 		pin_mask |= (1 << 28);
+-static struct platform_device rmt_pwm_led_dev = {
+-	.name		= "leds-atmel-pwm",
+-	.id		= -1,
+-	.dev		= {
+-		.platform_data	= &rmt_pwm_led_data,
++static struct platform_device leds_pwm = {
++	.name   = "leds_pwm",
++	.id     = -1,
++	.dev    = {
++		.platform_data = &pwm_data,
+ 	},
+ };
+ #endif
+@@ -325,7 +334,8 @@ static int __init mrmt1_init(void)
+ #ifdef CONFIG_BOARD_MRMT_BL_PWM
+ 	/* Use PWM for Backlight controls */
+ 	at32_add_device_pwm(1 << PWM_CH_BL);
+-	platform_device_register(&rmt_pwm_led_dev);
++	pwm_add_table(pwm_lookup, ARRAY_SIZE(pwm_lookup));
++	platform_device_register(&leds_pwm);
+ #else
+ 	/* Backlight always on */
+ 	udelay( 1 );
 -- 
 1.9.1
