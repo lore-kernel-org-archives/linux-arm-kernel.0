@@ -1,132 +1,70 @@
-From: t.dakhran@gmail.com (Tarek Dakhran)
-Date: Wed, 28 May 2014 06:20:06 +0400
-Subject: [PATCH v11 2/3] clk: exynos5410: register clocks using common
- clock framework
-In-Reply-To: <20140528004116.7816.69646@quantum>
-References: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>
- <1401074613-29227-3-git-send-email-t.dakhran@samsung.com>
- <20140528004116.7816.69646@quantum>
-Message-ID: <CANhyOUdow9niHXMg0fGdXf_6PVKzAGas6h_JtNZFG+2rEGQk4g@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 27 May 2014 20:48:20 -0600
+Subject: [PATCH v8 0/3] R-Car Gen2 PCIe host driver
+In-Reply-To: <1399892270-25021-1-git-send-email-phil.edworthy@renesas.com>
+References: <1399892270-25021-1-git-send-email-phil.edworthy@renesas.com>
+Message-ID: <20140528024820.GL11907@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Mon, May 12, 2014 at 11:57:47AM +0100, Phil Edworthy wrote:
+> This is version 8 of a PCIe Host driver for the R-Car Gen2 devices,
+> i.e. R-Car H2 (r8a7790) and R-Car M2 (r8a7791).
+> 
+> v8:
+>  - Platform changes removed from this patch set
+>  - Moved header file contents into c file
+>  - Formatting cleaned up
+>  - Remove bus/dev/func range checks for config access
+>  - Add comment about config access serialization
+>  - Made rcar_pcie_setup_window() return void as no errors possible
+>  - Remove unused register definitions
+>  - Removed __init markers to fix section mismatches
+>  - Add explicit bus number range
+>  - Get the root bus nr from config writes instead of sys->busnr
+>  - Use PCI domains
+>  - Removed unused variable in rcar_msi_free()
+>  - Split interrupt bindings into separate cells
+> 
+> v7:
+>  - Change binding description of clocks to 'clock specifiers'
+> 
+> v6:
+>  - Correct DT bindings description for reg and clocks
+>  - Split device and board DT changes
+>  - Add shmobile to subject for shmobile DT patches
+>  - Don't check MSI irq number is valid, as upper level checks this
+>  - Change "Unexpected MSI" msg to debug level
+>  - Reword "Unexpected MSI" comment so that it's one line
+>  - Remove patch that adds HAVE_ARM_ARCH_TIMER to koelsch defconfig as not needed
+> 
+> v5:
+>  - Use module_platform_driver instead of subsys_initcall
+>  - Use the of_device_id data field for HW init function
+>  - Init hw_pci struct in declaration
+>  - Renesas SoC compatible string has peripheral before device name
+>  - Add PCIe bus clock reference
+>  - Use dma-ranges property to specify inbound memory regions
+>  - Support multiple IO windows and correct resources
+>  - Return IRQ_NONE from MSI isr when there is no pending MSI
+>  - Add additional interrupt bindings
+> 
+> v4:
+>  - Use runtime PM properly
+> 
+> Phil Edworthy (3):
+>   PCI: host: rcar: Add Renesas R-Car PCIe driver
+>   PCI: host: rcar: Add MSI support
+>   dt-bindings: pci: rcar pcie device tree bindings
+> 
+>  Documentation/devicetree/bindings/pci/rcar-pci.txt |   47 +
+>  drivers/pci/host/Kconfig                           |    6 +
+>  drivers/pci/host/Makefile                          |    1 +
+>  drivers/pci/host/pcie-rcar.c                       | 1008 ++++++++++++++++++++
+>  4 files changed, 1062 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/rcar-pci.txt
+>  create mode 100644 drivers/pci/host/pcie-rcar.c
 
-On Wed, May 28, 2014 at 4:41 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Tarek Dakhran (2014-05-25 20:23:32)
->> The EXYNOS5410 clocks are statically listed and registered
->> using the Samsung specific common clock helper functions.
->>
->> Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
->> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
->> ---
->>  .../devicetree/bindings/clock/exynos5410-clock.txt |   45 +++++
->>  drivers/clk/samsung/Makefile                       |    1 +
->>  drivers/clk/samsung/clk-exynos5410.c               |  209 ++++++++++++++++++++
->>  include/dt-bindings/clock/exynos5410.h             |   33 ++++
->>  4 files changed, 288 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-clock.txt
->>  create mode 100644 drivers/clk/samsung/clk-exynos5410.c
->>  create mode 100644 include/dt-bindings/clock/exynos5410.h
->>
->> diff --git a/Documentation/devicetree/bindings/clock/exynos5410-clock.txt b/Documentation/devicetree/bindings/clock/exynos5410-clock.txt
->> new file mode 100644
->> index 0000000..aeab635
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/exynos5410-clock.txt
->> @@ -0,0 +1,45 @@
->> +* Samsung Exynos5410 Clock Controller
->> +
->> +The Exynos5410 clock controller generates and supplies clock to various
->> +controllers within the Exynos5410 SoC.
->> +
->> +Required Properties:
->> +
->> +- compatible: should be "samsung,exynos5410-clock"
->> +
->> +- reg: physical base address of the controller and length of memory mapped
->> +  region.
->> +
->> +- #clock-cells: should be 1.
->> +
->> +All available clocks are defined as preprocessor macros in
->> +dt-bindings/clock/exynos5410.h header and can be used in device
->> +tree sources.
->> +
->> +External clock:
->> +
->> +There is clock that is generated outside the SoC. It
->> +is expected that it is defined using standard clock bindings
->> +with following clock-output-name:
->> +
->> + - "fin_pll" - PLL input clock from XXTI
->
-> Does fin_pll feed into the exynos5410-clock controller? If so, should
-> the example clock-controller node below have a clocks and clock-names
-> property?
+Applied with Simon's ack to pci/host-rcar for v3.16, thanks!
 
-fin_pll does not feed into exynos5410-clock controller, but into mct do.
-
-> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-> new file mode 100644
-> index 0000000..3839c26
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/exynos5410.dtsi
-> @@ -0,0 +1,206 @@
-> +/*
-> + * SAMSUNG EXYNOS5410 SoC device tree source
-> + *
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + *             http://www.samsung.com
-> + *
-> + * SAMSUNG EXYNOS5410 SoC device nodes are listed in this file.
-> + * EXYNOS5410 based board files can include this file and provide
-> + * values for board specfic bindings.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include "skeleton.dtsi"
-> +#include <dt-bindings/clock/exynos5410.h>
-> +
-> +/ {
-> +       compatible = "samsung,exynos5410", "samsung,exynos5";
-> +       interrupt-parent = <&gic>;
-[snip]
-> +               mct: mct at 101C0000 {
-> +                       compatible = "samsung,exynos4210-mct";
-> +                       reg = <0x101C0000 0xB00>;
-> +                       interrupt-parent = <&interrupt_map>;
-> +                       interrupts = <0>, <1>, <2>, <3>,
-> +                               <4>, <5>, <6>, <7>,
-> +                               <8>, <9>, <10>, <11>;
-> +                       clocks = <&fin_pll>, <&clock CLK_MCT>;
-> +                       clock-names = "fin_pll", "mct";
-> +
-> +                       interrupt_map: interrupt-map {
-> +                               #interrupt-cells = <1>;
-> +                               #address-cells = <0>;
-> +                               #size-cells = <0>;
-> +                               interrupt-map = <0 &combiner 23 3>,
-> +                                               <1 &combiner 23 4>,
-> +                                               <2 &combiner 25 2>,
-> +                                               <3 &combiner 25 3>,
-> +                                               <4 &gic 0 120 0>,
-> +                                               <5 &gic 0 121 0>,
-> +                                               <6 &gic 0 122 0>,
-> +                                               <7 &gic 0 123 0>,
-> +                                               <8 &gic 0 128 0>,
-> +                                               <9 &gic 0 129 0>,
-> +                                               <10 &gic 0 130 0>,
-> +                                               <11 &gic 0 131 0>;
-> +                       };
-> +               };
-> +
-
-That's why I documented fin_pll. Should I add mct binding example to
-documentation too?
-
-Best regards,
-     Tarek
+Bjorn
