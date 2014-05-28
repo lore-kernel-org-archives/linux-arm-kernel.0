@@ -1,52 +1,38 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 28 May 2014 15:18:51 -0500
-Subject: [PATCH] ARM: dts: qcom: Update msm8960 device trees
-In-Reply-To: <20140528200948.GI2012@joshc.qualcomm.com>
-References: <1401301643-20191-1-git-send-email-galak@codeaurora.org>
- <20140528200948.GI2012@joshc.qualcomm.com>
-Message-ID: <7C29E7CF-F9A4-4BCE-99AC-2C12FD22258F@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 28 May 2014 21:19:55 +0100
+Subject: [PATCH v8 5/8] arm64: Add ftrace support
+In-Reply-To: <1398851676-16389-6-git-send-email-takahiro.akashi@linaro.org>
+References: <1394862048-28758-1-git-send-email-takahiro.akashi@linaro.org>
+ <1398851676-16389-1-git-send-email-takahiro.akashi@linaro.org>
+ <1398851676-16389-6-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140528201955.GJ5099@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Apr 30, 2014 at 06:54:33PM +0900, AKASHI Takahiro wrote:
 
-On May 28, 2014, at 3:09 PM, Josh Cartwright <joshc@codeaurora.org> wrote:
+> +/*
+> + * arch/arm64/kernel/entry-ftrace.S
+> + *
+> + * Copyright (C) 2013 Linaro Limited
+> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/linkage.h>
+> +#include <asm/ftrace.h>
+> +#include <asm/insn.h>
 
-> On Wed, May 28, 2014 at 01:27:23PM -0500, Kumar Gala wrote:
->> * Move SoC peripherals into an SoC container node
->> * Move serial enabling into board file (qcom-msm8960-cdp.dts)
->> * Cleanup cpu node to match binding spec, enable-method and compatible
->>  should be per cpu, not part of the container
->> * Drop interrupts property from l2-cache node as its not part of the
->>  binding spec
->> 
->> Signed-off-by: Kumar Gala <galak@codeaurora.org>
->> ---
->> arch/arm/boot/dts/qcom-msm8960-cdp.dts |   6 ++
->> arch/arm/boot/dts/qcom-msm8960.dtsi    | 165 +++++++++++++++++----------------
->> 2 files changed, 93 insertions(+), 78 deletions(-)
->> 
->> diff --git a/arch/arm/boot/dts/qcom-msm8960-cdp.dts b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
->> index a58fb88..8e77ed7 100644
->> --- a/arch/arm/boot/dts/qcom-msm8960-cdp.dts
->> +++ b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
->> @@ -3,4 +3,10 @@
->> / {
->> 	model = "Qualcomm MSM8960 CDP";
->> 	compatible = "qcom,msm8960-cdp", "qcom,msm8960";
->> +
->> +	soc {
->> +		serial at 16440000 {
->> +			status = "ok";
->> +		};
->> +	};
->> };
-> 
-> Is now the time put these serial nodes under a GSBI parent node?
-
-Yeah, I?ll make the change to the 8960 & 8660 dts
-
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+asm/insn.h contains a bunch of C stuff which won't build without
+__ASSEMBLY__ guards unless I'm missing something (I'm working with a
+non-mainline tree so I might be).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140528/d1863090/attachment.sig>
