@@ -1,45 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 28 May 2014 20:49:13 +0100
-Subject: [PATCH v2 1/4] devicetree: bindings: Properly document micrel
- ks8851 SPI chips
-In-Reply-To: <53863CA3.7040000@codeaurora.org>
-References: <1400875040-13269-1-git-send-email-sboyd@codeaurora.org>
- <1400875040-13269-2-git-send-email-sboyd@codeaurora.org>
- <20140524124858.GR22111@sirena.org.uk>
- <5385063F.30407@codeaurora.org>
- <20140528151646.GU20155@pengutronix.de>
- <20140528171219.GD5099@sirena.org.uk>
- <53863CA3.7040000@codeaurora.org>
-Message-ID: <20140528194913.GI5099@sirena.org.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 28 May 2014 22:03:54 +0200
+Subject: [PATCH v3 1/2] dmaengine: s3c24xx-dma: Process whole SG chain
+In-Reply-To: <1400617382-7051-1-git-send-email-anarsoul@gmail.com>
+References: <1400617382-7051-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <2226052.jOkjSV51zk@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 12:44:35PM -0700, Stephen Boyd wrote:
-> On 05/28/14 10:12, Mark Brown wrote:
+Am Dienstag, 20. Mai 2014, 23:23:01 schrieb Vasily Khoruzhick:
+> Due to redundant 'break' in loop driver processed only first chunk.
+> 
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 
-> > If the supply must always be physically present the bindings should be
-> > specified as it being mandatory and the code written in that fashion; as
-> > an extension Linux will put a dummy in but this is attempting to handle
-> > incorrect DTs.  This means we have functional error handling in cases
-> > where there is something to worry about and simplifies the code using
-> > the regulator.
+I think I wrote this for v1 already, but here it is again.
 
-> Ok, you're saying the opposite of Rob. Should it be required or optional
-> in the DT binding?
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-I'm saying it should be required.  The implementation accepts it as an
-extension (a recent extension at that).
-
-> Ok. Dave M has already picked up all these patches so I'll send a patch
-> to replace regulator_get_optional() with regulator_get() and fix up the
-> error handling unless I hear otherwise.
-
-Yes, please.  I'm much more worried about the abuse of
-regulator_get_optional() than the binding.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140528/2dfa8b45/attachment-0001.sig>
+> ---
+> v2: No changes
+> v3: No changes
+> 
+>  drivers/dma/s3c24xx-dma.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/dma/s3c24xx-dma.c b/drivers/dma/s3c24xx-dma.c
+> index 4eddedb..2167608 100644
+> --- a/drivers/dma/s3c24xx-dma.c
+> +++ b/drivers/dma/s3c24xx-dma.c
+> @@ -961,7 +961,6 @@ static struct dma_async_tx_descriptor
+> *s3c24xx_dma_prep_slave_sg( dsg->src_addr = slave_addr;
+>  			dsg->dst_addr = sg_dma_address(sg);
+>  		}
+> -		break;
+>  	}
+> 
+>  	return vchan_tx_prep(&s3cchan->vc, &txd->vd, flags);
