@@ -1,24 +1,14 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 27 May 2014 18:19:33 -0700
-Subject: [PATCH v2] clk: bcm/kona: implement determine_rate()
-In-Reply-To: <1401209816-24953-1-git-send-email-elder@linaro.org>
-References: <1401209816-24953-1-git-send-email-elder@linaro.org>
-Message-ID: <20140528011933.7816.95715@quantum>
+Date: Tue, 27 May 2014 18:27:08 -0700
+Subject: [PATCH] MAINTAINERS: add AT91 Clock Support entry
+In-Reply-To: <1401190768-3932-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1401190768-3932-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140528012708.7816.58824@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Alex Elder (2014-05-27 09:56:56)
-> Implement the clk->determine_rate method for Broadcom Kona peripheral
-> clocks.  This allows a peripheral clock to be re-parented in order to
-> satisfy a rate change request.  This takes the place of the previous
-> kona_peri_clk_round_rate() functionality, though that function remains
-> because it is used by the new one.
-> 
-> The parent clock that allows the peripheral clock to produce a rate
-> closest to the one requested is the one selected, though the current
-> parent is used by default.
-> 
-> Signed-off-by: Alex Elder <elder@linaro.org>
+Quoting Boris BREZILLON (2014-05-27 04:39:28)
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
 Applied to clk-next.
 
@@ -26,90 +16,25 @@ Regards,
 Mike
 
 > ---
-> v2: Added WARN_ON_ONCE() call as suggested.
+>  MAINTAINERS | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> This patch is based on Mike Turquette's current "clk-next" branch.
->     42dd880 Merge branch 'clk-fixes' into clk-next
-> 
-> It is available here:
->     http://git.linaro.org/landing-teams/working/broadcom/kernel.git
->     Branch review/bcm-determine-rate-v2
-> 
->  drivers/clk/bcm/clk-kona.c | 54 +++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 53 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
-> index d603c4e..95af2e6 100644
-> --- a/drivers/clk/bcm/clk-kona.c
-> +++ b/drivers/clk/bcm/clk-kona.c
-> @@ -1031,6 +1031,58 @@ static long kona_peri_clk_round_rate(struct clk_hw *hw, unsigned long rate,
->                                 rate ? rate : 1, *parent_rate, NULL);
->  }
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 1066264..40c5580 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -808,6 +808,11 @@ F: arch/arm/boot/dts/at91*.dtsi
+>  F:     arch/arm/boot/dts/sama*.dts
+>  F:     arch/arm/boot/dts/sama*.dtsi
 >  
-> +static long kona_peri_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
-> +               unsigned long *best_parent_rate, struct clk **best_parent)
-> +{
-> +       struct kona_clk *bcm_clk = to_kona_clk(hw);
-> +       struct clk *clk = hw->clk;
-> +       struct clk *current_parent;
-> +       unsigned long parent_rate;
-> +       unsigned long best_delta;
-> +       unsigned long best_rate;
-> +       u32 parent_count;
-> +       u32 which;
+> +ARM/ATMEL AT91 Clock Support
+> +M:     Boris Brezillon <boris.brezillon@free-electrons.com>
+> +S:     Maintained
+> +F:     drivers/clk/at91
 > +
-> +       /*
-> +        * If there is no other parent to choose, use the current one.
-> +        * Note:  We don't honor (or use) CLK_SET_RATE_NO_REPARENT.
-> +        */
-> +       WARN_ON_ONCE(bcm_clk->init_data.flags & CLK_SET_RATE_NO_REPARENT);
-> +       parent_count = (u32)bcm_clk->init_data.num_parents;
-> +       if (parent_count < 2)
-> +               return kona_peri_clk_round_rate(hw, rate, best_parent_rate);
-> +
-> +       /* Unless we can do better, stick with current parent */
-> +       current_parent = clk_get_parent(clk);
-> +       parent_rate = __clk_get_rate(current_parent);
-> +       best_rate = kona_peri_clk_round_rate(hw, rate, &parent_rate);
-> +       best_delta = abs(best_rate - rate);
-> +
-> +       /* Check whether any other parent clock can produce a better result */
-> +       for (which = 0; which < parent_count; which++) {
-> +               struct clk *parent = clk_get_parent_by_index(clk, which);
-> +               unsigned long delta;
-> +               unsigned long other_rate;
-> +
-> +               BUG_ON(!parent);
-> +               if (parent == current_parent)
-> +                       continue;
-> +
-> +               /* We don't support CLK_SET_RATE_PARENT */
-> +               parent_rate = __clk_get_rate(parent);
-> +               other_rate = kona_peri_clk_round_rate(hw, rate, &parent_rate);
-> +               delta = abs(other_rate - rate);
-> +               if (delta < best_delta) {
-> +                       best_delta = delta;
-> +                       best_rate = other_rate;
-> +                       *best_parent = parent;
-> +                       *best_parent_rate = parent_rate;
-> +               }
-> +       }
-> +
-> +       return best_rate;
-> +}
-> +
->  static int kona_peri_clk_set_parent(struct clk_hw *hw, u8 index)
->  {
->         struct kona_clk *bcm_clk = to_kona_clk(hw);
-> @@ -1135,7 +1187,7 @@ struct clk_ops kona_peri_clk_ops = {
->         .disable = kona_peri_clk_disable,
->         .is_enabled = kona_peri_clk_is_enabled,
->         .recalc_rate = kona_peri_clk_recalc_rate,
-> -       .round_rate = kona_peri_clk_round_rate,
-> +       .determine_rate = kona_peri_clk_determine_rate,
->         .set_parent = kona_peri_clk_set_parent,
->         .get_parent = kona_peri_clk_get_parent,
->         .set_rate = kona_peri_clk_set_rate,
+>  ARM/CALXEDA HIGHBANK ARCHITECTURE
+>  M:     Rob Herring <robh@kernel.org>
+>  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
 > -- 
-> 1.9.1
+> 1.8.3.2
 > 
