@@ -1,54 +1,45 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 28 May 2014 21:46:54 +0200
-Subject: [PATCH v3 0/6] mfd: axp20x: add AXP221 PMIC support
-In-Reply-To: <20140527194932.GD12304@sirena.org.uk>
-References: <1401183535-31003-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140527194932.GD12304@sirena.org.uk>
-Message-ID: <53863D2E.7050008@free-electrons.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 28 May 2014 20:49:13 +0100
+Subject: [PATCH v2 1/4] devicetree: bindings: Properly document micrel
+ ks8851 SPI chips
+In-Reply-To: <53863CA3.7040000@codeaurora.org>
+References: <1400875040-13269-1-git-send-email-sboyd@codeaurora.org>
+ <1400875040-13269-2-git-send-email-sboyd@codeaurora.org>
+ <20140524124858.GR22111@sirena.org.uk>
+ <5385063F.30407@codeaurora.org>
+ <20140528151646.GU20155@pengutronix.de>
+ <20140528171219.GD5099@sirena.org.uk>
+ <53863CA3.7040000@codeaurora.org>
+Message-ID: <20140528194913.GI5099@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, May 28, 2014 at 12:44:35PM -0700, Stephen Boyd wrote:
+> On 05/28/14 10:12, Mark Brown wrote:
 
-Hello Mark,
+> > If the supply must always be physically present the bindings should be
+> > specified as it being mandatory and the code written in that fashion; as
+> > an extension Linux will put a dummy in but this is attempting to handle
+> > incorrect DTs.  This means we have functional error handling in cases
+> > where there is something to worry about and simplifies the code using
+> > the regulator.
 
-On 27/05/2014 21:49, Mark Brown wrote:
-> On Tue, May 27, 2014 at 11:38:49AM +0200, Boris BREZILLON wrote:
->
->> I'm still waiting for inputs regarding the ipsout regulator representation:
-> If you've got questions you need an answer to urgently it's possibly
-> best to highlight them outside of a series like this doing that helps
-> make it more obvious.
+> Ok, you're saying the opposite of Rob. Should it be required or optional
+> in the DT binding?
 
-Noted. I'll take care to send a separate mail next time.
+I'm saying it should be required.  The implementation accepts it as an
+extension (a recent extension at that).
 
-BTW, I don't if you've noticed, but patch 5 of this series implements
-helper functions to register several regulators from a regulator_desc
-and an of_regulator_match table (as you suggested).
+> Ok. Dave M has already picked up all these patches so I'll send a patch
+> to replace regulator_get_optional() with regulator_get() and fix up the
+> error handling unless I hear otherwise.
 
->>  * The ipsout regulator is currently represented as a fixed regulator
->>    providing a 5v output, and this is not exactly the case.
->>    AFAIU (here's is the datasheet traduction if you want to check [1]), the
->>    ipsout output is a multiplexer that choose among vbus (5V), acin (12V
->>    which is then converted to 5V) and the battery power supply (3,5 -> 4,2 V).
->>    This means the output voltage of ipsout vary between 3,5V and 5V.
->>    How can we express this kind of muxer in the regulator framework (is there
->>    already something available ?) ?
->>    Note that the power supply selection is automatic, though we could force
->>    one power supply, but then we loose the ability to unplug one power supply
->>    without impacting the system.
-> This sounds like it may as well just be represented as an unregulated
-> supply - it's just the system root supply really.  Nothing can rely on
-> the voltage anyway as it's going to vary randomly depending on what the
-> user does power wise and typically it'd only be used as a supply for
-> things that don't care about the specific voltage.
-
-Okay, I'm fine with that.
-
-Thanks.
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Yes, please.  I'm much more worried about the abuse of
+regulator_get_optional() than the binding.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140528/2dfa8b45/attachment-0001.sig>
