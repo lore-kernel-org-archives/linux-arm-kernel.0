@@ -1,94 +1,84 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Wed, 28 May 2014 16:09:44 +0100
-Subject: [PATCH v2 02/11] sched: remove a wake_affine condition
-In-Reply-To: <CAKfTPtB_4bQxBOUJ4tCFRVqzHDRVXj3YPkyzyTv_h-sgm8NwEQ@mail.gmail.com>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-3-git-send-email-vincent.guittot@linaro.org>
- <20140527124848.GQ30445@twins.programming.kicks-ass.net>
- <CAKfTPtAbnDdQ=C6oABtwUPr7ADhHo1qsdzt5GFsuVMncA9Q=Qw@mail.gmail.com>
- <20140527153937.GE19143@laptop.programming.kicks-ass.net>
- <CAKfTPtCZx4i5HFnma3EFYjxVHojUAkezSS7jL7KDTgwvKEVFwQ@mail.gmail.com>
- <CAKfTPtB_4bQxBOUJ4tCFRVqzHDRVXj3YPkyzyTv_h-sgm8NwEQ@mail.gmail.com>
-Message-ID: <5385FC38.3050201@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 28 May 2014 23:14:29 +0800
+Subject: [linux-sunxi] [PATCH v9 1/2] Documentation: dt: Add Allwinner A31
+ DMA controller bindings
+In-Reply-To: <1400762084-31606-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1400762084-31606-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1400762084-31606-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v67ekvfjx+nFNGfVkWYH1XeeHq4+jPGsVZBzCQNPH9Eddg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent & Peter,
+On Thu, May 22, 2014 at 8:34 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The Allwinner A31 DMA controller is rather simple to describe in the DT. Add
+> the bindings documentation.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  .../devicetree/bindings/dma/sun6i-dma.txt          | 45 ++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/sun6i-dma.txt
+>
+> diff --git a/Documentation/devicetree/bindings/dma/sun6i-dma.txt b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+> new file mode 100644
+> index 000000000000..5d7c86d52665
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+> @@ -0,0 +1,45 @@
+> +Allwinner A31 DMA Controller
+> +
+> +This driver follows the generic DMA bindings defined in dma.txt.
+> +
+> +Required properties:
+> +
+> +- compatible:  Must be "allwinner,sun6i-a31-dma"
+> +- reg:         Should contain the registers base address and length
+> +- interrupts:  Should contain a reference to the interrupt used by this device
+> +- clocks:      Should contain a reference to the parent AHB clock
+> +- resets:      Should contain a reference to the reset controller asserting
+> +               this device in reset
 
-On 28/05/14 07:49, Vincent Guittot wrote:
-[...]
-> 
-> Nick,
-> 
-> While doing some rework on the wake affine part of the scheduler, i
-> failed to catch the use case that takes advantage of a condition that
-> you added some while ago with the commit
-> a3f21bce1fefdf92a4d1705e888d390b10f3ac6f
-> 
-> Could you help us to clarify the 2 first lines of the test that you added ?
-> +                       if ((tl <= load &&
-> +                               tl + target_load(cpu, idx) <=
-> SCHED_LOAD_SCALE) ||
-> +                               100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
-> 
-> Regards,
-> Vincent
->>
->>>
->>>>> commit a3f21bce1fefdf92a4d1705e888d390b10f3ac6f
->>>>>
->>>>>
->>>>> +                       if ((tl <= load &&
->>>>> +                               tl + target_load(cpu, idx) <= SCHED_LOAD_SCALE) ||
->>>>> +                               100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
->>>>>
->>>>>
->>>>> So back when the code got introduced, it read:
->>>>>
->>>>>         target_load(prev_cpu, idx) - sync*SCHED_LOAD_SCALE < source_load(this_cpu, idx) &&
->>>>>         target_load(prev_cpu, idx) - sync*SCHED_LOAD_SCALE + target_load(this_cpu, idx) < SCHED_LOAD_SCALE
->>>>>
+Extra spaces between the leading tabs.
+(Gmail messes up whitespaces, please see original mail.)
 
-Shouldn't this be 
-
-target_load(this_cpu, idx) - sync*SCHED_LOAD_SCALE <= source_load(prev_cpu, idx) &&
-target_load(this_cpu, idx) - sync*SCHED_LOAD_SCALE + target_load(prev_cpu, idx) <= SCHED_LOAD_SCALE
-
-"[PATCH] sched: implement smpnice" (2dd73a4f09beacadde827a032cf15fd8b1fa3d48)
-mentions that SCHED_LOAD_BALANCE (IMHO, should be SCHED_LOAD_SCALE) represents
-the load contribution of a single task. So I read the second part as if
-the sum of the load of this_cpu and prev_cpu is smaller or equal to the
-(maximal) load contribution (maximal possible effect) of a single task.
-
-There is even a comment in "[PATCH] sched: tweak affine wakeups"
-(a3f21bce1fefdf92a4d1705e888d390b10f3ac6f) in try_to_wake_up() when
-SCHED_LOAD_SCALE gets subtracted from tl = this_load =
-target_load(this_cpu, idx):
-
-+ * If sync wakeup then subtract the (maximum possible)
-+ * effect of the currently running task from the load
-+ * of the current CPU:
-
-"[PATCH] sched: implement smpnice" then replaces SCHED_LOAD_SCALE w/ 
-
-+static inline unsigned long cpu_avg_load_per_task(int cpu)
-+{
-+       runqueue_t *rq = cpu_rq(cpu);
-+       unsigned long n = rq->nr_running;
-+
-+       return n ?  rq->raw_weighted_load / n : SCHED_LOAD_SCALE;
-
--- Dietmar
-
->>>>> So while the first line makes some sense, the second line is still
->>>>> somewhat challenging.
->>>>>
->>>>> I read the second line something like: if there's less than one full
->>>>> task running on the combined cpus.
->>>>
->>>> ok. your explanation makes sense
->>>
->>> Maybe, its still slightly weird :-)
->>>
->>>>>
-[...]
+> +- #dma-cells : Should be 1, a single cell holding a line request number
+> +
+> +Example:
+> +       dma: dma-controller at 01c02000 {
+> +               compatible = "allwinner,sun6i-a31-dma";
+> +               reg = <0x01c02000 0x1000>;
+> +               interrupts = <0 50 4>;
+> +               clocks = <&ahb1_gates 6>;
+> +               resets = <&ahb1_rst 6>;
+> +               #dma-cells = <1>;
+> +       };
+> +
+> +Clients:
+> +
+> +DMA clients connected to the A31 DMA controller must use the format
+> +described in the dma.txt file, using a two-cell specifier for each
+> +channel: a phandle plus one integer cells.
+> +The two cells in order are:
+> +
+> +1. A phandle pointing to the DMA controller.
+> +2. The port ID as specified in the datasheet
+> +
+> +Example:
+> +spi2: spi at 01c6a000 {
+> +       compatible = "allwinner,sun6i-a31-spi";
+> +       reg = <0x01c6a000 0x1000>;
+> +       interrupts = <0 67 4>;
+> +       clocks = <&ahb1_gates 22>, <&spi2_clk>;
+> +       clock-names = "ahb", "mod";
+> +       dmas = <&dma 25>, <&dma 25>;
+> +       dma-names = "rx", "tx";
+> +       resets = <&ahb1_rst 22>;
+> +};
+> --
+> 1.9.3
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
