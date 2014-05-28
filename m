@@ -1,39 +1,60 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 28 May 2014 09:43:02 +0530
-Subject: [PATCH v2 Resend 2/2] ARM: dts: Add secure firmware support for
- Arndale-octa
-In-Reply-To: <1401250382-24046-1-git-send-email-sachin.kamat@linaro.org>
-References: <1401250382-24046-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1401250382-24046-2-git-send-email-sachin.kamat@linaro.org>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Wed, 28 May 2014 09:58:15 +0530
+Subject: [PATCH v6 0/6] add cpuidle support for Exynos5420
+In-Reply-To: <53831795.9070006@gmail.com>
+References: <CANuQgHGSA+R__raSa_tzrgpceqLD2SZw+s0XQUHGF4wscgh6Kg@mail.gmail.com>
+ <1400227438-27155-1-git-send-email-chander.kashyap@linaro.org>
+ <53831795.9070006@gmail.com>
+Message-ID: <CANuQgHH284A9QY7M5zGbSE-mXjm2KDqr54VWmtKVkbma3zZvvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tushar Behera <tushar.behera@linaro.org>
+On 26 May 2014 15:59, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Chander,
+>
+> On 16.05.2014 10:03, Chander Kashyap wrote:
+>> Exynos5420 is a big-little Soc from Samsung. It has 4 A15 and 4 A7 cores.
+>>
+>> This patchset adds cpuidle support for Exynos5420 SoC based on
+>> generic big.little cpuidle driver.
+>>
+>> Tested on SMDK5420.
+>>
+>> This patch set depends on:
+>>       1. [PATCH 0/5] MCPM backend for Exynos5420
+>>          http://www.spinics.net/lists/arm-kernel/msg331100.html
+>> Changelog is in respective patches.
+>> Chander Kashyap (5):
+>>   driver: cpuidle-big-little: add of_device_id structure
+>>   arm: exynos: add generic function to calculate cpu number
+>>   cpuidle: config: Add ARCH_EXYNOS entry to select cpuidle-big-little
+>>     driver
+>>   driver: cpuidle: cpuidle-big-little: init driver for Exynos5420
+>>   exynos: cpuidle: do not allow cpuidle registration for Exynos5420
+>>   mcpm: exynos: populate suspend and powered_up callbacks
+>>
+>>  arch/arm/mach-exynos/exynos.c        |    4 +++-
+>>  arch/arm/mach-exynos/mcpm-exynos.c   |   36 ++++++++++++++++++++++++++++++++++
+>>  arch/arm/mach-exynos/regs-pmu.h      |    9 +++++++++
+>>  drivers/cpuidle/Kconfig.arm          |    2 +-
+>>  drivers/cpuidle/cpuidle-big_little.c |   12 +++++++++++-
+>>  5 files changed, 60 insertions(+), 3 deletions(-)
+>>
+>
+> For the whole series,
+>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-Arndale-Octa board is always configured to work with trustzone
-firmware binary. Added DTS node entry to enable this support.
+Thanks Tomasz.
 
-Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
----
- arch/arm/boot/dts/exynos5420-arndale-octa.dts |    5 +++++
- 1 file changed, 5 insertions(+)
+Dear Kukjin,
+Can you take these patches.
+>
+> Best regards,
+> Tomasz
 
-diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-index 6ee8149fd5c4..434fd9d3e09d 100644
---- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-+++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-@@ -26,6 +26,11 @@
- 		bootargs = "console=ttySAC3,115200";
- 	};
- 
-+	firmware at 02073000 {
-+		compatible = "samsung,secure-firmware";
-+		reg = <0x02073000 0x1000>;
-+	};
-+
- 	fixed-rate-clocks {
- 		oscclk {
- 			compatible = "samsung,exynos5420-oscclk";
+
+
 -- 
-1.7.9.5
+with warm regards,
+Chander Kashyap
