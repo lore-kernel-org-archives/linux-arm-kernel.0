@@ -1,56 +1,42 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 27 May 2014 23:31:08 -0700
-Subject: [PATCH v3 00/14] ARM/ARM64: KVM: big endian host support
-In-Reply-To: <20140526154959.GD31431@lvm>
-References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
- <20140526154959.GD31431@lvm>
-Message-ID: <CAA3XUr2DHae55t7kXFYTv6-5wyBohoyOvs_tqA4kN7RFrfc=xw@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 28 May 2014 09:31:00 +0300
+Subject: [PATCH 4/4] ARM: dts: Add LCD panel sharp ls037v7dw01 support
+ for omap3-evm and ldp
+In-Reply-To: <20140527211405.GF32336@atomide.com>
+References: <CAGhQ9Vwa8xXQEo5dNEKAvmaS9DoBjVSthtd8=owk+atVdFuiiA@mail.gmail.com>
+ <20140430174751.GA12362@atomide.com> <20140505183919.GA15463@atomide.com>
+ <20140508233628.GJ2198@atomide.com> <536C7EA7.5000306@ti.com>
+ <20140509153723.GD17814@atomide.com> <20140513213205.GB18001@atomide.com>
+ <537C9FC6.8020104@ti.com> <20140521145053.GG17417@atomide.com>
+ <20140527205910.GE32336@atomide.com> <20140527211405.GF32336@atomide.com>
+Message-ID: <538582A4.7070104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 May 2014 08:49, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Tue, May 13, 2014 at 09:13:52AM -0700, Victor Kamensky wrote:
->> Hi,
->>
->> Here is updated patches to address KVM host support in big endian
->> ARM V7/V8.
->>
->> Changes since previous version [1] and [2]:
->>
->> x) joined both v7 [1] and v8 [2] series into one
->>
->> x) addressed, nearly all, Christoffer's comments to previous
->> patch series
->>
->> x) Fixed few issues in 'ARM: KVM: handle 64bit values passed to
->> mrcc or from mcrr instructions in BE case' that got discovered
->> after moving to the latest v3.15-rc5 kernel
->
-> What were the issues?
+On 28/05/14 00:14, Tony Lindgren wrote:
 
-You correctly spotted it: it related TTBR handling and access_vm_reg
-function
+> FYI, I'm getting this with current linux next:
+> 
+> omapfb omapfb: failed to allocate framebuffer
+> omapfb omapfb: failed to allocate fbmem
+> omapfb omapfb: failed to setup omapfb
+> omapfb: probe of omapfb failed with error -12
 
->>
->> x) Fixed issue in supporting 32bit guest by V8 BE KVM host
->
-> Is this changes only from v2 to v3 or?
+You need the attached patch to fix linux-next's dma alloc.
 
-Change in v3 patch 14 that deals with access_vm_reg function.
+ Tomi
 
-> Consider using the common format for changelogs, see here for an
-> example:
-> https://lists.cs.columbia.edu/pipermail/kvmarm/2014-May/009468.html
-
-Thanks. Will try to do that.
-
-Christoffer, Marc thank you very much  for review! I accepted a lot of
-comments and update patches. For remaining issues I've sent my
-responses. When we get a bit more closure on remaining issues, I
-will report the series.
-
-Thanks,
-Victor
-
-> Thanks,
-> -Christoffer
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-mm-compaction-properly-signal-and-act-upon-lock-and-.patch
+Type: text/x-patch
+Size: 1115 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140528/f13b6755/attachment.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140528/f13b6755/attachment.sig>
