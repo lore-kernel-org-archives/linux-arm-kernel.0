@@ -1,108 +1,44 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 28 May 2014 13:11:12 -0700
-Subject: [PATCH] net: ks8851: Don't use regulator_get_optional()
-Message-ID: <1401307872-23190-1-git-send-email-sboyd@codeaurora.org>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Wed, 28 May 2014 15:09:49 -0500
+Subject: [PATCH] ARM: dts: qcom: Update msm8960 device trees
+In-Reply-To: <1401301643-20191-1-git-send-email-galak@codeaurora.org>
+References: <1401301643-20191-1-git-send-email-galak@codeaurora.org>
+Message-ID: <20140528200948.GI2012@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We shouldn't be using regulator_get_optional() here. These
-regulators are always present as part of the physical design and
-there isn't any way to use an internal regulator or change the
-source of the reference voltage via software. Given that the only
-users of this driver in the kernel are DT based, this change
-should be transparent to them even if they don't specify any
-supplies because the regulator framework will insert dummy
-supplies as needed.
+On Wed, May 28, 2014 at 01:27:23PM -0500, Kumar Gala wrote:
+> * Move SoC peripherals into an SoC container node
+> * Move serial enabling into board file (qcom-msm8960-cdp.dts)
+> * Cleanup cpu node to match binding spec, enable-method and compatible
+>   should be per cpu, not part of the container
+> * Drop interrupts property from l2-cache node as its not part of the
+>   binding spec
+> 
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> ---
+>  arch/arm/boot/dts/qcom-msm8960-cdp.dts |   6 ++
+>  arch/arm/boot/dts/qcom-msm8960.dtsi    | 165 +++++++++++++++++----------------
+>  2 files changed, 93 insertions(+), 78 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-msm8960-cdp.dts b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
+> index a58fb88..8e77ed7 100644
+> --- a/arch/arm/boot/dts/qcom-msm8960-cdp.dts
+> +++ b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
+> @@ -3,4 +3,10 @@
+>  / {
+>  	model = "Qualcomm MSM8960 CDP";
+>  	compatible = "qcom,msm8960-cdp", "qcom,msm8960";
+> +
+> +	soc {
+> +		serial at 16440000 {
+> +			status = "ok";
+> +		};
+> +	};
+>  };
 
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Mark Brown <broonie@kernel.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/net/ethernet/micrel/ks8851.c | 50 ++++++++++++++++--------------------
- 1 file changed, 22 insertions(+), 28 deletions(-)
+Is now the time put these serial nodes under a GSBI parent node?
 
-diff --git a/drivers/net/ethernet/micrel/ks8851.c b/drivers/net/ethernet/micrel/ks8851.c
-index e72918970a58..66d4ab703f45 100644
---- a/drivers/net/ethernet/micrel/ks8851.c
-+++ b/drivers/net/ethernet/micrel/ks8851.c
-@@ -1441,32 +1441,30 @@ static int ks8851_probe(struct spi_device *spi)
- 		}
- 	}
- 
--	ks->vdd_io = devm_regulator_get_optional(&spi->dev, "vdd-io");
-+	ks->vdd_io = devm_regulator_get(&spi->dev, "vdd-io");
- 	if (IS_ERR(ks->vdd_io)) {
- 		ret = PTR_ERR(ks->vdd_io);
--		if (ret == -EPROBE_DEFER)
--			goto err_reg_io;
--	} else {
--		ret = regulator_enable(ks->vdd_io);
--		if (ret) {
--			dev_err(&spi->dev, "regulator vdd_io enable fail: %d\n",
--				ret);
--			goto err_reg_io;
--		}
-+		goto err_reg_io;
-+	}
-+
-+	ret = regulator_enable(ks->vdd_io);
-+	if (ret) {
-+		dev_err(&spi->dev, "regulator vdd_io enable fail: %d\n",
-+			ret);
-+		goto err_reg_io;
- 	}
- 
--	ks->vdd_reg = devm_regulator_get_optional(&spi->dev, "vdd");
-+	ks->vdd_reg = devm_regulator_get(&spi->dev, "vdd");
- 	if (IS_ERR(ks->vdd_reg)) {
- 		ret = PTR_ERR(ks->vdd_reg);
--		if (ret == -EPROBE_DEFER)
--			goto err_reg;
--	} else {
--		ret = regulator_enable(ks->vdd_reg);
--		if (ret) {
--			dev_err(&spi->dev, "regulator vdd enable fail: %d\n",
--				ret);
--			goto err_reg;
--		}
-+		goto err_reg;
-+	}
-+
-+	ret = regulator_enable(ks->vdd_reg);
-+	if (ret) {
-+		dev_err(&spi->dev, "regulator vdd enable fail: %d\n",
-+			ret);
-+		goto err_reg;
- 	}
- 
- 	if (gpio_is_valid(gpio)) {
-@@ -1572,11 +1570,9 @@ err_irq:
- 	if (gpio_is_valid(gpio))
- 		gpio_set_value(gpio, 0);
- err_id:
--	if (!IS_ERR(ks->vdd_reg))
--		regulator_disable(ks->vdd_reg);
-+	regulator_disable(ks->vdd_reg);
- err_reg:
--	if (!IS_ERR(ks->vdd_io))
--		regulator_disable(ks->vdd_io);
-+	regulator_disable(ks->vdd_io);
- err_reg_io:
- err_gpio:
- 	free_netdev(ndev);
-@@ -1594,10 +1590,8 @@ static int ks8851_remove(struct spi_device *spi)
- 	free_irq(spi->irq, priv);
- 	if (gpio_is_valid(priv->gpio))
- 		gpio_set_value(priv->gpio, 0);
--	if (!IS_ERR(priv->vdd_reg))
--		regulator_disable(priv->vdd_reg);
--	if (!IS_ERR(priv->vdd_io))
--		regulator_disable(priv->vdd_io);
-+	regulator_disable(priv->vdd_reg);
-+	regulator_disable(priv->vdd_io);
- 	free_netdev(priv->netdev);
- 
- 	return 0;
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
