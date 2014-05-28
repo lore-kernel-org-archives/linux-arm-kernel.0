@@ -1,51 +1,49 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 27 May 2014 19:05:31 -0700
-Subject: [RFC PATCH 2/5] clk: Introduce 'clk_round_rate_nearest()'
-In-Reply-To: <9956925.Qsz2bH3rDg@vostro.rjw.lan>
-References: <20140521073457.GD31687@pengutronix.de>
- <00f65d1c-a375-40e7-b30a-cd8cb3ca87fc@BN1BFFO11FD020.protection.gbl>
- <CAKohpomb+h6ZNDgJ8AwJ_J9DjMB7AP_v-cp8coG3CACo5Wt4vQ@mail.gmail.com>
- <9956925.Qsz2bH3rDg@vostro.rjw.lan>
-Message-ID: <20140528020531.7816.5349@quantum>
+Date: Tue, 27 May 2014 19:16:02 -0700
+Subject: [PATCH] clk: divider: Fix overflow in clk_divider_bestdiv
+In-Reply-To: <1399479850-25292-1-git-send-email-t.figa@samsung.com>
+References: <1399479850-25292-1-git-send-email-t.figa@samsung.com>
+Message-ID: <20140528021602.10062.60638@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rafael J. Wysocki (2014-05-26 04:22:32)
-> On Monday, May 26, 2014 11:59:09 AM Viresh Kumar wrote:
-> > On 23 May 2014 21:44, S?ren Brinkmann <soren.brinkmann@xilinx.com> wrote:
-> > > Viresh: Could you imagine something similar for cpufreq? You suggested
-> > > migrating to Hz resolution. I guess that would ideally mean to follow
-> > > the CCF to a 64-bit type for frequencies and increasing the resolution.
-> > > I have a messy patch migrating cpufreq and OPP to Hz and unsigned long
-> > > that works on Zynq. But cpufreq has so many users that it would become
-> > > quite an undertaking.
-> > > And we'd need some new/amended OPP DT binding.
-> > 
-> > If we are going to migrate to Hz from KHz, I think we must consider the
-> > 64 bit stuff right now, otherwise it will bite us later.
-> > 
-> > @Rafael: What do you think?
+Quoting Tomasz Figa (2014-05-07 09:24:10)
+> Commit c686078 ("clk: divider: Add round to closest divider") introduced
+> a helper function to check whether given divisor is the best one instead
+> of direct check. However due to int type used instead of unsigned long
+> for passing calculated rates to this function in certain cases an
+> overflow could occur, for example when trying to obtain maximum possible
+> clock rate by calling clk_round_rate(..., UINT_MAX).
 > 
-> I agree as far as the 64-bit thing goes, but is switching to Hz really
-> necessary?
+> This patch fixes this issue by changing the type of rate, now and best
+> arguments of the function to unsigned long, which is the type that
+> should be used for clock rates.
+> 
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 
-Rafael,
+Sorry for the long wait. This one flew under the radar. Applied to
+clk-next.
 
-Why should CPUfreq migrate to 64-bit if not switching to Hz? CPU clock
-rates are specified as KHz in CPUfreq via an unsigned int. On 32-bit
-systems that comes out to a max of 4.29THz (terahertz!)!
-
-Or maybe you meant, "I agree that the clock framework should switch to
-the 64-bit thing"?
-
-Personally I'd like to see the clock framework and cpufreq get on the
-same page (data type) for specifying clock rates, and the clock
-framework really should not use a granularity like KHz. In fact we have
-some fractional rates like 13.25Hz ...
-
-Thanks,
+Regards,
 Mike
 
+> ---
+>  drivers/clk/clk-divider.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Rafael
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index c572945..e0b360a 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -232,7 +232,7 @@ static int _div_round(struct clk_divider *divider, unsigned long parent_rate,
+>  }
+>  
+>  static bool _is_best_div(struct clk_divider *divider,
+> -               int rate, int now, int best)
+> +               unsigned long rate, unsigned long now, unsigned long best)
+>  {
+>         if (divider->flags & CLK_DIVIDER_ROUND_CLOSEST)
+>                 return abs(rate - now) < abs(rate - best);
+> -- 
+> 1.9.2
 > 
