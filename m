@@ -1,45 +1,55 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 28 May 2014 11:18:56 -0500
-Subject: [PATCH 1/5] devicetree: bindings: Document micrel vendor prefix
-In-Reply-To: <1400792413-21618-2-git-send-email-sboyd@codeaurora.org>
-References: <1400792413-21618-1-git-send-email-sboyd@codeaurora.org>
- <1400792413-21618-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CAL_JsqK1wkXMkJCag5g72enGcss2Cr1fYjEo--KkgQBDGuqyEQ@mail.gmail.com>
+Date: Wed, 28 May 2014 11:30:04 -0500
+Subject: [PATCH 0/6] DT early console initialization
+In-Reply-To: <20140514142644.1C922C4153D@trevor.secretlab.ca>
+References: <1399587823-17701-1-git-send-email-robherring2@gmail.com>
+ <20140514142644.1C922C4153D@trevor.secretlab.ca>
+Message-ID: <CAL_JsqK9nifPWW5jnzYifsMuvRjhD9wTT+YbE0sPM6N4xaj1yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 4:00 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> There's one existing use of 'micrel' in the documentation so use
-> 'micrel' instead of the company's ticker symbol 'mcrl'.
+On Wed, May 14, 2014 at 9:26 AM, Grant Likely <grant.likely@linaro.org> wrote:
+> On Thu,  8 May 2014 17:23:37 -0500, Rob Herring <robherring2@gmail.com> wrote:
+>> From: Rob Herring <robh@kernel.org>
+>>
+>> This series adds support for early serial console initialization using
+>> DT. This enables determining the serial port type and address using the
+>> FDT and allows enabling the console before platform specific
+>> initialization runs. I've tested this on arm64. ARM support is dependent
+>> on adding fixmap support.
+>>
+>> Currently, the earlycon is only enabled if "earlycon" is present on the
+>> kernel command line. The FDT needs to have /chosen/stdout-path set to
+>> the path of the serial port.
+>>
+>> This series is dependent on generic earlycon[1], libfdt support[2], and
+>> vmlinux.lds.h clean-ups[3]. The first 2 are in linux-next already. A git
+>> branch is available here:
+>>
+>> git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git earlycon-dt
 >
-> Cc: <devicetree@vger.kernel.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Nice. For the whole series:
+>
+> Acked-by: Grant Likely <grant.likely@linaro.org>
+>
+> I haven't tested it though.
+>>
+>> Rob
+>>
+>> [1] https://lkml.org/lkml/2014/4/18/573
+>> [2] https://lkml.org/lkml/2014/4/22/1202
+>> [3] https://lkml.org/lkml/2014/3/27/285
+>>
+>> Rob Herring (6):
+>>   of: align RESERVEDMEM_OF_DECLARE function callbacks to other callbacks
+>>   of: consolidate linker section OF match table declarations
+>>   serial: earlycon: add DT support
+>>   of/fdt: add FDT address translation support
+>>   of/fdt: add FDT serial scanning for earlycon
+>>   tty/serial: pl011: add DT based earlycon support
 
-Applied for 3.16.
+Greg, I plan to take this series thru the DT tree for 3.16 unless you
+have any objections. It has dependencies on both the tty-next and the
+DT trees.
 
 Rob
-
-> ---
->
-> This is mostly here as the first patch to make checkpatch quiet. I expect DT
-> maintainers to pick this one up.
->
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 1bc2174e1a05..2fe06ad1d248 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -76,6 +76,7 @@ linux Linux-specific binding
->  lsi    LSI Corp. (LSI Logic)
->  marvell        Marvell Technology Group Ltd.
->  maxim  Maxim Integrated Products
-> +micrel Micrel Inc.
->  microchip      Microchip Technology Inc.
->  mosaixtech     Mosaix Technologies, Inc.
->  moxa   Moxa
-> --
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
->
