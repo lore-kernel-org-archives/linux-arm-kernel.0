@@ -1,54 +1,125 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 28 May 2014 08:59:06 +0530
-Subject: [PATCH 1/1] ARM: keystone: Staticize keystone_restart
-In-Reply-To: <538499A3.7090602@ti.com>
-References: <1401189824-19814-1-git-send-email-sachin.kamat@linaro.org>
- <538499A3.7090602@ti.com>
-Message-ID: <CAK9yfHxtzY_=708QAP7TikS_wvmN1E3Vug01wGUoLjrEu0pOMg@mail.gmail.com>
+From: elder@linaro.org (Alex Elder)
+Date: Tue, 27 May 2014 22:30:47 -0500
+Subject: [PATCH v4 1/5] devicetree: bindings: document Broadcom CPU enable
+ method
+In-Reply-To: <20140527114958.GC18476@e102568-lin.cambridge.arm.com>
+References: <1400607830-10989-1-git-send-email-elder@linaro.org>
+ <1400607830-10989-2-git-send-email-elder@linaro.org>
+ <20140527114958.GC18476@e102568-lin.cambridge.arm.com>
+Message-ID: <53855867.7050800@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ivan,
+On 05/27/2014 06:49 AM, Lorenzo Pieralisi wrote:
+> On Tue, May 20, 2014 at 06:43:46PM +0100, Alex Elder wrote:
+>> Broadcom mobile SoCs use a ROM-implemented holding pen for
+>> controlled boot of secondary cores.  A special register is
+>> used to communicate to the ROM that a secondary core should
+>> start executing kernel code.  This enable method is currently
+>> used for members of the bcm281xx and bcm21664 SoC families.
+>>
+>> The use of an enable method also allows the SMP operation vector to
+>> be assigned as a result of device tree content for these SoCs.
+>>
+>> Signed-off-by: Alex Elder <elder@linaro.org>
+> 
+> This is getting out of control, it is absolutely ghastly. I wonder how
+> I can manage to keep cpus.txt updated if anyone with a boot method
+> du jour adds into cpus.txt, and honestly in this specific case it is even
+> hard to understand why.
 
-On 27 May 2014 19:26, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
->
-> On 05/27/2014 02:23 PM, Sachin Kamat wrote:
->>
->> 'keystone_restart' is used only in this file.
->>
->> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+OK, in this message I'll focus on the particulars of this
+proposed binding.
+
+> Can't it be done with bindings for the relative register address space
+> (regmap ?) and platform code just calls the registers driver to set-up the
+> jump address ? It is platform specific code anyway there is no way you
+> can make this generic.
+
+I want to clarify what you're after here.
+
+My aim is to add SMP support for a class of Broadcom SMP
+machines.  To do so, I'm told I need to use the technique
+of assigning the SMP operations vector as a result of
+identifying an enable method in the DT.
+
+For 32-bit ARM, there are no generic "enable-method" values.
+(I did attempt to create one for "spin-table" but that was
+rejected by Russell King.)  For the machines I'm trying to
+enable, secondary CPUS start out spinning in a ROM-based
+holding pen, and there is no need for a kernel-based one.
+
+However, like a spin-table/holding pen enable method, a
+memory location is required for coordination between the
+boot CPU running kernel code and secondary CPUs running ROM
+code.  My proposal specifies it using a special numeric
+property value named "secondary-boot-reg" in the "cpus"
+node in the DT.
+
+And as I understand it, the issue you have relates to how
+this memory location is specified.
+
+You suggest regmap.  I'm using a single 32-bit register,
+only at very early boot time, and thereafter access to
+it is meaningless.  It seems like overkill if it's only
+used for this purpose.  I could hide the register values
+in the code, but with the exception of that, the code I'm
+using is generic (in the context of this class of Broadcom
+machine).  I could specify the register differently somehow,
+in a different node, or with a different property.
+
+The bottom line here is I'm not sure whether I understand
+what you're suggesting, or perhaps why what you suggest is
+preferable.  I'm very open to suggestions, I just need it
+laid out a bit more detail in order to respond directly.
+
+Thanks.
+
+					-Alex
+
+> I really do not see the point in cluttering cpus.txt with this stuff, it
+> is a platform specific hack, and do not belong in generic bindings in my
+> opinion.
+> 
+> Thanks,
+> Lorenzo
+> 
 >> ---
->>   arch/arm/mach-keystone/keystone.c |    2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>  Documentation/devicetree/bindings/arm/cpus.txt | 12 ++++++++++++
+>>  1 file changed, 12 insertions(+)
 >>
->> diff --git a/arch/arm/mach-keystone/keystone.c
->> b/arch/arm/mach-keystone/keystone.c
->> index 59b8383cbdb0..4ac124b7e4e8 100644
->> --- a/arch/arm/mach-keystone/keystone.c
->> +++ b/arch/arm/mach-keystone/keystone.c
->> @@ -123,7 +123,7 @@ static const char *keystone_match[] __initconst = {
->>         NULL,
->>   };
->>   -void keystone_restart(enum reboot_mode mode, const char *cmd)
->> +static void keystone_restart(enum reboot_mode mode, const char *cmd)
->>   {
->>         u32 val;
+>> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+>> index 333f4ae..c6a2411 100644
+>> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+>> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+>> @@ -185,6 +185,7 @@ nodes to be present and contain the properties described below.
+>>  			    "qcom,gcc-msm8660"
+>>  			    "qcom,kpss-acc-v1"
+>>  			    "qcom,kpss-acc-v2"
+>> +			    "brcm,bcm11351-cpu-method"
+>>  
+>>  	- cpu-release-addr
+>>  		Usage: required for systems that have an "enable-method"
+>> @@ -209,6 +210,17 @@ nodes to be present and contain the properties described below.
+>>  		Value type: <phandle>
+>>  		Definition: Specifies the ACC[2] node associated with this CPU.
+>>  
+>> +	- secondary-boot-reg
+>> +		Usage:
+>> +			Required for systems that have an "enable-method"
+>> +			property value of "brcm,bcm11351-cpu-method".
+>> +		Value type: <u32>
+>> +		Definition:
+>> +			Specifies the physical address of the register used to
+>> +			request the ROM holding pen code release a secondary
+>> +			CPU.  The value written to the register is formed by
+>> +			encoding the target CPU id into the low bits of the
+>> +			physical start address it should jump to.
+>>  
+>>  Example 1 (dual-cluster big.LITTLE system 32-bit):
+>>  
+>> -- 
+>> 1.9.1
 >>
->
->
-> Hi Sachin,
->
-> The function keystone_restart() has been deleted in the following series:
-> [Patch v7 0/7] Introduce keystone reset driver
-> https://lkml.org/lkml/2014/5/23/588
-
-Ah.. missed it.
-
->
-> So, there is no reason to correct it.
-
-Please ignore this patch.
-
--- 
-With warm regards,
-Sachin
+>>
+> 
