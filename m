@@ -1,60 +1,54 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 28 May 2014 09:47:12 +0200
-Subject: [PATCH RESEND v4 0/8] Add Allwinner A31 USB support
-In-Reply-To: <20140527225318.GA21602@kroah.com>
-References: <1399995862-17788-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140514123419.GK29258@lukather> <20140514160520.GA4679@kroah.com>
- <20140515091438.GR29258@lukather>
- <20140527225318.GA21602@kroah.com>
-Message-ID: <20140528074712.GM4730@lukather>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 28 May 2014 00:57:07 -0700
+Subject: [PATCH 1/1] clk/exynos4: Fix compilation warning
+In-Reply-To: <1401077788-31427-1-git-send-email-sachin.kamat@linaro.org>
+References: <1401077788-31427-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <20140528075707.10062.7113@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 03:53:18PM -0700, Greg Kroah-Hartman wrote:
-> On Thu, May 15, 2014 at 11:14:38AM +0200, Maxime Ripard wrote:
-> > Hi Greg,
-> > 
-> > On Wed, May 14, 2014 at 06:05:20PM +0200, Greg Kroah-Hartman wrote:
-> > > On Wed, May 14, 2014 at 02:34:19PM +0200, Maxime Ripard wrote:
-> > > > On Tue, May 13, 2014 at 05:44:14PM +0200, Maxime Ripard wrote:
-> > > > > Hi everyone,
-> > > > > 
-> > > > > This patchset adds support for the USB controllers found in the
-> > > > > Allwinner A31.
-> > > > > 
-> > > > > While the design is similar to the earlier Allwinner SoCs that are
-> > > > > already supported, a few details here and there change, like the fact
-> > > > > that the PHYs now have one clock per phy, while it used to be only one
-> > > > > for all the PHYs.
-> > > > > 
-> > > > > Resent adding Alan Stern's Acked-by and puting Greg KH in the
-> > > > > recipients this time...
-> > > > 
-> > > > Applied patches 2, 7 and 8.
-> > > 
-> > > Feel free to apply patches 5 and 6 to your tree, as your branch needs
-> > > these, with my:
-> > > 
-> > > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > > 
-> > > Or, if you want me to take them, just let me know and I will.
-> > 
-> > You can merge them, I don't need them in any of my branch.
+Quoting Sachin Kamat (2014-05-25 21:16:28)
+> Fixes the following warning:
+> WARNING: drivers/built-in.o(.text.unlikely+0x2c50): Section mismatch in reference from the function exynos4_clk_sleep_init() to the (unknown reference) .init.data:(unknown)
+>    The function exynos4_clk_sleep_init() references
+>    the (unknown reference) __initdata (unknown).
+>    This is often because exynos4_clk_sleep_init lacks a __initdata
+>    annotation or the annotation of (unknown) is wrong.
 > 
-> Now applied, thanks.
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Reported-by: kbuild test robot <fengguang.wu@intel.com>
 
-Great, thanks!
+Applied to clk-next.
 
-Maxime
+Thanks!
+Mike
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140528/73f9a6e6/attachment-0001.sig>
+> ---
+>  drivers/clk/samsung/clk-exynos4.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+> index c4df294bb7fb..4f150c9dd38c 100644
+> --- a/drivers/clk/samsung/clk-exynos4.c
+> +++ b/drivers/clk/samsung/clk-exynos4.c
+> @@ -324,7 +324,7 @@ static struct syscore_ops exynos4_clk_syscore_ops = {
+>         .resume = exynos4_clk_resume,
+>  };
+>  
+> -static void exynos4_clk_sleep_init(void)
+> +static void __init exynos4_clk_sleep_init(void)
+>  {
+>         exynos4_save_common = samsung_clk_alloc_reg_dump(exynos4_clk_regs,
+>                                         ARRAY_SIZE(exynos4_clk_regs));
+> @@ -359,7 +359,7 @@ err_warn:
+>                 __func__);
+>  }
+>  #else
+> -static void exynos4_clk_sleep_init(void) {}
+> +static void __init exynos4_clk_sleep_init(void) {}
+>  #endif
+>  
+>  /* list of all parent clock list */
+> -- 
+> 1.7.9.5
+> 
