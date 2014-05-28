@@ -1,52 +1,51 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 28 May 2014 12:27:35 +0200
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in device
- tree
-In-Reply-To: <5385B689.5000802@broadcom.com>
-References: <537E31F7.1030505@gmail.com>	<537F1148.3010102@redhat.com>	<20140523112239.GB12304@sirena.org.uk>	<537F3610.3050104@redhat.com>	<20140523162718.GE22111@sirena.org.uk>	<53806F26.6050706@redhat.com>	<20140525123452.GS22111@sirena.org.uk>	<53824294.1090609@redhat.com>	<20140526103807.GV22111@sirena.org.uk>	<538321AB.4050006@redhat.com>	<20140526142225.GF22111@sirena.org.uk>	<538356DA.7090302@redhat.com>	<CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>	<53838023.2080807@redhat.com>
- <CAPDyKFpg_2RQabM044C1hsNTcuxdVVOvw0ZONVRdysk=eom8UA@mail.gmail.com>
- <5385AF94.90004@redhat.com> <5385B689.5000802@broadcom.com>
-Message-ID: <5385BA17.9040301@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 28 May 2014 12:27:28 +0200
+Subject: [PATCH 2/5] pinctrl: sunxi: Add macro definition for pinctrl with
+ more than one interrupt
+In-Reply-To: <1401272851-15873-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1401272851-15873-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1401272851-15873-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The A31 and A23, unlike the other Allwinner SoCs, have several interrupts banks
+and parent interrupts, while the other only have up to 32 interrupts in a
+single bank and a single parent interrupt.
 
-On 05/28/2014 12:12 PM, Arend van Spriel wrote:
+Start supporting it by introducing a function macro to declare irq functions
+and their banks.
 
-<snip>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/pinctrl/sunxi/pinctrl-sunxi.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
->>>> Yes, although I must admit that have not thought about how to deal with
->>>> slots, I've no experience with the mmc slots concept at all, or is slot
->>>> just a different name for sdio function ?
->>>
->>> Some mmc hosts may support more than one slot. Thus they can operate
->>> on more than one card.
->>>
->>> Currently, there are no support for this in the mmc core. There can
->>> only be one card per host, but that's due to software limitation of
->>> the mmc stack.  Following your suggestion; modelling the card as child
->>> node under the mmc host, can easily be extended to support more than
->>> one slot.
->>
->> Actually what I'm suggesting is based on Sascha Hauer's
->> "mmc: Add SDIO function devicetree subnode parsing"
->>
->> Patch, which models the sdio functions as child nodes, (with the
->> one with reg =<0>  being the card itself) this also makes sense since each
->> sdio-function gets its own device representing it, so having one child node
->> per sdio-functions leads to one child node per device which seems sensible.
-> 
-> To complicate thing, for brcmfmac the sdio functions are not considered individual devices. This means that brcmfmac creates one driver instance which claims multiple sdio functions.
-
-Right, but that is not really important for the overall device tree model
-we can just put all the info brcmfmac needs in the child-node for sdio-func 1,
-and then the driver can get to it since it claims both functions anyways,
-that is actually what the oob irq support patchset I posted a few days ago
-does. But that patch-set is missing the extra slot level in the child-nodes,
-so if we agree we want that extra level in the hierarchy I'll need to fix
-that for v2 of the set.
-
-Regards,
-
-Hans
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+index 8169ba598876..cb87e15b1b3c 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+@@ -77,6 +77,7 @@
+ struct sunxi_desc_function {
+ 	const char	*name;
+ 	u8		muxval;
++	u8		irqbank;
+ 	u8		irqnum;
+ };
+ 
+@@ -139,6 +140,14 @@ struct sunxi_pinctrl {
+ 		.irqnum = _irq,					\
+ 	}
+ 
++#define SUNXI_FUNCTION_IRQ_BANK(_val, _bank, _irq)		\
++	{							\
++		.name = "irq",					\
++		.muxval = _val,					\
++		.irqbank = _bank,				\
++		.irqnum = _irq,					\
++	}
++
+ /*
+  * The sunXi PIO registers are organized as is:
+  * 0x00 - 0x0c	Muxing values.
+-- 
+1.9.3
