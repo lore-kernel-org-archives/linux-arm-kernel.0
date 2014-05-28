@@ -1,73 +1,49 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Wed, 28 May 2014 18:12:45 +0800
-Subject: [PATCH] pwm: i.MX: Cleanup indentation for register definitions
-In-Reply-To: <20140528115636.4ad791aa@ipc1.ka-ro>
-References: <1401185980-29536-1-git-send-email-Ying.Liu@freescale.com>
- <20140528115636.4ad791aa@ipc1.ka-ro>
-Message-ID: <5385B69D.50508@freescale.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 28 May 2014 11:11:38 +0100
+Subject: [PATCH v2 0/9] arm64: KVM: debug infrastructure support
+In-Reply-To: <20140528095833.GO16428@lvm>
+References: <1400604945-25247-1-git-send-email-marc.zyngier@arm.com>
+ <20140525153421.GA3866@lvm> <5385B2DD.8090200@arm.com>
+ <20140528095833.GO16428@lvm>
+Message-ID: <5385B65A.9000803@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2014 05:56 PM, Lothar Wa?mann wrote:
-> Hi,
-> 
-> Liu Ying wrote:
->> This patch contains no logic change to cleanup indentation
->> for register definitions only.
+On 28/05/14 10:58, Christoffer Dall wrote:
+> On Wed, May 28, 2014 at 10:56:45AM +0100, Marc Zyngier wrote:
+>> On 25/05/14 16:34, Christoffer Dall wrote:
+>>> On Tue, May 20, 2014 at 05:55:36PM +0100, Marc Zyngier wrote:
+>>>> This patch series adds debug support, a key feature missing from the
+>>>> KVM/arm64 port.
+>>>>
+>>>> The main idea is to keep track of whether the debug registers are
+>>>> "dirty" (changed by the guest) or not. In this case, perform the usual
+>>>> save/restore dance, for one run only. It means we only have a penalty
+>>>> if a guest is actively using the debug registers.
+>>>>
+>>>> The amount of registers is properly frightening, but CPUs actually
+>>>> only implement a subset of them. Also, there is a number of registers
+>>>> we don't bother emulating (things having to do with external debug and
+>>>> OSlock).
+>>>
+>>> What is the rationale about not having to deal with external debug and
+>>> OSlock?
 >>
->> Cc: Thierry Reding <thierry.reding@gmail.com>
->> Cc: Sascha Hauer <s.hauer@pengutronix.de>
->> Cc: Shawn Guo <shawn.guo@freescale.com>
->> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
->> Cc: linux-pwm at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
->> ---
->>  drivers/pwm/pwm-imx.c |   26 +++++++++++++-------------
->>  1 file changed, 13 insertions(+), 13 deletions(-)
+>> External debug is when you actually plug a physical JTAG into the CPU.
+>> OSlock is a way to prevent "other software" to play with the debug
+>> registers. My understanding is that it is only useful in combination
+>> with the external debug.
 >>
->> diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
->> index cc47733..0784554 100644
->> --- a/drivers/pwm/pwm-imx.c
->> +++ b/drivers/pwm/pwm-imx.c
->> @@ -21,24 +21,24 @@
->>  
->>  /* i.MX1 and i.MX21 share the same PWM function block: */
->>  
->> -#define MX1_PWMC    0x00   /* PWM Control Register */
->> -#define MX1_PWMS    0x04   /* PWM Sample Register */
->> -#define MX1_PWMP    0x08   /* PWM Period Register */
->> +#define MX1_PWMC			0x00   /* PWM Control Register */
->> +#define MX1_PWMS			0x04   /* PWM Sample Register */
->> +#define MX1_PWMP			0x08   /* PWM Period Register */
->>  
->> -#define MX1_PWMC_EN		(1 << 4)
->> +#define MX1_PWMC_EN			(1 << 4)
->>  
->>  /* i.MX27, i.MX31, i.MX35 share the same PWM function block: */
->>  
->> -#define MX3_PWMCR                 0x00    /* PWM Control Register */
->> -#define MX3_PWMSAR                0x0C    /* PWM Sample Register */
->> -#define MX3_PWMPR                 0x10    /* PWM Period Register */
->> -#define MX3_PWMCR_PRESCALER(x)    (((x - 1) & 0xFFF) << 4)
->> -#define MX3_PWMCR_DOZEEN                (1 << 24)
->> -#define MX3_PWMCR_WAITEN                (1 << 23)
->> +#define MX3_PWMCR			0x00    /* PWM Control Register */
->> +#define MX3_PWMSAR			0x0C    /* PWM Sample Register */
->> +#define MX3_PWMPR			0x10    /* PWM Period Register */
->> +#define MX3_PWMCR_PRESCALER(x)		(((x - 1) & 0xFFF) << 4)
->                                                    ^
-> You could also add the missing () around the macro argument when you
-> are changing this line anyway.
-> 
+>> In both case, implementing support for this is probably not worth the
+>> effort, at least for the time being.
+>>
+> OK, can we document that somewhere clearly in the code then so we know
+> how we can simply ignore those registers?
 
-I may generate a separate patch to do that.
+Sure. I'll add some documentation.
 
-Thanks.
+Thanks,
 
-> 
-> Lothar Wa?mann
-> 
-
+	M.
 -- 
-Liu Ying
+Jazz is not dead. It just smells funny...
