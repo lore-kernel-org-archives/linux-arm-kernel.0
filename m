@@ -1,37 +1,88 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 28 May 2014 12:58:55 +0200
-Subject: [PATCH v2 09/11] sched: test the cpu's capacity in wake affine
-In-Reply-To: <1400860385-14555-10-git-send-email-vincent.guittot@linaro.org>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-10-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20140528105855.GR30445@twins.programming.kicks-ass.net>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 28 May 2014 13:02:08 +0200
+Subject: [PATCH 1/1] clk: exynos5420: Staticize local variables
+In-Reply-To: <CAK9yfHwzAsJLfYfn_ZfyEx+jerntZOn3fBG682M08hN+DR+sCA@mail.gmail.com>
+References: <1400673482-16287-1-git-send-email-sachin.kamat@linaro.org>
+ <CAK9yfHwzAsJLfYfn_ZfyEx+jerntZOn3fBG682M08hN+DR+sCA@mail.gmail.com>
+Message-ID: <5385C230.8090006@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 05:53:03PM +0200, Vincent Guittot wrote:
-> Currently the task always wakes affine on this_cpu if the latter is idle.
-> Before waking up the task on this_cpu, we check that this_cpu capacity is not
-> significantly reduced because of RT tasks or irq activity.
+Hi Sachin,
+
+On 28.05.2014 10:01, Sachin Kamat wrote:
+> On 21 May 2014 17:28, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+>> Local symbols are made static.
+>>
+>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>> ---
+>>  drivers/clk/samsung/clk-exynos5420.c |   10 +++++-----
+>>  1 file changed, 5 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+>> index 9d7d7eed03fd..41b507baf5d6 100644
+>> --- a/drivers/clk/samsung/clk-exynos5420.c
+>> +++ b/drivers/clk/samsung/clk-exynos5420.c
+>> @@ -474,7 +474,7 @@ static struct samsung_fixed_factor_clock
+>>         FFACTOR(0, "ff_dout_spll2", "mout_sclk_spll", 1, 2, 0),
+>>  };
+>>
+>> -struct samsung_mux_clock exynos5800_mux_clks[] __initdata = {
+>> +static struct samsung_mux_clock exynos5800_mux_clks[] __initdata = {
+>>         MUX(0, "mout_aclk400_isp", mout_group3_5800_p, SRC_TOP0, 0, 3),
+>>         MUX(0, "mout_aclk400_mscl", mout_group3_5800_p, SRC_TOP0, 4, 3),
+>>         MUX(0, "mout_aclk400_wcore", mout_group2_5800_p, SRC_TOP0, 16, 3),
+>> @@ -523,7 +523,7 @@ struct samsung_mux_clock exynos5800_mux_clks[] __initdata = {
+>>         MUX(0, "mout_fimd1", mout_group2_p, SRC_DISP10, 4, 3),
+>>  };
+>>
+>> -struct samsung_div_clock exynos5800_div_clks[] __initdata = {
+>> +static struct samsung_div_clock exynos5800_div_clks[] __initdata = {
+>>         DIV(0, "dout_aclk400_wcore", "mout_aclk400_wcore", DIV_TOP0, 16, 3),
+>>
+>>         DIV(0, "dout_aclk550_cam", "mout_aclk550_cam",
+>> @@ -539,14 +539,14 @@ struct samsung_div_clock exynos5800_div_clks[] __initdata = {
+>>         DIV(0, "dout_sclk_sw", "sclk_spll", DIV_TOP9, 24, 6),
+>>  };
+>>
+>> -struct samsung_gate_clock exynos5800_gate_clks[] __initdata = {
+>> +static struct samsung_gate_clock exynos5800_gate_clks[] __initdata = {
+>>         GATE(CLK_ACLK550_CAM, "aclk550_cam", "mout_user_aclk550_cam",
+>>                                 GATE_BUS_TOP, 24, 0, 0),
+>>         GATE(CLK_ACLK432_SCALER, "aclk432_scaler", "mout_user_aclk432_scaler",
+>>                                 GATE_BUS_TOP, 27, 0, 0),
+>>  };
+>>
+>> -struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
+>> +static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
+>>         MUX(0, "sclk_bpll", mout_bpll_p, TOP_SPARE2, 0, 1),
+>>         MUX(0, "mout_aclk400_wcore_bpll", mout_aclk400_wcore_bpll_p,
+>>                                 TOP_SPARE2, 4, 1),
+>> @@ -576,7 +576,7 @@ struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
+>>         MUX(0, "mout_fimd1", mout_group3_p, SRC_DISP10, 4, 1),
+>>  };
+>>
+>> -struct samsung_div_clock exynos5420_div_clks[] __initdata = {
+>> +static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
+>>         DIV(0, "dout_aclk400_wcore", "mout_aclk400_wcore_bpll",
+>>                         DIV_TOP0, 16, 3),
+>>  };
+>> --
 > 
-> Use case where the number of irq and the time spent under irq is important
-> will take benefit of this because the task that is woken up by irq or softirq
-> will not use the same CPU than irq (and softirq) but a idle one which share
-> its LLC.
+> Mike,
+> 
+> Tomasz is probably on vacation. Can you please take this patch?
+> 
 
-OK, so I'm having a terrible time parsing the above.
+Sorry for late reply. Yes, I'm on vacation right now until 9.06, so I'm
+going to be less active through this period of time.
 
-So looking at the patch you make balance false even when this_load==0
-when the effective power/capacity (nico's patches haven't fully sunk in
-yet) of this cpu is less than that of the previous cpu.
+As for this patch, I'm not sure if it will apply to Mike's tree, as it
+seems to depend on patches that went through Kukjin's tree. Since this
+isn't anything critical, I'd suggest deferring this for next release, so
+I can pick this patch up directly after 3.16-rc1 is released.
 
-Is that right?
+In case you want to proceed with it now, feel free to add my Acked-by.
 
-Now I'm only struggling to understand the rationale for this, its got
-LLC in there somewhere, but I'm failing to comprehend.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140528/39dff26e/attachment.sig>
+Best regards,
+Tomasz
