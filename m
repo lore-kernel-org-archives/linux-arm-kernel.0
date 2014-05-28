@@ -1,184 +1,152 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 28 May 2014 11:14:38 +0200
-Subject: [PATCH v3 14/14] ARM64: KVM: fix big endian issue in
- access_vm_reg for 32bit guest
-In-Reply-To: <CAA3XUr15fJu3vRU3Hq=fajiRCd1gvkdmvJfsa3Te4N-3puwcWA@mail.gmail.com>
-References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
- <1399997646-4716-15-git-send-email-victor.kamensky@linaro.org>
- <20140526175225.GF31431@lvm>
- <CAA3XUr15fJu3vRU3Hq=fajiRCd1gvkdmvJfsa3Te4N-3puwcWA@mail.gmail.com>
-Message-ID: <20140528091438.GL16428@lvm>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 28 May 2014 13:07:34 +0300
+Subject: [PATCH v1] of/irq: do irq resolution in platform_get_irq_byname()
+In-Reply-To: <CACxGe6ts-TcSKk2F0-XSxAxeTxVCiyDHgh-O12v+F2OjHUsPyg@mail.gmail.com>
+References: <1400582523-22684-1-git-send-email-grygorii.strashko@ti.com>
+ <20140523080333.66720C4176E@trevor.secretlab.ca>
+ <CAGa+x85mOHtNAj-UHgK2_z8zWAF=qwFcRcUgHTR-byNiX7heHA@mail.gmail.com>
+ <CAL_JsqLm3wfVS+au+JUbhBhxz=LuVpepH6GxabCQhPowhbw77g@mail.gmail.com>
+ <20140528071855.GJ4227@lee--X1>
+ <CACRpkdYgkEOjLamYu5uKSgs3iTNJ-w5XkbeygKjRdR-bNdETfg@mail.gmail.com>
+ <CAGb2v64f8Wju6dtVuVN2x=9YVGA-=RXozzhpJZNspKZ05f=jtA@mail.gmail.com>
+ <CACxGe6ts-TcSKk2F0-XSxAxeTxVCiyDHgh-O12v+F2OjHUsPyg@mail.gmail.com>
+Message-ID: <5385B566.2050600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 11:11:57PM -0700, Victor Kamensky wrote:
-> On 26 May 2014 10:52, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > On Tue, May 13, 2014 at 09:14:06AM -0700, Victor Kamensky wrote:
-> >> Fix isssue with 32bit guests running on top of BE KVM host. Guest
-> >> state is retored with double word read operations. Within the high
-> >
-> > restored (spell check should catch this).
-> >
-> > "Guest state is restored with double word read operations."  I don't
-> > know what this sentence is supposed to tell me.
-> >
-> >> and low word data is already byteswap. This code effectively swaps
-> >
-> > "data is already byteswap" is not English.  data is already byteswapped?
-> >
-> >> two words within 64bit value.
-> >>
-> >> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> >> ---
-> >>  arch/arm64/kvm/sys_regs.c | 14 ++++++++++++--
-> >>  1 file changed, 12 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> >> index 060c3a9..4438b47 100644
-> >> --- a/arch/arm64/kvm/sys_regs.c
-> >> +++ b/arch/arm64/kvm/sys_regs.c
-> >> @@ -51,6 +51,16 @@ static u32 cache_levels;
-> >>  /* CSSELR values; used to index KVM_REG_ARM_DEMUX_ID_CCSIDR */
-> >>  #define CSSELR_MAX 12
-> >>
-> >> +/* Word access indexes for 64bit vm accessor */
-> >> +#ifdef CONFIG_CPU_BIG_ENDIAN
-> >> +#define CP15_REG_MSW_INDEX 0
-> >> +#define CP15_REG_LSW_INDEX 1
-> >> +#else
-> >> +#define CP15_REG_MSW_INDEX 1
-> >> +#define CP15_REG_LSW_INDEX 0
-> >> +#endif
-> >> +
-> >> +
-> >>  /* Which cache CCSIDR represents depends on CSSELR value. */
-> >>  static u32 get_ccsidr(u32 csselr)
-> >>  {
-> >> @@ -137,9 +147,9 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
-> >>       if (!p->is_aarch32) {
-> >>               vcpu_sys_reg(vcpu, r->reg) = val;
-> >>       } else {
-> >> -             vcpu_cp15(vcpu, r->reg) = val & 0xffffffffUL;
-> >> +             vcpu_cp15(vcpu, r->reg + CP15_REG_LSW_INDEX) = val & 0xffffffffUL;
-> >>               if (!p->is_32bit)
-> >> -                     vcpu_cp15(vcpu, r->reg + 1) = val >> 32;
-> >> +                     vcpu_cp15(vcpu, r->reg + CP15_REG_MSW_INDEX) = val >> 32;
-> >>       }
-> >>       return true;
-> >>  }
-> >> --
-> >> 1.8.1.4
-> >>
-> > I really don't like this. If anything I feel like it should be
-> > abstracted inside vcpu_cp15,
-> 
-> good point, please see revised proposal below
-> 
-> > but wouldn't it be cleaner to do something
-> > along the lines of:
-> >
-> > u64 *regstore = (u64 *)vcpu->arch.ctxt.cp15[r->reg];
-> > if (p->is_32bit)
-> >         val &= 0xffffffffUL;
-> > *regstore = val;
-> 
-> I don't think above will be correct. The way I read
-> it the following hypothetical instructions sequence
-> 
-> mcrr    p15, 0, r6, r7, c2    @ TTBR 0
-> mcr    p15, 0, r6, c2, c0, 0 @ 32bit TTBR 0
-> 
-> will get TTBR 0 high word to 0, when mrc instruction executes, but
-> it should be left unchanged in case of 'p->is_32bit'
-> 
-> How about something like following? Is it move into right direction?
-> 
-> From b0a7793b03d9c62f7b9c53a317cb2d19a75c935b Mon Sep 17 00:00:00 2001
-> From: Victor Kamensky <victor.kamensky@linaro.org>
-> Date: Mon, 12 May 2014 13:57:21 -0700
-> Subject: [PATCH] ARM64: KVM: fix big endian issue in access_vm_reg for 32bit
->  guest
-> 
-> Fix issue with 32bit guests running on top of BE KVM host.
-> Indexes of high and low words of 64bit cp15 register are
-> swapped in case of big endian code, since 64bit cp15 state is
-> restored or saved with double word write or read instruction.
-> 
-> Define helper macros to access high low words of 64bit cp15
-> register.
-> 
-> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> ---
->  arch/arm64/include/asm/kvm_host.h | 8 ++++++++
->  arch/arm64/kvm/sys_regs.c         | 4 ++--
->  2 files changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_host.h
-> b/arch/arm64/include/asm/kvm_host.h
-> index 0a1d697..e9d2e11 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -140,6 +140,14 @@ struct kvm_vcpu_arch {
->  #define vcpu_sys_reg(v,r)    ((v)->arch.ctxt.sys_regs[(r)])
->  #define vcpu_cp15(v,r)        ((v)->arch.ctxt.cp15[(r)])
-> 
-> +#ifdef CONFIG_CPU_BIG_ENDIAN
-> +#define vcpu_cp15_64_high(v,r) ((v)->arch.ctxt.cp15[((r) + 0)])
-> +#define vcpu_cp15_64_low(v,r) ((v)->arch.ctxt.cp15[((r) + 1)])
-> +#else
-> +#define vcpu_cp15_64_high(v,r) ((v)->arch.ctxt.cp15[((r) + 1)])
-> +#define vcpu_cp15_64_low(v,r) ((v)->arch.ctxt.cp15[((r) + 0)])
-> +#endif
-> +
->  struct kvm_vm_stat {
->      u32 remote_tlb_flush;
->  };
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index a13e7e7..b243e07 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -137,9 +137,9 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
->      if (!p->is_aarch32) {
->          vcpu_sys_reg(vcpu, r->reg) = val;
->      } else {
-> -        vcpu_cp15(vcpu, r->reg) = val & 0xffffffffUL;
-> +        vcpu_cp15_64_low(vcpu, r->reg) = val & 0xffffffffUL;
->          if (!p->is_32bit)
-> -            vcpu_cp15(vcpu, r->reg + 1) = val >> 32;
-> +            vcpu_cp15_64_high(vcpu, r->reg) = val >> 32;
->      }
->      return true;
->  }
-> -- 
-> 1.8.1.4
+Hi All,
 
-This is definitely much better than the original patch.
+On 05/28/2014 12:03 PM, Grant Likely wrote:
+> On Wed, May 28, 2014 at 9:49 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+>> On Wed, May 28, 2014 at 4:25 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>> On Wed, May 28, 2014 at 9:18 AM, Lee Jones <lee.jones@linaro.org> wrote:
+>>>> On Tue, 27 May 2014, Rob Herring wrote:
+>>>>
+>>>>> On Tue, May 27, 2014 at 3:23 PM, Kevin Hilman <khilman@linaro.org> wrote:
+>>>>>> On Fri, May 23, 2014 at 1:03 AM, Grant Likely <grant.likely@linaro.org> wrote:
+>>>>>>> On Tue, 20 May 2014 13:42:02 +0300, Grygorii Strashko <grygorii.strashko@ti.com> wrote:
+>>>>>>>> The commit 9ec36cafe43bf835f8f29273597a5b0cbc8267ef
+>>>>>>>> "of/irq: do irq resolution in platform_get_irq" from Rob Herring -
+>>>>>>>> moves resolving of the interrupt resources in platform_get_irq().
+>>>>>>>> But this solution isn't complete because platform_get_irq_byname()
+>>>>>>>> need to be modified the same way.
+>>>>>>>>
+>>>>>>>> Hence, fix it by adding interrupt resolution code at the
+>>>>>>>> platform_get_irq_byname() function too.
+>>>>>>>>
+>>>>>>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>>>>>>> Cc: Rob Herring <robh@kernel.org>
+>>>>>>>> Cc: Tony Lindgren <tony@atomide.com>
+>>>>>>>> Cc: Grant Likely <grant.likely@linaro.org>
+>>>>>>>> Cc: Thierry Reding <thierry.reding@gmail.com>
+>>>>>>>>
+>>>>>>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>>>>>>>
+>>>>>>> Applied, Thanks.
+>>>>>>
+>>>>>> As of next-20150526, the ST u8500 Snowball board has been failing boot
+>>>>>> in linux-next, and was bisected down to this patch (commit
+>>>>>> ad69674e73a1 in -next).   Full boot failure attached.
+>>>>>>
+>>>>>> I have not dug any deeper, but can confirm that next-20140526 with
+>>>>>> this patch reverted boots again on the snowball board.
+>>>>>
+>>>>> There's a patch on the list which fixes it. The problem is stmmac
+>>>>> driver was expecting only one error code.
+>>>>
+>>>> Does Snowball even use stmmac?
+>>>
+>>> No.
+>>>
+>>> I don't get this...
+>>
+>> Log says musb is wrestling control over some pins with some other driver:
+>>
+>> [    1.441497] pinctrl-nomadik soc:pinctrl: pin GPIO256_AF28 already
+>> requested by a03e0000.usb_per5; cannot claim for musb-hdrc.0.auto
+>> [    1.453369] pinctrl-nomadik soc:pinctrl: pin-256 (musb-hdrc.0.auto)
+>> status -22
+>> [    1.460571] pinctrl-nomadik soc:pinctrl: could not request pin 256
+>> (GPIO256_AF28) from group usb_a_1  on device pinctrl-nomadik
+>> [    1.472076] musb-hdrc musb-hdrc.0.auto: Error applying setting,
+>> reverse things back
+>> [    1.479827] HS USB OTG: no transceiver configured
+>> [    1.484558] musb-hdrc musb-hdrc.0.auto: musb_init_controller failed
+>> with status -517
+>> [    1.492309] platform musb-hdrc.0.auto: Driver musb-hdrc requests
+>> probe deferral
+>> [    1.500183] pinctrl-nomadik soc:pinctrl: pin GPIO256_AF28 already
+>> requested by a03e0000.usb_per5; cannot claim for musb-hdrc.0.auto
+>> [    1.512023] pinctrl-nomadik soc:pinctrl: pin-256 (musb-hdrc.0.auto)
+>> status -22
+>> [    1.519226] pinctrl-nomadik soc:pinctrl: could not request pin 256
+>> (GPIO256_AF28) from group usb_a_1  on device pinctrl-nomadik
+>> [    1.530731] musb-ux500 musb-hdrc.0.auto: Error applying setting,
+>> reverse things back
+>> [    1.539184] pinctrl-nomadik soc:pinctrl: pin GPIO256_AF28 already
+>> requested by a03e0000.usb_per5; cannot claim for musb-hdrc.1.auto
+>> [    1.551025] pinctrl-nomadik soc:pinctrl: pin-256 (musb-hdrc.1.auto)
+>> status -22
+>> [    1.558258] pinctrl-nomadik soc:pinctrl: could not request pin 256
+>> (GPIO256_AF28) from group usb_a_1  on device pinctrl-nomadik
+>> [    1.569732] musb-hdrc musb-hdrc.1.auto: Error applying setting,
+>> reverse things back
+>> [    1.577453] HS USB OTG: no transceiver configured
+>>
+>> [ .. repeats until the end .. ]
+>>
+>> I think this is not related to this patch.
+>
+> The bisected patch causes platform_get_irq() to always parse the
+> devicetree to obtain the irq instead of using a precalculated value in
+> the platform_device. There are two possible scenarios for this problem
+> that I can think of:
+> 1) Platform_get_irq() is getting called multiple times (which would
+> happen on a deferred probe) but the setup code isn't handling it
+> properly, like trying to request the GPIO more than once
+> 2) the platform_device was preloaded with an irq number that differs
+> from what is determined when parsing the tree. This would happen if a
+> platform_device was created manually.
+>
 
-> 
-> > But I think the thing that bothers me in general with all these patches
-> > is that they deal specially with a lot of situations where the data
-> > structure was designed specifically to make the code easy to read, and
-> > now it just becomes a really complicated mess.  Have you carefully
-> > considered other options, redesigning the data structure layout etc.?
-> 
-> I have considered different options and I am open for
-> suggestions. Bytesswaps quite often could be done in different
-> places but achieve the same result. In several cases I initially
-> developed patch that deals with BE issue in one way and
-> reworked to make it more compact less intrusive. For example
-> in this particular case order of high and low words of 64bit cp15
-> register could be kept the same in BE/LE cases but code that
-> save/restore it could be changed to do byteswap. My opinion
-> that proposed option is more clean.
-> 
-What I was thinking is to avoid packing 64-bit values as two 32-bit
-values, so for example having two separate arrays on the kvm_cpu_context
-struct, one for 32-bit coprocessor registers and one for 64-bit
-coprocessor registers.
+Could anyone try attached patch? It has to improve situation, but it 
+might not fix all problems (see my previous e-mail).
 
-That would sort of follow Benjamin Herrenschmidt's manatra about always
-using the correctly typed values everywhere to avoid endianness issues.
+Regards,
+-grygorii
 
-Did you look at that approach?  Does it blow up?
+--
+ From 4a41912dba648c935982274966426fa430fd5aa4 Mon Sep 17 00:00:00 2001
+From: Grygorii Strashko <grygorii.strashko@ti.com>
+Date: Wed, 28 May 2014 12:53:34 +0300
+Subject: [PATCH] mfd: ab8500: fix dt irq mapping
 
--Christoffer
+The AD8500 defines itself as interrupt-controller in DT,
+but it doesn't assign DT node to IRQ domain when creates it.
+As result, of_irq_xx() helpers don't work because they can't
+find necessary IRQ domain.
+
+Hence, fix it by assigning AD8500 core device DT node to IRQ
+domain when it's created.
+
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+  drivers/mfd/ab8500-core.c |    2 +-
+  1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+index a8ee4a3..cf2e6a1 100644
+--- a/drivers/mfd/ab8500-core.c
++++ b/drivers/mfd/ab8500-core.c
+@@ -591,7 +591,7 @@ static int ab8500_irq_init(struct ab8500 *ab8500, 
+struct device_node *np)
+  		num_irqs = AB8500_NR_IRQS;
+
+  	/* If ->irq_base is zero this will give a linear mapping */
+-	ab8500->domain = irq_domain_add_simple(NULL,
++	ab8500->domain = irq_domain_add_simple(ab8500->dev->of_node,
+  			num_irqs, 0,
+  			&ab8500_irq_ops, ab8500);
+
+-- 
+1.7.9.5
