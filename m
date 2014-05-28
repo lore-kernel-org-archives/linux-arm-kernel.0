@@ -1,53 +1,76 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 28 May 2014 11:00:26 +0200
-Subject: [PATCH v6 3/6] cpuidle: config: Add ARCH_EXYNOS entry to select
- cpuidle-big-little driver
-In-Reply-To: <1400227438-27155-4-git-send-email-chander.kashyap@linaro.org>
-References: <CANuQgHGSA+R__raSa_tzrgpceqLD2SZw+s0XQUHGF4wscgh6Kg@mail.gmail.com>
- <1400227438-27155-1-git-send-email-chander.kashyap@linaro.org>
- <1400227438-27155-4-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <5385A5AA.8070402@linaro.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 28 May 2014 12:49:01 +0300
+Subject: [PATCH v1] of/irq: do irq resolution in platform_get_irq_byname()
+In-Reply-To: <CAL_JsqLm3wfVS+au+JUbhBhxz=LuVpepH6GxabCQhPowhbw77g@mail.gmail.com>
+References: <1400582523-22684-1-git-send-email-grygorii.strashko@ti.com>	<20140523080333.66720C4176E@trevor.secretlab.ca>	<CAGa+x85mOHtNAj-UHgK2_z8zWAF=qwFcRcUgHTR-byNiX7heHA@mail.gmail.com>
+ <CAL_JsqLm3wfVS+au+JUbhBhxz=LuVpepH6GxabCQhPowhbw77g@mail.gmail.com>
+Message-ID: <5385B10D.3020207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2014 10:03 AM, Chander Kashyap wrote:
-> Add support to select generic big-little cpuidle driver for Samsung Exynos
-> series SoC's. This is required for Exynos big-llittle SoC's eg, Exynos5420.
->
-> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+Hi All,
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+On 05/28/2014 03:37 AM, Rob Herring wrote:
+> On Tue, May 27, 2014 at 3:23 PM, Kevin Hilman <khilman@linaro.org> wrote:
+>> On Fri, May 23, 2014 at 1:03 AM, Grant Likely <grant.likely@linaro.org> wrote:
+>>> On Tue, 20 May 2014 13:42:02 +0300, Grygorii Strashko <grygorii.strashko@ti.com> wrote:
+>>>> The commit 9ec36cafe43bf835f8f29273597a5b0cbc8267ef
+>>>> "of/irq: do irq resolution in platform_get_irq" from Rob Herring -
+>>>> moves resolving of the interrupt resources in platform_get_irq().
+>>>> But this solution isn't complete because platform_get_irq_byname()
+>>>> need to be modified the same way.
+>>>>
+>>>> Hence, fix it by adding interrupt resolution code at the
+>>>> platform_get_irq_byname() function too.
+>>>>
+>>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>>> Cc: Rob Herring <robh@kernel.org>
+>>>> Cc: Tony Lindgren <tony@atomide.com>
+>>>> Cc: Grant Likely <grant.likely@linaro.org>
+>>>> Cc: Thierry Reding <thierry.reding@gmail.com>
+>>>>
+>>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>>>
+>>> Applied, Thanks.
+>>
+>> As of next-20150526, the ST u8500 Snowball board has been failing boot
+>> in linux-next, and was bisected down to this patch (commit
+>> ad69674e73a1 in -next).   Full boot failure attached.
+>>
+>> I have not dug any deeper, but can confirm that next-20140526 with
+>> this patch reverted boots again on the snowball board.
+> 
+> There's a patch on the list which fixes it. The problem is stmmac
+> driver was expecting only one error code.
+> 
 
-> ---
-> Changes in v4:
-> 	1. Typo fixed from SOC_EXYNOS5420 to ARCH_EXYNOS
-> 	2. Commit message updated
-> Changes in v3: None
-> Changes in v2:
-> 	1. Changed config macro from SOC_EXYNOS5420 to ARCH_EXYNOS
->   drivers/cpuidle/Kconfig.arm |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-> index 97ccc31..d9596e7 100644
-> --- a/drivers/cpuidle/Kconfig.arm
-> +++ b/drivers/cpuidle/Kconfig.arm
-> @@ -4,7 +4,7 @@
->
->   config ARM_BIG_LITTLE_CPUIDLE
->   	bool "Support for ARM big.LITTLE processors"
-> -	depends on ARCH_VEXPRESS_TC2_PM
-> +	depends on ARCH_VEXPRESS_TC2_PM || ARCH_EXYNOS
->   	select ARM_CPU_SUSPEND
->   	select CPU_IDLE_MULTIPLE_DRIVERS
->   	help
->
+Seems root cause of problem is hidden inside MFD ab8500-core.c :(
+And it's related to simulations supporting of DT and non-DT devices.
+
+For example:
+----- Log file contains lines
+[    0.919677] ab8500-debug ab8500-debug.0: First irq not found, err -22
+[    0.926147] ab8500-debug: probe of ab8500-debug.0 failed with error -22
+
+DT definition of ab8500-debug is specified as following (ste-dbx5x0.dtsi):
+	ab8500-debugfs {
+		compatible = "stericsson,ab8500-debug";
+	};
+
+In code ab8500-debug is created using mfd_add_devices() API which fills
+device's resources manually, but, in same time, It links ab8500-debug device
+to DT node because MFD cell has of_compatible property set to:
+ 		.of_compatible = "stericsson,ab8500-debug",
 
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Problem: both new versions of APIs platform_get_irq_byname() and
+platform_get_irq() will fail to get IRQ.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+
+Another problem is:
+[    1.038909] abx5x0-usb ab8500-usb.0: Link status irq not found
+- looking on it now - it should work
+
+
+Best regards,
+-grygorii
