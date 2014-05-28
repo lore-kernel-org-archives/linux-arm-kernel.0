@@ -1,63 +1,110 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 28 May 2014 12:27:27 +0200
-Subject: [PATCH 1/5] pinctrl: sunxi: Remove irq_mask_ack and use irq_ack
- instead
+Date: Wed, 28 May 2014 12:27:29 +0200
+Subject: [PATCH 3/5] pinctrl: sunxi: Declare the number of interrupt banks in
+ the descriptor
 In-Reply-To: <1401272851-15873-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1401272851-15873-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1401272851-15873-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1401272851-15873-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If irq_mask_ack is not defined, mask_ack_irq will call irq_mask and then
-irq_ack. In order to avoid code duplication, between irq_mask_ack and irq_mask,
-just declare irq_ack.
+Declare in the description structure associated to the compatible the number of
+interrupt banks the device has. For now, we're not doing anything with it.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/pinctrl/sunxi/pinctrl-sunxi.c | 15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+ drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c   | 1 +
+ drivers/pinctrl/sunxi/pinctrl-sun5i-a10s.c  | 1 +
+ drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c   | 1 +
+ drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c | 1 +
+ drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c   | 1 +
+ drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c   | 1 +
+ drivers/pinctrl/sunxi/pinctrl-sunxi.h       | 1 +
+ 7 files changed, 7 insertions(+)
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-index d69a440e728d..71d6cd10d56f 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-@@ -571,26 +571,15 @@ static int sunxi_pinctrl_irq_set_type(struct irq_data *d,
- 	return 0;
- }
- 
--static void sunxi_pinctrl_irq_mask_ack(struct irq_data *d)
-+static void sunxi_pinctrl_irq_ack(struct irq_data *d)
- {
- 	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
--	u32 ctrl_reg = sunxi_irq_ctrl_reg(d->hwirq);
--	u8 ctrl_idx = sunxi_irq_ctrl_offset(d->hwirq);
- 	u32 status_reg = sunxi_irq_status_reg(d->hwirq);
- 	u8 status_idx = sunxi_irq_status_offset(d->hwirq);
- 	unsigned long flags;
--	u32 val;
--
--	spin_lock_irqsave(&pctl->lock, flags);
--
--	/* Mask the IRQ */
--	val = readl(pctl->membase + ctrl_reg);
--	writel(val & ~(1 << ctrl_idx), pctl->membase + ctrl_reg);
- 
- 	/* Clear the IRQ */
- 	writel(1 << status_idx, pctl->membase + status_reg);
--
--	spin_unlock_irqrestore(&pctl->lock, flags);
- }
- 
- static void sunxi_pinctrl_irq_mask(struct irq_data *d)
-@@ -636,8 +625,8 @@ static void sunxi_pinctrl_irq_unmask(struct irq_data *d)
- }
- 
- static struct irq_chip sunxi_pinctrl_irq_chip = {
-+	.irq_ack	= sunxi_pinctrl_irq_ack,
- 	.irq_mask	= sunxi_pinctrl_irq_mask,
--	.irq_mask_ack	= sunxi_pinctrl_irq_mask_ack,
- 	.irq_unmask	= sunxi_pinctrl_irq_unmask,
- 	.irq_set_type	= sunxi_pinctrl_irq_set_type,
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
+index fa1ff7c7e357..86b608bedca6 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
+@@ -1010,6 +1010,7 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
+ static const struct sunxi_pinctrl_desc sun4i_a10_pinctrl_data = {
+ 	.pins = sun4i_a10_pins,
+ 	.npins = ARRAY_SIZE(sun4i_a10_pins),
++	.irq_banks = 1,
  };
+ 
+ static int sun4i_a10_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun5i-a10s.c b/drivers/pinctrl/sunxi/pinctrl-sun5i-a10s.c
+index 164d743f526c..2fa7430cabaf 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun5i-a10s.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun5i-a10s.c
+@@ -661,6 +661,7 @@ static const struct sunxi_desc_pin sun5i_a10s_pins[] = {
+ static const struct sunxi_pinctrl_desc sun5i_a10s_pinctrl_data = {
+ 	.pins = sun5i_a10s_pins,
+ 	.npins = ARRAY_SIZE(sun5i_a10s_pins),
++	.irq_banks = 1,
+ };
+ 
+ static int sun5i_a10s_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c b/drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c
+index 1188a2b7b988..29c734a60b51 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c
+@@ -382,6 +382,7 @@ static const struct sunxi_desc_pin sun5i_a13_pins[] = {
+ static const struct sunxi_pinctrl_desc sun5i_a13_pinctrl_data = {
+ 	.pins = sun5i_a13_pins,
+ 	.npins = ARRAY_SIZE(sun5i_a13_pins),
++	.irq_banks = 1,
+ };
+ 
+ static int sun5i_a13_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c
+index 8fcba48e0a42..9a2517b65113 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c
+@@ -93,6 +93,7 @@ static const struct sunxi_pinctrl_desc sun6i_a31_r_pinctrl_data = {
+ 	.pins = sun6i_a31_r_pins,
+ 	.npins = ARRAY_SIZE(sun6i_a31_r_pins),
+ 	.pin_base = PL_BASE,
++	.irq_banks = 2,
+ };
+ 
+ static int sun6i_a31_r_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
+index 8dea5856458b..7adc4888eb27 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
+@@ -836,6 +836,7 @@ static const struct sunxi_desc_pin sun6i_a31_pins[] = {
+ static const struct sunxi_pinctrl_desc sun6i_a31_pinctrl_data = {
+ 	.pins = sun6i_a31_pins,
+ 	.npins = ARRAY_SIZE(sun6i_a31_pins),
++	.irq_banks = 4,
+ };
+ 
+ static int sun6i_a31_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c b/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
+index d8577ce5f1a4..dac99e02bfdb 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
+@@ -1036,6 +1036,7 @@ static const struct sunxi_desc_pin sun7i_a20_pins[] = {
+ static const struct sunxi_pinctrl_desc sun7i_a20_pinctrl_data = {
+ 	.pins = sun7i_a20_pins,
+ 	.npins = ARRAY_SIZE(sun7i_a20_pins),
++	.irq_banks = 1,
+ };
+ 
+ static int sun7i_a20_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+index cb87e15b1b3c..7ddcce0f3c27 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+@@ -90,6 +90,7 @@ struct sunxi_pinctrl_desc {
+ 	const struct sunxi_desc_pin	*pins;
+ 	int				npins;
+ 	unsigned			pin_base;
++	unsigned			irq_banks;
+ };
+ 
+ struct sunxi_pinctrl_function {
 -- 
 1.9.3
