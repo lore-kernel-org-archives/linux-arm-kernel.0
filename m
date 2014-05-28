@@ -1,107 +1,149 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 28 May 2014 10:52:34 +0900
-Subject: [PATCH] ARM: shmobile: r8a7779: Add clock index macros for DT sources
-Message-ID: <1401241954-12646-1-git-send-email-horms+renesas@verge.net.au>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 27 May 2014 18:54:41 -0700
+Subject: [PATCH 03/17] phy: ti-pipe3: add external clock support for PCIe
+ PHY
+In-Reply-To: <5374B409.3000607@ti.com>
+References: <1399383244-14556-1-git-send-email-kishon@ti.com>
+ <5373897C.6080504@ti.com>
+ <CAGo_u6qw1OomEw_ueb3x+xT+qZLAfGv7Se1K=o725aOoD3ankQ@mail.gmail.com>
+ <5374859F.5080902@ti.com> <53748819.8060705@ti.com>
+ <CAGo_u6qbbdAbdvrB3AFXSH1qD5MaBkJbi6oJJvvTWW4xfbmd_Q@mail.gmail.com>
+ <5374AC0A.7070709@ti.com>
+ <CAGo_u6r8XtGHOvsfJKQMZ2ghFRz8x8_UhzyKE9jnwO6mJ2HYpQ@mail.gmail.com>
+ <5374B09F.2080803@ti.com> <5374B409.3000607@ti.com>
+Message-ID: <20140528015441.7816.62452@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add macros usable by device tree sources to reference r8a7779 clocks by
-index.
+Quoting Nishanth Menon (2014-05-15 05:33:13)
+> On 05/15/2014 07:18 AM, Kishon Vijay Abraham I wrote:
+> > Hi,
+> > 
+> > On Thursday 15 May 2014 05:42 PM, Nishanth Menon wrote:
+> >> On Thu, May 15, 2014 at 6:59 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> >>> Hi Nishant,
+> >>>
+> >>> On Thursday 15 May 2014 05:16 PM, Nishanth Menon wrote:
+> >>>> On Thu, May 15, 2014 at 4:25 AM, Roger Quadros <rogerq@ti.com> wrote:
+> >>>>> On 05/15/2014 12:15 PM, Kishon Vijay Abraham I wrote:
+> >>>>>> Hi Nishanth,
+> >>>>>>
+> >>>>>> On Wednesday 14 May 2014 09:04 PM, Nishanth Menon wrote:
+> >>>>>>> On Wed, May 14, 2014 at 10:19 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> >>>>>>>> Hi Roger,
+> >>>>>>>>
+> >>>>>>>> On Wednesday 14 May 2014 06:46 PM, Roger Quadros wrote:
+> >>>>>>>>> Hi Kishon,
+> >>>>>>>>>
+> >>>>>>>>> On 05/06/2014 04:33 PM, Kishon Vijay Abraham I wrote:
+> >>>>>>>>>> APLL used by PCIE phy can either use external clock as input or the clock
+> >>>>>>>>>> from DPLL. Added support for the APLL to use external clock as input here.
+> >>>>>>>>>>
+> >>>>>>>>>> Cc: Rajendra Nayak <rnayak@ti.com>
+> >>>>>>>>>> Cc: Tero Kristo <t-kristo@ti.com>
+> >>>>>>>>>> Cc: Paul Walmsley <paul@pwsan.com>
+> >>>>>>>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >>>>>>>>>> ---
+> >>>>>>>>>>  Documentation/devicetree/bindings/phy/ti-phy.txt |    4 ++
+> >>>>>>>>>>  drivers/phy/phy-ti-pipe3.c                       |   75 ++++++++++++++--------
+> >>>>>>>>>>  2 files changed, 52 insertions(+), 27 deletions(-)
+> >>>>>>>>>>
+> >>>>>>>>>> diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
+> >>>>>>>>>> index bc9afb5..d50f8ee 100644
+> >>>>>>>>>> --- a/Documentation/devicetree/bindings/phy/ti-phy.txt
+> >>>>>>>>>> +++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
+> >>>>>>>>>> @@ -76,6 +76,10 @@ Required properties:
+> >>>>>>>>>>     * "dpll_ref_m2" - external dpll ref clk
+> >>>>>>>>>>     * "phy-div" - divider for apll
+> >>>>>>>>>>     * "div-clk" - apll clock
+> >>>>>>>>>> +   * "apll_mux" - mux for pcie apll
+> >>>>>>>>>> +   * "refclk_ext" - external reference clock for pcie apll
+> >>>>>>>>>> + - ti,ext-clk: To specifiy if PCIE apll should use external clock. Applicable
+> >>>>>>>>>> +   only to PCIE PHY.
+> >>>>>>>>>
+> >>>>>>>>> Instead of specifying both clock sources "dpll_ref_clock", "refclk_ext" and then specifying a 3rd control option "ti,ext-clk" to select one of the 2 sources, why can't the DT just supply one clock source, i.e. the one that is being used in the board instance? The driver should then just configure the clock rate that is needed at that node. Shouldn't the clock framework automatically take care of muxing and parent rates?
+> >>>>>>>>
+> >>>>>>>> Want the dt to have all the clocks used by the controller. "ti,ext-clk" should
+> >>>>>>>> go in the board dt file (suggested by Nishanth).
+> >>>>>>>> The point is at some point later if some one wants to change the clock source,
+> >>>>>>>> it should be a simple enabling "ti,ext-clk" flag instead of finding the clock
+> >>>>>>>> phandle etc..
+> >>>>>>>
+> >>>>>>> Wonder if that is implicit by the presence of  "refclk_ext" in the
+> >>>>>>> clocks provided?
+> >>>>>>
+> >>>>>> IMO the presence of "refclk_ext" is useless unless the board indicates it
+> >>>>>> provides the clock source.
+> >>>>>>
+> >>>>>> refclk_ext holds phandle for *fixed-clock*, so irrespective of whether the
+> >>>>>> board provides a clock or not, it can have that handle for configuring in PRCM.
+> >>>>>> However if the board does not provide the clock source, configuring refclk_ext
+> >>>>>> in PRCM is useless.
+> >>>>>
+> >>>>> I think what Nishant meant is that if "refclk_ext" is provided it means that the driver
+> >>>>> should use that over "dpll_ref_clock" so no need of a separate "ti,ext-clk" flag.
+> >>>>
+> >>>> yes, thank you for clarifying - it does indeed redundant to have
+> >>>> "ti,ext-clk". and apologies on being a little obscure in the comment.
+> >>>
+> >>> Irrespective of whether external reference clock is used or not, all DRA7
+> >>> (apll) has an input for external reference clock (and also a PRCM register for
+> >>> programming it) and it has to be specified in dt no?
+> >>
+> >> Why is that a binding for ti-phy? that is a problem for the APLL clock
+> >> driver (selecting it's own source). PHY properties should describe
+> >> itself -> let the bindings of the APLL describe itself. please dont
+> >> mix the two up.
+> > 
+> > The apll clock node is like this
+> > 
+> > apll_pcie_in_clk_mux: apll_pcie_in_clk_mux at 4ae06118 {
+> >         compatible = "mux-clock";
+> >         clocks = <&dpll_pcie_ref_m2ldo_ck>, <&pciesref_acs_clk_ck>;
+> >         #clock-cells = <0>;
+> >         reg = <0x4a00821c 0x4>;
+> >         bit-mask = <0x80>;
+> > };
+> > 
+> > The external reference clock is denoted by *pciesref_acs_clk_ck*.
+> > 
+> > refclk_ext holds the phandle to *pciesref_acs_clk_ck* and is used in
+> > "clk_set_parent" to set the parent of apll mux.
+> 
+> So, How about this: if refclk_ext is not defined, dont do setparent,
+> if it is defined, do setparent.
+> in short:
+> Optional Properties:
+> * "refclk_ext" - external reference clock for pcie apll - if defined,
+> used as the parent to "apll_mux"
+> 
+> That said, my problem in general with this approach(which many folks
+> have taken of describing parent of clock X in hardware block binding
+> for Y) is the following:
+> 
+> The binding now has dependency on clock tree hierarchy. What if
+> towmorrow, we have a tree where refclk_ext parent of muxZ parent of
+> apll_mux? the binding breaks down. Lets not forget that we consider DT
+> as an ABI - we dont want to change the binding in the future.
+> 
+> I had always preferred describing parent-child relationship of clocks
+> by the approach Tero posted: https://patchwork.kernel.org/patch/3871551/
+> 
+> Maybe Mike and Tero could help here?
 
-Based on work for the r8a7791 SoC by Laurent Pinchart.
+Hi all,
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- include/dt-bindings/clock/r8a7779-clock.h | 64 +++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
- create mode 100644 include/dt-bindings/clock/r8a7779-clock.h
+I didn't read all of this context, but it seems like
+https://lkml.org/lkml/2014/5/19/539
 
-Hi Mike,
+might be a good fit here. Assuming that the PIPE3 PHY consumes the APLL
+clock, then it reasonable for the dts phy node to specify
+assigned-clock-parent.
 
-as discussed elsewhere please consider this for v3.16.
-It resolves the build-breakage caused by
-7b42a99 ("clk: shmobile: r8a7779: Add clocks support").
+Regards,
+Mike
 
-I have tested that this does resolve the build problem
-reported by Arnd by applying it on top of clk-next whose
-current head is 42dd880 ("Merge branch 'clk-fixes' into clk-next").
-
-As I am a little unsure of how to enable ARCH_R8A7779 and
-ARCH_SHMOBILE_MULTI in clk-next I compiled it my modifying
-drivers/clk/shmobile/Makefile to compile the driver if ARCH_R8A7790
-is set and then compiled using the shmobile_defconfig.
-
-
-diff --git a/include/dt-bindings/clock/r8a7779-clock.h b/include/dt-bindings/clock/r8a7779-clock.h
-new file mode 100644
-index 0000000..381a611
---- /dev/null
-+++ b/include/dt-bindings/clock/r8a7779-clock.h
-@@ -0,0 +1,64 @@
-+/*
-+ * Copyright (C) 2013  Horms Solutions Ltd.
-+ *
-+ * Contact: Simon Horman <horms@verge.net.au>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#ifndef __DT_BINDINGS_CLOCK_R8A7779_H__
-+#define __DT_BINDINGS_CLOCK_R8A7779_H__
-+
-+/* CPG */
-+#define R8A7779_CLK_PLLA	0
-+#define R8A7779_CLK_Z		1
-+#define R8A7779_CLK_ZS		2
-+#define R8A7779_CLK_S		3
-+#define R8A7779_CLK_S1		4
-+#define R8A7779_CLK_P		5
-+#define R8A7779_CLK_B		6
-+#define R8A7779_CLK_OUT		7
-+
-+/* MSTP 0 */
-+#define R8A7779_CLK_HSPI	7
-+#define R8A7779_CLK_TMU2	14
-+#define R8A7779_CLK_TMU1	15
-+#define R8A7779_CLK_TMU0	16
-+#define R8A7779_CLK_HSCIF1	18
-+#define R8A7779_CLK_HSCIF0	19
-+#define R8A7779_CLK_SCIF5	21
-+#define R8A7779_CLK_SCIF4	22
-+#define R8A7779_CLK_SCIF3	23
-+#define R8A7779_CLK_SCIF2	24
-+#define R8A7779_CLK_SCIF1	25
-+#define R8A7779_CLK_SCIF0	26
-+#define R8A7779_CLK_I2C3	27
-+#define R8A7779_CLK_I2C2	28
-+#define R8A7779_CLK_I2C1	29
-+#define R8A7779_CLK_I2C0	30
-+
-+/* MSTP 1 */
-+#define R8A7779_CLK_USB01	0
-+#define R8A7779_CLK_USB2	1
-+#define R8A7779_CLK_DU		3
-+#define R8A7779_CLK_VIN2	8
-+#define R8A7779_CLK_VIN1	9
-+#define R8A7779_CLK_VIN0	10
-+#define R8A7779_CLK_ETHER	14
-+#define R8A7779_CLK_SATA	15
-+#define R8A7779_CLK_PCIE	16
-+#define R8A7779_CLK_VIN3	20
-+
-+/* MSTP 3 */
-+#define R8A7779_CLK_SDHI3	20
-+#define R8A7779_CLK_SDHI2	21
-+#define R8A7779_CLK_SDHI1	22
-+#define R8A7779_CLK_SDHI0	23
-+#define R8A7779_CLK_MMC1	30
-+#define R8A7779_CLK_MMC0	31
-+
-+
-+#endif /* __DT_BINDINGS_CLOCK_R8A7779_H__ */
--- 
-1.8.5.2
+> 
+> -- 
+> Regards,
+> Nishanth Menon
