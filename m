@@ -1,93 +1,69 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 28 May 2014 09:41:49 +0900
-Subject: [PATCH v8 0/3] R-Car Gen2 PCIe host driver
-In-Reply-To: <20140527230923.GG11907@google.com>
-References: <1399892270-25021-1-git-send-email-phil.edworthy@renesas.com>
- <20140527230923.GG11907@google.com>
-Message-ID: <20140528004149.GF7374@verge.net.au>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 27 May 2014 18:05:18 -0700
+Subject: PXA 2xx devictree port and clock infrastructure
+In-Reply-To: <87vbsqdd27.fsf@free.fr>
+References: <87zji3cr3d.fsf@free.fr> <201405271717.48783.arnd@arndb.de>
+ <20140527154303.GA6835@leverpostej> <4580668.Rz95HmpxUr@wuerfel>
+ <87vbsqdd27.fsf@free.fr>
+Message-ID: <20140528010518.7816.7374@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 05:09:23PM -0600, Bjorn Helgaas wrote:
-> On Mon, May 12, 2014 at 11:57:47AM +0100, Phil Edworthy wrote:
-> > This is version 8 of a PCIe Host driver for the R-Car Gen2 devices,
-> > i.e. R-Car H2 (r8a7790) and R-Car M2 (r8a7791).
+Quoting Robert Jarzmik (2014-05-27 16:20:00)
+> Arnd Bergmann <arnd@arndb.de> writes:
 > 
-> How do we want to handle maintenance of this new file (pcie-rcar.c)?
-> MAINTAINERS currently contains drivers/pci/host/*rcar*, which matches it
-> and says Simon maintains it.  If he wants it, I'd like an ack from him
-> before merging it.  If not, I'd like to update MAINTAINERS to show who I
-> should look for acks from.
+> > Right, that is the general recommendation at least. I'm always a bit cautious
+> > when it comes to PXA because I don't expect that platform to fully get
+> > converted to DT in the long run, and very little new work is going on there.
+> >
+> > OTOH, if people like Robert and Daniel do this for fun, it's definitely
+> > great to see the full solution.
 > 
-> I don't care either way; I just don't know what to do with this right now.
-
-Hi Bjorn,
-
-I'm happy for the maintenance role to default to me.
-
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
-
-> Bjorn
+> OK, so let's suppose I go for (c), and :
+>  - create drivers/clk/clk-pxa2xx.c
+>    => OF clock driver
+>  - amend the mach-pxa accordingly to move all clock stuff to this driver
 > 
-> > v8:
-> >  - Platform changes removed from this patch set
-> >  - Moved header file contents into c file
-> >  - Formatting cleaned up
-> >  - Remove bus/dev/func range checks for config access
-> >  - Add comment about config access serialization
-> >  - Made rcar_pcie_setup_window() return void as no errors possible
-> >  - Remove unused register definitions
-> >  - Removed __init markers to fix section mismatches
-> >  - Add explicit bus number range
-> >  - Get the root bus nr from config writes instead of sys->busnr
-> >  - Use PCI domains
-> >  - Removed unused variable in rcar_msi_free()
-> >  - Split interrupt bindings into separate cells
-> > 
-> > v7:
-> >  - Change binding description of clocks to 'clock specifiers'
-> > 
-> > v6:
-> >  - Correct DT bindings description for reg and clocks
-> >  - Split device and board DT changes
-> >  - Add shmobile to subject for shmobile DT patches
-> >  - Don't check MSI irq number is valid, as upper level checks this
-> >  - Change "Unexpected MSI" msg to debug level
-> >  - Reword "Unexpected MSI" comment so that it's one line
-> >  - Remove patch that adds HAVE_ARM_ARCH_TIMER to koelsch defconfig as not needed
-> > 
-> > v5:
-> >  - Use module_platform_driver instead of subsys_initcall
-> >  - Use the of_device_id data field for HW init function
-> >  - Init hw_pci struct in declaration
-> >  - Renesas SoC compatible string has peripheral before device name
-> >  - Add PCIe bus clock reference
-> >  - Use dma-ranges property to specify inbound memory regions
-> >  - Support multiple IO windows and correct resources
-> >  - Return IRQ_NONE from MSI isr when there is no pending MSI
-> >  - Add additional interrupt bindings
-> > 
-> > v4:
-> >  - Use runtime PM properly
-> > 
-> > Phil Edworthy (3):
-> >   PCI: host: rcar: Add Renesas R-Car PCIe driver
-> >   PCI: host: rcar: Add MSI support
-> >   dt-bindings: pci: rcar pcie device tree bindings
-> > 
-> >  Documentation/devicetree/bindings/pci/rcar-pci.txt |   47 +
-> >  drivers/pci/host/Kconfig                           |    6 +
-> >  drivers/pci/host/Makefile                          |    1 +
-> >  drivers/pci/host/pcie-rcar.c                       | 1008 ++++++++++++++++++++
-> >  4 files changed, 1062 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pci/rcar-pci.txt
-> >  create mode 100644 drivers/pci/host/pcie-rcar.c
-> > 
-> > -- 
-> > 1.9.1
-> > 
+> Is there a clean way for the transition phase, where devicetree pxa-dt machine
+> will have to exist with non-DT machine code ? ie. is there around a clock driver
+> I can look at where both OF *and* non-OF are working ?
+> 
+> Ah, and given that PXA clocks are very simple :
+>  - their rate is almost always constant, and not changeable
+>  - only one register exists to enable/disable all the clocks (bitmask of 32
+>  possible clock enables)
+> 
+> Isn't there already a skeleton to handle this type of clocks ? It looks to me
+> pretty generic, yet I haven't found it in drivers/clk. Maybe I missed something
+> ?
+
+There is a fixed-rate clock type already and a fixed-factor (e.g.
+fixed-divider) clock type. DT bindings exist for these types already.
+See,
+
+drivers/clk/clk-fixed-rate.c
+drivers/clk/clk-fixed-factor.c
+Documentation/devicetree/bindings/clock/fixed-clock.txt
+Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
+
+For the gate clocks we have a gate-clock type:
+
+drivers/clk/clk-gate.c
+
+No DT binding exists for this type, as it it usually parsed by a
+platform- or controller-specific compatible string. For an example of a
+32-bit register where each bit toggles a clock gate, please see:
+
+Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+
+There might be simpler examples that don't use the clock-indices stuff,
+but that was just from a quick grep.
+
+Regards,
+Mike
+
+> 
+> Cheers.
+> 
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> Robert
