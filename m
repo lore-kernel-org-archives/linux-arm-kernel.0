@@ -1,50 +1,80 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 28 May 2014 12:34:42 -0700
-Subject: [PATCH 0/5] serial: imx: fixes
-In-Reply-To: <1399648788-26061-1-git-send-email-dean_jenkins@mentor.com>
-References: <1399648788-26061-1-git-send-email-dean_jenkins@mentor.com>
-Message-ID: <20140528193442.GA7066@kroah.com>
+From: larry.bassel@linaro.org (Larry Bassel)
+Date: Wed, 28 May 2014 12:35:51 -0700
+Subject: [PATCH v5 1/2] arm64: adjust el0_sync so that a function can
+ be called
+In-Reply-To: <20140528112738.GE15222@arm.com>
+References: <1401130573-7443-1-git-send-email-larry.bassel@linaro.org>
+ <1401130573-7443-2-git-send-email-larry.bassel@linaro.org>
+ <20140528112738.GE15222@arm.com>
+Message-ID: <20140528193542.GD7953@ubuette>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 04:19:43PM +0100, dean_jenkins at mentor.com wrote:
-> From: Dean Jenkins <Dean_Jenkins@mentor.com>
+On 28 May 14 12:27, Will Deacon wrote:
+> Hi Larry,
 > 
-> The following set of patches were tested on an i.MX6 multi-core platform.
+> On Mon, May 26, 2014 at 07:56:12PM +0100, Larry Bassel wrote:
+> > To implement the context tracker properly on arm64,
+> > a function call needs to be made after debugging and
+> > interrupts are turned on, but before the lr is changed
+> > to point to ret_to_user(). If the function call
+> > is made after the lr is changed the function will not
+> > return to the correct place.
+> > 
+> > For similar reasons, defer the setting of x0 so that
+> > it doesn't need to be saved around the function call
+> > (save far_el1 in x26 temporarily instead).
+> > 
+> > Signed-off-by: Larry Bassel <larry.bassel@linaro.org>
 > 
-> Patches 1 to 4 were tested using a Bluetooth BCSP UART connection at 115.2kbps
-> and 4Mbps. The fixes were needed because the i.MX6 UART driver caused spinlock
-> deadlocks with the HCI TTY layer.
+> [...]
 > 
-> Patch 5 improves the i.MX6 UART driver for use with kdb.
 > 
-> Patch 1: serial: imx: remove unneeded imx_transmit_buffer() from imx_start_tx()
-> Patch 2: serial: imx: remove uart_write_wakeup() from imx_transmit_buffer()
-> Patch 3: serial: imx: avoid spinlock recursion deadlock
-> Patch 4: serial: imx: move imx_transmit_buffer() into imx_txint()
-> Patch 5: serial: imx: clean up imx_poll_get_char()
-> 
-> The patches are based off 3.15-rc4.
-> 
-> ----------------------------------------------------------------
-> Andy Lowe (1):
->       serial: imx: avoid spinlock recursion deadlock
-> 
-> Dirk Behme (4):
->       serial: imx: remove unneeded imx_transmit_buffer() from imx_start_tx()
->       serial: imx: remove uart_write_wakeup() from imx_transmit_buffer()
->       serial: imx: move imx_transmit_buffer() into imx_txint()
->       serial: imx: clean up imx_poll_get_char()
-> 
->  drivers/tty/serial/imx.c |   73 ++++++++++++++--------------------------------
->  1 file changed, 22 insertions(+), 51 deletions(-)
+> Why have you added this mov instruction?
 
-Given the rather confusing threads based on these patches, I don't know
-what to apply.
+I believe (please correct me if I'm wrong) that it is necessary.
+Here is why:
 
-Dean, can you respin what patches you want applied and resend them so
-I'm not so confused?
+> > @@ -476,23 +481,27 @@ el0_undef:
+> >  	// enable interrupts before calling the main handler
+> >  	enable_dbg_and_irq
+> >  	mov	x0, sp
+> > +	adr	lr, ret_to_user
+> >  	b	do_undefinstr
+> >  el0_dbg:
+> >  	/*
+> >  	 * Debug exception handling
+> >  	 */
+> >  	tbnz	x24, #0, el0_inv		// EL0 only
+> > -	mrs	x0, far_el1
+> > +	mrs	x26, far_el1
 
-thanks,
+needed because do_debug_exception may clobber x0, so save far_el1
+in x26 (as other parts of this patch do)
 
-greg k-h
+> > +	mov	x0, x26
+
+needed because far_el1 is expected to be in x0 here
+
+> >  	mov	x1, x25
+> >  	mov	x2, sp
+> >  	bl	do_debug_exception
+> >  	enable_dbg
+
+[call to ct_user_exit will go here in the next patch, this may re-clobber x0]
+
+> > +	mov	x0, x26
+
+needed because far_el1 is expected to be in x0 here
+
+Since the purpose of this patch is to make calling a function
+possible in this code path, the "extra" mov instruction above
+is necessary and IMHO should be added in this patch and not in the
+next one whose purpose is to define the ct_user_* macros and
+add calls to them in the proper places.
+
+> >  	b	ret_to_user
+> 
+> Will
+
+Larry
