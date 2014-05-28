@@ -1,53 +1,39 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 28 May 2014 12:27:38 +0100
-Subject: [PATCH v5 1/2] arm64: adjust el0_sync so that a function can be
- called
-In-Reply-To: <1401130573-7443-2-git-send-email-larry.bassel@linaro.org>
+Date: Wed, 28 May 2014 12:44:38 +0100
+Subject: [PATCH v5 2/2] arm64: enable context tracking
+In-Reply-To: <1401130573-7443-3-git-send-email-larry.bassel@linaro.org>
 References: <1401130573-7443-1-git-send-email-larry.bassel@linaro.org>
- <1401130573-7443-2-git-send-email-larry.bassel@linaro.org>
-Message-ID: <20140528112738.GE15222@arm.com>
+ <1401130573-7443-3-git-send-email-larry.bassel@linaro.org>
+Message-ID: <20140528114438.GF15222@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Larry,
 
-On Mon, May 26, 2014 at 07:56:12PM +0100, Larry Bassel wrote:
-> To implement the context tracker properly on arm64,
-> a function call needs to be made after debugging and
-> interrupts are turned on, but before the lr is changed
-> to point to ret_to_user(). If the function call
-> is made after the lr is changed the function will not
-> return to the correct place.
+On Mon, May 26, 2014 at 07:56:13PM +0100, Larry Bassel wrote:
+> Make calls to ct_user_enter when the kernel is exited
+> and ct_user_exit when the kernel is entered (in el0_da,
+> el0_ia, el0_svc, el0_irq and all of the "error" paths).
 > 
-> For similar reasons, defer the setting of x0 so that
-> it doesn't need to be saved around the function call
-> (save far_el1 in x26 temporarily instead).
+> These macros expand to function calls which will only work
+> properly if el0_sync and related code has been rearranged
+> (in a previous patch of this series).
 > 
-> Signed-off-by: Larry Bassel <larry.bassel@linaro.org>
+> The calls to ct_user_exit are made after hw debugging has been
+> enabled (enable_dbg_and_irq).
+> 
+> The call to ct_user_enter is made at the beginning of the
+> kernel_exit macro.
+> 
+> This patch is based on earlier work by Kevin Hilman.
+> Save/restore optimizations were also done by Kevin.
 
-[...]
+Apologies if we've discussed this before (it rings a bell), but why are we
+penalising the fast syscall path with this? Shouldn't TIF_NOHZ contribute to
+out _TIF_WORK_MASK, then we could do the tracking on the syscall slow path?
 
-> @@ -476,23 +481,27 @@ el0_undef:
->  	// enable interrupts before calling the main handler
->  	enable_dbg_and_irq
->  	mov	x0, sp
-> +	adr	lr, ret_to_user
->  	b	do_undefinstr
->  el0_dbg:
->  	/*
->  	 * Debug exception handling
->  	 */
->  	tbnz	x24, #0, el0_inv		// EL0 only
-> -	mrs	x0, far_el1
-> +	mrs	x26, far_el1
-> +	mov	x0, x26
->  	mov	x1, x25
->  	mov	x2, sp
->  	bl	do_debug_exception
->  	enable_dbg
-> +	mov	x0, x26
->  	b	ret_to_user
+I think that would tidy up your mov into x19 too.
 
-Why have you added this mov instruction?
+Also -- how do you track ret_from_fork in the child with these patches?
 
 Will
