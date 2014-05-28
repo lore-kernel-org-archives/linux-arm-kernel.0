@@ -1,327 +1,170 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 28 May 2014 10:03:29 +0200
-Subject: [PATCH v3 07/14] ARM: KVM: one_reg coproc set and get BE fixes
-In-Reply-To: <CAA3XUr0BKSYNTwv88YBQxeewJ4kLRza2qGmJj_iYVmDmJQFPQg@mail.gmail.com>
-References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
- <1399997646-4716-8-git-send-email-victor.kamensky@linaro.org>
- <20140525191426.GA23912@lvm>
- <CAA3XUr0BKSYNTwv88YBQxeewJ4kLRza2qGmJj_iYVmDmJQFPQg@mail.gmail.com>
-Message-ID: <20140528080329.GG16428@lvm>
+Date: Wed, 28 May 2014 10:09:57 +0200
+Subject: [PATCH v6 4/4] add 2nd stage page fault handling during live
+ migration
+In-Reply-To: <53853C2F.8080003@samsung.com>
+References: <1400178451-4984-1-git-send-email-m.smarduch@samsung.com>
+ <1400178451-4984-5-git-send-email-m.smarduch@samsung.com>
+ <20140527201945.GD16428@lvm> <53853C2F.8080003@samsung.com>
+Message-ID: <20140528080957.GH16428@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 11:19:59PM -0700, Victor Kamensky wrote:
-> On 25 May 2014 12:14, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > On Tue, May 13, 2014 at 09:13:59AM -0700, Victor Kamensky wrote:
-> >> Fix code that handles KVM_SET_ONE_REG, KVM_GET_ONE_REG ioctls to work in BE
-> >> image. Before this fix get/set_one_reg functions worked correctly only in
-> >> LE case - reg_from_user was taking 'void *' kernel address that actually could
-> >> be target/source memory of either 4 bytes size or 8 bytes size, and code copied
-> >> from/to user memory that could hold either 4 bytes register, 8 byte register
-> >> or pair of 4 bytes registers.
+On Tue, May 27, 2014 at 06:30:23PM -0700, Mario Smarduch wrote:
+> On 05/27/2014 01:19 PM, Christoffer Dall wrote:
+> > On Thu, May 15, 2014 at 11:27:31AM -0700, Mario Smarduch wrote:
+> >> This patch adds support for handling 2nd stage page faults during migration,
+> >> it disables faulting in huge pages, and splits up existing huge pages.
 > >>
-> >> For example note that there was a case when 4 bytes register was read from
-> >> user-land to kernel target address of 8 bytes value. Because it was working
-> >> in LE, least significant word was memcpy(ied) and it just worked. In BE code
-> >> with 'void *' as target/source 'val' type it is impossible to tell whether
-> >> 4 bytes register from user-land should be copied to 'val' address itself
-> >> (4 bytes target) or it should be copied to 'val' + 4 (least significant word
-> >> of 8 bytes value). So first change was to introduce strongly typed
-> >> functions, where type of target/source 'val' is strongly defined:
-> >>
-> >> reg_from_user_to_u64 - reads register from user-land to kernel 'u64 *val'
-> >>                   address; register size could be 4 or 8 bytes
-> >> reg_from_user_to_u32 - reads register(s) from user-land to kernel 'u32 *val'
-> >>                   address; note it could be one or two 4 bytes registers
-> >> reg_to_user_from_u64 - writes register from kernel 'u64 *val' address to
-> >>                   user-land register memory; register size could be
-> >>                   4 or 8 bytes
-> >> ret_to_user_from_u32 - writes register(s) from kernel 'u32 *val' address to
-> >>                   user-land register(s) memory; note it could be
-> >>                   one or two 4 bytes registers
-> >>
-> >> All places where reg_from_user, reg_to_user functions were used, were changed
-> >> to use either corresponding u64 or u32 variants of functions depending on
-> >> type of source/target kernel memory variable.
-> >>
-> >> In case of 'u64 *val' and register size equals 4 bytes, reg_from_user_to_u64
-> >> and reg_to_user_from_u64 work only with least siginificant word of
-> >> target/source kernel value. It would be nice to deal only with u32 kernel
-> >> values in _u32 functions and with u64 kernel values in _u64 functions,
-> >> however it is not always possible because functions like set_invariant_cp15
-> >> get_invariant_cp15 store values in u64 types but registers are 32bit.
-> >>
-> >> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> >> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 > >> ---
-> >>  arch/arm/kvm/coproc.c | 118 +++++++++++++++++++++++++++++++++++++++-----------
-> >>  1 file changed, 92 insertions(+), 26 deletions(-)
+> >>  arch/arm/kvm/mmu.c |   36 ++++++++++++++++++++++++++++++++++--
+> >>  1 file changed, 34 insertions(+), 2 deletions(-)
 > >>
-> >> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-> >> index c58a351..5ca6582 100644
-> >> --- a/arch/arm/kvm/coproc.c
-> >> +++ b/arch/arm/kvm/coproc.c
-> >> @@ -682,17 +682,83 @@ static struct coproc_reg invariant_cp15[] = {
-> >>       { CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
-> >>  };
-> >>
-> >> -static int reg_from_user(void *val, const void __user *uaddr, u64 id)
-> >> +/*
-> >> + * Reads register value from user-land uaddr address into kernel u64 value
-> >> + * given by val address. Note register size could be 4 bytes, so user-land
-> >> + * 4 bytes value will be copied into least significant word. Or register
-> >> + * size could be 8 bytes, so function works as regular copy.
-> >> + */
-> >
-> > Reads a register value from a userspace address to a kernel u64
-> > variable.  Note that the id may still encode a register size of 4 bytes,
-> > in which case only 4 bytes will be copied from userspace into the least
-> > significant word of *val.
-> >
-> >> +static int reg_from_user_to_u64(u64 *val, const void __user *uaddr, u64 id)
-> >> +{
-> >> +     unsigned long regsize = KVM_REG_SIZE(id);
-> >> +     union {
-> >> +             u32     word;
-> >> +             u64     dword;
-> >> +     } tmp = {0};
+> >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> >> index b939312..10e7bf6 100644
+> >> --- a/arch/arm/kvm/mmu.c
+> >> +++ b/arch/arm/kvm/mmu.c
+> >> @@ -1002,6 +1002,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>  	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
+> >>  	struct vm_area_struct *vma;
+> >>  	pfn_t pfn;
+> >> +	bool migration_active;
+> >>  
+> >>  	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
+> >>  	if (fault_status == FSC_PERM && !write_fault) {
+> >> @@ -1053,12 +1054,23 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>  		return -EFAULT;
+> >>  
+> >>  	spin_lock(&kvm->mmu_lock);
 > >> +
-> >> +     if (copy_from_user(&tmp, uaddr, regsize) != 0)
-> >> +             return -EFAULT;
+> >> +	/*
+> >> +	 * Place inside lock to prevent race condition when whole VM is being
+> >> +	 * write proteced. Prevent race of huge page install when migration is
+> >> +	 * active.
+> >> +	 */
+> >> +	migration_active = vcpu->kvm->arch.migration_in_progress;
 > >> +
-> >> +     switch (regsize) {
-> >> +     case 4:
-> >> +             *val = tmp.word;
-> >> +             break;
-> >> +     case 8:
-> >> +             *val = tmp.dword;
-> >> +             break;
-> >> +     }
-> >> +     return 0;
-> >> +}
+> >>  	if (mmu_notifier_retry(kvm, mmu_seq))
+> >>  		goto out_unlock;
+> >> -	if (!hugetlb && !force_pte)
 > >> +
-> >> +/*
-> >> + * Reads register value from user-land uaddr address to kernel u32 value
-> >> + * or array of two u32 values. I.e. it may really copy two u32 registers
-> >> + * when used with register which size is 8 bytes (for example V7 64
-> >> + * bit registers like TTBR0/TTBR1).
-> >> + */
-> >
-> > Reads a register value from a userspace address to a kernel u32 variable
-> > or a kernel array of two u32 values.  That is, it may really copy two
-> > u32 registers when used with registers defined by the ABI to be 8 bytes
-> > long (e.g. TTBR0/TTBR1).
-> >
-> >> +static int reg_from_user_to_u32(u32 *val, const void __user *uaddr, u64 id)
-> >>  {
-> >> -     /* This Just Works because we are little endian. */
-> >>       if (copy_from_user(val, uaddr, KVM_REG_SIZE(id)) != 0)
-> >>               return -EFAULT;
-> >>       return 0;
-> >>  }
-> >>
-> >> -static int reg_to_user(void __user *uaddr, const void *val, u64 id)
-> >> +/*
-> >> + * Writes register value to user-land uaddr address from kernel u64 value
-> >> + * given by val address. Note register size could be 4 bytes, so only 4
-> >> + * bytes from least significant word will by copied into uaddr address.
-> >> + * In case of 8 bytes sized register it works as regular copy.
-> >> + */
-> >
-> > Writes a register value to a userspace address from a kernel u64 value.
-> > Note that the register size could be only 4 bytes, in which case only
-> > the least significant 4 bytes will be copied into to the userspace
-> > address.
-> >
-> >> +static int reg_to_user_from_u64(void __user *uaddr, const u64 *val, u64 id)
-> >> +{
-> >> +     unsigned long regsize = KVM_REG_SIZE(id);
-> >> +     union {
-> >> +             u32     word;
-> >> +             u64     dword;
-> >> +     } tmp;
-> >> +
-> >> +     switch (regsize) {
-> >> +     case 4:
-> >> +             tmp.word = *val;
-> >> +             break;
-> >> +     case 8:
-> >> +             tmp.dword = *val;
-> >> +             break;
-> >> +     }
-> >> +
-> >> +     if (copy_to_user(uaddr, &tmp, regsize) != 0)
-> >> +             return -EFAULT;
-> >> +     return 0;
-> >> +}
-> >> +
-> >> +/*
-> >> + * Writes register value to user-land uaddr address from kernel u32 value
-> >> + * or arra of two u32 values. I.e it may really copy two u32 registers
-> >> + * when used with register which size is 8 bytes (for example V7 64
-> >> + * bit registers like TTBR0/TTBR1).
-> >> + */
-> >
-> > Writes a register value to a userspace address from a kernel u32 variable
-> > or a kernel array of two u32 values.  That is, it may really copy two
-> > u32 registers when used with registers defined by the ABI to be 8 bytes
-> > long (e.g. TTBR0/TTBR1).
-> >
-> >> +static int reg_to_user_from_u32(void __user *uaddr, const u32 *val, u64 id)
-> >>  {
-> >> -     /* This Just Works because we are little endian. */
-> >>       if (copy_to_user(uaddr, val, KVM_REG_SIZE(id)) != 0)
-> >>               return -EFAULT;
-> >>       return 0;
-> >> @@ -710,7 +776,7 @@ static int get_invariant_cp15(u64 id, void __user *uaddr)
-> >>       if (!r)
-> >>               return -ENOENT;
-> >>
-> >> -     return reg_to_user(uaddr, &r->val, id);
-> >> +     return reg_to_user_from_u64(uaddr, &r->val, id);
-> >>  }
-> >>
-> >>  static int set_invariant_cp15(u64 id, void __user *uaddr)
-> >> @@ -726,7 +792,7 @@ static int set_invariant_cp15(u64 id, void __user *uaddr)
-> >>       if (!r)
-> >>               return -ENOENT;
-> >>
-> >> -     err = reg_from_user(&val, uaddr, id);
-> >> +     err = reg_from_user_to_u64(&val, uaddr, id);
-> >>       if (err)
-> >>               return err;
-> >>
-> >> @@ -894,8 +960,8 @@ static int vfp_get_reg(const struct kvm_vcpu *vcpu, u64 id, void __user *uaddr)
-> >>       if (vfpid < num_fp_regs()) {
-> >>               if (KVM_REG_SIZE(id) != 8)
-> >>                       return -ENOENT;
-> >> -             return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpregs[vfpid],
-> >> -                                id);
-> >> +             return reg_to_user_from_u64(uaddr, &vcpu->arch.vfp_guest.fpregs[vfpid],
-> >> +                                         id);
-> >>       }
-> >>
-> >>       /* FP control registers are all 32 bit. */
-> >> @@ -904,22 +970,22 @@ static int vfp_get_reg(const struct kvm_vcpu *vcpu, u64 id, void __user *uaddr)
-> >>
-> >>       switch (vfpid) {
-> >>       case KVM_REG_ARM_VFP_FPEXC:
-> >> -             return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpexc, id);
-> >> +             return reg_to_user_from_u32(uaddr, &vcpu->arch.vfp_guest.fpexc, id);
-> >>       case KVM_REG_ARM_VFP_FPSCR:
-> >> -             return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpscr, id);
-> >> +             return reg_to_user_from_u32(uaddr, &vcpu->arch.vfp_guest.fpscr, id);
-> >>       case KVM_REG_ARM_VFP_FPINST:
-> >> -             return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpinst, id);
-> >> +             return reg_to_user_from_u32(uaddr, &vcpu->arch.vfp_guest.fpinst, id);
-> >>       case KVM_REG_ARM_VFP_FPINST2:
-> >> -             return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpinst2, id);
-> >> +             return reg_to_user_from_u32(uaddr, &vcpu->arch.vfp_guest.fpinst2, id);
-> >>       case KVM_REG_ARM_VFP_MVFR0:
-> >>               val = fmrx(MVFR0);
-> >> -             return reg_to_user(uaddr, &val, id);
-> >> +             return reg_to_user_from_u32(uaddr, &val, id);
-> >>       case KVM_REG_ARM_VFP_MVFR1:
-> >>               val = fmrx(MVFR1);
-> >> -             return reg_to_user(uaddr, &val, id);
-> >> +             return reg_to_user_from_u32(uaddr, &val, id);
-> >>       case KVM_REG_ARM_VFP_FPSID:
-> >>               val = fmrx(FPSID);
-> >> -             return reg_to_user(uaddr, &val, id);
-> >> +             return reg_to_user_from_u32(uaddr, &val, id);
-> >>       default:
-> >>               return -ENOENT;
-> >>       }
-> >> @@ -938,8 +1004,8 @@ static int vfp_set_reg(struct kvm_vcpu *vcpu, u64 id, const void __user *uaddr)
-> >>       if (vfpid < num_fp_regs()) {
-> >>               if (KVM_REG_SIZE(id) != 8)
-> >>                       return -ENOENT;
-> >> -             return reg_from_user(&vcpu->arch.vfp_guest.fpregs[vfpid],
-> >> -                                  uaddr, id);
-> >> +             return reg_from_user_to_u64(&vcpu->arch.vfp_guest.fpregs[vfpid],
-> >> +                                         uaddr, id);
-> >>       }
-> >>
-> >>       /* FP control registers are all 32 bit. */
-> >> @@ -948,28 +1014,28 @@ static int vfp_set_reg(struct kvm_vcpu *vcpu, u64 id, const void __user *uaddr)
-> >>
-> >>       switch (vfpid) {
-> >>       case KVM_REG_ARM_VFP_FPEXC:
-> >> -             return reg_from_user(&vcpu->arch.vfp_guest.fpexc, uaddr, id);
-> >> +             return reg_from_user_to_u32(&vcpu->arch.vfp_guest.fpexc, uaddr, id);
-> >>       case KVM_REG_ARM_VFP_FPSCR:
-> >> -             return reg_from_user(&vcpu->arch.vfp_guest.fpscr, uaddr, id);
-> >> +             return reg_from_user_to_u32(&vcpu->arch.vfp_guest.fpscr, uaddr, id);
-> >>       case KVM_REG_ARM_VFP_FPINST:
-> >> -             return reg_from_user(&vcpu->arch.vfp_guest.fpinst, uaddr, id);
-> >> +             return reg_from_user_to_u32(&vcpu->arch.vfp_guest.fpinst, uaddr, id);
-> >>       case KVM_REG_ARM_VFP_FPINST2:
-> >> -             return reg_from_user(&vcpu->arch.vfp_guest.fpinst2, uaddr, id);
-> >> +             return reg_from_user_to_u32(&vcpu->arch.vfp_guest.fpinst2, uaddr, id);
-> >>       /* These are invariant. */
-> >>       case KVM_REG_ARM_VFP_MVFR0:
-> >> -             if (reg_from_user(&val, uaddr, id))
-> >> +             if (reg_from_user_to_u32(&val, uaddr, id))
-> >>                       return -EFAULT;
-> >>               if (val != fmrx(MVFR0))
-> >>                       return -EINVAL;
-> >>               return 0;
-> >>       case KVM_REG_ARM_VFP_MVFR1:
-> >> -             if (reg_from_user(&val, uaddr, id))
-> >> +             if (reg_from_user_to_u32(&val, uaddr, id))
-> >>                       return -EFAULT;
-> >>               if (val != fmrx(MVFR1))
-> >>                       return -EINVAL;
-> >>               return 0;
-> >>       case KVM_REG_ARM_VFP_FPSID:
-> >> -             if (reg_from_user(&val, uaddr, id))
-> >> +             if (reg_from_user_to_u32(&val, uaddr, id))
-> >>                       return -EFAULT;
-> >>               if (val != fmrx(FPSID))
-> >>                       return -EINVAL;
-> >> @@ -1016,7 +1082,7 @@ int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> >>               return get_invariant_cp15(reg->id, uaddr);
-> >>
-> >>       /* Note: copies two regs if size is 64 bit. */
-> >> -     return reg_to_user(uaddr, &vcpu->arch.cp15[r->reg], reg->id);
-> >> +     return reg_to_user_from_u32(uaddr, &vcpu->arch.cp15[r->reg], reg->id);
-> >>  }
-> >>
-> >>  int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> >> @@ -1035,7 +1101,7 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> >>               return set_invariant_cp15(reg->id, uaddr);
-> >>
-> >>       /* Note: copies two regs if size is 64 bit */
-> >> -     return reg_from_user(&vcpu->arch.cp15[r->reg], uaddr, reg->id);
-> >> +     return reg_from_user_to_u32(&vcpu->arch.cp15[r->reg], uaddr, reg->id);
-> >>  }
-> >>
-> >>  static unsigned int num_demux_regs(void)
-> >> --
-> >> 1.8.1.4
-> >>
-> >
-> > It's definitely an improvement with the new naming, and I do appreciate
-> > you taking the time to write comments.  (Apologies for suggesting a raw
-> > rewrite, but there were a number of language issues with the proposed
-> > versions and it felt overly burdensome on you to ask you to address all
-> > of them).
-> >
-> > However, I'm still not crazy about this overall approach (see separate
-> > mail on the old thread).
-> >
-> > I'm curious, how many special cases are there really, and how many
-> > places would we have to introduce a conditional on the calling side?
+> >> +	/* When migrating don't spend cycles coalescing huge pages */
+> >> +	if (!hugetlb && !force_pte && !migration_active)
+> >>  		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+> >>  
+> >> -	if (hugetlb) {
+> >> +	/* During migration don't install huge pages */
+> > 
+> > again, all this is not about migration per se, it's about when logging
+> > dirty pages, (which may be commonly used for migration).
+> > 
 > 
-> I've just posted as RFC updated version of the patch. And yes, you
-> are right u64 regsize 4 access happens only in one place, I fixed as
-> you suggested and got rid of regsize == 4 in _u64 functions.
-> 
-> Reading/wring array of two u32 values as regsize == 8 still remains
-> I don't know how to handle it more cleanly.
+> Yes that's true , I'll update but until recently (new RFC on qemu list) where
+> dirty logging is used for getting VM RSS or hot memory regions, I don't see any
+> other use case.
 > 
 
-The kernel-side caller has to put the value in a u64 (if it's a write),
-then call the user space 64-bit copying function, and then (if it's a
-read) convert that into the two u32s afterwards.
+That doesn't really matter.  KVM doesn't really know (or care) what user
+space is doing with its features; it implements a certain functionality
+behind an ABI, and that's it.  For things to be consistent and make
+sense in the kernel, you can only refer to concepts defined by KVM, not
+by how QEMU or kvmtools (or some other user space client) may use it.
+
+> >> +	if (hugetlb && !migration_active) {
+> >>  		pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
+> >>  		new_pmd = pmd_mkhuge(new_pmd);
+> >>  		if (writable) {
+> >> @@ -1069,6 +1081,23 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>  		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+> >>  	} else {
+> >>  		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
+> >> +
+> >> +		/*
+> >> +		 * If pmd is  mapping a huge page then split it up into
+> >> +		 * small pages, when doing live migration.
+> >> +		 */
+> >> +		if (migration_active) {
+> >> +			pmd_t *pmd;
+> >> +			if (hugetlb) {
+> >> +				pfn += pte_index(fault_ipa);
+> >> +				gfn = fault_ipa >> PAGE_SHIFT;
+> >> +			}
+> > 
+> > how can you have hugetlb when we entered this else-clause conditional on
+> > having !hugetlb?
+> > 
+> - if(hugetlb && !migration_active)
+
+ah, you changed that, sorry, my bad.
+
+> 
+> forces all page faults to enter here while in migration. Huge page entries
+> are cleared and stage2_set_pte() splits the huge page, and installs the pte
+> for the fault_ipa. I placed that there since it flows with installing 
+> a pte as well as splitting a huge page. But your comment on performance
+> split up huge page vs. deferred  page faulting should move it out of here. 
+> 
+
+Why do you need to make that change?  I would think that just not
+setting hugetlb when you have dirty page logging activated should take
+care of all that you need.
+
+Wrt. my comments on performance, I had a look at the x86 code, and they
+seem to take your approach.  We should probably talk more closely to
+them about their experiences.
+
+> 
+> >> +			new_pte = pfn_pte(pfn, PAGE_S2);
+> >> +			pmd = stage2_get_pmd(kvm, NULL, fault_ipa);
+> >> +			if (pmd && kvm_pmd_huge(*pmd))
+> >> +				clear_pmd_entry(kvm, pmd, fault_ipa);
+> > 
+> > If we have a huge pmd entry, how did we take a fault on there?  Would
+> > that be if a different CPU inserted a huge page entry since we got here,
+> > is this what you're trying to handle?
+> > 
+> > I'm confused.
+> > 
+> 
+> I thing this related to the above.
+> 
+
+Well, if you're taking a fault, it means that you either don't have a
+PMD or you don't have a pte.  If you have kvm_pmd_huge() you have a pmd
+and you don't need a pte, so this should never happen. Ever.
+
+> >> +		}
+> >> +
+> >>  		if (writable) {
+> >>  			kvm_set_s2pte_writable(&new_pte);
+> >>  			kvm_set_pfn_dirty(pfn);
+> >> @@ -1077,6 +1106,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>  		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
+> >>  	}
+> >>  
+> >> +	/* Assuming 4k pages, set one bit/page in memslot dirty_bitmap[] */
+> > 
+> > Assuming? this makes me nervous.  The point is probably that it's
+> > harmless if we're not logging dirty pages, because then nobody reads teh
+> > data structure, and if we are logging, then we are mapping everything
+> > using 4K pages?
+> > 
+> > It's probably clearer code-wise to condition this on whether or not we
+> > are logging dirty page, and the branch is also likely to be much faster
+> > than the function call to mark_page_dirty.
+> > 
+> 
+> I'm not sure I get the point. The call is always safe, you either 
+> have old copy or new copy of memory slot with dirty_bitmap set or not set.
+> The log read is done while holding kvm slots_lock.
+> 
+> Is the comment related to performance, not supporting multiple page sizes,
+> or it's unsafe to call mark_page_dirty() under all circumstances, or 
+> something else? 
+> 
+> 
+You're always calling this, regardless if you have dirty page logging
+activated or not.  I think this is weird.
 
 -Christoffer
