@@ -1,54 +1,115 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 27 May 2014 18:09:39 -0700
-Subject: [PATCH] spi: Set cs-gpios to output direction
-In-Reply-To: <20140524115457.GP22111@sirena.org.uk>
-References: <1400893054-16126-1-git-send-email-sboyd@codeaurora.org>
- <20140524115457.GP22111@sirena.org.uk>
-Message-ID: <53853753.1030506@codeaurora.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 27 May 2014 18:19:33 -0700
+Subject: [PATCH v2] clk: bcm/kona: implement determine_rate()
+In-Reply-To: <1401209816-24953-1-git-send-email-elder@linaro.org>
+References: <1401209816-24953-1-git-send-email-elder@linaro.org>
+Message-ID: <20140528011933.7816.95715@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/24/14 04:54, Mark Brown wrote:
-> On Fri, May 23, 2014 at 05:57:34PM -0700, Stephen Boyd wrote:
->> Some gpios used for cs-gpios may not be configured for output by
->> default. In these cases gpio_set_value() won't have any effect
->> and so the chip select line won't toggle. Request the cs-gpios
->> and set them to output direction once we know if the chip select
->> is default high or default low.
-> Currently the SPI framework is expecting that the controller driver will
-> own the GPIOs so it's not requesting them at all - starting to request
-> them in the core without warning is likely to lead to double requests
-> which doesn't seem like the best idea ever.  The driver has to
-> understand that there are GPIO chip selects since it needs to figure out
-> what to do with any underlying hardware chip selects that it can't stop
-> toggling (there may be none or it may be directable into space with
-> pinmux but we can't rely on that).  
+Quoting Alex Elder (2014-05-27 09:56:56)
+> Implement the clk->determine_rate method for Broadcom Kona peripheral
+> clocks.  This allows a peripheral clock to be re-parented in order to
+> satisfy a rate change request.  This takes the place of the previous
+> kona_peri_clk_round_rate() functionality, though that function remains
+> because it is used by the new one.
+> 
+> The parent clock that allows the peripheral clock to produce a rate
+> closest to the one requested is the one selected, though the current
+> parent is used by default.
+> 
+> Signed-off-by: Alex Elder <elder@linaro.org>
 
-Ok. My SPI controller is relying on the pinctrl framework to request
-these gpios and I didn't have that configured in DT.
+Applied to clk-next.
 
->
->> I wonder if we should request the gpios when the master controller
->> probes or when a spi device is added? We only know what the default
->> value should be when the spi device is added. On the other hand,
->> we should probably fail probe if the gpio controller isn't ready when
->> the spi master controller probes.
-> Right, plus the fact that each driver has to open code the requesting,
-> probe deferral handling and so on.  It's not super awesome, the whole
-> area around GPIO chip select handling needs a bit of a sorched earth
-> refactoring.
->
-> Ideally we'd be able to error out only the device using an individual
-> GPIO rather than the whole controller if a GPIO isn't there for some
-> reason so doing it at device time would be nicer but my recollection is
-> that this won't play nicely with deferred probe, it's a while since I
-> looked so I may be misremembering.
+Regards,
+Mike
 
-Yes. There would need to be some hook into the SPI core from the driver
-core that notified of any new driver probes. Then we could try and get
-any pending cs-gpios again and then add the device that uses that chip
-select.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> ---
+> v2: Added WARN_ON_ONCE() call as suggested.
+> 
+> This patch is based on Mike Turquette's current "clk-next" branch.
+>     42dd880 Merge branch 'clk-fixes' into clk-next
+> 
+> It is available here:
+>     http://git.linaro.org/landing-teams/working/broadcom/kernel.git
+>     Branch review/bcm-determine-rate-v2
+> 
+>  drivers/clk/bcm/clk-kona.c | 54 +++++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 53 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
+> index d603c4e..95af2e6 100644
+> --- a/drivers/clk/bcm/clk-kona.c
+> +++ b/drivers/clk/bcm/clk-kona.c
+> @@ -1031,6 +1031,58 @@ static long kona_peri_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+>                                 rate ? rate : 1, *parent_rate, NULL);
+>  }
+>  
+> +static long kona_peri_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
+> +               unsigned long *best_parent_rate, struct clk **best_parent)
+> +{
+> +       struct kona_clk *bcm_clk = to_kona_clk(hw);
+> +       struct clk *clk = hw->clk;
+> +       struct clk *current_parent;
+> +       unsigned long parent_rate;
+> +       unsigned long best_delta;
+> +       unsigned long best_rate;
+> +       u32 parent_count;
+> +       u32 which;
+> +
+> +       /*
+> +        * If there is no other parent to choose, use the current one.
+> +        * Note:  We don't honor (or use) CLK_SET_RATE_NO_REPARENT.
+> +        */
+> +       WARN_ON_ONCE(bcm_clk->init_data.flags & CLK_SET_RATE_NO_REPARENT);
+> +       parent_count = (u32)bcm_clk->init_data.num_parents;
+> +       if (parent_count < 2)
+> +               return kona_peri_clk_round_rate(hw, rate, best_parent_rate);
+> +
+> +       /* Unless we can do better, stick with current parent */
+> +       current_parent = clk_get_parent(clk);
+> +       parent_rate = __clk_get_rate(current_parent);
+> +       best_rate = kona_peri_clk_round_rate(hw, rate, &parent_rate);
+> +       best_delta = abs(best_rate - rate);
+> +
+> +       /* Check whether any other parent clock can produce a better result */
+> +       for (which = 0; which < parent_count; which++) {
+> +               struct clk *parent = clk_get_parent_by_index(clk, which);
+> +               unsigned long delta;
+> +               unsigned long other_rate;
+> +
+> +               BUG_ON(!parent);
+> +               if (parent == current_parent)
+> +                       continue;
+> +
+> +               /* We don't support CLK_SET_RATE_PARENT */
+> +               parent_rate = __clk_get_rate(parent);
+> +               other_rate = kona_peri_clk_round_rate(hw, rate, &parent_rate);
+> +               delta = abs(other_rate - rate);
+> +               if (delta < best_delta) {
+> +                       best_delta = delta;
+> +                       best_rate = other_rate;
+> +                       *best_parent = parent;
+> +                       *best_parent_rate = parent_rate;
+> +               }
+> +       }
+> +
+> +       return best_rate;
+> +}
+> +
+>  static int kona_peri_clk_set_parent(struct clk_hw *hw, u8 index)
+>  {
+>         struct kona_clk *bcm_clk = to_kona_clk(hw);
+> @@ -1135,7 +1187,7 @@ struct clk_ops kona_peri_clk_ops = {
+>         .disable = kona_peri_clk_disable,
+>         .is_enabled = kona_peri_clk_is_enabled,
+>         .recalc_rate = kona_peri_clk_recalc_rate,
+> -       .round_rate = kona_peri_clk_round_rate,
+> +       .determine_rate = kona_peri_clk_determine_rate,
+>         .set_parent = kona_peri_clk_set_parent,
+>         .get_parent = kona_peri_clk_get_parent,
+>         .set_rate = kona_peri_clk_set_rate,
+> -- 
+> 1.9.1
+> 
