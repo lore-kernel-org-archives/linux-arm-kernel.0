@@ -1,135 +1,38 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Wed, 28 May 2014 21:25:32 +0800
-Subject: [PATCH v2 1/2] Documentation: add Device tree bindings for
- Hisilicon hix5hd2 ethernet
-In-Reply-To: <20140528125354.GA2092@leverpostej>
-References: <1401194667-14445-1-git-send-email-zhangfei.gao@linaro.org>
- <1401194667-14445-2-git-send-email-zhangfei.gao@linaro.org>
- <20140527133423.GB6969@leverpostej> <53857714.3070603@linaro.org>
- <20140528125354.GA2092@leverpostej>
-Message-ID: <5385E3CC.9050700@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 28 May 2014 15:29:26 +0200
+Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
+In-Reply-To: <CACRpkdZjEVYgq7tKEfmZC0Fu4n=JuUues=pAAtquLahkex=pkA@mail.gmail.com>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+ <5840140.8yGnd4Ycx3@wuerfel>
+ <CACRpkdZjEVYgq7tKEfmZC0Fu4n=JuUues=pAAtquLahkex=pkA@mail.gmail.com>
+Message-ID: <4960549.viM91iY2g2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wednesday 28 May 2014 10:23:09 Linus Walleij wrote:
+> diff --git a/arch/arm/boot/dts/integratorap.dts
+> b/arch/arm/boot/dts/integratorap.dts
+> index b10e6351da53..f0c397fd45c5 100644
+> --- a/arch/arm/boot/dts/integratorap.dts
+> +++ b/arch/arm/boot/dts/integratorap.dts
+> @@ -8,6 +8,7 @@
+>  / {
+>         model = "ARM Integrator/AP";
+>         compatible = "arm,integrator-ap";
+> +       dma-ranges = <0x80000000 0x8 0x00000000 0x80000000>;
+> 
+>         aliases {
+>                 arm,timer-primary = &timer2;
+> 
 
+It looks like you accidentally copied the ranges from keystone, even
+though that has a 64-bit root bus and you only have 32-bit.
 
-On 05/28/2014 08:53 PM, Mark Rutland wrote:
-> On Wed, May 28, 2014 at 06:41:40AM +0100, zhangfei wrote:
->> Dear Mark
->>
->> On 05/27/2014 09:34 PM, Mark Rutland wrote:
->>> On Tue, May 27, 2014 at 01:44:26PM +0100, Zhangfei Gao wrote:
->>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->>>> ---
->>>>    .../bindings/net/hisilicon-hix5hd2-gmac.txt        |   36 ++++++++++++++++++++
->>>>    1 file changed, 36 insertions(+)
->>>>    create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt b/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
->>>> new file mode 100644
->>>> index 0000000..5fe3835
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
->>>> @@ -0,0 +1,36 @@
->>>> +Hisilicon hix5hd2 gmac controller
->>>
->>> Just to clarify, is the SoC name "hix5hd2", or is the 'x' a wildcard?
->> "hix5hd2" is Soc name, which contains a series of similar chips.
->
-> How similar are they?
->
-> It's preferable to have a precise name, even when used as a fallback for
-> other similar devices.
+I suspect what you want is
 
-The soc name "hix5hd2" is provided by hisilicon.
-In fact, they have considered a lot and discussed long time for this name :)
+	dma-ranges = <0x80000000 0 0x80000000>;
 
->
->>>
->>>> +
->>>> +Required properties:
->>>> +- compatible: should be "hisilicon,hix5hd2-gmac".
->>>> +- reg: specifies base physical address(s) and size of the device registers.
->>>> +  The first region is the MAC register base and size.
->>>> +  The second region is external interface control register.
->>>
->>> Single registers? Are these not part of a larger block?
->> It is a single register, outside of the memory region.
->> gmac0: reg = <0xf9840000 0x1000>,<0xf984300c 0x4>;
->> gmac1: reg = <0xf9841000 0x1000>,<0xf9843010 0x4>;
->>
->> The register is controlling interface mode, duplex etc.
->> In fact it is rather a bug fix to the silicon, when it is added with
->> intension of not touching the original ip design.
->>
->> It may be moved to the memory region in the future silicon design.
->> However, currently without such register, it can not work.
->
-> I see. Is it possible that a future revision might have this fixed, such
-> that the second reg entry would become optional?
+to translate dma_addr_t 0x80000000-0xffffffff to phys_addr_t 0x0-0x7fffffff
+rather than phys_addr_t 0x800000000-0x87fffffff.
 
-We have given this feedback to the silicon team, and they admit this 
-should be fixed.
-However, not sure it can be fixed soon since the product pressure.
-Can we keep this first since it is required currently.
-
->
->>>
->>>> +- interrupts: should contain the MAC interrupts
->>>
->>> How many, in which order?
->> There is only one interrrupt.
->> How about:
->> - interrupts: interrupt for the device
->
-> The original wording is OK, all you need to do is change the original
-> wording to get rid of the trailing 's':
->
-> - interrupts: should contain the MAC interrupt
-OK, thanks
-
->
->>
->>>
->>>> +- #address-cells: must be <1>.
->>>> +- #size-cells: must be <0>.
->>>> +- phy-mode: see ethernet.txt [1].
->>>> +- phy-handle: see ethernet.txt [1].
->>>> +- mac-address: see ethernet.txt [1].
->>>> +- clocks: clock phandle and specifier pair.
->>>
->>> Is this the only clock input to the gmac block?
->>>
->>> Is the clock input named in any documentation?
->>
->> We have abstract only ONE mac clock input, which is in other patch for
->> drivers/clk/hisilicon/clk-hix5hd2.c
->> The clock input name is in include/dt-bindings/clock/hix5hd2-clock.h,
->> described in "Documentation/devicetree/bindings/clock/hix5hd2-clock.txt"
->
-> If you have only one physical clock input in the GMAC block, that's
-> fine. Is there a name for that input line from the POV of the GMAC
-> block?
-
-There is no name, and since it is only one clock, no name required.
-The clock is abstracted for simplicity, which also contains some 
-specific reset requiement.
-
->
->> How about:
->> - clocks: a pointer to the reference clock for this device.
->
-> I think the original wording is OK, I'd just like to be clear on what
-> the HW looks like.
-OK, thanks.
-
->
->>
->> Or should I mention hix5hd2-clock.h in this binding?
->
-> No, that's part of the description of the clock provider. It shouldn't
-> be mentioned here.
->
-> Cheers,
-> Mark.
->
+	Arnd
