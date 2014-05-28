@@ -1,42 +1,41 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 28 May 2014 13:09:00 +0200
-Subject: [RFC] Sort out S5P SoCs support in mainline
-In-Reply-To: <13875033.1X6R9lksgc@wuerfel>
-References: <021f01cf7a61$69853e30$3c8fba90$@samsung.com>
- <13875033.1X6R9lksgc@wuerfel>
-Message-ID: <5385C3CC.6010509@gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 28 May 2014 13:15:01 +0200
+Subject: [PATCH v2 09/11] sched: test the cpu's capacity in wake affine
+In-Reply-To: <20140528105855.GR30445@twins.programming.kicks-ass.net>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-10-git-send-email-vincent.guittot@linaro.org>
+ <20140528105855.GR30445@twins.programming.kicks-ass.net>
+Message-ID: <CAKfTPtAvFEmAmPMQsEN-=ftudQwd0fHOxq4MRs3HDyHYjLPGZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28.05.2014 13:04, Arnd Bergmann wrote:
-> On Wednesday 28 May 2014 19:41:41 Kukjin Kim wrote:
->> Hi all,
+On 28 May 2014 12:58, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Fri, May 23, 2014 at 05:53:03PM +0200, Vincent Guittot wrote:
+>> Currently the task always wakes affine on this_cpu if the latter is idle.
+>> Before waking up the task on this_cpu, we check that this_cpu capacity is not
+>> significantly reduced because of RT tasks or irq activity.
 >>
->> I'm wondering who need to support following SoCs/boards in mainline.
->>
->> * S5P64X0/SMDK6440 and SMDK6450
->> * S5PC100/SMDKC100
->>
->> If nobody is using them, how about to remove them from mainline?
-> 
-> I talked about this with Tomasz Figa before, he also thinks they can be removed.
-> I don't see any reason to keep them myself, and will apply a patch to remove
-> them. Of course, if later somebody comes around who does need them, we can
-> revert the patch to bring them back.
+>> Use case where the number of irq and the time spent under irq is important
+>> will take benefit of this because the task that is woken up by irq or softirq
+>> will not use the same CPU than irq (and softirq) but a idle one which share
+>> its LLC.
+>
+> OK, so I'm having a terrible time parsing the above.
+>
+> So looking at the patch you make balance false even when this_load==0
+> when the effective power/capacity (nico's patches haven't fully sunk in
+> yet) of this cpu is less than that of the previous cpu.
+>
+> Is that right?
 
-Or better, if later somebody comes around who does need them, we can add
-them properly, using Device Tree and existing generic code.
+yes,
 
-Anyway, for removal of both s5p64x0 and s5pc100:
+>
+> Now I'm only struggling to understand the rationale for this, its got
+> LLC in there somewhere, but I'm failing to comprehend.
 
-Acked-by: Tomasz Figa <t.figa@samsung.com>
-
-Actually I have played a bit with the code to see how much can be
-removed and ended up with following branch:
-
-https://github.com/tom3q/linux.git v3.17-cleanup
-
-Feel free to do _whatever_ you want with patches there.
-
-Best regards,
-Tomasz
+Ah.. i have probably overestimated the fact that wake_affine was only
+done at MC or SMT level but after reading more deeply the glags
+configuration of all  sched_domain level , my assumption is not true.
+So I need to test sd flag to make sure that their share their cache at
+this level
