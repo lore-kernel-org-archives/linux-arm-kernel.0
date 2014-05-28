@@ -1,120 +1,112 @@
 From: zhangfei.gao@linaro.org (zhangfei)
-Date: Wed, 28 May 2014 13:17:33 +0800
-Subject: [PATCH 3/3] net: hisilicon: add hix5hd2 mac driver
-In-Reply-To: <201405271525.46356.arnd@arndb.de>
-References: <1400504227-12047-1-git-send-email-zhangfei.gao@linaro.org>
- <201405261651.15998.arnd@arndb.de> <53840D40.3000600@linaro.org>
- <201405271525.46356.arnd@arndb.de>
-Message-ID: <5385716D.9010308@linaro.org>
+Date: Wed, 28 May 2014 13:41:40 +0800
+Subject: [PATCH v2 1/2] Documentation: add Device tree bindings for
+ Hisilicon hix5hd2 ethernet
+In-Reply-To: <20140527133423.GB6969@leverpostej>
+References: <1401194667-14445-1-git-send-email-zhangfei.gao@linaro.org>
+ <1401194667-14445-2-git-send-email-zhangfei.gao@linaro.org>
+ <20140527133423.GB6969@leverpostej>
+Message-ID: <53857714.3070603@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Mark
 
-
-On 05/27/2014 09:25 PM, Arnd Bergmann wrote:
-> On Tuesday 27 May 2014, zhangfei wrote:
->> On 05/26/2014 10:51 PM, Arnd Bergmann wrote:
->>> On Monday 19 May 2014, Zhangfei Gao wrote:
->>>
->>> I only noticed one real issue with the driver:
->>>
->>>> +struct hix5hd2_desc {
->>>> +    __le32 buff_addr;
->>>> +    __le32 buff_len:11;
->>>> +    __le32 reserve2:5;
->>>> +    __le32 data_len:11;
->>>> +    __le32 reserve1:2;
->>>> +    __le32 fl:2;
->>>> +    __le32 descvid:1;
->>>> +} __aligned(32);
->>>> +
->>>
->>> You should generall not use bitfields in hardware data structures, as that is
->>> not endian safe and will prevent running a big-endian kernel on this machine.
->>> Better convert this to a set of __le32 fields and explicit shifts and masks.
+On 05/27/2014 09:34 PM, Mark Rutland wrote:
+> On Tue, May 27, 2014 at 01:44:26PM +0100, Zhangfei Gao wrote:
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>> ---
+>>   .../bindings/net/hisilicon-hix5hd2-gmac.txt        |   36 ++++++++++++++++++++
+>>   1 file changed, 36 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
 >>
->> Got it, will update.
+>> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt b/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
+>> new file mode 100644
+>> index 0000000..5fe3835
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
+>> @@ -0,0 +1,36 @@
+>> +Hisilicon hix5hd2 gmac controller
+>
+> Just to clarify, is the SoC name "hix5hd2", or is the 'x' a wildcard?
+"hix5hd2" is Soc name, which contains a series of similar chips.
+>
+>> +
+>> +Required properties:
+>> +- compatible: should be "hisilicon,hix5hd2-gmac".
+>> +- reg: specifies base physical address(s) and size of the device registers.
+>> +  The first region is the MAC register base and size.
+>> +  The second region is external interface control register.
+>
+> Single registers? Are these not part of a larger block?
+It is a single register, outside of the memory region.
+gmac0: reg = <0xf9840000 0x1000>,<0xf984300c 0x4>;
+gmac1: reg = <0xf9841000 0x1000>,<0xf9843010 0x4>;
+
+The register is controlling interface mode, duplex etc.
+In fact it is rather a bug fix to the silicon, when it is added with 
+intension of not touching the original ip design.
+
+It may be moved to the memory region in the future silicon design.
+However, currently without such register, it can not work.
+
+>
+>> +- interrupts: should contain the MAC interrupts
+>
+> How many, in which order?
+There is only one interrrupt.
+How about:
+- interrupts: interrupt for the device
+
+>
+>> +- #address-cells: must be <1>.
+>> +- #size-cells: must be <0>.
+>> +- phy-mode: see ethernet.txt [1].
+>> +- phy-handle: see ethernet.txt [1].
+>> +- mac-address: see ethernet.txt [1].
+>> +- clocks: clock phandle and specifier pair.
+>
+> Is this the only clock input to the gmac block?
+>
+> Is the clock input named in any documentation?
+
+We have abstract only ONE mac clock input, which is in other patch for 
+drivers/clk/hisilicon/clk-hix5hd2.c
+The clock input name is in include/dt-bindings/clock/hix5hd2-clock.h, 
+described in "Documentation/devicetree/bindings/clock/hix5hd2-clock.txt"
+
+How about:
+- clocks: a pointer to the reference clock for this device.
+
+Or should I mention hix5hd2-clock.h in this binding?
+
+>
+> Cheers,
+> Mark.
+>
+>> +
+>> +- PHY subnode: inherits from phy binding [2]
+>> +
+>> +[1] Documentation/devicetree/bindings/net/ethernet.txt
+>> +[2] Documentation/devicetree/bindings/net/phy.txt
+>> +
+>> +Example:
+>> +	gmac0: ethernet at f9840000 {
+>> +		compatible = "hisilicon,hix5hd2-gmac";
+>> +		reg = <0xf9840000 0x1000>,<0xf984300c 0x4>;
+>> +		interrupts = <0 71 4>;
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +		phy-mode = "mii";
+>> +		phy-handle = <&phy2>;
+>> +		mac-address = [00 00 00 00 00 00];
+>> +		clocks = <&clock HIX5HD2_MAC0_CLK>;
+>> +
+>> +		phy2: ethernet-phy at 2 {
+>> +			reg = <2>;
+>> +		};
+>> +	};
+>> --
+>> 1.7.9.5
 >>
->> More knowledge about big-endian kernel is appreciated, in which case we
->> should consider such kernel.
->> Can we only consider this driver is only running on arm, which is
->> little-endian.
->
-> The main user of big-endian kernels that I know of are network infrastructure
-> people that have a ton of legacy user-space code written in non-portable
-> big-endian style.
->
-> There is no real technical advantage in running one endianess or the other
-> on ARM, so generally everyone uses little-endian because that is what their
-> user space is, except for the few people that have ported over their
-> code from PowerPC or MIPSeb.
->
->>> Two smaller things you should think about, I'm not entirely sure about these:
->>>
->>>> +static int hix5hd2_rx(struct net_device *dev, int limit)
->>>> +{
->>>> +    struct hix5hd2_priv *priv = netdev_priv(dev);
->>>> +    struct sk_buff *skb;
->>>> +    struct hix5hd2_desc *desc;
->>>> +    dma_addr_t dma_addr;
->>>> +    u32 start, end, num, pos, i, len;
->>>> +
->>>> +    /* software read pointer */
->>>> +    start = dma_cnt(readl_relaxed(priv->base + RX_BQ_RD_ADDR));
->>>> +    /* logic write pointer */
->>>> +    end = dma_cnt(readl_relaxed(priv->base + RX_BQ_WR_ADDR));
->>>
->>> I think one of these needs to be readl() instead of readl_relaxed(),
->>> to ensure the data is correctly ordered with regard to the pointer
->>> access.
->> readl_relaxed can ensure the sequence.
 >>
->>>
->>>> +    if (pos != start)
->>>> +            writel(dma_byte(pos), priv->base + TX_RQ_RD_ADDR);
->>>
->>> While this looks like it could be writel_relaxed().
->>>
->> En, I think all three cases can use xxx_relaxed.
->> These accesses are just update pointer used by internal logic and get
->> pointer updated by internal logic.
->
-> You always need a barrier between the access to a buffer from the kernel
-> and the register access communicating with the hardware about that
-> buffer:
->
-> For tx:
->
-> 	a) write to DMA descriptor
-> 	b) wmb()
-> 	c) writel_relaxed(register)
->
-> writel() is the short form of b+c. If you omit the __iowmb(), the decriptor
-> access may still be inside of the CPU write buffer (or the cache on coherent
-> systems) by the time the hardware reads the descriptor.
->
-> for rx:
->
-> 	a) readl_relaxed(register)
-> 	b) rmb()
-> 	c) read from descriptor or skb data
->
-> If you leave out the __iormb() here, it's possible that the CPU can prefetch
-> the access to the descriptor while waiting for the register data, and read
-> stale data.
->
-> If your particular machine doesn't need rmb() or wmb() (e.g. for
-> non-SMP ARMv6 or older), the build process should replace them with
-> do{}while(0) them automatically.
-
-Thanks Arnd,
-Yes, understand, barrier still required.
-
-What I thought was the dma in this controller keeps running and not need 
-desc to trigger, only update pointer, so no need barrier.
-Even so, desc still need to be sync via barrier, otherwise, desc with 
-stale info may be used.
-
-Will add barrier accordingly.
-
-Thanks
