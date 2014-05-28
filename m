@@ -1,195 +1,59 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 28 May 2014 22:27:11 +0200
-Subject: [PATCH v3 2/2] dmaengine: s3c24xx-dma: Add cyclic transfer support
-In-Reply-To: <1400617382-7051-2-git-send-email-anarsoul@gmail.com>
-References: <1400617382-7051-1-git-send-email-anarsoul@gmail.com>
- <1400617382-7051-2-git-send-email-anarsoul@gmail.com>
-Message-ID: <12980361.XxRXJT5sjI@phil>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 28 May 2014 13:30:01 -0700
+Subject: [PATCH 0/6] DT early console initialization
+In-Reply-To: <CAL_JsqK9nifPWW5jnzYifsMuvRjhD9wTT+YbE0sPM6N4xaj1yA@mail.gmail.com>
+References: <1399587823-17701-1-git-send-email-robherring2@gmail.com>
+ <20140514142644.1C922C4153D@trevor.secretlab.ca>
+ <CAL_JsqK9nifPWW5jnzYifsMuvRjhD9wTT+YbE0sPM6N4xaj1yA@mail.gmail.com>
+Message-ID: <20140528203001.GA14334@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 20. Mai 2014, 23:23:02 schrieb Vasily Khoruzhick:
-> Many audio interface drivers require support of cyclic transfers to work
-> correctly, for example Samsung ASoC DMA driver. This patch adds support
-> for cyclic transfers to the s3c24xx-dma driver
+On Wed, May 28, 2014 at 11:30:04AM -0500, Rob Herring wrote:
+> On Wed, May 14, 2014 at 9:26 AM, Grant Likely <grant.likely@linaro.org> wrote:
+> > On Thu,  8 May 2014 17:23:37 -0500, Rob Herring <robherring2@gmail.com> wrote:
+> >> From: Rob Herring <robh@kernel.org>
+> >>
+> >> This series adds support for early serial console initialization using
+> >> DT. This enables determining the serial port type and address using the
+> >> FDT and allows enabling the console before platform specific
+> >> initialization runs. I've tested this on arm64. ARM support is dependent
+> >> on adding fixmap support.
+> >>
+> >> Currently, the earlycon is only enabled if "earlycon" is present on the
+> >> kernel command line. The FDT needs to have /chosen/stdout-path set to
+> >> the path of the serial port.
+> >>
+> >> This series is dependent on generic earlycon[1], libfdt support[2], and
+> >> vmlinux.lds.h clean-ups[3]. The first 2 are in linux-next already. A git
+> >> branch is available here:
+> >>
+> >> git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git earlycon-dt
+> >
+> > Nice. For the whole series:
+> >
+> > Acked-by: Grant Likely <grant.likely@linaro.org>
+> >
+> > I haven't tested it though.
+> >>
+> >> Rob
+> >>
+> >> [1] https://lkml.org/lkml/2014/4/18/573
+> >> [2] https://lkml.org/lkml/2014/4/22/1202
+> >> [3] https://lkml.org/lkml/2014/3/27/285
+> >>
+> >> Rob Herring (6):
+> >>   of: align RESERVEDMEM_OF_DECLARE function callbacks to other callbacks
+> >>   of: consolidate linker section OF match table declarations
+> >>   serial: earlycon: add DT support
+> >>   of/fdt: add FDT address translation support
+> >>   of/fdt: add FDT serial scanning for earlycon
+> >>   tty/serial: pl011: add DT based earlycon support
 > 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> Greg, I plan to take this series thru the DT tree for 3.16 unless you
+> have any objections. It has dependencies on both the tty-next and the
+> DT trees.
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+No objection from me at all, feel free to do so.
 
-> ---
-> v2: make a code a bit shorter by using is_slave_direction()
-> v3: remove redundant parenthesis, use proper formatting for size_t values
-> 
->  drivers/dma/s3c24xx-dma.c | 112
-> +++++++++++++++++++++++++++++++++++++++++++++- 1 file changed, 111
-> insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/dma/s3c24xx-dma.c b/drivers/dma/s3c24xx-dma.c
-> index 2167608..43bf02d 100644
-> --- a/drivers/dma/s3c24xx-dma.c
-> +++ b/drivers/dma/s3c24xx-dma.c
-> @@ -164,6 +164,7 @@ struct s3c24xx_sg {
->   * @disrcc: value for source control register
->   * @didstc: value for destination control register
->   * @dcon: base value for dcon register
-> + * @cyclic: indicate cyclic transfer
->   */
->  struct s3c24xx_txd {
->  	struct virt_dma_desc vd;
-> @@ -173,6 +174,7 @@ struct s3c24xx_txd {
->  	u32 disrcc;
->  	u32 didstc;
->  	u32 dcon;
-> +	bool cyclic;
->  };
-> 
->  struct s3c24xx_dma_chan;
-> @@ -669,8 +671,10 @@ static irqreturn_t s3c24xx_dma_irq(int irq, void *data)
-> /* when more sg's are in this txd, start the next one */
->  		if (!list_is_last(txd->at, &txd->dsg_list)) {
->  			txd->at = txd->at->next;
-> +			if (txd->cyclic)
-> +				vchan_cyclic_callback(&txd->vd);
->  			s3c24xx_dma_start_next_sg(s3cchan, txd);
-> -		} else {
-> +		} else if (!txd->cyclic) {
->  			s3cchan->at = NULL;
->  			vchan_cookie_complete(&txd->vd);
-> 
-> @@ -682,6 +686,12 @@ static irqreturn_t s3c24xx_dma_irq(int irq, void *data)
-> s3c24xx_dma_start_next_txd(s3cchan);
->  			else
->  				s3c24xx_dma_phy_free(s3cchan);
-> +		} else {
-> +			vchan_cyclic_callback(&txd->vd);
-> +
-> +			/* Cyclic: reset at beginning */
-> +			txd->at = txd->dsg_list.next;
-> +			s3c24xx_dma_start_next_sg(s3cchan, txd);
->  		}
->  	}
->  	spin_unlock(&s3cchan->vc.lock);
-> @@ -877,6 +887,104 @@ static struct dma_async_tx_descriptor
-> *s3c24xx_dma_prep_memcpy( return vchan_tx_prep(&s3cchan->vc, &txd->vd,
-> flags);
->  }
-> 
-> +static struct dma_async_tx_descriptor *s3c24xx_dma_prep_dma_cyclic(
-> +	struct dma_chan *chan, dma_addr_t addr, size_t size, size_t period,
-> +	enum dma_transfer_direction direction, unsigned long flags,
-> +	void *context)
-> +{
-> +	struct s3c24xx_dma_chan *s3cchan = to_s3c24xx_dma_chan(chan);
-> +	struct s3c24xx_dma_engine *s3cdma = s3cchan->host;
-> +	const struct s3c24xx_dma_platdata *pdata = s3cdma->pdata;
-> +	struct s3c24xx_dma_channel *cdata = &pdata->channels[s3cchan->id];
-> +	struct s3c24xx_txd *txd;
-> +	struct s3c24xx_sg *dsg;
-> +	unsigned sg_len;
-> +	dma_addr_t slave_addr;
-> +	u32 hwcfg = 0;
-> +	int i;
-> +
-> +	dev_dbg(&s3cdma->pdev->dev,
-> +		"prepare cyclic transaction of %zu bytes with period %zu from %s\n",
-> +		size, period, s3cchan->name);
-> +
-> +	if (!is_slave_direction(direction)) {
-> +		dev_err(&s3cdma->pdev->dev,
-> +			"direction %d unsupported\n", direction);
-> +		return NULL;
-> +	}
-> +
-> +	txd = s3c24xx_dma_get_txd();
-> +	if (!txd)
-> +		return NULL;
-> +
-> +	txd->cyclic = 1;
-> +
-> +	if (cdata->handshake)
-> +		txd->dcon |= S3C24XX_DCON_HANDSHAKE;
-> +
-> +	switch (cdata->bus) {
-> +	case S3C24XX_DMA_APB:
-> +		txd->dcon |= S3C24XX_DCON_SYNC_PCLK;
-> +		hwcfg |= S3C24XX_DISRCC_LOC_APB;
-> +		break;
-> +	case S3C24XX_DMA_AHB:
-> +		txd->dcon |= S3C24XX_DCON_SYNC_HCLK;
-> +		hwcfg |= S3C24XX_DISRCC_LOC_AHB;
-> +		break;
-> +	}
-> +
-> +	/*
-> +	 * Always assume our peripheral desintation is a fixed
-> +	 * address in memory.
-> +	 */
-> +	hwcfg |= S3C24XX_DISRCC_INC_FIXED;
-> +
-> +	/*
-> +	 * Individual dma operations are requested by the slave,
-> +	 * so serve only single atomic operations (S3C24XX_DCON_SERV_SINGLE).
-> +	 */
-> +	txd->dcon |= S3C24XX_DCON_SERV_SINGLE;
-> +
-> +	if (direction == DMA_MEM_TO_DEV) {
-> +		txd->disrcc = S3C24XX_DISRCC_LOC_AHB |
-> +			      S3C24XX_DISRCC_INC_INCREMENT;
-> +		txd->didstc = hwcfg;
-> +		slave_addr = s3cchan->cfg.dst_addr;
-> +		txd->width = s3cchan->cfg.dst_addr_width;
-> +	} else {
-> +		txd->disrcc = hwcfg;
-> +		txd->didstc = S3C24XX_DIDSTC_LOC_AHB |
-> +			      S3C24XX_DIDSTC_INC_INCREMENT;
-> +		slave_addr = s3cchan->cfg.src_addr;
-> +		txd->width = s3cchan->cfg.src_addr_width;
-> +	}
-> +
-> +	sg_len = size / period;
-> +
-> +	for (i = 0; i < sg_len; i++) {
-> +		dsg = kzalloc(sizeof(*dsg), GFP_NOWAIT);
-> +		if (!dsg) {
-> +			s3c24xx_dma_free_txd(txd);
-> +			return NULL;
-> +		}
-> +		list_add_tail(&dsg->node, &txd->dsg_list);
-> +
-> +		dsg->len = period;
-> +		/* Check last period length */
-> +		if (i == sg_len - 1)
-> +			dsg->len = size - period * i;
-> +		if (direction == DMA_MEM_TO_DEV) {
-> +			dsg->src_addr = addr + period * i;
-> +			dsg->dst_addr = slave_addr;
-> +		} else { /* DMA_DEV_TO_MEM */
-> +			dsg->src_addr = slave_addr;
-> +			dsg->dst_addr = addr + period * i;
-> +		}
-> +	}
-> +
-> +	return vchan_tx_prep(&s3cchan->vc, &txd->vd, flags);
-> +}
-> +
->  static struct dma_async_tx_descriptor *s3c24xx_dma_prep_slave_sg(
->  		struct dma_chan *chan, struct scatterlist *sgl,
->  		unsigned int sg_len, enum dma_transfer_direction direction,
-> @@ -1197,6 +1305,7 @@ static int s3c24xx_dma_probe(struct platform_device
-> *pdev)
-> 
->  	/* Initialize slave engine for SoC internal dedicated peripherals */
->  	dma_cap_set(DMA_SLAVE, s3cdma->slave.cap_mask);
-> +	dma_cap_set(DMA_CYCLIC, s3cdma->slave.cap_mask);
->  	dma_cap_set(DMA_PRIVATE, s3cdma->slave.cap_mask);
->  	s3cdma->slave.dev = &pdev->dev;
->  	s3cdma->slave.device_alloc_chan_resources =
-> @@ -1206,6 +1315,7 @@ static int s3c24xx_dma_probe(struct platform_device
-> *pdev) s3cdma->slave.device_tx_status = s3c24xx_dma_tx_status;
->  	s3cdma->slave.device_issue_pending = s3c24xx_dma_issue_pending;
->  	s3cdma->slave.device_prep_slave_sg = s3c24xx_dma_prep_slave_sg;
-> +	s3cdma->slave.device_prep_dma_cyclic = s3c24xx_dma_prep_dma_cyclic;
->  	s3cdma->slave.device_control = s3c24xx_dma_control;
-> 
->  	/* Register as many memcpy channels as there are physical channels */
+greg k-h
