@@ -1,35 +1,261 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Wed, 28 May 2014 18:26:44 +0400
-Subject: [PATCH] acornscsi: remove linked command support
-In-Reply-To: <20140528104114.GE13542@infradead.org>
-References: <1400926433.31526.89.camel@x220>
- <20140528104114.GE13542@infradead.org>
-Message-ID: <1401287204.2288.28.camel@dabdike>
+From: delicious.quinoa@gmail.com (Alan Tull)
+Date: Wed, 28 May 2014 09:38:30 -0500
+Subject: [PATCHv5 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
+ controller
+In-Reply-To: <20140528070133.GD13172@pengutronix.de>
+References: <CAF03EBfOrBWsGVkwYHQt9Pm858LtkgUThkM6dFjksa93ETo_bw@mail.gmail.com>
+ <20140519191206.GH949@pengutronix.de>
+ <CAF03EBfwFC7bK=j0W3K+no9TK7xe2nF1ZXH9bMBRNzVErB5EjQ@mail.gmail.com>
+ <CANk1AXTdSheUkNtF2fSmtcYaUrd2CnTjBxGitmSy88H4VRVbnw@mail.gmail.com>
+ <20140520144446.GJ949@pengutronix.de>
+ <CAF03EBe+G8EpZSU7vhu4QZ3E-Nq4WnHw7DRM7=EyxHkjzp5cqg@mail.gmail.com>
+ <20140527071157.GC20695@pengutronix.de>
+ <CANk1AXTMHuWeaxn_hVi+AH=aXbbSNov=894YmSYfvfvpWM+eSg@mail.gmail.com>
+ <20140527194228.GB13172@pengutronix.de>
+ <CANk1AXRMZrNWr4FR6KYAkN3JwVA1d9qdn00UY3OaYurz6DNvmA@mail.gmail.com>
+ <20140528070133.GD13172@pengutronix.de>
+Message-ID: <CANk1AXRMGu8W1WNGDpcuahhZ9GUfs04iigEcDJFDYfqUR4C2CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-05-28 at 03:41 -0700, Christoph Hellwig wrote:
-> On Sat, May 24, 2014 at 12:13:53PM +0200, Paul Bolle wrote:
-> > The acornscsi driver was added in v2.1.88. It has always #undef-ed
-> > CONFIG_SCSI_ACORNSCSI_LINK near the top of acornscsi.c. And, just to be
-> > sure, it has also always triggered a preprocessor error if
-> > CONFIG_SCSI_ACORNSCSI_LINK was still defined. But, as far as I can see,
-> > it has never even been possible to set SCSI_ACORNSCSI_LINK through
-> > kconfig, or its predecessors, in the first place.
-> > 
-> > Let's remove the code involved.
-> > 
-> > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> 
-> Looks good,
-> 
-> Reviewed-by: Christoph Hellwig <hch@lst.de>
-> 
-> And I have to disagree with James here, removing code that isn't even
-> compiled always is an improvement, especially for an unmaintained
-> driver.
+On Wed, May 28, 2014 at 2:01 AM, Steffen Trumtrar
+<s.trumtrar@pengutronix.de> wrote:
+> On Tue, May 27, 2014 at 03:57:47PM -0500, Alan Tull wrote:
+>> On Tue, May 27, 2014 at 2:42 PM, Steffen Trumtrar
+>> <s.trumtrar@pengutronix.de> wrote:
+>> > On Tue, May 27, 2014 at 02:12:17PM -0500, Alan Tull wrote:
+>> >> On Tue, May 27, 2014 at 2:11 AM, Steffen Trumtrar
+>> >> <s.trumtrar@pengutronix.de> wrote:
+>> >> > On Wed, May 21, 2014 at 10:38:34AM -0500, Thor Thayer wrote:
+>> >> >> On Tue, May 20, 2014 at 9:44 AM, Steffen Trumtrar
+>> >> >> <s.trumtrar@pengutronix.de> wrote:
+>> >> >> > Hi!
+>> >> >> >
+>> >> >> > On Tue, May 20, 2014 at 09:31:06AM -0500, Alan Tull wrote:
+>> >> >> >> On Mon, May 19, 2014 at 2:37 PM, Thor Thayer <tthayer.linux@gmail.com> wrote:
+>> >> >> >>
+>> >> >> >> >>> >> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+>> >> >> >> >>> >> new file mode 100644
+>> >> >> >> >>> >> index 0000000..8f8746b
+>> >> >> >> >>> >> --- /dev/null
+>> >> >> >> >>> >> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+>> >> >> >> >>> >> @@ -0,0 +1,11 @@
+>> >> >> >> >>> >> +Altera SOCFPGA SDRAM Controller
+>> >> >> >> >>> >> +
+>> >> >> >> >>> >> +Required properties:
+>> >> >> >> >>> >> +- compatible : "altr,sdr-ctl";
+>> >> >> >> >>> >> +- reg : Should contain 1 register ranges(address and length)
+>> >> >> >> >>> >> +
+>> >> >> >> >>> >> +Example:
+>> >> >> >> >>> >> +     sdrctl at ffc25000 {
+>> >> >> >> >>> >> +             compatible = "altr,sdr-ctl";
+>> >> >> >> >>> >> +             reg = <0xffc25000 0x1000>;
+>> >> >> >> >>> >> +     };
+>> >> >> >> >>> >> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+>> >> >> >> >>> >> index df43702..6ce912e 100644
+>> >> >> >> >>> >> --- a/arch/arm/boot/dts/socfpga.dtsi
+>> >> >> >> >>> >> +++ b/arch/arm/boot/dts/socfpga.dtsi
+>> >> >> >> >>> >> @@ -676,6 +676,11 @@
+>> >> >> >> >>> >>                       clocks = <&l4_sp_clk>;
+>> >> >> >> >>> >>               };
+>> >> >> >> >>> >>
+>> >> >> >> >>> >> +             sdrctl at ffc25000 {
+>> >> >> >> >>> >> +                     compatible = "altr,sdr-ctl", "syscon";
+>> >> >> >> >>> >                                                    ^^^^^^^^^^
+>> >> >> >> >>> >
+>> >> >> >> >>> > Get rid of that, too, please.
+>> >> >> >> >>>
+>> >> >> >> >>> Hi Steffan,
+>> >> >> >> >>>
+>> >> >> >> >>> I believe I need to keep the "syscon". The same register (ctrlcfg)
+>> >> >> >> >>> that has the ECC enable bitfield also includes the DRAM configuration
+>> >> >> >> >>> bitfields that other drivers will want to access (specifically the
+>> >> >> >> >>> FPGA bridge needs this information). Since this register will be
+>> >> >> >> >>> shared between drivers,  syscon seems like the best solution.
+>> >> >> >> >>>
+>> >> >> >> >>
+>> >> >> >> >> Hm, from looking at the documentation of the ctrlcfg I can't really
+>> >> >> >> >> understand which bits you would need for the FPGA brigde and why.
+>> >> >> >>
+>> >> >> >> Hi Steffen,
+>> >> >> >>
+>> >> >> >> Offset 0x80 in the sdr-ctl is the "fpgaportrst" register.  14 bits
+>> >> >> >> wide, defaults to 0.  When appropriate bits set to 1 in that reg, it
+>> >> >> >> allows an FPGA port to come out of reset (enables that port).  Has no
+>> >> >> >> other effect on SDRAM configuration.
+>> >> >> >>
+>> >> >> >> >> That all sounds like stuff you would want to set for the specific
+>> >> >> >> >> RAM you are dealing with on a specific board.
+>> >> >> >> >> What bridge are you talking about? The SDRAM bridge?
+>> >> >> >>
+>> >> >> >> Yes, the port allows the FPGA a direct path to the SDRAM.  This one
+>> >> >> >> register the only register in the sdr that the bridge driver needs.
+>> >> >> >>
+>> >> >> >
+>> >> >> > So, what I suggested down ...
+>> >> >> >
+>> >> >> >> >>
+>> >> >> >> >> I can see the problem with the ECC enable, though.
+>> >> >> >> >>
+>> >> >> >> >> Regards,
+>> >> >> >> >> Steffen
+>> >> >> >> >>
+>> >> >> >> >
+>> >> >> >> >>> >                 sdrctl at ffc25000 {
+>> >> >> >> >>> >                         compatible = "altr,sdr-ctl";
+>> >> >> >> >>> >                         reg = <0xffc25000 0x1000>;
+>> >> >> >> >>> >                         ranges;
+>> >> >> >> >>> >
+>> >> >> >> >>> >                         edac at ffc2502c {
+>> >> >> >> >>> >                                 compatible = "altr,sdram-edac";
+>> >> >> >> >>> >                                 reg = <0xffc2502c 0x50>;
+>> >> >> >> >>> >                                 interrupts = <0 39 4>;
+>> >> >> >> >>> >                         };
+>> >> >> >> >>> >                 };
+>> >> >> >> >>> >
+>> >> >> >> >>> > Then we can later add:
+>> >> >> >> >>> >
+>> >> >> >> >>> >                         sdr-ports: ports at ffc2507c {
+>> >> >> >> >>> >                                 #reset-cells = <1>;
+>> >> >> >> >>> >                                 compatible = "altr,sdr-ports";
+>> >> >> >> >>> >                                 reg = <0xffc2507c 0x10>;
+>> >> >> >> >>> >                                 clocks = <&ddr_dqs_clk>;
+>> >> >> >> >>> >                                 ...
+>> >> >> >> >>> >                         };
+>> >> >> >>
+>> >> >> >
+>> >> >> > ... here should work. No?! Just a simple driver that registers with the
+>> >> >> > reset-framework. I would add 0x7c to that driver and than that driver could
+>> >> >> > "configure" the port and let it out of reset.
+>> >> >> >
+>> >> >> > I have done the same thing for the other 3 bridges, but am not finished yet.
+>> >> >> > Especially the GPV-stuff needs to at least be able to be added later if not now.
+>> >> >> >
+>> >> >
+>> >> > Hi Thor!
+>> >> >
+>> >> >> I'm not clear on how the EDAC driver will interact with the registers
+>> >> >> allocated to the SDRAM controller. If the group of registers from
+>> >> >> 0xffc25000 to 0xffc26000 is exclusively allocated to the SDRAM
+>> >> >> controller, how does the EDAC driver cleanly access that single
+>> >> >> register inside this range?
+>> >> >>
+>> >> >
+>> >> > The compatible in the example is wrong. I didn't mean to map the whole address space
+>> >> > to some driver.
+>> >> > I think for the configuration register syscon is the right approach. It is a
+>> >> > bag of bits that don't necessitate an own driver, so syscon is perfect.
+>> >> >
+>> >> > So, let me change my proposal to
+>> >> >
+>> >> >         sdr-ctl: sdram at ffc25000 {
+>> >> >                 compatible = "altr,sdr-ctl", "syscon";
+>> >> >                 reg = <0xffc25000 0x1>;
+>> >> >         };
+>> >> >
+>> >> >         edac: edac at ffc2502c {
+>> >> >                 compatible = "altr,sdram-edac";
+>> >> >                 reg = <0xffc2502c 0x50>;
+>> >> >                 interrupts = <0 39 4>;
+>> >> >                 config = <&sdr-ctl>;
+>> >> >                 ...
+>> >> >         };
+>> >> >
+>> >> >         sdr-ports: ports at ffc2507c {
+>> >> >                 compatible = "altr,sdr-ports";
+>> >> >                 reg = <0xffc2507c 0x10>;
+>> >> >                 clocks = <&ddr_dqs_clk>;
+>> >> >                 ...
+>> >> >         };
+>> >> >
+>> >> > Maybe we can just skip the outer node that combines all the others.
+>> >> > So, if we do it like that, you can still use syscon, but only for the register
+>> >> > that needs it. And the EDAC definitely needs access to the config register, so
+>> >> > all is good.
+>> >> >
+>> >> >> Is the solution that I don't use request_region() (and therefore not
+>> >> >> request exclusive access) when setting up the SDRAM controller?
+>> >> >>
+>> >> >> If you could point me to your drivers for the other bridges that you
+>> >> >> reference, your code may answer my question.
+>> >> >>
+>> >> >
+>> >> > The other bridges don't need access to any SDRAM controller registers and
+>> >> > I haven't even started to implement the GPV-stuff with the lw2hps-bridge :-(
+>> >> >
+>> >> > Regards,
+>> >> > Steffen
+>> >> >
+>> >> > --
+>> >> > Pengutronix e.K.                           |                             |
+>> >> > Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>> >> > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+>> >> > Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>> >>
+>> >> OK now I understand.  For register offset 0x0, that's all stuff set up
+>> >> in the bootloader.  We won't be touching that register except for the
+>> >> EDAC.  So syscon isn't needed here.
+>> >>
+>> >> Each driver that uses some sdr registers can specify which registers
+>> >> it uses in the device tree.  So far we don't have any cases of two
+>> >> drivers that share a register.
+>> >>
+>> >> The ECC driver will need two ranges: offset 0x00 and 0x38 through 0x50.
+>> >> The fpga bridges just needs offset 0x80.
+>> >>
+>> >
+>> > Well, almost ;-)
+>> > Use syscon for 0x0 and reference that in the ECC driver, which only is
+>> > responsible for 0x38 to 0x50. Then flip the two EDAC bits via the syscon-phandle.
+>> > Then a bootloader can probe with the same dts and have a driver match on the
+>> > config-register and one for all the DRAM setup (< 0x38), which we don't need in
+>> > the kernel. On the other hand the EDAC seems unneccessary for the bootloader.
+>> > And this all matches the partitioning of the SDR register space, so I think it
+>> > is also a correct hardware description.
+>> >
+>> > Regards,
+>> > Steffen
+>> >
+>> > --
+>> > Pengutronix e.K.                           |                             |
+>> > Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>> > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+>> > Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>>
+>> We could do that.  But is syscon a concept the bootloader will know about?
+>>
+>
+> Depends on the bootloader. I guess u-boot doesn't, but barebox does.
 
-Well, as I said, this is in theory a maintained driver, so just get an
-ack from Russell and this debate is moot.
+OK then we will want offset 0 to be 'syscon'.
 
-James
+> Alternative would be to have the bootloader know that it has to look for an
+> ECC node when it instead is looking for DRAM timing/width/... setup.
+> Sounds wrong to me.
+>
+>> Actually it is a bit messier than what I originally said:
+>>  ECC driver needs two ranges: offset 0x00 and 0x38 through 0x50.
+>>  Machine layer needs control of 0x10, 0x14, 0x54, and 0x58 for putting
+>> SDRAM into self-refresh.
+>
+> I didn't get that. Does the ECC driver need access to this "machine layer"?
+
+Nope.  Now that I think about it this machine layer will only need
+access to 0x54, 0x58 and nobody else will need them.
+
+So I agree with your suggestion.  I think that besides offset 0, these
+registers will be not be shared between drivers.
+
+Thanks!
+Alan Tull
+
+>
+> Regards,
+> Steffen
+>
+>
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
