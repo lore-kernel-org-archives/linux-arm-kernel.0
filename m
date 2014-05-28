@@ -1,168 +1,189 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 28 May 2014 13:27:39 -0500
-Subject: [PATCH] ARM: dts: qcom: Update msm8660 device trees
-Message-ID: <1401301659-20235-1-git-send-email-galak@codeaurora.org>
+Date: Wed, 28 May 2014 13:32:56 -0500
+Subject: [PATCH v2] ARM: dts: qcom: Update msm8974/apq8074 device trees
+Message-ID: <1401301976-22506-1-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Move SoC peripherals into an SoC container node
-* Move serial enabling into board file (qcom-msm8660-surf.dts)
+* Move serial enabling into board file (qcom-apq8074-dragonboard.dts)
+* Move spi pinctrl into board file
 * Cleanup cpu node to match binding spec, enable-method and compatible
   should be per cpu, not part of the container
+* Drop interrupts property from l2-cache node as its not part of the
+  binding spec
+* Move timer node out of SoC container
 
 Signed-off-by: Kumar Gala <galak@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-msm8660-surf.dts |   6 ++
- arch/arm/boot/dts/qcom-msm8660.dtsi     | 104 +++++++++++++++++---------------
- 2 files changed, 63 insertions(+), 47 deletions(-)
+v2:
+* Move timer node out of SoC container
 
-diff --git a/arch/arm/boot/dts/qcom-msm8660-surf.dts b/arch/arm/boot/dts/qcom-msm8660-surf.dts
-index 169bad9..13f5a78 100644
---- a/arch/arm/boot/dts/qcom-msm8660-surf.dts
-+++ b/arch/arm/boot/dts/qcom-msm8660-surf.dts
-@@ -3,4 +3,10 @@
- / {
- 	model = "Qualcomm MSM8660 SURF";
- 	compatible = "qcom,msm8660-surf", "qcom,msm8660";
-+
+ arch/arm/boot/dts/qcom-apq8074-dragonboard.dts | 28 ++++++++++++++-
+ arch/arm/boot/dts/qcom-msm8974.dtsi            | 49 ++++++++++----------------
+ 2 files changed, 45 insertions(+), 32 deletions(-)
+
+diff --git a/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+index 92320c4..b4dfb01 100644
+--- a/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
++++ b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+@@ -4,7 +4,11 @@
+ 	model = "Qualcomm APQ8074 Dragonboard";
+ 	compatible = "qcom,apq8074-dragonboard", "qcom,apq8074";
+ 
+-	soc: soc {
 +	soc {
-+		serial at 19c40000 {
++		serial at f991e000 {
 +			status = "ok";
 +		};
-+	};
++
+ 		sdhci at f9824900 {
+ 			bus-width = <8>;
+ 			non-removable;
+@@ -15,5 +19,27 @@
+ 			cd-gpios = <&msmgpio 62 0x1>;
+ 			bus-width = <4>;
+ 		};
++
++
++		pinctrl at fd510000 {
++			spi8_default: spi8_default {
++				mosi {
++					pins = "gpio45";
++					function = "blsp_spi8";
++				};
++				miso {
++					pins = "gpio46";
++					function = "blsp_spi8";
++				};
++				cs {
++					pins = "gpio47";
++					function = "blsp_spi8";
++				};
++				clk {
++					pins = "gpio48";
++					function = "blsp_spi8";
++				};
++			};
++		};
+ 	};
  };
-diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-index c52a9e9..41bc38b 100644
---- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-@@ -12,16 +12,18 @@
- 	cpus {
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index c530a33..69dca2a 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -13,10 +13,10 @@
  		#address-cells = <1>;
  		#size-cells = <0>;
--		compatible = "qcom,scorpion";
--		enable-method = "qcom,gcc-msm8660";
+ 		interrupts = <1 9 0xf04>;
+-		compatible = "qcom,krait";
+-		enable-method = "qcom,kpss-acc-v2";
  
  		cpu at 0 {
-+			compatible = "qcom,scorpion";
-+			enable-method = "qcom,gcc-msm8660";
++			compatible = "qcom,krait";
++			enable-method = "qcom,kpss-acc-v2";
  			device_type = "cpu";
  			reg = <0>;
  			next-level-cache = <&L2>;
+@@ -24,6 +24,8 @@
  		};
  
  		cpu at 1 {
-+			compatible = "qcom,scorpion";
-+			enable-method = "qcom,gcc-msm8660";
++			compatible = "qcom,krait";
++			enable-method = "qcom,kpss-acc-v2";
  			device_type = "cpu";
  			reg = <1>;
  			next-level-cache = <&L2>;
-@@ -33,55 +35,63 @@
+@@ -31,6 +33,8 @@
+ 		};
+ 
+ 		cpu at 2 {
++			compatible = "qcom,krait";
++			enable-method = "qcom,kpss-acc-v2";
+ 			device_type = "cpu";
+ 			reg = <2>;
+ 			next-level-cache = <&L2>;
+@@ -38,6 +42,8 @@
+ 		};
+ 
+ 		cpu at 3 {
++			compatible = "qcom,krait";
++			enable-method = "qcom,kpss-acc-v2";
+ 			device_type = "cpu";
+ 			reg = <3>;
+ 			next-level-cache = <&L2>;
+@@ -47,7 +53,6 @@
+ 		L2: l2-cache {
+ 			compatible = "cache";
+ 			cache-level = <2>;
+-			interrupts = <0 2 0x4>;
+ 			qcom,saw = <&saw_l2>;
  		};
  	};
+@@ -57,6 +62,15 @@
+ 		interrupts = <1 7 0xf04>;
+ 	};
  
--	intc: interrupt-controller at 2080000 {
--		compatible = "qcom,msm-8660-qgic";
--		interrupt-controller;
--		#interrupt-cells = <3>;
--		reg = < 0x02080000 0x1000 >,
--		      < 0x02081000 0x1000 >;
--	};
-+	soc: soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		compatible = "simple-bus";
- 
--	timer at 2000000 {
--		compatible = "qcom,scss-timer", "qcom,msm-timer";
--		interrupts = <1 0 0x301>,
--			     <1 1 0x301>,
--			     <1 2 0x301>;
--		reg = <0x02000000 0x100>;
--		clock-frequency = <27000000>,
--				  <32768>;
--		cpu-offset = <0x40000>;
--	};
-+		intc: interrupt-controller at 2080000 {
-+			compatible = "qcom,msm-8660-qgic";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			reg = < 0x02080000 0x1000 >,
-+			      < 0x02081000 0x1000 >;
-+		};
- 
--	msmgpio: gpio at 800000 {
--		compatible = "qcom,msm-gpio";
--		reg = <0x00800000 0x4000>;
--		gpio-controller;
--		#gpio-cells = <2>;
--		ngpio = <173>;
--		interrupts = <0 16 0x4>;
--		interrupt-controller;
--		#interrupt-cells = <2>;
--	};
-+		timer at 2000000 {
-+			compatible = "qcom,scss-timer", "qcom,msm-timer";
-+			interrupts = <1 0 0x301>,
-+				     <1 1 0x301>,
-+				     <1 2 0x301>;
-+			reg = <0x02000000 0x100>;
-+			clock-frequency = <27000000>,
-+					  <32768>;
-+			cpu-offset = <0x40000>;
-+		};
- 
--	gcc: clock-controller at 900000 {
--		compatible = "qcom,gcc-msm8660";
--		#clock-cells = <1>;
--		#reset-cells = <1>;
--		reg = <0x900000 0x4000>;
--	};
-+		msmgpio: gpio at 800000 {
-+			compatible = "qcom,msm-gpio";
-+			reg = <0x00800000 0x4000>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			ngpio = <173>;
-+			interrupts = <0 16 0x4>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
- 
--	serial at 19c40000 {
--		compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
--		reg = <0x19c40000 0x1000>,
--		      <0x19c00000 0x1000>;
--		interrupts = <0 195 0x0>;
--		clocks = <&gcc GSBI12_UART_CLK>, <&gcc GSBI12_H_CLK>;
--		clock-names = "core", "iface";
--	};
-+		gcc: clock-controller at 900000 {
-+			compatible = "qcom,gcc-msm8660";
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+			reg = <0x900000 0x4000>;
-+		};
- 
--	qcom,ssbi at 500000 {
--		compatible = "qcom,ssbi";
--		reg = <0x500000 0x1000>;
--		qcom,controller-type = "pmic-arbiter";
-+		serial at 19c40000 {
-+			compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
-+			reg = <0x19c40000 0x1000>,
-+			      <0x19c00000 0x1000>;
-+			interrupts = <0 195 0x0>;
-+			clocks = <&gcc GSBI12_UART_CLK>, <&gcc GSBI12_H_CLK>;
-+			clock-names = "core", "iface";
-+			status = "disabled";
-+		};
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupts = <1 2 0xf08>,
++			     <1 3 0xf08>,
++			     <1 4 0xf08>,
++			     <1 1 0xf08>;
++		clock-frequency = <19200000>;
++	};
 +
-+		qcom,ssbi at 500000 {
-+			compatible = "qcom,ssbi";
-+			reg = <0x500000 0x1000>;
-+			qcom,controller-type = "pmic-arbiter";
-+		};
+ 	soc: soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -71,15 +85,6 @@
+ 			      <0xf9002000 0x1000>;
+ 		};
+ 
+-		timer {
+-			compatible = "arm,armv7-timer";
+-			interrupts = <1 2 0xf08>,
+-				     <1 3 0xf08>,
+-				     <1 4 0xf08>,
+-				     <1 1 0xf08>;
+-			clock-frequency = <19200000>;
+-		};
+-
+ 		timer at f9020000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+@@ -190,6 +195,7 @@
+ 			interrupts = <0 108 0x0>;
+ 			clocks = <&gcc GCC_BLSP1_UART2_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
+ 			clock-names = "core", "iface";
++			status = "disabled";
+ 		};
+ 
+ 		sdhci at f9824900 {
+@@ -229,25 +235,6 @@
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+ 			interrupts = <0 208 0>;
+-
+-			spi8_default: spi8_default {
+-				mosi {
+-					pins = "gpio45";
+-					function = "blsp_spi8";
+-				};
+-				miso {
+-					pins = "gpio46";
+-					function = "blsp_spi8";
+-				};
+-				cs {
+-					pins = "gpio47";
+-					function = "blsp_spi8";
+-				};
+-				clk {
+-					pins = "gpio48";
+-					function = "blsp_spi8";
+-				};
+-			};
+ 		};
  	};
  };
 -- 
