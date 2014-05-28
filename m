@@ -1,25 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 May 2014 13:04:02 +0200
-Subject: [RFC] Sort out S5P SoCs support in mainline
-In-Reply-To: <021f01cf7a61$69853e30$3c8fba90$@samsung.com>
-References: <021f01cf7a61$69853e30$3c8fba90$@samsung.com>
-Message-ID: <13875033.1X6R9lksgc@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 28 May 2014 12:03:51 +0100
+Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
+ device tree
+In-Reply-To: <CAPDyKFqCwSfnbXJffQeMUMLEgZPcqjEMhbTXxi4HKOKqExQ70g@mail.gmail.com>
+References: <53824294.1090609@redhat.com>
+ <20140526103807.GV22111@sirena.org.uk>
+ <538321AB.4050006@redhat.com>
+ <20140526142225.GF22111@sirena.org.uk>
+ <538356DA.7090302@redhat.com>
+ <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
+ <53838023.2080807@redhat.com>
+ <CAPDyKFpg_2RQabM044C1hsNTcuxdVVOvw0ZONVRdysk=eom8UA@mail.gmail.com>
+ <20140527175326.GZ12304@sirena.org.uk>
+ <CAPDyKFqCwSfnbXJffQeMUMLEgZPcqjEMhbTXxi4HKOKqExQ70g@mail.gmail.com>
+Message-ID: <20140528110351.GI12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 May 2014 19:41:41 Kukjin Kim wrote:
-> Hi all,
-> 
-> I'm wondering who need to support following SoCs/boards in mainline.
-> 
-> * S5P64X0/SMDK6440 and SMDK6450
-> * S5PC100/SMDKC100
-> 
-> If nobody is using them, how about to remove them from mainline?
+On Wed, May 28, 2014 at 10:19:11AM +0200, Ulf Hansson wrote:
+> On 27 May 2014 19:53, Mark Brown <broonie@kernel.org> wrote:
 
-I talked about this with Tomasz Figa before, he also thinks they can be removed.
-I don't see any reason to keep them myself, and will apply a patch to remove
-them. Of course, if later somebody comes around who does need them, we can
-revert the patch to bring them back.
+> > This then either conflicts with cases where we need to describe the
+> > actual contents of the slot with a compatible string or means that the
+> > SDIO driver needs to handle powerup sequencing since we should be
+> > binding to the first compatible we find.  If the host controller driver
+> > and/or subsystem is going to deal with the powering up it's not clear
+> > that it specifically needs to be the compatible property that's used
+> > to determine the powerup method, it could just be a boolean or a
+> > 'power-method = blah' property (where blah is one of a series of strings
+> > defining methods).  Alternatively we could have separate nodes for the
+> > slot and SDIO device but that feels meh.  What's the hard requirement
+> > for it to specifically be a compatible property?
 
-	Arnd
+> Since the sdio bus is a discoverable bus, we must leave the "SDIO card
+> device id" outside the information of the DT child node. Instead the
+> "SDIO card device id" will be fetched once the card has been properly
+> powered and initialized. From sdio bus' ->match(), the "SDIO func
+> driver id" will be matched with the "SDIO card device id".
+
+> What we need to describe in the child node is only what "powerup
+> driver" to use (an obviously it's resources). I don't see why there
+> should be a conflict in using a compatible property, but I might be
+> missing your point.
+
+I wouldn't assume that the SDIO bus will always be accurately
+discoverable - hardware engineers can always repurpose things for other
+purposes.
+
+> > There's also the need for the SDIO device to be able to get at the
+> > resources provided and actively work with them at runtime if it wants to
+> > manage things more actively (partial poweroff for low power states or
+> > managing clock rates for example).
+
+> Yes, that's is also a reason to why I thought it would make sense to
+> have a "powerup driver". Typically this driver should support runtime
+> PM to handle these kind of fine grained power management.
+
+No, runtime PM isn't really fine grained - I'm talking about things
+like starting and stopping individual resources or configuring them.
+
+> The SDIO func driver will have access (through the struct
+> mmc_card|host) to the "powerup driver's" struct device, and can use
+> pm_runtime_get|put() for it, to tell the "powerup driver" when it may
+> go into power save state.
+
+> This kind of fine grained power management is not related directly to
+> the SDIO specification, and should not be a part of the mmc core in my
+> opinion.
+
+> If we don't have a compatible string in the DT child node of the mmc
+> host, but just a DT property - is there a way to achieve the above
+> anyway?
+
+I don't see any relationship between having compatible strings and the
+ability to achieve things like that to be honest.  Having compatible
+strings has no real impact on what we can implement, the power driver
+you're talking about can easily be library code or a feature of part of
+the code that already exists - so long as we know what hardware is there
+it's up to us how we interpret that.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140528/580648d8/attachment.sig>
