@@ -1,47 +1,71 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 28 May 2014 11:42:17 -0700
-Subject: [PATCH] misc: atmel_pwm: only build for supported platforms
-In-Reply-To: <1401299948.22486.51.camel@x220>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-17-git-send-email-arnd@arndb.de>
- <536CA80A.60201@atmel.com> <1401279867.22486.6.camel@x220>
- <20140528155916.GA9793@piout.net> <1401293383.22486.18.camel@x220>
- <20140528175439.GA18470@piout.net> <1401299948.22486.51.camel@x220>
-Message-ID: <20140528184217.GB30031@kroah.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 28 May 2014 11:44:08 -0700
+Subject: [PATCH v3 1/5] sc_phy:SmartCard(SC) PHY interface to SC controller
+In-Reply-To: <1401267437-22489-2-git-send-email-satish.patel@ti.com>
+References: <1401267437-22489-1-git-send-email-satish.patel@ti.com>
+ <1401267437-22489-2-git-send-email-satish.patel@ti.com>
+Message-ID: <20140528184408.GC30031@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 07:59:08PM +0200, Paul Bolle wrote:
-> On Wed, 2014-05-28 at 19:55 +0200, Alexandre Belloni wrote:
-> > On 28/05/2014 at 18:09:43 +0200, Paul Bolle wrote :
-> > > On Wed, 2014-05-28 at 17:59 +0200, Alexandre Belloni wrote:
-> > > > On 28/05/2014 at 14:24:27 +0200, Paul Bolle wrote :
-> > > > > > >  config ATMEL_PWM
-> > > > > > >  	tristate "Atmel AT32/AT91 PWM support"
-> > > > > > > -	depends on HAVE_CLK && (AVR32 || ARCH_AT91 || COMPILE_TEST)
-> > > > > > > +	depends on HAVE_CLK
-> > > > > > > +	depends on AVR32 || AT91SAM9263 || AT91SAM9RL || AT91SAM9G45
-> > > > > 
-> > > > > Symbols AT91SAM9263, AT91SAM9RL, and AT91SAM9G45 do not seem to exist in
-> > > > > next-20140528. Should these perhaps be SOC_AT91SAM9263, SOC_AT91SAM9RL,
-> > > > > and SOC_AT91SAM9G45 and/or ARCH_AT91SAM9263, ARCH_AT91SAM9RL, and
-> > > > > ARCH_AT91SAM9G45?
-> > > > 
-> > > > I wouldn't bother too much fixing that, this will definitely be remove
-> > > > in 3.17. 
-> > > 
-> > > Are you talking about: 1) the problem this patch tried to fix; or 2) the
-> > > problem it created?
-> > > 
-> > 
-> > I'm removing the whole atmel_pwm driver so the CONFIG_ATMEL_PWM symbol
-> > will be gone.
-> 
-> So the patch we're discussing here will never be included in a release?
+On Wed, May 28, 2014 at 02:27:13PM +0530, Satish Patel wrote:
+> +/**
+> + * struct sc_phy - The basic smart card phy structure
+> + *
+> + * @dev: phy device
+> + * @pdata: pointer to phy's private data structure
+> + * @set_config: called to set phy's configuration
+> + * @get_config: called to get phy's configuration
+> + * @activate_card: perform smart card activation
+> + * @deactivate_card: perform smart card de-activation
+> + * @warm_reset: execute smart card warm reset sequence
+> + * @register_card_activity_cb: register call back to phy device.
+> + * This call back will be called on card insert or remove event
+> + *
+> + * smart card controller uses this interface to communicate with
+> + * smart card via phy.Some smart card phy has multiple slots for
+> + * cards. This inerface also enables controller to communicate with
+> + * one or more smart card connected over phy.
+> + */
+> +struct sc_phy {
+> +	/* phy's device pointer */
+> +	struct device *dev;
 
-So, should I just remove it right now?  I like deleting files :)
+So this is the "parent", right?  Why not embed a struct device into this
+structure as well, further streaching out the device tree.
 
-thanks,
+> +
+> +	/* phy's private data */
+> +	void *pdata;
 
-greg k-h
+If you do the above, then this pointer is not needed.
+
+
+> +
+> +	/* notify data, passed by interface user as a part of
+> +	 * register_notify API. Data should be passed back when
+> +	 * notification raised to the interface user
+> +	 */
+> +	void *notify_data;
+
+What makes this different from the pdata?
+
+
+> +
+> +	int	(*set_config)(struct sc_phy *phy, u8 slot,
+> +			enum sc_phy_config attr, int value);
+> +	int	(*get_config)(struct sc_phy *phy, u8 slot, enum
+> +			sc_phy_config attr);
+> +	int	(*activate_card)(struct sc_phy *phy, u8 slot);
+> +	int	(*deactivate_card)(struct sc_phy *phy, u8 slot);
+> +	int	(*get_syncatr)(struct sc_phy *phy, u8 slot, u8 len, char *atr);
+> +	int	(*warm_reset)(struct sc_phy *phy, u8 slot);
+> +	int	(*register_notify)(struct sc_phy *phy,
+> +			 struct	notifier_block *nb, void *notify_data);
+> +	int	(*unregister_notify)(struct sc_phy *phy,
+> +			struct	notifier_block *nb);
+> +};
+> +
+> +#endif /* __SC_PHY_H__ */
+> -- 
+> 1.7.9.5
