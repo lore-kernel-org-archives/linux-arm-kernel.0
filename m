@@ -1,26 +1,51 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Wed, 28 May 2014 02:52:10 -0700
-Subject: [PATCH 08/12] scsi/NCR5380: adopt dprintk()
-In-Reply-To: <20140318004214.992467108@telegraphics.com.au>
-References: <20140318004212.612472697@telegraphics.com.au>
- <20140318004214.992467108@telegraphics.com.au>
-Message-ID: <20140528095210.GH26617@infradead.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 28 May 2014 11:51:52 +0200
+Subject: [PATCH 03/11] pinctrl: sunxi: Move setting of mux to irq type
+ from unmask to set_type
+In-Reply-To: <20140528093653.GN4730@lukather>
+References: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>
+ <1401090486-4414-4-git-send-email-hdegoede@redhat.com>
+ <CACRpkdZcGJTXfcxN_sogm+hYHM56d_VxtuZqth0t-c2mgAJ0vA@mail.gmail.com>
+ <20140528093653.GN4730@lukather>
+Message-ID: <5385B1B8.8070803@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 18, 2014 at 11:42:20AM +1100, Finn Thain wrote:
-> All NCR5380 drivers already include the NCR5380.h header. Better to
-> adopt those macros rather than have three variations on them.
-> 
-> Moreover, the macros in NCR5380.h are preferable because the atari_NCR5380
-> and sun3_NCR5380 versions are inflexible. For example, they can't accomodate
-> dprintk(NDEBUG_MAIN | NDEBUG_QUEUES, ...)
-> 
-> Replace the *_PRINTK macros from atari_NCR5380.h and sun3_NCR5380.h with
-> the equivalent macros from NCR5380.h.
-> 
-> Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+Hi,
 
-Looks good,
+On 05/28/2014 11:36 AM, Maxime Ripard wrote:
+> On Tue, May 27, 2014 at 04:18:29PM +0200, Linus Walleij wrote:
+>> On Mon, May 26, 2014 at 9:47 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>
+>>> With level triggered interrupt mask / unmask will get called for each
+>>> interrupt, doing the somewhat expensive mux setting on each unmask thus is
+>>> not a good idea. Instead move it to the set_type callback, which is typically
+>>> done only once for each irq.
+>>>
+>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>
+>> Yes move it out of mask/unmask but no, not into set_type().
+>>
+>> Can you not use the irqchip startup()/shutdown() callbacks
+>> instead?
+> 
+> I think we can use irq_request_resources then
+> https://lkml.org/lkml/2014/3/12/307
 
-Reviewed-by: Christoph Hellwig <hch@lst.de>
+Sounds good, I'll modify the patch to move it here before posting a v2 of
+this series. Note v2 likely won't happen till this weekend, -ENOTIME.
+
+> We could even merge the gpio_to_irq code into it.
+
+Erm, no we need that as a separate function for the gpio_chip's to_irq
+callback.
+
+> It's called in __setup_irq, so it's guaranteed to be called, and it
+> will bail out early without doing anything, since it's one of the
+> first thing __setup_irq does.
+
+Right, as I said above, this sounds good.
+
+Regards,
+
+Hans
