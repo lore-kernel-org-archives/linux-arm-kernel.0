@@ -1,32 +1,30 @@
-From: fthain@telegraphics.com.au (Finn Thain)
-Date: Wed, 28 May 2014 22:09:33 +1000 (EST)
-Subject: [PATCH 05/12] scsi/NCR5380: fix build failures when debugging
- is enabled
-In-Reply-To: <20140528095015.GE26617@infradead.org>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Wed, 28 May 2014 05:13:39 -0700
+Subject: [PATCH 05/12] scsi/NCR5380: fix build failures when debugging is
+ enabled
+In-Reply-To: <alpine.LNX.2.00.1405282207580.31798@nippy.intranet>
 References: <20140318004212.612472697@telegraphics.com.au>
  <20140318004214.102469994@telegraphics.com.au>
  <20140528095015.GE26617@infradead.org>
-Message-ID: <alpine.LNX.2.00.1405282207580.31798@nippy.intranet>
+ <alpine.LNX.2.00.1405282207580.31798@nippy.intranet>
+Message-ID: <20140528121339.GA29126@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Wed, 28 May 2014, Christoph Hellwig wrote:
-
-> Looks good,
+On Wed, May 28, 2014 at 10:09:33PM +1000, Finn Thain wrote:
+> [PATCH v2 05/12] scsi/NCR5380: fix build failures when debugging is enabled
+> [PATCH v2 06/12] scsi/NCR5380: fix dprintk macro usage and definition
+> [PATCH v2 09/12] scsi/NCR5380: fix and standardize NDEBUG macros
 > 
-> Reviewed-by: Christoph Hellwig <hch@lst.de>
+> And several patches in the v2 submission had some acked-by tags added.
 > 
+> The v2 series is the one to merge (but I think James intends to do that).
 
-Thanks for reviewing. There was a later submission (version 2) with 
-changes made to three of these patches,
+I've pulled this version into the for-3.16 drivers tree I'm collection
+for james:
 
-[PATCH v2 05/12] scsi/NCR5380: fix build failures when debugging is enabled
-[PATCH v2 06/12] scsi/NCR5380: fix dprintk macro usage and definition
-[PATCH v2 09/12] scsi/NCR5380: fix and standardize NDEBUG macros
+  http://git.infradead.org/users/hch/scsi-queue.git/shortlog/refs/heads/drivers-for-3.16
 
-And several patches in the v2 submission had some acked-by tags added.
+  git://git.infradead.org/users/hch/scsi-queue.git drivers-for-3.16
 
-The v2 series is the one to merge (but I think James intends to do that).
-
--- 
+Can you send incremental changes if needed?
