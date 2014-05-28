@@ -1,30 +1,19 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Wed, 28 May 2014 05:13:39 -0700
-Subject: [PATCH 05/12] scsi/NCR5380: fix build failures when debugging is
- enabled
-In-Reply-To: <alpine.LNX.2.00.1405282207580.31798@nippy.intranet>
-References: <20140318004212.612472697@telegraphics.com.au>
- <20140318004214.102469994@telegraphics.com.au>
- <20140528095015.GE26617@infradead.org>
- <alpine.LNX.2.00.1405282207580.31798@nippy.intranet>
-Message-ID: <20140528121339.GA29126@infradead.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 28 May 2014 14:14:15 +0200
+Subject: [PATCH 1/2] ARM: ux500: Staticize local symbols in cpu-db8500.c
+In-Reply-To: <1401269165-2996-1-git-send-email-sachin.kamat@linaro.org>
+References: <1401269165-2996-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <CACRpkdas_Rpkge873ktDE0hoq-0=WUTU_Kibdt5LyFgZ=r_3bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 10:09:33PM +1000, Finn Thain wrote:
-> [PATCH v2 05/12] scsi/NCR5380: fix build failures when debugging is enabled
-> [PATCH v2 06/12] scsi/NCR5380: fix dprintk macro usage and definition
-> [PATCH v2 09/12] scsi/NCR5380: fix and standardize NDEBUG macros
-> 
-> And several patches in the v2 submission had some acked-by tags added.
-> 
-> The v2 series is the one to merge (but I think James intends to do that).
+On Wed, May 28, 2014 at 11:26 AM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
 
-I've pulled this version into the for-3.16 drivers tree I'm collection
-for james:
+> Symbols local to this file are made static.
+>
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 
-  http://git.infradead.org/users/hch/scsi-queue.git/shortlog/refs/heads/drivers-for-3.16
+Patch applied.
 
-  git://git.infradead.org/users/hch/scsi-queue.git drivers-for-3.16
-
-Can you send incremental changes if needed?
+Yours,
+Linus Walleij
