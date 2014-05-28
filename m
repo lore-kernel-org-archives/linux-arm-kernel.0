@@ -1,78 +1,56 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 28 May 2014 12:47:21 -0700
-Subject: [PATCH RESEND 3/5] tty/serial: Add GPIOLIB helpers for
- controlling modem lines
-In-Reply-To: <20140528194550.GA12735@kroah.com>
-References: <1400005245-11943-1-git-send-email-richard.genoud@gmail.com>
- <1400005245-11943-4-git-send-email-richard.genoud@gmail.com>
- <20140528194550.GA12735@kroah.com>
-Message-ID: <20140528194721.GA12869@kroah.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 28 May 2014 12:44:35 -0700
+Subject: [PATCH v2 1/4] devicetree: bindings: Properly document micrel
+ ks8851 SPI chips
+In-Reply-To: <20140528171219.GD5099@sirena.org.uk>
+References: <1400875040-13269-1-git-send-email-sboyd@codeaurora.org>
+ <1400875040-13269-2-git-send-email-sboyd@codeaurora.org>
+ <20140524124858.GR22111@sirena.org.uk> <5385063F.30407@codeaurora.org>
+ <20140528151646.GU20155@pengutronix.de> <20140528171219.GD5099@sirena.org.uk>
+Message-ID: <53863CA3.7040000@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 12:45:50PM -0700, Greg Kroah-Hartman wrote:
-> On Tue, May 13, 2014 at 08:20:43PM +0200, Richard Genoud wrote:
-> > This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
-> > GPIO.
-> > This will be useful for many boards which have a serial controller that
-> > only handle CTS/RTS pins (or even just RX/TX).
-> > 
-> > Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> > Tested-by: Yegor Yefremov <yegorslists@googlemail.com>
-> > ---
-> >  Documentation/serial/driver            |   25 ++++++
-> >  drivers/tty/serial/Kconfig             |    3 +
-> >  drivers/tty/serial/Makefile            |    3 +
-> >  drivers/tty/serial/serial_mctrl_gpio.c |  143 ++++++++++++++++++++++++++++++++
-> >  drivers/tty/serial/serial_mctrl_gpio.h |  110 ++++++++++++++++++++++++
-> >  5 files changed, 284 insertions(+)
-> >  create mode 100644 drivers/tty/serial/serial_mctrl_gpio.c
-> >  create mode 100644 drivers/tty/serial/serial_mctrl_gpio.h
-> > 
-> > diff --git a/Documentation/serial/driver b/Documentation/serial/driver
-> > index c3a7689..3bba1ae 100644
-> > --- a/Documentation/serial/driver
-> > +++ b/Documentation/serial/driver
-> > @@ -429,3 +429,28 @@ thus:
-> >  		struct uart_port	port;
-> >  		int			my_stuff;
-> >  	};
-> > +
-> > +Modem control lines via GPIO
-> > +----------------------------
-> > +
-> > +Some helpers are provided in order to set/get modem control lines via GPIO.
-> > +
-> > +mctrl_gpio_init(dev, idx):
-> > +	This will get the {cts,rts,...}-gpios from device tree if they are
-> > +	present and request them, set direction etc, and return an
-> > +	allocated structure. devm_* functions are used, so there's no need
-> > +	to call mctrl_gpio_free().
-> > +
-> > +mctrl_gpio_free(dev, gpios):
-> > +	This will free the requested gpios in mctrl_gpio_init().
-> > +	As devm_* function are used, there's generally no need to call
-> > +	this function.
-> > +
-> > +mctrl_gpio_to_gpiod(gpios, gidx)
-> > +	This returns the gpio structure associated to the modem line index.
-> > +
-> > +mctrl_gpio_set(gpios, mctrl):
-> > +	This will sets the gpios according to the mctrl state.
-> > +
-> > +mctrl_gpio_get(gpios, mctrl):
-> > +	This will update mctrl with the gpios values.
-> > diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> > index 5d9b01a..95afd31 100644
-> > --- a/drivers/tty/serial/Kconfig
-> > +++ b/drivers/tty/serial/Kconfig
-> > @@ -1510,4 +1510,7 @@ config SERIAL_ST_ASC_CONSOLE
-> >  
-> >  endmenu
-> >  
-> > +config SERIAL_MCTRL_GPIO
-> > +	tristate
-> 
-> Why is this added here?  Who is going to use it?
+On 05/28/14 10:12, Mark Brown wrote:
+> On Wed, May 28, 2014 at 05:16:46PM +0200, Uwe Kleine-K?nig wrote:
+>> On Tue, May 27, 2014 at 02:40:15PM -0700, Stephen Boyd wrote:
+>>> On 05/24/14 05:48, Mark Brown wrote:
+>>>> So, according to the datasheet I managed to find this device has a
+>>>> supply VDD_IO (so normally written vdd-io-supply here), some other
+>>>> supplies which are tied to VDD_IO (so can probably be omitted) and a
+>>>> supply VDD_A3.3 none of which are optional.  There is an internal
+>>>> regulator which can be used to drop a higher voltage VDD_IO down for
+>>>> some of the supplies tied to it but that's essentially a noop from
+>>>> software as far as I can tell.  None of these supplies are obviously
+>>>> optional, though I've not read the datasheet in detail so I may have
+>>>> missed something here.
+>> There is a difference between the supply being optional for the hardware
+>> to work and the need to specify it in the device tree, isn't it? My
+>> expectation is that when it's not specified there is just nothing the
+>> the software needs to care for. 
+> If the supply must always be physically present the bindings should be
+> specified as it being mandatory and the code written in that fashion; as
+> an extension Linux will put a dummy in but this is attempting to handle
+> incorrect DTs.  This means we have functional error handling in cases
+> where there is something to worry about and simplifies the code using
+> the regulator.
 
-Ah, the next patch does, nevermind...
+Ok, you're saying the opposite of Rob. Should it be required or optional
+in the DT binding?
+
+>
+> regulator_get_optional() should *only* be used if the supply may be
+> omitted from the physical design and should generally always be
+> accompanied by code which does something substantially different such as
+> using an internal regulator or changing the source for a reference
+> voltage instead.
+>
+>
+
+Ok. Dave M has already picked up all these patches so I'll send a patch
+to replace regulator_get_optional() with regulator_get() and fix up the
+error handling unless I hear otherwise.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
