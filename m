@@ -1,166 +1,151 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Wed, 28 May 2014 18:50:13 +0800
-Subject: [PATCH v5 3/3] pwm: i.MX: Avoid sample FIFO overflow for i.MX PWM
- version2
-In-Reply-To: <1401274213-8954-1-git-send-email-Ying.Liu@freescale.com>
-References: <1401274213-8954-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1401274213-8954-3-git-send-email-Ying.Liu@freescale.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 28 May 2014 12:50:36 +0200
+Subject: [PATCH V4] mmc: mmci: Enforce DMA configuration through DT
+In-Reply-To: <1400561154-17846-1-git-send-email-ulf.hansson@linaro.org>
+References: <1400561154-17846-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CAPDyKFrRP-0EZzzyfxinYDp+aPca-t0Gmw3i2tdjM=dX-DXT4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX PWM version2 is embedded in several i.MX SoCs,
-such as i.MX27, i.MX51 and i.MX6SL.  There is a 4-word(16bit)
-sample FIFO in this IP.  Each FIFO slot determines the duty
-period of a PWM waveform in one full cycle.  The IP spec
-mentions that we should not write a fourth sample because
-the FIFO will become full and triggers a FIFO write error
-(FWE) which will prevent the PWM from starting once it is
-enabled.  In order to avoid any sample FIFO overflow issue,
-this patch clears all sample FIFO by doing software reset
-in the configuration hook when the controller is disabled
-or waits for a full PWM cycle to get a relinquished FIFO
-slot when the controller is enabled and the FIFO is fully
-loaded.
+On 20 May 2014 06:45, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> Remove the option to provide DMA configuration as platform data,
+> enforce it through DT.
+>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Roland Stigge <stigge@antcom.de>
 
-The FIFO overflow issue can be reproduced by the following
-commands on the i.MX6SL EVK platform, assuming we use PWM2
-for the debug LED which is driven by the pin HSIC_STROBE
-and the maximal brightness is 255.
-echo 0   > /sys/class/leds/user/brightness
-echo 0   > /sys/class/leds/user/brightness
-echo 0   > /sys/class/leds/user/brightness
-echo 0   > /sys/class/leds/user/brightness
-echo 255 > /sys/class/leds/user/brightness
-Here, FWE happens(PWMSR register reads 0x58) and the LED
-can not be lighten.
+Hi Roland,
 
-Another way to reproduce the FIFO overflow issue is to run
-this script:
-while true;
-	do echo 255 > /sys/class/leds/user/brightness;
-done
+Just a kind reminder.
 
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@freescale.com>
-Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-Cc: linux-pwm at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
----
-v4->v5:
-* Rebase up to the commit(1/3 in this series) which fixes
-  the macro MX3_PWMCR_PRESCALER(x) definition.
+If you don't have any objections I intend to queue this patch through
+the below git tree.
 
-v3->v4:
-* To address Sascha's comment, drop the rollover event approach
-  and wait for a full PWM cycle to get a relinquished FIFO slot
-  when the controller is enabled and the FIFO is fully loaded.
-* Update commit message accordlingly, including a new way to
-  reproduce the FIFO overflow issue.
+Kind regards
+Ulf Hansson
 
-v2->v3:
-* Wait for a rollover event before configuration when PWM
-  is active with non-zero duty period.  And, update commit
-  message for that.
-* Fix some typos in commit head and message(fifo -> FIFO,
-  pwm -> PWM, etc).
-* Cc linux-kernel at vger.kernel.org.
-
-v1->v2:
-* To address Lothar Wa?mann's comment, add a timeout mechanism
-  instead of endless polling the SWR bit to be cleared by the
-  hardware.
-
- drivers/pwm/pwm-imx.c |   45 +++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 43 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
-index fc47fab..ceb81fc 100644
---- a/drivers/pwm/pwm-imx.c
-+++ b/drivers/pwm/pwm-imx.c
-@@ -14,6 +14,7 @@
- #include <linux/slab.h>
- #include <linux/err.h>
- #include <linux/clk.h>
-+#include <linux/delay.h>
- #include <linux/io.h>
- #include <linux/pwm.h>
- #include <linux/of.h>
-@@ -30,6 +31,7 @@
- /* i.MX27, i.MX31, i.MX35 share the same PWM function block: */
- 
- #define MX3_PWMCR			0x00    /* PWM Control Register */
-+#define MX3_PWMSR			0x04    /* PWM Status Register */
- #define MX3_PWMSAR			0x0C    /* PWM Sample Register */
- #define MX3_PWMPR			0x10    /* PWM Period Register */
- #define MX3_PWMCR_PRESCALER(x)		((((x) - 1) & 0xFFF) << 4)
-@@ -38,7 +40,12 @@
- #define MX3_PWMCR_DBGEN			(1 << 22)
- #define MX3_PWMCR_CLKSRC_IPG_HIGH	(2 << 16)
- #define MX3_PWMCR_CLKSRC_IPG		(1 << 16)
-+#define MX3_PWMCR_SWR			(1 << 3)
- #define MX3_PWMCR_EN			(1 << 0)
-+#define MX3_PWMSR_FIFOAV_4WORDS		0x4
-+#define MX3_PWMSR_FIFOAV_MASK		0x7
-+
-+#define MX3_PWM_SWR_LOOP		5
- 
- struct imx_chip {
- 	struct clk	*clk_per;
-@@ -103,9 +110,43 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
- 		struct pwm_device *pwm, int duty_ns, int period_ns)
- {
- 	struct imx_chip *imx = to_imx_chip(chip);
-+	struct device *dev = chip->dev;
- 	unsigned long long c;
- 	unsigned long period_cycles, duty_cycles, prescale;
--	u32 cr;
-+	unsigned int period_ms;
-+	bool enable = test_bit(PWMF_ENABLED, &pwm->flags);
-+	int wait_count = 0, fifoav;
-+	u32 cr, sr;
-+
-+	/*
-+	 * i.MX PWMv2 has a 4-word sample FIFO.
-+	 * In order to avoid FIFO overflow issue, we do software reset
-+	 * to clear all sample FIFO if the controller is disabled or
-+	 * wait for a full PWM cycle to get a relinquished FIFO slot
-+	 * when the controller is enabled and the FIFO is fully loaded.
-+	 */
-+	if (enable) {
-+		sr = readl(imx->mmio_base + MX3_PWMSR);
-+		fifoav = sr & MX3_PWMSR_FIFOAV_MASK;
-+		if (fifoav == MX3_PWMSR_FIFOAV_4WORDS) {
-+			period_ms = DIV_ROUND_UP(pwm->period, NSEC_PER_MSEC);
-+			msleep(period_ms);
-+
-+			sr = readl(imx->mmio_base + MX3_PWMSR);
-+			if (fifoav == (sr & MX3_PWMSR_FIFOAV_MASK))
-+				dev_warn(dev, "there is no free FIFO slot\n");
-+		}
-+	} else {
-+		writel(MX3_PWMCR_SWR, imx->mmio_base + MX3_PWMCR);
-+		do {
-+			usleep_range(200, 1000);
-+			cr = readl(imx->mmio_base + MX3_PWMCR);
-+		} while ((cr & MX3_PWMCR_SWR) &&
-+			 (wait_count++ < MX3_PWM_SWR_LOOP));
-+
-+		if (cr & MX3_PWMCR_SWR)
-+			dev_warn(dev, "software reset timeout\n");
-+	}
- 
- 	c = clk_get_rate(imx->clk_per);
- 	c = c * period_ns;
-@@ -135,7 +176,7 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
- 		MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN |
- 		MX3_PWMCR_DBGEN | MX3_PWMCR_CLKSRC_IPG_HIGH;
- 
--	if (test_bit(PWMF_ENABLED, &pwm->flags))
-+	if (enable)
- 		cr |= MX3_PWMCR_EN;
- 
- 	writel(cr, imx->mmio_base + MX3_PWMCR);
--- 
-1.7.9.5
+> ---
+>
+> Note, this patch is based upon the next branch from the following git
+> git://git.linaro.org/people/ulf.hansson/mmc.git
+>
+> Changes in v4:
+>         Removed the NULL pointer assignment of ->dma_filter cb for mach-lpc32xx.
+>
+> ---
+>  arch/arm/mach-lpc32xx/phy3250.c |    3 ---
+>  drivers/mmc/host/mmci.c         |   24 +-----------------------
+>  include/linux/amba/mmci.h       |   17 -----------------
+>  3 files changed, 1 insertion(+), 43 deletions(-)
+>
+> diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
+> index 34932e0..7858d5b 100644
+> --- a/arch/arm/mach-lpc32xx/phy3250.c
+> +++ b/arch/arm/mach-lpc32xx/phy3250.c
+> @@ -202,9 +202,6 @@ static struct mmci_platform_data lpc32xx_mmci_data = {
+>         .ocr_mask       = MMC_VDD_30_31 | MMC_VDD_31_32 |
+>                           MMC_VDD_32_33 | MMC_VDD_33_34,
+>         .ios_handler    = mmc_handle_ios,
+> -       .dma_filter     = NULL,
+> -       /* No DMA for now since AMBA PL080 dmaengine driver only does scatter
+> -        * gather, and the MMCI driver doesn't do it this way */
+>  };
+>
+>  static struct lpc32xx_slc_platform_data lpc32xx_slc_data = {
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index 758efea..a084edd 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -366,7 +366,6 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
+>  #ifdef CONFIG_DMA_ENGINE
+>  static void mmci_dma_setup(struct mmci_host *host)
+>  {
+> -       struct mmci_platform_data *plat = host->plat;
+>         const char *rxname, *txname;
+>         dma_cap_mask_t mask;
+>
+> @@ -380,25 +379,6 @@ static void mmci_dma_setup(struct mmci_host *host)
+>         dma_cap_zero(mask);
+>         dma_cap_set(DMA_SLAVE, mask);
+>
+> -       if (plat && plat->dma_filter) {
+> -               if (!host->dma_rx_channel && plat->dma_rx_param) {
+> -                       host->dma_rx_channel = dma_request_channel(mask,
+> -                                                          plat->dma_filter,
+> -                                                          plat->dma_rx_param);
+> -                       /* E.g if no DMA hardware is present */
+> -                       if (!host->dma_rx_channel)
+> -                               dev_err(mmc_dev(host->mmc), "no RX DMA channel\n");
+> -               }
+> -
+> -               if (!host->dma_tx_channel && plat->dma_tx_param) {
+> -                       host->dma_tx_channel = dma_request_channel(mask,
+> -                                                          plat->dma_filter,
+> -                                                          plat->dma_tx_param);
+> -                       if (!host->dma_tx_channel)
+> -                               dev_warn(mmc_dev(host->mmc), "no TX DMA channel\n");
+> -               }
+> -       }
+> -
+>         /*
+>          * If only an RX channel is specified, the driver will
+>          * attempt to use it bidirectionally, however if it is
+> @@ -446,11 +426,9 @@ static void mmci_dma_setup(struct mmci_host *host)
+>   */
+>  static inline void mmci_dma_release(struct mmci_host *host)
+>  {
+> -       struct mmci_platform_data *plat = host->plat;
+> -
+>         if (host->dma_rx_channel)
+>                 dma_release_channel(host->dma_rx_channel);
+> -       if (host->dma_tx_channel && plat->dma_tx_param)
+> +       if (host->dma_tx_channel)
+>                 dma_release_channel(host->dma_tx_channel);
+>         host->dma_rx_channel = host->dma_tx_channel = NULL;
+>  }
+> diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
+> index 3f95d32..8c98113 100644
+> --- a/include/linux/amba/mmci.h
+> +++ b/include/linux/amba/mmci.h
+> @@ -6,9 +6,6 @@
+>
+>  #include <linux/mmc/host.h>
+>
+> -/* Just some dummy forwarding */
+> -struct dma_chan;
+> -
+>  /**
+>   * struct mmci_platform_data - platform configuration for the MMCI
+>   * (also known as PL180) block.
+> @@ -26,17 +23,6 @@ struct dma_chan;
+>   * @gpio_wp: read this GPIO pin to see if the card is write protected
+>   * @gpio_cd: read this GPIO pin to detect card insertion
+>   * @cd_invert: true if the gpio_cd pin value is active low
+> - * @dma_filter: function used to select an appropriate RX and TX
+> - * DMA channel to be used for DMA, if and only if you're deploying the
+> - * generic DMA engine
+> - * @dma_rx_param: parameter passed to the DMA allocation
+> - * filter in order to select an appropriate RX channel. If
+> - * there is a bidirectional RX+TX channel, then just specify
+> - * this and leave dma_tx_param set to NULL
+> - * @dma_tx_param: parameter passed to the DMA allocation
+> - * filter in order to select an appropriate TX channel. If this
+> - * is NULL the driver will attempt to use the RX channel as a
+> - * bidirectional channel
+>   */
+>  struct mmci_platform_data {
+>         unsigned int ocr_mask;
+> @@ -45,9 +31,6 @@ struct mmci_platform_data {
+>         int     gpio_wp;
+>         int     gpio_cd;
+>         bool    cd_invert;
+> -       bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
+> -       void *dma_rx_param;
+> -       void *dma_tx_param;
+>  };
+>
+>  #endif
+> --
+> 1.7.9.5
+>
