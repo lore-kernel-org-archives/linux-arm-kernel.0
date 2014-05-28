@@ -1,48 +1,125 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 May 2014 08:46:43 +0200
-Subject: [PATCH] arm: Set hardirq tracing to on when idling
-In-Reply-To: <53852D96.60006@acm.org>
-References: <1401045323-7116-1-git-send-email-minyard@acm.org>
- <6082113.tHepRBe99K@wuerfel> <53852D96.60006@acm.org>
-Message-ID: <4260533.1h2PQ8Ph4h@wuerfel>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 28 May 2014 08:49:39 +0200
+Subject: [PATCH v2 02/11] sched: remove a wake_affine condition
+In-Reply-To: <CAKfTPtCZx4i5HFnma3EFYjxVHojUAkezSS7jL7KDTgwvKEVFwQ@mail.gmail.com>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-3-git-send-email-vincent.guittot@linaro.org>
+ <20140527124848.GQ30445@twins.programming.kicks-ass.net>
+ <CAKfTPtAbnDdQ=C6oABtwUPr7ADhHo1qsdzt5GFsuVMncA9Q=Qw@mail.gmail.com>
+ <20140527153937.GE19143@laptop.programming.kicks-ass.net>
+ <CAKfTPtCZx4i5HFnma3EFYjxVHojUAkezSS7jL7KDTgwvKEVFwQ@mail.gmail.com>
+Message-ID: <CAKfTPtB_4bQxBOUJ4tCFRVqzHDRVXj3YPkyzyTv_h-sgm8NwEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 May 2014 19:28:06 Corey Minyard wrote:
-> On 05/27/2014 02:27 PM, Arnd Bergmann wrote:
-> > On Tuesday 27 May 2014 11:53:59 Stephen Boyd wrote:
-> >> On 05/27/14 11:49, Arnd Bergmann wrote:
-> >>> You also commented in that thread about stop_critical_timings()/
-> >>> start_critical_timings(). Corey, can you look at that, too? I
-> >>> think it's designed to avoid the issue you are seeing but
-> >>> for some reason doesn't.
-> >> I sent a patch last week to "solve" this problem. I'm not sure if it's
-> >> right but it works for me.
-> >>
-> >> https://lkml.org/lkml/2014/5/19/607
-> > I think that one was also wrong, as the intention of the existing
-> > stop_critical_timings() function is already to do the same that
-> > Corey's patch does, i.e. stop the trace before we go to idle as
-> > if we were turning IRQs on.
-> >
-> > Corey, does it work for you if you replace the new trace_hardirqs_on()
-> > you added with time_hardirqs_on() or stop_critical_timing()?
-> 
-> Well, more information on this.  It turns out that the generic idle loop
-> calls stop_critical_timing() and start_critical timing(), so the
-> arch_cpu_idle() shouldn't have to.
-> 
-> However, the idle loop calls rcu_idle_enter() after it calls
-> stop_critical_timing(), and that is resetting the critical timing, it
-> appears.  It's disabling/enabling interrupts in rcu_idle_enter().  If I
-> switch the order of the rcu_idle and critical timing calls, the issue
-> goes away.
-> 
-> Stephen's patch does not seem to be necessary for my issue. I tried with
-> the patch applied, too.  It doesn't seem to hurt, at least.  It did not
-> fix the problem by itself, though.
+Using another email address for Nick
 
-Interesting, it looked like the "big hammer" solution to me (compared to
-yours) that should deal with the problem in any case.
+On 27 May 2014 18:14, Vincent Guittot <vincent.guittot@linaro.org> wrote:
+> On 27 May 2014 17:39, Peter Zijlstra <peterz@infradead.org> wrote:
+>> On Tue, May 27, 2014 at 05:19:02PM +0200, Vincent Guittot wrote:
+>>> On 27 May 2014 14:48, Peter Zijlstra <peterz@infradead.org> wrote:
+>>> > On Fri, May 23, 2014 at 05:52:56PM +0200, Vincent Guittot wrote:
+>>> >> I have tried to understand the meaning of the condition :
+>>> >>  (this_load <= load &&
+>>> >>   this_load + target_load(prev_cpu, idx) <= tl_per_task)
+>>> >> but i failed to find a use case that can take advantage of it and i haven't
+>>> >> found description of it in the previous commits' log.
+>>> >
+>>> > commit 2dd73a4f09beacadde827a032cf15fd8b1fa3d48
+>>> >
+>>> >     int try_to_wake_up():
+>>> >
+>>> >     in this function the value SCHED_LOAD_BALANCE is used to represent the load
+>>> >     contribution of a single task in various calculations in the code that
+>>> >     decides which CPU to put the waking task on.  While this would be a valid
+>>> >     on a system where the nice values for the runnable tasks were distributed
+>>> >     evenly around zero it will lead to anomalous load balancing if the
+>>> >     distribution is skewed in either direction.  To overcome this problem
+>>> >     SCHED_LOAD_SCALE has been replaced by the load_weight for the relevant task
+>>> >     or by the average load_weight per task for the queue in question (as
+>>> >     appropriate).
+>>> >
+>>> >                         if ((tl <= load &&
+>>> > -                               tl + target_load(cpu, idx) <= SCHED_LOAD_SCALE) ||
+>>> > -                               100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
+>>> > +                               tl + target_load(cpu, idx) <= tl_per_task) ||
+>>> > +                               100*(tl + p->load_weight) <= imbalance*load) {
+>>>
+>>> The oldest patch i had found was: https://lkml.org/lkml/2005/2/24/34
+>>> where task_hot had been replaced by
+>>> + if ((tl <= load &&
+>>> + tl + target_load(cpu, idx) <= SCHED_LOAD_SCALE) ||
+>>> + 100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
+>>>
+>>> but as explained, i haven't found a clear explanation of this condition
+>>
+>> Yeah, that's the commit I had below; but I suppose we could ask Nick if
+>> we really want, I've heard he still replies to email, even though he's
+>> locked up in a basement somewhere :-)
 
-	Arnd
+ok, I have added him in the list
+
+Nick,
+
+While doing some rework on the wake affine part of the scheduler, i
+failed to catch the use case that takes advantage of a condition that
+you added some while ago with the commit
+a3f21bce1fefdf92a4d1705e888d390b10f3ac6f
+
+Could you help us to clarify the 2 first lines of the test that you added ?
++                       if ((tl <= load &&
++                               tl + target_load(cpu, idx) <=
+SCHED_LOAD_SCALE) ||
++                               100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
+
+Regards,
+Vincent
+>
+>>
+>>> > commit a3f21bce1fefdf92a4d1705e888d390b10f3ac6f
+>>> >
+>>> >
+>>> > +                       if ((tl <= load &&
+>>> > +                               tl + target_load(cpu, idx) <= SCHED_LOAD_SCALE) ||
+>>> > +                               100*(tl + SCHED_LOAD_SCALE) <= imbalance*load) {
+>>> >
+>>> >
+>>> > So back when the code got introduced, it read:
+>>> >
+>>> >         target_load(prev_cpu, idx) - sync*SCHED_LOAD_SCALE < source_load(this_cpu, idx) &&
+>>> >         target_load(prev_cpu, idx) - sync*SCHED_LOAD_SCALE + target_load(this_cpu, idx) < SCHED_LOAD_SCALE
+>>> >
+>>> > So while the first line makes some sense, the second line is still
+>>> > somewhat challenging.
+>>> >
+>>> > I read the second line something like: if there's less than one full
+>>> > task running on the combined cpus.
+>>>
+>>> ok. your explanation makes sense
+>>
+>> Maybe, its still slightly weird :-)
+>>
+>>> >
+>>> > Now for idx==0 this is hard, because even when sync=1 you can only make
+>>> > it true if both cpus are completely idle, in which case you really want
+>>> > to move to the waking cpu I suppose.
+>>>
+>>> This use case is already taken into account by
+>>>
+>>> if (this_load > 0)
+>>> ..
+>>> else
+>>>  balance = true
+>>
+>> Agreed.
+>>
+>>> > One task running will have it == SCHED_LOAD_SCALE.
+>>> >
+>>> > But for idx>0 this can trigger in all kinds of situations of light load.
+>>>
+>>> target_load is the max between load for idx == 0 and load for the
+>>> selected idx so we have even less chance to match the condition : both
+>>> cpu are completely idle
+>>
+>> Ah, yes, I forgot to look at the target_load() thing and missed the max,
+>> yes that all makes it entirely less likely.
