@@ -1,45 +1,44 @@
-From: minyard@acm.org (Corey Minyard)
-Date: Tue, 27 May 2014 19:28:06 -0500
-Subject: [PATCH] arm: Set hardirq tracing to on when idling
-In-Reply-To: <6082113.tHepRBe99K@wuerfel>
-References: <1401045323-7116-1-git-send-email-minyard@acm.org>
- <4475199.26Fs5MKAfh@wuerfel> <5384DF47.2070904@codeaurora.org>
- <6082113.tHepRBe99K@wuerfel>
-Message-ID: <53852D96.60006@acm.org>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 27 May 2014 19:37:00 -0500
+Subject: [PATCH v1] of/irq: do irq resolution in platform_get_irq_byname()
+In-Reply-To: <CAGa+x85mOHtNAj-UHgK2_z8zWAF=qwFcRcUgHTR-byNiX7heHA@mail.gmail.com>
+References: <1400582523-22684-1-git-send-email-grygorii.strashko@ti.com>
+ <20140523080333.66720C4176E@trevor.secretlab.ca>
+ <CAGa+x85mOHtNAj-UHgK2_z8zWAF=qwFcRcUgHTR-byNiX7heHA@mail.gmail.com>
+Message-ID: <CAL_JsqLm3wfVS+au+JUbhBhxz=LuVpepH6GxabCQhPowhbw77g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/2014 02:27 PM, Arnd Bergmann wrote:
-> On Tuesday 27 May 2014 11:53:59 Stephen Boyd wrote:
->> On 05/27/14 11:49, Arnd Bergmann wrote:
->>> You also commented in that thread about stop_critical_timings()/
->>> start_critical_timings(). Corey, can you look at that, too? I
->>> think it's designed to avoid the issue you are seeing but
->>> for some reason doesn't.
->> I sent a patch last week to "solve" this problem. I'm not sure if it's
->> right but it works for me.
+On Tue, May 27, 2014 at 3:23 PM, Kevin Hilman <khilman@linaro.org> wrote:
+> On Fri, May 23, 2014 at 1:03 AM, Grant Likely <grant.likely@linaro.org> wrote:
+>> On Tue, 20 May 2014 13:42:02 +0300, Grygorii Strashko <grygorii.strashko@ti.com> wrote:
+>>> The commit 9ec36cafe43bf835f8f29273597a5b0cbc8267ef
+>>> "of/irq: do irq resolution in platform_get_irq" from Rob Herring -
+>>> moves resolving of the interrupt resources in platform_get_irq().
+>>> But this solution isn't complete because platform_get_irq_byname()
+>>> need to be modified the same way.
+>>>
+>>> Hence, fix it by adding interrupt resolution code at the
+>>> platform_get_irq_byname() function too.
+>>>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>> Cc: Rob Herring <robh@kernel.org>
+>>> Cc: Tony Lindgren <tony@atomide.com>
+>>> Cc: Grant Likely <grant.likely@linaro.org>
+>>> Cc: Thierry Reding <thierry.reding@gmail.com>
+>>>
+>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 >>
->> https://lkml.org/lkml/2014/5/19/607
-> I think that one was also wrong, as the intention of the existing
-> stop_critical_timings() function is already to do the same that
-> Corey's patch does, i.e. stop the trace before we go to idle as
-> if we were turning IRQs on.
+>> Applied, Thanks.
 >
-> Corey, does it work for you if you replace the new trace_hardirqs_on()
-> you added with time_hardirqs_on() or stop_critical_timing()?
+> As of next-20150526, the ST u8500 Snowball board has been failing boot
+> in linux-next, and was bisected down to this patch (commit
+> ad69674e73a1 in -next).   Full boot failure attached.
+>
+> I have not dug any deeper, but can confirm that next-20140526 with
+> this patch reverted boots again on the snowball board.
 
-Well, more information on this.  It turns out that the generic idle loop
-calls stop_critical_timing() and start_critical timing(), so the
-arch_cpu_idle() shouldn't have to.
+There's a patch on the list which fixes it. The problem is stmmac
+driver was expecting only one error code.
 
-However, the idle loop calls rcu_idle_enter() after it calls
-stop_critical_timing(), and that is resetting the critical timing, it
-appears.  It's disabling/enabling interrupts in rcu_idle_enter().  If I
-switch the order of the rcu_idle and critical timing calls, the issue
-goes away.
-
-Stephen's patch does not seem to be necessary for my issue. I tried with
-the patch applied, too.  It doesn't seem to hurt, at least.  It did not
-fix the problem by itself, though.
-
--corey
+Rob
