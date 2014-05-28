@@ -1,80 +1,90 @@
-From: larry.bassel@linaro.org (Larry Bassel)
-Date: Wed, 28 May 2014 12:35:51 -0700
-Subject: [PATCH v5 1/2] arm64: adjust el0_sync so that a function can
- be called
-In-Reply-To: <20140528112738.GE15222@arm.com>
-References: <1401130573-7443-1-git-send-email-larry.bassel@linaro.org>
- <1401130573-7443-2-git-send-email-larry.bassel@linaro.org>
- <20140528112738.GE15222@arm.com>
-Message-ID: <20140528193542.GD7953@ubuette>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 28 May 2014 12:45:50 -0700
+Subject: [PATCH RESEND 3/5] tty/serial: Add GPIOLIB helpers for
+ controlling modem lines
+In-Reply-To: <1400005245-11943-4-git-send-email-richard.genoud@gmail.com>
+References: <1400005245-11943-1-git-send-email-richard.genoud@gmail.com>
+ <1400005245-11943-4-git-send-email-richard.genoud@gmail.com>
+Message-ID: <20140528194550.GA12735@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 May 14 12:27, Will Deacon wrote:
-> Hi Larry,
+On Tue, May 13, 2014 at 08:20:43PM +0200, Richard Genoud wrote:
+> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
+> GPIO.
+> This will be useful for many boards which have a serial controller that
+> only handle CTS/RTS pins (or even just RX/TX).
 > 
-> On Mon, May 26, 2014 at 07:56:12PM +0100, Larry Bassel wrote:
-> > To implement the context tracker properly on arm64,
-> > a function call needs to be made after debugging and
-> > interrupts are turned on, but before the lr is changed
-> > to point to ret_to_user(). If the function call
-> > is made after the lr is changed the function will not
-> > return to the correct place.
-> > 
-> > For similar reasons, defer the setting of x0 so that
-> > it doesn't need to be saved around the function call
-> > (save far_el1 in x26 temporarily instead).
-> > 
-> > Signed-off-by: Larry Bassel <larry.bassel@linaro.org>
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> Tested-by: Yegor Yefremov <yegorslists@googlemail.com>
+> ---
+>  Documentation/serial/driver            |   25 ++++++
+>  drivers/tty/serial/Kconfig             |    3 +
+>  drivers/tty/serial/Makefile            |    3 +
+>  drivers/tty/serial/serial_mctrl_gpio.c |  143 ++++++++++++++++++++++++++++++++
+>  drivers/tty/serial/serial_mctrl_gpio.h |  110 ++++++++++++++++++++++++
+>  5 files changed, 284 insertions(+)
+>  create mode 100644 drivers/tty/serial/serial_mctrl_gpio.c
+>  create mode 100644 drivers/tty/serial/serial_mctrl_gpio.h
 > 
-> [...]
-> 
-> 
-> Why have you added this mov instruction?
+> diff --git a/Documentation/serial/driver b/Documentation/serial/driver
+> index c3a7689..3bba1ae 100644
+> --- a/Documentation/serial/driver
+> +++ b/Documentation/serial/driver
+> @@ -429,3 +429,28 @@ thus:
+>  		struct uart_port	port;
+>  		int			my_stuff;
+>  	};
+> +
+> +Modem control lines via GPIO
+> +----------------------------
+> +
+> +Some helpers are provided in order to set/get modem control lines via GPIO.
+> +
+> +mctrl_gpio_init(dev, idx):
+> +	This will get the {cts,rts,...}-gpios from device tree if they are
+> +	present and request them, set direction etc, and return an
+> +	allocated structure. devm_* functions are used, so there's no need
+> +	to call mctrl_gpio_free().
+> +
+> +mctrl_gpio_free(dev, gpios):
+> +	This will free the requested gpios in mctrl_gpio_init().
+> +	As devm_* function are used, there's generally no need to call
+> +	this function.
+> +
+> +mctrl_gpio_to_gpiod(gpios, gidx)
+> +	This returns the gpio structure associated to the modem line index.
+> +
+> +mctrl_gpio_set(gpios, mctrl):
+> +	This will sets the gpios according to the mctrl state.
+> +
+> +mctrl_gpio_get(gpios, mctrl):
+> +	This will update mctrl with the gpios values.
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index 5d9b01a..95afd31 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -1510,4 +1510,7 @@ config SERIAL_ST_ASC_CONSOLE
+>  
+>  endmenu
+>  
+> +config SERIAL_MCTRL_GPIO
+> +	tristate
 
-I believe (please correct me if I'm wrong) that it is necessary.
-Here is why:
+Why is this added here?  Who is going to use it?
 
-> > @@ -476,23 +481,27 @@ el0_undef:
-> >  	// enable interrupts before calling the main handler
-> >  	enable_dbg_and_irq
-> >  	mov	x0, sp
-> > +	adr	lr, ret_to_user
-> >  	b	do_undefinstr
-> >  el0_dbg:
-> >  	/*
-> >  	 * Debug exception handling
-> >  	 */
-> >  	tbnz	x24, #0, el0_inv		// EL0 only
-> > -	mrs	x0, far_el1
-> > +	mrs	x26, far_el1
+> +
+>  endif # TTY
+> diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
+> index 3680854..bcf31da 100644
+> --- a/drivers/tty/serial/Makefile
+> +++ b/drivers/tty/serial/Makefile
+> @@ -87,3 +87,6 @@ obj-$(CONFIG_SERIAL_EFM32_UART) += efm32-uart.o
+>  obj-$(CONFIG_SERIAL_ARC)	+= arc_uart.o
+>  obj-$(CONFIG_SERIAL_RP2)	+= rp2.o
+>  obj-$(CONFIG_SERIAL_FSL_LPUART)	+= fsl_lpuart.o
+> +
+> +# GPIOLIB helpers for modem control lines
+> +obj-$(CONFIG_SERIAL_MCTRL_GPIO) += serial_mctrl_gpio.o
 
-needed because do_debug_exception may clobber x0, so save far_el1
-in x26 (as other parts of this patch do)
-
-> > +	mov	x0, x26
-
-needed because far_el1 is expected to be in x0 here
-
-> >  	mov	x1, x25
-> >  	mov	x2, sp
-> >  	bl	do_debug_exception
-> >  	enable_dbg
-
-[call to ct_user_exit will go here in the next patch, this may re-clobber x0]
-
-> > +	mov	x0, x26
-
-needed because far_el1 is expected to be in x0 here
-
-Since the purpose of this patch is to make calling a function
-possible in this code path, the "extra" mov instruction above
-is necessary and IMHO should be added in this patch and not in the
-next one whose purpose is to define the ct_user_* macros and
-add calls to them in the proper places.
-
-> >  	b	ret_to_user
-> 
-> Will
-
-Larry
+This chunk doesn't apply anymore :(
