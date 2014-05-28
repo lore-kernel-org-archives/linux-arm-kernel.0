@@ -1,38 +1,74 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 28 May 2014 16:59:31 +0100
-Subject: EFI_STUB fails to boot non-EFI on arm64
-In-Reply-To: <20140523150331.GS4179@bivouac.eciton.net>
-References: <20140523094513.GC9252@arm.com>
- <20140523131656.GR4179@bivouac.eciton.net>
- <20140523134720.GA9256@arm.com>
- <20140523150331.GS4179@bivouac.eciton.net>
-Message-ID: <20140528155931.GA20523@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 28 May 2014 12:59:43 -0300
+Subject: [PATCH] ahci: imx: manage only sata_ref_clk in
+ imx_sata_enable[disable]
+In-Reply-To: <5386026C.1010603@redhat.com>
+References: <1401289539-3485-1-git-send-email-shawn.guo@freescale.com>
+ <5386026C.1010603@redhat.com>
+Message-ID: <CAOMZO5BkdkU-_s8G5CqVMzfkMgxdUg8bx0JJnqC8dPyFMK=Ocw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 04:03:31PM +0100, Leif Lindholm wrote:
-> On Fri, May 23, 2014 at 02:47:20PM +0100, Catalin Marinas wrote:
-> > Can we add another of detecting whether it's an EFI application and
-> > avoid calling efi_init()? I can see x86 sets some efi_loader_signature
-> > string in exit_boot() and checks against it later when calling
-> > efi_init().
-> 
-> Well, I agree that we shouldn't be spewing error messages for expected
-> operation, but efi_init() is the function we call to determine
-> whether we _are_ booting via UEFI - and it sets flags accordingly for
-> the efi_enabled() macro.
-> 
-> My view is that this should be fixed in fdt_find_uefi_params(). A
-> single info message that we can't find evidence of UEFI should be
-> printed in the non-error case.
-> 
-> Like below?
+Hans,
 
-Why not move the efi_get_fdt_params call out of efi_init and into
-setup_arch via a wrapper? Then efi_get_fdt_params and efi_init can have
-useful return values, which allow us to distinguish between "My DT doesn't
-have the necessary UEFI properties" and "UEFI failed to initialise" without
-having to make some printks pr_info and others pr_err within efi_init
-itself..
+On Wed, May 28, 2014 at 12:36 PM, Hans de Goede <hdegoede@redhat.com> wrote:
 
-Will
+> The proper fix is obvious, if we've shutdown everything due to there
+> not being a device present at the initial probe, don't call
+> ahci_platform_resume_host on resume, as is done in the attached patch.
+
+I tested your attached patch. It does not build as it lacks to add the
+definition of imxpriv inside the suspend/resume functions. After
+fixing it I get:
+
+root at freescale /$ echo mem > /sys/power/state
+PM: Syncing filesystems ... done.
+Freezing user space processes ... (elapsed 0.002 seconds) done.
+Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
+PM: suspend of devices complete after 91.109 msecs
+PM: suspend devices took 0.100 seconds
+PM: late suspend of devices complete after 9.086 msecs
+PM: noirq suspend of devices complete after 8.780 msecs
+Disabling non-boot CPUs ...
+CPU1: shutdown
+CPU2: shutdown
+CPU3: shutdown
+Enabling non-boot CPUs ...
+CPU1: Booted secondary processor
+CPU1 is up
+CPU2: Booted secondary processor
+CPU2 is up
+CPU3: Booted secondary processor
+CPU3 is up
+PM: noirq resume of devices complete after 6.914 msecs
+PM: early resume of devices complete after 5.160 msecs
+PM: resume of devices complete after 167.025 msecs
+PM: resume devices took 0.180 seconds
+Restarting tasks ... done.
+ata1: failed to resume link (SControl 2003)
+random: nonblocking pool is initialized
+root at freescale /$ ata1: softreset failed (1st FIS failed)
+ata1: failed to resume link (SControl 2003)
+ata1: softreset failed (1st FIS failed)
+ata1: failed to resume link (SControl 2003)
+ata1: softreset failed (1st FIS failed)
+ata1: limiting SATA link speed to 1.5 Gbps
+ata1: failed to resume link (SControl 2003)
+ata1: softreset failed (1st FIS failed)
+ata1: reset failed, giving up
+
+With Shawn's version I  do not get the suspend error messages:
+...
+CPU1: Booted secondary processor
+CPU1 is up
+CPU2: Booted secondary processor
+CPU2 is up
+CPU3: Booted secondary processor
+CPU3 is up
+PM: noirq resume of devices complete after 5.836 msecs
+PM: early resume of devices complete after 5.334 msecs
+PM: resume of devices complete after 176.763 msecs
+PM: resume devices took 0.190 seconds
+Restarting tasks ... done.
+ata1: SATA link down (SStatus 0 SControl 300)
+random: nonblocking pool is initialized
