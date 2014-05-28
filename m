@@ -1,61 +1,167 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 28 May 2014 12:33:51 +0200
-Subject: [PATCH 03/11] pinctrl: sunxi: Move setting of mux to irq type
- from unmask to set_type
-In-Reply-To: <5385B1B8.8070803@redhat.com>
-References: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>
- <1401090486-4414-4-git-send-email-hdegoede@redhat.com>
- <CACRpkdZcGJTXfcxN_sogm+hYHM56d_VxtuZqth0t-c2mgAJ0vA@mail.gmail.com>
- <20140528093653.GN4730@lukather> <5385B1B8.8070803@redhat.com>
-Message-ID: <20140528103351.GQ4730@lukather>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 28 May 2014 11:36:25 +0100
+Subject: [PATCH v4 1/5] devicetree: bindings: document Broadcom CPU
+ enable method
+In-Reply-To: <53855867.7050800@linaro.org>
+References: <1400607830-10989-1-git-send-email-elder@linaro.org>
+ <1400607830-10989-2-git-send-email-elder@linaro.org>
+ <20140527114958.GC18476@e102568-lin.cambridge.arm.com>
+ <53855867.7050800@linaro.org>
+Message-ID: <20140528103625.GA29219@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 11:51:52AM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 05/28/2014 11:36 AM, Maxime Ripard wrote:
-> > On Tue, May 27, 2014 at 04:18:29PM +0200, Linus Walleij wrote:
-> >> On Mon, May 26, 2014 at 9:47 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+On Wed, May 28, 2014 at 04:30:47AM +0100, Alex Elder wrote:
+> On 05/27/2014 06:49 AM, Lorenzo Pieralisi wrote:
+> > On Tue, May 20, 2014 at 06:43:46PM +0100, Alex Elder wrote:
+> >> Broadcom mobile SoCs use a ROM-implemented holding pen for
+> >> controlled boot of secondary cores.  A special register is
+> >> used to communicate to the ROM that a secondary core should
+> >> start executing kernel code.  This enable method is currently
+> >> used for members of the bcm281xx and bcm21664 SoC families.
 > >>
-> >>> With level triggered interrupt mask / unmask will get called for each
-> >>> interrupt, doing the somewhat expensive mux setting on each unmask thus is
-> >>> not a good idea. Instead move it to the set_type callback, which is typically
-> >>> done only once for each irq.
-> >>>
-> >>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >> The use of an enable method also allows the SMP operation vector to
+> >> be assigned as a result of device tree content for these SoCs.
 > >>
-> >> Yes move it out of mask/unmask but no, not into set_type().
-> >>
-> >> Can you not use the irqchip startup()/shutdown() callbacks
-> >> instead?
+> >> Signed-off-by: Alex Elder <elder@linaro.org>
 > > 
-> > I think we can use irq_request_resources then
-> > https://lkml.org/lkml/2014/3/12/307
+> > This is getting out of control, it is absolutely ghastly. I wonder how
+> > I can manage to keep cpus.txt updated if anyone with a boot method
+> > du jour adds into cpus.txt, and honestly in this specific case it is even
+> > hard to understand why.
 > 
-> Sounds good, I'll modify the patch to move it here before posting a v2 of
-> this series. Note v2 likely won't happen till this weekend, -ENOTIME.
+> OK, in this message I'll focus on the particulars of this
+> proposed binding.
 > 
-> > We could even merge the gpio_to_irq code into it.
+> > Can't it be done with bindings for the relative register address space
+> > (regmap ?) and platform code just calls the registers driver to set-up the
+> > jump address ? It is platform specific code anyway there is no way you
+> > can make this generic.
 > 
-> Erm, no we need that as a separate function for the gpio_chip's to_irq
-> callback.
+> I want to clarify what you're after here.
+> 
+> My aim is to add SMP support for a class of Broadcom SMP
+> machines.  To do so, I'm told I need to use the technique
+> of assigning the SMP operations vector as a result of
+> identifying an enable method in the DT.
+> 
+> For 32-bit ARM, there are no generic "enable-method" values.
+> (I did attempt to create one for "spin-table" but that was
+> rejected by Russell King.)  For the machines I'm trying to
+> enable, secondary CPUS start out spinning in a ROM-based
+> holding pen, and there is no need for a kernel-based one.
+> 
+> However, like a spin-table/holding pen enable method, a
+> memory location is required for coordination between the
+> boot CPU running kernel code and secondary CPUs running ROM
+> code.  My proposal specifies it using a special numeric
+> property value named "secondary-boot-reg" in the "cpus"
+> node in the DT.
+> 
+> And as I understand it, the issue you have relates to how
+> this memory location is specified.
 
-Linus sent a patch stating otherwise a few weeks ago, and was
-suggesting moving it to irq_startup.
+The issue I have relates to cluttering cpus.txt with all
+sorts of platform specific SMP boot hacks.
 
-https://lkml.org/lkml/2014/5/9/50
+> You suggest regmap.  I'm using a single 32-bit register,
+> only at very early boot time, and thereafter access to
+> it is meaningless.  It seems like overkill if it's only
+> used for this purpose.  I could hide the register values
+> in the code, but with the exception of that, the code I'm
+> using is generic (in the context of this class of Broadcom
+> machine).  I could specify the register differently somehow,
+> in a different node, or with a different property.
 
-Maxime
+Is that register part of a larger registers block ? What I wanted
+to say is that you can use a driver "API" (we wish) to write that
+register, something like eg vexpress does with sysflags:
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140528/4f0e6e7a/attachment.sig>
+drivers/mfd/vexpress-sysreg.c
+
+vexpress_flags_set()
+
+instead of grabbing the reg address from a platform specific boot
+method DT entry.
+
+I doubt that register exists on its own, even though I have to say this
+would force you to write yet another platform specific driver to control
+a bunch of registers, I do not see any other solution.
+
+One thing is for certain: I really do not see the point in adding a boot
+method per-SoC, and I do not want to end up having a cpus.txt file with a
+gazillion entries just because every given platform reinvents the wheel when
+it comes to booting an SMP system, cpus.txt would become a document that
+describes platform quirks, not a proper binding anymore.
+
+At least all platform specific quirks must be moved out of cpus.txt and
+in platform documentation, I understand it is just a cosmetic change but
+I want to prevent cpus.txt to become an abomination.
+
+> The bottom line here is I'm not sure whether I understand
+> what you're suggesting, or perhaps why what you suggest is
+> preferable.  I'm very open to suggestions, I just need it
+> laid out a bit more detail in order to respond directly.
+
+See above.
+
+Thanks !
+Lorenzo
+
+> 
+> Thanks.
+> 
+> 					-Alex
+> 
+> > I really do not see the point in cluttering cpus.txt with this stuff, it
+> > is a platform specific hack, and do not belong in generic bindings in my
+> > opinion.
+> > 
+> > Thanks,
+> > Lorenzo
+> > 
+> >> ---
+> >>  Documentation/devicetree/bindings/arm/cpus.txt | 12 ++++++++++++
+> >>  1 file changed, 12 insertions(+)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> >> index 333f4ae..c6a2411 100644
+> >> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> >> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> >> @@ -185,6 +185,7 @@ nodes to be present and contain the properties described below.
+> >>  			    "qcom,gcc-msm8660"
+> >>  			    "qcom,kpss-acc-v1"
+> >>  			    "qcom,kpss-acc-v2"
+> >> +			    "brcm,bcm11351-cpu-method"
+> >>  
+> >>  	- cpu-release-addr
+> >>  		Usage: required for systems that have an "enable-method"
+> >> @@ -209,6 +210,17 @@ nodes to be present and contain the properties described below.
+> >>  		Value type: <phandle>
+> >>  		Definition: Specifies the ACC[2] node associated with this CPU.
+> >>  
+> >> +	- secondary-boot-reg
+> >> +		Usage:
+> >> +			Required for systems that have an "enable-method"
+> >> +			property value of "brcm,bcm11351-cpu-method".
+> >> +		Value type: <u32>
+> >> +		Definition:
+> >> +			Specifies the physical address of the register used to
+> >> +			request the ROM holding pen code release a secondary
+> >> +			CPU.  The value written to the register is formed by
+> >> +			encoding the target CPU id into the low bits of the
+> >> +			physical start address it should jump to.
+> >>  
+> >>  Example 1 (dual-cluster big.LITTLE system 32-bit):
+> >>  
+> >> -- 
+> >> 1.9.1
+> >>
+> >>
+> > 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
