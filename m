@@ -1,51 +1,40 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 28 May 2014 11:51:52 +0200
-Subject: [PATCH 03/11] pinctrl: sunxi: Move setting of mux to irq type
- from unmask to set_type
-In-Reply-To: <20140528093653.GN4730@lukather>
-References: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>
- <1401090486-4414-4-git-send-email-hdegoede@redhat.com>
- <CACRpkdZcGJTXfcxN_sogm+hYHM56d_VxtuZqth0t-c2mgAJ0vA@mail.gmail.com>
- <20140528093653.GN4730@lukather>
-Message-ID: <5385B1B8.8070803@redhat.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Wed, 28 May 2014 02:54:23 -0700
+Subject: [PATCH 09/12] scsi/NCR5380: fix and standardize NDEBUG macros
+In-Reply-To: <20140318004215.292486266@telegraphics.com.au>
+References: <20140318004212.612472697@telegraphics.com.au>
+ <20140318004215.292486266@telegraphics.com.au>
+Message-ID: <20140528095423.GI26617@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 05/28/2014 11:36 AM, Maxime Ripard wrote:
-> On Tue, May 27, 2014 at 04:18:29PM +0200, Linus Walleij wrote:
->> On Mon, May 26, 2014 at 9:47 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->>
->>> With level triggered interrupt mask / unmask will get called for each
->>> interrupt, doing the somewhat expensive mux setting on each unmask thus is
->>> not a good idea. Instead move it to the set_type callback, which is typically
->>> done only once for each irq.
->>>
->>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>
->> Yes move it out of mask/unmask but no, not into set_type().
->>
->> Can you not use the irqchip startup()/shutdown() callbacks
->> instead?
+On Tue, Mar 18, 2014 at 11:42:21AM +1100, Finn Thain wrote:
+> All three NCR5380 core driver implementations share the same NCR5380.h
+> header file so they need to agree on certain macro definitions.
 > 
-> I think we can use irq_request_resources then
-> https://lkml.org/lkml/2014/3/12/307
+> The flag bit used by the NDEBUG_MERGING macro in atari_NCR5380 and
+> sun3_NCR5380 collides with the bit used by NDEBUG_LISTS.
+> 
+> Moreover, NDEBUG_ABORT appears in NCR5380.c so it should be defined in
+> NCR5380.h rather than in each of the many drivers using that core.
+> 
+> An undefined NDEBUG_ABORT macro caused compiler errors and led to dodgy
+> workarounds in the core driver that can now be removed.
+> (See commits f566a576bca09de85bf477fc0ab2c8c96405b77b and
+> 185a7a1cd79b9891e3c17abdb103ba1c98d6ca7a.)
+> 
+> Move all of the NDEBUG_ABORT, NDEBUG_TAGS and NDEBUG_MERGING macro
+> definitions into NCR5380.h where all the other NDEBUG macros live.
+> 
+> Also, incorrect "#ifdef NDEBUG" becomes "#if NDEBUG" to fix the warning:
+> drivers/scsi/mac_scsi.c: At top level:
+> drivers/scsi/NCR5380.c:418: warning: 'NCR5380_print' defined but not used
+> drivers/scsi/NCR5380.c:459: warning: 'NCR5380_print_phase' defined but not used
+> 
+> The debugging code is now enabled when NDEBUG != 0.
+> 
+> Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
 
-Sounds good, I'll modify the patch to move it here before posting a v2 of
-this series. Note v2 likely won't happen till this weekend, -ENOTIME.
+Looks good,
 
-> We could even merge the gpio_to_irq code into it.
-
-Erm, no we need that as a separate function for the gpio_chip's to_irq
-callback.
-
-> It's called in __setup_irq, so it's guaranteed to be called, and it
-> will bail out early without doing anything, since it's one of the
-> first thing __setup_irq does.
-
-Right, as I said above, this sounds good.
-
-Regards,
-
-Hans
+Reviewed-by: Christoph Hellwig <hch@lst.de>
