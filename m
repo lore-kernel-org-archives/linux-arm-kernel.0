@@ -1,28 +1,18 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Wed, 28 May 2014 03:41:14 -0700
-Subject: [PATCH] acornscsi: remove linked command support
-In-Reply-To: <1400926433.31526.89.camel@x220>
-References: <1400926433.31526.89.camel@x220>
-Message-ID: <20140528104114.GE13542@infradead.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 28 May 2014 19:41:41 +0900
+Subject: [RFC] Sort out S5P SoCs support in mainline
+Message-ID: <021f01cf7a61$69853e30$3c8fba90$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 24, 2014 at 12:13:53PM +0200, Paul Bolle wrote:
-> The acornscsi driver was added in v2.1.88. It has always #undef-ed
-> CONFIG_SCSI_ACORNSCSI_LINK near the top of acornscsi.c. And, just to be
-> sure, it has also always triggered a preprocessor error if
-> CONFIG_SCSI_ACORNSCSI_LINK was still defined. But, as far as I can see,
-> it has never even been possible to set SCSI_ACORNSCSI_LINK through
-> kconfig, or its predecessors, in the first place.
-> 
-> Let's remove the code involved.
-> 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+Hi all,
 
-Looks good,
+I'm wondering who need to support following SoCs/boards in mainline.
 
-Reviewed-by: Christoph Hellwig <hch@lst.de>
+* S5P64X0/SMDK6440 and SMDK6450
+* S5PC100/SMDKC100
 
-And I have to disagree with James here, removing code that isn't even
-compiled always is an improvement, especially for an unmaintained
-driver.
+If nobody is using them, how about to remove them from mainline?
+
+Thanks,
+Kukjin
