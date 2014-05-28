@@ -1,74 +1,53 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 28 May 2014 12:59:43 -0300
-Subject: [PATCH] ahci: imx: manage only sata_ref_clk in
- imx_sata_enable[disable]
-In-Reply-To: <5386026C.1010603@redhat.com>
-References: <1401289539-3485-1-git-send-email-shawn.guo@freescale.com>
- <5386026C.1010603@redhat.com>
-Message-ID: <CAOMZO5BkdkU-_s8G5CqVMzfkMgxdUg8bx0JJnqC8dPyFMK=Ocw@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 28 May 2014 18:17:10 +0200
+Subject: [RFC PATCH 2/5] clk: Introduce 'clk_round_rate_nearest()'
+In-Reply-To: <20140528020531.7816.5349@quantum>
+References: <20140521073457.GD31687@pengutronix.de>
+ <9956925.Qsz2bH3rDg@vostro.rjw.lan> <20140528020531.7816.5349@quantum>
+Message-ID: <1731476.hDvqXAW3JF@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hans,
+On Tuesday, May 27, 2014 07:05:31 PM Mike Turquette wrote:
+> Quoting Rafael J. Wysocki (2014-05-26 04:22:32)
+> > On Monday, May 26, 2014 11:59:09 AM Viresh Kumar wrote:
+> > > On 23 May 2014 21:44, S?ren Brinkmann <soren.brinkmann@xilinx.com> wrote:
+> > > > Viresh: Could you imagine something similar for cpufreq? You suggested
+> > > > migrating to Hz resolution. I guess that would ideally mean to follow
+> > > > the CCF to a 64-bit type for frequencies and increasing the resolution.
+> > > > I have a messy patch migrating cpufreq and OPP to Hz and unsigned long
+> > > > that works on Zynq. But cpufreq has so many users that it would become
+> > > > quite an undertaking.
+> > > > And we'd need some new/amended OPP DT binding.
+> > > 
+> > > If we are going to migrate to Hz from KHz, I think we must consider the
+> > > 64 bit stuff right now, otherwise it will bite us later.
+> > > 
+> > > @Rafael: What do you think?
+> > 
+> > I agree as far as the 64-bit thing goes, but is switching to Hz really
+> > necessary?
+> 
+> Rafael,
+> 
+> Why should CPUfreq migrate to 64-bit if not switching to Hz? CPU clock
+> rates are specified as KHz in CPUfreq via an unsigned int. On 32-bit
+> systems that comes out to a max of 4.29THz (terahertz!)!
+> 
+> Or maybe you meant, "I agree that the clock framework should switch to
+> the 64-bit thing"?
 
-On Wed, May 28, 2014 at 12:36 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+That should have been something like "If we were to switch to Hz
+resolution, it would be necessary to switch over to 64-bit too".
 
-> The proper fix is obvious, if we've shutdown everything due to there
-> not being a device present at the initial probe, don't call
-> ahci_platform_resume_host on resume, as is done in the attached patch.
+> Personally I'd like to see the clock framework and cpufreq get on the
+> same page (data type) for specifying clock rates, and the clock
+> framework really should not use a granularity like KHz. In fact we have
+> some fractional rates like 13.25Hz ...
 
-I tested your attached patch. It does not build as it lacks to add the
-definition of imxpriv inside the suspend/resume functions. After
-fixing it I get:
+Well, as I said.  There's a cost to that and it is not particularly
+clear to me whether or not that cost is justifiable.  And some architectures
+don't even use the clock framework for cpufreq, mind you.  How many of them
+do, actually?
 
-root at freescale /$ echo mem > /sys/power/state
-PM: Syncing filesystems ... done.
-Freezing user space processes ... (elapsed 0.002 seconds) done.
-Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
-PM: suspend of devices complete after 91.109 msecs
-PM: suspend devices took 0.100 seconds
-PM: late suspend of devices complete after 9.086 msecs
-PM: noirq suspend of devices complete after 8.780 msecs
-Disabling non-boot CPUs ...
-CPU1: shutdown
-CPU2: shutdown
-CPU3: shutdown
-Enabling non-boot CPUs ...
-CPU1: Booted secondary processor
-CPU1 is up
-CPU2: Booted secondary processor
-CPU2 is up
-CPU3: Booted secondary processor
-CPU3 is up
-PM: noirq resume of devices complete after 6.914 msecs
-PM: early resume of devices complete after 5.160 msecs
-PM: resume of devices complete after 167.025 msecs
-PM: resume devices took 0.180 seconds
-Restarting tasks ... done.
-ata1: failed to resume link (SControl 2003)
-random: nonblocking pool is initialized
-root at freescale /$ ata1: softreset failed (1st FIS failed)
-ata1: failed to resume link (SControl 2003)
-ata1: softreset failed (1st FIS failed)
-ata1: failed to resume link (SControl 2003)
-ata1: softreset failed (1st FIS failed)
-ata1: limiting SATA link speed to 1.5 Gbps
-ata1: failed to resume link (SControl 2003)
-ata1: softreset failed (1st FIS failed)
-ata1: reset failed, giving up
-
-With Shawn's version I  do not get the suspend error messages:
-...
-CPU1: Booted secondary processor
-CPU1 is up
-CPU2: Booted secondary processor
-CPU2 is up
-CPU3: Booted secondary processor
-CPU3 is up
-PM: noirq resume of devices complete after 5.836 msecs
-PM: early resume of devices complete after 5.334 msecs
-PM: resume of devices complete after 176.763 msecs
-PM: resume devices took 0.190 seconds
-Restarting tasks ... done.
-ata1: SATA link down (SStatus 0 SControl 300)
-random: nonblocking pool is initialized
+Rafael
