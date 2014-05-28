@@ -1,38 +1,27 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 28 May 2014 21:19:55 +0100
-Subject: [PATCH v8 5/8] arm64: Add ftrace support
-In-Reply-To: <1398851676-16389-6-git-send-email-takahiro.akashi@linaro.org>
-References: <1394862048-28758-1-git-send-email-takahiro.akashi@linaro.org>
- <1398851676-16389-1-git-send-email-takahiro.akashi@linaro.org>
- <1398851676-16389-6-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140528201955.GJ5099@sirena.org.uk>
+Date: Wed, 28 May 2014 21:23:27 +0100
+Subject: [PATCH] net: ks8851: Don't use regulator_get_optional()
+In-Reply-To: <1401307872-23190-1-git-send-email-sboyd@codeaurora.org>
+References: <1401307872-23190-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140528202327.GK5099@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 06:54:33PM +0900, AKASHI Takahiro wrote:
+On Wed, May 28, 2014 at 01:11:12PM -0700, Stephen Boyd wrote:
+> We shouldn't be using regulator_get_optional() here. These
+> regulators are always present as part of the physical design and
+> there isn't any way to use an internal regulator or change the
+> source of the reference voltage via software. Given that the only
+> users of this driver in the kernel are DT based, this change
+> should be transparent to them even if they don't specify any
+> supplies because the regulator framework will insert dummy
+> supplies as needed.
 
-> +/*
-> + * arch/arm64/kernel/entry-ftrace.S
-> + *
-> + * Copyright (C) 2013 Linaro Limited
-> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/linkage.h>
-> +#include <asm/ftrace.h>
-> +#include <asm/insn.h>
-
-asm/insn.h contains a bunch of C stuff which won't build without
-__ASSEMBLY__ guards unless I'm missing something (I'm working with a
-non-mainline tree so I might be).
+Reviewed-by: Mark Brown <broonie@linaro.org>
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140528/d1863090/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140528/1c7cff8e/attachment.sig>
