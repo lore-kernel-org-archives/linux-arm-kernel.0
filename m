@@ -1,39 +1,45 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 28 May 2014 11:53:34 -0700
-Subject: [PATCH v3 1/5] sc_phy:SmartCard(SC) PHY interface to SC controller
-In-Reply-To: <1401267437-22489-2-git-send-email-satish.patel@ti.com>
-References: <1401267437-22489-1-git-send-email-satish.patel@ti.com>
- <1401267437-22489-2-git-send-email-satish.patel@ti.com>
-Message-ID: <20140528185334.GA30763@kroah.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 28 May 2014 19:50:51 +0100
+Subject: [PATCH 3/5] regulator: axp20x: Update the bindings to use a
+ local parent regulator
+In-Reply-To: <1401297069-7423-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1401297069-7423-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1401297069-7423-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140528185051.GB22488@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 02:27:13PM +0530, Satish Patel wrote:
-> SmartCard controller uses this interface to communicate with
-> SmartCard via PHY
-> 
-> Some SmartCard PHY has multiple slots for cards.
-> This inerface also enables controller to communicate
-> with one or more SmartCard connected over phy.
-> 
-> interface structure includes following APIs
-> - set/get config
-> - activate/deactivate smart card
-> - warm reset
-> - register_notify (for card insert/remove/overheat)
-> - unregister_notify
-> 
-> Signed-off-by: Satish Patel <satish.patel@ti.com>
-> ---
->  Documentation/sc_phy.txt |  171 ++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/sc_phy.h   |  136 ++++++++++++++++++++++++++++++++++++
->  2 files changed, 307 insertions(+)
->  create mode 100644 Documentation/sc_phy.txt
->  create mode 100644 include/linux/sc_phy.h
+On Wed, May 28, 2014 at 07:11:07PM +0200, Maxime Ripard wrote:
 
-These are .h files, but where is the "api" functions that use
-these structures defined at?
+>  		axp_vcore_reg: dcdc2 {
+> +			vin-supply = <&axp_ipsout_reg>;
 
-confused,
+>  		axp_ddr_reg: dcdc3 {
+> +			vin-supply = <&axp_ipsout_reg>;
 
-greg k-h
+>  		axp_rtc_reg: ldo1 {
+> +			vin-supply = <&axp_ipsout_reg>;
+
+>  		axp_analog_reg: ldo2 {
+> +			vin-supply = <&axp_ipsout_reg>;
+
+>  		axp_pll_reg: ldo3 {
+> +			vin-supply = <&axp_ipsout_reg>;
+
+>  		axp_hdmi_reg: ldo4 {
+> +			vin-supply = <&axp_ipsout_reg>;
+
+>  		axp_mic_reg: ldo5 {
+> +			vin-supply = <&axp_ipsout_reg>;
+
+This is saying that every single regulator on the device is powered by a
+(presumably) single input called "vin".  This would certainly be an
+unusual package design...  As ever the name of the supply should follow
+the name of the pin on the device.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140528/742d1fba/attachment.sig>
