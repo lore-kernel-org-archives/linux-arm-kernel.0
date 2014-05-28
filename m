@@ -1,63 +1,151 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 28 May 2014 12:52:36 -0300
-Subject: [PATCH] ahci: imx: manage only sata_ref_clk in
- imx_sata_enable[disable]
-In-Reply-To: <1401289539-3485-1-git-send-email-shawn.guo@freescale.com>
-References: <1401289539-3485-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <CAOMZO5D4-Xij3MudRGzBcVmeGekfsmExSyeZgRMUMFbFbXW1+A@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 28 May 2014 10:52:45 -0500
+Subject: [PATCH 03/17] phy: ti-pipe3: add external clock support for PCIe
+ PHY
+In-Reply-To: <20140528015441.7816.62452@quantum>
+References: <1399383244-14556-1-git-send-email-kishon@ti.com>
+ <5373897C.6080504@ti.com>
+ <CAGo_u6qw1OomEw_ueb3x+xT+qZLAfGv7Se1K=o725aOoD3ankQ@mail.gmail.com>
+ <5374859F.5080902@ti.com> <53748819.8060705@ti.com>
+ <CAGo_u6qbbdAbdvrB3AFXSH1qD5MaBkJbi6oJJvvTWW4xfbmd_Q@mail.gmail.com>
+ <5374AC0A.7070709@ti.com>
+ <CAGo_u6r8XtGHOvsfJKQMZ2ghFRz8x8_UhzyKE9jnwO6mJ2HYpQ@mail.gmail.com>
+ <5374B09F.2080803@ti.com> <5374B409.3000607@ti.com>
+ <20140528015441.7816.62452@quantum>
+Message-ID: <CAGo_u6pyoAr7RbhmSwmuk_vPhkBOb9F5YA=m7dNtJWsfprvu5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 12:05 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> Doing suspend/resume on imx6q and imx53 boards with no SATA disk
-> attached will trigger the following warning.
+On Tue, May 27, 2014 at 8:54 PM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Nishanth Menon (2014-05-15 05:33:13)
+>> On 05/15/2014 07:18 AM, Kishon Vijay Abraham I wrote:
+>> > Hi,
+>> >
+>> > On Thursday 15 May 2014 05:42 PM, Nishanth Menon wrote:
+>> >> On Thu, May 15, 2014 at 6:59 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> >>> Hi Nishant,
+>> >>>
+>> >>> On Thursday 15 May 2014 05:16 PM, Nishanth Menon wrote:
+>> >>>> On Thu, May 15, 2014 at 4:25 AM, Roger Quadros <rogerq@ti.com> wrote:
+>> >>>>> On 05/15/2014 12:15 PM, Kishon Vijay Abraham I wrote:
+>> >>>>>> Hi Nishanth,
+>> >>>>>>
+>> >>>>>> On Wednesday 14 May 2014 09:04 PM, Nishanth Menon wrote:
+>> >>>>>>> On Wed, May 14, 2014 at 10:19 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> >>>>>>>> Hi Roger,
+>> >>>>>>>>
+>> >>>>>>>> On Wednesday 14 May 2014 06:46 PM, Roger Quadros wrote:
+>> >>>>>>>>> Hi Kishon,
+>> >>>>>>>>>
+>> >>>>>>>>> On 05/06/2014 04:33 PM, Kishon Vijay Abraham I wrote:
+>> >>>>>>>>>> APLL used by PCIE phy can either use external clock as input or the clock
+>> >>>>>>>>>> from DPLL. Added support for the APLL to use external clock as input here.
+>> >>>>>>>>>>
+>> >>>>>>>>>> Cc: Rajendra Nayak <rnayak@ti.com>
+>> >>>>>>>>>> Cc: Tero Kristo <t-kristo@ti.com>
+>> >>>>>>>>>> Cc: Paul Walmsley <paul@pwsan.com>
+>> >>>>>>>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> >>>>>>>>>> ---
+>> >>>>>>>>>>  Documentation/devicetree/bindings/phy/ti-phy.txt |    4 ++
+>> >>>>>>>>>>  drivers/phy/phy-ti-pipe3.c                       |   75 ++++++++++++++--------
+>> >>>>>>>>>>  2 files changed, 52 insertions(+), 27 deletions(-)
+>> >>>>>>>>>>
+>> >>>>>>>>>> diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
+>> >>>>>>>>>> index bc9afb5..d50f8ee 100644
+>> >>>>>>>>>> --- a/Documentation/devicetree/bindings/phy/ti-phy.txt
+>> >>>>>>>>>> +++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
+>> >>>>>>>>>> @@ -76,6 +76,10 @@ Required properties:
+>> >>>>>>>>>>     * "dpll_ref_m2" - external dpll ref clk
+>> >>>>>>>>>>     * "phy-div" - divider for apll
+>> >>>>>>>>>>     * "div-clk" - apll clock
+>> >>>>>>>>>> +   * "apll_mux" - mux for pcie apll
+>> >>>>>>>>>> +   * "refclk_ext" - external reference clock for pcie apll
+>> >>>>>>>>>> + - ti,ext-clk: To specifiy if PCIE apll should use external clock. Applicable
+>> >>>>>>>>>> +   only to PCIE PHY.
+>> >>>>>>>>>
+>> >>>>>>>>> Instead of specifying both clock sources "dpll_ref_clock", "refclk_ext" and then specifying a 3rd control option "ti,ext-clk" to select one of the 2 sources, why can't the DT just supply one clock source, i.e. the one that is being used in the board instance? The driver should then just configure the clock rate that is needed at that node. Shouldn't the clock framework automatically take care of muxing and parent rates?
+>> >>>>>>>>
+>> >>>>>>>> Want the dt to have all the clocks used by the controller. "ti,ext-clk" should
+>> >>>>>>>> go in the board dt file (suggested by Nishanth).
+>> >>>>>>>> The point is at some point later if some one wants to change the clock source,
+>> >>>>>>>> it should be a simple enabling "ti,ext-clk" flag instead of finding the clock
+>> >>>>>>>> phandle etc..
+>> >>>>>>>
+>> >>>>>>> Wonder if that is implicit by the presence of  "refclk_ext" in the
+>> >>>>>>> clocks provided?
+>> >>>>>>
+>> >>>>>> IMO the presence of "refclk_ext" is useless unless the board indicates it
+>> >>>>>> provides the clock source.
+>> >>>>>>
+>> >>>>>> refclk_ext holds phandle for *fixed-clock*, so irrespective of whether the
+>> >>>>>> board provides a clock or not, it can have that handle for configuring in PRCM.
+>> >>>>>> However if the board does not provide the clock source, configuring refclk_ext
+>> >>>>>> in PRCM is useless.
+>> >>>>>
+>> >>>>> I think what Nishant meant is that if "refclk_ext" is provided it means that the driver
+>> >>>>> should use that over "dpll_ref_clock" so no need of a separate "ti,ext-clk" flag.
+>> >>>>
+>> >>>> yes, thank you for clarifying - it does indeed redundant to have
+>> >>>> "ti,ext-clk". and apologies on being a little obscure in the comment.
+>> >>>
+>> >>> Irrespective of whether external reference clock is used or not, all DRA7
+>> >>> (apll) has an input for external reference clock (and also a PRCM register for
+>> >>> programming it) and it has to be specified in dt no?
+>> >>
+>> >> Why is that a binding for ti-phy? that is a problem for the APLL clock
+>> >> driver (selecting it's own source). PHY properties should describe
+>> >> itself -> let the bindings of the APLL describe itself. please dont
+>> >> mix the two up.
+>> >
+>> > The apll clock node is like this
+>> >
+>> > apll_pcie_in_clk_mux: apll_pcie_in_clk_mux at 4ae06118 {
+>> >         compatible = "mux-clock";
+>> >         clocks = <&dpll_pcie_ref_m2ldo_ck>, <&pciesref_acs_clk_ck>;
+>> >         #clock-cells = <0>;
+>> >         reg = <0x4a00821c 0x4>;
+>> >         bit-mask = <0x80>;
+>> > };
+>> >
+>> > The external reference clock is denoted by *pciesref_acs_clk_ck*.
+>> >
+>> > refclk_ext holds the phandle to *pciesref_acs_clk_ck* and is used in
+>> > "clk_set_parent" to set the parent of apll mux.
+>>
+>> So, How about this: if refclk_ext is not defined, dont do setparent,
+>> if it is defined, do setparent.
+>> in short:
+>> Optional Properties:
+>> * "refclk_ext" - external reference clock for pcie apll - if defined,
+>> used as the parent to "apll_mux"
+>>
+>> That said, my problem in general with this approach(which many folks
+>> have taken of describing parent of clock X in hardware block binding
+>> for Y) is the following:
+>>
+>> The binding now has dependency on clock tree hierarchy. What if
+>> towmorrow, we have a tree where refclk_ext parent of muxZ parent of
+>> apll_mux? the binding breaks down. Lets not forget that we consider DT
+>> as an ABI - we dont want to change the binding in the future.
+>>
+>> I had always preferred describing parent-child relationship of clocks
+>> by the approach Tero posted: https://patchwork.kernel.org/patch/3871551/
+>>
+>> Maybe Mike and Tero could help here?
 >
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 661 at drivers/ata/libahci.c:224 ahci_enable_ahci+0x74/0x8)
-> Modules linked in:
-> CPU: 0 PID: 661 Comm: sh Tainted: G        W     3.15.0-rc5-next-20140521-000027
-> Backtrace:
-> [<80011c90>] (dump_backtrace) from [<80011e2c>] (show_stack+0x18/0x1c)
->  r6:803a22f4 r5:00000000 r4:00000000 r3:00000000
-> [<80011e14>] (show_stack) from [<80661e60>] (dump_stack+0x88/0xa4)
-> [<80661dd8>] (dump_stack) from [<80028fdc>] (warn_slowpath_common+0x70/0x94)
->  r5:00000009 r4:00000000
-> [<80028f6c>] (warn_slowpath_common) from [<80029024>] (warn_slowpath_null+0x24/)
->  r8:808f68c4 r7:00000000 r6:00000000 r5:00000000 r4:e0810004
-> [<80029000>] (warn_slowpath_null) from [<803a22f4>] (ahci_enable_ahci+0x74/0x80)
-> [<803a2280>] (ahci_enable_ahci) from [<803a2324>] (ahci_reset_controller+0x24/0)
->  r8:ddcd9410 r7:80351178 r6:ddcd9444 r5:dde8b850 r4:e0810000 r3:ddf35e90
-> [<803a2300>] (ahci_reset_controller) from [<803a2c68>] (ahci_platform_resume_ho)
->  r7:80351178 r6:ddcd9444 r5:dde8b850 r4:ddcd9410
-> [<803a2c30>] (ahci_platform_resume_host) from [<803a38f0>] (imx_ahci_resume+0x2)
->  r5:00000000 r4:ddcd9410
-> [<803a38c4>] (imx_ahci_resume) from [<803511ac>] (platform_pm_resume+0x34/0x54)
-> ....
+> Hi all,
 >
-> The reason is that the SATA controller has no working clock at this
-> point, and thus ahci_enable_ahci() fails to enable the controller.  In
-> case that there is no SATA disk attached, the imx_sata_disable() gets
-> called in ahci_imx_error_handler(), and both sata_clk and sata_ref_clk
-> will be disabled there.  Because all the imx_sata_enable() calls
-> afterward will return immediately due to imxpriv->no_device check, the
-> SATA controller working clock sata_clk will never get any chance to be
-> enabled again.
+> I didn't read all of this context, but it seems like
+> https://lkml.org/lkml/2014/5/19/539
 >
-> This is a regression caused by commit 90870d79d4f2 (ahci-imx: Port to
-> library-ised ahci_platform).  Before the commit, only sata_ref_clk is
-> managed by the driver in enable/disable function.  But after the commit,
-> all the clocks are enabled/disabled in a row by ahci platform helpers
-> ahci_platform_enable[disable]_clks.  Since ahb_clk is a bus clock which
-> does not have gate at all, and i.MX low-power hardware module already
-> manages sata_clk across suspend/resume cycle, the only clock that needs
-> to be managed by software is sata_ref_clk.
->
-> So instead of using ahci_platform_enable[disable]_clks to manage all
-> the clocks in a row from imx_sata_enable[disable], we should manage
-> only sata_ref_clk in there.
->
-> Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
-> Fixes: 90870d79d4f2 (ahci-imx: Port to library-ised ahci_platform)
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> might be a good fit here. Assuming that the PIPE3 PHY consumes the APLL
+> clock, then it reasonable for the dts phy node to specify
+> assigned-clock-parent.
 
-Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+
+Yes indeed. Seems like the need to describe some sort of parent
+description in dt makes sense for other users as well. I wonder if we
+will see some alignment soonish enough for us to start using them.
+
+Regards,
+Nishanth Menon
