@@ -1,32 +1,29 @@
 From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 28 May 2014 09:01:47 +0530
-Subject: [PATCH v2 1/1] ARM: ux500: Staticize ux500_soc_attr
-Message-ID: <1401247907-8366-1-git-send-email-sachin.kamat@linaro.org>
+Date: Wed, 28 May 2014 09:09:03 +0530
+Subject: [PATCH 1/1] ARM: mvebu: Staticize armada_370_xp_cpu_pm_init
+Message-ID: <1401248343-9747-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'ux500_soc_attr' is local to this file. While at it also make it
-const to match the argument list of device_create_file.
+'armada_370_xp_cpu_pm_init' is local to this file.
 
 Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 ---
-Made ux500_soc_attr const as suggested by Lee Jones.
----
- arch/arm/mach-ux500/cpu.c |    2 +-
+ arch/arm/mach-mvebu/pmsu.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index db16b5a04ad5..dbb2970ee7da 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -125,7 +125,7 @@ static void __init soc_info_populate(struct soc_device_attribute *soc_dev_attr,
- 	soc_dev_attr->revision = ux500_get_revision();
- }
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index 53a55c8520bf..861f6be7a26c 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -263,7 +263,7 @@ static struct notifier_block armada_370_xp_cpu_pm_notifier = {
+ 	.notifier_call = armada_370_xp_cpu_pm_notify,
+ };
  
--struct device_attribute ux500_soc_attr =
-+static const struct device_attribute ux500_soc_attr =
- 	__ATTR(process,  S_IRUGO, ux500_get_process,  NULL);
+-int __init armada_370_xp_cpu_pm_init(void)
++static int __init armada_370_xp_cpu_pm_init(void)
+ {
+ 	struct device_node *np;
  
- struct device * __init ux500_soc_device_init(const char *soc_id)
 -- 
 1.7.9.5
