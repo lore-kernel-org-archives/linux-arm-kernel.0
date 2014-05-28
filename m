@@ -1,57 +1,49 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 28 May 2014 14:24:27 +0200
-Subject: [PATCH] misc: atmel_pwm: only build for supported platforms
-In-Reply-To: <536CA80A.60201@atmel.com>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-17-git-send-email-arnd@arndb.de>
- <536CA80A.60201@atmel.com>
-Message-ID: <1401279867.22486.6.camel@x220>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 28 May 2014 07:49:06 -0500
+Subject: [PATCH 0/3] ARM: OMAP5+: Support Duty Cycle Correction(DCC)
+In-Reply-To: <5382DFE8.1080104@ti.com>
+References: <1400237160-25125-1-git-send-email-nm@ti.com>
+ <20140523210720.23136.65858@quantum> <5382DFE8.1080104@ti.com>
+Message-ID: <5385DB42.8030900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-05-09 at 12:03 +0200, Nicolas Ferre wrote:
-> On 08/05/2014 16:56, Arnd Bergmann :
-> > There is architecture code in mach-at91 that depends on the
-> > CONFIG_ATMEL_PWM symbol in order to call the soc-specific
-> > at91_add_device_pwm function. While all of this is about code
-> > that will be removed in the future, using DT probing and
-> > the PWM framework, we currently get a build failure:
-> > 
-> > arch/arm/mach-at91/built-in.o: In function `at91_pwm_leds':
-> > arch/arm/mach-at91/leds.c:88: undefined reference to `at91_add_device_pwm'
-> > 
-> > This patch ensures we only try to build this driver on
-> > platforms on which it will build and work.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Mon 26 May 2014 01:32:08 AM CDT, Tero Kristo wrote:
+> On 05/24/2014 12:07 AM, Mike Turquette wrote:
+>> Quoting Nishanth Menon (2014-05-16 03:45:57)
+>>> Hi,
+>>>
+>>> This patch series has been carried over in vendor kernel for quiet
+>>> few years now.
+>>>
+>>> Unfortunately, it was very recently re-discovered and upstream kernel
+>>> is noticed to be broken for OMAP5 1.5GHz - at least we are operating
+>>> DPLL at frequency higher than what it was intended to be when CPUFreq
+>>> is enabled. Thankfully, with nominal voltage(we dont use AVS yet in
+>>> upstream for the mentioned platforms) and margins in trimming, we
+>>> have so far not crashed - but I strongly suspect this might be some
+>>> boundary case survival.
+>>
+>> DCC also exists in OMAP4. In some cases customers used it, in other
+>> cases we just ran the PLL way out of spec and the mpu_clk would divide
+>> by 2.
+>>
+>> Is this broken for OMAP4 as well?
+>
+> Yes, its broken. This series does not address the OMAP4 needs for it,
+> but can be expanded later by just defining a proper clock type with
+> OMAP4 specific DCC rate limits etc. for it. We would need properly
+> functioning DVFS for OMAP4 panda first though I guess... (support for
+> the TPS regulator.)
 
-It seems this one just landed in linux-next (in next-20140528).
+Panda does not need DCC. Panda uses 4430 and Panda-ES uses 4460. 
+neither of which need DCC (DPLLs are trimmed for required frequencies 
+there) - 4430 never had DCC, 4460 had broken DCC. 4470 (which is not 
+upstream and does not have a panda variant) is the only one needing DCC 
+at higher frequencies, and that needs an entirely different 
+scheme(compared to OMAP5+) as mentioned by Tero if 4470 ever gets 
+supported upstream.
 
-> > diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-> > index fe2230c..ce29342 100644
-> > --- a/drivers/misc/Kconfig
-> > +++ b/drivers/misc/Kconfig
-> > @@ -53,7 +53,8 @@ config AD525X_DPOT_SPI
-> >  
-> >  config ATMEL_PWM
-> >  	tristate "Atmel AT32/AT91 PWM support"
-> > -	depends on HAVE_CLK && (AVR32 || ARCH_AT91 || COMPILE_TEST)
-> > +	depends on HAVE_CLK
-> > +	depends on AVR32 || AT91SAM9263 || AT91SAM9RL || AT91SAM9G45
-
-Symbols AT91SAM9263, AT91SAM9RL, and AT91SAM9G45 do not seem to exist in
-next-20140528. Should these perhaps be SOC_AT91SAM9263, SOC_AT91SAM9RL,
-and SOC_AT91SAM9G45 and/or ARCH_AT91SAM9263, ARCH_AT91SAM9RL, and
-ARCH_AT91SAM9G45?
-
-> >  	help
-> >  	  This option enables device driver support for the PWM channels
-> >  	  on certain Atmel processors.  Pulse Width Modulation is used for
-> > 
-
-
-Paul Bolle
+--
+Regards,
+Nishanth Menon
