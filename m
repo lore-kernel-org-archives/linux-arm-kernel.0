@@ -1,45 +1,37 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 28 May 2014 08:13:13 +0100
-Subject: [GIT PULL] mfd: Immutable branch between MFD and OMAP, due for v3.16
-In-Reply-To: <1401214140-9828-1-git-send-email-tony@atomide.com>
-References: <1401214140-9828-1-git-send-email-tony@atomide.com>
-Message-ID: <20140528071313.GH4227@lee--X1>
+Date: Wed, 28 May 2014 08:14:19 +0100
+Subject: [PATCH v2 1/1] ARM: ux500: Staticize ux500_soc_attr
+In-Reply-To: <1401247907-8366-1-git-send-email-sachin.kamat@linaro.org>
+References: <1401247907-8366-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <20140528071419.GI4227@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Tony, here's the pull-request:
+> 'ux500_soc_attr' is local to this file. While at it also make it
+> const to match the argument list of device_create_file.
+> 
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> ---
+> Made ux500_soc_attr const as suggested by Lee Jones.
+> ---
+>  arch/arm/mach-ux500/cpu.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-The following changes since commit 455c6fdbd219161bd09b1165f11699d6d73de11c:
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-  Linux 3.14 (2014-03-30 20:40:15 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/mfd-omap-v3.16-1
-
-for you to fetch changes up to 43fef47f94a1ae46fb2720dada32fa3b5547bee2:
-
-  mfd: twl4030-power: Add a configuration to turn off oscillator during off-idle (2014-05-28 08:06:18 +0100)
-
-----------------------------------------------------------------
-Second immutable branch between MFD and OMAP due for the v3.16 merge window.
-
-----------------------------------------------------------------
-Tony Lindgren (7):
-      mfd: twl-core: Fix idle mode signaling for omaps when booted with device tree
-      mfd: twl4030-power: Fix hang on reboot if sleep configuration was loaded earlier
-      mfd: twl4030-power: Fix some defines for SW_EVENTS
-      mfd: twl4030-power: Add generic reset configuration
-      mfd: twl4030-power: Add recommended idle configuration
-      mfd: twl4030-power: Add support for board specific configuration
-      mfd: twl4030-power: Add a configuration to turn off oscillator during off-idle
-
- .../devicetree/bindings/mfd/twl4030-power.txt      |  17 +-
- arch/arm/mach-omap2/omap_twl.c                     |  60 -----
- drivers/mfd/twl-core.c                             |  15 ++
- drivers/mfd/twl4030-power.c                        | 286 +++++++++++++++++++--
- include/linux/i2c/twl.h                            |   4 +
- 5 files changed, 296 insertions(+), 86 deletions(-)
+> diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
+> index db16b5a04ad5..dbb2970ee7da 100644
+> --- a/arch/arm/mach-ux500/cpu.c
+> +++ b/arch/arm/mach-ux500/cpu.c
+> @@ -125,7 +125,7 @@ static void __init soc_info_populate(struct soc_device_attribute *soc_dev_attr,
+>  	soc_dev_attr->revision = ux500_get_revision();
+>  }
+>  
+> -struct device_attribute ux500_soc_attr =
+> +static const struct device_attribute ux500_soc_attr =
+>  	__ATTR(process,  S_IRUGO, ux500_get_process,  NULL);
+>  
+>  struct device * __init ux500_soc_device_init(const char *soc_id)
 
 -- 
 Lee Jones
