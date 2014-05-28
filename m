@@ -1,20 +1,219 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 28 May 2014 14:16:30 +0200
-Subject: [PATCH 2/2] ARM: ux500: Staticize ab8505_regulators
-In-Reply-To: <1401269165-2996-2-git-send-email-sachin.kamat@linaro.org>
-References: <1401269165-2996-1-git-send-email-sachin.kamat@linaro.org>
- <1401269165-2996-2-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <CACRpkdZf23iDt3VMJ_95mHidDuE-wO-pe9h5UyRhP3tmuHXDPA@mail.gmail.com>
+From: elder@linaro.org (Alex Elder)
+Date: Wed, 28 May 2014 07:22:06 -0500
+Subject: [PATCH v4 1/5] devicetree: bindings: document Broadcom CPU enable
+ method
+In-Reply-To: <20140528103625.GA29219@e102568-lin.cambridge.arm.com>
+References: <1400607830-10989-1-git-send-email-elder@linaro.org>
+ <1400607830-10989-2-git-send-email-elder@linaro.org>
+ <20140527114958.GC18476@e102568-lin.cambridge.arm.com>
+ <53855867.7050800@linaro.org>
+ <20140528103625.GA29219@e102568-lin.cambridge.arm.com>
+Message-ID: <5385D4EE.2040304@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 11:26 AM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+On 05/28/2014 05:36 AM, Lorenzo Pieralisi wrote:
+> On Wed, May 28, 2014 at 04:30:47AM +0100, Alex Elder wrote:
+>> On 05/27/2014 06:49 AM, Lorenzo Pieralisi wrote:
+>>> On Tue, May 20, 2014 at 06:43:46PM +0100, Alex Elder wrote:
+>>>> Broadcom mobile SoCs use a ROM-implemented holding pen for
+>>>> controlled boot of secondary cores.  A special register is
+>>>> used to communicate to the ROM that a secondary core should
+>>>> start executing kernel code.  This enable method is currently
+>>>> used for members of the bcm281xx and bcm21664 SoC families.
+>>>>
+>>>> The use of an enable method also allows the SMP operation vector to
+>>>> be assigned as a result of device tree content for these SoCs.
+>>>>
+>>>> Signed-off-by: Alex Elder <elder@linaro.org>
+>>>
+>>> This is getting out of control, it is absolutely ghastly. I wonder how
+>>> I can manage to keep cpus.txt updated if anyone with a boot method
+>>> du jour adds into cpus.txt, and honestly in this specific case it is even
+>>> hard to understand why.
+>>
+>> OK, in this message I'll focus on the particulars of this
+>> proposed binding.
+>>
+>>> Can't it be done with bindings for the relative register address space
+>>> (regmap ?) and platform code just calls the registers driver to set-up the
+>>> jump address ? It is platform specific code anyway there is no way you
+>>> can make this generic.
+>>
+>> I want to clarify what you're after here.
+>>
+>> My aim is to add SMP support for a class of Broadcom SMP
+>> machines.  To do so, I'm told I need to use the technique
+>> of assigning the SMP operations vector as a result of
+>> identifying an enable method in the DT.
+>>
+>> For 32-bit ARM, there are no generic "enable-method" values.
+>> (I did attempt to create one for "spin-table" but that was
+>> rejected by Russell King.)  For the machines I'm trying to
+>> enable, secondary CPUS start out spinning in a ROM-based
+>> holding pen, and there is no need for a kernel-based one.
+>>
+>> However, like a spin-table/holding pen enable method, a
+>> memory location is required for coordination between the
+>> boot CPU running kernel code and secondary CPUs running ROM
+>> code.  My proposal specifies it using a special numeric
+>> property value named "secondary-boot-reg" in the "cpus"
+>> node in the DT.
+>>
+>> And as I understand it, the issue you have relates to how
+>> this memory location is specified.
+> 
+> The issue I have relates to cluttering cpus.txt with all
+> sorts of platform specific SMP boot hacks.
 
-> 'ab8505_regulators' is used only in this file.
->
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+OK, as I mentioned in my other message, I totally
+agree with you here.  It's a total (and building)
+mess.  I discussed this with Mark Rutland at ELC
+last month and suggested splitting that stuff out
+of "cpus.txt", which I have now proposed with a
+patch.
+    https://lkml.org/lkml/2014/5/8/545
 
-Patch applied.
+>> You suggest regmap.  I'm using a single 32-bit register,
+>> only at very early boot time, and thereafter access to
+>> it is meaningless.  It seems like overkill if it's only
+>> used for this purpose.  I could hide the register values
+>> in the code, but with the exception of that, the code I'm
+>> using is generic (in the context of this class of Broadcom
+>> machine).  I could specify the register differently somehow,
+>> in a different node, or with a different property.
+> 
+> Is that register part of a larger registers block ? What I wanted
+> to say is that you can use a driver "API" (we wish) to write that
+> register, something like eg vexpress does with sysflags:
+> 
+> drivers/mfd/vexpress-sysreg.c
+> 
+> vexpress_flags_set()
+> 
+> instead of grabbing the reg address from a platform specific boot
+> method DT entry.
 
-Yours,
-Linus Walleij
+I had this exact thought when I was working on this.  Yes,
+this register *is* part of a register block, "ChipRegs", and
+I wanted to have a separate driver/library/API to manage access
+to registers in that block.  But the block is sort of a dumping
+ground for many unrelated things, and lots of them aren't going
+to be used for normal operation (lots of debug and diagnostic
+functionality, for example).  After some discussion with others
+on my team I made the explicit decision to *not* have any sort
+of API in this case, and just specify the register.  We decided
+that if and when we had a need for multiple users of addresses
+in this range we'd figure out how to do best what was required.
+
+> I doubt that register exists on its own, even though I have to say this
+> would force you to write yet another platform specific driver to control
+> a bunch of registers, I do not see any other solution.
+
+Yes, exactly, and I was prepared to do that.  But doing a whole
+driver for that one address seemed to make less sense.
+
+> One thing is for certain: I really do not see the point in adding a boot
+> method per-SoC, and I do not want to end up having a cpus.txt file with a
+
+I'd love to see common, "standard" boot methods.  For ARM32
+it seems each one was done separately, and in many cases,
+slightly differently.  The one I saw the most was "spin table,"
+but making that "standard" was deemed unacceptable.
+
+> gazillion entries just because every given platform reinvents the wheel when
+> it comes to booting an SMP system, cpus.txt would become a document that
+> describes platform quirks, not a proper binding anymore.
+
+Agreed.
+
+> At least all platform specific quirks must be moved out of cpus.txt and
+> in platform documentation, I understand it is just a cosmetic change but
+> I want to prevent cpus.txt to become an abomination.
+
+Agreed.
+
+>> The bottom line here is I'm not sure whether I understand
+>> what you're suggesting, or perhaps why what you suggest is
+>> preferable.  I'm very open to suggestions, I just need it
+>> laid out a bit more detail in order to respond directly.
+> 
+> See above.
+
+I really appreciate your responses.  One problem with this
+process is you don't get the benefit of the discussion and
+design process that went on prior to posting this stuff
+publicly.
+
+If you still feel strongly we should have a custom driver
+to manage this "ChipRegs" address space, say so, and I can
+put one together.  If my explanations above mitigate your
+concerns, please say that as well.  Either way I just want
+to make progress toward getting this support upstream.
+
+Thanks a lot.
+
+					-Alex
+
+> 
+> Thanks !
+> Lorenzo
+> 
+>>
+>> Thanks.
+>>
+>> 					-Alex
+>>
+>>> I really do not see the point in cluttering cpus.txt with this stuff, it
+>>> is a platform specific hack, and do not belong in generic bindings in my
+>>> opinion.
+>>>
+>>> Thanks,
+>>> Lorenzo
+>>>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/arm/cpus.txt | 12 ++++++++++++
+>>>>  1 file changed, 12 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+>>>> index 333f4ae..c6a2411 100644
+>>>> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+>>>> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+>>>> @@ -185,6 +185,7 @@ nodes to be present and contain the properties described below.
+>>>>  			    "qcom,gcc-msm8660"
+>>>>  			    "qcom,kpss-acc-v1"
+>>>>  			    "qcom,kpss-acc-v2"
+>>>> +			    "brcm,bcm11351-cpu-method"
+>>>>  
+>>>>  	- cpu-release-addr
+>>>>  		Usage: required for systems that have an "enable-method"
+>>>> @@ -209,6 +210,17 @@ nodes to be present and contain the properties described below.
+>>>>  		Value type: <phandle>
+>>>>  		Definition: Specifies the ACC[2] node associated with this CPU.
+>>>>  
+>>>> +	- secondary-boot-reg
+>>>> +		Usage:
+>>>> +			Required for systems that have an "enable-method"
+>>>> +			property value of "brcm,bcm11351-cpu-method".
+>>>> +		Value type: <u32>
+>>>> +		Definition:
+>>>> +			Specifies the physical address of the register used to
+>>>> +			request the ROM holding pen code release a secondary
+>>>> +			CPU.  The value written to the register is formed by
+>>>> +			encoding the target CPU id into the low bits of the
+>>>> +			physical start address it should jump to.
+>>>>  
+>>>>  Example 1 (dual-cluster big.LITTLE system 32-bit):
+>>>>  
+>>>> -- 
+>>>> 1.9.1
+>>>>
+>>>>
+>>>
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+> 
