@@ -1,69 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 May 2014 18:49:45 +0100
-Subject: [PATCH] arm64: mm: fix pmd_write CoW brokenness
-In-Reply-To: <1401296836-16837-1-git-send-email-will.deacon@arm.com>
-References: <1401296836-16837-1-git-send-email-will.deacon@arm.com>
-Message-ID: <538621B9.9090503@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 28 May 2014 19:55:35 +0200
+Subject: [PATCH] misc: atmel_pwm: only build for supported platforms
+In-Reply-To: <1401293383.22486.18.camel@x220>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-17-git-send-email-arnd@arndb.de>
+ <536CA80A.60201@atmel.com> <1401279867.22486.6.camel@x220>
+ <20140528155916.GA9793@piout.net> <1401293383.22486.18.camel@x220>
+Message-ID: <20140528175439.GA18470@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On 28/05/14 18:07, Will Deacon wrote:
-> Commit 9c7e535fcc17 ("arm64: mm: Route pmd thp functions through pte
-> equivalents") changed the pmd manipulator and accessor functions to
-> convert the target pmd to a pte, process it with the pte functions, then
-> convert it back. Along the way, we gained support for PTE_WRITE, however
-> this is completely ignored by set_pmd_at, and so we fail to set the
-> PMD_SECT_RDONLY for PMDs, resulting in all sorts of lovely failures (like
-> CoW not working).
+On 28/05/2014 at 18:09:43 +0200, Paul Bolle wrote :
+> On Wed, 2014-05-28 at 17:59 +0200, Alexandre Belloni wrote:
+> > On 28/05/2014 at 14:24:27 +0200, Paul Bolle wrote :
+> > > > >  config ATMEL_PWM
+> > > > >  	tristate "Atmel AT32/AT91 PWM support"
+> > > > > -	depends on HAVE_CLK && (AVR32 || ARCH_AT91 || COMPILE_TEST)
+> > > > > +	depends on HAVE_CLK
+> > > > > +	depends on AVR32 || AT91SAM9263 || AT91SAM9RL || AT91SAM9G45
+> > > 
+> > > Symbols AT91SAM9263, AT91SAM9RL, and AT91SAM9G45 do not seem to exist in
+> > > next-20140528. Should these perhaps be SOC_AT91SAM9263, SOC_AT91SAM9RL,
+> > > and SOC_AT91SAM9G45 and/or ARCH_AT91SAM9263, ARCH_AT91SAM9RL, and
+> > > ARCH_AT91SAM9G45?
+> > 
+> > I wouldn't bother too much fixing that, this will definitely be remove
+> > in 3.17. 
 > 
-> Partially reverting the offending commit (by making use of
-> PMD_SECT_RDONLY explicitly for pmd_{write,wrprotect,mkwrite} functions)
-> leads to further issues because pmd_write can then return potentially
-> incorrect values for page table entries marked as RDONLY, leading to
-> BUG_ON(pmd_write(entry)) tripping under some THP workloads.
-> 
-> This patch fixes the issue by routing set_pmd_at through set_pte_at,
-> which correctly takes the PTE_WRITE flag into account. Given that
-> THP mappings are always anonymous, the additional cache-flushing code
-> in __sync_icache_dcache won't impose any significant overhead as the
-> flush will be skipped.
-> 
-> Cc: Steve Capper <steve.capper@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
-> 
-> Whilst this is a fairly scary change at this point in the cycle, I can't get
-> through an LTP run without it. Furthermore, spurious CoW failures for tasks
-> that happen to get transparent hugepages are a pretty significant regression.
-> 
->  arch/arm64/include/asm/pgtable.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 90c811f05a2e..20785f9da95c 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -266,7 +266,7 @@ static inline pmd_t pte_pmd(pte_t pte)
->  
->  #define pmd_page(pmd)           pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
->  
-> -#define set_pmd_at(mm, addr, pmdp, pmd)	set_pmd(pmdp, pmd)
-> +#define set_pmd_at(mm, addr, pmdp, pmd)	set_pte_at(mm, addr, pmdp, pmd_pte(pmd))
->  
->  static inline int has_transparent_hugepage(void)
->  {
+> Are you talking about: 1) the problem this patch tried to fix; or 2) the
+> problem it created?
 > 
 
-I managed to reliably reproduce the failure on my favourite arm64 board
-running a KVM guest with THP enabled. Adding this patch to the guest
-kernel made it behave correctly.
+I'm removing the whole atmel_pwm driver so the CONFIG_ATMEL_PWM symbol
+will be gone.
 
-So FWIW:
-Tested-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
