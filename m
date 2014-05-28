@@ -1,252 +1,91 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 May 2014 13:04:50 +0100
-Subject: [PATCH] arm/arm64: KVM: Fix and refactor unmap_range
-In-Reply-To: <1401117643-23034-1-git-send-email-christoffer.dall@linaro.org>
-References: <1401117643-23034-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <5385D0E2.3000000@arm.com>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Wed, 28 May 2014 13:10:01 +0100
+Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
+In-Reply-To: <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20140528121001.GI19967@e103034-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/05/14 16:20, Christoffer Dall wrote:
-> unmap_range() was utterly broken, to quote Marc, and broke in all sorts
-> of situations.  It was also quite complicated to follow and didn't
-> follow the usual scheme of having a separate iterating function for each
-> level of page tables.
+On Fri, May 23, 2014 at 04:53:02PM +0100, Vincent Guittot wrote:
+> Monitor the activity level of each group of each sched_domain level. The
+> activity is the amount of cpu_power that is currently used on a CPU or group
+> of CPUs. We use the runnable_avg_sum and _period to evaluate this activity
+> level. In the special use case where the CPU is fully loaded by more than 1
+> task, the activity level is set above the cpu_power in order to reflect the
+> overload of the CPU
 > 
-> Address this by refactoring the code and introduce a pgd_clear()
-> function.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 > ---
->  arch/arm/include/asm/kvm_mmu.h   |  12 ++++
->  arch/arm/kvm/mmu.c               | 126 ++++++++++++++++++++++-----------------
->  arch/arm64/include/asm/kvm_mmu.h |  15 +++++
->  3 files changed, 99 insertions(+), 54 deletions(-)
+>  kernel/sched/fair.c | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
 > 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index 5c7aa3c..5cc0b0f 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -127,6 +127,18 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
->  	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
->  })
+> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> index b7c51be..c01d8b6 100644
+> --- a/kernel/sched/fair.c
+> +++ b/kernel/sched/fair.c
+> @@ -4044,6 +4044,11 @@ static unsigned long power_of(int cpu)
+>  	return cpu_rq(cpu)->cpu_power;
+>  }
 >  
-> +static inline bool kvm_page_empty(void *ptr)
+> +static unsigned long power_orig_of(int cpu)
 > +{
-> +	struct page *ptr_page = virt_to_page(ptr);
-> +	return page_count(ptr_page) == 1;
+> +	return cpu_rq(cpu)->cpu_power_orig;
 > +}
 > +
-> +
-> +#define kvm_pte_table_empty(ptep) kvm_page_empty(ptep)
-> +#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
-> +#define kvm_pud_table_empty(pudp) (0)
-> +
-> +
->  struct kvm;
->  
->  #define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 16f8049..0572522 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -46,6 +46,10 @@ static phys_addr_t hyp_idmap_vector;
->  
->  #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
->  
-> +#ifndef __unused
-> +#    define __unused			__attribute__((unused))
-> +#endif
-> +
-
-Do we actually need this?
-
->  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>  static unsigned long cpu_avg_load_per_task(int cpu)
 >  {
->  	/*
-> @@ -90,10 +94,13 @@ static void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
->  	return p;
+>  	struct rq *rq = cpu_rq(cpu);
+> @@ -4438,6 +4443,18 @@ done:
+>  	return target;
 >  }
 >  
-> -static bool page_empty(void *ptr)
-> +static void clear_pgd_entry(struct kvm *kvm, pgd_t *pgd, phys_addr_t addr)
->  {
-> -	struct page *ptr_page = virt_to_page(ptr);
-> -	return page_count(ptr_page) == 1;
-> +	pud_t *pud_table __unused = pud_offset(pgd, 0);
-> +	pgd_clear(pgd);
-> +	kvm_tlb_flush_vmid_ipa(kvm, addr);
-> +	pud_free(NULL, pud_table);
-> +	put_page(virt_to_page(pgd));
->  }
->  
->  static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
-> @@ -124,70 +131,81 @@ static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
->  	put_page(virt_to_page(pmd));
->  }
->  
-> -static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
-> +static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
-> +		       unsigned long long addr, unsigned long long end)
->  {
-> -	if (pte_present(*pte)) {
-> -		kvm_set_pte(pte, __pte(0));
-> -		put_page(virt_to_page(pte));
-> -		kvm_tlb_flush_vmid_ipa(kvm, addr);
-> -	}
-> +	pte_t *pte, *start_pte;
-> +	unsigned long long start_addr = addr;
-> +
-> +	start_pte = pte = pte_offset_kernel(pmd, addr);
-> +	do {
-> +		if (!pte_none(*pte)) {
-> +			kvm_set_pte(pte, __pte(0));
-> +			put_page(virt_to_page(pte));
-> +			kvm_tlb_flush_vmid_ipa(kvm, addr);
-> +		}
-> +	} while (pte++, addr += PAGE_SIZE, addr != end);
-> +
-> +	if (kvm_pte_table_empty(start_pte))
-> +		clear_pmd_entry(kvm, pmd, start_addr);
->  }
->  
-> -static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
-> -			unsigned long long start, u64 size)
-> +static void unmap_pmds(struct kvm *kvm, pud_t *pud,
-> +		       unsigned long long addr, unsigned long long end)
->  {
-> -	pgd_t *pgd;
-> -	pud_t *pud;
-> -	pmd_t *pmd;
-> -	pte_t *pte;
-> -	unsigned long long addr = start, end = start + size;
-> -	u64 next;
-> -
-> -	while (addr < end) {
-> -		pgd = pgdp + pgd_index(addr);
-> -		pud = pud_offset(pgd, addr);
-> -		pte = NULL;
-> -		if (pud_none(*pud)) {
-> -			addr = kvm_pud_addr_end(addr, end);
-> -			continue;
-> -		}
-> +	unsigned long long next, start_addr = addr;
-> +	pmd_t *pmd, *start_pmd;
->  
-> -		if (pud_huge(*pud)) {
-> -			/*
-> -			 * If we are dealing with a huge pud, just clear it and
-> -			 * move on.
-> -			 */
-> -			clear_pud_entry(kvm, pud, addr);
-> -			addr = kvm_pud_addr_end(addr, end);
-> -			continue;
-> +	start_pmd = pmd = pmd_offset(pud, addr);
-> +	do {
-> +		next = kvm_pmd_addr_end(addr, end);
-> +		if (!pmd_none(*pmd)) {
-> +			if (kvm_pmd_huge(*pmd))
-> +				clear_pmd_entry(kvm, pmd, addr);
-> +			else
-> +				unmap_ptes(kvm, pmd, addr, next);
->  		}
-> +	} while (pmd++, addr = next, addr != end);
->  
-> -		pmd = pmd_offset(pud, addr);
-> -		if (pmd_none(*pmd)) {
-> -			addr = kvm_pmd_addr_end(addr, end);
-> -			continue;
-> -		}
-> +	if (kvm_pmd_table_empty(start_pmd))
-> +		clear_pud_entry(kvm, pud, start_addr);
-> +}
->  
-> -		if (!kvm_pmd_huge(*pmd)) {
-> -			pte = pte_offset_kernel(pmd, addr);
-> -			clear_pte_entry(kvm, pte, addr);
-> -			next = addr + PAGE_SIZE;
-> -		}
-> +static void unmap_puds(struct kvm *kvm, pgd_t *pgd,
-> +		       unsigned long long addr, unsigned long long end)
+> +static int get_cpu_activity(int cpu)
 > +{
-> +	unsigned long long next, start_addr = addr;
-> +	pud_t *pud, *start_pud;
->  
-> -		/*
-> -		 * If the pmd entry is to be cleared, walk back up the ladder
-> -		 */
-> -		if (kvm_pmd_huge(*pmd) || (pte && page_empty(pte))) {
-> -			clear_pmd_entry(kvm, pmd, addr);
-> -			next = kvm_pmd_addr_end(addr, end);
-> -			if (page_empty(pmd) && !page_empty(pud)) {
-> +	start_pud = pud = pud_offset(pgd, addr);
-> +	do {
-> +		next = kvm_pud_addr_end(addr, end);
-> +		if (!pud_none(*pud)) {
-> +			if (pud_huge(*pid)) {
->  				clear_pud_entry(kvm, pud, addr);
-> -				next = kvm_pud_addr_end(addr, end);
-> +			} else {
-> +				unmap_pmds(kvm, pud, addr, next);
->  			}
->  		}
-> +	} while (pud++, addr = next, addr != end);
->  
-> -		addr = next;
-> -	}
-> +	if (kvm_pud_table_empty(start_pud))
-> +		clear_pgd_entry(kvm, pgd, start_addr);
+> +	struct rq *rq = cpu_rq(cpu);
+> +	u32 sum = rq->avg.runnable_avg_sum;
+> +	u32 period = rq->avg.runnable_avg_period;
+> +
+> +	if (sum >= period)
+> +		return power_orig_of(cpu) + rq->nr_running - 1;
+> +
+> +	return (sum * power_orig_of(cpu)) / period;
 > +}
-> +
-> +
-> +static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
-> +			unsigned long long start, u64 size)
-> +{
-> +	pgd_t *pgd;
-> +	unsigned long long addr = start, end = start + size;
-> +	unsigned long long next;
-> +
-> +	pgd = pgdp + pgd_index(addr);
-> +	do {
-> +		next = kvm_pgd_addr_end(addr, end);
-> +		unmap_puds(kvm, pgd, addr, next);
-> +	} while (pgd++, addr = next, addr != end);
->  }
->  
->  static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index 7d29847..8e138c7 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -125,6 +125,21 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
->  #define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
->  #define kvm_pmd_addr_end(addr, end)	pmd_addr_end(addr, end)
->  
-> +static inline bool kvm_page_empty(void *ptr)
-> +{
-> +	struct page *ptr_page = virt_to_page(ptr);
-> +	return page_count(ptr_page) == 1;
-> +}
-> +
-> +#define kvm_pte_table_empty(ptep) kvm_page_empty(ptep)
-> +#ifndef CONFIG_ARM64_64K_PAGES
-> +#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
-> +#else
-> +#define kvm_pmd_table_empty(pmdp) (0)
-> +#endif
-> +#define kvm_pud_table_empty(pudp) (0)
-> +
-> +
->  struct kvm;
->  
->  #define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
-> 
 
-Other than the odd __unused, looks pretty good. I gave it a quick go on
-my dual A7 rig, and it did worked nicely.
+The rq runnable_avg_{sum, period} give a very long term view of the cpu
+utilization (I will use the term utilization instead of activity as I
+think that is what we are talking about here). IMHO, it is too slow to
+be used as basis for load balancing decisions. I think that was also
+agreed upon in the last discussion related to this topic [1].
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+The basic problem is that worst case: sum starting from 0 and period
+already at LOAD_AVG_MAX = 47742, it takes LOAD_AVG_MAX_N = 345 periods
+(ms) for sum to reach 47742. In other words, the cpu might have been
+fully utilized for 345 ms before it is considered fully utilized.
+Periodic load-balancing happens much more frequently than that.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Also, if load-balancing actually moves tasks around it may take quite a
+while before runnable_avg_sum actually reflects this change. The next
+periodic load-balance is likely to happen before runnable_avg_sum has
+reflected the result of the previous periodic load-balance.
+
+To avoid these problems, we need to base utilization on a metric which
+is updated instantaneously when we add/remove tasks to a cpu (or a least
+fast enough that we don't see the above problems). In the previous
+discussion [1] it was suggested that a sum of unweighted task
+runnable_avg_{sum,period} ratio instead. That is, an unweighted
+equivalent to weighted_cpuload(). That isn't a perfect solution either.
+It is fine as long as the cpus are not fully utilized, but when they are
+we need to use weighted_cpuload() to preserve smp_nice. What to do
+around the tipping point needs more thought, but I think that is
+currently the best proposal for a solution for task and cpu utilization.
+
+rq runnable_avg_sum is useful for decisions where we need a longer term
+view of the cpu utilization, but I don't see how we can use as cpu
+utilization metric for load-balancing decisions at wakeup or
+periodically.
+
+Morten
+
+[1] https://lkml.org/lkml/2014/1/8/251
