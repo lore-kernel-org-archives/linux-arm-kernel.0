@@ -1,84 +1,59 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 28 May 2014 23:14:29 +0800
-Subject: [linux-sunxi] [PATCH v9 1/2] Documentation: dt: Add Allwinner A31
- DMA controller bindings
-In-Reply-To: <1400762084-31606-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1400762084-31606-1-git-send-email-maxime.ripard@free-electrons.com>
- <1400762084-31606-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v67ekvfjx+nFNGfVkWYH1XeeHq4+jPGsVZBzCQNPH9Eddg@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 28 May 2014 17:16:46 +0200
+Subject: [PATCH v2 1/4] devicetree: bindings: Properly document micrel
+ ks8851 SPI chips
+In-Reply-To: <5385063F.30407@codeaurora.org>
+References: <1400875040-13269-1-git-send-email-sboyd@codeaurora.org>
+ <1400875040-13269-2-git-send-email-sboyd@codeaurora.org>
+ <20140524124858.GR22111@sirena.org.uk>
+ <5385063F.30407@codeaurora.org>
+Message-ID: <20140528151646.GU20155@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 8:34 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The Allwinner A31 DMA controller is rather simple to describe in the DT. Add
-> the bindings documentation.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  .../devicetree/bindings/dma/sun6i-dma.txt          | 45 ++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/sun6i-dma.txt
->
-> diff --git a/Documentation/devicetree/bindings/dma/sun6i-dma.txt b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-> new file mode 100644
-> index 000000000000..5d7c86d52665
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-> @@ -0,0 +1,45 @@
-> +Allwinner A31 DMA Controller
-> +
-> +This driver follows the generic DMA bindings defined in dma.txt.
-> +
-> +Required properties:
-> +
-> +- compatible:  Must be "allwinner,sun6i-a31-dma"
-> +- reg:         Should contain the registers base address and length
-> +- interrupts:  Should contain a reference to the interrupt used by this device
-> +- clocks:      Should contain a reference to the parent AHB clock
-> +- resets:      Should contain a reference to the reset controller asserting
-> +               this device in reset
+Hello Stephen,
 
-Extra spaces between the leading tabs.
-(Gmail messes up whitespaces, please see original mail.)
+On Tue, May 27, 2014 at 02:40:15PM -0700, Stephen Boyd wrote:
+> On 05/24/14 05:48, Mark Brown wrote:
+> > On Fri, May 23, 2014 at 12:57:17PM -0700, Stephen Boyd wrote:
+> >
+> >>  Optional properties:
+> >> -- vdd-supply:	supply for Ethernet mac
+> >> +- vdd-supply: analog 3.3V supply for Ethernet mac
+> >> +- vdd-io-supply: digital 1.8V IO supply for Ethernet mac
+> > So, according to the datasheet I managed to find this device has a
+> > supply VDD_IO (so normally written vdd-io-supply here), some other
+> > supplies which are tied to VDD_IO (so can probably be omitted) and a
+> > supply VDD_A3.3 none of which are optional.  There is an internal
+> > regulator which can be used to drop a higher voltage VDD_IO down for
+> > some of the supplies tied to it but that's essentially a noop from
+> > software as far as I can tell.  None of these supplies are obviously
+> > optional, though I've not read the datasheet in detail so I may have
+> > missed something here.
+There is a difference between the supply being optional for the hardware
+to work and the need to specify it in the device tree, isn't it? My
+expectation is that when it's not specified there is just nothing the
+the software needs to care for. 
 
-> +- #dma-cells : Should be 1, a single cell holding a line request number
-> +
-> +Example:
-> +       dma: dma-controller at 01c02000 {
-> +               compatible = "allwinner,sun6i-a31-dma";
-> +               reg = <0x01c02000 0x1000>;
-> +               interrupts = <0 50 4>;
-> +               clocks = <&ahb1_gates 6>;
-> +               resets = <&ahb1_rst 6>;
-> +               #dma-cells = <1>;
-> +       };
-> +
-> +Clients:
-> +
-> +DMA clients connected to the A31 DMA controller must use the format
-> +described in the dma.txt file, using a two-cell specifier for each
-> +channel: a phandle plus one integer cells.
-> +The two cells in order are:
-> +
-> +1. A phandle pointing to the DMA controller.
-> +2. The port ID as specified in the datasheet
-> +
-> +Example:
-> +spi2: spi at 01c6a000 {
-> +       compatible = "allwinner,sun6i-a31-spi";
-> +       reg = <0x01c6a000 0x1000>;
-> +       interrupts = <0 67 4>;
-> +       clocks = <&ahb1_gates 22>, <&spi2_clk>;
-> +       clock-names = "ahb", "mod";
-> +       dmas = <&dma 25>, <&dma 25>;
-> +       dma-names = "rx", "tx";
-> +       resets = <&ahb1_rst 22>;
-> +};
-> --
-> 1.9.3
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> > That said it looks like this is intended to be a supply for an external
+> > PHY rather than the device itself, but even so my original question
+> > about it being able to operate without power still applies.  Looking at
+> > the code it's certainly not doing any of the handling of a missing
+> > supply that I would associate with using _optional().
+> 
+> I agree, both supplies don't look optional. Unfortunately
+> efm32gg-dk3750.dts doesn't look to be listing any supply, and this
+> driver only recently got support for the VDD_A3.3 supply that the omap
+> board uses (adding Uwe for any comments on efm setup). I presume on
+If I read the schematic correctly there is nothing to regulate on the
+efm32 dev board. If you want to take a look on the schematic yourself,
+it's contained in the documentation package available at
+http://www.silabs.com/products/mcu/lowpower/pages/efm32gg-dk3750.aspx .
+BDR3201A_A02_sch.pdf, page 3 of 22.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
