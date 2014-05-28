@@ -1,40 +1,50 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 28 May 2014 18:09:43 +0200
-Subject: [PATCH] misc: atmel_pwm: only build for supported platforms
-In-Reply-To: <20140528155916.GA9793@piout.net>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-17-git-send-email-arnd@arndb.de>
- <536CA80A.60201@atmel.com> <1401279867.22486.6.camel@x220>
- <20140528155916.GA9793@piout.net>
-Message-ID: <1401293383.22486.18.camel@x220>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 28 May 2014 17:10:02 +0100
+Subject: [PATCH v2 9/9] arm64: KVM: enable trapping of all debug registers
+In-Reply-To: <20140525153629.GJ3866@lvm>
+References: <1400604945-25247-1-git-send-email-marc.zyngier@arm.com>
+ <1400604945-25247-10-git-send-email-marc.zyngier@arm.com>
+ <20140525153629.GJ3866@lvm>
+Message-ID: <53860A5A.8030009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-05-28 at 17:59 +0200, Alexandre Belloni wrote:
-> On 28/05/2014 at 14:24:27 +0200, Paul Bolle wrote :
-> > > >  config ATMEL_PWM
-> > > >  	tristate "Atmel AT32/AT91 PWM support"
-> > > > -	depends on HAVE_CLK && (AVR32 || ARCH_AT91 || COMPILE_TEST)
-> > > > +	depends on HAVE_CLK
-> > > > +	depends on AVR32 || AT91SAM9263 || AT91SAM9RL || AT91SAM9G45
-> > 
-> > Symbols AT91SAM9263, AT91SAM9RL, and AT91SAM9G45 do not seem to exist in
-> > next-20140528. Should these perhaps be SOC_AT91SAM9263, SOC_AT91SAM9RL,
-> > and SOC_AT91SAM9G45 and/or ARCH_AT91SAM9263, ARCH_AT91SAM9RL, and
-> > ARCH_AT91SAM9G45?
+On 25/05/14 16:36, Christoffer Dall wrote:
+> On Tue, May 20, 2014 at 05:55:45PM +0100, Marc Zyngier wrote:
+>> Enable trapping of the debug registers, preventing the guests to
+>> mess with the host state (and allowing guests to use the debug
+>> infrastructure as well).
+>>
+>> Reviewed-by: Anup Patel <anup.patel@linaro.org>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/hyp.S | 8 ++++++++
+>>  1 file changed, 8 insertions(+)
+>>
+>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+>> index 73ec5c4..72ed0bf8 100644
+>> --- a/arch/arm64/kvm/hyp.S
+>> +++ b/arch/arm64/kvm/hyp.S
+>> @@ -777,6 +777,14 @@ __kvm_hyp_code_start:
+>>  	mrs	x2, mdcr_el2
+>>  	and	x2, x2, #MDCR_EL2_HPMN_MASK
+>>  	orr	x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
+>> +	orr	x2, x2, #(MDCR_EL2_TDRA | MDCR_EL2_TDOSA)
 > 
-> I wouldn't bother too much fixing that, this will definitely be remove
-> in 3.17. 
+> so we unconditionally trap on the OS register access, but we don't
+> properly emulate these do we?  What's the rationale?  (atmittedly,
+> again, I'm not 100% clear on how the OS lock thingy is supposed to
+> work/be used).
 
-Are you talking about: 1) the problem this patch tried to fix; or 2) the
-problem it created?
+The rational is that we don't want the guest to mess with the host
+state, which may have decided to use the OSlock thing (we don't use it
+at all, but who knows...). So we trap it, discard whatever the guest
+wants to put there, and carry on.
 
-> I was too late for 3.16 because my series was waiting on
-> another patch set.
+I'm not sure if this would confuse any guest (we only have Linux so far,
+so I'm not too worried). Should a more adventurous guest show up, we can
+revisit this.
 
-We're already too late to fix stuff for v3.16-rc1 (which will probably
-only be released about three to four weeks from now)? Is that correct?
-
-
-Paul Bolle
+	M.
+-- 
+Jazz is not dead. It just smells funny...
