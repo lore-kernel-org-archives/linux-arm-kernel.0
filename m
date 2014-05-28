@@ -1,92 +1,150 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 28 May 2014 16:46:50 -0500
-Subject: [PATCH V2 2/2] power: twl4030_charger: attempt to power off in case
- of critical events
-In-Reply-To: <1401313610-14252-1-git-send-email-nm@ti.com>
-References: <1401313610-14252-1-git-send-email-nm@ti.com>
-Message-ID: <1401313610-14252-3-git-send-email-nm@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 29 May 2014 01:51:11 +0400
+Subject: [PATCH v2] ARM: shmobile: r8a7790: link PCI USB devices to USB PHY
+In-Reply-To: <CANqRtoTanAWvEODE99dY-BRU1FOm3V78FM6ePYKtVbK1Ro+79A@mail.gmail.com>
+References: <201405270217.33057.sergei.shtylyov@cogentembedded.com>	<CANqRtoT+xKmK7wkayiD9yCmUqFNKWxpeSgkGTiCqc+THYE0sVw@mail.gmail.com>	<5383C439.1080808@cogentembedded.com>
+ <CANqRtoTanAWvEODE99dY-BRU1FOm3V78FM6ePYKtVbK1Ro+79A@mail.gmail.com>
+Message-ID: <53865A4F.7000007@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Attempt to power off in case of critical events such as battery removal,
-over voltage events.
+Hello.
 
-There is no guarentee that we'd be in a safe scenario here, but the very
-least we can try to do is to power off the device to prevent damage to
-the system instead of just printing a message and hoping for the best.
+On 05/27/2014 04:41 AM, Magnus Damm wrote:
 
-NOTE: twl4030 should attempt some form of recovery, but just depending
-on that is never a safe alternative.
+>>>> Describe the PCI USB devices that are behind the PCI bridges, adding
+>>>> necessary
+>>>> links to the USB PHY device.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-new patch. original attempt was: https://patchwork.kernel.org/patch/4002371/
+>>>> Based on the original work by Ben Dooks <ben.dooks@codethink.co.uk>.
 
-NOTE: we dont have poweroff support yet enabled on LDP, but it just needs
-relevant dts entry.
+>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
- drivers/power/twl4030_charger.c |   26 +++++++++++++++++++++-----
- 1 file changed, 21 insertions(+), 5 deletions(-)
+>>>> ---
+>>>> This patch is against 'renesas-devel-v3.15-rc7-20140526' tag of Simon
+>>>> Horman's
+>>>> 'renesas.git' repo plus R8A7790/Lager PCI and USB PHY support patches
+>>>> posted
+>>>> before. The patch requires the internal PCI DT support, USB PHY driver,
+>>>> and
+>>>> USB HCD generic PHY support (also already posted) in order to work.
 
-diff --git a/drivers/power/twl4030_charger.c b/drivers/power/twl4030_charger.c
-index 2598c58..ed0dbd2 100644
---- a/drivers/power/twl4030_charger.c
-+++ b/drivers/power/twl4030_charger.c
-@@ -22,6 +22,7 @@
- #include <linux/power_supply.h>
- #include <linux/notifier.h>
- #include <linux/usb/otg.h>
-+#include <linux/reboot.h>
- #include <linux/regulator/machine.h>
- 
- #define TWL4030_BCIMSTATEC	0x02
-@@ -332,6 +333,7 @@ static irqreturn_t twl4030_bci_interrupt(int irq, void *arg)
- 	struct twl4030_bci *bci = arg;
- 	u8 irqs1, irqs2;
- 	int ret;
-+	bool power_off = false;
- 
- 	ret = twl_i2c_read_u8(TWL4030_MODULE_INTERRUPTS, &irqs1,
- 			      TWL4030_INTERRUPTS_BCIISR1A);
-@@ -352,20 +354,34 @@ static irqreturn_t twl4030_bci_interrupt(int irq, void *arg)
- 	}
- 
- 	/* various monitoring events, for now we just log them here */
--	if (irqs1 & (TWL4030_TBATOR2 | TWL4030_TBATOR1))
-+	if (irqs1 & (TWL4030_TBATOR2 | TWL4030_TBATOR1)) {
- 		dev_warn(bci->dev, "battery temperature out of range\n");
-+		power_off = true;
-+	}
- 
--	if (irqs1 & TWL4030_BATSTS)
-+	if (irqs1 & TWL4030_BATSTS) {
- 		dev_crit(bci->dev, "battery disconnected\n");
-+		power_off = true;
-+	}
- 
--	if (irqs2 & TWL4030_VBATOV)
-+	if (irqs2 & TWL4030_VBATOV) {
- 		dev_crit(bci->dev, "VBAT overvoltage\n");
-+		power_off = true;
-+	}
- 
--	if (irqs2 & TWL4030_VBUSOV)
-+	if (irqs2 & TWL4030_VBUSOV) {
- 		dev_crit(bci->dev, "VBUS overvoltage\n");
-+		power_off = true;
-+	}
- 
--	if (irqs2 & TWL4030_ACCHGOV)
-+	if (irqs2 & TWL4030_ACCHGOV) {
- 		dev_crit(bci->dev, "Ac charger overvoltage\n");
-+		power_off = true;
-+	}
-+
-+	/* Try to shutdown the system */
-+	if (power_off)
-+		orderly_poweroff(true);
- 
- 	return IRQ_HANDLED;
- }
--- 
-1.7.9.5
+>>>> Changes in version 2:
+>>>> - renamed the PCI OHCI/EHCI device nodes to comply with the PCI binding;
+>>>> - changed the PHY specifier in the PCI#2 node to reflect that channel #1
+>>>> support
+>>>>     was dropped;
+>>>> - resolved rejects, refreshed the patch.
+
+>>>>    arch/arm/boot/dts/r8a7790.dtsi |   28 ++++++++++++++++++++++++++++
+>>>>    1 file changed, 28 insertions(+)
+
+>>>> Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
+>>>> ===================================================================
+>>>> --- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
+>>>> +++ renesas/arch/arm/boot/dts/r8a7790.dtsi
+>>>> @@ -919,6 +919,20 @@
+>>>>                   interrupt-map = <0x0000 0 0 1 &gic 0 108
+>>>> IRQ_TYPE_LEVEL_HIGH
+>>>>                                    0x0800 0 0 1 &gic 0 108
+>>>> IRQ_TYPE_LEVEL_HIGH
+>>>>                                    0x1000 0 0 2 &gic 0 108
+>>>> IRQ_TYPE_LEVEL_HIGH>;
+>>>> +
+>>>> +               usb at 0,1 {
+>>>> +                       reg = <0x800 0 0 0 0>;
+>>>> +                       device_type = "pci";
+>>>> +                       phys = <&usbphy 0 0>;
+>>>> +                       phy-names = "usb";
+>>>> +               };
+>>>> +
+>>>> +               usb at 0,2 {
+>>>> +                       reg = <0x1000 0 0 0 0>;
+>>>> +                       device_type = "pci";
+>>>> +                       phys = <&usbphy 0 0>;
+>>>> +                       phy-names = "usb";
+>>>> +               };
+>>>>           };
+>>>>
+>>>>           pci1: pci at ee0b0000 {
+>>>> @@ -955,5 +969,19 @@
+>>>>                   interrupt-map = <0x0000 0 0 1 &gic 0 113
+>>>> IRQ_TYPE_LEVEL_HIGH
+>>>>                                    0x0800 0 0 1 &gic 0 113
+>>>> IRQ_TYPE_LEVEL_HIGH
+>>>>                                    0x1000 0 0 2 &gic 0 113
+>>>> IRQ_TYPE_LEVEL_HIGH>;
+>>>> +
+>>>> +               usb at 0,1 {
+>>>> +                       reg = <0x800 0 0 0 0>;
+>>>> +                       device_type = "pci";
+>>>> +                       phys = <&usbphy 1 0>;
+>>>> +                       phy-names = "usb";
+>>>> +               };
+>>>> +
+>>>> +               usb at 0,2 {
+>>>> +                       reg = <0x1000 0 0 0 0>;
+>>>> +                       device_type = "pci";
+>>>> +                       phys = <&usbphy 1 0>;
+>>>> +                       phy-names = "usb";
+>>>> +               };
+>>>>           };
+>>>>    };
+
+>>> Hi Sergei,
+
+>>> Above I see two hunks of DTS code but my r8a7790 data sheet contains
+>>> three USB PCI devices. Perhaps my understanding is wrong, or may there
+
+>>     You probably wanted to say 6 (OHCI and EHCI are 2 different PCI devices).
+
+> Sure. I guess it depends on if you count PCI host controllers or USB
+> host controllers..
+
+    You said "USB PCI devices", so I thought you meant the latter.
+
+>>> is some other patch available to enable all USB PCI devices included
+>>> in the SoC?
+
+>>     This patch doesn't enable USB devices, it just links them to the PHY
+>> where it makes sense (for USB channel #1 it doesn't).
+
+> I know we've discussed this before, and for USB channel #1 you tend to
+> say that the PHY is not necessary for operation. From my side I am not
+> so sure. Over the months I seen several shortcuts and missing pieces
+> so for now just assume this is another rushed attempt. As usual I
+> would like to make sure the dependencies are correctly described in DT
+> before merging anything.
+
+> Like I mentioned earlier there are shared bits in UGCTRL register in
+
+    Did you mean UGCTRL or UGCTRL2 register? My testing didn't prove that the 
+UGCTRL bits (CONNECT and PLLRESET) affect anything but the USBHS controller -- 
+my PHY driver only touches these bits if the PHY selected corresponds to the 
+USBHS itself (which is not supported by DT yet)...
+
+> the PHY. Those may or may not affect USB channel #1. Furthermore, on
+> top of this we have the MSTP bit for the PHY that may or may not be
+> related to USB channel #1.
+
+    There is no MSTP bit for the PHY, there's MSTP bit for USBHS controller of 
+which this PHY is a part.
+
+> My opinion is that if the USB PHY requires the MSTP clock to be
+> enabled when using USB channel #1 _or_ the UGCTRL bits affect the USB
+> Channel #1 then DT needs to point out the relationship between the PHY
+> and the USB Host
+
+    I agree and I can conduct some additional tests only linking the USB 
+channel #1 to the PHY driver, and hence enabling the USBHS clock only for it...
+
+> so Runtime PM can be used in the PHY driver to
+> dynamically manage the clock.
+
+    Er, do you insist on using the runtime PM vs clock API? I'm not yet sure 
+it'll work with a named clock...
+
+> Thanks,
+> / magnus
+
+WBR, Sergei
