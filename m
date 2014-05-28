@@ -1,98 +1,60 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 28 May 2014 00:22:40 -0700
-Subject: [PATCH v11 2/3] clk: exynos5410: register clocks using common
- clock framework
-In-Reply-To: <01a201cf7a30$41ecca90$c5c65fb0$@samsung.com>
-References: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>
- <1401074613-29227-3-git-send-email-t.dakhran@samsung.com>
- <20140528004116.7816.69646@quantum>
- <01a201cf7a30$41ecca90$c5c65fb0$@samsung.com>
-Message-ID: <20140528072240.10062.16890@quantum>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 28 May 2014 09:47:12 +0200
+Subject: [PATCH RESEND v4 0/8] Add Allwinner A31 USB support
+In-Reply-To: <20140527225318.GA21602@kroah.com>
+References: <1399995862-17788-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140514123419.GK29258@lukather> <20140514160520.GA4679@kroah.com>
+ <20140515091438.GR29258@lukather>
+ <20140527225318.GA21602@kroah.com>
+Message-ID: <20140528074712.GM4730@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kukjin Kim (2014-05-27 21:49:49)
-> Mike Turquette wrote:
+On Tue, May 27, 2014 at 03:53:18PM -0700, Greg Kroah-Hartman wrote:
+> On Thu, May 15, 2014 at 11:14:38AM +0200, Maxime Ripard wrote:
+> > Hi Greg,
 > > 
-> > Quoting Tarek Dakhran (2014-05-25 20:23:32)
-> > > The EXYNOS5410 clocks are statically listed and registered
-> > > using the Samsung specific common clock helper functions.
-> > >
-> > > Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
-> > > Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
-> > > ---
-> > >  .../devicetree/bindings/clock/exynos5410-clock.txt |   45 +++++
-> > >  drivers/clk/samsung/Makefile                       |    1 +
-> > >  drivers/clk/samsung/clk-exynos5410.c               |  209
-> > ++++++++++++++++++++
-> > >  include/dt-bindings/clock/exynos5410.h             |   33 ++++
-> > >  4 files changed, 288 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-
-> > clock.txt
-> > >  create mode 100644 drivers/clk/samsung/clk-exynos5410.c
-> > >  create mode 100644 include/dt-bindings/clock/exynos5410.h
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/clock/exynos5410-
-> > clock.txt b/Documentation/devicetree/bindings/clock/exynos5410-clock.txt
-> > > new file mode 100644
-> > > index 0000000..aeab635
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/clock/exynos5410-clock.txt
-> > > @@ -0,0 +1,45 @@
-> > > +* Samsung Exynos5410 Clock Controller
-> > > +
-> > > +The Exynos5410 clock controller generates and supplies clock to various
-> > > +controllers within the Exynos5410 SoC.
-> > > +
-> > > +Required Properties:
-> > > +
-> > > +- compatible: should be "samsung,exynos5410-clock"
-> > > +
-> > > +- reg: physical base address of the controller and length of memory
-> > mapped
-> > > +  region.
-> > > +
-> > > +- #clock-cells: should be 1.
-> > > +
-> > > +All available clocks are defined as preprocessor macros in
-> > > +dt-bindings/clock/exynos5410.h header and can be used in device
-> > > +tree sources.
-> > > +
-> > > +External clock:
-> > > +
-> > > +There is clock that is generated outside the SoC. It
-> > > +is expected that it is defined using standard clock bindings
-> > > +with following clock-output-name:
-> > > +
-> > > + - "fin_pll" - PLL input clock from XXTI
+> > On Wed, May 14, 2014 at 06:05:20PM +0200, Greg Kroah-Hartman wrote:
+> > > On Wed, May 14, 2014 at 02:34:19PM +0200, Maxime Ripard wrote:
+> > > > On Tue, May 13, 2014 at 05:44:14PM +0200, Maxime Ripard wrote:
+> > > > > Hi everyone,
+> > > > > 
+> > > > > This patchset adds support for the USB controllers found in the
+> > > > > Allwinner A31.
+> > > > > 
+> > > > > While the design is similar to the earlier Allwinner SoCs that are
+> > > > > already supported, a few details here and there change, like the fact
+> > > > > that the PHYs now have one clock per phy, while it used to be only one
+> > > > > for all the PHYs.
+> > > > > 
+> > > > > Resent adding Alan Stern's Acked-by and puting Greg KH in the
+> > > > > recipients this time...
+> > > > 
+> > > > Applied patches 2, 7 and 8.
+> > > 
+> > > Feel free to apply patches 5 and 6 to your tree, as your branch needs
+> > > these, with my:
+> > > 
+> > > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > > 
+> > > Or, if you want me to take them, just let me know and I will.
 > > 
-> > Does fin_pll feed into the exynos5410-clock controller? If so, should
-> > the example clock-controller node below have a clocks and clock-names
-> > property?
-> > 
-> Well, it is fixed clocks and generated outside of the SoC...so maybe the properties are not required?
-
-I guess the fin_pll parts of the binding description are not needed
-then. This isn't a big issue, but I think that someone reading that
-binding (like myself) might conclude that there is some relationship
-between the clock controller and the external clock, which seems not to
-be the case.
-
+> > You can merge them, I don't need them in any of my branch.
 > 
-> BTW, I've applied this series with Tomasz Figa's reviewed tag and sent out to arm-soc today so if any concerns on this, please let me know immediately.
+> Now applied, thanks.
 
-As far as I can tell the fin_pll paragraph can be removed at a later
-date. It isn't part of any real DT binding description such as a
-property or definition. So no need to cause havoc for your existing pull
-request.
+Great, thanks!
 
-Regards,
-Mike
+Maxime
 
-> 
-> > Otherwise patch looks good.
-> > 
-> 
-> Thanks,
-> Kukjin
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140528/73f9a6e6/attachment-0001.sig>
