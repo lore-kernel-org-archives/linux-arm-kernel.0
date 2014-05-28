@@ -1,199 +1,252 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 28 May 2014 20:04:00 +0800
-Subject: [PATCH 5/5] pinctrl: sunxi: Implement multiple interrupt banks
- support
-In-Reply-To: <CAGb2v65KU9UYU9Vn7X0b4-hE7WJchPxuF1UQDeECqc=-147gsA@mail.gmail.com>
-References: <1401272851-15873-1-git-send-email-maxime.ripard@free-electrons.com>
- <1401272851-15873-6-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v65KU9UYU9Vn7X0b4-hE7WJchPxuF1UQDeECqc=-147gsA@mail.gmail.com>
-Message-ID: <CAGb2v65-3ddhaiF-CMdem9NHHibboQYaqXC1axDX+VcpWSLPxw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 28 May 2014 13:04:50 +0100
+Subject: [PATCH] arm/arm64: KVM: Fix and refactor unmap_range
+In-Reply-To: <1401117643-23034-1-git-send-email-christoffer.dall@linaro.org>
+References: <1401117643-23034-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <5385D0E2.3000000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 7:47 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> Hi,
->
-> On Wed, May 28, 2014 at 6:27 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> The A23 and A31 support multiple interrupt banks. Support it by adding a linear
->> domain covering all the banks. It's trickier than it should because there's an
->> interrupt per bank, so we have multiple interrupts using the same domain.
->>
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 62 +++++++++++++++++++++++++++--------
->>  drivers/pinctrl/sunxi/pinctrl-sunxi.h | 11 +++++--
->>  2 files changed, 57 insertions(+), 16 deletions(-)
->>
->> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->> index 71d6cd10d56f..69b58aacc636 100644
->> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->> @@ -635,17 +635,25 @@ static void sunxi_pinctrl_irq_handler(unsigned irq, struct irq_desc *desc)
->>  {
->>         struct irq_chip *chip = irq_get_chip(irq);
->>         struct sunxi_pinctrl *pctl = irq_get_handler_data(irq);
->> -       const unsigned long reg = readl(pctl->membase + IRQ_STATUS_REG);
->> +       unsigned long bank, reg, val;
->> +
->> +       for (bank = 0; bank < pctl->desc->irq_banks; bank++)
->> +               if (irq == pctl->irq[bank])
->> +                       break;
->
-> bail out or BUG_ON(bank == pctl->desc->irq_banks)?
-> (dumb question: would this even happen?)
->
->> +
->> +       reg = sunxi_irq_status_reg_from_bank(bank);
->> +       val = readl(pctl->membase + reg);
->>
->>         /* Clear all interrupts */
->> -       writel(reg, pctl->membase + IRQ_STATUS_REG);
->> +       writel(val, pctl->membase + reg);
->>
->> -       if (reg) {
->> +       if (val) {
->>                 int irqoffset;
->>
->>                 chained_irq_enter(chip, desc);
->> -               for_each_set_bit(irqoffset, &reg, SUNXI_IRQ_NUMBER) {
->> -                       int pin_irq = irq_find_mapping(pctl->domain, irqoffset);
->> +               for_each_set_bit(irqoffset, &val, SUNXI_IRQ_NUMBER) {
->> +                       int pin_irq = irq_find_mapping(pctl->domain,
->> +                                                      bank * SUNXI_IRQ_NUMBER + irqoffset);
->>                         generic_handle_irq(pin_irq);
->>                 }
->>                 chained_irq_exit(chip, desc);
->> @@ -713,8 +721,11 @@ static int sunxi_pinctrl_build_state(struct platform_device *pdev)
->>
->>                 while (func->name) {
->>                         /* Create interrupt mapping while we're at it */
->> -                       if (!strcmp(func->name, "irq"))
->> -                               pctl->irq_array[func->irqnum] = pin->pin.number;
->> +                       if (!strcmp(func->name, "irq")) {
->> +                               int irqnum = func->irqnum + func->irqbank * SUNXI_IRQ_NUMBER;
->> +                               pctl->irq_array[irqnum] = pin->pin.number;
->> +                       }
->> +
->>                         sunxi_pinctrl_add_function(pctl, func->name);
->>                         func++;
->>                 }
->> @@ -784,6 +795,13 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
->>         pctl->dev = &pdev->dev;
->>         pctl->desc = desc;
->>
->> +       pctl->irq_array = devm_kcalloc(&pdev->dev,
->> +                                      SUNXI_IRQ_NUMBER * pctl->desc->irq_banks,
->> +                                      sizeof(*pctl->irq_array),
->> +                                      GFP_KERNEL);
->> +       if (!pctl->irq_array)
->> +               return -ENOMEM;
->> +
->>         ret = sunxi_pinctrl_build_state(pdev);
->>         if (ret) {
->>                 dev_err(&pdev->dev, "dt probe failed: %d\n", ret);
->> @@ -868,21 +886,34 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
->>         if (ret)
->>                 goto gpiochip_error;
->>
->> -       pctl->irq = irq_of_parse_and_map(node, 0);
->> +       pctl->irq = devm_kcalloc(&pdev->dev,
->> +                                pctl->desc->irq_banks,
->> +                                sizeof(*pctl->irq),
->> +                                GFP_KERNEL);
->>         if (!pctl->irq) {
->> -               ret = -EINVAL;
->> +               ret = -ENOMEM;
->>                 goto clk_error;
->>         }
->>
->> -       pctl->domain = irq_domain_add_linear(node, SUNXI_IRQ_NUMBER,
->> -                                            &irq_domain_simple_ops, NULL);
->> +       for (i = 0; i < pctl->desc->irq_banks; i++) {
->> +               pctl->irq[i] = platform_get_irq(pdev, i);
->> +               if (pctl->irq[i] < 0) {
->> +                       ret = pctl->irq[i];
->> +                       goto clk_error;
->> +               }
->> +       }
->> +
->> +       pctl->domain = irq_domain_add_linear(node,
->> +                                            pctl->desc->irq_banks * SUNXI_IRQ_NUMBER,
->> +                                            &irq_domain_simple_ops,
->> +                                            NULL);
->>         if (!pctl->domain) {
->>                 dev_err(&pdev->dev, "Couldn't register IRQ domain\n");
->>                 ret = -ENOMEM;
->>                 goto clk_error;
->>         }
->>
->> -       for (i = 0; i < SUNXI_IRQ_NUMBER; i++) {
->> +       for (i = 0; i < (pctl->desc->irq_banks * SUNXI_IRQ_NUMBER); i++) {
->>                 int irqno = irq_create_mapping(pctl->domain, i);
->>
->>                 irq_set_chip_and_handler(irqno, &sunxi_pinctrl_irq_chip,
->> @@ -890,8 +921,11 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
->>                 irq_set_chip_data(irqno, pctl);
->>         };
->>
->> -       irq_set_chained_handler(pctl->irq, sunxi_pinctrl_irq_handler);
->> -       irq_set_handler_data(pctl->irq, pctl);
->> +       for (i = 0; i < pctl->desc->irq_banks; i++) {
->> +               irq_set_chained_handler(pctl->irq[i],
->> +                                       sunxi_pinctrl_irq_handler);
->> +               irq_set_handler_data(pctl->irq[i], pctl);
->> +       }
->>
->>         dev_info(&pdev->dev, "initialized sunXi PIO driver\n");
->>
->> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
->> index 7ddcce0f3c27..e4a808e66fd2 100644
->> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
->> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
->> @@ -68,6 +68,8 @@
->>  #define IRQ_STATUS_IRQ_BITS            1
->>  #define IRQ_STATUS_IRQ_MASK            ((1 << IRQ_STATUS_IRQ_BITS) - 1)
->>
->> +#define IRQ_MEM_SIZE           0x20
->> +
->>  #define IRQ_EDGE_RISING                0x00
->>  #define IRQ_EDGE_FALLING       0x01
->>  #define IRQ_LEVEL_HIGH         0x02
->> @@ -115,8 +117,8 @@ struct sunxi_pinctrl {
->>         unsigned                        nfunctions;
->>         struct sunxi_pinctrl_group      *groups;
->>         unsigned                        ngroups;
->> -       int                             irq;
->> -       int                             irq_array[SUNXI_IRQ_NUMBER];
->> +       int                             *irq;
->> +       unsigned                        *irq_array;
->>         spinlock_t                      lock;
->>         struct pinctrl_dev              *pctl_dev;
->>  };
->> @@ -250,6 +252,11 @@ static inline u32 sunxi_irq_ctrl_offset(u16 irq)
->>         return irq_num * IRQ_CTRL_IRQ_BITS;
->>  }
->>
->> +static inline u32 sunxi_irq_status_reg_from_bank(u8 bank)
->> +{
->> +       return IRQ_STATUS_REG + bank * IRQ_MEM_SIZE;
->> +}
->> +
->>  static inline u32 sunxi_irq_status_reg(u16 irq)
->>  {
->>         u8 reg = irq / IRQ_STATUS_IRQ_PER_REG * 0x04;
+On 26/05/14 16:20, Christoffer Dall wrote:
+> unmap_range() was utterly broken, to quote Marc, and broke in all sorts
+> of situations.  It was also quite complicated to follow and didn't
+> follow the usual scheme of having a separate iterating function for each
+> level of page tables.
+> 
+> Address this by refactoring the code and introduce a pgd_clear()
+> function.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm/include/asm/kvm_mmu.h   |  12 ++++
+>  arch/arm/kvm/mmu.c               | 126 ++++++++++++++++++++++-----------------
+>  arch/arm64/include/asm/kvm_mmu.h |  15 +++++
+>  3 files changed, 99 insertions(+), 54 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index 5c7aa3c..5cc0b0f 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -127,6 +127,18 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+>  	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
+>  })
+>  
+> +static inline bool kvm_page_empty(void *ptr)
+> +{
+> +	struct page *ptr_page = virt_to_page(ptr);
+> +	return page_count(ptr_page) == 1;
+> +}
+> +
+> +
+> +#define kvm_pte_table_empty(ptep) kvm_page_empty(ptep)
+> +#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
+> +#define kvm_pud_table_empty(pudp) (0)
+> +
+> +
+>  struct kvm;
+>  
+>  #define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 16f8049..0572522 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -46,6 +46,10 @@ static phys_addr_t hyp_idmap_vector;
+>  
+>  #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
+>  
+> +#ifndef __unused
+> +#    define __unused			__attribute__((unused))
+> +#endif
+> +
 
-Sorry, missed this. You should also change 0x04 to IRQ_MEM_SIZE
-(I believe that was the original intention?) for sunxi_irq_*_reg.
+Do we actually need this?
 
-This should fix the mask/unmask/set_type callbacks.
+>  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>  {
+>  	/*
+> @@ -90,10 +94,13 @@ static void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
+>  	return p;
+>  }
+>  
+> -static bool page_empty(void *ptr)
+> +static void clear_pgd_entry(struct kvm *kvm, pgd_t *pgd, phys_addr_t addr)
+>  {
+> -	struct page *ptr_page = virt_to_page(ptr);
+> -	return page_count(ptr_page) == 1;
+> +	pud_t *pud_table __unused = pud_offset(pgd, 0);
+> +	pgd_clear(pgd);
+> +	kvm_tlb_flush_vmid_ipa(kvm, addr);
+> +	pud_free(NULL, pud_table);
+> +	put_page(virt_to_page(pgd));
+>  }
+>  
+>  static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
+> @@ -124,70 +131,81 @@ static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
+>  	put_page(virt_to_page(pmd));
+>  }
+>  
+> -static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
+> +static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
+> +		       unsigned long long addr, unsigned long long end)
+>  {
+> -	if (pte_present(*pte)) {
+> -		kvm_set_pte(pte, __pte(0));
+> -		put_page(virt_to_page(pte));
+> -		kvm_tlb_flush_vmid_ipa(kvm, addr);
+> -	}
+> +	pte_t *pte, *start_pte;
+> +	unsigned long long start_addr = addr;
+> +
+> +	start_pte = pte = pte_offset_kernel(pmd, addr);
+> +	do {
+> +		if (!pte_none(*pte)) {
+> +			kvm_set_pte(pte, __pte(0));
+> +			put_page(virt_to_page(pte));
+> +			kvm_tlb_flush_vmid_ipa(kvm, addr);
+> +		}
+> +	} while (pte++, addr += PAGE_SIZE, addr != end);
+> +
+> +	if (kvm_pte_table_empty(start_pte))
+> +		clear_pmd_entry(kvm, pmd, start_addr);
+>  }
+>  
+> -static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+> -			unsigned long long start, u64 size)
+> +static void unmap_pmds(struct kvm *kvm, pud_t *pud,
+> +		       unsigned long long addr, unsigned long long end)
+>  {
+> -	pgd_t *pgd;
+> -	pud_t *pud;
+> -	pmd_t *pmd;
+> -	pte_t *pte;
+> -	unsigned long long addr = start, end = start + size;
+> -	u64 next;
+> -
+> -	while (addr < end) {
+> -		pgd = pgdp + pgd_index(addr);
+> -		pud = pud_offset(pgd, addr);
+> -		pte = NULL;
+> -		if (pud_none(*pud)) {
+> -			addr = kvm_pud_addr_end(addr, end);
+> -			continue;
+> -		}
+> +	unsigned long long next, start_addr = addr;
+> +	pmd_t *pmd, *start_pmd;
+>  
+> -		if (pud_huge(*pud)) {
+> -			/*
+> -			 * If we are dealing with a huge pud, just clear it and
+> -			 * move on.
+> -			 */
+> -			clear_pud_entry(kvm, pud, addr);
+> -			addr = kvm_pud_addr_end(addr, end);
+> -			continue;
+> +	start_pmd = pmd = pmd_offset(pud, addr);
+> +	do {
+> +		next = kvm_pmd_addr_end(addr, end);
+> +		if (!pmd_none(*pmd)) {
+> +			if (kvm_pmd_huge(*pmd))
+> +				clear_pmd_entry(kvm, pmd, addr);
+> +			else
+> +				unmap_ptes(kvm, pmd, addr, next);
+>  		}
+> +	} while (pmd++, addr = next, addr != end);
+>  
+> -		pmd = pmd_offset(pud, addr);
+> -		if (pmd_none(*pmd)) {
+> -			addr = kvm_pmd_addr_end(addr, end);
+> -			continue;
+> -		}
+> +	if (kvm_pmd_table_empty(start_pmd))
+> +		clear_pud_entry(kvm, pud, start_addr);
+> +}
+>  
+> -		if (!kvm_pmd_huge(*pmd)) {
+> -			pte = pte_offset_kernel(pmd, addr);
+> -			clear_pte_entry(kvm, pte, addr);
+> -			next = addr + PAGE_SIZE;
+> -		}
+> +static void unmap_puds(struct kvm *kvm, pgd_t *pgd,
+> +		       unsigned long long addr, unsigned long long end)
+> +{
+> +	unsigned long long next, start_addr = addr;
+> +	pud_t *pud, *start_pud;
+>  
+> -		/*
+> -		 * If the pmd entry is to be cleared, walk back up the ladder
+> -		 */
+> -		if (kvm_pmd_huge(*pmd) || (pte && page_empty(pte))) {
+> -			clear_pmd_entry(kvm, pmd, addr);
+> -			next = kvm_pmd_addr_end(addr, end);
+> -			if (page_empty(pmd) && !page_empty(pud)) {
+> +	start_pud = pud = pud_offset(pgd, addr);
+> +	do {
+> +		next = kvm_pud_addr_end(addr, end);
+> +		if (!pud_none(*pud)) {
+> +			if (pud_huge(*pid)) {
+>  				clear_pud_entry(kvm, pud, addr);
+> -				next = kvm_pud_addr_end(addr, end);
+> +			} else {
+> +				unmap_pmds(kvm, pud, addr, next);
+>  			}
+>  		}
+> +	} while (pud++, addr = next, addr != end);
+>  
+> -		addr = next;
+> -	}
+> +	if (kvm_pud_table_empty(start_pud))
+> +		clear_pgd_entry(kvm, pgd, start_addr);
+> +}
+> +
+> +
+> +static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+> +			unsigned long long start, u64 size)
+> +{
+> +	pgd_t *pgd;
+> +	unsigned long long addr = start, end = start + size;
+> +	unsigned long long next;
+> +
+> +	pgd = pgdp + pgd_index(addr);
+> +	do {
+> +		next = kvm_pgd_addr_end(addr, end);
+> +		unmap_puds(kvm, pgd, addr, next);
+> +	} while (pgd++, addr = next, addr != end);
+>  }
+>  
+>  static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 7d29847..8e138c7 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -125,6 +125,21 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+>  #define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
+>  #define kvm_pmd_addr_end(addr, end)	pmd_addr_end(addr, end)
+>  
+> +static inline bool kvm_page_empty(void *ptr)
+> +{
+> +	struct page *ptr_page = virt_to_page(ptr);
+> +	return page_count(ptr_page) == 1;
+> +}
+> +
+> +#define kvm_pte_table_empty(ptep) kvm_page_empty(ptep)
+> +#ifndef CONFIG_ARM64_64K_PAGES
+> +#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
+> +#else
+> +#define kvm_pmd_table_empty(pmdp) (0)
+> +#endif
+> +#define kvm_pud_table_empty(pudp) (0)
+> +
+> +
+>  struct kvm;
+>  
+>  #define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
+> 
 
->> --
->> 1.9.3
->>
->
-> The rest looks good. Thanks for making it happen!
->
->
-> Cheers
-> ChenYu
+Other than the odd __unused, looks pretty good. I gave it a quick go on
+my dual A7 rig, and it did worked nicely.
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
