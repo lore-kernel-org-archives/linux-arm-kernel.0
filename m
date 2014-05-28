@@ -1,59 +1,73 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 28 May 2014 13:30:01 -0700
-Subject: [PATCH 0/6] DT early console initialization
-In-Reply-To: <CAL_JsqK9nifPWW5jnzYifsMuvRjhD9wTT+YbE0sPM6N4xaj1yA@mail.gmail.com>
-References: <1399587823-17701-1-git-send-email-robherring2@gmail.com>
- <20140514142644.1C922C4153D@trevor.secretlab.ca>
- <CAL_JsqK9nifPWW5jnzYifsMuvRjhD9wTT+YbE0sPM6N4xaj1yA@mail.gmail.com>
-Message-ID: <20140528203001.GA14334@kroah.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 28 May 2014 21:42:39 +0100
+Subject: EFI_STUB fails to boot non-EFI on arm64
+In-Reply-To: <20140528184043.GB20523@arm.com>
+References: <20140523094513.GC9252@arm.com>
+ <20140523131656.GR4179@bivouac.eciton.net>
+ <20140523134720.GA9256@arm.com>
+ <20140523150331.GS4179@bivouac.eciton.net>
+ <20140528155931.GA20523@arm.com>
+ <20140528180525.GU4179@bivouac.eciton.net>
+ <20140528184043.GB20523@arm.com>
+Message-ID: <20140528204239.GV4179@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 11:30:04AM -0500, Rob Herring wrote:
-> On Wed, May 14, 2014 at 9:26 AM, Grant Likely <grant.likely@linaro.org> wrote:
-> > On Thu,  8 May 2014 17:23:37 -0500, Rob Herring <robherring2@gmail.com> wrote:
-> >> From: Rob Herring <robh@kernel.org>
-> >>
-> >> This series adds support for early serial console initialization using
-> >> DT. This enables determining the serial port type and address using the
-> >> FDT and allows enabling the console before platform specific
-> >> initialization runs. I've tested this on arm64. ARM support is dependent
-> >> on adding fixmap support.
-> >>
-> >> Currently, the earlycon is only enabled if "earlycon" is present on the
-> >> kernel command line. The FDT needs to have /chosen/stdout-path set to
-> >> the path of the serial port.
-> >>
-> >> This series is dependent on generic earlycon[1], libfdt support[2], and
-> >> vmlinux.lds.h clean-ups[3]. The first 2 are in linux-next already. A git
-> >> branch is available here:
-> >>
-> >> git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git earlycon-dt
-> >
-> > Nice. For the whole series:
-> >
-> > Acked-by: Grant Likely <grant.likely@linaro.org>
-> >
-> > I haven't tested it though.
-> >>
-> >> Rob
-> >>
-> >> [1] https://lkml.org/lkml/2014/4/18/573
-> >> [2] https://lkml.org/lkml/2014/4/22/1202
-> >> [3] https://lkml.org/lkml/2014/3/27/285
-> >>
-> >> Rob Herring (6):
-> >>   of: align RESERVEDMEM_OF_DECLARE function callbacks to other callbacks
-> >>   of: consolidate linker section OF match table declarations
-> >>   serial: earlycon: add DT support
-> >>   of/fdt: add FDT address translation support
-> >>   of/fdt: add FDT serial scanning for earlycon
-> >>   tty/serial: pl011: add DT based earlycon support
+On Wed, May 28, 2014 at 07:40:43PM +0100, Will Deacon wrote:
+> > Well, but (for the output part) my patch already did that?
+> > If the "Getting parameters from FDT:\n" was too verbose, we could
+> > just drop it, and have the same effect on output.
 > 
-> Greg, I plan to take this series thru the DT tree for 3.16 unless you
-> have any objections. It has dependencies on both the tty-next and the
-> DT trees.
+> It's the pr_err which is annoying, not the "Getting parameters from FDT:\n"
+> message. Why should I have an error logged to my console when I was never
+> intending to boot using EFI anyway?
 
-No objection from me at all, feel free to do so.
+The pr_err would now only be triggered if some UEFI properties were
+present and not others. I.e. if the UEFI stub loader failed miserably
+without detecting it, or something corrupted the DT later on. We would
+then be the proud owners of a system in an undefined state.
 
-greg k-h
+> > Thing is - there is not really any error case available anywhere
+> > during the execution of efi_init() and its branches other than:
+> > - Information required for UEFI boot cannot be found.
+> > - Information exists, but is invalid.
+> > - Failed to early_memremap some UEFI regions into the kernel.
+> > which all amounts to "UEFI not available or something went wrong",
+> > rather than "UEFI failed to initialise".
+> 
+> Fine, but in this case the DT had the relevant properties which is a good
+> indication that the user was at least *trying* to boot using EFI, no?
+
+Having a partial/invalid DT is going to cause undefined behaviour
+regardless of your method of booting.
+
+And if the data provided proved inaccessible or broken, the symptom
+would be a complete lack of memblocks. So it may in fact not be
+possible for that pr_err to ever make it to the console :)
+
+> > If efi_init returns successfully, EFI_BOOT is set, and testable using
+> > the efi_enabled() macro.
+> > 
+> > The proper "UEFI failed to initialise" bit does not come until the
+> > early_initcall arm64_enter_virtual_mode(), and is indicated not by
+> > a return value, but by setting the flag indicating that
+> > EFI_RUNTIME_SERVICES are available, which is checked later in core
+> > code using the efi_enabled() macro.
+> 
+> Sorry, I naively assumed that with a name like efi_init it might, you know,
+> initialise EFI? ;)
+
+Name cargo-culted from ia64/x86 by me, and from me by Mark :)
+
+> > So moving the call to efi_get_fdt_params() would have little effect
+> > other than adding a third call site for UEFI bits in setup_arch().
+> 
+> I don't mind having the extra call site if it allows us to distinguish
+> errors from information.
+
+And I still don't see how an extra call site in setup_arch would make
+this more possible than it already is (with my suggested patch to the
+current version of the code).
+
+/
+    Leif
