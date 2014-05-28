@@ -1,34 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 28 May 2014 16:17:39 +0100
-Subject: [PATCH] acornscsi: remove linked command support
-In-Reply-To: <1401287204.2288.28.camel@dabdike>
-References: <1400926433.31526.89.camel@x220>
- <20140528104114.GE13542@infradead.org> <1401287204.2288.28.camel@dabdike>
-Message-ID: <20140528151739.GJ3693@n2100.arm.linux.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 28 May 2014 16:21:42 +0100
+Subject: [PATCH 0/2] arm: alignment trap tweaks
+In-Reply-To: <cover.1399028497.git.robin.murphy@arm.com>
+References: <cover.1399028497.git.robin.murphy@arm.com>
+Message-ID: <5385FF06.3020506@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 06:26:44PM +0400, James Bottomley wrote:
-> On Wed, 2014-05-28 at 03:41 -0700, Christoph Hellwig wrote:
-> > Looks good,
-> > 
-> > Reviewed-by: Christoph Hellwig <hch@lst.de>
-> > 
-> > And I have to disagree with James here, removing code that isn't even
-> > compiled always is an improvement, especially for an unmaintained
-> > driver.
-> 
-> Well, as I said, this is in theory a maintained driver, so just get an
-> ack from Russell and this debate is moot.
+On 07/05/14 10:51, Robin Murphy wrote:
+> Hi all,
+>
+> Revisiting the alignment trap again thanks to an obscure corner case
+> with NEON alignment hints - patch 1 is a repost from a while back as a
+> ping, because modern userspaces really should just get a resounding
+> "Don't do that!" if they manage to step outside the architecture.
+> Patch 2 is the fix for cases where fixup does need to be turned back on
+> for whatever reason.
+>
 
-I don't see any harm in removing this - I don't think I've owned any
-SCSI devices which supported linked commands, which is why I never
-put much effort into it.  As no one else seems to care about it (given
-the number of years it's been left alone), removing the linked command
-stuff is fine.
+Ping. Any comment on these? Admittedly it's a very hard-to-hit bug, but 
+it's a bug all the same.
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Thanks,
+Robin.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> The following testcase compiled with -marm illustrates the problem:
+> with fixup enabled, when the VLD1 instruction with the alignment hint
+> set faults by performing a misaligned access, it fails to load the NEON
+> registers as expected and eventually writes back nonsense to the base
+> register, resulting in a misleading segfault on the next iteration.
+>
+> --->8---
+>
+> #include <stdint.h>
+> #include <stdio.h>
+>
+> static uint8_t buffer[256], got[256];
+>
+> int main() {
+> 	uint8_t *base = (uint8_t *)((intptr_t)buffer + 0x7 & ~0x7);
+> 	void *p = base, *q = got;
+> 	int i;
+>
+> 	for (i=0; i<64; i++)
+> 		base[i] = i;
+> 	for (i=0; i<4; i++) {
+> 		asm volatile ("vld1.8 {d0,d1}, [%0]\n vst1.8 {d0,d1}, [%1]\n"
+> 				: "=r"(p),"=r"(q) : "0"(p),"1"(q) : "d0","d1");
+> 		printf("unaligned: %p [%d,%d,%d,...]\n", p++, got[0], got[1], got[2]);
+> 	}
+> 	p = base;
+> 	for (i=0; i<4; i++) {
+> 		asm volatile ("vld1.8 {d0,d1}, [%0:64]\n vst1.8 {d0,d1}, [%1]\n"
+> 				: "=r"(p),"=r"(q) : "0"(p),"1"(q) : "d0","d1");
+> 		printf("misaligned: %p [%d,%d,%d,...]\n", p++, got[0], got[1], got[2]);
+> 	}
+> 	return 0;
+> }
+>
+> --->8---
+>
+> Robin Murphy (2):
+>    arm: SIGBUS on unsupported ARMv6 unaligned accesses
+>    arm: don't break misaligned NEON load/store
+>
+>   arch/arm/mm/alignment.c |    9 ++++++---
+>   1 file changed, 6 insertions(+), 3 deletions(-)
+>
+> --
+> 1.7.9.5
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
