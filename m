@@ -1,98 +1,99 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 29 May 2014 12:23:58 +0800
-Subject: [PATCH 17/22] mfd: sun6i-prcm: Add support for Allwinner A23 PRCM
-In-Reply-To: <20140527083021.GE4730@lukather>
-References: <1400831485-28576-1-git-send-email-wens@csie.org>
- <1400831485-28576-18-git-send-email-wens@csie.org>
- <20140525191434.GX10768@lukather>
- <CAGb2v66cV_nRpHhrtDUYzncO5wimx+vRBW6BFcU0Kz=bKkNs+g@mail.gmail.com>
- <20140527083021.GE4730@lukather>
-Message-ID: <CAGb2v65v7rqBwFbn1JtQv44nQxepAq-ciwsBdHaELbzWXQNU9g@mail.gmail.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Thu, 29 May 2014 10:07:15 +0530
+Subject: [PATCH v6 0/6] add cpuidle support for Exynos5420
+In-Reply-To: <5385A638.2000001@linaro.org>
+References: <CANuQgHGSA+R__raSa_tzrgpceqLD2SZw+s0XQUHGF4wscgh6Kg@mail.gmail.com>
+ <1400227438-27155-1-git-send-email-chander.kashyap@linaro.org>
+ <53831795.9070006@gmail.com>
+ <CANuQgHH284A9QY7M5zGbSE-mXjm2KDqr54VWmtKVkbma3zZvvw@mail.gmail.com>
+ <015f01cf7a2e$3b141590$b13c40b0$@samsung.com>
+ <5385A638.2000001@linaro.org>
+Message-ID: <CANuQgHGM_PsDO0RmEKDVXSs1u50VMuLrx-=0sYhDut1gSjspcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 4:30 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Mon, May 26, 2014 at 12:36:38PM +0800, Chen-Yu Tsai wrote:
->> On Mon, May 26, 2014 at 3:14 AM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > On Fri, May 23, 2014 at 03:51:20PM +0800, Chen-Yu Tsai wrote:
->> >> The Allwinner A23 SoC has a PRCM unit like the previous A31 SoC.
->> >> The differences are the AR100 clock can no longer be modified,
->> >> and the APB0 clock has different divisors.
->> >>
->> >> This patch adds a compatible with a modified subdevice list for
->> >> the A23.
->> >>
->> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> >> ---
->> >>  .../devicetree/bindings/mfd/sun6i-prcm.txt         |  2 +-
->> >>  drivers/mfd/sun6i-prcm.c                           | 30 ++++++++++++++++++++++
->> >>  2 files changed, 31 insertions(+), 1 deletion(-)
->> >>
->> >> diff --git a/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt b/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
->> >> index 1f5a31f..03c5a55 100644
->> >> --- a/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
->> >> +++ b/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
->> >> @@ -4,7 +4,7 @@ PRCM is an MFD device exposing several Power Management related devices
->> >>  (like clks and reset controllers).
->> >>
->> >>  Required properties:
->> >> - - compatible: "allwinner,sun6i-a31-prcm"
->> >> + - compatible: "allwinner,sun6i-a31-prcm" or "allwinner,sun8i-a23-prcm"
->> >>   - reg: The PRCM registers range
->> >>
->> >>  The prcm node may contain several subdevices definitions:
->> >> diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
->> >> index 718fc4d..c96bb6c 100644
->> >> --- a/drivers/mfd/sun6i-prcm.c
->> >> +++ b/drivers/mfd/sun6i-prcm.c
->> >> @@ -76,16 +76,46 @@ static const struct mfd_cell sun6i_a31_prcm_subdevs[] = {
->> >>       },
->> >>  };
->> >>
->> >> +static const struct mfd_cell sun8i_a23_prcm_subdevs[] = {
->> >> +     {
->> >> +             .name = "sun6i-a31-apb0-clk",
->> >> +             .of_compatible = "allwinner,sun8i-a23-apb0-clk",
->> >> +             .num_resources = ARRAY_SIZE(sun6i_a31_apb0_clk_res),
->> >> +             .resources = sun6i_a31_apb0_clk_res,
->> >> +     },
->> >> +     {
->> >> +             .name = "sun6i-a31-apb0-gates-clk",
->> >> +             .of_compatible = "allwinner,sun6i-a31-apb0-gates-clk",
->> >> +             .num_resources = ARRAY_SIZE(sun6i_a31_apb0_gates_clk_res),
->> >> +             .resources = sun6i_a31_apb0_gates_clk_res,
->> >> +     },
->> >
->> > Did I just have a brainfart, or didn't you just introduced an
->> > sun8i-a23-apb0-gates-clk driver?
+On 28 May 2014 14:32, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> On 05/28/2014 06:35 AM, Kukjin Kim wrote:
 >>
->> My bad, I missed this one. The one in the DT is correct.
->> It actually works, so I'm a bit confused here.
->> Which one does the driver core actually use?
+>> Chander Kashyap wrote:
+>>>
+>>>
+>>> On 26 May 2014 15:59, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>>>>
+>>>> Hi Chander,
+>>>>
+>>>> On 16.05.2014 10:03, Chander Kashyap wrote:
+>>>>>
+>>>>> Exynos5420 is a big-little Soc from Samsung. It has 4 A15 and 4 A7
+>>>
+>>> cores.
+>>>>>
+>>>>>
+>>>>> This patchset adds cpuidle support for Exynos5420 SoC based on
+>>>>> generic big.little cpuidle driver.
+>>>>>
+>>>>> Tested on SMDK5420.
+>>>>>
+>>>>> This patch set depends on:
+>>>>>        1. [PATCH 0/5] MCPM backend for Exynos5420
+>>>>>           http://www.spinics.net/lists/arm-kernel/msg331100.html
+>>>>> Changelog is in respective patches.
+>>>>> Chander Kashyap (5):
+>>>>>    driver: cpuidle-big-little: add of_device_id structure
+>>>>>    arm: exynos: add generic function to calculate cpu number
+>>>>>    cpuidle: config: Add ARCH_EXYNOS entry to select cpuidle-big-little
+>>>>>      driver
+>>>>>    driver: cpuidle: cpuidle-big-little: init driver for Exynos5420
+>>>>>    exynos: cpuidle: do not allow cpuidle registration for Exynos5420
+>>>>>    mcpm: exynos: populate suspend and powered_up callbacks
+>>>>>
+>>>>>   arch/arm/mach-exynos/exynos.c        |    4 +++-
+>>>>>   arch/arm/mach-exynos/mcpm-exynos.c   |   36
+>>>
+>>> ++++++++++++++++++++++++++++++++++
+>>>>>
+>>>>>   arch/arm/mach-exynos/regs-pmu.h      |    9 +++++++++
+>>>>>   drivers/cpuidle/Kconfig.arm          |    2 +-
+>>>>>   drivers/cpuidle/cpuidle-big_little.c |   12 +++++++++++-
+>>>>>   5 files changed, 60 insertions(+), 3 deletions(-)
+>>>>>
+>>>>
+>>>> For the whole series,
+>>>>
+>>>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+>>>
+>>>
+>>> Thanks Tomasz.
+>>>
+>>> Dear Kukjin,
+>>> Can you take these patches.
+>>>>
+>>>>
+>> When I looked at this series quickly, looks good to me but I need to get
+>> ack from cpuidle maintainer Rafael or Daniel.
 >
-> Actually, it will use both, and will match the of_compatible string
-> try to match it against the mfd-sub-nodes compatibles. If nothing
-> matches, it won't fill the dev.of_node field.
-
-So actually it was supposed to use "allwinner,sun6i-a31-apb0-gates-clk",
-as that clk driver takes clock-indices, so no need to define gate masks
-and tie them to some new compatible.
-
-There was no sun8i-a23-apb0-gates-clk driver.
-
-I must not be getting enough sleep.
-
->> > And there's no ar100 and ahb0 clocks ?
->>
->> The ahb0 is a fixed-factor (1:1) clock. There are no controls for it.
->> The ar100 clock on the A23 has no controls either, so fixed-factor
->> clock again.
 >
-> Ack.
+> Acked the different cpuidle bits.
+
+Hi Kukjin,
+Can you take it now?
+
+
+>
+> Thanks
+>   -- Daniel
+>
 >
 > --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+>
+
+
+
+-- 
+with warm regards,
+Chander Kashyap
