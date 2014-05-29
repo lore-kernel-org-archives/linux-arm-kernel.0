@@ -1,51 +1,63 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 29 May 2014 21:16:27 +0200
-Subject: [PATCH v2 2/5] pinctrl: sunxi: Add macro definition for pinctrl with
- more than one interrupt
+Date: Thu, 29 May 2014 21:16:26 +0200
+Subject: [PATCH v2 1/5] pinctrl: sunxi: Remove irq_mask_ack and use irq_ack
+ instead
 In-Reply-To: <1401390990-5355-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1401390990-5355-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1401390990-5355-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1401390990-5355-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31 and A23, unlike the other Allwinner SoCs, have several interrupts banks
-and parent interrupts, while the other only have up to 32 interrupts in a
-single bank and a single parent interrupt.
-
-Start supporting it by introducing a function macro to declare irq functions
-and their banks.
+If irq_mask_ack is not defined, mask_ack_irq will call irq_mask and then
+irq_ack. In order to avoid code duplication, between irq_mask_ack and irq_mask,
+just declare irq_ack.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/pinctrl/sunxi/pinctrl-sunxi.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 16 ++--------------
+ 1 file changed, 2 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-index 8169ba598876..cb87e15b1b3c 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-@@ -77,6 +77,7 @@
- struct sunxi_desc_function {
- 	const char	*name;
- 	u8		muxval;
-+	u8		irqbank;
- 	u8		irqnum;
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index d69a440e728d..93e774034e51 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -571,26 +571,14 @@ static int sunxi_pinctrl_irq_set_type(struct irq_data *d,
+ 	return 0;
+ }
+ 
+-static void sunxi_pinctrl_irq_mask_ack(struct irq_data *d)
++static void sunxi_pinctrl_irq_ack(struct irq_data *d)
+ {
+ 	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
+-	u32 ctrl_reg = sunxi_irq_ctrl_reg(d->hwirq);
+-	u8 ctrl_idx = sunxi_irq_ctrl_offset(d->hwirq);
+ 	u32 status_reg = sunxi_irq_status_reg(d->hwirq);
+ 	u8 status_idx = sunxi_irq_status_offset(d->hwirq);
+-	unsigned long flags;
+-	u32 val;
+-
+-	spin_lock_irqsave(&pctl->lock, flags);
+-
+-	/* Mask the IRQ */
+-	val = readl(pctl->membase + ctrl_reg);
+-	writel(val & ~(1 << ctrl_idx), pctl->membase + ctrl_reg);
+ 
+ 	/* Clear the IRQ */
+ 	writel(1 << status_idx, pctl->membase + status_reg);
+-
+-	spin_unlock_irqrestore(&pctl->lock, flags);
+ }
+ 
+ static void sunxi_pinctrl_irq_mask(struct irq_data *d)
+@@ -636,8 +624,8 @@ static void sunxi_pinctrl_irq_unmask(struct irq_data *d)
+ }
+ 
+ static struct irq_chip sunxi_pinctrl_irq_chip = {
++	.irq_ack	= sunxi_pinctrl_irq_ack,
+ 	.irq_mask	= sunxi_pinctrl_irq_mask,
+-	.irq_mask_ack	= sunxi_pinctrl_irq_mask_ack,
+ 	.irq_unmask	= sunxi_pinctrl_irq_unmask,
+ 	.irq_set_type	= sunxi_pinctrl_irq_set_type,
  };
- 
-@@ -139,6 +140,14 @@ struct sunxi_pinctrl {
- 		.irqnum = _irq,					\
- 	}
- 
-+#define SUNXI_FUNCTION_IRQ_BANK(_val, _bank, _irq)		\
-+	{							\
-+		.name = "irq",					\
-+		.muxval = _val,					\
-+		.irqbank = _bank,				\
-+		.irqnum = _irq,					\
-+	}
-+
- /*
-  * The sunXi PIO registers are organized as is:
-  * 0x00 - 0x0c	Muxing values.
 -- 
 2.0.0
