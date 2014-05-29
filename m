@@ -1,55 +1,118 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 29 May 2014 15:51:28 -0500
-Subject: [PATCH] of: treat PCI config space as IORESOURCE_MEM type
-In-Reply-To: <CAL_JsqLPFDwtd-QYDqCwx1JVj1Aa8=nof-e0P6R9CZra+fXHfw@mail.gmail.com>
-References: <1401379426-9701-1-git-send-email-galak@codeaurora.org>
- <CAL_JsqLPFDwtd-QYDqCwx1JVj1Aa8=nof-e0P6R9CZra+fXHfw@mail.gmail.com>
-Message-ID: <47B1E3D0-4336-4529-80B0-172F4ACA5C97@codeaurora.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 29 May 2014 15:51:36 -0500
+Subject: [PATCH v5 1/2] cpufreq / OPP: Allow boost frequency to be looked
+ up from device tree
+In-Reply-To: <1401374319-4480-2-git-send-email-thomas.ab@samsung.com>
+References: <1401374319-4480-1-git-send-email-thomas.ab@samsung.com>
+ <1401374319-4480-2-git-send-email-thomas.ab@samsung.com>
+Message-ID: <53879DD8.1060906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On May 29, 2014, at 3:44 PM, Rob Herring <robherring2@gmail.com> wrote:
-
-> On Thu, May 29, 2014 at 11:03 AM, Kumar Gala <galak@codeaurora.org> wrote:
->> If we have a PCI config space specified in something like a ranges
->> property we should treat it as memory type resource.
+On 05/29/2014 09:38 AM, Thomas Abraham wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
 > 
-> Config space should not be in ranges[1]. We have some cases that are,
-> but we don't want new ones.
-
-For the cases we have I agree, however an ECAM based cfg seems completely legit.
-
->> Signed-off-by: Kumar Gala <galak@codeaurora.org>
->> ---
->> drivers/of/address.c | 3 +++
->> 1 file changed, 3 insertions(+)
->> 
->> diff --git a/drivers/of/address.c b/drivers/of/address.c
->> index cb4242a..4e7ee59 100644
->> --- a/drivers/of/address.c
->> +++ b/drivers/of/address.c
->> @@ -122,6 +122,9 @@ static unsigned int of_bus_pci_get_flags(const __be32 *addr)
->>        u32 w = be32_to_cpup(addr);
->> 
->>        switch((w >> 24) & 0x03) {
->> +       case 0x00: /* cfg space */
->> +               flags |= IORESOURCE_MEM;
->> +               break;
+> Commit 6f19efc0 ("cpufreq: Add boost frequency support in core") adds
+> support for CPU boost mode. This patch adds support for finding available
+> boost frequencies from device tree and marking them as usable in boost mode.
 > 
-> How would you then distinguish actual memory ranges?
-
-One assumes you are still looking at pci_space as part of of_pci_range
-
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Lukasz Majewski <l.majewski@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> ---
+>  drivers/cpufreq/cpufreq_opp.c |   45 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
 > 
-> Rob
+> diff --git a/drivers/cpufreq/cpufreq_opp.c b/drivers/cpufreq/cpufreq_opp.c
+> index c0c6f4a..05fb115 100644
+> --- a/drivers/cpufreq/cpufreq_opp.c
+> +++ b/drivers/cpufreq/cpufreq_opp.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/pm_opp.h>
+>  #include <linux/rcupdate.h>
+>  #include <linux/slab.h>
+> +#include <linux/of.h>
+>  
+>  /**
+>   * dev_pm_opp_init_cpufreq_table() - create a cpufreq table for a device
+> @@ -51,6 +52,11 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+>  	struct cpufreq_frequency_table *freq_table = NULL;
+>  	int i, max_opps, ret = 0;
+>  	unsigned long rate;
+> +#ifdef CONFIG_CPU_FREQ_BOOST_SW
+> +	struct cpufreq_frequency_table *ft;
+> +	int len, count;
+> +	u32 *boost_freqs = NULL;
+> +#endif
+>  
+>  	rcu_read_lock();
+>  
+> @@ -82,6 +88,45 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+>  
+>  	*table = &freq_table[0];
+>  
+> +#ifdef CONFIG_CPU_FREQ_BOOST_SW
+> +	if (!of_find_property(dev->of_node, "boost-frequencies", &len))
+> +		goto out;
+> +
+> +	if (!len || !IS_ALIGNED(len, sizeof(u32))) {
+> +		dev_err(dev, "%s: invalid boost frequency\n", __func__);
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +
+> +	boost_freqs = kmalloc(len, GFP_KERNEL);
+> +	if (!boost_freqs) {
+> +		dev_err(dev, "%s: no memory for boost freq table\n", __func__);
+> +		ret = -ENOMEM;
+> +		goto out;
+> +	}
+> +
+> +	count = len / sizeof(u32);
+> +	of_property_read_u32_array(dev->of_node, "boost-frequencies",
+> +			boost_freqs, count);
+> +
+> +	for (i = 0; i < count; i++) {
+> +		cpufreq_for_each_valid_entry(ft, *table) {
+> +			if (boost_freqs[i] == ft->frequency) {
+> +				ft->flags |= CPUFREQ_BOOST_FREQ;
+> +				pr_debug("%s: marked %d as boost frequency\n",
+> +					__func__, boost_freqs[i]);
+> +				break;
+> +			}
+> +		}
+> +
+> +		if (ft->frequency == CPUFREQ_TABLE_END)
+> +			dev_err(dev, "%s: invalid boost frequency %d\n",
+> +				__func__, boost_freqs[i]);
+> +	}
+> +
+> +	kfree(boost_freqs);
+> +#endif
+> +
+>  out:
+>  	rcu_read_unlock();
+>  	if (ret)
 > 
-> [1] http://www.spinics.net/lists/linux-pci/msg30585.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I suggest the following checkpatch --strict warnings should be fixed.
+
+@@ -0,0 +1,10 @@
++CHECK: Alignment should match open parenthesis
++#65: FILE: drivers/cpufreq/cpufreq_opp.c:110:
+++      of_property_read_u32_array(dev->of_node, "boost-frequencies",
+++                      boost_freqs, count);
++CHECK: Alignment should match open parenthesis
++#72: FILE: drivers/cpufreq/cpufreq_opp.c:117:
+++                              pr_debug("%s: marked %d as boost
+frequency\n",
+++                                      __func__, boost_freqs[i]);
++If any of these errors are false positives, please report
++them to the maintainer, see CHECKPATCH in MAINTAINERS.
+
+Otherwise,
+For the entire series:
+Acked-by: Nishanth Menon <nm@ti.com>
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Regards,
+Nishanth Menon
