@@ -1,70 +1,137 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 29 May 2014 16:13:26 +0200
-Subject: [PATCH v2] ARM: realview: basic device tree implementation
-In-Reply-To: <53870787.3030202@gmail.com>
-References: <1399586896-16906-1-git-send-email-linus.walleij@linaro.org>
- <201405091244.02066.arnd@arndb.de>
- <CACRpkdb8c=k3Ky=TisNdzycc3owJsNSQmSTu03RR5E0QvE0KZA@mail.gmail.com>
- <537E7B83.4020900@gmail.com>
- <CACRpkdap1U19EiULnq11udhY91UnnNu_-5MnLby3idbdjzBj4Q@mail.gmail.com>
- <53870787.3030202@gmail.com>
-Message-ID: <CACRpkdYVe+++Qb-CWrWwM1zDHxNqmpE0CFzp959Q40Zqb5sUEg@mail.gmail.com>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Thu, 29 May 2014 19:53:07 +0530
+Subject: [PATCH v4 1/2] cpufreq / OPP: Allow boost frequency to be looked
+ up from device tree
+In-Reply-To: <CAKohpom02xmubyNMMmH9J59i8KCoAXpZoX+Gj9NP9gQ8B9qB3w@mail.gmail.com>
+References: <1400852262-6290-1-git-send-email-thomas.ab@samsung.com>
+ <1400852262-6290-2-git-send-email-thomas.ab@samsung.com>
+ <CAKohpom02xmubyNMMmH9J59i8KCoAXpZoX+Gj9NP9gQ8B9qB3w@mail.gmail.com>
+Message-ID: <CAJuA9aizRwThtt9t2yaGAH_BvKrReq+krmh-ieL1W9Nua57c2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 29, 2014 at 12:10 PM, Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com> wrote:
-> On 05/29/2014 11:44 AM, Linus Walleij wrote:
-
->> Hmmmm well I want to see that code before I believe it ... but
->> I get what you mean.
+On Mon, May 26, 2014 at 11:28 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 23 May 2014 19:07, Thomas Abraham <thomas.ab@samsung.com> wrote:
+>> From: Thomas Abraham <thomas.ab@samsung.com>
+>>
+>> Commit 6f19efc0 ("cpufreq: Add boost frequency support in core") adds
+>> support for CPU boost mode. This patch adds support for finding available
+>> boost frequencies from device tree and marking them as usable in boost mode.
+>>
+>> Cc: Nishanth Menon <nm@ti.com>
+>> Cc: Lukasz Majewski <l.majewski@samsung.com>
+>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+>> ---
+>>  drivers/cpufreq/cpufreq_opp.c |   44 +++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 44 insertions(+)
+>>
+>> diff --git a/drivers/cpufreq/cpufreq_opp.c b/drivers/cpufreq/cpufreq_opp.c
+>> index c0c6f4a..2b3905b 100644
+>> --- a/drivers/cpufreq/cpufreq_opp.c
+>> +++ b/drivers/cpufreq/cpufreq_opp.c
+>> @@ -19,6 +19,7 @@
+>>  #include <linux/pm_opp.h>
+>>  #include <linux/rcupdate.h>
+>>  #include <linux/slab.h>
+>> +#include <linux/of.h>
+>>
+>>  /**
+>>   * dev_pm_opp_init_cpufreq_table() - create a cpufreq table for a device
+>> @@ -51,6 +52,10 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+>>         struct cpufreq_frequency_table *freq_table = NULL;
+>>         int i, max_opps, ret = 0;
+>>         unsigned long rate;
+>> +#ifdef CONFIG_CPU_FREQ_BOOST_SW
+>> +       int j, len;
+>> +       u32 *boost_freqs = NULL;
+>> +#endif
+>>
+>>         rcu_read_lock();
+>>
+>> @@ -82,6 +87,45 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+>>
+>>         *table = &freq_table[0];
+>>
+>> +#ifdef CONFIG_CPU_FREQ_BOOST_SW
+>> +       if (of_find_property(dev->of_node, "boost-frequencies", &len)) {
 >
-> Well, the register set on Berlin I was thinking about tackles pinctrl,
-> padmux, clock, reset and some other freaky stuff I cannot recall. The
-> mess in it is that there is no order you can apply to split it up into
-> separate nodes. Moreover, the next SoC has some registers just shoved
-> into it, moving some other registers.
-
-Berlin hardware engineers seem to be hellbent on complicating
-your life.
-
-> The way we will go for it on Berlin is now:
+> Maybe:
+> if(!of_find_property(...))
+>         goto out;
 >
-> (a) have a single node for the whole chip-ctrl register set
-> (b) register clk driver on it (early, as it provides timer clk)
-> (c) register one chip-ctrl driver on it that will
->     (d) reserve the iomap,
->     (e) register a regmap-mmio,
->     (f) register platform_devices for {pinctrl,reset,...} that will
->         use regmap-mmio and read their properties from the single
->         node
+> To get rid of extra indentation levels below..
+>
+>> +               struct cpufreq_frequency_table *ft;
+>
+> Declare at the top with boost_freqs, etc..
+>
+>> +               if (len == 0 || (len & (sizeof(u32) - 1)) != 0) {
+>
+> s/len == 0/!len
+>
+> And use IS_ALIGNED() instead of the right hand side of ||
+>
+>> +                       dev_err(dev, "%s: invalid boost frequency\n", __func__);
+>> +                       ret = -EINVAL;
+>> +                       goto out;
+>> +               }
+>> +
+>> +               boost_freqs = kzalloc(len, GFP_KERNEL);
+>
+> Can we do a devm_kzalloc instead? And why not kmalloc BTW ?
 
-OK makes perfect sense actually.
+This is a temporary storage that is freed at the end of this function.
+So devm_kzalloc is not used. Yes, kmalloc can be used.
 
-> The individual drivers should stay in their respective drivers/ folder,
-> but (c) needs a good home. It would have been mach-foo in the past, and
-> could be drivers/soc now. In (f), I tend to just lookup regmap by name,
-> no DT involved at all.
-
-OK
-
-> BTW, syscon is of no use here at all, once it registers itself as a
-> driver for the node, there will be no other drivers registered. That
-> would at least require (again subsystem driven) dummy-nodes for
-> pinctrl, clk, reset.
-
-Yeah that sucks, we need something more flexible no question
-about that.
-
-Will the chipctrl driver be as generic as syscon or a
-Berlin-specific thing?
-
-> Also, using some of_xlate as we already have for clk, gpio, pinctrl ...
-> would put an end to syscon's syscon_get_regmap_from_{foo,bar,baz,...}
-> that gets a new helper every cycle.
-
-This part I don't understand but I guess I will understand it
-when I see the code.
-
-Yours,
-Linus Walleij
+>
+>> +               if (!boost_freqs) {
+>> +                       dev_warn(dev, "%s: no memory for boost freq table\n",
+>
+> dev_err ?
+>
+>> +                                       __func__);
+>> +                       ret = -ENOMEM;
+>> +                       goto out;
+>> +               }
+>> +               of_property_read_u32_array(dev->of_node, "boost-frequencies",
+>> +                       boost_freqs, len / sizeof(u32));
+>
+>
+> Create int count = len / sizeof(u32) instead.. You have used this
+> multiple times.
+>
+>> +               for (j = 0; j < len / sizeof(u32); j++) {
+>> +                       ft = *table;
+>> +                       for (i = 0; ft->frequency != CPUFREQ_TABLE_END; i++) {
+>
+> See if new macros can be used here instead. cpufreq_for_each_valid_entry().
+>
+>> +                               if (boost_freqs[j] == ft->frequency) {
+>> +                                       ft->flags |= CPUFREQ_BOOST_FREQ;
+>> +                                       break;
+>> +                               }
+>> +                               ft++;
+>> +                       }
+>> +
+>> +                       if (ft->frequency == CPUFREQ_TABLE_END)
+>> +                               pr_err("%s: invalid boost frequency %d\n",
+>> +                                       __func__, boost_freqs[j]);
+>
+> Maybe a pr_debug on the else part as well ? With boost freqs ..
+>
+>> +               }
+>> +       }
+>> +
+>> +       kfree(boost_freqs);
+>> +#endif
+>> +
+>>  out:
+>>         rcu_read_unlock();
+>>         if (ret)
+>> --
+>> 1.7.9.5
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
