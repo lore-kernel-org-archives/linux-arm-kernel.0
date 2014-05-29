@@ -1,34 +1,51 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 29 May 2014 12:08:20 +0530
-Subject: [TEMP PATCH v2 18/18] ARM: dts: dra7: Add *resets* property for PCIe
- dt node
-In-Reply-To: <1401345500-20188-1-git-send-email-kishon@ti.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 29 May 2014 15:48:55 +0900
+Subject: [PATCH v2 16/18] ARM: OMAP: Enable PCI for DRA7
+In-Reply-To: <1401345500-20188-17-git-send-email-kishon@ti.com>
 References: <1401345500-20188-1-git-send-email-kishon@ti.com>
-Message-ID: <1401345500-20188-19-git-send-email-kishon@ti.com>
+ <1401345500-20188-17-git-send-email-kishon@ti.com>
+Message-ID: <000601cf7b0a$0fbce200$2f36a600$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added *resets* and *reset-names* properies for PCIe dt node.
-The documention for this node can be found @ ../bindings/pci/ti-pci.txt.
+On Thursday, May 29, 2014 3:38 PM, Kishon Vijay Abraham I wrote:
+> 
+> Now that we have added PCIe driver for DRA7 SOCs, enable PCI on
+> DRA7 SOCs.
+> 
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  arch/arm/mach-omap2/Kconfig |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index cb31d43..b179e80 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -75,6 +75,8 @@ config SOC_DRA7XX
+>  	select ARM_GIC
+>  	select HAVE_ARM_ARCH_TIMER
+>  	select IRQ_CROSSBAR
+> +	select MIGHT_HAVE_PCI
+> +	select ARCH_SUPPORTS_MSI
 
-Cc: Dan Murphy <dmurphy@ti.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi |    2 ++
- 1 file changed, 2 insertions(+)
+Hi Kishon,
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 1239f0d..03494b2 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1055,6 +1055,8 @@
- 				#interrupt-cells = <1>;
- 				num-lanes = <1>;
- 				ti,hwmods = "pcie1";
-+				resets = <&prm_resets &device_reset>;
-+				reset-names = "reset";
- 				phys = <&pcie1_phy>;
- 				phy-names = "pcie-phy0";
- 				interrupt-map-mask = <0 0 0 7>;
--- 
-1.7.9.5
+Please, don't select ARCH_SUPPORTS_MSI, because this kconfig
+option was already removed in v3.12 by the commit ebd97be635
+('PCI: remove ARCH_SUPPORTS_MSI kconfig option'). So, there is
+NO need to select 'ARCH_SUPPORTS_MSI'.
+
+Best regards,
+Jingoo Han
+
+> 
+>  config ARCH_OMAP2PLUS
+>  	bool
+> --
+> 1.7.9.5
