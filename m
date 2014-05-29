@@ -1,49 +1,48 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 May 2014 11:21:52 -0700
-Subject: [GIT PULL 3rd 1/3] Samsung Exynos cpuidle updates for 3.16
-In-Reply-To: <035601cf7897$6c959190$45c0b4b0$@samsung.com>
-References: <035601cf7897$6c959190$45c0b4b0$@samsung.com>
-Message-ID: <20140529182152.GB18481@quad.lixom.net>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 29 May 2014 20:29:37 +0200
+Subject: [PATCH] arm: msm: remove board file for Nexus One (ie. mahimahi)
+In-Reply-To: <1400177413.11786.11.camel@x220>
+References: <1400101656.9826.4.camel@x220> <20140515174448.GA31159@fifo99.com>
+ <1400177413.11786.11.camel@x220>
+Message-ID: <20140529182937.GA18230@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 01:03:17PM +0900, Kukjin Kim wrote:
-> Note: merge conflict will be happened when pulling this for
-> arch/arm/mach-exynos/cpuidle.
-> You may just fixup with 'git rm arch/arm/mach-exynos/cpuidle.', it is due to
-> 'removing inclusion of <plat/cpu.h>' before moving cpuidle driver into
-> drivers/cpuidle...
+On Thu 2014-05-15 20:10:13, Paul Bolle wrote:
+> Daniel,
 > 
-> - Kukjin
+> On Thu, 2014-05-15 at 17:44 +0000, dwalker at fifo99.com wrote:
+> > On Wed, May 14, 2014 at 11:07:36PM +0200, Paul Bolle wrote:
+> > > Commit 1b802ff79f03 ("arm: msm: add board file for Nexus One (ie.
+> > > mahimahi)") added just board-mahimahi.c. It did not add
+> > > board-mahimahi.h, Makefile changes or Kconfig changes.
+> > > 
+> > > Four years have passed and this file is still dangling. Remove it.
+> > > 
+> > > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> > > ---
+> > > Untested. But what to test here?
+> > > 
+> > I don't mine if Sapphire gets removed,
 > 
-> The following changes since commit 985326c9f65a4c1a3b5ab875e6ce0c97c39449ec:
+> Could you ACK that patch, please?
 > 
->   Merge branch 'v3.16-next/clk-samsung' into v3.16-next/cpuidle-exynos
-> (2014-05-26 05:20:25 +0900)
+> >  but I'm working on this one now..
 > 
-> are available in the git repository at:
+> That's good to hear.
 > 
+> >  So I don't want it deleted.
 > 
->   http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/exynos-cpuidle
-> 
-> for you to fetch changes up to cd245f59aae5d6ef265f46aa6cea78354d61b629:
-> 
->   ARM: EXYNOS: Fix kernel panic when unplugging CPU1 on exynos (2014-05-26
-> 05:21:47 +0900)
-> 
-> ----------------------------------------------------------------
-> Samsung exynos-cpuidle updates for v3.16
-> 
-> - From Daniel Lezcano:
->  This patchset relies on the cpm_pm notifier to initiate the
->  powerdown sequence operations from pm.c instead cpuidle.c.
->  Thus the cpuidle driver is no longer dependent from arch
->  specific code as everything is called from the pm.c file.
-> 
-> Note, this is based on tags/exnos-mcpm and tags/samsung-clk
+> This is not something I get to decide. Nevertheless, given that this
+> file shouldn't have been merged to begin with, I'd appreciate it if some
+> deadline could be agreed upon.
 
-Merged into next/drivers.
+Daniel is working on solving that. That should be enough. It is not as
+the file is great problem to anybody.
 
+If it is not fixed within year, you may want to retransmit your patch.
 
--Olof
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
