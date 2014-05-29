@@ -1,124 +1,112 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Thu, 29 May 2014 19:52:56 +0800
-Subject: [PATCH v2 1/2] Documentation: add Device tree bindings for
- Hisilicon hix5hd2 ethernet
-In-Reply-To: <20140528145804.GA16088@leverpostej>
-References: <1401194667-14445-1-git-send-email-zhangfei.gao@linaro.org>
- <1401194667-14445-2-git-send-email-zhangfei.gao@linaro.org>
- <20140527133423.GB6969@leverpostej> <53857714.3070603@linaro.org>
- <20140528125354.GA2092@leverpostej> <5385E3CC.9050700@linaro.org>
- <20140528145804.GA16088@leverpostej>
-Message-ID: <53871F98.8070603@linaro.org>
+From: javi.merino@arm.com (Javi Merino)
+Date: Thu, 29 May 2014 13:06:24 +0100
+Subject: [PATCH v1 2/6] thermal: cpu_cooling: Support passing driver
+ private data.
+In-Reply-To: <1401351334-11210-3-git-send-email-amit.daniel@samsung.com>
+References: <1401351334-11210-1-git-send-email-amit.daniel@samsung.com>
+ <1401351334-11210-3-git-send-email-amit.daniel@samsung.com>
+Message-ID: <20140529120624.GA2593@e104805>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Amit,
 
+One minor comment.
 
-On 05/28/2014 10:58 PM, Mark Rutland wrote:
-> On Wed, May 28, 2014 at 02:25:32PM +0100, zhangfei wrote:
->>
->>
->> On 05/28/2014 08:53 PM, Mark Rutland wrote:
->>> On Wed, May 28, 2014 at 06:41:40AM +0100, zhangfei wrote:
->>>> Dear Mark
->>>>
->>>> On 05/27/2014 09:34 PM, Mark Rutland wrote:
->>>>> On Tue, May 27, 2014 at 01:44:26PM +0100, Zhangfei Gao wrote:
->>>>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->>>>>> ---
->>>>>>     .../bindings/net/hisilicon-hix5hd2-gmac.txt        |   36 ++++++++++++++++++++
->>>>>>     1 file changed, 36 insertions(+)
->>>>>>     create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
->>>>>>
->>>>>> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt b/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
->>>>>> new file mode 100644
->>>>>> index 0000000..5fe3835
->>>>>> --- /dev/null
->>>>>> +++ b/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
->>>>>> @@ -0,0 +1,36 @@
->>>>>> +Hisilicon hix5hd2 gmac controller
->>>>>
->>>>> Just to clarify, is the SoC name "hix5hd2", or is the 'x' a wildcard?
->>>> "hix5hd2" is Soc name, which contains a series of similar chips.
->>>
->>> How similar are they?
->>>
->>> It's preferable to have a precise name, even when used as a fallback for
->>> other similar devices.
->>
->> The soc name "hix5hd2" is provided by hisilicon.
->> In fact, they have considered a lot and discussed long time for this name :)
->
-> Sure, I would not expect hisilicon to rebrand their SoC family due to my
-> comments on a mailing list.
->
-> w.r.t. naming in the kernel I could only find an unanswered query [1]
-> from Olof Johansson earlier this month, and no rationale for the change.
->
-> I tried searching online for "hix5hd2" and didn't find much other than a
-> suggestion it's also known as "Hi3716cv200". I assume this means the
-> Hi371 range in general, which covers a few variants on the hisilicon
-> website [2]. The names there are far more specific than "hix5hd2".
->
-> We've been bitten in the past when generic SoC family names are used in
-> DT bindings without also having specific strings. It's usually better to
-> choose a particular variant as the base, and have others claim
-> compatibility with that (with additional more specific compatible
-> strings).
->
-> The key issue is how similar the SoC variants are. If they are identical
-> w.r.t. this block and the blocks it is attached to, then the compatible
-> string you propose is likely to be fine. However, subtle differences in
-> integration across variants might cause issues for which we want
-> targeted workarounds, or we might be able to make better use of
-> particular variants based on information that we cannot probe from the
-> HW. For that we need very specific compatible strings, and in general it
-> is better to add those and not need them than to need them but not have
-> them.
+On Thu, May 29, 2014 at 09:15:30AM +0100, Amit Daniel Kachhap wrote:
+> This patch allows the caller of cpufreq cooling APIs to register along
+> with their driver data which will be useful while receiving any cooling states
+> notifications.
+> This patch is in preparation to add notfication support for cpufrequency
+> cooling changes. This change also removes the unnecessary exposing of
+> internal housekeeping structure via thermal_cooling_device->devdata to the
+> users of cpufreq cooling APIs. As part of this implmentation, this private local
+> structure (cpufreq_dev) is now stored in a list and scanned for each call to
+> cpu cooling interfaces.
+> 
+> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> ---
+>  Documentation/thermal/cpu-cooling-api.txt          |    3 +-
+>  drivers/thermal/cpu_cooling.c                      |   89 ++++++++++++++++----
+>  drivers/thermal/db8500_cpufreq_cooling.c           |    2 +-
+>  drivers/thermal/samsung/exynos_thermal_common.c    |    2 +-
+>  drivers/thermal/ti-soc-thermal/ti-thermal-common.c |    2 +-
+>  include/linux/cpu_cooling.h                        |    5 +-
+>  6 files changed, 80 insertions(+), 23 deletions(-)
+> 
+> diff --git a/Documentation/thermal/cpu-cooling-api.txt b/Documentation/thermal/cpu-cooling-api.txt
+> index fca24c9..aaa07c6 100644
+> --- a/Documentation/thermal/cpu-cooling-api.txt
+> +++ b/Documentation/thermal/cpu-cooling-api.txt
+> @@ -17,13 +17,14 @@ the user. The registration APIs returns the cooling device pointer.
+> 
+>  1.1 cpufreq registration/unregistration APIs
+>  1.1.1 struct thermal_cooling_device *cpufreq_cooling_register(
+> -       struct cpumask *clip_cpus)
+> +       struct cpumask *clip_cpus, void *devdata)
+> 
+>      This interface function registers the cpufreq cooling device with the name
+>      "thermal-cpufreq-%x". This api can support multiple instances of cpufreq
+>      cooling devices.
+> 
+>     clip_cpus: cpumask of cpus where the frequency constraints will happen.
+> +   devdata: driver private data pointer.
+> 
+>  1.1.2 void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
+> 
+> diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
+> index 16388b0..6d145d5 100644
+> --- a/drivers/thermal/cpu_cooling.c
+> +++ b/drivers/thermal/cpu_cooling.c
+> @@ -50,16 +50,18 @@ struct cpufreq_cooling_device {
+>         unsigned int cpufreq_state;
+>         unsigned int cpufreq_val;
+>         struct cpumask allowed_cpus;
+> +       struct list_head node;
+>  };
+>  static DEFINE_IDR(cpufreq_idr);
+>  static DEFINE_MUTEX(cooling_cpufreq_lock);
+> 
+> -static unsigned int cpufreq_dev_count;
+> -
+>  /* notify_table passes value to the CPUFREQ_ADJUST callback function. */
+>  #define NOTIFY_INVALID NULL
+>  static DEFINE_PER_CPU(struct cpufreq_cooling_device *, notify_device);
+> 
+> +/* A list to hold all the cpufreq cooling devices registered */
+> +static LIST_HEAD(cpufreq_cooling_list);
+> +
+>  /**
+>   * get_idr - function to get a unique id.
+>   * @idr: struct idr * handle used to create a id.
+> @@ -98,6 +100,26 @@ static void release_idr(struct idr *idr, int id)
+> 
+>  /* Below code defines functions to be used for cpufreq as cooling device */
+> 
+> +/**
+> + * cpufreq_cooling_get_info - function to cpufreq_dev for the corresponding cdev
+> + * @cdev: pointer of the cooling device
+> + *
+> + * This function will loop through the cpufreq_cooling_device list and
+> + * return the matching device
+> + *
 
-Currently hix5hd2 is series of hi3716c v200, hi3719c v100, hi3718c v100.
-They are same soc, except minus pin assembles different.
+You should add a "Locking:" section here which documents that this
+function must be called with cooling_cpufreq_lock held.
 
-However, not all hi37x is in this series, for example hi3716c v100 is a 
-different soc.
+Cheers,
+Javi
 
-In the future hi3719m, hi3718m may also plan to add to hix5hd2 series.
-The difference will be different cpu core number, different gpu core number.
-Also use different ethernet controller.
-
-
->>>>>> +
->>>>>> +Required properties:
->>>>>> +- compatible: should be "hisilicon,hix5hd2-gmac".
->>>>>> +- reg: specifies base physical address(s) and size of the device registers.
->>>>>> +  The first region is the MAC register base and size.
->>>>>> +  The second region is external interface control register.
->>>>>
->>>>> Single registers? Are these not part of a larger block?
->>>> It is a single register, outside of the memory region.
->>>> gmac0: reg = <0xf9840000 0x1000>,<0xf984300c 0x4>;
->>>> gmac1: reg = <0xf9841000 0x1000>,<0xf9843010 0x4>;
->>>>
->>>> The register is controlling interface mode, duplex etc.
->>>> In fact it is rather a bug fix to the silicon, when it is added with
->>>> intension of not touching the original ip design.
->>>>
->>>> It may be moved to the memory region in the future silicon design.
->>>> However, currently without such register, it can not work.
->>>
->>> I see. Is it possible that a future revision might have this fixed, such
->>> that the second reg entry would become optional?
->>
->> We have given this feedback to the silicon team, and they admit this
->> should be fixed.
->> However, not sure it can be fixed soon since the product pressure.
->> Can we keep this first since it is required currently.
->
-> I'm not asking for its removal, I'm just trying to find out if in future
-> we might need to support a DTB without the second entry.
->
-
-Double confirmed with silicon guy, the fix can not be added in this chip.
-As the product is stable now, and it is too expensive to make new version.
-
-Thanks
+> + * Return: cpufreq_cooling_device if matched with the cdev or NULL if not
+> + * matched.
+> + */
+> +static inline struct cpufreq_cooling_device *
+> +cpufreq_cooling_get_info(struct thermal_cooling_device *cdev)
+> +{
+> +       struct cpufreq_cooling_device *cpufreq_dev = NULL;
+> +       list_for_each_entry(cpufreq_dev, &cpufreq_cooling_list, node)
+> +               if (cpufreq_dev->cool_dev == cdev)
+> +                       break;
+> +       return cpufreq_dev;
+> +}
+> +
