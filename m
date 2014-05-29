@@ -1,82 +1,57 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 29 May 2014 14:21:36 -0700
-Subject: [PATCH] clk: exynos5420: Keep aclk66_peric enabled during boot
-Message-ID: <1401398496-4624-1-git-send-email-dianders@chromium.org>
+Date: Thu, 29 May 2014 14:41:14 -0700
+Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
+In-Reply-To: <CAKfTPtA_PfdXi6h=fSOYNZrFjtc_sA+xwwMPT+6TiWTPsOVTmw@mail.gmail.com>
+References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
+ <53752E25.9060604@gmail.com>
+ <CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>
+ <53753443.8010303@gmail.com>
+ <CAD=FV=V8UZoeOqEwfx_E015pLM+amTt51LrUa+dk7mTdn=vKgA@mail.gmail.com>
+ <53753C17.1090002@gmail.com>
+ <CAD=FV=WGa7j_As_NpySxU7OEd_SzuGWK6oxU6UeiJ-4HsoWvvg@mail.gmail.com>
+ <CAD=FV=WfE8hubR8uaY5-1a=0cFQz-OLsLT0dWGyJhS60YNqPVg@mail.gmail.com>
+ <CAKfTPtA_PfdXi6h=fSOYNZrFjtc_sA+xwwMPT+6TiWTPsOVTmw@mail.gmail.com>
+Message-ID: <CAD=FV=XavuOEHhnhL_wOfj3J=vef9Kbwd+eSriYzJ_OxtLsJFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Right now if you've got earlyprintk enabled on exynos5420-peach-pit
-then you'll get a hang on boot.  Here's why:
+Vincent,
 
-1. The i2c-s3c2410 driver will probe at subsys_initcall.  It will
-   enable its clock and disable it.  This is the clock "i2c2".
-2. The act of disabling "i2c2" will disable its parents.  In this case
-   the parent is "aclk66_peric".  There are no other children of
-   "aclk66_peric" officially enabled, so "aclk66_peric" will be turned
-   off (despite being CLK_IGNORE_UNUSED, but that's by design).
-3. The next time you try to earlyprintk you'll do so without the UART
-   clock enabled.  That's because the UART clocks are also children of
-   "aclk66_peric".  You'll hang.
+On Thu, May 29, 2014 at 1:42 PM, Vincent Guittot
+<vincent.guittot@linaro.org> wrote:
+>> In summary, we've got the following MCT patches proposed to go upstream:
+>>
+>> 1. MCT scheduler clock: <http://crosreview.com/56363> and
+>> <http://crosreview.com/56364>
+>> 2. Speed MCT access: <http://crosreview.com/56365>.  I wonder if we
+>> could also speed it up further with a 64-bit read.
+>> 3. Use MCT for udelay: yet to be written.
+>>
+>> ...does someone want to claim the task of sending those things up?
+>>
+>>
+>> Oh, actually it looks like (93bfb76 clocksource: exynos_mct: register
+>> sched_clock callback) in linuxnext adds a partial version of the first
+>> patch but isn't as complete as what's in our tree (it's missing the
+>> KConfig change we have locally as well as the notrace so it probably
+>> breaks ftrace?).  Adding Vincent.
+>
+> Hi Doug,
+>
+> Thanks for adding me in the loop.
+>
+> The only difference i see are:
+>  -HAVE_SCHED_CLOCK which is no more needed
+>  -and the use of 32bit vs 64bit in the for-next
+>  -notrace is present in the for-next  AFAICT
 
-There's no good place to put a clock enable for earlyprintk, which is
-handled by a bunch of assembly code.  The best we can do is to handle
-this in the clock driver.
+Ah, my bad!  Yes, you're right that things look OK.  I looked too
+quickly and didn't see the notrace.  ...and I wasn't aware that
+HAVE_SCHED_CLOCK was no longer needed.
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
- drivers/clk/samsung/clk-exynos5420.c | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+One thing that might be interesting is to consider using 32-bit
+instead of 64-bit.  We know that this clock is slow to access, so
+reducing 3 reads down to 1 would be worth it.  A 32-bit clock should
+be sufficient for the scheduler anyway.
 
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index 9d7d7ee..1e586be 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -1172,11 +1172,17 @@ static struct of_device_id ext_clk_match[] __initdata = {
- 	{ },
- };
- 
-+/* Keep these clocks on until late_initcall */
-+static const char *boot_clocks[] __initconst = {
-+	"aclk66_peric",
-+};
-+
- /* register exynos5420 clocks */
- static void __init exynos5x_clk_init(struct device_node *np,
- 		enum exynos5x_soc soc)
- {
- 	struct samsung_clk_provider *ctx;
-+	int i;
- 
- 	if (np) {
- 		reg_base = of_iomap(np, 0);
-@@ -1226,6 +1232,12 @@ static void __init exynos5x_clk_init(struct device_node *np,
- 	}
- 
- 	exynos5420_clk_sleep_init();
-+
-+	for (i = 0; i < ARRAY_SIZE(boot_clocks); i++) {
-+		struct clk *to_enable = __clk_lookup(boot_clocks[i]);
-+
-+		clk_prepare_enable(to_enable);
-+	}
- }
- 
- static void __init exynos5420_clk_init(struct device_node *np)
-@@ -1239,3 +1251,15 @@ static void __init exynos5800_clk_init(struct device_node *np)
- 	exynos5x_clk_init(np, EXYNOS5800);
- }
- CLK_OF_DECLARE(exynos5800_clk, "samsung,exynos5800-clock", exynos5800_clk_init);
-+
-+static int __init exynos5420_clk_late_init(void)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(boot_clocks); i++) {
-+		struct clk *to_disable = __clk_lookup(boot_clocks[i]);
-+
-+		clk_disable_unprepare(to_disable);
-+	}
-+}
-+late_initcall(exynos5420_clk_late_init);
--- 
-1.9.1.423.g4596e3a
+-Doug
