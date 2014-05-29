@@ -1,23 +1,29 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 29 May 2014 13:01:27 -0600
-Subject: [PATCH v5 0/5] efuse driver for Tegra
-In-Reply-To: <1401281677-32110-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1401281677-32110-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <53878407.3050409@wwwdotorg.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 29 May 2014 21:02:27 +0200
+Subject: [PATCH] ARM: OMAP: SX1: remove check for CONFIG_SX1_OLD_FLASH
+In-Reply-To: <20140516211231.GF12881@atomide.com>
+References: <1400182902.11786.21.camel@x220>
+ <20140516211231.GF12881@atomide.com>
+Message-ID: <20140529190227.GB18230@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2014 06:54 AM, Peter De Schrijver wrote:
-> This driver allows userspace to read the raw efuse data. Its userspace
-> interface is modelled after the sunxi_sid driver which provides similar
-> functionality for some Allwinner SoCs. It has been tested on
-> Tegra20 (ventana), Tegra30 (beaverboard), Tegra114 (dalmore) and
-> Tegra124 (jetson TK1).
-
-> Changes since v4:
+On Fri 2014-05-16 14:12:31, Tony Lindgren wrote:
+> * Paul Bolle <pebolle@tiscali.nl> [140515 12:42]:
+> > A check for CONFIG_SX1_OLD_FLASH was added in v2.6.24. But the related
+> > Kconfig symbol was never part of the tree. So we can remove some dead
+> > code.
 > 
-> * Provide fallback to hardcoded 0x70000800 in case the apbmisc DT node is
->   missing. This is exactly what the current code does and prevents a system
->   crash in that case due to an invalid memory access by tegra_read_chipid()
+> Thanks applying into omap-for-v3.16/board.
 
-Wouldn't it be better to simply return an error?
+Actually... It seems there are two variant of SX1, and this is very
+useful piece of documentation how the _other_ variant looks.
+
+And if someone is hacking linux on sx1, he can probably figure out
+#ifdef in .c file...
+
+IOW adding the config option might be better solution.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
