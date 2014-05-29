@@ -1,57 +1,49 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 29 May 2014 14:41:14 -0700
-Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
-In-Reply-To: <CAKfTPtA_PfdXi6h=fSOYNZrFjtc_sA+xwwMPT+6TiWTPsOVTmw@mail.gmail.com>
-References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
- <53752E25.9060604@gmail.com>
- <CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>
- <53753443.8010303@gmail.com>
- <CAD=FV=V8UZoeOqEwfx_E015pLM+amTt51LrUa+dk7mTdn=vKgA@mail.gmail.com>
- <53753C17.1090002@gmail.com>
- <CAD=FV=WGa7j_As_NpySxU7OEd_SzuGWK6oxU6UeiJ-4HsoWvvg@mail.gmail.com>
- <CAD=FV=WfE8hubR8uaY5-1a=0cFQz-OLsLT0dWGyJhS60YNqPVg@mail.gmail.com>
- <CAKfTPtA_PfdXi6h=fSOYNZrFjtc_sA+xwwMPT+6TiWTPsOVTmw@mail.gmail.com>
-Message-ID: <CAD=FV=XavuOEHhnhL_wOfj3J=vef9Kbwd+eSriYzJ_OxtLsJFg@mail.gmail.com>
+From: larry.bassel@linaro.org (Larry Bassel)
+Date: Thu, 29 May 2014 14:45:02 -0700
+Subject: [PATCH v6 0/2] context tracker support for arm64
+Message-ID: <1401399904-24471-1-git-send-email-larry.bassel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vincent,
+Implement and enable context tracking for arm64 (which is
+a prerequisite for FULL_NOHZ support). This patchset
+builds upon earlier work by Kevin Hilman and is based on
+Will Deacon's tree.
 
-On Thu, May 29, 2014 at 1:42 PM, Vincent Guittot
-<vincent.guittot@linaro.org> wrote:
->> In summary, we've got the following MCT patches proposed to go upstream:
->>
->> 1. MCT scheduler clock: <http://crosreview.com/56363> and
->> <http://crosreview.com/56364>
->> 2. Speed MCT access: <http://crosreview.com/56365>.  I wonder if we
->> could also speed it up further with a 64-bit read.
->> 3. Use MCT for udelay: yet to be written.
->>
->> ...does someone want to claim the task of sending those things up?
->>
->>
->> Oh, actually it looks like (93bfb76 clocksource: exynos_mct: register
->> sched_clock callback) in linuxnext adds a partial version of the first
->> patch but isn't as complete as what's in our tree (it's missing the
->> KConfig change we have locally as well as the notrace so it probably
->> breaks ftrace?).  Adding Vincent.
->
-> Hi Doug,
->
-> Thanks for adding me in the loop.
->
-> The only difference i see are:
->  -HAVE_SCHED_CLOCK which is no more needed
->  -and the use of 32bit vs 64bit in the for-next
->  -notrace is present in the for-next  AFAICT
+Changes v5 to v6:
 
-Ah, my bad!  Yes, you're right that things look OK.  I looked too
-quickly and didn't see the notrace.  ...and I wasn't aware that
-HAVE_SCHED_CLOCK was no longer needed.
+* Don't save far_el1 in x26 in el0_dbg path (not needed)
+* TIF_NOHZ processes go through the slow path (so no register
+save/restore is needed in ct_user_enter)
 
-One thing that might be interesting is to consider using 32-bit
-instead of 64-bit.  We know that this clock is slow to access, so
-reducing 3 reads down to 1 would be worth it.  A 32-bit clock should
-be sufficient for the scheduler anyway.
+Changes v4 to v5:
 
--Doug
+* Improvement to code restoring far_el1 (suggested by Christopher Covington)
+* Improvement to register save/restore in ct_user_enter
+
+Changes v3 to v4:
+
+* Rename parameter of ct_user_exit from save to restore
+* Rebased patch to Will Deacon's tree (branch remotes/origin/aarch64
+of git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git)
+
+Changes v2 to v3:
+
+* Save/restore necessary registers in ct_user_enter and ct_user_exit
+* Annotate "error paths" out of el0_sync with ct_user_exit
+
+Changes v1 to v2:
+
+* Save far_el1 in x26 temporarily
+
+Larry Bassel (2):
+  arm64: adjust el0_sync so that a function can be called
+  arm64: enable context tracking
+
+ arch/arm64/Kconfig                   |  1 +
+ arch/arm64/include/asm/thread_info.h |  4 +++
+ arch/arm64/kernel/entry.S            | 58 +++++++++++++++++++++++++++++++-----
+ 3 files changed, 56 insertions(+), 7 deletions(-)
+
+-- 
+1.8.3.2
