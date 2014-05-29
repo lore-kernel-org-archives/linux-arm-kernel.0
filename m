@@ -1,53 +1,63 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 29 May 2014 12:08:13 +0530
-Subject: [PATCH v2 11/18] ARM: dts: dra7: Add dt data for PCIe PHY control
- module
+Date: Thu, 29 May 2014 12:08:14 +0530
+Subject: [PATCH v2 12/18] ARM: dts: dra7xx-clocks: rename pcie clocks to
+ accommodate second PHY instance
 In-Reply-To: <1401345500-20188-1-git-send-email-kishon@ti.com>
 References: <1401345500-20188-1-git-send-email-kishon@ti.com>
-Message-ID: <1401345500-20188-12-git-send-email-kishon@ti.com>
+Message-ID: <1401345500-20188-13-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added dt data for PCIe PHY control module used by PCIe PHY.
-The documention for this node can be found @ ../bindings/phy/ti-phy.txt
+There are two instances of PCIe PHY in DRA7xx. So renamed
+optfclk_pciephy_32khz, optfclk_pciephy_clk and optfclk_pciephy_div_clk to
+optfclk_pciephy1_32khz, optfclk_pciephy1_clk and optfclk_pciephy1_div_clk
+respectively. This is needed for adding the clocks for second PCIe PHY
+instance.
 
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Tero Kristo <t-kristo@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Tony Lindgren <tony@atomide.com>
 Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Kumar Gala <galak@codeaurora.org>
+Signed-off-by: Keerthy <j-keerthy@ti.com>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/boot/dts/dra7xx-clocks.dtsi |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index f0ca46d..3c7e7f2 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -803,6 +803,23 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+index e1bd052..3d8c9c2 100644
+--- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
++++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+@@ -1165,7 +1165,7 @@
+ 		reg = <0x021c>, <0x0220>;
+ 	};
  
-+		omap_control_pcie1phy: omap-control-pciephy at 0x4a003c40 {
-+			compatible = "ti,control-phy-pcie";
-+			reg = <0x4a003c40 0x4>, <0x4a003c14 0x4>, <0x4a003c34 0x4>;
-+			reg-names = "power", "control_sma", "pcie_pcs";
-+			clocks = <&sys_clkin1>;
-+			clock-names = "sysclk";
-+		};
-+
-+		omap_control_pcie2phy: omap-control-pciephy at 0x4a003c44 {
-+			compatible = "ti,control-phy-pcie";
-+			reg = <0x4a003c44 0x4>, <0x4a003c14 0x4>, <0x4a003c34 0x4>;
-+			reg-names = "power", "control_sma", "pcie_pcs";
-+			clocks = <&sys_clkin1>;
-+			clock-names = "sysclk";
-+			status = "disabled";
-+		};
-+
- 		omap_control_usb2phy1: control-phy at 4a002300 {
- 			compatible = "ti,control-phy-usb2";
- 			reg = <0x4a002300 0x4>;
+-	optfclk_pciephy_32khz: optfclk_pciephy_32khz at 4a0093b0 {
++	optfclk_pciephy1_32khz: optfclk_pciephy_32khz at 4a0093b0 {
+ 		compatible = "ti,gate-clock";
+ 		clocks = <&sys_32k_ck>;
+ 		#clock-cells = <0>;
+@@ -1183,7 +1183,7 @@
+ 		ti,max-div = <2>;
+ 	};
+ 
+-	optfclk_pciephy_clk: optfclk_pciephy_clk at 4a0093b0 {
++	optfclk_pciephy1_clk: optfclk_pciephy_clk at 4a0093b0 {
+ 		compatible = "ti,gate-clock";
+ 		clocks = <&apll_pcie_ck>;
+ 		#clock-cells = <0>;
+@@ -1191,7 +1191,7 @@
+ 		ti,bit-shift = <9>;
+ 	};
+ 
+-	optfclk_pciephy_div_clk: optfclk_pciephy_div_clk at 4a0093b0 {
++	optfclk_pciephy1_div_clk: optfclk_pciephy_div_clk at 4a0093b0 {
+ 		compatible = "ti,gate-clock";
+ 		clocks = <&optfclk_pciephy_div>;
+ 		#clock-cells = <0>;
 -- 
 1.7.9.5
