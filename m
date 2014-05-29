@@ -1,39 +1,55 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 29 May 2014 09:34:43 +0200
-Subject: [PATCH] CMA: correct unlock target
-In-Reply-To: <1401344958-3790-1-git-send-email-iamjoonsoo.kim@lge.com>
-References: <1401344958-3790-1-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <5386E313.6070705@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 29 May 2014 08:37:13 +0100
+Subject: [PATCH 4/5] mfd: axp209x: Drop the parent supplies field
+In-Reply-To: <1401297069-7423-5-git-send-email-maxime.ripard@free-electrons.com>
+References: <1401297069-7423-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1401297069-7423-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140529073713.GF1954@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+> Now that the regulator code get its parent supplies purely from the DT, we can
+> drop the parent supplies resources in the MFD driver.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/mfd/axp20x.c | 11 -----------
+>  1 file changed, 11 deletions(-)
 
-On 2014-05-29 08:29, Joonsoo Kim wrote:
-> 'cma: Remove potential deadlock situation' introduces per cma area mutex
-> for bitmap management. It is good, but there is one mistake. When we
-> can't find appropriate area in bitmap, we release cma_mutex global lock
-> rather than cma->lock and this is a bug. So fix it.
->
-> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-Thanks for spotting this issue. I've added it to my tree.
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 5734f8c82abf..6231adbb295d 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -140,15 +140,6 @@ static const struct regmap_irq_chip axp20x_regmap_irq_chip = {
+>  	.init_ack_masked	= true,
+>  };
+>  
+> -static const char * axp20x_supplies[] = {
+> -	"acin",
+> -	"vin2",
+> -	"vin3",
+> -	"ldo24in",
+> -	"ldo3in",
+> -	"ldo5in",
+> -};
+> -
+>  static struct mfd_cell axp20x_cells[] = {
+>  	{
+>  		.name			= "axp20x-pek",
+> @@ -156,8 +147,6 @@ static struct mfd_cell axp20x_cells[] = {
+>  		.resources		= axp20x_pek_resources,
+>  	}, {
+>  		.name			= "axp20x-regulator",
+> -		.parent_supplies	= axp20x_supplies,
+> -		.num_parent_supplies	= ARRAY_SIZE(axp20x_supplies),
+>  	},
+>  };
+>  
 
-> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-> index 6f6bffc..83969f8 100644
-> --- a/drivers/base/dma-contiguous.c
-> +++ b/drivers/base/dma-contiguous.c
-> @@ -331,7 +331,7 @@ struct page *dma_alloc_from_contiguous(struct device *dev, int count,
->   		pageno = bitmap_find_next_zero_area(cma->bitmap, cma->count,
->   						    start, count, mask);
->   		if (pageno >= cma->count) {
-> -			mutex_unlock(&cma_mutex);
-> +			mutex_unlock(&cma->lock);
->   			break;
->   		}
->   		bitmap_set(cma->bitmap, pageno, count);
-
-Best regards
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
