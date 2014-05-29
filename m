@@ -1,76 +1,98 @@
-From: wujianguo@huawei.com (Jianguo Wu)
-Date: Thu, 29 May 2014 11:20:57 +0800
-Subject: [PATCH v3] ARM: mm: support big-endian page tables
-In-Reply-To: <53587C48.8080103@huawei.com>
-References: <534F9F79.9050503@huawei.com>
- <87ob00wau2.fsf@approximate.cambridge.arm.com>
- <20140423132033.GE5649@arm.com> <53587C48.8080103@huawei.com>
-Message-ID: <5386A799.7040403@huawei.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 29 May 2014 12:23:58 +0800
+Subject: [PATCH 17/22] mfd: sun6i-prcm: Add support for Allwinner A23 PRCM
+In-Reply-To: <20140527083021.GE4730@lukather>
+References: <1400831485-28576-1-git-send-email-wens@csie.org>
+ <1400831485-28576-18-git-send-email-wens@csie.org>
+ <20140525191434.GX10768@lukather>
+ <CAGb2v66cV_nRpHhrtDUYzncO5wimx+vRBW6BFcU0Kz=bKkNs+g@mail.gmail.com>
+ <20140527083021.GE4730@lukather>
+Message-ID: <CAGb2v65v7rqBwFbn1JtQv44nQxepAq-ciwsBdHaELbzWXQNU9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-Could you please merge this to mainline? Thanks!
+On Tue, May 27, 2014 at 4:30 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Mon, May 26, 2014 at 12:36:38PM +0800, Chen-Yu Tsai wrote:
+>> On Mon, May 26, 2014 at 3:14 AM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > On Fri, May 23, 2014 at 03:51:20PM +0800, Chen-Yu Tsai wrote:
+>> >> The Allwinner A23 SoC has a PRCM unit like the previous A31 SoC.
+>> >> The differences are the AR100 clock can no longer be modified,
+>> >> and the APB0 clock has different divisors.
+>> >>
+>> >> This patch adds a compatible with a modified subdevice list for
+>> >> the A23.
+>> >>
+>> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> >> ---
+>> >>  .../devicetree/bindings/mfd/sun6i-prcm.txt         |  2 +-
+>> >>  drivers/mfd/sun6i-prcm.c                           | 30 ++++++++++++++++++++++
+>> >>  2 files changed, 31 insertions(+), 1 deletion(-)
+>> >>
+>> >> diff --git a/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt b/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
+>> >> index 1f5a31f..03c5a55 100644
+>> >> --- a/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
+>> >> +++ b/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
+>> >> @@ -4,7 +4,7 @@ PRCM is an MFD device exposing several Power Management related devices
+>> >>  (like clks and reset controllers).
+>> >>
+>> >>  Required properties:
+>> >> - - compatible: "allwinner,sun6i-a31-prcm"
+>> >> + - compatible: "allwinner,sun6i-a31-prcm" or "allwinner,sun8i-a23-prcm"
+>> >>   - reg: The PRCM registers range
+>> >>
+>> >>  The prcm node may contain several subdevices definitions:
+>> >> diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
+>> >> index 718fc4d..c96bb6c 100644
+>> >> --- a/drivers/mfd/sun6i-prcm.c
+>> >> +++ b/drivers/mfd/sun6i-prcm.c
+>> >> @@ -76,16 +76,46 @@ static const struct mfd_cell sun6i_a31_prcm_subdevs[] = {
+>> >>       },
+>> >>  };
+>> >>
+>> >> +static const struct mfd_cell sun8i_a23_prcm_subdevs[] = {
+>> >> +     {
+>> >> +             .name = "sun6i-a31-apb0-clk",
+>> >> +             .of_compatible = "allwinner,sun8i-a23-apb0-clk",
+>> >> +             .num_resources = ARRAY_SIZE(sun6i_a31_apb0_clk_res),
+>> >> +             .resources = sun6i_a31_apb0_clk_res,
+>> >> +     },
+>> >> +     {
+>> >> +             .name = "sun6i-a31-apb0-gates-clk",
+>> >> +             .of_compatible = "allwinner,sun6i-a31-apb0-gates-clk",
+>> >> +             .num_resources = ARRAY_SIZE(sun6i_a31_apb0_gates_clk_res),
+>> >> +             .resources = sun6i_a31_apb0_gates_clk_res,
+>> >> +     },
+>> >
+>> > Did I just have a brainfart, or didn't you just introduced an
+>> > sun8i-a23-apb0-gates-clk driver?
+>>
+>> My bad, I missed this one. The one in the DT is correct.
+>> It actually works, so I'm a bit confused here.
+>> Which one does the driver core actually use?
+>
+> Actually, it will use both, and will match the of_compatible string
+> try to match it against the mfd-sub-nodes compatibles. If nothing
+> matches, it won't fill the dev.of_node field.
 
-Jianguo Wu.
+So actually it was supposed to use "allwinner,sun6i-a31-apb0-gates-clk",
+as that clk driver takes clock-indices, so no need to define gate masks
+and tie them to some new compatible.
 
-On 2014/4/24 10:51, Jianguo Wu wrote:
+There was no sun8i-a23-apb0-gates-clk driver.
 
-> On 2014/4/23 21:20, Will Deacon wrote:
-> 
->> Hi Jianguo,
+I must not be getting enough sleep.
+
+>> > And there's no ar100 and ahb0 clocks ?
 >>
->> On Thu, Apr 17, 2014 at 10:43:01AM +0100, Marc Zyngier wrote:
->>> On Thu, Apr 17 2014 at 10:31:37 am BST, Jianguo Wu <wujianguo@huawei.com> wrote:
->>>> When enable LPAE and big-endian in a hisilicon board, while specify
->>>> mem=384M mem=512M at 7680M, will get bad page state:
->>>>
->>>> Freeing unused kernel memory: 180K (c0466000 - c0493000)
->>>> BUG: Bad page state in process init  pfn:fa442
->>>> page:c7749840 count:0 mapcount:-1 mapping:  (null) index:0x0
->>>> page flags: 0x40000400(reserved)
->>>> Modules linked in:
->>>> CPU: 0 PID: 1 Comm: init Not tainted 3.10.27+ #66
->>>> [<c000f5f0>] (unwind_backtrace+0x0/0x11c) from [<c000cbc4>] (show_stack+0x10/0x14)
->>>> [<c000cbc4>] (show_stack+0x10/0x14) from [<c009e448>] (bad_page+0xd4/0x104)
->>>> [<c009e448>] (bad_page+0xd4/0x104) from [<c009e520>] (free_pages_prepare+0xa8/0x14c)
->>>> [<c009e520>] (free_pages_prepare+0xa8/0x14c) from [<c009f8ec>] (free_hot_cold_page+0x18/0xf0)
->>>> [<c009f8ec>] (free_hot_cold_page+0x18/0xf0) from [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8)
->>>> [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8) from [<c00b6458>] (handle_mm_fault+0xf4/0x120)
->>>> [<c00b6458>] (handle_mm_fault+0xf4/0x120) from [<c0013754>] (do_page_fault+0xfc/0x354)
->>>> [<c0013754>] (do_page_fault+0xfc/0x354) from [<c0008400>] (do_DataAbort+0x2c/0x90)
->>>> [<c0008400>] (do_DataAbort+0x2c/0x90) from [<c0008fb4>] (__dabt_usr+0x34/0x40)
->>
->>
->> [...]
->>
->> Please can you put this into Russell's patch system? You can also add my
->> ack:
->>
->>   Acked-by: Will Deacon <will.deacon@arm.com>
->>
->> You should also CC stable <stable@vger.kernel.org> in the commit log.
->>
-> 
-> Hi Will,
-> I have submit to http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8037/1.
-> 
-> Thanks,
-> Jianguo Wu.
-> 
->> Cheers,
->>
->> Will
->>
->> .
->>
-> 
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+>> The ahb0 is a fixed-factor (1:1) clock. There are no controls for it.
+>> The ar100 clock on the A23 has no controls either, so fixed-factor
+>> clock again.
+>
+> Ack.
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
