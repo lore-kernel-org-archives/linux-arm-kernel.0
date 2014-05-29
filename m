@@ -1,43 +1,46 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 29 May 2014 11:51:00 -0500
-Subject: [PATCH v2 03/18] PCI: designware: Configuration space should be
- specified in 'reg'
-In-Reply-To: <20140529163037.GC2552@obsidianresearch.com>
-References: <1401345500-20188-1-git-send-email-kishon@ti.com>
- <1401345500-20188-4-git-send-email-kishon@ti.com>
- <98E18225-3C63-4106-901A-A5D3DEC268C8@codeaurora.org>
- <20140529151840.GD1677@bart.dudau.co.uk>
- <CF1BAF3F-E16E-4864-8052-8C3EC29000B0@codeaurora.org>
- <20140529163037.GC2552@obsidianresearch.com>
-Message-ID: <A9B853EE-65C6-4B2E-ABC0-1E64DE584E91@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 29 May 2014 09:52:25 -0700
+Subject: [GIT PULL 5/5] Samsung Exynos MCPM support for 3.16
+In-Reply-To: <20140522053841.GI32618@quad.lixom.net>
+References: <014801cf73c8$7d1f9930$775ecb90$@samsung.com>
+ <20140522053841.GI32618@quad.lixom.net>
+Message-ID: <CAOesGMj=c3RVQs2=xtWV82nMxjD9w6QNv2Wz4wTi7KrOuHYTig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, May 21, 2014 at 10:38 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, May 20, 2014 at 10:11:54AM +0900, Kukjin Kim wrote:
+>> The following changes since commit d7067f1c5fa0232001502569c6878d22308da268:
+>>
+>>   devicetree: bindings: document SYSRAM binding (2014-05-15 03:30:29 +0900)
+>>
+>> are available in the git repository at:
+>>
+>>   http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>> tags/exynos-mcpm
+>>
+>> for you to fetch changes up to ccf5511797cd4b48d20a85fa1778f5608eac9fd7:
+>>
+>>   ARM: EXYNOS: Add MCPM call-back functions (2014-05-16 04:26:30 +0900)
+>>
+>> ----------------------------------------------------------------
+>> Exynos MCPM support for v3.16
+>>
+>> - adding MCPM backend support for SMP secondary boot and core switching
+>> on Samsung's Exynos5420.
+>>
+>> Tested on exynos5420-smdk5420 and exynos5420 based chromebook (peach-pit)
+>> using the "/dev/b.L_switcher" user interface. Secondary core boot-up has
+>> also been tested on both the boards.
+>
+> This goes with new SoC enablement as well; we'll merge it after multi-platform.
 
-On May 29, 2014, at 11:30 AM, Jason Gunthorpe <jgunthorpe@obsidianresearch.com> wrote:
+Merged now, since multiplatform is going in as well.
 
-> On Thu, May 29, 2014 at 11:03:36AM -0500, Kumar Gala wrote:
-> 
->> Just because the kernel doesn?t handle this is NO reason to change
->> the way the DT works.
-> 
-> The OF specs do not specify how to process a config type ranges entry,
-> and we all mutually agreed that the only sane interpretation for such
-> a thing would be to describe an ECAM memory space so generic code
-> could potentially make use of it.
-> 
-> Since designware is not ECAM it should not use config ranges.
-> 
-> This has come up multiple times now, and the above is the consensus.
-> 
-> Jason
+What confused me for a while here was that this branch was based on a
+partial version of the DT branch, but it didn't match any of the
+branch heads we had merged in. It's not wrong to do so but it's useful
+to get a heads up in the pull request.
 
-Well the designware controller does support ECAM, just that the current in kernel users don?t do cfg space that way.
 
-So do we continue to support the current users that use a cfg range for a non-ECAM space?  Or break their DT and convert them to using regs?
-
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+-Olof
