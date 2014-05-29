@@ -1,36 +1,61 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 29 May 2014 13:04:33 -0600
-Subject: [PATCH v5 3/5] misc: fuse: Add efuse driver for Tegra
-In-Reply-To: <1401281677-32110-4-git-send-email-pdeschrijver@nvidia.com>
-References: <1401281677-32110-1-git-send-email-pdeschrijver@nvidia.com>
- <1401281677-32110-4-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <538784C1.6000504@wwwdotorg.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 29 May 2014 14:05:50 -0500
+Subject: [PATCH] ARM: DRA722: add detection of SoC information.
+Message-ID: <1401390350-10048-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2014 06:54 AM, Peter De Schrijver wrote:
-> Implement fuse driver for Tegra20, Tegra30, Tegra114 and Tegra124.
+Add support for DRA72x device DIEID. Currently these devices are
+reported as DRA75/74 family of processors.
 
-> diff --git a/Documentation/ABI/testing/sysfs-driver-tegra-fuse b/Documentation/ABI/testing/sysfs-driver-tegra-fuse
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ (test using linux-next next-20140529 tag):
+ before: http://slexy.org/raw/s21Yb8sOhy
+ after:  http://slexy.org/raw/s20Nx96NrY
 
-> +Description:	read-only access to the efuses on Tegra20, Tegra30, Tegra114
-> +		and Tegra124 SoC's from NVIDIA. The efuses contain write once
-> +		data programmed at the factory. The data is layed out in 32bit
-> +		words in LSB first formnat. The number of valid bits depends
+ Applies on:
+ git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git 
+ branch: omap-for-v3.16/soc
 
-s/formnat/format/
+ arch/arm/mach-omap2/id.c  |   12 ++++++++++++
+ arch/arm/mach-omap2/soc.h |    1 +
+ 2 files changed, 13 insertions(+)
 
-> +		on the word and the SoC. The mapping is as follows:
-> +
-> +		For Tegra20:
-> +		Word 0 - 1    : bit 0
-> +		Word 2        : unused
-> +		Word 3        : bits 0 - 31
-> +		Word 4        : bits 0 - 7
-
-Do we really need these long tables that indicate which bits are used?
-As I mentioned before, when I asked for documentation of the format of
-these files, all I wanted was a brief not indicating that the data was
-binary, and that each bit potentially represents a fuse... Either we
-should leave it at that, or actually document what each bit represents,
-which would hopefully be a pointless duplication of the TRM.
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 71bf216..801244a 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -649,6 +649,18 @@ void __init dra7xxx_check_revision(void)
+ 		}
+ 		break;
+ 
++	case 0xb9bc:
++		switch (rev) {
++		case 0:
++			omap_revision = DRA722_REV_ES1_0;
++			break;
++		default:
++			/* If we have no new revisions */
++			omap_revision = DRA722_REV_ES1_0;
++			break;
++		}
++		break;
++
+ 	default:
+ 		/* Unknown default to latest silicon rev as default*/
+ 		pr_warn("%s: unknown idcode=0x%08x (hawkeye=0x%08x,rev=0x%d)\n",
+diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+index de2a34c..01ca808 100644
+--- a/arch/arm/mach-omap2/soc.h
++++ b/arch/arm/mach-omap2/soc.h
+@@ -462,6 +462,7 @@ IS_OMAP_TYPE(3430, 0x3430)
+ #define DRA7XX_CLASS		0x07000000
+ #define DRA752_REV_ES1_0	(DRA7XX_CLASS | (0x52 << 16) | (0x10 << 8))
+ #define DRA752_REV_ES1_1	(DRA7XX_CLASS | (0x52 << 16) | (0x11 << 8))
++#define DRA722_REV_ES1_0	(DRA7XX_CLASS | (0x22 << 16) | (0x10 << 8))
+ 
+ void omap2xxx_check_revision(void);
+ void omap3xxx_check_revision(void);
+-- 
+1.7.9.5
