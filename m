@@ -1,255 +1,134 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 29 May 2014 19:21:13 +0200
-Subject: [PATCH v2] ARM: update Allwinner defconfig
-Message-ID: <1401384073-8016-1-git-send-email-maxime.ripard@free-electrons.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 29 May 2014 10:47:28 -0700
+Subject: [PATCH v2 2/5] clk: bcm281xx: implement prerequisite clocks
+In-Reply-To: <5387661E.7060106@linaro.org>
+References: <1400590362-11177-1-git-send-email-elder@linaro.org>
+ <1400590362-11177-3-git-send-email-elder@linaro.org>
+ <20140524005358.23136.8918@quantum> <53873577.8000502@linaro.org>
+ <20140529163552.10062.50409@quantum> <5387661E.7060106@linaro.org>
+Message-ID: <20140529174728.10062.42854@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update sunxi_defconfig and multi_v7 with all the latest Allwinner additions.
+Quoting Alex Elder (2014-05-29 09:53:50)
+> On 05/29/2014 11:35 AM, Mike Turquette wrote:
+> > Quoting Alex Elder (2014-05-29 06:26:15)
+> >> On 05/23/2014 07:53 PM, Mike Turquette wrote:
+> >>> The above seems like a lot effort to go to. Why not skip all of this and
+> >>> just implement the prerequisite logic in the .enable & .disable
+> >>> callbacks? E.g. your kona clk .enable callback would look like:
+> >>
+> >> I think the problem is that it means the clock consumers
+> >> would have to know that prerequisite relationship.  And
+> >> that is dependent on the clock tree.  The need for it in
+> >> this case was because the boot loader didn't initialize
+> >> all the clocks that were needed.  If we could count on
+> >> the boot loader setting things up initially we might not
+> >> need to do this.
+> 
+> I think you've convinced me that if the prerequisite is
+> set up at initialization time, the consumers don't need
+> to know about the the clock tree.
+> 
+> >>>
+> >>> diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
+> >>> index d603c4e..51f35b4 100644
+> >>> --- a/drivers/clk/bcm/clk-kona.c
+> >>> +++ b/drivers/clk/bcm/clk-kona.c
+> >>> @@ -987,6 +987,12 @@ static int kona_peri_clk_enable(struct clk_hw *hw)
+> >>>  {
+> >>>       struct kona_clk *bcm_clk = to_kona_clk(hw);
+> >>>       struct bcm_clk_gate *gate = &bcm_clk->u.peri->gate;
+> >>> +     int ret;
+> >>> +
+> >>> +     hw->prereq_bus_clk = clk_get(hw->ccu, hw->prereq);
+> >>> +     ret = clk_enable(prereq_bus_clk);
+> >>> +     if (ret)
+> >>> +             return ret;
+> >>>  
+> >>>       return clk_gate(bcm_clk->ccu, bcm_clk->init_data.name, gate, true);
+> >>>  }
+> >>> @@ -997,6 +1003,9 @@ static void kona_peri_clk_disable(struct clk_hw *hw)
+> >>>       struct bcm_clk_gate *gate = &bcm_clk->u.peri->gate;
+> >>>  
+> >>>       (void)clk_gate(bcm_clk->ccu, bcm_clk->init_data.name, gate, false);
+> >>> +
+> >>> +     clk_disable(hw->prereq_bus_clk);
+> >>> +     clk_put(hw->prereq_bus_clk);
+> >>>  }
+> >>>  
+> >>>  static int kona_peri_clk_is_enabled(struct clk_hw *hw)
+> >>>
+> >>>
+> >>> I guess it might take some trickery to get clk_get to work like that.
+> >>> Let me know if I've completely lost the plot.
+> >>
+> >> I don't think so, but I think there's a lot of stuff
+> >> here to try to understand, and you're trying to extract
+> >> it from the code without the benefit of some background
+> >> of how and why it's done this way.
+> >>
+> >> Hopefully all this verbiage is moving you closer to
+> >> understanding...  I appreciate your patience.
+> > 
+> > Hi Alex,
+> > 
+> > Can you comment on my diff above? I basically tossed up some pseudo-code
+> > to show how clk_enable calls can be nested inside of each other. I'd
+> > like to know if that approach makes sense for your prereq clocks case.
+> 
+> Yes, I should have looked more closely before.
+> 
+> Are you suggesting this prerequisite notion get elevated into the
+> common framework?
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
-Hi Arnd, Kevin, Olof,
+Nope.
 
-It would be great if you could apply this patch directly.
+> Or is "hw" here just representative of the
+> Kona-specific clock structure?
 
-Thanks!
-Maxime
+Yup. It's just good old struct clk_hw. There is one instance of this
+struct for every struct clk object.
 
-Changes from v1:
-  - Rebased on top of arm-soc next/defconfig
+> 
+> In any case, you're suggesting the prerequisite be handled in the
+> enable path (as opposed to the one-time initialization path),
+> which during the course of this discussion I've been thinking may
+> be the right way to do it.
 
+Right, and don't forget that you have both the prepare path AND the
+enable path. It is common for drivers to call clk_prepare once at probe
+time and then aggressively call clk_enable/clk_disable for fine-grained
+PM. Likewise some drivers always use clk_prepare_enable and
+clk_disable_unprepare.
 
- arch/arm/configs/multi_v7_defconfig | 22 ++++++++++++++------
- arch/arm/configs/sunxi_defconfig    | 40 ++++++++++++++++++++++++++++++++++---
- 2 files changed, 53 insertions(+), 9 deletions(-)
+The point is that you have two callbacks that you might split some of
+this stuff across. Your "initializiation" stuff might go into .prepare()
+and simply enabling the clock might go into .enable().
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index f3ef03183e31..bb7ecba711ad 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -5,9 +5,11 @@ CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_EMBEDDED=y
-+CONFIG_PERF_EVENTS=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- CONFIG_PARTITION_ADVANCED=y
-+CONFIG_ARCH_VIRT=y
- CONFIG_ARCH_MVEBU=y
- CONFIG_MACH_ARMADA_370=y
- CONFIG_MACH_ARMADA_375=y
-@@ -15,13 +17,12 @@ CONFIG_MACH_ARMADA_38X=y
- CONFIG_MACH_ARMADA_XP=y
- CONFIG_MACH_DOVE=y
- CONFIG_ARCH_BCM=y
--CONFIG_ARCH_BCM_5301X=y
- CONFIG_ARCH_BCM_MOBILE=y
-+CONFIG_ARCH_BCM_5301X=y
- CONFIG_ARCH_BERLIN=y
- CONFIG_MACH_BERLIN_BG2=y
- CONFIG_MACH_BERLIN_BG2CD=y
- CONFIG_MACH_BERLIN_BG2Q=y
--CONFIG_GPIO_PCA953X=y
- CONFIG_ARCH_HIGHBANK=y
- CONFIG_ARCH_HI3xxx=y
- CONFIG_ARCH_KEYSTONE=y
-@@ -35,8 +36,8 @@ CONFIG_ARCH_OMAP3=y
- CONFIG_ARCH_OMAP4=y
- CONFIG_SOC_OMAP5=y
- CONFIG_SOC_AM33XX=y
--CONFIG_SOC_DRA7XX=y
- CONFIG_SOC_AM43XX=y
-+CONFIG_SOC_DRA7XX=y
- CONFIG_ARCH_QCOM=y
- CONFIG_ARCH_MSM8X60=y
- CONFIG_ARCH_MSM8960=y
-@@ -62,7 +63,6 @@ CONFIG_MACH_SNOWBALL=y
- CONFIG_MACH_UX500_DT=y
- CONFIG_ARCH_VEXPRESS=y
- CONFIG_ARCH_VEXPRESS_CA9X4=y
--CONFIG_ARCH_VIRT=y
- CONFIG_ARCH_WM8850=y
- CONFIG_ARCH_ZYNQ=y
- CONFIG_NEON=y
-@@ -119,11 +119,13 @@ CONFIG_ICS932S401=y
- CONFIG_APDS9802ALS=y
- CONFIG_ISL29003=y
- CONFIG_EEPROM_AT24=y
-+CONFIG_EEPROM_SUNXI_SID=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_BLK_DEV_SR=y
- CONFIG_SCSI_MULTI_LUN=y
- CONFIG_ATA=y
- CONFIG_SATA_AHCI_PLATFORM=y
-+CONFIG_AHCI_SUNXI=y
- CONFIG_SATA_HIGHBANK=y
- CONFIG_SATA_MV=y
- CONFIG_NETDEVICES=y
-@@ -193,6 +195,8 @@ CONFIG_SPI_OMAP24XX=y
- CONFIG_SPI_ORION=y
- CONFIG_SPI_PL022=y
- CONFIG_SPI_SIRF=y
-+CONFIG_SPI_SUN4I=y
-+CONFIG_SPI_SUN6I=y
- CONFIG_SPI_TEGRA114=y
- CONFIG_SPI_TEGRA20_SFLASH=y
- CONFIG_SPI_TEGRA20_SLINK=y
-@@ -201,6 +205,7 @@ CONFIG_PINCTRL_PALMAS=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_GENERIC_PLATFORM=y
- CONFIG_GPIO_DWAPB=y
-+CONFIG_GPIO_PCA953X=y
- CONFIG_GPIO_PCA953X_IRQ=y
- CONFIG_GPIO_TWL4030=y
- CONFIG_GPIO_PALMAS=y
-@@ -271,6 +276,8 @@ CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_TEGRA=y
- CONFIG_USB_EHCI_HCD_PLATFORM=y
- CONFIG_USB_ISP1760_HCD=y
-+CONFIG_USB_OHCI_HCD=y
-+CONFIG_USB_OHCI_HCD_PLATFORM=y
- CONFIG_USB_STORAGE=y
- CONFIG_USB_CHIPIDEA=y
- CONFIG_USB_CHIPIDEA_HOST=y
-@@ -287,14 +294,15 @@ CONFIG_MMC_ARMMMCI=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_OF_ARASAN=y
- CONFIG_MMC_SDHCI_ESDHC_IMX=y
--CONFIG_MMC_SDHCI_PXAV3=y
--CONFIG_MMC_SDHCI_TEGRA=y
- CONFIG_MMC_SDHCI_DOVE=y
-+CONFIG_MMC_SDHCI_TEGRA=y
-+CONFIG_MMC_SDHCI_PXAV3=y
- CONFIG_MMC_SDHCI_SPEAR=y
- CONFIG_MMC_SDHCI_BCM_KONA=y
- CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
- CONFIG_MMC_MVSDIO=y
-+CONFIG_MMC_SUNXI=y
- CONFIG_EDAC=y
- CONFIG_EDAC_MM_EDAC=y
- CONFIG_EDAC_HIGHBANK_MC=y
-@@ -310,6 +318,7 @@ CONFIG_RTC_DRV_TPS65910=y
- CONFIG_RTC_DRV_EM3027=y
- CONFIG_RTC_DRV_PL031=y
- CONFIG_RTC_DRV_VT8500=y
-+CONFIG_RTC_DRV_SUNXI=y
- CONFIG_RTC_DRV_MV=y
- CONFIG_RTC_DRV_TEGRA=y
- CONFIG_DMADEVICES=y
-@@ -344,6 +353,7 @@ CONFIG_PWM=y
- CONFIG_PWM_TEGRA=y
- CONFIG_PWM_VT8500=y
- CONFIG_OMAP_USB2=y
-+CONFIG_PHY_SUN4I_USB=y
- CONFIG_EXT4_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index 5a69fd13a67b..7209bfd62074 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -1,13 +1,17 @@
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_BLK_DEV_INITRD=y
-+CONFIG_PERF_EVENTS=y
- CONFIG_ARCH_SUNXI=y
- CONFIG_SMP=y
- CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
- CONFIG_HIGHPTE=y
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_VFP=y
- CONFIG_NEON=y
-+CONFIG_PM_RUNTIME=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -25,8 +29,12 @@ CONFIG_IP_PNP_BOOTP=y
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_EEPROM_SUNXI_SID=y
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_ATA=y
-+CONFIG_AHCI_SUNXI=y
- CONFIG_NETDEVICES=y
- CONFIG_SUN4I_EMAC=y
-+# CONFIG_NET_VENDOR_ARC is not set
- # CONFIG_NET_CADENCE is not set
- # CONFIG_NET_VENDOR_BROADCOM is not set
- # CONFIG_NET_VENDOR_CIRRUS is not set
-@@ -34,22 +42,30 @@ CONFIG_SUN4I_EMAC=y
- # CONFIG_NET_VENDOR_INTEL is not set
- # CONFIG_NET_VENDOR_MARVELL is not set
- # CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_MICROCHIP is not set
- # CONFIG_NET_VENDOR_NATSEMI is not set
-+# CONFIG_NET_VENDOR_SAMSUNG is not set
- # CONFIG_NET_VENDOR_SEEQ is not set
- # CONFIG_NET_VENDOR_SMSC is not set
- CONFIG_STMMAC_ETH=y
-+# CONFIG_NET_VENDOR_VIA is not set
- # CONFIG_NET_VENDOR_WIZNET is not set
- # CONFIG_WLAN is not set
-+# CONFIG_INPUT_MOUSEDEV is not set
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_NR_UARTS=8
- CONFIG_SERIAL_8250_RUNTIME_UARTS=8
- CONFIG_SERIAL_8250_DW=y
-+CONFIG_SERIAL_OF_PLATFORM=y
-+# CONFIG_HW_RANDOM is not set
- CONFIG_I2C=y
--# CONFIG_I2C_COMPAT is not set
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_SPI=y
-+CONFIG_SPI_SUN4I=y
- CONFIG_SPI_SUN6I=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_POWER_SUPPLY=y
-@@ -58,16 +74,34 @@ CONFIG_POWER_RESET_SUN6I=y
- # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
- CONFIG_SUNXI_WATCHDOG=y
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_MFD_AXP20X=y
-+CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
-+CONFIG_REGULATOR_GPIO=y
-+CONFIG_USB=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_HCD_PLATFORM=y
-+CONFIG_USB_OHCI_HCD=y
-+CONFIG_USB_OHCI_HCD_PLATFORM=y
-+CONFIG_MMC=y
-+CONFIG_MMC_SUNXI=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
- CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
-+CONFIG_RTC_CLASS=y
-+# CONFIG_RTC_INTF_SYSFS is not set
-+# CONFIG_RTC_INTF_PROC is not set
-+CONFIG_RTC_DRV_SUNXI=y
- # CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_PHY_SUN4I_USB=y
-+CONFIG_EXT4_FS=y
-+CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_NFS_FS=y
-+CONFIG_NFS_V3_ACL=y
-+CONFIG_NFS_V4=y
- CONFIG_ROOT_NFS=y
--CONFIG_NLS=y
- CONFIG_PRINTK_TIME=y
-+CONFIG_DEBUG_FS=y
--- 
-2.0.0
+> 
+> Let me see if I can rework it that way and I'll let you know
+> what I discover as a result.  I hope to have something to
+> talk about later today.
+
+Sounds good.
+
+Regards,
+Mike
+
+> 
+> Thanks a lot Mike.
+> 
+>                                         -Alex
+> 
+> > Note that Linux device drivers that consume leaf clocks do NOT need to
+> > know about the prereq clocks. All of that prereq clock knowledge is
+> > stored in the .enable callback for the leaf clock (see above).
+> > 
+> > Regards,
+> > Mike
+> > 
+> >>
+> >>                                         -Alex
+> >>
+> 
