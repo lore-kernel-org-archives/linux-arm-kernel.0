@@ -1,82 +1,200 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 29 May 2014 09:35:52 -0700
-Subject: [PATCH v2 2/5] clk: bcm281xx: implement prerequisite clocks
-In-Reply-To: <53873577.8000502@linaro.org>
-References: <1400590362-11177-1-git-send-email-elder@linaro.org>
- <1400590362-11177-3-git-send-email-elder@linaro.org>
- <20140524005358.23136.8918@quantum> <53873577.8000502@linaro.org>
-Message-ID: <20140529163552.10062.50409@quantum>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 29 May 2014 17:36:17 +0100
+Subject: [PATCH] drm/exynos: hdmi: remove the i2c drivers and use devtree -
+ continued
+Message-ID: <1401381377-29973-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Alex Elder (2014-05-29 06:26:15)
-> On 05/23/2014 07:53 PM, Mike Turquette wrote:
-> > The above seems like a lot effort to go to. Why not skip all of this and
-> > just implement the prerequisite logic in the .enable & .disable
-> > callbacks? E.g. your kona clk .enable callback would look like:
-> 
-> I think the problem is that it means the clock consumers
-> would have to know that prerequisite relationship.  And
-> that is dependent on the clock tree.  The need for it in
-> this case was because the boot loader didn't initialize
-> all the clocks that were needed.  If we could count on
-> the boot loader setting things up initially we might not
-> need to do this.
-> 
-> > 
-> > diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
-> > index d603c4e..51f35b4 100644
-> > --- a/drivers/clk/bcm/clk-kona.c
-> > +++ b/drivers/clk/bcm/clk-kona.c
-> > @@ -987,6 +987,12 @@ static int kona_peri_clk_enable(struct clk_hw *hw)
-> >  {
-> >       struct kona_clk *bcm_clk = to_kona_clk(hw);
-> >       struct bcm_clk_gate *gate = &bcm_clk->u.peri->gate;
-> > +     int ret;
-> > +
-> > +     hw->prereq_bus_clk = clk_get(hw->ccu, hw->prereq);
-> > +     ret = clk_enable(prereq_bus_clk);
-> > +     if (ret)
-> > +             return ret;
-> >  
-> >       return clk_gate(bcm_clk->ccu, bcm_clk->init_data.name, gate, true);
-> >  }
-> > @@ -997,6 +1003,9 @@ static void kona_peri_clk_disable(struct clk_hw *hw)
-> >       struct bcm_clk_gate *gate = &bcm_clk->u.peri->gate;
-> >  
-> >       (void)clk_gate(bcm_clk->ccu, bcm_clk->init_data.name, gate, false);
-> > +
-> > +     clk_disable(hw->prereq_bus_clk);
-> > +     clk_put(hw->prereq_bus_clk);
-> >  }
-> >  
-> >  static int kona_peri_clk_is_enabled(struct clk_hw *hw)
-> > 
-> > 
-> > I guess it might take some trickery to get clk_get to work like that.
-> > Let me know if I've completely lost the plot.
-> 
-> I don't think so, but I think there's a lot of stuff
-> here to try to understand, and you're trying to extract
-> it from the code without the benefit of some background
-> of how and why it's done this way.
-> 
-> Hopefully all this verbiage is moving you closer to
-> understanding...  I appreciate your patience.
+There appears to have been a merge error on commit:
 
-Hi Alex,
+  2b76813: drm/exynos: hdmi: remove the i2c drivers and use
 
-Can you comment on my diff above? I basically tossed up some pseudo-code
-to show how clk_enable calls can be nested inside of each other. I'd
-like to know if that approach makes sense for your prereq clocks case.
+The original submission can be found at:
 
-Note that Linux device drivers that consume leaf clocks do NOT need to
-know about the prereq clocks. All of that prereq clock knowledge is
-stored in the .enable callback for the leaf clock (see above).
+  https://patchwork.kernel.org/patch/3559541/
 
-Regards,
-Mike
+It looks like the commit was only half applied.  This patch aims
+to finish what was started by Daniel.
 
-> 
->                                         -Alex
-> 
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/gpu/drm/exynos/exynos_ddc.c     | 63 --------------------------------
+ drivers/gpu/drm/exynos/exynos_hdmi.h    | 23 ------------
+ drivers/gpu/drm/exynos/exynos_hdmiphy.c | 65 ---------------------------------
+ 3 files changed, 151 deletions(-)
+ delete mode 100644 drivers/gpu/drm/exynos/exynos_ddc.c
+ delete mode 100644 drivers/gpu/drm/exynos/exynos_hdmi.h
+ delete mode 100644 drivers/gpu/drm/exynos/exynos_hdmiphy.c
+
+diff --git a/drivers/gpu/drm/exynos/exynos_ddc.c b/drivers/gpu/drm/exynos/exynos_ddc.c
+deleted file mode 100644
+index 6a8c84e..0000000
+--- a/drivers/gpu/drm/exynos/exynos_ddc.c
++++ /dev/null
+@@ -1,63 +0,0 @@
+-/*
+- * Copyright (C) 2011 Samsung Electronics Co.Ltd
+- * Authors:
+- *	Seung-Woo Kim <sw0312.kim@samsung.com>
+- *	Inki Dae <inki.dae@samsung.com>
+- *
+- * This program is free software; you can redistribute  it and/or modify it
+- * under  the terms of  the GNU General  Public License as published by the
+- * Free Software Foundation;  either version 2 of the  License, or (at your
+- * option) any later version.
+- *
+- */
+-
+-#include <drm/drmP.h>
+-
+-#include <linux/kernel.h>
+-#include <linux/i2c.h>
+-#include <linux/of.h>
+-
+-#include "exynos_drm_drv.h"
+-#include "exynos_hdmi.h"
+-
+-static int s5p_ddc_probe(struct i2c_client *client,
+-			const struct i2c_device_id *dev_id)
+-{
+-	hdmi_attach_ddc_client(client);
+-
+-	dev_info(&client->adapter->dev,
+-		"attached %s into i2c adapter successfully\n",
+-		client->name);
+-
+-	return 0;
+-}
+-
+-static int s5p_ddc_remove(struct i2c_client *client)
+-{
+-	dev_info(&client->adapter->dev,
+-		"detached %s from i2c adapter successfully\n",
+-		client->name);
+-
+-	return 0;
+-}
+-
+-static struct of_device_id hdmiddc_match_types[] = {
+-	{
+-		.compatible = "samsung,exynos5-hdmiddc",
+-	}, {
+-		.compatible = "samsung,exynos4210-hdmiddc",
+-	}, {
+-		/* end node */
+-	}
+-};
+-
+-struct i2c_driver ddc_driver = {
+-	.driver = {
+-		.name = "exynos-hdmiddc",
+-		.owner = THIS_MODULE,
+-		.of_match_table = hdmiddc_match_types,
+-	},
+-	.probe		= s5p_ddc_probe,
+-	.remove		= s5p_ddc_remove,
+-	.command		= NULL,
+-};
+diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.h b/drivers/gpu/drm/exynos/exynos_hdmi.h
+deleted file mode 100644
+index 0ddf395..0000000
+--- a/drivers/gpu/drm/exynos/exynos_hdmi.h
++++ /dev/null
+@@ -1,23 +0,0 @@
+-/*
+- *
+- * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+- * Authors:
+- *	Inki Dae <inki.dae@samsung.com>
+- *	Seung-Woo Kim <sw0312.kim@samsung.com>
+- *
+- * This program is free software; you can redistribute  it and/or modify it
+- * under  the terms of  the GNU General  Public License as published by the
+- * Free Software Foundation;  either version 2 of the  License, or (at your
+- * option) any later version.
+- */
+-
+-#ifndef _EXYNOS_HDMI_H_
+-#define _EXYNOS_HDMI_H_
+-
+-void hdmi_attach_ddc_client(struct i2c_client *ddc);
+-void hdmi_attach_hdmiphy_client(struct i2c_client *hdmiphy);
+-
+-extern struct i2c_driver hdmiphy_driver;
+-extern struct i2c_driver ddc_driver;
+-
+-#endif
+diff --git a/drivers/gpu/drm/exynos/exynos_hdmiphy.c b/drivers/gpu/drm/exynos/exynos_hdmiphy.c
+deleted file mode 100644
+index 59abb14..0000000
+--- a/drivers/gpu/drm/exynos/exynos_hdmiphy.c
++++ /dev/null
+@@ -1,65 +0,0 @@
+-/*
+- * Copyright (C) 2011 Samsung Electronics Co.Ltd
+- * Authors:
+- *	Seung-Woo Kim <sw0312.kim@samsung.com>
+- *	Inki Dae <inki.dae@samsung.com>
+- *
+- * This program is free software; you can redistribute  it and/or modify it
+- * under  the terms of  the GNU General  Public License as published by the
+- * Free Software Foundation;  either version 2 of the  License, or (at your
+- * option) any later version.
+- *
+- */
+-
+-#include <drm/drmP.h>
+-
+-#include <linux/kernel.h>
+-#include <linux/i2c.h>
+-#include <linux/of.h>
+-
+-#include "exynos_drm_drv.h"
+-#include "exynos_hdmi.h"
+-
+-
+-static int hdmiphy_probe(struct i2c_client *client,
+-	const struct i2c_device_id *id)
+-{
+-	hdmi_attach_hdmiphy_client(client);
+-
+-	dev_info(&client->adapter->dev, "attached s5p_hdmiphy "
+-		"into i2c adapter successfully\n");
+-
+-	return 0;
+-}
+-
+-static int hdmiphy_remove(struct i2c_client *client)
+-{
+-	dev_info(&client->adapter->dev, "detached s5p_hdmiphy "
+-		"from i2c adapter successfully\n");
+-
+-	return 0;
+-}
+-
+-static struct of_device_id hdmiphy_match_types[] = {
+-	{
+-		.compatible = "samsung,exynos5-hdmiphy",
+-	}, {
+-		.compatible = "samsung,exynos4210-hdmiphy",
+-	}, {
+-		.compatible = "samsung,exynos4212-hdmiphy",
+-	}, {
+-		/* end node */
+-	}
+-};
+-
+-struct i2c_driver hdmiphy_driver = {
+-	.driver = {
+-		.name	= "exynos-hdmiphy",
+-		.owner	= THIS_MODULE,
+-		.of_match_table = hdmiphy_match_types,
+-	},
+-	.probe		= hdmiphy_probe,
+-	.remove		= hdmiphy_remove,
+-	.command		= NULL,
+-};
+-EXPORT_SYMBOL(hdmiphy_driver);
+-- 
+1.8.3.2
