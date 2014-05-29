@@ -1,61 +1,85 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 29 May 2014 17:40:13 -0500
-Subject: [PATCH v2 03/11] irqchip: versatile-fpga: add support for arm,
- versatile-sic
-In-Reply-To: <1401403221-27523-1-git-send-email-robherring2@gmail.com>
-References: <1401403221-27523-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1401403221-27523-4-git-send-email-robherring2@gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 29 May 2014 16:09:48 -0700
+Subject: [PATCH] ARM: at91: fix rtc irq mask for sam9x5 SoCs
+In-Reply-To: <20140509163652.GE6776@localhost>
+References: <957b209589094df48ddedbc57c6ccdfd@BLUPR05MB037.namprd05.prod.outlook.com>
+ <1399479649-3247-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140508154912.GA6776@localhost>
+ <536BBEA4.6080908@free-electrons.com>
+ <20140509163652.GE6776@localhost>
+Message-ID: <20140529160948.a63fa268a37d985189837a85@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <robh@kernel.org>
+On Fri, 9 May 2014 18:36:52 +0200 Johan Hovold <johan@hovold.com> wrote:
 
-The secondary controller on ARM Versatile AB and PB is similar to
-other ARM platforms, but has a pass-thru register to connect some
-interrupts directly to interrupt inputs on the primary interrupt
-controller. The PIC_ENABLES register needs to be configured for
-proper operation when the matching node is arm,versatile-sic. Add the
-the necessary IRQCHIP_DECLARE as well.
+> On Thu, May 08, 2014 at 07:28:04PM +0200, Boris BREZILLON wrote:
+> 
+> > > You should also keep the flush (read of IMR) regardless (to make sure
+> > > the write has reached the peripheral), and remember to remove the now
+> > > unused mask variable.
+> > 
+> > Does it has something to do with memory barriers ?
+> > If so, why not using writel instead of writel_relaxed ?
+> 
+> You only need to use the non-relaxed version when synchronising with DMA
+> operations.
+> 
+> The read-back of a register on the same device is a common technique to
+> make sure that preceding write has actually reached the peripheral
+> (write posting or flushing). In this case, it is used to make
+> (reasonably) sure that interrupts have actually been masked before
+> returning. (In the general case, you'd even need to verify the read-back
+> value to be certain that the device has changed its state.)
+> 
 
-Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Arnd Bergmann <arnd@arndb.de>
+So I grabbed this patch as it's tied to "rtc: rtc-at91rm9200: fix
+uninterruptible wait for ACKUPD" and is not in linux-next.  Someone
+shout at me if that was a mistake.
+
+
+
+From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Subject: ARM: at91: fix rtc irq mask for sam9x5 SoCs
+
+The RTC IMR register is not reliable on sam9x5 SoCs, hence why me have to
+mask all interrupts no matter what IMR claims about already masked irqs.
+
+Mark said:
+
+: Atmel actually has this issue in the Errata of the SAM9G25 and SAM9G35
+: datasheets which might be worth referencing in the description?
+
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Reported-by: Bryan Evenson <bevenson@melinkcorp.com>
+Tested-by: Bryan Evenson <bevenson@melinkcorp.com>
+Cc: Andrew Victor <linux@maxim.org.za>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Alessandro Zummo <a.zummo@towertech.it>
+Cc: Mark Roszko <mark.roszko@gmail.com>
+Cc: Johan Hovold <johan@hovold.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
 ---
-v2:
-- Rework to use the compatible string for pass-thru register setup.
 
- drivers/irqchip/irq-versatile-fpga.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/mach-at91/sysirq_mask.c |    7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
-diff --git a/drivers/irqchip/irq-versatile-fpga.c b/drivers/irqchip/irq-versatile-fpga.c
-index 8e0bb56..90bf131 100644
---- a/drivers/irqchip/irq-versatile-fpga.c
-+++ b/drivers/irqchip/irq-versatile-fpga.c
-@@ -28,6 +28,8 @@
- #define FIQ_ENABLE_SET		0x28
- #define FIQ_ENABLE_CLEAR	0x2C
+diff -puN arch/arm/mach-at91/sysirq_mask.c~arm-at91-fix-rtc-irq-mask-for-sam9x5-socs arch/arm/mach-at91/sysirq_mask.c
+--- a/arch/arm/mach-at91/sysirq_mask.c~arm-at91-fix-rtc-irq-mask-for-sam9x5-socs
++++ a/arch/arm/mach-at91/sysirq_mask.c
+@@ -37,12 +37,7 @@ void __init at91_sysirq_mask_rtc(u32 rtc
+ 	if (!base)
+ 		return;
  
-+#define PIC_ENABLES             0x20	/* set interrupt pass through bits */
-+
- /**
-  * struct fpga_irq_data - irq data container for the FPGA IRQ controller
-  * @base: memory offset in virtual memory
-@@ -213,7 +215,15 @@ int __init fpga_irq_of_init(struct device_node *node,
- 	writel(clear_mask, base + IRQ_ENABLE_CLEAR);
- 	writel(clear_mask, base + FIQ_ENABLE_CLEAR);
+-	mask = readl_relaxed(base + AT91_RTC_IMR);
+-	if (mask) {
+-		pr_info("AT91: Disabling rtc irq\n");
+-		writel_relaxed(mask, base + AT91_RTC_IDR);
+-		(void)readl_relaxed(base + AT91_RTC_IMR);	/* flush */
+-	}
++	writel_relaxed(0x1f, base + AT91_RTC_IDR);
  
-+	/*
-+	 * On Versatile AB/PB, some secondary interrupts have a direct
-+	 * pass-thru to the primary controller which need to be enabled.
-+	 */
-+	if (of_device_is_compatible(node, "arm,versatile-sic"))
-+		writel(0xffd00000, base + PIC_ENABLES);
-+
- 	return 0;
+ 	iounmap(base);
  }
- IRQCHIP_DECLARE(arm_fpga, "arm,versatile-fpga-irq", fpga_irq_of_init);
-+IRQCHIP_DECLARE(arm_fpga_sic, "arm,versatile-sic", fpga_irq_of_init);
- #endif
--- 
-1.9.1
+_
