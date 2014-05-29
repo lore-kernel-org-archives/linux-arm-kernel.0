@@ -1,73 +1,55 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 29 May 2014 18:16:54 +0100
-Subject: [PATCH v2] arm64: kernel: initialize broadcast hrtimer based clock
- event device
-Message-ID: <1401383814-22600-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 29 May 2014 10:20:16 -0700
+Subject: [PATCH] scripts/dtc: pad DTBs to facilitate later modification
+In-Reply-To: <53875876.2020001@wwwdotorg.org>
+References: <1400888507-11637-1-git-send-email-khilman@linaro.org>
+ <53875876.2020001@wwwdotorg.org>
+Message-ID: <CAGa+x84SkGzC3cPCvnZHJEK2uJion=0fowBNdkydjF1GnLLsTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On platforms implementing CPU power management, the CPUidle subsystem
-can allow CPUs to enter idle states where local timers logic is lost on power
-down. To keep the software timers functional the kernel relies on an
-always-on broadcast timer to be present in the platform to relay the
-interrupt signalling the timer expiries.
+On Thu, May 29, 2014 at 8:55 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 05/23/2014 05:41 PM, Kevin Hilman wrote:
+>> By default, add some padding to the DT blobs to facilitate later
+>> patching.
+>>
+>> An example need for DTB patching is the need to modifiy the command
+>> line on platforms where ATAGS are not (or cannot) be used to pass the
+>> commandline.  For example, we do not support a big-endian kernel
+>> reading ATAGS from a little-endian u-boot, so the only way to pass a
+>> command line in the DT.
+>>
+>> Also, without ATAG support (or if u-boot was built without
+>> CONFIG_INITRD_TAG) the only way to pass an initrd is by adding an
+>> initrd= option to command line (in the DT).
+>>
+>> Therefore, to facilitate adding to the DT command line directly in the
+>> DTB, add some padding.
+>>
+>> Cc: Nicolas Pitre <nico@linaro.org>
+>> Cc: Stephen Warren <swarren@wwwdotorg.org>
+>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+>> ---
+>> I kinda pulled 64 bytes out of the air here since it's enough to add
+>> some common things to the commandline like debug, earlyprink
+>> initrd=<addr>,<size>, etc., but I'm certainlly not opposed to more
+>> padding.
+>
+> Conceptually,
+> Acked-by: Stephen Warren <swarren@nvidia.com>
+>
+> But I would expect a pad of something like 4KB to be more future-proof.
+> U-Boot appears to use 4KB on ARM at least:
+>
+> ./arch/arm/dts/Makefile:37:DTC_FLAGS += -R 4 -p 0x1000
 
-For platforms implementing CPU core gating that do not implement an always-on
-HW timer or implement it in a broken way, this patch adds code to initialize
-the kernel hrtimer based clock event device upon boot (which can be chosen as
-tick broadcast device by the kernel).
-It relies on a dynamically chosen CPU to be always powered-up. This CPU then
-relays the timer interrupt to CPUs in deep-idle states through its HW local
-timer device.
+Great.  As I mentioned above, I'm certainly not opposed to more
+padding, and agree that it would be more future proof.  I was simply
+being rather conservative in case folks didn't want to see every .dtb
+grow by 4k.
 
-Having a CPU always-on has implications on power management platform
-capabilities and makes CPUidle suboptimal, since at least a CPU is kept
-always in a shallow idle state by the kernel to relay timer interrupts,
-but at least leaves the kernel with a functional system with some working
-power management capabilities.
+I'll wait a bit to see if there are any other opinions, and the respin
+with 4k padding.
 
-The hrtimer based clock event device is unconditionally registered, but
-has the lowest possible rating such that any broadcast-capable HW clock
-event device present will be chosen in preference as the tick broadcast
-device.
-
-Cc: Preeti U Murthy <preeti@linux.vnet.ibm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
-changes in v2:
-
-- Reworded the commit log according to reviews
-
-It should be ready to go.
-
-Thanks,
-Lorenzo
-
- arch/arm64/kernel/time.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-index 6815987..1a7125c 100644
---- a/arch/arm64/kernel/time.c
-+++ b/arch/arm64/kernel/time.c
-@@ -18,6 +18,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/clockchips.h>
- #include <linux/export.h>
- #include <linux/kernel.h>
- #include <linux/interrupt.h>
-@@ -69,6 +70,8 @@ void __init time_init(void)
- 	of_clk_init(NULL);
- 	clocksource_of_init();
- 
-+	tick_setup_hrtimer_broadcast();
-+
- 	arch_timer_rate = arch_timer_get_rate();
- 	if (!arch_timer_rate)
- 		panic("Unable to initialise architected timer.\n");
--- 
-1.8.4
+Kevin
