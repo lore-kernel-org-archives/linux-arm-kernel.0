@@ -1,101 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 29 May 2014 13:39:29 +0100
-Subject: [PATCH] arm64: kernel: initialize broadcast hrtimer based clock
- event device
-In-Reply-To: <53871444.3080206@linux.vnet.ibm.com>
-References: <1401355381-11446-1-git-send-email-lorenzo.pieralisi@arm.com>
- <53871444.3080206@linux.vnet.ibm.com>
-Message-ID: <20140529123929.GF24233@leverpostej>
+From: javi.merino@arm.com (Javi Merino)
+Date: Thu, 29 May 2014 13:42:49 +0100
+Subject: [PATCH v1 6/6] ACPI: thermal: processor: Use the generic cpufreq
+ infrastructure
+In-Reply-To: <1401351334-11210-7-git-send-email-amit.daniel@samsung.com>
+References: <1401351334-11210-1-git-send-email-amit.daniel@samsung.com>
+ <1401351334-11210-7-git-send-email-amit.daniel@samsung.com>
+Message-ID: <20140529124248.GC2593@e104805>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Preeti,
+Hi Amit,
 
-On Thu, May 29, 2014 at 12:04:36PM +0100, Preeti U Murthy wrote:
-> Hi Lorenzo,
+On Thu, May 29, 2014 at 09:15:34AM +0100, Amit Daniel Kachhap wrote:
+> This patch upgrades the ACPI cpufreq cooling portions to use the generic
+> cpufreq cooling infrastructure. There should not be any functionality
+> related changes as the same behaviour is provided by the generic
+> cpufreq APIs with the notifier mechanism.
 > 
-> On 05/29/2014 02:53 PM, Lorenzo Pieralisi wrote:
-> > On platforms implementing CPU power management, the CPUidle subsystem
-> > can allow CPUs to enter idle states where local timers logic is lost on power
-> > down. To keep the software timers functional the kernel relies on an
-> > always-on broadcast timer to be present in the platform to relay the
-> > interrupt signalling the timer expiries.
-> > 
-> > For platforms implementing CPU core gating that do not implement an always-on
-> > HW timer or implement it in a broken way, this patch adds code to initialize
-> > the kernel software broadcast hrtimer upon boot. It relies on a dynamically
+> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> ---
+>  drivers/acpi/processor_driver.c  |    6 +-
+>  drivers/acpi/processor_thermal.c |  235 ++++++++++++++++++--------------------
+>  include/acpi/processor.h         |    3 +-
+>  3 files changed, 115 insertions(+), 129 deletions(-)
 > 
-> It would be best to use the term "hrtimer based broadcast device"
-> throughout the changelog for uniformity and to avoid confusion instead
-> of mixing it with "software broadcast".
+> diff --git a/drivers/acpi/processor_driver.c b/drivers/acpi/processor_driver.c
+> index 7f70f31..10aba4a 100644
+> --- a/drivers/acpi/processor_driver.c
+> +++ b/drivers/acpi/processor_driver.c
+> @@ -36,6 +36,7 @@
+>  #include <linux/cpuidle.h>
+>  #include <linux/slab.h>
+>  #include <linux/acpi.h>
+> +#include <linux/cpu_cooling.h>
 > 
-> > chosen CPU to be always powered-up. This CPU then relays the timer interrupt
-> > to CPUs in deep-idle states through its HW local timer device.
-> > 
-> > On systems with power management capabilities but no functional HW broadcast
-> > tick device, the hrtimer based clock event device allows the kernel to
-> > enter high-resolution timer mode, which improves system latencies and saves
-> > dynamic power.
+>  #include <acpi/processor.h>
 > 
-> Sorry but I do not understand the above paragraph. What do you mean by
-> "allows the kernel to enter high resolution timer mode" ? And how does
-> it improve system latency? I understand that the hrtimer based
-> clockevent device saves dynamic power since it provides a mechanism in
-> which cpus can enter deeper idle states.
-
-When there's no oneshot-capable broadcast device and the CPU-local
-clock_event_device has the CLK_EVT_FEAT_C3STOP flag,
-tick_is_oneshot_available will return false. Thus
-tick_check_oneshot_change will return false, and hrtimer_switch_to_hres
-will never switch to high resolution mode (and we can also never enter
-NOHZ mode), leaving us stuck in periodic mode.
-
-In periodic mode ticks occur at fixed intervals, and any timer wakeup
-will occur after the tick following the requested wakeup time, adding
-some amount of latency over what would be possible with high resolution
-mode. Additionally, as we can only wake up at said ticks and not between
-them, it's possible that several timers for intervals shorter than that
-tick interval will fire at once upon a timer tick. Any tasks which
-requested these wakeups will fight for CPU time, and some will see
-additional latency because of this.
-
-> > 
-> > The side effect of having a CPU always-on has implications on power management
-> > platform capabilities and makes CPUidle suboptimal, since at least a CPU is
-> > kept always in a shallow idle state by the kernel to relay timer interrupts,
-> > but at least leaves the kernel with a functional system with some working power
-> > management capabilities.
-> > 
-> > The hrtimer based clock event device has lowest possible rating so that,
-> > if a platform contains a functional HW clock event device with broadcast
-> > capabilities, that device is always chosen as a tick broadcast device instead
-> > of the software based one, now present by default.
+> @@ -178,8 +179,7 @@ static int __acpi_processor_start(struct acpi_device *device)
+>         if (!cpuidle_get_driver() || cpuidle_get_driver() == &acpi_idle_driver)
+>                 acpi_processor_power_init(pr);
 > 
-> I think this statement "instead of the software based one, now present
-> by default" is incorrect. The hrtimer based clock event device will come
-> into picture only when the arch calls tick_setup_hrtimer_broadcast()
-> explicitly. Otherwise either the arch should register a real clock
-> device which does broadcast or should disable deep idle states where the
-> local timers stop. So I would suggest skipping the last paragraph as it
-> is not conveying anything in specific. The fact that a clock device with
-> the highest rating will be chosen is already known and need not be
-> mentioned explicitly IMHO.
+> -       pr->cdev = thermal_cooling_device_register("Processor", device,
+> -                                                  &processor_cooling_ops);
+> +       pr->cdev = acpi_processor_cooling_register(device);
 
-I think it is worth keeping the paragraph to allay anyone's fear that
-the hrtimer based broadcast device might be selected in preference to a
-real suitable clock. I would otherwise not be aware that the hrtimer
-based broadcast device had the lowest rating (and would have to go and
-look that up separately).
+With this you have removed the only cooling device whose type was
+"Processor".  There's special code for dealing with this cooling
+device in drivers/thermal/thermal_core.c:passive_store():
 
-As the arch code has delegated timer registration to
-clocksoruce_of_init, it doesn't know whether any of the real devices
-that may have been registered are suitable as a broadcast source for
-oneshot events. So we can't conditionally register the hrtimer based
-broadcast device.
+		list_for_each_entry(cdev, &thermal_cdev_list, node) {
+			if (!strncmp("Processor", cdev->type,
+				     sizeof("Processor")))
+				thermal_zone_bind_cooling_device(tz,
+						THERMAL_TRIPS_NONE, cdev,
+						THERMAL_NO_LIMIT,
+						THERMAL_NO_LIMIT);
+		}
+		mutex_unlock(&thermal_list_lock);
+		if (!tz->passive_delay)
 
-Perhaps we could replace "now present by default" with "which is
-unconditionally registered in case no suitable hardware device is
-present"?
+With your change, that code is now "dead" as it can't do anything.  No
+I don't know what should you do with it, either remove it or make it
+match the cpufreq cooling device.  But this patch should deal with
+that code as well.
 
 Cheers,
-Mark.
+Javi
