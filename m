@@ -1,122 +1,96 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Thu, 29 May 2014 15:14:33 -0700
-Subject: [PATCH] gpio: removes all usage of gpiochip_remove retval
-In-Reply-To: <1401400492-26175-1-git-send-email-berthe.ab@gmail.com>
-References: <1401400492-26175-1-git-send-email-berthe.ab@gmail.com>
-Message-ID: <5387B149.20408@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 29 May 2014 15:29:04 -0700
+Subject: [PATCH] clk: exynos5420: Keep aclk66_peric enabled during boot
+In-Reply-To: <1401398496-4624-1-git-send-email-dianders@chromium.org>
+References: <1401398496-4624-1-git-send-email-dianders@chromium.org>
+Message-ID: <20140529222904.10062.22764@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2014 02:54 PM, abdoulaye berthe wrote:
-
-Did you forget a changelog explaining why this is either needed, or even 
-a good idea?  I joined the conversation late and don't know why you are 
-doing this.
-
-Thanks,
-David Daney
-
-
-
-> Signed-off-by: abdoulaye berthe <berthe.ab@gmail.com>
+Quoting Doug Anderson (2014-05-29 14:21:36)
+> Right now if you've got earlyprintk enabled on exynos5420-peach-pit
+> then you'll get a hang on boot.  Here's why:
+> 
+> 1. The i2c-s3c2410 driver will probe at subsys_initcall.  It will
+>    enable its clock and disable it.  This is the clock "i2c2".
+> 2. The act of disabling "i2c2" will disable its parents.  In this case
+>    the parent is "aclk66_peric".  There are no other children of
+>    "aclk66_peric" officially enabled, so "aclk66_peric" will be turned
+>    off (despite being CLK_IGNORE_UNUSED, but that's by design).
+> 3. The next time you try to earlyprintk you'll do so without the UART
+>    clock enabled.  That's because the UART clocks are also children of
+>    "aclk66_peric".  You'll hang.
+> 
+> There's no good place to put a clock enable for earlyprintk, which is
+> handled by a bunch of assembly code.  The best we can do is to handle
+> this in the clock driver.
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 > ---
->   arch/arm/common/scoop.c                        | 10 ++--------
->   arch/mips/txx9/generic/setup.c                 |  4 ++--
->   arch/powerpc/platforms/83xx/mcu_mpc8349emitx.c |  3 ++-
->   arch/sh/boards/mach-x3proto/gpio.c             |  6 ++----
->   drivers/bcma/driver_gpio.c                     |  3 ++-
->   drivers/gpio/gpio-74x164.c                     |  8 +++-----
->   drivers/gpio/gpio-adnp.c                       |  9 +--------
->   drivers/gpio/gpio-adp5520.c                    |  8 +-------
->   drivers/gpio/gpio-adp5588.c                    |  6 +-----
->   drivers/gpio/gpio-amd8111.c                    |  3 +--
->   drivers/gpio/gpio-arizona.c                    |  3 ++-
->   drivers/gpio/gpio-cs5535.c                     |  8 +-------
->   drivers/gpio/gpio-da9052.c                     |  3 ++-
->   drivers/gpio/gpio-da9055.c                     |  3 ++-
->   drivers/gpio/gpio-dwapb.c                      |  2 +-
->   drivers/gpio/gpio-em.c                         |  5 +----
->   drivers/gpio/gpio-f7188x.c                     | 18 ++----------------
->   drivers/gpio/gpio-generic.c                    |  3 ++-
->   drivers/gpio/gpio-grgpio.c                     |  4 +---
->   drivers/gpio/gpio-ich.c                        |  9 +--------
->   drivers/gpio/gpio-it8761e.c                    |  6 +-----
->   drivers/gpio/gpio-janz-ttl.c                   |  8 +-------
->   drivers/gpio/gpio-kempld.c                     |  3 ++-
->   drivers/gpio/gpio-lp3943.c                     |  3 ++-
->   drivers/gpio/gpio-lynxpoint.c                  |  5 +----
->   drivers/gpio/gpio-max730x.c                    | 12 ++++--------
->   drivers/gpio/gpio-max732x.c                    |  7 +------
->   drivers/gpio/gpio-mc33880.c                    | 11 +++--------
->   drivers/gpio/gpio-mc9s08dz60.c                 |  3 ++-
->   drivers/gpio/gpio-mcp23s08.c                   | 26 +++++++-------------------
->   drivers/gpio/gpio-ml-ioh.c                     |  8 ++------
->   drivers/gpio/gpio-msm-v2.c                     |  5 +----
->   drivers/gpio/gpio-mxc.c                        |  2 +-
->   drivers/gpio/gpio-octeon.c                     |  3 ++-
->   drivers/gpio/gpio-palmas.c                     |  3 ++-
->   drivers/gpio/gpio-pca953x.c                    |  7 +------
->   drivers/gpio/gpio-pcf857x.c                    |  4 +---
->   drivers/gpio/gpio-pch.c                        | 10 ++--------
->   drivers/gpio/gpio-rc5t583.c                    |  3 ++-
->   drivers/gpio/gpio-rcar.c                       |  5 +----
->   drivers/gpio/gpio-rdc321x.c                    |  7 ++-----
->   drivers/gpio/gpio-sch.c                        | 16 +++-------------
->   drivers/gpio/gpio-sch311x.c                    |  6 ++----
->   drivers/gpio/gpio-sodaville.c                  |  4 +---
->   drivers/gpio/gpio-stmpe.c                      |  8 +-------
->   drivers/gpio/gpio-sx150x.c                     |  7 ++-----
->   drivers/gpio/gpio-syscon.c                     |  3 ++-
->   drivers/gpio/gpio-tb10x.c                      |  5 +----
->   drivers/gpio/gpio-tc3589x.c                    |  8 +-------
->   drivers/gpio/gpio-timberdale.c                 |  5 +----
->   drivers/gpio/gpio-tps6586x.c                   |  3 ++-
->   drivers/gpio/gpio-tps65910.c                   |  3 ++-
->   drivers/gpio/gpio-tps65912.c                   |  3 ++-
->   drivers/gpio/gpio-ts5500.c                     |  6 +++---
->   drivers/gpio/gpio-twl4030.c                    |  4 +---
->   drivers/gpio/gpio-twl6040.c                    |  3 ++-
->   drivers/gpio/gpio-ucb1400.c                    |  2 +-
->   drivers/gpio/gpio-viperboard.c                 | 10 +++-------
->   drivers/gpio/gpio-vx855.c                      |  3 +--
->   drivers/gpio/gpio-wm831x.c                     |  3 ++-
->   drivers/gpio/gpio-wm8350.c                     |  3 ++-
->   drivers/gpio/gpio-wm8994.c                     |  3 ++-
->   drivers/hid/hid-cp2112.c                       |  6 ++----
->   drivers/input/keyboard/adp5588-keys.c          |  4 +---
->   drivers/input/keyboard/adp5589-keys.c          |  4 +---
->   drivers/input/touchscreen/ad7879.c             | 10 +++-------
->   drivers/leds/leds-pca9532.c                    | 10 ++--------
->   drivers/leds/leds-tca6507.c                    |  7 ++-----
->   drivers/media/dvb-frontends/cxd2820r_core.c    | 10 +++-------
->   drivers/mfd/asic3.c                            |  3 ++-
->   drivers/mfd/htc-i2cpld.c                       |  8 +-------
->   drivers/mfd/sm501.c                            | 17 +++--------------
->   drivers/mfd/tc6393xb.c                         | 13 ++++---------
->   drivers/mfd/ucb1x00-core.c                     |  8 ++------
->   drivers/pinctrl/pinctrl-abx500.c               | 15 +++------------
->   drivers/pinctrl/pinctrl-adi2.c                 |  9 ++++-----
->   drivers/pinctrl/pinctrl-as3722.c               | 11 ++---------
->   drivers/pinctrl/pinctrl-baytrail.c             |  5 +----
->   drivers/pinctrl/pinctrl-coh901.c               | 10 ++--------
->   drivers/pinctrl/pinctrl-exynos5440.c           |  6 +-----
->   drivers/pinctrl/pinctrl-msm.c                  | 11 ++---------
->   drivers/pinctrl/pinctrl-nomadik.c              |  2 +-
->   drivers/pinctrl/pinctrl-rockchip.c             | 16 ++++------------
->   drivers/pinctrl/pinctrl-samsung.c              | 14 ++++----------
->   drivers/pinctrl/pinctrl-sunxi.c                |  3 +--
->   drivers/pinctrl/sh-pfc/gpio.c                  |  9 +++------
->   drivers/pinctrl/spear/pinctrl-plgpio.c         |  3 +--
->   drivers/pinctrl/vt8500/pinctrl-wmt.c           |  9 ++-------
->   drivers/platform/x86/intel_pmic_gpio.c         |  3 +--
->   drivers/ssb/driver_gpio.c                      |  3 ++-
->   drivers/staging/vme/devices/vme_pio2_gpio.c    |  4 +---
->   drivers/tty/serial/max310x.c                   | 10 ++++------
->   drivers/video/fbdev/via/via-gpio.c             | 10 +++-------
->   sound/soc/codecs/wm5100.c                      |  5 +----
->   sound/soc/codecs/wm8903.c                      |  6 +-----
->   sound/soc/codecs/wm8962.c                      |  5 +----
->   sound/soc/codecs/wm8996.c                      |  6 +-----
->   97 files changed, 182 insertions(+), 460 deletions(-)
->
-[...]
+>  drivers/clk/samsung/clk-exynos5420.c | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 9d7d7ee..1e586be 100644
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -1172,11 +1172,17 @@ static struct of_device_id ext_clk_match[] __initdata = {
+>         { },
+>  };
+>  
+> +/* Keep these clocks on until late_initcall */
+> +static const char *boot_clocks[] __initconst = {
+> +       "aclk66_peric",
+> +};
+> +
+>  /* register exynos5420 clocks */
+>  static void __init exynos5x_clk_init(struct device_node *np,
+>                 enum exynos5x_soc soc)
+>  {
+>         struct samsung_clk_provider *ctx;
+> +       int i;
+>  
+>         if (np) {
+>                 reg_base = of_iomap(np, 0);
+> @@ -1226,6 +1232,12 @@ static void __init exynos5x_clk_init(struct device_node *np,
+>         }
+>  
+>         exynos5420_clk_sleep_init();
+> +
+> +       for (i = 0; i < ARRAY_SIZE(boot_clocks); i++) {
+> +               struct clk *to_enable = __clk_lookup(boot_clocks[i]);
+
+How about replacing __clk_lookup with clk_get? You can keep the struct
+clk object hanging around for later...
+
+> +
+> +               clk_prepare_enable(to_enable);
+> +       }
+>  }
+>  
+>  static void __init exynos5420_clk_init(struct device_node *np)
+> @@ -1239,3 +1251,15 @@ static void __init exynos5800_clk_init(struct device_node *np)
+>         exynos5x_clk_init(np, EXYNOS5800);
+>  }
+>  CLK_OF_DECLARE(exynos5800_clk, "samsung,exynos5800-clock", exynos5800_clk_init);
+> +
+> +static int __init exynos5420_clk_late_init(void)
+> +{
+> +       int i;
+> +
+> +       for (i = 0; i < ARRAY_SIZE(boot_clocks); i++) {
+> +               struct clk *to_disable = __clk_lookup(boot_clocks[i]);
+> +
+> +               clk_disable_unprepare(to_disable);
+
+And then release it here with a clk_put.
+
+Regards,
+Mike
+
+> +       }
+> +}
+> +late_initcall(exynos5420_clk_late_init);
+> -- 
+> 1.9.1.423.g4596e3a
+> 
