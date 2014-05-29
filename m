@@ -1,45 +1,73 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 29 May 2014 10:08:07 -0700
-Subject: [PATCH v6 4/4] add 2nd stage page fault handling during live
- migration
-In-Reply-To: <20140529085134.GB61607@lvm>
-References: <1400178451-4984-1-git-send-email-m.smarduch@samsung.com>
- <1400178451-4984-5-git-send-email-m.smarduch@samsung.com>
- <20140527201945.GD16428@lvm> <53853C2F.8080003@samsung.com>
- <20140528080957.GH16428@lvm> <5386232A.3050602@samsung.com>
- <20140529085134.GB61607@lvm>
-Message-ID: <53876977.1040502@samsung.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 29 May 2014 18:16:54 +0100
+Subject: [PATCH v2] arm64: kernel: initialize broadcast hrtimer based clock
+ event device
+Message-ID: <1401383814-22600-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On platforms implementing CPU power management, the CPUidle subsystem
+can allow CPUs to enter idle states where local timers logic is lost on power
+down. To keep the software timers functional the kernel relies on an
+always-on broadcast timer to be present in the platform to relay the
+interrupt signalling the timer expiries.
 
->> So this needs to be cleared up given this is key to logging.
->> Cases this code handles during migration -
->> 1. huge page fault described above - write protect fault so you breakup
->>    the huge page.
->> 2. All other faults - first time access, pte write protect you again wind up in
->>    stage2_set_pte().
->>
->> Am I missing something here?
->>
-> 
-> no, I forgot about the fact that we can take the permission fault now.
-> Hmm, ok, so either we need to use the original approach of always
-> splitting up huge pages or we need to just follow the regular huge page
-> path here and just mark all 512 4K pages dirty in the log, or handle it
-> in stage2_set_pte().
-> 
-> I would say go with the most simple appraoch for now (which may be going
-> back to splitting all pmd_huge() into regular pte's), and we can take a
-> more careful look in the next patch iteration.
-> 
+For platforms implementing CPU core gating that do not implement an always-on
+HW timer or implement it in a broken way, this patch adds code to initialize
+the kernel hrtimer based clock event device upon boot (which can be chosen as
+tick broadcast device by the kernel).
+It relies on a dynamically chosen CPU to be always powered-up. This CPU then
+relays the timer interrupt to CPUs in deep-idle states through its HW local
+timer device.
 
-Looking at the overall memslot update architecture and various
-fail scenarios - user_mem_abort() appears to be the most
-optimal and reliable place. First Write Protect huge pages after
-memslots are committed and deal with rest in user_mem_abort().
+Having a CPU always-on has implications on power management platform
+capabilities and makes CPUidle suboptimal, since at least a CPU is kept
+always in a shallow idle state by the kernel to relay timer interrupts,
+but at least leaves the kernel with a functional system with some working
+power management capabilities.
 
-Still need some feedback on the pud_huge() before revising for
-next iteration?
+The hrtimer based clock event device is unconditionally registered, but
+has the lowest possible rating such that any broadcast-capable HW clock
+event device present will be chosen in preference as the tick broadcast
+device.
 
-- Mario
+Cc: Preeti U Murthy <preeti@linux.vnet.ibm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+changes in v2:
+
+- Reworded the commit log according to reviews
+
+It should be ready to go.
+
+Thanks,
+Lorenzo
+
+ arch/arm64/kernel/time.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+index 6815987..1a7125c 100644
+--- a/arch/arm64/kernel/time.c
++++ b/arch/arm64/kernel/time.c
+@@ -18,6 +18,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/clockchips.h>
+ #include <linux/export.h>
+ #include <linux/kernel.h>
+ #include <linux/interrupt.h>
+@@ -69,6 +70,8 @@ void __init time_init(void)
+ 	of_clk_init(NULL);
+ 	clocksource_of_init();
+ 
++	tick_setup_hrtimer_broadcast();
++
+ 	arch_timer_rate = arch_timer_get_rate();
+ 	if (!arch_timer_rate)
+ 		panic("Unable to initialise architected timer.\n");
+-- 
+1.8.4
