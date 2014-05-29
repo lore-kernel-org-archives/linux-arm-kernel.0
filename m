@@ -1,142 +1,39 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 29 May 2014 11:50:24 +0200
-Subject: [PATCH v2 10/11] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <1400860385-14555-11-git-send-email-vincent.guittot@linaro.org>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-11-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20140529095024.GF11074@laptop.programming.kicks-ass.net>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 29 May 2014 11:03:34 +0100
+Subject: [PATCH v6] serial: sirf: Fix compilation failure
+Message-ID: <1401357814-15772-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 05:53:04PM +0200, Vincent Guittot wrote:
-> If the CPU is used for handling lot of IRQs, trig a load balance to check if
-> it's worth moving its tasks on another CPU that has more capacity
-> 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> ---
->  kernel/sched/fair.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-> index e8a30f9..2501e49 100644
-> --- a/kernel/sched/fair.c
-> +++ b/kernel/sched/fair.c
-> @@ -5948,6 +5948,13 @@ static bool update_sd_pick_busiest(struct lb_env *env,
->  	if (sgs->sum_nr_running > sgs->group_capacity)
->  		return true;
->  
-> +	/*
-> +	 * The group capacity is reduced probably because of activity from other
-> +	 * sched class or interrupts which use part of the available capacity
-> +	 */
-> +	if ((sg->sgp->power_orig * 100) > (sgs->group_power * env->sd->imbalance_pct))
-> +		return true;
-> +
->  	if (sgs->group_imb)
->  		return true;
->  
+After 07d410e0) serial: sirf: fix spinlock deadlock issue it is no longer
+possiblet to compile this driver. The rename of one of the spinlocks is
+faulty. After looking at the original patch I believe this is the correct
+fix.
 
-But we should already do this because the load numbers are scaled with
-the power/capacity figures. If one CPU gets significant less time to run
-fair tasks, its effective load would spike and it'd get to be selected
-here anyway.
+Compile tested using ARM's multi_v7_defconfig
 
-Or am I missing something?
-
-> @@ -7282,6 +7289,12 @@ static inline int nohz_kick_needed(struct rq *rq)
->  
->  		if (nr_busy > 1)
->  			goto need_kick_unlock;
-> +
-> +		if ((rq->cfs.h_nr_running >= 1)
-> +		 && ((rq->cpu_power * sd->imbalance_pct) <
-> +					(rq->cpu_power_orig * 100)))
-> +			goto need_kick_unlock;
-> +
->  	}
->  
->  	sd = rcu_dereference(per_cpu(sd_asym, cpu));
-
-OK, so there you're kicking the idle balancer to try and get another CPU
-to pull some load? That makes sense I suppose.
-
-That function is pretty horrible though; how about something like this
-first?
-
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Jiri Slaby <jslaby@suse.cz>
+Cc: Barry Song <baohua@kernel.org>
+Cc: Qipan Li <Qipan.Li@csr.com>
+Cc: linux-serial at vger.kernel.org
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 ---
- kernel/sched/fair.c | 29 +++++++++++++----------------
- 1 file changed, 13 insertions(+), 16 deletions(-)
+ drivers/tty/serial/sirfsoc_uart.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index c9617b73bcc0..47fb96e6fa83 100644
---- a/kernel/sched/fair.c
-+++ b/kernel/sched/fair.c
-@@ -7215,15 +7215,16 @@ static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle)
-  *   - For SD_ASYM_PACKING, if the lower numbered cpu's in the scheduler
-  *     domain span are idle.
-  */
--static inline int nohz_kick_needed(struct rq *rq)
-+static inline bool nohz_kick_needed(struct rq *rq)
- {
- 	unsigned long now = jiffies;
- 	struct sched_domain *sd;
- 	struct sched_group_power *sgp;
- 	int nr_busy, cpu = rq->cpu;
-+	bool kick = false;
- 
- 	if (unlikely(rq->idle_balance))
--		return 0;
-+		return false;
- 
-        /*
- 	* We may be recently in ticked or tickless idle mode. At the first
-@@ -7237,38 +7238,34 @@ static inline int nohz_kick_needed(struct rq *rq)
- 	 * balancing.
- 	 */
- 	if (likely(!atomic_read(&nohz.nr_cpus)))
--		return 0;
-+		return false;
- 
- 	if (time_before(now, nohz.next_balance))
--		return 0;
-+		return false;
- 
- 	if (rq->nr_running >= 2)
--		goto need_kick;
-+		return true;
- 
- 	rcu_read_lock();
- 	sd = rcu_dereference(per_cpu(sd_busy, cpu));
--
- 	if (sd) {
- 		sgp = sd->groups->sgp;
- 		nr_busy = atomic_read(&sgp->nr_busy_cpus);
- 
--		if (nr_busy > 1)
--			goto need_kick_unlock;
-+		if (nr_busy > 1) {
-+			kick = true;
-+			goto unlock;
-+		}
- 	}
- 
- 	sd = rcu_dereference(per_cpu(sd_asym, cpu));
--
- 	if (sd && (cpumask_first_and(nohz.idle_cpus_mask,
- 				  sched_domain_span(sd)) < cpu))
--		goto need_kick_unlock;
--
--	rcu_read_unlock();
--	return 0;
-+		kick = true;
- 
--need_kick_unlock:
-+unlock:
- 	rcu_read_unlock();
--need_kick:
--	return 1;
-+	return kick;
- }
- #else
- static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle) { }
+diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
+index 236f892..1f2be48 100644
+--- a/drivers/tty/serial/sirfsoc_uart.c
++++ b/drivers/tty/serial/sirfsoc_uart.c
+@@ -704,7 +704,7 @@ static void sirfsoc_uart_rx_dma_complete_tl(unsigned long param)
+ 	struct sirfsoc_int_en *uint_en = &sirfport->uart_reg->uart_int_en;
+ 	unsigned long flags;
+ 	struct dma_tx_state tx_state;
+-	spin_lock_irqsave(&port->rx_lock, flags);
++	spin_lock_irqsave(&port->lock, flags);
+ 	while (DMA_COMPLETE == dmaengine_tx_status(sirfport->rx_dma_chan,
+ 			sirfport->rx_dma_items[sirfport->rx_completed].cookie, &tx_state)) {
+ 		sirfsoc_uart_insert_rx_buf_to_tty(sirfport,
+-- 
+1.9.0
