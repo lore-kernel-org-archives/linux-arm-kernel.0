@@ -1,219 +1,214 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 29 May 2014 12:08:03 +0530
-Subject: [PATCH v2 01/18] phy: phy-omap-pipe3: Add support for PCIe PHY
+Date: Thu, 29 May 2014 12:08:04 +0530
+Subject: [PATCH v2 02/18] phy: pipe3: insert delay to enumerate in GEN2 mode
 In-Reply-To: <1401345500-20188-1-git-send-email-kishon@ti.com>
 References: <1401345500-20188-1-git-send-email-kishon@ti.com>
-Message-ID: <1401345500-20188-2-git-send-email-kishon@ti.com>
+Message-ID: <1401345500-20188-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCIe PHY uses an external pll instead of the internal pll used by SATA
-and USB3. So added support in pipe3 PHY to use external pll.
+8-bit delay value (0xF1) is required for GEN2 devices to be enumerated
+consistently. Added an API to be called from PHY drivers to set this delay
+value and called it from PIPE3 driver to set the delay value.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 Reviewed-by: Roger Quadros <rogerq@ti.com>
 ---
- Documentation/devicetree/bindings/phy/ti-phy.txt |    8 +-
- drivers/phy/phy-ti-pipe3.c                       |   99 +++++++++++++++++-----
- 2 files changed, 84 insertions(+), 23 deletions(-)
+ Documentation/devicetree/bindings/phy/ti-phy.txt |   12 ++---
+ drivers/phy/phy-omap-control.c                   |   52 +++++++++++++++++++++-
+ drivers/phy/phy-ti-pipe3.c                       |    4 +-
+ include/linux/phy/omap_control_phy.h             |   10 +++++
+ 4 files changed, 71 insertions(+), 7 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
-index 9ce458f..cf3de7e 100644
+index cf3de7e..36bb6c9 100644
 --- a/Documentation/devicetree/bindings/phy/ti-phy.txt
 +++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
-@@ -56,8 +56,8 @@ usb2phy at 4a0ad080 {
- TI PIPE3 PHY
+@@ -9,15 +9,17 @@ Required properties:
+                         e.g. USB2_PHY on OMAP5.
+  "ti,control-phy-pipe3" - if it has DPLL and individual Rx & Tx power control
+                         e.g. USB3 PHY and SATA PHY on OMAP5.
++ "ti,control-phy-pcie" - for pcie to support external clock for pcie and to
++			set PCS delay value.
++			e.g. PCIE PHY in DRA7x
+  "ti,control-phy-usb2-dra7" - if it has power down register like USB2 PHY on
+                         DRA7 platform.
+  "ti,control-phy-usb2-am437" - if it has power down register like USB2 PHY on
+                         AM437 platform.
+- - reg : Address and length of the register set for the device. It contains
+-   the address of "otghs_control" for control-phy-otghs or "power" register
+-   for other types.
+- - reg-names: should be "otghs_control" control-phy-otghs and "power" for
+-   other types.
++ - reg : register ranges as listed in the reg-names property
++ - reg-names: "otghs_control" for control-phy-otghs
++	      "power", "pcie_pcs" and "control_sma" for control-phy-pcie
++	      "power" for all other types
  
- Required properties:
-- - compatible: Should be "ti,phy-usb3" or "ti,phy-pipe3-sata".
--   "ti,omap-usb3" is deprecated.
-+ - compatible: Should be "ti,phy-usb3", "ti,phy-pipe3-sata" or
-+   "ti,phy-pipe3-pcie. "ti,omap-usb3" is deprecated.
-  - reg : Address and length of the register set for the device.
-  - reg-names: The names of the register addresses corresponding to the registers
-    filled in "reg".
-@@ -69,6 +69,10 @@ Required properties:
-    * "wkupclk" - wakeup clock.
-    * "sysclk" - system clock.
-    * "refclk" - reference clock.
-+   * "dpll_ref" - external dpll ref clk
-+   * "dpll_ref_m2" - external dpll ref clk
-+   * "phy-div" - divider for apll
-+   * "div-clk" - apll clock
+ omap_control_usb: omap-control-usb at 4a002300 {
+         compatible = "ti,control-phy-otghs";
+diff --git a/drivers/phy/phy-omap-control.c b/drivers/phy/phy-omap-control.c
+index 311b4f9..9487bf1 100644
+--- a/drivers/phy/phy-omap-control.c
++++ b/drivers/phy/phy-omap-control.c
+@@ -27,6 +27,41 @@
+ #include <linux/phy/omap_control_phy.h>
  
- Optional properties:
-  - ctrl-module : phandle of the control module used by PHY driver to power on
-diff --git a/drivers/phy/phy-ti-pipe3.c b/drivers/phy/phy-ti-pipe3.c
-index 5913676..d43019d 100644
---- a/drivers/phy/phy-ti-pipe3.c
-+++ b/drivers/phy/phy-ti-pipe3.c
-@@ -80,6 +80,7 @@ struct ti_pipe3 {
- 	struct clk		*wkupclk;
- 	struct clk		*sys_clk;
- 	struct clk		*refclk;
-+	struct clk		*div_clk;
- 	struct pipe3_dpll_map	*dpll_map;
- };
- 
-@@ -215,6 +216,9 @@ static int ti_pipe3_init(struct phy *x)
- 	u32 val;
- 	int ret = 0;
- 
-+	if (of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-pcie"))
-+		return 0;
+ /**
++ * omap_control_pcie_pcs - set the PCS delay count
++ * @dev: the control module device
++ * @id: index of the pcie PHY (should be 1 or 2)
++ * @delay: 8 bit delay value
++ */
++void omap_control_pcie_pcs(struct device *dev, u8 id, u8 delay)
++{
++	u32 val;
++	struct omap_control_phy	*control_phy;
 +
- 	/* Bring it out of IDLE if it is IDLE */
- 	val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
- 	if (val & PLL_IDLE) {
-@@ -238,8 +242,11 @@ static int ti_pipe3_exit(struct phy *x)
- 	u32 val;
- 	unsigned long timeout;
- 
--	/* SATA DPLL can't be powered down due to Errata i783 */
--	if (of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-sata"))
-+	/* SATA DPLL can't be powered down due to Errata i783 and PCIe
-+	 * does not have internal DPLL
-+	 */
-+	if (of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-sata") ||
-+	    of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-pcie"))
- 		return 0;
- 
- 	/* Put DPLL in IDLE mode */
-@@ -286,32 +293,41 @@ static int ti_pipe3_probe(struct platform_device *pdev)
- 	struct device_node *control_node;
- 	struct platform_device *control_pdev;
- 	const struct of_device_id *match;
--
--	match = of_match_device(of_match_ptr(ti_pipe3_id_table), &pdev->dev);
--	if (!match)
--		return -EINVAL;
-+	struct clk *clk;
- 
- 	phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
- 	if (!phy) {
- 		dev_err(&pdev->dev, "unable to alloc mem for TI PIPE3 PHY\n");
- 		return -ENOMEM;
- 	}
-+	phy->dev		= &pdev->dev;
- 
--	phy->dpll_map = (struct pipe3_dpll_map *)match->data;
--	if (!phy->dpll_map) {
--		dev_err(&pdev->dev, "no DPLL data\n");
--		return -EINVAL;
--	}
-+	if (!of_device_is_compatible(node, "ti,phy-pipe3-pcie")) {
-+		match = of_match_device(of_match_ptr(ti_pipe3_id_table),
-+					&pdev->dev);
-+		if (!match)
-+			return -EINVAL;
- 
--	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "pll_ctrl");
--	phy->pll_ctrl_base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(phy->pll_ctrl_base))
--		return PTR_ERR(phy->pll_ctrl_base);
-+		phy->dpll_map = (struct pipe3_dpll_map *)match->data;
-+		if (!phy->dpll_map) {
-+			dev_err(&pdev->dev, "no DPLL data\n");
-+			return -EINVAL;
-+		}
- 
--	phy->dev		= &pdev->dev;
-+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-+						   "pll_ctrl");
-+		phy->pll_ctrl_base = devm_ioremap_resource(&pdev->dev, res);
-+		if (IS_ERR(phy->pll_ctrl_base))
-+			return PTR_ERR(phy->pll_ctrl_base);
- 
--	if (!of_device_is_compatible(node, "ti,phy-pipe3-sata")) {
-+		phy->sys_clk = devm_clk_get(phy->dev, "sysclk");
-+		if (IS_ERR(phy->sys_clk)) {
-+			dev_err(&pdev->dev, "unable to get sysclk\n");
-+			return -EINVAL;
-+		}
++	if (IS_ERR(dev) || !dev) {
++		pr_err("%s: invalid device\n", __func__);
++		return;
 +	}
- 
-+	if (!of_device_is_compatible(node, "ti,phy-pipe3-sata")) {
- 		phy->wkupclk = devm_clk_get(phy->dev, "wkupclk");
- 		if (IS_ERR(phy->wkupclk)) {
- 			dev_err(&pdev->dev, "unable to get wkupclk\n");
-@@ -328,10 +344,35 @@ static int ti_pipe3_probe(struct platform_device *pdev)
- 		phy->refclk = ERR_PTR(-ENODEV);
- 	}
- 
--	phy->sys_clk = devm_clk_get(phy->dev, "sysclk");
--	if (IS_ERR(phy->sys_clk)) {
--		dev_err(&pdev->dev, "unable to get sysclk\n");
--		return -EINVAL;
-+	if (of_device_is_compatible(node, "ti,phy-pipe3-pcie")) {
-+		clk = devm_clk_get(phy->dev, "dpll_ref");
-+		if (IS_ERR(clk)) {
-+			dev_err(&pdev->dev, "unable to get dpll ref clk\n");
-+			return PTR_ERR(clk);
-+		}
-+		clk_set_rate(clk, 1500000000);
 +
-+		clk = devm_clk_get(phy->dev, "dpll_ref_m2");
-+		if (IS_ERR(clk)) {
-+			dev_err(&pdev->dev, "unable to get dpll ref m2 clk\n");
-+			return PTR_ERR(clk);
-+		}
-+		clk_set_rate(clk, 100000000);
++	control_phy = dev_get_drvdata(dev);
++	if (!control_phy) {
++		dev_err(dev, "%s: invalid control phy device\n", __func__);
++		return;
++	}
 +
-+		clk = devm_clk_get(phy->dev, "phy-div");
-+		if (IS_ERR(clk)) {
-+			dev_err(&pdev->dev, "unable to get phy-div clk\n");
-+			return PTR_ERR(clk);
-+		}
-+		clk_set_rate(clk, 100000000);
++	if (control_phy->type != OMAP_CTRL_TYPE_PCIE) {
++		dev_err(dev, "%s: unsupported operation\n", __func__);
++		return;
++	}
 +
-+		phy->div_clk = devm_clk_get(phy->dev, "div-clk");
-+		if (IS_ERR(phy->div_clk)) {
-+			dev_err(&pdev->dev, "unable to get div-clk\n");
-+			return PTR_ERR(phy->div_clk);
-+		}
-+	} else {
-+		phy->div_clk = ERR_PTR(-ENODEV);
- 	}
++	val = readl(control_phy->pcie_pcs);
++	val &= ~(OMAP_CTRL_PCIE_PCS_MASK <<
++		(id * OMAP_CTRL_PCIE_PCS_DELAY_COUNT_SHIFT));
++	val |= delay << (id * OMAP_CTRL_PCIE_PCS_DELAY_COUNT_SHIFT);
++	writel(val, control_phy->pcie_pcs);
++}
++EXPORT_SYMBOL_GPL(omap_control_pcie_pcs);
++
++/**
+  * omap_control_phy_power - power on/off the phy using control module reg
+  * @dev: the control module device
+  * @on: 0 or 1, based on powering on or off the PHY
+@@ -61,6 +96,7 @@ void omap_control_phy_power(struct device *dev, int on)
+ 			val |= OMAP_CTRL_DEV_PHY_PD;
+ 		break;
  
- 	control_node = of_parse_phandle(node, "ctrl-module", 0);
-@@ -387,6 +428,8 @@ static int ti_pipe3_runtime_suspend(struct device *dev)
- 		clk_disable_unprepare(phy->wkupclk);
- 	if (!IS_ERR(phy->refclk))
- 		clk_disable_unprepare(phy->refclk);
-+	if (!IS_ERR(phy->div_clk))
-+		clk_disable_unprepare(phy->div_clk);
++	case OMAP_CTRL_TYPE_PCIE:
+ 	case OMAP_CTRL_TYPE_PIPE3:
+ 		rate = clk_get_rate(control_phy->sys_clk);
+ 		rate = rate/1000000;
+@@ -211,6 +247,7 @@ EXPORT_SYMBOL_GPL(omap_control_usb_set_mode);
+ static const enum omap_control_phy_type otghs_data = OMAP_CTRL_TYPE_OTGHS;
+ static const enum omap_control_phy_type usb2_data = OMAP_CTRL_TYPE_USB2;
+ static const enum omap_control_phy_type pipe3_data = OMAP_CTRL_TYPE_PIPE3;
++static const enum omap_control_phy_type pcie_data = OMAP_CTRL_TYPE_PCIE;
+ static const enum omap_control_phy_type dra7usb2_data = OMAP_CTRL_TYPE_DRA7USB2;
+ static const enum omap_control_phy_type am437usb2_data = OMAP_CTRL_TYPE_AM437USB2;
  
- 	return 0;
- }
-@@ -412,8 +455,19 @@ static int ti_pipe3_runtime_resume(struct device *dev)
+@@ -228,6 +265,10 @@ static const struct of_device_id omap_control_phy_id_table[] = {
+ 		.data = &pipe3_data,
+ 	},
+ 	{
++		.compatible = "ti,control-phy-pcie",
++		.data = &pcie_data,
++	},
++	{
+ 		.compatible = "ti,control-phy-usb2-dra7",
+ 		.data = &dra7usb2_data,
+ 	},
+@@ -279,7 +320,8 @@ static int omap_control_phy_probe(struct platform_device *pdev)
  		}
  	}
  
-+	if (!IS_ERR(phy->div_clk)) {
-+		ret = clk_prepare_enable(phy->div_clk);
-+		if (ret) {
-+			dev_err(phy->dev, "Failed to enable div_clk %d\n", ret);
-+			goto err3;
-+		}
-+	}
- 	return 0;
+-	if (control_phy->type == OMAP_CTRL_TYPE_PIPE3) {
++	if (control_phy->type == OMAP_CTRL_TYPE_PIPE3 ||
++	    control_phy->type == OMAP_CTRL_TYPE_PCIE) {
+ 		control_phy->sys_clk = devm_clk_get(control_phy->dev,
+ 			"sys_clkin");
+ 		if (IS_ERR(control_phy->sys_clk)) {
+@@ -288,6 +330,14 @@ static int omap_control_phy_probe(struct platform_device *pdev)
+ 		}
+ 	}
  
-+err3:
-+	if (!IS_ERR(phy->wkupclk))
-+		clk_disable_unprepare(phy->wkupclk);
++	if (control_phy->type == OMAP_CTRL_TYPE_PCIE) {
++		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
++						   "pcie_pcs");
++		control_phy->pcie_pcs = devm_ioremap_resource(&pdev->dev, res);
++		if (IS_ERR(control_phy->pcie_pcs))
++			return PTR_ERR(control_phy->pcie_pcs);
++	}
 +
- err2:
- 	if (!IS_ERR(phy->refclk))
- 		clk_disable_unprepare(phy->refclk);
-@@ -446,6 +500,9 @@ static const struct of_device_id ti_pipe3_id_table[] = {
- 		.compatible = "ti,phy-pipe3-sata",
- 		.data = dpll_map_sata,
- 	},
-+	{
-+		.compatible = "ti,phy-pipe3-pcie",
-+	},
- 	{}
+ 	dev_set_drvdata(control_phy->dev, control_phy);
+ 
+ 	return 0;
+diff --git a/drivers/phy/phy-ti-pipe3.c b/drivers/phy/phy-ti-pipe3.c
+index d43019d..11a1594 100644
+--- a/drivers/phy/phy-ti-pipe3.c
++++ b/drivers/phy/phy-ti-pipe3.c
+@@ -216,8 +216,10 @@ static int ti_pipe3_init(struct phy *x)
+ 	u32 val;
+ 	int ret = 0;
+ 
+-	if (of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-pcie"))
++	if (of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-pcie")) {
++		omap_control_pcie_pcs(phy->control_dev, 0x1, 0xF1);
+ 		return 0;
++	}
+ 
+ 	/* Bring it out of IDLE if it is IDLE */
+ 	val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
+diff --git a/include/linux/phy/omap_control_phy.h b/include/linux/phy/omap_control_phy.h
+index 5450403..e9e6cfb 100644
+--- a/include/linux/phy/omap_control_phy.h
++++ b/include/linux/phy/omap_control_phy.h
+@@ -23,6 +23,7 @@ enum omap_control_phy_type {
+ 	OMAP_CTRL_TYPE_OTGHS = 1,	/* Mailbox OTGHS_CONTROL */
+ 	OMAP_CTRL_TYPE_USB2,	/* USB2_PHY, power down in CONTROL_DEV_CONF */
+ 	OMAP_CTRL_TYPE_PIPE3,	/* PIPE3 PHY, DPLL & seperate Rx/Tx power */
++	OMAP_CTRL_TYPE_PCIE,	/* RX TX control of ACSPCIE */
+ 	OMAP_CTRL_TYPE_DRA7USB2, /* USB2 PHY, power and power_aux e.g. DRA7 */
+ 	OMAP_CTRL_TYPE_AM437USB2, /* USB2 PHY, power e.g. AM437x */
  };
- MODULE_DEVICE_TABLE(of, ti_pipe3_id_table);
+@@ -33,6 +34,7 @@ struct omap_control_phy {
+ 	u32 __iomem *otghs_control;
+ 	u32 __iomem *power;
+ 	u32 __iomem *power_aux;
++	u32 __iomem *pcie_pcs;
+ 
+ 	struct clk *sys_clk;
+ 
+@@ -63,6 +65,9 @@ enum omap_control_usb_mode {
+ #define	OMAP_CTRL_PIPE3_PHY_TX_RX_POWERON	0x3
+ #define	OMAP_CTRL_PIPE3_PHY_TX_RX_POWEROFF	0x0
+ 
++#define	OMAP_CTRL_PCIE_PCS_MASK			0xff
++#define	OMAP_CTRL_PCIE_PCS_DELAY_COUNT_SHIFT	0x8
++
+ #define OMAP_CTRL_USB2_PHY_PD		BIT(28)
+ 
+ #define AM437X_CTRL_USB2_PHY_PD		BIT(0)
+@@ -74,6 +79,7 @@ enum omap_control_usb_mode {
+ void omap_control_phy_power(struct device *dev, int on);
+ void omap_control_usb_set_mode(struct device *dev,
+ 			       enum omap_control_usb_mode mode);
++void omap_control_pcie_pcs(struct device *dev, u8 id, u8 delay);
+ #else
+ 
+ static inline void omap_control_phy_power(struct device *dev, int on)
+@@ -84,6 +90,10 @@ static inline void omap_control_usb_set_mode(struct device *dev,
+ 	enum omap_control_usb_mode mode)
+ {
+ }
++
++static inline void omap_control_pcie_pcs(struct device *dev, u8 id, u8 delay)
++{
++}
+ #endif
+ 
+ #endif	/* __OMAP_CONTROL_PHY_H__ */
 -- 
 1.7.9.5
