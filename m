@@ -1,43 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 29 May 2014 16:01:27 +0200
-Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
-In-Reply-To: <5385ECE0.7040703@ti.com>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
- <5840140.8yGnd4Ycx3@wuerfel>
- <CACRpkdZjEVYgq7tKEfmZC0Fu4n=JuUues=pAAtquLahkex=pkA@mail.gmail.com>
- <4960549.viM91iY2g2@wuerfel>
- <CACRpkda5x-fJWTN40ze17woMWuWoVbuhbNu5nkm1sFcdJchRfA@mail.gmail.com>
- <5385ECE0.7040703@ti.com>
-Message-ID: <CACRpkdaD6ZLFu7-tOeDRvKCAC6X6_W84Vsqs1o-xUzUZOjyvFQ@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 29 May 2014 16:02:04 +0200
+Subject: [PATCH v2 11/11] sched: replace capacity by activity
+In-Reply-To: <1400860385-14555-12-git-send-email-vincent.guittot@linaro.org>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-12-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20140529140204.GH11074@laptop.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 4:04 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On Wednesday 28 May 2014 09:32 AM, Linus Walleij wrote:
+On Fri, May 23, 2014 at 05:53:05PM +0200, Vincent Guittot wrote:
+> @@ -6052,8 +6006,8 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
+>  		 * with a large weight task outweighs the tasks on the system).
+>  		 */
+>  		if (prefer_sibling && sds->local &&
+> -		    sds->local_stat.group_has_capacity)
+> -			sgs->group_capacity = min(sgs->group_capacity, 1U);
+> +		    sds->local_stat.group_capacity > 0)
+> +			sgs->group_capacity = min(sgs->group_capacity, 1L);
+>  
+>  		if (update_sd_pick_busiest(env, sds, sg, sgs)) {
+>  			sds->busiest = sg;
+> @@ -6228,7 +6182,7 @@ static inline void calculate_imbalance(struct lb_env *env, struct sd_lb_stats *s
+>  		 * have to drop below capacity to reach cpu-load equilibrium.
+>  		 */
+>  		load_above_capacity =
+> -			(busiest->sum_nr_running - busiest->group_capacity);
+> +			(busiest->sum_nr_running - busiest->group_weight);
+>  
+>  		load_above_capacity *= (SCHED_LOAD_SCALE * SCHED_POWER_SCALE);
+>  		load_above_capacity /= busiest->group_power;
 
->>> I suspect what you want is
->>>
->>>         dma-ranges = <0x80000000 0 0x80000000>;
->>>
->>> to translate dma_addr_t 0x80000000-0xffffffff to phys_addr_t 0x0-0x7fffffff
->>> rather than phys_addr_t 0x800000000-0x87fffffff.
->>
-> Interesting. Where does the ROM address space resides on integrator then considering
-> address 0 is used for DMA.
+I think you just broke PREFER_SIBLING here..
 
-The ROM is at physical address 0x20000000, don't ask me
-why :-)
-
-The RAM is typically at 0x00000000-0x0fffffff, on up to four parallell
-tiles, i.e. up to four completely independent CPUs are booted off the
-same ROM and using a set of shared peripherals.
-
->> Thanks, I'll fix up my patch.
->>
-> Feel free to add my ack after the fixup if you need one.
-
-Thanks!
-
-Yours,
-Linus Walleij
+So we want PREFER_SIBLING to work on nr_running, not utilization because
+we want to spread single tasks around, regardless of their utilization.
