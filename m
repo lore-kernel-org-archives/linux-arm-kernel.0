@@ -1,68 +1,113 @@
-From: javi.merino@arm.com (Javi Merino)
-Date: Thu, 29 May 2014 13:42:49 +0100
-Subject: [PATCH v1 6/6] ACPI: thermal: processor: Use the generic cpufreq
- infrastructure
-In-Reply-To: <1401351334-11210-7-git-send-email-amit.daniel@samsung.com>
-References: <1401351334-11210-1-git-send-email-amit.daniel@samsung.com>
- <1401351334-11210-7-git-send-email-amit.daniel@samsung.com>
-Message-ID: <20140529124248.GC2593@e104805>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 29 May 2014 18:46:31 +0530
+Subject: [PATCH v2 03/18] PCI: designware: Configuration space should
+ be specified in 'reg'
+In-Reply-To: <2CC2A0A4A178534D93D5159BF3BCB6619B94AD3904@EAPEX1MAIL1.st.com>
+References: <1401345500-20188-1-git-send-email-kishon@ti.com>
+ <1401345500-20188-4-git-send-email-kishon@ti.com>
+ <2CC2A0A4A178534D93D5159BF3BCB6619B94AD3904@EAPEX1MAIL1.st.com>
+Message-ID: <5387332F.7050404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Amit,
+Hi,
 
-On Thu, May 29, 2014 at 09:15:34AM +0100, Amit Daniel Kachhap wrote:
-> This patch upgrades the ACPI cpufreq cooling portions to use the generic
-> cpufreq cooling infrastructure. There should not be any functionality
-> related changes as the same behaviour is provided by the generic
-> cpufreq APIs with the notifier mechanism.
+On Thursday 29 May 2014 12:41 PM, Mohit KUMAR DCG wrote:
+> Hello Kishon,
 > 
-> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> ---
->  drivers/acpi/processor_driver.c  |    6 +-
->  drivers/acpi/processor_thermal.c |  235 ++++++++++++++++++--------------------
->  include/acpi/processor.h         |    3 +-
->  3 files changed, 115 insertions(+), 129 deletions(-)
+>> -----Original Message-----
+>> From: Kishon Vijay Abraham I [mailto:kishon at ti.com]
+>> Sent: Thursday, May 29, 2014 12:08 PM
+>> To: devicetree at vger.kernel.org; linux-doc at vger.kernel.org; linux-arm-
+>> kernel at lists.infradead.org; linux-omap at vger.kernel.org; linux-
+>> pci at vger.kernel.org; linux-kernel at vger.kernel.org
+>> Cc: arnd at arndb.de; tony at atomide.com; jg1.han at samsung.com;
+>> kishon at ti.com; Jason Gunthorpe; Bjorn Helgaas; Mohit KUMAR DCG; Marek
+>> Vasut
+>> Subject: [PATCH v2 03/18] PCI: designware: Configuration space should be
+>> specified in 'reg'
+>>
+>> The configuration address space has so far been specified in *ranges*,
+>> however it should be specified in *reg* making it a platform MEM resource.
+>> Hence used 'platform_get_resource_*' API to get configuration address
+>> space in the designware driver.
+>>
+>> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+>> Cc: Bjorn Helgaas <bhelgaas@google.com>
+>> Cc: Mohit Kumar <mohit.kumar@st.com>
+>> Cc: Jingoo Han <jg1.han@samsung.com>
+>> Cc: Marek Vasut <marex@denx.de>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>  .../devicetree/bindings/pci/designware-pcie.txt    |    1 +
+>>  drivers/pci/host/pcie-designware.c                 |   17 +++++++++++++++--
+>>  2 files changed, 16 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt
+>> b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+>> index d6fae13..8314360 100644
+>> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
+>> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+>> @@ -6,6 +6,7 @@ Required properties:
+>>  	as "samsung,exynos5440-pcie" or "fsl,imx6q-pcie".
+>>  - reg: base addresses and lengths of the pcie controller,
+>>  	the phy controller, additional register for the phy controller.
+>> +	The configuration address space should also be specified here.
+>>  - interrupts: interrupt values for level interrupt,
+>>  	pulse interrupt, special interrupt.
+>>  - clocks: from common clock binding: handle to pci clock.
+>> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-
+>> designware.c
+>> index c4e3732..603b386 100644
+>> --- a/drivers/pci/host/pcie-designware.c
+>> +++ b/drivers/pci/host/pcie-designware.c
+>> @@ -20,6 +20,7 @@
+>>  #include <linux/of_pci.h>
+>>  #include <linux/pci.h>
+>>  #include <linux/pci_regs.h>
+>> +#include <linux/platform_device.h>
+>>  #include <linux/types.h>
+>>
+>>  #include "pcie-designware.h"
+>> @@ -392,11 +393,23 @@ static const struct irq_domain_ops
+>> msi_domain_ops = {  int __init dw_pcie_host_init(struct pcie_port *pp)  {
+>>  	struct device_node *np = pp->dev->of_node;
+>> +	struct platform_device *pdev = to_platform_device(pp->dev);
+>>  	struct of_pci_range range;
+>>  	struct of_pci_range_parser parser;
+>> +	struct resource *cfg_res;
+>>  	u32 val;
+>>  	int i;
+>>
+>> +	cfg_res = platform_get_resource_byname(pdev,
+>> IORESOURCE_MEM, "config");
+>> +	if (cfg_res) {
+>> +		pp->config.cfg0_size = resource_size(cfg_res)/2;
+>> +		pp->config.cfg1_size = resource_size(cfg_res)/2;
+>> +		pp->cfg0_base = cfg_res->start;
+>> +		pp->cfg1_base = cfg_res->start + pp->config.cfg0_size;
+>> +	} else {
+>> +		dev_err(pp->dev, "missing *config* reg space\n");
+>> +	}
+>> +
+>>  	if (of_pci_range_parser_init(&parser, np)) {
+>>  		dev_err(pp->dev, "missing ranges property\n");
+>>  		return -EINVAL;
+>> @@ -429,6 +442,8 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>>  			of_pci_range_to_resource(&range, np, &pp->cfg);
+>>  			pp->config.cfg0_size = resource_size(&pp->cfg)/2;
+>>  			pp->config.cfg1_size = resource_size(&pp->cfg)/2;
+>> +			pp->cfg0_base = pp->cfg.start;
+>> +			pp->cfg1_base = pp->cfg.start + pp-
+>>> config.cfg0_size;
 > 
-> diff --git a/drivers/acpi/processor_driver.c b/drivers/acpi/processor_driver.c
-> index 7f70f31..10aba4a 100644
-> --- a/drivers/acpi/processor_driver.c
-> +++ b/drivers/acpi/processor_driver.c
-> @@ -36,6 +36,7 @@
->  #include <linux/cpuidle.h>
->  #include <linux/slab.h>
->  #include <linux/acpi.h>
-> +#include <linux/cpu_cooling.h>
-> 
->  #include <acpi/processor.h>
-> 
-> @@ -178,8 +179,7 @@ static int __acpi_processor_start(struct acpi_device *device)
->         if (!cpuidle_get_driver() || cpuidle_get_driver() == &acpi_idle_driver)
->                 acpi_processor_power_init(pr);
-> 
-> -       pr->cdev = thermal_cooling_device_register("Processor", device,
-> -                                                  &processor_cooling_ops);
-> +       pr->cdev = acpi_processor_cooling_register(device);
+> - As you are getting cfg address space as MEM resource, so remove above code that
+>  gets the configuration space from dt range. Also correct dt for pcie cfg space for the platforms
+>  based on this driver.
 
-With this you have removed the only cooling device whose type was
-"Processor".  There's special code for dealing with this cooling
-device in drivers/thermal/thermal_core.c:passive_store():
+Ok. Will send that as a separate patch converting all platforms to use MEM
+resource.
 
-		list_for_each_entry(cdev, &thermal_cdev_list, node) {
-			if (!strncmp("Processor", cdev->type,
-				     sizeof("Processor")))
-				thermal_zone_bind_cooling_device(tz,
-						THERMAL_TRIPS_NONE, cdev,
-						THERMAL_NO_LIMIT,
-						THERMAL_NO_LIMIT);
-		}
-		mutex_unlock(&thermal_list_lock);
-		if (!tz->passive_delay)
-
-With your change, that code is now "dead" as it can't do anything.  No
-I don't know what should you do with it, either remove it or make it
-match the cpufreq cooling device.  But this patch should deal with
-that code as well.
-
-Cheers,
-Javi
+Thanks
+Kishon
