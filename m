@@ -1,125 +1,82 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 29 May 2014 12:32:22 -0400
-Subject: [PATCH v2 03/18] PCI: designware: Configuration space should
- be specified in 'reg'
-In-Reply-To: <1401345500-20188-4-git-send-email-kishon@ti.com>
-References: <1401345500-20188-1-git-send-email-kishon@ti.com>
- <1401345500-20188-4-git-send-email-kishon@ti.com>
-Message-ID: <53876116.90504@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 29 May 2014 09:35:52 -0700
+Subject: [PATCH v2 2/5] clk: bcm281xx: implement prerequisite clocks
+In-Reply-To: <53873577.8000502@linaro.org>
+References: <1400590362-11177-1-git-send-email-elder@linaro.org>
+ <1400590362-11177-3-git-send-email-elder@linaro.org>
+ <20140524005358.23136.8918@quantum> <53873577.8000502@linaro.org>
+Message-ID: <20140529163552.10062.50409@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/29/2014 2:38 AM, ABRAHAM, KISHON VIJAY wrote:
-> The configuration address space has so far been specified in *ranges*,
-> however it should be specified in *reg* making it a platform MEM resource.
-> Hence used 'platform_get_resource_*' API to get configuration address
-> space in the designware driver.
->
-> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Mohit Kumar <mohit.kumar@st.com>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: Marek Vasut <marex@denx.de>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->   .../devicetree/bindings/pci/designware-pcie.txt    |    1 +
->   drivers/pci/host/pcie-designware.c                 |   17 +++++++++++++++--
->   2 files changed, 16 insertions(+), 2 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> index d6fae13..8314360 100644
-> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> @@ -6,6 +6,7 @@ Required properties:
->   	as "samsung,exynos5440-pcie" or "fsl,imx6q-pcie".
->   - reg: base addresses and lengths of the pcie controller,
->   	the phy controller, additional register for the phy controller.
-> +	The configuration address space should also be specified here.
-Kishon,
+Quoting Alex Elder (2014-05-29 06:26:15)
+> On 05/23/2014 07:53 PM, Mike Turquette wrote:
+> > The above seems like a lot effort to go to. Why not skip all of this and
+> > just implement the prerequisite logic in the .enable & .disable
+> > callbacks? E.g. your kona clk .enable callback would look like:
+> 
+> I think the problem is that it means the clock consumers
+> would have to know that prerequisite relationship.  And
+> that is dependent on the clock tree.  The need for it in
+> this case was because the boot loader didn't initialize
+> all the clocks that were needed.  If we could count on
+> the boot loader setting things up initially we might not
+> need to do this.
+> 
+> > 
+> > diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
+> > index d603c4e..51f35b4 100644
+> > --- a/drivers/clk/bcm/clk-kona.c
+> > +++ b/drivers/clk/bcm/clk-kona.c
+> > @@ -987,6 +987,12 @@ static int kona_peri_clk_enable(struct clk_hw *hw)
+> >  {
+> >       struct kona_clk *bcm_clk = to_kona_clk(hw);
+> >       struct bcm_clk_gate *gate = &bcm_clk->u.peri->gate;
+> > +     int ret;
+> > +
+> > +     hw->prereq_bus_clk = clk_get(hw->ccu, hw->prereq);
+> > +     ret = clk_enable(prereq_bus_clk);
+> > +     if (ret)
+> > +             return ret;
+> >  
+> >       return clk_gate(bcm_clk->ccu, bcm_clk->init_data.name, gate, true);
+> >  }
+> > @@ -997,6 +1003,9 @@ static void kona_peri_clk_disable(struct clk_hw *hw)
+> >       struct bcm_clk_gate *gate = &bcm_clk->u.peri->gate;
+> >  
+> >       (void)clk_gate(bcm_clk->ccu, bcm_clk->init_data.name, gate, false);
+> > +
+> > +     clk_disable(hw->prereq_bus_clk);
+> > +     clk_put(hw->prereq_bus_clk);
+> >  }
+> >  
+> >  static int kona_peri_clk_is_enabled(struct clk_hw *hw)
+> > 
+> > 
+> > I guess it might take some trickery to get clk_get to work like that.
+> > Let me know if I've completely lost the plot.
+> 
+> I don't think so, but I think there's a lot of stuff
+> here to try to understand, and you're trying to extract
+> it from the code without the benefit of some background
+> of how and why it's done this way.
+> 
+> Hopefully all this verbiage is moving you closer to
+> understanding...  I appreciate your patience.
 
-I am working on the Keystone PCI driver for which v1 is already posted. 
-Want to clarify
-following.
-1. Original text for reg states "base addresses and lengths of the pcie 
-controller,
-         the phy controller, additional register for the phy controller" 
-and you added
-         "The configuration address space should also be specified here"
+Hi Alex,
 
-    and the code below added resource name "config"
+Can you comment on my diff above? I basically tossed up some pseudo-code
+to show how clk_enable calls can be nested inside of each other. I'd
+like to know if that approach makes sense for your prereq clocks case.
 
-Does PCI designware follow some convention? Does it mean after applying 
-this patch
-config name is mandatory or optional? Below code you are not returning 
-error. Can you
-or author of PCI designware clarify what is expected to be present as 
-mandatory and
-what is optional.
+Note that Linux device drivers that consume leaf clocks do NOT need to
+know about the prereq clocks. All of that prereq clock knowledge is
+stored in the .enable callback for the leaf clock (see above).
 
-Does config refers to RC's config space or EP's config space or both? 
-The code below divide
-the size by 2. So it appears to be RC's + EP's config space. Please clarify.
+Regards,
+Mike
 
->   - interrupts: interrupt values for level interrupt,
->   	pulse interrupt, special interrupt.
->   - clocks: from common clock binding: handle to pci clock.
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index c4e3732..603b386 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -20,6 +20,7 @@
->   #include <linux/of_pci.h>
->   #include <linux/pci.h>
->   #include <linux/pci_regs.h>
-> +#include <linux/platform_device.h>
->   #include <linux/types.h>
->   
->   #include "pcie-designware.h"
-> @@ -392,11 +393,23 @@ static const struct irq_domain_ops msi_domain_ops = {
->   int __init dw_pcie_host_init(struct pcie_port *pp)
->   {
->   	struct device_node *np = pp->dev->of_node;
-> +	struct platform_device *pdev = to_platform_device(pp->dev);
->   	struct of_pci_range range;
->   	struct of_pci_range_parser parser;
-> +	struct resource *cfg_res;
->   	u32 val;
->   	int i;
->   
-> +	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
-> +	if (cfg_res) {
-> +		pp->config.cfg0_size = resource_size(cfg_res)/2;
-> +		pp->config.cfg1_size = resource_size(cfg_res)/2;
-> +		pp->cfg0_base = cfg_res->start;
-> +		pp->cfg1_base = cfg_res->start + pp->config.cfg0_size;
-> +	} else {
-> +		dev_err(pp->dev, "missing *config* reg space\n");
-This should return error -EINVAL.
-
-> +	}
-> +
->   	if (of_pci_range_parser_init(&parser, np)) {
->   		dev_err(pp->dev, "missing ranges property\n");
->   		return -EINVAL;
-> @@ -429,6 +442,8 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
->   			of_pci_range_to_resource(&range, np, &pp->cfg);
->   			pp->config.cfg0_size = resource_size(&pp->cfg)/2;
->   			pp->config.cfg1_size = resource_size(&pp->cfg)/2;
-> +			pp->cfg0_base = pp->cfg.start;
-> +			pp->cfg1_base = pp->cfg.start + pp->config.cfg0_size;
->   		}
->   	}
->   
-> @@ -441,8 +456,6 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
->   		}
->   	}
->   
-> -	pp->cfg0_base = pp->cfg.start;
-> -	pp->cfg1_base = pp->cfg.start + pp->config.cfg0_size;
->   	pp->mem_base = pp->mem.start;
->   
->   	pp->va_cfg0_base = devm_ioremap(pp->dev, pp->cfg0_base,
-BTW, Please also review my Keystone series so that we could discuss this 
-topic in that context
-as well.
+> 
+>                                         -Alex
+> 
