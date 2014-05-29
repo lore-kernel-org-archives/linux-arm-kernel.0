@@ -1,37 +1,33 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 29 May 2014 21:42:23 +0200
-Subject: [PATCH] ARM: OMAP: SX1: remove check for CONFIG_SX1_OLD_FLASH
-In-Reply-To: <20140529191738.GA18567@atomide.com>
-References: <1400182902.11786.21.camel@x220>
- <20140516211231.GF12881@atomide.com>
- <20140529190227.GB18230@amd.pavel.ucw.cz>
- <20140529191738.GA18567@atomide.com>
-Message-ID: <20140529194223.GA20722@amd.pavel.ucw.cz>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 29 May 2014 12:43:00 -0700
+Subject: [PATCH] ARM: kconfig: allow PCI support to be selected with
+ ARCH_MULTIPLATFORM
+In-Reply-To: <1401229595-524-1-git-send-email-will.deacon@arm.com>
+References: <1401229595-524-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20140529194300.GH18481@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2014-05-29 12:17:39, Tony Lindgren wrote:
-> * Pavel Machek <pavel@ucw.cz> [140529 12:03]:
-> > On Fri 2014-05-16 14:12:31, Tony Lindgren wrote:
-> > > * Paul Bolle <pebolle@tiscali.nl> [140515 12:42]:
-> > > > A check for CONFIG_SX1_OLD_FLASH was added in v2.6.24. But the related
-> > > > Kconfig symbol was never part of the tree. So we can remove some dead
-> > > > code.
-> > > 
-> > > Thanks applying into omap-for-v3.16/board.
-> > 
-> > Actually... It seems there are two variant of SX1, and this is very
-> > useful piece of documentation how the _other_ variant looks.
-> > 
-> > And if someone is hacking linux on sx1, he can probably figure out
-> > #ifdef in .c file...
-> > 
-> > IOW adding the config option might be better solution.
+On Tue, May 27, 2014 at 11:26:35PM +0100, Will Deacon wrote:
+> When targetting ARCH_MULTIPLATFORM, we may include support for SoCs with
+> PCI-capable devices (e.g. mach-virt with virtio-pci).
 > 
-> Or just a comment saying the same?
+> This patch allows PCI support to be selected for these SoCs by selecting
+> CONFIG_MIGHT_HAVE_PCI when CONFIG_ARCH_MULTIPLATFORM=y and removes the
+> individual selections from multi-platform enabled SoCs.
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> 
+> Hi Arnd, Olof, Kevin,
+> 
+> Please can you take this patch via the arm-soc tree for 3.16? It doesn't
+> really fit with the generic PCI host driver that I'll send via Bjorn and
+> it seems OTT to send you a pull request containing just this patch.
+> 
 
-Yes, #if 0 with a comment would do the same trick.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Thanks, applied to next/cleanup.
+
+
+-Olof
