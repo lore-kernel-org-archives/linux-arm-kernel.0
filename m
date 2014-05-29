@@ -1,43 +1,99 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 29 May 2014 18:42:01 +0200
-Subject: [PATCH] drm/exynos: hdmi: remove the i2c drivers and use devtree
- - continued
-In-Reply-To: <1401381377-29973-1-git-send-email-lee.jones@linaro.org>
-References: <1401381377-29973-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <53876359.8070304@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 29 May 2014 17:48:55 +0100
+Subject: [PATCH] arm64: kernel: initialize broadcast hrtimer based clock
+ event device
+In-Reply-To: <20140529142912.GB20798@red-moon>
+References: <1401355381-11446-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <53871444.3080206@linux.vnet.ibm.com>
+ <20140529123929.GF24233@leverpostej>
+ <20140529142912.GB20798@red-moon>
+Message-ID: <20140529164855.GH24233@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
+On Thu, May 29, 2014 at 03:29:12PM +0100, Lorenzo Pieralisi wrote:
+> On Thu, May 29, 2014 at 01:39:29PM +0100, Mark Rutland wrote:
+> 
+> [...]
+> 
+> > > > The side effect of having a CPU always-on has implications on power management
+> > > > platform capabilities and makes CPUidle suboptimal, since at least a CPU is
+> > > > kept always in a shallow idle state by the kernel to relay timer interrupts,
+> > > > but at least leaves the kernel with a functional system with some working power
+> > > > management capabilities.
+> > > > 
+> > > > The hrtimer based clock event device has lowest possible rating so that,
+> > > > if a platform contains a functional HW clock event device with broadcast
+> > > > capabilities, that device is always chosen as a tick broadcast device instead
+> > > > of the software based one, now present by default.
+> > > 
+> > > I think this statement "instead of the software based one, now present
+> > > by default" is incorrect. The hrtimer based clock event device will come
+> > > into picture only when the arch calls tick_setup_hrtimer_broadcast()
+> > > explicitly. Otherwise either the arch should register a real clock
+> > > device which does broadcast or should disable deep idle states where the
+> > > local timers stop. So I would suggest skipping the last paragraph as it
+> > > is not conveying anything in specific. The fact that a clock device with
+> > > the highest rating will be chosen is already known and need not be
+> > > mentioned explicitly IMHO.
+> > 
+> > I think it is worth keeping the paragraph to allay anyone's fear that
+> > the hrtimer based broadcast device might be selected in preference to a
+> > real suitable clock. I would otherwise not be aware that the hrtimer
+> > based broadcast device had the lowest rating (and would have to go and
+> > look that up separately).
+> > 
+> > As the arch code has delegated timer registration to
+> > clocksoruce_of_init, it doesn't know whether any of the real devices
+> > that may have been registered are suitable as a broadcast source for
+> > oneshot events. So we can't conditionally register the hrtimer based
+> > broadcast device.
+> > 
+> > Perhaps we could replace "now present by default" with "which is
+> > unconditionally registered in case no suitable hardware device is
+> > present"?
+> 
+> How about this:
+> 
+> -- >8 --
+> Subject: [PATCH] arm64: kernel: initialize broadcast hrtimer based clock event
+>  device
+> 
+> On platforms implementing CPU power management, the CPUidle subsystem
+> can allow CPUs to enter idle states where local timers logic is lost on power
+> down. To keep the software timers functional the kernel relies on an
+> always-on broadcast timer to be present in the platform to relay the
+> interrupt signalling the timer expiries.
+> 
+> For platforms implementing CPU core gating that do not implement an always-on
+> HW timer or implement it in a broken way, this patch adds code to initialize
+> the kernel hrtimer based clock event device upon boot (which can be chosen as
+> tick broadcast device by the kernel).
+> It relies on a dynamically chosen CPU to be always powered-up. This CPU then
+> relays the timer interrupt to CPUs in deep-idle states through its HW local
+> timer device.
+> 
+> The side effect of having a CPU always-on has implications on power management
+> platform capabilities and makes CPUidle suboptimal, since at least a CPU is
+> kept always in a shallow idle state by the kernel to relay timer interrupts,
+> but at least leaves the kernel with a functional system with some working power
+> management capabilities.
 
-On 29.05.2014 18:36, Lee Jones wrote:
-> There appears to have been a merge error on commit:
-> 
->   2b76813: drm/exynos: hdmi: remove the i2c drivers and use
-> 
-> The original submission can be found at:
-> 
->   https://patchwork.kernel.org/patch/3559541/
-> 
-> It looks like the commit was only half applied.  This patch aims
-> to finish what was started by Daniel.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/gpu/drm/exynos/exynos_ddc.c     | 63 --------------------------------
->  drivers/gpu/drm/exynos/exynos_hdmi.h    | 23 ------------
->  drivers/gpu/drm/exynos/exynos_hdmiphy.c | 65 ---------------------------------
->  3 files changed, 151 deletions(-)
->  delete mode 100644 drivers/gpu/drm/exynos/exynos_ddc.c
->  delete mode 100644 drivers/gpu/drm/exynos/exynos_hdmi.h
->  delete mode 100644 drivers/gpu/drm/exynos/exynos_hdmiphy.c
-> 
+I think "The side effect of" is redundant, but otherwise this is fine.
 
-Obviously there is nothing to review, but still:
+> 
+> The hrtimer based clock event device has lowest possible rating so that,
+> if a platform contains a functional HW clock event device with broadcast
+> capabilities, that device is always chosen as a tick broadcast device instead
+> of the hrtimer based one, which is unconditionally registered in case no
+> suitable hardware clock event device is present.
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+The last paragaph jumps back and forward a bit. How about:
 
-Thanks for the patch.
+The hrtimer based clock event device is unconditionally registered, but
+has the lowest possible rating such that any broadcast-capable HW clock
+event device present will be chosen in preference as the tick broadcast
+device.
 
-Best regards,
-Tomasz
+Cheers,
+Mark.
