@@ -1,48 +1,104 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 May 2014 21:24:07 +0200
-Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
-In-Reply-To: <53873F4A.9030303@ti.com>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
- <CACRpkdaD6ZLFu7-tOeDRvKCAC6X6_W84Vsqs1o-xUzUZOjyvFQ@mail.gmail.com>
- <53873F4A.9030303@ti.com>
-Message-ID: <4755790.VgRQTHz3K1@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 29 May 2014 21:31:35 +0200
+Subject: [PATCH 17/22] mfd: sun6i-prcm: Add support for Allwinner A23 PRCM
+In-Reply-To: <CAGb2v65v7rqBwFbn1JtQv44nQxepAq-ciwsBdHaELbzWXQNU9g@mail.gmail.com>
+References: <1400831485-28576-1-git-send-email-wens@csie.org>
+ <1400831485-28576-18-git-send-email-wens@csie.org>
+ <20140525191434.GX10768@lukather>
+ <CAGb2v66cV_nRpHhrtDUYzncO5wimx+vRBW6BFcU0Kz=bKkNs+g@mail.gmail.com>
+ <20140527083021.GE4730@lukather>
+ <CAGb2v65v7rqBwFbn1JtQv44nQxepAq-ciwsBdHaELbzWXQNU9g@mail.gmail.com>
+Message-ID: <20140529193135.GY4730@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 May 2014 10:08:10 Santosh Shilimkar wrote:
-> On Thursday 29 May 2014 10:01 AM, Linus Walleij wrote:
-> > On Wed, May 28, 2014 at 4:04 PM, Santosh Shilimkar
-> > <santosh.shilimkar@ti.com> wrote:
-> >> On Wednesday 28 May 2014 09:32 AM, Linus Walleij wrote:
-> > 
-> >>>> I suspect what you want is
-> >>>>
-> >>>>         dma-ranges = <0x80000000 0 0x80000000>;
-> >>>>
-> >>>> to translate dma_addr_t 0x80000000-0xffffffff to phys_addr_t 0x0-0x7fffffff
-> >>>> rather than phys_addr_t 0x800000000-0x87fffffff.
-> >>>
-> >> Interesting. Where does the ROM address space resides on integrator then considering
-> >> address 0 is used for DMA.
-> > 
-> > The ROM is at physical address 0x20000000, don't ask me
-> > why 
-> > 
-> > The RAM is typically at 0x00000000-0x0fffffff, on up to four parallell
-> > tiles, i.e. up to four completely independent CPUs are booted off the
-> > same ROM and using a set of shared peripherals.
-> > 
-> The reason I asked the question because most of the ARM SOC I came across
-> aren't using the RAM phys address 0 and thought was because of boot architecture
-> with ROM occupying that address with reset vector starting at address 0.
+On Thu, May 29, 2014 at 12:23:58PM +0800, Chen-Yu Tsai wrote:
+> On Tue, May 27, 2014 at 4:30 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Mon, May 26, 2014 at 12:36:38PM +0800, Chen-Yu Tsai wrote:
+> >> On Mon, May 26, 2014 at 3:14 AM, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> > On Fri, May 23, 2014 at 03:51:20PM +0800, Chen-Yu Tsai wrote:
+> >> >> The Allwinner A23 SoC has a PRCM unit like the previous A31 SoC.
+> >> >> The differences are the AR100 clock can no longer be modified,
+> >> >> and the APB0 clock has different divisors.
+> >> >>
+> >> >> This patch adds a compatible with a modified subdevice list for
+> >> >> the A23.
+> >> >>
+> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> >> ---
+> >> >>  .../devicetree/bindings/mfd/sun6i-prcm.txt         |  2 +-
+> >> >>  drivers/mfd/sun6i-prcm.c                           | 30 ++++++++++++++++++++++
+> >> >>  2 files changed, 31 insertions(+), 1 deletion(-)
+> >> >>
+> >> >> diff --git a/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt b/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
+> >> >> index 1f5a31f..03c5a55 100644
+> >> >> --- a/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
+> >> >> +++ b/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
+> >> >> @@ -4,7 +4,7 @@ PRCM is an MFD device exposing several Power Management related devices
+> >> >>  (like clks and reset controllers).
+> >> >>
+> >> >>  Required properties:
+> >> >> - - compatible: "allwinner,sun6i-a31-prcm"
+> >> >> + - compatible: "allwinner,sun6i-a31-prcm" or "allwinner,sun8i-a23-prcm"
+> >> >>   - reg: The PRCM registers range
+> >> >>
+> >> >>  The prcm node may contain several subdevices definitions:
+> >> >> diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
+> >> >> index 718fc4d..c96bb6c 100644
+> >> >> --- a/drivers/mfd/sun6i-prcm.c
+> >> >> +++ b/drivers/mfd/sun6i-prcm.c
+> >> >> @@ -76,16 +76,46 @@ static const struct mfd_cell sun6i_a31_prcm_subdevs[] = {
+> >> >>       },
+> >> >>  };
+> >> >>
+> >> >> +static const struct mfd_cell sun8i_a23_prcm_subdevs[] = {
+> >> >> +     {
+> >> >> +             .name = "sun6i-a31-apb0-clk",
+> >> >> +             .of_compatible = "allwinner,sun8i-a23-apb0-clk",
+> >> >> +             .num_resources = ARRAY_SIZE(sun6i_a31_apb0_clk_res),
+> >> >> +             .resources = sun6i_a31_apb0_clk_res,
+> >> >> +     },
+> >> >> +     {
+> >> >> +             .name = "sun6i-a31-apb0-gates-clk",
+> >> >> +             .of_compatible = "allwinner,sun6i-a31-apb0-gates-clk",
+> >> >> +             .num_resources = ARRAY_SIZE(sun6i_a31_apb0_gates_clk_res),
+> >> >> +             .resources = sun6i_a31_apb0_gates_clk_res,
+> >> >> +     },
+> >> >
+> >> > Did I just have a brainfart, or didn't you just introduced an
+> >> > sun8i-a23-apb0-gates-clk driver?
+> >>
+> >> My bad, I missed this one. The one in the DT is correct.
+> >> It actually works, so I'm a bit confused here.
+> >> Which one does the driver core actually use?
+> >
+> > Actually, it will use both, and will match the of_compatible string
+> > try to match it against the mfd-sub-nodes compatibles. If nothing
+> > matches, it won't fill the dev.of_node field.
 > 
-> That was one of the main reason we had description on max_*pfn on ARM w.r.t
-> to other acrhes.
+> So actually it was supposed to use "allwinner,sun6i-a31-apb0-gates-clk",
+> as that clk driver takes clock-indices, so no need to define gate masks
+> and tie them to some new compatible.
 > 
-> Will corner ARM guys to understand bit more about it in some conference 
+> There was no sun8i-a23-apb0-gates-clk driver.
+> 
+> I must not be getting enough sleep.
 
-If this is anything like the versatile express, the reason it works is probably
-because there is another microcontroller in the system that does the bootstrap
-and is able to load code into RAM before turning on the main CPU.
+I'd still prefer it to have a different compatible though, at least to
+be consistent.
 
-	Arnd
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140529/ce8ec282/attachment.sig>
