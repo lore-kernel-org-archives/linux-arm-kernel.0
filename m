@@ -1,46 +1,107 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 May 2014 09:52:25 -0700
-Subject: [GIT PULL 5/5] Samsung Exynos MCPM support for 3.16
-In-Reply-To: <20140522053841.GI32618@quad.lixom.net>
-References: <014801cf73c8$7d1f9930$775ecb90$@samsung.com>
- <20140522053841.GI32618@quad.lixom.net>
-Message-ID: <CAOesGMj=c3RVQs2=xtWV82nMxjD9w6QNv2Wz4wTi7KrOuHYTig@mail.gmail.com>
+From: elder@linaro.org (Alex Elder)
+Date: Thu, 29 May 2014 11:53:50 -0500
+Subject: [PATCH v2 2/5] clk: bcm281xx: implement prerequisite clocks
+In-Reply-To: <20140529163552.10062.50409@quantum>
+References: <1400590362-11177-1-git-send-email-elder@linaro.org>
+ <1400590362-11177-3-git-send-email-elder@linaro.org>
+ <20140524005358.23136.8918@quantum> <53873577.8000502@linaro.org>
+ <20140529163552.10062.50409@quantum>
+Message-ID: <5387661E.7060106@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 21, 2014 at 10:38 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Tue, May 20, 2014 at 10:11:54AM +0900, Kukjin Kim wrote:
->> The following changes since commit d7067f1c5fa0232001502569c6878d22308da268:
+On 05/29/2014 11:35 AM, Mike Turquette wrote:
+> Quoting Alex Elder (2014-05-29 06:26:15)
+>> On 05/23/2014 07:53 PM, Mike Turquette wrote:
+>>> The above seems like a lot effort to go to. Why not skip all of this and
+>>> just implement the prerequisite logic in the .enable & .disable
+>>> callbacks? E.g. your kona clk .enable callback would look like:
 >>
->>   devicetree: bindings: document SYSRAM binding (2014-05-15 03:30:29 +0900)
->>
->> are available in the git repository at:
->>
->>   http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->> tags/exynos-mcpm
->>
->> for you to fetch changes up to ccf5511797cd4b48d20a85fa1778f5608eac9fd7:
->>
->>   ARM: EXYNOS: Add MCPM call-back functions (2014-05-16 04:26:30 +0900)
->>
->> ----------------------------------------------------------------
->> Exynos MCPM support for v3.16
->>
->> - adding MCPM backend support for SMP secondary boot and core switching
->> on Samsung's Exynos5420.
->>
->> Tested on exynos5420-smdk5420 and exynos5420 based chromebook (peach-pit)
->> using the "/dev/b.L_switcher" user interface. Secondary core boot-up has
->> also been tested on both the boards.
->
-> This goes with new SoC enablement as well; we'll merge it after multi-platform.
+>> I think the problem is that it means the clock consumers
+>> would have to know that prerequisite relationship.  And
+>> that is dependent on the clock tree.  The need for it in
+>> this case was because the boot loader didn't initialize
+>> all the clocks that were needed.  If we could count on
+>> the boot loader setting things up initially we might not
+>> need to do this.
 
-Merged now, since multiplatform is going in as well.
+I think you've convinced me that if the prerequisite is
+set up at initialization time, the consumers don't need
+to know about the the clock tree.
 
-What confused me for a while here was that this branch was based on a
-partial version of the DT branch, but it didn't match any of the
-branch heads we had merged in. It's not wrong to do so but it's useful
-to get a heads up in the pull request.
+>>>
+>>> diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
+>>> index d603c4e..51f35b4 100644
+>>> --- a/drivers/clk/bcm/clk-kona.c
+>>> +++ b/drivers/clk/bcm/clk-kona.c
+>>> @@ -987,6 +987,12 @@ static int kona_peri_clk_enable(struct clk_hw *hw)
+>>>  {
+>>>       struct kona_clk *bcm_clk = to_kona_clk(hw);
+>>>       struct bcm_clk_gate *gate = &bcm_clk->u.peri->gate;
+>>> +     int ret;
+>>> +
+>>> +     hw->prereq_bus_clk = clk_get(hw->ccu, hw->prereq);
+>>> +     ret = clk_enable(prereq_bus_clk);
+>>> +     if (ret)
+>>> +             return ret;
+>>>  
+>>>       return clk_gate(bcm_clk->ccu, bcm_clk->init_data.name, gate, true);
+>>>  }
+>>> @@ -997,6 +1003,9 @@ static void kona_peri_clk_disable(struct clk_hw *hw)
+>>>       struct bcm_clk_gate *gate = &bcm_clk->u.peri->gate;
+>>>  
+>>>       (void)clk_gate(bcm_clk->ccu, bcm_clk->init_data.name, gate, false);
+>>> +
+>>> +     clk_disable(hw->prereq_bus_clk);
+>>> +     clk_put(hw->prereq_bus_clk);
+>>>  }
+>>>  
+>>>  static int kona_peri_clk_is_enabled(struct clk_hw *hw)
+>>>
+>>>
+>>> I guess it might take some trickery to get clk_get to work like that.
+>>> Let me know if I've completely lost the plot.
+>>
+>> I don't think so, but I think there's a lot of stuff
+>> here to try to understand, and you're trying to extract
+>> it from the code without the benefit of some background
+>> of how and why it's done this way.
+>>
+>> Hopefully all this verbiage is moving you closer to
+>> understanding...  I appreciate your patience.
+> 
+> Hi Alex,
+> 
+> Can you comment on my diff above? I basically tossed up some pseudo-code
+> to show how clk_enable calls can be nested inside of each other. I'd
+> like to know if that approach makes sense for your prereq clocks case.
 
+Yes, I should have looked more closely before.
 
--Olof
+Are you suggesting this prerequisite notion get elevated into the
+common framework?  Or is "hw" here just representative of the
+Kona-specific clock structure?
+
+In any case, you're suggesting the prerequisite be handled in the
+enable path (as opposed to the one-time initialization path),
+which during the course of this discussion I've been thinking may
+be the right way to do it.
+
+Let me see if I can rework it that way and I'll let you know
+what I discover as a result.  I hope to have something to
+talk about later today.
+
+Thanks a lot Mike.
+
+					-Alex
+
+> Note that Linux device drivers that consume leaf clocks do NOT need to
+> know about the prereq clocks. All of that prereq clock knowledge is
+> stored in the .enable callback for the leaf clock (see above).
+> 
+> Regards,
+> Mike
+> 
+>>
+>>                                         -Alex
+>>
