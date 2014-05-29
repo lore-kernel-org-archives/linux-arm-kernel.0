@@ -1,37 +1,49 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 30 May 2014 09:40:25 +1000
-Subject: [PATCH] gpio: removes all usage of gpiochip_remove retval
-In-Reply-To: <CABprBybQ-Jyk95zCqnoWjjyzhNyHVbsbEhb=vA5d=ZYp95_bFA@mail.gmail.com>
-References: <1401400492-26175-1-git-send-email-berthe.ab@gmail.com>
- <5387B149.20408@gmail.com>
- <CABprBybQ-Jyk95zCqnoWjjyzhNyHVbsbEhb=vA5d=ZYp95_bFA@mail.gmail.com>
-Message-ID: <20140530094025.3b78301e@canb.auug.org.au>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 30 May 2014 00:40:12 +0100
+Subject: nommu build failures on ARM in linux-next
+In-Reply-To: <20140529185534.GK3693@n2100.arm.linux.org.uk>
+References: <5387661F.1050000@windriver.com>
+ <20140529185534.GK3693@n2100.arm.linux.org.uk>
+Message-ID: <20140529234012.GL3693@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi abdoulaye,
+On Thu, May 29, 2014 at 07:55:34PM +0100, Russell King - ARM Linux wrote:
+> On Thu, May 29, 2014 at 12:53:51PM -0400, Paul Gortmaker wrote:
+> > Hi Russell,
+> > 
+> > The allnoconfig builds in linux-next fail because __clear_cr
+> > lives in mmu.c without any stub or similar in nommu.c
+> > 
+> > Introduced by:
+> > 
+> > commit 247e4fff3aa927ad069447e6da05bb966b70dece
+> > Author: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Date:   Sun Apr 13 18:57:29 2014 +0100
+> > 
+> >     ARM: provide common method to clear bits in CPU control register
+> >     
+> > Sample failure:
+> >   http://kisskb.ellerman.id.au/kisskb/buildresult/11264405/
+> 
+> ALIGNMENT_TRAP depends on CPU_CP15_MMU, so it's quite reasonable that
+> __clear_cr should exist in this case - but it doesn't because it's in
+> mmu.c.  I guess we need __clear_cr moved to arch/arm/kernel/setup.c.
 
-On Fri, 30 May 2014 01:16:22 +0200 abdoulaye berthe <berthe.ab@gmail.com> wrote:
->
-> The aim of this patch is to make gpiochip_remove() behavior consistent,
-> especially when issuing a remove request while the chipio chip is
-> still requested. A patch has been submitted to change the return value of
-> gpiochip_remove() from int to void. This one updates users of the return
-> value:
+I've been looking at doing this, and while it can be done by applying
+a patch on top, that's not my preferred solution.
 
-Then you need to keep these two patch in a series with this one first
-to make sure that the other patch is not applied without this one.
+However, my preferred solution (which is to fix the commit) needs a bit
+of rework of the patch series, and given the number of patches I'm
+carrying right now, I'm just going to drop the branch out of linux-next
+and hold it off until the following merge window instead.
 
-And you should add the above explanation to the changelog for this
-patch.
+Even so, I suspect even with this build problem solved, that's not going
+to be the end of the story for noMMU breakage... it's certainly something
+that gets very little testing by anyone.  I suspect it should be removed
+from the mainline kernel tree rather than being a constant source of these
+kinds of problems.
 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140530/d9bb6d03/attachment.sig>
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
