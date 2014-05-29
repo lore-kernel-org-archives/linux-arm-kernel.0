@@ -1,57 +1,33 @@
-From: lho@apm.com (Loc Ho)
-Date: Thu, 29 May 2014 11:54:52 -0700
-Subject: [PATCH 1/3] Documentation: Update Arasan SDHC documentation for
- the APM X-Gene SoC SDHC DTS binding
-In-Reply-To: <20140519123230.GA3663@leverpostej>
-References: <1400398918-1502-1-git-send-email-lho@apm.com>
- <1400398918-1502-2-git-send-email-lho@apm.com>
- <20140519123230.GA3663@leverpostej>
-Message-ID: <CAPw-ZTn_gN4k24JcWWnMSi5LgRdRm30=-BsNSVmx6ymN-2=GFw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 May 2014 19:55:34 +0100
+Subject: nommu build failures on ARM in linux-next
+In-Reply-To: <5387661F.1050000@windriver.com>
+References: <5387661F.1050000@windriver.com>
+Message-ID: <20140529185534.GK3693@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Thu, May 29, 2014 at 12:53:51PM -0400, Paul Gortmaker wrote:
+> Hi Russell,
+> 
+> The allnoconfig builds in linux-next fail because __clear_cr
+> lives in mmu.c without any stub or similar in nommu.c
+> 
+> Introduced by:
+> 
+> commit 247e4fff3aa927ad069447e6da05bb966b70dece
+> Author: Russell King <rmk+kernel@arm.linux.org.uk>
+> Date:   Sun Apr 13 18:57:29 2014 +0100
+> 
+>     ARM: provide common method to clear bits in CPU control register
+>     
+> Sample failure:
+>   http://kisskb.ellerman.id.au/kisskb/buildresult/11264405/
 
->> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
->> index 98ee2ab..8fc4cc4 100644
->> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
->> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
->> @@ -8,14 +8,17 @@ Device Tree Bindings for the Arasan SDHCI Controller
->>    [3] Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
->>
->>  Required Properties:
->> -  - compatible: Compatibility string. Must be 'arasan,sdhci-8.9a'
->> +  - compatible: Compatibility string. Must be 'arasan,sdhci-8.9a' or
->> +                'xgene,arasan,sdhci-8.9a'
->
-> "xgene" is not a vendor, nor is it documented as such.
+ALIGNMENT_TRAP depends on CPU_CP15_MMU, so it's quite reasonable that
+__clear_cr should exist in this case - but it doesn't because it's in
+mmu.c.  I guess we need __clear_cr moved to arch/arm/kernel/setup.c.
 
-I will change to "apm".
-
->
->>    - reg: From mmc bindings: Register location and length.
->> -  - clocks: From clock bindings: Handles to clock inputs.
->> -  - clock-names: From clock bindings: Tuple including "clk_xin" and "clk_ahb"
->>    - interrupts: Interrupt specifier
->>    - interrupt-parent: Phandle for the interrupt controller that services
->>                     interrupts for this device.
->>
->> +Optional Properties:
->> +  - clocks: From clock bindings: Handles to clock inputs.
->> +  - clock-names: From clock bindings: Tuple including "clk_xin" and "clk_ahb"
->
-> Given that these used to be required, they are presumably still required
-> in some cases?
-
->From the driver point of view, it is optional as it no longer requires
-this. But from usage point of view, if an HW requires this to work
-correctly, then it musts be provided.
-
->
-> If we're going to alter these lines, it'd be nice to clean them up at
-> the same time (a list is not a tuple, clocks aren't just phandles).
->
-
-I will update this.
-
--Loc
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
