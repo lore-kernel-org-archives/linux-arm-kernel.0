@@ -1,191 +1,172 @@
 From: amit.daniel@samsung.com (Amit Daniel Kachhap)
-Date: Thu, 29 May 2014 13:45:31 +0530
-Subject: [PATCH v1 3/6] thermal: thermal-core: Add notifications support for
- the cooling states
+Date: Thu, 29 May 2014 13:45:32 +0530
+Subject: [PATCH v1 4/6] thermal: cpu_cooling: Add support to find up/low
+ frequency levels.
 In-Reply-To: <1401351334-11210-1-git-send-email-amit.daniel@samsung.com>
 References: <1401351334-11210-1-git-send-email-amit.daniel@samsung.com>
-Message-ID: <1401351334-11210-4-git-send-email-amit.daniel@samsung.com>
+Message-ID: <1401351334-11210-5-git-send-email-amit.daniel@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds notification infrastructure for any requests related to cooling
-states. The notifier structure passed is of both Get/Set type. So the receiver
-of these can sense the new/cur/max cooling state as decided by thermal governor.
-In addition to that it can also override the cooling state and may do something
-interesting after receiving these CPU cooling events such as masking some
-states, enabling some extra conditional states or perform any extra operation
-for aggressive thermal cooling.
-The notfications events can be of type,
-
-1. COOLING_SET_STATE_PRE
-2. COOLING_SET_STATE_POST
-3. COOLING_GET_CUR_STATE
-4. COOLING_GET_MAX_STATE
+This patch adds support to get P state ceil/floor level for nearest frequency.
+This will be used for consolidating ACPI cpufreq cooling via the generic cpu
+cooling framework.
 
 Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
 ---
- Documentation/thermal/sysfs-api.txt |   21 +++++++++++
- drivers/thermal/thermal_core.c      |   69 ++++++++++++++++++++++++++++++++++-
- include/linux/thermal.h             |   21 +++++++++++
- 3 files changed, 109 insertions(+), 2 deletions(-)
+ Documentation/thermal/cpu-cooling-api.txt       |   15 +++++++++
+ drivers/thermal/cpu_cooling.c                   |   39 +++++++++++++++++------
+ drivers/thermal/samsung/exynos_thermal_common.c |    3 +-
+ include/linux/cpu_cooling.h                     |   13 ++++++-
+ 4 files changed, 57 insertions(+), 13 deletions(-)
 
-diff --git a/Documentation/thermal/sysfs-api.txt b/Documentation/thermal/sysfs-api.txt
-index 87519cb..5f45e03 100644
---- a/Documentation/thermal/sysfs-api.txt
-+++ b/Documentation/thermal/sysfs-api.txt
-@@ -92,6 +92,27 @@ temperature) and throttle appropriate devices.
-     It deletes the corresponding entry form /sys/class/thermal folder and
-     unbind itself from all the thermal zone devices using it.
+diff --git a/Documentation/thermal/cpu-cooling-api.txt b/Documentation/thermal/cpu-cooling-api.txt
+index aaa07c6..a1f93b8 100644
+--- a/Documentation/thermal/cpu-cooling-api.txt
++++ b/Documentation/thermal/cpu-cooling-api.txt
+@@ -31,3 +31,18 @@ the user. The registration APIs returns the cooling device pointer.
+     This interface function unregisters the "thermal-cpufreq-%x" cooling device.
  
-+1.2.3 int thermal_cooling_register_notifier(struct notifier_block *nb)
+     cdev: Cooling device pointer which has to be unregistered.
 +
-+    This interface function registers the client notifier handler. The notifier
-+    handler can use this to monitor or update any cooling state requests.
-+    nb: notifier structure containing client notifier handler.
++1.1.3 unsigned long cpufreq_cooling_get_level(unsigned int cpu,
++			unsigned int freq, enum cpufreq_cooling_property)
 +
-+1.2.4 int thermal_cooling_unregister_notifier(struct notifier_block *nb)
++    This interface gets the frequency level for the absolute frequency by
++    matching in grequency table.
 +
-+    This interface function unregisters the client notifier handler.
-+    nb: notifier structure containing client notifier handler.
++    cpu: cpu for which the frequency level is expected.
++    freq: absolute input frequency as found in cpu freq table.
++    cpufreq_cooling_property:
++	.GET_LEVEL_CEIL: returns the ceil of the frequency level.
++	.GET_LEVEL_FLOOR: returns the floor of the frequency level.
++	.GET_LEVEL_EXACT: returns the exact frequency level if found.
++	.GET_MAXL: returns the max frequency level.
 +
-+1.2.5 int thermal_cooling_notify_states(struct thermal_cooling_status *request,enum cooling_state_ops op)
-+
-+    This interface function invokes the earlier registered cooling states handler.
-+    request: holds the relevant cooling state value.
-+	.cur_state: current cooling state.
-+	.new_state: new cooling state to be set.
-+	.max_state: max cooling state.
-+	.devdata: driver private data pointer.
-+    op: describes various operation supported.
-+
- 1.3 interface for binding a thermal zone device with a thermal cooling device
- 1.3.1 int thermal_zone_bind_cooling_device(struct thermal_zone_device *tz,
- 	int trip, struct thermal_cooling_device *cdev,
-diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
-index 71b0ec0..1a60f83 100644
---- a/drivers/thermal/thermal_core.c
-+++ b/drivers/thermal/thermal_core.c
-@@ -52,6 +52,8 @@ static DEFINE_MUTEX(thermal_idr_lock);
- static LIST_HEAD(thermal_tz_list);
- static LIST_HEAD(thermal_cdev_list);
- static LIST_HEAD(thermal_governor_list);
-+/* Notfier list to validates/updates the cpufreq cooling states */
-+static BLOCKING_NOTIFIER_HEAD(cooling_state_notifier_list);
+diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
+index 6d145d5..4ce8803 100644
+--- a/drivers/thermal/cpu_cooling.c
++++ b/drivers/thermal/cpu_cooling.c
+@@ -120,11 +120,7 @@ cpufreq_cooling_get_info(struct thermal_cooling_device *cdev)
+ 	return cpufreq_dev;
+ }
  
- static DEFINE_MUTEX(thermal_list_lock);
- static DEFINE_MUTEX(thermal_governor_lock);
-@@ -1073,8 +1075,71 @@ static struct class thermal_class = {
- };
+-enum cpufreq_cooling_property {
+-	GET_LEVEL,
+-	GET_FREQ,
+-	GET_MAXL,
+-};
++#define GET_FREQ (sizeof(enum cpufreq_cooling_property) + 1)
  
  /**
-- * __thermal_cooling_device_register() - register a new thermal cooling device
-- * @np:		a pointer to a device tree node.
-+ * thermal_cooling_notify_states - Invoke the necessary cooling states handler.
-+ * @request: holds the relevant cooling state value. say if the cooling state
-+ * operation is of type COOLING_GET_MAX_STATE, then request holds
-+ * the current max cooling state value.
-+ * @op: different operations supported
-+ *
-+ * This API allows the registered user to recieve the different cooling
-+ * notifications like current state, max state and set state.
-+ *
-+ * Return: 0 (success)
-+ */
-+int thermal_cooling_notify_states(struct thermal_cooling_status *request,
-+				enum cooling_state_ops op)
-+{
-+	/* Invoke the notifiers which have registered for this state change */
-+	if (op == COOLING_SET_STATE_PRE ||
-+		op == COOLING_SET_STATE_POST ||
-+		op == COOLING_GET_MAX_STATE ||
-+		op == COOLING_GET_CUR_STATE) {
-+		blocking_notifier_call_chain(
-+			&cooling_state_notifier_list, op, request);
-+	}
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(thermal_cooling_notify_states);
-+
-+/**
-+ * thermal_cooling_register_notifier - registers a notifier with thermal cooling.
-+ * @nb:	notifier function to register.
-+ *
-+ * Add a driver to receive all cooling notifications like current state,
-+ * max state and set state. The drivers after reading the events can perform
-+ * some mapping like grouping some P states into 1 cooling state.
-+ *
-+ * Return: 0 (success)
-+ */
-+int thermal_cooling_register_notifier(struct notifier_block *nb)
-+{
-+	int ret = 0;
-+	ret = blocking_notifier_chain_register(
-+				&cooling_state_notifier_list, nb);
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(thermal_cooling_register_notifier);
-+
-+/**
-+ * thermal_cooling_unregister_notifier - unregisters a notifier with thermal
-+ * cooling.
-+ * @nb:	notifier function to unregister.
-+ *
-+ * Removes a driver to receive further cooling notifications.
-+ *
-+ * Return: 0 (success)
-+ */
-+int thermal_cooling_unregister_notifier(struct notifier_block *nb)
-+{
-+	int ret = 0;
-+	ret = blocking_notifier_chain_unregister(
-+				&cooling_state_notifier_list, nb);
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(thermal_cooling_unregister_notifier);
-+
-+/**
-+ * thermal_cooling_device_register() - register a new thermal cooling device
-  * @type:	the thermal cooling device type.
-  * @devdata:	device private data.
-  * @ops:		standard thermal cooling devices callbacks.
-diff --git a/include/linux/thermal.h b/include/linux/thermal.h
-index f7e11c7..3fb1b92 100644
---- a/include/linux/thermal.h
-+++ b/include/linux/thermal.h
-@@ -106,6 +106,21 @@ enum {
- };
- #define THERMAL_GENL_CMD_MAX (__THERMAL_GENL_CMD_MAX - 1)
+  * get_property - fetch a property of interest for a give cpu.
+@@ -207,15 +203,37 @@ static int get_property(unsigned int cpu, unsigned long input,
+ 		/* now we have a valid frequency entry */
+ 		freq = table[i].frequency;
  
-+/* Cooling states supported operations */
-+enum cooling_state_ops {
-+	COOLING_SET_STATE_PRE,
-+	COOLING_SET_STATE_POST,
-+	COOLING_GET_CUR_STATE,
-+	COOLING_GET_MAX_STATE,
+-		if (property == GET_LEVEL && (unsigned int)input == freq) {
++		if (property == GET_LEVEL_EXACT &&
++						(unsigned int)input == freq) {
+ 			/* get level by frequency */
+ 			*output = descend ? j : (max_level - j);
+ 			return 0;
+-		}
+-		if (property == GET_FREQ && level == j) {
++		} else if (property == GET_FREQ && level == j) {
+ 			/* get frequency by level */
+ 			*output = freq;
+ 			return 0;
++		} else if (property == GET_LEVEL_FLOOR) {
++			/* get minimum possible level by frequency */
++			if (descend && freq <= input) {
++				*output = j;
++				return 0;
++			} else if (!descend) {
++				if (freq <= input)
++					*output = (max_level - j);
++				else
++					return 0;
++			}
++		} else if (property == GET_LEVEL_CEIL) {
++			/* get maximum possible level by frequency */
++			if (!descend && freq >= input) {
++				*output = (max_level - j);
++				return 0;
++			} else if (descend) {
++				if (freq >= input)
++					*output = j;
++				else
++					return 0;
++			}
+ 		}
+ 		j++;
+ 	}
+@@ -234,11 +252,12 @@ static int get_property(unsigned int cpu, unsigned long input,
+  * Return: The matched cooling level on success or THERMAL_CSTATE_INVALID
+  * otherwise.
+  */
+-unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq)
++unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq,
++			enum cpufreq_cooling_property property)
+ {
+ 	unsigned int val;
+ 
+-	if (get_property(cpu, (unsigned long)freq, &val, GET_LEVEL))
++	if (get_property(cpu, (unsigned long)freq, &val, property))
+ 		return THERMAL_CSTATE_INVALID;
+ 
+ 	return (unsigned long)val;
+diff --git a/drivers/thermal/samsung/exynos_thermal_common.c b/drivers/thermal/samsung/exynos_thermal_common.c
+index a7306fa..aa4696b 100644
+--- a/drivers/thermal/samsung/exynos_thermal_common.c
++++ b/drivers/thermal/samsung/exynos_thermal_common.c
+@@ -156,7 +156,8 @@ static int exynos_bind(struct thermal_zone_device *thermal,
+ 	/* Bind the thermal zone to the cpufreq cooling device */
+ 	for (i = 0; i < tab_size; i++) {
+ 		clip_data = (struct freq_clip_table *)&(tab_ptr[i]);
+-		level = cpufreq_cooling_get_level(0, clip_data->freq_clip_max);
++		level = cpufreq_cooling_get_level(0, clip_data->freq_clip_max,
++						GET_LEVEL_EXACT);
+ 		if (level == THERMAL_CSTATE_INVALID)
+ 			return 0;
+ 		switch (GET_ZONE(i)) {
+diff --git a/include/linux/cpu_cooling.h b/include/linux/cpu_cooling.h
+index aaef7d8..dba52c9 100644
+--- a/include/linux/cpu_cooling.h
++++ b/include/linux/cpu_cooling.h
+@@ -28,6 +28,13 @@
+ #include <linux/thermal.h>
+ #include <linux/cpumask.h>
+ 
++enum cpufreq_cooling_property {
++	GET_LEVEL_CEIL,
++	GET_LEVEL_FLOOR,
++	GET_LEVEL_EXACT,
++	GET_MAXL,
 +};
 +
-+struct thermal_cooling_status {
-+	unsigned long cur_state;
-+	unsigned long new_state;
-+	unsigned long max_state;
-+	void *devdata;
-+};
-+
- struct thermal_zone_device_ops {
- 	int (*bind) (struct thermal_zone_device *,
- 		     struct thermal_cooling_device *);
-@@ -285,6 +300,12 @@ struct thermal_cooling_device *
- thermal_of_cooling_device_register(struct device_node *np, char *, void *,
- 				   const struct thermal_cooling_device_ops *);
- void thermal_cooling_device_unregister(struct thermal_cooling_device *);
-+
-+int thermal_cooling_notify_states(struct thermal_cooling_status *request,
-+				enum cooling_state_ops op);
-+int thermal_cooling_register_notifier(struct notifier_block *nb);
-+int thermal_cooling_unregister_notifier(struct notifier_block *nb);
-+
- struct thermal_zone_device *thermal_zone_get_zone_by_name(const char *name);
- int thermal_zone_get_temp(struct thermal_zone_device *tz, unsigned long *temp);
+ #ifdef CONFIG_CPU_THERMAL
+ /**
+  * cpufreq_cooling_register - function to create cpufreq cooling device.
+@@ -61,7 +68,8 @@ of_cpufreq_cooling_register(struct device_node *np,
+  */
+ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev);
  
+-unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq);
++unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq,
++					enum cpufreq_cooling_property);
+ #else /* !CONFIG_CPU_THERMAL */
+ static inline struct thermal_cooling_device *
+ cpufreq_cooling_register(const struct cpumask *clip_cpus, void *devdata)
+@@ -80,7 +88,8 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
+ 	return;
+ }
+ static inline
+-unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq)
++unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq,
++					enum cpufreq_cooling_property property)
+ {
+ 	return THERMAL_CSTATE_INVALID;
+ }
 -- 
 1.7.1
