@@ -1,31 +1,43 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 29 May 2014 15:55:10 +0200
-Subject: [PATCH v2 11/11] sched: replace capacity by activity
-In-Reply-To: <1400860385-14555-12-git-send-email-vincent.guittot@linaro.org>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-12-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20140529135510.GG11074@laptop.programming.kicks-ass.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 29 May 2014 16:01:27 +0200
+Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
+In-Reply-To: <5385ECE0.7040703@ti.com>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+ <5840140.8yGnd4Ycx3@wuerfel>
+ <CACRpkdZjEVYgq7tKEfmZC0Fu4n=JuUues=pAAtquLahkex=pkA@mail.gmail.com>
+ <4960549.viM91iY2g2@wuerfel>
+ <CACRpkda5x-fJWTN40ze17woMWuWoVbuhbNu5nkm1sFcdJchRfA@mail.gmail.com>
+ <5385ECE0.7040703@ti.com>
+Message-ID: <CACRpkdaD6ZLFu7-tOeDRvKCAC6X6_W84Vsqs1o-xUzUZOjyvFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 05:53:05PM +0200, Vincent Guittot wrote:
-> The scheduler tries to compute how many tasks a group of CPUs can handle by
-> assuming that a task's load is SCHED_LOAD_SCALE and a CPU capacity is
-> SCHED_POWER_SCALE.
-> We can now have a better idea of the utilization of a group fo CPUs thanks to
-> group_actitvity and deduct how many capacity is still available.
-> 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> ---
+On Wed, May 28, 2014 at 4:04 PM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> On Wednesday 28 May 2014 09:32 AM, Linus Walleij wrote:
 
-Right, so as Preeti already mentioned, this wrecks SMT. It also seems to
-loose the aggressive spread, where we want to run 1 task on each 'core'
-before we start 'balancing'.
+>>> I suspect what you want is
+>>>
+>>>         dma-ranges = <0x80000000 0 0x80000000>;
+>>>
+>>> to translate dma_addr_t 0x80000000-0xffffffff to phys_addr_t 0x0-0x7fffffff
+>>> rather than phys_addr_t 0x800000000-0x87fffffff.
+>>
+> Interesting. Where does the ROM address space resides on integrator then considering
+> address 0 is used for DMA.
 
-So I think we should be able to fix this by setting PREFER_SIBLING on
-the SMT domain, that way we'll get single tasks running on each SMT
-domain before filling them up until capacity.
+The ROM is at physical address 0x20000000, don't ask me
+why :-)
 
-Now, its been a while since I looked at PREFER_SIBLING, and I've not yet
-looked at what your patch does to it, but it seems to me that that is
-the first direction we should look for an answer to this.
+The RAM is typically at 0x00000000-0x0fffffff, on up to four parallell
+tiles, i.e. up to four completely independent CPUs are booted off the
+same ROM and using a set of shared peripherals.
+
+>> Thanks, I'll fix up my patch.
+>>
+> Feel free to add my ack after the fixup if you need one.
+
+Thanks!
+
+Yours,
+Linus Walleij
