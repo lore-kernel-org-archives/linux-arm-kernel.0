@@ -1,43 +1,52 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 29 May 2014 21:56:24 +0200
-Subject: [PATCH v2 11/11] sched: replace capacity by activity
-In-Reply-To: <20140529140204.GH11074@laptop.programming.kicks-ass.net>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-12-git-send-email-vincent.guittot@linaro.org>
- <20140529140204.GH11074@laptop.programming.kicks-ass.net>
-Message-ID: <CAKfTPtACXf+c01O+dCU2ZTc-Mrs+nTKYsu0_aBt8awxSg5WD=g@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 29 May 2014 16:04:49 -0400
+Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
+In-Reply-To: <4755790.VgRQTHz3K1@wuerfel>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+ <CACRpkdaD6ZLFu7-tOeDRvKCAC6X6_W84Vsqs1o-xUzUZOjyvFQ@mail.gmail.com>
+ <53873F4A.9030303@ti.com> <4755790.VgRQTHz3K1@wuerfel>
+Message-ID: <538792E1.3020500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 May 2014 16:02, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Fri, May 23, 2014 at 05:53:05PM +0200, Vincent Guittot wrote:
->> @@ -6052,8 +6006,8 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
->>                * with a large weight task outweighs the tasks on the system).
->>                */
->>               if (prefer_sibling && sds->local &&
->> -                 sds->local_stat.group_has_capacity)
->> -                     sgs->group_capacity = min(sgs->group_capacity, 1U);
->> +                 sds->local_stat.group_capacity > 0)
->> +                     sgs->group_capacity = min(sgs->group_capacity, 1L);
+On Thursday 29 May 2014 03:24 PM, Arnd Bergmann wrote:
+> On Thursday 29 May 2014 10:08:10 Santosh Shilimkar wrote:
+>> On Thursday 29 May 2014 10:01 AM, Linus Walleij wrote:
+>>> On Wed, May 28, 2014 at 4:04 PM, Santosh Shilimkar
+>>> <santosh.shilimkar@ti.com> wrote:
+>>>> On Wednesday 28 May 2014 09:32 AM, Linus Walleij wrote:
+>>>
+>>>>>> I suspect what you want is
+>>>>>>
+>>>>>>         dma-ranges = <0x80000000 0 0x80000000>;
+>>>>>>
+>>>>>> to translate dma_addr_t 0x80000000-0xffffffff to phys_addr_t 0x0-0x7fffffff
+>>>>>> rather than phys_addr_t 0x800000000-0x87fffffff.
+>>>>>
+>>>> Interesting. Where does the ROM address space resides on integrator then considering
+>>>> address 0 is used for DMA.
+>>>
+>>> The ROM is at physical address 0x20000000, don't ask me
+>>> why 
+>>>
+>>> The RAM is typically at 0x00000000-0x0fffffff, on up to four parallell
+>>> tiles, i.e. up to four completely independent CPUs are booted off the
+>>> same ROM and using a set of shared peripherals.
+>>>
+>> The reason I asked the question because most of the ARM SOC I came across
+>> aren't using the RAM phys address 0 and thought was because of boot architecture
+>> with ROM occupying that address with reset vector starting at address 0.
 >>
->>               if (update_sd_pick_busiest(env, sds, sg, sgs)) {
->>                       sds->busiest = sg;
->> @@ -6228,7 +6182,7 @@ static inline void calculate_imbalance(struct lb_env *env, struct sd_lb_stats *s
->>                * have to drop below capacity to reach cpu-load equilibrium.
->>                */
->>               load_above_capacity =
->> -                     (busiest->sum_nr_running - busiest->group_capacity);
->> +                     (busiest->sum_nr_running - busiest->group_weight);
+>> That was one of the main reason we had description on max_*pfn on ARM w.r.t
+>> to other acrhes.
 >>
->>               load_above_capacity *= (SCHED_LOAD_SCALE * SCHED_POWER_SCALE);
->>               load_above_capacity /= busiest->group_power;
->
-> I think you just broke PREFER_SIBLING here..
+>> Will corner ARM guys to understand bit more about it in some conference 
+> 
+> If this is anything like the versatile express, the reason it works is probably
+> because there is another microcontroller in the system that does the bootstrap
+> and is able to load code into RAM before turning on the main CPU.
+> 
+That make sense now. Thanks for those extra bits.
 
-you mean by replacing the capacity which was reflecting the number of
-core for SMT by the group_weight ?
-
->
-> So we want PREFER_SIBLING to work on nr_running, not utilization because
-> we want to spread single tasks around, regardless of their utilization.
->
+Regards,
+Santosh
