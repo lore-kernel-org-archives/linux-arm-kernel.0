@@ -1,27 +1,29 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 29 May 2014 11:26:44 -0500
-Subject: [PATCH] ARM: qcom: Enable GSBI driver in defconfig
-Message-ID: <1401380804-16108-1-git-send-email-galak@codeaurora.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 29 May 2014 10:30:37 -0600
+Subject: [PATCH v2 03/18] PCI: designware: Configuration space should be
+ specified in 'reg'
+In-Reply-To: <CF1BAF3F-E16E-4864-8052-8C3EC29000B0@codeaurora.org>
+References: <1401345500-20188-1-git-send-email-kishon@ti.com>
+ <1401345500-20188-4-git-send-email-kishon@ti.com>
+ <98E18225-3C63-4106-901A-A5D3DEC268C8@codeaurora.org>
+ <20140529151840.GD1677@bart.dudau.co.uk>
+ <CF1BAF3F-E16E-4864-8052-8C3EC29000B0@codeaurora.org>
+Message-ID: <20140529163037.GC2552@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
----
- arch/arm/configs/qcom_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+On Thu, May 29, 2014 at 11:03:36AM -0500, Kumar Gala wrote:
 
-diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
-index bfed753..42ebd72 100644
---- a/arch/arm/configs/qcom_defconfig
-+++ b/arch/arm/configs/qcom_defconfig
-@@ -131,6 +131,7 @@ CONFIG_RTC_CLASS=y
- CONFIG_DMADEVICES=y
- CONFIG_QCOM_BAM_DMA=y
- CONFIG_STAGING=y
-+CONFIG_QCOM_GSBI=y
- CONFIG_COMMON_CLK_QCOM=y
- CONFIG_MSM_GCC_8660=y
- CONFIG_MSM_MMCC_8960=y
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> Just because the kernel doesn?t handle this is NO reason to change
+> the way the DT works.
+
+The OF specs do not specify how to process a config type ranges entry,
+and we all mutually agreed that the only sane interpretation for such
+a thing would be to describe an ECAM memory space so generic code
+could potentially make use of it.
+
+Since designware is not ECAM it should not use config ranges.
+
+This has come up multiple times now, and the above is the consensus.
+
+Jason
