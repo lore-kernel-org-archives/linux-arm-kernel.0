@@ -1,105 +1,42 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 28 May 2014 17:07:13 -0700
-Subject: [PATCH v2 00/10] Marvell Berlin full clock support
-In-Reply-To: <1400517811-24668-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1400517811-24668-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140529000713.10062.99196@quantum>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 29 May 2014 09:15:37 +0900
+Subject: [PATCH v5] clk: shmobile: Add R8A7740-specific clock support
+In-Reply-To: <20140528190651.10062.74327@quantum>
+References: <1400851635-27116-1-git-send-email-ulrich.hecht+renesas@gmail.com>
+ <20140523203900.23136.74970@quantum>
+ <20140526003716.GA730@verge.net.au>
+ <20140528190651.10062.74327@quantum>
+Message-ID: <20140529001537.GE22705@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sebastian Hesselbarth (2014-05-19 09:43:21)
-> Mike,
+On Wed, May 28, 2014 at 12:06:51PM -0700, Mike Turquette wrote:
+> Quoting Simon Horman (2014-05-25 17:37:16)
+> > [ Cc ARM-SoC Maintainers <arm@kernel.org> ]
+> > 
+> > On Fri, May 23, 2014 at 01:39:00PM -0700, Mike Turquette wrote:
+> > > Quoting Ulrich Hecht (2014-05-23 06:27:15)
+> > > > Driver for the R8A7740's clocks that are too specific to be supported by a
+> > > > generic driver.
+> > > > 
+> > > > Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+> > > > Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> > > > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > > 
+> > > Taken into clk-next.
+> > 
+> > Thanks Mike!
+> > 
+> > I would like to queue-up integration patches that depend on this one.
+> > Ideally for v3.17.
+> > 
+> > Do you expect this patch to appear in v3.16-rc1?  If not would it be
+> > possible for you to provide a branch with stable commit ids that I could
+> > use as a base?
 > 
-> this is v2 of the Berlin SoC clock driver [1] but with a reworked DT
-> binding as requested [2]. We decided to not even try to split up the chip
-> control registers that deal with pinmux, padmux, clock, reset, and evil
-> stuff we haven't even looked at. Instead we keep a single node that clock
-> driver will remap early, while proper platform_drivers use a regmap
-> instead. Although clock and other drivers share the same register range,
-> they use individual registers exclusively.
-> 
-> There are some functional fixes in the single clock drivers, I noticed
-> while retesting each individial driver. There will be more to fixup but
-> without any drivers actually using the clocks, it is hard to tell what
-> isn't working now.
-> 
-> Anyway, the current binding should match what you requested and having
-> a clock driver for v3.16 will really be a huge benefit for us to work
-> on more driver support.
-> 
-> If you are fine with it, please take patches 2-7 and I'll pick up
-> 1,8-10 in berlin branch.
+> I will submit this patch towards 3.16-rc1 when the merge window opens.
 
-Patches #2-7 applied to clk-next.
+Thanks Mike, I'll look out for it there.
 
-Thanks!
-Mike
-
-> 
-> Sebastian
-> 
-> [1] https://lkml.kernel.org/r/1399839881-29895-1-git-send-email-sebastian.hesselbarth at gmail.com
-> [2] https://lkml.kernel.org/r/20140515044106.19795.57249 at quantum
-> 
-> Alexandre Belloni (4):
->   clk: berlin: add driver for BG2x simple PLLs
->   clk: berlin: add driver for BG2x complex divider cells
->   clk: berlin: add core clock driver for BG2Q
->   ARM: dts: berlin: convert BG2Q to DT clock nodes
-> 
-> Sebastian Hesselbarth (6):
->   dt-binding: ARM: add clock binding docs for Marvell Berlin2 SoCs
->   clk: berlin: add binding include for Berlin SoC clock ids
->   clk: berlin: add driver for BG2x audio/video PLL
->   clk: berlin: add core clock driver for BG2/BG2CD
->   ARM: dts: berlin: convert BG2CD to DT clock nodes
->   ARM: dts: berlin: convert BG2 to DT clock nodes
-> 
->  .../devicetree/bindings/arm/marvell,berlin.txt     |  47 ++
->  arch/arm/boot/dts/berlin2.dtsi                     |  56 +-
->  arch/arm/boot/dts/berlin2cd.dtsi                   |  53 +-
->  arch/arm/boot/dts/berlin2q.dtsi                    |  54 +-
->  drivers/clk/Makefile                               |   1 +
->  drivers/clk/berlin/Makefile                        |   4 +
->  drivers/clk/berlin/berlin2-avpll.c                 | 393 ++++++++++++
->  drivers/clk/berlin/berlin2-avpll.h                 |  36 ++
->  drivers/clk/berlin/berlin2-div.c                   | 265 ++++++++
->  drivers/clk/berlin/berlin2-div.h                   |  89 +++
->  drivers/clk/berlin/berlin2-pll.c                   | 117 ++++
->  drivers/clk/berlin/berlin2-pll.h                   |  37 ++
->  drivers/clk/berlin/bg2.c                           | 691 +++++++++++++++++++++
->  drivers/clk/berlin/bg2q.c                          | 389 ++++++++++++
->  drivers/clk/berlin/common.h                        |  29 +
->  include/dt-bindings/clock/berlin2.h                |  45 ++
->  include/dt-bindings/clock/berlin2q.h               |  31 +
->  17 files changed, 2240 insertions(+), 97 deletions(-)
->  create mode 100644 drivers/clk/berlin/Makefile
->  create mode 100644 drivers/clk/berlin/berlin2-avpll.c
->  create mode 100644 drivers/clk/berlin/berlin2-avpll.h
->  create mode 100644 drivers/clk/berlin/berlin2-div.c
->  create mode 100644 drivers/clk/berlin/berlin2-div.h
->  create mode 100644 drivers/clk/berlin/berlin2-pll.c
->  create mode 100644 drivers/clk/berlin/berlin2-pll.h
->  create mode 100644 drivers/clk/berlin/bg2.c
->  create mode 100644 drivers/clk/berlin/bg2q.c
->  create mode 100644 drivers/clk/berlin/common.h
->  create mode 100644 include/dt-bindings/clock/berlin2.h
->  create mode 100644 include/dt-bindings/clock/berlin2q.h
-> 
-> ---
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Randy Dunlap <rdunlap@infradead.org>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Cc: Jisheng Zhang <jszhang@marvell.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-doc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> -- 
-> 1.9.1
-> 
+Ulrich, please resubmit the series that depends on this change
+once this patch hits Linus's tree.
