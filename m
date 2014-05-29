@@ -1,52 +1,51 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 29 May 2014 16:04:49 -0400
-Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
-In-Reply-To: <4755790.VgRQTHz3K1@wuerfel>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
- <CACRpkdaD6ZLFu7-tOeDRvKCAC6X6_W84Vsqs1o-xUzUZOjyvFQ@mail.gmail.com>
- <53873F4A.9030303@ti.com> <4755790.VgRQTHz3K1@wuerfel>
-Message-ID: <538792E1.3020500@ti.com>
+From: larry.bassel@linaro.org (Larry Bassel)
+Date: Thu, 29 May 2014 13:08:57 -0700
+Subject: [PATCH v6 0/2] context tracker support for arm64
+Message-ID: <1401394139-23469-1-git-send-email-larry.bassel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 May 2014 03:24 PM, Arnd Bergmann wrote:
-> On Thursday 29 May 2014 10:08:10 Santosh Shilimkar wrote:
->> On Thursday 29 May 2014 10:01 AM, Linus Walleij wrote:
->>> On Wed, May 28, 2014 at 4:04 PM, Santosh Shilimkar
->>> <santosh.shilimkar@ti.com> wrote:
->>>> On Wednesday 28 May 2014 09:32 AM, Linus Walleij wrote:
->>>
->>>>>> I suspect what you want is
->>>>>>
->>>>>>         dma-ranges = <0x80000000 0 0x80000000>;
->>>>>>
->>>>>> to translate dma_addr_t 0x80000000-0xffffffff to phys_addr_t 0x0-0x7fffffff
->>>>>> rather than phys_addr_t 0x800000000-0x87fffffff.
->>>>>
->>>> Interesting. Where does the ROM address space resides on integrator then considering
->>>> address 0 is used for DMA.
->>>
->>> The ROM is at physical address 0x20000000, don't ask me
->>> why 
->>>
->>> The RAM is typically at 0x00000000-0x0fffffff, on up to four parallell
->>> tiles, i.e. up to four completely independent CPUs are booted off the
->>> same ROM and using a set of shared peripherals.
->>>
->> The reason I asked the question because most of the ARM SOC I came across
->> aren't using the RAM phys address 0 and thought was because of boot architecture
->> with ROM occupying that address with reset vector starting at address 0.
->>
->> That was one of the main reason we had description on max_*pfn on ARM w.r.t
->> to other acrhes.
->>
->> Will corner ARM guys to understand bit more about it in some conference 
-> 
-> If this is anything like the versatile express, the reason it works is probably
-> because there is another microcontroller in the system that does the bootstrap
-> and is able to load code into RAM before turning on the main CPU.
-> 
-That make sense now. Thanks for those extra bits.
+Implement and enable context tracking for arm64 (which is
+a prerequisite for FULL_NOHZ support). This patchset
+builds upon earlier work by Kevin Hilman and is based on
+Will Deacon's tree.
 
-Regards,
-Santosh
+Changes v5 to v6:
+
+* Don't save far_el1 in x26 in el0_dbg path (not needed)
+* TIF_NOHZ processes go through the slow path (so no register
+save/restore is needed in ct_user_enter)
+
+Changes v4 to v5:
+
+* Improvement to code restoring far_el1 (suggested by Christopher Covington)
+* Improvement to register save/restore in ct_user_enter
+
+Changes v3 to v4:
+
+* Rename parameter of ct_user_exit from save to restore
+* Rebased patch to Will Deacon's tree (branch remotes/origin/aarch64
+of git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git)
+
+Changes v2 to v3:
+
+* Save/restore necessary registers in ct_user_enter and ct_user_exit
+* Annotate "error paths" out of el0_sync with ct_user_exit
+
+Changes v1 to v2:
+
+* Save far_el1 in x26 temporarily
+
+*** BLURB HERE ***
+
+Larry Bassel (2):
+  arm64: adjust el0_sync so that a function can be called
+  arm64: enable context tracking
+
+ arch/arm64/Kconfig                   |  1 +
+ arch/arm64/include/asm/thread_info.h |  4 +++
+ arch/arm64/kernel/entry.S            | 58 +++++++++++++++++++++++++++++++-----
+ 3 files changed, 56 insertions(+), 7 deletions(-)
+
+-- 
+1.8.3.2
