@@ -1,53 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 29 May 2014 11:14:41 +0100
-Subject: [PATCH] arm64: kernel: initialize broadcast hrtimer based clock
- event device
-In-Reply-To: <1401355381-11446-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1401355381-11446-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20140529101441.GM29812@arm.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 29 May 2014 11:31:40 +0100
+Subject: [RFC v2 04/10] ARM: vexpress: Extend UART with FIQ support
+In-Reply-To: <20140523150452.GX3693@n2100.arm.linux.org.uk>
+References: <1400083125-1464-1-git-send-email-daniel.thompson@linaro.org>
+ <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
+ <1400853478-5824-5-git-send-email-daniel.thompson@linaro.org>
+ <20140523150452.GX3693@n2100.arm.linux.org.uk>
+Message-ID: <53870C8C.1070108@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 29, 2014 at 10:23:01AM +0100, Lorenzo Pieralisi wrote:
-> On platforms implementing CPU power management, the CPUidle subsystem
-> can allow CPUs to enter idle states where local timers logic is lost on power
-> down. To keep the software timers functional the kernel relies on an
-> always-on broadcast timer to be present in the platform to relay the
-> interrupt signalling the timer expiries.
+On 23/05/14 16:04, Russell King - ARM Linux wrote:
+> On Fri, May 23, 2014 at 02:57:52PM +0100, Daniel Thompson wrote:
+>> @@ -140,7 +140,7 @@
+>>  			v2m_serial0: uart at 090000 {
+>>  				compatible = "arm,pl011", "arm,primecell";
+>>  				reg = <0x090000 0x1000>;
+>> -				interrupts = <5>;
+>> +				interrupts = <5>, <69>;
 > 
-> For platforms implementing CPU core gating that do not implement an always-on
-> HW timer or implement it in a broken way, this patch adds code to initialize
-> the kernel software broadcast hrtimer upon boot. It relies on a dynamically
-> chosen CPU to be always powered-up. This CPU then relays the timer interrupt
-> to CPUs in deep-idle states through its HW local timer device.
-> 
-> On systems with power management capabilities but no functional HW broadcast
-> tick device, the hrtimer based clock event device allows the kernel to
-> enter high-resolution timer mode, which improves system latencies and saves
-> dynamic power.
-> 
-> The side effect of having a CPU always-on has implications on power management
-> platform capabilities and makes CPUidle suboptimal, since at least a CPU is
-> kept always in a shallow idle state by the kernel to relay timer interrupts,
-> but at least leaves the kernel with a functional system with some working power
-> management capabilities.
-> 
-> The hrtimer based clock event device has lowest possible rating so that,
-> if a platform contains a functional HW clock event device with broadcast
-> capabilities, that device is always chosen as a tick broadcast device instead
-> of the software based one, now present by default.
-> 
-> Cc: Preeti U Murthy <preeti@linux.vnet.ibm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> NAK.  This is obviously a Linux implementation detail - the second
+> number is your "FIQ" number which you've decided will be offset by
+> 64.
 
-Thanks Lorenzo,
+Certainly the offset of 64 is a more or less meaningless magic number
+that I decided on, however I don't think it originates within Linux. It
+is both introduced and consumed within the device tree itself.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+I've proposed adding a flag to the gic bindings to mark a FIQ; the GIC
+calls interrupt 69 (above) <0 5 0x84> (where 0x80 is the flag to request
+FIQ routing alongside 0x04 which is the trigger type).
 
-With this patch applied, cyclictest starts reporting sane numbers and I
-no longer see latency-related failures in LTP when it does things like
-test timeouts and nanosleep()s.
+However vexpress-a15 has an interrupt-map between the UART and the GIC.
+Thus far I've not found a way, other by offset, to allow a UART sitting
+on a child bus to be provided with both IRQ and FIQ versions of an
+interrupt.
 
-Will
+> --- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+> @@ -233,7 +233,7 @@
+>  			 <5 0 0 0x10000000 0x04000000>;
+>  
+>  		#interrupt-cells = <1>;
+> -		interrupt-map-mask = <0 0 63>;
+> +		interrupt-map-mask = <0 0 127>;
+                                         ^^^^^
+
+The 64 offset is introduced here. Nothing in Linux imposes anything on
+the value (I originally had the shadow routings from 59 to 63 and this
+also worked).
+
+My code may still be inappropriate but, right now, I'm unsure whether
+the proposed changes to the gic bindings are included in the NAK, not in
+the NAK or whether they sit in the middle ground where I have to provide
+better argumentation.
+
+
+Daniel.
