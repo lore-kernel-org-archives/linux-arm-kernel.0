@@ -1,51 +1,61 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 29 May 2014 19:57:26 +0200
-Subject: [PATCH v6 4/4] add 2nd stage page fault handling during live
- migration
-In-Reply-To: <53876977.1040502@samsung.com>
-References: <1400178451-4984-1-git-send-email-m.smarduch@samsung.com>
- <1400178451-4984-5-git-send-email-m.smarduch@samsung.com>
- <20140527201945.GD16428@lvm> <53853C2F.8080003@samsung.com>
- <20140528080957.GH16428@lvm> <5386232A.3050602@samsung.com>
- <20140529085134.GB61607@lvm> <53876977.1040502@samsung.com>
-Message-ID: <20140529175726.GC62489@lvm>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 29 May 2014 19:59:37 +0200
+Subject: [PATCH 5/5] pinctrl: sunxi: Implement multiple interrupt banks
+ support
+In-Reply-To: <CAGb2v65KU9UYU9Vn7X0b4-hE7WJchPxuF1UQDeECqc=-147gsA@mail.gmail.com>
+References: <1401272851-15873-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1401272851-15873-6-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v65KU9UYU9Vn7X0b4-hE7WJchPxuF1UQDeECqc=-147gsA@mail.gmail.com>
+Message-ID: <20140529175937.GW4730@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 29, 2014 at 10:08:07AM -0700, Mario Smarduch wrote:
+On Wed, May 28, 2014 at 07:47:15PM +0800, Chen-Yu Tsai wrote:
+> Hi,
 > 
-> >> So this needs to be cleared up given this is key to logging.
-> >> Cases this code handles during migration -
-> >> 1. huge page fault described above - write protect fault so you breakup
-> >>    the huge page.
-> >> 2. All other faults - first time access, pte write protect you again wind up in
-> >>    stage2_set_pte().
-> >>
-> >> Am I missing something here?
-> >>
-> > 
-> > no, I forgot about the fact that we can take the permission fault now.
-> > Hmm, ok, so either we need to use the original approach of always
-> > splitting up huge pages or we need to just follow the regular huge page
-> > path here and just mark all 512 4K pages dirty in the log, or handle it
-> > in stage2_set_pte().
-> > 
-> > I would say go with the most simple appraoch for now (which may be going
-> > back to splitting all pmd_huge() into regular pte's), and we can take a
-> > more careful look in the next patch iteration.
-> > 
+> On Wed, May 28, 2014 at 6:27 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The A23 and A31 support multiple interrupt banks. Support it by adding a linear
+> > domain covering all the banks. It's trickier than it should because there's an
+> > interrupt per bank, so we have multiple interrupts using the same domain.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 62 +++++++++++++++++++++++++++--------
+> >  drivers/pinctrl/sunxi/pinctrl-sunxi.h | 11 +++++--
+> >  2 files changed, 57 insertions(+), 16 deletions(-)
+> >
+> > diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> > index 71d6cd10d56f..69b58aacc636 100644
+> > --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> > +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> > @@ -635,17 +635,25 @@ static void sunxi_pinctrl_irq_handler(unsigned irq, struct irq_desc *desc)
+> >  {
+> >         struct irq_chip *chip = irq_get_chip(irq);
+> >         struct sunxi_pinctrl *pctl = irq_get_handler_data(irq);
+> > -       const unsigned long reg = readl(pctl->membase + IRQ_STATUS_REG);
+> > +       unsigned long bank, reg, val;
+> > +
+> > +       for (bank = 0; bank < pctl->desc->irq_banks; bank++)
+> > +               if (irq == pctl->irq[bank])
+> > +                       break;
 > 
-> Looking at the overall memslot update architecture and various
-> fail scenarios - user_mem_abort() appears to be the most
-> optimal and reliable place. First Write Protect huge pages after
-> memslots are committed and deal with rest in user_mem_abort().
-> 
-> Still need some feedback on the pud_huge() before revising for
-> next iteration?
-> 
-Just assume it's not used for now, and that you don't have to consider
-it, and make that assumption clear in the commit message, so it doesn't
-block this work.  I have a feeling we need to go through a few
-iterations here, so let's get that rolling.
+> bail out or BUG_ON(bank == pctl->desc->irq_banks)?
+> (dumb question: would this even happen?)
 
-Thanks.
+This can be a spurious interrupt, so I'd prefer to just bail out.
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140529/6ea9a852/attachment.sig>
