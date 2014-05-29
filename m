@@ -1,46 +1,25 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 29 May 2014 21:16:25 +0200
-Subject: [PATCH v2 0/5] pinctrl: sunxi: Add A31 external interrupts support
-Message-ID: <1401390990-5355-1-git-send-email-maxime.ripard@free-electrons.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 29 May 2014 13:22:57 -0600
+Subject: [PATCH v5 0/5] efuse driver for Tegra
+In-Reply-To: <20140528061645.252c2fbc.akpm@linux-foundation.org>
+References: <1401281677-32110-1-git-send-email-pdeschrijver@nvidia.com>
+ <20140528061645.252c2fbc.akpm@linux-foundation.org>
+Message-ID: <53878911.9090508@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+On 05/28/2014 07:16 AM, Andrew Morton wrote:
+> On Wed, 28 May 2014 15:54:32 +0300 Peter De Schrijver <pdeschrijver@nvidia.com> wrote:
+> 
+>> This driver allows userspace to read the raw efuse data.
+> 
+> The patchset uses an inexplicable mixture of "fuse" and "efuse".
+> Given that the kernel already has a "fuse", it would be nice if
+> this code could use "efuse" everywhere.
 
-This is an attempt at making the external interrupts on the A31 and
-the A23 working.
-
-The main difference with the previous code is that there's now several
-banks and several parent interrupts, instead of a single bank with a
-single parent interrupt in the older SoCs.
-
-Most of the diffstat is to register the new irq pin functions. The
-real code additions are those in the core pinctrl driver.
-
-Maxime
-
-Changes from v1:
-   - Bail out of the interrupt handler in case of a spurious interrupt
-   - Fix the wrong register offset in sunxi_irq_*_reg functions.
-
-Maxime Ripard (5):
-  pinctrl: sunxi: Remove irq_mask_ack and use irq_ack instead
-  pinctrl: sunxi: Add macro definition for pinctrl with more than one
-    interrupt
-  pinctrl: sunxi: Declare the number of interrupt banks in the
-    descriptor
-  pinctrl: sunxi: Declare the interrupt function for the A31
-  pinctrl: sunxi: Implement multiple interrupt banks support
-
- drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c   |   1 +
- drivers/pinctrl/sunxi/pinctrl-sun5i-a10s.c  |   1 +
- drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c   |   1 +
- drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c |   1 +
- drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c   | 217 +++++++++++++++++++---------
- drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c   |   1 +
- drivers/pinctrl/sunxi/pinctrl-sunxi.c       |  81 +++++++----
- drivers/pinctrl/sunxi/pinctrl-sunxi.h       |  46 +++++-
- 8 files changed, 241 insertions(+), 108 deletions(-)
-
--- 
-2.0.0
+I didn't check every instance, but a mix of those two terms seems
+reasonable. "fuse" is the type of HW object; it's a generic HW term that
+exists outside the scope of this patch. While the conflict with Linux's
+filesystem is unfortunate, it's a name collision that I think we'll
+simply have to live with; it's not created by this patch. "efuse" is the
+name of the Tegra module that hosts Tegra's fuses.
