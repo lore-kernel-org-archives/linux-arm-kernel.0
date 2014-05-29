@@ -1,36 +1,54 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 29 May 2014 10:53:52 +0200
-Subject: [PATCH v2 7/9] arm64: KVM: add trap handlers for AArch32 debug
- registers
-In-Reply-To: <53860830.4080707@arm.com>
+Date: Thu, 29 May 2014 10:55:25 +0200
+Subject: [PATCH v2 9/9] arm64: KVM: enable trapping of all debug registers
+In-Reply-To: <53860A5A.8030009@arm.com>
 References: <1400604945-25247-1-git-send-email-marc.zyngier@arm.com>
- <1400604945-25247-8-git-send-email-marc.zyngier@arm.com>
- <20140525153546.GH3866@lvm> <53860830.4080707@arm.com>
-Message-ID: <20140529085352.GC61607@lvm>
+ <1400604945-25247-10-git-send-email-marc.zyngier@arm.com>
+ <20140525153629.GJ3866@lvm> <53860A5A.8030009@arm.com>
+Message-ID: <20140529085525.GD61607@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 05:00:48PM +0100, Marc Zyngier wrote:
-> On 25/05/14 16:35, Christoffer Dall wrote:
-> > On Tue, May 20, 2014 at 05:55:43PM +0100, Marc Zyngier wrote:
-
-[...]
-
-> >> +
-> >> +	/* DBGDSAR (32bit) */
-> >> +	{ Op1( 0), CRn( 2), CRm( 0), Op2( 0), trap_raz_wi },
-> >> +
+On Wed, May 28, 2014 at 05:10:02PM +0100, Marc Zyngier wrote:
+> On 25/05/14 16:36, Christoffer Dall wrote:
+> > On Tue, May 20, 2014 at 05:55:45PM +0100, Marc Zyngier wrote:
+> >> Enable trapping of the debug registers, preventing the guests to
+> >> mess with the host state (and allowing guests to use the debug
+> >> infrastructure as well).
+> >>
+> >> Reviewed-by: Anup Patel <anup.patel@linaro.org>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  arch/arm64/kvm/hyp.S | 8 ++++++++
+> >>  1 file changed, 8 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> >> index 73ec5c4..72ed0bf8 100644
+> >> --- a/arch/arm64/kvm/hyp.S
+> >> +++ b/arch/arm64/kvm/hyp.S
+> >> @@ -777,6 +777,14 @@ __kvm_hyp_code_start:
+> >>  	mrs	x2, mdcr_el2
+> >>  	and	x2, x2, #MDCR_EL2_HPMN_MASK
+> >>  	orr	x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
+> >> +	orr	x2, x2, #(MDCR_EL2_TDRA | MDCR_EL2_TDOSA)
 > > 
-> > we don't handle access to any implementation defined debug registers?
-> > Did we actually check what would be implemented for the cores we
-> > support?
+> > so we unconditionally trap on the OS register access, but we don't
+> > properly emulate these do we?  What's the rationale?  (atmittedly,
+> > again, I'm not 100% clear on how the OS lock thingy is supposed to
+> > work/be used).
 > 
-> No. So far, I've stuck with what the ARM ARM describe. Unless you're
-> thinking of a particular register I may ignored?
+> The rational is that we don't want the guest to mess with the host
+> state, which may have decided to use the OSlock thing (we don't use it
+> at all, but who knows...). So we trap it, discard whatever the guest
+> wants to put there, and carry on.
 > 
-I was just wondering if there are any implementation defined registers
-on the cores we claim to support (a15/a57/a53), and if so, if we
-shouldn't add some handlers for those for completeness sake.  I didn't
-actually check.  Did you?
+> I'm not sure if this would confuse any guest (we only have Linux so far,
+> so I'm not too worried). Should a more adventurous guest show up, we can
+> revisit this.
+> 
+Yes, your explanation in the cover letter reply calmed me down.
 
+I'm happy with this.
+
+Thanks,
 -Christoffer
