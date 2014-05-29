@@ -1,63 +1,79 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 29 May 2014 12:08:14 +0530
-Subject: [PATCH v2 12/18] ARM: dts: dra7xx-clocks: rename pcie clocks to
- accommodate second PHY instance
+Date: Thu, 29 May 2014 12:08:19 +0530
+Subject: [TEMP PATCH v2 17/18] PCI: host: pcie-dra7xx: use reset framework
+ APIs to reset PCIe
 In-Reply-To: <1401345500-20188-1-git-send-email-kishon@ti.com>
 References: <1401345500-20188-1-git-send-email-kishon@ti.com>
-Message-ID: <1401345500-20188-13-git-send-email-kishon@ti.com>
+Message-ID: <1401345500-20188-18-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two instances of PCIe PHY in DRA7xx. So renamed
-optfclk_pciephy_32khz, optfclk_pciephy_clk and optfclk_pciephy_div_clk to
-optfclk_pciephy1_32khz, optfclk_pciephy1_clk and optfclk_pciephy1_div_clk
-respectively. This is needed for adding the clocks for second PCIe PHY
-instance.
+Get reset nodes from dt and use reset framework APIs to reset PCIe.
+This is needed since reset is handled by the SoC.
 
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Tero Kristo <t-kristo@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Kumar Gala <galak@codeaurora.org>
-Signed-off-by: Keerthy <j-keerthy@ti.com>
+Cc: Dan Murphy <dmurphy@ti.com>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/boot/dts/dra7xx-clocks.dtsi |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/pci/ti-pci.txt |    4 ++++
+ drivers/pci/host/pci-dra7xx.c                    |   10 ++++++++++
+ 2 files changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index e1bd052..3d8c9c2 100644
---- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -1165,7 +1165,7 @@
- 		reg = <0x021c>, <0x0220>;
- 	};
+diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
+index d07d2eb..3649c2e 100644
+--- a/Documentation/devicetree/bindings/pci/ti-pci.txt
++++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
+@@ -22,6 +22,8 @@ PCIe Designware Controller
+    num-lanes,
+    interrupt-map-mask,
+    interrupt-map : as specified in ../designware-pcie.txt
++ - resets: phandle used if reset is handled be soc
++ - reset-names: name given to the phandle
  
--	optfclk_pciephy_32khz: optfclk_pciephy_32khz at 4a0093b0 {
-+	optfclk_pciephy1_32khz: optfclk_pciephy_32khz at 4a0093b0 {
- 		compatible = "ti,gate-clock";
- 		clocks = <&sys_32k_ck>;
- 		#clock-cells = <0>;
-@@ -1183,7 +1183,7 @@
- 		ti,max-div = <2>;
- 	};
+ Example:
+ axi {
+@@ -45,6 +47,8 @@ axi {
+ 		ti,hwmods = "pcie1";
+ 		phys = <&pcie1_phy>;
+ 		phy-names = "pcie-phy0";
++		resets = <&prm_resets &device_reset>;
++		reset-names = "reset";
+ 		interrupt-map-mask = <0 0 0 7>;
+ 		interrupt-map = <0 0 0 1 &pcie_intc 1>,
+ 				<0 0 0 2 &pcie_intc 2>,
+diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
+index 8fb3a2e..17f5e6a 100644
+--- a/drivers/pci/host/pci-dra7xx.c
++++ b/drivers/pci/host/pci-dra7xx.c
+@@ -22,6 +22,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/resource.h>
++#include <linux/reset.h>
+ #include <linux/types.h>
  
--	optfclk_pciephy_clk: optfclk_pciephy_clk at 4a0093b0 {
-+	optfclk_pciephy1_clk: optfclk_pciephy_clk at 4a0093b0 {
- 		compatible = "ti,gate-clock";
- 		clocks = <&apll_pcie_ck>;
- 		#clock-cells = <0>;
-@@ -1191,7 +1191,7 @@
- 		ti,bit-shift = <9>;
- 	};
+ #include "pcie-designware.h"
+@@ -332,6 +333,7 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *np = dev->of_node;
+ 	char name[10];
++	struct reset_control *rstc;
  
--	optfclk_pciephy_div_clk: optfclk_pciephy_div_clk at 4a0093b0 {
-+	optfclk_pciephy1_div_clk: optfclk_pciephy_div_clk at 4a0093b0 {
- 		compatible = "ti,gate-clock";
- 		clocks = <&optfclk_pciephy_div>;
- 		#clock-cells = <0>;
+ 	dra7xx = devm_kzalloc(dev, sizeof(*dra7xx), GFP_KERNEL);
+ 	if (!dra7xx)
+@@ -355,6 +357,14 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
+ 	if (!base)
+ 		return -ENOMEM;
+ 
++	rstc = devm_reset_control_get(dev, "reset");
++	if (IS_ERR(rstc))
++		return PTR_ERR(rstc);
++
++	ret = reset_control_deassert(rstc);
++	if (ret)
++		return ret;
++
+ 	phy_count = of_property_count_strings(np, "phy-names");
+ 	if (phy_count < 0) {
+ 		dev_err(dev, "unable to find the strings\n");
 -- 
 1.7.9.5
