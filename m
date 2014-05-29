@@ -1,55 +1,86 @@
 From: elder@linaro.org (Alex Elder)
-Date: Thu, 29 May 2014 09:05:56 -0500
-Subject: [PATCH v3 0/5] clk: bcm: prerequisite and bus clock support
-Message-ID: <1401372361-18842-1-git-send-email-elder@linaro.org>
+Date: Thu, 29 May 2014 09:05:57 -0500
+Subject: [PATCH v3 1/5] clk: bcm281xx: add an initialized flag
+In-Reply-To: <1401372361-18842-1-git-send-email-elder@linaro.org>
+References: <1401372361-18842-1-git-send-email-elder@linaro.org>
+Message-ID: <1401372361-18842-2-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently only peripheral clocks are supported for Broadcom platforms
-that use Kona style CCUs for clocking.  This series adds support for
-bus clocks as well.
+Add a flag that tracks whether a clock has already been initialized.
+This will be used by the next patch to avoid initializing a clock
+more than once when it's listed as a prerequisite.
 
-One motivation for doing this is that there exist peripheral clocks
-that cannot be configured without having first initialized a related
-bus clock.  Adding bus clock support allows such peripheral clocks
-to be usable.
+Signed-off-by: Alex Elder <elder@linaro.org>
+---
+ drivers/clk/bcm/clk-kona.c | 17 +++++++++++++++--
+ drivers/clk/bcm/clk-kona.h |  7 +++++++
+ 2 files changed, 22 insertions(+), 2 deletions(-)
 
-This also imposes a new requirement, however--that the bus clock
-be initialized *before* the clock that depends on it.  For this,
-we define the notion of a "prerequisite" clock.  If a clock has a
-prerequisite specified, that prequisite clock will be initialized
-first.  For now this only affects startup-time initialization.
-
-These patches are based on Mike Turquette's current "clk-next"
-branch.
-    4c8f806 Merge branch 'clk-fixes' into clk-next
-
-They are available here:
-    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
-    Branch review/bcm-bus-clk-v3
-
-					-Alex
-
-Version history:
-v3: - Deleted unused clk_lookup field from struct kona_clk
-    - Now use term "initialized" rather than "enabled"
-v2: - Added field "p" to the previously unnamed prereq union.
-
-
-Alex Elder (5):
-  clk: bcm281xx: add an initialized flag
-  clk: bcm281xx: implement prerequisite clocks
-  clk: bcm281xx: add bus clock support
-  clk: bcm281xx: define a bus clock
-  ARM: dts: add bus clock bsc3_apb for bcm281xx
-
- arch/arm/boot/dts/bcm11351.dtsi      |   3 +-
- drivers/clk/bcm/clk-bcm281xx.c       |  13 +++-
- drivers/clk/bcm/clk-kona-setup.c     |  96 +++++++++++++++++++++++++++-
- drivers/clk/bcm/clk-kona.c           | 120 ++++++++++++++++++++++++++++++++++-
- drivers/clk/bcm/clk-kona.h           |  34 +++++++++-
- include/dt-bindings/clock/bcm281xx.h |   3 +-
- 6 files changed, 258 insertions(+), 11 deletions(-)
-
+diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
+index 95af2e6..9691b62 100644
+--- a/drivers/clk/bcm/clk-kona.c
++++ b/drivers/clk/bcm/clk-kona.c
+@@ -27,6 +27,9 @@
+ #define CCU_ACCESS_PASSWORD      0xA5A500
+ #define CLK_GATE_DELAY_LOOP      2000
+ 
++#define clk_is_initialized(_clk)	FLAG_TEST((_clk), KONA, INITIALIZED)
++#define clk_set_initialized(_clk)	FLAG_SET((_clk), KONA, INITIALIZED)
++
+ /* Bitfield operations */
+ 
+ /* Produces a mask of set bits covering a range of a 32-bit value */
+@@ -1246,13 +1249,23 @@ static bool __peri_clk_init(struct kona_clk *bcm_clk)
+ 
+ static bool __kona_clk_init(struct kona_clk *bcm_clk)
+ {
++	bool ret;
++
++	if (clk_is_initialized(bcm_clk))
++		return true;
++
+ 	switch (bcm_clk->type) {
+ 	case bcm_clk_peri:
+-		return __peri_clk_init(bcm_clk);
++		ret = __peri_clk_init(bcm_clk);
++		break;
+ 	default:
++		ret = false;
+ 		BUG();
+ 	}
+-	return -EINVAL;
++	if (ret)
++		clk_set_initialized(bcm_clk);
++
++	return ret;
+ }
+ 
+ /* Set a CCU and all its clocks into their desired initial state */
+diff --git a/drivers/clk/bcm/clk-kona.h b/drivers/clk/bcm/clk-kona.h
+index 2537b30..10e238d 100644
+--- a/drivers/clk/bcm/clk-kona.h
++++ b/drivers/clk/bcm/clk-kona.h
+@@ -406,6 +406,7 @@ struct kona_clk {
+ 	struct clk_init_data init_data;	/* includes name of this clock */
+ 	struct ccu_data *ccu;	/* ccu this clock is associated with */
+ 	enum bcm_clk_type type;
++	u32 flags;		/* BCM_CLK_KONA_FLAGS_* below */
+ 	union {
+ 		void *data;
+ 		struct peri_clk_data *peri;
+@@ -414,6 +415,12 @@ struct kona_clk {
+ #define to_kona_clk(_hw) \
+ 	container_of(_hw, struct kona_clk, hw)
+ 
++/*
++ * Kona clock flags:
++ *   INITIALIZED	clock has been initialized already
++ */
++#define BCM_CLK_KONA_FLAGS_INITIALIZED	((u32)1 << 0)	/* Clock initialized */
++
+ /* Initialization macro for an entry in a CCU's kona_clks[] array. */
+ #define KONA_CLK(_ccu_name, _clk_name, _type)				\
+ 	{								\
 -- 
 1.9.1
