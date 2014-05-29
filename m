@@ -1,91 +1,101 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Thu, 29 May 2014 20:36:20 +0800
-Subject: [PATCH 2/2] clk: hix5hd2: add sd clk
-In-Reply-To: <1401366980-15352-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1401366980-15352-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1401366980-15352-3-git-send-email-zhangfei.gao@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 29 May 2014 13:39:29 +0100
+Subject: [PATCH] arm64: kernel: initialize broadcast hrtimer based clock
+ event device
+In-Reply-To: <53871444.3080206@linux.vnet.ibm.com>
+References: <1401355381-11446-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <53871444.3080206@linux.vnet.ibm.com>
+Message-ID: <20140529123929.GF24233@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jiancheng Xue <xuejiancheng@huawei.com>
+Hi Preeti,
 
-Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
----
- drivers/clk/hisilicon/clk-hix5hd2.c       |   21 +++++++++++++++------
- include/dt-bindings/clock/hix5hd2-clock.h |    4 ++++
- 2 files changed, 19 insertions(+), 6 deletions(-)
+On Thu, May 29, 2014 at 12:04:36PM +0100, Preeti U Murthy wrote:
+> Hi Lorenzo,
+> 
+> On 05/29/2014 02:53 PM, Lorenzo Pieralisi wrote:
+> > On platforms implementing CPU power management, the CPUidle subsystem
+> > can allow CPUs to enter idle states where local timers logic is lost on power
+> > down. To keep the software timers functional the kernel relies on an
+> > always-on broadcast timer to be present in the platform to relay the
+> > interrupt signalling the timer expiries.
+> > 
+> > For platforms implementing CPU core gating that do not implement an always-on
+> > HW timer or implement it in a broken way, this patch adds code to initialize
+> > the kernel software broadcast hrtimer upon boot. It relies on a dynamically
+> 
+> It would be best to use the term "hrtimer based broadcast device"
+> throughout the changelog for uniformity and to avoid confusion instead
+> of mixing it with "software broadcast".
+> 
+> > chosen CPU to be always powered-up. This CPU then relays the timer interrupt
+> > to CPUs in deep-idle states through its HW local timer device.
+> > 
+> > On systems with power management capabilities but no functional HW broadcast
+> > tick device, the hrtimer based clock event device allows the kernel to
+> > enter high-resolution timer mode, which improves system latencies and saves
+> > dynamic power.
+> 
+> Sorry but I do not understand the above paragraph. What do you mean by
+> "allows the kernel to enter high resolution timer mode" ? And how does
+> it improve system latency? I understand that the hrtimer based
+> clockevent device saves dynamic power since it provides a mechanism in
+> which cpus can enter deeper idle states.
 
-diff --git a/drivers/clk/hisilicon/clk-hix5hd2.c b/drivers/clk/hisilicon/clk-hix5hd2.c
-index 4c4f1f6..3bb725f 100644
---- a/drivers/clk/hisilicon/clk-hix5hd2.c
-+++ b/drivers/clk/hisilicon/clk-hix5hd2.c
-@@ -50,9 +50,9 @@ static const char *sfc_mux_p[] __initconst = {
- 		"24m", "150m", "200m", "100m", "75m", };
- static u32 sfc_mux_table[] = {0, 4, 5, 6, 7};
- 
--static const char *sdio1_mux_p[] __initconst = {
-+static const char *sdio_mux_p[] __initconst = {
- 		"75m", "100m", "50m", "15m", };
--static u32 sdio1_mux_table[] = {0, 1, 2, 3};
-+static u32 sdio_mux_table[] = {0, 1, 2, 3};
- 
- static const char *fephy_mux_p[] __initconst = { "25m", "125m"};
- static u32 fephy_mux_table[] = {0, 1};
-@@ -61,20 +61,29 @@ static u32 fephy_mux_table[] = {0, 1};
- static struct hisi_mux_clock hix5hd2_mux_clks[] __initdata = {
- 	{ HIX5HD2_SFC_MUX, "sfc_mux", sfc_mux_p, ARRAY_SIZE(sfc_mux_p),
- 		CLK_SET_RATE_PARENT, 0x5c, 8, 3, 0, sfc_mux_table, },
--	{ HIX5HD2_MMC_MUX, "mmc_mux", sdio1_mux_p, ARRAY_SIZE(sdio1_mux_p),
--		CLK_SET_RATE_PARENT, 0xa0, 8, 2, 0, sdio1_mux_table, },
-+	{ HIX5HD2_MMC_MUX, "mmc_mux", sdio_mux_p, ARRAY_SIZE(sdio_mux_p),
-+		CLK_SET_RATE_PARENT, 0xa0, 8, 2, 0, sdio_mux_table, },
-+	{ HIX5HD2_SD_MUX, "sd_mux", sdio_mux_p, ARRAY_SIZE(sdio_mux_p),
-+		CLK_SET_RATE_PARENT, 0x9c, 8, 2, 0, sdio_mux_table, },
- 	{ HIX5HD2_FEPHY_MUX, "fephy_mux",
- 		fephy_mux_p, ARRAY_SIZE(fephy_mux_p),
- 		CLK_SET_RATE_PARENT, 0x120, 8, 2, 0, fephy_mux_table, },
- };
- 
- static struct hisi_gate_clock hix5hd2_gate_clks[] __initdata = {
--	/*sfc*/
-+	/* sfc */
- 	{ HIX5HD2_SFC_CLK, "clk_sfc", "sfc_mux",
- 		CLK_SET_RATE_PARENT, 0x5c, 0, 0, },
- 	{ HIX5HD2_SFC_RST, "rst_sfc", "clk_sfc",
- 		CLK_SET_RATE_PARENT, 0x5c, 4, CLK_GATE_SET_TO_DISABLE, },
--	/*sdio1*/
-+	/* sdio0 */
-+	{ HIX5HD2_SD_BIU_CLK, "clk_sd_biu", "200m",
-+		CLK_SET_RATE_PARENT, 0x9c, 0, 0, },
-+	{ HIX5HD2_SD_CIU_CLK, "clk_sd_ciu", "sd_mux",
-+		CLK_SET_RATE_PARENT, 0x9c, 1, 0, },
-+	{ HIX5HD2_SD_CIU_RST, "rst_sd_ciu", "clk_sd_ciu",
-+		CLK_SET_RATE_PARENT, 0x9c, 4, CLK_GATE_SET_TO_DISABLE, },
-+	/* sdio1 */
- 	{ HIX5HD2_MMC_BIU_CLK, "clk_mmc_biu", "200m",
- 		CLK_SET_RATE_PARENT, 0xa0, 0, 0, },
- 	{ HIX5HD2_MMC_CIU_CLK, "clk_mmc_ciu", "mmc_mux",
-diff --git a/include/dt-bindings/clock/hix5hd2-clock.h b/include/dt-bindings/clock/hix5hd2-clock.h
-index e328669..5bd4135 100644
---- a/include/dt-bindings/clock/hix5hd2-clock.h
-+++ b/include/dt-bindings/clock/hix5hd2-clock.h
-@@ -46,6 +46,7 @@
- #define HIX5HD2_SFC_MUX			64
- #define HIX5HD2_MMC_MUX			65
- #define HIX5HD2_FEPHY_MUX		66
-+#define HIX5HD2_SD_MUX			67
- 
- /* gate clocks */
- #define HIX5HD2_SFC_RST			128
-@@ -56,6 +57,9 @@
- #define HIX5HD2_FWD_BUS_CLK		133
- #define HIX5HD2_FWD_SYS_CLK		134
- #define HIX5HD2_MAC0_PHY_CLK		135
-+#define HIX5HD2_SD_CIU_CLK		136
-+#define HIX5HD2_SD_BIU_CLK		137
-+#define HIX5HD2_SD_CIU_RST		138
- 
- /* complex */
- #define HIX5HD2_MAC0_CLK		192
--- 
-1.7.9.5
+When there's no oneshot-capable broadcast device and the CPU-local
+clock_event_device has the CLK_EVT_FEAT_C3STOP flag,
+tick_is_oneshot_available will return false. Thus
+tick_check_oneshot_change will return false, and hrtimer_switch_to_hres
+will never switch to high resolution mode (and we can also never enter
+NOHZ mode), leaving us stuck in periodic mode.
+
+In periodic mode ticks occur at fixed intervals, and any timer wakeup
+will occur after the tick following the requested wakeup time, adding
+some amount of latency over what would be possible with high resolution
+mode. Additionally, as we can only wake up at said ticks and not between
+them, it's possible that several timers for intervals shorter than that
+tick interval will fire at once upon a timer tick. Any tasks which
+requested these wakeups will fight for CPU time, and some will see
+additional latency because of this.
+
+> > 
+> > The side effect of having a CPU always-on has implications on power management
+> > platform capabilities and makes CPUidle suboptimal, since at least a CPU is
+> > kept always in a shallow idle state by the kernel to relay timer interrupts,
+> > but at least leaves the kernel with a functional system with some working power
+> > management capabilities.
+> > 
+> > The hrtimer based clock event device has lowest possible rating so that,
+> > if a platform contains a functional HW clock event device with broadcast
+> > capabilities, that device is always chosen as a tick broadcast device instead
+> > of the software based one, now present by default.
+> 
+> I think this statement "instead of the software based one, now present
+> by default" is incorrect. The hrtimer based clock event device will come
+> into picture only when the arch calls tick_setup_hrtimer_broadcast()
+> explicitly. Otherwise either the arch should register a real clock
+> device which does broadcast or should disable deep idle states where the
+> local timers stop. So I would suggest skipping the last paragraph as it
+> is not conveying anything in specific. The fact that a clock device with
+> the highest rating will be chosen is already known and need not be
+> mentioned explicitly IMHO.
+
+I think it is worth keeping the paragraph to allay anyone's fear that
+the hrtimer based broadcast device might be selected in preference to a
+real suitable clock. I would otherwise not be aware that the hrtimer
+based broadcast device had the lowest rating (and would have to go and
+look that up separately).
+
+As the arch code has delegated timer registration to
+clocksoruce_of_init, it doesn't know whether any of the real devices
+that may have been registered are suitable as a broadcast source for
+oneshot events. So we can't conditionally register the hrtimer based
+broadcast device.
+
+Perhaps we could replace "now present by default" with "which is
+unconditionally registered in case no suitable hardware device is
+present"?
+
+Cheers,
+Mark.
