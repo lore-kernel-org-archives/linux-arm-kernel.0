@@ -1,45 +1,48 @@
-From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
-Date: Thu, 29 May 2014 15:36:10 +0200
-Subject: [PATCH v11 0/3] Exynos 5410 support
-In-Reply-To: <7hr43f9mmn.fsf@paris.lan>
-References: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>
- <7hr43f9mmn.fsf@paris.lan>
-Message-ID: <538737CA.4070709@suse.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 29 May 2014 08:44:00 -0500
+Subject: [RFC v2 04/10] ARM: vexpress: Extend UART with FIQ support
+In-Reply-To: <53870C8C.1070108@linaro.org>
+References: <1400083125-1464-1-git-send-email-daniel.thompson@linaro.org>
+ <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
+ <1400853478-5824-5-git-send-email-daniel.thompson@linaro.org>
+ <20140523150452.GX3693@n2100.arm.linux.org.uk>
+ <53870C8C.1070108@linaro.org>
+Message-ID: <CAL_JsqL0pYOEiyo8KfJA1aO_MOmwvn6a4hibZcamm0Jcw4Q6bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tarek and Kevin,
-
-Am 27.05.2014 19:06, schrieb Kevin Hilman:
-> Tarek Dakhran <t.dakhran@samsung.com> writes:
-> 
->> The series of patches represent support of Exynos 5410 SoC
+On Thu, May 29, 2014 at 5:31 AM, Daniel Thompson
+<daniel.thompson@linaro.org> wrote:
+> On 23/05/14 16:04, Russell King - ARM Linux wrote:
+>> On Fri, May 23, 2014 at 02:57:52PM +0100, Daniel Thompson wrote:
+>>> @@ -140,7 +140,7 @@
+>>>                      v2m_serial0: uart at 090000 {
+>>>                              compatible = "arm,pl011", "arm,primecell";
+>>>                              reg = <0x090000 0x1000>;
+>>> -                            interrupts = <5>;
+>>> +                            interrupts = <5>, <69>;
 >>
->> The Exynos 5410 is the first Samsung SoC based on big.LITTLE architecture
->>
->> Patches add new platform description, support of clock controller and device
->> tree for Exynos 5410.
->>
->> Has been build on Samsung Linux Kernel
->>   (branch: for-next, commit: 97eae6c Merge branch 'v3.16-next/multiplatform' into for-next)
->>
->> Has been tested on: 1) Exynos 5410 reference board (exynos_defconfig)
->> 		    2) Exynos 5410 reference board (multi_v7_defconfig)
->> 		    3) Odroid-XU board (exynos_defconfig)
->> 		    4) Odroid-XU board (multi_v7_defconfig)
-> 
-> Tested-by: Kevin Hilman <khilman@linaro.org>
-> 
-> FYI, I boot tested this on an odroid-xu (exynos_defconfig and
-> multi_v7_defconfig.)
+>> NAK.  This is obviously a Linux implementation detail - the second
+>> number is your "FIQ" number which you've decided will be offset by
+>> 64.
 
-Could you clarify: Are you using exynos5410-smdk5410.dts with the
-ODROID-XU or do you have some upcoming exynos5410-odroidxu.dts based on
-exynos5410.dtsi?
++1
 
-Thanks,
-Andreas
+> Certainly the offset of 64 is a more or less meaningless magic number
+> that I decided on, however I don't think it originates within Linux. It
+> is both introduced and consumed within the device tree itself.
+>
+> I've proposed adding a flag to the gic bindings to mark a FIQ; the GIC
+> calls interrupt 69 (above) <0 5 0x84> (where 0x80 is the flag to request
+> FIQ routing alongside 0x04 which is the trigger type).
 
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+That would be better than the magic number, but I'm not convinced that
+belongs in the DT either.
+
+Whether the uart uses FIQ is not dependent on this DT setting, but
+based on whether the user wants to use the uart for kdb or not. You
+have enough information already to figure out which interrupt. What's
+missing is whether you have the capability to use FIQ or not. I don't
+recall if you can tell that from the GIC or not.
+
+Rob
