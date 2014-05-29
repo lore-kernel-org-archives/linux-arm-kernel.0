@@ -1,13 +1,43 @@
-From: greg@kroah.com (Greg KH)
-Date: Thu, 29 May 2014 16:25:34 -0700
-Subject: [PATCH] gpio: removes all usage of gpiochip_remove retval
-In-Reply-To: <1401400492-26175-1-git-send-email-berthe.ab@gmail.com>
-References: <1401400492-26175-1-git-send-email-berthe.ab@gmail.com>
-Message-ID: <20140529232534.GA11741@kroah.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 30 May 2014 08:31:17 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v3.16
+Message-ID: <cover.1401406177.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 29, 2014 at 11:54:52PM +0200, abdoulaye berthe wrote:
-> Signed-off-by: abdoulaye berthe <berthe.ab@gmail.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Why?
+Please consider these Renesas ARM based SoC fixes for v3.16.
+
+This corrects a bug that will be introduced in v3.15.
+The bug causes audio playback to fail on the Armadillo800 EVA board.
+
+I am posting this as a fix for v3.16 rather than v3.15 as I believe
+it is too late in the v3.15 cycle for a change of this nature.
+As such I would also like this change considered for v3.15 -stable.
+
+
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v3.16
+
+for you to fetch changes up to 730359857f5f0e1fac9881c63d389d73adb5f416:
+
+  ARM: shmobile: armadillo800eva: fixup HDMI sound flags setting (2014-05-28 12:57:07 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Fixes for v3.16
+
+This corrects a bug that will be introduced in v3.15.
+The bug causes audio playback to fail on the Armadillo800 EVA board.
+
+----------------------------------------------------------------
+Kuninori Morimoto (1):
+      ARM: shmobile: armadillo800eva: fixup HDMI sound flags setting
+
+ arch/arm/mach-shmobile/board-armadillo800eva.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
