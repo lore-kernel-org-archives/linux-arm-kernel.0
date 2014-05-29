@@ -1,78 +1,30 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 May 2014 11:17:08 -0700
-Subject: [GIT PULL 2/5] Samsung clock updates for 3.16
-In-Reply-To: <014501cf73c8$5eb66960$1c233c20$@samsung.com>
-References: <014501cf73c8$5eb66960$1c233c20$@samsung.com>
-Message-ID: <20140529181708.GA18481@quad.lixom.net>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 29 May 2014 11:25:24 -0700
+Subject: [PATCH tty-next] serial: sirf: Fix compilation failure
+In-Reply-To: <CAGsJ_4ypSdP-i35BaQaciPo-g=+8Z5-T2MV5zgDP98BMciGbGw@mail.gmail.com>
+References: <1396010535-2654-1-git-send-email-daniel.thompson@linaro.org>
+ <1401358423-31532-1-git-send-email-daniel.thompson@linaro.org>
+ <CAGsJ_4ypSdP-i35BaQaciPo-g=+8Z5-T2MV5zgDP98BMciGbGw@mail.gmail.com>
+Message-ID: <20140529182524.GA22969@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 10:11:03AM +0900, Kukjin Kim wrote:
-> The following changes since commit 34c453ce16633539a94a2e876faeb731ac1be899:
+On Thu, May 29, 2014 at 08:14:02PM +0800, Barry Song wrote:
+> 2014-05-29 18:13 GMT+08:00 Daniel Thompson <daniel.thompson@linaro.org>:
+> > After 07d410e0) serial: sirf: fix spinlock deadlock issue it is no longer
+> > possiblet to compile this driver. The rename of one of the spinlocks is
+> > faulty. After looking at the original patch I believe this is the correct
+> > fix.
+> >
+> > Compile tested using ARM's multi_v7_defconfig
+> >
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Cc: Jiri Slaby <jslaby@suse.cz>
+> > Cc: Barry Song <baohua@kernel.org>
+> > Cc: Qipan Li <Qipan.Li@csr.com>
+> > Cc: linux-serial at vger.kernel.org
+> > Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 > 
->   ARM: S3C24XX: fix merge conflict (2014-05-15 05:54:38 +0900)
-> 
-> are available in the git repository at:
-> 
->   http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-clk
-> 
-> for you to fetch changes up to 6520e968eef4f88c076a84a80e026049d157132e:
-> 
->   clk: exynos5420: Add 5800 specific clocks (2014-05-19 22:15:08 +0900)
-> 
-> ----------------------------------------------------------------
-> Samsung clock updates for 3.16
-> 
-> In this time, it is having dependency with arch/arm/ for 3.16,
-> I pulled them into samsung tree from Tomasz under agreement from Mike.
-> 
-> - Pull for_3.16/exynos5260 from Tomasz Figa:
-> 
->   "This pull request contains patches preparing Samsung Common Clock
-> Framework
->   helpers to support Exynos5260 by adding support for multiple clock
-> providers
->   and then adding clock driver for Exynos5260."
-> 
-> - Pull for_3.16/clk_fixes_non_critical from Tomasz Figa:
-> 
->   "This pull requests contains a number of non-critical fixes for Samsung
-> clock
->   framework and drivers, including:
->   1) a series of fixes for Exynos5420 to correct clock definitions and make
-> the
->   driver closer to the documentation,
->   2) several missing clocks and clock IDs added to Exynos4, Exynos5250 and
->   Exynos5420 drivers,
->   3) fix for incorrect initialization of clock table with NULL,
->   4) compiler warning fix."
-> 
-> - Pull for_3.16/clk_cleanup from Tomasz Figa:
-> 
->   "This pull requests contains minor clean-up related to Samsung clock
->   support, including:
->   1) move Kconfig entries of Samsung clock drivers to drivers/clk,
->   2) compile drivers/clk/samsung conditionally when COMMON_CLK_SAMSUNG is
->   selected,
->   3) remove obsolete Kconfig lines after moving s3c24xx to CCF."
-> 
-> - Pull for_3.16/exynos3250 from Tomasz Figa:
-> 
->   "This small pull request contains a patch adding clock driver for
-> Exynos3250,
->   which depends on previous pull requests in this series."
-> 
-> - add dt bindings for exynos3250 clock
-> - add exynos5800 specific clocks in current exynos5420 clock
-> 
-> Note that this branch is based on s3c24xx ccf branch
+> Qipan prepared a same patch to fix this.
 
-Hi,
-
-Merged into next/soc. In the future, you can probably just send up topic
-branches like these directly, no need to merge them together just to send them
-up.
-
-
--Olof
+Why didn't he send it?
