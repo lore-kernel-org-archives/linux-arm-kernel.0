@@ -1,48 +1,53 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 29 May 2014 11:13:43 +0100
-Subject: [PATCH tty-next] serial: sirf: Fix compilation failure
-In-Reply-To: <1396010535-2654-1-git-send-email-daniel.thompson@linaro.org>
-References: <1396010535-2654-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1401358423-31532-1-git-send-email-daniel.thompson@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 29 May 2014 11:14:41 +0100
+Subject: [PATCH] arm64: kernel: initialize broadcast hrtimer based clock
+ event device
+In-Reply-To: <1401355381-11446-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1401355381-11446-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20140529101441.GM29812@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After 07d410e0) serial: sirf: fix spinlock deadlock issue it is no longer
-possiblet to compile this driver. The rename of one of the spinlocks is
-faulty. After looking at the original patch I believe this is the correct
-fix.
+On Thu, May 29, 2014 at 10:23:01AM +0100, Lorenzo Pieralisi wrote:
+> On platforms implementing CPU power management, the CPUidle subsystem
+> can allow CPUs to enter idle states where local timers logic is lost on power
+> down. To keep the software timers functional the kernel relies on an
+> always-on broadcast timer to be present in the platform to relay the
+> interrupt signalling the timer expiries.
+> 
+> For platforms implementing CPU core gating that do not implement an always-on
+> HW timer or implement it in a broken way, this patch adds code to initialize
+> the kernel software broadcast hrtimer upon boot. It relies on a dynamically
+> chosen CPU to be always powered-up. This CPU then relays the timer interrupt
+> to CPUs in deep-idle states through its HW local timer device.
+> 
+> On systems with power management capabilities but no functional HW broadcast
+> tick device, the hrtimer based clock event device allows the kernel to
+> enter high-resolution timer mode, which improves system latencies and saves
+> dynamic power.
+> 
+> The side effect of having a CPU always-on has implications on power management
+> platform capabilities and makes CPUidle suboptimal, since at least a CPU is
+> kept always in a shallow idle state by the kernel to relay timer interrupts,
+> but at least leaves the kernel with a functional system with some working power
+> management capabilities.
+> 
+> The hrtimer based clock event device has lowest possible rating so that,
+> if a platform contains a functional HW clock event device with broadcast
+> capabilities, that device is always chosen as a tick broadcast device instead
+> of the software based one, now present by default.
+> 
+> Cc: Preeti U Murthy <preeti@linux.vnet.ibm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Compile tested using ARM's multi_v7_defconfig
+Thanks Lorenzo,
 
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.cz>
-Cc: Barry Song <baohua@kernel.org>
-Cc: Qipan Li <Qipan.Li@csr.com>
-Cc: linux-serial at vger.kernel.org
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-Notes:
-    Sorry to resend within a few minutes. Patch is identical to parent but the
-    subject line has been corrected. The original 'v6' was just utterly
-    wrong! This patch is a not-previously-shared patch to fix a build
-    regression that appears in tty-next.
+With this patch applied, cyclictest starts reporting sane numbers and I
+no longer see latency-related failures in LTP when it does things like
+test timeouts and nanosleep()s.
 
- drivers/tty/serial/sirfsoc_uart.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
-index 236f892..1f2be48 100644
---- a/drivers/tty/serial/sirfsoc_uart.c
-+++ b/drivers/tty/serial/sirfsoc_uart.c
-@@ -704,7 +704,7 @@ static void sirfsoc_uart_rx_dma_complete_tl(unsigned long param)
- 	struct sirfsoc_int_en *uint_en = &sirfport->uart_reg->uart_int_en;
- 	unsigned long flags;
- 	struct dma_tx_state tx_state;
--	spin_lock_irqsave(&port->rx_lock, flags);
-+	spin_lock_irqsave(&port->lock, flags);
- 	while (DMA_COMPLETE == dmaengine_tx_status(sirfport->rx_dma_chan,
- 			sirfport->rx_dma_items[sirfport->rx_completed].cookie, &tx_state)) {
- 		sirfsoc_uart_insert_rx_buf_to_tty(sirfport,
--- 
-1.9.0
+Will
