@@ -1,43 +1,45 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 29 May 2014 09:55:34 -0600
-Subject: [PATCH] scripts/dtc: pad DTBs to facilitate later modification
-In-Reply-To: <1400888507-11637-1-git-send-email-khilman@linaro.org>
-References: <1400888507-11637-1-git-send-email-khilman@linaro.org>
-Message-ID: <53875876.2020001@wwwdotorg.org>
+Date: Thu, 29 May 2014 09:52:22 -0600
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <1400877395-4235-1-git-send-email-thierry.reding@gmail.com>
+References: <1400877395-4235-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <538757B6.4010109@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/2014 05:41 PM, Kevin Hilman wrote:
-> By default, add some padding to the DT blobs to facilitate later
-> patching.
+On 05/23/2014 02:36 PM, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
 > 
-> An example need for DTB patching is the need to modifiy the command
-> line on platforms where ATAGS are not (or cannot) be used to pass the
-> commandline.  For example, we do not support a big-endian kernel
-> reading ATAGS from a little-endian u-boot, so the only way to pass a
-> command line in the DT.
+> This commit introduces a generic device tree binding for IOMMU devices.
+> Only a very minimal subset is described here, but it is enough to cover
+> the requirements of both the Exynos System MMU and Tegra SMMU as
+> discussed here:
 > 
-> Also, without ATAG support (or if u-boot was built without
-> CONFIG_INITRD_TAG) the only way to pass an initrd is by adding an
-> initrd= option to command line (in the DT).
+>     https://lkml.org/lkml/2014/4/27/346
 > 
-> Therefore, to facilitate adding to the DT command line directly in the
-> DTB, add some padding.
-> 
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
 > ---
-> I kinda pulled 64 bytes out of the air here since it's enough to add
-> some common things to the commandline like debug, earlyprink
-> initrd=<addr>,<size>, etc., but I'm certainlly not opposed to more
-> padding.
+> Apologies for the noise, but apparently I mistyped one of the email
+> addresses, should be fixed now.
+> 
+> Changes in v2:
+> - add notes about "dma-ranges" property (drop note from commit message)
+> - document priorities of "iommus" property vs. "dma-ranges" property
+> - drop #iommu-cells in favour of #address-cells and #size-cells
 
-Conceptually,
-Acked-by: Stephen Warren <swarren@nvidia.com>
-
-But I would expect a pad of something like 4KB to be more future-proof.
-U-Boot appears to use 4KB on ARM at least:
-
-./arch/arm/dts/Makefile:37:DTC_FLAGS += -R 4 -p 0x1000
+I think this is a mistake. address-cells/size-cells are for transactions
+flowing down the bus (from the CPU to date). Describing a connection
+from a device to an IOMMU is something completely different, and should
+therefore simply use an iommu-cells property to describe any necessary
+information. If we start re-using properties for different things in
+different contexts, how is anyone going to know what they mean, and how
+will conflicts be resolved. For example, what if there's a single HW
+module that both acts as a regular register bus with children (where
+address-cells/size-cells defines how transactions reach the children
+from the parent), and is also an IOMMU (where according to this binding
+proposal, address-cells/size-cells represent some aspect of the IOMMU
+feature). Using different properties for different things is the only
+sane way to keep different concepts separate. Another alternative would
+be to represent the single HW module as separate nodes in DT, but I
+think that will only make our lives harder, and where I've done that in
+the past, I've regretted it.
