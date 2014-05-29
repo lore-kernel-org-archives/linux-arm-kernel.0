@@ -1,47 +1,37 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 May 2014 12:44:23 -0700
-Subject: [GIT PULL] omap dt fixes and and clocks for v3.16 merge window
-In-Reply-To: <20140528175838.GA4707@atomide.com>
-References: <20140528175838.GA4707@atomide.com>
-Message-ID: <20140529194423.GI18481@quad.lixom.net>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Thu, 29 May 2014 21:44:09 +0200
+Subject: [PATCH v2 10/11] sched: move cfs task on a CPU with higher
+ capacity
+In-Reply-To: <20140529140427.GI11074@laptop.programming.kicks-ass.net>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-11-git-send-email-vincent.guittot@linaro.org>
+ <20140529140427.GI11074@laptop.programming.kicks-ass.net>
+Message-ID: <CAKfTPtAC_qpK5SgSQHHTzKw+Mm_EzdufdhQUoTfbjr74vwUjsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 10:58:39AM -0700, Tony Lindgren wrote:
-> The following changes since commit d712ff63b18309c939396f593510fbcccbafb9e4:
-> 
->   ARM: dts: Enable mcpdm and mcbsp1 on DuoVero (2014-05-19 17:20:31 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/dt-part3
-> 
-> for you to fetch changes up to 43369f0fe81044427f6b1eedeb16bf8c74c86d48:
-> 
->   Merge branch 'for-v3.16/clk-dt' of https://github.com/t-kristo/linux-pm into omap-for-v3.16/dt-v2 (2014-05-28 10:14:48 -0700)
-> 
-> ----------------------------------------------------------------
-> 
-> Most likely the last pull request from me for omap changes for
-> v3.16 that's dts fixes for clocks and enabling few features
-> that were still being discussed earlier:
-> 
-> - A bunch of omap clock related dts fixes queued by Tero Kristo.
-> 
-> - Enable parallel nand on am437x that was not merged earlier as
->   I requested more information about the muxing for it. And
->   we need to also enable ecc hardware support for am43xx.
-> 
-> - Enable the modem support for n900 that was dropped earlier
->   because we had to fix the related hwmod entry first with patch
->   ARM: OMAP2+: Fix ssi hwmod entry to allow idling.
-> 
-> - And finally, add the omap2 clock dts files. These will allow
->   us to enable the dt clocks and drop the legacy clocks for omap2
->   with a follow-up patch once the related clock driver binding
->   changes are merged.
+On 29 May 2014 16:04, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Fri, May 23, 2014 at 05:53:04PM +0200, Vincent Guittot wrote:
+>> @@ -7282,6 +7289,12 @@ static inline int nohz_kick_needed(struct rq *rq)
+>>
+>>               if (nr_busy > 1)
+>>                       goto need_kick_unlock;
+>> +
+>> +             if ((rq->cfs.h_nr_running >= 1)
+>> +              && ((rq->cpu_power * sd->imbalance_pct) <
+>> +                                     (rq->cpu_power_orig * 100)))
+>> +                     goto need_kick_unlock;
+>> +
+>>       }
+>>
+>>       sd = rcu_dereference(per_cpu(sd_asym, cpu));
+>
+> So what happens when a cpu is consistently low on power (say due to a
+> pinned RT task) the balancer would quickly adjust the load level, but
+> this would endlessly kick things into action, even though we're balanced
+> just fine.
 
-Merged into next/dt. Thanks.
-
-
--Olof
+If there is more than 1 running task or more than 1 busy CPU, we will
+kick the ilb because of the former conditions. Then, if there is only
+1 task and no other busy cpu, we should trig the ILB. Nevertheless, I
+can add a test to check that there is an idle cpu in the sched_domain
