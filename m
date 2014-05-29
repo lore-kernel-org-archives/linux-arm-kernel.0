@@ -1,33 +1,47 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 May 2014 12:43:00 -0700
-Subject: [PATCH] ARM: kconfig: allow PCI support to be selected with
- ARCH_MULTIPLATFORM
-In-Reply-To: <1401229595-524-1-git-send-email-will.deacon@arm.com>
-References: <1401229595-524-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20140529194300.GH18481@quad.lixom.net>
+Date: Thu, 29 May 2014 12:44:23 -0700
+Subject: [GIT PULL] omap dt fixes and and clocks for v3.16 merge window
+In-Reply-To: <20140528175838.GA4707@atomide.com>
+References: <20140528175838.GA4707@atomide.com>
+Message-ID: <20140529194423.GI18481@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 11:26:35PM +0100, Will Deacon wrote:
-> When targetting ARCH_MULTIPLATFORM, we may include support for SoCs with
-> PCI-capable devices (e.g. mach-virt with virtio-pci).
+On Wed, May 28, 2014 at 10:58:39AM -0700, Tony Lindgren wrote:
+> The following changes since commit d712ff63b18309c939396f593510fbcccbafb9e4:
 > 
-> This patch allows PCI support to be selected for these SoCs by selecting
-> CONFIG_MIGHT_HAVE_PCI when CONFIG_ARCH_MULTIPLATFORM=y and removes the
-> individual selections from multi-platform enabled SoCs.
+>   ARM: dts: Enable mcpdm and mcbsp1 on DuoVero (2014-05-19 17:20:31 -0700)
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
+> are available in the git repository at:
 > 
-> Hi Arnd, Olof, Kevin,
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/dt-part3
 > 
-> Please can you take this patch via the arm-soc tree for 3.16? It doesn't
-> really fit with the generic PCI host driver that I'll send via Bjorn and
-> it seems OTT to send you a pull request containing just this patch.
+> for you to fetch changes up to 43369f0fe81044427f6b1eedeb16bf8c74c86d48:
 > 
+>   Merge branch 'for-v3.16/clk-dt' of https://github.com/t-kristo/linux-pm into omap-for-v3.16/dt-v2 (2014-05-28 10:14:48 -0700)
+> 
+> ----------------------------------------------------------------
+> 
+> Most likely the last pull request from me for omap changes for
+> v3.16 that's dts fixes for clocks and enabling few features
+> that were still being discussed earlier:
+> 
+> - A bunch of omap clock related dts fixes queued by Tero Kristo.
+> 
+> - Enable parallel nand on am437x that was not merged earlier as
+>   I requested more information about the muxing for it. And
+>   we need to also enable ecc hardware support for am43xx.
+> 
+> - Enable the modem support for n900 that was dropped earlier
+>   because we had to fix the related hwmod entry first with patch
+>   ARM: OMAP2+: Fix ssi hwmod entry to allow idling.
+> 
+> - And finally, add the omap2 clock dts files. These will allow
+>   us to enable the dt clocks and drop the legacy clocks for omap2
+>   with a follow-up patch once the related clock driver binding
+>   changes are merged.
 
-Thanks, applied to next/cleanup.
+Merged into next/dt. Thanks.
 
 
 -Olof
