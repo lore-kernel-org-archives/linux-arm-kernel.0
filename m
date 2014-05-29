@@ -1,33 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 May 2014 19:55:34 +0100
-Subject: nommu build failures on ARM in linux-next
-In-Reply-To: <5387661F.1050000@windriver.com>
-References: <5387661F.1050000@windriver.com>
-Message-ID: <20140529185534.GK3693@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 29 May 2014 13:01:06 -0600
+Subject: [PATCH v5 2/5] ARM: tegra: move fuse exports to tegra-soc.h
+In-Reply-To: <1401281677-32110-3-git-send-email-pdeschrijver@nvidia.com>
+References: <1401281677-32110-1-git-send-email-pdeschrijver@nvidia.com>
+ <1401281677-32110-3-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <538783F2.9020901@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 29, 2014 at 12:53:51PM -0400, Paul Gortmaker wrote:
-> Hi Russell,
-> 
-> The allnoconfig builds in linux-next fail because __clear_cr
-> lives in mmu.c without any stub or similar in nommu.c
-> 
-> Introduced by:
-> 
-> commit 247e4fff3aa927ad069447e6da05bb966b70dece
-> Author: Russell King <rmk+kernel@arm.linux.org.uk>
-> Date:   Sun Apr 13 18:57:29 2014 +0100
-> 
->     ARM: provide common method to clear bits in CPU control register
->     
-> Sample failure:
->   http://kisskb.ellerman.id.au/kisskb/buildresult/11264405/
+On 05/28/2014 06:54 AM, Peter De Schrijver wrote:
+> All fuse related functionality will move to a driver in the following patches.
+> To prepare for this, export all the required functionality in a global header
+> file and move all users of fuse.h to tegra-soc.h. While we're at it, remove
+> tegra_bct_strapping, as its only user was removed in Commit a7cbe92cef27
+> ("ARM: tegra: remove tegra EMC scaling driver").
 
-ALIGNMENT_TRAP depends on CPU_CP15_MMU, so it's quite reasonable that
-__clear_cr should exist in this case - but it doesn't because it's in
-mmu.c.  I guess we need __clear_cr moved to arch/arm/kernel/setup.c.
+> diff --git a/include/linux/tegra-soc.h b/include/linux/tegra-soc.h
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> @@ -33,4 +54,8 @@ static inline int tegra_apb_writel_using_dma(u32 value, unsigned long offset)
+>  	return -EINVAL;
+>  }
+>  #endif
+> +
+> +#endif /* __ASSEMBLY__ */
+> +
+> +
+>  #endif /* __LINUX_TEGRA_SOC_H_ */
+
+Nit: 2 blank lines there. I'll try and remember to fix that up when I
+apply this, if nothing requires a repost.
