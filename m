@@ -1,43 +1,37 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 May 2014 12:40:02 -0700
-Subject: [GIT PULL 3rd 2/3] Samsung Exynos SoC updates for 3.16
-In-Reply-To: <035701cf7897$6fb5e460$4f21ad20$@samsung.com>
-References: <035701cf7897$6fb5e460$4f21ad20$@samsung.com>
-Message-ID: <20140529194002.GG18481@quad.lixom.net>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 29 May 2014 21:42:23 +0200
+Subject: [PATCH] ARM: OMAP: SX1: remove check for CONFIG_SX1_OLD_FLASH
+In-Reply-To: <20140529191738.GA18567@atomide.com>
+References: <1400182902.11786.21.camel@x220>
+ <20140516211231.GF12881@atomide.com>
+ <20140529190227.GB18230@amd.pavel.ucw.cz>
+ <20140529191738.GA18567@atomide.com>
+Message-ID: <20140529194223.GA20722@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 01:03:22PM +0900, Kukjin Kim wrote:
-> The following changes since commit be1f7c8d7e2bc8b8c76846aa6f276e8d2ef8975a:
+On Thu 2014-05-29 12:17:39, Tony Lindgren wrote:
+> * Pavel Machek <pavel@ucw.cz> [140529 12:03]:
+> > On Fri 2014-05-16 14:12:31, Tony Lindgren wrote:
+> > > * Paul Bolle <pebolle@tiscali.nl> [140515 12:42]:
+> > > > A check for CONFIG_SX1_OLD_FLASH was added in v2.6.24. But the related
+> > > > Kconfig symbol was never part of the tree. So we can remove some dead
+> > > > code.
+> > > 
+> > > Thanks applying into omap-for-v3.16/board.
+> > 
+> > Actually... It seems there are two variant of SX1, and this is very
+> > useful piece of documentation how the _other_ variant looks.
+> > 
+> > And if someone is hacking linux on sx1, he can probably figure out
+> > #ifdef in .c file...
+> > 
+> > IOW adding the config option might be better solution.
 > 
->   cpufreq: exynos: Fix the compile error (2014-05-26 04:05:01 +0900)
-> 
-> are available in the git repository at:
-> 
->   http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/exynos-soc
-> 
-> for you to fetch changes up to 455ae9aba2f05e77eaf1073b78e887b06f93a4fd:
-> 
->   ARM: dts: Add device tree sources for exynos3250 (2014-05-26 05:32:02
-> +0900)
-> 
-> ----------------------------------------------------------------
-> Exynos new SoCs support for v3.16
-> 
-> - add support for exynos5260 SoC and exynos5260-xyref5260 board
-> - add support for exynos5800 SoC and exynos5800-peach-pi board
-> - add support for exynos3250 SoC
-> 
-> Note that this branch is on top of tags/samsung-cleanup.
+> Or just a comment saying the same?
 
-This branch mixes contents from what should be two branches: One quite short
-one that just contains the code/Kconfig changes for the new SoCs. And the rest
-(DTS/DTSI additions) should go in a DT branch.
-
-Please respin as two separate branches. This will include respinning the
-multiplatform branches too, etc, unfortunately. Please post fresh pull requests
-for any respun/rebased branch.
-
-
--Olof
+Yes, #if 0 with a comment would do the same trick.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
