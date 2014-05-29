@@ -1,29 +1,36 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 29 May 2014 21:02:27 +0200
-Subject: [PATCH] ARM: OMAP: SX1: remove check for CONFIG_SX1_OLD_FLASH
-In-Reply-To: <20140516211231.GF12881@atomide.com>
-References: <1400182902.11786.21.camel@x220>
- <20140516211231.GF12881@atomide.com>
-Message-ID: <20140529190227.GB18230@amd.pavel.ucw.cz>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 29 May 2014 13:04:33 -0600
+Subject: [PATCH v5 3/5] misc: fuse: Add efuse driver for Tegra
+In-Reply-To: <1401281677-32110-4-git-send-email-pdeschrijver@nvidia.com>
+References: <1401281677-32110-1-git-send-email-pdeschrijver@nvidia.com>
+ <1401281677-32110-4-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <538784C1.6000504@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2014-05-16 14:12:31, Tony Lindgren wrote:
-> * Paul Bolle <pebolle@tiscali.nl> [140515 12:42]:
-> > A check for CONFIG_SX1_OLD_FLASH was added in v2.6.24. But the related
-> > Kconfig symbol was never part of the tree. So we can remove some dead
-> > code.
-> 
-> Thanks applying into omap-for-v3.16/board.
+On 05/28/2014 06:54 AM, Peter De Schrijver wrote:
+> Implement fuse driver for Tegra20, Tegra30, Tegra114 and Tegra124.
 
-Actually... It seems there are two variant of SX1, and this is very
-useful piece of documentation how the _other_ variant looks.
+> diff --git a/Documentation/ABI/testing/sysfs-driver-tegra-fuse b/Documentation/ABI/testing/sysfs-driver-tegra-fuse
 
-And if someone is hacking linux on sx1, he can probably figure out
-#ifdef in .c file...
+> +Description:	read-only access to the efuses on Tegra20, Tegra30, Tegra114
+> +		and Tegra124 SoC's from NVIDIA. The efuses contain write once
+> +		data programmed at the factory. The data is layed out in 32bit
+> +		words in LSB first formnat. The number of valid bits depends
 
-IOW adding the config option might be better solution.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+s/formnat/format/
+
+> +		on the word and the SoC. The mapping is as follows:
+> +
+> +		For Tegra20:
+> +		Word 0 - 1    : bit 0
+> +		Word 2        : unused
+> +		Word 3        : bits 0 - 31
+> +		Word 4        : bits 0 - 7
+
+Do we really need these long tables that indicate which bits are used?
+As I mentioned before, when I asked for documentation of the format of
+these files, all I wanted was a brief not indicating that the data was
+binary, and that each bit potentially represents a fuse... Either we
+should leave it at that, or actually document what each bit represents,
+which would hopefully be a pointless duplication of the TRM.
