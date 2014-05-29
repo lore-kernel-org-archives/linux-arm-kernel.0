@@ -1,52 +1,199 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 29 May 2014 09:30:55 +0900
-Subject: [PATCH v2 0/4] ARM: shmobile: marzen: Initialise SCIF devices
- using DT
-In-Reply-To: <1400153973-25546-1-git-send-email-horms+renesas@verge.net.au>
-References: <1400153973-25546-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20140529003055.GF22705@verge.net.au>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Wed, 28 May 2014 17:35:09 -0700
+Subject: [PATCH] mmc: dw_mmc: change to use recommended reset procedure
+In-Reply-To: <CAPz6YkW+eJjoUz0YRb_JOsKXMUhCe4hRUQVQLhZbkfo01fVnqg@mail.gmail.com>
+References: <CAPz6YkW+eJjoUz0YRb_JOsKXMUhCe4hRUQVQLhZbkfo01fVnqg@mail.gmail.com>
+Message-ID: <1401323709-10345-1-git-send-email-sonnyrao@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 15, 2014 at 08:39:29PM +0900, Simon Horman wrote:
-> The aim of this series is to provide a working prototype for enabling
-> SCIF devices using DT on the marzen board when booting using multiplatform.
-> 
-> This series addresses the review received for v1.
-> Changes are noted in the changelog of each updated patch.
-> 
-> 
-> This series depends on:
-> [PATCH v6 00/17] ARM: shmobile: r8a7779, marzen: CCF and multiplatform
-> 
-> This series was created and tested with the above mentioned series applied
-> on top of a merge of:
-> * The renesas-devel-v3.15-rc1-20140515 tag of my renesas tree.
-> * The clk-next branch of Mike Turquettes's tree
->   This is to provide the following which were previously part of this series:
->   - clk: shmobile: r8a7779: Add MSTP clock support
->   - clk: shmobile: r8a7779: Add clocks support
-> 
-> This series works in conjunction with but does not have a run-time or compile
-> time dependency on:
-> [PATCH v3] serial: sh-sci: Add device tree support for r8a7779
+This patch changes the fifo reset code to follow the reset procedure
+outlined in the documentation of Synopsys Mobile storage host databook.
 
-As all the pre-requisites are now in place I have queued up this series.
+Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+---
+v2: Add Generic DMA support
+    per the documentation, move interrupt clear before wait
+    make the test for DMA host->use_dma rather than host->using_dma
+    add proper return values (although it appears no caller checks)
+v3: rename fifo reset function, and change callers
+    use this combined reset function in dw_mci_resume()
+    just one caller left (probe), so get rid of dw_mci_ctrl_all_reset()
+    use DMA reset bit for all systems which use DMA
+    remove extra IDMAC reset in dw_mci_work_routine_card()
+    do CIU clock update in error path, if CIU reset cleared
 
-> 
-> 
-> Simon Horman (4):
->   ARM: shmobile: r8a7779: Add scif nodes to dtsi
->   ARM: shmobile: marzen: Remove early_printk from command line
->   ARM: shmobile: marzen: Initialise SCIF devices using DT
->   ARM: shmobile: marzen: Do not use workaround for scif devices
-> 
->  arch/arm/boot/dts/r8a7779-marzen.dts            | 24 ++++++++--
->  arch/arm/boot/dts/r8a7779.dtsi                  | 60 +++++++++++++++++++++++++
->  arch/arm/mach-shmobile/board-marzen-reference.c |  6 ---
->  arch/arm/mach-shmobile/setup-r8a7779.c          |  8 ++--
->  4 files changed, 84 insertions(+), 14 deletions(-)
-> 
-> -- 
-> 1.8.5.2
-> 
+ drivers/mmc/host/dw_mmc.c | 85 +++++++++++++++++++++++++++++++++++------------
+ drivers/mmc/host/dw_mmc.h |  1 +
+ 2 files changed, 64 insertions(+), 22 deletions(-)
+
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index 55cd110..988492c 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -111,8 +111,7 @@ static const u8 tuning_blk_pattern_8bit[] = {
+ 	0xff, 0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee,
+ };
+ 
+-static inline bool dw_mci_fifo_reset(struct dw_mci *host);
+-static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host);
++static inline bool dw_mci_reset(struct dw_mci *host);
+ 
+ #if defined(CONFIG_DEBUG_FS)
+ static int dw_mci_req_show(struct seq_file *s, void *v)
+@@ -1254,7 +1253,7 @@ static int dw_mci_data_complete(struct dw_mci *host, struct mmc_data *data)
+ 		 * After an error, there may be data lingering
+ 		 * in the FIFO
+ 		 */
+-		dw_mci_fifo_reset(host);
++		dw_mci_reset(host);
+ 	} else {
+ 		data->bytes_xfered = data->blocks * data->blksz;
+ 		data->error = 0;
+@@ -1371,7 +1370,7 @@ static void dw_mci_tasklet_func(unsigned long priv)
+ 
+ 			/* CMD error in data command */
+ 			if (mrq->cmd->error && mrq->data)
+-				dw_mci_fifo_reset(host);
++				dw_mci_reset(host);
+ 
+ 			host->cmd = NULL;
+ 			host->data = NULL;
+@@ -1982,14 +1981,9 @@ static void dw_mci_work_routine_card(struct work_struct *work)
+ 			}
+ 
+ 			/* Power down slot */
+-			if (present == 0) {
++			if (present == 0)
+ 				/* Clear down the FIFO */
+-				dw_mci_fifo_reset(host);
+-#ifdef CONFIG_MMC_DW_IDMAC
+-				dw_mci_idmac_reset(host);
+-#endif
+-
+-			}
++				dw_mci_reset(host);
+ 
+ 			spin_unlock_bh(&host->lock);
+ 
+@@ -2323,8 +2317,11 @@ static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset)
+ 	return false;
+ }
+ 
+-static inline bool dw_mci_fifo_reset(struct dw_mci *host)
++static inline bool dw_mci_reset(struct dw_mci *host)
+ {
++	u32 flags = SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET;
++	bool ret = false;
++
+ 	/*
+ 	 * Reseting generates a block interrupt, hence setting
+ 	 * the scatter-gather pointer to NULL.
+@@ -2334,15 +2331,57 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
+ 		host->sg = NULL;
+ 	}
+ 
+-	return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
+-}
++	if (host->use_dma)
++		flags |= SDMMC_CTRL_DMA_RESET;
+ 
+-static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
+-{
+-	return dw_mci_ctrl_reset(host,
+-				 SDMMC_CTRL_FIFO_RESET |
+-				 SDMMC_CTRL_RESET |
+-				 SDMMC_CTRL_DMA_RESET);
++	if (dw_mci_ctrl_reset(host, flags)) {
++		/*
++		 * In all cases we clear the RAWINTS register to clear any
++		 * interrupts.
++		 */
++		mci_writel(host, RINTSTS, 0xFFFFFFFF);
++
++		/* if using dma we wait for dma_req to clear */
++		if (host->use_dma) {
++			unsigned long timeout = jiffies + msecs_to_jiffies(500);
++			u32 status;
++			do {
++				status = mci_readl(host, STATUS);
++				if (!(status & SDMMC_STATUS_DMA_REQ))
++					break;
++				cpu_relax();
++			} while (time_before(jiffies, timeout));
++
++			if (status & SDMMC_STATUS_DMA_REQ) {
++				dev_err(host->dev,
++					"%s: Timeout waiting for dma_req to "
++					"clear during reset", __func__);
++				goto ciu_out;
++			}
++
++			/* when using DMA next we reset the fifo again */
++			if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET))
++				goto ciu_out;
++		}
++	} else {
++		dev_err(host->dev, "%s: Reset bits didn't clear", __func__);
++
++		/* if the controller reset bit did clear, then set clock regs */
++		if (!(mci_readl(host, CTRL) & SDMMC_CTRL_RESET))
++			goto ciu_out;
++	}
++
++	if (IS_ENABLED(CONFIG_MMC_DW_IDMAC))
++		/* It is also recommended that we reset and reprogram idmac */
++		dw_mci_idmac_reset(host);
++
++	ret = true;
++
++ciu_out:
++	/* After a CTRL reset we need to have CIU set clock registers  */
++	mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
++
++	return ret;
+ }
+ 
+ #ifdef CONFIG_OF
+@@ -2432,6 +2471,7 @@ int dw_mci_probe(struct dw_mci *host)
+ 	const struct dw_mci_drv_data *drv_data = host->drv_data;
+ 	int width, i, ret = 0;
+ 	u32 fifo_size;
++	u32 flags;
+ 	int init_slots = 0;
+ 
+ 	if (!host->pdata) {
+@@ -2555,7 +2595,8 @@ int dw_mci_probe(struct dw_mci *host)
+ 	}
+ 
+ 	/* Reset all blocks */
+-	if (!dw_mci_ctrl_all_reset(host))
++	flags = SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET | SDMMC_CTRL_DMA_RESET;
++	if (!dw_mci_ctrl_reset(host, flags))
+ 		return -ENODEV;
+ 
+ 	host->dma_ops = host->pdata->dma_ops;
+@@ -2744,7 +2785,7 @@ int dw_mci_resume(struct dw_mci *host)
+ 		}
+ 	}
+ 
+-	if (!dw_mci_ctrl_all_reset(host)) {
++	if (!dw_mci_reset(host)) {
+ 		ret = -ENODEV;
+ 		return ret;
+ 	}
+diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+index 6bf24ab..2505804 100644
+--- a/drivers/mmc/host/dw_mmc.h
++++ b/drivers/mmc/host/dw_mmc.h
+@@ -129,6 +129,7 @@
+ #define SDMMC_CMD_INDX(n)		((n) & 0x1F)
+ /* Status register defines */
+ #define SDMMC_GET_FCNT(x)		(((x)>>17) & 0x1FFF)
++#define SDMMC_STATUS_DMA_REQ		BIT(31)
+ /* FIFOTH register defines */
+ #define SDMMC_SET_FIFOTH(m, r, t)	(((m) & 0x7) << 28 | \
+ 					 ((r) & 0xFFF) << 16 | \
+-- 
+1.8.3.2
