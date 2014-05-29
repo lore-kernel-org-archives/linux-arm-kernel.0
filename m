@@ -1,42 +1,38 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 30 May 2014 08:31:24 +0900
-Subject: [PATCH] ARM: shmobile: armadillo800eva: fixup HDMI sound flags setting
-In-Reply-To: <cover.1401406177.git.horms+renesas@verge.net.au>
-References: <cover.1401406177.git.horms+renesas@verge.net.au>
-Message-ID: <730359857f5f0e1fac9881c63d389d73adb5f416.1401406177.git.horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 30 May 2014 08:34:54 +0900
+Subject: [PATCH 2/2] arm: shmobile: r8a7791: add USB3.0 node to
+ r8a7791.dtsi
+In-Reply-To: <5387149A.4010503@renesas.com>
+References: <5387149A.4010503@renesas.com>
+Message-ID: <20140529233453.GA15648@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On Thu, May 29, 2014 at 08:06:02PM +0900, Yoshihiro Shimoda wrote:
+> Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> ---
+>  arch/arm/boot/dts/r8a7791.dtsi |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+> index c2b5b38..2855c1f 100644
+> --- a/arch/arm/boot/dts/r8a7791.dtsi
+> +++ b/arch/arm/boot/dts/r8a7791.dtsi
+> @@ -906,4 +906,14 @@
+>  		#size-cells = <0>;
+>  		status = "disabled";
+>  	};
+> +
+> +	xhci: xhci at ee000000 {
+> +		compatible = "renesas,xhci-r8a7791";
+> +		reg = <0 0xee000000 0 0xc00>;
+> +		interrupts = <0 101 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp3_clks R8A7791_CLK_SSUSB>;
+> +		phys = <&usbphy 1 1>;
+> +		phy-names = "usb";
+> +		status = "disabled";
+> +	};
+>  };
 
-c7a507eea1db1430476289f525f9c853d5d485e8
-(ASoC: fsi: fixup SND_SOC_DAIFMT_CBx_CFx flags)
-fixuped FSI driver's behavior
-which didn't match to ALSA flags.
-
-But, it didn't care about armadillo800eva HDMI sound flags.
-This patch fixed it.
-
-Reported-by: Bui Duc Phuc(Fukuda) <bd-phuc@jinso.co.jp>
-Reported-by: Hiep Cao Minh <cm-hiep@jinso.co.jp>
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-armadillo800eva.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index 2858f38..40895cc 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -1016,7 +1016,7 @@ static struct asoc_simple_card_info fsi2_hdmi_info = {
- 	.platform	= "sh_fsi2",
- 	.cpu_dai = {
- 		.name	= "fsib-dai",
--		.fmt	= SND_SOC_DAIFMT_CBM_CFM,
-+		.fmt	= SND_SOC_DAIFMT_CBS_CFS,
- 	},
- 	.codec_dai = {
- 		.name = "sh_mobile_hdmi-hifi",
--- 
-1.8.5.2
+I assume that Sergei's comments regarding the r8a7790 version
+of this change are equally relevant here.
