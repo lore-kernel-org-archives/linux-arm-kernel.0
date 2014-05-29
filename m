@@ -1,59 +1,38 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 29 May 2014 11:31:40 +0100
-Subject: [RFC v2 04/10] ARM: vexpress: Extend UART with FIQ support
-In-Reply-To: <20140523150452.GX3693@n2100.arm.linux.org.uk>
-References: <1400083125-1464-1-git-send-email-daniel.thompson@linaro.org>
- <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
- <1400853478-5824-5-git-send-email-daniel.thompson@linaro.org>
- <20140523150452.GX3693@n2100.arm.linux.org.uk>
-Message-ID: <53870C8C.1070108@linaro.org>
+From: andreas2025@gmail.com (Andy Ng)
+Date: Thu, 29 May 2014 11:54:06 +0100
+Subject: IMX6 and SDMA on EIM bus
+In-Reply-To: <CAAVaN8y_P6oY8MpOA=_41mR8Ks_p2KwTTuwpOJmWfbanG1wRxw@mail.gmail.com>
+References: <CAAVaN8y_P6oY8MpOA=_41mR8Ks_p2KwTTuwpOJmWfbanG1wRxw@mail.gmail.com>
+Message-ID: <CAAVaN8zZfiK7VBe+eKU1dhkO-qe+MhQc8W=b8L=76yNbNNZneg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/14 16:04, Russell King - ARM Linux wrote:
-> On Fri, May 23, 2014 at 02:57:52PM +0100, Daniel Thompson wrote:
->> @@ -140,7 +140,7 @@
->>  			v2m_serial0: uart at 090000 {
->>  				compatible = "arm,pl011", "arm,primecell";
->>  				reg = <0x090000 0x1000>;
->> -				interrupts = <5>;
->> +				interrupts = <5>, <69>;
-> 
-> NAK.  This is obviously a Linux implementation detail - the second
-> number is your "FIQ" number which you've decided will be offset by
-> 64.
+Why the latest versions of the imx-sdma driver do not support:
 
-Certainly the offset of 64 is a more or less meaningless magic number
-that I decided on, however I don't think it originates within Linux. It
-is both introduced and consumed within the device tree itself.
+case IMX_DMATYPE_FIFO_MEMORY:
+res = sdma_script_addrs->ap_2_ap_fixed_addr;
+break;
 
-I've proposed adding a flag to the gic bindings to mark a FIQ; the GIC
-calls interrupt 69 (above) <0 5 0x84> (where 0x80 is the flag to request
-FIQ routing alongside 0x04 which is the trigger type).
-
-However vexpress-a15 has an interrupt-map between the UART and the GIC.
-Thus far I've not found a way, other by offset, to allow a UART sitting
-on a child bus to be provided with both IRQ and FIQ versions of an
-interrupt.
-
-> --- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-> +++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-> @@ -233,7 +233,7 @@
->  			 <5 0 0 0x10000000 0x04000000>;
->  
->  		#interrupt-cells = <1>;
-> -		interrupt-map-mask = <0 0 63>;
-> +		interrupt-map-mask = <0 0 127>;
-                                         ^^^^^
-
-The 64 offset is introduced here. Nothing in Linux imposes anything on
-the value (I originally had the shadow routings from 59 to 63 and this
-also worked).
-
-My code may still be inappropriate but, right now, I'm unsure whether
-the proposed changes to the gic bindings are included in the NAK, not in
-the NAK or whether they sit in the middle ground where I have to provide
-better argumentation.
+Has it ever worked?
 
 
-Daniel.
+On Wed, May 28, 2014 at 11:18 PM, Andy Ng <andreas2025@gmail.com> wrote:
+> Hello,
+>
+> I try to use  external SDMA trigger events to push data from the RAM
+> to EIM bus on imx6.
+> I have set up a device_prep_slave_sg  of a scatter gather lists to get
+> the buffers out. I am using IMX_DMATYPE_EXT,
+> transfer type which corresponds to mcu_2_app. Every time there is an
+> external event, the SDMA makes some dma progress. However, I don't see
+> any data arriving to the EIM bus. I have the impression that I am
+> using the wrong ROM script, as mcu_2_app may have code to access the
+> Peripheral DMA
+>
+> Does anyone have tried to SDMA transfers from RAM to EIM bus and with
+> use of external events?
+> And in order to be more specific. my destination EIM address is a fixed one.
+>
+> Any advice will be very much appreciated.
+>
+> Andreas
