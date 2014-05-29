@@ -1,165 +1,20 @@
-From: javi.merino@arm.com (Javi Merino)
-Date: Thu, 29 May 2014 13:24:38 +0100
-Subject: [PATCH v1 3/6] thermal: thermal-core: Add notifications support
- for the cooling states
-In-Reply-To: <1401351334-11210-4-git-send-email-amit.daniel@samsung.com>
-References: <1401351334-11210-1-git-send-email-amit.daniel@samsung.com>
- <1401351334-11210-4-git-send-email-amit.daniel@samsung.com>
-Message-ID: <20140529122438.GB2593@e104805>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Thu, 29 May 2014 20:36:18 +0800
+Subject: [PATCH 0/2] clk: clk-hix5hd2 add complex clk and sd clk
+Message-ID: <1401366980-15352-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Amit,
 
-On Thu, May 29, 2014 at 09:15:31AM +0100, Amit Daniel Kachhap wrote:
-> This patch adds notification infrastructure for any requests related to cooling
-> states. The notifier structure passed is of both Get/Set type. So the receiver
-> of these can sense the new/cur/max cooling state as decided by thermal governor.
-> In addition to that it can also override the cooling state and may do something
-> interesting after receiving these CPU cooling events such as masking some
-> states, enabling some extra conditional states or perform any extra operation
-> for aggressive thermal cooling.
-> The notfications events can be of type,
-> 
-> 1. COOLING_SET_STATE_PRE
-> 2. COOLING_SET_STATE_POST
-> 3. COOLING_GET_CUR_STATE
-> 4. COOLING_GET_MAX_STATE
-> 
-> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> ---
->  Documentation/thermal/sysfs-api.txt |   21 +++++++++++
->  drivers/thermal/thermal_core.c      |   69 ++++++++++++++++++++++++++++++++++-
->  include/linux/thermal.h             |   21 +++++++++++
->  3 files changed, 109 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/thermal/sysfs-api.txt b/Documentation/thermal/sysfs-api.txt
-> index 87519cb..5f45e03 100644
-> --- a/Documentation/thermal/sysfs-api.txt
-> +++ b/Documentation/thermal/sysfs-api.txt
-> @@ -92,6 +92,27 @@ temperature) and throttle appropriate devices.
->      It deletes the corresponding entry form /sys/class/thermal folder and
->      unbind itself from all the thermal zone devices using it.
->  
-> +1.2.3 int thermal_cooling_register_notifier(struct notifier_block *nb)
-> +
-> +    This interface function registers the client notifier handler. The notifier
-> +    handler can use this to monitor or update any cooling state requests.
-> +    nb: notifier structure containing client notifier handler.
-> +
-> +1.2.4 int thermal_cooling_unregister_notifier(struct notifier_block *nb)
-> +
-> +    This interface function unregisters the client notifier handler.
-> +    nb: notifier structure containing client notifier handler.
-> +
-> +1.2.5 int thermal_cooling_notify_states(struct thermal_cooling_status *request,enum cooling_state_ops op)
-> +
-> +    This interface function invokes the earlier registered cooling states handler.
-> +    request: holds the relevant cooling state value.
-> +	.cur_state: current cooling state.
-> +	.new_state: new cooling state to be set.
-> +	.max_state: max cooling state.
-> +	.devdata: driver private data pointer.
-> +    op: describes various operation supported.
-> +
->  1.3 interface for binding a thermal zone device with a thermal cooling device
->  1.3.1 int thermal_zone_bind_cooling_device(struct thermal_zone_device *tz,
->  	int trip, struct thermal_cooling_device *cdev,
-> diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
-> index 71b0ec0..1a60f83 100644
-> --- a/drivers/thermal/thermal_core.c
-> +++ b/drivers/thermal/thermal_core.c
-> @@ -52,6 +52,8 @@ static DEFINE_MUTEX(thermal_idr_lock);
->  static LIST_HEAD(thermal_tz_list);
->  static LIST_HEAD(thermal_cdev_list);
->  static LIST_HEAD(thermal_governor_list);
-> +/* Notfier list to validates/updates the cpufreq cooling states */
-> +static BLOCKING_NOTIFIER_HEAD(cooling_state_notifier_list);
->  
->  static DEFINE_MUTEX(thermal_list_lock);
->  static DEFINE_MUTEX(thermal_governor_lock);
-> @@ -1073,8 +1075,71 @@ static struct class thermal_class = {
->  };
->  
->  /**
-> - * __thermal_cooling_device_register() - register a new thermal cooling device
-> - * @np:		a pointer to a device tree node.
-> + * thermal_cooling_notify_states - Invoke the necessary cooling states handler.
-> + * @request: holds the relevant cooling state value. say if the cooling state
-> + * operation is of type COOLING_GET_MAX_STATE, then request holds
-> + * the current max cooling state value.
-> + * @op: different operations supported
-> + *
-> + * This API allows the registered user to recieve the different cooling
-> + * notifications like current state, max state and set state.
-> + *
-> + * Return: 0 (success)
-> + */
-> +int thermal_cooling_notify_states(struct thermal_cooling_status *request,
-> +				enum cooling_state_ops op)
-> +{
-> +	/* Invoke the notifiers which have registered for this state change */
-> +	if (op == COOLING_SET_STATE_PRE ||
-> +		op == COOLING_SET_STATE_POST ||
-> +		op == COOLING_GET_MAX_STATE ||
-> +		op == COOLING_GET_CUR_STATE) {
-> +		blocking_notifier_call_chain(
-> +			&cooling_state_notifier_list, op, request);
-> +	}
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(thermal_cooling_notify_states);
-> +
-> +/**
-> + * thermal_cooling_register_notifier - registers a notifier with thermal cooling.
-> + * @nb:	notifier function to register.
-> + *
-> + * Add a driver to receive all cooling notifications like current state,
-> + * max state and set state. The drivers after reading the events can perform
-> + * some mapping like grouping some P states into 1 cooling state.
-> + *
-> + * Return: 0 (success)
-> + */
-> +int thermal_cooling_register_notifier(struct notifier_block *nb)
-> +{
-> +	int ret = 0;
-> +	ret = blocking_notifier_chain_register(
-> +				&cooling_state_notifier_list, nb);
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(thermal_cooling_register_notifier);
-> +
-> +/**
-> + * thermal_cooling_unregister_notifier - unregisters a notifier with thermal
-> + * cooling.
-> + * @nb:	notifier function to unregister.
-> + *
-> + * Removes a driver to receive further cooling notifications.
-> + *
-> + * Return: 0 (success)
+Zhangfei Gao (1):
+  clk: hix5hd2: add complex clk
 
-Or %-ENOENT if the notifier is not registered.
+xuejiancheng (1):
+  clk: hix5hd2: add sd clk
 
-> + */
-> +int thermal_cooling_unregister_notifier(struct notifier_block *nb)
-> +{
-> +	int ret = 0;
-> +	ret = blocking_notifier_chain_unregister(
-> +				&cooling_state_notifier_list, nb);
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(thermal_cooling_unregister_notifier);
-> +
-> +/**
-> + * thermal_cooling_device_register() - register a new thermal cooling device
+ drivers/clk/hisilicon/clk-hix5hd2.c       |  205 ++++++++++++++++++++++++++++-
+ include/dt-bindings/clock/hix5hd2-clock.h |   13 ++
+ 2 files changed, 212 insertions(+), 6 deletions(-)
 
-This is wrong, the function below this comment is still
-__thermal_cooling_device_register() whose first parameter is np, not
-type.
-
->   * @type:	the thermal cooling device type.
->   * @devdata:	device private data.
->   * @ops:		standard thermal cooling devices callbacks.
-
-Cheers,
-Javi
+-- 
+1.7.9.5
