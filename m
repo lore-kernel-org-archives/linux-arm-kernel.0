@@ -1,42 +1,70 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 28 May 2014 21:53:20 -0700
-Subject: [PATCH 0/7] qcom clock updates
-In-Reply-To: <1400281634-9313-1-git-send-email-sboyd@codeaurora.org>
-References: <1400281634-9313-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140529045320.10062.97090@quantum>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 29 May 2014 13:54:02 +0900
+Subject: [PATCH RESEND] ARM: kdump: 2nd kernel should use strict pfn_valid
+ in SPARSEMEM platform
+In-Reply-To: <1401266668-34365-1-git-send-email-wangnan0@huawei.com>
+References: <1401266668-34365-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <5386BD6A.7020509@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2014-05-16 16:07:07)
-> Here are some bug fixes and updates to qcom clock driver. Mostly focused
-> on running more drivers on msm8974 based devices and some fixes found
-> in the process.
+Catalin, Will
 
-Applied to clk-next.
+Can we assume that HAVE_ARCH_PFN_VALID is alway yes on arm64?
+Looking at arm64/Kconfig,
+config ARCH_HAS_HOLES_MEMORYMODEL
+	def_bool y if SPARSEMEM
+...
+config HAVE_ARCH_PFN_VALID
+	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
 
-Regards,
-Mike
+is this intentional?
 
-> 
-> Stephen Boyd (7):
->   clk: qcom: Fix clk_rcg2_is_enabled() check
->   clk: qcom: Fix mmcc-8974's PLL configurations
->   clk: qcom: Return highest rate when round_rate() exceeds plan
->   clk: qcom: Support display RCG clocks
->   clk: qcom: Properly support display clocks on msm8974
->   clk: qcom: Support msm8974pro global clock control hardware
->   clk: qcom: Return error pointers for unimplemented clocks
-> 
->  .../devicetree/bindings/clock/qcom,gcc.txt         |   2 +
->  drivers/clk/qcom/clk-rcg.h                         |   3 +
->  drivers/clk/qcom/clk-rcg2.c                        | 304 +++++++++++++++++++--
->  drivers/clk/qcom/common.c                          |   4 +-
->  drivers/clk/qcom/gcc-msm8974.c                     | 130 ++++++++-
->  drivers/clk/qcom/mmcc-msm8974.c                    | 118 ++++----
->  include/dt-bindings/clock/qcom,gcc-msm8974.h       |   4 +
->  7 files changed, 485 insertions(+), 80 deletions(-)
-> 
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
+-Takahiro AKASHI
+
+On 05/28/2014 05:44 PM, Wang Nan wrote:
+> This patch removes an irrational limitation for crash dump kernel on ARM
+> platform with SPARSEMEM enabled.
+>
+> Without this patch, crash reservation area for a crash dump kernel with
+> SPARSEMEM selected must occupy a full section plus 1MiB. If not,
+> elfcorehdr and some memory space used by the first kernel will unable to
+> get accessed. This is caused by pfn_valid: fast pfn_valid ragards any
+> pfn in a valid section as valid and prevents it to be ioremapped.
+>
+> This limitation wastes memory, because sections are always large and
+> crash dump kernel should be as small as possible.
+>
+> This patch selects HAVE_ARCH_PFN_VALID for CRASH_DUMP, makes crash dump
+> kernel to use strict version of pfn_valid().
+>
+> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+> ---
+>
+> This is the third time I post this patch. The previous records can be
+> retrived from:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256498.html
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/257472.html
+>
+> Different from previous version, this patch select HAVE_ARCH_PFN_VALID
+> right after CRASH_DUMP config entry.
+>
+> ---
+>
+>   arch/arm/Kconfig | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index c57ddcb..d5ffbb1 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -2160,6 +2160,7 @@ config ATAGS_PROC
+>
+>   config CRASH_DUMP
+>   	bool "Build kdump crash kernel (EXPERIMENTAL)"
+> +	select HAVE_ARCH_PFN_VALID if SPARSEMEM
+>   	help
+>   	  Generate crash dump after being started by kexec. This should
+>   	  be normally only set in special crash dump kernels which are
+>
