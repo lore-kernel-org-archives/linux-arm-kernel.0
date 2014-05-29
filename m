@@ -1,191 +1,65 @@
-From: larry.bassel@linaro.org (Larry Bassel)
-Date: Thu, 29 May 2014 14:45:04 -0700
-Subject: [PATCH v6 2/2] arm64: enable context tracking
-In-Reply-To: <1401399904-24471-1-git-send-email-larry.bassel@linaro.org>
-References: <1401399904-24471-1-git-send-email-larry.bassel@linaro.org>
-Message-ID: <1401399904-24471-3-git-send-email-larry.bassel@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 29 May 2014 16:50:24 -0500
+Subject: [PATCH] of: treat PCI config space as IORESOURCE_MEM type
+In-Reply-To: <47B1E3D0-4336-4529-80B0-172F4ACA5C97@codeaurora.org>
+References: <1401379426-9701-1-git-send-email-galak@codeaurora.org>
+ <CAL_JsqLPFDwtd-QYDqCwx1JVj1Aa8=nof-e0P6R9CZra+fXHfw@mail.gmail.com>
+ <47B1E3D0-4336-4529-80B0-172F4ACA5C97@codeaurora.org>
+Message-ID: <CAL_JsqK8PJHUgb0-i=6MdydAo-97iUTBfnqVgTchgghY8R9XZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make calls to ct_user_enter when the kernel is exited
-and ct_user_exit when the kernel is entered (in el0_da,
-el0_ia, el0_svc, el0_irq and all of the "error" paths).
+Adding Jason Gunthorpe...
 
-These macros expand to function calls which will only work
-properly if el0_sync and related code has been rearranged
-(in a previous patch of this series).
+On Thu, May 29, 2014 at 3:51 PM, Kumar Gala <galak@codeaurora.org> wrote:
+>
+> On May 29, 2014, at 3:44 PM, Rob Herring <robherring2@gmail.com> wrote:
+>
+>> On Thu, May 29, 2014 at 11:03 AM, Kumar Gala <galak@codeaurora.org> wrote:
+>>> If we have a PCI config space specified in something like a ranges
+>>> property we should treat it as memory type resource.
+>>
+>> Config space should not be in ranges[1]. We have some cases that are,
+>> but we don't want new ones.
+>
+> For the cases we have I agree, however an ECAM based cfg seems completely legit.
 
-The calls to ct_user_exit are made after hw debugging has been
-enabled (enable_dbg_and_irq).
+The previous discussion concluded otherwise. Debate it with Jason. I
+don't really have an opinion other than it be done one way.
 
-The call to ct_user_enter is made at the beginning of the
-kernel_exit macro.
+Rob
 
-This patch is based on earlier work by Kevin Hilman.
-Save/restore optimizations were also done by Kevin.
-
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
-Signed-off-by: Larry Bassel <larry.bassel@linaro.org>
----
- arch/arm64/Kconfig                   |  1 +
- arch/arm64/include/asm/thread_info.h |  4 ++++
- arch/arm64/kernel/entry.S            | 39 +++++++++++++++++++++++++++++++++++-
- 3 files changed, 43 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index e759af5..ef18ae5 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -55,6 +55,7 @@ config ARM64
- 	select RTC_LIB
- 	select SPARSE_IRQ
- 	select SYSCTL_EXCEPTION_TRACE
-+	select HAVE_CONTEXT_TRACKING
- 	help
- 	  ARM 64-bit (AArch64) Linux support.
- 
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 720e70b..8363f34 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -100,6 +100,7 @@ static inline struct thread_info *current_thread_info(void)
- #define TIF_SIGPENDING		0
- #define TIF_NEED_RESCHED	1
- #define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
-+#define TIF_NOHZ                7
- #define TIF_SYSCALL_TRACE	8
- #define TIF_POLLING_NRFLAG	16
- #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
-@@ -113,9 +114,12 @@ static inline struct thread_info *current_thread_info(void)
- #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
- #define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
- #define _TIF_32BIT		(1 << TIF_32BIT)
-+#define _TIF_SYSCALL_TRACE      (1 << TIF_SYSCALL_TRACE)
-+#define _TIF_NOHZ               (1 << TIF_NOHZ)
- 
- #define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
- 				 _TIF_NOTIFY_RESUME)
-+#define _TIF_SYSCALL_WORK       (_TIF_SYSCALL_TRACE | _TIF_NOHZ)
- 
- #endif /* __KERNEL__ */
- #endif /* __ASM_THREAD_INFO_H */
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index b0101b9..3c484e2 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -30,6 +30,32 @@
- #include <asm/unistd32.h>
- 
- /*
-+ * Context tracking subsystem.  Used to instrument transitions
-+ * between user and kernel mode.
-+ */
-+	.macro ct_user_exit, restore = 0
-+#ifdef CONFIG_CONTEXT_TRACKING
-+	bl	context_tracking_user_exit
-+	.if \restore == 1
-+	/*
-+	 * Save/restore needed during syscalls.  Restore syscall arguments from
-+	 * the values already saved on stack during kernel_entry.
-+	 */
-+	ldp	x0, x1, [sp]
-+	ldp	x2, x3, [sp, #S_X2]
-+	ldp	x4, x5, [sp, #S_X4]
-+	ldp	x6, x7, [sp, #S_X6]
-+	.endif
-+#endif
-+	.endm
-+
-+	.macro ct_user_enter
-+#ifdef CONFIG_CONTEXT_TRACKING
-+	bl	context_tracking_user_enter
-+#endif
-+	.endm
-+
-+/*
-  * Bad Abort numbers
-  *-----------------
-  */
-@@ -91,6 +117,7 @@
- 	.macro	kernel_exit, el, ret = 0
- 	ldp	x21, x22, [sp, #S_PC]		// load ELR, SPSR
- 	.if	\el == 0
-+	ct_user_enter
- 	ldr	x23, [sp, #S_SP]		// load return stack pointer
- 	.endif
- 	.if	\ret
-@@ -318,6 +345,7 @@ el1_irq:
- 	bl	trace_hardirqs_off
- #endif
- 
-+	ct_user_exit
- 	irq_handler
- 
- #ifdef CONFIG_PREEMPT
-@@ -427,6 +455,7 @@ el0_da:
- 	mrs	x26, far_el1
- 	// enable interrupts before calling the main handler
- 	enable_dbg_and_irq
-+	ct_user_exit
- 	bic	x0, x26, #(0xff << 56)
- 	mov	x1, x25
- 	mov	x2, sp
-@@ -439,6 +468,7 @@ el0_ia:
- 	mrs	x26, far_el1
- 	// enable interrupts before calling the main handler
- 	enable_dbg_and_irq
-+	ct_user_exit
- 	mov	x0, x26
- 	orr	x1, x25, #1 << 24		// use reserved ISS bit for instruction aborts
- 	mov	x2, sp
-@@ -449,6 +479,7 @@ el0_fpsimd_acc:
- 	 * Floating Point or Advanced SIMD access
- 	 */
- 	enable_dbg
-+	ct_user_exit
- 	mov	x0, x25
- 	mov	x1, sp
- 	adr	lr, ret_to_user
-@@ -458,6 +489,7 @@ el0_fpsimd_exc:
- 	 * Floating Point or Advanced SIMD exception
- 	 */
- 	enable_dbg
-+	ct_user_exit
- 	mov	x0, x25
- 	mov	x1, sp
- 	adr	lr, ret_to_user
-@@ -480,6 +512,7 @@ el0_undef:
- 	 */
- 	// enable interrupts before calling the main handler
- 	enable_dbg_and_irq
-+	ct_user_exit
- 	mov	x0, sp
- 	adr	lr, ret_to_user
- 	b	do_undefinstr
-@@ -493,9 +526,11 @@ el0_dbg:
- 	mov	x2, sp
- 	bl	do_debug_exception
- 	enable_dbg
-+	ct_user_exit
- 	b	ret_to_user
- el0_inv:
- 	enable_dbg
-+	ct_user_exit
- 	mov	x0, sp
- 	mov	x1, #BAD_SYNC
- 	mrs	x2, esr_el1
-@@ -616,9 +651,11 @@ el0_svc:
- el0_svc_naked:					// compat entry point
- 	stp	x0, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
- 	enable_dbg_and_irq
-+	ct_user_exit 1
- 
- 	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall tracing
--	tbnz	x16, #TIF_SYSCALL_TRACE, __sys_trace // are we tracing syscalls?
-+	and	x16, x16, #_TIF_SYSCALL_WORK    // are we tracing syscalls?
-+	cbnz	x16, __sys_trace
- 	adr	lr, ret_fast_syscall		// return address
- 	cmp     scno, sc_nr                     // check upper syscall limit
- 	b.hs	ni_sys
--- 
-1.8.3.2
+>>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+>>> ---
+>>> drivers/of/address.c | 3 +++
+>>> 1 file changed, 3 insertions(+)
+>>>
+>>> diff --git a/drivers/of/address.c b/drivers/of/address.c
+>>> index cb4242a..4e7ee59 100644
+>>> --- a/drivers/of/address.c
+>>> +++ b/drivers/of/address.c
+>>> @@ -122,6 +122,9 @@ static unsigned int of_bus_pci_get_flags(const __be32 *addr)
+>>>        u32 w = be32_to_cpup(addr);
+>>>
+>>>        switch((w >> 24) & 0x03) {
+>>> +       case 0x00: /* cfg space */
+>>> +               flags |= IORESOURCE_MEM;
+>>> +               break;
+>>
+>> How would you then distinguish actual memory ranges?
+>
+> One assumes you are still looking at pci_space as part of of_pci_range
+>
+>>
+>> Rob
+>>
+>> [1] http://www.spinics.net/lists/linux-pci/msg30585.html
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> --
+> Employee of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+>
