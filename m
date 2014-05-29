@@ -1,39 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 29 May 2014 11:44:54 +0200
-Subject: [PATCH v2] ARM: realview: basic device tree implementation
-In-Reply-To: <537E7B83.4020900@gmail.com>
-References: <1399586896-16906-1-git-send-email-linus.walleij@linaro.org>
- <201405091244.02066.arnd@arndb.de>
- <CACRpkdb8c=k3Ky=TisNdzycc3owJsNSQmSTu03RR5E0QvE0KZA@mail.gmail.com>
- <537E7B83.4020900@gmail.com>
-Message-ID: <CACRpkdap1U19EiULnq11udhY91UnnNu_-5MnLby3idbdjzBj4Q@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 29 May 2014 10:47:11 +0100
+Subject: [PATCH v8 5/8] arm64: Add ftrace support
+In-Reply-To: <20140529080705.GD29812@arm.com>
+References: <1394862048-28758-1-git-send-email-takahiro.akashi@linaro.org>
+ <1398851676-16389-1-git-send-email-takahiro.akashi@linaro.org>
+ <1398851676-16389-6-git-send-email-takahiro.akashi@linaro.org>
+ <20140528201955.GJ5099@sirena.org.uk>
+ <20140529080705.GD29812@arm.com>
+Message-ID: <20140529094711.GM5099@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 12:34 AM, Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com> wrote:
-> On 05/22/2014 09:41 AM, Linus Walleij wrote:
+On Thu, May 29, 2014 at 09:07:05AM +0100, Will Deacon wrote:
+> On Wed, May 28, 2014 at 09:19:55PM +0100, Mark Brown wrote:
+> > On Wed, Apr 30, 2014 at 06:54:33PM +0900, AKASHI Takahiro wrote:
 
->> So for now I keep to our special driver.
->
-> +1 for drivers/soc _and_ of_xlate for regmap instead of syscon.
->
-> driven by Mike Turquette's request to join mach-berlin clock node into a
-> single node, we currently use pinctrl driver (that must be somewhere in
-> Linus inbox) as a crutch to register a regmap for other drivers.
+> > > +#include <linux/linkage.h>
+> > > +#include <asm/ftrace.h>
+> > > +#include <asm/insn.h>
 
-I've merged it actually, I think. Else hit me on any missed patches.
+> > asm/insn.h contains a bunch of C stuff which won't build without
+> > __ASSEMBLY__ guards unless I'm missing something (I'm working with a
+> > non-mainline tree so I might be).
 
-> With a drivers/soc we'd have a good place for those messy, SoC-specific
-> registers to put a driver that hooks up to a single node and takes care
-> of registering e.g. pinctrl and reset the plain-old platform_device
-> way. It will be a little bit like arm/mach-foo before, but maybe we
-> have to admit that on SoCs there will always be some amount of
-> very specific, non-probable, non-describable registers that simply need
-> special treatment.
+> The guards are added earlier in this series.
 
-Hmmmm well I want to see that code before I believe it ... but
-I get what you mean.
-
-Yours,
-Linus Walleij
+Yeah, I discussed with Akashi-san later - the guard patch didn't
+actually make it onto the list properly, neither of us has a copy
+locally.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140529/92d8ef66/attachment-0001.sig>
