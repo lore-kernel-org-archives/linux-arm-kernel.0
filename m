@@ -1,30 +1,49 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 29 May 2014 11:25:24 -0700
-Subject: [PATCH tty-next] serial: sirf: Fix compilation failure
-In-Reply-To: <CAGsJ_4ypSdP-i35BaQaciPo-g=+8Z5-T2MV5zgDP98BMciGbGw@mail.gmail.com>
-References: <1396010535-2654-1-git-send-email-daniel.thompson@linaro.org>
- <1401358423-31532-1-git-send-email-daniel.thompson@linaro.org>
- <CAGsJ_4ypSdP-i35BaQaciPo-g=+8Z5-T2MV5zgDP98BMciGbGw@mail.gmail.com>
-Message-ID: <20140529182524.GA22969@kroah.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 29 May 2014 11:21:52 -0700
+Subject: [GIT PULL 3rd 1/3] Samsung Exynos cpuidle updates for 3.16
+In-Reply-To: <035601cf7897$6c959190$45c0b4b0$@samsung.com>
+References: <035601cf7897$6c959190$45c0b4b0$@samsung.com>
+Message-ID: <20140529182152.GB18481@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 29, 2014 at 08:14:02PM +0800, Barry Song wrote:
-> 2014-05-29 18:13 GMT+08:00 Daniel Thompson <daniel.thompson@linaro.org>:
-> > After 07d410e0) serial: sirf: fix spinlock deadlock issue it is no longer
-> > possiblet to compile this driver. The rename of one of the spinlocks is
-> > faulty. After looking at the original patch I believe this is the correct
-> > fix.
-> >
-> > Compile tested using ARM's multi_v7_defconfig
-> >
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: Jiri Slaby <jslaby@suse.cz>
-> > Cc: Barry Song <baohua@kernel.org>
-> > Cc: Qipan Li <Qipan.Li@csr.com>
-> > Cc: linux-serial at vger.kernel.org
-> > Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+On Mon, May 26, 2014 at 01:03:17PM +0900, Kukjin Kim wrote:
+> Note: merge conflict will be happened when pulling this for
+> arch/arm/mach-exynos/cpuidle.
+> You may just fixup with 'git rm arch/arm/mach-exynos/cpuidle.', it is due to
+> 'removing inclusion of <plat/cpu.h>' before moving cpuidle driver into
+> drivers/cpuidle...
 > 
-> Qipan prepared a same patch to fix this.
+> - Kukjin
+> 
+> The following changes since commit 985326c9f65a4c1a3b5ab875e6ce0c97c39449ec:
+> 
+>   Merge branch 'v3.16-next/clk-samsung' into v3.16-next/cpuidle-exynos
+> (2014-05-26 05:20:25 +0900)
+> 
+> are available in the git repository at:
+> 
+> 
+>   http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/exynos-cpuidle
+> 
+> for you to fetch changes up to cd245f59aae5d6ef265f46aa6cea78354d61b629:
+> 
+>   ARM: EXYNOS: Fix kernel panic when unplugging CPU1 on exynos (2014-05-26
+> 05:21:47 +0900)
+> 
+> ----------------------------------------------------------------
+> Samsung exynos-cpuidle updates for v3.16
+> 
+> - From Daniel Lezcano:
+>  This patchset relies on the cpm_pm notifier to initiate the
+>  powerdown sequence operations from pm.c instead cpuidle.c.
+>  Thus the cpuidle driver is no longer dependent from arch
+>  specific code as everything is called from the pm.c file.
+> 
+> Note, this is based on tags/exnos-mcpm and tags/samsung-clk
 
-Why didn't he send it?
+Merged into next/drivers.
+
+
+-Olof
