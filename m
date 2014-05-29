@@ -1,17 +1,46 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 29 May 2014 16:11:29 +0800
-Subject: [PATCH] ARM: dts: imx6qdl-gw5xxx: Fix Linear Technology vendor
- prefix
-In-Reply-To: <1401093631-18467-1-git-send-email-p.zabel@pengutronix.de>
-References: <1401093631-18467-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20140529081128.GH8860@dragon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 29 May 2014 09:10:36 +0100
+Subject: [for-next][PATCH] ftrace: Make CALLER_ADDRx macros more generic
+In-Reply-To: <5386C543.6070104@linaro.org>
+References: <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394862353-28963-7-git-send-email-takahiro.akashi@linaro.org>
+ <20140416135217.GF1001@arm.com> <535E3040.7090402@linaro.org>
+ <20140527091019.54a8d2d6@gandalf.local.home>
+ <20140527184940.GA26035@arm.com> <5386C543.6070104@linaro.org>
+Message-ID: <20140529081036.GF29812@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 10:40:31AM +0200, Philipp Zabel wrote:
-> The vendor prefix for Linear Technology should be lltc,
-> same as the NASDAQ symbol.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+On Thu, May 29, 2014 at 06:27:31AM +0100, AKASHI Takahiro wrote:
+> Hi Will
 
-Applied, thanks.
+Hi Akashi,
+
+> On 05/28/2014 03:49 AM, Will Deacon wrote:
+> > On Tue, May 27, 2014 at 02:10:19PM +0100, Steven Rostedt wrote:
+> >> Will,
+> >>
+> >> I made a separate branch called ftrace/arm64 as shown below. You can
+> >> pull that branch to base the rest of Akashi-san's patches on top of it.
+> >> The branch is based on top of v3.15-rc5.
+> >
+> > Thanks Steve, I'll pull that in.
+> >
+> > Akashi: please can you re-send your series, based on the branch below and
+> > including the acks/reviewed-by tags you got for v6 of the patches?
+> 
+> Sorry again to have missed your e-mail :-)
+
+You should fix your filters!
+
+> I'm sure that you can successfully apply all my patch series, without any
+> modification, from:
+>      v6 arm64: prerequisites for audit and ftrace
+>      v8 arm64: Add ftrace support
+> except for the patch, "[v8 1/8] ftrace: make CALLER_ADDRx macros more generic,"
+> which was replaced by a new version and already appears in Steven's repo.
+
+Yeah, you're right, I've managed to pick patches 2-8 from that posting --
+thanks.
+
+Will
