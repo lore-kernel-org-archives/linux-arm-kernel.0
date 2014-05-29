@@ -1,33 +1,19 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 29 May 2014 12:37:42 -0700
-Subject: [GIT PULL 3rd 3/3] Samsung clk-2 updates for 3.16
-In-Reply-To: <035801cf7897$72d573e0$58805ba0$@samsung.com>
-References: <035801cf7897$72d573e0$58805ba0$@samsung.com>
-Message-ID: <20140529193742.GC18481@quad.lixom.net>
+From: rientjes@google.com (David Rientjes)
+Date: Thu, 29 May 2014 12:37:38 -0700 (PDT)
+Subject: [PATCH] CMA: correct unlock target
+In-Reply-To: <1401344958-3790-1-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1401344958-3790-1-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <alpine.DEB.2.02.1405291237280.28588@chino.kir.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 01:03:27PM +0900, Kukjin Kim wrote:
-> The following changes since commit 6520e968eef4f88c076a84a80e026049d157132e:
-> 
->   clk: exynos5420: Add 5800 specific clocks (2014-05-19 22:15:08 +0900)
-> 
-> are available in the git repository at:
-> 
->   http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-clk-2
-> 
-> for you to fetch changes up to bfed1074f213051e94648bfad0d0611a16d81366:
-> 
->   clk: exynos5250: Add missing sysmmu clocks for DISP and ISP blocks
-> (2014-05-26 06:48:10 +0900)
-> 
-> ----------------------------------------------------------------
-> Samsung 2nd clock updates for 3.16	
-> 
-> - Add missing sysmmu clocks for DISP and ISP blocks for exynos5250
+On Thu, 29 May 2014, Joonsoo Kim wrote:
 
-Merged, thanks.
+> 'cma: Remove potential deadlock situation' introduces per cma area mutex
+> for bitmap management. It is good, but there is one mistake. When we
+> can't find appropriate area in bitmap, we release cma_mutex global lock
+> rather than cma->lock and this is a bug. So fix it.
+> 
+> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 
-
--Olof
+Acked-by: David Rientjes <rientjes@google.com>
