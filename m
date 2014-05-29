@@ -1,123 +1,39 @@
-From: Mohit.KUMAR@st.com (Mohit KUMAR DCG)
-Date: Thu, 29 May 2014 15:11:08 +0800
-Subject: [PATCH v2 03/18] PCI: designware: Configuration space should be
- specified in 'reg'
-In-Reply-To: <1401345500-20188-4-git-send-email-kishon@ti.com>
-References: <1401345500-20188-1-git-send-email-kishon@ti.com>
- <1401345500-20188-4-git-send-email-kishon@ti.com>
-Message-ID: <2CC2A0A4A178534D93D5159BF3BCB6619B94AD3904@EAPEX1MAIL1.st.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 29 May 2014 09:34:43 +0200
+Subject: [PATCH] CMA: correct unlock target
+In-Reply-To: <1401344958-3790-1-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1401344958-3790-1-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <5386E313.6070705@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kishon,
+Hello,
 
-> -----Original Message-----
-> From: Kishon Vijay Abraham I [mailto:kishon at ti.com]
-> Sent: Thursday, May 29, 2014 12:08 PM
-> To: devicetree at vger.kernel.org; linux-doc at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-omap at vger.kernel.org; linux-
-> pci at vger.kernel.org; linux-kernel at vger.kernel.org
-> Cc: arnd at arndb.de; tony at atomide.com; jg1.han at samsung.com;
-> kishon at ti.com; Jason Gunthorpe; Bjorn Helgaas; Mohit KUMAR DCG; Marek
-> Vasut
-> Subject: [PATCH v2 03/18] PCI: designware: Configuration space should be
-> specified in 'reg'
-> 
-> The configuration address space has so far been specified in *ranges*,
-> however it should be specified in *reg* making it a platform MEM resource.
-> Hence used 'platform_get_resource_*' API to get configuration address
-> space in the designware driver.
-> 
-> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Mohit Kumar <mohit.kumar@st.com>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: Marek Vasut <marex@denx.de>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  .../devicetree/bindings/pci/designware-pcie.txt    |    1 +
->  drivers/pci/host/pcie-designware.c                 |   17 +++++++++++++++--
->  2 files changed, 16 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> index d6fae13..8314360 100644
-> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> @@ -6,6 +6,7 @@ Required properties:
->  	as "samsung,exynos5440-pcie" or "fsl,imx6q-pcie".
->  - reg: base addresses and lengths of the pcie controller,
->  	the phy controller, additional register for the phy controller.
-> +	The configuration address space should also be specified here.
->  - interrupts: interrupt values for level interrupt,
->  	pulse interrupt, special interrupt.
->  - clocks: from common clock binding: handle to pci clock.
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-
-> designware.c
-> index c4e3732..603b386 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -20,6 +20,7 @@
->  #include <linux/of_pci.h>
->  #include <linux/pci.h>
->  #include <linux/pci_regs.h>
-> +#include <linux/platform_device.h>
->  #include <linux/types.h>
-> 
->  #include "pcie-designware.h"
-> @@ -392,11 +393,23 @@ static const struct irq_domain_ops
-> msi_domain_ops = {  int __init dw_pcie_host_init(struct pcie_port *pp)  {
->  	struct device_node *np = pp->dev->of_node;
-> +	struct platform_device *pdev = to_platform_device(pp->dev);
->  	struct of_pci_range range;
->  	struct of_pci_range_parser parser;
-> +	struct resource *cfg_res;
->  	u32 val;
->  	int i;
-> 
-> +	cfg_res = platform_get_resource_byname(pdev,
-> IORESOURCE_MEM, "config");
-> +	if (cfg_res) {
-> +		pp->config.cfg0_size = resource_size(cfg_res)/2;
-> +		pp->config.cfg1_size = resource_size(cfg_res)/2;
-> +		pp->cfg0_base = cfg_res->start;
-> +		pp->cfg1_base = cfg_res->start + pp->config.cfg0_size;
-> +	} else {
-> +		dev_err(pp->dev, "missing *config* reg space\n");
-> +	}
-> +
->  	if (of_pci_range_parser_init(&parser, np)) {
->  		dev_err(pp->dev, "missing ranges property\n");
->  		return -EINVAL;
-> @@ -429,6 +442,8 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
->  			of_pci_range_to_resource(&range, np, &pp->cfg);
->  			pp->config.cfg0_size = resource_size(&pp->cfg)/2;
->  			pp->config.cfg1_size = resource_size(&pp->cfg)/2;
-> +			pp->cfg0_base = pp->cfg.start;
-> +			pp->cfg1_base = pp->cfg.start + pp-
-> >config.cfg0_size;
+On 2014-05-29 08:29, Joonsoo Kim wrote:
+> 'cma: Remove potential deadlock situation' introduces per cma area mutex
+> for bitmap management. It is good, but there is one mistake. When we
+> can't find appropriate area in bitmap, we release cma_mutex global lock
+> rather than cma->lock and this is a bug. So fix it.
+>
+> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 
-- As you are getting cfg address space as MEM resource, so remove above code that
- gets the configuration space from dt range. Also correct dt for pcie cfg space for the platforms
- based on this driver.
+Thanks for spotting this issue. I've added it to my tree.
 
-Otherwise looks fine to me.
+> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+> index 6f6bffc..83969f8 100644
+> --- a/drivers/base/dma-contiguous.c
+> +++ b/drivers/base/dma-contiguous.c
+> @@ -331,7 +331,7 @@ struct page *dma_alloc_from_contiguous(struct device *dev, int count,
+>   		pageno = bitmap_find_next_zero_area(cma->bitmap, cma->count,
+>   						    start, count, mask);
+>   		if (pageno >= cma->count) {
+> -			mutex_unlock(&cma_mutex);
+> +			mutex_unlock(&cma->lock);
+>   			break;
+>   		}
+>   		bitmap_set(cma->bitmap, pageno, count);
 
-Thanks
-Mohit
-
->  		}
->  	}
-> 
-> @@ -441,8 +456,6 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
->  		}
->  	}
-> 
-> -	pp->cfg0_base = pp->cfg.start;
-> -	pp->cfg1_base = pp->cfg.start + pp->config.cfg0_size;
->  	pp->mem_base = pp->mem.start;
-> 
->  	pp->va_cfg0_base = devm_ioremap(pp->dev, pp->cfg0_base,
-> --
-> 1.7.9.5
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
