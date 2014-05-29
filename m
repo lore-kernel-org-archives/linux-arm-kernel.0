@@ -1,61 +1,57 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 29 May 2014 14:05:50 -0500
-Subject: [PATCH] ARM: DRA722: add detection of SoC information.
-Message-ID: <1401390350-10048-1-git-send-email-nm@ti.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 29 May 2014 12:10:37 -0700
+Subject: [PATCH v6 4/4] add 2nd stage page fault handling during live
+ migration
+In-Reply-To: <20140529175726.GC62489@lvm>
+References: <1400178451-4984-1-git-send-email-m.smarduch@samsung.com>
+ <1400178451-4984-5-git-send-email-m.smarduch@samsung.com>
+ <20140527201945.GD16428@lvm> <53853C2F.8080003@samsung.com>
+ <20140528080957.GH16428@lvm> <5386232A.3050602@samsung.com>
+ <20140529085134.GB61607@lvm> <53876977.1040502@samsung.com>
+ <20140529175726.GC62489@lvm>
+Message-ID: <5387862D.7050201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for DRA72x device DIEID. Currently these devices are
-reported as DRA75/74 family of processors.
+On 05/29/2014 10:57 AM, Christoffer Dall wrote:
+> On Thu, May 29, 2014 at 10:08:07AM -0700, Mario Smarduch wrote:
+>>
+>>>> So this needs to be cleared up given this is key to logging.
+>>>> Cases this code handles during migration -
+>>>> 1. huge page fault described above - write protect fault so you breakup
+>>>>    the huge page.
+>>>> 2. All other faults - first time access, pte write protect you again wind up in
+>>>>    stage2_set_pte().
+>>>>
+>>>> Am I missing something here?
+>>>>
+>>>
+>>> no, I forgot about the fact that we can take the permission fault now.
+>>> Hmm, ok, so either we need to use the original approach of always
+>>> splitting up huge pages or we need to just follow the regular huge page
+>>> path here and just mark all 512 4K pages dirty in the log, or handle it
+>>> in stage2_set_pte().
+>>>
+>>> I would say go with the most simple appraoch for now (which may be going
+>>> back to splitting all pmd_huge() into regular pte's), and we can take a
+>>> more careful look in the next patch iteration.
+>>>
+>>
+>> Looking at the overall memslot update architecture and various
+>> fail scenarios - user_mem_abort() appears to be the most
+>> optimal and reliable place. First Write Protect huge pages after
+>> memslots are committed and deal with rest in user_mem_abort().
+>>
+>> Still need some feedback on the pud_huge() before revising for
+>> next iteration?
+>>
+> Just assume it's not used for now, and that you don't have to consider
+> it, and make that assumption clear in the commit message, so it doesn't
+> block this work.  I have a feeling we need to go through a few
+> iterations here, so let's get that rolling.
+> 
+> Thanks.
+> 
+Ok thanks I'm on it now.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- (test using linux-next next-20140529 tag):
- before: http://slexy.org/raw/s21Yb8sOhy
- after:  http://slexy.org/raw/s20Nx96NrY
-
- Applies on:
- git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git 
- branch: omap-for-v3.16/soc
-
- arch/arm/mach-omap2/id.c  |   12 ++++++++++++
- arch/arm/mach-omap2/soc.h |    1 +
- 2 files changed, 13 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 71bf216..801244a 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -649,6 +649,18 @@ void __init dra7xxx_check_revision(void)
- 		}
- 		break;
- 
-+	case 0xb9bc:
-+		switch (rev) {
-+		case 0:
-+			omap_revision = DRA722_REV_ES1_0;
-+			break;
-+		default:
-+			/* If we have no new revisions */
-+			omap_revision = DRA722_REV_ES1_0;
-+			break;
-+		}
-+		break;
-+
- 	default:
- 		/* Unknown default to latest silicon rev as default*/
- 		pr_warn("%s: unknown idcode=0x%08x (hawkeye=0x%08x,rev=0x%d)\n",
-diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
-index de2a34c..01ca808 100644
---- a/arch/arm/mach-omap2/soc.h
-+++ b/arch/arm/mach-omap2/soc.h
-@@ -462,6 +462,7 @@ IS_OMAP_TYPE(3430, 0x3430)
- #define DRA7XX_CLASS		0x07000000
- #define DRA752_REV_ES1_0	(DRA7XX_CLASS | (0x52 << 16) | (0x10 << 8))
- #define DRA752_REV_ES1_1	(DRA7XX_CLASS | (0x52 << 16) | (0x11 << 8))
-+#define DRA722_REV_ES1_0	(DRA7XX_CLASS | (0x22 << 16) | (0x10 << 8))
- 
- void omap2xxx_check_revision(void);
- void omap3xxx_check_revision(void);
--- 
-1.7.9.5
+- Mario
