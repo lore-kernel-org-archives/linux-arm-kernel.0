@@ -1,48 +1,63 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 29 May 2014 08:44:00 -0500
-Subject: [RFC v2 04/10] ARM: vexpress: Extend UART with FIQ support
-In-Reply-To: <53870C8C.1070108@linaro.org>
-References: <1400083125-1464-1-git-send-email-daniel.thompson@linaro.org>
- <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
- <1400853478-5824-5-git-send-email-daniel.thompson@linaro.org>
- <20140523150452.GX3693@n2100.arm.linux.org.uk>
- <53870C8C.1070108@linaro.org>
-Message-ID: <CAL_JsqL0pYOEiyo8KfJA1aO_MOmwvn6a4hibZcamm0Jcw4Q6bA@mail.gmail.com>
+Date: Thu, 29 May 2014 08:47:31 -0500
+Subject: [PATCH v3 1/5] sc_phy:SmartCard(SC) PHY interface to SC controller
+In-Reply-To: <5386F0FE.7040003@ti.com>
+References: <1401267437-22489-1-git-send-email-satish.patel@ti.com>
+ <1401267437-22489-2-git-send-email-satish.patel@ti.com>
+ <20140528185334.GA30763@kroah.com> <5386F0FE.7040003@ti.com>
+Message-ID: <CAL_Jsq+E7a=wh_yzQyaSEVAwfa34BYZ4DxvLOfJGFVDsf1dZ+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 29, 2014 at 5:31 AM, Daniel Thompson
-<daniel.thompson@linaro.org> wrote:
-> On 23/05/14 16:04, Russell King - ARM Linux wrote:
->> On Fri, May 23, 2014 at 02:57:52PM +0100, Daniel Thompson wrote:
->>> @@ -140,7 +140,7 @@
->>>                      v2m_serial0: uart at 090000 {
->>>                              compatible = "arm,pl011", "arm,primecell";
->>>                              reg = <0x090000 0x1000>;
->>> -                            interrupts = <5>;
->>> +                            interrupts = <5>, <69>;
->>
->> NAK.  This is obviously a Linux implementation detail - the second
->> number is your "FIQ" number which you've decided will be offset by
->> 64.
-
-+1
-
-> Certainly the offset of 64 is a more or less meaningless magic number
-> that I decided on, however I don't think it originates within Linux. It
-> is both introduced and consumed within the device tree itself.
+On Thu, May 29, 2014 at 3:34 AM, Satish Patel <satish.patel@ti.com> wrote:
 >
-> I've proposed adding a flag to the gic bindings to mark a FIQ; the GIC
-> calls interrupt 69 (above) <0 5 0x84> (where 0x80 is the flag to request
-> FIQ routing alongside 0x04 which is the trigger type).
+>
+> On 5/29/2014 12:23 AM, Greg KH wrote:
+>>
+>> On Wed, May 28, 2014 at 02:27:13PM +0530, Satish Patel wrote:
+>>>
+>>> SmartCard controller uses this interface to communicate with
+>>> SmartCard via PHY
+>>>
+>>> Some SmartCard PHY has multiple slots for cards.
+>>> This inerface also enables controller to communicate
+>>> with one or more SmartCard connected over phy.
+>>>
+>>> interface structure includes following APIs
+>>> - set/get config
+>>> - activate/deactivate smart card
+>>> - warm reset
+>>> - register_notify (for card insert/remove/overheat)
+>>> - unregister_notify
+>>>
+>>> Signed-off-by: Satish Patel <satish.patel@ti.com>
+>>> ---
+>>>   Documentation/sc_phy.txt |  171
+>>> ++++++++++++++++++++++++++++++++++++++++++++++
+>>>   include/linux/sc_phy.h   |  136 ++++++++++++++++++++++++++++++++++++
+>>>   2 files changed, 307 insertions(+)
+>>>   create mode 100644 Documentation/sc_phy.txt
+>>>   create mode 100644 include/linux/sc_phy.h
+>>
+>>
+>> These are .h files, but where is the "api" functions that use
+>> these structures defined at?
+>>
+> This is like template/wrappers, smart card phy driver will write API
+> functions. And smartcard controller will call these functions.
+> With proposed approach, smartcard controller can communicate with any smart
+> card phy (TI/NxP) without change in code. Using DT entry smartcard and PHY
+> will gets connected with each other.
+> Refer diagram given @Documentation/sc_phy.txt.
+>
+>
+>> confused,
 
-That would be better than the magic number, but I'm not convinced that
-belongs in the DT either.
+I believe the api Greg is wondering about is the notifier which as I
+commented is not a good design.
 
-Whether the uart uses FIQ is not dependent on this DT setting, but
-based on whether the user wants to use the uart for kdb or not. You
-have enough information already to figure out which interrupt. What's
-missing is whether you have the capability to use FIQ or not. I don't
-recall if you can tell that from the GIC or not.
+There is now a phy subsystem. I don't know if it has what you need,
+but you should look at it to determine if it will work or could be
+extended to work.
 
 Rob
