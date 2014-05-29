@@ -1,32 +1,39 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 29 May 2014 11:03:46 -0500
-Subject: [PATCH] of: treat PCI config space as IORESOURCE_MEM type
-Message-ID: <1401379426-9701-1-git-send-email-galak@codeaurora.org>
+Date: Thu, 29 May 2014 11:05:06 -0500
+Subject: [Patch v2 4/4] tty: serial: msm: Remove direct access to GSBI
+In-Reply-To: <A56B810D-869A-4E4F-BC29-C9B0F6CDCE79@codeaurora.org>
+References: <1398357082-5102-1-git-send-email-agross@codeaurora.org>
+ <1398357082-5102-5-git-send-email-agross@codeaurora.org>
+ <A56B810D-869A-4E4F-BC29-C9B0F6CDCE79@codeaurora.org>
+Message-ID: <5A73A2BD-6113-4BC0-860F-BBE6A8232585@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we have a PCI config space specified in something like a ranges
-property we should treat it as memory type resource.
 
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
----
- drivers/of/address.c | 3 +++
- 1 file changed, 3 insertions(+)
+On May 29, 2014, at 10:14 AM, Kumar Gala <galak@codeaurora.org> wrote:
 
-diff --git a/drivers/of/address.c b/drivers/of/address.c
-index cb4242a..4e7ee59 100644
---- a/drivers/of/address.c
-+++ b/drivers/of/address.c
-@@ -122,6 +122,9 @@ static unsigned int of_bus_pci_get_flags(const __be32 *addr)
- 	u32 w = be32_to_cpup(addr);
- 
- 	switch((w >> 24) & 0x03) {
-+	case 0x00: /* cfg space */
-+		flags |= IORESOURCE_MEM;
-+		break;
- 	case 0x01:
- 		flags |= IORESOURCE_IO;
- 		break;
+> 
+> On Apr 24, 2014, at 11:31 AM, Andy Gross <agross@codeaurora.org> wrote:
+> 
+>> This patch removes direct access of the GSBI registers.  GSBI configuration
+>> should be done through the GSBI driver directly.
+>> 
+>> Signed-off-by: Andy Gross <agross@codeaurora.org>
+>> ---
+>> drivers/tty/serial/msm_serial.c |   48 ++-------------------------------------
+>> drivers/tty/serial/msm_serial.h |    5 ----
+>> 2 files changed, 2 insertions(+), 51 deletions(-)
+> 
+> Greg,
+> 
+> Any update on pulling this is for next?
+> 
+> - k
+
+I?ll send it via arm-soc as the related patches are going via that path.
+
+- k
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
