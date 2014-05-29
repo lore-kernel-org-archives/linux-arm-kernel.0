@@ -1,100 +1,124 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Thu, 29 May 2014 16:34:36 +0530
-Subject: [PATCH] arm64: kernel: initialize broadcast hrtimer based clock
- event device
-In-Reply-To: <1401355381-11446-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1401355381-11446-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <53871444.3080206@linux.vnet.ibm.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Thu, 29 May 2014 19:52:56 +0800
+Subject: [PATCH v2 1/2] Documentation: add Device tree bindings for
+ Hisilicon hix5hd2 ethernet
+In-Reply-To: <20140528145804.GA16088@leverpostej>
+References: <1401194667-14445-1-git-send-email-zhangfei.gao@linaro.org>
+ <1401194667-14445-2-git-send-email-zhangfei.gao@linaro.org>
+ <20140527133423.GB6969@leverpostej> <53857714.3070603@linaro.org>
+ <20140528125354.GA2092@leverpostej> <5385E3CC.9050700@linaro.org>
+ <20140528145804.GA16088@leverpostej>
+Message-ID: <53871F98.8070603@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
 
-On 05/29/2014 02:53 PM, Lorenzo Pieralisi wrote:
-> On platforms implementing CPU power management, the CPUidle subsystem
-> can allow CPUs to enter idle states where local timers logic is lost on power
-> down. To keep the software timers functional the kernel relies on an
-> always-on broadcast timer to be present in the platform to relay the
-> interrupt signalling the timer expiries.
-> 
-> For platforms implementing CPU core gating that do not implement an always-on
-> HW timer or implement it in a broken way, this patch adds code to initialize
-> the kernel software broadcast hrtimer upon boot. It relies on a dynamically
 
-It would be best to use the term "hrtimer based broadcast device"
-throughout the changelog for uniformity and to avoid confusion instead
-of mixing it with "software broadcast".
+On 05/28/2014 10:58 PM, Mark Rutland wrote:
+> On Wed, May 28, 2014 at 02:25:32PM +0100, zhangfei wrote:
+>>
+>>
+>> On 05/28/2014 08:53 PM, Mark Rutland wrote:
+>>> On Wed, May 28, 2014 at 06:41:40AM +0100, zhangfei wrote:
+>>>> Dear Mark
+>>>>
+>>>> On 05/27/2014 09:34 PM, Mark Rutland wrote:
+>>>>> On Tue, May 27, 2014 at 01:44:26PM +0100, Zhangfei Gao wrote:
+>>>>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>>>>>> ---
+>>>>>>     .../bindings/net/hisilicon-hix5hd2-gmac.txt        |   36 ++++++++++++++++++++
+>>>>>>     1 file changed, 36 insertions(+)
+>>>>>>     create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
+>>>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt b/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
+>>>>>> new file mode 100644
+>>>>>> index 0000000..5fe3835
+>>>>>> --- /dev/null
+>>>>>> +++ b/Documentation/devicetree/bindings/net/hisilicon-hix5hd2-gmac.txt
+>>>>>> @@ -0,0 +1,36 @@
+>>>>>> +Hisilicon hix5hd2 gmac controller
+>>>>>
+>>>>> Just to clarify, is the SoC name "hix5hd2", or is the 'x' a wildcard?
+>>>> "hix5hd2" is Soc name, which contains a series of similar chips.
+>>>
+>>> How similar are they?
+>>>
+>>> It's preferable to have a precise name, even when used as a fallback for
+>>> other similar devices.
+>>
+>> The soc name "hix5hd2" is provided by hisilicon.
+>> In fact, they have considered a lot and discussed long time for this name :)
+>
+> Sure, I would not expect hisilicon to rebrand their SoC family due to my
+> comments on a mailing list.
+>
+> w.r.t. naming in the kernel I could only find an unanswered query [1]
+> from Olof Johansson earlier this month, and no rationale for the change.
+>
+> I tried searching online for "hix5hd2" and didn't find much other than a
+> suggestion it's also known as "Hi3716cv200". I assume this means the
+> Hi371 range in general, which covers a few variants on the hisilicon
+> website [2]. The names there are far more specific than "hix5hd2".
+>
+> We've been bitten in the past when generic SoC family names are used in
+> DT bindings without also having specific strings. It's usually better to
+> choose a particular variant as the base, and have others claim
+> compatibility with that (with additional more specific compatible
+> strings).
+>
+> The key issue is how similar the SoC variants are. If they are identical
+> w.r.t. this block and the blocks it is attached to, then the compatible
+> string you propose is likely to be fine. However, subtle differences in
+> integration across variants might cause issues for which we want
+> targeted workarounds, or we might be able to make better use of
+> particular variants based on information that we cannot probe from the
+> HW. For that we need very specific compatible strings, and in general it
+> is better to add those and not need them than to need them but not have
+> them.
 
-> chosen CPU to be always powered-up. This CPU then relays the timer interrupt
-> to CPUs in deep-idle states through its HW local timer device.
-> 
-> On systems with power management capabilities but no functional HW broadcast
-> tick device, the hrtimer based clock event device allows the kernel to
-> enter high-resolution timer mode, which improves system latencies and saves
-> dynamic power.
+Currently hix5hd2 is series of hi3716c v200, hi3719c v100, hi3718c v100.
+They are same soc, except minus pin assembles different.
 
-Sorry but I do not understand the above paragraph. What do you mean by
-"allows the kernel to enter high resolution timer mode" ? And how does
-it improve system latency? I understand that the hrtimer based
-clockevent device saves dynamic power since it provides a mechanism in
-which cpus can enter deeper idle states.
+However, not all hi37x is in this series, for example hi3716c v100 is a 
+different soc.
 
-> 
-> The side effect of having a CPU always-on has implications on power management
-> platform capabilities and makes CPUidle suboptimal, since at least a CPU is
-> kept always in a shallow idle state by the kernel to relay timer interrupts,
-> but at least leaves the kernel with a functional system with some working power
-> management capabilities.
-> 
-> The hrtimer based clock event device has lowest possible rating so that,
-> if a platform contains a functional HW clock event device with broadcast
-> capabilities, that device is always chosen as a tick broadcast device instead
-> of the software based one, now present by default.
+In the future hi3719m, hi3718m may also plan to add to hix5hd2 series.
+The difference will be different cpu core number, different gpu core number.
+Also use different ethernet controller.
 
-I think this statement "instead of the software based one, now present
-by default" is incorrect. The hrtimer based clock event device will come
-into picture only when the arch calls tick_setup_hrtimer_broadcast()
-explicitly. Otherwise either the arch should register a real clock
-device which does broadcast or should disable deep idle states where the
-local timers stop. So I would suggest skipping the last paragraph as it
-is not conveying anything in specific. The fact that a clock device with
-the highest rating will be chosen is already known and need not be
-mentioned explicitly IMHO.
 
-> 
-> Cc: Preeti U Murthy <preeti@linux.vnet.ibm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  arch/arm64/kernel/time.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-> index 29c39d5..3d43900 100644
-> --- a/arch/arm64/kernel/time.c
-> +++ b/arch/arm64/kernel/time.c
-> @@ -18,6 +18,7 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->  
-> +#include <linux/clockchips.h>
->  #include <linux/export.h>
->  #include <linux/kernel.h>
->  #include <linux/interrupt.h>
-> @@ -67,6 +68,8 @@ void __init time_init(void)
->  
->  	clocksource_of_init();
->  
-> +	tick_setup_hrtimer_broadcast();
-> +
->  	arch_timer_rate = arch_timer_get_rate();
->  	if (!arch_timer_rate)
->  		panic("Unable to initialise architected timer.\n");
-> 
+>>>>>> +
+>>>>>> +Required properties:
+>>>>>> +- compatible: should be "hisilicon,hix5hd2-gmac".
+>>>>>> +- reg: specifies base physical address(s) and size of the device registers.
+>>>>>> +  The first region is the MAC register base and size.
+>>>>>> +  The second region is external interface control register.
+>>>>>
+>>>>> Single registers? Are these not part of a larger block?
+>>>> It is a single register, outside of the memory region.
+>>>> gmac0: reg = <0xf9840000 0x1000>,<0xf984300c 0x4>;
+>>>> gmac1: reg = <0xf9841000 0x1000>,<0xf9843010 0x4>;
+>>>>
+>>>> The register is controlling interface mode, duplex etc.
+>>>> In fact it is rather a bug fix to the silicon, when it is added with
+>>>> intension of not touching the original ip design.
+>>>>
+>>>> It may be moved to the memory region in the future silicon design.
+>>>> However, currently without such register, it can not work.
+>>>
+>>> I see. Is it possible that a future revision might have this fixed, such
+>>> that the second reg entry would become optional?
+>>
+>> We have given this feedback to the silicon team, and they admit this
+>> should be fixed.
+>> However, not sure it can be fixed soon since the product pressure.
+>> Can we keep this first since it is required currently.
+>
+> I'm not asking for its removal, I'm just trying to find out if in future
+> we might need to support a DTB without the second entry.
+>
 
-You have defined flag "CPUIDLE_FLAG_TIMER_STOP" for your deep idle
-states in which timer stops right?
+Double confirmed with silicon guy, the fix can not be added in this chip.
+As the product is stable now, and it is too expensive to make new version.
 
-Regards
-Preeti U Murthy
+Thanks
