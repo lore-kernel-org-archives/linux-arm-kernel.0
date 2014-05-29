@@ -1,155 +1,45 @@
-From: elder@linaro.org (Alex Elder)
-Date: Thu, 29 May 2014 08:26:55 -0500
-Subject: [PATCH v2 1/5] clk: bcm281xx: add an initialized flag
-In-Reply-To: <20140524003344.23136.68999@quantum>
-References: <1400590362-11177-1-git-send-email-elder@linaro.org>
- <1400590362-11177-2-git-send-email-elder@linaro.org>
- <20140524003344.23136.68999@quantum>
-Message-ID: <5387359F.7080507@linaro.org>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Thu, 29 May 2014 15:36:10 +0200
+Subject: [PATCH v11 0/3] Exynos 5410 support
+In-Reply-To: <7hr43f9mmn.fsf@paris.lan>
+References: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>
+ <7hr43f9mmn.fsf@paris.lan>
+Message-ID: <538737CA.4070709@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/2014 07:33 PM, Mike Turquette wrote:
-> Quoting Alex Elder (2014-05-20 05:52:38)
->> Add a flag that tracks whether a clock has already been initialized.
->> This will be used by the next patch to avoid initializing a clock
->> more than once when it's listed as a prerequisite.
->>
->> Signed-off-by: Alex Elder <elder@linaro.org>
->> ---
->>  drivers/clk/bcm/clk-kona.c | 17 +++++++++++++++--
->>  drivers/clk/bcm/clk-kona.h |  7 +++++++
->>  2 files changed, 22 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
->> index d603c4e..d8a7f38 100644
->> --- a/drivers/clk/bcm/clk-kona.c
->> +++ b/drivers/clk/bcm/clk-kona.c
->> @@ -27,6 +27,9 @@
->>  #define CCU_ACCESS_PASSWORD      0xA5A500
->>  #define CLK_GATE_DELAY_LOOP      2000
->>  
->> +#define clk_is_initialized(_clk)       FLAG_TEST((_clk), KONA, INITIALIZED)
->> +#define clk_set_initialized(_clk)      FLAG_SET((_clk), KONA, INITIALIZED)
->> +
->>  /* Bitfield operations */
->>  
->>  /* Produces a mask of set bits covering a range of a 32-bit value */
->> @@ -1194,13 +1197,23 @@ static bool __peri_clk_init(struct kona_clk *bcm_clk)
->>  
->>  static bool __kona_clk_init(struct kona_clk *bcm_clk)
->>  {
->> +       bool ret;
->> +
->> +       if (clk_is_initialized(bcm_clk))
->> +               return true;
->> +
->>         switch (bcm_clk->type) {
->>         case bcm_clk_peri:
->> -               return __peri_clk_init(bcm_clk);
->> +               ret = __peri_clk_init(bcm_clk);
+Hi Tarek and Kevin,
+
+Am 27.05.2014 19:06, schrieb Kevin Hilman:
+> Tarek Dakhran <t.dakhran@samsung.com> writes:
 > 
-> Hi Alex,
-> 
-> Going through this code, it's a bit hard to keep up ;-)
-
-Here's how the structures are organized:
-- A Kona clock is either a peripheral or a bus clock,
-  but a lot of things are handled generically at the
-  Kona level of abstraction.
-- A peripheral clock has a selector (mux), up to two
-  dividers, and a gate.  All of these are optional.
-- A bus clock has a gate, which is optional.  (There
-  are a few other things but I'm just ignoring them
-  for now.)
-- Each of these sort of sub-components (gate, divider,
-  etc.) are handled on their own.  In other words, there
-  are gate routines that operate on a gate regardless
-  of whether it's on bus or peripheral clock.
-- These sub-components are grouped like this because
-  there are some weird gating requirements.  (I've
-  said before I wanted to try to split things off where
-  possible to use the common framework code more, but
-  that opportunity hasn't arisen yet.)
-
-> Does the call to __peri_clk_init enable the prereq clocks? If so, is
-> their clk->prepare_count and clk->enable_count properly incremented?
-
-My use of the term "enable" is imprecise.
-
-The purpose of these *_init() routines is to set the hardware
-to a known initial state.  Right now, *defining* what that
-state should be has not been sent out for review, but that's
-the reason it's set up this way.  The model is basically, when
-you want to make a change, you record what the new value should
-be and the *_commit() it.  Special values, used at initialization
-time, indicate we don't have a desired value but we don't know
-what the hardware is currently is set to either.  When those
-special values (like BAD_SCALED_DIV_VALUE) are seen, the current
-value is read from the hardware rather than written.
-
-Anyway, to (hopefully) answer your question...
-
-All of the prerequisite activity occurs in __kona_clk_init(),
-which is called for every Kona clock.  The first thing that
-does is call __kona_prereq_init(), in order to set up and
-initialize (using __kona_clk_init()) the prerequisite clock
-if there is one.
-
-*After* the prerequisite clock is set up, the rest of the
-original clock initialization occurs, by calling (e.g.)
-__peri_clk_init().
-
-Sorry to be so verbose but I think it helps to understand
-the design underlying this stuff.
-
-I'm going to be submitting a new version of this series
-today.  It will pull out the clk_lookup field and
-some comments that you spotted that are just dead code.
-
-					-Alex
-
-> Thanks,
-> Mike
-> 
->> +               break;
->>         default:
->> +               ret = false;
->>                 BUG();
->>         }
->> -       return -EINVAL;
->> +       if (ret)
->> +               clk_set_initialized(bcm_clk);
->> +
->> +       return ret;
->>  }
->>  
->>  /* Set a CCU and all its clocks into their desired initial state */
->> diff --git a/drivers/clk/bcm/clk-kona.h b/drivers/clk/bcm/clk-kona.h
->> index 2537b30..10e238d 100644
->> --- a/drivers/clk/bcm/clk-kona.h
->> +++ b/drivers/clk/bcm/clk-kona.h
->> @@ -406,6 +406,7 @@ struct kona_clk {
->>         struct clk_init_data init_data; /* includes name of this clock */
->>         struct ccu_data *ccu;   /* ccu this clock is associated with */
->>         enum bcm_clk_type type;
->> +       u32 flags;              /* BCM_CLK_KONA_FLAGS_* below */
->>         union {
->>                 void *data;
->>                 struct peri_clk_data *peri;
->> @@ -414,6 +415,12 @@ struct kona_clk {
->>  #define to_kona_clk(_hw) \
->>         container_of(_hw, struct kona_clk, hw)
->>  
->> +/*
->> + * Kona clock flags:
->> + *   INITIALIZED       clock has been initialized already
->> + */
->> +#define BCM_CLK_KONA_FLAGS_INITIALIZED ((u32)1 << 0)   /* Clock initialized */
->> +
->>  /* Initialization macro for an entry in a CCU's kona_clks[] array. */
->>  #define KONA_CLK(_ccu_name, _clk_name, _type)                          \
->>         {                                                               \
->> -- 
->> 1.9.1
+>> The series of patches represent support of Exynos 5410 SoC
 >>
+>> The Exynos 5410 is the first Samsung SoC based on big.LITTLE architecture
+>>
+>> Patches add new platform description, support of clock controller and device
+>> tree for Exynos 5410.
+>>
+>> Has been build on Samsung Linux Kernel
+>>   (branch: for-next, commit: 97eae6c Merge branch 'v3.16-next/multiplatform' into for-next)
+>>
+>> Has been tested on: 1) Exynos 5410 reference board (exynos_defconfig)
+>> 		    2) Exynos 5410 reference board (multi_v7_defconfig)
+>> 		    3) Odroid-XU board (exynos_defconfig)
+>> 		    4) Odroid-XU board (multi_v7_defconfig)
+> 
+> Tested-by: Kevin Hilman <khilman@linaro.org>
+> 
+> FYI, I boot tested this on an odroid-xu (exynos_defconfig and
+> multi_v7_defconfig.)
+
+Could you clarify: Are you using exynos5410-smdk5410.dts with the
+ODROID-XU or do you have some upcoming exynos5410-odroidxu.dts based on
+exynos5410.dtsi?
+
+Thanks,
+Andreas
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
