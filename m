@@ -1,45 +1,39 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 29 May 2014 11:38:27 +0200
+Date: Thu, 29 May 2014 11:44:54 +0200
 Subject: [PATCH v2] ARM: realview: basic device tree implementation
-In-Reply-To: <6096979.7R8fyMRDdE@wuerfel>
+In-Reply-To: <537E7B83.4020900@gmail.com>
 References: <1399586896-16906-1-git-send-email-linus.walleij@linaro.org>
- <5057707.jNCXlqf9dH@wuerfel>
- <CACRpkdZX=UFhMfUn68hA+s2FLGRYy_dmjRng_fHtAQEhah0oRA@mail.gmail.com>
- <6096979.7R8fyMRDdE@wuerfel>
-Message-ID: <CACRpkdajvFMwmW=KUE_eb2g9BNA_KPsWJQLp1Vda09qUDUU-9w@mail.gmail.com>
+ <201405091244.02066.arnd@arndb.de>
+ <CACRpkdb8c=k3Ky=TisNdzycc3owJsNSQmSTu03RR5E0QvE0KZA@mail.gmail.com>
+ <537E7B83.4020900@gmail.com>
+Message-ID: <CACRpkdap1U19EiULnq11udhY91UnnNu_-5MnLby3idbdjzBj4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 10:35 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 22 May 2014 20:52:38 Linus Walleij wrote:
->> On Thu, May 22, 2014 at 5:49 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Thursday 22 May 2014 15:45:03 Catalin Marinas wrote:
->>
->> >> Anyway, I don't think we have any streaming DMA used on these RealView
->> >> boards.
->> >
->> > Yes, I think that is correct. MMCI, SSP and serial could all use
->> > DMA but are not configured to do it.
->>
->> PB1176 has no working DMA (borked DMA hardware), the PB11MPCore
->> actually has working DMA but only on UART TX and maybe AACI
->> (haven't tested) no clue about the Cortex boards PBA8 and PBX though.
+On Fri, May 23, 2014 at 12:34 AM, Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com> wrote:
+> On 05/22/2014 09:41 AM, Linus Walleij wrote:
+
+>> So for now I keep to our special driver.
 >
-> I don't see any DMA data passed to the pl011 driver for PB11MPCore
-> or any other realview board, so even if it works, we don't use it.
+> +1 for drivers/soc _and_ of_xlate for regmap instead of syscon.
+>
+> driven by Mike Turquette's request to join mach-berlin clock node into a
+> single node, we currently use pinctrl driver (that must be somewhere in
+> Linus inbox) as a crutch to register a regmap for other drivers.
 
-No I was more saying it works in theory... and we actually have
-patches to enable it for e.g. memcpy on Versatile and PB11MP
-that I floated at times, Russell also experimented around with it.
+I've merged it actually, I think. Else hit me on any missed patches.
 
-> The AACI driver doesn't seem to support DMA.
+> With a drivers/soc we'd have a good place for those messy, SoC-specific
+> registers to put a driver that hooks up to a single node and takes care
+> of registering e.g. pinctrl and reset the plain-old platform_device
+> way. It will be a little bit like arm/mach-foo before, but maybe we
+> have to admit that on SoCs there will always be some amount of
+> very specific, non-probable, non-describable registers that simply need
+> special treatment.
 
-Nope, but the hardware does.
-
-> PBA8 and PBX don't need the hack because they don't have a broken
-> l2x0.
-
-True!
+Hmmmm well I want to see that code before I believe it ... but
+I get what you mean.
 
 Yours,
 Linus Walleij
