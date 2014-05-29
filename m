@@ -1,33 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 29 May 2014 12:17:39 -0700
-Subject: [PATCH] ARM: OMAP: SX1: remove check for CONFIG_SX1_OLD_FLASH
-In-Reply-To: <20140529190227.GB18230@amd.pavel.ucw.cz>
-References: <1400182902.11786.21.camel@x220>
- <20140516211231.GF12881@atomide.com>
- <20140529190227.GB18230@amd.pavel.ucw.cz>
-Message-ID: <20140529191738.GA18567@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 29 May 2014 21:16:27 +0200
+Subject: [PATCH v2 2/5] pinctrl: sunxi: Add macro definition for pinctrl with
+ more than one interrupt
+In-Reply-To: <1401390990-5355-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1401390990-5355-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1401390990-5355-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [140529 12:03]:
-> On Fri 2014-05-16 14:12:31, Tony Lindgren wrote:
-> > * Paul Bolle <pebolle@tiscali.nl> [140515 12:42]:
-> > > A check for CONFIG_SX1_OLD_FLASH was added in v2.6.24. But the related
-> > > Kconfig symbol was never part of the tree. So we can remove some dead
-> > > code.
-> > 
-> > Thanks applying into omap-for-v3.16/board.
-> 
-> Actually... It seems there are two variant of SX1, and this is very
-> useful piece of documentation how the _other_ variant looks.
-> 
-> And if someone is hacking linux on sx1, he can probably figure out
-> #ifdef in .c file...
-> 
-> IOW adding the config option might be better solution.
+The A31 and A23, unlike the other Allwinner SoCs, have several interrupts banks
+and parent interrupts, while the other only have up to 32 interrupts in a
+single bank and a single parent interrupt.
 
-Or just a comment saying the same?
+Start supporting it by introducing a function macro to declare irq functions
+and their banks.
 
-Regards,
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/pinctrl/sunxi/pinctrl-sunxi.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Tony
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+index 8169ba598876..cb87e15b1b3c 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+@@ -77,6 +77,7 @@
+ struct sunxi_desc_function {
+ 	const char	*name;
+ 	u8		muxval;
++	u8		irqbank;
+ 	u8		irqnum;
+ };
+ 
+@@ -139,6 +140,14 @@ struct sunxi_pinctrl {
+ 		.irqnum = _irq,					\
+ 	}
+ 
++#define SUNXI_FUNCTION_IRQ_BANK(_val, _bank, _irq)		\
++	{							\
++		.name = "irq",					\
++		.muxval = _val,					\
++		.irqbank = _bank,				\
++		.irqnum = _irq,					\
++	}
++
+ /*
+  * The sunXi PIO registers are organized as is:
+  * 0x00 - 0x0c	Muxing values.
+-- 
+2.0.0
