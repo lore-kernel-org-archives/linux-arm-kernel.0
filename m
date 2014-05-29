@@ -1,75 +1,50 @@
-From: thomas.ab@samsung.com (Thomas Abraham)
-Date: Thu, 29 May 2014 20:08:39 +0530
-Subject: [PATCH v5 2/2] Documentation: devicetree: Add boost-frequency binding
- to list boost mode frequency
-In-Reply-To: <1401374319-4480-1-git-send-email-thomas.ab@samsung.com>
-References: <1401374319-4480-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <1401374319-4480-3-git-send-email-thomas.ab@samsung.com>
+From: t.dakhran@samsung.com (Tarek Dakhran)
+Date: Thu, 29 May 2014 18:46:58 +0400
+Subject: [PATCH v11 0/3] Exynos 5410 support
+In-Reply-To: <538737CA.4070709@suse.de>
+References: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>
+ <7hr43f9mmn.fsf@paris.lan> <538737CA.4070709@suse.de>
+Message-ID: <53874862.5080809@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Abraham <thomas.ab@samsung.com>
+Hi Andreas,
 
-Add a new optional boost-frequency binding for specifying the frequencies
-usable in boost mode.
+On 05/29/2014 05:36 PM, Andreas F?rber wrote:
+> Hi Tarek and Kevin,
+>
+> Am 27.05.2014 19:06, schrieb Kevin Hilman:
+>> Tarek Dakhran <t.dakhran@samsung.com> writes:
+>>
+>>> The series of patches represent support of Exynos 5410 SoC
+>>>
+>>> The Exynos 5410 is the first Samsung SoC based on big.LITTLE architecture
+>>>
+>>> Patches add new platform description, support of clock controller and device
+>>> tree for Exynos 5410.
+>>>
+>>> Has been build on Samsung Linux Kernel
+>>>    (branch: for-next, commit: 97eae6c Merge branch 'v3.16-next/multiplatform' into for-next)
+>>>
+>>> Has been tested on: 1) Exynos 5410 reference board (exynos_defconfig)
+>>> 		    2) Exynos 5410 reference board (multi_v7_defconfig)
+>>> 		    3) Odroid-XU board (exynos_defconfig)
+>>> 		    4) Odroid-XU board (multi_v7_defconfig)
+>> Tested-by: Kevin Hilman <khilman@linaro.org>
+>>
+>> FYI, I boot tested this on an odroid-xu (exynos_defconfig and
+>> multi_v7_defconfig.)
+> Could you clarify: Are you using exynos5410-smdk5410.dts with the
+> ODROID-XU or do you have some upcoming exynos5410-odroidxu.dts based on
+> exynos5410.dtsi?
+We use exynos5410-smdk5410.dts for booting ODROID-XU.
 
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Lukasz Majewski <l.majewski@samsung.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- .../devicetree/bindings/cpufreq/cpufreq-boost.txt  |   38 ++++++++++++++++++++
- 1 file changed, 38 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+>
+> Thanks,
+> Andreas
+>
 
-diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
-new file mode 100644
-index 0000000..63ed0fc
---- /dev/null
-+++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
-@@ -0,0 +1,38 @@
-+* Device tree binding for CPU boost frequency (aka over-clocking)
-+
-+Certain CPU's can be operated in optional 'boost' mode (or sometimes referred as
-+overclocking) in which the CPU can operate at frequencies which are not
-+specified by the manufacturer as CPU's operating frequency.
-+
-+Optional Properties:
-+- boost-frequencies: list of frequencies in KHz to be used only in boost mode.
-+  This list should be a subset of frequencies listed in "operating-points"
-+  property. Refer to Documentation/devicetree/bindings/power/opp.txt for
-+  details about "operating-points" property.
-+
-+Example:
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+
-+			operating-points = <
-+				1500000 1350000
-+				1400000 1287500
-+				1300000 1250000
-+				1200000 1187500
-+				1100000 1137500
-+				1000000 1087500
-+			>;
-+			boost-frequencies = <1500000 1400000>;
-+		};
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <1>;
-+		};
-+	};
+
 -- 
-1.7.9.5
+Best regards,
+     Tarek Dakhran
