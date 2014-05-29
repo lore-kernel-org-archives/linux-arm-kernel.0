@@ -1,55 +1,255 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 29 May 2014 10:20:16 -0700
-Subject: [PATCH] scripts/dtc: pad DTBs to facilitate later modification
-In-Reply-To: <53875876.2020001@wwwdotorg.org>
-References: <1400888507-11637-1-git-send-email-khilman@linaro.org>
- <53875876.2020001@wwwdotorg.org>
-Message-ID: <CAGa+x84SkGzC3cPCvnZHJEK2uJion=0fowBNdkydjF1GnLLsTw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 29 May 2014 19:21:13 +0200
+Subject: [PATCH v2] ARM: update Allwinner defconfig
+Message-ID: <1401384073-8016-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 29, 2014 at 8:55 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 05/23/2014 05:41 PM, Kevin Hilman wrote:
->> By default, add some padding to the DT blobs to facilitate later
->> patching.
->>
->> An example need for DTB patching is the need to modifiy the command
->> line on platforms where ATAGS are not (or cannot) be used to pass the
->> commandline.  For example, we do not support a big-endian kernel
->> reading ATAGS from a little-endian u-boot, so the only way to pass a
->> command line in the DT.
->>
->> Also, without ATAG support (or if u-boot was built without
->> CONFIG_INITRD_TAG) the only way to pass an initrd is by adding an
->> initrd= option to command line (in the DT).
->>
->> Therefore, to facilitate adding to the DT command line directly in the
->> DTB, add some padding.
->>
->> Cc: Nicolas Pitre <nico@linaro.org>
->> Cc: Stephen Warren <swarren@wwwdotorg.org>
->> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> Signed-off-by: Kevin Hilman <khilman@linaro.org>
->> ---
->> I kinda pulled 64 bytes out of the air here since it's enough to add
->> some common things to the commandline like debug, earlyprink
->> initrd=<addr>,<size>, etc., but I'm certainlly not opposed to more
->> padding.
->
-> Conceptually,
-> Acked-by: Stephen Warren <swarren@nvidia.com>
->
-> But I would expect a pad of something like 4KB to be more future-proof.
-> U-Boot appears to use 4KB on ARM at least:
->
-> ./arch/arm/dts/Makefile:37:DTC_FLAGS += -R 4 -p 0x1000
+Update sunxi_defconfig and multi_v7 with all the latest Allwinner additions.
 
-Great.  As I mentioned above, I'm certainly not opposed to more
-padding, and agree that it would be more future proof.  I was simply
-being rather conservative in case folks didn't want to see every .dtb
-grow by 4k.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+Hi Arnd, Kevin, Olof,
 
-I'll wait a bit to see if there are any other opinions, and the respin
-with 4k padding.
+It would be great if you could apply this patch directly.
 
-Kevin
+Thanks!
+Maxime
+
+Changes from v1:
+  - Rebased on top of arm-soc next/defconfig
+
+
+ arch/arm/configs/multi_v7_defconfig | 22 ++++++++++++++------
+ arch/arm/configs/sunxi_defconfig    | 40 ++++++++++++++++++++++++++++++++++---
+ 2 files changed, 53 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index f3ef03183e31..bb7ecba711ad 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -5,9 +5,11 @@ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_EMBEDDED=y
++CONFIG_PERF_EVENTS=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ CONFIG_PARTITION_ADVANCED=y
++CONFIG_ARCH_VIRT=y
+ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_375=y
+@@ -15,13 +17,12 @@ CONFIG_MACH_ARMADA_38X=y
+ CONFIG_MACH_ARMADA_XP=y
+ CONFIG_MACH_DOVE=y
+ CONFIG_ARCH_BCM=y
+-CONFIG_ARCH_BCM_5301X=y
+ CONFIG_ARCH_BCM_MOBILE=y
++CONFIG_ARCH_BCM_5301X=y
+ CONFIG_ARCH_BERLIN=y
+ CONFIG_MACH_BERLIN_BG2=y
+ CONFIG_MACH_BERLIN_BG2CD=y
+ CONFIG_MACH_BERLIN_BG2Q=y
+-CONFIG_GPIO_PCA953X=y
+ CONFIG_ARCH_HIGHBANK=y
+ CONFIG_ARCH_HI3xxx=y
+ CONFIG_ARCH_KEYSTONE=y
+@@ -35,8 +36,8 @@ CONFIG_ARCH_OMAP3=y
+ CONFIG_ARCH_OMAP4=y
+ CONFIG_SOC_OMAP5=y
+ CONFIG_SOC_AM33XX=y
+-CONFIG_SOC_DRA7XX=y
+ CONFIG_SOC_AM43XX=y
++CONFIG_SOC_DRA7XX=y
+ CONFIG_ARCH_QCOM=y
+ CONFIG_ARCH_MSM8X60=y
+ CONFIG_ARCH_MSM8960=y
+@@ -62,7 +63,6 @@ CONFIG_MACH_SNOWBALL=y
+ CONFIG_MACH_UX500_DT=y
+ CONFIG_ARCH_VEXPRESS=y
+ CONFIG_ARCH_VEXPRESS_CA9X4=y
+-CONFIG_ARCH_VIRT=y
+ CONFIG_ARCH_WM8850=y
+ CONFIG_ARCH_ZYNQ=y
+ CONFIG_NEON=y
+@@ -119,11 +119,13 @@ CONFIG_ICS932S401=y
+ CONFIG_APDS9802ALS=y
+ CONFIG_ISL29003=y
+ CONFIG_EEPROM_AT24=y
++CONFIG_EEPROM_SUNXI_SID=y
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_BLK_DEV_SR=y
+ CONFIG_SCSI_MULTI_LUN=y
+ CONFIG_ATA=y
+ CONFIG_SATA_AHCI_PLATFORM=y
++CONFIG_AHCI_SUNXI=y
+ CONFIG_SATA_HIGHBANK=y
+ CONFIG_SATA_MV=y
+ CONFIG_NETDEVICES=y
+@@ -193,6 +195,8 @@ CONFIG_SPI_OMAP24XX=y
+ CONFIG_SPI_ORION=y
+ CONFIG_SPI_PL022=y
+ CONFIG_SPI_SIRF=y
++CONFIG_SPI_SUN4I=y
++CONFIG_SPI_SUN6I=y
+ CONFIG_SPI_TEGRA114=y
+ CONFIG_SPI_TEGRA20_SFLASH=y
+ CONFIG_SPI_TEGRA20_SLINK=y
+@@ -201,6 +205,7 @@ CONFIG_PINCTRL_PALMAS=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_GENERIC_PLATFORM=y
+ CONFIG_GPIO_DWAPB=y
++CONFIG_GPIO_PCA953X=y
+ CONFIG_GPIO_PCA953X_IRQ=y
+ CONFIG_GPIO_TWL4030=y
+ CONFIG_GPIO_PALMAS=y
+@@ -271,6 +276,8 @@ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_TEGRA=y
+ CONFIG_USB_EHCI_HCD_PLATFORM=y
+ CONFIG_USB_ISP1760_HCD=y
++CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_OHCI_HCD_PLATFORM=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_HOST=y
+@@ -287,14 +294,15 @@ CONFIG_MMC_ARMMMCI=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_OF_ARASAN=y
+ CONFIG_MMC_SDHCI_ESDHC_IMX=y
+-CONFIG_MMC_SDHCI_PXAV3=y
+-CONFIG_MMC_SDHCI_TEGRA=y
+ CONFIG_MMC_SDHCI_DOVE=y
++CONFIG_MMC_SDHCI_TEGRA=y
++CONFIG_MMC_SDHCI_PXAV3=y
+ CONFIG_MMC_SDHCI_SPEAR=y
+ CONFIG_MMC_SDHCI_BCM_KONA=y
+ CONFIG_MMC_OMAP=y
+ CONFIG_MMC_OMAP_HS=y
+ CONFIG_MMC_MVSDIO=y
++CONFIG_MMC_SUNXI=y
+ CONFIG_EDAC=y
+ CONFIG_EDAC_MM_EDAC=y
+ CONFIG_EDAC_HIGHBANK_MC=y
+@@ -310,6 +318,7 @@ CONFIG_RTC_DRV_TPS65910=y
+ CONFIG_RTC_DRV_EM3027=y
+ CONFIG_RTC_DRV_PL031=y
+ CONFIG_RTC_DRV_VT8500=y
++CONFIG_RTC_DRV_SUNXI=y
+ CONFIG_RTC_DRV_MV=y
+ CONFIG_RTC_DRV_TEGRA=y
+ CONFIG_DMADEVICES=y
+@@ -344,6 +353,7 @@ CONFIG_PWM=y
+ CONFIG_PWM_TEGRA=y
+ CONFIG_PWM_VT8500=y
+ CONFIG_OMAP_USB2=y
++CONFIG_PHY_SUN4I_USB=y
+ CONFIG_EXT4_FS=y
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index 5a69fd13a67b..7209bfd62074 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -1,13 +1,17 @@
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_BLK_DEV_INITRD=y
++CONFIG_PERF_EVENTS=y
+ CONFIG_ARCH_SUNXI=y
+ CONFIG_SMP=y
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ CONFIG_HIGHPTE=y
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_ARM_ATAG_DTB_COMPAT=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
++CONFIG_PM_RUNTIME=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+@@ -25,8 +29,12 @@ CONFIG_IP_PNP_BOOTP=y
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_EEPROM_SUNXI_SID=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_ATA=y
++CONFIG_AHCI_SUNXI=y
+ CONFIG_NETDEVICES=y
+ CONFIG_SUN4I_EMAC=y
++# CONFIG_NET_VENDOR_ARC is not set
+ # CONFIG_NET_CADENCE is not set
+ # CONFIG_NET_VENDOR_BROADCOM is not set
+ # CONFIG_NET_VENDOR_CIRRUS is not set
+@@ -34,22 +42,30 @@ CONFIG_SUN4I_EMAC=y
+ # CONFIG_NET_VENDOR_INTEL is not set
+ # CONFIG_NET_VENDOR_MARVELL is not set
+ # CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_MICROCHIP is not set
+ # CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_SAMSUNG is not set
+ # CONFIG_NET_VENDOR_SEEQ is not set
+ # CONFIG_NET_VENDOR_SMSC is not set
+ CONFIG_STMMAC_ETH=y
++# CONFIG_NET_VENDOR_VIA is not set
+ # CONFIG_NET_VENDOR_WIZNET is not set
+ # CONFIG_WLAN is not set
++# CONFIG_INPUT_MOUSEDEV is not set
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_NR_UARTS=8
+ CONFIG_SERIAL_8250_RUNTIME_UARTS=8
+ CONFIG_SERIAL_8250_DW=y
++CONFIG_SERIAL_OF_PLATFORM=y
++# CONFIG_HW_RANDOM is not set
+ CONFIG_I2C=y
+-# CONFIG_I2C_COMPAT is not set
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_MV64XXX=y
+ CONFIG_SPI=y
++CONFIG_SPI_SUN4I=y
+ CONFIG_SPI_SUN6I=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_POWER_SUPPLY=y
+@@ -58,16 +74,34 @@ CONFIG_POWER_RESET_SUN6I=y
+ # CONFIG_HWMON is not set
+ CONFIG_WATCHDOG=y
+ CONFIG_SUNXI_WATCHDOG=y
+-# CONFIG_USB_SUPPORT is not set
++CONFIG_MFD_AXP20X=y
++CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
++CONFIG_REGULATOR_GPIO=y
++CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_HCD_PLATFORM=y
++CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_OHCI_HCD_PLATFORM=y
++CONFIG_MMC=y
++CONFIG_MMC_SUNXI=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
++CONFIG_RTC_CLASS=y
++# CONFIG_RTC_INTF_SYSFS is not set
++# CONFIG_RTC_INTF_PROC is not set
++CONFIG_RTC_DRV_SUNXI=y
+ # CONFIG_IOMMU_SUPPORT is not set
++CONFIG_PHY_SUN4I_USB=y
++CONFIG_EXT4_FS=y
++CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_NFS_FS=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
+ CONFIG_ROOT_NFS=y
+-CONFIG_NLS=y
+ CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_FS=y
+-- 
+2.0.0
