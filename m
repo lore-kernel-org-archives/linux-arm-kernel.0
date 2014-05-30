@@ -1,43 +1,28 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 31 May 2014 03:20:23 +0900
-Subject: [PATCH v2 Resend 2/2] ARM: dts: Add secure firmware support for
- Arndale-octa
-In-Reply-To: <1401250382-24046-2-git-send-email-sachin.kamat@linaro.org>
-References: <1401250382-24046-1-git-send-email-sachin.kamat@linaro.org>
- <1401250382-24046-2-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <5388CBE7.40202@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 30 May 2014 19:20:37 +0100
+Subject: [PATCH v6 1/2] arm64: adjust el0_sync so that a function can be
+ called
+In-Reply-To: <1401399904-24471-2-git-send-email-larry.bassel@linaro.org>
+References: <1401399904-24471-1-git-send-email-larry.bassel@linaro.org>
+ <1401399904-24471-2-git-send-email-larry.bassel@linaro.org>
+Message-ID: <20140530182037.GH22895@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/14 13:13, Sachin Kamat wrote:
-> From: Tushar Behera<tushar.behera@linaro.org>
->
-> Arndale-Octa board is always configured to work with trustzone
-> firmware binary. Added DTS node entry to enable this support.
->
-> Signed-off-by: Tushar Behera<tushar.behera@linaro.org>
-> Signed-off-by: Sachin Kamat<sachin.kamat@linaro.org>
-> ---
->   arch/arm/boot/dts/exynos5420-arndale-octa.dts |    5 +++++
->   1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-> index 6ee8149fd5c4..434fd9d3e09d 100644
-> --- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-> +++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-> @@ -26,6 +26,11 @@
->   		bootargs = "console=ttySAC3,115200";
->   	};
->
-> +	firmware at 02073000 {
-> +		compatible = "samsung,secure-firmware";
-> +		reg =<0x02073000 0x1000>;
-> +	};
-> +
->   	fixed-rate-clocks {
->   		oscclk {
->   			compatible = "samsung,exynos5420-oscclk";
+On Thu, May 29, 2014 at 10:45:03PM +0100, Larry Bassel wrote:
+> To implement the context tracker properly on arm64,
+> a function call needs to be made after debugging and
+> interrupts are turned on, but before the lr is changed
+> to point to ret_to_user(). If the function call
+> is made after the lr is changed the function will not
+> return to the correct place.
+> 
+> For similar reasons, defer the setting of x0 so that
+> it doesn't need to be saved around the function call
+> (save far_el1 in x26 temporarily instead).
 
-Applied, thanks.
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-- Kukjin
+Thanks guys!
+
+Will
