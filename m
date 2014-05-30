@@ -1,33 +1,98 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 30 May 2014 14:53:22 +0100
-Subject: [RFC PATCH 04/11] coresight: add CoreSight ETB driver
-In-Reply-To: <1401457391-12242-5-git-send-email-mathieu.poirier@linaro.org>
-References: <1401457391-12242-1-git-send-email-mathieu.poirier@linaro.org>
- <1401457391-12242-5-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20140530135321.GQ3693@n2100.arm.linux.org.uk>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 30 May 2014 16:00:21 +0200
+Subject: [PATCH] clk: exynos5420: Keep aclk66_peric enabled during boot
+In-Reply-To: <1401398496-4624-1-git-send-email-dianders@chromium.org>
+References: <1401398496-4624-1-git-send-email-dianders@chromium.org>
+Message-ID: <53888EF5.5090800@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NAK for all the reasons I mentioned in the previous submission in 2012.
+Hello Doug,
 
-You partially did the right thing - you read through the previous
-submission, and you said in your cover message that you had addressed
-some of the comments from that submission.
+On 05/29/2014 11:21 PM, Doug Anderson wrote:
+> Right now if you've got earlyprintk enabled on exynos5420-peach-pit
+> then you'll get a hang on boot.  Here's why:
+> 
+> 1. The i2c-s3c2410 driver will probe at subsys_initcall.  It will
+>    enable its clock and disable it.  This is the clock "i2c2".
+> 2. The act of disabling "i2c2" will disable its parents.  In this case
+>    the parent is "aclk66_peric".  There are no other children of
+>    "aclk66_peric" officially enabled, so "aclk66_peric" will be turned
+>    off (despite being CLK_IGNORE_UNUSED, but that's by design).
+> 3. The next time you try to earlyprintk you'll do so without the UART
+>    clock enabled.  That's because the UART clocks are also children of
+>    "aclk66_peric".  You'll hang.
+> 
+> There's no good place to put a clock enable for earlyprintk, which is
+> handled by a bunch of assembly code.  The best we can do is to handle
+> this in the clock driver.
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+>  drivers/clk/samsung/clk-exynos5420.c | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
 
-What I find extremely distasteful is that you seem to have chosen to
-completely ignore my comments - you haven't mentioned them in your
-covering message at all, and you've just gone ahead and converted ETM
-and ETB to be platform devices.
+I tested your patch and it solves the issue for me, so feel free to add
 
-That gets you a NAK for that change, because you have done nothing what
-so ever to address the concerns I raised.
+Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-Since you seem to have ignored my comments, this is as far as I'm looking
-at your submission, and you can consider the entire submission NAK'd by
-me.
+Just one trivial comment below:
 
-Thanks.
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 9d7d7ee..1e586be 100644
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -1172,11 +1172,17 @@ static struct of_device_id ext_clk_match[] __initdata = {
+>  	{ },
+>  };
+>  
+> +/* Keep these clocks on until late_initcall */
+> +static const char *boot_clocks[] __initconst = {
+> +	"aclk66_peric",
+> +};
+> +
+>  /* register exynos5420 clocks */
+>  static void __init exynos5x_clk_init(struct device_node *np,
+>  		enum exynos5x_soc soc)
+>  {
+>  	struct samsung_clk_provider *ctx;
+> +	int i;
+>  
+>  	if (np) {
+>  		reg_base = of_iomap(np, 0);
+> @@ -1226,6 +1232,12 @@ static void __init exynos5x_clk_init(struct device_node *np,
+>  	}
+>  
+>  	exynos5420_clk_sleep_init();
+> +
+> +	for (i = 0; i < ARRAY_SIZE(boot_clocks); i++) {
+> +		struct clk *to_enable = __clk_lookup(boot_clocks[i]);
+> +
+> +		clk_prepare_enable(to_enable);
+> +	}
+>  }
+>  
+>  static void __init exynos5420_clk_init(struct device_node *np)
+> @@ -1239,3 +1251,15 @@ static void __init exynos5800_clk_init(struct device_node *np)
+>  	exynos5x_clk_init(np, EXYNOS5800);
+>  }
+>  CLK_OF_DECLARE(exynos5800_clk, "samsung,exynos5800-clock", exynos5800_clk_init);
+> +
+> +static int __init exynos5420_clk_late_init(void)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(boot_clocks); i++) {
+> +		struct clk *to_disable = __clk_lookup(boot_clocks[i]);
+> +
+> +		clk_disable_unprepare(to_disable);
+> +	}
+> +}
+> +late_initcall(exynos5420_clk_late_init);
+> 
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+You should return 0 here.
+
+Best regards,
+Javier
