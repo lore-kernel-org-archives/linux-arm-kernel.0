@@ -1,104 +1,147 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 30 May 2014 10:20:44 +0100
-Subject: [PATCH RFCv2 1/5] ARM: use write allocate by default on ARMv6+
-In-Reply-To: <20140530100819.1208149f@free-electrons.com>
-References: <1400600105-3013-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1400600105-3013-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140526162643.GB3693@n2100.arm.linux.org.uk>
- <20140527111542.6a49833f@free-electrons.com>
- <20140527094749.GE3693@n2100.arm.linux.org.uk>
- <20140527135216.7eaf3b3f@free-electrons.com>
- <20140527121806.GF3693@n2100.arm.linux.org.uk>
- <20140527143745.386c77d9@free-electrons.com>
- <20140528112450.GH3693@n2100.arm.linux.org.uk>
- <20140530100819.1208149f@free-electrons.com>
-Message-ID: <20140530092044.GO3693@n2100.arm.linux.org.uk>
+From: Jiada_Wang@mentor.com (Wang, Jiada (ESD))
+Date: Fri, 30 May 2014 09:27:20 +0000
+Subject: [PATCH 1/2] serial: imx: remove the DMA wait queue
+In-Reply-To: <1400819575-20435-1-git-send-email-b32955@freescale.com>
+References: <1400819575-20435-1-git-send-email-b32955@freescale.com>
+Message-ID: <857E9EDCA6C0904DB3357321AA9123EBE14B5A2C@NA-MBX-03.mgc.mentorg.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 30, 2014 at 10:08:19AM +0200, Thomas Petazzoni wrote:
-> Russell,
-> 
-> Thanks a lot for working on a new proposal for this topic.
-> 
-> On Wed, 28 May 2014 12:24:50 +0100, Russell King - ARM Linux wrote:
-> 
-> > But the way you go about this is totally silly - you effectively end
-> > up enabling all the SMP stuff even though you don't need it (which means
-> > that on a SMP kernel, you end up with a bunch of extra stuff on those
-> > platforms which aren't SMP, just because you want maybe one or two
-> > is_smp() sites to return true.
-> 
-> Again, have you looked at the PATCH RFCv1 for this patch series? My
-> first version was doing *exactly* what you suggest: only make the few
-> call sites of is_smp() I was interested in to return true for the
-> specific platforms that needed it.
+Hi Shijie
 
-No, and I don't intend to, because it's probably well buried.
+After apply this patch into our kernel,
+We are facing data hang issue when sending big size file (2M used in test) to uart port
+Note: Rx port is also keep receiving data.
 
-> PATCH RFCv2 was generated after a discussion with Catalin and Rob, who
-> suggested that we might want to simply always use the SMP capabilities
-> on SMP-capable processors.
+After read the implementation of uart_stop(),
+I feel like, stop_tx() is used to perform flow control when like a XOFF is received.
+Which means no data should be dropped, as they may need to be sent out,
+When next start_tx() is called.
 
-Frankly, they are both wrong if they suggested the approach in your v2
-patch for all the reasons I've raised as objections against v2.
+But by calling dmaengine_termiate_all(), the data already be submitted to DMA engine,
+May be lost, thus cause data hang.
 
-> > How about this patch for a start - which incidentally fixes two minor
-> > bugs where specifying cachepolicy=<anything> on ARMv6 provokes a warning,
-> > and sets the policy to writeback read-allocate, only to have it overriden
-> > later.  The second bug is that we "hoped" that is_smp() reflects the asm
-> > code's page table setup - this patch makes it more explicit by reading
-> > the PMD flags, finding the appropriate entry in the table, and setting
-> > the cache policy to that.  I've left the is_smp() check in because we
-> > really do want to detect if something goes awry there.
-> > 
-> > However, the effect of this patch is that the C code now follows how
-> > the assembly code sets up the page tables, which means that this is now
-> > controllable via the PMD MMU flags in the assembly procinfo structure.
-> > This means that for the Armada devices which need write-alloc for
-> > coherency, you can specify that in the proc-*.S files - yes, it means
-> > that you need a separate entry.
-> 
-> While that would work for Armada 370 and Armada XP, it does not work
-> for Armada 375 and Armada 38x, as far as I can see. Armada 375 and
-> Armada 38x are SMP-capable,
+What do you think?
 
-I'm *not* trying to solve everything here, I'm only solving the problem
-of the C setup code matching what the assembly setup code is doing -
-which is a long standing minor bug for ARMv6+.
+Thanks,
+Jiada
 
-> but we want to support hardware I/O
-> coherency in a CONFIG_SMP=n configuration (mainly because Armada 380 is
-> single-core). This means that in proc-v7.S, we would have to define
-> that the page tables should use the write-allocate cache policy, and
-> the shareable attribute, and this for *all* Cortex-A9, because from a
-> MIDR point of view, there is no difference between the Cortex-A9 in
-> Armada 375/38x and other Cortex-A9. And there are Cortex-A9, like the
-> Aegis thing from TI that are *not* SMP-capable, so enabling shareable
-> attributes will break.
+-----Original Message-----
+From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Huang Shijie
+Sent: Friday, May 23, 2014 1:33 PM
+To: gregkh at linuxfoundation.org
+Cc: linux-arm-kernel at lists.infradead.org; Huang Shijie; linux-kernel at vger.kernel.org; linux-serial at vger.kernel.org
+Subject: [PATCH 1/2] serial: imx: remove the DMA wait queue
 
-If that's the case, we can't then support IO coherency at all - because
-to have the asm code setup the page tables without the S bit set, and
-then have the C code overwrite them with the S bit set is also a violation
-of the architecture, as Catalin said when he patched the kernel adding
-this restriction:
+The DMA wait queue makes the code very complicated:
+  For RX, the @->stop_rx hook does not really stop the RX;
+  For TX, the @->stop_tx hook does not really stop the TX.
 
-        /*
-         * This restriction is partly to do with the way we boot; it is
-         * unpredictable to have memory mapped using two different sets of
-         * memory attributes (shared, type, and cache attribs).  We can not
-         * change these attributes once the initial assembly has setup the
-         * page tables.
-         */
+The above make the imx_shutdown has to wait the RX/TX DMA to be finished.
 
-Whatever the assembly code does in respect to these attributes, the C
-code has to follow.  So, my approach is entirely correct and right.
+In order to make code more simple, this patch removes the DMA wait queue.
+By calling the dmaengine_terminate_all, this patch makes the RX stops immediately after we call the @->stop_rx hook, so does the TX.
 
-What this means is if we can't distinguish Armada's IO coherency at
-assembly time, then we can't setup the page tables without the sharable
-bit set in the asm code, and then set them up with the sharable bit set
-in the C code.
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ drivers/tty/serial/imx.c |   42 ++++++++++++++----------------------------
+ 1 files changed, 14 insertions(+), 28 deletions(-)
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c index d1f16d3..ed6cdf7 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -225,7 +225,6 @@ struct imx_port {
+ 	void			*rx_buf;
+ 	unsigned int		tx_bytes;
+ 	unsigned int		dma_tx_nents;
+-	wait_queue_head_t	dma_wait;
+ 	unsigned int            saved_reg[11];
+ };
+ 
+@@ -417,12 +416,10 @@ static void imx_stop_tx(struct uart_port *port)
+ 		return;
+ 	}
+ 
+-	/*
+-	 * We are maybe in the SMP context, so if the DMA TX thread is running
+-	 * on other cpu, we have to wait for it to finish.
+-	 */
+-	if (sport->dma_is_enabled && sport->dma_is_txing)
+-		return;
++	if (sport->dma_is_enabled && sport->dma_is_txing) {
++		dmaengine_terminate_all(sport->dma_chan_tx);
++		sport->dma_is_txing = 0;
++	}
+ 
+ 	temp = readl(sport->port.membase + UCR1);
+ 	writel(temp & ~UCR1_TXMPTYEN, sport->port.membase + UCR1); @@ -436,12 +433,10 @@ static void imx_stop_rx(struct uart_port *port)
+ 	struct imx_port *sport = (struct imx_port *)port;
+ 	unsigned long temp;
+ 
+-	/*
+-	 * We are maybe in the SMP context, so if the DMA TX thread is running
+-	 * on other cpu, we have to wait for it to finish.
+-	 */
+-	if (sport->dma_is_enabled && sport->dma_is_rxing)
+-		return;
++	if (sport->dma_is_enabled && sport->dma_is_rxing) {
++		dmaengine_terminate_all(sport->dma_chan_rx);
++		sport->dma_is_rxing = 0;
++	}
+ 
+ 	temp = readl(sport->port.membase + UCR2);
+ 	writel(temp & ~UCR2_RXEN, sport->port.membase + UCR2); @@ -498,12 +493,6 @@ static void dma_tx_callback(void *data)
+ 	dev_dbg(sport->port.dev, "we finish the TX DMA.\n");
+ 
+ 	uart_write_wakeup(&sport->port);
+-
+-	if (waitqueue_active(&sport->dma_wait)) {
+-		wake_up(&sport->dma_wait);
+-		dev_dbg(sport->port.dev, "exit in %s.\n", __func__);
+-		return;
+-	}
+ }
+ 
+ static void imx_dma_tx(struct imx_port *sport) @@ -876,10 +865,6 @@ static void imx_rx_dma_done(struct imx_port *sport)
+ 	writel(temp, sport->port.membase + UCR1);
+ 
+ 	sport->dma_is_rxing = 0;
+-
+-	/* Is the shutdown waiting for us? */
+-	if (waitqueue_active(&sport->dma_wait))
+-		wake_up(&sport->dma_wait);
+ }
+ 
+ /*
+@@ -1026,8 +1011,6 @@ static void imx_enable_dma(struct imx_port *sport)  {
+ 	unsigned long temp;
+ 
+-	init_waitqueue_head(&sport->dma_wait);
+-
+ 	/* set UCR1 */
+ 	temp = readl(sport->port.membase + UCR1);
+ 	temp |= UCR1_RDMAEN | UCR1_TDMAEN | UCR1_ATDMAEN | @@ -1219,10 +1202,13 @@ static void imx_shutdown(struct uart_port *port)
+ 	unsigned long flags;
+ 
+ 	if (sport->dma_is_enabled) {
+-		/* We have to wait for the DMA to finish. */
+-		wait_event(sport->dma_wait,
+-			!sport->dma_is_rxing && !sport->dma_is_txing);
++		/*
++		 * The upper layer may does not call the @->stop_tx and
++		 * @->stop_rx, so we call them ourselves.
++		 */
++		imx_stop_tx(port);
+ 		imx_stop_rx(port);
++
+ 		imx_disable_dma(sport);
+ 		imx_uart_dma_exit(sport);
+ 	}
+--
+1.7.8
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
