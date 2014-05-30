@@ -1,75 +1,179 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 30 May 2014 22:18:18 +0200
-Subject: [PATCH 5/5] irqchip: irq-armada-370-xp: mask all interrupts during
- initialization
-In-Reply-To: <1401481098-23326-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1401481098-23326-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1401481098-23326-6-git-send-email-thomas.petazzoni@free-electrons.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 30 May 2014 22:19:40 +0200
+Subject: [PATCH v6 2/2] Documentation: devicetree: Add boost-frequency
+ binding to list boost mode frequency
+In-Reply-To: <5388E666.2090203@ti.com>
+References: <1401440477-4328-1-git-send-email-thomas.ab@samsung.com>
+ <1401440477-4328-3-git-send-email-thomas.ab@samsung.com>
+ <20140530130827.GK24233@leverpostej>
+ <CAJuA9ajs6K1PVtXC4_U0vQsA0oPnpaF_PdMfiQJxBFStF3Z2aw@mail.gmail.com>
+ <20140530185549.GN24233@leverpostej> <5388E105.3070609@ti.com>
+ <5388E3D2.2060602@gmail.com> <5388E666.2090203@ti.com>
+Message-ID: <5388E7DC.40606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now, the irq-armada-370-xp irqchip driver was not masking all
-interrupts at initialization. While in most cases this is not a
-problem because the bootloader has probably masked all interrupts, it
-becomes a problem when you use kexec: you're in kernel A, with many
-interrupts enabled, and then kexec into kernel B, without going
-through the bootloader. So during the boot process, if an interrupt
-occurs while the corresponding driver has not been loaded, you would
-get spurious interrupts.
+On 30.05.2014 22:13, Nishanth Menon wrote:
+> On 05/30/2014 03:02 PM, Tomasz Figa wrote:
+>> On 30.05.2014 21:50, Nishanth Menon wrote:
+>>> On 05/30/2014 01:55 PM, Mark Rutland wrote:
+>>>> On Fri, May 30, 2014 at 07:05:43PM +0100, Thomas Abraham wrote:
+>>>>> Hi Mark,
+>>>>>
+>>>>> On Fri, May 30, 2014 at 6:38 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> Apologies for being somewhat late w.r.t. review on this.
+>>>>>>
+>>>>>> On Fri, May 30, 2014 at 10:01:17AM +0100, Thomas Abraham wrote:
+>>>>>>> From: Thomas Abraham <thomas.ab@samsung.com>
+>>>>>>>
+>>>>>>> Add a new optional boost-frequency binding for specifying the frequencies
+>>>>>>> usable in boost mode.
+>>>>>>>
+>>>>>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>>>>>> Cc: Pawel Moll <pawel.moll@arm.com>
+>>>>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>>>>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>>>>>>> Cc: Kumar Gala <galak@codeaurora.org>
+>>>>>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+>>>>>>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>>>>>> Acked-by: Nishanth Menon <nm@ti.com>
+>>>>>>> Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+>>>>>>> ---
+>>>>>>>  .../devicetree/bindings/cpufreq/cpufreq-boost.txt  |   38 ++++++++++++++++++++
+>>>>>>>  1 file changed, 38 insertions(+)
+>>>>>>>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+>>>>>>>
+>>>>>>> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+>>>>>>> new file mode 100644
+>>>>>>> index 0000000..63ed0fc
+>>>>>>> --- /dev/null
+>>>>>>> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+>>>>>>> @@ -0,0 +1,38 @@
+>>>>>>> +* Device tree binding for CPU boost frequency (aka over-clocking)
+>>>>>>> +
+>>>>>>> +Certain CPU's can be operated in optional 'boost' mode (or sometimes referred as
+>>>>>>
+>>>>>> Nit: CPUs (we're not greengrocers [1])
+>>>>>>
+>>>>>>> +overclocking) in which the CPU can operate at frequencies which are not
+>>>>>>> +specified by the manufacturer as CPU's operating frequency.
+>>>>>>> +
+>>>>>>> +Optional Properties:
+>>>>>>> +- boost-frequencies: list of frequencies in KHz to be used only in boost mode.
+>>>>>>> +  This list should be a subset of frequencies listed in "operating-points"
+>>>>>>> +  property. Refer to Documentation/devicetree/bindings/power/opp.txt for
+>>>>>>> +  details about "operating-points" property.
+>>>>>>
+>>>>>> What is 'boost-mode'?
+>>>>>
+>>>>> boost-mode activates additional one or more cpu clock speeds (which
+>>>>> are not specified as operating frequency of the cpu by the
+>>>>> manufacturer). The cpu is allowed to operate in these boost mode
+>>>>> speeds when the boost mode is active. The boost mode speeds are
+>>>>> usually undocumented. Some of the chip samples could be clocked in
+>>>>> boost mode speeds and only such samples can be safely operated in
+>>>>> boost mode.
+>>>>>
+>>>>> The mechanism of entry into and exit out of boost mode is outside the
+>>>>> scope of this documentation.
+>>>>>
+>>>>>>
+>>>>>> What are the limitations on boost frequencies? When is a CPU expected to
+>>>>>> go to these frequencies and for now long? When should I as a dt author
+>>>>>> place elements in boost-frequencies?
+>>>>>
+>>>>> I will add these details in the next revision of this patch.
+>>>>
+>>>> Cheers.
+>>>>
+>>>>>>
+>>>>>> Why are these in both operating-points and boost-frequencies? It'll be
+>>>>>> really easy to accidentally forget to mark something as a
+>>>>>> boost-frequency this way. Why not have a boost-points instead?
+>>>>>
+>>>>> Does boost-points mean a set of clock speeds which are not listed as
+>>>>> part of operating-points property? If yes, that also is a possible
+>>>>> implementation (it was implemented in one of the earlier version of
+>>>>> this series). Could you confirm that you want the boost mode speeds to
+>>>>> be exclusive of the speeds listed in operating-points?
+>>>>
+>>>> If these boost mode operating points are not generally advisable for use
+>>>> as the other operating-points are, then they should IMO been in an
+>>>> entirely separate property exclusive of (but in the same format as) the
+>>>> operating-points property, e.g.
+>>>>
+>>>> operating points = <A B>, <C D>;
+>>>> boost-points = <E F>;
+>>>
+>>> you are asking boost frequencies to remain for ever tied down to OPP
+>>> style description.
+>>>
+>>> What we are trying to describe? "What are my SoC's overclocked
+>>> frequencies"? That description can be used even in a system that does
+>>> not use OPP style table (say ACPI based OPP tables or whatever
+>>> acronymned table).
+>>>
+>>> Tying it down to operating points just because we have it today as a
+>>> convenient description, is limiting.
+>>>
+>>> Further, if we decide to educate boost-frequencies to also indicate
+>>> how long is it safe? That does indeed belong to boost-frequency
+>>> description and not OPP description. Or if we decide to change
+>>> operating-points description[1] in the future has an impact on
+>>> "boost-points" description, when it should not have.
+>>>
+>>>>
+>>>> Otherwise, without boost-mode support we have to parse the boost mode
+>>>> table to figure out which points to avoid. Or if someone typos a value
+>>> That is OS usage of h/w description - yeah - in anycase, if OS has no
+>>> ability to deal with boost-frequencies, it should skip it for sure.
+>>>
+>>>> in either table we might go into a boost mode when we didn't want to!
+>>>>
+>>> There are other ways to screw up device with dts typo. you could give
+>>> a wrong voltage(extra 0?) and ensure you never use the chip ever
+>>> again.. typos are dt bugs, we can do the best to write robust code to
+>>> report them.
+>>>
+>>
+>> Typos are not the primary thing to worry about here. Adding boost
+>> frequencies to the list of primary operating points is flawed, because
+>> an OS that has no idea of boost mode will use them as normal operating
+>> points and this is not desired.
+> 
+> That means we have an implementation bug in OS since it does not
+> consider the complete hardware description that device tree is
+> providing. An analogy will be a regulator compatible match being used
+> but regulator-min-microvolt and regulator-max-microvolt being ignored
+> by OS.
 
-This commit fixes that by ensuring all interrupts are properly masked
-when the irqchip driver is initialized. Note that interrupt masking
-takes place at two level: at the global level (main_int_base) and at
-the per-CPU level (per_cpu_int_base).
+No. The operating points bindings were defined far before this
+boost-frequency and so there is no requirement to support the latter.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/irqchip/irq-armada-370-xp.c | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
+> 
+> We never said that "operating points" are "primary operating points".
+> all we said is they are "operating points" for the device - we dont
+> associate meanings to it. You may add to it[1] in platform code, as we
+> decided to.
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 71f7784..6fdceeb 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -339,6 +339,15 @@ static void armada_mpic_send_doorbell(const struct cpumask *mask,
- 
- static void armada_xp_mpic_smp_cpu_init(void)
- {
-+	u32 control;
-+	int nr_irqs, i;
-+
-+	control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
-+	nr_irqs = (control >> 2) & 0x3ff;
-+
-+	for (i = 0; i < nr_irqs; i++)
-+		writel(i, per_cpu_int_base + ARMADA_370_XP_INT_SET_MASK_OFFS);
-+
- 	/* Clear pending IPIs */
- 	writel(0, per_cpu_int_base + ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
- 
-@@ -479,7 +488,7 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 					     struct device_node *parent)
- {
- 	struct resource main_int_res, per_cpu_int_res;
--	int parent_irq;
-+	int parent_irq, nr_irqs, i;
- 	u32 control;
- 
- 	BUG_ON(of_address_to_resource(node, 0, &main_int_res));
-@@ -501,9 +510,13 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 	BUG_ON(!per_cpu_int_base);
- 
- 	control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
-+	nr_irqs = (control >> 2) & 0x3ff;
-+
-+	for (i = 0; i < nr_irqs; i++)
-+		writel(i, main_int_base + ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS);
- 
- 	armada_370_xp_mpic_domain =
--		irq_domain_add_linear(node, (control >> 2) & 0x3ff,
-+		irq_domain_add_linear(node, nr_irqs,
- 				&armada_370_xp_mpic_irq_ops, NULL);
- 
- 	BUG_ON(!armada_370_xp_mpic_domain);
--- 
-1.9.3
+Maybe generic OPP bindings don't state that, but I believe that at least
+cpufreq-cpu0 bindings have been defined (and the driver implemented)
+this way and changing the semantics now would be breaking DT ABI
+compatibility.
+
+> 
+> boost-frequencies are describing "overclocked frequencies" - should it
+> matter if the description of that comes from platform code OR existing
+> opp tables or what ever? I dont think defining them as "operating
+> point" style as the only way of describing overclocked frequencies are
+> the right approach to describing it.
+
+Nobody said that it is the only way. The whole point here is that it
+should be separate from the main operating-points property, as boost
+operating points are not normal operating points and the OS must be
+specifically aware how to handle them.
+
+Best regards,
+Tomasz
