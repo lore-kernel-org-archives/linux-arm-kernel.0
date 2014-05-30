@@ -1,100 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 30 May 2014 21:06:16 +0200
-Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <CAL_JsqKumG1PSFoVfeGpLLG+MjXFeF4aUjun=vv1BJpaxk0Byg@mail.gmail.com>
-References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
- <CAL_JsqKumG1PSFoVfeGpLLG+MjXFeF4aUjun=vv1BJpaxk0Byg@mail.gmail.com>
-Message-ID: <4545972.cM7IP1qTXQ@wuerfel>
+From: t.dakhran@gmail.com (Tarek Dakhran)
+Date: Fri, 30 May 2014 23:07:01 +0400
+Subject: [PATCH v11 0/3] Exynos 5410 support
+In-Reply-To: <CAC5m3Bz53QO5tTTvk7qnBQtwtjMvSgYZ15prAvnLjdogQRsfMQ@mail.gmail.com>
+References: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>
+ <7hr43f9mmn.fsf@paris.lan> <538737CA.4070709@suse.de>
+ <53874862.5080809@samsung.com> <538775AB.3000604@suse.de>
+ <CAC5m3Bz53QO5tTTvk7qnBQtwtjMvSgYZ15prAvnLjdogQRsfMQ@mail.gmail.com>
+Message-ID: <CANhyOUeq1MMHHn9t+Fy5gpkb43y_rS9F_OAoJ_KFyM1pL4ZJ4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 May 2014 08:16:05 Rob Herring wrote:
-> On Fri, May 23, 2014 at 3:33 PM, Thierry Reding
-> <thierry.reding@gmail.com> wrote:
-> > From: Thierry Reding <treding@nvidia.com>
-> > +IOMMU master node:
-> > +==================
-> > +
-> > +Devices that access memory through an IOMMU are called masters. A device can
-> > +have multiple master interfaces (to one or more IOMMU devices).
-> > +
-> > +Required properties:
-> > +--------------------
-> > +- iommus: A list of phandle and IOMMU specifier pairs that describe the IOMMU
-> > +  master interfaces of the device. One entry in the list describes one master
-> > +  interface of the device.
-> > +
-> > +When an "iommus" property is specified in a device tree node, the IOMMU will
-> > +be used for address translation. If a "dma-ranges" property exists in the
-> > +device's parent node it will be ignored. An exception to this rule is if the
-> > +referenced IOMMU is disabled, in which case the "dma-ranges" property of the
-> > +parent shall take effect.
-> 
-> Just thinking out loud, could you have dma-ranges in the iommu node
-> for the case when the iommu is enabled rather than putting the DMA
-> window information into the iommus property?
-> 
-> This would probably mean that you need both #iommu-cells and #address-cells.
+Hi,
 
-The reason for doing like this was that you may need a different window
-for each device, while there can only be one dma-ranges property in 
-an iommu node.
+On Fri, May 30, 2014 at 7:41 AM, Tushar Behera <trblinux@gmail.com> wrote:
+> On Thu, May 29, 2014 at 11:30 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>> Hi Tarek,
+>>
+>>
+>> And I reproducibly get failures for CPUs 1-3, resulting in only one CPU
+>> in /proc/cpuinfo (compared to 4 on downstream 3.14):
+>>
+>> [    0.045778] CPU: Testing write buffer coherency: ok
+>> [    0.045968] /cpus/cpu at 0 missing clock-frequency property
+>> [    0.045993] /cpus/cpu at 1 missing clock-frequency property
+>> [    0.046016] /cpus/cpu at 2 missing clock-frequency property
+>> [    0.046040] /cpus/cpu at 3 missing clock-frequency property
+>> [    0.046059] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+>> [    0.046135] Setting up static identity map for 0x403a8920 - 0x403a8978
+>> [    2.075052] CPU1: failed to come online
+>> [    4.085095] CPU2: failed to come online
+>> [    6.095142] CPU3: failed to come online
+>> [    6.095237] Brought up 1 CPUs
+>> [    6.095269] SMP: Total of 1 processors activated.
+>> [    6.095303] CPU: All CPU(s) started in HYP mode.
+>> [    6.095336] CPU: Virtualization extensions available.
+>>
+>> I also notice another apparent device tree issue:
+>>
+>> [    7.341814] of_get_named_gpiod_flags: can't parse gpios property of
+>> node '/soc/mmc at 12220000/slot at 0[0]'
+>> [    7.341850] of_get_named_gpiod_flags: can't parse gpios property of
+>> node '/soc/mmc at 12220000/slot at 0[0]'
+>>
+>> Are any of those known issues and being worked on?
+>> (The CPU failures affected 5420 Arndale Octa as well iirc.)
+>>
+>
+> Can you check after applying following two patches for Arndale-Octa
+> ([1],[2])? In other words, a patch similar to [2] might be required
+> for this board too if it is booting under secure mode.
 
-> > +
-> > +Optional properties:
-> > +--------------------
-> > +- iommu-names: A list of names identifying each entry in the "iommus"
-> > +  property.
-> 
-> Do we really need a name here? I would not expect that you have
-> clearly documented names here from the datasheet like you would for
-> interrupts or clocks, so you'd just be making up names. Sorry, but I'm
-> not a fan of names properties in general.
+Firmware node already present into exynos5410-smdk5410.dts
+So with only patch[1] 4xA15 cores will boot on ODROID-XU and SMDK5410.
 
-Good point, this was really overdesign by modeling it after other
-subsystems that can have a use for names.
- 
-> > +Multiple-master IOMMU:
-> > +----------------------
-> > +
-> > +       iommu {
-> > +               /* the specifier represents the ID of the master */
-> > +               #address-cells = <1>;
-> > +               #size-cells = <0>;
-> > +       };
-> > +
-> > +       master {
-> > +               /* device has master ID 42 in the IOMMU */
-> > +               iommus = <&/iommu 42>;
-> > +       };
-> 
-> Presumably the ID would be the streamID on ARM's SMMU. How would a
-> master with 8 streamIDs be described? This is what Calxeda midway has
-> for SATA and I would expect that to be somewhat common. Either you
-> need some ID masking or you'll have lots of duplication when you have
-> windows.
+>
+> [1] http://www.spinics.net/lists/linux-samsung-soc/msg31776.html
+>
+> [PATCH v2 Resend 1/2] ARM: EXYNOS: Update secondary boot addr for secure mode
+>
+> [2] http://www.spinics.net/lists/linux-samsung-soc/msg31777.html
+>
+> [PATCH v2 Resend 2/2] ARM: dts: Add secure firmware support for Arndale-octa
+>
+>
+> --
+> Tushar Behera
 
-I don't understand the problem. If you have stream IDs 0 through 7,
-you would have
-
-	master at a {
-		...
-		iommus = <&smmu 0>;
-	};
-
-	master at b {
-		...
-		iommus = <&smmu 1;
-	};
-
-	...
-
-	master at 12 {
-		...
-		iommus = <&smmu 7;
-	};
-
-and you don't need a window@all. Why would you need a mask of
-some sort?
-
-	Arnd
+Best regards,
+    Tarek
