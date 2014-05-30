@@ -1,63 +1,77 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 30 May 2014 10:02:57 +0200
-Subject: nommu build failures on ARM in linux-next
-In-Reply-To: <20140529234012.GL3693@n2100.arm.linux.org.uk>
-References: <5387661F.1050000@windriver.com>
- <20140529185534.GK3693@n2100.arm.linux.org.uk>
- <20140529234012.GL3693@n2100.arm.linux.org.uk>
-Message-ID: <20140530080257.GW20155@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 30 May 2014 10:08:19 +0200
+Subject: [PATCH RFCv2 1/5] ARM: use write allocate by default on ARMv6+
+In-Reply-To: <20140528112450.GH3693@n2100.arm.linux.org.uk>
+References: <1400600105-3013-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1400600105-3013-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140526162643.GB3693@n2100.arm.linux.org.uk>
+ <20140527111542.6a49833f@free-electrons.com>
+ <20140527094749.GE3693@n2100.arm.linux.org.uk>
+ <20140527135216.7eaf3b3f@free-electrons.com>
+ <20140527121806.GF3693@n2100.arm.linux.org.uk>
+ <20140527143745.386c77d9@free-electrons.com>
+ <20140528112450.GH3693@n2100.arm.linux.org.uk>
+Message-ID: <20140530100819.1208149f@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Russell,
 
-[adding a few people to Cc]
+Thanks a lot for working on a new proposal for this topic.
 
-On Fri, May 30, 2014 at 12:40:12AM +0100, Russell King - ARM Linux wrote:
-> On Thu, May 29, 2014 at 07:55:34PM +0100, Russell King - ARM Linux wrote:
-> > On Thu, May 29, 2014 at 12:53:51PM -0400, Paul Gortmaker wrote:
-> > > Hi Russell,
-> > > 
-> > > The allnoconfig builds in linux-next fail because __clear_cr
-> > > lives in mmu.c without any stub or similar in nommu.c
-> > > 
-> > > Introduced by:
-> > > 
-> > > commit 247e4fff3aa927ad069447e6da05bb966b70dece
-> > > Author: Russell King <rmk+kernel@arm.linux.org.uk>
-> > > Date:   Sun Apr 13 18:57:29 2014 +0100
-> > > 
-> > >     ARM: provide common method to clear bits in CPU control register
-> > >     
-> > > Sample failure:
-> > >   http://kisskb.ellerman.id.au/kisskb/buildresult/11264405/
-> > 
-> > ALIGNMENT_TRAP depends on CPU_CP15_MMU, so it's quite reasonable that
-> > __clear_cr should exist in this case - but it doesn't because it's in
-> > mmu.c.  I guess we need __clear_cr moved to arch/arm/kernel/setup.c.
+On Wed, 28 May 2014 12:24:50 +0100, Russell King - ARM Linux wrote:
+
+> But the way you go about this is totally silly - you effectively end
+> up enabling all the SMP stuff even though you don't need it (which means
+> that on a SMP kernel, you end up with a bunch of extra stuff on those
+> platforms which aren't SMP, just because you want maybe one or two
+> is_smp() sites to return true.
+
+Again, have you looked at the PATCH RFCv1 for this patch series? My
+first version was doing *exactly* what you suggest: only make the few
+call sites of is_smp() I was interested in to return true for the
+specific platforms that needed it.
+
+PATCH RFCv2 was generated after a discussion with Catalin and Rob, who
+suggested that we might want to simply always use the SMP capabilities
+on SMP-capable processors.
+
+> How about this patch for a start - which incidentally fixes two minor
+> bugs where specifying cachepolicy=<anything> on ARMv6 provokes a warning,
+> and sets the policy to writeback read-allocate, only to have it overriden
+> later.  The second bug is that we "hoped" that is_smp() reflects the asm
+> code's page table setup - this patch makes it more explicit by reading
+> the PMD flags, finding the appropriate entry in the table, and setting
+> the cache policy to that.  I've left the is_smp() check in because we
+> really do want to detect if something goes awry there.
 > 
-> I've been looking at doing this, and while it can be done by applying
-> a patch on top, that's not my preferred solution.
-> 
-> However, my preferred solution (which is to fix the commit) needs a bit
-> of rework of the patch series, and given the number of patches I'm
-> carrying right now, I'm just going to drop the branch out of linux-next
-> and hold it off until the following merge window instead.
-> 
-> Even so, I suspect even with this build problem solved, that's not going
-> to be the end of the story for noMMU breakage... it's certainly something
-> that gets very little testing by anyone.  I suspect it should be removed
-> from the mainline kernel tree rather than being a constant source of these
-> kinds of problems.
-That would mean that support for Cortex-M3 would die, too, which would
-(IMHO) be sad.
+> However, the effect of this patch is that the C code now follows how
+> the assembly code sets up the page tables, which means that this is now
+> controllable via the PMD MMU flags in the assembly procinfo structure.
+> This means that for the Armada devices which need write-alloc for
+> coherency, you can specify that in the proc-*.S files - yes, it means
+> that you need a separate entry.
 
-Currently the efm32 test in our autobuilder is broken, I will address
-that and then keep an eye on it.
+While that would work for Armada 370 and Armada XP, it does not work
+for Armada 375 and Armada 38x, as far as I can see. Armada 375 and
+Armada 38x are SMP-capable, but we want to support hardware I/O
+coherency in a CONFIG_SMP=n configuration (mainly because Armada 380 is
+single-core). This means that in proc-v7.S, we would have to define
+that the page tables should use the write-allocate cache policy, and
+the shareable attribute, and this for *all* Cortex-A9, because from a
+MIDR point of view, there is no difference between the Cortex-A9 in
+Armada 375/38x and other Cortex-A9. And there are Cortex-A9, like the
+Aegis thing from TI that are *not* SMP-capable, so enabling shareable
+attributes will break.
 
-Best regards
-Uwe
+So unless I'm missing something, I don't see how your approach solves
+the problem for the Cortex-A9 platforms. What would be your suggestion
+to solve this issue?
 
+Thanks,
+
+Thomas
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
