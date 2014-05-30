@@ -1,51 +1,36 @@
 From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Fri, 30 May 2014 16:07:38 +0530
-Subject: [PATCH Resend 5/8] ARM: vt8500: Staticize local symbols
+Date: Fri, 30 May 2014 16:07:40 +0530
+Subject: [PATCH Resend 7/8] ARM: spear: Staticize spear1310_io_desc in
+ spear1310.c
 In-Reply-To: <1401446261-22423-1-git-send-email-sachin.kamat@linaro.org>
 References: <1401446261-22423-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1401446261-22423-5-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <1401446261-22423-7-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Variables local to this file are made static.
+'spear1310_io_desc' is used only in this file.
 
 Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Tony Prisk <linux@prisktech.co.nz>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Viresh Kumar <viresh.linux@gmail.com>
+Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
+Cc: spear-devel at list.st.com
 ---
- arch/arm/mach-vt8500/vt8500.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-spear/spear1310.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
-index 4a73464cb11b..2da7be31e7e2 100644
---- a/arch/arm/mach-vt8500/vt8500.c
-+++ b/arch/arm/mach-vt8500/vt8500.c
-@@ -44,7 +44,7 @@
- 
- static void __iomem *pmc_base;
- 
--void vt8500_restart(enum reboot_mode mode, const char *cmd)
-+static void vt8500_restart(enum reboot_mode mode, const char *cmd)
- {
- 	if (pmc_base)
- 		writel(1, pmc_base + VT8500_PMSR_REG);
-@@ -60,7 +60,7 @@ static struct map_desc vt8500_io_desc[] __initdata = {
- 	},
- };
- 
--void __init vt8500_map_io(void)
-+static void __init vt8500_map_io(void)
- {
- 	iotable_init(vt8500_io_desc, ARRAY_SIZE(vt8500_io_desc));
- }
-@@ -72,7 +72,7 @@ static void vt8500_power_off(void)
- 	asm("mcr%? p15, 0, %0, c7, c0, 4" : : "r" (0));
- }
- 
--void __init vt8500_init(void)
-+static void __init vt8500_init(void)
- {
- 	struct device_node *np;
- #if defined(CONFIG_FB_VT8500) || defined(CONFIG_FB_WM8505)
+diff --git a/arch/arm/mach-spear/spear1310.c b/arch/arm/mach-spear/spear1310.c
+index 824b12a56a42..d9ce4d8000f0 100644
+--- a/arch/arm/mach-spear/spear1310.c
++++ b/arch/arm/mach-spear/spear1310.c
+@@ -42,7 +42,7 @@ static const char * const spear1310_dt_board_compat[] = {
+  * PHYSICAL		VIRTUAL
+  * 0xD8000000		0xFA000000
+  */
+-struct map_desc spear1310_io_desc[] __initdata = {
++static struct map_desc spear1310_io_desc[] __initdata = {
+ 	{
+ 		.virtual	= VA_SPEAR1310_RAS_GRP1_BASE,
+ 		.pfn		= __phys_to_pfn(SPEAR1310_RAS_GRP1_BASE),
 -- 
 1.7.9.5
