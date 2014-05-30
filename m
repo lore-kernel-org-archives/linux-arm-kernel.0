@@ -1,27 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 30 May 2014 01:13:54 +0100
-Subject: [PATCH v3] ARM: mm: support big-endian page tables
-In-Reply-To: <20140529075837.GA29812@arm.com>
-References: <534F9F79.9050503@huawei.com>
- <87ob00wau2.fsf@approximate.cambridge.arm.com>
- <20140423132033.GE5649@arm.com> <53587C48.8080103@huawei.com>
- <5386A799.7040403@huawei.com> <20140529075837.GA29812@arm.com>
-Message-ID: <20140530001354.GN3693@n2100.arm.linux.org.uk>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Fri, 30 May 2014 01:56:03 +0100
+Subject: [PATCH] of: treat PCI config space as IORESOURCE_MEM type
+In-Reply-To: <47B1E3D0-4336-4529-80B0-172F4ACA5C97@codeaurora.org>
+References: <1401379426-9701-1-git-send-email-galak@codeaurora.org>
+ <CAL_JsqLPFDwtd-QYDqCwx1JVj1Aa8=nof-e0P6R9CZra+fXHfw@mail.gmail.com>
+ <47B1E3D0-4336-4529-80B0-172F4ACA5C97@codeaurora.org>
+Message-ID: <20140530005602.GE1677@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 29, 2014 at 08:58:38AM +0100, Will Deacon wrote:
-> On Thu, May 29, 2014 at 04:20:57AM +0100, Jianguo Wu wrote:
-> > Hi Russell,
-> > Could you please merge this to mainline? Thanks!
+On Thu, May 29, 2014 at 03:51:28PM -0500, Kumar Gala wrote:
 > 
-> Give him a chance, it's not the merge window yet ;) I can see it queued in
-> his for-next branch.
+> On May 29, 2014, at 3:44 PM, Rob Herring <robherring2@gmail.com> wrote:
+> 
+> > On Thu, May 29, 2014 at 11:03 AM, Kumar Gala <galak@codeaurora.org> wrote:
+> >> If we have a PCI config space specified in something like a ranges
+> >> property we should treat it as memory type resource.
+> > 
+> > Config space should not be in ranges[1]. We have some cases that are,
+> > but we don't want new ones.
+> 
+> For the cases we have I agree, however an ECAM based cfg seems completely legit.
+> 
+> >> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> >> ---
+> >> drivers/of/address.c | 3 +++
+> >> 1 file changed, 3 insertions(+)
+> >> 
+> >> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> >> index cb4242a..4e7ee59 100644
+> >> --- a/drivers/of/address.c
+> >> +++ b/drivers/of/address.c
+> >> @@ -122,6 +122,9 @@ static unsigned int of_bus_pci_get_flags(const __be32 *addr)
+> >>        u32 w = be32_to_cpup(addr);
+> >> 
+> >>        switch((w >> 24) & 0x03) {
+> >> +       case 0x00: /* cfg space */
+> >> +               flags |= IORESOURCE_MEM;
+> >> +               break;
+> > 
+> > How would you then distinguish actual memory ranges?
+> 
+> One assumes you are still looking at pci_space as part of of_pci_range
 
-It's not like it's something that has ever worked in the past - so
-it's really a new feature rather than a bug fix, even through we've
-been growing BE support in other areas.
+That doesn't happen when you start scanning the bus. The existing code will
+use the IORESOURCE_MEM for allocating memory space for devices, which is
+not what you want. Did you test your patch on any PCI system? I'm pretty
+sure that with my patch series that tries to make a generic framework for
+host controllers this will fail.
+
+We really need a IORESOURCE_CFG flag for this space.
+
+Best regards,
+Liviu
+
+> 
+> > 
+> > Rob
+> > 
+> > [1] http://www.spinics.net/lists/linux-pci/msg30585.html
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> -- 
+> Employee of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+-------------------
+   .oooO
+   (   )
+    \ (  Oooo.
+     \_) (   )
+          ) /
+         (_/
+
+ One small step
+   for me ...
