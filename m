@@ -1,44 +1,36 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 31 May 2014 03:18:30 +0900
-Subject: [PATCH] ARM: dts: exynos4: Fix reg sizes of GIC
-In-Reply-To: <53886E53.70206@gmail.com>
-References: <1400855960-22033-1-git-send-email-t.figa@samsung.com>
- <53886E53.70206@gmail.com>
-Message-ID: <5388CB76.2030806@samsung.com>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Fri, 30 May 2014 20:19:37 +0200
+Subject: [PATCH v2 Resend 1/2] ARM: EXYNOS: Update secondary boot addr
+ for secure mode
+In-Reply-To: <1401250382-24046-1-git-send-email-sachin.kamat@linaro.org>
+References: <1401250382-24046-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <5388CBB9.1050003@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/14 20:41, Tomasz Figa wrote:
-> Hi,
->
-> On 23.05.2014 16:39, Tomasz Figa wrote:
->> This patch fixes reg entry sizes in GIC node that were not large enough
->> to cover whole regions.
->>
->> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
->> ---
->>   arch/arm/boot/dts/exynos4.dtsi | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
->> index b8ece4b..fbaf426 100644
->> --- a/arch/arm/boot/dts/exynos4.dtsi
->> +++ b/arch/arm/boot/dts/exynos4.dtsi
->> @@ -113,7 +113,7 @@
->>   		compatible = "arm,cortex-a9-gic";
->>   		#interrupt-cells =<3>;
->>   		interrupt-controller;
->> -		reg =<0x10490000 0x1000>,<0x10480000 0x100>;
->> +		reg =<0x10490000 0x10000>,<0x10480000 0x10000>;
->>   	};
->>
->>   	combiner: interrupt-controller at 10440000 {
->>
->
-> Ping.
->
-Yeah, SZ_64K is used for GIC_CPU and GIC_DIST before moving on DT 
-support. Applied, but I need to check this is required for stable tree...
+Am 28.05.2014 06:13, schrieb Sachin Kamat:
+> Almost all Exynos-series of SoCs that run in secure mode don't need
+> additional offset for every CPU, with Exynos4412 being the only
+> exception.
+> 
+> Tested on Origen-Quad (Exynos4412) and Arndale-Octa (Exynos5420).
+> 
+> While at it, fix the coding style (space around *).
+> 
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> ---
+>  arch/arm/mach-exynos/firmware.c |    9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
 
-Thanks,
-Kukjin
+Fixes ODROID-XU (Exynos5410) as well - thought it had been a prereq to
+applying the 5410 patches...
+
+Tested-by: Andreas F?rber <afaerber@suse.de>
+
+Regards,
+Andreas
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
