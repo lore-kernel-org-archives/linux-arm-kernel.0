@@ -1,21 +1,15 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 30 May 2014 07:17:27 -0500
-Subject: [PATCH v2 00/11] ARM: Versatile irq and clock DT support
-In-Reply-To: <CACRpkdZhtAG7ThDvzTi6UBrF=ALd3huHquWQ+t-aaSBZOAfy6g@mail.gmail.com>
-References: <1401403221-27523-1-git-send-email-robherring2@gmail.com>
- <CACRpkdZhtAG7ThDvzTi6UBrF=ALd3huHquWQ+t-aaSBZOAfy6g@mail.gmail.com>
-Message-ID: <CAL_JsqLfoFvr8Tz1GqfA5PU1tP4zEtO21VuQObfRKmeLLJMK2g@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 30 May 2014 13:26:35 +0100
+Subject: [PATCH 0/{1,1}] i2c: Make I2C ID tables non-mandatory for DT/ACPI
+Message-ID: <1401452797-29521-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 30, 2014 at 4:41 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, May 30, 2014 at 12:40 AM, Rob Herring <robherring2@gmail.com> wrote:
->
->> Linus, This could use testing again on Versatile.
->
-> OK I should probably test on Versatile *and* the Integrators since
-> these are also affected. Do you have a branch I can pull?
+Hi Wolfram,
 
-git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git versatile-v2
+Here we have two patches which achieve exactly the same aim.  I
+wasn't sure with method you'd prefer, so I thought I'd submit
+both and you can make a choice.
 
-Rob
+Kind regards,
+Lee
