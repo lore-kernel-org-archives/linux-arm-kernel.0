@@ -1,69 +1,41 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 30 May 2014 16:29:22 -0700
-Subject: [PATCH 2/2] gpio: gpiolib: set gpiochip_remove retval to void
-In-Reply-To: <5388CB1B.3090802@metafoo.de>
-References: <20140530094025.3b78301e@canb.auug.org.au>
- <1401449454-30895-1-git-send-email-berthe.ab@gmail.com>
- <1401449454-30895-2-git-send-email-berthe.ab@gmail.com>
- <CAMuHMdV6AtjD2aqO3buzj8Eo7A7xc_+ROYnxEi2sdjMaqFiAuA@mail.gmail.com>
- <5388C0F1.90503@gmail.com> <5388CB1B.3090802@metafoo.de>
-Message-ID: <20140530232922.GD25854@kroah.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 30 May 2014 16:57:20 -0700
+Subject: [GIT PULL] qcom driver changes for v3.16-2
+In-Reply-To: <alpine.DEB.2.00.1405301138220.5291@galak-ubuntu.qualcomm.com>
+References: <alpine.DEB.2.00.1405301138220.5291@galak-ubuntu.qualcomm.com>
+Message-ID: <20140530235720.GA27752@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 30, 2014 at 08:16:59PM +0200, Lars-Peter Clausen wrote:
-> On 05/30/2014 07:33 PM, David Daney wrote:
-> >On 05/30/2014 04:39 AM, Geert Uytterhoeven wrote:
-> >>On Fri, May 30, 2014 at 1:30 PM, abdoulaye berthe <berthe.ab@gmail.com>
-> >>wrote:
-> >>>--- a/drivers/gpio/gpiolib.c
-> >>>+++ b/drivers/gpio/gpiolib.c
-> >>>@@ -1263,10 +1263,9 @@ static void gpiochip_irqchip_remove(struct
-> >>>gpio_chip *gpiochip);
-> >>>   *
-> >>>   * A gpio_chip with any GPIOs still requested may not be removed.
-> >>>   */
-> >>>-int gpiochip_remove(struct gpio_chip *chip)
-> >>>+void gpiochip_remove(struct gpio_chip *chip)
-> >>>  {
-> >>>         unsigned long   flags;
-> >>>-       int             status = 0;
-> >>>         unsigned        id;
-> >>>
-> >>>         acpi_gpiochip_remove(chip);
-> >>>@@ -1278,24 +1277,15 @@ int gpiochip_remove(struct gpio_chip *chip)
-> >>>         of_gpiochip_remove(chip);
-> >>>
-> >>>         for (id = 0; id < chip->ngpio; id++) {
-> >>>-               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags)) {
-> >>>-                       status = -EBUSY;
-> >>>-                       break;
-> >>>-               }
-> >>>-       }
-> >>>-       if (status == 0) {
-> >>>-               for (id = 0; id < chip->ngpio; id++)
-> >>>-                       chip->desc[id].chip = NULL;
-> >>>-
-> >>>-               list_del(&chip->list);
-> >>>+               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags))
-> >>>+                       panic("gpio: removing gpiochip with gpios still
-> >>>requested\n");
-> >>
-> >>panic?
-> >
-> >NACK to the patch for this reason.  The strongest thing you should do here
-> >is WARN.
-> >
-> >That said, I am not sure why we need this whole patch set in the first place.
+On Fri, May 30, 2014 at 11:41:01AM -0500, Kumar Gala wrote:
+> The following changes since commit 5d144e36b7c51612922fa05d37ff3a869261cc82:
 > 
-> Well, what currently happens when you remove a device that is a provider of
-> a gpio_chip which is still in use, is that the kernel crashes. Probably with
-> a rather cryptic error message. So this patch doesn't really change the
-> behavior, but makes it more explicit what is actually wrong. And even if you
-> replace the panic() by a WARN() it will again just crash slightly later.
+>   soc: qcom: Add GSBI driver (2014-05-23 11:38:04 -0500)
 > 
-> This is a design flaw in the GPIO subsystem that needs to be fixed.
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-drivers-for-3.16-2
+> 
+> for you to fetch changes up to 31964ffebbb958c6cf289c7c12edd7530d6221b9:
+> 
+>   tty: serial: msm: Remove direct access to GSBI (2014-05-29 11:06:20 -0500)
+> 
+> ----------------------------------------------------------------
+> Qualcomm ARM Based driver Updates for v3.16-2
+> 
+> * Updated MSM uart driver to not access GSBI control registers
+> 
+> ----------------------------------------------------------------
+> Andy Gross (1):
+>       tty: serial: msm: Remove direct access to GSBI
+> 
+>  drivers/tty/serial/msm_serial.c | 48 ++---------------------------------------
+>  drivers/tty/serial/msm_serial.h |  5 -----
+>  2 files changed, 2 insertions(+), 51 deletions(-)
 
-Then fix the GPIO code properly, don't add a new panic() to the kernel.
+Do you want me to take these in the tty tree?  Or are they going to go
+through the arm tree(s) for other reasons (dependancies)?
+
+thanks,
 
 greg k-h
