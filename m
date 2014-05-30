@@ -1,72 +1,36 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri, 30 May 2014 10:33:37 -0700
-Subject: [PATCH 2/2] gpio: gpiolib: set gpiochip_remove retval to void
-In-Reply-To: <CAMuHMdV6AtjD2aqO3buzj8Eo7A7xc_+ROYnxEi2sdjMaqFiAuA@mail.gmail.com>
-References: <20140530094025.3b78301e@canb.auug.org.au>
- <1401449454-30895-1-git-send-email-berthe.ab@gmail.com>
- <1401449454-30895-2-git-send-email-berthe.ab@gmail.com>
- <CAMuHMdV6AtjD2aqO3buzj8Eo7A7xc_+ROYnxEi2sdjMaqFiAuA@mail.gmail.com>
-Message-ID: <5388C0F1.90503@gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 30 May 2014 19:48:00 +0200
+Subject: [PATCH] i2c: Make I2C ID tables non-mandatory for DT'ed and/or
+ ACPI'ed devices
+In-Reply-To: <20140530133405.GB29731@lee--X1>
+References: <1401452797-29521-1-git-send-email-lee.jones@linaro.org>
+ <1401452797-29521-2-git-send-email-lee.jones@linaro.org>
+ <20140530123656.GC2742@katana> <20140530133405.GB29731@lee--X1>
+Message-ID: <20140530174800.GA4917@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2014 04:39 AM, Geert Uytterhoeven wrote:
-> On Fri, May 30, 2014 at 1:30 PM, abdoulaye berthe <berthe.ab@gmail.com> wrote:
->> --- a/drivers/gpio/gpiolib.c
->> +++ b/drivers/gpio/gpiolib.c
->> @@ -1263,10 +1263,9 @@ static void gpiochip_irqchip_remove(struct gpio_chip *gpiochip);
->>    *
->>    * A gpio_chip with any GPIOs still requested may not be removed.
->>    */
->> -int gpiochip_remove(struct gpio_chip *chip)
->> +void gpiochip_remove(struct gpio_chip *chip)
->>   {
->>          unsigned long   flags;
->> -       int             status = 0;
->>          unsigned        id;
->>
->>          acpi_gpiochip_remove(chip);
->> @@ -1278,24 +1277,15 @@ int gpiochip_remove(struct gpio_chip *chip)
->>          of_gpiochip_remove(chip);
->>
->>          for (id = 0; id < chip->ngpio; id++) {
->> -               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags)) {
->> -                       status = -EBUSY;
->> -                       break;
->> -               }
->> -       }
->> -       if (status == 0) {
->> -               for (id = 0; id < chip->ngpio; id++)
->> -                       chip->desc[id].chip = NULL;
->> -
->> -               list_del(&chip->list);
->> +               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags))
->> +                       panic("gpio: removing gpiochip with gpios still requested\n");
->
-> panic?
+Hi Lee,
 
-NACK to the patch for this reason.  The strongest thing you should do 
-here is WARN.
+sorry for the delay.
 
-That said, I am not sure why we need this whole patch set in the first 
-place.
+> Would you mind telling me what I have changed that affects drivers
+> registering via Sysfs?
 
-David Daney
+Check Documentation/i2c/instantiating-devices, method 4. If a driver
+does not have i2c_device_id, then this method won't work because the
+newly created device has no of_node or ACPI_node and nothing will match.
+Looking at the bigger picture, I'd really like to keep this feature.
+People use it.
 
+Regards,
 
+   Wolfram
 
->
-> Is this likely to happen?
->
-> Gr{oetje,eeting}s,
->
->                          Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                  -- Linus Torvalds
->
->
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140530/5fb539ef/attachment.sig>
