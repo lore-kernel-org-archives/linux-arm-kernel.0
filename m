@@ -1,65 +1,114 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 30 May 2014 08:34:02 +0200
-Subject: [PATCH v2 11/11] sched: replace capacity by activity
-In-Reply-To: <CAKfTPtACXf+c01O+dCU2ZTc-Mrs+nTKYsu0_aBt8awxSg5WD=g@mail.gmail.com>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-12-git-send-email-vincent.guittot@linaro.org>
- <20140529140204.GH11074@laptop.programming.kicks-ass.net>
- <CAKfTPtACXf+c01O+dCU2ZTc-Mrs+nTKYsu0_aBt8awxSg5WD=g@mail.gmail.com>
-Message-ID: <20140530063402.GB11096@twins.programming.kicks-ass.net>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Fri, 30 May 2014 09:31:30 +0200
+Subject: [PATCH v5 1/2] cpufreq / OPP: Allow boost frequency to be looked
+ up from device tree
+In-Reply-To: <1401374319-4480-2-git-send-email-thomas.ab@samsung.com>
+References: <1401374319-4480-1-git-send-email-thomas.ab@samsung.com>
+ <1401374319-4480-2-git-send-email-thomas.ab@samsung.com>
+Message-ID: <20140530093130.2610eb0a@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 29, 2014 at 09:56:24PM +0200, Vincent Guittot wrote:
-> On 29 May 2014 16:02, Peter Zijlstra <peterz@infradead.org> wrote:
-> > On Fri, May 23, 2014 at 05:53:05PM +0200, Vincent Guittot wrote:
-> >> @@ -6052,8 +6006,8 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
-> >>                * with a large weight task outweighs the tasks on the system).
-> >>                */
-> >>               if (prefer_sibling && sds->local &&
-> >> -                 sds->local_stat.group_has_capacity)
-> >> -                     sgs->group_capacity = min(sgs->group_capacity, 1U);
-> >> +                 sds->local_stat.group_capacity > 0)
-> >> +                     sgs->group_capacity = min(sgs->group_capacity, 1L);
-> >>
-> >>               if (update_sd_pick_busiest(env, sds, sg, sgs)) {
-> >>                       sds->busiest = sg;
-> >> @@ -6228,7 +6182,7 @@ static inline void calculate_imbalance(struct lb_env *env, struct sd_lb_stats *s
-> >>                * have to drop below capacity to reach cpu-load equilibrium.
-> >>                */
-> >>               load_above_capacity =
-> >> -                     (busiest->sum_nr_running - busiest->group_capacity);
-> >> +                     (busiest->sum_nr_running - busiest->group_weight);
-> >>
-> >>               load_above_capacity *= (SCHED_LOAD_SCALE * SCHED_POWER_SCALE);
-> >>               load_above_capacity /= busiest->group_power;
-> >
-> > I think you just broke PREFER_SIBLING here..
+Hi Thomas,
+
+> From: Thomas Abraham <thomas.ab@samsung.com>
 > 
-> you mean by replacing the capacity which was reflecting the number of
-> core for SMT by the group_weight ?
+> Commit 6f19efc0 ("cpufreq: Add boost frequency support in core") adds
+> support for CPU boost mode. This patch adds support for finding
+> available boost frequencies from device tree and marking them as
+> usable in boost mode.
+> 
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Lukasz Majewski <l.majewski@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> ---
+>  drivers/cpufreq/cpufreq_opp.c |   45
+> +++++++++++++++++++++++++++++++++++++++++ 1 file changed, 45
+> insertions(+)
+> 
+> diff --git a/drivers/cpufreq/cpufreq_opp.c
+> b/drivers/cpufreq/cpufreq_opp.c index c0c6f4a..05fb115 100644
+> --- a/drivers/cpufreq/cpufreq_opp.c
+> +++ b/drivers/cpufreq/cpufreq_opp.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/pm_opp.h>
+>  #include <linux/rcupdate.h>
+>  #include <linux/slab.h>
+> +#include <linux/of.h>
+>  
+>  /**
+>   * dev_pm_opp_init_cpufreq_table() - create a cpufreq table for a
+> device @@ -51,6 +52,11 @@ int dev_pm_opp_init_cpufreq_table(struct
+> device *dev, struct cpufreq_frequency_table *freq_table = NULL;
+>  	int i, max_opps, ret = 0;
+>  	unsigned long rate;
+> +#ifdef CONFIG_CPU_FREQ_BOOST_SW
+> +	struct cpufreq_frequency_table *ft;
+> +	int len, count;
+> +	u32 *boost_freqs = NULL;
+> +#endif
+>  
+>  	rcu_read_lock();
+>  
+> @@ -82,6 +88,45 @@ int dev_pm_opp_init_cpufreq_table(struct device
+> *dev, 
+>  	*table = &freq_table[0];
+>  
+> +#ifdef CONFIG_CPU_FREQ_BOOST_SW
+> +	if (!of_find_property(dev->of_node, "boost-frequencies",
+> &len))
+> +		goto out;
+> +
+> +	if (!len || !IS_ALIGNED(len, sizeof(u32))) {
+> +		dev_err(dev, "%s: invalid boost frequency\n",
+> __func__);
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +
+> +	boost_freqs = kmalloc(len, GFP_KERNEL);
+> +	if (!boost_freqs) {
+> +		dev_err(dev, "%s: no memory for boost freq table\n",
+> __func__);
+> +		ret = -ENOMEM;
+> +		goto out;
+> +	}
+> +
+> +	count = len / sizeof(u32);
+> +	of_property_read_u32_array(dev->of_node, "boost-frequencies",
+> +			boost_freqs, count);
+> +
+> +	for (i = 0; i < count; i++) {
+> +		cpufreq_for_each_valid_entry(ft, *table) {
+> +			if (boost_freqs[i] == ft->frequency) {
+> +				ft->flags |= CPUFREQ_BOOST_FREQ;
+> +				pr_debug("%s: marked %d as boost
+> frequency\n",
+> +					__func__, boost_freqs[i]);
+> +				break;
+> +			}
+> +		}
+> +
+> +		if (ft->frequency == CPUFREQ_TABLE_END)
+> +			dev_err(dev, "%s: invalid boost frequency
+> %d\n",
+> +				__func__, boost_freqs[i]);
+> +	}
+> +
+> +	kfree(boost_freqs);
+> +#endif
+> +
+>  out:
+>  	rcu_read_unlock();
+>  	if (ret)
 
-Right to in the first hunk we lower group_capacity to 1 when prefer_sibling,
-then in the second hunk, you replace that group_capacity usage with
-group_weight.
+Acked-by: Lukasz Majewski <l.majewski@samsung.com>
 
-With the end result that prefer_sibling is now ineffective.
+Thomas, thanks for this patch.
 
-That said, I fudged the prefer_sibling usage into the capacity logic,
-mostly because I could and it was already how the SMT stuff was working.
-But there is no reason we should continue to intertwine these two
-things.
+-- 
+Best regards,
 
-So I think it would be good to have a patch that implements
-prefer_sibling on nr_running separate from the existing capacity bits,
-and then convert the remaining capacity bits to utilization (or activity
-or whatever you did call it, see Morton's comments etc.).
+Lukasz Majewski
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140530/06b10982/attachment-0001.sig>
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
