@@ -1,47 +1,112 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Fri, 30 May 2014 07:52:25 +0200
-Subject: [PATCH 2/2] serial: imx: disable the receiver ready interrupt
- for imx_stop_rx
-In-Reply-To: <1400819575-20435-2-git-send-email-b32955@freescale.com>
-References: <1400819575-20435-1-git-send-email-b32955@freescale.com>
- <1400819575-20435-2-git-send-email-b32955@freescale.com>
-Message-ID: <53881C99.1090207@gmail.com>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Fri, 30 May 2014 11:24:50 +0530
+Subject: [PATCH] arm64: kernel: initialize broadcast hrtimer based clock
+ event device
+In-Reply-To: <20140529123929.GF24233@leverpostej>
+References: <1401355381-11446-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <53871444.3080206@linux.vnet.ibm.com> <20140529123929.GF24233@leverpostej>
+Message-ID: <53881D2A.7060001@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.05.2014 06:32, Huang Shijie wrote:
-> This patch disables the receiver ready interrupt for imx_stop_rx.
-> It reduces the interrupt numbers when the uart is going to close
-> or suspend.
->
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->   drivers/tty/serial/imx.c |    4 ++++
->   1 files changed, 4 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index ed6cdf7..6026101 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -440,6 +440,10 @@ static void imx_stop_rx(struct uart_port *port)
->
->   	temp = readl(sport->port.membase + UCR2);
->   	writel(temp & ~UCR2_RXEN, sport->port.membase + UCR2);
-> +
-> +	/* disable the `Receiver Ready Interrrupt` */
-> +	temp = readl(sport->port.membase + UCR1);
-> +	writel(temp & ~UCR1_RRDYEN, sport->port.membase + UCR1);
+On 05/29/2014 06:09 PM, Mark Rutland wrote:
+> Hi Preeti,
+> 
+> On Thu, May 29, 2014 at 12:04:36PM +0100, Preeti U Murthy wrote:
+>> Hi Lorenzo,
+>>
+>> On 05/29/2014 02:53 PM, Lorenzo Pieralisi wrote:
+>>> On platforms implementing CPU power management, the CPUidle subsystem
+>>> can allow CPUs to enter idle states where local timers logic is lost on power
+>>> down. To keep the software timers functional the kernel relies on an
+>>> always-on broadcast timer to be present in the platform to relay the
+>>> interrupt signalling the timer expiries.
+>>>
+>>> For platforms implementing CPU core gating that do not implement an always-on
+>>> HW timer or implement it in a broken way, this patch adds code to initialize
+>>> the kernel software broadcast hrtimer upon boot. It relies on a dynamically
+>>
+>> It would be best to use the term "hrtimer based broadcast device"
+>> throughout the changelog for uniformity and to avoid confusion instead
+>> of mixing it with "software broadcast".
+>>
+>>> chosen CPU to be always powered-up. This CPU then relays the timer interrupt
+>>> to CPUs in deep-idle states through its HW local timer device.
+>>>
+>>> On systems with power management capabilities but no functional HW broadcast
+>>> tick device, the hrtimer based clock event device allows the kernel to
+>>> enter high-resolution timer mode, which improves system latencies and saves
+>>> dynamic power.
+>>
+>> Sorry but I do not understand the above paragraph. What do you mean by
+>> "allows the kernel to enter high resolution timer mode" ? And how does
+>> it improve system latency? I understand that the hrtimer based
+>> clockevent device saves dynamic power since it provides a mechanism in
+>> which cpus can enter deeper idle states.
+> 
+> When there's no oneshot-capable broadcast device and the CPU-local
+> clock_event_device has the CLK_EVT_FEAT_C3STOP flag,
+> tick_is_oneshot_available will return false. Thus
+> tick_check_oneshot_change will return false, and hrtimer_switch_to_hres
+> will never switch to high resolution mode (and we can also never enter
+> NOHZ mode), leaving us stuck in periodic mode.
+> 
+> In periodic mode ticks occur at fixed intervals, and any timer wakeup
+> will occur after the tick following the requested wakeup time, adding
+> some amount of latency over what would be possible with high resolution
+> mode. Additionally, as we can only wake up at said ticks and not between
+> them, it's possible that several timers for intervals shorter than that
+> tick interval will fire at once upon a timer tick. Any tasks which
+> requested these wakeups will fight for CPU time, and some will see
+> additional latency because of this.
 
-Will this change cause a loss or a processing delay of RX characters 
-pending in the RX FIFO ?
+Ah ok I see now. Thanks for the explanation :)
 
-It is not clear whether disabling the receiver will clear the RX FIFO. 
-My guess is that the contents of the RX FIFO will remain intact when 
-the receiver is disabled. The RX interrupt has an opportunity to mop 
-up these pending characters in the RX FIFO but disabling the RX 
-interrupt has potential to leave those characters in the RX FIFO. Does 
-it matter ?
+> 
+>>>
+>>> The side effect of having a CPU always-on has implications on power management
+>>> platform capabilities and makes CPUidle suboptimal, since at least a CPU is
+>>> kept always in a shallow idle state by the kernel to relay timer interrupts,
+>>> but at least leaves the kernel with a functional system with some working power
+>>> management capabilities.
+>>>
+>>> The hrtimer based clock event device has lowest possible rating so that,
+>>> if a platform contains a functional HW clock event device with broadcast
+>>> capabilities, that device is always chosen as a tick broadcast device instead
+>>> of the software based one, now present by default.
+>>
+>> I think this statement "instead of the software based one, now present
+>> by default" is incorrect. The hrtimer based clock event device will come
+>> into picture only when the arch calls tick_setup_hrtimer_broadcast()
+>> explicitly. Otherwise either the arch should register a real clock
+>> device which does broadcast or should disable deep idle states where the
+>> local timers stop. So I would suggest skipping the last paragraph as it
+>> is not conveying anything in specific. The fact that a clock device with
+>> the highest rating will be chosen is already known and need not be
+>> mentioned explicitly IMHO.
+> 
+> I think it is worth keeping the paragraph to allay anyone's fear that
+> the hrtimer based broadcast device might be selected in preference to a
+> real suitable clock. I would otherwise not be aware that the hrtimer
+> based broadcast device had the lowest rating (and would have to go and
+> look that up separately).
+> 
+> As the arch code has delegated timer registration to
+> clocksoruce_of_init, it doesn't know whether any of the real devices
+> that may have been registered are suitable as a broadcast source for
+> oneshot events. So we can't conditionally register the hrtimer based
+> broadcast device.
+> 
+> Perhaps we could replace "now present by default" with "which is
+> unconditionally registered in case no suitable hardware device is
+> present"?
 
-Thanks
+Yes I would say "which gets registered in case no suitable hardware
+devices is present." This would make it clearer.
 
-Dirk
+Regards
+Preeti U Murthy
+> 
+> Cheers,
+> Mark.
+> 
