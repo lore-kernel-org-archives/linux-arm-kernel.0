@@ -1,45 +1,26 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 30 May 2014 19:48:03 +0100
-Subject: [PATCH v6 2/2] Documentation: devicetree: Add boost-frequency
- binding to list boost mode frequency
-In-Reply-To: <5388D0EB.1090001@gmail.com>
-References: <1401440477-4328-1-git-send-email-thomas.ab@samsung.com>	<1401440477-4328-3-git-send-email-thomas.ab@samsung.com>	<20140530130827.GK24233@leverpostej>
- <CAJuA9ajs6K1PVtXC4_U0vQsA0oPnpaF_PdMfiQJxBFStF3Z2aw@mail.gmail.com>
- <5388CAC5.5010607@gmail.com> <5388D02D.4020209@arm.com>
- <5388D0EB.1090001@gmail.com>
-Message-ID: <5388D263.20401@arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 31 May 2014 03:47:55 +0900
+Subject: [RFC] Sort out S5P SoCs support in mainline
+In-Reply-To: <5385C3AE.1020602@samsung.com>
+References: <021f01cf7a61$69853e30$3c8fba90$@samsung.com>
+ <5385C3AE.1020602@samsung.com>
+Message-ID: <5388D25B.4020106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 30/05/14 19:41, Tomasz Figa wrote:
-> On 30.05.2014 20:38, Sudeep Holla wrote:
->> On 30/05/14 19:15, Tomasz Figa wrote:
->>> On 30.05.2014 20:05, Thomas Abraham wrote:
->>>> On Fri, May 30, 2014 at 6:38 PM, Mark Rutland <mark.rutland@arm.com>
->>>> wrote:
+On 05/28/14 20:08, Marek Szyprowski wrote:
+> Hello,
 >
-> [snip]
->
->>>>> Why are these in both operating-points and boost-frequencies? It'll be
->>>>> really easy to accidentally forget to mark something as a
->>>>> boost-frequency this way. Why not have a boost-points instead?
->>>>
+> On 2014-05-28 12:41, Kukjin Kim wrote:
+>> I'm wondering who need to support following SoCs/boards in mainline.
 >>
->> I was told that index is not preferred based on the previous discussions
->> when the OPP bindings were designed. In addition the OPP binding doesn't
->> enforce any ordering. There are thermal bindings that assume otherwise and
->> is broken. So boost-points is not feasible.
+>> * S5P64X0/SMDK6440 and SMDK6450
+>> * S5PC100/SMDKC100
 >>
+>> If nobody is using them, how about to remove them from mainline?
 >
-> My understanding of Mark's comment was that the boost-points property
-> would use the same format as operating-points and parsing code would
-> just concatenate operating points with boost points after making the
-> latter with necessary flag or whatever.
+> I'm okay with removing S5PC100.
 >
+Thanks for your confirm on S5PC100.
 
-Ah, I misunderstood that. That should be fine as it avoids duplication.
-
-Regards,
-Sudeep
+- Kukjin
