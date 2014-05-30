@@ -1,147 +1,44 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 30 May 2014 20:15:33 +0200
-Subject: [PATCH v6 2/2] Documentation: devicetree: Add boost-frequency
- binding to list boost mode frequency
-In-Reply-To: <CAJuA9ajs6K1PVtXC4_U0vQsA0oPnpaF_PdMfiQJxBFStF3Z2aw@mail.gmail.com>
-References: <1401440477-4328-1-git-send-email-thomas.ab@samsung.com>	<1401440477-4328-3-git-send-email-thomas.ab@samsung.com>	<20140530130827.GK24233@leverpostej>
- <CAJuA9ajs6K1PVtXC4_U0vQsA0oPnpaF_PdMfiQJxBFStF3Z2aw@mail.gmail.com>
-Message-ID: <5388CAC5.5010607@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 31 May 2014 03:18:30 +0900
+Subject: [PATCH] ARM: dts: exynos4: Fix reg sizes of GIC
+In-Reply-To: <53886E53.70206@gmail.com>
+References: <1400855960-22033-1-git-send-email-t.figa@samsung.com>
+ <53886E53.70206@gmail.com>
+Message-ID: <5388CB76.2030806@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/30/14 20:41, Tomasz Figa wrote:
+> Hi,
+>
+> On 23.05.2014 16:39, Tomasz Figa wrote:
+>> This patch fixes reg entry sizes in GIC node that were not large enough
+>> to cover whole regions.
+>>
+>> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+>> ---
+>>   arch/arm/boot/dts/exynos4.dtsi | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+>> index b8ece4b..fbaf426 100644
+>> --- a/arch/arm/boot/dts/exynos4.dtsi
+>> +++ b/arch/arm/boot/dts/exynos4.dtsi
+>> @@ -113,7 +113,7 @@
+>>   		compatible = "arm,cortex-a9-gic";
+>>   		#interrupt-cells =<3>;
+>>   		interrupt-controller;
+>> -		reg =<0x10490000 0x1000>,<0x10480000 0x100>;
+>> +		reg =<0x10490000 0x10000>,<0x10480000 0x10000>;
+>>   	};
+>>
+>>   	combiner: interrupt-controller at 10440000 {
+>>
+>
+> Ping.
+>
+Yeah, SZ_64K is used for GIC_CPU and GIC_DIST before moving on DT 
+support. Applied, but I need to check this is required for stable tree...
 
-
-On 30.05.2014 20:05, Thomas Abraham wrote:
-> Hi Mark,
-> 
-> On Fri, May 30, 2014 at 6:38 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> Hi,
->>
->> Apologies for being somewhat late w.r.t. review on this.
->>
->> On Fri, May 30, 2014 at 10:01:17AM +0100, Thomas Abraham wrote:
->>> From: Thomas Abraham <thomas.ab@samsung.com>
->>>
->>> Add a new optional boost-frequency binding for specifying the frequencies
->>> usable in boost mode.
->>>
->>> Cc: Rob Herring <robh+dt@kernel.org>
->>> Cc: Pawel Moll <pawel.moll@arm.com>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
->>> Cc: Kumar Gala <galak@codeaurora.org>
->>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->>> Acked-by: Nishanth Menon <nm@ti.com>
->>> Acked-by: Lukasz Majewski <l.majewski@samsung.com>
->>> ---
->>>  .../devicetree/bindings/cpufreq/cpufreq-boost.txt  |   38 ++++++++++++++++++++
->>>  1 file changed, 38 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
->>> new file mode 100644
->>> index 0000000..63ed0fc
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
->>> @@ -0,0 +1,38 @@
->>> +* Device tree binding for CPU boost frequency (aka over-clocking)
->>> +
->>> +Certain CPU's can be operated in optional 'boost' mode (or sometimes referred as
->>
->> Nit: CPUs (we're not greengrocers [1])
->>
->>> +overclocking) in which the CPU can operate at frequencies which are not
->>> +specified by the manufacturer as CPU's operating frequency.
->>> +
->>> +Optional Properties:
->>> +- boost-frequencies: list of frequencies in KHz to be used only in boost mode.
->>> +  This list should be a subset of frequencies listed in "operating-points"
->>> +  property. Refer to Documentation/devicetree/bindings/power/opp.txt for
->>> +  details about "operating-points" property.
->>
->> What is 'boost-mode'?
-> 
-> boost-mode activates additional one or more cpu clock speeds (which
-> are not specified as operating frequency of the cpu by the
-> manufacturer). The cpu is allowed to operate in these boost mode
-> speeds when the boost mode is active. The boost mode speeds are
-> usually undocumented. Some of the chip samples could be clocked in
-> boost mode speeds and only such samples can be safely operated in
-> boost mode.
-> 
-
-IMHO the most important part that I believe should be stated in the
-documentation is that CPU usually can operate in boost mode for limited
-amount of time, which depends on thermal conditions, which makes the
-boost operating points separate from normal ones, which can be used at
-any time.
-
-> The mechanism of entry into and exit out of boost mode is outside the
-> scope of this documentation.
-> 
->>
->> What are the limitations on boost frequencies? When is a CPU expected to
->> go to these frequencies and for now long? When should I as a dt author
->> place elements in boost-frequencies?
-> 
-> I will add these details in the next revision of this patch.
-> 
->>
->> Why are these in both operating-points and boost-frequencies? It'll be
->> really easy to accidentally forget to mark something as a
->> boost-frequency this way. Why not have a boost-points instead?
-> 
-> Does boost-points mean a set of clock speeds which are not listed as
-> part of operating-points property? If yes, that also is a possible
-> implementation (it was implemented in one of the earlier version of
-> this series). Could you confirm that you want the boost mode speeds to
-> be exclusive of the speeds listed in operating-points?
-
-It seems reasonable to have boost operating points completely separate
-from normal ones, so that a kernel without support for boost mode will
-not use them. Also considering my comment above, logically boost
-operating points are not considered normal operating points, due to
-various constraints that need to be met to use them (i.e. mostly thermal
-conditions).
-
-> 
-> Thanks,
-> Thomas.
-> 
->>
->>> +
->>> +Example:
->>> +
->>> +     cpus {
->>> +             #address-cells = <1>;
->>> +             #size-cells = <0>;
->>> +             cpu at 0 {
->>> +                     device_type = "cpu";
->>> +                     compatible = "arm,cortex-a9";
->>> +                     reg = <0>;
->>> +
->>> +                     operating-points = <
->>> +                             1500000 1350000
->>> +                             1400000 1287500
->>> +                             1300000 1250000
->>> +                             1200000 1187500
->>> +                             1100000 1137500
->>> +                             1000000 1087500
->>> +                     >;
->>> +                     boost-frequencies = <1500000 1400000>;
->>
->> This is more of a general issue, but I hate the whole cpufreq-cpu0 way
->> of assuming that all CPUs mirror CPU0.
->>
->> It would be nicer if either this were dropped in /cpus or repeated
->> per-cpu.
-
-Would it make any difference?
-
-IMHO, as long as the binding is well defined and doesn't cause
-significant issues, I don't think there is a reason to redesign it and
-add a necessity to support both new and old variants.
-
-Best regards,
-Tomasz
+Thanks,
+Kukjin
