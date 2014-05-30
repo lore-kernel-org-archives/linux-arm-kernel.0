@@ -1,84 +1,55 @@
-From: sdu.liu@huawei.com (Liu hua)
-Date: Fri, 30 May 2014 16:14:33 +0800
-Subject: [RESEND PATCH] kexec : add sparse memory related values to vmcore
-In-Reply-To: <20140529001328.GD22705@verge.net.au>
-References: <1401284996-44873-1-git-send-email-sdu.liu@huawei.com>
- <20140529001328.GD22705@verge.net.au>
-Message-ID: <53883DE9.6090705@huawei.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 30 May 2014 10:17:05 +0200
+Subject: RFC: representing sdio devices oob interrupt, clks, etc. in device
+ tree
+In-Reply-To: <20140528164326.GB5099@sirena.org.uk>
+References: <53824294.1090609@redhat.com>
+ <20140526103807.GV22111@sirena.org.uk> <538321AB.4050006@redhat.com>
+ <20140526142225.GF22111@sirena.org.uk> <538356DA.7090302@redhat.com>
+ <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
+ <53838023.2080807@redhat.com>
+ <CAPDyKFpg_2RQabM044C1hsNTcuxdVVOvw0ZONVRdysk=eom8UA@mail.gmail.com>
+ <5385AF94.90004@redhat.com> <5385CCE6.9070204@gmail.com>
+ <20140528164326.GB5099@sirena.org.uk>
+Message-ID: <53883E81.3060109@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/5/29 8:13, Simon Horman wrote:
-> On Wed, May 28, 2014 at 09:49:56PM +0800, Liu Hua wrote:
->> This patch deales with sparse memory model.
->>
->> For ARM32 platforms, different vendors may define different
->> SECTION_SIZE_BITS, which we did not write to vmcore.
->>
->> For example:
->>
->>   1 arch/arm/mach-clps711x/include/mach/memory.h
->>     #define SECTION_SIZE_BITS 24
->>   2 arch/arm/mach-exynos/include/mach/memory.h
->>     #define SECTION_SIZE_BITS 28
->>   3 arch/arm/mach-sa1100/include/mach/memory.h
->>     #define SECTION_SIZE_BITS 27
-> 
-> I wonder if this problem will eventually go away, or at least only
-> apply to older platforms, as ARM moves towards multiplatform: a single
-> kernel for more than one platform.
+Hi,
 
-For ARM32 platform, it may cost a long time. And when glancing over
-the commit log of kernel, we can find this macro changed several times.
-The user space tools must take care of all these changed for compatibility.
+On 05/28/2014 06:43 PM, Mark Brown wrote:
+> On Wed, May 28, 2014 at 01:47:50PM +0200, Tomasz Figa wrote:
 
+<snip>
+
+>> IMHO, all we need here is a way to tell the MMC (or HSIC) core when to
+>> look for a new device and when not (e.g. power down the host controller
+>> completely). Anything else, including proper power sequencing is up to
+>> the platform driver of such non-discoverable device - it's only its host
+>> interface that is discoverable when enabled. I believe this simplistic
+>> approach would lead to much less new code added, better reusability of
+>> code (power sequencing independent of host interface) and no need to
+>> create overly generic code, which usually turns out to be not generic
+>> enough.
 > 
->> It is really a bad news for user space tools such as
->> makedumpfile and crash, who have to defines them as
->> macros. So for the same architecture, we may need to
->> recomile them to parse vmcores with different
->> SECTION_SIZE_BITS.
->>
->> And if we enable LPAE, MAX_PHYSMEM_SIZE can alse
->> be variable.
->>
->> This patch adds these SECTION_SIZE_BITS and MAX_PHYSMEM_SIZE
->> to vmcore. which makes user space tools more compatible.
->>
->> BTW, makedumpfile has queued the related patch.
->>
->> Signed-off-by: Liu Hua <sdu.liu@huawei.com>
->> ---
->>  kernel/kexec.c | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/kernel/kexec.c b/kernel/kexec.c
->> index bf0b929e..8b1a193 100644
->> --- a/kernel/kexec.c
->> +++ b/kernel/kexec.c
->> @@ -1577,6 +1577,8 @@ static int __init crash_save_vmcoreinfo_init(void)
->>  	VMCOREINFO_LENGTH(mem_section, NR_SECTION_ROOTS);
->>  	VMCOREINFO_STRUCT_SIZE(mem_section);
->>  	VMCOREINFO_OFFSET(mem_section, section_mem_map);
->> +	VMCOREINFO_NUMBER(MAX_PHYSMEM_BITS);
->> +	VMCOREINFO_NUMBER(SECTION_SIZE_BITS);
->>  #endif
->>  	VMCOREINFO_STRUCT_SIZE(page);
->>  	VMCOREINFO_STRUCT_SIZE(pglist_data);
->> -- 
->> 1.9.0
->>
->>
->> _______________________________________________
->> kexec mailing list
->> kexec at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/kexec
->>
-> 
-> _______________________________________________
-> kexec mailing list
-> kexec at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/kexec
-> 
-> .
-> 
+> We then have the problem of working out where that platform driver comes
+> from, for many of these buses the device can be completely described as
+> just a device on the parent bus with some resources connected.
+
+Right, I think what we should do is focus on the DT description for this
+first and then worry about the implementation later.
+
+I believe that at the DT level this all should be represented as a child-node
+under the host controller. Following that reasoning it makes perfect sense
+to just focus on mmc for now, while keeping in mind that it would be nice if
+what comes out of this will be re-usable.
+
+I've done a detailed, updated proposal for the mmc case (with admittedly
+some implementation comments in there) in my last mail, but unfortunately
+I've seen little response to that. Can people please reply to my
+proposal where we've 2 levels of child nodes, one per mmc slot, and then the
+slot nodes has card / sdio-func child nodes, see my last mail.
+
+Regards,
+
+Hans
