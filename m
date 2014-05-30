@@ -1,107 +1,71 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 31 May 2014 04:59:24 +0900
-Subject: [GIT PULL 2/5] Samsung DT updates for 3.16
-Message-ID: <5388E31C.5070903@samsung.com>
+Date: Sat, 31 May 2014 04:59:39 +0900
+Subject: [GIT PULL 3/5] Samsung Exynos updates for 3.16
+Message-ID: <5388E32B.3010908@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 3c8977f17796f0b8816a1a283b0b80b71c83d416:
+The following changes since commit fced6dee29f6fb143fe16ea90331176ff77e6120:
 
-   ARM: dts: enable usb nodes for exynos4412-trats2 (2014-05-23 03:31:33 
-+0900)
+   Merge branch 'v3.16-next/cleanup-samsung' into 
+v3.16-next/platform-exynos (2014-05-31 02:36:49 +0900)
 
 are available in the git repository at:
 
+
    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/samsung-dt-3
+tags/samsung-exynos
 
-for you to fetch changes up to 345e9bf08276395bd6620dfab56d1b679136d2ce:
+for you to fetch changes up to 9dfa92ec4033c348aae6bafc1881e07229fabaa6:
 
-   ARM: dts: add secure firmware support for exynos5420-arndale-octa 
-(2014-05-31 04:03:31 +0900)
-
-----------------------------------------------------------------
-Samsung 3rd DT updates for v3.16
-
-- add dts files support for new SoCs
-   : exynos3250 SoC
-   : exynos5260 SoC and exynos5260-xyref5260 board
-   : exynos5410 SoC and exynos5410-smdk5410 board
-   : exynos5800 SoC and exynos5800-peach-pi board
-
-- exynos4210-origen and exynos4412-origen
-   : enable RTC and WDT nodes
-   : use key code macros
-
-- exynos5250-arndale
-   : use key code macros
-
-- exynos5420-arndale-octa
-   : add secure firmware support
-
-- exynos5440
-   : update watchdog node name
+   ARM: EXYNOS: Enable multi-platform build support (2014-05-31 02:43:51 
++0900)
 
 ----------------------------------------------------------------
-Arun Kumar K (5):
-       ARM: dts: add dts file for exynos5800 SoC
-       ARM: dts: add dts file for exynos5800-peach-pi board
-       ARM: dts: add mfc node for exynos5800
-       ARM: dts: correct the usb phy node in exynos5420-peach-pit
-       ARM: dts: correct the usb phy node in exynos5800-peach-pi
+Samsung Exynos updates for 3.16
 
-Chanwoo Choi (1):
-       ARM: dts: add pmu sysreg node to exynos3250
+- add new SoCs support
+   : exynos3250, 5260, 5410 and 5800
 
-Rahul Sharma (5):
-       ARM: dts: add dts files for exynos5260 SoC
-       ARM: dts: add dts file for exynos5260-xyref5260 board
-       ARM: dts: enable hdmi for exynos5800-peach-pi
-       ARM: dts: enable display controller for exynos5800-peach-pi
-       ARM: dts: enable fimd for exynos5800-peach-pi
+- enable multi-platform on exynos
+   : consolidate exynos related Kconfig entries
 
-Sachin Kamat (3):
-       ARM: dts: enable RTC and WDT nodes on Origen boards
-       ARM: dts: use key code macros on Origen and Arndale boards
-       ARM: dts: update watchdog node name in exynos5440
+Note that this requires tags/samsung-cleanup and tags/samsung-clk-2
+because of mostly migration exynos specific macros into mach-exynos
+and exynos related Kconfig entries.
+
+One more merge conflict happens in arch/arm/Kconfig for ARCH_EXYNOS
+due to SRAM stuff, even though tried to sort them out. Since just
+resolving it would be better I think, please remove ARCH_EXYNOS in
+arch/arm/Kconfig when merge conflict happens.
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+       ARM: EXYNOS: Enable multi-platform build support
+
+Arun Kumar K (1):
+       ARM: EXYNOS: Add 5800 SoC support
+
+Chanwoo Choi (2):
+       ARM: EXYNOS: Add Exynos3250 SoC ID
+       ARM: EXYNOS: Support secondary CPU boot of Exynos3250
+
+Pankaj Dubey (1):
+       ARM: EXYNOS: initial board support for exynos5260 SoC
+
+Sachin Kamat (1):
+       ARM: EXYNOS: Consolidate Kconfig entries
 
 Tarek Dakhran (1):
-       ARM: dts: add dts files for exynos5410 and exynos5410-smdk5410
+       ARM: EXYNOS: Add support for EXYNOS5410 SoC
 
-Tomasz Figa (1):
-       ARM: dts: add dts files for exynos3250 SoC
-
-Tushar Behera (1):
-       ARM: dts: add secure firmware support for exynos5420-arndale-octa
-
-Vivek Gautam (1):
-       ARM: dts: add Vbus regulator for USB 3.0 on exynos5800-peach-pi
-
-  .../devicetree/bindings/arm/samsung/pmu.txt        |   1 +
-  arch/arm/boot/dts/Makefile                         |   5 +-
-  arch/arm/boot/dts/exynos3250-pinctrl.dtsi          | 475 +++++++++++++++++
-  arch/arm/boot/dts/exynos3250.dtsi                  | 444 ++++++++++++++++
-  arch/arm/boot/dts/exynos4210-origen.dts            |  19 +-
-  arch/arm/boot/dts/exynos4412-origen.dts            |  21 +-
-  arch/arm/boot/dts/exynos5250-arndale.dts           |  13 +-
-  arch/arm/boot/dts/exynos5260-pinctrl.dtsi          | 574 
-+++++++++++++++++++++
-  arch/arm/boot/dts/exynos5260-xyref5260.dts         | 103 ++++
-  arch/arm/boot/dts/exynos5260.dtsi                  | 304 +++++++++++
-  arch/arm/boot/dts/exynos5410-smdk5410.dts          |  82 +++
-  arch/arm/boot/dts/exynos5410.dtsi                  | 206 ++++++++
-  arch/arm/boot/dts/exynos5420-arndale-octa.dts      |   5 +
-  arch/arm/boot/dts/exynos5420-peach-pit.dts         |   4 +-
-  arch/arm/boot/dts/exynos5440.dtsi                  |   2 +-
-  arch/arm/boot/dts/exynos5800-peach-pi.dts          | 253 +++++++++
-  arch/arm/boot/dts/exynos5800.dtsi                  |  28 +
-  17 files changed, 2518 insertions(+), 21 deletions(-)
-  create mode 100644 arch/arm/boot/dts/exynos3250-pinctrl.dtsi
-  create mode 100644 arch/arm/boot/dts/exynos3250.dtsi
-  create mode 100644 arch/arm/boot/dts/exynos5260-pinctrl.dtsi
-  create mode 100644 arch/arm/boot/dts/exynos5260-xyref5260.dts
-  create mode 100644 arch/arm/boot/dts/exynos5260.dtsi
-  create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
-  create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
-  create mode 100644 arch/arm/boot/dts/exynos5800-peach-pi.dts
-  create mode 100644 arch/arm/boot/dts/exynos5800.dtsi
+  arch/arm/Kconfig                | 19 ---------
+  arch/arm/mach-exynos/Kconfig    | 92 
++++++++++++++++++++++++------------------
+  arch/arm/mach-exynos/Makefile   |  2 +
+  arch/arm/mach-exynos/common.h   | 29 ++++++++++++-
+  arch/arm/mach-exynos/exynos.c   |  3 ++
+  arch/arm/mach-exynos/firmware.c |  9 +++-
+  arch/arm/mach-exynos/platsmp.c  |  2 +-
+  arch/arm/plat-samsung/Makefile  |  3 ++
+  8 files changed, 96 insertions(+), 63 deletions(-)
