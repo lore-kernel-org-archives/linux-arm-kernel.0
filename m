@@ -1,99 +1,52 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 30 May 2014 13:34:45 +0200
-Subject: [PATCH] Exynos4: cpuidle: support dual CPUs with AFTR state
-In-Reply-To: <53884FD2.7020700@linaro.org>
-References: <1396604925-18383-1-git-send-email-daniel.lezcano@linaro.org>
- <53594D17.6020107@samsung.com> <53884FD2.7020700@linaro.org>
-Message-ID: <53886CD5.8010301@gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 30 May 2014 14:36:18 +0300
+Subject: [PATCH v5 3/5] misc: fuse: Add efuse driver for Tegra
+In-Reply-To: <538784C1.6000504@wwwdotorg.org>
+References: <1401281677-32110-1-git-send-email-pdeschrijver@nvidia.com>
+ <1401281677-32110-4-git-send-email-pdeschrijver@nvidia.com>
+ <538784C1.6000504@wwwdotorg.org>
+Message-ID: <20140530113618.GQ5961@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Thu, May 29, 2014 at 09:04:33PM +0200, Stephen Warren wrote:
+> On 05/28/2014 06:54 AM, Peter De Schrijver wrote:
+> > Implement fuse driver for Tegra20, Tegra30, Tegra114 and Tegra124.
+> 
+> > diff --git a/Documentation/ABI/testing/sysfs-driver-tegra-fuse b/Documentation/ABI/testing/sysfs-driver-tegra-fuse
+> 
+> > +Description:	read-only access to the efuses on Tegra20, Tegra30, Tegra114
+> > +		and Tegra124 SoC's from NVIDIA. The efuses contain write once
+> > +		data programmed at the factory. The data is layed out in 32bit
+> > +		words in LSB first formnat. The number of valid bits depends
+> 
+> s/formnat/format/
+> 
+> > +		on the word and the SoC. The mapping is as follows:
+> > +
+> > +		For Tegra20:
+> > +		Word 0 - 1    : bit 0
+> > +		Word 2        : unused
+> > +		Word 3        : bits 0 - 31
+> > +		Word 4        : bits 0 - 7
+> 
+> Do we really need these long tables that indicate which bits are used?
+> As I mentioned before, when I asked for documentation of the format of
+> these files, all I wanted was a brief not indicating that the data was
+> binary, and that each bit potentially represents a fuse... Either we
+> should leave it at that, or actually document what each bit represents,
+> which would hopefully be a pointless duplication of the TRM.
 
-On 30.05.2014 11:30, Daniel Lezcano wrote:
-> On 04/24/2014 07:42 PM, Tomasz Figa wrote:
->> Hi Daniel,
->>
->> Please see my comments inline.
->>
->> Btw. Please fix your e-mail composer to properly wrap your messages
->> around 7xth column, as otherwise they're hard to read.
->>
->> On 04.04.2014 11:48, Daniel Lezcano wrote:
->>> The following driver is for exynos4210. I did not yet finished the
->>> other boards, so
->>> I created a specific driver for 4210 which could be merged later.
->>>
->>> The driver is based on Colin Cross's driver found at:
->>>
->>> https://android.googlesource.com/kernel/exynos/+/e686b1ec67423c40b4fdf811f9a4dfa3b393a010%5E%5E!/
->>>
->>>
->>>
->>> This one was based on a 3.4 kernel and an old API.
->>>
->>> It has been refreshed, simplified and based on the recent code cleanup
->>> I sent
->>> today.
->>>
->>> The AFTR could be entered when all the cpus (except cpu0) are down. In
->>> order to
->>> reach this situation, the couple idle states are used.
->>>
->>> There is a sync barrier at the entry and the exit of the low power
->>> function. So
->>> all cpus will enter and exit the function at the same time.
->>>
->>> At this point, CPU0 knows the other cpu will power down itself. CPU0
->>> waits for
->>> the CPU1 to be powered down and then initiate the AFTR power down
->>> sequence.
->>>
->>> No interrupts are handled by CPU1, this is why we switch to the timer
->>> broadcast
->>> even if the local timer is not impacted by the idle state.
->>>
->>> When CPU0 wakes up, it powers up CPU1 and waits for it to boot. Then
->>> they both
->>> exit the idle function.
->>>
->>> This driver allows the exynos4210 to have the same power consumption
->>> at idle
->>> time than the one when we have to unplug CPU1 in order to let CPU0 to
->>> reach
->>> the AFTR state.
->>>
->>> This patch is a RFC because, we have to find a way to remove the macros
->>> definitions and cpu powerdown function without pulling the arch
->>> dependent
->>> headers.
->>>
->>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>> ---
->>>   arch/arm/mach-exynos/common.c        |   11 +-
->>>   drivers/cpuidle/Kconfig.arm          |    8 ++
->>>   drivers/cpuidle/Makefile             |    1 +
->>>   drivers/cpuidle/cpuidle-exynos4210.c |  226
->>> ++++++++++++++++++++++++++++++++++
-> 
-> [ ... ]
-> 
-> 
->> Otherwise, I quite like the whole idea. I need to play a bit with CPU
->> hotplug and PMU to verify that things couldn't really be simplified a
->> bit, but in general this looks reasonably.
-> 
-> Hi Tomasz,
-> 
-> did you have time to look at this simplification ?
+Some fuses are OEM defined, so there is no way to document all fuses there.
+Would you be ok with just dropping the tables then? So, the description would
+become:
 
-Unfortunately I got preempted with other things to do and now I'm on
-vacation. I worked a bit with Bart (added on CC) on this and generally
-the conclusion was that all the things are necessary. He was also
-working to extend the driver to support Exynos4x12.
+Description:    read-only access to the efuses on Tegra20, Tegra30, Tegra114
+                and Tegra124 SoC's from NVIDIA. The efuses contain write once
+                data programmed at the factory. The data is layed out in 32bit
+                words in LSB first format. The number of valid bits depends
+                on the word and the SoC.
 
-Bart, has anything interesting showed up since we talked about this last
-time?
+Cheers,
 
-Best regards,
-Tomasz
+Peter.
