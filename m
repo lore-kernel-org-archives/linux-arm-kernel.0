@@ -1,460 +1,281 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Fri, 30 May 2014 12:10:50 +0200
-Subject: [PATCH 2/2] backlight: remove trivial get_brightness implementations
-In-Reply-To: <1401444650-12267-1-git-send-email-a.hajda@samsung.com>
-References: <1401444650-12267-1-git-send-email-a.hajda@samsung.com>
-Message-ID: <1401444650-12267-3-git-send-email-a.hajda@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 30 May 2014 11:17:04 +0100
+Subject: [RFC 1/2] ACPI: Add support for Platform Communication Channel
+In-Reply-To: <1401222599-12416-2-git-send-email-ashwin.chaugule@linaro.org>
+References: <1401222599-12416-1-git-send-email-ashwin.chaugule@linaro.org>
+ <1401222599-12416-2-git-send-email-ashwin.chaugule@linaro.org>
+Message-ID: <20140530101704.GS5099@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since backlight core returns props.brightness in case get_brightness
-is not implemented trivial implementations are not needed anymore.
+On Tue, May 27, 2014 at 04:29:58PM -0400, Ashwin Chaugule wrote:
+> ACPI 5.0a+ spec defines a generic mode of communication
+> between the OS and a platform such as the BMC. This medium
+> (PCC) is typically used by CPPC (ACPI CPU Performance management),
+> RAS (ACPI reliability protocol) and MPST (ACPI Memory power
+> states).
+> 
+> This patch adds initial support for PCC to be usable by the
+> aforementioned PCC clients.
 
-Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
----
- drivers/macintosh/via-pmu-backlight.c      | 6 ------
- drivers/platform/x86/samsung-q10.c         | 6 ------
- drivers/video/backlight/aat2870_bl.c       | 6 ------
- drivers/video/backlight/ams369fg06.c       | 6 ------
- drivers/video/backlight/bd6107.c           | 6 ------
- drivers/video/backlight/gpio_backlight.c   | 6 ------
- drivers/video/backlight/ld9040.c           | 6 ------
- drivers/video/backlight/lp855x_bl.c        | 6 ------
- drivers/video/backlight/lp8788_bl.c        | 6 ------
- drivers/video/backlight/lv5207lp.c         | 6 ------
- drivers/video/backlight/pandora_bl.c       | 6 ------
- drivers/video/backlight/pwm_bl.c           | 6 ------
- drivers/video/backlight/s6e63m0.c          | 6 ------
- drivers/video/backlight/tps65217_bl.c      | 6 ------
- drivers/video/fbdev/aty/aty128fb.c         | 6 ------
- drivers/video/fbdev/aty/atyfb_base.c       | 6 ------
- drivers/video/fbdev/aty/radeon_backlight.c | 6 ------
- drivers/video/fbdev/exynos/s6e8ax0.c       | 6 ------
- drivers/video/fbdev/nvidia/nv_backlight.c  | 6 ------
- drivers/video/fbdev/riva/fbdev.c           | 6 ------
- 20 files changed, 120 deletions(-)
+This looks an awful lot like a mailbox - should it be integrated with
+the mailbox system that Jassi (CCed) has been working on getting
+upstream?  Not deleting any context for Jassi's benefit.
 
-diff --git a/drivers/macintosh/via-pmu-backlight.c b/drivers/macintosh/via-pmu-backlight.c
-index b1d9117..6f68537 100644
---- a/drivers/macintosh/via-pmu-backlight.c
-+++ b/drivers/macintosh/via-pmu-backlight.c
-@@ -110,13 +110,7 @@ static int pmu_backlight_update_status(struct backlight_device *bd)
- }
- 
- 
--static int pmu_backlight_get_brightness(struct backlight_device *bd)
--{
--	return bd->props.brightness;
--}
--
- static const struct backlight_ops pmu_backlight_data = {
--	.get_brightness	= pmu_backlight_get_brightness,
- 	.update_status	= pmu_backlight_update_status,
- 
- };
-diff --git a/drivers/platform/x86/samsung-q10.c b/drivers/platform/x86/samsung-q10.c
-index 5413f62..28d12bd 100644
---- a/drivers/platform/x86/samsung-q10.c
-+++ b/drivers/platform/x86/samsung-q10.c
-@@ -46,13 +46,7 @@ static int samsungq10_bl_set_intensity(struct backlight_device *bd)
- 	return 0;
- }
- 
--static int samsungq10_bl_get_intensity(struct backlight_device *bd)
--{
--	return bd->props.brightness;
--}
--
- static const struct backlight_ops samsungq10_bl_ops = {
--	.get_brightness = samsungq10_bl_get_intensity,
- 	.update_status	= samsungq10_bl_set_intensity,
- };
- 
-diff --git a/drivers/video/backlight/aat2870_bl.c b/drivers/video/backlight/aat2870_bl.c
-index ec5350f..86234c3 100644
---- a/drivers/video/backlight/aat2870_bl.c
-+++ b/drivers/video/backlight/aat2870_bl.c
-@@ -67,11 +67,6 @@ static inline int aat2870_bl_disable(struct aat2870_bl_driver_data *aat2870_bl)
- 	return aat2870->write(aat2870, AAT2870_BL_CH_EN, 0x0);
- }
- 
--static int aat2870_bl_get_brightness(struct backlight_device *bd)
--{
--	return bd->props.brightness;
--}
--
- static int aat2870_bl_update_status(struct backlight_device *bd)
- {
- 	struct aat2870_bl_driver_data *aat2870_bl = bl_get_data(bd);
-@@ -120,7 +115,6 @@ static int aat2870_bl_check_fb(struct backlight_device *bd, struct fb_info *fi)
- 
- static const struct backlight_ops aat2870_bl_ops = {
- 	.options = BL_CORE_SUSPENDRESUME,
--	.get_brightness = aat2870_bl_get_brightness,
- 	.update_status = aat2870_bl_update_status,
- 	.check_fb = aat2870_bl_check_fb,
- };
-diff --git a/drivers/video/backlight/ams369fg06.c b/drivers/video/backlight/ams369fg06.c
-index d8952c4..4726c8b 100644
---- a/drivers/video/backlight/ams369fg06.c
-+++ b/drivers/video/backlight/ams369fg06.c
-@@ -410,11 +410,6 @@ static int ams369fg06_set_power(struct lcd_device *ld, int power)
- 	return ams369fg06_power(lcd, power);
- }
- 
--static int ams369fg06_get_brightness(struct backlight_device *bd)
--{
--	return bd->props.brightness;
--}
--
- static int ams369fg06_set_brightness(struct backlight_device *bd)
- {
- 	int ret = 0;
-@@ -443,7 +438,6 @@ static struct lcd_ops ams369fg06_lcd_ops = {
- };
- 
- static const struct backlight_ops ams369fg06_backlight_ops = {
--	.get_brightness = ams369fg06_get_brightness,
- 	.update_status = ams369fg06_set_brightness,
- };
- 
-diff --git a/drivers/video/backlight/bd6107.c b/drivers/video/backlight/bd6107.c
-index 16dd9bc..fdb2f7e 100644
---- a/drivers/video/backlight/bd6107.c
-+++ b/drivers/video/backlight/bd6107.c
-@@ -105,11 +105,6 @@ static int bd6107_backlight_update_status(struct backlight_device *backlight)
- 	return 0;
- }
- 
--static int bd6107_backlight_get_brightness(struct backlight_device *backlight)
--{
--	return backlight->props.brightness;
--}
--
- static int bd6107_backlight_check_fb(struct backlight_device *backlight,
- 				       struct fb_info *info)
- {
-@@ -121,7 +116,6 @@ static int bd6107_backlight_check_fb(struct backlight_device *backlight,
- static const struct backlight_ops bd6107_backlight_ops = {
- 	.options	= BL_CORE_SUSPENDRESUME,
- 	.update_status	= bd6107_backlight_update_status,
--	.get_brightness	= bd6107_backlight_get_brightness,
- 	.check_fb	= bd6107_backlight_check_fb,
- };
- 
-diff --git a/drivers/video/backlight/gpio_backlight.c b/drivers/video/backlight/gpio_backlight.c
-index a2eba12..c3ad803 100644
---- a/drivers/video/backlight/gpio_backlight.c
-+++ b/drivers/video/backlight/gpio_backlight.c
-@@ -43,11 +43,6 @@ static int gpio_backlight_update_status(struct backlight_device *bl)
- 	return 0;
- }
- 
--static int gpio_backlight_get_brightness(struct backlight_device *bl)
--{
--	return bl->props.brightness;
--}
--
- static int gpio_backlight_check_fb(struct backlight_device *bl,
- 				   struct fb_info *info)
- {
-@@ -59,7 +54,6 @@ static int gpio_backlight_check_fb(struct backlight_device *bl,
- static const struct backlight_ops gpio_backlight_ops = {
- 	.options	= BL_CORE_SUSPENDRESUME,
- 	.update_status	= gpio_backlight_update_status,
--	.get_brightness	= gpio_backlight_get_brightness,
- 	.check_fb	= gpio_backlight_check_fb,
- };
- 
-diff --git a/drivers/video/backlight/ld9040.c b/drivers/video/backlight/ld9040.c
-index 506a6c2..ccb44e8 100644
---- a/drivers/video/backlight/ld9040.c
-+++ b/drivers/video/backlight/ld9040.c
-@@ -642,11 +642,6 @@ static int ld9040_get_power(struct lcd_device *ld)
- 	return lcd->power;
- }
- 
--static int ld9040_get_brightness(struct backlight_device *bd)
--{
--	return bd->props.brightness;
--}
--
- static int ld9040_set_brightness(struct backlight_device *bd)
- {
- 	int ret = 0, brightness = bd->props.brightness;
-@@ -674,7 +669,6 @@ static struct lcd_ops ld9040_lcd_ops = {
- };
- 
- static const struct backlight_ops ld9040_backlight_ops  = {
--	.get_brightness = ld9040_get_brightness,
- 	.update_status = ld9040_set_brightness,
- };
- 
-diff --git a/drivers/video/backlight/lp855x_bl.c b/drivers/video/backlight/lp855x_bl.c
-index 2ca3a04..dcdd544 100644
---- a/drivers/video/backlight/lp855x_bl.c
-+++ b/drivers/video/backlight/lp855x_bl.c
-@@ -274,15 +274,9 @@ static int lp855x_bl_update_status(struct backlight_device *bl)
- 	return 0;
- }
- 
--static int lp855x_bl_get_brightness(struct backlight_device *bl)
--{
--	return bl->props.brightness;
--}
--
- static const struct backlight_ops lp855x_bl_ops = {
- 	.options = BL_CORE_SUSPENDRESUME,
- 	.update_status = lp855x_bl_update_status,
--	.get_brightness = lp855x_bl_get_brightness,
- };
- 
- static int lp855x_backlight_register(struct lp855x *lp)
-diff --git a/drivers/video/backlight/lp8788_bl.c b/drivers/video/backlight/lp8788_bl.c
-index daba34d..d6c4f6a 100644
---- a/drivers/video/backlight/lp8788_bl.c
-+++ b/drivers/video/backlight/lp8788_bl.c
-@@ -176,15 +176,9 @@ static int lp8788_bl_update_status(struct backlight_device *bl_dev)
- 	return 0;
- }
- 
--static int lp8788_bl_get_brightness(struct backlight_device *bl_dev)
--{
--	return bl_dev->props.brightness;
--}
--
- static const struct backlight_ops lp8788_bl_ops = {
- 	.options = BL_CORE_SUSPENDRESUME,
- 	.update_status = lp8788_bl_update_status,
--	.get_brightness = lp8788_bl_get_brightness,
- };
- 
- static int lp8788_backlight_register(struct lp8788_bl *bl)
-diff --git a/drivers/video/backlight/lv5207lp.c b/drivers/video/backlight/lv5207lp.c
-index 1802b2d..8ab7297 100644
---- a/drivers/video/backlight/lv5207lp.c
-+++ b/drivers/video/backlight/lv5207lp.c
-@@ -70,11 +70,6 @@ static int lv5207lp_backlight_update_status(struct backlight_device *backlight)
- 	return 0;
- }
- 
--static int lv5207lp_backlight_get_brightness(struct backlight_device *backlight)
--{
--	return backlight->props.brightness;
--}
--
- static int lv5207lp_backlight_check_fb(struct backlight_device *backlight,
- 				       struct fb_info *info)
- {
-@@ -86,7 +81,6 @@ static int lv5207lp_backlight_check_fb(struct backlight_device *backlight,
- static const struct backlight_ops lv5207lp_backlight_ops = {
- 	.options	= BL_CORE_SUSPENDRESUME,
- 	.update_status	= lv5207lp_backlight_update_status,
--	.get_brightness	= lv5207lp_backlight_get_brightness,
- 	.check_fb	= lv5207lp_backlight_check_fb,
- };
- 
-diff --git a/drivers/video/backlight/pandora_bl.c b/drivers/video/backlight/pandora_bl.c
-index 2098c5d..2e3f820 100644
---- a/drivers/video/backlight/pandora_bl.c
-+++ b/drivers/video/backlight/pandora_bl.c
-@@ -100,15 +100,9 @@ done:
- 	return 0;
- }
- 
--static int pandora_backlight_get_brightness(struct backlight_device *bl)
--{
--	return bl->props.brightness;
--}
--
- static const struct backlight_ops pandora_backlight_ops = {
- 	.options	= BL_CORE_SUSPENDRESUME,
- 	.update_status	= pandora_backlight_update_status,
--	.get_brightness	= pandora_backlight_get_brightness,
- };
- 
- static int pandora_backlight_probe(struct platform_device *pdev)
-diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-index 38ca88b..c9c8496 100644
---- a/drivers/video/backlight/pwm_bl.c
-+++ b/drivers/video/backlight/pwm_bl.c
-@@ -115,11 +115,6 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
- 	return 0;
- }
- 
--static int pwm_backlight_get_brightness(struct backlight_device *bl)
--{
--	return bl->props.brightness;
--}
--
- static int pwm_backlight_check_fb(struct backlight_device *bl,
- 				  struct fb_info *info)
- {
-@@ -130,7 +125,6 @@ static int pwm_backlight_check_fb(struct backlight_device *bl,
- 
- static const struct backlight_ops pwm_backlight_ops = {
- 	.update_status	= pwm_backlight_update_status,
--	.get_brightness	= pwm_backlight_get_brightness,
- 	.check_fb	= pwm_backlight_check_fb,
- };
- 
-diff --git a/drivers/video/backlight/s6e63m0.c b/drivers/video/backlight/s6e63m0.c
-index 510a1bc..94399f8 100644
---- a/drivers/video/backlight/s6e63m0.c
-+++ b/drivers/video/backlight/s6e63m0.c
-@@ -597,11 +597,6 @@ static int s6e63m0_get_power(struct lcd_device *ld)
- 	return lcd->power;
- }
- 
--static int s6e63m0_get_brightness(struct backlight_device *bd)
--{
--	return bd->props.brightness;
--}
--
- static int s6e63m0_set_brightness(struct backlight_device *bd)
- {
- 	int ret = 0, brightness = bd->props.brightness;
-@@ -629,7 +624,6 @@ static struct lcd_ops s6e63m0_lcd_ops = {
- };
- 
- static const struct backlight_ops s6e63m0_backlight_ops  = {
--	.get_brightness = s6e63m0_get_brightness,
- 	.update_status = s6e63m0_set_brightness,
- };
- 
-diff --git a/drivers/video/backlight/tps65217_bl.c b/drivers/video/backlight/tps65217_bl.c
-index 595dcf5..2e04d93 100644
---- a/drivers/video/backlight/tps65217_bl.c
-+++ b/drivers/video/backlight/tps65217_bl.c
-@@ -109,15 +109,9 @@ static int tps65217_bl_update_status(struct backlight_device *bl)
- 	return rc;
- }
- 
--static int tps65217_bl_get_brightness(struct backlight_device *bl)
--{
--	return bl->props.brightness;
--}
--
- static const struct backlight_ops tps65217_bl_ops = {
- 	.options	= BL_CORE_SUSPENDRESUME,
- 	.update_status	= tps65217_bl_update_status,
--	.get_brightness	= tps65217_bl_get_brightness
- };
- 
- static int tps65217_bl_hw_init(struct tps65217_bl *tps65217_bl,
-diff --git a/drivers/video/fbdev/aty/aty128fb.c b/drivers/video/fbdev/aty/aty128fb.c
-index 52108be..ff60701 100644
---- a/drivers/video/fbdev/aty/aty128fb.c
-+++ b/drivers/video/fbdev/aty/aty128fb.c
-@@ -1802,13 +1802,7 @@ static int aty128_bl_update_status(struct backlight_device *bd)
- 	return 0;
- }
- 
--static int aty128_bl_get_brightness(struct backlight_device *bd)
--{
--	return bd->props.brightness;
--}
--
- static const struct backlight_ops aty128_bl_data = {
--	.get_brightness	= aty128_bl_get_brightness,
- 	.update_status	= aty128_bl_update_status,
- };
- 
-diff --git a/drivers/video/fbdev/aty/atyfb_base.c b/drivers/video/fbdev/aty/atyfb_base.c
-index c3d0074..37ec09b 100644
---- a/drivers/video/fbdev/aty/atyfb_base.c
-+++ b/drivers/video/fbdev/aty/atyfb_base.c
-@@ -2211,13 +2211,7 @@ static int aty_bl_update_status(struct backlight_device *bd)
- 	return 0;
- }
- 
--static int aty_bl_get_brightness(struct backlight_device *bd)
--{
--	return bd->props.brightness;
--}
--
- static const struct backlight_ops aty_bl_data = {
--	.get_brightness = aty_bl_get_brightness,
- 	.update_status	= aty_bl_update_status,
- };
- 
-diff --git a/drivers/video/fbdev/aty/radeon_backlight.c b/drivers/video/fbdev/aty/radeon_backlight.c
-index db572df..301d6d6 100644
---- a/drivers/video/fbdev/aty/radeon_backlight.c
-+++ b/drivers/video/fbdev/aty/radeon_backlight.c
-@@ -123,13 +123,7 @@ static int radeon_bl_update_status(struct backlight_device *bd)
- 	return 0;
- }
- 
--static int radeon_bl_get_brightness(struct backlight_device *bd)
--{
--	return bd->props.brightness;
--}
--
- static const struct backlight_ops radeon_bl_data = {
--	.get_brightness = radeon_bl_get_brightness,
- 	.update_status	= radeon_bl_update_status,
- };
- 
-diff --git a/drivers/video/fbdev/exynos/s6e8ax0.c b/drivers/video/fbdev/exynos/s6e8ax0.c
-index 29e70ed..95873f2 100644
---- a/drivers/video/fbdev/exynos/s6e8ax0.c
-+++ b/drivers/video/fbdev/exynos/s6e8ax0.c
-@@ -704,11 +704,6 @@ static int s6e8ax0_get_power(struct lcd_device *ld)
- 	return lcd->power;
- }
- 
--static int s6e8ax0_get_brightness(struct backlight_device *bd)
--{
--	return bd->props.brightness;
--}
--
- static int s6e8ax0_set_brightness(struct backlight_device *bd)
- {
- 	int ret = 0, brightness = bd->props.brightness;
-@@ -736,7 +731,6 @@ static struct lcd_ops s6e8ax0_lcd_ops = {
- };
- 
- static const struct backlight_ops s6e8ax0_backlight_ops = {
--	.get_brightness = s6e8ax0_get_brightness,
- 	.update_status = s6e8ax0_set_brightness,
- };
- 
-diff --git a/drivers/video/fbdev/nvidia/nv_backlight.c b/drivers/video/fbdev/nvidia/nv_backlight.c
-index 8471008..5c151b2 100644
---- a/drivers/video/fbdev/nvidia/nv_backlight.c
-+++ b/drivers/video/fbdev/nvidia/nv_backlight.c
-@@ -82,13 +82,7 @@ static int nvidia_bl_update_status(struct backlight_device *bd)
- 	return 0;
- }
- 
--static int nvidia_bl_get_brightness(struct backlight_device *bd)
--{
--	return bd->props.brightness;
--}
--
- static const struct backlight_ops nvidia_bl_ops = {
--	.get_brightness = nvidia_bl_get_brightness,
- 	.update_status	= nvidia_bl_update_status,
- };
- 
-diff --git a/drivers/video/fbdev/riva/fbdev.c b/drivers/video/fbdev/riva/fbdev.c
-index 8a8d7f0..be73727 100644
---- a/drivers/video/fbdev/riva/fbdev.c
-+++ b/drivers/video/fbdev/riva/fbdev.c
-@@ -326,13 +326,7 @@ static int riva_bl_update_status(struct backlight_device *bd)
- 	return 0;
- }
- 
--static int riva_bl_get_brightness(struct backlight_device *bd)
--{
--	return bd->props.brightness;
--}
--
- static const struct backlight_ops riva_bl_ops = {
--	.get_brightness = riva_bl_get_brightness,
- 	.update_status	= riva_bl_update_status,
- };
- 
--- 
-1.9.1
+> 
+> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> ---
+>  drivers/acpi/Kconfig  |  10 +++
+>  drivers/acpi/Makefile |   2 +-
+>  drivers/acpi/pcc.c    | 192 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 203 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/acpi/pcc.c
+> 
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index ff5c83c..8f40e52 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -352,6 +352,16 @@ config ACPI_REDUCED_HARDWARE_ONLY
+>  
+>  	If you are unsure what to do, do not enable this option.
+>  
+> +config ACPI_PCC
+> +	bool "ACPI Platform Communication Channel"
+> +	def_bool n
+> +	depends on ACPI
+> +	help
+> +	Enable this option if your platform supports PCC as defined in the
+> +	ACPI spec 5.0a+. PCC is a generic mechanism for the OS to communicate
+> +	with a platform such as a BMC. PCC is typically used by CPPC, RAS
+> +	and MPST.
+> +
+>  source "drivers/acpi/apei/Kconfig"
+>  
+>  config ACPI_EXTLOG
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index fc133d4..d8aa613 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -74,7 +74,7 @@ obj-$(CONFIG_ACPI_HED)		+= hed.o
+>  obj-$(CONFIG_ACPI_EC_DEBUGFS)	+= ec_sys.o
+>  obj-$(CONFIG_ACPI_CUSTOM_METHOD)+= custom_method.o
+>  obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
+> -
+> +obj-$(CONFIG_ACPI_PCC)		+= pcc.o
+>  # processor has its own "processor." module_param namespace
+>  processor-y			:= processor_driver.o processor_throttling.o
+>  processor-y			+= processor_idle.o processor_thermal.o
+> diff --git a/drivers/acpi/pcc.c b/drivers/acpi/pcc.c
+> new file mode 100644
+> index 0000000..328ca93
+> --- /dev/null
+> +++ b/drivers/acpi/pcc.c
+> @@ -0,0 +1,192 @@
+> +/*
+> + *	Copyright (C) 2014 Linaro Ltd.
+> + *	Author:	Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> + *
+> + *  This program is free software; you can redistribute it and/or modify
+> + *  it under the terms of the GNU General Public License as published by
+> + *  the Free Software Foundation; either version 2 of the License, or
+> + *  (at your option) any later version.
+> + *
+> + *  This program is distributed in the hope that it will be useful,
+> + *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *  GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#include <linux/acpi.h>
+> +#include <linux/io.h>
+> +#include <linux/uaccess.h>
+> +#include <linux/init.h>
+> +#include <linux/cpufreq.h>
+> +#include <linux/delay.h>
+> +#include <linux/ioctl.h>
+> +#include <linux/vmalloc.h>
+> +
+> +#include <acpi/actbl.h>
+> +
+> +#define MAX_PCC_SUBSPACES	256
+> +#define PCCS_SS_SIG_MAGIC	0x50434300
+> +#define PCC_CMD_COMPLETE	0x1
+> +#define PCC_VERSION			"0.1"
+> +
+> +struct pcc_ss_desc {
+> +	struct acpi_pcct_subspace *pcc_ss_ptr;
+> +	raw_spinlock_t lock;
+> +};
+> +
+> +/* Array of Type 0 PCC Subspace descriptors */
+> +struct pcc_ss_desc pcc_ss_arr[MAX_PCC_SUBSPACES];
+> +
+> +/* Total number of subspaces detected in PCCT. */
+> +static int total_ss;
+> +
+> +/*
+> + * PCC clients call this function to get a base address of their
+> + * Communication channel
+> + */
+> +int get_pcc_comm_channel(u32 ss_idx, u64 __iomem *addr, int *len)
+> +{
+> +	struct acpi_pcct_subspace *pcct_subspace =
+> +		pcc_ss_arr[ss_idx].pcc_ss_ptr;
+> +
+> +	if (pcct_subspace) {
+> +		*addr = pcct_subspace->base_address;
+> +		*len = pcct_subspace->length;
+> +	} else
+> +		return -EINVAL;
+> +
+> +	return 0;
+> +}
+> +
+> +/* Send PCC cmd on behalf of this (subspace id) PCC client */
+> +u16 send_pcc_cmd(u8 cmd, u8 sci, u32 ss_idx, u64 __iomem *base_addr)
+> +{
+> +	struct acpi_pcct_subspace *pcct_subspace =
+> +		pcc_ss_arr[ss_idx].pcc_ss_ptr;
+> +	struct acpi_pcct_shared_memory *generic_comm_base =
+> +		(struct acpi_pcct_shared_memory *)base_addr;
+> +	struct acpi_generic_address doorbell;
+> +	u64 doorbell_preserve;
+> +	u64 doorbell_val;
+> +	u64 doorbell_write;
+> +	/*
+> +	 * Min time in usec that OSPM is expected to wait
+> +	 * before sending the next PCC cmd.
+> +	 */
+> +	u16 cmd_delay = pcct_subspace->min_turnaround_time;
+> +
+> +	if (!generic_comm_base) {
+> +		pr_err("No Generic Communication Channel provided.\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	raw_spin_lock(&pcc_ss_arr[ss_idx].lock);
+> +
+> +	/* Get doorbell details for this subspace. */
+> +	doorbell = pcct_subspace->doorbell_register;
+> +	doorbell_preserve = pcct_subspace->preserve_mask;
+> +	doorbell_write = pcct_subspace->write_mask;
+> +
+> +	/* Loop until CMD complete bit is set. For prev cmds. */
+> +	while (!(ioread16(&generic_comm_base->status) & PCC_CMD_COMPLETE))
+> +		udelay(cmd_delay);
+> +
+> +	/* Write to the shared comm region. */
+> +	iowrite16(cmd, &generic_comm_base->command);
+> +
+> +	/* Write Subspace MAGIC value so platform can identify destination. */
+> +	iowrite32((PCCS_SS_SIG_MAGIC | ss_idx), &generic_comm_base->signature);
+> +
+> +	/* Flip CMD COMPLETE bit */
+> +	iowrite16(0, &generic_comm_base->status);
+> +
+> +	/* Sync notification from OSPM to Platform. */
+> +	acpi_read(&doorbell_val, &doorbell);
+> +	acpi_write((doorbell_val & doorbell_preserve) | doorbell_write,
+> +			&doorbell);
+> +
+> +	/* Wait for Platform to consume. */
+> +	while (!(ioread16(&generic_comm_base->status) & PCC_CMD_COMPLETE))
+> +		udelay(cmd_delay);
+> +
+> +	raw_spin_unlock(&pcc_ss_arr[ss_idx].lock);
+> +
+> +	return generic_comm_base->status;
+> +}
+> +
+> +static int parse_pcc_subspace(struct acpi_subtable_header *header,
+> +		const unsigned long end)
+> +{
+> +	struct acpi_pcct_subspace *pcct_ss;
+> +
+> +	if (total_ss <= MAX_PCC_SUBSPACES) {
+> +		pcct_ss = (struct acpi_pcct_subspace *) header;
+> +
+> +		if (pcct_ss->header.type != ACPI_PCCT_TYPE_GENERIC_SUBSPACE) {
+> +			pr_err("Incorrect PCC Subspace type detected\n");
+> +			return -EINVAL;
+> +		}
+> +
+> +		pcc_ss_arr[total_ss].pcc_ss_ptr = pcct_ss;
+> +		raw_spin_lock_init(&pcc_ss_arr[total_ss].lock);
+> +
+> +		total_ss++;
+> +	} else {
+> +		pr_err("No more space for PCC subspaces.\n");
+> +		return -ENOSPC;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int __init pcc_probe(void)
+> +{
+> +	acpi_status status = AE_OK;
+> +	acpi_size pcct_tbl_header_size;
+> +	struct acpi_table_pcct *pcct_tbl;
+> +
+> +	/* Search for PCCT */
+> +	status = acpi_get_table_with_size(ACPI_SIG_PCCT, 0,
+> +			(struct acpi_table_header **)&pcct_tbl,
+> +			&pcct_tbl_header_size);
+> +
+> +	if (ACPI_SUCCESS(status) && !pcct_tbl) {
+> +		pr_warn("PCCT header not found.\n");
+> +		status = AE_NOT_FOUND;
+> +		goto out_err;
+> +	}
+> +
+> +	status = acpi_table_parse_entries(ACPI_SIG_PCCT,
+> +			sizeof(struct acpi_table_pcct),
+> +			ACPI_PCCT_TYPE_GENERIC_SUBSPACE,
+> +			parse_pcc_subspace, MAX_PCC_SUBSPACES);
+> +
+> +	if (ACPI_SUCCESS(status))
+> +		pr_err("Error parsing PCC subspaces from PCCT\n");
+> +
+> +	pr_info("Detected %d PCC Subspaces\n", total_ss);
+> +
+> +out_err:
+> +	return ACPI_SUCCESS(status) ? 1 : 0;
+> +}
+> +
+> +static int __init pcc_init(void)
+> +{
+> +	int ret;
+> +
+> +	if (acpi_disabled)
+> +		return -ENODEV;
+> +
+> +	/* Check if PCC support is available. */
+> +	ret = pcc_probe();
+> +
+> +	if (ret) {
+> +		pr_debug("PCC probe failed.\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +device_initcall(pcc_init);
+> -- 
+> 1.8.3.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140530/121c531c/attachment-0001.sig>
