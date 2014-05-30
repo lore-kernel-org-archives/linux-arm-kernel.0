@@ -1,29 +1,29 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Fri, 30 May 2014 07:43:08 -0600
-Subject: [RFC PATCH 08/11] coresight: adding support for beagle board
+Date: Fri, 30 May 2014 07:43:10 -0600
+Subject: [RFC PATCH 10/11] coresight: adding support for beagleXM
 In-Reply-To: <1401457391-12242-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1401457391-12242-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1401457391-12242-9-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1401457391-12242-11-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Panchaxari Prasannamurthy <panchaxari.prasannamurthy@linaro.org>
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-Added support for coresight device in dts for Beagle Board, by adding
-blocks of coresight, ETM, ETB blocks.
+Currently supporting ETM and ETB.  Support for TPIU
+and SDTI are yet to be added.
 
-Signed-off-by: Panchaxari Prasannamurthy <panchaxari.prasannamurthy@linaro.org>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- arch/arm/boot/dts/omap3-beagle.dts | 30 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-beagle-xm.dts | 30 ++++++++++++++++++++++++++++++
  1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index 5053766..0017084 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -80,6 +80,36 @@
- 		};
- 
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index 447e714..b39bede 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -86,6 +86,36 @@
+ 		reset-gpios = <&gpio5 19 GPIO_ACTIVE_LOW>; /* gpio_147 */
+ 		vcc-supply = <&hsusb2_power>;
  	};
 +
 +	coresight {
