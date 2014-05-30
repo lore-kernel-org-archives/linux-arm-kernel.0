@@ -1,34 +1,81 @@
-From: satish.patel@ti.com (Satish Patel)
-Date: Fri, 30 May 2014 09:38:20 +0530
-Subject: [PATCH v3 3/5] char: ti-usim: Add driver for USIM module on AM43xx
-In-Reply-To: <20140529155349.GD32214@kroah.com>
-References: <1401267437-22489-1-git-send-email-satish.patel@ti.com>
- <1401267437-22489-4-git-send-email-satish.patel@ti.com>
- <CAL_JsqKs=a8GRJRmNE-oxU4imHqnb5szv+Km-wv3KuN0d6Bxkg@mail.gmail.com>
- <53870671.6080601@ti.com> <20140529155349.GD32214@kroah.com>
-Message-ID: <53880434.7080002@ti.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 30 May 2014 07:02:58 +0200
+Subject: [PATCH] clk: exynos5420: Keep aclk66_peric enabled during boot
+In-Reply-To: <20140529222904.10062.22764@quantum>
+References: <1401398496-4624-1-git-send-email-dianders@chromium.org>
+ <20140529222904.10062.22764@quantum>
+Message-ID: <53881102.1080406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On 30.05.2014 00:29, Mike Turquette wrote:
+> Quoting Doug Anderson (2014-05-29 14:21:36)
+>> Right now if you've got earlyprintk enabled on exynos5420-peach-pit
+>> then you'll get a hang on boot.  Here's why:
+>>
+>> 1. The i2c-s3c2410 driver will probe at subsys_initcall.  It will
+>>    enable its clock and disable it.  This is the clock "i2c2".
+>> 2. The act of disabling "i2c2" will disable its parents.  In this case
+>>    the parent is "aclk66_peric".  There are no other children of
+>>    "aclk66_peric" officially enabled, so "aclk66_peric" will be turned
+>>    off (despite being CLK_IGNORE_UNUSED, but that's by design).
+>> 3. The next time you try to earlyprintk you'll do so without the UART
+>>    clock enabled.  That's because the UART clocks are also children of
+>>    "aclk66_peric".  You'll hang.
+>>
+>> There's no good place to put a clock enable for earlyprintk, which is
+>> handled by a bunch of assembly code.  The best we can do is to handle
+>> this in the clock driver.
+>>
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> ---
+>>  drivers/clk/samsung/clk-exynos5420.c | 24 ++++++++++++++++++++++++
+>>  1 file changed, 24 insertions(+)
+>>
+>> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+>> index 9d7d7ee..1e586be 100644
+>> --- a/drivers/clk/samsung/clk-exynos5420.c
+>> +++ b/drivers/clk/samsung/clk-exynos5420.c
+>> @@ -1172,11 +1172,17 @@ static struct of_device_id ext_clk_match[] __initdata = {
+>>         { },
+>>  };
+>>  
+>> +/* Keep these clocks on until late_initcall */
+>> +static const char *boot_clocks[] __initconst = {
+>> +       "aclk66_peric",
+>> +};
+>> +
+>>  /* register exynos5420 clocks */
+>>  static void __init exynos5x_clk_init(struct device_node *np,
+>>                 enum exynos5x_soc soc)
+>>  {
+>>         struct samsung_clk_provider *ctx;
+>> +       int i;
+>>  
+>>         if (np) {
+>>                 reg_base = of_iomap(np, 0);
+>> @@ -1226,6 +1232,12 @@ static void __init exynos5x_clk_init(struct device_node *np,
+>>         }
+>>  
+>>         exynos5420_clk_sleep_init();
+>> +
+>> +       for (i = 0; i < ARRAY_SIZE(boot_clocks); i++) {
+>> +               struct clk *to_enable = __clk_lookup(boot_clocks[i]);
+> 
+> How about replacing __clk_lookup with clk_get? You can keep the struct
+> clk object hanging around for later...
+> 
 
-On 5/29/2014 9:23 PM, Greg Kroah-Hartman wrote:
-> On Thu, May 29, 2014 at 03:35:37PM +0530, Satish Patel wrote:
->>>> +enum usim_card_mode {
->>>> +       USIM_CARD_MODE_ASYNC = 0,       /* asynchronous mode */
->>>> +       USIM_CARD_MODE_SYNC_TYPE1,      /* synchronous mode: Type 1 */
->>>> +       USIM_CARD_MODE_SYNC_TYPE2,      /* synchronous mode: Type 2 */
->>>> +       USIM_CARD_MODE_SYNC_OTHER,      /* Any other synchronous type */
->>>> +};
->>>> +struct usim_data {
->>>> +       int slot;
->>>> +       int rxexplen;
->>>> +       int txlen;
->>>> +       unsigned char apdu[256];
->>>> +};
->
-> You need to use the proper variable types for a structure that is going
-> to cross the user/kernel boundry in an ioctl :(
-Do you mean to use __u32 instead int ? make use of types defined in 
-types.h ? if yes, I will make that change :). Thanks for pointing out.
->
+Mike, correct me if I'm wrong, but I thought you need clkdev look-up
+entry for clk_get() to find a clock. Here, this clock apparently don't
+have one and you don't even have a struct device * to pass to clk_get(),
+so even if you had a look-up entry, it would need to be a wildcard entry
+(with NULL device), which wouldn't be too elegant.
+
+Doug, isn't a similar thing needed for PM debug as well? Maybe having
+this clock always ungated whenever DEBUG_LL is enabled would be enough?
+
+Best regards,
+Tomasz
