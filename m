@@ -1,28 +1,46 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 30 May 2014 16:01:17 -0500
-Subject: [PATCH v6 2/2] Documentation: devicetree: Add boost-frequency
- binding to list boost mode frequency
-In-Reply-To: <5388ED87.1090209@gmail.com>
-References: <1401440477-4328-1-git-send-email-thomas.ab@samsung.com>
- <1401440477-4328-3-git-send-email-thomas.ab@samsung.com>
- <20140530130827.GK24233@leverpostej>
- <CAJuA9ajs6K1PVtXC4_U0vQsA0oPnpaF_PdMfiQJxBFStF3Z2aw@mail.gmail.com>
- <20140530185549.GN24233@leverpostej> <5388E105.3070609@ti.com>
- <5388E3D2.2060602@gmail.com> <5388E666.2090203@ti.com>
- <5388E7DC.40606@gmail.com> <5388EB21.5020300@ti.com>
- <5388ED87.1090209@gmail.com>
-Message-ID: <5388F19D.8070303@ti.com>
+From: todd.fujinaka@intel.com (Fujinaka, Todd)
+Date: Fri, 30 May 2014 21:11:46 +0000
+Subject: [E1000-devel] ARM support for igb driver
+In-Reply-To: <CAHH3p5KdWvc_=m0XZxhb8drjpWVJ68BR_rH9bhrhNerSjCc-Tg@mail.gmail.com>
+References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>
+ <20140530191852.GA25314@obsidianresearch.com>
+ <CAHH3p5KS9BVb-1-u2LbfLL8OO4pmExGmCtZY=fEYELS+q=grcA@mail.gmail.com>
+ <4627439.I2CpBecnJJ@wuerfel>
+ <CAHH3p5KdWvc_=m0XZxhb8drjpWVJ68BR_rH9bhrhNerSjCc-Tg@mail.gmail.com>
+Message-ID: <9B4A1B1917080E46B64F07F2989DADD653375F6F@ORSMSX114.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2014 03:43 PM, Tomasz Figa wrote:
-[...]
-> OK, so you add overclocked frequencies to operating-points property,
-> boost-frequency property, build a dtb, use it with a kernel that doesn't
-> support boost-frequency and nicely overheat (and likely destroy) your
-> board. I don't think this makes too much sense, sorry.
-Yes, that is unfortunately true as well :( Sigh.
+It just took me one Google search and I found that VDM is being used for MCTP. Searching the datasheet for the i210 (that I'm sure I suggested you consult) discusses MCTP in section 10.7.
 
--- 
-Regards,
-Nishanth Menon
+I can't see there is a way to turn off MCTP.
+
+Todd Fujinaka
+Software Application Engineer
+Networking Division (ND)
+Intel Corporation
+todd.fujinaka at intel.com
+(503) 712-4565
+
+-----Original Message-----
+From: shiv prakash Agarwal [mailto:chhotu.shiv at gmail.com] 
+Sent: Friday, May 30, 2014 1:14 PM
+To: Arnd Bergmann
+Cc: linux-arm-kernel at lists.infradead.org; Jason Gunthorpe; Duyck, Alexander H; Thomas Petazzoni; e1000-devel at lists.sourceforge.net; Fujinaka, Todd; Lucas Stach
+Subject: Re: [E1000-devel] ARM support for igb driver
+
+Notsure about root port, Can't it be disabled by Intel device?
+
+On Sat, May 31, 2014 at 1:26 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 31 May 2014 01:05:29 shiv prakash Agarwal wrote:
+>> Thanks Jason,
+>>
+>> Is there a way to disable sending VDM by Intel card?
+>> And what is the purpose of sending type 1 VDM if it has to be 
+>> discarded by root port anyway?
+>
+> I think you should really just disable the behavior at the root port.
+> Which host driver are you using (sorry if I forgot and you already 
+> mentioned it)?
+>
+>         Arnd
