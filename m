@@ -1,64 +1,66 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 30 May 2014 10:12:43 -0600
-Subject: [PATCH v5 3/5] misc: fuse: Add efuse driver for Tegra
-In-Reply-To: <20140530113618.GQ5961@tbergstrom-lnx.Nvidia.com>
-References: <1401281677-32110-1-git-send-email-pdeschrijver@nvidia.com>
- <1401281677-32110-4-git-send-email-pdeschrijver@nvidia.com>
- <538784C1.6000504@wwwdotorg.org>
- <20140530113618.GQ5961@tbergstrom-lnx.Nvidia.com>
-Message-ID: <5388ADFB.1060505@wwwdotorg.org>
+From: ao2@ao2.it (Antonio Ospite)
+Date: Fri, 30 May 2014 18:18:09 +0200
+Subject: [PATCH] spi/pxa2xx: fix runtime PM enabling order
+Message-ID: <1401466689-24335-1-git-send-email-ao2@ao2.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2014 05:36 AM, Peter De Schrijver wrote:
-> On Thu, May 29, 2014 at 09:04:33PM +0200, Stephen Warren wrote:
->> On 05/28/2014 06:54 AM, Peter De Schrijver wrote:
->>> Implement fuse driver for Tegra20, Tegra30, Tegra114 and Tegra124.
->>
->>> diff --git a/Documentation/ABI/testing/sysfs-driver-tegra-fuse b/Documentation/ABI/testing/sysfs-driver-tegra-fuse
->>
->>> +Description:	read-only access to the efuses on Tegra20, Tegra30, Tegra114
->>> +		and Tegra124 SoC's from NVIDIA. The efuses contain write once
->>> +		data programmed at the factory. The data is layed out in 32bit
->>> +		words in LSB first formnat. The number of valid bits depends
->>
->> s/formnat/format/
->>
->>> +		on the word and the SoC. The mapping is as follows:
->>> +
->>> +		For Tegra20:
->>> +		Word 0 - 1    : bit 0
->>> +		Word 2        : unused
->>> +		Word 3        : bits 0 - 31
->>> +		Word 4        : bits 0 - 7
->>
->> Do we really need these long tables that indicate which bits are used?
->> As I mentioned before, when I asked for documentation of the format of
->> these files, all I wanted was a brief not indicating that the data was
->> binary, and that each bit potentially represents a fuse... Either we
->> should leave it at that, or actually document what each bit represents,
->> which would hopefully be a pointless duplication of the TRM.
-> 
-> Some fuses are OEM defined, so there is no way to document all fuses there.
-> Would you be ok with just dropping the tables then?
+In commit 7dd62787334ac6e0e2a0ef3f20bb1936ac431b04 (spi/pxa2xx: Convert
+to core runtime PM) master->auto_runtime_pm was set to true.
 
-Yes.
+In this case pm_runtime_enable() must be called *before*
+spi_register_master(), otherwise the kernel hangs with this error
+message:
 
-> So, the description would become:
-> 
-> Description:    read-only access to the efuses on Tegra20, Tegra30, Tegra114
->                 and Tegra124 SoC's from NVIDIA. The efuses contain write once
->                 data programmed at the factory. The data is layed out in 32bit
->                 words in LSB first format. The number of valid bits depends
->                 on the word and the SoC.
+  spi_master spi0: Failed to power device: -13
 
-Almost. That's still missing the key information that the data format is
-one bit per fuse, and the ordering. Perhaps change from:
+A similar fix, but for spi/hspi, was applied in
+268d76430d1b68c340687357ffd18b4b12d02269.
 
-The data is layed out in 32bit words in LSB first format.
+Signed-off-by: Antonio Ospite <ao2@ao2.it>
+---
 
-to:
+Hi,
 
-The data is laid out in 32bit words in LSB first format. Each bit
-represents a single fuse value. Bits order/assignment exactly matches
-the HW registers, including any unused bits.
+I must admit I copied from 268d76430d1b68c340687357ffd18b4b12d02269 without
+understanding much of what is going on, but fact is that the patch makes my
+board boot again.
+
+Can anyone confirm that this is indeed the correct fix?
+
+Thanks,
+   Antonio
+
+ drivers/spi/spi-pxa2xx.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+index 41185d0..a07b758 100644
+--- a/drivers/spi/spi-pxa2xx.c
++++ b/drivers/spi/spi-pxa2xx.c
+@@ -1202,6 +1202,11 @@ static int pxa2xx_spi_probe(struct platform_device *pdev)
+ 	tasklet_init(&drv_data->pump_transfers, pump_transfers,
+ 		     (unsigned long)drv_data);
+ 
++	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
++	pm_runtime_use_autosuspend(&pdev->dev);
++	pm_runtime_set_active(&pdev->dev);
++	pm_runtime_enable(&pdev->dev);
++
+ 	/* Register with the SPI framework */
+ 	platform_set_drvdata(pdev, drv_data);
+ 	status = devm_spi_register_master(&pdev->dev, master);
+@@ -1210,11 +1215,6 @@ static int pxa2xx_spi_probe(struct platform_device *pdev)
+ 		goto out_error_clock_enabled;
+ 	}
+ 
+-	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
+-	pm_runtime_use_autosuspend(&pdev->dev);
+-	pm_runtime_set_active(&pdev->dev);
+-	pm_runtime_enable(&pdev->dev);
+-
+ 	return status;
+ 
+ out_error_clock_enabled:
+-- 
+2.0.0
