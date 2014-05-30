@@ -1,43 +1,38 @@
-From: riku.voipio@linaro.org (Riku Voipio)
-Date: Fri, 30 May 2014 15:28:19 +0300
-Subject: =?UTF-8?q?=5BPATCH=5D=20thermal=3A=20allow=20building=20dove=5Fthermal=20with=20mvebu?=
-Message-ID: <1401452899-13952-1-git-send-email-riku.voipio@linaro.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 30 May 2014 14:36:57 +0200
+Subject: [PATCH] i2c: Make I2C ID tables non-mandatory for DT'ed and/or
+ ACPI'ed devices
+In-Reply-To: <1401452797-29521-2-git-send-email-lee.jones@linaro.org>
+References: <1401452797-29521-1-git-send-email-lee.jones@linaro.org>
+ <1401452797-29521-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140530123656.GC2742@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT-enabled Dove has moved from ARCH_DOVE in mach-dove to MACH_DOVE
-in mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
-DT-only MACH_DOVE to thermal Kconfig.
+On Fri, May 30, 2014 at 01:26:36PM +0100, Lee Jones wrote:
+> Currently the I2C framework insists on devices supplying an I2C ID
+> table.  Many of the devices which do so unnecessarily adding quite a
+> few wasted lines to kernel code.  This patch allows drivers a means
+> to 'not' supply the aforementioned table and match on either DT
+> and/or ACPI match tables instead.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-This was originally supposed to go in via "ARM: dove: prepare new Dove DT Kconfig"
-patch from Sebastian Hesselbarth for 3.15, but slipped through the cracks.
+Sadly, it is not that easy...
 
-I've tested on CuBox that without this patch you can't compile
-dove_thermal into a mach-mvebu based kernel, and with this patch I can
-build the driver and it works as expected run-time.
+> +	/*
+> +	 * An I2C ID table is not madatory, if and only if, a suitable Device
+> +	 * Tree and/or ACPI match table entry is supplied for the probing
+> +	 * device.
+> +	 */
 
-Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Eduardo Valentin <edubezval@gmail.com>
-Cc: linux-pm at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- drivers/thermal/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+That means we end up with drivers which cannot be used for run-time
+instantiation via the 'new_device'-file in sysfs. I don't like that.
 
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index 2d51912..5783c72 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -151,7 +151,7 @@ config KIRKWOOD_THERMAL
- 
- config DOVE_THERMAL
- 	tristate "Temperature sensor on Marvell Dove SoCs"
--	depends on ARCH_DOVE
-+	depends on ARCH_DOVE ||?MACH_DOVE
- 	depends on OF
- 	help
- 	  Support for the Dove thermal sensor driver in the Linux thermal
--- 
-2.0.0.rc2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140530/9bf142e5/attachment.sig>
