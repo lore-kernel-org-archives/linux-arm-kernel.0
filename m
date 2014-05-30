@@ -1,69 +1,45 @@
-From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
-Date: Fri, 30 May 2014 22:38:34 +0900
-Subject: [PATCH 2/2] arm: shmobile: r8a7790: add USB3.0 node to
- r8a7790.dtsi
-In-Reply-To: <538882C6.3050202@cogentembedded.com>
-References: <53871338.8050606@renesas.com>
- <53875B7E.5010104@cogentembedded.com> <5388760D.3020101@renesas.com>
- <538882C6.3050202@cogentembedded.com>
-Message-ID: <538889DA.8060006@renesas.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri, 30 May 2014 19:10:03 +0530
+Subject: [RFC 1/2] ACPI: Add support for Platform Communication Channel
+In-Reply-To: <CAJ5Y-eYmGKj3uvUwSYkJ3DBA=wS9LTgjG56XCmQWH0-Ax_gBaQ@mail.gmail.com>
+References: <1401222599-12416-1-git-send-email-ashwin.chaugule@linaro.org>
+ <1401222599-12416-2-git-send-email-ashwin.chaugule@linaro.org>
+ <20140530101704.GS5099@sirena.org.uk>
+ <CABb+yY0cQw3ZvkK37TkHuMdeOrxckJU-TNFsdiFzBHdUgaBxgg@mail.gmail.com>
+ <CAJ5Y-eYmGKj3uvUwSYkJ3DBA=wS9LTgjG56XCmQWH0-Ax_gBaQ@mail.gmail.com>
+Message-ID: <CAJe_ZhcRgrHCED-TA-NOJF6Njv-Z=ttTXO=wfn1VZjcCbiR6aA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 30 May 2014 18:58, Ashwin Chaugule <ashwin.chaugule@linaro.org> wrote:
+> Hello,
+>
+> On 30 May 2014 09:03, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> On Fri, May 30, 2014 at 3:47 PM, Mark Brown <broonie@kernel.org> wrote:
+>>> On Tue, May 27, 2014 at 04:29:58PM -0400, Ashwin Chaugule wrote:
+>>>> ACPI 5.0a+ spec defines a generic mode of communication
+>>>> between the OS and a platform such as the BMC. This medium
+>>>> (PCC) is typically used by CPPC (ACPI CPU Performance management),
+>>>> RAS (ACPI reliability protocol) and MPST (ACPI Memory power
+>>>> states).
+>>>>
+>>>> This patch adds initial support for PCC to be usable by the
+>>>> aforementioned PCC clients.
+>>>
+>>> This looks an awful lot like a mailbox - should it be integrated with
+>>> the mailbox system that Jassi (CCed) has been working on getting
+>>> upstream?  Not deleting any context for Jassi's benefit.
+>>>
+>> Yeah, the mailbox api should support PCC as such, with pcc-test.c as
+>> the client above and pcc.c as the controller driver below it.
+>
+> Interesting. Do you have a git repo with this framework where I could
+> have a look?
+>
+Please scrape it from https://lkml.org/lkml/2014/5/15/49
+My platform also uses the doorbell mechanism with request and response
+written in shared-memory, so I am confident the mailbox api should
+work for PCC.
 
-(2014/05/30 22:08), Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 05/30/2014 04:14 PM, Yoshihiro Shimoda wrote:
-> 
->>>> Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
->>>> ---
->>>>    arch/arm/boot/dts/r8a7790.dtsi |   10 ++++++++++
->>>>    1 file changed, 10 insertions(+)
-> 
->>>> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
->>>> index e06c486..e6b04f2 100644
->>>> --- a/arch/arm/boot/dts/r8a7790.dtsi
->>>> +++ b/arch/arm/boot/dts/r8a7790.dtsi
->>>> @@ -902,4 +902,14 @@
->>>>            #size-cells = <0>;
->>>>            status = "disabled";
->>>>        };
->>>> +
->>>> +    xhci: xhci at ee000000 {
-> 
->>>      The node name should be "usb at ee000000", according to section 2.2.2 of the
->>> ePAPR standard [1]:
-> 
->> Thank you for the point! I will fix this and r8a7791's one.
-> 
->>>> +        compatible = "renesas,xhci-r8a7790";
->>>> +        reg = <0 0xee000000 0 0xc00>;
->>>> +        interrupts = <0 101 IRQ_TYPE_LEVEL_HIGH>;
->>>> +        clocks = <&mstp3_clks R8A7790_CLK_SSUSB>;
->>>> +        phys = <&usbphy 1 1>;
-> 
->>>      This part is dependent on the generic PHY support in the USB HCD in order
->>> to work.
-> 
->    Oops, I hadn't seen that you added generic PHY support to the xHCI driver when writing this. I'm however for adding the generic PHY support to the generic USB HCD code, so that we can use it for the PCI controllers.
-> 
->> This means that I should wait to add this parameter until the generic USB PHY Gen2
->> driver is supported in upstream?
-> 
->    At least describe that dependency.
-
-Thank you for the reply! I will add such a describption in change log.
-
-Best regards,
-Yoshihiro Shimoda
-
->> Best regards,
->> Yoshihiro Shimoda
-> 
-> WBR, Sergei
-> 
-
--- 
-Yoshihiro Shimoda
+Regards,
+-Jassi
