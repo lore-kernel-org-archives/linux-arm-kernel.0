@@ -1,34 +1,33 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 30 May 2014 11:41:01 -0500 (CDT)
-Subject: [GIT PULL] qcom driver changes for v3.16-2
-Message-ID: <alpine.DEB.2.00.1405301138220.5291@galak-ubuntu.qualcomm.com>
+Date: Fri, 30 May 2014 11:42:25 -0500 (CDT)
+Subject: [GIT PULL] qcom defconfig changes for v3.16-2
+Message-ID: <alpine.DEB.2.00.1405301141060.5291@galak-ubuntu.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 5d144e36b7c51612922fa05d37ff3a869261cc82:
+The following changes since commit f604759ec025e21d0c29a6d0addd53bbc60eb12e:
 
-   soc: qcom: Add GSBI driver (2014-05-23 11:38:04 -0500)
+   ARM: config: Update msm_defconfig (2014-05-22 11:18:56 -0500)
 
 are available in the git repository at:
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-drivers-for-3.16-2
+   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-defconfig-for-3.16-2
 
-for you to fetch changes up to 31964ffebbb958c6cf289c7c12edd7530d6221b9:
+for you to fetch changes up to 15ce39ade232bdac9fb788c66da9bcc7eb1a46a9:
 
-   tty: serial: msm: Remove direct access to GSBI (2014-05-29 11:06:20 -0500)
-
-----------------------------------------------------------------
-Qualcomm ARM Based driver Updates for v3.16-2
-
-* Updated MSM uart driver to not access GSBI control registers
+   ARM: qcom: Enable GSBI driver in defconfig (2014-05-29 11:27:03 -0500)
 
 ----------------------------------------------------------------
-Andy Gross (1):
-       tty: serial: msm: Remove direct access to GSBI
+Qualcomm ARM Based defconfig Updates for v3.16-2
 
-  drivers/tty/serial/msm_serial.c | 48 ++---------------------------------------
-  drivers/tty/serial/msm_serial.h |  5 -----
-  2 files changed, 2 insertions(+), 51 deletions(-)
+* Enable qcom GSBI driver
+
+----------------------------------------------------------------
+Kumar Gala (1):
+       ARM: qcom: Enable GSBI driver in defconfig
+
+  arch/arm/configs/qcom_defconfig | 1 +
+  1 file changed, 1 insertion(+)
 
 --
 Employee of Qualcomm Innovation Center, Inc.
