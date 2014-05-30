@@ -1,26 +1,53 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 30 May 2014 13:58:07 +0200
-Subject: [PATCH v4 00/11] ARM: Exynos: PMU cleanup and refactoring for
- using DT
-In-Reply-To: <CAGm_ybjW6SAxsqmnBCGnZ0nEPLhBxgzeZS4dtLwwjW4PtuWJWg@mail.gmail.com>
-References: <1399704998-13321-1-git-send-email-pankaj.dubey@samsung.com>
- <CAGm_ybjW6SAxsqmnBCGnZ0nEPLhBxgzeZS4dtLwwjW4PtuWJWg@mail.gmail.com>
-Message-ID: <5388724F.9010108@gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 30 May 2014 14:19:06 +0200
+Subject: [PATCH v6 0/2] cpufreq: opp: Add device tree based lookup of
+ boost mode frequency
+In-Reply-To: <1401440477-4328-1-git-send-email-thomas.ab@samsung.com>
+References: <1401440477-4328-1-git-send-email-thomas.ab@samsung.com>
+Message-ID: <5683009.PqtetcWKuO@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vikas, Pankaj,
-
-On 27.05.2014 13:26, Vikas Sajjan wrote:
-> Hi,
+On Friday, May 30, 2014 02:31:15 PM Thomas Abraham wrote:
+> Changes since v5:
+> - Fixes for checkpatch warnings with --strict option as suggested by
+>   Nishanth Menon.
 > 
-> Any comments on this series?
+> Changes since v4:
+> - Code improvements suggested by Viresh Kumar.
 > 
+> Changes since v3:
+> - Minor changes as suggested in the last version.
+> 
+> Changes since v2:
+> - Reworked based on the "PM / OPP: move cpufreq specific helpers out of OPP 
+>   layer" patch series posted by Nishanth Menon.
+> 
+> Changes since v1:
+> - Boost mode frequencies are specfied as a set of frequencies instead of
+>   specifying them as OPPs. Thanks to Nishanth, Lukasz and Rob for the
+>   feedback.
+> 
+> This series has been acked by authors and maintainers of the code
+> portions changed in this series. The new DT binding introduced in this
+> patch needs an ack from device tree binding maintainers as well.
+> 
+> Commit 6f19efc0 ("cpufreq: Add boost frequency support in core") adds
+> support for CPU boost mode for CPUfreq drivers. To use the new boost
+> mode, CPUfreq drivers have to specify the boost mode frequency and
+> voltage within the CPUfreq driver, which is the case for Exynos4x12
+> CPUfreq driver.
+> 
+> But for CPUfreq drivers which obtain the OPPs from cpus node, this
+> patch series adds support to specify boost mode frequencies in the
+> cpu device tree node. This requirement came up when Lukasz pointed
+> out the regression caused by the Exynos CPUfreq driver consolidation
+> patches.
 
-I still have this series on my to-review list, but it's quite complex
-and I didn't have needed amount of time yet, sorry. At the moment I'm on
-vacation, so I don't want to spend too much time on the mailing list,
-but I'll do my best to find some.
+Both patches queued up for 3.16 in the linux-pm tree.
 
-Best regards,
-Tomasz
+Thanks!
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
