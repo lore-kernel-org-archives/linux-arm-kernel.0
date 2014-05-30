@@ -1,38 +1,45 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Fri, 30 May 2014 09:28:06 -0400
-Subject: [RFC 1/2] ACPI: Add support for Platform Communication Channel
-In-Reply-To: <CABb+yY0cQw3ZvkK37TkHuMdeOrxckJU-TNFsdiFzBHdUgaBxgg@mail.gmail.com>
-References: <1401222599-12416-1-git-send-email-ashwin.chaugule@linaro.org>
- <1401222599-12416-2-git-send-email-ashwin.chaugule@linaro.org>
- <20140530101704.GS5099@sirena.org.uk>
- <CABb+yY0cQw3ZvkK37TkHuMdeOrxckJU-TNFsdiFzBHdUgaBxgg@mail.gmail.com>
-Message-ID: <CAJ5Y-eYmGKj3uvUwSYkJ3DBA=wS9LTgjG56XCmQWH0-Ax_gBaQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 30 May 2014 14:34:05 +0100
+Subject: [PATCH] i2c: Make I2C ID tables non-mandatory for DT'ed and/or
+ ACPI'ed devices
+In-Reply-To: <20140530123656.GC2742@katana>
+References: <1401452797-29521-1-git-send-email-lee.jones@linaro.org>
+ <1401452797-29521-2-git-send-email-lee.jones@linaro.org>
+ <20140530123656.GC2742@katana>
+Message-ID: <20140530133405.GB29731@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+> > Currently the I2C framework insists on devices supplying an I2C ID
+> > table.  Many of the devices which do so unnecessarily adding quite a
+> > few wasted lines to kernel code.  This patch allows drivers a means
+> > to 'not' supply the aforementioned table and match on either DT
+> > and/or ACPI match tables instead.
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Sadly, it is not that easy...
+> 
+> > +	/*
+> > +	 * An I2C ID table is not madatory, if and only if, a suitable Device
+> > +	 * Tree and/or ACPI match table entry is supplied for the probing
+> > +	 * device.
+> > +	 */
+> 
+> That means we end up with drivers which cannot be used for run-time
+> instantiation via the 'new_device'-file in sysfs. I don't like that.
 
-On 30 May 2014 09:03, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> On Fri, May 30, 2014 at 3:47 PM, Mark Brown <broonie@kernel.org> wrote:
->> On Tue, May 27, 2014 at 04:29:58PM -0400, Ashwin Chaugule wrote:
->>> ACPI 5.0a+ spec defines a generic mode of communication
->>> between the OS and a platform such as the BMC. This medium
->>> (PCC) is typically used by CPPC (ACPI CPU Performance management),
->>> RAS (ACPI reliability protocol) and MPST (ACPI Memory power
->>> states).
->>>
->>> This patch adds initial support for PCC to be usable by the
->>> aforementioned PCC clients.
->>
->> This looks an awful lot like a mailbox - should it be integrated with
->> the mailbox system that Jassi (CCed) has been working on getting
->> upstream?  Not deleting any context for Jassi's benefit.
->>
-> Yeah, the mailbox api should support PCC as such, with pcc-test.c as
-> the client above and pcc.c as the controller driver below it.
+I've found the code and taken a quick look at it.  I'm still not sure
+I understand your point.  The semantics for any device attempting to
+register with an I2C ID table should be unchanged.  The only intended
+difference would be for drivers which do not wish to supply one due
+to the fact that they have other means of matching, namely DT and
+ACPI.
 
-Interesting. Do you have a git repo with this framework where I could
-have a look?
-
-Cheers,
-Ashwin
+Would you mind telling me what I have changed that affects drivers
+registering via Sysfs?
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
