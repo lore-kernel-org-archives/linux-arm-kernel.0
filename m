@@ -1,98 +1,56 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 30 May 2014 16:00:21 +0200
-Subject: [PATCH] clk: exynos5420: Keep aclk66_peric enabled during boot
-In-Reply-To: <1401398496-4624-1-git-send-email-dianders@chromium.org>
-References: <1401398496-4624-1-git-send-email-dianders@chromium.org>
-Message-ID: <53888EF5.5090800@collabora.co.uk>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Fri, 30 May 2014 15:04:32 +0100
+Subject: [PATCH v2 04/11] sched: Allow all archs to set the power_orig
+In-Reply-To: <1400860385-14555-5-git-send-email-vincent.guittot@linaro.org>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-5-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <53888FF0.4020403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug,
-
-On 05/29/2014 11:21 PM, Doug Anderson wrote:
-> Right now if you've got earlyprintk enabled on exynos5420-peach-pit
-> then you'll get a hang on boot.  Here's why:
+On 23/05/14 16:52, Vincent Guittot wrote:
+> power_orig is only changed for system with a SMT sched_domain level in order to
+> reflect the lower capacity of CPUs. Heterogenous system also have to reflect an
+> original capacity that is different from the default value.
 > 
-> 1. The i2c-s3c2410 driver will probe at subsys_initcall.  It will
->    enable its clock and disable it.  This is the clock "i2c2".
-> 2. The act of disabling "i2c2" will disable its parents.  In this case
->    the parent is "aclk66_peric".  There are no other children of
->    "aclk66_peric" officially enabled, so "aclk66_peric" will be turned
->    off (despite being CLK_IGNORE_UNUSED, but that's by design).
-> 3. The next time you try to earlyprintk you'll do so without the UART
->    clock enabled.  That's because the UART clocks are also children of
->    "aclk66_peric".  You'll hang.
+> Create a more generic function arch_scale_cpu_power that can be also used by
+> non SMT platform to set power_orig.
 > 
-> There's no good place to put a clock enable for earlyprintk, which is
-> handled by a bunch of assembly code.  The best we can do is to handle
-> this in the clock driver.
+> The weak behavior of arch_scale_cpu_power is the previous SMT one in order to
+> keep backward compatibility in the use of power_orig.
 > 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
->  drivers/clk/samsung/clk-exynos5420.c | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
-> 
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 
-I tested your patch and it solves the issue for me, so feel free to add
+As you know, besides uarch scaled cpu power for HMP, freq scaled cpu
+power is important for energy-aware scheduling to achieve freq scale
+invariance for task load.
 
-Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+I know that your patch-set is not about introducing freq scaled cpu
+power, but we were discussing how this can be achieved w/ your patch-set
+in place, so maybe you can share your opinion regarding the easiest way
+to achieve freq scale invariance with us?
 
-Just one trivial comment below:
+(1) We assume that the current way (update_cpu_power() calls
+arch_scale_freq_power() to get the avg power(freq) over the time period
+since the last call to arch_scale_freq_power()) is suitable
+for us. Do you have another opinion here?
 
-> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-> index 9d7d7ee..1e586be 100644
-> --- a/drivers/clk/samsung/clk-exynos5420.c
-> +++ b/drivers/clk/samsung/clk-exynos5420.c
-> @@ -1172,11 +1172,17 @@ static struct of_device_id ext_clk_match[] __initdata = {
->  	{ },
->  };
->  
-> +/* Keep these clocks on until late_initcall */
-> +static const char *boot_clocks[] __initconst = {
-> +	"aclk66_peric",
-> +};
-> +
->  /* register exynos5420 clocks */
->  static void __init exynos5x_clk_init(struct device_node *np,
->  		enum exynos5x_soc soc)
->  {
->  	struct samsung_clk_provider *ctx;
-> +	int i;
->  
->  	if (np) {
->  		reg_base = of_iomap(np, 0);
-> @@ -1226,6 +1232,12 @@ static void __init exynos5x_clk_init(struct device_node *np,
->  	}
->  
->  	exynos5420_clk_sleep_init();
-> +
-> +	for (i = 0; i < ARRAY_SIZE(boot_clocks); i++) {
-> +		struct clk *to_enable = __clk_lookup(boot_clocks[i]);
-> +
-> +		clk_prepare_enable(to_enable);
-> +	}
->  }
->  
->  static void __init exynos5420_clk_init(struct device_node *np)
-> @@ -1239,3 +1251,15 @@ static void __init exynos5800_clk_init(struct device_node *np)
->  	exynos5x_clk_init(np, EXYNOS5800);
->  }
->  CLK_OF_DECLARE(exynos5800_clk, "samsung,exynos5800-clock", exynos5800_clk_init);
-> +
-> +static int __init exynos5420_clk_late_init(void)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(boot_clocks); i++) {
-> +		struct clk *to_disable = __clk_lookup(boot_clocks[i]);
-> +
-> +		clk_disable_unprepare(to_disable);
-> +	}
-> +}
-> +late_initcall(exynos5420_clk_late_init);
-> 
+(2) Is the current layout of update_cpu_power() adequate for this, where
+we scale power_orig related to freq and then related to rt/(irq):
 
-You should return 0 here.
+  power_orig = scale_cpu(SCHED_POWER_SCALE)
+  power = scale_rt(scale_freq(power_orig))
 
-Best regards,
-Javier
+or do we need an extra power_freq data member on the rq and do:
+
+  power_orig = scale_cpu(SCHED_POWER_SCALE)
+  power_freq = scale_freq(power_orig))
+  power = scale_rt(power_orig))
+
+In other words, do we consider rt/(irq) pressure when calculating freq
+scale invariant task load or not?
+
+Thanks,
+
+-- Dietmar
+[...]
