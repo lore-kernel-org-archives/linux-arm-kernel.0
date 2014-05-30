@@ -1,75 +1,64 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Fri, 30 May 2014 11:49:02 +0530
-Subject: [PATCH 1/1] ARM: vt8500: Staticize local symbols
-In-Reply-To: <53879C1F.1060804@prisktech.co.nz>
-References: <1401191863-9404-1-git-send-email-sachin.kamat@linaro.org>
- <4308955.HrfvHXcbAr@wuerfel> <53879C1F.1060804@prisktech.co.nz>
-Message-ID: <CAK9yfHyZ+wr=e=nONnsq3==AT-CQUyNRuhDBBu0mfr6=mExO2A@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 30 May 2014 08:29:37 +0200
+Subject: [PATCH v2 10/11] sched: move cfs task on a CPU with higher
+ capacity
+In-Reply-To: <CAKfTPtCHhxyugMOCeS0hZoEXWhgRec4uOBexZ2aB2A+Eycgi8w@mail.gmail.com>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-11-git-send-email-vincent.guittot@linaro.org>
+ <20140529095024.GF11074@laptop.programming.kicks-ass.net>
+ <CAKfTPtCHhxyugMOCeS0hZoEXWhgRec4uOBexZ2aB2A+Eycgi8w@mail.gmail.com>
+Message-ID: <20140530062937.GA11096@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 May 2014 02:14, Tony Prisk <linux@prisktech.co.nz> wrote:
->
-> On 28/05/14 00:05, Arnd Bergmann wrote:
->>
->> On Tuesday 27 May 2014 17:27:43 Sachin Kamat wrote:
->>>
->>> Variables local to this file are made static.
->>>
->>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
->>> ---
->>>   arch/arm/mach-vt8500/vt8500.c |    6 +++---
->>>   1 file changed, 3 insertions(+), 3 deletions(-)
->>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
->>
->> Looks good to me, but you forgot to take the maintainer on Cc.
->>
->> How should we handle this patch? I guess this is the only one
->> for vt8500 in 3.16, so I can pick it up directly with Tony's
->> Ack.
->>
->>> diff --git a/arch/arm/mach-vt8500/vt8500.c
->>> b/arch/arm/mach-vt8500/vt8500.c
->>> index 4a73464cb11b..2da7be31e7e2 100644
->>> --- a/arch/arm/mach-vt8500/vt8500.c
->>> +++ b/arch/arm/mach-vt8500/vt8500.c
->>> @@ -44,7 +44,7 @@
->>>     static void __iomem *pmc_base;
->>>   -void vt8500_restart(enum reboot_mode mode, const char *cmd)
->>> +static void vt8500_restart(enum reboot_mode mode, const char *cmd)
->>>   {
->>>         if (pmc_base)
->>>                 writel(1, pmc_base + VT8500_PMSR_REG);
->>> @@ -60,7 +60,7 @@ static struct map_desc vt8500_io_desc[] __initdata = {
->>>         },
->>>   };
->>>   -void __init vt8500_map_io(void)
->>> +static void __init vt8500_map_io(void)
->>>   {
->>>         iotable_init(vt8500_io_desc, ARRAY_SIZE(vt8500_io_desc));
->>>   }
->>> @@ -72,7 +72,7 @@ static void vt8500_power_off(void)
->>>         asm("mcr%? p15, 0, %0, c7, c0, 4" : : "r" (0));
->>>   }
->>>   -void __init vt8500_init(void)
->>> +static void __init vt8500_init(void)
->>>   {
->>>         struct device_node *np;
->>>   #if defined(CONFIG_FB_VT8500) || defined(CONFIG_FB_WM8505)
->>>
-> Acked-by: Tony Prisk <linux@prisktech.co.nz>
+On Thu, May 29, 2014 at 09:37:39PM +0200, Vincent Guittot wrote:
+> On 29 May 2014 11:50, Peter Zijlstra <peterz@infradead.org> wrote:
+> > On Fri, May 23, 2014 at 05:53:04PM +0200, Vincent Guittot wrote:
+> >> If the CPU is used for handling lot of IRQs, trig a load balance to check if
+> >> it's worth moving its tasks on another CPU that has more capacity
+> >>
+> >> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> >> ---
+> >>  kernel/sched/fair.c | 13 +++++++++++++
+> >>  1 file changed, 13 insertions(+)
+> >>
+> >> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> >> index e8a30f9..2501e49 100644
+> >> --- a/kernel/sched/fair.c
+> >> +++ b/kernel/sched/fair.c
+> >> @@ -5948,6 +5948,13 @@ static bool update_sd_pick_busiest(struct lb_env *env,
+> >>       if (sgs->sum_nr_running > sgs->group_capacity)
+> >>               return true;
+> >>
+> >> +     /*
+> >> +      * The group capacity is reduced probably because of activity from other
+> >> +      * sched class or interrupts which use part of the available capacity
+> >> +      */
+> >> +     if ((sg->sgp->power_orig * 100) > (sgs->group_power * env->sd->imbalance_pct))
+> >> +             return true;
+> >> +
+> >>       if (sgs->group_imb)
+> >>               return true;
+> >>
+> >
+> > But we should already do this because the load numbers are scaled with
+> > the power/capacity figures. If one CPU gets significant less time to run
+> > fair tasks, its effective load would spike and it'd get to be selected
+> > here anyway.
+> >
+> > Or am I missing something?
+> 
+> The CPU could have been picked when the capacity becomes null (which
+> occurred when the cpu_power goes below half the default
+> SCHED_POWER_SCALE). And even after that, there were some conditions in
+> find_busiest_group that was bypassing this busiest group
 
-Thanks Tony.
-
-> Can you pick this up please Arnd? Doesn't look like there will be anything
-> else for 3.16
-
-Arnd,
-
-I have a few more similar patches for other platforms (mvebu, sti, spear).
-Can I send them as well along with the accumulated acks for you to apply?
-
----
-With warm regards,
-Sachin
+Could you detail those conditions? FWIW those make excellent Changelog
+material.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140530/b71e5088/attachment.sig>
