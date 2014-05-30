@@ -1,47 +1,69 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 30 May 2014 13:07:28 -0500
-Subject: [PATCH] ARM: qcom: Enable GSBI driver in defconfig
-In-Reply-To: <5388BFAF.1050204@codeaurora.org>
-References: <1401380804-16108-1-git-send-email-galak@codeaurora.org>
- <5388BFAF.1050204@codeaurora.org>
-Message-ID: <81F038DE-9849-4510-86F4-EF41169418FA@codeaurora.org>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Fri, 30 May 2014 23:37:58 +0530
+Subject: [PATCH v6 0/2] cpufreq: opp: Add device tree based lookup of
+ boost mode frequency
+In-Reply-To: <1430270.VsBiDfiUL9@vostro.rjw.lan>
+References: <1401440477-4328-1-git-send-email-thomas.ab@samsung.com>
+ <5683009.PqtetcWKuO@vostro.rjw.lan>
+ <1430270.VsBiDfiUL9@vostro.rjw.lan>
+Message-ID: <CAJuA9aiz8ipNXt0-9ybrTUdeH=boOp2BOo2KPsLMVAYUNBPRuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, May 30, 2014 at 8:17 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Friday, May 30, 2014 02:19:06 PM Rafael J. Wysocki wrote:
+>> On Friday, May 30, 2014 02:31:15 PM Thomas Abraham wrote:
+>> > Changes since v5:
+>> > - Fixes for checkpatch warnings with --strict option as suggested by
+>> >   Nishanth Menon.
+>> >
+>> > Changes since v4:
+>> > - Code improvements suggested by Viresh Kumar.
+>> >
+>> > Changes since v3:
+>> > - Minor changes as suggested in the last version.
+>> >
+>> > Changes since v2:
+>> > - Reworked based on the "PM / OPP: move cpufreq specific helpers out of OPP
+>> >   layer" patch series posted by Nishanth Menon.
+>> >
+>> > Changes since v1:
+>> > - Boost mode frequencies are specfied as a set of frequencies instead of
+>> >   specifying them as OPPs. Thanks to Nishanth, Lukasz and Rob for the
+>> >   feedback.
+>> >
+>> > This series has been acked by authors and maintainers of the code
+>> > portions changed in this series. The new DT binding introduced in this
+>> > patch needs an ack from device tree binding maintainers as well.
+>> >
+>> > Commit 6f19efc0 ("cpufreq: Add boost frequency support in core") adds
+>> > support for CPU boost mode for CPUfreq drivers. To use the new boost
+>> > mode, CPUfreq drivers have to specify the boost mode frequency and
+>> > voltage within the CPUfreq driver, which is the case for Exynos4x12
+>> > CPUfreq driver.
+>> >
+>> > But for CPUfreq drivers which obtain the OPPs from cpus node, this
+>> > patch series adds support to specify boost mode frequencies in the
+>> > cpu device tree node. This requirement came up when Lukasz pointed
+>> > out the regression caused by the Exynos CPUfreq driver consolidation
+>> > patches.
+>>
+>> Both patches queued up for 3.16 in the linux-pm tree.
+>
+> But please address the Mark's comments or I'll drop them.
 
-On May 30, 2014, at 12:28 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+Hi Rafael,
 
-> On 05/29/14 09:26, Kumar Gala wrote:
->> Signed-off-by: Kumar Gala <galak@codeaurora.org>
->> ---
->> arch/arm/configs/qcom_defconfig | 1 +
->> 1 file changed, 1 insertion(+)
->> 
->> diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
->> index bfed753..42ebd72 100644
->> --- a/arch/arm/configs/qcom_defconfig
->> +++ b/arch/arm/configs/qcom_defconfig
->> @@ -131,6 +131,7 @@ CONFIG_RTC_CLASS=y
->> CONFIG_DMADEVICES=y
->> CONFIG_QCOM_BAM_DMA=y
->> CONFIG_STAGING=y
->> +CONFIG_QCOM_GSBI=y
->> CONFIG_COMMON_CLK_QCOM=y
->> CONFIG_MSM_GCC_8660=y
->> CONFIG_MSM_MMCC_8960=y
-> 
-> It would be good to do this in the multi-platform defconfig as well.
-> Otherwise users of that defconfig (i.e. khilman's boot tester) will
-> start failing to boot once the DT changes land.
-> 
-> ? 
+Please drop this series for now. Both the patches have to reworked
+based on Mark's comments.
 
-Will do after 3.16-rc1, as nothing Kevin is booting uses the GSBI.
+Thanks,
+Thomas.
 
-Trying to decide if we should have some Kconfig dependency here.
-
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+>
+> Rafael
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
