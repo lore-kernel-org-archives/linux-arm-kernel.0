@@ -1,76 +1,54 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Fri, 30 May 2014 11:31:53 +0530
-Subject: [PATCH v2] arm64: kernel: initialize broadcast hrtimer based
- clock event device
-In-Reply-To: <1401383814-22600-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1401383814-22600-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <53881ED1.2040907@linux.vnet.ibm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 30 May 2014 08:07:11 +0200
+Subject: [PATCH] CMA: correct unlock target
+In-Reply-To: <53874AB5.5010908@codeaurora.org>
+References: <1401344958-3790-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <5386E313.6070705@samsung.com> <53874AB5.5010908@codeaurora.org>
+Message-ID: <5388200F.7000201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2014 10:46 PM, Lorenzo Pieralisi wrote:
-> On platforms implementing CPU power management, the CPUidle subsystem
-> can allow CPUs to enter idle states where local timers logic is lost on power
-> down. To keep the software timers functional the kernel relies on an
-> always-on broadcast timer to be present in the platform to relay the
-> interrupt signalling the timer expiries.
-> 
-> For platforms implementing CPU core gating that do not implement an always-on
-> HW timer or implement it in a broken way, this patch adds code to initialize
-> the kernel hrtimer based clock event device upon boot (which can be chosen as
-> tick broadcast device by the kernel).
-> It relies on a dynamically chosen CPU to be always powered-up. This CPU then
-> relays the timer interrupt to CPUs in deep-idle states through its HW local
-> timer device.
-> 
-> Having a CPU always-on has implications on power management platform
-> capabilities and makes CPUidle suboptimal, since at least a CPU is kept
-> always in a shallow idle state by the kernel to relay timer interrupts,
-> but at least leaves the kernel with a functional system with some working
-> power management capabilities.
-> 
-> The hrtimer based clock event device is unconditionally registered, but
-> has the lowest possible rating such that any broadcast-capable HW clock
-> event device present will be chosen in preference as the tick broadcast
-> device.
-> 
-> Cc: Preeti U Murthy <preeti@linux.vnet.ibm.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
-> changes in v2:
-> 
-> - Reworded the commit log according to reviews
-> 
-> It should be ready to go.
-> 
-> Thanks,
-> Lorenzo
-> 
->  arch/arm64/kernel/time.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-> index 6815987..1a7125c 100644
-> --- a/arch/arm64/kernel/time.c
-> +++ b/arch/arm64/kernel/time.c
-> @@ -18,6 +18,7 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->  
-> +#include <linux/clockchips.h>
->  #include <linux/export.h>
->  #include <linux/kernel.h>
->  #include <linux/interrupt.h>
-> @@ -69,6 +70,8 @@ void __init time_init(void)
->  	of_clk_init(NULL);
->  	clocksource_of_init();
->  
-> +	tick_setup_hrtimer_broadcast();
-> +
->  	arch_timer_rate = arch_timer_get_rate();
->  	if (!arch_timer_rate)
->  		panic("Unable to initialise architected timer.\n");
-> 
-Reviewed-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
+Hello,
+
+On 2014-05-29 16:56, Laura Abbott wrote:
+> On 5/29/2014 12:34 AM, Marek Szyprowski wrote:
+> > Hello,
+> >
+> > On 2014-05-29 08:29, Joonsoo Kim wrote:
+> >> 'cma: Remove potential deadlock situation' introduces per cma area mutex
+> >> for bitmap management. It is good, but there is one mistake. When we
+> >> can't find appropriate area in bitmap, we release cma_mutex global lock
+> >> rather than cma->lock and this is a bug. So fix it.
+> >>
+> >> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> >
+> > Thanks for spotting this issue. I've added it to my tree.
+> >
+> >> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+> >> index 6f6bffc..83969f8 100644
+> >> --- a/drivers/base/dma-contiguous.c
+> >> +++ b/drivers/base/dma-contiguous.c
+> >> @@ -331,7 +331,7 @@ struct page *dma_alloc_from_contiguous(struct device *dev, int count,
+> >>           pageno = bitmap_find_next_zero_area(cma->bitmap, cma->count,
+> >>                               start, count, mask);
+> >>           if (pageno >= cma->count) {
+> >> -            mutex_unlock(&cma_mutex);
+> >> +            mutex_unlock(&cma->lock);
+> >>               break;
+> >>           }
+> >>           bitmap_set(cma->bitmap, pageno, count);
+> >
+> > Best regards
+>
+> Acked-by: Laura Abbott <lauraa@codeaurora.org>
+>
+> Who actually ended up picking up that patch? I sent it out but didn't realize it had been
+> picked up.
+
+I've taken it to my dma-mapping tree some time ago, I think that
+I've replied to the original mail with information about taking it.
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
