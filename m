@@ -1,79 +1,36 @@
-From: t.dakhran@gmail.com (Tarek Dakhran)
-Date: Fri, 30 May 2014 23:15:46 +0400
-Subject: [PATCH v11 0/3] Exynos 5410 support
-In-Reply-To: <CAK9yfHwatFrQ9ssjJXi=eR3mz95xWQeRJ4-vkteR_Npksa3+tg@mail.gmail.com>
-References: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>
- <7hr43f9mmn.fsf@paris.lan> <538737CA.4070709@suse.de>
- <53874862.5080809@samsung.com> <538775AB.3000604@suse.de>
- <CAC5m3Bz53QO5tTTvk7qnBQtwtjMvSgYZ15prAvnLjdogQRsfMQ@mail.gmail.com>
- <CAK9yfHwatFrQ9ssjJXi=eR3mz95xWQeRJ4-vkteR_Npksa3+tg@mail.gmail.com>
-Message-ID: <CANhyOUf0coACaziesgSXsL3Vy-sypxS_Eo=Cb-2OEAaBodep=w@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 30 May 2014 13:18:52 -0600
+Subject: [E1000-devel] ARM support for igb driver
+In-Reply-To: <CAHH3p5+cR+AQRjxxA=AZN-P2yNSk9Qb6W0BjhAuFa7WPp38=DQ@mail.gmail.com>
+References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>
+ <201405061718.54012.arnd@arndb.de>
+ <1399389873.29530.3.camel@weser.hi.pengutronix.de>
+ <4799695.pjGjqc80tj@wuerfel>
+ <CAHH3p5+rNiSLBBeL-coYroa62rxQJ6wjxTdkCcUtXzvvcAQkXQ@mail.gmail.com>
+ <5388BE1D.7040504@intel.com>
+ <CAHH3p5+cR+AQRjxxA=AZN-P2yNSk9Qb6W0BjhAuFa7WPp38=DQ@mail.gmail.com>
+Message-ID: <20140530191852.GA25314@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Fri, May 30, 2014 at 11:32:34PM +0530, shiv prakash Agarwal wrote:
+> Finally we see that this hang occurs because some VDM is sent by
+> this I210 card.  Why this card sends VDM? and how can we disable it?
 
-On Fri, May 30, 2014 at 10:16 PM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
->
->
-> On Friday, 30 May 2014, Tushar Behera <trblinux@gmail.com> wrote:
->>
->> On Thu, May 29, 2014 at 11:30 PM, Andreas F?rber <afaerber@suse.de> wrote:
->> > Hi Tarek,
->> >
->> >
->> > And I reproducibly get failures for CPUs 1-3, resulting in only one CPU
->> > in /proc/cpuinfo (compared to 4 on downstream 3.14):
->> >
->> > [    0.045778] CPU: Testing write buffer coherency: ok
->> > [    0.045968] /cpus/cpu at 0 missing clock-frequency property
->> > [    0.045993] /cpus/cpu at 1 missing clock-frequency property
->> > [    0.046016] /cpus/cpu at 2 missing clock-frequency property
->> > [    0.046040] /cpus/cpu at 3 missing clock-frequency property
->> > [    0.046059] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
->> > [    0.046135] Setting up static identity map for 0x403a8920 -
->> > 0x403a8978
->> > [    2.075052] CPU1: failed to come online
->> > [    4.085095] CPU2: failed to come online
->> > [    6.095142] CPU3: failed to come online
->> > [    6.095237] Brought up 1 CPUs
->> > [    6.095269] SMP: Total of 1 processors activated.
->> > [    6.095303] CPU: All CPU(s) started in HYP mode.
->> > [    6.095336] CPU: Virtualization extensions available.
->> >
->> > I also notice another apparent device tree issue:
->> >
->> > [    7.341814] of_get_named_gpiod_flags: can't parse gpios property of
->> > node '/soc/mmc at 12220000/slot at 0[0]'
->> > [    7.341850] of_get_named_gpiod_flags: can't parse gpios property of
->> > node '/soc/mmc at 12220000/slot at 0[0]'
->> >
->> > Are any of those known issues and being worked on?
->> > (The CPU failures affected 5420 Arndale Octa as well iirc.)
->> >
+> VDM = Venodor Defined Message
 
-[snip]
+FWIW, when I last looked at Intel stuff in an analyzer it was sending
+regular VDMs for some purpose.
 
->>
->> [1] http://www.spinics.net/lists/linux-samsung-soc/msg31776.html
->>
->> [PATCH v2 Resend 1/2] ARM: EXYNOS: Update secondary boot addr for secure
->> mode
->>
->> [2] http://www.spinics.net/lists/linux-samsung-soc/msg31777.html
->>
->> [PATCH v2 Resend 2/2] ARM: dts: Add secure firmware support for
->> Arndale-octa
->>
->>
->> Kukjin,
->
-> Can you please apply the above patches?
->
+Type 1 VDMs should not cause any errors, the root port should just
+silently discard them.
 
-Patches [1], [2] tested on ODROID-XU, SMDK5410 and Arndale Octa boards.
+If your root port is returning an error completion or otherwise from a
+type 1 VDM then it is broken and the device would be properly
+asserting DLP. Some work around would be required for that kind of HW
+defect :|
 
-Tested-by: Tarek Dakhran <t.dakhran@samsung.com>
+I once tracked down a similar bug with VDM handling in a PCI-E
+device..
 
-Best regards,
-     Tarek
+Jason
