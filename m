@@ -1,70 +1,97 @@
-From: t.dakhran@gmail.com (Tarek Dakhran)
-Date: Fri, 30 May 2014 23:07:01 +0400
-Subject: [PATCH v11 0/3] Exynos 5410 support
-In-Reply-To: <CAC5m3Bz53QO5tTTvk7qnBQtwtjMvSgYZ15prAvnLjdogQRsfMQ@mail.gmail.com>
-References: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>
- <7hr43f9mmn.fsf@paris.lan> <538737CA.4070709@suse.de>
- <53874862.5080809@samsung.com> <538775AB.3000604@suse.de>
- <CAC5m3Bz53QO5tTTvk7qnBQtwtjMvSgYZ15prAvnLjdogQRsfMQ@mail.gmail.com>
-Message-ID: <CANhyOUeq1MMHHn9t+Fy5gpkb43y_rS9F_OAoJ_KFyM1pL4ZJ4w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 30 May 2014 21:11:07 +0200
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140530112728.GB3949@e103592.cambridge.arm.com>
+References: <1400877395-4235-1-git-send-email-thierry.reding@gmail.com>
+ <20140530073006.GA24748@ulmo>
+ <20140530112728.GB3949@e103592.cambridge.arm.com>
+Message-ID: <4663172.oXIylQOrlk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Friday 30 May 2014 12:27:28 Dave Martin wrote:
+> On Fri, May 30, 2014 at 08:30:08AM +0100, Thierry Reding wrote:
+> > On Thu, May 29, 2014 at 09:52:22AM -0600, Stephen Warren wrote:
+> > > On 05/23/2014 02:36 PM, Thierry Reding wrote:
+> > > I think this is a mistake. address-cells/size-cells are for transactions
+> > > flowing down the bus (from the CPU to date). Describing a connection
+> > > from a device to an IOMMU is something completely different, and should
+> > > therefore simply use an iommu-cells property to describe any necessary
+> > > information. If we start re-using properties for different things in
+> > > different contexts, how is anyone going to know what they mean, and how
+> > > will conflicts be resolved. For example, what if there's a single HW
+> > > module that both acts as a regular register bus with children (where
+> > > address-cells/size-cells defines how transactions reach the children
+> > > from the parent), and is also an IOMMU (where according to this binding
+> > > proposal, address-cells/size-cells represent some aspect of the IOMMU
+> > > feature). Using different properties for different things is the only
+> > > sane way to keep different concepts separate. Another alternative would
+> > > be to represent the single HW module as separate nodes in DT, but I
+> > > think that will only make our lives harder, and where I've done that in
+> > > the past, I've regretted it.
+> > 
+> > There was some back-and-forth on this topic and the latest concensus
+> > when I wrote the second version was that #address-cells and #size-cells
+> > were to be used.
+> > 
+> > But there was some bore back-and-forth after that, and it seems like
+> > Arnd no longer thinks that using #address-cells and #size-cells is a
+> > good idea either[0].
+> 
+> Mistake or not, ePAPR already (ab)uses the address concept for PCI.
+> Unless ePAPR is wrong, I don't think it makes sense to argue that
+> the address concept cannot be repurposed.
+> 
+> The reason why this is abused for PCI is the same as our reason here:
+> different masters really are treated as distinct even when accessing
+> the same destination address, and DT has no general native way to
+> describe that.
+> 
+> One clear advantage of using #address-cells etc. is that ePAPR already
+> has very clear and well-defined ways of how to specify range mappings.
+> This gives us a ready-made way to describe windowed IOMMUs and 1:1
+> remappings of whole blocks of master IDs, which are the most obvious
+> cases other than having a small-integer set of explicit IDs.
+> 
+> That said, the PCI pseudo-address thing is not something we _necessarily_
+> want to repeat.
 
-On Fri, May 30, 2014 at 7:41 AM, Tushar Behera <trblinux@gmail.com> wrote:
-> On Thu, May 29, 2014 at 11:30 PM, Andreas F?rber <afaerber@suse.de> wrote:
->> Hi Tarek,
->>
->>
->> And I reproducibly get failures for CPUs 1-3, resulting in only one CPU
->> in /proc/cpuinfo (compared to 4 on downstream 3.14):
->>
->> [    0.045778] CPU: Testing write buffer coherency: ok
->> [    0.045968] /cpus/cpu at 0 missing clock-frequency property
->> [    0.045993] /cpus/cpu at 1 missing clock-frequency property
->> [    0.046016] /cpus/cpu at 2 missing clock-frequency property
->> [    0.046040] /cpus/cpu at 3 missing clock-frequency property
->> [    0.046059] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
->> [    0.046135] Setting up static identity map for 0x403a8920 - 0x403a8978
->> [    2.075052] CPU1: failed to come online
->> [    4.085095] CPU2: failed to come online
->> [    6.095142] CPU3: failed to come online
->> [    6.095237] Brought up 1 CPUs
->> [    6.095269] SMP: Total of 1 processors activated.
->> [    6.095303] CPU: All CPU(s) started in HYP mode.
->> [    6.095336] CPU: Virtualization extensions available.
->>
->> I also notice another apparent device tree issue:
->>
->> [    7.341814] of_get_named_gpiod_flags: can't parse gpios property of
->> node '/soc/mmc at 12220000/slot at 0[0]'
->> [    7.341850] of_get_named_gpiod_flags: can't parse gpios property of
->> node '/soc/mmc at 12220000/slot at 0[0]'
->>
->> Are any of those known issues and being worked on?
->> (The CPU failures affected 5420 Arndale Octa as well iirc.)
->>
->
-> Can you check after applying following two patches for Arndale-Octa
-> ([1],[2])? In other words, a patch similar to [2] might be required
-> for this board too if it is booting under secure mode.
+I'm really impartial to the question of whether to use #address-cells
+or #iommus now. It's possible that we can use the addresses in some
+meaningful way, but it's not clear to me that this will help make the
+representation cleaner or that we will actually want it for SMMU.
 
-Firmware node already present into exynos5410-smdk5410.dts
-So with only patch[1] 4xA15 cores will boot on ODROID-XU and SMDK5410.
+> > Arnd, can you take another look at this binding and see if there's
+> > anything else missing? If not I'll go through the document again and
+> > update all #address-cells/#size-cells references with #iommu-cells as
+> > appropriate and submit v3.
+> 
+> How do you envisage propagation of the master ID bits downstream of the
+> IOMMU would be described?
+> 
+> We will definitely need a way to describe this for GICv3.  How those
+> values are propagated is likely to vary between related SoCs and doesn't
+> feel like it should be baked into a driver, especially for the ARM SMMU
+> which may get reused in radically different SoC families from different
+> vendors.
+> 
+> The most likely types of remapping are the adding of a base offset or
+> some extra bits to the ID -- because not all MSIs to the GIC will
+> necessarily pass through the IOMMU.  It's also possible that we might
+> see ID squashing or folding in some systems.
+> 
+> 
+> For types of remapping which mix the ID and address together, I now
+> do tend to agree that any flexibility arising from describing that
+> in a general way that is unlikely to repay the cost of trying to
+> interpret and analyse the DT.  Defining a few sterotypical kinds
+> of mapping explicitly, as needed, looks more sensible for now.  The
+> windowed-IOMMU case is one example.
 
->
-> [1] http://www.spinics.net/lists/linux-samsung-soc/msg31776.html
->
-> [PATCH v2 Resend 1/2] ARM: EXYNOS: Update secondary boot addr for secure mode
->
-> [2] http://www.spinics.net/lists/linux-samsung-soc/msg31777.html
->
-> [PATCH v2 Resend 2/2] ARM: dts: Add secure firmware support for Arndale-octa
->
->
-> --
-> Tushar Behera
+For MSI, my feeling is that we'd just be best off doing an end-to-end
+description. Any device using an MSI would have an interrupt specifier
+that is sufficient for the interrupt controller to understand where
+the IRQ comes from, and return an address/value pair back to the driver
+to program into some register.
 
-Best regards,
-    Tarek
+	Arnd
