@@ -1,144 +1,178 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 30 May 2014 22:02:26 +0200
-Subject: [PATCH v6 2/2] Documentation: devicetree: Add boost-frequency
- binding to list boost mode frequency
-In-Reply-To: <5388E105.3070609@ti.com>
-References: <1401440477-4328-1-git-send-email-thomas.ab@samsung.com>
- <1401440477-4328-3-git-send-email-thomas.ab@samsung.com>
- <20140530130827.GK24233@leverpostej>
- <CAJuA9ajs6K1PVtXC4_U0vQsA0oPnpaF_PdMfiQJxBFStF3Z2aw@mail.gmail.com>
- <20140530185549.GN24233@leverpostej> <5388E105.3070609@ti.com>
-Message-ID: <5388E3D2.2060602@gmail.com>
+From: ydroneaud@opteya.com (Yann Droneaud)
+Date: Fri, 30 May 2014 22:02:47 +0200
+Subject: [PATCH] driver core/platform: remove unused implicit padding in
+ platform_object
+Message-ID: <1401480167-15091-1-git-send-email-ydroneaud@opteya.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.05.2014 21:50, Nishanth Menon wrote:
-> On 05/30/2014 01:55 PM, Mark Rutland wrote:
->> On Fri, May 30, 2014 at 07:05:43PM +0100, Thomas Abraham wrote:
->>> Hi Mark,
->>>
->>> On Fri, May 30, 2014 at 6:38 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->>>> Hi,
->>>>
->>>> Apologies for being somewhat late w.r.t. review on this.
->>>>
->>>> On Fri, May 30, 2014 at 10:01:17AM +0100, Thomas Abraham wrote:
->>>>> From: Thomas Abraham <thomas.ab@samsung.com>
->>>>>
->>>>> Add a new optional boost-frequency binding for specifying the frequencies
->>>>> usable in boost mode.
->>>>>
->>>>> Cc: Rob Herring <robh+dt@kernel.org>
->>>>> Cc: Pawel Moll <pawel.moll@arm.com>
->>>>> Cc: Mark Rutland <mark.rutland@arm.com>
->>>>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
->>>>> Cc: Kumar Gala <galak@codeaurora.org>
->>>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->>>>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->>>>> Acked-by: Nishanth Menon <nm@ti.com>
->>>>> Acked-by: Lukasz Majewski <l.majewski@samsung.com>
->>>>> ---
->>>>>  .../devicetree/bindings/cpufreq/cpufreq-boost.txt  |   38 ++++++++++++++++++++
->>>>>  1 file changed, 38 insertions(+)
->>>>>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
->>>>> new file mode 100644
->>>>> index 0000000..63ed0fc
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
->>>>> @@ -0,0 +1,38 @@
->>>>> +* Device tree binding for CPU boost frequency (aka over-clocking)
->>>>> +
->>>>> +Certain CPU's can be operated in optional 'boost' mode (or sometimes referred as
->>>>
->>>> Nit: CPUs (we're not greengrocers [1])
->>>>
->>>>> +overclocking) in which the CPU can operate at frequencies which are not
->>>>> +specified by the manufacturer as CPU's operating frequency.
->>>>> +
->>>>> +Optional Properties:
->>>>> +- boost-frequencies: list of frequencies in KHz to be used only in boost mode.
->>>>> +  This list should be a subset of frequencies listed in "operating-points"
->>>>> +  property. Refer to Documentation/devicetree/bindings/power/opp.txt for
->>>>> +  details about "operating-points" property.
->>>>
->>>> What is 'boost-mode'?
->>>
->>> boost-mode activates additional one or more cpu clock speeds (which
->>> are not specified as operating frequency of the cpu by the
->>> manufacturer). The cpu is allowed to operate in these boost mode
->>> speeds when the boost mode is active. The boost mode speeds are
->>> usually undocumented. Some of the chip samples could be clocked in
->>> boost mode speeds and only such samples can be safely operated in
->>> boost mode.
->>>
->>> The mechanism of entry into and exit out of boost mode is outside the
->>> scope of this documentation.
->>>
->>>>
->>>> What are the limitations on boost frequencies? When is a CPU expected to
->>>> go to these frequencies and for now long? When should I as a dt author
->>>> place elements in boost-frequencies?
->>>
->>> I will add these details in the next revision of this patch.
->>
->> Cheers.
->>
->>>>
->>>> Why are these in both operating-points and boost-frequencies? It'll be
->>>> really easy to accidentally forget to mark something as a
->>>> boost-frequency this way. Why not have a boost-points instead?
->>>
->>> Does boost-points mean a set of clock speeds which are not listed as
->>> part of operating-points property? If yes, that also is a possible
->>> implementation (it was implemented in one of the earlier version of
->>> this series). Could you confirm that you want the boost mode speeds to
->>> be exclusive of the speeds listed in operating-points?
->>
->> If these boost mode operating points are not generally advisable for use
->> as the other operating-points are, then they should IMO been in an
->> entirely separate property exclusive of (but in the same format as) the
->> operating-points property, e.g.
->>
->> operating points = <A B>, <C D>;
->> boost-points = <E F>;
-> 
-> you are asking boost frequencies to remain for ever tied down to OPP
-> style description.
-> 
-> What we are trying to describe? "What are my SoC's overclocked
-> frequencies"? That description can be used even in a system that does
-> not use OPP style table (say ACPI based OPP tables or whatever
-> acronymned table).
-> 
-> Tying it down to operating points just because we have it today as a
-> convenient description, is limiting.
-> 
-> Further, if we decide to educate boost-frequencies to also indicate
-> how long is it safe? That does indeed belong to boost-frequency
-> description and not OPP description. Or if we decide to change
-> operating-points description[1] in the future has an impact on
-> "boost-points" description, when it should not have.
-> 
->>
->> Otherwise, without boost-mode support we have to parse the boost mode
->> table to figure out which points to avoid. Or if someone typos a value
-> That is OS usage of h/w description - yeah - in anycase, if OS has no
-> ability to deal with boost-frequencies, it should skip it for sure.
-> 
->> in either table we might go into a boost mode when we didn't want to!
->>
-> There are other ways to screw up device with dts typo. you could give
-> a wrong voltage(extra 0?) and ensure you never use the chip ever
-> again.. typos are dt bugs, we can do the best to write robust code to
-> report them.
-> 
+Up to 7 bytes are wasted at the end of struct platform_object
+in the form of padding after name field: unfortunately this
+padding is not used when allocating the memory to hold the
+name.
 
-Typos are not the primary thing to worry about here. Adding boost
-frequencies to the list of primary operating points is flawed, because
-an OS that has no idea of boost mode will use them as normal operating
-points and this is not desired.
+This patch converts name array from name[1] to C99 flexible
+array name[] (equivalent to name[0]) so that no padding is
+required by the presence of this field. Memory allocation
+is updated to take care of allocating an additional byte for
+the NUL terminating character.
 
-Best regards,
-Tomasz
+Built on Fedora 20, using GCC 4.8, for ARM, i386, SPARC64 and
+x86_64 architectures, the data structure layout can be reported
+with following command:
+
+  $ pahole drivers/base/platform.o \
+           --recursive             \
+           --class_name device,pdev_archdata,platform_device,platform_object
+
+Please find below some comparisons of structure layout for arm,
+i386, sparc64 and x86_64 architecture before and after the patch.
+
+  --- obj-arm/drivers/base/platform.o.pahole.v3.15-rc7-79-gfe45736f4134	2014-05-30 10:32:06.290960701 +0200
+  +++ obj-arm/drivers/base/platform.o.pahole.v3.15-rc7-80-g2cdb06858d71	2014-05-30 11:26:20.851988347 +0200
+  @@ -81,10 +81,9 @@
+     /* XXX last struct has 4 bytes of padding */
+
+  	/* --- cacheline 6 boundary (384 bytes) was 8 bytes ago --- */
+  -	char                       name[1];              /*   392     1 */
+  +	char                       name[0];              /*   392     0 */
+
+  -	/* size: 400, cachelines: 7, members: 2 */
+  -	/* padding: 7 */
+  +	/* size: 392, cachelines: 7, members: 2 */
+   	/* paddings: 1, sum paddings: 4 */
+  -	/* last cacheline: 16 bytes */
+  +	/* last cacheline: 8 bytes */
+   };
+
+  --- obj-i386/drivers/base/platform.o.pahole.v3.15-rc7-79-gfe45736f4134 2014-05-30 10:32:06.305960691 +0200
+  +++ obj-i386/drivers/base/platform.o.pahole.v3.15-rc7-80-g2cdb06858d71 2014-05-30 11:26:20.875988332 +0200
+  @@ -73,9 +73,8 @@
+   struct platform_object {
+   	struct platform_device     pdev;                 /*     0   396 */
+   	/* --- cacheline 6 boundary (384 bytes) was 12 bytes ago --- */
+  -	char                       name[1];              /*   396     1 */
+  +	char                       name[0];              /*   396     0 */
+
+  -	/* size: 400, cachelines: 7, members: 2 */
+  -	/* padding: 3 */
+  -	/* last cacheline: 16 bytes */
+  +	/* size: 396, cachelines: 7, members: 2 */
+  +	/* last cacheline: 12 bytes */
+   };
+
+  --- obj-sparc64/drivers/base/platform.o.pahole.v3.15-rc7-79-gfe45736f4134 2014-05-30 10:32:06.406960625 +0200
+  +++ obj-sparc64/drivers/base/platform.o.pahole.v3.15-rc7-80-g2cdb06858d71 2014-05-30 11:26:20.971988269 +0200
+  @@ -94,9 +94,8 @@
+   struct platform_object {
+   	struct platform_device     pdev;                 /*     0  2208 */
+   	/* --- cacheline 34 boundary (2176 bytes) was 32 bytes ago --- */
+  -	char                       name[1];              /*  2208     1 */
+  +	char                       name[0];              /*  2208     0 */
+
+  -	/* size: 2216, cachelines: 35, members: 2 */
+  -	/* padding: 7 */
+  -	/* last cacheline: 40 bytes */
+  +	/* size: 2208, cachelines: 35, members: 2 */
+  +	/* last cacheline: 32 bytes */
+   };
+
+  --- obj-x86_64/drivers/base/platform.o.pahole.v3.15-rc7-79-gfe45736f4134 2014-05-30 10:32:06.432960608 +0200
+  +++ obj-x86_64/drivers/base/platform.o.pahole.v3.15-rc7-80-g2cdb06858d71 2014-05-30 11:26:21.000988250 +0200
+  @@ -84,9 +84,8 @@
+   struct platform_object {
+   	struct platform_device     pdev;                 /*     0   720 */
+   	/* --- cacheline 11 boundary (704 bytes) was 16 bytes ago --- */
+  -	char                       name[1];              /*   720     1 */
+  +	char                       name[0];              /*   720     0 */
+
+  -	/* size: 728, cachelines: 12, members: 2 */
+  -	/* padding: 7 */
+  -	/* last cacheline: 24 bytes */
+  +	/* size: 720, cachelines: 12, members: 2 */
+  +	/* last cacheline: 16 bytes */
+   };
+
+Changes from v5 [1]:
+- dropped dma_mask allocation changes and only kept padding
+  removal changes (name array length set to 0).
+
+Changes from v4 [2]:
+[by Emil Goode <emilgoode@gmail.com>:]
+- Split v4 of the patch into two separate patches.
+- Generated new object file size and data structure layout info.
+- Updated the changelog message.
+
+Changes from v3 [3]:
+- fixed commit message so that git am doesn't fail.
+
+Changes from v2 [4]:
+- move 'dma_mask' to platform_object so that it's always
+  allocated and won't leak on release; remove all previously
+  added support functions.
+- use C99 flexible array member for 'name' to remove padding
+  at the end of platform_object.
+
+Changes from v1 [5]:
+- remove unneeded kfree() from error path
+- add reference to author/commit adding allocation of dmamask
+
+Changes from v0 [6]:
+- small rewrite to squeeze the patch to a bare minimal
+
+[1] http://lkml.kernel.org/r/1401122483-31603-2-git-send-email-emilgoode at gmail.com
+    http://lkml.kernel.org/r/1401122483-31603-1-git-send-email-emilgoode at gmail.com
+    http://lkml.kernel.org/r/1401122483-31603-3-git-send-email-emilgoode at gmail.com
+
+[2] http://lkml.kernel.org/r/1390817152-30898-1-git-send-email-ydroneaud at opteya.com
+    https://patchwork.kernel.org/patch/3541871/
+
+[3] http://lkml.kernel.org/r/1390771138-28348-1-git-send-email-ydroneaud at opteya.com
+    https://patchwork.kernel.org/patch/3540081/
+
+[4] http://lkml.kernel.org/r/1389683909-17495-1-git-send-email-ydroneaud at opteya.com
+    https://patchwork.kernel.org/patch/3484411/
+
+[5] http://lkml.kernel.org/r/1389649085-7365-1-git-send-email-ydroneaud at opteya.com
+    https://patchwork.kernel.org/patch/3480961/
+
+[6] http://lkml.kernel.org/r/1386886207-2735-1-git-send-email-ydroneaud at opteya.com
+
+Cc: Emil Goode <emilgoode@gmail.com>
+Cc: Dan Carpenter <dan.carpenter@oracle.com>
+Cc: Shawn Guo <shawn.guo@freescale.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Yann Droneaud <ydroneaud@opteya.com>
+---
+ drivers/base/platform.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+index 5b47210889e0..b126c9363f53 100644
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -162,7 +162,7 @@ EXPORT_SYMBOL_GPL(platform_add_devices);
+ 
+ struct platform_object {
+ 	struct platform_device pdev;
+-	char name[1];
++	char name[];
+ };
+ 
+ /**
+@@ -203,7 +203,7 @@ struct platform_device *platform_device_alloc(const char *name, int id)
+ {
+ 	struct platform_object *pa;
+ 
+-	pa = kzalloc(sizeof(struct platform_object) + strlen(name), GFP_KERNEL);
++	pa = kzalloc(sizeof(*pa) + strlen(name) + 1, GFP_KERNEL);
+ 	if (pa) {
+ 		strcpy(pa->name, name);
+ 		pa->pdev.name = pa->name;
+-- 
+1.9.3
