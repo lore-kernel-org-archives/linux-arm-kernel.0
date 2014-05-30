@@ -1,55 +1,37 @@
 From: nikolay.borisov@arm.com (Nikolay Borisov)
-Date: Fri, 30 May 2014 17:59:44 +0100
-Subject: [PATCH v2 0/7] Fix backtrace support in THUMB2 mode
-Message-ID: <1401469191-29232-1-git-send-email-nikolay.borisov@arm.com>
+Date: Fri, 30 May 2014 17:59:47 +0100
+Subject: [PATCH v3 3/7] ARM: perf: Make perf use arm_get_current_stackframe
+In-Reply-To: <1401469191-29232-1-git-send-email-nikolay.borisov@arm.com>
+References: <1401469191-29232-1-git-send-email-nikolay.borisov@arm.com>
+Message-ID: <1401469191-29232-4-git-send-email-nikolay.borisov@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nikolay Borisov <Nikolay.Borisov@arm.com>
 
-Currently all the code which deals with backtrace support assumes that R11
-is the frame-pointer. While this is the case for ARM mode and is explicitly
-documented in the AAPCS, this is not the case for THUMB2 mode.
+Make the perf backend use the API so that it correctly references the FP
+when in THUMB2 mode
 
-There is no official document requiring that R11 has to be the frame pointer
-and GCC uses R7 as FP and given that R7's usage is so intertwined within GCC's
-mechanics it is unlikely to change, so fixing backtrace in THUMB2 mode seems
-in order.
+Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
+---
+ arch/arm/kernel/perf_event.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-This patch series rectifies the problem by first fixing the
-thread_save_fp macro to reference the correct register. Furthermore, there
-a lot of repetetive sequences of code such as :
-
-stackframe.fp = pt_regs->ARM_fp
-stackframe.lr = pt_regs->ARM_lr
-
-so introducing a function arm_get_current_stack_frame which both
-hides this repetition and also utilizes teh frame_pointer(regs) macro
-to reference the correct register depending on the mode.
-
-Finally, change all the call sites so that they utilize the new routine.
-
-Changes since v1:
- * Nothing major, just made arg_get_current_stack frame an inline routine.
-
-Nikolay Borisov (7):
-  ARM: Make thread_save_fp macro aware of THUMB2 mode
-  ARM: Introduce arm_get_current_stack_frame()
-  ARM: perf: Make perf use arm_get_current_stackframe
-  ARM: time: Make use of arm_get_current_stackframe
-  ARM: unwind: Use arm_get_current_stackframe
-  ARM: traps: Make use of the frame_pointer macro
-  ARM: oprofile: Use of arm_get_current_stackframe
-
- arch/arm/include/asm/ptrace.h      |  6 ++++++
- arch/arm/include/asm/stacktrace.h  | 12 ++++++++++++
- arch/arm/include/asm/thread_info.h |  6 ++++++
- arch/arm/kernel/perf_event.c       |  5 +----
- arch/arm/kernel/time.c             |  5 +----
- arch/arm/kernel/traps.c            |  6 ++++--
- arch/arm/kernel/unwind.c           |  8 +++-----
- arch/arm/oprofile/common.c         |  5 +----
- 8 files changed, 34 insertions(+), 19 deletions(-)
-
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index a6bc431..55353fd 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -621,10 +621,7 @@ perf_callchain_kernel(struct perf_callchain_entry *entry, struct pt_regs *regs)
+ 		return;
+ 	}
+ 
+-	fr.fp = regs->ARM_fp;
+-	fr.sp = regs->ARM_sp;
+-	fr.lr = regs->ARM_lr;
+-	fr.pc = regs->ARM_pc;
++	arm_get_current_stackframe(regs, &fr);
+ 	walk_stackframe(&fr, callchain_trace, entry);
+ }
+ 
 -- 
 1.8.1.5
