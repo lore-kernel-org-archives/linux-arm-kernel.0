@@ -1,28 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 30 May 2014 19:20:37 +0100
-Subject: [PATCH v6 1/2] arm64: adjust el0_sync so that a function can be
- called
-In-Reply-To: <1401399904-24471-2-git-send-email-larry.bassel@linaro.org>
-References: <1401399904-24471-1-git-send-email-larry.bassel@linaro.org>
- <1401399904-24471-2-git-send-email-larry.bassel@linaro.org>
-Message-ID: <20140530182037.GH22895@arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 31 May 2014 03:21:17 +0900
+Subject: [PATCH] arm: exynos: Enable mcpm for dual-cluster 5800 SoC
+In-Reply-To: <1401083676-25660-1-git-send-email-a.kesavan@samsung.com>
+References: <1401083676-25660-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <5388CC1D.8060301@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 29, 2014 at 10:45:03PM +0100, Larry Bassel wrote:
-> To implement the context tracker properly on arm64,
-> a function call needs to be made after debugging and
-> interrupts are turned on, but before the lr is changed
-> to point to ret_to_user(). If the function call
-> is made after the lr is changed the function will not
-> return to the correct place.
-> 
-> For similar reasons, defer the setting of x0 so that
-> it doesn't need to be saved around the function call
-> (save far_el1 in x26 temporarily instead).
+On 05/26/14 14:54, Abhilash Kesavan wrote:
+> 5800 is very similar to 5420. We can re-use the existing
+> MCPM support for 5800 for secondary boot-up and switching.
+>
+> Signed-off-by: Abhilash Kesavan<a.kesavan@samsung.com>
+> ---
+>   arch/arm/mach-exynos/mcpm-exynos.c |    8 +++++++-
+>   1 file changed, 7 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+> index 1ac618c..20707bd 100644
+> --- a/arch/arm/mach-exynos/mcpm-exynos.c
+> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+> @@ -290,13 +290,19 @@ static void __naked exynos_pm_power_up_setup(unsigned int affinity_level)
+>   	"b	cci_enable_port_for_self");
+>   }
+>
+> +static const struct of_device_id exynos_dt_mcpm_match[] = {
+> +	{ .compatible = "samsung,exynos5420" },
+> +	{ .compatible = "samsung,exynos5800" },
+> +	{},
+> +};
+> +
+>   static int __init exynos_mcpm_init(void)
+>   {
+>   	struct device_node *node;
+>   	void __iomem *ns_sram_base_addr;
+>   	int ret;
+>
+> -	node = of_find_compatible_node(NULL, NULL, "samsung,exynos5420");
+> +	node = of_find_matching_node(NULL, exynos_dt_mcpm_match);
+>   	if (!node)
+>   		return -ENODEV;
+>   	of_node_put(node);
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+Applied, thanks.
 
-Thanks guys!
-
-Will
+- Kukjin
