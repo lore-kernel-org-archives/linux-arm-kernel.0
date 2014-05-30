@@ -1,177 +1,114 @@
-From: mohun106@gmail.com (Radha Mohan)
-Date: Fri, 30 May 2014 16:06:57 -0700
-Subject: [PATCH v4 00/20] arm64: GICv3 support
-In-Reply-To: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
-References: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAC8NTUWuuUrHKp4a1WkqSfiPNZjbwffBn-u7DGsrB8eF65e_ig@mail.gmail.com>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Sat, 31 May 2014 00:11:23 +0100
+Subject: [PATCH] of: treat PCI config space as IORESOURCE_MEM type
+In-Reply-To: <F22EE9D6-8F58-4AF0-9684-71B7A3BFF868@codeaurora.org>
+References: <1401379426-9701-1-git-send-email-galak@codeaurora.org>
+ <CAL_JsqLPFDwtd-QYDqCwx1JVj1Aa8=nof-e0P6R9CZra+fXHfw@mail.gmail.com>
+ <47B1E3D0-4336-4529-80B0-172F4ACA5C97@codeaurora.org>
+ <20140530005602.GE1677@bart.dudau.co.uk>
+ <CAErSpo7qEhJyUAu58R8g6+AEhRGo_+Vv0EMgkK+3ZQOU9+jmhg@mail.gmail.com>
+ <20140530014116.GF1677@bart.dudau.co.uk>
+ <F22EE9D6-8F58-4AF0-9684-71B7A3BFF868@codeaurora.org>
+Message-ID: <20140530230830.GG1677@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-The patch set is working for us on our platform. Below are some of the
-things we tested with the GICv3 driver.
+On Fri, May 30, 2014 at 03:45:05PM -0500, Kumar Gala wrote:
+> 
+> On May 29, 2014, at 8:41 PM, Liviu Dudau <liviu@dudau.co.uk> wrote:
+> 
+> > On Thu, May 29, 2014 at 07:29:31PM -0600, Bjorn Helgaas wrote:
+> >> On Thu, May 29, 2014 at 6:56 PM, Liviu Dudau <liviu@dudau.co.uk> wrote:
+> >>> On Thu, May 29, 2014 at 03:51:28PM -0500, Kumar Gala wrote:
+> >>>> 
+> >>>> On May 29, 2014, at 3:44 PM, Rob Herring <robherring2@gmail.com> wrote:
+> >>>> 
+> >>>>> On Thu, May 29, 2014 at 11:03 AM, Kumar Gala <galak@codeaurora.org> wrote:
+> >>>>>> If we have a PCI config space specified in something like a ranges
+> >>>>>> property we should treat it as memory type resource.
+> >>>>> 
+> >>>>> Config space should not be in ranges[1]. We have some cases that are,
+> >>>>> but we don't want new ones.
+> >>>> 
+> >>>> For the cases we have I agree, however an ECAM based cfg seems completely legit.
+> >>>> 
+> >>>>>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> >>>>>> ---
+> >>>>>> drivers/of/address.c | 3 +++
+> >>>>>> 1 file changed, 3 insertions(+)
+> >>>>>> 
+> >>>>>> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> >>>>>> index cb4242a..4e7ee59 100644
+> >>>>>> --- a/drivers/of/address.c
+> >>>>>> +++ b/drivers/of/address.c
+> >>>>>> @@ -122,6 +122,9 @@ static unsigned int of_bus_pci_get_flags(const __be32 *addr)
+> >>>>>>       u32 w = be32_to_cpup(addr);
+> >>>>>> 
+> >>>>>>       switch((w >> 24) & 0x03) {
+> >>>>>> +       case 0x00: /* cfg space */
+> >>>>>> +               flags |= IORESOURCE_MEM;
+> >>>>>> +               break;
+> >>>>> 
+> >>>>> How would you then distinguish actual memory ranges?
+> >>>> 
+> >>>> One assumes you are still looking at pci_space as part of of_pci_range
+> >>> 
+> >>> That doesn't happen when you start scanning the bus. The existing code will
+> >>> use the IORESOURCE_MEM for allocating memory space for devices, which is
+> >>> not what you want. Did you test your patch on any PCI system? I'm pretty
+> >>> sure that with my patch series that tries to make a generic framework for
+> >>> host controllers this will fail.
+> >>> 
+> >>> We really need a IORESOURCE_CFG flag for this space.
+> >> 
+> >> Maybe, but I'm not convinced yet.  The existing IORESOURCE_TYPE_BITS
+> >> types are for things that are mutually exclusive address spaces.  I
+> >> think this discussion is about ECAM, where the CPU side is definitely
+> >> in the same address space (IORESOURCE_MEM) as RAM, APICs, host bridge
+> >> apertures, device MMIO, etc.  The ECAM area must appear in the
+> >> iomem_resource tree so we avoid it when allocating other areas.
+> > 
+> > Agree, I'm only concerned that if this ECAM config space gets added to
+> > the list of pci_host_bridge windows it will be indistinguishable from
+> > IORESOURCE_MEM resources and pci_create_root_bus() will add it to the
+> > bus and allow devices present on that bus to be assigned addresses from
+> > that range. Which might not be what one wants for certain BARs.
+> > 
+> > I've had an aborted attempt to parse ECAM ranges in one version of my
+> > series (granted, I was trying to hack the IORESOURCE_TYPE_BITS as well)
+> > and things got horribly wrong quickly. I could give this patch a go with
+> > my series tomorrow when I'm in the office and report back.
+> 
+> We need to fix the parsing code to be smarter about this case.
 
-System: Cavium's proprietary simulator
-Cores: 16
-GIC version: GICv3
+Wow, what a sweeping statement! Did you not understand that the issue is not
+the parsing code but the way the rest of the core code uses an IORESOURCE_MEM
+once you have parsed it into a resource structure and added it to the list
+of pci_host_bridge_windows?
 
-1) SGI, PPI and SPI
-2) MSI and MSI-x with SPI and also LPI (took previous version of an
-unposted LPI/ITS driver which now is missing from Marc's git tree)
+Best regards,
+Liviu
 
-The kind of devices that were tested are UARTs, AHCI controller,
-SR-IOV capable devices.
-
-So,
-Acked-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-Tested-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-
-regards,
-Radha Mohan
-Cavium Inc.
-
-On Thu, May 15, 2014 at 10:58 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> GICv3 is the base for a new generation of interrupt controllers
-> designed to overcome some of the most glaring limitations of GICv2.
->
-> Some of the features are:
-> - Support for more than 8 CPUs (a lot more...)
-> - System registers for CPU interface access (instead of the memory
->   mapped GICC, GICV, GICH)
-> - Message based interrupts
->
-> This patch series currently support:
-> - Affinity Routing
-> - System Registers
-> - Non-Secure Group-1 interrupts only
-> - KVM support (GICv3 host, GICv2 guest)
->
-> What is *not yet* supported in this series (WIP):
-> - LPI/ITS/MSI
-> - KVM GICv3 guest support
-> - Any form of power management
-> - 32bit systems
->
-> To be built, this code requires a fairly recent compiler/binutils
-> combo. Linaro 13.06 seems to do the trick. This has been tested on the
-> ARM FVP and Foundation models, with non-regressions run on a VExpress
-> TC-2 and another Cortex-A57 based platform.
->
-> So far, the level of reviewing has been embarassingly low (my sincere
-> thanks to Christoffer and Will for being the only ones to review
-> it). While the documentation is unfortunately not public yet, it is
-> available to those actively implementing GICv3 in their hardware, and
-> I'm really eager to see reviews and test reports.
->
-> Without that kind of engagement, it is unlikely that this code will
-> get merged any time soon.
->
-> Individuals without access to documentation and/or hardware can still
-> review the code (it shares a lot of concepts with GICv2) and test in
-> on the freely available Foundation model (see
-> http://releases.linaro.org/latest/openembedded/aarch64/ for details on
-> how to use the Foundation model).
->
-> The code is also available at the following location (warning,
-> unstable branch!):
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv3
->
-> * From v3 [3]
->   - Fixed a lot of issues found by Christoffer (too many to report
->     here, see the email thread)
->   - New .sync_lr_elrsr backend
->   - New probing method
->   - New irqchip_in_kernel implementation
->   - Checked full bisectability of the series (hopefully got it right
->     this time...)
->   - rebased on top of 3.15-rc5
->
-> * From v2 [2]
->   - removed sharing of the xlate method with GICv2 (TI crossbar is now
->     getting in the way...)
->   - Switched to a tree domain to accomodate for the LPI space
->   - Fixed more bisectability
->
-> * From the initial revision [1]
->   - Some code sharing with GICv2
->   - Barrier cleanup/clarification
->   - Revised boot protocol update
->   - Consistent use of the MPIDR access macros
->   - Fixed a number of embarassing bugs
->   - Fixed DT examples
->   - Fixed bisectability of the series
->
-> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/229959.html
-> [2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241972.html
-> [3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/248008.html
->
-> Marc Zyngier (20):
->   ARM: GIC: move some bits of GICv2 to a library-type file
->   arm64: initial support for GICv3
->   arm64: GICv3 device tree binding documentation
->   arm64: boot protocol documentation update for GICv3
->   KVM: arm/arm64: vgic: move GICv2 registers to their own structure
->   KVM: ARM: vgic: introduce vgic_ops and LR manipulation primitives
->   KVM: ARM: vgic: abstract access to the ELRSR bitmap
->   KVM: ARM: vgic: abstract EISR bitmap access
->   KVM: ARM: vgic: abstract MISR decoding
->   KVM: ARM: vgic: move underflow handling to vgic_ops
->   KVM: ARM: vgic: abstract VMCR access
->   KVM: ARM: vgic: introduce vgic_enable
->   KVM: ARM: introduce vgic_params structure
->   KVM: ARM: vgic: split GICv2 backend from the main vgic code
->   KVM: ARM: vgic: revisit implementation of irqchip_in_kernel
->   arm64: KVM: remove __kvm_hyp_code_{start,end} from hyp.S
->   arm64: KVM: split GICv2 world switch from hyp code
->   arm64: KVM: move HCR_EL2.{IMO,FMO} manipulation into the vgic switch
->     code
->   KVM: ARM: vgic: add the GICv3 backend
->   arm64: KVM: vgic: add GICv3 world switch
->
->  Documentation/arm64/booting.txt                  |   6 +
->  Documentation/devicetree/bindings/arm/gic-v3.txt |  79 +++
->  arch/arm/include/asm/kvm_host.h                  |   5 +
->  arch/arm/kernel/asm-offsets.c                    |  14 +-
->  arch/arm/kvm/Makefile                            |   1 +
->  arch/arm/kvm/interrupts_head.S                   |  26 +-
->  arch/arm64/Kconfig                               |   1 +
->  arch/arm64/include/asm/kvm_arm.h                 |   5 +-
->  arch/arm64/include/asm/kvm_asm.h                 |  14 +-
->  arch/arm64/include/asm/kvm_host.h                |  28 +
->  arch/arm64/include/asm/virt.h                    |   4 +
->  arch/arm64/kernel/asm-offsets.c                  |  25 +-
->  arch/arm64/kernel/head.S                         |  18 +
->  arch/arm64/kernel/hyp-stub.S                     |   1 +
->  arch/arm64/kvm/Makefile                          |   4 +
->  arch/arm64/kvm/hyp.S                             | 127 +----
->  arch/arm64/kvm/vgic-v2-switch.S                  | 133 +++++
->  arch/arm64/kvm/vgic-v3-switch.S                  | 271 +++++++++
->  drivers/irqchip/Kconfig                          |   5 +
->  drivers/irqchip/Makefile                         |   3 +-
->  drivers/irqchip/irq-gic-common.c                 | 115 ++++
->  drivers/irqchip/irq-gic-common.h                 |  29 +
->  drivers/irqchip/irq-gic-v3.c                     | 684 +++++++++++++++++++++++
->  drivers/irqchip/irq-gic.c                        |  59 +-
->  include/kvm/arm_vgic.h                           | 115 +++-
->  include/linux/irqchip/arm-gic-v3.h               | 190 +++++++
->  virt/kvm/arm/vgic-v2.c                           | 236 ++++++++
->  virt/kvm/arm/vgic-v3.c                           | 225 ++++++++
->  virt/kvm/arm/vgic.c                              | 345 ++++++------
->  29 files changed, 2415 insertions(+), 353 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/gic-v3.txt
->  create mode 100644 arch/arm64/kvm/vgic-v2-switch.S
->  create mode 100644 arch/arm64/kvm/vgic-v3-switch.S
->  create mode 100644 drivers/irqchip/irq-gic-common.c
->  create mode 100644 drivers/irqchip/irq-gic-common.h
->  create mode 100644 drivers/irqchip/irq-gic-v3.c
->  create mode 100644 include/linux/irqchip/arm-gic-v3.h
->  create mode 100644 virt/kvm/arm/vgic-v2.c
->  create mode 100644 virt/kvm/arm/vgic-v3.c
->
+> 
+> - k
+> -- 
+> Employee of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> 
 > --
-> 1.8.3.4
->
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+-- 
+-------------------
+   .oooO
+   (   )
+    \ (  Oooo.
+     \_) (   )
+          ) /
+         (_/
+
+ One small step
+   for me ...
