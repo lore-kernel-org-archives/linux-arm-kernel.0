@@ -1,51 +1,34 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 30 May 2014 10:45:07 +0900
-Subject: [GIT PULL 3rd 2/3] Samsung Exynos SoC updates for 3.16
-In-Reply-To: <20140529194002.GG18481@quad.lixom.net>
-References: <035701cf7897$6fb5e460$4f21ad20$@samsung.com>
- <20140529194002.GG18481@quad.lixom.net>
-Message-ID: <060a01cf7ba8$c9614130$5c23c390$@samsung.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 29 May 2014 20:54:27 -0500
+Subject: [PATCH] net: ks8851: Don't use regulator_get_optional()
+In-Reply-To: <1401307872-23190-1-git-send-email-sboyd@codeaurora.org>
+References: <1401307872-23190-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CAGo_u6oH_LbZwjXoMziqZp5Wg3KfEcXE5Wg0Kcmqei1EPGivfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
-> 
-> On Mon, May 26, 2014 at 01:03:22PM +0900, Kukjin Kim wrote:
-> > The following changes since commit be1f7c8d7e2bc8b8c76846aa6f276e8d2ef8975a:
-> >
-> >   cpufreq: exynos: Fix the compile error (2014-05-26 04:05:01 +0900)
-> >
-> > are available in the git repository at:
-> >
-> >   http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > tags/exynos-soc
-> >
-> > for you to fetch changes up to 455ae9aba2f05e77eaf1073b78e887b06f93a4fd:
-> >
-> >   ARM: dts: Add device tree sources for exynos3250 (2014-05-26 05:32:02
-> > +0900)
-> >
-> > ----------------------------------------------------------------
-> > Exynos new SoCs support for v3.16
-> >
-> > - add support for exynos5260 SoC and exynos5260-xyref5260 board
-> > - add support for exynos5800 SoC and exynos5800-peach-pi board
-> > - add support for exynos3250 SoC
-> >
-> > Note that this branch is on top of tags/samsung-cleanup.
-> 
-> This branch mixes contents from what should be two branches: One quite short
-> one that just contains the code/Kconfig changes for the new SoCs. And the rest
-> (DTS/DTSI additions) should go in a DT branch.
-> 
-Oh, OK. I will re-sort them out.
+On Wed, May 28, 2014 at 3:11 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> We shouldn't be using regulator_get_optional() here. These
+> regulators are always present as part of the physical design and
+> there isn't any way to use an internal regulator or change the
+> source of the reference voltage via software. Given that the only
+> users of this driver in the kernel are DT based, this change
+> should be transparent to them even if they don't specify any
+> supplies because the regulator framework will insert dummy
+> supplies as needed.
+>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Mark Brown <broonie@kernel.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
 
-> Please respin as two separate branches. This will include respinning the
-> multiplatform branches too, etc, unfortunately. Please post fresh pull requests
-> for any respun/rebased branch.
-> 
-OK. I will do it tonight in my time.
+Reviewed-and-Tested-by: Nishanth Menon <nm@ti.com>
 
-Thanks for your pulling others ;-)
+SDP2430: with next-20140529:
+before patch: https://github.com/nmenon/kernel-test-logs/blob/next-20140529/omap2plus_defconfig/sdp2430.txt
 
-- Kukjin
+After patch: http://slexy.org/raw/s21sryFhAx
+Looks good.
+---
+Regards,
+Nishanth Menon
