@@ -1,64 +1,70 @@
 From: elder@linaro.org (Alex Elder)
-Date: Fri, 30 May 2014 15:53:01 -0500
-Subject: [PATCH v4 0/7] clk: bcm: prerequisite and bus clock support
-Message-ID: <1401483188-5395-1-git-send-email-elder@linaro.org>
+Date: Fri, 30 May 2014 15:53:02 -0500
+Subject: [PATCH v4 1/7] clk: kona: allow nested ccu_write_enable() requests
+In-Reply-To: <1401483188-5395-1-git-send-email-elder@linaro.org>
+References: <1401483188-5395-1-git-send-email-elder@linaro.org>
+Message-ID: <1401483188-5395-2-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently only peripheral clocks are supported for Broadcom platforms
-that use Kona style CCUs for clocking.  This series adds support for
-bus clocks as well.
+Use a counter rather than a Boolean to track whether write access to
+a CCU has been enabled or not.  This will allow more than one of
+these requests to be nested.
 
-One motivation for doing this is that there exist peripheral clocks
-that cannot be configured without having first enabled a related bus
-clock.  Adding bus clock support allows such peripheral clocks to be
-usable.
+Note that __ccu_write_enable() and __ccu_write_disable() calls all
+come in pairs, and they are always surrounded immediately by calls
+to ccu_lock() and ccu_unlock().
 
-This also imposes a new requirement, however--that the bus clock be
-enabled *before* operating on the clock that depends on it.  For
-this, we define the notion of a "prerequisite" clock.  If a clock
-has a prerequisite specified, that prequisite clock will be prepared
-and enabled at the beginning  of the dependent clock's ->prepare
-method.  The prerequisite clock is similarly disabled and unprepared
-at the end of the dependent clock's ->unprepare method.
+Signed-off-by: Alex Elder <elder@linaro.org>
+---
+ drivers/clk/bcm/clk-kona.c | 14 ++++----------
+ drivers/clk/bcm/clk-kona.h |  2 +-
+ 2 files changed, 5 insertions(+), 11 deletions(-)
 
-These patches are based on Mike Turquette's current "clk-next"
-branch.
-    9ec2749 clk: qcom: Return error pointers for unimplemented clocks
-
-They are available here:
-    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
-    Branch review/bcm-bus-clk-v4
-
-					-Alex
-
-Version history:
-v4  - Remove boot-time initialization of clocks, opting instead to
-      do this work when needed, via clock ->prepare method.
-    - Prerequisite clocks are now prepared and enabled as
-      in a dependent clock's ->prepare method.
-    - Use __clk_lookup() to get the prerequisite clock pointer.
-    - ccu_write_enable() calls can now be nested
-v3: - Deleted clk_lookup field from struct kona_clk.
-    - Now use term "initialized" rather than "enabled".
-v2: - Added field "p" to the previously unnamed prereq union.
-
-Alex Elder (7):
-  clk: kona: allow nested ccu_write_enable() requests
-  clk: kona: move some code
-  clk: kona: don't init clocks at startup time
-  clk: bcm281xx: implement prerequisite clocks
-  clk: bcm281xx: add bus clock support
-  clk: bcm281xx: define a bus clock
-  ARM: dts: add bus clock bsc3_apb for bcm281xx
-
- arch/arm/boot/dts/bcm11351.dtsi      |   3 +-
- drivers/clk/bcm/clk-bcm281xx.c       |  13 +-
- drivers/clk/bcm/clk-kona-setup.c     | 123 ++++++++++++-
- drivers/clk/bcm/clk-kona.c           | 325 ++++++++++++++++++++++++-----------
- drivers/clk/bcm/clk-kona.h           |  31 +++-
- include/dt-bindings/clock/bcm281xx.h |   3 +-
- 6 files changed, 387 insertions(+), 111 deletions(-)
-
+diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
+index 95af2e6..ee8e988 100644
+--- a/drivers/clk/bcm/clk-kona.c
++++ b/drivers/clk/bcm/clk-kona.c
+@@ -170,13 +170,8 @@ static inline void ccu_unlock(struct ccu_data *ccu, unsigned long flags)
+  */
+ static inline void __ccu_write_enable(struct ccu_data *ccu)
+ {
+-	if (ccu->write_enabled) {
+-		pr_err("%s: access already enabled for %s\n", __func__,
+-			ccu->name);
+-		return;
+-	}
+-	ccu->write_enabled = true;
+-	__ccu_write(ccu, 0, CCU_ACCESS_PASSWORD | 1);
++	if (!ccu->write_enabled++)
++		__ccu_write(ccu, 0, CCU_ACCESS_PASSWORD | 1);
+ }
+ 
+ static inline void __ccu_write_disable(struct ccu_data *ccu)
+@@ -186,9 +181,8 @@ static inline void __ccu_write_disable(struct ccu_data *ccu)
+ 			ccu->name);
+ 		return;
+ 	}
+-
+-	__ccu_write(ccu, 0, CCU_ACCESS_PASSWORD);
+-	ccu->write_enabled = false;
++	if (!--ccu->write_enabled)
++		__ccu_write(ccu, 0, CCU_ACCESS_PASSWORD);
+ }
+ 
+ /*
+diff --git a/drivers/clk/bcm/clk-kona.h b/drivers/clk/bcm/clk-kona.h
+index 2537b30..e9a8466 100644
+--- a/drivers/clk/bcm/clk-kona.h
++++ b/drivers/clk/bcm/clk-kona.h
+@@ -478,7 +478,7 @@ struct ccu_policy {
+ struct ccu_data {
+ 	void __iomem *base;	/* base of mapped address space */
+ 	spinlock_t lock;	/* serialization lock */
+-	bool write_enabled;	/* write access is currently enabled */
++	u32 write_enabled;	/* write access enable count */
+ 	struct ccu_policy policy;
+ 	struct list_head links;	/* for ccu_list */
+ 	struct device_node *node;
 -- 
 1.9.1
