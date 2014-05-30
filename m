@@ -1,109 +1,107 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 30 May 2014 19:55:49 +0100
-Subject: [PATCH v6 2/2] Documentation: devicetree: Add boost-frequency
- binding to list boost mode frequency
-In-Reply-To: <CAJuA9ajs6K1PVtXC4_U0vQsA0oPnpaF_PdMfiQJxBFStF3Z2aw@mail.gmail.com>
-References: <1401440477-4328-1-git-send-email-thomas.ab@samsung.com>
- <1401440477-4328-3-git-send-email-thomas.ab@samsung.com>
- <20140530130827.GK24233@leverpostej>
- <CAJuA9ajs6K1PVtXC4_U0vQsA0oPnpaF_PdMfiQJxBFStF3Z2aw@mail.gmail.com>
-Message-ID: <20140530185549.GN24233@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 30 May 2014 21:01:19 +0200
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140530112226.GA3949@e103592.cambridge.arm.com>
+References: <1400877395-4235-1-git-send-email-thierry.reding@gmail.com>
+ <20140530112226.GA3949@e103592.cambridge.arm.com>
+Message-ID: <4830064.JvgTAs8Xty@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 30, 2014 at 07:05:43PM +0100, Thomas Abraham wrote:
-> Hi Mark,
+On Friday 30 May 2014 12:22:32 Dave Martin wrote:
+> > +
+> > +Examples:
+> > +=========
+> > +
+> > +Single-master IOMMU:
+> > +--------------------
+> > +
+> > +	iommu {
+> > +		#address-cells = <0>;
+> > +		#size-cells = <0>;
+> > +	};
+> > +
+> > +	master {
+> > +		iommus = <&/iommu>;
+> > +	};
+> > +
+> > +Multiple-master IOMMU with fixed associations:
+> > +----------------------------------------------
+> > +
+> > +	/* multiple-master IOMMU */
+> > +	iommu {
+> > +		/*
+> > +		 * Masters are statically associated with this IOMMU and
+> > +		 * address translation is always enabled.
+> > +		 */
+> > +		#address-cells = <0>;
+> > +		#size-cells = <0>;
 > 
-> On Fri, May 30, 2014 at 6:38 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Hi,
-> >
-> > Apologies for being somewhat late w.r.t. review on this.
-> >
-> > On Fri, May 30, 2014 at 10:01:17AM +0100, Thomas Abraham wrote:
-> >> From: Thomas Abraham <thomas.ab@samsung.com>
-> >>
-> >> Add a new optional boost-frequency binding for specifying the frequencies
-> >> usable in boost mode.
-> >>
-> >> Cc: Rob Herring <robh+dt@kernel.org>
-> >> Cc: Pawel Moll <pawel.moll@arm.com>
-> >> Cc: Mark Rutland <mark.rutland@arm.com>
-> >> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> >> Cc: Kumar Gala <galak@codeaurora.org>
-> >> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> >> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> >> Acked-by: Nishanth Menon <nm@ti.com>
-> >> Acked-by: Lukasz Majewski <l.majewski@samsung.com>
-> >> ---
-> >>  .../devicetree/bindings/cpufreq/cpufreq-boost.txt  |   38 ++++++++++++++++++++
-> >>  1 file changed, 38 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
-> >> new file mode 100644
-> >> index 0000000..63ed0fc
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
-> >> @@ -0,0 +1,38 @@
-> >> +* Device tree binding for CPU boost frequency (aka over-clocking)
-> >> +
-> >> +Certain CPU's can be operated in optional 'boost' mode (or sometimes referred as
-> >
-> > Nit: CPUs (we're not greengrocers [1])
-> >
-> >> +overclocking) in which the CPU can operate at frequencies which are not
-> >> +specified by the manufacturer as CPU's operating frequency.
-> >> +
-> >> +Optional Properties:
-> >> +- boost-frequencies: list of frequencies in KHz to be used only in boost mode.
-> >> +  This list should be a subset of frequencies listed in "operating-points"
-> >> +  property. Refer to Documentation/devicetree/bindings/power/opp.txt for
-> >> +  details about "operating-points" property.
-> >
-> > What is 'boost-mode'?
+> In this example, can different translations be set up for the different
+> masters?
 > 
-> boost-mode activates additional one or more cpu clock speeds (which
-> are not specified as operating frequency of the cpu by the
-> manufacturer). The cpu is allowed to operate in these boost mode
-> speeds when the boost mode is active. The boost mode speeds are
-> usually undocumented. Some of the chip samples could be clocked in
-> boost mode speeds and only such samples can be safely operated in
-> boost mode.
+> With no cells available to contain any sort of ID, it looks like this
+> is not possible.
+
+Correct, this example is for an IOMMU that does not use IDs but has a
+shared address space for all devices.
+
+> > +Multiple-master IOMMU with configurable DMA window:
+> > +---------------------------------------------------
+> > +
+> > +	/ {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +
+> > +		iommu {
+> > +			/* master ID, address of DMA window */
+> > +			#address-cells = <2>;
+> > +			#size-cells = <2>;
+> > +		};
+> > +
+> > +		master {
+> > +			/* master ID 42, 4 GiB DMA window starting at 0 */
+> > +			iommus = <&/iommu  42 0  0x1 0x0>;
 > 
-> The mechanism of entry into and exit out of boost mode is outside the
-> scope of this documentation.
+> I'm still concerned that in order to deal with future cases we will have
+> to invent multiple ways to parse the "iommus" property.  For example, if
+> we have a PCEe RC mastering through an IOMMU, it will pass a huge set
+> of possible master IDs to the IOMMU, not just noe or two.
 > 
-> >
-> > What are the limitations on boost frequencies? When is a CPU expected to
-> > go to these frequencies and for now long? When should I as a dt author
-> > place elements in boost-frequencies?
+> Do you have a solution in mind for that which doesn't break backwards
+> compatibility?
+
+I think we can treat PCI as a special case here and have an interface
+that gets used by the PCI core code to talk to the IOMMU core code
+when setting up a the dma_map_ops for a PCI function. As long as the
+IOMMU driver understands what PCI is, we don't have to describe the
+mapping in detail.
+
+> One option is to include an extra cell to the IOMMUs property
+> that indicates how to parse it.  For now, only a single value would
+> be defined.  For example:
 > 
-> I will add these details in the next revision of this patch.
-
-Cheers.
-
-> >
-> > Why are these in both operating-points and boost-frequencies? It'll be
-> > really easy to accidentally forget to mark something as a
-> > boost-frequency this way. Why not have a boost-points instead?
+> 	iommus = <&/iommu IOMMU_SIMPLE 42>;
 > 
-> Does boost-points mean a set of clock speeds which are not listed as
-> part of operating-points property? If yes, that also is a possible
-> implementation (it was implemented in one of the earlier version of
-> this series). Could you confirm that you want the boost mode speeds to
-> be exclusive of the speeds listed in operating-points?
+> Then maybe later
+> 
+> 	iommus = <&/iommu IOMMU_RANGE 0x10000 0x10000>;
+> 
+> (I'm not suggesting what IOMMU_RANGE might mean.)
+> 
 
-If these boost mode operating points are not generally advisable for use
-as the other operating-points are, then they should IMO been in an
-entirely separate property exclusive of (but in the same format as) the
-operating-points property, e.g.
+This can really be left up to the specific IOMMU driver itself.
+We can have drivers that support both #address-cells=<1>
+and #address-cells=<2> and behave differently based on that.
+I don't see a reason to define that across IOMMU implementations.
 
-operating points = <A B>, <C D>;
-boost-points = <E F>;
+> Other options are to introduce a new property name
+> 
+> 	range-iommus = <&/iommu 0x10000 0x10000>;
+> 
+> or control the parsing of incompatible iommus properties via a compatible
+> string somewhere.
 
-Otherwise, without boost-mode support we have to parse the boost mode
-table to figure out which points to avoid. Or if someone typos a value
-in either table we might go into a boost mode when we didn't want to!
+Introducing a new compatible string is always an option as the last resort.
 
-Cheers,
-Mark.
+	Arnd
