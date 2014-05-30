@@ -1,89 +1,72 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Fri, 30 May 2014 09:31:49 +0200
-Subject: [PATCH v5 2/2] Documentation: devicetree: Add boost-frequency
- binding to list boost mode frequency
-In-Reply-To: <1401374319-4480-3-git-send-email-thomas.ab@samsung.com>
-References: <1401374319-4480-1-git-send-email-thomas.ab@samsung.com>
- <1401374319-4480-3-git-send-email-thomas.ab@samsung.com>
-Message-ID: <20140530093149.2e41bfb9@amdc2363>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 30 May 2014 09:30:08 +0200
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <538757B6.4010109@wwwdotorg.org>
+References: <1400877395-4235-1-git-send-email-thierry.reding@gmail.com>
+ <538757B6.4010109@wwwdotorg.org>
+Message-ID: <20140530073006.GA24748@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-> From: Thomas Abraham <thomas.ab@samsung.com>
+On Thu, May 29, 2014 at 09:52:22AM -0600, Stephen Warren wrote:
+> On 05/23/2014 02:36 PM, Thierry Reding wrote:
+> > From: Thierry Reding <treding@nvidia.com>
+> > 
+> > This commit introduces a generic device tree binding for IOMMU devices.
+> > Only a very minimal subset is described here, but it is enough to cover
+> > the requirements of both the Exynos System MMU and Tegra SMMU as
+> > discussed here:
+> > 
+> >     https://lkml.org/lkml/2014/4/27/346
+> > 
+> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> > ---
+> > Apologies for the noise, but apparently I mistyped one of the email
+> > addresses, should be fixed now.
+> > 
+> > Changes in v2:
+> > - add notes about "dma-ranges" property (drop note from commit message)
+> > - document priorities of "iommus" property vs. "dma-ranges" property
+> > - drop #iommu-cells in favour of #address-cells and #size-cells
 > 
-> Add a new optional boost-frequency binding for specifying the
-> frequencies usable in boost mode.
-> 
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Lukasz Majewski <l.majewski@samsung.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  .../devicetree/bindings/cpufreq/cpufreq-boost.txt  |   38
-> ++++++++++++++++++++ 1 file changed, 38 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
-> 
-> diff --git
-> a/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
-> b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt new
-> file mode 100644 index 0000000..63ed0fc --- /dev/null
-> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
-> @@ -0,0 +1,38 @@
-> +* Device tree binding for CPU boost frequency (aka over-clocking)
-> +
-> +Certain CPU's can be operated in optional 'boost' mode (or sometimes
-> referred as +overclocking) in which the CPU can operate at
-> frequencies which are not +specified by the manufacturer as CPU's
-> operating frequency. +
-> +Optional Properties:
-> +- boost-frequencies: list of frequencies in KHz to be used only in
-> boost mode.
-> +  This list should be a subset of frequencies listed in
-> "operating-points"
-> +  property. Refer to Documentation/devicetree/bindings/power/opp.txt
-> for
-> +  details about "operating-points" property.
-> +
-> +Example:
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <0>;
-> +
-> +			operating-points = <
-> +				1500000 1350000
-> +				1400000 1287500
-> +				1300000 1250000
-> +				1200000 1187500
-> +				1100000 1137500
-> +				1000000 1087500
-> +			>;
-> +			boost-frequencies = <1500000 1400000>;
-> +		};
-> +		cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <1>;
-> +		};
-> +	};
+> I think this is a mistake. address-cells/size-cells are for transactions
+> flowing down the bus (from the CPU to date). Describing a connection
+> from a device to an IOMMU is something completely different, and should
+> therefore simply use an iommu-cells property to describe any necessary
+> information. If we start re-using properties for different things in
+> different contexts, how is anyone going to know what they mean, and how
+> will conflicts be resolved. For example, what if there's a single HW
+> module that both acts as a regular register bus with children (where
+> address-cells/size-cells defines how transactions reach the children
+> from the parent), and is also an IOMMU (where according to this binding
+> proposal, address-cells/size-cells represent some aspect of the IOMMU
+> feature). Using different properties for different things is the only
+> sane way to keep different concepts separate. Another alternative would
+> be to represent the single HW module as separate nodes in DT, but I
+> think that will only make our lives harder, and where I've done that in
+> the past, I've regretted it.
 
-Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+There was some back-and-forth on this topic and the latest concensus
+when I wrote the second version was that #address-cells and #size-cells
+were to be used.
 
--- 
-Best regards,
+But there was some bore back-and-forth after that, and it seems like
+Arnd no longer thinks that using #address-cells and #size-cells is a
+good idea either[0].
 
-Lukasz Majewski
+Arnd, can you take another look at this binding and see if there's
+anything else missing? If not I'll go through the document again and
+update all #address-cells/#size-cells references with #iommu-cells as
+appropriate and submit v3.
 
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Thanks,
+Thierry
+
+[0]: https://lkml.org/lkml/2014/5/20/609
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140530/6cf2a62b/attachment.sig>
