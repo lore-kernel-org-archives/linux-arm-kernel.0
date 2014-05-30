@@ -1,66 +1,39 @@
-From: ao2@ao2.it (Antonio Ospite)
-Date: Fri, 30 May 2014 18:18:09 +0200
-Subject: [PATCH] spi/pxa2xx: fix runtime PM enabling order
-Message-ID: <1401466689-24335-1-git-send-email-ao2@ao2.it>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 30 May 2014 09:23:54 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v3.16
+In-Reply-To: <cover.1401406177.git.horms+renesas@verge.net.au>
+References: <cover.1401406177.git.horms+renesas@verge.net.au>
+Message-ID: <CAOesGMh9vQ6F9gFzeYYCizSwpiOFwKONAvNM5U6wVi1ezdjhmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit 7dd62787334ac6e0e2a0ef3f20bb1936ac431b04 (spi/pxa2xx: Convert
-to core runtime PM) master->auto_runtime_pm was set to true.
+On Thu, May 29, 2014 at 4:31 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+>
+> Please consider these Renesas ARM based SoC fixes for v3.16.
+>
+> This corrects a bug that will be introduced in v3.15.
+> The bug causes audio playback to fail on the Armadillo800 EVA board.
+>
+> I am posting this as a fix for v3.16 rather than v3.15 as I believe
+> it is too late in the v3.15 cycle for a change of this nature.
+> As such I would also like this change considered for v3.15 -stable.
+>
+>
+> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+>
+>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v3.16
+>
+> for you to fetch changes up to 730359857f5f0e1fac9881c63d389d73adb5f416:
+>
+>   ARM: shmobile: armadillo800eva: fixup HDMI sound flags setting (2014-05-28 12:57:07 +0900)
 
-In this case pm_runtime_enable() must be called *before*
-spi_register_master(), otherwise the kernel hangs with this error
-message:
+Merged, thanks.
 
-  spi_master spi0: Failed to power device: -13
 
-A similar fix, but for spi/hspi, was applied in
-268d76430d1b68c340687357ffd18b4b12d02269.
-
-Signed-off-by: Antonio Ospite <ao2@ao2.it>
----
-
-Hi,
-
-I must admit I copied from 268d76430d1b68c340687357ffd18b4b12d02269 without
-understanding much of what is going on, but fact is that the patch makes my
-board boot again.
-
-Can anyone confirm that this is indeed the correct fix?
-
-Thanks,
-   Antonio
-
- drivers/spi/spi-pxa2xx.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
-index 41185d0..a07b758 100644
---- a/drivers/spi/spi-pxa2xx.c
-+++ b/drivers/spi/spi-pxa2xx.c
-@@ -1202,6 +1202,11 @@ static int pxa2xx_spi_probe(struct platform_device *pdev)
- 	tasklet_init(&drv_data->pump_transfers, pump_transfers,
- 		     (unsigned long)drv_data);
- 
-+	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
-+	pm_runtime_use_autosuspend(&pdev->dev);
-+	pm_runtime_set_active(&pdev->dev);
-+	pm_runtime_enable(&pdev->dev);
-+
- 	/* Register with the SPI framework */
- 	platform_set_drvdata(pdev, drv_data);
- 	status = devm_spi_register_master(&pdev->dev, master);
-@@ -1210,11 +1215,6 @@ static int pxa2xx_spi_probe(struct platform_device *pdev)
- 		goto out_error_clock_enabled;
- 	}
- 
--	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
--	pm_runtime_use_autosuspend(&pdev->dev);
--	pm_runtime_set_active(&pdev->dev);
--	pm_runtime_enable(&pdev->dev);
--
- 	return status;
- 
- out_error_clock_enabled:
--- 
-2.0.0
+-Olof
