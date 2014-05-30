@@ -1,32 +1,72 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Fri, 30 May 2014 13:32:14 -0400
-Subject: [RFC 1/2] ACPI: Add support for Platform Communication Channel
-In-Reply-To: <CAJe_ZhcRgrHCED-TA-NOJF6Njv-Z=ttTXO=wfn1VZjcCbiR6aA@mail.gmail.com>
-References: <1401222599-12416-1-git-send-email-ashwin.chaugule@linaro.org>
- <1401222599-12416-2-git-send-email-ashwin.chaugule@linaro.org>
- <20140530101704.GS5099@sirena.org.uk>
- <CABb+yY0cQw3ZvkK37TkHuMdeOrxckJU-TNFsdiFzBHdUgaBxgg@mail.gmail.com>
- <CAJ5Y-eYmGKj3uvUwSYkJ3DBA=wS9LTgjG56XCmQWH0-Ax_gBaQ@mail.gmail.com>
- <CAJe_ZhcRgrHCED-TA-NOJF6Njv-Z=ttTXO=wfn1VZjcCbiR6aA@mail.gmail.com>
-Message-ID: <CAJ5Y-eb=9JLJn4YwDV7evYsd0FDNGu=Fj5RucjEz-PtdJVNZ+w@mail.gmail.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Fri, 30 May 2014 10:33:37 -0700
+Subject: [PATCH 2/2] gpio: gpiolib: set gpiochip_remove retval to void
+In-Reply-To: <CAMuHMdV6AtjD2aqO3buzj8Eo7A7xc_+ROYnxEi2sdjMaqFiAuA@mail.gmail.com>
+References: <20140530094025.3b78301e@canb.auug.org.au>
+ <1401449454-30895-1-git-send-email-berthe.ab@gmail.com>
+ <1401449454-30895-2-git-send-email-berthe.ab@gmail.com>
+ <CAMuHMdV6AtjD2aqO3buzj8Eo7A7xc_+ROYnxEi2sdjMaqFiAuA@mail.gmail.com>
+Message-ID: <5388C0F1.90503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
-
-On 30 May 2014 09:40, Jassi Brar <jaswinder.singh@linaro.org> wrote:
+On 05/30/2014 04:39 AM, Geert Uytterhoeven wrote:
+> On Fri, May 30, 2014 at 1:30 PM, abdoulaye berthe <berthe.ab@gmail.com> wrote:
+>> --- a/drivers/gpio/gpiolib.c
+>> +++ b/drivers/gpio/gpiolib.c
+>> @@ -1263,10 +1263,9 @@ static void gpiochip_irqchip_remove(struct gpio_chip *gpiochip);
+>>    *
+>>    * A gpio_chip with any GPIOs still requested may not be removed.
+>>    */
+>> -int gpiochip_remove(struct gpio_chip *chip)
+>> +void gpiochip_remove(struct gpio_chip *chip)
+>>   {
+>>          unsigned long   flags;
+>> -       int             status = 0;
+>>          unsigned        id;
 >>
-> Please scrape it from https://lkml.org/lkml/2014/5/15/49
-> My platform also uses the doorbell mechanism with request and response
-> written in shared-memory, so I am confident the mailbox api should
-> work for PCC.
+>>          acpi_gpiochip_remove(chip);
+>> @@ -1278,24 +1277,15 @@ int gpiochip_remove(struct gpio_chip *chip)
+>>          of_gpiochip_remove(chip);
+>>
+>>          for (id = 0; id < chip->ngpio; id++) {
+>> -               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags)) {
+>> -                       status = -EBUSY;
+>> -                       break;
+>> -               }
+>> -       }
+>> -       if (status == 0) {
+>> -               for (id = 0; id < chip->ngpio; id++)
+>> -                       chip->desc[id].chip = NULL;
+>> -
+>> -               list_del(&chip->list);
+>> +               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags))
+>> +                       panic("gpio: removing gpiochip with gpios still requested\n");
+>
+> panic?
 
-Just had a quick look. PCC integration appears doable and the queuing
-and async notification stuff also looks useful. I'll play around with
-it a bit more to see if it really works. Meanwhile, the one thing that
-comes to mind is the DT bindings. For an ACPI-only kernel, we'll
-probably need another function (at least) to register mbox controllers
-and clients.
+NACK to the patch for this reason.  The strongest thing you should do 
+here is WARN.
 
-Cheers,
-Ashwin
+That said, I am not sure why we need this whole patch set in the first 
+place.
+
+David Daney
+
+
+
+>
+> Is this likely to happen?
+>
+> Gr{oetje,eeting}s,
+>
+>                          Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                  -- Linus Torvalds
+>
+>
