@@ -1,28 +1,39 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Fri, 30 May 2014 10:50:56 +0300
-Subject: [PATCH v2 4/4] ARM: debug: qcom: add UART addresses to Kconfig
- help
-In-Reply-To: <CABuKBeLHOKK+DsVPBGPDmeSqceSTMGZeOd74-Jp4Z9vUWDZ_yQ@mail.gmail.com>
-References: <1400857952-6963-1-git-send-email-gdjakov@mm-sol.com>
- <1400857952-6963-5-git-send-email-gdjakov@mm-sol.com>
- <CABuKBe+B_Ga-w4aA4dApDTa26rCuhetRTJku27Madm+fHtDcLA@mail.gmail.com>
- <53834578.9090305@mm-sol.com>
- <CABuKBeJXqSi=6XY5Fg7mg_daQ4D8ornS-kn7NDPktCtro7yNNw@mail.gmail.com>
- <53847FA1.60509@mm-sol.com>
- <CABuKBeLHOKK+DsVPBGPDmeSqceSTMGZeOd74-Jp4Z9vUWDZ_yQ@mail.gmail.com>
-Message-ID: <1401436256.13544.7.camel@iivanov-dev>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 30 May 2014 09:55:10 +0200
+Subject: [PATCH] ahci: imx: manage only sata_ref_clk in
+ imx_sata_enable[disable]
+In-Reply-To: <CAOMZO5Az_JR58a3cwGYK1_vcJ_twz4sEq+NHXv2SZ6yuN=wjGQ@mail.gmail.com>
+References: <1401289539-3485-1-git-send-email-shawn.guo@freescale.com>	<5386026C.1010603@redhat.com>	<CAOMZO5BkdkU-_s8G5CqVMzfkMgxdUg8bx0JJnqC8dPyFMK=Ocw@mail.gmail.com>	<538610D5.7070908@redhat.com>
+ <CAOMZO5Az_JR58a3cwGYK1_vcJ_twz4sEq+NHXv2SZ6yuN=wjGQ@mail.gmail.com>
+Message-ID: <5388395E.80500@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-05-29 at 17:26 +0200, Matthias Brugger wrote:
+Hi,
 
-> IMHO the dependancy is that DEBUG_LL uses the uart device, and this is
-> added when you add the dts.
-> AFAIK there can arise problems with multi-platform kernels if the uart
-> is not present.
+On 05/28/2014 06:48 PM, Fabio Estevam wrote:
+> On Wed, May 28, 2014 at 1:37 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> 
+>> Ah yes I see, the ahci_imx suspend/resume handler now no longer
+>> touches the controller, but the ata core is still trying to use it.
+>>
+>> Ok, in that case I agree that your original patch is the best
+>> solution.
+>>
+>> Your original patch is:
+>>
+>> Acked-by: Hans de Goede <hdegoede@redhat.com>
+> 
+> I think you meant Shawn's patch, not mine :-)
 
-Once DEBUG_LL is enabled you don't have multi-platform kernel anymore,
-so this should not be an issue here.
+Right, so to be extra clear, the patch titled:
+
+"ahci: imx: manage only sata_ref_clk in imx_sata_enable[disable]"
+
+is:
+
+Acked-by: Hans de Goede <hdegoede@redhat.com>
 
 Regards,
-Ivan
+
+Hans
