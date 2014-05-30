@@ -1,64 +1,65 @@
 From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 30 May 2014 08:29:37 +0200
-Subject: [PATCH v2 10/11] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <CAKfTPtCHhxyugMOCeS0hZoEXWhgRec4uOBexZ2aB2A+Eycgi8w@mail.gmail.com>
+Date: Fri, 30 May 2014 08:34:02 +0200
+Subject: [PATCH v2 11/11] sched: replace capacity by activity
+In-Reply-To: <CAKfTPtACXf+c01O+dCU2ZTc-Mrs+nTKYsu0_aBt8awxSg5WD=g@mail.gmail.com>
 References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-11-git-send-email-vincent.guittot@linaro.org>
- <20140529095024.GF11074@laptop.programming.kicks-ass.net>
- <CAKfTPtCHhxyugMOCeS0hZoEXWhgRec4uOBexZ2aB2A+Eycgi8w@mail.gmail.com>
-Message-ID: <20140530062937.GA11096@twins.programming.kicks-ass.net>
+ <1400860385-14555-12-git-send-email-vincent.guittot@linaro.org>
+ <20140529140204.GH11074@laptop.programming.kicks-ass.net>
+ <CAKfTPtACXf+c01O+dCU2ZTc-Mrs+nTKYsu0_aBt8awxSg5WD=g@mail.gmail.com>
+Message-ID: <20140530063402.GB11096@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 29, 2014 at 09:37:39PM +0200, Vincent Guittot wrote:
-> On 29 May 2014 11:50, Peter Zijlstra <peterz@infradead.org> wrote:
-> > On Fri, May 23, 2014 at 05:53:04PM +0200, Vincent Guittot wrote:
-> >> If the CPU is used for handling lot of IRQs, trig a load balance to check if
-> >> it's worth moving its tasks on another CPU that has more capacity
+On Thu, May 29, 2014 at 09:56:24PM +0200, Vincent Guittot wrote:
+> On 29 May 2014 16:02, Peter Zijlstra <peterz@infradead.org> wrote:
+> > On Fri, May 23, 2014 at 05:53:05PM +0200, Vincent Guittot wrote:
+> >> @@ -6052,8 +6006,8 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
+> >>                * with a large weight task outweighs the tasks on the system).
+> >>                */
+> >>               if (prefer_sibling && sds->local &&
+> >> -                 sds->local_stat.group_has_capacity)
+> >> -                     sgs->group_capacity = min(sgs->group_capacity, 1U);
+> >> +                 sds->local_stat.group_capacity > 0)
+> >> +                     sgs->group_capacity = min(sgs->group_capacity, 1L);
 > >>
-> >> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> >> ---
-> >>  kernel/sched/fair.c | 13 +++++++++++++
-> >>  1 file changed, 13 insertions(+)
+> >>               if (update_sd_pick_busiest(env, sds, sg, sgs)) {
+> >>                       sds->busiest = sg;
+> >> @@ -6228,7 +6182,7 @@ static inline void calculate_imbalance(struct lb_env *env, struct sd_lb_stats *s
+> >>                * have to drop below capacity to reach cpu-load equilibrium.
+> >>                */
+> >>               load_above_capacity =
+> >> -                     (busiest->sum_nr_running - busiest->group_capacity);
+> >> +                     (busiest->sum_nr_running - busiest->group_weight);
 > >>
-> >> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-> >> index e8a30f9..2501e49 100644
-> >> --- a/kernel/sched/fair.c
-> >> +++ b/kernel/sched/fair.c
-> >> @@ -5948,6 +5948,13 @@ static bool update_sd_pick_busiest(struct lb_env *env,
-> >>       if (sgs->sum_nr_running > sgs->group_capacity)
-> >>               return true;
-> >>
-> >> +     /*
-> >> +      * The group capacity is reduced probably because of activity from other
-> >> +      * sched class or interrupts which use part of the available capacity
-> >> +      */
-> >> +     if ((sg->sgp->power_orig * 100) > (sgs->group_power * env->sd->imbalance_pct))
-> >> +             return true;
-> >> +
-> >>       if (sgs->group_imb)
-> >>               return true;
-> >>
+> >>               load_above_capacity *= (SCHED_LOAD_SCALE * SCHED_POWER_SCALE);
+> >>               load_above_capacity /= busiest->group_power;
 > >
-> > But we should already do this because the load numbers are scaled with
-> > the power/capacity figures. If one CPU gets significant less time to run
-> > fair tasks, its effective load would spike and it'd get to be selected
-> > here anyway.
-> >
-> > Or am I missing something?
+> > I think you just broke PREFER_SIBLING here..
 > 
-> The CPU could have been picked when the capacity becomes null (which
-> occurred when the cpu_power goes below half the default
-> SCHED_POWER_SCALE). And even after that, there were some conditions in
-> find_busiest_group that was bypassing this busiest group
+> you mean by replacing the capacity which was reflecting the number of
+> core for SMT by the group_weight ?
 
-Could you detail those conditions? FWIW those make excellent Changelog
-material.
+Right to in the first hunk we lower group_capacity to 1 when prefer_sibling,
+then in the second hunk, you replace that group_capacity usage with
+group_weight.
+
+With the end result that prefer_sibling is now ineffective.
+
+That said, I fudged the prefer_sibling usage into the capacity logic,
+mostly because I could and it was already how the SMT stuff was working.
+But there is no reason we should continue to intertwine these two
+things.
+
+So I think it would be good to have a patch that implements
+prefer_sibling on nr_running separate from the existing capacity bits,
+and then convert the remaining capacity bits to utilization (or activity
+or whatever you did call it, see Morton's comments etc.).
+
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140530/b71e5088/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140530/06b10982/attachment-0001.sig>
