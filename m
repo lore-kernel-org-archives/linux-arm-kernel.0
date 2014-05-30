@@ -1,33 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 May 2014 09:57:11 +0200
-Subject: [PATCH] pinctrl: sirf: fix a bad conflict resolution
-Message-ID: <1401436631-30576-1-git-send-email-linus.walleij@linaro.org>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Fri, 30 May 2014 09:58:30 +0200
+Subject: nommu build failures on ARM in linux-next
+In-Reply-To: <20140529234012.GL3693@n2100.arm.linux.org.uk>
+References: <5387661F.1050000@windriver.com>
+ <20140529185534.GK3693@n2100.arm.linux.org.uk>
+ <20140529234012.GL3693@n2100.arm.linux.org.uk>
+Message-ID: <20140530075830.GO22169@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 294d1351ff47726f0f110b88e816cbafe89512fb
-"pinctrl: sirf: switch to using allocated state container"
-caused a build conflict due to a bad conflict resolution
-when cherry-picking the patch. Fix it up.
+On Fri, May 30, 2014 at 12:40:12AM +0100, Russell King - ARM Linux wrote:
+> Even so, I suspect even with this build problem solved, that's not going
+> to be the end of the story for noMMU breakage... it's certainly something
+> that gets very little testing by anyone.  I suspect it should be removed
+> from the mainline kernel tree rather than being a constant source of these
+> kinds of problems.
 
-Cc: Barry Song <Baohua.Song@csr.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/sirf/pinctrl-sirf.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Uwe can have a look next week.
 
-diff --git a/drivers/pinctrl/sirf/pinctrl-sirf.c b/drivers/pinctrl/sirf/pinctrl-sirf.c
-index 0e835219c42e..014f5b1fee55 100644
---- a/drivers/pinctrl/sirf/pinctrl-sirf.c
-+++ b/drivers/pinctrl/sirf/pinctrl-sirf.c
-@@ -575,7 +575,7 @@ static void sirfsoc_gpio_handle_irq(unsigned int irq, struct irq_desc *desc)
- 	int i;
- 
- 	for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
--		bank = &sgpio_chip.sgpio_bank[i];
-+		bank = &sgpio->sgpio_bank[i];
- 		if (bank->parent_irq == irq)
- 			break;
- 	}
+Taken that it took *ages* to get Cortex-M3 support in mainline and taken
+that it might become more interesting with the upcoming generation of
+FPGAs and Cortex-A SoCs with an additional Cortex-M, it would be pretty
+bad to lose NOMMU again.
+
+rsc
 -- 
-1.9.3
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
