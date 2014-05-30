@@ -1,268 +1,142 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 30 May 2014 12:02:40 -0600
-Subject: [RFC PATCH 01/11] coresight: add CoreSight core layer framework
-In-Reply-To: <CAL_Jsq+U+H7cPDALQHzLV0aT7EQjKcR74eoFWFP_HuLePi73Ag@mail.gmail.com>
-References: <1401457391-12242-1-git-send-email-mathieu.poirier@linaro.org>
- <1401457391-12242-2-git-send-email-mathieu.poirier@linaro.org>
- <CAL_Jsq+U+H7cPDALQHzLV0aT7EQjKcR74eoFWFP_HuLePi73Ag@mail.gmail.com>
-Message-ID: <CANLsYkxnJKB=uFwQDW4Ec3nMfOtnh3f1QQGKf=adH1jUxfsrng@mail.gmail.com>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Fri, 30 May 2014 23:35:43 +0530
+Subject: [PATCH v6 2/2] Documentation: devicetree: Add boost-frequency
+ binding to list boost mode frequency
+In-Reply-To: <20140530130827.GK24233@leverpostej>
+References: <1401440477-4328-1-git-send-email-thomas.ab@samsung.com>
+ <1401440477-4328-3-git-send-email-thomas.ab@samsung.com>
+ <20140530130827.GK24233@leverpostej>
+Message-ID: <CAJuA9ajs6K1PVtXC4_U0vQsA0oPnpaF_PdMfiQJxBFStF3Z2aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 May 2014 11:25, Rob Herring <robherring2@gmail.com> wrote:
-> On Fri, May 30, 2014 at 8:43 AM,  <mathieu.poirier@linaro.org> wrote:
->> From: Pratik Patel <pratikp@codeaurora.org>
+Hi Mark,
+
+On Fri, May 30, 2014 at 6:38 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
+>
+> Apologies for being somewhat late w.r.t. review on this.
+>
+> On Fri, May 30, 2014 at 10:01:17AM +0100, Thomas Abraham wrote:
+>> From: Thomas Abraham <thomas.ab@samsung.com>
 >>
->> CoreSight components are compliant with the ARM CoreSight
->> architecture specification and can be connected in various
->> topologies to suite a particular SoCs tracing needs. These trace
->> components can generally be classified as sources, links and
->> sinks. Trace data produced by one or more sources flows through
->> the intermediate links connecting the source to the currently
->> selected sink.
+>> Add a new optional boost-frequency binding for specifying the frequencies
+>> usable in boost mode.
 >>
->> CoreSight framework provides an interface for the CoreSight trace
->> drivers to register themselves with. It's intended to build up a
->> topological view of the CoreSight components and configure the
->> right series of components on user input via debugfs.
->>
->> For eg., when enabling a source, framework builds up a path
->> consisting of all the components connecting the source to the
->> currently selected sink and enables all of them.
->>
->> Framework also supports switching between available sinks and
->> also provides status information to user space applications
->> through sysfs interface.
->>
->> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
->> Signed-off-by: Panchaxari Prasannamurthy <panchaxari.prasannamurthy@linaro.org>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Pawel Moll <pawel.moll@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>> Cc: Kumar Gala <galak@codeaurora.org>
+>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>> Acked-by: Nishanth Menon <nm@ti.com>
+>> Acked-by: Lukasz Majewski <l.majewski@samsung.com>
 >> ---
->>  .../devicetree/bindings/arm/coresight.txt          | 138 ++++
->>  drivers/Kconfig                                    |   2 +
->>  drivers/Makefile                                   |   1 +
->>  drivers/coresight/Kconfig                          |   9 +
->>  drivers/coresight/Makefile                         |   5 +
->>  drivers/coresight/coresight-priv.h                 |  46 ++
->>  drivers/coresight/coresight.c                      | 739 +++++++++++++++++++++
->>  drivers/coresight/of_coresight.c                   | 124 ++++
->>  include/linux/coresight.h                          | 181 +++++
->>  include/linux/of_coresight.h                       |  27 +
->>  10 files changed, 1272 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/coresight.txt
->>  create mode 100644 drivers/coresight/Kconfig
->>  create mode 100644 drivers/coresight/Makefile
->>  create mode 100644 drivers/coresight/coresight-priv.h
->>  create mode 100644 drivers/coresight/coresight.c
->>  create mode 100644 drivers/coresight/of_coresight.c
->>  create mode 100644 include/linux/coresight.h
->>  create mode 100644 include/linux/of_coresight.h
+>>  .../devicetree/bindings/cpufreq/cpufreq-boost.txt  |   38 ++++++++++++++++++++
+>>  1 file changed, 38 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
 >>
->> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+>> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
 >> new file mode 100644
->> index 0000000..3e21665
+>> index 0000000..63ed0fc
 >> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
->> @@ -0,0 +1,138 @@
->> +* CoreSight Components
+>> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+>> @@ -0,0 +1,38 @@
+>> +* Device tree binding for CPU boost frequency (aka over-clocking)
 >> +
->> +CoreSight components are compliant with the ARM CoreSight architecture
->> +specification and can be connected in various topologies to suite a particular
->> +SoCs tracing needs. These trace components can generally be classified as sinks,
->> +links and sources. Trace data produced by one or more sources flows through the
->> +intermediate links connecting the source to the currently selected sink. Each
->> +CoreSight component device should use these properties to describe its hardware
->> +characteristcs.
+>> +Certain CPU's can be operated in optional 'boost' mode (or sometimes referred as
+>
+> Nit: CPUs (we're not greengrocers [1])
+>
+>> +overclocking) in which the CPU can operate at frequencies which are not
+>> +specified by the manufacturer as CPU's operating frequency.
 >> +
->> +Required properties:
->> +
->> +- compatible : name of the component used for driver matching
+>> +Optional Properties:
+>> +- boost-frequencies: list of frequencies in KHz to be used only in boost mode.
+>> +  This list should be a subset of frequencies listed in "operating-points"
+>> +  property. Refer to Documentation/devicetree/bindings/power/opp.txt for
+>> +  details about "operating-points" property.
 >
-> Where are the specific strings for components?
+> What is 'boost-mode'?
 
-"Coresight" is made of multiple components with each component needing
-a different driver.
->
->> +- reg : physical base address and length of the register set(s) of the component
->> +- coresight-id : unique integer identifier for the component
->
-> compatible + reg is a unique id.
+boost-mode activates additional one or more cpu clock speeds (which
+are not specified as operating frequency of the cpu by the
+manufacturer). The cpu is allowed to operate in these boost mode
+speeds when the boost mode is active. The boost mode speeds are
+usually undocumented. Some of the chip samples could be clocked in
+boost mode speeds and only such samples can be safely operated in
+boost mode.
 
-Some coresight IP blocks like the replicator don't have a reg property
-- the "coresight-id" and "coresight-name" are the only way to identify
-them properly.
-
->
->> +- coresight-name : unique descriptive name of the component
->
-> compatible is a descriptive name.
-
-That is what ends up under /sys/kernel/debug/coresight/.  Since there
-can be multiple entity of the same type it is easier and more
-convivial for users.  For instance: "coresight-etb-replicator" and
-"coresight-tpiu-replicator" are easier to identify than
-"coresight-replicator0" and "coresight-replicator1".
-
-We need to keep "coresight-id" or "coresight-name" - I prefer the
-former.  What is your take on this?
+The mechanism of entry into and exit out of boost mode is outside the
+scope of this documentation.
 
 >
->> +- coresight-nr-inports : number of input ports on the component
->> +
->> +coresight-outports, coresight-child-list and coresight-child-ports lists will
->> +be of the same length and will have a one to one correspondence among the
->> +elements at the same list index.
->> +
->> +coresight-default-sink must be specified for one of the sink devices that is
->> +intended to be made the default sink. Other sink devices must not have this
->> +specified. Not specifying this property on any of the sinks is invalid.
->
-> Why do you need the default-sink in DT? Isn't the configuration going
-> to depend on the user?
+> What are the limitations on boost frequencies? When is a CPU expected to
+> go to these frequencies and for now long? When should I as a dt author
+> place elements in boost-frequencies?
 
-Users can change this at will via debugfs.  It's a default boot time
-configuration and can be removed if you're absolutely keen on it.
-Please advise.
+I will add these details in the next revision of this patch.
 
 >
->> +
->> +Optional properties:
->> +
->> +- coresight-outports : list of output port numbers of this component
->> +- coresight-child-list : list of phandles pointing to the children of this
->> +                        component
->> +- coresight-child-ports : list of input port numbers of the children
->> +- coresight-default-sink : represents the default compile time CoreSight sink
->
-> Seems like the OF graph helpers being defined for V4L2 could be useful
-> here to describe the connections. We should not invent something new
-> to describe arbitrary connections.
+> Why are these in both operating-points and boost-frequencies? It'll be
+> really easy to accidentally forget to mark something as a
+> boost-frequency this way. Why not have a boost-points instead?
 
-Very well, I'll take a look.
+Does boost-points mean a set of clock speeds which are not listed as
+part of operating-points property? If yes, that also is a possible
+implementation (it was implemented in one of the earlier version of
+this series). Could you confirm that you want the boost mode speeds to
+be exclusive of the speeds listed in operating-points?
 
->
->> +- arm,buffer-size : size of contiguous buffer space for TMC ETR
->
-> TMC ETR?
-
-Trace Memory Controller in Embedded Trace Router configuration.
-
->
->> +- arm,cp14 : cp14 access to ETM registers is implemented and should be used
->> +- clocks : the clock associated to the coresight entity.
->> +- cpu: only valid for ETM/PTMs - the cpu this ETM/PTM is affined to.
->
-> I think you need some separation of bindings by component rather than
-> saying which components certain properties apply to.
-
-Ok.
+Thanks,
+Thomas.
 
 >
 >> +
 >> +Example:
 >> +
->> +1. Bus declaration:
->> +       coresight {
->> +               compatible = "arm,coresight";
->> +               #address-cells = <1>;
->> +               #size-cells = <1>;
->> +               ranges;
->> +               ...
->> +               ...
->> +               ...
->> +        };
+>> +     cpus {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +             cpu at 0 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a9";
+>> +                     reg = <0>;
 >> +
->> +        coresight {
->> +               compatible = "arm,coresight";
->> +               #address-cells = <1>;
->> +               #size-cells = <1>;
->> +               ranges = <0x20010000 0 0x20010000 0x1000
->> +                         0x20030000 0 0x20030000 0x1000
->> +                         0x20040000 0 0x20040000 0x1000
->> +                         0x2201c000 0 0x2201c000 0x1000
->> +                         0x2201d000 0 0x2201d000 0x1000
->> +                         0x2203c000 0 0x2203c000 0x1000
->> +                         0x2203d000 0 0x2203d000 0x1000
->> +                         0x2203e000 0 0x2203e000 0x1000>;
+>> +                     operating-points = <
+>> +                             1500000 1350000
+>> +                             1400000 1287500
+>> +                             1300000 1250000
+>> +                             1200000 1187500
+>> +                             1100000 1137500
+>> +                             1000000 1087500
+>> +                     >;
+>> +                     boost-frequencies = <1500000 1400000>;
 >
-> This is not how ranges generally work. For no translation, use just
-> "ranges;". Otherwise you should have base address and reg properties
-> are just offsets from the base. Anyway, it's not really pertinent to
-> your example.
-
-In the case of that specific board doing a one-to-one mapping in
-"ranges" was mandatory.  Otherwise the mapping wasn't done at all.
-
+> This is more of a general issue, but I hate the whole cpufreq-cpu0 way
+> of assuming that all CPUs mirror CPU0.
 >
->> +               ...
->> +               ...
->> +               ...
->> +       };
->> +
->> +2. Sinks
->> +       etb: etb at 20010000 {
->> +               compatible = "arm,coresight-etb";
->> +               reg = <0x20010000 0x1000>;
->> +
->> +               coresight-id = <0>;
->> +               coresight-name = "coresight-etb";
->> +               coresight-nr-inports = <1>;
->> +               coresight-default-sink;
->> +       };
->> +
->> +       tpiu: tpiu at 20030000 {
->> +               compatible = "arm,coresight-tpiu";
->> +               reg = <0x20030000 0x1000>;
->> +
->> +               coresight-id = <1>;
->> +               coresight-name = "coresight-tpiu";
->> +               coresight-nr-inports = <1>;
->> +       };
->> +
->> +3. Links
->> +       replicator: replicator {
->> +               compatible = "arm,coresight-replicator";
->> +
->> +               coresight-id = <2>;
->> +               coresight-name = "coresight-replicator";
->> +               coresight-nr-inports = <1>;
->> +               coresight-outports = <0 1>;
->> +               coresight-child-list = <&etb &tpiu>;
->> +               coresight-child-ports = <0 0>;
+> It would be nicer if either this were dropped in /cpus or repeated
+> per-cpu.
 >
-> This could be one property instead of 2: <&etb 0>, <&tpiu 0>;
+> Cheers,
+> Mark.
 >
-
-But then we'd have to do the parsing of said property in the code -
-isn't that less desirable?
-
-> Then add a #coresight-cells
+>> +             };
+>> +             cpu at 1 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a9";
+>> +                     reg = <1>;
+>> +             };
+>> +     };
+>> --
+>> 1.7.9.5
+>>
+>>
 >
->> +       };
->> +
->> +       funnel: funnel at 20040000 {
->> +               compatible = "arm,coresight-funnel";
->> +               reg = <0x20040000 0x1000>;
->> +
->> +               coresight-id = <3>;
->> +               coresight-name = "coresight-funnel";
->> +               coresight-nr-inports = <8>;
->> +               coresight-outports = <0>;
->> +               coresight-child-list = <&replicator>;
->> +               coresight-child-ports = <0>;
->> +       };
->> +
->> +4. Sources
->> +       ptm0: ptm at 2201c000 {
->> +               compatible = "arm,coresight-etm";
->> +               reg = <0x2201c000 0x1000>;
->> +
->> +               coresight-id = <9>;
->> +               coresight-name = "coresight-ptm0";
->> +               cpu = <&cpu0>;
->> +               coresight-nr-inports = <0>;
->
-> A source can be implied by no inports property. Likewise for a sink.
-
-Sources have  a compatible property to identify them.  A sink has a
-single input port.  Did I get your comment right?
+> [1] http://en.wikipedia.org/wiki/Apostrophe#Superfluous_apostrophes_.28.22greengrocers.27_apostrophes.22.29
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
