@@ -1,112 +1,76 @@
 From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Fri, 30 May 2014 11:24:50 +0530
-Subject: [PATCH] arm64: kernel: initialize broadcast hrtimer based clock
- event device
-In-Reply-To: <20140529123929.GF24233@leverpostej>
-References: <1401355381-11446-1-git-send-email-lorenzo.pieralisi@arm.com>
- <53871444.3080206@linux.vnet.ibm.com> <20140529123929.GF24233@leverpostej>
-Message-ID: <53881D2A.7060001@linux.vnet.ibm.com>
+Date: Fri, 30 May 2014 11:31:53 +0530
+Subject: [PATCH v2] arm64: kernel: initialize broadcast hrtimer based
+ clock event device
+In-Reply-To: <1401383814-22600-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1401383814-22600-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <53881ED1.2040907@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2014 06:09 PM, Mark Rutland wrote:
-> Hi Preeti,
+On 05/29/2014 10:46 PM, Lorenzo Pieralisi wrote:
+> On platforms implementing CPU power management, the CPUidle subsystem
+> can allow CPUs to enter idle states where local timers logic is lost on power
+> down. To keep the software timers functional the kernel relies on an
+> always-on broadcast timer to be present in the platform to relay the
+> interrupt signalling the timer expiries.
 > 
-> On Thu, May 29, 2014 at 12:04:36PM +0100, Preeti U Murthy wrote:
->> Hi Lorenzo,
->>
->> On 05/29/2014 02:53 PM, Lorenzo Pieralisi wrote:
->>> On platforms implementing CPU power management, the CPUidle subsystem
->>> can allow CPUs to enter idle states where local timers logic is lost on power
->>> down. To keep the software timers functional the kernel relies on an
->>> always-on broadcast timer to be present in the platform to relay the
->>> interrupt signalling the timer expiries.
->>>
->>> For platforms implementing CPU core gating that do not implement an always-on
->>> HW timer or implement it in a broken way, this patch adds code to initialize
->>> the kernel software broadcast hrtimer upon boot. It relies on a dynamically
->>
->> It would be best to use the term "hrtimer based broadcast device"
->> throughout the changelog for uniformity and to avoid confusion instead
->> of mixing it with "software broadcast".
->>
->>> chosen CPU to be always powered-up. This CPU then relays the timer interrupt
->>> to CPUs in deep-idle states through its HW local timer device.
->>>
->>> On systems with power management capabilities but no functional HW broadcast
->>> tick device, the hrtimer based clock event device allows the kernel to
->>> enter high-resolution timer mode, which improves system latencies and saves
->>> dynamic power.
->>
->> Sorry but I do not understand the above paragraph. What do you mean by
->> "allows the kernel to enter high resolution timer mode" ? And how does
->> it improve system latency? I understand that the hrtimer based
->> clockevent device saves dynamic power since it provides a mechanism in
->> which cpus can enter deeper idle states.
+> For platforms implementing CPU core gating that do not implement an always-on
+> HW timer or implement it in a broken way, this patch adds code to initialize
+> the kernel hrtimer based clock event device upon boot (which can be chosen as
+> tick broadcast device by the kernel).
+> It relies on a dynamically chosen CPU to be always powered-up. This CPU then
+> relays the timer interrupt to CPUs in deep-idle states through its HW local
+> timer device.
 > 
-> When there's no oneshot-capable broadcast device and the CPU-local
-> clock_event_device has the CLK_EVT_FEAT_C3STOP flag,
-> tick_is_oneshot_available will return false. Thus
-> tick_check_oneshot_change will return false, and hrtimer_switch_to_hres
-> will never switch to high resolution mode (and we can also never enter
-> NOHZ mode), leaving us stuck in periodic mode.
+> Having a CPU always-on has implications on power management platform
+> capabilities and makes CPUidle suboptimal, since at least a CPU is kept
+> always in a shallow idle state by the kernel to relay timer interrupts,
+> but at least leaves the kernel with a functional system with some working
+> power management capabilities.
 > 
-> In periodic mode ticks occur at fixed intervals, and any timer wakeup
-> will occur after the tick following the requested wakeup time, adding
-> some amount of latency over what would be possible with high resolution
-> mode. Additionally, as we can only wake up at said ticks and not between
-> them, it's possible that several timers for intervals shorter than that
-> tick interval will fire at once upon a timer tick. Any tasks which
-> requested these wakeups will fight for CPU time, and some will see
-> additional latency because of this.
-
-Ah ok I see now. Thanks for the explanation :)
-
+> The hrtimer based clock event device is unconditionally registered, but
+> has the lowest possible rating such that any broadcast-capable HW clock
+> event device present will be chosen in preference as the tick broadcast
+> device.
 > 
->>>
->>> The side effect of having a CPU always-on has implications on power management
->>> platform capabilities and makes CPUidle suboptimal, since at least a CPU is
->>> kept always in a shallow idle state by the kernel to relay timer interrupts,
->>> but at least leaves the kernel with a functional system with some working power
->>> management capabilities.
->>>
->>> The hrtimer based clock event device has lowest possible rating so that,
->>> if a platform contains a functional HW clock event device with broadcast
->>> capabilities, that device is always chosen as a tick broadcast device instead
->>> of the software based one, now present by default.
->>
->> I think this statement "instead of the software based one, now present
->> by default" is incorrect. The hrtimer based clock event device will come
->> into picture only when the arch calls tick_setup_hrtimer_broadcast()
->> explicitly. Otherwise either the arch should register a real clock
->> device which does broadcast or should disable deep idle states where the
->> local timers stop. So I would suggest skipping the last paragraph as it
->> is not conveying anything in specific. The fact that a clock device with
->> the highest rating will be chosen is already known and need not be
->> mentioned explicitly IMHO.
+> Cc: Preeti U Murthy <preeti@linux.vnet.ibm.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+> changes in v2:
 > 
-> I think it is worth keeping the paragraph to allay anyone's fear that
-> the hrtimer based broadcast device might be selected in preference to a
-> real suitable clock. I would otherwise not be aware that the hrtimer
-> based broadcast device had the lowest rating (and would have to go and
-> look that up separately).
+> - Reworded the commit log according to reviews
 > 
-> As the arch code has delegated timer registration to
-> clocksoruce_of_init, it doesn't know whether any of the real devices
-> that may have been registered are suitable as a broadcast source for
-> oneshot events. So we can't conditionally register the hrtimer based
-> broadcast device.
+> It should be ready to go.
 > 
-> Perhaps we could replace "now present by default" with "which is
-> unconditionally registered in case no suitable hardware device is
-> present"?
-
-Yes I would say "which gets registered in case no suitable hardware
-devices is present." This would make it clearer.
-
-Regards
-Preeti U Murthy
+> Thanks,
+> Lorenzo
 > 
-> Cheers,
-> Mark.
+>  arch/arm64/kernel/time.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
+> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+> index 6815987..1a7125c 100644
+> --- a/arch/arm64/kernel/time.c
+> +++ b/arch/arm64/kernel/time.c
+> @@ -18,6 +18,7 @@
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  
+> +#include <linux/clockchips.h>
+>  #include <linux/export.h>
+>  #include <linux/kernel.h>
+>  #include <linux/interrupt.h>
+> @@ -69,6 +70,8 @@ void __init time_init(void)
+>  	of_clk_init(NULL);
+>  	clocksource_of_init();
+>  
+> +	tick_setup_hrtimer_broadcast();
+> +
+>  	arch_timer_rate = arch_timer_get_rate();
+>  	if (!arch_timer_rate)
+>  		panic("Unable to initialise architected timer.\n");
+> 
+Reviewed-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
