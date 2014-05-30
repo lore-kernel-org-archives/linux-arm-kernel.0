@@ -1,95 +1,111 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 30 May 2014 16:28:22 -0700
-Subject: [PATCH v4 1/7] clk: kona: allow nested ccu_write_enable() requests
-In-Reply-To: <1401483188-5395-2-git-send-email-elder@linaro.org>
+Date: Fri, 30 May 2014 16:37:02 -0700
+Subject: [PATCH v4 3/7] clk: kona: don't init clocks at startup time
+In-Reply-To: <1401483188-5395-4-git-send-email-elder@linaro.org>
 References: <1401483188-5395-1-git-send-email-elder@linaro.org>
- <1401483188-5395-2-git-send-email-elder@linaro.org>
-Message-ID: <20140530232822.10062.26597@quantum>
+ <1401483188-5395-4-git-send-email-elder@linaro.org>
+Message-ID: <20140530233702.10062.60452@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Alex Elder (2014-05-30 13:53:02)
-> Use a counter rather than a Boolean to track whether write access to
-> a CCU has been enabled or not.  This will allow more than one of
-> these requests to be nested.
-> 
-> Note that __ccu_write_enable() and __ccu_write_disable() calls all
-> come in pairs, and they are always surrounded immediately by calls
-> to ccu_lock() and ccu_unlock().
-> 
-> Signed-off-by: Alex Elder <elder@linaro.org>
-> ---
->  drivers/clk/bcm/clk-kona.c | 14 ++++----------
->  drivers/clk/bcm/clk-kona.h |  2 +-
->  2 files changed, 5 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
-> index 95af2e6..ee8e988 100644
-> --- a/drivers/clk/bcm/clk-kona.c
-> +++ b/drivers/clk/bcm/clk-kona.c
-> @@ -170,13 +170,8 @@ static inline void ccu_unlock(struct ccu_data *ccu, unsigned long flags)
->   */
->  static inline void __ccu_write_enable(struct ccu_data *ccu)
-
-Per Documentation/CodingStyle, chapter 15, "the inline disease", it
-might be best to not inline these functions.
-
+Quoting Alex Elder (2014-05-30 13:53:04)
+> +static int kona_clk_prepare(struct clk_hw *hw)
 >  {
-> -       if (ccu->write_enabled) {
-> -               pr_err("%s: access already enabled for %s\n", __func__,
-> -                       ccu->name);
-> -               return;
-> -       }
-> -       ccu->write_enabled = true;
-> -       __ccu_write(ccu, 0, CCU_ACCESS_PASSWORD | 1);
-> +       if (!ccu->write_enabled++)
-> +               __ccu_write(ccu, 0, CCU_ACCESS_PASSWORD | 1);
->  }
->  
->  static inline void __ccu_write_disable(struct ccu_data *ccu)
-> @@ -186,9 +181,8 @@ static inline void __ccu_write_disable(struct ccu_data *ccu)
->                         ccu->name);
->                 return;
+> +       struct kona_clk *bcm_clk = to_kona_clk(hw);
+> +       struct ccu_data *ccu = bcm_clk->ccu;
+> +       unsigned long flags;
+> +       int ret = 0;
+> +
+> +       flags = ccu_lock(ccu);
+> +       __ccu_write_enable(ccu);
+> +
+>         switch (bcm_clk->type) {
+>         case bcm_clk_peri:
+> -               return __peri_clk_init(bcm_clk);
+> +               if (!__peri_clk_init(bcm_clk))
+> +                       ret = -EINVAL;
+> +               break;
+>         default:
+>                 BUG();
 >         }
+
+The switch-case only has one match, plus a default. Will there be others
+in the future?  Otherwise it can be replaced with an if-statement.
+
+> -       return -EINVAL;
+> -}
 > -
-> -       __ccu_write(ccu, 0, CCU_ACCESS_PASSWORD);
-> -       ccu->write_enabled = false;
-> +       if (!--ccu->write_enabled)
-> +               __ccu_write(ccu, 0, CCU_ACCESS_PASSWORD);
-
-What happens if calls to __ccu_write_enable and __ccu_write_disable are
-unbalanced? It would be better to catch that case and throw a WARN:
-
-	if (WARN_ON(ccu->write_enabled == 0))
-		return;
-
-	if (--ccu->write_enabled > 0)
-		return;
-
-	__ccu_write(ccu, 0, CCU_ACCESS_PASSWORD);
-
->  }
+> -/* Set a CCU and all its clocks into their desired initial state */
+> -bool __init kona_ccu_init(struct ccu_data *ccu)
+> -{
+> -       unsigned long flags;
+> -       unsigned int which;
+> -       struct clk **clks = ccu->clk_data.clks;
+> -       bool success = true;
+> -
+> -       flags = ccu_lock(ccu);
+> -       __ccu_write_enable(ccu);
+> -
+> -       for (which = 0; which < ccu->clk_data.clk_num; which++) {
+> -               struct kona_clk *bcm_clk;
+> -
+> -               if (!clks[which])
+> -                       continue;
+> -               bcm_clk = to_kona_clk(__clk_get_hw(clks[which]));
+> -               success &= __kona_clk_init(bcm_clk);
+> -       }
 >  
->  /*
-> diff --git a/drivers/clk/bcm/clk-kona.h b/drivers/clk/bcm/clk-kona.h
-> index 2537b30..e9a8466 100644
-> --- a/drivers/clk/bcm/clk-kona.h
-> +++ b/drivers/clk/bcm/clk-kona.h
-> @@ -478,7 +478,7 @@ struct ccu_policy {
->  struct ccu_data {
->         void __iomem *base;     /* base of mapped address space */
->         spinlock_t lock;        /* serialization lock */
-> -       bool write_enabled;     /* write access is currently enabled */
-> +       u32 write_enabled;      /* write access enable count */
+>         __ccu_write_disable(ccu);
+>         ccu_unlock(ccu, flags);
+> -       return success;
+> +
+> +       return ret;
+>  }
 
-Why u32? An unsigned int will do just nicely here.
+Does this prepare callback "enable" a clock? E.g does a line NOT toggle
+at a rate prior to this call, and then after this call completes that
+same line is now toggling at a rate?
+
+>  
+> -/* Clock operations */
+> +static void kona_clk_unprepare(struct clk_hw *hw)
+> +{
+> +       /* Nothing to do. */
+> +}
+
+Is doing nothing the right thing to do? Could power be saved somehow if
+the .unprepare callback really gets called? Remember that if .unprepare
+actually runs (because struct clk->prepare_count == 0) then the next
+call to clk_prepare will actually call your .prepare callback and set up
+the prereq clocks again. So the prereq clock initialization is no longer
+a one-time thing, which might afford you some optimizations.
 
 Regards,
 Mike
 
->         struct ccu_policy policy;
->         struct list_head links; /* for ccu_list */
->         struct device_node *node;
+>  
+>  static int kona_peri_clk_enable(struct clk_hw *hw)
+>  {
+> @@ -1264,6 +1258,8 @@ static int kona_peri_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+>  }
+>  
+>  struct clk_ops kona_peri_clk_ops = {
+> +       .prepare = kona_clk_prepare,
+> +       .unprepare = kona_clk_unprepare,
+>         .enable = kona_peri_clk_enable,
+>         .disable = kona_peri_clk_disable,
+>         .is_enabled = kona_peri_clk_is_enabled,
+> diff --git a/drivers/clk/bcm/clk-kona.h b/drivers/clk/bcm/clk-kona.h
+> index e9a8466..3409111 100644
+> --- a/drivers/clk/bcm/clk-kona.h
+> +++ b/drivers/clk/bcm/clk-kona.h
+> @@ -511,6 +511,5 @@ extern u64 scaled_div_build(struct bcm_clk_div *div, u32 div_value,
+>  extern struct clk *kona_clk_setup(struct kona_clk *bcm_clk);
+>  extern void __init kona_dt_ccu_setup(struct ccu_data *ccu,
+>                                 struct device_node *node);
+> -extern bool __init kona_ccu_init(struct ccu_data *ccu);
+>  
+>  #endif /* _CLK_KONA_H */
 > -- 
 > 1.9.1
 > 
