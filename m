@@ -1,57 +1,47 @@
 From: nikolay.borisov@arm.com (Nikolay Borisov)
-Date: Fri, 30 May 2014 17:59:50 +0100
-Subject: [PATCH v2 6/7] ARM: traps: Make use of the frame_pointer macro
+Date: Fri, 30 May 2014 17:59:45 +0100
+Subject: [PATCH v2 1/7] ARM: Make thread_save_fp macro aware of THUMB2 mode
 In-Reply-To: <1401469191-29232-1-git-send-email-nikolay.borisov@arm.com>
 References: <1401469191-29232-1-git-send-email-nikolay.borisov@arm.com>
-Message-ID: <1401469191-29232-7-git-send-email-nikolay.borisov@arm.com>
+Message-ID: <1401469191-29232-2-git-send-email-nikolay.borisov@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nikolay Borisov <Nikolay.Borisov@arm.com>
 
-Use the newly-introduced frame_pointer macro to extract
-the correct FP based on whether we are in THUMB2 mode or not.
+The thread_save_fp macro has been defined so that it always reads the fp member
+of the cpu_context_save struct. However, in the case of THUMB2 the fp is saved
+not in the fp (r11) member but rather in r7.
+
+This patch changes the way the macro is defined such that FP is read from the
+correct place depending on whether we are a THUMB2 kernel or not. This enables
+the backtrace in sitaution such as "echo t > /proc/sysrq-trigger" or the
+function in which a process sleeping when "ps -Al" is invoked.
 
 Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
+Reviewed-by: Anurag Aggarwal <anurag19aggarwal@gmail.com>
 ---
- arch/arm/kernel/traps.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/thread_info.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index abd2fc0..c8e4bb7 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -31,11 +31,13 @@
- #include <asm/exception.h>
- #include <asm/unistd.h>
- #include <asm/traps.h>
-+#include <asm/ptrace.h>
- #include <asm/unwind.h>
- #include <asm/tls.h>
- #include <asm/system_misc.h>
- #include <asm/opcodes.h>
- 
+diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+index f989d7c..e4e4208 100644
+--- a/arch/arm/include/asm/thread_info.h
++++ b/arch/arm/include/asm/thread_info.h
+@@ -114,8 +114,14 @@ static inline struct thread_info *current_thread_info(void)
+ 	((unsigned long)(task_thread_info(tsk)->cpu_context.pc))
+ #define thread_saved_sp(tsk)	\
+ 	((unsigned long)(task_thread_info(tsk)->cpu_context.sp))
 +
- static const char *handler[]= {
- 	"prefetch abort",
- 	"data abort",
-@@ -184,7 +186,7 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 		tsk = current;
++#ifndef CONFIG_THUMB2_KERNEL
+ #define thread_saved_fp(tsk)	\
+ 	((unsigned long)(task_thread_info(tsk)->cpu_context.fp))
++#else
++#define thread_saved_fp(tsk)	\
++	((unsigned long)(task_thread_info(tsk)->cpu_context.r7))
++#endif
  
- 	if (regs) {
--		fp = regs->ARM_fp;
-+		fp = frame_pointer(regs);
- 		mode = processor_mode(regs);
- 	} else if (tsk != current) {
- 		fp = thread_saved_fp(tsk);
-@@ -719,7 +721,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
- 		dump_instr("", regs);
- 		if (user_mode(regs)) {
- 			__show_regs(regs);
--			c_backtrace(regs->ARM_fp, processor_mode(regs));
-+			c_backtrace(frame_pointer(regs), processor_mode(regs));
- 		}
- 	}
- #endif
+ extern void crunch_task_disable(struct thread_info *);
+ extern void crunch_task_copy(struct thread_info *, void *);
 -- 
 1.8.1.5
