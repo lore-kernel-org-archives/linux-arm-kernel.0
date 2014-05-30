@@ -1,71 +1,43 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 31 May 2014 04:59:39 +0900
-Subject: [GIT PULL 3/5] Samsung Exynos updates for 3.16
-Message-ID: <5388E32B.3010908@samsung.com>
+Date: Sat, 31 May 2014 05:00:01 +0900
+Subject: [GIT PULL 4/5] Samsung Exynos MCPM-2 for 3.16
+Message-ID: <5388E341.6070608@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit fced6dee29f6fb143fe16ea90331176ff77e6120:
+The following changes since commit ccf5511797cd4b48d20a85fa1778f5608eac9fd7:
 
-   Merge branch 'v3.16-next/cleanup-samsung' into 
-v3.16-next/platform-exynos (2014-05-31 02:36:49 +0900)
+   ARM: EXYNOS: Add MCPM call-back functions (2014-05-16 04:26:30 +0900)
 
 are available in the git repository at:
 
-
    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/samsung-exynos
+tags/exynos-mcpm-2
 
-for you to fetch changes up to 9dfa92ec4033c348aae6bafc1881e07229fabaa6:
+for you to fetch changes up to 7c5688e7fd722690e636c64630ad56babb589e96:
 
-   ARM: EXYNOS: Enable multi-platform build support (2014-05-31 02:43:51 
+   ARM: EXYNOS: mcpm rename the power_down_finish (2014-05-31 03:01:36 
 +0900)
 
 ----------------------------------------------------------------
-Samsung Exynos updates for 3.16
+Exynos 2nd MCPM updates for v3.16
 
-- add new SoCs support
-   : exynos3250, 5260, 5410 and 5800
+- enable mcpm for dual-cluster exynos5800
+- since commit 166aaf39 ("ARM: 8029/1: mcpm: Rename the
+   power_down_finish() functions to be less confusing"),
+   use new member name wait_for_cpu_powerdown.
 
-- enable multi-platform on exynos
-   : consolidate exynos related Kconfig entries
+This is based on tags/exynos-mcpm.
 
-Note that this requires tags/samsung-cleanup and tags/samsung-clk-2
-because of mostly migration exynos specific macros into mach-exynos
-and exynos related Kconfig entries.
-
-One more merge conflict happens in arch/arm/Kconfig for ARCH_EXYNOS
-due to SRAM stuff, even though tried to sort them out. Since just
-resolving it would be better I think, please remove ARCH_EXYNOS in
-arch/arm/Kconfig when merge conflict happens.
+Note that since the commit 166aaf39 is in rmk tree so this
+should be sent to upstream after that in 3.16 merge window.
 
 ----------------------------------------------------------------
-Arnd Bergmann (1):
-       ARM: EXYNOS: Enable multi-platform build support
+Abhilash Kesavan (1):
+       ARM: EXYNOS: Enable mcpm for dual-cluster exynos5800 SoC
 
-Arun Kumar K (1):
-       ARM: EXYNOS: Add 5800 SoC support
+Kukjin Kim (1):
+       ARM: EXYNOS: mcpm rename the power_down_finish
 
-Chanwoo Choi (2):
-       ARM: EXYNOS: Add Exynos3250 SoC ID
-       ARM: EXYNOS: Support secondary CPU boot of Exynos3250
-
-Pankaj Dubey (1):
-       ARM: EXYNOS: initial board support for exynos5260 SoC
-
-Sachin Kamat (1):
-       ARM: EXYNOS: Consolidate Kconfig entries
-
-Tarek Dakhran (1):
-       ARM: EXYNOS: Add support for EXYNOS5410 SoC
-
-  arch/arm/Kconfig                | 19 ---------
-  arch/arm/mach-exynos/Kconfig    | 92 
-+++++++++++++++++++++++------------------
-  arch/arm/mach-exynos/Makefile   |  2 +
-  arch/arm/mach-exynos/common.h   | 29 ++++++++++++-
-  arch/arm/mach-exynos/exynos.c   |  3 ++
-  arch/arm/mach-exynos/firmware.c |  9 +++-
-  arch/arm/mach-exynos/platsmp.c  |  2 +-
-  arch/arm/plat-samsung/Makefile  |  3 ++
-  8 files changed, 96 insertions(+), 63 deletions(-)
+  arch/arm/mach-exynos/mcpm-exynos.c | 12 +++++++++---
+  1 file changed, 9 insertions(+), 3 deletions(-)
