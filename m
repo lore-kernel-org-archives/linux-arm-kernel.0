@@ -1,51 +1,55 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 30 May 2014 10:59:03 -0600
-Subject: [PATCH v2] mm, compaction: properly signal and act upon lock
- and need_sched() contention
-In-Reply-To: <537F082F.50501@suse.cz>
-References: <1399904111-23520-1-git-send-email-vbabka@suse.cz>	<1400233673-11477-1-git-send-email-vbabka@suse.cz>	<CAGa+x87-NRyK6kUiXNL_bRNEGm+DR6M3HPSLYEoq4t6Nrtnd_g@mail.gmail.com>
- <CAAQ0ZWQDVxAzZVm86ATXd1JGUVoLXj_Y5Ske7htxH_6a4GPKRg@mail.gmail.com>
- <537F082F.50501@suse.cz>
-Message-ID: <5388B8D7.1020907@wwwdotorg.org>
+From: nikolay.borisov@arm.com (Nikolay Borisov)
+Date: Fri, 30 May 2014 17:59:44 +0100
+Subject: [PATCH v2 0/7] Fix backtrace support in THUMB2 mode
+Message-ID: <1401469191-29232-1-git-send-email-nikolay.borisov@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/2014 02:34 AM, Vlastimil Babka wrote:
-> On 05/23/2014 04:48 AM, Shawn Guo wrote:
->> On 23 May 2014 07:49, Kevin Hilman <khilman@linaro.org> wrote:
->>> On Fri, May 16, 2014 at 2:47 AM, Vlastimil Babka <vbabka@suse.cz> wrote:
->>>> Compaction uses compact_checklock_irqsave() function to periodically check for
->>>> lock contention and need_resched() to either abort async compaction, or to
->>>> free the lock, schedule and retake the lock. When aborting, cc->contended is
->>>> set to signal the contended state to the caller. Two problems have been
->>>> identified in this mechanism.
->>>
->>> This patch (or later version) has hit next-20140522 (in the form
->>> commit 645ceea9331bfd851bc21eea456dda27862a10f4) and according to my
->>> bisect, appears to be the culprit of several boot failures on ARM
->>> platforms.
->>
->> On i.MX6 where CMA is enabled, the commit causes the drivers calling
->> dma_alloc_coherent() fail to probe.  Tracing it a little bit, it seems
->> dma_alloc_from_contiguous() always return page as NULL after this
->> commit.
->>
->> Shawn
->>
-> 
-> Really sorry, guys :/
-> 
-> -----8<-----
-> From: Vlastimil Babka <vbabka@suse.cz>
-> Date: Fri, 23 May 2014 10:18:56 +0200
-> Subject: mm-compaction-properly-signal-and-act-upon-lock-and-need_sched-contention-fix2
-> 
-> Step 1: Change function name and comment between v1 and v2 so that the return
->         value signals the opposite thing.
-> Step 2: Change the call sites to reflect the opposite return value.
-> Step 3: ???
-> Step 4: Make a complete fool of yourself.
+From: Nikolay Borisov <Nikolay.Borisov@arm.com>
 
-Tested-by: Stephen Warren <swarren@nvidia.com>
+Currently all the code which deals with backtrace support assumes that R11
+is the frame-pointer. While this is the case for ARM mode and is explicitly
+documented in the AAPCS, this is not the case for THUMB2 mode.
 
-This fix doesn't seem to be in linux-next yet:-(
+There is no official document requiring that R11 has to be the frame pointer
+and GCC uses R7 as FP and given that R7's usage is so intertwined within GCC's
+mechanics it is unlikely to change, so fixing backtrace in THUMB2 mode seems
+in order.
+
+This patch series rectifies the problem by first fixing the
+thread_save_fp macro to reference the correct register. Furthermore, there
+a lot of repetetive sequences of code such as :
+
+stackframe.fp = pt_regs->ARM_fp
+stackframe.lr = pt_regs->ARM_lr
+
+so introducing a function arm_get_current_stack_frame which both
+hides this repetition and also utilizes teh frame_pointer(regs) macro
+to reference the correct register depending on the mode.
+
+Finally, change all the call sites so that they utilize the new routine.
+
+Changes since v1:
+ * Nothing major, just made arg_get_current_stack frame an inline routine.
+
+Nikolay Borisov (7):
+  ARM: Make thread_save_fp macro aware of THUMB2 mode
+  ARM: Introduce arm_get_current_stack_frame()
+  ARM: perf: Make perf use arm_get_current_stackframe
+  ARM: time: Make use of arm_get_current_stackframe
+  ARM: unwind: Use arm_get_current_stackframe
+  ARM: traps: Make use of the frame_pointer macro
+  ARM: oprofile: Use of arm_get_current_stackframe
+
+ arch/arm/include/asm/ptrace.h      |  6 ++++++
+ arch/arm/include/asm/stacktrace.h  | 12 ++++++++++++
+ arch/arm/include/asm/thread_info.h |  6 ++++++
+ arch/arm/kernel/perf_event.c       |  5 +----
+ arch/arm/kernel/time.c             |  5 +----
+ arch/arm/kernel/traps.c            |  6 ++++--
+ arch/arm/kernel/unwind.c           |  8 +++-----
+ arch/arm/oprofile/common.c         |  5 +----
+ 8 files changed, 34 insertions(+), 19 deletions(-)
+
+-- 
+1.8.1.5
