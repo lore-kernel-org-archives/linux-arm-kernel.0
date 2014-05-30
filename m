@@ -1,57 +1,30 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 30 May 2014 13:39:15 +0200
-Subject: [PATCH 2/2] gpio: gpiolib: set gpiochip_remove retval to void
-In-Reply-To: <1401449454-30895-2-git-send-email-berthe.ab@gmail.com>
-References: <20140530094025.3b78301e@canb.auug.org.au>
- <1401449454-30895-1-git-send-email-berthe.ab@gmail.com>
- <1401449454-30895-2-git-send-email-berthe.ab@gmail.com>
-Message-ID: <CAMuHMdV6AtjD2aqO3buzj8Eo7A7xc_+ROYnxEi2sdjMaqFiAuA@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 30 May 2014 13:39:57 +0200
+Subject: [PATCH] ARM: EXYNOS: Fix core ID used by platsmp and hotplug code
+In-Reply-To: <1400858430-4278-1-git-send-email-t.figa@samsung.com>
+References: <1400858430-4278-1-git-send-email-t.figa@samsung.com>
+Message-ID: <53886E0D.3050804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 30, 2014 at 1:30 PM, abdoulaye berthe <berthe.ab@gmail.com> wrote:
-> --- a/drivers/gpio/gpiolib.c
-> +++ b/drivers/gpio/gpiolib.c
-> @@ -1263,10 +1263,9 @@ static void gpiochip_irqchip_remove(struct gpio_chip *gpiochip);
->   *
->   * A gpio_chip with any GPIOs still requested may not be removed.
->   */
-> -int gpiochip_remove(struct gpio_chip *chip)
-> +void gpiochip_remove(struct gpio_chip *chip)
->  {
->         unsigned long   flags;
-> -       int             status = 0;
->         unsigned        id;
->
->         acpi_gpiochip_remove(chip);
-> @@ -1278,24 +1277,15 @@ int gpiochip_remove(struct gpio_chip *chip)
->         of_gpiochip_remove(chip);
->
->         for (id = 0; id < chip->ngpio; id++) {
-> -               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags)) {
-> -                       status = -EBUSY;
-> -                       break;
-> -               }
-> -       }
-> -       if (status == 0) {
-> -               for (id = 0; id < chip->ngpio; id++)
-> -                       chip->desc[id].chip = NULL;
-> -
-> -               list_del(&chip->list);
-> +               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags))
-> +                       panic("gpio: removing gpiochip with gpios still requested\n");
+Hi,
 
-panic?
+On 23.05.2014 17:20, Tomasz Figa wrote:
+> When CPU topology is specified in device tree, cpu_logical_map() does
+> not return core ID anymore, but rather full MPIDR value. This breaks
+> existing calculation of PMU register offsets on Exynos SoCs.
+> 
+> This patch fixes the problem by adjusting the code to use only core ID
+> bits of the value returned by cpu_logical_map() to allow CPU topology to
+> be specified in device tree on Exynos SoCs.
+> 
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+>  arch/arm/mach-exynos/hotplug.c | 10 ++++++----
+>  arch/arm/mach-exynos/platsmp.c | 34 +++++++++++++++++++---------------
+>  2 files changed, 25 insertions(+), 19 deletions(-)
 
-Is this likely to happen?
+Ping.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards,
+Tomasz
