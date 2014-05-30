@@ -1,47 +1,41 @@
 From: nikolay.borisov@arm.com (Nikolay Borisov)
-Date: Fri, 30 May 2014 17:59:45 +0100
-Subject: [PATCH v2 1/7] ARM: Make thread_save_fp macro aware of THUMB2 mode
+Date: Fri, 30 May 2014 17:59:49 +0100
+Subject: [PATCH v2 5/7] ARM: unwind: Use arm_get_current_stackframe
 In-Reply-To: <1401469191-29232-1-git-send-email-nikolay.borisov@arm.com>
 References: <1401469191-29232-1-git-send-email-nikolay.borisov@arm.com>
-Message-ID: <1401469191-29232-2-git-send-email-nikolay.borisov@arm.com>
+Message-ID: <1401469191-29232-6-git-send-email-nikolay.borisov@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nikolay Borisov <Nikolay.Borisov@arm.com>
 
-The thread_save_fp macro has been defined so that it always reads the fp member
-of the cpu_context_save struct. However, in the case of THUMB2 the fp is saved
-not in the fp (r11) member but rather in r7.
-
-This patch changes the way the macro is defined such that FP is read from the
-correct place depending on whether we are a THUMB2 kernel or not. This enables
-the backtrace in sitaution such as "echo t > /proc/sysrq-trigger" or the
-function in which a process sleeping when "ps -Al" is invoked.
+Make the unwind code use the correct API so that the frame pointer
+is extracted from the correct register.
 
 Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
-Reviewed-by: Anurag Aggarwal <anurag19aggarwal@gmail.com>
 ---
- arch/arm/include/asm/thread_info.h | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/kernel/unwind.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-index f989d7c..e4e4208 100644
---- a/arch/arm/include/asm/thread_info.h
-+++ b/arch/arm/include/asm/thread_info.h
-@@ -114,8 +114,14 @@ static inline struct thread_info *current_thread_info(void)
- 	((unsigned long)(task_thread_info(tsk)->cpu_context.pc))
- #define thread_saved_sp(tsk)	\
- 	((unsigned long)(task_thread_info(tsk)->cpu_context.sp))
-+
-+#ifndef CONFIG_THUMB2_KERNEL
- #define thread_saved_fp(tsk)	\
- 	((unsigned long)(task_thread_info(tsk)->cpu_context.fp))
-+#else
-+#define thread_saved_fp(tsk)	\
-+	((unsigned long)(task_thread_info(tsk)->cpu_context.r7))
-+#endif
+diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+index 3c21769..7aaec44 100644
+--- a/arch/arm/kernel/unwind.c
++++ b/arch/arm/kernel/unwind.c
+@@ -479,12 +479,10 @@ void unwind_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 		tsk = current;
  
- extern void crunch_task_disable(struct thread_info *);
- extern void crunch_task_copy(struct thread_info *, void *);
+ 	if (regs) {
+-		frame.fp = regs->ARM_fp;
+-		frame.sp = regs->ARM_sp;
+-		frame.lr = regs->ARM_lr;
++		arm_get_current_stackframe(regs, &frame);
+ 		/* PC might be corrupted, use LR in that case. */
+-		frame.pc = kernel_text_address(regs->ARM_pc)
+-			 ? regs->ARM_pc : regs->ARM_lr;
++		if (!kernel_text_address(regs->ARM_pc))
++			frame.pc = regs->ARM_lr;
+ 	} else if (tsk == current) {
+ 		frame.fp = (unsigned long)__builtin_frame_address(0);
+ 		frame.sp = current_sp;
 -- 
 1.8.1.5
