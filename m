@@ -1,37 +1,123 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 30 May 2014 10:17:49 -0600
-Subject: [PATCH v5 0/5] efuse driver for Tegra
-In-Reply-To: <20140530082356.GP5961@tbergstrom-lnx.Nvidia.com>
-References: <1401281677-32110-1-git-send-email-pdeschrijver@nvidia.com>
- <53878407.3050409@wwwdotorg.org>
- <20140530082356.GP5961@tbergstrom-lnx.Nvidia.com>
-Message-ID: <5388AF2D.4060909@wwwdotorg.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 30 May 2014 09:28:29 -0700
+Subject: [PATCH] clk: exynos5420: Keep aclk66_peric enabled during boot
+In-Reply-To: <53881102.1080406@gmail.com>
+References: <1401398496-4624-1-git-send-email-dianders@chromium.org>
+ <20140529222904.10062.22764@quantum> <53881102.1080406@gmail.com>
+Message-ID: <CAD=FV=Xsdaze6mDG=ZeCBZ9deYMjarftTK7YDtoN3fo5jzFbTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2014 02:23 AM, Peter De Schrijver wrote:
-> On Thu, May 29, 2014 at 09:01:27PM +0200, Stephen Warren wrote:
->> On 05/28/2014 06:54 AM, Peter De Schrijver wrote:
->>> This driver allows userspace to read the raw efuse data. Its userspace
->>> interface is modelled after the sunxi_sid driver which provides similar
->>> functionality for some Allwinner SoCs. It has been tested on
->>> Tegra20 (ventana), Tegra30 (beaverboard), Tegra114 (dalmore) and
->>> Tegra124 (jetson TK1).
->>
->>> Changes since v4:
->>>
->>> * Provide fallback to hardcoded 0x70000800 in case the apbmisc DT node is
->>>   missing. This is exactly what the current code does and prevents a system
->>>   crash in that case due to an invalid memory access by tegra_read_chipid()
->>
->> Wouldn't it be better to simply return an error?
-> 
-> This would mean you can't boot a system with these patches applied unless you
-> also update the device tree. The system would crash during boot because CCF
-> relies on tegra_read_chipid() as an APB barrier. Also tegra_boot_secondary()
-> relies on the chipid to select the correct method for booting secondary cores.
+Tomasz,
 
-Is this series really backwards-compatible anyway? tegra_init_fuse()
-contains a whole bunch of places where resources are pulled out of DT,
-and only one of those has a fallback to use APBMISC_BASE if the DT entry
-isn't present.
+On Thu, May 29, 2014 at 10:02 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi,
+>
+> On 30.05.2014 00:29, Mike Turquette wrote:
+>> Quoting Doug Anderson (2014-05-29 14:21:36)
+>>> Right now if you've got earlyprintk enabled on exynos5420-peach-pit
+>>> then you'll get a hang on boot.  Here's why:
+>>>
+>>> 1. The i2c-s3c2410 driver will probe at subsys_initcall.  It will
+>>>    enable its clock and disable it.  This is the clock "i2c2".
+>>> 2. The act of disabling "i2c2" will disable its parents.  In this case
+>>>    the parent is "aclk66_peric".  There are no other children of
+>>>    "aclk66_peric" officially enabled, so "aclk66_peric" will be turned
+>>>    off (despite being CLK_IGNORE_UNUSED, but that's by design).
+>>> 3. The next time you try to earlyprintk you'll do so without the UART
+>>>    clock enabled.  That's because the UART clocks are also children of
+>>>    "aclk66_peric".  You'll hang.
+>>>
+>>> There's no good place to put a clock enable for earlyprintk, which is
+>>> handled by a bunch of assembly code.  The best we can do is to handle
+>>> this in the clock driver.
+>>>
+>>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>>> ---
+>>>  drivers/clk/samsung/clk-exynos5420.c | 24 ++++++++++++++++++++++++
+>>>  1 file changed, 24 insertions(+)
+>>>
+>>> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+>>> index 9d7d7ee..1e586be 100644
+>>> --- a/drivers/clk/samsung/clk-exynos5420.c
+>>> +++ b/drivers/clk/samsung/clk-exynos5420.c
+>>> @@ -1172,11 +1172,17 @@ static struct of_device_id ext_clk_match[] __initdata = {
+>>>         { },
+>>>  };
+>>>
+>>> +/* Keep these clocks on until late_initcall */
+>>> +static const char *boot_clocks[] __initconst = {
+>>> +       "aclk66_peric",
+>>> +};
+>>> +
+>>>  /* register exynos5420 clocks */
+>>>  static void __init exynos5x_clk_init(struct device_node *np,
+>>>                 enum exynos5x_soc soc)
+>>>  {
+>>>         struct samsung_clk_provider *ctx;
+>>> +       int i;
+>>>
+>>>         if (np) {
+>>>                 reg_base = of_iomap(np, 0);
+>>> @@ -1226,6 +1232,12 @@ static void __init exynos5x_clk_init(struct device_node *np,
+>>>         }
+>>>
+>>>         exynos5420_clk_sleep_init();
+>>> +
+>>> +       for (i = 0; i < ARRAY_SIZE(boot_clocks); i++) {
+>>> +               struct clk *to_enable = __clk_lookup(boot_clocks[i]);
+>>
+>> How about replacing __clk_lookup with clk_get? You can keep the struct
+>> clk object hanging around for later...
+>>
+>
+> Mike, correct me if I'm wrong, but I thought you need clkdev look-up
+> entry for clk_get() to find a clock. Here, this clock apparently don't
+> have one and you don't even have a struct device * to pass to clk_get(),
+> so even if you had a look-up entry, it would need to be a wildcard entry
+> (with NULL device), which wouldn't be too elegant.
+
+I'll send up the next patch changing this clock to "GATE_A" which will
+allow global lookups.  ...then I'll use clk_get() as Mike requests.
+We can see if we like it better and can always move back to
+__clk_lookup().
+
+
+> Doug, isn't a similar thing needed for PM debug as well? Maybe having
+> this clock always ungated whenever DEBUG_LL is enabled would be enough?
+
+There may be a possible case where this is needed for PM debug, but I
+don't _think_ it's needed in all the common cases.  It's also not
+sufficient, I think.
+
+Specifically:
+
+1. This patch only gets "aclk66_peric", not the UART clock itself.  It
+makes the assumption (required for earlyprink) that the bootloader
+left enough clocks on to use the UART.  That is roughly documented in
+Documentation/arm/Booting.  Mostly this patch is making sure that we
+don't screw up the nice environment that the bootloader left for us.
+This solution has the nice side effect that we don't need to try to
+figure out which actual UART is active / grab the right clock.
+
+2. Without grabbing the real UART clock then PM debug would start
+failing anyway when the system disables all unused clocks in
+late_init.
+
+3. I would assume that if there was a problem here it would have
+surfaced in 5250.  5250 doesn't have the problem we're addressing here
+since there's no gate clock for "aclk66_peric" (or if there is one,
+it's not described in our clock tree).
+
+4. Assuming that you've got the serial port specified as a console=
+port, I think the core will use s3c24xx_serial_pm to enable the clock
+and leave it on.
+
+
+...I haven't got myself setup for PM debug upstream right now (would
+be good to get it configured / working locally eventually), but I
+think if we have problems to solve there then we should solve it in
+code related to PM debug.  How does that sound?
+
+Also note that on ChromeOS we always have DEBUG_LL enabled (though we
+usually don't have earlyprintk on the command line).
