@@ -1,71 +1,59 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 30 May 2014 10:33:46 -0500
-Subject: [PATCH v3 2/2] ARM : change fixmap mapping region to support 32
- CPUs
-In-Reply-To: <1397559967-26050-3-git-send-email-sdu.liu@huawei.com>
-References: <1397559967-26050-1-git-send-email-sdu.liu@huawei.com>
- <1397559967-26050-3-git-send-email-sdu.liu@huawei.com>
-Message-ID: <CAL_JsqKE-L2PN3mXHNdTPMEyTMR9ZtbgGB=O_V6nOXN0YC0a4A@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 30 May 2014 09:44:55 -0600
+Subject: [PATCH v1] ARM: pci: add call to pcie_bus_configure_settings()
+In-Reply-To: <1401297293-3950-1-git-send-email-m-karicheri2@ti.com>
+References: <1401297293-3950-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <20140530154455.GC4607@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 6:06 AM, Liu Hua <sdu.liu@huawei.com> wrote:
-> In 32-bit ARM systems, the fixmap mapping region can support
-> no more than 14 CPUs(total: 896k; one CPU: 64K). And we can
-> configure NR_CPUS up to 32. So there is a mismatch.
->
-> This patch moves fixmapping region downwards to region
-> 0xffc00000-0xffe00000. Then the fixmap mapping region can
-> support up to 32 CPUs
+On Wed, May 28, 2014 at 01:14:53PM -0400, Murali Karicheri wrote:
+> Call pcie_bus_configure_settings on ARM, like for other platforms.
+> pcie_bus_configure_settings makes sure the MPS across the bus is
+> uniform and provides the ability to tune the MRSS and MPS to higher
+> performance values. This is particularly important for embedded where
+> there is no firmware to program these PCI-E settings for the OS.
+> 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 
-Ugg, this series breaks using fixmap for anything other than kmap
-since 32 cpus requires all 2MB of the region and nothing is left.
-There's work in flight to support early_ioremap, early console, and RO
-text patching which all use the fixmap region.
+I applied this to pci/misc for v3.16.  Russell, let me know if you object
+or prefer another route, and I can drop it.  I tweaked the changelog but
+didn't touch the actual patch, so I think git will do the right thing if it
+arrives via two trees.
 
-There's a couple of options to solve this:
-
-- Only support up to 16 cpus. It could be anywhere between 17-31, but
-that seems somewhat unlikely. Are we really ever going to see 32-bit
-32 core systems?
-- Reduce KM_TYPE_NR from 16 to 15. Based on the comment for it, we
-probably don't want to do that. Is increasing it to the default of 20
-worthwhile? Some of the options here would allow doing that.
-- Add 0xffe00000-0xfff00000 to the fixmap region. This would make
-fixmap span 2 PMDs with the top PMD having a mixture of uses like we
-had before.
-- push the PCI i/o space down to 0xfec00000 and make fixmap 4MB. This
-is a cleaner solution as the 2 PMDs are only used for fixmap. This may
-require some static mapping adjustments on some platforms.
-- Same as previous option, but convert the PCI i/o space to fixmap
-entries. We don't really need all 2MB for PCI.
-
-Opinions on the best solution?
-
-
-Also, there is an error in the documentation below:
-
->
-> Signed-off-by: Liu Hua <sdu.liu@huawei.com>
+> CC: Russell King <linux@arm.linux.org.uk>
+> CC: Bjorn Helgaas <bhelgaas@google.com>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> CC: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > ---
->  Documentation/arm/memory.txt   |  2 +-
->  arch/arm/include/asm/fixmap.h  | 16 ++--------------
->  arch/arm/include/asm/highmem.h |  1 +
->  arch/arm/mm/highmem.c          | 27 +++++++++++++++++++++------
->  arch/arm/mm/mmu.c              |  4 ++++
->  5 files changed, 29 insertions(+), 21 deletions(-)
->
-> diff --git a/Documentation/arm/memory.txt b/Documentation/arm/memory.txt
-> index 4bfb9ff..a9fc59b 100644
-> --- a/Documentation/arm/memory.txt
-> +++ b/Documentation/arm/memory.txt
-> @@ -41,7 +41,7 @@ fffe8000      fffeffff        DTCM mapping area for platforms with
->  fffe0000       fffe7fff        ITCM mapping area for platforms with
->                                 ITCM mounted inside the CPU.
->
-> -fff00000       fffdffff        Fixmap mapping region.  Addresses provided
-> +fffc0000       ffdfffff        Fixmap mapping region.  Addresses provided
-
-s/fffc0000/ffc00000/
-
-Rob
+>  - Fixed comments against initial version
+>  arch/arm/kernel/bios32.c |   12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index 16d43cd..17a26c1 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -545,6 +545,18 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
+>  		 */
+>  		pci_bus_add_devices(bus);
+>  	}
+> +
+> +	list_for_each_entry(sys, &head, node) {
+> +		struct pci_bus *bus = sys->bus;
+> +
+> +		/* Configure PCI Express settings */
+> +		if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+> +			struct pci_bus *child;
+> +
+> +			list_for_each_entry(child, &bus->children, node)
+> +				pcie_bus_configure_settings(child);
+> +		}
+> +	}
+>  }
+>  
+>  #ifndef CONFIG_PCI_HOST_ITE8152
+> -- 
+> 1.7.9.5
+> 
