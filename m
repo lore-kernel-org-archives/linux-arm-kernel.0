@@ -1,59 +1,74 @@
-From: trblinux@gmail.com (Tushar Behera)
-Date: Fri, 30 May 2014 09:11:21 +0530
-Subject: [PATCH v11 0/3] Exynos 5410 support
-In-Reply-To: <538775AB.3000604@suse.de>
-References: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>
- <7hr43f9mmn.fsf@paris.lan> <538737CA.4070709@suse.de>
- <53874862.5080809@samsung.com> <538775AB.3000604@suse.de>
-Message-ID: <CAC5m3Bz53QO5tTTvk7qnBQtwtjMvSgYZ15prAvnLjdogQRsfMQ@mail.gmail.com>
+From: satish.patel@ti.com (Satish Patel)
+Date: Fri, 30 May 2014 09:21:35 +0530
+Subject: [PATCH v3 1/5] sc_phy:SmartCard(SC) PHY interface to SC controller
+In-Reply-To: <CAL_Jsq+E7a=wh_yzQyaSEVAwfa34BYZ4DxvLOfJGFVDsf1dZ+A@mail.gmail.com>
+References: <1401267437-22489-1-git-send-email-satish.patel@ti.com>	<1401267437-22489-2-git-send-email-satish.patel@ti.com>	<20140528185334.GA30763@kroah.com>	<5386F0FE.7040003@ti.com>
+ <CAL_Jsq+E7a=wh_yzQyaSEVAwfa34BYZ4DxvLOfJGFVDsf1dZ+A@mail.gmail.com>
+Message-ID: <53880047.7070804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 29, 2014 at 11:30 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Hi Tarek,
->
->
-> And I reproducibly get failures for CPUs 1-3, resulting in only one CPU
-> in /proc/cpuinfo (compared to 4 on downstream 3.14):
->
-> [    0.045778] CPU: Testing write buffer coherency: ok
-> [    0.045968] /cpus/cpu at 0 missing clock-frequency property
-> [    0.045993] /cpus/cpu at 1 missing clock-frequency property
-> [    0.046016] /cpus/cpu at 2 missing clock-frequency property
-> [    0.046040] /cpus/cpu at 3 missing clock-frequency property
-> [    0.046059] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-> [    0.046135] Setting up static identity map for 0x403a8920 - 0x403a8978
-> [    2.075052] CPU1: failed to come online
-> [    4.085095] CPU2: failed to come online
-> [    6.095142] CPU3: failed to come online
-> [    6.095237] Brought up 1 CPUs
-> [    6.095269] SMP: Total of 1 processors activated.
-> [    6.095303] CPU: All CPU(s) started in HYP mode.
-> [    6.095336] CPU: Virtualization extensions available.
->
-> I also notice another apparent device tree issue:
->
-> [    7.341814] of_get_named_gpiod_flags: can't parse gpios property of
-> node '/soc/mmc at 12220000/slot at 0[0]'
-> [    7.341850] of_get_named_gpiod_flags: can't parse gpios property of
-> node '/soc/mmc at 12220000/slot at 0[0]'
->
-> Are any of those known issues and being worked on?
-> (The CPU failures affected 5420 Arndale Octa as well iirc.)
->
-
-Can you check after applying following two patches for Arndale-Octa
-([1],[2])? In other words, a patch similar to [2] might be required
-for this board too if it is booting under secure mode.
-
-[1] http://www.spinics.net/lists/linux-samsung-soc/msg31776.html
-
-[PATCH v2 Resend 1/2] ARM: EXYNOS: Update secondary boot addr for secure mode
-
-[2] http://www.spinics.net/lists/linux-samsung-soc/msg31777.html
-
-[PATCH v2 Resend 2/2] ARM: dts: Add secure firmware support for Arndale-octa
 
 
---
-Tushar Behera
+On 5/29/2014 7:17 PM, Rob Herring wrote:
+> On Thu, May 29, 2014 at 3:34 AM, Satish Patel <satish.patel@ti.com> wrote:
+>>
+>>
+>> On 5/29/2014 12:23 AM, Greg KH wrote:
+>>>
+>>> On Wed, May 28, 2014 at 02:27:13PM +0530, Satish Patel wrote:
+>>>>
+>>>> SmartCard controller uses this interface to communicate with
+>>>> SmartCard via PHY
+>>>>
+>>>> Some SmartCard PHY has multiple slots for cards.
+>>>> This inerface also enables controller to communicate
+>>>> with one or more SmartCard connected over phy.
+>>>>
+>>>> interface structure includes following APIs
+>>>> - set/get config
+>>>> - activate/deactivate smart card
+>>>> - warm reset
+>>>> - register_notify (for card insert/remove/overheat)
+>>>> - unregister_notify
+>>>>
+>>>> Signed-off-by: Satish Patel <satish.patel@ti.com>
+>>>> ---
+>>>>    Documentation/sc_phy.txt |  171
+>>>> ++++++++++++++++++++++++++++++++++++++++++++++
+>>>>    include/linux/sc_phy.h   |  136 ++++++++++++++++++++++++++++++++++++
+>>>>    2 files changed, 307 insertions(+)
+>>>>    create mode 100644 Documentation/sc_phy.txt
+>>>>    create mode 100644 include/linux/sc_phy.h
+>>>
+>>>
+>>> These are .h files, but where is the "api" functions that use
+>>> these structures defined at?
+>>>
+>> This is like template/wrappers, smart card phy driver will write API
+>> functions. And smartcard controller will call these functions.
+>> With proposed approach, smartcard controller can communicate with any smart
+>> card phy (TI/NxP) without change in code. Using DT entry smartcard and PHY
+>> will gets connected with each other.
+>> Refer diagram given @Documentation/sc_phy.txt.
+>>
+>>
+>>> confused,
+>
+> I believe the api Greg is wondering about is the notifier which as I
+> commented is not a good design.
+>
+> There is now a phy subsystem. I don't know if it has what you need,
+> but you should look at it to determine if it will work or could be
+> extended to work.
+>
+I have given my comments on notifier, it is required to notify real time 
+events like card insert/remove to the smart card controller. As this 
+interrupts tied to phy (in case phy is present) not with controller.
+
+Existing phy subsystem does not support generic operations for the phy. 
+If at all it adds supports for these, in future I am ok to get align 
+with it.
+
+> Rob
+>
