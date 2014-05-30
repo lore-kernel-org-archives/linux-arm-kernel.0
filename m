@@ -1,54 +1,53 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 30 May 2014 08:07:11 +0200
-Subject: [PATCH] CMA: correct unlock target
-In-Reply-To: <53874AB5.5010908@codeaurora.org>
-References: <1401344958-3790-1-git-send-email-iamjoonsoo.kim@lge.com>
- <5386E313.6070705@samsung.com> <53874AB5.5010908@codeaurora.org>
-Message-ID: <5388200F.7000201@samsung.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 30 May 2014 12:53:46 +0800
+Subject: [PATCH 2/2] serial: imx: disable the receiver ready interrupt
+ for imx_stop_rx
+In-Reply-To: <53881C99.1090207@gmail.com>
+References: <1400819575-20435-1-git-send-email-b32955@freescale.com>
+ <1400819575-20435-2-git-send-email-b32955@freescale.com>
+ <53881C99.1090207@gmail.com>
+Message-ID: <20140530045344.GA13338@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, May 30, 2014 at 07:52:25AM +0200, Dirk Behme wrote:
+> On 23.05.2014 06:32, Huang Shijie wrote:
+> >This patch disables the receiver ready interrupt for imx_stop_rx.
+> >It reduces the interrupt numbers when the uart is going to close
+> >or suspend.
+> >
+> >Signed-off-by: Huang Shijie <b32955@freescale.com>
+> >---
+> >  drivers/tty/serial/imx.c |    4 ++++
+> >  1 files changed, 4 insertions(+), 0 deletions(-)
+> >
+> >diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> >index ed6cdf7..6026101 100644
+> >--- a/drivers/tty/serial/imx.c
+> >+++ b/drivers/tty/serial/imx.c
+> >@@ -440,6 +440,10 @@ static void imx_stop_rx(struct uart_port *port)
+> >
+> >  	temp = readl(sport->port.membase + UCR2);
+> >  	writel(temp & ~UCR2_RXEN, sport->port.membase + UCR2);
+> >+
+> >+	/* disable the `Receiver Ready Interrrupt` */
+> >+	temp = readl(sport->port.membase + UCR1);
+> >+	writel(temp & ~UCR1_RRDYEN, sport->port.membase + UCR1);
+> 
+> Will this change cause a loss or a processing delay of RX characters
+> pending in the RX FIFO ?
+> 
+> It is not clear whether disabling the receiver will clear the RX
+> FIFO. My guess is that the contents of the RX FIFO will remain
+> intact when the receiver is disabled. The RX interrupt has an
+> opportunity to mop up these pending characters in the RX FIFO but
+> disabling the RX interrupt has potential to leave those characters
+> in the RX FIFO. Does it matter ?
+When the @stop_rx() is called, the system(or the application) is closing
+or suspending, and it has decided to abandon the RX data. 
 
-On 2014-05-29 16:56, Laura Abbott wrote:
-> On 5/29/2014 12:34 AM, Marek Szyprowski wrote:
-> > Hello,
-> >
-> > On 2014-05-29 08:29, Joonsoo Kim wrote:
-> >> 'cma: Remove potential deadlock situation' introduces per cma area mutex
-> >> for bitmap management. It is good, but there is one mistake. When we
-> >> can't find appropriate area in bitmap, we release cma_mutex global lock
-> >> rather than cma->lock and this is a bug. So fix it.
-> >>
-> >> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> >
-> > Thanks for spotting this issue. I've added it to my tree.
-> >
-> >> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-> >> index 6f6bffc..83969f8 100644
-> >> --- a/drivers/base/dma-contiguous.c
-> >> +++ b/drivers/base/dma-contiguous.c
-> >> @@ -331,7 +331,7 @@ struct page *dma_alloc_from_contiguous(struct device *dev, int count,
-> >>           pageno = bitmap_find_next_zero_area(cma->bitmap, cma->count,
-> >>                               start, count, mask);
-> >>           if (pageno >= cma->count) {
-> >> -            mutex_unlock(&cma_mutex);
-> >> +            mutex_unlock(&cma->lock);
-> >>               break;
-> >>           }
-> >>           bitmap_set(cma->bitmap, pageno, count);
-> >
-> > Best regards
->
-> Acked-by: Laura Abbott <lauraa@codeaurora.org>
->
-> Who actually ended up picking up that patch? I sent it out but didn't realize it had been
-> picked up.
+So i think it do not matter the RX FIFO has some left data.
+We will reset the RX FIFO when the UART port is re-started again.
 
-I've taken it to my dma-mapping tree some time ago, I think that
-I've replied to the original mail with information about taking it.
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+thanks
+Huang Shijie
