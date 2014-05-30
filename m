@@ -1,154 +1,205 @@
-From: elder@linaro.org (Alex Elder)
-Date: Thu, 29 May 2014 22:20:15 -0500
-Subject: [PATCH v2 2/5] clk: bcm281xx: implement prerequisite clocks
-In-Reply-To: <20140524005358.23136.8918@quantum>
-References: <1400590362-11177-1-git-send-email-elder@linaro.org>
- <1400590362-11177-3-git-send-email-elder@linaro.org>
- <20140524005358.23136.8918@quantum>
-Message-ID: <5387F8EF.3030607@linaro.org>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 30 May 2014 13:38:04 +1000
+Subject: linux-next: manual merge of the omap_dss2 tree with the arm-soc tree
+Message-ID: <20140530133804.414f6d5c@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/2014 07:53 PM, Mike Turquette wrote:
-> Quoting Alex Elder (2014-05-20 05:52:39)
->> @@ -743,11 +746,16 @@ struct clk *kona_clk_setup(struct kona_clk *bcm_clk)
->>         clk = clk_register(NULL, &bcm_clk->hw);
->>         if (IS_ERR(clk)) {
->>                 pr_err("%s: error registering clock %s (%ld)\n", __func__,
->> -                       init_data->name, PTR_ERR(clk));
->> +                       name, PTR_ERR(clk));
->>                 goto out_teardown;
->>         }
->>         BUG_ON(!clk);
->>  
->> +       /*  Make it so we can look the clock up using clk_find() */
-> 
-> s/clk_find/clk_get/ ?
-> 
->> +       bcm_clk->cl.con_id = name;
->> +       bcm_clk->cl.clk = clk;
->> +       clkdev_add(&bcm_clk->cl);
-> 
-> This is not so nice. I'll explain more below.
+Hi Tomi,
 
-OK, despite what I said before, I do need this, or
-something like it, so I can look up clocks by name.
-(Continued below.)
+Today's linux-next merge of the omap_dss2 tree got a conflict in
+arch/arm/boot/dts/am437x-gp-evm.dts between commit 99ffa6425f1b ("ARM:
+dts: am437x-gp-evm: add support for parallel NAND flash") from the
+arm-soc tree and commit 0186bec97131 ("ARM: dts: am437x-gp-evm: add LCD
+data") from the omap_dss2 tree.
 
-> 
->> +
->>         return clk;
->>  out_teardown:
->>         bcm_clk_teardown(bcm_clk);
->> diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
->> index d8a7f38..fd070d6 100644
->> --- a/drivers/clk/bcm/clk-kona.c
->> +++ b/drivers/clk/bcm/clk-kona.c
->> @@ -1195,6 +1195,48 @@ static bool __peri_clk_init(struct kona_clk *bcm_clk)
->>         return true;
->>  }
->>  
->> +static bool __kona_clk_init(struct kona_clk *bcm_clk);
->> +static bool __kona_prereq_init(struct kona_clk *bcm_clk)
->> +{
->> +       struct clk *clk;
->> +       struct clk_hw *hw;
->> +       struct kona_clk *prereq;
->> +
->> +       BUG_ON(clk_is_initialized(bcm_clk));
->> +
->> +       if (!bcm_clk->p.prereq)
->> +               return true;
->> +
->> +       clk = clk_get(NULL, bcm_clk->p.prereq);
-> 
-> The clkdev global namespace is getting polluted with all of these new
-> prereq clocks. If there was an associated struct device *dev with them
-> then it wouldn't be a problem, but you might get collisions with other
-> clock drivers that also use NULL for the device.
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-Yes I recognize this.  Ideally a CCU would have a device struct
-associated with it that I could use, because the name of a clock
-is unique within that context.  But I have no such device available.
-(Please correct me if I'm wrong.  I don't want to make one up, and
-I would like to use it if it exists.)
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-> It would be a lot nicer for the clocks that require a prereq clock to
-> just use clk_get(dev, "well_known_name"); in the same way that drivers
-> use it, without considering it a special case.
-
-I can do something like that if I can get a meaningful device
-structure.  Do you have any suggestions?
-
-Other than this issue, I've implemented all of the previous
-initialization routines using ->prepare() instead, and it
-works fine.  I'm going to send an updated series out tomorrow.
-I want to look it over again after a good night's sleep...
-
-					-Alex
-
->> +       if (IS_ERR(clk)) {
->> +               pr_err("%s: unable to get prereq clock %s for %s\n",
->> +                       __func__, bcm_clk->p.prereq, bcm_clk->init_data.name);
->> +               return false;
->> +       }
->> +       hw = __clk_get_hw(clk);
->> +       if (!hw) {
->> +               pr_err("%s: null hw pointer for clock %s\n", __func__,
->> +                       bcm_clk->init_data.name);
->> +               return false;
->> +       }
->> +       prereq = to_kona_clk(hw);
->> +       if (prereq->ccu != bcm_clk->ccu) {
->> +               pr_err("%s: prereq clock %s CCU different for clock %s\n",
->> +                       __func__, bcm_clk->p.prereq, bcm_clk->init_data.name);
->> +               return false;
->> +       }
->> +
->> +       /* Initialize the prerequisite clock first */
->> +       if (!__kona_clk_init(prereq)) {
->> +               pr_err("%s: failed to init prereq %s for clock %s\n",
->> +                       __func__, bcm_clk->p.prereq, bcm_clk->init_data.name);
->> +               return false;
->> +       }
->> +       bcm_clk->p.prereq_clk = clk;
-> 
-> The above seems like a lot effort to go to. Why not skip all of this and
-> just implement the prerequisite logic in the .enable & .disable
-> callbacks? E.g. your kona clk .enable callback would look like:
-> 
-> diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
-> index d603c4e..51f35b4 100644
-> --- a/drivers/clk/bcm/clk-kona.c
-> +++ b/drivers/clk/bcm/clk-kona.c
-> @@ -987,6 +987,12 @@ static int kona_peri_clk_enable(struct clk_hw *hw)
->  {
->  	struct kona_clk *bcm_clk = to_kona_clk(hw);
->  	struct bcm_clk_gate *gate = &bcm_clk->u.peri->gate;
-> +	int ret;
-> +
-> +	hw->prereq_bus_clk = clk_get(hw->ccu, hw->prereq);
-> +	ret = clk_enable(prereq_bus_clk);
-> +	if (ret)
-> +		return ret;
->  
->  	return clk_gate(bcm_clk->ccu, bcm_clk->init_data.name, gate, true);
->  }
-> @@ -997,6 +1003,9 @@ static void kona_peri_clk_disable(struct clk_hw *hw)
->  	struct bcm_clk_gate *gate = &bcm_clk->u.peri->gate;
->  
->  	(void)clk_gate(bcm_clk->ccu, bcm_clk->init_data.name, gate, false);
-> +
-> +	clk_disable(hw->prereq_bus_clk);
-> +	clk_put(hw->prereq_bus_clk);
->  }
->  
->  static int kona_peri_clk_is_enabled(struct clk_hw *hw)
-> 
-> 
-> I guess it might take some trickery to get clk_get to work like that.
-> Let me know if I've completely lost the plot.
-> 
-> Regards,
-> Mike
-> 
+diff --cc arch/arm/boot/dts/am437x-gp-evm.dts
+index c25d15837ce9,3acccdf258e9..000000000000
+--- a/arch/arm/boot/dts/am437x-gp-evm.dts
++++ b/arch/arm/boot/dts/am437x-gp-evm.dts
+@@@ -151,26 -193,46 +193,67 @@@
+  		>;
+  	};
+  
+ +	nand_flash_x8: nand_flash_x8 {
+ +		pinctrl-single,pins = <
+ +			0x26c(PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* spi2_cs0.gpio/eMMCorNANDsel */
+ +			0x0  (PIN_INPUT  | MUX_MODE0)	/* gpmc_ad0.gpmc_ad0 */
+ +			0x4  (PIN_INPUT  | MUX_MODE0)	/* gpmc_ad1.gpmc_ad1 */
+ +			0x8  (PIN_INPUT  | MUX_MODE0)	/* gpmc_ad2.gpmc_ad2 */
+ +			0xc  (PIN_INPUT  | MUX_MODE0)	/* gpmc_ad3.gpmc_ad3 */
+ +			0x10 (PIN_INPUT  | MUX_MODE0)	/* gpmc_ad4.gpmc_ad4 */
+ +			0x14 (PIN_INPUT  | MUX_MODE0)	/* gpmc_ad5.gpmc_ad5 */
+ +			0x18 (PIN_INPUT  | MUX_MODE0)	/* gpmc_ad6.gpmc_ad6 */
+ +			0x1c (PIN_INPUT  | MUX_MODE0)	/* gpmc_ad7.gpmc_ad7 */
+ +			0x70 (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_wait0.gpmc_wait0 */
+ +			0x74 (PIN_OUTPUT_PULLUP | MUX_MODE7)	/* gpmc_wpn.gpmc_wpn */
+ +			0x7c (PIN_OUTPUT | MUX_MODE0)		/* gpmc_csn0.gpmc_csn0  */
+ +			0x90 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_advn_ale.gpmc_advn_ale */
+ +			0x94 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_oen_ren.gpmc_oen_ren */
+ +			0x98 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_wen.gpmc_wen */
+ +			0x9c (PIN_OUTPUT | MUX_MODE0)		/* gpmc_be0n_cle.gpmc_be0n_cle */
+ +		>;
+ +	};
+++
++ 	dss_pins: dss_pins {
++ 		pinctrl-single,pins = <
++ 			0x020 (PIN_OUTPUT_PULLUP | MUX_MODE1) /*gpmc ad 8 -> DSS DATA 23 */
++ 			0x024 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++ 			0x028 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++ 			0x02c (PIN_OUTPUT_PULLUP | MUX_MODE1)
++ 			0x030 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++ 			0x034 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++ 			0x038 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++ 			0x03c (PIN_OUTPUT_PULLUP | MUX_MODE1) /*gpmc ad 15 -> DSS DATA 16 */
++ 			0x0a0 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS DATA 0 */
++ 			0x0a4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++ 			0x0a8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++ 			0x0ac (PIN_OUTPUT_PULLUP | MUX_MODE0)
++ 			0x0b0 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++ 			0x0b4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++ 			0x0b8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++ 			0x0bc (PIN_OUTPUT_PULLUP | MUX_MODE0)
++ 			0x0c0 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++ 			0x0c4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++ 			0x0c8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++ 			0x0cc (PIN_OUTPUT_PULLUP | MUX_MODE0)
++ 			0x0d0 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++ 			0x0d4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++ 			0x0d8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++ 			0x0dc (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS DATA 15 */
++ 			0x0e0 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS VSYNC */
++ 			0x0e4 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS HSYNC */
++ 			0x0e8 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS PCLK */
++ 			0x0ec (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS AC BIAS EN */
++ 
++ 		>;
++ 	};
++ 
++ 	lcd_pins: lcd_pins {
++ 		pinctrl-single,pins = <
++ 			/* GPIO 5_8 to select LCD / HDMI */
++ 			0x238 (PIN_OUTPUT_PULLUP | MUX_MODE7)
++ 		>;
++ 	};
+  };
+  
+  &i2c0 {
+@@@ -273,89 -330,16 +356,103 @@@
+  	phy-mode = "rgmii";
+  };
+  
+ +&elm {
+ +	status = "okay";
+ +};
+ +
+ +&gpmc {
+ +	status = "okay";
+ +	pinctrl-names = "default";
+ +	pinctrl-0 = <&nand_flash_x8>;
+ +	ranges = <0 0 0 0x01000000>;	/* minimum GPMC partition = 16MB */
+ +	nand at 0,0 {
+ +		reg = <0 0 4>;		/* device IO registers */
+ +		ti,nand-ecc-opt = "bch8";
+ +		ti,elm-id = <&elm>;
+ +		nand-bus-width = <8>;
+ +		gpmc,device-width = <1>;
+ +		gpmc,sync-clk-ps = <0>;
+ +		gpmc,cs-on-ns = <0>;
+ +		gpmc,cs-rd-off-ns = <40>;
+ +		gpmc,cs-wr-off-ns = <40>;
+ +		gpmc,adv-on-ns = <0>;
+ +		gpmc,adv-rd-off-ns = <25>;
+ +		gpmc,adv-wr-off-ns = <25>;
+ +		gpmc,we-on-ns = <0>;
+ +		gpmc,we-off-ns = <20>;
+ +		gpmc,oe-on-ns = <3>;
+ +		gpmc,oe-off-ns = <30>;
+ +		gpmc,access-ns = <30>;
+ +		gpmc,rd-cycle-ns = <40>;
+ +		gpmc,wr-cycle-ns = <40>;
+ +		gpmc,wait-pin = <0>;
+ +		gpmc,wait-on-read;
+ +		gpmc,wait-on-write;
+ +		gpmc,bus-turnaround-ns = <0>;
+ +		gpmc,cycle2cycle-delay-ns = <0>;
+ +		gpmc,clk-activation-ns = <0>;
+ +		gpmc,wait-monitoring-ns = <0>;
+ +		gpmc,wr-access-ns = <40>;
+ +		gpmc,wr-data-mux-bus-ns = <0>;
+ +		/* MTD partition table */
+ +		/* All SPL-* partitions are sized to minimal length
+ +		 * which can be independently programmable. For
+ +		 * NAND flash this is equal to size of erase-block */
+ +		#address-cells = <1>;
+ +		#size-cells = <1>;
+ +		partition at 0 {
+ +			label = "NAND.SPL";
+ +			reg = <0x00000000 0x00040000>;
+ +		};
+ +		partition at 1 {
+ +			label = "NAND.SPL.backup1";
+ +			reg = <0x00040000 0x00040000>;
+ +		};
+ +		partition at 2 {
+ +			label = "NAND.SPL.backup2";
+ +			reg = <0x00080000 0x00040000>;
+ +		};
+ +		partition at 3 {
+ +			label = "NAND.SPL.backup3";
+ +			reg = <0x000c0000 0x00040000>;
+ +		};
+ +		partition at 4 {
+ +			label = "NAND.u-boot-spl-os";
+ +			reg = <0x00100000 0x00080000>;
+ +		};
+ +		partition at 5 {
+ +			label = "NAND.u-boot";
+ +			reg = <0x00180000 0x00100000>;
+ +		};
+ +		partition at 6 {
+ +			label = "NAND.u-boot-env";
+ +			reg = <0x00280000 0x00040000>;
+ +		};
+ +		partition at 7 {
+ +			label = "NAND.u-boot-env.backup1";
+ +			reg = <0x002c0000 0x00040000>;
+ +		};
+ +		partition at 8 {
+ +			label = "NAND.kernel";
+ +			reg = <0x00300000 0x00700000>;
+ +		};
+ +		partition at 9 {
+ +			label = "NAND.file-system";
+ +			reg = <0x00a00000 0x1f600000>;
+ +		};
+ +	};
+ +};
+++
++ &dss {
++ 	status = "ok";
++ 
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&dss_pins>;
++ 
++ 	port {
++ 		dpi_out: endpoint at 0 {
++ 			remote-endpoint = <&lcd_in>;
++ 			data-lines = <24>;
++ 		};
++ 	};
++ };
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140530/ef2404a9/attachment.sig>
