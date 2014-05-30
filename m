@@ -1,105 +1,61 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 30 May 2014 09:32:42 -0700
-Subject: [PATCH v2] clk: exynos5420: Keep aclk66_peric enabled during boot
-In-Reply-To: <1401398496-4624-1-git-send-email-dianders@chromium.org>
-References: <1401398496-4624-1-git-send-email-dianders@chromium.org>
-Message-ID: <1401467562-5585-1-git-send-email-dianders@chromium.org>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 30 May 2014 11:38:13 -0500 (CDT)
+Subject: [GIT PULL] qcom DT changes for v3.16-2
+Message-ID: <alpine.DEB.2.00.1405301137040.5291@galak-ubuntu.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Right now if you've got earlyprintk enabled on exynos5420-peach-pit
-then you'll get a hang on boot.  Here's why:
+The following changes since commit 08f9234ad6b0b8bc51046346eabf5b92e631e62a:
 
-1. The i2c-s3c2410 driver will probe at subsys_initcall.  It will
-   enable its clock and disable it.  This is the clock "i2c2".
-2. The act of disabling "i2c2" will disable its parents.  In this case
-   the parent is "aclk66_peric".  There are no other children of
-   "aclk66_peric" officially enabled, so "aclk66_peric" will be turned
-   off (despite being CLK_IGNORE_UNUSED, but that's by design).
-3. The next time you try to earlyprintk you'll do so without the UART
-   clock enabled.  That's because the UART clocks are also children of
-   "aclk66_peric".  You'll hang.
+   soc: qcom: Add device tree binding for GSBI (2014-05-23 11:38:53 -0500)
 
-There's no good place to put a clock enable for earlyprintk, which is
-handled by a bunch of assembly code.  The best we can do is to handle
-this in the clock driver.
+are available in the git repository at:
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
-Changes in v2:
-- Use GATE_A and clk_get().  Save the clock for putting later.
-- Return 0 from exynos5420_clk_late_init().
+   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-dt-for-3.16-2
 
- drivers/clk/samsung/clk-exynos5420.c | 33 +++++++++++++++++++++++++++++++--
- 1 file changed, 31 insertions(+), 2 deletions(-)
+for you to fetch changes up to f46d23f6f3676720de2a3f195413a5e69f202238:
 
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index 9d7d7ee..70b607a 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -890,8 +890,8 @@ static struct samsung_gate_clock exynos5x_gate_clks[] __initdata = {
- 			GATE_BUS_TOP, 9, CLK_IGNORE_UNUSED, 0),
- 	GATE(0, "aclk66_psgen", "mout_user_aclk66_psgen",
- 			GATE_BUS_TOP, 10, CLK_IGNORE_UNUSED, 0),
--	GATE(CLK_ACLK66_PERIC, "aclk66_peric", "mout_user_aclk66_peric",
--			GATE_BUS_TOP, 11, CLK_IGNORE_UNUSED, 0),
-+	GATE_A(CLK_ACLK66_PERIC, "aclk66_peric", "mout_user_aclk66_peric",
-+			GATE_BUS_TOP, 11, CLK_IGNORE_UNUSED, 0, "aclk66_peric"),
- 	GATE(0, "aclk266_isp", "mout_user_aclk266_isp",
- 			GATE_BUS_TOP, 13, 0, 0),
- 	GATE(0, "aclk166", "mout_user_aclk166",
-@@ -1172,11 +1172,22 @@ static struct of_device_id ext_clk_match[] __initdata = {
- 	{ },
- };
- 
-+/* Keep these clocks on until late_initcall */
-+struct boot_clock {
-+	char *name;
-+	struct clk *clk;
-+};
-+
-+static struct boot_clock boot_clocks[] __initdata = {
-+	{ .name = "aclk66_peric", },
-+};
-+
- /* register exynos5420 clocks */
- static void __init exynos5x_clk_init(struct device_node *np,
- 		enum exynos5x_soc soc)
- {
- 	struct samsung_clk_provider *ctx;
-+	int i;
- 
- 	if (np) {
- 		reg_base = of_iomap(np, 0);
-@@ -1226,6 +1237,11 @@ static void __init exynos5x_clk_init(struct device_node *np,
- 	}
- 
- 	exynos5420_clk_sleep_init();
-+
-+	for (i = 0; i < ARRAY_SIZE(boot_clocks); i++) {
-+		boot_clocks[i].clk = clk_get(NULL, boot_clocks[i].name);
-+		clk_prepare_enable(boot_clocks[i].clk);
-+	}
- }
- 
- static void __init exynos5420_clk_init(struct device_node *np)
-@@ -1239,3 +1255,16 @@ static void __init exynos5800_clk_init(struct device_node *np)
- 	exynos5x_clk_init(np, EXYNOS5800);
- }
- CLK_OF_DECLARE(exynos5800_clk, "samsung,exynos5800-clock", exynos5800_clk_init);
-+
-+static int __init exynos5420_clk_late_init(void)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(boot_clocks); i++) {
-+		clk_disable_unprepare(boot_clocks[i].clk);
-+		clk_put(boot_clocks[i].clk);
-+	}
-+
-+	return 0;
-+}
-+late_initcall(exynos5420_clk_late_init);
--- 
-1.9.1.423.g4596e3a
+   ARM: dts: qcom: Add APQ8084-MTP board support (2014-05-29 11:16:45 -0500)
+
+----------------------------------------------------------------
+Qualcomm ARM Based Device Tree Updates for v3.16-2
+
+* Updated MSM8660/MSM8960/MSM8974 dts for various updates or conformitity
+   to binding specs
+* Added APQ8064 SoC and IFC6410 board device tree support
+* Added APQ8084 SoC and APQ8084-MTP board device tree support
+
+----------------------------------------------------------------
+Georgi Djakov (2):
+       ARM: dts: qcom: Add APQ8084 SoC support
+       ARM: dts: qcom: Add APQ8084-MTP board support
+
+Kumar Gala (4):
+       ARM: dts: qcom: Update msm8974/apq8074 device trees
+       ARM: dts: qcom: Update msm8960 device trees
+       ARM: dts: qcom: Update msm8660 device trees
+       ARM: dts: qcom: Add initial APQ8064 SoC and IFC6410 board device trees
+
+  arch/arm/boot/dts/Makefile                     |   9 +-
+  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts     |  16 +++
+  arch/arm/boot/dts/qcom-apq8064-v2.0.dtsi       |   1 +
+  arch/arm/boot/dts/qcom-apq8064.dtsi            | 170 +++++++++++++++++++++++
+  arch/arm/boot/dts/qcom-apq8074-dragonboard.dts |  28 +++-
+  arch/arm/boot/dts/qcom-apq8084-mtp.dts         |   6 +
+  arch/arm/boot/dts/qcom-apq8084.dtsi            | 179 +++++++++++++++++++++++++
+  arch/arm/boot/dts/qcom-msm8660-surf.dts        |  10 ++
+  arch/arm/boot/dts/qcom-msm8660.dtsi            | 115 +++++++++-------
+  arch/arm/boot/dts/qcom-msm8960-cdp.dts         |  10 ++
+  arch/arm/boot/dts/qcom-msm8960.dtsi            | 176 +++++++++++++-----------
+  arch/arm/boot/dts/qcom-msm8974.dtsi            |  49 +++----
+  arch/arm/mach-qcom/board.c                     |   4 +-
+  13 files changed, 612 insertions(+), 161 deletions(-)
+  create mode 100644 arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+  create mode 100644 arch/arm/boot/dts/qcom-apq8064-v2.0.dtsi
+  create mode 100644 arch/arm/boot/dts/qcom-apq8064.dtsi
+  create mode 100644 arch/arm/boot/dts/qcom-apq8084-mtp.dts
+  create mode 100644 arch/arm/boot/dts/qcom-apq8084.dtsi
+
+--
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
