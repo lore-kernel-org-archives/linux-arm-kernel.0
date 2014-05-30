@@ -1,97 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 30 May 2014 21:11:07 +0200
-Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140530112728.GB3949@e103592.cambridge.arm.com>
-References: <1400877395-4235-1-git-send-email-thierry.reding@gmail.com>
- <20140530073006.GA24748@ulmo>
- <20140530112728.GB3949@e103592.cambridge.arm.com>
-Message-ID: <4663172.oXIylQOrlk@wuerfel>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 30 May 2014 21:13:59 +0200
+Subject: [PATCH v2 11/11] sched: replace capacity by activity
+In-Reply-To: <20140530063402.GB11096@twins.programming.kicks-ass.net>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-12-git-send-email-vincent.guittot@linaro.org>
+ <20140529140204.GH11074@laptop.programming.kicks-ass.net>
+ <CAKfTPtACXf+c01O+dCU2ZTc-Mrs+nTKYsu0_aBt8awxSg5WD=g@mail.gmail.com>
+ <20140530063402.GB11096@twins.programming.kicks-ass.net>
+Message-ID: <CAKfTPtDDMT84k+gJ2qmw9ApVmiJAgP_E5xGu0qTwj84p7XJQjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 May 2014 12:27:28 Dave Martin wrote:
-> On Fri, May 30, 2014 at 08:30:08AM +0100, Thierry Reding wrote:
-> > On Thu, May 29, 2014 at 09:52:22AM -0600, Stephen Warren wrote:
-> > > On 05/23/2014 02:36 PM, Thierry Reding wrote:
-> > > I think this is a mistake. address-cells/size-cells are for transactions
-> > > flowing down the bus (from the CPU to date). Describing a connection
-> > > from a device to an IOMMU is something completely different, and should
-> > > therefore simply use an iommu-cells property to describe any necessary
-> > > information. If we start re-using properties for different things in
-> > > different contexts, how is anyone going to know what they mean, and how
-> > > will conflicts be resolved. For example, what if there's a single HW
-> > > module that both acts as a regular register bus with children (where
-> > > address-cells/size-cells defines how transactions reach the children
-> > > from the parent), and is also an IOMMU (where according to this binding
-> > > proposal, address-cells/size-cells represent some aspect of the IOMMU
-> > > feature). Using different properties for different things is the only
-> > > sane way to keep different concepts separate. Another alternative would
-> > > be to represent the single HW module as separate nodes in DT, but I
-> > > think that will only make our lives harder, and where I've done that in
-> > > the past, I've regretted it.
-> > 
-> > There was some back-and-forth on this topic and the latest concensus
-> > when I wrote the second version was that #address-cells and #size-cells
-> > were to be used.
-> > 
-> > But there was some bore back-and-forth after that, and it seems like
-> > Arnd no longer thinks that using #address-cells and #size-cells is a
-> > good idea either[0].
-> 
-> Mistake or not, ePAPR already (ab)uses the address concept for PCI.
-> Unless ePAPR is wrong, I don't think it makes sense to argue that
-> the address concept cannot be repurposed.
-> 
-> The reason why this is abused for PCI is the same as our reason here:
-> different masters really are treated as distinct even when accessing
-> the same destination address, and DT has no general native way to
-> describe that.
-> 
-> One clear advantage of using #address-cells etc. is that ePAPR already
-> has very clear and well-defined ways of how to specify range mappings.
-> This gives us a ready-made way to describe windowed IOMMUs and 1:1
-> remappings of whole blocks of master IDs, which are the most obvious
-> cases other than having a small-integer set of explicit IDs.
-> 
-> That said, the PCI pseudo-address thing is not something we _necessarily_
-> want to repeat.
+On 30 May 2014 08:34, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Thu, May 29, 2014 at 09:56:24PM +0200, Vincent Guittot wrote:
+>> On 29 May 2014 16:02, Peter Zijlstra <peterz@infradead.org> wrote:
+>> > On Fri, May 23, 2014 at 05:53:05PM +0200, Vincent Guittot wrote:
+>> >> @@ -6052,8 +6006,8 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
+>> >>                * with a large weight task outweighs the tasks on the system).
+>> >>                */
+>> >>               if (prefer_sibling && sds->local &&
+>> >> -                 sds->local_stat.group_has_capacity)
+>> >> -                     sgs->group_capacity = min(sgs->group_capacity, 1U);
+>> >> +                 sds->local_stat.group_capacity > 0)
+>> >> +                     sgs->group_capacity = min(sgs->group_capacity, 1L);
+>> >>
+>> >>               if (update_sd_pick_busiest(env, sds, sg, sgs)) {
+>> >>                       sds->busiest = sg;
+>> >> @@ -6228,7 +6182,7 @@ static inline void calculate_imbalance(struct lb_env *env, struct sd_lb_stats *s
+>> >>                * have to drop below capacity to reach cpu-load equilibrium.
+>> >>                */
+>> >>               load_above_capacity =
+>> >> -                     (busiest->sum_nr_running - busiest->group_capacity);
+>> >> +                     (busiest->sum_nr_running - busiest->group_weight);
+>> >>
+>> >>               load_above_capacity *= (SCHED_LOAD_SCALE * SCHED_POWER_SCALE);
+>> >>               load_above_capacity /= busiest->group_power;
+>> >
+>> > I think you just broke PREFER_SIBLING here..
+>>
+>> you mean by replacing the capacity which was reflecting the number of
+>> core for SMT by the group_weight ?
+>
+> Right to in the first hunk we lower group_capacity to 1 when prefer_sibling,
+> then in the second hunk, you replace that group_capacity usage with
+> group_weight.
+>
+> With the end result that prefer_sibling is now ineffective.
 
-I'm really impartial to the question of whether to use #address-cells
-or #iommus now. It's possible that we can use the addresses in some
-meaningful way, but it's not clear to me that this will help make the
-representation cleaner or that we will actually want it for SMMU.
+ok
 
-> > Arnd, can you take another look at this binding and see if there's
-> > anything else missing? If not I'll go through the document again and
-> > update all #address-cells/#size-cells references with #iommu-cells as
-> > appropriate and submit v3.
-> 
-> How do you envisage propagation of the master ID bits downstream of the
-> IOMMU would be described?
-> 
-> We will definitely need a way to describe this for GICv3.  How those
-> values are propagated is likely to vary between related SoCs and doesn't
-> feel like it should be baked into a driver, especially for the ARM SMMU
-> which may get reused in radically different SoC families from different
-> vendors.
-> 
-> The most likely types of remapping are the adding of a base offset or
-> some extra bits to the ID -- because not all MSIs to the GIC will
-> necessarily pass through the IOMMU.  It's also possible that we might
-> see ID squashing or folding in some systems.
-> 
-> 
-> For types of remapping which mix the ID and address together, I now
-> do tend to agree that any flexibility arising from describing that
-> in a general way that is unlikely to repay the cost of trying to
-> interpret and analyse the DT.  Defining a few sterotypical kinds
-> of mapping explicitly, as needed, looks more sensible for now.  The
-> windowed-IOMMU case is one example.
+>
+> That said, I fudged the prefer_sibling usage into the capacity logic,
+> mostly because I could and it was already how the SMT stuff was working.
+> But there is no reason we should continue to intertwine these two
+> things.
+>
+> So I think it would be good to have a patch that implements
+> prefer_sibling on nr_running separate from the existing capacity bits,
+> and then convert the remaining capacity bits to utilization (or activity
+> or whatever you did call it, see Morton's comments etc.).
 
-For MSI, my feeling is that we'd just be best off doing an end-to-end
-description. Any device using an MSI would have an interrupt specifier
-that is sufficient for the interrupt controller to understand where
-the IRQ comes from, and return an address/value pair back to the driver
-to program into some register.
+ok, i'm going to prepare such change
 
-	Arnd
+>
+>
