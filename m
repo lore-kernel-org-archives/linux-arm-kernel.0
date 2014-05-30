@@ -1,53 +1,75 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 30 May 2014 12:53:46 +0800
-Subject: [PATCH 2/2] serial: imx: disable the receiver ready interrupt
- for imx_stop_rx
-In-Reply-To: <53881C99.1090207@gmail.com>
-References: <1400819575-20435-1-git-send-email-b32955@freescale.com>
- <1400819575-20435-2-git-send-email-b32955@freescale.com>
- <53881C99.1090207@gmail.com>
-Message-ID: <20140530045344.GA13338@shlinux1.ap.freescale.net>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Fri, 30 May 2014 11:49:02 +0530
+Subject: [PATCH 1/1] ARM: vt8500: Staticize local symbols
+In-Reply-To: <53879C1F.1060804@prisktech.co.nz>
+References: <1401191863-9404-1-git-send-email-sachin.kamat@linaro.org>
+ <4308955.HrfvHXcbAr@wuerfel> <53879C1F.1060804@prisktech.co.nz>
+Message-ID: <CAK9yfHyZ+wr=e=nONnsq3==AT-CQUyNRuhDBBu0mfr6=mExO2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 30, 2014 at 07:52:25AM +0200, Dirk Behme wrote:
-> On 23.05.2014 06:32, Huang Shijie wrote:
-> >This patch disables the receiver ready interrupt for imx_stop_rx.
-> >It reduces the interrupt numbers when the uart is going to close
-> >or suspend.
-> >
-> >Signed-off-by: Huang Shijie <b32955@freescale.com>
-> >---
-> >  drivers/tty/serial/imx.c |    4 ++++
-> >  1 files changed, 4 insertions(+), 0 deletions(-)
-> >
-> >diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> >index ed6cdf7..6026101 100644
-> >--- a/drivers/tty/serial/imx.c
-> >+++ b/drivers/tty/serial/imx.c
-> >@@ -440,6 +440,10 @@ static void imx_stop_rx(struct uart_port *port)
-> >
-> >  	temp = readl(sport->port.membase + UCR2);
-> >  	writel(temp & ~UCR2_RXEN, sport->port.membase + UCR2);
-> >+
-> >+	/* disable the `Receiver Ready Interrrupt` */
-> >+	temp = readl(sport->port.membase + UCR1);
-> >+	writel(temp & ~UCR1_RRDYEN, sport->port.membase + UCR1);
-> 
-> Will this change cause a loss or a processing delay of RX characters
-> pending in the RX FIFO ?
-> 
-> It is not clear whether disabling the receiver will clear the RX
-> FIFO. My guess is that the contents of the RX FIFO will remain
-> intact when the receiver is disabled. The RX interrupt has an
-> opportunity to mop up these pending characters in the RX FIFO but
-> disabling the RX interrupt has potential to leave those characters
-> in the RX FIFO. Does it matter ?
-When the @stop_rx() is called, the system(or the application) is closing
-or suspending, and it has decided to abandon the RX data. 
+On 30 May 2014 02:14, Tony Prisk <linux@prisktech.co.nz> wrote:
+>
+> On 28/05/14 00:05, Arnd Bergmann wrote:
+>>
+>> On Tuesday 27 May 2014 17:27:43 Sachin Kamat wrote:
+>>>
+>>> Variables local to this file are made static.
+>>>
+>>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>>> ---
+>>>   arch/arm/mach-vt8500/vt8500.c |    6 +++---
+>>>   1 file changed, 3 insertions(+), 3 deletions(-)
+>>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>>
+>> Looks good to me, but you forgot to take the maintainer on Cc.
+>>
+>> How should we handle this patch? I guess this is the only one
+>> for vt8500 in 3.16, so I can pick it up directly with Tony's
+>> Ack.
+>>
+>>> diff --git a/arch/arm/mach-vt8500/vt8500.c
+>>> b/arch/arm/mach-vt8500/vt8500.c
+>>> index 4a73464cb11b..2da7be31e7e2 100644
+>>> --- a/arch/arm/mach-vt8500/vt8500.c
+>>> +++ b/arch/arm/mach-vt8500/vt8500.c
+>>> @@ -44,7 +44,7 @@
+>>>     static void __iomem *pmc_base;
+>>>   -void vt8500_restart(enum reboot_mode mode, const char *cmd)
+>>> +static void vt8500_restart(enum reboot_mode mode, const char *cmd)
+>>>   {
+>>>         if (pmc_base)
+>>>                 writel(1, pmc_base + VT8500_PMSR_REG);
+>>> @@ -60,7 +60,7 @@ static struct map_desc vt8500_io_desc[] __initdata = {
+>>>         },
+>>>   };
+>>>   -void __init vt8500_map_io(void)
+>>> +static void __init vt8500_map_io(void)
+>>>   {
+>>>         iotable_init(vt8500_io_desc, ARRAY_SIZE(vt8500_io_desc));
+>>>   }
+>>> @@ -72,7 +72,7 @@ static void vt8500_power_off(void)
+>>>         asm("mcr%? p15, 0, %0, c7, c0, 4" : : "r" (0));
+>>>   }
+>>>   -void __init vt8500_init(void)
+>>> +static void __init vt8500_init(void)
+>>>   {
+>>>         struct device_node *np;
+>>>   #if defined(CONFIG_FB_VT8500) || defined(CONFIG_FB_WM8505)
+>>>
+> Acked-by: Tony Prisk <linux@prisktech.co.nz>
 
-So i think it do not matter the RX FIFO has some left data.
-We will reset the RX FIFO when the UART port is re-started again.
+Thanks Tony.
 
-thanks
-Huang Shijie
+> Can you pick this up please Arnd? Doesn't look like there will be anything
+> else for 3.16
+
+Arnd,
+
+I have a few more similar patches for other platforms (mvebu, sti, spear).
+Can I send them as well along with the accumulated acks for you to apply?
+
+---
+With warm regards,
+Sachin
