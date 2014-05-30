@@ -1,101 +1,140 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 30 May 2014 21:49:59 +0200
-Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <CAL_Jsq+tkFNpjSEZboT+o69B_Z3a8e-ZVKaYDmLwtkyYoPy6VQ@mail.gmail.com>
-References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
- <4545972.cM7IP1qTXQ@wuerfel>
- <CAL_Jsq+tkFNpjSEZboT+o69B_Z3a8e-ZVKaYDmLwtkyYoPy6VQ@mail.gmail.com>
-Message-ID: <5288123.eXagyPAxNq@wuerfel>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 30 May 2014 14:50:29 -0500
+Subject: [PATCH v6 2/2] Documentation: devicetree: Add boost-frequency
+ binding to list boost mode frequency
+In-Reply-To: <20140530185549.GN24233@leverpostej>
+References: <1401440477-4328-1-git-send-email-thomas.ab@samsung.com>
+ <1401440477-4328-3-git-send-email-thomas.ab@samsung.com>
+ <20140530130827.GK24233@leverpostej>
+ <CAJuA9ajs6K1PVtXC4_U0vQsA0oPnpaF_PdMfiQJxBFStF3Z2aw@mail.gmail.com>
+ <20140530185549.GN24233@leverpostej>
+Message-ID: <5388E105.3070609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 May 2014 14:31:55 Rob Herring wrote:
-> On Fri, May 30, 2014 at 2:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Friday 30 May 2014 08:16:05 Rob Herring wrote:
-> >> On Fri, May 23, 2014 at 3:33 PM, Thierry Reding
-> >> <thierry.reding@gmail.com> wrote:
-> >> > From: Thierry Reding <treding@nvidia.com>
-> >> > +IOMMU master node:
-> >> > +==================
-> >> > +
-> >> > +Devices that access memory through an IOMMU are called masters. A device can
-> >> > +have multiple master interfaces (to one or more IOMMU devices).
-> >> > +
-> >> > +Required properties:
-> >> > +--------------------
-> >> > +- iommus: A list of phandle and IOMMU specifier pairs that describe the IOMMU
-> >> > +  master interfaces of the device. One entry in the list describes one master
-> >> > +  interface of the device.
-> >> > +
-> >> > +When an "iommus" property is specified in a device tree node, the IOMMU will
-> >> > +be used for address translation. If a "dma-ranges" property exists in the
-> >> > +device's parent node it will be ignored. An exception to this rule is if the
-> >> > +referenced IOMMU is disabled, in which case the "dma-ranges" property of the
-> >> > +parent shall take effect.
-> >>
-> >> Just thinking out loud, could you have dma-ranges in the iommu node
-> >> for the case when the iommu is enabled rather than putting the DMA
-> >> window information into the iommus property?
-> >>
-> >> This would probably mean that you need both #iommu-cells and #address-cells.
-> >
-> > The reason for doing like this was that you may need a different window
-> > for each device, while there can only be one dma-ranges property in
-> > an iommu node.
+On 05/30/2014 01:55 PM, Mark Rutland wrote:
+> On Fri, May 30, 2014 at 07:05:43PM +0100, Thomas Abraham wrote:
+>> Hi Mark,
+>>
+>> On Fri, May 30, 2014 at 6:38 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>> Hi,
+>>>
+>>> Apologies for being somewhat late w.r.t. review on this.
+>>>
+>>> On Fri, May 30, 2014 at 10:01:17AM +0100, Thomas Abraham wrote:
+>>>> From: Thomas Abraham <thomas.ab@samsung.com>
+>>>>
+>>>> Add a new optional boost-frequency binding for specifying the frequencies
+>>>> usable in boost mode.
+>>>>
+>>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>>> Cc: Pawel Moll <pawel.moll@arm.com>
+>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>>>> Cc: Kumar Gala <galak@codeaurora.org>
+>>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+>>>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>>> Acked-by: Nishanth Menon <nm@ti.com>
+>>>> Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+>>>> ---
+>>>>  .../devicetree/bindings/cpufreq/cpufreq-boost.txt  |   38 ++++++++++++++++++++
+>>>>  1 file changed, 38 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+>>>> new file mode 100644
+>>>> index 0000000..63ed0fc
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+>>>> @@ -0,0 +1,38 @@
+>>>> +* Device tree binding for CPU boost frequency (aka over-clocking)
+>>>> +
+>>>> +Certain CPU's can be operated in optional 'boost' mode (or sometimes referred as
+>>>
+>>> Nit: CPUs (we're not greengrocers [1])
+>>>
+>>>> +overclocking) in which the CPU can operate at frequencies which are not
+>>>> +specified by the manufacturer as CPU's operating frequency.
+>>>> +
+>>>> +Optional Properties:
+>>>> +- boost-frequencies: list of frequencies in KHz to be used only in boost mode.
+>>>> +  This list should be a subset of frequencies listed in "operating-points"
+>>>> +  property. Refer to Documentation/devicetree/bindings/power/opp.txt for
+>>>> +  details about "operating-points" property.
+>>>
+>>> What is 'boost-mode'?
+>>
+>> boost-mode activates additional one or more cpu clock speeds (which
+>> are not specified as operating frequency of the cpu by the
+>> manufacturer). The cpu is allowed to operate in these boost mode
+>> speeds when the boost mode is active. The boost mode speeds are
+>> usually undocumented. Some of the chip samples could be clocked in
+>> boost mode speeds and only such samples can be safely operated in
+>> boost mode.
+>>
+>> The mechanism of entry into and exit out of boost mode is outside the
+>> scope of this documentation.
+>>
+>>>
+>>> What are the limitations on boost frequencies? When is a CPU expected to
+>>> go to these frequencies and for now long? When should I as a dt author
+>>> place elements in boost-frequencies?
+>>
+>> I will add these details in the next revision of this patch.
 > 
-> My suggestion was that you also put the IDs in the dma-ranges as the
-> first cell much as ranges for PCI encodes other information in the
-> first cell. Then you can have an entry for each ID. The downside is
-> another special case like PCI.
+> Cheers.
 > 
-> The argument for using #address-cells and #size-cells seems to be to
-> align with how ranges work. If that's the route we want to go, then I
-> say we should not stop there and actually use dma-ranges as well.
-> Otherwise, I don't see the advantage over #iommu-cells.
-
-I can see how dma-ranges in bus nodes work, it just doesn't seem to
-have any reasonable meaning in the iommu node itself.
-
-> > I don't understand the problem. If you have stream IDs 0 through 7,
-> > you would have
-> >
-> >         master at a {
-> >                 ...
-> >                 iommus = <&smmu 0>;
-> >         };
-> >
-> >         master at b {
-> >                 ...
-> >                 iommus = <&smmu 1;
-> >         };
-> >
-> >         ...
-> >
-> >         master at 12 {
-> >                 ...
-> >                 iommus = <&smmu 7;
-> >         };
-> >
-> > and you don't need a window at all. Why would you need a mask of
-> > some sort?
+>>>
+>>> Why are these in both operating-points and boost-frequencies? It'll be
+>>> really easy to accidentally forget to mark something as a
+>>> boost-frequency this way. Why not have a boost-points instead?
+>>
+>> Does boost-points mean a set of clock speeds which are not listed as
+>> part of operating-points property? If yes, that also is a possible
+>> implementation (it was implemented in one of the earlier version of
+>> this series). Could you confirm that you want the boost mode speeds to
+>> be exclusive of the speeds listed in operating-points?
 > 
-> 1 master with 7 IDs like this:
+> If these boost mode operating points are not generally advisable for use
+> as the other operating-points are, then they should IMO been in an
+> entirely separate property exclusive of (but in the same format as) the
+> operating-points property, e.g.
 > 
->          master at a {
->                  ...
->                  iommus = <&smmu 0> <&smmu 1> <&smmu 2> <&smmu 3>
-> <&smmu 4> <&smmu 5> <&smmu 6> <&smmu 7>;
->          };
+> operating points = <A B>, <C D>;
+> boost-points = <E F>;
+
+you are asking boost frequencies to remain for ever tied down to OPP
+style description.
+
+What we are trying to describe? "What are my SoC's overclocked
+frequencies"? That description can be used even in a system that does
+not use OPP style table (say ACPI based OPP tables or whatever
+acronymned table).
+
+Tying it down to operating points just because we have it today as a
+convenient description, is limiting.
+
+Further, if we decide to educate boost-frequencies to also indicate
+how long is it safe? That does indeed belong to boost-frequency
+description and not OPP description. Or if we decide to change
+operating-points description[1] in the future has an impact on
+"boost-points" description, when it should not have.
+
 > 
-> If there was any sort of window, then it is almost certainly the same
-> window for each ID.
+> Otherwise, without boost-mode support we have to parse the boost mode
+> table to figure out which points to avoid. Or if someone typos a value
+That is OS usage of h/w description - yeah - in anycase, if OS has no
+ability to deal with boost-frequencies, it should skip it for sure.
 
-Ok, I see. In that case you'd probably want to have #address-cells = <1>
-and #size-cells = <1> and give a range of IDs like
+> in either table we might go into a boost mode when we didn't want to!
+> 
+There are other ways to screw up device with dts typo. you could give
+a wrong voltage(extra 0?) and ensure you never use the chip ever
+again.. typos are dt bugs, we can do the best to write robust code to
+report them.
 
-	iommus = <&smmu 0 8>;
 
-Do you think that ranges can have a meaningful definition with the ARM
-SMMU stream IDs?
-
-	Arnd
+[1] http://marc.info/?t=140059618500008&r=1&w=2
+-- 
+Regards,
+Nishanth Menon
