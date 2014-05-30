@@ -1,67 +1,43 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 30 May 2014 13:26:37 +0100
-Subject: [PATCH] i2c: Make I2C ID tables non-mandatory for DT'ed and/or
- ACPI'ed devices
-In-Reply-To: <1401452797-29521-1-git-send-email-lee.jones@linaro.org>
-References: <1401452797-29521-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1401452797-29521-3-git-send-email-lee.jones@linaro.org>
+From: riku.voipio@linaro.org (Riku Voipio)
+Date: Fri, 30 May 2014 15:28:19 +0300
+Subject: =?UTF-8?q?=5BPATCH=5D=20thermal=3A=20allow=20building=20dove=5Fthermal=20with=20mvebu?=
+Message-ID: <1401452899-13952-1-git-send-email-riku.voipio@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the I2C framework insists on devices supplying an I2C ID
-table.  Many of the devices which do so unnecessarily adding quite a
-few wasted lines to kernel code.  This patch allows drivers a means
-to 'not' supply the aforementioned table and match on either DT
-and/or ACPI match tables instead.
+DT-enabled Dove has moved from ARCH_DOVE in mach-dove to MACH_DOVE
+in mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
+DT-only MACH_DOVE to thermal Kconfig.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+This was originally supposed to go in via "ARM: dove: prepare new Dove DT Kconfig"
+patch from Sebastian Hesselbarth for 3.15, but slipped through the cracks.
+
+I've tested on CuBox that without this patch you can't compile
+dove_thermal into a mach-mvebu based kernel, and with this patch I can
+build the driver and it works as expected run-time.
+
+Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: Eduardo Valentin <edubezval@gmail.com>
+Cc: linux-pm at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
 ---
- drivers/i2c/i2c-core.c | 20 ++++++++++++++++++--
- 1 file changed, 18 insertions(+), 2 deletions(-)
+ drivers/thermal/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index 7c7f4b8..49c534d 100644
---- a/drivers/i2c/i2c-core.c
-+++ b/drivers/i2c/i2c-core.c
-@@ -260,13 +260,29 @@ static int i2c_device_probe(struct device *dev)
- {
- 	struct i2c_client	*client = i2c_verify_client(dev);
- 	struct i2c_driver	*driver;
-+	const struct of_device_id *of_match	= dev->driver->of_match_table;
-+	const struct acpi_device_id *acpi_match	= dev->driver->acpi_match_table;
-+	const struct i2c_device_id *id;
- 	int status;
+diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+index 2d51912..5783c72 100644
+--- a/drivers/thermal/Kconfig
++++ b/drivers/thermal/Kconfig
+@@ -151,7 +151,7 @@ config KIRKWOOD_THERMAL
  
- 	if (!client)
- 		return 0;
- 
- 	driver = to_i2c_driver(dev->driver);
--	if (!driver->probe || !driver->id_table)
-+	if (!driver->probe)
-+		return -EINVAL;
-+
-+	/*
-+	 * An I2C ID table is not madatory, if and only if, a suitable Device
-+	 * Tree and/or ACPI match table entry is supplied for the probing
-+	 * device.
-+	 */
-+	if (driver->id_table)
-+		id = i2c_match_id(driver->id_table, client);
-+	else if (of_match_device(of_match, dev) ||
-+		 acpi_match_device(acpi_match, dev))
-+		id = NULL;
-+	else
- 		return -ENODEV;
- 
- 	if (!device_can_wakeup(&client->dev))
-@@ -275,7 +291,7 @@ static int i2c_device_probe(struct device *dev)
- 	dev_dbg(dev, "probe\n");
- 
- 	acpi_dev_pm_attach(&client->dev, true);
--	status = driver->probe(client, i2c_match_id(driver->id_table, client));
-+	status = driver->probe(client, id);
- 	if (status)
- 		acpi_dev_pm_detach(&client->dev, true);
- 
+ config DOVE_THERMAL
+ 	tristate "Temperature sensor on Marvell Dove SoCs"
+-	depends on ARCH_DOVE
++	depends on ARCH_DOVE ||?MACH_DOVE
+ 	depends on OF
+ 	help
+ 	  Support for the Dove thermal sensor driver in the Linux thermal
 -- 
-1.8.3.2
+2.0.0.rc2
