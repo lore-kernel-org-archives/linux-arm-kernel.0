@@ -1,52 +1,57 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 30 May 2014 14:36:18 +0300
-Subject: [PATCH v5 3/5] misc: fuse: Add efuse driver for Tegra
-In-Reply-To: <538784C1.6000504@wwwdotorg.org>
-References: <1401281677-32110-1-git-send-email-pdeschrijver@nvidia.com>
- <1401281677-32110-4-git-send-email-pdeschrijver@nvidia.com>
- <538784C1.6000504@wwwdotorg.org>
-Message-ID: <20140530113618.GQ5961@tbergstrom-lnx.Nvidia.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 30 May 2014 13:39:15 +0200
+Subject: [PATCH 2/2] gpio: gpiolib: set gpiochip_remove retval to void
+In-Reply-To: <1401449454-30895-2-git-send-email-berthe.ab@gmail.com>
+References: <20140530094025.3b78301e@canb.auug.org.au>
+ <1401449454-30895-1-git-send-email-berthe.ab@gmail.com>
+ <1401449454-30895-2-git-send-email-berthe.ab@gmail.com>
+Message-ID: <CAMuHMdV6AtjD2aqO3buzj8Eo7A7xc_+ROYnxEi2sdjMaqFiAuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 29, 2014 at 09:04:33PM +0200, Stephen Warren wrote:
-> On 05/28/2014 06:54 AM, Peter De Schrijver wrote:
-> > Implement fuse driver for Tegra20, Tegra30, Tegra114 and Tegra124.
-> 
-> > diff --git a/Documentation/ABI/testing/sysfs-driver-tegra-fuse b/Documentation/ABI/testing/sysfs-driver-tegra-fuse
-> 
-> > +Description:	read-only access to the efuses on Tegra20, Tegra30, Tegra114
-> > +		and Tegra124 SoC's from NVIDIA. The efuses contain write once
-> > +		data programmed at the factory. The data is layed out in 32bit
-> > +		words in LSB first formnat. The number of valid bits depends
-> 
-> s/formnat/format/
-> 
-> > +		on the word and the SoC. The mapping is as follows:
-> > +
-> > +		For Tegra20:
-> > +		Word 0 - 1    : bit 0
-> > +		Word 2        : unused
-> > +		Word 3        : bits 0 - 31
-> > +		Word 4        : bits 0 - 7
-> 
-> Do we really need these long tables that indicate which bits are used?
-> As I mentioned before, when I asked for documentation of the format of
-> these files, all I wanted was a brief not indicating that the data was
-> binary, and that each bit potentially represents a fuse... Either we
-> should leave it at that, or actually document what each bit represents,
-> which would hopefully be a pointless duplication of the TRM.
+On Fri, May 30, 2014 at 1:30 PM, abdoulaye berthe <berthe.ab@gmail.com> wrote:
+> --- a/drivers/gpio/gpiolib.c
+> +++ b/drivers/gpio/gpiolib.c
+> @@ -1263,10 +1263,9 @@ static void gpiochip_irqchip_remove(struct gpio_chip *gpiochip);
+>   *
+>   * A gpio_chip with any GPIOs still requested may not be removed.
+>   */
+> -int gpiochip_remove(struct gpio_chip *chip)
+> +void gpiochip_remove(struct gpio_chip *chip)
+>  {
+>         unsigned long   flags;
+> -       int             status = 0;
+>         unsigned        id;
+>
+>         acpi_gpiochip_remove(chip);
+> @@ -1278,24 +1277,15 @@ int gpiochip_remove(struct gpio_chip *chip)
+>         of_gpiochip_remove(chip);
+>
+>         for (id = 0; id < chip->ngpio; id++) {
+> -               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags)) {
+> -                       status = -EBUSY;
+> -                       break;
+> -               }
+> -       }
+> -       if (status == 0) {
+> -               for (id = 0; id < chip->ngpio; id++)
+> -                       chip->desc[id].chip = NULL;
+> -
+> -               list_del(&chip->list);
+> +               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags))
+> +                       panic("gpio: removing gpiochip with gpios still requested\n");
 
-Some fuses are OEM defined, so there is no way to document all fuses there.
-Would you be ok with just dropping the tables then? So, the description would
-become:
+panic?
 
-Description:    read-only access to the efuses on Tegra20, Tegra30, Tegra114
-                and Tegra124 SoC's from NVIDIA. The efuses contain write once
-                data programmed at the factory. The data is layed out in 32bit
-                words in LSB first format. The number of valid bits depends
-                on the word and the SoC.
+Is this likely to happen?
 
-Cheers,
+Gr{oetje,eeting}s,
 
-Peter.
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
