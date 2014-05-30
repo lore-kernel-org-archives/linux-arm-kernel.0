@@ -1,36 +1,65 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 30 May 2014 13:18:52 -0600
-Subject: [E1000-devel] ARM support for igb driver
-In-Reply-To: <CAHH3p5+cR+AQRjxxA=AZN-P2yNSk9Qb6W0BjhAuFa7WPp38=DQ@mail.gmail.com>
-References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>
- <201405061718.54012.arnd@arndb.de>
- <1399389873.29530.3.camel@weser.hi.pengutronix.de>
- <4799695.pjGjqc80tj@wuerfel>
- <CAHH3p5+rNiSLBBeL-coYroa62rxQJ6wjxTdkCcUtXzvvcAQkXQ@mail.gmail.com>
- <5388BE1D.7040504@intel.com>
- <CAHH3p5+cR+AQRjxxA=AZN-P2yNSk9Qb6W0BjhAuFa7WPp38=DQ@mail.gmail.com>
-Message-ID: <20140530191852.GA25314@obsidianresearch.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 30 May 2014 21:19:53 +0200
+Subject: [RFC] Sort out S5P SoCs support in mainline
+In-Reply-To: <5388D2E5.5080006@samsung.com>
+References: <021f01cf7a61$69853e30$3c8fba90$@samsung.com>
+ <13875033.1X6R9lksgc@wuerfel> <5385C3CC.6010509@gmail.com>
+ <5388D2E5.5080006@samsung.com>
+Message-ID: <5388D9D9.5020602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 30, 2014 at 11:32:34PM +0530, shiv prakash Agarwal wrote:
-> Finally we see that this hang occurs because some VDM is sent by
-> this I210 card.  Why this card sends VDM? and how can we disable it?
 
-> VDM = Venodor Defined Message
 
-FWIW, when I last looked at Intel stuff in an analyzer it was sending
-regular VDMs for some purpose.
+On 30.05.2014 20:50, Kukjin Kim wrote:
+> On 05/28/14 20:09, Tomasz Figa wrote:
+>> On 28.05.2014 13:04, Arnd Bergmann wrote:
+>>> On Wednesday 28 May 2014 19:41:41 Kukjin Kim wrote:
+>>>> Hi all,
+>>>>
+>>>> I'm wondering who need to support following SoCs/boards in mainline.
+>>>>
+>>>> * S5P64X0/SMDK6440 and SMDK6450
+>>>> * S5PC100/SMDKC100
+>>>>
+>>>> If nobody is using them, how about to remove them from mainline?
+>>>
+>>> I talked about this with Tomasz Figa before, he also thinks they can
+>>> be removed.
+>>> I don't see any reason to keep them myself, and will apply a patch to
+>>> remove
+>>> them. Of course, if later somebody comes around who does need them,
+>>> we can
+>>> revert the patch to bring them back.
+> 
+> Yeah, agreed.
+> 
+>>
+>> Or better, if later somebody comes around who does need them, we can add
+>> them properly, using Device Tree and existing generic code.
+>>
+> Of course.
+> 
+>> Anyway, for removal of both s5p64x0 and s5pc100:
+>>
+>> Acked-by: Tomasz Figa<t.figa@samsung.com>
+>>
+>> Actually I have played a bit with the code to see how much can be
+>> removed and ended up with following branch:
+>>
+>> https://github.com/tom3q/linux.git v3.17-cleanup
+>>
+>> Feel free to do _whatever_ you want with patches there.
+>>
+> OK, thanks.
+> 
+> Let me remove them from mainline when 3.16-rc1 is released...
 
-Type 1 VDMs should not cause any errors, the root port should just
-silently discard them.
+Alright.
 
-If your root port is returning an error completion or otherwise from a
-type 1 VDM then it is broken and the device would be properly
-asserting DLP. Some work around would be required for that kind of HW
-defect :|
+I have a series to convert s5pv210 to DT-only waiting to be sent as soon
+as 3.16-rc1 is released, but if you remove those two first, I should be
+able to simplify several things, so I'll wait.
 
-I once tracked down a similar bug with VDM handling in a PCI-E
-device..
-
-Jason
+Best regards,
+Tomasz
