@@ -1,244 +1,71 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 30 May 2014 18:03:57 +0300
-Subject: [PATCH RESEND] clk: flatten clk tree in debugfs
-Message-ID: <1401462237-14954-1-git-send-email-pdeschrijver@nvidia.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 30 May 2014 10:33:46 -0500
+Subject: [PATCH v3 2/2] ARM : change fixmap mapping region to support 32
+ CPUs
+In-Reply-To: <1397559967-26050-3-git-send-email-sdu.liu@huawei.com>
+References: <1397559967-26050-1-git-send-email-sdu.liu@huawei.com>
+ <1397559967-26050-3-git-send-email-sdu.liu@huawei.com>
+Message-ID: <CAL_JsqKE-L2PN3mXHNdTPMEyTMR9ZtbgGB=O_V6nOXN0YC0a4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch flattens the clk tree in CCF debugfs. Instead of representing the
-clocks and their hierarchy as a directory structure under
-/sys/kernel/debug/clk, each clock gets a single directory directly under
-/sys/kernel/debug/clk. The orphans directory is replaced by a file called
-clk_orphan_summary.
+On Tue, Apr 15, 2014 at 6:06 AM, Liu Hua <sdu.liu@huawei.com> wrote:
+> In 32-bit ARM systems, the fixmap mapping region can support
+> no more than 14 CPUs(total: 896k; one CPU: 64K). And we can
+> configure NR_CPUS up to 32. So there is a mismatch.
+>
+> This patch moves fixmapping region downwards to region
+> 0xffc00000-0xffe00000. Then the fixmap mapping region can
+> support up to 32 CPUs
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
-Apologies for the noise. I missed linux-arm-kernel at lists.infradead.org in the
-first post.
+Ugg, this series breaks using fixmap for anything other than kmap
+since 32 cpus requires all 2MB of the region and nothing is left.
+There's work in flight to support early_ioremap, early console, and RO
+text patching which all use the fixmap region.
 
----
- drivers/clk/clk.c |  114 ++++++++++++++++------------------------------------
- 1 files changed, 35 insertions(+), 79 deletions(-)
+There's a couple of options to solve this:
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index dff0373..453ff3b0 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -36,6 +36,17 @@ static HLIST_HEAD(clk_root_list);
- static HLIST_HEAD(clk_orphan_list);
- static LIST_HEAD(clk_notifier_list);
- 
-+static struct hlist_head *all_lists[] = {
-+	&clk_root_list,
-+	&clk_orphan_list,
-+	NULL,
-+};
-+
-+static struct hlist_head *orphan_list[] = {
-+	&clk_orphan_list,
-+	NULL,
-+};
-+
- /***           locking             ***/
- static void clk_prepare_lock(void)
- {
-@@ -98,7 +109,6 @@ static void clk_enable_unlock(unsigned long flags)
- #include <linux/debugfs.h>
- 
- static struct dentry *rootdir;
--static struct dentry *orphandir;
- static int inited = 0;
- 
- static void clk_summary_show_one(struct seq_file *s, struct clk *c, int level)
-@@ -131,17 +141,16 @@ static void clk_summary_show_subtree(struct seq_file *s, struct clk *c,
- static int clk_summary_show(struct seq_file *s, void *data)
- {
- 	struct clk *c;
-+	struct hlist_head **lists = (struct hlist_head **)s->private;
- 
- 	seq_printf(s, "   clock                        enable_cnt  prepare_cnt  rate        accuracy\n");
- 	seq_printf(s, "---------------------------------------------------------------------------------\n");
- 
- 	clk_prepare_lock();
- 
--	hlist_for_each_entry(c, &clk_root_list, child_node)
--		clk_summary_show_subtree(s, c, 0);
--
--	hlist_for_each_entry(c, &clk_orphan_list, child_node)
--		clk_summary_show_subtree(s, c, 0);
-+	for (; *lists; lists++)
-+		hlist_for_each_entry(c, *lists, child_node)
-+			clk_summary_show_subtree(s, c, 0);
- 
- 	clk_prepare_unlock();
- 
-@@ -194,21 +203,19 @@ static int clk_dump(struct seq_file *s, void *data)
- {
- 	struct clk *c;
- 	bool first_node = true;
-+	struct hlist_head **lists = (struct hlist_head **)s->private;
- 
- 	seq_printf(s, "{");
- 
- 	clk_prepare_lock();
- 
--	hlist_for_each_entry(c, &clk_root_list, child_node) {
--		if (!first_node)
--			seq_printf(s, ",");
--		first_node = false;
--		clk_dump_subtree(s, c, 0);
--	}
--
--	hlist_for_each_entry(c, &clk_orphan_list, child_node) {
--		seq_printf(s, ",");
--		clk_dump_subtree(s, c, 0);
-+	for (; *lists; lists++) {
-+		hlist_for_each_entry(c, *lists, child_node) {
-+			if (!first_node)
-+				seq_puts(s, ",");
-+			first_node = false;
-+			clk_dump_subtree(s, c, 0);
-+		}
- 	}
- 
- 	clk_prepare_unlock();
-@@ -306,7 +313,7 @@ static int clk_debug_create_subtree(struct clk *clk, struct dentry *pdentry)
- 		goto out;
- 
- 	hlist_for_each_entry(child, &clk->children, child_node)
--		clk_debug_create_subtree(child, clk->dentry);
-+		clk_debug_create_subtree(child, pdentry);
- 
- 	ret = 0;
- out:
-@@ -326,31 +333,12 @@ out:
-  */
- static int clk_debug_register(struct clk *clk)
- {
--	struct clk *parent;
--	struct dentry *pdentry;
- 	int ret = 0;
- 
- 	if (!inited)
- 		goto out;
- 
--	parent = clk->parent;
--
--	/*
--	 * Check to see if a clk is a root clk.  Also check that it is
--	 * safe to add this clk to debugfs
--	 */
--	if (!parent)
--		if (clk->flags & CLK_IS_ROOT)
--			pdentry = rootdir;
--		else
--			pdentry = orphandir;
--	else
--		if (parent->dentry)
--			pdentry = parent->dentry;
--		else
--			goto out;
--
--	ret = clk_debug_create_subtree(clk, pdentry);
-+	ret = clk_debug_create_subtree(clk, rootdir);
- 
- out:
- 	return ret;
-@@ -372,39 +360,6 @@ static void clk_debug_unregister(struct clk *clk)
- }
- 
- /**
-- * clk_debug_reparent - reparent clk node in the debugfs clk tree
-- * @clk: the clk being reparented
-- * @new_parent: the new clk parent, may be NULL
-- *
-- * Rename clk entry in the debugfs clk tree if debugfs has been
-- * initialized.  Otherwise it bails out early since the debugfs clk tree
-- * will be created lazily by clk_debug_init as part of a late_initcall.
-- *
-- * Caller must hold prepare_lock.
-- */
--static void clk_debug_reparent(struct clk *clk, struct clk *new_parent)
--{
--	struct dentry *d;
--	struct dentry *new_parent_d;
--
--	if (!inited)
--		return;
--
--	if (new_parent)
--		new_parent_d = new_parent->dentry;
--	else
--		new_parent_d = orphandir;
--
--	d = debugfs_rename(clk->dentry->d_parent, clk->dentry,
--			new_parent_d, clk->name);
--	if (d)
--		clk->dentry = d;
--	else
--		pr_debug("%s: failed to rename debugfs entry for %s\n",
--				__func__, clk->name);
--}
--
--/**
-  * clk_debug_init - lazily create the debugfs clk tree visualization
-  *
-  * clks are often initialized very early during boot before memory can
-@@ -426,19 +381,24 @@ static int __init clk_debug_init(void)
- 	if (!rootdir)
- 		return -ENOMEM;
- 
--	d = debugfs_create_file("clk_summary", S_IRUGO, rootdir, NULL,
-+	d = debugfs_create_file("clk_summary", S_IRUGO, rootdir, &all_lists,
- 				&clk_summary_fops);
- 	if (!d)
- 		return -ENOMEM;
- 
--	d = debugfs_create_file("clk_dump", S_IRUGO, rootdir, NULL,
-+	d = debugfs_create_file("clk_dump", S_IRUGO, rootdir, &all_lists,
- 				&clk_dump_fops);
- 	if (!d)
- 		return -ENOMEM;
- 
--	orphandir = debugfs_create_dir("orphans", rootdir);
-+	d = debugfs_create_file("clk_orphan_summary", S_IRUGO, rootdir,
-+				&orphan_list, &clk_summary_fops);
-+	if (!d)
-+		return -ENOMEM;
- 
--	if (!orphandir)
-+	d = debugfs_create_file("clk_orphan_dump", S_IRUGO, rootdir,
-+				&orphan_list, &clk_dump_fops);
-+	if (!d)
- 		return -ENOMEM;
- 
- 	clk_prepare_lock();
-@@ -447,7 +407,7 @@ static int __init clk_debug_init(void)
- 		clk_debug_create_subtree(clk, rootdir);
- 
- 	hlist_for_each_entry(clk, &clk_orphan_list, child_node)
--		clk_debug_create_subtree(clk, orphandir);
-+		clk_debug_create_subtree(clk, rootdir);
- 
- 	inited = 1;
- 
-@@ -1277,9 +1237,6 @@ static void __clk_set_parent_after(struct clk *clk, struct clk *parent,
- 		clk_disable(old_parent);
- 		__clk_unprepare(old_parent);
- 	}
--
--	/* update debugfs with new clk tree topology */
--	clk_debug_reparent(clk, parent);
- }
- 
- static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
-@@ -1685,7 +1642,6 @@ out:
- void __clk_reparent(struct clk *clk, struct clk *new_parent)
- {
- 	clk_reparent(clk, new_parent);
--	clk_debug_reparent(clk, new_parent);
- 	__clk_recalc_accuracies(clk);
- 	__clk_recalc_rates(clk, POST_RATE_CHANGE);
- }
--- 
-1.7.7.rc0.72.g4b5ea.dirty
+- Only support up to 16 cpus. It could be anywhere between 17-31, but
+that seems somewhat unlikely. Are we really ever going to see 32-bit
+32 core systems?
+- Reduce KM_TYPE_NR from 16 to 15. Based on the comment for it, we
+probably don't want to do that. Is increasing it to the default of 20
+worthwhile? Some of the options here would allow doing that.
+- Add 0xffe00000-0xfff00000 to the fixmap region. This would make
+fixmap span 2 PMDs with the top PMD having a mixture of uses like we
+had before.
+- push the PCI i/o space down to 0xfec00000 and make fixmap 4MB. This
+is a cleaner solution as the 2 PMDs are only used for fixmap. This may
+require some static mapping adjustments on some platforms.
+- Same as previous option, but convert the PCI i/o space to fixmap
+entries. We don't really need all 2MB for PCI.
+
+Opinions on the best solution?
+
+
+Also, there is an error in the documentation below:
+
+>
+> Signed-off-by: Liu Hua <sdu.liu@huawei.com>
+> ---
+>  Documentation/arm/memory.txt   |  2 +-
+>  arch/arm/include/asm/fixmap.h  | 16 ++--------------
+>  arch/arm/include/asm/highmem.h |  1 +
+>  arch/arm/mm/highmem.c          | 27 +++++++++++++++++++++------
+>  arch/arm/mm/mmu.c              |  4 ++++
+>  5 files changed, 29 insertions(+), 21 deletions(-)
+>
+> diff --git a/Documentation/arm/memory.txt b/Documentation/arm/memory.txt
+> index 4bfb9ff..a9fc59b 100644
+> --- a/Documentation/arm/memory.txt
+> +++ b/Documentation/arm/memory.txt
+> @@ -41,7 +41,7 @@ fffe8000      fffeffff        DTCM mapping area for platforms with
+>  fffe0000       fffe7fff        ITCM mapping area for platforms with
+>                                 ITCM mounted inside the CPU.
+>
+> -fff00000       fffdffff        Fixmap mapping region.  Addresses provided
+> +fffc0000       ffdfffff        Fixmap mapping region.  Addresses provided
+
+s/fffc0000/ffc00000/
+
+Rob
