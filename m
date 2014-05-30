@@ -1,118 +1,177 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 30 May 2014 16:03:26 -0700
-Subject: [PATCH v2 11/11] clk: versatile: add versatile OSC support
-In-Reply-To: <1401403221-27523-12-git-send-email-robherring2@gmail.com>
-References: <1401403221-27523-1-git-send-email-robherring2@gmail.com>
- <1401403221-27523-12-git-send-email-robherring2@gmail.com>
-Message-ID: <20140530230326.10062.15472@quantum>
+From: mohun106@gmail.com (Radha Mohan)
+Date: Fri, 30 May 2014 16:06:57 -0700
+Subject: [PATCH v4 00/20] arm64: GICv3 support
+In-Reply-To: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
+References: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAC8NTUWuuUrHKp4a1WkqSfiPNZjbwffBn-u7DGsrB8eF65e_ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rob Herring (2014-05-29 15:40:21)
-> From: Rob Herring <robh@kernel.org>
-> 
-> Versatile platforms share the same OSC programming model as Integrator
-> platforms. Add the necessary parameters and init functions for Versatile.
-> 
-> Renaming the file to clk-versatile.c as versatile is used as the family
-> name for ARM, Ltd. boards.
-> 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+Hi Marc,
+The patch set is working for us on our platform. Below are some of the
+things we tested with the GICv3 driver.
 
-So it's OK to rename the file and add the new stuff in one commit? I
-thought there were some guidelines about doing renames separately...
+System: Cavium's proprietary simulator
+Cores: 16
+GIC version: GICv3
 
-Regards,
-Mike
+1) SGI, PPI and SPI
+2) MSI and MSI-x with SPI and also LPI (took previous version of an
+unposted LPI/ITS driver which now is missing from Marc's git tree)
 
-> ---
-> v2:
-> - Rename clk-integrator.c to clk-versatile.c
-> 
->  drivers/clk/versatile/Makefile                     |  3 +-
->  .../{clk-integrator.c => clk-versatile.c}          | 35 ++++++++++++++++++++--
->  2 files changed, 34 insertions(+), 4 deletions(-)
->  rename drivers/clk/versatile/{clk-integrator.c => clk-versatile.c} (66%)
-> 
-> diff --git a/drivers/clk/versatile/Makefile b/drivers/clk/versatile/Makefile
-> index c16ca78..9ee2b37 100644
-> --- a/drivers/clk/versatile/Makefile
-> +++ b/drivers/clk/versatile/Makefile
-> @@ -1,6 +1,5 @@
->  # Makefile for Versatile-specific clocks
-> -obj-$(CONFIG_ICST)             += clk-icst.o
-> -obj-$(CONFIG_ARCH_INTEGRATOR)  += clk-integrator.o
-> +obj-$(CONFIG_ICST)             += clk-icst.o clk-versatile.o
->  obj-$(CONFIG_INTEGRATOR_IMPD1) += clk-impd1.o
->  obj-$(CONFIG_ARCH_REALVIEW)    += clk-realview.o
->  obj-$(CONFIG_ARCH_VEXPRESS)    += clk-vexpress.o clk-sp810.o
-> diff --git a/drivers/clk/versatile/clk-integrator.c b/drivers/clk/versatile/clk-versatile.c
-> similarity index 66%
-> rename from drivers/clk/versatile/clk-integrator.c
-> rename to drivers/clk/versatile/clk-versatile.c
-> index 734c4b8..fe52a79 100644
-> --- a/drivers/clk/versatile/clk-integrator.c
-> +++ b/drivers/clk/versatile/clk-versatile.c
-> @@ -17,6 +17,9 @@
->  
->  #define INTEGRATOR_HDR_LOCK_OFFSET     0x14
->  
-> +#define VERSATILE_SYS_OSCCLCD_OFFSET   0x1c
-> +#define VERSATILE_SYS_LOCK_OFFSET      0x20
-> +
->  /* Base offset for the core module */
->  static void __iomem *cm_base;
->  
-> @@ -37,11 +40,27 @@ static const struct clk_icst_desc __initdata cm_auxosc_desc = {
->         .lock_offset = INTEGRATOR_HDR_LOCK_OFFSET,
->  };
->  
-> -static void __init of_integrator_cm_osc_setup(struct device_node *np)
-> +static const struct icst_params versatile_auxosc_params = {
-> +       .vco_max        = ICST307_VCO_MAX,
-> +       .vco_min        = ICST307_VCO_MIN,
-> +       .vd_min         = 4 + 8,
-> +       .vd_max         = 511 + 8,
-> +       .rd_min         = 1 + 2,
-> +       .rd_max         = 127 + 2,
-> +       .s2div          = icst307_s2div,
-> +       .idx2s          = icst307_idx2s,
-> +};
-> +
-> +static const struct clk_icst_desc versatile_auxosc_desc __initconst = {
-> +       .params = &versatile_auxosc_params,
-> +       .vco_offset = VERSATILE_SYS_OSCCLCD_OFFSET,
-> +       .lock_offset = VERSATILE_SYS_LOCK_OFFSET,
-> +};
-> +static void __init cm_osc_setup(struct device_node *np,
-> +                               const struct clk_icst_desc *desc)
->  {
->         struct clk *clk = ERR_PTR(-EINVAL);
->         const char *clk_name = np->name;
-> -       const struct clk_icst_desc *desc = &cm_auxosc_desc;
->         const char *parent_name;
->  
->         if (!cm_base) {
-> @@ -65,5 +84,17 @@ static void __init of_integrator_cm_osc_setup(struct device_node *np)
->         if (!IS_ERR(clk))
->                 of_clk_add_provider(np, of_clk_src_simple_get, clk);
->  }
-> +
-> +static void __init of_integrator_cm_osc_setup(struct device_node *np)
-> +{
-> +       cm_osc_setup(np, &cm_auxosc_desc);
-> +}
->  CLK_OF_DECLARE(integrator_cm_auxosc_clk,
->         "arm,integrator-cm-auxosc", of_integrator_cm_osc_setup);
-> +
-> +static void __init of_versatile_cm_osc_setup(struct device_node *np)
-> +{
-> +       cm_osc_setup(np, &versatile_auxosc_desc);
-> +}
-> +CLK_OF_DECLARE(versatile_cm_auxosc_clk,
-> +              "arm,versatile-cm-auxosc", of_versatile_cm_osc_setup);
-> -- 
-> 1.9.1
-> 
+The kind of devices that were tested are UARTs, AHCI controller,
+SR-IOV capable devices.
+
+So,
+Acked-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+Tested-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+
+regards,
+Radha Mohan
+Cavium Inc.
+
+On Thu, May 15, 2014 at 10:58 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> GICv3 is the base for a new generation of interrupt controllers
+> designed to overcome some of the most glaring limitations of GICv2.
+>
+> Some of the features are:
+> - Support for more than 8 CPUs (a lot more...)
+> - System registers for CPU interface access (instead of the memory
+>   mapped GICC, GICV, GICH)
+> - Message based interrupts
+>
+> This patch series currently support:
+> - Affinity Routing
+> - System Registers
+> - Non-Secure Group-1 interrupts only
+> - KVM support (GICv3 host, GICv2 guest)
+>
+> What is *not yet* supported in this series (WIP):
+> - LPI/ITS/MSI
+> - KVM GICv3 guest support
+> - Any form of power management
+> - 32bit systems
+>
+> To be built, this code requires a fairly recent compiler/binutils
+> combo. Linaro 13.06 seems to do the trick. This has been tested on the
+> ARM FVP and Foundation models, with non-regressions run on a VExpress
+> TC-2 and another Cortex-A57 based platform.
+>
+> So far, the level of reviewing has been embarassingly low (my sincere
+> thanks to Christoffer and Will for being the only ones to review
+> it). While the documentation is unfortunately not public yet, it is
+> available to those actively implementing GICv3 in their hardware, and
+> I'm really eager to see reviews and test reports.
+>
+> Without that kind of engagement, it is unlikely that this code will
+> get merged any time soon.
+>
+> Individuals without access to documentation and/or hardware can still
+> review the code (it shares a lot of concepts with GICv2) and test in
+> on the freely available Foundation model (see
+> http://releases.linaro.org/latest/openembedded/aarch64/ for details on
+> how to use the Foundation model).
+>
+> The code is also available at the following location (warning,
+> unstable branch!):
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv3
+>
+> * From v3 [3]
+>   - Fixed a lot of issues found by Christoffer (too many to report
+>     here, see the email thread)
+>   - New .sync_lr_elrsr backend
+>   - New probing method
+>   - New irqchip_in_kernel implementation
+>   - Checked full bisectability of the series (hopefully got it right
+>     this time...)
+>   - rebased on top of 3.15-rc5
+>
+> * From v2 [2]
+>   - removed sharing of the xlate method with GICv2 (TI crossbar is now
+>     getting in the way...)
+>   - Switched to a tree domain to accomodate for the LPI space
+>   - Fixed more bisectability
+>
+> * From the initial revision [1]
+>   - Some code sharing with GICv2
+>   - Barrier cleanup/clarification
+>   - Revised boot protocol update
+>   - Consistent use of the MPIDR access macros
+>   - Fixed a number of embarassing bugs
+>   - Fixed DT examples
+>   - Fixed bisectability of the series
+>
+> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/229959.html
+> [2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241972.html
+> [3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/248008.html
+>
+> Marc Zyngier (20):
+>   ARM: GIC: move some bits of GICv2 to a library-type file
+>   arm64: initial support for GICv3
+>   arm64: GICv3 device tree binding documentation
+>   arm64: boot protocol documentation update for GICv3
+>   KVM: arm/arm64: vgic: move GICv2 registers to their own structure
+>   KVM: ARM: vgic: introduce vgic_ops and LR manipulation primitives
+>   KVM: ARM: vgic: abstract access to the ELRSR bitmap
+>   KVM: ARM: vgic: abstract EISR bitmap access
+>   KVM: ARM: vgic: abstract MISR decoding
+>   KVM: ARM: vgic: move underflow handling to vgic_ops
+>   KVM: ARM: vgic: abstract VMCR access
+>   KVM: ARM: vgic: introduce vgic_enable
+>   KVM: ARM: introduce vgic_params structure
+>   KVM: ARM: vgic: split GICv2 backend from the main vgic code
+>   KVM: ARM: vgic: revisit implementation of irqchip_in_kernel
+>   arm64: KVM: remove __kvm_hyp_code_{start,end} from hyp.S
+>   arm64: KVM: split GICv2 world switch from hyp code
+>   arm64: KVM: move HCR_EL2.{IMO,FMO} manipulation into the vgic switch
+>     code
+>   KVM: ARM: vgic: add the GICv3 backend
+>   arm64: KVM: vgic: add GICv3 world switch
+>
+>  Documentation/arm64/booting.txt                  |   6 +
+>  Documentation/devicetree/bindings/arm/gic-v3.txt |  79 +++
+>  arch/arm/include/asm/kvm_host.h                  |   5 +
+>  arch/arm/kernel/asm-offsets.c                    |  14 +-
+>  arch/arm/kvm/Makefile                            |   1 +
+>  arch/arm/kvm/interrupts_head.S                   |  26 +-
+>  arch/arm64/Kconfig                               |   1 +
+>  arch/arm64/include/asm/kvm_arm.h                 |   5 +-
+>  arch/arm64/include/asm/kvm_asm.h                 |  14 +-
+>  arch/arm64/include/asm/kvm_host.h                |  28 +
+>  arch/arm64/include/asm/virt.h                    |   4 +
+>  arch/arm64/kernel/asm-offsets.c                  |  25 +-
+>  arch/arm64/kernel/head.S                         |  18 +
+>  arch/arm64/kernel/hyp-stub.S                     |   1 +
+>  arch/arm64/kvm/Makefile                          |   4 +
+>  arch/arm64/kvm/hyp.S                             | 127 +----
+>  arch/arm64/kvm/vgic-v2-switch.S                  | 133 +++++
+>  arch/arm64/kvm/vgic-v3-switch.S                  | 271 +++++++++
+>  drivers/irqchip/Kconfig                          |   5 +
+>  drivers/irqchip/Makefile                         |   3 +-
+>  drivers/irqchip/irq-gic-common.c                 | 115 ++++
+>  drivers/irqchip/irq-gic-common.h                 |  29 +
+>  drivers/irqchip/irq-gic-v3.c                     | 684 +++++++++++++++++++++++
+>  drivers/irqchip/irq-gic.c                        |  59 +-
+>  include/kvm/arm_vgic.h                           | 115 +++-
+>  include/linux/irqchip/arm-gic-v3.h               | 190 +++++++
+>  virt/kvm/arm/vgic-v2.c                           | 236 ++++++++
+>  virt/kvm/arm/vgic-v3.c                           | 225 ++++++++
+>  virt/kvm/arm/vgic.c                              | 345 ++++++------
+>  29 files changed, 2415 insertions(+), 353 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/gic-v3.txt
+>  create mode 100644 arch/arm64/kvm/vgic-v2-switch.S
+>  create mode 100644 arch/arm64/kvm/vgic-v3-switch.S
+>  create mode 100644 drivers/irqchip/irq-gic-common.c
+>  create mode 100644 drivers/irqchip/irq-gic-common.h
+>  create mode 100644 drivers/irqchip/irq-gic-v3.c
+>  create mode 100644 include/linux/irqchip/arm-gic-v3.h
+>  create mode 100644 virt/kvm/arm/vgic-v2.c
+>  create mode 100644 virt/kvm/arm/vgic-v3.c
+>
+> --
+> 1.8.3.4
+>
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
