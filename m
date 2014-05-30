@@ -1,46 +1,59 @@
-From: todd.fujinaka@intel.com (Fujinaka, Todd)
-Date: Fri, 30 May 2014 21:11:46 +0000
-Subject: [E1000-devel] ARM support for igb driver
-In-Reply-To: <CAHH3p5KdWvc_=m0XZxhb8drjpWVJ68BR_rH9bhrhNerSjCc-Tg@mail.gmail.com>
-References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>
- <20140530191852.GA25314@obsidianresearch.com>
- <CAHH3p5KS9BVb-1-u2LbfLL8OO4pmExGmCtZY=fEYELS+q=grcA@mail.gmail.com>
- <4627439.I2CpBecnJJ@wuerfel>
- <CAHH3p5KdWvc_=m0XZxhb8drjpWVJ68BR_rH9bhrhNerSjCc-Tg@mail.gmail.com>
-Message-ID: <9B4A1B1917080E46B64F07F2989DADD653375F6F@ORSMSX114.amr.corp.intel.com>
+From: elder@linaro.org (Alex Elder)
+Date: Fri, 30 May 2014 17:28:51 -0500
+Subject: [PATCH v4 RESEND 0/5] ARM: SMP: support Broadcom mobile SoCs
+Message-ID: <1401488936-21186-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It just took me one Google search and I found that VDM is being used for MCTP. Searching the datasheet for the i210 (that I'm sure I suggested you consult) discusses MCTP in section 10.7.
+This series adds SMP support for two Broadcom mobile SoC families.
+It uses CPU_METHOD_OF_DECLARE() so that SMP operations are assigned
+using device tree rather than adding it to a machine definition in a
+board file.
 
-I can't see there is a way to turn off MCTP.
+The enable method starts a secondary core by writing to a register
+monitored by CPUs spinning in a ROM-based holding pen loop.  The
+address of this register is recorded as a property in the "cpus"
+node of the device tree.
 
-Todd Fujinaka
-Software Application Engineer
-Networking Division (ND)
-Intel Corporation
-todd.fujinaka at intel.com
-(503) 712-4565
+					-Alex
 
------Original Message-----
-From: shiv prakash Agarwal [mailto:chhotu.shiv at gmail.com] 
-Sent: Friday, May 30, 2014 1:14 PM
-To: Arnd Bergmann
-Cc: linux-arm-kernel at lists.infradead.org; Jason Gunthorpe; Duyck, Alexander H; Thomas Petazzoni; e1000-devel at lists.sourceforge.net; Fujinaka, Todd; Lucas Stach
-Subject: Re: [E1000-devel] ARM support for igb driver
+Notes:
+    - I would prefer to document the binding in a separate file in
+      the way suggested here:
+        https://lkml.org/lkml/2014/5/20/559
+      But for now I'm keeping this independent of that.
+    - This series is based on v3.15-rc4, plus one more recently-posted patch:
+	https://lkml.org/lkml/2014/4/15/303
+    - This series is available here:
+	http://git.linaro.org/landing-teams/working/broadcom/kernel.git
+	Branch review/bcm-smp-v4
 
-Notsure about root port, Can't it be disabled by Intel device?
+History
+v4: - Renamed "platsmp.c" to be "kona_smp.c".
+    - Rebased onto v3.15-rc5
+v3: - Dropped definition and use of CPU_METHOD_OF_DECLARE_SETUP()
+    - Added documentation for "enable-method"
+    - Rebased onto v3.15-rc4
+v2: - Fixed a Makefile error (:= should have been +=)
+    - No longer set CONFIG_NR_CPUS in bcm_defconfig
+    - Rebased onto v3.15-rc1
 
-On Sat, May 31, 2014 at 1:26 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 31 May 2014 01:05:29 shiv prakash Agarwal wrote:
->> Thanks Jason,
->>
->> Is there a way to disable sending VDM by Intel card?
->> And what is the purpose of sending type 1 VDM if it has to be 
->> discarded by root port anyway?
->
-> I think you should really just disable the behavior at the root port.
-> Which host driver are you using (sorry if I forgot and you already 
-> mentioned it)?
->
->         Arnd
+Alex Elder (5):
+  devicetree: bindings: document Broadcom CPU enable method
+  ARM: add SMP support for Broadcom mobile SoCs
+  ARM: configs: enable SMP in bcm_defconfig
+  ARM: dts: enable SMP support for bcm28155
+  ARM: dts: enable SMP support for bcm21664
+
+ Documentation/devicetree/bindings/arm/cpus.txt |  12 ++
+ arch/arm/boot/dts/bcm11351.dtsi                |  19 +++
+ arch/arm/boot/dts/bcm21664.dtsi                |  19 +++
+ arch/arm/configs/bcm_defconfig                 |   1 +
+ arch/arm/mach-bcm/Kconfig                      |  18 ++-
+ arch/arm/mach-bcm/Makefile                     |   3 +
+ arch/arm/mach-bcm/kona_smp.c                   | 202 +++++++++++++++++++++++++
+ 7 files changed, 271 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-bcm/kona_smp.c
+
+-- 
+1.9.1
