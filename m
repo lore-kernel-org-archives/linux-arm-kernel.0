@@ -1,65 +1,68 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 30 May 2014 21:19:53 +0200
-Subject: [RFC] Sort out S5P SoCs support in mainline
-In-Reply-To: <5388D2E5.5080006@samsung.com>
-References: <021f01cf7a61$69853e30$3c8fba90$@samsung.com>
- <13875033.1X6R9lksgc@wuerfel> <5385C3CC.6010509@gmail.com>
- <5388D2E5.5080006@samsung.com>
-Message-ID: <5388D9D9.5020602@gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 30 May 2014 21:20:40 +0200
+Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
+In-Reply-To: <5388546E.5070007@arm.com>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
+ <5388546E.5070007@arm.com>
+Message-ID: <CAKfTPtA04sQ4ox7yAU8Wxn_1DLuAxmm9UgER_-Nidtd6sNEEMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 30 May 2014 11:50, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+> On 23/05/14 16:53, Vincent Guittot wrote:
+>> Monitor the activity level of each group of each sched_domain level. The
+>> activity is the amount of cpu_power that is currently used on a CPU or group
+>> of CPUs. We use the runnable_avg_sum and _period to evaluate this activity
+>> level. In the special use case where the CPU is fully loaded by more than 1
+>> task, the activity level is set above the cpu_power in order to reflect the
+>> overload of the CPU
+>>
+>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>
+> [...]
+>
+>>  /*
+>>   * select_task_rq_fair: Select target runqueue for the waking task in domains
+>>   * that have the 'sd_flag' flag set. In practice, this is SD_BALANCE_WAKE,
+>> @@ -5518,6 +5535,7 @@ struct sg_lb_stats {
+>>       unsigned long sum_weighted_load; /* Weighted load of group's tasks */
+>>       unsigned long load_per_task;
+>>       unsigned long group_power;
+>> +     unsigned long group_activity; /* Total activity of the group */
+>>       unsigned int sum_nr_running; /* Nr tasks running in the group */
+>>       unsigned int group_capacity;
+>>       unsigned int idle_cpus;
+>> @@ -5538,6 +5556,7 @@ struct sd_lb_stats {
+>>       struct sched_group *busiest;    /* Busiest group in this sd */
+>>       struct sched_group *local;      /* Local group in this sd */
+>>       unsigned long total_load;       /* Total load of all groups in sd */
+>> +     unsigned long total_activity;  /* Total activity of all groups in sd */
+>>       unsigned long total_pwr;        /* Total power of all groups in sd */
+>>       unsigned long avg_load; /* Average load across all groups in sd */
+>>
+>> @@ -5557,6 +5576,7 @@ static inline void init_sd_lb_stats(struct sd_lb_stats *sds)
+>>               .busiest = NULL,
+>>               .local = NULL,
+>>               .total_load = 0UL,
+>> +             .total_activity = 0UL,
+>
+> AFAICS, total_activity is not used right now. Do you intend to use it to
+> calculate something like avg_activity later (like total_load/avg_load)?
 
+this patch only creates group_activity and total_activity.The use of
+these statistics appears on the next patches. I have not planned to
+compute such avg_activity for the moment mainly because i have need it
+yet.
 
-On 30.05.2014 20:50, Kukjin Kim wrote:
-> On 05/28/14 20:09, Tomasz Figa wrote:
->> On 28.05.2014 13:04, Arnd Bergmann wrote:
->>> On Wednesday 28 May 2014 19:41:41 Kukjin Kim wrote:
->>>> Hi all,
->>>>
->>>> I'm wondering who need to support following SoCs/boards in mainline.
->>>>
->>>> * S5P64X0/SMDK6440 and SMDK6450
->>>> * S5PC100/SMDKC100
->>>>
->>>> If nobody is using them, how about to remove them from mainline?
->>>
->>> I talked about this with Tomasz Figa before, he also thinks they can
->>> be removed.
->>> I don't see any reason to keep them myself, and will apply a patch to
->>> remove
->>> them. Of course, if later somebody comes around who does need them,
->>> we can
->>> revert the patch to bring them back.
-> 
-> Yeah, agreed.
-> 
->>
->> Or better, if later somebody comes around who does need them, we can add
->> them properly, using Device Tree and existing generic code.
->>
-> Of course.
-> 
->> Anyway, for removal of both s5p64x0 and s5pc100:
->>
->> Acked-by: Tomasz Figa<t.figa@samsung.com>
->>
->> Actually I have played a bit with the code to see how much can be
->> removed and ended up with following branch:
->>
->> https://github.com/tom3q/linux.git v3.17-cleanup
->>
->> Feel free to do _whatever_ you want with patches there.
->>
-> OK, thanks.
-> 
-> Let me remove them from mainline when 3.16-rc1 is released...
+Do you have in mind any use of such avg_activity ?
 
-Alright.
+Vincent
 
-I have a series to convert s5pv210 to DT-only waiting to be sent as soon
-as 3.16-rc1 is released, but if you remove those two first, I should be
-able to simplify several things, so I'll wait.
-
-Best regards,
-Tomasz
+>
+>>               .total_pwr = 0UL,
+>>               .busiest_stat = {
+>>                       .avg_load = 0UL,
+>
+> [...]
+>
