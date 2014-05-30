@@ -1,133 +1,53 @@
-From: m-karicheri2@ti.com (Karicheri, Muralidharan)
-Date: Fri, 30 May 2014 14:15:13 +0000
-Subject: [PATCH v2 03/18] PCI: designware: Configuration space should be
- specified in 'reg'
-In-Reply-To: <53876116.90504@ti.com>
-References: <1401345500-20188-1-git-send-email-kishon@ti.com>
- <1401345500-20188-4-git-send-email-kishon@ti.com> <53876116.90504@ti.com>
-Message-ID: <3E54258959B69E4282D79E01AB1F32B70477D2A4@DFLE11.ent.ti.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 30 May 2014 16:47:15 +0200
+Subject: [PATCH v6 0/2] cpufreq: opp: Add device tree based lookup of
+ boost mode frequency
+In-Reply-To: <5683009.PqtetcWKuO@vostro.rjw.lan>
+References: <1401440477-4328-1-git-send-email-thomas.ab@samsung.com>
+ <5683009.PqtetcWKuO@vostro.rjw.lan>
+Message-ID: <1430270.VsBiDfiUL9@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Murali Karicheri [mailto:m-karicheri2 at ti.com]
->Sent: Thursday, May 29, 2014 12:32 PM
->To: ABRAHAM, KISHON VIJAY
->Cc: devicetree at vger.kernel.org; linux-doc at vger.kernel.org; linux-arm-
->kernel at lists.infradead.org; linux-omap at vger.kernel.org; linux-pci at vger.kernel.org; linux-
->kernel at vger.kernel.org; arnd at arndb.de; tony at atomide.com; jg1.han at samsung.com;
->Jason Gunthorpe; Bjorn Helgaas; Mohit Kumar; Marek Vasut
->Subject: Re: [PATCH v2 03/18] PCI: designware: Configuration space should be specified
->in 'reg'
->
->On 5/29/2014 2:38 AM, ABRAHAM, KISHON VIJAY wrote:
->> The configuration address space has so far been specified in *ranges*,
->> however it should be specified in *reg* making it a platform MEM resource.
->> Hence used 'platform_get_resource_*' API to get configuration address
->> space in the designware driver.
->>
->> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
->> Cc: Bjorn Helgaas <bhelgaas@google.com>
->> Cc: Mohit Kumar <mohit.kumar@st.com>
->> Cc: Jingoo Han <jg1.han@samsung.com>
->> Cc: Marek Vasut <marex@denx.de>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>   .../devicetree/bindings/pci/designware-pcie.txt    |    1 +
->>   drivers/pci/host/pcie-designware.c                 |   17 +++++++++++++++--
->>   2 files changed, 16 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt
->> b/Documentation/devicetree/bindings/pci/designware-pcie.txt
->> index d6fae13..8314360 100644
->> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
->> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
->> @@ -6,6 +6,7 @@ Required properties:
->>   	as "samsung,exynos5440-pcie" or "fsl,imx6q-pcie".
->>   - reg: base addresses and lengths of the pcie controller,
->>   	the phy controller, additional register for the phy controller.
->> +	The configuration address space should also be specified here.
->Kishon,
->
->I am working on the Keystone PCI driver for which v1 is already posted.
->Want to clarify
->following.
->1. Original text for reg states "base addresses and lengths of the pcie controller,
->         the phy controller, additional register for the phy controller"
->and you added
->         "The configuration address space should also be specified here"
->
->    and the code below added resource name "config"
->
->Does PCI designware follow some convention? Does it mean after applying this patch
->config name is mandatory or optional? Below code you are not returning error. Can you or
->author of PCI designware clarify what is expected to be present as mandatory and what is
->optional.
->
->Does config refers to RC's config space or EP's config space or both?
->The code below divide
->the size by 2. So it appears to be RC's + EP's config space. Please clarify.
->
->>   - interrupts: interrupt values for level interrupt,
->>   	pulse interrupt, special interrupt.
->>   - clocks: from common clock binding: handle to pci clock.
->> diff --git a/drivers/pci/host/pcie-designware.c
->> b/drivers/pci/host/pcie-designware.c
->> index c4e3732..603b386 100644
->> --- a/drivers/pci/host/pcie-designware.c
->> +++ b/drivers/pci/host/pcie-designware.c
->> @@ -20,6 +20,7 @@
->>   #include <linux/of_pci.h>
->>   #include <linux/pci.h>
->>   #include <linux/pci_regs.h>
->> +#include <linux/platform_device.h>
->>   #include <linux/types.h>
->>
->>   #include "pcie-designware.h"
->> @@ -392,11 +393,23 @@ static const struct irq_domain_ops msi_domain_ops = {
->>   int __init dw_pcie_host_init(struct pcie_port *pp)
->>   {
->>   	struct device_node *np = pp->dev->of_node;
->> +	struct platform_device *pdev = to_platform_device(pp->dev);
->>   	struct of_pci_range range;
->>   	struct of_pci_range_parser parser;
->> +	struct resource *cfg_res;
->>   	u32 val;
->>   	int i;
->>
->> +	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
->> +	if (cfg_res) {
->> +		pp->config.cfg0_size = resource_size(cfg_res)/2;
->> +		pp->config.cfg1_size = resource_size(cfg_res)/2;
->> +		pp->cfg0_base = cfg_res->start;
->> +		pp->cfg1_base = cfg_res->start + pp->config.cfg0_size;
->> +	} else {
->> +		dev_err(pp->dev, "missing *config* reg space\n");
->This should return error -EINVAL.
->
->> +	}
->> +
->>   	if (of_pci_range_parser_init(&parser, np)) {
->>   		dev_err(pp->dev, "missing ranges property\n");
->>   		return -EINVAL;
->> @@ -429,6 +442,8 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
->>   			of_pci_range_to_resource(&range, np, &pp->cfg);
->>   			pp->config.cfg0_size = resource_size(&pp->cfg)/2;
->>   			pp->config.cfg1_size = resource_size(&pp->cfg)/2;
->> +			pp->cfg0_base = pp->cfg.start;
->> +			pp->cfg1_base = pp->cfg.start + pp->config.cfg0_size;
->>   		}
->>   	}
->>
->> @@ -441,8 +456,6 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
->>   		}
->>   	}
->>
->> -	pp->cfg0_base = pp->cfg.start;
->> -	pp->cfg1_base = pp->cfg.start + pp->config.cfg0_size;
->>   	pp->mem_base = pp->mem.start;
->>
->>   	pp->va_cfg0_base = devm_ioremap(pp->dev, pp->cfg0_base,
->BTW, Please also review my Keystone series so that we could discuss this topic in that
->context as well.
+On Friday, May 30, 2014 02:19:06 PM Rafael J. Wysocki wrote:
+> On Friday, May 30, 2014 02:31:15 PM Thomas Abraham wrote:
+> > Changes since v5:
+> > - Fixes for checkpatch warnings with --strict option as suggested by
+> >   Nishanth Menon.
+> > 
+> > Changes since v4:
+> > - Code improvements suggested by Viresh Kumar.
+> > 
+> > Changes since v3:
+> > - Minor changes as suggested in the last version.
+> > 
+> > Changes since v2:
+> > - Reworked based on the "PM / OPP: move cpufreq specific helpers out of OPP 
+> >   layer" patch series posted by Nishanth Menon.
+> > 
+> > Changes since v1:
+> > - Boost mode frequencies are specfied as a set of frequencies instead of
+> >   specifying them as OPPs. Thanks to Nishanth, Lukasz and Rob for the
+> >   feedback.
+> > 
+> > This series has been acked by authors and maintainers of the code
+> > portions changed in this series. The new DT binding introduced in this
+> > patch needs an ack from device tree binding maintainers as well.
+> > 
+> > Commit 6f19efc0 ("cpufreq: Add boost frequency support in core") adds
+> > support for CPU boost mode for CPUfreq drivers. To use the new boost
+> > mode, CPUfreq drivers have to specify the boost mode frequency and
+> > voltage within the CPUfreq driver, which is the case for Exynos4x12
+> > CPUfreq driver.
+> > 
+> > But for CPUfreq drivers which obtain the OPPs from cpus node, this
+> > patch series adds support to specify boost mode frequencies in the
+> > cpu device tree node. This requirement came up when Lukasz pointed
+> > out the regression caused by the Exynos CPUfreq driver consolidation
+> > patches.
+> 
+> Both patches queued up for 3.16 in the linux-pm tree.
+
+But please address the Mark's comments or I'll drop them.
+
+Rafael
