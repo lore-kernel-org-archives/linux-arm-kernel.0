@@ -1,93 +1,59 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Sat, 31 May 2014 15:19:14 +0300
-Subject: [PATCH 2/2] gpio: gpiolib: set gpiochip_remove retval to void
-In-Reply-To: <5389864B.4000107@metafoo.de>
-References: <20140530094025.3b78301e@canb.auug.org.au>
- <1401449454-30895-1-git-send-email-berthe.ab@gmail.com>
- <1401449454-30895-2-git-send-email-berthe.ab@gmail.com>
- <CAMuHMdV6AtjD2aqO3buzj8Eo7A7xc_+ROYnxEi2sdjMaqFiAuA@mail.gmail.com>
- <5388C0F1.90503@gmail.com> <5388CB1B.3090802@metafoo.de>
- <20140530232922.GD25854@kroah.com> <5389864B.4000107@metafoo.de>
-Message-ID: <20140531121914.GM15585@mwanda>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 31 May 2014 14:54:40 +0200
+Subject: [PATCH v2] thermal: allow building dove_thermal with mvebu
+In-Reply-To: <1401537027-32291-1-git-send-email-riku.voipio@linaro.org>
+References: <1401452899-13952-1-git-send-email-riku.voipio@linaro.org>
+ <1401537027-32291-1-git-send-email-riku.voipio@linaro.org>
+Message-ID: <5389D110.8020606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 31, 2014 at 09:35:39AM +0200, Lars-Peter Clausen wrote:
-> On 05/31/2014 01:29 AM, Greg KH wrote:
-> >On Fri, May 30, 2014 at 08:16:59PM +0200, Lars-Peter Clausen wrote:
-> >>On 05/30/2014 07:33 PM, David Daney wrote:
-> >>>On 05/30/2014 04:39 AM, Geert Uytterhoeven wrote:
-> >>>>On Fri, May 30, 2014 at 1:30 PM, abdoulaye berthe <berthe.ab@gmail.com>
-> >>>>wrote:
-> >>>>>--- a/drivers/gpio/gpiolib.c
-> >>>>>+++ b/drivers/gpio/gpiolib.c
-> >>>>>@@ -1263,10 +1263,9 @@ static void gpiochip_irqchip_remove(struct
-> >>>>>gpio_chip *gpiochip);
-> >>>>>   *
-> >>>>>   * A gpio_chip with any GPIOs still requested may not be removed.
-> >>>>>   */
-> >>>>>-int gpiochip_remove(struct gpio_chip *chip)
-> >>>>>+void gpiochip_remove(struct gpio_chip *chip)
-> >>>>>  {
-> >>>>>         unsigned long   flags;
-> >>>>>-       int             status = 0;
-> >>>>>         unsigned        id;
-> >>>>>
-> >>>>>         acpi_gpiochip_remove(chip);
-> >>>>>@@ -1278,24 +1277,15 @@ int gpiochip_remove(struct gpio_chip *chip)
-> >>>>>         of_gpiochip_remove(chip);
-> >>>>>
-> >>>>>         for (id = 0; id < chip->ngpio; id++) {
-> >>>>>-               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags)) {
-> >>>>>-                       status = -EBUSY;
-> >>>>>-                       break;
-> >>>>>-               }
-> >>>>>-       }
-> >>>>>-       if (status == 0) {
-> >>>>>-               for (id = 0; id < chip->ngpio; id++)
-> >>>>>-                       chip->desc[id].chip = NULL;
-> >>>>>-
-> >>>>>-               list_del(&chip->list);
-> >>>>>+               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags))
-> >>>>>+                       panic("gpio: removing gpiochip with gpios still
-> >>>>>requested\n");
-> >>>>
-> >>>>panic?
-> >>>
-> >>>NACK to the patch for this reason.  The strongest thing you should do here
-> >>>is WARN.
-> >>>
-> >>>That said, I am not sure why we need this whole patch set in the first place.
-> >>
-> >>Well, what currently happens when you remove a device that is a provider of
-> >>a gpio_chip which is still in use, is that the kernel crashes. Probably with
-> >>a rather cryptic error message. So this patch doesn't really change the
-> >>behavior, but makes it more explicit what is actually wrong. And even if you
-> >>replace the panic() by a WARN() it will again just crash slightly later.
-> >>
-> >>This is a design flaw in the GPIO subsystem that needs to be fixed.
-> >
-> >Then fix the GPIO code properly, don't add a new panic() to the kernel.
+On 05/31/2014 01:50 PM, Riku Voipio wrote:
+> DT-enabled Dove has moved from ARCH_DOVE in mach-dove to MACH_DOVE
+> in mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
+> DT-only MACH_DOVE to thermal Kconfig.
 > 
-> Until somebody comes up with a patch that fixes this for good I
-> think that patch is still an improvement over the current situation.
-> Rather than keeping the kernel running in a inconsistent state,
-> which might cause all kinds of undefined behavior and which will
-> lead to a crash eventually, we might as well just crash the kernel
-> at the cause of the inconsistent state. This will make it obvious
-> why it crashed (compared to a random stacktrace) and will also
-> prevent the kernel from running in a undefined state.
+> This was originally supposed to go in via "ARM: dove: prepare new Dove DT Kconfig"
+> patch from Sebastian Hesselbarth for 3.15, but slipped through the cracks.
 > 
+> I've tested on CuBox that without this patch you can't compile
+> dove_thermal into a mach-mvebu based kernel, and with this patch I can
+> build the driver and it works as expected run-time.
 
-Really, adding a panic here is not ok.  With a WARN() then you have
-time to save the dmesg to a file.
+Riku,
 
-This CC list is way too huge.  We're all wondering how often this stuff
-crashes anyway?  Have you tried to fix the bug instead of just calling
-panic()?  Is there a bugzilla entry or something?  Is there a thread on
-the list?
+looking through my mails, the corresponding patch should have
+already been applied [1].
 
-Just add a WARN() and fix the bug then cleanup the error handling.
+If not, you get my
 
-regards,
-dan carpenter
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+[1] https://lkml.kernel.org/r/1395295065.3571.10.camel at rzhang1-mobl4
+
+> v2: non-ascii char creeped in somehow
+> 
+> Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Eduardo Valentin <edubezval@gmail.com>
+> Cc: linux-pm at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  drivers/thermal/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+> index 2d51912..5783c72 100644
+> --- a/drivers/thermal/Kconfig
+> +++ b/drivers/thermal/Kconfig
+> @@ -151,7 +151,7 @@ config KIRKWOOD_THERMAL
+>  
+>  config DOVE_THERMAL
+>  	tristate "Temperature sensor on Marvell Dove SoCs"
+> -	depends on ARCH_DOVE
+> +	depends on ARCH_DOVE || MACH_DOVE
+>  	depends on OF
+>  	help
+>  	  Support for the Dove thermal sensor driver in the Linux thermal
+> 
