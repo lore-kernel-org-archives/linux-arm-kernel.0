@@ -1,36 +1,73 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 31 May 2014 16:01:36 +0200
-Subject: [PATCH v2 2/5] pinctrl: sunxi: Add IRQCHIP_SKIP_SET_WAKE flag for
- pinctrl irq chip
+Date: Sat, 31 May 2014 16:01:37 +0200
+Subject: [PATCH v2 3/5] pinctrl: sunxi: Move setting of mux to irq type from
+ unmask to request_resources
 In-Reply-To: <1401544899-405-1-git-send-email-hdegoede@redhat.com>
 References: <1401544899-405-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1401544899-405-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1401544899-405-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chen-Yu Tsai <wens@csie.org>
+With level triggered interrupt mask / unmask will get called for each
+interrupt, doing the somewhat expensive mux setting on each unmask thus is
+not a good idea. Instead add a request_resources callback and do it there.
 
-The sunxi pinctrl irq chip driver does not support wakeup at the
-moment. Adding IRQCHIP_SKIP_SET_WAKE lets the irqs work with drivers
-using wakeup.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/pinctrl/sunxi/pinctrl-sunxi.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 22 ++++++++++++++--------
+ 1 file changed, 14 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-index d989a10..c199337 100644
+index c199337..61d3246 100644
 --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
 +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-@@ -630,6 +630,7 @@ static struct irq_chip sunxi_pinctrl_irq_chip = {
+@@ -531,6 +531,19 @@ static int sunxi_pinctrl_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+ 	return irq_find_mapping(pctl->domain, desc->irqnum);
+ }
+ 
++static int sunxi_pinctrl_irq_request_resources(struct irq_data *d)
++{
++	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
++	struct sunxi_desc_function *func;
++
++	func = sunxi_pinctrl_desc_find_function_by_pin(pctl,
++					pctl->irq_array[d->hwirq], "irq");
++
++	/* Change muxing to INT mode */
++	sunxi_pmx_set(pctl->pctl_dev, pctl->irq_array[d->hwirq], func->muxval);
++
++	return 0;
++}
+ 
+ static int sunxi_pinctrl_irq_set_type(struct irq_data *d,
+ 				      unsigned int type)
+@@ -603,19 +616,11 @@ static void sunxi_pinctrl_irq_mask(struct irq_data *d)
+ static void sunxi_pinctrl_irq_unmask(struct irq_data *d)
+ {
+ 	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
+-	struct sunxi_desc_function *func;
+ 	u32 reg = sunxi_irq_ctrl_reg(d->hwirq);
+ 	u8 idx = sunxi_irq_ctrl_offset(d->hwirq);
+ 	unsigned long flags;
+ 	u32 val;
+ 
+-	func = sunxi_pinctrl_desc_find_function_by_pin(pctl,
+-						       pctl->irq_array[d->hwirq],
+-						       "irq");
+-
+-	/* Change muxing to INT mode */
+-	sunxi_pmx_set(pctl->pctl_dev, pctl->irq_array[d->hwirq], func->muxval);
+-
+ 	spin_lock_irqsave(&pctl->lock, flags);
+ 
+ 	/* Unmask the IRQ */
+@@ -629,6 +634,7 @@ static struct irq_chip sunxi_pinctrl_irq_chip = {
+ 	.irq_ack	= sunxi_pinctrl_irq_ack,
  	.irq_mask	= sunxi_pinctrl_irq_mask,
  	.irq_unmask	= sunxi_pinctrl_irq_unmask,
++	.irq_request_resources = sunxi_pinctrl_irq_request_resources,
  	.irq_set_type	= sunxi_pinctrl_irq_set_type,
-+	.flags		= IRQCHIP_SKIP_SET_WAKE,
+ 	.flags		= IRQCHIP_SKIP_SET_WAKE,
  };
- 
- static void sunxi_pinctrl_irq_handler(unsigned irq, struct irq_desc *desc)
 -- 
 2.0.0
