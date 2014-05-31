@@ -1,45 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 31 May 2014 20:31:32 +0200
-Subject: [PATCH v2 0/7] Fix backtrace support in THUMB2 mode
-In-Reply-To: <1401469191-29232-1-git-send-email-nikolay.borisov@arm.com>
-References: <1401469191-29232-1-git-send-email-nikolay.borisov@arm.com>
-Message-ID: <5507361.VIWsBiqp2f@wuerfel>
+Date: Sat, 31 May 2014 20:34:20 +0200
+Subject: [E1000-devel] ARM support for igb driver
+In-Reply-To: <CAHH3p5KdWvc_=m0XZxhb8drjpWVJ68BR_rH9bhrhNerSjCc-Tg@mail.gmail.com>
+References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>
+ <4627439.I2CpBecnJJ@wuerfel>
+ <CAHH3p5KdWvc_=m0XZxhb8drjpWVJ68BR_rH9bhrhNerSjCc-Tg@mail.gmail.com>
+Message-ID: <4893591.dl3XO76euB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 May 2014 17:59:44 Nikolay Borisov wrote:
-> From: Nikolay Borisov <Nikolay.Borisov@arm.com>
-> 
-> Currently all the code which deals with backtrace support assumes that R11
-> is the frame-pointer. While this is the case for ARM mode and is explicitly
-> documented in the AAPCS, this is not the case for THUMB2 mode.
-> 
-> There is no official document requiring that R11 has to be the frame pointer
-> and GCC uses R7 as FP and given that R7's usage is so intertwined within GCC's
-> mechanics it is unlikely to change, so fixing backtrace in THUMB2 mode seems
-> in order.
-> 
-> This patch series rectifies the problem by first fixing the
-> thread_save_fp macro to reference the correct register. Furthermore, there
-> a lot of repetetive sequences of code such as :
-> 
-> stackframe.fp = pt_regs->ARM_fp
-> stackframe.lr = pt_regs->ARM_lr
-> 
-> so introducing a function arm_get_current_stack_frame which both
-> hides this repetition and also utilizes teh frame_pointer(regs) macro
-> to reference the correct register depending on the mode.
-> 
-> Finally, change all the call sites so that they utilize the new routine.
+On Saturday 31 May 2014 01:44:28 shiv prakash Agarwal wrote:
+> Notsure about root port, Can't it be disabled by Intel device?
 
-Sorry for the stupid question, but does your series relate to the
-#warning "TODO: return_address should use unwind tables" that we see
-all the time in arch/arm/kernel/return_address.c?
+My point is that it's the wrong place to disable it: every device
+is allowed to generate this type of VDMs, and the root port is
+supposed to silently ignore them if it doesn't handle them.
 
-If I remember the story correctly, the problem is that so far we could
-never use the frame pointer in thumb2 mode, and nobody has implemented
-a version of that function using the arm unwinder.
+If the root port doesn't do that, it's a bug in the host bridge
+driver, not in some device driver that happens to operate a
+device within the specification.
 
-Are we now able to use the frame pointer after all?
+Which host bridge driver do you use?
 
 	Arnd
