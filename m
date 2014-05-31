@@ -1,147 +1,138 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 31 May 2014 16:10:11 +0400
-Subject: [PATCH 3/5] ARM: clps711x: Switch CLPS711X subarch to use cpuidle
- driver
+Date: Sat, 31 May 2014 16:10:10 +0400
+Subject: [PATCH 2/5] ARM: clps711x: Move debug include into
+ arch/arm/include/debug/
 In-Reply-To: <1401538213-16106-1-git-send-email-shc_work@mail.ru>
 References: <1401538213-16106-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1401538213-16106-3-git-send-email-shc_work@mail.ru>
+Message-ID: <1401538213-16106-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes old support for cpuidle and switches all current
-users to use new cpuidle driver.
+One more step to allowing CLPS711X to participate in the
+multi-platform defconfig.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/board-autcpu12.c |  1 -
- arch/arm/mach-clps711x/board-cdb89712.c |  1 -
- arch/arm/mach-clps711x/board-clep7312.c |  1 -
- arch/arm/mach-clps711x/board-edb7211.c  |  1 -
- arch/arm/mach-clps711x/board-p720t.c    |  1 -
- arch/arm/mach-clps711x/common.c         | 12 ------------
- arch/arm/mach-clps711x/common.h         |  1 -
- arch/arm/mach-clps711x/devices.c        | 10 ++++++++++
- 8 files changed, 10 insertions(+), 18 deletions(-)
+ arch/arm/Kconfig.debug                            |  1 +
+ arch/arm/include/debug/clps711x.S                 | 38 +++++++++++++++++++++++
+ arch/arm/mach-clps711x/include/mach/debug-macro.S | 38 -----------------------
+ arch/arm/mach-clps711x/include/mach/hardware.h    |  2 +-
+ 4 files changed, 40 insertions(+), 39 deletions(-)
+ create mode 100644 arch/arm/include/debug/clps711x.S
+ delete mode 100644 arch/arm/mach-clps711x/include/mach/debug-macro.S
 
-diff --git a/arch/arm/mach-clps711x/board-autcpu12.c b/arch/arm/mach-clps711x/board-autcpu12.c
-index d62ca16..45abf6b 100644
---- a/arch/arm/mach-clps711x/board-autcpu12.c
-+++ b/arch/arm/mach-clps711x/board-autcpu12.c
-@@ -266,7 +266,6 @@ MACHINE_START(AUTCPU12, "autronix autcpu12")
- 	/* Maintainer: Thomas Gleixner */
- 	.atag_offset	= 0x20000,
- 	.map_io		= clps711x_map_io,
--	.init_early	= clps711x_init_early,
- 	.init_irq	= clps711x_init_irq,
- 	.init_time	= clps711x_timer_init,
- 	.init_machine	= autcpu12_init,
-diff --git a/arch/arm/mach-clps711x/board-cdb89712.c b/arch/arm/mach-clps711x/board-cdb89712.c
-index e261a47..1ec378c 100644
---- a/arch/arm/mach-clps711x/board-cdb89712.c
-+++ b/arch/arm/mach-clps711x/board-cdb89712.c
-@@ -140,7 +140,6 @@ MACHINE_START(CDB89712, "Cirrus-CDB89712")
- 	/* Maintainer: Ray Lehtiniemi */
- 	.atag_offset	= 0x100,
- 	.map_io		= clps711x_map_io,
--	.init_early	= clps711x_init_early,
- 	.init_irq	= clps711x_init_irq,
- 	.init_time	= clps711x_timer_init,
- 	.init_machine	= cdb89712_init,
-diff --git a/arch/arm/mach-clps711x/board-clep7312.c b/arch/arm/mach-clps711x/board-clep7312.c
-index 221b9de..1f3b403 100644
---- a/arch/arm/mach-clps711x/board-clep7312.c
-+++ b/arch/arm/mach-clps711x/board-clep7312.c
-@@ -38,7 +38,6 @@ MACHINE_START(CLEP7212, "Cirrus Logic 7212/7312")
- 	.atag_offset	= 0x0100,
- 	.fixup		= fixup_clep7312,
- 	.map_io		= clps711x_map_io,
--	.init_early	= clps711x_init_early,
- 	.init_irq	= clps711x_init_irq,
- 	.init_time	= clps711x_timer_init,
- 	.restart	= clps711x_restart,
-diff --git a/arch/arm/mach-clps711x/board-edb7211.c b/arch/arm/mach-clps711x/board-edb7211.c
-index 0776098..fa4580f 100644
---- a/arch/arm/mach-clps711x/board-edb7211.c
-+++ b/arch/arm/mach-clps711x/board-edb7211.c
-@@ -180,7 +180,6 @@ MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
- 	.fixup		= fixup_edb7211,
- 	.reserve	= edb7211_reserve,
- 	.map_io		= clps711x_map_io,
--	.init_early	= clps711x_init_early,
- 	.init_irq	= clps711x_init_irq,
- 	.init_time	= clps711x_timer_init,
- 	.init_machine	= edb7211_init,
-diff --git a/arch/arm/mach-clps711x/board-p720t.c b/arch/arm/mach-clps711x/board-p720t.c
-index 67b7337..4a2ec28 100644
---- a/arch/arm/mach-clps711x/board-p720t.c
-+++ b/arch/arm/mach-clps711x/board-p720t.c
-@@ -365,7 +365,6 @@ MACHINE_START(P720T, "ARM-Prospector720T")
- 	.atag_offset	= 0x100,
- 	.fixup		= fixup_p720t,
- 	.map_io		= clps711x_map_io,
--	.init_early	= clps711x_init_early,
- 	.init_irq	= clps711x_init_irq,
- 	.init_time	= clps711x_timer_init,
- 	.init_machine	= p720t_init,
-diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
-index aee81fa..2a6323b 100644
---- a/arch/arm/mach-clps711x/common.c
-+++ b/arch/arm/mach-clps711x/common.c
-@@ -193,15 +193,3 @@ void clps711x_restart(enum reboot_mode mode, const char *cmd)
- {
- 	soft_restart(0);
- }
--
--static void clps711x_idle(void)
--{
--	clps_writel(1, HALT);
--	asm("mov r0, r0");
--	asm("mov r0, r0");
--}
--
--void __init clps711x_init_early(void)
--{
--	arm_pm_idle = clps711x_idle;
--}
-diff --git a/arch/arm/mach-clps711x/common.h b/arch/arm/mach-clps711x/common.h
-index 7489139..f881899 100644
---- a/arch/arm/mach-clps711x/common.h
-+++ b/arch/arm/mach-clps711x/common.h
-@@ -13,7 +13,6 @@ extern void clps711x_map_io(void);
- extern void clps711x_init_irq(void);
- extern void clps711x_timer_init(void);
- extern void clps711x_restart(enum reboot_mode mode, const char *cmd);
--extern void clps711x_init_early(void);
- 
- /* drivers/irqchip/irq-clps711x.c */
- void clps711x_intc_init(phys_addr_t, resource_size_t);
-diff --git a/arch/arm/mach-clps711x/devices.c b/arch/arm/mach-clps711x/devices.c
-index 2001488..0c689d3 100644
---- a/arch/arm/mach-clps711x/devices.c
-+++ b/arch/arm/mach-clps711x/devices.c
-@@ -14,6 +14,15 @@
- 
- #include <mach/hardware.h>
- 
-+static const struct resource clps711x_cpuidle_res __initconst =
-+	DEFINE_RES_MEM(CLPS711X_PHYS_BASE + HALT, SZ_128);
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 9ca888f..7e008ef 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -990,6 +990,7 @@ config DEBUG_STI_UART
+ config DEBUG_LL_INCLUDE
+ 	string
+ 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
++	default "debug/clps711x.S" if DEBUG_CLPS711X_UART1 || DEBUG_CLPS711X_UART2
+ 	default "debug/pl01x.S" if DEBUG_LL_UART_PL01X || DEBUG_UART_PL01X
+ 	default "debug/exynos.S" if DEBUG_EXYNOS_UART
+ 	default "debug/efm32.S" if DEBUG_LL_UART_EFM32
+diff --git a/arch/arm/include/debug/clps711x.S b/arch/arm/include/debug/clps711x.S
+new file mode 100644
+index 0000000..abe2254
+--- /dev/null
++++ b/arch/arm/include/debug/clps711x.S
+@@ -0,0 +1,38 @@
++/*
++ * Copyright (C) 2014 Alexander Shiyan <shc_work@mail.ru>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
 +
-+static void __init clps711x_add_cpuidle(void)
-+{
-+	platform_device_register_simple("clps711x-cpuidle", PLATFORM_DEVID_NONE,
-+					&clps711x_cpuidle_res, 1);
-+}
++#ifndef CONFIG_DEBUG_CLPS711X_UART2
++#define CLPS711X_UART_PADDR	(0x80000000 + 0x0000)
++#define CLPS711X_UART_VADDR	(0xfeff0000 + 0x0000)
++#else
++#define CLPS711X_UART_PADDR	(0x80000000 + 0x1000)
++#define CLPS711X_UART_VADDR	(0xfeff0000 + 0x1000)
++#endif
 +
- static const phys_addr_t clps711x_gpios[][2] __initconst = {
- 	{ PADR, PADDR },
- 	{ PBDR, PBDDR },
-@@ -83,6 +92,7 @@ static void __init clps711x_add_uart(void)
++#define SYSFLG		(0x0140)
++#define SYSFLG_UBUSY	(1 << 11)
++#define UARTDR		(0x0480)
++
++	.macro	addruart, rp, rv, tmp
++	ldr	\rv, =CLPS711X_UART_VADDR
++	ldr	\rp, =CLPS711X_UART_PADDR
++	.endm
++
++	.macro	waituart,rd,rx
++	.endm
++
++	.macro	senduart,rd,rx
++	str	\rd, [\rx, #UARTDR]
++	.endm
++
++	.macro	busyuart,rd,rx
++1001:	ldr	\rd, [\rx, #SYSFLG]
++	tst	\rd, #SYSFLG_UBUSY
++	bne	1001b
++	.endm
+diff --git a/arch/arm/mach-clps711x/include/mach/debug-macro.S b/arch/arm/mach-clps711x/include/mach/debug-macro.S
+deleted file mode 100644
+index cb3684f..0000000
+--- a/arch/arm/mach-clps711x/include/mach/debug-macro.S
++++ /dev/null
+@@ -1,38 +0,0 @@
+-/* arch/arm/mach-clps711x/include/mach/debug-macro.S
+- *
+- * Debugging macro include header
+- *
+- *  Copyright (C) 1994-1999 Russell King
+- *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+-*/
+-
+-#include <mach/hardware.h>
+-
+-		.macro	addruart, rp, rv, tmp
+-#ifndef CONFIG_DEBUG_CLPS711X_UART2
+-		mov	\rp, #0x0000	@ UART1
+-#else
+-		mov	\rp, #0x1000	@ UART2
+-#endif
+-		orr	\rv, \rp, #CLPS711X_VIRT_BASE
+-		orr	\rp, \rp, #CLPS711X_PHYS_BASE
+-		.endm
+-
+-		.macro	senduart,rd,rx
+-		str	\rd, [\rx, #0x0480]	@ UARTDR
+-		.endm
+-
+-		.macro	waituart,rd,rx
+-		.endm
+-
+-		.macro	busyuart,rd,rx
+-1001:		ldr	\rd, [\rx, #0x0140]	@ SYSFLGx
+-		tst	\rd, #1 << 11		@ UBUSYx
+-		bne	1001b
+-		.endm
+-
+diff --git a/arch/arm/mach-clps711x/include/mach/hardware.h b/arch/arm/mach-clps711x/include/mach/hardware.h
+index 292cbcb..833129c 100644
+--- a/arch/arm/mach-clps711x/include/mach/hardware.h
++++ b/arch/arm/mach-clps711x/include/mach/hardware.h
+@@ -24,7 +24,7 @@
  
- void __init clps711x_devices_init(void)
- {
-+	clps711x_add_cpuidle();
- 	clps711x_add_gpio();
- 	clps711x_add_syscon();
- 	clps711x_add_uart();
+ #include <mach/clps711x.h>
+ 
+-#define CLPS711X_VIRT_BASE	IOMEM(0xfe000000)
++#define CLPS711X_VIRT_BASE	IOMEM(0xfeff0000)
+ 
+ #ifndef __ASSEMBLY__
+ #define clps_readb(off)		readb(CLPS711X_VIRT_BASE + (off))
 -- 
 1.8.5.5
