@@ -1,47 +1,38 @@
-From: riku.voipio@linaro.org (Riku Voipio)
-Date: Sat, 31 May 2014 14:50:26 +0300
-Subject: [PATCH v2] thermal: allow building dove_thermal with mvebu
-In-Reply-To: <1401452899-13952-1-git-send-email-riku.voipio@linaro.org>
-References: <1401452899-13952-1-git-send-email-riku.voipio@linaro.org>
-Message-ID: <1401537027-32291-1-git-send-email-riku.voipio@linaro.org>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Sat, 31 May 2014 15:05:27 +0300
+Subject: [PATCH] driver core/platform: remove unused implicit padding in
+ platform_object
+In-Reply-To: <1401523299.15490.6.camel@localhost.localdomain>
+References: <1401480167-15091-1-git-send-email-ydroneaud@opteya.com>
+ <20140530201054.GF17724@mwanda>
+ <1401523299.15490.6.camel@localhost.localdomain>
+Message-ID: <20140531120526.GL15585@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT-enabled Dove has moved from ARCH_DOVE in mach-dove to MACH_DOVE
-in mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
-DT-only MACH_DOVE to thermal Kconfig.
+On Sat, May 31, 2014 at 10:01:39AM +0200, Yann Droneaud wrote:
+> Hi Dan,
+> 
+> Le vendredi 30 mai 2014 ? 23:10 +0300, Dan Carpenter a ?crit :
+> > This changelog doesn't match the patch.
+> > 
+> 
+> Hum, let me guess .... I've failed to set the proper subject prefix
+> to add v6 suffic to PATCH: 
+> I've changed the patch title since v5 (from Emil Goode)... so it's like
+> a new one.
+> 
+> Is it really necessary to resend the patch ?
 
-This was originally supposed to go in via "ARM: dove: prepare new Dove DT Kconfig"
-patch from Sebastian Hesselbarth for 3.15, but slipped through the cracks.
+Oh.  Sorry, I didn't understand what you were trying to say...  You're
+right.
 
-I've tested on CuBox that without this patch you can't compile
-dove_thermal into a mach-mvebu based kernel, and with this patch I can
-build the driver and it works as expected run-time.
+For some reason I just looked at the patch first and then I started
+reading the changelog and got to the bit about GCC on ARM and said
+thought have been describing a different change without reading the
+rest.  This was my bad.  I should have read more carefully.
 
-v2: non-ascii char creeped in somehow
+Very thourough patch description.  :)
 
-Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Eduardo Valentin <edubezval@gmail.com>
-Cc: linux-pm at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- drivers/thermal/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index 2d51912..5783c72 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -151,7 +151,7 @@ config KIRKWOOD_THERMAL
- 
- config DOVE_THERMAL
- 	tristate "Temperature sensor on Marvell Dove SoCs"
--	depends on ARCH_DOVE
-+	depends on ARCH_DOVE || MACH_DOVE
- 	depends on OF
- 	help
- 	  Support for the Dove thermal sensor driver in the Linux thermal
--- 
-2.0.0.rc2
+regards,
+dan carpenter
