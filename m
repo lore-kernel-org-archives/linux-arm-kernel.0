@@ -1,132 +1,40 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 31 May 2014 16:01:38 +0200
-Subject: [PATCH v2 4/5] pinctrl: sunxi: Properly handle level triggered gpio
- interrupts
-In-Reply-To: <1401544899-405-1-git-send-email-hdegoede@redhat.com>
-References: <1401544899-405-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1401544899-405-5-git-send-email-hdegoede@redhat.com>
+From: gdjakov@mm-sol.com (Georgi Djakov)
+Date: Sat, 31 May 2014 18:45:30 +0300
+Subject: [PATCH v2 0/4] clk: qcom: Add APQ8084 Global Clock Controller support
+Message-ID: <1401551134-28485-1-git-send-email-gdjakov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For level triggered gpio interrupts we need to use handle_fasteoi_irq,
-like we do with the irq-sunxi-nmi driver. This is necessary to give threaded
-interrupt handlers a chance to actuall clear the source of the interrupt
-(which may involve sleeping waiting for i2c / spi / mmc transfers), before
-acknowledging the interrupt.
+This patchset adds support for the global clock controller found on the
+APQ8084 based platforms.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/pinctrl/sunxi/pinctrl-sunxi.c | 57 +++++++++++++++++++++++++----------
- 1 file changed, 41 insertions(+), 16 deletions(-)
+Patches 1,2 can go through clk-next and 3,4 through arm-soc.
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-index 61d3246..418a430 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-@@ -31,6 +31,11 @@
- #include "../core.h"
- #include "pinctrl-sunxi.h"
- 
-+static void sunxi_pinctrl_irq_ack(struct irq_data *d);
-+static void sunxi_pinctrl_irq_mask(struct irq_data *d);
-+static void sunxi_pinctrl_irq_unmask(struct irq_data *d);
-+static int sunxi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type);
-+
- static struct sunxi_pinctrl_group *
- sunxi_pinctrl_find_group_by_name(struct sunxi_pinctrl *pctl, const char *group)
- {
-@@ -545,10 +550,29 @@ static int sunxi_pinctrl_irq_request_resources(struct irq_data *d)
- 	return 0;
- }
- 
--static int sunxi_pinctrl_irq_set_type(struct irq_data *d,
--				      unsigned int type)
-+static struct irq_chip sunxi_pinctrl_edge_irq_chip = {
-+	.irq_ack		= sunxi_pinctrl_irq_ack,
-+	.irq_mask		= sunxi_pinctrl_irq_mask,
-+	.irq_unmask		= sunxi_pinctrl_irq_unmask,
-+	.irq_request_resources	= sunxi_pinctrl_irq_request_resources,
-+	.irq_set_type		= sunxi_pinctrl_irq_set_type,
-+	.flags			= IRQCHIP_SKIP_SET_WAKE,
-+};
-+
-+static struct irq_chip sunxi_pinctrl_level_irq_chip = {
-+	.irq_eoi		= sunxi_pinctrl_irq_ack,
-+	.irq_mask		= sunxi_pinctrl_irq_mask,
-+	.irq_unmask		= sunxi_pinctrl_irq_unmask,
-+	.irq_request_resources	= sunxi_pinctrl_irq_request_resources,
-+	.irq_set_type		= sunxi_pinctrl_irq_set_type,
-+	.flags			= IRQCHIP_SKIP_SET_WAKE | IRQCHIP_EOI_THREADED
-+				  | IRQCHIP_EOI_IF_HANDLED,
-+};
-+
-+static int sunxi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type)
- {
- 	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
-+	struct irq_desc *desc = container_of(d, struct irq_desc, irq_data);
- 	u32 reg = sunxi_irq_cfg_reg(d->hwirq);
- 	u8 index = sunxi_irq_cfg_offset(d->hwirq);
- 	unsigned long flags;
-@@ -575,6 +599,14 @@ static int sunxi_pinctrl_irq_set_type(struct irq_data *d,
- 		return -EINVAL;
- 	}
- 
-+	if (type & IRQ_TYPE_LEVEL_MASK) {
-+		d->chip = &sunxi_pinctrl_level_irq_chip;
-+		desc->handle_irq = handle_fasteoi_irq;
-+	} else {
-+		d->chip = &sunxi_pinctrl_edge_irq_chip;
-+		desc->handle_irq = handle_edge_irq;
-+	}
-+
- 	spin_lock_irqsave(&pctl->lock, flags);
- 
- 	regval = readl(pctl->membase + reg);
-@@ -630,15 +662,6 @@ static void sunxi_pinctrl_irq_unmask(struct irq_data *d)
- 	spin_unlock_irqrestore(&pctl->lock, flags);
- }
- 
--static struct irq_chip sunxi_pinctrl_irq_chip = {
--	.irq_ack	= sunxi_pinctrl_irq_ack,
--	.irq_mask	= sunxi_pinctrl_irq_mask,
--	.irq_unmask	= sunxi_pinctrl_irq_unmask,
--	.irq_request_resources = sunxi_pinctrl_irq_request_resources,
--	.irq_set_type	= sunxi_pinctrl_irq_set_type,
--	.flags		= IRQCHIP_SKIP_SET_WAKE,
--};
--
- static void sunxi_pinctrl_irq_handler(unsigned irq, struct irq_desc *desc)
- {
- 	struct irq_chip *chip = irq_get_chip(irq);
-@@ -655,9 +678,6 @@ static void sunxi_pinctrl_irq_handler(unsigned irq, struct irq_desc *desc)
- 	reg = sunxi_irq_status_reg_from_bank(bank);
- 	val = readl(pctl->membase + reg);
- 
--	/* Clear all interrupts */
--	writel(val, pctl->membase + reg);
--
- 	if (val) {
- 		int irqoffset;
- 
-@@ -927,12 +947,17 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
- 	for (i = 0; i < (pctl->desc->irq_banks * IRQ_PER_BANK); i++) {
- 		int irqno = irq_create_mapping(pctl->domain, i);
- 
--		irq_set_chip_and_handler(irqno, &sunxi_pinctrl_irq_chip,
--					 handle_simple_irq);
-+		irq_set_chip_and_handler(irqno, &sunxi_pinctrl_edge_irq_chip,
-+					 handle_edge_irq);
- 		irq_set_chip_data(irqno, pctl);
- 	};
- 
- 	for (i = 0; i < pctl->desc->irq_banks; i++) {
-+		/* Mask and clear all IRQs before registering a handler */
-+		writel(0, pctl->membase + sunxi_irq_ctrl_reg_from_bank(i));
-+		writel(0xffffffff,
-+			pctl->membase + sunxi_irq_status_reg_from_bank(i));
-+
- 		irq_set_chained_handler(pctl->irq[i],
- 					sunxi_pinctrl_irq_handler);
- 		irq_set_handler_data(pctl->irq[i], pctl);
+Changes from v1:
+ - Moved APQ8084 clocks into a separate file and under separate Kconfig
+   entry. Dropped the override function patch from v1.
+ - Added the missing information about resets (suggested by Kumar Gala).
+ - Made the UART DT node "disabled" in dtsi and "okay" in dts (suggested
+   by Kumar Gala)
+
+Georgi Djakov (4):
+  clk: qcom: Add APQ8084 Global Clock Controller documentation
+  clk: qcom: Add APQ8084 Global Clock Controller support
+  ARM: dts: qcom: Add APQ8084 Global Clock Controller DT node
+  ARM: dts: qcom: Add APQ8084 serial port DT node
+
+ .../devicetree/bindings/clock/qcom,gcc.txt         |    1 +
+ arch/arm/boot/dts/qcom-apq8084-mtp.dts             |    6 +
+ arch/arm/boot/dts/qcom-apq8084.dtsi                |   18 +
+ drivers/clk/qcom/Kconfig                           |    8 +
+ drivers/clk/qcom/Makefile                          |    1 +
+ drivers/clk/qcom/gcc-apq8084.c                     | 2951 ++++++++++++++++++++
+ include/dt-bindings/clock/qcom,gcc-apq8084.h       |  337 +++
+ include/dt-bindings/reset/qcom,gcc-apq8084.h       |  116 +
+ 8 files changed, 3438 insertions(+)
+ create mode 100644 drivers/clk/qcom/gcc-apq8084.c
+ create mode 100644 include/dt-bindings/clock/qcom,gcc-apq8084.h
+ create mode 100644 include/dt-bindings/reset/qcom,gcc-apq8084.h
+
 -- 
-2.0.0
+1.7.9.5
