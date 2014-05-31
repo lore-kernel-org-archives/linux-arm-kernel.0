@@ -1,31 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 30 May 2014 20:58:18 -0700
-Subject: [GIT PULL] qcom driver changes for v3.16-2
-In-Reply-To: <alpine.DEB.2.00.1405301138220.5291@galak-ubuntu.qualcomm.com>
-References: <alpine.DEB.2.00.1405301138220.5291@galak-ubuntu.qualcomm.com>
-Message-ID: <20140531035818.GD14790@quad.lixom.net>
+Date: Fri, 30 May 2014 21:39:42 -0700
+Subject: [GIT PULL 1/5] Samsung CLK update for 3.16
+In-Reply-To: <5388E301.7080407@samsung.com>
+References: <5388E301.7080407@samsung.com>
+Message-ID: <20140531043942.GA21917@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 30, 2014 at 11:41:01AM -0500, Kumar Gala wrote:
-> The following changes since commit 5d144e36b7c51612922fa05d37ff3a869261cc82:
+On Sat, May 31, 2014 at 04:58:57AM +0900, Kukjin Kim wrote:
+> The following changes since commit bfed1074f213051e94648bfad0d0611a16d81366:
 > 
->   soc: qcom: Add GSBI driver (2014-05-23 11:38:04 -0500)
+>   clk: exynos5250: Add missing sysmmu clocks for DISP and ISP blocks
+> (2014-05-26 06:48:10 +0900)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-drivers-for-3.16-2
-> 
-> for you to fetch changes up to 31964ffebbb958c6cf289c7c12edd7530d6221b9:
-> 
->   tty: serial: msm: Remove direct access to GSBI (2014-05-29 11:06:20 -0500)
-> 
-> ----------------------------------------------------------------
-> Qualcomm ARM Based driver Updates for v3.16-2
-> 
-> * Updated MSM uart driver to not access GSBI control registers
 
-Ok, merged.
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-clk-3
+> 
+> for you to fetch changes up to e7ef0b632eb45b0c725629da3561ecde8935a398:
+> 
+>   clk: exynos5410: register clocks using common clock framework
+> (2014-05-31 02:13:16 +0900)
+
+Merged, thanks.
 
 
 -Olof
