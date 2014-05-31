@@ -1,59 +1,37 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 31 May 2014 14:54:40 +0200
-Subject: [PATCH v2] thermal: allow building dove_thermal with mvebu
-In-Reply-To: <1401537027-32291-1-git-send-email-riku.voipio@linaro.org>
-References: <1401452899-13952-1-git-send-email-riku.voipio@linaro.org>
- <1401537027-32291-1-git-send-email-riku.voipio@linaro.org>
-Message-ID: <5389D110.8020606@gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 31 May 2014 15:48:06 +0200
+Subject: [PATCH] i2c: Make I2C ID tables non-mandatory for DT'ed and/or
+ ACPI'ed devices
+In-Reply-To: <20140530192516.GA4319@lee--X1>
+References: <1401452797-29521-1-git-send-email-lee.jones@linaro.org>
+ <1401452797-29521-2-git-send-email-lee.jones@linaro.org>
+ <20140530123656.GC2742@katana> <20140530133405.GB29731@lee--X1>
+ <20140530174800.GA4917@katana> <20140530192516.GA4319@lee--X1>
+Message-ID: <20140531134805.GA3287@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/31/2014 01:50 PM, Riku Voipio wrote:
-> DT-enabled Dove has moved from ARCH_DOVE in mach-dove to MACH_DOVE
-> in mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
-> DT-only MACH_DOVE to thermal Kconfig.
-> 
-> This was originally supposed to go in via "ARM: dove: prepare new Dove DT Kconfig"
-> patch from Sebastian Hesselbarth for 3.15, but slipped through the cracks.
-> 
-> I've tested on CuBox that without this patch you can't compile
-> dove_thermal into a mach-mvebu based kernel, and with this patch I can
-> build the driver and it works as expected run-time.
 
-Riku,
+> Right, I read the function which provides the functionality, but my
+> point is; I don't think my patch changes the semantics in a way which
+> would adversely affect this option.  If you think that it does, can you
+> specify how please?
 
-looking through my mails, the corresponding patch should have
-already been applied [1].
+Currently, if a driver would be DT only and does not provide a seperate
+i2c_device_id table, then the driver is unusable with method 4. I don't
+like to have some drivers being capable of it and some not.
 
-If not, you get my
+> Does the sysfs method create a i2c_device_id table?  If not, how does
+> it probe successfully pre-patch?
 
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+The sysfs method creates a device. Its name is matched against
+i2c_device_ids only since it does not have a node pointer for DT to be
+matched against.
 
-[1] https://lkml.kernel.org/r/1395295065.3571.10.camel at rzhang1-mobl4
-
-> v2: non-ascii char creeped in somehow
-> 
-> Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: Eduardo Valentin <edubezval@gmail.com>
-> Cc: linux-pm at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  drivers/thermal/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> index 2d51912..5783c72 100644
-> --- a/drivers/thermal/Kconfig
-> +++ b/drivers/thermal/Kconfig
-> @@ -151,7 +151,7 @@ config KIRKWOOD_THERMAL
->  
->  config DOVE_THERMAL
->  	tristate "Temperature sensor on Marvell Dove SoCs"
-> -	depends on ARCH_DOVE
-> +	depends on ARCH_DOVE || MACH_DOVE
->  	depends on OF
->  	help
->  	  Support for the Dove thermal sensor driver in the Linux thermal
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140531/ed161c08/attachment.sig>
