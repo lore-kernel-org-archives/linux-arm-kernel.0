@@ -1,25 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 31 May 2014 20:34:20 +0200
-Subject: [E1000-devel] ARM support for igb driver
-In-Reply-To: <CAHH3p5KdWvc_=m0XZxhb8drjpWVJ68BR_rH9bhrhNerSjCc-Tg@mail.gmail.com>
-References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>
- <4627439.I2CpBecnJJ@wuerfel>
- <CAHH3p5KdWvc_=m0XZxhb8drjpWVJ68BR_rH9bhrhNerSjCc-Tg@mail.gmail.com>
-Message-ID: <4893591.dl3XO76euB@wuerfel>
+Date: Sat, 31 May 2014 20:41:04 +0200
+Subject: [PATCH 1/2] pci: Add IORESOURCE_BIT entry for PCIe ECAM resources.
+In-Reply-To: <1401496601-31983-2-git-send-email-Liviu.Dudau@arm.com>
+References: <20140530233034.GH1677@bart.dudau.co.uk>
+ <1401496601-31983-1-git-send-email-Liviu.Dudau@arm.com>
+ <1401496601-31983-2-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <4756033.LkcFQN0chs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 31 May 2014 01:44:28 shiv prakash Agarwal wrote:
-> Notsure about root port, Can't it be disabled by Intel device?
+On Saturday 31 May 2014 01:36:40 Liviu Dudau wrote:
+> We would like to be able to describe PCIe ECAM resources as
+> IORESOURCE_MEM blocks while distinguish them from standard
+> memory resources. Add an IORESOURCE_BIT entry for this case.
+> 
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-My point is that it's the wrong place to disable it: every device
-is allowed to generate this type of VDMs, and the root port is
-supposed to silently ignore them if it doesn't handle them.
-
-If the root port doesn't do that, it's a bug in the host bridge
-driver, not in some device driver that happens to operate a
-device within the specification.
-
-Which host bridge driver do you use?
+I still don't see any value in this at all. What is the advantage
+of doing this opposed to just having a standardized 'reg' property
+for a particular compatible string?
 
 	Arnd
