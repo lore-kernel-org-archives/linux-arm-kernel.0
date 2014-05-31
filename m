@@ -1,38 +1,33 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Sat, 31 May 2014 15:05:27 +0300
-Subject: [PATCH] driver core/platform: remove unused implicit padding in
- platform_object
-In-Reply-To: <1401523299.15490.6.camel@localhost.localdomain>
-References: <1401480167-15091-1-git-send-email-ydroneaud@opteya.com>
- <20140530201054.GF17724@mwanda>
- <1401523299.15490.6.camel@localhost.localdomain>
-Message-ID: <20140531120526.GL15585@mwanda>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 31 May 2014 16:10:09 +0400
+Subject: [PATCH 1/5] ARM: clps711x: Remove IO_ADDRESS() macro
+Message-ID: <1401538213-16106-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 31, 2014 at 10:01:39AM +0200, Yann Droneaud wrote:
-> Hi Dan,
-> 
-> Le vendredi 30 mai 2014 ? 23:10 +0300, Dan Carpenter a ?crit :
-> > This changelog doesn't match the patch.
-> > 
-> 
-> Hum, let me guess .... I've failed to set the proper subject prefix
-> to add v6 suffic to PATCH: 
-> I've changed the patch title since v5 (from Emil Goode)... so it's like
-> a new one.
-> 
-> Is it really necessary to resend the patch ?
+All uses of the IO_ADDRESS() macro has been removed.
+This patch removes the definition of this macro.
 
-Oh.  Sorry, I didn't understand what you were trying to say...  You're
-right.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/mach-clps711x/include/mach/hardware.h | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-For some reason I just looked at the patch first and then I started
-reading the changelog and got to the bit about GCC on ARM and said
-thought have been describing a different change without reading the
-rest.  This was my bad.  I should have read more carefully.
-
-Very thourough patch description.  :)
-
-regards,
-dan carpenter
+diff --git a/arch/arm/mach-clps711x/include/mach/hardware.h b/arch/arm/mach-clps711x/include/mach/hardware.h
+index 5d6afda..292cbcb 100644
+--- a/arch/arm/mach-clps711x/include/mach/hardware.h
++++ b/arch/arm/mach-clps711x/include/mach/hardware.h
+@@ -24,10 +24,7 @@
+ 
+ #include <mach/clps711x.h>
+ 
+-#define IO_ADDRESS(x)		(0xdc000000 + (((x) & 0x03ffffff) | \
+-				(((x) >> 2) & 0x3c000000)))
+-
+-#define CLPS711X_VIRT_BASE	IOMEM(IO_ADDRESS(CLPS711X_PHYS_BASE))
++#define CLPS711X_VIRT_BASE	IOMEM(0xfe000000)
+ 
+ #ifndef __ASSEMBLY__
+ #define clps_readb(off)		readb(CLPS711X_VIRT_BASE + (off))
+-- 
+1.8.5.5
