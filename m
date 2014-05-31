@@ -1,79 +1,117 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Sat, 31 May 2014 09:35:39 +0200
-Subject: [PATCH 2/2] gpio: gpiolib: set gpiochip_remove retval to void
-In-Reply-To: <20140530232922.GD25854@kroah.com>
-References: <20140530094025.3b78301e@canb.auug.org.au>
- <1401449454-30895-1-git-send-email-berthe.ab@gmail.com>
- <1401449454-30895-2-git-send-email-berthe.ab@gmail.com>
- <CAMuHMdV6AtjD2aqO3buzj8Eo7A7xc_+ROYnxEi2sdjMaqFiAuA@mail.gmail.com>
- <5388C0F1.90503@gmail.com> <5388CB1B.3090802@metafoo.de>
- <20140530232922.GD25854@kroah.com>
-Message-ID: <5389864B.4000107@metafoo.de>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 31 May 2014 11:40:16 +0400
+Subject: [PATCH RFT] ARM: imx6q: Remove static memory mapping for SCU
+Message-ID: <1401522016-25024-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/31/2014 01:29 AM, Greg KH wrote:
-> On Fri, May 30, 2014 at 08:16:59PM +0200, Lars-Peter Clausen wrote:
->> On 05/30/2014 07:33 PM, David Daney wrote:
->>> On 05/30/2014 04:39 AM, Geert Uytterhoeven wrote:
->>>> On Fri, May 30, 2014 at 1:30 PM, abdoulaye berthe <berthe.ab@gmail.com>
->>>> wrote:
->>>>> --- a/drivers/gpio/gpiolib.c
->>>>> +++ b/drivers/gpio/gpiolib.c
->>>>> @@ -1263,10 +1263,9 @@ static void gpiochip_irqchip_remove(struct
->>>>> gpio_chip *gpiochip);
->>>>>    *
->>>>>    * A gpio_chip with any GPIOs still requested may not be removed.
->>>>>    */
->>>>> -int gpiochip_remove(struct gpio_chip *chip)
->>>>> +void gpiochip_remove(struct gpio_chip *chip)
->>>>>   {
->>>>>          unsigned long   flags;
->>>>> -       int             status = 0;
->>>>>          unsigned        id;
->>>>>
->>>>>          acpi_gpiochip_remove(chip);
->>>>> @@ -1278,24 +1277,15 @@ int gpiochip_remove(struct gpio_chip *chip)
->>>>>          of_gpiochip_remove(chip);
->>>>>
->>>>>          for (id = 0; id < chip->ngpio; id++) {
->>>>> -               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags)) {
->>>>> -                       status = -EBUSY;
->>>>> -                       break;
->>>>> -               }
->>>>> -       }
->>>>> -       if (status == 0) {
->>>>> -               for (id = 0; id < chip->ngpio; id++)
->>>>> -                       chip->desc[id].chip = NULL;
->>>>> -
->>>>> -               list_del(&chip->list);
->>>>> +               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags))
->>>>> +                       panic("gpio: removing gpiochip with gpios still
->>>>> requested\n");
->>>>
->>>> panic?
->>>
->>> NACK to the patch for this reason.  The strongest thing you should do here
->>> is WARN.
->>>
->>> That said, I am not sure why we need this whole patch set in the first place.
->>
->> Well, what currently happens when you remove a device that is a provider of
->> a gpio_chip which is still in use, is that the kernel crashes. Probably with
->> a rather cryptic error message. So this patch doesn't really change the
->> behavior, but makes it more explicit what is actually wrong. And even if you
->> replace the panic() by a WARN() it will again just crash slightly later.
->>
->> This is a design flaw in the GPIO subsystem that needs to be fixed.
->
-> Then fix the GPIO code properly, don't add a new panic() to the kernel.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+Completely untested.
+---
+ arch/arm/mach-imx/common.h     |  1 -
+ arch/arm/mach-imx/mach-imx6q.c |  8 +-------
+ arch/arm/mach-imx/platsmp.c    | 30 +++++++-----------------------
+ 3 files changed, 8 insertions(+), 31 deletions(-)
 
-Until somebody comes up with a patch that fixes this for good I think that 
-patch is still an improvement over the current situation. Rather than 
-keeping the kernel running in a inconsistent state, which might cause all 
-kinds of undefined behavior and which will lead to a crash eventually, we 
-might as well just crash the kernel at the cause of the inconsistent state. 
-This will make it obvious why it crashed (compared to a random stacktrace) 
-and will also prevent the kernel from running in a undefined state.
-
-- Lars
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 9586187..7fdbb18 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -96,7 +96,6 @@ u32 imx_get_cpu_arg(int cpu);
+ void imx_set_cpu_arg(int cpu, u32 arg);
+ #ifdef CONFIG_SMP
+ void v7_secondary_startup(void);
+-void imx_scu_map_io(void);
+ void imx_smp_prepare(void);
+ void imx_scu_standby_enable(void);
+ #else
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index e60456d..f3a0170 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -381,12 +381,6 @@ static void __init imx6q_init_late(void)
+ 	}
+ }
+ 
+-static void __init imx6q_map_io(void)
+-{
+-	debug_ll_io_init();
+-	imx_scu_map_io();
+-}
+-
+ static void __init imx6q_init_irq(void)
+ {
+ 	imx_init_revision_from_anatop();
+@@ -404,7 +398,7 @@ static const char *imx6q_dt_compat[] __initconst = {
+ 
+ DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad/DualLite (Device Tree)")
+ 	.smp		= smp_ops(imx_smp_ops),
+-	.map_io		= imx6q_map_io,
++	.map_io		= debug_ll_io_init,
+ 	.init_irq	= imx6q_init_irq,
+ 	.init_machine	= imx6q_init_machine,
+ 	.init_late      = imx6q_init_late,
+diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
+index 5b57c17..4d3aba0 100644
+--- a/arch/arm/mach-imx/platsmp.c
++++ b/arch/arm/mach-imx/platsmp.c
+@@ -11,40 +11,18 @@
+  */
+ 
+ #include <linux/init.h>
++#include <linux/io.h>
+ #include <linux/smp.h>
+ #include <asm/cacheflush.h>
+-#include <asm/page.h>
+ #include <asm/smp_scu.h>
+-#include <asm/mach/map.h>
+ 
+ #include "common.h"
+-#include "hardware.h"
+ 
+ #define SCU_STANDBY_ENABLE	(1 << 5)
+ 
+ u32 g_diag_reg;
+ static void __iomem *scu_base;
+ 
+-static struct map_desc scu_io_desc __initdata = {
+-	/* .virtual and .pfn are run-time assigned */
+-	.length		= SZ_4K,
+-	.type		= MT_DEVICE,
+-};
+-
+-void __init imx_scu_map_io(void)
+-{
+-	unsigned long base;
+-
+-	/* Get SCU base */
+-	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
+-
+-	scu_io_desc.virtual = IMX_IO_P2V(base);
+-	scu_io_desc.pfn = __phys_to_pfn(base);
+-	iotable_init(&scu_io_desc, 1);
+-
+-	scu_base = IMX_IO_ADDRESS(base);
+-}
+-
+ void imx_scu_standby_enable(void)
+ {
+ 	u32 val = readl_relaxed(scu_base);
+@@ -66,8 +44,14 @@ static int imx_boot_secondary(unsigned int cpu, struct task_struct *idle)
+  */
+ static void __init imx_smp_init_cpus(void)
+ {
++	unsigned long base;
+ 	int i, ncores;
+ 
++	/* Get SCU base */
++	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
++
++	scu_base = ioremap(base, SZ_4K);
++
+ 	ncores = scu_get_core_count(scu_base);
+ 
+ 	for (i = ncores; i < NR_CPUS; i++)
+-- 
+1.8.5.5
