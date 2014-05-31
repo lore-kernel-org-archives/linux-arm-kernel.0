@@ -1,31 +1,117 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 30 May 2014 20:35:07 -0700
-Subject: [GIT PULL] qcom SoC changes for v3.16-2
-In-Reply-To: <alpine.DEB.2.00.1405301142280.5291@galak-ubuntu.qualcomm.com>
-References: <alpine.DEB.2.00.1405301142280.5291@galak-ubuntu.qualcomm.com>
-Message-ID: <20140531033507.GC14790@quad.lixom.net>
+From: elder@linaro.org (Alex Elder)
+Date: Fri, 30 May 2014 22:46:46 -0500
+Subject: [PATCH v4 1/7] clk: kona: allow nested ccu_write_enable() requests
+In-Reply-To: <20140530232822.10062.26597@quantum>
+References: <1401483188-5395-1-git-send-email-elder@linaro.org>
+ <1401483188-5395-2-git-send-email-elder@linaro.org>
+ <20140530232822.10062.26597@quantum>
+Message-ID: <538950A6.6020300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 30, 2014 at 11:43:13AM -0500, Kumar Gala wrote:
-> The following changes since commit 87cfb00d666cca3abf36f755279cde1b27b9c377:
+On 05/30/2014 06:28 PM, Mike Turquette wrote:
+> Quoting Alex Elder (2014-05-30 13:53:02)
+>> Use a counter rather than a Boolean to track whether write access to
+>> a CCU has been enabled or not.  This will allow more than one of
+>> these requests to be nested.
+>>
+>> Note that __ccu_write_enable() and __ccu_write_disable() calls all
+>> come in pairs, and they are always surrounded immediately by calls
+>> to ccu_lock() and ccu_unlock().
+>>
+>> Signed-off-by: Alex Elder <elder@linaro.org>
+>> ---
+>>  drivers/clk/bcm/clk-kona.c | 14 ++++----------
+>>  drivers/clk/bcm/clk-kona.h |  2 +-
+>>  2 files changed, 5 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
+>> index 95af2e6..ee8e988 100644
+>> --- a/drivers/clk/bcm/clk-kona.c
+>> +++ b/drivers/clk/bcm/clk-kona.c
+>> @@ -170,13 +170,8 @@ static inline void ccu_unlock(struct ccu_data *ccu, unsigned long flags)
+>>   */
+>>  static inline void __ccu_write_enable(struct ccu_data *ccu)
 > 
->   ARM: qcom: Select PINCTRL by default for ARCH_QCOM (2014-05-22 11:50:42 -0500)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-soc-for-3.16-2
-> 
-> for you to fetch changes up to 2f528dd3b30c4351c0ece73b8bdc39753c02003b:
-> 
->   ARM: debug: qcom: add UART addresses to Kconfig help for APQ8084 (2014-05-29 11:14:28 -0500)
-> 
-> ----------------------------------------------------------------
-> Qualcomm ARM Based SoC Updates for v3.16-2
-> 
-> * Updated Kconfig DEBUG_QCOM_UARTDM help to include APQ8084 info
+> Per Documentation/CodingStyle, chapter 15, "the inline disease", it
+> might be best to not inline these functions.
 
-Merged, thanks.
+This was not intentional.  I normally only inline things
+defined in header files, and maybe this is an artifact of
+having been in a header at one time.  I don't know, I'll get
+rid of the inline.
 
+> 
+>>  {
+>> -       if (ccu->write_enabled) {
+>> -               pr_err("%s: access already enabled for %s\n", __func__,
+>> -                       ccu->name);
+>> -               return;
+>> -       }
+>> -       ccu->write_enabled = true;
+>> -       __ccu_write(ccu, 0, CCU_ACCESS_PASSWORD | 1);
+>> +       if (!ccu->write_enabled++)
+>> +               __ccu_write(ccu, 0, CCU_ACCESS_PASSWORD | 1);
+>>  }
+>>  
+>>  static inline void __ccu_write_disable(struct ccu_data *ccu)
+>> @@ -186,9 +181,8 @@ static inline void __ccu_write_disable(struct ccu_data *ccu)
+>>                         ccu->name);
+>>                 return;
+>>         }
+>> -
+>> -       __ccu_write(ccu, 0, CCU_ACCESS_PASSWORD);
+>> -       ccu->write_enabled = false;
+>> +       if (!--ccu->write_enabled)
+>> +               __ccu_write(ccu, 0, CCU_ACCESS_PASSWORD);
+> 
+> What happens if calls to __ccu_write_enable and __ccu_write_disable are
+> unbalanced? It would be better to catch that case and throw a WARN:
 
--Olof
+You can't see it in the diff, but that's what happens
+(well, it's a pr_err(), not a WARN()).   I think a WARN()
+is probably right in this case though.
+
+> 	if (WARN_ON(ccu->write_enabled == 0))
+> 		return;
+> 
+> 	if (--ccu->write_enabled > 0)
+> 		return;
+> 
+> 	__ccu_write(ccu, 0, CCU_ACCESS_PASSWORD);
+> 
+>>  }
+>>  
+>>  /*
+>> diff --git a/drivers/clk/bcm/clk-kona.h b/drivers/clk/bcm/clk-kona.h
+>> index 2537b30..e9a8466 100644
+>> --- a/drivers/clk/bcm/clk-kona.h
+>> +++ b/drivers/clk/bcm/clk-kona.h
+>> @@ -478,7 +478,7 @@ struct ccu_policy {
+>>  struct ccu_data {
+>>         void __iomem *base;     /* base of mapped address space */
+>>         spinlock_t lock;        /* serialization lock */
+>> -       bool write_enabled;     /* write access is currently enabled */
+>> +       u32 write_enabled;      /* write access enable count */
+> 
+> Why u32? An unsigned int will do just nicely here.
+
+That's a preference of mine.  I almost always favor
+using u32, etc. because they are compact, and explicit
+about the size and signedness.  I "know" an int is 32
+bits, but I still prefer being explicit.
+
+I'll interpret this as a preference on your part for
+unsigned int, and I have no problem making that change.
+
+					-Alex
+
+> Regards,
+> Mike
+> 
+>>         struct ccu_policy policy;
+>>         struct list_head links; /* for ccu_list */
+>>         struct device_node *node;
+>> -- 
+>> 1.9.1
+>>
