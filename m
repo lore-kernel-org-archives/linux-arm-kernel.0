@@ -1,41 +1,67 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 31 May 2014 21:03:30 +0200
-Subject: [PATCH v2 0/4] mmc: Add SDIO function devicetree subnode parsing
-Message-ID: <1401563014-13856-1-git-send-email-hdegoede@redhat.com>
+Date: Sat, 31 May 2014 21:03:33 +0200
+Subject: [PATCH v2 3/4] mmc: Set slot_no on devicetree / of systems too
+In-Reply-To: <1401563014-13856-1-git-send-email-hdegoede@redhat.com>
+References: <1401563014-13856-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1401563014-13856-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Some host controllers have multiple slots. The mmc-core sofar does not
+really have any knowledge of this, the host drivers for these controllers
+simple call mmc_add_host() multiple times.
 
-Here is v2 of my submission of Sascha Hauer's
-"mmc: Add SDIO function devicetree subnode parsing" patch.
+These mmc_host-s will share their parent device and on devicetree systems
+also their parent->of_node.
 
-This version has been reworked as a result of the discussion about sdio
-powerup sequencing. Specifically the location of the per sdio-function subnodes
-has been moved from being a subnode under the mmc host, to being a subnode
-under the mmc-slot node (which itself is a subnode under the mmc host).
+This commit makes multi-slot mmc host drivers set the already existing, but
+sofar only used for ACPI, slot_no member of mmc_host so that mmc-core functions
+parsing the devicetree can determine what the right slot devicetree subnode is
+to parse for a multi-slot host.
 
-This not only matches the notion of their needing to be a slot abstraction
-between the 2 which came up during the powerup discussion, it actually matches
-what we are already doing, as while working on this patch-set I learned that
-several dt-bindings already use slot child-nodes.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/mmc/host/atmel-mci.c | 1 +
+ drivers/mmc/host/dw_mmc.c    | 1 +
+ include/linux/mmc/host.h     | 2 +-
+ 3 files changed, 3 insertions(+), 1 deletion(-)
 
-Note this patch-set is not about powerup sequencing, it is related though,
-it is about the need to store extra info on sdio devices in devicetree in
-general. The specific itch I'm scratching here is getting oob interrupts to
-work for sdio wifi modules (which in my case do not need any special powerup).
-
-Changes since v1:
-- Submit as a stand-alone patch-set, rather then as part of a larger oob irq
-  support patchset crossing multiple subsystems
-- Add a patch to document the already existing practice of using slot subnodes
-- Split of the dt bindings documentation for sdio-func child nodes into its
-  own patch
-- Add a preparation patch, setting slot_no where relevant
-- And finally the "Add SDIO function devicetree subnode parsing" patch itself
-  has been modified to look for the sdio function childnodes under a slot node
-  instead of directly under the host node
-
-Regards,
-
-Hans
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index 42706ea..a58906b 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -2170,6 +2170,7 @@ static int __init atmci_init_slot(struct atmel_mci *host,
+ 		slot_data->wp_pin);
+ 
+ 	mmc->ops = &atmci_ops;
++	mmc->slotno = id;
+ 	mmc->f_min = DIV_ROUND_UP(host->bus_hz, 512);
+ 	mmc->f_max = host->bus_hz / 2;
+ 	mmc->ocr_avail	= MMC_VDD_32_33 | MMC_VDD_33_34;
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index cced599..c27a86b 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -2149,6 +2149,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+ 	slot->quirks = dw_mci_of_get_slot_quirks(host->dev, slot->id);
+ 
+ 	mmc->ops = &dw_mci_ops;
++	mmc->slotno = id;
+ 	if (of_property_read_u32_array(host->dev->of_node,
+ 				       "clock-freq-min-max", freq, 2)) {
+ 		mmc->f_min = DW_MCI_FREQ_MIN;
+diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+index cb61ea4..10d1091 100644
+--- a/include/linux/mmc/host.h
++++ b/include/linux/mmc/host.h
+@@ -356,7 +356,7 @@ struct mmc_host {
+ 
+ 	unsigned int		actual_clock;	/* Actual HC clock rate */
+ 
+-	unsigned int		slotno;	/* used for sdio acpi binding */
++	unsigned int		slotno;	/* used for sdio acpi / of binding */
+ 
+ 	unsigned long		private[0] ____cacheline_aligned;
+ };
+-- 
+2.0.0
