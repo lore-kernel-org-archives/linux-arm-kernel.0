@@ -1,127 +1,49 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 30 May 2014 21:38:44 -0500
-Subject: [PATCH v2 11/11] clk: versatile: add versatile OSC support
-In-Reply-To: <20140530230326.10062.15472@quantum>
-References: <1401403221-27523-1-git-send-email-robherring2@gmail.com>
- <1401403221-27523-12-git-send-email-robherring2@gmail.com>
- <20140530230326.10062.15472@quantum>
-Message-ID: <CAL_Jsq+KQa9ZKCfiy479JOg8qYx8AOmFQKuvQp3fKmWBoURpaQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 30 May 2014 20:08:42 -0700
+Subject: [GIT PULL] qcom driver changes for v3.16-2
+In-Reply-To: <20140530235720.GA27752@kroah.com>
+References: <alpine.DEB.2.00.1405301138220.5291@galak-ubuntu.qualcomm.com>
+ <20140530235720.GA27752@kroah.com>
+Message-ID: <CAOesGMjhFLD=Rkz0SqSav9qfAzWBCXLf03b=5=xj0uZzz6KwdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 30, 2014 at 6:03 PM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Rob Herring (2014-05-29 15:40:21)
->> From: Rob Herring <robh@kernel.org>
+On Fri, May 30, 2014 at 4:57 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Fri, May 30, 2014 at 11:41:01AM -0500, Kumar Gala wrote:
+>> The following changes since commit 5d144e36b7c51612922fa05d37ff3a869261cc82:
 >>
->> Versatile platforms share the same OSC programming model as Integrator
->> platforms. Add the necessary parameters and init functions for Versatile.
+>>   soc: qcom: Add GSBI driver (2014-05-23 11:38:04 -0500)
 >>
->> Renaming the file to clk-versatile.c as versatile is used as the family
->> name for ARM, Ltd. boards.
+>> are available in the git repository at:
 >>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> Cc: Mike Turquette <mturquette@linaro.org>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-drivers-for-3.16-2
+>>
+>> for you to fetch changes up to 31964ffebbb958c6cf289c7c12edd7530d6221b9:
+>>
+>>   tty: serial: msm: Remove direct access to GSBI (2014-05-29 11:06:20 -0500)
+>>
+>> ----------------------------------------------------------------
+>> Qualcomm ARM Based driver Updates for v3.16-2
+>>
+>> * Updated MSM uart driver to not access GSBI control registers
+>>
+>> ----------------------------------------------------------------
+>> Andy Gross (1):
+>>       tty: serial: msm: Remove direct access to GSBI
+>>
+>>  drivers/tty/serial/msm_serial.c | 48 ++---------------------------------------
+>>  drivers/tty/serial/msm_serial.h |  5 -----
+>>  2 files changed, 2 insertions(+), 51 deletions(-)
 >
-> So it's OK to rename the file and add the new stuff in one commit? I
-> thought there were some guidelines about doing renames separately...
+> Do you want me to take these in the tty tree?  Or are they going to go
+> through the arm tree(s) for other reasons (dependancies)?
 
-You don't want to move of a chunk of code and change it along the way
-because you can't see the real changes, but a file rename does not
-affect the diff here (other than the Makefile change).
+In the other thread about this patch
+(http://marc.info/?l=linux-kernel&m=140137951814522&w=2), he claimed:
 
-Rob
+"I?ll send it via arm-soc as the related patches are going via that path."
 
->
-> Regards,
-> Mike
->
->> ---
->> v2:
->> - Rename clk-integrator.c to clk-versatile.c
->>
->>  drivers/clk/versatile/Makefile                     |  3 +-
->>  .../{clk-integrator.c => clk-versatile.c}          | 35 ++++++++++++++++++++--
->>  2 files changed, 34 insertions(+), 4 deletions(-)
->>  rename drivers/clk/versatile/{clk-integrator.c => clk-versatile.c} (66%)
->>
->> diff --git a/drivers/clk/versatile/Makefile b/drivers/clk/versatile/Makefile
->> index c16ca78..9ee2b37 100644
->> --- a/drivers/clk/versatile/Makefile
->> +++ b/drivers/clk/versatile/Makefile
->> @@ -1,6 +1,5 @@
->>  # Makefile for Versatile-specific clocks
->> -obj-$(CONFIG_ICST)             += clk-icst.o
->> -obj-$(CONFIG_ARCH_INTEGRATOR)  += clk-integrator.o
->> +obj-$(CONFIG_ICST)             += clk-icst.o clk-versatile.o
->>  obj-$(CONFIG_INTEGRATOR_IMPD1) += clk-impd1.o
->>  obj-$(CONFIG_ARCH_REALVIEW)    += clk-realview.o
->>  obj-$(CONFIG_ARCH_VEXPRESS)    += clk-vexpress.o clk-sp810.o
->> diff --git a/drivers/clk/versatile/clk-integrator.c b/drivers/clk/versatile/clk-versatile.c
->> similarity index 66%
->> rename from drivers/clk/versatile/clk-integrator.c
->> rename to drivers/clk/versatile/clk-versatile.c
->> index 734c4b8..fe52a79 100644
->> --- a/drivers/clk/versatile/clk-integrator.c
->> +++ b/drivers/clk/versatile/clk-versatile.c
->> @@ -17,6 +17,9 @@
->>
->>  #define INTEGRATOR_HDR_LOCK_OFFSET     0x14
->>
->> +#define VERSATILE_SYS_OSCCLCD_OFFSET   0x1c
->> +#define VERSATILE_SYS_LOCK_OFFSET      0x20
->> +
->>  /* Base offset for the core module */
->>  static void __iomem *cm_base;
->>
->> @@ -37,11 +40,27 @@ static const struct clk_icst_desc __initdata cm_auxosc_desc = {
->>         .lock_offset = INTEGRATOR_HDR_LOCK_OFFSET,
->>  };
->>
->> -static void __init of_integrator_cm_osc_setup(struct device_node *np)
->> +static const struct icst_params versatile_auxosc_params = {
->> +       .vco_max        = ICST307_VCO_MAX,
->> +       .vco_min        = ICST307_VCO_MIN,
->> +       .vd_min         = 4 + 8,
->> +       .vd_max         = 511 + 8,
->> +       .rd_min         = 1 + 2,
->> +       .rd_max         = 127 + 2,
->> +       .s2div          = icst307_s2div,
->> +       .idx2s          = icst307_idx2s,
->> +};
->> +
->> +static const struct clk_icst_desc versatile_auxosc_desc __initconst = {
->> +       .params = &versatile_auxosc_params,
->> +       .vco_offset = VERSATILE_SYS_OSCCLCD_OFFSET,
->> +       .lock_offset = VERSATILE_SYS_LOCK_OFFSET,
->> +};
->> +static void __init cm_osc_setup(struct device_node *np,
->> +                               const struct clk_icst_desc *desc)
->>  {
->>         struct clk *clk = ERR_PTR(-EINVAL);
->>         const char *clk_name = np->name;
->> -       const struct clk_icst_desc *desc = &cm_auxosc_desc;
->>         const char *parent_name;
->>
->>         if (!cm_base) {
->> @@ -65,5 +84,17 @@ static void __init of_integrator_cm_osc_setup(struct device_node *np)
->>         if (!IS_ERR(clk))
->>                 of_clk_add_provider(np, of_clk_src_simple_get, clk);
->>  }
->> +
->> +static void __init of_integrator_cm_osc_setup(struct device_node *np)
->> +{
->> +       cm_osc_setup(np, &cm_auxosc_desc);
->> +}
->>  CLK_OF_DECLARE(integrator_cm_auxosc_clk,
->>         "arm,integrator-cm-auxosc", of_integrator_cm_osc_setup);
->> +
->> +static void __init of_versatile_cm_osc_setup(struct device_node *np)
->> +{
->> +       cm_osc_setup(np, &versatile_auxosc_desc);
->> +}
->> +CLK_OF_DECLARE(versatile_cm_auxosc_clk,
->> +              "arm,versatile-cm-auxosc", of_versatile_cm_osc_setup);
->> --
->> 1.9.1
->>
+I'm not fussed either way. I haven't touched these branches yet.
+
+
+-Olof
