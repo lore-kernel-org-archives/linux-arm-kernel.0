@@ -1,50 +1,50 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 30 May 2014 21:44:26 -0700
-Subject: [GIT PULL 3/5] Samsung Exynos updates for 3.16
-In-Reply-To: <5388E32B.3010908@samsung.com>
-References: <5388E32B.3010908@samsung.com>
-Message-ID: <20140531044426.GE21917@quad.lixom.net>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Sat, 31 May 2014 10:15:56 +0530
+Subject: [PATCH] arm: exynos: Fix "allmodconfig" build errors in mcpm and
+ hotplug
+In-Reply-To: <CAK9yfHzNkVZX6pMkFmdeubTgoZdRhd=U0oMtUDHr9bvZZYQYbQ@mail.gmail.com>
+References: <1401083696-25702-1-git-send-email-a.kesavan@samsung.com>
+ <CAK9yfHzNkVZX6pMkFmdeubTgoZdRhd=U0oMtUDHr9bvZZYQYbQ@mail.gmail.com>
+Message-ID: <CAK9yfHxaDtx7r1wg_8f+A2Z-ZDwvBcfGFq9BkWhSzPjntNsg5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 31, 2014 at 04:59:39AM +0900, Kukjin Kim wrote:
-> The following changes since commit fced6dee29f6fb143fe16ea90331176ff77e6120:
-> 
->   Merge branch 'v3.16-next/cleanup-samsung' into
-> v3.16-next/platform-exynos (2014-05-31 02:36:49 +0900)
-> 
-> are available in the git repository at:
-> 
-> 
++ Olof
 
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-exynos
-> 
-> for you to fetch changes up to 9dfa92ec4033c348aae6bafc1881e07229fabaa6:
-> 
->   ARM: EXYNOS: Enable multi-platform build support (2014-05-31
-> 02:43:51 +0900)
-> 
-> ----------------------------------------------------------------
-> Samsung Exynos updates for 3.16
-> 
-> - add new SoCs support
->   : exynos3250, 5260, 5410 and 5800
-> 
-> - enable multi-platform on exynos
->   : consolidate exynos related Kconfig entries
-> 
-> Note that this requires tags/samsung-cleanup and tags/samsung-clk-2
-> because of mostly migration exynos specific macros into mach-exynos
-> and exynos related Kconfig entries.
-> 
-> One more merge conflict happens in arch/arm/Kconfig for ARCH_EXYNOS
-> due to SRAM stuff, even though tried to sort them out. Since just
-> resolving it would be better I think, please remove ARCH_EXYNOS in
-> arch/arm/Kconfig when merge conflict happens.
+On 26 May 2014 12:19, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+> Thanks Abhilash.
+>
+> On 26 May 2014 11:24, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
+>> This fixes the following build errors:
+>>
+>> /tmp/ccRbZlaA.s: Assembler messages:
+>> /tmp/ccRbZlaA.s:69: Error: selected processor does not support ARM mode `isb '
+>> /tmp/ccRbZlaA.s:75: Error: selected processor does not support ARM mode `isb '
+>> /tmp/ccRbZlaA.s:76: Error: selected processor does not support ARM mode `dsb '
+>> make[1]: *** [arch/arm/mach-exynos/hotplug.o] Error 1
+>>
+>> /tmp/ccJEg4jw.s: Assembler messages:
+>> /tmp/ccJEg4jw.s:454: Error: selected processor does not support ARM mode `isb'
+>> /tmp/ccJEg4jw.s:455: Error: selected processor does not support ARM mode `dsb'
+>> /tmp/ccJEg4jw.s:465: Error: selected processor does not support ARM mode `isb'
+>> /tmp/ccJEg4jw.s:474: Error: selected processor does not support ARM mode `isb'
+>> /tmp/ccJEg4jw.s:475: Error: selected processor does not support ARM mode `dsb'
+>> /tmp/ccJEg4jw.s:516: Error: selected processor does not support ARM mode `isb'
+>> /tmp/ccJEg4jw.s:525: Error: selected processor does not support ARM mode `isb'
+>> /tmp/ccJEg4jw.s:526: Error: selected processor does not support ARM mode `dsb'
+>> make[1]: *** [arch/arm/mach-exynos/mcpm-exynos.o] Error 1
+>>
+>> Reported-by: Sachin Kamat <sachin.kamat@linaro.org>
+>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>
+> This patch fixes the above reported issues.
+>
+> Tested-by: Sachin Kamat <sachin.kamat@linaro.org>
 
-There was also a conflict in firmware.c due to fixes, please double-check my
-resolution of it.
+Kukjin,
 
+This patch is also needed to fix the reported build error.
 
--Olof
+-- 
+With warm regards,
+Sachin
