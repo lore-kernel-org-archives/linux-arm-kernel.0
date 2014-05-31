@@ -1,50 +1,45 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 31 May 2014 10:01:34 +0400
-Subject: [PATCH 3/3] ARM: i.MX: avic: Cleanup driver
+Date: Sat, 31 May 2014 10:01:32 +0400
+Subject: [PATCH 2/3] ARM: i.MX: avic: Remove #ifdef CONFIG_PM
 In-Reply-To: <1401516095-31020-1-git-send-email-shc_work@mail.ru>
 References: <1401516095-31020-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1401516095-31020-5-git-send-email-shc_work@mail.ru>
+Message-ID: <1401516095-31020-3-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch reduce license text and removes unused #include.
-No functional changes.
+Suspend/Resume functions are not called by generic irqchip if PM
+is not enabled. This patch removes excess #ifdef CONFIG_PM from
+i.MX AVIC driver, so these functions will always be compiled in,
+that increase compile coverage of this driver.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-imx/avic.c | 11 -----------
- 1 file changed, 11 deletions(-)
+ arch/arm/mach-imx/avic.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
 diff --git a/arch/arm/mach-imx/avic.c b/arch/arm/mach-imx/avic.c
-index 374be0c..d020531 100644
+index 9adcad2..374be0c 100644
 --- a/arch/arm/mach-imx/avic.c
 +++ b/arch/arm/mach-imx/avic.c
-@@ -6,18 +6,8 @@
-  * modify it under the terms of the GNU General Public License
-  * as published by the Free Software Foundation; either version 2
-  * of the License, or (at your option) any later version.
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-- * MA  02110-1301, USA.
-  */
+@@ -86,7 +86,6 @@ static struct mxc_extra_irq avic_extra_irq = {
+ #endif
+ };
  
--#include <linux/module.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
- #include <linux/io.h>
-@@ -27,7 +17,6 @@
- #include <asm/exception.h>
+-#ifdef CONFIG_PM
+ static u32 avic_saved_mask_reg[2];
  
- #include "common.h"
--#include "hardware.h"
- #include "irq-common.h"
+ static void avic_irq_suspend(struct irq_data *d)
+@@ -108,11 +107,6 @@ static void avic_irq_resume(struct irq_data *d)
+ 	__raw_writel(avic_saved_mask_reg[idx], avic_base + ct->regs.mask);
+ }
  
- #define AVIC_INTCNTL		0x00	/* int control reg */
+-#else
+-#define avic_irq_suspend NULL
+-#define avic_irq_resume NULL
+-#endif
+-
+ static __init void avic_init_gc(int idx, unsigned int irq_start)
+ {
+ 	struct irq_chip_generic *gc;
 -- 
 1.8.5.5
