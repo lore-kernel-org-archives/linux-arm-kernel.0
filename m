@@ -1,94 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 1 Jun 2014 15:45:43 +0800
-Subject: [PATCH 1/5] mmc: sdhci-esdhc-imx: add f_max field to private data
-In-Reply-To: <1400848384-3226-2-git-send-email-s.hauer@pengutronix.de>
-References: <1400848384-3226-1-git-send-email-s.hauer@pengutronix.de>
- <1400848384-3226-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20140601074540.GC11061@dragon>
+From: ydroneaud@opteya.com (Yann Droneaud)
+Date: Sun, 01 Jun 2014 10:00:16 +0200
+Subject: [PATCH] driver core/platform: remove unused implicit padding in
+ platform_object
+In-Reply-To: <20140531120526.GL15585@mwanda>
+References: <1401480167-15091-1-git-send-email-ydroneaud@opteya.com>
+ <20140530201054.GF17724@mwanda>
+ <1401523299.15490.6.camel@localhost.localdomain>
+ <20140531120526.GL15585@mwanda>
+Message-ID: <1401609616.17059.2.camel@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 02:33:00PM +0200, Sascha Hauer wrote:
-> The driver filled in the clk and clock fields in struct
-> sdhci_pltfm_host, but they are unused in the sdhci-pltfm
-> code and only ever used it for internal use. This adds
-> a field f_max to private data and uses it instead.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c | 18 +++++++++---------
->  1 file changed, 9 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index b841bb7..d530820 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -152,6 +152,7 @@ struct pltfm_imx_data {
->  	struct pinctrl_state *pins_200mhz;
->  	const struct esdhc_soc_data *socdata;
->  	struct esdhc_platform_data boarddata;
-> +	unsigned long f_max;
->  	struct clk *clk_ipg;
->  	struct clk *clk_ahb;
->  	struct clk *clk_per;
-> @@ -574,19 +575,16 @@ static unsigned int esdhc_pltfm_get_max_clock(struct sdhci_host *host)
->  {
->  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->  	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-> -	struct esdhc_platform_data *boarddata = &imx_data->boarddata;
->  
-> -	if (boarddata->f_max && (boarddata->f_max < pltfm_host->clock))
-> -		return boarddata->f_max;
-> -	else
-> -		return pltfm_host->clock;
-> +	return imx_data->f_max;
->  }
->  
->  static unsigned int esdhc_pltfm_get_min_clock(struct sdhci_host *host)
->  {
->  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct pltfm_imx_data *imx_data = pltfm_host->priv;
->  
-> -	return pltfm_host->clock / 256 / 16;
-> +	return imx_data->f_max / 256 / 16;
->  }
->  
->  static inline void esdhc_pltfm_set_clock(struct sdhci_host *host,
-> @@ -594,7 +592,7 @@ static inline void esdhc_pltfm_set_clock(struct sdhci_host *host,
->  {
->  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->  	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-> -	unsigned int host_clock = pltfm_host->clock;
-> +	unsigned int host_clock = clk_get_rate(imx_data->clk_per);
+Hi Dan,
 
-Will this bring the issue that commit a974862faee1 (mmc: sdhci-esdhc-imx:
-fix access hardirq-unsafe lock in atomic context) fixed back to us?
-
-Shawn
-
->  	int pre_div = 2;
->  	int div = 1;
->  	u32 temp, val;
-> @@ -994,8 +992,6 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->  		goto free_sdhci;
->  	}
->  
-> -	pltfm_host->clk = imx_data->clk_per;
-> -	pltfm_host->clock = clk_get_rate(pltfm_host->clk);
->  	clk_prepare_enable(imx_data->clk_per);
->  	clk_prepare_enable(imx_data->clk_ipg);
->  	clk_prepare_enable(imx_data->clk_ahb);
-> @@ -1051,6 +1047,10 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->  					host->mmc->parent->platform_data);
->  	}
->  
-> +	imx_data->f_max = clk_get_rate(imx_data->clk_per);
-> +	if (boarddata->f_max && boarddata->f_max < imx_data->f_max)
-> +		imx_data->f_max = boarddata->f_max;
-> +
->  	/* write_protect */
->  	if (boarddata->wp_type == ESDHC_WP_GPIO) {
->  		err = mmc_gpio_request_ro(host->mmc, boarddata->wp_gpio);
-> -- 
-> 2.0.0.rc0
+Le samedi 31 mai 2014 ? 15:05 +0300, Dan Carpenter a ?crit :
+> On Sat, May 31, 2014 at 10:01:39AM +0200, Yann Droneaud wrote:
+> > Le vendredi 30 mai 2014 ? 23:10 +0300, Dan Carpenter a ?crit :
+> > > This changelog doesn't match the patch.
+> > > 
+> > 
+> > Hum, let me guess .... I've failed to set the proper subject prefix
+> > to add v6 suffic to PATCH: 
+> > I've changed the patch title since v5 (from Emil Goode)... so it's like
+> > a new one.
+> > 
+> > Is it really necessary to resend the patch ?
 > 
+> Oh.  Sorry, I didn't understand what you were trying to say...  You're
+> right.
+> 
+
+Sorry about that.
+
+If it's unclear, I should modify the commit message.
+
+> For some reason I just looked at the patch first and then I started
+> reading the changelog and got to the bit about GCC on ARM and said
+> thought have been describing a different change without reading the
+> rest.  This was my bad.  I should have read more carefully.
+> 
+> Very thourough patch description.  :)
+> 
+
+Thank you.
+
+Regards.
+
+-- 
+Yann Droneaud
+OPTEYA
