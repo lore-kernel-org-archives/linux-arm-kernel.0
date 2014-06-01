@@ -1,29 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 01 Jun 2014 13:46:02 +0200
-Subject: [E1000-devel] ARM support for igb driver
-In-Reply-To: <CAHH3p5JDXVZAKQUUQ5ao1GzwhNtU-+Hs_afT0tYeaw9oUthu-A@mail.gmail.com>
-References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>
- <4893591.dl3XO76euB@wuerfel>
- <CAHH3p5JDXVZAKQUUQ5ao1GzwhNtU-+Hs_afT0tYeaw9oUthu-A@mail.gmail.com>
-Message-ID: <5174568.hMNHACE7UI@wuerfel>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Sun, 1 Jun 2014 17:10:07 +0530
+Subject: [PATCH] dma: imx: correct sdmac->status for cyclic dma tx
+In-Reply-To: <1400116933-14063-1-git-send-email-jiada_wang@mentor.com>
+References: <1400116933-14063-1-git-send-email-jiada_wang@mentor.com>
+Message-ID: <20140601114007.GQ21128@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 01 June 2014 11:26:57 shiv prakash Agarwal wrote:
-> I don't see all devices send VDMs, then why Intel I-210?
+On Wed, May 14, 2014 at 06:22:13PM -0700, jiada_wang at mentor.com wrote:
+> From: Jiada Wang <jiada_wang@mentor.com>
+> 
+> In cyclic dma tx's handler sdma_handle_channel_loop(),
+> SDMA channel statue is set to either DMA_ERROR or DMA_IN_PROGRESS
+> based on each period's status. This has the following issues:
+> 
+> 1) If one period's status is BD_RROR, then channel status
+>    will be set to DMA_ERROR, but it will be overwritten to DMA_IN_PROGRESS
+>    if the following periods are OK.
+> 2) DMA client may call sdma_control(DMA_TERMINATE_ALL) to stop the cyclic dma
+>    operation, sdma channel status will be set to DMA_ERROR,
+>    but if after this handler is called, then again the channel status will be overwritten
+>    to DMA_IN_PROGRESS. Then the following dmaengine_prep_dma_cyclic() will always fail,
+>    as channel status is DMA_IN_PROGRESS.
+> 
+> As in cyclic dma tx, channel status will be initially set to DMA_IN_PROGRESS,
+> driver only needs to change it to DMA_ERROR, when something wrong happens
+> (one period status is wrong, or stoped by client explicitly).
 
-There is no obligation to do it of course.
+Applied, thanks
 
-> Also, Is it a bug in host bridge hardware or driver? If hardware, how
-> can we make device not to send it?
-
-If the hardware cannot handle them, it's a hardware bug. If the hardware
-does handle them correctly but the software doesn't, that is a bug in
-the bridge driver.
-
-We have a couple of host bridge drivers that register a trap handler
-and then look at the bridge registers to determine the exact cause.
-
-Which host bridge driver do you use?
-
-	Arnd
+-- 
+~Vinod
