@@ -1,7 +1,7 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun,  1 Jun 2014 22:32:08 +0200
-Subject: [PATCH] i2c: nuc900: remove driver
-Message-ID: <1401654750-20644-1-git-send-email-wsa@the-dreams.de>
+Date: Sun,  1 Jun 2014 22:35:25 +0200
+Subject: [PATCH v2] i2c: nuc900: remove driver
+Message-ID: <1401654925-20791-1-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -27,10 +27,45 @@ Reported-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 Cc: Wan ZongShun <mcuos.com@gmail.org>
 ---
+
+Change since V1: remove Kconfig and Makefile entries, too
+
+ drivers/i2c/busses/Kconfig      |   7 -
+ drivers/i2c/busses/Makefile     |   1 -
  drivers/i2c/busses/i2c-nuc900.c | 709 ----------------------------------------
- 1 file changed, 709 deletions(-)
+ 3 files changed, 717 deletions(-)
  delete mode 100644 drivers/i2c/busses/i2c-nuc900.c
 
+diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+index 9c750efa69ae..7ccc51e85ba5 100644
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -570,13 +570,6 @@ config I2C_NOMADIK
+ 	  I2C interface from ST-Ericsson's Nomadik and Ux500 architectures,
+ 	  as well as the STA2X11 PCIe I/O HUB.
+ 
+-config I2C_NUC900
+-	tristate "NUC900 I2C Driver"
+-	depends on ARCH_W90X900
+-	help
+-	  Say Y here to include support for I2C controller in the
+-	  Winbond/Nuvoton NUC900 based System-on-Chip devices.
+-
+ config I2C_OCORES
+ 	tristate "OpenCores I2C Controller"
+ 	help
+diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
+index 18d18ff9db93..413d062a08f8 100644
+--- a/drivers/i2c/busses/Makefile
++++ b/drivers/i2c/busses/Makefile
+@@ -55,7 +55,6 @@ obj-$(CONFIG_I2C_MPC)		+= i2c-mpc.o
+ obj-$(CONFIG_I2C_MV64XXX)	+= i2c-mv64xxx.o
+ obj-$(CONFIG_I2C_MXS)		+= i2c-mxs.o
+ obj-$(CONFIG_I2C_NOMADIK)	+= i2c-nomadik.o
+-obj-$(CONFIG_I2C_NUC900)	+= i2c-nuc900.o
+ obj-$(CONFIG_I2C_OCORES)	+= i2c-ocores.o
+ obj-$(CONFIG_I2C_OMAP)		+= i2c-omap.o
+ obj-$(CONFIG_I2C_PASEMI)	+= i2c-pasemi.o
 diff --git a/drivers/i2c/busses/i2c-nuc900.c b/drivers/i2c/busses/i2c-nuc900.c
 deleted file mode 100644
 index 36394d737faf..000000000000
