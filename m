@@ -1,50 +1,51 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Sun, 1 Jun 2014 12:26:50 +0100
-Subject: [PATCH 1/2] pci: Add IORESOURCE_BIT entry for PCIe ECAM resources.
-In-Reply-To: <4756033.LkcFQN0chs@wuerfel>
-References: <20140530233034.GH1677@bart.dudau.co.uk>
- <1401496601-31983-1-git-send-email-Liviu.Dudau@arm.com>
- <1401496601-31983-2-git-send-email-Liviu.Dudau@arm.com>
- <4756033.LkcFQN0chs@wuerfel>
-Message-ID: <20140601112648.GI1677@bart.dudau.co.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun,  1 Jun 2014 12:30:32 +0100
+Subject: [PATCH v2] ARM: mcs lock: implement wfe-based polling for MCS locking
+Message-ID: <1401622232-9918-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 31, 2014 at 08:41:04PM +0200, Arnd Bergmann wrote:
-> On Saturday 31 May 2014 01:36:40 Liviu Dudau wrote:
-> > We would like to be able to describe PCIe ECAM resources as
-> > IORESOURCE_MEM blocks while distinguish them from standard
-> > memory resources. Add an IORESOURCE_BIT entry for this case.
-> > 
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> 
-> I still don't see any value in this at all. What is the advantage
-> of doing this opposed to just having a standardized 'reg' property
-> for a particular compatible string?
+This patch introduces a wfe-based polling loop for spinning on contended
+MCS locks and waking up corresponding waiters when the lock is released.
 
-Oh, I agree. This patch was trying to provide an improved solution
-to the original patch just in case someone considers this a worthwhile
-exercise.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
 
-Best regards,
-Liviu
+v1 => v2: Use SMP guards and dsb_sev() macro to ensure this compiles and
+          runs only on CPUs that can support v6k.
 
-> 
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+ arch/arm/include/asm/mcs_spinlock.h | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 arch/arm/include/asm/mcs_spinlock.h
 
+diff --git a/arch/arm/include/asm/mcs_spinlock.h b/arch/arm/include/asm/mcs_spinlock.h
+new file mode 100644
+index 000000000000..f652ad65840a
+--- /dev/null
++++ b/arch/arm/include/asm/mcs_spinlock.h
+@@ -0,0 +1,23 @@
++#ifndef __ASM_MCS_LOCK_H
++#define __ASM_MCS_LOCK_H
++
++#ifdef CONFIG_SMP
++#include <asm/spinlock.h>
++
++/* MCS spin-locking. */
++#define arch_mcs_spin_lock_contended(lock)				\
++do {									\
++	/* Ensure prior stores are observed before we enter wfe. */	\
++	smp_mb();							\
++	while (!(smp_load_acquire(lock)))				\
++		wfe();							\
++} while (0)								\
++
++#define arch_mcs_spin_unlock_contended(lock)				\
++do {									\
++	smp_store_release(lock, 1);					\
++	dsb_sev();							\
++} while (0)
++
++#endif	/* CONFIG_SMP */
++#endif	/* __ASM_MCS_LOCK_H */
 -- 
--------------------
-   .oooO
-   (   )
-    \ (  Oooo.
-     \_) (   )
-          ) /
-         (_/
-
- One small step
-   for me ...
+1.9.2
