@@ -1,75 +1,29 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Sun, 01 Jun 2014 12:33:36 +0100
-Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
-In-Reply-To: <CAKfTPtA04sQ4ox7yAU8Wxn_1DLuAxmm9UgER_-Nidtd6sNEEMQ@mail.gmail.com>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
- <5388546E.5070007@arm.com>
- <CAKfTPtA04sQ4ox7yAU8Wxn_1DLuAxmm9UgER_-Nidtd6sNEEMQ@mail.gmail.com>
-Message-ID: <538B0F90.8090902@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 01 Jun 2014 13:46:02 +0200
+Subject: [E1000-devel] ARM support for igb driver
+In-Reply-To: <CAHH3p5JDXVZAKQUUQ5ao1GzwhNtU-+Hs_afT0tYeaw9oUthu-A@mail.gmail.com>
+References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>
+ <4893591.dl3XO76euB@wuerfel>
+ <CAHH3p5JDXVZAKQUUQ5ao1GzwhNtU-+Hs_afT0tYeaw9oUthu-A@mail.gmail.com>
+Message-ID: <5174568.hMNHACE7UI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/14 20:20, Vincent Guittot wrote:
-> On 30 May 2014 11:50, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
->> On 23/05/14 16:53, Vincent Guittot wrote:
->>> Monitor the activity level of each group of each sched_domain level. The
->>> activity is the amount of cpu_power that is currently used on a CPU or group
->>> of CPUs. We use the runnable_avg_sum and _period to evaluate this activity
->>> level. In the special use case where the CPU is fully loaded by more than 1
->>> task, the activity level is set above the cpu_power in order to reflect the
->>> overload of the CPU
->>>
->>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->>
->> [...]
->>
->>>   /*
->>>    * select_task_rq_fair: Select target runqueue for the waking task in domains
->>>    * that have the 'sd_flag' flag set. In practice, this is SD_BALANCE_WAKE,
->>> @@ -5518,6 +5535,7 @@ struct sg_lb_stats {
->>>        unsigned long sum_weighted_load; /* Weighted load of group's tasks */
->>>        unsigned long load_per_task;
->>>        unsigned long group_power;
->>> +     unsigned long group_activity; /* Total activity of the group */
->>>        unsigned int sum_nr_running; /* Nr tasks running in the group */
->>>        unsigned int group_capacity;
->>>        unsigned int idle_cpus;
->>> @@ -5538,6 +5556,7 @@ struct sd_lb_stats {
->>>        struct sched_group *busiest;    /* Busiest group in this sd */
->>>        struct sched_group *local;      /* Local group in this sd */
->>>        unsigned long total_load;       /* Total load of all groups in sd */
->>> +     unsigned long total_activity;  /* Total activity of all groups in sd */
->>>        unsigned long total_pwr;        /* Total power of all groups in sd */
->>>        unsigned long avg_load; /* Average load across all groups in sd */
->>>
->>> @@ -5557,6 +5576,7 @@ static inline void init_sd_lb_stats(struct sd_lb_stats *sds)
->>>                .busiest = NULL,
->>>                .local = NULL,
->>>                .total_load = 0UL,
->>> +             .total_activity = 0UL,
->>
->> AFAICS, total_activity is not used right now. Do you intend to use it to
->> calculate something like avg_activity later (like total_load/avg_load)?
->
-> this patch only creates group_activity and total_activity.The use of
-> these statistics appears on the next patches. I have not planned to
-> compute such avg_activity for the moment mainly because i have need it
-> yet.
->
-> Do you have in mind any use of such avg_activity ?
+On Sunday 01 June 2014 11:26:57 shiv prakash Agarwal wrote:
+> I don't see all devices send VDMs, then why Intel I-210?
 
-No, not really but I still don't see (taken all your patches) where 
-sds->total_activity is used.
+There is no obligation to do it of course.
 
-$ find . -name "*.[ch]" | xargs grep total_activity
-./kernel/sched/fair.c:	unsigned long total_activity;  /* Total activity 
-of all groups in sd */
-./kernel/sched/fair.c:		.total_activity = 0UL,
-./kernel/sched/fair.c:		sds->total_activity += sgs->group_activity;
+> Also, Is it a bug in host bridge hardware or driver? If hardware, how
+> can we make device not to send it?
 
-OOTH, sgs->group_activity is used to set sgs->group_capacity which is 
-then used in if conditions in update_sd_pick_busiest(), 
-update_sd_lb_stats() and find_busiest_group().
+If the hardware cannot handle them, it's a hardware bug. If the hardware
+does handle them correctly but the software doesn't, that is a bug in
+the bridge driver.
 
-[...]
+We have a couple of host bridge drivers that register a trap handler
+and then look at the bridge registers to determine the exact cause.
+
+Which host bridge driver do you use?
+
+	Arnd
