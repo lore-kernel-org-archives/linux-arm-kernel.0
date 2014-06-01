@@ -1,29 +1,94 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 01 May 2014 08:43:07 +0200
-Subject: [PATCH v2 01/12] ARM: imx/mxs defconfigs: add MTD_SPI_NOR (new
- dependency for M25P80)
-In-Reply-To: <1398925607-7482-2-git-send-email-computersforpeace@gmail.com>
-References: <1398925607-7482-1-git-send-email-computersforpeace@gmail.com>
- <1398925607-7482-2-git-send-email-computersforpeace@gmail.com>
-Message-ID: <1398926587.28080.5.camel@x220>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 1 Jun 2014 15:45:43 +0800
+Subject: [PATCH 1/5] mmc: sdhci-esdhc-imx: add f_max field to private data
+In-Reply-To: <1400848384-3226-2-git-send-email-s.hauer@pengutronix.de>
+References: <1400848384-3226-1-git-send-email-s.hauer@pengutronix.de>
+ <1400848384-3226-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20140601074540.GC11061@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-04-30 at 23:26 -0700, Brian Norris wrote:
-> These defconfigs contain the CONFIG_M25P80 symbol, which is now
-
-That's a typo: use "the MTD_M25P80 symbol" (but only if you need to
-resend anyway, I'd say; the same typo can be found in the subject too).
-
-> dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to satisfy
-> the new dependency.
+On Fri, May 23, 2014 at 02:33:00PM +0200, Sascha Hauer wrote:
+> The driver filled in the clk and clock fields in struct
+> sdhci_pltfm_host, but they are unused in the sdhci-pltfm
+> code and only ever used it for internal use. This adds
+> a field f_max to private data and uses it instead.
 > 
-> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-> Cc: Shawn Guo <shawn.guo@freescale.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Reviewed-by: Marek Vasut <marex@denx.de>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/mmc/host/sdhci-esdhc-imx.c | 18 +++++++++---------
+>  1 file changed, 9 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index b841bb7..d530820 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -152,6 +152,7 @@ struct pltfm_imx_data {
+>  	struct pinctrl_state *pins_200mhz;
+>  	const struct esdhc_soc_data *socdata;
+>  	struct esdhc_platform_data boarddata;
+> +	unsigned long f_max;
+>  	struct clk *clk_ipg;
+>  	struct clk *clk_ahb;
+>  	struct clk *clk_per;
+> @@ -574,19 +575,16 @@ static unsigned int esdhc_pltfm_get_max_clock(struct sdhci_host *host)
+>  {
+>  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>  	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+> -	struct esdhc_platform_data *boarddata = &imx_data->boarddata;
+>  
+> -	if (boarddata->f_max && (boarddata->f_max < pltfm_host->clock))
+> -		return boarddata->f_max;
+> -	else
+> -		return pltfm_host->clock;
+> +	return imx_data->f_max;
+>  }
+>  
+>  static unsigned int esdhc_pltfm_get_min_clock(struct sdhci_host *host)
+>  {
+>  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+>  
+> -	return pltfm_host->clock / 256 / 16;
+> +	return imx_data->f_max / 256 / 16;
+>  }
+>  
+>  static inline void esdhc_pltfm_set_clock(struct sdhci_host *host,
+> @@ -594,7 +592,7 @@ static inline void esdhc_pltfm_set_clock(struct sdhci_host *host,
+>  {
+>  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>  	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+> -	unsigned int host_clock = pltfm_host->clock;
+> +	unsigned int host_clock = clk_get_rate(imx_data->clk_per);
 
+Will this bring the issue that commit a974862faee1 (mmc: sdhci-esdhc-imx:
+fix access hardirq-unsafe lock in atomic context) fixed back to us?
 
-Paul Bolle
+Shawn
+
+>  	int pre_div = 2;
+>  	int div = 1;
+>  	u32 temp, val;
+> @@ -994,8 +992,6 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+>  		goto free_sdhci;
+>  	}
+>  
+> -	pltfm_host->clk = imx_data->clk_per;
+> -	pltfm_host->clock = clk_get_rate(pltfm_host->clk);
+>  	clk_prepare_enable(imx_data->clk_per);
+>  	clk_prepare_enable(imx_data->clk_ipg);
+>  	clk_prepare_enable(imx_data->clk_ahb);
+> @@ -1051,6 +1047,10 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+>  					host->mmc->parent->platform_data);
+>  	}
+>  
+> +	imx_data->f_max = clk_get_rate(imx_data->clk_per);
+> +	if (boarddata->f_max && boarddata->f_max < imx_data->f_max)
+> +		imx_data->f_max = boarddata->f_max;
+> +
+>  	/* write_protect */
+>  	if (boarddata->wp_type == ESDHC_WP_GPIO) {
+>  		err = mmc_gpio_request_ro(host->mmc, boarddata->wp_gpio);
+> -- 
+> 2.0.0.rc0
+> 
