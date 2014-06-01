@@ -1,38 +1,31 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 30 Jun 2014 20:31:28 -0700
-Subject: [GIT PULL] the great <mach/gpio.h> purge
-In-Reply-To: <02c501cf94d1$fca59720$f5f0c560$@samsung.com>
-References: <CACRpkdbPHn6bWdr8t9BrmE2JZZuuVnF7ujzEFdrM86WmrRS5Hw@mail.gmail.com>
- <02c501cf94d1$fca59720$f5f0c560$@samsung.com>
-Message-ID: <CAOesGMgkG_LJR2Db6+S339SYpaf+0cBxs2oXNOAHiq4-J3H0pQ@mail.gmail.com>
+From: chhotu.shiv@gmail.com (shiv prakash Agarwal)
+Date: Sun, 1 Jun 2014 11:26:57 +0530
+Subject: [E1000-devel] ARM support for igb driver
+In-Reply-To: <4893591.dl3XO76euB@wuerfel>
+References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>
+ <4627439.I2CpBecnJJ@wuerfel>
+ <CAHH3p5KdWvc_=m0XZxhb8drjpWVJ68BR_rH9bhrhNerSjCc-Tg@mail.gmail.com>
+ <4893591.dl3XO76euB@wuerfel>
+Message-ID: <CAHH3p5JDXVZAKQUUQ5ao1GzwhNtU-+Hs_afT0tYeaw9oUthu-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 7:13 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Linus Walleij wrote:
->>
->> Hi ARM SoC guys,
->>
-> Hi Linus,
+I don't see all devices send VDMs, then why Intel I-210?
+Also, Is it a bug in host bridge hardware or driver? If hardware, how
+can we make device not to send it?
+
+On Sun, Jun 1, 2014 at 12:04 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 31 May 2014 01:44:28 shiv prakash Agarwal wrote:
+>> Notsure about root port, Can't it be disabled by Intel device?
 >
->> please pull in this patch set removing <mach/gpio.h> for good.
->> I guess it could collide with some S5P deletion.
+> My point is that it's the wrong place to disable it: every device
+> is allowed to generate this type of VDMs, and the root port is
+> supposed to silently ignore them if it doesn't handle them.
 >
-> Yeah...
+> If the root port doesn't do that, it's a bug in the host bridge
+> driver, not in some device driver that happens to operate a
+> device within the specification.
 >
->> If you decide to pull the S5P purge first, tell me so I can rebase.
->>
-> So, I think, would be better if we could remove S5P64X0 and S5PC100 then
-> <mach/gpio.h> in samsung stuff. But it's up to arm-soc maintainer? ;-)
-
-
-As long as it's just deletion from both sides, I can happily resolve
-that when merging.
-
-Kukjin, I presume the removal would be in a cleanup branch as well?
-Please try to send it soon so we can get some time in -next with it.
-
-(I'll do merges in a couple of days, the backlog is building up. :)
-
-
--Olof
+> Which host bridge driver do you use?
+>
+>         Arnd
