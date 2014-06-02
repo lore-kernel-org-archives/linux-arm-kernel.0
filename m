@@ -1,88 +1,19 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 02 Jun 2014 15:40:21 +0200
-Subject: [PATCH v2 7/7] ARM: EXYNOS: cpuidle: add secure firmware support
- to AFTR mode code
-In-Reply-To: <538C78DB.1060809@gmail.com>
-References: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
- <1401712543-14281-8-git-send-email-b.zolnierkie@samsung.com>
- <538C78DB.1060809@gmail.com>
-Message-ID: <2929163.ygQuOcYWlC@amdc1032>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon,  2 Jun 2014 14:41:00 +0100
+Subject: [PATCH 0/3] i2c: Relax requirement for I2C Device ID tables
+Message-ID: <1401716463-23457-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, June 02, 2014 03:15:07 PM Tomasz Figa wrote:
-> Hi,
-> 
-> On 02.06.2014 14:35, Bartlomiej Zolnierkiewicz wrote:
-> > * Use do_idle firmware method instead of cpu_do_idle() on boards with
-> >   secure firmware enabled.
-> > 
-> > * Use sysram_ns_base_addr + 0x24 address for exynos_boot_vector_addr()
-> >   and sysram_ns_base_addr + 0x20 one for exynos_boot_vector_flag() on
-> >   boards with secure firmware enabled.
-> > 
-> > This patch fixes hang on an attempt to enter AFTR mode for TRATS2
-> > board (which uses EXYNOS4412 SoC with secure firmware enabled).
-> > 
-> > This patch shouldn't cause any functionality changes on boards that
-> > don't use secure firmware.
-> > 
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> >  arch/arm/mach-exynos/pm.c        | 8 ++++++--
-> >  drivers/cpuidle/cpuidle-exynos.c | 7 ++++++-
-> >  2 files changed, 12 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> > index 0fb9a5a..62a0a5e 100644
-> > --- a/arch/arm/mach-exynos/pm.c
-> > +++ b/arch/arm/mach-exynos/pm.c
-> > @@ -169,7 +169,9 @@ int exynos_cluster_power_state(int cluster)
-> >  
-> >  static inline void __iomem *exynos_boot_vector_addr(void)
-> >  {
-> > -	if (samsung_rev() == EXYNOS4210_REV_1_1)
-> > +	if (firmware_run())
-> > +		return sysram_ns_base_addr + 0x24;
-> > +	else if (samsung_rev() == EXYNOS4210_REV_1_1)
-> 
-> Aha, so this is the use case for the function added by patch 1/7.
-> 
-> Well, I don't see the need to do it this way and complicate the API. As
-> I mentioned in my comments to patches 2/7 and 5/7, more general firmware
-> operations should be taking care of setting those registers to
-> appropriate values and so there shouldn't be any need to use them
-> directly outside the implementation of firmware ops.
+Hi Wolfram,
 
-More general firmware operations would handle the secure firmware case
-fine but how would you like to handle a fallback case given that you
-cannot use samsung_rev() etc. in drivers/cpuidle/cpuidle-exynos.c?
+After this patch-set, it should become possible to start stripping out
+those unnecessary I2C Device ID tables that are currently lurking around,
+mostly redundantly.  Firstly, we create a look-up function whose job it
+is to match I2C device name to a Device Tree node.  Then we add some
+extra protection in i2c_match_id(), so that we can call the function with
+a NULL parameter. This in turn aids to the elegance of the final change
+which relaxes the requirement of a populated .id_table.
 
-> [snip]
-> 
-> >  static int idle_finisher(unsigned long flags)
-> >  {
-> >  	exynos_enter_aftr();
-> > -	cpu_do_idle();
-> > +	if (firmware_run())
-> > +		/* no need to check the return value on EXYNOS SoCs */
-> > +		call_firmware_op(do_idle, FW_DO_IDLE_AFTR);
-> > +	else
-> > +		cpu_do_idle();
-> 
-> This could be done just by
-> 
-> 	if (call_firmware_op(do_idle, FW_DO_IDLE_AFTR) == -ENOSYS)
-> 		cpu_do_idle();
-> 
-> which is 3 lines less than with a function that is suppose to simplify
-> the code.
-
-OK.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Kind regards,
+Lee
