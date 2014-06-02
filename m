@@ -1,149 +1,47 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon,  2 Jun 2014 15:40:22 +0200
-Subject: [PATCH 2/4] ARM: shmobile: r8a7791: Add SYS-DMAC support
+Date: Mon,  2 Jun 2014 15:40:21 +0200
+Subject: [PATCH 1/4] ARM: shmobile: r8a7791: Add SYS-DMAC clocks
 In-Reply-To: <1401716424-29740-1-git-send-email-geert+renesas@glider.be>
 References: <1401716424-29740-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1401716424-29740-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1401716424-29740-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-
-This patch enables SYS-DMAC0 (= Low), it doesn't support
-SYS-DMAC1 (= HI) today.
-Because, SYS-DMAC HI/Low interrupt mapping is not
-good match to SH-DMAC driver.
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-[Geert: Rebased]
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/include/mach/r8a7791.h |  5 ++
- arch/arm/mach-shmobile/setup-r8a7791.c        | 81 +++++++++++++++++++++++++++
- 2 files changed, 86 insertions(+)
+ arch/arm/mach-shmobile/clock-r8a7791.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7791.h b/arch/arm/mach-shmobile/include/mach/r8a7791.h
-index 86eae7bceb6f..533999916e73 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7791.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7791.h
-@@ -1,6 +1,11 @@
- #ifndef __ASM_R8A7791_H__
- #define __ASM_R8A7791_H__
- 
-+/* DMA slave IDs */
-+enum {
-+	RCAR_DMA_SLAVE_INVALID,
-+};
-+
- void r8a7791_add_standard_devices(void);
- void r8a7791_add_dt_devices(void);
- void r8a7791_clock_init(void);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7791.c b/arch/arm/mach-shmobile/setup-r8a7791.c
-index 04a96ddb3224..77e1bc2b2870 100644
---- a/arch/arm/mach-shmobile/setup-r8a7791.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7791.c
-@@ -25,13 +25,93 @@
- #include <linux/platform_data/gpio-rcar.h>
- #include <linux/platform_data/irq-renesas-irqc.h>
- #include <linux/serial_sci.h>
-+#include <linux/sh_dma.h>
- #include <linux/sh_timer.h>
- #include <mach/common.h>
-+#include <mach/dma-register.h>
- #include <mach/irqs.h>
- #include <mach/r8a7791.h>
- #include <mach/rcar-gen2.h>
- #include <asm/mach/arch.h>
- 
-+#define DMAE_CHANNEL(a, b)			\
-+{						\
-+	.offset		= (a) - 0x20,		\
-+	.dmars		= (a) - 0x20 + 0x40,	\
-+	.chclr_bit	= (b),			\
-+	.chclr_offset	= 0x80 - 0x20,		\
-+}
-+
-+/* Sys-DMAC */
-+#define SYS_DMAC_SLAVE(_id, _bit, _addr, toffset, roffset, t, r)\
-+{								\
-+	.slave_id	= SYS_DMAC_SLAVE_## _id ##_TX,		\
-+	.addr		= _addr + toffset,			\
-+	.chcr		= CHCR_TX(XMIT_SZ_## _bit ##BIT),	\
-+	.mid_rid	= t,					\
-+}, {								\
-+	.slave_id	= SYS_DMAC_SLAVE_## _id ##_RX,		\
-+	.addr		= _addr + roffset,			\
-+	.chcr		= CHCR_RX(XMIT_SZ_## _bit ##BIT),	\
-+	.mid_rid	= r,					\
-+}
-+
-+static const struct sh_dmae_slave_config r8a7791_sys_dmac_slaves[] = {
-+};
-+
-+static const struct sh_dmae_channel r8a7791_sys_dmac_channels[] = {
-+	DMAE_CHANNEL(0x8000, 0),
-+	DMAE_CHANNEL(0x8080, 1),
-+	DMAE_CHANNEL(0x8100, 2),
-+	DMAE_CHANNEL(0x8180, 3),
-+	DMAE_CHANNEL(0x8200, 4),
-+	DMAE_CHANNEL(0x8280, 5),
-+	DMAE_CHANNEL(0x8300, 6),
-+	DMAE_CHANNEL(0x8380, 7),
-+	DMAE_CHANNEL(0x8400, 8),
-+	DMAE_CHANNEL(0x8480, 9),
-+	DMAE_CHANNEL(0x8500, 10),
-+	DMAE_CHANNEL(0x8580, 11),
-+	DMAE_CHANNEL(0x8600, 12),
-+	DMAE_CHANNEL(0x8680, 13),
-+	DMAE_CHANNEL(0x8700, 14),
-+};
-+
-+static struct sh_dmae_pdata r8a7791_sys_dmac_platform_data = {
-+	.slave		= r8a7791_sys_dmac_slaves,
-+	.slave_num	= ARRAY_SIZE(r8a7791_sys_dmac_slaves),
-+	.channel	= r8a7791_sys_dmac_channels,
-+	.channel_num	= ARRAY_SIZE(r8a7791_sys_dmac_channels),
-+	.ts_low_shift	= TS_LOW_SHIFT,
-+	.ts_low_mask	= TS_LOW_BIT << TS_LOW_SHIFT,
-+	.ts_high_shift	= TS_HI_SHIFT,
-+	.ts_high_mask	= TS_HI_BIT << TS_HI_SHIFT,
-+	.ts_shift	= dma_ts_shift,
-+	.ts_shift_num	= ARRAY_SIZE(dma_ts_shift),
-+	.dmaor_init	= DMAOR_DME,
-+	.chclr_present	= 1,
-+	.chclr_bitwise	= 1,
-+};
-+
-+static struct resource r8a7791_sys_dmac_resources[] = {
-+	/* Channel registers and DMAOR for low */
-+	DEFINE_RES_MEM(0xe6700020, 0x8763 - 0x20),
-+	DEFINE_RES_IRQ(gic_spi(197)),
-+	DEFINE_RES_NAMED(gic_spi(200), 15, NULL, IORESOURCE_IRQ),
-+
-+	/*
-+	 * HI is not supported
-+	 * since IRQ has strange mapping
-+	 */
-+};
-+
-+#define r8a7791_register_sys_dmac(id)				\
-+	platform_device_register_resndata(			\
-+		&platform_bus, "sh-dma-engine", id,		\
-+		&r8a7791_sys_dmac_resources[id * 3],	3,	\
-+		&r8a7791_sys_dmac_platform_data,		\
-+		sizeof(r8a7791_sys_dmac_platform_data))
-+
- static const struct resource pfc_resources[] __initconst = {
- 	DEFINE_RES_MEM(0xe6060000, 0x250),
- };
-@@ -205,6 +285,7 @@ void __init r8a7791_add_standard_devices(void)
- 	r8a7791_add_dt_devices();
- 	r8a7791_register_irqc(0);
- 	r8a7791_register_thermal();
-+	r8a7791_register_sys_dmac(0);
- }
- 
- #ifdef CONFIG_USE_OF
+diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
+index e2fdfcc14436..b0b2294513e2 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7791.c
++++ b/arch/arm/mach-shmobile/clock-r8a7791.c
+@@ -178,7 +178,7 @@ enum {
+ 	MSTP719, MSTP718, MSTP715, MSTP714,
+ 	MSTP522,
+ 	MSTP314, MSTP312, MSTP311,
+-	MSTP216, MSTP207, MSTP206,
++	MSTP219, MSTP218, MSTP216, MSTP207, MSTP206,
+ 	MSTP204, MSTP203, MSTP202,
+ 	MSTP124,
+ 	MSTP_NR
+@@ -215,6 +215,8 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP312] = SH_CLK_MSTP32_STS(&div6_clks[DIV6_SD1], SMSTPCR3, 12, MSTPSR3, 0), /* SDHI1 */
+ 	[MSTP311] = SH_CLK_MSTP32_STS(&div6_clks[DIV6_SD2], SMSTPCR3, 11, MSTPSR3, 0), /* SDHI2 */
+ 	[MSTP216] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 16, MSTPSR2, 0), /* SCIFB2 */
++	[MSTP219] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 19, MSTPSR2, 0), /* SYS-DMAC0 */
++	[MSTP218] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 18, MSTPSR2, 0), /* SYS-DMAC1 */
+ 	[MSTP207] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 7, MSTPSR2, 0), /* SCIFB1 */
+ 	[MSTP206] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 6, MSTPSR2, 0), /* SCIFB0 */
+ 	[MSTP204] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 4, MSTPSR2, 0), /* SCIFA0 */
+@@ -267,6 +269,8 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_ICK_ID("fck", "sh-cmt-48-gen2.0", &mstp_clks[MSTP124]),
+ 	CLKDEV_DEV_ID("qspi.0", &mstp_clks[MSTP917]),
+ 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
++	CLKDEV_DEV_ID("sh-dma-engine.0", &mstp_clks[MSTP219]),
++	CLKDEV_DEV_ID("sh-dma-engine.1", &mstp_clks[MSTP218]),
+ 	CLKDEV_DEV_ID("i2c-rcar_gen2.0", &mstp_clks[MSTP931]),
+ 	CLKDEV_DEV_ID("i2c-rcar_gen2.1", &mstp_clks[MSTP930]),
+ 	CLKDEV_DEV_ID("i2c-rcar_gen2.2", &mstp_clks[MSTP929]),
 -- 
 1.9.1
