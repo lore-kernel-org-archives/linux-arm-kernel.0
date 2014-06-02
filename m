@@ -1,66 +1,26 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 02 Jun 2014 14:35:38 +0200
-Subject: [PATCH v2 2/7] ARM: EXYNOS: add support for firmware-assisted
- c15resume
-In-Reply-To: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1401712543-14281-3-git-send-email-b.zolnierkie@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 2 Jun 2014 13:35:22 +0100
+Subject: [PATCH 2/2] clkdev: Export clk_register_clkdev
+In-Reply-To: <1401738379-4107-3-git-send-email-chiau.ee.chew@intel.com>
+References: <1401738379-4107-1-git-send-email-chiau.ee.chew@intel.com>
+ <1401738379-4107-3-git-send-email-chiau.ee.chew@intel.com>
+Message-ID: <20140602123522.GB31751@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <t.figa@samsung.com>
+On Tue, Jun 03, 2014 at 03:46:19AM +0800, Chew Chiau Ee wrote:
+> From: Darren Hart <dvhart@linux.intel.com>
+> 
+> Allow spi-pxa2xx-pci with common clock framework support to build as a
+> module by exporting clk_register_clkdev.
 
-This change is a preparation for adding secure firmware support to
-EXYNOS cpuidle driver.
-
-This patch shouldn't cause any functionality changes.
-
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-[bzolnier: splitted out from bigger patch]
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
- arch/arm/include/asm/firmware.h | 4 ++++
- arch/arm/mach-exynos/firmware.c | 8 ++++++++
- 2 files changed, 12 insertions(+)
-
-diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
-index c72ec47..70883c7 100644
---- a/arch/arm/include/asm/firmware.h
-+++ b/arch/arm/include/asm/firmware.h
-@@ -41,6 +41,10 @@ struct firmware_ops {
- 	 * Initializes L2 cache
- 	 */
- 	int (*l2x0_init)(void);
-+	/*
-+	 * Restores coprocessor 15 registers
-+	 */
-+	int (*c15resume)(u32 *regs);
- };
- 
- /* Global pointer for current firmware_ops structure, can't be NULL. */
-diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
-index eb91d23..195b65c 100644
---- a/arch/arm/mach-exynos/firmware.c
-+++ b/arch/arm/mach-exynos/firmware.c
-@@ -64,10 +64,18 @@ static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
- 	return 0;
- }
- 
-+static int exynos_c15resume(u32 *regs)
-+{
-+	exynos_smc(SMC_CMD_C15RESUME, regs[0], regs[1], 0);
-+
-+	return 0;
-+}
-+
- static const struct firmware_ops exynos_firmware_ops = {
- 	.do_idle		= exynos_do_idle,
- 	.set_cpu_boot_addr	= exynos_set_cpu_boot_addr,
- 	.cpu_boot		= exynos_cpu_boot,
-+	.c15resume	= exynos_c15resume,
- };
- 
- void __init exynos_firmware_init(void)
--- 
-1.8.2.3
+This needs to be patch 1 in the series not patch 2 since the change to
+the driver to use the exported symbol depends on this rather than the
+other way around.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140602/22ba96e0/attachment.sig>
