@@ -1,126 +1,38 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 02 Jun 2014 15:10:01 -0700
-Subject: [GIT PULL] sirf clk update for 3.16
-In-Reply-To: <CAGsJ_4ymGxROu5fz2YFwPMTsPDiXrHUshoQFJ5SWhtHCK5HGKg@mail.gmail.com>
-References: <CAGsJ_4z+Y2P1YNTQWC-VsaT3N0Kasd=LvxAbLVLMftnt8gZbkg@mail.gmail.com>
- <20140515060124.3084.44286@quantum>
- <CAGsJ_4ymGxROu5fz2YFwPMTsPDiXrHUshoQFJ5SWhtHCK5HGKg@mail.gmail.com>
-Message-ID: <20140602221001.10062.66723@quantum>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 2 Jun 2014 23:16:27 +0100
+Subject: [PATCH 2/3] arm: tegra: enable igb, stmpe, i2c chardev, spidev,
+ lm95245, pwm leds
+In-Reply-To: <538CA635.4050502@ziswiler.com>
+References: <c5522b0efcbfc7690dcde6aaf78b9dd568f99604.1401665237.git.marcel@ziswiler.com>
+ <39a8704a4c8170d6b0620a1e5e44042eae6d8810.1401665237.git.marcel@ziswiler.com>
+ <538CA24B.1010602@wwwdotorg.org> <538CA635.4050502@ziswiler.com>
+Message-ID: <20140602221627.GP31751@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Barry Song (2014-05-18 05:50:40)
-> 2014-05-15 14:01 GMT+08:00 Mike Turquette <mturquette@linaro.org>:
-> > Quoting Barry Song (2014-05-12 07:45:00)
-> >> Hi Mike,
-> >>
-> >> can you pull the below update for 3.16? it cleanups the sirf clk codes
-> >> to fix some minor checkpatch issues according to key customer's
-> >> requirement.
-> >>
-> >>
-> >> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-> >>
-> >>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-> >>
-> >> are available in the git repository at:
-> >>
-> >>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
-> >> tags/clk-sirf-for-3.16
-> >
-> > Hi Barry,
-> >
-> > I get the following warnings when pulling this tag onto the clk-next
-> > branch:
-> >
-> > In file included from drivers/clk/sirf/clk-prima2.c:20:0:
-> > drivers/clk/sirf/clk-common.c:199:2: warning: initialization discards ?const? qualifier from pointer target type [enabled by default]
-> >   .parent_names = pll_clk_parents,
-> >   ^
-> >   ... repeats a for every .parent_names instance ...
-> >
-> > In file included from drivers/clk/sirf/clk-atlas6.c:20:0:
-> > drivers/clk/sirf/clk-common.c:199:2: warning: initialization discards ?const? qualifier from pointer target type [enabled by default]
-> >   .parent_names = pll_clk_parents,
-> >   ^
-> >   ... repeats a for every .parent_names instance ...
-> >
-> > Can you fix up and resubmit?
-> >
-> 
-> hi Mike,
-> this might mean we need a fix in clk core. we moved to "const char *
-> const" for clk parents
-> by:
-> 137 -static const char *pll_clk_parents[] = {
-> 138 +static const char * const pll_clk_parents[] = {
-> ...
-> repeated for every clk_parent.
-> ...
-> 
-> to fix checkpatch issues like:
-> #287: FILE: clk-common.c:287:
-> +static const char *dmn_clk_parents[] = {
-> 
-> WARNING: static const char * array should probably be static const char * const
-> 
-> but in clk_init_data, parent_names are "const char **"
-> const char              **parent_names;
-> 
-> if we don't change the parent_names of clk_init_data structure, the
-> only thing we can do to fix "warning: initialization discards ?const?
-> qualifier from pointer target type" is doing things like:
-> 
->  static struct clk_init_data clk_spi1_init = {
->         .name = "spi1",
->         .ops = &ios_ops,
-> -       .parent_names = std_clk_io_parents,
-> +       .parent_names = (const char **)std_clk_io_parents,
->         .num_parents = ARRAY_SIZE(std_clk_io_parents),
->  };
-> 
-> but this looks not too right. what is your opinion? i want to send a
-> fix for this issue by:
-> 
-> commit ef10a461aaa5db647a5e8d4d1f43659bab2ae9e1
-> Author: Barry Song <Baohua.Song@csr.com>
-> Date:   Sun May 18 20:47:29 2014 +0800
-> 
->     clk: move parent_names of clk_init_data to "const char * const *"
-> 
->     Signed-off-by: Barry Song ...
-> 
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 5119174..f919806 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -188,7 +188,7 @@ struct clk_ops {
->  struct clk_init_data {
->         const char              *name;
->         const struct clk_ops    *ops;
-> -       const char              **parent_names;
-> +       const char * const      *parent_names;
+On Mon, Jun 02, 2014 at 06:28:37PM +0200, Marcel Ziswiler wrote:
+> On 06/02/2014 06:11 PM, Stephen Warren wrote:
 
-Such a fix throws the following warning:
+> >>+CONFIG_SPI_SPIDEV=y
 
-| drivers/clk/clk.c: In function ?__clk_register?:
-drivers/clk/clk.c|1966 col 20| warning: assignment discards ?const? qualifier from pointer target type [enabled by default]
-||   clk->parent_names = hw->init->parent_names;
-||                     ^
+> >Is this useful with DT? I thought that unlike I2C_CHARDEV, spidev needed
+> >dummy devices to exist in DT for spidev to work? If so, there's not much
+> >point adding the option to defconfig, since people can add it when they
+> >put the dummy devices into DT.
 
-I haven't really taken the time to think about this one. Feel free to
-submit a fix, otherwise I'll take a good look at it after 3.16-rc1.
+> Yes, the Apalis T30 DT I sent actually contains two of them which we call
+> generic Apalis SPI1 and SPI2 out-of-the-box configured for exactly that.
+> Without the config enabled though it probably does not make much sense to
+> include it in the DT so I would consider removing it again.
 
-Regards,
-Mike
-
->         u8                      num_parents;
->         unsigned long           flags;
->  };
-> 
-> 
-> > Regards,
-> > Mike
-> >
-> 
-> -barry
+Your DT is broken if it's got a "spidev" node in it, you should be
+describing the hardware not the Linux implementation of the software.
+It would be really nice if we had a good way of handling this but we
+don't yet.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140602/6e5c3da7/attachment.sig>
