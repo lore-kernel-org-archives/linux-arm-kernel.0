@@ -1,203 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 02 Jun 2014 13:59:56 +0100
-Subject: [PATCH v4 00/20] arm64: GICv3 support
-In-Reply-To: <F2AEAF3A-4BD4-4A57-89B0-7EFC488A6A08@caviumnetworks.com>
- (Tirumalesh Chalamarla's message of "Sat, 31 May 2014 02:14:45 +0100")
-References: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
- <CAC8NTUWuuUrHKp4a1WkqSfiPNZjbwffBn-u7DGsrB8eF65e_ig@mail.gmail.com>
- <F2AEAF3A-4BD4-4A57-89B0-7EFC488A6A08@caviumnetworks.com>
-Message-ID: <87fvjn1n77.fsf@approximate.cambridge.arm.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 02 Jun 2014 15:01:59 +0200
+Subject: [PATCH v2 3/7] ARM: EXYNOS: add AFTR mode support to firmware
+ do_idle method
+In-Reply-To: <1401712543-14281-4-git-send-email-b.zolnierkie@samsung.com>
+References: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
+ <1401712543-14281-4-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <538C75C7.4030708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 31 2014 at  2:14:45 am BST, "Chalamarla, Tirumalesh" <Tirumalesh.Chalamarla@caviumnetworks.com> wrote:
-> It still has lot of GICv2 specific code in vgic.c, i think it will
-> change with the KVM GICv3 guest support.
+Hi,
 
-Which is exactly what is expected, as we don't support anything else so
-far.
+On 02.06.2014 14:35, Bartlomiej Zolnierkiewicz wrote:
+> On some platforms (i.e. EXYNOS ones) more than one idle mode is
+> available and we need to distinguish them in firmware do_idle method.
+> 
+> Add mode parameter to do_idle firmware method and AFTR mode support
+> to EXYNOS do_idle implementation.
+> 
+> This change is a preparation for adding secure firmware support to
+> EXYNOS cpuidle driver.
+> 
+> This patch shouldn't cause any functionality changes (please note
+> that do_idle firmware method is unused currently).
+> 
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/include/asm/firmware.h |  7 ++++++-
+>  arch/arm/mach-exynos/firmware.c | 10 ++++++++--
+>  2 files changed, 14 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
+> index 70883c7..63989c3 100644
+> --- a/arch/arm/include/asm/firmware.h
+> +++ b/arch/arm/include/asm/firmware.h
+> @@ -28,7 +28,7 @@ struct firmware_ops {
+>  	/*
+>  	 * Enters CPU idle mode
+>  	 */
+> -	int (*do_idle)(void);
+> +	int (*do_idle)(int mode);
+>  	/*
+>  	 * Sets boot address of specified physical CPU
+>  	 */
+> @@ -47,6 +47,11 @@ struct firmware_ops {
+>  	int (*c15resume)(u32 *regs);
+>  };
+>  
+> +enum {
 
-> Reviewed-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
-> Tested-by: Tirumalesh Chalamarla<tchalamarla@cavium.com>
+What about making this enum named and using it instead of int for mode
+argument of do_idle operation?
 
-Thanks for that. Can you specify the patches to which this applies?
+> +	FW_DO_IDLE_NORMAL,
 
-Cheers,
+IMHO this should be called FW_DO_IDLE_SLEEP, as this is how it is used
+on Exynos4x12.
 
-	M.
+OR (which is probably a better idea)
 
-> On 31-May-2014, at 4:36 am, Radha Mohan <mohun106@gmail.com> wrote:
->
->> Hi Marc,
->> The patch set is working for us on our platform. Below are some of the
->> things we tested with the GICv3 driver.
->> 
->> System: Cavium's proprietary simulator
->> Cores: 16
->> GIC version: GICv3
->> 
->> 1) SGI, PPI and SPI
->> 2) MSI and MSI-x with SPI and also LPI (took previous version of an
->> unposted LPI/ITS driver which now is missing from Marc's git tree)
->> 
->> The kind of devices that were tested are UARTs, AHCI controller,
->> SR-IOV capable devices.
->> 
->> So,
->> Acked-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->> Tested-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->> 
->> regards,
->> Radha Mohan
->> Cavium Inc.
->> 
->> On Thu, May 15, 2014 at 10:58 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> GICv3 is the base for a new generation of interrupt controllers
->>> designed to overcome some of the most glaring limitations of GICv2.
->>> 
->>> Some of the features are:
->>> - Support for more than 8 CPUs (a lot more...)
->>> - System registers for CPU interface access (instead of the memory
->>>  mapped GICC, GICV, GICH)
->>> - Message based interrupts
->>> 
->>> This patch series currently support:
->>> - Affinity Routing
->>> - System Registers
->>> - Non-Secure Group-1 interrupts only
->>> - KVM support (GICv3 host, GICv2 guest)
->>> 
->>> What is *not yet* supported in this series (WIP):
->>> - LPI/ITS/MSI
->>> - KVM GICv3 guest support
->>> - Any form of power management
->>> - 32bit systems
->>> 
->>> To be built, this code requires a fairly recent compiler/binutils
->>> combo. Linaro 13.06 seems to do the trick. This has been tested on the
->>> ARM FVP and Foundation models, with non-regressions run on a VExpress
->>> TC-2 and another Cortex-A57 based platform.
->>> 
->>> So far, the level of reviewing has been embarassingly low (my sincere
->>> thanks to Christoffer and Will for being the only ones to review
->>> it). While the documentation is unfortunately not public yet, it is
->>> available to those actively implementing GICv3 in their hardware, and
->>> I'm really eager to see reviews and test reports.
->>> 
->>> Without that kind of engagement, it is unlikely that this code will
->>> get merged any time soon.
->>> 
->>> Individuals without access to documentation and/or hardware can still
->>> review the code (it shares a lot of concepts with GICv2) and test in
->>> on the freely available Foundation model (see
->>> http://releases.linaro.org/latest/openembedded/aarch64/ for details on
->>> how to use the Foundation model).
->>> 
->>> The code is also available at the following location (warning,
->>> unstable branch!):
->>> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/gicv3
->>> 
->>> * From v3 [3]
->>>  - Fixed a lot of issues found by Christoffer (too many to report
->>>    here, see the email thread)
->>>  - New .sync_lr_elrsr backend
->>>  - New probing method
->>>  - New irqchip_in_kernel implementation
->>>  - Checked full bisectability of the series (hopefully got it right
->>>    this time...)
->>>  - rebased on top of 3.15-rc5
->>> 
->>> * From v2 [2]
->>>  - removed sharing of the xlate method with GICv2 (TI crossbar is now
->>>    getting in the way...)
->>>  - Switched to a tree domain to accomodate for the LPI space
->>>  - Fixed more bisectability
->>> 
->>> * From the initial revision [1]
->>>  - Some code sharing with GICv2
->>>  - Barrier cleanup/clarification
->>>  - Revised boot protocol update
->>>  - Consistent use of the MPIDR access macros
->>>  - Fixed a number of embarassing bugs
->>>  - Fixed DT examples
->>>  - Fixed bisectability of the series
->>> 
->>> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/229959.html
->>> [2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241972.html
->>> [3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/248008.html
->>> 
->>> Marc Zyngier (20):
->>>  ARM: GIC: move some bits of GICv2 to a library-type file
->>>  arm64: initial support for GICv3
->>>  arm64: GICv3 device tree binding documentation
->>>  arm64: boot protocol documentation update for GICv3
->>>  KVM: arm/arm64: vgic: move GICv2 registers to their own structure
->>>  KVM: ARM: vgic: introduce vgic_ops and LR manipulation primitives
->>>  KVM: ARM: vgic: abstract access to the ELRSR bitmap
->>>  KVM: ARM: vgic: abstract EISR bitmap access
->>>  KVM: ARM: vgic: abstract MISR decoding
->>>  KVM: ARM: vgic: move underflow handling to vgic_ops
->>>  KVM: ARM: vgic: abstract VMCR access
->>>  KVM: ARM: vgic: introduce vgic_enable
->>>  KVM: ARM: introduce vgic_params structure
->>>  KVM: ARM: vgic: split GICv2 backend from the main vgic code
->>>  KVM: ARM: vgic: revisit implementation of irqchip_in_kernel
->>>  arm64: KVM: remove __kvm_hyp_code_{start,end} from hyp.S
->>>  arm64: KVM: split GICv2 world switch from hyp code
->>>  arm64: KVM: move HCR_EL2.{IMO,FMO} manipulation into the vgic switch
->>>    code
->>>  KVM: ARM: vgic: add the GICv3 backend
->>>  arm64: KVM: vgic: add GICv3 world switch
->>> 
->>> Documentation/arm64/booting.txt                  |   6 +
->>> Documentation/devicetree/bindings/arm/gic-v3.txt |  79 +++
->>> arch/arm/include/asm/kvm_host.h                  |   5 +
->>> arch/arm/kernel/asm-offsets.c                    |  14 +-
->>> arch/arm/kvm/Makefile                            |   1 +
->>> arch/arm/kvm/interrupts_head.S                   |  26 +-
->>> arch/arm64/Kconfig                               |   1 +
->>> arch/arm64/include/asm/kvm_arm.h                 |   5 +-
->>> arch/arm64/include/asm/kvm_asm.h                 |  14 +-
->>> arch/arm64/include/asm/kvm_host.h                |  28 +
->>> arch/arm64/include/asm/virt.h                    |   4 +
->>> arch/arm64/kernel/asm-offsets.c                  |  25 +-
->>> arch/arm64/kernel/head.S                         |  18 +
->>> arch/arm64/kernel/hyp-stub.S                     |   1 +
->>> arch/arm64/kvm/Makefile                          |   4 +
->>> arch/arm64/kvm/hyp.S                             | 127 +----
->>> arch/arm64/kvm/vgic-v2-switch.S                  | 133 +++++
->>> arch/arm64/kvm/vgic-v3-switch.S                  | 271 +++++++++
->>> drivers/irqchip/Kconfig                          |   5 +
->>> drivers/irqchip/Makefile                         |   3 +-
->>> drivers/irqchip/irq-gic-common.c                 | 115 ++++
->>> drivers/irqchip/irq-gic-common.h                 |  29 +
->>> drivers/irqchip/irq-gic-v3.c                     | 684 +++++++++++++++++++++++
->>> drivers/irqchip/irq-gic.c                        |  59 +-
->>> include/kvm/arm_vgic.h                           | 115 +++-
->>> include/linux/irqchip/arm-gic-v3.h               | 190 +++++++
->>> virt/kvm/arm/vgic-v2.c                           | 236 ++++++++
->>> virt/kvm/arm/vgic-v3.c                           | 225 ++++++++
->>> virt/kvm/arm/vgic.c                              | 345 ++++++------
->>> 29 files changed, 2415 insertions(+), 353 deletions(-)
->>> create mode 100644 Documentation/devicetree/bindings/arm/gic-v3.txt
->>> create mode 100644 arch/arm64/kvm/vgic-v2-switch.S
->>> create mode 100644 arch/arm64/kvm/vgic-v3-switch.S
->>> create mode 100644 drivers/irqchip/irq-gic-common.c
->>> create mode 100644 drivers/irqchip/irq-gic-common.h
->>> create mode 100644 drivers/irqchip/irq-gic-v3.c
->>> create mode 100644 include/linux/irqchip/arm-gic-v3.h
->>> create mode 100644 virt/kvm/arm/vgic-v2.c
->>> create mode 100644 virt/kvm/arm/vgic-v3.c
->>> 
->>> --
->>> 1.8.3.4
->>> 
->>> _______________________________________________
->>> kvmarm mailing list
->>> kvmarm at lists.cs.columbia.edu
->>> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
->
->
+This is probably too Exynos-specific, so mode argument could be kept int
+or maybe unsigned long to make it more universal and this enum defined
+in an Exynos-specific header instead.
 
--- 
-Jazz is not dead. It just smells funny.
+Best regards,
+Tomasz
