@@ -1,196 +1,47 @@
-From: amit.kachhap@gmail.com (Amit Kachhap)
-Date: Mon, 2 Jun 2014 15:01:19 +0530
-Subject: [PATCH v1 3/6] thermal: thermal-core: Add notifications support
- for the cooling states
-In-Reply-To: <20140529122438.GB2593@e104805>
-References: <1401351334-11210-1-git-send-email-amit.daniel@samsung.com>
- <1401351334-11210-4-git-send-email-amit.daniel@samsung.com>
- <20140529122438.GB2593@e104805>
-Message-ID: <CADGdYn4+dA=vDV23bx7dDz2j9k9RFW1Apa153-FrtWgbVqEGYw@mail.gmail.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 02 Jun 2014 13:32:48 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAyLzJdIGNsazogY2xwczcxMXg6IEFkZCBEVCBiaW5kaW5n?=
+ =?UTF-8?B?cyBkb2N1bWVudGF0aW9u?=
+In-Reply-To: <20140602085651.GA12397@leverpostej>
+References: <1401616522-13505-1-git-send-email-shc_work@mail.ru>
+ <20140602085651.GA12397@leverpostej>
+Message-ID: <1401701568.132789498@f354.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/29/14, Javi Merino <javi.merino@arm.com> wrote:
-> Hi Amit,
->
-> On Thu, May 29, 2014 at 09:15:31AM +0100, Amit Daniel Kachhap wrote:
->> This patch adds notification infrastructure for any requests related to
->> cooling
->> states. The notifier structure passed is of both Get/Set type. So the
->> receiver
->> of these can sense the new/cur/max cooling state as decided by thermal
->> governor.
->> In addition to that it can also override the cooling state and may do
->> something
->> interesting after receiving these CPU cooling events such as masking some
->> states, enabling some extra conditional states or perform any extra
->> operation
->> for aggressive thermal cooling.
->> The notfications events can be of type,
->>
->> 1. COOLING_SET_STATE_PRE
->> 2. COOLING_SET_STATE_POST
->> 3. COOLING_GET_CUR_STATE
->> 4. COOLING_GET_MAX_STATE
->>
->> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> ---
->>  Documentation/thermal/sysfs-api.txt |   21 +++++++++++
->>  drivers/thermal/thermal_core.c      |   69
->> ++++++++++++++++++++++++++++++++++-
->>  include/linux/thermal.h             |   21 +++++++++++
->>  3 files changed, 109 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/thermal/sysfs-api.txt
->> b/Documentation/thermal/sysfs-api.txt
->> index 87519cb..5f45e03 100644
->> --- a/Documentation/thermal/sysfs-api.txt
->> +++ b/Documentation/thermal/sysfs-api.txt
->> @@ -92,6 +92,27 @@ temperature) and throttle appropriate devices.
->>      It deletes the corresponding entry form /sys/class/thermal folder
->> and
->>      unbind itself from all the thermal zone devices using it.
->>
->> +1.2.3 int thermal_cooling_register_notifier(struct notifier_block *nb)
->> +
->> +    This interface function registers the client notifier handler. The
->> notifier
->> +    handler can use this to monitor or update any cooling state
->> requests.
->> +    nb: notifier structure containing client notifier handler.
->> +
->> +1.2.4 int thermal_cooling_unregister_notifier(struct notifier_block *nb)
->> +
->> +    This interface function unregisters the client notifier handler.
->> +    nb: notifier structure containing client notifier handler.
->> +
->> +1.2.5 int thermal_cooling_notify_states(struct thermal_cooling_status
->> *request,enum cooling_state_ops op)
->> +
->> +    This interface function invokes the earlier registered cooling states
->> handler.
->> +    request: holds the relevant cooling state value.
->> +	.cur_state: current cooling state.
->> +	.new_state: new cooling state to be set.
->> +	.max_state: max cooling state.
->> +	.devdata: driver private data pointer.
->> +    op: describes various operation supported.
->> +
->>  1.3 interface for binding a thermal zone device with a thermal cooling
->> device
->>  1.3.1 int thermal_zone_bind_cooling_device(struct thermal_zone_device
->> *tz,
->>  	int trip, struct thermal_cooling_device *cdev,
->> diff --git a/drivers/thermal/thermal_core.c
->> b/drivers/thermal/thermal_core.c
->> index 71b0ec0..1a60f83 100644
->> --- a/drivers/thermal/thermal_core.c
->> +++ b/drivers/thermal/thermal_core.c
->> @@ -52,6 +52,8 @@ static DEFINE_MUTEX(thermal_idr_lock);
->>  static LIST_HEAD(thermal_tz_list);
->>  static LIST_HEAD(thermal_cdev_list);
->>  static LIST_HEAD(thermal_governor_list);
->> +/* Notfier list to validates/updates the cpufreq cooling states */
->> +static BLOCKING_NOTIFIER_HEAD(cooling_state_notifier_list);
->>
->>  static DEFINE_MUTEX(thermal_list_lock);
->>  static DEFINE_MUTEX(thermal_governor_lock);
->> @@ -1073,8 +1075,71 @@ static struct class thermal_class = {
->>  };
->>
->>  /**
->> - * __thermal_cooling_device_register() - register a new thermal cooling
->> device
->> - * @np:		a pointer to a device tree node.
->> + * thermal_cooling_notify_states - Invoke the necessary cooling states
->> handler.
->> + * @request: holds the relevant cooling state value. say if the cooling
->> state
->> + * operation is of type COOLING_GET_MAX_STATE, then request holds
->> + * the current max cooling state value.
->> + * @op: different operations supported
->> + *
->> + * This API allows the registered user to recieve the different cooling
->> + * notifications like current state, max state and set state.
->> + *
->> + * Return: 0 (success)
->> + */
->> +int thermal_cooling_notify_states(struct thermal_cooling_status
->> *request,
->> +				enum cooling_state_ops op)
->> +{
->> +	/* Invoke the notifiers which have registered for this state change */
->> +	if (op == COOLING_SET_STATE_PRE ||
->> +		op == COOLING_SET_STATE_POST ||
->> +		op == COOLING_GET_MAX_STATE ||
->> +		op == COOLING_GET_CUR_STATE) {
->> +		blocking_notifier_call_chain(
->> +			&cooling_state_notifier_list, op, request);
->> +	}
->> +	return 0;
->> +}
->> +EXPORT_SYMBOL_GPL(thermal_cooling_notify_states);
->> +
->> +/**
->> + * thermal_cooling_register_notifier - registers a notifier with thermal
->> cooling.
->> + * @nb:	notifier function to register.
->> + *
->> + * Add a driver to receive all cooling notifications like current state,
->> + * max state and set state. The drivers after reading the events can
->> perform
->> + * some mapping like grouping some P states into 1 cooling state.
->> + *
->> + * Return: 0 (success)
->> + */
->> +int thermal_cooling_register_notifier(struct notifier_block *nb)
->> +{
->> +	int ret = 0;
->> +	ret = blocking_notifier_chain_register(
->> +				&cooling_state_notifier_list, nb);
->> +	return ret;
->> +}
->> +EXPORT_SYMBOL_GPL(thermal_cooling_register_notifier);
->> +
->> +/**
->> + * thermal_cooling_unregister_notifier - unregisters a notifier with
->> thermal
->> + * cooling.
->> + * @nb:	notifier function to unregister.
->> + *
->> + * Removes a driver to receive further cooling notifications.
->> + *
->> + * Return: 0 (success)
->
-> Or %-ENOENT if the notifier is not registered.
->
->> + */
->> +int thermal_cooling_unregister_notifier(struct notifier_block *nb)
->> +{
->> +	int ret = 0;
->> +	ret = blocking_notifier_chain_unregister(
->> +				&cooling_state_notifier_list, nb);
->> +	return ret;
->> +}
->> +EXPORT_SYMBOL_GPL(thermal_cooling_unregister_notifier);
->> +
->> +/**
->> + * thermal_cooling_device_register() - register a new thermal cooling
->> device
->
-> This is wrong, the function below this comment is still
-> __thermal_cooling_device_register() whose first parameter is np, not
-> type.
-I did not add this. This seems wrong. Will modify this as a fix in the version.
+Mon, 2 Jun 2014 09:56:51 +0100 ?? Mark Rutland <mark.rutland@arm.com>:
+> On Sun, Jun 01, 2014 at 10:55:22AM +0100, Alexander Shiyan wrote:
+> > This patch adds DT binding documentation for the Cirrus Logic
+> > CLPS711X-based CPUs clock subsystem.
+> > 
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > ---
+> >  .../devicetree/bindings/clock/clps711x-clock.txt      | 19 +++++++++++++++++++
+> >  1 file changed, 19 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/clock/clps711x-clock.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/clock/clps711x-clock.txt b/Documentation/devicetree/bindings/clock/clps711x-clock.txt
+> > new file mode 100644
+> > index 0000000..0fdf3c9
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/clock/clps711x-clock.txt
+> > @@ -0,0 +1,19 @@
+> > +* Clock bindings for the Cirrus Logic CLPS711X CPUs
+> > +
+> > +Required properties:
+> > +- compatible  : Shall contain "cirrus,clps711x-clk".
+> > +- reg         : Address of the internal register set.
+> > +- cpufreq     : Factory set default frequency in HZ.
+> 
+> Huh? Why is this called "cpufreq" what is this the frequency of,
+> exactly?
+> 
+> Is this an input or an output?
 
-Thanks,
-Amit
->
->>   * @type:	the thermal cooling device type.
->>   * @devdata:	device private data.
->>   * @ops:		standard thermal cooling devices callbacks.
->
-> Cheers,
-> Javi
->
->
+Modern CLPS711X CPUs support PLL reprogramming, while for older processors,
+this procedure is not possible and the CPU clock is set to a fixed value. Thus if the
+value of the PLL multiplier is not correct (missing), we use a fixed CPU frequency
+of the processor, described in DT, which allows us to use the driver for the new and
+old versions of this CPU.
+
+---
