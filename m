@@ -1,32 +1,57 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Mon,  2 Jun 2014 11:21:03 +0200
-Subject: [PATCH 2/5] Documentation: bindings: document the Marvell Berlin
- enable-method
+Date: Mon,  2 Jun 2014 11:21:05 +0200
+Subject: [PATCH 4/5] ARM: dts: berlin: add SMP related nodes and properties
+ for BG2
 In-Reply-To: <1401700866-24804-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1401700866-24804-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1401700866-24804-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1401700866-24804-5-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SMP support for Marvell Berlin SoCs introduce a new enable-method.
-Document it.
+Add required nodes and properties into the Berlin BG2 device tree to
+take advantage of the newly introduced SMP support. Add the scu and
+cpu-ctrl nodes along with the CPUs enable-method property.
 
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 ---
- Documentation/devicetree/bindings/arm/cpus.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/berlin2.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index 333f4aea3029..50ec9ae6de28 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -185,6 +185,7 @@ nodes to be present and contain the properties described below.
- 			    "qcom,gcc-msm8660"
- 			    "qcom,kpss-acc-v1"
- 			    "qcom,kpss-acc-v2"
-+			    "marvell,berlin-smp"
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index 56a1af2f1052..f38ddda8a75e 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
+@@ -21,6 +21,7 @@
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		enable-method = "marvell,berlin-smp";
  
- 	- cpu-release-addr
- 		Usage: required for systems that have an "enable-method"
+ 		cpu at 0 {
+ 			compatible = "marvell,pj4b";
+@@ -72,6 +73,11 @@
+ 			cache-level = <2>;
+ 		};
+ 
++		scu: snoop-control-unit at ad0000 {
++			compatible = "arm,cortex-a9-scu";
++			reg = <0xad0000 0x58>;
++		};
++
+ 		gic: interrupt-controller at ad1000 {
+ 			compatible = "arm,cortex-a9-gic";
+ 			reg = <0xad1000 0x1000>, <0xad0100 0x0100>;
+@@ -86,6 +92,11 @@
+ 			clocks = <&sysclk>;
+ 		};
+ 
++		cpu-ctrl at dd0000 {
++			compatible = "marvell,berlin-cpu-ctrl";
++			reg = <0xdd0000 0x10000>;
++		};
++
+ 		apb at e80000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
 -- 
 1.9.1
