@@ -1,43 +1,38 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon,  2 Jun 2014 13:57:34 -0700
-Subject: [PATCHv2 0/4] Page protections for arm64
-Message-ID: <1401742658-11841-1-git-send-email-lauraa@codeaurora.org>
+Date: Mon,  2 Jun 2014 13:57:37 -0700
+Subject: [PATCHv2 3/4] arm64: Switch to ldr for loading the stub vectors
+In-Reply-To: <1401742658-11841-1-git-send-email-lauraa@codeaurora.org>
+References: <1401742658-11841-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1401742658-11841-4-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-This is v2 of adding page protections for arm64. This implements
-CONFIG_DEBUG_SET_MODULE_RONX for modules and adds similar protections
-for direct mapped memory. The module portion (1/4) should be ready for
-merging assuming no more issues are found (I know I'm off cycle here).
+The hyp stub vectors are currently loaded using adr. This
+instruction has a +/- 1MB range for the loading address. If
+the alignment for sections is changed. the address may be more
+than 1MB away, resulting in reclocation errors. Switch to using
+ldr for getting the address to ensure we aren't affected by the
+location of the __hyp_stub_vectors.
 
-v2:
- - Added a memory barrier after flush_tlb_kernel_range per request of
-   Steve Capper.
- - Dropped the ENTRY per Will in handle_arch_irq
- - Added the Kconfig to align sections up to SECTION_SIZE. Added a patch
-   to fix the related relocation errors from this option.
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+ arch/arm64/kernel/head.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Laura Abbott (4):
-  arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support
-  arm64: Treat handle_arch_irq as a function pointer
-  arm64: Switch to ldr for loading the stub vectors
-  arm64: add better page protections to arm64
-
- arch/arm64/Kconfig.debug            |  34 +++++++
- arch/arm64/include/asm/cacheflush.h |   4 +
- arch/arm64/kernel/entry.S           |   8 +-
- arch/arm64/kernel/head.S            |   2 +-
- arch/arm64/kernel/vmlinux.lds.S     |  17 ++++
- arch/arm64/mm/Makefile              |   2 +-
- arch/arm64/mm/init.c                |   1 +
- arch/arm64/mm/mm.h                  |   2 +
- arch/arm64/mm/mmu.c                 | 173 ++++++++++++++++++++++++++++++++----
- arch/arm64/mm/pageattr.c            | 121 +++++++++++++++++++++++++
- 10 files changed, 344 insertions(+), 20 deletions(-)
- create mode 100644 arch/arm64/mm/pageattr.c
-
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 0fd5650..07574f4 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -208,7 +208,7 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
+ 	msr	vttbr_el2, xzr
+ 
+ 	/* Hypervisor stub */
+-	adr	x0, __hyp_stub_vectors
++	ldr	x0, =__hyp_stub_vectors
+ 	msr	vbar_el2, x0
+ 
+ 	/* spsr */
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
