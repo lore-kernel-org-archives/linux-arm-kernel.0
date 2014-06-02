@@ -1,60 +1,28 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 2 Jun 2014 16:22:40 -0700
-Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
-In-Reply-To: <CAD=FV=WjaKLFjs4RbruJq_RRGpjVkbS+755u6ZBq2L1CMAFh5A@mail.gmail.com>
-References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
- <53752E25.9060604@gmail.com>
- <CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>
- <53753443.8010303@gmail.com>
- <CAD=FV=V8UZoeOqEwfx_E015pLM+amTt51LrUa+dk7mTdn=vKgA@mail.gmail.com>
- <53753C17.1090002@gmail.com>
- <CAD=FV=WGa7j_As_NpySxU7OEd_SzuGWK6oxU6UeiJ-4HsoWvvg@mail.gmail.com>
- <CAJFHJrrgWGc4XGQB0ysLufAg3Wouz-aYXu97Sy2Kp=HzK+akVQ@mail.gmail.com>
- <CAASgrz2Nr69tpfC8ka9gbs2OvjLEGsvgAj4vBCFxhsamuFum7w@mail.gmail.com>
- <53754CE2.3000905@gmail.com>
- <CAD=FV=UMoL7i9rg_QtBAqPwisSQyRqRmk8wQhneMXAiLBjTT1A@mail.gmail.com>
- <CAPz6YkU8GDrLj8UkqEQXxxqxWF5_p427wKSDgAp+QPR7WE7Ujg@mail.gmail.com>
- <CAJFHJrrb2XFDZqJh4OuLdFP=J0aR4pGe-WLWKZ7ZpMfUSPGd4Q@mail.gmail.com>
- <5376A726.4000106@samsung.com>
- <CAD=FV=VXSP1TM9qY8PxFuQ+Tq2Ju57VdpzpwsHXqHshQm_havQ@mail.gmail.com>
- <035001cf74f8$0aabdae0$200390a0$@samsung.com>
- <537CD235.2020304@samsung.com>
- <CAJFHJrpdVQ6G=-h5J_EgBT8+XSiyvPnNGR2yBDV27i8TDQ7jRg@mail.gmail.com>
- <CAD=FV=WjaKLFjs4RbruJq_RRGpjVkbS+755u6ZBq2L1CMAFh5A@mail.gmail.com>
-Message-ID: <CAD=FV=XkG1WzA91vFCVZxYCTr0Sk2VVgr1px=DXxrnbTTYNTKA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Jun 2014 00:42:16 +0100
+Subject: Exynos induced build error with recent arm-soc
+Message-ID: <20140602234216.GD933@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin,
+Spotted with a randconfig today:
 
-On Wed, May 28, 2014 at 10:38 AM, Doug Anderson <dianders@chromium.org> wrote:
-> Kukjin,
->
-> On Wed, May 21, 2014 at 11:34 AM, Chirantan Ekbote
-> <chirantan@chromium.org> wrote:
->> On Wed, May 21, 2014 at 9:20 AM, Tomasz Figa <t.figa@samsung.com> wrote:
->>> On 21.05.2014 15:24, Kukjin Kim wrote:
->>>
->>>> BTW, since
->>>> exynos5260, exynos5420 and exynos5800 doesn't support arch timer, we
->>>> have been using MCT on exynos5 SoCs.
->>>
->>> Hmm, I thought arch timer was a core feature of ARM Cortex A15 (and A7)
->>> cores. Also you mention Exynos5420, while Chirantan's patch removing MCT
->>> node from exynos5420.dtsi, would suggest that it worked for him fine. (I
->>> assume it was tested.)
->>>
->>
->> I was able to boot both 5420 and 5800 with just the arch timers on our
->> 3.8 based franken-kernel.  The upstream kernel doesn't boot on those
->> systems with or without the mct so I wasn't able to test there.
->> Although looking at the upstream device tree now I see that there is
->> no entry for the arch timer in exynos5420.dtsi.  Maybe it should be
->> added in?
->
-> A gentle reminder to respond here about the status of MCT on 5420 and 5800.
+arch/arm/mach-exynos/built-in.o: In function `exynos_set_cpu_boot_addr':
+pm_domains.c:(.text+0x19c): undefined reference to `sysram_ns_base_addr'
+arch/arm/mach-exynos/built-in.o:(.data+0x94): undefined reference to `exynos_enter_aftr'
 
-Another reminder to respond about the status of arch timers on 5420
-and 5800 (sorry, meant arch timers here--we know MCT works).
+This should be fixed before the merge window...
 
--Doug
+The failing .config is:
+
+http://www.arm.linux.org.uk/developer/build/file.php?lid=8598
+
+and the resulting build log with errors:
+
+http://www.arm.linux.org.uk/developer/build/result.php?type=log&cid=3001&lid=8600&format=build
+
+Thanks.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
