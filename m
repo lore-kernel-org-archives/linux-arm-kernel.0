@@ -1,55 +1,43 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Mon, 02 Jun 2014 17:08:29 +0100
-Subject: [PATCH 3/3] i2c: Make I2C ID tables non-mandatory for DT'ed
- and/or ACPI'ed devices
-In-Reply-To: <1401716463-23457-4-git-send-email-lee.jones@linaro.org>
-References: <1401716463-23457-1-git-send-email-lee.jones@linaro.org>
- <1401716463-23457-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140602160829.F3519C40476@trevor.secretlab.ca>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 02 Jun 2014 10:11:55 -0600
+Subject: [PATCH 2/3] arm: tegra: enable igb, stmpe, i2c chardev, spidev,
+ lm95245, pwm leds
+In-Reply-To: <39a8704a4c8170d6b0620a1e5e44042eae6d8810.1401665237.git.marcel@ziswiler.com>
+References: <c5522b0efcbfc7690dcde6aaf78b9dd568f99604.1401665237.git.marcel@ziswiler.com>
+ <39a8704a4c8170d6b0620a1e5e44042eae6d8810.1401665237.git.marcel@ziswiler.com>
+Message-ID: <538CA24B.1010602@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  2 Jun 2014 14:41:03 +0100, Lee Jones <lee.jones@linaro.org> wrote:
-> Currently the I2C framework insists on devices supplying an I2C ID
-> table.  Many of the devices which do so unnecessarily adding quite a
-> few wasted lines to kernel code.  This patch allows drivers a means
-> to 'not' supply the aforementioned table and match on either DT
-> and/or ACPI match tables instead.
+On 06/01/2014 05:37 PM, Marcel Ziswiler wrote:
+> The NVIDIA Tegra 3 based Apalis T30 module contains an Intel i210 resp.
+> i211 gigabit Ethernet controller, an STMPE811 ADC/touch controller, I2C
+> as well as SPI buses and PWM LEDs generically accessible from user
+> space and an LM95245 temperature sensor chip. The later five can also
+> be found on the Colibri T30 module.
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-Looks reasonable.
-
-g.
-
+> While at it move the PCA953x GPIO entry down to its proper place to
+> have it all nicely ordered again.
+> 
+> Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
 > ---
->  drivers/i2c/i2c-core.c | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> index d0c7180..811b78f 100644
-> --- a/drivers/i2c/i2c-core.c
-> +++ b/drivers/i2c/i2c-core.c
-> @@ -271,7 +271,18 @@ static int i2c_device_probe(struct device *dev)
->  		return 0;
->  
->  	driver = to_i2c_driver(dev->driver);
-> -	if (!driver->probe || !driver->id_table)
-> +	if (!driver->probe)
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * An I2C ID table is not madatory, if and only if, a suitable Device
-> +	 * Tree and/or ACPI match table entry is supplied for the probing
-> +	 * device.
-> +	 *
-> +	 * TODO: Provide 'device type' to 'ACPI node' call and match here.
-> +	 */
-> +	if (!driver->id_table &&
-> +	    !of_match_device(dev->driver->of_match_table, dev))
->  		return -ENODEV;
->  
->  	if (!device_can_wakeup(&client->dev))
-> -- 
-> 1.8.3.2
-> 
+> BTW: How about MTD_SPI_NOR,
+
+That might only exist in linux-next.
+
+> PROC_DEVICETREE and CRYPTO_DEV_TEGRA_AES
+> which I haven't found any mentioning anywhere?
+
+The TEGRA_AES driver has been removed, so the option should be removed
+from defconfig too. I don't know what happened to PROC_DEVICTREE - it
+doesn't seem to exist any more. Was it replaced by something else or
+deleted? Feel free to send patches for those.
+
+> diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+
+> +CONFIG_SPI_SPIDEV=y
+
+Is this useful with DT? I thought that unlike I2C_CHARDEV, spidev needed
+dummy devices to exist in DT for spidev to work? If so, there's not much
+point adding the option to defconfig, since people can add it when they
+put the dummy devices into DT.
