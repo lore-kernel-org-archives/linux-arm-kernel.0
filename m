@@ -1,57 +1,88 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 2 Jun 2014 13:59:44 +0200
-Subject: [PATCH v2 3/5] pinctrl: sunxi: Move setting of mux to irq type
- from unmask to request_resources
-In-Reply-To: <1401544899-405-4-git-send-email-hdegoede@redhat.com>
-References: <1401544899-405-1-git-send-email-hdegoede@redhat.com>
- <1401544899-405-4-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140602115944.GE27722@lukather>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 2 Jun 2014 14:03:27 +0200
+Subject: [GIT PULL] MMC for v.3.16
+Message-ID: <CAPDyKFpkKNx17ha=WWAp4-6w3k4pRYSHUhOWHv1G+1_wAEBceA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 31, 2014 at 04:01:37PM +0200, Hans de Goede wrote:
-> With level triggered interrupt mask / unmask will get called for each
-> interrupt, doing the somewhat expensive mux setting on each unmask thus is
-> not a good idea. Instead add a request_resources callback and do it there.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 22 ++++++++++++++--------
->  1 file changed, 14 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> index c199337..61d3246 100644
-> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> @@ -531,6 +531,19 @@ static int sunxi_pinctrl_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
->  	return irq_find_mapping(pctl->domain, desc->irqnum);
->  }
->  
-> +static int sunxi_pinctrl_irq_request_resources(struct irq_data *d)
-> +{
-> +	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
-> +	struct sunxi_desc_function *func;
-> +
-> +	func = sunxi_pinctrl_desc_find_function_by_pin(pctl,
-> +					pctl->irq_array[d->hwirq], "irq");
+Hi Linus,
 
-I know you're just moving code here, but we should add a check for
-func being !NULL here, otherwise, the kernel is going to blow up at
-the next line.
+This is the first PR I send to you as I am co-maintaining the MMC
+subsystem with Chris Ball. You will receive a separate PR for MMC from
+him as well, as usual.
 
-And since gpio_to_irq might not be called before the request_irq, you
-might be in such a case.
+These patches are mainly updates for the mmci driver and have been
+tested in linux-next.
 
-Maxime
+Some ARM SoC related patches are also included and those have been
+acked from the corresponding maintainers to go through my mmc tree.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140602/f95a9644/attachment.sig>
+Some more details in the signed tag.
+
+Kind regards
+Ulf Hansson
+
+
+The following changes since commit 89ca3b881987f5a4be4c5dbaa7f0df12bbdde2fd:
+
+  Linux 3.15-rc4 (2014-05-04 18:14:42 -0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/ulf.hansson/mmc.git tags/mmc-v3.16-1
+
+for you to fetch changes up to 8c3a05b489ef097f86bf87c64192456553f57781:
+
+  mmc: mmci: Enforce DMA configuration through DT (2014-06-02 11:20:25 +0200)
+
+----------------------------------------------------------------
+Updates for mmci driver:
+ - Put the device into low power state at system suspend.
+ - Convert to the common mmc DT parser.
+ - Add missing DT bindings needed for ux500.
+
+Updates for ARM ux500|u300:
+ - Convert to the common mmc DT bindings.
+ - Remove redundant board file for mmci platform data.
+
+----------------------------------------------------------------
+Ulf Hansson (22):
+      mmc: mmci: Mask IRQs for all variants during runtime suspend
+      mmc: mmci: Let runtime PM callbacks be available for CONFIG_PM
+      mmc: mmci: Put the device into low power state at system suspend
+      mmc: mmci: Convert to the mmc gpio API
+      mmc: mmci: Convert to devm functions
+      mmc: mmci: Update DT documentation
+      mmc: mmci: Add DT bindings for signal direction
+      mmc: mmci: Add DT bindings for feedback clock pin
+      mmc: mmci: Use the common mmc DT parser
+      ARM: ux500: Add mmci signal directions and feeback clock in DT for href
+      ARM: ux500: Convert to the common mmc DT bindings for highspeed mode
+      ARM: nomadik: Convert to the common mmc DT bindings for highspeed mode
+      ARM: u300: Convert to the common mmc DT bindings for highspeed mode
+      mmc: mmci: Mark the DT bindings for highspeed mode as deprecated
+      mmc: mmci: Enable MMC_CAP_CMD23
+      ARM: ux500: Add the mmc capabilities flags to DT
+      ARM: ux500: Add a vmmc regulator through DT for the poped eMMC for href
+      ARM: ux500: Remove redundant board file for mmci platform data
+      mmc: mmci: Enforce DT for signal direction and feedback clock
+      mmc: mmci: Enforce mmc capabilities through DT
+      mmc: mmci: Enforce max frequency configuration through DT
+      mmc: mmci: Enforce DMA configuration through DT
+
+ Documentation/devicetree/bindings/mmc/mmci.txt |   54 +++-
+ arch/arm/boot/dts/ste-ccu9540.dts              |    6 +-
+ arch/arm/boot/dts/ste-href.dtsi                |   19 +-
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi     |    4 +-
+ arch/arm/boot/dts/ste-snowball.dts             |    4 +-
+ arch/arm/boot/dts/ste-u300.dts                 |    4 +-
+ arch/arm/mach-lpc32xx/phy3250.c                |    3 -
+ arch/arm/mach-ux500/Makefile                   |    3 +-
+ arch/arm/mach-ux500/board-mop500-sdi.c         |  166 ------------
+ arch/arm/mach-ux500/board-mop500.h             |    5 -
+ arch/arm/mach-ux500/cpu-db8500.c               |    4 -
+ drivers/mmc/host/mmci.c                        |  324 ++++++------------------
+ drivers/mmc/host/mmci.h                        |   14 +-
+ include/linux/amba/mmci.h                      |   42 ---
+ 14 files changed, 169 insertions(+), 483 deletions(-)
+ delete mode 100644 arch/arm/mach-ux500/board-mop500-sdi.c
