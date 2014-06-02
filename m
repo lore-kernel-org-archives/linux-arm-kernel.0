@@ -1,45 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Jun 2014 14:33:53 +0100
-Subject: iMX6Q FEC: transmit queue 0 timed out
-In-Reply-To: <CAOpc7mFbJQNeBmOG0C-Qn856MmhtUkTq=QeDPC-EWXryi6sFGg@mail.gmail.com>
-References: <CAOpc7mF4naY8xuBDFNpHuQPsrULVriKj-ZcpEwpPwtA8UT1Wpw@mail.gmail.com>
- <20140602124242.GB933@n2100.arm.linux.org.uk>
- <CAOpc7mFbJQNeBmOG0C-Qn856MmhtUkTq=QeDPC-EWXryi6sFGg@mail.gmail.com>
-Message-ID: <20140602133352.GC933@n2100.arm.linux.org.uk>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon,  2 Jun 2014 15:40:20 +0200
+Subject: [PATCH 0/4] ARM: shmobile: koelsch legacy: Enable DMA for QSPI
+Message-ID: <1401716424-29740-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 02, 2014 at 03:15:21PM +0200, Holger Schurig wrote:
-> Transmit clocking and pinmux?  Do you mean ENET_TX_EN?  Yep, that's
-> set. Somehow barebox can send, it's just Linux that doesn't want to do
-> it. Note that ENET_TX_CLK is not muxed, as it is for MII, not for
-> RMII.
-> 
-> In case I confuse what you meant, here are excerpts from my DTS:
+This patch series enables DMA support for QSPI on r8a7791/koelsch legacy.
+It's independent from the series "ARM: shmobile: koelsch reference: Enable
+DMA for QSPI".
 
-It's probably ENET_REF_CLK that's the cause of the problem.
+[2/4] was written by Morimoto-san for LTSI 3.10, and forward ported by me.
 
-> pinctrl_fec: fecgrp {
->    fsl,pins = <
->       MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0 0x1b030
->       MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1 0x1b030
->       MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN   0x1b030
->       MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0 0x1b030
->       MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1 0x1b030
->       MX6QDL_PAD_ENET_RX_ER__ENET_RX_ER   0x1b030
->       MX6QDL_PAD_ENET_MDIO__ENET_MDIO     0x0B850
->       MX6QDL_PAD_ENET_MDC__ENET_MDC       0x1b030
->       MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN  0x1b030
->       MX6QDL_PAD_GPIO_16__ENET_REF_CLK    0x1b030
->       >;
-> };
+This was tested on r8a7791/koelsch.
 
-On the Microsom, I need:
+Performance figures for reading from a QSPI FLASH driven at 24.375 MHz are:
+  - Single:  1.1 Mbps PIO, 23 Mbps DMA
+  - Dual  : 12.7 Mbps PIO, 48 Mbps DMA
+  - Quad  : 13   Mbps PIO, 70 Mbps DMA
 
-      MX6QDL_PAD_GPIO_16__ENET_REF_CLK        0xc0000000
+Thanks for your comments!
 
-Does that work for you?
+  [1/4] ARM: shmobile: r8a7791: Add SYS-DMAC clocks
+  [2/4] ARM: shmobile: r8a7791: Add SYS-DMAC support
+  [3/4] ARM: shmobile: r8a7791: Add QSPI DMA support
+  [4/4] ARM: shmobile: koelsch legacy: Enable DMA for QSPI
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+ arch/arm/mach-shmobile/board-koelsch.c        |  2 +
+ arch/arm/mach-shmobile/clock-r8a7791.c        |  6 +-
+ arch/arm/mach-shmobile/include/mach/r8a7791.h |  7 +++
+ arch/arm/mach-shmobile/setup-r8a7791.c        | 82 +++++++++++++++++++++++++++
+ 4 files changed, 96 insertions(+), 1 deletion(-)
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
