@@ -1,45 +1,33 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 2 Jun 2014 19:14:28 +0200
-Subject: [PATCH v3 1/6] i2c: s3c2410: Handle i2c sys_cfg register in i2c
- driver
-In-Reply-To: <1399706419-13976-2-git-send-email-pankaj.dubey@samsung.com>
-References: <1399706287-13919-1-git-send-email-y@samsung.com>
- <1399706419-13976-1-git-send-email-pankaj.dubey@samsung.com>
- <1399706419-13976-2-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <20140602171428.GK2654@katana>
+From: jwerner@chromium.org (Julius Werner)
+Date: Mon, 2 Jun 2014 10:15:36 -0700
+Subject: [PATCH 1/2] ARM: dts: Enable USB 3503 hub on exynos5250-snow
+In-Reply-To: <CAFp+6iFbDfWconRZzMhSXFG_RbXF-rnYwraJK1P1tQSb6R+Dkw@mail.gmail.com>
+References: <1399293056-17143-1-git-send-email-gautam.vivek@samsung.com>
+ <536BA9E8.2030306@suse.de> <536BAD05.9070401@samsung.com>
+ <CAODwPW8FpsF6vo5Z8_+YXwchwab=7Ltv0nEvP_=907HK232xCg@mail.gmail.com>
+ <CAFp+6iFbDfWconRZzMhSXFG_RbXF-rnYwraJK1P1tQSb6R+Dkw@mail.gmail.com>
+Message-ID: <CAODwPW9Qkem9OGjVn+EkxvWa5SKWBn=9oG+rvLv9tZVJ=UWx4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 10, 2014 at 04:20:14PM +0900, Pankaj Dubey wrote:
-> Let's handle i2c interrupt re-configuration in i2c driver. This will
-> help us in removing some soc specific checks from machine files.
-> Since only Exynos5250, and Exynos5420 need to do this, added syscon
-> based phandle to i2c device nodes of respective SoC DT files.
-> Also handle saving and restoring of SYS_I2C_CFG register during
-> suspend and resume of i2c driver. This will help in removing soc
-> specific check from mach-exynos/pm.c.
-> 
-> CC: Rob Herring <robh+dt@kernel.org>
-> CC: Randy Dunlap <rdunlap@infradead.org>
-> CC: Wolfram Sang <wsa@the-dreams.de>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: devicetree at vger.kernel.org
-> CC: linux-doc at vger.kernel.org
-> CC: linux-i2c at vger.kernel.org
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Ok, there was already a patch posted by you for this[1], which had
+> quite a much discussion
+> on it.
+> Would you like to give some pointers based on that ?
+> One that Olof had suggested was to use gpio-reset driver which is yet
+> to make to mainline.
+> But i think with that too we need to take care of the timing for
+> resetting the hub before PHY
+> gets reset.
 
-Shall this go via i2c-tree? Looks to me like it should go with the rest
-of the series? Patch is mostly okay (only reviewed the code, not the
-bindings), one nit:
+Oh, right, I remember now. Seems like there wasn't much consensus on
+how to solve the problem there, and I think I didn't really have time
+to work on it any more either.
 
-> +	regmap_update_bits(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, BIT(id), val);
-
-Hardcode the '0' and drop using 'val'?
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140602/40aacffb/attachment.sig>
+I think coupling in another driver to reset the device isn't a bad
+idea... this could even be usb3503 if you modified it a little, and it
+could also address Tomasz' concerns from that thread that the solution
+should be extensible to other HSIC devices that need a different reset
+sequence. But you need some mechanism to hook the two drivers together
+and make sure phy-samsung-usb2 synchronously calls the reset function
+at exactly the right point to ensure the timing works right.
