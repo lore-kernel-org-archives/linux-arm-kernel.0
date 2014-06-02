@@ -1,55 +1,49 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 2 Jun 2014 11:25:16 +0100
-Subject: [PATCH] ARM: decompressor: a minor optimization
-In-Reply-To: <1401449433-1963-1-git-send-email-yamada.m@jp.panasonic.com>
-References: <1401449433-1963-1-git-send-email-yamada.m@jp.panasonic.com>
-Message-ID: <20140602102516.GC3855@e103592.cambridge.arm.com>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Mon, 2 Jun 2014 12:27:50 +0200
+Subject: [PATCH 1/5] ARM: berlin: add SMP support
+In-Reply-To: <20140602100332.GH28090@lunn.ch>
+References: <1401700866-24804-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1401700866-24804-2-git-send-email-antoine.tenart@free-electrons.com>
+ <20140602094715.GG28090@lunn.ch> <20140602100048.GA12162@kwain>
+ <20140602100332.GH28090@lunn.ch>
+Message-ID: <20140602102750.GB13681@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 30, 2014 at 08:30:33PM +0900, Masahiro Yamada wrote:
-> "ldr sp, [r0, #28]" can be squashed into the previous ldm instruction.
-
-See commit 77754410fb8ecd7cf307bcd75d60f3b22b8c3cd2
-ARM: 6286/1: fix Thumb-2 decompressor broken by "Auto calculate ZRELADDR"
-
-Loading sp with LDMIA is not allowed in Thumb.  For simpler code
-maintenance, the code was just made Thumb-compatible anyway by splitting
-out the sp load while fixing another issue.  This isn't part of a core
-loop, so shouldn't have a significant impact on performance.
-
-git blame can be useful for finding out how an odd-looking piece of code
-came into existence.  Sometimes you have to dig through a few patches to
-find the answer.
-
-Cheers
----Dave
-
+On Mon, Jun 02, 2014 at 12:03:32PM +0200, Andrew Lunn wrote:
+> On Mon, Jun 02, 2014 at 12:00:48PM +0200, Antoine T?nart wrote:
+> > Hi Andrew,
+> > 
+> > On Mon, Jun 02, 2014 at 11:47:15AM +0200, Andrew Lunn wrote:
+> > > On Mon, Jun 02, 2014 at 11:21:02AM +0200, Antoine T?nart wrote:
+> > > > +
+> > > > +static inline void berlin_reset_cpu(unsigned int cpu)
+> > > > +{
+> > > > +	u32 val;
+> > > > +
+> > > > +	val = readl(cpu_ctrl + CPU_RESET);
+> > > > +	val |= BIT(cpu_logical_map(cpu));
+> > > > +	writel(val, cpu_ctrl + CPU_RESET);
+> > > > +}
+> > > 
+> > > Is this performing a reset on the CPU, or is it taking it out of reset?
+> > > 
+> > > If you are going to implement CPU hotplug at some point, you are going
+> > > to want to be able to put the CPU into reset, i.e. power it off, and
+> > > take it out of reset, i.e. power it on and getting it running. So it
+> > > might help if we get these function names clear now.
+> > 
+> > It is performing a reset on the CPU. berlin_perform_reset_cpu() then?
 > 
-> Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
-> ---
->  arch/arm/boot/compressed/head.S | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 066b034..8c392c5 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -194,8 +194,7 @@ not_angel:
->  		blcs	cache_on
->  
->  restart:	adr	r0, LC0
-> -		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}
-> -		ldr	sp, [r0, #28]
-> +		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12, sp}
->  
->  		/*
->  		 * We might be running at a different address.  We need
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> What happens if the CPU is powered off? Will a reset power it on?  Or
+> are you assuming the boot loader has powered it on?
+
+I actually don't have information about this. For now let's assume the
+boot loader has powered on the CPUs.
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
