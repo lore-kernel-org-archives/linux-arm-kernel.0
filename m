@@ -1,61 +1,282 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 02 Jun 2014 07:48:59 -0700
-Subject: [PATCH v1] of/irq: do irq resolution in platform_get_irq_byname()
-In-Reply-To: <5385B566.2050600@ti.com> (Grygorii Strashko's message of "Wed,
- 28 May 2014 13:07:34 +0300")
-References: <1400582523-22684-1-git-send-email-grygorii.strashko@ti.com>
- <20140523080333.66720C4176E@trevor.secretlab.ca>
- <CAGa+x85mOHtNAj-UHgK2_z8zWAF=qwFcRcUgHTR-byNiX7heHA@mail.gmail.com>
- <CAL_JsqLm3wfVS+au+JUbhBhxz=LuVpepH6GxabCQhPowhbw77g@mail.gmail.com>
- <20140528071855.GJ4227@lee--X1>
- <CACRpkdYgkEOjLamYu5uKSgs3iTNJ-w5XkbeygKjRdR-bNdETfg@mail.gmail.com>
- <CAGb2v64f8Wju6dtVuVN2x=9YVGA-=RXozzhpJZNspKZ05f=jtA@mail.gmail.com>
- <CACxGe6ts-TcSKk2F0-XSxAxeTxVCiyDHgh-O12v+F2OjHUsPyg@mail.gmail.com>
- <5385B566.2050600@ti.com>
-Message-ID: <7h7g4zz7s4.fsf@paris.lan>
+From: ulrich.hecht@gmail.com (Ulrich Hecht)
+Date: Mon,  2 Jun 2014 16:54:58 +0200
+Subject: [PATCH v2] clk: shmobile: sh73a0 common clock framework implementation
+Message-ID: <1401720898-12939-1-git-send-email-ulrich.hecht+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grygorii Strashko <grygorii.strashko@ti.com> writes:
+Driver for the SH73A0's clocks that are too specific to be supported by a
+generic driver.
 
-> Hi All,
->
-> On 05/28/2014 12:03 PM, Grant Likely wrote:
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+---
 
-[...]
+Changes since v1:
+- reshuffled to include DT bindings and Makefile changes
+- reformatted register addresses and divider masks
+- marked bindings as experimental
+- use div4_clk::parent instead of hardcoding them
 
->> The bisected patch causes platform_get_irq() to always parse the
->> devicetree to obtain the irq instead of using a precalculated value in
->> the platform_device. There are two possible scenarios for this problem
->> that I can think of:
->> 1) Platform_get_irq() is getting called multiple times (which would
->> happen on a deferred probe) but the setup code isn't handling it
->> properly, like trying to request the GPIO more than once
->> 2) the platform_device was preloaded with an irq number that differs
->> from what is determined when parsing the tree. This would happen if a
->> platform_device was created manually.
->>
->
-> Could anyone try attached patch? It has to improve situation, but it
-> might not fix all problems (see my previous e-mail).
+ .../bindings/clock/renesas,sh73a0-cpg-clocks.txt   |  31 ++++
+ drivers/clk/shmobile/Makefile                      |   1 +
+ drivers/clk/shmobile/clk-sh73a0.c                  | 199 +++++++++++++++++++++
+ 3 files changed, 231 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/renesas,sh73a0-cpg-clocks.txt
+ create mode 100644 drivers/clk/shmobile/clk-sh73a0.c
 
-I can confirm it makes the STE Snowball boot again on top of next-20150602.
-
-> From 4a41912dba648c935982274966426fa430fd5aa4 Mon Sep 17 00:00:00 2001
-> From: Grygorii Strashko <grygorii.strashko@ti.com>
-> Date: Wed, 28 May 2014 12:53:34 +0300
-> Subject: [PATCH] mfd: ab8500: fix dt irq mapping
->
-> The AD8500 defines itself as interrupt-controller in DT,
-> but it doesn't assign DT node to IRQ domain when creates it.
-> As result, of_irq_xx() helpers don't work because they can't
-> find necessary IRQ domain.
->
-> Hence, fix it by assigning AD8500 core device DT node to IRQ
-> domain when it's created.
->
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-
-Tested-by: Kevin Hilman <khilman@linaro.org>
-
-Kevin
+diff --git a/Documentation/devicetree/bindings/clock/renesas,sh73a0-cpg-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,sh73a0-cpg-clocks.txt
+new file mode 100644
+index 0000000..6b8dece
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/renesas,sh73a0-cpg-clocks.txt
+@@ -0,0 +1,31 @@
++These bindings should be considered EXPERIMENTAL for now.
++
++* Renesas SH73A0 Clock Pulse Generator (CPG)
++
++The CPG generates core clocks for the SH73A0 SoC. It includes four PLLs
++and several fixed ratio dividers.
++
++Required Properties:
++
++  - compatible: Must be "renesas,sh73a0-cpg-clocks"
++
++  - reg: Base address and length of the memory resource used by the CPG
++
++  - clocks: Reference to the parent clocks
++  - #clock-cells: Must be 1
++  - clock-output-names: The names of the clocks. Supported clocks are "main",
++    "pll0", "pll1", "pll2", "pll3", "z", "dsi0phy", "dsi1phy", and "twd"
++
++
++Example
++-------
++
++        cpg_clocks: cpg_clocks at e6150000 {
++                compatible = "renesas,sh73a0-cpg-clocks";
++                reg = <0 0xe6150000 0 0x10000>;
++                clocks = <&extal1_clk>, <&extal2_clk>;
++                #clock-cells = <1>;
++                clock-output-names = "main", "pll0", "pll1", "pll2",
++                                     "pll3", "z", "dsi0phy", "dsi1phy",
++                                     "twd";
++        };
+diff --git a/drivers/clk/shmobile/Makefile b/drivers/clk/shmobile/Makefile
+index bdf342d..6a54e73 100644
+--- a/drivers/clk/shmobile/Makefile
++++ b/drivers/clk/shmobile/Makefile
+@@ -3,6 +3,7 @@ obj-$(CONFIG_ARCH_R7S72100)		+= clk-rz.o
+ obj-$(CONFIG_ARCH_R8A7779)		+= clk-r8a7779.o
+ obj-$(CONFIG_ARCH_R8A7790)		+= clk-rcar-gen2.o
+ obj-$(CONFIG_ARCH_R8A7791)		+= clk-rcar-gen2.o
++obj-$(CONFIG_ARCH_SH73A0)		+= clk-sh73a0.o
+ obj-$(CONFIG_ARCH_SHMOBILE_MULTI)	+= clk-div6.o
+ obj-$(CONFIG_ARCH_SHMOBILE_MULTI)	+= clk-mstp.o
+ # for emply built-in.o
+diff --git a/drivers/clk/shmobile/clk-sh73a0.c b/drivers/clk/shmobile/clk-sh73a0.c
+new file mode 100644
+index 0000000..0310de2
+--- /dev/null
++++ b/drivers/clk/shmobile/clk-sh73a0.c
+@@ -0,0 +1,199 @@
++/*
++ * sh73a0 Core CPG Clocks
++ *
++ * Copyright (C) 2014  Ulrich Hecht
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/clkdev.h>
++#include <linux/clk/shmobile.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/spinlock.h>
++
++struct sh73a0_cpg {
++	struct clk_onecell_data data;
++	spinlock_t lock;
++	void __iomem *reg;
++};
++
++#define CPG_FRQCRA	0x00
++#define CPG_FRQCRB	0x04
++#define CPG_SD0CKCR	0x74
++#define CPG_SD1CKCR	0x78
++#define CPG_SD2CKCR	0x7c
++#define CPG_PLLECR	0xd0
++#define CPG_PLL0CR	0xd8
++#define CPG_PLL1CR	0x28
++#define CPG_PLL2CR	0x2c
++#define CPG_PLL3CR	0xdc
++#define CPG_CKSCR	0xc0
++#define CPG_DSI0PHYCR	0x6c
++#define CPG_DSI1PHYCR	0x70
++
++#define CLK_ENABLE_ON_INIT BIT(0)
++
++struct div4_clk {
++	const char *name;
++	const char *parent;
++	unsigned int reg;
++	unsigned int shift;
++	unsigned int mask;
++	int flags;
++};
++
++static struct div4_clk div4_clks[] = {
++	{ "zg", "pll0", CPG_FRQCRA, 16, 0x0d7f, CLK_ENABLE_ON_INIT },
++	{ "m3", "pll1", CPG_FRQCRA, 12, 0x1dff, CLK_ENABLE_ON_INIT },
++	{ "b",  "pll1", CPG_FRQCRA,  8, 0x0dff, CLK_ENABLE_ON_INIT },
++	{ "m1", "pll1", CPG_FRQCRA,  4, 0x1dff, 0 },
++	{ "m2", "pll1", CPG_FRQCRA,  0, 0x1dff, 0 },
++	{ "z",  "pll0", CPG_FRQCRB, 24, 0x097f, 0 },
++	{ "zx", "pll1", CPG_FRQCRB, 12, 0x0dff, 0 },
++	{ "hp", "pll1", CPG_FRQCRB,  4, 0x0dff, 0 },
++	{ NULL, 0, 0, 0, 0 },
++};
++
++static const struct clk_div_table div4_div_table[] = {
++	{ 0, 2 }, { 1, 3 }, { 2, 4 }, { 3, 6 }, { 4, 8 }, { 5, 12 },
++	{ 6, 16 }, { 7, 18 }, { 8, 24 }, { 10, 36 }, { 11, 48 },
++	{ 12, 7 }, { 0, 0 }
++};
++
++static struct clk * __init
++sh73a0_cpg_register_clock(struct device_node *np, struct sh73a0_cpg *cpg,
++			     const char *name)
++{
++	const struct clk_div_table *table = NULL;
++	const char *parent_name;
++	unsigned int shift, reg;
++	unsigned int mult = 1;
++	unsigned int div = 1;
++
++	if (!strcmp(name, "main")) {
++		/* extal1, extal1_div2, extal2, extal2_div2 */
++		parent_name = of_clk_get_parent_name(np,
++			(clk_readl(cpg->reg + CPG_CKSCR) >> 28) & 3);
++	} else if (!strncmp(name, "pll", 3)) {
++		void __iomem *enable_reg = cpg->reg;
++		u32 enable_bit = name[3] - '0';
++		parent_name = "main";
++		switch (enable_bit) {
++		case 0:
++			enable_reg += CPG_PLL0CR;
++			break;
++		case 1:
++			enable_reg += CPG_PLL1CR;
++			break;
++		case 2:
++			enable_reg += CPG_PLL2CR;
++			break;
++		case 3:
++			enable_reg += CPG_PLL3CR;
++			break;
++		default:
++			return ERR_PTR(-EINVAL);
++		}
++		if (clk_readl(cpg->reg + CPG_PLLECR) & BIT(enable_bit)) {
++			mult = ((clk_readl(enable_reg) >> 24) & 0x3f) + 1;
++			/* handle CFG bit for PLL1 and PLL2 */
++			if (enable_bit == 1 || enable_bit == 2)
++				if (clk_readl(enable_reg) & BIT(20))
++					mult *= 2;
++		}
++	} else if (!strcmp(name, "dsi0phy") || !strcmp(name, "dsi1phy")) {
++		u32 phy_no = name[3] - '0';
++		void __iomem *dsi_reg = cpg->reg +
++			(phy_no ? CPG_DSI1PHYCR : CPG_DSI0PHYCR);
++		parent_name = phy_no ? "dsi1pck" : "dsi0pck";
++		div = __raw_readl(dsi_reg);
++		if (!(div & 0xb8000))
++			div = 1;
++		else
++			div = (div & 0x3f) + 1;
++	} else {
++		struct div4_clk *c;
++		for (c = div4_clks; c->name; c++) {
++			if (!strcmp(name, c->name)) {
++				parent_name = c->parent;
++				table = div4_div_table;
++				reg = c->reg;
++				shift = c->shift;
++				break;
++			}
++		}
++		if (!c->name)
++			return ERR_PTR(-EINVAL);
++	}
++
++	if (!table) {
++		return clk_register_fixed_factor(NULL, name, parent_name, 0,
++						 mult, div);
++	} else {
++		return clk_register_divider_table(NULL, name, parent_name, 0,
++						  cpg->reg + reg, shift, 4, 0,
++						  table, &cpg->lock);
++	}
++}
++
++static void __init sh73a0_cpg_clocks_init(struct device_node *np)
++{
++	struct sh73a0_cpg *cpg;
++	struct clk **clks;
++	unsigned int i;
++	int num_clks;
++
++	num_clks = of_property_count_strings(np, "clock-output-names");
++	if (num_clks < 0) {
++		pr_err("%s: failed to count clocks\n", __func__);
++		return;
++	}
++
++	cpg = kzalloc(sizeof(*cpg), GFP_KERNEL);
++	clks = kzalloc(num_clks * sizeof(*clks), GFP_KERNEL);
++	if (cpg == NULL || clks == NULL) {
++		/* We're leaking memory on purpose, there's no point in cleaning
++		 * up as the system won't boot anyway.
++		 */
++		return;
++	}
++
++	spin_lock_init(&cpg->lock);
++
++	cpg->data.clks = clks;
++	cpg->data.clk_num = num_clks;
++
++	cpg->reg = of_iomap(np, 0);
++	if (WARN_ON(cpg->reg == NULL))
++		return;
++
++	/* Set SDHI clocks to a known state */
++	clk_writel(0x108, cpg->reg + CPG_SD0CKCR);
++	clk_writel(0x108, cpg->reg + CPG_SD1CKCR);
++	clk_writel(0x108, cpg->reg + CPG_SD2CKCR);
++
++	for (i = 0; i < num_clks; ++i) {
++		const char *name;
++		struct clk *clk;
++
++		of_property_read_string_index(np, "clock-output-names", i,
++					      &name);
++
++		clk = sh73a0_cpg_register_clock(np, cpg, name);
++		if (IS_ERR(clk))
++			pr_err("%s: failed to register %s %s clock (%ld)\n",
++			       __func__, np->name, name, PTR_ERR(clk));
++		else
++			cpg->data.clks[i] = clk;
++	}
++
++	of_clk_add_provider(np, of_clk_src_onecell_get, &cpg->data);
++}
++CLK_OF_DECLARE(sh73a0_cpg_clks, "renesas,sh73a0-cpg-clocks",
++	       sh73a0_cpg_clocks_init);
+-- 
+1.8.4.5
