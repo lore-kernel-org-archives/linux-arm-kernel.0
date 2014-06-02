@@ -1,82 +1,67 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 02 Jun 2014 14:35:43 +0200
-Subject: [PATCH v2 7/7] ARM: EXYNOS: cpuidle: add secure firmware support to
- AFTR mode code
-In-Reply-To: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1401712543-14281-8-git-send-email-b.zolnierkie@samsung.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 2 Jun 2014 14:38:51 +0200
+Subject: [PATCH] i2c: Make I2C ID tables non-mandatory for DT'ed and/or
+ ACPI'ed devices
+In-Reply-To: <CACRpkdZvyfA0aaJe3YuevXfA2pTZLRPZ3mQpitL6qD7=qE0Xyg@mail.gmail.com>
+References: <1401452797-29521-1-git-send-email-lee.jones@linaro.org>
+ <1401452797-29521-2-git-send-email-lee.jones@linaro.org>
+ <20140530123656.GC2742@katana> <20140530133405.GB29731@lee--X1>
+ <20140530174800.GA4917@katana> <20140530192516.GA4319@lee--X1>
+ <20140531134805.GA3287@katana>
+ <CACRpkdZvyfA0aaJe3YuevXfA2pTZLRPZ3mQpitL6qD7=qE0Xyg@mail.gmail.com>
+Message-ID: <20140602123851.GB2654@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Use do_idle firmware method instead of cpu_do_idle() on boards with
-  secure firmware enabled.
+On Mon, Jun 02, 2014 at 02:16:59PM +0200, Linus Walleij wrote:
+> On Sat, May 31, 2014 at 3:48 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> >
+> >> Right, I read the function which provides the functionality, but my
+> >> point is; I don't think my patch changes the semantics in a way which
+> >> would adversely affect this option.  If you think that it does, can you
+> >> specify how please?
+> >
+> > Currently, if a driver would be DT only and does not provide a seperate
+> > i2c_device_id table, then the driver is unusable with method 4. I don't
+> > like to have some drivers being capable of it and some not.
+> >
+> >> Does the sysfs method create a i2c_device_id table?  If not, how does
+> >> it probe successfully pre-patch?
+> >
+> > The sysfs method creates a device. Its name is matched against
+> > i2c_device_ids only since it does not have a node pointer for DT to be
+> > matched against.
+> 
+> Is this really so useful on embedded systems?
 
-* Use sysram_ns_base_addr + 0x24 address for exynos_boot_vector_addr()
-  and sysram_ns_base_addr + 0x20 one for exynos_boot_vector_flag() on
-  boards with secure firmware enabled.
+Well, this feature is at least nice with embedded:
 
-This patch fixes hang on an attempt to enter AFTR mode for TRATS2
-board (which uses EXYNOS4412 SoC with secure firmware enabled).
-
-This patch shouldn't cause any functionality changes on boards that
-don't use secure firmware.
-
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/pm.c        | 8 ++++++--
- drivers/cpuidle/cpuidle-exynos.c | 7 ++++++-
- 2 files changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 0fb9a5a..62a0a5e 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -169,7 +169,9 @@ int exynos_cluster_power_state(int cluster)
- 
- static inline void __iomem *exynos_boot_vector_addr(void)
- {
--	if (samsung_rev() == EXYNOS4210_REV_1_1)
-+	if (firmware_run())
-+		return sysram_ns_base_addr + 0x24;
-+	else if (samsung_rev() == EXYNOS4210_REV_1_1)
- 		return S5P_INFORM7;
- 	else if (samsung_rev() == EXYNOS4210_REV_1_0)
- 		return sysram_base_addr + 0x24;
-@@ -178,7 +180,9 @@ static inline void __iomem *exynos_boot_vector_addr(void)
- 
- static inline void __iomem *exynos_boot_vector_flag(void)
- {
--	if (samsung_rev() == EXYNOS4210_REV_1_1)
-+	if (firmware_run())
-+		return sysram_ns_base_addr + 0x20;
-+	else if (samsung_rev() == EXYNOS4210_REV_1_1)
- 		return S5P_INFORM6;
- 	else if (samsung_rev() == EXYNOS4210_REV_1_0)
- 		return sysram_base_addr + 0x20;
-diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
-index 7c01512..f90a4a0 100644
---- a/drivers/cpuidle/cpuidle-exynos.c
-+++ b/drivers/cpuidle/cpuidle-exynos.c
-@@ -17,13 +17,18 @@
- #include <asm/proc-fns.h>
- #include <asm/suspend.h>
- #include <asm/cpuidle.h>
-+#include <asm/firmware.h>
- 
- static void (*exynos_enter_aftr)(void);
- 
- static int idle_finisher(unsigned long flags)
- {
- 	exynos_enter_aftr();
--	cpu_do_idle();
-+	if (firmware_run())
-+		/* no need to check the return value on EXYNOS SoCs */
-+		call_firmware_op(do_idle, FW_DO_IDLE_AFTR);
-+	else
-+		cpu_do_idle();
- 
- 	return 1;
- }
--- 
-1.8.2.3
+* You are developing a driver on a test board, where you soldered the I2C
+  device yourself.
+
+---
+
+Or during HW bringup, you this or that driver for a device (out-of-tree
+vs. in-kernel), and hey, the RTC even has an EEPROM at another address,
+let's try. Such things are the use cases I have mostly seen and those
+customers liked it.
+
+The problem is that we are talking about matching against I2C slave
+drivers. I can't see a line between embedded and non-embedded when it
+comes to slaves. They are just slaves and could be on any hardware.
+Keeping the bigger picture in mind, IMO it is cumbersome if some drivers
+support user-space instantiation and some not.
+
+Though, I wouldn't mind if compatible entries could be passed to the
+'new_device' file, in addition to i2c_device_ids. Yet, this needs some
+extra handling I haven't found the time for, yet.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140602/18a595ec/attachment-0001.sig>
