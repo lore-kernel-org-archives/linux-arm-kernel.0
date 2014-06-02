@@ -1,33 +1,36 @@
-From: jwerner@chromium.org (Julius Werner)
-Date: Mon, 2 Jun 2014 10:15:36 -0700
-Subject: [PATCH 1/2] ARM: dts: Enable USB 3503 hub on exynos5250-snow
-In-Reply-To: <CAFp+6iFbDfWconRZzMhSXFG_RbXF-rnYwraJK1P1tQSb6R+Dkw@mail.gmail.com>
-References: <1399293056-17143-1-git-send-email-gautam.vivek@samsung.com>
- <536BA9E8.2030306@suse.de> <536BAD05.9070401@samsung.com>
- <CAODwPW8FpsF6vo5Z8_+YXwchwab=7Ltv0nEvP_=907HK232xCg@mail.gmail.com>
- <CAFp+6iFbDfWconRZzMhSXFG_RbXF-rnYwraJK1P1tQSb6R+Dkw@mail.gmail.com>
-Message-ID: <CAODwPW9Qkem9OGjVn+EkxvWa5SKWBn=9oG+rvLv9tZVJ=UWx4A@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 02 Jun 2014 11:15:47 -0600
+Subject: [PATCH 1/3] arm: multi_v7: enable igb, stmpe, spidev, lm95245,
+ pwm leds
+In-Reply-To: <CAOesGMg6aBpH18VO6XF1HxbXsJy92QadT3MVT2vOY41s=oCRrw@mail.gmail.com>
+References: <cc612cd3f24f01cfc8fd3e81b1027ff94862e8b4.1401700579.git.marcel@ziswiler.com>
+ <CAOesGMg6aBpH18VO6XF1HxbXsJy92QadT3MVT2vOY41s=oCRrw@mail.gmail.com>
+Message-ID: <538CB143.5020504@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Ok, there was already a patch posted by you for this[1], which had
-> quite a much discussion
-> on it.
-> Would you like to give some pointers based on that ?
-> One that Olof had suggested was to use gpio-reset driver which is yet
-> to make to mainline.
-> But i think with that too we need to take care of the timing for
-> resetting the hub before PHY
-> gets reset.
+On 06/02/2014 11:01 AM, Olof Johansson wrote:
+> On Mon, Jun 2, 2014 at 2:43 AM, Marcel Ziswiler <marcel@ziswiler.com> wrote:
+>> The NVIDIA Tegra 3 based Apalis T30 module contains an Intel i210 resp.
+>> i211 gigabit Ethernet controller, an STMPE811 ADC/touch controller,
+>> SPI bus and PWM LEDs generically accessible from user space and an
+>> LM95245 temperature sensor chip. The later four can also be found on
+>> the Colibri T30 module.
+>>
+>> While at it move the NEON entry down to its proper place to have it all
+>> nicely ordered again.
+>>
+>> Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
+>> ---
+>> BTW: How about TEGRA_EMC_SCALING_ENABLE, MACH_UX500_DT, OMAP_USB3 and
+>> MMC_SUNXI which I haven't found any mentioning anywhere, MTD_M25P80
+>> which depends on MTD_SPI_NOR or DOVE_THERMAL which depends on the
+>> legacy ARCH_DOVE (besides USE_OF of course) being not much of multi
+>> compatible?
+> 
+> Can you resend towards the end of the merge window, please? We should
+> make a pass and update anything new that has been merged for 3.16
+> around then.
 
-Oh, right, I remember now. Seems like there wasn't much consensus on
-how to solve the problem there, and I think I didn't really have time
-to work on it any more either.
-
-I think coupling in another driver to reset the device isn't a bad
-idea... this could even be usb3503 if you modified it a little, and it
-could also address Tomasz' concerns from that thread that the solution
-should be extensible to other HSIC devices that need a different reset
-sequence. But you need some mechanism to hook the two drivers together
-and make sure phy-samsung-usb2 synchronously calls the reset function
-at exactly the right point to ensure the timing works right.
+I think the content in this patch is for 3.17. The issues mentioned
+below --- would be worth fixing for 3.16.
