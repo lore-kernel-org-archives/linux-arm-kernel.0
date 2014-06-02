@@ -1,34 +1,55 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 2 Jun 2014 14:19:49 +0800
-Subject: [PATCH 1/3] ARM: i.MX: avic: Use irqchip_init() for IRQ
- initialization in DT case
-In-Reply-To: <1401683074.224894202@f141.i.mail.ru>
-References: <1401516095-31020-1-git-send-email-shc_work@mail.ru>
- <20140602022120.GL8860@dragon> <1401683074.224894202@f141.i.mail.ru>
-Message-ID: <20140602061948.GO8860@dragon>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Mon, 02 Jun 2014 11:51:10 +0530
+Subject: [PATCH v2 11/11] sched: replace capacity by activity
+In-Reply-To: <20140529135510.GG11074@laptop.programming.kicks-ass.net>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-12-git-send-email-vincent.guittot@linaro.org>
+ <20140529135510.GG11074@laptop.programming.kicks-ass.net>
+Message-ID: <538C17D6.60100@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 02, 2014 at 08:24:34AM +0400, Alexander Shiyan wrote:
-> Mon, 2 Jun 2014 10:21:21 +0800 ?? Shawn Guo <shawn.guo@freescale.com>:
-> > On Sat, May 31, 2014 at 10:01:30AM +0400, Alexander Shiyan wrote:
-> > > Use generic irqchip_init() DT call to initialize IRQs, so after this patch,
-> > > the mxc-avic driver is quite prepared to move to drivers/irqchip.
-> > 
-> > What's the whole plan of the moving?  IOW, what's left after this patch
-> > and what's the plan for those?
+On 05/29/2014 07:25 PM, Peter Zijlstra wrote:
+> On Fri, May 23, 2014 at 05:53:05PM +0200, Vincent Guittot wrote:
+>> The scheduler tries to compute how many tasks a group of CPUs can handle by
+>> assuming that a task's load is SCHED_LOAD_SCALE and a CPU capacity is
+>> SCHED_POWER_SCALE.
+>> We can now have a better idea of the utilization of a group fo CPUs thanks to
+>> group_actitvity and deduct how many capacity is still available.
+>>
+>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>> ---
 > 
-> For the full movement of these drivers into drivers/irqchip, we need to find a
-> solution for i.MX specific functions, such as mxc_set_irq_fiq() and
-> tzic_enable_wake(). I haven't found a good solution yet...
-> 
-> > > As a temporary solution to do it, we use OF_DECLARE_2()
-> > 
-> > I do not see OF_DECLARE_2() is defined anywhere?
-> 
-> <include/linux/of.h>
+> Right, so as Preeti already mentioned, this wrecks SMT. It also seems to
+> loose the aggressive spread, where we want to run 1 task on each 'core'
+> before we start 'balancing'.
 
-The <include/linux/of.h> on my tree doesn't have it yet.  So I cannot
-apply it for now anyway.
+True. I just profiled the ebizzy runs and found that ebizzy threads were
+being packed onto a single core which is SMT-8 capable before spreading.
+This was a 6 core, SMT-8 machine. So for instance if I run 8 threads of
+ebizzy. the load balancing as record by perf sched record showed that
+two cores were packed upto 3 ebizzy threads and one core ran two ebizzy
+threads while the rest of the 3 cores were idle.
 
-Shawn
+I am unable to understand which part of this patch is aiding packing to
+a core.  There is this check in this patch right?
+
+if (sgs->group_capacity < 0)
+		return true;
+
+which should ideally prevent such packing? Because irrespective of the
+number of SMT threads, the capacity of a core is unchanged. And in the
+above scenario, we have 6 tasks on 3 cores. So shouldn't the above check
+have caught it?
+
+Regards
+Preeti U Murthy
+> 
+> So I think we should be able to fix this by setting PREFER_SIBLING on
+> the SMT domain, that way we'll get single tasks running on each SMT
+> domain before filling them up until capacity.
+> 
+> Now, its been a while since I looked at PREFER_SIBLING, and I've not yet
+> looked at what your patch does to it, but it seems to me that that is
+> the first direction we should look for an answer to this.
+> 
