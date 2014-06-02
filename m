@@ -1,49 +1,47 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  2 Jun 2014 14:41:02 +0100
-Subject: [PATCH 2/3] i2c: Add pointer dereference protection to i2c_match_id()
+Date: Mon,  2 Jun 2014 14:41:03 +0100
+Subject: [PATCH 3/3] i2c: Make I2C ID tables non-mandatory for DT'ed and/or
+ ACPI'ed devices
 In-Reply-To: <1401716463-23457-1-git-send-email-lee.jones@linaro.org>
 References: <1401716463-23457-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1401716463-23457-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1401716463-23457-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we're providing dereference protection for i2c_match_id(), which
-saves us having to do it each time it's called.  We're also stripping
-out the (now) needless check in i2c_device_match().  This patch paves
-the way for other, similar code trimming.
+Currently the I2C framework insists on devices supplying an I2C ID
+table.  Many of the devices which do so unnecessarily adding quite a
+few wasted lines to kernel code.  This patch allows drivers a means
+to 'not' supply the aforementioned table and match on either DT
+and/or ACPI match tables instead.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/i2c/i2c-core.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ drivers/i2c/i2c-core.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index 2e47641..d0c7180 100644
+index d0c7180..811b78f 100644
 --- a/drivers/i2c/i2c-core.c
 +++ b/drivers/i2c/i2c-core.c
-@@ -83,6 +83,9 @@ void i2c_transfer_trace_unreg(void)
- static const struct i2c_device_id *i2c_match_id(const struct i2c_device_id *id,
- 						const struct i2c_client *client)
- {
-+	if (!id)
-+		return NULL;
-+
- 	while (id->name[0]) {
- 		if (strcmp(client->name, id->name) == 0)
- 			return id;
-@@ -108,9 +111,10 @@ static int i2c_device_match(struct device *dev, struct device_driver *drv)
- 		return 1;
+@@ -271,7 +271,18 @@ static int i2c_device_probe(struct device *dev)
+ 		return 0;
  
- 	driver = to_i2c_driver(drv);
--	/* match on an id table if there is one */
--	if (driver->id_table)
--		return i2c_match_id(driver->id_table, client) != NULL;
+ 	driver = to_i2c_driver(dev->driver);
+-	if (!driver->probe || !driver->id_table)
++	if (!driver->probe)
++		return -EINVAL;
 +
-+	/* Finally an I2C match */
-+	if (i2c_match_id(driver->id_table, client))
-+		return 1;
++	/*
++	 * An I2C ID table is not madatory, if and only if, a suitable Device
++	 * Tree and/or ACPI match table entry is supplied for the probing
++	 * device.
++	 *
++	 * TODO: Provide 'device type' to 'ACPI node' call and match here.
++	 */
++	if (!driver->id_table &&
++	    !of_match_device(dev->driver->of_match_table, dev))
+ 		return -ENODEV;
  
- 	return 0;
- }
+ 	if (!device_can_wakeup(&client->dev))
 -- 
 1.8.3.2
