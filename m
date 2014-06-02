@@ -1,83 +1,42 @@
-From: Nikolay.Borisov@arm.com (Nikolay Borisov)
-Date: Mon, 2 Jun 2014 09:34:58 +0100
-Subject: [PATCH v2 0/7] Fix backtrace support in THUMB2 mode
-In-Reply-To: <5507361.VIWsBiqp2f@wuerfel>
-References: <1401469191-29232-1-git-send-email-nikolay.borisov@arm.com>
- <5507361.VIWsBiqp2f@wuerfel>
-Message-ID: <1C23526A7C42DB45BBF55B662C7C530E2B7805A780@BUNGLE.Emea.Arm.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Mon, 2 Jun 2014 11:36:07 +0300
+Subject: [PATCH] driver core/platform: remove unused implicit padding in
+ platform_object
+In-Reply-To: <1401609616.17059.2.camel@localhost.localdomain>
+References: <1401480167-15091-1-git-send-email-ydroneaud@opteya.com>
+ <20140530201054.GF17724@mwanda>
+ <1401523299.15490.6.camel@localhost.localdomain>
+ <20140531120526.GL15585@mwanda>
+ <1401609616.17059.2.camel@localhost.localdomain>
+Message-ID: <20140602083607.GS15585@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding Dave Martin as CC]
+On Sun, Jun 01, 2014 at 10:00:16AM +0200, Yann Droneaud wrote:
+> Hi Dan,
+> 
+> Le samedi 31 mai 2014 ? 15:05 +0300, Dan Carpenter a ?crit :
+> > On Sat, May 31, 2014 at 10:01:39AM +0200, Yann Droneaud wrote:
+> > > Le vendredi 30 mai 2014 ? 23:10 +0300, Dan Carpenter a ?crit :
+> > > > This changelog doesn't match the patch.
+> > > > 
+> > > 
+> > > Hum, let me guess .... I've failed to set the proper subject prefix
+> > > to add v6 suffic to PATCH: 
+> > > I've changed the patch title since v5 (from Emil Goode)... so it's like
+> > > a new one.
+> > > 
+> > > Is it really necessary to resend the patch ?
+> > 
+> > Oh.  Sorry, I didn't understand what you were trying to say...  You're
+> > right.
+> > 
+> 
+> Sorry about that.
+> 
+> If it's unclear, I should modify the commit message.
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 31 May 2014 19:32
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Nikolay Borisov; rric at kernel.org; Will Deacon; u.kleine-
-> koenig at pengutronix.de
-> Subject: Re: [PATCH v2 0/7] Fix backtrace support in THUMB2 mode
->
-> On Friday 30 May 2014 17:59:44 Nikolay Borisov wrote:
-> > From: Nikolay Borisov <Nikolay.Borisov@arm.com>
-> >
-> > Currently all the code which deals with backtrace support assumes
-> that R11
-> > is the frame-pointer. While this is the case for ARM mode and is
-> explicitly
-> > documented in the AAPCS, this is not the case for THUMB2 mode.
-> >
-> > There is no official document requiring that R11 has to be the frame
-> pointer
-> > and GCC uses R7 as FP and given that R7's usage is so intertwined
-> within GCC's
-> > mechanics it is unlikely to change, so fixing backtrace in THUMB2
-> mode seems
-> > in order.
-> >
-> > This patch series rectifies the problem by first fixing the
-> > thread_save_fp macro to reference the correct register. Furthermore,
-> there
-> > a lot of repetetive sequences of code such as :
-> >
-> > stackframe.fp = pt_regs->ARM_fp
-> > stackframe.lr = pt_regs->ARM_lr
-> >
-> > so introducing a function arm_get_current_stack_frame which both
-> > hides this repetition and also utilizes teh frame_pointer(regs) macro
-> > to reference the correct register depending on the mode.
-> >
-> > Finally, change all the call sites so that they utilize the new
-> routine.
->
-> Sorry for the stupid question, but does your series relate to the
-> #warning "TODO: return_address should use unwind tables" that we see
-> all the time in arch/arm/kernel/return_address.c?
->
+It's clear.  Sorry that was my bad.
 
-My changes have nothing to do with the use of unwind table whatsoever,
-I guess this warning is a result of a completely different issue. Probably
-Dave Martin could shed more light on this.
-
-> If I remember the story correctly, the problem is that so far we could
-> never use the frame pointer in thumb2 mode, and nobody has implemented
-> a version of that function using the arm unwinder.
->
-> Are we now able to use the frame pointer after all?
-
-What my changes implement, boils down to referring the correct register
-Which acts as a frame pointer depending on whether we are running a THUMB2
-Kernel or not.
-
->
->       Arnd
->
-
-Regards,
-Nikolay
-
-
--- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
-
-ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
-ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
+regards,
+dan carpenter
