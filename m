@@ -1,36 +1,51 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 02 Jun 2014 11:15:47 -0600
-Subject: [PATCH 1/3] arm: multi_v7: enable igb, stmpe, spidev, lm95245,
- pwm leds
-In-Reply-To: <CAOesGMg6aBpH18VO6XF1HxbXsJy92QadT3MVT2vOY41s=oCRrw@mail.gmail.com>
-References: <cc612cd3f24f01cfc8fd3e81b1027ff94862e8b4.1401700579.git.marcel@ziswiler.com>
- <CAOesGMg6aBpH18VO6XF1HxbXsJy92QadT3MVT2vOY41s=oCRrw@mail.gmail.com>
-Message-ID: <538CB143.5020504@wwwdotorg.org>
+From: philippe.retornaz@gmail.com (=?ISO-8859-1?Q?Philippe_R=E9tornaz?=)
+Date: Mon, 02 Jun 2014 19:18:16 +0200
+Subject: [PATCH 1/5] ARM: imx: Use PTR_ERR_OR_ZERO in platform-mxc_rnga.c
+In-Reply-To: <20140529080321.GF8860@dragon>
+References: <1401339434-26085-1-git-send-email-sachin.kamat@linaro.org>
+ <20140529080321.GF8860@dragon>
+Message-ID: <538CB1D8.5080809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2014 11:01 AM, Olof Johansson wrote:
-> On Mon, Jun 2, 2014 at 2:43 AM, Marcel Ziswiler <marcel@ziswiler.com> wrote:
->> The NVIDIA Tegra 3 based Apalis T30 module contains an Intel i210 resp.
->> i211 gigabit Ethernet controller, an STMPE811 ADC/touch controller,
->> SPI bus and PWM LEDs generically accessible from user space and an
->> LM95245 temperature sensor chip. The later four can also be found on
->> the Colibri T30 module.
+Le 29/05/2014 10:03, Shawn Guo a ?crit :
+> On Thu, May 29, 2014 at 10:27:10AM +0530, Sachin Kamat wrote:
+>> PTR_ERR_OR_ZERO simplifies the code.
 >>
->> While at it move the NEON entry down to its proper place to have it all
->> nicely ordered again.
+>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org> ---
+>> arch/arm/mach-imx/devices/platform-mxc_rnga.c |    6 ++---- 1 file
+>> changed, 2 insertions(+), 4 deletions(-)
 >>
->> Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
->> ---
->> BTW: How about TEGRA_EMC_SCALING_ENABLE, MACH_UX500_DT, OMAP_USB3 and
->> MMC_SUNXI which I haven't found any mentioning anywhere, MTD_M25P80
->> which depends on MTD_SPI_NOR or DOVE_THERMAL which depends on the
->> legacy ARCH_DOVE (besides USE_OF of course) being not much of multi
->> compatible?
-> 
-> Can you resend towards the end of the merge window, please? We should
-> make a pass and update anything new that has been merged for 3.16
-> around then.
+>> diff --git a/arch/arm/mach-imx/devices/platform-mxc_rnga.c
+>> b/arch/arm/mach-imx/devices/platform-mxc_rnga.c index
+>> [...]
+>
+> The existing code looks just fine and actually more readable to me.
+> Also, all the files you are patching will eventually be killed by DT
+> support.  So let's just leave it there as it is for now.
 
-I think the content in this patch is for 3.17. The issues mentioned
-below --- would be worth fixing for 3.16.
+heh ... well ... not so fast please !
+There is a non-negligible amount of work to have a fully functional
+imx31 on DT.
+
+Not working:
+- USB  (chipidea driver sort of works, but the PHY is a complete mess).
+- Camera
+- SPI hardware chip select support
+- pinmux support is totally absent
+
+Currently, on imx31 we can boot on DT with (and only if the bootloader
+does the pinmux for you):
+- SDMA
+- Watchdog
+- SDHC
+- Timer
+- Uart
+
+And I did not even had a look at the i2c, EMI, LCD and sound support.
+
+So I hope imx31 platform boards can stay until the situation gets better.
+
+Thanks,
+
+Philippe
