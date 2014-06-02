@@ -1,94 +1,96 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 2 Jun 2014 09:01:33 +0900
-Subject: [RESEND PATCH] kexec : add sparse memory related values to vmcore
-In-Reply-To: <53883DE9.6090705@huawei.com>
-References: <1401284996-44873-1-git-send-email-sdu.liu@huawei.com>
- <20140529001328.GD22705@verge.net.au> <53883DE9.6090705@huawei.com>
-Message-ID: <20140602000132.GB20022@verge.net.au>
+From: chanho61.park@samsung.com (Chanho Park)
+Date: Mon, 02 Jun 2014 09:20:45 +0900
+Subject: [PATCHv3] ARM: dts: exynos4: clean up arm-pmu node
+Message-ID: <1401668445-9810-1-git-send-email-chanho61.park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 30, 2014 at 04:14:33PM +0800, Liu hua wrote:
-> On 2014/5/29 8:13, Simon Horman wrote:
-> > On Wed, May 28, 2014 at 09:49:56PM +0800, Liu Hua wrote:
-> >> This patch deales with sparse memory model.
-> >>
-> >> For ARM32 platforms, different vendors may define different
-> >> SECTION_SIZE_BITS, which we did not write to vmcore.
-> >>
-> >> For example:
-> >>
-> >>   1 arch/arm/mach-clps711x/include/mach/memory.h
-> >>     #define SECTION_SIZE_BITS 24
-> >>   2 arch/arm/mach-exynos/include/mach/memory.h
-> >>     #define SECTION_SIZE_BITS 28
-> >>   3 arch/arm/mach-sa1100/include/mach/memory.h
-> >>     #define SECTION_SIZE_BITS 27
-> > 
-> > I wonder if this problem will eventually go away, or at least only
-> > apply to older platforms, as ARM moves towards multiplatform: a single
-> > kernel for more than one platform.
-> 
-> For ARM32 platform, it may cost a long time. And when glancing over
-> the commit log of kernel, we can find this macro changed several times.
-> The user space tools must take care of all these changed for compatibility.
+This patch cleans a arm-pmu node up for exynos4. Only exynos4412 series
+boards have four pmu interrupts. Rest of exynos4 boards, except 4412, have only
+two pmu interrupts. Thus, we can define two interrupts in the
+exynos4.dtsi and extends the interrupts only exynos4412.dtsi.
 
-Sure, that reasoning is fine by me.
+Cc: Chanwoo Choi <cw00.choi@samsung.com>
+Cc: Tomasz Figa <t.figa@samsung.com>
+Tested-by: Tushar Behera <tushar.behera@linaro.org>
+Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+---
+Changes from v2:
+ - Rebase the patch on top of the kukjin's v3.16-next/dt-samsung-3
+Changes from v1:
+ - Remove duplicated properties in exynos4412.dtsi(Comment from Tomasz Figa)
 
-> >> It is really a bad news for user space tools such as
-> >> makedumpfile and crash, who have to defines them as
-> >> macros. So for the same architecture, we may need to
-> >> recomile them to parse vmcores with different
-> >> SECTION_SIZE_BITS.
-> >>
-> >> And if we enable LPAE, MAX_PHYSMEM_SIZE can alse
-> >> be variable.
-> >>
-> >> This patch adds these SECTION_SIZE_BITS and MAX_PHYSMEM_SIZE
-> >> to vmcore. which makes user space tools more compatible.
-> >>
-> >> BTW, makedumpfile has queued the related patch.
-> >>
-> >> Signed-off-by: Liu Hua <sdu.liu@huawei.com>
-> >> ---
-> >>  kernel/kexec.c | 2 ++
-> >>  1 file changed, 2 insertions(+)
-> >>
-> >> diff --git a/kernel/kexec.c b/kernel/kexec.c
-> >> index bf0b929e..8b1a193 100644
-> >> --- a/kernel/kexec.c
-> >> +++ b/kernel/kexec.c
-> >> @@ -1577,6 +1577,8 @@ static int __init crash_save_vmcoreinfo_init(void)
-> >>  	VMCOREINFO_LENGTH(mem_section, NR_SECTION_ROOTS);
-> >>  	VMCOREINFO_STRUCT_SIZE(mem_section);
-> >>  	VMCOREINFO_OFFSET(mem_section, section_mem_map);
-> >> +	VMCOREINFO_NUMBER(MAX_PHYSMEM_BITS);
-> >> +	VMCOREINFO_NUMBER(SECTION_SIZE_BITS);
-> >>  #endif
-> >>  	VMCOREINFO_STRUCT_SIZE(page);
-> >>  	VMCOREINFO_STRUCT_SIZE(pglist_data);
-> >> -- 
-> >> 1.9.0
-> >>
-> >>
-> >> _______________________________________________
-> >> kexec mailing list
-> >> kexec at lists.infradead.org
-> >> http://lists.infradead.org/mailman/listinfo/kexec
-> >>
-> > 
-> > _______________________________________________
-> > kexec mailing list
-> > kexec at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/kexec
-> > 
-> > .
-> > 
-> 
-> 
-> 
-> _______________________________________________
-> kexec mailing list
-> kexec at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/kexec
-> 
+ arch/arm/boot/dts/exynos4.dtsi    | 6 ++++++
+ arch/arm/boot/dts/exynos4210.dtsi | 6 ------
+ arch/arm/boot/dts/exynos4412.dtsi | 4 ++++
+ arch/arm/boot/dts/exynos4x12.dtsi | 6 ------
+ 4 files changed, 10 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index b8ece4b..5cb21a7 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -123,6 +123,12 @@
+ 		reg = <0x10440000 0x1000>;
+ 	};
+ 
++	pmu {
++		compatible = "arm,cortex-a9-pmu";
++		interrupt-parent = <&combiner>;
++		interrupts = <2 2>, <3 2>;
++	};
++
+ 	sys_reg: syscon at 10010000 {
+ 		compatible = "samsung,exynos4-sysreg", "syscon";
+ 		reg = <0x10010000 0x400>;
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index ee3001f..a4f28e8 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -93,12 +93,6 @@
+ 		#clock-cells = <1>;
+ 	};
+ 
+-	pmu {
+-		compatible = "arm,cortex-a9-pmu";
+-		interrupt-parent = <&combiner>;
+-		interrupts = <2 2>, <3 2>;
+-	};
+-
+ 	pinctrl_0: pinctrl at 11400000 {
+ 		compatible = "samsung,exynos4210-pinctrl";
+ 		reg = <0x11400000 0x1000>;
+diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+index c42a3e1..d8bc059e 100644
+--- a/arch/arm/boot/dts/exynos4412.dtsi
++++ b/arch/arm/boot/dts/exynos4412.dtsi
+@@ -26,6 +26,10 @@
+ 		samsung,combiner-nr = <20>;
+ 	};
+ 
++	pmu {
++		interrupts = <2 2>, <3 2>, <18 2>, <19 2>;
++	};
++
+ 	gic: interrupt-controller at 10490000 {
+ 		cpu-offset = <0x4000>;
+ 	};
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index c5a943d..95cdfb9 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -31,12 +31,6 @@
+ 		mshc0 = &mshc_0;
+ 	};
+ 
+-	pmu {
+-		compatible = "arm,cortex-a9-pmu";
+-		interrupt-parent = <&combiner>;
+-		interrupts = <2 2>, <3 2>, <18 2>, <19 2>;
+-	};
+-
+ 	sysram at 02020000 {
+ 		compatible = "mmio-sram";
+ 		reg = <0x02020000 0x40000>;
+-- 
+1.8.3.2
