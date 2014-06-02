@@ -1,63 +1,57 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 2 Jun 2014 14:57:22 +0100
-Subject: [PATCH 1/3] i2c: Provide 'device type' to 'OF device node' look-up
-In-Reply-To: <1401716463-23457-2-git-send-email-lee.jones@linaro.org>
-References: <1401716463-23457-1-git-send-email-lee.jones@linaro.org>
- <1401716463-23457-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140602135722.GC4146@lee--X1>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 02 Jun 2014 14:58:34 +0100
+Subject: [PATCH v2 0/7] ARM: shmobile: koelsch reference: Enable DMA for
+ QSPI
+In-Reply-To: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
+References: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <538C830A.9090400@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> We have a problem.  There are lots of I2C device ID tables scattered
-> around the kernel which are redundant in all Device Tree and/or ACPI
-> only supported device drivers.  After recent discussions it has become
-> apparent that the only thing blocking the complete removal of these
-> tables is the continued support of 'register an I2C device via sysfs'
-> functionality.  As the sysfs method doesn't know anything about Device
-> Tree or ACPI, we can not pass any nodes in.  This patch searches all
-> known Device Tree nodes and attempts to acquire a match from the
-> device name provided via sysfs.  It can not fail, but if found assigns
-> the matching of_node to i2c_board_info prior to registering.
+On 02/06/14 14:42, Geert Uytterhoeven wrote:
+> This patch series enables DMA support for QSPI on r8a7791/koelsch
+> reference.  It's independent from the series "ARM: shmobile: koelsch
+> legacy: Enable DMA for QSPI", but it depends on the SHDMA work for r8a7790
+> by Ben Dooks (cfr. "[PATCH v2 0/9] Updates Renesas OF-DMA code").
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/i2c/i2c-core.c | 31 +++++++++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
+> Changes Compared to previous submission ("[PATCH/RFC 0/7] ARM: shmobile:
+> r8a7791: Add preliminary DMA support"):
+>   - "[6/7] ARM: shmobile: r8a7791 dtsi: Enable DMA for MSIOF" was dropped,
+>   - 2/7 was added,
+>   - 7/7 was changed (see changelog in individual patch).
+> 
+> This was tested on r8a7791/koelsch.
+> 
+> Performance figures for reading from a QSPI FLASH driven at 24.375 MHz are:
+>   - Single:  1.1 Mbps PIO, 23 Mbps DMA
+>   - Dual  : 12.7 Mbps PIO, 48 Mbps DMA
+>   - Quad  : 13   Mbps PIO, 70 Mbps DMA
+> 
+> Thanks for your comments!
+> 
+>   [1/7] DMA: shdma: Add r8a7791 support
+>   [2/7] DMA: shdma: Spelling s/controll/control/
+>   [3/7] ARM: shmobile: r8a7791 dtsi: add SYS-DMAC clocks
+>   [4/7] ARM: shmobile: r8a7791: Add SYS-DMAC channel definitions for bindings
+>   [5/7] ARM: shmobile: r8a7791 dtsi: Add SYS-DMAC0 and SYS-DMAC1 nodes
+>   [6/7] ARM: shmobile: koelsch dts: Enable sysdma0 and sysdma1
+>   [7/7] ARM: shmobile: r8a7791 dtsi: Enable DMA for QSPI
+> 
+>  Documentation/devicetree/bindings/dma/shdma.txt |   7 +-
+>  arch/arm/boot/dts/r8a7791-koelsch.dts           |   8 ++
+>  arch/arm/boot/dts/r8a7791.dtsi                  |  79 ++++++++++++++++-
+>  drivers/dma/sh/shdmac.c                         |   1 +
+>  include/dt-bindings/dma/r8a7791-dma.h           | 111 ++++++++++++++++++++++++
+>  5 files changed, 201 insertions(+), 5 deletions(-)
+>  create mode 100644 include/dt-bindings/dma/r8a7791-dma.h
+> 
+> Gr{oetje,eeting}s,
 
-[...]
+Hi, thanks for testing against the current DMA series, I will try
+and get a new series out for you in the next few days with the
+changes to use 1 parameter phandles instead of 2 parameter ones.
 
-> +static struct device_node *of_i2c_type_to_node(char *type)
-> +{
-> +	struct device_node *np;
-> +	const char *compatible, *name;
-> +	int len;
-> +
-> +	if (!type)
-> +		return NULL;
-> +
-> +	for_each_of_allnodes(np) {
-> +		compatible = of_get_property(np, "compatible", &len);
-> +		if (!compatible)
-> +			continue;
-> +
-> +		name = strchr(compatible, ',');
-> +		if (!name)
-> +			name = compatible;
-> +		else
-> +			name++;
-> +
-> +		if (!strncmp(name, type, len - (name - compatible)))
-> +			return np;
-> +	}
-> +
-> +	return NULL;
-> +}
-
-Ah, this _might_ not work if there are more than one devices of the
-same type.  I guess I need to check the 'reg' property too.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
