@@ -1,88 +1,62 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 2 Jun 2014 14:03:27 +0200
-Subject: [GIT PULL] MMC for v.3.16
-Message-ID: <CAPDyKFpkKNx17ha=WWAp4-6w3k4pRYSHUhOWHv1G+1_wAEBceA@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 02 Jun 2014 14:08:29 +0200
+Subject: [PATCH 6/7] ARM: EXYNOS: PM: fix register setup on EXYNOS4x12 for
+ AFTR mode code
+In-Reply-To: <5375D44F.7000505@linaro.org>
+References: <1399287439-31376-1-git-send-email-b.zolnierkie@samsung.com>
+ <1399287439-31376-7-git-send-email-b.zolnierkie@samsung.com>
+ <5375D44F.7000505@linaro.org>
+Message-ID: <2762097.QhkViWyNLQ@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
 
-This is the first PR I send to you as I am co-maintaining the MMC
-subsystem with Chris Ball. You will receive a separate PR for MMC from
-him as well, as usual.
+Hi,
 
-These patches are mainly updates for the mmci driver and have been
-tested in linux-next.
+On Friday, May 16, 2014 11:03:11 AM Daniel Lezcano wrote:
+> On 05/05/2014 12:57 PM, Bartlomiej Zolnierkiewicz wrote:
+> > Add S5P_CENTRAL_SEQ_OPTION register setup for EXYNOS4x12 to AFTR
+> > mode code.  Without this setup AFTR mode doesn't show any benefit
+> > over WFI one.  When this setup is applied AFTR mode reduces power
+> > consumption by ~12% (as measured on Trats2 board).
+> >
+> > This change is a preparation for adding secure firmware support to
+> > EXYNOS cpuidle driver.
+> >
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > ---
+> >   arch/arm/mach-exynos/pm.c | 4 ++++
+> >   1 file changed, 4 insertions(+)
+> >
+> > diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> > index 18f6bf8..3922968 100644
+> > --- a/arch/arm/mach-exynos/pm.c
+> > +++ b/arch/arm/mach-exynos/pm.c
+> > @@ -391,6 +391,10 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+> >   	case CPU_PM_ENTER:
+> >   		if (cpu == 0) {
+> >   			exynos_pm_central_suspend();
+> > +			if (soc_is_exynos4212() || soc_is_exynos4412())
+> > +				__raw_writel(S5P_USE_STANDBY_WFI0 |
+> > +					     S5P_USE_STANDBY_WFE0,
+> > +					     S5P_CENTRAL_SEQ_OPTION);
+> 
+> Why not put this code in the exynos_enter_aftr() ?
 
-Some ARM SoC related patches are also included and those have been
-acked from the corresponding maintainers to go through my mmc tree.
+I would prefer to keep this code close to exynos_pm_central_suspend()
+because exynos_pm_suspend() (which calls exynos_pm_central_suspend()
+too) also contains S5P_USE_STANDBY_WF[I,E]0 setting code (done for all
+SoCs).  If possible I would like to make this code common for AFTR &
+suspend in the future (once it is tested on Exynos4210 and Exynos5250)
+by moving S5P_USE_STANDBY_WF[I,E]0 setting to exynos_pm_central_suspend()
+and doing it for all SoCs.  Are you okay with this?
 
-Some more details in the signed tag.
+> >   			exynos_cpu_save_register();
+> >   		}
+> >   		break;
 
-Kind regards
-Ulf Hansson
-
-
-The following changes since commit 89ca3b881987f5a4be4c5dbaa7f0df12bbdde2fd:
-
-  Linux 3.15-rc4 (2014-05-04 18:14:42 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/ulf.hansson/mmc.git tags/mmc-v3.16-1
-
-for you to fetch changes up to 8c3a05b489ef097f86bf87c64192456553f57781:
-
-  mmc: mmci: Enforce DMA configuration through DT (2014-06-02 11:20:25 +0200)
-
-----------------------------------------------------------------
-Updates for mmci driver:
- - Put the device into low power state at system suspend.
- - Convert to the common mmc DT parser.
- - Add missing DT bindings needed for ux500.
-
-Updates for ARM ux500|u300:
- - Convert to the common mmc DT bindings.
- - Remove redundant board file for mmci platform data.
-
-----------------------------------------------------------------
-Ulf Hansson (22):
-      mmc: mmci: Mask IRQs for all variants during runtime suspend
-      mmc: mmci: Let runtime PM callbacks be available for CONFIG_PM
-      mmc: mmci: Put the device into low power state at system suspend
-      mmc: mmci: Convert to the mmc gpio API
-      mmc: mmci: Convert to devm functions
-      mmc: mmci: Update DT documentation
-      mmc: mmci: Add DT bindings for signal direction
-      mmc: mmci: Add DT bindings for feedback clock pin
-      mmc: mmci: Use the common mmc DT parser
-      ARM: ux500: Add mmci signal directions and feeback clock in DT for href
-      ARM: ux500: Convert to the common mmc DT bindings for highspeed mode
-      ARM: nomadik: Convert to the common mmc DT bindings for highspeed mode
-      ARM: u300: Convert to the common mmc DT bindings for highspeed mode
-      mmc: mmci: Mark the DT bindings for highspeed mode as deprecated
-      mmc: mmci: Enable MMC_CAP_CMD23
-      ARM: ux500: Add the mmc capabilities flags to DT
-      ARM: ux500: Add a vmmc regulator through DT for the poped eMMC for href
-      ARM: ux500: Remove redundant board file for mmci platform data
-      mmc: mmci: Enforce DT for signal direction and feedback clock
-      mmc: mmci: Enforce mmc capabilities through DT
-      mmc: mmci: Enforce max frequency configuration through DT
-      mmc: mmci: Enforce DMA configuration through DT
-
- Documentation/devicetree/bindings/mmc/mmci.txt |   54 +++-
- arch/arm/boot/dts/ste-ccu9540.dts              |    6 +-
- arch/arm/boot/dts/ste-href.dtsi                |   19 +-
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi     |    4 +-
- arch/arm/boot/dts/ste-snowball.dts             |    4 +-
- arch/arm/boot/dts/ste-u300.dts                 |    4 +-
- arch/arm/mach-lpc32xx/phy3250.c                |    3 -
- arch/arm/mach-ux500/Makefile                   |    3 +-
- arch/arm/mach-ux500/board-mop500-sdi.c         |  166 ------------
- arch/arm/mach-ux500/board-mop500.h             |    5 -
- arch/arm/mach-ux500/cpu-db8500.c               |    4 -
- drivers/mmc/host/mmci.c                        |  324 ++++++------------------
- drivers/mmc/host/mmci.h                        |   14 +-
- include/linux/amba/mmci.h                      |   42 ---
- 14 files changed, 169 insertions(+), 483 deletions(-)
- delete mode 100644 arch/arm/mach-ux500/board-mop500-sdi.c
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
