@@ -1,58 +1,38 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 2 Jun 2014 11:42:22 +0100
-Subject: [PATCH 2/2] clk: clps711x: Add DT bindings documentation
-In-Reply-To: <1401701568.132789498@f354.i.mail.ru>
-References: <1401616522-13505-1-git-send-email-shc_work@mail.ru>
- <20140602085651.GA12397@leverpostej>
- <1401701568.132789498@f354.i.mail.ru>
-Message-ID: <20140602104222.GA13573@leverpostej>
+Date: Mon, 2 Jun 2014 11:44:05 +0100
+Subject: [PATCH 2/5] Documentation: bindings: document the Marvell Berlin
+ enable-method
+In-Reply-To: <1401700866-24804-3-git-send-email-antoine.tenart@free-electrons.com>
+References: <1401700866-24804-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1401700866-24804-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20140602104405.GB13573@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 02, 2014 at 10:32:48AM +0100, Alexander Shiyan wrote:
-> Mon, 2 Jun 2014 09:56:51 +0100 ?? Mark Rutland <mark.rutland@arm.com>:
-> > On Sun, Jun 01, 2014 at 10:55:22AM +0100, Alexander Shiyan wrote:
-> > > This patch adds DT binding documentation for the Cirrus Logic
-> > > CLPS711X-based CPUs clock subsystem.
-> > > 
-> > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > > ---
-> > >  .../devicetree/bindings/clock/clps711x-clock.txt      | 19 +++++++++++++++++++
-> > >  1 file changed, 19 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/clock/clps711x-clock.txt
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/clock/clps711x-clock.txt b/Documentation/devicetree/bindings/clock/clps711x-clock.txt
-> > > new file mode 100644
-> > > index 0000000..0fdf3c9
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/clock/clps711x-clock.txt
-> > > @@ -0,0 +1,19 @@
-> > > +* Clock bindings for the Cirrus Logic CLPS711X CPUs
-> > > +
-> > > +Required properties:
-> > > +- compatible  : Shall contain "cirrus,clps711x-clk".
-> > > +- reg         : Address of the internal register set.
-> > > +- cpufreq     : Factory set default frequency in HZ.
-> > 
-> > Huh? Why is this called "cpufreq" what is this the frequency of,
-> > exactly?
-> > 
-> > Is this an input or an output?
+On Mon, Jun 02, 2014 at 10:21:03AM +0100, Antoine T?nart wrote:
+> The SMP support for Marvell Berlin SoCs introduce a new enable-method.
+> Document it.
 > 
-> Modern CLPS711X CPUs support PLL reprogramming, while for older processors,
-> this procedure is not possible and the CPU clock is set to a fixed value. Thus if the
-> value of the PLL multiplier is not correct (missing), we use a fixed CPU frequency
-> of the processor, described in DT, which allows us to use the driver for the new and
-> old versions of this CPU.
+> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/arm/cpus.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> index 333f4aea3029..50ec9ae6de28 100644
+> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> @@ -185,6 +185,7 @@ nodes to be present and contain the properties described below.
+>  			    "qcom,gcc-msm8660"
+>  			    "qcom,kpss-acc-v1"
+>  			    "qcom,kpss-acc-v2"
+> +			    "marvell,berlin-smp"
 
-Ok. So this is the frequency of a (non-programmable) PLL which feeds the
-clock IP block?
+And what does this mean?
 
-Or is this internal to the IP block?
-
-Typically we'd use "clock-frequency" as the name for such an input, or
-just model it as a normal clock input and feed it a fixed-rate-clock for
-the non-programmable case.
+The existing bindings are ambiguous enough. It would be nice to have a
+proper document describing the method, as Alex Elder is trying to sort
+out for the existing bindings.
 
 Cheers,
 Mark.
