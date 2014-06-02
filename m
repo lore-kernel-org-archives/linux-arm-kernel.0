@@ -1,101 +1,109 @@
-From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Mon,  2 Jun 2014 11:43:50 +0200
-Subject: [PATCH 1/3] arm: multi_v7: enable igb, stmpe, spidev, lm95245,
- pwm leds
-Message-ID: <cc612cd3f24f01cfc8fd3e81b1027ff94862e8b4.1401700579.git.marcel@ziswiler.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 2 Jun 2014 11:47:15 +0200
+Subject: [PATCH 1/5] ARM: berlin: add SMP support
+In-Reply-To: <1401700866-24804-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1401700866-24804-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1401700866-24804-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20140602094715.GG28090@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NVIDIA Tegra 3 based Apalis T30 module contains an Intel i210 resp.
-i211 gigabit Ethernet controller, an STMPE811 ADC/touch controller,
-SPI bus and PWM LEDs generically accessible from user space and an
-LM95245 temperature sensor chip. The later four can also be found on
-the Colibri T30 module.
+On Mon, Jun 02, 2014 at 11:21:02AM +0200, Antoine T?nart wrote:
+> +
+> +static inline void berlin_reset_cpu(unsigned int cpu)
+> +{
+> +	u32 val;
+> +
+> +	val = readl(cpu_ctrl + CPU_RESET);
+> +	val |= BIT(cpu_logical_map(cpu));
+> +	writel(val, cpu_ctrl + CPU_RESET);
+> +}
 
-While at it move the NEON entry down to its proper place to have it all
-nicely ordered again.
+Hi Antoine
 
-Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
----
-BTW: How about TEGRA_EMC_SCALING_ENABLE, MACH_UX500_DT, OMAP_USB3 and
-MMC_SUNXI which I haven't found any mentioning anywhere, MTD_M25P80
-which depends on MTD_SPI_NOR or DOVE_THERMAL which depends on the
-legacy ARCH_DOVE (besides USE_OF of course) being not much of multi
-compatible?
+Is this performing a reset on the CPU, or is it taking it out of reset?
 
- arch/arm/configs/multi_v7_defconfig |   11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+If you are going to implement CPU hotplug at some point, you are going
+to want to be able to put the CPU into reset, i.e. power it off, and
+take it out of reset, i.e. power it on and getting it running. So it
+might help if we get these function names clear now.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 7f4645c..7cfc176 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -65,7 +65,6 @@ CONFIG_ARCH_VEXPRESS=y
- CONFIG_ARCH_VEXPRESS_CA9X4=y
- CONFIG_ARCH_WM8850=y
- CONFIG_ARCH_ZYNQ=y
--CONFIG_NEON=y
- CONFIG_TRUSTED_FOUNDATIONS=y
- CONFIG_PCI=y
- CONFIG_PCI_MSI=y
-@@ -81,6 +80,7 @@ CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_STAT_DETAILS=y
- CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
- CONFIG_CPU_IDLE=y
-+CONFIG_NEON=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -132,6 +132,7 @@ CONFIG_NETDEVICES=y
- CONFIG_SUN4I_EMAC=y
- CONFIG_MACB=y
- CONFIG_NET_CALXEDA_XGMAC=y
-+CONFIG_IGB=y
- CONFIG_MV643XX_ETH=y
- CONFIG_MVNETA=y
- CONFIG_KS8851=y
-@@ -155,6 +156,8 @@ CONFIG_KEYBOARD_TEGRA=y
- CONFIG_KEYBOARD_SPEAR=y
- CONFIG_KEYBOARD_CROS_EC=y
- CONFIG_MOUSE_PS2_ELANTECH=y
-+CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_STMPE=y
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MPU3050=y
- CONFIG_SERIO_AMBAKMI=y
-@@ -200,6 +203,7 @@ CONFIG_SPI_SUN6I=y
- CONFIG_SPI_TEGRA114=y
- CONFIG_SPI_TEGRA20_SFLASH=y
- CONFIG_SPI_TEGRA20_SLINK=y
-+CONFIG_SPI_SPIDEV=y
- CONFIG_PINCTRL_AS3722=y
- CONFIG_PINCTRL_PALMAS=y
- CONFIG_GPIO_SYSFS=y
-@@ -217,6 +221,7 @@ CONFIG_POWER_RESET_AS3722=y
- CONFIG_POWER_RESET_GPIO=y
- CONFIG_POWER_RESET_SUN6I=y
- CONFIG_SENSORS_LM90=y
-+CONFIG_SENSORS_LM95245=y
- CONFIG_THERMAL=y
- CONFIG_DOVE_THERMAL=y
- CONFIG_ARMADA_THERMAL=y
-@@ -227,6 +232,7 @@ CONFIG_MFD_AS3722=y
- CONFIG_MFD_CROS_EC=y
- CONFIG_MFD_CROS_EC_SPI=y
- CONFIG_MFD_MAX8907=y
-+CONFIG_MFD_STMPE=y
- CONFIG_MFD_PALMAS=y
- CONFIG_MFD_TPS65090=y
- CONFIG_MFD_TPS6586X=y
-@@ -303,6 +309,9 @@ CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
- CONFIG_MMC_MVSDIO=y
- CONFIG_MMC_SUNXI=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_PWM=y
- CONFIG_EDAC=y
- CONFIG_EDAC_MM_EDAC=y
- CONFIG_EDAC_HIGHBANK_MC=y
--- 
-1.7.9.5
+      Andrew
+
+
+> +
+> +static int berlin_boot_secondary(unsigned int cpu, struct task_struct *idle)
+> +{
+> +	if (!cpu_ctrl)
+> +		return -EFAULT;
+> +
+> +	/*
+> +	 * Reset the CPU, making it to execute the instruction in the reset
+> +	 * exception register.
+> +	 */
+> +	berlin_reset_cpu(cpu);
+> +
+> +	return 0;
+> +}
+> +
+> +static void __init berlin_smp_prepare_cpus(unsigned int max_cpus)
+> +{
+> +	struct device_node *np;
+> +	void __iomem *scu_base;
+> +	void __iomem *vectors_base;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
+> +	scu_base = of_iomap(np, 0);
+> +	of_node_put(np);
+> +	if (!scu_base)
+> +		return;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "marvell,berlin-cpu-ctrl");
+> +	cpu_ctrl = of_iomap(np, 0);
+> +	of_node_put(np);
+> +	if (!cpu_ctrl)
+> +		goto unmap_scu;
+> +
+> +	vectors_base = ioremap(CONFIG_VECTORS_BASE, SZ_32K);
+> +	if (!vectors_base)
+> +		goto unmap_scu;
+> +
+> +	scu_enable(scu_base);
+> +	flush_cache_all();
+> +
+> +	/*
+> +	 * Write the first instruction the CPU will execute after being reseted
+> +	 * in the reset exception register.
+> +	 */
+> +	writel(boot_inst, vectors_base + RESET_VECT);
+> +
+> +	/*
+> +	 * Write the secondary startup address into the SW reset address
+> +	 * register. This is used by boot_inst.
+
+Maybe it would be better to call this the reset address vector instead
+of address register. It is in the vector space after all.
+
+   Andrew
+
+> +	 */
+> +	writel(virt_to_phys(berlin_secondary_startup), vectors_base + SW_RESET_ADDR);
+> +
+> +	iounmap(vectors_base);
+> +unmap_scu:
+> +	iounmap(scu_base);
+> +}
+> +
+> +static struct smp_operations berlin_smp_ops __initdata = {
+> +	.smp_prepare_cpus	= berlin_smp_prepare_cpus,
+> +	.smp_boot_secondary	= berlin_boot_secondary,
+> +};
+> +CPU_METHOD_OF_DECLARE(berlin_smp, "marvell,berlin-smp", &berlin_smp_ops);
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
