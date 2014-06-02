@@ -1,160 +1,126 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 2 Jun 2014 10:21:21 +0800
-Subject: [PATCH 1/3] ARM: i.MX: avic: Use irqchip_init() for IRQ
- initialization in DT case
-In-Reply-To: <1401516095-31020-1-git-send-email-shc_work@mail.ru>
-References: <1401516095-31020-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20140602022120.GL8860@dragon>
+Date: Mon, 2 Jun 2014 10:44:13 +0800
+Subject: [PATCH RFT] ARM: imx6q: Remove static memory mapping for SCU
+In-Reply-To: <1401522016-25024-1-git-send-email-shc_work@mail.ru>
+References: <1401522016-25024-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20140602024412.GM8860@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 31, 2014 at 10:01:30AM +0400, Alexander Shiyan wrote:
-> Use generic irqchip_init() DT call to initialize IRQs, so after this patch,
-> the mxc-avic driver is quite prepared to move to drivers/irqchip.
-
-What's the whole plan of the moving?  IOW, what's left after this patch
-and what's the plan for those?
-
-> As a temporary solution to do it, we use OF_DECLARE_2()
-
-I do not see OF_DECLARE_2() is defined anywhere?
-
-> instead of IRQCHIP_DECLARE().
-> 
+On Sat, May 31, 2014 at 11:40:16AM +0400, Alexander Shiyan wrote:
 > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+> Completely untested.
+> ---
+>  arch/arm/mach-imx/common.h     |  1 -
+>  arch/arm/mach-imx/mach-imx6q.c |  8 +-------
+>  arch/arm/mach-imx/platsmp.c    | 30 +++++++-----------------------
+>  3 files changed, 8 insertions(+), 31 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+> index 9586187..7fdbb18 100644
+> --- a/arch/arm/mach-imx/common.h
+> +++ b/arch/arm/mach-imx/common.h
+> @@ -96,7 +96,6 @@ u32 imx_get_cpu_arg(int cpu);
+>  void imx_set_cpu_arg(int cpu, u32 arg);
+>  #ifdef CONFIG_SMP
+>  void v7_secondary_startup(void);
+> -void imx_scu_map_io(void);
+>  void imx_smp_prepare(void);
+>  void imx_scu_standby_enable(void);
+>  #else
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index e60456d..f3a0170 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -381,12 +381,6 @@ static void __init imx6q_init_late(void)
+>  	}
+>  }
+>  
+> -static void __init imx6q_map_io(void)
+> -{
+> -	debug_ll_io_init();
+> -	imx_scu_map_io();
+> -}
+> -
+>  static void __init imx6q_init_irq(void)
+>  {
+>  	imx_init_revision_from_anatop();
+> @@ -404,7 +398,7 @@ static const char *imx6q_dt_compat[] __initconst = {
+>  
+>  DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad/DualLite (Device Tree)")
+>  	.smp		= smp_ops(imx_smp_ops),
+> -	.map_io		= imx6q_map_io,
+> +	.map_io		= debug_ll_io_init,
+>  	.init_irq	= imx6q_init_irq,
+>  	.init_machine	= imx6q_init_machine,
+>  	.init_late      = imx6q_init_late,
+> diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
+> index 5b57c17..4d3aba0 100644
+> --- a/arch/arm/mach-imx/platsmp.c
+> +++ b/arch/arm/mach-imx/platsmp.c
+> @@ -11,40 +11,18 @@
+>   */
+>  
+>  #include <linux/init.h>
+> +#include <linux/io.h>
+>  #include <linux/smp.h>
+>  #include <asm/cacheflush.h>
+> -#include <asm/page.h>
+>  #include <asm/smp_scu.h>
+> -#include <asm/mach/map.h>
+>  
+>  #include "common.h"
+> -#include "hardware.h"
+>  
+>  #define SCU_STANDBY_ENABLE	(1 << 5)
+>  
+>  u32 g_diag_reg;
+>  static void __iomem *scu_base;
+>  
+> -static struct map_desc scu_io_desc __initdata = {
+> -	/* .virtual and .pfn are run-time assigned */
+> -	.length		= SZ_4K,
+> -	.type		= MT_DEVICE,
+> -};
+> -
+> -void __init imx_scu_map_io(void)
+> -{
+> -	unsigned long base;
+> -
+> -	/* Get SCU base */
+> -	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
+> -
+> -	scu_io_desc.virtual = IMX_IO_P2V(base);
+> -	scu_io_desc.pfn = __phys_to_pfn(base);
+> -	iotable_init(&scu_io_desc, 1);
+> -
+> -	scu_base = IMX_IO_ADDRESS(base);
+> -}
+> -
+>  void imx_scu_standby_enable(void)
+>  {
+>  	u32 val = readl_relaxed(scu_base);
+> @@ -66,8 +44,14 @@ static int imx_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>   */
+>  static void __init imx_smp_init_cpus(void)
+>  {
+> +	unsigned long base;
+>  	int i, ncores;
+>  
+> +	/* Get SCU base */
+> +	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
+> +
+> +	scu_base = ioremap(base, SZ_4K);
 
-The patch number in the subject is confusing.  There are 6 patches in
-the series rather than 3.
+No.  I do not think that ioremap() is ready at this point.
 
 Shawn
 
-> ---
->  arch/arm/mach-imx/avic.c     | 29 ++++++++++++++++++++++-------
->  arch/arm/mach-imx/imx25-dt.c |  1 -
->  arch/arm/mach-imx/imx27-dt.c |  1 -
->  arch/arm/mach-imx/imx31-dt.c |  1 -
->  arch/arm/mach-imx/imx35-dt.c |  3 ++-
->  5 files changed, 24 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/avic.c b/arch/arm/mach-imx/avic.c
-> index 24b103c..9adcad2 100644
-> --- a/arch/arm/mach-imx/avic.c
-> +++ b/arch/arm/mach-imx/avic.c
-> @@ -22,6 +22,7 @@
->  #include <linux/irqdomain.h>
->  #include <linux/io.h>
->  #include <linux/of.h>
-> +#include <linux/of_address.h>
->  #include <asm/mach/irq.h>
->  #include <asm/exception.h>
->  
-> @@ -153,13 +154,10 @@ static void __exception_irq_entry avic_handle_irq(struct pt_regs *regs)
->   * interrupts. It registers the interrupt enable and disable functions
->   * to the kernel for each interrupt source.
->   */
-> -void __init mxc_init_irq(void __iomem *irqbase)
-> +static void __init _avic_init_irq(struct device_node *np)
->  {
-> -	struct device_node *np;
->  	int irq_base;
-> -	int i;
-> -
-> -	avic_base = irqbase;
-> +	unsigned i;
->  
->  	/* put the AVIC into the reset value with
->  	 * all interrupts disabled
-> @@ -178,7 +176,6 @@ void __init mxc_init_irq(void __iomem *irqbase)
->  	irq_base = irq_alloc_descs(-1, 0, AVIC_NUM_IRQS, numa_node_id());
->  	WARN_ON(irq_base < 0);
->  
-> -	np = of_find_compatible_node(NULL, NULL, "fsl,avic");
->  	domain = irq_domain_add_legacy(np, AVIC_NUM_IRQS, irq_base, 0,
->  				       &irq_domain_simple_ops, NULL);
->  	WARN_ON(!domain);
-> @@ -196,6 +193,24 @@ void __init mxc_init_irq(void __iomem *irqbase)
->  	/* Initialize FIQ */
->  	init_FIQ(FIQ_START);
->  #endif
-> +}
 > +
-> +void __init mxc_init_irq(void __iomem *irqbase)
-> +{
-> +	avic_base = irqbase;
-> +
-> +	_avic_init_irq(NULL);
-> +}
+>  	ncores = scu_get_core_count(scu_base);
 >  
-> -	printk(KERN_INFO "MXC IRQ initialized\n");
-> +static int __init avic_init_irq_dt(struct device_node *np,
-> +				   struct device_node *parent)
-> +{
-> +	avic_base = of_iomap(np, 0);
-> +	if (!avic_base)
-> +		return -ENOMEM;
-> +
-> +	_avic_init_irq(np);
-> +
-> +	return 0;
->  }
-> +OF_DECLARE_2(irqchip, mxc_avic, "fsl,avic", avic_init_irq_dt);
-> diff --git a/arch/arm/mach-imx/imx25-dt.c b/arch/arm/mach-imx/imx25-dt.c
-> index 42a65e0..2f97743 100644
-> --- a/arch/arm/mach-imx/imx25-dt.c
-> +++ b/arch/arm/mach-imx/imx25-dt.c
-> @@ -37,7 +37,6 @@ static void __init imx25_timer_init(void)
->  DT_MACHINE_START(IMX25_DT, "Freescale i.MX25 (Device Tree Support)")
->  	.map_io		= mx25_map_io,
->  	.init_early	= imx25_init_early,
-> -	.init_irq	= mx25_init_irq,
->  	.init_time	= imx25_timer_init,
->  	.init_machine	= imx25_dt_init,
->  	.dt_compat	= imx25_dt_board_compat,
-> diff --git a/arch/arm/mach-imx/imx27-dt.c b/arch/arm/mach-imx/imx27-dt.c
-> index 17bd405..09c577c 100644
-> --- a/arch/arm/mach-imx/imx27-dt.c
-> +++ b/arch/arm/mach-imx/imx27-dt.c
-> @@ -42,7 +42,6 @@ static void __init imx27_timer_init(void)
->  DT_MACHINE_START(IMX27_DT, "Freescale i.MX27 (Device Tree Support)")
->  	.map_io		= mx27_map_io,
->  	.init_early	= imx27_init_early,
-> -	.init_irq	= mx27_init_irq,
->  	.init_time	= imx27_timer_init,
->  	.init_machine	= imx27_dt_init,
->  	.dt_compat	= imx27_dt_board_compat,
-> diff --git a/arch/arm/mach-imx/imx31-dt.c b/arch/arm/mach-imx/imx31-dt.c
-> index 581f4d6..6e7a4c2 100644
-> --- a/arch/arm/mach-imx/imx31-dt.c
-> +++ b/arch/arm/mach-imx/imx31-dt.c
-> @@ -38,7 +38,6 @@ static void __init imx31_dt_timer_init(void)
->  DT_MACHINE_START(IMX31_DT, "Freescale i.MX31 (Device Tree Support)")
->  	.map_io		= mx31_map_io,
->  	.init_early	= imx31_init_early,
-> -	.init_irq	= mx31_init_irq,
->  	.init_time	= imx31_dt_timer_init,
->  	.init_machine	= imx31_dt_init,
->  	.dt_compat	= imx31_dt_board_compat,
-> diff --git a/arch/arm/mach-imx/imx35-dt.c b/arch/arm/mach-imx/imx35-dt.c
-> index a62854c..6b74123 100644
-> --- a/arch/arm/mach-imx/imx35-dt.c
-> +++ b/arch/arm/mach-imx/imx35-dt.c
-> @@ -9,6 +9,7 @@
->   */
->  
->  #include <linux/irq.h>
-> +#include <linux/irqchip.h>
->  #include <linux/irqdomain.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
-> @@ -31,7 +32,7 @@ static void __init imx35_dt_init(void)
->  static void __init imx35_irq_init(void)
->  {
->  	imx_init_l2cache();
-> -	mx35_init_irq();
-> +	irqchip_init();
->  }
->  
->  static const char *imx35_dt_board_compat[] __initconst = {
+>  	for (i = ncores; i < NR_CPUS; i++)
 > -- 
 > 1.8.5.5
 > 
