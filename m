@@ -1,76 +1,60 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 02 Jun 2014 16:11:31 -0700 (PDT)
-Subject: [PATCH v3 2/2] net: hisilicon: add hix5hd2 mac driver
-In-Reply-To: <1401440528-7804-3-git-send-email-zhangfei.gao@linaro.org>
-References: <1401440528-7804-1-git-send-email-zhangfei.gao@linaro.org>
- <1401440528-7804-3-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <20140602.161131.783479189097234753.davem@davemloft.net>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 2 Jun 2014 16:22:40 -0700
+Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
+In-Reply-To: <CAD=FV=WjaKLFjs4RbruJq_RRGpjVkbS+755u6ZBq2L1CMAFh5A@mail.gmail.com>
+References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
+ <53752E25.9060604@gmail.com>
+ <CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>
+ <53753443.8010303@gmail.com>
+ <CAD=FV=V8UZoeOqEwfx_E015pLM+amTt51LrUa+dk7mTdn=vKgA@mail.gmail.com>
+ <53753C17.1090002@gmail.com>
+ <CAD=FV=WGa7j_As_NpySxU7OEd_SzuGWK6oxU6UeiJ-4HsoWvvg@mail.gmail.com>
+ <CAJFHJrrgWGc4XGQB0ysLufAg3Wouz-aYXu97Sy2Kp=HzK+akVQ@mail.gmail.com>
+ <CAASgrz2Nr69tpfC8ka9gbs2OvjLEGsvgAj4vBCFxhsamuFum7w@mail.gmail.com>
+ <53754CE2.3000905@gmail.com>
+ <CAD=FV=UMoL7i9rg_QtBAqPwisSQyRqRmk8wQhneMXAiLBjTT1A@mail.gmail.com>
+ <CAPz6YkU8GDrLj8UkqEQXxxqxWF5_p427wKSDgAp+QPR7WE7Ujg@mail.gmail.com>
+ <CAJFHJrrb2XFDZqJh4OuLdFP=J0aR4pGe-WLWKZ7ZpMfUSPGd4Q@mail.gmail.com>
+ <5376A726.4000106@samsung.com>
+ <CAD=FV=VXSP1TM9qY8PxFuQ+Tq2Ju57VdpzpwsHXqHshQm_havQ@mail.gmail.com>
+ <035001cf74f8$0aabdae0$200390a0$@samsung.com>
+ <537CD235.2020304@samsung.com>
+ <CAJFHJrpdVQ6G=-h5J_EgBT8+XSiyvPnNGR2yBDV27i8TDQ7jRg@mail.gmail.com>
+ <CAD=FV=WjaKLFjs4RbruJq_RRGpjVkbS+755u6ZBq2L1CMAFh5A@mail.gmail.com>
+Message-ID: <CAD=FV=XkG1WzA91vFCVZxYCTr0Sk2VVgr1px=DXxrnbTTYNTKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhangfei Gao <zhangfei.gao@linaro.org>
-Date: Fri, 30 May 2014 17:02:08 +0800
+Kukjin,
 
-> +			skb = netdev_alloc_skb_ip_align(priv->netdev,
-> +				MAC_MAX_FRAME_SIZE);
+On Wed, May 28, 2014 at 10:38 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Kukjin,
+>
+> On Wed, May 21, 2014 at 11:34 AM, Chirantan Ekbote
+> <chirantan@chromium.org> wrote:
+>> On Wed, May 21, 2014 at 9:20 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+>>> On 21.05.2014 15:24, Kukjin Kim wrote:
+>>>
+>>>> BTW, since
+>>>> exynos5260, exynos5420 and exynos5800 doesn't support arch timer, we
+>>>> have been using MCT on exynos5 SoCs.
+>>>
+>>> Hmm, I thought arch timer was a core feature of ARM Cortex A15 (and A7)
+>>> cores. Also you mention Exynos5420, while Chirantan's patch removing MCT
+>>> node from exynos5420.dtsi, would suggest that it worked for him fine. (I
+>>> assume it was tested.)
+>>>
+>>
+>> I was able to boot both 5420 and 5800 with just the arch timers on our
+>> 3.8 based franken-kernel.  The upstream kernel doesn't boot on those
+>> systems with or without the mct so I wasn't able to test there.
+>> Although looking at the upstream device tree now I see that there is
+>> no entry for the arch timer in exynos5420.dtsi.  Maybe it should be
+>> added in?
+>
+> A gentle reminder to respond here about the status of MCT on 5420 and 5800.
 
-When a function call, declaration, or definition spans multiple lines,
-you must start the arguments on the second and subsequent lines exactly
-at the first column after the openning parenthesis.
+Another reminder to respond about the status of arch timers on 5420
+and 5800 (sorry, meant arch timers here--we know MCT works).
 
-Please therefore reindent this properly.
-
-> +		addr = dma_map_single(priv->dev, skb->data,
-> +					MAC_MAX_FRAME_SIZE, DMA_FROM_DEVICE);
-
-Likewise.
-
-> +		desc->cmd = cpu_to_le32(DESC_VLD_FREE |
-> +			(MAC_MAX_FRAME_SIZE - 1) << DESC_BUFF_LEN_OFF);
-
-Likewise.
-
-> +	desc->cmd = cpu_to_le32(DESC_VLD_BUSY | DESC_FL_FULL |
-> +			(skb->len & DESC_DATA_MASK) << DESC_DATA_LEN_OFF |
-> +			(skb->len & DESC_DATA_MASK) << DESC_BUFF_LEN_OFF);
-
-Likewise.
-
-> +	priv->phy = of_phy_connect(dev, priv->phy_node,
-> +		&hix5hd2_adjust_link, 0, priv->phy_mode);
-
-Likewise.
-
-> +static int hix5hd2_mdio_wait_ready(struct mii_bus *bus)
-> +{
-> +	struct hix5hd2_priv *priv = bus->priv;
-> +	void __iomem *base = priv->base;
-> +	int i, timeout = 10000;
-> +
-> +	for (i = 0; readl_relaxed(base + MDIO_SINGLE_CMD) & MDIO_START; i++) {
-> +		if (i == timeout)
-> +			return -ETIMEDOUT;
-> +		udelay(1);
-> +	}
-> +
-> +	return 0;
-> +}
-
-10,000 udelay(1)'s is a long time, consider changing to usleep() or
-similar.
-
-> +			dma_free_coherent(priv->dev, priv->pool[i].size,
-> +					priv->pool[i].desc,
-> +					priv->pool[i].phys_addr);
-
-Indentation.
-
-> +		virt_addr = dma_alloc_coherent(dev, size, &phys_addr,
-> +				GFP_KERNEL);
-
-Likewise.
-
-> +		netdev_warn(ndev, "using random MAC address %pM\n",
-> +			 ndev->dev_addr);
-
-Likewise.
+-Doug
