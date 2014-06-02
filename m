@@ -1,126 +1,138 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 02 Jun 2014 14:05:56 -0700
-Subject: [PATCH v4 1/7] clk: kona: allow nested ccu_write_enable() requests
-In-Reply-To: <538950A6.6020300@linaro.org>
-References: <1401483188-5395-1-git-send-email-elder@linaro.org>
- <1401483188-5395-2-git-send-email-elder@linaro.org>
- <20140530232822.10062.26597@quantum> <538950A6.6020300@linaro.org>
-Message-ID: <20140602210556.10062.18574@quantum>
+Date: Mon, 02 Jun 2014 14:08:19 -0700
+Subject: [PATCH v2 11/11] clk: versatile: add versatile OSC support
+In-Reply-To: <CAL_Jsq+KQa9ZKCfiy479JOg8qYx8AOmFQKuvQp3fKmWBoURpaQ@mail.gmail.com>
+References: <1401403221-27523-1-git-send-email-robherring2@gmail.com>
+ <1401403221-27523-12-git-send-email-robherring2@gmail.com>
+ <20140530230326.10062.15472@quantum>
+ <CAL_Jsq+KQa9ZKCfiy479JOg8qYx8AOmFQKuvQp3fKmWBoURpaQ@mail.gmail.com>
+Message-ID: <20140602210819.10062.61603@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Alex Elder (2014-05-30 20:46:46)
-> On 05/30/2014 06:28 PM, Mike Turquette wrote:
-> > Quoting Alex Elder (2014-05-30 13:53:02)
-> >> Use a counter rather than a Boolean to track whether write access to
-> >> a CCU has been enabled or not.  This will allow more than one of
-> >> these requests to be nested.
+Quoting Rob Herring (2014-05-30 19:38:44)
+> On Fri, May 30, 2014 at 6:03 PM, Mike Turquette <mturquette@linaro.org> wrote:
+> > Quoting Rob Herring (2014-05-29 15:40:21)
+> >> From: Rob Herring <robh@kernel.org>
 > >>
-> >> Note that __ccu_write_enable() and __ccu_write_disable() calls all
-> >> come in pairs, and they are always surrounded immediately by calls
-> >> to ccu_lock() and ccu_unlock().
+> >> Versatile platforms share the same OSC programming model as Integrator
+> >> platforms. Add the necessary parameters and init functions for Versatile.
 > >>
-> >> Signed-off-by: Alex Elder <elder@linaro.org>
-> >> ---
-> >>  drivers/clk/bcm/clk-kona.c | 14 ++++----------
-> >>  drivers/clk/bcm/clk-kona.h |  2 +-
-> >>  2 files changed, 5 insertions(+), 11 deletions(-)
+> >> Renaming the file to clk-versatile.c as versatile is used as the family
+> >> name for ARM, Ltd. boards.
 > >>
-> >> diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
-> >> index 95af2e6..ee8e988 100644
-> >> --- a/drivers/clk/bcm/clk-kona.c
-> >> +++ b/drivers/clk/bcm/clk-kona.c
-> >> @@ -170,13 +170,8 @@ static inline void ccu_unlock(struct ccu_data *ccu, unsigned long flags)
-> >>   */
-> >>  static inline void __ccu_write_enable(struct ccu_data *ccu)
-> > 
-> > Per Documentation/CodingStyle, chapter 15, "the inline disease", it
-> > might be best to not inline these functions.
+> >> Signed-off-by: Rob Herring <robh@kernel.org>
+> >> Cc: Mike Turquette <mturquette@linaro.org>
+> >> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> >
+> > So it's OK to rename the file and add the new stuff in one commit? I
+> > thought there were some guidelines about doing renames separately...
 > 
-> This was not intentional.  I normally only inline things
-> defined in header files, and maybe this is an artifact of
-> having been in a header at one time.  I don't know, I'll get
-> rid of the inline.
-> 
-> > 
-> >>  {
-> >> -       if (ccu->write_enabled) {
-> >> -               pr_err("%s: access already enabled for %s\n", __func__,
-> >> -                       ccu->name);
-> >> -               return;
-> >> -       }
-> >> -       ccu->write_enabled = true;
-> >> -       __ccu_write(ccu, 0, CCU_ACCESS_PASSWORD | 1);
-> >> +       if (!ccu->write_enabled++)
-> >> +               __ccu_write(ccu, 0, CCU_ACCESS_PASSWORD | 1);
-> >>  }
-> >>  
-> >>  static inline void __ccu_write_disable(struct ccu_data *ccu)
-> >> @@ -186,9 +181,8 @@ static inline void __ccu_write_disable(struct ccu_data *ccu)
-> >>                         ccu->name);
-> >>                 return;
-> >>         }
-> >> -
-> >> -       __ccu_write(ccu, 0, CCU_ACCESS_PASSWORD);
-> >> -       ccu->write_enabled = false;
-> >> +       if (!--ccu->write_enabled)
-> >> +               __ccu_write(ccu, 0, CCU_ACCESS_PASSWORD);
-> > 
-> > What happens if calls to __ccu_write_enable and __ccu_write_disable are
-> > unbalanced? It would be better to catch that case and throw a WARN:
-> 
-> You can't see it in the diff, but that's what happens
-> (well, it's a pr_err(), not a WARN()).   I think a WARN()
-> is probably right in this case though.
-> 
-> >       if (WARN_ON(ccu->write_enabled == 0))
-> >               return;
-> > 
-> >       if (--ccu->write_enabled > 0)
-> >               return;
-> > 
-> >       __ccu_write(ccu, 0, CCU_ACCESS_PASSWORD);
-> > 
-> >>  }
-> >>  
-> >>  /*
-> >> diff --git a/drivers/clk/bcm/clk-kona.h b/drivers/clk/bcm/clk-kona.h
-> >> index 2537b30..e9a8466 100644
-> >> --- a/drivers/clk/bcm/clk-kona.h
-> >> +++ b/drivers/clk/bcm/clk-kona.h
-> >> @@ -478,7 +478,7 @@ struct ccu_policy {
-> >>  struct ccu_data {
-> >>         void __iomem *base;     /* base of mapped address space */
-> >>         spinlock_t lock;        /* serialization lock */
-> >> -       bool write_enabled;     /* write access is currently enabled */
-> >> +       u32 write_enabled;      /* write access enable count */
-> > 
-> > Why u32? An unsigned int will do just nicely here.
-> 
-> That's a preference of mine.  I almost always favor
-> using u32, etc. because they are compact, and explicit
-> about the size and signedness.  I "know" an int is 32
-> bits, but I still prefer being explicit.
-> 
-> I'll interpret this as a preference on your part for
-> unsigned int, and I have no problem making that change.
+> You don't want to move of a chunk of code and change it along the way
+> because you can't see the real changes, but a file rename does not
+> affect the diff here (other than the Makefile change).
 
-It's not a big deal, I was just curious why. Feel free to use whatever
-solution you prefer here.
+Sounds good. Let me know if you want me to take this into clk-next after
+-rc1 drops. Otherwise:
+
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
 Regards,
 Mike
 
 > 
->                                         -Alex
+> Rob
 > 
+> >
 > > Regards,
 > > Mike
-> > 
-> >>         struct ccu_policy policy;
-> >>         struct list_head links; /* for ccu_list */
-> >>         struct device_node *node;
-> >> -- 
+> >
+> >> ---
+> >> v2:
+> >> - Rename clk-integrator.c to clk-versatile.c
+> >>
+> >>  drivers/clk/versatile/Makefile                     |  3 +-
+> >>  .../{clk-integrator.c => clk-versatile.c}          | 35 ++++++++++++++++++++--
+> >>  2 files changed, 34 insertions(+), 4 deletions(-)
+> >>  rename drivers/clk/versatile/{clk-integrator.c => clk-versatile.c} (66%)
+> >>
+> >> diff --git a/drivers/clk/versatile/Makefile b/drivers/clk/versatile/Makefile
+> >> index c16ca78..9ee2b37 100644
+> >> --- a/drivers/clk/versatile/Makefile
+> >> +++ b/drivers/clk/versatile/Makefile
+> >> @@ -1,6 +1,5 @@
+> >>  # Makefile for Versatile-specific clocks
+> >> -obj-$(CONFIG_ICST)             += clk-icst.o
+> >> -obj-$(CONFIG_ARCH_INTEGRATOR)  += clk-integrator.o
+> >> +obj-$(CONFIG_ICST)             += clk-icst.o clk-versatile.o
+> >>  obj-$(CONFIG_INTEGRATOR_IMPD1) += clk-impd1.o
+> >>  obj-$(CONFIG_ARCH_REALVIEW)    += clk-realview.o
+> >>  obj-$(CONFIG_ARCH_VEXPRESS)    += clk-vexpress.o clk-sp810.o
+> >> diff --git a/drivers/clk/versatile/clk-integrator.c b/drivers/clk/versatile/clk-versatile.c
+> >> similarity index 66%
+> >> rename from drivers/clk/versatile/clk-integrator.c
+> >> rename to drivers/clk/versatile/clk-versatile.c
+> >> index 734c4b8..fe52a79 100644
+> >> --- a/drivers/clk/versatile/clk-integrator.c
+> >> +++ b/drivers/clk/versatile/clk-versatile.c
+> >> @@ -17,6 +17,9 @@
+> >>
+> >>  #define INTEGRATOR_HDR_LOCK_OFFSET     0x14
+> >>
+> >> +#define VERSATILE_SYS_OSCCLCD_OFFSET   0x1c
+> >> +#define VERSATILE_SYS_LOCK_OFFSET      0x20
+> >> +
+> >>  /* Base offset for the core module */
+> >>  static void __iomem *cm_base;
+> >>
+> >> @@ -37,11 +40,27 @@ static const struct clk_icst_desc __initdata cm_auxosc_desc = {
+> >>         .lock_offset = INTEGRATOR_HDR_LOCK_OFFSET,
+> >>  };
+> >>
+> >> -static void __init of_integrator_cm_osc_setup(struct device_node *np)
+> >> +static const struct icst_params versatile_auxosc_params = {
+> >> +       .vco_max        = ICST307_VCO_MAX,
+> >> +       .vco_min        = ICST307_VCO_MIN,
+> >> +       .vd_min         = 4 + 8,
+> >> +       .vd_max         = 511 + 8,
+> >> +       .rd_min         = 1 + 2,
+> >> +       .rd_max         = 127 + 2,
+> >> +       .s2div          = icst307_s2div,
+> >> +       .idx2s          = icst307_idx2s,
+> >> +};
+> >> +
+> >> +static const struct clk_icst_desc versatile_auxosc_desc __initconst = {
+> >> +       .params = &versatile_auxosc_params,
+> >> +       .vco_offset = VERSATILE_SYS_OSCCLCD_OFFSET,
+> >> +       .lock_offset = VERSATILE_SYS_LOCK_OFFSET,
+> >> +};
+> >> +static void __init cm_osc_setup(struct device_node *np,
+> >> +                               const struct clk_icst_desc *desc)
+> >>  {
+> >>         struct clk *clk = ERR_PTR(-EINVAL);
+> >>         const char *clk_name = np->name;
+> >> -       const struct clk_icst_desc *desc = &cm_auxosc_desc;
+> >>         const char *parent_name;
+> >>
+> >>         if (!cm_base) {
+> >> @@ -65,5 +84,17 @@ static void __init of_integrator_cm_osc_setup(struct device_node *np)
+> >>         if (!IS_ERR(clk))
+> >>                 of_clk_add_provider(np, of_clk_src_simple_get, clk);
+> >>  }
+> >> +
+> >> +static void __init of_integrator_cm_osc_setup(struct device_node *np)
+> >> +{
+> >> +       cm_osc_setup(np, &cm_auxosc_desc);
+> >> +}
+> >>  CLK_OF_DECLARE(integrator_cm_auxosc_clk,
+> >>         "arm,integrator-cm-auxosc", of_integrator_cm_osc_setup);
+> >> +
+> >> +static void __init of_versatile_cm_osc_setup(struct device_node *np)
+> >> +{
+> >> +       cm_osc_setup(np, &versatile_auxosc_desc);
+> >> +}
+> >> +CLK_OF_DECLARE(versatile_cm_auxosc_clk,
+> >> +              "arm,versatile-cm-auxosc", of_versatile_cm_osc_setup);
+> >> --
 > >> 1.9.1
 > >>
-> 
