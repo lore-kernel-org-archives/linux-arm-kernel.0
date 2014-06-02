@@ -1,96 +1,70 @@
-From: chanho61.park@samsung.com (Chanho Park)
-Date: Mon, 02 Jun 2014 09:20:45 +0900
-Subject: [PATCHv3] ARM: dts: exynos4: clean up arm-pmu node
-Message-ID: <1401668445-9810-1-git-send-email-chanho61.park@samsung.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 2 Jun 2014 10:49:57 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+Message-ID: <20140602104957.21878870@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch cleans a arm-pmu node up for exynos4. Only exynos4412 series
-boards have four pmu interrupts. Rest of exynos4 boards, except 4412, have only
-two pmu interrupts. Thus, we can define two interrupts in the
-exynos4.dtsi and extends the interrupts only exynos4412.dtsi.
+Hi all,
 
-Cc: Chanwoo Choi <cw00.choi@samsung.com>
-Cc: Tomasz Figa <t.figa@samsung.com>
-Tested-by: Tushar Behera <tushar.behera@linaro.org>
-Signed-off-by: Chanho Park <chanho61.park@samsung.com>
----
-Changes from v2:
- - Rebase the patch on top of the kukjin's v3.16-next/dt-samsung-3
-Changes from v1:
- - Remove duplicated properties in exynos4412.dtsi(Comment from Tomasz Figa)
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-exynos/exynos.c between commits dfbdd3d55403 ("ARM: l2c:
+exynos: remove cache size override"), 25a9ef63cd2b ("ARM: l2c: exynos:
+convert to common l2c310 early resume functionality") and 15b0bc4041ba
+("ARM: l2c: exynos: convert to generic l2c OF initialisation (and
+thereby fix it)") from the arm tree and commit b5b9324a6296 ("ARM:
+exynos: don't run exynos4 l2x0 setup on other platforms") from the
+arm-soc tree.
 
- arch/arm/boot/dts/exynos4.dtsi    | 6 ++++++
- arch/arm/boot/dts/exynos4210.dtsi | 6 ------
- arch/arm/boot/dts/exynos4412.dtsi | 4 ++++
- arch/arm/boot/dts/exynos4x12.dtsi | 6 ------
- 4 files changed, 10 insertions(+), 12 deletions(-)
+I fixed it up (the former removes the code updated by the latter) and
+can carry the fix as necessary (no action is required).
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index b8ece4b..5cb21a7 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -123,6 +123,12 @@
- 		reg = <0x10440000 0x1000>;
- 	};
- 
-+	pmu {
-+		compatible = "arm,cortex-a9-pmu";
-+		interrupt-parent = <&combiner>;
-+		interrupts = <2 2>, <3 2>;
-+	};
-+
- 	sys_reg: syscon at 10010000 {
- 		compatible = "samsung,exynos4-sysreg", "syscon";
- 		reg = <0x10010000 0x400>;
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index ee3001f..a4f28e8 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -93,12 +93,6 @@
- 		#clock-cells = <1>;
- 	};
- 
--	pmu {
--		compatible = "arm,cortex-a9-pmu";
--		interrupt-parent = <&combiner>;
--		interrupts = <2 2>, <3 2>;
--	};
--
- 	pinctrl_0: pinctrl at 11400000 {
- 		compatible = "samsung,exynos4210-pinctrl";
- 		reg = <0x11400000 0x1000>;
-diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-index c42a3e1..d8bc059e 100644
---- a/arch/arm/boot/dts/exynos4412.dtsi
-+++ b/arch/arm/boot/dts/exynos4412.dtsi
-@@ -26,6 +26,10 @@
- 		samsung,combiner-nr = <20>;
- 	};
- 
-+	pmu {
-+		interrupts = <2 2>, <3 2>, <18 2>, <19 2>;
-+	};
-+
- 	gic: interrupt-controller at 10490000 {
- 		cpu-offset = <0x4000>;
- 	};
-diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-index c5a943d..95cdfb9 100644
---- a/arch/arm/boot/dts/exynos4x12.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12.dtsi
-@@ -31,12 +31,6 @@
- 		mshc0 = &mshc_0;
- 	};
- 
--	pmu {
--		compatible = "arm,cortex-a9-pmu";
--		interrupt-parent = <&combiner>;
--		interrupts = <2 2>, <3 2>, <18 2>, <19 2>;
--	};
--
- 	sysram at 02020000 {
- 		compatible = "mmio-sram";
- 		reg = <0x02020000 0x40000>;
 -- 
-1.8.3.2
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-exynos/exynos.c
+index a763c0862da9,bc43e22693b7..000000000000
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@@ -305,17 -246,25 +243,6 @@@ void __init exynos_init_io(void
+  	exynos_map_io();
+  }
+  
+- struct bus_type exynos_subsys = {
+- 	.name		= "exynos-core",
+- 	.dev_name	= "exynos-core",
+- };
+- 
+- static int __init exynos_core_init(void)
+ -static int __init exynos4_l2x0_cache_init(void)
+--{
+- 	return subsys_system_register(&exynos_subsys, NULL);
+ -	int ret;
+ -
+ -	if (!soc_is_exynos4())
+ -		return 0;
+ -
+ -	ret = l2x0_of_init(L2_AUX_VAL, L2_AUX_MASK);
+ -	if (ret)
+ -		return ret;
+ -
+ -	if (IS_ENABLED(CONFIG_S5P_SLEEP)) {
+ -		l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
+ -		clean_dcache_area(&l2x0_regs_phys, sizeof(unsigned long));
+ -	}
+ -	return 0;
+--}
+- core_initcall(exynos_core_init);
+ -early_initcall(exynos4_l2x0_cache_init);
+--
+  static void __init exynos_dt_machine_init(void)
+  {
+  	struct device_node *i2c_np;
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140602/83e7bc5f/attachment.sig>
