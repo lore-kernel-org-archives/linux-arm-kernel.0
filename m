@@ -1,57 +1,108 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 02 Jun 2014 14:58:34 +0100
-Subject: [PATCH v2 0/7] ARM: shmobile: koelsch reference: Enable DMA for
- QSPI
-In-Reply-To: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
-References: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <538C830A.9090400@codethink.co.uk>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 2 Jun 2014 16:07:52 +0200
+Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
+In-Reply-To: <538B0F90.8090902@arm.com>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
+ <5388546E.5070007@arm.com>
+ <CAKfTPtA04sQ4ox7yAU8Wxn_1DLuAxmm9UgER_-Nidtd6sNEEMQ@mail.gmail.com>
+ <538B0F90.8090902@arm.com>
+Message-ID: <CAKfTPtAurF0sxHmA+hK++NKwJfPWZuv3n2OrKtZYtcKRZbnOjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/14 14:42, Geert Uytterhoeven wrote:
-> This patch series enables DMA support for QSPI on r8a7791/koelsch
-> reference.  It's independent from the series "ARM: shmobile: koelsch
-> legacy: Enable DMA for QSPI", but it depends on the SHDMA work for r8a7790
-> by Ben Dooks (cfr. "[PATCH v2 0/9] Updates Renesas OF-DMA code").
-> 
-> Changes Compared to previous submission ("[PATCH/RFC 0/7] ARM: shmobile:
-> r8a7791: Add preliminary DMA support"):
->   - "[6/7] ARM: shmobile: r8a7791 dtsi: Enable DMA for MSIOF" was dropped,
->   - 2/7 was added,
->   - 7/7 was changed (see changelog in individual patch).
-> 
-> This was tested on r8a7791/koelsch.
-> 
-> Performance figures for reading from a QSPI FLASH driven at 24.375 MHz are:
->   - Single:  1.1 Mbps PIO, 23 Mbps DMA
->   - Dual  : 12.7 Mbps PIO, 48 Mbps DMA
->   - Quad  : 13   Mbps PIO, 70 Mbps DMA
-> 
-> Thanks for your comments!
-> 
->   [1/7] DMA: shdma: Add r8a7791 support
->   [2/7] DMA: shdma: Spelling s/controll/control/
->   [3/7] ARM: shmobile: r8a7791 dtsi: add SYS-DMAC clocks
->   [4/7] ARM: shmobile: r8a7791: Add SYS-DMAC channel definitions for bindings
->   [5/7] ARM: shmobile: r8a7791 dtsi: Add SYS-DMAC0 and SYS-DMAC1 nodes
->   [6/7] ARM: shmobile: koelsch dts: Enable sysdma0 and sysdma1
->   [7/7] ARM: shmobile: r8a7791 dtsi: Enable DMA for QSPI
-> 
->  Documentation/devicetree/bindings/dma/shdma.txt |   7 +-
->  arch/arm/boot/dts/r8a7791-koelsch.dts           |   8 ++
->  arch/arm/boot/dts/r8a7791.dtsi                  |  79 ++++++++++++++++-
->  drivers/dma/sh/shdmac.c                         |   1 +
->  include/dt-bindings/dma/r8a7791-dma.h           | 111 ++++++++++++++++++++++++
->  5 files changed, 201 insertions(+), 5 deletions(-)
->  create mode 100644 include/dt-bindings/dma/r8a7791-dma.h
-> 
-> Gr{oetje,eeting}s,
+On 1 June 2014 13:33, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+> On 30/05/14 20:20, Vincent Guittot wrote:
+>>
+>> On 30 May 2014 11:50, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+>>>
+>>> On 23/05/14 16:53, Vincent Guittot wrote:
+>>>>
+>>>> Monitor the activity level of each group of each sched_domain level. The
+>>>> activity is the amount of cpu_power that is currently used on a CPU or
+>>>> group
+>>>> of CPUs. We use the runnable_avg_sum and _period to evaluate this
+>>>> activity
+>>>> level. In the special use case where the CPU is fully loaded by more
+>>>> than 1
+>>>> task, the activity level is set above the cpu_power in order to reflect
+>>>> the
+>>>> overload of the CPU
+>>>>
+>>>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>>>
+>>>
+>>> [...]
+>>>
+>>>>   /*
+>>>>    * select_task_rq_fair: Select target runqueue for the waking task in
+>>>> domains
+>>>>    * that have the 'sd_flag' flag set. In practice, this is
+>>>> SD_BALANCE_WAKE,
+>>>> @@ -5518,6 +5535,7 @@ struct sg_lb_stats {
+>>>>        unsigned long sum_weighted_load; /* Weighted load of group's
+>>>> tasks */
+>>>>        unsigned long load_per_task;
+>>>>        unsigned long group_power;
+>>>> +     unsigned long group_activity; /* Total activity of the group */
+>>>>        unsigned int sum_nr_running; /* Nr tasks running in the group */
+>>>>        unsigned int group_capacity;
+>>>>        unsigned int idle_cpus;
+>>>> @@ -5538,6 +5556,7 @@ struct sd_lb_stats {
+>>>>        struct sched_group *busiest;    /* Busiest group in this sd */
+>>>>        struct sched_group *local;      /* Local group in this sd */
+>>>>        unsigned long total_load;       /* Total load of all groups in sd
+>>>> */
+>>>> +     unsigned long total_activity;  /* Total activity of all groups in
+>>>> sd */
+>>>>        unsigned long total_pwr;        /* Total power of all groups in
+>>>> sd */
+>>>>        unsigned long avg_load; /* Average load across all groups in sd
+>>>> */
+>>>>
+>>>> @@ -5557,6 +5576,7 @@ static inline void init_sd_lb_stats(struct
+>>>> sd_lb_stats *sds)
+>>>>                .busiest = NULL,
+>>>>                .local = NULL,
+>>>>                .total_load = 0UL,
+>>>> +             .total_activity = 0UL,
+>>>
+>>>
+>>> AFAICS, total_activity is not used right now. Do you intend to use it to
+>>> calculate something like avg_activity later (like total_load/avg_load)?
+>>
+>>
+>> this patch only creates group_activity and total_activity.The use of
+>> these statistics appears on the next patches. I have not planned to
+>> compute such avg_activity for the moment mainly because i have need it
+>> yet.
+>>
+>> Do you have in mind any use of such avg_activity ?
+>
+>
+> No, not really but I still don't see (taken all your patches) where
+> sds->total_activity is used.
+>
+> $ find . -name "*.[ch]" | xargs grep total_activity
+> ./kernel/sched/fair.c:  unsigned long total_activity;  /* Total activity of
+> all groups in sd */
+> ./kernel/sched/fair.c:          .total_activity = 0UL,
+> ./kernel/sched/fair.c:          sds->total_activity += sgs->group_activity;
+>
+> OOTH, sgs->group_activity is used to set sgs->group_capacity which is then
+> used in if conditions in update_sd_pick_busiest(), update_sd_lb_stats() and
+> find_busiest_group().
 
-Hi, thanks for testing against the current DMA series, I will try
-and get a new series out for you in the next few days with the
-changes to use 1 parameter phandles instead of 2 parameter ones.
+Sorry, i misread you 1st email and haven't understood that you were
+specifically speaking about total_activity.
+When i created the activity statistic, i have added both sg and sd
+fields but i finally only use the sg one. If i don't need the sd field
+after updating my patches, i will remove it
 
+Thanks
+Vincent
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+>
+> [...]
+>
+>
