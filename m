@@ -1,57 +1,43 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Mon,  2 Jun 2014 11:21:05 +0200
-Subject: [PATCH 4/5] ARM: dts: berlin: add SMP related nodes and properties
- for BG2
+Date: Mon,  2 Jun 2014 11:21:04 +0200
+Subject: [PATCH 3/5] Documentation: bindings: add the Berlin CPU control doc
 In-Reply-To: <1401700866-24804-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1401700866-24804-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1401700866-24804-5-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1401700866-24804-4-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add required nodes and properties into the Berlin BG2 device tree to
-take advantage of the newly introduced SMP support. Add the scu and
-cpu-ctrl nodes along with the CPUs enable-method property.
+Document the CPU control compatible, needed for the SMP support on
+Marvell Berlin SoCs.
 
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ Documentation/devicetree/bindings/arm/marvell,berlin.txt | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-index 56a1af2f1052..f38ddda8a75e 100644
---- a/arch/arm/boot/dts/berlin2.dtsi
-+++ b/arch/arm/boot/dts/berlin2.dtsi
-@@ -21,6 +21,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "marvell,berlin-smp";
+diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+index 0677003e1476..7f9b3ccdf25b 100644
+--- a/Documentation/devicetree/bindings/arm/marvell,berlin.txt
++++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+@@ -23,3 +23,19 @@ SoC and board used. Currently known SoC compatibles are:
  
- 		cpu at 0 {
- 			compatible = "marvell,pj4b";
-@@ -72,6 +73,11 @@
- 			cache-level = <2>;
- 		};
- 
-+		scu: snoop-control-unit at ad0000 {
-+			compatible = "arm,cortex-a9-scu";
-+			reg = <0xad0000 0x58>;
-+		};
+ 	...
+ }
 +
- 		gic: interrupt-controller at ad1000 {
- 			compatible = "arm,cortex-a9-gic";
- 			reg = <0xad1000 0x1000>, <0xad0100 0x0100>;
-@@ -86,6 +92,11 @@
- 			clocks = <&sysclk>;
- 		};
- 
-+		cpu-ctrl at dd0000 {
-+			compatible = "marvell,berlin-cpu-ctrl";
-+			reg = <0xdd0000 0x10000>;
-+		};
++* Marvell Berlin CPU control bindings
 +
- 		apb at e80000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
++CPU control register allows various operations on CPUs, like resetting them
++independently.
++
++Required properties:
++- compatible: should be "marvell,berlin-cpu-ctrl"
++- reg: address and length of the register set
++
++Example:
++
++cpu-ctrl at f7dd0000 {
++	compatible = "marvell,berlin-cpu-ctrl";
++	reg = <0xf7dd0000 0x10000>;
++};
 -- 
 1.9.1
