@@ -1,338 +1,279 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon,  2 Jun 2014 14:04:07 -0700
-Subject: =?UTF-8?q?=5BGIT=20PULL=204/7=5D=20ARM=3A=20SoC=20board=20support=20updates=20for=203=2E16?=
+Date: Mon,  2 Jun 2014 14:04:10 -0700
+Subject: [GIT PULL 7/7] ARM: SoC driver changes
 In-Reply-To: <1401743050-7379-1-git-send-email-olof@lixom.net>
 References: <1401743050-7379-1-git-send-email-olof@lixom.net>
-Message-ID: <1401743050-7379-5-git-send-email-olof@lixom.net>
+Message-ID: <1401743050-7379-8-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bulk of this branch is updates for Renesas Shmobile. They are still
-doing some enablement for classic boards first, and then come up with DT
-bindings when they've had a chance to learn more about the hardware. Not
-necessarily a bad way to go about it, and they're looking at moving some
-of the temporary board code resulting from it to drivers/staging instead
-to avoid the churn here.
+SoC-near driver changes that we're merging through our tree. Mostly
+because they depend on other changes we have staged, but in some cases
+because the driver maintainers preferred that we did it this way.
 
-As a result of the shmobile clock cleanups, we end up merging quite a
-bit of SH code here as well. We ended up merging it here instead of in
-the cleanup branch due to the other board changes depending on it.
+This contains a largeish cleanup series of the omap_l3_noc bus driver,
+cpuidle rework for Exynos, some reset driver conversions and a long
+branch of TI EDMA fixes and cleanups, with more to come next release.
 
+The TI EDMA cleanups is a shared branch with the dmaengine tree, with
+a handful of Davinci-specific fixes on top.
 
-Conflicts:
-
-arch/arm/boot/dts/Makefile:
-	Keep genmai, delete kxm9d and genmap-reference. (Yes, the same
-	target exists for LEGACY and MULTI in this case).
+After discussion at last year's KS (and some more on the mailing lists),
+we are here adding a drivers/soc directory. The purpose of this is
+to keep per-vendor shared code that's needed by different drivers but
+that doesn't fit into the MFD (nor drivers/platform) model. We expect
+to keep merging contents for this hierarchy through arm-soc so we can
+keep an eye on what the vendors keep adding here and not making it a
+free-for-all to shove in crazy stuff.
 
 ----------------------------------------------------------------
 
-The following changes since commit 41faf937ee7ab1297151ddf2ca0151157fd0405a:
+The following changes since commit 35683340e0e953a6c64fecffacf76478f01dcf1f:
 
-  Merge tag 'soc-for-3.16' into HEAD
+  Merge tag 'dt-for-3.16' into HEAD
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/boards-for-3.16
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/drivers-for-3.16
 
-for you to fetch changes up to 03a2ec647be0394b2b94b7a6a8af2310ad704c72:
+for you to fetch changes up to 45e70b7d48d53d5eb193c6b3f012b31ca135fb4c:
 
-  Merge tag 'davinci-for-v3.16/board' of git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci into next/boards
+  Merge tag 'samsung-drivers-2' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into next/drivers
 
 ----------------------------------------------------------------
 
-Alexandre Belloni (1):
-      ARM: multi_v7_defconfig: Select CONFIG_MACH_BERLIN_BG2Q
+Afzal Mohammed (2):
+      bus: omap_l3_noc: ignore masked out unclearable targets
+      bus: omap_l3_noc: Add AM4372 interconnect error data
 
-Andrew Lunn (2):
-      ARM: mvebu_v5_defconfig: Enable sound modules needed for t5325
-      ARM: multi_v5_defconfig: Enable sound modules needed for t5325
+Amit Daniel Kachhap (1):
+      ARM: EXYNOS: Move arm core power down clock to exynos5250 common clock
 
-Antoine T?nart (1):
-      ARM: multi_v7_defconfig: select CONFIG_GPIO_DWAPB
+Andy Gross (2):
+      soc: qcom: Add GSBI driver
+      tty: serial: msm: Remove direct access to GSBI
 
-Brian Norris (1):
-      ARM: mvebu: defconfig: add MTD_SPI_NOR (new dependency for M25P80)
+Arnd Bergmann (3):
+      Merge tag 'qcom-drivers-for-3.16' of git://git.kernel.org/.../galak/linux-qcom into next/drivers
+      Merge tag 'sunxi-drivers-for-3.16-2' of https://github.com/mripard/linux into next/drivers
+      soc: qcom: fix of_device_id table
 
-Ezequiel Garcia (2):
-      ARM: mvebu: Enable nfsroot in the defconfig
-      ARM: mvebu: enable fhandle in the defconfigs
+Boris BREZILLON (2):
+      reset: sunxi: document sunxi's reset controllers bindings
+      reset: sunxi: allow MFD subdevices probe
 
-Geert Uytterhoeven (5):
-      ARM: shmobile: multiplatform: Enable MSIOF in defconfig
-      ARM: shmobile: koelsch-reference: Work around core clock issues
-      ARM: shmobile: koelsch legacy: Enable Quad SPI transfers for the SPI FLASH
-      ARM: shmobile: lager legacy: Enable Quad SPI transfers for the SPI FLASH
-      ARM: shmobile: Add forward declaration of struct clk to silence warning
+Daniel Lezcano (20):
+      ARM: EXYNOS: Prevent forward declaration for cpuidle
+      ARM: EXYNOS: Use cpuidle_register
+      ARM: EXYNOS: Change function name prefix for cpuidle
+      ARM: EXYNOS: Encapsulate register access inside a function for pm
+      ARM: EXYNOS: Move some code inside the idle_finisher for cpuidle
+      ARM: EXYNOS: Fix S5P_WAKEUP_STAT call for cpuidle
+      ARM: EXYNOS: Use the cpu_pm notifier for pm
+      ARM: EXYNOS: Move scu_enable in the cpu_pm notifier
+      ARM: EXYNOS: Remove ifdef for scu_enable in pm
+      ARM: EXYNOS: Pass wakeup mask parameter to function for cpuidle
+      ARM: EXYNOS: Encapsulate boot vector code into a function for cpuidle
+      ARM: EXYNOS: Disable cpuidle for exynos5440
+      ARM: EXYNOS: Encapsulate the AFTR code into a function
+      ARM: EXYNOS: Move the AFTR state function into pm.c
+      ARM: EXYNOS: Move the power sequence call in the cpu_pm notifier
+      ARM: EXYNOS: Move S5P_CHECK_SLEEP into pm.c
+      ARM: EXYNOS: Pass the AFTR callback to the platform_data
+      ARM: EXYNOS: Cleanup all unneeded headers from cpuidle.c
+      ARM: EXYNOS: Move the driver to drivers/cpuidle directory
+      ARM: EXYNOS: Fix kernel panic when unplugging CPU1 on exynos
 
-Gregory CLEMENT (1):
-      ARM: configs: enable XHCI mvebu support in multi_v7_defconfig
+Florian Fainelli (3):
+      bus: add Broadcom GISB bus arbiter timeout/error handler
+      Documentation: devicetree: add Broadcom GISB arbiter bindings
+      Documentation: sysfs: add Broadcom GISB arbiter sysfs properties
 
-Kuninori Morimoto (3):
-      ARM: shmobile: bockw: remove old style audio clock
-      ARM: shmobile: bockw: switch to use dai info for R-Car sound
-      ARM: shmobile: lager: switch to use dai info for R-Car sound
+Ivan Khoronzhuk (3):
+      Documentation: dt: add bindings for keystone reset driver
+      Documentation: dt: add bindings for keystone pll control controller
+      power: reset: keystone-reset: introduce keystone reset driver
 
-Lad, Prabhakar (1):
-      ARM: sunxi: drop CONFIG_COMMON_CLK_DEBUG
+Joel Fernandes (4):
+      dmaengine: edma: Add DMA memcpy support
+      dmaengine: edma: No need save/restore interrupt flags during spin_lock in IRQ
+      dmaengine: edma: Document variables used for residue accounting
+      dmaengine: edma: update DMA memcpy to use new param element
 
-Laurent Pinchart (69):
-      clocksource: sh_cmt: Use request_irq() instead of setup_irq()
-      clocksource: sh_cmt: Split channel fields from sh_cmt_priv
-      clocksource: sh_cmt: Rename struct sh_cmt_priv to sh_cmt_device
-      clocksource: sh_cmt: Split channel setup to separate function
-      clocksource: sh_cmt: Constify name argument to sh_cmt_register()
-      clocksource: sh_cmt: Rename mapbase/mapbase_str to mapbase_ch/mapbase
-      clocksource: sh_cmt: Add memory base to sh_cmt_channel structure
-      clocksource: sh_cmt: Add index to struct sh_cmt_channel
-      clocksource: sh_cmt: Replace kmalloc + memset with kzalloc
-      clocksource: sh_cmt: Allocate channels dynamically
-      clocksource: sh_cmt: Split static information from sh_cmt_device
-      clocksource: sh_cmt: Replace hardcoded register values with macros
-      clocksource: sh_cmt: Set cpumask to cpu_possible_mask
-      clocksource: sh_cmt: Hardcode CMT clock event rating to 125
-      clocksource: sh_cmt: Hardcode CMT clock source rating to 125
-      clocksource: sh_cmt: Add support for multiple channels per device
-      clocksource: sh_cmt: Rename clock to "fck" in the non-legacy case
-      clocksource: sh_cmt: Remove FSF mail address from GPL notice
-      clocksource: sh_cmt: Sort headers alphabetically
-      clocksource: sh_cmt: Request IRQ for clock event device only
-      clocksource: sh_tmu: Use request_irq() instead of setup_irq()
-      clocksource: sh_tmu: Split channel fields from sh_tmu_priv
-      clocksource: sh_tmu: Rename struct sh_tmu_priv to sh_tmu_device
-      clocksource: sh_tmu: Split channel setup to separate function
-      clocksource: sh_tmu: Constify name argument to sh_tmu_register()
-      clocksource: sh_tmu: Add memory base to sh_tmu_channel structure
-      clocksource: sh_tmu: Add index to struct sh_tmu_channel
-      clocksource: sh_tmu: Replace kmalloc + memset with kzalloc
-      clocksource: sh_tmu: Allocate channels dynamically
-      clocksource: sh_tmu: Replace hardcoded register values with macros
-      clocksource: sh_tmu: Hardcode TMU clock event and source ratings to 200
-      clocksource: sh_tmu: Add support for multiple channels per device
-      clocksource: sh_tmu: Rename clock to "fck" in the non-legacy case
-      clocksource: sh_tmu: Remove FSF mail address from GPL notice
-      clocksource: sh_tmu: Sort headers alphabetically
-      clocksource: sh_mtu2: Use request_irq() instead of setup_irq()
-      clocksource: sh_mtu2: Turn sh_mtu2_priv fields into local variables
-      clocksource: sh_mtu2: Split channel fields from sh_mtu2_priv
-      clocksource: sh_mtu2: Rename struct sh_mtu2_priv to sh_mtu2_device
-      clocksource: sh_mtu2: Split channel setup to separate function
-      clocksource: sh_mtu2: Constify name argument to sh_mtu2_register()
-      clocksource: sh_mtu2: Add memory base to sh_mtu2_channel structure
-      clocksource: sh_mtu2: Add index to struct sh_mtu2_channel
-      clocksource: sh_mtu2: Replace kmalloc + memset with kzalloc
-      clocksource: sh_mtu2: Allocate channels dynamically
-      clocksource: sh_mtu2: Replace hardcoded register values with macros
-      clocksource: sh_mtu2: Set cpumask to cpu_possible_mask
-      clocksource: sh_mtu2: Hardcode MTU2 clock event rating to 200
-      clocksource: sh_mtu2: Add support for multiple channels per device
-      clocksource: sh_mtu2: Rename clock to "fck" in the non-legacy case
-      clocksource: sh_mtu2: Remove FSF mail address from GPL notice
-      clocksource: sh_mtu2: Sort headers alphabetically
-      sh: Switch to new style CMT device
-      ARM: shmobile: sh7372: Switch to new style CMT device
-      ARM: shmobile: sh73a0: Switch to new style CMT device
-      ARM: shmobile: r8a73a4: Switch to new style CMT device
-      ARM: shmobile: r8a7740: Switch to new style CMT device
-      ARM: shmobile: r8a7790: Switch to new style CMT device
-      ARM: shmobile: r8a7791: Switch to new style CMT device
-      sh: Switch to new style TMU device
-      ARM: shmobile: sh7372: Switch to new style TMU device
-      ARM: shmobile: sh73a0: Switch to new style TMU device
-      ARM: shmobile: r8a7740: Switch to new style TMU device
-      ARM: shmobile: r8a7778: Switch to new style TMU device
-      ARM: shmobile: r8a7779: Switch to new style TMU device
-      sh: Switch to new style MTU2 device
-      ARM: shmobile: r7s72100: Switch to new style MTU2 device
-      ARM: shmobile: lager: Enable SCIF0 and SCIF1 serial ports in DT
-      ARM: shmobile: koelsch: Enable SCIF0 and SCIF1 serial ports in DT
+Kukjin Kim (1):
+      Merge branch 'v3.16-next/clk-samsung' into v3.16-next/cpuidle-exynos
 
-Magnus Damm (9):
-      ARM: shmobile: Include i2c-shmobile.c in shmobile_defconfig
-      ARM: shmobile: Include at24.c in shmobile_defconfig
-      ARM: shmobile: Enable HIGHMEM in shmobile_defconfig
-      ARM: shmobile: Enable VSP1 in shmobile_defconfig
-      ARM: shmobile: Use shmobile_clk_workaround() on Lager
-      ARM: shmobile: Use shmobile_clk_workaround() on Koelsch
-      ARM: shmobile: Add Lager clock workarounds for SDHI and MMCIF
-      ARM: shmobile: Add Koelsch clock workarounds for SDHI
-      ARM: shmobile: Minor cleanup of the Armadillo legacy board code
+Maxime Ripard (1):
+      power: reset: Add Allwinner A31 reset code
 
-Olof Johansson (14):
-      Merge tag 'renesas-defconfig-for-v3.16' of git://git.kernel.org/.../horms/renesas into next/boards
-      Merge branch 'renesas/clock' into next/boards
-      Merge tag 'renesas-boards-for-v3.16' of git://git.kernel.org/.../horms/renesas into next/boards
-      Merge tag 'mvebu-defconfig-3.16' of git://git.infradead.org/linux-mvebu into next/boards
-      Merge tag 'renesas-boards2-for-v3.16' of git://git.kernel.org/.../horms/renesas into next/boards
-      Merge branch 'depends/clockevents-cleanups' into next/boards
-      Merge tag 'renesas-clock-cleanup2-for-v3.16' of git://git.kernel.org/.../horms/renesas into next/boards
-      Merge tag 'renesas-dt-scif-for-v3.16' of git://git.kernel.org/.../horms/renesas into next/boards
-      Merge tag 'renesas-r7s72100-ccf-for-v3.16' of git://git.kernel.org/.../horms/renesas into next/boards
-      Merge tag 'sunxi-defconfig-for-3.16' of https://github.com/mripard/linux into next/boards
-      Merge tag 'tegra-for-3.16-defconfig' of git://git.kernel.org/.../tegra/linux into next/boards
-      Merge tag 'renesas-r7s72100-ccf2-for-v3.16' of git://git.kernel.org/.../horms/renesas into next/boards
-      Merge tag 'omap-for-v3.16/board-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/boards
-      Merge tag 'davinci-for-v3.16/board' of git://git.kernel.org/.../nsekhar/linux-davinci into next/boards
+Nishanth Menon (14):
+      bus: omap_l3_noc: Fix copyright information
+      bus: omap_l3_noc: remove iclk from omap_l3 struct
+      bus: omap_l3_noc: populate l3->dev and use it
+      bus: omap_l3_noc: switch over to relaxed variants of readl/writel
+      bus: omap_l3_noc: un-obfuscate l3_targ address computation
+      bus: omap_l3_noc: move L3 master data structure out
+      bus: omap_l3_noc: convert target information into a structure
+      bus: omap_l3_noc: convert flagmux information into a structure
+      bus: omap_l3_noc: fix masterid detection
+      bus: omap_l3_noc: make error reporting and handling common
+      bus: omap_l3_noc: improve readability by using helper for slave event parsing
+      bus: omap_l3_noc: add information about the type of operation
+      bus: omap_l3_noc: Add information about the context of operation
+      bus: omap_l3_noc: introduce concept of submodule
 
-Paul Bolle (6):
-      ARM: OMAP: omap3stalker: remove two Kconfig macros
-      ARM: OMAP: remove some dead code
-      ARM: OMAP: SX1: remove check for CONFIG_SX1_OLD_FLASH
-      ARM: OMAP: AM3517EVM: remove check for CONFIG_PANEL_SHARP_LQ043T1DG01
-      ARM: OMAP: replace checks for CONFIG_USB_GADGET_OMAP
-      ARM: davinci: remove checks for CONFIG_USB_MUSB_PERIPHERAL
+Olof Johansson (11):
+      Merge tag 'socfpga-driver-update-for-3.16' of git://git.rocketboards.org/linux-socfpga-next into next/drivers
+      Merge tag 'mvebu-drivers-3.16' of git://git.infradead.org/linux-mvebu into next/drivers
+      Merge branch 'sunxi/drivers-for-3.16' of https://github.com/mripard/linux into next/drivers
+      Merge tag 'samsung-drivers' of http://git.kernel.org/.../kgene/linux-samsung into next/drivers
+      Merge tag 'omap-for-v3.16/l3-noc-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/drivers
+      Merge tag 'davinci-fixes-for-v3.15-rc4' of git://git.kernel.org/.../nsekhar/linux-davinci into next/drivers
+      Merge tag 'davinci-for-v3.16/edma' of git://git.kernel.org/.../nsekhar/linux-davinci into next/drivers
+      Merge tag 'keystone-reset-driver' of git://git.kernel.org/.../ssantosh/linux-keystone into next/drivers
+      Merge tag 'exynos-cpuidle' of http://git.kernel.org/.../kgene/linux-samsung into next/drivers
+      Merge tag 'qcom-drivers-for-3.16-2' of git://git.kernel.org/.../galak/linux-qcom into next/drivers
+      Merge tag 'samsung-drivers-2' of git://git.kernel.org/.../kgene/linux-samsung into next/drivers
 
-Sebastian Reichel (1):
-      ARM: OMAP2+: Add support for RNG on DT booted N900
+Peter Ujfalusi (29):
+      platform_data: edma: Be precise with the paRAM struct
+      arm: common: edma: Save the number of event queues/TCs
+      dmaengine: edma: Correct the handling of src/dst_maxburst == 0
+      dmaengine: edma: Add support for DMA_PAUSE/RESUME operation
+      dmaengine: edma: Set DMA_CYCLIC capability flag
+      dmaengine: edma: Reduce debug print verbosity for non verbose debugging
+      dmaengine: edma: Implement device_slave_caps callback
+      dmaengine: edma: Prefix debug prints where the text were identical in prep callbacks
+      dmaengine: edma: Print the direction value as well when it is not supported
+      dmaengine: edma: Add channel number to debug prints
+      drivers: bus: omap_l3: Convert to use devm_kzalloc
+      drivers: bus: omap_l3: Convert to use devm_ioremap_resource()
+      drivers: bus: omap_l3: Convert to use devm_request_irq()
+      drivers: bus: omap_l3: Remove the platform driver's remove function
+      drivers: bus: omap_l3: Change pr_crit() to dev_err() when IRQ request fails
+      ARM: edma: Clean up and simplify the code around irq request
+      ARM: edma: No need to clean the pdata in edma_of_parse_dt()
+      ARM: edma: Take the number of tc from edma_soc_info (pdata)
+      ARM: edma: Do not change TC -> Queue mapping, leave it to default.
+      ARM: davinci: Remove eDMA3 queue_tc_mapping data from edma_soc_info
+      ARM: edma: Remove queue_tc_mapping data from edma_soc_info
+      ARM: edma: Remove num_cc member from struct edma
+      ARM: edma: Save number of regions from pdata to struct edma
+      ARM: edma: Get IP configuration from HW (number of channels, tc, etc)
+      dt/bindings: ti,edma: Remove redundant properties from documentation
+      ARM: dts: am33xx: Remove obsolete properties from edma node
+      ARM: dts: am4372: Remove obsolete properties from edma node
+      ARM: davinci: Remove redundant/unused parameters for edma
+      ARM: edma: Remove redundant/unused parameters from edma_soc_info
 
-Simon Horman (7):
-      ARM: shmobile: Enable USB [EO]HCI HCD support in shmobile_defconfig
-      ARM: shmobile: koelsch: Annotate clk_names with __initconst
-      ARM: shmobile: lager: Annotate clk_names with __initconst
-      ARM: shmobile: koelsch-reference: Annotate clk_enables as __initconst
-      ARM: shmobile: lager-reference: Work around core clock issues
-      Merge tag 'renesas-clock-for-v3.16' into cmt-mtu2-tmu-cleanups-for-v3.16
-      Merge branch 'clockevents/cmt-mtu2-tmu-cleanups' of git://git.linaro.org/people/daniel.lezcano/linux into cmt-mtu2-tmu-cleanups-for-v3.16
+Rajendra Nayak (2):
+      bus: omap_l3_noc: Add support for discountinous flag mux input numbers
+      bus: omap_l3_noc: Add DRA7 interconnect error data
 
-Stefan Agner (1):
-      ARM: add drivers for Colibri T30 to multi_v7_defconfig
+Santosh Shilimkar (1):
+      soc: Introduce drivers/soc place-holder for SOC specific drivers
 
-Stephen Warren (2):
-      ARM: multi_v7: enable AT24C EEPROM driver
-      ARM: tegra: tegra_defconfig updates
+Sricharan R (2):
+      bus: omap_l3_noc: rename functions and data to omap_l3
+      bus: omap_l3_noc: use of_match_data to pick up SoC information
 
-Thomas Petazzoni (3):
-      ARM: configs: add CONFIG_MMC_SDHCI_PXAV3 to the mvebu_v7_defconfig
-      ARM: configs: add ahci_mvebu to mvebu_v7_defconfig
-      ARM: configs: add CONFIG_MMC_SDHCI_PXAV3 to the multi_v7_defconfig
+Steffen Trumtrar (1):
+      reset: add driver for socfpga
 
-Ulrich Hecht (1):
-      ARM: shmobile: Enable USBHS gadget support in shmobile_defconfig
+Thomas Gleixner (6):
+      dmaengine: edma: Sanitize residue reporting
+      dmaengine: edma: Check the current decriptor first in tx_status()
+      dmaengine: edma: Create private pset struct
+      dmaengine: edma: Store transfer data in edma_desc and edma_pset
+      dmaengine: edma: Make reading the position of active channels work
+      dmaengine: edma: Provide granular accounting
 
-Wolfram Sang (16):
-      ARM: shmobile: r7s72100: document MSTP clock support
-      ARM: shmobile: r7s72100: add essential clock nodes to dtsi
-      ARM: shmobile: r7s72100: genmai: populate nodes for external clocks
-      ARM: shmobile: r7s72100: add scif nodes to dtsi
-      ARM: shmobile: r7s72100: genmai: add uart alias and activate scif2 as console
-      ARM: shmobile: r7s72100: genmai: platform scif devices only for legacy support
-      ARM: shmobile: r7s72100: add i2c clocks to dtsi
-      ARM: shmobile: r7s72100: remove I2C DT clocks from legacy clock support
-      ARM: shmobile: r7s72100: add spi clocks to dtsi
-      ARM: shmobile: r7s72100: remove SPI DT clocks from legacy clock support
-      ARM: shmobile: r7s72100: use workaround for non DT-clocks
-      ARM: shmobile: Remove non-multiplatform Genmai reference support
-      ARM: shmobile: genmai-reference: Remove legacy clock support
-      ARM: shmobile: Sync Genmai DTS with Genmai reference DTS
-      ARM: shmobile: Let Genmai multiplatform boot with Genmai DTB
-      ARM: shmobile: Remove Genmai reference DTS
+Thomas Petazzoni (5):
+      memory: mvebu-devbus: use ARMADA_ prefix in defines
+      memory: mvebu-devbus: use _SHIFT suffixes instead of _BIT
+      memory: mvebu-devbus: split functions
+      memory: mvebu-devbus: add Orion5x support
+      memory: mvebu-devbus: add a devbus, keep-config property
+
+Tomasz Figa (1):
+      cpufreq: exynos: Fix driver compilation with ARCH_MULTIPLATFORM
+
+Vincent Guittot (1):
+      clocksource: exynos_mct: register sched_clock callback
 
 
- .../bindings/clock/renesas,cpg-mstp-clocks.txt  |   1 +
- arch/arm/boot/dts/Makefile                      |   3 +-
- arch/arm/boot/dts/r7s72100-genmai-reference.dts |  42 -
- arch/arm/boot/dts/r7s72100-genmai.dts           |  30 +-
- arch/arm/boot/dts/r7s72100.dtsi                 | 215 ++++-
- arch/arm/boot/dts/r8a7790-lager.dts             |  21 +-
- arch/arm/boot/dts/r8a7791-koelsch.dts           |  21 +-
- arch/arm/configs/davinci_all_defconfig          |   1 -
- arch/arm/configs/dove_defconfig                 |   2 +-
- arch/arm/configs/kirkwood_defconfig             |   1 +
- arch/arm/configs/multi_v5_defconfig             |   3 +-
- arch/arm/configs/multi_v7_defconfig             |  11 +
- arch/arm/configs/mvebu_v5_defconfig             |   5 +-
- arch/arm/configs/mvebu_v7_defconfig             |   9 +
- arch/arm/configs/shmobile_defconfig             |  14 +
- arch/arm/configs/sunxi_defconfig                |   1 -
- arch/arm/configs/tegra_defconfig                |  10 +
- arch/arm/mach-davinci/board-dm355-evm.c         |   4 -
- arch/arm/mach-davinci/board-dm355-leopard.c     |   4 -
- arch/arm/mach-omap1/board-h2.c                  |   2 +-
- arch/arm/mach-omap1/board-h3.c                  |   2 +-
- arch/arm/mach-omap1/board-innovator.c           |   2 +-
- arch/arm/mach-omap1/board-osk.c                 |   2 +-
- arch/arm/mach-omap1/board-sx1.c                 |  26 -
- arch/arm/mach-omap1/pm.c                        |  13 +-
- arch/arm/mach-omap2/board-am3517evm.c           |   5 -
- arch/arm/mach-omap2/board-omap3stalker.c        |   4 -
- arch/arm/mach-omap2/pdata-quirks.c              |  12 +
- arch/arm/mach-shmobile/Kconfig                  |  11 -
- arch/arm/mach-shmobile/Makefile                 |   1 -
- arch/arm/mach-shmobile/Makefile.boot            |   1 -
- arch/arm/mach-shmobile/board-armadillo800eva.c  |   7 +-
- arch/arm/mach-shmobile/board-bockw.c            |  63 +-
- arch/arm/mach-shmobile/board-genmai-reference.c |  18 +-
- arch/arm/mach-shmobile/board-genmai.c           |  44 +
- .../arm/mach-shmobile/board-koelsch-reference.c |  71 +-
- arch/arm/mach-shmobile/board-koelsch.c          |   2 +-
- arch/arm/mach-shmobile/board-lager-reference.c  |  69 +-
- arch/arm/mach-shmobile/board-lager.c            |  29 +-
- arch/arm/mach-shmobile/clock-r7s72100.c         |  11 +-
- arch/arm/mach-shmobile/clock-r8a73a4.c          |   2 +-
- arch/arm/mach-shmobile/clock-r8a7740.c          |  10 +-
- arch/arm/mach-shmobile/clock-r8a7778.c          |   4 +-
- arch/arm/mach-shmobile/clock-r8a7779.c          |   4 +-
- arch/arm/mach-shmobile/clock-r8a7790.c          |   2 +-
- arch/arm/mach-shmobile/clock-r8a7791.c          |   2 +-
- arch/arm/mach-shmobile/clock-sh7372.c           |   9 +-
- arch/arm/mach-shmobile/clock-sh73a0.c           |   5 +-
- arch/arm/mach-shmobile/include/mach/clock.h     |   1 +
- arch/arm/mach-shmobile/setup-r7s72100.c         |  69 +-
- arch/arm/mach-shmobile/setup-r8a73a4.c          |  17 +-
- arch/arm/mach-shmobile/setup-r8a7740.c          | 133 +--
- arch/arm/mach-shmobile/setup-r8a7778.c          |  28 +-
- arch/arm/mach-shmobile/setup-r8a7779.c          |  66 +-
- arch/arm/mach-shmobile/setup-r8a7790.c          |  25 +-
- arch/arm/mach-shmobile/setup-r8a7791.c          |  25 +-
- arch/arm/mach-shmobile/setup-sh7372.c           |  89 +-
- arch/arm/mach-shmobile/setup-sh73a0.c           |  92 +-
- arch/sh/kernel/cpu/clock-cpg.c                  |  10 +-
- arch/sh/kernel/cpu/sh2/setup-sh7619.c           |  66 +-
- arch/sh/kernel/cpu/sh2a/clock-sh7264.c          |   4 +-
- arch/sh/kernel/cpu/sh2a/clock-sh7269.c          |   4 +-
- arch/sh/kernel/cpu/sh2a/setup-mxg.c             |  98 +-
- arch/sh/kernel/cpu/sh2a/setup-sh7201.c          |  98 +-
- arch/sh/kernel/cpu/sh2a/setup-sh7203.c          | 133 +--
- arch/sh/kernel/cpu/sh2a/setup-sh7206.c          | 164 +---
- arch/sh/kernel/cpu/sh2a/setup-sh7264.c          | 140 +--
- arch/sh/kernel/cpu/sh2a/setup-sh7269.c          | 133 +--
- arch/sh/kernel/cpu/sh3/setup-sh7705.c           |  78 +-
- arch/sh/kernel/cpu/sh3/setup-sh770x.c           |  78 +-
- arch/sh/kernel/cpu/sh3/setup-sh7710.c           |  78 +-
- arch/sh/kernel/cpu/sh3/setup-sh7720.c           | 228 +----
- arch/sh/kernel/cpu/sh4/setup-sh4-202.c          |  78 +-
- arch/sh/kernel/cpu/sh4/setup-sh7750.c           | 138 +--
- arch/sh/kernel/cpu/sh4/setup-sh7760.c           |  78 +-
- arch/sh/kernel/cpu/sh4a/clock-sh7343.c          |   2 +-
- arch/sh/kernel/cpu/sh4a/clock-sh7366.c          |   2 +-
- arch/sh/kernel/cpu/sh4a/clock-sh7722.c          |   6 +-
- arch/sh/kernel/cpu/sh4a/clock-sh7723.c          |  10 +-
- arch/sh/kernel/cpu/sh4a/clock-sh7724.c          |  10 +-
- arch/sh/kernel/cpu/sh4a/clock-sh7734.c          |  12 +-
- arch/sh/kernel/cpu/sh4a/clock-sh7757.c          |   4 +-
- arch/sh/kernel/cpu/sh4a/clock-sh7785.c          |   8 +-
- arch/sh/kernel/cpu/sh4a/clock-sh7786.c          |  16 +-
- arch/sh/kernel/cpu/sh4a/clock-shx3.c            |   8 +-
- arch/sh/kernel/cpu/sh4a/setup-sh7343.c          |  96 +-
- arch/sh/kernel/cpu/sh4a/setup-sh7366.c          |  96 +-
- arch/sh/kernel/cpu/sh4a/setup-sh7722.c          |  96 +-
- arch/sh/kernel/cpu/sh4a/setup-sh7723.c          | 172 +---
- arch/sh/kernel/cpu/sh4a/setup-sh7724.c          | 173 +---
- arch/sh/kernel/cpu/sh4a/setup-sh7734.c          | 235 +----
- arch/sh/kernel/cpu/sh4a/setup-sh7757.c          |  48 +-
- arch/sh/kernel/cpu/sh4a/setup-sh7763.c          | 154 +--
- arch/sh/kernel/cpu/sh4a/setup-sh7770.c          | 230 +----
- arch/sh/kernel/cpu/sh4a/setup-sh7780.c          | 154 +--
- arch/sh/kernel/cpu/sh4a/setup-sh7785.c          | 154 +--
- arch/sh/kernel/cpu/sh4a/setup-sh7786.c          | 299 +-----
- arch/sh/kernel/cpu/sh4a/setup-shx3.c            | 150 +--
- arch/sh/kernel/cpu/sh5/setup-sh5.c              |  79 +-
- drivers/clocksource/sh_cmt.c                    | 956 ++++++++++++-------
- drivers/clocksource/sh_mtu2.c                   | 488 +++++++---
- drivers/clocksource/sh_tmu.c                    | 541 +++++++----
- drivers/usb/phy/phy-isp1301-omap.c              |   2 +-
- include/dt-bindings/clock/r7s72100-clock.h      |  41 +
- include/linux/sh_timer.h                        |   1 +
- 105 files changed, 2435 insertions(+), 4790 deletions(-)
- delete mode 100644 arch/arm/boot/dts/r7s72100-genmai-reference.dts
- create mode 100644 include/dt-bindings/clock/r7s72100-clock.h
+ .../ABI/testing/sysfs-platform-brcmstb-gisb-arb |   8 +
+ .../devicetree/bindings/arm/omap/l3-noc.txt     |   2 +
+ .../devicetree/bindings/bus/brcm,gisb-arb.txt   |  30 +
+ .../bindings/clock/ti-keystone-pllctrl.txt      |  20 +
+ .../devicetree/bindings/dma/ti-edma.txt         |  13 +-
+ .../memory-controllers/mvebu-devbus.txt         |  32 +-
+ .../bindings/power/reset/keystone-reset.txt     |  67 +++
+ .../reset/allwinner,sunxi-clock-reset.txt       |  21 +
+ arch/arm/boot/dts/am33xx.dtsi                   |   3 -
+ arch/arm/boot/dts/am4372.dtsi                   |   3 -
+ arch/arm/common/edma.c                          | 197 ++++---
+ arch/arm/mach-davinci/devices-da8xx.c           |  31 --
+ arch/arm/mach-davinci/dm355.c                   |  14 -
+ arch/arm/mach-davinci/dm365.c                   |  16 -
+ arch/arm/mach-davinci/dm644x.c                  |  14 -
+ arch/arm/mach-davinci/dm646x.c                  |  16 -
+ arch/arm/mach-exynos/Makefile                   |   1 -
+ arch/arm/mach-exynos/common.h                   |   2 +
+ arch/arm/mach-exynos/cpuidle.c                  | 255 ---------
+ arch/arm/mach-exynos/exynos.c                   |   8 +-
+ arch/arm/mach-exynos/platsmp.c                  |   2 +-
+ arch/arm/mach-exynos/pm.c                       | 152 +++++-
+ arch/arm/mach-exynos/regs-pmu.h                 |   2 -
+ drivers/Kconfig                                 |   2 +
+ drivers/Makefile                                |   3 +
+ drivers/bus/Kconfig                             |   8 +
+ drivers/bus/Makefile                            |   1 +
+ drivers/bus/brcmstb_gisb.c                      | 289 ++++++++++
+ drivers/bus/omap_l3_noc.c                       | 406 ++++++++------
+ drivers/bus/omap_l3_noc.h                       | 545 ++++++++++++++-----
+ drivers/clk/samsung/clk-exynos5250.c            |  42 ++
+ drivers/clocksource/exynos_mct.c                |   8 +
+ drivers/cpufreq/Kconfig.arm                     |   6 +-
+ drivers/cpufreq/exynos-cpufreq.c                |   2 -
+ drivers/cpufreq/exynos-cpufreq.h                |  30 +-
+ drivers/cpufreq/exynos4210-cpufreq.c            |  39 +-
+ drivers/cpufreq/exynos4x12-cpufreq.c            |  40 +-
+ drivers/cpufreq/exynos5250-cpufreq.c            |  43 +-
+ drivers/cpuidle/Kconfig.arm                     |   6 +
+ drivers/cpuidle/Makefile                        |   1 +
+ drivers/cpuidle/cpuidle-exynos.c                |  99 ++++
+ drivers/dma/edma.c                              | 335 +++++++++---
+ drivers/memory/mvebu-devbus.c                   | 229 +++++---
+ drivers/power/reset/Kconfig                     |  15 +
+ drivers/power/reset/Makefile                    |   2 +
+ drivers/power/reset/keystone-reset.c            | 166 ++++++
+ drivers/power/reset/sun6i-reboot.c              |  85 +++
+ drivers/reset/Makefile                          |   1 +
+ drivers/reset/reset-socfpga.c                   | 146 +++++
+ drivers/reset/reset-sunxi.c                     |  21 +-
+ drivers/soc/Kconfig                             |   5 +
+ drivers/soc/Makefile                            |   5 +
+ drivers/soc/qcom/Kconfig                        |  11 +
+ drivers/soc/qcom/Makefile                       |   1 +
+ drivers/soc/qcom/qcom_gsbi.c                    |  85 +++
+ drivers/tty/serial/msm_serial.c                 |  48 +-
+ drivers/tty/serial/msm_serial.h                 |   5 -
+ include/linux/platform_data/edma.h              |  28 +-
+ 58 files changed, 2605 insertions(+), 1062 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-platform-brcmstb-gisb-arb
+ create mode 100644 Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/ti-keystone-pllctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/power/reset/keystone-reset.txt
+ create mode 100644 Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
+ delete mode 100644 arch/arm/mach-exynos/cpuidle.c
+ create mode 100644 drivers/bus/brcmstb_gisb.c
+ create mode 100644 drivers/cpuidle/cpuidle-exynos.c
+ create mode 100644 drivers/power/reset/keystone-reset.c
+ create mode 100644 drivers/power/reset/sun6i-reboot.c
+ create mode 100644 drivers/reset/reset-socfpga.c
+ create mode 100644 drivers/soc/Kconfig
+ create mode 100644 drivers/soc/Makefile
+ create mode 100644 drivers/soc/qcom/Kconfig
+ create mode 100644 drivers/soc/qcom/Makefile
+ create mode 100644 drivers/soc/qcom/qcom_gsbi.c
