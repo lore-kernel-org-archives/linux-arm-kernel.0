@@ -1,28 +1,30 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 1 Jun 2014 20:28:34 -0700
-Subject: linux-next: manual merge of the arm-soc tree with the arm tree
-In-Reply-To: <20140602104957.21878870@canb.auug.org.au>
-References: <20140602104957.21878870@canb.auug.org.au>
-Message-ID: <CAOesGMhDqYKSvxTK9pDnvWbmEUK_WUFKxGLJemZO6uFxtROcLg@mail.gmail.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 02 Jun 2014 08:24:34 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzNdIEFSTTogaS5NWDogYXZpYzogVXNlIGlycWNoaXBf?=
+ =?UTF-8?B?aW5pdCgpIGZvciBJUlEgaW5pdGlhbGl6YXRpb24gaW4gRFQgY2FzZQ==?=
+In-Reply-To: <20140602022120.GL8860@dragon>
+References: <1401516095-31020-1-git-send-email-shc_work@mail.ru>
+ <20140602022120.GL8860@dragon>
+Message-ID: <1401683074.224894202@f141.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 1, 2014 at 5:49 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi all,
->
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> arch/arm/mach-exynos/exynos.c between commits dfbdd3d55403 ("ARM: l2c:
-> exynos: remove cache size override"), 25a9ef63cd2b ("ARM: l2c: exynos:
-> convert to common l2c310 early resume functionality") and 15b0bc4041ba
-> ("ARM: l2c: exynos: convert to generic l2c OF initialisation (and
-> thereby fix it)") from the arm tree and commit b5b9324a6296 ("ARM:
-> exynos: don't run exynos4 l2x0 setup on other platforms") from the
-> arm-soc tree.
->
-> I fixed it up (the former removes the code updated by the latter) and
-> can carry the fix as necessary (no action is required).
+Mon, 2 Jun 2014 10:21:21 +0800 ?? Shawn Guo <shawn.guo@freescale.com>:
+> On Sat, May 31, 2014 at 10:01:30AM +0400, Alexander Shiyan wrote:
+> > Use generic irqchip_init() DT call to initialize IRQs, so after this patch,
+> > the mxc-avic driver is quite prepared to move to drivers/irqchip.
+> 
+> What's the whole plan of the moving?  IOW, what's left after this patch
+> and what's the plan for those?
 
-Looks good. Thanks.
+For the full movement of these drivers into drivers/irqchip, we need to find a
+solution for i.MX specific functions, such as mxc_set_irq_fiq() and
+tzic_enable_wake(). I haven't found a good solution yet...
 
+> > As a temporary solution to do it, we use OF_DECLARE_2()
+> 
+> I do not see OF_DECLARE_2() is defined anywhere?
 
--Olof
+<include/linux/of.h>
+
+---
