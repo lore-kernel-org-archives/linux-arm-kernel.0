@@ -1,57 +1,45 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 2 Jun 2014 19:07:59 +0200
-Subject: [GIT PULL] at91: drivers for 3.16 #1
-In-Reply-To: <CAOesGMj1FuozbydRf=J7jWFt_8GZ8ZKZReg_1BmvPC706cZ7rQ@mail.gmail.com>
-References: <1401726901-19093-1-git-send-email-nicolas.ferre@atmel.com>
- <CAOesGMj1FuozbydRf=J7jWFt_8GZ8ZKZReg_1BmvPC706cZ7rQ@mail.gmail.com>
-Message-ID: <20140602170758.GA17518@piout.net>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 2 Jun 2014 19:14:28 +0200
+Subject: [PATCH v3 1/6] i2c: s3c2410: Handle i2c sys_cfg register in i2c
+ driver
+In-Reply-To: <1399706419-13976-2-git-send-email-pankaj.dubey@samsung.com>
+References: <1399706287-13919-1-git-send-email-y@samsung.com>
+ <1399706419-13976-1-git-send-email-pankaj.dubey@samsung.com>
+ <1399706419-13976-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <20140602171428.GK2654@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 02/06/2014 at 09:37:01 -0700, Olof Johansson wrote :
-> On Mon, Jun 2, 2014 at 9:35 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> > Arnd, Olof, Kevin,
-> >
-> > Here is an additional AT91 pull-request for 3.16 about drivers and
-> > particularly focused on PWM.
-> > Alexandre did a great job replacing the existing calls to the older,
-> > non-standard drivers by the use of the newer "pwm-atmel" which takes
-> > advantage of the PWM framework.
-> > In addition of removing three obsolete drivers, it also solves an issue with
-> > non existing Kconfig symbols introduced by (misc: atmel_pwm: only build for
-> > supported platforms) which was trying to avoid a build failure... so, all in
-> > all, a pretty good thing!
-> >
-> > The drawback is that this series depends on two git trees:
-> >
-> > Obviously, one from Thierry:
-> > git://git.kernel.org/pub/scm/linux/kernel/git/thierry.reding/linux-pwm
-> >
-> > And as well the one from Greg who took Arnd's patch for Kconfig:
-> > git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/char-misc
-> >
-> > Tell me if you feel it is the proper way to deal with this or if it is too late
-> > for this round (look at the diffstat, yummy ;-))
-> >
-> > Thanks, best regards,
-> >
-> > The following changes since commit fa264e615338c423e344d34621f992858b957097:
-> >
-> >   Merge branch 'char-misc-next' of git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/char-misc into at91-3.16-drivers (2014-06-02 18:02:18 +0200)
-> >
-> > are available in the git repository at:
-> >
-> >
-> >   git://github.com/at91linux/linux-at91.git tags/at91-drivers
+On Sat, May 10, 2014 at 04:20:14PM +0900, Pankaj Dubey wrote:
+> Let's handle i2c interrupt re-configuration in i2c driver. This will
+> help us in removing some soc specific checks from machine files.
+> Since only Exynos5250, and Exynos5420 need to do this, added syscon
+> based phandle to i2c device nodes of respective SoC DT files.
+> Also handle saving and restoring of SYS_I2C_CFG register during
+> suspend and resume of i2c driver. This will help in removing soc
+> specific check from mach-exynos/pm.c.
 > 
-> The 3.16 merge window is open, please resend after -rc1.
-> 
+> CC: Rob Herring <robh+dt@kernel.org>
+> CC: Randy Dunlap <rdunlap@infradead.org>
+> CC: Wolfram Sang <wsa@the-dreams.de>
+> CC: Russell King <linux@arm.linux.org.uk>
+> CC: devicetree at vger.kernel.org
+> CC: linux-doc at vger.kernel.org
+> CC: linux-i2c at vger.kernel.org
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 
-Hopefully, this will solve our dependency issues :)
+Shall this go via i2c-tree? Looks to me like it should go with the rest
+of the series? Patch is mostly okay (only reviewed the code, not the
+bindings), one nit:
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> +	regmap_update_bits(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, BIT(id), val);
+
+Hardcode the '0' and drop using 'val'?
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140602/40aacffb/attachment.sig>
