@@ -1,38 +1,70 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 2 Jun 2014 23:16:27 +0100
-Subject: [PATCH 2/3] arm: tegra: enable igb, stmpe, i2c chardev, spidev,
- lm95245, pwm leds
-In-Reply-To: <538CA635.4050502@ziswiler.com>
-References: <c5522b0efcbfc7690dcde6aaf78b9dd568f99604.1401665237.git.marcel@ziswiler.com>
- <39a8704a4c8170d6b0620a1e5e44042eae6d8810.1401665237.git.marcel@ziswiler.com>
- <538CA24B.1010602@wwwdotorg.org> <538CA635.4050502@ziswiler.com>
-Message-ID: <20140602221627.GP31751@sirena.org.uk>
+From: elder@linaro.org (Alex Elder)
+Date: Mon,  2 Jun 2014 17:44:51 -0500
+Subject: [PATCH v5 0/7] clk: bcm: prerequisite and bus clock support
+Message-ID: <1401749098-10185-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 02, 2014 at 06:28:37PM +0200, Marcel Ziswiler wrote:
-> On 06/02/2014 06:11 PM, Stephen Warren wrote:
+Currently only peripheral clocks are supported for Broadcom platforms
+that use Kona style CCUs for clocking.  This series adds support for
+bus clocks as well.
 
-> >>+CONFIG_SPI_SPIDEV=y
+One motivation for doing this is that there exist peripheral clocks
+that cannot be configured without having first enabled a related bus
+clock.  Adding bus clock support allows such peripheral clocks to be
+usable.
 
-> >Is this useful with DT? I thought that unlike I2C_CHARDEV, spidev needed
-> >dummy devices to exist in DT for spidev to work? If so, there's not much
-> >point adding the option to defconfig, since people can add it when they
-> >put the dummy devices into DT.
+This also imposes a new requirement, however--that the bus clock be
+enabled *before* operating on the clock that depends on it.  For
+this, we define the notion of a "prerequisite" clock.  If a clock
+has a prerequisite specified, that prequisite clock will be prepared
+and enabled at the beginning  of the dependent clock's ->prepare
+method.  The prerequisite clock is similarly disabled and unprepared
+at the end of the dependent clock's ->unprepare method.
 
-> Yes, the Apalis T30 DT I sent actually contains two of them which we call
-> generic Apalis SPI1 and SPI2 out-of-the-box configured for exactly that.
-> Without the config enabled though it probably does not make much sense to
-> include it in the DT so I would consider removing it again.
+These patches are based on Mike Turquette's current "clk-next"
+branch.
+    9ec2749 clk: qcom: Return error pointers for unimplemented clocks
 
-Your DT is broken if it's got a "spidev" node in it, you should be
-describing the hardware not the Linux implementation of the software.
-It would be really nice if we had a good way of handling this but we
-don't yet.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140602/6e5c3da7/attachment.sig>
+They are available here:
+    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
+    Branch review/bcm-bus-clk-v5
+
+					-Alex
+
+Version history:
+v5  - All clocks get initialized the first time they are prepared.
+    - A per-clock flag now avoids doing initialization more than once.
+    - Prerequisite clocks get prepared and enabled in a dependent
+      clock's prepare routine, *before* preparing the dependent.
+    - No longer require nestable CCU write enable requests.
+    - Dropped requirement that clock and prerequisite share CCU.
+v4  - Remove boot-time initialization of clocks, opting instead to
+      do this work when needed, via clock ->prepare method.
+    - Prerequisite clocks are now prepared and enabled in a
+      dependent clock's ->prepare method.
+    - Use __clk_lookup() to get the prerequisite clock pointer.
+    - ccu_write_enable() calls can now be nested
+v3: - Deleted clk_lookup field from struct kona_clk.
+    - Now use term "initialized" rather than "enabled".
+v2: - Added field "p" to the previously unnamed prereq union.
+
+Alex Elder (7):
+  clk: kona: move some code
+  clk: kona: don't init clocks at startup time
+  clk: bcm281xx: add an initialized flag
+  clk: bcm281xx: implement prerequisite clocks
+  clk: bcm281xx: add bus clock support
+  clk: bcm281xx: define a bus clock
+  ARM: dts: add bus clock bsc3_apb for bcm281xx
+
+ arch/arm/boot/dts/bcm11351.dtsi      |   3 +-
+ drivers/clk/bcm/clk-bcm281xx.c       |  13 +-
+ drivers/clk/bcm/clk-kona-setup.c     |  99 ++++++++++-
+ drivers/clk/bcm/clk-kona.c           | 310 +++++++++++++++++++++++++----------
+ drivers/clk/bcm/clk-kona.h           |  36 +++-
+ include/dt-bindings/clock/bcm281xx.h |   3 +-
+ 6 files changed, 364 insertions(+), 100 deletions(-)
+
+-- 
+1.9.1
