@@ -1,51 +1,53 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  2 Jun 2014 11:47:23 +0100
-Subject: [PATCH] arm64: ptrace: change fs when passing kernel pointer to
- regset code
-Message-ID: <1401706043-1741-1-git-send-email-will.deacon@arm.com>
+Date: Mon,  2 Jun 2014 11:47:29 +0100
+Subject: [PATCH] arm64: uid16: fix __kernel_old_{gid,uid}_t definitions
+Message-ID: <1401706049-1787-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our compat PTRACE_POKEUSR implementation simply passes the user data to
-regset_copy_from_user after some simple range checking. Unfortunately,
-the data in question has already been copied to the kernel stack by this
-point, so the subsequent access_ok check fails and the ptrace request
-returns -EFAULT. This causes problems tracing fork() with older versions
-of strace.
+Whilst native arm64 applications don't have the 16-bit UID/GID syscalls
+wired up, compat tasks can still access them. The 16-bit wrappers for
+these syscalls use __kernel_old_uid_t and __kernel_old_gid_t, which must
+be 16-bit data types to maintain compatibility with the 16-bit UIDs used
+by compat applications.
 
-This patch briefly changes the fs to KERNEL_DS, so that the access_ok
-check passes even with a kernel address.
+This patch defines 16-bit __kernel_old_{gid,uid}_t types for arm64
+instead of using the 32-bit types provided by asm-generic.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/ptrace.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/include/asm/Kbuild             |  1 -
+ arch/arm64/include/uapi/asm/posix_types.h | 10 ++++++++++
+ 2 files changed, 10 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/include/uapi/asm/posix_types.h
 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 6a8928bba03c..bf288e443a9f 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -821,6 +821,7 @@ static int compat_ptrace_write_user(struct task_struct *tsk, compat_ulong_t off,
- 				    compat_ulong_t val)
- {
- 	int ret;
-+	mm_segment_t old_fs = get_fs();
- 
- 	if (off & 3 || off >= COMPAT_USER_SZ)
- 		return -EIO;
-@@ -828,10 +829,13 @@ static int compat_ptrace_write_user(struct task_struct *tsk, compat_ulong_t off,
- 	if (off >= sizeof(compat_elf_gregset_t))
- 		return 0;
- 
-+	set_fs(KERNEL_DS);
- 	ret = copy_regset_from_user(tsk, &user_aarch32_view,
- 				    REGSET_COMPAT_GPR, off,
- 				    sizeof(compat_ulong_t),
- 				    &val);
-+	set_fs(old_fs);
+diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+index 83f71b3004a8..f06a9c2d399e 100644
+--- a/arch/arm64/include/asm/Kbuild
++++ b/arch/arm64/include/asm/Kbuild
+@@ -30,7 +30,6 @@ generic-y += msgbuf.h
+ generic-y += mutex.h
+ generic-y += pci.h
+ generic-y += poll.h
+-generic-y += posix_types.h
+ generic-y += preempt.h
+ generic-y += resource.h
+ generic-y += rwsem.h
+diff --git a/arch/arm64/include/uapi/asm/posix_types.h b/arch/arm64/include/uapi/asm/posix_types.h
+new file mode 100644
+index 000000000000..7985ff60ca3f
+--- /dev/null
++++ b/arch/arm64/include/uapi/asm/posix_types.h
+@@ -0,0 +1,10 @@
++#ifndef __ASM_POSIX_TYPES_H
++#define __ASM_POSIX_TYPES_H
 +
- 	return ret;
- }
- 
++typedef unsigned short __kernel_old_uid_t;
++typedef unsigned short __kernel_old_gid_t;
++#define __kernel_old_uid_t __kernel_old_uid_t
++
++#include <asm-generic/posix_types.h>
++
++#endif /*  __ASM_POSIX_TYPES_H */
 -- 
 1.9.2
