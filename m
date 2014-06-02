@@ -1,71 +1,27 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 02 Jun 2014 15:16:40 +0200
-Subject: [PATCH v2 4/7] ARM: EXYNOS: PM: replace EXYNOS_BOOT_VECTOR_*
- macros by static inlines
-In-Reply-To: <538C76A4.8050508@gmail.com>
-References: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
- <1401712543-14281-5-git-send-email-b.zolnierkie@samsung.com>
- <538C76A4.8050508@gmail.com>
-Message-ID: <2528436.0tFl7PZNSv@amdc1032>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 2 Jun 2014 09:24:50 -0400
+Subject: [PATCH v3 0/7] of: setup dma parameters using dma-ranges and
+ dma-coherent
+In-Reply-To: <20140602063702.GB7834@dragon>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140602063702.GB7834@dragon>
+Message-ID: <538C7B22.2020107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-On Monday, June 02, 2014 03:05:40 PM Tomasz Figa wrote:
-> Hi,
+On Monday 02 June 2014 02:37 AM, Shawn Guo wrote:
+> On Thu, Apr 24, 2014 at 11:30:00AM -0400, Santosh Shilimkar wrote:
+>> Here is an updated v3 of the series. Series introduces support for setting up
+>> dma parameters based on device tree properties like 'dma-ranges' and
+>> 'dma-coherent' and also update to ARM 32 bit port. Earlier version of the
+>> series can be found here [3], [2] and [1].
 > 
-> On 02.06.2014 14:35, Bartlomiej Zolnierkiewicz wrote:
-> > Replace EXYNOS_BOOT_VECTOR_ADDR and EXYNOS_BOOT_VECTOR_FLAG macros
-> > by exynos_boot_vector_addr() and exynos_boot_vector_flag() static
-> > inlines.
-> > 
-> > This patch shouldn't cause any functionality changes.
-> > 
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> >  arch/arm/mach-exynos/pm.c | 28 ++++++++++++++++++++--------
-> >  1 file changed, 20 insertions(+), 8 deletions(-)
+> Are these two generic device tree properties documented somewhere under
+> Documentation/devicetree/bindings?
 > 
-> > diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> > index 87c0d34..cf09383 100644
-> > --- a/arch/arm/mach-exynos/pm.c
-> > +++ b/arch/arm/mach-exynos/pm.c
-> > @@ -166,12 +166,23 @@ int exynos_cluster_power_state(int cluster)
-> >  			S5P_CORE_LOCAL_PWR_EN);
-> >  }
-> >  
-> > -#define EXYNOS_BOOT_VECTOR_ADDR	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
-> > -			S5P_INFORM7 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
-> > -			(sysram_base_addr + 0x24) : S5P_INFORM0))
-> > -#define EXYNOS_BOOT_VECTOR_FLAG	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
-> > -			S5P_INFORM6 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
-> > -			(sysram_base_addr + 0x20) : S5P_INFORM1))
-> > +static inline void __iomem *exynos_boot_vector_addr(void)
-> > +{
-> > +	if (samsung_rev() == EXYNOS4210_REV_1_1)
-> > +		return S5P_INFORM7;
-> > +	else if (samsung_rev() == EXYNOS4210_REV_1_0)
-> > +		return sysram_base_addr + 0x24;
-> > +	return S5P_INFORM0;
-> 
-> I know this is not strictly related to this patch, but isn't a check
-> whether the SoC is Exynos4210 also needed, before comparing the revision
-> with Exynos4210-specific values?
+These bindings have been already in use before this series. But looks like
+they have not been documented. I will do a patch to add description for those
+couple of parameters.
 
-Yes, it is needed but other SoCs need to be verified that they do not
-rely on a buggy code (to not introduce regressions).  This is of course
-outside a scope of the current patchset.
-
-> Otherwise looks good.
-> 
-> Best regards,
-> Tomasz
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Regards,
+Santosh
