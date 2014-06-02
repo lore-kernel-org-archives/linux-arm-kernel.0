@@ -1,55 +1,35 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Mon, 2 Jun 2014 15:34:17 +0100
-Subject: [PATCH 3/3] i2c: Make I2C ID tables non-mandatory for DT'ed
- and/or ACPI'ed devices
-In-Reply-To: <1401716463-23457-4-git-send-email-lee.jones@linaro.org>
-References: <1401716463-23457-1-git-send-email-lee.jones@linaro.org>
- <1401716463-23457-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140602153417.2065c1a5@alan.etchedpixels.co.uk>
+From: ben@trinity.fluff.org (Ben Dooks)
+Date: Mon, 2 Jun 2014 15:37:20 +0100
+Subject: [GIT PULL] MMC for v.3.16
+In-Reply-To: <CAPDyKFpkKNx17ha=WWAp4-6w3k4pRYSHUhOWHv1G+1_wAEBceA@mail.gmail.com>
+References: <CAPDyKFpkKNx17ha=WWAp4-6w3k4pRYSHUhOWHv1G+1_wAEBceA@mail.gmail.com>
+Message-ID: <20140602143720.GB19809@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  2 Jun 2014 14:41:03 +0100
-Lee Jones <lee.jones@linaro.org> wrote:
-
-> Currently the I2C framework insists on devices supplying an I2C ID
-> table.  Many of the devices which do so unnecessarily adding quite a
-> few wasted lines to kernel code.  This patch allows drivers a means
-> to 'not' supply the aforementioned table and match on either DT
-> and/or ACPI match tables instead.
+On Mon, Jun 02, 2014 at 02:03:27PM +0200, Ulf Hansson wrote:
+> Hi Linus,
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/i2c/i2c-core.c | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
+> This is the first PR I send to you as I am co-maintaining the MMC
+> subsystem with Chris Ball. You will receive a separate PR for MMC from
+> him as well, as usual.
 > 
-> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> index d0c7180..811b78f 100644
-> --- a/drivers/i2c/i2c-core.c
-> +++ b/drivers/i2c/i2c-core.c
-> @@ -271,7 +271,18 @@ static int i2c_device_probe(struct device *dev)
->  		return 0;
->  
->  	driver = to_i2c_driver(dev->driver);
-> -	if (!driver->probe || !driver->id_table)
-> +	if (!driver->probe)
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * An I2C ID table is not madatory, if and only if, a suitable Device
+> These patches are mainly updates for the mmci driver and have been
+> tested in linux-next.
+> 
+> Some ARM SoC related patches are also included and those have been
+> acked from the corresponding maintainers to go through my mmc tree.
+> 
+> Some more details in the signed tag.
+> 
+> Kind regards
+> Ulf Hansson
 
-typo "madatory"..
+Hi, is it too late to get the sh-mmcif driver cleanups in? I posted
+them some time ago but they do not seem to have been applied.
 
-> +	 * Tree and/or ACPI match table entry is supplied for the probing
-> +	 * device.
-> +	 *
-> +	 * TODO: Provide 'device type' to 'ACPI node' call and match here.
-> +	 */
-> +	if (!driver->id_table &&
-> +	    !of_match_device(dev->driver->of_match_table, dev))
->  		return -ENODEV;
->  
 
-Looks sensible to me other than that.
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
 
->  	if (!device_can_wakeup(&client->dev))
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
