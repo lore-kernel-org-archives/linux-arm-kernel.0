@@ -1,95 +1,119 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 2 Jun 2014 12:33:51 +0200
-Subject: [PATCH 03/11] pinctrl: sunxi: Move setting of mux to irq type
- from unmask to set_type
-In-Reply-To: <53899D21.3000008@redhat.com>
-References: <53899D21.3000008@redhat.com>
-Message-ID: <20140602103351.GC27722@lukather>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 02 Jun 2014 12:38:45 +0200
+Subject: [PATCH v2] ARM: exynos4: hotplug: Fix CPU idle clock down after CPU
+ off
+Message-ID: <1401705525-8678-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 31, 2014 at 11:13:05AM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 05/28/2014 12:33 PM, Maxime Ripard wrote:
-> >On Wed, May 28, 2014 at 11:51:52AM +0200, Hans de Goede wrote:
-> >>Hi,
-> >>
-> >>On 05/28/2014 11:36 AM, Maxime Ripard wrote:
-> >>>On Tue, May 27, 2014 at 04:18:29PM +0200, Linus Walleij wrote:
-> >>>>On Mon, May 26, 2014 at 9:47 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> >>>>
-> >>>>>With level triggered interrupt mask / unmask will get called for each
-> >>>>>interrupt, doing the somewhat expensive mux setting on each unmask thus is
-> >>>>>not a good idea. Instead move it to the set_type callback, which is typically
-> >>>>>done only once for each irq.
-> >>>>>
-> >>>>>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>>>
-> >>>>Yes move it out of mask/unmask but no, not into set_type().
-> >>>>
-> >>>>Can you not use the irqchip startup()/shutdown() callbacks
-> >>>>instead?
-> >>>
-> >>>I think we can use irq_request_resources then
-> >>>https://lkml.org/lkml/2014/3/12/307
-> >>
-> >>Sounds good, I'll modify the patch to move it here before posting a v2 of
-> >>this series. Note v2 likely won't happen till this weekend, -ENOTIME.
-> >>
-> >>>We could even merge the gpio_to_irq code into it.
-> >>
-> >>Erm, no we need that as a separate function for the gpio_chip's to_irq
-> >>callback.
-> >
-> >Linus sent a patch stating otherwise a few weeks ago, and was
-> >suggesting moving it to irq_startup.
-> >
-> >https://lkml.org/lkml/2014/5/9/50
-> 
-> That is not going to work, that patch uses gpiochip_irqchip_add,
-> which in turn uses gpiochip_to_irq as to_irq handler, which
-> assumes that gpio offset == irq offset, which is not true for
-> sunxi-pinctrl.
-> 
-> Specifically gpio_chio_to_irq does:
-> 
-> static int gpiochip_to_irq(struct gpio_chip *chip, unsigned offset)
-> {
->         return irq_find_mapping(chip->irqdomain, offset);
-> }
-> 
-> Where as the sunxi code does (simplified):
-> 
-> static int sunxi_pinctrl_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
-> {
-> 	struct sunxi_desc_function *desc = sunxi_pinctrl_desc_find_function_by_pin(pctl, offset, "irq");
-> 	return irq_find_mapping(pctl->domain, desc->irqnum);\
-> }
+On Exynos4 USE_DELAYED_RESET_ASSERTION must be set in
+ARM_COREx_OPTION register during CPU power down. This is the proper way
+of powering down CPU.
 
-Yes, I know it's not going to work, but my point was that gpio_to_irq
-might not be called by the drivers, and it's still valid not to do
-it. So we might end up with a driver requesting an interrupt that
-won't be muxed to it.
+Additionally without this the CPU clock down won't work after powering
+down some other CPU and online CPUs will work at full frequency chosen
+by CPUfreq governor.
 
-But thinking more about it, it would be wrong to remove the .to_irq
-callback completely either, since drivers might need a "secondary"
-interrupt (like the card detect one for an MMC driver), and a lot of
-these use an additional gpio property to do so. So we need to keep it.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
+---
+Changes since v1:
+1. Use delayed reset assertion on all Exynos4 family and all cores, not
+   only on core 1 of Exynos4212.
+2. Rebase on Tomasz Figa's patch:
+   ARM: EXYNOS: Fix core ID used by platsmp and hotplug code
+   http://www.spinics.net/lists/linux-samsung-soc/msg31604.html
+---
+ arch/arm/mach-exynos/hotplug.c  | 27 +++++++++++++++++++++++++--
+ arch/arm/mach-exynos/regs-pmu.h |  3 +++
+ 2 files changed, 28 insertions(+), 2 deletions(-)
 
-Nevermind then.
-
-Maxime
-
+diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+index 920a4baa53cd..f2521bc53869 100644
+--- a/arch/arm/mach-exynos/hotplug.c
++++ b/arch/arm/mach-exynos/hotplug.c
+@@ -22,7 +22,7 @@
+ #include "common.h"
+ #include "regs-pmu.h"
+ 
+-static inline void cpu_leave_lowpower(void)
++static inline void cpu_leave_lowpower(u32 core_id)
+ {
+ 	unsigned int v;
+ 
+@@ -36,6 +36,14 @@ static inline void cpu_leave_lowpower(void)
+ 	  : "=&r" (v)
+ 	  : "Ir" (CR_C), "Ir" (0x40)
+ 	  : "cc");
++
++	if (soc_is_exynos4()) {
++		unsigned int tmp;
++
++		tmp = __raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
++		tmp &= ~(S5P_USE_DELAYED_RESET_ASSERTION);
++		__raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
++	}
+ }
+ 
+ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+@@ -47,6 +55,19 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ 
+ 		/* Turn the CPU off on next WFI instruction. */
+ 		exynos_cpu_power_down(core_id);
++		if (soc_is_exynos4()) {
++			unsigned int tmp;
++
++			/*
++			 * Exynos 4 SoCs require setting
++			 * USE_DELAYED_RESET_ASSERTION so the CPU idle
++			 * clock down feature could properly detect
++			 * global idle state when CPU1 is off.
++			 */
++			tmp = __raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
++			tmp |= S5P_USE_DELAYED_RESET_ASSERTION;
++			__raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
++		}
+ 
+ 		wfi();
+ 
+@@ -76,6 +97,8 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ void __ref exynos_cpu_die(unsigned int cpu)
+ {
+ 	int spurious = 0;
++	u32 mpidr = cpu_logical_map(cpu);
++	u32 core_id = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+ 
+ 	v7_exit_coherency_flush(louis);
+ 
+@@ -85,7 +108,7 @@ void __ref exynos_cpu_die(unsigned int cpu)
+ 	 * bring this CPU back into the world of cache
+ 	 * coherency, and then restore interrupts
+ 	 */
+-	cpu_leave_lowpower();
++	cpu_leave_lowpower(core_id);
+ 
+ 	if (spurious)
+ 		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
+diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+index 1d13b08708f0..59bd92112842 100644
+--- a/arch/arm/mach-exynos/regs-pmu.h
++++ b/arch/arm/mach-exynos/regs-pmu.h
+@@ -25,6 +25,7 @@
+ 
+ #define S5P_USE_STANDBY_WFI0			(1 << 16)
+ #define S5P_USE_STANDBY_WFE0			(1 << 24)
++#define S5P_USE_DELAYED_RESET_ASSERTION		BIT(12)
+ 
+ #define EXYNOS_SWRESET				S5P_PMUREG(0x0400)
+ #define EXYNOS5440_SWRESET			S5P_PMUREG(0x00C4)
+@@ -111,6 +112,8 @@
+ 			(EXYNOS_ARM_CORE0_CONFIGURATION + (0x80 * (_nr)))
+ #define EXYNOS_ARM_CORE_STATUS(_nr)		\
+ 			(EXYNOS_ARM_CORE_CONFIGURATION(_nr) + 0x4)
++#define EXYNOS_ARM_CORE_OPTION(_nr)		\
++			(EXYNOS_ARM_CORE_CONFIGURATION(_nr) + 0x8)
+ 
+ #define EXYNOS_ARM_COMMON_CONFIGURATION		S5P_PMUREG(0x2500)
+ #define EXYNOS_COMMON_CONFIGURATION(_nr)	\
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140602/25fca981/attachment.sig>
+1.9.1
