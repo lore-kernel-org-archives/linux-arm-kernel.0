@@ -1,47 +1,27 @@
-From: gdjakov@mm-sol.com (Georgi Djakov)
-Date: Mon, 02 Jun 2014 22:47:38 +0300
-Subject: [PATCH v2 2/4] clk: qcom: Add APQ8084 Global Clock Controller
- support
-In-Reply-To: <20140602193603.GM20486@codeaurora.org>
-References: <1401551134-28485-1-git-send-email-gdjakov@mm-sol.com>
- <1401551134-28485-3-git-send-email-gdjakov@mm-sol.com>
- <20140602193603.GM20486@codeaurora.org>
-Message-ID: <538CD4DA.10403@mm-sol.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 02 Jun 2014 12:51:19 -0700
+Subject: [PATCH v7 0/2] context tracker support for arm64
+In-Reply-To: <1401478455-26391-1-git-send-email-larry.bassel@linaro.org>
+ (Larry Bassel's message of "Fri, 30 May 2014 12:34:13 -0700")
+References: <1401478455-26391-1-git-send-email-larry.bassel@linaro.org>
+Message-ID: <7hvbsjw0nc.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.06.14, 22:36, Stephen Boyd wrote:
-> On 05/31, Georgi Djakov wrote:
->> +
->> +static const struct qcom_reset_map gcc_apq8084_resets[] = {
-> 
->> +	[GCC_VENUS0_BCR] = { 0x1020 },
-> 
->> +	[GCC_VPU_BCR] = { 0x1400 },
-> 
->> +	[GCC_MDSS_BCR] = { 0x2300 },
->> +	[GCC_AVSYNC_BCR] = { 0x2400 },
->> +	[GCC_OXILI_BCR] = { 0x4020 },
->> +	[GCC_OXILICX_BCR] = { 0x4030 },
->> +	[GCC_OCMEMCX_BCR] = { 0x4050 },
-> 
-> These aren't in global clock control (looks like mmcc).
-> 
+Larry Bassel <larry.bassel@linaro.org> writes:
 
-Will remove it!
+> Implement and enable context tracking for arm64 (which is
+> a prerequisite for FULL_NOHZ support). This patchset
+> builds upon earlier work by Kevin Hilman and is based on
+> Will Deacon's tree.
+>
+> Changes v6 to v7:
+>
+> * Rename parameter of ct_user_exit from restore to syscall
 
->> +#define GCC_VENUS0_BCR			56
-> 
->> +#define GCC_VPU_BCR			76
-> 
-> 
->> +#define GCC_MDSS_BCR			93
->> +#define GCC_AVSYNC_BCR			94
->> +#define GCC_OXILI_BCR			95
->> +#define GCC_OXILICX_BCR			96
->> +#define GCC_OCMEMCX_BCR			97
-> 
-> Ditto
-> 
+Also for v7:
 
-Thank you for reviewing the patches!
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
+Tested-by: Kevin Hilman <khilman@linaro.org>
+
+Kevin
