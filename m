@@ -1,88 +1,53 @@
-From: amit.kachhap@gmail.com (Amit Kachhap)
-Date: Mon, 2 Jun 2014 14:51:48 +0530
-Subject: [PATCH v1 6/6] ACPI: thermal: processor: Use the generic cpufreq
- infrastructure
-In-Reply-To: <20140529124248.GC2593@e104805>
-References: <1401351334-11210-1-git-send-email-amit.daniel@samsung.com>
- <1401351334-11210-7-git-send-email-amit.daniel@samsung.com>
- <20140529124248.GC2593@e104805>
-Message-ID: <CADGdYn7FZCjhzbFMtNPFtQV_naQhVk+nR1VFNH88M92_NQmfsA@mail.gmail.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Mon, 2 Jun 2014 14:53:18 +0530
+Subject: [Pull Request] Various ARM platform code fixes
+Message-ID: <CAK9yfHw=zecLHWHVZWvf3PzphYG3CDyTwMRXicUUFM4kkhT9Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javi,
+Hi Arnd,
 
-On 5/29/14, Javi Merino <javi.merino@arm.com> wrote:
-> Hi Amit,
->
-> On Thu, May 29, 2014 at 09:15:34AM +0100, Amit Daniel Kachhap wrote:
->> This patch upgrades the ACPI cpufreq cooling portions to use the generic
->> cpufreq cooling infrastructure. There should not be any functionality
->> related changes as the same behaviour is provided by the generic
->> cpufreq APIs with the notifier mechanism.
->>
->> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> ---
->>  drivers/acpi/processor_driver.c  |    6 +-
->>  drivers/acpi/processor_thermal.c |  235
->> ++++++++++++++++++--------------------
->>  include/acpi/processor.h         |    3 +-
->>  3 files changed, 115 insertions(+), 129 deletions(-)
->>
->> diff --git a/drivers/acpi/processor_driver.c
->> b/drivers/acpi/processor_driver.c
->> index 7f70f31..10aba4a 100644
->> --- a/drivers/acpi/processor_driver.c
->> +++ b/drivers/acpi/processor_driver.c
->> @@ -36,6 +36,7 @@
->>  #include <linux/cpuidle.h>
->>  #include <linux/slab.h>
->>  #include <linux/acpi.h>
->> +#include <linux/cpu_cooling.h>
->>
->>  #include <acpi/processor.h>
->>
->> @@ -178,8 +179,7 @@ static int __acpi_processor_start(struct acpi_device
->> *device)
->>         if (!cpuidle_get_driver() || cpuidle_get_driver() ==
->> &acpi_idle_driver)
->>                 acpi_processor_power_init(pr);
->>
->> -       pr->cdev = thermal_cooling_device_register("Processor", device,
->> -
->> &processor_cooling_ops);
->> +       pr->cdev = acpi_processor_cooling_register(device);
->
-> With this you have removed the only cooling device whose type was
-> "Processor".  There's special code for dealing with this cooling
-> device in drivers/thermal/thermal_core.c:passive_store():
->
-> 		list_for_each_entry(cdev, &thermal_cdev_list, node) {
-> 			if (!strncmp("Processor", cdev->type,
-> 				     sizeof("Processor")))
-> 				thermal_zone_bind_cooling_device(tz,
-> 						THERMAL_TRIPS_NONE, cdev,
-> 						THERMAL_NO_LIMIT,
-> 						THERMAL_NO_LIMIT);
-> 		}
-> 		mutex_unlock(&thermal_list_lock);
-> 		if (!tz->passive_delay)
->
-> With your change, that code is now "dead" as it can't do anything.  No
-> I don't know what should you do with it, either remove it or make it
-> match the cpufreq cooling device.  But this patch should deal with
-> that code as well.
-nice catch. I somehow missed modifying this section.
-I think the following changes should fix this,
--                       if (!strncmp("Processor", cdev->type,
--                                    sizeof("Processor")))
-+                       if (!strncmp("thermal-cpufreq", cdev->type,
-+                                    sizeof("thermal-cpufreq")))
-                                thermal_zone_bind_cooling_device(tz,
+As suggested by you I am sending a pull request for the below 8 patches.
+These are based on for-next branch of arm-soc tree [1].
 
->
-> Cheers,
-> Javi
->
->
->
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+
+
+
+The following changes since commit f8175c74fd39ccc336391a9491fc0353d6f92b90:
+
+  Merge branch 'next/soc' into for-next (2014-05-31 10:20:56 -0700)
+
+are available in the git repository at:
+
+
+  git://git.linaro.org/people/sachin.kamat/linux-common-kernel.git arm-soc
+
+for you to fetch changes up to 545ce3a27284b231fca8ea09cc3e37d66793b56f:
+
+  ARM: spear: Staticize local symbols in spear1340.c (2014-06-02 13:56:58 +0530)
+
+----------------------------------------------------------------
+Sachin Kamat (8):
+      ARM: sti: Staticize local variables
+      ARM: mvebu: Staticize armada_375_smp_cpu1_enable_wa
+      ARM: mvebu: Staticize armada_370_xp_cpu_pm_init
+      ARM: mvebu: Staticize mvebu_cpu_reset_init
+      ARM: vt8500: Staticize local symbols
+      ARM: spear: Staticize spear13xx_io_desc
+      ARM: spear: Staticize spear1310_io_desc in spear1310.c
+      ARM: spear: Staticize local symbols in spear1340.c
+
+ arch/arm/mach-mvebu/cpu-reset.c  |    2 +-
+ arch/arm/mach-mvebu/platsmp-a9.c |    2 +-
+ arch/arm/mach-mvebu/pmsu.c       |    2 +-
+ arch/arm/mach-spear/spear1310.c  |    2 +-
+ arch/arm/mach-spear/spear1340.c  |    6 +++---
+ arch/arm/mach-spear/spear13xx.c  |    2 +-
+ arch/arm/mach-sti/platsmp.c      |    6 +++---
+ arch/arm/mach-vt8500/vt8500.c    |    6 +++---
+ 8 files changed, 14 insertions(+), 14 deletions(-)
+
+-- 
+With warm regards,
+Sachin
