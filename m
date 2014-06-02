@@ -1,41 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 2 Jun 2014 09:38:41 -0700
-Subject: [GIT PULL] mfd: Immutable branch between MFD and OMAP, due for
- v3.16
-In-Reply-To: <20140528180607.GB4707@atomide.com>
-References: <1401214140-9828-1-git-send-email-tony@atomide.com>
- <20140528071313.GH4227@lee--X1> <20140528180607.GB4707@atomide.com>
-Message-ID: <20140602163841.GC11004@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 2 Jun 2014 09:42:48 -0700
+Subject: [Pull Request] Various ARM platform code fixes
+In-Reply-To: <CAK9yfHw=zecLHWHVZWvf3PzphYG3CDyTwMRXicUUFM4kkhT9Mw@mail.gmail.com>
+References: <CAK9yfHw=zecLHWHVZWvf3PzphYG3CDyTwMRXicUUFM4kkhT9Mw@mail.gmail.com>
+Message-ID: <CAOesGMhsxKCVXJPX-JF96nvwstDp3crZKZzb3GVKX=dzZMMD0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [140528 11:11]:
-> * Lee Jones <lee.jones@linaro.org> [140528 00:14]:
-> > Thanks Tony, here's the pull-request:
-> > 
-> > The following changes since commit 455c6fdbd219161bd09b1165f11699d6d73de11c:
-> > 
-> >   Linux 3.14 (2014-03-30 20:40:15 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/mfd-omap-v3.16-1
-> > 
-> > for you to fetch changes up to 43fef47f94a1ae46fb2720dada32fa3b5547bee2:
-> > 
-> >   mfd: twl4030-power: Add a configuration to turn off oscillator during off-idle (2014-05-28 08:06:18 +0100)
-> > 
-> > ----------------------------------------------------------------
-> > Second immutable branch between MFD and OMAP due for the v3.16 merge window.
-> 
-> Thanks a lot, this will make it easier for me to chase down potential
-> PM related regressions ;) I'm merging this for testing only into the
-> linux-omap master branch, no need for me to include it into any
-> of my upstream heading branches.
+On Mon, Jun 2, 2014 at 2:23 AM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+> Hi Arnd,
+>
+> As suggested by you I am sending a pull request for the below 8 patches.
+> These are based on for-next branch of arm-soc tree [1].
+>
+> [1] git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
 
-Lee, I'm not seeing this in linux next, did you maybe forget to merge
-it into the MFD tree?
+Please, don't send random pull requests to us. Some of these patches
+are for platforms that have quite active maintainers and you're
+messing up everyone's workflow by randomly sending them to us.
 
-Regards,
+I have no idea what you talked to Arnd about, and you give no
+reference to it in your pull request.
 
-Tony
+Besides, the merge window is open, we're not taking anything new until
+after -rc1.
+
+
+-Olof
