@@ -1,58 +1,45 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 2 Jun 2014 10:35:15 -0300
-Subject: [PATCH v2] mm, compaction: properly signal and act upon lock and
- need_sched() contention
-In-Reply-To: <537F082F.50501@suse.cz>
-References: <1399904111-23520-1-git-send-email-vbabka@suse.cz>
- <1400233673-11477-1-git-send-email-vbabka@suse.cz>
- <CAGa+x87-NRyK6kUiXNL_bRNEGm+DR6M3HPSLYEoq4t6Nrtnd_g@mail.gmail.com>
- <CAAQ0ZWQDVxAzZVm86ATXd1JGUVoLXj_Y5Ske7htxH_6a4GPKRg@mail.gmail.com>
- <537F082F.50501@suse.cz>
-Message-ID: <CAOMZO5BKaicq7NkoJO4vU5W3hiDike6kSdH+2eD=h0B5BsDjTg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 2 Jun 2014 14:33:53 +0100
+Subject: iMX6Q FEC: transmit queue 0 timed out
+In-Reply-To: <CAOpc7mFbJQNeBmOG0C-Qn856MmhtUkTq=QeDPC-EWXryi6sFGg@mail.gmail.com>
+References: <CAOpc7mF4naY8xuBDFNpHuQPsrULVriKj-ZcpEwpPwtA8UT1Wpw@mail.gmail.com>
+ <20140602124242.GB933@n2100.arm.linux.org.uk>
+ <CAOpc7mFbJQNeBmOG0C-Qn856MmhtUkTq=QeDPC-EWXryi6sFGg@mail.gmail.com>
+Message-ID: <20140602133352.GC933@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vlastimil,
+On Mon, Jun 02, 2014 at 03:15:21PM +0200, Holger Schurig wrote:
+> Transmit clocking and pinmux?  Do you mean ENET_TX_EN?  Yep, that's
+> set. Somehow barebox can send, it's just Linux that doesn't want to do
+> it. Note that ENET_TX_CLK is not muxed, as it is for MII, not for
+> RMII.
+> 
+> In case I confuse what you meant, here are excerpts from my DTS:
 
-On Fri, May 23, 2014 at 5:34 AM, Vlastimil Babka <vbabka@suse.cz> wrote:
+It's probably ENET_REF_CLK that's the cause of the problem.
 
-> Really sorry, guys :/
->
-> -----8<-----
-> From: Vlastimil Babka <vbabka@suse.cz>
-> Date: Fri, 23 May 2014 10:18:56 +0200
-> Subject: mm-compaction-properly-signal-and-act-upon-lock-and-need_sched-contention-fix2
->
-> Step 1: Change function name and comment between v1 and v2 so that the return
->         value signals the opposite thing.
-> Step 2: Change the call sites to reflect the opposite return value.
-> Step 3: ???
-> Step 4: Make a complete fool of yourself.
->
-> Signed-off-by: Vlastimil Babka <vbabka@suse.cz>
-> ---
->  mm/compaction.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/mm/compaction.c b/mm/compaction.c
-> index a525cd4..5175019 100644
-> --- a/mm/compaction.c
-> +++ b/mm/compaction.c
-> @@ -237,13 +237,13 @@ static inline bool compact_should_abort(struct compact_control *cc)
->         if (need_resched()) {
->                 if (cc->mode == MIGRATE_ASYNC) {
->                         cc->contended = true;
-> -                       return false;
-> +                       return true;
->                 }
->
->                 cond_resched();
->         }
->
-> -       return true;
-> +       return false;
->  }
+> pinctrl_fec: fecgrp {
+>    fsl,pins = <
+>       MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0 0x1b030
+>       MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1 0x1b030
+>       MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN   0x1b030
+>       MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0 0x1b030
+>       MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1 0x1b030
+>       MX6QDL_PAD_ENET_RX_ER__ENET_RX_ER   0x1b030
+>       MX6QDL_PAD_ENET_MDIO__ENET_MDIO     0x0B850
+>       MX6QDL_PAD_ENET_MDC__ENET_MDC       0x1b030
+>       MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN  0x1b030
+>       MX6QDL_PAD_GPIO_16__ENET_REF_CLK    0x1b030
+>       >;
+> };
 
-This patch is still not in linux-next.
+On the Microsom, I need:
 
-Could you please submit it formally?
+      MX6QDL_PAD_GPIO_16__ENET_REF_CLK        0xc0000000
+
+Does that work for you?
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
