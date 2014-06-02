@@ -1,279 +1,300 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon,  2 Jun 2014 14:04:10 -0700
-Subject: [GIT PULL 7/7] ARM: SoC driver changes
-In-Reply-To: <1401743050-7379-1-git-send-email-olof@lixom.net>
-References: <1401743050-7379-1-git-send-email-olof@lixom.net>
-Message-ID: <1401743050-7379-8-git-send-email-olof@lixom.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon,  2 Jun 2014 15:07:27 -0700
+Subject: [PATCH] ARM: Remove ARCH_HAS_CPUFREQ config option
+Message-ID: <1401746847-3193-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SoC-near driver changes that we're merging through our tree. Mostly
-because they depend on other changes we have staged, but in some cases
-because the driver maintainers preferred that we did it this way.
+This config exists entirely to hide the cpufreq menu from the
+kernel configuration unless a platform has selected it. Nothing
+is actually built if this config is 'Y' and it just leads to
+more patches that add a select under a platform Kconfig so that
+some other CPUfreq option can be chosen. Let's remove the
+option so that we can always enable CPUfreq drivers on ARM
+platforms.
 
-This contains a largeish cleanup series of the omap_l3_noc bus driver,
-cpuidle rework for Exynos, some reset driver conversions and a long
-branch of TI EDMA fixes and cleanups, with more to come next release.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/Kconfig               | 18 ------------------
+ arch/arm/mach-davinci/Kconfig  |  1 -
+ arch/arm/mach-highbank/Kconfig |  1 -
+ arch/arm/mach-imx/Kconfig      |  3 ---
+ arch/arm/mach-mvebu/Kconfig    |  1 -
+ arch/arm/mach-omap2/Kconfig    |  1 -
+ arch/arm/mach-shmobile/Kconfig |  2 --
+ arch/arm/mach-spear/Kconfig    |  1 -
+ arch/arm/mach-tegra/Kconfig    |  1 -
+ arch/arm/mach-ux500/Kconfig    |  1 -
+ arch/arm/mach-vexpress/Kconfig |  1 -
+ arch/arm/mach-vt8500/Kconfig   |  1 -
+ arch/arm/mach-zynq/Kconfig     |  1 -
+ 13 files changed, 33 deletions(-)
 
-The TI EDMA cleanups is a shared branch with the dmaengine tree, with
-a handful of Davinci-specific fixes on top.
-
-After discussion at last year's KS (and some more on the mailing lists),
-we are here adding a drivers/soc directory. The purpose of this is
-to keep per-vendor shared code that's needed by different drivers but
-that doesn't fit into the MFD (nor drivers/platform) model. We expect
-to keep merging contents for this hierarchy through arm-soc so we can
-keep an eye on what the vendors keep adding here and not making it a
-free-for-all to shove in crazy stuff.
-
-----------------------------------------------------------------
-
-The following changes since commit 35683340e0e953a6c64fecffacf76478f01dcf1f:
-
-  Merge tag 'dt-for-3.16' into HEAD
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/drivers-for-3.16
-
-for you to fetch changes up to 45e70b7d48d53d5eb193c6b3f012b31ca135fb4c:
-
-  Merge tag 'samsung-drivers-2' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into next/drivers
-
-----------------------------------------------------------------
-
-Afzal Mohammed (2):
-      bus: omap_l3_noc: ignore masked out unclearable targets
-      bus: omap_l3_noc: Add AM4372 interconnect error data
-
-Amit Daniel Kachhap (1):
-      ARM: EXYNOS: Move arm core power down clock to exynos5250 common clock
-
-Andy Gross (2):
-      soc: qcom: Add GSBI driver
-      tty: serial: msm: Remove direct access to GSBI
-
-Arnd Bergmann (3):
-      Merge tag 'qcom-drivers-for-3.16' of git://git.kernel.org/.../galak/linux-qcom into next/drivers
-      Merge tag 'sunxi-drivers-for-3.16-2' of https://github.com/mripard/linux into next/drivers
-      soc: qcom: fix of_device_id table
-
-Boris BREZILLON (2):
-      reset: sunxi: document sunxi's reset controllers bindings
-      reset: sunxi: allow MFD subdevices probe
-
-Daniel Lezcano (20):
-      ARM: EXYNOS: Prevent forward declaration for cpuidle
-      ARM: EXYNOS: Use cpuidle_register
-      ARM: EXYNOS: Change function name prefix for cpuidle
-      ARM: EXYNOS: Encapsulate register access inside a function for pm
-      ARM: EXYNOS: Move some code inside the idle_finisher for cpuidle
-      ARM: EXYNOS: Fix S5P_WAKEUP_STAT call for cpuidle
-      ARM: EXYNOS: Use the cpu_pm notifier for pm
-      ARM: EXYNOS: Move scu_enable in the cpu_pm notifier
-      ARM: EXYNOS: Remove ifdef for scu_enable in pm
-      ARM: EXYNOS: Pass wakeup mask parameter to function for cpuidle
-      ARM: EXYNOS: Encapsulate boot vector code into a function for cpuidle
-      ARM: EXYNOS: Disable cpuidle for exynos5440
-      ARM: EXYNOS: Encapsulate the AFTR code into a function
-      ARM: EXYNOS: Move the AFTR state function into pm.c
-      ARM: EXYNOS: Move the power sequence call in the cpu_pm notifier
-      ARM: EXYNOS: Move S5P_CHECK_SLEEP into pm.c
-      ARM: EXYNOS: Pass the AFTR callback to the platform_data
-      ARM: EXYNOS: Cleanup all unneeded headers from cpuidle.c
-      ARM: EXYNOS: Move the driver to drivers/cpuidle directory
-      ARM: EXYNOS: Fix kernel panic when unplugging CPU1 on exynos
-
-Florian Fainelli (3):
-      bus: add Broadcom GISB bus arbiter timeout/error handler
-      Documentation: devicetree: add Broadcom GISB arbiter bindings
-      Documentation: sysfs: add Broadcom GISB arbiter sysfs properties
-
-Ivan Khoronzhuk (3):
-      Documentation: dt: add bindings for keystone reset driver
-      Documentation: dt: add bindings for keystone pll control controller
-      power: reset: keystone-reset: introduce keystone reset driver
-
-Joel Fernandes (4):
-      dmaengine: edma: Add DMA memcpy support
-      dmaengine: edma: No need save/restore interrupt flags during spin_lock in IRQ
-      dmaengine: edma: Document variables used for residue accounting
-      dmaengine: edma: update DMA memcpy to use new param element
-
-Kukjin Kim (1):
-      Merge branch 'v3.16-next/clk-samsung' into v3.16-next/cpuidle-exynos
-
-Maxime Ripard (1):
-      power: reset: Add Allwinner A31 reset code
-
-Nishanth Menon (14):
-      bus: omap_l3_noc: Fix copyright information
-      bus: omap_l3_noc: remove iclk from omap_l3 struct
-      bus: omap_l3_noc: populate l3->dev and use it
-      bus: omap_l3_noc: switch over to relaxed variants of readl/writel
-      bus: omap_l3_noc: un-obfuscate l3_targ address computation
-      bus: omap_l3_noc: move L3 master data structure out
-      bus: omap_l3_noc: convert target information into a structure
-      bus: omap_l3_noc: convert flagmux information into a structure
-      bus: omap_l3_noc: fix masterid detection
-      bus: omap_l3_noc: make error reporting and handling common
-      bus: omap_l3_noc: improve readability by using helper for slave event parsing
-      bus: omap_l3_noc: add information about the type of operation
-      bus: omap_l3_noc: Add information about the context of operation
-      bus: omap_l3_noc: introduce concept of submodule
-
-Olof Johansson (11):
-      Merge tag 'socfpga-driver-update-for-3.16' of git://git.rocketboards.org/linux-socfpga-next into next/drivers
-      Merge tag 'mvebu-drivers-3.16' of git://git.infradead.org/linux-mvebu into next/drivers
-      Merge branch 'sunxi/drivers-for-3.16' of https://github.com/mripard/linux into next/drivers
-      Merge tag 'samsung-drivers' of http://git.kernel.org/.../kgene/linux-samsung into next/drivers
-      Merge tag 'omap-for-v3.16/l3-noc-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/drivers
-      Merge tag 'davinci-fixes-for-v3.15-rc4' of git://git.kernel.org/.../nsekhar/linux-davinci into next/drivers
-      Merge tag 'davinci-for-v3.16/edma' of git://git.kernel.org/.../nsekhar/linux-davinci into next/drivers
-      Merge tag 'keystone-reset-driver' of git://git.kernel.org/.../ssantosh/linux-keystone into next/drivers
-      Merge tag 'exynos-cpuidle' of http://git.kernel.org/.../kgene/linux-samsung into next/drivers
-      Merge tag 'qcom-drivers-for-3.16-2' of git://git.kernel.org/.../galak/linux-qcom into next/drivers
-      Merge tag 'samsung-drivers-2' of git://git.kernel.org/.../kgene/linux-samsung into next/drivers
-
-Peter Ujfalusi (29):
-      platform_data: edma: Be precise with the paRAM struct
-      arm: common: edma: Save the number of event queues/TCs
-      dmaengine: edma: Correct the handling of src/dst_maxburst == 0
-      dmaengine: edma: Add support for DMA_PAUSE/RESUME operation
-      dmaengine: edma: Set DMA_CYCLIC capability flag
-      dmaengine: edma: Reduce debug print verbosity for non verbose debugging
-      dmaengine: edma: Implement device_slave_caps callback
-      dmaengine: edma: Prefix debug prints where the text were identical in prep callbacks
-      dmaengine: edma: Print the direction value as well when it is not supported
-      dmaengine: edma: Add channel number to debug prints
-      drivers: bus: omap_l3: Convert to use devm_kzalloc
-      drivers: bus: omap_l3: Convert to use devm_ioremap_resource()
-      drivers: bus: omap_l3: Convert to use devm_request_irq()
-      drivers: bus: omap_l3: Remove the platform driver's remove function
-      drivers: bus: omap_l3: Change pr_crit() to dev_err() when IRQ request fails
-      ARM: edma: Clean up and simplify the code around irq request
-      ARM: edma: No need to clean the pdata in edma_of_parse_dt()
-      ARM: edma: Take the number of tc from edma_soc_info (pdata)
-      ARM: edma: Do not change TC -> Queue mapping, leave it to default.
-      ARM: davinci: Remove eDMA3 queue_tc_mapping data from edma_soc_info
-      ARM: edma: Remove queue_tc_mapping data from edma_soc_info
-      ARM: edma: Remove num_cc member from struct edma
-      ARM: edma: Save number of regions from pdata to struct edma
-      ARM: edma: Get IP configuration from HW (number of channels, tc, etc)
-      dt/bindings: ti,edma: Remove redundant properties from documentation
-      ARM: dts: am33xx: Remove obsolete properties from edma node
-      ARM: dts: am4372: Remove obsolete properties from edma node
-      ARM: davinci: Remove redundant/unused parameters for edma
-      ARM: edma: Remove redundant/unused parameters from edma_soc_info
-
-Rajendra Nayak (2):
-      bus: omap_l3_noc: Add support for discountinous flag mux input numbers
-      bus: omap_l3_noc: Add DRA7 interconnect error data
-
-Santosh Shilimkar (1):
-      soc: Introduce drivers/soc place-holder for SOC specific drivers
-
-Sricharan R (2):
-      bus: omap_l3_noc: rename functions and data to omap_l3
-      bus: omap_l3_noc: use of_match_data to pick up SoC information
-
-Steffen Trumtrar (1):
-      reset: add driver for socfpga
-
-Thomas Gleixner (6):
-      dmaengine: edma: Sanitize residue reporting
-      dmaengine: edma: Check the current decriptor first in tx_status()
-      dmaengine: edma: Create private pset struct
-      dmaengine: edma: Store transfer data in edma_desc and edma_pset
-      dmaengine: edma: Make reading the position of active channels work
-      dmaengine: edma: Provide granular accounting
-
-Thomas Petazzoni (5):
-      memory: mvebu-devbus: use ARMADA_ prefix in defines
-      memory: mvebu-devbus: use _SHIFT suffixes instead of _BIT
-      memory: mvebu-devbus: split functions
-      memory: mvebu-devbus: add Orion5x support
-      memory: mvebu-devbus: add a devbus, keep-config property
-
-Tomasz Figa (1):
-      cpufreq: exynos: Fix driver compilation with ARCH_MULTIPLATFORM
-
-Vincent Guittot (1):
-      clocksource: exynos_mct: register sched_clock callback
-
-
- .../ABI/testing/sysfs-platform-brcmstb-gisb-arb |   8 +
- .../devicetree/bindings/arm/omap/l3-noc.txt     |   2 +
- .../devicetree/bindings/bus/brcm,gisb-arb.txt   |  30 +
- .../bindings/clock/ti-keystone-pllctrl.txt      |  20 +
- .../devicetree/bindings/dma/ti-edma.txt         |  13 +-
- .../memory-controllers/mvebu-devbus.txt         |  32 +-
- .../bindings/power/reset/keystone-reset.txt     |  67 +++
- .../reset/allwinner,sunxi-clock-reset.txt       |  21 +
- arch/arm/boot/dts/am33xx.dtsi                   |   3 -
- arch/arm/boot/dts/am4372.dtsi                   |   3 -
- arch/arm/common/edma.c                          | 197 ++++---
- arch/arm/mach-davinci/devices-da8xx.c           |  31 --
- arch/arm/mach-davinci/dm355.c                   |  14 -
- arch/arm/mach-davinci/dm365.c                   |  16 -
- arch/arm/mach-davinci/dm644x.c                  |  14 -
- arch/arm/mach-davinci/dm646x.c                  |  16 -
- arch/arm/mach-exynos/Makefile                   |   1 -
- arch/arm/mach-exynos/common.h                   |   2 +
- arch/arm/mach-exynos/cpuidle.c                  | 255 ---------
- arch/arm/mach-exynos/exynos.c                   |   8 +-
- arch/arm/mach-exynos/platsmp.c                  |   2 +-
- arch/arm/mach-exynos/pm.c                       | 152 +++++-
- arch/arm/mach-exynos/regs-pmu.h                 |   2 -
- drivers/Kconfig                                 |   2 +
- drivers/Makefile                                |   3 +
- drivers/bus/Kconfig                             |   8 +
- drivers/bus/Makefile                            |   1 +
- drivers/bus/brcmstb_gisb.c                      | 289 ++++++++++
- drivers/bus/omap_l3_noc.c                       | 406 ++++++++------
- drivers/bus/omap_l3_noc.h                       | 545 ++++++++++++++-----
- drivers/clk/samsung/clk-exynos5250.c            |  42 ++
- drivers/clocksource/exynos_mct.c                |   8 +
- drivers/cpufreq/Kconfig.arm                     |   6 +-
- drivers/cpufreq/exynos-cpufreq.c                |   2 -
- drivers/cpufreq/exynos-cpufreq.h                |  30 +-
- drivers/cpufreq/exynos4210-cpufreq.c            |  39 +-
- drivers/cpufreq/exynos4x12-cpufreq.c            |  40 +-
- drivers/cpufreq/exynos5250-cpufreq.c            |  43 +-
- drivers/cpuidle/Kconfig.arm                     |   6 +
- drivers/cpuidle/Makefile                        |   1 +
- drivers/cpuidle/cpuidle-exynos.c                |  99 ++++
- drivers/dma/edma.c                              | 335 +++++++++---
- drivers/memory/mvebu-devbus.c                   | 229 +++++---
- drivers/power/reset/Kconfig                     |  15 +
- drivers/power/reset/Makefile                    |   2 +
- drivers/power/reset/keystone-reset.c            | 166 ++++++
- drivers/power/reset/sun6i-reboot.c              |  85 +++
- drivers/reset/Makefile                          |   1 +
- drivers/reset/reset-socfpga.c                   | 146 +++++
- drivers/reset/reset-sunxi.c                     |  21 +-
- drivers/soc/Kconfig                             |   5 +
- drivers/soc/Makefile                            |   5 +
- drivers/soc/qcom/Kconfig                        |  11 +
- drivers/soc/qcom/Makefile                       |   1 +
- drivers/soc/qcom/qcom_gsbi.c                    |  85 +++
- drivers/tty/serial/msm_serial.c                 |  48 +-
- drivers/tty/serial/msm_serial.h                 |   5 -
- include/linux/platform_data/edma.h              |  28 +-
- 58 files changed, 2605 insertions(+), 1062 deletions(-)
- create mode 100644 Documentation/ABI/testing/sysfs-platform-brcmstb-gisb-arb
- create mode 100644 Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt
- create mode 100644 Documentation/devicetree/bindings/clock/ti-keystone-pllctrl.txt
- create mode 100644 Documentation/devicetree/bindings/power/reset/keystone-reset.txt
- create mode 100644 Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
- delete mode 100644 arch/arm/mach-exynos/cpuidle.c
- create mode 100644 drivers/bus/brcmstb_gisb.c
- create mode 100644 drivers/cpuidle/cpuidle-exynos.c
- create mode 100644 drivers/power/reset/keystone-reset.c
- create mode 100644 drivers/power/reset/sun6i-reboot.c
- create mode 100644 drivers/reset/reset-socfpga.c
- create mode 100644 drivers/soc/Kconfig
- create mode 100644 drivers/soc/Makefile
- create mode 100644 drivers/soc/qcom/Kconfig
- create mode 100644 drivers/soc/qcom/Makefile
- create mode 100644 drivers/soc/qcom/qcom_gsbi.c
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5e91e40c1d22..3fdae40d5114 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -179,13 +179,6 @@ config ARCH_HAS_ILOG2_U32
+ config ARCH_HAS_ILOG2_U64
+ 	bool
+ 
+-config ARCH_HAS_CPUFREQ
+-	bool
+-	help
+-	  Internal node to signify that the ARCH has CPUFREQ support
+-	  and that the relevant menu configurations are displayed for
+-	  it.
+-
+ config ARCH_HAS_BANDGAP
+ 	bool
+ 
+@@ -321,7 +314,6 @@ config ARCH_MULTIPLATFORM
+ 
+ config ARCH_INTEGRATOR
+ 	bool "ARM Ltd. Integrator family"
+-	select ARCH_HAS_CPUFREQ
+ 	select ARM_AMBA
+ 	select ARM_PATCH_PHYS_VIRT
+ 	select AUTO_ZRELADDR
+@@ -540,7 +532,6 @@ config ARCH_DOVE
+ 
+ config ARCH_KIRKWOOD
+ 	bool "Marvell Kirkwood"
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CPU_FEROCEON
+ 	select GENERIC_CLOCKEVENTS
+@@ -639,7 +630,6 @@ config ARCH_LPC32XX
+ config ARCH_PXA
+ 	bool "PXA2xx/PXA3xx-based"
+ 	depends on MMU
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_MTD_XIP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_CPU_SUSPEND if PM
+@@ -709,7 +699,6 @@ config ARCH_RPC
+ 
+ config ARCH_SA1100
+ 	bool "SA1100-based"
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_MTD_XIP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_SPARSEMEM_ENABLE
+@@ -727,7 +716,6 @@ config ARCH_SA1100
+ 
+ config ARCH_S3C24XX
+ 	bool "Samsung S3C24XX SoCs"
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ATAGS
+ 	select CLKDEV_LOOKUP
+@@ -748,7 +736,6 @@ config ARCH_S3C24XX
+ 
+ config ARCH_S3C64XX
+ 	bool "Samsung S3C64XX"
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_AMBA
+ 	select ARM_VIC
+@@ -811,7 +798,6 @@ config ARCH_S5PC100
+ 
+ config ARCH_S5PV210
+ 	bool "Samsung S5PV210/S5PC110"
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARCH_SPARSEMEM_ENABLE
+ 	select ATAGS
+@@ -831,7 +817,6 @@ config ARCH_S5PV210
+ 
+ config ARCH_EXYNOS
+ 	bool "Samsung EXYNOS"
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_SPARSEMEM_ENABLE
+@@ -867,7 +852,6 @@ config ARCH_DAVINCI
+ config ARCH_OMAP1
+ 	bool "TI OMAP1"
+ 	depends on MMU
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARCH_OMAP
+ 	select ARCH_REQUIRE_GPIOLIB
+@@ -2185,9 +2169,7 @@ endmenu
+ 
+ menu "CPU Power Management"
+ 
+-if ARCH_HAS_CPUFREQ
+ source "drivers/cpufreq/Kconfig"
+-endif
+ 
+ source "drivers/cpuidle/Kconfig"
+ 
+diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+index db18ef866593..584e8d4e2892 100644
+--- a/arch/arm/mach-davinci/Kconfig
++++ b/arch/arm/mach-davinci/Kconfig
+@@ -39,7 +39,6 @@ config ARCH_DAVINCI_DA830
+ config ARCH_DAVINCI_DA850
+ 	bool "DA850/OMAP-L138/AM18x based system"
+ 	select ARCH_DAVINCI_DA8XX
+-	select ARCH_HAS_CPUFREQ
+ 	select CP_INTC
+ 
+ config ARCH_DAVINCI_DA8XX
+diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
+index 830b76e70250..a5960e2ac090 100644
+--- a/arch/arm/mach-highbank/Kconfig
++++ b/arch/arm/mach-highbank/Kconfig
+@@ -1,7 +1,6 @@
+ config ARCH_HIGHBANK
+ 	bool "Calxeda ECX-1000/2000 (Highbank/Midway)" if ARCH_MULTI_V7
+ 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARCH_HAS_OPP
+ 	select ARCH_SUPPORTS_BIG_ENDIAN
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 4776e1ffacd5..145d379ec5c9 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -1,6 +1,5 @@
+ config ARCH_MXC
+ 	bool "Freescale i.MX family" if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_OPP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_CPU_SUSPEND if PM
+@@ -99,7 +98,6 @@ config SOC_IMX25
+ 
+ config SOC_IMX27
+ 	bool
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_OPP
+ 	select CPU_ARM926T
+ 	select IMX_HAVE_IOMUX_V1
+@@ -124,7 +122,6 @@ config SOC_IMX35
+ 
+ config SOC_IMX5
+ 	bool
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_OPP
+ 	select ARCH_MXC_IOMUX_V3
+ 	select MXC_TZIC
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 80e01b3c8c9c..c3611ea369cb 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -87,7 +87,6 @@ config MACH_DOVE
+ 
+ config MACH_KIRKWOOD
+ 	bool "Marvell Kirkwood boards" if ARCH_MULTI_V5
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CPU_FEROCEON
+ 	select KIRKWOOD_CLK
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index cb31d4390d52..0d185aad7047 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -79,7 +79,6 @@ config SOC_DRA7XX
+ config ARCH_OMAP2PLUS
+ 	bool
+ 	select ARCH_HAS_BANDGAP
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARCH_OMAP
+ 	select ARCH_REQUIRE_GPIOLIB
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index bc91eaf99e98..555fd8949e02 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -86,7 +86,6 @@ config ARCH_R8A73A4
+ 	select CPU_V7
+ 	select SH_CLK_CPG
+ 	select RENESAS_IRQC
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_OPP
+ 	select SYS_SUPPORTS_SH_CMT
+ 	select SYS_SUPPORTS_SH_TMU
+@@ -265,7 +264,6 @@ config MACH_KOELSCH
+ config MACH_KZM9G
+ 	bool "KZM-A9-GT board"
+ 	depends on ARCH_SH73A0
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_OPP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+diff --git a/arch/arm/mach-spear/Kconfig b/arch/arm/mach-spear/Kconfig
+index 0786249b2832..90df2022276a 100644
+--- a/arch/arm/mach-spear/Kconfig
++++ b/arch/arm/mach-spear/Kconfig
+@@ -14,7 +14,6 @@ if PLAT_SPEAR
+ config ARCH_SPEAR13XX
+ 	bool "ST SPEAr13xx"
+ 	depends on ARCH_MULTI_V7 || PLAT_SPEAR_SINGLE
+-	select ARCH_HAS_CPUFREQ
+ 	select ARM_GIC
+ 	select GPIO_SPEAR_SPICS
+ 	select HAVE_ARM_SCU if SMP
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 55b305d51669..9a4e074375b3 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -1,6 +1,5 @@
+ config ARCH_TEGRA
+ 	bool "NVIDIA Tegra" if ARCH_MULTI_V7
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
+ 	select ARM_GIC
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index b41a42da1505..9b93144c1c2b 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -3,7 +3,6 @@ config ARCH_U8500
+ 	depends on MMU
+ 	select AB8500_CORE
+ 	select ABX500_CORE
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_AMBA
+ 	select ARM_ERRATA_754322
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 657d52d0391f..4620da4befa2 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -62,7 +62,6 @@ config ARCH_VEXPRESS_DCSCB
+ 
+ config ARCH_VEXPRESS_SPC
+ 	bool "Versatile Express Serial Power Controller (SPC)"
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_OPP
+ 	select PM_OPP
+ 	help
+diff --git a/arch/arm/mach-vt8500/Kconfig b/arch/arm/mach-vt8500/Kconfig
+index 08f56a41cb55..aaaa24fe4d71 100644
+--- a/arch/arm/mach-vt8500/Kconfig
++++ b/arch/arm/mach-vt8500/Kconfig
+@@ -1,6 +1,5 @@
+ config ARCH_VT8500
+ 	bool
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CLKDEV_LOOKUP
+ 	select VT8500_TIMER
+diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
+index 58c2b844e0a3..6e6a78cbaac7 100644
+--- a/arch/arm/mach-zynq/Kconfig
++++ b/arch/arm/mach-zynq/Kconfig
+@@ -2,7 +2,6 @@ config ARCH_ZYNQ
+ 	bool "Xilinx Zynq ARM Cortex A9 Platform" if ARCH_MULTI_V7
+ 	select ARM_AMBA
+ 	select ARM_GIC
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_OPP
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
