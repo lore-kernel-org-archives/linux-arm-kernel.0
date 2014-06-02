@@ -1,73 +1,76 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  2 Jun 2014 19:56:21 -0300
-Subject: [PATCH] ARM: dts: imx6q-udoo: Add USB Host support
-Message-ID: <1401749781-4572-1-git-send-email-festevam@gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 02 Jun 2014 16:11:31 -0700 (PDT)
+Subject: [PATCH v3 2/2] net: hisilicon: add hix5hd2 mac driver
+In-Reply-To: <1401440528-7804-3-git-send-email-zhangfei.gao@linaro.org>
+References: <1401440528-7804-1-git-send-email-zhangfei.gao@linaro.org>
+ <1401440528-7804-3-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20140602.161131.783479189097234753.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+From: Zhangfei Gao <zhangfei.gao@linaro.org>
+Date: Fri, 30 May 2014 17:02:08 +0800
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6q-udoo.dts | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+> +			skb = netdev_alloc_skb_ip_align(priv->netdev,
+> +				MAC_MAX_FRAME_SIZE);
 
-diff --git a/arch/arm/boot/dts/imx6q-udoo.dts b/arch/arm/boot/dts/imx6q-udoo.dts
-index 6c56106..e3bff2a 100644
---- a/arch/arm/boot/dts/imx6q-udoo.dts
-+++ b/arch/arm/boot/dts/imx6q-udoo.dts
-@@ -23,6 +23,23 @@
- 	memory {
- 		reg = <0x10000000 0x40000000>;
- 	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_usb_h1_vbus: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			regulator-name = "usb_h1_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
-+			gpio = <&gpio7 12 0>;
-+		};
-+	};
- };
- 
- &fec {
-@@ -81,6 +98,13 @@
- 			>;
- 		};
- 
-+		pinctrl_usbh: usbhgrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x80000000
-+				MX6QDL_PAD_NANDF_CS2__CCM_CLKO2 0x130b0
-+			>;
-+		};
-+
- 		pinctrl_usdhc3: usdhc3grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17059
-@@ -104,6 +128,14 @@
- 	status = "okay";
- };
- 
-+&usbh1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbh>;
-+	vbus-supply = <&reg_usb_h1_vbus>;
-+	clocks = <&clks 201>;
-+	status = "okay";
-+};
-+
- &usdhc3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc3>;
--- 
-1.8.3.2
+When a function call, declaration, or definition spans multiple lines,
+you must start the arguments on the second and subsequent lines exactly
+at the first column after the openning parenthesis.
+
+Please therefore reindent this properly.
+
+> +		addr = dma_map_single(priv->dev, skb->data,
+> +					MAC_MAX_FRAME_SIZE, DMA_FROM_DEVICE);
+
+Likewise.
+
+> +		desc->cmd = cpu_to_le32(DESC_VLD_FREE |
+> +			(MAC_MAX_FRAME_SIZE - 1) << DESC_BUFF_LEN_OFF);
+
+Likewise.
+
+> +	desc->cmd = cpu_to_le32(DESC_VLD_BUSY | DESC_FL_FULL |
+> +			(skb->len & DESC_DATA_MASK) << DESC_DATA_LEN_OFF |
+> +			(skb->len & DESC_DATA_MASK) << DESC_BUFF_LEN_OFF);
+
+Likewise.
+
+> +	priv->phy = of_phy_connect(dev, priv->phy_node,
+> +		&hix5hd2_adjust_link, 0, priv->phy_mode);
+
+Likewise.
+
+> +static int hix5hd2_mdio_wait_ready(struct mii_bus *bus)
+> +{
+> +	struct hix5hd2_priv *priv = bus->priv;
+> +	void __iomem *base = priv->base;
+> +	int i, timeout = 10000;
+> +
+> +	for (i = 0; readl_relaxed(base + MDIO_SINGLE_CMD) & MDIO_START; i++) {
+> +		if (i == timeout)
+> +			return -ETIMEDOUT;
+> +		udelay(1);
+> +	}
+> +
+> +	return 0;
+> +}
+
+10,000 udelay(1)'s is a long time, consider changing to usleep() or
+similar.
+
+> +			dma_free_coherent(priv->dev, priv->pool[i].size,
+> +					priv->pool[i].desc,
+> +					priv->pool[i].phys_addr);
+
+Indentation.
+
+> +		virt_addr = dma_alloc_coherent(dev, size, &phys_addr,
+> +				GFP_KERNEL);
+
+Likewise.
+
+> +		netdev_warn(ndev, "using random MAC address %pM\n",
+> +			 ndev->dev_addr);
+
+Likewise.
