@@ -1,91 +1,55 @@
-From: javi.merino@arm.com (Javi Merino)
-Date: Mon, 2 Jun 2014 11:20:48 +0100
-Subject: [PATCH v1 6/6] ACPI: thermal: processor: Use the generic cpufreq
- infrastructure
-In-Reply-To: <CADGdYn7FZCjhzbFMtNPFtQV_naQhVk+nR1VFNH88M92_NQmfsA@mail.gmail.com>
-References: <1401351334-11210-1-git-send-email-amit.daniel@samsung.com>
- <1401351334-11210-7-git-send-email-amit.daniel@samsung.com>
- <20140529124248.GC2593@e104805>
- <CADGdYn7FZCjhzbFMtNPFtQV_naQhVk+nR1VFNH88M92_NQmfsA@mail.gmail.com>
-Message-ID: <20140602102047.GB2795@e104805>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 2 Jun 2014 11:25:16 +0100
+Subject: [PATCH] ARM: decompressor: a minor optimization
+In-Reply-To: <1401449433-1963-1-git-send-email-yamada.m@jp.panasonic.com>
+References: <1401449433-1963-1-git-send-email-yamada.m@jp.panasonic.com>
+Message-ID: <20140602102516.GC3855@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 02, 2014 at 10:21:48AM +0100, Amit Kachhap wrote:
-> Hi Javi,
-> 
-> On 5/29/14, Javi Merino <javi.merino@arm.com> wrote:
-> > Hi Amit,
-> >
-> > On Thu, May 29, 2014 at 09:15:34AM +0100, Amit Daniel Kachhap wrote:
-> >> This patch upgrades the ACPI cpufreq cooling portions to use the generic
-> >> cpufreq cooling infrastructure. There should not be any functionality
-> >> related changes as the same behaviour is provided by the generic
-> >> cpufreq APIs with the notifier mechanism.
-> >>
-> >> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> >> ---
-> >>  drivers/acpi/processor_driver.c  |    6 +-
-> >>  drivers/acpi/processor_thermal.c |  235
-> >> ++++++++++++++++++--------------------
-> >>  include/acpi/processor.h         |    3 +-
-> >>  3 files changed, 115 insertions(+), 129 deletions(-)
-> >>
-> >> diff --git a/drivers/acpi/processor_driver.c
-> >> b/drivers/acpi/processor_driver.c
-> >> index 7f70f31..10aba4a 100644
-> >> --- a/drivers/acpi/processor_driver.c
-> >> +++ b/drivers/acpi/processor_driver.c
-> >> @@ -36,6 +36,7 @@
-> >>  #include <linux/cpuidle.h>
-> >>  #include <linux/slab.h>
-> >>  #include <linux/acpi.h>
-> >> +#include <linux/cpu_cooling.h>
-> >>
-> >>  #include <acpi/processor.h>
-> >>
-> >> @@ -178,8 +179,7 @@ static int __acpi_processor_start(struct acpi_device
-> >> *device)
-> >>         if (!cpuidle_get_driver() || cpuidle_get_driver() ==
-> >> &acpi_idle_driver)
-> >>                 acpi_processor_power_init(pr);
-> >>
-> >> -       pr->cdev = thermal_cooling_device_register("Processor", device,
-> >> -
-> >> &processor_cooling_ops);
-> >> +       pr->cdev = acpi_processor_cooling_register(device);
-> >
-> > With this you have removed the only cooling device whose type was
-> > "Processor".  There's special code for dealing with this cooling
-> > device in drivers/thermal/thermal_core.c:passive_store():
-> >
-> > 		list_for_each_entry(cdev, &thermal_cdev_list, node) {
-> > 			if (!strncmp("Processor", cdev->type,
-> > 				     sizeof("Processor")))
-> > 				thermal_zone_bind_cooling_device(tz,
-> > 						THERMAL_TRIPS_NONE, cdev,
-> > 						THERMAL_NO_LIMIT,
-> > 						THERMAL_NO_LIMIT);
-> > 		}
-> > 		mutex_unlock(&thermal_list_lock);
-> > 		if (!tz->passive_delay)
-> >
-> > With your change, that code is now "dead" as it can't do anything.  No
-> > I don't know what should you do with it, either remove it or make it
-> > match the cpufreq cooling device.  But this patch should deal with
-> > that code as well.
-> nice catch. I somehow missed modifying this section.
-> I think the following changes should fix this,
-> -                       if (!strncmp("Processor", cdev->type,
-> -                                    sizeof("Processor")))
-> +                       if (!strncmp("thermal-cpufreq", cdev->type,
-> +                                    sizeof("thermal-cpufreq")))
->                                 thermal_zone_bind_cooling_device(tz,
-> 
+On Fri, May 30, 2014 at 08:30:33PM +0900, Masahiro Yamada wrote:
+> "ldr sp, [r0, #28]" can be squashed into the previous ldm instruction.
 
-That should do it.  I don't really understand why this code is
-specifically looking for ACPI processor cooling devices but I guess
-that's the least disrupting change you can make.
+See commit 77754410fb8ecd7cf307bcd75d60f3b22b8c3cd2
+ARM: 6286/1: fix Thumb-2 decompressor broken by "Auto calculate ZRELADDR"
 
-Cheers,
-Javi
+Loading sp with LDMIA is not allowed in Thumb.  For simpler code
+maintenance, the code was just made Thumb-compatible anyway by splitting
+out the sp load while fixing another issue.  This isn't part of a core
+loop, so shouldn't have a significant impact on performance.
+
+git blame can be useful for finding out how an odd-looking piece of code
+came into existence.  Sometimes you have to dig through a few patches to
+find the answer.
+
+Cheers
+---Dave
+
+> 
+> Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
+> ---
+>  arch/arm/boot/compressed/head.S | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index 066b034..8c392c5 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -194,8 +194,7 @@ not_angel:
+>  		blcs	cache_on
+>  
+>  restart:	adr	r0, LC0
+> -		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}
+> -		ldr	sp, [r0, #28]
+> +		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12, sp}
+>  
+>  		/*
+>  		 * We might be running at a different address.  We need
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
