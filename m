@@ -1,55 +1,77 @@
-From: holgerschurig@gmail.com (Holger Schurig)
-Date: Mon, 2 Jun 2014 15:15:21 +0200
-Subject: iMX6Q FEC: transmit queue 0 timed out
-In-Reply-To: <20140602124242.GB933@n2100.arm.linux.org.uk>
-References: <CAOpc7mF4naY8xuBDFNpHuQPsrULVriKj-ZcpEwpPwtA8UT1Wpw@mail.gmail.com>
- <20140602124242.GB933@n2100.arm.linux.org.uk>
-Message-ID: <CAOpc7mFbJQNeBmOG0C-Qn856MmhtUkTq=QeDPC-EWXryi6sFGg@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 02 Jun 2014 15:15:07 +0200
+Subject: [PATCH v2 7/7] ARM: EXYNOS: cpuidle: add secure firmware support
+ to AFTR mode code
+In-Reply-To: <1401712543-14281-8-git-send-email-b.zolnierkie@samsung.com>
+References: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
+ <1401712543-14281-8-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <538C78DB.1060809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Transmit clocking and pinmux?  Do you mean ENET_TX_EN?  Yep, that's
-set. Somehow barebox can send, it's just Linux that doesn't want to do
-it. Note that ENET_TX_CLK is not muxed, as it is for MII, not for
-RMII.
+Hi,
 
-In case I confuse what you meant, here are excerpts from my DTS:
+On 02.06.2014 14:35, Bartlomiej Zolnierkiewicz wrote:
+> * Use do_idle firmware method instead of cpu_do_idle() on boards with
+>   secure firmware enabled.
+> 
+> * Use sysram_ns_base_addr + 0x24 address for exynos_boot_vector_addr()
+>   and sysram_ns_base_addr + 0x20 one for exynos_boot_vector_flag() on
+>   boards with secure firmware enabled.
+> 
+> This patch fixes hang on an attempt to enter AFTR mode for TRATS2
+> board (which uses EXYNOS4412 SoC with secure firmware enabled).
+> 
+> This patch shouldn't cause any functionality changes on boards that
+> don't use secure firmware.
+> 
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-exynos/pm.c        | 8 ++++++--
+>  drivers/cpuidle/cpuidle-exynos.c | 7 ++++++-
+>  2 files changed, 12 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> index 0fb9a5a..62a0a5e 100644
+> --- a/arch/arm/mach-exynos/pm.c
+> +++ b/arch/arm/mach-exynos/pm.c
+> @@ -169,7 +169,9 @@ int exynos_cluster_power_state(int cluster)
+>  
+>  static inline void __iomem *exynos_boot_vector_addr(void)
+>  {
+> -	if (samsung_rev() == EXYNOS4210_REV_1_1)
+> +	if (firmware_run())
+> +		return sysram_ns_base_addr + 0x24;
+> +	else if (samsung_rev() == EXYNOS4210_REV_1_1)
 
-&fec {
-   pinctrl-names = "default";
-   pinctrl-0 = <&pinctrl_fec>;
-   phy-mode = "rmii";
-   phy-reset-gpios = <&gpio2 4 GPIO_ACTIVE_LOW>;
-   status = "okay";
-};
+Aha, so this is the use case for the function added by patch 1/7.
 
-...
+Well, I don't see the need to do it this way and complicate the API. As
+I mentioned in my comments to patches 2/7 and 5/7, more general firmware
+operations should be taking care of setting those registers to
+appropriate values and so there shouldn't be any need to use them
+directly outside the implementation of firmware ops.
 
-pinctrl_fec: fecgrp {
-   fsl,pins = <
-      MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0 0x1b030
-      MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1 0x1b030
-      MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN   0x1b030
-      MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0 0x1b030
-      MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1 0x1b030
-      MX6QDL_PAD_ENET_RX_ER__ENET_RX_ER   0x1b030
-      MX6QDL_PAD_ENET_MDIO__ENET_MDIO     0x0B850
-      MX6QDL_PAD_ENET_MDC__ENET_MDC       0x1b030
-      MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN  0x1b030
-      MX6QDL_PAD_GPIO_16__ENET_REF_CLK    0x1b030
-      >;
-};
+[snip]
 
+>  static int idle_finisher(unsigned long flags)
+>  {
+>  	exynos_enter_aftr();
+> -	cpu_do_idle();
+> +	if (firmware_run())
+> +		/* no need to check the return value on EXYNOS SoCs */
+> +		call_firmware_op(do_idle, FW_DO_IDLE_AFTR);
+> +	else
+> +		cpu_do_idle();
 
-Or did you mean the clocks internal to the CPU?  So far I didn't
-really care for them, because I thought that the clocking framework in
-conjunction with the device tree takes care of that. Hmm, in the
-refernce manual, chapter 23.3 they talk about mac0_txmem_clk, which
-isn't in that list. If I read the manual correct, this is enabled by
-enet_clk_enable, so let's look into CCGR1:
+This could be done just by
 
-/ # devmem 0x20C406c
-0xF0FCFC00
-                                      ...
-Hmm, the first 'C' from the right contains bits 10-11 (CCM_CCGR1.CG5)
-and they are both set, so enet_clk_enable is also on.
+	if (call_firmware_op(do_idle, FW_DO_IDLE_AFTR) == -ENOSYS)
+		cpu_do_idle();
+
+which is 3 lines less than with a function that is suppose to simplify
+the code.
+
+Best regards,
+Tomasz
