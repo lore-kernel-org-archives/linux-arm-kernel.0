@@ -1,77 +1,71 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 02 Jun 2014 15:15:07 +0200
-Subject: [PATCH v2 7/7] ARM: EXYNOS: cpuidle: add secure firmware support
- to AFTR mode code
-In-Reply-To: <1401712543-14281-8-git-send-email-b.zolnierkie@samsung.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 02 Jun 2014 15:16:40 +0200
+Subject: [PATCH v2 4/7] ARM: EXYNOS: PM: replace EXYNOS_BOOT_VECTOR_*
+ macros by static inlines
+In-Reply-To: <538C76A4.8050508@gmail.com>
 References: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
- <1401712543-14281-8-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <538C78DB.1060809@gmail.com>
+ <1401712543-14281-5-git-send-email-b.zolnierkie@samsung.com>
+ <538C76A4.8050508@gmail.com>
+Message-ID: <2528436.0tFl7PZNSv@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
 Hi,
 
-On 02.06.2014 14:35, Bartlomiej Zolnierkiewicz wrote:
-> * Use do_idle firmware method instead of cpu_do_idle() on boards with
->   secure firmware enabled.
+On Monday, June 02, 2014 03:05:40 PM Tomasz Figa wrote:
+> Hi,
 > 
-> * Use sysram_ns_base_addr + 0x24 address for exynos_boot_vector_addr()
->   and sysram_ns_base_addr + 0x20 one for exynos_boot_vector_flag() on
->   boards with secure firmware enabled.
+> On 02.06.2014 14:35, Bartlomiej Zolnierkiewicz wrote:
+> > Replace EXYNOS_BOOT_VECTOR_ADDR and EXYNOS_BOOT_VECTOR_FLAG macros
+> > by exynos_boot_vector_addr() and exynos_boot_vector_flag() static
+> > inlines.
+> > 
+> > This patch shouldn't cause any functionality changes.
+> > 
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  arch/arm/mach-exynos/pm.c | 28 ++++++++++++++++++++--------
+> >  1 file changed, 20 insertions(+), 8 deletions(-)
 > 
-> This patch fixes hang on an attempt to enter AFTR mode for TRATS2
-> board (which uses EXYNOS4412 SoC with secure firmware enabled).
+> > diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> > index 87c0d34..cf09383 100644
+> > --- a/arch/arm/mach-exynos/pm.c
+> > +++ b/arch/arm/mach-exynos/pm.c
+> > @@ -166,12 +166,23 @@ int exynos_cluster_power_state(int cluster)
+> >  			S5P_CORE_LOCAL_PWR_EN);
+> >  }
+> >  
+> > -#define EXYNOS_BOOT_VECTOR_ADDR	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+> > -			S5P_INFORM7 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
+> > -			(sysram_base_addr + 0x24) : S5P_INFORM0))
+> > -#define EXYNOS_BOOT_VECTOR_FLAG	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+> > -			S5P_INFORM6 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
+> > -			(sysram_base_addr + 0x20) : S5P_INFORM1))
+> > +static inline void __iomem *exynos_boot_vector_addr(void)
+> > +{
+> > +	if (samsung_rev() == EXYNOS4210_REV_1_1)
+> > +		return S5P_INFORM7;
+> > +	else if (samsung_rev() == EXYNOS4210_REV_1_0)
+> > +		return sysram_base_addr + 0x24;
+> > +	return S5P_INFORM0;
 > 
-> This patch shouldn't cause any functionality changes on boards that
-> don't use secure firmware.
+> I know this is not strictly related to this patch, but isn't a check
+> whether the SoC is Exynos4210 also needed, before comparing the revision
+> with Exynos4210-specific values?
+
+Yes, it is needed but other SoCs need to be verified that they do not
+rely on a buggy code (to not introduce regressions).  This is of course
+outside a scope of the current patchset.
+
+> Otherwise looks good.
 > 
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/pm.c        | 8 ++++++--
->  drivers/cpuidle/cpuidle-exynos.c | 7 ++++++-
->  2 files changed, 12 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index 0fb9a5a..62a0a5e 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -169,7 +169,9 @@ int exynos_cluster_power_state(int cluster)
->  
->  static inline void __iomem *exynos_boot_vector_addr(void)
->  {
-> -	if (samsung_rev() == EXYNOS4210_REV_1_1)
-> +	if (firmware_run())
-> +		return sysram_ns_base_addr + 0x24;
-> +	else if (samsung_rev() == EXYNOS4210_REV_1_1)
-
-Aha, so this is the use case for the function added by patch 1/7.
-
-Well, I don't see the need to do it this way and complicate the API. As
-I mentioned in my comments to patches 2/7 and 5/7, more general firmware
-operations should be taking care of setting those registers to
-appropriate values and so there shouldn't be any need to use them
-directly outside the implementation of firmware ops.
-
-[snip]
-
->  static int idle_finisher(unsigned long flags)
->  {
->  	exynos_enter_aftr();
-> -	cpu_do_idle();
-> +	if (firmware_run())
-> +		/* no need to check the return value on EXYNOS SoCs */
-> +		call_firmware_op(do_idle, FW_DO_IDLE_AFTR);
-> +	else
-> +		cpu_do_idle();
-
-This could be done just by
-
-	if (call_firmware_op(do_idle, FW_DO_IDLE_AFTR) == -ENOSYS)
-		cpu_do_idle();
-
-which is 3 lines less than with a function that is suppose to simplify
-the code.
+> Best regards,
+> Tomasz
 
 Best regards,
-Tomasz
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
