@@ -1,282 +1,78 @@
-From: ulrich.hecht@gmail.com (Ulrich Hecht)
-Date: Mon,  2 Jun 2014 16:54:58 +0200
-Subject: [PATCH v2] clk: shmobile: sh73a0 common clock framework implementation
-Message-ID: <1401720898-12939-1-git-send-email-ulrich.hecht+renesas@gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 02 Jun 2014 08:05:10 -0700
+Subject: [PATCH v11 0/3] Exynos 5410 support
+In-Reply-To: <CANhyOUeq1MMHHn9t+Fy5gpkb43y_rS9F_OAoJ_KFyM1pL4ZJ4w@mail.gmail.com>
+ (Tarek Dakhran's message of "Fri, 30 May 2014 23:07:01 +0400")
+References: <1401074613-29227-1-git-send-email-t.dakhran@samsung.com>
+ <7hr43f9mmn.fsf@paris.lan> <538737CA.4070709@suse.de>
+ <53874862.5080809@samsung.com> <538775AB.3000604@suse.de>
+ <CAC5m3Bz53QO5tTTvk7qnBQtwtjMvSgYZ15prAvnLjdogQRsfMQ@mail.gmail.com>
+ <CANhyOUeq1MMHHn9t+Fy5gpkb43y_rS9F_OAoJ_KFyM1pL4ZJ4w@mail.gmail.com>
+Message-ID: <7hzjhvxsgp.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Driver for the SH73A0's clocks that are too specific to be supported by a
-generic driver.
+Tarek Dakhran <t.dakhran@gmail.com> writes:
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
----
+> Hi,
+>
+> On Fri, May 30, 2014 at 7:41 AM, Tushar Behera <trblinux@gmail.com> wrote:
+>> On Thu, May 29, 2014 at 11:30 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>>> Hi Tarek,
+>>>
+>>>
+>>> And I reproducibly get failures for CPUs 1-3, resulting in only one CPU
+>>> in /proc/cpuinfo (compared to 4 on downstream 3.14):
+>>>
+>>> [    0.045778] CPU: Testing write buffer coherency: ok
+>>> [    0.045968] /cpus/cpu at 0 missing clock-frequency property
+>>> [    0.045993] /cpus/cpu at 1 missing clock-frequency property
+>>> [    0.046016] /cpus/cpu at 2 missing clock-frequency property
+>>> [    0.046040] /cpus/cpu at 3 missing clock-frequency property
+>>> [    0.046059] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+>>> [    0.046135] Setting up static identity map for 0x403a8920 - 0x403a8978
+>>> [    2.075052] CPU1: failed to come online
+>>> [    4.085095] CPU2: failed to come online
+>>> [    6.095142] CPU3: failed to come online
+>>> [    6.095237] Brought up 1 CPUs
+>>> [    6.095269] SMP: Total of 1 processors activated.
+>>> [    6.095303] CPU: All CPU(s) started in HYP mode.
+>>> [    6.095336] CPU: Virtualization extensions available.
+>>>
+>>> I also notice another apparent device tree issue:
+>>>
+>>> [    7.341814] of_get_named_gpiod_flags: can't parse gpios property of
+>>> node '/soc/mmc at 12220000/slot at 0[0]'
+>>> [    7.341850] of_get_named_gpiod_flags: can't parse gpios property of
+>>> node '/soc/mmc at 12220000/slot at 0[0]'
+>>>
+>>> Are any of those known issues and being worked on?
+>>> (The CPU failures affected 5420 Arndale Octa as well iirc.)
+>>>
+>>
+>> Can you check after applying following two patches for Arndale-Octa
+>> ([1],[2])? In other words, a patch similar to [2] might be required
+>> for this board too if it is booting under secure mode.
+>
+> Firmware node already present into exynos5410-smdk5410.dts
+> So with only patch[1] 4xA15 cores will boot on ODROID-XU and SMDK5410.
 
-Changes since v1:
-- reshuffled to include DT bindings and Makefile changes
-- reformatted register addresses and divider masks
-- marked bindings as experimental
-- use div4_clk::parent instead of hardcoding them
+I also confirm that with 4xA15 cores boot when adding patch [1].
 
- .../bindings/clock/renesas,sh73a0-cpg-clocks.txt   |  31 ++++
- drivers/clk/shmobile/Makefile                      |   1 +
- drivers/clk/shmobile/clk-sh73a0.c                  | 199 +++++++++++++++++++++
- 3 files changed, 231 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/renesas,sh73a0-cpg-clocks.txt
- create mode 100644 drivers/clk/shmobile/clk-sh73a0.c
+Kevin
 
-diff --git a/Documentation/devicetree/bindings/clock/renesas,sh73a0-cpg-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,sh73a0-cpg-clocks.txt
-new file mode 100644
-index 0000000..6b8dece
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/renesas,sh73a0-cpg-clocks.txt
-@@ -0,0 +1,31 @@
-+These bindings should be considered EXPERIMENTAL for now.
-+
-+* Renesas SH73A0 Clock Pulse Generator (CPG)
-+
-+The CPG generates core clocks for the SH73A0 SoC. It includes four PLLs
-+and several fixed ratio dividers.
-+
-+Required Properties:
-+
-+  - compatible: Must be "renesas,sh73a0-cpg-clocks"
-+
-+  - reg: Base address and length of the memory resource used by the CPG
-+
-+  - clocks: Reference to the parent clocks
-+  - #clock-cells: Must be 1
-+  - clock-output-names: The names of the clocks. Supported clocks are "main",
-+    "pll0", "pll1", "pll2", "pll3", "z", "dsi0phy", "dsi1phy", and "twd"
-+
-+
-+Example
-+-------
-+
-+        cpg_clocks: cpg_clocks at e6150000 {
-+                compatible = "renesas,sh73a0-cpg-clocks";
-+                reg = <0 0xe6150000 0 0x10000>;
-+                clocks = <&extal1_clk>, <&extal2_clk>;
-+                #clock-cells = <1>;
-+                clock-output-names = "main", "pll0", "pll1", "pll2",
-+                                     "pll3", "z", "dsi0phy", "dsi1phy",
-+                                     "twd";
-+        };
-diff --git a/drivers/clk/shmobile/Makefile b/drivers/clk/shmobile/Makefile
-index bdf342d..6a54e73 100644
---- a/drivers/clk/shmobile/Makefile
-+++ b/drivers/clk/shmobile/Makefile
-@@ -3,6 +3,7 @@ obj-$(CONFIG_ARCH_R7S72100)		+= clk-rz.o
- obj-$(CONFIG_ARCH_R8A7779)		+= clk-r8a7779.o
- obj-$(CONFIG_ARCH_R8A7790)		+= clk-rcar-gen2.o
- obj-$(CONFIG_ARCH_R8A7791)		+= clk-rcar-gen2.o
-+obj-$(CONFIG_ARCH_SH73A0)		+= clk-sh73a0.o
- obj-$(CONFIG_ARCH_SHMOBILE_MULTI)	+= clk-div6.o
- obj-$(CONFIG_ARCH_SHMOBILE_MULTI)	+= clk-mstp.o
- # for emply built-in.o
-diff --git a/drivers/clk/shmobile/clk-sh73a0.c b/drivers/clk/shmobile/clk-sh73a0.c
-new file mode 100644
-index 0000000..0310de2
---- /dev/null
-+++ b/drivers/clk/shmobile/clk-sh73a0.c
-@@ -0,0 +1,199 @@
-+/*
-+ * sh73a0 Core CPG Clocks
-+ *
-+ * Copyright (C) 2014  Ulrich Hecht
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/clk/shmobile.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/spinlock.h>
-+
-+struct sh73a0_cpg {
-+	struct clk_onecell_data data;
-+	spinlock_t lock;
-+	void __iomem *reg;
-+};
-+
-+#define CPG_FRQCRA	0x00
-+#define CPG_FRQCRB	0x04
-+#define CPG_SD0CKCR	0x74
-+#define CPG_SD1CKCR	0x78
-+#define CPG_SD2CKCR	0x7c
-+#define CPG_PLLECR	0xd0
-+#define CPG_PLL0CR	0xd8
-+#define CPG_PLL1CR	0x28
-+#define CPG_PLL2CR	0x2c
-+#define CPG_PLL3CR	0xdc
-+#define CPG_CKSCR	0xc0
-+#define CPG_DSI0PHYCR	0x6c
-+#define CPG_DSI1PHYCR	0x70
-+
-+#define CLK_ENABLE_ON_INIT BIT(0)
-+
-+struct div4_clk {
-+	const char *name;
-+	const char *parent;
-+	unsigned int reg;
-+	unsigned int shift;
-+	unsigned int mask;
-+	int flags;
-+};
-+
-+static struct div4_clk div4_clks[] = {
-+	{ "zg", "pll0", CPG_FRQCRA, 16, 0x0d7f, CLK_ENABLE_ON_INIT },
-+	{ "m3", "pll1", CPG_FRQCRA, 12, 0x1dff, CLK_ENABLE_ON_INIT },
-+	{ "b",  "pll1", CPG_FRQCRA,  8, 0x0dff, CLK_ENABLE_ON_INIT },
-+	{ "m1", "pll1", CPG_FRQCRA,  4, 0x1dff, 0 },
-+	{ "m2", "pll1", CPG_FRQCRA,  0, 0x1dff, 0 },
-+	{ "z",  "pll0", CPG_FRQCRB, 24, 0x097f, 0 },
-+	{ "zx", "pll1", CPG_FRQCRB, 12, 0x0dff, 0 },
-+	{ "hp", "pll1", CPG_FRQCRB,  4, 0x0dff, 0 },
-+	{ NULL, 0, 0, 0, 0 },
-+};
-+
-+static const struct clk_div_table div4_div_table[] = {
-+	{ 0, 2 }, { 1, 3 }, { 2, 4 }, { 3, 6 }, { 4, 8 }, { 5, 12 },
-+	{ 6, 16 }, { 7, 18 }, { 8, 24 }, { 10, 36 }, { 11, 48 },
-+	{ 12, 7 }, { 0, 0 }
-+};
-+
-+static struct clk * __init
-+sh73a0_cpg_register_clock(struct device_node *np, struct sh73a0_cpg *cpg,
-+			     const char *name)
-+{
-+	const struct clk_div_table *table = NULL;
-+	const char *parent_name;
-+	unsigned int shift, reg;
-+	unsigned int mult = 1;
-+	unsigned int div = 1;
-+
-+	if (!strcmp(name, "main")) {
-+		/* extal1, extal1_div2, extal2, extal2_div2 */
-+		parent_name = of_clk_get_parent_name(np,
-+			(clk_readl(cpg->reg + CPG_CKSCR) >> 28) & 3);
-+	} else if (!strncmp(name, "pll", 3)) {
-+		void __iomem *enable_reg = cpg->reg;
-+		u32 enable_bit = name[3] - '0';
-+		parent_name = "main";
-+		switch (enable_bit) {
-+		case 0:
-+			enable_reg += CPG_PLL0CR;
-+			break;
-+		case 1:
-+			enable_reg += CPG_PLL1CR;
-+			break;
-+		case 2:
-+			enable_reg += CPG_PLL2CR;
-+			break;
-+		case 3:
-+			enable_reg += CPG_PLL3CR;
-+			break;
-+		default:
-+			return ERR_PTR(-EINVAL);
-+		}
-+		if (clk_readl(cpg->reg + CPG_PLLECR) & BIT(enable_bit)) {
-+			mult = ((clk_readl(enable_reg) >> 24) & 0x3f) + 1;
-+			/* handle CFG bit for PLL1 and PLL2 */
-+			if (enable_bit == 1 || enable_bit == 2)
-+				if (clk_readl(enable_reg) & BIT(20))
-+					mult *= 2;
-+		}
-+	} else if (!strcmp(name, "dsi0phy") || !strcmp(name, "dsi1phy")) {
-+		u32 phy_no = name[3] - '0';
-+		void __iomem *dsi_reg = cpg->reg +
-+			(phy_no ? CPG_DSI1PHYCR : CPG_DSI0PHYCR);
-+		parent_name = phy_no ? "dsi1pck" : "dsi0pck";
-+		div = __raw_readl(dsi_reg);
-+		if (!(div & 0xb8000))
-+			div = 1;
-+		else
-+			div = (div & 0x3f) + 1;
-+	} else {
-+		struct div4_clk *c;
-+		for (c = div4_clks; c->name; c++) {
-+			if (!strcmp(name, c->name)) {
-+				parent_name = c->parent;
-+				table = div4_div_table;
-+				reg = c->reg;
-+				shift = c->shift;
-+				break;
-+			}
-+		}
-+		if (!c->name)
-+			return ERR_PTR(-EINVAL);
-+	}
-+
-+	if (!table) {
-+		return clk_register_fixed_factor(NULL, name, parent_name, 0,
-+						 mult, div);
-+	} else {
-+		return clk_register_divider_table(NULL, name, parent_name, 0,
-+						  cpg->reg + reg, shift, 4, 0,
-+						  table, &cpg->lock);
-+	}
-+}
-+
-+static void __init sh73a0_cpg_clocks_init(struct device_node *np)
-+{
-+	struct sh73a0_cpg *cpg;
-+	struct clk **clks;
-+	unsigned int i;
-+	int num_clks;
-+
-+	num_clks = of_property_count_strings(np, "clock-output-names");
-+	if (num_clks < 0) {
-+		pr_err("%s: failed to count clocks\n", __func__);
-+		return;
-+	}
-+
-+	cpg = kzalloc(sizeof(*cpg), GFP_KERNEL);
-+	clks = kzalloc(num_clks * sizeof(*clks), GFP_KERNEL);
-+	if (cpg == NULL || clks == NULL) {
-+		/* We're leaking memory on purpose, there's no point in cleaning
-+		 * up as the system won't boot anyway.
-+		 */
-+		return;
-+	}
-+
-+	spin_lock_init(&cpg->lock);
-+
-+	cpg->data.clks = clks;
-+	cpg->data.clk_num = num_clks;
-+
-+	cpg->reg = of_iomap(np, 0);
-+	if (WARN_ON(cpg->reg == NULL))
-+		return;
-+
-+	/* Set SDHI clocks to a known state */
-+	clk_writel(0x108, cpg->reg + CPG_SD0CKCR);
-+	clk_writel(0x108, cpg->reg + CPG_SD1CKCR);
-+	clk_writel(0x108, cpg->reg + CPG_SD2CKCR);
-+
-+	for (i = 0; i < num_clks; ++i) {
-+		const char *name;
-+		struct clk *clk;
-+
-+		of_property_read_string_index(np, "clock-output-names", i,
-+					      &name);
-+
-+		clk = sh73a0_cpg_register_clock(np, cpg, name);
-+		if (IS_ERR(clk))
-+			pr_err("%s: failed to register %s %s clock (%ld)\n",
-+			       __func__, np->name, name, PTR_ERR(clk));
-+		else
-+			cpg->data.clks[i] = clk;
-+	}
-+
-+	of_clk_add_provider(np, of_clk_src_onecell_get, &cpg->data);
-+}
-+CLK_OF_DECLARE(sh73a0_cpg_clks, "renesas,sh73a0-cpg-clocks",
-+	       sh73a0_cpg_clocks_init);
--- 
-1.8.4.5
+>>
+>> [1] http://www.spinics.net/lists/linux-samsung-soc/msg31776.html
+>>
+>> [PATCH v2 Resend 1/2] ARM: EXYNOS: Update secondary boot addr for secure mode
+>>
+>> [2] http://www.spinics.net/lists/linux-samsung-soc/msg31777.html
+>>
+>> [PATCH v2 Resend 2/2] ARM: dts: Add secure firmware support for Arndale-octa
+>>
+>>
+>> --
+>> Tushar Behera
+>
+> Best regards,
+>     Tarek
