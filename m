@@ -1,47 +1,198 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon,  2 Jun 2014 13:57:36 -0700
-Subject: [PATCHv2 2/4] arm64: Treat handle_arch_irq as a function pointer
+Date: Mon,  2 Jun 2014 13:57:35 -0700
+Subject: [PATCHv2 1/4] arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support
 In-Reply-To: <1401742658-11841-1-git-send-email-lauraa@codeaurora.org>
 References: <1401742658-11841-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1401742658-11841-3-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1401742658-11841-2-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-handle_arch_irq isn't actually text, it's just a function
-pointer. It doesn't need to be stored in the text section
-and doing so causes problems if we ever want to make the
-kernel text readonly. Move it to the data section.
+In a similar fashion to other architecture, add the infrastructure
+and Kconfig to enable DEBUG_SET_MODULE_RONX support. When
+enabled, module ranges will be marked read-only/no-execute as
+appropriate.
 
 Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
- arch/arm64/kernel/entry.S | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ arch/arm64/Kconfig.debug            |  11 ++++
+ arch/arm64/include/asm/cacheflush.h |   4 ++
+ arch/arm64/mm/Makefile              |   2 +-
+ arch/arm64/mm/pageattr.c            | 121 ++++++++++++++++++++++++++++++++++++
+ 4 files changed, 137 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/mm/pageattr.c
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 39ac630..7c8ea1f 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -139,7 +139,8 @@ tsk	.req	x28		// current thread_info
-  * Interrupt handling.
-  */
- 	.macro	irq_handler
--	ldr	x1, handle_arch_irq
-+	ldr	x1, =handle_arch_irq
-+	ldr	x1, [x1]
- 	mov	x0, sp
- 	blr	x1
- 	.endm
-@@ -678,5 +679,8 @@ ENTRY(sys_rt_sigreturn_wrapper)
- 	b	sys_rt_sigreturn
- ENDPROC(sys_rt_sigreturn_wrapper)
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index d10ec33..53979ac 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -37,4 +37,15 @@ config PID_IN_CONTEXTIDR
+ 	  instructions during context switch. Say Y here only if you are
+ 	  planning to use hardware trace tools with this kernel.
  
--ENTRY(handle_arch_irq)
-+	.data
-+	.globl handle_arch_irq
-+	.align 4
-+handle_arch_irq:
- 	.quad	0
++config DEBUG_SET_MODULE_RONX
++        bool "Set loadable kernel module data as NX and text as RO"
++        depends on MODULES
++        help
++          This option helps catch unintended modifications to loadable
++          kernel module's text and read-only data. It also prevents execution
++          of module data. Such protection may interfere with run-time code
++          patching and dynamic kernel tracing - and they might also protect
++          against certain classes of kernel exploits.
++          If in doubt, say "N".
++
+ endmenu
+diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+index 4c60e64..c12f837 100644
+--- a/arch/arm64/include/asm/cacheflush.h
++++ b/arch/arm64/include/asm/cacheflush.h
+@@ -157,4 +157,8 @@ static inline void flush_cache_vunmap(unsigned long start, unsigned long end)
+ {
+ }
+ 
++int set_memory_ro(unsigned long addr, int numpages);
++int set_memory_rw(unsigned long addr, int numpages);
++int set_memory_x(unsigned long addr, int numpages);
++int set_memory_nx(unsigned long addr, int numpages);
+ #endif
+diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
+index b51d364..25b1114 100644
+--- a/arch/arm64/mm/Makefile
++++ b/arch/arm64/mm/Makefile
+@@ -1,5 +1,5 @@
+ obj-y				:= dma-mapping.o extable.o fault.o init.o \
+ 				   cache.o copypage.o flush.o \
+ 				   ioremap.o mmap.o pgd.o mmu.o \
+-				   context.o tlb.o proc.o
++				   context.o tlb.o proc.o pageattr.o
+ obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
+diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+new file mode 100644
+index 0000000..d8ab747
+--- /dev/null
++++ b/arch/arm64/mm/pageattr.c
+@@ -0,0 +1,121 @@
++/*
++ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#include <linux/kernel.h>
++#include <linux/mm.h>
++#include <linux/sched.h>
++
++#include <asm/pgtable.h>
++#include <asm/tlbflush.h>
++
++static pte_t clear_pte_bit(pte_t pte, pgprot_t prot)
++{
++	pte_val(pte) &= ~pgprot_val(prot);
++	return pte;
++}
++
++static pte_t set_pte_bit(pte_t pte, pgprot_t prot)
++{
++	pte_val(pte) |= pgprot_val(prot);
++	return pte;
++}
++
++static int __change_memory(pte_t *ptep, pgtable_t token, unsigned long addr,
++			pgprot_t prot, bool set)
++{
++	pte_t pte;
++
++	if (set)
++		pte = set_pte_bit(*ptep, prot);
++	else
++		pte = clear_pte_bit(*ptep, prot);
++	set_pte(ptep, pte);
++	return 0;
++}
++
++static int set_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
++			void *data)
++{
++	pgprot_t prot = (pgprot_t)data;
++
++	return __change_memory(ptep, token, addr, prot, true);
++}
++
++static int clear_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
++			void *data)
++{
++	pgprot_t prot = (pgprot_t)data;
++
++	return __change_memory(ptep, token, addr, prot, false);
++}
++
++static int change_memory_common(unsigned long addr, int numpages,
++				pgprot_t prot, bool set)
++{
++	unsigned long start = addr;
++	unsigned long size = PAGE_SIZE*numpages;
++	unsigned long end = start + size;
++	int ret;
++
++	if (start < MODULES_VADDR || start >= MODULES_END)
++		return -EINVAL;
++
++	if (end < MODULES_VADDR || end >= MODULES_END)
++		return -EINVAL;
++
++	if (set)
++		ret = apply_to_page_range(&init_mm, start, size,
++					set_page_range, (void *)prot);
++	else
++		ret = apply_to_page_range(&init_mm, start, size,
++					clear_page_range, (void *)prot);
++
++	flush_tlb_kernel_range(start, end);
++	isb();
++	return ret;
++}
++
++static int change_memory_set_bit(unsigned long addr, int numpages,
++					pgprot_t prot)
++{
++	return change_memory_common(addr, numpages, prot, true);
++}
++
++static int change_memory_clear_bit(unsigned long addr, int numpages,
++					pgprot_t prot)
++{
++	return change_memory_common(addr, numpages, prot, false);
++}
++
++int set_memory_ro(unsigned long addr, int numpages)
++{
++	return change_memory_set_bit(addr, numpages, __pgprot(PTE_RDONLY));
++}
++EXPORT_SYMBOL_GPL(set_memory_ro);
++
++int set_memory_rw(unsigned long addr, int numpages)
++{
++	return change_memory_clear_bit(addr, numpages, __pgprot(PTE_RDONLY));
++}
++EXPORT_SYMBOL_GPL(set_memory_rw);
++
++int set_memory_nx(unsigned long addr, int numpages)
++{
++	return change_memory_set_bit(addr, numpages, __pgprot(PTE_PXN));
++}
++EXPORT_SYMBOL_GPL(set_memory_nx);
++
++int set_memory_x(unsigned long addr, int numpages)
++{
++	return change_memory_clear_bit(addr, numpages, __pgprot(PTE_PXN));
++}
++EXPORT_SYMBOL_GPL(set_memory_x);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
