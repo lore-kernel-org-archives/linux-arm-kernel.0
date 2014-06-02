@@ -1,43 +1,82 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 02 Jun 2014 10:11:55 -0600
-Subject: [PATCH 2/3] arm: tegra: enable igb, stmpe, i2c chardev, spidev,
- lm95245, pwm leds
-In-Reply-To: <39a8704a4c8170d6b0620a1e5e44042eae6d8810.1401665237.git.marcel@ziswiler.com>
-References: <c5522b0efcbfc7690dcde6aaf78b9dd568f99604.1401665237.git.marcel@ziswiler.com>
- <39a8704a4c8170d6b0620a1e5e44042eae6d8810.1401665237.git.marcel@ziswiler.com>
-Message-ID: <538CA24B.1010602@wwwdotorg.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 02 Jun 2014 18:13:42 +0200
+Subject: [PATCH v2 4/7] ARM: EXYNOS: PM: replace EXYNOS_BOOT_VECTOR_*
+ macros by static inlines
+In-Reply-To: <1401712543-14281-5-git-send-email-b.zolnierkie@samsung.com>
+References: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
+ <1401712543-14281-5-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <538CA2B6.4080805@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2014 05:37 PM, Marcel Ziswiler wrote:
-> The NVIDIA Tegra 3 based Apalis T30 module contains an Intel i210 resp.
-> i211 gigabit Ethernet controller, an STMPE811 ADC/touch controller, I2C
-> as well as SPI buses and PWM LEDs generically accessible from user
-> space and an LM95245 temperature sensor chip. The later five can also
-> be found on the Colibri T30 module.
-> 
-> While at it move the PCA953x GPIO entry down to its proper place to
-> have it all nicely ordered again.
-> 
-> Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
+On 06/02/2014 02:35 PM, Bartlomiej Zolnierkiewicz wrote:
+> Replace EXYNOS_BOOT_VECTOR_ADDR and EXYNOS_BOOT_VECTOR_FLAG macros
+> by exynos_boot_vector_addr() and exynos_boot_vector_flag() static
+> inlines.
+>
+> This patch shouldn't cause any functionality changes.
+>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+
 > ---
-> BTW: How about MTD_SPI_NOR,
+>   arch/arm/mach-exynos/pm.c | 28 ++++++++++++++++++++--------
+>   1 file changed, 20 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> index 87c0d34..cf09383 100644
+> --- a/arch/arm/mach-exynos/pm.c
+> +++ b/arch/arm/mach-exynos/pm.c
+> @@ -166,12 +166,23 @@ int exynos_cluster_power_state(int cluster)
+>   			S5P_CORE_LOCAL_PWR_EN);
+>   }
+>
+> -#define EXYNOS_BOOT_VECTOR_ADDR	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+> -			S5P_INFORM7 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
+> -			(sysram_base_addr + 0x24) : S5P_INFORM0))
+> -#define EXYNOS_BOOT_VECTOR_FLAG	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+> -			S5P_INFORM6 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
+> -			(sysram_base_addr + 0x20) : S5P_INFORM1))
+> +static inline void __iomem *exynos_boot_vector_addr(void)
+> +{
+> +	if (samsung_rev() == EXYNOS4210_REV_1_1)
+> +		return S5P_INFORM7;
+> +	else if (samsung_rev() == EXYNOS4210_REV_1_0)
+> +		return sysram_base_addr + 0x24;
+> +	return S5P_INFORM0;
+> +}
+> +
+> +static inline void __iomem *exynos_boot_vector_flag(void)
+> +{
+> +	if (samsung_rev() == EXYNOS4210_REV_1_1)
+> +		return S5P_INFORM6;
+> +	else if (samsung_rev() == EXYNOS4210_REV_1_0)
+> +		return sysram_base_addr + 0x20;
+> +	return S5P_INFORM1;
+> +}
+>
+>   #define S5P_CHECK_AFTR  0xFCBA0D10
+>   #define S5P_CHECK_SLEEP 0x00000BAD
+> @@ -184,8 +195,9 @@ static void exynos_set_wakeupmask(long mask)
+>
+>   static void exynos_cpu_set_boot_vector(long flags)
+>   {
+> -	__raw_writel(virt_to_phys(exynos_cpu_resume), EXYNOS_BOOT_VECTOR_ADDR);
+> -	__raw_writel(flags, EXYNOS_BOOT_VECTOR_FLAG);
+> +	__raw_writel(virt_to_phys(exynos_cpu_resume),
+> +		     exynos_boot_vector_addr());
+> +	__raw_writel(flags, exynos_boot_vector_flag());
+>   }
+>
+>   void exynos_enter_aftr(void)
+>
 
-That might only exist in linux-next.
 
-> PROC_DEVICETREE and CRYPTO_DEV_TEGRA_AES
-> which I haven't found any mentioning anywhere?
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-The TEGRA_AES driver has been removed, so the option should be removed
-from defconfig too. I don't know what happened to PROC_DEVICTREE - it
-doesn't seem to exist any more. Was it replaced by something else or
-deleted? Feel free to send patches for those.
-
-> diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-
-> +CONFIG_SPI_SPIDEV=y
-
-Is this useful with DT? I thought that unlike I2C_CHARDEV, spidev needed
-dummy devices to exist in DT for spidev to work? If so, there's not much
-point adding the option to defconfig, since people can add it when they
-put the dummy devices into DT.
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
