@@ -1,40 +1,47 @@
-From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Mon, 02 Jun 2014 18:28:37 +0200
-Subject: [PATCH 2/3] arm: tegra: enable igb, stmpe, i2c chardev, spidev,
- lm95245, pwm leds
-In-Reply-To: <538CA24B.1010602@wwwdotorg.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 02 Jun 2014 10:33:13 -0600
+Subject: [PATCH 3/3] arm: tegra: initial support for apalis t30
+In-Reply-To: <b470c9c8631a6ef021d140192eb07006de3cfd93.1401665237.git.marcel@ziswiler.com>
 References: <c5522b0efcbfc7690dcde6aaf78b9dd568f99604.1401665237.git.marcel@ziswiler.com>
- <39a8704a4c8170d6b0620a1e5e44042eae6d8810.1401665237.git.marcel@ziswiler.com>
- <538CA24B.1010602@wwwdotorg.org>
-Message-ID: <538CA635.4050502@ziswiler.com>
+ <b470c9c8631a6ef021d140192eb07006de3cfd93.1401665237.git.marcel@ziswiler.com>
+Message-ID: <538CA749.3010106@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2014 06:11 PM, Stephen Warren wrote:
->> BTW: How about MTD_SPI_NOR,
->
-> That might only exist in linux-next.
->
->> PROC_DEVICETREE and CRYPTO_DEV_TEGRA_AES
->> which I haven't found any mentioning anywhere?
->
-> The TEGRA_AES driver has been removed, so the option should be removed
-> from defconfig too. I don't know what happened to PROC_DEVICTREE - it
-> doesn't seem to exist any more. Was it replaced by something else or
-> deleted? Feel free to send patches for those.
+On 06/01/2014 05:37 PM, Marcel Ziswiler wrote:
+> This patch adds the device tree to support Toradex Apalis T30, a
+> computer on module which can be used on different carrier boards.
+> 
+> The module consists of a Tegra 3 SoC, two PMICs, 1 or 2 GB of DDR3L
+> RAM, eMMC, an LM95245 temperature sensor chip, an i210 resp. i211
+> gigabit Ethernet controller, an STMPE811 ADC/touch controller as well
+> as two MCP2515 CAN controllers. Furthermore, there is an SGTL5000 audio
+> codec which is not yet supported. Anything that is not self contained
+> on the module is disabled by default.
+> 
+> The device tree for the Evaluation Board includes the modules device
+> tree and enables the supported peripherals of the carrier board (the
+> Evaluation Board supports almost all of them).
+> 
+> While at it also add the device tree binding documentation for Apalis
+> T30 as well as the previously missing one for the recently added
+> Colibri T30.
 
-OK, will do.
+> diff --git a/arch/arm/boot/dts/tegra30-apalis-eval.dts b/arch/arm/boot/dts/tegra30-apalis-eval.dts
 
->> diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
->
->> +CONFIG_SPI_SPIDEV=y
->
-> Is this useful with DT? I thought that unlike I2C_CHARDEV, spidev needed
-> dummy devices to exist in DT for spidev to work? If so, there's not much
-> point adding the option to defconfig, since people can add it when they
-> put the dummy devices into DT.
+> +	/* SPI1: Apalis SPI1 */
+> +	spi at 7000d400 {
+> +		status = "okay";
+> +		spi-max-frequency = <25000000>;
+> +		spidev0: spidev at 1 {
+> +			compatible = "spidev";
+> +			reg = <1>;
+> +			spi-max-frequency = <25000000>;
+> +		};
+> +	};
 
-Yes, the Apalis T30 DT I sent actually contains two of them which we 
-call generic Apalis SPI1 and SPI2 out-of-the-box configured for exactly 
-that. Without the config enabled though it probably does not make much 
-sense to include it in the DT so I would consider removing it again.
+I vaguely recall people speaking out against including "spidev" devices
+in DT because they don't represent actual HW, but rather a way to
+request that the SPI bus be exposed to user-space, which is a pure SW
+issue. Wouldn't it be better if the spidev interface worked like
+I2C_CHARDEV, where fake devices weren't actually required?
