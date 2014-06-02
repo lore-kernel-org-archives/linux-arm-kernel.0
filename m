@@ -1,123 +1,67 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 2 Jun 2014 11:56:26 +0100
-Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <4663172.oXIylQOrlk@wuerfel>
-References: <1400877395-4235-1-git-send-email-thierry.reding@gmail.com>
- <20140530073006.GA24748@ulmo>
- <20140530112728.GB3949@e103592.cambridge.arm.com>
- <4663172.oXIylQOrlk@wuerfel>
-Message-ID: <20140602105626.GE3855@e103592.cambridge.arm.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 2 Jun 2014 12:06:39 +0100
+Subject: [PATCH 1/8] mmc: sdhci-st: Intial support for ST SDHCI controller
+In-Reply-To: <20140522165036.GK19747@lee--X1>
+References: <1400771902-26553-1-git-send-email-peter.griffin@linaro.org>
+ <1400771902-26553-2-git-send-email-peter.griffin@linaro.org>
+ <20140522165036.GK19747@lee--X1>
+Message-ID: <20140602110639.GA1483@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 30, 2014 at 09:11:07PM +0200, Arnd Bergmann wrote:
-> On Friday 30 May 2014 12:27:28 Dave Martin wrote:
-> > On Fri, May 30, 2014 at 08:30:08AM +0100, Thierry Reding wrote:
-> > > On Thu, May 29, 2014 at 09:52:22AM -0600, Stephen Warren wrote:
-> > > > On 05/23/2014 02:36 PM, Thierry Reding wrote:
-> > > > I think this is a mistake. address-cells/size-cells are for transactions
-> > > > flowing down the bus (from the CPU to date). Describing a connection
-> > > > from a device to an IOMMU is something completely different, and should
-> > > > therefore simply use an iommu-cells property to describe any necessary
-> > > > information. If we start re-using properties for different things in
-> > > > different contexts, how is anyone going to know what they mean, and how
-> > > > will conflicts be resolved. For example, what if there's a single HW
-> > > > module that both acts as a regular register bus with children (where
-> > > > address-cells/size-cells defines how transactions reach the children
-> > > > from the parent), and is also an IOMMU (where according to this binding
-> > > > proposal, address-cells/size-cells represent some aspect of the IOMMU
-> > > > feature). Using different properties for different things is the only
-> > > > sane way to keep different concepts separate. Another alternative would
-> > > > be to represent the single HW module as separate nodes in DT, but I
-> > > > think that will only make our lives harder, and where I've done that in
-> > > > the past, I've regretted it.
-> > > 
-> > > There was some back-and-forth on this topic and the latest concensus
-> > > when I wrote the second version was that #address-cells and #size-cells
-> > > were to be used.
-> > > 
-> > > But there was some bore back-and-forth after that, and it seems like
-> > > Arnd no longer thinks that using #address-cells and #size-cells is a
-> > > good idea either[0].
-> > 
-> > Mistake or not, ePAPR already (ab)uses the address concept for PCI.
-> > Unless ePAPR is wrong, I don't think it makes sense to argue that
-> > the address concept cannot be repurposed.
-> > 
-> > The reason why this is abused for PCI is the same as our reason here:
-> > different masters really are treated as distinct even when accessing
-> > the same destination address, and DT has no general native way to
-> > describe that.
-> > 
-> > One clear advantage of using #address-cells etc. is that ePAPR already
-> > has very clear and well-defined ways of how to specify range mappings.
-> > This gives us a ready-made way to describe windowed IOMMUs and 1:1
-> > remappings of whole blocks of master IDs, which are the most obvious
-> > cases other than having a small-integer set of explicit IDs.
-> > 
-> > That said, the PCI pseudo-address thing is not something we _necessarily_
-> > want to repeat.
+Hi Lee,
+
+Thanks for your feedback, all your other comments will be fixed in v2. 
+However see comments below for this patch
+
+> > +	clk_prepare_enable(clk);
 > 
-> I'm really impartial to the question of whether to use #address-cells
-> or #iommus now. It's possible that we can use the addresses in some
-> meaningful way, but it's not clear to me that this will help make the
-> representation cleaner or that we will actually want it for SMMU.
+> Move this down as far as it will go.  When do you _need_ the clock
+> running by?
 > 
-> > > Arnd, can you take another look at this binding and see if there's
-> > > anything else missing? If not I'll go through the document again and
-> > > update all #address-cells/#size-cells references with #iommu-cells as
-> > > appropriate and submit v3.
-> > 
-> > How do you envisage propagation of the master ID bits downstream of the
-> > IOMMU would be described?
-> > 
-> > We will definitely need a way to describe this for GICv3.  How those
-> > values are propagated is likely to vary between related SoCs and doesn't
-> > feel like it should be baked into a driver, especially for the ARM SMMU
-> > which may get reused in radically different SoC families from different
-> > vendors.
-> > 
-> > The most likely types of remapping are the adding of a base offset or
-> > some extra bits to the ID -- because not all MSIs to the GIC will
-> > necessarily pass through the IOMMU.  It's also possible that we might
-> > see ID squashing or folding in some systems.
-> > 
-> > 
-> > For types of remapping which mix the ID and address together, I now
-> > do tend to agree that any flexibility arising from describing that
-> > in a general way that is unlikely to repay the cost of trying to
-> > interpret and analyse the DT.  Defining a few sterotypical kinds
-> > of mapping explicitly, as needed, looks more sensible for now.  The
-> > windowed-IOMMU case is one example.
+> > +	host->mmc->caps |= MMC_CAP_8_BIT_DATA | MMC_CAP_BUS_WIDTH_TEST
+> > +			| MMC_CAP_1_8V_DDR;
+> > +
+> > +	if (of_property_read_bool(np, "non-removable"))
+> > +		host->mmc->caps |= MMC_CAP_NONREMOVABLE;
+> > +
+> > +	pltfm_host = sdhci_priv(host);
+> > +	pltfm_host->clk = clk;
+> > +
+> > +	ret = sdhci_add_host(host);
+> > +	if (ret) {
+> > +		dev_err(&pdev->dev, "Failed sdhci_add_host\n");
+> > +		goto err_out;
 > 
-> For MSI, my feeling is that we'd just be best off doing an end-to-end
-> description. Any device using an MSI would have an interrupt specifier
-> that is sufficient for the interrupt controller to understand where
-> the IRQ comes from, and return an address/value pair back to the driver
-> to program into some register.
+> If it's possible to move the clk_prepare enable down past here, then
+> you only need to do sdhci_pltfm_free() and you can remove all of the
+> err_out error path.
 
-This is OK so long as the number of endpoint pairings is trivial.
+No its not possible. sdhci_add_host() reads registers on
+the IP, if the clock isn't enabled the system can hang.
 
-If there are multiple GICv3 ITSes addressable by a master, then we
-might have to describe each one per master, or impose policy on the
-DT whereby we choose one or two arbitrary or preferred ITSes for a
-particular master and describe just those.
+> 
+> > +	}
+> > +
+> > +	pltfm_host->priv = pdata;
+> > +
+> > +	platform_set_drvdata(pdev, host);
+> > +
+> > +	host_version = readw_relaxed((host->ioaddr + SDHCI_HOST_VERSION));
+> 
+> Do we want to be doing any error checking for unsupported devices
+> here?
 
-It's worth nothing that ePAPR strenuously avoids such an approach
-for describing DMA: device-device DMA would require information about
-every possible destination in every master node.
+Not that I'm aware of. This is just a debug print I added as it is useful
+for debugging. Its not unheard for software folks not to be told that the
+IP version has changed in a new SoC, so comparing dmesg traces of working
+kernels with non working ones which include IP versions etc can often
+shed some light on whats happening.
 
-Of course, device-device DMA turns out not to be a hot topic in
-practice most of the time, and likewise with this master ID stuff the
-number of pairings that are really relevant in useful situations is
-much smaller than the number of possible pairings.
+Arguably if the maintainers think its helpful then it could be added in 
+sdhci_add_host(), and every platform would benefit. Or if its deemed 
+not helpful then it can be removed!
 
-The element of gamble here, and the design of DT around Linux's
-present-day limitations makes me feel uneasy, but there's no
-knockdown argument that I'm aware of.
+Cheers,
 
-_If_ we end up with a combinatorial explosion of pairings in the
-future, do you have a solution in mind?
-
-Cheers
----Dave
+Peter.
