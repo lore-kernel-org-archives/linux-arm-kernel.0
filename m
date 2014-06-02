@@ -1,144 +1,49 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 2 Jun 2014 14:57:39 -0400
-Subject: [PATCH v1 2/6] thermal: cpu_cooling: Support passing driver
- private data.
-In-Reply-To: <CADGdYn6_cxfxR9+CA+pez00ViOVpTbv=r3eaGsk94CJ8PhF1tA@mail.gmail.com>
-References: <1401351334-11210-1-git-send-email-amit.daniel@samsung.com>
- <1401351334-11210-3-git-send-email-amit.daniel@samsung.com>
- <20140529120624.GA2593@e104805>
- <CADGdYn6_cxfxR9+CA+pez00ViOVpTbv=r3eaGsk94CJ8PhF1tA@mail.gmail.com>
-Message-ID: <20140602185739.GC5902@developer>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 02 Jun 2014 21:00:16 +0200
+Subject: [PATCH v3 0/7] of: setup dma parameters using dma-ranges and
+ dma-coherent
+In-Reply-To: <538C9E3C.2000103@ti.com>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+ <4197388.OE67ahhtqp@wuerfel> <538C9E3C.2000103@ti.com>
+Message-ID: <4328786.m38YGt2sIU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 02, 2014 at 02:54:04PM +0530, Amit Kachhap wrote:
-> On 5/29/14, Javi Merino <javi.merino@arm.com> wrote:
-> > Hi Amit,
-> >
-> > One minor comment.
-> >
-> > On Thu, May 29, 2014 at 09:15:30AM +0100, Amit Daniel Kachhap wrote:
-> >> This patch allows the caller of cpufreq cooling APIs to register along
-> >> with their driver data which will be useful while receiving any cooling
-> >> states
-> >> notifications.
-> >> This patch is in preparation to add notfication support for cpufrequency
-> >> cooling changes. This change also removes the unnecessary exposing of
-> >> internal housekeeping structure via thermal_cooling_device->devdata to
-> >> the
-> >> users of cpufreq cooling APIs. As part of this implmentation, this private
-> >> local
-> >> structure (cpufreq_dev) is now stored in a list and scanned for each call
-> >> to
-> >> cpu cooling interfaces.
-> >>
-> >> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> >> ---
-> >>  Documentation/thermal/cpu-cooling-api.txt          |    3 +-
-> >>  drivers/thermal/cpu_cooling.c                      |   89
-> >> ++++++++++++++++----
-> >>  drivers/thermal/db8500_cpufreq_cooling.c           |    2 +-
-> >>  drivers/thermal/samsung/exynos_thermal_common.c    |    2 +-
-> >>  drivers/thermal/ti-soc-thermal/ti-thermal-common.c |    2 +-
-> >>  include/linux/cpu_cooling.h                        |    5 +-
-> >>  6 files changed, 80 insertions(+), 23 deletions(-)
-> >>
-> >> diff --git a/Documentation/thermal/cpu-cooling-api.txt
-> >> b/Documentation/thermal/cpu-cooling-api.txt
-> >> index fca24c9..aaa07c6 100644
-> >> --- a/Documentation/thermal/cpu-cooling-api.txt
-> >> +++ b/Documentation/thermal/cpu-cooling-api.txt
-> >> @@ -17,13 +17,14 @@ the user. The registration APIs returns the cooling
-> >> device pointer.
-> >>
-> >>  1.1 cpufreq registration/unregistration APIs
-> >>  1.1.1 struct thermal_cooling_device *cpufreq_cooling_register(
-> >> -       struct cpumask *clip_cpus)
-> >> +       struct cpumask *clip_cpus, void *devdata)
-> >>
-> >>      This interface function registers the cpufreq cooling device with the
-> >> name
-> >>      "thermal-cpufreq-%x". This api can support multiple instances of
-> >> cpufreq
-> >>      cooling devices.
-> >>
-> >>     clip_cpus: cpumask of cpus where the frequency constraints will
-> >> happen.
-> >> +   devdata: driver private data pointer.
-> >>
-> >>  1.1.2 void cpufreq_cooling_unregister(struct thermal_cooling_device
-> >> *cdev)
-> >>
-> >> diff --git a/drivers/thermal/cpu_cooling.c
-> >> b/drivers/thermal/cpu_cooling.c
-> >> index 16388b0..6d145d5 100644
-> >> --- a/drivers/thermal/cpu_cooling.c
-> >> +++ b/drivers/thermal/cpu_cooling.c
-> >> @@ -50,16 +50,18 @@ struct cpufreq_cooling_device {
-> >>         unsigned int cpufreq_state;
-> >>         unsigned int cpufreq_val;
-> >>         struct cpumask allowed_cpus;
-> >> +       struct list_head node;
-> >>  };
-> >>  static DEFINE_IDR(cpufreq_idr);
-> >>  static DEFINE_MUTEX(cooling_cpufreq_lock);
-> >>
-> >> -static unsigned int cpufreq_dev_count;
-> >> -
-> >>  /* notify_table passes value to the CPUFREQ_ADJUST callback function. */
-> >>  #define NOTIFY_INVALID NULL
-> >>  static DEFINE_PER_CPU(struct cpufreq_cooling_device *, notify_device);
-> >>
-> >> +/* A list to hold all the cpufreq cooling devices registered */
-> >> +static LIST_HEAD(cpufreq_cooling_list);
-> >> +
-> >>  /**
-> >>   * get_idr - function to get a unique id.
-> >>   * @idr: struct idr * handle used to create a id.
-> >> @@ -98,6 +100,26 @@ static void release_idr(struct idr *idr, int id)
-> >>
-> >>  /* Below code defines functions to be used for cpufreq as cooling device
-> >> */
-> >>
-> >> +/**
-> >> + * cpufreq_cooling_get_info - function to cpufreq_dev for the
-> >> corresponding cdev
-> >> + * @cdev: pointer of the cooling device
-> >> + *
-> >> + * This function will loop through the cpufreq_cooling_device list and
-> >> + * return the matching device
-> >> + *
-> >
-> > You should add a "Locking:" section here which documents that this
-> > function must be called with cooling_cpufreq_lock held.
-> Yes agreed. Will update in the next version.
-
-One good practice is to check the output of scripts/kerneldoc on your
-changed file.
-
-Cheers
-
+On Monday 02 June 2014 11:54:36 Santosh Shilimkar wrote:
 > 
-> Thanks,
-> Amit
-> >
-> > Cheers,
-> > Javi
-> >
-> >> + * Return: cpufreq_cooling_device if matched with the cdev or NULL if
-> >> not
-> >> + * matched.
-> >> + */
-> >> +static inline struct cpufreq_cooling_device *
-> >> +cpufreq_cooling_get_info(struct thermal_cooling_device *cdev)
-> >> +{
-> >> +       struct cpufreq_cooling_device *cpufreq_dev = NULL;
-> >> +       list_for_each_entry(cpufreq_dev, &cpufreq_cooling_list, node)
-> >> +               if (cpufreq_dev->cool_dev == cdev)
-> >> +                       break;
-> >> +       return cpufreq_dev;
-> >> +}
-> >> +
-> >
-> >
-> >
+> On Monday 02 June 2014 11:06 AM, Arnd Bergmann wrote:
+> > On Monday 02 June 2014 09:24:50 Santosh Shilimkar wrote:
+> >> On Monday 02 June 2014 02:37 AM, Shawn Guo wrote:
+> >>> On Thu, Apr 24, 2014 at 11:30:00AM -0400, Santosh Shilimkar wrote:
+> >>>> Here is an updated v3 of the series. Series introduces support for setting up
+> >>>> dma parameters based on device tree properties like 'dma-ranges' and
+> >>>> 'dma-coherent' and also update to ARM 32 bit port. Earlier version of the
+> >>>> series can be found here [3], [2] and [1].
+> >>>
+> >>> Are these two generic device tree properties documented somewhere under
+> >>> Documentation/devicetree/bindings?
+> >>>
+> >> These bindings have been already in use before this series. But looks like
+> >> they have not been documented. I will do a patch to add description for those
+> >> couple of parameters.
+> > 
+> > dma-ranges is part of ePAPR, and was documented in some ieee-1275 addenda
+> > before that, but I agree it would be nice to have something in kernel as
+> > well, at the minimum something pointing to the relevant documents.
+> > 
+> We are thinking of updating 'Documentation/devicetree/bindings/dma/dma.txt'
+> to add the information for these extra two parameters.
+> 
+> Is that fine or any other suggestion ?
+
+I think that's the wrong place. That entire directory currently deals with
+the specific case of DMA engines, as opposed to the more DMA bus mastering
+in general. We could rename that to
+Documentation/devicetree/bindings/dmaengine, but renames tend to cause
+extra patch conficts, so I'd prefer finding another location for this.
+
+How about a section in the top-level
+Documentation/devicetree/booting-without-of.txt file? After all, this
+is very generic and can impact any device that acts as a bus master.
+
+	Arnd
