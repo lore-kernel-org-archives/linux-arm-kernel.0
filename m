@@ -1,73 +1,50 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 2 Jun 2014 13:09:08 -0500
-Subject: [PATCH 1/2] pci: Add IORESOURCE_BIT entry for PCIe ECAM resources.
-In-Reply-To: <20140602162306.4AB0FC40476@trevor.secretlab.ca>
-References: <20140530233034.GH1677@bart.dudau.co.uk>
- <1401496601-31983-1-git-send-email-Liviu.Dudau@arm.com>
- <1401496601-31983-2-git-send-email-Liviu.Dudau@arm.com>
- <4756033.LkcFQN0chs@wuerfel> <20140602150945.964D4C40381@trevor.secretlab.ca>
- <390B3F94-C058-47D6-82CE-0393E60014FF@codeaurora.org>
- <20140602162306.4AB0FC40476@trevor.secretlab.ca>
-Message-ID: <2F6515B1-48FE-4ED6-908E-CC1CAD7AF403@codeaurora.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 02 Jun 2014 22:13:29 +0400
+Subject: [PATCH 1/4] ARM: shmobile: r8a7791: Add SYS-DMAC clocks
+In-Reply-To: <1401716424-29740-2-git-send-email-geert+renesas@glider.be>
+References: <1401716424-29740-1-git-send-email-geert+renesas@glider.be>
+ <1401716424-29740-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <538CBEC9.6090707@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello.
 
-On Jun 2, 2014, at 11:23 AM, Grant Likely <grant.likely@linaro.org> wrote:
+On 06/02/2014 05:40 PM, Geert Uytterhoeven wrote:
 
-> On Mon, 2 Jun 2014 10:40:30 -0500, Kumar Gala <galak@codeaurora.org> wrote:
->> 
->> On Jun 2, 2014, at 10:09 AM, Grant Likely <grant.likely@linaro.org> wrote:
->> 
->>> On Sat, 31 May 2014 20:41:04 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
->>>> On Saturday 31 May 2014 01:36:40 Liviu Dudau wrote:
->>>>> We would like to be able to describe PCIe ECAM resources as
->>>>> IORESOURCE_MEM blocks while distinguish them from standard
->>>>> memory resources. Add an IORESOURCE_BIT entry for this case.
->>>>> 
->>>>> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
->>>> 
->>>> I still don't see any value in this at all. What is the advantage
->>>> of doing this opposed to just having a standardized 'reg' property
->>>> for a particular compatible string?
->>> 
->>> I'm inclined to agree. It doesn't seem appropriate to put config space
->>> in ranges, and the host controller binding is responsible for
->>> identifying how config space is memory mapped.
->>> 
->>> g.
->> 
->> I don?t agree when it comes to ECAM, but we can drop this for now
->> until someone really does that.
-> 
-> Okay, humor me then. What would a ranges property look like for ECAM? Do
-> you have an example? I believe there would need to be a separate entry
-> for each and every PCI device on the bus to get the config spaces to be
-> contiguous.
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>   arch/arm/mach-shmobile/clock-r8a7791.c | 6 +++++-
+>   1 file changed, 5 insertions(+), 1 deletion(-)
 
-The definition of ECAM is a 256M linear region with each 4k being a different bus/dev/func.
+> diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
+> index e2fdfcc14436..b0b2294513e2 100644
+> --- a/arch/arm/mach-shmobile/clock-r8a7791.c
+> +++ b/arch/arm/mach-shmobile/clock-r8a7791.c
+> @@ -178,7 +178,7 @@ enum {
+>   	MSTP719, MSTP718, MSTP715, MSTP714,
+>   	MSTP522,
+>   	MSTP314, MSTP312, MSTP311,
+> -	MSTP216, MSTP207, MSTP206,
+> +	MSTP219, MSTP218, MSTP216, MSTP207, MSTP206,
 
-So the ranges would look something like:
+    I'd put the latter two on a separate line or on the same line with the 
+following three.
 
-   ranges = <0x00000000 0 0x00000000 0x0ff00000 0 0x10000000>   /* configuration space */
+>   	MSTP204, MSTP203, MSTP202,
+>   	MSTP124,
+>   	MSTP_NR
+> @@ -215,6 +215,8 @@ static struct clk mstp_clks[MSTP_NR] = {
+>   	[MSTP312] = SH_CLK_MSTP32_STS(&div6_clks[DIV6_SD1], SMSTPCR3, 12, MSTPSR3, 0), /* SDHI1 */
+>   	[MSTP311] = SH_CLK_MSTP32_STS(&div6_clks[DIV6_SD2], SMSTPCR3, 11, MSTPSR3, 0), /* SDHI2 */
+>   	[MSTP216] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 16, MSTPSR2, 0), /* SCIFB2 */
+> +	[MSTP219] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 19, MSTPSR2, 0), /* SYS-DMAC0 */
+> +	[MSTP218] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 18, MSTPSR2, 0), /* SYS-DMAC1 */
 
-The reason I think allow an ECAM makes sense in ranges is because it allows for a direct IO read/write to CFG space (w/o any mapping) similar to what one would do for MEM space or IO.
+    I think these 2 clocks should precede SCIFB2 clock.
 
-> However, what do we do with the 2 cases that exist in upstream that
->> are using ranges for cfg space?
-> 
-> Ignore them in the core code? Make the specific host controller handle
-> them I would think.
+>   	[MSTP207] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 7, MSTPSR2, 0), /* SCIFB1 */
+>   	[MSTP206] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 6, MSTPSR2, 0), /* SCIFB0 */
+>   	[MSTP204] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 4, MSTPSR2, 0), /* SCIFA0 */
 
-I just meant, should we ?break? their DTs and move them from using ranges to reg?
-
-- k
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+WBR, Sergei
