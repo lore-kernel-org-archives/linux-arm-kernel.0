@@ -1,22 +1,47 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 2 Jun 2014 12:43:01 -0700
-Subject: [PATCH v2 3/4] ARM: dts: qcom: Add APQ8084 Global Clock
- Controller DT node
-In-Reply-To: <1401551134-28485-4-git-send-email-gdjakov@mm-sol.com>
+From: gdjakov@mm-sol.com (Georgi Djakov)
+Date: Mon, 02 Jun 2014 22:47:38 +0300
+Subject: [PATCH v2 2/4] clk: qcom: Add APQ8084 Global Clock Controller
+ support
+In-Reply-To: <20140602193603.GM20486@codeaurora.org>
 References: <1401551134-28485-1-git-send-email-gdjakov@mm-sol.com>
- <1401551134-28485-4-git-send-email-gdjakov@mm-sol.com>
-Message-ID: <20140602194301.GP20486@codeaurora.org>
+ <1401551134-28485-3-git-send-email-gdjakov@mm-sol.com>
+ <20140602193603.GM20486@codeaurora.org>
+Message-ID: <538CD4DA.10403@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/31, Georgi Djakov wrote:
-> This patch adds the necessary node to probe the global clock
-> controller on APQ8084 platforms.
+On 02.06.14, 22:36, Stephen Boyd wrote:
+> On 05/31, Georgi Djakov wrote:
+>> +
+>> +static const struct qcom_reset_map gcc_apq8084_resets[] = {
 > 
-> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+>> +	[GCC_VENUS0_BCR] = { 0x1020 },
+> 
+>> +	[GCC_VPU_BCR] = { 0x1400 },
+> 
+>> +	[GCC_MDSS_BCR] = { 0x2300 },
+>> +	[GCC_AVSYNC_BCR] = { 0x2400 },
+>> +	[GCC_OXILI_BCR] = { 0x4020 },
+>> +	[GCC_OXILICX_BCR] = { 0x4030 },
+>> +	[GCC_OCMEMCX_BCR] = { 0x4050 },
+> 
+> These aren't in global clock control (looks like mmcc).
+> 
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Will remove it!
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+>> +#define GCC_VENUS0_BCR			56
+> 
+>> +#define GCC_VPU_BCR			76
+> 
+> 
+>> +#define GCC_MDSS_BCR			93
+>> +#define GCC_AVSYNC_BCR			94
+>> +#define GCC_OXILI_BCR			95
+>> +#define GCC_OXILICX_BCR			96
+>> +#define GCC_OCMEMCX_BCR			97
+> 
+> Ditto
+> 
+
+Thank you for reviewing the patches!
