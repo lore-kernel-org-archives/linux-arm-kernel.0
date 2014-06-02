@@ -1,50 +1,139 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 02 Jun 2014 22:13:29 +0400
-Subject: [PATCH 1/4] ARM: shmobile: r8a7791: Add SYS-DMAC clocks
-In-Reply-To: <1401716424-29740-2-git-send-email-geert+renesas@glider.be>
-References: <1401716424-29740-1-git-send-email-geert+renesas@glider.be>
- <1401716424-29740-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <538CBEC9.6090707@cogentembedded.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Mon, 2 Jun 2014 11:33:09 -0700
+Subject: [PATCH v4 2/4] Documentation: dts: Add bindings for APM X-Gene
+ SoC ethernet driver
+In-Reply-To: <CAGVrzcbecJHbZn1UU3yaD3MtSWk8FmgjMxG4zmQONrnVc05uqg@mail.gmail.com>
+References: <1399326447-2329-1-git-send-email-isubramanian@apm.com>
+ <1399326447-2329-3-git-send-email-isubramanian@apm.com>
+ <CAGVrzcbecJHbZn1UU3yaD3MtSWk8FmgjMxG4zmQONrnVc05uqg@mail.gmail.com>
+Message-ID: <CAKh23FmFe+5Bn2=OD=GNgzCu9Sqd5Sx=P0_UC=UBvkeMihnhhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, May 5, 2014 at 2:57 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> 2014-05-05 14:47 GMT-07:00 Iyappan Subramanian <isubramanian@apm.com>:
+>> This patch adds documentation for APM X-Gene SoC ethernet DTS binding.
+>>
+>> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+>> Signed-off-by: Ravi Patel <rapatel@apm.com>
+>> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
+>> ---
+>>  .../devicetree/bindings/net/apm-xgene-enet.txt     |   66 ++++++++++++++++++++
+>>  1 file changed, 66 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+>> new file mode 100644
+>> index 0000000..9ad6fe1
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+>> @@ -0,0 +1,66 @@
+>> +APM X-Gene SoC Ethernet nodes
+>> +
+>> +Ethernet nodes are defined to describe on-chip ethernet interfaces in
+>> +APM X-Gene SoC.
+>> +
+>> +Required properties:
+>> +- compatible:          Should be "apm,xgene-enet"
+>> +- reg:                 First resource is the ethernet base register set
+>> +                       Second resource is the ring base register set
+>> +                       Third resource is the ring command register set
+>> +- interrupts:          Ethernet main interrupt
+>> +- clocks:              Reference to the clock entry.
+>> +- local-mac-address:   Ethernet MAC address.
+>> +- phy-connection-type: Ethernet MII mode.
+>
+> - phy-handle is not listed anywhere, yet, present in the example you give.
 
-On 06/02/2014 05:40 PM, Geert Uytterhoeven wrote:
+I will add phy-handle information under required properties.
 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
->   arch/arm/mach-shmobile/clock-r8a7791.c | 6 +++++-
->   1 file changed, 5 insertions(+), 1 deletion(-)
+>
+>> +
+>> +- mdio device tree subnode: When the X-Gene SoC has a phy connected to its local
+>> +               mdio, there must be device tree subnode with the following
+>> +               required properties:
+>
+> In that specific case, 'phy-handle' becomes an optional property.
+>
+>> +
+>> +       - compatible: Must be "apm,xgene-mdio".
+>> +       - #address-cells: Must be <1>.
+>> +       - #size-cells: Must be <0>.
+>> +
+>> +       For the phy on the mdio bus, there must be a node with the following
+>> +       fields:
+>> +
+>> +       - reg: phy id used to communicate to phy.
+>
+> Better refer to Documentation/devicetree/bindings/ethernet/phy.txt
+> which contains a more exhaustive binding description for Ethernet PHY
+> nodes.
+>
+>> +
+>> +Optional properties:
+>> +- status               : Should be "ok" or "disabled" for enabled/disabled.
+>> +                         Default is "ok".
+>> +
+>> +Example:
+>> +       menetclk: menetclk {
+>> +               compatible = "apm,xgene-device-clock";
+>> +               clock-output-names = "menetclk";
+>> +               status = "ok";
+>> +       };
+>> +
+>> +       menet: ethernet at 17020000 {
+>> +               compatible = "apm,xgene-enet";
+>> +               status = "disabled";
+>> +               reg = <0x0 0x17020000 0x0 0xd100>,
+>> +                     <0x0 0X17030000 0x0 0X400>,
+>> +                     <0x0 0X10000000 0x0 0X200>;
+>
+> Since you have mutliple values in your 'reg' property, you could also
+> provide an optional 'reg-names' which documents what the register
+> ranges are about.
 
-> diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
-> index e2fdfcc14436..b0b2294513e2 100644
-> --- a/arch/arm/mach-shmobile/clock-r8a7791.c
-> +++ b/arch/arm/mach-shmobile/clock-r8a7791.c
-> @@ -178,7 +178,7 @@ enum {
->   	MSTP719, MSTP718, MSTP715, MSTP714,
->   	MSTP522,
->   	MSTP314, MSTP312, MSTP311,
-> -	MSTP216, MSTP207, MSTP206,
-> +	MSTP219, MSTP218, MSTP216, MSTP207, MSTP206,
+I will add reg-names supplemental property.
 
-    I'd put the latter two on a separate line or on the same line with the 
-following three.
+>
+>> +               interrupts = <0x0 0x3c 0x4>;
+>> +               clocks = <&menetclk 0>;
+>> +               local-mac-address = [00 01 73 00 00 01];
+>> +               phy-connection-type = "rgmii";
+>> +               phy-handle = <&menetphy>;
+>> +               mdio {
+>> +                       compatible = "apm,xgene-mdio";
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <0>;
+>> +                       menetphy: menetphy at 3 {
+>
+> This PHY node is missing a compatible string as described in
+> Documentation/devicetree/bindings/net/ethernet/phy.txt. Your binding
+> should also link to that documentation for
 
->   	MSTP204, MSTP203, MSTP202,
->   	MSTP124,
->   	MSTP_NR
-> @@ -215,6 +215,8 @@ static struct clk mstp_clks[MSTP_NR] = {
->   	[MSTP312] = SH_CLK_MSTP32_STS(&div6_clks[DIV6_SD1], SMSTPCR3, 12, MSTPSR3, 0), /* SDHI1 */
->   	[MSTP311] = SH_CLK_MSTP32_STS(&div6_clks[DIV6_SD2], SMSTPCR3, 11, MSTPSR3, 0), /* SDHI2 */
->   	[MSTP216] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 16, MSTPSR2, 0), /* SCIFB2 */
-> +	[MSTP219] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 19, MSTPSR2, 0), /* SYS-DMAC0 */
-> +	[MSTP218] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 18, MSTPSR2, 0), /* SYS-DMAC1 */
+I will add the compatible property as per the phy.txt recommendations.
 
-    I think these 2 clocks should precede SCIFB2 clock.
-
->   	[MSTP207] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 7, MSTPSR2, 0), /* SCIFB1 */
->   	[MSTP206] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 6, MSTPSR2, 0), /* SCIFB0 */
->   	[MSTP204] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 4, MSTPSR2, 0), /* SCIFA0 */
-
-WBR, Sergei
+>
+>> +                               reg = <0x3>;
+>> +                       };
+>> +
+>> +               };
+>> +       };
+>> +
+>> +/* Board-specific peripheral configurations */
+>> +
+>> +&menet {
+>> +        status = "ok";
+>> +};
+>> --
+>> 1.7.9.5
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+>
+> --
+> Florian
