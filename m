@@ -1,75 +1,41 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 02 Jun 2014 18:05:04 +0200
-Subject: [PATCH 6/7] ARM: EXYNOS: PM: fix register setup on EXYNOS4x12
- for AFTR mode code
-In-Reply-To: <2762097.QhkViWyNLQ@amdc1032>
-References: <1399287439-31376-1-git-send-email-b.zolnierkie@samsung.com>
- <1399287439-31376-7-git-send-email-b.zolnierkie@samsung.com>
- <5375D44F.7000505@linaro.org> <2762097.QhkViWyNLQ@amdc1032>
-Message-ID: <538CA0B0.2030200@linaro.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 2 Jun 2014 18:05:21 +0200
+Subject: [PATCH v2] i2c: nuc900: remove driver
+In-Reply-To: <1401654925-20791-1-git-send-email-wsa@the-dreams.de>
+References: <1401654925-20791-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <20140602160521.GF2654@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2014 02:08 PM, Bartlomiej Zolnierkiewicz wrote:
->
-> Hi,
->
-> On Friday, May 16, 2014 11:03:11 AM Daniel Lezcano wrote:
->> On 05/05/2014 12:57 PM, Bartlomiej Zolnierkiewicz wrote:
->>> Add S5P_CENTRAL_SEQ_OPTION register setup for EXYNOS4x12 to AFTR
->>> mode code.  Without this setup AFTR mode doesn't show any benefit
->>> over WFI one.  When this setup is applied AFTR mode reduces power
->>> consumption by ~12% (as measured on Trats2 board).
->>>
->>> This change is a preparation for adding secure firmware support to
->>> EXYNOS cpuidle driver.
->>>
->>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->>> ---
->>>    arch/arm/mach-exynos/pm.c | 4 ++++
->>>    1 file changed, 4 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
->>> index 18f6bf8..3922968 100644
->>> --- a/arch/arm/mach-exynos/pm.c
->>> +++ b/arch/arm/mach-exynos/pm.c
->>> @@ -391,6 +391,10 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
->>>    	case CPU_PM_ENTER:
->>>    		if (cpu == 0) {
->>>    			exynos_pm_central_suspend();
->>> +			if (soc_is_exynos4212() || soc_is_exynos4412())
->>> +				__raw_writel(S5P_USE_STANDBY_WFI0 |
->>> +					     S5P_USE_STANDBY_WFE0,
->>> +					     S5P_CENTRAL_SEQ_OPTION);
->>
->> Why not put this code in the exynos_enter_aftr() ?
->
-> I would prefer to keep this code close to exynos_pm_central_suspend()
-> because exynos_pm_suspend() (which calls exynos_pm_central_suspend()
-> too) also contains S5P_USE_STANDBY_WF[I,E]0 setting code (done for all
-> SoCs).  If possible I would like to make this code common for AFTR &
-> suspend in the future (once it is tested on Exynos4210 and Exynos5250)
-> by moving S5P_USE_STANDBY_WF[I,E]0 setting to exynos_pm_central_suspend()
-> and doing it for all SoCs.  Are you okay with this?
+On Sun, Jun 01, 2014 at 10:35:25PM +0200, Wolfram Sang wrote:
+> Arnd said in another patch:
+> 
+> "As far as I can tell, this driver must have produced this
+> error for as long as it has been merged into the mainline kernel, but
+> it was never part of the normal build tests:
+> 
+> drivers/i2c/busses/i2c-nuc900.c: In function 'nuc900_i2c_probe':
+> drivers/i2c/busses/i2c-nuc900.c:601:17: error: request for member
+> 'apbfreq' in something not a structure or union
+>   ret = (i2c->clk.apbfreq)/(pdata->bus_freq * 5) - 1;
+>                  ^
+> This is an attempt to get the driver to build and possibly
+> work correctly, although I do wonder whether we should just
+> remove it, as it has clearly never worked."
+> 
+> I agree with removing it since nobody showed interest in Arnd's fixup
+> patch.
+> 
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> Cc: Wan ZongShun <mcuos.com@gmail.org>
 
-Yeah, no problem.
+Applied to for-next, thanks!
 
-
->>>    			exynos_cpu_save_register();
->>>    		}
->>>    		break;
->
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
->
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140602/815b759b/attachment.sig>
