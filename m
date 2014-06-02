@@ -1,34 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 02 Jun 2014 11:07:19 +0200
-Subject: [PATCH v2] i2c: nuc900: remove driver
-In-Reply-To: <1401654925-20791-1-git-send-email-wsa@the-dreams.de>
-References: <1401654925-20791-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <5344745.s7ruhXG564@wuerfel>
+Date: Mon, 02 Jun 2014 11:17:23 +0200
+Subject: [PATCH V4] mmc: mmci: Enforce DMA configuration through DT
+In-Reply-To: <CAPDyKFrRP-0EZzzyfxinYDp+aPca-t0Gmw3i2tdjM=dX-DXT4w@mail.gmail.com>
+References: <1400561154-17846-1-git-send-email-ulf.hansson@linaro.org>
+ <CAPDyKFrRP-0EZzzyfxinYDp+aPca-t0Gmw3i2tdjM=dX-DXT4w@mail.gmail.com>
+Message-ID: <4964687.xgf1CmDf7Y@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 01 June 2014 22:35:25 Wolfram Sang wrote:
-> Arnd said in another patch:
-> 
-> "As far as I can tell, this driver must have produced this
-> error for as long as it has been merged into the mainline kernel, but
-> it was never part of the normal build tests:
-> 
-> drivers/i2c/busses/i2c-nuc900.c: In function 'nuc900_i2c_probe':
-> drivers/i2c/busses/i2c-nuc900.c:601:17: error: request for member
-> 'apbfreq' in something not a structure or union
->   ret = (i2c->clk.apbfreq)/(pdata->bus_freq * 5) - 1;
->                  ^
-> This is an attempt to get the driver to build and possibly
-> work correctly, although I do wonder whether we should just
-> remove it, as it has clearly never worked."
-> 
-> I agree with removing it since nobody showed interest in Arnd's fixup
-> patch.
-> 
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> Cc: Wan ZongShun <mcuos.com@gmail.org>
-> 
+On Wednesday 28 May 2014 12:50:36 Ulf Hansson wrote:
+> On 20 May 2014 06:45, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> > Remove the option to provide DMA configuration as platform data,
+> > enforce it through DT.
+> >
+> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Roland Stigge <stigge@antcom.de>
+
+
+For the mach-lpc32xx part:
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+In fact, I had done the same patch for arch/arm/mach-lpc32xx/phy3250.c
+myself after hitting the build error on linux-next. Thanks for taking
+care of it!
+
+        Arnd
