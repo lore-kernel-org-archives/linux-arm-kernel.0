@@ -1,41 +1,26 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 02 Jun 2014 14:53:01 +0100
-Subject: [PATCH v2 7/7] ARM: shmobile: r8a7791 dtsi: Enable DMA for QSPI
-In-Reply-To: <1401716531-29794-8-git-send-email-geert+renesas@glider.be>
-References: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
- <1401716531-29794-8-git-send-email-geert+renesas@glider.be>
-Message-ID: <538C81BD.5090502@codethink.co.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 2 Jun 2014 14:53:02 +0100
+Subject: Add SDHCI support for STMicroelectronics SoCs
+In-Reply-To: <20140602102930.GB437@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1400771902-26553-1-git-send-email-peter.griffin@linaro.org>
+ <537E1B55.1090807@st.com>
+ <20140602102930.GB437@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20140602135302.GB4146@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/14 14:42, Geert Uytterhoeven wrote:
-> Add a DMA property to the QSPI node
+> > >Initially it supports the stih416 and stih415 SoCs, and has
+> > >been tested on a stih416-b2020 board.
+> > 
+> > In next version, could you also add  drivers/mmc/host/sdhci-st.c in
+> > the ARM/STI ARCHITECTURE field of MAINTAINERS file?
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> v2:
->   - QSPI needs to use 8-bit accesses for DMA, not 32-bit,
->   - Reorder: TX first, RX second.
-> 
->  arch/arm/boot/dts/r8a7791.dtsi | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-> index 37685ef32ea0..6c285ffc46cb 100644
-> --- a/arch/arm/boot/dts/r8a7791.dtsi
-> +++ b/arch/arm/boot/dts/r8a7791.dtsi
-> @@ -917,6 +917,9 @@
->  		reg = <0 0xe6b10000 0 0x2c>;
->  		interrupts = <0 184 IRQ_TYPE_LEVEL_HIGH>;
->  		clocks = <&mstp9_clks R8A7791_CLK_QSPI_MOD>;
-> +		dmas = <&dma0 R8A7791_DMA_QSPI_TX CHCR_TX_8BIT>,
-> +		       <&dma0 R8A7791_DMA_QSPI_RX CHCR_RX_8BIT>;
-> +		dma-names = "tx", "rx";
+> Was out on hols last week. I have fixed it in v2.
 
-I am hopeful that we can remove the CHCR settings, each driver
-should configure the width when configuring the slave. V2 of
-the patches will reflect this.
+This should be in its own patch.
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
