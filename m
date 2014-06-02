@@ -1,78 +1,37 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 2 Jun 2014 10:53:31 +0100
-Subject: [PATCH] ARM: zImage: add DSB and ISB barriers after relocating
- code
-In-Reply-To: <537EB8F2.3090401@gmail.com>
-References: <1400808472-401-1-git-send-email-marc.ceeeee@gmail.com>
- <alpine.LFD.2.11.1405222155240.17310@knanqh.ubzr>
- <537EB8F2.3090401@gmail.com>
-Message-ID: <20140602095324.GA3855@e103592.cambridge.arm.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon,  2 Jun 2014 11:54:12 +0200
+Subject: [PATCH] ARM: drop warning about return_address not using unwind tables
+Message-ID: <1401702852-30664-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 22, 2014 at 07:56:50PM -0700, Marc Carino wrote:
-> Hi Nicolas,
-> 
-> > Beware... This statement isn't true in most cases.
-> 
-> Ah, yes - I do have to reword that bit. (Per the booting document, the
-> I-cache can either be on or off upon entry, correct?)
-> 
-> > Are you sure of that?  When the MMU is off, memory access is strongly
-> > ordered.  I'm wondering if instruction prefetching applies in that
-> > case.
-> 
-> I'm unable to find a statement in the ARM architecture reference manual
-> (ARM ARM) supporting the need for the DSB, so upon second glance I think
-> I'll eliminate it.
+The warning was introduced in 2009 (commit 4bf1fa5a34aa ([ARM] 5613/1:
+implement CALLER_ADDRESSx)). The only result is that CALLER_ADDRESSx for
+x > 1 returns NULL which doesn't do much harm.
 
-I believe you won't find a statement in the ARM ARM supporting the view
-that you _don't_ need a DSB either :)
+The drawback of implementing the use of unwind tables for the kernel
+tracers is that much of the unwinder code would need to be marked as not
+traceable.
 
-I believe you need it.  DSB is the only operation that can serialise
-program order against the D-side for abitrary code.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/kernel/return_address.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-Strongly-ordered memory on the D-side guarantees that D-side operations
-cannot occur out of order with respect to this CPU, but there is still
-no guarantee about how that relates to the I-side, even with ISB.
-
-> Anyway, you are correct. While the MMU is off, data accesses are
-> assigned the strongly-ordered memory type. However for instruction
-> fetches, memory is assigned the Normal memory type (B3.2.1). Further,
-> the architecture allows for prefetching of instructions within the
-> current and subsequent 4K page from the currently-executing program
-> counter (B3.2.3).
-> 
-> Furthermore, I've encountered the "self-modifying code" example within
-> the ARM ARM, which implies that a pipeline flush is needed after
-> performing stores memory that is a part of the instruction stream.
-> 
-> Another interesting tidbit is that there id no specification of
-> coherency order between data and instructions for _any_ memory type
-> (A3.9.3). It is expected that the programmer to insert an ISB to ensure
-> instruction fetches are synced-up with the most-recent view of memory.
-> 
-> > Also, is this a problem that you actually experienced in practice?
-> 
-> Yes.
-> 
-> > Are you sure those CP15 accesses are fine on all the CPU variants
-> > that may execute this code?  Officially we still support back to
-> > ARMv4 implementations.
-> 
-> No. I suppose I would have to leverage a lookup table scheme as is done
-> with the cache maintenance operations in order for this patch to be
-> portable?
-
-How is what we're trying to achieve here different from the operation
-that needs to be done in between decompressing the kernel and jumping
-to it?  Can't we just call cache_clean_flush?
-
-Except that a possibly-redundant flush of the D-cache will be done,
-this should do exactly the right thing.
-
-This code is hairy to get right ... it would be better not to fragment
-it unnecessarily.
-
-Cheers
----Dave
+diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
+index fafedd86885d..827d946d2be4 100644
+--- a/arch/arm/kernel/return_address.c
++++ b/arch/arm/kernel/return_address.c
+@@ -59,10 +59,6 @@ void *return_address(unsigned int level)
+ 
+ #else /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) */
+ 
+-#if defined(CONFIG_ARM_UNWIND)
+-#warning "TODO: return_address should use unwind tables"
+-#endif
+-
+ void *return_address(unsigned int level)
+ {
+ 	return NULL;
+-- 
+2.0.0.rc2
