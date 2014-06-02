@@ -1,108 +1,32 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 2 Jun 2014 16:07:52 +0200
-Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
-In-Reply-To: <538B0F90.8090902@arm.com>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
- <5388546E.5070007@arm.com>
- <CAKfTPtA04sQ4ox7yAU8Wxn_1DLuAxmm9UgER_-Nidtd6sNEEMQ@mail.gmail.com>
- <538B0F90.8090902@arm.com>
-Message-ID: <CAKfTPtAurF0sxHmA+hK++NKwJfPWZuv3n2OrKtZYtcKRZbnOjw@mail.gmail.com>
+From: holgerschurig@gmail.com (Holger Schurig)
+Date: Mon, 2 Jun 2014 16:11:10 +0200
+Subject: iMX6Q FEC: transmit queue 0 timed out
+In-Reply-To: <20140602133352.GC933@n2100.arm.linux.org.uk>
+References: <CAOpc7mF4naY8xuBDFNpHuQPsrULVriKj-ZcpEwpPwtA8UT1Wpw@mail.gmail.com>
+ <20140602124242.GB933@n2100.arm.linux.org.uk>
+ <CAOpc7mFbJQNeBmOG0C-Qn856MmhtUkTq=QeDPC-EWXryi6sFGg@mail.gmail.com>
+ <20140602133352.GC933@n2100.arm.linux.org.uk>
+Message-ID: <CAOpc7mHJ5CqCcB1rE3b8q58HDdSWeG41PTAMwgeARAL_hgUt_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 June 2014 13:33, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
-> On 30/05/14 20:20, Vincent Guittot wrote:
->>
->> On 30 May 2014 11:50, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
->>>
->>> On 23/05/14 16:53, Vincent Guittot wrote:
->>>>
->>>> Monitor the activity level of each group of each sched_domain level. The
->>>> activity is the amount of cpu_power that is currently used on a CPU or
->>>> group
->>>> of CPUs. We use the runnable_avg_sum and _period to evaluate this
->>>> activity
->>>> level. In the special use case where the CPU is fully loaded by more
->>>> than 1
->>>> task, the activity level is set above the cpu_power in order to reflect
->>>> the
->>>> overload of the CPU
->>>>
->>>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->>>
->>>
->>> [...]
->>>
->>>>   /*
->>>>    * select_task_rq_fair: Select target runqueue for the waking task in
->>>> domains
->>>>    * that have the 'sd_flag' flag set. In practice, this is
->>>> SD_BALANCE_WAKE,
->>>> @@ -5518,6 +5535,7 @@ struct sg_lb_stats {
->>>>        unsigned long sum_weighted_load; /* Weighted load of group's
->>>> tasks */
->>>>        unsigned long load_per_task;
->>>>        unsigned long group_power;
->>>> +     unsigned long group_activity; /* Total activity of the group */
->>>>        unsigned int sum_nr_running; /* Nr tasks running in the group */
->>>>        unsigned int group_capacity;
->>>>        unsigned int idle_cpus;
->>>> @@ -5538,6 +5556,7 @@ struct sd_lb_stats {
->>>>        struct sched_group *busiest;    /* Busiest group in this sd */
->>>>        struct sched_group *local;      /* Local group in this sd */
->>>>        unsigned long total_load;       /* Total load of all groups in sd
->>>> */
->>>> +     unsigned long total_activity;  /* Total activity of all groups in
->>>> sd */
->>>>        unsigned long total_pwr;        /* Total power of all groups in
->>>> sd */
->>>>        unsigned long avg_load; /* Average load across all groups in sd
->>>> */
->>>>
->>>> @@ -5557,6 +5576,7 @@ static inline void init_sd_lb_stats(struct
->>>> sd_lb_stats *sds)
->>>>                .busiest = NULL,
->>>>                .local = NULL,
->>>>                .total_load = 0UL,
->>>> +             .total_activity = 0UL,
->>>
->>>
->>> AFAICS, total_activity is not used right now. Do you intend to use it to
->>> calculate something like avg_activity later (like total_load/avg_load)?
->>
->>
->> this patch only creates group_activity and total_activity.The use of
->> these statistics appears on the next patches. I have not planned to
->> compute such avg_activity for the moment mainly because i have need it
->> yet.
->>
->> Do you have in mind any use of such avg_activity ?
+> On the Microsom, I need:
 >
+>       MX6QDL_PAD_GPIO_16__ENET_REF_CLK        0xc0000000
 >
-> No, not really but I still don't see (taken all your patches) where
-> sds->total_activity is used.
->
-> $ find . -name "*.[ch]" | xargs grep total_activity
-> ./kernel/sched/fair.c:  unsigned long total_activity;  /* Total activity of
-> all groups in sd */
-> ./kernel/sched/fair.c:          .total_activity = 0UL,
-> ./kernel/sched/fair.c:          sds->total_activity += sgs->group_activity;
->
-> OOTH, sgs->group_activity is used to set sgs->group_capacity which is then
-> used in if conditions in update_sd_pick_busiest(), update_sd_lb_stats() and
-> find_busiest_group().
+> Does that work for you?
 
-Sorry, i misread you 1st email and haven't understood that you were
-specifically speaking about total_activity.
-When i created the activity statistic, i have added both sg and sd
-fields but i finally only use the sg one. If i don't need the sd field
-after updating my patches, i will remove it
+Still works in Barebox, but in Linux:
 
-Thanks
-Vincent
+/ # ifconfig eth0 192.168.233.198
+fec 2188000.ethernet eth0: MDIO write timeout
+fec 2188000.ethernet eth0: MDIO read timeout
+fec 2188000.ethernet eth0: MDIO write timeout
+fec 2188000.ethernet eth0: could not attach to PHY
+ifconfig: SIOCSIFFLAGS: Connection timed out
+/ #
 
->
-> [...]
->
->
+I see that some in-Linux-tree DTS have this value, others have
+0x4001b0a8 (one in-barebox-tree DTS has a simple 0x1b0b0). Both SION
+settings create the same error at ifup time for me. And Barebox
+doesn't care for any of them, continue to do TFTP all the time.
