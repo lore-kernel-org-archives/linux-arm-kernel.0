@@ -1,38 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 2 Jun 2014 13:35:17 +0100
-Subject: [PATCH] arm64: uid16: fix __kernel_old_{gid,uid}_t definitions
-In-Reply-To: <24318565.Hg3EHrYVE1@wuerfel>
-References: <1401706049-1787-1-git-send-email-will.deacon@arm.com>
- <24318565.Hg3EHrYVE1@wuerfel>
-Message-ID: <20140602123517.GC13968@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 02 Jun 2014 14:35:36 +0200
+Subject: [PATCH v2 0/7] ARM: EXYNOS: cpuidle: fix AFTR mode on boards with
+ secure firmware enabled
+Message-ID: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi,
 
-On Mon, Jun 02, 2014 at 12:45:39PM +0100, Arnd Bergmann wrote:
-> On Monday 02 June 2014 11:47:29 Will Deacon wrote:
-> > Whilst native arm64 applications don't have the 16-bit UID/GID syscalls
-> > wired up, compat tasks can still access them. The 16-bit wrappers for
-> > these syscalls use __kernel_old_uid_t and __kernel_old_gid_t, which must
-> > be 16-bit data types to maintain compatibility with the 16-bit UIDs used
-> > by compat applications.
-> > 
-> > This patch defines 16-bit __kernel_old_{gid,uid}_t types for arm64
-> > instead of using the 32-bit types provided by asm-generic.
-> > 
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+This patch series fixes support for AFTR idle mode on boards with
+secure firmware enabled (it also includes fix for register setup on
+EXYNOS4x12 SoCs).  It has been tested on Trats2 target but should
+also work on (EXYNOS4412 based) Insignal Origen board.
 
-Cheers!
+v2:
+- synced against next-20140602
+- added missing Acked-by-s
 
-> Is this a theoretical problem, or did you actually encounter binaries
-> with old uid syscalls?
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
 
-I hit it during an AArch32 LTP run which passes '-1' for some parameters
-to the 16-bit flavours of setreuid etc. So I suppose it's theoretical in
-the sense that I've only observed the issue within a testsuite as opposed
-to a real application.
 
-Will
+Bartlomiej Zolnierkiewicz (5):
+  ARM: EXYNOS: add AFTR mode support to firmware do_idle method
+  ARM: EXYNOS: PM: replace EXYNOS_BOOT_VECTOR_* macros by static inlines
+  ARM: EXYNOS: PM: use c15resume firmware method if secure firmware is
+    enabled
+  ARM: EXYNOS: PM: fix register setup on EXYNOS4x12 for AFTR mode code
+  ARM: EXYNOS: cpuidle: add secure firmware support to AFTR mode code
+
+Kyungmin Park (1):
+  arm: firmware: Check firmware is running or not
+
+Tomasz Figa (1):
+  ARM: EXYNOS: add support for firmware-assisted c15resume
+
+ arch/arm/common/firmware.c       |  5 +++++
+ arch/arm/include/asm/firmware.h  | 14 +++++++++++++-
+ arch/arm/mach-exynos/firmware.c  | 18 ++++++++++++++++--
+ arch/arm/mach-exynos/pm.c        | 40 ++++++++++++++++++++++++++++++++--------
+ drivers/cpuidle/cpuidle-exynos.c |  7 ++++++-
+ 5 files changed, 72 insertions(+), 12 deletions(-)
+
+-- 
+1.8.2.3
