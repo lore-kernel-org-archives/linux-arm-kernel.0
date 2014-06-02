@@ -1,50 +1,54 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 02 Jun 2014 15:05:54 +0200
-Subject: [PATCH v2 1/7] arm: firmware: Check firmware is running or not
-In-Reply-To: <538C7342.4000700@gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 02 Jun 2014 15:07:46 +0200
+Subject: [PATCH v2 5/7] ARM: EXYNOS: PM: use c15resume firmware method
+ if secure firmware is enabled
+In-Reply-To: <1401712543-14281-6-git-send-email-b.zolnierkie@samsung.com>
 References: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
- <1401712543-14281-2-git-send-email-b.zolnierkie@samsung.com>
- <538C7342.4000700@gmail.com>
-Message-ID: <7579658.qxmXgWLkvU@amdc1032>
+ <1401712543-14281-6-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <538C7722.8020706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
 Hi,
 
-On Monday, June 02, 2014 02:51:14 PM Tomasz Figa wrote:
-> Hi,
+On 02.06.2014 14:35, Bartlomiej Zolnierkiewicz wrote:
+> Use c15resume firmware method instead of accessing the registers
+> directly in exynos_cpu_restore_register() if secure firmware is
+> enabled.  This affects both PM resume method and cpuidle AFTR mode.
 > 
-> On 02.06.2014 14:35, Bartlomiej Zolnierkiewicz wrote:
-> > From: Kyungmin Park <kyungmin.park@samsung.com>
-> > 
-> > To support multi-platform, it needs to know it's running under secure
-> > OS or not.  Sometimes it needs to access physical address by SMC calls.
-> > 
-> > e.g.,
-> >         if (firmware_run()) {
-> >                 addr = physical address;
-> >         } else {
-> >                 addr = virtual address;
-> >         }
-> > 
-> >         call_firmware_ops(read_address, addr, &value);
+> This patch shouldn't cause any functionality changes on boards that
+> don't use secure firmware.
 > 
-> Hmm, I don't understand the code above. It first asks whether the
-> firmware is available and then calls a firmware operation anyway
-> (assuming that firmware is available regardless of the check above)...
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-exynos/pm.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> I don't like the idea of this function, because we have designed the
-> firmware API to not require this kind of checks. Instead, you just call
-> whatever firmware operation you need and if it returns -ENOSYS you need
-> to fallback to legacy (firmware-less) way of doing it.
-> 
-> Could you provide your use case for which this doesn't work?
+> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> index cf09383..aeff99e 100644
+> --- a/arch/arm/mach-exynos/pm.c
+> +++ b/arch/arm/mach-exynos/pm.c
+> @@ -26,6 +26,7 @@
+>  #include <asm/hardware/cache-l2x0.h>
+>  #include <asm/smp_scu.h>
+>  #include <asm/suspend.h>
+> +#include <asm/firmware.h>
+>  
+>  #include <plat/pm-common.h>
+>  #include <plat/pll.h>
+> @@ -232,6 +233,9 @@ static void exynos_cpu_restore_register(void)
+>  {
+>  	unsigned long tmp;
+>  
+> +	if (call_firmware_op(c15resume, save_arm_register) == 0)
+> +		return;
+> +
 
-Please take a look at patch #7.
+As I mentioned in my comments to patch 2/7, instead of introducing
+heavily SoC-specific operations, I'd rather add more general suspend and
+resume firmware operations which would take care of both saving and
+restoring those registers.
 
 Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Tomasz
