@@ -1,23 +1,18 @@
 From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Mon, 02 Jun 2014 22:24:41 +0200
-Subject: [PATCH 3/3] arm: tegra: initial support for apalis t30
-In-Reply-To: <538CA749.3010106@wwwdotorg.org>
-References: <c5522b0efcbfc7690dcde6aaf78b9dd568f99604.1401665237.git.marcel@ziswiler.com>
- <b470c9c8631a6ef021d140192eb07006de3cfd93.1401665237.git.marcel@ziswiler.com>
- <538CA749.3010106@wwwdotorg.org>
-Message-ID: <538CDD89.6080605@ziswiler.com>
+Date: Mon, 02 Jun 2014 22:33:02 +0200
+Subject: [PATCH 1/3] arm: multi_v7: enable igb, stmpe, spidev, lm95245,
+ pwm leds
+In-Reply-To: <538CB143.5020504@wwwdotorg.org>
+References: <cc612cd3f24f01cfc8fd3e81b1027ff94862e8b4.1401700579.git.marcel@ziswiler.com>
+ <CAOesGMg6aBpH18VO6XF1HxbXsJy92QadT3MVT2vOY41s=oCRrw@mail.gmail.com>
+ <538CB143.5020504@wwwdotorg.org>
+Message-ID: <538CDF7E.6080602@ziswiler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2014 06:33 PM, Stephen Warren wrote:
-> I vaguely recall people speaking out against including "spidev" devices
-> in DT because they don't represent actual HW, but rather a way to
-> request that the SPI bus be exposed to user-space, which is a pure SW
-> issue. Wouldn't it be better if the spidev interface worked like
-> I2C_CHARDEV, where fake devices weren't actually required?
+On 06/02/2014 07:15 PM, Stephen Warren wrote:
+> I think the content in this patch is for 3.17. The issues mentioned
+> below --- would be worth fixing for 3.16.
 
-Well, there is one important difference. While I2C indeed does not have 
-any further hardware dependency apart from the clock (SCL) and data 
-(SDA) lines SPI actually requires dedicated hardware chip-select lines 
-as well. But I guess NVIDIA has been rather ignorant about any of this 
-in the past...
+It sure is your call. I feared it being too late for 3.16 now with Linus 
+having opened the merge window presumably one week early.
