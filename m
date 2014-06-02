@@ -1,300 +1,126 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  2 Jun 2014 15:07:27 -0700
-Subject: [PATCH] ARM: Remove ARCH_HAS_CPUFREQ config option
-Message-ID: <1401746847-3193-1-git-send-email-sboyd@codeaurora.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 02 Jun 2014 15:10:01 -0700
+Subject: [GIT PULL] sirf clk update for 3.16
+In-Reply-To: <CAGsJ_4ymGxROu5fz2YFwPMTsPDiXrHUshoQFJ5SWhtHCK5HGKg@mail.gmail.com>
+References: <CAGsJ_4z+Y2P1YNTQWC-VsaT3N0Kasd=LvxAbLVLMftnt8gZbkg@mail.gmail.com>
+ <20140515060124.3084.44286@quantum>
+ <CAGsJ_4ymGxROu5fz2YFwPMTsPDiXrHUshoQFJ5SWhtHCK5HGKg@mail.gmail.com>
+Message-ID: <20140602221001.10062.66723@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This config exists entirely to hide the cpufreq menu from the
-kernel configuration unless a platform has selected it. Nothing
-is actually built if this config is 'Y' and it just leads to
-more patches that add a select under a platform Kconfig so that
-some other CPUfreq option can be chosen. Let's remove the
-option so that we can always enable CPUfreq drivers on ARM
-platforms.
+Quoting Barry Song (2014-05-18 05:50:40)
+> 2014-05-15 14:01 GMT+08:00 Mike Turquette <mturquette@linaro.org>:
+> > Quoting Barry Song (2014-05-12 07:45:00)
+> >> Hi Mike,
+> >>
+> >> can you pull the below update for 3.16? it cleanups the sirf clk codes
+> >> to fix some minor checkpatch issues according to key customer's
+> >> requirement.
+> >>
+> >>
+> >> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+> >>
+> >>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
+> >> tags/clk-sirf-for-3.16
+> >
+> > Hi Barry,
+> >
+> > I get the following warnings when pulling this tag onto the clk-next
+> > branch:
+> >
+> > In file included from drivers/clk/sirf/clk-prima2.c:20:0:
+> > drivers/clk/sirf/clk-common.c:199:2: warning: initialization discards ?const? qualifier from pointer target type [enabled by default]
+> >   .parent_names = pll_clk_parents,
+> >   ^
+> >   ... repeats a for every .parent_names instance ...
+> >
+> > In file included from drivers/clk/sirf/clk-atlas6.c:20:0:
+> > drivers/clk/sirf/clk-common.c:199:2: warning: initialization discards ?const? qualifier from pointer target type [enabled by default]
+> >   .parent_names = pll_clk_parents,
+> >   ^
+> >   ... repeats a for every .parent_names instance ...
+> >
+> > Can you fix up and resubmit?
+> >
+> 
+> hi Mike,
+> this might mean we need a fix in clk core. we moved to "const char *
+> const" for clk parents
+> by:
+> 137 -static const char *pll_clk_parents[] = {
+> 138 +static const char * const pll_clk_parents[] = {
+> ...
+> repeated for every clk_parent.
+> ...
+> 
+> to fix checkpatch issues like:
+> #287: FILE: clk-common.c:287:
+> +static const char *dmn_clk_parents[] = {
+> 
+> WARNING: static const char * array should probably be static const char * const
+> 
+> but in clk_init_data, parent_names are "const char **"
+> const char              **parent_names;
+> 
+> if we don't change the parent_names of clk_init_data structure, the
+> only thing we can do to fix "warning: initialization discards ?const?
+> qualifier from pointer target type" is doing things like:
+> 
+>  static struct clk_init_data clk_spi1_init = {
+>         .name = "spi1",
+>         .ops = &ios_ops,
+> -       .parent_names = std_clk_io_parents,
+> +       .parent_names = (const char **)std_clk_io_parents,
+>         .num_parents = ARRAY_SIZE(std_clk_io_parents),
+>  };
+> 
+> but this looks not too right. what is your opinion? i want to send a
+> fix for this issue by:
+> 
+> commit ef10a461aaa5db647a5e8d4d1f43659bab2ae9e1
+> Author: Barry Song <Baohua.Song@csr.com>
+> Date:   Sun May 18 20:47:29 2014 +0800
+> 
+>     clk: move parent_names of clk_init_data to "const char * const *"
+> 
+>     Signed-off-by: Barry Song ...
+> 
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 5119174..f919806 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -188,7 +188,7 @@ struct clk_ops {
+>  struct clk_init_data {
+>         const char              *name;
+>         const struct clk_ops    *ops;
+> -       const char              **parent_names;
+> +       const char * const      *parent_names;
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/Kconfig               | 18 ------------------
- arch/arm/mach-davinci/Kconfig  |  1 -
- arch/arm/mach-highbank/Kconfig |  1 -
- arch/arm/mach-imx/Kconfig      |  3 ---
- arch/arm/mach-mvebu/Kconfig    |  1 -
- arch/arm/mach-omap2/Kconfig    |  1 -
- arch/arm/mach-shmobile/Kconfig |  2 --
- arch/arm/mach-spear/Kconfig    |  1 -
- arch/arm/mach-tegra/Kconfig    |  1 -
- arch/arm/mach-ux500/Kconfig    |  1 -
- arch/arm/mach-vexpress/Kconfig |  1 -
- arch/arm/mach-vt8500/Kconfig   |  1 -
- arch/arm/mach-zynq/Kconfig     |  1 -
- 13 files changed, 33 deletions(-)
+Such a fix throws the following warning:
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5e91e40c1d22..3fdae40d5114 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -179,13 +179,6 @@ config ARCH_HAS_ILOG2_U32
- config ARCH_HAS_ILOG2_U64
- 	bool
- 
--config ARCH_HAS_CPUFREQ
--	bool
--	help
--	  Internal node to signify that the ARCH has CPUFREQ support
--	  and that the relevant menu configurations are displayed for
--	  it.
--
- config ARCH_HAS_BANDGAP
- 	bool
- 
-@@ -321,7 +314,6 @@ config ARCH_MULTIPLATFORM
- 
- config ARCH_INTEGRATOR
- 	bool "ARM Ltd. Integrator family"
--	select ARCH_HAS_CPUFREQ
- 	select ARM_AMBA
- 	select ARM_PATCH_PHYS_VIRT
- 	select AUTO_ZRELADDR
-@@ -540,7 +532,6 @@ config ARCH_DOVE
- 
- config ARCH_KIRKWOOD
- 	bool "Marvell Kirkwood"
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_REQUIRE_GPIOLIB
- 	select CPU_FEROCEON
- 	select GENERIC_CLOCKEVENTS
-@@ -639,7 +630,6 @@ config ARCH_LPC32XX
- config ARCH_PXA
- 	bool "PXA2xx/PXA3xx-based"
- 	depends on MMU
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_MTD_XIP
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_CPU_SUSPEND if PM
-@@ -709,7 +699,6 @@ config ARCH_RPC
- 
- config ARCH_SA1100
- 	bool "SA1100-based"
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_MTD_XIP
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARCH_SPARSEMEM_ENABLE
-@@ -727,7 +716,6 @@ config ARCH_SA1100
- 
- config ARCH_S3C24XX
- 	bool "Samsung S3C24XX SoCs"
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ATAGS
- 	select CLKDEV_LOOKUP
-@@ -748,7 +736,6 @@ config ARCH_S3C24XX
- 
- config ARCH_S3C64XX
- 	bool "Samsung S3C64XX"
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_AMBA
- 	select ARM_VIC
-@@ -811,7 +798,6 @@ config ARCH_S5PC100
- 
- config ARCH_S5PV210
- 	bool "Samsung S5PV210/S5PC110"
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_HAS_HOLES_MEMORYMODEL
- 	select ARCH_SPARSEMEM_ENABLE
- 	select ATAGS
-@@ -831,7 +817,6 @@ config ARCH_S5PV210
- 
- config ARCH_EXYNOS
- 	bool "Samsung EXYNOS"
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_HAS_HOLES_MEMORYMODEL
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARCH_SPARSEMEM_ENABLE
-@@ -867,7 +852,6 @@ config ARCH_DAVINCI
- config ARCH_OMAP1
- 	bool "TI OMAP1"
- 	depends on MMU
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_HAS_HOLES_MEMORYMODEL
- 	select ARCH_OMAP
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -2185,9 +2169,7 @@ endmenu
- 
- menu "CPU Power Management"
- 
--if ARCH_HAS_CPUFREQ
- source "drivers/cpufreq/Kconfig"
--endif
- 
- source "drivers/cpuidle/Kconfig"
- 
-diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-index db18ef866593..584e8d4e2892 100644
---- a/arch/arm/mach-davinci/Kconfig
-+++ b/arch/arm/mach-davinci/Kconfig
-@@ -39,7 +39,6 @@ config ARCH_DAVINCI_DA830
- config ARCH_DAVINCI_DA850
- 	bool "DA850/OMAP-L138/AM18x based system"
- 	select ARCH_DAVINCI_DA8XX
--	select ARCH_HAS_CPUFREQ
- 	select CP_INTC
- 
- config ARCH_DAVINCI_DA8XX
-diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
-index 830b76e70250..a5960e2ac090 100644
---- a/arch/arm/mach-highbank/Kconfig
-+++ b/arch/arm/mach-highbank/Kconfig
-@@ -1,7 +1,6 @@
- config ARCH_HIGHBANK
- 	bool "Calxeda ECX-1000/2000 (Highbank/Midway)" if ARCH_MULTI_V7
- 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_HAS_HOLES_MEMORYMODEL
- 	select ARCH_HAS_OPP
- 	select ARCH_SUPPORTS_BIG_ENDIAN
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 4776e1ffacd5..145d379ec5c9 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -1,6 +1,5 @@
- config ARCH_MXC
- 	bool "Freescale i.MX family" if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_HAS_OPP
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_CPU_SUSPEND if PM
-@@ -99,7 +98,6 @@ config SOC_IMX25
- 
- config SOC_IMX27
- 	bool
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_HAS_OPP
- 	select CPU_ARM926T
- 	select IMX_HAVE_IOMUX_V1
-@@ -124,7 +122,6 @@ config SOC_IMX35
- 
- config SOC_IMX5
- 	bool
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_HAS_OPP
- 	select ARCH_MXC_IOMUX_V3
- 	select MXC_TZIC
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 80e01b3c8c9c..c3611ea369cb 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -87,7 +87,6 @@ config MACH_DOVE
- 
- config MACH_KIRKWOOD
- 	bool "Marvell Kirkwood boards" if ARCH_MULTI_V5
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_REQUIRE_GPIOLIB
- 	select CPU_FEROCEON
- 	select KIRKWOOD_CLK
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index cb31d4390d52..0d185aad7047 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -79,7 +79,6 @@ config SOC_DRA7XX
- config ARCH_OMAP2PLUS
- 	bool
- 	select ARCH_HAS_BANDGAP
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_HAS_HOLES_MEMORYMODEL
- 	select ARCH_OMAP
- 	select ARCH_REQUIRE_GPIOLIB
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index bc91eaf99e98..555fd8949e02 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -86,7 +86,6 @@ config ARCH_R8A73A4
- 	select CPU_V7
- 	select SH_CLK_CPG
- 	select RENESAS_IRQC
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_HAS_OPP
- 	select SYS_SUPPORTS_SH_CMT
- 	select SYS_SUPPORTS_SH_TMU
-@@ -265,7 +264,6 @@ config MACH_KOELSCH
- config MACH_KZM9G
- 	bool "KZM-A9-GT board"
- 	depends on ARCH_SH73A0
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_HAS_OPP
- 	select ARCH_REQUIRE_GPIOLIB
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
-diff --git a/arch/arm/mach-spear/Kconfig b/arch/arm/mach-spear/Kconfig
-index 0786249b2832..90df2022276a 100644
---- a/arch/arm/mach-spear/Kconfig
-+++ b/arch/arm/mach-spear/Kconfig
-@@ -14,7 +14,6 @@ if PLAT_SPEAR
- config ARCH_SPEAR13XX
- 	bool "ST SPEAr13xx"
- 	depends on ARCH_MULTI_V7 || PLAT_SPEAR_SINGLE
--	select ARCH_HAS_CPUFREQ
- 	select ARM_GIC
- 	select GPIO_SPEAR_SPICS
- 	select HAVE_ARM_SCU if SMP
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 55b305d51669..9a4e074375b3 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -1,6 +1,5 @@
- config ARCH_TEGRA
- 	bool "NVIDIA Tegra" if ARCH_MULTI_V7
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
- 	select ARM_GIC
-diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-index b41a42da1505..9b93144c1c2b 100644
---- a/arch/arm/mach-ux500/Kconfig
-+++ b/arch/arm/mach-ux500/Kconfig
-@@ -3,7 +3,6 @@ config ARCH_U8500
- 	depends on MMU
- 	select AB8500_CORE
- 	select ABX500_CORE
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_AMBA
- 	select ARM_ERRATA_754322
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index 657d52d0391f..4620da4befa2 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -62,7 +62,6 @@ config ARCH_VEXPRESS_DCSCB
- 
- config ARCH_VEXPRESS_SPC
- 	bool "Versatile Express Serial Power Controller (SPC)"
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_HAS_OPP
- 	select PM_OPP
- 	help
-diff --git a/arch/arm/mach-vt8500/Kconfig b/arch/arm/mach-vt8500/Kconfig
-index 08f56a41cb55..aaaa24fe4d71 100644
---- a/arch/arm/mach-vt8500/Kconfig
-+++ b/arch/arm/mach-vt8500/Kconfig
-@@ -1,6 +1,5 @@
- config ARCH_VT8500
- 	bool
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_REQUIRE_GPIOLIB
- 	select CLKDEV_LOOKUP
- 	select VT8500_TIMER
-diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
-index 58c2b844e0a3..6e6a78cbaac7 100644
---- a/arch/arm/mach-zynq/Kconfig
-+++ b/arch/arm/mach-zynq/Kconfig
-@@ -2,7 +2,6 @@ config ARCH_ZYNQ
- 	bool "Xilinx Zynq ARM Cortex A9 Platform" if ARCH_MULTI_V7
- 	select ARM_AMBA
- 	select ARM_GIC
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_HAS_OPP
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+| drivers/clk/clk.c: In function ?__clk_register?:
+drivers/clk/clk.c|1966 col 20| warning: assignment discards ?const? qualifier from pointer target type [enabled by default]
+||   clk->parent_names = hw->init->parent_names;
+||                     ^
+
+I haven't really taken the time to think about this one. Feel free to
+submit a fix, otherwise I'll take a good look at it after 3.16-rc1.
+
+Regards,
+Mike
+
+>         u8                      num_parents;
+>         unsigned long           flags;
+>  };
+> 
+> 
+> > Regards,
+> > Mike
+> >
+> 
+> -barry
