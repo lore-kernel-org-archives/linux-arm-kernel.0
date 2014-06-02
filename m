@@ -1,5 +1,5 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Mon, 02 Jun 2014 17:46:02 +0900
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 2 Jun 2014 10:48:46 +0200
 Subject: [linux-sunxi] [PATCH v2 1/4] dt: bindings: mmc: Document the
  practice of using subnodes for slots
 In-Reply-To: <538C3812.9060705@samsung.com>
@@ -9,11 +9,11 @@ References: <1401563014-13856-1-git-send-email-hdegoede@redhat.com>
  <538AF124.9040106@redhat.com>
  <CAPDyKFon5J6aUTzSmqGn_pkxgud26=+KBW0pkim-adMmWG_xXg@mail.gmail.com>
  <538C3812.9060705@samsung.com>
-Message-ID: <538C39CA.4020301@samsung.com>
+Message-ID: <CAPDyKFp1KcQaOAqKBA7xrq85mVoNFecqO8QLT3EBzST6Giv-Sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2014 05:38 PM, Jaehoon Chung wrote:
+On 2 June 2014 10:38, Jaehoon Chung <jh80.chung@samsung.com> wrote:
 > On 06/02/2014 05:29 PM, Ulf Hansson wrote:
 >> On 1 June 2014 11:23, Hans de Goede <hdegoede@redhat.com> wrote:
 >>> Hi,
@@ -88,23 +88,24 @@ On 06/02/2014 05:38 PM, Jaehoon Chung wrote:
 >>
 >> Thus I suggest we should clean-up host drivers to support only one
 >> card per host, and entirely skip the slot concept.
-> 
+>
 > Well, almost platform is used the only one card per host, although some controller is supported the slot concept.
 > But we don't know that controller should be used the multi slot per host, in future.
 > So I think we can't skip the slot concept.
-If we need to change the dw-mmc controller, let me know, plz.
-I want to fix this problem before release the 3.16.
-Actually, i think it can remove the subnode, if ensure not to use multi-slot at dwmmc.
 
-Anyway, I will also consider to get more better solution. Thanks for pointing out.
+The mmc core only supports one card per host.
 
-Best Regards,
-Jaehoon Chung
+Adding DT bindings for something that seems unlikely to be supported
+in future, seems like a bad idea. It's better to add it when/if
+needed.
 
-> 
+Kind regards
+Uffe
+
+>
 > Best Regards,
 > Jaehoon Chung
-> 
+>
 >>
 >> Kind regards
 >> Uffe
@@ -117,4 +118,4 @@ Jaehoon Chung
 >>>
 >>> *) Assuming you don't find any issues
 >>
-> 
+>
