@@ -1,29 +1,32 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Mon, 02 Jun 2014 16:09:45 +0100
-Subject: [PATCH 1/2] pci: Add IORESOURCE_BIT entry for PCIe ECAM resources.
-In-Reply-To: <4756033.LkcFQN0chs@wuerfel>
-References: <20140530233034.GH1677@bart.dudau.co.uk>
- <1401496601-31983-1-git-send-email-Liviu.Dudau@arm.com>
- <1401496601-31983-2-git-send-email-Liviu.Dudau@arm.com>
- <4756033.LkcFQN0chs@wuerfel>
-Message-ID: <20140602150945.964D4C40381@trevor.secretlab.ca>
+From: dvhart@linux.intel.com (Darren Hart)
+Date: Mon, 02 Jun 2014 08:16:08 -0700
+Subject: [PATCH 2/2] clkdev: Export clk_register_clkdev
+In-Reply-To: <20140602123522.GB31751@sirena.org.uk>
+References: <1401738379-4107-1-git-send-email-chiau.ee.chew@intel.com>
+ <1401738379-4107-3-git-send-email-chiau.ee.chew@intel.com>
+ <20140602123522.GB31751@sirena.org.uk>
+Message-ID: <CFB1E2EA.94DEE%dvhart@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 31 May 2014 20:41:04 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 31 May 2014 01:36:40 Liviu Dudau wrote:
-> > We would like to be able to describe PCIe ECAM resources as
-> > IORESOURCE_MEM blocks while distinguish them from standard
-> > memory resources. Add an IORESOURCE_BIT entry for this case.
-> > 
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> 
-> I still don't see any value in this at all. What is the advantage
-> of doing this opposed to just having a standardized 'reg' property
-> for a particular compatible string?
+On 6/2/14, 5:35, "Mark Brown" <broonie@kernel.org> wrote:
 
-I'm inclined to agree. It doesn't seem appropriate to put config space
-in ranges, and the host controller binding is responsible for
-identifying how config space is memory mapped.
+>On Tue, Jun 03, 2014 at 03:46:19AM +0800, Chew Chiau Ee wrote:
+>> From: Darren Hart <dvhart@linux.intel.com>
+>> 
+>> Allow spi-pxa2xx-pci with common clock framework support to build as a
+>> module by exporting clk_register_clkdev.
+>
+>This needs to be patch 1 in the series not patch 2 since the change to
+>the driver to use the exported symbol depends on this rather than the
+>other way around.
+>
 
-g.
+That was going to be my only comment as well. It's important to ensure
+things build consistently through the git history. Git bisect is a key use
+case here, breaking that makes for very cranky kernel engineers :-)
+Dependencies first, new mechanisms second.
+
+-- 
+Darren Hart					Open Source Technology Center
+darren.hart at intel.com				            Intel Corporation
