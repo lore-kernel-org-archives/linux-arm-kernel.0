@@ -1,33 +1,76 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon,  2 Jun 2014 14:04:03 -0700
-Subject: [GIT PULL 0/7] ARM: SoC material for 3.16, first batch
-Message-ID: <1401743050-7379-1-git-send-email-olof@lixom.net>
+Date: Mon,  2 Jun 2014 14:04:04 -0700
+Subject: [GIT PULL 1/7] ARM: SoC low-priority fixes for 3.16
+In-Reply-To: <1401743050-7379-1-git-send-email-olof@lixom.net>
+References: <1401743050-7379-1-git-send-email-olof@lixom.net>
+Message-ID: <1401743050-7379-2-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+A small selection of fixes coming in late during the release cycle and
+not being critical enough for 3.15 inclusion.
 
-Here's the first batch of arm-soc material for 3.16. There are a couple
-more branches but they depend on shared contents with Russell's tree,
-so we'll send that up after he has had his material merged.
+----------------------------------------------------------------
 
-Again, like last merge window, the bulk of contents is in device tree
-updates. We've even had a couple of SoCs go in that didn't require enough
-code changes that I noticed it when I was sifting through the material
-writing up the tags, which is good news. It's not a primary goal that we
-can do quite this much only with DT updates, but it's still good to see.
+The following changes since commit 425553209b387fa2125df09d01a2d1c1724bd205:
 
-There are a few conflicts, some due to add/add from our different branches,
-and a few of them because we've had new changes not always properly based on
-cleanups and not caught it in time. Nothing that should be too messy to fix up.
+  Merge tag 'pci-v3.16-changes' of git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci into next
 
-We've been holding back Samsung from adding new SoC support until they
-sorted out their multiplatform support, which they now have done. We're
-very happy to be able to build an Exynos-enabled kernel together with
-the other platforms now (Tegra, i.MX, OMAP, and all the others). This
-also means that their slight backlog of SoC support is now picked up so
-we've got a bunch of clock drivers and other things for their 3250 and
-5410/5420/5800 series of chips.
+are available in the git repository at:
 
-I've documented the conflicts in each email, and I've pushed a
-"resolved-for-3.16" branch with our proposed resolutions.
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-3.16
+
+for you to fetch changes up to da98f44f27d81d7fe9a41f69af4fe08c18d13b56:
+
+  Merge tag 'renesas-fixes-for-v3.16' of git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas into next/fixes-non-critical
+
+----------------------------------------------------------------
+
+Afzal Mohammed (1):
+      ARM: dts: AM4372: add l3-noc information
+
+Hans de Goede (1):
+      reset: Add of_reset_control_get to reset.h
+
+Joel Fernandes (1):
+      ARM: OMAP5: Redo THUMB mode switch on secondary CPU
+
+Johan Hovold (1):
+      ARM: dts: am335x-boneblack: remove use of ti,vcc-aux-disable-is-sleep
+
+Kuninori Morimoto (1):
+      ARM: shmobile: armadillo800eva: fixup HDMI sound flags setting
+
+Olof Johansson (3):
+      Merge branch 'reset/fixes' of git://git.pengutronix.de/git/pza/linux into next/fixes-non-critical
+      Merge tag 'omap-for-v3.16/fixes-not-urgent-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/fixes-non-critical
+      Merge tag 'renesas-fixes-for-v3.16' of git://git.kernel.org/.../horms/renesas into next/fixes-non-critical
+
+Oussama Ghorbel (1):
+      ARM: OMAP2+: free use_gptimer_clksrc variable after boot
+
+Pekon Gupta (1):
+      ARM: dts: am43xx: fix starting offset of NAND.filesystem MTD partition
+
+Rajendra Nayak (1):
+      ARM: dts: DRA7: Use dra7-l3-noc instead of omap4-l3-noc
+
+Stephen Boyd (1):
+      ARM: msm: Silence readb/writeb warnings due to missing IOMEM()
+
+Tony Lindgren (1):
+      Merge branch 'pull/l3noc/dts-fixes' of https://github.com/nmenon/linux-2.6-playground into omap-for-v3.16/fixes-not-urgent
+
+
+ arch/arm/boot/dts/am335x-boneblack.dts         |  1 -
+ arch/arm/boot/dts/am4372.dtsi                  |  6 +++++-
+ arch/arm/boot/dts/am43x-epos-evm.dts           |  2 +-
+ arch/arm/boot/dts/dra7.dtsi                    |  6 +++---
+ arch/arm/mach-msm/board-trout-gpio.c           |  2 +-
+ arch/arm/mach-msm/board-trout.c                |  2 +-
+ arch/arm/mach-msm/board-trout.h                |  2 +-
+ arch/arm/mach-omap2/omap-headsmp.S             |  6 +-----
+ arch/arm/mach-omap2/timer.c                    |  2 +-
+ arch/arm/mach-shmobile/board-armadillo800eva.c |  2 +-
+ include/linux/reset.h                          | 10 ++++++++++
+ 11 files changed, 25 insertions(+), 16 deletions(-)
