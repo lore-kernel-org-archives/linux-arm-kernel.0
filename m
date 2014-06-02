@@ -1,121 +1,85 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 2 Jun 2014 10:48:46 +0200
-Subject: [linux-sunxi] [PATCH v2 1/4] dt: bindings: mmc: Document the
- practice of using subnodes for slots
-In-Reply-To: <538C3812.9060705@samsung.com>
-References: <1401563014-13856-1-git-send-email-hdegoede@redhat.com>
- <1401563014-13856-2-git-send-email-hdegoede@redhat.com>
- <CAOesGMisqtPWKY6N5ch36c0VyBP1Pu725cehBU+2gYtKXQs=hQ@mail.gmail.com>
- <538AF124.9040106@redhat.com>
- <CAPDyKFon5J6aUTzSmqGn_pkxgud26=+KBW0pkim-adMmWG_xXg@mail.gmail.com>
- <538C3812.9060705@samsung.com>
-Message-ID: <CAPDyKFp1KcQaOAqKBA7xrq85mVoNFecqO8QLT3EBzST6Giv-Sw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 2 Jun 2014 10:51:50 +0200
+Subject: TASK_SIZE for !MMU
+In-Reply-To: <20140429100028.GH28564@pengutronix.de>
+References: <20140429100028.GH28564@pengutronix.de>
+Message-ID: <20140602085150.GA31147@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 June 2014 10:38, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> On 06/02/2014 05:29 PM, Ulf Hansson wrote:
->> On 1 June 2014 11:23, Hans de Goede <hdegoede@redhat.com> wrote:
->>> Hi,
->>>
->>>
->>> On 05/31/2014 10:13 PM, Olof Johansson wrote:
->>>>
->>>> On Sat, May 31, 2014 at 12:03 PM, Hans de Goede <hdegoede@redhat.com>
->>>> wrote:
->>>>>
->>>>> The following existing MMC host controller bindings use slot subnodes:
->>>>>
->>>>> Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
->>>>> Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
->>>>> Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
->>>>> Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
->>>>> Documentation/devicetree/bindings/mmc/atmel-hsmci.txt
->>>>> Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
->>>>>
->>>>> This commit documents this practice in the standard mmc bindings
->>>>> documentation.
->>>>>
->>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>>
->>>>
->>>> There are today only two drivers that use this kind of binding, dw_mmc
->>>> and the at91 one.
->>>
->>>
->>> Correct.
->>>
->>>
->>>> Neither seems to actually ever have been used with
->>>> more than one slot. I doubt anyone building an exynos-based system
->>>> will ever do a multi-slot solution, and it seems that the at91 driver
->>>> doesn't actually handle more than one slot.
->>>>
->>>> I'm personally not that excited about complicating the bindings by
->>>> opening up for this -- I would rather work towards removing the
->>>> concept of slots if it's one of those things that are going to remain
->>>> unused. We have actually been talking about reworking the dw_mmc
->>>> binding to remove the slot concept (and simplify the driver by doing
->>>> so).
->>>
->>>
->>> I'm fine with removing the slot subnode, I added it because of it being
->>> brought up in the powerup sequence discussion. I explicitly asked there
->>> if adding such a subnode level was seen as desirable but nobody
->>> answered :|
->>>
->>> Anyways, either way works for me. I can do a v3 dropping the slot subnode
->>> level again. I would really like to move forward with a decision on how-to
->>> represent non probable info for sdio devices in device nodes. So do you
->>> have any other remarks other then that the slot subnode should be dropped ?
->>> And if not can you please review and ack (*) v3 of this patch-set once
->>> I've send it?
->>>
->>> Chris Ball and Ulf Hansson, what is your take on this, are you willing to
->>> take this patch set? And do you want it with or without the slot subnodes ?
->>
->> I certainly appreciate you working actively on this Hans, I will look
->> into the patchset as soon as I can.
->>
->> I share Olof's view about the slot nodes, we must not add DT bindings
->> that isn't really needed.
->>
->> Regarding the slot subnodes; Jaehoon Chung recently posted a patchset
->> for adding the parsing of it, intended for dwmmc. I withdraw my ack
->> for it, and let's try to go in the other direction instead.
->>
->> [PATCHv3 0/4] mmc: fixed the mmc_of_parse for dwmmc.
->>
->> Thus I suggest we should clean-up host drivers to support only one
->> card per host, and entirely skip the slot concept.
->
-> Well, almost platform is used the only one card per host, although some controller is supported the slot concept.
-> But we don't know that controller should be used the multi slot per host, in future.
-> So I think we can't skip the slot concept.
+Hello
 
-The mmc core only supports one card per host.
+[expand Cc: a bit]
 
-Adding DT bindings for something that seems unlikely to be supported
-in future, seems like a bad idea. It's better to add it when/if
-needed.
+On Tue, Apr 29, 2014 at 12:00:28PM +0200, Uwe Kleine-K?nig wrote:
+> I grepped through the kernel (v3.15-rc1) for usages of TASK_SIZE to
+> check if/how it is used on !MMU ARM machines. Most open questions also
+> affect the other !MMU platforms, so I put the blackfin, c6x, frv and
+> m32r, m68k, microblaze and xtensa lists on Cc:. (Did I miss a platform
+> that cares for !MMU ?)
+> 
+> Most occurences are fine, see the list at the end of this mail. However
+> some are not or are unclear to me. Here is the complete list[1] apart from
+> the definition of TASK_SIZE for !MMU in arch/arm/include/asm/memory.h:
+> 
+>  - Probably this should be explict s/TASK_SIZE/CONFIG_DRAM_SIZE/. This
+>    is generic code however while CONFIG_DRAM_SIZE is ARM only.
+>         mm/nommu.c:     if (!rlen || rlen > TASK_SIZE)
+> 
+>  - The issue the patch by Rabin is addressing (Subject: [PATCH] ARM: fix
+>    string functions on !MMU), alternatively make TASK_SIZE ~0UL.
+>         arch/arm/include/asm/uaccess.h:#define user_addr_max() \
+>         arch/arm/include/asm/uaccess.h: (segment_eq(get_fs(), USER_DS) ? TASK_SIZE : ~0UL)
+[reference: http://www.spinics.net/lists/arm-kernel/msg324112.html ]
+ 
+>  - probably bearable if broken:
+>         drivers/misc/lkdtm.c:           if (user_addr >= TASK_SIZE) {
+>         lib/test_user_copy.c:   user_addr = vm_mmap(...)
+>         lib/test_user_copy.c:   if (user_addr >= (unsigned long)(TASK_SIZE)) {
+>         lib/test_user_copy.c:           pr_warn("Failed to allocate user memory\n");
+>         lib/test_user_copy.c:           return -ENOMEM;
+> 
+>  - unclear to me:
+>         fs/exec.c:      current->mm->task_size = TASK_SIZE;
+>    - depends on PERF_EVENTS
+>         kernel/events/core.c:   if (!addr || addr >= TASK_SIZE)
+>         kernel/events/core.c:   return TASK_SIZE - addr;
+>         kernel/events/uprobes.c:                area->vaddr = get_unmapped_area(NULL, TASK_SIZE - PAGE_SIZE,
+>    - depends on (PERF_EVENTS && (CPU_V6 || CPU_V6K || CPU_V7)):
+>         arch/arm/kernel/hw_breakpoint.c:        return (va >= TASK_SIZE) && ((va + len - 1) >= TASK_SIZE);
+>    - seems to cope with big TASK_SIZE
+>         fs/namespace.c:        size = TASK_SIZE - (unsigned long)data;
+>         fs/namespace.c:        if (size > PAGE_SIZE)
+>         fs/namespace.c:                size = PAGE_SIZE;
+>    - depends on PLAT_S5P || ARCH_EXYNOS, this looks wrong
+>         drivers/media/platform/s5p-mfc/s5p_mfc_common.h:#define DST_QUEUE_OFF_BASE      (TASK_SIZE / 2)
+>    - used for prctl(PR_SET_MM, ...)
+>         kernel/sys.c:   if (addr >= TASK_SIZE || addr < mmap_min_addr)
+> 
+> Any help to judge if these are OK is appreciated (even from Will :-)
+> 
+> I think it would be OK to define TASK_SIZE to 0xffffffff for !MMU.
+> blackfin, frv and m68k also do this. c6x does define it to 0xFFFFF000 to
+> leave space for error codes.
+> 
+> Thoughts?
+The problem is that current linus/master (and also next) doesn't boot on
+my ARM-nommu machine because the user string functions (strnlen_user,
+strncpy_from_user et al.) refuse to work on strings above TASK_SIZE
+which in my case also includes the XIP kernel image.
 
-Kind regards
-Uffe
+Maybe someone of the mm people can bring light into the unclear points
+above and the question what TASK_SIZE is supposed to be on no-MMU
+machines?
 
->
-> Best Regards,
-> Jaehoon Chung
->
->>
->> Kind regards
->> Uffe
->>
->>>
->>> Thanks & Regards,
->>>
->>> Hans
->>>
->>>
->>> *) Assuming you don't find any issues
->>
->
+Best regards
+Uwe
+
+> [1] complete as in "skip everything below arch/ but arch/arm" :-)
+> 
+[removed the list, if you're interested, it's available at
+http://mid.gmane.org/20140429100028.GH28564 at pengutronix.de]
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
