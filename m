@@ -1,20 +1,31 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 2 Jun 2014 14:37:04 +0800
-Subject: [PATCH v3 0/7] of: setup dma parameters using dma-ranges and
- dma-coherent
-In-Reply-To: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20140602063702.GB7834@dragon>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 2 Jun 2014 08:40:38 +0200
+Subject: [PATCH 1/5] mmc: sdhci-esdhc-imx: add f_max field to private data
+In-Reply-To: <20140601074540.GC11061@dragon>
+References: <1400848384-3226-1-git-send-email-s.hauer@pengutronix.de>
+ <1400848384-3226-2-git-send-email-s.hauer@pengutronix.de>
+ <20140601074540.GC11061@dragon>
+Message-ID: <20140602064038.GP15686@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 11:30:00AM -0400, Santosh Shilimkar wrote:
-> Here is an updated v3 of the series. Series introduces support for setting up
-> dma parameters based on device tree properties like 'dma-ranges' and
-> 'dma-coherent' and also update to ARM 32 bit port. Earlier version of the
-> series can be found here [3], [2] and [1].
+On Sun, Jun 01, 2014 at 03:45:43PM +0800, Shawn Guo wrote:
+> > @@ -594,7 +592,7 @@ static inline void esdhc_pltfm_set_clock(struct sdhci_host *host,
+> >  {
+> >  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> >  	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+> > -	unsigned int host_clock = pltfm_host->clock;
+> > +	unsigned int host_clock = clk_get_rate(imx_data->clk_per);
+> 
+> Will this bring the issue that commit a974862faee1 (mmc: sdhci-esdhc-imx:
+> fix access hardirq-unsafe lock in atomic context) fixed back to us?
 
-Are these two generic device tree properties documented somewhere under
-Documentation/devicetree/bindings?
+Probably, yes, because the ?%$&"$$ sdhc driver still uses spinlocks.
 
-Shawn
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
