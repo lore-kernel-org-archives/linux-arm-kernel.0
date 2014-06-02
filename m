@@ -1,30 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 2 Jun 2014 13:36:47 +0100
-Subject: [PATCH 2/2] clkdev: Export clk_register_clkdev
-In-Reply-To: <1401738379-4107-3-git-send-email-chiau.ee.chew@intel.com>
-References: <1401738379-4107-1-git-send-email-chiau.ee.chew@intel.com>
- <1401738379-4107-3-git-send-email-chiau.ee.chew@intel.com>
-Message-ID: <20140602123647.GC31751@sirena.org.uk>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 02 Jun 2014 14:35:42 +0200
+Subject: [PATCH v2 6/7] ARM: EXYNOS: PM: fix register setup on EXYNOS4x12 for
+ AFTR mode code
+In-Reply-To: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1401712543-14281-7-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 03, 2014 at 03:46:19AM +0800, Chew Chiau Ee wrote:
+Add S5P_CENTRAL_SEQ_OPTION register setup for EXYNOS4x12 to AFTR
+mode code.  Without this setup AFTR mode doesn't show any benefit
+over WFI one.  When this setup is applied AFTR mode reduces power
+consumption by ~12% (as measured on Trats2 board).
 
-> From: Darren Hart <dvhart@linux.intel.com>
-> 
-> Allow spi-pxa2xx-pci with common clock framework support to build as a
-> module by exporting clk_register_clkdev.
-> 
-> Signed-off-by: Darren Hart <dvhart@linux.intel.com>
-> Reviewed-by: Chew, Chiau Ee <chiau.ee.chew@intel.com>
+This change is a preparation for adding secure firmware support to
+EXYNOS cpuidle driver.
 
-Oh, and I just noticed - you need to supply a Signed-off-by for any
-patches you are submitting, please see Documentation/SubmittingPatches,
-this is required for legal reasons.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140602/b3867ece/attachment.sig>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos/pm.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index aeff99e..0fb9a5a 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -456,6 +456,10 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+ 	case CPU_PM_ENTER:
+ 		if (cpu == 0) {
+ 			exynos_pm_central_suspend();
++			if (soc_is_exynos4212() || soc_is_exynos4412())
++				__raw_writel(S5P_USE_STANDBY_WFI0 |
++					     S5P_USE_STANDBY_WFE0,
++					     S5P_CENTRAL_SEQ_OPTION);
+ 			exynos_cpu_save_register();
+ 		}
+ 		break;
+-- 
+1.8.2.3
