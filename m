@@ -1,109 +1,83 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 02 Jun 2014 10:33:37 +0200
-Subject: [linux-sunxi] [PATCH v2 1/4] dt: bindings: mmc: Document the
- practice of using subnodes for slots
-In-Reply-To: <CAPDyKFon5J6aUTzSmqGn_pkxgud26=+KBW0pkim-adMmWG_xXg@mail.gmail.com>
-References: <1401563014-13856-1-git-send-email-hdegoede@redhat.com>	<1401563014-13856-2-git-send-email-hdegoede@redhat.com>	<CAOesGMisqtPWKY6N5ch36c0VyBP1Pu725cehBU+2gYtKXQs=hQ@mail.gmail.com>	<538AF124.9040106@redhat.com>
- <CAPDyKFon5J6aUTzSmqGn_pkxgud26=+KBW0pkim-adMmWG_xXg@mail.gmail.com>
-Message-ID: <538C36E1.40507@redhat.com>
+From: Nikolay.Borisov@arm.com (Nikolay Borisov)
+Date: Mon, 2 Jun 2014 09:34:58 +0100
+Subject: [PATCH v2 0/7] Fix backtrace support in THUMB2 mode
+In-Reply-To: <5507361.VIWsBiqp2f@wuerfel>
+References: <1401469191-29232-1-git-send-email-nikolay.borisov@arm.com>
+ <5507361.VIWsBiqp2f@wuerfel>
+Message-ID: <1C23526A7C42DB45BBF55B662C7C530E2B7805A780@BUNGLE.Emea.Arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+[Adding Dave Martin as CC]
 
-On 06/02/2014 10:29 AM, Ulf Hansson wrote:
-> On 1 June 2014 11:23, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->>
->> On 05/31/2014 10:13 PM, Olof Johansson wrote:
->>>
->>> On Sat, May 31, 2014 at 12:03 PM, Hans de Goede <hdegoede@redhat.com>
->>> wrote:
->>>>
->>>> The following existing MMC host controller bindings use slot subnodes:
->>>>
->>>> Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
->>>> Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
->>>> Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
->>>> Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
->>>> Documentation/devicetree/bindings/mmc/atmel-hsmci.txt
->>>> Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
->>>>
->>>> This commit documents this practice in the standard mmc bindings
->>>> documentation.
->>>>
->>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>
->>>
->>> There are today only two drivers that use this kind of binding, dw_mmc
->>> and the at91 one.
->>
->>
->> Correct.
->>
->>
->>> Neither seems to actually ever have been used with
->>> more than one slot. I doubt anyone building an exynos-based system
->>> will ever do a multi-slot solution, and it seems that the at91 driver
->>> doesn't actually handle more than one slot.
->>>
->>> I'm personally not that excited about complicating the bindings by
->>> opening up for this -- I would rather work towards removing the
->>> concept of slots if it's one of those things that are going to remain
->>> unused. We have actually been talking about reworking the dw_mmc
->>> binding to remove the slot concept (and simplify the driver by doing
->>> so).
->>
->>
->> I'm fine with removing the slot subnode, I added it because of it being
->> brought up in the powerup sequence discussion. I explicitly asked there
->> if adding such a subnode level was seen as desirable but nobody
->> answered :|
->>
->> Anyways, either way works for me. I can do a v3 dropping the slot subnode
->> level again. I would really like to move forward with a decision on how-to
->> represent non probable info for sdio devices in device nodes. So do you
->> have any other remarks other then that the slot subnode should be dropped ?
->> And if not can you please review and ack (*) v3 of this patch-set once
->> I've send it?
->>
->> Chris Ball and Ulf Hansson, what is your take on this, are you willing to
->> take this patch set? And do you want it with or without the slot subnodes ?
-> 
-> I certainly appreciate you working actively on this Hans, I will look
-> into the patchset as soon as I can.
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: 31 May 2014 19:32
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Nikolay Borisov; rric at kernel.org; Will Deacon; u.kleine-
+> koenig at pengutronix.de
+> Subject: Re: [PATCH v2 0/7] Fix backtrace support in THUMB2 mode
+>
+> On Friday 30 May 2014 17:59:44 Nikolay Borisov wrote:
+> > From: Nikolay Borisov <Nikolay.Borisov@arm.com>
+> >
+> > Currently all the code which deals with backtrace support assumes
+> that R11
+> > is the frame-pointer. While this is the case for ARM mode and is
+> explicitly
+> > documented in the AAPCS, this is not the case for THUMB2 mode.
+> >
+> > There is no official document requiring that R11 has to be the frame
+> pointer
+> > and GCC uses R7 as FP and given that R7's usage is so intertwined
+> within GCC's
+> > mechanics it is unlikely to change, so fixing backtrace in THUMB2
+> mode seems
+> > in order.
+> >
+> > This patch series rectifies the problem by first fixing the
+> > thread_save_fp macro to reference the correct register. Furthermore,
+> there
+> > a lot of repetetive sequences of code such as :
+> >
+> > stackframe.fp = pt_regs->ARM_fp
+> > stackframe.lr = pt_regs->ARM_lr
+> >
+> > so introducing a function arm_get_current_stack_frame which both
+> > hides this repetition and also utilizes teh frame_pointer(regs) macro
+> > to reference the correct register depending on the mode.
+> >
+> > Finally, change all the call sites so that they utilize the new
+> routine.
+>
+> Sorry for the stupid question, but does your series relate to the
+> #warning "TODO: return_address should use unwind tables" that we see
+> all the time in arch/arm/kernel/return_address.c?
+>
 
-Thanks. If I read you correctly below, then you want the slot nodes
-to be removed, correct? In that case it is probably best if you wait reviewing
-until I've done a v3, with the slot nodes removed. I hope to find some time
-to do this this evening (CET).
+My changes have nothing to do with the use of unwind table whatsoever,
+I guess this warning is a result of a completely different issue. Probably
+Dave Martin could shed more light on this.
+
+> If I remember the story correctly, the problem is that so far we could
+> never use the frame pointer in thumb2 mode, and nobody has implemented
+> a version of that function using the arm unwinder.
+>
+> Are we now able to use the frame pointer after all?
+
+What my changes implement, boils down to referring the correct register
+Which acts as a frame pointer depending on whether we are running a THUMB2
+Kernel or not.
+
+>
+>       Arnd
+>
 
 Regards,
+Nikolay
 
-Hans
 
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
 
-> 
-> I share Olof's view about the slot nodes, we must not add DT bindings
-> that isn't really needed.
-> 
-> Regarding the slot subnodes; Jaehoon Chung recently posted a patchset
-> for adding the parsing of it, intended for dwmmc. I withdraw my ack
-> for it, and let's try to go in the other direction instead.
-> 
-> [PATCHv3 0/4] mmc: fixed the mmc_of_parse for dwmmc.
-> 
-> Thus I suggest we should clean-up host drivers to support only one
-> card per host, and entirely skip the slot concept.
-> 
-> Kind regards
-> Uffe
-> 
->>
->> Thanks & Regards,
->>
->> Hans
->>
->>
->> *) Assuming you don't find any issues
+ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
+ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
