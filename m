@@ -1,95 +1,40 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 02 Jun 2014 18:28:55 +0200
-Subject: [PATCH v2 7/7] ARM: EXYNOS: cpuidle: add secure firmware support
- to AFTR mode code
-In-Reply-To: <1401712543-14281-8-git-send-email-b.zolnierkie@samsung.com>
-References: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
- <1401712543-14281-8-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <538CA647.8040207@linaro.org>
+From: marcel@ziswiler.com (Marcel Ziswiler)
+Date: Mon, 02 Jun 2014 18:28:37 +0200
+Subject: [PATCH 2/3] arm: tegra: enable igb, stmpe, i2c chardev, spidev,
+ lm95245, pwm leds
+In-Reply-To: <538CA24B.1010602@wwwdotorg.org>
+References: <c5522b0efcbfc7690dcde6aaf78b9dd568f99604.1401665237.git.marcel@ziswiler.com>
+ <39a8704a4c8170d6b0620a1e5e44042eae6d8810.1401665237.git.marcel@ziswiler.com>
+ <538CA24B.1010602@wwwdotorg.org>
+Message-ID: <538CA635.4050502@ziswiler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2014 02:35 PM, Bartlomiej Zolnierkiewicz wrote:
-> * Use do_idle firmware method instead of cpu_do_idle() on boards with
->    secure firmware enabled.
+On 06/02/2014 06:11 PM, Stephen Warren wrote:
+>> BTW: How about MTD_SPI_NOR,
 >
-> * Use sysram_ns_base_addr + 0x24 address for exynos_boot_vector_addr()
->    and sysram_ns_base_addr + 0x20 one for exynos_boot_vector_flag() on
->    boards with secure firmware enabled.
+> That might only exist in linux-next.
 >
-> This patch fixes hang on an attempt to enter AFTR mode for TRATS2
-> board (which uses EXYNOS4412 SoC with secure firmware enabled).
+>> PROC_DEVICETREE and CRYPTO_DEV_TEGRA_AES
+>> which I haven't found any mentioning anywhere?
 >
-> This patch shouldn't cause any functionality changes on boards that
-> don't use secure firmware.
->
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->   arch/arm/mach-exynos/pm.c        | 8 ++++++--
->   drivers/cpuidle/cpuidle-exynos.c | 7 ++++++-
->   2 files changed, 12 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index 0fb9a5a..62a0a5e 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -169,7 +169,9 @@ int exynos_cluster_power_state(int cluster)
->
->   static inline void __iomem *exynos_boot_vector_addr(void)
->   {
-> -	if (samsung_rev() == EXYNOS4210_REV_1_1)
-> +	if (firmware_run())
-> +		return sysram_ns_base_addr + 0x24;
-> +	else if (samsung_rev() == EXYNOS4210_REV_1_1)
->   		return S5P_INFORM7;
->   	else if (samsung_rev() == EXYNOS4210_REV_1_0)
->   		return sysram_base_addr + 0x24;
-> @@ -178,7 +180,9 @@ static inline void __iomem *exynos_boot_vector_addr(void)
->
->   static inline void __iomem *exynos_boot_vector_flag(void)
->   {
-> -	if (samsung_rev() == EXYNOS4210_REV_1_1)
-> +	if (firmware_run())
-> +		return sysram_ns_base_addr + 0x20;
-> +	else if (samsung_rev() == EXYNOS4210_REV_1_1)
->   		return S5P_INFORM6;
->   	else if (samsung_rev() == EXYNOS4210_REV_1_0)
->   		return sysram_base_addr + 0x20;
-> diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
-> index 7c01512..f90a4a0 100644
-> --- a/drivers/cpuidle/cpuidle-exynos.c
-> +++ b/drivers/cpuidle/cpuidle-exynos.c
-> @@ -17,13 +17,18 @@
->   #include <asm/proc-fns.h>
->   #include <asm/suspend.h>
->   #include <asm/cpuidle.h>
-> +#include <asm/firmware.h>
->
->   static void (*exynos_enter_aftr)(void);
->
->   static int idle_finisher(unsigned long flags)
->   {
->   	exynos_enter_aftr();
-> -	cpu_do_idle();
-> +	if (firmware_run())
-> +		/* no need to check the return value on EXYNOS SoCs */
-> +		call_firmware_op(do_idle, FW_DO_IDLE_AFTR);
-> +	else
-> +		cpu_do_idle();
+> The TEGRA_AES driver has been removed, so the option should be removed
+> from defconfig too. I don't know what happened to PROC_DEVICTREE - it
+> doesn't seem to exist any more. Was it replaced by something else or
+> deleted? Feel free to send patches for those.
 
-Why not move this code into the exynos_enter_aftr() function, so 
-preventing more dependency ?
+OK, will do.
 
-
->   	return 1;
->   }
+>> diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
 >
+>> +CONFIG_SPI_SPIDEV=y
+>
+> Is this useful with DT? I thought that unlike I2C_CHARDEV, spidev needed
+> dummy devices to exist in DT for spidev to work? If so, there's not much
+> point adding the option to defconfig, since people can add it when they
+> put the dummy devices into DT.
 
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Yes, the Apalis T30 DT I sent actually contains two of them which we 
+call generic Apalis SPI1 and SPI2 out-of-the-box configured for exactly 
+that. Without the config enabled though it probably does not make much 
+sense to include it in the DT so I would consider removing it again.
