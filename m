@@ -1,138 +1,33 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 02 Jun 2014 14:08:19 -0700
-Subject: [PATCH v2 11/11] clk: versatile: add versatile OSC support
-In-Reply-To: <CAL_Jsq+KQa9ZKCfiy479JOg8qYx8AOmFQKuvQp3fKmWBoURpaQ@mail.gmail.com>
-References: <1401403221-27523-1-git-send-email-robherring2@gmail.com>
- <1401403221-27523-12-git-send-email-robherring2@gmail.com>
- <20140530230326.10062.15472@quantum>
- <CAL_Jsq+KQa9ZKCfiy479JOg8qYx8AOmFQKuvQp3fKmWBoURpaQ@mail.gmail.com>
-Message-ID: <20140602210819.10062.61603@quantum>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon,  2 Jun 2014 14:04:03 -0700
+Subject: [GIT PULL 0/7] ARM: SoC material for 3.16, first batch
+Message-ID: <1401743050-7379-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rob Herring (2014-05-30 19:38:44)
-> On Fri, May 30, 2014 at 6:03 PM, Mike Turquette <mturquette@linaro.org> wrote:
-> > Quoting Rob Herring (2014-05-29 15:40:21)
-> >> From: Rob Herring <robh@kernel.org>
-> >>
-> >> Versatile platforms share the same OSC programming model as Integrator
-> >> platforms. Add the necessary parameters and init functions for Versatile.
-> >>
-> >> Renaming the file to clk-versatile.c as versatile is used as the family
-> >> name for ARM, Ltd. boards.
-> >>
-> >> Signed-off-by: Rob Herring <robh@kernel.org>
-> >> Cc: Mike Turquette <mturquette@linaro.org>
-> >> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> >
-> > So it's OK to rename the file and add the new stuff in one commit? I
-> > thought there were some guidelines about doing renames separately...
-> 
-> You don't want to move of a chunk of code and change it along the way
-> because you can't see the real changes, but a file rename does not
-> affect the diff here (other than the Makefile change).
+Hi Linus,
 
-Sounds good. Let me know if you want me to take this into clk-next after
--rc1 drops. Otherwise:
+Here's the first batch of arm-soc material for 3.16. There are a couple
+more branches but they depend on shared contents with Russell's tree,
+so we'll send that up after he has had his material merged.
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+Again, like last merge window, the bulk of contents is in device tree
+updates. We've even had a couple of SoCs go in that didn't require enough
+code changes that I noticed it when I was sifting through the material
+writing up the tags, which is good news. It's not a primary goal that we
+can do quite this much only with DT updates, but it's still good to see.
 
-Regards,
-Mike
+There are a few conflicts, some due to add/add from our different branches,
+and a few of them because we've had new changes not always properly based on
+cleanups and not caught it in time. Nothing that should be too messy to fix up.
 
-> 
-> Rob
-> 
-> >
-> > Regards,
-> > Mike
-> >
-> >> ---
-> >> v2:
-> >> - Rename clk-integrator.c to clk-versatile.c
-> >>
-> >>  drivers/clk/versatile/Makefile                     |  3 +-
-> >>  .../{clk-integrator.c => clk-versatile.c}          | 35 ++++++++++++++++++++--
-> >>  2 files changed, 34 insertions(+), 4 deletions(-)
-> >>  rename drivers/clk/versatile/{clk-integrator.c => clk-versatile.c} (66%)
-> >>
-> >> diff --git a/drivers/clk/versatile/Makefile b/drivers/clk/versatile/Makefile
-> >> index c16ca78..9ee2b37 100644
-> >> --- a/drivers/clk/versatile/Makefile
-> >> +++ b/drivers/clk/versatile/Makefile
-> >> @@ -1,6 +1,5 @@
-> >>  # Makefile for Versatile-specific clocks
-> >> -obj-$(CONFIG_ICST)             += clk-icst.o
-> >> -obj-$(CONFIG_ARCH_INTEGRATOR)  += clk-integrator.o
-> >> +obj-$(CONFIG_ICST)             += clk-icst.o clk-versatile.o
-> >>  obj-$(CONFIG_INTEGRATOR_IMPD1) += clk-impd1.o
-> >>  obj-$(CONFIG_ARCH_REALVIEW)    += clk-realview.o
-> >>  obj-$(CONFIG_ARCH_VEXPRESS)    += clk-vexpress.o clk-sp810.o
-> >> diff --git a/drivers/clk/versatile/clk-integrator.c b/drivers/clk/versatile/clk-versatile.c
-> >> similarity index 66%
-> >> rename from drivers/clk/versatile/clk-integrator.c
-> >> rename to drivers/clk/versatile/clk-versatile.c
-> >> index 734c4b8..fe52a79 100644
-> >> --- a/drivers/clk/versatile/clk-integrator.c
-> >> +++ b/drivers/clk/versatile/clk-versatile.c
-> >> @@ -17,6 +17,9 @@
-> >>
-> >>  #define INTEGRATOR_HDR_LOCK_OFFSET     0x14
-> >>
-> >> +#define VERSATILE_SYS_OSCCLCD_OFFSET   0x1c
-> >> +#define VERSATILE_SYS_LOCK_OFFSET      0x20
-> >> +
-> >>  /* Base offset for the core module */
-> >>  static void __iomem *cm_base;
-> >>
-> >> @@ -37,11 +40,27 @@ static const struct clk_icst_desc __initdata cm_auxosc_desc = {
-> >>         .lock_offset = INTEGRATOR_HDR_LOCK_OFFSET,
-> >>  };
-> >>
-> >> -static void __init of_integrator_cm_osc_setup(struct device_node *np)
-> >> +static const struct icst_params versatile_auxosc_params = {
-> >> +       .vco_max        = ICST307_VCO_MAX,
-> >> +       .vco_min        = ICST307_VCO_MIN,
-> >> +       .vd_min         = 4 + 8,
-> >> +       .vd_max         = 511 + 8,
-> >> +       .rd_min         = 1 + 2,
-> >> +       .rd_max         = 127 + 2,
-> >> +       .s2div          = icst307_s2div,
-> >> +       .idx2s          = icst307_idx2s,
-> >> +};
-> >> +
-> >> +static const struct clk_icst_desc versatile_auxosc_desc __initconst = {
-> >> +       .params = &versatile_auxosc_params,
-> >> +       .vco_offset = VERSATILE_SYS_OSCCLCD_OFFSET,
-> >> +       .lock_offset = VERSATILE_SYS_LOCK_OFFSET,
-> >> +};
-> >> +static void __init cm_osc_setup(struct device_node *np,
-> >> +                               const struct clk_icst_desc *desc)
-> >>  {
-> >>         struct clk *clk = ERR_PTR(-EINVAL);
-> >>         const char *clk_name = np->name;
-> >> -       const struct clk_icst_desc *desc = &cm_auxosc_desc;
-> >>         const char *parent_name;
-> >>
-> >>         if (!cm_base) {
-> >> @@ -65,5 +84,17 @@ static void __init of_integrator_cm_osc_setup(struct device_node *np)
-> >>         if (!IS_ERR(clk))
-> >>                 of_clk_add_provider(np, of_clk_src_simple_get, clk);
-> >>  }
-> >> +
-> >> +static void __init of_integrator_cm_osc_setup(struct device_node *np)
-> >> +{
-> >> +       cm_osc_setup(np, &cm_auxosc_desc);
-> >> +}
-> >>  CLK_OF_DECLARE(integrator_cm_auxosc_clk,
-> >>         "arm,integrator-cm-auxosc", of_integrator_cm_osc_setup);
-> >> +
-> >> +static void __init of_versatile_cm_osc_setup(struct device_node *np)
-> >> +{
-> >> +       cm_osc_setup(np, &versatile_auxosc_desc);
-> >> +}
-> >> +CLK_OF_DECLARE(versatile_cm_auxosc_clk,
-> >> +              "arm,versatile-cm-auxosc", of_versatile_cm_osc_setup);
-> >> --
-> >> 1.9.1
-> >>
+We've been holding back Samsung from adding new SoC support until they
+sorted out their multiplatform support, which they now have done. We're
+very happy to be able to build an Exynos-enabled kernel together with
+the other platforms now (Tegra, i.MX, OMAP, and all the others). This
+also means that their slight backlog of SoC support is now picked up so
+we've got a bunch of clock drivers and other things for their 3250 and
+5410/5420/5800 series of chips.
+
+I've documented the conflicts in each email, and I've pushed a
+"resolved-for-3.16" branch with our proposed resolutions.
