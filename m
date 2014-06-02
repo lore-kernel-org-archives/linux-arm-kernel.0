@@ -1,41 +1,30 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 2 Jun 2014 11:54:36 -0400
-Subject: [PATCH v3 0/7] of: setup dma parameters using dma-ranges and
- dma-coherent
-In-Reply-To: <4197388.OE67ahhtqp@wuerfel>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
- <20140602063702.GB7834@dragon> <538C7B22.2020107@ti.com>
- <4197388.OE67ahhtqp@wuerfel>
-Message-ID: <538C9E3C.2000103@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 02 Jun 2014 10:00:03 -0600
+Subject: [PATCH 1/3] arm: multi_v7: enable igb, stmpe, spidev, lm95245,
+ pwm leds
+In-Reply-To: <cc612cd3f24f01cfc8fd3e81b1027ff94862e8b4.1401700579.git.marcel@ziswiler.com>
+References: <cc612cd3f24f01cfc8fd3e81b1027ff94862e8b4.1401700579.git.marcel@ziswiler.com>
+Message-ID: <538C9F83.1010800@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
-
-On Monday 02 June 2014 11:06 AM, Arnd Bergmann wrote:
-> On Monday 02 June 2014 09:24:50 Santosh Shilimkar wrote:
->> On Monday 02 June 2014 02:37 AM, Shawn Guo wrote:
->>> On Thu, Apr 24, 2014 at 11:30:00AM -0400, Santosh Shilimkar wrote:
->>>> Here is an updated v3 of the series. Series introduces support for setting up
->>>> dma parameters based on device tree properties like 'dma-ranges' and
->>>> 'dma-coherent' and also update to ARM 32 bit port. Earlier version of the
->>>> series can be found here [3], [2] and [1].
->>>
->>> Are these two generic device tree properties documented somewhere under
->>> Documentation/devicetree/bindings?
->>>
->> These bindings have been already in use before this series. But looks like
->> they have not been documented. I will do a patch to add description for those
->> couple of parameters.
+On 06/02/2014 03:43 AM, Marcel Ziswiler wrote:
+> The NVIDIA Tegra 3 based Apalis T30 module contains an Intel i210 resp.
+> i211 gigabit Ethernet controller, an STMPE811 ADC/touch controller,
+> SPI bus and PWM LEDs generically accessible from user space and an
+> LM95245 temperature sensor chip. The later four can also be found on
+> the Colibri T30 module.
 > 
-> dma-ranges is part of ePAPR, and was documented in some ieee-1275 addenda
-> before that, but I agree it would be nice to have something in kernel as
-> well, at the minimum something pointing to the relevant documents.
+> While at it move the NEON entry down to its proper place to have it all
+> nicely ordered again.
 > 
-We are thinking of updating 'Documentation/devicetree/bindings/dma/dma.txt'
-to add the information for these extra two parameters.
+> Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
+> ---
+> BTW: How about TEGRA_EMC_SCALING_ENABLE
 
-Is that fine or any other suggestion ?
+I thought a patch was sent to remove that. Perhaps the patch was only
+sent to tegra_defconfig.
 
-Regards,
-Santosh
+> ... MTD_M25P80 which depends on MTD_SPI_NOR
+
+I've seen patches to fix that too.
