@@ -1,125 +1,58 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 2 Jun 2014 11:41:04 +0100
-Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <5288123.eXagyPAxNq@wuerfel>
-References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
- <4545972.cM7IP1qTXQ@wuerfel>
- <CAL_Jsq+tkFNpjSEZboT+o69B_Z3a8e-ZVKaYDmLwtkyYoPy6VQ@mail.gmail.com>
- <5288123.eXagyPAxNq@wuerfel>
-Message-ID: <20140602104104.GD3855@e103592.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 2 Jun 2014 11:42:22 +0100
+Subject: [PATCH 2/2] clk: clps711x: Add DT bindings documentation
+In-Reply-To: <1401701568.132789498@f354.i.mail.ru>
+References: <1401616522-13505-1-git-send-email-shc_work@mail.ru>
+ <20140602085651.GA12397@leverpostej>
+ <1401701568.132789498@f354.i.mail.ru>
+Message-ID: <20140602104222.GA13573@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 30, 2014 at 09:49:59PM +0200, Arnd Bergmann wrote:
-> On Friday 30 May 2014 14:31:55 Rob Herring wrote:
-> > On Fri, May 30, 2014 at 2:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Friday 30 May 2014 08:16:05 Rob Herring wrote:
-> > >> On Fri, May 23, 2014 at 3:33 PM, Thierry Reding
-> > >> <thierry.reding@gmail.com> wrote:
-> > >> > From: Thierry Reding <treding@nvidia.com>
-> > >> > +IOMMU master node:
-> > >> > +==================
-> > >> > +
-> > >> > +Devices that access memory through an IOMMU are called masters. A device can
-> > >> > +have multiple master interfaces (to one or more IOMMU devices).
-> > >> > +
-> > >> > +Required properties:
-> > >> > +--------------------
-> > >> > +- iommus: A list of phandle and IOMMU specifier pairs that describe the IOMMU
-> > >> > +  master interfaces of the device. One entry in the list describes one master
-> > >> > +  interface of the device.
-> > >> > +
-> > >> > +When an "iommus" property is specified in a device tree node, the IOMMU will
-> > >> > +be used for address translation. If a "dma-ranges" property exists in the
-> > >> > +device's parent node it will be ignored. An exception to this rule is if the
-> > >> > +referenced IOMMU is disabled, in which case the "dma-ranges" property of the
-> > >> > +parent shall take effect.
-> > >>
-> > >> Just thinking out loud, could you have dma-ranges in the iommu node
-> > >> for the case when the iommu is enabled rather than putting the DMA
-> > >> window information into the iommus property?
-> > >>
-> > >> This would probably mean that you need both #iommu-cells and #address-cells.
-> > >
-> > > The reason for doing like this was that you may need a different window
-> > > for each device, while there can only be one dma-ranges property in
-> > > an iommu node.
+On Mon, Jun 02, 2014 at 10:32:48AM +0100, Alexander Shiyan wrote:
+> Mon, 2 Jun 2014 09:56:51 +0100 ?? Mark Rutland <mark.rutland@arm.com>:
+> > On Sun, Jun 01, 2014 at 10:55:22AM +0100, Alexander Shiyan wrote:
+> > > This patch adds DT binding documentation for the Cirrus Logic
+> > > CLPS711X-based CPUs clock subsystem.
+> > > 
+> > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > > ---
+> > >  .../devicetree/bindings/clock/clps711x-clock.txt      | 19 +++++++++++++++++++
+> > >  1 file changed, 19 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/clock/clps711x-clock.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/clock/clps711x-clock.txt b/Documentation/devicetree/bindings/clock/clps711x-clock.txt
+> > > new file mode 100644
+> > > index 0000000..0fdf3c9
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/clock/clps711x-clock.txt
+> > > @@ -0,0 +1,19 @@
+> > > +* Clock bindings for the Cirrus Logic CLPS711X CPUs
+> > > +
+> > > +Required properties:
+> > > +- compatible  : Shall contain "cirrus,clps711x-clk".
+> > > +- reg         : Address of the internal register set.
+> > > +- cpufreq     : Factory set default frequency in HZ.
 > > 
-> > My suggestion was that you also put the IDs in the dma-ranges as the
-> > first cell much as ranges for PCI encodes other information in the
-> > first cell. Then you can have an entry for each ID. The downside is
-> > another special case like PCI.
+> > Huh? Why is this called "cpufreq" what is this the frequency of,
+> > exactly?
 > > 
-> > The argument for using #address-cells and #size-cells seems to be to
-> > align with how ranges work. If that's the route we want to go, then I
-> > say we should not stop there and actually use dma-ranges as well.
-> > Otherwise, I don't see the advantage over #iommu-cells.
+> > Is this an input or an output?
 > 
-> I can see how dma-ranges in bus nodes work, it just doesn't seem to
-> have any reasonable meaning in the iommu node itself.
+> Modern CLPS711X CPUs support PLL reprogramming, while for older processors,
+> this procedure is not possible and the CPU clock is set to a fixed value. Thus if the
+> value of the PLL multiplier is not correct (missing), we use a fixed CPU frequency
+> of the processor, described in DT, which allows us to use the driver for the new and
+> old versions of this CPU.
 
-dma-ranges defines a static mapping for mastering through the bus node.
+Ok. So this is the frequency of a (non-programmable) PLL which feeds the
+clock IP block?
 
-The whole point of an IOMMU is that it maps dynamically, so I agree:
-I'm unclear on what dma-ranges should mean in the IOMMU node itself
-(if anything).
+Or is this internal to the IP block?
 
-> 
-> > > I don't understand the problem. If you have stream IDs 0 through 7,
-> > > you would have
-> > >
-> > >         master at a {
-> > >                 ...
-> > >                 iommus = <&smmu 0>;
-> > >         };
-> > >
-> > >         master at b {
-> > >                 ...
-> > >                 iommus = <&smmu 1;
-> > >         };
-> > >
-> > >         ...
-> > >
-> > >         master at 12 {
-> > >                 ...
-> > >                 iommus = <&smmu 7;
-> > >         };
-> > >
-> > > and you don't need a window at all. Why would you need a mask of
-> > > some sort?
-> > 
-> > 1 master with 7 IDs like this:
-> > 
-> >          master at a {
-> >                  ...
-> >                  iommus = <&smmu 0> <&smmu 1> <&smmu 2> <&smmu 3>
-> > <&smmu 4> <&smmu 5> <&smmu 6> <&smmu 7>;
-> >          };
-> > 
-> > If there was any sort of window, then it is almost certainly the same
-> > window for each ID.
+Typically we'd use "clock-frequency" as the name for such an input, or
+just model it as a normal clock input and feed it a fixed-rate-clock for
+the non-programmable case.
 
-Do we have real examples of using a window *and* an ID?  I thought the
-windowed-IOMMU concept was partly a way of encoding the ID in some
-real address bits on the bus.  If you're doing that, it seems less likely
-that there is a true "ID" as such (though it is possible).
-
-> Ok, I see. In that case you'd probably want to have #address-cells = <1>
-> and #size-cells = <1> and give a range of IDs like
-> 
-> 	iommus = <&smmu 0 8>;
-> 
-> Do you think that ranges can have a meaningful definition with the ARM
-> SMMU stream IDs?
-
-In the strictest sense, no.
-
-But for a large set of sane configurations, this probably works.
-
-Small sets of randomly-assigned IDs can just be enumerated one by one.
-
-We wouldn't be able to describe folding and bit shuffling, but we
-probably don't want to encourage that anyway.
-
-Cheers
----Dave
+Cheers,
+Mark.
