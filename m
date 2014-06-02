@@ -1,34 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 2 Jun 2014 13:46:38 +0100
-Subject: [PATCH 1/2] spi/pxa2xx-pci: Add common clock framework support
- in PCI glue layer
-In-Reply-To: <1401738379-4107-2-git-send-email-chiau.ee.chew@intel.com>
-References: <1401738379-4107-1-git-send-email-chiau.ee.chew@intel.com>
- <1401738379-4107-2-git-send-email-chiau.ee.chew@intel.com>
-Message-ID: <20140602124638.GD31751@sirena.org.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 02 Jun 2014 14:51:14 +0200
+Subject: [PATCH v2 1/7] arm: firmware: Check firmware is running or not
+In-Reply-To: <1401712543-14281-2-git-send-email-b.zolnierkie@samsung.com>
+References: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
+ <1401712543-14281-2-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <538C7342.4000700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 03, 2014 at 03:46:18AM +0800, Chew Chiau Ee wrote:
+Hi,
 
-> ---
->  drivers/spi/spi-pxa2xx-pci.c |   20 ++++++++++++++++++++
->  1 files changed, 20 insertions(+), 0 deletions(-)
+On 02.06.2014 14:35, Bartlomiej Zolnierkiewicz wrote:
+> From: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> To support multi-platform, it needs to know it's running under secure
+> OS or not.  Sometimes it needs to access physical address by SMC calls.
+> 
+> e.g.,
+>         if (firmware_run()) {
+>                 addr = physical address;
+>         } else {
+>                 addr = virtual address;
+>         }
+> 
+>         call_firmware_ops(read_address, addr, &value);
 
-> +	clk = clk_register_fixed_rate(&dev->dev, "spi_pxa2xx_clk", NULL,
-> +					CLK_IS_ROOT, c->max_clk_rate);
-> +	 if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
+Hmm, I don't understand the code above. It first asks whether the
+firmware is available and then calls a firmware operation anyway
+(assuming that firmware is available regardless of the check above)...
 
-This is pretty much fine code wise but I'd expect to see some Kconfig
-updates adding dependencies on the clock API - clk_register_fixed_rate()
-is only provided if the fixed rate driver is present.  I'm also not
-seeing any changes to unregister the fixed rate clock as the device is
-removed.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140602/bfcc481a/attachment.sig>
+I don't like the idea of this function, because we have designed the
+firmware API to not require this kind of checks. Instead, you just call
+whatever firmware operation you need and if it returns -ENOSYS you need
+to fallback to legacy (firmware-less) way of doing it.
+
+Could you provide your use case for which this doesn't work?
+
+Best regards,
+Tomasz
