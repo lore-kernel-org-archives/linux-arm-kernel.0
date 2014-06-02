@@ -1,47 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  2 Jun 2014 14:41:03 +0100
-Subject: [PATCH 3/3] i2c: Make I2C ID tables non-mandatory for DT'ed and/or
- ACPI'ed devices
-In-Reply-To: <1401716463-23457-1-git-send-email-lee.jones@linaro.org>
-References: <1401716463-23457-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1401716463-23457-4-git-send-email-lee.jones@linaro.org>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon,  2 Jun 2014 15:42:04 +0200
+Subject: [PATCH v2 0/7] ARM: shmobile: koelsch reference: Enable DMA for QSPI
+Message-ID: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the I2C framework insists on devices supplying an I2C ID
-table.  Many of the devices which do so unnecessarily adding quite a
-few wasted lines to kernel code.  This patch allows drivers a means
-to 'not' supply the aforementioned table and match on either DT
-and/or ACPI match tables instead.
+This patch series enables DMA support for QSPI on r8a7791/koelsch
+reference.  It's independent from the series "ARM: shmobile: koelsch
+legacy: Enable DMA for QSPI", but it depends on the SHDMA work for r8a7790
+by Ben Dooks (cfr. "[PATCH v2 0/9] Updates Renesas OF-DMA code").
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/i2c/i2c-core.c | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+Changes Compared to previous submission ("[PATCH/RFC 0/7] ARM: shmobile:
+r8a7791: Add preliminary DMA support"):
+  - "[6/7] ARM: shmobile: r8a7791 dtsi: Enable DMA for MSIOF" was dropped,
+  - 2/7 was added,
+  - 7/7 was changed (see changelog in individual patch).
 
-diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index d0c7180..811b78f 100644
---- a/drivers/i2c/i2c-core.c
-+++ b/drivers/i2c/i2c-core.c
-@@ -271,7 +271,18 @@ static int i2c_device_probe(struct device *dev)
- 		return 0;
- 
- 	driver = to_i2c_driver(dev->driver);
--	if (!driver->probe || !driver->id_table)
-+	if (!driver->probe)
-+		return -EINVAL;
-+
-+	/*
-+	 * An I2C ID table is not madatory, if and only if, a suitable Device
-+	 * Tree and/or ACPI match table entry is supplied for the probing
-+	 * device.
-+	 *
-+	 * TODO: Provide 'device type' to 'ACPI node' call and match here.
-+	 */
-+	if (!driver->id_table &&
-+	    !of_match_device(dev->driver->of_match_table, dev))
- 		return -ENODEV;
- 
- 	if (!device_can_wakeup(&client->dev))
--- 
-1.8.3.2
+This was tested on r8a7791/koelsch.
+
+Performance figures for reading from a QSPI FLASH driven at 24.375 MHz are:
+  - Single:  1.1 Mbps PIO, 23 Mbps DMA
+  - Dual  : 12.7 Mbps PIO, 48 Mbps DMA
+  - Quad  : 13   Mbps PIO, 70 Mbps DMA
+
+Thanks for your comments!
+
+  [1/7] DMA: shdma: Add r8a7791 support
+  [2/7] DMA: shdma: Spelling s/controll/control/
+  [3/7] ARM: shmobile: r8a7791 dtsi: add SYS-DMAC clocks
+  [4/7] ARM: shmobile: r8a7791: Add SYS-DMAC channel definitions for bindings
+  [5/7] ARM: shmobile: r8a7791 dtsi: Add SYS-DMAC0 and SYS-DMAC1 nodes
+  [6/7] ARM: shmobile: koelsch dts: Enable sysdma0 and sysdma1
+  [7/7] ARM: shmobile: r8a7791 dtsi: Enable DMA for QSPI
+
+ Documentation/devicetree/bindings/dma/shdma.txt |   7 +-
+ arch/arm/boot/dts/r8a7791-koelsch.dts           |   8 ++
+ arch/arm/boot/dts/r8a7791.dtsi                  |  79 ++++++++++++++++-
+ drivers/dma/sh/shdmac.c                         |   1 +
+ include/dt-bindings/dma/r8a7791-dma.h           | 111 ++++++++++++++++++++++++
+ 5 files changed, 201 insertions(+), 5 deletions(-)
+ create mode 100644 include/dt-bindings/dma/r8a7791-dma.h
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
