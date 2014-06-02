@@ -1,51 +1,55 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 02 Jun 2014 15:10:05 +0200
-Subject: [PATCH v2 6/7] ARM: EXYNOS: PM: fix register setup on EXYNOS4x12
- for AFTR mode code
-In-Reply-To: <1401712543-14281-7-git-send-email-b.zolnierkie@samsung.com>
-References: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
- <1401712543-14281-7-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <538C77AD.1000801@gmail.com>
+From: holgerschurig@gmail.com (Holger Schurig)
+Date: Mon, 2 Jun 2014 15:15:21 +0200
+Subject: iMX6Q FEC: transmit queue 0 timed out
+In-Reply-To: <20140602124242.GB933@n2100.arm.linux.org.uk>
+References: <CAOpc7mF4naY8xuBDFNpHuQPsrULVriKj-ZcpEwpPwtA8UT1Wpw@mail.gmail.com>
+ <20140602124242.GB933@n2100.arm.linux.org.uk>
+Message-ID: <CAOpc7mFbJQNeBmOG0C-Qn856MmhtUkTq=QeDPC-EWXryi6sFGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Transmit clocking and pinmux?  Do you mean ENET_TX_EN?  Yep, that's
+set. Somehow barebox can send, it's just Linux that doesn't want to do
+it. Note that ENET_TX_CLK is not muxed, as it is for MII, not for
+RMII.
 
-On 02.06.2014 14:35, Bartlomiej Zolnierkiewicz wrote:
-> Add S5P_CENTRAL_SEQ_OPTION register setup for EXYNOS4x12 to AFTR
-> mode code.  Without this setup AFTR mode doesn't show any benefit
-> over WFI one.  When this setup is applied AFTR mode reduces power
-> consumption by ~12% (as measured on Trats2 board).
-> 
-> This change is a preparation for adding secure firmware support to
-> EXYNOS cpuidle driver.
-> 
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/pm.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index aeff99e..0fb9a5a 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -456,6 +456,10 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
->  	case CPU_PM_ENTER:
->  		if (cpu == 0) {
->  			exynos_pm_central_suspend();
-> +			if (soc_is_exynos4212() || soc_is_exynos4412())
-> +				__raw_writel(S5P_USE_STANDBY_WFI0 |
-> +					     S5P_USE_STANDBY_WFE0,
-> +					     S5P_CENTRAL_SEQ_OPTION);
+In case I confuse what you meant, here are excerpts from my DTS:
 
-I wonder whether this isn't required on any Exynos SoC in general, as
-this mask decides which STANDBY_WFI/WFE signals are considered before
-entering the lower power state.
+&fec {
+   pinctrl-names = "default";
+   pinctrl-0 = <&pinctrl_fec>;
+   phy-mode = "rmii";
+   phy-reset-gpios = <&gpio2 4 GPIO_ACTIVE_LOW>;
+   status = "okay";
+};
 
-Also you should check the behavior with Krzysztof's patch adding support
-for delayed reset assertion, which should cause WFI/WFE signals of CPUs
-powered down to be kept asserted.
+...
 
-Best regards,
-Tomasz
+pinctrl_fec: fecgrp {
+   fsl,pins = <
+      MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0 0x1b030
+      MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1 0x1b030
+      MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN   0x1b030
+      MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0 0x1b030
+      MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1 0x1b030
+      MX6QDL_PAD_ENET_RX_ER__ENET_RX_ER   0x1b030
+      MX6QDL_PAD_ENET_MDIO__ENET_MDIO     0x0B850
+      MX6QDL_PAD_ENET_MDC__ENET_MDC       0x1b030
+      MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN  0x1b030
+      MX6QDL_PAD_GPIO_16__ENET_REF_CLK    0x1b030
+      >;
+};
+
+
+Or did you mean the clocks internal to the CPU?  So far I didn't
+really care for them, because I thought that the clocking framework in
+conjunction with the device tree takes care of that. Hmm, in the
+refernce manual, chapter 23.3 they talk about mac0_txmem_clk, which
+isn't in that list. If I read the manual correct, this is enabled by
+enet_clk_enable, so let's look into CCGR1:
+
+/ # devmem 0x20C406c
+0xF0FCFC00
+                                      ...
+Hmm, the first 'C' from the right contains bits 10-11 (CCM_CCGR1.CG5)
+and they are both set, so enet_clk_enable is also on.
