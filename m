@@ -1,40 +1,52 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 02 Jun 2014 14:51:14 +0200
-Subject: [PATCH v2 1/7] arm: firmware: Check firmware is running or not
-In-Reply-To: <1401712543-14281-2-git-send-email-b.zolnierkie@samsung.com>
+Date: Mon, 02 Jun 2014 14:56:36 +0200
+Subject: [PATCH v2 2/7] ARM: EXYNOS: add support for firmware-assisted
+ c15resume
+In-Reply-To: <1401712543-14281-3-git-send-email-b.zolnierkie@samsung.com>
 References: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
- <1401712543-14281-2-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <538C7342.4000700@gmail.com>
+ <1401712543-14281-3-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <538C7484.9070801@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
 On 02.06.2014 14:35, Bartlomiej Zolnierkiewicz wrote:
-> From: Kyungmin Park <kyungmin.park@samsung.com>
+> From: Tomasz Figa <t.figa@samsung.com>
 > 
-> To support multi-platform, it needs to know it's running under secure
-> OS or not.  Sometimes it needs to access physical address by SMC calls.
+> This change is a preparation for adding secure firmware support to
+> EXYNOS cpuidle driver.
 > 
-> e.g.,
->         if (firmware_run()) {
->                 addr = physical address;
->         } else {
->                 addr = virtual address;
->         }
+> This patch shouldn't cause any functionality changes.
 > 
->         call_firmware_ops(read_address, addr, &value);
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> [bzolnier: splitted out from bigger patch]
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  arch/arm/include/asm/firmware.h | 4 ++++
+>  arch/arm/mach-exynos/firmware.c | 8 ++++++++
+>  2 files changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
+> index c72ec47..70883c7 100644
+> --- a/arch/arm/include/asm/firmware.h
+> +++ b/arch/arm/include/asm/firmware.h
+> @@ -41,6 +41,10 @@ struct firmware_ops {
+>  	 * Initializes L2 cache
+>  	 */
+>  	int (*l2x0_init)(void);
+> +	/*
+> +	 * Restores coprocessor 15 registers
+> +	 */
+> +	int (*c15resume)(u32 *regs);
 
-Hmm, I don't understand the code above. It first asks whether the
-firmware is available and then calls a firmware operation anyway
-(assuming that firmware is available regardless of the check above)...
+Well, this was just a kind of internal hack, so I'm not sure this is
+suitable as a generic firmware operation in mainline.
 
-I don't like the idea of this function, because we have designed the
-firmware API to not require this kind of checks. Instead, you just call
-whatever firmware operation you need and if it returns -ENOSYS you need
-to fallback to legacy (firmware-less) way of doing it.
-
-Could you provide your use case for which this doesn't work?
+I'd rather implement this as a part of a wider suspend and resume
+firmware operations, where suspend would save values of cp15 registers
+and resume would restore them.
 
 Best regards,
 Tomasz
