@@ -1,279 +1,91 @@
-From: ritesh.harjani@gmail.com (ritesh.harjani at gmail.com)
-Date: Mon, 2 Jun 2014 15:49:22 +0530
-Subject: [PATCH 3/4] arm: dma-mapping: Refractor iommu_alloc/free funcs
-In-Reply-To: <1401704363-31052-3-git-send-email-ritesh.harjani@gmail.com>
-References: <1401704363-31052-1-git-send-email-ritesh.harjani@gmail.com>
- <1401704363-31052-2-git-send-email-ritesh.harjani@gmail.com>
- <1401704363-31052-3-git-send-email-ritesh.harjani@gmail.com>
-Message-ID: <1401704363-31052-4-git-send-email-ritesh.harjani@gmail.com>
+From: javi.merino@arm.com (Javi Merino)
+Date: Mon, 2 Jun 2014 11:20:48 +0100
+Subject: [PATCH v1 6/6] ACPI: thermal: processor: Use the generic cpufreq
+ infrastructure
+In-Reply-To: <CADGdYn7FZCjhzbFMtNPFtQV_naQhVk+nR1VFNH88M92_NQmfsA@mail.gmail.com>
+References: <1401351334-11210-1-git-send-email-amit.daniel@samsung.com>
+ <1401351334-11210-7-git-send-email-amit.daniel@samsung.com>
+ <20140529124248.GC2593@e104805>
+ <CADGdYn7FZCjhzbFMtNPFtQV_naQhVk+nR1VFNH88M92_NQmfsA@mail.gmail.com>
+Message-ID: <20140602102047.GB2795@e104805>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ritesh Harjani <ritesh.harjani@gmail.com>
+On Mon, Jun 02, 2014 at 10:21:48AM +0100, Amit Kachhap wrote:
+> Hi Javi,
+> 
+> On 5/29/14, Javi Merino <javi.merino@arm.com> wrote:
+> > Hi Amit,
+> >
+> > On Thu, May 29, 2014 at 09:15:34AM +0100, Amit Daniel Kachhap wrote:
+> >> This patch upgrades the ACPI cpufreq cooling portions to use the generic
+> >> cpufreq cooling infrastructure. There should not be any functionality
+> >> related changes as the same behaviour is provided by the generic
+> >> cpufreq APIs with the notifier mechanism.
+> >>
+> >> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> >> ---
+> >>  drivers/acpi/processor_driver.c  |    6 +-
+> >>  drivers/acpi/processor_thermal.c |  235
+> >> ++++++++++++++++++--------------------
+> >>  include/acpi/processor.h         |    3 +-
+> >>  3 files changed, 115 insertions(+), 129 deletions(-)
+> >>
+> >> diff --git a/drivers/acpi/processor_driver.c
+> >> b/drivers/acpi/processor_driver.c
+> >> index 7f70f31..10aba4a 100644
+> >> --- a/drivers/acpi/processor_driver.c
+> >> +++ b/drivers/acpi/processor_driver.c
+> >> @@ -36,6 +36,7 @@
+> >>  #include <linux/cpuidle.h>
+> >>  #include <linux/slab.h>
+> >>  #include <linux/acpi.h>
+> >> +#include <linux/cpu_cooling.h>
+> >>
+> >>  #include <acpi/processor.h>
+> >>
+> >> @@ -178,8 +179,7 @@ static int __acpi_processor_start(struct acpi_device
+> >> *device)
+> >>         if (!cpuidle_get_driver() || cpuidle_get_driver() ==
+> >> &acpi_idle_driver)
+> >>                 acpi_processor_power_init(pr);
+> >>
+> >> -       pr->cdev = thermal_cooling_device_register("Processor", device,
+> >> -
+> >> &processor_cooling_ops);
+> >> +       pr->cdev = acpi_processor_cooling_register(device);
+> >
+> > With this you have removed the only cooling device whose type was
+> > "Processor".  There's special code for dealing with this cooling
+> > device in drivers/thermal/thermal_core.c:passive_store():
+> >
+> > 		list_for_each_entry(cdev, &thermal_cdev_list, node) {
+> > 			if (!strncmp("Processor", cdev->type,
+> > 				     sizeof("Processor")))
+> > 				thermal_zone_bind_cooling_device(tz,
+> > 						THERMAL_TRIPS_NONE, cdev,
+> > 						THERMAL_NO_LIMIT,
+> > 						THERMAL_NO_LIMIT);
+> > 		}
+> > 		mutex_unlock(&thermal_list_lock);
+> > 		if (!tz->passive_delay)
+> >
+> > With your change, that code is now "dead" as it can't do anything.  No
+> > I don't know what should you do with it, either remove it or make it
+> > match the cpufreq cooling device.  But this patch should deal with
+> > that code as well.
+> nice catch. I somehow missed modifying this section.
+> I think the following changes should fix this,
+> -                       if (!strncmp("Processor", cdev->type,
+> -                                    sizeof("Processor")))
+> +                       if (!strncmp("thermal-cpufreq", cdev->type,
+> +                                    sizeof("thermal-cpufreq")))
+>                                 thermal_zone_bind_cooling_device(tz,
+> 
 
-iommu_alloc/free_buffer can be moved out to
-lib/iommu_helper.c as a part of refactoring
-arm iommu dma-mapping code.
+That should do it.  I don't really understand why this code is
+specifically looking for ACPI processor cooling devices but I guess
+that's the least disrupting change you can make.
 
-Change-Id: I5fba02f64cb4913f6d0200189267826df47df8d6
-Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
----
- arch/arm/mm/dma-mapping.c    | 95 +-------------------------------------------
- include/linux/iommu-helper.h |  8 ++++
- lib/iommu-helper.c           | 95 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 105 insertions(+), 93 deletions(-)
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 38fc146..268004c 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1161,98 +1161,6 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
- 	spin_unlock_irqrestore(&mapping->lock, flags);
- }
- 
--static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
--					  gfp_t gfp, struct dma_attrs *attrs)
--{
--	struct page **pages;
--	int count = size >> PAGE_SHIFT;
--	int array_size = count * sizeof(struct page *);
--	int i = 0;
--
--	if (array_size <= PAGE_SIZE)
--		pages = kzalloc(array_size, gfp);
--	else
--		pages = vzalloc(array_size);
--	if (!pages)
--		return NULL;
--
--	if (dma_get_attr(DMA_ATTR_FORCE_CONTIGUOUS, attrs))
--	{
--		unsigned long order = get_order(size);
--		struct page *page;
--
--		page = dma_alloc_from_contiguous(dev, count, order);
--		if (!page)
--			goto error;
--
--		__dma_clear_buffer(page, size);
--
--		for (i = 0; i < count; i++)
--			pages[i] = page + i;
--
--		return pages;
--	}
--
--	/*
--	 * IOMMU can map any pages, so himem can also be used here
--	 */
--	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
--
--	while (count) {
--		int j, order = __fls(count);
--
--		pages[i] = alloc_pages(gfp, order);
--		while (!pages[i] && order)
--			pages[i] = alloc_pages(gfp, --order);
--		if (!pages[i])
--			goto error;
--
--		if (order) {
--			split_page(pages[i], order);
--			j = 1 << order;
--			while (--j)
--				pages[i + j] = pages[i] + j;
--		}
--
--		__dma_clear_buffer(pages[i], PAGE_SIZE << order);
--		i += 1 << order;
--		count -= 1 << order;
--	}
--
--	return pages;
--error:
--	while (i--)
--		if (pages[i])
--			__free_pages(pages[i], 0);
--	if (array_size <= PAGE_SIZE)
--		kfree(pages);
--	else
--		vfree(pages);
--	return NULL;
--}
--
--static int __iommu_free_buffer(struct device *dev, struct page **pages,
--			       size_t size, struct dma_attrs *attrs)
--{
--	int count = size >> PAGE_SHIFT;
--	int array_size = count * sizeof(struct page *);
--	int i;
--
--	if (dma_get_attr(DMA_ATTR_FORCE_CONTIGUOUS, attrs)) {
--		dma_release_from_contiguous(dev, pages[0], count);
--	} else {
--		for (i = 0; i < count; i++)
--			if (pages[i])
--				__free_pages(pages[i], 0);
--	}
--
--	if (array_size <= PAGE_SIZE)
--		kfree(pages);
--	else
--		vfree(pages);
--	return 0;
--}
--
- /*
-  * Create a CPU mapping for a specified pages
-  */
-@@ -1417,7 +1325,8 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
- 	 */
- 	gfp &= ~(__GFP_COMP);
- 
--	pages = __iommu_alloc_buffer(dev, size, gfp, attrs);
-+	pages = __iommu_alloc_buffer(dev, size, gfp, attrs,
-+					__dma_clear_buffer);
- 	if (!pages)
- 		return NULL;
- 
-diff --git a/include/linux/iommu-helper.h b/include/linux/iommu-helper.h
-index c6a315d..b27b7cb8 100644
---- a/include/linux/iommu-helper.h
-+++ b/include/linux/iommu-helper.h
-@@ -2,6 +2,7 @@
- #define _LINUX_IOMMU_HELPER_H
- 
- #include <linux/kernel.h>
-+#include <linux/dma-attrs.h>
- 
- #ifdef CONFIG_DMA_USE_IOMMU_HELPER_MAPPING
- struct dma_iommu_mapping {
-@@ -19,6 +20,13 @@ struct dma_iommu_mapping {
- 	struct kref		kref;
- };
- 
-+extern struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
-+					  gfp_t gfp, struct dma_attrs *attrs,
-+			void (*arch_clear_buffer_cb)(struct page*, size_t));
-+
-+extern int __iommu_free_buffer(struct device *dev, struct page **pages,
-+			       size_t size, struct dma_attrs *attrs);
-+
- extern void __iommu_detach_device(struct device *dev);
- 
- extern void __iommu_release_mapping(struct dma_iommu_mapping *mapping);
-diff --git a/lib/iommu-helper.c b/lib/iommu-helper.c
-index 28daaa5..e0f643a 100644
---- a/lib/iommu-helper.c
-+++ b/lib/iommu-helper.c
-@@ -13,6 +13,8 @@
- #include <linux/slab.h>
- #include <linux/vmalloc.h>
- #include <linux/errno.h>
-+#include <linux/dma-contiguous.h>
-+#include <linux/mm.h>
- #endif
- 
- int iommu_is_span_boundary(unsigned int index, unsigned int nr,
-@@ -51,6 +53,99 @@ EXPORT_SYMBOL(iommu_area_alloc);
- 
- #ifdef CONFIG_DMA_USE_IOMMU_HELPER_MAPPING
- 
-+struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
-+					  gfp_t gfp, struct dma_attrs *attrs,
-+			void (*arch_clear_buffer_cb)(struct page*, size_t))
-+{
-+	struct page **pages;
-+	int count = size >> PAGE_SHIFT;
-+	int array_size = count * sizeof(struct page *);
-+	int i = 0;
-+
-+	if (array_size <= PAGE_SIZE)
-+		pages = kzalloc(array_size, gfp);
-+	else
-+		pages = vzalloc(array_size);
-+	if (!pages)
-+		return NULL;
-+
-+	if (dma_get_attr(DMA_ATTR_FORCE_CONTIGUOUS, attrs)) {
-+		unsigned long order = get_order(size);
-+		struct page *page;
-+
-+		page = dma_alloc_from_contiguous(dev, count, order);
-+		if (!page)
-+			goto error;
-+
-+		if (arch_clear_buffer_cb)
-+			arch_clear_buffer_cb(page, size);
-+
-+		for (i = 0; i < count; i++)
-+			pages[i] = page + i;
-+
-+		return pages;
-+	}
-+
-+	/*
-+	 * IOMMU can map any pages, so himem can also be used here
-+	 */
-+	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
-+
-+	while (count) {
-+		int j, order = __fls(count);
-+
-+		pages[i] = alloc_pages(gfp, order);
-+		while (!pages[i] && order)
-+			pages[i] = alloc_pages(gfp, --order);
-+		if (!pages[i])
-+			goto error;
-+
-+		if (order) {
-+			split_page(pages[i], order);
-+			j = 1 << order;
-+			while (--j)
-+				pages[i + j] = pages[i] + j;
-+		}
-+		if (arch_clear_buffer_cb)
-+			arch_clear_buffer_cb(pages[i], PAGE_SIZE << order);
-+		i += 1 << order;
-+		count -= 1 << order;
-+	}
-+
-+	return pages;
-+error:
-+	while (i--)
-+		if (pages[i])
-+			__free_pages(pages[i], 0);
-+	if (array_size <= PAGE_SIZE)
-+		kfree(pages);
-+	else
-+		vfree(pages);
-+	return NULL;
-+}
-+
-+int __iommu_free_buffer(struct device *dev, struct page **pages,
-+			       size_t size, struct dma_attrs *attrs)
-+{
-+	int count = size >> PAGE_SHIFT;
-+	int array_size = count * sizeof(struct page *);
-+	int i;
-+
-+	if (dma_get_attr(DMA_ATTR_FORCE_CONTIGUOUS, attrs)) {
-+		dma_release_from_contiguous(dev, pages[0], count);
-+	} else {
-+		for (i = 0; i < count; i++)
-+			if (pages[i])
-+				__free_pages(pages[i], 0);
-+	}
-+
-+	if (array_size <= PAGE_SIZE)
-+		kfree(pages);
-+	else
-+		vfree(pages);
-+	return 0;
-+}
-+
- /**
-  * __iommu_init_mapping
-  * @bus: pointer to the bus holding the client device (for IOMMU calls)
--- 
-1.8.1.3
+Cheers,
+Javi
