@@ -1,30 +1,58 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Mon,  2 Jun 2014 11:44:01 -0700
-Subject: [PATCH] ARM: dts: imx6: ventana: correct gw52xx sgtl5000 clock source
-Message-ID: <1401734641-27308-1-git-send-email-tharvey@gateworks.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Mon, 2 Jun 2014 13:28:00 -0400
+Subject: [PATCH] MAINTAINERS: Update Eduardo Valentin's email address
+In-Reply-To: <1401444208-6887-1-git-send-email-lee.jones@linaro.org>
+References: <1401444208-6887-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140602172800.GA5902@developer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correct the invalid clock for the sgtl5000 audio codec on the GW52xx Ventana
-baseboard.
+Hello Lee Jones,
 
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
----
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Fri, May 30, 2014 at 11:03:28AM +0100, Lee Jones wrote:
+> Eduardo TI address is bouncing, but it looks like he's still
+> contributing via his Gmail address.
+> 
 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-index eb8e293..e9fbef0 100644
---- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-@@ -281,7 +281,7 @@
- 	codec: sgtl5000 at 0a {
- 		compatible = "fsl,sgtl5000";
- 		reg = <0x0a>;
--		clocks = <&clks 169>;
-+		clocks = <&clks 201>;
- 		VDDA-supply = <&reg_1p8v>;
- 		VDDIO-supply = <&reg_3p3v>;
- 	};
--- 
-1.8.3.2
+Thanks for being proactive! I actually sent the very same patch a while
+ago:
+
+
+https://lkml.org/lkml/2014/4/2/644
+
+
+Maybe it's fallen into the cracks.
+
+Rui, any idea what is the status of that patch?
+
+> Cc: Eduardo Valentin <edubezval@gmail.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  MAINTAINERS | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 6dc67b1..a9dc15b 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -8850,7 +8850,7 @@ F:	drivers/media/radio/radio-raremono.c
+>  
+>  THERMAL
+>  M:	Zhang Rui <rui.zhang@intel.com>
+> -M:	Eduardo Valentin <eduardo.valentin@ti.com>
+> +M:	Eduardo Valentin <edubezval@gmail.com>
+>  L:	linux-pm at vger.kernel.org
+>  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/rzhang/linux.git
+>  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/evalenti/linux-soc-thermal.git
+> @@ -8877,7 +8877,7 @@ S:	Maintained
+>  F:	drivers/platform/x86/thinkpad_acpi.c
+>  
+>  TI BANDGAP AND THERMAL DRIVER
+> -M:	Eduardo Valentin <eduardo.valentin@ti.com>
+> +M:	Eduardo Valentin <edubezval@gmail.com>
+>  L:	linux-pm at vger.kernel.org
+>  S:	Supported
+>  F:	drivers/thermal/ti-soc-thermal/
+> -- 
+> 1.8.3.2
+> 
