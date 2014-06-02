@@ -1,48 +1,55 @@
-From: vbabka@suse.cz (Vlastimil Babka)
-Date: Mon, 02 Jun 2014 16:33:41 +0200
-Subject: [PATCH -mm] mm, compaction: properly signal and act upon lock and
- need_sched() contention - fix
-In-Reply-To: <CAOMZO5BKaicq7NkoJO4vU5W3hiDike6kSdH+2eD=h0B5BsDjTg@mail.gmail.com>
-References: <1399904111-23520-1-git-send-email-vbabka@suse.cz>	<1400233673-11477-1-git-send-email-vbabka@suse.cz>	<CAGa+x87-NRyK6kUiXNL_bRNEGm+DR6M3HPSLYEoq4t6Nrtnd_g@mail.gmail.com>	<CAAQ0ZWQDVxAzZVm86ATXd1JGUVoLXj_Y5Ske7htxH_6a4GPKRg@mail.gmail.com>	<537F082F.50501@suse.cz>
- <CAOMZO5BKaicq7NkoJO4vU5W3hiDike6kSdH+2eD=h0B5BsDjTg@mail.gmail.com>
-Message-ID: <538C8B45.6070803@suse.cz>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Mon, 2 Jun 2014 15:34:17 +0100
+Subject: [PATCH 3/3] i2c: Make I2C ID tables non-mandatory for DT'ed
+ and/or ACPI'ed devices
+In-Reply-To: <1401716463-23457-4-git-send-email-lee.jones@linaro.org>
+References: <1401716463-23457-1-git-send-email-lee.jones@linaro.org>
+ <1401716463-23457-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140602153417.2065c1a5@alan.etchedpixels.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-compact_should_abort() returns true instead of false and vice versa
-due to changes between v1 and v2 of the patch. This makes both async
-and sync compaction abort with high probability, and has been reported
-to cause e.g. soft lockups on some ARM boards, or drivers calling
-dma_alloc_coherent() fail to probe with CMA enabled on different boards.
+On Mon,  2 Jun 2014 14:41:03 +0100
+Lee Jones <lee.jones@linaro.org> wrote:
 
-This patch fixes the return value to match comments and callers expecations.
+> Currently the I2C framework insists on devices supplying an I2C ID
+> table.  Many of the devices which do so unnecessarily adding quite a
+> few wasted lines to kernel code.  This patch allows drivers a means
+> to 'not' supply the aforementioned table and match on either DT
+> and/or ACPI match tables instead.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/i2c/i2c-core.c | 13 ++++++++++++-
+>  1 file changed, 12 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> index d0c7180..811b78f 100644
+> --- a/drivers/i2c/i2c-core.c
+> +++ b/drivers/i2c/i2c-core.c
+> @@ -271,7 +271,18 @@ static int i2c_device_probe(struct device *dev)
+>  		return 0;
+>  
+>  	driver = to_i2c_driver(dev->driver);
+> -	if (!driver->probe || !driver->id_table)
+> +	if (!driver->probe)
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * An I2C ID table is not madatory, if and only if, a suitable Device
 
-Reported-and-tested-by: Kevin Hilman <khilman@linaro.org>
-Reported-and-tested-by: Shawn Guo <shawn.guo@linaro.org>
-Tested-by: Stephen Warren <swarren@nvidia.com>
-Signed-off-by: Vlastimil Babka <vbabka@suse.cz>
----
- mm/compaction.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+typo "madatory"..
 
-diff --git a/mm/compaction.c b/mm/compaction.c
-index a525cd4..5175019 100644
---- a/mm/compaction.c
-+++ b/mm/compaction.c
-@@ -237,13 +237,13 @@ static inline bool compact_should_abort(struct compact_control *cc)
- 	if (need_resched()) {
- 		if (cc->mode == MIGRATE_ASYNC) {
- 			cc->contended = true;
--			return false;
-+			return true;
- 		}
- 
- 		cond_resched();
- 	}
- 
--	return true;
-+	return false;
- }
- 
- /* Returns true if the page is within a block suitable for migration to */
--- 1.8.4.5 
+> +	 * Tree and/or ACPI match table entry is supplied for the probing
+> +	 * device.
+> +	 *
+> +	 * TODO: Provide 'device type' to 'ACPI node' call and match here.
+> +	 */
+> +	if (!driver->id_table &&
+> +	    !of_match_device(dev->driver->of_match_table, dev))
+>  		return -ENODEV;
+>  
+
+Looks sensible to me other than that.
+
+>  	if (!device_can_wakeup(&client->dev))
