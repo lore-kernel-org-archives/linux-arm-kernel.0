@@ -1,44 +1,42 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 2 Jun 2014 19:27:58 +0300
-Subject: [PATCH-next] mfd: ab8500: fix dt irq mapping
-Message-ID: <1401726478-14879-1-git-send-email-grygorii.strashko@ti.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Mon, 2 Jun 2014 10:40:30 -0500
+Subject: [PATCH 1/2] pci: Add IORESOURCE_BIT entry for PCIe ECAM resources.
+In-Reply-To: <20140602150945.964D4C40381@trevor.secretlab.ca>
+References: <20140530233034.GH1677@bart.dudau.co.uk>
+ <1401496601-31983-1-git-send-email-Liviu.Dudau@arm.com>
+ <1401496601-31983-2-git-send-email-Liviu.Dudau@arm.com>
+ <4756033.LkcFQN0chs@wuerfel> <20140602150945.964D4C40381@trevor.secretlab.ca>
+Message-ID: <390B3F94-C058-47D6-82CE-0393E60014FF@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AD8500 defines itself as interrupt-controller in DT,
-but it doesn't assign DT node to IRQ domain when creates it.
-As result, of_irq_xx() helpers don't work because they can't
-find necessary IRQ domain.
 
-Hence, fix it by assigning AD8500 core device DT node to IRQ
-domain when it's created.
+On Jun 2, 2014, at 10:09 AM, Grant Likely <grant.likely@linaro.org> wrote:
 
-This patch fixes STE u8500 Snowball boot failure reported by Kevin Hilman
-https://lkml.org/lkml/2014/5/27/624
+> On Sat, 31 May 2014 20:41:04 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Saturday 31 May 2014 01:36:40 Liviu Dudau wrote:
+>>> We would like to be able to describe PCIe ECAM resources as
+>>> IORESOURCE_MEM blocks while distinguish them from standard
+>>> memory resources. Add an IORESOURCE_BIT entry for this case.
+>>> 
+>>> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+>> 
+>> I still don't see any value in this at all. What is the advantage
+>> of doing this opposed to just having a standardized 'reg' property
+>> for a particular compatible string?
+> 
+> I'm inclined to agree. It doesn't seem appropriate to put config space
+> in ranges, and the host controller binding is responsible for
+> identifying how config space is memory mapped.
+> 
+> g.
 
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: Rob Herring <robh@kernel.org>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Reported-and-tested-by: Kevin Hilman <khilman@linaro.org>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- drivers/mfd/ab8500-core.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I don?t agree when it comes to ECAM, but we can drop this for now until someone really does that.
 
-diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index a8ee4a3..cf2e6a1 100644
---- a/drivers/mfd/ab8500-core.c
-+++ b/drivers/mfd/ab8500-core.c
-@@ -591,7 +591,7 @@ static int ab8500_irq_init(struct ab8500 *ab8500, struct device_node *np)
- 		num_irqs = AB8500_NR_IRQS;
- 
- 	/* If ->irq_base is zero this will give a linear mapping */
--	ab8500->domain = irq_domain_add_simple(NULL,
-+	ab8500->domain = irq_domain_add_simple(ab8500->dev->of_node,
- 			num_irqs, 0,
- 			&ab8500_irq_ops, ab8500);
- 
+However, what do we do with the 2 cases that exist in upstream that are using ranges for cfg space?
+
+- k
+
 -- 
-1.7.9.5
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
