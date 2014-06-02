@@ -1,26 +1,78 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 2 Jun 2014 13:35:22 +0100
-Subject: [PATCH 2/2] clkdev: Export clk_register_clkdev
-In-Reply-To: <1401738379-4107-3-git-send-email-chiau.ee.chew@intel.com>
-References: <1401738379-4107-1-git-send-email-chiau.ee.chew@intel.com>
- <1401738379-4107-3-git-send-email-chiau.ee.chew@intel.com>
-Message-ID: <20140602123522.GB31751@sirena.org.uk>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 02 Jun 2014 14:35:39 +0200
+Subject: [PATCH v2 3/7] ARM: EXYNOS: add AFTR mode support to firmware do_idle
+ method
+In-Reply-To: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1401712543-14281-4-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 03, 2014 at 03:46:19AM +0800, Chew Chiau Ee wrote:
-> From: Darren Hart <dvhart@linux.intel.com>
-> 
-> Allow spi-pxa2xx-pci with common clock framework support to build as a
-> module by exporting clk_register_clkdev.
+On some platforms (i.e. EXYNOS ones) more than one idle mode is
+available and we need to distinguish them in firmware do_idle method.
 
-This needs to be patch 1 in the series not patch 2 since the change to
-the driver to use the exported symbol depends on this rather than the
-other way around.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140602/22ba96e0/attachment.sig>
+Add mode parameter to do_idle firmware method and AFTR mode support
+to EXYNOS do_idle implementation.
+
+This change is a preparation for adding secure firmware support to
+EXYNOS cpuidle driver.
+
+This patch shouldn't cause any functionality changes (please note
+that do_idle firmware method is unused currently).
+
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/include/asm/firmware.h |  7 ++++++-
+ arch/arm/mach-exynos/firmware.c | 10 ++++++++--
+ 2 files changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
+index 70883c7..63989c3 100644
+--- a/arch/arm/include/asm/firmware.h
++++ b/arch/arm/include/asm/firmware.h
+@@ -28,7 +28,7 @@ struct firmware_ops {
+ 	/*
+ 	 * Enters CPU idle mode
+ 	 */
+-	int (*do_idle)(void);
++	int (*do_idle)(int mode);
+ 	/*
+ 	 * Sets boot address of specified physical CPU
+ 	 */
+@@ -47,6 +47,11 @@ struct firmware_ops {
+ 	int (*c15resume)(u32 *regs);
+ };
+ 
++enum {
++	FW_DO_IDLE_NORMAL,
++	FW_DO_IDLE_AFTR,
++};
++
+ /* Global pointer for current firmware_ops structure, can't be NULL. */
+ extern const struct firmware_ops *firmware_ops;
+ 
+diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+index 195b65c..3a34132 100644
+--- a/arch/arm/mach-exynos/firmware.c
++++ b/arch/arm/mach-exynos/firmware.c
+@@ -21,9 +21,15 @@
+ #include "common.h"
+ #include "smc.h"
+ 
+-static int exynos_do_idle(void)
++static int exynos_do_idle(int mode)
+ {
+-	exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
++	switch (mode) {
++	case FW_DO_IDLE_AFTR:
++		exynos_smc(SMC_CMD_CPU0AFTR, 0, 0, 0);
++		break;
++	case FW_DO_IDLE_NORMAL:
++		exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
++	}
+ 	return 0;
+ }
+ 
+-- 
+1.8.2.3
