@@ -1,43 +1,48 @@
-From: ml.lawnick@gmx.de (Michael Lawnick)
-Date: Mon, 02 Jun 2014 16:29:45 +0200
-Subject: [PATCH] i2c: Make I2C ID tables non-mandatory for DT'ed and/or
- ACPI'ed devices
-In-Reply-To: <CACRpkdZvyfA0aaJe3YuevXfA2pTZLRPZ3mQpitL6qD7=qE0Xyg@mail.gmail.com>
-References: <1401452797-29521-1-git-send-email-lee.jones@linaro.org>	<1401452797-29521-2-git-send-email-lee.jones@linaro.org>	<20140530123656.GC2742@katana>	<20140530133405.GB29731@lee--X1>	<20140530174800.GA4917@katana>	<20140530192516.GA4319@lee--X1>	<20140531134805.GA3287@katana>
- <CACRpkdZvyfA0aaJe3YuevXfA2pTZLRPZ3mQpitL6qD7=qE0Xyg@mail.gmail.com>
-Message-ID: <538C8A59.2070907@gmx.de>
+From: vbabka@suse.cz (Vlastimil Babka)
+Date: Mon, 02 Jun 2014 16:33:41 +0200
+Subject: [PATCH -mm] mm, compaction: properly signal and act upon lock and
+ need_sched() contention - fix
+In-Reply-To: <CAOMZO5BKaicq7NkoJO4vU5W3hiDike6kSdH+2eD=h0B5BsDjTg@mail.gmail.com>
+References: <1399904111-23520-1-git-send-email-vbabka@suse.cz>	<1400233673-11477-1-git-send-email-vbabka@suse.cz>	<CAGa+x87-NRyK6kUiXNL_bRNEGm+DR6M3HPSLYEoq4t6Nrtnd_g@mail.gmail.com>	<CAAQ0ZWQDVxAzZVm86ATXd1JGUVoLXj_Y5Ske7htxH_6a4GPKRg@mail.gmail.com>	<537F082F.50501@suse.cz>
+ <CAOMZO5BKaicq7NkoJO4vU5W3hiDike6kSdH+2eD=h0B5BsDjTg@mail.gmail.com>
+Message-ID: <538C8B45.6070803@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 02.06.2014 14:16, schrieb Linus Walleij:
-> On Sat, May 31, 2014 at 3:48 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
->>
->>> Right, I read the function which provides the functionality, but my
->>> point is; I don't think my patch changes the semantics in a way which
->>> would adversely affect this option.  If you think that it does, can you
->>> specify how please?
->>
->> Currently, if a driver would be DT only and does not provide a seperate
->> i2c_device_id table, then the driver is unusable with method 4. I don't
->> like to have some drivers being capable of it and some not.
->>
->>> Does the sysfs method create a i2c_device_id table?  If not, how does
->>> it probe successfully pre-patch?
->>
->> The sysfs method creates a device. Its name is matched against
->> i2c_device_ids only since it does not have a node pointer for DT to be
->> matched against.
->
-> Is this really so useful on embedded systems?
->
-> I was under the impression that this method was something used
-> on say PC desktops with temperature monitors and EEPROMs
-> on some I2C link on the PCB, usage entirely optional and fun
-> for userspace hacks.
->
-We use it for dynamic instantiating whole subsystems with multiplexers, 
-sensors, controllers in an embedded system. The device list is taken 
-from an I2C eeprom which gets read on hotplug.
+compact_should_abort() returns true instead of false and vice versa
+due to changes between v1 and v2 of the patch. This makes both async
+and sync compaction abort with high probability, and has been reported
+to cause e.g. soft lockups on some ARM boards, or drivers calling
+dma_alloc_coherent() fail to probe with CMA enabled on different boards.
 
-KR
-Michael
+This patch fixes the return value to match comments and callers expecations.
+
+Reported-and-tested-by: Kevin Hilman <khilman@linaro.org>
+Reported-and-tested-by: Shawn Guo <shawn.guo@linaro.org>
+Tested-by: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Vlastimil Babka <vbabka@suse.cz>
+---
+ mm/compaction.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/mm/compaction.c b/mm/compaction.c
+index a525cd4..5175019 100644
+--- a/mm/compaction.c
++++ b/mm/compaction.c
+@@ -237,13 +237,13 @@ static inline bool compact_should_abort(struct compact_control *cc)
+ 	if (need_resched()) {
+ 		if (cc->mode == MIGRATE_ASYNC) {
+ 			cc->contended = true;
+-			return false;
++			return true;
+ 		}
+ 
+ 		cond_resched();
+ 	}
+ 
+-	return true;
++	return false;
+ }
+ 
+ /* Returns true if the page is within a block suitable for migration to */
+-- 1.8.4.5 
