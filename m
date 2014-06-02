@@ -1,52 +1,39 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 02 Jun 2014 14:56:36 +0200
-Subject: [PATCH v2 2/7] ARM: EXYNOS: add support for firmware-assisted
- c15resume
-In-Reply-To: <1401712543-14281-3-git-send-email-b.zolnierkie@samsung.com>
-References: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
- <1401712543-14281-3-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <538C7484.9070801@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 02 Jun 2014 13:57:49 +0100
+Subject: [PATCH v4 00/20] arm64: GICv3 support
+In-Reply-To: <CAC8NTUWuuUrHKp4a1WkqSfiPNZjbwffBn-u7DGsrB8eF65e_ig@mail.gmail.com>
+ (Radha Mohan's message of "Sat, 31 May 2014 00:06:57 +0100")
+References: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
+ <CAC8NTUWuuUrHKp4a1WkqSfiPNZjbwffBn-u7DGsrB8eF65e_ig@mail.gmail.com>
+Message-ID: <87k38z1naq.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, May 31 2014 at 12:06:57 am BST, Radha Mohan <mohun106@gmail.com> wrote:
+> Hi Marc,
+> The patch set is working for us on our platform. Below are some of the
+> things we tested with the GICv3 driver.
+>
+> System: Cavium's proprietary simulator
+> Cores: 16
+> GIC version: GICv3
+>
+> 1) SGI, PPI and SPI
+> 2) MSI and MSI-x with SPI and also LPI (took previous version of an
+> unposted LPI/ITS driver which now is missing from Marc's git tree)
+>
+> The kind of devices that were tested are UARTs, AHCI controller,
+> SR-IOV capable devices.
+>
+> So,
+> Acked-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> Tested-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
 
-On 02.06.2014 14:35, Bartlomiej Zolnierkiewicz wrote:
-> From: Tomasz Figa <t.figa@samsung.com>
-> 
-> This change is a preparation for adding secure firmware support to
-> EXYNOS cpuidle driver.
-> 
-> This patch shouldn't cause any functionality changes.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> [bzolnier: splitted out from bigger patch]
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  arch/arm/include/asm/firmware.h | 4 ++++
->  arch/arm/mach-exynos/firmware.c | 8 ++++++++
->  2 files changed, 12 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
-> index c72ec47..70883c7 100644
-> --- a/arch/arm/include/asm/firmware.h
-> +++ b/arch/arm/include/asm/firmware.h
-> @@ -41,6 +41,10 @@ struct firmware_ops {
->  	 * Initializes L2 cache
->  	 */
->  	int (*l2x0_init)(void);
-> +	/*
-> +	 * Restores coprocessor 15 registers
-> +	 */
-> +	int (*c15resume)(u32 *regs);
+Thanks. I suppose this only applies to the first few patches, as you
+don't mention KVM here?
 
-Well, this was just a kind of internal hack, so I'm not sure this is
-suitable as a generic firmware operation in mainline.
+Cheers,
 
-I'd rather implement this as a part of a wider suspend and resume
-firmware operations, where suspend would save values of cp15 registers
-and resume would restore them.
-
-Best regards,
-Tomasz
+	M.
+-- 
+Jazz is not dead. It just smells funny.
