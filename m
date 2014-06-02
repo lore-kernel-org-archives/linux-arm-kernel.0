@@ -1,47 +1,88 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon,  2 Jun 2014 15:40:21 +0200
-Subject: [PATCH 1/4] ARM: shmobile: r8a7791: Add SYS-DMAC clocks
-In-Reply-To: <1401716424-29740-1-git-send-email-geert+renesas@glider.be>
-References: <1401716424-29740-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1401716424-29740-2-git-send-email-geert+renesas@glider.be>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 02 Jun 2014 15:40:21 +0200
+Subject: [PATCH v2 7/7] ARM: EXYNOS: cpuidle: add secure firmware support
+ to AFTR mode code
+In-Reply-To: <538C78DB.1060809@gmail.com>
+References: <1401712543-14281-1-git-send-email-b.zolnierkie@samsung.com>
+ <1401712543-14281-8-git-send-email-b.zolnierkie@samsung.com>
+ <538C78DB.1060809@gmail.com>
+Message-ID: <2929163.ygQuOcYWlC@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/mach-shmobile/clock-r8a7791.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+On Monday, June 02, 2014 03:15:07 PM Tomasz Figa wrote:
+> Hi,
+> 
+> On 02.06.2014 14:35, Bartlomiej Zolnierkiewicz wrote:
+> > * Use do_idle firmware method instead of cpu_do_idle() on boards with
+> >   secure firmware enabled.
+> > 
+> > * Use sysram_ns_base_addr + 0x24 address for exynos_boot_vector_addr()
+> >   and sysram_ns_base_addr + 0x20 one for exynos_boot_vector_flag() on
+> >   boards with secure firmware enabled.
+> > 
+> > This patch fixes hang on an attempt to enter AFTR mode for TRATS2
+> > board (which uses EXYNOS4412 SoC with secure firmware enabled).
+> > 
+> > This patch shouldn't cause any functionality changes on boards that
+> > don't use secure firmware.
+> > 
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  arch/arm/mach-exynos/pm.c        | 8 ++++++--
+> >  drivers/cpuidle/cpuidle-exynos.c | 7 ++++++-
+> >  2 files changed, 12 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> > index 0fb9a5a..62a0a5e 100644
+> > --- a/arch/arm/mach-exynos/pm.c
+> > +++ b/arch/arm/mach-exynos/pm.c
+> > @@ -169,7 +169,9 @@ int exynos_cluster_power_state(int cluster)
+> >  
+> >  static inline void __iomem *exynos_boot_vector_addr(void)
+> >  {
+> > -	if (samsung_rev() == EXYNOS4210_REV_1_1)
+> > +	if (firmware_run())
+> > +		return sysram_ns_base_addr + 0x24;
+> > +	else if (samsung_rev() == EXYNOS4210_REV_1_1)
+> 
+> Aha, so this is the use case for the function added by patch 1/7.
+> 
+> Well, I don't see the need to do it this way and complicate the API. As
+> I mentioned in my comments to patches 2/7 and 5/7, more general firmware
+> operations should be taking care of setting those registers to
+> appropriate values and so there shouldn't be any need to use them
+> directly outside the implementation of firmware ops.
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
-index e2fdfcc14436..b0b2294513e2 100644
---- a/arch/arm/mach-shmobile/clock-r8a7791.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7791.c
-@@ -178,7 +178,7 @@ enum {
- 	MSTP719, MSTP718, MSTP715, MSTP714,
- 	MSTP522,
- 	MSTP314, MSTP312, MSTP311,
--	MSTP216, MSTP207, MSTP206,
-+	MSTP219, MSTP218, MSTP216, MSTP207, MSTP206,
- 	MSTP204, MSTP203, MSTP202,
- 	MSTP124,
- 	MSTP_NR
-@@ -215,6 +215,8 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP312] = SH_CLK_MSTP32_STS(&div6_clks[DIV6_SD1], SMSTPCR3, 12, MSTPSR3, 0), /* SDHI1 */
- 	[MSTP311] = SH_CLK_MSTP32_STS(&div6_clks[DIV6_SD2], SMSTPCR3, 11, MSTPSR3, 0), /* SDHI2 */
- 	[MSTP216] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 16, MSTPSR2, 0), /* SCIFB2 */
-+	[MSTP219] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 19, MSTPSR2, 0), /* SYS-DMAC0 */
-+	[MSTP218] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 18, MSTPSR2, 0), /* SYS-DMAC1 */
- 	[MSTP207] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 7, MSTPSR2, 0), /* SCIFB1 */
- 	[MSTP206] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 6, MSTPSR2, 0), /* SCIFB0 */
- 	[MSTP204] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 4, MSTPSR2, 0), /* SCIFA0 */
-@@ -267,6 +269,8 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_ICK_ID("fck", "sh-cmt-48-gen2.0", &mstp_clks[MSTP124]),
- 	CLKDEV_DEV_ID("qspi.0", &mstp_clks[MSTP917]),
- 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
-+	CLKDEV_DEV_ID("sh-dma-engine.0", &mstp_clks[MSTP219]),
-+	CLKDEV_DEV_ID("sh-dma-engine.1", &mstp_clks[MSTP218]),
- 	CLKDEV_DEV_ID("i2c-rcar_gen2.0", &mstp_clks[MSTP931]),
- 	CLKDEV_DEV_ID("i2c-rcar_gen2.1", &mstp_clks[MSTP930]),
- 	CLKDEV_DEV_ID("i2c-rcar_gen2.2", &mstp_clks[MSTP929]),
--- 
-1.9.1
+More general firmware operations would handle the secure firmware case
+fine but how would you like to handle a fallback case given that you
+cannot use samsung_rev() etc. in drivers/cpuidle/cpuidle-exynos.c?
+
+> [snip]
+> 
+> >  static int idle_finisher(unsigned long flags)
+> >  {
+> >  	exynos_enter_aftr();
+> > -	cpu_do_idle();
+> > +	if (firmware_run())
+> > +		/* no need to check the return value on EXYNOS SoCs */
+> > +		call_firmware_op(do_idle, FW_DO_IDLE_AFTR);
+> > +	else
+> > +		cpu_do_idle();
+> 
+> This could be done just by
+> 
+> 	if (call_firmware_op(do_idle, FW_DO_IDLE_AFTR) == -ENOSYS)
+> 		cpu_do_idle();
+> 
+> which is 3 lines less than with a function that is suppose to simplify
+> the code.
+
+OK.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
