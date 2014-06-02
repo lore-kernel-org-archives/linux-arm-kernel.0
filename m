@@ -1,31 +1,44 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 2 Jun 2014 12:18:34 -0300
-Subject: [PATCH -mm] mm, compaction: properly signal and act upon lock and
- need_sched() contention - fix
-In-Reply-To: <538C8B45.6070803@suse.cz>
-References: <1399904111-23520-1-git-send-email-vbabka@suse.cz>
- <1400233673-11477-1-git-send-email-vbabka@suse.cz>
- <CAGa+x87-NRyK6kUiXNL_bRNEGm+DR6M3HPSLYEoq4t6Nrtnd_g@mail.gmail.com>
- <CAAQ0ZWQDVxAzZVm86ATXd1JGUVoLXj_Y5Ske7htxH_6a4GPKRg@mail.gmail.com>
- <537F082F.50501@suse.cz>
- <CAOMZO5BKaicq7NkoJO4vU5W3hiDike6kSdH+2eD=h0B5BsDjTg@mail.gmail.com>
- <538C8B45.6070803@suse.cz>
-Message-ID: <CAOMZO5CCMwT9fPie1-JF+zqBfk4AYjuD43dwEEkRYqOjUPLN2w@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 2 Jun 2014 19:27:58 +0300
+Subject: [PATCH-next] mfd: ab8500: fix dt irq mapping
+Message-ID: <1401726478-14879-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 2, 2014 at 11:33 AM, Vlastimil Babka <vbabka@suse.cz> wrote:
-> compact_should_abort() returns true instead of false and vice versa
-> due to changes between v1 and v2 of the patch. This makes both async
-> and sync compaction abort with high probability, and has been reported
-> to cause e.g. soft lockups on some ARM boards, or drivers calling
-> dma_alloc_coherent() fail to probe with CMA enabled on different boards.
->
-> This patch fixes the return value to match comments and callers expecations.
->
-> Reported-and-tested-by: Kevin Hilman <khilman@linaro.org>
-> Reported-and-tested-by: Shawn Guo <shawn.guo@linaro.org>
-> Tested-by: Stephen Warren <swarren@nvidia.com>
-> Signed-off-by: Vlastimil Babka <vbabka@suse.cz>
+The AD8500 defines itself as interrupt-controller in DT,
+but it doesn't assign DT node to IRQ domain when creates it.
+As result, of_irq_xx() helpers don't work because they can't
+find necessary IRQ domain.
 
-Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+Hence, fix it by assigning AD8500 core device DT node to IRQ
+domain when it's created.
+
+This patch fixes STE u8500 Snowball boot failure reported by Kevin Hilman
+https://lkml.org/lkml/2014/5/27/624
+
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Lee Jones <lee.jones@linaro.org>
+Cc: Rob Herring <robh@kernel.org>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Reported-and-tested-by: Kevin Hilman <khilman@linaro.org>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ drivers/mfd/ab8500-core.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+index a8ee4a3..cf2e6a1 100644
+--- a/drivers/mfd/ab8500-core.c
++++ b/drivers/mfd/ab8500-core.c
+@@ -591,7 +591,7 @@ static int ab8500_irq_init(struct ab8500 *ab8500, struct device_node *np)
+ 		num_irqs = AB8500_NR_IRQS;
+ 
+ 	/* If ->irq_base is zero this will give a linear mapping */
+-	ab8500->domain = irq_domain_add_simple(NULL,
++	ab8500->domain = irq_domain_add_simple(ab8500->dev->of_node,
+ 			num_irqs, 0,
+ 			&ab8500_irq_ops, ab8500);
+ 
+-- 
+1.7.9.5
