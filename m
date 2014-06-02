@@ -1,70 +1,77 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 2 Jun 2014 10:49:57 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the arm tree
-Message-ID: <20140602104957.21878870@canb.auug.org.au>
+From: chanho.min@lge.com (Chanho Min)
+Date: Mon,  2 Jun 2014 10:45:28 +0900
+Subject: [PATCH] arm: dma-mapping: fix potential build error under !CMA
+Message-ID: <1401673528-19077-1-git-send-email-chanho.min@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This patch fixes build error under !CONFIG_CMA. dev_get_cma_area can be used
+when CMA is disabled when the bellow patch is appied.
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-exynos/exynos.c between commits dfbdd3d55403 ("ARM: l2c:
-exynos: remove cache size override"), 25a9ef63cd2b ("ARM: l2c: exynos:
-convert to common l2c310 early resume functionality") and 15b0bc4041ba
-("ARM: l2c: exynos: convert to generic l2c OF initialisation (and
-thereby fix it)") from the arm tree and commit b5b9324a6296 ("ARM:
-exynos: don't run exynos4 l2x0 setup on other platforms") from the
-arm-soc tree.
+"arm: dma-mapping: add checking cma area initialized"
+https://lkml.org/lkml/2014/5/22/35
 
-I fixed it up (the former removes the code updated by the latter) and
-can carry the fix as necessary (no action is required).
+arch/arm/mm/dma-mapping.c: In function 'atomic_pool_init':
+arch/arm/mm/dma-mapping.c:361:2: error: implicit declaration of function
+ 'dev_get_cma_area' [-Werror=implicit-function-declaration]
 
+Signed-off-by: Chanho Min <chanho.min@lge.com>
+---
+ arch/arm/include/asm/dma-contiguous.h |    2 +-
+ include/asm-generic/dma-contiguous.h  |   13 +++++++++++--
+ 2 files changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/include/asm/dma-contiguous.h b/arch/arm/include/asm/dma-contiguous.h
+index 3ed37b4..56c17bc 100644
+--- a/arch/arm/include/asm/dma-contiguous.h
++++ b/arch/arm/include/asm/dma-contiguous.h
+@@ -2,11 +2,11 @@
+ #define ASMARM_DMA_CONTIGUOUS_H
+ 
+ #ifdef __KERNEL__
+-#ifdef CONFIG_CMA
+ 
+ #include <linux/types.h>
+ #include <asm-generic/dma-contiguous.h>
+ 
++#ifdef CONFIG_CMA
+ void dma_contiguous_early_fixup(phys_addr_t base, unsigned long size);
+ 
+ #endif
+diff --git a/include/asm-generic/dma-contiguous.h b/include/asm-generic/dma-contiguous.h
+index 294b1e7..3d48460 100644
+--- a/include/asm-generic/dma-contiguous.h
++++ b/include/asm-generic/dma-contiguous.h
+@@ -2,11 +2,11 @@
+ #define ASM_DMA_CONTIGUOUS_H
+ 
+ #ifdef __KERNEL__
+-#ifdef CONFIG_CMA
+ 
+ #include <linux/device.h>
+ #include <linux/dma-contiguous.h>
+ 
++#ifdef CONFIG_CMA
+ static inline struct cma *dev_get_cma_area(struct device *dev)
+ {
+ 	if (dev && dev->cma_area)
+@@ -22,7 +22,16 @@ static inline void dev_set_cma_area(struct device *dev, struct cma *cma)
+ 		dma_contiguous_default_area = cma;
+ }
+ 
+-#endif
++#else
++static inline struct cma *dev_get_cma_area(struct device *dev)
++{
++	return NULL;
++}
++
++static inline void dev_set_cma_area(struct device *dev, struct cma *cma)
++{
++}
+ #endif
+ 
+ #endif
++#endif
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/mach-exynos/exynos.c
-index a763c0862da9,bc43e22693b7..000000000000
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@@ -305,17 -246,25 +243,6 @@@ void __init exynos_init_io(void
-  	exynos_map_io();
-  }
-  
-- struct bus_type exynos_subsys = {
-- 	.name		= "exynos-core",
-- 	.dev_name	= "exynos-core",
-- };
-- 
-- static int __init exynos_core_init(void)
- -static int __init exynos4_l2x0_cache_init(void)
---{
-- 	return subsys_system_register(&exynos_subsys, NULL);
- -	int ret;
- -
- -	if (!soc_is_exynos4())
- -		return 0;
- -
- -	ret = l2x0_of_init(L2_AUX_VAL, L2_AUX_MASK);
- -	if (ret)
- -		return ret;
- -
- -	if (IS_ENABLED(CONFIG_S5P_SLEEP)) {
- -		l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
- -		clean_dcache_area(&l2x0_regs_phys, sizeof(unsigned long));
- -	}
- -	return 0;
---}
-- core_initcall(exynos_core_init);
- -early_initcall(exynos4_l2x0_cache_init);
---
-  static void __init exynos_dt_machine_init(void)
-  {
-  	struct device_node *i2c_np;
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140602/83e7bc5f/attachment.sig>
+1.7.9.5
