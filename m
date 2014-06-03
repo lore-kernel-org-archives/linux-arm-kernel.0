@@ -1,55 +1,67 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Tue, 3 Jun 2014 13:12:52 +0530
-Subject: [PATCH 00/14] irqchip: crossbar: driver fixes
-Message-ID: <1401781386-4982-1-git-send-email-r.sricharan@ti.com>
+Date: Tue, 3 Jun 2014 13:12:55 +0530
+Subject: [PATCH 03/14] irqchip: crossbar: fix checkpatch warning
+In-Reply-To: <1401781386-4982-1-git-send-email-r.sricharan@ti.com>
+References: <1401781386-4982-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <1401781386-4982-4-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series does some cleanup and provides support for
-hardwired IRQ and crossbar definitions.
+From: Nishanth Menon <nm@ti.com>
 
-On certain platforms such as DRA7, SPIs 0, 1, 2, 3, 5, 6, 10,
-131, 132, 133 are direct wired to hardware blocks bypassing
-crossbar. This quirky implementation is *NOT* supposed to be the
-expectation of crossbar hardware usage. This series adds support
-to represent such hard-wired irqs through DT and avoid generic
-allocation/programming of crossbar in the driver.
+remove un-necessary space in function pointer.
 
-This way of supporting hard-wired irqs was a result of
-the below discussions.
-http://www.spinics.net/lists/arm-kernel/msg329946.html
+Fixes checkpatch warning:
+WARNING: Unnecessary space before function pointer arguments
+ #37: FILE: drivers/irqchip/irq-crossbar.c:37:
+ +	void (*write) (int, int);
 
-Based on linux-next next-20140602 tag + Tony's omap-for-v3.16/crossbar branch.
+WARNING: Missing a blank line after declarations
++	int *register_offsets;
++	void (*write)(int, int);
 
-The patches are available here
- git at github.com:Sricharanti/sricharan.git crossbar_updates
+WARNING: Prefer kcalloc over kzalloc with multiply
++	cb->irq_map = kzalloc(max * sizeof(int), GFP_KERNEL);
 
-Nishanth Menon (11):
-  irqchip: crossbar: remove IS_ERR_VALUE check
-  irqchip: crossbar: fix sparse warnings
-  irqchip: crossbar: fix checkpatch warning
-  irqchip: crossbar: fix kerneldoc warning
-  irqchip: crossbar: fix memory leak incase of invalid entry
-  irqchip: crossbar: return proper error value
-  irqchip: crossbar: change the goto naming
-  irqchip: crossbar: introduce ti,max-crossbar-sources to identify
-    valid crossbar mapping
-  irqchip: crossbar: introduce centralized check for crossbar write
-  Documentation: dt: OMAP: crossbar: add description for interrupt
-    consumer
-  irqchip: crossbar allow for quirky hardware with direct hardwiring of
-    GIC
+WARNING: Prefer kcalloc over kzalloc with multiply
++	cb->register_offsets = kzalloc(max * sizeof(int), GFP_KERNEL);
 
-Rajendra Nayak (1):
-  irqchip: crossbar: DRA7: Fix unused crossbar list
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ drivers/irqchip/irq-crossbar.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-Sricharan R (2):
-  irqchip: crossbar: set cb pointer to null in case of error
-  irqchip: crossbar: Add kerneldoc for crossbar_domain_unmap callback
-
- .../devicetree/bindings/arm/omap/crossbar.txt      |   27 +++++
- drivers/irqchip/irq-crossbar.c                     |  127 +++++++++++++++-----
- 2 files changed, 125 insertions(+), 29 deletions(-)
-
+diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
+index 5da9d36..58790d4 100644
+--- a/drivers/irqchip/irq-crossbar.c
++++ b/drivers/irqchip/irq-crossbar.c
+@@ -34,7 +34,8 @@ struct crossbar_device {
+ 	uint *irq_map;
+ 	void __iomem *crossbar_base;
+ 	int *register_offsets;
+-	void (*write) (int, int);
++
++	void (*write)(int, int);
+ };
+ 
+ /**
+@@ -150,7 +151,7 @@ static int __init crossbar_of_init(struct device_node *node,
+ 		goto err1;
+ 
+ 	of_property_read_u32(node, "ti,max-irqs", &max);
+-	cb->irq_map = kzalloc(max * sizeof(int), GFP_KERNEL);
++	cb->irq_map = kcalloc(max, sizeof(int), GFP_KERNEL);
+ 	if (!cb->irq_map)
+ 		goto err2;
+ 
+@@ -176,7 +177,7 @@ static int __init crossbar_of_init(struct device_node *node,
+ 		}
+ 	}
+ 
+-	cb->register_offsets = kzalloc(max * sizeof(int), GFP_KERNEL);
++	cb->register_offsets = kcalloc(max, sizeof(int), GFP_KERNEL);
+ 	if (!cb->register_offsets)
+ 		goto err3;
+ 
 -- 
 1.7.9.5
