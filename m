@@ -1,62 +1,41 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 3 Jun 2014 13:15:32 +0200
-Subject: [PATCH v2 10/11] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <CAKfTPtBXddNFXDuL5YNNtcW7e1Un=LqHU8bgaejJwPObSGoBhg@mail.gmail.com>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-11-git-send-email-vincent.guittot@linaro.org>
- <20140529095024.GF11074@laptop.programming.kicks-ass.net>
- <CAKfTPtCHhxyugMOCeS0hZoEXWhgRec4uOBexZ2aB2A+Eycgi8w@mail.gmail.com>
- <20140530062937.GA11096@twins.programming.kicks-ass.net>
- <CAKfTPtBXddNFXDuL5YNNtcW7e1Un=LqHU8bgaejJwPObSGoBhg@mail.gmail.com>
-Message-ID: <20140603111532.GW11096@twins.programming.kicks-ass.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 3 Jun 2014 13:18:15 +0200
+Subject: [PATCH] i2c: Make I2C ID tables non-mandatory for DT'ed and/or
+ ACPI'ed devices
+In-Reply-To: <538C8A59.2070907@gmx.de>
+References: <1401452797-29521-1-git-send-email-lee.jones@linaro.org>
+ <1401452797-29521-2-git-send-email-lee.jones@linaro.org>
+ <20140530123656.GC2742@katana> <20140530133405.GB29731@lee--X1>
+ <20140530174800.GA4917@katana> <20140530192516.GA4319@lee--X1>
+ <20140531134805.GA3287@katana>
+ <CACRpkdZvyfA0aaJe3YuevXfA2pTZLRPZ3mQpitL6qD7=qE0Xyg@mail.gmail.com>
+ <538C8A59.2070907@gmx.de>
+Message-ID: <CACRpkdbo9_xo6j7JBcjiuk6eYkqyaeMYLFsH3VczxotOmVRh1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 02, 2014 at 07:06:44PM +0200, Vincent Guittot wrote:
-> > Could you detail those conditions? FWIW those make excellent Changelog
-> > material.
-> 
-> I have looked back into my tests and traces:
-> 
-> In a 1st test, the capacity of the CPU was still above half default
-> value (power=538) unlike what i remembered. So it's some what "normal"
-> to keep the task on CPU0 which also handles IRQ because sg_capacity
-> still returns 1.
+On Mon, Jun 2, 2014 at 4:29 PM, Michael Lawnick <ml.lawnick@gmx.de> wrote:
+> Am 02.06.2014 14:16, schrieb Linus Walleij:
 
-OK, so I suspect that once we move to utilization based capacity stuff
-we'll do the migration IF the task indeed requires more cpu than can be
-provided by the reduced, one, right?
+>> Is this really so useful on embedded systems?
+>>
+>> I was under the impression that this method was something used
+>> on say PC desktops with temperature monitors and EEPROMs
+>> on some I2C link on the PCB, usage entirely optional and fun
+>> for userspace hacks.
+>>
+> We use it for dynamic instantiating whole subsystems with multiplexers,
+> sensors, controllers in an embedded system. The device list is taken from an
+> I2C eeprom which gets read on hotplug.
 
-> In a 2nd test,the main task runs (most of the time) on CPU0 whereas
-> the max power of the latter is only 623 and the cpu_power goes below
-> 512 (power=330) during the use case. So the sg_capacity of CPU0 is
-> null but the main task still stays on CPU0.
-> The use case (scp transfer) is made of a long running task (ssh) and a
-> periodic short task (scp). ssh runs on CPU0 and scp runs each 6ms on
-> CPU1. The newly idle load balance on CPU1 doesn't pull the long
-> running task although sg_capacity is null because of
-> sd->nr_balance_failed is never incremented and load_balance doesn't
-> trig an active load_balance. When an idle balance occurs in the middle
-> of the newly idle balance, the ssh long task migrates on CPU1 but as
-> soon as it sleeps and wakes up, it goes back on CPU0 because of the
-> wake affine which migrates it back on CPU0 (issue solved by patch 09).
+Does this mean that you have stored the names (strings) that are used
+by the Linux kernel for identifying the devices into your EEPROM?
 
-OK, so there's two problems here, right?
- 1) we don't migrate away from cpu0
- 2) if we do, we get pulled back.
+That means that you have made the kernel-internal device driver names
+an ABI which is unfortunate :-/
 
-And patch 9 solves 2, so maybe enhance its changelog to mention this
-slightly more explicit.
+This is one of the reasons to why we insist on device tree: OS neutral
+hardware description.
 
-Which leaves us with 1.. interesting problem. I'm just not sure
-endlessly kicking a low capacity cpu is the right fix for that.
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140603/e8b14b3d/attachment.sig>
+Yours,
+Linus Walleij
