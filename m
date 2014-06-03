@@ -1,41 +1,21 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 3 Jun 2014 09:53:17 +0200
-Subject: [PATCH v2 4/7] ARM: shmobile: r8a7791: Add SYS-DMAC channel
- definitions for bindings
-In-Reply-To: <538C818B.5060703@codethink.co.uk>
-References: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
- <1401716531-29794-5-git-send-email-geert+renesas@glider.be>
- <538C818B.5060703@codethink.co.uk>
-Message-ID: <CAMuHMdWkPy8eydh4BntXdtf5ZJKP4yG26QovLUjvGUYYv3dStw@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 3 Jun 2014 09:50:11 +0200
+Subject: [PATCH 1/5] ARM: berlin: add SMP support
+In-Reply-To: <20140603141913.710a1f7e@xhacker>
+References: <1401700866-24804-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1401700866-24804-2-git-send-email-antoine.tenart@free-electrons.com>
+ <20140602094715.GG28090@lunn.ch> <20140602100048.GA12162@kwain>
+ <20140602100332.GH28090@lunn.ch> <20140602102750.GB13681@kwain>
+ <20140603141913.710a1f7e@xhacker>
+Message-ID: <20140603075011.GA22742@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+> We don't support independently power off cpu on BG2 and BG2Q in linux kernel.
+> So we can assume that bootloader has powered on the CPUs
 
-On Mon, Jun 2, 2014 at 3:52 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
->> +// FIXME
->> +#define CHCR_RX_8BIT SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_8BIT)
->> +#define CHCR_TX_8BIT SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_8BIT)
->> +#define CHCR_RX_16BIT        SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_16BIT)
->> +#define CHCR_TX_16BIT        SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_16BIT)
->> +#define CHCR_RX_32BIT        SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_32BIT)
->> +#define CHCR_TX_32BIT        SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_32BIT)
->> +#define CHCR_RX_256BIT       SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_256BIT)
->> +#define CHCR_TX_256BIT       SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_256BIT)
->
-> I am pretty sure for round-2 we can remove these in favour of a
-> table in the driver. The only device that has a non-standard setting
-> is the SDHI and that will support 32bit and 256bit transfers.
+Can i assume from your answer that the hardware does actually support
+independent power off/on of CPUs? It could be added sometime in the
+future.
 
-Thanks, I'm eagerly awaiting your next version...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	Andrew
