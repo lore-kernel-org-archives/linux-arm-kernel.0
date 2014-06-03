@@ -1,39 +1,100 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 3 Jun 2014 17:50:07 +0200
-Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
-In-Reply-To: <20140528154703.GJ19967@e103034-lin>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
- <20140528121001.GI19967@e103034-lin>
- <CAKfTPtDxeBfZK1AxCRqEG91pi--Ti1RYFoQPDhvMVnGTCspQ-g@mail.gmail.com>
- <20140528154703.GJ19967@e103034-lin>
-Message-ID: <20140603155007.GZ30445@twins.programming.kicks-ass.net>
+From: yi.li@linaro.org (Yi Li)
+Date: Tue,  3 Jun 2014 23:57:13 +0800
+Subject: [PATCH] ARM64:DMI: Add smbios/dmi support on arm64
+Message-ID: <1401811033-16478-1-git-send-email-yi.li@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 04:47:03PM +0100, Morten Rasmussen wrote:
-> Since we may do periodic load-balance every 10 ms or so, we will perform
-> a number of load-balances where runnable_avg_sum will mostly be
-> reflecting the state of the world before a change (new task queued or
-> moved a task to a different cpu). If you had have two tasks continuously
-> on one cpu and your other cpu is idle, and you move one of the tasks to
-> the other cpu, runnable_avg_sum will remain unchanged, 47742, on the
-> first cpu while it starts from 0 on the other one. 10 ms later it will
-> have increased a bit, 32 ms later it will be 47742/2, and 345 ms later
-> it reaches 47742. In the mean time the cpu doesn't appear fully utilized
-> and we might decide to put more tasks on it because we don't know if
-> runnable_avg_sum represents a partially utilized cpu (for example a 50%
-> task) or if it will continue to rise and eventually get to 47742.
+Add smbios/dmi support on arm64 system, it depends on
+EFI boot.
 
-Ah, no, since we track per task, and update the per-cpu ones when we
-migrate tasks, the per-cpu values should be instantly updated.
+Signed-off-by: Yi Li <yi.li@linaro.org>
+---
 
-If we were to increase per task storage, we might as well also track
-running_avg not only runnable_avg.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140603/5592e64c/attachment.sig>
+Changes since v1:
+  -Followed Ard Biesheuvel's suggestion to rebase the patch on
+   Matt Fleming's arm64-efi branch.
+
+ arch/arm64/Kconfig           |   10 ++++++++++
+ arch/arm64/include/asm/dmi.h |   28 ++++++++++++++++++++++++++++
+ arch/arm64/kernel/setup.c    |    2 ++
+ 3 files changed, 40 insertions(+)
+ create mode 100644 arch/arm64/include/asm/dmi.h
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 6c71f12..13ee261 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -294,6 +294,16 @@ config EFI
+ 	  allow the kernel to be booted as an EFI application. This
+ 	  is only useful on systems that have UEFI firmware.
+ 
++config DMI
++	bool "Enable support for SMBIOS (DMI) tables"
++	depends on EFI
++	default y
++	help
++	  This enables SMBIOS/DMI feature for systems.
++
++	  This option is only useful on systems that have UEFI firmware.
++	  However, even with this option, the resultant kernel should
++	  continue to boot on existing non-UEFI platforms.
+ endmenu
+ 
+ menu "Userspace binary formats"
+diff --git a/arch/arm64/include/asm/dmi.h b/arch/arm64/include/asm/dmi.h
+new file mode 100644
+index 0000000..f2198bf
+--- /dev/null
++++ b/arch/arm64/include/asm/dmi.h
+@@ -0,0 +1,28 @@
++/*
++ * arch/arm64/include/asm/dmi.h
++ *
++ * Copyright (C) 2013 Linaro Limited.
++ * Written by: Yi Li (yi.li at linaro.org)
++ *
++ * based on arch/ia64/include/asm/dmi.h
++ *
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file "COPYING" in the main directory of this archive
++ * for more details.
++ */
++
++
++#ifndef _ASM_DMI_H
++#define _ASM_DMI_H 1
++
++#include <linux/slab.h>
++#include <asm/io.h>
++
++/* Use efi mappings for DMI */
++#define dmi_early_remap(x, l)	efi_lookup_mapped_addr(x)
++#define dmi_early_unmap(x, l)
++#define dmi_remap(x, l)			efi_lookup_mapped_addr(x)
++#define dmi_unmap(x)
++#define dmi_alloc(l)			kzalloc(l, GFP_ATOMIC)
++
++#endif
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 0a14aaf..7622561 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -42,6 +42,7 @@
+ #include <linux/of_fdt.h>
+ #include <linux/of_platform.h>
+ #include <linux/efi.h>
++#include <linux/dmi.h>
+ 
+ #include <asm/fixmap.h>
+ #include <asm/cputype.h>
+@@ -400,6 +401,7 @@ static int __init arm64_device_init(void)
+ {
+ 	of_clk_init(NULL);
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	dmi_scan_machine();
+ 	return 0;
+ }
+ arch_initcall(arm64_device_init);
+-- 
+1.7.9.5
