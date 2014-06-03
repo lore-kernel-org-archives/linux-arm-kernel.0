@@ -1,73 +1,144 @@
-From: khiem.nguyen.xt@renesas.com (Khiem Nguyen)
-Date: Tue, 03 Jun 2014 13:36:33 +0900
-Subject: [PATCH v2 0/7] ARM: shmobile: koelsch reference: Enable DMA for
- QSPI
-In-Reply-To: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
-References: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <538D50D1.7010900@renesas.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon,  2 Jun 2014 21:47:46 -0700
+Subject: [PATCH] ARM: exynos: move sysram info to exynos.c
+Message-ID: <1401770866-1975-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+This solves a problem with building with CONFIG_SMP=n due to missing
+sysram_base_addr (or sysram_ns_base_addr) variables.
 
-Thanks for the patches.
+The new setup method is more awkward than I'd like for it to be, but
+it can't be done in init_early() since ioremap is not yet available,
+but it needs to happen before SMP.
 
-I think this patch series should be divided into 2 parts,
-one for DMA in general and one for DMA supporting QSPI.
+Reported-by: Russell King <linux@arm.linux.org.uk>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Tomasz Figa <t.figa@samsung.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
 
-How do you think about it ?
+I'm not entirely happy with the solution here, especially the dual
+call path. The platsmp.c->exynos.c call isn't ideal either but I'm less
+worried about that. Seemed overkill to create a new c file just for this.
 
-Best regards,
-KHIEM Nguyen
+I've tested to make sure this still works on arndale, and the build
+errors as reported by Russell are definitely gone.
 
-On 6/2/2014 10:42 PM, Geert Uytterhoeven wrote:
-> This patch series enables DMA support for QSPI on r8a7791/koelsch
-> reference.  It's independent from the series "ARM: shmobile: koelsch
-> legacy: Enable DMA for QSPI", but it depends on the SHDMA work for r8a7790
-> by Ben Dooks (cfr. "[PATCH v2 0/9] Updates Renesas OF-DMA code").
->
-> Changes Compared to previous submission ("[PATCH/RFC 0/7] ARM: shmobile:
-> r8a7791: Add preliminary DMA support"):
->    - "[6/7] ARM: shmobile: r8a7791 dtsi: Enable DMA for MSIOF" was dropped,
->    - 2/7 was added,
->    - 7/7 was changed (see changelog in individual patch).
->
-> This was tested on r8a7791/koelsch.
->
-> Performance figures for reading from a QSPI FLASH driven at 24.375 MHz are:
->    - Single:  1.1 Mbps PIO, 23 Mbps DMA
->    - Dual  : 12.7 Mbps PIO, 48 Mbps DMA
->    - Quad  : 13   Mbps PIO, 70 Mbps DMA
->
-> Thanks for your comments!
->
->    [1/7] DMA: shdma: Add r8a7791 support
->    [2/7] DMA: shdma: Spelling s/controll/control/
->    [3/7] ARM: shmobile: r8a7791 dtsi: add SYS-DMAC clocks
->    [4/7] ARM: shmobile: r8a7791: Add SYS-DMAC channel definitions for bindings
->    [5/7] ARM: shmobile: r8a7791 dtsi: Add SYS-DMAC0 and SYS-DMAC1 nodes
->    [6/7] ARM: shmobile: koelsch dts: Enable sysdma0 and sysdma1
->    [7/7] ARM: shmobile: r8a7791 dtsi: Enable DMA for QSPI
->
->   Documentation/devicetree/bindings/dma/shdma.txt |   7 +-
->   arch/arm/boot/dts/r8a7791-koelsch.dts           |   8 ++
->   arch/arm/boot/dts/r8a7791.dtsi                  |  79 ++++++++++++++++-
->   drivers/dma/sh/shdmac.c                         |   1 +
->   include/dt-bindings/dma/r8a7791-dma.h           | 111 ++++++++++++++++++++++++
->   5 files changed, 201 insertions(+), 5 deletions(-)
->   create mode 100644 include/dt-bindings/dma/r8a7791-dma.h
->
-> Gr{oetje,eeting}s,
->
-> 						Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
-> 							    -- Linus Torvalds
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Better ideas welcome.
+
+
+ arch/arm/mach-exynos/common.h  |    1 +
+ arch/arm/mach-exynos/exynos.c  |   29 +++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/platsmp.c |   26 ++------------------------
+ 3 files changed, 32 insertions(+), 24 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 80b90e3..5a3a1ec 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -118,6 +118,7 @@ extern void __iomem *sysram_ns_base_addr;
+ extern void __iomem *sysram_base_addr;
+ void exynos_init_io(void);
+ void exynos_restart(enum reboot_mode mode, const char *cmd);
++void exynos_sysram_init(void);
+ void exynos_cpuidle_init(void);
+ void exynos_cpufreq_init(void);
+ void exynos_init_late(void);
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index bc43e22..9183675 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -187,6 +187,28 @@ void __init exynos_cpufreq_init(void)
+ 	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
+ }
+ 
++void __iomem *sysram_base_addr;
++void __iomem *sysram_ns_base_addr;
++
++void __init exynos_sysram_init(void)
++{
++	struct device_node *node;
++
++	for_each_compatible_node(node, NULL, "samsung,exynos4210-sysram") {
++		if (!of_device_is_available(node))
++			continue;
++		sysram_base_addr = of_iomap(node, 0);
++		break;
++	}
++
++	for_each_compatible_node(node, NULL, "samsung,exynos4210-sysram-ns") {
++		if (!of_device_is_available(node))
++			continue;
++		sysram_ns_base_addr = of_iomap(node, 0);
++		break;
++	}
++}
++
+ void __init exynos_init_late(void)
+ {
+ 	if (of_machine_is_compatible("samsung,exynos5440"))
+@@ -293,6 +315,13 @@ static void __init exynos_dt_machine_init(void)
+ 		}
+ 	}
+ 
++	/*
++	 * This is called from smp_prepare_cpus if we've built for SMP, but
++	 * we still need to set it up for PM and firmware ops if not.
++	 */
++	if (!IS_ENABLED(SMP))
++		exynos_sysram_init();
++
+ 	exynos_cpuidle_init();
+ 	exynos_cpufreq_init();
+ 
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index ec02422..1c8d31e 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -32,28 +32,6 @@
+ 
+ extern void exynos4_secondary_startup(void);
+ 
+-void __iomem *sysram_base_addr;
+-void __iomem *sysram_ns_base_addr;
+-
+-static void __init exynos_smp_prepare_sysram(void)
+-{
+-	struct device_node *node;
+-
+-	for_each_compatible_node(node, NULL, "samsung,exynos4210-sysram") {
+-		if (!of_device_is_available(node))
+-			continue;
+-		sysram_base_addr = of_iomap(node, 0);
+-		break;
+-	}
+-
+-	for_each_compatible_node(node, NULL, "samsung,exynos4210-sysram-ns") {
+-		if (!of_device_is_available(node))
+-			continue;
+-		sysram_ns_base_addr = of_iomap(node, 0);
+-		break;
+-	}
+-}
+-
+ static inline void __iomem *cpu_boot_reg_base(void)
+ {
+ 	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
+@@ -234,11 +212,11 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 	int i;
+ 
++	exynos_sysram_init();
++
+ 	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
+ 		scu_enable(scu_base_addr());
+ 
+-	exynos_smp_prepare_sysram();
+-
+ 	/*
+ 	 * Write the address of secondary startup into the
+ 	 * system-wide flags register. The boot monitor waits
+-- 
+1.7.10.4
