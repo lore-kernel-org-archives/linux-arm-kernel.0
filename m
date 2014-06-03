@@ -1,87 +1,33 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Tue, 3 Jun 2014 13:12:59 +0530
-Subject: [PATCH 07/14] irqchip: crossbar: return proper error value
+Date: Tue, 3 Jun 2014 13:13:01 +0530
+Subject: [PATCH 09/14] irqchip: crossbar: set cb pointer to null in case of
+ error
 In-Reply-To: <1401781386-4982-1-git-send-email-r.sricharan@ti.com>
 References: <1401781386-4982-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1401781386-4982-8-git-send-email-r.sricharan@ti.com>
+Message-ID: <1401781386-4982-10-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+If crossbar_of_init returns with a error, then set the cb pointer
+to null.
 
-crossbar_of_init always returns -ENOMEM in case of errors, return proper
-error results in case of failures.
-
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Sricharan R <r.sricharan@ti.com>
 ---
- drivers/irqchip/irq-crossbar.c |   15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ drivers/irqchip/irq-crossbar.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index fea3e5d..524e6e9 100644
+index cf0d79f..5f3e75a 100644
 --- a/drivers/irqchip/irq-crossbar.c
 +++ b/drivers/irqchip/irq-crossbar.c
-@@ -140,20 +140,26 @@ static const struct irq_domain_ops routable_irq_domain_ops = {
- static int __init crossbar_of_init(struct device_node *node,
- 				   const struct crossbar_data *data)
- {
--	int i, size, max, reserved = 0, entry, safe_map;
-+	int i, size, max = 0, reserved = 0, entry, safe_map;
- 	const __be32 *irqsr;
- 	const int *irqsk = NULL;
-+	int ret = -ENOMEM;
- 
- 	cb = kzalloc(sizeof(*cb), GFP_KERNEL);
- 
- 	if (!cb)
--		return -ENOMEM;
-+		return ret;
- 
- 	cb->crossbar_base = of_iomap(node, 0);
- 	if (!cb->crossbar_base)
- 		goto err1;
- 
- 	of_property_read_u32(node, "ti,max-irqs", &max);
-+	if (!max) {
-+		pr_err("missing 'ti,max-irqs' property\n");
-+		ret = -EINVAL;
-+		goto err2;
-+	}
- 	cb->irq_map = kcalloc(max, sizeof(int), GFP_KERNEL);
- 	if (!cb->irq_map)
- 		goto err2;
-@@ -174,6 +180,7 @@ static int __init crossbar_of_init(struct device_node *node,
- 						   i, &entry);
- 			if (entry > max) {
- 				pr_err("Invalid reserved entry\n");
-+				ret = -EINVAL;
- 				goto err3;
- 			}
- 			cb->irq_map[entry] = IRQ_RESERVED;
-@@ -198,6 +205,7 @@ static int __init crossbar_of_init(struct device_node *node,
- 		break;
- 	default:
- 		pr_err("Invalid reg-size property\n");
-+		ret = -EINVAL;
- 		goto err4;
- 		break;
- 	}
-@@ -225,6 +233,7 @@ static int __init crossbar_of_init(struct device_node *node,
- 
- 			if (entry > max) {
- 				pr_err("Invalid skip entry\n");
-+				ret = -EINVAL;
- 				goto err4;
- 			}
- 			cb->irq_map[entry] = IRQ_SKIP;
-@@ -250,7 +259,7 @@ err2:
+@@ -259,6 +259,8 @@ err_base:
  	iounmap(cb->crossbar_base);
- err1:
+ err_cb:
  	kfree(cb);
--	return -ENOMEM;
-+	return ret;
++
++	cb = NULL;
+ 	return ret;
  }
  
- /* irq number 10,133,139 and 140 cannot be used because of hw bug */
 -- 
 1.7.9.5
