@@ -1,69 +1,92 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Tue, 3 Jun 2014 18:41:25 +0100
-Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
-In-Reply-To: <20140603155939.GA30445@twins.programming.kicks-ass.net>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
- <20140528121001.GI19967@e103034-lin>
- <CAKfTPtDxeBfZK1AxCRqEG91pi--Ti1RYFoQPDhvMVnGTCspQ-g@mail.gmail.com>
- <20140528154703.GJ19967@e103034-lin>
- <CAKfTPtCd8Mm+bvO3f1ybRC=gV-vQ=_5SxcUnOiuZ0XTf0JN=mA@mail.gmail.com>
- <20140603120354.GC29593@e103034-lin>
- <20140603155939.GA30445@twins.programming.kicks-ass.net>
-Message-ID: <20140603174125.GG29593@e103034-lin>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 03 Jun 2014 10:41:20 -0700
+Subject: [GIT PULL] Allwinner sunXi clock changes for 3.16
+In-Reply-To: <538B7B6C.3020601@elopez.com.ar>
+References: <538B7B6C.3020601@elopez.com.ar>
+Message-ID: <20140603174120.10062.16229@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 03, 2014 at 04:59:39PM +0100, Peter Zijlstra wrote:
-> On Tue, Jun 03, 2014 at 01:03:54PM +0100, Morten Rasmussen wrote:
-> > An unweighted version of cfs.runnable_load_avg gives you a metric that
-> > captures cpu utilization to some extend, but not the number of tasks.
-> > And it reflects task migrations immediately unlike the rq
-> > runnable_avg_sum.
+Quoting Emilio L?pez (2014-06-01 12:13:48)
+> Hi Mike,
 > 
-> So runnable_avg would be equal to the utilization as long as
-> there's idle time, as soon as we're over-loaded the metric shows how
-> much extra cpu is required.
-> 
-> That is, runnable_avg - running_avg >= 0 and the amount is the
-> exact amount of extra cpu required to make all tasks run but not have
-> idle time.
+> Here is the sunxi clocks pull for 3.16. As you probably saw during the 
+> cycle, this mostly contains improved A31 support and a bit of 
+> housekeeping. Please note that this pull does *not* contain the MMC 
+> clock patches Hans sent, as you merged those yourself on clk-next
 
-Yes, roughly. runnable_avg goes up quite steeply if you have many tasks
-on a fully utilized cpu, so the actual amount of extra cpu required
-might be somewhat lower. I can't come up with something better, so I
-agree.
+Hi Emilio,
+
+-rc8 is pretty late for me to take this in under normal circumstances,
+and since the merge window opened early this time I will defer taking
+this pull request in until 3.16-rc1 is released. It'll be one of the
+first things applied to the new clk-next.
+
+Regards,
+Mike
 
 > 
-> > Agreed, but I think it is quite important to discuss what we understand
-> > by cpu utilization. It seems to be different depending on what you want
-> > to use it for.
+> Cheers,
 > 
-> I understand utilization to be however much cpu is actually used, so I
-> would, per the existing naming, call running_avg to be the avg
-> utilization of a task/group/cpu whatever.
-
-I see your point, but for load balancing purposes we are more intested
-in the runnable_avg as it tells us about the cpu capacity requirements.
-I don't like to throw more terms into the mix, but you could call
-runnable_avg the potential task/group/cpu utilization. This is an
-estimate of how much utilization a task would cause if we moved it to an
-idle cpu. That might be quite different from running_avg on an
-over-utilized cpu.
-
+> Emilio
 > 
-> > We have done experiments internally with rq runnable_avg_sum for
-> > load-balancing decisions in the past and found it unsuitable due to its
-> > slow response to task migrations. That is why I brought it up here.
+> --->8---
 > 
-> So I'm not entirely seeing that from the code (I've not traced this),
-> afaict we actually update the per-cpu values on migration based on the
-> task values.
+> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 > 
-> old_rq->sum -= p->val;
-> new_rq->sum += p->val;
+>    Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
 > 
-> like,.. except of course totally obscured.
-
-Yes, for cfs.runnable_load_avg, rq->avg.runnable_avg_sum is different.
-See the other reply.
+> are available in the git repository at:
+> 
+>    https://bitbucket.org/emiliolopez/linux.git tags/sunxi-clk-for-3.16
+> 
+> for you to fetch changes up to 4da7e86418af722793610e57cee9d3e73d16ed58:
+> 
+>    clk: sunxi: document PRCM clock compatible strings (2014-05-15 
+> 12:20:14 -0300)
+> 
+> ----------------------------------------------------------------
+> Allwinner sunXi SoCs clock changes
+> 
+> This pull contains some new code to add support for A31 clocks by Maxime
+> and Boris. It also reworks the driver a bit to avoid having a huge
+> single file when we have a full folder for ourselves, and separating
+> different functional units makes sense.
+> 
+> ----------------------------------------------------------------
+> Boris BREZILLON (2):
+>        clk: sunxi: add PRCM (Power/Reset/Clock Management) clks support
+>        clk: sunxi: document PRCM clock compatible strings
+> 
+> Emilio L?pez (1):
+>        clk: sunxi: document new A31 USB clock compatible
+> 
+> Maxime Ripard (7):
+>        clk: sunxi: Implement A31 USB clock
+>        clk: sunxi: Remove calls to clk_put
+>        clk: sunxi: Move the 24M oscillator to a file of its own
+>        clk: sunxi: Move the GMAC clock to a file of its own
+>        clk: sunxi: Rework clock protection code
+>        clk: sun6i: Protect CPU clock
+>        clk: sun6i: Protect SDRAM gating bit
+> 
+>   Documentation/devicetree/bindings/clock/sunxi.txt |   4 +++
+>   drivers/clk/sunxi/Makefile                        |   4 +++
+>   drivers/clk/sunxi/clk-a10-hosc.c                  |  73 
+> +++++++++++++++++++++++++++++++++++++++++
+>   drivers/clk/sunxi/clk-a20-gmac.c                  | 119 
+> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>   drivers/clk/sunxi/clk-sun6i-apb0-gates.c          |  99 
+> +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>   drivers/clk/sunxi/clk-sun6i-apb0.c                |  77 
+> +++++++++++++++++++++++++++++++++++++++++++
+>   drivers/clk/sunxi/clk-sun6i-ar100.c               | 233 
+> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>   drivers/clk/sunxi/clk-sunxi.c                     | 239 
+> +++++++++++++++++++++++++++++-------------------------------------------------------------------------------------------------------
+>   8 files changed, 661 insertions(+), 187 deletions(-)
+>   create mode 100644 drivers/clk/sunxi/clk-a10-hosc.c
+>   create mode 100644 drivers/clk/sunxi/clk-a20-gmac.c
+>   create mode 100644 drivers/clk/sunxi/clk-sun6i-apb0-gates.c
+>   create mode 100644 drivers/clk/sunxi/clk-sun6i-apb0.c
+>   create mode 100644 drivers/clk/sunxi/clk-sun6i-ar100.c
