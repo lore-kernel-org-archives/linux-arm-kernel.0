@@ -1,76 +1,63 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 3 Jun 2014 14:31:38 +0200
-Subject: [PATCH v2 10/11] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <20140603111532.GW11096@twins.programming.kicks-ass.net>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-11-git-send-email-vincent.guittot@linaro.org>
- <20140529095024.GF11074@laptop.programming.kicks-ass.net>
- <CAKfTPtCHhxyugMOCeS0hZoEXWhgRec4uOBexZ2aB2A+Eycgi8w@mail.gmail.com>
- <20140530062937.GA11096@twins.programming.kicks-ass.net>
- <CAKfTPtBXddNFXDuL5YNNtcW7e1Un=LqHU8bgaejJwPObSGoBhg@mail.gmail.com>
- <20140603111532.GW11096@twins.programming.kicks-ass.net>
-Message-ID: <CAKfTPtBRkWY1hTBqd9cQKetFbWEVvJVo-wKUz9MN-ZfZLq4TuA@mail.gmail.com>
+From: chhotu.shiv@gmail.com (shiv prakash Agarwal)
+Date: Tue, 3 Jun 2014 18:03:06 +0530
+Subject: [E1000-devel] ARM support for igb driver
+In-Reply-To: <9B4A1B1917080E46B64F07F2989DADD653376495@ORSMSX114.amr.corp.intel.com>
+References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>
+ <4893591.dl3XO76euB@wuerfel>
+ <CAHH3p5JDXVZAKQUUQ5ao1GzwhNtU-+Hs_afT0tYeaw9oUthu-A@mail.gmail.com>
+ <5174568.hMNHACE7UI@wuerfel>
+ <CAHH3p5++xjH8+eeerBX468_rhfPeRh=43PsHETTRriA1uJrG7w@mail.gmail.com>
+ <9B4A1B1917080E46B64F07F2989DADD653376495@ORSMSX114.amr.corp.intel.com>
+Message-ID: <CAHH3p5LXSiS=LZ=Yg=hxt=VJbbD-+5FPnfWUTFTaHCr5vHqb0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 June 2014 13:15, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Mon, Jun 02, 2014 at 07:06:44PM +0200, Vincent Guittot wrote:
->> > Could you detail those conditions? FWIW those make excellent Changelog
->> > material.
+Thanks,
+
+Yes it is a NIC. How to get dump of its EEPROM?
+
+On Mon, Jun 2, 2014 at 9:35 PM, Fujinaka, Todd <todd.fujinaka@intel.com> wrote:
+> There is no hardware bug. The PCIe spec allows VDMs. Note Section 2.2.8.6 where there appear to be a couple of options.
+>
+> - (Receivers) Completers silently discard Vendor_Defined Type 1 Messages which they are not designed to receive ? this is not an error condition.
+> - (Receivers) Completers handle the receipt of an unsupported Vendor_Defined Type 0 Message as an Unsupported Request, and the error is reported according to Section 6.2.
+>
+> I think you may have MCTP enabled and you should be able to disable it in the EEPROM. I will need a lot more information about your system and whether the i210 is a LOM (LAD-on-motherboard, soldered onto your motherboard) or a NIC (what we call a plug-in PCIe card). Either way, you probably won't be able to get it changed without a working OS.
+>
+> If it's a NIC, you can take it out and put it in a non-ARM Linux system and send me a dump of your current EEPROM.
+>
+> Todd Fujinaka
+> Software Application Engineer
+> Networking Division (ND)
+> Intel Corporation
+> todd.fujinaka at intel.com
+> (503) 712-4565
+>
+> -----Original Message-----
+> From: shiv prakash Agarwal [mailto:chhotu.shiv at gmail.com]
+> Sent: Sunday, June 01, 2014 9:54 PM
+> To: Arnd Bergmann
+> Cc: linux-arm-kernel at lists.infradead.org; Duyck, Alexander H; Thomas Petazzoni; e1000-devel at lists.sourceforge.net; Jason Gunthorpe; Fujinaka, Todd; Lucas Stach
+> Subject: Re: [E1000-devel] ARM support for igb driver
+>
+> Yes its hardware bug. I need to know whether we can disable it from device side? If yes, how?
+>
+> On Sun, Jun 1, 2014 at 5:16 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Sunday 01 June 2014 11:26:57 shiv prakash Agarwal wrote:
+>>> I don't see all devices send VDMs, then why Intel I-210?
 >>
->> I have looked back into my tests and traces:
+>> There is no obligation to do it of course.
 >>
->> In a 1st test, the capacity of the CPU was still above half default
->> value (power=538) unlike what i remembered. So it's some what "normal"
->> to keep the task on CPU0 which also handles IRQ because sg_capacity
->> still returns 1.
->
-> OK, so I suspect that once we move to utilization based capacity stuff
-> we'll do the migration IF the task indeed requires more cpu than can be
-> provided by the reduced, one, right?
-
-The current version of the patchset only checks if the capacity of a
-CPU has significantly reduced that we should look for another CPU. But
-we effectively could also add compare the remaining capacity with the
-task load
-
->
->> In a 2nd test,the main task runs (most of the time) on CPU0 whereas
->> the max power of the latter is only 623 and the cpu_power goes below
->> 512 (power=330) during the use case. So the sg_capacity of CPU0 is
->> null but the main task still stays on CPU0.
->> The use case (scp transfer) is made of a long running task (ssh) and a
->> periodic short task (scp). ssh runs on CPU0 and scp runs each 6ms on
->> CPU1. The newly idle load balance on CPU1 doesn't pull the long
->> running task although sg_capacity is null because of
->> sd->nr_balance_failed is never incremented and load_balance doesn't
->> trig an active load_balance. When an idle balance occurs in the middle
->> of the newly idle balance, the ssh long task migrates on CPU1 but as
->> soon as it sleeps and wakes up, it goes back on CPU0 because of the
->> wake affine which migrates it back on CPU0 (issue solved by patch 09).
->
-> OK, so there's two problems here, right?
->  1) we don't migrate away from cpu0
->  2) if we do, we get pulled back.
->
-> And patch 9 solves 2, so maybe enhance its changelog to mention this
-> slightly more explicit.
->
-> Which leaves us with 1.. interesting problem. I'm just not sure
-> endlessly kicking a low capacity cpu is the right fix for that.
-
-What prevent us to migrate the task directly is the fact that
-nr_balance_failed is not incremented for newly idle and it's the only
-condition for active migration (except asym feature)
-
-We could add a additional test in need_active_balance for newly_idle
-load balance. Something like:
-
-if ((sd->flags & SD_SHARE_PKG_RESOURCES)
- && (senv->rc_rq->cpu_power_orig * 100) > (env->src_rq->group_power *
-env->sd->imbalance_pct))
-return 1;
-
->
->
+>>> Also, Is it a bug in host bridge hardware or driver? If hardware, how
+>>> can we make device not to send it?
+>>
+>> If the hardware cannot handle them, it's a hardware bug. If the
+>> hardware does handle them correctly but the software doesn't, that is
+>> a bug in the bridge driver.
+>>
+>> We have a couple of host bridge drivers that register a trap handler
+>> and then look at the bridge registers to determine the exact cause.
+>>
+>> Which host bridge driver do you use?
+>>
+>>         Arnd
