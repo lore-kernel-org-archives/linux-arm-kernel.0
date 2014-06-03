@@ -1,40 +1,40 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 3 Jun 2014 19:37:41 +0200
-Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
-In-Reply-To: <20140603171628.GE29593@e103034-lin>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
- <20140528121001.GI19967@e103034-lin>
- <20140603154058.GY30445@twins.programming.kicks-ass.net>
- <20140603171628.GE29593@e103034-lin>
-Message-ID: <20140603173741.GE13930@laptop.programming.kicks-ass.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 03 Jun 2014 10:37:44 -0700
+Subject: [PATCH] clk: export __clk_round_rate for providers
+In-Reply-To: <6099360.oW6xYL5CNm@wuerfel>
+References: <6099360.oW6xYL5CNm@wuerfel>
+Message-ID: <20140603173744.10062.55679@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 03, 2014 at 06:16:28PM +0100, Morten Rasmussen wrote:
-> > I'm not too worried about the tipping point, per task runnable figures
-> > of an overloaded cpu are higher, so migration between an overloaded cpu
-> > and an underloaded cpu are going to be tricky no matter what we do.
+Quoting Arnd Bergmann (2014-06-03 02:40:14)
+> Commit 99cbd064b0 ("clk: qcom: Support display RCG clocks") adds
+> a use of the __clk_round_rate in a clock provided that can be built
+> as a loadable module.
 > 
-> Yes, agreed. I just got the impression that you were concerned about
-> smp_nice last time we discussed this.
-
-Well, yes, we need to keep that working, but the exact detail around the
-tipping point are near impossible to get right, so I'm not too bothered
-there.
-
-> > > rq runnable_avg_sum is useful for decisions where we need a longer term
-> > > view of the cpu utilization, but I don't see how we can use as cpu
-> > > utilization metric for load-balancing decisions at wakeup or
-> > > periodically.
-> > 
-> > So keeping one with a faster decay would add extra per-task storage. But
-> > would be possible..
+> This exports the symbol to avoid the build error from compiling
+> the qcom clock as a module.
 > 
-> I have had that thought when we discussed potential replacements for
-> cpu_load[]. It will require some messing around with the nicely
-> optimized load tracking maths if we want to have load tracking with a
-> different y-coefficient.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Mike Turquette <mturquette@linaro.org>
 
-My initial thought was a y=0.5, which is really >>=1. But yes, if we
-want something else that'll get messy real fast methinks.
+Applied.
+
+Thanks,
+Mike
+
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 2df2b26..8b73ede 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1006,6 +1006,7 @@ unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
+>         else
+>                 return clk->rate;
+>  }
+> +EXPORT_SYMBOL_GPL(__clk_round_rate);
+>  
+>  /**
+>   * clk_round_rate - round the given rate for a clk
+> 
