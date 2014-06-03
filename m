@@ -1,100 +1,80 @@
-From: yi.li@linaro.org (Yi Li)
-Date: Tue,  3 Jun 2014 23:57:13 +0800
-Subject: [PATCH] ARM64:DMI: Add smbios/dmi support on arm64
-Message-ID: <1401811033-16478-1-git-send-email-yi.li@linaro.org>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 3 Jun 2014 17:59:39 +0200
+Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
+In-Reply-To: <20140603120354.GC29593@e103034-lin>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
+ <20140528121001.GI19967@e103034-lin>
+ <CAKfTPtDxeBfZK1AxCRqEG91pi--Ti1RYFoQPDhvMVnGTCspQ-g@mail.gmail.com>
+ <20140528154703.GJ19967@e103034-lin>
+ <CAKfTPtCd8Mm+bvO3f1ybRC=gV-vQ=_5SxcUnOiuZ0XTf0JN=mA@mail.gmail.com>
+ <20140603120354.GC29593@e103034-lin>
+Message-ID: <20140603155939.GA30445@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add smbios/dmi support on arm64 system, it depends on
-EFI boot.
+On Tue, Jun 03, 2014 at 01:03:54PM +0100, Morten Rasmussen wrote:
+> On Wed, May 28, 2014 at 05:39:10PM +0100, Vincent Guittot wrote:
+> > On 28 May 2014 17:47, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
+> > > On Wed, May 28, 2014 at 02:15:03PM +0100, Vincent Guittot wrote:
+> > >> On 28 May 2014 14:10, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
+> > >> > On Fri, May 23, 2014 at 04:53:02PM +0100, Vincent Guittot wrote:
 
-Signed-off-by: Yi Li <yi.li@linaro.org>
----
+> > > I agree that the task runnable_avg_sum is always affected by the
+> > > circumstances on the cpu where it is running, and that it takes this
+> > > history with it. However, I think cfs.runnable_load_avg leads to less
+> > > problems than using the rq runnable_avg_sum. It would work nicely for
+> > > the two tasks on two cpus example I mentioned earlier. We don't need add
+> > 
+> > i would say that nr_running is an even better metrics for such
+> > situation as the load doesn't give any additional information.
+> 
+> I fail to understand how nr_running can be used. nr_running doesn't tell
+> you anything about the utilization of the cpu, just the number tasks
+> that happen to be runnable at a point in time on a specific cpu. It
+> might be two small tasks that just happened to be running while you read
+> nr_running.
 
-Changes since v1:
-  -Followed Ard Biesheuvel's suggestion to rebase the patch on
-   Matt Fleming's arm64-efi branch.
+Agreed, I'm not at all seeing how nr_running is useful here.
 
- arch/arm64/Kconfig           |   10 ++++++++++
- arch/arm64/include/asm/dmi.h |   28 ++++++++++++++++++++++++++++
- arch/arm64/kernel/setup.c    |    2 ++
- 3 files changed, 40 insertions(+)
- create mode 100644 arch/arm64/include/asm/dmi.h
+> An unweighted version of cfs.runnable_load_avg gives you a metric that
+> captures cpu utilization to some extend, but not the number of tasks.
+> And it reflects task migrations immediately unlike the rq
+> runnable_avg_sum.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 6c71f12..13ee261 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -294,6 +294,16 @@ config EFI
- 	  allow the kernel to be booted as an EFI application. This
- 	  is only useful on systems that have UEFI firmware.
- 
-+config DMI
-+	bool "Enable support for SMBIOS (DMI) tables"
-+	depends on EFI
-+	default y
-+	help
-+	  This enables SMBIOS/DMI feature for systems.
-+
-+	  This option is only useful on systems that have UEFI firmware.
-+	  However, even with this option, the resultant kernel should
-+	  continue to boot on existing non-UEFI platforms.
- endmenu
- 
- menu "Userspace binary formats"
-diff --git a/arch/arm64/include/asm/dmi.h b/arch/arm64/include/asm/dmi.h
-new file mode 100644
-index 0000000..f2198bf
---- /dev/null
-+++ b/arch/arm64/include/asm/dmi.h
-@@ -0,0 +1,28 @@
-+/*
-+ * arch/arm64/include/asm/dmi.h
-+ *
-+ * Copyright (C) 2013 Linaro Limited.
-+ * Written by: Yi Li (yi.li at linaro.org)
-+ *
-+ * based on arch/ia64/include/asm/dmi.h
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ */
-+
-+
-+#ifndef _ASM_DMI_H
-+#define _ASM_DMI_H 1
-+
-+#include <linux/slab.h>
-+#include <asm/io.h>
-+
-+/* Use efi mappings for DMI */
-+#define dmi_early_remap(x, l)	efi_lookup_mapped_addr(x)
-+#define dmi_early_unmap(x, l)
-+#define dmi_remap(x, l)			efi_lookup_mapped_addr(x)
-+#define dmi_unmap(x)
-+#define dmi_alloc(l)			kzalloc(l, GFP_ATOMIC)
-+
-+#endif
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 0a14aaf..7622561 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -42,6 +42,7 @@
- #include <linux/of_fdt.h>
- #include <linux/of_platform.h>
- #include <linux/efi.h>
-+#include <linux/dmi.h>
- 
- #include <asm/fixmap.h>
- #include <asm/cputype.h>
-@@ -400,6 +401,7 @@ static int __init arm64_device_init(void)
- {
- 	of_clk_init(NULL);
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	dmi_scan_machine();
- 	return 0;
- }
- arch_initcall(arm64_device_init);
--- 
-1.7.9.5
+So runnable_avg would be equal to the utilization as long as
+there's idle time, as soon as we're over-loaded the metric shows how
+much extra cpu is required.
+
+That is, runnable_avg - running_avg >= 0 and the amount is the
+exact amount of extra cpu required to make all tasks run but not have
+idle time.
+
+> Agreed, but I think it is quite important to discuss what we understand
+> by cpu utilization. It seems to be different depending on what you want
+> to use it for.
+
+I understand utilization to be however much cpu is actually used, so I
+would, per the existing naming, call running_avg to be the avg
+utilization of a task/group/cpu whatever.
+
+> We have done experiments internally with rq runnable_avg_sum for
+> load-balancing decisions in the past and found it unsuitable due to its
+> slow response to task migrations. That is why I brought it up here.
+
+So I'm not entirely seeing that from the code (I've not traced this),
+afaict we actually update the per-cpu values on migration based on the
+task values.
+
+old_rq->sum -= p->val;
+new_rq->sum += p->val;
+
+like,.. except of course totally obscured.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140603/847f8a37/attachment.sig>
