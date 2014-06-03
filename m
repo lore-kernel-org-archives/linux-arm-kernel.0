@@ -1,60 +1,162 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 3 Jun 2014 17:19:56 +0200
-Subject: TASK_SIZE for !MMU
-In-Reply-To: <20140603141138.GH16741@pengutronix.de>
-References: <20140429100028.GH28564@pengutronix.de>
- <20140602085150.GA31147@pengutronix.de>
- <538DBC3F.9060207@uclinux.org>
- <20140603141138.GH16741@pengutronix.de>
-Message-ID: <CAMuHMdXpOcWhsjMRaW6YVeK4g-QJN7WNkRHD+q4==GkBPp5=0w@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 3 Jun 2014 16:22:01 +0100
+Subject: [PATCHv2 1/4] arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support
+In-Reply-To: <1401742658-11841-2-git-send-email-lauraa@codeaurora.org>
+References: <1401742658-11841-1-git-send-email-lauraa@codeaurora.org>
+ <1401742658-11841-2-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20140603152201.GP23149@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 3, 2014 at 4:11 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
->> I did that same change for m68k in commit cc24c40 ("m68knommu: remove
->> size limit on non-MMU TASK_SIZE"). For similar reasons as you need to
->> now.
-> ok.
->
->> >>Thoughts?
->> >The problem is that current linus/master (and also next) doesn't boot on
->> >my ARM-nommu machine because the user string functions (strnlen_user,
->> >strncpy_from_user et al.) refuse to work on strings above TASK_SIZE
->> >which in my case also includes the XIP kernel image.
->>
->> I seem to recall that we were not considering flash or anything else
->> other than RAM when defining that original TASK_SIZE (back many, many
->> years ago). Some of the address checks you list above made some sense
->> if you had everything in RAM (though only upper bounds are checked).
->> The thinking was some checking is better than none I suppose.
-> What is the actual meaning of TASK_SIZE? The maximal value of a valid
-> userspace address?
+Hi Laura,
 
-Yes
+This is looking better, but comments inline.
 
-$ git show cc24c40
-commit cc24c405949e3d4418a90014d10166679d78141a
-Author: Greg Ungerer <gerg@uclinux.org>
-Date:   Mon May 24 11:22:05 2010 +1000
+On Mon, Jun 02, 2014 at 09:57:35PM +0100, Laura Abbott wrote:
+> 
+> In a similar fashion to other architecture, add the infrastructure
+> and Kconfig to enable DEBUG_SET_MODULE_RONX support. When
+> enabled, module ranges will be marked read-only/no-execute as
+> appropriate.
+> 
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> ---
+>  arch/arm64/Kconfig.debug            |  11 ++++
+>  arch/arm64/include/asm/cacheflush.h |   4 ++
+>  arch/arm64/mm/Makefile              |   2 +-
+>  arch/arm64/mm/pageattr.c            | 121 ++++++++++++++++++++++++++++++++++++
+>  4 files changed, 137 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm64/mm/pageattr.c
 
-    m68knommu: remove size limit on non-MMU TASK_SIZE
+[...]
 
-    The TASK_SIZE define is used in some places as a limit on the size of
-    the virtual address space of a process. On non-MMU systems those addresses
-    used in comparison will be physical addresses, and they could be anywhere
-    in the 32bit physical address space. So for !CONFIG_MMU systems set the
-    TASK_SIZE to the maximum physical address.
+>  obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
+> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+> new file mode 100644
+> index 0000000..d8ab747
+> --- /dev/null
+> +++ b/arch/arm64/mm/pageattr.c
+> @@ -0,0 +1,121 @@
+> +/*
+> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#include <linux/kernel.h>
+> +#include <linux/mm.h>
+> +#include <linux/sched.h>
+> +
+> +#include <asm/pgtable.h>
+> +#include <asm/tlbflush.h>
+> +
+> +static pte_t clear_pte_bit(pte_t pte, pgprot_t prot)
+> +{
+> +	pte_val(pte) &= ~pgprot_val(prot);
+> +	return pte;
+> +}
+> +
+> +static pte_t set_pte_bit(pte_t pte, pgprot_t prot)
+> +{
+> +	pte_val(pte) |= pgprot_val(prot);
+> +	return pte;
+> +}
 
-    Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+We could actually re-use these for building our pte_mk* functions in
+pgtable.h. Care to move them there?
 
-Gr{oetje,eeting}s,
+> +static int __change_memory(pte_t *ptep, pgtable_t token, unsigned long addr,
+> +			pgprot_t prot, bool set)
+> +{
+> +	pte_t pte;
+> +
+> +	if (set)
+> +		pte = set_pte_bit(*ptep, prot);
+> +	else
+> +		pte = clear_pte_bit(*ptep, prot);
+> +	set_pte(ptep, pte);
+> +	return 0;
+> +}
+> +
+> +static int set_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
+> +			void *data)
+> +{
+> +	pgprot_t prot = (pgprot_t)data;
+> +
+> +	return __change_memory(ptep, token, addr, prot, true);
+> +}
+> +
+> +static int clear_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
+> +			void *data)
+> +{
+> +	pgprot_t prot = (pgprot_t)data;
+> +
+> +	return __change_memory(ptep, token, addr, prot, false);
+> +}
+> +
+> +static int change_memory_common(unsigned long addr, int numpages,
+> +				pgprot_t prot, bool set)
+> +{
+> +	unsigned long start = addr;
+> +	unsigned long size = PAGE_SIZE*numpages;
+> +	unsigned long end = start + size;
+> +	int ret;
+> +
+> +	if (start < MODULES_VADDR || start >= MODULES_END)
+> +		return -EINVAL;
+> +
+> +	if (end < MODULES_VADDR || end >= MODULES_END)
+> +		return -EINVAL;
 
-                        Geert
+Can you use is_module_address here, or do you need to change the page
+attributes for areas where no modules are currently loaded too?
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> +	if (set)
+> +		ret = apply_to_page_range(&init_mm, start, size,
+> +					set_page_range, (void *)prot);
+> +	else
+> +		ret = apply_to_page_range(&init_mm, start, size,
+> +					clear_page_range, (void *)prot);
+> +
+> +	flush_tlb_kernel_range(start, end);
+> +	isb();
+> +	return ret;
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+We already have an isb in flush_tlb_kernel_range.
+
+> +static int change_memory_set_bit(unsigned long addr, int numpages,
+> +					pgprot_t prot)
+> +{
+> +	return change_memory_common(addr, numpages, prot, true);
+> +}
+> +
+> +static int change_memory_clear_bit(unsigned long addr, int numpages,
+> +					pgprot_t prot)
+> +{
+> +	return change_memory_common(addr, numpages, prot, false);
+> +}
+> +
+> +int set_memory_ro(unsigned long addr, int numpages)
+> +{
+> +	return change_memory_set_bit(addr, numpages, __pgprot(PTE_RDONLY));
+> +}
+> +EXPORT_SYMBOL_GPL(set_memory_ro);
+> +
+> +int set_memory_rw(unsigned long addr, int numpages)
+> +{
+> +	return change_memory_clear_bit(addr, numpages, __pgprot(PTE_RDONLY));
+> +}
+> +EXPORT_SYMBOL_GPL(set_memory_rw);
+
+I'm slightly worried about the interaction with this and PTE_WRITE (see
+linux-next). If the kernel pages are marked as PTE_DIRTY | PTE_WRITE, then
+setting read-only is a weird contradiction. Can you take PTE_WRITE into
+account for these two please?
+
+Will
