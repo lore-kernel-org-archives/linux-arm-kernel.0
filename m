@@ -1,97 +1,74 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 3 Jun 2014 15:46:02 +0100
-Subject: [PATCH] arm64: ptrace: fix empty registers set in prstatus of
- aarch32 process core
-In-Reply-To: <1401774369-7060-2-git-send-email-victor.kamensky@linaro.org>
-References: <1401774369-7060-1-git-send-email-victor.kamensky@linaro.org>
- <1401774369-7060-2-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20140603144602.GN23149@arm.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 03 Jun 2014 15:49:13 +0100
+Subject: [E1000-devel] ARM support for igb driver
+In-Reply-To: <536800A8.7090801@intel.com>
+References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>	<CF7EA37A.4676A%matthew.vick@intel.com>	<CAHH3p5JFc3jgeK7OFd1rtgDS3gjRdjiPr3LwwqfyKMPGSTwMWA@mail.gmail.com>	<CF7FD060.46A87%matthew.vick@intel.com>	<CAHH3p5J8V6uWEzbCoT+x-6_2x1q=nc=_oMn0qnnj113FmeuW6A@mail.gmail.com>	<9B4A1B1917080E46B64F07F2989DADD6533627A5@ORSMSX114.amr.corp.intel.com>	<CAHH3p5KEPXw5mxP-13evd774nyO5C13ky0=fCaZPCNVx1gh3Ow@mail.gmail.com>	<CAHH3p5LaRwgdECxsO4OZSdWEhGt232yj-3347kYEStP6NLg2xg@mail.gmail.com>	<5360041A.7030005@intel.com>	<CAHH3p5L6WM3FaZ19Tw9vUcsk+kERfBKnGC2BRtnftJR1pbSF7g@mail.gmail.com>	<5367AE02.8030802@intel.com>
+ <20140505223839.45778902@skate> <536800A8.7090801@intel.com>
+Message-ID: <538DE069.5030804@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Victor,
-
-Thanks for both the fix and the detailed explanation!
-
-On Tue, Jun 03, 2014 at 06:46:09AM +0100, Victor Kamensky wrote:
-> Currently core file of aarch32 process prstatus note has empty
-> registers set. As result aarch32 core files create by V8 kernel are
-> not very useful.
-> 
-> It happens because compat_gpr_get and compat_gpr_set functions can
-> copy registers values to/from either kbuf or ubuf. ELF core file
-> collection function fill_thread_core_info calls compat_gpr_get
-> with kbuf set and ubuf set to 0. But current compat_gpr_get and
-> compat_gpr_set function handle copy to/from only ubuf case.
-> 
-> Fix is to handle kbuf and ubuf as two separate cases in similar
-> way as other functions like user_regset_copyout, user_regset_copyin do.
-
-An alternative is to use set_fs when kbuf is set, then use
-copy_{to,from}_user for everything. However, given how ugly I find
-set_fs to start with, your patch looks good to me:
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-We probably want a CC stable too.
-
-Cheers,
-
-Will
-
-> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> ---
->  arch/arm64/kernel/ptrace.c | 28 +++++++++++++++++++---------
->  1 file changed, 19 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> index 6a8928b..9c9c2b9 100644
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -650,11 +650,16 @@ static int compat_gpr_get(struct task_struct *target,
->  			reg = task_pt_regs(target)->regs[idx];
->  		}
->  
-> -		ret = copy_to_user(ubuf, &reg, sizeof(reg));
-> -		if (ret)
-> -			break;
-> -
-> -		ubuf += sizeof(reg);
-> +		if (kbuf) {
-> +			memcpy(kbuf, &reg, sizeof(reg));
-> +			kbuf += sizeof(reg);
-> +		} else {
-> +			ret = copy_to_user(ubuf, &reg, sizeof(reg));
-> +			if (ret)
-> +				break;
-> +
-> +			ubuf += sizeof(reg);
-> +		}
->  	}
->  
->  	return ret;
-> @@ -684,11 +689,16 @@ static int compat_gpr_set(struct task_struct *target,
->  		unsigned int idx = start + i;
->  		compat_ulong_t reg;
->  
-> -		ret = copy_from_user(&reg, ubuf, sizeof(reg));
-> -		if (ret)
-> -			return ret;
-> +		if (kbuf) {
-> +			memcpy(&reg, kbuf, sizeof(reg));
-> +			kbuf += sizeof(reg);
-> +		} else {
-> +			ret = copy_from_user(&reg, ubuf, sizeof(reg));
-> +			if (ret)
-> +				return ret;
->  
-> -		ubuf += sizeof(reg);
-> +			ubuf += sizeof(reg);
-> +		}
->  
->  		switch (idx) {
->  		case 15:
-> -- 
-> 1.8.1.4
+On 05/05/14 22:20, Alexander Duyck wrote:
+> On 05/05/2014 01:38 PM, Thomas Petazzoni wrote:
+>> Dear Alexander Duyck,
+>>
+>> On Mon, 05 May 2014 08:28:02 -0700, Alexander Duyck wrote:
+>>
+>>>> 1. So overall issue is any memory/config space access hangs(logs above)
+>>>> if bus master enable bit is set on IGB NIC card,this is not observed
+>>>> with E1000E NIC cards on same platform.
+>>>>
+>>>> 2. Above issue is repro'able on my ARM platform, not x86 ubuntu. Not
+>>>> sure how much its related to ARM though.
+>>>>
+>>>> 3. I saw below differences in lspci -vvv output b/w e1000e and igb, I am
+>>>> not sure if this has anything to do with above issue.
+>>>> RC config is same for both cases.
+>>>>
+>>>> IGB / E1000E
+>>>>
+>>>> Command Status: INTx+/INTx-
+>>>> PM Status:           NoSoftRst+/NoSoftRst-
+>>>> DevCap:                FLReset-/FLReset+
+>>>> No Dev/Link2 Cap/Sta Registers for E1000E
+>>>> Some differences in AER Registers
+>>>>
+>>>> 4. Any idea, if this card is verified on ARM by anybody?
+>>>>
+>>>
+>>> It seems like you are glossing over the obvious issue.  You said it
+>>> yourself, this works fine on x86.  Therefore this is likely VERY related
+>>> to ARM, or at least your specific ARM platform configuration.
+>>
+>> Since I haven't seen the beginning of the thread, I might be completely
+>> off topic. However, I wanted to mention that I have successfully used
+>> and tested an IGB PCIe NIC on an ARM Armada XP platform. If that is
+>> useful, I'd be happy to provide you with additional details upon
+>> request.
+>>
+>> Best regards,
+>>
+>> Thomas
+>>
 > 
 > 
+> Thomas,
+> 
+> Glad to hear that this is working on your ARM platform as expected.
+> 
+> I believe the issue Shiv is having is due to a problem with the specific
+> platform as the IGB device is reporting a Data Link Protocol error via
+> AER and I believe this is what is causing his platform issues.  On
+> enabling BME the device is likely signalling a Fatal Error message in
+> response to the DLP error.  The original error he was seeing was:
+> 
+> Unhandled fault: imprecise external abort (0x1406) at 0x00000000
+
+I should sort out making these errors non-fatal to the system, there's
+not really much point in killing a process that may not have been the
+initiator of the problem.
+
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
