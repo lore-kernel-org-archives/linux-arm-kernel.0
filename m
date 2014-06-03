@@ -1,43 +1,37 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Tue, 3 Jun 2014 13:12:57 +0530
-Subject: [PATCH 05/14] irqchip: crossbar: DRA7: Fix unused crossbar list
+Date: Tue, 3 Jun 2014 13:12:58 +0530
+Subject: [PATCH 06/14] irqchip: crossbar: fix memory leak incase of invalid
+ entry
 In-Reply-To: <1401781386-4982-1-git-send-email-r.sricharan@ti.com>
 References: <1401781386-4982-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1401781386-4982-6-git-send-email-r.sricharan@ti.com>
+Message-ID: <1401781386-4982-7-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+From: Nishanth Menon <nm@ti.com>
 
-On DRA7 compatible IRQ crossbar, IRQ 10 default mapped to L3_APP_IRQ,
-IRQ133 is default mapped to NMI pin, 139 and 140 crossbars are
-unused(not routed). Mark these as unused crossbar IRQs.
+When the provided unused skip list entry is greater than max irqs
+possible, we go to err3, but we fail to free register_offsets,
+should have returned to err4 instead which ensures that allocated
+register_offsets are freed as well.
 
-Technical Reference Manual documentation update expected
-DRA72x-TRMINC00067 is being used to track the update.
-
-Reported-by: Nishanth Menon <nm@ti.com>
-Reported-by: Sricharan R <r.sricharan@ti.com>
-Reported-by: Suman Anna <s-anna@ti.com>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- drivers/irqchip/irq-crossbar.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-crossbar.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index 7d4db07..42a2e62 100644
+index 42a2e62..fea3e5d 100644
 --- a/drivers/irqchip/irq-crossbar.c
 +++ b/drivers/irqchip/irq-crossbar.c
-@@ -253,8 +253,8 @@ err1:
- 	return -ENOMEM;
- }
+@@ -225,7 +225,7 @@ static int __init crossbar_of_init(struct device_node *node,
  
--/* irq number 10 cannot be used because of hw bug */
--static int dra_irqs_unused[] = { 10 };
-+/* irq number 10,133,139 and 140 cannot be used because of hw bug */
-+static int dra_irqs_unused[] = { 10 , 133, 139, 140 };
- static struct crossbar_data cb_dra_data = { dra_irqs_unused,
- 				     ARRAY_SIZE(dra_irqs_unused), 0 };
- 
+ 			if (entry > max) {
+ 				pr_err("Invalid skip entry\n");
+-				goto err3;
++				goto err4;
+ 			}
+ 			cb->irq_map[entry] = IRQ_SKIP;
+ 		}
 -- 
 1.7.9.5
