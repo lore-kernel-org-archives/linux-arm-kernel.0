@@ -1,49 +1,161 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 03 Jun 2014 16:13:07 +0100
-Subject: [E1000-devel] ARM support for igb driver
-In-Reply-To: <4294251.h9ODuG21v5@wuerfel>
-References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>
- <536800A8.7090801@intel.com> <538DE069.5030804@codethink.co.uk>
- <4294251.h9ODuG21v5@wuerfel>
-Message-ID: <538DE603.60801@codethink.co.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 03 Jun 2014 17:13:17 +0200
+Subject: [PATCH v2 4/5] pinctrl: sunxi: Properly handle level triggered
+ gpio interrupts
+In-Reply-To: <20140603133022.GK27722@lukather>
+References: <1401544899-405-1-git-send-email-hdegoede@redhat.com>
+ <1401544899-405-5-git-send-email-hdegoede@redhat.com>
+ <20140603133022.GK27722@lukather>
+Message-ID: <538DE60D.5070705@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/14 16:05, Arnd Bergmann wrote:
-> On Tuesday 03 June 2014 15:49:13 Ben Dooks wrote:
->> On 05/05/14 22:20, Alexander Duyck wrote:
->>> On 05/05/2014 01:38 PM, Thomas Petazzoni wrote:
->>>
->>> Glad to hear that this is working on your ARM platform as expected.
->>>
->>> I believe the issue Shiv is having is due to a problem with the specific
->>> platform as the IGB device is reporting a Data Link Protocol error via
->>> AER and I believe this is what is causing his platform issues.  On
->>> enabling BME the device is likely signalling a Fatal Error message in
->>> response to the DLP error.  The original error he was seeing was:
->>>
->>> Unhandled fault: imprecise external abort (0x1406) at 0x00000000
+Hi,
+
+On 06/03/2014 03:30 PM, Maxime Ripard wrote:
+> On Sat, May 31, 2014 at 04:01:38PM +0200, Hans de Goede wrote:
+>> For level triggered gpio interrupts we need to use handle_fasteoi_irq,
+>> like we do with the irq-sunxi-nmi driver. This is necessary to give threaded
+>> interrupt handlers a chance to actuall clear the source of the interrupt
+>> (which may involve sleeping waiting for i2c / spi / mmc transfers), before
+>> acknowledging the interrupt.
 >>
->> I should sort out making these errors non-fatal to the system, there's
->> not really much point in killing a process that may not have been the
->> initiator of the problem.
-> 
-> We really shouldn't catch those errors system-wide, it belongs into
-> the specific host bridge driver, but Shiv refuses to say which one that
-> is, so we can't fix it.
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   drivers/pinctrl/sunxi/pinctrl-sunxi.c | 57 +++++++++++++++++++++++++----------
+>>   1 file changed, 41 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>> index 61d3246..418a430 100644
+>> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>> @@ -31,6 +31,11 @@
+>>   #include "../core.h"
+>>   #include "pinctrl-sunxi.h"
+>>
+>> +static void sunxi_pinctrl_irq_ack(struct irq_data *d);
+>> +static void sunxi_pinctrl_irq_mask(struct irq_data *d);
+>> +static void sunxi_pinctrl_irq_unmask(struct irq_data *d);
+>> +static int sunxi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type);
+>> +
+>>   static struct sunxi_pinctrl_group *
+>>   sunxi_pinctrl_find_group_by_name(struct sunxi_pinctrl *pctl, const char *group)
+>>   {
+>> @@ -545,10 +550,29 @@ static int sunxi_pinctrl_irq_request_resources(struct irq_data *d)
+>>   	return 0;
+>>   }
+>>
+>> -static int sunxi_pinctrl_irq_set_type(struct irq_data *d,
+>> -				      unsigned int type)
+>> +static struct irq_chip sunxi_pinctrl_edge_irq_chip = {
+>> +	.irq_ack		= sunxi_pinctrl_irq_ack,
+>> +	.irq_mask		= sunxi_pinctrl_irq_mask,
+>> +	.irq_unmask		= sunxi_pinctrl_irq_unmask,
+>> +	.irq_request_resources	= sunxi_pinctrl_irq_request_resources,
+>> +	.irq_set_type		= sunxi_pinctrl_irq_set_type,
+>> +	.flags			= IRQCHIP_SKIP_SET_WAKE,
+>> +};
+>> +
+>> +static struct irq_chip sunxi_pinctrl_level_irq_chip = {
+>> +	.irq_eoi		= sunxi_pinctrl_irq_ack,
+>> +	.irq_mask		= sunxi_pinctrl_irq_mask,
+>> +	.irq_unmask		= sunxi_pinctrl_irq_unmask,
+>> +	.irq_request_resources	= sunxi_pinctrl_irq_request_resources,
+>> +	.irq_set_type		= sunxi_pinctrl_irq_set_type,
+>> +	.flags			= IRQCHIP_SKIP_SET_WAKE | IRQCHIP_EOI_THREADED
+>> +				  | IRQCHIP_EOI_IF_HANDLED,
+>> +};
+>
+> Maybe we can just forward declare these two structures, instead of all
+> their functions.
 
-I am not sure what else we can do, either we either have to have a
-default null handler, or log that they have happened.
+Variables cannot be forward declared, they can be declared extern, but last
+time I checked extern and static don't mix.
 
-The whole issue with the "imprecise external" part is that you have
-no idea what instruction (or core) caused the issue and IIRC there is
-very little information about what actually sent the abort.
+>
+>> +
+>> +static int sunxi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type)
+>>   {
+>>   	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
+>> +	struct irq_desc *desc = container_of(d, struct irq_desc, irq_data);
+>>   	u32 reg = sunxi_irq_cfg_reg(d->hwirq);
+>>   	u8 index = sunxi_irq_cfg_offset(d->hwirq);
+>>   	unsigned long flags;
+>> @@ -575,6 +599,14 @@ static int sunxi_pinctrl_irq_set_type(struct irq_data *d,
+>>   		return -EINVAL;
+>>   	}
+>>
+>> +	if (type & IRQ_TYPE_LEVEL_MASK) {
+>> +		d->chip = &sunxi_pinctrl_level_irq_chip;
+>> +		desc->handle_irq = handle_fasteoi_irq;
+>> +	} else {
+>> +		d->chip = &sunxi_pinctrl_edge_irq_chip;
+>> +		desc->handle_irq = handle_edge_irq;
+>
+> irq_set_chip_and_handler?
 
-I believe these are useful to report as they tend to show that some
-part of the system has gone wrong. For example, we get them on the
-rcar-h2 if the system tries to access a unit that has not been
-properly clocked.
+Does a lookup of the irqdata which we already have here, and
+that lookup takes a lock which is already held here.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+>
+>> +	}
+>> +
+>>   	spin_lock_irqsave(&pctl->lock, flags);
+>>
+>>   	regval = readl(pctl->membase + reg);
+>> @@ -630,15 +662,6 @@ static void sunxi_pinctrl_irq_unmask(struct irq_data *d)
+>>   	spin_unlock_irqrestore(&pctl->lock, flags);
+>>   }
+>>
+>> -static struct irq_chip sunxi_pinctrl_irq_chip = {
+>> -	.irq_ack	= sunxi_pinctrl_irq_ack,
+>> -	.irq_mask	= sunxi_pinctrl_irq_mask,
+>> -	.irq_unmask	= sunxi_pinctrl_irq_unmask,
+>> -	.irq_request_resources = sunxi_pinctrl_irq_request_resources,
+>> -	.irq_set_type	= sunxi_pinctrl_irq_set_type,
+>> -	.flags		= IRQCHIP_SKIP_SET_WAKE,
+>> -};
+>> -
+>>   static void sunxi_pinctrl_irq_handler(unsigned irq, struct irq_desc *desc)
+>>   {
+>>   	struct irq_chip *chip = irq_get_chip(irq);
+>> @@ -655,9 +678,6 @@ static void sunxi_pinctrl_irq_handler(unsigned irq, struct irq_desc *desc)
+>>   	reg = sunxi_irq_status_reg_from_bank(bank);
+>>   	val = readl(pctl->membase + reg);
+>>
+>> -	/* Clear all interrupts */
+>> -	writel(val, pctl->membase + reg);
+>> -
+>>   	if (val) {
+>>   		int irqoffset;
+>>
+>> @@ -927,12 +947,17 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
+>>   	for (i = 0; i < (pctl->desc->irq_banks * IRQ_PER_BANK); i++) {
+>>   		int irqno = irq_create_mapping(pctl->domain, i);
+>>
+>> -		irq_set_chip_and_handler(irqno, &sunxi_pinctrl_irq_chip,
+>> -					 handle_simple_irq);
+>> +		irq_set_chip_and_handler(irqno, &sunxi_pinctrl_edge_irq_chip,
+>> +					 handle_edge_irq);
+>>   		irq_set_chip_data(irqno, pctl);
+>>   	};
+>>
+>>   	for (i = 0; i < pctl->desc->irq_banks; i++) {
+>> +		/* Mask and clear all IRQs before registering a handler */
+>> +		writel(0, pctl->membase + sunxi_irq_ctrl_reg_from_bank(i));
+>> +		writel(0xffffffff,
+>> +			pctl->membase + sunxi_irq_status_reg_from_bank(i));
+>> +
+>>   		irq_set_chained_handler(pctl->irq[i],
+>>   					sunxi_pinctrl_irq_handler);
+>>   		irq_set_handler_data(pctl->irq[i], pctl);
+>> --
+>> 2.0.0
+>>
+>
+> Looks fine otherwise, thanks.
+
+
+Regards,
+
+Hans
