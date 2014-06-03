@@ -1,97 +1,112 @@
-From: ritesh.harjani@gmail.com (Ritesh Harjani)
-Date: Tue, 3 Jun 2014 21:36:34 +0530
-Subject: Fwd: [PATCH 0/4] arm:dma-mapping Refactoring iommu dma-mapping code
-Message-ID: <CAD15agYD+fEjqR+fn5KoJoQwgc0O2tP8oL7dKtxM5FqCWsuDBA@mail.gmail.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Tue, 3 Jun 2014 09:27:24 -0700
+Subject: [PATCH] arm64: ptrace: fix empty registers set in prstatus of
+ aarch32 process core
+In-Reply-To: <20140603144602.GN23149@arm.com>
+References: <1401774369-7060-1-git-send-email-victor.kamensky@linaro.org>
+ <1401774369-7060-2-git-send-email-victor.kamensky@linaro.org>
+ <20140603144602.GN23149@arm.com>
+Message-ID: <CAA3XUr2J7X3emYJgHFxBcP5TudazU68TQ4DL8YGLDmDSDbDCUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry about the spam, I guess due to HTML format, delivery failed to
-arm mailing list.
-So re-sending this.
-
-
-++ for reviewing.
-
 Hi Will,
 
-Thanks for reviewing this.
-
-On Tue, Jun 3, 2014 at 6:31 PM, Will Deacon <will.deacon@arm.com> wrote:
+On 3 June 2014 07:46, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Victor,
 >
-> On Mon, Jun 02, 2014 at 11:19:19AM +0100, ritesh.harjani at gmail.com wrote:
-> > From: Ritesh Harjani <ritesh.harjani@gmail.com>
-> > Hi All,
+> Thanks for both the fix and the detailed explanation!
 >
-> Hi Ritesh,
+> On Tue, Jun 03, 2014 at 06:46:09AM +0100, Victor Kamensky wrote:
+>> Currently core file of aarch32 process prstatus note has empty
+>> registers set. As result aarch32 core files create by V8 kernel are
+>> not very useful.
+>>
+>> It happens because compat_gpr_get and compat_gpr_set functions can
+>> copy registers values to/from either kbuf or ubuf. ELF core file
+>> collection function fill_thread_core_info calls compat_gpr_get
+>> with kbuf set and ubuf set to 0. But current compat_gpr_get and
+>> compat_gpr_set function handle copy to/from only ubuf case.
+>>
+>> Fix is to handle kbuf and ubuf as two separate cases in similar
+>> way as other functions like user_regset_copyout, user_regset_copyin do.
 >
-> Thanks for the new patches. I have a few comments on the series as a whole.
+> An alternative is to use set_fs when kbuf is set, then use
+> copy_{to,from}_user for everything. However, given how ugly I find
+> set_fs to start with, your patch looks good to me:
 >
-> > This patch series is to refractor iommu related common code from
-> > arch/arm/dma-mapping.c to lib/iommu-helper.c based on the various
-> > discussions with the maintainers/experts [1].
-> >
-> > Currently the only user of the common lib/iommu-helper code will
-> > be ARM & ARM64 but later various architecture might try to use this
-> > iommu lib helper functions.
-> >
-> > Major change of this refactoring starts with bringing out struct dma_iommu_mapping
-> > *mapping variable from arch/arm/include/asm/device.h to include/linux/device.h
-> > and by moving out complete structure defination of dma_iommu_mapping to
-> > inclue/linux/iommu-helper.h. Link [2] give more details on why this was done,
-> > also this change got approval from Will Daecon [2].
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+
+Thank you for review. Please forgive my naive question, I've tried to
+google it, but does not look I do a good job. Is there any special thing
+I need to do, so you or Catalin would pick this up? I've posted patches
+to Russell's patch system before but never dealt with arm64 patches.
+
+Or I just need to repost the patch to linux-arm-kernel with your
+'Acked-by'  and Cc: stable at vger.kernel.org in it?
+
+Thanks,
+Victor
+
+> We probably want a CC stable too.
 >
-> Well, I can't approve changes to include/linux/device.h, so that probably
-> needs to be acked by Grant and/or Greg. Could you split that patch out into
-> a separate change please, so that it can go in independently?
-
-Yes, I think what you are asking here is done as part of patch [1/4],
-which are changes to include/linux/device.h
-"arm: dma-iommu: Move out dma_iommu_mapping struct".
-
-Did you mean something else here, when you said to have a independent
-patch for this ? I guess path [1/4] does what you are asking. Please
-let me know if I missed something here.
-
->
-> Also, I think you could merge patches 2 and 3, no?
-
-I did this so that reviewers don't have a large change to review. I
-guess I got suggestions for this earlier.
-But if you still insist I can merge the changes ?
-
->
->
-> > There are 1/2 more function definitions which I can think of moving out, but
-> > those can be done once this patch series is approved as those are not very
-> > big changes.
->
-> This certainly looks good to start with, although I think you should
-> consider renaming the functions in the helper library so that they aren't
-> prefixed with double underscores. Maybe iommu_helper_* instead?
-
-Ok, I did had iommu_lib* routine in my earlier raw patch series to get
-some comments, on which Arnd commented if I better drop those lib_
-prefix. If I only have iommu_ prefix it confuses with drivers/iommu.c.
-(http://lists.linuxfoundation.org/pipermail/iommu/2014-March/007837.html)
-
-Ok, so I will better have iommu_helper prefix in the v2 patch series.
-Please comment if anyone have objections on this.
-
->
-> Finally, please drop the ChangeId entries from your commit messages (and
-
-Yes, forgot to remove this. Sorry about that.
-
->
-> you've consistently misspelled refactor as refractor).
-
-Yes, my bad I keep getting confused between these two words. I will
-fix this as well in v2.
-
->
+> Cheers,
 >
 > Will
-
-
-Thanks
-Ritesh
+>
+>> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+>> ---
+>>  arch/arm64/kernel/ptrace.c | 28 +++++++++++++++++++---------
+>>  1 file changed, 19 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+>> index 6a8928b..9c9c2b9 100644
+>> --- a/arch/arm64/kernel/ptrace.c
+>> +++ b/arch/arm64/kernel/ptrace.c
+>> @@ -650,11 +650,16 @@ static int compat_gpr_get(struct task_struct *target,
+>>                       reg = task_pt_regs(target)->regs[idx];
+>>               }
+>>
+>> -             ret = copy_to_user(ubuf, &reg, sizeof(reg));
+>> -             if (ret)
+>> -                     break;
+>> -
+>> -             ubuf += sizeof(reg);
+>> +             if (kbuf) {
+>> +                     memcpy(kbuf, &reg, sizeof(reg));
+>> +                     kbuf += sizeof(reg);
+>> +             } else {
+>> +                     ret = copy_to_user(ubuf, &reg, sizeof(reg));
+>> +                     if (ret)
+>> +                             break;
+>> +
+>> +                     ubuf += sizeof(reg);
+>> +             }
+>>       }
+>>
+>>       return ret;
+>> @@ -684,11 +689,16 @@ static int compat_gpr_set(struct task_struct *target,
+>>               unsigned int idx = start + i;
+>>               compat_ulong_t reg;
+>>
+>> -             ret = copy_from_user(&reg, ubuf, sizeof(reg));
+>> -             if (ret)
+>> -                     return ret;
+>> +             if (kbuf) {
+>> +                     memcpy(&reg, kbuf, sizeof(reg));
+>> +                     kbuf += sizeof(reg);
+>> +             } else {
+>> +                     ret = copy_from_user(&reg, ubuf, sizeof(reg));
+>> +                     if (ret)
+>> +                             return ret;
+>>
+>> -             ubuf += sizeof(reg);
+>> +                     ubuf += sizeof(reg);
+>> +             }
+>>
+>>               switch (idx) {
+>>               case 15:
+>> --
+>> 1.8.1.4
+>>
+>>
