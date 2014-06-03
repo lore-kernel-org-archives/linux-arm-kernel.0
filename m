@@ -1,71 +1,39 @@
-From: holgerschurig@gmail.com (Holger Schurig)
-Date: Tue, 3 Jun 2014 17:45:16 +0200
-Subject: iMX6Q FEC: transmit queue 0 timed out
-In-Reply-To: <d7f1957c2afc44e8b900001e606905c0@BLUPR03MB373.namprd03.prod.outlook.com>
-References: <CAOpc7mF4naY8xuBDFNpHuQPsrULVriKj-ZcpEwpPwtA8UT1Wpw@mail.gmail.com>
- <20140602124242.GB933@n2100.arm.linux.org.uk>
- <CAOpc7mFbJQNeBmOG0C-Qn856MmhtUkTq=QeDPC-EWXryi6sFGg@mail.gmail.com>
- <20140602133352.GC933@n2100.arm.linux.org.uk>
- <CAOpc7mHJ5CqCcB1rE3b8q58HDdSWeG41PTAMwgeARAL_hgUt_g@mail.gmail.com>
- <d7f1957c2afc44e8b900001e606905c0@BLUPR03MB373.namprd03.prod.outlook.com>
-Message-ID: <CAOpc7mHHOmEcvnSDTc+9eyCtLyMBvR2aU36XFcddT4pa0f2KOQ@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 3 Jun 2014 17:50:07 +0200
+Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
+In-Reply-To: <20140528154703.GJ19967@e103034-lin>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
+ <20140528121001.GI19967@e103034-lin>
+ <CAKfTPtDxeBfZK1AxCRqEG91pi--Ti1RYFoQPDhvMVnGTCspQ-g@mail.gmail.com>
+ <20140528154703.GJ19967@e103034-lin>
+Message-ID: <20140603155007.GZ30445@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for you help.
+On Wed, May 28, 2014 at 04:47:03PM +0100, Morten Rasmussen wrote:
+> Since we may do periodic load-balance every 10 ms or so, we will perform
+> a number of load-balances where runnable_avg_sum will mostly be
+> reflecting the state of the world before a change (new task queued or
+> moved a task to a different cpu). If you had have two tasks continuously
+> on one cpu and your other cpu is idle, and you move one of the tasks to
+> the other cpu, runnable_avg_sum will remain unchanged, 47742, on the
+> first cpu while it starts from 0 on the other one. 10 ms later it will
+> have increased a bit, 32 ms later it will be 47742/2, and 345 ms later
+> it reaches 47742. In the mean time the cpu doesn't appear fully utilized
+> and we might decide to put more tasks on it because we don't know if
+> runnable_avg_sum represents a partially utilized cpu (for example a 50%
+> task) or if it will continue to rise and eventually get to 47742.
 
-Okay, first I enabled SION, I used MX6QDL_PAD_GPIO_16__ENET_REF_CLK
-0x4001b0a8. Barebox still worked, Linux not.
+Ah, no, since we track per task, and update the per-cpu ones when we
+migrate tasks, the per-cpu values should be instantly updated.
 
-As soon as I set GPR1[21], Barebox can no longer boot via TFTP:
-
-barebox:/ initrd
-Kernel + Initrd via TFTP
-eth0: error frame: 0x4c226028 0x00000804
-T eth0: error frame: 0x4c226048 0x00000804
-T eth0: error frame: 0x4c226050 0x00000810
-T eth0: error frame: 0x4c226098 0x00000804
-T error: First block is not block 1 (2)
-could not open /mnt/image/boot/initrd.img.gz: Invalid argument
-handler failed with: Invalid argument
-barebox:/
-
-
-Also, it looks like Linux itself sets this bit, don't know where.
-Because after barebox couldn't boot via TFTP anymore, I changed
-barebox back to not set it:
-
-barebox:/ md 0x20e0004+4
-020e0004: ff0d001b                                           ....
-barebox:/ initrd
-Kernel + Initrd via TFTP
-
-Loading ARM Linux zImage '/mnt/linux/arch/arm/boot/zImage'
-OS image not yet relocated
-Loading initrd GZIP compressed '/mnt/image/boot/initrd.img.gz'
-initrd image not yet relocated
-Passing control to ARM zImage handler
-no OS load address, defaulting to 0x10708000
-no initrd load address, defaulting to 0x109ca000
-commandline: console=ttymxc0,115200n8 quiet root=/dev/ram rdinit=/sbin/init
-
-Starting kernel at 0x10708000, initrd at 0x109ca000, oftree at 0x10a9b000...
-
-/ # devmem 0x20e0004
-0xFF2D301B
-
-
-Here, Barebox shows it's not set, and Linux (busybox' devmem command)
-show that it's set. I did the obvious thing and cleared that bit in
-Linux (via devmem 0x20e0004 32 0xFF0D301B), but that didn't make
-"ifconfig eth0 192.168.233.198" work, in both cases the same error
-messages:
-
-fec 2188000.ethernet eth0: MDIO write timeout
-fec 2188000.ethernet eth0: MDIO read timeout
-fec 2188000.ethernet eth0: MDIO write timeout
-fec 2188000.ethernet eth0: could not attach to PHY
-ifconfig: SIOCSIFFLAGS: Connection timed out
-
-
-I wonder if I need to turn on this anatop clock?  How?
+If we were to increase per task storage, we might as well also track
+running_avg not only runnable_avg.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140603/5592e64c/attachment.sig>
