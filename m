@@ -1,58 +1,30 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 3 Jun 2014 08:50:35 -0600
-Subject: [PATCH 0/8] i.MX6 PCIe binding change and MSI support
-In-Reply-To: <1401801767.5422.4.camel@weser.hi.pengutronix.de>
-References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
- <20140424175844.GD29593@google.com>
- <1398421265.4657.25.camel@weser.hi.pengutronix.de>
- <CAErSpo7Boi8d+apAUC3TmmE33LuRMYJ6J+TEPLRbeyZyU3O8RQ@mail.gmail.com>
- <1398774686.4677.12.camel@weser.hi.pengutronix.de>
- <1399885183.5016.4.camel@weser.hi.pengutronix.de>
- <20140530173053.GF4607@google.com>
- <1401801767.5422.4.camel@weser.hi.pengutronix.de>
-Message-ID: <CAErSpo5hP6UYbCVMu_43ezbrNvd0-BBW_KOVbcd_Uj4MHRao2Q@mail.gmail.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 03 Jun 2014 15:57:18 +0100
+Subject: [E1000-devel] ARM support for igb driver
+In-Reply-To: <5368F898.2000803@intel.com>
+References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>	<CF7EA37A.4676A%matthew.vick@intel.com>	<CAHH3p5JFc3jgeK7OFd1rtgDS3gjRdjiPr3LwwqfyKMPGSTwMWA@mail.gmail.com>	<CF7FD060.46A87%matthew.vick@intel.com>	<CAHH3p5J8V6uWEzbCoT+x-6_2x1q=nc=_oMn0qnnj113FmeuW6A@mail.gmail.com>	<9B4A1B1917080E46B64F07F2989DADD6533627A5@ORSMSX114.amr.corp.intel.com>	<CAHH3p5KEPXw5mxP-13evd774nyO5C13ky0=fCaZPCNVx1gh3Ow@mail.gmail.com>	<CAHH3p5LaRwgdECxsO4OZSdWEhGt232yj-3347kYEStP6NLg2xg@mail.gmail.com>	<5360041A.7030005@intel.com>	<CAHH3p5L6WM3FaZ19Tw9vUcsk+kERfBKnGC2BRtnftJR1pbSF7g@mail.gmail.com>	<5367AE02.8030802@intel.com>	<20140505223839.45778902@skate>	<536800A8.7090801@intel.com>
+ <CAHH3p5L4DaORYJ8_6zMEY3ikEnABU1L0B2C6Fezb_g6dCjtr5Q@mail.gmail.com>
+ <5368F898.2000803@intel.com>
+Message-ID: <538DE24E.10904@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 3, 2014 at 7:22 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> Hello Bjorn,
->
-> Am Freitag, den 30.05.2014, 11:30 -0600 schrieb Bjorn Helgaas:
->> On Mon, May 12, 2014 at 10:59:43AM +0200, Lucas Stach wrote:
->> > Hi Bjorn,
->> >
->> > just a friendly reminder. It would be nice if you could pull those in.
->> >
->> > Shawn already pulled the DT change and as it is a binding change this
->> > means PCIe on i.MX6 is broken in -next, as long as the remaining patches
->> > are missing.
->>
->> I applied these to pci/host-imx6 for v3.16.
->>
->> Sorry I didn't do this sooner; I get a lot of email and it's easy to
->> overlook things.  I mostly work from patchwork
->> (http://patchwork.ozlabs.org/project/linux-pci/list/?order=date), and I had
->> dropped this series from there because there was enough discussion that I
->> expected a re-post, so it wasn't on my radar screen anymore.
->>
->> Bjorn
->>
->> > Am Dienstag, den 29.04.2014, 14:31 +0200 schrieb Lucas Stach:
->> > > Hi Bjorn,
->> > >
->> > > Am Freitag, den 25.04.2014, 08:39 -0600 schrieb Bjorn Helgaas:
->> > > [...]
->> > > > >> >   PCI: designware: split Exynos and i.MX bindings
->
-> It seems you missed this one patch. This isn't too urgent, as it is just
-> the doc update, but it should still go into 3.16 along with the other
-> changes. I would have expected that is ok for this to go through your
-> tree.
+On 06/05/14 15:58, Alexander Duyck wrote:
+> Shiv,
+> 
+> I think we are at the limits of what we can do from the Intel end.
+> Based on the comments from Thomas it sounds like there shouldn't be any
+> issues specifically with ARM that prevent the use of IGB PCIe devices,
+> and the fact is the error your are seeing "Unhandled fault: imprecise
+> external abort (0x1406) at 0x00000000" can indicate some sort of bus
+> fault.  It would probably be best to work with someone more familiar
+> with the inner workings of ARM CPUs as they might be able to work out
+> some other workarounds for the external abort.
 
-Oops, sorry.  I had mentioned patches 4-8 earlier in the conversation,
-so that's what I merged.
+I did send a pair of patches for this, as imprecise aborts are not
+traceable to their source instruction and there is a case that it
+should not abort any tasks.
 
-I added patch 2 to pci/host-imx6, and I'll ask Linus to pull it later
-along with some other things I forgot.  Thanks for the reminder!
-
-Bjorn
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
