@@ -1,66 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 3 Jun 2014 09:11:36 +0100
-Subject: [PATCH 3/3] i2c: Make I2C ID tables non-mandatory for DT'ed
- and/or ACPI'ed devices
-In-Reply-To: <20140602153417.2065c1a5@alan.etchedpixels.co.uk>
-References: <1401716463-23457-1-git-send-email-lee.jones@linaro.org>
- <1401716463-23457-4-git-send-email-lee.jones@linaro.org>
- <20140602153417.2065c1a5@alan.etchedpixels.co.uk>
-Message-ID: <20140603081136.GE3060@lee--X1>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue,  3 Jun 2014 10:21:30 +0200
+Subject: [RESEND PATCH v4 0/2] i2c: sunxi: add P2WI controller support
+Message-ID: <1401783692-22358-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 02 Jun 2014, One Thousand Gnomes wrote:
+Hello,
 
-> On Mon,  2 Jun 2014 14:41:03 +0100
-> Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > Currently the I2C framework insists on devices supplying an I2C ID
-> > table.  Many of the devices which do so unnecessarily adding quite a
-> > few wasted lines to kernel code.  This patch allows drivers a means
-> > to 'not' supply the aforementioned table and match on either DT
-> > and/or ACPI match tables instead.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/i2c/i2c-core.c | 13 ++++++++++++-
-> >  1 file changed, 12 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> > index d0c7180..811b78f 100644
-> > --- a/drivers/i2c/i2c-core.c
-> > +++ b/drivers/i2c/i2c-core.c
-> > @@ -271,7 +271,18 @@ static int i2c_device_probe(struct device *dev)
-> >  		return 0;
-> >  
-> >  	driver = to_i2c_driver(dev->driver);
-> > -	if (!driver->probe || !driver->id_table)
-> > +	if (!driver->probe)
-> > +		return -EINVAL;
-> > +
-> > +	/*
-> > +	 * An I2C ID table is not madatory, if and only if, a suitable Device
-> 
-> typo "madatory"..
-> 
-> > +	 * Tree and/or ACPI match table entry is supplied for the probing
-> > +	 * device.
-> > +	 *
-> > +	 * TODO: Provide 'device type' to 'ACPI node' call and match here.
-> > +	 */
-> > +	if (!driver->id_table &&
-> > +	    !of_match_device(dev->driver->of_match_table, dev))
-> >  		return -ENODEV;
-> >  
-> 
-> Looks sensible to me other than that.
+This series adds support for the P2WI block used by some Allwinner boards
+to interface with the AXP221 PMIC.
 
-Can I add your Ack once the typo is fixed?
+Wolfram, I sent the last version of this series almost a month ago and had
+no feedback from you.
 
-> >  	if (!device_can_wakeup(&client->dev))
+We need this code to support the "X-Powers' AXP221 PMIC + Allwinner's A31
+SoC" solution (which, AFAICT, is used on most A31 boards), and the fact
+that it's not merged or at least reviewed is really holding us back.
+
+Best Regards,
+
+Boris
+
+Changes since v3:
+- update the DT bindings doc
+- fix a comment that was no longer true
+
+Changes since v2:
+- drop the initialization (switch from I2C to P2WI mode) part
+- print devm_ioremap_resource err code
+
+Changes since v1:
+- implement P2WI initilization
+- implement P2WI bus frequency configuration
+- implement address consistency check
+- fix devm_request_and_ioremap return check
+- rework the macro definitions
+- fix typos
+
+[1] http://www.spinics.net/lists/linux-i2c/msg15066.html
+[2] http://comments.gmane.org/gmane.comp.hardware.netbook.arm.sunxi/8947
+Boris BREZILLON (2):
+  i2c: sunxi: add P2WI DT bindings documentation
+  i2c: sunxi: add P2WI (Push/Pull 2 Wire Interface) controller support
+
+ .../devicetree/bindings/i2c/i2c-sunxi-p2wi.txt     |  41 +++
+ drivers/i2c/busses/Kconfig                         |  12 +
+ drivers/i2c/busses/Makefile                        |   1 +
+ drivers/i2c/busses/i2c-sun6i-p2wi.c                | 349 +++++++++++++++++++++
+ 4 files changed, 403 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-sunxi-p2wi.txt
+ create mode 100644 drivers/i2c/busses/i2c-sun6i-p2wi.c
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.3.2
