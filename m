@@ -1,61 +1,100 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 3 Jun 2014 18:11:48 +0100
-Subject: [PATCH] arm64: ptrace: fix empty registers set in prstatus of
- aarch32 process core
-In-Reply-To: <20140603163341.GS23149@arm.com>
-References: <1401774369-7060-1-git-send-email-victor.kamensky@linaro.org>
- <1401774369-7060-2-git-send-email-victor.kamensky@linaro.org>
- <20140603144602.GN23149@arm.com>
- <CAA3XUr2J7X3emYJgHFxBcP5TudazU68TQ4DL8YGLDmDSDbDCUw@mail.gmail.com>
- <20140603163341.GS23149@arm.com>
-Message-ID: <20140603171148.GE10126@arm.com>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Tue, 3 Jun 2014 18:16:28 +0100
+Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
+In-Reply-To: <20140603154058.GY30445@twins.programming.kicks-ass.net>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
+ <20140528121001.GI19967@e103034-lin>
+ <20140603154058.GY30445@twins.programming.kicks-ass.net>
+Message-ID: <20140603171628.GE29593@e103034-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 03, 2014 at 05:33:41PM +0100, Will Deacon wrote:
-> On Tue, Jun 03, 2014 at 05:27:24PM +0100, Victor Kamensky wrote:
-> > Hi Will,
+On Tue, Jun 03, 2014 at 04:40:58PM +0100, Peter Zijlstra wrote:
+> On Wed, May 28, 2014 at 01:10:01PM +0100, Morten Rasmussen wrote:
+> > The rq runnable_avg_{sum, period} give a very long term view of the cpu
+> > utilization (I will use the term utilization instead of activity as I
+> > think that is what we are talking about here). IMHO, it is too slow to
+> > be used as basis for load balancing decisions. I think that was also
+> > agreed upon in the last discussion related to this topic [1].
 > > 
-> > On 3 June 2014 07:46, Will Deacon <will.deacon@arm.com> wrote:
-> > > Hi Victor,
-> > >
-> > > Thanks for both the fix and the detailed explanation!
-> > >
-> > > On Tue, Jun 03, 2014 at 06:46:09AM +0100, Victor Kamensky wrote:
-> > >> Currently core file of aarch32 process prstatus note has empty
-> > >> registers set. As result aarch32 core files create by V8 kernel are
-> > >> not very useful.
-> > >>
-> > >> It happens because compat_gpr_get and compat_gpr_set functions can
-> > >> copy registers values to/from either kbuf or ubuf. ELF core file
-> > >> collection function fill_thread_core_info calls compat_gpr_get
-> > >> with kbuf set and ubuf set to 0. But current compat_gpr_get and
-> > >> compat_gpr_set function handle copy to/from only ubuf case.
-> > >>
-> > >> Fix is to handle kbuf and ubuf as two separate cases in similar
-> > >> way as other functions like user_regset_copyout, user_regset_copyin do.
-> > >
-> > > An alternative is to use set_fs when kbuf is set, then use
-> > > copy_{to,from}_user for everything. However, given how ugly I find
-> > > set_fs to start with, your patch looks good to me:
-> > >
-> > >   Acked-by: Will Deacon <will.deacon@arm.com>
-> > 
-> > Thank you for review. Please forgive my naive question, I've tried to
-> > google it, but does not look I do a good job. Is there any special thing
-> > I need to do, so you or Catalin would pick this up? I've posted patches
-> > to Russell's patch system before but never dealt with arm64 patches.
-> > 
-> > Or I just need to repost the patch to linux-arm-kernel with your
-> > 'Acked-by'  and Cc: stable at vger.kernel.org in it?
+> > The basic problem is that worst case: sum starting from 0 and period
+> > already at LOAD_AVG_MAX = 47742, it takes LOAD_AVG_MAX_N = 345 periods
+> > (ms) for sum to reach 47742. In other words, the cpu might have been
+> > fully utilized for 345 ms before it is considered fully utilized.
+> > Periodic load-balancing happens much more frequently than that.
 > 
-> Yes, please. Just repost the patch with those tags and we'll pick it up
-> after the merge window. If you notice that we've forgotten, please give us a
-> prod!
+> Like said earlier the 94% mark is actually hit much sooner, but yes,
+> likely still too slow.
+> 
+> 50% at 32 ms, 75% at 64 ms, 87.5% at 96 ms, etc..
 
-Also don't forget to cc us on the email, it's quicker this way.
+Agreed.
 
-Thanks.
+> 
+> > Also, if load-balancing actually moves tasks around it may take quite a
+> > while before runnable_avg_sum actually reflects this change. The next
+> > periodic load-balance is likely to happen before runnable_avg_sum has
+> > reflected the result of the previous periodic load-balance.
+> > 
+> > To avoid these problems, we need to base utilization on a metric which
+> > is updated instantaneously when we add/remove tasks to a cpu (or a least
+> > fast enough that we don't see the above problems).
+> 
+> So the per-task-load-tracking stuff already does that. It updates the
+> per-cpu load metrics on migration. See {de,en}queue_entity_load_avg().
 
--- 
-Catalin
+I think there is some confusion here. There are two per-cpu load metrics
+that tracks differently.
+
+The cfs.runnable_load_avg is basically the sum of the load contributions
+of the tasks on the cfs rq. The sum gets updated whenever tasks are
+{en,de}queued by adding/subtracting the load contribution of the task
+being added/removed. That is the one you are referring to.
+
+The rq runnable_avg_sum (actually rq->avg.runnable_avg_{sum, period}) is
+tracking whether the cpu has something to do or not. It doesn't matter
+many tasks are runnable or what their load is. It is updated in
+update_rq_runnable_avg(). It increases when rq->nr_running > 0 and
+decays if not. It also takes time spent running rt tasks into account in
+idle_{enter, exit}_fair(). So if you remove tasks from the rq, this
+metric will start decaying and eventually get to 0, unlike the
+cfs.runnable_load_avg where the task load contribution subtracted every
+time a task is removed. The rq runnable_avg_sum is the one being used in
+this patch set.
+
+Ben, pjt, please correct me if I'm wrong.
+
+> And keeping an unweighted per-cpu variant isn't that much more work.
+
+Agreed.
+
+> 
+> > In the previous
+> > discussion [1] it was suggested that a sum of unweighted task
+> > runnable_avg_{sum,period} ratio instead. That is, an unweighted
+> > equivalent to weighted_cpuload(). That isn't a perfect solution either.
+> > It is fine as long as the cpus are not fully utilized, but when they are
+> > we need to use weighted_cpuload() to preserve smp_nice. What to do
+> > around the tipping point needs more thought, but I think that is
+> > currently the best proposal for a solution for task and cpu utilization.
+> 
+> I'm not too worried about the tipping point, per task runnable figures
+> of an overloaded cpu are higher, so migration between an overloaded cpu
+> and an underloaded cpu are going to be tricky no matter what we do.
+
+Yes, agreed. I just got the impression that you were concerned about
+smp_nice last time we discussed this.
+
+> > rq runnable_avg_sum is useful for decisions where we need a longer term
+> > view of the cpu utilization, but I don't see how we can use as cpu
+> > utilization metric for load-balancing decisions at wakeup or
+> > periodically.
+> 
+> So keeping one with a faster decay would add extra per-task storage. But
+> would be possible..
+
+I have had that thought when we discussed potential replacements for
+cpu_load[]. It will require some messing around with the nicely
+optimized load tracking maths if we want to have load tracking with a
+different y-coefficient.
