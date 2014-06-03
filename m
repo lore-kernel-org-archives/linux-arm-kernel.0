@@ -1,206 +1,25 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 3 Jun 2014 14:31:13 +0800
-Subject: [PATCH 1/5] ARM: berlin: add SMP support
-In-Reply-To: <1401700866-24804-2-git-send-email-antoine.tenart@free-electrons.com>
-References: <1401700866-24804-1-git-send-email-antoine.tenart@free-electrons.com>
- <1401700866-24804-2-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20140603143113.0b2aeb74@xhacker>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 02 Jun 2014 23:39:37 -0700 (PDT)
+Subject: [PATCH v4 0/2] add hix5hd2 mac driver
+In-Reply-To: <1401774577-16683-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1401774577-16683-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20140602.233937.182448049174382056.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
+From: Zhangfei Gao <zhangfei.gao@linaro.org>
+Date: Tue,  3 Jun 2014 13:49:35 +0800
 
-On Mon, 2 Jun 2014 02:21:02 -0700
-Antoine T?nart <antoine.tenart@free-electrons.com> wrote:
-
-> Adds SMP support for Berlin SoCs. Secondary CPUs are reseted, then
-> execute the instruction we put in the reset exception register, setting
-> the pc at the address contained in the software reset address register,
-> which is the physical address of the Berlin secondary startup.
+> v4:
+> Update indent
+> Use usleep_range instead of udelay
 > 
-> This implementation avoid using the pen lock mechanism.
+> v3:
+> Remove .ndo_get_stats as mentioned by Tobias
+> Add __le32 conversion pointed by Mark
 > 
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> ---
->  arch/arm/mach-berlin/Kconfig   |  3 ++
->  arch/arm/mach-berlin/Makefile  |  3 +-
->  arch/arm/mach-berlin/headsmp.S | 30 +++++++++++++
->  arch/arm/mach-berlin/platsmp.c | 99
-> ++++++++++++++++++++++++++++++++++++++++++ 4 files changed, 134
-> insertions(+), 1 deletion(-) create mode 100644
-> arch/arm/mach-berlin/headsmp.S create mode 100644
-> arch/arm/mach-berlin/platsmp.c
-> 
-> diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
-> index d3c5f14dc142..e3733692f67a 100644
-> --- a/arch/arm/mach-berlin/Kconfig
-> +++ b/arch/arm/mach-berlin/Kconfig
-> @@ -4,6 +4,7 @@ config ARCH_BERLIN
->  	select GENERIC_IRQ_CHIP
->  	select DW_APB_ICTL
->  	select DW_APB_TIMER_OF
-> +	select SMP
->  
->  if ARCH_BERLIN
->  
-> @@ -13,6 +14,7 @@ config MACH_BERLIN_BG2
->  	bool "Marvell Armada 1500 (BG2)"
->  	select CACHE_L2X0
->  	select CPU_PJ4B
-> +	select HAVE_ARM_SCU if SMP
->  	select HAVE_ARM_TWD if SMP
->  
->  config MACH_BERLIN_BG2CD
-> @@ -24,6 +26,7 @@ config MACH_BERLIN_BG2Q
->  	bool "Marvell Armada 1500 Pro (BG2-Q)"
->  	select CACHE_L2X0
->  	select CPU_V7
-> +	select HAVE_ARM_SCU if SMP
->  	select HAVE_ARM_TWD if SMP
->  	select HAVE_SMP
->  
-> diff --git a/arch/arm/mach-berlin/Makefile b/arch/arm/mach-berlin/Makefile
-> index ab69fe956f49..c0719ecd1890 100644
-> --- a/arch/arm/mach-berlin/Makefile
-> +++ b/arch/arm/mach-berlin/Makefile
-> @@ -1 +1,2 @@
-> -obj-y += berlin.o
-> +obj-y			+= berlin.o
-> +obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o
-> diff --git a/arch/arm/mach-berlin/headsmp.S b/arch/arm/mach-berlin/headsmp.S
-> new file mode 100644
-> index 000000000000..d295b5185598
-> --- /dev/null
-> +++ b/arch/arm/mach-berlin/headsmp.S
-> @@ -0,0 +1,30 @@
-> +/*
-> + * Copyright (C) 2014 Marvell Technology Group Ltd.
-> + *
-> + * Antoine T?nart <antoine.tenart@free-electrons.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/linkage.h>
-> +#include <linux/init.h>
-> +#include <asm/assembler.h>
-> +
-> +ENTRY(berlin_secondary_startup)
-> + ARM_BE8(setend be)
-> +	bl	v7_invalidate_l1
-> +	b       secondary_startup
-> +ENDPROC(berlin_secondary_startup)
-> +
-> +/*
-> + * If the following instruction is set in the reset exception register,
-> CPUs
-> + * will fetch the value of the software reset address register when being
-> + * reseted.
-> + */
-> +.global boot_inst
-> +boot_inst:
-> +	ldr	pc, [pc, #140]
-> +
-> +	.align
-> diff --git a/arch/arm/mach-berlin/platsmp.c b/arch/arm/mach-berlin/platsmp.c
-> new file mode 100644
-> index 000000000000..c04c90b81ae3
-> --- /dev/null
-> +++ b/arch/arm/mach-berlin/platsmp.c
-> @@ -0,0 +1,99 @@
-> +/*
-> + * Copyright (C) 2014 Marvell Technology Group Ltd.
-> + *
-> + * Antoine T?nart <antoine.tenart@free-electrons.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/io.h>
-> +#include <linux/delay.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +
-> +#include <asm/cacheflush.h>
-> +#include <asm/smp_plat.h>
-> +#include <asm/smp_scu.h>
-> +
-> +#define CPU_RESET		0x00
-> +
-> +#define RESET_VECT		0x00
-> +#define SW_RESET_ADDR		0x94
-> +
-> +extern void berlin_secondary_startup(void);
-> +extern u32 boot_inst;
-> +
-> +static void __iomem *cpu_ctrl;
-> +
-> +static inline void berlin_reset_cpu(unsigned int cpu)
-> +{
-> +	u32 val;
-> +
-> +	val = readl(cpu_ctrl + CPU_RESET);
-> +	val |= BIT(cpu_logical_map(cpu));
-> +	writel(val, cpu_ctrl + CPU_RESET);
+> v2:
+> Update binding accoring to Sergei comments
+> Update descriptor as Arnd's suggestion
 
-"writel(BIT(cpu_logical_map(cpu)), cpu_ctrl + CPU_RESET)" is enough.
-we don't need to read and modify, because we writing 0 has no any effect.
-
-> +}
-> +
-> +static int berlin_boot_secondary(unsigned int cpu, struct task_struct
-> *idle) +{
-> +	if (!cpu_ctrl)
-> +		return -EFAULT;
-> +
-> +	/*
-> +	 * Reset the CPU, making it to execute the instruction in the reset
-> +	 * exception register.
-> +	 */
-> +	berlin_reset_cpu(cpu);
-> +
-> +	return 0;
-> +}
-> +
-> +static void __init berlin_smp_prepare_cpus(unsigned int max_cpus)
-> +{
-> +	struct device_node *np;
-> +	void __iomem *scu_base;
-> +	void __iomem *vectors_base;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
-> +	scu_base = of_iomap(np, 0);
-> +	of_node_put(np);
-> +	if (!scu_base)
-> +		return;
-> +
-> +	np = of_find_compatible_node(NULL, NULL,
-> "marvell,berlin-cpu-ctrl");
-> +	cpu_ctrl = of_iomap(np, 0);
-> +	of_node_put(np);
-> +	if (!cpu_ctrl)
-> +		goto unmap_scu;
-> +
-> +	vectors_base = ioremap(CONFIG_VECTORS_BASE, SZ_32K);
-> +	if (!vectors_base)
-> +		goto unmap_scu;
-> +
-> +	scu_enable(scu_base);
-> +	flush_cache_all();
-> +
-> +	/*
-> +	 * Write the first instruction the CPU will execute after being
-> reseted
-> +	 * in the reset exception register.
-> +	 */
-> +	writel(boot_inst, vectors_base + RESET_VECT);
-
-Is it better to let bootloader/firmware handle this writing. Then, we can
-also remove the tricky boot_inst in headsmp.S.
-
-Many thanks for this patch,
-Jisheng
+Series applied, thanks.
