@@ -1,37 +1,33 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 3 Jun 2014 15:15:16 -0700
-Subject: [PATCH] ARM: mvebu: DT: fix OpenBlocks AX3-4 RAM size
-In-Reply-To: <7hzjhtuasd.fsf@paris.lan>
-References: <5388ddb9.0458440a.2be7.323c@mx.google.com>
- <1401818320-7202-1-git-send-email-jason@lakedaemon.net>
- <7hzjhtuasd.fsf@paris.lan>
-Message-ID: <CAGa+x84ZdQDtpdrxVPY2i9jnvZfug6JnP6Ok=5Tafqy3cbOtdw@mail.gmail.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Wed, 4 Jun 2014 01:18:07 +0200
+Subject: HSI: fix omap ssi driver dependency
+In-Reply-To: <5261510.XDu5DxNnFl@wuerfel>
+References: <5261510.XDu5DxNnFl@wuerfel>
+Message-ID: <20140603231807.GA13171@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 3, 2014 at 11:07 AM, Kevin Hilman <khilman@linaro.org> wrote:
-> Jason Cooper <jason@lakedaemon.net> writes:
->
->> The OpenBlocks AX3-4 has a non-DT bootloader.  It also comes with 1GB of
->> soldered on RAM, and a DIMM slot for expansion.
->>
->> Unfortunately, atags_to_fdt() doesn't work in big-endian mode, so we see
->> the following failure when attempting to boot a big-endian kernel:
-[...]
->>
->> Fix this by setting a sane default (1 GB) in the dts file.
->>
->> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
->
-> Tested-by: Kevin Hilman <khilman@linaro.org>
+Hi Arnd,
 
-Also FYI, I put a temporary hack into my automated boot setup to use
-fdtput to live-patch the openblocks DTB with 1G, and you can see that
-openblocks is now passing boot test for big-endian:
+On Tue, Jun 03, 2014 at 05:14:01PM +0200, Arnd Bergmann wrote:
+> The SSI protocol implementation has an incorrect dependency on the OMAP_SSI
+> driver, which allows SSI to be built-in while the underlying OMAP_SSI
+> implementation is a loadable module, causing a link error.
+> 
+> This changes the dependency to the simpler 'depends on OMAP_SSI' that also
+> ensures that SSI-protocol can only be a module if OMAP_SSI is not built-in.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-   http://lists.linaro.org/pipermail/kernel-build-reports/2014-June/003812.html
+Thanks, applied:
 
-Also FYI, I added mvebu_v7_defconfig + CONFIG_CPU_BIG_ENDIAN=y to the
-mix, so those should start showing up in subsequent boot tests also.
+https://git.kernel.org/cgit/linux/kernel/git/sre/linux-hsi.git/commit/?h=for-next&id=518e1624f56615a88c91bc79c7b4b4d9eb2419e5
 
-Kevin
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140604/d46a40df/attachment.sig>
