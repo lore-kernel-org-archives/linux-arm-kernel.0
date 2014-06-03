@@ -1,39 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 2 Jun 2014 21:03:55 -0700
-Subject: Exynos induced build error with recent arm-soc
-In-Reply-To: <20140602234216.GD933@n2100.arm.linux.org.uk>
-References: <20140602234216.GD933@n2100.arm.linux.org.uk>
-Message-ID: <CAOesGMjLAoWOAkm-5+HrHDND_TRyBmbA49ugK+bRBZswBhd3wA@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 3 Jun 2014 09:57:14 +0530
+Subject: [PATCH] ARM: Remove ARCH_HAS_CPUFREQ config option
+In-Reply-To: <1401746847-3193-1-git-send-email-sboyd@codeaurora.org>
+References: <1401746847-3193-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CAOh2x==wsy2_+GygS03snFN_YOar3eHi7v1a-jNdsQYoWCAZsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 2, 2014 at 4:42 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Spotted with a randconfig today:
+On Tue, Jun 3, 2014 at 3:37 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> This config exists entirely to hide the cpufreq menu from the
+> kernel configuration unless a platform has selected it. Nothing
+> is actually built if this config is 'Y' and it just leads to
+> more patches that add a select under a platform Kconfig so that
+> some other CPUfreq option can be chosen. Let's remove the
+> option so that we can always enable CPUfreq drivers on ARM
+> platforms.
 >
-> arch/arm/mach-exynos/built-in.o: In function `exynos_set_cpu_boot_addr':
-> pm_domains.c:(.text+0x19c): undefined reference to `sysram_ns_base_addr'
-> arch/arm/mach-exynos/built-in.o:(.data+0x94): undefined reference to `exynos_enter_aftr'
->
-> This should be fixed before the merge window...
->
-> The failing .config is:
->
-> http://www.arm.linux.org.uk/developer/build/file.php?lid=8598
->
-> and the resulting build log with errors:
->
-> http://www.arm.linux.org.uk/developer/build/result.php?type=log&cid=3001&lid=8600&format=build
->
-> Thanks.
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm/Kconfig               | 18 ------------------
+>  arch/arm/mach-davinci/Kconfig  |  1 -
+>  arch/arm/mach-highbank/Kconfig |  1 -
+>  arch/arm/mach-imx/Kconfig      |  3 ---
+>  arch/arm/mach-mvebu/Kconfig    |  1 -
+>  arch/arm/mach-omap2/Kconfig    |  1 -
+>  arch/arm/mach-shmobile/Kconfig |  2 --
+>  arch/arm/mach-spear/Kconfig    |  1 -
+>  arch/arm/mach-tegra/Kconfig    |  1 -
+>  arch/arm/mach-ux500/Kconfig    |  1 -
+>  arch/arm/mach-vexpress/Kconfig |  1 -
+>  arch/arm/mach-vt8500/Kconfig   |  1 -
+>  arch/arm/mach-zynq/Kconfig     |  1 -
+>  13 files changed, 33 deletions(-)
 
-Ah, yes, definitely needs fixing. Looks like sysram_base_addr can
-cause similar problems if CONFIG_SUSPEND -> CONFIG_PM_SLEEP is enabled
-on !SMP.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-The setup (and location) for these variables need to be moved out of
-platsmp.c. exynos.c seems like as good a place as any in this case.
-I'll post a patch separately in a few minutes.
-
-
--Olof
+While you are at it, please see if you can also fix unicore as well.
