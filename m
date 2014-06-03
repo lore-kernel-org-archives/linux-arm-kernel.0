@@ -1,40 +1,43 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 03 Jun 2014 10:37:44 -0700
-Subject: [PATCH] clk: export __clk_round_rate for providers
-In-Reply-To: <6099360.oW6xYL5CNm@wuerfel>
-References: <6099360.oW6xYL5CNm@wuerfel>
-Message-ID: <20140603173744.10062.55679@quantum>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 3 Jun 2014 19:39:23 +0200
+Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
+In-Reply-To: <20140603171628.GE29593@e103034-lin>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
+ <20140528121001.GI19967@e103034-lin>
+ <20140603154058.GY30445@twins.programming.kicks-ass.net>
+ <20140603171628.GE29593@e103034-lin>
+Message-ID: <20140603173923.GF13930@laptop.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Arnd Bergmann (2014-06-03 02:40:14)
-> Commit 99cbd064b0 ("clk: qcom: Support display RCG clocks") adds
-> a use of the __clk_round_rate in a clock provided that can be built
-> as a loadable module.
+On Tue, Jun 03, 2014 at 06:16:28PM +0100, Morten Rasmussen wrote:
+> > So the per-task-load-tracking stuff already does that. It updates the
+> > per-cpu load metrics on migration. See {de,en}queue_entity_load_avg().
 > 
-> This exports the symbol to avoid the build error from compiling
-> the qcom clock as a module.
+> I think there is some confusion here. There are two per-cpu load metrics
+> that tracks differently.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Mike Turquette <mturquette@linaro.org>
+> The cfs.runnable_load_avg is basically the sum of the load contributions
+> of the tasks on the cfs rq. The sum gets updated whenever tasks are
+> {en,de}queued by adding/subtracting the load contribution of the task
+> being added/removed. That is the one you are referring to.
+> 
+> The rq runnable_avg_sum (actually rq->avg.runnable_avg_{sum, period}) is
+> tracking whether the cpu has something to do or not. It doesn't matter
+> many tasks are runnable or what their load is. It is updated in
+> update_rq_runnable_avg(). It increases when rq->nr_running > 0 and
+> decays if not. It also takes time spent running rt tasks into account in
+> idle_{enter, exit}_fair(). So if you remove tasks from the rq, this
+> metric will start decaying and eventually get to 0, unlike the
+> cfs.runnable_load_avg where the task load contribution subtracted every
+> time a task is removed. The rq runnable_avg_sum is the one being used in
+> this patch set.
+> 
+> Ben, pjt, please correct me if I'm wrong.
 
-Applied.
+Argh, ok I completely missed that. I think the cfs.runnable_load_avg is
+the sane number, not entirely sure what good rq->avg.runnable_avg is
+good for, it seems a weird metric on first consideration.
 
-Thanks,
-Mike
-
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 2df2b26..8b73ede 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1006,6 +1006,7 @@ unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
->         else
->                 return clk->rate;
->  }
-> +EXPORT_SYMBOL_GPL(__clk_round_rate);
->  
->  /**
->   * clk_round_rate - round the given rate for a clk
-> 
+Will have to ponder that a bit more.
