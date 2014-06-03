@@ -1,58 +1,17 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Tue, 3 Jun 2014 13:13:04 +0530
-Subject: [PATCH 12/14] irqchip: crossbar: introduce centralized check for
- crossbar write
-In-Reply-To: <1401781386-4982-1-git-send-email-r.sricharan@ti.com>
-References: <1401781386-4982-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1401781386-4982-13-git-send-email-r.sricharan@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 3 Jun 2014 15:45:58 +0800
+Subject: [PATCH] ARM: dts: imx6: ventana: correct gw52xx sgtl5000 clock
+ source
+In-Reply-To: <1401734641-27308-1-git-send-email-tharvey@gateworks.com>
+References: <1401734641-27308-1-git-send-email-tharvey@gateworks.com>
+Message-ID: <20140603074557.GQ8860@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+On Mon, Jun 02, 2014 at 11:44:01AM -0700, Tim Harvey wrote:
+> Correct the invalid clock for the sgtl5000 audio codec on the GW52xx Ventana
+> baseboard.
+> 
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 
-This is a basic check to ensure that crossbar register needs to be
-written. This ensures that we have a common check which is used in
-both map and unmap logic.
-
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- drivers/irqchip/irq-crossbar.c |   14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index cf69c4d..745ad0a 100644
---- a/drivers/irqchip/irq-crossbar.c
-+++ b/drivers/irqchip/irq-crossbar.c
-@@ -96,10 +96,20 @@ static inline int allocate_free_irq(int cb_no)
- 	return -ENODEV;
- }
- 
-+static inline bool needs_crossbar_write(irq_hw_number_t hw)
-+{
-+	if (hw > GIC_IRQ_START)
-+		return true;
-+
-+	return false;
-+}
-+
- static int crossbar_domain_map(struct irq_domain *d, unsigned int irq,
- 			       irq_hw_number_t hw)
- {
--	cb->write(hw - GIC_IRQ_START, cb->irq_map[hw - GIC_IRQ_START]);
-+	if (needs_crossbar_write(hw))
-+		cb->write(hw - GIC_IRQ_START, cb->irq_map[hw - GIC_IRQ_START]);
-+
- 	return 0;
- }
- 
-@@ -117,7 +127,7 @@ static void crossbar_domain_unmap(struct irq_domain *d, unsigned int irq)
- {
- 	irq_hw_number_t hw = irq_get_irq_data(irq)->hwirq;
- 
--	if (hw > GIC_IRQ_START)
-+	if (needs_crossbar_write(hw))
- 		cb->irq_map[hw - GIC_IRQ_START] = IRQ_FREE;
- }
- 
--- 
-1.7.9.5
+Applied, thanks.
