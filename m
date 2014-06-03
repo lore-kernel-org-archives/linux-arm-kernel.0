@@ -1,42 +1,120 @@
-From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Tue, 03 Jun 2014 08:02:37 +0200
-Subject: [PATCH 2/3] arm: tegra: enable igb, stmpe, i2c chardev, spidev,
- lm95245, pwm leds
-In-Reply-To: <20140602221627.GP31751@sirena.org.uk>
-References: <c5522b0efcbfc7690dcde6aaf78b9dd568f99604.1401665237.git.marcel@ziswiler.com>
- <39a8704a4c8170d6b0620a1e5e44042eae6d8810.1401665237.git.marcel@ziswiler.com>
- <538CA24B.1010602@wwwdotorg.org> <538CA635.4050502@ziswiler.com>
- <20140602221627.GP31751@sirena.org.uk>
-Message-ID: <538D64FD.2010909@ziswiler.com>
+From: spk.linux@gmail.com (Sachin Kamat)
+Date: Tue, 3 Jun 2014 11:43:21 +0530
+Subject: [PATCH] ARM: Remove ARCH_HAS_CPUFREQ config option
+In-Reply-To: <1401746847-3193-1-git-send-email-sboyd@codeaurora.org>
+References: <1401746847-3193-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CAK5sBcEbLetRcgPuDJ30RqYjLOHhCXChtKE5ep22ZvEPWc9XwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2014 12:16 AM, Mark Brown wrote:
-> On Mon, Jun 02, 2014 at 06:28:37PM +0200, Marcel Ziswiler wrote:
->> On 06/02/2014 06:11 PM, Stephen Warren wrote:
+On Tue, Jun 3, 2014 at 3:37 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> This config exists entirely to hide the cpufreq menu from the
+> kernel configuration unless a platform has selected it. Nothing
+> is actually built if this config is 'Y' and it just leads to
+> more patches that add a select under a platform Kconfig so that
+> some other CPUfreq option can be chosen. Let's remove the
+> option so that we can always enable CPUfreq drivers on ARM
+> platforms.
 >
->>>> +CONFIG_SPI_SPIDEV=y
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm/Kconfig               | 18 ------------------
+>  arch/arm/mach-davinci/Kconfig  |  1 -
+>  arch/arm/mach-highbank/Kconfig |  1 -
+>  arch/arm/mach-imx/Kconfig      |  3 ---
+>  arch/arm/mach-mvebu/Kconfig    |  1 -
+>  arch/arm/mach-omap2/Kconfig    |  1 -
+>  arch/arm/mach-shmobile/Kconfig |  2 --
+>  arch/arm/mach-spear/Kconfig    |  1 -
+>  arch/arm/mach-tegra/Kconfig    |  1 -
+>  arch/arm/mach-ux500/Kconfig    |  1 -
+>  arch/arm/mach-vexpress/Kconfig |  1 -
+>  arch/arm/mach-vt8500/Kconfig   |  1 -
+>  arch/arm/mach-zynq/Kconfig     |  1 -
+>  13 files changed, 33 deletions(-)
 >
->>> Is this useful with DT? I thought that unlike I2C_CHARDEV, spidev needed
->>> dummy devices to exist in DT for spidev to work? If so, there's not much
->>> point adding the option to defconfig, since people can add it when they
->>> put the dummy devices into DT.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 5e91e40c1d22..3fdae40d5114 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -179,13 +179,6 @@ config ARCH_HAS_ILOG2_U32
+>  config ARCH_HAS_ILOG2_U64
+>         bool
 >
->> Yes, the Apalis T30 DT I sent actually contains two of them which we call
->> generic Apalis SPI1 and SPI2 out-of-the-box configured for exactly that.
->> Without the config enabled though it probably does not make much sense to
->> include it in the DT so I would consider removing it again.
+> -config ARCH_HAS_CPUFREQ
+> -       bool
+> -       help
+> -         Internal node to signify that the ARCH has CPUFREQ support
+> -         and that the relevant menu configurations are displayed for
+> -         it.
+> -
+>  config ARCH_HAS_BANDGAP
+>         bool
 >
-> Your DT is broken if it's got a "spidev" node in it, you should be
-> describing the hardware not the Linux implementation of the software.
-> It would be really nice if we had a good way of handling this but we
-> don't yet.
+> @@ -321,7 +314,6 @@ config ARCH_MULTIPLATFORM
+>
+>  config ARCH_INTEGRATOR
+>         bool "ARM Ltd. Integrator family"
+> -       select ARCH_HAS_CPUFREQ
+>         select ARM_AMBA
+>         select ARM_PATCH_PHYS_VIRT
+>         select AUTO_ZRELADDR
+> @@ -540,7 +532,6 @@ config ARCH_DOVE
+>
+>  config ARCH_KIRKWOOD
+>         bool "Marvell Kirkwood"
+> -       select ARCH_HAS_CPUFREQ
+>         select ARCH_REQUIRE_GPIOLIB
+>         select CPU_FEROCEON
+>         select GENERIC_CLOCKEVENTS
+> @@ -639,7 +630,6 @@ config ARCH_LPC32XX
+>  config ARCH_PXA
+>         bool "PXA2xx/PXA3xx-based"
+>         depends on MMU
+> -       select ARCH_HAS_CPUFREQ
+>         select ARCH_MTD_XIP
+>         select ARCH_REQUIRE_GPIOLIB
+>         select ARM_CPU_SUSPEND if PM
+> @@ -709,7 +699,6 @@ config ARCH_RPC
+>
+>  config ARCH_SA1100
+>         bool "SA1100-based"
+> -       select ARCH_HAS_CPUFREQ
+>         select ARCH_MTD_XIP
+>         select ARCH_REQUIRE_GPIOLIB
+>         select ARCH_SPARSEMEM_ENABLE
+> @@ -727,7 +716,6 @@ config ARCH_SA1100
+>
+>  config ARCH_S3C24XX
+>         bool "Samsung S3C24XX SoCs"
+> -       select ARCH_HAS_CPUFREQ
+>         select ARCH_REQUIRE_GPIOLIB
+>         select ATAGS
+>         select CLKDEV_LOOKUP
+> @@ -748,7 +736,6 @@ config ARCH_S3C24XX
+>
+>  config ARCH_S3C64XX
+>         bool "Samsung S3C64XX"
+> -       select ARCH_HAS_CPUFREQ
+>         select ARCH_REQUIRE_GPIOLIB
+>         select ARM_AMBA
+>         select ARM_VIC
+> @@ -811,7 +798,6 @@ config ARCH_S5PC100
+>
+>  config ARCH_S5PV210
+>         bool "Samsung S5PV210/S5PC110"
+> -       select ARCH_HAS_CPUFREQ
+>         select ARCH_HAS_HOLES_MEMORYMODEL
+>         select ARCH_SPARSEMEM_ENABLE
+>         select ATAGS
+> @@ -831,7 +817,6 @@ config ARCH_S5PV210
+>
+>  config ARCH_EXYNOS
+>         bool "Samsung EXYNOS"
+> -       select ARCH_HAS_CPUFREQ
+>         select ARCH_HAS_HOLES_MEMORYMODEL
+>         select ARCH_REQUIRE_GPIOLIB
+>         select ARCH_SPARSEMEM_ENABLE
 
-I strongly disagree, it almost perfectly describes the hardware. Unlike 
-on I2c where modelling a bus is enough to allow generic user space 
-access unfortunately on SPI this is not enough as it requires a specific 
-chip-select as well. This is exactly what spidev does and maps to our 
-hardware perfectly which has one dedicated chip-select per SPI bus on a 
-dedicated header which allows our customers out-of-the-box spidev user 
-space access to almost any SPI device connected to those buses just like 
-with i2c-devs on I2C buses.
+I think this patch is not based on the latest code base as ARCH_EXYNOS
+symbol is now defined in arch/arm/mach-exynos/Kconfig file.
