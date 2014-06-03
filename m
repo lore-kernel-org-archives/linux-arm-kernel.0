@@ -1,78 +1,308 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue,  3 Jun 2014 11:21:30 -0700
-Subject: [PATCH] arm64: ptrace: fix empty registers set in prstatus of aarch32
- process core
-Message-ID: <1401819690-3048-1-git-send-email-victor.kamensky@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue,  3 Jun 2014 11:24:23 -0700
+Subject: [PATCH v2] ARM: Remove ARCH_HAS_CPUFREQ config option
+Message-ID: <1401819863-20296-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently core file of aarch32 process prstatus note has empty
-registers set. As result aarch32 core files create by V8 kernel are
-not very useful.
+This config exists entirely to hide the cpufreq menu from the
+kernel configuration unless a platform has selected it. Nothing
+is actually built if this config is 'Y' and it just leads to more
+patches that add a select under a platform Kconfig so that some
+other CPUfreq option can be chosen. Let's remove the option so
+that we can always enable CPUfreq drivers on ARM platforms.
 
-It happens because compat_gpr_get and compat_gpr_set functions can
-copy registers values to/from either kbuf or ubuf. ELF core file
-collection function fill_thread_core_info calls compat_gpr_get
-with kbuf set and ubuf set to 0. But current compat_gpr_get and
-compat_gpr_set function handle copy to/from only ubuf case.
-
-Fix is to handle kbuf and ubuf as two separate cases in similar
-way as other functions like user_regset_copyout, user_regset_copyin do.
-
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: stable at vger.kernel.org
-Cc: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm64/kernel/ptrace.c | 28 +++++++++++++++++++---------
- 1 file changed, 19 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 6a8928b..9c9c2b9 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -650,11 +650,16 @@ static int compat_gpr_get(struct task_struct *target,
- 			reg = task_pt_regs(target)->regs[idx];
- 		}
+Maybe this can go through the arm-soc tree by direct patch
+application?
+
+ arch/arm/Kconfig               | 17 -----------------
+ arch/arm/mach-davinci/Kconfig  |  1 -
+ arch/arm/mach-exynos/Kconfig   |  1 -
+ arch/arm/mach-highbank/Kconfig |  1 -
+ arch/arm/mach-imx/Kconfig      |  3 ---
+ arch/arm/mach-mvebu/Kconfig    |  1 -
+ arch/arm/mach-omap2/Kconfig    |  1 -
+ arch/arm/mach-shmobile/Kconfig |  2 --
+ arch/arm/mach-spear/Kconfig    |  1 -
+ arch/arm/mach-tegra/Kconfig    |  1 -
+ arch/arm/mach-ux500/Kconfig    |  1 -
+ arch/arm/mach-vexpress/Kconfig |  1 -
+ arch/arm/mach-vt8500/Kconfig   |  1 -
+ arch/arm/mach-zynq/Kconfig     |  1 -
+ 14 files changed, 33 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 692399cc1170..e5a7396c990d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -176,13 +176,6 @@ config ARCH_HAS_ILOG2_U32
+ config ARCH_HAS_ILOG2_U64
+ 	bool
  
--		ret = copy_to_user(ubuf, &reg, sizeof(reg));
--		if (ret)
--			break;
+-config ARCH_HAS_CPUFREQ
+-	bool
+-	help
+-	  Internal node to signify that the ARCH has CPUFREQ support
+-	  and that the relevant menu configurations are displayed for
+-	  it.
 -
--		ubuf += sizeof(reg);
-+		if (kbuf) {
-+			memcpy(kbuf, &reg, sizeof(reg));
-+			kbuf += sizeof(reg);
-+		} else {
-+			ret = copy_to_user(ubuf, &reg, sizeof(reg));
-+			if (ret)
-+				break;
-+
-+			ubuf += sizeof(reg);
-+		}
- 	}
+ config ARCH_HAS_BANDGAP
+ 	bool
  
- 	return ret;
-@@ -684,11 +689,16 @@ static int compat_gpr_set(struct task_struct *target,
- 		unsigned int idx = start + i;
- 		compat_ulong_t reg;
+@@ -319,7 +312,6 @@ config ARCH_MULTIPLATFORM
  
--		ret = copy_from_user(&reg, ubuf, sizeof(reg));
--		if (ret)
--			return ret;
-+		if (kbuf) {
-+			memcpy(&reg, kbuf, sizeof(reg));
-+			kbuf += sizeof(reg);
-+		} else {
-+			ret = copy_from_user(&reg, ubuf, sizeof(reg));
-+			if (ret)
-+				return ret;
+ config ARCH_INTEGRATOR
+ 	bool "ARM Ltd. Integrator family"
+-	select ARCH_HAS_CPUFREQ
+ 	select ARM_AMBA
+ 	select ARM_PATCH_PHYS_VIRT
+ 	select AUTO_ZRELADDR
+@@ -539,7 +531,6 @@ config ARCH_DOVE
  
--		ubuf += sizeof(reg);
-+			ubuf += sizeof(reg);
-+		}
+ config ARCH_KIRKWOOD
+ 	bool "Marvell Kirkwood"
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CPU_FEROCEON
+ 	select GENERIC_CLOCKEVENTS
+@@ -638,7 +629,6 @@ config ARCH_LPC32XX
+ config ARCH_PXA
+ 	bool "PXA2xx/PXA3xx-based"
+ 	depends on MMU
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_MTD_XIP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_CPU_SUSPEND if PM
+@@ -708,7 +698,6 @@ config ARCH_RPC
  
- 		switch (idx) {
- 		case 15:
+ config ARCH_SA1100
+ 	bool "SA1100-based"
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_MTD_XIP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_SPARSEMEM_ENABLE
+@@ -726,7 +715,6 @@ config ARCH_SA1100
+ 
+ config ARCH_S3C24XX
+ 	bool "Samsung S3C24XX SoCs"
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ATAGS
+ 	select CLKDEV_LOOKUP
+@@ -747,7 +735,6 @@ config ARCH_S3C24XX
+ 
+ config ARCH_S3C64XX
+ 	bool "Samsung S3C64XX"
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_AMBA
+ 	select ARM_VIC
+@@ -810,7 +797,6 @@ config ARCH_S5PC100
+ 
+ config ARCH_S5PV210
+ 	bool "Samsung S5PV210/S5PC110"
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARCH_SPARSEMEM_ENABLE
+ 	select ATAGS
+@@ -846,7 +832,6 @@ config ARCH_DAVINCI
+ config ARCH_OMAP1
+ 	bool "TI OMAP1"
+ 	depends on MMU
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARCH_OMAP
+ 	select ARCH_REQUIRE_GPIOLIB
+@@ -2115,9 +2100,7 @@ endmenu
+ 
+ menu "CPU Power Management"
+ 
+-if ARCH_HAS_CPUFREQ
+ source "drivers/cpufreq/Kconfig"
+-endif
+ 
+ source "drivers/cpuidle/Kconfig"
+ 
+diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+index db18ef866593..584e8d4e2892 100644
+--- a/arch/arm/mach-davinci/Kconfig
++++ b/arch/arm/mach-davinci/Kconfig
+@@ -39,7 +39,6 @@ config ARCH_DAVINCI_DA830
+ config ARCH_DAVINCI_DA850
+ 	bool "DA850/OMAP-L138/AM18x based system"
+ 	select ARCH_DAVINCI_DA8XX
+-	select ARCH_HAS_CPUFREQ
+ 	select CP_INTC
+ 
+ config ARCH_DAVINCI_DA8XX
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index d58995c9a95a..845031b50826 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -10,7 +10,6 @@
+ config ARCH_EXYNOS
+ 	bool "Samsung EXYNOS" if ARCH_MULTI_V7
+ 	select ARCH_HAS_BANDGAP
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_AMBA
+diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
+index 830b76e70250..a5960e2ac090 100644
+--- a/arch/arm/mach-highbank/Kconfig
++++ b/arch/arm/mach-highbank/Kconfig
+@@ -1,7 +1,6 @@
+ config ARCH_HIGHBANK
+ 	bool "Calxeda ECX-1000/2000 (Highbank/Midway)" if ARCH_MULTI_V7
+ 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARCH_HAS_OPP
+ 	select ARCH_SUPPORTS_BIG_ENDIAN
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 4cce93d6c042..8acd4b1cc5d6 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -1,6 +1,5 @@
+ config ARCH_MXC
+ 	bool "Freescale i.MX family" if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_OPP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_CPU_SUSPEND if PM
+@@ -99,7 +98,6 @@ config SOC_IMX25
+ 
+ config SOC_IMX27
+ 	bool
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_OPP
+ 	select CPU_ARM926T
+ 	select IMX_HAVE_IOMUX_V1
+@@ -693,7 +691,6 @@ comment "Device tree only"
+ 
+ config SOC_IMX5
+ 	bool
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_OPP
+ 	select HAVE_IMX_SRC
+ 	select MXC_TZIC
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 6090b9eb00c8..c8bef39ec199 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -84,7 +84,6 @@ config MACH_DOVE
+ 
+ config MACH_KIRKWOOD
+ 	bool "Marvell Kirkwood boards" if ARCH_MULTI_V5
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CPU_FEROCEON
+ 	select KIRKWOOD_CLK
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 0ba482638ebf..d8006a2bb808 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -80,7 +80,6 @@ config SOC_DRA7XX
+ config ARCH_OMAP2PLUS
+ 	bool
+ 	select ARCH_HAS_BANDGAP
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARCH_OMAP
+ 	select ARCH_REQUIRE_GPIOLIB
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index dbd954e61aa7..270e5caf3c97 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -85,7 +85,6 @@ config ARCH_R8A73A4
+ 	select CPU_V7
+ 	select SH_CLK_CPG
+ 	select RENESAS_IRQC
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_OPP
+ 	select SYS_SUPPORTS_SH_CMT
+ 	select SYS_SUPPORTS_SH_TMU
+@@ -264,7 +263,6 @@ config MACH_KOELSCH
+ config MACH_KZM9G
+ 	bool "KZM-A9-GT board"
+ 	depends on ARCH_SH73A0
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_OPP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+diff --git a/arch/arm/mach-spear/Kconfig b/arch/arm/mach-spear/Kconfig
+index 0786249b2832..90df2022276a 100644
+--- a/arch/arm/mach-spear/Kconfig
++++ b/arch/arm/mach-spear/Kconfig
+@@ -14,7 +14,6 @@ if PLAT_SPEAR
+ config ARCH_SPEAR13XX
+ 	bool "ST SPEAr13xx"
+ 	depends on ARCH_MULTI_V7 || PLAT_SPEAR_SINGLE
+-	select ARCH_HAS_CPUFREQ
+ 	select ARM_GIC
+ 	select GPIO_SPEAR_SPICS
+ 	select HAVE_ARM_SCU if SMP
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index e16999e5b735..8981ed49787d 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -1,6 +1,5 @@
+ config ARCH_TEGRA
+ 	bool "NVIDIA Tegra" if ARCH_MULTI_V7
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
+ 	select ARM_GIC
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index b41a42da1505..9b93144c1c2b 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -3,7 +3,6 @@ config ARCH_U8500
+ 	depends on MMU
+ 	select AB8500_CORE
+ 	select ABX500_CORE
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_AMBA
+ 	select ARM_ERRATA_754322
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 90249cfc37b3..2e2e8bbb88d7 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -65,7 +65,6 @@ config ARCH_VEXPRESS_DCSCB
+ 
+ config ARCH_VEXPRESS_SPC
+ 	bool "Versatile Express Serial Power Controller (SPC)"
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_OPP
+ 	select PM_OPP
+ 	help
+diff --git a/arch/arm/mach-vt8500/Kconfig b/arch/arm/mach-vt8500/Kconfig
+index 08f56a41cb55..aaaa24fe4d71 100644
+--- a/arch/arm/mach-vt8500/Kconfig
++++ b/arch/arm/mach-vt8500/Kconfig
+@@ -1,6 +1,5 @@
+ config ARCH_VT8500
+ 	bool
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CLKDEV_LOOKUP
+ 	select VT8500_TIMER
+diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
+index 573e0db1d0f0..0c164f81e72d 100644
+--- a/arch/arm/mach-zynq/Kconfig
++++ b/arch/arm/mach-zynq/Kconfig
+@@ -1,6 +1,5 @@
+ config ARCH_ZYNQ
+ 	bool "Xilinx Zynq ARM Cortex A9 Platform" if ARCH_MULTI_V7
+-	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_OPP
+ 	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select ARM_AMBA
 -- 
-1.8.1.4
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
