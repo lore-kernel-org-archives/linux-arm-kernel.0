@@ -1,35 +1,63 @@
-From: wbx@openadk.org (Waldemar Brodkorb)
-Date: Tue, 3 Jun 2014 11:42:32 +0200
-Subject: oops on cubox-i (v3.15-rc4)
-In-Reply-To: <20140523154453.GY3693@n2100.arm.linux.org.uk>
-References: <20140509144438.GW14063@waldemar-brodkorb.de>
- <20140511002506.GN12708@titan.lakedaemon.net>
- <20140523101751.GH618@waldemar-brodkorb.de>
- <20140523143845.GD8664@titan.lakedaemon.net>
- <20140523154453.GY3693@n2100.arm.linux.org.uk>
-Message-ID: <20140603094231.GH4197@waldemar-brodkorb.de>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 3 Jun 2014 11:50:01 +0200
+Subject: [PATCH v2 11/11] sched: replace capacity by activity
+In-Reply-To: <538C17D6.60100@linux.vnet.ibm.com>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-12-git-send-email-vincent.guittot@linaro.org>
+ <20140529135510.GG11074@laptop.programming.kicks-ass.net>
+ <538C17D6.60100@linux.vnet.ibm.com>
+Message-ID: <CAKfTPtAF+HNzs8B-xP2jPbJ+iJVO2wR0frmZ=EgQs35A_wXyNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Again,
-> > > > 
-> > > > On Fri, May 09, 2014 at 04:44:38PM +0200, Waldemar Brodkorb wrote:
-> > > > > Dear Kernel Hackers,
-> > > > > 
-> > > > > I am getting kernel oopses on my cubox-i (i2ultra) running
-> > > > > Linux 3.15-rc4, when using the box as a samba server with 
-> > > > > a local attached 8 GB usb stick. (it also happen with a smaller
-> > > > > video on the micro-sd card)
-> > > > > The oops happens while playing a movie (4 GB file) on a samba client 
-> > > > > (macos x maverick macbook) via vlc (after 5-15 minutes). 
-> > > > > 
-> > > > > Both systems are connected to a gigabit ethernet switch.
-> > > > > 
-> > > > > The oops happens with ntfs-3g, ntfs, vfat and ext4 filesystem.
+On 2 June 2014 08:21, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
+> On 05/29/2014 07:25 PM, Peter Zijlstra wrote:
+>> On Fri, May 23, 2014 at 05:53:05PM +0200, Vincent Guittot wrote:
+>>> The scheduler tries to compute how many tasks a group of CPUs can handle by
+>>> assuming that a task's load is SCHED_LOAD_SCALE and a CPU capacity is
+>>> SCHED_POWER_SCALE.
+>>> We can now have a better idea of the utilization of a group fo CPUs thanks to
+>>> group_actitvity and deduct how many capacity is still available.
+>>>
+>>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>>> ---
+>>
+>> Right, so as Preeti already mentioned, this wrecks SMT. It also seems to
+>> loose the aggressive spread, where we want to run 1 task on each 'core'
+>> before we start 'balancing'.
+>
+> True. I just profiled the ebizzy runs and found that ebizzy threads were
+> being packed onto a single core which is SMT-8 capable before spreading.
+> This was a 6 core, SMT-8 machine. So for instance if I run 8 threads of
+> ebizzy. the load balancing as record by perf sched record showed that
+> two cores were packed upto 3 ebizzy threads and one core ran two ebizzy
+> threads while the rest of the 3 cores were idle.
+>
+> I am unable to understand which part of this patch is aiding packing to
+> a core.  There is this check in this patch right?
+>
+> if (sgs->group_capacity < 0)
+>                 return true;
+>
+> which should ideally prevent such packing? Because irrespective of the
+> number of SMT threads, the capacity of a core is unchanged. And in the
+> above scenario, we have 6 tasks on 3 cores. So shouldn't the above check
+> have caught it?
 
-The problem is gone with rc7.
-It seems just like a cold, after seven rc'ays it's gone.
+yes, it should. the group_capacity should become < 0 because the CPU
+are fully loaded and the activity reach the max capacity value +
+nr_running
 
-Sorry for the noise.
-        best regards
-                Waldemar 
+>
+> Regards
+> Preeti U Murthy
+>>
+>> So I think we should be able to fix this by setting PREFER_SIBLING on
+>> the SMT domain, that way we'll get single tasks running on each SMT
+>> domain before filling them up until capacity.
+>>
+>> Now, its been a while since I looked at PREFER_SIBLING, and I've not yet
+>> looked at what your patch does to it, but it seems to me that that is
+>> the first direction we should look for an answer to this.
+>>
+>
