@@ -1,63 +1,54 @@
-From: chhotu.shiv@gmail.com (shiv prakash Agarwal)
-Date: Tue, 3 Jun 2014 18:03:06 +0530
-Subject: [E1000-devel] ARM support for igb driver
-In-Reply-To: <9B4A1B1917080E46B64F07F2989DADD653376495@ORSMSX114.amr.corp.intel.com>
-References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>
- <4893591.dl3XO76euB@wuerfel>
- <CAHH3p5JDXVZAKQUUQ5ao1GzwhNtU-+Hs_afT0tYeaw9oUthu-A@mail.gmail.com>
- <5174568.hMNHACE7UI@wuerfel>
- <CAHH3p5++xjH8+eeerBX468_rhfPeRh=43PsHETTRriA1uJrG7w@mail.gmail.com>
- <9B4A1B1917080E46B64F07F2989DADD653376495@ORSMSX114.amr.corp.intel.com>
-Message-ID: <CAHH3p5LXSiS=LZ=Yg=hxt=VJbbD-+5FPnfWUTFTaHCr5vHqb0w@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 03 Jun 2014 13:41:43 +0100
+Subject: [RFC v2 04/10] ARM: vexpress: Extend UART with FIQ support
+In-Reply-To: <CAL_JsqL0pYOEiyo8KfJA1aO_MOmwvn6a4hibZcamm0Jcw4Q6bA@mail.gmail.com>
+References: <1400083125-1464-1-git-send-email-daniel.thompson@linaro.org>	<1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>	<1400853478-5824-5-git-send-email-daniel.thompson@linaro.org>	<20140523150452.GX3693@n2100.arm.linux.org.uk>	<53870C8C.1070108@linaro.org>
+ <CAL_JsqL0pYOEiyo8KfJA1aO_MOmwvn6a4hibZcamm0Jcw4Q6bA@mail.gmail.com>
+Message-ID: <538DC287.9060900@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks,
+On 29/05/14 14:44, Rob Herring wrote:
+> On Thu, May 29, 2014 at 5:31 AM, Daniel Thompson
+> <daniel.thompson@linaro.org> wrote:
+>> On 23/05/14 16:04, Russell King - ARM Linux wrote:
+>>> On Fri, May 23, 2014 at 02:57:52PM +0100, Daniel Thompson wrote:
+>>>> @@ -140,7 +140,7 @@
+>>>>                      v2m_serial0: uart at 090000 {
+>>>>                              compatible = "arm,pl011", "arm,primecell";
+>>>>                              reg = <0x090000 0x1000>;
+>>>> -                            interrupts = <5>;
+>>>> +                            interrupts = <5>, <69>;
+>>>
+>>> NAK.  This is obviously a Linux implementation detail - the second
+>>> number is your "FIQ" number which you've decided will be offset by
+>>> 64.
+> 
+> +1
+> 
+>> Certainly the offset of 64 is a more or less meaningless magic number
+>> that I decided on, however I don't think it originates within Linux. It
+>> is both introduced and consumed within the device tree itself.
+>>
+>> I've proposed adding a flag to the gic bindings to mark a FIQ; the GIC
+>> calls interrupt 69 (above) <0 5 0x84> (where 0x80 is the flag to request
+>> FIQ routing alongside 0x04 which is the trigger type).
+> 
+> That would be better than the magic number, but I'm not convinced that
+> belongs in the DT either.
+> 
+> Whether the uart uses FIQ is not dependent on this DT setting, but
+> based on whether the user wants to use the uart for kdb or not. You
+> have enough information already to figure out which interrupt. What's
+> missing is whether you have the capability to use FIQ or not. I don't
+> recall if you can tell that from the GIC or not.
 
-Yes it is a NIC. How to get dump of its EEPROM?
+Ok.
 
-On Mon, Jun 2, 2014 at 9:35 PM, Fujinaka, Todd <todd.fujinaka@intel.com> wrote:
-> There is no hardware bug. The PCIe spec allows VDMs. Note Section 2.2.8.6 where there appear to be a couple of options.
->
-> - (Receivers) Completers silently discard Vendor_Defined Type 1 Messages which they are not designed to receive ? this is not an error condition.
-> - (Receivers) Completers handle the receipt of an unsupported Vendor_Defined Type 0 Message as an Unsupported Request, and the error is reported according to Section 6.2.
->
-> I think you may have MCTP enabled and you should be able to disable it in the EEPROM. I will need a lot more information about your system and whether the i210 is a LOM (LAD-on-motherboard, soldered onto your motherboard) or a NIC (what we call a plug-in PCIe card). Either way, you probably won't be able to get it changed without a working OS.
->
-> If it's a NIC, you can take it out and put it in a non-ARM Linux system and send me a dump of your current EEPROM.
->
-> Todd Fujinaka
-> Software Application Engineer
-> Networking Division (ND)
-> Intel Corporation
-> todd.fujinaka at intel.com
-> (503) 712-4565
->
-> -----Original Message-----
-> From: shiv prakash Agarwal [mailto:chhotu.shiv at gmail.com]
-> Sent: Sunday, June 01, 2014 9:54 PM
-> To: Arnd Bergmann
-> Cc: linux-arm-kernel at lists.infradead.org; Duyck, Alexander H; Thomas Petazzoni; e1000-devel at lists.sourceforge.net; Jason Gunthorpe; Fujinaka, Todd; Lucas Stach
-> Subject: Re: [E1000-devel] ARM support for igb driver
->
-> Yes its hardware bug. I need to know whether we can disable it from device side? If yes, how?
->
-> On Sun, Jun 1, 2014 at 5:16 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Sunday 01 June 2014 11:26:57 shiv prakash Agarwal wrote:
->>> I don't see all devices send VDMs, then why Intel I-210?
->>
->> There is no obligation to do it of course.
->>
->>> Also, Is it a bug in host bridge hardware or driver? If hardware, how
->>> can we make device not to send it?
->>
->> If the hardware cannot handle them, it's a hardware bug. If the
->> hardware does handle them correctly but the software doesn't, that is
->> a bug in the bridge driver.
->>
->> We have a couple of host bridge drivers that register a trap handler
->> and then look at the bridge registers to determine the exact cause.
->>
->> Which host bridge driver do you use?
->>
->>         Arnd
+I've just started playing with an idea that keeps the shadow virqw for
+FIQ idea but doesn't require any device tree changes...
+
+Another RFC will follow in due course.
+
+
+Daniel.
