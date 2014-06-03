@@ -1,36 +1,37 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 3 Jun 2014 14:14:20 -0700
-Subject: [PATCH] tty: serial: msm: Fix section mismatch warning
-In-Reply-To: <CAOesGMh5knixNp+dgWnQu5M00N4ZMm10PoBh3YVTquryfRh-cw@mail.gmail.com>
-References: <1401826402-1079-1-git-send-email-galak@codeaurora.org>
- <20140603203318.GB6582@kroah.com>
- <CAOesGMh5knixNp+dgWnQu5M00N4ZMm10PoBh3YVTquryfRh-cw@mail.gmail.com>
-Message-ID: <20140603211420.GA1192@kroah.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 03 Jun 2014 23:12:09 +0200
+Subject: [alsa-devel] [PATCH] ASoC: pxa: add I2C dependencies as needed
+In-Reply-To: <46560700.2S4p0nUZl8@wuerfel> (Arnd Bergmann's message of "Tue,
+ 03 Jun 2014 20:38:27 +0200")
+References: <46560700.2S4p0nUZl8@wuerfel>
+Message-ID: <87k38xg0k6.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 03, 2014 at 02:04:43PM -0700, Olof Johansson wrote:
-> On Tue, Jun 3, 2014 at 1:33 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> > On Tue, Jun 03, 2014 at 03:13:22PM -0500, Kumar Gala wrote:
-> >> WARNING: drivers/tty/built-in.o(.data+0x3544): Section mismatch in
-> >> reference from the variable msm_platform_driver to the function
-> >> .init.text:msm_serial_probe()
-> >> The variable msm_platform_driver references
-> >> the function __init msm_serial_probe()
-> >> If the reference is valid then annotate the
-> >> variable with __init* or __refdata (see linux/init.h) or name the variable:
-> >> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
-> >
-> > Where is this mismatch showing up at?  3.15-rc8, 3.16-rc1?  Somewhere
-> > older or else?
-> 
-> Linus' next branch, it was merged through arm-soc. I didn't notice it
-> in time to fix it before we sent to Linus. :(
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Ok, do you want to take this patch then?  I don't mind taking it through
-my tree, but it will have to wait until after 3.16-rc1 is out.  It's up
-to you.
+> We have in the past added 'depends on I2C' for some of the PXA boards
+> after hitting randconfig build bugs. I have seens a couple of new
+> bugs in this area during the linux-next cycle for 3.16, after it
+> became possible to build some more PXA machines with I2C disabled.
+>
+> To shut this up for good, this adds the dependency to every board
+> that uses I2C as the interface to the codec. I have gone through
+> all board files and verified that they all either use AC97 or
+> I2C, and this annotates the latter. Some of these already enable
+> I2C from mach-pxa/Kconfig, but since that can change it's better
+> to be explicit here.
+>
+> The link error that can result otherwise happens when CONFIG_I2C
+> is set to 'm' and the codec driver is built-in as a result of being
+> selected by the platform specific glue.
 
-thanks,
+Hi Arnd,
 
-greg k-h
+Any reason SND_PXA2XX_SOC_MIOA701 escaped ? The board is PXA based, and its
+codec wm9713 is I2C based, and relies on AC97.
+
+Cheers.
+
+-- 
+Robert
