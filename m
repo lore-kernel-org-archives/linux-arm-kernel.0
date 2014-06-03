@@ -1,332 +1,91 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Tue, 03 Jun 2014 16:19:26 -0700
-Subject: [PATCH v7 3/4] arm: dirty log write protect management support
+Date: Tue, 03 Jun 2014 16:19:27 -0700
+Subject: [PATCH v7 4/4] arm: dirty page logging 2nd stage page fault handling
+ support
 In-Reply-To: <1401837567-5527-1-git-send-email-m.smarduch@samsung.com>
 References: <1401837567-5527-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <1401837567-5527-4-git-send-email-m.smarduch@samsung.com>
+Message-ID: <1401837567-5527-5-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for keeping track of VM dirty pages. As dirty page log
-is retrieved, the pages that have been written are write protected again for
-next write and log read.
+This patch adds support for handling 2nd stage page faults during migration,
+it disables faulting in huge pages, and disolves huge pages to page tables.
+In case migration is canceled huge pages will be used again.
 
 Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 ---
- arch/arm/include/asm/kvm_host.h |    3 ++
- arch/arm/kvm/arm.c              |    5 ---
- arch/arm/kvm/mmu.c              |   79 +++++++++++++++++++++++++++++++++++
- arch/x86/kvm/x86.c              |   86 ---------------------------------------
- virt/kvm/kvm_main.c             |   81 ++++++++++++++++++++++++++++++++++++
- 5 files changed, 163 insertions(+), 91 deletions(-)
+ arch/arm/kvm/mmu.c |   36 ++++++++++++++++++++++++++++++++++--
+ 1 file changed, 34 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 59565f5..b760f9c 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -232,5 +232,8 @@ u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
- int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
- 
- void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
-+void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
-+	struct kvm_memory_slot *slot,
-+	gfn_t gfn_offset, unsigned long mask);
- 
- #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index dfd63ac..f06fb21 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -780,11 +780,6 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 	}
- }
- 
--int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
--{
--	return -EINVAL;
--}
--
- static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
- 					struct kvm_arm_device_addr *dev_addr)
- {
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index e5dff85..1c546c9 100644
+index 1c546c9..aca4fbf 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -874,6 +874,85 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot)
+@@ -966,6 +966,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
+ 	struct vm_area_struct *vma;
+ 	pfn_t pfn;
++	/* Get logging status, if dirty_bitmap is not NULL then logging is on */
++	bool logging_active = !!memslot->dirty_bitmap;
+ 
+ 	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
+ 	if (fault_status == FSC_PERM && !write_fault) {
+@@ -1019,10 +1021,16 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	spin_lock(&kvm->mmu_lock);
+ 	if (mmu_notifier_retry(kvm, mmu_seq))
+ 		goto out_unlock;
+-	if (!hugetlb && !force_pte)
++
++	/* When logging don't spend cycles to check for huge pages */
++	if (!hugetlb && !force_pte && !logging_active)
+ 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+ 
+-	if (hugetlb) {
++	/*
++	 * Force all not present/perm faults to PTE handling, address both
++	 * PMD and PTE faults
++	 */
++	if (hugetlb && !logging_active) {
+ 		pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
+ 		new_pmd = pmd_mkhuge(new_pmd);
+ 		if (writable) {
+@@ -1034,6 +1042,22 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	} else {
+ 		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
+ 		if (writable) {
++			/*
++			 * If pmd is  mapping a huge page then clear it and let
++			 * stage2_set_pte() create a pte table. At the sametime
++			 * you write protect the pte (PAGE_S2 pgprot_t).
++			 */
++			if (logging_active) {
++				pmd_t *pmd;
++				if (hugetlb) {
++					pfn += pte_index(fault_ipa);
++					gfn = fault_ipa >> PAGE_SHIFT;
++					new_pte = pfn_pte(pfn, PAGE_S2);
++				}
++				pmd = stage2_get_pmd(kvm, NULL, fault_ipa);
++				if (pmd && kvm_pmd_huge(*pmd))
++					clear_pmd_entry(kvm, pmd, fault_ipa);
++			}
+ 			kvm_set_s2pte_writable(&new_pte);
+ 			kvm_set_pfn_dirty(pfn);
+ 		}
+@@ -1041,6 +1065,14 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
+ 	}
+ 
++	/*
++	 * Log the dirty page in dirty_bitmap[], call regardless if logging is
++	 * disabled or enabled both cases handled safely.
++	 * TODO: for larger page size mark mulitple dirty page bits for each
++	 *       4k page.
++	 */
++	if (writable)
++		mark_page_dirty(kvm, gfn);
+ 
+ out_unlock:
  	spin_unlock(&kvm->mmu_lock);
- }
- 
-+/**
-+ * stage2_wp_mask_range() - write protect memslot pages set in mask
-+ * @pmd - pointer to page table
-+ * @start_ipa - the start range of mask
-+ * @addr - start_ipa or start range of adjusted mask if crossing PMD range
-+ * @mask - mask of dirty pages
-+ *
-+ * Walk mask and write protect the associated dirty pages in the memory region.
-+ * If mask crosses a PMD range adjust it to next page table and return.
-+ */
-+static void stage2_wp_mask_range(pmd_t *pmd, phys_addr_t start_ipa,
-+		phys_addr_t *addr, unsigned long *mask)
-+{
-+	pte_t *pte;
-+	bool crosses_pmd;
-+	int i;
-+
-+	for (i = __ffs(*mask), *addr = start_ipa + i * PAGE_SIZE;
-+		*mask;
-+		i = __ffs(*mask), *addr = start_ipa + i * PAGE_SIZE) {
-+		crosses_pmd = !!((start_ipa & PMD_MASK) ^ (*addr & PMD_MASK));
-+		if (unlikely(crosses_pmd)) {
-+			/* Adjust mask dirty bits relative to next page table */
-+			*mask >>= (PTRS_PER_PTE - pte_index(start_ipa));
-+			return;
-+		}
-+
-+		pte = pte_offset_kernel(pmd, *addr);
-+		if (!pte_none(*pte))
-+			kvm_set_s2pte_readonly(pte);
-+		*mask &= ~(1 << i);
-+	}
-+}
-+
-+/**
-+ * kvm_mmu_write_protected_pt_masked() - write protect dirty pages set in mask
-+ * @kvm:        The KVM pointer
-+ * @slot:       The memory slot associated with mask
-+ * @gfn_offset: The gfn offset in memory slot
-+ * @mask:       The mask of dirty pages@offset 'gnf_offset' in this memory
-+ *              slot to be write protected
-+ *
-+ * Called from dirty page logging read function to write protect bits set in
-+ * mask to record future writes to these pages in dirty page log. This function
-+ * uses simplified page table walk knowing that mask spawns range of two PMDs.
-+ *
-+ * 'kvm->mmu_lock' must be  held to protect against concurrent modification
-+ * of page tables (2nd stage fault, mmu modifiers, ...)
-+ *
-+ */
-+void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
-+		struct kvm_memory_slot *slot,
-+		gfn_t gfn_offset, unsigned long mask)
-+{
-+	pud_t *pud;
-+	pmd_t *pmd;
-+	phys_addr_t start_ipa = (slot->base_gfn + gfn_offset) << PAGE_SHIFT;
-+	phys_addr_t end_ipa = start_ipa + BITS_PER_LONG * PAGE_SIZE;
-+	phys_addr_t addr = start_ipa;
-+	pgd_t *pgdp = kvm->arch.pgd, *pgd;
-+
-+	do {
-+		pgd = pgdp + pgd_index(addr);
-+		if (pgd_present(*pgd)) {
-+			pud = pud_offset(pgd, addr);
-+			if (!pud_none(*pud) && !pud_huge(*pud)) {
-+				pmd = pmd_offset(pud, addr);
-+				if (!pmd_none(*pmd) && !kvm_pmd_huge(*pmd))
-+					stage2_wp_mask_range(pmd, start_ipa,
-+								&addr, &mask);
-+				else
-+					addr += PMD_SIZE;
-+			} else
-+				addr += PUD_SIZE;
-+		} else
-+			addr += PGDIR_SIZE;
-+	} while (mask && addr < end_ipa);
-+}
-+
- static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			  struct kvm_memory_slot *memslot,
- 			  unsigned long fault_status)
-diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
-index c5582c3..a603ca3 100644
---- a/arch/x86/kvm/x86.c
-+++ b/arch/x86/kvm/x86.c
-@@ -3569,92 +3569,6 @@ static int kvm_vm_ioctl_reinject(struct kvm *kvm,
- 	return 0;
- }
- 
--/**
-- * kvm_vm_ioctl_get_dirty_log - get and clear the log of dirty pages in a slot
-- * @kvm: kvm instance
-- * @log: slot id and address to which we copy the log
-- *
-- * We need to keep it in mind that VCPU threads can write to the bitmap
-- * concurrently.  So, to avoid losing data, we keep the following order for
-- * each bit:
-- *
-- *   1. Take a snapshot of the bit and clear it if needed.
-- *   2. Write protect the corresponding page.
-- *   3. Flush TLB's if needed.
-- *   4. Copy the snapshot to the userspace.
-- *
-- * Between 2 and 3, the guest may write to the page using the remaining TLB
-- * entry.  This is not a problem because the page will be reported dirty at
-- * step 4 using the snapshot taken before and step 3 ensures that successive
-- * writes will be logged for the next call.
-- */
--int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
--{
--	int r;
--	struct kvm_memory_slot *memslot;
--	unsigned long n, i;
--	unsigned long *dirty_bitmap;
--	unsigned long *dirty_bitmap_buffer;
--	bool is_dirty = false;
--
--	mutex_lock(&kvm->slots_lock);
--
--	r = -EINVAL;
--	if (log->slot >= KVM_USER_MEM_SLOTS)
--		goto out;
--
--	memslot = id_to_memslot(kvm->memslots, log->slot);
--
--	dirty_bitmap = memslot->dirty_bitmap;
--	r = -ENOENT;
--	if (!dirty_bitmap)
--		goto out;
--
--	n = kvm_dirty_bitmap_bytes(memslot);
--
--	dirty_bitmap_buffer = dirty_bitmap + n / sizeof(long);
--	memset(dirty_bitmap_buffer, 0, n);
--
--	spin_lock(&kvm->mmu_lock);
--
--	for (i = 0; i < n / sizeof(long); i++) {
--		unsigned long mask;
--		gfn_t offset;
--
--		if (!dirty_bitmap[i])
--			continue;
--
--		is_dirty = true;
--
--		mask = xchg(&dirty_bitmap[i], 0);
--		dirty_bitmap_buffer[i] = mask;
--
--		offset = i * BITS_PER_LONG;
--		kvm_mmu_write_protect_pt_masked(kvm, memslot, offset, mask);
--	}
--
--	spin_unlock(&kvm->mmu_lock);
--
--	/* See the comments in kvm_mmu_slot_remove_write_access(). */
--	lockdep_assert_held(&kvm->slots_lock);
--
--	/*
--	 * All the TLBs can be flushed out of mmu lock, see the comments in
--	 * kvm_mmu_slot_remove_write_access().
--	 */
--	if (is_dirty)
--		kvm_flush_remote_tlbs(kvm);
--
--	r = -EFAULT;
--	if (copy_to_user(log->dirty_bitmap, dirty_bitmap_buffer, n))
--		goto out;
--
--	r = 0;
--out:
--	mutex_unlock(&kvm->slots_lock);
--	return r;
--}
--
- int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_event,
- 			bool line_status)
- {
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index ba25765..d8d5091 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -429,6 +429,87 @@ static int kvm_init_mmu_notifier(struct kvm *kvm)
- 	return mmu_notifier_register(&kvm->mmu_notifier, current->mm);
- }
- 
-+
-+/**
-+ * kvm_vm_ioctl_get_dirty_log - get and clear the log of dirty pages in a slot
-+ * @kvm: kvm instance
-+ * @log: slot id and address to which we copy the log
-+ *
-+ * We need to keep it in mind that VCPU threads can write to the bitmap
-+ * concurrently.  So, to avoid losing data, we keep the following order for
-+ * each bit:
-+ *
-+ *   1. Take a snapshot of the bit and clear it if needed.
-+ *   2. Write protect the corresponding page.
-+ *   3. Flush TLB's if needed.
-+ *   4. Copy the snapshot to the userspace.
-+ *
-+ * Between 2 and 3, the guest may write to the page using the remaining TLB
-+ * entry.  This is not a problem because the page will be reported dirty at
-+ * step 4 using the snapshot taken before and step 3 ensures that successive
-+ * writes will be logged for the next call.
-+ */
-+
-+int __weak kvm_vm_ioctl_get_dirty_log(struct kvm *kvm,
-+						struct kvm_dirty_log *log)
-+{
-+	int r;
-+	struct kvm_memory_slot *memslot;
-+	unsigned long n, i;
-+	unsigned long *dirty_bitmap;
-+	unsigned long *dirty_bitmap_buffer;
-+	bool is_dirty = false;
-+
-+	mutex_lock(&kvm->slots_lock);
-+
-+	r = -EINVAL;
-+	if (log->slot >= KVM_USER_MEM_SLOTS)
-+		goto out;
-+
-+	memslot = id_to_memslot(kvm->memslots, log->slot);
-+
-+	dirty_bitmap = memslot->dirty_bitmap;
-+	r = -ENOENT;
-+	if (!dirty_bitmap)
-+		goto out;
-+
-+	n = kvm_dirty_bitmap_bytes(memslot);
-+
-+	dirty_bitmap_buffer = dirty_bitmap + n / sizeof(long);
-+	memset(dirty_bitmap_buffer, 0, n);
-+
-+	spin_lock(&kvm->mmu_lock);
-+
-+	for (i = 0; i < n / sizeof(long); i++) {
-+		unsigned long mask;
-+		gfn_t offset;
-+
-+		if (!dirty_bitmap[i])
-+			continue;
-+
-+		is_dirty = true;
-+
-+		mask = xchg(&dirty_bitmap[i], 0);
-+		dirty_bitmap_buffer[i] = mask;
-+
-+		offset = i * BITS_PER_LONG;
-+		kvm_mmu_write_protect_pt_masked(kvm, memslot, offset, mask);
-+	}
-+	if (is_dirty)
-+		kvm_flush_remote_tlbs(kvm);
-+
-+	spin_unlock(&kvm->mmu_lock);
-+
-+	r = -EFAULT;
-+	if (copy_to_user(log->dirty_bitmap, dirty_bitmap_buffer, n))
-+		goto out;
-+
-+	r = 0;
-+out:
-+	mutex_unlock(&kvm->slots_lock);
-+	return r;
-+}
-+
- #else  /* !(CONFIG_MMU_NOTIFIER && KVM_ARCH_WANT_MMU_NOTIFIER) */
- 
- static int kvm_init_mmu_notifier(struct kvm *kvm)
 -- 
 1.7.9.5
