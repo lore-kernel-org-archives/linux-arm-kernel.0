@@ -1,117 +1,258 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 3 Jun 2014 15:47:53 +0200
-Subject: [PATCH v2 5/5] pinctrl: sunxi: Define enable / disable irq
- callbacks for level triggered irqs
-In-Reply-To: <1401544899-405-6-git-send-email-hdegoede@redhat.com>
-References: <1401544899-405-1-git-send-email-hdegoede@redhat.com>
- <1401544899-405-6-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140603134753.GL27722@lukather>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 3 Jun 2014 14:52:58 +0100
+Subject: [PATCH v2] arm/arm64: KVM: Fix and refactor unmap_range
+In-Reply-To: <1401286977-59260-1-git-send-email-christoffer.dall@linaro.org>
+References: <1401286977-59260-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <CAPvkgC2MQdxuCWXygQ-072Pr-GBFGcC044AfKWR4kpuBbEmOJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 31, 2014 at 04:01:39PM +0200, Hans de Goede wrote:
-> Some drivers use disable_irq / enable_irq and do the work clearing the source
-> in another thread instead of using a threaded interrupt handler.
-> 
-> The irqchip used not having irq_disable and irq_enable callbacks in this case,
-> will lead to unnecessary spurious interrupts:
-> 
-> On a disable_irq in a chip without a handller for this, the irq core will
-> remember the disable, but not actually call into the irqchip. With a level
-> triggered interrupt (where the source has not been cleared) this will lead
-> to an immediate retrigger, at which point the irq-core will mask the irq.
-> So having an irq_disable callback in the irqchip will save us the interrupt
-> firing a 2nd time for nothing.
+Hi Christoffer,
+I have some comments below:
 
-Judging by the comments there, it seems more like a feature.
-
-> Drivers using disable / enable_irq like this, will call enable_irq when
-> they finally have cleared the interrupt source, without an enable_irq callback,
-> this will turn into an unmask, at which point the irq will trigger immediately
-> because when it was originally acked the level was still high, so the ack was
-> a nop.
-
-I don't think enable_irq offers any warranty regarding the state of
-the interrupt. It's up to the driver to clear the interrupts before
-calling enable_irq if it doesn't want any irrelevant/spurious
-interrupts.
-
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On 28 May 2014 15:22, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> unmap_range() was utterly broken, to quote Marc, and broke in all sorts
+> of situations.  It was also quite complicated to follow and didn't
+> follow the usual scheme of having a separate iterating function for each
+> level of page tables.
+>
+> Address this by refactoring the code and introduce a pgd_clear()
+> function.
+>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
->  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
-> 
-> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> index 418a430..6ccbe43 100644
-> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> @@ -34,6 +34,7 @@
->  static void sunxi_pinctrl_irq_ack(struct irq_data *d);
->  static void sunxi_pinctrl_irq_mask(struct irq_data *d);
->  static void sunxi_pinctrl_irq_unmask(struct irq_data *d);
-> +static void sunxi_pinctrl_irq_ack_unmask(struct irq_data *d);
->  static int sunxi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type);
->  
->  static struct sunxi_pinctrl_group *
-> @@ -563,6 +564,10 @@ static struct irq_chip sunxi_pinctrl_level_irq_chip = {
->  	.irq_eoi		= sunxi_pinctrl_irq_ack,
->  	.irq_mask		= sunxi_pinctrl_irq_mask,
->  	.irq_unmask		= sunxi_pinctrl_irq_unmask,
-> +	/* Define irq_enable / disable to avoid spurious irqs for drivers
-> +	 * using these to suppress irqs while they clear the irq source */
-
-What "drivers" are we talking about? I grepped for a while, and didn't
-any obvious candidates.
-
-But again, I feel like if a driver wants to work outside of the usual
-interrupt workflow, it's up to the driver itself to know what it's
-doing.
-
-> +	.irq_enable		= sunxi_pinctrl_irq_ack_unmask,
-> +	.irq_disable		= sunxi_pinctrl_irq_mask,
->  	.irq_request_resources	= sunxi_pinctrl_irq_request_resources,
->  	.irq_set_type		= sunxi_pinctrl_irq_set_type,
->  	.flags			= IRQCHIP_SKIP_SET_WAKE | IRQCHIP_EOI_THREADED
-> @@ -662,6 +667,28 @@ static void sunxi_pinctrl_irq_unmask(struct irq_data *d)
->  	spin_unlock_irqrestore(&pctl->lock, flags);
->  }
->  
-> +static void sunxi_pinctrl_irq_ack_unmask(struct irq_data *d)
+> Changes since v2:
+>  - Don't define custom __unused but reuse __maybe_unused
+>
+>  arch/arm/include/asm/kvm_mmu.h   |  12 ++++
+>  arch/arm/kvm/mmu.c               | 122 ++++++++++++++++++++++-----------------
+>  arch/arm64/include/asm/kvm_mmu.h |  15 +++++
+>  3 files changed, 95 insertions(+), 54 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index 5c7aa3c..5cc0b0f 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -127,6 +127,18 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+>         (__boundary - 1 < (end) - 1)? __boundary: (end);                \
+>  })
+>
+> +static inline bool kvm_page_empty(void *ptr)
 > +{
-> +	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
-> +	u32 ctrl_reg = sunxi_irq_ctrl_reg(d->hwirq);
-> +	u8 ctrl_idx = sunxi_irq_ctrl_offset(d->hwirq);
-> +	u32 status_reg = sunxi_irq_status_reg(d->hwirq);
-> +	u8 status_idx = sunxi_irq_status_offset(d->hwirq);
-> +	unsigned long flags;
-> +	u32 val;
-> +
-> +	spin_lock_irqsave(&pctl->lock, flags);
-> +
-> +	/* Clear the IRQ */
-> +	writel(1 << status_idx, pctl->membase + status_reg);
-> +
-> +	/* Unmask the IRQ */
-> +	val = readl(pctl->membase + ctrl_reg);
-> +	writel(val | (1 << ctrl_idx), pctl->membase + ctrl_reg);
-> +
-> +	spin_unlock_irqrestore(&pctl->lock, flags);
+> +       struct page *ptr_page = virt_to_page(ptr);
+> +       return page_count(ptr_page) == 1;
 > +}
+> +
+> +
+> +#define kvm_pte_table_empty(ptep) kvm_page_empty(ptep)
+> +#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
+> +#define kvm_pud_table_empty(pudp) (0)
+> +
+> +
+>  struct kvm;
+>
+>  #define kvm_flush_dcache_to_poc(a,l)   __cpuc_flush_dcache_area((a), (l))
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 16f8049..6ee6e06 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -90,10 +90,13 @@ static void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
+>         return p;
+>  }
+>
+> -static bool page_empty(void *ptr)
+> +static void clear_pgd_entry(struct kvm *kvm, pgd_t *pgd, phys_addr_t addr)
+>  {
+> -       struct page *ptr_page = virt_to_page(ptr);
+> -       return page_count(ptr_page) == 1;
+> +       pud_t *pud_table __maybe_unused = pud_offset(pgd, 0);
+> +       pgd_clear(pgd);
+> +       kvm_tlb_flush_vmid_ipa(kvm, addr);
+> +       pud_free(NULL, pud_table);
+> +       put_page(virt_to_page(pgd));
+>  }
+>
+>  static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
+> @@ -124,70 +127,81 @@ static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
+>         put_page(virt_to_page(pmd));
+>  }
+>
+> -static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
+> +static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
+> +                      unsigned long long addr, unsigned long long end)
 
-Please at least call sunxi_pinctrl_irq_ack and
-sunxi_pinctrl_irq_unmask if you're doing this.
+We have a lot of unsigned long longs in this patch, should they not be
+phys_addr_t instead?
 
-Maxime
+>  {
+> -       if (pte_present(*pte)) {
+> -               kvm_set_pte(pte, __pte(0));
+> -               put_page(virt_to_page(pte));
+> -               kvm_tlb_flush_vmid_ipa(kvm, addr);
+> -       }
+> +       pte_t *pte, *start_pte;
+> +       unsigned long long start_addr = addr;
+> +
+> +       start_pte = pte = pte_offset_kernel(pmd, addr);
+> +       do {
+> +               if (!pte_none(*pte)) {
+> +                       kvm_set_pte(pte, __pte(0));
+> +                       put_page(virt_to_page(pte));
+> +                       kvm_tlb_flush_vmid_ipa(kvm, addr);
+> +               }
+> +       } while (pte++, addr += PAGE_SIZE, addr != end);
+> +
+> +       if (kvm_pte_table_empty(start_pte))
+> +               clear_pmd_entry(kvm, pmd, start_addr);
 
+I don't quite follow this clear_p[um]d_entry logic.
+So this clear_pmd_entry will de-allocate the page containing the ptes
+(referenced from the pmd entry)?
+If so, what happens if not all the ptes in the page need to be unmapped?
+
+The clear_p[um]d_entry functions appear to be split in two with one
+codepath for huge entries (without any de-allocation) and the other
+path for table entries that does have de-allocation. Would it be
+better to perhaps split these functions in two with a more descriptive
+name for the clear and de-allocate case?
+
+>  }
+>
+> -static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+> -                       unsigned long long start, u64 size)
+> +static void unmap_pmds(struct kvm *kvm, pud_t *pud,
+> +                      unsigned long long addr, unsigned long long end)
+>  {
+> -       pgd_t *pgd;
+> -       pud_t *pud;
+> -       pmd_t *pmd;
+> -       pte_t *pte;
+> -       unsigned long long addr = start, end = start + size;
+> -       u64 next;
+> -
+> -       while (addr < end) {
+> -               pgd = pgdp + pgd_index(addr);
+> -               pud = pud_offset(pgd, addr);
+> -               pte = NULL;
+> -               if (pud_none(*pud)) {
+> -                       addr = kvm_pud_addr_end(addr, end);
+> -                       continue;
+> -               }
+> +       unsigned long long next, start_addr = addr;
+> +       pmd_t *pmd, *start_pmd;
+>
+> -               if (pud_huge(*pud)) {
+> -                       /*
+> -                        * If we are dealing with a huge pud, just clear it and
+> -                        * move on.
+> -                        */
+> -                       clear_pud_entry(kvm, pud, addr);
+> -                       addr = kvm_pud_addr_end(addr, end);
+> -                       continue;
+> +       start_pmd = pmd = pmd_offset(pud, addr);
+> +       do {
+> +               next = kvm_pmd_addr_end(addr, end);
+> +               if (!pmd_none(*pmd)) {
+> +                       if (kvm_pmd_huge(*pmd))
+> +                               clear_pmd_entry(kvm, pmd, addr);
+> +                       else
+> +                               unmap_ptes(kvm, pmd, addr, next);
+>                 }
+> +       } while (pmd++, addr = next, addr != end);
+>
+> -               pmd = pmd_offset(pud, addr);
+> -               if (pmd_none(*pmd)) {
+> -                       addr = kvm_pmd_addr_end(addr, end);
+> -                       continue;
+> -               }
+> +       if (kvm_pmd_table_empty(start_pmd))
+> +               clear_pud_entry(kvm, pud, start_addr);
+> +}
+>
+> -               if (!kvm_pmd_huge(*pmd)) {
+> -                       pte = pte_offset_kernel(pmd, addr);
+> -                       clear_pte_entry(kvm, pte, addr);
+> -                       next = addr + PAGE_SIZE;
+> -               }
+> +static void unmap_puds(struct kvm *kvm, pgd_t *pgd,
+> +                      unsigned long long addr, unsigned long long end)
+> +{
+> +       unsigned long long next, start_addr = addr;
+> +       pud_t *pud, *start_pud;
+>
+> -               /*
+> -                * If the pmd entry is to be cleared, walk back up the ladder
+> -                */
+> -               if (kvm_pmd_huge(*pmd) || (pte && page_empty(pte))) {
+> -                       clear_pmd_entry(kvm, pmd, addr);
+> -                       next = kvm_pmd_addr_end(addr, end);
+> -                       if (page_empty(pmd) && !page_empty(pud)) {
+> +       start_pud = pud = pud_offset(pgd, addr);
+> +       do {
+> +               next = kvm_pud_addr_end(addr, end);
+> +               if (!pud_none(*pud)) {
+> +                       if (pud_huge(*pid)) {
+>                                 clear_pud_entry(kvm, pud, addr);
+> -                               next = kvm_pud_addr_end(addr, end);
+> +                       } else {
+> +                               unmap_pmds(kvm, pud, addr, next);
+>                         }
+>                 }
+> +       } while (pud++, addr = next, addr != end);
+>
+> -               addr = next;
+> -       }
+> +       if (kvm_pud_table_empty(start_pud))
+> +               clear_pgd_entry(kvm, pgd, start_addr);
+> +}
+> +
+> +
+> +static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+> +                       unsigned long long start, u64 size)
+> +{
+> +       pgd_t *pgd;
+> +       unsigned long long addr = start, end = start + size;
+> +       unsigned long long next;
+> +
+> +       pgd = pgdp + pgd_index(addr);
+> +       do {
+> +               next = kvm_pgd_addr_end(addr, end);
+> +               unmap_puds(kvm, pgd, addr, next);
+> +       } while (pgd++, addr = next, addr != end);
+>  }
+>
+>  static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 7d29847..8e138c7 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -125,6 +125,21 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+>  #define kvm_pud_addr_end(addr, end)    pud_addr_end(addr, end)
+>  #define kvm_pmd_addr_end(addr, end)    pmd_addr_end(addr, end)
+>
+> +static inline bool kvm_page_empty(void *ptr)
+> +{
+> +       struct page *ptr_page = virt_to_page(ptr);
+> +       return page_count(ptr_page) == 1;
+> +}
+> +
+> +#define kvm_pte_table_empty(ptep) kvm_page_empty(ptep)
+> +#ifndef CONFIG_ARM64_64K_PAGES
+> +#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
+> +#else
+> +#define kvm_pmd_table_empty(pmdp) (0)
+> +#endif
+> +#define kvm_pud_table_empty(pudp) (0)
+> +
+> +
+>  struct kvm;
+>
+>  #define kvm_flush_dcache_to_poc(a,l)   __flush_dcache_area((a), (l))
+> --
+> 1.8.5.2
+>
+
+Cheers,
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140603/08da55c8/attachment.sig>
+Steve
