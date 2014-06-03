@@ -1,25 +1,31 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 3 Jun 2014 23:57:11 +0200
-Subject: [PATCH] ARM: mvebu: DT: fix OpenBlocks AX3-4 RAM size
-In-Reply-To: <7hzjhtuasd.fsf@paris.lan>
-References: <5388ddb9.0458440a.2be7.323c@mx.google.com>
- <1401818320-7202-1-git-send-email-jason@lakedaemon.net>
- <7hzjhtuasd.fsf@paris.lan>
-Message-ID: <20140603235711.4c751270@free-electrons.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 3 Jun 2014 22:59:44 +0100
+Subject: [alsa-devel] [PATCH] ASoC: pxa: add I2C dependencies as needed
+In-Reply-To: <87k38xg0k6.fsf@free.fr>
+References: <46560700.2S4p0nUZl8@wuerfel>
+ <87k38xg0k6.fsf@free.fr>
+Message-ID: <20140603215944.GB2520@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kevin Hilman,
+On Tue, Jun 03, 2014 at 11:12:09PM +0200, Robert Jarzmik wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
 
-On Tue, 03 Jun 2014 11:07:30 -0700, Kevin Hilman wrote:
+> > To shut this up for good, this adds the dependency to every board
+> > that uses I2C as the interface to the codec. I have gone through
+> > all board files and verified that they all either use AC97 or
+> > I2C, and this annotates the latter. Some of these already enable
+> > I2C from mach-pxa/Kconfig, but since that can change it's better
+> > to be explicit here.
 
-> Also, what do you think about backporting this for -stable?  At least
-> for v3.14+ since that's when BE started working.
+> Any reason SND_PXA2XX_SOC_MIOA701 escaped ? The board is PXA based, and its
+> codec wm9713 is I2C based, and relies on AC97.
 
-Actually, BE started to work in v3.13+.
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+The WM9713 is AC'97 only, there's no I2C interface there.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140603/a45d7e02/attachment.sig>
