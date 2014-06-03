@@ -1,122 +1,100 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 3 Jun 2014 19:35:38 +0000 (UTC)
-Subject: [PATCH 1/3] clk: ti: add 'ti,round-rate' flag
-In-Reply-To: <20140531000207.10062.55946@quantum>
-References: <1399540009-6953-1-git-send-email-tomi.valkeinen@ti.com>
- <5370B839.3050108@ti.com> <5370BAFF.9070501@ti.com>
- <20140515060834.3084.5199@quantum> <5374B241.9010201@ti.com>
- <20140531000207.10062.55946@quantum>
-Message-ID: <alpine.DEB.2.02.1406031907210.14238@utopia.booyaka.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 3 Jun 2014 21:47:00 +0200
+Subject: [PATCH] ARM: fix string functions on !MMU
+In-Reply-To: <20140603075132.GF16741@pengutronix.de>
+References: <1398103808-24380-1-git-send-email-rabin@rab.in>
+ <20140428075149.GB28564@pengutronix.de>
+ <20140602165343.GA20915@debian>
+ <20140603075132.GF16741@pengutronix.de>
+Message-ID: <20140603194700.GI16741@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 May 2014, Mike Turquette wrote:
+Hello,
 
-> Quoting Tomi Valkeinen (2014-05-15 05:25:37)
-> > On 15/05/14 09:08, Mike Turquette wrote:
-> > > Quoting Tomi Valkeinen (2014-05-12 05:13:51)
-> > >> On 12/05/14 15:02, Tero Kristo wrote:
-> > >>> On 05/08/2014 12:06 PM, Tomi Valkeinen wrote:
-> > >>>> The current DPLL code does not try to round the clock rate, and instead
-> > >>>> returns an error if the requested clock rate cannot be produced exactly
-> > >>>> by the DPLL.
-> > >>>>
-> > >>>> It could be argued that this is a bug, but as the current drivers may
-> > >>>> depend on that behavior, a new flag 'ti,round-rate' is added which
-> > >>>> enables clock rate rounding.
-> > >>>
-> > >>> Someone could probably argue that this flag is not a hardware feature,
-> > >>
-> > >> I fully agree.
-> > >>
-> > >>> but instead is used to describe linux-kernel behavior, and would
-> > >>> probably be frowned upon by the DT enthusiasts. Othen than that, I like
-> > >>> this approach better than a global setting, but would like second
-> > >>> opinions here.
-> > >>
-> > >> I think the dpll code should always do rounding. That's what
-> > >> round_rate() is supposed to do, afaik. The current behavior of not
-> > >> rounding and returning an error is a bug in my opinion.
+On Tue, Jun 03, 2014 at 09:51:33AM +0200, Uwe Kleine-K?nig wrote:
+> On Mon, Jun 02, 2014 at 06:53:43PM +0200, Rabin Vincent wrote:
+> > On Mon, Apr 28, 2014 at 09:51:49AM +0200, Uwe Kleine-K?nig wrote:
+> > > On Mon, Apr 21, 2014 at 08:10:08PM +0200, Rabin Vincent wrote:
+> > > > 8c56cc8be5b38e ("ARM: 7449/1: use generic strnlen_user and
+> > > > strncpy_from_user functions") apparently broken those string operations
+> > > > for !MMU.  USER_DS == KERNEL_DS on !MMU, so user_addr_max() always
+> > > > restricts the addresses to TASK_SIZE.
+> > > > 
+> > > > TASK_SIZE has anyway no meaning on !MMU, so make user_addr_max() not
+> > > > restrict anything.
+> > > > 
+> > > > Signed-off-by: Rabin Vincent <rabin@rab.in>
+> > > I tested this on my efm32 machine and it booted just fine. Before I used
+> > > a patch that did:
 > > > 
-> > > From include/linux/clk.h:
-> > > 
-> > > /**
-> > >  * clk_round_rate - adjust a rate to the exact rate a clock can provide
-> > >  * @clk: clock source
-> > >  * @rate: desired clock rate in Hz
-> > >  *
-> > >  * Returns rounded clock rate in Hz, or negative errno.
-> > >  */
-> > > long clk_round_rate(struct clk *clk, unsigned long rate);
-> > > 
-> > > Definitely not rounding the rate is a bug, with respect to the API
-> > > definition. Has anyone tried making the new flag as the default behavior
-> > > and seeing if anything breaks?
+> > > diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> > > index 02fa2558f662..f25c7f4c5a44 100644
+> > > --- a/arch/arm/include/asm/memory.h
+> > > +++ b/arch/arm/include/asm/memory.h
+> > > @@ -92,9 +92,12 @@
+> > >   * It is difficult to define and perhaps will never meet the original meaning
+> > >   * of this define that was meant to.
+> > >   * Fortunately, there is no reference for this in noMMU mode, for now.
+> > > + *
+> > > + * HACK: copy_from_user must even handle copying from flash. So don't impose a
+> > > + * limit at all. Not sure this is correct ...
+> > >   */
+> > >  #ifndef TASK_SIZE
+> > > -#define TASK_SIZE              (CONFIG_DRAM_SIZE)
+> > > +#define TASK_SIZE              (~0UL)
+> > >  #endif
 > > 
-> > The v1 of the patch fixed the rounding unconditionally:
+> > The current code for user_addr_max() for !MMU is essentialy:
 > > 
-> > http://article.gmane.org/gmane.linux.ports.arm.kernel/295077
+> > 	#define user_addr_max() TASK_SIZE
 > > 
-> > Paul wanted it optional so that existing drivers would not break. No one
-> > knows if there is such a driver, or what would the driver's code look
-> > like that would cause an issue.
+> > which is obviously wrong for the KERNEL_DS case, since it should be
+> > ~0UL.  And user space can access all that the kernel does, so there
+> > should be no restriction for USER_DS either (which is anyway equivalent
+> > to KERNEL_DS).  Hence, I think my patch, which removes the usage of
+> > TASK_SIZE in user_addr_max() for !MMU, is correct regardless of what the
+> > correct definition or meaning of TASK_SIZE for !MMU is.
 > > 
-> > And, as I've pointed out in the above thread, as clk-divider driver
-> > doesn't an error code from the dpll driver, my opinion is that such
-> > drivers would not work even now.
-> > 
-> > I like v1 more.
-> > 
-> > In any case, I hope we'd get something merged ASAP so that we fix the
-> > display AM3xxx boards and we'd still have time to possibly find out if
-> > some other driver breaks.
+> > If you make TASK_SIZE to ~0UL (which is probably what it should be on
+> > !MMU), then the result is equivalent to my patch but it is not
+> > semantically correct since you are restricting user_addr_max() to
+> > TASK_SIZE even for the KERNEL_DS.
+> I'd prefer to share as much code as possible between MMU and !MMU, so my
+> preferred solution is:
 > 
-> Resurrecting this thread. Can we reach a consensus? I prefer V1 as well
-> for the reasons stated above, and also since ti,round-rate isn't really
-> describing the hardware at all in DT.
+> 	#ifndef CONFIG_MMU
+> 	#define TASK_SIZE	~0UL	/* do we need parentesis? */
+> 	#endif
+> 
+> 	#define user_addr_max()	\
+> 		(segment_eq(get_fs(), KERNEL_DS) ? ~0UL : TASK_SIZE)
 
-What's really needed is better control over rounding in the clock code.  
-Both the driver API should be improved; and, to the extent that clock 
-sources share the same underlying code implementation, probably some clock 
-source configuration data enhancement is needed (DT or whatever).
+After looking into that a bit more I wonder if the correct version is
+(maybe an equivalent to):
 
-Furthermore, clk_set_rate() should never silently round a requested rate - 
-it should just return an error if it can't satisfy the requested rate 
-precisely.  Silently rounding a rate is racy, and, if we care about 
-drivers behaving consistently across different integration environments, 
-prone to behavior that the driver may not expect.
+	#define user_addr_max() \
+		(segment_eq(get_fs(), KERNEL_DS) ? ~0UL : get_fs())
 
-Frankly, a DT "ti,round-rate" property is risible.  I certainly understand 
-why you don't like it and I don't know why that specific property was 
-proposed.  The issue has never been whether clk_round_rate() should round 
-rates.  Of course it should.  The more pertinent question is, *how* should 
-it round the rate?  A more reasonable DT property approach would be to 
-specify how the clock's rate should be rounded: to the closest rate, to 
-the closest rate equal to or less than the desired rate, to the closest 
-rate greater than or equal to the desired rate; what the tolerance of the 
-"closest rate" should be, etc.  But drivers, e.g. many drivers that 
-control external I/O, should always be able to state that they want an 
-exact rate.
+That is because in the MMU case get_fs() is #defined as:
 
-...
+	#define get_fs()        (current_thread_info()->addr_limit)
 
-In terms of the short-term thing to do, I'm currently thinking that the 
-thing to do is to modify the PLL set_rate() code in mach-omap2/ to not 
-round the rate at all, and then switch the PLL rate rounding code to 
-equal-or-closest-lesser-rate, with something like the oldhardcoded rate 
-tolerances.  That should push the responsibility out to the drivers to 
-control how they want the rounding to happen.  Then the drivers should be 
-able to probe available rates with repeated calls to clk_round_rate() if 
-they want, and if people get unhappy with that, then it might drive 
-rounding improvements in the clock API.
+and .addr_limit is changeable via set_fs. This would also mean that the
+current definition:
 
-But all this won't happen in -rc8; this is 3.16 material..
+	#define user_addr_max() \
+		(segment_eq(get_fs(), USER_DS) ? TASK_SIZE : ~0UL)
 
+might return ~0UL even though there is a limit which just happens not to
+be TASK_SIZE. (BTW, alpha, m68k, openrisc and sparc use the same
+definition.)
 
-> We can always see how it goes and fix it up afterwards when everything 
-> explodes.
+Thoughts?
 
-No thanks... that's what leads to these kinds of messes :-( 
+Best regards
+Uwe
 
-
-- Paul
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
