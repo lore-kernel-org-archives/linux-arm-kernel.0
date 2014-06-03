@@ -1,61 +1,82 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 03 Jun 2014 19:59:17 +0200
-Subject: [PATCH v2 1/2] arm: shmobile: r8a7791: add USB3.0 clocks to
- device tree
-In-Reply-To: <538D71C1.3010900@renesas.com>
-References: <538D71C1.3010900@renesas.com>
-Message-ID: <3639732.t6IJBqd63T@avalon>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue,  3 Jun 2014 17:58:40 +0000
+Subject: [PATCH] ARM: mvebu: DT: fix OpenBlocks AX3-4 RAM size
+In-Reply-To: <5388ddb9.0458440a.2be7.323c@mx.google.com>
+References: <5388ddb9.0458440a.2be7.323c@mx.google.com>
+Message-ID: <1401818320-7202-1-git-send-email-jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shimoda-san,
+The OpenBlocks AX3-4 has a non-DT bootloader.  It also comes with 1GB of
+soldered on RAM, and a DIMM slot for expansion.
 
-Thank you for the patch.
+Unfortunately, atags_to_fdt() doesn't work in big-endian mode, so we see
+the following failure when attempting to boot a big-endian kernel:
 
-On Tuesday 03 June 2014 15:57:05 Yoshihiro Shimoda wrote:
-> Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+  686 slab pages
+  17 pages shared
+  0 pages swap cached
+  [ pid ]   uid  tgid total_vm      rss nr_ptes swapents oom_score_adj name
+  Kernel panic - not syncing: Out of memory and no killable processes...
 
-Apart for the parent clock that I can't verify due to lack of documentation,
+  CPU: 1 PID: 351 Comm: kworker/u4:0 Not tainted 3.15.0-rc8-next-20140603 #1
+  [<c0215a54>] (unwind_backtrace) from [<c021160c>] (show_stack+0x10/0x14)
+  [<c021160c>] (show_stack) from [<c0802500>] (dump_stack+0x78/0x94)
+  [<c0802500>] (dump_stack) from [<c0800068>] (panic+0x90/0x21c)
+  [<c0800068>] (panic) from [<c02b5704>] (out_of_memory+0x320/0x340)
+  [<c02b5704>] (out_of_memory) from [<c02b93a0>] (__alloc_pages_nodemask+0x874/0x930)
+  [<c02b93a0>] (__alloc_pages_nodemask) from [<c02d446c>] (handle_mm_fault+0x744/0x96c)
+  [<c02d446c>] (handle_mm_fault) from [<c02cf250>] (__get_user_pages+0xd0/0x4c0)
+  [<c02cf250>] (__get_user_pages) from [<c02f3598>] (get_arg_page+0x54/0xbc)
+  [<c02f3598>] (get_arg_page) from [<c02f3878>] (copy_strings+0x278/0x29c)
+  [<c02f3878>] (copy_strings) from [<c02f38bc>] (copy_strings_kernel+0x20/0x28)
+  [<c02f38bc>] (copy_strings_kernel) from [<c02f4f1c>] (do_execve+0x3a8/0x4c8)
+  [<c02f4f1c>] (do_execve) from [<c025ac10>] (____call_usermodehelper+0x15c/0x194)
+  [<c025ac10>] (____call_usermodehelper) from [<c020e9b8>] (ret_from_fork+0x14/0x3c)
+  CPU0: stopping
+  CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.15.0-rc8-next-20140603 #1
+  [<c0215a54>] (unwind_backtrace) from [<c021160c>] (show_stack+0x10/0x14)
+  [<c021160c>] (show_stack) from [<c0802500>] (dump_stack+0x78/0x94)
+  [<c0802500>] (dump_stack) from [<c021429c>] (handle_IPI+0x138/0x174)
+  [<c021429c>] (handle_IPI) from [<c02087f0>] (armada_370_xp_handle_irq+0xb0/0xcc)
+  [<c02087f0>] (armada_370_xp_handle_irq) from [<c0212100>] (__irq_svc+0x40/0x50)
+  Exception stack(0xc0b6bf68 to 0xc0b6bfb0)
+  bf60:                   e9fad598 00000000 00f509a3 00000000 c0b6a000 c0b724c4
+  bf80: c0b72458 c0b6a000 00000000 00000000 c0b66da0 c0b6a000 00000000 c0b6bfb0
+  bfa0: c027bb94 c027bb24 60000313 ffffffff
+  [<c0212100>] (__irq_svc) from [<c027bb24>] (cpu_startup_entry+0x54/0x214)
+  [<c027bb24>] (cpu_startup_entry) from [<c0ac5b30>] (start_kernel+0x318/0x37c)
+  [<c0ac5b30>] (start_kernel) from [<00208078>] (0x208078)
+  ---[ end Kernel panic - not syncing: Out of memory and no killable processes...
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Fix this by setting a sane default (1 GB) in the dts file.
 
-> ---
->  arch/arm/boot/dts/r8a7791.dtsi |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-> index ede8b7f..c2b5b38 100644
-> --- a/arch/arm/boot/dts/r8a7791.dtsi
-> +++ b/arch/arm/boot/dts/r8a7791.dtsi
-> @@ -784,15 +784,15 @@
->  			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-
-clocks";
->  			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
->  			clocks = <&cp_clk>, <&sd2_clk>, <&sd1_clk>, <&cpg_clocks
-> R8A7791_CLK_SD0>, -				 <&mmc0_clk>, <&hp_clk>, <&hp_clk>, 
-<&rclk_clk>;
-> +				 <&mmc0_clk>, <&hp_clk>, <&hp_clk>, <&mp_clk>, <&rclk_clk>;
->  			#clock-cells = <1>;
->  			renesas,clock-indices = <
->  				R8A7791_CLK_TPU0 R8A7791_CLK_SDHI2 R8A7791_CLK_SDHI1 
-R8A7791_CLK_SDHI0
-> -				R8A7791_CLK_MMCIF0 R8A7791_CLK_IIC0 R8A7791_CLK_IIC1 
-R8A7791_CLK_CMT1
-> +				R8A7791_CLK_MMCIF0 R8A7791_CLK_IIC0 R8A7791_CLK_IIC1 
-R8A7791_CLK_SSUSB
-> R8A7791_CLK_CMT1
->  			>;
-> 
->  			clock-output-names =
->  				"tpu0", "sdhi2", "sdhi1", "sdhi0",
-> -				"mmcif0", "i2c7", "i2c8", "cmt1";
-> +				"mmcif0", "i2c7", "i2c8", "ssusb", "cmt1";
->  		};
->  		mstp5_clks: mstp5_clks at e6150144 {
->  			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-
-clocks";
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+Kevin,
 
+Please test when you have a moment.  If it works for you, feel free to apply it
+directly wherever you feel it's appropriate.
+
+thx,
+
+Jason.
+
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index 5d42feb31049..178382ca594f 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -25,7 +25,7 @@
+ 
+ 	memory {
+ 		device_type = "memory";
+-		reg = <0 0x00000000 0 0xC0000000>; /* 3 GB */
++		reg = <0 0x00000000 0 0x40000000>; /* 1 GB soldered on */
+ 	};
+ 
+ 	soc {
 -- 
-Regards,
-
-Laurent Pinchart
+2.0.0
