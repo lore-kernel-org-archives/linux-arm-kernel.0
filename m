@@ -1,39 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 3 Jun 2014 16:22:51 +0100
-Subject: [PATCHv2 3/4] arm64: Switch to ldr for loading the stub vectors
-In-Reply-To: <1401742658-11841-4-git-send-email-lauraa@codeaurora.org>
-References: <1401742658-11841-1-git-send-email-lauraa@codeaurora.org>
- <1401742658-11841-4-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140603152251.GQ23149@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Jun 2014 17:23:16 +0200
+Subject: [E1000-devel] ARM support for igb driver
+In-Reply-To: <538DE603.60801@codethink.co.uk>
+References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>
+ <4294251.h9ODuG21v5@wuerfel> <538DE603.60801@codethink.co.uk>
+Message-ID: <20276415.m3UVtkWF1S@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 02, 2014 at 09:57:37PM +0100, Laura Abbott wrote:
+On Tuesday 03 June 2014 16:13:07 Ben Dooks wrote:
+> On 03/06/14 16:05, Arnd Bergmann wrote:
+> > On Tuesday 03 June 2014 15:49:13 Ben Dooks wrote:
+> >> On 05/05/14 22:20, Alexander Duyck wrote:
+> >>> On 05/05/2014 01:38 PM, Thomas Petazzoni wrote:
+> >>>
+> >>> Glad to hear that this is working on your ARM platform as expected.
+> >>>
+> >>> I believe the issue Shiv is having is due to a problem with the specific
+> >>> platform as the IGB device is reporting a Data Link Protocol error via
+> >>> AER and I believe this is what is causing his platform issues.  On
+> >>> enabling BME the device is likely signalling a Fatal Error message in
+> >>> response to the DLP error.  The original error he was seeing was:
+> >>>
+> >>> Unhandled fault: imprecise external abort (0x1406) at 0x00000000
+> >>
+> >> I should sort out making these errors non-fatal to the system, there's
+> >> not really much point in killing a process that may not have been the
+> >> initiator of the problem.
+> > 
+> > We really shouldn't catch those errors system-wide, it belongs into
+> > the specific host bridge driver, but Shiv refuses to say which one that
+> > is, so we can't fix it.
 > 
-> The hyp stub vectors are currently loaded using adr. This
-> instruction has a +/- 1MB range for the loading address. If
-> the alignment for sections is changed. the address may be more
-> than 1MB away, resulting in reclocation errors. Switch to using
-> ldr for getting the address to ensure we aren't affected by the
-> location of the __hyp_stub_vectors.
+> I am not sure what else we can do, either we either have to have a
+> default null handler, or log that they have happened.
 > 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
->  arch/arm64/kernel/head.S | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> The whole issue with the "imprecise external" part is that you have
+> no idea what instruction (or core) caused the issue and IIRC there is
+> very little information about what actually sent the abort.
 > 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 0fd5650..07574f4 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -208,7 +208,7 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
->  	msr	vttbr_el2, xzr
->  
->  	/* Hypervisor stub */
-> -	adr	x0, __hyp_stub_vectors
-> +	ldr	x0, =__hyp_stub_vectors
->  	msr	vbar_el2, x0
+> I believe these are useful to report as they tend to show that some
+> part of the system has gone wrong. For example, we get them on the
+> rcar-h2 if the system tries to access a unit that has not been
+> properly clocked.
 
-Or use Ard's trick with adrp and the lo12 relocation?
+In my experience, any unit that can send such an abort also has
+a diagnotic register that you can look into to find out at least the
+unit that triggered it so you can disable it.
 
-Will
+If none of the known sources caused the abort, it's generally best
+to shut down the system to avoid further data corruption. 
+
+	Arnd
