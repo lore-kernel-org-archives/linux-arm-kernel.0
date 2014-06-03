@@ -1,104 +1,76 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Tue, 03 Jun 2014 22:14:55 +1000
-Subject: TASK_SIZE for !MMU
-In-Reply-To: <20140602085150.GA31147@pengutronix.de>
-References: <20140429100028.GH28564@pengutronix.de>
- <20140602085150.GA31147@pengutronix.de>
-Message-ID: <538DBC3F.9060207@uclinux.org>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 3 Jun 2014 14:31:38 +0200
+Subject: [PATCH v2 10/11] sched: move cfs task on a CPU with higher
+ capacity
+In-Reply-To: <20140603111532.GW11096@twins.programming.kicks-ass.net>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-11-git-send-email-vincent.guittot@linaro.org>
+ <20140529095024.GF11074@laptop.programming.kicks-ass.net>
+ <CAKfTPtCHhxyugMOCeS0hZoEXWhgRec4uOBexZ2aB2A+Eycgi8w@mail.gmail.com>
+ <20140530062937.GA11096@twins.programming.kicks-ass.net>
+ <CAKfTPtBXddNFXDuL5YNNtcW7e1Un=LqHU8bgaejJwPObSGoBhg@mail.gmail.com>
+ <20140603111532.GW11096@twins.programming.kicks-ass.net>
+Message-ID: <CAKfTPtBRkWY1hTBqd9cQKetFbWEVvJVo-wKUz9MN-ZfZLq4TuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
-On 02/06/14 18:51, Uwe Kleine-K?nig wrote:
-> Hello
+On 3 June 2014 13:15, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Mon, Jun 02, 2014 at 07:06:44PM +0200, Vincent Guittot wrote:
+>> > Could you detail those conditions? FWIW those make excellent Changelog
+>> > material.
+>>
+>> I have looked back into my tests and traces:
+>>
+>> In a 1st test, the capacity of the CPU was still above half default
+>> value (power=538) unlike what i remembered. So it's some what "normal"
+>> to keep the task on CPU0 which also handles IRQ because sg_capacity
+>> still returns 1.
 >
-> [expand Cc: a bit]
+> OK, so I suspect that once we move to utilization based capacity stuff
+> we'll do the migration IF the task indeed requires more cpu than can be
+> provided by the reduced, one, right?
+
+The current version of the patchset only checks if the capacity of a
+CPU has significantly reduced that we should look for another CPU. But
+we effectively could also add compare the remaining capacity with the
+task load
+
 >
-> On Tue, Apr 29, 2014 at 12:00:28PM +0200, Uwe Kleine-K?nig wrote:
->> I grepped through the kernel (v3.15-rc1) for usages of TASK_SIZE to
->> check if/how it is used on !MMU ARM machines. Most open questions also
->> affect the other !MMU platforms, so I put the blackfin, c6x, frv and
->> m32r, m68k, microblaze and xtensa lists on Cc:. (Did I miss a platform
->> that cares for !MMU ?)
->>
->> Most occurences are fine, see the list at the end of this mail. However
->> some are not or are unclear to me. Here is the complete list[1] apart from
->> the definition of TASK_SIZE for !MMU in arch/arm/include/asm/memory.h:
->>
->>   - Probably this should be explict s/TASK_SIZE/CONFIG_DRAM_SIZE/. This
->>     is generic code however while CONFIG_DRAM_SIZE is ARM only.
->>          mm/nommu.c:     if (!rlen || rlen > TASK_SIZE)
->>
->>   - The issue the patch by Rabin is addressing (Subject: [PATCH] ARM: fix
->>     string functions on !MMU), alternatively make TASK_SIZE ~0UL.
->>          arch/arm/include/asm/uaccess.h:#define user_addr_max() \
->>          arch/arm/include/asm/uaccess.h: (segment_eq(get_fs(), USER_DS) ? TASK_SIZE : ~0UL)
-> [reference: http://www.spinics.net/lists/arm-kernel/msg324112.html ]
+>> In a 2nd test,the main task runs (most of the time) on CPU0 whereas
+>> the max power of the latter is only 623 and the cpu_power goes below
+>> 512 (power=330) during the use case. So the sg_capacity of CPU0 is
+>> null but the main task still stays on CPU0.
+>> The use case (scp transfer) is made of a long running task (ssh) and a
+>> periodic short task (scp). ssh runs on CPU0 and scp runs each 6ms on
+>> CPU1. The newly idle load balance on CPU1 doesn't pull the long
+>> running task although sg_capacity is null because of
+>> sd->nr_balance_failed is never incremented and load_balance doesn't
+>> trig an active load_balance. When an idle balance occurs in the middle
+>> of the newly idle balance, the ssh long task migrates on CPU1 but as
+>> soon as it sleeps and wakes up, it goes back on CPU0 because of the
+>> wake affine which migrates it back on CPU0 (issue solved by patch 09).
 >
->>   - probably bearable if broken:
->>          drivers/misc/lkdtm.c:           if (user_addr >= TASK_SIZE) {
->>          lib/test_user_copy.c:   user_addr = vm_mmap(...)
->>          lib/test_user_copy.c:   if (user_addr >= (unsigned long)(TASK_SIZE)) {
->>          lib/test_user_copy.c:           pr_warn("Failed to allocate user memory\n");
->>          lib/test_user_copy.c:           return -ENOMEM;
->>
->>   - unclear to me:
->>          fs/exec.c:      current->mm->task_size = TASK_SIZE;
->>     - depends on PERF_EVENTS
->>          kernel/events/core.c:   if (!addr || addr >= TASK_SIZE)
->>          kernel/events/core.c:   return TASK_SIZE - addr;
->>          kernel/events/uprobes.c:                area->vaddr = get_unmapped_area(NULL, TASK_SIZE - PAGE_SIZE,
->>     - depends on (PERF_EVENTS && (CPU_V6 || CPU_V6K || CPU_V7)):
->>          arch/arm/kernel/hw_breakpoint.c:        return (va >= TASK_SIZE) && ((va + len - 1) >= TASK_SIZE);
->>     - seems to cope with big TASK_SIZE
->>          fs/namespace.c:        size = TASK_SIZE - (unsigned long)data;
->>          fs/namespace.c:        if (size > PAGE_SIZE)
->>          fs/namespace.c:                size = PAGE_SIZE;
->>     - depends on PLAT_S5P || ARCH_EXYNOS, this looks wrong
->>          drivers/media/platform/s5p-mfc/s5p_mfc_common.h:#define DST_QUEUE_OFF_BASE      (TASK_SIZE / 2)
->>     - used for prctl(PR_SET_MM, ...)
->>          kernel/sys.c:   if (addr >= TASK_SIZE || addr < mmap_min_addr)
->>
->> Any help to judge if these are OK is appreciated (even from Will :-)
->>
->> I think it would be OK to define TASK_SIZE to 0xffffffff for !MMU.
->> blackfin, frv and m68k also do this. c6x does define it to 0xFFFFF000 to
->> leave space for error codes.
-
-I did that same change for m68k in commit cc24c40 ("m68knommu: remove
-size limit on non-MMU TASK_SIZE"). For similar reasons as you need to
-now.
-
-
->> Thoughts?
-> The problem is that current linus/master (and also next) doesn't boot on
-> my ARM-nommu machine because the user string functions (strnlen_user,
-> strncpy_from_user et al.) refuse to work on strings above TASK_SIZE
-> which in my case also includes the XIP kernel image.
-
-I seem to recall that we were not considering flash or anything else
-other than RAM when defining that original TASK_SIZE (back many, many
-years ago). Some of the address checks you list above made some sense
-if you had everything in RAM (though only upper bounds are checked).
-The thinking was some checking is better than none I suppose.
-
-Setting a hard coded memory size in CONFIG_DRAM_SIZE is not all that
-fantastic either...
-
-Regards
-Greg
-
-
-> Maybe someone of the mm people can bring light into the unclear points
-> above and the question what TASK_SIZE is supposed to be on no-MMU
-> machines?
+> OK, so there's two problems here, right?
+>  1) we don't migrate away from cpu0
+>  2) if we do, we get pulled back.
 >
-> Best regards
-> Uwe
+> And patch 9 solves 2, so maybe enhance its changelog to mention this
+> slightly more explicit.
 >
->> [1] complete as in "skip everything below arch/ but arch/arm" :-)
->>
-> [removed the list, if you're interested, it's available at
-> http://mid.gmane.org/20140429100028.GH28564 at pengutronix.de]
+> Which leaves us with 1.. interesting problem. I'm just not sure
+> endlessly kicking a low capacity cpu is the right fix for that.
+
+What prevent us to migrate the task directly is the fact that
+nr_balance_failed is not incremented for newly idle and it's the only
+condition for active migration (except asym feature)
+
+We could add a additional test in need_active_balance for newly_idle
+load balance. Something like:
+
+if ((sd->flags & SD_SHARE_PKG_RESOURCES)
+ && (senv->rc_rq->cpu_power_orig * 100) > (env->src_rq->group_power *
+env->sd->imbalance_pct))
+return 1;
+
+>
 >
