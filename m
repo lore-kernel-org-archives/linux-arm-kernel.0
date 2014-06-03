@@ -1,63 +1,29 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 3 Jun 2014 09:11:09 +0100
-Subject: [PATCH 3/3] i2c: Make I2C ID tables non-mandatory for DT'ed
- and/or ACPI'ed devices
-In-Reply-To: <20140602160829.F3519C40476@trevor.secretlab.ca>
-References: <1401716463-23457-1-git-send-email-lee.jones@linaro.org>
- <1401716463-23457-4-git-send-email-lee.jones@linaro.org>
- <20140602160829.F3519C40476@trevor.secretlab.ca>
-Message-ID: <20140603081109.GD3060@lee--X1>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue,  3 Jun 2014 10:11:27 +0200
+Subject: [PATCH v3 0/2] mmc: Add SDIO function devicetree subnode parsing
+Message-ID: <1401783089-18065-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 02 Jun 2014, Grant Likely wrote:
-> On Mon,  2 Jun 2014 14:41:03 +0100, Lee Jones <lee.jones@linaro.org> wrote:
-> > Currently the I2C framework insists on devices supplying an I2C ID
-> > table.  Many of the devices which do so unnecessarily adding quite a
-> > few wasted lines to kernel code.  This patch allows drivers a means
-> > to 'not' supply the aforementioned table and match on either DT
-> > and/or ACPI match tables instead.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Looks reasonable.
+Hi All,
 
-Can I add your Ack?
+Here is v3 of my submission of Sascha Hauer's
+"mmc: Add SDIO function devicetree subnode parsing" patch.
 
-> g.
-> 
-> > ---
-> >  drivers/i2c/i2c-core.c | 13 ++++++++++++-
-> >  1 file changed, 12 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> > index d0c7180..811b78f 100644
-> > --- a/drivers/i2c/i2c-core.c
-> > +++ b/drivers/i2c/i2c-core.c
-> > @@ -271,7 +271,18 @@ static int i2c_device_probe(struct device *dev)
-> >  		return 0;
-> >  
-> >  	driver = to_i2c_driver(dev->driver);
-> > -	if (!driver->probe || !driver->id_table)
-> > +	if (!driver->probe)
-> > +		return -EINVAL;
-> > +
-> > +	/*
-> > +	 * An I2C ID table is not madatory, if and only if, a suitable Device
-> > +	 * Tree and/or ACPI match table entry is supplied for the probing
-> > +	 * device.
-> > +	 *
-> > +	 * TODO: Provide 'device type' to 'ACPI node' call and match here.
-> > +	 */
-> > +	if (!driver->id_table &&
-> > +	    !of_match_device(dev->driver->of_match_table, dev))
-> >  		return -ENODEV;
-> >  
-> >  	if (!device_can_wakeup(&client->dev))
-> 
+Changes since v1:
+- Submit as a stand-alone patch-set, rather then as part of a larger oob irq
+  support patchset crossing multiple subsystems
+- Add a patch to document the already existing practice of using slot subnodes
+- Split of the dt bindings documentation for sdio-func child nodes into its
+  own patch
+- Add a preparation patch, setting slot_no where relevant
+- And finally the "Add SDIO function devicetree subnode parsing" patch itself
+  has been modified to look for the sdio function childnodes under a slot node
+  instead of directly under the host node
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Changes since v2:
+- Drop the slot subnodes again, and drop the 2 slot subnodes patches
+
+Regards,
+
+Hans
