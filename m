@@ -1,30 +1,52 @@
-From: yamada.m@jp.panasonic.com (Masahiro Yamada)
-Date: Tue, 03 Jun 2014 15:19:16 +0900
-Subject: [PATCH] ARM: decompressor: a minor optimization
-In-Reply-To: <20140602102516.GC3855@e103592.cambridge.arm.com>
-References: <1401449433-1963-1-git-send-email-yamada.m@jp.panasonic.com>
- <20140602102516.GC3855@e103592.cambridge.arm.com>
-Message-ID: <20140603151916.3224.AA925319@jp.panasonic.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 3 Jun 2014 14:19:13 +0800
+Subject: [PATCH 1/5] ARM: berlin: add SMP support
+In-Reply-To: <20140602102750.GB13681@kwain>
+References: <1401700866-24804-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1401700866-24804-2-git-send-email-antoine.tenart@free-electrons.com>
+ <20140602094715.GG28090@lunn.ch> <20140602100048.GA12162@kwain>
+ <20140602100332.GH28090@lunn.ch> <20140602102750.GB13681@kwain>
+Message-ID: <20140603141913.710a1f7e@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+Hi Andrew, Antoine, 
 
+On Mon, 2 Jun 2014 03:27:50 -0700
+Antoine T?nart <antoine.tenart@free-electrons.com> wrote:
 
-> Loading sp with LDMIA is not allowed in Thumb.  For simpler code
-> maintenance, the code was just made Thumb-compatible anyway by splitting
-> out the sp load while fixing another issue.  This isn't part of a core
-> loop, so shouldn't have a significant impact on performance.
+> On Mon, Jun 02, 2014 at 12:03:32PM +0200, Andrew Lunn wrote:
+> > On Mon, Jun 02, 2014 at 12:00:48PM +0200, Antoine T?nart wrote:
+> > > Hi Andrew,
+> > > 
+> > > On Mon, Jun 02, 2014 at 11:47:15AM +0200, Andrew Lunn wrote:
+> > > > On Mon, Jun 02, 2014 at 11:21:02AM +0200, Antoine T?nart wrote:
+> > > > > +
+> > > > > +static inline void berlin_reset_cpu(unsigned int cpu)
+> > > > > +{
+> > > > > +	u32 val;
+> > > > > +
+> > > > > +	val = readl(cpu_ctrl + CPU_RESET);
+> > > > > +	val |= BIT(cpu_logical_map(cpu));
+> > > > > +	writel(val, cpu_ctrl + CPU_RESET);
+> > > > > +}
+> > > > 
+> > > > Is this performing a reset on the CPU, or is it taking it out of
+> > > > reset?
+> > > > 
+> > > > If you are going to implement CPU hotplug at some point, you are going
+> > > > to want to be able to put the CPU into reset, i.e. power it off, and
+> > > > take it out of reset, i.e. power it on and getting it running. So it
+> > > > might help if we get these function names clear now.
+> > > 
+> > > It is performing a reset on the CPU. berlin_perform_reset_cpu() then?
+> > 
+> > What happens if the CPU is powered off? Will a reset power it on?  Or
+> > are you assuming the boot loader has powered it on?
 > 
-> git blame can be useful for finding out how an odd-looking piece of code
-> came into existence.  Sometimes you have to dig through a few patches to
-> find the answer.
+> I actually don't have information about this. For now let's assume the
+> boot loader has powered on the CPUs.
+> 
 
-
-Thank you for explaning this!
-
-Please disregard this patch. Sorry for noise.
-
-
-Best Regards
-Masahiro Yamada
+We don't support independently power off cpu on BG2 and BG2Q in linux kernel.
+So we can assume that bootloader has powered on the CPUs
