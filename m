@@ -1,35 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue,  3 Jun 2014 09:37:47 +0200
-Subject: [PATCH RFC] pinctrl: hide CONFIG_PINMUX and CONFIG_PINCONF
-Message-ID: <1401781067-4316-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Tue, 3 Jun 2014 13:12:53 +0530
+Subject: [PATCH 01/14] irqchip: crossbar: remove IS_ERR_VALUE check
+In-Reply-To: <1401781386-4982-1-git-send-email-r.sricharan@ti.com>
+References: <1401781386-4982-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <1401781386-4982-2-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These symbols are supposed to be selected by the drivers actually needing
-them. The only situation where it would make sense to enable them without a
-driver selecting them is when an out-of-tree pinctrl driver is used.
+From: Nishanth Menon <nm@ti.com>
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+IS_ERR_VALUE makes sense only *if* there could be valid values in
+negative error range. But in the cases that we do use it, there is no
+such case. Just remove the same.
+
+Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- drivers/pinctrl/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-crossbar.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index 33f9dc1f14fd..4ba1f7ef2b47 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -11,10 +11,10 @@ menu "Pin controllers"
- 	depends on PINCTRL
+diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
+index de021638..c5415ae 100644
+--- a/drivers/irqchip/irq-crossbar.c
++++ b/drivers/irqchip/irq-crossbar.c
+@@ -110,15 +110,15 @@ static int crossbar_domain_xlate(struct irq_domain *d,
+ 				 unsigned long *out_hwirq,
+ 				 unsigned int *out_type)
+ {
+-	unsigned long ret;
++	int ret;
  
- config PINMUX
--	bool "Support pin multiplexing controllers"
-+	bool
+ 	ret = get_prev_map_irq(intspec[1]);
+-	if (!IS_ERR_VALUE(ret))
++	if (ret >= 0)
+ 		goto found;
  
- config PINCONF
--	bool "Support pin configuration controllers"
-+	bool
+ 	ret = allocate_free_irq(intspec[1]);
  
- config GENERIC_PINCONF
- 	bool
+-	if (IS_ERR_VALUE(ret))
++	if (ret < 0)
+ 		return ret;
+ 
+ found:
 -- 
-2.0.0
+1.7.9.5
