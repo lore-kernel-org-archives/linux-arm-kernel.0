@@ -1,82 +1,81 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue,  3 Jun 2014 17:58:40 +0000
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 03 Jun 2014 11:07:30 -0700
 Subject: [PATCH] ARM: mvebu: DT: fix OpenBlocks AX3-4 RAM size
-In-Reply-To: <5388ddb9.0458440a.2be7.323c@mx.google.com>
+In-Reply-To: <1401818320-7202-1-git-send-email-jason@lakedaemon.net> (Jason
+ Cooper's message of "Tue, 3 Jun 2014 17:58:40 +0000")
 References: <5388ddb9.0458440a.2be7.323c@mx.google.com>
-Message-ID: <1401818320-7202-1-git-send-email-jason@lakedaemon.net>
+ <1401818320-7202-1-git-send-email-jason@lakedaemon.net>
+Message-ID: <7hzjhtuasd.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OpenBlocks AX3-4 has a non-DT bootloader.  It also comes with 1GB of
-soldered on RAM, and a DIMM slot for expansion.
+Jason Cooper <jason@lakedaemon.net> writes:
 
-Unfortunately, atags_to_fdt() doesn't work in big-endian mode, so we see
-the following failure when attempting to boot a big-endian kernel:
+> The OpenBlocks AX3-4 has a non-DT bootloader.  It also comes with 1GB of
+> soldered on RAM, and a DIMM slot for expansion.
+>
+> Unfortunately, atags_to_fdt() doesn't work in big-endian mode, so we see
+> the following failure when attempting to boot a big-endian kernel:
 
-  686 slab pages
-  17 pages shared
-  0 pages swap cached
-  [ pid ]   uid  tgid total_vm      rss nr_ptes swapents oom_score_adj name
-  Kernel panic - not syncing: Out of memory and no killable processes...
+The same will happen on kernels without the ATAG_DTB_COMPAT option
+enabled too, right?
 
-  CPU: 1 PID: 351 Comm: kworker/u4:0 Not tainted 3.15.0-rc8-next-20140603 #1
-  [<c0215a54>] (unwind_backtrace) from [<c021160c>] (show_stack+0x10/0x14)
-  [<c021160c>] (show_stack) from [<c0802500>] (dump_stack+0x78/0x94)
-  [<c0802500>] (dump_stack) from [<c0800068>] (panic+0x90/0x21c)
-  [<c0800068>] (panic) from [<c02b5704>] (out_of_memory+0x320/0x340)
-  [<c02b5704>] (out_of_memory) from [<c02b93a0>] (__alloc_pages_nodemask+0x874/0x930)
-  [<c02b93a0>] (__alloc_pages_nodemask) from [<c02d446c>] (handle_mm_fault+0x744/0x96c)
-  [<c02d446c>] (handle_mm_fault) from [<c02cf250>] (__get_user_pages+0xd0/0x4c0)
-  [<c02cf250>] (__get_user_pages) from [<c02f3598>] (get_arg_page+0x54/0xbc)
-  [<c02f3598>] (get_arg_page) from [<c02f3878>] (copy_strings+0x278/0x29c)
-  [<c02f3878>] (copy_strings) from [<c02f38bc>] (copy_strings_kernel+0x20/0x28)
-  [<c02f38bc>] (copy_strings_kernel) from [<c02f4f1c>] (do_execve+0x3a8/0x4c8)
-  [<c02f4f1c>] (do_execve) from [<c025ac10>] (____call_usermodehelper+0x15c/0x194)
-  [<c025ac10>] (____call_usermodehelper) from [<c020e9b8>] (ret_from_fork+0x14/0x3c)
-  CPU0: stopping
-  CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.15.0-rc8-next-20140603 #1
-  [<c0215a54>] (unwind_backtrace) from [<c021160c>] (show_stack+0x10/0x14)
-  [<c021160c>] (show_stack) from [<c0802500>] (dump_stack+0x78/0x94)
-  [<c0802500>] (dump_stack) from [<c021429c>] (handle_IPI+0x138/0x174)
-  [<c021429c>] (handle_IPI) from [<c02087f0>] (armada_370_xp_handle_irq+0xb0/0xcc)
-  [<c02087f0>] (armada_370_xp_handle_irq) from [<c0212100>] (__irq_svc+0x40/0x50)
-  Exception stack(0xc0b6bf68 to 0xc0b6bfb0)
-  bf60:                   e9fad598 00000000 00f509a3 00000000 c0b6a000 c0b724c4
-  bf80: c0b72458 c0b6a000 00000000 00000000 c0b66da0 c0b6a000 00000000 c0b6bfb0
-  bfa0: c027bb94 c027bb24 60000313 ffffffff
-  [<c0212100>] (__irq_svc) from [<c027bb24>] (cpu_startup_entry+0x54/0x214)
-  [<c027bb24>] (cpu_startup_entry) from [<c0ac5b30>] (start_kernel+0x318/0x37c)
-  [<c0ac5b30>] (start_kernel) from [<00208078>] (0x208078)
-  ---[ end Kernel panic - not syncing: Out of memory and no killable processes...
+>   686 slab pages
+>   17 pages shared
+>   0 pages swap cached
+>   [ pid ]   uid  tgid total_vm      rss nr_ptes swapents oom_score_adj name
+>   Kernel panic - not syncing: Out of memory and no killable processes...
+>
+>   CPU: 1 PID: 351 Comm: kworker/u4:0 Not tainted 3.15.0-rc8-next-20140603 #1
+>   [<c0215a54>] (unwind_backtrace) from [<c021160c>] (show_stack+0x10/0x14)
+>   [<c021160c>] (show_stack) from [<c0802500>] (dump_stack+0x78/0x94)
+>   [<c0802500>] (dump_stack) from [<c0800068>] (panic+0x90/0x21c)
+>   [<c0800068>] (panic) from [<c02b5704>] (out_of_memory+0x320/0x340)
+>   [<c02b5704>] (out_of_memory) from [<c02b93a0>] (__alloc_pages_nodemask+0x874/0x930)
+>   [<c02b93a0>] (__alloc_pages_nodemask) from [<c02d446c>] (handle_mm_fault+0x744/0x96c)
+>   [<c02d446c>] (handle_mm_fault) from [<c02cf250>] (__get_user_pages+0xd0/0x4c0)
+>   [<c02cf250>] (__get_user_pages) from [<c02f3598>] (get_arg_page+0x54/0xbc)
+>   [<c02f3598>] (get_arg_page) from [<c02f3878>] (copy_strings+0x278/0x29c)
+>   [<c02f3878>] (copy_strings) from [<c02f38bc>] (copy_strings_kernel+0x20/0x28)
+>   [<c02f38bc>] (copy_strings_kernel) from [<c02f4f1c>] (do_execve+0x3a8/0x4c8)
+>   [<c02f4f1c>] (do_execve) from [<c025ac10>] (____call_usermodehelper+0x15c/0x194)
+>   [<c025ac10>] (____call_usermodehelper) from [<c020e9b8>] (ret_from_fork+0x14/0x3c)
+>   CPU0: stopping
+>   CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.15.0-rc8-next-20140603 #1
+>   [<c0215a54>] (unwind_backtrace) from [<c021160c>] (show_stack+0x10/0x14)
+>   [<c021160c>] (show_stack) from [<c0802500>] (dump_stack+0x78/0x94)
+>   [<c0802500>] (dump_stack) from [<c021429c>] (handle_IPI+0x138/0x174)
+>   [<c021429c>] (handle_IPI) from [<c02087f0>] (armada_370_xp_handle_irq+0xb0/0xcc)
+>   [<c02087f0>] (armada_370_xp_handle_irq) from [<c0212100>] (__irq_svc+0x40/0x50)
+>   Exception stack(0xc0b6bf68 to 0xc0b6bfb0)
+>   bf60:                   e9fad598 00000000 00f509a3 00000000 c0b6a000 c0b724c4
+>   bf80: c0b72458 c0b6a000 00000000 00000000 c0b66da0 c0b6a000 00000000 c0b6bfb0
+>   bfa0: c027bb94 c027bb24 60000313 ffffffff
+>   [<c0212100>] (__irq_svc) from [<c027bb24>] (cpu_startup_entry+0x54/0x214)
+>   [<c027bb24>] (cpu_startup_entry) from [<c0ac5b30>] (start_kernel+0x318/0x37c)
+>   [<c0ac5b30>] (start_kernel) from [<00208078>] (0x208078)
+>   ---[ end Kernel panic - not syncing: Out of memory and no killable processes...
+>
+> Fix this by setting a sane default (1 GB) in the dts file.
+>
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 
-Fix this by setting a sane default (1 GB) in the dts file.
+Tested-by: Kevin Hilman <khilman@linaro.org>
 
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
----
-Kevin,
+> ---
+> Kevin,
+>
+> Please test when you have a moment.  If it works for you, feel free to apply it
+> directly wherever you feel it's appropriate.
 
-Please test when you have a moment.  If it works for you, feel free to apply it
-directly wherever you feel it's appropriate.
+Yes, this works for me as I've been using the same hack to boot several BE
+kernels on the openblocks recently.
 
-thx,
+Could you do the minor changelog update above (ATAG_COMPAT), add the
+Tested-by and send to arm at kernel.org so it gets tracked for arm-soc
+merge.
 
-Jason.
+Also, what do you think about backporting this for -stable?  At least
+for v3.14+ since that's when BE started working.
 
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-index 5d42feb31049..178382ca594f 100644
---- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-+++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-@@ -25,7 +25,7 @@
- 
- 	memory {
- 		device_type = "memory";
--		reg = <0 0x00000000 0 0xC0000000>; /* 3 GB */
-+		reg = <0 0x00000000 0 0x40000000>; /* 1 GB soldered on */
- 	};
- 
- 	soc {
--- 
-2.0.0
+Kevin
