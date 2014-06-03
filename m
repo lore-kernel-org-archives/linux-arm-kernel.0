@@ -1,35 +1,43 @@
-From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
-Date: Tue, 3 Jun 2014 15:57:16 +0900
-Subject: [PATCH v2 2/2] arm: shmobile: r8a7791: add USB3.0 node to r8a7791.dtsi
-Message-ID: <538D71CC.1090306@renesas.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Tue, 03 Jun 2014 09:00:48 +0200
+Subject: [RFC PATCH 2/3] DMA,
+ CMA: use general CMA reserved area management framework
+In-Reply-To: <1401757919-30018-3-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1401757919-30018-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1401757919-30018-3-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <xa1twqcyjx3z.fsf@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This node depends on a generic phy driver of usb.
+On Tue, Jun 03 2014, Joonsoo Kim wrote:
+> Now, we have general CMA reserved area management framework,
+> so use it for future maintainabilty. There is no functional change.
+>
+> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 
-Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
----
- arch/arm/boot/dts/r8a7791.dtsi |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+Acked-by: Michal Nazarewicz <mina86@mina86.com>
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index c2b5b38..5d6f4d6 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -906,4 +906,14 @@
- 		#size-cells = <0>;
- 		status = "disabled";
- 	};
-+
-+	xhci: usb at ee000000 {
-+		compatible = "renesas,xhci-r8a7791";
-+		reg = <0 0xee000000 0 0xc00>;
-+		interrupts = <0 101 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7791_CLK_SSUSB>;
-+		phys = <&usbphy 1 1>;
-+		phy-names = "usb";
-+		status = "disabled";
-+	};
- };
+> diff --git a/include/linux/dma-contiguous.h b/include/linux/dma-contiguous.h
+> index dfb1dc9..ecb85ac 100644
+> --- a/include/linux/dma-contiguous.h
+> +++ b/include/linux/dma-contiguous.h
+> @@ -53,9 +53,10 @@
+>  
+>  #ifdef __KERNEL__
+>  
+> +#include <linux/device.h>
+> +
+
+Why is this suddenly required?
+
+>  struct cma;
+>  struct page;
+> -struct device;
+>  
+>  #ifdef CONFIG_DMA_CMA
+
 -- 
-1.7.9.5
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
