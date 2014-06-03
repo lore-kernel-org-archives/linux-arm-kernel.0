@@ -1,52 +1,38 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Tue, 3 Jun 2014 12:59:43 +0530
-Subject: [PATCH 00/14] irqchip: crossbar: driver fixes
-Message-ID: <1401780597-4735-1-git-send-email-r.sricharan@ti.com>
+From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
+Date: Tue,  3 Jun 2014 09:33:10 +0200
+Subject: [PATCH 2/2] ARM: dts: berlin: enable i2c0 and i2c2
+In-Reply-To: <1401780790-17830-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1401780790-17830-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1401780790-17830-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series does some cleanup and provides support for
-hardwired IRQ and crossbar definitions.
+Enable the I2C0 and I2C2 for the Marvell Berlin BG2G DMP. I2C1 and I2C3
+are also working on this board, but no devices seemed to be there.
 
-On certain platforms such as DRA7, SPIs 0, 1, 2, 3, 5, 6, 10,
-131, 132, 133 are direct wired to hardware blocks bypassing
-crossbar. This quirky implementation is *NOT* supposed to be the
-expectation of crossbar hardware usage. This series adds support
-to represent such hard-wired irqs through DT and avoid generic
-allocation/programming of crossbar in the driver.
+Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+---
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-This way of supporting hard-wired irqs was a result of
-the below discussions.
-http://www.spinics.net/lists/arm-kernel/msg329946.html
-
-Based on linux-next next-20140602 tag + Tony's omap-for-v3.16/crossbar branch.
-
-Nishanth Menon (11):
-  irqchip: crossbar: remove IS_ERR_VALUE check
-  irqchip: crossbar: fix sparse warnings
-  irqchip: crossbar: fix checkpatch warning
-  irqchip: crossbar: fix kerneldoc warning
-  irqchip: crossbar: fix memory leak incase of invalid entry
-  irqchip: crossbar: return proper error value
-  irqchip: crossbar: change the goto naming
-  irqchip: crossbar: introduce ti,max-crossbar-sources to identify
-    valid crossbar mapping
-  irqchip: crossbar: introduce centralized check for crossbar write
-  Documentation: dt: OMAP: crossbar: add description for interrupt
-    consumer
-  irqchip: crossbar allow for quirky hardware with direct hardwiring of
-    GIC
-
-Rajendra Nayak (1):
-  irqchip: crossbar: DRA7: Fix unused crossbar list
-
-Sricharan R (2):
-  irqchip: crossbar: set cb pointer to null in case of error
-  irqchip: crossbar: Add kerneldoc for crossbar_domain_unmap callback
-
- .../devicetree/bindings/arm/omap/crossbar.txt      |   27 +++++
- drivers/irqchip/irq-crossbar.c                     |  127 +++++++++++++++-----
- 2 files changed, 125 insertions(+), 29 deletions(-)
-
+diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+index 995150f93795..a357ce02a64e 100644
+--- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
++++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+@@ -34,6 +34,14 @@
+ 	status = "okay";
+ };
+ 
++&i2c0 {
++	status = "okay";
++};
++
++&i2c2 {
++	status = "okay";
++};
++
+ &uart0 {
+ 	status = "okay";
+ };
 -- 
-1.7.9.5
+1.9.1
