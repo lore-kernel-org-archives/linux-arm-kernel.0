@@ -1,54 +1,37 @@
-From: gdjakov@mm-sol.com (Georgi Djakov)
-Date: Tue,  3 Jun 2014 17:29:41 +0300
-Subject: [PATCH v3 2/2] ARM: dts: qcom: Add APQ8084 serial port DT node
-In-Reply-To: <1401805781-26637-1-git-send-email-gdjakov@mm-sol.com>
-References: <1401805781-26637-1-git-send-email-gdjakov@mm-sol.com>
-Message-ID: <1401805781-26637-3-git-send-email-gdjakov@mm-sol.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 3 Jun 2014 15:43:19 +0100
+Subject: [PATCH 3/5] regulator: axp20x: Update the bindings to use a
+ local parent regulator
+In-Reply-To: <20140603131204.GJ27722@lukather>
+References: <1401297069-7423-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1401297069-7423-4-git-send-email-maxime.ripard@free-electrons.com>
+ <20140528185051.GB22488@sirena.org.uk>
+ <20140603131204.GJ27722@lukather>
+Message-ID: <20140603144319.GD31751@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the necessary DT node to probe the serial driver on
-APQ8084 platforms.
+On Tue, Jun 03, 2014 at 03:12:04PM +0200, Maxime Ripard wrote:
+> On Wed, May 28, 2014 at 07:50:51PM +0100, Mark Brown wrote:
+> > On Wed, May 28, 2014 at 07:11:07PM +0200, Maxime Ripard wrote:
 
-Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/boot/dts/qcom-apq8084-mtp.dts |    6 ++++++
- arch/arm/boot/dts/qcom-apq8084.dtsi    |    8 ++++++++
- 2 files changed, 14 insertions(+)
+> > >  		axp_mic_reg: ldo5 {
+> > > +			vin-supply = <&axp_ipsout_reg>;
 
-diff --git a/arch/arm/boot/dts/qcom-apq8084-mtp.dts b/arch/arm/boot/dts/qcom-apq8084-mtp.dts
-index 9dae387..8ecec58 100644
---- a/arch/arm/boot/dts/qcom-apq8084-mtp.dts
-+++ b/arch/arm/boot/dts/qcom-apq8084-mtp.dts
-@@ -3,4 +3,10 @@
- / {
- 	model = "Qualcomm APQ 8084-MTP";
- 	compatible = "qcom,apq8084-mtp", "qcom,apq8084";
-+
-+	soc {
-+		serial at f995e000 {
-+			status = "okay";
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
-index 1e785df..b5b156e 100644
---- a/arch/arm/boot/dts/qcom-apq8084.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
-@@ -185,5 +185,13 @@
- 			reg = <0xfc400000 0x4000>;
- 		};
- 
-+		serial at f995e000 {
-+			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-+			reg = <0xf995e000 0x1000>;
-+			interrupts = <0 114 0x0>;
-+			clocks = <&gcc GCC_BLSP2_UART2_APPS_CLK>, <&gcc GCC_BLSP2_AHB_CLK>;
-+			clock-names = "core", "iface";
-+			status = "disabled";
-+		};
- 	};
- };
--- 
-1.7.9.5
+> > This is saying that every single regulator on the device is powered by a
+> > (presumably) single input called "vin".  This would certainly be an
+> > unusual package design...  As ever the name of the supply should follow
+> > the name of the pin on the device.
+
+> Not exactly. Each regulator has its own input pin, named
+> <regulator_name>in in the schematics, with the exception of LDO2 and
+> LDO4 that share the same pin.
+
+OK, so the supplies should be called <regulator_name>in then not vin.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140603/311e4ddb/attachment.sig>
