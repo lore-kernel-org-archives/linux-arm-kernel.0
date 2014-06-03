@@ -1,368 +1,113 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Tue,  3 Jun 2014 10:11:58 +0900
-Subject: [RFC PATCH 3/3] PPC, KVM,
- CMA: use general CMA reserved area management framework
-In-Reply-To: <1401757919-30018-1-git-send-email-iamjoonsoo.kim@lge.com>
-References: <1401757919-30018-1-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <1401757919-30018-4-git-send-email-iamjoonsoo.kim@lge.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Tue, 03 Jun 2014 10:13:26 +0900
+Subject: [linux-sunxi] [PATCH v2 1/4] dt: bindings: mmc: Document the
+ practice of using subnodes for slots
+In-Reply-To: <CAPDyKFodJc6bT=TPSLxWkXXE6t9mE0rv9Y3vp2iBW9N_NEw77g@mail.gmail.com>
+References: <1401563014-13856-1-git-send-email-hdegoede@redhat.com>
+ <1401563014-13856-2-git-send-email-hdegoede@redhat.com>
+ <CAOesGMisqtPWKY6N5ch36c0VyBP1Pu725cehBU+2gYtKXQs=hQ@mail.gmail.com>
+ <538AF124.9040106@redhat.com>
+ <CAPDyKFon5J6aUTzSmqGn_pkxgud26=+KBW0pkim-adMmWG_xXg@mail.gmail.com>
+ <538C3812.9060705@samsung.com> <538C39CA.4020301@samsung.com>
+ <CAPDyKFodJc6bT=TPSLxWkXXE6t9mE0rv9Y3vp2iBW9N_NEw77g@mail.gmail.com>
+Message-ID: <538D2136.5030008@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now, we have general CMA reserved area management framework,
-so use it for future maintainabilty. There is no functional change.
++ Seungwon Jeon
 
-Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-
-diff --git a/arch/powerpc/kvm/book3s_hv_builtin.c b/arch/powerpc/kvm/book3s_hv_builtin.c
-index 8cd0dae..43c3f81 100644
---- a/arch/powerpc/kvm/book3s_hv_builtin.c
-+++ b/arch/powerpc/kvm/book3s_hv_builtin.c
-@@ -15,12 +15,14 @@
- #include <linux/init.h>
- #include <linux/memblock.h>
- #include <linux/sizes.h>
-+#include <linux/cma.h>
- 
- #include <asm/cputable.h>
- #include <asm/kvm_ppc.h>
- #include <asm/kvm_book3s.h>
- 
--#include "book3s_hv_cma.h"
-+#define KVM_CMA_CHUNK_ORDER	18
-+
- /*
-  * Hash page table alignment on newer cpus(CPU_FTR_ARCH_206)
-  * should be power of 2.
-@@ -42,6 +44,8 @@ static unsigned long kvm_cma_resv_ratio = 5;
- unsigned long kvm_rma_pages = (1 << 27) >> PAGE_SHIFT;	/* 128MB */
- EXPORT_SYMBOL_GPL(kvm_rma_pages);
- 
-+static struct cma *kvm_cma;
-+
- /* Work out RMLS (real mode limit selector) field value for a given RMA size.
-    Assumes POWER7 or PPC970. */
- static inline int lpcr_rmls(unsigned long rma_size)
-@@ -96,7 +100,7 @@ struct kvm_rma_info *kvm_alloc_rma()
- 	ri = kmalloc(sizeof(struct kvm_rma_info), GFP_KERNEL);
- 	if (!ri)
- 		return NULL;
--	page = kvm_alloc_cma(kvm_rma_pages, kvm_rma_pages);
-+	page = cma_alloc(kvm_cma, kvm_rma_pages, get_order(kvm_rma_pages));
- 	if (!page)
- 		goto err_out;
- 	atomic_set(&ri->use_count, 1);
-@@ -111,7 +115,7 @@ EXPORT_SYMBOL_GPL(kvm_alloc_rma);
- void kvm_release_rma(struct kvm_rma_info *ri)
- {
- 	if (atomic_dec_and_test(&ri->use_count)) {
--		kvm_release_cma(pfn_to_page(ri->base_pfn), kvm_rma_pages);
-+		cma_release(kvm_cma, pfn_to_page(ri->base_pfn), kvm_rma_pages);
- 		kfree(ri);
- 	}
- }
-@@ -133,13 +137,13 @@ struct page *kvm_alloc_hpt(unsigned long nr_pages)
- 	/* Old CPUs require HPT aligned on a multiple of its size */
- 	if (!cpu_has_feature(CPU_FTR_ARCH_206))
- 		align_pages = nr_pages;
--	return kvm_alloc_cma(nr_pages, align_pages);
-+	return cma_alloc(kvm_cma, nr_pages, get_order(align_pages));
- }
- EXPORT_SYMBOL_GPL(kvm_alloc_hpt);
- 
- void kvm_release_hpt(struct page *page, unsigned long nr_pages)
- {
--	kvm_release_cma(page, nr_pages);
-+	cma_release(kvm_cma, page, nr_pages);
- }
- EXPORT_SYMBOL_GPL(kvm_release_hpt);
- 
-@@ -178,6 +182,7 @@ void __init kvm_cma_reserve(void)
- 			align_size = HPT_ALIGN_PAGES << PAGE_SHIFT;
- 
- 		align_size = max(kvm_rma_pages << PAGE_SHIFT, align_size);
--		kvm_cma_declare_contiguous(selected_size, align_size);
-+		cma_declare_contiguous(selected_size, 0, 0, align_size,
-+			KVM_CMA_CHUNK_ORDER - PAGE_SHIFT, false, &kvm_cma);
- 	}
- }
-diff --git a/arch/powerpc/kvm/book3s_hv_cma.c b/arch/powerpc/kvm/book3s_hv_cma.c
-deleted file mode 100644
-index d9d3d85..0000000
---- a/arch/powerpc/kvm/book3s_hv_cma.c
-+++ /dev/null
-@@ -1,240 +0,0 @@
--/*
-- * Contiguous Memory Allocator for ppc KVM hash pagetable  based on CMA
-- * for DMA mapping framework
-- *
-- * Copyright IBM Corporation, 2013
-- * Author Aneesh Kumar K.V <aneesh.kumar@linux.vnet.ibm.com>
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License as
-- * published by the Free Software Foundation; either version 2 of the
-- * License or (at your optional) any later version of the license.
-- *
-- */
--#define pr_fmt(fmt) "kvm_cma: " fmt
--
--#ifdef CONFIG_CMA_DEBUG
--#ifndef DEBUG
--#  define DEBUG
--#endif
--#endif
--
--#include <linux/memblock.h>
--#include <linux/mutex.h>
--#include <linux/sizes.h>
--#include <linux/slab.h>
--
--#include "book3s_hv_cma.h"
--
--struct kvm_cma {
--	unsigned long	base_pfn;
--	unsigned long	count;
--	unsigned long	*bitmap;
--};
--
--static DEFINE_MUTEX(kvm_cma_mutex);
--static struct kvm_cma kvm_cma_area;
--
--/**
-- * kvm_cma_declare_contiguous() - reserve area for contiguous memory handling
-- *			          for kvm hash pagetable
-- * @size:  Size of the reserved memory.
-- * @alignment:  Alignment for the contiguous memory area
-- *
-- * This function reserves memory for kvm cma area. It should be
-- * called by arch code when early allocator (memblock or bootmem)
-- * is still activate.
-- */
--long __init kvm_cma_declare_contiguous(phys_addr_t size, phys_addr_t alignment)
--{
--	long base_pfn;
--	phys_addr_t addr;
--	struct kvm_cma *cma = &kvm_cma_area;
--
--	pr_debug("%s(size %lx)\n", __func__, (unsigned long)size);
--
--	if (!size)
--		return -EINVAL;
--	/*
--	 * Sanitise input arguments.
--	 * We should be pageblock aligned for CMA.
--	 */
--	alignment = max(alignment, (phys_addr_t)(PAGE_SIZE << pageblock_order));
--	size = ALIGN(size, alignment);
--	/*
--	 * Reserve memory
--	 * Use __memblock_alloc_base() since
--	 * memblock_alloc_base() panic()s.
--	 */
--	addr = __memblock_alloc_base(size, alignment, 0);
--	if (!addr) {
--		base_pfn = -ENOMEM;
--		goto err;
--	} else
--		base_pfn = PFN_DOWN(addr);
--
--	/*
--	 * Each reserved area must be initialised later, when more kernel
--	 * subsystems (like slab allocator) are available.
--	 */
--	cma->base_pfn = base_pfn;
--	cma->count    = size >> PAGE_SHIFT;
--	pr_info("CMA: reserved %ld MiB\n", (unsigned long)size / SZ_1M);
--	return 0;
--err:
--	pr_err("CMA: failed to reserve %ld MiB\n", (unsigned long)size / SZ_1M);
--	return base_pfn;
--}
--
--/**
-- * kvm_alloc_cma() - allocate pages from contiguous area
-- * @nr_pages: Requested number of pages.
-- * @align_pages: Requested alignment in number of pages
-- *
-- * This function allocates memory buffer for hash pagetable.
-- */
--struct page *kvm_alloc_cma(unsigned long nr_pages, unsigned long align_pages)
--{
--	int ret;
--	struct page *page = NULL;
--	struct kvm_cma *cma = &kvm_cma_area;
--	unsigned long chunk_count, nr_chunk;
--	unsigned long mask, pfn, pageno, start = 0;
--
--
--	if (!cma || !cma->count)
--		return NULL;
--
--	pr_debug("%s(cma %p, count %lu, align pages %lu)\n", __func__,
--		 (void *)cma, nr_pages, align_pages);
--
--	if (!nr_pages)
--		return NULL;
--	/*
--	 * align mask with chunk size. The bit tracks pages in chunk size
--	 */
--	VM_BUG_ON(!is_power_of_2(align_pages));
--	mask = (align_pages >> (KVM_CMA_CHUNK_ORDER - PAGE_SHIFT)) - 1;
--	BUILD_BUG_ON(PAGE_SHIFT > KVM_CMA_CHUNK_ORDER);
--
--	chunk_count = cma->count >>  (KVM_CMA_CHUNK_ORDER - PAGE_SHIFT);
--	nr_chunk = nr_pages >> (KVM_CMA_CHUNK_ORDER - PAGE_SHIFT);
--
--	mutex_lock(&kvm_cma_mutex);
--	for (;;) {
--		pageno = bitmap_find_next_zero_area(cma->bitmap, chunk_count,
--						    start, nr_chunk, mask);
--		if (pageno >= chunk_count)
--			break;
--
--		pfn = cma->base_pfn + (pageno << (KVM_CMA_CHUNK_ORDER - PAGE_SHIFT));
--		ret = alloc_contig_range(pfn, pfn + nr_pages, MIGRATE_CMA);
--		if (ret == 0) {
--			bitmap_set(cma->bitmap, pageno, nr_chunk);
--			page = pfn_to_page(pfn);
--			memset(pfn_to_kaddr(pfn), 0, nr_pages << PAGE_SHIFT);
--			break;
--		} else if (ret != -EBUSY) {
--			break;
--		}
--		pr_debug("%s(): memory range@%p is busy, retrying\n",
--			 __func__, pfn_to_page(pfn));
--		/* try again with a bit different memory target */
--		start = pageno + mask + 1;
--	}
--	mutex_unlock(&kvm_cma_mutex);
--	pr_debug("%s(): returned %p\n", __func__, page);
--	return page;
--}
--
--/**
-- * kvm_release_cma() - release allocated pages for hash pagetable
-- * @pages: Allocated pages.
-- * @nr_pages: Number of allocated pages.
-- *
-- * This function releases memory allocated by kvm_alloc_cma().
-- * It returns false when provided pages do not belong to contiguous area and
-- * true otherwise.
-- */
--bool kvm_release_cma(struct page *pages, unsigned long nr_pages)
--{
--	unsigned long pfn;
--	unsigned long nr_chunk;
--	struct kvm_cma *cma = &kvm_cma_area;
--
--	if (!cma || !pages)
--		return false;
--
--	pr_debug("%s(page %p count %lu)\n", __func__, (void *)pages, nr_pages);
--
--	pfn = page_to_pfn(pages);
--
--	if (pfn < cma->base_pfn || pfn >= cma->base_pfn + cma->count)
--		return false;
--
--	VM_BUG_ON(pfn + nr_pages > cma->base_pfn + cma->count);
--	nr_chunk = nr_pages >>  (KVM_CMA_CHUNK_ORDER - PAGE_SHIFT);
--
--	mutex_lock(&kvm_cma_mutex);
--	bitmap_clear(cma->bitmap,
--		     (pfn - cma->base_pfn) >> (KVM_CMA_CHUNK_ORDER - PAGE_SHIFT),
--		     nr_chunk);
--	free_contig_range(pfn, nr_pages);
--	mutex_unlock(&kvm_cma_mutex);
--
--	return true;
--}
--
--static int __init kvm_cma_activate_area(unsigned long base_pfn,
--					unsigned long count)
--{
--	unsigned long pfn = base_pfn;
--	unsigned i = count >> pageblock_order;
--	struct zone *zone;
--
--	WARN_ON_ONCE(!pfn_valid(pfn));
--	zone = page_zone(pfn_to_page(pfn));
--	do {
--		unsigned j;
--		base_pfn = pfn;
--		for (j = pageblock_nr_pages; j; --j, pfn++) {
--			WARN_ON_ONCE(!pfn_valid(pfn));
--			/*
--			 * alloc_contig_range requires the pfn range
--			 * specified to be in the same zone. Make this
--			 * simple by forcing the entire CMA resv range
--			 * to be in the same zone.
--			 */
--			if (page_zone(pfn_to_page(pfn)) != zone)
--				return -EINVAL;
--		}
--		init_cma_reserved_pageblock(pfn_to_page(base_pfn));
--	} while (--i);
--	return 0;
--}
--
--static int __init kvm_cma_init_reserved_areas(void)
--{
--	int bitmap_size, ret;
--	unsigned long chunk_count;
--	struct kvm_cma *cma = &kvm_cma_area;
--
--	pr_debug("%s()\n", __func__);
--	if (!cma->count)
--		return 0;
--	chunk_count = cma->count >> (KVM_CMA_CHUNK_ORDER - PAGE_SHIFT);
--	bitmap_size = BITS_TO_LONGS(chunk_count) * sizeof(long);
--	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
--	if (!cma->bitmap)
--		return -ENOMEM;
--
--	ret = kvm_cma_activate_area(cma->base_pfn, cma->count);
--	if (ret)
--		goto error;
--	return 0;
--
--error:
--	kfree(cma->bitmap);
--	return ret;
--}
--core_initcall(kvm_cma_init_reserved_areas);
-diff --git a/arch/powerpc/kvm/book3s_hv_cma.h b/arch/powerpc/kvm/book3s_hv_cma.h
-deleted file mode 100644
-index 655144f..0000000
---- a/arch/powerpc/kvm/book3s_hv_cma.h
-+++ /dev/null
-@@ -1,27 +0,0 @@
--/*
-- * Contiguous Memory Allocator for ppc KVM hash pagetable  based on CMA
-- * for DMA mapping framework
-- *
-- * Copyright IBM Corporation, 2013
-- * Author Aneesh Kumar K.V <aneesh.kumar@linux.vnet.ibm.com>
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License as
-- * published by the Free Software Foundation; either version 2 of the
-- * License or (at your optional) any later version of the license.
-- *
-- */
--
--#ifndef __POWERPC_KVM_CMA_ALLOC_H__
--#define __POWERPC_KVM_CMA_ALLOC_H__
--/*
-- * Both RMA and Hash page allocation will be multiple of 256K.
-- */
--#define KVM_CMA_CHUNK_ORDER	18
--
--extern struct page *kvm_alloc_cma(unsigned long nr_pages,
--				  unsigned long align_pages);
--extern bool kvm_release_cma(struct page *pages, unsigned long nr_pages);
--extern long kvm_cma_declare_contiguous(phys_addr_t size,
--				       phys_addr_t alignment) __init;
--#endif
--- 
-1.7.9.5
+On 06/02/2014 05:52 PM, Ulf Hansson wrote:
+> On 2 June 2014 10:46, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>> On 06/02/2014 05:38 PM, Jaehoon Chung wrote:
+>>> On 06/02/2014 05:29 PM, Ulf Hansson wrote:
+>>>> On 1 June 2014 11:23, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>> Hi,
+>>>>>
+>>>>>
+>>>>> On 05/31/2014 10:13 PM, Olof Johansson wrote:
+>>>>>>
+>>>>>> On Sat, May 31, 2014 at 12:03 PM, Hans de Goede <hdegoede@redhat.com>
+>>>>>> wrote:
+>>>>>>>
+>>>>>>> The following existing MMC host controller bindings use slot subnodes:
+>>>>>>>
+>>>>>>> Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
+>>>>>>> Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+>>>>>>> Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+>>>>>>> Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+>>>>>>> Documentation/devicetree/bindings/mmc/atmel-hsmci.txt
+>>>>>>> Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+>>>>>>>
+>>>>>>> This commit documents this practice in the standard mmc bindings
+>>>>>>> documentation.
+>>>>>>>
+>>>>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>>>>
+>>>>>>
+>>>>>> There are today only two drivers that use this kind of binding, dw_mmc
+>>>>>> and the at91 one.
+>>>>>
+>>>>>
+>>>>> Correct.
+>>>>>
+>>>>>
+>>>>>> Neither seems to actually ever have been used with
+>>>>>> more than one slot. I doubt anyone building an exynos-based system
+>>>>>> will ever do a multi-slot solution, and it seems that the at91 driver
+>>>>>> doesn't actually handle more than one slot.
+>>>>>>
+>>>>>> I'm personally not that excited about complicating the bindings by
+>>>>>> opening up for this -- I would rather work towards removing the
+>>>>>> concept of slots if it's one of those things that are going to remain
+>>>>>> unused. We have actually been talking about reworking the dw_mmc
+>>>>>> binding to remove the slot concept (and simplify the driver by doing
+>>>>>> so).
+>>>>>
+>>>>>
+>>>>> I'm fine with removing the slot subnode, I added it because of it being
+>>>>> brought up in the powerup sequence discussion. I explicitly asked there
+>>>>> if adding such a subnode level was seen as desirable but nobody
+>>>>> answered :|
+>>>>>
+>>>>> Anyways, either way works for me. I can do a v3 dropping the slot subnode
+>>>>> level again. I would really like to move forward with a decision on how-to
+>>>>> represent non probable info for sdio devices in device nodes. So do you
+>>>>> have any other remarks other then that the slot subnode should be dropped ?
+>>>>> And if not can you please review and ack (*) v3 of this patch-set once
+>>>>> I've send it?
+>>>>>
+>>>>> Chris Ball and Ulf Hansson, what is your take on this, are you willing to
+>>>>> take this patch set? And do you want it with or without the slot subnodes ?
+>>>>
+>>>> I certainly appreciate you working actively on this Hans, I will look
+>>>> into the patchset as soon as I can.
+>>>>
+>>>> I share Olof's view about the slot nodes, we must not add DT bindings
+>>>> that isn't really needed.
+>>>>
+>>>> Regarding the slot subnodes; Jaehoon Chung recently posted a patchset
+>>>> for adding the parsing of it, intended for dwmmc. I withdraw my ack
+>>>> for it, and let's try to go in the other direction instead.
+>>>>
+>>>> [PATCHv3 0/4] mmc: fixed the mmc_of_parse for dwmmc.
+>>>>
+>>>> Thus I suggest we should clean-up host drivers to support only one
+>>>> card per host, and entirely skip the slot concept.
+>>>
+>>> Well, almost platform is used the only one card per host, although some controller is supported the slot concept.
+>>> But we don't know that controller should be used the multi slot per host, in future.
+>>> So I think we can't skip the slot concept.
+>> If we need to change the dw-mmc controller, let me know, plz.
+>> I want to fix this problem before release the 3.16.
+>> Actually, i think it can remove the subnode, if ensure not to use multi-slot at dwmmc.
+> 
+> That seems like the best approach. Please try to remove the subnodes
+> and make use of mmc_of_parse, as is.
+> 
+> Kind regards
+> Uffe
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
