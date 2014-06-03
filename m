@@ -1,29 +1,35 @@
-From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Tue,  3 Jun 2014 15:16:51 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: add ST Keyscan driver
-Message-ID: <1401801411-6158-1-git-send-email-gabriel.fernandez@linaro.org>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Tue, 3 Jun 2014 14:22:18 +0100
+Subject: [PATCH v2 04/11] sched: Allow all archs to set the power_orig
+In-Reply-To: <1400860385-14555-5-git-send-email-vincent.guittot@linaro.org>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-5-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20140603132217.GD29593@e103034-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds KEYBOARD_ST_KEYSCAN config
+On Fri, May 23, 2014 at 04:52:58PM +0100, Vincent Guittot wrote:
+> power_orig is only changed for system with a SMT sched_domain level in order to
+> reflect the lower capacity of CPUs. Heterogenous system also have to reflect an
+> original capacity that is different from the default value.
+> 
+> Create a more generic function arch_scale_cpu_power that can be also used by
+> non SMT platform to set power_orig.
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+I did a quick test of the patch set with adjusting cpu_power on
+big.LITTLE (ARM TC2) to reflect the different compute capacities of the
+A15s and A7s. I ran the sysbench cpu benchmark with 5 threads with and
+without the patches applied, but with non-default cpu_powers.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 19dbddb..c123e35 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -155,6 +155,7 @@ CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_TEGRA=y
- CONFIG_KEYBOARD_SPEAR=y
-+CONFIG_KEYBOARD_ST_KEYSCAN=y
- CONFIG_KEYBOARD_CROS_EC=y
- CONFIG_MOUSE_PS2_ELANTECH=y
- CONFIG_INPUT_MISC=y
--- 
-1.9.1
+I didn't see any difference in the load-balance. Three tasks ended up on
+the two A15s and two tasks ended up on two of the three A7s leaving one
+unused in both cases.
+
+Using default cpu_power I get one task on each of the five cpus (best
+throughput). Unless I messed something up, it seems that setting
+cpu_power doesn't give me the best throughput with these patches
+applied.
+
+Have you done any tests on big.LITTLE?
+
+Morten
