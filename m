@@ -1,31 +1,36 @@
 From: khiem.nguyen.xt@renesas.com (Khiem Nguyen)
-Date: Tue, 03 Jun 2014 13:29:47 +0900
-Subject: [PATCH 0/4] ARM: shmobile: koelsch legacy: Enable DMA for QSPI
-In-Reply-To: <1401716424-29740-1-git-send-email-geert+renesas@glider.be>
-References: <1401716424-29740-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <538D4F3B.6080806@renesas.com>
+Date: Tue, 03 Jun 2014 13:36:33 +0900
+Subject: [PATCH v2 0/7] ARM: shmobile: koelsch reference: Enable DMA for
+ QSPI
+In-Reply-To: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
+References: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <538D50D1.7010900@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Geert,
 
-Thanks for the patch.
+Thanks for the patches.
 
-It seems that patch 1 and patch 2 are to support DMA in general,
-while patch 3 and patch 4 are to support DMA  for QSPI.
+I think this patch series should be divided into 2 parts,
+one for DMA in general and one for DMA supporting QSPI.
 
-So, I think it should be separated into 2 patch series.
 How do you think about it ?
 
 Best regards,
 KHIEM Nguyen
 
-On 6/2/2014 10:40 PM, Geert Uytterhoeven wrote:
-> This patch series enables DMA support for QSPI on r8a7791/koelsch legacy.
-> It's independent from the series "ARM: shmobile: koelsch reference: Enable
-> DMA for QSPI".
+On 6/2/2014 10:42 PM, Geert Uytterhoeven wrote:
+> This patch series enables DMA support for QSPI on r8a7791/koelsch
+> reference.  It's independent from the series "ARM: shmobile: koelsch
+> legacy: Enable DMA for QSPI", but it depends on the SHDMA work for r8a7790
+> by Ben Dooks (cfr. "[PATCH v2 0/9] Updates Renesas OF-DMA code").
 >
-> [2/4] was written by Morimoto-san for LTSI 3.10, and forward ported by me.
+> Changes Compared to previous submission ("[PATCH/RFC 0/7] ARM: shmobile:
+> r8a7791: Add preliminary DMA support"):
+>    - "[6/7] ARM: shmobile: r8a7791 dtsi: Enable DMA for MSIOF" was dropped,
+>    - 2/7 was added,
+>    - 7/7 was changed (see changelog in individual patch).
 >
 > This was tested on r8a7791/koelsch.
 >
@@ -36,16 +41,21 @@ On 6/2/2014 10:40 PM, Geert Uytterhoeven wrote:
 >
 > Thanks for your comments!
 >
->    [1/4] ARM: shmobile: r8a7791: Add SYS-DMAC clocks
->    [2/4] ARM: shmobile: r8a7791: Add SYS-DMAC support
->    [3/4] ARM: shmobile: r8a7791: Add QSPI DMA support
->    [4/4] ARM: shmobile: koelsch legacy: Enable DMA for QSPI
+>    [1/7] DMA: shdma: Add r8a7791 support
+>    [2/7] DMA: shdma: Spelling s/controll/control/
+>    [3/7] ARM: shmobile: r8a7791 dtsi: add SYS-DMAC clocks
+>    [4/7] ARM: shmobile: r8a7791: Add SYS-DMAC channel definitions for bindings
+>    [5/7] ARM: shmobile: r8a7791 dtsi: Add SYS-DMAC0 and SYS-DMAC1 nodes
+>    [6/7] ARM: shmobile: koelsch dts: Enable sysdma0 and sysdma1
+>    [7/7] ARM: shmobile: r8a7791 dtsi: Enable DMA for QSPI
 >
->   arch/arm/mach-shmobile/board-koelsch.c        |  2 +
->   arch/arm/mach-shmobile/clock-r8a7791.c        |  6 +-
->   arch/arm/mach-shmobile/include/mach/r8a7791.h |  7 +++
->   arch/arm/mach-shmobile/setup-r8a7791.c        | 82 +++++++++++++++++++++++++++
->   4 files changed, 96 insertions(+), 1 deletion(-)
+>   Documentation/devicetree/bindings/dma/shdma.txt |   7 +-
+>   arch/arm/boot/dts/r8a7791-koelsch.dts           |   8 ++
+>   arch/arm/boot/dts/r8a7791.dtsi                  |  79 ++++++++++++++++-
+>   drivers/dma/sh/shdmac.c                         |   1 +
+>   include/dt-bindings/dma/r8a7791-dma.h           | 111 ++++++++++++++++++++++++
+>   5 files changed, 201 insertions(+), 5 deletions(-)
+>   create mode 100644 include/dt-bindings/dma/r8a7791-dma.h
 >
 > Gr{oetje,eeting}s,
 >
