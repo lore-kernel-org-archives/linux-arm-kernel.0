@@ -1,45 +1,78 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 03 Jun 2014 11:11:46 -0700
-Subject: [PATCH] ARM: Remove ARCH_HAS_CPUFREQ config option
-In-Reply-To: <CAOh2x==wsy2_+GygS03snFN_YOar3eHi7v1a-jNdsQYoWCAZsw@mail.gmail.com>
-References: <1401746847-3193-1-git-send-email-sboyd@codeaurora.org>
- <CAOh2x==wsy2_+GygS03snFN_YOar3eHi7v1a-jNdsQYoWCAZsw@mail.gmail.com>
-Message-ID: <538E0FE2.4090405@codeaurora.org>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Tue,  3 Jun 2014 11:21:30 -0700
+Subject: [PATCH] arm64: ptrace: fix empty registers set in prstatus of aarch32
+ process core
+Message-ID: <1401819690-3048-1-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/14 21:27, Viresh Kumar wrote:
-> On Tue, Jun 3, 2014 at 3:37 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> This config exists entirely to hide the cpufreq menu from the
->> kernel configuration unless a platform has selected it. Nothing
->> is actually built if this config is 'Y' and it just leads to
->> more patches that add a select under a platform Kconfig so that
->> some other CPUfreq option can be chosen. Let's remove the
->> option so that we can always enable CPUfreq drivers on ARM
->> platforms.
->>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
->>  arch/arm/Kconfig               | 18 ------------------
->>  arch/arm/mach-davinci/Kconfig  |  1 -
->>  arch/arm/mach-highbank/Kconfig |  1 -
->>  arch/arm/mach-imx/Kconfig      |  3 ---
->>  arch/arm/mach-mvebu/Kconfig    |  1 -
->>  arch/arm/mach-omap2/Kconfig    |  1 -
->>  arch/arm/mach-shmobile/Kconfig |  2 --
->>  arch/arm/mach-spear/Kconfig    |  1 -
->>  arch/arm/mach-tegra/Kconfig    |  1 -
->>  arch/arm/mach-ux500/Kconfig    |  1 -
->>  arch/arm/mach-vexpress/Kconfig |  1 -
->>  arch/arm/mach-vt8500/Kconfig   |  1 -
->>  arch/arm/mach-zynq/Kconfig     |  1 -
->>  13 files changed, 33 deletions(-)
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->
-> While you are at it, please see if you can also fix unicore as well.
+Currently core file of aarch32 process prstatus note has empty
+registers set. As result aarch32 core files create by V8 kernel are
+not very useful.
 
-Sure I'll send a separate patch and Cc you.
+It happens because compat_gpr_get and compat_gpr_set functions can
+copy registers values to/from either kbuf or ubuf. ELF core file
+collection function fill_thread_core_info calls compat_gpr_get
+with kbuf set and ubuf set to 0. But current compat_gpr_get and
+compat_gpr_set function handle copy to/from only ubuf case.
 
+Fix is to handle kbuf and ubuf as two separate cases in similar
+way as other functions like user_regset_copyout, user_regset_copyin do.
+
+Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Cc: stable at vger.kernel.org
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/kernel/ptrace.c | 28 +++++++++++++++++++---------
+ 1 file changed, 19 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index 6a8928b..9c9c2b9 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -650,11 +650,16 @@ static int compat_gpr_get(struct task_struct *target,
+ 			reg = task_pt_regs(target)->regs[idx];
+ 		}
+ 
+-		ret = copy_to_user(ubuf, &reg, sizeof(reg));
+-		if (ret)
+-			break;
+-
+-		ubuf += sizeof(reg);
++		if (kbuf) {
++			memcpy(kbuf, &reg, sizeof(reg));
++			kbuf += sizeof(reg);
++		} else {
++			ret = copy_to_user(ubuf, &reg, sizeof(reg));
++			if (ret)
++				break;
++
++			ubuf += sizeof(reg);
++		}
+ 	}
+ 
+ 	return ret;
+@@ -684,11 +689,16 @@ static int compat_gpr_set(struct task_struct *target,
+ 		unsigned int idx = start + i;
+ 		compat_ulong_t reg;
+ 
+-		ret = copy_from_user(&reg, ubuf, sizeof(reg));
+-		if (ret)
+-			return ret;
++		if (kbuf) {
++			memcpy(&reg, kbuf, sizeof(reg));
++			kbuf += sizeof(reg);
++		} else {
++			ret = copy_from_user(&reg, ubuf, sizeof(reg));
++			if (ret)
++				return ret;
+ 
+-		ubuf += sizeof(reg);
++			ubuf += sizeof(reg);
++		}
+ 
+ 		switch (idx) {
+ 		case 15:
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.1.4
