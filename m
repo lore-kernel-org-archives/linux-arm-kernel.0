@@ -1,17 +1,50 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 3 Jun 2014 15:45:58 +0800
-Subject: [PATCH] ARM: dts: imx6: ventana: correct gw52xx sgtl5000 clock
- source
-In-Reply-To: <1401734641-27308-1-git-send-email-tharvey@gateworks.com>
-References: <1401734641-27308-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <20140603074557.GQ8860@dragon>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Tue, 3 Jun 2014 13:13:05 +0530
+Subject: [PATCH 13/14] Documentation: dt: OMAP: crossbar: add description for
+ interrupt consumer
+In-Reply-To: <1401781386-4982-1-git-send-email-r.sricharan@ti.com>
+References: <1401781386-4982-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <1401781386-4982-14-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 02, 2014 at 11:44:01AM -0700, Tim Harvey wrote:
-> Correct the invalid clock for the sgtl5000 audio codec on the GW52xx Ventana
-> baseboard.
-> 
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+From: Nishanth Menon <nm@ti.com>
 
-Applied, thanks.
+The current crossbar description does not include the description
+required for the consumer of the crossbar, a.k.a devices whoes events
+pass through the crossbar into the GIC interrupt controller.
+
+So, provide documentation for the same.
+
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ .../devicetree/bindings/arm/omap/crossbar.txt      |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+index 6d2e2f5..816d11b 100644
+--- a/Documentation/devicetree/bindings/arm/omap/crossbar.txt
++++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+@@ -27,3 +27,20 @@ Examples:
+ 			ti,reg-size = <2>;
+ 			ti,irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
+ 		};
++
++Consumer:
++========
++See Documentation/devicetree/bindings/interrupt-controller/interrupts.txt and
++Documentation/devicetree/bindings/arm/gic.txt for further details.
++
++An interrupt consumer on an SoC using crossbar will use:
++	interrupts = <GIC_SPI request_number interrupt_level>
++request number shall be between 0 to that described by
++"ti,max-crossbar-sources"
++
++Example:
++	device_x at 0x4a023000 {
++		/* Crossbar 8 used */
++		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
++		...
++	};
+-- 
+1.7.9.5
