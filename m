@@ -1,47 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 3 Jun 2014 22:04:24 +0100
-Subject: [PATCH] arm64: topology: add MPIDR-based detection
-In-Reply-To: <20140603173103.GA18004@red-moon>
-References: <1401644249-23792-1-git-send-email-broonie@kernel.org>
- <20140603173103.GA18004@red-moon>
-Message-ID: <20140603210424.GJ31751@sirena.org.uk>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 3 Jun 2014 15:15:16 -0700
+Subject: [PATCH] ARM: mvebu: DT: fix OpenBlocks AX3-4 RAM size
+In-Reply-To: <7hzjhtuasd.fsf@paris.lan>
+References: <5388ddb9.0458440a.2be7.323c@mx.google.com>
+ <1401818320-7202-1-git-send-email-jason@lakedaemon.net>
+ <7hzjhtuasd.fsf@paris.lan>
+Message-ID: <CAGa+x84ZdQDtpdrxVPY2i9jnvZfug6JnP6Ok=5Tafqy3cbOtdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 03, 2014 at 06:31:03PM +0100, Lorenzo Pieralisi wrote:
+On Tue, Jun 3, 2014 at 11:07 AM, Kevin Hilman <khilman@linaro.org> wrote:
+> Jason Cooper <jason@lakedaemon.net> writes:
+>
+>> The OpenBlocks AX3-4 has a non-DT bootloader.  It also comes with 1GB of
+>> soldered on RAM, and a DIMM slot for expansion.
+>>
+>> Unfortunately, atags_to_fdt() doesn't work in big-endian mode, so we see
+>> the following failure when attempting to boot a big-endian kernel:
+[...]
+>>
+>> Fix this by setting a sane default (1 GB) in the dts file.
+>>
+>> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+>
+> Tested-by: Kevin Hilman <khilman@linaro.org>
 
-> I refactored the patch (UP code path) and deliberately removed the
-> code that packs affinity levels into the cluster id. I do not
-> like packing the affinity levels and on second thoughts packing the
-> unused affinity levels into cluster_id is as correct as packing
-> the unused affinity levels into core_id (ie it is arbitrary), so I do
+Also FYI, I put a temporary hack into my automated boot setup to use
+fdtput to live-patch the openblocks DTB with 1G, and you can see that
+openblocks is now passing boot test for big-endian:
 
-I'm having a really hard time seeing this as anything other than a step
-back.  Your change causes us to discard the higher affinity levels which
-seems like something we actively know to be misleading and means that we
-will be handing the scheduler two different identically numbered cores
-(all the affinity levels we do pay attention to will be identical) if we
-ever encounter such a system which is actively broken.
+   http://lists.linaro.org/pipermail/kernel-build-reports/2014-June/003812.html
 
-> not think we should do it, that's the reason why we defined DT bindings
-> to add a proper topology semantics and we should use them when the MPIDR
-> values deviate from the "recommendations".
+Also FYI, I added mvebu_v7_defconfig + CONFIG_CPU_BIG_ENDIAN=y to the
+mix, so those should start showing up in subsequent boot tests also.
 
-I'd agree with not going to great lengths unless someone defines
-semantics for the higher affinity levels in the future however it does
-seem like completely ignoring them when it's so easy to take some
-account of them is insufficiently defensive - it's similar to things
-like putting the of_node_put() calls in even though they don't do
-anything at the minute.
-
-> Patch attached, my ack included, should be ready to go, unless you
-> object to that.
-
-Well, I certainly don't object to getting something merged here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140603/817d97c1/attachment.sig>
+Kevin
