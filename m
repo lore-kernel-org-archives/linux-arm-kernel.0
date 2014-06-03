@@ -1,157 +1,85 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 3 Jun 2014 18:31:03 +0100
-Subject: [PATCH] arm64: topology: add MPIDR-based detection
-In-Reply-To: <1401644249-23792-1-git-send-email-broonie@kernel.org>
-References: <1401644249-23792-1-git-send-email-broonie@kernel.org>
-Message-ID: <20140603173103.GA18004@red-moon>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 03 Jun 2014 10:34:35 -0700
+Subject: [PATCH v6 2/2] arm64: enable context tracking
+In-Reply-To: <20140603102646.GB23149@arm.com> (Will Deacon's message of "Tue,
+ 3 Jun 2014 11:26:46 +0100")
+References: <1401399904-24471-1-git-send-email-larry.bassel@linaro.org>
+ <1401399904-24471-3-git-send-email-larry.bassel@linaro.org>
+ <20140530182349.GI22895@arm.com> <7hioonythl.fsf@paris.lan>
+ <20140603102646.GB23149@arm.com>
+Message-ID: <7hfvjlvqvo.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+Will Deacon <will.deacon@arm.com> writes:
 
-On Sun, Jun 01, 2014 at 06:37:29PM +0100, Mark Brown wrote:
-> From: Zi Shen Lim <zlim@broadcom.com>
-> 
-> Create cpu topology based on MPIDR. When hardware sets MPIDR to sane
-> values, this method will always work. Therefore it should also work well
-> as the fallback method. [1]
-> 
-> When we have multiple processing elements in the system, we create
-> the cpu topology by mapping each affinity level (from lowest to highest)
-> to threads (if they exist), cores, and clusters.
-> 
-> We combine data from all higher affinity levels into cluster_id
-> so we don't lose any information from MPIDR. [2]
+> Hi guys,
+>
+> On Fri, May 30, 2014 at 08:08:38PM +0100, Kevin Hilman wrote:
+>> Will Deacon <will.deacon@arm.com> writes:
+>> > I'd like to give these some stress testing before it gets merged, so I'm
+>> > not sure if it'll make it for 3.16 given where we are at the moment.
+>> 
+>> FWIW, this feature is disabled by default.  I use the following kconfig
+>> fragment to enable the various parts I use for testing:
+>> 
+>> CONFIG_NO_HZ=y
+>> CONFIG_NO_HZ_FULL=y
+>> CONFIG_NO_HZ_FULL_ALL=y
+>> CONFIG_NO_HZ_FULL_SYSIDLE=y
+>> 
+>> # default to power-efficient workqueues (which are then set to unbound)
+>> CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
+>> 
+>> # lockup detector sets a 4s timer on every CPU, which wakes CPUs
+>> # from idle. (alternately, can be controlled via procfs,
+>> # e.g: echo 0 > /proc/sys/kernel/watchdog)
+>> #CONFIG_LOCKUP_DETECTOR=n
+>
+> I had a go with this, but I couldn't seem to trigger any context tracking
+> without forcing CONFIG_CONTEXT_TRACKING_FORCE=y. Does that mean we're
+> missing something else?
 
-I refactored the patch (UP code path) and deliberately removed the
-code that packs affinity levels into the cluster id. I do not
-like packing the affinity levels and on second thoughts packing the
-unused affinity levels into cluster_id is as correct as packing
-the unused affinity levels into core_id (ie it is arbitrary), so I do
-not think we should do it, that's the reason why we defined DT bindings
-to add a proper topology semantics and we should use them when the MPIDR
-values deviate from the "recommendations".
+No, it just means that you never hit the conditions to trigger full
+NOHZ.  Using _FORCE is a good way to do that since it forces the context
+tracking paths whether or not it's actually needed by full NOHZ.
 
-Patch attached, my ack included, should be ready to go, unless you
-object to that.
+> Anyway, with that forced on, I see the following during boot:
+>
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 0 at kernel/rcu/tree.c:418 rcu_eqs_enter+0x84/0xa4()
+> Modules linked in:
+> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.15.0-rc8+ #5
+> Call trace:
+> [<ffffffc000088048>] dump_backtrace+0x0/0x130
+> [<ffffffc000088188>] show_stack+0x10/0x1c
+> [<ffffffc0004891a0>] dump_stack+0x74/0xbc
+> [<ffffffc0000a45e0>] warn_slowpath_common+0x8c/0xb4
+> [<ffffffc0000a46cc>] warn_slowpath_null+0x14/0x20
+> [<ffffffc0000efc14>] rcu_eqs_enter+0x80/0xa4
+> [<ffffffc0000efc58>] rcu_idle_enter+0x20/0x50
+> [<ffffffc0000dd314>] cpu_startup_entry+0x118/0x184
+> [<ffffffc0004865ec>] rest_init+0x7c/0x88
+> [<ffffffc000609800>] start_kernel+0x368/0x37c
+> ---[ end trace c17313e162496e65 ]---
 
-Lorenzo
+So this suggests that we've told RCU that we've entered userspace twice,
+without having left (the context tracker is an extention of the RCU
+extended quiscent state machinery.)
 
-> [1] http://www.spinics.net/lists/arm-kernel/msg317445.html
-> [2] https://lkml.org/lkml/2014/4/23/703
-> 
-> Signed-off-by: Zi Shen Lim <zlim@broadcom.com>
-> Signed-off-by: Mark Brown <broonie@linaro.org>
-> ---
->  arch/arm64/include/asm/cputype.h |  2 ++
->  arch/arm64/kernel/topology.c     | 51 +++++++++++++++++++++++++++++-----------
->  2 files changed, 39 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-> index 27f54a7cc81b..ed48a3a7836a 100644
-> --- a/arch/arm64/include/asm/cputype.h
-> +++ b/arch/arm64/include/asm/cputype.h
-> @@ -18,6 +18,8 @@
->  
->  #define INVALID_HWID		ULONG_MAX
->  
-> +#define MPIDR_UP_BITMASK	(0x1 << 30)
-> +#define MPIDR_MT_BITMASK	(0x1 << 24)
->  #define MPIDR_HWID_BITMASK	0xff00ffffff
->  
->  #define MPIDR_LEVEL_BITS_SHIFT	3
-> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-> index 43514f905916..9a0160068503 100644
-> --- a/arch/arm64/kernel/topology.c
-> +++ b/arch/arm64/kernel/topology.c
-> @@ -20,6 +20,7 @@
->  #include <linux/of.h>
->  #include <linux/sched.h>
->  
-> +#include <asm/cputype.h>
->  #include <asm/topology.h>
->  
->  static int __init get_cpu_for_node(struct device_node *node)
-> @@ -188,13 +189,9 @@ static int __init parse_dt_topology(void)
->  	 * Check that all cores are in the topology; the SMP code will
->  	 * only mark cores described in the DT as possible.
->  	 */
-> -	for_each_possible_cpu(cpu) {
-> -		if (cpu_topology[cpu].cluster_id == -1) {
-> -			pr_err("CPU%d: No topology information specified\n",
-> -			       cpu);
-> +	for_each_possible_cpu(cpu)
-> +		if (cpu_topology[cpu].cluster_id == -1)
->  			ret = -EINVAL;
-> -		}
-> -	}
->  
->  out_map:
->  	of_node_put(map);
-> @@ -219,14 +216,6 @@ static void update_siblings_masks(unsigned int cpuid)
->  	struct cpu_topology *cpu_topo, *cpuid_topo = &cpu_topology[cpuid];
->  	int cpu;
->  
-> -	if (cpuid_topo->cluster_id == -1) {
-> -		/*
-> -		 * DT does not contain topology information for this cpu.
-> -		 */
-> -		pr_debug("CPU%u: No topology information configured\n", cpuid);
-> -		return;
-> -	}
-> -
->  	/* update core and thread sibling masks */
->  	for_each_possible_cpu(cpu) {
->  		cpu_topo = &cpu_topology[cpu];
-> @@ -249,6 +238,40 @@ static void update_siblings_masks(unsigned int cpuid)
->  
->  void store_cpu_topology(unsigned int cpuid)
->  {
-> +	struct cpu_topology *cpuid_topo = &cpu_topology[cpuid];
-> +	u64 mpidr;
-> +
-> +	if (cpuid_topo->cluster_id != -1)
-> +		goto topology_populated;
-> +
-> +	mpidr = read_cpuid_mpidr();
-> +
-> +	/* Create cpu topology mapping based on MPIDR. */
-> +	if (mpidr & MPIDR_UP_BITMASK) {
-> +		/* Uniprocessor system */
-> +		cpuid_topo->thread_id  = -1;
-> +		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> +		cpuid_topo->cluster_id = 0;
-> +	} else if (mpidr & MPIDR_MT_BITMASK) {
-> +		/* Multiprocessor system : Multi-threads per core */
-> +		cpuid_topo->thread_id  = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> +		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> +		cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 2) |
-> +					 MPIDR_AFFINITY_LEVEL(mpidr, 3) << 8;
-> +	} else {
-> +		/* Multiprocessor system : Single-thread per core */
-> +		cpuid_topo->thread_id  = -1;
-> +		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> +		cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 1) |
-> +					 MPIDR_AFFINITY_LEVEL(mpidr, 2) << 8 |
-> +					 MPIDR_AFFINITY_LEVEL(mpidr, 3) << 16;
-> +	}
-> +
-> +	pr_debug("CPU%u: cluster %d core %d thread %d mpidr %llx\n",
-> +		 cpuid, cpuid_topo->cluster_id, cpuid_topo->core_id,
-> +		 cpuid_topo->thread_id, mpidr);
-> +
-> +topology_populated:
->  	update_siblings_masks(cpuid);
->  }
->  
-> -- 
-> 2.0.0.rc4
-> 
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-arm64-topology-add-MPIDR-based-detection.patch
-Type: text/x-diff
-Size: 3828 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140603/d5e1520c/attachment-0001.bin>
+So after I was able to reproduce this (after some IRC discussion with
+Will, and using full ubuntu rootfs and CONFIG_CONTEXT_TRACKING_FORCE=y)
+I think I found the bug.
+
+Basically, the problem is that we have a ct_user_exit in el1_irq
+(interrupt in kernel space) when it should be in el0_irq (interrupt in
+user space.)  
+
+Moving the ct_user_exit into el0_irq, I'm not able to see the problem.  
+
+Larry, could you sanity check that and respin a v8 with that change if
+it works for you?
+
+Thanks,
+
+Kevin
