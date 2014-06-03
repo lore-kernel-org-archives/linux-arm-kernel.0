@@ -1,62 +1,69 @@
 From: chirantan@chromium.org (Chirantan Ekbote)
-Date: Tue, 3 Jun 2014 11:41:26 -0700
-Subject: [PATCH] arm: dts: exynos5: Remove multi core timer
-In-Reply-To: <033a01cf74f2$d025ce80$70716b80$@samsung.com>
-References: <1400188079-21832-1-git-send-email-chirantan@chromium.org>
- <53752E25.9060604@gmail.com>
- <CAD=FV=WKOtZaUyzTWNqR=vi_L=U-Q1dct2U_oCYi3ZJv6401Hg@mail.gmail.com>
- <53753443.8010303@gmail.com>
- <CAD=FV=V8UZoeOqEwfx_E015pLM+amTt51LrUa+dk7mTdn=vKgA@mail.gmail.com>
- <53753C17.1090002@gmail.com>
- <CAD=FV=WGa7j_As_NpySxU7OEd_SzuGWK6oxU6UeiJ-4HsoWvvg@mail.gmail.com>
- <CAJFHJrrgWGc4XGQB0ysLufAg3Wouz-aYXu97Sy2Kp=HzK+akVQ@mail.gmail.com>
- <CAASgrz2Nr69tpfC8ka9gbs2OvjLEGsvgAj4vBCFxhsamuFum7w@mail.gmail.com>
- <53754CE2.3000905@gmail.com>
- <CAD=FV=UMoL7i9rg_QtBAqPwisSQyRqRmk8wQhneMXAiLBjTT1A@mail.gmail.com>
- <CAPz6YkU8GDrLj8UkqEQXxxqxWF5_p427wKSDgAp+QPR7WE7Ujg@mail.gmail.com>
- <CAJFHJrrb2XFDZqJh4OuLdFP=J0aR4pGe-WLWKZ7ZpMfUSPGd4Q@mail.gmail.com>
- <033a01cf74f2$d025ce80$70716b80$@samsung.com>
-Message-ID: <CAJFHJrq79aH1QaDZqT74edwhcmYhriqG9FR4dfO1d24VfH1_uw@mail.gmail.com>
+Date: Tue,  3 Jun 2014 11:48:19 -0700
+Subject: [PATCH] arm: mct: Don't reset the counter during boot and resume
+Message-ID: <1401821299-24431-1-git-send-email-chirantan@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Unfortunately on some exynos systems, resetting the mct counter also
+resets the architected timer counter.  This can cause problems if the
+architected timer driver has already been initialized because the kernel
+will think that the counter has wrapped around, causing a big jump in
+printk timestamps and delaying any scheduled clock events until the
+counter reaches the value it had before it was reset.
 
-On Wed, May 21, 2014 at 5:47 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Yeah, actually we don't need to reset the count value after suspend/resume.
-> So, how about following? I think, it should be fine to you.
->
-> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-> index 8d64200..d24db6f 100644
-> --- a/drivers/clocksource/exynos_mct.c
-> +++ b/drivers/clocksource/exynos_mct.c
-> @@ -157,12 +157,15 @@ static void exynos4_mct_frc_start(u32 hi, u32 lo)
->  {
->         u32 reg;
->
-> -       exynos4_mct_write(lo, EXYNOS4_MCT_G_CNT_L);
-> -       exynos4_mct_write(hi, EXYNOS4_MCT_G_CNT_U);
-> -
->         reg = __raw_readl(reg_base + EXYNOS4_MCT_G_TCON);
-> -       reg |= MCT_G_TCON_START;
-> -       exynos4_mct_write(reg, EXYNOS4_MCT_G_TCON);
-> +
-> +       if (!(reg & MCT_G_TCON_START)) {
-> +               exynos4_mct_write(lo, EXYNOS4_MCT_G_CNT_L);
-> +               exynos4_mct_write(hi, EXYNOS4_MCT_G_CNT_U);
-> +
-> +               reg |= MCT_G_TCON_START;
-> +               exynos4_mct_write(reg, EXYNOS4_MCT_G_TCON);
-> +       }
->  }
->
->
+The kernel code makes no assumptions about the initial value of the mct
+counter so there is no reason from a software perspective to clear the
+counter before starting it.  This also fixes the problems described in
+the previous paragraph.
 
-As Doug mentioned, this seems more complicated than necessary since
-the kernel doesn't care about the initial value of the mct counter at
-all.  Is there some reason from a hardware standpoint that the counter
-needs to be cleared?  If not, I would rather just delete the two
-offending lines.  I am sending a patch that does this instead.
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Doug Anderson <dianders@chromium.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
+Signed-off-by: Chirantan Ekbote <chirantan@chromium.org>
+---
+ drivers/clocksource/exynos_mct.c | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
 
-Cheers,
-Chirantan
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index acf5a32..9b4a0ae 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -152,13 +152,10 @@ static void exynos4_mct_write(unsigned int value, unsigned long offset)
+ }
+ 
+ /* Clocksource handling */
+-static void exynos4_mct_frc_start(u32 hi, u32 lo)
++static void exynos4_mct_frc_start(void)
+ {
+ 	u32 reg;
+ 
+-	exynos4_mct_write(lo, EXYNOS4_MCT_G_CNT_L);
+-	exynos4_mct_write(hi, EXYNOS4_MCT_G_CNT_U);
+-
+ 	reg = __raw_readl(reg_base + EXYNOS4_MCT_G_TCON);
+ 	reg |= MCT_G_TCON_START;
+ 	exynos4_mct_write(reg, EXYNOS4_MCT_G_TCON);
+@@ -180,7 +177,7 @@ static cycle_t exynos4_frc_read(struct clocksource *cs)
+ 
+ static void exynos4_frc_resume(struct clocksource *cs)
+ {
+-	exynos4_mct_frc_start(0, 0);
++	exynos4_mct_frc_start();
+ }
+ 
+ struct clocksource mct_frc = {
+@@ -194,7 +191,7 @@ struct clocksource mct_frc = {
+ 
+ static void __init exynos4_clocksource_init(void)
+ {
+-	exynos4_mct_frc_start(0, 0);
++	exynos4_mct_frc_start();
+ 
+ 	if (clocksource_register_hz(&mct_frc, clk_rate))
+ 		panic("%s: can't register clocksource\n", mct_frc.name);
+-- 
+1.9.1.423.g4596e3a
