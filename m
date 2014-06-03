@@ -1,30 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 03 Jun 2014 11:40:14 +0200
-Subject: [PATCH] clk: export __clk_round_rate for providers
-Message-ID: <6099360.oW6xYL5CNm@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 3 Jun 2014 10:45:37 +0100
+Subject: [PATCH 2/3] arm: tegra: enable igb, stmpe, i2c chardev, spidev,
+ lm95245, pwm leds
+In-Reply-To: <538D64FD.2010909@ziswiler.com>
+References: <c5522b0efcbfc7690dcde6aaf78b9dd568f99604.1401665237.git.marcel@ziswiler.com>
+ <39a8704a4c8170d6b0620a1e5e44042eae6d8810.1401665237.git.marcel@ziswiler.com>
+ <538CA24B.1010602@wwwdotorg.org> <538CA635.4050502@ziswiler.com>
+ <20140602221627.GP31751@sirena.org.uk>
+ <538D64FD.2010909@ziswiler.com>
+Message-ID: <20140603094537.GQ31751@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 99cbd064b0 ("clk: qcom: Support display RCG clocks") adds
-a use of the __clk_round_rate in a clock provided that can be built
-as a loadable module.
+On Tue, Jun 03, 2014 at 08:02:37AM +0200, Marcel Ziswiler wrote:
+> On 06/03/2014 12:16 AM, Mark Brown wrote:
 
-This exports the symbol to avoid the build error from compiling
-the qcom clock as a module.
+> >Your DT is broken if it's got a "spidev" node in it, you should be
+> >describing the hardware not the Linux implementation of the software.
+> >It would be really nice if we had a good way of handling this but we
+> >don't yet.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Mike Turquette <mturquette@linaro.org>
+> I strongly disagree, it almost perfectly describes the hardware. Unlike on
+> I2c where modelling a bus is enough to allow generic user space access
+> unfortunately on SPI this is not enough as it requires a specific
+> chip-select as well. This is exactly what spidev does and maps to our
+> hardware perfectly which has one dedicated chip-select per SPI bus on a
+> dedicated header which allows our customers out-of-the-box spidev user space
+> access to almost any SPI device connected to those buses just like with
+> i2c-devs on I2C buses.
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 2df2b26..8b73ede 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1006,6 +1006,7 @@ unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
- 	else
- 		return clk->rate;
- }
-+EXPORT_SYMBOL_GPL(__clk_round_rate);
- 
- /**
-  * clk_round_rate - round the given rate for a clk
+When you say "generic user space access" you are describing a specific
+detail of how this device happens to be controlled with your software.
+This is not a description of your hardware, it is a description of how
+it is controlled with your current software.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140603/c2e171d6/attachment.sig>
