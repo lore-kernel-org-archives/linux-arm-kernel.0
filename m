@@ -1,59 +1,61 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Tue, 3 Jun 2014 13:12:54 +0530
-Subject: [PATCH 02/14] irqchip: crossbar: fix sparse warnings
+Date: Tue, 3 Jun 2014 13:12:56 +0530
+Subject: [PATCH 04/14] irqchip: crossbar: fix kerneldoc warning
 In-Reply-To: <1401781386-4982-1-git-send-email-r.sricharan@ti.com>
 References: <1401781386-4982-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1401781386-4982-3-git-send-email-r.sricharan@ti.com>
+Message-ID: <1401781386-4982-5-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nishanth Menon <nm@ti.com>
 
-There is absolutely no need for crossbar driver to expose functions and
-variables into global namespace. So make them all static
-
-Fixes sparse warnings:
-drivers/irqchip/irq-crossbar.c:129:29: warning: symbol 'routable_irq_domain_ops' was not declared. Should it be static?
-drivers/irqchip/irq-crossbar.c:252:5: warning: symbol 'dra_irqs_unused' was not declared. Should it be static?
-drivers/irqchip/irq-crossbar.c:253:22: warning: symbol 'cb_dra_data' was not declared. Should it be static?
-drivers/irqchip/irq-crossbar.c:261:12: warning: symbol 'irqcrossbar_init' was not declared. Should it be static?
+kernel doc style is wrong in code. fix it to squelch
+kerneldoc warnings:
+Warning(drivers/irqchip/irq-crossbar.c:27): missing initial short description on line:
+ * struct crossbar_device: crossbar device description
+Info(drivers/irqchip/irq-crossbar.c:27): Scanning doc for struct
+Warning(drivers/irqchip/irq-crossbar.c:39): No description found for parameter 'write'
+Warning(drivers/irqchip/irq-crossbar.c:42): missing initial short description on line:
+ * struct crossbar_data: Platform specific data
+Info(drivers/irqchip/irq-crossbar.c:42): Scanning doc for struct
+Warning(drivers/irqchip/irq-crossbar.c:50): No description found for parameter 'safe_map'
+4 warnings
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- drivers/irqchip/irq-crossbar.c |    7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/irqchip/irq-crossbar.c |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index c5415ae..5da9d36 100644
+index 58790d4..7d4db07 100644
 --- a/drivers/irqchip/irq-crossbar.c
 +++ b/drivers/irqchip/irq-crossbar.c
-@@ -16,6 +16,7 @@
- #include <linux/of_device.h>
- #include <linux/slab.h>
- #include <linux/irqchip/arm-gic.h>
-+#include <linux/irqchip/irq-crossbar.h>
+@@ -23,11 +23,13 @@
+ #define IRQ_SKIP	-3
+ #define GIC_IRQ_START	32
  
- #define IRQ_FREE	-1
- #define IRQ_RESERVED	-2
-@@ -126,7 +127,7 @@ found:
- 	return 0;
- }
+-/*
++/**
++ * struct crossbar_device - crossbar device descriptio
+  * @int_max: maximum number of supported interrupts
+  * @irq_map: array of interrupts to crossbar number mapping
+  * @crossbar_base: crossbar base address
+  * @register_offsets: offsets for each irq number
++ * @write: register write function pointer
+  */
+ struct crossbar_device {
+ 	uint int_max;
+@@ -39,9 +41,10 @@ struct crossbar_device {
+ };
  
--const struct irq_domain_ops routable_irq_domain_ops = {
-+static const struct irq_domain_ops routable_irq_domain_ops = {
- 	.map = crossbar_domain_map,
- 	.unmap = crossbar_domain_unmap,
- 	.xlate = crossbar_domain_xlate
-@@ -249,8 +250,8 @@ err1:
- }
- 
- /* irq number 10 cannot be used because of hw bug */
--int dra_irqs_unused[] = { 10 };
--struct crossbar_data cb_dra_data = { dra_irqs_unused,
-+static int dra_irqs_unused[] = { 10 };
-+static struct crossbar_data cb_dra_data = { dra_irqs_unused,
- 				     ARRAY_SIZE(dra_irqs_unused), 0 };
- 
- static const struct of_device_id crossbar_match[] __initconst = {
+ /**
+- * struct crossbar_data: Platform specific data
++ * struct crossbar_data - Platform specific data
+  * @irqs_unused: array of irqs that cannot be used because of hw erratas
+  * @size: size of the irqs_unused array
++ * @safe_map: safe value to write to crossbar register
+  */
+ struct crossbar_data {
+ 	const uint *irqs_unused;
 -- 
 1.7.9.5
