@@ -1,35 +1,22 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 3 Jun 2014 13:21:09 +0200
-Subject: [PATCH-next] mfd: ab8500: fix dt irq mapping
-In-Reply-To: <1401726478-14879-1-git-send-email-grygorii.strashko@ti.com>
-References: <1401726478-14879-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <CACRpkda7EEJNmfjHseQP9ChQ+OJf62qe=aBy3FJ-EFPGO1r6cg@mail.gmail.com>
+From: spk.linux@gmail.com (Sachin Kamat)
+Date: Tue, 3 Jun 2014 16:57:28 +0530
+Subject: [PATCH] serial: samsung: fix typo in debug code
+In-Reply-To: <10455941.RzodM59Z3O@wuerfel>
+References: <10455941.RzodM59Z3O@wuerfel>
+Message-ID: <CAK5sBcH8YH1+i0yBUHLqiYWAmOV3v5Dpoavxo-ZOGA8oX0OcwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 2, 2014 at 6:27 PM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
+Hi Arnd,
 
-> The AD8500 defines itself as interrupt-controller in DT,
-> but it doesn't assign DT node to IRQ domain when creates it.
-> As result, of_irq_xx() helpers don't work because they can't
-> find necessary IRQ domain.
+On Tue, Jun 3, 2014 at 3:23 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> commit e4ac92df2791 ("serial: samsung: Neaten dbg uses") introduced
+> a regression in the conversion from vsprintf to vsnprintf.
 >
-> Hence, fix it by assigning AD8500 core device DT node to IRQ
-> domain when it's created.
->
-> This patch fixes STE u8500 Snowball boot failure reported by Kevin Hilman
-> https://lkml.org/lkml/2014/5/27/624
->
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Reported-and-tested-by: Kevin Hilman <khilman@linaro.org>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> This fixes the build error by passing the correct variable name.
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+I submitted a similar patch sometime back.
+http://www.spinics.net/lists/linux-serial/msg12843.html
 
-Yours,
-Linus Walleij
+Regards,
+Sachin
