@@ -1,30 +1,50 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 3 Jun 2014 16:02:39 +0800
-Subject: [PATCH 1/5] ARM: berlin: add SMP support
-In-Reply-To: <20140603075011.GA22742@lunn.ch>
-References: <1401700866-24804-1-git-send-email-antoine.tenart@free-electrons.com>
- <1401700866-24804-2-git-send-email-antoine.tenart@free-electrons.com>
- <20140602094715.GG28090@lunn.ch> <20140602100048.GA12162@kwain>
- <20140602100332.GH28090@lunn.ch> <20140602102750.GB13681@kwain>
- <20140603141913.710a1f7e@xhacker> <20140603075011.GA22742@lunn.ch>
-Message-ID: <20140603160239.38defafe@xhacker>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 3 Jun 2014 09:06:32 +0100
+Subject: [GIT PULL] mfd: Immutable branch between MFD and OMAP, due for
+ v3.16
+In-Reply-To: <20140602163841.GC11004@atomide.com>
+References: <1401214140-9828-1-git-send-email-tony@atomide.com>
+ <20140528071313.GH4227@lee--X1> <20140528180607.GB4707@atomide.com>
+ <20140602163841.GC11004@atomide.com>
+Message-ID: <20140603080632.GC3060@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-On Tue, 3 Jun 2014 00:50:11 -0700
-Andrew Lunn <andrew@lunn.ch> wrote:
-
-> > We don't support independently power off cpu on BG2 and BG2Q in linux
-> > kernel. So we can assume that bootloader has powered on the CPUs
+On Mon, 02 Jun 2014, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [140528 11:11]:
+> > * Lee Jones <lee.jones@linaro.org> [140528 00:14]:
+> > > Thanks Tony, here's the pull-request:
+> > > 
+> > > The following changes since commit 455c6fdbd219161bd09b1165f11699d6d73de11c:
+> > > 
+> > >   Linux 3.14 (2014-03-30 20:40:15 -0700)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/mfd-omap-v3.16-1
+> > > 
+> > > for you to fetch changes up to 43fef47f94a1ae46fb2720dada32fa3b5547bee2:
+> > > 
+> > >   mfd: twl4030-power: Add a configuration to turn off oscillator during off-idle (2014-05-28 08:06:18 +0100)
+> > > 
+> > > ----------------------------------------------------------------
+> > > Second immutable branch between MFD and OMAP due for the v3.16 merge window.
+> > 
+> > Thanks a lot, this will make it easier for me to chase down potential
+> > PM related regressions ;) I'm merging this for testing only into the
+> > linux-omap master branch, no need for me to include it into any
+> > of my upstream heading branches.
 > 
-> Can i assume from your answer that the hardware does actually support
-> independent power off/on of CPUs? It could be added sometime in the
-> future.
-> 
+> Lee, I'm not seeing this in linux next, did you maybe forget to merge
+> it into the MFD tree?
 
-The BG2 and BG2Q HW doesn't support independent power off/on CPUs.
+I didn't forget, but I didn't do it either. :)
 
-Sorry for confusion,
-Jisheng
+I have re-merged all of the IBs this morning, so should be in -next
+by tomorrow.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
