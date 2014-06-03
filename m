@@ -1,73 +1,61 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 03 Jun 2014 18:04:47 +0100
-Subject: [RFC PATCH 07/11] coresight: add CoreSight ETM driver
-In-Reply-To: <CANLsYkwWWcrQPXWHZM=B7GBDQ4SyiB9cchaXPQFzvOKQUVSMTA@mail.gmail.com>
-References: <1401457391-12242-1-git-send-email-mathieu.poirier@linaro.org>	<1401457391-12242-8-git-send-email-mathieu.poirier@linaro.org>	<538DA2E0.6070103@linaro.org>
- <CANLsYkwWWcrQPXWHZM=B7GBDQ4SyiB9cchaXPQFzvOKQUVSMTA@mail.gmail.com>
-Message-ID: <538E002F.1070907@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 3 Jun 2014 18:11:48 +0100
+Subject: [PATCH] arm64: ptrace: fix empty registers set in prstatus of
+ aarch32 process core
+In-Reply-To: <20140603163341.GS23149@arm.com>
+References: <1401774369-7060-1-git-send-email-victor.kamensky@linaro.org>
+ <1401774369-7060-2-git-send-email-victor.kamensky@linaro.org>
+ <20140603144602.GN23149@arm.com>
+ <CAA3XUr2J7X3emYJgHFxBcP5TudazU68TQ4DL8YGLDmDSDbDCUw@mail.gmail.com>
+ <20140603163341.GS23149@arm.com>
+Message-ID: <20140603171148.GE10126@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/14 17:37, Mathieu Poirier wrote:
->>> +static ssize_t debugfs_status_read(struct file *file, char __user *user_buf,
->>> +                                size_t count, loff_t *ppos)
->>> +{
->>> +     ssize_t ret;
->>> +     uint32_t val;
->>> +     unsigned long flags;
->>> +     char *buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
->>> +     struct etm_drvdata *drvdata = file->private_data;
->>> +
->>> +     if (!buf)
->>> +             return -ENOMEM;
->>> +
->>> +     ret = clk_prepare_enable(drvdata->clk);
->>> +     if (ret)
->>> +             goto out;
->>> +
->>> +     spin_lock_irqsave(&drvdata->spinlock, flags);
->>> +
->>> +     ETM_UNLOCK(drvdata);
->>> +     val = etm_readl(drvdata, ETMCCR);
->>> +     ret += sprintf(buf, "ETMCCR: 0x%08x\n", val);
->>> +     val = etm_readl(drvdata, ETMCCER);
->>> +     ret += sprintf(buf + ret, "ETMCCER: 0x%08x\n", val);
->>> +     val = etm_readl(drvdata, ETMSCR);
->>> +     ret += sprintf(buf + ret, "ETMSCR: 0x%08x\n", val);
->>> +     val = etm_readl(drvdata, ETMIDR);
->>> +     ret += sprintf(buf + ret, "ETMIDR: 0x%08x\n", val);
->>> +     val = etm_readl(drvdata, ETMCR);
->>> +     ret += sprintf(buf + ret, "ETMCR: 0x%08x\n", val);
->>> +     val = etm_readl(drvdata, ETMTEEVR);
->>> +     ret += sprintf(buf + ret, "Enable event: 0x%08x\n", val);
->>> +     val = etm_readl(drvdata, ETMTSSCR);
->>> +     ret += sprintf(buf + ret, "Enable start/stop: 0x%08x\n", val);
->>> +     ret += sprintf(buf + ret,
->>> +                    "Enable control: CR1 0x%08x CR2 0x%08x\n",
->>> +                    etm_readl(drvdata, ETMTECR1),
->>> +                    etm_readl(drvdata, ETMTECR2));
->>> +
->>> +     ETM_LOCK(drvdata);
->>> +
->>> +     spin_unlock_irqrestore(&drvdata->spinlock, flags);
->>> +     clk_disable_unprepare(drvdata->clk);
->>> +
->>> +     ret = simple_read_from_buffer(user_buf, count, ppos, buf, ret);
->>> +out:
->>> +     kfree(buf);
->>> +     return ret;
->>> +}
->>
->> Really not sure whether this should be in the read method. If we don't
->> read the file in one go the spin_lock() we'll not get a cohesive set of
->> registers.
+On Tue, Jun 03, 2014 at 05:33:41PM +0100, Will Deacon wrote:
+> On Tue, Jun 03, 2014 at 05:27:24PM +0100, Victor Kamensky wrote:
+> > Hi Will,
+> > 
+> > On 3 June 2014 07:46, Will Deacon <will.deacon@arm.com> wrote:
+> > > Hi Victor,
+> > >
+> > > Thanks for both the fix and the detailed explanation!
+> > >
+> > > On Tue, Jun 03, 2014 at 06:46:09AM +0100, Victor Kamensky wrote:
+> > >> Currently core file of aarch32 process prstatus note has empty
+> > >> registers set. As result aarch32 core files create by V8 kernel are
+> > >> not very useful.
+> > >>
+> > >> It happens because compat_gpr_get and compat_gpr_set functions can
+> > >> copy registers values to/from either kbuf or ubuf. ELF core file
+> > >> collection function fill_thread_core_info calls compat_gpr_get
+> > >> with kbuf set and ubuf set to 0. But current compat_gpr_get and
+> > >> compat_gpr_set function handle copy to/from only ubuf case.
+> > >>
+> > >> Fix is to handle kbuf and ubuf as two separate cases in similar
+> > >> way as other functions like user_regset_copyout, user_regset_copyin do.
+> > >
+> > > An alternative is to use set_fs when kbuf is set, then use
+> > > copy_{to,from}_user for everything. However, given how ugly I find
+> > > set_fs to start with, your patch looks good to me:
+> > >
+> > >   Acked-by: Will Deacon <will.deacon@arm.com>
+> > 
+> > Thank you for review. Please forgive my naive question, I've tried to
+> > google it, but does not look I do a good job. Is there any special thing
+> > I need to do, so you or Catalin would pick this up? I've posted patches
+> > to Russell's patch system before but never dealt with arm64 patches.
+> > 
+> > Or I just need to repost the patch to linux-arm-kernel with your
+> > 'Acked-by'  and Cc: stable at vger.kernel.org in it?
 > 
-> I get your point but since there is a possibility (even very remove)
-> that any of these registers can be changed between the two read
-> operations, the only reasonable solution I see is to return an error
-> if  (ret > size).  What your opinion on that?
+> Yes, please. Just repost the patch with those tags and we'll pick it up
+> after the merge window. If you notice that we've forgotten, please give us a
+> prod!
 
-I'd prefer that we simply copy the approach used by simple_attr_read().
+Also don't forget to cc us on the email, it's quicker this way.
 
+Thanks.
 
-Daniel.
+-- 
+Catalin
