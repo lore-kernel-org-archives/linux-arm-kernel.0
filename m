@@ -1,42 +1,23 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 2 Jun 2014 23:50:13 -0700
-Subject: Tegra baseline test results for v3.15-rc8
-Message-ID: <538D7025.9080403@nvidia.com>
+From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
+Date: Tue, 3 Jun 2014 15:54:08 +0900
+Subject: [PATCH v2 0/2] arm: shmobile: add USB 3.0 DT for r8a7790
+Message-ID: <538D7110.3090201@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.15-rc8.
-Logs and other details at:
+This patch series is based on the renesas-devel-v3.15-rc7-20140530
+in renesas.git.
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.15-rc8/20140602180103/
+Changes from v1:
+ - Change node name to "usb at ee000000" in patch 2.
+ - Add comment in the change log of patch 2 about a generic phy.
 
+Yoshihiro Shimoda (2):
+  arm: shmobile: r8a7790: add USB3.0 clocks to device tree
+  arm: shmobile: r8a7790: add USB3.0 node to r8a7790.dtsi
 
-Test summary
-------------
+ arch/arm/boot/dts/r8a7790.dtsi |   16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
 
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
-
-
-
-vmlinux object size
-(delta in bytes from test_v3.15-rc7 (c7208164e66f63e3ec1759b98087849286410741)):
-    text     data      bss    total  kernel
-   +1488      +80      -64    +1504  multi_v7_defconfig
-   +1296      +56     -128    +1224  tegra_defconfig
-
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.15-rc7 (c7208164e66f63e3ec1759b98087849286410741))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+-- 
+1.7.9.5
