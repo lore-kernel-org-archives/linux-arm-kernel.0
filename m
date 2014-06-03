@@ -1,50 +1,20 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 3 Jun 2014 09:06:32 +0100
-Subject: [GIT PULL] mfd: Immutable branch between MFD and OMAP, due for
- v3.16
-In-Reply-To: <20140602163841.GC11004@atomide.com>
-References: <1401214140-9828-1-git-send-email-tony@atomide.com>
- <20140528071313.GH4227@lee--X1> <20140528180607.GB4707@atomide.com>
- <20140602163841.GC11004@atomide.com>
-Message-ID: <20140603080632.GC3060@lee--X1>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 3 Jun 2014 10:05:22 +0200
+Subject: [PATCH 2/2] ARM: dts: berlin: enable i2c0 and i2c2
+In-Reply-To: <1401780790-17830-3-git-send-email-antoine.tenart@free-electrons.com>
+References: <1401780790-17830-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1401780790-17830-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20140603080522.GB22742@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 02 Jun 2014, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [140528 11:11]:
-> > * Lee Jones <lee.jones@linaro.org> [140528 00:14]:
-> > > Thanks Tony, here's the pull-request:
-> > > 
-> > > The following changes since commit 455c6fdbd219161bd09b1165f11699d6d73de11c:
-> > > 
-> > >   Linux 3.14 (2014-03-30 20:40:15 -0700)
-> > > 
-> > > are available in the git repository at:
-> > > 
-> > >   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/mfd-omap-v3.16-1
-> > > 
-> > > for you to fetch changes up to 43fef47f94a1ae46fb2720dada32fa3b5547bee2:
-> > > 
-> > >   mfd: twl4030-power: Add a configuration to turn off oscillator during off-idle (2014-05-28 08:06:18 +0100)
-> > > 
-> > > ----------------------------------------------------------------
-> > > Second immutable branch between MFD and OMAP due for the v3.16 merge window.
-> > 
-> > Thanks a lot, this will make it easier for me to chase down potential
-> > PM related regressions ;) I'm merging this for testing only into the
-> > linux-omap master branch, no need for me to include it into any
-> > of my upstream heading branches.
-> 
-> Lee, I'm not seeing this in linux next, did you maybe forget to merge
-> it into the MFD tree?
+On Tue, Jun 03, 2014 at 09:33:10AM +0200, Antoine T?nart wrote:
+> Enable the I2C0 and I2C2 for the Marvell Berlin BG2G DMP. I2C1 and I2C3
+> are also working on this board, but no devices seemed to be there.
 
-I didn't forget, but I didn't do it either. :)
+Hi Antoine
 
-I have re-merged all of the IBs this morning, so should be in -next
-by tomorrow.
+Does this mean that IC0 and I2C2 have devices on them? Could you also
+add nodes for the devices?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+    Andrew
