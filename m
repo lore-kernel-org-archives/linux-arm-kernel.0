@@ -1,58 +1,109 @@
 From: lho@apm.com (Loc Ho)
-Date: Mon,  2 Jun 2014 20:14:16 -0600
-Subject: PATCH v3 0/4] edac: Add APM X-Gene SoC EDAC driver
-Message-ID: <1401761660-11515-1-git-send-email-lho@apm.com>
+Date: Mon,  2 Jun 2014 20:14:18 -0600
+Subject: [PATCH v3 2/4] Documentation: Add documentation for the APM X-Gene
+ SoC EDAC DTS binding
+In-Reply-To: <1401761660-11515-2-git-send-email-lho@apm.com>
+References: <1401761660-11515-1-git-send-email-lho@apm.com>
+ <1401761660-11515-2-git-send-email-lho@apm.com>
+Message-ID: <1401761660-11515-3-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the APM X-Gene SoC EDAC driver.
+This patch adds documentation for the APM X-Gene SoC EDAC DTS binding.
 
-v3:
-* Update binding documentation for PMD DT node and exampples
-* Add binding documentation for SoC DT node
-* Change MC, PMD, and L3C driver error injection to use debugfs
-* Add missing IRQ for MC correctable error (code and DT)
-* Use true/false where appropriate instead 1/0
-* Add bit definition for L1 MMUESR register and fully decode this error
-* Remove the un-necessary dev variable from xgene_edac_pmd_ctx structure
-* Add check for disabled PMD (code and DT)
-* Switch to edac_printk instead pr_err
-* Some minor comments update
-
-v2:
-* Add EDAC entry in MAINTAINERS for APM EDAC driver
-* Remove the MC scrub patch
-* Remove the word 'Caches' from Kconfig
-* Change all MASK defines to use BIT(x)
-* Update comment or remove them
-* Wrap error injection code around CONFIG_EDAC_DEBUG
-* Change function name xgene_edac_mc_hw_init to xgene_edac_mc_irq_ctl
-* Change all function XXX_hw_init to XXX_hw_ctl
-* Fix typo 'activie'
-* Move calling function edac_mc_alloc after resource retrieval
-* Check for NULL on platform_get_resource return if reference directly
-* Add documentation for struct xgene_edac_pmd_ctx
-* Move L1 and L2 check out of function xgene_edac_pmd_check to its own
-  functions
-* Use for loop for configure each CPU of an PMD
-* Replace /2 by >> 1
-* Remove unnecessary comment on edac_device_add_device failure
-* Make mem_err_ip static const
-* Unwind EDAC register correctly if failed
+Signed-off-by: Feng Kan <fkan@apm.com>
+Signed-off-by: Loc Ho <lho@apm.com>
 ---
-Loc Ho (4):
-  MAINTAINERS: Add entry for APM X-Gene SoC EDAC driver
-  Documentation: Add documentation for the APM X-Gene SoC EDAC DTS
-    binding
-  edac: Add APM X-Gene SoC EDAC driver
-  arm64: Add APM X-Gene SoC EDAC DTS entries
-
- .../devicetree/bindings/edac/apm-xgene-edac.txt    |   81 +
- MAINTAINERS                                        |    8 +
- arch/arm64/boot/dts/apm-storm.dtsi                 |   97 +
- drivers/edac/Kconfig                               |    9 +-
- drivers/edac/Makefile                              |    3 +
- drivers/edac/xgene_edac.c                          | 2033 ++++++++++++++++++++
- 6 files changed, 2230 insertions(+), 1 deletions(-)
+ .../devicetree/bindings/edac/apm-xgene-edac.txt    |   81 ++++++++++++++++++++
+ 1 files changed, 81 insertions(+), 0 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
- create mode 100644 drivers/edac/xgene_edac.c
+
+diff --git a/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+new file mode 100644
+index 0000000..fc3dbbc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+@@ -0,0 +1,81 @@
++* APM X-Gene EDAC nodes
++
++EDAC nodes are defined to describe on-chip error detection and correction.
++There are four types of EDAC:
++
++  memory controller	- Memory controller
++  PMD (L1/L2)		- Processor module unit (PMD) L1/L2 cache
++  L3			- CPU L3 cache
++  SoC			- SoC IP such as SATA, Ethernet, and etc
++
++The following section describes the memory controller DT node binding.
++
++Required properties:
++- compatible		: Shall be "apm,xgene-edac-mc".
++- reg			: First resource shall be the PCP resource.
++			  Second resource shall be the CSW resource.
++			  Third resource shall be the MCB-A resource.
++			  Fourth resource shall be the MCB-B resource.
++			  Fifth resource shall be the MCU resource.
++- interrupts            : Interrupt-specifier for MCU error IRQ(s).
++
++The following section describes the L1/L2 DT node binding.
++
++- compatible		: Shall be "apm,xgene-edac-pmd".
++- reg			: First resource shall be the PCP resource.
++			  Second resource shall be the PMD resource.
++			  Third resource shall be the PMD efuse resource.
++- interrupts            : Interrupt-specifier for PMD error IRQ(s).
++
++The following section describes the L3 DT node binding.
++
++- compatible		: Shall be "apm,xgene-edac-l3".
++- reg			: First resource shall be the PCP resource.
++			  Second resource shall be the L3 resource.
++- interrupts            : Interrupt-specifier for L3 error IRQ(s).
++
++The following section describes the SOC DT node binding.
++
++- compatible		: Shall be "apm,xgene-edac-soc"".
++- reg			: First resource shall be the PCP resource.
++			  Second resource shall be the SOC resource.
++- interrupts		: nterrupt-specifier for SoC error IRQ(s).
++
++Example:
++	edacmc0: edacmc0 at 7e800000 {
++		compatible = "apm,xgene-edac-mc";
++		reg = <0x0 0x78800000 0x0 0x1000>,
++		      <0x0 0x7e200000 0x0 0x1000>,
++		      <0x0 0x7e700000 0x0 0x1000>,
++		      <0x0 0x7e720000 0x0 0x1000>,
++		      <0x0 0x7e800000 0x0 0x1000>;
++		interrupts = <0x0 0x20 0x4>,
++			     <0x0 0x21 0x4>;
++	};
++
++	edacl3: edacl3 at 7e600000 {
++		compatible = "apm,xgene-edac-l3";
++		reg = <0x0 0x78800000 0x0 0x1000>,
++		      <0x0 0x7e600000 0x0 0x1000>;
++		interrupts = <0x0 0x20 0x4>,
++			     <0x0 0x21 0x4>;
++	};
++
++	edacpmd0: edacpmd0 at 7c000000 {
++		compatible = "apm,xgene-edac-pmd";
++		reg = <0x0 0x78800000 0x0 0x1000>,
++		      <0x0 0x7c000000 0x0 0x200000>,
++		      <0x0 0x1054a000 0x0 0x10>;
++		interrupts = <0x0 0x20 0x4>,
++			     <0x0 0x21 0x4>;
++	};
++
++	edacsoc: edacsoc at 7e930000 {
++		compatible = "apm,xgene-edac-soc";
++		reg = <0x0 0x78800000 0x0 0x1000>,
++		      <0x0 0x7e930000 0x0 0x1000>;
++		interrupts = <0x0 0x20 0x4>,
++			     <0x0 0x21 0x4>,
++			     <0x0 0x27 0x4>;
++	};
++
+-- 
+1.5.5
