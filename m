@@ -1,88 +1,86 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 3 Jun 2014 14:12:31 +0300
-Subject: [PATCH v1] of/irq: do irq resolution in platform_get_irq_byname()
-In-Reply-To: <20140603092050.F0FD0C40D3B@trevor.secretlab.ca>
-References: <1400582523-22684-1-git-send-email-grygorii.strashko@ti.com>	<20140523080333.66720C4176E@trevor.secretlab.ca>	<CAGa+x85mOHtNAj-UHgK2_z8zWAF=qwFcRcUgHTR-byNiX7heHA@mail.gmail.com>	<CAL_JsqLm3wfVS+au+JUbhBhxz=LuVpepH6GxabCQhPowhbw77g@mail.gmail.com>	<20140528071855.GJ4227@lee--X1>	<CACRpkdYgkEOjLamYu5uKSgs3iTNJ-w5XkbeygKjRdR-bNdETfg@mail.gmail.com>	<CAGb2v64f8Wju6dtVuVN2x=9YVGA-=RXozzhpJZNspKZ05f=jtA@mail.gmail.com>	<CACxGe6ts-TcSKk2F0-XSxAxeTxVCiyDHgh-O12v+F2OjHUsPyg@mail.gmail.com>	<5385B566.2050600@ti.com>
- <7h7g4zz7s4.fsf@paris.lan> <20140603092050.F0FD0C40D3B@trevor.secretlab.ca>
-Message-ID: <538DAD9F.1030008@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 3 Jun 2014 11:26:46 +0100
+Subject: [PATCH v6 2/2] arm64: enable context tracking
+In-Reply-To: <7hioonythl.fsf@paris.lan>
+References: <1401399904-24471-1-git-send-email-larry.bassel@linaro.org>
+ <1401399904-24471-3-git-send-email-larry.bassel@linaro.org>
+ <20140530182349.GI22895@arm.com> <7hioonythl.fsf@paris.lan>
+Message-ID: <20140603102646.GB23149@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi guys,
 
-On 06/03/2014 12:20 PM, Grant Likely wrote:
-> On Mon, 02 Jun 2014 07:48:59 -0700, Kevin Hilman <khilman@linaro.org> wrote:
->> Grygorii Strashko <grygorii.strashko@ti.com> writes:
->>
->>> Hi All,
->>>
->>> On 05/28/2014 12:03 PM, Grant Likely wrote:
->>
->> [...]
->>
->>>> The bisected patch causes platform_get_irq() to always parse the
->>>> devicetree to obtain the irq instead of using a precalculated value in
->>>> the platform_device. There are two possible scenarios for this problem
->>>> that I can think of:
->>>> 1) Platform_get_irq() is getting called multiple times (which would
->>>> happen on a deferred probe) but the setup code isn't handling it
->>>> properly, like trying to request the GPIO more than once
->>>> 2) the platform_device was preloaded with an irq number that differs
->>>> from what is determined when parsing the tree. This would happen if a
->>>> platform_device was created manually.
->>>>
->>>
->>> Could anyone try attached patch? It has to improve situation, but it
->>> might not fix all problems (see my previous e-mail).
->>
->> I can confirm it makes the STE Snowball boot again on top of next-20150602.
->>
->>>  From 4a41912dba648c935982274966426fa430fd5aa4 Mon Sep 17 00:00:00 2001
->>> From: Grygorii Strashko <grygorii.strashko@ti.com>
->>> Date: Wed, 28 May 2014 12:53:34 +0300
->>> Subject: [PATCH] mfd: ab8500: fix dt irq mapping
->>>
->>> The AD8500 defines itself as interrupt-controller in DT,
->>> but it doesn't assign DT node to IRQ domain when creates it.
->>> As result, of_irq_xx() helpers don't work because they can't
->>> find necessary IRQ domain.
->>>
->>> Hence, fix it by assigning AD8500 core device DT node to IRQ
->>> domain when it's created.
->>>
->>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>
->> Tested-by: Kevin Hilman <khilman@linaro.org>
-
-Thanks for testing it.
-
+On Fri, May 30, 2014 at 08:08:38PM +0100, Kevin Hilman wrote:
+> Will Deacon <will.deacon@arm.com> writes:
+> > I'd like to give these some stress testing before it gets merged, so I'm
+> > not sure if it'll make it for 3.16 given where we are at the moment.
 > 
-> So is that it, or were there other problems? If it is then you can add
-
-This is minimal solution and some sub-devices of ab8500 MFD may still 
-not work.
-
-For example, ab8500-debugfs may not work (ste-dbx5x0.dtsi):
-	ab8500-debugfs {
-		compatible = "stericsson,ab8500-debug";
-	};
-
- and its DT definition may need to be updated to explicitly define IRQs,
-smth like this:
-	ab8500-debugfs {
-		compatible = "stericsson,ab8500-debug";
-		interrupts = <0 IRQ_TYPE_LEVEL_HIGH
-			      111 IRQ_TYPE_LEVEL_HIGH>;
-		interrupt-names = "IRQ_FIRST", "IRQ_LAST";
-	};
-
-> my acked-by when applying.
+> FWIW, this feature is disabled by default.  I use the following kconfig
+> fragment to enable the various parts I use for testing:
 > 
-> Acked-by: Grant Likely <grant.likely@linaro.org>
+> CONFIG_NO_HZ=y
+> CONFIG_NO_HZ_FULL=y
+> CONFIG_NO_HZ_FULL_ALL=y
+> CONFIG_NO_HZ_FULL_SYSIDLE=y
 > 
+> # default to power-efficient workqueues (which are then set to unbound)
+> CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
+> 
+> # lockup detector sets a 4s timer on every CPU, which wakes CPUs
+> # from idle. (alternately, can be controlled via procfs,
+> # e.g: echo 0 > /proc/sys/kernel/watchdog)
+> #CONFIG_LOCKUP_DETECTOR=n
 
-I've reposted this patch already:
- https://lkml.org/lkml/2014/6/2/379
+I had a go with this, but I couldn't seem to trigger any context tracking
+without forcing CONFIG_CONTEXT_TRACKING_FORCE=y. Does that mean we're
+missing something else?
 
-Regards,
--grygorii
+Anyway, with that forced on, I see the following during boot:
+
+
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 0 at kernel/rcu/tree.c:418 rcu_eqs_enter+0x84/0xa4()
+Modules linked in:
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.15.0-rc8+ #5
+Call trace:
+[<ffffffc000088048>] dump_backtrace+0x0/0x130
+[<ffffffc000088188>] show_stack+0x10/0x1c
+[<ffffffc0004891a0>] dump_stack+0x74/0xbc
+[<ffffffc0000a45e0>] warn_slowpath_common+0x8c/0xb4
+[<ffffffc0000a46cc>] warn_slowpath_null+0x14/0x20
+[<ffffffc0000efc14>] rcu_eqs_enter+0x80/0xa4
+[<ffffffc0000efc58>] rcu_idle_enter+0x20/0x50
+[<ffffffc0000dd314>] cpu_startup_entry+0x118/0x184
+[<ffffffc0004865ec>] rest_init+0x7c/0x88
+[<ffffffc000609800>] start_kernel+0x368/0x37c
+---[ end trace c17313e162496e65 ]---
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 0 at kernel/rcu/tree.c:541 rcu_eqs_exit+0xb0/0xbc()
+Modules linked in:
+CPU: 0 PID: 0 Comm: swapper/0 Tainted: G        W     3.15.0-rc8+ #5
+Call trace:
+[<ffffffc000088048>] dump_backtrace+0x0/0x130
+[<ffffffc000088188>] show_stack+0x10/0x1c
+[<ffffffc0004891a0>] dump_stack+0x74/0xbc
+[<ffffffc0000a45e0>] warn_slowpath_common+0x8c/0xb4
+[<ffffffc0000a46cc>] warn_slowpath_null+0x14/0x20
+[<ffffffc0000ed384>] rcu_eqs_exit+0xac/0xbc
+[<ffffffc0000efdac>] rcu_user_exit+0xc/0x18
+[<ffffffc00011d48c>] context_tracking_user_exit+0xc4/0xd4
+[<ffffffc000083d98>] el1_irq+0x58/0xd4
+[<ffffffc0000dd318>] cpu_startup_entry+0x11c/0x184
+[<ffffffc0004865ec>] rest_init+0x7c/0x88
+[<ffffffc000609800>] start_kernel+0x368/0x37c
+---[ end trace c17313e162496e66 ]---
+
+
+Can you take a look please? I had to fix up some conflicts to apply your
+patches against our for-next branch, so I've put a branch here for you to
+look at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git aarch64/context-tracking
+
+Cheers,
+
+Will
