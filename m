@@ -1,92 +1,77 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 03 Jun 2014 14:39:32 +0900
-Subject: [PATCH] ARM: EXYNOS: Fix the sequence of secondary CPU boot for
- Exynos3250
-Message-ID: <1401773972-13689-1-git-send-email-cw00.choi@samsung.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Mon,  2 Jun 2014 22:46:09 -0700
+Subject: [PATCH] arm64: ptrace: fix empty registers set in prstatus of aarch32
+ process core
+In-Reply-To: <1401774369-7060-1-git-send-email-victor.kamensky@linaro.org>
+References: <1401774369-7060-1-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1401774369-7060-2-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set AUTOWAKEUP_EN bit to ARM_CORE_CONFIGURATION register
-because Exynos3250 removes WFE in secure mode so that turn on automatically
-after setting CORE_LOCAL_PWR_EN. Also, This patch use dbs_sev() macro
-to guarantee the data synchronization of command instead of IPI_WAKEUP
-because Exynos3250 don't have WFE mode in secue mode.
+Currently core file of aarch32 process prstatus note has empty
+registers set. As result aarch32 core files create by V8 kernel are
+not very useful.
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+It happens because compat_gpr_get and compat_gpr_set functions can
+copy registers values to/from either kbuf or ubuf. ELF core file
+collection function fill_thread_core_info calls compat_gpr_get
+with kbuf set and ubuf set to 0. But current compat_gpr_get and
+compat_gpr_set function handle copy to/from only ubuf case.
+
+Fix is to handle kbuf and ubuf as two separate cases in similar
+way as other functions like user_regset_copyout, user_regset_copyin do.
+
+Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
 ---
- arch/arm/mach-exynos/platsmp.c  | 9 ++++++++-
- arch/arm/mach-exynos/pm.c       | 8 ++++++--
- arch/arm/mach-exynos/regs-pmu.h | 4 ++++
- 3 files changed, 18 insertions(+), 3 deletions(-)
+ arch/arm64/kernel/ptrace.c | 28 +++++++++++++++++++---------
+ 1 file changed, 19 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index ec02422..882fb84 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -149,6 +149,10 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 			return -ETIMEDOUT;
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index 6a8928b..9c9c2b9 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -650,11 +650,16 @@ static int compat_gpr_get(struct task_struct *target,
+ 			reg = task_pt_regs(target)->regs[idx];
  		}
+ 
+-		ret = copy_to_user(ubuf, &reg, sizeof(reg));
+-		if (ret)
+-			break;
+-
+-		ubuf += sizeof(reg);
++		if (kbuf) {
++			memcpy(kbuf, &reg, sizeof(reg));
++			kbuf += sizeof(reg);
++		} else {
++			ret = copy_to_user(ubuf, &reg, sizeof(reg));
++			if (ret)
++				break;
++
++			ubuf += sizeof(reg);
++		}
  	}
-+
-+	if (soc_is_exynos3250())
-+		__raw_writel(EXYNOS3_COREPORESET(phys_cpu), EXYNOS_SWRESET);
-+
- 	/*
- 	 * Send the secondary CPU a soft interrupt, thereby causing
- 	 * the boot monitor to read the system wide flags register,
-@@ -182,7 +186,10 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
  
- 		call_firmware_op(cpu_boot, phys_cpu);
+ 	return ret;
+@@ -684,11 +689,16 @@ static int compat_gpr_set(struct task_struct *target,
+ 		unsigned int idx = start + i;
+ 		compat_ulong_t reg;
  
--		arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-+		if (soc_is_exynos3250())
-+			dsb_sev();
-+		else
-+			arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+-		ret = copy_from_user(&reg, ubuf, sizeof(reg));
+-		if (ret)
+-			return ret;
++		if (kbuf) {
++			memcpy(&reg, kbuf, sizeof(reg));
++			kbuf += sizeof(reg);
++		} else {
++			ret = copy_from_user(&reg, ubuf, sizeof(reg));
++			if (ret)
++				return ret;
  
- 		if (pen_release == -1)
- 			break;
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 87c0d34..4681f64 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -121,8 +121,12 @@ void exynos_cpu_power_down(int cpu)
-  */
- void exynos_cpu_power_up(int cpu)
- {
--	__raw_writel(S5P_CORE_LOCAL_PWR_EN,
--		     EXYNOS_ARM_CORE_CONFIGURATION(cpu));
-+	u32 core_conf = 0;
-+
-+	core_conf |= S5P_CORE_LOCAL_PWR_EN;
-+	if (soc_is_exynos3250())
-+		core_conf |= S5P_CORE_AUTOWAKEUP_EN;
-+	__raw_writel(core_conf, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
- }
+-		ubuf += sizeof(reg);
++			ubuf += sizeof(reg);
++		}
  
- /**
-diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-index 1d13b08..674dfc2 100644
---- a/arch/arm/mach-exynos/regs-pmu.h
-+++ b/arch/arm/mach-exynos/regs-pmu.h
-@@ -128,6 +128,7 @@
- 
- #define S5P_CORE_LOCAL_PWR_EN			0x3
- #define S5P_INT_LOCAL_PWR_EN			0x7
-+#define S5P_CORE_AUTOWAKEUP_EN			(1 << 31)
- 
- /* Only for EXYNOS4210 */
- #define S5P_CMU_CLKSTOP_LCD1_LOWPWR	S5P_PMUREG(0x1154)
-@@ -186,6 +187,9 @@
- #define S5P_DIS_IRQ_CORE3			S5P_PMUREG(0x1034)
- #define S5P_DIS_IRQ_CENTRAL3			S5P_PMUREG(0x1038)
- 
-+/* For EXYNOS3 */
-+#define EXYNOS3_COREPORESET(cpu)		((1 << 4) << cpu)
-+
- /* For EXYNOS5 */
- 
- #define EXYNOS5_SYS_I2C_CFG					S5P_SYSREG(0x0234)
+ 		switch (idx) {
+ 		case 15:
 -- 
-1.8.0
+1.8.1.4
