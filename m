@@ -1,7 +1,9 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Jun 2014 09:56:48 +0200
-Subject: [PATCH] hsi: omap_ssi_port: use normal module refcounting
-Message-ID: <7426698.eEpYu3o0WK@wuerfel>
+Date: Wed, 04 Jun 2014 10:00:59 +0200
+Subject: [PATCH v2] hsi: omap_ssi_port: use normal module refcounting
+In-Reply-To: <7426698.eEpYu3o0WK@wuerfel>
+References: <7426698.eEpYu3o0WK@wuerfel>
+Message-ID: <4579153.ES6XlsZ43F@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,9 +24,11 @@ Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Cc: Sebastian Reichel <sre@kernel.org>
 Cc: Carlos Chinea <carlos.chinea@nokia.com>
 Cc: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+---
+v2: fix a stupid typo, I accidentally sent out the wrong version of the patch
 
 diff --git a/drivers/hsi/controllers/omap_ssi_port.c b/drivers/hsi/controllers/omap_ssi_port.c
-index b8693f0..6eb7c28 100644
+index b8693f0..29aea0b 100644
 --- a/drivers/hsi/controllers/omap_ssi_port.c
 +++ b/drivers/hsi/controllers/omap_ssi_port.c
 @@ -1116,8 +1116,7 @@ static int __init ssi_port_probe(struct platform_device *pd)
@@ -41,7 +45,7 @@ index b8693f0..6eb7c28 100644
  
  	omap_ssi->port[omap_port->port_id] = NULL;
  	platform_set_drvdata(pd, NULL);
-+	module_put(port->owner);
++	module_put(ssi->owner);
  	pm_runtime_disable(&pd->dev);
  
  	return 0;
