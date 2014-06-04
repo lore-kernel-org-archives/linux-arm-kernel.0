@@ -1,107 +1,75 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 4 Jun 2014 12:29:29 -0500
-Subject: [PATCH 3/7] i2c: Add the ability to match device to compatible
- string without an of_node
-In-Reply-To: <1401883796-17841-4-git-send-email-lee.jones@linaro.org>
-References: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
- <1401883796-17841-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAL_JsqJOEipHyjD2NCjQd1BvLumnM3PkVDqUjrMNfXCOmXcNAA@mail.gmail.com>
+From: Ranjani.Vaidyanathan@freescale.com (Ranjani.Vaidyanathan at freescale.com)
+Date: Wed, 4 Jun 2014 17:29:58 +0000
+Subject: [PATCH] ARM: imx6: Fix procedure to switch the parent of
+ LDB_DI_CLK
+In-Reply-To: <538F4B43.6070804@gmail.com>
+References: <1397044538-12676-1-git-send-email-festevam@gmail.com>
+ <538F4B43.6070804@gmail.com>
+Message-ID: <5f0cb6161f5146cbbc778149015249ce@BY2PR03MB379.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 4, 2014 at 7:09 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> A great deal of I2C devices are currently matched via DT node name, and
-> as such the compatible naming convention of '<vendor>,<device>' has gone
-> somewhat awry - some nodes don't supply one, some supply an arbitrary
-> string and others the correct device name with an arbitrary vendor prefix.
->
-> In an effort to correct this problem we have to supply a mechanism to
-> match a device by compatible string AND by simple device name.  This
-> function strips off the '<vendor>,' part of a supplied compatible string
-> and attempts to match without it.
->
-> The plan is to remove this function once all of the compatible strings
-> for each device have been brought into line.
+Hi Dirk,
 
-Then should you add a warning for cases needing to be fixed?
+Responses below.
 
-Rob
+Thanks,
+Ranjani
 
+-----Original Message-----
+From: Dirk Behme [mailto:dirk.behme at gmail.com] 
+Sent: Wednesday, June 04, 2014 11:37 AM
+To: Vaidyanathan Ranjani-RA5478; Estevam Fabio-R49496
+Cc: Fabio Estevam; Guo Shawn-R65073; christian.gmeiner at gmail.com; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH] ARM: imx6: Fix procedure to switch the parent of LDB_DI_CLK
+
+On 09.04.2014 13:55, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 >
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Due to incorrect placement of the clock gate cell in the ldb_di[x]_clk 
+> tree, the glitchy parent mux of ldb_di[x]_clk can cause a glitch to 
+> enter the ldb_di_ipu_div divider. If the divider gets locked up, no 
+> ldb_di[x]_clk is generated, and the LVDS display will hang when the 
+> ipu_di_clk is sourced from ldb_di_clk.
+>
+> To fix the problem, both the new and current parent of the ldb_di_clk 
+> should be disabled before the switch. This patch ensures that correct 
+> steps are followed when ldb_di_clk parent is switched in the beginning of boot.
+>
+> Signed-off-by: Ranjani Vaidyanathan 
+> <Ranjani.Vaidyanathan@freescale.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
->  drivers/i2c/i2c-core.c | 25 +++++++++++++++++++++++++
->  include/linux/i2c.h    | 10 ++++++++++
->  2 files changed, 35 insertions(+)
+>   arch/arm/mach-imx/clk-imx6q.c | 125 ++++++++++++++++++++++++++++++++++++++++--
+>   1 file changed, 121 insertions(+), 4 deletions(-)
 >
-> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> index d3802dc..7dcd5c3 100644
-> --- a/drivers/i2c/i2c-core.c
-> +++ b/drivers/i2c/i2c-core.c
-> @@ -1090,6 +1090,31 @@ struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node)
->         return i2c_verify_adapter(dev);
->  }
->  EXPORT_SYMBOL(of_find_i2c_adapter_by_node);
+> diff --git a/arch/arm/mach-imx/clk-imx6q.c 
+> b/arch/arm/mach-imx/clk-imx6q.c index 20ad0d1..3ee45f4 100644
+> --- a/arch/arm/mach-imx/clk-imx6q.c
+> +++ b/arch/arm/mach-imx/clk-imx6q.c
+....
+> +static void disable_anatop_clocks(void __iomem *anatop_base) {
+> +	unsigned int reg;
 > +
-> +const struct of_device_id
-> +*i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
-> +                                 struct device *dev)
-> +{
-> +       const struct i2c_client *client = i2c_verify_client(dev);
-> +       const char *name;
-> +
-> +       if (!(client && matches))
-> +               return NULL;
-> +
-> +       for (; matches->compatible[0]; matches++) {
-> +               name = strchr(matches->compatible, ',');
-> +               if (!name)
-> +                       name = matches->compatible;
-> +               else
-> +                       name++;
-> +
-> +               if (!strncmp(client->name, name, strlen(client->name)))
-> +                       return matches;
-> +       }
-> +
-> +       return NULL;
-> +}
-> +EXPORT_SYMBOL_GPL(i2c_of_match_device_strip_vendor);
->  #else
->  static void of_i2c_register_devices(struct i2c_adapter *adap) { }
->  #endif /* CONFIG_OF */
-> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-> index b556e0a..f7ec75b 100644
-> --- a/include/linux/i2c.h
-> +++ b/include/linux/i2c.h
-> @@ -564,6 +564,9 @@ extern struct i2c_client *of_find_i2c_device_by_node(struct device_node *node);
->  /* must call put_device() when done with returned i2c_adapter device */
->  extern struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node);
->
-> +extern const struct of_device_id
-> +*i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
-> +                                 struct device *dev);
->  #else
->
->  static inline struct i2c_client *of_find_i2c_device_by_node(struct device_node *node)
-> @@ -575,6 +578,13 @@ static inline struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node
->  {
->         return NULL;
->  }
-> +
-> +const struct of_device_id
-> +*i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
-> +                                 struct device *dev)
-> +{
-> +       return NULL;
-> +}
->  #endif /* CONFIG_OF */
->
->  #endif /* _LINUX_I2C_H */
-> --
-> 1.8.3.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> +	/* Make sure PFDs are disabled at boot. */
+> +	reg = readl_relaxed(anatop_base + 0x100);
+> +	/* Cannot disable pll2_pfd2_396M, as it is the MMDC clock in iMX6DL */
+> +	if (cpu_is_imx6dl())
+> +		reg |= 0x80008080;
+> +	else
+> +		reg |= 0x80808080;
+
+There are two issues with this code section:
+
+1) You want to know here if pll2_pfd2_396M is used as MMDC clock. This is independent of IMX6DL. Even a Quad/Dual could use pll2_pfd2_396M as MMDC clock. You better should check what you are really looking for:
+
+if (MMDC clock == pll2_pfd2_396M)
+...
+[RV] Yes, you are perfectly correct. We need to check MMDC parent clock. 
+
+2) Why is bit 31, i.e. the uppermost '8' in 0x80808080, set here? It looks like the TRM marks bit 31 - 24 as reserved?
+[RV] Yes, this should also be fixed. 
+
+Best regards
+
+Dirk
