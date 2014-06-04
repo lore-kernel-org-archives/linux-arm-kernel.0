@@ -1,87 +1,50 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 4 Jun 2014 13:07:29 +0200
-Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
-In-Reply-To: <20140604103619.GL29593@e103034-lin>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
- <20140528121001.GI19967@e103034-lin>
- <CAKfTPtDxeBfZK1AxCRqEG91pi--Ti1RYFoQPDhvMVnGTCspQ-g@mail.gmail.com>
- <20140528154703.GJ19967@e103034-lin>
- <20140603155007.GZ30445@twins.programming.kicks-ass.net>
- <CAKfTPtDUvH--WxFATTW6YRAvLuohzyNHDUq6DRdfxc7gRKCX6Q@mail.gmail.com>
- <20140604080809.GK30445@twins.programming.kicks-ass.net>
- <CAKfTPtBCG1Jq2b+fyoGuA=7yG_yUbsmaD+j-ZXXsPNGp5giKpg@mail.gmail.com>
- <20140604101724.GD11096@twins.programming.kicks-ass.net>
- <20140604103619.GL29593@e103034-lin>
-Message-ID: <CAKfTPtCVyLRG-fSge1shdw5aSDB3y=_qzU1DOVgCx0VBnn6mnA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Jun 2014 13:09:35 +0200
+Subject: [PATCH] ARM: integrator: fix section mismatch problem
+In-Reply-To: <20140604105726.GB23430@n2100.arm.linux.org.uk>
+References: <1401879202-10516-1-git-send-email-linus.walleij@linaro.org>
+ <10542022.FtcLF0Em3k@wuerfel> <20140604105726.GB23430@n2100.arm.linux.org.uk>
+Message-ID: <18867368.JlUVYRYg9X@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 June 2014 12:36, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
-> On Wed, Jun 04, 2014 at 11:17:24AM +0100, Peter Zijlstra wrote:
->> On Wed, Jun 04, 2014 at 11:32:10AM +0200, Vincent Guittot wrote:
->> > On 4 June 2014 10:08, Peter Zijlstra <peterz@infradead.org> wrote:
->> > > On Wed, Jun 04, 2014 at 09:47:26AM +0200, Vincent Guittot wrote:
->> > >> On 3 June 2014 17:50, Peter Zijlstra <peterz@infradead.org> wrote:
->> > >> > On Wed, May 28, 2014 at 04:47:03PM +0100, Morten Rasmussen wrote:
->> > >> >> Since we may do periodic load-balance every 10 ms or so, we will perform
->> > >> >> a number of load-balances where runnable_avg_sum will mostly be
->> > >> >> reflecting the state of the world before a change (new task queued or
->> > >> >> moved a task to a different cpu). If you had have two tasks continuously
->> > >> >> on one cpu and your other cpu is idle, and you move one of the tasks to
->> > >> >> the other cpu, runnable_avg_sum will remain unchanged, 47742, on the
->> > >> >> first cpu while it starts from 0 on the other one. 10 ms later it will
->> > >> >> have increased a bit, 32 ms later it will be 47742/2, and 345 ms later
->> > >> >> it reaches 47742. In the mean time the cpu doesn't appear fully utilized
->> > >> >> and we might decide to put more tasks on it because we don't know if
->> > >> >> runnable_avg_sum represents a partially utilized cpu (for example a 50%
->> > >> >> task) or if it will continue to rise and eventually get to 47742.
->> > >> >
->> > >> > Ah, no, since we track per task, and update the per-cpu ones when we
->> > >> > migrate tasks, the per-cpu values should be instantly updated.
->> > >> >
->> > >> > If we were to increase per task storage, we might as well also track
->> > >> > running_avg not only runnable_avg.
->> > >>
->> > >> I agree that the removed running_avg should give more useful
->> > >> information about the the load of a CPU.
->> > >>
->> > >> The main issue with running_avg is that it's disturbed by other tasks
->> > >> (as point out previously). As a typical example,  if we have 2 tasks
->> > >> with a load of 25% on 1 CPU, the unweighted runnable_load_avg will be
->> > >> in the range of [100% - 50%] depending of the parallelism of the
->> > >> runtime of the tasks whereas the reality is 50% and the use of
->> > >> running_avg will return this value
->> > >
->> > > I'm not sure I see how 100% is possible, but yes I agree that runnable
->> > > can indeed be inflated due to this queueing effect.
->>
->> Let me explain the 75%, take any one of the above scenarios. Lets call
->> the two tasks A and B, and let for a moment assume A always wins and
->> runs first, and then B.
->>
->> So A will be runnable for 25%, B otoh will be runnable the entire time A
->> is actually running plus its own running time, giving 50%. Together that
->> makes 75%.
->>
->> If you release the assumption that A runs first, but instead assume they
->> equally win the first execution, you get them averaging at 37.5% each,
->> which combined will still give 75%.
->
-> But that is assuming that the first task gets to run to completion of it
-> busy period. If it uses up its sched_slice and we switch to the other
-> tasks, they both get to wait.
->
-> For example, if the sched_slice is 5 ms and the busy period is 10 ms,
-> the execution pattern would be: A, B, A, B, idle, ... In that case A is
-> runnable for 15 ms and B is for 20 ms. Assuming that the overall period
-> is 40 ms, the A runnable is 37.5% and B is 50%.
+On Wednesday 04 June 2014 11:57:26 Russell King - ARM Linux wrote:
+> On Wed, Jun 04, 2014 at 12:57:02PM +0200, Arnd Bergmann wrote:
+> > On Wednesday 04 June 2014 12:53:22 Linus Walleij wrote:
+> > > This addresses a section mismatch problem in the IM-PD1
+> > > driver in the Integrator/AP.
+> > > 
+> > > The IM-PD1 contains a VIC interrupt controller and therefore
+> > > the driver calls vic_init_cascaded() which is marked __init as
+> > > irqchips are simply not hot-pluggable and specifically the VIC
+> > > is assumed to initiate only on boot.
+> > > 
+> > > However the module driver model of the Integrator LM bus
+> > > assumes that logic tile drivers can be probed at runtime. This
+> > > is not really the case for IM-PD1: these tiles are detected at
+> > > boot and they cannot be plugged into a running system. Before
+> > > this patch it is of course possible to modprobe them later.
+> > > 
+> > > By first forcing the IM-PD1 to bool we make sure this driver
+> > > gets compiled into the kernel, and we know it will be probed
+> > > only at boot time when the tiles are detected, so we can tag
+> > > its probe function __init_refok as we know it won't be called
+> > > after boot now, and the section mismatch problem goes away.
+> > > 
+> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > Cc: Russell King <linux@arm.linux.org.uk>
+> > > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> > > ---
+> > > ARM SoC folks: please apply this directly if the solution seems
+> > > acceptable.
+> > 
+> > Looks good to me, I'm applying this on top of another fix
+> > I have just added to next/soc2.
+> 
+> That's a NAK on that until the issue I've raised has been checked.
+> 
 
-The exact value for your scheduling example above is:
-A runnable will be 47% and B runnable will be 60% (unless i make a
-mistake in my computation)
-and CPU runnable will be 60% too
+Ok, I'll retract the patch, I haven't pushed the branch yet, so it's
+easy to back out. Thanks for having a look at the issue so quickly.
 
-Vincent
-
->
+	Arnd
