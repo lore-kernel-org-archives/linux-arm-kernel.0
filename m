@@ -1,39 +1,35 @@
-From: ml.lawnick@gmx.de (Michael Lawnick)
-Date: Wed, 04 Jun 2014 08:09:31 +0200
-Subject: [PATCH] i2c: Make I2C ID tables non-mandatory for DT'ed and/or
- ACPI'ed devices
-In-Reply-To: <CACRpkdbo9_xo6j7JBcjiuk6eYkqyaeMYLFsH3VczxotOmVRh1Q@mail.gmail.com>
-References: <1401452797-29521-1-git-send-email-lee.jones@linaro.org>	<1401452797-29521-2-git-send-email-lee.jones@linaro.org>	<20140530123656.GC2742@katana>	<20140530133405.GB29731@lee--X1>	<20140530174800.GA4917@katana>	<20140530192516.GA4319@lee--X1>	<20140531134805.GA3287@katana>	<CACRpkdZvyfA0aaJe3YuevXfA2pTZLRPZ3mQpitL6qD7=qE0Xyg@mail.gmail.com>	<538C8A59.2070907@gmx.de>
- <CACRpkdbo9_xo6j7JBcjiuk6eYkqyaeMYLFsH3VczxotOmVRh1Q@mail.gmail.com>
-Message-ID: <538EB81B.3090807@gmx.de>
+From: marcel@ziswiler.com (Marcel Ziswiler)
+Date: Wed, 04 Jun 2014 08:20:59 +0200
+Subject: [PATCH 2/3] arm: tegra: enable igb, stmpe, i2c chardev, spidev,
+ lm95245, pwm leds
+In-Reply-To: <20140603094537.GQ31751@sirena.org.uk>
+References: <c5522b0efcbfc7690dcde6aaf78b9dd568f99604.1401665237.git.marcel@ziswiler.com>
+ <39a8704a4c8170d6b0620a1e5e44042eae6d8810.1401665237.git.marcel@ziswiler.com>
+ <538CA24B.1010602@wwwdotorg.org> <538CA635.4050502@ziswiler.com>
+ <20140602221627.GP31751@sirena.org.uk> <538D64FD.2010909@ziswiler.com>
+ <20140603094537.GQ31751@sirena.org.uk>
+Message-ID: <538EBACB.70100@ziswiler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 03.06.2014 13:18, schrieb Linus Walleij:
-> On Mon, Jun 2, 2014 at 4:29 PM, Michael Lawnick <ml.lawnick@gmx.de> wrote:
->> Am 02.06.2014 14:16, schrieb Linus Walleij:
->
->>> Is this really so useful on embedded systems?
->>>
->>> I was under the impression that this method was something used
->>> on say PC desktops with temperature monitors and EEPROMs
->>> on some I2C link on the PCB, usage entirely optional and fun
->>> for userspace hacks.
->>>
->> We use it for dynamic instantiating whole subsystems with multiplexers,
->> sensors, controllers in an embedded system. The device list is taken from an
->> I2C eeprom which gets read on hotplug.
->
-> Does this mean that you have stored the names (strings) that are used
-> by the Linux kernel for identifying the devices into your EEPROM?
->
-> That means that you have made the kernel-internal device driver names
-> an ABI which is unfortunate :-/
->
-> This is one of the reasons to why we insist on device tree: OS neutral
-> hardware description.
+On 06/03/2014 11:45 AM, Mark Brown wrote:
+> When you say "generic user space access" you are describing a specific
+> detail of how this device happens to be controlled with your software.
 
-The eeprom contains a device tree that is dynamically merged.
+No, not at all. In fact I did not even specify neither the exact type of 
+device apart from it being a SPI device nor any property of the software 
+apart from the generic user space access thereof implemented in the 
+Linux kernel. I really don't see any difference to i2c chardev which is 
+already enabled in multi_v7_defconfig.
 
-KR
-Michael
+> This is not a description of your hardware, it is a description of how
+> it is controlled with your current software.
+
+Sorry, but I really don't know what you are referring to. It's a pure 
+hardware description of some pins being the SPI bus namely MISO/MOSI and 
+the clock plus an accompanying chip-select pin.
+
+I fear for some reason or another you have some affinity against spidev 
+which strikes me odd. Admittedly it is not perfect but it is the only 
+generic SPI user space access currently implemented in the Linux kernel 
+and so far did its job perfectly for many of our customers.
