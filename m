@@ -1,38 +1,37 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Thu, 5 Jun 2014 01:48:46 +0200
-Subject: [PATCH v2] hsi: omap_ssi_port: use normal module refcounting
-In-Reply-To: <4579153.ES6XlsZ43F@wuerfel>
-References: <7426698.eEpYu3o0WK@wuerfel>
- <4579153.ES6XlsZ43F@wuerfel>
-Message-ID: <20140604234846.GA16356@earth.universe>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Jun 2014 00:46:57 +0100
+Subject: [PATCH] ARM: fix debug prints relevant to PCI devices
+In-Reply-To: <538F738A.6020003@wwwdotorg.org>
+References: <1401909447-8434-1-git-send-email-vidyas@nvidia.com>
+ <538F738A.6020003@wwwdotorg.org>
+Message-ID: <20140604234657.GD23430@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Jun 04, 2014 at 10:00:59AM +0200, Arnd Bergmann wrote:
-> The ref_module() function is used for internal housekeeping of the
-> module code, it's not normally used by subsystems or device drivers,
-> and the use of ref_module in the omap_ssi_port driver causes a link
-> build error when modules are disabled:
+On Wed, Jun 04, 2014 at 01:29:14PM -0600, Stephen Warren wrote:
+> On 06/04/2014 01:17 PM, Vidya Sagar wrote:
+> > As per PCIe spec, fast back-to-back transactions feature
+> > is not applicable to PCIe devices. Hence, do not print
+> > that fast back-to-back trasactions are disabled when
+> > there is a PCIe device found on the bus
 > 
-> hsi/controllers/omap_ssi_port.c: In function 'ssi_port_probe':
-> hsi/controllers/omap_ssi_port.c:1119:2: error: implicit declaration of function 'ref_module' [-Werror=implicit-function-declaration]
+> > @@ -298,6 +299,8 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+> >  	list_for_each_entry(dev, &bus->devices, bus_list) {
+> >  		u16 status;
+> >  
+> > +		if (!has_pcie_dev)
+> > +			has_pcie_dev = pci_pcie_cap(dev);
 > 
-> This changes the omap_ssi_port driver to use try_module_get()
-> and module_put() instead, which is the normal way to ensure that
-> the driver providing a device used in another module does not
-> go away.
+> This sets the flag if any PCIe device is detected, even if regular PCI
+> devices are also detected. I assume the two can be mixed on a bus if
+> there's a bridge (although perhaps that would be separate buses, and
+> child buses don't get traversed by this function?)
 
-Thanks, applied:
+This function gets caller per PCI bus - if there's a bridge between
+(which there should be between PCIe and PCI) then they are by definition
+separate buses.  (I'm guessing that there aren't transparent bridges
+between PCI and PCIe.)
 
-https://git.kernel.org/cgit/linux/kernel/git/sre/linux-hsi.git/commit/?h=for-next&id=b357d7b58f379ebe8038cd97b6204f2f5c52220d
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140605/8de21a91/attachment.sig>
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
