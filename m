@@ -1,36 +1,107 @@
-From: dev@lynxeye.de (Lucas Stach)
-Date: Wed, 04 Jun 2014 19:32:09 +0200
-Subject: Tegra 2 T20 NAND Flash Support
-In-Reply-To: <20140604144134.GH28484@ulmo>
-References: <538E6FB5.5020806@ziswiler.com> <1401866283.2173.3.camel@tellur>
- <538EC96A.4050702@ziswiler.com> <20140604144134.GH28484@ulmo>
-Message-ID: <1401903129.9454.2.camel@tellur>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 4 Jun 2014 12:29:29 -0500
+Subject: [PATCH 3/7] i2c: Add the ability to match device to compatible
+ string without an of_node
+In-Reply-To: <1401883796-17841-4-git-send-email-lee.jones@linaro.org>
+References: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
+ <1401883796-17841-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAL_JsqJOEipHyjD2NCjQd1BvLumnM3PkVDqUjrMNfXCOmXcNAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 04.06.2014, 16:41 +0200 schrieb Thierry Reding:
-> On Wed, Jun 04, 2014 at 09:23:22AM +0200, Marcel Ziswiler wrote:
-> > On 06/04/2014 09:18 AM, Lucas Stach wrote:
-> > >I took the Linux Tegra NAND driver from Thierry and cleaned it up quite
-> > >a bit. It now works with both ONFI and non-ONFI NAND, at least for
-> > >reading. Writing doesn't quite work yet and I've got side-tracked with
-> > >other stuff.
-> > >
-> > >If you are interested in moving this forward I can put up my WIP patches
-> > >to some public location.
-> > 
-> > Sounds great, yes. That would be perfect, thanks.
-> > 
-> > We even once got an universal NAND test infrastructure from Micron based on
-> > a re-worked Colibri T20 which we could use to validate it with various NAND
-> > flash parts.
-> 
-> Excellent, I would've had a hard time digging up those patches. It's
-> really been quite a while.
-> 
-I've put up a rebased version of the patches at
+On Wed, Jun 4, 2014 at 7:09 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> A great deal of I2C devices are currently matched via DT node name, and
+> as such the compatible naming convention of '<vendor>,<device>' has gone
+> somewhat awry - some nodes don't supply one, some supply an arbitrary
+> string and others the correct device name with an arbitrary vendor prefix.
+>
+> In an effort to correct this problem we have to supply a mechanism to
+> match a device by compatible string AND by simple device name.  This
+> function strips off the '<vendor>,' part of a supplied compatible string
+> and attempts to match without it.
+>
+> The plan is to remove this function once all of the compatible strings
+> for each device have been brought into line.
 
-git://git.pengutronix.de/git/lst/linux.git tegra-nand
+Then should you add a warning for cases needing to be fixed?
 
-Regards,
-Lucas
+Rob
+
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/i2c/i2c-core.c | 25 +++++++++++++++++++++++++
+>  include/linux/i2c.h    | 10 ++++++++++
+>  2 files changed, 35 insertions(+)
+>
+> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> index d3802dc..7dcd5c3 100644
+> --- a/drivers/i2c/i2c-core.c
+> +++ b/drivers/i2c/i2c-core.c
+> @@ -1090,6 +1090,31 @@ struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node)
+>         return i2c_verify_adapter(dev);
+>  }
+>  EXPORT_SYMBOL(of_find_i2c_adapter_by_node);
+> +
+> +const struct of_device_id
+> +*i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
+> +                                 struct device *dev)
+> +{
+> +       const struct i2c_client *client = i2c_verify_client(dev);
+> +       const char *name;
+> +
+> +       if (!(client && matches))
+> +               return NULL;
+> +
+> +       for (; matches->compatible[0]; matches++) {
+> +               name = strchr(matches->compatible, ',');
+> +               if (!name)
+> +                       name = matches->compatible;
+> +               else
+> +                       name++;
+> +
+> +               if (!strncmp(client->name, name, strlen(client->name)))
+> +                       return matches;
+> +       }
+> +
+> +       return NULL;
+> +}
+> +EXPORT_SYMBOL_GPL(i2c_of_match_device_strip_vendor);
+>  #else
+>  static void of_i2c_register_devices(struct i2c_adapter *adap) { }
+>  #endif /* CONFIG_OF */
+> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+> index b556e0a..f7ec75b 100644
+> --- a/include/linux/i2c.h
+> +++ b/include/linux/i2c.h
+> @@ -564,6 +564,9 @@ extern struct i2c_client *of_find_i2c_device_by_node(struct device_node *node);
+>  /* must call put_device() when done with returned i2c_adapter device */
+>  extern struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node);
+>
+> +extern const struct of_device_id
+> +*i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
+> +                                 struct device *dev);
+>  #else
+>
+>  static inline struct i2c_client *of_find_i2c_device_by_node(struct device_node *node)
+> @@ -575,6 +578,13 @@ static inline struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node
+>  {
+>         return NULL;
+>  }
+> +
+> +const struct of_device_id
+> +*i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
+> +                                 struct device *dev)
+> +{
+> +       return NULL;
+> +}
+>  #endif /* CONFIG_OF */
+>
+>  #endif /* _LINUX_I2C_H */
+> --
+> 1.8.3.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
