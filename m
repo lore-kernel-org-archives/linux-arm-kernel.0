@@ -1,56 +1,67 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 4 Jun 2014 06:05:40 -0500
-Subject: [PATCH v6 2/6] dt-bindings: add mtk-timer bindings
-In-Reply-To: <1401468964-5307-3-git-send-email-matthias.bgg@gmail.com>
-References: <1401468964-5307-1-git-send-email-matthias.bgg@gmail.com>
- <1401468964-5307-3-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <CAL_Jsq+SkzTsczhh-DWvsktmCVtgNBsBtK3QqK5Am7UxMPgURA@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 4 Jun 2014 13:06:07 +0200
+Subject: [PATCH 1/8] mmc: sdhci-st: Intial support for ST SDHCI controller
+In-Reply-To: <20140604084831.GB23469@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1400771902-26553-1-git-send-email-peter.griffin@linaro.org>
+ <1400771902-26553-2-git-send-email-peter.griffin@linaro.org>
+ <CAPDyKFpanhYbf89tEKru=_oOfBGZZxs0=eqr_5MvU9v_bGULjQ@mail.gmail.com>
+ <20140604084831.GB23469@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <CAPDyKFqvQca9RfsVVyfeC9r=pEDM2mBkfS7SzpYZHHXMnHfyUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 30, 2014 at 11:56 AM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
-> Add binding documentation for the General Porpose Timer driver of
-> the Mediatek SoCs.
+On 4 June 2014 10:48, Peter Griffin <peter.griffin@linaro.org> wrote:
+> Hi Ulf,
 >
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-
-Acked-by: Rob Herring <robh@kernel.org>
-
-but one typo below:
-
-> ---
->  .../bindings/timer/mediatek,mtk-timer.txt          |   18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+> Thanks for reviewing, see my comments below: -
 >
-> diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-> new file mode 100644
-> index 0000000..0558ddd0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-> @@ -0,0 +1,18 @@
-> +Mediatek MT6577, MT6572 and MT6589 Timers
-> +---------------------------------------
-> +
-> +Required properties:
-> +- compatible: Should be "mediatek,mt6577-timer"
-> +- reg: Should contain location and length for timers register.
-> +- clocks: Clocks driving the timer hardware. This list shoud include two
-
-s/shoud/should/
-
-> +       clocks. The order is system clock and as second clock the RTC clock.
-> +
-> +Examples:
-> +
-> +       timer at 10008000 {
-> +               compatible = "mediatek,mt6577-timer";
-> +               reg = <0x10008000 0x80>;
-> +               interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
-> +               clocks = <&system_clk>, <&rtc_clk>;
-> +               clock-names = "system-clk", "rtc-clk";
-> +       };
-> --
-> 1.7.9.5
+> On Fri, 23 May 2014, Ulf Hansson wrote:
+>> > +static unsigned int sdhci_st_get_max_clk(struct sdhci_host *host)
+>> > +{
+>> > +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>> > +
+>> > +       return clk_get_rate(pltfm_host->clk);
+>> > +}
+>>
+>> There are sdhci library function for the above:
+>> sdhci_pltfm_clk_get_max_clock()
 >
+> I've fixed in v2 to use the library function
+>
+>> > +       host->mmc->caps |= MMC_CAP_8_BIT_DATA | MMC_CAP_BUS_WIDTH_TEST
+>> > +                       | MMC_CAP_1_8V_DDR;
+>>
+>> Comment below.
+>>
+>> > +
+>> > +       if (of_property_read_bool(np, "non-removable"))
+>> > +               host->mmc->caps |= MMC_CAP_NONREMOVABLE;
+>>
+>> MMC_CAP_1_8V_DDR, MMC_CAP_8_BIT_DATA, MMC_CAP_NONREMOVABLE aren?t
+>> those board specific capabilities?
+>
+> Yep
+>>
+>> Unless there are something that prevents you from using the common mmc
+>> DT parser, I would suggest you to use it. mmc_of_parse(). Thus you can
+>> provide these capabilities through DT instead.
+>
+> Thanks for pointing that out, I've switched over to using mmc_of_parse,
+> and everything works as expected.
+>
+> Also as an added bonus this will simplify support for the next SoC which
+> needs access to the high speed ddr / sdr bindings which
+> mmc_of_parse already supports :-)
+>
+> In v2 I've also removed the reset controller code from this platform driver
+> with the intention of adding it back in, in the generic code. The idea
+> would be that an additional 'reset' binding could be provided, which if
+> present would be used to deassert the IP reset line of the controller at
+> probe / resume, and assert reset at remove / sleep.
+>
+> Is this something you view as useful, if so I will prepare some RFC patches?
+
+Sounds useful. Please go ahead and send patches! :-)
+
+Kind regards
+Uffe
