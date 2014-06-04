@@ -1,110 +1,97 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Wed, 4 Jun 2014 13:04:06 +0300
-Subject: [PATCH V2 2/2] power: twl4030_charger: attempt to power off in
- case of critical events
-In-Reply-To: <1401313610-14252-3-git-send-email-nm@ti.com>
-References: <1401313610-14252-1-git-send-email-nm@ti.com>
- <1401313610-14252-3-git-send-email-nm@ti.com>
-Message-ID: <CANOLnOPb1xbqb5WXaK5-kdCezVuDhNxTtE5VV_MbCi4WTd2=oA@mail.gmail.com>
+From: vkale@apm.com (Vinayak Kale)
+Date: Wed, 4 Jun 2014 15:35:54 +0530
+Subject: [PATCH] arm64: dts: Add more serial port nodes in APM X-Gene
+ device tree
+In-Reply-To: <1395836346-9350-1-git-send-email-vkale@apm.com>
+References: <1395836346-9350-1-git-send-email-vkale@apm.com>
+Message-ID: <CAPrCYkcJr5ODY3Sjcq5D_Db-cM3SAXYjUK2H9FGePrO_q0wMEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 29, 2014 at 12:46 AM, Nishanth Menon <nm@ti.com> wrote:
-> Attempt to power off in case of critical events such as battery removal,
-> over voltage events.
->
-> There is no guarentee that we'd be in a safe scenario here, but the very
-> least we can try to do is to power off the device to prevent damage to
-> the system instead of just printing a message and hoping for the best.
+Hi Catalin / Will,
 
-At least "battery temperature out of range" does seem to happen quite
-often while charging on hot summer day. I'd prefer my pandora to not
-shutdown in such case, it could just stop charging instead.
+Can you please merge this one?
 
+Thanks
+-Vinayak
+
+On Wed, Mar 26, 2014 at 5:49 PM, Vinayak Kale <vkale@apm.com> wrote:
+> APM X-Gene Storm SoC supports 4 serial ports. This patch adds device nodes
+> for serial ports 1 to 3 (a device node for serial port 0 is already present
+> in the dts file).
+> This patch also sets the compatible property of serial nodes to "ns16550a".
 >
-> NOTE: twl4030 should attempt some form of recovery, but just depending
-> on that is never a safe alternative.
->
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
 > ---
-> new patch. original attempt was: https://patchwork.kernel.org/patch/4002371/
+>  arch/arm64/boot/dts/apm-mustang.dts |  4 ++++
+>  arch/arm64/boot/dts/apm-storm.dtsi  | 36 +++++++++++++++++++++++++++++++++++-
+>  2 files changed, 39 insertions(+), 1 deletion(-)
 >
-> NOTE: we dont have poweroff support yet enabled on LDP, but it just needs
-> relevant dts entry.
->
->  drivers/power/twl4030_charger.c |   26 +++++++++++++++++++++-----
->  1 file changed, 21 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/power/twl4030_charger.c b/drivers/power/twl4030_charger.c
-> index 2598c58..ed0dbd2 100644
-> --- a/drivers/power/twl4030_charger.c
-> +++ b/drivers/power/twl4030_charger.c
-> @@ -22,6 +22,7 @@
->  #include <linux/power_supply.h>
->  #include <linux/notifier.h>
->  #include <linux/usb/otg.h>
-> +#include <linux/reboot.h>
->  #include <linux/regulator/machine.h>
->
->  #define TWL4030_BCIMSTATEC     0x02
-> @@ -332,6 +333,7 @@ static irqreturn_t twl4030_bci_interrupt(int irq, void *arg)
->         struct twl4030_bci *bci = arg;
->         u8 irqs1, irqs2;
->         int ret;
-> +       bool power_off = false;
->
->         ret = twl_i2c_read_u8(TWL4030_MODULE_INTERRUPTS, &irqs1,
->                               TWL4030_INTERRUPTS_BCIISR1A);
-> @@ -352,20 +354,34 @@ static irqreturn_t twl4030_bci_interrupt(int irq, void *arg)
->         }
->
->         /* various monitoring events, for now we just log them here */
-> -       if (irqs1 & (TWL4030_TBATOR2 | TWL4030_TBATOR1))
-> +       if (irqs1 & (TWL4030_TBATOR2 | TWL4030_TBATOR1)) {
->                 dev_warn(bci->dev, "battery temperature out of range\n");
-> +               power_off = true;
-> +       }
->
-> -       if (irqs1 & TWL4030_BATSTS)
-> +       if (irqs1 & TWL4030_BATSTS) {
->                 dev_crit(bci->dev, "battery disconnected\n");
-> +               power_off = true;
-> +       }
->
-> -       if (irqs2 & TWL4030_VBATOV)
-> +       if (irqs2 & TWL4030_VBATOV) {
->                 dev_crit(bci->dev, "VBAT overvoltage\n");
-> +               power_off = true;
-> +       }
->
-> -       if (irqs2 & TWL4030_VBUSOV)
-> +       if (irqs2 & TWL4030_VBUSOV) {
->                 dev_crit(bci->dev, "VBUS overvoltage\n");
-> +               power_off = true;
-> +       }
->
-> -       if (irqs2 & TWL4030_ACCHGOV)
-> +       if (irqs2 & TWL4030_ACCHGOV) {
->                 dev_crit(bci->dev, "Ac charger overvoltage\n");
-> +               power_off = true;
-> +       }
+> diff --git a/arch/arm64/boot/dts/apm-mustang.dts b/arch/arm64/boot/dts/apm-mustang.dts
+> index 1247ca1..6541962 100644
+> --- a/arch/arm64/boot/dts/apm-mustang.dts
+> +++ b/arch/arm64/boot/dts/apm-mustang.dts
+> @@ -24,3 +24,7 @@
+>                 reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
+>         };
+>  };
 > +
-> +       /* Try to shutdown the system */
-> +       if (power_off)
-> +               orderly_poweroff(true);
+> +&serial0 {
+> +       status = "ok";
+> +};
+> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+> index d37d736..2277b5c 100644
+> --- a/arch/arm64/boot/dts/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
+> @@ -179,13 +179,47 @@
+>                 };
 >
->         return IRQ_HANDLED;
->  }
+>                 serial0: serial at 1c020000 {
+> +                       status = "disabled";
+>                         device_type = "serial";
+> -                       compatible = "ns16550";
+> +                       compatible = "ns16550a";
+>                         reg = <0 0x1c020000 0x0 0x1000>;
+>                         reg-shift = <2>;
+>                         clock-frequency = <10000000>; /* Updated by bootloader */
+>                         interrupt-parent = <&gic>;
+>                         interrupts = <0x0 0x4c 0x4>;
+>                 };
+> +
+> +               serial1: serial at 1c021000 {
+> +                       status = "disabled";
+> +                       device_type = "serial";
+> +                       compatible = "ns16550a";
+> +                       reg = <0 0x1c021000 0x0 0x1000>;
+> +                       reg-shift = <2>;
+> +                       clock-frequency = <10000000>; /* Updated by bootloader */
+> +                       interrupt-parent = <&gic>;
+> +                       interrupts = <0x0 0x4d 0x4>;
+> +               };
+> +
+> +               serial2: serial at 1c022000 {
+> +                       status = "disabled";
+> +                       device_type = "serial";
+> +                       compatible = "ns16550a";
+> +                       reg = <0 0x1c022000 0x0 0x1000>;
+> +                       reg-shift = <2>;
+> +                       clock-frequency = <10000000>; /* Updated by bootloader */
+> +                       interrupt-parent = <&gic>;
+> +                       interrupts = <0x0 0x4e 0x4>;
+> +               };
+> +
+> +               serial3: serial at 1c023000 {
+> +                       status = "disabled";
+> +                       device_type = "serial";
+> +                       compatible = "ns16550a";
+> +                       reg = <0 0x1c023000 0x0 0x1000>;
+> +                       reg-shift = <2>;
+> +                       clock-frequency = <10000000>; /* Updated by bootloader */
+> +                       interrupt-parent = <&gic>;
+> +                       interrupts = <0x0 0x4f 0x4>;
+> +               };
+>         };
+>  };
 > --
-> 1.7.9.5
+> 1.8.2.1
 >
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
--- 
-Gra?vydas
