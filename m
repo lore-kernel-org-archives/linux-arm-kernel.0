@@ -1,50 +1,67 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Wed, 4 Jun 2014 16:56:05 +0530
-Subject: [PATCH] ASoC: samsung: Add I2C dependency for snow
-In-Reply-To: <7290614.Z7JFMYFomx@wuerfel>
-References: <7290614.Z7JFMYFomx@wuerfel>
-Message-ID: <CAHbNUh2tKh1zMM7xQ41sWEs6xwd5U5OyzewZQTC9wdPRTZ4nsA@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 04 Jun 2014 13:29:53 +0200
+Subject: [PATCH v2 1/7] DMA: shdma: Add r8a7791 support
+In-Reply-To: <1401716531-29794-2-git-send-email-geert+renesas@glider.be>
+References: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
+ <1401716531-29794-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <2461508.0gZiIUPGHB@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 June 2014 15:10, Arnd Bergmann <arnd@arndb.de> wrote:
-> Both codecs used by snow, max98090 and max98095 require the use
-> of I2C, so we can only select this driver if I2C is there, otherwise
-> we get a build error like:
->
-> codecs/max98090.c:2494:1: warning: data definition has no type or storage class [enabled by default]
->  module_i2c_driver(max98090_i2c_driver);
->  ^
-> codecs/max98095.c:2443:1: warning: data definition has no type or storage class [enabled by default]
->  module_i2c_driver(max98095_i2c_driver);
->  ^
->
-> This adds one more I2C dependency to the hundreds we already
-> have.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Tushar Behera <tushar.behera@linaro.org>
+Hi Geert,
 
-Thanks for the patch. I should have added this dependency while
-introducing this config option.
+Thank you for the patch.
 
-Acked-by: Tushar Behera <tushar.behera@linaro.org>
+On Monday 02 June 2014 15:42:05 Geert Uytterhoeven wrote:
 
+Missing commit message ?
+
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
-> diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-> index a7cb8f6..cb7be4f 100644
-> --- a/sound/soc/samsung/Kconfig
-> +++ b/sound/soc/samsung/Kconfig
-> @@ -232,7 +232,7 @@ config SND_SOC_LITTLEMILL
->
->  config SND_SOC_SNOW
->         tristate "Audio support for Google Snow boards"
-> -       depends on SND_SOC_SAMSUNG
-> +       depends on SND_SOC_SAMSUNG && I2C
->         select SND_SOC_MAX98090
->         select SND_SOC_MAX98095
->         select SND_SAMSUNG_I2S
->
+> v2:
+>   - No changes
+> 
+>  Documentation/devicetree/bindings/dma/shdma.txt | 5 +++--
+>  drivers/dma/sh/shdmac.c                         | 1 +
+>  2 files changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/shdma.txt
+> b/Documentation/devicetree/bindings/dma/shdma.txt index
+> 86d5c509594b..d26b7065ae94 100644
+> --- a/Documentation/devicetree/bindings/dma/shdma.txt
+> +++ b/Documentation/devicetree/bindings/dma/shdma.txt
+> @@ -24,8 +24,9 @@ Optional properties (currently unused):
+>  Required properties:
+>  - compatible:	should be of the form "renesas,shdma-<soc>", where <soc>
+> should be replaced with the desired SoC model, e.g.
+> -		"renesas,shdma-r8a73a4" for the system DMAC on r8a73a4 SoC
+> -		"renesas,shdma-r8a7790" for the DMAC on the R8A7790.
+> +		"renesas,shdma-r8a73a4" for the system DMAC on r8a73a4 SoC,
+> +		"renesas,shdma-r8a7790" for the DMAC on the R8A7790,
+> +		"renesas,shdma-r8a7791" for the DMAC on the R8A7791.
+
+I would just remove the commas and full stop to avoid modifying unrelated 
+lines in future patches.
+
+The R8A7791 has several DMACs (LBSC, SYS, RT, Audio, 2D, USBHS). It would thus 
+make sense to explicitly state which DMACs the bindings cover.
+
+>  Example:
+>  	dmac: dma-multiplexer at 0 {
+> diff --git a/drivers/dma/sh/shdmac.c b/drivers/dma/sh/shdmac.c
+> index 91b3f744d7b2..cdbc68e72ca1 100644
+> --- a/drivers/dma/sh/shdmac.c
+> +++ b/drivers/dma/sh/shdmac.c
+> @@ -691,6 +691,7 @@ static const struct shdma_ops sh_dmae_shdma_ops = {
+>  static const struct of_device_id sh_dmae_of_match[] = {
+>  	{ .compatible = "renesas,shdma-r8a73a4", .data = r8a73a4_shdma_devid },
+>  	{ .compatible = "renesas,shdma-r8a7790", .data = &shdma_arm_info },
+> +	{ .compatible = "renesas,shdma-r8a7791", .data = &shdma_arm_info },
+>  	{}
+>  };
+>  MODULE_DEVICE_TABLE(of, sh_dmae_of_match);
 
 -- 
-Tushar Behera
+Regards,
+
+Laurent Pinchart
