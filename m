@@ -1,73 +1,79 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 4 Jun 2014 09:37:27 +0100
-Subject: [PATCH 1/8] mmc: sdhci-st: Intial support for ST SDHCI controller
-In-Reply-To: <537EE84C.2020607@linaro.org>
-References: <1400771902-26553-1-git-send-email-peter.griffin@linaro.org>
- <1400771902-26553-2-git-send-email-peter.griffin@linaro.org>
- <537EE84C.2020607@linaro.org>
-Message-ID: <20140604083727.GA23469@griffinp-ThinkPad-X1-Carbon-2nd>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Wed, 4 Jun 2014 16:45:12 +0800
+Subject: [PATCH v2] ARM: at91: #if 0 out ISI code for AT91SAM9263
+In-Reply-To: <1400845814.31526.29.camel@x220>
+References: <1400142868.20469.12.camel@x220>	
+ <F4C251BF-666E-4E89-A6F7-3D96A669A8D8@jcrosoft.com>
+ <1400845814.31526.29.camel@x220>
+Message-ID: <538EDC98.2080700@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srini,
+Hi, Paul
 
-Thanks for reviewing, see my comments below: -
+On 5/23/2014 7:50 PM, Paul Bolle wrote:
+> In v2.6.25 code was added for an Image Sensor Interface (ISI) for
+> AT91SAM9263. That code depended on the Kconfig macro
+> CONFIG_VIDEO_AT91_ISI and its MODULE variant. The related Kconfig symbol
+> has never been added to the tree. The net effect of this was that
+> at91_add_device_isi() was a NOP. No one noticed because no callers of
+> that function were added to the tree at that time.
+>
+> The first caller of a function with that name was added in v3.4. But
+> that caller apparently only called the function defined for AT91SAM9G45.
+> (that function was also added in v3.4). So even then AT91SAM9263's NOP
+> version of at91_add_device_isi() remained unused.
+>
+> This means that the ISI code for AT91SAM9263 could be removed. But,
+> since it can be useful for future reference, let's "#if 0" it instead.
+>
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> ---
+> v2: Jean-Christophe would like to keep the information currently hidden
+> behind "#if defined(CONFIG_VIDEO_AT91_ISI) [...]". I'd like the
+> reference to that Kconfig macro dropped. Using "#if 0" will do both, so
+> that makes for a nice compromise, I'd say.
 
-On Fri, 23 May 2014, Srinivas Kandagatla wrote:
+I think we can keep the #if 0 as a reference so far. When the devices 
+file is finally removed. We will add the ISI resouces to DT file.
+So I am ok with this.
 
-> >+struct st_mmc_platform_data {
-> >+	struct  reset_control	*rstc;
-> >+};
-> 
-> st_mmc_platform_data name is bit missleading as this data is not
-> part of platform data. Probably you could rename it to struct
-> sdhci_st_data.
+Hi, J.C.
 
-I've now removed this reset controller code for v2, as based on Maxime's feedback
-I think this would be better off going in the generic code, so all 
-platforms could benefit if they have a reset controller implementation.
+What do you think of this patch?
 
-I plan to send some RFC patches which implement this seperately to this series.
-
-> >+	pltfm_host->priv = pdata;
-> >+
-> >+	platform_set_drvdata(pdev, host);
-> 
-> Why not platform_set_drvdata(pdev, priv_host);
-> As you are not using sdhci_host directly, this will reduced few
-> indirections in the driver.
-
-Your right, and I was going to change this, but with the re-think on the reset
-controller code above I will now need sdhci_host so would prefer to leave it as
-is for now.
-
-> >+err_out:
-> >+	clk_disable_unprepare(clk);
-> >+	sdhci_pltfm_free(pdev);
-> >+
-> IP could be left out of reset in this path.
-
-Good spot, I'll remember this when I add the reset code
-back in :-)
-
-> 
-> replace:
-> [...
-> >+static SIMPLE_DEV_PM_OPS(sdhci_st_pmops, sdhci_st_suspend, sdhci_st_resume);
-> >+#define SDHCI_ST_PMOPS (&sdhci_st_pmops)
-> >+#else
-> >+#define SDHCI_ST_PMOPS NULL
-> >+#endif
-> ...]
-> 
-> with :
-> 
-> #endif
-> 
-> static SIMPLE_DEV_PM_OPS(sdhci_st_pmops, sdhci_st_suspend, sdhci_st_resume);
-
-Fixed in v2
-
-regards,
-
-Peter.
+Best Regards,
+Josh Wu
+>
+> Josh verified that this definition of at91_add_device_isi() never will
+> be called. Thanks!
+>
+> Still untested!
+>
+>   arch/arm/mach-at91/at91sam9263_devices.c | 6 +-----
+>   1 file changed, 1 insertion(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+> index 43d53d6156dd..30af3048ade5 100644
+> --- a/arch/arm/mach-at91/at91sam9263_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
+> @@ -900,8 +900,7 @@ void __init at91_add_device_lcdc(struct atmel_lcdfb_pdata *data) {}
+>    *  Image Sensor Interface
+>    * -------------------------------------------------------------------- */
+>   
+> -#if defined(CONFIG_VIDEO_AT91_ISI) || defined(CONFIG_VIDEO_AT91_ISI_MODULE)
+> -
+> +#if 0 /* keep for future reference */
+>   struct resource isi_resources[] = {
+>   	[0] = {
+>   		.start	= AT91SAM9263_BASE_ISI,
+> @@ -947,9 +946,6 @@ void __init at91_add_device_isi(struct isi_platform_data *data,
+>   		/* TODO: register the PCK for ISI_MCK and set its parent */
+>   	}
+>   }
+> -#else
+> -void __init at91_add_device_isi(struct isi_platform_data *data,
+> -		bool use_pck_as_mck) {}
+>   #endif
+>   
+>   
