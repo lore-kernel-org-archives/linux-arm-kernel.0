@@ -1,61 +1,41 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 4 Jun 2014 13:39:17 +0200
-Subject: [PATCH v2 1/7] DMA: shdma: Add r8a7791 support
-In-Reply-To: <2461508.0gZiIUPGHB@avalon>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 04 Jun 2014 12:45:19 +0100
+Subject: [PATCH v2 4/7] ARM: shmobile: r8a7791: Add SYS-DMAC channel
+ definitions for bindings
+In-Reply-To: <3770565.HiyLmu1184@avalon>
 References: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
- <1401716531-29794-2-git-send-email-geert+renesas@glider.be>
- <2461508.0gZiIUPGHB@avalon>
-Message-ID: <CAMuHMdXUt912Gkavn8ibw2yej7WGeULZTqG1wmmgLz1PDReJWg@mail.gmail.com>
+ <538C818B.5060703@codethink.co.uk>
+ <CAMuHMdWkPy8eydh4BntXdtf5ZJKP4yG26QovLUjvGUYYv3dStw@mail.gmail.com>
+ <3770565.HiyLmu1184@avalon>
+Message-ID: <538F06CF.5090406@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 4, 2014 at 1:29 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Monday 02 June 2014 15:42:05 Geert Uytterhoeven wrote:
->
-> Missing commit message ?
-
-I didn't have anything more to say than the one-liner ;-)
-
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> ---
->> v2:
->>   - No changes
+On 04/06/14 12:30, Laurent Pinchart wrote:
+> On Tuesday 03 June 2014 09:53:17 Geert Uytterhoeven wrote:
+>> On Mon, Jun 2, 2014 at 3:52 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+>>>> +// FIXME
+>>>> +#define CHCR_RX_8BIT SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_8BIT)
+>>>> +#define CHCR_TX_8BIT SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_8BIT)
+>>>> +#define CHCR_RX_16BIT        SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_16BIT)
+>>>> +#define CHCR_TX_16BIT        SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_16BIT)
+>>>> +#define CHCR_RX_32BIT        SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_32BIT)
+>>>> +#define CHCR_TX_32BIT        SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_32BIT)
+>>>> +#define CHCR_RX_256BIT       SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_256BIT)
+>>>> +#define CHCR_TX_256BIT       SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_256BIT)
+>>>
+>>> I am pretty sure for round-2 we can remove these in favour of a
+>>> table in the driver. The only device that has a non-standard setting
+>>> is the SDHI and that will support 32bit and 256bit transfers.
 >>
->>  Documentation/devicetree/bindings/dma/shdma.txt | 5 +++--
->>  drivers/dma/sh/shdmac.c                         | 1 +
->>  2 files changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/dma/shdma.txt
->> b/Documentation/devicetree/bindings/dma/shdma.txt index
->> 86d5c509594b..d26b7065ae94 100644
->> --- a/Documentation/devicetree/bindings/dma/shdma.txt
->> +++ b/Documentation/devicetree/bindings/dma/shdma.txt
->> @@ -24,8 +24,9 @@ Optional properties (currently unused):
->>  Required properties:
->>  - compatible:        should be of the form "renesas,shdma-<soc>", where <soc>
->> should be replaced with the desired SoC model, e.g.
->> -             "renesas,shdma-r8a73a4" for the system DMAC on r8a73a4 SoC
->> -             "renesas,shdma-r8a7790" for the DMAC on the R8A7790.
->> +             "renesas,shdma-r8a73a4" for the system DMAC on r8a73a4 SoC,
->> +             "renesas,shdma-r8a7790" for the DMAC on the R8A7790,
->> +             "renesas,shdma-r8a7791" for the DMAC on the R8A7791.
->
-> I would just remove the commas and full stop to avoid modifying unrelated
-> lines in future patches.
->
-> The R8A7791 has several DMACs (LBSC, SYS, RT, Audio, 2D, USBHS). It would thus
-> make sense to explicitly state which DMACs the bindings cover.
+>> Thanks, I'm eagerly awaiting your next version...
+> 
+> Speaking of that, Ben, do you have a git tree with your latest patches ?
 
-Good point. That also applies to the r8a7790.
+Not yet, as currently working on sorting out the soc_camera before
+moving back to the DMA. I have a plan, just not had the time to sort
+it out.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
