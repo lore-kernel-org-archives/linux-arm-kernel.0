@@ -1,50 +1,62 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Wed,  4 Jun 2014 10:30:34 -0700
-Subject: [PATCH 3/3] clocksource: exynos_mct: Optimize register reads with
- ldmia
-In-Reply-To: <1401903034-20074-1-git-send-email-dianders@chromium.org>
-References: <1401903034-20074-1-git-send-email-dianders@chromium.org>
-Message-ID: <1401903034-20074-3-git-send-email-dianders@chromium.org>
+Date: Wed,  4 Jun 2014 10:30:32 -0700
+Subject: [PATCH 1/3] clocksource: exynos_mct: Fix ftrace
+Message-ID: <1401903034-20074-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we saw in (clocksource: exynos_mct: cache mct upper count), the
-time spent reading the MCT shows up fairly high in real-world
-profiles.  That means that it's worth some optimization.
+In (93bfb76 clocksource: exynos_mct: register sched_clock callback) we
+supported using the MCT as a scheduler clock.  We properly marked
+exynos4_read_sched_clock() as notrace.  However, we then went and
+called another function that _wasn't_ notrace.  That means if you do:
 
-We get a roughly 10% speedup in userspace gettimeofday() by using an
-ldmia to read the two halfs of the MCT.  That seems like a worthwhile
-thing to do.
+  cd /sys/kernel/debug/tracing/
+  echo function_graph > current_tracer
 
-Before: 1173084 us for 1000000 gettimeofday in userspace
-After:  1045674 us for 1000000 gettimeofday in userspace
+You'll get a crash.
 
-NOTE: we could actually do better than this if we really wanted to.
-Technically we could register the clocksource as a 32-bit timer and
-only use the "lower" half.  Doing so brings us down to 1014429 us for
-1000000 gettimeofday in userspace (and doesn't even require assembly
-code).  That would be an alternative to this change.
+Fix this (but still let other readers of the MCT be trace-enabled) by
+adding an extra function.  It's important to keep other users of MCT
+traceable because the MCT is actually quite slow.
 
 Signed-off-by: Doug Anderson <dianders@chromium.org>
 ---
- drivers/clocksource/exynos_mct.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/clocksource/exynos_mct.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 7cbe4aa..6e3017b 100644
+index 8d64200..ba3a683 100644
 --- a/drivers/clocksource/exynos_mct.c
 +++ b/drivers/clocksource/exynos_mct.c
-@@ -172,8 +172,9 @@ static inline cycle_t notrace _exynos4_frc_read(void)
+@@ -165,7 +165,7 @@ static void exynos4_mct_frc_start(u32 hi, u32 lo)
+ 	exynos4_mct_write(reg, EXYNOS4_MCT_G_TCON);
+ }
  
- 	do {
- 		hi = hi2;
--		lo = __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
--		hi2 = __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_U);
-+		asm volatile("ldmia  %2, {%0, %1}"
-+			     : "=r" (lo), "=r" (hi2)
-+			     : "r" (reg_base + EXYNOS4_MCT_G_CNT_L));
- 	} while (hi != hi2);
- 
+-static cycle_t exynos4_frc_read(struct clocksource *cs)
++static inline cycle_t notrace _exynos4_frc_read(void)
+ {
+ 	unsigned int lo, hi;
+ 	u32 hi2 = __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_U);
+@@ -179,6 +179,11 @@ static cycle_t exynos4_frc_read(struct clocksource *cs)
  	return ((cycle_t)hi << 32) | lo;
+ }
+ 
++static cycle_t exynos4_frc_read(struct clocksource *cs)
++{
++	return _exynos4_frc_read();
++}
++
+ static void exynos4_frc_resume(struct clocksource *cs)
+ {
+ 	exynos4_mct_frc_start(0, 0);
+@@ -195,7 +200,7 @@ struct clocksource mct_frc = {
+ 
+ static u64 notrace exynos4_read_sched_clock(void)
+ {
+-	return exynos4_frc_read(&mct_frc);
++	return _exynos4_frc_read();
+ }
+ 
+ static void __init exynos4_clocksource_init(void)
 -- 
 2.0.0.526.g5318336
