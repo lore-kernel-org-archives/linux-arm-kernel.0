@@ -1,37 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Jun 2014 11:40:40 +0200
-Subject: [PATCH] ASoC: samsung: Add I2C dependency for snow
-Message-ID: <7290614.Z7JFMYFomx@wuerfel>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 4 Jun 2014 11:40:06 +0200
+Subject: [PATCH] ARM: orion5x: fix mvebu_mbus_dt_init call
+In-Reply-To: <4280897.V3UkQjotOL@wuerfel>
+References: <4280897.V3UkQjotOL@wuerfel>
+Message-ID: <20140604114006.476cef06@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both codecs used by snow, max98090 and max98095 require the use
-of I2C, so we can only select this driver if I2C is there, otherwise
-we get a build error like:
+Dear Arnd Bergmann,
 
-codecs/max98090.c:2494:1: warning: data definition has no type or storage class [enabled by default]
- module_i2c_driver(max98090_i2c_driver);
- ^
-codecs/max98095.c:2443:1: warning: data definition has no type or storage class [enabled by default]
- module_i2c_driver(max98095_i2c_driver);
- ^
+On Wed, 04 Jun 2014 11:06:40 +0200, Arnd Bergmann wrote:
+> The prototype for mvebu_mbus_dt_init() changed around the same time
+> as a new caller was added to orion5x. This adds the missing argument
+> to make orion5x behave correctly to avoid this build error:
+> 
+> mach-orion5x/board-dt.c: In function 'orion5x_dt_init':
+> mach-orion5x/board-dt.c:48:2: error: too few arguments to function 'mvebu_mbus_dt_init'
+>   BUG_ON(mvebu_mbus_dt_init());
+>   ^
+> In file included from mach-orion5x/board-dt.c:18:0:
+> include/linux/mbus.h:76:5: note: declared here
+>  int mvebu_mbus_dt_init(bool is_coherent);
+>      ^
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-This adds one more I2C dependency to the hundreds we already
-have.
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Tushar Behera <tushar.behera@linaro.org>
----
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index a7cb8f6..cb7be4f 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -232,7 +232,7 @@ config SND_SOC_LITTLEMILL
- 
- config SND_SOC_SNOW
- 	tristate "Audio support for Google Snow boards"
--	depends on SND_SOC_SAMSUNG
-+	depends on SND_SOC_SAMSUNG && I2C
- 	select SND_SOC_MAX98090
- 	select SND_SOC_MAX98095
- 	select SND_SAMSUNG_I2S
+> Thomas, I assume you were aware of this problem since you
+> wrote the two patches that clashed, but for some reason we
+> screwed it up when merging them into arm-soc. Should we apply
+> this directly as a bug fix to arm-soc or did you already have
+> another solution planned?
+
+Yes, I am indeed aware of this change. I think I did a patch to fix it
+at some point, but maybe it got lost in the merging process, or simply
+I don't remember correctly what happened. It's indeed caused by an
+interaction between changes in the mvebu-mbus driver and the conversion
+of mach-orion5x to DT. Your patch is the correct solution.
+
+Thanks a lot!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
