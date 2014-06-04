@@ -1,35 +1,25 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Jun 2014 14:56:01 +0100
-Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140604134400.GE28484@ulmo>
-References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
- <4545972.cM7IP1qTXQ@wuerfel> <87tx87rrp2.fsf@nvidia.com>
- <4462924.8iRbdkOPp7@wuerfel> <20140604134400.GE28484@ulmo>
-Message-ID: <20140604135600.GD6644@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Jun 2014 15:58:28 +0200
+Subject: [PATCH 2/4] ARM: mach-s5p: get rid of all <mach/gpio.h> headers
+In-Reply-To: <1401888838-3126-3-git-send-email-linus.walleij@linaro.org>
+References: <1401888838-3126-1-git-send-email-linus.walleij@linaro.org>
+ <1401888838-3126-3-git-send-email-linus.walleij@linaro.org>
+Message-ID: <4544212.mqY6dSouMv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 04, 2014 at 02:44:03PM +0100, Thierry Reding wrote:
-> On Fri, May 30, 2014 at 09:54:37PM +0200, Arnd Bergmann wrote:
-> > On Friday 30 May 2014 22:29:13 Hiroshi Doyu wrote:
-> > > The disadvantage of this is that this limits the max number of streamIDs
-> > > to support. If # of streamID is increased later more than 64, this
-> > > format cannot cover any more. You have to predict the max # of streamIDs
-> > > in advance if steamID is statically assigned.
-> > > 
-> > 
-> > Well, the iommu specific binding could allow a variable #address-cells.
-> > That way, you just need to know the number of stream IDs for that instance
-> > of the iommu.
+On Wednesday 04 June 2014 15:33:56 Linus Walleij wrote:
+> This renames all the local <mach/gpio.h> headers in the S5P platforms
+> to <mach/gpio-samsung.h> indicating a scope local to this platform,
+> and cuts the implicit inclusion of <mach/gpio.h> from <linux/gpio.h>
+> by removing the use of NEED_MACH_GPIO_H from all S5P variants.
 > 
-> That sounds fairly complicated to me. I don't see what that buys us over
-> the clarity and simplicity that the above explicit notation gives us. Is
-> it not more common for a device to have a single master rather than a
-> whole bunch of them?
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> 
 
-I've never seen a device upstream of an ARM SMMU with a single stream-id;
-they always seem to have a whole bunch of them. Calxeda's SATA controller
-had 10 IDs, for example, and a PL330 DMA controller tends to have at least
-3.
+Hmm, this patch will obviously clash with the removal of S5p64xx
+and s5pc100. It shouldn't be hard to resolve the conflict when we
+merge both into arm-soc/next/cleanup, but maybe there is a way to
+avoid it?
 
-Will
+	Arnd
