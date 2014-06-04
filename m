@@ -1,46 +1,98 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 04 Jun 2014 23:32:48 +0400
-Subject: [PATCH] ARM: fix debug prints relevant to PCI devices
-In-Reply-To: <1401909447-8434-1-git-send-email-vidyas@nvidia.com>
-References: <1401909447-8434-1-git-send-email-vidyas@nvidia.com>
-Message-ID: <538F7460.6020600@cogentembedded.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 4 Jun 2014 14:34:31 -0500
+Subject: mainline boot: 37 passed 4 failed
+ (mainline/v3.15-rc8-4569-g3de0ef8) (palmas regression uEVM)
+In-Reply-To: <20140604090111.GE2520@sirena.org.uk>
+References: <538e6a20.0168440a.7895.422b@mx.google.com>
+ <CAOesGMg4ESoPVvCc4is7wpA8PVOOSDzh5=VZZ67NnJjD3jUzmw@mail.gmail.com>
+ <20140604090111.GE2520@sirena.org.uk>
+Message-ID: <20140604193431.GB4858@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Minor change in subject, +Keerthy.
 
-On 06/04/2014 11:17 PM, Vidya Sagar wrote:
+On 10:01-20140604, Mark Brown wrote:
+> On Tue, Jun 03, 2014 at 06:26:14PM -0700, Olof Johansson wrote:
+> > On Tue, Jun 3, 2014 at 5:36 PM, Olof's autobooter <build@lixom.net> wrote:
+> 
+> > > [    2.816920] smps9: failed to get the current voltage
+> 
+> > This seems to be from palmas registration failing, which in turns
+> > causes vmmc regulator lookup to fail. See the errors about palmas-pmic
+> > above.
+> 
+> Always CC maintainers on things.  This is a bug in the driver, it needs
+> to support retrieving voltages at all times (and would probably run into
+> trouble anyway).
+Full thread: http://marc.info/?t=140184538000004&r=1&w=2
 
-> As per PCIe spec, fast back-to-back transactions feature
-> is not applicable to PCIe devices. Hence, do not print
-> that fast back-to-back trasactions are disabled when
-> there is a PCIe device found on the bus
+Yeah, this does seems to be a regression. The following is based on
+next-20140604.
 
-> Signed-off-by: Vidya Sagar <vidyas@nvidia.com>
-> ---
->   arch/arm/kernel/bios32.c | 9 +++++++--
->   1 file changed, 7 insertions(+), 2 deletions(-)
+Seems to help my OMAP5uevm.
+If this makes sense, I will repost it as a formal patch.
 
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index 17a26c1..95ad3fb 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-[...]
-> @@ -354,9 +357,11 @@ void pcibios_fixup_bus(struct pci_bus *bus)
->
->   	/*
->   	 * Report what we did for this bus
-> +	 * (only if the bus doesn't have even one PCIe device)
->   	 */
-> -	printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
-> -		bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
-> +	if (!has_pcie_dev)
-> +		printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
+8<----------------
+>From 3feaa7f5c749b1673aef3fd26f43b965dd627dc9 Mon Sep 17 00:00:00 2001
+From: Nishanth Menon <nm@ti.com>
+Date: Wed, 4 Jun 2014 14:09:09 -0500
+Subject: [PATCH] regulator: palmas: Fix SMPS list for 0V
 
-    Time to change this to pr_info()...
+get_voltage_sel reads from SMPS register - if the read selector value
+is 0, the SMPS is actually disabled - So, this is in addition to the
+ctrl_register that may also be used to enable/disable the SMPS.
 
-> +			bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
->   }
->   EXPORT_SYMBOL(pcibios_fixup_bus);
+The original logic(prior to commit dbabd624d4eec50b6) used to be:
+static int palmas_map_voltage_smps(struct regulator_dev *rdev,
+               int min_uV, int max_uV)
+<snip>
+       if (min_uV == 0)
+               return 0;
 
-WBR, Sergei
+To handle this scenario, with the transition to regulator_list
+implementation, we seem to have missed the data necessary to mark as
+one of the valid entries as "0" 'disabled regulator' which results in
+0 volts - So, stick with pre-existing logic.
+
+Without this added to the list, palmas regulator driver,
+on probe, attempts to setup constraints and in the case of
+OMAP5uEVM, SMPS9 (which is mapped for 2v1 audio supply) fails in
+regulator_list_voltage_linear_range mapping of '0', and as a fall back
+of constraints not being applied, the entire regulator list is not
+enumerated due to assumption that something system wide has gone bad
+on with the PMIC.
+
+Fixes: dbabd624d4eec50b6 ("regulator: palmas: Reemove open coded functions with helper functions")
+Reported-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ drivers/regulator/palmas-regulator.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/regulator/palmas-regulator.c b/drivers/regulator/palmas-regulator.c
+index 864ed02..b982f0f 100644
+--- a/drivers/regulator/palmas-regulator.c
++++ b/drivers/regulator/palmas-regulator.c
+@@ -37,12 +37,14 @@ struct regs_info {
+ };
+ 
+ static const struct regulator_linear_range smps_low_ranges[] = {
++	REGULATOR_LINEAR_RANGE(0, 0x0, 0x0, 0),
+ 	REGULATOR_LINEAR_RANGE(500000, 0x1, 0x6, 0),
+ 	REGULATOR_LINEAR_RANGE(510000, 0x7, 0x79, 10000),
+ 	REGULATOR_LINEAR_RANGE(1650000, 0x7A, 0x7f, 0),
+ };
+ 
+ static const struct regulator_linear_range smps_high_ranges[] = {
++	REGULATOR_LINEAR_RANGE(0, 0x0, 0x0, 0),
+ 	REGULATOR_LINEAR_RANGE(1000000, 0x1, 0x6, 0),
+ 	REGULATOR_LINEAR_RANGE(1020000, 0x7, 0x79, 20000),
+ 	REGULATOR_LINEAR_RANGE(3300000, 0x7A, 0x7f, 0),
+-- 
+1.7.9.5
+
+
+-- 
+Regards,
+Nishanth Menon
