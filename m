@@ -1,47 +1,45 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Wed,  4 Jun 2014 16:31:55 +0200
-Subject: [PATCH RESEND 07/12] drivers: clk: st: Add quadfs reset handling
-In-Reply-To: <1401892320-18211-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1401892320-18211-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1401892320-18211-8-git-send-email-gabriel.fernandez@linaro.org>
+Date: Wed,  4 Jun 2014 16:31:48 +0200
+Subject: [PATCH RESEND 00/12] Add Flexgen Clock support
+Message-ID: <1401892320-18211-1-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the support of quadfs reset handling.
+The goal of this series is to add Flexgen clock support to ST SoCs.
 
-Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
----
- drivers/clk/st/clkgen-fsyn.c | 5 +++++
- 1 file changed, 5 insertions(+)
+A Flexgen clock is composed by:
+  - a clock cross bar (represented by a mux element)
+  - a pre and final dividers (represented by a divider and gate elements)
 
-diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
-index 5aae17c..46b29c4 100644
---- a/drivers/clk/st/clkgen-fsyn.c
-+++ b/drivers/clk/st/clkgen-fsyn.c
-@@ -70,12 +70,14 @@ struct clkgen_quadfs_data {
- 	bool powerup_polarity;
- 	bool standby_polarity;
- 	bool nsdiv_present;
-+	bool nrst_present;
- 	struct clkgen_field ndiv;
- 	struct clkgen_field ref_bw;
- 	struct clkgen_field nreset;
- 	struct clkgen_field npda;
- 	struct clkgen_field lock_status;
- 
-+	struct clkgen_field nrst[QUADFS_MAX_CHAN];
- 	struct clkgen_field nsb[QUADFS_MAX_CHAN];
- 	struct clkgen_field en[QUADFS_MAX_CHAN];
- 	struct clkgen_field mdiv[QUADFS_MAX_CHAN];
-@@ -615,6 +617,9 @@ static int quadfs_fsynth_enable(struct clk_hw *hw)
- 
- 	CLKGEN_WRITE(fs, nsb[fs->chan], !fs->data->standby_polarity);
- 
-+	if (fs->data->nrst_present)
-+		CLKGEN_WRITE(fs, nrst[fs->chan], 0);
-+
- 	if (fs->lock)
- 		spin_unlock_irqrestore(fs->lock, flags);
- 
+Tested on B2020 board.
+
+Gabriel Fernandez (12):
+  clk: st: Update ST clock binding documentation
+  clk: st: Adds Flexgen clock binding
+  drivers: clk: st: STiH407: Support for Flexgen Clocks
+  drivers: clk: st: STiH407: Support for A9 MUX Clocks
+  drivers: clk: st: STiH407: Support for clockgenA0
+  drivers: clk: st: Add polarity bit indication
+  drivers: clk: st: Add quadfs reset handling
+  drivers: clk: st: STiH407: Support for clockgenC0
+  drivers: clk: st: STiH407: Support for clockgenD0/D2/D3
+  drivers: clk: st: STiH407: Support for clockgenA9
+  drivers: clk: st: Update frequency tables for fs660c32 and fs432c65
+  drivers: clk: st: Use round to closest divider flag
+
+ .../devicetree/bindings/clock/st/st,clkgen-mux.txt |   2 +-
+ .../devicetree/bindings/clock/st/st,clkgen-pll.txt |   5 +-
+ .../devicetree/bindings/clock/st/st,clkgen.txt     |  25 +-
+ .../devicetree/bindings/clock/st/st,flexgen.txt    |  48 +++
+ .../devicetree/bindings/clock/st/st,quadfs.txt     |   3 +
+ drivers/clk/st/Makefile                            |   2 +-
+ drivers/clk/st/clk-flexgen.c                       | 332 +++++++++++++++++++++
+ drivers/clk/st/clkgen-fsyn.c                       | 175 ++++++++++-
+ drivers/clk/st/clkgen-mux.c                        |  12 +-
+ drivers/clk/st/clkgen-pll.c                        |  64 ++++
+ 10 files changed, 647 insertions(+), 21 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/st/st,flexgen.txt
+ create mode 100644 drivers/clk/st/clk-flexgen.c
+
 -- 
 1.9.1
