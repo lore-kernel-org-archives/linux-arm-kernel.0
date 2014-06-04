@@ -1,10 +1,10 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed,  4 Jun 2014 16:20:39 -0700
-Subject: [PATCH 3.14 010/228] clocksource: Exynos_mct: Use
- irq_force_affinity() in cpu bringup
+Date: Wed,  4 Jun 2014 16:20:40 -0700
+Subject: [PATCH 3.14 011/228] clocksource: Exynos_mct: Register clock event
+ after request_irq()
 In-Reply-To: <20140604232347.966798903@linuxfoundation.org>
 References: <20140604232347.966798903@linuxfoundation.org>
-Message-ID: <20140604232348.417680655@linuxfoundation.org>
+Message-ID: <20140604232348.455118116@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,19 +12,21 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 ------------------
 
-From: Thomas Gleixner <tglx@linutronix.de>
+From: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-commit 30ccf03b4a6a2102a2219058bdc6d779dc637dd7 upstream.
+commit 8db6e5104b77de5d0b7002b95069da0992a34be9 upstream.
 
-The starting cpu is not yet in the online mask so irq_set_affinity()
-fails which results in per cpu timers for this cpu ending up on some
-other online cpu, ususally cpu 0.
+After hotplugging CPU1 the first call of interrupt handler for CPU1
+oneshot timer was called on CPU0 because it fired before setting IRQ
+affinity. Affected are SoCs where Multi Core Timer interrupts are
+shared (SPI), e.g. Exynos 4210.
 
-Use irq_force_affinity() which disables the online mask check and
-makes things work.
+During setup of the MCT timers the clock event device should be
+registered after setting the affinity for interrupt. This will prevent
+starting the timer too early.
 
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Cc: Kyungmin Park <kyungmin.park@samsung.com>
 Cc: Marek Szyprowski <m.szyprowski@samsung.com>
 Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
@@ -32,42 +34,31 @@ Cc: Tomasz Figa <t.figa@samsung.com>,
 Cc: Daniel Lezcano <daniel.lezcano@linaro.org>,
 Cc: Kukjin Kim <kgene.kim@samsung.com>
 Cc: linux-arm-kernel at lists.infradead.org,
-Link: http://lkml.kernel.org/r/20140416143316.106665251 at linutronix.de
+Link: http://lkml.kernel.org/r/20140416143316.299247848 at linutronix.de
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 ---
- drivers/clocksource/exynos_mct.c |    8 +-------
- 1 file changed, 1 insertion(+), 7 deletions(-)
+ drivers/clocksource/exynos_mct.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 --- a/drivers/clocksource/exynos_mct.c
 +++ b/drivers/clocksource/exynos_mct.c
-@@ -432,6 +432,7 @@ static int exynos4_local_timer_setup(str
- 				evt->irq);
- 			return -EIO;
- 		}
-+		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
+@@ -418,8 +418,6 @@ static int exynos4_local_timer_setup(str
+ 	evt->set_mode = exynos4_tick_set_mode;
+ 	evt->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+ 	evt->rating = 450;
+-	clockevents_config_and_register(evt, clk_rate / (TICK_BASE_CNT + 1),
+-					0xf, 0x7fffffff);
+ 
+ 	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
+ 
+@@ -436,6 +434,8 @@ static int exynos4_local_timer_setup(str
  	} else {
  		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
  	}
-@@ -452,7 +453,6 @@ static int exynos4_mct_cpu_notify(struct
- 					   unsigned long action, void *hcpu)
- {
- 	struct mct_clock_event_device *mevt;
--	unsigned int cpu;
++	clockevents_config_and_register(evt, clk_rate / (TICK_BASE_CNT + 1),
++					0xf, 0x7fffffff);
  
- 	/*
- 	 * Grab cpu pointer in each case to avoid spurious
-@@ -463,12 +463,6 @@ static int exynos4_mct_cpu_notify(struct
- 		mevt = this_cpu_ptr(&percpu_mct_tick);
- 		exynos4_local_timer_setup(&mevt->evt);
- 		break;
--	case CPU_ONLINE:
--		cpu = (unsigned long)hcpu;
--		if (mct_int_type == MCT_INT_SPI)
--			irq_set_affinity(mct_irqs[MCT_L0_IRQ + cpu],
--						cpumask_of(cpu));
--		break;
- 	case CPU_DYING:
- 		mevt = this_cpu_ptr(&percpu_mct_tick);
- 		exynos4_local_timer_stop(&mevt->evt);
+ 	return 0;
+ }
