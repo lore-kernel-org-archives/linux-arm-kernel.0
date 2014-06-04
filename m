@@ -1,65 +1,34 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 04 Jun 2014 13:29:53 +0200
-Subject: [PATCH v2 1/7] DMA: shdma: Add r8a7791 support
-In-Reply-To: <1401716531-29794-2-git-send-email-geert+renesas@glider.be>
+Date: Wed, 04 Jun 2014 13:30:55 +0200
+Subject: [PATCH v2 4/7] ARM: shmobile: r8a7791: Add SYS-DMAC channel
+ definitions for bindings
+In-Reply-To: <CAMuHMdWkPy8eydh4BntXdtf5ZJKP4yG26QovLUjvGUYYv3dStw@mail.gmail.com>
 References: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
- <1401716531-29794-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <2461508.0gZiIUPGHB@avalon>
+ <538C818B.5060703@codethink.co.uk>
+ <CAMuHMdWkPy8eydh4BntXdtf5ZJKP4yG26QovLUjvGUYYv3dStw@mail.gmail.com>
+Message-ID: <3770565.HiyLmu1184@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-
-Thank you for the patch.
-
-On Monday 02 June 2014 15:42:05 Geert Uytterhoeven wrote:
-
-Missing commit message ?
-
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> v2:
->   - No changes
+On Tuesday 03 June 2014 09:53:17 Geert Uytterhoeven wrote:
+> On Mon, Jun 2, 2014 at 3:52 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+> >> +// FIXME
+> >> +#define CHCR_RX_8BIT SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_8BIT)
+> >> +#define CHCR_TX_8BIT SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_8BIT)
+> >> +#define CHCR_RX_16BIT        SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_16BIT)
+> >> +#define CHCR_TX_16BIT        SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_16BIT)
+> >> +#define CHCR_RX_32BIT        SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_32BIT)
+> >> +#define CHCR_TX_32BIT        SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_32BIT)
+> >> +#define CHCR_RX_256BIT       SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_256BIT)
+> >> +#define CHCR_TX_256BIT       SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_256BIT)
+> > 
+> > I am pretty sure for round-2 we can remove these in favour of a
+> > table in the driver. The only device that has a non-standard setting
+> > is the SDHI and that will support 32bit and 256bit transfers.
 > 
->  Documentation/devicetree/bindings/dma/shdma.txt | 5 +++--
->  drivers/dma/sh/shdmac.c                         | 1 +
->  2 files changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/shdma.txt
-> b/Documentation/devicetree/bindings/dma/shdma.txt index
-> 86d5c509594b..d26b7065ae94 100644
-> --- a/Documentation/devicetree/bindings/dma/shdma.txt
-> +++ b/Documentation/devicetree/bindings/dma/shdma.txt
-> @@ -24,8 +24,9 @@ Optional properties (currently unused):
->  Required properties:
->  - compatible:	should be of the form "renesas,shdma-<soc>", where <soc>
-> should be replaced with the desired SoC model, e.g.
-> -		"renesas,shdma-r8a73a4" for the system DMAC on r8a73a4 SoC
-> -		"renesas,shdma-r8a7790" for the DMAC on the R8A7790.
-> +		"renesas,shdma-r8a73a4" for the system DMAC on r8a73a4 SoC,
-> +		"renesas,shdma-r8a7790" for the DMAC on the R8A7790,
-> +		"renesas,shdma-r8a7791" for the DMAC on the R8A7791.
+> Thanks, I'm eagerly awaiting your next version...
 
-I would just remove the commas and full stop to avoid modifying unrelated 
-lines in future patches.
-
-The R8A7791 has several DMACs (LBSC, SYS, RT, Audio, 2D, USBHS). It would thus 
-make sense to explicitly state which DMACs the bindings cover.
-
->  Example:
->  	dmac: dma-multiplexer at 0 {
-> diff --git a/drivers/dma/sh/shdmac.c b/drivers/dma/sh/shdmac.c
-> index 91b3f744d7b2..cdbc68e72ca1 100644
-> --- a/drivers/dma/sh/shdmac.c
-> +++ b/drivers/dma/sh/shdmac.c
-> @@ -691,6 +691,7 @@ static const struct shdma_ops sh_dmae_shdma_ops = {
->  static const struct of_device_id sh_dmae_of_match[] = {
->  	{ .compatible = "renesas,shdma-r8a73a4", .data = r8a73a4_shdma_devid },
->  	{ .compatible = "renesas,shdma-r8a7790", .data = &shdma_arm_info },
-> +	{ .compatible = "renesas,shdma-r8a7791", .data = &shdma_arm_info },
->  	{}
->  };
->  MODULE_DEVICE_TABLE(of, sh_dmae_of_match);
+Speaking of that, Ben, do you have a git tree with your latest patches ?
 
 -- 
 Regards,
