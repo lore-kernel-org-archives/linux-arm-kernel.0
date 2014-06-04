@@ -1,90 +1,110 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Wed, 4 Jun 2014 11:00:22 +0100
-Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
-In-Reply-To: <CAKfTPtBCG1Jq2b+fyoGuA=7yG_yUbsmaD+j-ZXXsPNGp5giKpg@mail.gmail.com>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
- <20140528121001.GI19967@e103034-lin>
- <CAKfTPtDxeBfZK1AxCRqEG91pi--Ti1RYFoQPDhvMVnGTCspQ-g@mail.gmail.com>
- <20140528154703.GJ19967@e103034-lin>
- <20140603155007.GZ30445@twins.programming.kicks-ass.net>
- <CAKfTPtDUvH--WxFATTW6YRAvLuohzyNHDUq6DRdfxc7gRKCX6Q@mail.gmail.com>
- <20140604080809.GK30445@twins.programming.kicks-ass.net>
- <CAKfTPtBCG1Jq2b+fyoGuA=7yG_yUbsmaD+j-ZXXsPNGp5giKpg@mail.gmail.com>
-Message-ID: <20140604100022.GJ29593@e103034-lin>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Wed, 4 Jun 2014 13:04:06 +0300
+Subject: [PATCH V2 2/2] power: twl4030_charger: attempt to power off in
+ case of critical events
+In-Reply-To: <1401313610-14252-3-git-send-email-nm@ti.com>
+References: <1401313610-14252-1-git-send-email-nm@ti.com>
+ <1401313610-14252-3-git-send-email-nm@ti.com>
+Message-ID: <CANOLnOPb1xbqb5WXaK5-kdCezVuDhNxTtE5VV_MbCi4WTd2=oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 04, 2014 at 10:32:10AM +0100, Vincent Guittot wrote:
-> On 4 June 2014 10:08, Peter Zijlstra <peterz@infradead.org> wrote:
-> > On Wed, Jun 04, 2014 at 09:47:26AM +0200, Vincent Guittot wrote:
-> >> On 3 June 2014 17:50, Peter Zijlstra <peterz@infradead.org> wrote:
-> >> > On Wed, May 28, 2014 at 04:47:03PM +0100, Morten Rasmussen wrote:
-> >> >> Since we may do periodic load-balance every 10 ms or so, we will perform
-> >> >> a number of load-balances where runnable_avg_sum will mostly be
-> >> >> reflecting the state of the world before a change (new task queued or
-> >> >> moved a task to a different cpu). If you had have two tasks continuously
-> >> >> on one cpu and your other cpu is idle, and you move one of the tasks to
-> >> >> the other cpu, runnable_avg_sum will remain unchanged, 47742, on the
-> >> >> first cpu while it starts from 0 on the other one. 10 ms later it will
-> >> >> have increased a bit, 32 ms later it will be 47742/2, and 345 ms later
-> >> >> it reaches 47742. In the mean time the cpu doesn't appear fully utilized
-> >> >> and we might decide to put more tasks on it because we don't know if
-> >> >> runnable_avg_sum represents a partially utilized cpu (for example a 50%
-> >> >> task) or if it will continue to rise and eventually get to 47742.
-> >> >
-> >> > Ah, no, since we track per task, and update the per-cpu ones when we
-> >> > migrate tasks, the per-cpu values should be instantly updated.
-> >> >
-> >> > If we were to increase per task storage, we might as well also track
-> >> > running_avg not only runnable_avg.
-> >>
-> >> I agree that the removed running_avg should give more useful
-> >> information about the the load of a CPU.
-> >>
-> >> The main issue with running_avg is that it's disturbed by other tasks
-> >> (as point out previously). As a typical example,  if we have 2 tasks
-> >> with a load of 25% on 1 CPU, the unweighted runnable_load_avg will be
-> >> in the range of [100% - 50%] depending of the parallelism of the
-> >> runtime of the tasks whereas the reality is 50% and the use of
-> >> running_avg will return this value
-> >
-> > I'm not sure I see how 100% is possible, but yes I agree that runnable
-> > can indeed be inflated due to this queueing effect.
-> 
-> In fact, it can be even worse than that because i forgot to take into
-> account the geometric series effect which implies that it depends of
-> the runtime (idletime) of the task
-> 
-> Take 3 examples:
-> 
-> 2 tasks that need to run 10ms  simultaneously each 40ms. If they share
-> the same CPU, they will be on the runqueue 20ms (in fact a bit less
-> for one of them), Their load (runnable_avg_sum/runnable_avg_period)
-> will be 33% each so the unweighted runnable_load_avg of the CPU will
-> be 66%
+On Thu, May 29, 2014 at 12:46 AM, Nishanth Menon <nm@ti.com> wrote:
+> Attempt to power off in case of critical events such as battery removal,
+> over voltage events.
+>
+> There is no guarentee that we'd be in a safe scenario here, but the very
+> least we can try to do is to power off the device to prevent damage to
+> the system instead of just printing a message and hoping for the best.
 
-Right, it actually depends on how often you switch between the tasks. If
-you sched_tick happens every 10 ms then in this example one task will
-run for 10 ms an be done, while the other one waits for 10 ms and then
-runs to completion in 10 ms. The result is that one task is runnable for
-10 ms and the other one is runnable for 20 ms. That gives you 25% and
-50% for a total of 75%.
+At least "battery temperature out of range" does seem to happen quite
+often while charging on hot summer day. I'd prefer my pandora to not
+shutdown in such case, it could just stop charging instead.
 
-> 
-> 2 tasks that need to run 25ms simultaneously each 100ms. If they share
-> the same CPU, they will be on the runqueue 50ms (in fact a bit less
-> for one of them), Their load (runnable_avg_sum/runnable_avg_period)
-> will be 74% each so the unweighted runnable_load_avg of the CPU will
-> be 148%
-> 
-> 2 tasks that need to run 50ms  simultaneously each 200ms. If they
-> share the same CPU, they will be on the runqueue 100ms (in fact a bit
-> less for one of them), Their load
-> (runnable_avg_sum/runnable_avg_period) will be 89% each so the
-> unweighted runnable_load_avg of the CPU will be 180%
+>
+> NOTE: twl4030 should attempt some form of recovery, but just depending
+> on that is never a safe alternative.
+>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+> new patch. original attempt was: https://patchwork.kernel.org/patch/4002371/
+>
+> NOTE: we dont have poweroff support yet enabled on LDP, but it just needs
+> relevant dts entry.
+>
+>  drivers/power/twl4030_charger.c |   26 +++++++++++++++++++++-----
+>  1 file changed, 21 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/power/twl4030_charger.c b/drivers/power/twl4030_charger.c
+> index 2598c58..ed0dbd2 100644
+> --- a/drivers/power/twl4030_charger.c
+> +++ b/drivers/power/twl4030_charger.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/power_supply.h>
+>  #include <linux/notifier.h>
+>  #include <linux/usb/otg.h>
+> +#include <linux/reboot.h>
+>  #include <linux/regulator/machine.h>
+>
+>  #define TWL4030_BCIMSTATEC     0x02
+> @@ -332,6 +333,7 @@ static irqreturn_t twl4030_bci_interrupt(int irq, void *arg)
+>         struct twl4030_bci *bci = arg;
+>         u8 irqs1, irqs2;
+>         int ret;
+> +       bool power_off = false;
+>
+>         ret = twl_i2c_read_u8(TWL4030_MODULE_INTERRUPTS, &irqs1,
+>                               TWL4030_INTERRUPTS_BCIISR1A);
+> @@ -352,20 +354,34 @@ static irqreturn_t twl4030_bci_interrupt(int irq, void *arg)
+>         }
+>
+>         /* various monitoring events, for now we just log them here */
+> -       if (irqs1 & (TWL4030_TBATOR2 | TWL4030_TBATOR1))
+> +       if (irqs1 & (TWL4030_TBATOR2 | TWL4030_TBATOR1)) {
+>                 dev_warn(bci->dev, "battery temperature out of range\n");
+> +               power_off = true;
+> +       }
+>
+> -       if (irqs1 & TWL4030_BATSTS)
+> +       if (irqs1 & TWL4030_BATSTS) {
+>                 dev_crit(bci->dev, "battery disconnected\n");
+> +               power_off = true;
+> +       }
+>
+> -       if (irqs2 & TWL4030_VBATOV)
+> +       if (irqs2 & TWL4030_VBATOV) {
+>                 dev_crit(bci->dev, "VBAT overvoltage\n");
+> +               power_off = true;
+> +       }
+>
+> -       if (irqs2 & TWL4030_VBUSOV)
+> +       if (irqs2 & TWL4030_VBUSOV) {
+>                 dev_crit(bci->dev, "VBUS overvoltage\n");
+> +               power_off = true;
+> +       }
+>
+> -       if (irqs2 & TWL4030_ACCHGOV)
+> +       if (irqs2 & TWL4030_ACCHGOV) {
+>                 dev_crit(bci->dev, "Ac charger overvoltage\n");
+> +               power_off = true;
+> +       }
+> +
+> +       /* Try to shutdown the system */
+> +       if (power_off)
+> +               orderly_poweroff(true);
+>
+>         return IRQ_HANDLED;
+>  }
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-In this case you switch been the tasks before they complete, so in this
-case both tasks are waiting so runnable will get much righer than 75%.
-You are right. It was thinking about tasks where the busy period is
-short enough that they run to completion when they are scheduled.
+
+
+-- 
+Gra?vydas
