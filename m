@@ -1,82 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 4 Jun 2014 17:50:49 +0200
-Subject: [GIT PULL] Allwinner sunXi clock changes for 3.16
-In-Reply-To: <20140604151216.10062.81810@quantum>
-References: <538B7B6C.3020601@elopez.com.ar>
- <20140603174120.10062.16229@quantum>
- <20140604071922.GA5765@lukather>
- <20140604151216.10062.81810@quantum>
-Message-ID: <20140604155049.GD5765@lukather>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 4 Jun 2014 16:55:29 +0100
+Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
+ device tree
+In-Reply-To: <CAPDyKFo_xHSKzoeKJb5sh+O3cMGsnqx_yVivpw8Tk72whPHGLQ@mail.gmail.com>
+References: <538321AB.4050006@redhat.com>
+ <20140526142225.GF22111@sirena.org.uk>
+ <538356DA.7090302@redhat.com>
+ <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
+ <53838023.2080807@redhat.com>
+ <CAPDyKFpg_2RQabM044C1hsNTcuxdVVOvw0ZONVRdysk=eom8UA@mail.gmail.com>
+ <20140527175326.GZ12304@sirena.org.uk>
+ <CAPDyKFqCwSfnbXJffQeMUMLEgZPcqjEMhbTXxi4HKOKqExQ70g@mail.gmail.com>
+ <20140528110351.GI12304@sirena.org.uk>
+ <CAPDyKFo_xHSKzoeKJb5sh+O3cMGsnqx_yVivpw8Tk72whPHGLQ@mail.gmail.com>
+Message-ID: <20140604155529.GP2520@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 04, 2014 at 08:12:16AM -0700, Mike Turquette wrote:
-> Quoting Maxime Ripard (2014-06-04 00:19:22)
-> > Hi Mike,
-> > 
-> > On Tue, Jun 03, 2014 at 10:41:20AM -0700, Mike Turquette wrote:
-> > > Quoting Emilio L?pez (2014-06-01 12:13:48)
-> > > > Hi Mike,
-> > > > 
-> > > > Here is the sunxi clocks pull for 3.16. As you probably saw during the 
-> > > > cycle, this mostly contains improved A31 support and a bit of 
-> > > > housekeeping. Please note that this pull does *not* contain the MMC 
-> > > > clock patches Hans sent, as you merged those yourself on clk-next
-> > > 
-> > > Hi Emilio,
-> > > 
-> > > -rc8 is pretty late for me to take this in under normal circumstances,
-> > > and since the merge window opened early this time I will defer taking
-> > > this pull request in until 3.16-rc1 is released. It'll be one of the
-> > > first things applied to the new clk-next.
-> > 
-> > I know that Emilio has been pretty late at sending this, but at least
-> > the A31 USB clocks patches is quite important for us, since it would
-> > allow to add the A31 to Olof's boot test farm.
-> 
-> I guess you will still reap the benefits of Olof's boot testing if this
-> is merged after 3.16-rc1?
+On Tue, Jun 03, 2014 at 12:57:52PM +0200, Ulf Hansson wrote:
+> On 28 May 2014 13:03, Mark Brown <broonie@kernel.org> wrote:
 
-Well, yeah, but it would be delayed by a release, while the needed
-drivers are already there.
+> > No, runtime PM isn't really fine grained - I'm talking about things
+> > like starting and stopping individual resources or configuring them.
 
-> > Could you reconsider merging this?
-> > 
-> > Just so that doesn't happen again, when do you expect the pull
-> > requests?
-> 
-> There isn't a hard rule for "must be in by -rcN". But I really don't
-> like taking patches after the merge window opens. Something bothers me
-> about the commitdate for patches in clk-next being later than the
-> commitdate for the new Linux major release.
+> Are you saying that you have several levels of quiescent mode of your
+> external chip?
 
-Which won't happen in this case, since we're at -rc8 ;)
+Partly, but also there can be active modes that don't use all
+functionality and hence can leave some of the inputs powered down (for
+example if a reference clock is used for some feature that isn't used
+all the time then that reference clock may be able to be powered down
+when the function is not in use).  The device isn't suspended but it can
+do without some of the resources it has.
 
-> I always take some trivial patches during this time, or fixes which
-> are obvious and would have to be sent for the next round of -rc's
-> anyways, but features or new hardware support is something I don't
-> like to take after the merge window opens.
-> 
-> I was bit a couple merge windows back by trying to be too aggressive
-> about sneaking stuff in at the last minute and I learned my lesson
-> ;-)
+> I am a bit puzzled of how such library should look like, but I suppose
+> we need to be able to go to different power states through it.
+> Typically the library may be invoked both from the mmc core to do
+> power up/off and from the sdio func driver to handle power save.
 
-If it makes it easier for you, I've been carrying these patches for
-quite some time in my working branch.
+> Does it make sense to you as well?
 
-But I definitely understand.
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Yes, certainly for the power up/down and runtime PM type operations.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
+Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140604/afed36ae/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140604/e57d3b5b/attachment.sig>
