@@ -1,54 +1,54 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed,  4 Jun 2014 17:30:19 +0100
-Subject: [PATCH v3 05/10] ARM: STi: DT: Add sdhci pin configuration for stih415
+Date: Wed,  4 Jun 2014 17:30:21 +0100
+Subject: [PATCH v3 07/10] ARM: STi: DT: Enable mmc0 for both stih415 and
+ stih416 SoCs
 In-Reply-To: <1401899424-1365-1-git-send-email-peter.griffin@linaro.org>
 References: <1401899424-1365-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1401899424-1365-6-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1401899424-1365-8-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the required pin config for the sdhci controller
-present in the stih415 SoC.
+Because the first sdhci controller is present on both stih415 and
+stih416 SoC which can both populate the b2020 board, it can be
+enabled in the generic DT file.
 
 Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 Acked-by: Lee Jones <lee.jones@linaro.org>
 Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
- arch/arm/boot/dts/stih415-pinctrl.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/boot/dts/stih41x-b2020.dtsi  | 4 ++++
+ arch/arm/boot/dts/stih41x-b2020x.dtsi | 4 ++++
+ 2 files changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih415-pinctrl.dtsi b/arch/arm/boot/dts/stih415-pinctrl.dtsi
-index caeac7e..eee2373 100644
---- a/arch/arm/boot/dts/stih415-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih415-pinctrl.dtsi
-@@ -429,6 +429,27 @@
- 					};
- 				};
- 			};
-+
-+			mmc0 {
-+				pinctrl_mmc0: mmc0 {
-+					st,pins {
-+						mmcclk = <&PIO13 4 ALT4 BIDIR_PU NICLK 0 CLK_B>;
-+						data0  = <&PIO14 4 ALT4 BIDIR_PU BYPASS 0>;
-+						data1  = <&PIO14 5 ALT4 BIDIR_PU BYPASS 0>;
-+						data2  = <&PIO14 6 ALT4 BIDIR_PU BYPASS 0>;
-+						data3  = <&PIO14 7 ALT4 BIDIR_PU BYPASS 0>;
-+						cmd    = <&PIO15 1 ALT4 BIDIR_PU BYPASS 0>;
-+						wp     = <&PIO15 3 ALT4 IN>;
-+						data4  = <&PIO16 4 ALT4 BIDIR_PU BYPASS 0>;
-+						data5  = <&PIO16 5 ALT4 BIDIR_PU BYPASS 0>;
-+						data6  = <&PIO16 6 ALT4 BIDIR_PU BYPASS 0>;
-+						data7  = <&PIO16 7 ALT4 BIDIR_PU BYPASS 0>;
-+						pwr    = <&PIO17 1 ALT4 OUT>;
-+						cd     = <&PIO17 2 ALT4 IN>;
-+						led    = <&PIO17 3 ALT4 OUT>;
-+					};
-+				};
-+			};
- 		};
+diff --git a/arch/arm/boot/dts/stih41x-b2020.dtsi b/arch/arm/boot/dts/stih41x-b2020.dtsi
+index d8a8429..5c2df46 100644
+--- a/arch/arm/boot/dts/stih41x-b2020.dtsi
++++ b/arch/arm/boot/dts/stih41x-b2020.dtsi
+@@ -74,5 +74,9 @@
  
- 		pin-controller-left {
+ 			pinctrl-0	= <&pinctrl_rgmii1>;
+ 		};
++
++		mmc0: sdhci at fe81e000 {
++			bus-width = <8>;
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/stih41x-b2020x.dtsi b/arch/arm/boot/dts/stih41x-b2020x.dtsi
+index df01c12..f797a06 100644
+--- a/arch/arm/boot/dts/stih41x-b2020x.dtsi
++++ b/arch/arm/boot/dts/stih41x-b2020x.dtsi
+@@ -8,6 +8,10 @@
+  */
+ / {
+ 	soc {
++		mmc0: sdhci at fe81e000 {
++			status = "okay";
++		};
++
+ 		spifsm: spifsm at fe902000 {
+ 			#address-cells = <1>;
+ 			#size-cells    = <1>;
 -- 
 1.9.1
