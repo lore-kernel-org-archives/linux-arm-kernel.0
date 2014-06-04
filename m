@@ -1,333 +1,63 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 4 Jun 2014 06:18:26 -0500
-Subject: [PATCH v6 1/6] clocksource: Add support for the Mediatek SoCs
-In-Reply-To: <1401468964-5307-2-git-send-email-matthias.bgg@gmail.com>
-References: <1401468964-5307-1-git-send-email-matthias.bgg@gmail.com>
- <1401468964-5307-2-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <CAL_JsqKCTZjh7o2zf_WsVi=iAR1ivTPQpvpNJ6W87jPXakMnZg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 4 Jun 2014 12:17:55 +0100
+Subject: [PATCH 2/3] arm: tegra: enable igb, stmpe, i2c chardev, spidev,
+ lm95245, pwm leds
+In-Reply-To: <538EBACB.70100@ziswiler.com>
+References: <c5522b0efcbfc7690dcde6aaf78b9dd568f99604.1401665237.git.marcel@ziswiler.com>
+ <39a8704a4c8170d6b0620a1e5e44042eae6d8810.1401665237.git.marcel@ziswiler.com>
+ <538CA24B.1010602@wwwdotorg.org> <538CA635.4050502@ziswiler.com>
+ <20140602221627.GP31751@sirena.org.uk>
+ <538D64FD.2010909@ziswiler.com>
+ <20140603094537.GQ31751@sirena.org.uk>
+ <538EBACB.70100@ziswiler.com>
+Message-ID: <20140604111755.GG2520@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 30, 2014 at 11:55 AM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
-> This patch adds a clock source and clock event for the timer found
-> on the Mediatek SoCs.
->
-> The Mediatek General Purpose Timer block provides five 32 bit timers and
-> one 64 bit timer.
->
-> Two 32 bit timers are used by this driver:
-> TIMER1: clock events supporting periodic and oneshot events
-> TIMER2: clock source configured as a free running counter
->
-> The General Purpose Timer block can be run with two clocks. A 13 MHz system
-> clock and the RTC clock running at 32 KHz. This implementation uses the system
-> clock with no clock source divider.
->
-> The interrupts are shared between the different timers and have to be read back
-> from a register. We just enable one interrupt for the clock event. The clock
-> event timer is used by all cores.
->
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> ---
->  drivers/clocksource/Kconfig     |    4 +
->  drivers/clocksource/Makefile    |    1 +
->  drivers/clocksource/mtk_timer.c |  242 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 247 insertions(+)
->  create mode 100644 drivers/clocksource/mtk_timer.c
->
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index 96918e1..1f73740 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -144,6 +144,10 @@ config VF_PIT_TIMER
->  config SYS_SUPPORTS_SH_CMT
->          bool
->
-> +config MTK_TIMER
-> +       select CLKSRC_MMIO
+On Wed, Jun 04, 2014 at 08:20:59AM +0200, Marcel Ziswiler wrote:
+> On 06/03/2014 11:45 AM, Mark Brown wrote:
 
-Also select CLKSRC_OF
+> >When you say "generic user space access" you are describing a specific
+> >detail of how this device happens to be controlled with your software.
 
-> +       bool
-> +
->  config SYS_SUPPORTS_SH_MTU2
->          bool
->
-> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> index 98cb6c5..619d302 100644
-> --- a/drivers/clocksource/Makefile
-> +++ b/drivers/clocksource/Makefile
-> @@ -33,6 +33,7 @@ obj-$(CONFIG_CLKSRC_EXYNOS_MCT)       += exynos_mct.o
->  obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)       += samsung_pwm_timer.o
->  obj-$(CONFIG_VF_PIT_TIMER)     += vf_pit_timer.o
->  obj-$(CONFIG_CLKSRC_QCOM)      += qcom-timer.o
-> +obj-$(CONFIG_MTK_TIMER)                += mtk_timer.o
->
->  obj-$(CONFIG_ARM_ARCH_TIMER)           += arm_arch_timer.o
->  obj-$(CONFIG_ARM_GLOBAL_TIMER)         += arm_global_timer.o
-> diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-> new file mode 100644
-> index 0000000..8e8b94a
-> --- /dev/null
-> +++ b/drivers/clocksource/mtk_timer.c
-> @@ -0,0 +1,242 @@
-> +/*
-> + * Mediatek SoCs General-Purpose Timer handling.
-> + *
-> + * Copyright (C) 2014 Matthias Brugger
-> + *
-> + * Matthias Brugger <matthias.bgg@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/clockchips.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqreturn.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/slab.h>
-> +
-> +#define GPT_IRQ_EN_REG         0x00
-> +#define GPT_IRQ_ENABLE(val)    BIT(val-1)
+> No, not at all. In fact I did not even specify neither the exact type of
+> device apart from it being a SPI device nor any property of the software
+> apart from the generic user space access thereof implemented in the Linux
 
-val should have parentheses.
+You're saying you're controlling it from userspace.  This is a
+particular detail of what you are doing in your system.  You happen to
+want to control the devices you are hanging off the system with
+userspace drivers but that's just what you're doing right now.
 
-> +#define GPT_IRQ_ACK_REG                0x08
-> +#define GPT_IRQ_ACK(val)       BIT(val-1)
+> kernel. I really don't see any difference to i2c chardev which is already
+> enabled in multi_v7_defconfig.
 
-ditto
+That does not require explicit registration as the device driver for the
+device in order to be used.
 
-> +
-> +#define TIMER_CTRL_REG(val)    (0x10 * val)
-> +#define TIMER_CTRL_OP(val)     (((val) & 0x3) << 4)
-> +#define TIMER_CTRL_OP_ONESHOT  (0)
-> +#define TIMER_CTRL_OP_REPEAT   (1)
-> +#define TIMER_CTRL_OP_FREERUN  (3)
-> +#define TIMER_CTRL_CLEAR       (2)
-> +#define TIMER_CTRL_ENABLE      (1)
-> +#define TIMER_CTRL_DISABLE     (0)
-> +
-> +#define TIMER_CLK_REG(val)     (0x04 + (0x10 * val))
-> +#define TIMER_CLK_SRC(val)     (((val) & 0x1) << 4)
-> +#define TIMER_CLK_SRC_SYS13M   (0)
-> +#define TIMER_CLK_SRC_RTC32K   (1)
-> +#define TIMER_CLK_DIV1         (0x0)
-> +#define TIMER_CLK_DIV2         (0x1)
-> +
-> +#define TIMER_CNT_REG(val)     (0x08 + (0x10 * val))
-> +#define TIMER_CMP_REG(val)     (0x0C + (0x10 * val))
-> +
-> +#define GPT_CLK_EVT    1
-> +#define GPT_CLK_SRC    2
-> +
-> +struct mtk_clock_event_device {
-> +       void __iomem *gpt_base;
-> +       u32 ticks_per_jiffy;
-> +       struct clock_event_device dev;
-> +};
-> +
-> +static inline struct mtk_clock_event_device *to_mtk_clk(
-> +                               struct clock_event_device *c)
-> +{
-> +       return container_of(c, struct mtk_clock_event_device, dev);
-> +}
-> +
-> +static void mtk_clkevt_time_stop(struct mtk_clock_event_device *evt, u8 timer)
-> +{
-> +       u32 val = readl(evt->gpt_base + TIMER_CTRL_REG(timer));
-> +       writel(val & ~TIMER_CTRL_ENABLE, evt->gpt_base +
-> +                       TIMER_CTRL_REG(timer));
-> +}
-> +
-> +static void mtk_clkevt_time_setup(struct mtk_clock_event_device *evt,
-> +                               unsigned long delay, u8 timer)
-> +{
-> +       writel(delay, evt->gpt_base + TIMER_CMP_REG(timer));
-> +}
-> +
-> +static void mtk_clkevt_time_start(struct mtk_clock_event_device *evt,
-> +               bool periodic, u8 timer)
-> +{
-> +       u32 val;
-> +
-> +       /* Acknowledge interrupt */
-> +       writel(GPT_IRQ_ACK(timer), evt->gpt_base + GPT_IRQ_ACK_REG);
-> +
-> +       val = readl(evt->gpt_base + TIMER_CTRL_REG(timer));
-> +
-> +       /* Clear 2 bit timer operation mode field */
-> +       val &= ~TIMER_CTRL_OP(0x3);
-> +
-> +       if (periodic)
-> +               val |= TIMER_CTRL_OP(TIMER_CTRL_OP_REPEAT);
-> +       else
-> +               val |= TIMER_CTRL_OP(TIMER_CTRL_OP_ONESHOT);
-> +
-> +       writel(val | TIMER_CTRL_ENABLE | TIMER_CTRL_CLEAR,
-> +              evt->gpt_base + TIMER_CTRL_REG(timer));
-> +}
-> +
-> +static void mtk_clkevt_mode(enum clock_event_mode mode,
-> +                               struct clock_event_device *clk)
-> +{
-> +       struct mtk_clock_event_device *evt = to_mtk_clk(clk);
-> +
-> +       mtk_clkevt_time_stop(evt, GPT_CLK_EVT);
-> +
-> +       switch (mode) {
-> +       case CLOCK_EVT_MODE_PERIODIC:
-> +               mtk_clkevt_time_setup(evt, evt->ticks_per_jiffy, GPT_CLK_EVT);
-> +               mtk_clkevt_time_start(evt, true, GPT_CLK_EVT);
-> +               break;
-> +       case CLOCK_EVT_MODE_ONESHOT:
-> +               mtk_clkevt_time_start(evt, false, GPT_CLK_EVT);
-> +               break;
-> +       case CLOCK_EVT_MODE_UNUSED:
-> +       case CLOCK_EVT_MODE_SHUTDOWN:
-> +       default:
-> +               /* No more interrupts will occur as source is disabled */
-> +               break;
-> +       }
-> +}
-> +
-> +static int mtk_clkevt_next_event(unsigned long event,
-> +                                  struct clock_event_device *clk)
-> +{
-> +       struct mtk_clock_event_device *evt = to_mtk_clk(clk);
-> +
-> +       mtk_clkevt_time_stop(evt, GPT_CLK_EVT);
-> +       mtk_clkevt_time_setup(evt, event, GPT_CLK_EVT);
-> +       mtk_clkevt_time_start(evt, false, GPT_CLK_EVT);
-> +
-> +       return 0;
-> +}
-> +
-> +static irqreturn_t mtk_timer_interrupt(int irq, void *dev_id)
-> +{
-> +       struct mtk_clock_event_device *evt = dev_id;
-> +
-> +       /* Acknowledge timer0 irq */
-> +       writel(GPT_IRQ_ACK(GPT_CLK_EVT), evt->gpt_base + GPT_IRQ_ACK_REG);
-> +       evt->dev.event_handler(&evt->dev);
-> +
-> +       return IRQ_HANDLED;
-> +}
-> +
-> +static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
-> +{
-> +       /* Disable all interrupts */
-> +       writel(0x0, evt->gpt_base + GPT_IRQ_EN_REG);
-> +       /* Acknowledge all interrupts */
-> +       writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
-> +}
-> +
-> +static void
-> +mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
-> +{
-> +       writel(TIMER_CTRL_CLEAR | TIMER_CTRL_DISABLE,
-> +               evt->gpt_base + TIMER_CTRL_REG(timer));
-> +
-> +       writel(TIMER_CLK_SRC(TIMER_CLK_SRC_SYS13M) | TIMER_CLK_DIV1,
-> +                       evt->gpt_base + TIMER_CLK_REG(timer));
-> +
-> +       writel(0x0, evt->gpt_base + TIMER_CMP_REG(timer));
-> +
-> +       writel(TIMER_CTRL_OP(option) | TIMER_CTRL_ENABLE,
-> +                       evt->gpt_base + TIMER_CTRL_REG(timer));
-> +}
-> +
-> +static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
-> +{
-> +       u32 val;
-> +
-> +       val = readl(evt->gpt_base + GPT_IRQ_EN_REG);
-> +       writel(val | GPT_IRQ_ENABLE(timer),
-> +                       evt->gpt_base + GPT_IRQ_EN_REG);
-> +}
-> +
-> +static void __init mtk_timer_init(struct device_node *node)
-> +{
-> +       struct mtk_clock_event_device *evt;
-> +       struct resource res;
-> +       unsigned long rate = 0;
-> +       struct clk *clk;
-> +       int ret;
-> +
-> +       evt = kzalloc(sizeof(*evt), GFP_KERNEL);
-> +       if (!evt)
-> +               panic("Can't allocate mtk clock event driver struct");
-> +
-> +       evt->dev.name = "mtk_tick";
-> +       evt->dev.rating = 300;
-> +       evt->dev.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
-> +       evt->dev.set_mode = mtk_clkevt_mode;
-> +       evt->dev.set_next_event = mtk_clkevt_next_event;
-> +       evt->dev.cpumask = cpu_possible_mask;
-> +
-> +       if (of_address_to_resource(node, 0, &res))
-> +               panic("Failed to parse resource\n");
+> >This is not a description of your hardware, it is a description of how
+> >it is controlled with your current software.
 
-panics are a bit pointless at this stage since your console is
-typically not up yet. Warning and continuing on with boot gives you a
-better shot at actually seeing the message.
+> Sorry, but I really don't know what you are referring to. It's a pure
+> hardware description of some pins being the SPI bus namely MISO/MOSI and the
+> clock plus an accompanying chip-select pin.
 
-> +
-> +       if (!request_mem_region(res.start, resource_size(&res), "mtk-timer"))
-> +               panic("Registers are a busy IO resource");
-> +
-> +       evt->gpt_base = ioremap(res.start, resource_size(&res));
+No, that's in the controller node - the chip selects are described
+there.  The child node references a chip select number that the master
+has and describes what's connected to that chip select.
 
-of_iomap instead of these 3 calls.
+> I fear for some reason or another you have some affinity against spidev
+> which strikes me odd. Admittedly it is not perfect but it is the only
+> generic SPI user space access currently implemented in the Linux kernel and
+> so far did its job perfectly for many of our customers.
 
-> +       if (!evt->gpt_base)
-> +               panic("Can't map registers");
-> +
-> +       evt->dev.irq = irq_of_parse_and_map(node, 0);
-> +       if (evt->dev.irq <= 0)
-> +               panic("Can't parse IRQ");
-> +
-> +       clk = of_clk_get(node, 0);
-> +       if (IS_ERR(clk))
-> +               panic("Can't get timer clock");
-> +
-> +       clk_prepare_enable(clk);
-> +       rate = clk_get_rate(clk);
-> +
-> +       ret = request_irq(evt->dev.irq, mtk_timer_interrupt,
-> +                       IRQF_TIMER | IRQF_IRQPOLL, "mtk_timer", evt);
-> +       if (ret)
-> +               pr_warn("failed to setup irq %d\n", evt->dev.irq);
-> +
-> +       evt->ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
-> +
-> +       mtk_timer_global_reset(evt);
-> +
-> +       /* Configure clock source */
-> +       mtk_timer_setup(evt, GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN);
-> +       clocksource_mmio_init(evt->gpt_base + TIMER_CNT_REG(GPT_CLK_SRC),
-> +                       node->name, rate, 300, 32, clocksource_mmio_readl_up);
-> +
-> +       /* Configure clock event */
-> +       mtk_timer_setup(evt, GPT_CLK_EVT, TIMER_CTRL_OP_REPEAT);
-> +       mtk_timer_enable_irq(evt, GPT_CLK_EVT);
-> +
-> +       clockevents_config_and_register(&evt->dev, rate, 0x3,
-> +                                       0xffffffff);
-> +}
-> +CLOCKSOURCE_OF_DECLARE(mtk_mt6577, "mediatek,mt6577-timer", mtk_timer_init);
-> --
-> 1.7.9.5
->
+It's a perfectly fine way of controlling things from userspace if that's
+a sensible way of controlling devices but that does not mean you should
+describe it in the device tree in that fashion.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140604/93c068c6/attachment.sig>
