@@ -1,118 +1,48 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 4 Jun 2014 13:52:46 +0200
-Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
-In-Reply-To: <20140604112342.GN29593@e103034-lin>
-References: <20140528121001.GI19967@e103034-lin>
- <CAKfTPtDxeBfZK1AxCRqEG91pi--Ti1RYFoQPDhvMVnGTCspQ-g@mail.gmail.com>
- <20140528154703.GJ19967@e103034-lin>
- <20140603155007.GZ30445@twins.programming.kicks-ass.net>
- <CAKfTPtDUvH--WxFATTW6YRAvLuohzyNHDUq6DRdfxc7gRKCX6Q@mail.gmail.com>
- <20140604080809.GK30445@twins.programming.kicks-ass.net>
- <CAKfTPtBCG1Jq2b+fyoGuA=7yG_yUbsmaD+j-ZXXsPNGp5giKpg@mail.gmail.com>
- <20140604101724.GD11096@twins.programming.kicks-ass.net>
- <20140604103619.GL29593@e103034-lin>
- <CAKfTPtCVyLRG-fSge1shdw5aSDB3y=_qzU1DOVgCx0VBnn6mnA@mail.gmail.com>
- <20140604112342.GN29593@e103034-lin>
-Message-ID: <CAKfTPtCsxkypo_4e9zTHV_XPUt7-Bybot2uNOHUZVfbd=7vXHw@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 04 Jun 2014 13:53:35 +0200
+Subject: [PATCH v2 4/7] ARM: shmobile: r8a7791: Add SYS-DMAC channel
+ definitions for bindings
+In-Reply-To: <538F06CF.5090406@codethink.co.uk>
+References: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
+ <3770565.HiyLmu1184@avalon> <538F06CF.5090406@codethink.co.uk>
+Message-ID: <1917207.MSyb5W7vbK@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 June 2014 13:23, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
-> On Wed, Jun 04, 2014 at 12:07:29PM +0100, Vincent Guittot wrote:
->> On 4 June 2014 12:36, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
->> > On Wed, Jun 04, 2014 at 11:17:24AM +0100, Peter Zijlstra wrote:
->> >> On Wed, Jun 04, 2014 at 11:32:10AM +0200, Vincent Guittot wrote:
->> >> > On 4 June 2014 10:08, Peter Zijlstra <peterz@infradead.org> wrote:
->> >> > > On Wed, Jun 04, 2014 at 09:47:26AM +0200, Vincent Guittot wrote:
->> >> > >> On 3 June 2014 17:50, Peter Zijlstra <peterz@infradead.org> wrote:
->> >> > >> > On Wed, May 28, 2014 at 04:47:03PM +0100, Morten Rasmussen wrote:
->> >> > >> >> Since we may do periodic load-balance every 10 ms or so, we will perform
->> >> > >> >> a number of load-balances where runnable_avg_sum will mostly be
->> >> > >> >> reflecting the state of the world before a change (new task queued or
->> >> > >> >> moved a task to a different cpu). If you had have two tasks continuously
->> >> > >> >> on one cpu and your other cpu is idle, and you move one of the tasks to
->> >> > >> >> the other cpu, runnable_avg_sum will remain unchanged, 47742, on the
->> >> > >> >> first cpu while it starts from 0 on the other one. 10 ms later it will
->> >> > >> >> have increased a bit, 32 ms later it will be 47742/2, and 345 ms later
->> >> > >> >> it reaches 47742. In the mean time the cpu doesn't appear fully utilized
->> >> > >> >> and we might decide to put more tasks on it because we don't know if
->> >> > >> >> runnable_avg_sum represents a partially utilized cpu (for example a 50%
->> >> > >> >> task) or if it will continue to rise and eventually get to 47742.
->> >> > >> >
->> >> > >> > Ah, no, since we track per task, and update the per-cpu ones when we
->> >> > >> > migrate tasks, the per-cpu values should be instantly updated.
->> >> > >> >
->> >> > >> > If we were to increase per task storage, we might as well also track
->> >> > >> > running_avg not only runnable_avg.
->> >> > >>
->> >> > >> I agree that the removed running_avg should give more useful
->> >> > >> information about the the load of a CPU.
->> >> > >>
->> >> > >> The main issue with running_avg is that it's disturbed by other tasks
->> >> > >> (as point out previously). As a typical example,  if we have 2 tasks
->> >> > >> with a load of 25% on 1 CPU, the unweighted runnable_load_avg will be
->> >> > >> in the range of [100% - 50%] depending of the parallelism of the
->> >> > >> runtime of the tasks whereas the reality is 50% and the use of
->> >> > >> running_avg will return this value
->> >> > >
->> >> > > I'm not sure I see how 100% is possible, but yes I agree that runnable
->> >> > > can indeed be inflated due to this queueing effect.
->> >>
->> >> Let me explain the 75%, take any one of the above scenarios. Lets call
->> >> the two tasks A and B, and let for a moment assume A always wins and
->> >> runs first, and then B.
->> >>
->> >> So A will be runnable for 25%, B otoh will be runnable the entire time A
->> >> is actually running plus its own running time, giving 50%. Together that
->> >> makes 75%.
->> >>
->> >> If you release the assumption that A runs first, but instead assume they
->> >> equally win the first execution, you get them averaging at 37.5% each,
->> >> which combined will still give 75%.
->> >
->> > But that is assuming that the first task gets to run to completion of it
->> > busy period. If it uses up its sched_slice and we switch to the other
->> > tasks, they both get to wait.
->> >
->> > For example, if the sched_slice is 5 ms and the busy period is 10 ms,
->> > the execution pattern would be: A, B, A, B, idle, ... In that case A is
->> > runnable for 15 ms and B is for 20 ms. Assuming that the overall period
->> > is 40 ms, the A runnable is 37.5% and B is 50%.
->>
->> The exact value for your scheduling example above is:
->> A runnable will be 47% and B runnable will be 60% (unless i make a
->> mistake in my computation)
->
-> I get:
->
-> A: 15/40 ms = 37.5%
-> B: 20/40 ms = 50%
->
-> Schedule:
->
->    | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms | 5 ms |
-> A:   run     rq     run  ----------- sleeping -------------  run
-> B:   rq      run    rq    run   ---- sleeping -------------  rq
->
->> and CPU runnable will be 60% too
->
-> rq->avg.runnable_avg_sum should be 50%. You have two tasks running for
-> 20 ms every 40 ms.
->
-> Right?
+Hi Ben,
 
-ok, i see the misunderstood.
-it's depends of what we mean by runnable. You take the % of time
-whereas i take the runnable_avg_sum/period
+On Wednesday 04 June 2014 12:45:19 Ben Dooks wrote:
+> On 04/06/14 12:30, Laurent Pinchart wrote:
+> > On Tuesday 03 June 2014 09:53:17 Geert Uytterhoeven wrote:
+> >> On Mon, Jun 2, 2014 at 3:52 PM, Ben Dooks wrote:
+> >>>> +// FIXME
+> >>>> +#define CHCR_RX_8BIT SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_8BIT)
+> >>>> +#define CHCR_TX_8BIT SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_8BIT)
+> >>>> +#define CHCR_RX_16BIT        SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_16BIT)
+> >>>> +#define CHCR_TX_16BIT        SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_16BIT)
+> >>>> +#define CHCR_RX_32BIT        SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_32BIT)
+> >>>> +#define CHCR_TX_32BIT        SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_32BIT)
+> >>>> +#define CHCR_RX_256BIT       SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_256BIT)
+> >>>> +#define CHCR_TX_256BIT       SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_256BIT)
+> >>> 
+> >>> I am pretty sure for round-2 we can remove these in favour of a
+> >>> table in the driver. The only device that has a non-standard setting
+> >>> is the SDHI and that will support 32bit and 256bit transfers.
+> >> 
+> >> Thanks, I'm eagerly awaiting your next version...
+> > 
+> > Speaking of that, Ben, do you have a git tree with your latest patches ?
+> 
+> Not yet, as currently working on sorting out the soc_camera before
+> moving back to the DMA. I have a plan, just not had the time to sort
+> it out.
 
-so A is on_rq 15/40 ms = 37.5% of the time which gives a
-runnable_avg_sum/runnable_avg_period of 47%
-B is on_rq  20/40 ms = 50% of the time which gives a
-runnable_avg_sum/runnable_avg_period of 60%
-and CPU has a task on its rq 20/40ms = 50% of the time which gives a
-runnable_avg_sum/runnable_avg_period of 60%
+I need to start implementing LPAE support for the DMAC using descriptors, and 
+I have to decide whether I'll go for a new driver of fix the existing one(s). 
+Having access to your code, even if it's work in progress, would be helpful, 
+otherwise there will be a high chance of conflicts.
 
-Vincent
+-- 
+Regards,
 
->
-> Morten
+Laurent Pinchart
