@@ -1,90 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  4 Jun 2014 14:47:28 +0200
-Subject: [PATCH v2] ARM: integrator: fix section mismatch problem
-Message-ID: <1401886048-22209-1-git-send-email-linus.walleij@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 4 Jun 2014 15:13:07 +0200
+Subject: [PATCH v2 6/6] usb: host: ohci-exynos: Use devm_ioremap_resource
+ instead of devm_ioremap
+In-Reply-To: <CAFp+6iFufCh6SVEF-HQA62ZsJGJGSebDSs28eqcrMy1X8e5vjA@mail.gmail.com>
+References: <1399723210-21569-1-git-send-email-gautam.vivek@samsung.com>
+ <1399723210-21569-7-git-send-email-gautam.vivek@samsung.com>
+ <CAFp+6iFufCh6SVEF-HQA62ZsJGJGSebDSs28eqcrMy1X8e5vjA@mail.gmail.com>
+Message-ID: <20140604131306.GB28484@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This addresses a section mismatch problem in the IM-PD1
-driver in the Integrator/AP.
+On Wed, Jun 04, 2014 at 03:41:20PM +0530, Vivek Gautam wrote:
+> Hi,
+> 
+> 
+> On Sat, May 10, 2014 at 5:30 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+> > Using devm_ioremap_resource() API should actually be preferred over
+> > devm_ioremap(), since the former request the mem region first and then
+> > gives back the ioremap'ed memory pointer.
+> > devm_ioremap_resource() calls request_mem_region(), therby preventing
+> > other drivers to make any overlapping call to the same region.
+> >
+> > Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> 
+> Although this patch and rest in the series are merged.
+> But i have got a doubt, so making this thread alive.
+> 
+> > ---
+> >  drivers/usb/host/ohci-exynos.c |    7 +++----
+> >  1 file changed, 3 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
+> > index 9cf80cb..dec691d 100644
+> > --- a/drivers/usb/host/ohci-exynos.c
+> > +++ b/drivers/usb/host/ohci-exynos.c
+> > @@ -120,10 +120,9 @@ skip_phy:
+> >
+> >         hcd->rsrc_start = res->start;
+> >         hcd->rsrc_len = resource_size(res);
+> > -       hcd->regs = devm_ioremap(&pdev->dev, res->start, hcd->rsrc_len);
+> > -       if (!hcd->regs) {
+> > -               dev_err(&pdev->dev, "Failed to remap I/O memory\n");
+> > -               err = -ENOMEM;
+> > +       hcd->regs = devm_ioremap_resource(&pdev->dev, res);
+> 
+> Here, we replaced devm_ioremap() call with devm_ioremap_resource(),
+> which internally requests the memory region
 
-The IM-PD1 contains a VIC interrupt controller and therefore
-the driver calls vic_init_cascaded() which is marked __init as
-irqchips are simply not hot-pluggable and specifically the VIC
-is assumed to initiate only on boot.
+I guess this could lead to problems if drivers haven't been written to
+cleanly split the register ranges that they access, since now two
+overlapping regions may be requested and cause the drivers to fail.
 
-However the module driver model of the Integrator LM bus
-assumes that logic tile drivers can be probed at runtime. This
-is not really the case for IM-PD1: these tiles are detected at
-boot and they cannot be plugged into a running system. Before
-this patch it is of course possible to modprobe them later.
+> and then does a "devm_ioremap()" or "devm_ioremap_nocache()" based on
+> the check for IORESOURCE_CACHEABLE flag.
+> 
+> But this flag is not set for the resource of this device.
+> So should we be explicitly setting the flag in driver ?
 
-By first forcing the IM-PD1 to bool we make sure this driver
-gets compiled into the kernel, and we know it will be probed
-only at boot time when the tiles are detected, so we can tag
-its probe function __init_refok as we know it won't be called
-after boot now, and the section mismatch problem goes away.
+I don't think it makes much sense to map these registers cached anyway.
+Drivers will likely expect writes to this region to take effect without
+needing any kind of flushing.
 
-As a side effect, sysfs binding from userspace becomes
-impossible, so we tag the driver to suppress the bind/unbind
-sysfs attributes.
-
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Suppress sysfs bind/unbind for the IM-PD1
-
-ARM SoC folks: please apply this directly if the solution seems
-acceptable.
----
- arch/arm/mach-integrator/Kconfig |  2 +-
- arch/arm/mach-integrator/impd1.c | 12 +++++++++++-
- 2 files changed, 12 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
-index ba43321001d8..64f8e2564a37 100644
---- a/arch/arm/mach-integrator/Kconfig
-+++ b/arch/arm/mach-integrator/Kconfig
-@@ -28,7 +28,7 @@ config ARCH_CINTEGRATOR
- 	bool
- 
- config INTEGRATOR_IMPD1
--	tristate "Include support for Integrator/IM-PD1"
-+	bool "Include support for Integrator/IM-PD1"
- 	depends on ARCH_INTEGRATOR_AP
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_VIC
-diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
-index 0e870ea818c4..3ce880729cff 100644
---- a/arch/arm/mach-integrator/impd1.c
-+++ b/arch/arm/mach-integrator/impd1.c
-@@ -308,7 +308,12 @@ static struct impd1_device impd1_devs[] = {
-  */
- #define IMPD1_VALID_IRQS 0x00000bffU
- 
--static int __init impd1_probe(struct lm_device *dev)
-+/*
-+ * As this module is bool, it is OK to have this as __init_refok() - no
-+ * probe calls will be done after the initial system bootup, as devices
-+ * are discovered as part of the machine startup.
-+ */
-+static int __init_refok impd1_probe(struct lm_device *dev)
- {
- 	struct impd1_module *impd1;
- 	int irq_base;
-@@ -397,6 +402,11 @@ static void impd1_remove(struct lm_device *dev)
- static struct lm_driver impd1_driver = {
- 	.drv = {
- 		.name	= "impd1",
-+		/*
-+		 * As we're dropping the probe() function, suppress driver
-+		 * binding from sysfs.
-+		 */
-+		.suppress_bind_attrs = true,
- 	},
- 	.probe		= impd1_probe,
- 	.remove		= impd1_remove,
--- 
-1.9.3
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140604/b3ac520e/attachment.sig>
