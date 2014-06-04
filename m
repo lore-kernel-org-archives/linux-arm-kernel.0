@@ -1,77 +1,58 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 4 Jun 2014 11:32:10 +0200
-Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
-In-Reply-To: <20140604080809.GK30445@twins.programming.kicks-ass.net>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
- <20140528121001.GI19967@e103034-lin>
- <CAKfTPtDxeBfZK1AxCRqEG91pi--Ti1RYFoQPDhvMVnGTCspQ-g@mail.gmail.com>
- <20140528154703.GJ19967@e103034-lin>
- <20140603155007.GZ30445@twins.programming.kicks-ass.net>
- <CAKfTPtDUvH--WxFATTW6YRAvLuohzyNHDUq6DRdfxc7gRKCX6Q@mail.gmail.com>
- <20140604080809.GK30445@twins.programming.kicks-ass.net>
-Message-ID: <CAKfTPtBCG1Jq2b+fyoGuA=7yG_yUbsmaD+j-ZXXsPNGp5giKpg@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 4 Jun 2014 10:34:53 +0100
+Subject: [PATCH] arm64: topology: add MPIDR-based detection
+In-Reply-To: <20140603210424.GJ31751@sirena.org.uk>
+References: <1401644249-23792-1-git-send-email-broonie@kernel.org>
+ <20140603173103.GA18004@red-moon>
+ <20140603210424.GJ31751@sirena.org.uk>
+Message-ID: <20140604093452.GA8057@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 June 2014 10:08, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Wed, Jun 04, 2014 at 09:47:26AM +0200, Vincent Guittot wrote:
->> On 3 June 2014 17:50, Peter Zijlstra <peterz@infradead.org> wrote:
->> > On Wed, May 28, 2014 at 04:47:03PM +0100, Morten Rasmussen wrote:
->> >> Since we may do periodic load-balance every 10 ms or so, we will perform
->> >> a number of load-balances where runnable_avg_sum will mostly be
->> >> reflecting the state of the world before a change (new task queued or
->> >> moved a task to a different cpu). If you had have two tasks continuously
->> >> on one cpu and your other cpu is idle, and you move one of the tasks to
->> >> the other cpu, runnable_avg_sum will remain unchanged, 47742, on the
->> >> first cpu while it starts from 0 on the other one. 10 ms later it will
->> >> have increased a bit, 32 ms later it will be 47742/2, and 345 ms later
->> >> it reaches 47742. In the mean time the cpu doesn't appear fully utilized
->> >> and we might decide to put more tasks on it because we don't know if
->> >> runnable_avg_sum represents a partially utilized cpu (for example a 50%
->> >> task) or if it will continue to rise and eventually get to 47742.
->> >
->> > Ah, no, since we track per task, and update the per-cpu ones when we
->> > migrate tasks, the per-cpu values should be instantly updated.
->> >
->> > If we were to increase per task storage, we might as well also track
->> > running_avg not only runnable_avg.
->>
->> I agree that the removed running_avg should give more useful
->> information about the the load of a CPU.
->>
->> The main issue with running_avg is that it's disturbed by other tasks
->> (as point out previously). As a typical example,  if we have 2 tasks
->> with a load of 25% on 1 CPU, the unweighted runnable_load_avg will be
->> in the range of [100% - 50%] depending of the parallelism of the
->> runtime of the tasks whereas the reality is 50% and the use of
->> running_avg will return this value
->
-> I'm not sure I see how 100% is possible, but yes I agree that runnable
-> can indeed be inflated due to this queueing effect.
+On Tue, Jun 03, 2014 at 10:04:24PM +0100, Mark Brown wrote:
+> On Tue, Jun 03, 2014 at 06:31:03PM +0100, Lorenzo Pieralisi wrote:
+> 
+> > I refactored the patch (UP code path) and deliberately removed the
+> > code that packs affinity levels into the cluster id. I do not
+> > like packing the affinity levels and on second thoughts packing the
+> > unused affinity levels into cluster_id is as correct as packing
+> > the unused affinity levels into core_id (ie it is arbitrary), so I do
+> 
+> I'm having a really hard time seeing this as anything other than a step
+> back.  Your change causes us to discard the higher affinity levels which
+> seems like something we actively know to be misleading and means that we
+> will be handing the scheduler two different identically numbered cores
+> (all the affinity levels we do pay attention to will be identical) if we
+> ever encounter such a system which is actively broken.
 
-In fact, it can be even worse than that because i forgot to take into
-account the geometric series effect which implies that it depends of
-the runtime (idletime) of the task
+If we ever encounter such systems we will deal with them when time
+comes, DT can handle them and patching this code is trivial.
 
-Take 3 examples:
+All I am saying is, let's wait and see, there is no compelling need to
+use aff3 (and aff2 on non-SMT systems) on current systems for the
+topology.
 
-2 tasks that need to run 10ms  simultaneously each 40ms. If they share
-the same CPU, they will be on the runqueue 20ms (in fact a bit less
-for one of them), Their load (runnable_avg_sum/runnable_avg_period)
-will be 33% each so the unweighted runnable_load_avg of the CPU will
-be 66%
+> > not think we should do it, that's the reason why we defined DT bindings
+> > to add a proper topology semantics and we should use them when the MPIDR
+> > values deviate from the "recommendations".
+> 
+> I'd agree with not going to great lengths unless someone defines
+> semantics for the higher affinity levels in the future however it does
+> seem like completely ignoring them when it's so easy to take some
+> account of them is insufficiently defensive - it's similar to things
+> like putting the of_node_put() calls in even though they don't do
+> anything at the minute.
 
-2 tasks that need to run 25ms simultaneously each 100ms. If they share
-the same CPU, they will be on the runqueue 50ms (in fact a bit less
-for one of them), Their load (runnable_avg_sum/runnable_avg_period)
-will be 74% each so the unweighted runnable_load_avg of the CPU will
-be 148%
+So why don't you remove of_node_put() all over the kernel then ?
 
-2 tasks that need to run 50ms  simultaneously each 200ms. If they
-share the same CPU, they will be on the runqueue 100ms (in fact a bit
-less for one of them), Their load
-(runnable_avg_sum/runnable_avg_period) will be 89% each so the
-unweighted runnable_load_avg of the CPU will be 180%
+As for the MPIDR and the affinity levels, see above.
 
-Vincent
+> > Patch attached, my ack included, should be ready to go, unless you
+> > object to that.
+> 
+> Well, I certainly don't object to getting something merged here.
+
+Neither do I, let's get this code in.
+
+Thanks,
+Lorenzo
