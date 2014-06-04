@@ -1,67 +1,35 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 4 Jun 2014 13:06:07 +0200
-Subject: [PATCH 1/8] mmc: sdhci-st: Intial support for ST SDHCI controller
-In-Reply-To: <20140604084831.GB23469@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1400771902-26553-1-git-send-email-peter.griffin@linaro.org>
- <1400771902-26553-2-git-send-email-peter.griffin@linaro.org>
- <CAPDyKFpanhYbf89tEKru=_oOfBGZZxs0=eqr_5MvU9v_bGULjQ@mail.gmail.com>
- <20140604084831.GB23469@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <CAPDyKFqvQca9RfsVVyfeC9r=pEDM2mBkfS7SzpYZHHXMnHfyUQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 4 Jun 2014 06:06:47 -0500
+Subject: [PATCH v6 3/6] vendor-prefixes: add prefix for Mediaktek Inc.
+In-Reply-To: <1401468964-5307-4-git-send-email-matthias.bgg@gmail.com>
+References: <1401468964-5307-1-git-send-email-matthias.bgg@gmail.com>
+ <1401468964-5307-4-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <CAL_JsqLpr70p96Cw0t54PjYdJrQA_O21q6=5LKd1J3nuhE8R+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 June 2014 10:48, Peter Griffin <peter.griffin@linaro.org> wrote:
-> Hi Ulf,
->
-> Thanks for reviewing, see my comments below: -
->
-> On Fri, 23 May 2014, Ulf Hansson wrote:
->> > +static unsigned int sdhci_st_get_max_clk(struct sdhci_host *host)
->> > +{
->> > +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->> > +
->> > +       return clk_get_rate(pltfm_host->clk);
->> > +}
->>
->> There are sdhci library function for the above:
->> sdhci_pltfm_clk_get_max_clock()
->
-> I've fixed in v2 to use the library function
->
->> > +       host->mmc->caps |= MMC_CAP_8_BIT_DATA | MMC_CAP_BUS_WIDTH_TEST
->> > +                       | MMC_CAP_1_8V_DDR;
->>
->> Comment below.
->>
->> > +
->> > +       if (of_property_read_bool(np, "non-removable"))
->> > +               host->mmc->caps |= MMC_CAP_NONREMOVABLE;
->>
->> MMC_CAP_1_8V_DDR, MMC_CAP_8_BIT_DATA, MMC_CAP_NONREMOVABLE aren?t
->> those board specific capabilities?
->
-> Yep
->>
->> Unless there are something that prevents you from using the common mmc
->> DT parser, I would suggest you to use it. mmc_of_parse(). Thus you can
->> provide these capabilities through DT instead.
->
-> Thanks for pointing that out, I've switched over to using mmc_of_parse,
-> and everything works as expected.
->
-> Also as an added bonus this will simplify support for the next SoC which
-> needs access to the high speed ddr / sdr bindings which
-> mmc_of_parse already supports :-)
->
-> In v2 I've also removed the reset controller code from this platform driver
-> with the intention of adding it back in, in the generic code. The idea
-> would be that an additional 'reset' binding could be provided, which if
-> present would be used to deassert the IP reset line of the controller at
-> probe / resume, and assert reset at remove / sleep.
->
-> Is this something you view as useful, if so I will prepare some RFC patches?
+On Fri, May 30, 2014 at 11:56 AM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-Sounds useful. Please go ahead and send patches! :-)
+Acked-by: Rob Herring <robh@kernel.org>
 
-Kind regards
-Uffe
+> ---
+>  .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index abc3080..73f9e4c 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -75,6 +75,7 @@ linux Linux-specific binding
+>  lsi    LSI Corp. (LSI Logic)
+>  marvell        Marvell Technology Group Ltd.
+>  maxim  Maxim Integrated Products
+> +mediatek       MediaTek Inc.
+>  microchip      Microchip Technology Inc.
+>  mosaixtech     Mosaix Technologies, Inc.
+>  moxa   Moxa
+> --
+> 1.7.9.5
+>
