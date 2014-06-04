@@ -1,43 +1,140 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 4 Jun 2014 15:46:00 +0200 (CEST)
-Subject: [PATCH v6 1/6] clocksource: Add support for the Mediatek SoCs
-In-Reply-To: <538F0230.7090800@free-electrons.com>
-References: <1401468964-5307-1-git-send-email-matthias.bgg@gmail.com>
- <1401468964-5307-2-git-send-email-matthias.bgg@gmail.com>
- <CAL_JsqKCTZjh7o2zf_WsVi=iAR1ivTPQpvpNJ6W87jPXakMnZg@mail.gmail.com>
- <538F0230.7090800@free-electrons.com>
-Message-ID: <alpine.DEB.2.10.1406041544130.3319@nanos>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed,  4 Jun 2014 15:47:54 +0200
+Subject: [PATCH v2] ARM: KVM: Unmap IPA on memslot delete/move
+Message-ID: <1401889674-10067-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Jun 2014, Gregory CLEMENT wrote:
-> Hi Rob,
-> 
-> On 04/06/2014 13:18, Rob Herring wrote:
-> 
-> [...]
-> 
-> >> +
-> >> +       if (of_address_to_resource(node, 0, &res))
-> >> +               panic("Failed to parse resource\n");
-> > 
-> > panics are a bit pointless at this stage since your console is
-> > typically not up yet. Warning and continuing on with boot gives you a
-> > better shot at actually seeing the message.
-> > 
-> >> +
-> >> +       if (!request_mem_region(res.start, resource_size(&res), "mtk-timer"))
-> >> +               panic("Registers are a busy IO resource");
-> >> +
-> >> +       evt->gpt_base = ioremap(res.start, resource_size(&res));
-> > 
-> > of_iomap instead of these 3 calls.
-> 
-> Actually of_iomap doesn't request_mem_region, that's why for
-> mvebu we are trying now to replace of_iomap by request_mem_region/ioremap.
+Currently when a KVM region is deleted or moved after
+KVM_SET_USER_MEMORY_REGION ioctl, the corresponding
+intermediate physical memory is not unmapped.
 
-What about creating of_io_request_and_map() instead of open coding it ?
+This patch corrects this and unmaps the region's IPA range
+in kvm_arch_commit_memory_region using unmap_stage2_range.
 
-Thanks,
+The patch was tested with QEMU using the VFIO platform
+device. In a specific IRQ handling case, the device regularly
+deletes/creates some RAM regions.
 
-	tglx
+Changes v1 -> v2
+- KVM_MR_MOVE case also handled and tested using a QEMU hack
+- memslot and memory_region stubs moved from arm.c to mmu.c
+  following Marc Zyngier recommendations.
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ arch/arm/kvm/arm.c | 37 -------------------------------------
+ arch/arm/kvm/mmu.c | 46 ++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 46 insertions(+), 37 deletions(-)
+
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index f0e50a0..bcc2929 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -155,16 +155,6 @@ int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
+ 	return VM_FAULT_SIGBUS;
+ }
+ 
+-void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
+-			   struct kvm_memory_slot *dont)
+-{
+-}
+-
+-int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
+-			    unsigned long npages)
+-{
+-	return 0;
+-}
+ 
+ /**
+  * kvm_arch_destroy_vm - destroy the VM data structure
+@@ -224,33 +214,6 @@ long kvm_arch_dev_ioctl(struct file *filp,
+ 	return -EINVAL;
+ }
+ 
+-void kvm_arch_memslots_updated(struct kvm *kvm)
+-{
+-}
+-
+-int kvm_arch_prepare_memory_region(struct kvm *kvm,
+-				   struct kvm_memory_slot *memslot,
+-				   struct kvm_userspace_memory_region *mem,
+-				   enum kvm_mr_change change)
+-{
+-	return 0;
+-}
+-
+-void kvm_arch_commit_memory_region(struct kvm *kvm,
+-				   struct kvm_userspace_memory_region *mem,
+-				   const struct kvm_memory_slot *old,
+-				   enum kvm_mr_change change)
+-{
+-}
+-
+-void kvm_arch_flush_shadow_all(struct kvm *kvm)
+-{
+-}
+-
+-void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
+-				   struct kvm_memory_slot *slot)
+-{
+-}
+ 
+ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm, unsigned int id)
+ {
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 16f8049..921245c 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -1100,3 +1100,49 @@ out:
+ 	free_hyp_pgds();
+ 	return err;
+ }
++
++void kvm_arch_commit_memory_region(struct kvm *kvm,
++				   struct kvm_userspace_memory_region *mem,
++				   const struct kvm_memory_slot *old,
++				   enum kvm_mr_change change)
++{
++	gpa_t gpa = old->base_gfn << PAGE_SHIFT;
++	u64 size = old->npages << PAGE_SHIFT;
++	if (change == KVM_MR_DELETE || change == KVM_MR_MOVE) {
++		spin_lock(&kvm->mmu_lock);
++		unmap_stage2_range(kvm, gpa, size);
++		spin_unlock(&kvm->mmu_lock);
++	}
++}
++
++int kvm_arch_prepare_memory_region(struct kvm *kvm,
++				   struct kvm_memory_slot *memslot,
++				   struct kvm_userspace_memory_region *mem,
++				   enum kvm_mr_change change)
++{
++	return 0;
++}
++
++void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
++			   struct kvm_memory_slot *dont)
++{
++}
++
++int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
++			    unsigned long npages)
++{
++	return 0;
++}
++
++void kvm_arch_memslots_updated(struct kvm *kvm)
++{
++}
++
++void kvm_arch_flush_shadow_all(struct kvm *kvm)
++{
++}
++
++void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
++				   struct kvm_memory_slot *slot)
++{
++}
+-- 
+1.9.1
