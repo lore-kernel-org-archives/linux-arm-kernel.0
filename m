@@ -1,57 +1,333 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Wed, 4 Jun 2014 12:17:30 +0100
-Subject: [PATCH v2 04/11] sched: Allow all archs to set the power_orig
-In-Reply-To: <CAKfTPtB2XC3hVN4LuRjvd3JB5GZ9=R5Tq6F52iYxO3nCJ04Cew@mail.gmail.com>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-5-git-send-email-vincent.guittot@linaro.org>
- <20140603132217.GD29593@e103034-lin>
- <CAKfTPtB2XC3hVN4LuRjvd3JB5GZ9=R5Tq6F52iYxO3nCJ04Cew@mail.gmail.com>
-Message-ID: <20140604111730.GM29593@e103034-lin>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 4 Jun 2014 06:18:26 -0500
+Subject: [PATCH v6 1/6] clocksource: Add support for the Mediatek SoCs
+In-Reply-To: <1401468964-5307-2-git-send-email-matthias.bgg@gmail.com>
+References: <1401468964-5307-1-git-send-email-matthias.bgg@gmail.com>
+ <1401468964-5307-2-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <CAL_JsqKCTZjh7o2zf_WsVi=iAR1ivTPQpvpNJ6W87jPXakMnZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 03, 2014 at 03:02:18PM +0100, Vincent Guittot wrote:
-> On 3 June 2014 15:22, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
-> > On Fri, May 23, 2014 at 04:52:58PM +0100, Vincent Guittot wrote:
-> >> power_orig is only changed for system with a SMT sched_domain level in order to
-> >> reflect the lower capacity of CPUs. Heterogenous system also have to reflect an
-> >> original capacity that is different from the default value.
-> >>
-> >> Create a more generic function arch_scale_cpu_power that can be also used by
-> >> non SMT platform to set power_orig.
-> >
-> > I did a quick test of the patch set with adjusting cpu_power on
-> > big.LITTLE (ARM TC2) to reflect the different compute capacities of the
-> > A15s and A7s. I ran the sysbench cpu benchmark with 5 threads with and
-> > without the patches applied, but with non-default cpu_powers.
-> >
-> > I didn't see any difference in the load-balance. Three tasks ended up on
-> > the two A15s and two tasks ended up on two of the three A7s leaving one
-> > unused in both cases.
-> >
-> > Using default cpu_power I get one task on each of the five cpus (best
-> > throughput). Unless I messed something up, it seems that setting
-> > cpu_power doesn't give me the best throughput with these patches
-> > applied.
-> 
-> That's normal this patchset is necessary but not enough to solve the
-> issue you mention. We also need to fix the way the imbalance is
-> calculated for such situation. I have planned to push that in another
-> patchset in order to not mix too much thing together
+On Fri, May 30, 2014 at 11:55 AM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+> This patch adds a clock source and clock event for the timer found
+> on the Mediatek SoCs.
+>
+> The Mediatek General Purpose Timer block provides five 32 bit timers and
+> one 64 bit timer.
+>
+> Two 32 bit timers are used by this driver:
+> TIMER1: clock events supporting periodic and oneshot events
+> TIMER2: clock source configured as a free running counter
+>
+> The General Purpose Timer block can be run with two clocks. A 13 MHz system
+> clock and the RTC clock running at 32 KHz. This implementation uses the system
+> clock with no clock source divider.
+>
+> The interrupts are shared between the different timers and have to be read back
+> from a register. We just enable one interrupt for the clock event. The clock
+> event timer is used by all cores.
+>
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
+>  drivers/clocksource/Kconfig     |    4 +
+>  drivers/clocksource/Makefile    |    1 +
+>  drivers/clocksource/mtk_timer.c |  242 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 247 insertions(+)
+>  create mode 100644 drivers/clocksource/mtk_timer.c
+>
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index 96918e1..1f73740 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -144,6 +144,10 @@ config VF_PIT_TIMER
+>  config SYS_SUPPORTS_SH_CMT
+>          bool
+>
+> +config MTK_TIMER
+> +       select CLKSRC_MMIO
 
-Based on the commit messages I was just lead to believe that this was a
-self-contained patch set that also addressed issues related to handling
-heterogeneous systems. Maybe it would be worth mentioning that this set
-is only part of the solution somewhere?
+Also select CLKSRC_OF
 
-It is a bit unclear to me how these changes, which appear to mainly
-improve factoring rt and irq time into cpu_power, will solve the
-cpu_power issues related to heterogeneous systems. Can you share your
-plans for the follow up patch set? I think it would be better to review
-the solution as a whole.
+> +       bool
+> +
+>  config SYS_SUPPORTS_SH_MTU2
+>          bool
+>
+> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> index 98cb6c5..619d302 100644
+> --- a/drivers/clocksource/Makefile
+> +++ b/drivers/clocksource/Makefile
+> @@ -33,6 +33,7 @@ obj-$(CONFIG_CLKSRC_EXYNOS_MCT)       += exynos_mct.o
+>  obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)       += samsung_pwm_timer.o
+>  obj-$(CONFIG_VF_PIT_TIMER)     += vf_pit_timer.o
+>  obj-$(CONFIG_CLKSRC_QCOM)      += qcom-timer.o
+> +obj-$(CONFIG_MTK_TIMER)                += mtk_timer.o
+>
+>  obj-$(CONFIG_ARM_ARCH_TIMER)           += arm_arch_timer.o
+>  obj-$(CONFIG_ARM_GLOBAL_TIMER)         += arm_global_timer.o
+> diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
+> new file mode 100644
+> index 0000000..8e8b94a
+> --- /dev/null
+> +++ b/drivers/clocksource/mtk_timer.c
+> @@ -0,0 +1,242 @@
+> +/*
+> + * Mediatek SoCs General-Purpose Timer handling.
+> + *
+> + * Copyright (C) 2014 Matthias Brugger
+> + *
+> + * Matthias Brugger <matthias.bgg@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clockchips.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/irq.h>
+> +#include <linux/irqreturn.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/slab.h>
+> +
+> +#define GPT_IRQ_EN_REG         0x00
+> +#define GPT_IRQ_ENABLE(val)    BIT(val-1)
 
-I absolutely agree that the imbalance calculation needs to fixed, but I
-don't think the current rq runnable_avg_sum is the right choice for that
-purpose for the reasons I pointed out the in other thread.
+val should have parentheses.
 
-Morten
+> +#define GPT_IRQ_ACK_REG                0x08
+> +#define GPT_IRQ_ACK(val)       BIT(val-1)
+
+ditto
+
+> +
+> +#define TIMER_CTRL_REG(val)    (0x10 * val)
+> +#define TIMER_CTRL_OP(val)     (((val) & 0x3) << 4)
+> +#define TIMER_CTRL_OP_ONESHOT  (0)
+> +#define TIMER_CTRL_OP_REPEAT   (1)
+> +#define TIMER_CTRL_OP_FREERUN  (3)
+> +#define TIMER_CTRL_CLEAR       (2)
+> +#define TIMER_CTRL_ENABLE      (1)
+> +#define TIMER_CTRL_DISABLE     (0)
+> +
+> +#define TIMER_CLK_REG(val)     (0x04 + (0x10 * val))
+> +#define TIMER_CLK_SRC(val)     (((val) & 0x1) << 4)
+> +#define TIMER_CLK_SRC_SYS13M   (0)
+> +#define TIMER_CLK_SRC_RTC32K   (1)
+> +#define TIMER_CLK_DIV1         (0x0)
+> +#define TIMER_CLK_DIV2         (0x1)
+> +
+> +#define TIMER_CNT_REG(val)     (0x08 + (0x10 * val))
+> +#define TIMER_CMP_REG(val)     (0x0C + (0x10 * val))
+> +
+> +#define GPT_CLK_EVT    1
+> +#define GPT_CLK_SRC    2
+> +
+> +struct mtk_clock_event_device {
+> +       void __iomem *gpt_base;
+> +       u32 ticks_per_jiffy;
+> +       struct clock_event_device dev;
+> +};
+> +
+> +static inline struct mtk_clock_event_device *to_mtk_clk(
+> +                               struct clock_event_device *c)
+> +{
+> +       return container_of(c, struct mtk_clock_event_device, dev);
+> +}
+> +
+> +static void mtk_clkevt_time_stop(struct mtk_clock_event_device *evt, u8 timer)
+> +{
+> +       u32 val = readl(evt->gpt_base + TIMER_CTRL_REG(timer));
+> +       writel(val & ~TIMER_CTRL_ENABLE, evt->gpt_base +
+> +                       TIMER_CTRL_REG(timer));
+> +}
+> +
+> +static void mtk_clkevt_time_setup(struct mtk_clock_event_device *evt,
+> +                               unsigned long delay, u8 timer)
+> +{
+> +       writel(delay, evt->gpt_base + TIMER_CMP_REG(timer));
+> +}
+> +
+> +static void mtk_clkevt_time_start(struct mtk_clock_event_device *evt,
+> +               bool periodic, u8 timer)
+> +{
+> +       u32 val;
+> +
+> +       /* Acknowledge interrupt */
+> +       writel(GPT_IRQ_ACK(timer), evt->gpt_base + GPT_IRQ_ACK_REG);
+> +
+> +       val = readl(evt->gpt_base + TIMER_CTRL_REG(timer));
+> +
+> +       /* Clear 2 bit timer operation mode field */
+> +       val &= ~TIMER_CTRL_OP(0x3);
+> +
+> +       if (periodic)
+> +               val |= TIMER_CTRL_OP(TIMER_CTRL_OP_REPEAT);
+> +       else
+> +               val |= TIMER_CTRL_OP(TIMER_CTRL_OP_ONESHOT);
+> +
+> +       writel(val | TIMER_CTRL_ENABLE | TIMER_CTRL_CLEAR,
+> +              evt->gpt_base + TIMER_CTRL_REG(timer));
+> +}
+> +
+> +static void mtk_clkevt_mode(enum clock_event_mode mode,
+> +                               struct clock_event_device *clk)
+> +{
+> +       struct mtk_clock_event_device *evt = to_mtk_clk(clk);
+> +
+> +       mtk_clkevt_time_stop(evt, GPT_CLK_EVT);
+> +
+> +       switch (mode) {
+> +       case CLOCK_EVT_MODE_PERIODIC:
+> +               mtk_clkevt_time_setup(evt, evt->ticks_per_jiffy, GPT_CLK_EVT);
+> +               mtk_clkevt_time_start(evt, true, GPT_CLK_EVT);
+> +               break;
+> +       case CLOCK_EVT_MODE_ONESHOT:
+> +               mtk_clkevt_time_start(evt, false, GPT_CLK_EVT);
+> +               break;
+> +       case CLOCK_EVT_MODE_UNUSED:
+> +       case CLOCK_EVT_MODE_SHUTDOWN:
+> +       default:
+> +               /* No more interrupts will occur as source is disabled */
+> +               break;
+> +       }
+> +}
+> +
+> +static int mtk_clkevt_next_event(unsigned long event,
+> +                                  struct clock_event_device *clk)
+> +{
+> +       struct mtk_clock_event_device *evt = to_mtk_clk(clk);
+> +
+> +       mtk_clkevt_time_stop(evt, GPT_CLK_EVT);
+> +       mtk_clkevt_time_setup(evt, event, GPT_CLK_EVT);
+> +       mtk_clkevt_time_start(evt, false, GPT_CLK_EVT);
+> +
+> +       return 0;
+> +}
+> +
+> +static irqreturn_t mtk_timer_interrupt(int irq, void *dev_id)
+> +{
+> +       struct mtk_clock_event_device *evt = dev_id;
+> +
+> +       /* Acknowledge timer0 irq */
+> +       writel(GPT_IRQ_ACK(GPT_CLK_EVT), evt->gpt_base + GPT_IRQ_ACK_REG);
+> +       evt->dev.event_handler(&evt->dev);
+> +
+> +       return IRQ_HANDLED;
+> +}
+> +
+> +static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
+> +{
+> +       /* Disable all interrupts */
+> +       writel(0x0, evt->gpt_base + GPT_IRQ_EN_REG);
+> +       /* Acknowledge all interrupts */
+> +       writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
+> +}
+> +
+> +static void
+> +mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
+> +{
+> +       writel(TIMER_CTRL_CLEAR | TIMER_CTRL_DISABLE,
+> +               evt->gpt_base + TIMER_CTRL_REG(timer));
+> +
+> +       writel(TIMER_CLK_SRC(TIMER_CLK_SRC_SYS13M) | TIMER_CLK_DIV1,
+> +                       evt->gpt_base + TIMER_CLK_REG(timer));
+> +
+> +       writel(0x0, evt->gpt_base + TIMER_CMP_REG(timer));
+> +
+> +       writel(TIMER_CTRL_OP(option) | TIMER_CTRL_ENABLE,
+> +                       evt->gpt_base + TIMER_CTRL_REG(timer));
+> +}
+> +
+> +static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
+> +{
+> +       u32 val;
+> +
+> +       val = readl(evt->gpt_base + GPT_IRQ_EN_REG);
+> +       writel(val | GPT_IRQ_ENABLE(timer),
+> +                       evt->gpt_base + GPT_IRQ_EN_REG);
+> +}
+> +
+> +static void __init mtk_timer_init(struct device_node *node)
+> +{
+> +       struct mtk_clock_event_device *evt;
+> +       struct resource res;
+> +       unsigned long rate = 0;
+> +       struct clk *clk;
+> +       int ret;
+> +
+> +       evt = kzalloc(sizeof(*evt), GFP_KERNEL);
+> +       if (!evt)
+> +               panic("Can't allocate mtk clock event driver struct");
+> +
+> +       evt->dev.name = "mtk_tick";
+> +       evt->dev.rating = 300;
+> +       evt->dev.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+> +       evt->dev.set_mode = mtk_clkevt_mode;
+> +       evt->dev.set_next_event = mtk_clkevt_next_event;
+> +       evt->dev.cpumask = cpu_possible_mask;
+> +
+> +       if (of_address_to_resource(node, 0, &res))
+> +               panic("Failed to parse resource\n");
+
+panics are a bit pointless at this stage since your console is
+typically not up yet. Warning and continuing on with boot gives you a
+better shot at actually seeing the message.
+
+> +
+> +       if (!request_mem_region(res.start, resource_size(&res), "mtk-timer"))
+> +               panic("Registers are a busy IO resource");
+> +
+> +       evt->gpt_base = ioremap(res.start, resource_size(&res));
+
+of_iomap instead of these 3 calls.
+
+> +       if (!evt->gpt_base)
+> +               panic("Can't map registers");
+> +
+> +       evt->dev.irq = irq_of_parse_and_map(node, 0);
+> +       if (evt->dev.irq <= 0)
+> +               panic("Can't parse IRQ");
+> +
+> +       clk = of_clk_get(node, 0);
+> +       if (IS_ERR(clk))
+> +               panic("Can't get timer clock");
+> +
+> +       clk_prepare_enable(clk);
+> +       rate = clk_get_rate(clk);
+> +
+> +       ret = request_irq(evt->dev.irq, mtk_timer_interrupt,
+> +                       IRQF_TIMER | IRQF_IRQPOLL, "mtk_timer", evt);
+> +       if (ret)
+> +               pr_warn("failed to setup irq %d\n", evt->dev.irq);
+> +
+> +       evt->ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
+> +
+> +       mtk_timer_global_reset(evt);
+> +
+> +       /* Configure clock source */
+> +       mtk_timer_setup(evt, GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN);
+> +       clocksource_mmio_init(evt->gpt_base + TIMER_CNT_REG(GPT_CLK_SRC),
+> +                       node->name, rate, 300, 32, clocksource_mmio_readl_up);
+> +
+> +       /* Configure clock event */
+> +       mtk_timer_setup(evt, GPT_CLK_EVT, TIMER_CTRL_OP_REPEAT);
+> +       mtk_timer_enable_irq(evt, GPT_CLK_EVT);
+> +
+> +       clockevents_config_and_register(&evt->dev, rate, 0x3,
+> +                                       0xffffffff);
+> +}
+> +CLOCKSOURCE_OF_DECLARE(mtk_mt6577, "mediatek,mt6577-timer", mtk_timer_init);
+> --
+> 1.7.9.5
+>
