@@ -1,284 +1,164 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed,  4 Jun 2014 17:15:43 +0200
-Subject: [PATCH v3] arm/arm64: KVM: Fix and refactor unmap_range
-Message-ID: <1401894943-11213-1-git-send-email-christoffer.dall@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed,  4 Jun 2014 17:16:28 +0200
+Subject: [PATCH 2/4] of: Add NVIDIA Tegra XUSB pad controller binding
+In-Reply-To: <1401894990-30092-1-git-send-email-thierry.reding@gmail.com>
+References: <1401894990-30092-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1401894990-30092-2-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-unmap_range() was utterly broken, to quote Marc, and broke in all sorts
-of situations.  It was also quite complicated to follow and didn't
-follow the usual scheme of having a separate iterating function for each
-level of page tables.
+From: Thierry Reding <treding@nvidia.com>
 
-Address this by refactoring the code and introduce a pgd_clear()
-function.
+This patch adds the device tree binding documentation for the XUSB pad
+controller found on NVIDIA Tegra SoCs. It exposes both pinmuxing and PHY
+capabilities.
 
-Tested on TC2 with/without THP and limited testing on the v8 Foundation
-Model.
-
-Reviewed-by: Jungseok Lee <jays.lee@samsung.com>
-Reviewed-by: Mario Smarduch <m.smarduch@samsung.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
-Changes since v2:
- - Don't call clear_p[mu]d_entry for huge pmd's or pud's
- - Use phys_addr_t instead of unsigned long longs
- - Change invalid 'pid' reference to pud
+ .../pinctrl/nvidia,tegra124-xusb-padctl.txt        | 135 +++++++++++++++++++++
+ 1 file changed, 135 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
 
-Changes since v1:
- - Don't define custom __unused but reuse __maybe_unused
-
- [ I kept the acked-by and reviewed-by tags because I felt the changes
-   were small enough to do so - if someone disagrees I'll be happy to
-   remove them, thanks. ]
-
- arch/arm/include/asm/kvm_mmu.h   |  12 +++
- arch/arm/kvm/mmu.c               | 157 +++++++++++++++++++++------------------
- arch/arm64/include/asm/kvm_mmu.h |  15 ++++
- 3 files changed, 111 insertions(+), 73 deletions(-)
-
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 5c7aa3c..5cc0b0f 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -127,6 +127,18 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
- 	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
- })
- 
-+static inline bool kvm_page_empty(void *ptr)
-+{
-+	struct page *ptr_page = virt_to_page(ptr);
-+	return page_count(ptr_page) == 1;
-+}
+diff --git a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
+new file mode 100644
+index 000000000000..8af59bbcdaa0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
+@@ -0,0 +1,135 @@
++Device tree binding for NVIDIA Tegra XUSB pad controller
++========================================================
++
++The Tegra XUSB pad controller manages a set of lanes, each of which can be
++assigned to one out of a set of different pads. Some of these pads have an
++associated PHY that must be powered up before the pad can be used.
++
++This document defines the device-specific binding for the XUSB pad controller.
++
++Refer to pinctrl-bindings.txt in this directory for generic information about
++pin controller device tree bindings and ../phy/phy-bindings.txt for details on
++how to describe and reference PHYs in device trees.
++
++Required properties:
++--------------------
++- compatible: should be "nvidia,tegra124-xusb-padctl"
++- reg: Physical base address and length of the controller's registers.
++- resets: Must contain an entry for each entry in reset-names.
++  See ../reset/reset.txt for details.
++- reset-names: Must include the following entries:
++  - padctl
++- #address-cells: Should be 0.
++- #size-cells: Should be 0.
++- #phy-cells: Should be 1. The specifier is the index of the PHY to reference.
++  Possible values are:
++  - 0: PCIe
++  - 1: SATA
++
++Lane muxing:
++------------
++
++Child nodes contain the pinmux configurations following the conventions from
++the pinctrl-bindings.txt document. Typically a single, static configuration is
++given and applied at boot time.
++
++Each subnode describes groups of lanes along with parameters and pads that
++they should be assigned to. The name of these subnodes is not important. All
++subnodes should be parsed solely based on their content.
++
++Each subnode only applies the parameters that are explicitly listed. In other
++words, if a subnode that lists a function but no pin configuration parameters
++implies no information about any pin configuration parameters. Similarly, a
++subnode that describes only an IDDQ parameter implies no information about
++what function the pins are assigned to. For this reason even seemingly boolean
++values are actually tristates in this binding: unspecified, off or on.
++Unspecified is represented as an absent property, and off/on are represented
++as integer values 0 and 1.
++
++Required properties:
++- nvidia,lanes: An array of strings. Each string is the name of a lane.
++
++Optional properties:
++- nvidia,function: A string that is the name of the function (pad) that the
++  pin or group should be assigned to. Valid values for function names are
++  listed below.
++- nvidia,iddq: Enables IDDQ mode of the lane. (0: no, 1: yes)
++
++Note that not all of these properties are valid for all lanes. Lanes can be
++divided into three groups:
++
++  - otg-0, otg-1, otg-2:
++
++    Valid functions for this group are: "snps", "xusb", "uart", "rsvd".
++
++    The nvidia,iddq property does not apply to this group.
++
++  - ulpi-0, hsic-0, hsic-1:
++
++    Valid functions for this group are: "snps", "xusb".
++
++    The nvidia,iddq property does not apply to this group.
++
++  - pcie-0, pcie-1, pcie-2, pcie-3, pcie-4, sata-0:
++
++    Valid functions for this group are: "pcie", "usb3", "sata", "rsvd".
 +
 +
-+#define kvm_pte_table_empty(ptep) kvm_page_empty(ptep)
-+#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
-+#define kvm_pud_table_empty(pudp) (0)
++Example:
++========
 +
++SoC file extract:
++-----------------
 +
- struct kvm;
- 
- #define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 16f8049..331e632 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -90,104 +90,115 @@ static void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
- 	return p;
- }
- 
--static bool page_empty(void *ptr)
-+static void clear_pgd_entry(struct kvm *kvm, pgd_t *pgd, phys_addr_t addr)
- {
--	struct page *ptr_page = virt_to_page(ptr);
--	return page_count(ptr_page) == 1;
-+	pud_t *pud_table __maybe_unused = pud_offset(pgd, 0);
-+	pgd_clear(pgd);
-+	kvm_tlb_flush_vmid_ipa(kvm, addr);
-+	pud_free(NULL, pud_table);
-+	put_page(virt_to_page(pgd));
- }
- 
- static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
- {
--	if (pud_huge(*pud)) {
--		pud_clear(pud);
--		kvm_tlb_flush_vmid_ipa(kvm, addr);
--	} else {
--		pmd_t *pmd_table = pmd_offset(pud, 0);
--		pud_clear(pud);
--		kvm_tlb_flush_vmid_ipa(kvm, addr);
--		pmd_free(NULL, pmd_table);
--	}
-+	pmd_t *pmd_table = pmd_offset(pud, 0);
-+	VM_BUG_ON(pud_huge(*pud));
-+	pud_clear(pud);
-+	kvm_tlb_flush_vmid_ipa(kvm, addr);
-+	pmd_free(NULL, pmd_table);
- 	put_page(virt_to_page(pud));
- }
- 
- static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
- {
--	if (kvm_pmd_huge(*pmd)) {
--		pmd_clear(pmd);
--		kvm_tlb_flush_vmid_ipa(kvm, addr);
--	} else {
--		pte_t *pte_table = pte_offset_kernel(pmd, 0);
--		pmd_clear(pmd);
--		kvm_tlb_flush_vmid_ipa(kvm, addr);
--		pte_free_kernel(NULL, pte_table);
--	}
-+	pte_t *pte_table = pte_offset_kernel(pmd, 0);
-+	VM_BUG_ON(kvm_pmd_huge(*pmd));
-+	pmd_clear(pmd);
-+	kvm_tlb_flush_vmid_ipa(kvm, addr);
-+	pte_free_kernel(NULL, pte_table);
- 	put_page(virt_to_page(pmd));
- }
- 
--static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
-+static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
-+		       phys_addr_t addr, phys_addr_t end)
- {
--	if (pte_present(*pte)) {
--		kvm_set_pte(pte, __pte(0));
--		put_page(virt_to_page(pte));
--		kvm_tlb_flush_vmid_ipa(kvm, addr);
--	}
-+	pte_t *pte, *start_pte;
-+	unsigned long long start_addr = addr;
++	padctl at 0,7009f000 {
++		compatible = "nvidia,tegra124-xusb-padctl";
++		reg = <0x0 0x7009f000 0x0 0x1000>;
++		resets = <&tegra_car 142>;
++		reset-names = "padctl";
 +
-+	start_pte = pte = pte_offset_kernel(pmd, addr);
-+	do {
-+		if (!pte_none(*pte)) {
-+			kvm_set_pte(pte, __pte(0));
-+			put_page(virt_to_page(pte));
-+			kvm_tlb_flush_vmid_ipa(kvm, addr);
-+		}
-+	} while (pte++, addr += PAGE_SIZE, addr != end);
++		#address-cells = <0>;
++		#size-cells = <0>;
++		#phy-cells = <1>;
++	};
 +
-+	if (kvm_pte_table_empty(start_pte))
-+		clear_pmd_entry(kvm, pmd, start_addr);
- }
- 
--static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
--			unsigned long long start, u64 size)
-+static void unmap_pmds(struct kvm *kvm, pud_t *pud,
-+		       phys_addr_t addr, phys_addr_t end)
- {
--	pgd_t *pgd;
--	pud_t *pud;
--	pmd_t *pmd;
--	pte_t *pte;
--	unsigned long long addr = start, end = start + size;
--	u64 next;
-+	phys_addr_t next, start_addr = addr;
-+	pmd_t *pmd, *start_pmd;
- 
--	while (addr < end) {
--		pgd = pgdp + pgd_index(addr);
--		pud = pud_offset(pgd, addr);
--		pte = NULL;
--		if (pud_none(*pud)) {
--			addr = kvm_pud_addr_end(addr, end);
--			continue;
--		}
--
--		if (pud_huge(*pud)) {
--			/*
--			 * If we are dealing with a huge pud, just clear it and
--			 * move on.
--			 */
--			clear_pud_entry(kvm, pud, addr);
--			addr = kvm_pud_addr_end(addr, end);
--			continue;
-+	start_pmd = pmd = pmd_offset(pud, addr);
-+	do {
-+		next = kvm_pmd_addr_end(addr, end);
-+		if (!pmd_none(*pmd)) {
-+			if (kvm_pmd_huge(*pmd)) {
-+				pmd_clear(pmd);
-+				kvm_tlb_flush_vmid_ipa(kvm, addr);
-+				put_page(virt_to_page(pmd));
-+			} else {
-+				unmap_ptes(kvm, pmd, addr, next);
-+			}
- 		}
-+	} while (pmd++, addr = next, addr != end);
- 
--		pmd = pmd_offset(pud, addr);
--		if (pmd_none(*pmd)) {
--			addr = kvm_pmd_addr_end(addr, end);
--			continue;
--		}
-+	if (kvm_pmd_table_empty(start_pmd))
-+		clear_pud_entry(kvm, pud, start_addr);
-+}
- 
--		if (!kvm_pmd_huge(*pmd)) {
--			pte = pte_offset_kernel(pmd, addr);
--			clear_pte_entry(kvm, pte, addr);
--			next = addr + PAGE_SIZE;
--		}
-+static void unmap_puds(struct kvm *kvm, pgd_t *pgd,
-+		       phys_addr_t addr, phys_addr_t end)
-+{
-+	phys_addr_t next, start_addr = addr;
-+	pud_t *pud, *start_pud;
- 
--		/*
--		 * If the pmd entry is to be cleared, walk back up the ladder
--		 */
--		if (kvm_pmd_huge(*pmd) || (pte && page_empty(pte))) {
--			clear_pmd_entry(kvm, pmd, addr);
--			next = kvm_pmd_addr_end(addr, end);
--			if (page_empty(pmd) && !page_empty(pud)) {
--				clear_pud_entry(kvm, pud, addr);
--				next = kvm_pud_addr_end(addr, end);
-+	start_pud = pud = pud_offset(pgd, addr);
-+	do {
-+		next = kvm_pud_addr_end(addr, end);
-+		if (!pud_none(*pud)) {
-+			if (pud_huge(*pud)) {
-+				pud_clear(pud);
-+				kvm_tlb_flush_vmid_ipa(kvm, addr);
-+				put_page(virt_to_page(pud));
-+			} else {
-+				unmap_pmds(kvm, pud, addr, next);
- 			}
- 		}
-+	} while (pud++, addr = next, addr != end);
- 
--		addr = next;
--	}
-+	if (kvm_pud_table_empty(start_pud))
-+		clear_pgd_entry(kvm, pgd, start_addr);
-+}
++Board file extract:
++-------------------
 +
++	pcie-controller at 0,01003000 {
++		...
 +
-+static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
-+			phys_addr_t start, u64 size)
-+{
-+	pgd_t *pgd;
-+	phys_addr_t addr = start, end = start + size;
-+	phys_addr_t next;
++		phys = <&padctl 0>;
++		phy-names = "pcie";
 +
-+	pgd = pgdp + pgd_index(addr);
-+	do {
-+		next = kvm_pgd_addr_end(addr, end);
-+		unmap_puds(kvm, pgd, addr, next);
-+	} while (pgd++, addr = next, addr != end);
- }
- 
- static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 7d29847..8e138c7 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -125,6 +125,21 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
- #define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
- #define kvm_pmd_addr_end(addr, end)	pmd_addr_end(addr, end)
- 
-+static inline bool kvm_page_empty(void *ptr)
-+{
-+	struct page *ptr_page = virt_to_page(ptr);
-+	return page_count(ptr_page) == 1;
-+}
++		...
++	};
 +
-+#define kvm_pte_table_empty(ptep) kvm_page_empty(ptep)
-+#ifndef CONFIG_ARM64_64K_PAGES
-+#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
-+#else
-+#define kvm_pmd_table_empty(pmdp) (0)
-+#endif
-+#define kvm_pud_table_empty(pudp) (0)
++	...
 +
++	padctl: padctl at 0,7009f000 {
++		pinmux {
++			pinctrl-0 = <&padctl_default>;
++			pinctrl-names = "default";
 +
- struct kvm;
- 
- #define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
++			padctl_default: pinmux {
++				usb3 {
++					nvidia,lanes = "pcie-0", "pcie-1";
++					nvidia,function = "usb3";
++					nvidia,iddq = <0>;
++				};
++
++				pcie {
++					nvidia,lanes = "pcie-2", "pcie-3",
++						       "pcie-4";
++					nvidia,function = "pcie";
++					nvidia,iddq = <0>;
++				};
++
++				sata {
++					nvidia,lanes = "sata-0";
++					nvidia,function = "sata";
++					nvidia,iddq = <0>;
++				};
++			};
++		};
++	};
 -- 
-1.8.5.2
+1.9.2
