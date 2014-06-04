@@ -1,65 +1,75 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  4 Jun 2014 13:09:55 +0100
-Subject: [PATCH 6/7] of/device: Allow I2C devices to OF match without
- supplying an OF node
+Date: Wed,  4 Jun 2014 13:09:56 +0100
+Subject: [PATCH 7/7] OF/ACPI/I2C: Add generic match function for the
+ aforementioned systems
 In-Reply-To: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
 References: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1401883796-17841-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <1401883796-17841-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The I2C framework supplies a means for devices to be registered without
-the requirement for platform_data, DT or ACPI.  The current solution is
-that every single I2C device in the kernel is forced to supply a
-normally empty/sparse I2C ID table so the I2C subsystem can match to.
-In an effort to a) rid the kernel of these tables and b) generify all
-(OF, ACPI and I2C) matching we need to provide some temporary work
-arounds until we can straighten out the blocking factors.
+Currently this is a helper function for the I2C subsystem to aid the
+matching of non-standard compatible strings and devices which use DT
+and/or ACPI, but do not supply any nodes (see: [1] Method 4).  However,
+it has been made more generic as it can be used to only make one call
+for drivers which support any mixture of OF, ACPI and/or I2C matching.
 
-This change is meant to be temporary and will be stripped out once
-we've converted all I2C device drivers from of_match_device() over
-to the new generic match_device().
+The initial aim is for of_match_device() to be replaced by this call
+in all I2C device drivers.
+
+[1] Documentation/i2c/instantiating-devices
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/of/device.c | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+ include/linux/match.h | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
+ create mode 100644 include/linux/match.h
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index dafb973..28913bf 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -1,6 +1,7 @@
- #include <linux/string.h>
- #include <linux/kernel.h>
- #include <linux/of.h>
+diff --git a/include/linux/match.h b/include/linux/match.h
+new file mode 100644
+index 0000000..20a08e2
+--- /dev/null
++++ b/include/linux/match.h
+@@ -0,0 +1,40 @@
++#include <linux/of.h>
++#include <linux/acpi.h>
 +#include <linux/i2c.h>
- #include <linux/of_device.h>
- #include <linux/init.h>
- #include <linux/module.h>
-@@ -21,9 +22,22 @@
- const struct of_device_id *of_match_device(const struct of_device_id *matches,
- 					   const struct device *dev)
- {
-+	const struct of_device_id *match;
 +
- 	if ((!matches) || (!dev->of_node))
- 		return NULL;
--	return of_match_node(matches, dev->of_node);
++static void *device_match(struct device *dev)
++{
++	struct device_driver *driver = dev->driver;
 +
-+	match = of_match_node(matches, dev->of_node);
-+	if (match)
-+		return match;
++	if (!driver)
++		return NULL;
 +
-+	/*
-+	 * Low impact workaround, until we can convert all I2C compatible
-+	 * strings over to the correctly specified <vendor>,<device> format.
-+	 */
-+	match = i2c_of_match_device_strip_vendor(matches, (struct device *)dev);
++	/* Attempt an OF style match */
++	if (IS_ENABLED(CONFIG_OF)) {
++		const struct of_device_id *of_match =
++			i2c_of_match_device(driver->of_match_table, dev);
++		if (of_match)
++			return (void *)of_match;
++	}
 +
-+	return match;
- }
- EXPORT_SYMBOL(of_match_device);
- 
++	/* Then ACPI style match */
++	if (IS_ENABLED(CONFIG_ACPI)) {
++		const struct acpi_device_id *acpi_match	=
++			acpi_match_device(driver->acpi_match_table, dev);
++		if (acpi_match)
++			return (void *)acpi_match;
++	}
++
++	/* Finally an I2C match */
++	if (IS_ENABLED(CONFIG_I2C)) {
++		struct i2c_client *client = i2c_verify_client(dev);
++		struct i2c_driver *i2c_drv = to_i2c_driver(driver);
++		struct i2c_device_id *i2c_match;
++
++		i2c_match = i2c_match_id(i2c_drv->id_table, client);
++		if (i2c_match)
++			return (void *)i2c_match;
++	}
++
++	return NULL;
++}
 -- 
 1.8.3.2
