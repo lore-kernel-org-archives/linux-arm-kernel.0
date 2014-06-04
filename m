@@ -1,36 +1,71 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 4 Jun 2014 19:03:40 +0200
-Subject: [PATCH 2/2] ARM: dts: berlin: enable i2c0 and i2c2
-In-Reply-To: <20140604164841.GA12859@kwain>
-References: <1401780790-17830-1-git-send-email-antoine.tenart@free-electrons.com>
- <1401780790-17830-3-git-send-email-antoine.tenart@free-electrons.com>
- <20140603080522.GB22742@lunn.ch> <20140604164841.GA12859@kwain>
-Message-ID: <20140604170340.GI6892@lunn.ch>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 4 Jun 2014 18:10:30 +0100
+Subject: [PATCH] arm64: topology: add MPIDR-based detection
+In-Reply-To: <20140604163400.GQ2520@sirena.org.uk>
+References: <1401644249-23792-1-git-send-email-broonie@kernel.org>
+ <20140603173103.GA18004@red-moon>
+ <20140603210424.GJ31751@sirena.org.uk>
+ <20140604093452.GA8057@e102568-lin.cambridge.arm.com>
+ <20140604115751.GH2520@sirena.org.uk>
+ <20140604130114.GB10775@e102568-lin.cambridge.arm.com>
+ <20140604135431.GL2520@sirena.org.uk>
+ <20140604155129.GD10775@e102568-lin.cambridge.arm.com>
+ <20140604163400.GQ2520@sirena.org.uk>
+Message-ID: <20140604171030.GE10775@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 04, 2014 at 06:48:41PM +0200, Antoine T?nart wrote:
-> Hi Andrew,
+On Wed, Jun 04, 2014 at 05:34:00PM +0100, Mark Brown wrote:
+> On Wed, Jun 04, 2014 at 04:51:29PM +0100, Lorenzo Pieralisi wrote:
 > 
-> On Tue, Jun 03, 2014 at 10:05:22AM +0200, Andrew Lunn wrote:
-> > On Tue, Jun 03, 2014 at 09:33:10AM +0200, Antoine T?nart wrote:
-> > > Enable the I2C0 and I2C2 for the Marvell Berlin BG2G DMP. I2C1 and I2C3
-> > > are also working on this board, but no devices seemed to be there.
-> > 
-> > Does this mean that IC0 and I2C2 have devices on them? Could you also
-> > add nodes for the devices?
+> > My question is: is it better to pack affinity levels and "guess" what aff3
+> > (and aff2 on non-SMT) means or add an additional level of hierarchy in the
+> > arm64 topology code (eg book_id - implemented only for s390 to the best
+> > of my knowledge) ?
 > 
-> No devices I can add for now. I you prefer we can drop this patch, keep
-> the other one and enable i2c nodes for the BG2Q DMP when they will be
-> needed.
+> Shoving them in there would address the issue as well, yes (though we'd
+> still have to combine aff2 and aff3 for the non-SMT case).  I don't know
+> if having books enabled has some overhead we don't want though.
+> 
+> > I personally prefer the latter approach but I think it boils down to
+> > understanding what do we want to provide the scheduler with if we have
+> > a hierarchy that extends beyond "cluster" level.
+> 
+> > I will be glad to help you implement it when time comes (and this will also
+> > fix the clusters of clusters DT issue we are facing - ie how to treat them).
+> 
+> > Now, I do not think it is a major problem at the moment, merging the
+> > patch I sent will give us more time to discuss how to define the
+> > topology for clusters of clusters, because that's what we are talking
+> > about.
+> 
+> In so far as you're saying that we don't really need to worry about
+> exactly how we handle multi-level clusters properly at the minute I
+> agree with you - until we have some idea what they physically look like
+> and can consider how well that maps onto the scheduler and whatnot it
+> doesn't really matter and we can just ignore it.  Given that I'm not
+> concerned about just reporting everything as flat like we do with DT at
+> the minute and don't see a real need to theorise about it, it'll just be
+> a performance problem and not a correctness problem when it is
+> encountered.  That feels like a better position to leave things in as it
+> will be less stress for whoever is bringing up such a fancy new system,
+> they can stand a reasonable chance of getting things at least running
+> with minimal effort.
 
-Hi Antoine
+Ok, I think we have an agreement, let's merge the patch I sent and
+discuss the way forward to cater for systems with clusters of clusters
+when we reasonably expect them to hit production, the scheduler expected
+topology might well change by that time and now we are well positioned
+to cope with future extensions (and actually packing affinity levels
+might well be the final solution if the scheduler expects a "flat"
+topology at the higher topology level).
 
-I was just wondering how you tested it, without having any devices?
-Is it that the devices on the bus don't have mainline drivers?
+> > Does it make sense ?
+> 
+> Like I say I do think that merging your current code is better than
+> nothing.
 
-I don't see a reason not to commit both. At least it allows i2c-detect
-to work and see what is on the bus, even if we cannot drive them.
+Great, thanks for bearing with me.
 
-Thanks
-	Andrew
+Thanks !
+Lorenzo
