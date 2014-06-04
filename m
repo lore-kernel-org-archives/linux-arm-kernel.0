@@ -1,34 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Jun 2014 14:50:47 +0100
-Subject: iMX6Q FEC: transmit queue 0 timed out
-In-Reply-To: <CAOpc7mHxYVOUQVcTqPH9pLXtqNaxgeqJGoJ=U4cRNgSzOpj7Wg@mail.gmail.com>
-References: <CAOpc7mF4naY8xuBDFNpHuQPsrULVriKj-ZcpEwpPwtA8UT1Wpw@mail.gmail.com>
- <20140602124242.GB933@n2100.arm.linux.org.uk>
- <CAOpc7mFbJQNeBmOG0C-Qn856MmhtUkTq=QeDPC-EWXryi6sFGg@mail.gmail.com>
- <20140602133352.GC933@n2100.arm.linux.org.uk>
- <CAOpc7mHJ5CqCcB1rE3b8q58HDdSWeG41PTAMwgeARAL_hgUt_g@mail.gmail.com>
- <d7f1957c2afc44e8b900001e606905c0@BLUPR03MB373.namprd03.prod.outlook.com>
- <CAOpc7mHHOmEcvnSDTc+9eyCtLyMBvR2aU36XFcddT4pa0f2KOQ@mail.gmail.com>
- <a97d34741f694cd2b89b4c7f0bebc114@BLUPR03MB373.namprd03.prod.outlook.com>
- <CAOpc7mHxYVOUQVcTqPH9pLXtqNaxgeqJGoJ=U4cRNgSzOpj7Wg@mail.gmail.com>
-Message-ID: <20140604135047.GC23430@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 4 Jun 2014 08:52:42 -0500
+Subject: [PATCH v6 1/6] clocksource: Add support for the Mediatek SoCs
+In-Reply-To: <538F0230.7090800@free-electrons.com>
+References: <1401468964-5307-1-git-send-email-matthias.bgg@gmail.com>
+ <1401468964-5307-2-git-send-email-matthias.bgg@gmail.com>
+ <CAL_JsqKCTZjh7o2zf_WsVi=iAR1ivTPQpvpNJ6W87jPXakMnZg@mail.gmail.com>
+ <538F0230.7090800@free-electrons.com>
+Message-ID: <CAL_JsqJGMDNKwJ7M5-mtbbKTa434=pXUTfYZH39Tja0LwJO7_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 04, 2014 at 01:50:54PM +0200, Holger Schurig wrote:
-> The PHY can be controlled if he creates or consume the REF CLK with
-> the signal on it's pin nINTSEL during the low->high transition of the
-> reset. I guess that whoever toggles this (i must dig into it, but the
-> reset pin is described in the device tree) doesn't care (or can't
-> care) how nINTSEL is set and so in Linux mode the modes of the two
-> devices don't harmonize.
+On Wed, Jun 4, 2014 at 6:25 AM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi Rob,
+>
+> On 04/06/2014 13:18, Rob Herring wrote:
+>
+> [...]
+>
+>>> +
+>>> +       if (of_address_to_resource(node, 0, &res))
+>>> +               panic("Failed to parse resource\n");
+>>
+>> panics are a bit pointless at this stage since your console is
+>> typically not up yet. Warning and continuing on with boot gives you a
+>> better shot at actually seeing the message.
+>>
+>>> +
+>>> +       if (!request_mem_region(res.start, resource_size(&res), "mtk-timer"))
+>>> +               panic("Registers are a busy IO resource");
+>>> +
+>>> +       evt->gpt_base = ioremap(res.start, resource_size(&res));
+>>
+>> of_iomap instead of these 3 calls.
+>
+> Actually of_iomap doesn't request_mem_region, that's why for
+> mvebu we are trying now to replace of_iomap by request_mem_region/ioremap.
 
-It sounds like you need to add appropriate pull-ups/pull-downs on the
-iMX6 configure the phy.  This is why imx6qdl-microsom-ar8035.dtsi has
-different settings from the normal RGMII pullups/downs - in the case
-of AR8035, a number of pins including the receive pins determine reset
-options.  See the comments in that file concerning "pin strapping".
+Then perhaps we should add of_iomap_resource which does both. It could
+possibly be added into of_iomap, but we'd have to ignore any failures
+due to overlapping regions.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Rob
