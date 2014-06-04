@@ -1,157 +1,77 @@
-From: lisovy@gmail.com (Rostislav Lisovy)
-Date: Wed,  4 Jun 2014 16:24:35 +0200
-Subject: [PATCH] ARM: omap2+: gpmc-nand: Use dynamic platform_device_alloc()
-Message-ID: <1401891875-27843-1-git-send-email-lisovy@merica.cz>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 4 Jun 2014 07:27:31 -0700
+Subject: XADC
+In-Reply-To: <538ECA49.8030207@metafoo.de>
+References: <e2cd1349-5cfb-4456-a1f5-74e7affff085@BN1AFFO11FD006.protection.gbl>
+ <alpine.DEB.2.01.1406040843120.32323@pmeerw.net>
+ <538ECA49.8030207@metafoo.de>
+Message-ID: <ab98c363-f3a0-4260-8226-7d159c9c0979@BN1AFFO11FD052.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPMC controller supports up to 8 memory devices connected to it.
-Since there is one statically allocated "struct platform_device
-gpmc_nand_device" it is not possible to configure the system to
-use more than one NAND device connected to the GPMC. This
-modification makes it possible to use up to 8 NAND devices
-connected to the GPMC controller.
+Hi Lars, Peter,
 
-Signed-off-by: Rostislav Lisovy <lisovy@merica.cz>
----
+On Wed, 2014-06-04 at 09:27AM +0200, Lars-Peter Clausen wrote:
+> On 06/04/2014 08:47 AM, Peter Meerwald wrote:
+> >Hello,
+> >
+> >>I recently found that you developed a driver for XADC and I thought I
+> >>enable it (see patch below). But it seems something is not working
+> >>correctly. The values I tested don't seem to be right and also fixed.
+> >>I.e. they don't change over time or across boards:
+> >>
+> >>   # cat in_temp0_scale
+> >>   123.040771484
+> >>   # cat in_voltage0_vccint_scale
+> >>   0.732421875
+> >>   # cat in_voltage0_vccint_raw
+> >>   1384
+> >>   # cat in_voltage1_vccaux_s[ 1203.660637] random: nonblocking pool is initialized
+> >>   # cat in_voltage1_vccaux_scale
+> >>   0.732421875
+> >>   # cat in_voltage3_vccpint_scale
+> >>   0.732421875
+> >
+> >the _scale values are supposed to be constant; their purpose is to scale a
+> >measurement so that the result is in a given unit
+> >
+> >e.g. in_temp0_scale scales in_temp0_raw so that the result
+> >(in_temp0_raw * in_temp0_scale) in milli Celsius
+> >
+> >in_voltage0_vccint_raw * in_voltage0_vccint_scale is supposed to give
+> >milli Volts
+> >
+> >so in_voltage0_vccint_raw should vary accross time / boards (and voltage
+> >hopefully :), but not the _scales
+> 
+> Yep, as Peter said scale and offset will be constant, raw should
+> change though, e.g. both voltage and temperature should a slight
+> jitter if you repeatedly read them. If not something is broken. We
+> had the driver in our images for Zynq board for a while now and so
+> far it worked fine. I think Mrinal and Radhey from Xilinx also
+> tested the driver.
 
-Tested on custom AM335x board with two different NAND chips
-(128 + 256 MiB) using GPMC configuration in FDT -- behaves
-correctly.
+Okay, thanks for the answers. Since the _scale value was the only one
+close to a Celsius or Fahrenheit value I thought that would be the
+final temperature. Anyway, the raw values do show some jitter. So far,
+so good, but the math doesn't add up I think:
 
+ # cat in_temp0_raw in_temp0_scale 
+ 2559
+ 123.040771484
 
- arch/arm/mach-omap2/gpmc-nand.c | 79 +++++++++++++++++++----------------------
- 1 file changed, 37 insertions(+), 42 deletions(-)
+multiplying those values gives
+2559 * 123.040771484 = 304156.787108
 
-diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
-index 4349e82..c5481a8 100644
---- a/arch/arm/mach-omap2/gpmc-nand.c
-+++ b/arch/arm/mach-omap2/gpmc-nand.c
-@@ -24,25 +24,6 @@
- /* minimum size for IO mapping */
- #define	NAND_IO_SIZE	4
- 
--static struct resource gpmc_nand_resource[] = {
--	{
--		.flags		= IORESOURCE_MEM,
--	},
--	{
--		.flags		= IORESOURCE_IRQ,
--	},
--	{
--		.flags		= IORESOURCE_IRQ,
--	},
--};
--
--static struct platform_device gpmc_nand_device = {
--	.name		= "omap2-nand",
--	.id		= 0,
--	.num_resources	= ARRAY_SIZE(gpmc_nand_resource),
--	.resource	= gpmc_nand_resource,
--};
--
- static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
- {
- 	/* platforms which support all ECC schemes */
-@@ -93,43 +74,41 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
- {
- 	int err	= 0;
- 	struct gpmc_settings s;
--	struct device *dev = &gpmc_nand_device.dev;
--
--	memset(&s, 0, sizeof(struct gpmc_settings));
-+	struct platform_device *pdev;
-+	struct resource gpmc_nand_res[] = {
-+		{ .flags = IORESOURCE_MEM, },
-+		{ .flags = IORESOURCE_IRQ, },
-+		{ .flags = IORESOURCE_IRQ, },
-+	};
- 
--	gpmc_nand_device.dev.platform_data = gpmc_nand_data;
-+	BUG_ON(gpmc_nand_data->cs >= GPMC_CS_NUM);
- 
- 	err = gpmc_cs_request(gpmc_nand_data->cs, NAND_IO_SIZE,
--				(unsigned long *)&gpmc_nand_resource[0].start);
-+			      (unsigned long *)&gpmc_nand_res[0].start);
- 	if (err < 0) {
--		dev_err(dev, "Cannot request GPMC CS %d, error %d\n",
--			gpmc_nand_data->cs, err);
-+		pr_err("omap2-gpmc: Cannot request GPMC CS %d, error %d\n",
-+		       gpmc_nand_data->cs, err);
- 		return err;
- 	}
--
--	gpmc_nand_resource[0].end = gpmc_nand_resource[0].start +
--							NAND_IO_SIZE - 1;
--
--	gpmc_nand_resource[1].start =
--				gpmc_get_client_irq(GPMC_IRQ_FIFOEVENTENABLE);
--	gpmc_nand_resource[2].start =
--				gpmc_get_client_irq(GPMC_IRQ_COUNT_EVENT);
-+	gpmc_nand_res[0].end = gpmc_nand_res[0].start + NAND_IO_SIZE - 1;
-+	gpmc_nand_res[1].start = gpmc_get_client_irq(GPMC_IRQ_FIFOEVENTENABLE);
-+	gpmc_nand_res[2].start = gpmc_get_client_irq(GPMC_IRQ_COUNT_EVENT);
- 
- 	if (gpmc_t) {
- 		err = gpmc_cs_set_timings(gpmc_nand_data->cs, gpmc_t);
- 		if (err < 0) {
--			dev_err(dev, "Unable to set gpmc timings: %d\n", err);
-+			pr_err("omap2-gpmc: Unable to set gpmc timings: %d\n", err);
- 			return err;
- 		}
- 	}
- 
-+	memset(&s, 0, sizeof(struct gpmc_settings));
- 	if (gpmc_nand_data->of_node)
- 		gpmc_read_settings_dt(gpmc_nand_data->of_node, &s);
- 	else
- 		gpmc_set_legacy(gpmc_nand_data, &s);
- 
- 	s.device_nand = true;
--
- 	err = gpmc_cs_program_settings(gpmc_nand_data->cs, &s);
- 	if (err < 0)
- 		goto out_free_cs;
-@@ -141,18 +120,34 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
- 	gpmc_update_nand_reg(&gpmc_nand_data->reg, gpmc_nand_data->cs);
- 
- 	if (!gpmc_hwecc_bch_capable(gpmc_nand_data->ecc_opt)) {
--		dev_err(dev, "Unsupported NAND ECC scheme selected\n");
--		return -EINVAL;
-+		pr_err("omap2-nand: Unsupported NAND ECC scheme selected\n");
-+		err = -EINVAL;
-+		goto out_free_cs;
- 	}
- 
--	err = platform_device_register(&gpmc_nand_device);
--	if (err < 0) {
--		dev_err(dev, "Unable to register NAND device\n");
--		goto out_free_cs;
-+
-+	pdev = platform_device_alloc("omap2-nand", gpmc_nand_data->cs);
-+	if (pdev) {
-+		err = platform_device_add_resources(pdev, gpmc_nand_res,
-+						    ARRAY_SIZE(gpmc_nand_res));
-+		if (!err)
-+			pdev->dev.platform_data = gpmc_nand_data;
-+	} else {
-+		err = -ENOMEM;
-+	}
-+	if (err)
-+		goto out_free_pdev;
-+
-+	err = platform_device_add(pdev);
-+	if (err) {
-+		dev_err(&pdev->dev, "Unable to register NAND device\n");
-+		goto out_free_pdev;
- 	}
- 
- 	return 0;
- 
-+out_free_pdev:
-+	platform_device_put(pdev);
- out_free_cs:
- 	gpmc_cs_free(gpmc_nand_data->cs);
- 
--- 
-1.9.1
+Even if that is mC, that would mean my chip is at 304 degrees C. I'm pretty
+sure my chip's not on fire :)
+(I have the feeling I just did another beginner's mistake here though).
+A 10x error might be in there somewhere. 30 degrees sounds realistic.
+
+I didn't test all voltages, but those look better.
+
+Also, is there a way to directly obtain a reading in a reasonable scale?
+This approach needs to read two sysfs files, one of those even giving a
+float.
+
+	S?ren
