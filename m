@@ -1,109 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Jun 2014 18:55:52 +0100
-Subject: [PATCH 3/7] i2c: Add the ability to match device to compatible
- string without an of_node
-In-Reply-To: <CAL_JsqJOEipHyjD2NCjQd1BvLumnM3PkVDqUjrMNfXCOmXcNAA@mail.gmail.com>
-References: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
- <1401883796-17841-4-git-send-email-lee.jones@linaro.org>
- <CAL_JsqJOEipHyjD2NCjQd1BvLumnM3PkVDqUjrMNfXCOmXcNAA@mail.gmail.com>
-Message-ID: <20140604175552.GB19550@lee--X1>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Jun 2014 18:59:30 +0100
+Subject: [PATCHv2] arm64: Add atomic pool for non-coherent and CMA
+ allocaitons.
+In-Reply-To: <538E689A.3050109@codeaurora.org>
+References: <1401739432-5358-1-git-send-email-lauraa@codeaurora.org>
+ <20140603132842.GI23149@arm.com> <538E689A.3050109@codeaurora.org>
+Message-ID: <20140604175930.GB27881@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 04 Jun 2014, Rob Herring wrote:
-
-> On Wed, Jun 4, 2014 at 7:09 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > A great deal of I2C devices are currently matched via DT node name, and
-> > as such the compatible naming convention of '<vendor>,<device>' has gone
-> > somewhat awry - some nodes don't supply one, some supply an arbitrary
-> > string and others the correct device name with an arbitrary vendor prefix.
-> >
-> > In an effort to correct this problem we have to supply a mechanism to
-> > match a device by compatible string AND by simple device name.  This
-> > function strips off the '<vendor>,' part of a supplied compatible string
-> > and attempts to match without it.
-> >
-> > The plan is to remove this function once all of the compatible strings
-> > for each device have been brought into line.
+On Wed, Jun 04, 2014 at 01:30:18AM +0100, Laura Abbott wrote:
+> On 6/3/2014 6:28 AM, Will Deacon wrote:
+> > Hi Laura,
+> > 
+> > On Mon, Jun 02, 2014 at 09:03:52PM +0100, Laura Abbott wrote:
+> >> Neither CMA nor noncoherent allocations support atomic allocations.
+> >> Add a dedicated atomic pool to support this.
+> >>
+> >> Change-Id: I46c8fdffe5e0687403d42b37643137c8cf344259
+> >> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> >> ---
+> >>
+> >> v2: Various bug fixes pointed out by David and Ritesh (CMA dependency, swapping
+> >> coherent, noncoherent). I'm still not sure how to address the devicetree
+> >> suggestion by Will [1][2]. I added the devicetree mailing list this time around
+> >> to get more input on this.
+> >>
+> >> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249180.html
+> >> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249528.html
+> > 
+> > Perhaps that can be done later then, since from what you're saying, we need
+> > the command-line option either way? Have you looked at how this fits in with
+> > the iommu-helper work from Ritesh? We could put the parameter parsing in
+> > there too.
+> > 
 > 
-> Then should you add a warning for cases needing to be fixed?
+> This doesn't seem to overlap with Ritesh's work. The atomic mapping is still
+> handled in the arm specific code so I assume it would be handled in the arm64
+> specific code as well. Another question might be is if it would be useful to
+> make the atomic code common somehow between arm and arm64.
 
-I was just going to go and fix them all, but I could do that as well?
+Yeah, that's what I was alluding to. The more of this code that can be
+shared between architectures, the better.
 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/i2c/i2c-core.c | 25 +++++++++++++++++++++++++
-> >  include/linux/i2c.h    | 10 ++++++++++
-> >  2 files changed, 35 insertions(+)
-> >
-> > diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> > index d3802dc..7dcd5c3 100644
-> > --- a/drivers/i2c/i2c-core.c
-> > +++ b/drivers/i2c/i2c-core.c
-> > @@ -1090,6 +1090,31 @@ struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node)
-> >         return i2c_verify_adapter(dev);
-> >  }
-> >  EXPORT_SYMBOL(of_find_i2c_adapter_by_node);
-> > +
-> > +const struct of_device_id
-> > +*i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
-> > +                                 struct device *dev)
-> > +{
-> > +       const struct i2c_client *client = i2c_verify_client(dev);
-> > +       const char *name;
-> > +
-> > +       if (!(client && matches))
-> > +               return NULL;
-> > +
-> > +       for (; matches->compatible[0]; matches++) {
-> > +               name = strchr(matches->compatible, ',');
-> > +               if (!name)
-> > +                       name = matches->compatible;
-> > +               else
-> > +                       name++;
-> > +
-> > +               if (!strncmp(client->name, name, strlen(client->name)))
-> > +                       return matches;
-> > +       }
-> > +
-> > +       return NULL;
-> > +}
-> > +EXPORT_SYMBOL_GPL(i2c_of_match_device_strip_vendor);
-> >  #else
-> >  static void of_i2c_register_devices(struct i2c_adapter *adap) { }
-> >  #endif /* CONFIG_OF */
-> > diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-> > index b556e0a..f7ec75b 100644
-> > --- a/include/linux/i2c.h
-> > +++ b/include/linux/i2c.h
-> > @@ -564,6 +564,9 @@ extern struct i2c_client *of_find_i2c_device_by_node(struct device_node *node);
-> >  /* must call put_device() when done with returned i2c_adapter device */
-> >  extern struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node);
-> >
-> > +extern const struct of_device_id
-> > +*i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
-> > +                                 struct device *dev);
-> >  #else
-> >
-> >  static inline struct i2c_client *of_find_i2c_device_by_node(struct device_node *node)
-> > @@ -575,6 +578,13 @@ static inline struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node
-> >  {
-> >         return NULL;
-> >  }
-> > +
-> > +const struct of_device_id
-> > +*i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
-> > +                                 struct device *dev)
-> > +{
-> > +       return NULL;
-> > +}
-> >  #endif /* CONFIG_OF */
-> >
-> >  #endif /* _LINUX_I2C_H */
-> >
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Will
