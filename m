@@ -1,76 +1,58 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Wed, 04 Jun 2014 21:57:40 +1000
-Subject: TASK_SIZE for !MMU
-In-Reply-To: <20140603141138.GH16741@pengutronix.de>
-References: <20140429100028.GH28564@pengutronix.de>
- <20140602085150.GA31147@pengutronix.de> <538DBC3F.9060207@uclinux.org>
- <20140603141138.GH16741@pengutronix.de>
-Message-ID: <538F09B4.8090308@uclinux.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 4 Jun 2014 12:57:51 +0100
+Subject: [PATCH] arm64: topology: add MPIDR-based detection
+In-Reply-To: <20140604093452.GA8057@e102568-lin.cambridge.arm.com>
+References: <1401644249-23792-1-git-send-email-broonie@kernel.org>
+ <20140603173103.GA18004@red-moon>
+ <20140603210424.GJ31751@sirena.org.uk>
+ <20140604093452.GA8057@e102568-lin.cambridge.arm.com>
+Message-ID: <20140604115751.GH2520@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jun 04, 2014 at 10:34:53AM +0100, Lorenzo Pieralisi wrote:
+> On Tue, Jun 03, 2014 at 10:04:24PM +0100, Mark Brown wrote:
 
-Hi Uwe,
+> > I'm having a really hard time seeing this as anything other than a step
+> > back.  Your change causes us to discard the higher affinity levels which
+> > seems like something we actively know to be misleading and means that we
+> > will be handing the scheduler two different identically numbered cores
+> > (all the affinity levels we do pay attention to will be identical) if we
+> > ever encounter such a system which is actively broken.
 
-On 04/06/14 00:11, Uwe Kleine-K?nig wrote:
-> On Tue, Jun 03, 2014 at 10:14:55PM +1000, Greg Ungerer wrote:
->>>> I think it would be OK to define TASK_SIZE to 0xffffffff for !MMU.
->>>> blackfin, frv and m68k also do this. c6x does define it to 0xFFFFF000 to
->>>> leave space for error codes.
->>
->> I did that same change for m68k in commit cc24c40 ("m68knommu: remove
->> size limit on non-MMU TASK_SIZE"). For similar reasons as you need to
->> now.
-> ok.
->
->>>> Thoughts?
->>> The problem is that current linus/master (and also next) doesn't boot on
->>> my ARM-nommu machine because the user string functions (strnlen_user,
->>> strncpy_from_user et al.) refuse to work on strings above TASK_SIZE
->>> which in my case also includes the XIP kernel image.
->>
->> I seem to recall that we were not considering flash or anything else
->> other than RAM when defining that original TASK_SIZE (back many, many
->> years ago). Some of the address checks you list above made some sense
->> if you had everything in RAM (though only upper bounds are checked).
->> The thinking was some checking is better than none I suppose.
-> What is the actual meaning of TASK_SIZE? The maximal value of a valid
-> userspace address?
+> If we ever encounter such systems we will deal with them when time
+> comes, DT can handle them and patching this code is trivial.
 
-Yes (as Geert pointed out :-)
-The limit of virtual userspace addresses.
+> All I am saying is, let's wait and see, there is no compelling need to
+> use aff3 (and aff2 on non-SMT systems) on current systems for the
+> topology.
 
+That's still a kernel patch or having to write DT to get things working
+which for the sake of avoiding a couple of shift and or statements just
+seems unhelpful.  If it was just going to give poor performance that'd
+be one thing but it's actively broken.
 
->> Setting a hard coded memory size in CONFIG_DRAM_SIZE is not all that
->> fantastic either...
-> Not sure what you mean? Having CONFIG_DRAM_SIZE at all or use it for
-> boundary checking?
+> > > not think we should do it, that's the reason why we defined DT bindings
+> > > to add a proper topology semantics and we should use them when the MPIDR
+> > > values deviate from the "recommendations".
 
-Having the DRAM size be a configure time constant. And as you have
-found RAM isn't the only place in the physical address space that
-code will necessarily access.
+> > I'd agree with not going to great lengths unless someone defines
+> > semantics for the higher affinity levels in the future however it does
+> > seem like completely ignoring them when it's so easy to take some
+> > account of them is insufficiently defensive - it's similar to things
+> > like putting the of_node_put() calls in even though they don't do
+> > anything at the minute.
 
+> So why don't you remove of_node_put() all over the kernel then ?
 
-> CONFIG_DRAM_SIZE is hardly used apart from defining TASK_SIZE:
->
->   - #define END_MEM (UL(CONFIG_DRAM_BASE) + CONFIG_DRAM_SIZE)
->     which is only used to define MODULES_END. Ap
->   - Some memory configuration using cp15 registers in
->     arch/arm/mm/proc-arm{740,940,946}.S
->
-> For the former I'd say better use 0xffffffff, too. For the latter I
-> wonder if we should just drop CPU_ARM740T, CPU_ARM940T and CPU_ARM946E.
-> These are only selectable if ARCH_INTEGRATOR and are not selected by
-> other symbols. As ARCH_INTEGRATOR selects ARM_PATCH_PHYS_VIRT since
-> commit fe9891454473 (ARM: integrator: Default enable
-> ARM_PATCH_PHYS_VIRT, AUTO_ZRELADDR) for Linux 3.13 and
-> ARM_PATCH_PHYS_VIRT depends on MMU the Integrator-noMMU targets are
-> broken anyhow.
->
-> I will prepare a patch series with some cleanups.
-
-I have no idea how many people would be using those older ARM CPU types.
-It was hard to get much interest for them in mainline even years ago.
-
-Regards
-Greg
+Well, for code that might run on SPARC, PowerPC or (IIRC) x86 where
+there are genuine OF implementations as opposed to just FDT and it does
+in fact do something so in generic code it's useful.  For code that'll
+only be run with FDT personally I'd not bother.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140604/72edf1ff/attachment.sig>
