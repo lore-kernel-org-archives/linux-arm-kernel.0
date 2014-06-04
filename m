@@ -1,45 +1,40 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 04 Jun 2014 13:25:20 +0200
-Subject: [PATCH v2 2/7] DMA: shdma: Spelling s/controll/control/
-In-Reply-To: <1401716531-29794-3-git-send-email-geert+renesas@glider.be>
-References: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
- <1401716531-29794-3-git-send-email-geert+renesas@glider.be>
-Message-ID: <5393917.echhd9vGYd@avalon>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 04 Jun 2014 13:25:36 +0200
+Subject: [PATCH v6 1/6] clocksource: Add support for the Mediatek SoCs
+In-Reply-To: <CAL_JsqKCTZjh7o2zf_WsVi=iAR1ivTPQpvpNJ6W87jPXakMnZg@mail.gmail.com>
+References: <1401468964-5307-1-git-send-email-matthias.bgg@gmail.com>	<1401468964-5307-2-git-send-email-matthias.bgg@gmail.com>
+ <CAL_JsqKCTZjh7o2zf_WsVi=iAR1ivTPQpvpNJ6W87jPXakMnZg@mail.gmail.com>
+Message-ID: <538F0230.7090800@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi Rob,
 
-Thank you for the patch.
+On 04/06/2014 13:18, Rob Herring wrote:
 
-On Monday 02 June 2014 15:42:06 Geert Uytterhoeven wrote:
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+[...]
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>> +
+>> +       if (of_address_to_resource(node, 0, &res))
+>> +               panic("Failed to parse resource\n");
+> 
+> panics are a bit pointless at this stage since your console is
+> typically not up yet. Warning and continuing on with boot gives you a
+> better shot at actually seeing the message.
+> 
+>> +
+>> +       if (!request_mem_region(res.start, resource_size(&res), "mtk-timer"))
+>> +               panic("Registers are a busy IO resource");
+>> +
+>> +       evt->gpt_base = ioremap(res.start, resource_size(&res));
+> 
+> of_iomap instead of these 3 calls.
 
-> ---
-> v2:
->   - New
-> 
->  Documentation/devicetree/bindings/dma/shdma.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/shdma.txt
-> b/Documentation/devicetree/bindings/dma/shdma.txt index
-> d26b7065ae94..2b61cab0525c 100644
-> --- a/Documentation/devicetree/bindings/dma/shdma.txt
-> +++ b/Documentation/devicetree/bindings/dma/shdma.txt
-> @@ -73,7 +73,7 @@ Example:
->  	};
-> 
->  For r8a7790 and newer implementations, the information for the channel
-> -controll register is found in the dma phandle and #dma-cells is set to 2.
-> +control register is found in the dma phandle and #dma-cells is set to 2.
-> 
->  	dma0: dma-mux at 0 {
->  		compatible = "renesas,shdma-mux";
+Actually of_iomap doesn't request_mem_region, that's why for
+mvebu we are trying now to replace of_iomap by request_mem_region/ioremap.
 
 -- 
-Regards,
-
-Laurent Pinchart
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
