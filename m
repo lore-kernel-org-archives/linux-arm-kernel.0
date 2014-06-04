@@ -1,33 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Jun 2014 15:53:27 +0200
-Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140604134400.GE28484@ulmo>
-References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
- <4462924.8iRbdkOPp7@wuerfel> <20140604134400.GE28484@ulmo>
-Message-ID: <5349895.mRr9cbXPnm@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 4 Jun 2014 14:54:31 +0100
+Subject: [PATCH] arm64: topology: add MPIDR-based detection
+In-Reply-To: <20140604130114.GB10775@e102568-lin.cambridge.arm.com>
+References: <1401644249-23792-1-git-send-email-broonie@kernel.org>
+ <20140603173103.GA18004@red-moon>
+ <20140603210424.GJ31751@sirena.org.uk>
+ <20140604093452.GA8057@e102568-lin.cambridge.arm.com>
+ <20140604115751.GH2520@sirena.org.uk>
+ <20140604130114.GB10775@e102568-lin.cambridge.arm.com>
+Message-ID: <20140604135431.GL2520@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 June 2014 15:44:03 Thierry Reding wrote:
-> > Well, the iommu specific binding could allow a variable #address-cells.
-> > That way, you just need to know the number of stream IDs for that instance
-> > of the iommu.
-> 
-> That sounds fairly complicated to me. I don't see what that buys us over
-> the clarity and simplicity that the above explicit notation gives us. Is
-> it not more common for a device to have a single master rather than a
-> whole bunch of them?
+On Wed, Jun 04, 2014 at 02:01:14PM +0100, Lorenzo Pieralisi wrote:
+> On Wed, Jun 04, 2014 at 12:57:51PM +0100, Mark Brown wrote:
 
-If I understood the problem right, the case that people want to handle
-is not actually multiple masters but instead multiple IOMMU contexts, which
-you can have in a GPU to handle multiple processes drawing on different
-parts of the screen, or in a NIC with virtual functions assigned to KVM
-guests or user processes. I don't know what the number of contexts per
-device would be here, but I assume it may be large enough to become
-a nuisance to list them individually.
+> > > All I am saying is, let's wait and see, there is no compelling need to
+> > > use aff3 (and aff2 on non-SMT systems) on current systems for the
 
-Then again, I also don't know how IOMMUs would show those. In the cases
-I've seen before, you actually have an ID for the master that is separate
-from the context ID, but apparently SMMU isn't that smart.
+> > That's still a kernel patch or having to write DT to get things working
+> > which for the sake of avoiding a couple of shift and or statements just
+> > seems unhelpful.  If it was just going to give poor performance that'd
+> > be one thing but it's actively broken.
 
-	Arnd
+> What's broken ? Please provide me with an example and I will update the
+> patch.
+
+If some system we encounter in the future is for example a SMT system
+which does use aff3 then until someone actively goes and fixes it by
+writing the DT/ACPI or updating the kernel if there's two threads
+0,0,0,0 and 0,0,0,1 we'll tell the scheduler they're both 0,0,0 which
+we're not supposed to do.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140604/fcea0077/attachment.sig>
