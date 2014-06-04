@@ -1,23 +1,49 @@
-From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Wed, 04 Jun 2014 09:23:22 +0200
-Subject: Tegra 2 T20 NAND Flash Support
-In-Reply-To: <1401866283.2173.3.camel@tellur>
-References: <538E6FB5.5020806@ziswiler.com> <1401866283.2173.3.camel@tellur>
-Message-ID: <538EC96A.4050702@ziswiler.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Wed, 04 Jun 2014 09:27:05 +0200
+Subject: XADC
+In-Reply-To: <alpine.DEB.2.01.1406040843120.32323@pmeerw.net>
+References: <e2cd1349-5cfb-4456-a1f5-74e7affff085@BN1AFFO11FD006.protection.gbl>
+ <alpine.DEB.2.01.1406040843120.32323@pmeerw.net>
+Message-ID: <538ECA49.8030207@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2014 09:18 AM, Lucas Stach wrote:
-> I took the Linux Tegra NAND driver from Thierry and cleaned it up quite
-> a bit. It now works with both ONFI and non-ONFI NAND, at least for
-> reading. Writing doesn't quite work yet and I've got side-tracked with
-> other stuff.
+On 06/04/2014 08:47 AM, Peter Meerwald wrote:
+> Hello,
 >
-> If you are interested in moving this forward I can put up my WIP patches
-> to some public location.
+>> I recently found that you developed a driver for XADC and I thought I
+>> enable it (see patch below). But it seems something is not working
+>> correctly. The values I tested don't seem to be right and also fixed.
+>> I.e. they don't change over time or across boards:
+>>
+>>    # cat in_temp0_scale
+>>    123.040771484
+>>    # cat in_voltage0_vccint_scale
+>>    0.732421875
+>>    # cat in_voltage0_vccint_raw
+>>    1384
+>>    # cat in_voltage1_vccaux_s[ 1203.660637] random: nonblocking pool is initialized
+>>    # cat in_voltage1_vccaux_scale
+>>    0.732421875
+>>    # cat in_voltage3_vccpint_scale
+>>    0.732421875
+>
+> the _scale values are supposed to be constant; their purpose is to scale a
+> measurement so that the result is in a given unit
+>
+> e.g. in_temp0_scale scales in_temp0_raw so that the result
+> (in_temp0_raw * in_temp0_scale) in milli Celsius
+>
+> in_voltage0_vccint_raw * in_voltage0_vccint_scale is supposed to give
+> milli Volts
+>
+> so in_voltage0_vccint_raw should vary accross time / boards (and voltage
+> hopefully :), but not the _scales
 
-Sounds great, yes. That would be perfect, thanks.
+Yep, as Peter said scale and offset will be constant, raw should change 
+though, e.g. both voltage and temperature should a slight jitter if you 
+repeatedly read them. If not something is broken. We had the driver in our 
+images for Zynq board for a while now and so far it worked fine. I think 
+Mrinal and Radhey from Xilinx also tested the driver.
 
-We even once got an universal NAND test infrastructure from Micron based 
-on a re-worked Colibri T20 which we could use to validate it with 
-various NAND flash parts.
+- Lars
