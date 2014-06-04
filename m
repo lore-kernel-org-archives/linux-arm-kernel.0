@@ -1,136 +1,105 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Wed,  4 Jun 2014 16:31:56 +0200
-Subject: [PATCH RESEND 08/12] drivers: clk: st: STiH407: Support for clockgenC0
+Date: Wed,  4 Jun 2014 16:31:49 +0200
+Subject: [PATCH RESEND 01/12] clk: st: Update ST clock binding documentation
 In-Reply-To: <1401892320-18211-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1401892320-18211-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1401892320-18211-9-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1401892320-18211-2-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch added support for DT registration of ClockGenC0
-It includes 2 c32 type PLL and a 660 Quadfs.
+This patch adds new compatibilities to support STiH407 SoC.
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
 ---
- drivers/clk/st/clkgen-fsyn.c | 47 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/st/clkgen-pll.c  | 32 ++++++++++++++++++++++++++++++
- 2 files changed, 79 insertions(+)
+ .../devicetree/bindings/clock/st/st,clkgen-mux.txt   |  2 +-
+ .../devicetree/bindings/clock/st/st,clkgen-pll.txt   |  5 ++++-
+ .../devicetree/bindings/clock/st/st,clkgen.txt       | 20 ++++++++++++++++----
+ .../devicetree/bindings/clock/st/st,quadfs.txt       |  3 +++
+ 4 files changed, 24 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
-index 46b29c4..68c6786 100644
---- a/drivers/clk/st/clkgen-fsyn.c
-+++ b/drivers/clk/st/clkgen-fsyn.c
-@@ -255,6 +255,49 @@ static struct clkgen_quadfs_data st_fs660c32_F_416 = {
- 	.get_rate	= clk_fs660c32_dig_get_rate,
- };
+diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
+index 943e080..2d92fc8 100644
+--- a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
++++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
+@@ -17,7 +17,7 @@ Required properties:
+ 	"st,stih416-clkgenf-vcc-sd",	"st,clkgen-mux"
+ 	"st,stih415-clkgen-a9-mux",	"st,clkgen-mux"
+ 	"st,stih416-clkgen-a9-mux",	"st,clkgen-mux"
+-
++	"st,stih407-clkgen-a9-mux",	"st,clkgen-mux"
  
-+static struct clkgen_quadfs_data st_fs660c32_C_407 = {
-+	.nrst_present = true,
-+	.nrst	= { CLKGEN_FIELD(0x2f0, 0x1, 0),
-+		    CLKGEN_FIELD(0x2f0, 0x1, 1),
-+		    CLKGEN_FIELD(0x2f0, 0x1, 2),
-+		    CLKGEN_FIELD(0x2f0, 0x1, 3) },
-+	.npda	= CLKGEN_FIELD(0x2f0, 0x1, 12),
-+	.nsb	= { CLKGEN_FIELD(0x2f0, 0x1, 8),
-+		    CLKGEN_FIELD(0x2f0, 0x1, 9),
-+		    CLKGEN_FIELD(0x2f0, 0x1, 10),
-+		    CLKGEN_FIELD(0x2f0, 0x1, 11) },
-+	.nsdiv_present = true,
-+	.nsdiv	= { CLKGEN_FIELD(0x304, 0x1, 24),
-+		    CLKGEN_FIELD(0x308, 0x1, 24),
-+		    CLKGEN_FIELD(0x30c, 0x1, 24),
-+		    CLKGEN_FIELD(0x310, 0x1, 24) },
-+	.mdiv	= { CLKGEN_FIELD(0x304, 0x1f, 15),
-+		    CLKGEN_FIELD(0x308, 0x1f, 15),
-+		    CLKGEN_FIELD(0x30c, 0x1f, 15),
-+		    CLKGEN_FIELD(0x310, 0x1f, 15) },
-+	.en	= { CLKGEN_FIELD(0x2fc, 0x1, 0),
-+		    CLKGEN_FIELD(0x2fc, 0x1, 1),
-+		    CLKGEN_FIELD(0x2fc, 0x1, 2),
-+		    CLKGEN_FIELD(0x2fc, 0x1, 3) },
-+	.ndiv	= CLKGEN_FIELD(0x2f4, 0x7, 16),
-+	.pe	= { CLKGEN_FIELD(0x304, 0x7fff, 0),
-+		    CLKGEN_FIELD(0x308, 0x7fff, 0),
-+		    CLKGEN_FIELD(0x30c, 0x7fff, 0),
-+		    CLKGEN_FIELD(0x310, 0x7fff, 0) },
-+	.sdiv	= { CLKGEN_FIELD(0x304, 0xf, 20),
-+		    CLKGEN_FIELD(0x308, 0xf, 20),
-+		    CLKGEN_FIELD(0x30c, 0xf, 20),
-+		    CLKGEN_FIELD(0x310, 0xf, 20) },
-+	.lockstatus_present = true,
-+	.lock_status = CLKGEN_FIELD(0x2A0, 0x1, 24),
-+	.powerup_polarity = 1,
-+	.standby_polarity = 1,
-+	.pll_ops	= &st_quadfs_pll_c32_ops,
-+	.rtbl		= fs660c32_rtbl,
-+	.rtbl_cnt	= ARRAY_SIZE(fs660c32_rtbl),
-+	.get_rate	= clk_fs660c32_dig_get_rate,
-+};
-+
- /**
-  * DOC: A Frequency Synthesizer that multiples its input clock by a fixed factor
-  *
-@@ -938,6 +981,10 @@ static struct of_device_id quadfs_of_match[] = {
- 		.compatible = "st,stih416-quadfs660-F",
- 		.data = (void *)&st_fs660c32_F_416
- 	},
-+	{
-+		.compatible = "st,stih407-quadfs660-C",
-+		.data = (void *)&st_fs660c32_C_407
-+	},
- 	{}
- };
+ - #clock-cells : from common clock binding; shall be set to 0.
  
-diff --git a/drivers/clk/st/clkgen-pll.c b/drivers/clk/st/clkgen-pll.c
-index 6916cfa..8952566 100644
---- a/drivers/clk/st/clkgen-pll.c
-+++ b/drivers/clk/st/clkgen-pll.c
-@@ -192,6 +192,30 @@ static struct clkgen_pll_data st_pll3200c32_407_a0 = {
- 	.ops		= &stm_pll3200c32_ops,
- };
+diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+index 81eb385..b852925 100644
+--- a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
++++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+@@ -19,11 +19,14 @@ Required properties:
+ 	"st,stih415-plls-c32-ddr",	"st,clkgen-plls-c32"
+ 	"st,stih416-plls-c32-a9",	"st,clkgen-plls-c32"
+ 	"st,stih416-plls-c32-ddr",	"st,clkgen-plls-c32"
++	"st,stih407-plls-c32-a0",	"st,clkgen-plls-c32"
++	"st,stih407-plls-c32-a9",	"st,clkgen-plls-c32"
++	"st,stih407-plls-c32-c0_0",	"st,clkgen-plls-c32"
++	"st,stih407-plls-c32-c0_1",	"st,clkgen-plls-c32"
  
-+static struct clkgen_pll_data st_pll3200c32_407_c0_0 = {
-+	/* 407 C0 PLL0 */
-+	.pdn_status	= CLKGEN_FIELD(0x2a0,	0x1,			8),
-+	.locked_status	= CLKGEN_FIELD(0x2a0,	0x1,			24),
-+	.ndiv		= CLKGEN_FIELD(0x2a4,	C32_NDIV_MASK,		16),
-+	.idf		= CLKGEN_FIELD(0x2a4,	C32_IDF_MASK,		0x0),
-+	.num_odfs = 1,
-+	.odf		= { CLKGEN_FIELD(0x2b4, C32_ODF_MASK,		0) },
-+	.odf_gate	= { CLKGEN_FIELD(0x2b4, 0x1,			6) },
-+	.ops		= &stm_pll3200c32_ops,
-+};
+ 	"st,stih415-gpu-pll-c32",	"st,clkgengpu-pll-c32"
+ 	"st,stih416-gpu-pll-c32",	"st,clkgengpu-pll-c32"
+ 
+-
+ - #clock-cells : From common clock binding; shall be set to 1.
+ 
+ - clocks : From common clock binding
+diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen.txt
+index 49ec5ae..55506c2 100644
+--- a/Documentation/devicetree/bindings/clock/st/st,clkgen.txt
++++ b/Documentation/devicetree/bindings/clock/st/st,clkgen.txt
+@@ -24,16 +24,28 @@ address is common of all subnode.
+ 		quadfs_node {
+ 			...
+ 		};
 +
-+static struct clkgen_pll_data st_pll3200c32_407_c0_1 = {
-+	/* 407 C0 PLL1 */
-+	.pdn_status	= CLKGEN_FIELD(0x2c8,	0x1,			8),
-+	.locked_status	= CLKGEN_FIELD(0x2c8,	0x1,			24),
-+	.ndiv		= CLKGEN_FIELD(0x2cc,	C32_NDIV_MASK,		16),
-+	.idf		= CLKGEN_FIELD(0x2cc,	C32_IDF_MASK,		0x0),
-+	.num_odfs = 1,
-+	.odf		= { CLKGEN_FIELD(0x2dc, C32_ODF_MASK,		0) },
-+	.odf_gate	= { CLKGEN_FIELD(0x2dc, 0x1,			6) },
-+	.ops		= &stm_pll3200c32_ops,
-+};
++		mux_node {
++			...
++		};
 +
- /**
-  * DOC: Clock Generated by PLL, rate set and enabled by bootloader
-  *
-@@ -588,6 +612,14 @@ static struct of_device_id c32_pll_of_match[] = {
- 		.compatible = "st,stih407-plls-c32-a0",
- 		.data = &st_pll3200c32_407_a0,
- 	},
-+	{
-+		.compatible = "st,stih407-plls-c32-c0_0",
-+		.data = &st_pll3200c32_407_c0_0,
-+	},
-+	{
-+		.compatible = "st,stih407-plls-c32-c0_1",
-+		.data = &st_pll3200c32_407_c0_1,
-+	},
- 	{}
- };
++		vcc_node {
++			...
++		};
+ 		...
+ 	};
+ 
+ This binding uses the common clock binding[1].
+-Each subnode should use the binding discribe in [2]..[4]
++Each subnode should use the binding discribe in [2]..[7]
+ 
+ [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+-[2] Documentation/devicetree/bindings/clock/st,quadfs.txt
+-[3] Documentation/devicetree/bindings/clock/st,quadfs.txt
+-[4] Documentation/devicetree/bindings/clock/st,quadfs.txt
++[2] Documentation/devicetree/bindings/clock/st,clkgen-divmux.txt
++[3] Documentation/devicetree/bindings/clock/st,clkgen-mux.txt
++[4] Documentation/devicetree/bindings/clock/st,clkgen-pll.txt
++[5] Documentation/devicetree/bindings/clock/st,clkgen-prediv.txt
++[6] Documentation/devicetree/bindings/clock/st,vcc.txt
++[7] Documentation/devicetree/bindings/clock/st,quadfs.txt
++
+ 
+ Required properties:
+ - reg : A Base address and length of the register set.
+diff --git a/Documentation/devicetree/bindings/clock/st/st,quadfs.txt b/Documentation/devicetree/bindings/clock/st/st,quadfs.txt
+index ec86d62..c0a4045 100644
+--- a/Documentation/devicetree/bindings/clock/st/st,quadfs.txt
++++ b/Documentation/devicetree/bindings/clock/st/st,quadfs.txt
+@@ -15,6 +15,9 @@ Required properties:
+   "st,stih416-quadfs432",	"st,quadfs"
+   "st,stih416-quadfs660-E",	"st,quadfs"
+   "st,stih416-quadfs660-F",	"st,quadfs"
++  "st,stih407-quadfs660-C",	"st,quadfs"
++  "st,stih407-quadfs660-D",	"st,quadfs"
++
+ 
+ - #clock-cells : from common clock binding; shall be set to 1.
  
 -- 
 1.9.1
