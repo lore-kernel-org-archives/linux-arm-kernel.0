@@ -1,51 +1,58 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  4 Jun 2014 13:09:50 +0100
-Subject: [PATCH 1/7] ACPICA: Only include ACPI asm files if ACPI is enabled
+Date: Wed,  4 Jun 2014 13:09:51 +0100
+Subject: [PATCH 2/7] i2c: Add pointer dereference protection to i2c_match_id()
 In-Reply-To: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
 References: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1401883796-17841-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1401883796-17841-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any drivers which support ACPI and Device Tree probing need to include
-both respective header files.  Without this patch, if a driver is being
-used on a platform which does not support ACPI and subsequently does not
-have the config option enabled, but includes linux/acpi.h the build
-breaks with:
+Here we're providing dereference protection for i2c_match_id(), which
+saves us having to do it each time it's called.  We're also stripping
+out the (now) needless check in i2c_device_match().  This patch paves
+the way for other, similar code trimming.
 
-  In file included from ../include/acpi/platform/acenv.h:150:0,
-                   from ../include/acpi/acpi.h:56,
-                   from ../include/linux/match.h:2,
-                   from ../drivers/i2c/i2c-core.c:43:
-  ../include/acpi/platform/aclinux.h:73:23:
-   fatal error: asm/acenv.h: No such file or directory
-   #include <asm/acenv.h>
-                       ^
-Cc: Lv Zheng <lv.zheng@intel.com>
-Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-Cc: linux-acpi at vger.kernel.org
-Cc: devel at acpica.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- include/acpi/platform/aclinux.h | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/i2c/i2c-core.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/include/acpi/platform/aclinux.h b/include/acpi/platform/aclinux.h
-index cd1f052..fdf7663 100644
---- a/include/acpi/platform/aclinux.h
-+++ b/include/acpi/platform/aclinux.h
-@@ -70,9 +70,10 @@
- #ifdef EXPORT_ACPI_INTERFACES
- #include <linux/export.h>
- #endif
--#include <asm/acenv.h>
+diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+index 7c7f4b8..d3802dc 100644
+--- a/drivers/i2c/i2c-core.c
++++ b/drivers/i2c/i2c-core.c
+@@ -82,6 +82,9 @@ void i2c_transfer_trace_unreg(void)
+ static const struct i2c_device_id *i2c_match_id(const struct i2c_device_id *id,
+ 						const struct i2c_client *client)
+ {
++	if (!(id && client))
++		return NULL;
++
+ 	while (id->name[0]) {
+ 		if (strcmp(client->name, id->name) == 0)
+ 			return id;
+@@ -95,8 +98,6 @@ static int i2c_device_match(struct device *dev, struct device_driver *drv)
+ 	struct i2c_client	*client = i2c_verify_client(dev);
+ 	struct i2c_driver	*driver;
  
--#ifndef CONFIG_ACPI
-+#ifdef CONFIG_ACPI
-+#include <asm/acenv.h>
-+#else
+-	if (!client)
+-		return 0;
  
- /* External globals for __KERNEL__, stubs is needed */
+ 	/* Attempt an OF style match */
+ 	if (of_driver_match_device(dev, drv))
+@@ -107,9 +108,10 @@ static int i2c_device_match(struct device *dev, struct device_driver *drv)
+ 		return 1;
  
+ 	driver = to_i2c_driver(drv);
+-	/* match on an id table if there is one */
+-	if (driver->id_table)
+-		return i2c_match_id(driver->id_table, client) != NULL;
++
++	/* Finally an I2C match */
++	if (i2c_match_id(driver->id_table, client))
++		return 1;
+ 
+ 	return 0;
+ }
 -- 
 1.8.3.2
