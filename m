@@ -1,25 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Jun 2014 15:58:28 +0200
-Subject: [PATCH 2/4] ARM: mach-s5p: get rid of all <mach/gpio.h> headers
-In-Reply-To: <1401888838-3126-3-git-send-email-linus.walleij@linaro.org>
-References: <1401888838-3126-1-git-send-email-linus.walleij@linaro.org>
- <1401888838-3126-3-git-send-email-linus.walleij@linaro.org>
-Message-ID: <4544212.mqY6dSouMv@wuerfel>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed, 4 Jun 2014 14:59:32 +0100
+Subject: [PATCH v2] arm/arm64: KVM: Fix and refactor unmap_range
+In-Reply-To: <20140604133029.GE19587@lvm>
+References: <1401286977-59260-1-git-send-email-christoffer.dall@linaro.org>
+ <CAPvkgC2MQdxuCWXygQ-072Pr-GBFGcC044AfKWR4kpuBbEmOJQ@mail.gmail.com>
+ <20140604133029.GE19587@lvm>
+Message-ID: <CAPvkgC0ph4tvBSiYJNzKjmJOZnCSD+5z-Ctdm3gqNKTo2_WREg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 June 2014 15:33:56 Linus Walleij wrote:
-> This renames all the local <mach/gpio.h> headers in the S5P platforms
-> to <mach/gpio-samsung.h> indicating a scope local to this platform,
-> and cuts the implicit inclusion of <mach/gpio.h> from <linux/gpio.h>
-> by removing the use of NEED_MACH_GPIO_H from all S5P variants.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> 
+On 4 June 2014 14:30, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Tue, Jun 03, 2014 at 02:52:58PM +0100, Steve Capper wrote:
 
-Hmm, this patch will obviously clash with the removal of S5p64xx
-and s5pc100. It shouldn't be hard to resolve the conflict when we
-merge both into arm-soc/next/cleanup, but maybe there is a way to
-avoid it?
+[ ... ]
 
-	Arnd
+>>
+>> I don't quite follow this clear_p[um]d_entry logic.
+>> So this clear_pmd_entry will de-allocate the page containing the ptes
+>> (referenced from the pmd entry)?
+>
+> Yes.
+>
+>> If so, what happens if not all the ptes in the page need to be unmapped?
+>
+> Well, then pte_table_empty() will return false (because there are still
+> active pte's in the pte table) and we won't call the function.
+>
+> The idea is that we ref-count each page table page with the number of
+> active entries in that page (in addition to the initial reference from
+> allocating the table).  So a ref-count of 1 means that there are no
+> active entries (xxx_table_empty() returns true), a refcount of 513 means
+> there are 512 active entries.
+>
+> Makes sense?
+
+Thanks Christoffer,
+Yes that makes perfect sense.
+
+Cheers,
+-- 
+Steve
