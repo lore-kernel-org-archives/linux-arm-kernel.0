@@ -1,113 +1,82 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 04 Jun 2014 14:37:42 +0100
-Subject: [PATCH v2] arm/arm64: KVM: Fix and refactor unmap_range
-In-Reply-To: <20140604133029.GE19587@lvm>
-References: <1401286977-59260-1-git-send-email-christoffer.dall@linaro.org>
- <CAPvkgC2MQdxuCWXygQ-072Pr-GBFGcC044AfKWR4kpuBbEmOJQ@mail.gmail.com>
- <20140604133029.GE19587@lvm>
-Message-ID: <538F2126.4000604@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed,  4 Jun 2014 13:41:20 +0000
+Subject: [PATCH V2] ARM: mvebu: DT: fix OpenBlocks AX3-4 RAM size
+In-Reply-To: <5388ddb9.0458440a.2be7.323c@mx.google.com>
+References: <5388ddb9.0458440a.2be7.323c@mx.google.com>
+Message-ID: <1401889280-8528-1-git-send-email-jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/14 14:30, Christoffer Dall wrote:
-> On Tue, Jun 03, 2014 at 02:52:58PM +0100, Steve Capper wrote:
->> Hi Christoffer,
->> I have some comments below:
->>
->> On 28 May 2014 15:22, Christoffer Dall <christoffer.dall@linaro.org> wrote:
->>> unmap_range() was utterly broken, to quote Marc, and broke in all sorts
->>> of situations.  It was also quite complicated to follow and didn't
->>> follow the usual scheme of having a separate iterating function for each
->>> level of page tables.
->>>
->>> Address this by refactoring the code and introduce a pgd_clear()
->>> function.
->>>
->>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>> ---
->>> Changes since v2:
->>>  - Don't define custom __unused but reuse __maybe_unused
->>>
->>>  arch/arm/include/asm/kvm_mmu.h   |  12 ++++
->>>  arch/arm/kvm/mmu.c               | 122 ++++++++++++++++++++++-----------------
->>>  arch/arm64/include/asm/kvm_mmu.h |  15 +++++
->>>  3 files changed, 95 insertions(+), 54 deletions(-)
->>>
->>> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
->>> index 5c7aa3c..5cc0b0f 100644
->>> --- a/arch/arm/include/asm/kvm_mmu.h
->>> +++ b/arch/arm/include/asm/kvm_mmu.h
->>> @@ -127,6 +127,18 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
->>>         (__boundary - 1 < (end) - 1)? __boundary: (end);                \
->>>  })
->>>
->>> +static inline bool kvm_page_empty(void *ptr)
->>> +{
->>> +       struct page *ptr_page = virt_to_page(ptr);
->>> +       return page_count(ptr_page) == 1;
->>> +}
->>> +
->>> +
->>> +#define kvm_pte_table_empty(ptep) kvm_page_empty(ptep)
->>> +#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
->>> +#define kvm_pud_table_empty(pudp) (0)
->>> +
->>> +
->>>  struct kvm;
->>>
->>>  #define kvm_flush_dcache_to_poc(a,l)   __cpuc_flush_dcache_area((a), (l))
->>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->>> index 16f8049..6ee6e06 100644
->>> --- a/arch/arm/kvm/mmu.c
->>> +++ b/arch/arm/kvm/mmu.c
->>> @@ -90,10 +90,13 @@ static void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
->>>         return p;
->>>  }
->>>
->>> -static bool page_empty(void *ptr)
->>> +static void clear_pgd_entry(struct kvm *kvm, pgd_t *pgd, phys_addr_t addr)
->>>  {
->>> -       struct page *ptr_page = virt_to_page(ptr);
->>> -       return page_count(ptr_page) == 1;
->>> +       pud_t *pud_table __maybe_unused = pud_offset(pgd, 0);
->>> +       pgd_clear(pgd);
->>> +       kvm_tlb_flush_vmid_ipa(kvm, addr);
->>> +       pud_free(NULL, pud_table);
->>> +       put_page(virt_to_page(pgd));
->>>  }
->>>
->>>  static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
->>> @@ -124,70 +127,81 @@ static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
->>>         put_page(virt_to_page(pmd));
->>>  }
->>>
->>> -static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
->>> +static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
->>> +                      unsigned long long addr, unsigned long long end)
->>
->> We have a lot of unsigned long longs in this patch, should they not be
->> phys_addr_t instead?
->>
-> 
-> I guess they should, I *think* the confusion came from the fact that
-> unmap_range is also called on the hyp page table manipulation code,
-> which works on VAs and not PAs, and we wanted to avoid the confusion.
-> But I can't be sure.
-> 
-> That being said, I'm thinking that once we fix the whoel
-> SL0/TTBR0_X/T0SZ dynamic mess, then this function may no longer work for
-> both hyp page tables and Stage-2 page tables and then even this pseudo
-> relevant argument goes away.
-> 
-> I would like to see if Marc remembers something here, but otherwise we
-> could change all the unsigned long long's to phys_addr_t's.
+The OpenBlocks AX3-4 has a non-DT bootloader.  It also comes with 1GB of
+soldered on RAM, and a DIMM slot for expansion.
 
-I don't think that'd be a problem, as long as we have a nice comment
-about that.
+Unfortunately, atags_to_fdt() doesn't work in big-endian mode, so we see
+the following failure when attempting to boot a big-endian kernel:
 
-Thanks,
+  686 slab pages
+  17 pages shared
+  0 pages swap cached
+  [ pid ]   uid  tgid total_vm      rss nr_ptes swapents oom_score_adj name
+  Kernel panic - not syncing: Out of memory and no killable processes...
 
-	M.
+  CPU: 1 PID: 351 Comm: kworker/u4:0 Not tainted 3.15.0-rc8-next-20140603 #1
+  [<c0215a54>] (unwind_backtrace) from [<c021160c>] (show_stack+0x10/0x14)
+  [<c021160c>] (show_stack) from [<c0802500>] (dump_stack+0x78/0x94)
+  [<c0802500>] (dump_stack) from [<c0800068>] (panic+0x90/0x21c)
+  [<c0800068>] (panic) from [<c02b5704>] (out_of_memory+0x320/0x340)
+  [<c02b5704>] (out_of_memory) from [<c02b93a0>] (__alloc_pages_nodemask+0x874/0x930)
+  [<c02b93a0>] (__alloc_pages_nodemask) from [<c02d446c>] (handle_mm_fault+0x744/0x96c)
+  [<c02d446c>] (handle_mm_fault) from [<c02cf250>] (__get_user_pages+0xd0/0x4c0)
+  [<c02cf250>] (__get_user_pages) from [<c02f3598>] (get_arg_page+0x54/0xbc)
+  [<c02f3598>] (get_arg_page) from [<c02f3878>] (copy_strings+0x278/0x29c)
+  [<c02f3878>] (copy_strings) from [<c02f38bc>] (copy_strings_kernel+0x20/0x28)
+  [<c02f38bc>] (copy_strings_kernel) from [<c02f4f1c>] (do_execve+0x3a8/0x4c8)
+  [<c02f4f1c>] (do_execve) from [<c025ac10>] (____call_usermodehelper+0x15c/0x194)
+  [<c025ac10>] (____call_usermodehelper) from [<c020e9b8>] (ret_from_fork+0x14/0x3c)
+  CPU0: stopping
+  CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.15.0-rc8-next-20140603 #1
+  [<c0215a54>] (unwind_backtrace) from [<c021160c>] (show_stack+0x10/0x14)
+  [<c021160c>] (show_stack) from [<c0802500>] (dump_stack+0x78/0x94)
+  [<c0802500>] (dump_stack) from [<c021429c>] (handle_IPI+0x138/0x174)
+  [<c021429c>] (handle_IPI) from [<c02087f0>] (armada_370_xp_handle_irq+0xb0/0xcc)
+  [<c02087f0>] (armada_370_xp_handle_irq) from [<c0212100>] (__irq_svc+0x40/0x50)
+  Exception stack(0xc0b6bf68 to 0xc0b6bfb0)
+  bf60:                   e9fad598 00000000 00f509a3 00000000 c0b6a000 c0b724c4
+  bf80: c0b72458 c0b6a000 00000000 00000000 c0b66da0 c0b6a000 00000000 c0b6bfb0
+  bfa0: c027bb94 c027bb24 60000313 ffffffff
+  [<c0212100>] (__irq_svc) from [<c027bb24>] (cpu_startup_entry+0x54/0x214)
+  [<c027bb24>] (cpu_startup_entry) from [<c0ac5b30>] (start_kernel+0x318/0x37c)
+  [<c0ac5b30>] (start_kernel) from [<00208078>] (0x208078)
+  ---[ end Kernel panic - not syncing: Out of memory and no killable processes...
+
+A similar failure will also occur if ARM_ATAG_DTB_COMPAT isn't selected.
+
+Fix this by setting a sane default (1 GB) in the dts file.
+
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+Tested-by: Kevin Hilman <khilman@linaro.org>
+Cc: <stable@vger.kernel.org> #v3.13+
+---
+Changes from v1:
+ - added comment re ARM_ATAG_DTB_COMPAT
+ - added Kevin's Tested-by
+ - Cc stable for v3.13+
+
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index 5d42feb31049..178382ca594f 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -25,7 +25,7 @@
+ 
+ 	memory {
+ 		device_type = "memory";
+-		reg = <0 0x00000000 0 0xC0000000>; /* 3 GB */
++		reg = <0 0x00000000 0 0x40000000>; /* 1 GB soldered on */
+ 	};
+ 
+ 	soc {
 -- 
-Jazz is not dead. It just smells funny...
+2.0.0
