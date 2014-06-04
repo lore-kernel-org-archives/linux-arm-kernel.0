@@ -1,51 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Jun 2014 10:00:59 +0200
-Subject: [PATCH v2] hsi: omap_ssi_port: use normal module refcounting
-In-Reply-To: <7426698.eEpYu3o0WK@wuerfel>
-References: <7426698.eEpYu3o0WK@wuerfel>
-Message-ID: <4579153.ES6XlsZ43F@wuerfel>
+From: santosh.shukla@linaro.org (Santosh Shukla)
+Date: Wed, 4 Jun 2014 13:37:04 +0530
+Subject: [PATCH] ARM: Exynos : Fix build error with thumb2
+In-Reply-To: <20140602101023.GB3855@e103592.cambridge.arm.com>
+References: <1401119625-11309-1-git-send-email-santosh.shukla@linaro.org>
+ <20140602101023.GB3855@e103592.cambridge.arm.com>
+Message-ID: <CA+iXiiO8ED9rdyxXh9ooDhb9OcBRH52acbqA7cgGX9kvgYaCXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ref_module() function is used for internal housekeeping of the
-module code, it's not normally used by subsystems or device drivers,
-and the use of ref_module in the omap_ssi_port driver causes a link
-build error when modules are disabled:
+On 2 June 2014 15:40, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Mon, May 26, 2014 at 09:23:45PM +0530, Santosh Shukla wrote:
+>> From: santosh shukla <santosh.shukla@linaro.org>
+>>
+>> Add non-global symbol .LLl2x0_regs_phys to avoid build break in thumb2 mode.
+>>
+>> IIUC, arm assembler fail to load value of "global" variable
+>> l2xo_regs_phys for thum2 mode and wrapping it in non-global symbol like
+>> .Ll2x0_regs_phys solves the build break issue.
+>>
+>> arch/arm/mach-exynos/sleep.S: Assembler messages:
+>> arch/arm/mach-exynos/sleep.S:57: Error: invalid immediate for address
+>> calculation (value = 0x00000004)
+>>
+>> fix inspired from [1]
+>>
+>> [1] https://lkml.org/lkml/2010/3/31/235
+>>
+>> Signed-off-by: santosh shukla <santosh.shukla@linaro.org>
+>
+> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+>
 
-hsi/controllers/omap_ssi_port.c: In function 'ssi_port_probe':
-hsi/controllers/omap_ssi_port.c:1119:2: error: implicit declaration of function 'ref_module' [-Werror=implicit-function-declaration]
+Thanks.
 
-This changes the omap_ssi_port driver to use try_module_get()
-and module_put() instead, which is the normal way to ensure that
-the driver providing a device used in another module does not
-go away.
+Hi Kukjin, if this patch ok with you then can you pick it up.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Sebastian Reichel <sre@kernel.org>
-Cc: Carlos Chinea <carlos.chinea@nokia.com>
-Cc: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
----
-v2: fix a stupid typo, I accidentally sent out the wrong version of the patch
-
-diff --git a/drivers/hsi/controllers/omap_ssi_port.c b/drivers/hsi/controllers/omap_ssi_port.c
-index b8693f0..29aea0b 100644
---- a/drivers/hsi/controllers/omap_ssi_port.c
-+++ b/drivers/hsi/controllers/omap_ssi_port.c
-@@ -1116,8 +1116,7 @@ static int __init ssi_port_probe(struct platform_device *pd)
- 
- 	dev_dbg(&pd->dev, "init ssi port...\n");
- 
--	err = ref_module(THIS_MODULE, ssi->owner);
--	if (err) {
-+	if (!try_module_get(ssi->owner)) {
- 		dev_err(&pd->dev, "could not increment parent module refcount (err=%d)\n",
- 			err);
- 		return -ENODEV;
-@@ -1254,6 +1253,7 @@ static int __exit ssi_port_remove(struct platform_device *pd)
- 
- 	omap_ssi->port[omap_port->port_id] = NULL;
- 	platform_set_drvdata(pd, NULL);
-+	module_put(ssi->owner);
- 	pm_runtime_disable(&pd->dev);
- 
- 	return 0;
+> The binutils folks insist that this is not a bug in gas.  (I disagreed, but
+> it's a grey area.)  This is the established pattern for working round this
+> issue -- looks fine to me.
+>
+> Cheers
+> ---Dave
+>
+>
+>> ---
+>>  arch/arm/mach-exynos/sleep.S |    4 +++-
+>>  1 file changed, 3 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/sleep.S b/arch/arm/mach-exynos/sleep.S
+>> index a2613e9..dc8c6b6 100644
+>> --- a/arch/arm/mach-exynos/sleep.S
+>> +++ b/arch/arm/mach-exynos/sleep.S
+>> @@ -54,7 +54,7 @@ ENTRY(exynos_cpu_resume)
+>>       ldr     r1, =CPU_CORTEX_A9
+>>       cmp     r0, r1
+>>       bne     skip_l2_resume
+>> -     adr     r0, l2x0_regs_phys
+>> +     adr     r0, .Ll2x0_regs_phys
+>>       ldr     r0, [r0]
+>>       cmp     r0, #0
+>>       beq     skip_l2_resume
+>> @@ -79,6 +79,8 @@ skip_l2_resume:
+>>       b       cpu_resume
+>>  ENDPROC(exynos_cpu_resume)
+>>  #ifdef CONFIG_CACHE_L2X0
+>> +
+>> +.Ll2x0_regs_phys:
+>>       .globl l2x0_regs_phys
+>>  l2x0_regs_phys:
+>>       .long   0
+>> --
+>> 1.7.9.5
+>>
+>>
+>> _______________________________________________
+>> linaro-kernel mailing list
+>> linaro-kernel at lists.linaro.org
+>> http://lists.linaro.org/mailman/listinfo/linaro-kernel
