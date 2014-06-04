@@ -1,39 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 4 Jun 2014 14:27:49 +0200
-Subject: [PATCH] ARM: integrator: fix section mismatch problem
-In-Reply-To: <20140604105657.GA23430@n2100.arm.linux.org.uk>
-References: <1401879202-10516-1-git-send-email-linus.walleij@linaro.org>
- <20140604105657.GA23430@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdYfcNJ0DdK8Hto0TiXDUES4SSGT_qv6PU56xA9O=WFFVA@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed,  4 Jun 2014 13:37:05 +0100
+Subject: [PATCH] irqchip: nvic: Use the generic noop function
+Message-ID: <1401885425-12378-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 4, 2014 at 12:56 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jun 04, 2014 at 12:53:22PM +0200, Linus Walleij wrote:
->> However the module driver model of the Integrator LM bus
->> assumes that logic tile drivers can be probed at runtime. This
->> is not really the case for IM-PD1: these tiles are detected at
->> boot and they cannot be plugged into a running system. Before
->> this patch it is of course possible to modprobe them later.
->
-> Check whether you can bind/unbind the driver via sysfs.  Merely making
-> stuff non-modular is really just a hack around this problem where the
-> device model can be used to bind/unbind devices.
+Using the generic function saves looking up this custom one in a source
+navigator.
 
-I first attempted to approach the problem using the pattern from
-platform_device_probe() which allows to have a discardable probe()
-function in a platform_driver.
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+---
+ drivers/irqchip/irq-nvic.c | 10 +---------
+ 1 file changed, 1 insertion(+), 9 deletions(-)
 
-In that case the sysfs bind/unbind problem is handled like so:
-
-       /* make sure driver won't have bind/unbind attributes */
-        drv->driver.suppress_bind_attrs = true;
-
-So the support of sysfs bind/unbind for a certain driver is somewhat
-optional, really.
-
-I will try the approach to set this for the IM-PD1 driver.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/irqchip/irq-nvic.c b/drivers/irqchip/irq-nvic.c
+index 70bdf6e..c935c61 100644
+--- a/drivers/irqchip/irq-nvic.c
++++ b/drivers/irqchip/irq-nvic.c
+@@ -49,14 +49,6 @@ nvic_handle_irq(irq_hw_number_t hwirq, struct pt_regs *regs)
+ 	handle_IRQ(irq, regs);
+ }
+ 
+-static void nvic_eoi(struct irq_data *d)
+-{
+-	/*
+-	 * This is a no-op as end of interrupt is signaled by the exception
+-	 * return sequence.
+-	 */
+-}
+-
+ static int __init nvic_of_init(struct device_node *node,
+ 			       struct device_node *parent)
+ {
+@@ -102,7 +94,7 @@ static int __init nvic_of_init(struct device_node *node,
+ 		gc->chip_types[0].regs.disable = NVIC_ICER;
+ 		gc->chip_types[0].chip.irq_mask = irq_gc_mask_disable_reg;
+ 		gc->chip_types[0].chip.irq_unmask = irq_gc_unmask_enable_reg;
+-		gc->chip_types[0].chip.irq_eoi = nvic_eoi;
++		gc->chip_types[0].chip.irq_eoi = irq_gc_noop;
+ 
+ 		/* disable interrupts */
+ 		writel_relaxed(~0, gc->reg_base + NVIC_ICER);
+-- 
+1.9.0
