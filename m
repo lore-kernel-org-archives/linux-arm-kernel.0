@@ -1,96 +1,74 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 4 Jun 2014 14:32:01 +0100
-Subject: [PATCH] ARM64:DMI: Add smbios/dmi support on arm64
-In-Reply-To: <1401811033-16478-1-git-send-email-yi.li@linaro.org>
-References: <1401811033-16478-1-git-send-email-yi.li@linaro.org>
-Message-ID: <20140604133200.GA4329@leverpostej>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed,  4 Jun 2014 15:33:54 +0200
+Subject: [PATCH 0/4] <mach/gpio.h> purge
+Message-ID: <1401888838-3126-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 03, 2014 at 04:57:13PM +0100, Yi Li wrote:
-> Add smbios/dmi support on arm64 system, it depends on
-> EFI boot.
+After deleting <mach/gpio.h> from the AT91 only S5P remains.
+This patch set fixes up S5P and then removes NEED_MACH_GPIO_H
+permanently removing any references to <mach/gpio.h> from the
+ARM kernel. Do a small cleanout of a dangling reference to
+ARM_GPIOLIB_COMPLEX at the same time.
 
-And what exactly does this provide us with?
+Linus Walleij (4):
+  ARM: s5p: cut the custom ARCH_NR_GPIOS definition
+  ARM: mach-s5p: get rid of all <mach/gpio.h> headers
+  ARM: kill CONFIG_NEED_MACH_GPIO_H
+  ARM: delete old reference to ARM_GPIOLIB_COMPLEX
 
-What is exposed through SMBIOS/DMI, and why would I want to enable it?
+ arch/arm/Kconfig                                  |  10 --
+ arch/arm/include/asm/gpio.h                       |   7 --
+ arch/arm/mach-s5p64x0/common.c                    |   2 +-
+ arch/arm/mach-s5p64x0/dev-audio.c                 |   3 +-
+ arch/arm/mach-s5p64x0/include/mach/gpio-samsung.h | 127 +++++++++++++++++++
+ arch/arm/mach-s5p64x0/include/mach/gpio.h         | 132 --------------------
+ arch/arm/mach-s5p64x0/mach-smdk6440.c             |   1 +
+ arch/arm/mach-s5p64x0/mach-smdk6450.c             |   1 +
+ arch/arm/mach-s5p64x0/setup-fb-24bpp.c            |   2 +-
+ arch/arm/mach-s5p64x0/setup-i2c0.c                |   2 +-
+ arch/arm/mach-s5p64x0/setup-i2c1.c                |   2 +-
+ arch/arm/mach-s5p64x0/setup-sdhci-gpio.c          |   2 +-
+ arch/arm/mach-s5p64x0/setup-spi.c                 |   2 +-
+ arch/arm/mach-s5pc100/dev-audio.c                 |   2 +-
+ arch/arm/mach-s5pc100/include/mach/gpio-samsung.h | 140 +++++++++++++++++++++
+ arch/arm/mach-s5pc100/include/mach/gpio.h         | 144 ----------------------
+ arch/arm/mach-s5pc100/mach-smdkc100.c             |   1 +
+ arch/arm/mach-s5pc100/setup-fb-24bpp.c            |   2 +-
+ arch/arm/mach-s5pc100/setup-i2c0.c                |   2 +-
+ arch/arm/mach-s5pc100/setup-i2c1.c                |   2 +-
+ arch/arm/mach-s5pc100/setup-ide.c                 |   2 +-
+ arch/arm/mach-s5pc100/setup-keypad.c              |   2 +-
+ arch/arm/mach-s5pc100/setup-sdhci-gpio.c          |   2 +-
+ arch/arm/mach-s5pc100/setup-spi.c                 |   2 +-
+ arch/arm/mach-s5pv210/dev-audio.c                 |   2 +-
+ arch/arm/mach-s5pv210/include/mach/gpio-samsung.h | 135 ++++++++++++++++++++
+ arch/arm/mach-s5pv210/include/mach/gpio.h         | 140 ---------------------
+ arch/arm/mach-s5pv210/mach-aquila.c               |   1 +
+ arch/arm/mach-s5pv210/mach-goni.c                 |   1 +
+ arch/arm/mach-s5pv210/mach-smdkv210.c             |   1 +
+ arch/arm/mach-s5pv210/setup-fb-24bpp.c            |   2 +-
+ arch/arm/mach-s5pv210/setup-fimc.c                |   3 +-
+ arch/arm/mach-s5pv210/setup-i2c0.c                |   2 +-
+ arch/arm/mach-s5pv210/setup-i2c1.c                |   2 +-
+ arch/arm/mach-s5pv210/setup-i2c2.c                |   2 +-
+ arch/arm/mach-s5pv210/setup-ide.c                 |   2 +-
+ arch/arm/mach-s5pv210/setup-keypad.c              |   2 +-
+ arch/arm/mach-s5pv210/setup-sdhci-gpio.c          |   2 +-
+ arch/arm/mach-s5pv210/setup-spi.c                 |   2 +-
+ arch/arm/plat-samsung/Kconfig                     |  16 ---
+ arch/arm/plat-samsung/include/plat/gpio-core.h    |   3 +
+ arch/arm/plat-samsung/pm-gpio.c                   |   2 -
+ arch/arm/plat-samsung/s5p-irq-eint.c              |   2 +-
+ drivers/gpio/gpio-samsung.c                       |   3 -
+ sound/soc/samsung/goni_wm8994.c                   |   2 +-
+ 45 files changed, 440 insertions(+), 481 deletions(-)
+ create mode 100644 arch/arm/mach-s5p64x0/include/mach/gpio-samsung.h
+ delete mode 100644 arch/arm/mach-s5p64x0/include/mach/gpio.h
+ create mode 100644 arch/arm/mach-s5pc100/include/mach/gpio-samsung.h
+ delete mode 100644 arch/arm/mach-s5pc100/include/mach/gpio.h
+ create mode 100644 arch/arm/mach-s5pv210/include/mach/gpio-samsung.h
+ delete mode 100644 arch/arm/mach-s5pv210/include/mach/gpio.h
 
-> 
-> Signed-off-by: Yi Li <yi.li@linaro.org>
-> ---
-> 
-> Changes since v1:
->   -Followed Ard Biesheuvel's suggestion to rebase the patch on
->    Matt Fleming's arm64-efi branch.
-> 
->  arch/arm64/Kconfig           |   10 ++++++++++
->  arch/arm64/include/asm/dmi.h |   28 ++++++++++++++++++++++++++++
->  arch/arm64/kernel/setup.c    |    2 ++
->  3 files changed, 40 insertions(+)
->  create mode 100644 arch/arm64/include/asm/dmi.h
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 6c71f12..13ee261 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -294,6 +294,16 @@ config EFI
->  	  allow the kernel to be booted as an EFI application. This
->  	  is only useful on systems that have UEFI firmware.
->  
-> +config DMI
-> +	bool "Enable support for SMBIOS (DMI) tables"
-> +	depends on EFI
-> +	default y
-> +	help
-> +	  This enables SMBIOS/DMI feature for systems.
-> +
-> +	  This option is only useful on systems that have UEFI firmware.
-> +	  However, even with this option, the resultant kernel should
-> +	  continue to boot on existing non-UEFI platforms.
->  endmenu
->  
->  menu "Userspace binary formats"
-> diff --git a/arch/arm64/include/asm/dmi.h b/arch/arm64/include/asm/dmi.h
-> new file mode 100644
-> index 0000000..f2198bf
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/dmi.h
-> @@ -0,0 +1,28 @@
-> +/*
-> + * arch/arm64/include/asm/dmi.h
-> + *
-> + * Copyright (C) 2013 Linaro Limited.
-> + * Written by: Yi Li (yi.li at linaro.org)
-> + *
-> + * based on arch/ia64/include/asm/dmi.h
-> + *
-> + * This file is subject to the terms and conditions of the GNU General Public
-> + * License.  See the file "COPYING" in the main directory of this archive
-> + * for more details.
-> + */
-> +
-> +
-> +#ifndef _ASM_DMI_H
-> +#define _ASM_DMI_H 1
-> +
-> +#include <linux/slab.h>
-> +#include <asm/io.h>
-
-Shouldn't that be linux/efi.h?
-
-Why do we need asm/io.h?
-
-> +
-> +/* Use efi mappings for DMI */
-> +#define dmi_early_remap(x, l)	efi_lookup_mapped_addr(x)
-> +#define dmi_early_unmap(x, l)
-> +#define dmi_remap(x, l)			efi_lookup_mapped_addr(x)
-> +#define dmi_unmap(x)
-> +#define dmi_alloc(l)			kzalloc(l, GFP_ATOMIC)
-> +
-> +#endif
-
-None of these seem to use anything from io.h directly.
-
-Cheers,
-Mark.
+-- 
+1.9.3
