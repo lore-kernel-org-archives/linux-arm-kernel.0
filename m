@@ -1,41 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Jun 2014 11:06:40 +0200
-Subject: [PATCH] ARM: orion5x: fix mvebu_mbus_dt_init call
-Message-ID: <4280897.V3UkQjotOL@wuerfel>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 4 Jun 2014 11:23:13 +0200
+Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
+In-Reply-To: <20140604085542.GH29593@e103034-lin>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
+ <20140528121001.GI19967@e103034-lin>
+ <CAKfTPtDxeBfZK1AxCRqEG91pi--Ti1RYFoQPDhvMVnGTCspQ-g@mail.gmail.com>
+ <20140528154703.GJ19967@e103034-lin>
+ <20140603155007.GZ30445@twins.programming.kicks-ass.net>
+ <CAKfTPtDUvH--WxFATTW6YRAvLuohzyNHDUq6DRdfxc7gRKCX6Q@mail.gmail.com>
+ <20140604080809.GK30445@twins.programming.kicks-ass.net>
+ <20140604085542.GH29593@e103034-lin>
+Message-ID: <20140604092313.GB11096@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The prototype for mvebu_mbus_dt_init() changed around the same time
-as a new caller was added to orion5x. This adds the missing argument
-to make orion5x behave correctly to avoid this build error:
+On Wed, Jun 04, 2014 at 09:55:42AM +0100, Morten Rasmussen wrote:
+> Both running_avg and runnable_avg are affected by other tasks on the
+> same cpus, but in different ways. They are equal if you only have one
+> task on a cpu. If you have more, running_avg will give you the true
+> requirement of the tasks until the cpu is fully utilized. At which point
+> the task running_avg will drop if you add more tasks (the unweighted sum
+> of task running_avgs remains constant).
+> 
+> runnable_avg on the other hand, might be affected as soon as you have
+> two task running on the same cpu if they are runnable at the same time.
+> That isn't necessarily a bad thing for load-balancing purposes, because
+> tasks that are runnable at the same time are likely to be run more
+> efficiently by placing them on different cpus. You might view as at sort
+> of built in concurrency factor, somewhat similar to what Yuyang is
+> proposing. runnable_avg increases rapidly when the cpu is over-utilized.
 
-mach-orion5x/board-dt.c: In function 'orion5x_dt_init':
-mach-orion5x/board-dt.c:48:2: error: too few arguments to function 'mvebu_mbus_dt_init'
-  BUG_ON(mvebu_mbus_dt_init());
-  ^
-In file included from mach-orion5x/board-dt.c:18:0:
-include/linux/mbus.h:76:5: note: declared here
- int mvebu_mbus_dt_init(bool is_coherent);
-     ^
+Agreed.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-Thomas, I assume you were aware of this problem since you
-wrote the two patches that clashed, but for some reason we
-screwed it up when merging them into arm-soc. Should we apply
-this directly as a bug fix to arm-soc or did you already have
-another solution planned?
+> > I'm not sure I see how 100% is possible, but yes I agree that runnable
+> > can indeed be inflated due to this queueing effect.
+> 
+> You should only be able to get to 75% worst case for runnable_avg for
+> that example. The total running_avg is 50% no matter if the tasks
+> overlaps or not.
 
-diff --git a/arch/arm/mach-orion5x/board-dt.c b/arch/arm/mach-orion5x/board-dt.c
-index 35d418f..79f033b 100644
---- a/arch/arm/mach-orion5x/board-dt.c
-+++ b/arch/arm/mach-orion5x/board-dt.c
-@@ -45,7 +45,7 @@ static void __init orion5x_dt_init(void)
- 	orion5x_id(&dev, &rev, &dev_name);
- 	printk(KERN_INFO "Orion ID: %s. TCLK=%d.\n", dev_name, orion5x_tclk);
- 
--	BUG_ON(mvebu_mbus_dt_init());
-+	BUG_ON(mvebu_mbus_dt_init(false));
- 
- 	/*
- 	 * Setup Orion address map
+Yes, 75% is what I ended up with.
+
+> f you had five tasks on one cpu that each have a 25% requirement you can
+> get individual task runnable_avgs of up to 100% (cpu unweighted
+> runnable_load_avg can get up 500%, I think), but the task running_avgs
+> would be 20% each (total of 100%). 
+
+Yeah, more or less so indeed. I had not considered the queueing effects
+on runnable_avg yesterday, so good that that got raised.
+
+That does indeed invalidate my: runnable - running := extra cpu required
+thing. It ends up being the extra cpu required for 0 latency but gobs of
+idle time, which is something else entirely.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140604/51458426/attachment.sig>
