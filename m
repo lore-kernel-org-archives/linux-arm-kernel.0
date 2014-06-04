@@ -1,52 +1,51 @@
-From: yuyang.du@intel.com (Yuyang Du)
-Date: Wed, 4 Jun 2014 07:11:29 +0800
-Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
-In-Reply-To: <20140603154058.GY30445@twins.programming.kicks-ass.net>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
- <20140528121001.GI19967@e103034-lin>
- <20140603154058.GY30445@twins.programming.kicks-ass.net>
-Message-ID: <20140603231129.GA662@intel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 4 Jun 2014 09:19:22 +0200
+Subject: [GIT PULL] Allwinner sunXi clock changes for 3.16
+In-Reply-To: <20140603174120.10062.16229@quantum>
+References: <538B7B6C.3020601@elopez.com.ar>
+ <20140603174120.10062.16229@quantum>
+Message-ID: <20140604071922.GA5765@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > The basic problem is that worst case: sum starting from 0 and period
-> > already at LOAD_AVG_MAX = 47742, it takes LOAD_AVG_MAX_N = 345 periods
-> > (ms) for sum to reach 47742. In other words, the cpu might have been
-> > fully utilized for 345 ms before it is considered fully utilized.
-> > Periodic load-balancing happens much more frequently than that.
-> 
-> Like said earlier the 94% mark is actually hit much sooner, but yes,
-> likely still too slow.
-> 
-> 50% at 32 ms, 75% at 64 ms, 87.5% at 96 ms, etc..
-> 
-> > In the previous
-> > discussion [1] it was suggested that a sum of unweighted task
-> > runnable_avg_{sum,period} ratio instead. That is, an unweighted
-> > equivalent to weighted_cpuload(). That isn't a perfect solution either.
-> > It is fine as long as the cpus are not fully utilized, but when they are
-> > we need to use weighted_cpuload() to preserve smp_nice. What to do
-> > around the tipping point needs more thought, but I think that is
-> > currently the best proposal for a solution for task and cpu utilization.
-> 
-> I'm not too worried about the tipping point, per task runnable figures
-> of an overloaded cpu are higher, so migration between an overloaded cpu
-> and an underloaded cpu are going to be tricky no matter what we do.
-> 
-Hi,
+Hi Mike,
 
-Can I join this dicussion late?
+On Tue, Jun 03, 2014 at 10:41:20AM -0700, Mike Turquette wrote:
+> Quoting Emilio L?pez (2014-06-01 12:13:48)
+> > Hi Mike,
+> > 
+> > Here is the sunxi clocks pull for 3.16. As you probably saw during the 
+> > cycle, this mostly contains improved A31 support and a bit of 
+> > housekeeping. Please note that this pull does *not* contain the MMC 
+> > clock patches Hans sent, as you merged those yourself on clk-next
+> 
+> Hi Emilio,
+> 
+> -rc8 is pretty late for me to take this in under normal circumstances,
+> and since the merge window opened early this time I will defer taking
+> this pull request in until 3.16-rc1 is released. It'll be one of the
+> first things applied to the new clk-next.
 
-As I understand, you are talking about a metric for cpu activity. And the
-issues about runnable_avg_sum is its sluggishness to latest change, and also
-need unweighted load averages.
+I know that Emilio has been pretty late at sending this, but at least
+the A31 USB clocks patches is quite important for us, since it would
+allow to add the A31 to Olof's boot test farm.
 
-You might be aware of my recent proposal to CPU ConCurrency (CC). It is 1) an
-average of nr_running, or 2) nr_running weighted CPU utilization. So it is a
-combination of CPU utlization and run queue (both factored  natually). It
-meets the needs you talked, I think. You can take it as a candidate, or at
-least we can talk about it?
+Could you reconsider merging this?
+
+Just so that doesn't happen again, when do you expect the pull
+requests?
 
 Thanks,
-Yuyang
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140604/6d0fcfd5/attachment.sig>
