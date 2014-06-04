@@ -1,53 +1,55 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 4 Jun 2014 11:49:50 -0700
-Subject: [PATCH 3/3] clocksource: exynos_mct: Optimize register reads with
- ldmia
-In-Reply-To: <alpine.DEB.2.10.1406042004140.3319@nanos>
-References: <1401903034-20074-1-git-send-email-dianders@chromium.org>
- <1401903034-20074-3-git-send-email-dianders@chromium.org>
- <alpine.DEB.2.10.1406042004140.3319@nanos>
-Message-ID: <CAD=FV=UDAcBeXewVinSG0WeoHkkw2zHe2ORp7BLW=NKxmKUiew@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 4 Jun 2014 11:59:26 -0700
+Subject: [PATCH 1/1] device.h: arm,dma-iommu: Move out dma_iommu_mapping
+ struct
+In-Reply-To: <CAD15agbiuXiiAp62R-NeLeX3rgNftmyb+wGiSVx-FgtcXzxpHA@mail.gmail.com>
+References: <1401869506-48129-1-git-send-email-ritesh.harjani@gmail.com>
+ <1401869506-48129-2-git-send-email-ritesh.harjani@gmail.com>
+ <20140604175145.GD20812@kroah.com>
+ <CAD15agbiuXiiAp62R-NeLeX3rgNftmyb+wGiSVx-FgtcXzxpHA@mail.gmail.com>
+Message-ID: <20140604185926.GB30884@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+On Thu, Jun 05, 2014 at 12:16:28AM +0530, Ritesh Harjani wrote:
+> Hi Greg,
+> 
+> Thanks for reviewing.
+> 
+> On Wed, Jun 4, 2014 at 11:21 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
+> > On Wed, Jun 04, 2014 at 01:41:46PM +0530, ritesh.harjani at gmail.com wrote:
+> >> From: Ritesh Harjani <ritesh.harjani@gmail.com>
+> >>
+> >> This patch moves out *mapping pointer of dma_iommu_mapping
+> >> from arch/arm/include/asm/device.h to include/liunux/device.h
+> >
+> > Why?  Who else can use this becides arm devices?
+> 
+> Currently only arm and arm64 are the archs at this very moment but
+> later other archs can make use of this, as its an arch independent
+> code. (Similar to as some arch make use of iommu_area_alloc in
+> iommu-helper.c)
+> 
+> >
+> >>
+> >> Also, it moves out complete structre definition of dma_iommu_mapping
+> >> to include/linux/iommu-helper.h
+> >>
+> >> This is done since arm iommu's dma-mapping arch independent code,
+> >> needs to be moved out to lib/iommu-helper.c, this means
+> >> dma_iommu_mapping will be arch independent and later other archs
+> >> can make use of it.
+> >
+> > Will that really happen?  Do you have patches that do that?  I'd prefer
+> > to not do stuff like this until you have a patch series that needs it,
+> > otherwise this is just unneeded churn.
+> 
+> Yes, foll link has the patch series, (under review)
+> http://www.spinics.net/lists/arm-kernel/msg336896.html
 
-On Wed, Jun 4, 2014 at 11:05 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Wed, 4 Jun 2014, Doug Anderson wrote:
->
->> As we saw in (clocksource: exynos_mct: cache mct upper count), the
->> time spent reading the MCT shows up fairly high in real-world
->> profiles.  That means that it's worth some optimization.
->>
->> We get a roughly 10% speedup in userspace gettimeofday() by using an
->> ldmia to read the two halfs of the MCT.  That seems like a worthwhile
->> thing to do.
->>
->> Before: 1173084 us for 1000000 gettimeofday in userspace
->> After:  1045674 us for 1000000 gettimeofday in userspace
->>
->> NOTE: we could actually do better than this if we really wanted to.
->> Technically we could register the clocksource as a 32-bit timer and
->> only use the "lower" half.  Doing so brings us down to 1014429 us for
->> 1000000 gettimeofday in userspace (and doesn't even require assembly
->> code).  That would be an alternative to this change.
->
-> I was about to ask exactly that question: What's the advantage of the
-> 64 bit dance there? AFAICT nothing.
+Make this patch 1/3 of that series and resend, I don't want to take this
+one if the others are not accepted.
 
-I debated whether to send out the 32-bit version, since I'd
-implemented both.  I'm happy to send out the 32-bit version too and
-people can pick which they like better.  Let me know.
+thanks,
 
-The final thing that pushed me over the edge to send the 64-bit
-version was that I didn't know enough about how MCT was used with
-respect to low power modes (we don't use AFTR / LPA modes on our
-system).  I could actually believe that we might want to set a timer
-for more than 178 seconds into the future for these low power modes.
-If that's the case, we still need to keep around the 64-bit read code
-for that case.  ...and once we have the 64-bit code then we might as
-well use it for the rest of the timers.
-
-Perhaps Tomasz will comment on this.
-
--Doug
+greg k-h
