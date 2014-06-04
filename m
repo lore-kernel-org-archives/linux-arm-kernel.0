@@ -1,49 +1,46 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 04 Jun 2014 09:27:05 +0200
-Subject: XADC
-In-Reply-To: <alpine.DEB.2.01.1406040843120.32323@pmeerw.net>
-References: <e2cd1349-5cfb-4456-a1f5-74e7affff085@BN1AFFO11FD006.protection.gbl>
- <alpine.DEB.2.01.1406040843120.32323@pmeerw.net>
-Message-ID: <538ECA49.8030207@metafoo.de>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 4 Jun 2014 09:47:26 +0200
+Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
+In-Reply-To: <20140603155007.GZ30445@twins.programming.kicks-ass.net>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
+ <20140528121001.GI19967@e103034-lin>
+ <CAKfTPtDxeBfZK1AxCRqEG91pi--Ti1RYFoQPDhvMVnGTCspQ-g@mail.gmail.com>
+ <20140528154703.GJ19967@e103034-lin>
+ <20140603155007.GZ30445@twins.programming.kicks-ass.net>
+Message-ID: <CAKfTPtDUvH--WxFATTW6YRAvLuohzyNHDUq6DRdfxc7gRKCX6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2014 08:47 AM, Peter Meerwald wrote:
-> Hello,
+On 3 June 2014 17:50, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Wed, May 28, 2014 at 04:47:03PM +0100, Morten Rasmussen wrote:
+>> Since we may do periodic load-balance every 10 ms or so, we will perform
+>> a number of load-balances where runnable_avg_sum will mostly be
+>> reflecting the state of the world before a change (new task queued or
+>> moved a task to a different cpu). If you had have two tasks continuously
+>> on one cpu and your other cpu is idle, and you move one of the tasks to
+>> the other cpu, runnable_avg_sum will remain unchanged, 47742, on the
+>> first cpu while it starts from 0 on the other one. 10 ms later it will
+>> have increased a bit, 32 ms later it will be 47742/2, and 345 ms later
+>> it reaches 47742. In the mean time the cpu doesn't appear fully utilized
+>> and we might decide to put more tasks on it because we don't know if
+>> runnable_avg_sum represents a partially utilized cpu (for example a 50%
+>> task) or if it will continue to rise and eventually get to 47742.
 >
->> I recently found that you developed a driver for XADC and I thought I
->> enable it (see patch below). But it seems something is not working
->> correctly. The values I tested don't seem to be right and also fixed.
->> I.e. they don't change over time or across boards:
->>
->>    # cat in_temp0_scale
->>    123.040771484
->>    # cat in_voltage0_vccint_scale
->>    0.732421875
->>    # cat in_voltage0_vccint_raw
->>    1384
->>    # cat in_voltage1_vccaux_s[ 1203.660637] random: nonblocking pool is initialized
->>    # cat in_voltage1_vccaux_scale
->>    0.732421875
->>    # cat in_voltage3_vccpint_scale
->>    0.732421875
+> Ah, no, since we track per task, and update the per-cpu ones when we
+> migrate tasks, the per-cpu values should be instantly updated.
 >
-> the _scale values are supposed to be constant; their purpose is to scale a
-> measurement so that the result is in a given unit
->
-> e.g. in_temp0_scale scales in_temp0_raw so that the result
-> (in_temp0_raw * in_temp0_scale) in milli Celsius
->
-> in_voltage0_vccint_raw * in_voltage0_vccint_scale is supposed to give
-> milli Volts
->
-> so in_voltage0_vccint_raw should vary accross time / boards (and voltage
-> hopefully :), but not the _scales
+> If we were to increase per task storage, we might as well also track
+> running_avg not only runnable_avg.
 
-Yep, as Peter said scale and offset will be constant, raw should change 
-though, e.g. both voltage and temperature should a slight jitter if you 
-repeatedly read them. If not something is broken. We had the driver in our 
-images for Zynq board for a while now and so far it worked fine. I think 
-Mrinal and Radhey from Xilinx also tested the driver.
+I agree that the removed running_avg should give more useful
+information about the the load of a CPU.
 
-- Lars
+The main issue with running_avg is that it's disturbed by other tasks
+(as point out previously). As a typical example,  if we have 2 tasks
+with a load of 25% on 1 CPU, the unweighted runnable_load_avg will be
+in the range of [100% - 50%] depending of the parallelism of the
+runtime of the tasks whereas the reality is 50% and the use of
+running_avg will return this value
+
+Vincent
