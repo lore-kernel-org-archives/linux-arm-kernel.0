@@ -1,78 +1,155 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Wed,  4 Jun 2014 16:31:54 +0200
-Subject: [PATCH RESEND 06/12] drivers: clk: st: Add polarity bit indication
-In-Reply-To: <1401892320-18211-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1401892320-18211-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1401892320-18211-7-git-send-email-gabriel.fernandez@linaro.org>
+Date: Wed,  4 Jun 2014 16:32:51 +0200
+Subject: [PATCH 3/4] ARM: STi: DT: STiH407: 407 DT Entry for clockgen D0/D2/D3
+In-Reply-To: <1401892372-18279-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1401892372-18279-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1401892372-18279-4-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces polarity indication for pll power up bit
-and for standby bit in order to have same code between Orly 2
-and CAN.
+Patch adds DT entries for clockgen D0/D2/D3
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
 ---
- drivers/clk/st/clkgen-fsyn.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/stih407-clock.dtsi | 126 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 126 insertions(+)
 
-diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
-index 4f53ee0..5aae17c 100644
---- a/drivers/clk/st/clkgen-fsyn.c
-+++ b/drivers/clk/st/clkgen-fsyn.c
-@@ -67,6 +67,8 @@ struct clkgen_quadfs_data {
- 	bool reset_present;
- 	bool bwfilter_present;
- 	bool lockstatus_present;
-+	bool powerup_polarity;
-+	bool standby_polarity;
- 	bool nsdiv_present;
- 	struct clkgen_field ndiv;
- 	struct clkgen_field ref_bw;
-@@ -308,7 +310,7 @@ static int quadfs_pll_enable(struct clk_hw *hw)
- 	/*
- 	 * Power up the PLL
- 	 */
--	CLKGEN_WRITE(pll, npda, 1);
-+	CLKGEN_WRITE(pll, npda, !pll->data->powerup_polarity);
- 
- 	if (pll->lock)
- 		spin_unlock_irqrestore(pll->lock, flags);
-@@ -335,7 +337,7 @@ static void quadfs_pll_disable(struct clk_hw *hw)
- 	 * Powerdown the PLL and then put block into soft reset if we have
- 	 * reset control.
- 	 */
--	CLKGEN_WRITE(pll, npda, 0);
-+	CLKGEN_WRITE(pll, npda, pll->data->powerup_polarity);
- 
- 	if (pll->data->reset_present)
- 		CLKGEN_WRITE(pll, nreset, 0);
-@@ -611,7 +613,7 @@ static int quadfs_fsynth_enable(struct clk_hw *hw)
- 	if (fs->lock)
- 		spin_lock_irqsave(fs->lock, flags);
- 
--	CLKGEN_WRITE(fs, nsb[fs->chan], 1);
-+	CLKGEN_WRITE(fs, nsb[fs->chan], !fs->data->standby_polarity);
- 
- 	if (fs->lock)
- 		spin_unlock_irqrestore(fs->lock, flags);
-@@ -631,7 +633,7 @@ static void quadfs_fsynth_disable(struct clk_hw *hw)
- 	if (fs->lock)
- 		spin_lock_irqsave(fs->lock, flags);
- 
--	CLKGEN_WRITE(fs, nsb[fs->chan], 0);
-+	CLKGEN_WRITE(fs, nsb[fs->chan], !fs->data->standby_polarity);
- 
- 	if (fs->lock)
- 		spin_unlock_irqrestore(fs->lock, flags);
-@@ -645,7 +647,7 @@ static int quadfs_fsynth_is_enabled(struct clk_hw *hw)
- 	pr_debug("%s: %s enable bit = 0x%x\n",
- 		 __func__, __clk_get_name(hw->clk), nsb);
- 
--	return !!nsb;
-+	return fs->data->standby_polarity ? !nsb : !!nsb;
- }
- 
- #define P15			(uint64_t)(1 << 15)
+diff --git a/arch/arm/boot/dts/stih407-clock.dtsi b/arch/arm/boot/dts/stih407-clock.dtsi
+index 85cc135..6e59011 100644
+--- a/arch/arm/boot/dts/stih407-clock.dtsi
++++ b/arch/arm/boot/dts/stih407-clock.dtsi
+@@ -139,5 +139,131 @@
+ 						     "clk-compo-dvp";
+ 			};
+ 		};
++
++		clk_s_d0_quadfs: clk-s-d0-quadfs at 9104000 {
++			#clock-cells = <1>;
++			compatible = "st,stih407-quadfs660-D", "st,quadfs";
++			reg = <0x9104000 0x1000>;
++
++			clocks = <&clk_sysin>;
++
++			clock-output-names = "clk-s-d0-fs0-ch0",
++					     "clk-s-d0-fs0-ch1",
++					     "clk-s-d0-fs0-ch2",
++					     "clk-s-d0-fs0-ch3";
++		};
++
++		clockgen-d0 at 09104000 {
++			compatible = "st,clkgen-c32";
++			reg = <0x9104000 0x1000>;
++
++			clk_s_d0_flexgen: clk-s-d0-flexgen {
++				#clock-cells = <1>;
++				compatible = "st,flexgen";
++
++				clocks = <&clk_s_d0_quadfs 0>,
++					 <&clk_s_d0_quadfs 1>,
++					 <&clk_s_d0_quadfs 2>,
++					 <&clk_s_d0_quadfs 3>,
++					 <&clk_sysin>;
++
++				clock-output-names = "clk-pcm-0",
++						     "clk-pcm-1",
++						     "clk-pcm-2",
++						     "clk-spdiff";
++			};
++		};
++
++		clk_s_d2_quadfs: clk-s-d2-quadfs at 9106000 {
++			#clock-cells = <1>;
++			compatible = "st,stih407-quadfs660-D", "st,quadfs";
++			reg = <0x9106000 0x1000>;
++
++			clocks = <&clk_sysin>;
++
++			clock-output-names = "clk-s-d2-fs0-ch0",
++					     "clk-s-d2-fs0-ch1",
++					     "clk-s-d2-fs0-ch2",
++					     "clk-s-d2-fs0-ch3";
++		};
++
++		clk_tmdsout_hdmi: clk-tmdsout-hdmi {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <0>;
++		};
++
++		clockgen-d2 at x9106000 {
++			compatible = "st,clkgen-c32";
++			reg = <0x9106000 0x1000>;
++
++			clk_s_d2_flexgen: clk-s-d2-flexgen {
++				#clock-cells = <1>;
++				compatible = "st,flexgen";
++
++				clocks = <&clk_s_d2_quadfs 0>,
++					 <&clk_s_d2_quadfs 1>,
++					 <&clk_s_d2_quadfs 2>,
++					 <&clk_s_d2_quadfs 3>,
++					 <&clk_sysin>,
++					 <&clk_sysin>,
++					 <&clk_tmdsout_hdmi>;
++
++				clock-output-names = "clk-pix-main-disp",
++						     "clk-pix-pip",
++						     "clk-pix-gdp1",
++						     "clk-pix-gdp2",
++						     "clk-pix-gdp3",
++						     "clk-pix-gdp4",
++						     "clk-pix-aux-disp",
++						     "clk-denc",
++						     "clk-pix-hddac",
++						     "clk-hddac",
++						     "clk-sddac",
++						     "clk-pix-dvo",
++						     "clk-dvo",
++						     "clk-pix-hdmi",
++						     "",
++						     "clk-ref-hdmiphy";
++						     };
++		};
++
++		clk_s_d3_quadfs: clk-s-d3-quadfs at 9107000 {
++			#clock-cells = <1>;
++			compatible = "st,stih407-quadfs660-D", "st,quadfs";
++			reg = <0x9107000 0x1000>;
++
++			clocks = <&clk_sysin>;
++
++			clock-output-names = "clk-s-d3-fs0-ch0",
++					     "clk-s-d3-fs0-ch1",
++					     "clk-s-d3-fs0-ch2",
++					     "clk-s-d3-fs0-ch3";
++		};
++
++		clockgen-d3 at 9107000 {
++			compatible = "st,clkgen-c32";
++			reg = <0x9107000 0x1000>;
++
++			clk_s_d3_flexgen: clk-s-d3-flexgen {
++				#clock-cells = <1>;
++				compatible = "st,flexgen";
++
++				clocks = <&clk_s_d3_quadfs 0>,
++					 <&clk_s_d3_quadfs 1>,
++					 <&clk_s_d3_quadfs 2>,
++					 <&clk_s_d3_quadfs 3>,
++					 <&clk_sysin>;
++
++				clock-output-names = "clk-stfe-frc1",
++						     "clk-tsout-0",
++						     "clk-tsout-1",
++						     "clk-mchi",
++						     "clk-vsens-compo",
++						     "clk-frc1-remote",
++						     "clk-lpc-0",
++						     "clk-lpc-1";
++			};
++		};
+ 	};
+ };
 -- 
 1.9.1
