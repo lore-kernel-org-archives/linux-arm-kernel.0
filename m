@@ -1,50 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Jun 2014 13:09:35 +0200
-Subject: [PATCH] ARM: integrator: fix section mismatch problem
-In-Reply-To: <20140604105726.GB23430@n2100.arm.linux.org.uk>
-References: <1401879202-10516-1-git-send-email-linus.walleij@linaro.org>
- <10542022.FtcLF0Em3k@wuerfel> <20140604105726.GB23430@n2100.arm.linux.org.uk>
-Message-ID: <18867368.JlUVYRYg9X@wuerfel>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 4 Jun 2014 13:15:59 +0200
+Subject: [PATCH v2 04/11] sched: Allow all archs to set the power_orig
+In-Reply-To: <538EE9E9.7090605@arm.com>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-5-git-send-email-vincent.guittot@linaro.org>
+ <53888FF0.4020403@arm.com>
+ <CAKfTPtB+2dsHjZw=KkYgbP4EnPebLjfdNeVDAStXFJ2h8wbm+g@mail.gmail.com>
+ <538EE9E9.7090605@arm.com>
+Message-ID: <CAKfTPtB9bh1_ZeQSFsC2eoBaytDBNcmn8ZZpY7Weqxui75Z2kA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 June 2014 11:57:26 Russell King - ARM Linux wrote:
-> On Wed, Jun 04, 2014 at 12:57:02PM +0200, Arnd Bergmann wrote:
-> > On Wednesday 04 June 2014 12:53:22 Linus Walleij wrote:
-> > > This addresses a section mismatch problem in the IM-PD1
-> > > driver in the Integrator/AP.
-> > > 
-> > > The IM-PD1 contains a VIC interrupt controller and therefore
-> > > the driver calls vic_init_cascaded() which is marked __init as
-> > > irqchips are simply not hot-pluggable and specifically the VIC
-> > > is assumed to initiate only on boot.
-> > > 
-> > > However the module driver model of the Integrator LM bus
-> > > assumes that logic tile drivers can be probed at runtime. This
-> > > is not really the case for IM-PD1: these tiles are detected at
-> > > boot and they cannot be plugged into a running system. Before
-> > > this patch it is of course possible to modprobe them later.
-> > > 
-> > > By first forcing the IM-PD1 to bool we make sure this driver
-> > > gets compiled into the kernel, and we know it will be probed
-> > > only at boot time when the tiles are detected, so we can tag
-> > > its probe function __init_refok as we know it won't be called
-> > > after boot now, and the section mismatch problem goes away.
-> > > 
-> > > Cc: Arnd Bergmann <arnd@arndb.de>
-> > > Cc: Russell King <linux@arm.linux.org.uk>
-> > > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> > > ---
-> > > ARM SoC folks: please apply this directly if the solution seems
-> > > acceptable.
-> > 
-> > Looks good to me, I'm applying this on top of another fix
-> > I have just added to next/soc2.
-> 
-> That's a NAK on that until the issue I've raised has been checked.
-> 
+On 4 June 2014 11:42, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+> [...]
+>>> (1) We assume that the current way (update_cpu_power() calls
+>>> arch_scale_freq_power() to get the avg power(freq) over the time period
+>>> since the last call to arch_scale_freq_power()) is suitable
+>>> for us. Do you have another opinion here?
+>>
+>> Using power (or power_freq as you mentioned below) is probably the
+>> easiest and more straight forward solution. You can use it to scale
+>> each element when updating entity runnable.
+>> Nevertheless, I see to 2 potential issues:
+>> - is power updated often enough to correctly follow the frequency
+>> scaling ? we need to compare power update frequency with
+>> runnable_avg_sum variation speed and the rate at which we will change
+>> the CPU's frequency.
+>> - the max value of runnable_avg_sum will be also scaled so a task
+>> running on a CPU with less capacity could be seen as a "low" load even
+>> if it's an always running tasks. So we need to find a way to reach the
+>> max value for such situation
+>
+> I think I mixed two problems together here:
+>
+> Firstly, we need to scale cpu power in update_cpu_power() regarding
+> uArch, frequency and rt/irq pressure.
+> Here the freq related value we get back from arch_scale_freq_power(...,
+> cpu) could be an instantaneous value (curr_freq(cpu)/max_freq(cpu)).
+>
+> Secondly, to be able to scale the runnable avg sum of a sched entity
+> (se->avg->runnable_avg_sum), we preferable have a coefficient
+> representing uArch diffs (cpu_power_orig(cpu)/cpu_power_orig(most
+> powerful cpu in the system) and another coefficient (avg freq over 'now
 
-Ok, I'll retract the patch, I haven't pushed the branch yet, so it's
-easy to back out. Thanks for having a look at the issue so quickly.
+AFAICT, the coefficient representing uArch diffs is already taken into
+account into power_freq thanks to scale_cpu, isn't it ?
 
-	Arnd
+> - sa->last_runnable_update'(cpu)/max_freq(cpu). This value would have to
+> be retrieved from the arch in __update_entity_runnable_avg().
+>
+>>> (2) Is the current layout of update_cpu_power() adequate for this, where
+>>> we scale power_orig related to freq and then related to rt/(irq):
+>>>
+>>>   power_orig = scale_cpu(SCHED_POWER_SCALE)
+>>>   power = scale_rt(scale_freq(power_orig))
+>>>
+>>> or do we need an extra power_freq data member on the rq and do:
+>>>
+>>>   power_orig = scale_cpu(SCHED_POWER_SCALE)
+>>>   power_freq = scale_freq(power_orig))
+>>>   power = scale_rt(power_orig))
+>>
+>> do you really mean power = scale_rt(power_orig) or power=scale_rt(power_freq) ?
+>
+> No, I also think that power=scale_rt(power_freq) is correct.
+>
+>>> In other words, do we consider rt/(irq) pressure when calculating freq
+>>> scale invariant task load or not?
+>>
+>> we should take power_freq which implies a new field
+> [...]
+>
