@@ -1,35 +1,36 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 4 Jun 2014 12:23:33 -0500
-Subject: [PATCH 0/4] <mach/gpio.h> purge
-In-Reply-To: <1401888838-3126-1-git-send-email-linus.walleij@linaro.org>
-References: <1401888838-3126-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAL_JsqL9_hbn-XDCm368YEPuW2mNnYio_-pAgUNOMw-7kd7MOQ@mail.gmail.com>
+From: dev@lynxeye.de (Lucas Stach)
+Date: Wed, 04 Jun 2014 19:32:09 +0200
+Subject: Tegra 2 T20 NAND Flash Support
+In-Reply-To: <20140604144134.GH28484@ulmo>
+References: <538E6FB5.5020806@ziswiler.com> <1401866283.2173.3.camel@tellur>
+ <538EC96A.4050702@ziswiler.com> <20140604144134.GH28484@ulmo>
+Message-ID: <1401903129.9454.2.camel@tellur>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 4, 2014 at 8:33 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> After deleting <mach/gpio.h> from the AT91 only S5P remains.
-> This patch set fixes up S5P and then removes NEED_MACH_GPIO_H
-> permanently removing any references to <mach/gpio.h> from the
-> ARM kernel. Do a small cleanout of a dangling reference to
-> ARM_GPIOLIB_COMPLEX at the same time.
+Am Mittwoch, den 04.06.2014, 16:41 +0200 schrieb Thierry Reding:
+> On Wed, Jun 04, 2014 at 09:23:22AM +0200, Marcel Ziswiler wrote:
+> > On 06/04/2014 09:18 AM, Lucas Stach wrote:
+> > >I took the Linux Tegra NAND driver from Thierry and cleaned it up quite
+> > >a bit. It now works with both ONFI and non-ONFI NAND, at least for
+> > >reading. Writing doesn't quite work yet and I've got side-tracked with
+> > >other stuff.
+> > >
+> > >If you are interested in moving this forward I can put up my WIP patches
+> > >to some public location.
+> > 
+> > Sounds great, yes. That would be perfect, thanks.
+> > 
+> > We even once got an universal NAND test infrastructure from Micron based on
+> > a re-worked Colibri T20 which we could use to validate it with various NAND
+> > flash parts.
+> 
+> Excellent, I would've had a hard time digging up those patches. It's
+> really been quite a while.
+> 
+I've put up a rebased version of the patches at
 
-Awesome.
+git://git.pengutronix.de/git/lst/linux.git tegra-nand
 
->
-> Linus Walleij (4):
->   ARM: s5p: cut the custom ARCH_NR_GPIOS definition
->   ARM: mach-s5p: get rid of all <mach/gpio.h> headers
->   ARM: kill CONFIG_NEED_MACH_GPIO_H
->   ARM: delete old reference to ARM_GPIOLIB_COMPLEX
->
->  arch/arm/Kconfig                                  |  10 --
->  arch/arm/include/asm/gpio.h                       |   7 --
->  arch/arm/mach-s5p64x0/common.c                    |   2 +-
->  arch/arm/mach-s5p64x0/dev-audio.c                 |   3 +-
->  arch/arm/mach-s5p64x0/include/mach/gpio-samsung.h | 127 +++++++++++++++++++
->  arch/arm/mach-s5p64x0/include/mach/gpio.h         | 132 --------------------
-
-Use -M option or set git config diff.renames=true so you don't have to remember.
-
-Rob
+Regards,
+Lucas
