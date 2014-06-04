@@ -1,52 +1,54 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 4 Jun 2014 12:01:23 -0700
-Subject: [PATCH 1/1] device.h: arm,dma-iommu: Move out dma_iommu_mapping
- struct
-In-Reply-To: <CAD15agbiuXiiAp62R-NeLeX3rgNftmyb+wGiSVx-FgtcXzxpHA@mail.gmail.com>
-References: <1401869506-48129-1-git-send-email-ritesh.harjani@gmail.com>
- <1401869506-48129-2-git-send-email-ritesh.harjani@gmail.com>
- <20140604175145.GD20812@kroah.com>
- <CAD15agbiuXiiAp62R-NeLeX3rgNftmyb+wGiSVx-FgtcXzxpHA@mail.gmail.com>
-Message-ID: <20140604190123.GC30884@kroah.com>
+From: vidyas@nvidia.com (Vidya Sagar)
+Date: Thu, 5 Jun 2014 00:47:27 +0530
+Subject: [PATCH] ARM: fix debug prints relevant to PCI devices
+Message-ID: <1401909447-8434-1-git-send-email-vidyas@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 05, 2014 at 12:16:28AM +0530, Ritesh Harjani wrote:
-> >> --- a/include/linux/device.h
-> >> +++ b/include/linux/device.h
-> >> @@ -705,6 +705,10 @@ struct device {
-> >>       /* arch specific additions */
-> >>       struct dev_archdata     archdata;
-> >>
-> >> +#ifdef CONFIG_DMA_USE_IOMMU_HELPER_MAPPING
-> >> +     struct dma_iommu_mapping        *mapping;
-> >> +#endif
-> >> +
-> >>       struct device_node      *of_node; /* associated device tree node */
-> >>       struct acpi_dev_node    acpi_node; /* associated ACPI device node */
-> >>
-> >
-> > Are you sure this will not break the build on systems that enable that
-> > option, yet do not include iommu-helper.h?
-> 
-> They need to include iommu-helper.h wherever they are using this
-> structure members. Until then no this should
-> not break the build I think for the case you mentioned.
+As per PCIe spec, fast back-to-back transactions feature
+is not applicable to PCIe devices. Hence, do not print
+that fast back-to-back trasactions are disabled when
+there is a PCIe device found on the bus
 
-Try it and find out :)
+Signed-off-by: Vidya Sagar <vidyas@nvidia.com>
+---
+ arch/arm/kernel/bios32.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-> That's how it was done in arch/arm/include/asm/device.h
-
-Perhaps something else was pulling in that .h file?  device.h is used
-_everywhere_ you can not assume someone will have included another .h
-file before it.
-
-> Do I need to do this in diff way ?
-
-Yes, just predefine the structure in the .h file.
-
-And do you really need the #ifdef?
-
-thanks,
-
-greg k-h
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 17a26c1..95ad3fb 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -290,6 +290,7 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ {
+ 	struct pci_dev *dev;
+ 	u16 features = PCI_COMMAND_SERR | PCI_COMMAND_PARITY | PCI_COMMAND_FAST_BACK;
++	int has_pcie_dev = 0;
+ 
+ 	/*
+ 	 * Walk the devices on this bus, working out what we can
+@@ -298,6 +299,8 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ 	list_for_each_entry(dev, &bus->devices, bus_list) {
+ 		u16 status;
+ 
++		if (!has_pcie_dev)
++			has_pcie_dev = pci_pcie_cap(dev);
+ 		pci_read_config_word(dev, PCI_STATUS, &status);
+ 
+ 		/*
+@@ -354,9 +357,11 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ 
+ 	/*
+ 	 * Report what we did for this bus
++	 * (only if the bus doesn't have even one PCIe device)
+ 	 */
+-	printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
+-		bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
++	if (!has_pcie_dev)
++		printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
++			bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
+ }
+ EXPORT_SYMBOL(pcibios_fixup_bus);
+ 
+-- 
+1.8.1.5
