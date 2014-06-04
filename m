@@ -1,60 +1,26 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed,  4 Jun 2014 16:24:28 -0700
-Subject: [PATCH 3.10 005/103] irqchip: Gic: Support forced affinity setting
-In-Reply-To: <20140604232546.704156131@linuxfoundation.org>
-References: <20140604232546.704156131@linuxfoundation.org>
-Message-ID: <20140604232547.006861681@linuxfoundation.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 5 Jun 2014 08:29:02 +0900
+Subject: [PATCH v2 3/7] ARM: shmobile: r8a7791 dtsi: add SYS-DMAC clocks
+In-Reply-To: <1507846.mqylbqQs2V@avalon>
+References: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
+ <1401716531-29794-4-git-send-email-geert+renesas@glider.be>
+ <1507846.mqylbqQs2V@avalon>
+Message-ID: <20140604232901.GA25614@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.10-stable review patch.  If anyone has any objections, please let me know.
+On Wed, Jun 04, 2014 at 01:24:57PM +0200, Laurent Pinchart wrote:
+> Hi Geert,
+> 
+> Thank you for the patch.
+> 
+> On Monday 02 June 2014 15:42:07 Geert Uytterhoeven wrote:
+> > Add clocks for the SYS-DMAC0 and SYS-DMAC1 hardware blocks.
+> > 
+> > Cfr. the r8a7790 version by Ben Dooks.
+> > 
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-------------------
-
-From: Thomas Gleixner <tglx@linutronix.de>
-
-commit ffde1de64012c406dfdda8690918248b472f24e4 upstream.
-
-To support the affinity setting of per cpu timers in the early startup
-of a not yet online cpu, implement the force logic, which disables the
-cpu online check.
-
-Tagged for stable to allow a simple fix of the affected SoC clock
-event drivers.
-
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Cc: Tomasz Figa <t.figa@samsung.com>,
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>,
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: linux-arm-kernel at lists.infradead.org,
-Link: http://lkml.kernel.org/r/20140416143315.916984416 at linutronix.de
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- drivers/irqchip/irq-gic.c |    8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
-
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -246,10 +246,14 @@ static int gic_set_affinity(struct irq_d
- 			    bool force)
- {
- 	void __iomem *reg = gic_dist_base(d) + GIC_DIST_TARGET + (gic_irq(d) & ~3);
--	unsigned int shift = (gic_irq(d) % 4) * 8;
--	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
-+	unsigned int cpu, shift = (gic_irq(d) % 4) * 8;
- 	u32 val, mask, bit;
- 
-+	if (!force)
-+		cpu = cpumask_any_and(mask_val, cpu_online_mask);
-+	else
-+		cpu = cpumask_first(mask_val);
-+
- 	if (cpu >= NR_GIC_CPU_IF || cpu >= nr_cpu_ids)
- 		return -EINVAL;
- 
+Thanks, I have queued this up.
