@@ -1,199 +1,57 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Wed,  4 Jun 2014 18:03:42 +0200
-Subject: [PATCH v2 1/5] ARM: berlin: add SMP support
+Date: Wed,  4 Jun 2014 18:03:46 +0200
+Subject: [PATCH v2 5/5] ARM: dts: berlin: add SMP related nodes and properties
+ for BG2Q
 In-Reply-To: <1401897826-11711-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1401897826-11711-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1401897826-11711-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1401897826-11711-6-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds SMP support for Berlin SoCs. Secondary CPUs are reset, then
-execute the instruction we put in the reset exception register, setting
-the pc at the address contained in the software reset address register,
-which is the physical address of the Berlin secondary startup.
-
-This implementation avoid using the pen lock mechanism.
+Add required nodes and properties into the Berlin BG2Q device tree to
+take advantage of the newly introduced SMP support. Add the scu and
+cpu-ctrl nodes along with the CPUs enable-method property.
 
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/mach-berlin/Kconfig   |  3 ++
- arch/arm/mach-berlin/Makefile  |  3 +-
- arch/arm/mach-berlin/headsmp.S | 30 +++++++++++++
- arch/arm/mach-berlin/platsmp.c | 99 ++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 134 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-berlin/headsmp.S
- create mode 100644 arch/arm/mach-berlin/platsmp.c
+ arch/arm/boot/dts/berlin2q.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
-index d3c5f14dc142..69e94c4e0e28 100644
---- a/arch/arm/mach-berlin/Kconfig
-+++ b/arch/arm/mach-berlin/Kconfig
-@@ -13,7 +13,9 @@ config MACH_BERLIN_BG2
- 	bool "Marvell Armada 1500 (BG2)"
- 	select CACHE_L2X0
- 	select CPU_PJ4B
-+	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
-+	select HAVE_SMP
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index 07452a7483fa..570f12f7e9c4 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -17,6 +17,7 @@
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		enable-method = "marvell,berlin-smp";
  
- config MACH_BERLIN_BG2CD
- 	bool "Marvell Armada 1500-mini (BG2CD)"
-@@ -24,6 +26,7 @@ config MACH_BERLIN_BG2Q
- 	bool "Marvell Armada 1500 Pro (BG2-Q)"
- 	select CACHE_L2X0
- 	select CPU_V7
-+	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
- 	select HAVE_SMP
+ 		cpu at 0 {
+ 			compatible = "arm,cortex-a9";
+@@ -94,6 +95,11 @@
+ 			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
  
-diff --git a/arch/arm/mach-berlin/Makefile b/arch/arm/mach-berlin/Makefile
-index ab69fe956f49..c0719ecd1890 100644
---- a/arch/arm/mach-berlin/Makefile
-+++ b/arch/arm/mach-berlin/Makefile
-@@ -1 +1,2 @@
--obj-y += berlin.o
-+obj-y			+= berlin.o
-+obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o
-diff --git a/arch/arm/mach-berlin/headsmp.S b/arch/arm/mach-berlin/headsmp.S
-new file mode 100644
-index 000000000000..4a4c56a58ad3
---- /dev/null
-+++ b/arch/arm/mach-berlin/headsmp.S
-@@ -0,0 +1,30 @@
-+/*
-+ * Copyright (C) 2014 Marvell Technology Group Ltd.
-+ *
-+ * Antoine T?nart <antoine.tenart@free-electrons.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
++		scu: snoop-control-unit at ad0000 {
++			compatible = "arm,cortex-a9-scu";
++			reg = <0xad0000 0x58>;
++		};
 +
-+#include <linux/linkage.h>
-+#include <linux/init.h>
-+#include <asm/assembler.h>
+ 		gic: interrupt-controller at ad1000 {
+ 			compatible = "arm,cortex-a9-gic";
+ 			reg = <0xad1000 0x1000>, <0xad0100 0x100>;
+@@ -101,6 +107,11 @@
+ 			#interrupt-cells = <3>;
+ 		};
+ 
++		cpu-ctrl at dd0000 {
++			compatible = "marvell,berlin-cpu-ctrl";
++			reg = <0xdd0000 0x10000>;
++		};
 +
-+ENTRY(berlin_secondary_startup)
-+ ARM_BE8(setend be)
-+	bl	v7_invalidate_l1
-+	b       secondary_startup
-+ENDPROC(berlin_secondary_startup)
-+
-+/*
-+ * If the following instruction is set in the reset exception vector, CPUs
-+ * will fetch the value of the software reset address vector when being
-+ * reset.
-+ */
-+.global boot_inst
-+boot_inst:
-+	ldr	pc, [pc, #140]
-+
-+	.align
-diff --git a/arch/arm/mach-berlin/platsmp.c b/arch/arm/mach-berlin/platsmp.c
-new file mode 100644
-index 000000000000..702e7982015a
---- /dev/null
-+++ b/arch/arm/mach-berlin/platsmp.c
-@@ -0,0 +1,99 @@
-+/*
-+ * Copyright (C) 2014 Marvell Technology Group Ltd.
-+ *
-+ * Antoine T?nart <antoine.tenart@free-electrons.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/delay.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+
-+#include <asm/cacheflush.h>
-+#include <asm/smp_plat.h>
-+#include <asm/smp_scu.h>
-+
-+#define CPU_RESET		0x00
-+
-+#define RESET_VECT		0x00
-+#define SW_RESET_ADDR		0x94
-+
-+extern void berlin_secondary_startup(void);
-+extern u32 boot_inst;
-+
-+static void __iomem *cpu_ctrl;
-+
-+static inline void berlin_perform_reset_cpu(unsigned int cpu)
-+{
-+	u32 val;
-+
-+	val = readl(cpu_ctrl + CPU_RESET);
-+	val |= BIT(cpu_logical_map(cpu));
-+	writel(val, cpu_ctrl + CPU_RESET);
-+}
-+
-+static int berlin_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	if (!cpu_ctrl)
-+		return -EFAULT;
-+
-+	/*
-+	 * Reset the CPU, making it to execute the instruction in the reset
-+	 * exception vector.
-+	 */
-+	berlin_perform_reset_cpu(cpu);
-+
-+	return 0;
-+}
-+
-+static void __init berlin_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	struct device_node *np;
-+	void __iomem *scu_base;
-+	void __iomem *vectors_base;
-+
-+	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
-+	scu_base = of_iomap(np, 0);
-+	of_node_put(np);
-+	if (!scu_base)
-+		return;
-+
-+	np = of_find_compatible_node(NULL, NULL, "marvell,berlin-cpu-ctrl");
-+	cpu_ctrl = of_iomap(np, 0);
-+	of_node_put(np);
-+	if (!cpu_ctrl)
-+		goto unmap_scu;
-+
-+	vectors_base = ioremap(CONFIG_VECTORS_BASE, SZ_32K);
-+	if (!vectors_base)
-+		goto unmap_scu;
-+
-+	scu_enable(scu_base);
-+	flush_cache_all();
-+
-+	/*
-+	 * Write the first instruction the CPU will execute after being reset
-+	 * in the reset exception vector.
-+	 */
-+	writel(boot_inst, vectors_base + RESET_VECT);
-+
-+	/*
-+	 * Write the secondary startup address into the SW reset address
-+	 * vector. This is used by boot_inst.
-+	 */
-+	writel(virt_to_phys(berlin_secondary_startup), vectors_base + SW_RESET_ADDR);
-+
-+	iounmap(vectors_base);
-+unmap_scu:
-+	iounmap(scu_base);
-+}
-+
-+static struct smp_operations berlin_smp_ops __initdata = {
-+	.smp_prepare_cpus	= berlin_smp_prepare_cpus,
-+	.smp_boot_secondary	= berlin_boot_secondary,
-+};
-+CPU_METHOD_OF_DECLARE(berlin_smp, "marvell,berlin-smp", &berlin_smp_ops);
+ 		apb at e80000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
 -- 
 1.9.1
