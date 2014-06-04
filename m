@@ -1,84 +1,131 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 04 Jun 2014 14:37:42 +0200
-Subject: [PATCH 7/7] OF/ACPI/I2C: Add generic match function for the
- aforementioned systems
-In-Reply-To: <1401883796-17841-8-git-send-email-lee.jones@linaro.org>
-References: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
- <1401883796-17841-8-git-send-email-lee.jones@linaro.org>
-Message-ID: <5769487.6cMQUCkisu@vostro.rjw.lan>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 04 Jun 2014 14:25:33 +0200
+Subject: [PATCH v2 5/7] ARM: shmobile: r8a7791 dtsi: Add SYS-DMAC0 and
+ SYS-DMAC1 nodes
+In-Reply-To: <1401716531-29794-6-git-send-email-geert+renesas@glider.be>
+References: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
+ <1401716531-29794-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <2440127.sDc7m91LPu@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 04, 2014 01:09:56 PM Lee Jones wrote:
-> Currently this is a helper function for the I2C subsystem to aid the
-> matching of non-standard compatible strings and devices which use DT
-> and/or ACPI, but do not supply any nodes (see: [1] Method 4).  However,
-> it has been made more generic as it can be used to only make one call
-> for drivers which support any mixture of OF, ACPI and/or I2C matching.
-> 
-> The initial aim is for of_match_device() to be replaced by this call
-> in all I2C device drivers.
-> 
-> [1] Documentation/i2c/instantiating-devices
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Hi Geert,
 
-Mika, can you please have a look at this, please?
+Thank you for the patch.
 
-
+On Monday 02 June 2014 15:42:09 Geert Uytterhoeven wrote:
+> Add nodes for the SYS-DMA controllers, SYS-DMAC0 and SYS-DMAC1. These
+> both share the same device sources, so are wrapped in the shdma-mux
+> node to allow both to be used.
+> 
+> Cfr. the r8a7790 version by Ben Dooks.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
->  include/linux/match.h | 40 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
->  create mode 100644 include/linux/match.h
+> v2:
+>   - No changes
 > 
-> diff --git a/include/linux/match.h b/include/linux/match.h
-> new file mode 100644
-> index 0000000..20a08e2
-> --- /dev/null
-> +++ b/include/linux/match.h
-> @@ -0,0 +1,40 @@
-> +#include <linux/of.h>
-> +#include <linux/acpi.h>
-> +#include <linux/i2c.h>
-> +
-> +static void *device_match(struct device *dev)
-> +{
-> +	struct device_driver *driver = dev->driver;
-> +
-> +	if (!driver)
-> +		return NULL;
-> +
-> +	/* Attempt an OF style match */
-> +	if (IS_ENABLED(CONFIG_OF)) {
-> +		const struct of_device_id *of_match =
-> +			i2c_of_match_device(driver->of_match_table, dev);
-> +		if (of_match)
-> +			return (void *)of_match;
-> +	}
-> +
-> +	/* Then ACPI style match */
-> +	if (IS_ENABLED(CONFIG_ACPI)) {
-> +		const struct acpi_device_id *acpi_match	=
-> +			acpi_match_device(driver->acpi_match_table, dev);
-> +		if (acpi_match)
-> +			return (void *)acpi_match;
-> +	}
-> +
-> +	/* Finally an I2C match */
-> +	if (IS_ENABLED(CONFIG_I2C)) {
-> +		struct i2c_client *client = i2c_verify_client(dev);
-> +		struct i2c_driver *i2c_drv = to_i2c_driver(driver);
-> +		struct i2c_device_id *i2c_match;
-> +
-> +		i2c_match = i2c_match_id(i2c_drv->id_table, client);
-> +		if (i2c_match)
-> +			return (void *)i2c_match;
-> +	}
-> +
-> +	return NULL;
-> +}
+>  arch/arm/boot/dts/r8a7791.dtsi | 69 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 69 insertions(+)
 > 
+> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+> index e5c35d784ec8..37685ef32ea0 100644
+> --- a/arch/arm/boot/dts/r8a7791.dtsi
+> +++ b/arch/arm/boot/dts/r8a7791.dtsi
+> @@ -11,6 +11,7 @@
+>   */
+> 
+>  #include <dt-bindings/clock/r8a7791-clock.h>
+> +#include <dt-bindings/dma/r8a7791-dma.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+> 
+> @@ -55,6 +56,74 @@
+>  		};
+>  	};
+> 
+> +	dma0: dma-mux at 0 {
+> +		compatible = "renesas,shdma-mux";
+> +		#dma-cells = <2>;
+> +		dma-channels = <30>;
+> +		dma-requests = <256>;
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		ranges;
+> +
+> +		sysdma0: dma-controller at e6700020 {
+> +			compatible = "renesas,shdma-r8a7791";
+> +			reg = <0 0xe6700020 0 0xffc0>;
+
+Even though the registered defined in the datasheet start at 0xe6700020, the 
+documentation clearly states that "The base address of registers for the 
+lower-numbered channels  (0 to 14) is H'E670 0000". I'm also wondering where 
+the size comes from, if you want to span the 0xe6700000 to 0xe670ffff range, 
+the size should be 0xffe0, not 0xffc0.
+
+Interrupts and clocks look fine to me.
+
+> +			clocks = <&mstp2_clks R8A7791_CLK_SYS_DMAC0>;
+> +			dma-channels = <15>;
+> +			interrupts =	<0 197 IRQ_TYPE_LEVEL_HIGH>, /* error */
+> +					<0 200 IRQ_TYPE_LEVEL_HIGH>, /* ch0 */
+> +					<0 201 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 202 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 203 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 204 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 205 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 206 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 207 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 208 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 209 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 210 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 211 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 212 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 213 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 214 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupt-names = "error",
+> +					"ch0", "ch1", "ch2", "ch3",
+> +					"ch4", "ch5", "ch6", "ch7",
+> +					"ch8", "ch9", "ch10", "ch11",
+> +					"ch12", "ch13", "ch14";
+> +			status = "disabled";
+> +		};
+> +
+> +		sysdma1: dma-controller at e6720020 {
+> +			compatible = "renesas,shdma-r8a7791";
+> +			reg = <0 0xe6720020 0 0xffc0>;
+> +			clocks = <&mstp2_clks R8A7791_CLK_SYS_DMAC1>;
+> +			dma-channels = <15>;
+> +			interrupts =  <0 220 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 216 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 217 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 218 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 219 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 308 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 309 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 310 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 311 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 312 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 313 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 314 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 315 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 316 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 317 IRQ_TYPE_LEVEL_HIGH>,
+> +					<0 318 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupt-names = "error",
+> +					"ch0", "ch1", "ch2", "ch3",
+> +					"ch4", "ch5", "ch6", "ch7",
+> +					"ch8", "ch9", "ch10", "ch11",
+> +					"ch12", "ch13", "ch14";
+> +			status = "disabled";
+> +		};
+> +	};
+> +
+>  	gic: interrupt-controller at f1001000 {
+>  		compatible = "arm,cortex-a15-gic";
+>  		#interrupt-cells = <3>;
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Regards,
+
+Laurent Pinchart
