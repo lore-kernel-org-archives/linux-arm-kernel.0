@@ -1,61 +1,51 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Wed, 04 Jun 2014 18:37:23 +0200
-Subject: [PATCH] ARM: imx6: Fix procedure to switch the parent of
- LDB_DI_CLK
-In-Reply-To: <1397044538-12676-1-git-send-email-festevam@gmail.com>
-References: <1397044538-12676-1-git-send-email-festevam@gmail.com>
-Message-ID: <538F4B43.6070804@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Jun 2014 17:39:33 +0100
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <13061821.NYx1AfEhs0@wuerfel>
+References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
+ <20140604134400.GE28484@ulmo> <20140604135600.GD6644@arm.com>
+ <13061821.NYx1AfEhs0@wuerfel>
+Message-ID: <20140604163933.GE6644@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.04.2014 13:55, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
->
-> Due to incorrect placement of the clock gate cell in the ldb_di[x]_clk tree,
-> the glitchy parent mux of ldb_di[x]_clk can cause a glitch to enter the
-> ldb_di_ipu_div divider. If the divider gets locked up, no ldb_di[x]_clk is
-> generated, and the LVDS display will hang when the ipu_di_clk is sourced from
-> ldb_di_clk.
->
-> To fix the problem, both the new and current parent of the ldb_di_clk should
-> be disabled before the switch. This patch ensures that correct steps are
-> followed when ldb_di_clk parent is switched in the beginning of boot.
->
-> Signed-off-by: Ranjani Vaidyanathan <Ranjani.Vaidyanathan@freescale.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->   arch/arm/mach-imx/clk-imx6q.c | 125 ++++++++++++++++++++++++++++++++++++++++--
->   1 file changed, 121 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> index 20ad0d1..3ee45f4 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-....
-> +static void disable_anatop_clocks(void __iomem *anatop_base)
-> +{
-> +	unsigned int reg;
-> +
-> +	/* Make sure PFDs are disabled at boot. */
-> +	reg = readl_relaxed(anatop_base + 0x100);
-> +	/* Cannot disable pll2_pfd2_396M, as it is the MMDC clock in iMX6DL */
-> +	if (cpu_is_imx6dl())
-> +		reg |= 0x80008080;
-> +	else
-> +		reg |= 0x80808080;
+On Wed, Jun 04, 2014 at 03:01:15PM +0100, Arnd Bergmann wrote:
+> On Wednesday 04 June 2014 14:56:01 Will Deacon wrote:
+> > On Wed, Jun 04, 2014 at 02:44:03PM +0100, Thierry Reding wrote:
+> > > On Fri, May 30, 2014 at 09:54:37PM +0200, Arnd Bergmann wrote:
+> > > > On Friday 30 May 2014 22:29:13 Hiroshi Doyu wrote:
+> > > > > The disadvantage of this is that this limits the max number of streamIDs
+> > > > > to support. If # of streamID is increased later more than 64, this
+> > > > > format cannot cover any more. You have to predict the max # of streamIDs
+> > > > > in advance if steamID is statically assigned.
+> > > > > 
+> > > > 
+> > > > Well, the iommu specific binding could allow a variable #address-cells.
+> > > > That way, you just need to know the number of stream IDs for that instance
+> > > > of the iommu.
+> > > 
+> > > That sounds fairly complicated to me. I don't see what that buys us over
+> > > the clarity and simplicity that the above explicit notation gives us. Is
+> > > it not more common for a device to have a single master rather than a
+> > > whole bunch of them?
+> > 
+> > I've never seen a device upstream of an ARM SMMU with a single stream-id;
+> > they always seem to have a whole bunch of them. Calxeda's SATA controller
+> > had 10 IDs, for example, and a PL330 DMA controller tends to have at least
+> > 3.
+> 
+> What are those good for? Would we just always use the first one?
 
-There are two issues with this code section:
+I think It's just an artifact of how these systems tend to be built. The
+StreamID is constructed out of bits on the bus (AXI and sideband), so a
+DMA controller could easily have one ID for reads, one for writes,
+one for execute. Masters capable of multiple outstanding transactions
+could also have sets of IDs too.
 
-1) You want to know here if pll2_pfd2_396M is used as MMDC clock. This 
-is independent of IMX6DL. Even a Quad/Dual could use pll2_pfd2_396M as 
-MMDC clock. You better should check what you are really looking for:
+The SMMU driver would point them all at the same context bank, as far as I
+can tell, but that means the driver does need to be aware of the incoming
+IDs.
 
-if (MMDC clock == pll2_pfd2_396M)
-...
+Rob might know how they constructed the IDs on the Calxeda SATA controller?
 
-2) Why is bit 31, i.e. the uppermost '8' in 0x80808080, set here? It 
-looks like the TRM marks bit 31 - 24 as reserved?
-
-Best regards
-
-Dirk
+Will
