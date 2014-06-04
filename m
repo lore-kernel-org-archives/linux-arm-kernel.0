@@ -1,62 +1,46 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Wed,  4 Jun 2014 10:30:32 -0700
-Subject: [PATCH 1/3] clocksource: exynos_mct: Fix ftrace
-Message-ID: <1401903034-20074-1-git-send-email-dianders@chromium.org>
+Date: Wed,  4 Jun 2014 10:30:33 -0700
+Subject: [PATCH 2/3] clocksource: exynos_mct: cache mct upper count
+In-Reply-To: <1401903034-20074-1-git-send-email-dianders@chromium.org>
+References: <1401903034-20074-1-git-send-email-dianders@chromium.org>
+Message-ID: <1401903034-20074-2-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In (93bfb76 clocksource: exynos_mct: register sched_clock callback) we
-supported using the MCT as a scheduler clock.  We properly marked
-exynos4_read_sched_clock() as notrace.  However, we then went and
-called another function that _wasn't_ notrace.  That means if you do:
+From: Mandeep Singh Baines <msb@chromium.org>
 
-  cd /sys/kernel/debug/tracing/
-  echo function_graph > current_tracer
+Saves one register read.  Note that the upper count only changes every
+~178 seconds with a 24MHz source clock, so it's likely it hasn't
+changed from call to call.
 
-You'll get a crash.
+Before: 1323852 us for 1000000 gettimeofday in userspace
+After:  1173084 us for 1000000 gettimeofday in userspace
 
-Fix this (but still let other readers of the MCT be trace-enabled) by
-adding an extra function.  It's important to keep other users of MCT
-traceable because the MCT is actually quite slow.
+Note that even with this change the CPU is in exynos_frc_read() more
+than 2% of the time in real world profiles of ChromeOS.  That
+indicates that it's important to optimize.
 
+Signed-off-by: Mandeep Singh Baines <msb@chromium.org>
+Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 Signed-off-by: Doug Anderson <dianders@chromium.org>
 ---
- drivers/clocksource/exynos_mct.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ drivers/clocksource/exynos_mct.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 8d64200..ba3a683 100644
+index ba3a683..7cbe4aa 100644
 --- a/drivers/clocksource/exynos_mct.c
 +++ b/drivers/clocksource/exynos_mct.c
-@@ -165,7 +165,7 @@ static void exynos4_mct_frc_start(u32 hi, u32 lo)
- 	exynos4_mct_write(reg, EXYNOS4_MCT_G_TCON);
- }
+@@ -167,8 +167,8 @@ static void exynos4_mct_frc_start(u32 hi, u32 lo)
  
--static cycle_t exynos4_frc_read(struct clocksource *cs)
-+static inline cycle_t notrace _exynos4_frc_read(void)
+ static inline cycle_t notrace _exynos4_frc_read(void)
  {
- 	unsigned int lo, hi;
- 	u32 hi2 = __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_U);
-@@ -179,6 +179,11 @@ static cycle_t exynos4_frc_read(struct clocksource *cs)
- 	return ((cycle_t)hi << 32) | lo;
- }
+-	unsigned int lo, hi;
+-	u32 hi2 = __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_U);
++	u32 lo, hi;
++	static u32 hi2;
  
-+static cycle_t exynos4_frc_read(struct clocksource *cs)
-+{
-+	return _exynos4_frc_read();
-+}
-+
- static void exynos4_frc_resume(struct clocksource *cs)
- {
- 	exynos4_mct_frc_start(0, 0);
-@@ -195,7 +200,7 @@ struct clocksource mct_frc = {
- 
- static u64 notrace exynos4_read_sched_clock(void)
- {
--	return exynos4_frc_read(&mct_frc);
-+	return _exynos4_frc_read();
- }
- 
- static void __init exynos4_clocksource_init(void)
+ 	do {
+ 		hi = hi2;
 -- 
 2.0.0.526.g5318336
