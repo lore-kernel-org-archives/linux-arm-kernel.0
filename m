@@ -1,57 +1,67 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Wed,  4 Jun 2014 18:03:45 +0200
-Subject: [PATCH v2 4/5] ARM: dts: berlin: add SMP related nodes and properties
- for BG2
+Date: Wed,  4 Jun 2014 18:03:44 +0200
+Subject: [PATCH v2 3/5] Documentation: bindings: add the marvell,
+ berlin-smp CPU enable method
 In-Reply-To: <1401897826-11711-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1401897826-11711-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1401897826-11711-5-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1401897826-11711-4-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add required nodes and properties into the Berlin BG2 device tree to
-take advantage of the newly introduced SMP support. Add the scu and
-cpu-ctrl nodes along with the CPUs enable-method property.
+Document the CPU enable method used by Marvell Berlin SoCs.
 
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ .../arm/cpu-enable-method/marvell,berlin-smp       | 41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/marvell,berlin-smp
 
-diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-index 56a1af2f1052..f38ddda8a75e 100644
---- a/arch/arm/boot/dts/berlin2.dtsi
-+++ b/arch/arm/boot/dts/berlin2.dtsi
-@@ -21,6 +21,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
+diff --git a/Documentation/devicetree/bindings/arm/cpu-enable-method/marvell,berlin-smp b/Documentation/devicetree/bindings/arm/cpu-enable-method/marvell,berlin-smp
+new file mode 100644
+index 000000000000..cd236b727e2a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/cpu-enable-method/marvell,berlin-smp
+@@ -0,0 +1,41 @@
++========================================================
++Secondary CPU enable-method "marvell,berlin-smp" binding
++========================================================
++
++This document describes the "marvell,berlin-smp" method for enabling secondary
++CPUs. To apply to all CPUs, a single "marvell,berlin-smp" enable method should
++be defined in the "cpus" node.
++
++Enable method name:	"marvell,berlin-smp"
++Compatible machines:	"marvell,berlin2" and "marvell,berlin2q"
++Compatible CPUs:	"marvell,pj4b" and "arm,cortex-a9"
++Related properties:	(none)
++
++Note:
++This enable method needs valid nodes compatible with "arm,cortex-a9-scu" and
++"marvell,berlin-cpu-ctrl"[1].
++
++Example:
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +		enable-method = "marvell,berlin-smp";
- 
- 		cpu at 0 {
- 			compatible = "marvell,pj4b";
-@@ -72,6 +73,11 @@
- 			cache-level = <2>;
- 		};
- 
-+		scu: snoop-control-unit at ad0000 {
-+			compatible = "arm,cortex-a9-scu";
-+			reg = <0xad0000 0x58>;
++
++		cpu at 0 {
++			compatible = "marvell,pj4b";
++			device_type = "cpu";
++			next-level-cache = <&l2>;
++			reg = <0>;
 +		};
 +
- 		gic: interrupt-controller at ad1000 {
- 			compatible = "arm,cortex-a9-gic";
- 			reg = <0xad1000 0x1000>, <0xad0100 0x0100>;
-@@ -86,6 +92,11 @@
- 			clocks = <&sysclk>;
- 		};
- 
-+		cpu-ctrl at dd0000 {
-+			compatible = "marvell,berlin-cpu-ctrl";
-+			reg = <0xdd0000 0x10000>;
++		cpu at 1 {
++			compatible = "marvell,pj4b";
++			device_type = "cpu";
++			next-level-cache = <&l2>;
++			reg = <1>;
 +		};
++	};
 +
- 		apb at e80000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
++--
++[1] arm/marvell,berlin.txt
 -- 
 1.9.1
