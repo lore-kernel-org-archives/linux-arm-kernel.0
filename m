@@ -1,40 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Jun 2014 12:36:49 +0200
-Subject: [PATCH] ARM: orion5x: fix mvebu_mbus_dt_init call
-In-Reply-To: <20140604114006.476cef06@free-electrons.com>
-References: <4280897.V3UkQjotOL@wuerfel>
- <20140604114006.476cef06@free-electrons.com>
-Message-ID: <7365244.alxTZQocGr@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed,  4 Jun 2014 12:53:22 +0200
+Subject: [PATCH] ARM: integrator: fix section mismatch problem
+Message-ID: <1401879202-10516-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 June 2014 11:40:06 Thomas Petazzoni wrote:
-> 
-> On Wed, 04 Jun 2014 11:06:40 +0200, Arnd Bergmann wrote:
-> > The prototype for mvebu_mbus_dt_init() changed around the same time
-> > as a new caller was added to orion5x. This adds the missing argument
-> > to make orion5x behave correctly to avoid this build error:
-> > 
-> > mach-orion5x/board-dt.c: In function 'orion5x_dt_init':
-> > mach-orion5x/board-dt.c:48:2: error: too few arguments to function 'mvebu_mbus_dt_init'
-> >   BUG_ON(mvebu_mbus_dt_init());
-> >   ^
-> > In file included from mach-orion5x/board-dt.c:18:0:
-> > include/linux/mbus.h:76:5: note: declared here
-> >  int mvebu_mbus_dt_init(bool is_coherent);
-> >      ^
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> 
+This addresses a section mismatch problem in the IM-PD1
+driver in the Integrator/AP.
 
-Ok, thanks!
+The IM-PD1 contains a VIC interrupt controller and therefore
+the driver calls vic_init_cascaded() which is marked __init as
+irqchips are simply not hot-pluggable and specifically the VIC
+is assumed to initiate only on boot.
 
-I've added my patch to the next/soc2 branch now, which already contains
-both branches that introduce the problem when combined.
+However the module driver model of the Integrator LM bus
+assumes that logic tile drivers can be probed at runtime. This
+is not really the case for IM-PD1: these tiles are detected at
+boot and they cannot be plugged into a running system. Before
+this patch it is of course possible to modprobe them later.
 
-This saves us creating a fixes branch on top of the mid-merge window
-state of torvalds/next.
+By first forcing the IM-PD1 to bool we make sure this driver
+gets compiled into the kernel, and we know it will be probed
+only at boot time when the tiles are detected, so we can tag
+its probe function __init_refok as we know it won't be called
+after boot now, and the section mismatch problem goes away.
 
-	Arnd
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks: please apply this directly if the solution seems
+acceptable.
+---
+ arch/arm/mach-integrator/Kconfig | 2 +-
+ arch/arm/mach-integrator/impd1.c | 7 ++++++-
+ 2 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
+index ba43321001d8..64f8e2564a37 100644
+--- a/arch/arm/mach-integrator/Kconfig
++++ b/arch/arm/mach-integrator/Kconfig
+@@ -28,7 +28,7 @@ config ARCH_CINTEGRATOR
+ 	bool
+ 
+ config INTEGRATOR_IMPD1
+-	tristate "Include support for Integrator/IM-PD1"
++	bool "Include support for Integrator/IM-PD1"
+ 	depends on ARCH_INTEGRATOR_AP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_VIC
+diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
+index 0e870ea818c4..05d845cb8758 100644
+--- a/arch/arm/mach-integrator/impd1.c
++++ b/arch/arm/mach-integrator/impd1.c
+@@ -308,7 +308,12 @@ static struct impd1_device impd1_devs[] = {
+  */
+ #define IMPD1_VALID_IRQS 0x00000bffU
+ 
+-static int __init impd1_probe(struct lm_device *dev)
++/*
++ * As this module is bool, it is OK to have this as __init_refok() - no
++ * probe calls will be done after the initial system bootup, as devices
++ * are discovered as part of the machine startup.
++ */
++static int __init_refok impd1_probe(struct lm_device *dev)
+ {
+ 	struct impd1_module *impd1;
+ 	int irq_base;
+-- 
+1.9.3
