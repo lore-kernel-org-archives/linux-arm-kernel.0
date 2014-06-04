@@ -1,97 +1,64 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Wed, 4 Jun 2014 15:35:54 +0530
-Subject: [PATCH] arm64: dts: Add more serial port nodes in APM X-Gene
- device tree
-In-Reply-To: <1395836346-9350-1-git-send-email-vkale@apm.com>
-References: <1395836346-9350-1-git-send-email-vkale@apm.com>
-Message-ID: <CAPrCYkcJr5ODY3Sjcq5D_Db-cM3SAXYjUK2H9FGePrO_q0wMEw@mail.gmail.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Wed, 4 Jun 2014 15:41:20 +0530
+Subject: [PATCH v2 6/6] usb: host: ohci-exynos: Use devm_ioremap_resource
+ instead of devm_ioremap
+In-Reply-To: <1399723210-21569-7-git-send-email-gautam.vivek@samsung.com>
+References: <1399723210-21569-1-git-send-email-gautam.vivek@samsung.com>
+ <1399723210-21569-7-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <CAFp+6iFufCh6SVEF-HQA62ZsJGJGSebDSs28eqcrMy1X8e5vjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin / Will,
+Hi,
 
-Can you please merge this one?
 
-Thanks
--Vinayak
-
-On Wed, Mar 26, 2014 at 5:49 PM, Vinayak Kale <vkale@apm.com> wrote:
-> APM X-Gene Storm SoC supports 4 serial ports. This patch adds device nodes
-> for serial ports 1 to 3 (a device node for serial port 0 is already present
-> in the dts file).
-> This patch also sets the compatible property of serial nodes to "ns16550a".
+On Sat, May 10, 2014 at 5:30 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+> Using devm_ioremap_resource() API should actually be preferred over
+> devm_ioremap(), since the former request the mem region first and then
+> gives back the ioremap'ed memory pointer.
+> devm_ioremap_resource() calls request_mem_region(), therby preventing
+> other drivers to make any overlapping call to the same region.
 >
-> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+
+Although this patch and rest in the series are merged.
+But i have got a doubt, so making this thread alive.
+
 > ---
->  arch/arm64/boot/dts/apm-mustang.dts |  4 ++++
->  arch/arm64/boot/dts/apm-storm.dtsi  | 36 +++++++++++++++++++++++++++++++++++-
->  2 files changed, 39 insertions(+), 1 deletion(-)
+>  drivers/usb/host/ohci-exynos.c |    7 +++----
+>  1 file changed, 3 insertions(+), 4 deletions(-)
 >
-> diff --git a/arch/arm64/boot/dts/apm-mustang.dts b/arch/arm64/boot/dts/apm-mustang.dts
-> index 1247ca1..6541962 100644
-> --- a/arch/arm64/boot/dts/apm-mustang.dts
-> +++ b/arch/arm64/boot/dts/apm-mustang.dts
-> @@ -24,3 +24,7 @@
->                 reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
->         };
->  };
-> +
-> +&serial0 {
-> +       status = "ok";
-> +};
-> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-> index d37d736..2277b5c 100644
-> --- a/arch/arm64/boot/dts/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
-> @@ -179,13 +179,47 @@
->                 };
+> diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
+> index 9cf80cb..dec691d 100644
+> --- a/drivers/usb/host/ohci-exynos.c
+> +++ b/drivers/usb/host/ohci-exynos.c
+> @@ -120,10 +120,9 @@ skip_phy:
 >
->                 serial0: serial at 1c020000 {
-> +                       status = "disabled";
->                         device_type = "serial";
-> -                       compatible = "ns16550";
-> +                       compatible = "ns16550a";
->                         reg = <0 0x1c020000 0x0 0x1000>;
->                         reg-shift = <2>;
->                         clock-frequency = <10000000>; /* Updated by bootloader */
->                         interrupt-parent = <&gic>;
->                         interrupts = <0x0 0x4c 0x4>;
->                 };
-> +
-> +               serial1: serial at 1c021000 {
-> +                       status = "disabled";
-> +                       device_type = "serial";
-> +                       compatible = "ns16550a";
-> +                       reg = <0 0x1c021000 0x0 0x1000>;
-> +                       reg-shift = <2>;
-> +                       clock-frequency = <10000000>; /* Updated by bootloader */
-> +                       interrupt-parent = <&gic>;
-> +                       interrupts = <0x0 0x4d 0x4>;
-> +               };
-> +
-> +               serial2: serial at 1c022000 {
-> +                       status = "disabled";
-> +                       device_type = "serial";
-> +                       compatible = "ns16550a";
-> +                       reg = <0 0x1c022000 0x0 0x1000>;
-> +                       reg-shift = <2>;
-> +                       clock-frequency = <10000000>; /* Updated by bootloader */
-> +                       interrupt-parent = <&gic>;
-> +                       interrupts = <0x0 0x4e 0x4>;
-> +               };
-> +
-> +               serial3: serial at 1c023000 {
-> +                       status = "disabled";
-> +                       device_type = "serial";
-> +                       compatible = "ns16550a";
-> +                       reg = <0 0x1c023000 0x0 0x1000>;
-> +                       reg-shift = <2>;
-> +                       clock-frequency = <10000000>; /* Updated by bootloader */
-> +                       interrupt-parent = <&gic>;
-> +                       interrupts = <0x0 0x4f 0x4>;
-> +               };
->         };
->  };
-> --
-> 1.8.2.1
->
+>         hcd->rsrc_start = res->start;
+>         hcd->rsrc_len = resource_size(res);
+> -       hcd->regs = devm_ioremap(&pdev->dev, res->start, hcd->rsrc_len);
+> -       if (!hcd->regs) {
+> -               dev_err(&pdev->dev, "Failed to remap I/O memory\n");
+> -               err = -ENOMEM;
+> +       hcd->regs = devm_ioremap_resource(&pdev->dev, res);
+
+Here, we replaced devm_ioremap() call with devm_ioremap_resource(),
+which internally
+requests the memory region and then does a "devm_ioremap()" or
+"devm_ioremap_nocache()"
+based on the check for IORESOURCE_CACHEABLE flag.
+
+But this flag is not set for the resource of this device.
+So should we be explicitly setting the flag in driver ?
+
+The query goes for other patches too in this series, wherein
+devm_ioremap() call is replaced with devm_ioremap_resource().
+
+[snip]
+
+
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
