@@ -1,68 +1,57 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 4 Jun 2014 13:51:37 +0100
-Subject: [PATCH 1/7] ACPICA: Only include ACPI asm files if ACPI is enabled
-In-Reply-To: <3061297.feg5DGUjIt@vostro.rjw.lan>
-References: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
- <1401883796-17841-2-git-send-email-lee.jones@linaro.org>
- <3061297.feg5DGUjIt@vostro.rjw.lan>
-Message-ID: <20140604125137.GA18171@lee--X1>
+From: ritesh.harjani@gmail.com (ritesh.harjani at gmail.com)
+Date: Wed, 4 Jun 2014 18:24:47 +0530
+Subject: [PATCHv2 0/2] arm:dma-mapping Refactoring iommu dma-mapping code
+Message-ID: <1401886489-25498-1-git-send-email-ritesh.harjani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 04 Jun 2014, Rafael J. Wysocki wrote:
+From: Ritesh Harjani <ritesh.harjani@gmail.com>
 
-> On Wednesday, June 04, 2014 01:09:50 PM Lee Jones wrote:
-> > Any drivers which support ACPI and Device Tree probing need to include
-> > both respective header files.  Without this patch, if a driver is being
-> > used on a platform which does not support ACPI and subsequently does not
-> > have the config option enabled, but includes linux/acpi.h the build
-> > breaks with:
-> > 
-> >   In file included from ../include/acpi/platform/acenv.h:150:0,
-> >                    from ../include/acpi/acpi.h:56,
-> >                    from ../include/linux/match.h:2,
-> >                    from ../drivers/i2c/i2c-core.c:43:
-> >   ../include/acpi/platform/aclinux.h:73:23:
-> >    fatal error: asm/acenv.h: No such file or directory
-> >    #include <asm/acenv.h>
-> >                        ^
-> 
-> Which kernel does this happen with?
+Hi All, 
 
-a0a962d (tag: refs/tags/next-20140602, refs/remotes/next/master)
-  Add linux-next specific files for 20140602
+This patch series is to refactor iommu related common code from
+arch/arm/dma-mapping.c to lib/iommu-helper.c based on the various
+discussions with the maintainers/experts [1].
 
-> > Cc: Lv Zheng <lv.zheng@intel.com>
-> > Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> > Cc: linux-acpi at vger.kernel.org
-> > Cc: devel at acpica.org
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  include/acpi/platform/aclinux.h | 5 +++--
-> >  1 file changed, 3 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/include/acpi/platform/aclinux.h b/include/acpi/platform/aclinux.h
-> > index cd1f052..fdf7663 100644
-> > --- a/include/acpi/platform/aclinux.h
-> > +++ b/include/acpi/platform/aclinux.h
-> > @@ -70,9 +70,10 @@
-> >  #ifdef EXPORT_ACPI_INTERFACES
-> >  #include <linux/export.h>
-> >  #endif
-> > -#include <asm/acenv.h>
-> >  
-> > -#ifndef CONFIG_ACPI
-> > +#ifdef CONFIG_ACPI
-> > +#include <asm/acenv.h>
-> > +#else
-> >  
-> >  /* External globals for __KERNEL__, stubs is needed */
-> >  
-> > 
-> 
+Currently the only user of the common lib/iommu-helper code will
+be ARM & ARM64 but later various architecture might try to use this
+iommu lib helper functions.
+
+Major change of this refactoring depends on bringing out struct dma_iommu_mapping 
+*mapping variable from arch/arm/include/asm/device.h to include/linux/device.h
+and by moving out complete structure definition of dma_iommu_mapping to
+inclue/linux/iommu-helper.h. This is now done as a separate patch based on Will's
+suggestion [2]. This patch series is based on top of that patch.
+
+There are 1/2 more function definitions which I can think of moving out, but
+those can be done once this patch series is approved as those are not very
+big changes.
+
+Also, this has been tested and verified on ARM hardware with IOMMU support.
+
+Changes from v1:
+1. Prefixed iommu_helper_* to all iommu-helper.h function instead of __iommu_*
+2. Submitted changes in device.h as a separate patch on top of which this patch
+   series is based upon[2].
+3. Merged [PATCH 2/4] and [PATCH 3/4] from v1 patch series to [PATCHv2 1/2],
+   based on Will Daecon suggestion [3].
+4. Removed Change-id value from all v1 patches.
+
+Links:
+[1]: https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg03458.html 
+[2]: https://lkml.org/lkml/2014/6/4/41
+[3]: http://www.spinics.net/lists/arm-kernel/msg336682.html
+
+
+Ritesh Harjani (2):
+  arm: dma-mapping: Refactor attach/detach, alloc/free func
+  arm:dma-iommu: Move out complete func defs
+
+ arch/arm/Kconfig             |  42 ++--
+ arch/arm/mm/dma-mapping.c    | 572 ++++---------------------------------------
+ include/linux/iommu-helper.h |  42 ++++
+ lib/iommu-helper.c           | 562 ++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 673 insertions(+), 545 deletions(-)
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.1.3
