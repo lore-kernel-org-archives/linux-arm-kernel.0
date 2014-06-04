@@ -1,46 +1,45 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed,  4 Jun 2014 10:30:33 -0700
-Subject: [PATCH 2/3] clocksource: exynos_mct: cache mct upper count
-In-Reply-To: <1401903034-20074-1-git-send-email-dianders@chromium.org>
-References: <1401903034-20074-1-git-send-email-dianders@chromium.org>
-Message-ID: <1401903034-20074-2-git-send-email-dianders@chromium.org>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Wed, 4 Jun 2014 19:37:01 +0200
+Subject: [PATCH 2/2] ARM: dts: berlin: enable i2c0 and i2c2
+In-Reply-To: <20140604170340.GI6892@lunn.ch>
+References: <1401780790-17830-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1401780790-17830-3-git-send-email-antoine.tenart@free-electrons.com>
+ <20140603080522.GB22742@lunn.ch> <20140604164841.GA12859@kwain>
+ <20140604170340.GI6892@lunn.ch>
+Message-ID: <20140604173701.GC12859@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mandeep Singh Baines <msb@chromium.org>
+On Wed, Jun 04, 2014 at 07:03:40PM +0200, Andrew Lunn wrote:
+> On Wed, Jun 04, 2014 at 06:48:41PM +0200, Antoine T?nart wrote:
+> > 
+> > On Tue, Jun 03, 2014 at 10:05:22AM +0200, Andrew Lunn wrote:
+> > > On Tue, Jun 03, 2014 at 09:33:10AM +0200, Antoine T?nart wrote:
+> > > > Enable the I2C0 and I2C2 for the Marvell Berlin BG2G DMP. I2C1 and I2C3
+> > > > are also working on this board, but no devices seemed to be there.
+> > > 
+> > > Does this mean that IC0 and I2C2 have devices on them? Could you also
+> > > add nodes for the devices?
+> > 
+> > No devices I can add for now. I you prefer we can drop this patch, keep
+> > the other one and enable i2c nodes for the BG2Q DMP when they will be
+> > needed.
+> 
+> I was just wondering how you tested it, without having any devices?
 
-Saves one register read.  Note that the upper count only changes every
-~178 seconds with a 24MHz source clock, so it's likely it hasn't
-changed from call to call.
+I tested with the i2ctools. I could see one device on each bus at the
+address it should be. I also tested the pin muxing configurations.
 
-Before: 1323852 us for 1000000 gettimeofday in userspace
-After:  1173084 us for 1000000 gettimeofday in userspace
+I don't have lots of information on these I2C buses, at least my test
+results match what I know.
 
-Note that even with this change the CPU is in exynos_frc_read() more
-than 2% of the time in real world profiles of ChromeOS.  That
-indicates that it's important to optimize.
+> Is it that the devices on the bus don't have mainline drivers?
 
-Signed-off-by: Mandeep Singh Baines <msb@chromium.org>
-Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
- drivers/clocksource/exynos_mct.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Not with I2C support.
 
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index ba3a683..7cbe4aa 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -167,8 +167,8 @@ static void exynos4_mct_frc_start(u32 hi, u32 lo)
- 
- static inline cycle_t notrace _exynos4_frc_read(void)
- {
--	unsigned int lo, hi;
--	u32 hi2 = __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_U);
-+	u32 lo, hi;
-+	static u32 hi2;
- 
- 	do {
- 		hi = hi2;
+Antoine
+
 -- 
-2.0.0.526.g5318336
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
