@@ -1,46 +1,47 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 4 Jun 2014 09:47:26 +0200
-Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
-In-Reply-To: <20140603155007.GZ30445@twins.programming.kicks-ass.net>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
- <20140528121001.GI19967@e103034-lin>
- <CAKfTPtDxeBfZK1AxCRqEG91pi--Ti1RYFoQPDhvMVnGTCspQ-g@mail.gmail.com>
- <20140528154703.GJ19967@e103034-lin>
- <20140603155007.GZ30445@twins.programming.kicks-ass.net>
-Message-ID: <CAKfTPtDUvH--WxFATTW6YRAvLuohzyNHDUq6DRdfxc7gRKCX6Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 04 Jun 2014 09:56:48 +0200
+Subject: [PATCH] hsi: omap_ssi_port: use normal module refcounting
+Message-ID: <7426698.eEpYu3o0WK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 June 2014 17:50, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Wed, May 28, 2014 at 04:47:03PM +0100, Morten Rasmussen wrote:
->> Since we may do periodic load-balance every 10 ms or so, we will perform
->> a number of load-balances where runnable_avg_sum will mostly be
->> reflecting the state of the world before a change (new task queued or
->> moved a task to a different cpu). If you had have two tasks continuously
->> on one cpu and your other cpu is idle, and you move one of the tasks to
->> the other cpu, runnable_avg_sum will remain unchanged, 47742, on the
->> first cpu while it starts from 0 on the other one. 10 ms later it will
->> have increased a bit, 32 ms later it will be 47742/2, and 345 ms later
->> it reaches 47742. In the mean time the cpu doesn't appear fully utilized
->> and we might decide to put more tasks on it because we don't know if
->> runnable_avg_sum represents a partially utilized cpu (for example a 50%
->> task) or if it will continue to rise and eventually get to 47742.
->
-> Ah, no, since we track per task, and update the per-cpu ones when we
-> migrate tasks, the per-cpu values should be instantly updated.
->
-> If we were to increase per task storage, we might as well also track
-> running_avg not only runnable_avg.
+The ref_module() function is used for internal housekeeping of the
+module code, it's not normally used by subsystems or device drivers,
+and the use of ref_module in the omap_ssi_port driver causes a link
+build error when modules are disabled:
 
-I agree that the removed running_avg should give more useful
-information about the the load of a CPU.
+hsi/controllers/omap_ssi_port.c: In function 'ssi_port_probe':
+hsi/controllers/omap_ssi_port.c:1119:2: error: implicit declaration of function 'ref_module' [-Werror=implicit-function-declaration]
 
-The main issue with running_avg is that it's disturbed by other tasks
-(as point out previously). As a typical example,  if we have 2 tasks
-with a load of 25% on 1 CPU, the unweighted runnable_load_avg will be
-in the range of [100% - 50%] depending of the parallelism of the
-runtime of the tasks whereas the reality is 50% and the use of
-running_avg will return this value
+This changes the omap_ssi_port driver to use try_module_get()
+and module_put() instead, which is the normal way to ensure that
+the driver providing a device used in another module does not
+go away.
 
-Vincent
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Sebastian Reichel <sre@kernel.org>
+Cc: Carlos Chinea <carlos.chinea@nokia.com>
+Cc: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+
+diff --git a/drivers/hsi/controllers/omap_ssi_port.c b/drivers/hsi/controllers/omap_ssi_port.c
+index b8693f0..6eb7c28 100644
+--- a/drivers/hsi/controllers/omap_ssi_port.c
++++ b/drivers/hsi/controllers/omap_ssi_port.c
+@@ -1116,8 +1116,7 @@ static int __init ssi_port_probe(struct platform_device *pd)
+ 
+ 	dev_dbg(&pd->dev, "init ssi port...\n");
+ 
+-	err = ref_module(THIS_MODULE, ssi->owner);
+-	if (err) {
++	if (!try_module_get(ssi->owner)) {
+ 		dev_err(&pd->dev, "could not increment parent module refcount (err=%d)\n",
+ 			err);
+ 		return -ENODEV;
+@@ -1254,6 +1253,7 @@ static int __exit ssi_port_remove(struct platform_device *pd)
+ 
+ 	omap_ssi->port[omap_port->port_id] = NULL;
+ 	platform_set_drvdata(pd, NULL);
++	module_put(port->owner);
+ 	pm_runtime_disable(&pd->dev);
+ 
+ 	return 0;
