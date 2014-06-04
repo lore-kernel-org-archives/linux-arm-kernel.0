@@ -1,26 +1,56 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 04 Jun 2014 21:40:09 +0200
-Subject: [alsa-devel] [PATCH] ASoC: pxa: add I2C dependencies as needed
-In-Reply-To: <20140603215944.GB2520@sirena.org.uk> (Mark Brown's message of
- "Tue, 3 Jun 2014 22:59:44 +0100")
-References: <46560700.2S4p0nUZl8@wuerfel> <87k38xg0k6.fsf@free.fr>
- <20140603215944.GB2520@sirena.org.uk>
-Message-ID: <87fvjkfopy.fsf@free.fr>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 4 Jun 2014 14:53:25 -0500
+Subject: [PATCH] regulator: core: print error value when constraints are not
+ applied
+Message-ID: <1401911605-5157-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown <broonie@kernel.org> writes:
+With commit 064d5cd110f94ce41ca5681dcda8b77fa63d5b95
+(regulator: core: Fix the init of DT defined fixed regulators)
+We ensure that regulator must be capable of providing it's current
+voltage when constraints are used, however adding the return value in
+the print is a little more informative to explain the nature of the
+failure involved.
 
->> Any reason SND_PXA2XX_SOC_MIOA701 escaped ? The board is PXA based, and its
->> codec wm9713 is I2C based, and relies on AC97.
->
-> The WM9713 is AC'97 only, there's no I2C interface there.
-Gees, you're right. I was remembering the registers, and that made my think of
-I2C registers, like in Maxim regulators.
+So, instead of providing message such as:
+smps9: failed to get the current voltage
 
-My bad, you're right, no I2C.
+having error value added to the message such as:
+smps9: failed to get the current voltage(-22)
 
-Cheers.
+is a little more informative for debugging the error.
 
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ drivers/regulator/core.c |    8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index 4c1f999..b4902ab 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -846,7 +846,9 @@ static int machine_constraints_voltage(struct regulator_dev *rdev,
+ 	    rdev->constraints->min_uV == rdev->constraints->max_uV) {
+ 		int current_uV = _regulator_get_voltage(rdev);
+ 		if (current_uV < 0) {
+-			rdev_err(rdev, "failed to get the current voltage\n");
++			rdev_err(rdev,
++				 "failed to get the current voltage(%d)\n",
++				 current_uV);
+ 			return current_uV;
+ 		}
+ 		if (current_uV < rdev->constraints->min_uV ||
+@@ -856,8 +858,8 @@ static int machine_constraints_voltage(struct regulator_dev *rdev,
+ 				rdev->constraints->max_uV);
+ 			if (ret < 0) {
+ 				rdev_err(rdev,
+-					"failed to apply %duV constraint\n",
+-					rdev->constraints->min_uV);
++					"failed to apply %duV constraint(%d)\n",
++					rdev->constraints->min_uV, ret);
+ 				return ret;
+ 			}
+ 		}
 -- 
-Robert
+1.7.9.5
