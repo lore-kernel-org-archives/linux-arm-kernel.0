@@ -1,75 +1,50 @@
-From: Ranjani.Vaidyanathan@freescale.com (Ranjani.Vaidyanathan at freescale.com)
-Date: Wed, 4 Jun 2014 17:29:58 +0000
-Subject: [PATCH] ARM: imx6: Fix procedure to switch the parent of
- LDB_DI_CLK
-In-Reply-To: <538F4B43.6070804@gmail.com>
-References: <1397044538-12676-1-git-send-email-festevam@gmail.com>
- <538F4B43.6070804@gmail.com>
-Message-ID: <5f0cb6161f5146cbbc778149015249ce@BY2PR03MB379.namprd03.prod.outlook.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed,  4 Jun 2014 10:30:34 -0700
+Subject: [PATCH 3/3] clocksource: exynos_mct: Optimize register reads with
+ ldmia
+In-Reply-To: <1401903034-20074-1-git-send-email-dianders@chromium.org>
+References: <1401903034-20074-1-git-send-email-dianders@chromium.org>
+Message-ID: <1401903034-20074-3-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
+As we saw in (clocksource: exynos_mct: cache mct upper count), the
+time spent reading the MCT shows up fairly high in real-world
+profiles.  That means that it's worth some optimization.
 
-Responses below.
+We get a roughly 10% speedup in userspace gettimeofday() by using an
+ldmia to read the two halfs of the MCT.  That seems like a worthwhile
+thing to do.
 
-Thanks,
-Ranjani
+Before: 1173084 us for 1000000 gettimeofday in userspace
+After:  1045674 us for 1000000 gettimeofday in userspace
 
------Original Message-----
-From: Dirk Behme [mailto:dirk.behme at gmail.com] 
-Sent: Wednesday, June 04, 2014 11:37 AM
-To: Vaidyanathan Ranjani-RA5478; Estevam Fabio-R49496
-Cc: Fabio Estevam; Guo Shawn-R65073; christian.gmeiner at gmail.com; linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCH] ARM: imx6: Fix procedure to switch the parent of LDB_DI_CLK
+NOTE: we could actually do better than this if we really wanted to.
+Technically we could register the clocksource as a 32-bit timer and
+only use the "lower" half.  Doing so brings us down to 1014429 us for
+1000000 gettimeofday in userspace (and doesn't even require assembly
+code).  That would be an alternative to this change.
 
-On 09.04.2014 13:55, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
->
-> Due to incorrect placement of the clock gate cell in the ldb_di[x]_clk 
-> tree, the glitchy parent mux of ldb_di[x]_clk can cause a glitch to 
-> enter the ldb_di_ipu_div divider. If the divider gets locked up, no 
-> ldb_di[x]_clk is generated, and the LVDS display will hang when the 
-> ipu_di_clk is sourced from ldb_di_clk.
->
-> To fix the problem, both the new and current parent of the ldb_di_clk 
-> should be disabled before the switch. This patch ensures that correct 
-> steps are followed when ldb_di_clk parent is switched in the beginning of boot.
->
-> Signed-off-by: Ranjani Vaidyanathan 
-> <Ranjani.Vaidyanathan@freescale.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->   arch/arm/mach-imx/clk-imx6q.c | 125 ++++++++++++++++++++++++++++++++++++++++--
->   1 file changed, 121 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c 
-> b/arch/arm/mach-imx/clk-imx6q.c index 20ad0d1..3ee45f4 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-....
-> +static void disable_anatop_clocks(void __iomem *anatop_base) {
-> +	unsigned int reg;
-> +
-> +	/* Make sure PFDs are disabled at boot. */
-> +	reg = readl_relaxed(anatop_base + 0x100);
-> +	/* Cannot disable pll2_pfd2_396M, as it is the MMDC clock in iMX6DL */
-> +	if (cpu_is_imx6dl())
-> +		reg |= 0x80008080;
-> +	else
-> +		reg |= 0x80808080;
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ drivers/clocksource/exynos_mct.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-There are two issues with this code section:
-
-1) You want to know here if pll2_pfd2_396M is used as MMDC clock. This is independent of IMX6DL. Even a Quad/Dual could use pll2_pfd2_396M as MMDC clock. You better should check what you are really looking for:
-
-if (MMDC clock == pll2_pfd2_396M)
-...
-[RV] Yes, you are perfectly correct. We need to check MMDC parent clock. 
-
-2) Why is bit 31, i.e. the uppermost '8' in 0x80808080, set here? It looks like the TRM marks bit 31 - 24 as reserved?
-[RV] Yes, this should also be fixed. 
-
-Best regards
-
-Dirk
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 7cbe4aa..6e3017b 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -172,8 +172,9 @@ static inline cycle_t notrace _exynos4_frc_read(void)
+ 
+ 	do {
+ 		hi = hi2;
+-		lo = __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
+-		hi2 = __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_U);
++		asm volatile("ldmia  %2, {%0, %1}"
++			     : "=r" (lo), "=r" (hi2)
++			     : "r" (reg_base + EXYNOS4_MCT_G_CNT_L));
+ 	} while (hi != hi2);
+ 
+ 	return ((cycle_t)hi << 32) | lo;
+-- 
+2.0.0.526.g5318336
