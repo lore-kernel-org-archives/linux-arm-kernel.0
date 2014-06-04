@@ -1,66 +1,284 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 04 Jun 2014 08:12:16 -0700
-Subject: [GIT PULL] Allwinner sunXi clock changes for 3.16
-In-Reply-To: <20140604071922.GA5765@lukather>
-References: <538B7B6C.3020601@elopez.com.ar>
- <20140603174120.10062.16229@quantum>
- <20140604071922.GA5765@lukather>
-Message-ID: <20140604151216.10062.81810@quantum>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed,  4 Jun 2014 17:15:43 +0200
+Subject: [PATCH v3] arm/arm64: KVM: Fix and refactor unmap_range
+Message-ID: <1401894943-11213-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2014-06-04 00:19:22)
-> Hi Mike,
-> 
-> On Tue, Jun 03, 2014 at 10:41:20AM -0700, Mike Turquette wrote:
-> > Quoting Emilio L?pez (2014-06-01 12:13:48)
-> > > Hi Mike,
-> > > 
-> > > Here is the sunxi clocks pull for 3.16. As you probably saw during the 
-> > > cycle, this mostly contains improved A31 support and a bit of 
-> > > housekeeping. Please note that this pull does *not* contain the MMC 
-> > > clock patches Hans sent, as you merged those yourself on clk-next
-> > 
-> > Hi Emilio,
-> > 
-> > -rc8 is pretty late for me to take this in under normal circumstances,
-> > and since the merge window opened early this time I will defer taking
-> > this pull request in until 3.16-rc1 is released. It'll be one of the
-> > first things applied to the new clk-next.
-> 
-> I know that Emilio has been pretty late at sending this, but at least
-> the A31 USB clocks patches is quite important for us, since it would
-> allow to add the A31 to Olof's boot test farm.
+unmap_range() was utterly broken, to quote Marc, and broke in all sorts
+of situations.  It was also quite complicated to follow and didn't
+follow the usual scheme of having a separate iterating function for each
+level of page tables.
 
-I guess you will still reap the benefits of Olof's boot testing if this
-is merged after 3.16-rc1?
+Address this by refactoring the code and introduce a pgd_clear()
+function.
 
-> 
-> Could you reconsider merging this?
-> 
-> Just so that doesn't happen again, when do you expect the pull
-> requests?
+Tested on TC2 with/without THP and limited testing on the v8 Foundation
+Model.
 
-There isn't a hard rule for "must be in by -rcN". But I really don't
-like taking patches after the merge window opens. Something bothers me
-about the commitdate for patches in clk-next being later than the
-commitdate for the new Linux major release. I always take some trivial
-patches during this time, or fixes which are obvious and would have to
-be sent for the next round of -rc's anyways, but features or new
-hardware support is something I don't like to take after the merge
-window opens.
+Reviewed-by: Jungseok Lee <jays.lee@samsung.com>
+Reviewed-by: Mario Smarduch <m.smarduch@samsung.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+Changes since v2:
+ - Don't call clear_p[mu]d_entry for huge pmd's or pud's
+ - Use phys_addr_t instead of unsigned long longs
+ - Change invalid 'pid' reference to pud
 
-I was bit a couple merge windows back by trying to be too aggressive
-about sneaking stuff in at the last minute and I learned my lesson ;-)
+Changes since v1:
+ - Don't define custom __unused but reuse __maybe_unused
 
-Regards,
-Mike
+ [ I kept the acked-by and reviewed-by tags because I felt the changes
+   were small enough to do so - if someone disagrees I'll be happy to
+   remove them, thanks. ]
 
-> 
-> Thanks,
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+ arch/arm/include/asm/kvm_mmu.h   |  12 +++
+ arch/arm/kvm/mmu.c               | 157 +++++++++++++++++++++------------------
+ arch/arm64/include/asm/kvm_mmu.h |  15 ++++
+ 3 files changed, 111 insertions(+), 73 deletions(-)
+
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 5c7aa3c..5cc0b0f 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -127,6 +127,18 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+ 	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
+ })
+ 
++static inline bool kvm_page_empty(void *ptr)
++{
++	struct page *ptr_page = virt_to_page(ptr);
++	return page_count(ptr_page) == 1;
++}
++
++
++#define kvm_pte_table_empty(ptep) kvm_page_empty(ptep)
++#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
++#define kvm_pud_table_empty(pudp) (0)
++
++
+ struct kvm;
+ 
+ #define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 16f8049..331e632 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -90,104 +90,115 @@ static void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
+ 	return p;
+ }
+ 
+-static bool page_empty(void *ptr)
++static void clear_pgd_entry(struct kvm *kvm, pgd_t *pgd, phys_addr_t addr)
+ {
+-	struct page *ptr_page = virt_to_page(ptr);
+-	return page_count(ptr_page) == 1;
++	pud_t *pud_table __maybe_unused = pud_offset(pgd, 0);
++	pgd_clear(pgd);
++	kvm_tlb_flush_vmid_ipa(kvm, addr);
++	pud_free(NULL, pud_table);
++	put_page(virt_to_page(pgd));
+ }
+ 
+ static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
+ {
+-	if (pud_huge(*pud)) {
+-		pud_clear(pud);
+-		kvm_tlb_flush_vmid_ipa(kvm, addr);
+-	} else {
+-		pmd_t *pmd_table = pmd_offset(pud, 0);
+-		pud_clear(pud);
+-		kvm_tlb_flush_vmid_ipa(kvm, addr);
+-		pmd_free(NULL, pmd_table);
+-	}
++	pmd_t *pmd_table = pmd_offset(pud, 0);
++	VM_BUG_ON(pud_huge(*pud));
++	pud_clear(pud);
++	kvm_tlb_flush_vmid_ipa(kvm, addr);
++	pmd_free(NULL, pmd_table);
+ 	put_page(virt_to_page(pud));
+ }
+ 
+ static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
+ {
+-	if (kvm_pmd_huge(*pmd)) {
+-		pmd_clear(pmd);
+-		kvm_tlb_flush_vmid_ipa(kvm, addr);
+-	} else {
+-		pte_t *pte_table = pte_offset_kernel(pmd, 0);
+-		pmd_clear(pmd);
+-		kvm_tlb_flush_vmid_ipa(kvm, addr);
+-		pte_free_kernel(NULL, pte_table);
+-	}
++	pte_t *pte_table = pte_offset_kernel(pmd, 0);
++	VM_BUG_ON(kvm_pmd_huge(*pmd));
++	pmd_clear(pmd);
++	kvm_tlb_flush_vmid_ipa(kvm, addr);
++	pte_free_kernel(NULL, pte_table);
+ 	put_page(virt_to_page(pmd));
+ }
+ 
+-static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
++static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
++		       phys_addr_t addr, phys_addr_t end)
+ {
+-	if (pte_present(*pte)) {
+-		kvm_set_pte(pte, __pte(0));
+-		put_page(virt_to_page(pte));
+-		kvm_tlb_flush_vmid_ipa(kvm, addr);
+-	}
++	pte_t *pte, *start_pte;
++	unsigned long long start_addr = addr;
++
++	start_pte = pte = pte_offset_kernel(pmd, addr);
++	do {
++		if (!pte_none(*pte)) {
++			kvm_set_pte(pte, __pte(0));
++			put_page(virt_to_page(pte));
++			kvm_tlb_flush_vmid_ipa(kvm, addr);
++		}
++	} while (pte++, addr += PAGE_SIZE, addr != end);
++
++	if (kvm_pte_table_empty(start_pte))
++		clear_pmd_entry(kvm, pmd, start_addr);
+ }
+ 
+-static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+-			unsigned long long start, u64 size)
++static void unmap_pmds(struct kvm *kvm, pud_t *pud,
++		       phys_addr_t addr, phys_addr_t end)
+ {
+-	pgd_t *pgd;
+-	pud_t *pud;
+-	pmd_t *pmd;
+-	pte_t *pte;
+-	unsigned long long addr = start, end = start + size;
+-	u64 next;
++	phys_addr_t next, start_addr = addr;
++	pmd_t *pmd, *start_pmd;
+ 
+-	while (addr < end) {
+-		pgd = pgdp + pgd_index(addr);
+-		pud = pud_offset(pgd, addr);
+-		pte = NULL;
+-		if (pud_none(*pud)) {
+-			addr = kvm_pud_addr_end(addr, end);
+-			continue;
+-		}
+-
+-		if (pud_huge(*pud)) {
+-			/*
+-			 * If we are dealing with a huge pud, just clear it and
+-			 * move on.
+-			 */
+-			clear_pud_entry(kvm, pud, addr);
+-			addr = kvm_pud_addr_end(addr, end);
+-			continue;
++	start_pmd = pmd = pmd_offset(pud, addr);
++	do {
++		next = kvm_pmd_addr_end(addr, end);
++		if (!pmd_none(*pmd)) {
++			if (kvm_pmd_huge(*pmd)) {
++				pmd_clear(pmd);
++				kvm_tlb_flush_vmid_ipa(kvm, addr);
++				put_page(virt_to_page(pmd));
++			} else {
++				unmap_ptes(kvm, pmd, addr, next);
++			}
+ 		}
++	} while (pmd++, addr = next, addr != end);
+ 
+-		pmd = pmd_offset(pud, addr);
+-		if (pmd_none(*pmd)) {
+-			addr = kvm_pmd_addr_end(addr, end);
+-			continue;
+-		}
++	if (kvm_pmd_table_empty(start_pmd))
++		clear_pud_entry(kvm, pud, start_addr);
++}
+ 
+-		if (!kvm_pmd_huge(*pmd)) {
+-			pte = pte_offset_kernel(pmd, addr);
+-			clear_pte_entry(kvm, pte, addr);
+-			next = addr + PAGE_SIZE;
+-		}
++static void unmap_puds(struct kvm *kvm, pgd_t *pgd,
++		       phys_addr_t addr, phys_addr_t end)
++{
++	phys_addr_t next, start_addr = addr;
++	pud_t *pud, *start_pud;
+ 
+-		/*
+-		 * If the pmd entry is to be cleared, walk back up the ladder
+-		 */
+-		if (kvm_pmd_huge(*pmd) || (pte && page_empty(pte))) {
+-			clear_pmd_entry(kvm, pmd, addr);
+-			next = kvm_pmd_addr_end(addr, end);
+-			if (page_empty(pmd) && !page_empty(pud)) {
+-				clear_pud_entry(kvm, pud, addr);
+-				next = kvm_pud_addr_end(addr, end);
++	start_pud = pud = pud_offset(pgd, addr);
++	do {
++		next = kvm_pud_addr_end(addr, end);
++		if (!pud_none(*pud)) {
++			if (pud_huge(*pud)) {
++				pud_clear(pud);
++				kvm_tlb_flush_vmid_ipa(kvm, addr);
++				put_page(virt_to_page(pud));
++			} else {
++				unmap_pmds(kvm, pud, addr, next);
+ 			}
+ 		}
++	} while (pud++, addr = next, addr != end);
+ 
+-		addr = next;
+-	}
++	if (kvm_pud_table_empty(start_pud))
++		clear_pgd_entry(kvm, pgd, start_addr);
++}
++
++
++static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
++			phys_addr_t start, u64 size)
++{
++	pgd_t *pgd;
++	phys_addr_t addr = start, end = start + size;
++	phys_addr_t next;
++
++	pgd = pgdp + pgd_index(addr);
++	do {
++		next = kvm_pgd_addr_end(addr, end);
++		unmap_puds(kvm, pgd, addr, next);
++	} while (pgd++, addr = next, addr != end);
+ }
+ 
+ static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 7d29847..8e138c7 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -125,6 +125,21 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+ #define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
+ #define kvm_pmd_addr_end(addr, end)	pmd_addr_end(addr, end)
+ 
++static inline bool kvm_page_empty(void *ptr)
++{
++	struct page *ptr_page = virt_to_page(ptr);
++	return page_count(ptr_page) == 1;
++}
++
++#define kvm_pte_table_empty(ptep) kvm_page_empty(ptep)
++#ifndef CONFIG_ARM64_64K_PAGES
++#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
++#else
++#define kvm_pmd_table_empty(pmdp) (0)
++#endif
++#define kvm_pud_table_empty(pudp) (0)
++
++
+ struct kvm;
+ 
+ #define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
+-- 
+1.8.5.2
