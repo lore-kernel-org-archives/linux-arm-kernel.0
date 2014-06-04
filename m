@@ -1,41 +1,57 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 04 Jun 2014 23:29:33 +0200
-Subject: [PATCH 1/7] ACPICA: Only include ACPI asm files if ACPI is enabled
-In-Reply-To: <20140604125137.GA18171@lee--X1>
-References: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
- <3061297.feg5DGUjIt@vostro.rjw.lan> <20140604125137.GA18171@lee--X1>
-Message-ID: <1603851.9SBouhvdWS@vostro.rjw.lan>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 4 Jun 2014 23:12:38 +0200
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140530112728.GB3949@e103592.cambridge.arm.com>
+References: <1400877395-4235-1-git-send-email-thierry.reding@gmail.com>
+ <538757B6.4010109@wwwdotorg.org> <20140530073006.GA24748@ulmo>
+ <20140530112728.GB3949@e103592.cambridge.arm.com>
+Message-ID: <20140604211237.GC18710@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 04, 2014 01:51:37 PM Lee Jones wrote:
-> On Wed, 04 Jun 2014, Rafael J. Wysocki wrote:
+On Fri, May 30, 2014 at 12:27:28PM +0100, Dave Martin wrote:
+> On Fri, May 30, 2014 at 08:30:08AM +0100, Thierry Reding wrote:
+[...]
+> > Arnd, can you take another look at this binding and see if there's
+> > anything else missing? If not I'll go through the document again and
+> > update all #address-cells/#size-cells references with #iommu-cells as
+> > appropriate and submit v3.
 > 
-> > On Wednesday, June 04, 2014 01:09:50 PM Lee Jones wrote:
-> > > Any drivers which support ACPI and Device Tree probing need to include
-> > > both respective header files.  Without this patch, if a driver is being
-> > > used on a platform which does not support ACPI and subsequently does not
-> > > have the config option enabled, but includes linux/acpi.h the build
-> > > breaks with:
-> > > 
-> > >   In file included from ../include/acpi/platform/acenv.h:150:0,
-> > >                    from ../include/acpi/acpi.h:56,
-> > >                    from ../include/linux/match.h:2,
-> > >                    from ../drivers/i2c/i2c-core.c:43:
-> > >   ../include/acpi/platform/aclinux.h:73:23:
-> > >    fatal error: asm/acenv.h: No such file or directory
-> > >    #include <asm/acenv.h>
-> > >                        ^
-> > 
-> > Which kernel does this happen with?
+> How do you envisage propagation of the master ID bits downstream of the
+> IOMMU would be described?
 > 
-> a0a962d (tag: refs/tags/next-20140602, refs/remotes/next/master)
->   Add linux-next specific files for 20140602
+> We will definitely need a way to describe this for GICv3.  How those
+> values are propagated is likely to vary between related SoCs and doesn't
+> feel like it should be baked into a driver, especially for the ARM SMMU
+> which may get reused in radically different SoC families from different
+> vendors.
 
-It looks like the problem is with include/linux/match.h that should not
-include acpi/acpi.h directly.
+Well, we've had cases like these in the past (power sequences come to
+mind). Some concepts are just too difficult or unwieldy to be put into
+device tree. I think that this is one of them.
 
-But I can't find this file in the Linus' next branch even, so I guess it's
-on its way to that branch?
+> The most likely types of remapping are the adding of a base offset or
+> some extra bits to the ID -- because not all MSIs to the GIC will
+> necessarily pass through the IOMMU.  It's also possible that we might
+> see ID squashing or folding in some systems.
 
-Rafael
+It can easily be argued that if the algorithm used to remap the ID
+varies, the compatibility of the device changes. Therefore I would
+expect any variant of the GICv3 that deviates from the "standard"
+mapping (if there is such a thing) to have its own compatible string.
+
+At that point there are two possibilities: a) handle the remapping in
+code hooked into the driver via matching of the compatible string or
+b) specifying a different specifier for each of these and keep the
+description in DT. From an implementation point of view, variant b) is
+likely going to be very similar to a), though (I'm thinking .of_xlate
+type of functions here).
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140604/d7163784/attachment.sig>
