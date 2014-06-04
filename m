@@ -1,45 +1,52 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Wed, 4 Jun 2014 19:37:01 +0200
-Subject: [PATCH 2/2] ARM: dts: berlin: enable i2c0 and i2c2
-In-Reply-To: <20140604170340.GI6892@lunn.ch>
-References: <1401780790-17830-1-git-send-email-antoine.tenart@free-electrons.com>
- <1401780790-17830-3-git-send-email-antoine.tenart@free-electrons.com>
- <20140603080522.GB22742@lunn.ch> <20140604164841.GA12859@kwain>
- <20140604170340.GI6892@lunn.ch>
-Message-ID: <20140604173701.GC12859@kwain>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 4 Jun 2014 10:51:45 -0700
+Subject: [PATCH 1/1] device.h: arm,dma-iommu: Move out dma_iommu_mapping
+ struct
+In-Reply-To: <1401869506-48129-2-git-send-email-ritesh.harjani@gmail.com>
+References: <1401869506-48129-1-git-send-email-ritesh.harjani@gmail.com>
+ <1401869506-48129-2-git-send-email-ritesh.harjani@gmail.com>
+Message-ID: <20140604175145.GD20812@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 04, 2014 at 07:03:40PM +0200, Andrew Lunn wrote:
-> On Wed, Jun 04, 2014 at 06:48:41PM +0200, Antoine T?nart wrote:
-> > 
-> > On Tue, Jun 03, 2014 at 10:05:22AM +0200, Andrew Lunn wrote:
-> > > On Tue, Jun 03, 2014 at 09:33:10AM +0200, Antoine T?nart wrote:
-> > > > Enable the I2C0 and I2C2 for the Marvell Berlin BG2G DMP. I2C1 and I2C3
-> > > > are also working on this board, but no devices seemed to be there.
-> > > 
-> > > Does this mean that IC0 and I2C2 have devices on them? Could you also
-> > > add nodes for the devices?
-> > 
-> > No devices I can add for now. I you prefer we can drop this patch, keep
-> > the other one and enable i2c nodes for the BG2Q DMP when they will be
-> > needed.
+On Wed, Jun 04, 2014 at 01:41:46PM +0530, ritesh.harjani at gmail.com wrote:
+> From: Ritesh Harjani <ritesh.harjani@gmail.com>
 > 
-> I was just wondering how you tested it, without having any devices?
+> This patch moves out *mapping pointer of dma_iommu_mapping
+> from arch/arm/include/asm/device.h to include/liunux/device.h
 
-I tested with the i2ctools. I could see one device on each bus at the
-address it should be. I also tested the pin muxing configurations.
+Why?  Who else can use this becides arm devices?
 
-I don't have lots of information on these I2C buses, at least my test
-results match what I know.
+> 
+> Also, it moves out complete structre definition of dma_iommu_mapping
+> to include/linux/iommu-helper.h
+> 
+> This is done since arm iommu's dma-mapping arch independent code,
+> needs to be moved out to lib/iommu-helper.c, this means
+> dma_iommu_mapping will be arch independent and later other archs
+> can make use of it.
 
-> Is it that the devices on the bus don't have mainline drivers?
+Will that really happen?  Do you have patches that do that?  I'd prefer
+to not do stuff like this until you have a patch series that needs it,
+otherwise this is just unneeded churn.
 
-Not with I2C support.
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -705,6 +705,10 @@ struct device {
+>  	/* arch specific additions */
+>  	struct dev_archdata	archdata;
+>  
+> +#ifdef CONFIG_DMA_USE_IOMMU_HELPER_MAPPING
+> +	struct dma_iommu_mapping	*mapping;
+> +#endif
+> +
+>  	struct device_node	*of_node; /* associated device tree node */
+>  	struct acpi_dev_node	acpi_node; /* associated ACPI device node */
+>  
 
-Antoine
+Are you sure this will not break the build on systems that enable that
+option, yet do not include iommu-helper.h?
 
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+thanks,
+
+greg k-h
