@@ -1,41 +1,46 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 04 Jun 2014 12:45:19 +0100
-Subject: [PATCH v2 4/7] ARM: shmobile: r8a7791: Add SYS-DMAC channel
- definitions for bindings
-In-Reply-To: <3770565.HiyLmu1184@avalon>
-References: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
- <538C818B.5060703@codethink.co.uk>
- <CAMuHMdWkPy8eydh4BntXdtf5ZJKP4yG26QovLUjvGUYYv3dStw@mail.gmail.com>
- <3770565.HiyLmu1184@avalon>
-Message-ID: <538F06CF.5090406@codethink.co.uk>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Wed, 4 Jun 2014 14:32:30 +0300
+Subject: [PATCH 0/9] Serial ATA support for NVIDIA Tegra124
+Message-ID: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/14 12:30, Laurent Pinchart wrote:
-> On Tuesday 03 June 2014 09:53:17 Geert Uytterhoeven wrote:
->> On Mon, Jun 2, 2014 at 3:52 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
->>>> +// FIXME
->>>> +#define CHCR_RX_8BIT SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_8BIT)
->>>> +#define CHCR_TX_8BIT SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_8BIT)
->>>> +#define CHCR_RX_16BIT        SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_16BIT)
->>>> +#define CHCR_TX_16BIT        SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_16BIT)
->>>> +#define CHCR_RX_32BIT        SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_32BIT)
->>>> +#define CHCR_TX_32BIT        SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_32BIT)
->>>> +#define CHCR_RX_256BIT       SHDMA_ARM_CHCR_RX(SHDMA_ARM_SZ_256BIT)
->>>> +#define CHCR_TX_256BIT       SHDMA_ARM_CHCR_TX(SHDMA_ARM_SZ_256BIT)
->>>
->>> I am pretty sure for round-2 we can remove these in favour of a
->>> table in the driver. The only device that has a non-standard setting
->>> is the SDHI and that will support 32bit and 256bit transfers.
->>
->> Thanks, I'm eagerly awaiting your next version...
-> 
-> Speaking of that, Ben, do you have a git tree with your latest patches ?
+Hi,
 
-Not yet, as currently working on sorting out the soc_camera before
-moving back to the DMA. I have a plan, just not had the time to sort
-it out.
+This series adds support for the onboard AHCI-compliant Serial ATA
+controller found on Tegra124 systems-on-chip. The controller is
+enabled on Jetson TK1. The series depends on Peter's efuse series 
+and Thierry's yet to be submitted XUSB pinctrl driver.
+
+A branch containing the series is located at 
+	git://github.com/cyndis/linux.git
+branch ahci-rel.
+
+Mikko Perttunen (9):
+  of: Add NVIDIA Tegra SATA controller binding
+  ARM: tegra: Add SATA controller to Tegra124 device tree
+  ARM: tegra: Add SATA and SATA power to Jetson TK1 device tree
+  clk: tegra: Enable hardware control of SATA PLL
+  clk: tegra: Add SATA clocks to Tegra124 initialization table
+  ARM: tegra: Export tegra_powergate_power_on
+  ahci: Increase AHCI_MAX_CLKS to 4
+  ata: Add support for the Tegra124 SATA controller
+  ARM: tegra: Add options for Tegra AHCI support to tegra_defconfig
+
+ .../devicetree/bindings/ata/tegra-sata.txt         |  29 ++
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts          |  36 ++
+ arch/arm/boot/dts/tegra124.dtsi                    |  24 ++
+ arch/arm/configs/tegra_defconfig                   |   3 +
+ arch/arm/mach-tegra/powergate.c                    |   1 +
+ drivers/ata/Kconfig                                |   9 +
+ drivers/ata/Makefile                               |   1 +
+ drivers/ata/ahci.h                                 |   2 +-
+ drivers/ata/ahci_tegra.c                           | 386 +++++++++++++++++++++
+ drivers/clk/tegra/clk-pll.c                        |   8 +
+ drivers/clk/tegra/clk-tegra124.c                   |   2 +
+ 11 files changed, 500 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/ata/tegra-sata.txt
+ create mode 100644 drivers/ata/ahci_tegra.c
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+1.8.1.5
