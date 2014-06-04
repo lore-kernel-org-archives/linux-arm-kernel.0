@@ -1,113 +1,31 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed,  4 Jun 2014 17:16:28 +0200
-Subject: [PATCH 2/4] of: Add NVIDIA Tegra XUSB pad controller binding
+Date: Wed,  4 Jun 2014 17:16:29 +0200
+Subject: [PATCH 3/4] ARM: tegra: tegra124: Add XUSB pad controller
 In-Reply-To: <1401894990-30092-1-git-send-email-thierry.reding@gmail.com>
 References: <1401894990-30092-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1401894990-30092-2-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1401894990-30092-3-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
-This patch adds the device tree binding documentation for the XUSB pad
-controller found on NVIDIA Tegra SoCs. It exposes both pinmuxing and PHY
-capabilities.
+The device tree node in the SoC file contains only the resources (such
+as registers, resets, ...) but none of the lane assignment information
+since that's board specific and belongs in the board file.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- .../pinctrl/nvidia,tegra124-xusb-padctl.txt        | 135 +++++++++++++++++++++
- 1 file changed, 135 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
+ arch/arm/boot/dts/tegra124.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
-new file mode 100644
-index 000000000000..8af59bbcdaa0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
-@@ -0,0 +1,135 @@
-+Device tree binding for NVIDIA Tegra XUSB pad controller
-+========================================================
-+
-+The Tegra XUSB pad controller manages a set of lanes, each of which can be
-+assigned to one out of a set of different pads. Some of these pads have an
-+associated PHY that must be powered up before the pad can be used.
-+
-+This document defines the device-specific binding for the XUSB pad controller.
-+
-+Refer to pinctrl-bindings.txt in this directory for generic information about
-+pin controller device tree bindings and ../phy/phy-bindings.txt for details on
-+how to describe and reference PHYs in device trees.
-+
-+Required properties:
-+--------------------
-+- compatible: should be "nvidia,tegra124-xusb-padctl"
-+- reg: Physical base address and length of the controller's registers.
-+- resets: Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names: Must include the following entries:
-+  - padctl
-+- #address-cells: Should be 0.
-+- #size-cells: Should be 0.
-+- #phy-cells: Should be 1. The specifier is the index of the PHY to reference.
-+  Possible values are:
-+  - 0: PCIe
-+  - 1: SATA
-+
-+Lane muxing:
-+------------
-+
-+Child nodes contain the pinmux configurations following the conventions from
-+the pinctrl-bindings.txt document. Typically a single, static configuration is
-+given and applied at boot time.
-+
-+Each subnode describes groups of lanes along with parameters and pads that
-+they should be assigned to. The name of these subnodes is not important. All
-+subnodes should be parsed solely based on their content.
-+
-+Each subnode only applies the parameters that are explicitly listed. In other
-+words, if a subnode that lists a function but no pin configuration parameters
-+implies no information about any pin configuration parameters. Similarly, a
-+subnode that describes only an IDDQ parameter implies no information about
-+what function the pins are assigned to. For this reason even seemingly boolean
-+values are actually tristates in this binding: unspecified, off or on.
-+Unspecified is represented as an absent property, and off/on are represented
-+as integer values 0 and 1.
-+
-+Required properties:
-+- nvidia,lanes: An array of strings. Each string is the name of a lane.
-+
-+Optional properties:
-+- nvidia,function: A string that is the name of the function (pad) that the
-+  pin or group should be assigned to. Valid values for function names are
-+  listed below.
-+- nvidia,iddq: Enables IDDQ mode of the lane. (0: no, 1: yes)
-+
-+Note that not all of these properties are valid for all lanes. Lanes can be
-+divided into three groups:
-+
-+  - otg-0, otg-1, otg-2:
-+
-+    Valid functions for this group are: "snps", "xusb", "uart", "rsvd".
-+
-+    The nvidia,iddq property does not apply to this group.
-+
-+  - ulpi-0, hsic-0, hsic-1:
-+
-+    Valid functions for this group are: "snps", "xusb".
-+
-+    The nvidia,iddq property does not apply to this group.
-+
-+  - pcie-0, pcie-1, pcie-2, pcie-3, pcie-4, sata-0:
-+
-+    Valid functions for this group are: "pcie", "usb3", "sata", "rsvd".
-+
-+
-+Example:
-+========
-+
-+SoC file extract:
-+-----------------
-+
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index 6e6bc4e8185c..38cb06fd693b 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -449,6 +449,17 @@
+ 		clock-names = "pclk", "clk32k_in";
+ 	};
+ 
 +	padctl at 0,7009f000 {
 +		compatible = "nvidia,tegra124-xusb-padctl";
 +		reg = <0x0 0x7009f000 0x0 0x1000>;
@@ -119,46 +37,8 @@ index 000000000000..8af59bbcdaa0
 +		#phy-cells = <1>;
 +	};
 +
-+Board file extract:
-+-------------------
-+
-+	pcie-controller at 0,01003000 {
-+		...
-+
-+		phys = <&padctl 0>;
-+		phy-names = "pcie";
-+
-+		...
-+	};
-+
-+	...
-+
-+	padctl: padctl at 0,7009f000 {
-+		pinmux {
-+			pinctrl-0 = <&padctl_default>;
-+			pinctrl-names = "default";
-+
-+			padctl_default: pinmux {
-+				usb3 {
-+					nvidia,lanes = "pcie-0", "pcie-1";
-+					nvidia,function = "usb3";
-+					nvidia,iddq = <0>;
-+				};
-+
-+				pcie {
-+					nvidia,lanes = "pcie-2", "pcie-3",
-+						       "pcie-4";
-+					nvidia,function = "pcie";
-+					nvidia,iddq = <0>;
-+				};
-+
-+				sata {
-+					nvidia,lanes = "sata-0";
-+					nvidia,function = "sata";
-+					nvidia,iddq = <0>;
-+				};
-+			};
-+		};
-+	};
+ 	sdhci at 0,700b0000 {
+ 		compatible = "nvidia,tegra124-sdhci";
+ 		reg = <0x0 0x700b0000 0x0 0x200>;
 -- 
 1.9.2
