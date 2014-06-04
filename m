@@ -1,58 +1,63 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 4 Jun 2014 10:34:53 +0100
-Subject: [PATCH] arm64: topology: add MPIDR-based detection
-In-Reply-To: <20140603210424.GJ31751@sirena.org.uk>
-References: <1401644249-23792-1-git-send-email-broonie@kernel.org>
- <20140603173103.GA18004@red-moon>
- <20140603210424.GJ31751@sirena.org.uk>
-Message-ID: <20140604093452.GA8057@e102568-lin.cambridge.arm.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 4 Jun 2014 11:35:15 +0200
+Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
+In-Reply-To: <20140604092313.GB11096@twins.programming.kicks-ass.net>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
+ <20140528121001.GI19967@e103034-lin>
+ <CAKfTPtDxeBfZK1AxCRqEG91pi--Ti1RYFoQPDhvMVnGTCspQ-g@mail.gmail.com>
+ <20140528154703.GJ19967@e103034-lin>
+ <20140603155007.GZ30445@twins.programming.kicks-ass.net>
+ <CAKfTPtDUvH--WxFATTW6YRAvLuohzyNHDUq6DRdfxc7gRKCX6Q@mail.gmail.com>
+ <20140604080809.GK30445@twins.programming.kicks-ass.net>
+ <20140604085542.GH29593@e103034-lin>
+ <20140604092313.GB11096@twins.programming.kicks-ass.net>
+Message-ID: <CAKfTPtBVyMMzXoFoL=kT8oP97BZ8S6P_2ySNhXLC1gR80jw6vA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 03, 2014 at 10:04:24PM +0100, Mark Brown wrote:
-> On Tue, Jun 03, 2014 at 06:31:03PM +0100, Lorenzo Pieralisi wrote:
-> 
-> > I refactored the patch (UP code path) and deliberately removed the
-> > code that packs affinity levels into the cluster id. I do not
-> > like packing the affinity levels and on second thoughts packing the
-> > unused affinity levels into cluster_id is as correct as packing
-> > the unused affinity levels into core_id (ie it is arbitrary), so I do
-> 
-> I'm having a really hard time seeing this as anything other than a step
-> back.  Your change causes us to discard the higher affinity levels which
-> seems like something we actively know to be misleading and means that we
-> will be handing the scheduler two different identically numbered cores
-> (all the affinity levels we do pay attention to will be identical) if we
-> ever encounter such a system which is actively broken.
+On 4 June 2014 11:23, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Wed, Jun 04, 2014 at 09:55:42AM +0100, Morten Rasmussen wrote:
+>> Both running_avg and runnable_avg are affected by other tasks on the
+>> same cpus, but in different ways. They are equal if you only have one
+>> task on a cpu. If you have more, running_avg will give you the true
+>> requirement of the tasks until the cpu is fully utilized. At which point
+>> the task running_avg will drop if you add more tasks (the unweighted sum
+>> of task running_avgs remains constant).
+>>
+>> runnable_avg on the other hand, might be affected as soon as you have
+>> two task running on the same cpu if they are runnable at the same time.
+>> That isn't necessarily a bad thing for load-balancing purposes, because
+>> tasks that are runnable at the same time are likely to be run more
+>> efficiently by placing them on different cpus. You might view as at sort
+>> of built in concurrency factor, somewhat similar to what Yuyang is
+>> proposing. runnable_avg increases rapidly when the cpu is over-utilized.
+>
+> Agreed.
+>
+>> > I'm not sure I see how 100% is possible, but yes I agree that runnable
+>> > can indeed be inflated due to this queueing effect.
+>>
+>> You should only be able to get to 75% worst case for runnable_avg for
+>> that example. The total running_avg is 50% no matter if the tasks
+>> overlaps or not.
+>
+> Yes, 75% is what I ended up with.
 
-If we ever encounter such systems we will deal with them when time
-comes, DT can handle them and patching this code is trivial.
+Can you explain how you reach 75% as it depends on the runtime and a
+runtime longer than 345ms will end to a 100% load whatever the
+idletime was previously ?
 
-All I am saying is, let's wait and see, there is no compelling need to
-use aff3 (and aff2 on non-SMT systems) on current systems for the
-topology.
 
-> > not think we should do it, that's the reason why we defined DT bindings
-> > to add a proper topology semantics and we should use them when the MPIDR
-> > values deviate from the "recommendations".
-> 
-> I'd agree with not going to great lengths unless someone defines
-> semantics for the higher affinity levels in the future however it does
-> seem like completely ignoring them when it's so easy to take some
-> account of them is insufficiently defensive - it's similar to things
-> like putting the of_node_put() calls in even though they don't do
-> anything at the minute.
-
-So why don't you remove of_node_put() all over the kernel then ?
-
-As for the MPIDR and the affinity levels, see above.
-
-> > Patch attached, my ack included, should be ready to go, unless you
-> > object to that.
-> 
-> Well, I certainly don't object to getting something merged here.
-
-Neither do I, let's get this code in.
-
-Thanks,
-Lorenzo
+>
+>> f you had five tasks on one cpu that each have a 25% requirement you can
+>> get individual task runnable_avgs of up to 100% (cpu unweighted
+>> runnable_load_avg can get up 500%, I think), but the task running_avgs
+>> would be 20% each (total of 100%).
+>
+> Yeah, more or less so indeed. I had not considered the queueing effects
+> on runnable_avg yesterday, so good that that got raised.
+>
+> That does indeed invalidate my: runnable - running := extra cpu required
+> thing. It ends up being the extra cpu required for 0 latency but gobs of
+> idle time, which is something else entirely.
