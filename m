@@ -1,38 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Jun 2014 19:00:26 +0100
-Subject: [PATCHv2 1/4] arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support
-In-Reply-To: <538E6EC2.5000004@codeaurora.org>
-References: <1401742658-11841-1-git-send-email-lauraa@codeaurora.org>
- <1401742658-11841-2-git-send-email-lauraa@codeaurora.org>
- <20140603152201.GP23149@arm.com> <538E6EC2.5000004@codeaurora.org>
-Message-ID: <20140604180026.GC27881@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 4 Jun 2014 20:05:47 +0200 (CEST)
+Subject: [PATCH 3/3] clocksource: exynos_mct: Optimize register reads
+ with ldmia
+In-Reply-To: <1401903034-20074-3-git-send-email-dianders@chromium.org>
+References: <1401903034-20074-1-git-send-email-dianders@chromium.org>
+ <1401903034-20074-3-git-send-email-dianders@chromium.org>
+Message-ID: <alpine.DEB.2.10.1406042004140.3319@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 04, 2014 at 01:56:34AM +0100, Laura Abbott wrote:
-> On 6/3/2014 8:22 AM, Will Deacon wrote:
-> >> +int set_memory_ro(unsigned long addr, int numpages)
-> >> +{
-> >> +	return change_memory_set_bit(addr, numpages, __pgprot(PTE_RDONLY));
-> >> +}
-> >> +EXPORT_SYMBOL_GPL(set_memory_ro);
-> >> +
-> >> +int set_memory_rw(unsigned long addr, int numpages)
-> >> +{
-> >> +	return change_memory_clear_bit(addr, numpages, __pgprot(PTE_RDONLY));
-> >> +}
-> >> +EXPORT_SYMBOL_GPL(set_memory_rw);
-> > 
-> > I'm slightly worried about the interaction with this and PTE_WRITE (see
-> > linux-next). If the kernel pages are marked as PTE_DIRTY | PTE_WRITE, then
-> > setting read-only is a weird contradiction. Can you take PTE_WRITE into
-> > account for these two please?
-> >
+On Wed, 4 Jun 2014, Doug Anderson wrote:
+
+> As we saw in (clocksource: exynos_mct: cache mct upper count), the
+> time spent reading the MCT shows up fairly high in real-world
+> profiles.  That means that it's worth some optimization.
 > 
-> It sounds like the solution should be to set/clear PTE_WRITE as appropriate
-> here, is my understanding correct?
+> We get a roughly 10% speedup in userspace gettimeofday() by using an
+> ldmia to read the two halfs of the MCT.  That seems like a worthwhile
+> thing to do.
+> 
+> Before: 1173084 us for 1000000 gettimeofday in userspace
+> After:  1045674 us for 1000000 gettimeofday in userspace
+> 
+> NOTE: we could actually do better than this if we really wanted to.
+> Technically we could register the clocksource as a 32-bit timer and
+> only use the "lower" half.  Doing so brings us down to 1014429 us for
+> 1000000 gettimeofday in userspace (and doesn't even require assembly
+> code).  That would be an alternative to this change.
 
-You got it! You can look at set_pte_at if you're unsure (bearing in mind
-that kernel mappings are always dirty).
+I was about to ask exactly that question: What's the advantage of the
+64 bit dance there? AFAICT nothing.
+ 
+Thanks,
 
-Will
+	tglx
