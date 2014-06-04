@@ -1,50 +1,63 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 03 Jun 2014 17:30:18 -0700
-Subject: [PATCHv2] arm64: Add atomic pool for non-coherent and CMA
- allocaitons.
-In-Reply-To: <20140603132842.GI23149@arm.com>
-References: <1401739432-5358-1-git-send-email-lauraa@codeaurora.org>
- <20140603132842.GI23149@arm.com>
-Message-ID: <538E689A.3050109@codeaurora.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Tue, 3 Jun 2014 17:53:25 -0700
+Subject: XADC
+Message-ID: <e2cd1349-5cfb-4456-a1f5-74e7affff085@BN1AFFO11FD006.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/3/2014 6:28 AM, Will Deacon wrote:
-> Hi Laura,
-> 
-> On Mon, Jun 02, 2014 at 09:03:52PM +0100, Laura Abbott wrote:
->> Neither CMA nor noncoherent allocations support atomic allocations.
->> Add a dedicated atomic pool to support this.
->>
->> Change-Id: I46c8fdffe5e0687403d42b37643137c8cf344259
->> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
->> ---
->>
->> v2: Various bug fixes pointed out by David and Ritesh (CMA dependency, swapping
->> coherent, noncoherent). I'm still not sure how to address the devicetree
->> suggestion by Will [1][2]. I added the devicetree mailing list this time around
->> to get more input on this.
->>
->> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249180.html
->> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249528.html
-> 
-> Perhaps that can be done later then, since from what you're saying, we need
-> the command-line option either way? Have you looked at how this fits in with
-> the iommu-helper work from Ritesh? We could put the parameter parsing in
-> there too.
-> 
+Hi Lars,
 
-This doesn't seem to overlap with Ritesh's work. The atomic mapping is still
-handled in the arm specific code so I assume it would be handled in the arm64
-specific code as well. Another question might be is if it would be useful to
-make the atomic code common somehow between arm and arm64.
+I recently found that you developed a driver for XADC and I thought I
+enable it (see patch below). But it seems something is not working
+correctly. The values I tested don't seem to be right and also fixed.
+I.e. they don't change over time or across boards:
 
-> Will
-> 
+  # cat in_temp0_scale 
+  123.040771484
+  # cat in_voltage0_vccint_scale 
+  0.732421875
+  # cat in_voltage0_vccint_raw 
+  1384
+  # cat in_voltage1_vccaux_s[ 1203.660637] random: nonblocking pool is initialized
+  # cat in_voltage1_vccaux_scale 
+  0.732421875
+  # cat in_voltage3_vccpint_scale 
+  0.732421875
 
-Thanks,
-Laura
+Do you have an idea what I'm missing?
 
+	Thanks,
+	S?ren
+
+----------------8<-----------------8<-----------------8<--------------8<--------
+Date: Tue, 3 Jun 2014 15:11:26 -0700
+Subject: [PATCH] ARM: zynq: DT: Add XADC node
+
+Add node for the Xilinx A/D Converter.
+
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+ arch/arm/boot/dts/zynq-7000.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index 760bbc463c5b..c5854286a95a 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -65,6 +65,14 @@
+ 		interrupt-parent = <&intc>;
+ 		ranges;
+ 
++		adc at f8007100 {
++			compatible = "xlnx,zynq-xadc-1.00.a";
++			reg = <0xf8007100 0x20>;
++			interrupts = <0 7 4>;
++			interrupt-parent = <&intc>;
++			clocks = <&clkc 12>;
++		};
++
+ 		i2c0: i2c at e0004000 {
+ 			compatible = "cdns,i2c-r1p10";
+ 			status = "disabled";
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+2.0.0
