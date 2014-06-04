@@ -1,64 +1,56 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed,  4 Jun 2014 17:30:16 +0100
-Subject: [PATCH v3 02/10] mmc: sdhci-st: ST Microelectronics SDHCI binding
- documentation.
+Date: Wed,  4 Jun 2014 17:30:18 +0100
+Subject: [PATCH v3 04/10] ARM: STi: DT: Add sdhci controller for stih416
 In-Reply-To: <1401899424-1365-1-git-send-email-peter.griffin@linaro.org>
 References: <1401899424-1365-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1401899424-1365-3-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1401899424-1365-5-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device tree binding documentation for the ST
-SDHCI driver. It documents the differences between the core properties
-described by mmc.txt and the properties used by the sdhci-st driver.
+This patch adds device tree config for both sdhci controllers
+on the stih416 SoC.
 
 Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 Acked-by: Lee Jones <lee.jones@linaro.org>
 Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
- Documentation/devicetree/bindings/mmc/sdhci-st.txt | 33 ++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-st.txt
+ arch/arm/boot/dts/stih416.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mmc/sdhci-st.txt b/Documentation/devicetree/bindings/mmc/sdhci-st.txt
-new file mode 100644
-index 0000000..7527db4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/sdhci-st.txt
-@@ -0,0 +1,33 @@
-+* STMicroelectronics sdhci-st MMC/SD controller
+diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+index 06473c5..6473287 100644
+--- a/arch/arm/boot/dts/stih416.dtsi
++++ b/arch/arm/boot/dts/stih416.dtsi
+@@ -236,5 +236,29 @@
+ 			resets	= <&powerdown STIH416_KEYSCAN_POWERDOWN>,
+ 				  <&softreset STIH416_KEYSCAN_SOFTRESET>;
+ 		};
 +
-+This file documents the differences between the core properties in
-+Documentation/devicetree/bindings/mmc/mmc.txt and the properties
-+used by the sdhci-st driver.
++		mmc0: sdhci at fe81e000 {
++			compatible	= "st,sdhci";
++			status		= "disabled";
++			reg		= <0xfe81e000 0x1000>;
++			interrupts	= <GIC_SPI 127 IRQ_TYPE_NONE>;
++			interrupt-names	= "mmcirq";
++			pinctrl-names	= "default";
++			pinctrl-0	= <&pinctrl_mmc0>;
++			clock-names	= "mmc";
++			clocks		= <&clk_s_a1_ls 1>;
++		};
 +
-+Required properties:
-+- compatible :  Must be "st,sdhci"
-+- clock-names : Should be "mmc"
-+                See: Documentation/devicetree/bindings/resource-names.txt
-+- clocks :      Phandle of the clock used by the sdhci controler
-+                See: Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Optional properties:
-+- non-removable: non-removable slot
-+                 See: Documentation/devicetree/bindings/mmc/mmc.txt
-+- bus-width: Number of data lines
-+                 See: Documentation/devicetree/bindings/mmc/mmc.txt
-+
-+Example:
-+
-+mmc0: sdhci at fe81e000 {
-+	compatible	= "st,sdhci";
-+	status		= "disabled";
-+	reg		= <0xfe81e000 0x1000>;
-+	interrupts	= <GIC_SPI 127 IRQ_TYPE_NONE>;
-+	interrupt-names	= "mmcirq";
-+	pinctrl-names	= "default";
-+	pinctrl-0	= <&pinctrl_mmc0>;
-+	clock-names	= "mmc";
-+	clocks		= <&clk_s_a1_ls 1>;
-+	bus-width       = <8>
-+};
++		mmc1: sdhci at fe81f000 {
++			compatible	= "st,sdhci";
++			status		= "disabled";
++			reg		= <0xfe81f000 0x1000>;
++			interrupts	= <GIC_SPI 128 IRQ_TYPE_NONE>;
++			interrupt-names	= "mmcirq";
++			pinctrl-names	= "default";
++			pinctrl-0	= <&pinctrl_mmc1>;
++			clock-names	= "mmc";
++			clocks		= <&clk_s_a1_ls 8>;
++		};
+ 	};
+ };
 -- 
 1.9.1
