@@ -1,56 +1,44 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 4 Jun 2014 10:08:09 +0200
-Subject: [PATCH v2 08/11] sched: get CPU's activity statistic
-In-Reply-To: <CAKfTPtDUvH--WxFATTW6YRAvLuohzyNHDUq6DRdfxc7gRKCX6Q@mail.gmail.com>
-References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
- <1400860385-14555-9-git-send-email-vincent.guittot@linaro.org>
- <20140528121001.GI19967@e103034-lin>
- <CAKfTPtDxeBfZK1AxCRqEG91pi--Ti1RYFoQPDhvMVnGTCspQ-g@mail.gmail.com>
- <20140528154703.GJ19967@e103034-lin>
- <20140603155007.GZ30445@twins.programming.kicks-ass.net>
- <CAKfTPtDUvH--WxFATTW6YRAvLuohzyNHDUq6DRdfxc7gRKCX6Q@mail.gmail.com>
-Message-ID: <20140604080809.GK30445@twins.programming.kicks-ass.net>
+From: ritesh.harjani@gmail.com (ritesh.harjani at gmail.com)
+Date: Wed, 4 Jun 2014 13:41:45 +0530
+Subject: [PATCH 0/1] device.h: Move out arch independent dma_iommu_mapping
+ struct
+Message-ID: <1401869506-48129-1-git-send-email-ritesh.harjani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 04, 2014 at 09:47:26AM +0200, Vincent Guittot wrote:
-> On 3 June 2014 17:50, Peter Zijlstra <peterz@infradead.org> wrote:
-> > On Wed, May 28, 2014 at 04:47:03PM +0100, Morten Rasmussen wrote:
-> >> Since we may do periodic load-balance every 10 ms or so, we will perform
-> >> a number of load-balances where runnable_avg_sum will mostly be
-> >> reflecting the state of the world before a change (new task queued or
-> >> moved a task to a different cpu). If you had have two tasks continuously
-> >> on one cpu and your other cpu is idle, and you move one of the tasks to
-> >> the other cpu, runnable_avg_sum will remain unchanged, 47742, on the
-> >> first cpu while it starts from 0 on the other one. 10 ms later it will
-> >> have increased a bit, 32 ms later it will be 47742/2, and 345 ms later
-> >> it reaches 47742. In the mean time the cpu doesn't appear fully utilized
-> >> and we might decide to put more tasks on it because we don't know if
-> >> runnable_avg_sum represents a partially utilized cpu (for example a 50%
-> >> task) or if it will continue to rise and eventually get to 47742.
-> >
-> > Ah, no, since we track per task, and update the per-cpu ones when we
-> > migrate tasks, the per-cpu values should be instantly updated.
-> >
-> > If we were to increase per task storage, we might as well also track
-> > running_avg not only runnable_avg.
-> 
-> I agree that the removed running_avg should give more useful
-> information about the the load of a CPU.
-> 
-> The main issue with running_avg is that it's disturbed by other tasks
-> (as point out previously). As a typical example,  if we have 2 tasks
-> with a load of 25% on 1 CPU, the unweighted runnable_load_avg will be
-> in the range of [100% - 50%] depending of the parallelism of the
-> runtime of the tasks whereas the reality is 50% and the use of
-> running_avg will return this value
+From: Ritesh Harjani <ritesh.harjani@gmail.com>
 
-I'm not sure I see how 100% is possible, but yes I agree that runnable
-can indeed be inflated due to this queueing effect.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140604/2acea284/attachment.sig>
+There has been various ongoing discussions on making arm iommu's dma-mapping
+stuff to be common code which is arch independent[1].
+Current users of this code will be arm and arm64, but later other archs
+can start utilizing this as well.
+
+Based on these discussion there has been work going on to refactor common
+arch independent code of arm iommu's dma-mapping to lib/iommu-helper.c [2].
+
+Since now dma_iommu_mapping stuff will be arch independent, so it make sense
+to move out struct dma_iommu_mapping *mapping variable from arch/arm/*/device.h 
+to include/linux/device.h as a first step [3].
+Also, to move out complete structure definition of dma_iommu_mapping 
+to include/linux/iommu-helper.h
+
+
+Links:
+[1]: https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg03458.html
+[2]: http://www.spinics.net/lists/arm-kernel/msg336343.html
+[3]: http://www.spinics.net/lists/arm-kernel/msg336682.html
+
+Ritesh Harjani (1):
+  device.h: arm,dma-iommu: Move out dma_iommu_mapping struct
+
+ arch/arm/Kconfig                          |  4 ++++
+ arch/arm/include/asm/device.h             |  9 ---------
+ arch/arm/include/asm/dma-iommu.h          | 16 +---------------
+ arch/arm/mm/dma-mapping.c                 | 20 ++++++++++----------
+ drivers/gpu/drm/exynos/exynos_drm_iommu.c | 10 +++++-----
+ include/linux/device.h                    |  4 ++++
+ include/linux/iommu-helper.h              | 22 ++++++++++++++++++++++
+ 7 files changed, 46 insertions(+), 39 deletions(-)
+
+-- 
+1.8.1.3
