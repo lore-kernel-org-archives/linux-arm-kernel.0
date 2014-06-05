@@ -1,69 +1,116 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 05 Jun 2014 10:47:45 -0600
-Subject: [PATCH 2/4] of: Add NVIDIA Tegra XUSB pad controller binding
-In-Reply-To: <1401894990-30092-2-git-send-email-thierry.reding@gmail.com>
-References: <1401894990-30092-1-git-send-email-thierry.reding@gmail.com>
- <1401894990-30092-2-git-send-email-thierry.reding@gmail.com>
-Message-ID: <53909F31.4050603@wwwdotorg.org>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Thu, 5 Jun 2014 18:56:23 +0200
+Subject: [PATCH 1/9] reset: add the Berlin reset controller driver
+In-Reply-To: <1401986205.4103.9.camel@paszta.hi.pengutronix.de>
+References: <1401983326-19205-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1401983326-19205-2-git-send-email-antoine.tenart@free-electrons.com>
+ <1401986205.4103.9.camel@paszta.hi.pengutronix.de>
+Message-ID: <20140605165623.GB21960@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2014 09:16 AM, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
+Hi Philipp,
+
+On Thu, Jun 05, 2014 at 06:36:45PM +0200, Philipp Zabel wrote:
+> > +#include <linux/platform_device.h>
 > 
-> This patch adds the device tree binding documentation for the XUSB pad
-> controller found on NVIDIA Tegra SoCs. It exposes both pinmuxing and PHY
-> capabilities.
+> Is there a reason this is not actually implemented as platform device?
 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
+The node describing this driver is shared with a pin controller and a
+clock driver. The pin controller is implemented as a platform device. I
+don't think we can have two platform device drivers using the device
+tree for the same node. Or I'm maybe missing something.
 
-> +- #phy-cells: Should be 1. The specifier is the index of the PHY to reference.
-> +  Possible values are:
-> +  - 0: PCIe
-> +  - 1: SATA
+> 
+> > +#include <linux/reset-controller.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/spinlock.h>
+> > +#include <linux/types.h>
+> > +
+> > +#define BERLIN_RESET_REGISTER		0x104
+> 
+> How many reset registers are there? (See below).
 
-Those values are defined in
-include/dt-bindings/pinctrl/pinctrl-tegra-xusb.h. I personally consider
-the <dt-bindings/> header files to be part of the binding itself, rather
-than being derived from the binding. As such, I'd suggest the following
-changes:
+I don't have lots of information about this. For now only the one used
+to reset the USB PHY but others may come later.
 
-* Make this patch 1 not patch 2
-* Move pinctrl-tegra-xusb.h into this patch.
-* Remove the list of values above, and replace it with the text "See
-<dt-bindings/pinctrl/pinctrl-tegra-xusb.h> for the set of valid values".
+> > +
+> > +static int berlin_reset_reset(struct reset_controller_dev *rcdev,
+> > +			      unsigned long id)
+> > +{
+> > +	struct berlin_reset_priv *priv = to_berlin_reset_priv(rcdev);
+> > +	unsigned long flags;
+> > +	int bank = id / BITS_PER_LONG;
+> > +	int offset = id % BITS_PER_LONG;
+> > +
+> > +	spin_lock_irqsave(&priv->lock, flags);
+> > +
+> > +	writel(BIT(offset), priv->base + bank * 4);
+> > +
+> > +	spin_unlock_irqrestore(&priv->lock, flags);
+> 
+> Since this is a single write into an apparently self-clearing
+> register, I see no need for the spinlock here.
 
-We'll need to make sure this patch is applied to a topic branch that can
-be merged into the pinctrl tree and the Tegra tree for 3.17, assuming
-that you'll be sending patches for 3.17 that use pinctrl-tegra-xusb.h.
+Sure.
 
-> +Example:
-> +========
-> +
-> +SoC file extract:
-> +-----------------
-> +
-> +	padctl at 0,7009f000 {
-> +		compatible = "nvidia,tegra124-xusb-padctl";
-> +		reg = <0x0 0x7009f000 0x0 0x1000>;
-> +		resets = <&tegra_car 142>;
-> +		reset-names = "padctl";
-> +
-> +		#address-cells = <0>;
-> +		#size-cells = <0>;
+> 
+> > +	/* let the reset be effective */
+> > +	udelay(10);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static struct reset_control_ops berlin_reset_ops = {
+> > +	.reset	= berlin_reset_reset,
+> > +};
+> > +
+> > +static int __berlin_reset_init(struct device_node *np)
+> > +{
+> > +	struct berlin_reset_priv *priv;
+> > +	struct resource res;
+> > +	resource_size_t size;
+> > +	int ret;
+> > +
+> > +	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+> > +	if (!priv)
+> > +		return -ENOMEM;
+> > +
+> > +	ret = of_address_to_resource(np, 0, &res);
+> > +	if (ret)
+> > +		goto err;
+> > +
+> > +	size = resource_size(&res);
+> > +
+> > +	priv->base = ioremap(res.start, size);
+> > +	if (!priv->base) {
+> > +		ret = -ENOMEM;
+> > +		goto err;
+> > +	}
+> 
+> A platform driver could use devm_kzalloc, platform_get_resource,
+> and devm_ioremap_resource here.
+> 
+> > +	priv->base += BERLIN_RESET_REGISTER;
+> > +
+> > +	priv->rcdev.owner = THIS_MODULE;
+> > +	priv->rcdev.nr_resets = size * 32;
+> 
+> This doesn't seem right. The device tree patch shows that
+> size = 0x400.
 
-Why are those two properties required? Yes, this node has sub-nodes, but
-those sub-nodes don't have a reg property or unit address. The main
-Tegra pinctrl nodes don't have #address/size-cells.
+The reg property is shared between drivers using the common chip
+controller node. I do not know how many registers are actually used
+to reset.
 
-> +Board file extract:
-> +-------------------
+We then could hardcode the size, with the registers actually used here?
 
-> +	padctl: padctl at 0,7009f000 {
-> +		pinmux {
-> +			pinctrl-0 = <&padctl_default>;
-> +			pinctrl-names = "default";
 
-Isn't there one extra level of nodes here. In the DT patches later in
-this series, pinctrl-0/pinctrl-names are directly inside the top-level
-padctl node.
+Thanks for the review!
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
