@@ -1,53 +1,93 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 5 Jun 2014 16:49:31 +0100
-Subject: [PATCH 3/5] regulator: axp20x: Update the bindings to use a
- local parent regulator
-In-Reply-To: <20140605142729.GG5765@lukather>
-References: <1401297069-7423-1-git-send-email-maxime.ripard@free-electrons.com>
- <1401297069-7423-4-git-send-email-maxime.ripard@free-electrons.com>
- <20140528185051.GB22488@sirena.org.uk>
- <20140603131204.GJ27722@lukather>
- <20140603144319.GD31751@sirena.org.uk>
- <20140605142729.GG5765@lukather>
-Message-ID: <20140605154931.GY2520@sirena.org.uk>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 5 Jun 2014 08:48:02 -0700
+Subject: XADC
+In-Reply-To: <539029AB.9010406@metafoo.de>
+References: <e2cd1349-5cfb-4456-a1f5-74e7affff085@BN1AFFO11FD006.protection.gbl>
+ <alpine.DEB.2.01.1406040843120.32323@pmeerw.net>
+ <538ECA49.8030207@metafoo.de>
+ <ab98c363-f3a0-4260-8226-7d159c9c0979@BN1AFFO11FD052.protection.gbl>
+ <539029AB.9010406@metafoo.de>
+Message-ID: <5d06713c-ae8d-498c-afab-690e50f0b7b6@BN1AFFO11FD005.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 05, 2014 at 04:27:29PM +0200, Maxime Ripard wrote:
+On Thu, 2014-06-05 at 10:26AM +0200, Lars-Peter Clausen wrote:
+> On 06/04/2014 04:27 PM, S?ren Brinkmann wrote:
+> >Hi Lars, Peter,
+> >
+> >On Wed, 2014-06-04 at 09:27AM +0200, Lars-Peter Clausen wrote:
+> >>On 06/04/2014 08:47 AM, Peter Meerwald wrote:
+> >>>Hello,
+> >>>
+> >>>>I recently found that you developed a driver for XADC and I thought I
+> >>>>enable it (see patch below). But it seems something is not working
+> >>>>correctly. The values I tested don't seem to be right and also fixed.
+> >>>>I.e. they don't change over time or across boards:
+> >>>>
+> >>>>   # cat in_temp0_scale
+> >>>>   123.040771484
+> >>>>   # cat in_voltage0_vccint_scale
+> >>>>   0.732421875
+> >>>>   # cat in_voltage0_vccint_raw
+> >>>>   1384
+> >>>>   # cat in_voltage1_vccaux_s[ 1203.660637] random: nonblocking pool is initialized
+> >>>>   # cat in_voltage1_vccaux_scale
+> >>>>   0.732421875
+> >>>>   # cat in_voltage3_vccpint_scale
+> >>>>   0.732421875
+> >>>
+> >>>the _scale values are supposed to be constant; their purpose is to scale a
+> >>>measurement so that the result is in a given unit
+> >>>
+> >>>e.g. in_temp0_scale scales in_temp0_raw so that the result
+> >>>(in_temp0_raw * in_temp0_scale) in milli Celsius
+> >>>
+> >>>in_voltage0_vccint_raw * in_voltage0_vccint_scale is supposed to give
+> >>>milli Volts
+> >>>
+> >>>so in_voltage0_vccint_raw should vary accross time / boards (and voltage
+> >>>hopefully :), but not the _scales
+> >>
+> >>Yep, as Peter said scale and offset will be constant, raw should
+> >>change though, e.g. both voltage and temperature should a slight
+> >>jitter if you repeatedly read them. If not something is broken. We
+> >>had the driver in our images for Zynq board for a while now and so
+> >>far it worked fine. I think Mrinal and Radhey from Xilinx also
+> >>tested the driver.
+> >
+> >Okay, thanks for the answers. Since the _scale value was the only one
+> >close to a Celsius or Fahrenheit value I thought that would be the
+> >final temperature. Anyway, the raw values do show some jitter. So far,
+> >so good, but the math doesn't add up I think:
+> >
+> >  # cat in_temp0_raw in_temp0_scale
+> >  2559
+> >  123.040771484
+> >
+> >multiplying those values gives
+> >2559 * 123.040771484 = 304156.787108
+> >
+> >Even if that is mC, that would mean my chip is at 304 degrees C. I'm pretty
+> >sure my chip's not on fire :)
+> >(I have the feeling I just did another beginner's mistake here though).
+> >A 10x error might be in there somewhere. 30 degrees sounds realistic.
+> 
+> There is also a in_temp0_offset attribute which needs to be added to
+> in_temp0_raw
+> 
+> temperature = (in_temp0_raw + in_temp0_offset) * in_temp0_scale.
+> 
+> In your case that is: (2559 - 2219) * 123.040771484 = 41833.86
+> 
+> >
+> >I didn't test all voltages, but those look better.
+> >
+> >Also, is there a way to directly obtain a reading in a reasonable scale?
+> >This approach needs to read two sysfs files, one of those even giving a
+> >float.
+> 
+> No.
 
-> You already list the regulators available and their supply in the
-> regulator driver, why do you need to set the regulator parents in the
-> mfd driver as well?
+That explains things. Thanks a lot. 
 
-Unless they're being used by the MFD directly there should be no need
-for the MFD to know anything about the supplies.
-
-> My guess is that it's to work around the fact that
-> regulator_dev_lookup only looks for the regulator's device of_node (so
-> not the PMIC one, but one of its child), which doesn't have the supply
-> properties, and then just falls back on the regulator alias
-> list. Would it make some sense to add a lookup in the parent device
-> of_node (which would be the "main" PMIC node in our case)?
-
-This sounds like you are passing the MFD child device into the regulator
-API when you should be passing the parent device in.
-
-> Also, there's also the fact that all the supply properties seems to
-> also be mandatory in the DT, even though the regulator itself might
-> not be used at all on the board, and the input voltage not wired to
-> anything.
-
-For electrical engineering reasons it's unlikely that the supplies are
-actually floating but yes, they are mandatory.  This is an issue with
-registering one device for the entire regulator subsystem on the PMIC,
-it interacts somewhat poorly with deferred probe.  However for systems
-with full constraints like DT and ACPI ones it should be mostly
-sidestepped since the if there is no supply mapped a dummy supply will
-be substituted.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140605/84478cc3/attachment.sig>
+	S?ren
