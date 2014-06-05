@@ -1,45 +1,45 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 5 Jun 2014 11:48:32 -0700
-Subject: [PATCH v2] clk: exynos5420: Keep aclk66_peric enabled during boot
-In-Reply-To: <1401467562-5585-1-git-send-email-dianders@chromium.org>
-References: <1401398496-4624-1-git-send-email-dianders@chromium.org>
- <1401467562-5585-1-git-send-email-dianders@chromium.org>
-Message-ID: <CAD=FV=W8-M5iOMDG190WGaeSySTd=qcp30k-H8DMUs_C5Pdwog@mail.gmail.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 05 Jun 2014 12:09:03 -0700
+Subject: [RESEND PATCH v7 3/4] arm: dirty log write protect management
+ support
+In-Reply-To: <5390146F.8020407@linux.vnet.ibm.com>
+References: <1401916278-24835-1-git-send-email-m.smarduch@samsung.com>
+ <5390146F.8020407@linux.vnet.ibm.com>
+Message-ID: <5390C04F.6060201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz / Mike,
+On 06/04/2014 11:55 PM, Xiao Guangrong wrote:
+> On 06/05/2014 05:11 AM, Mario Smarduch wrote:
+> 
+>> +	spin_lock(&kvm->mmu_lock);
+>> +
+>> +	for (i = 0; i < n / sizeof(long); i++) {
+>> +		unsigned long mask;
+>> +		gfn_t offset;
+>> +
+>> +		if (!dirty_bitmap[i])
+>> +			continue;
+>> +
+>> +		is_dirty = true;
+>> +
+>> +		mask = xchg(&dirty_bitmap[i], 0);
+>> +		dirty_bitmap_buffer[i] = mask;
+>> +
+>> +		offset = i * BITS_PER_LONG;
+>> +		kvm_mmu_write_protect_pt_masked(kvm, memslot, offset, mask);
+>> +	}
+>> +	if (is_dirty)
+>> +		kvm_flush_remote_tlbs(kvm);
+> 
+> You moved the flush into mmu-lock. Please do not :).
+> 
+> See commit 198c74f43f0f5473f99967aead30ddc622804bc1
+> 
 
-On Fri, May 30, 2014 at 9:32 AM, Doug Anderson <dianders@chromium.org> wrote:
-> Right now if you've got earlyprintk enabled on exynos5420-peach-pit
-> then you'll get a hang on boot.  Here's why:
->
-> 1. The i2c-s3c2410 driver will probe at subsys_initcall.  It will
->    enable its clock and disable it.  This is the clock "i2c2".
-> 2. The act of disabling "i2c2" will disable its parents.  In this case
->    the parent is "aclk66_peric".  There are no other children of
->    "aclk66_peric" officially enabled, so "aclk66_peric" will be turned
->    off (despite being CLK_IGNORE_UNUSED, but that's by design).
-> 3. The next time you try to earlyprintk you'll do so without the UART
->    clock enabled.  That's because the UART clocks are also children of
->    "aclk66_peric".  You'll hang.
->
-> There's no good place to put a clock enable for earlyprintk, which is
-> handled by a bunch of assembly code.  The best we can do is to handle
-> this in the clock driver.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
-> Changes in v2:
-> - Use GATE_A and clk_get().  Save the clock for putting later.
-> - Return 0 from exynos5420_clk_late_init().
->
->  drivers/clk/samsung/clk-exynos5420.c | 33 +++++++++++++++++++++++++++++++--
->  1 file changed, 31 insertions(+), 2 deletions(-)
+Thanks for reviewing, I revised to pick up your version.
 
-Are there other changes you'd like me to make to this?  It would be
-really nice to get this in for 3.16 so the system doesn't just
-mysteriously hang when you use earlyprintk.
+Functionally there should be no impact on ARM, the
+TLB flush function is different.
 
--Doug
+- Mario
