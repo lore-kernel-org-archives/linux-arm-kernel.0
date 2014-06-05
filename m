@@ -1,73 +1,212 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 5 Jun 2014 18:37:45 +0100
-Subject: [PATCH 7/7] OF/ACPI/I2C: Add generic match function for the
- aforementioned systems
-In-Reply-To: <20140605155509.GH24240@lee--X1>
-References: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
- <1401883796-17841-8-git-send-email-lee.jones@linaro.org>
- <20140605103009.85BE4C40A4D@trevor.secretlab.ca>
- <20140605103709.GE19550@lee--X1>
- <CACxGe6vLuKygv0E7yq42qe-Lh+nMZ1wrL7PW_TAeoz55wz9q8A@mail.gmail.com>
- <20140605155509.GH24240@lee--X1>
-Message-ID: <CACxGe6uV7G7WVd84XacA6LwFHaCm-2gUYzdTsjRgy3_UVx8Yxg@mail.gmail.com>
+From: aneesh.kumar@linux.vnet.ibm.com (Aneesh Kumar K.V)
+Date: Thu, 05 Jun 2014 23:09:05 +0530
+Subject: [RFC PATCH 1/3] CMA: generalize CMA reserved area management
+ functionality
+In-Reply-To: <1401757919-30018-2-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1401757919-30018-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1401757919-30018-2-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <87zjhrtfwm.fsf@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 5, 2014 at 4:55 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Thu, 05 Jun 2014, Grant Likely wrote:
->> On Thu, Jun 5, 2014 at 11:37 AM, Lee Jones <lee.jones@linaro.org> wrote:
->> > On Thu, 05 Jun 2014, Grant Likely wrote:
->> >
->> >> On Wed,  4 Jun 2014 13:09:56 +0100, Lee Jones <lee.jones@linaro.org> wrote:
->> >> > Currently this is a helper function for the I2C subsystem to aid the
->> >> > matching of non-standard compatible strings and devices which use DT
->> >> > and/or ACPI, but do not supply any nodes (see: [1] Method 4).  However,
->> >> > it has been made more generic as it can be used to only make one call
->> >> > for drivers which support any mixture of OF, ACPI and/or I2C matching.
->> >> >
->> >> > The initial aim is for of_match_device() to be replaced by this call
->> >> > in all I2C device drivers.
->> >> >
->> >> > [1] Documentation/i2c/instantiating-devices
->> >> >
->> >> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
->> >>
->> >> I don't like this. It drops all type safety on the match entry
->> >> and the caller has no idea what it got back.
->> >
->> > Okay, so what's the best way forward?
->> >
->> > Introduce a i2c_of_match_device() call instead?
->>
->> I still think the way to do it is to emulate the missing i2c_device_id
->> when calling the drivers .probe() hook by having a temporary copy on
->> the stack and filling it with data from the OF or ACPI table....
+Joonsoo Kim <iamjoonsoo.kim@lge.com> writes:
+
+> Currently, there are two users on CMA functionality, one is the DMA
+> subsystem and the other is the kvm on powerpc. They have their own code
+> to manage CMA reserved area even if they looks really similar.
+> From my guess, it is caused by some needs on bitmap management. Kvm side
+> wants to maintain bitmap not for 1 page, but for more size. Eventually it
+> use bitmap where one bit represents 64 pages.
 >
-> That's the opposite of what I'm trying to achieve.  I'm trying to get
-> rid of unused i2c_device_id tables, rather than reinforce their
-> mandatory existence.  I think an i2c_of_match_device() with knowledge
-> of how to match via pure DT principles (of_node/compatible) and a
-> fall-back, which is able to match on a provided of_device_id table
-> alone i.e. without the requirement of an existing of_node.
+> When I implement CMA related patches, I should change those two places
+> to apply my change and it seem to be painful to me. I want to change
+> this situation and reduce future code management overhead through
+> this patch.
+>
+> This change could also help developer who want to use CMA in their
+> new feature development, since they can use CMA easily without
+> copying & pasting this reserved area management code.
+>
+> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 
-What I'm suggesting does allow all those tables to be removed, but
-without a painful API breakage... having said that, it is only the
-drivers that drop their i2c_device_id tables that need to support the
-fallback behaviour, so it would be fine to pass null into the
-i2c_device_id argument and make the driver call the new function that
-returns an of_device_id regardless of whether a node is attached.
 
-> I've also been mulling over the idea of removing the second probe()
-> parameter, as suggested by Wolfram.  However, this has quite deep
-> ramifications which would require a great deal of driver adaptions.
+The way patches are split makes it difficult to review. Will it be
+possible to make changes against one implementation and them move that
+to generic code. That helps in finding out what exactly changed.
 
-That is of course the ideal. It would be a lot of work (I count 633
-users), but it would get i2c exactly where you want it to be. I did
-that kind of work when I merge platform_bus_type with
-of_platform_bus_type.
+>
+> diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
+> index 00e13ce..b3fe1cc 100644
+> --- a/drivers/base/Kconfig
+> +++ b/drivers/base/Kconfig
+> @@ -283,7 +283,7 @@ config CMA_ALIGNMENT
+>
+>  	  If unsure, leave the default value "8".
+>
+> -config CMA_AREAS
+> +config DMA_CMA_AREAS
+>  	int "Maximum count of the CMA device-private areas"
+>  	default 7
+>  	help
 
-You can mitigate it though by creating a .probe2 hook that doesn't
-have the parameter and then change over all the users in separate
-commits, finally removing the old hook when safe to do so.
+for ex: The above can be a seperate patch along with further DMA related
+cleanups . 
 
-g.
+
+> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+> index 83969f8..48cdac8 100644
+> --- a/drivers/base/dma-contiguous.c
+> +++ b/drivers/base/dma-contiguous.c
+> @@ -186,7 +186,7 @@ static int __init cma_activate_area(struct cma *cma)
+>  	return 0;
+>  }
+>
+> -static struct cma cma_areas[MAX_CMA_AREAS];
+> +static struct cma cma_areas[MAX_DMA_CMA_AREAS];
+>  static unsigned cma_area_count;
+>
+>  static int __init cma_init_reserved_areas(void)
+> diff --git a/include/linux/cma.h b/include/linux/cma.h
+> new file mode 100644
+> index 0000000..60ba06f
+> --- /dev/null
+> +++ b/include/linux/cma.h
+> @@ -0,0 +1,28 @@
+> +/*
+> + * Contiguous Memory Allocator
+> + *
+> + * Copyright LG Electronics Inc., 2014
+> + * Written by:
+> + *	Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of the
+> + * License or (at your optional) any later version of the license.
+> + *
+> + */
+> +
+> +#ifndef __CMA_H__
+> +#define __CMA_H__
+> +
+> +struct cma;
+> +
+> +extern struct page *cma_alloc(struct cma *cma, unsigned long count,
+> +				unsigned long align);
+> +extern bool cma_release(struct cma *cma, struct page *pages,
+> +				unsigned long count);
+> +extern int __init cma_declare_contiguous(phys_addr_t size, phys_addr_t base,
+> +				phys_addr_t limit, phys_addr_t alignment,
+> +				unsigned long bitmap_shift, bool fixed,
+> +				struct cma **res_cma);
+> +#endif
+> diff --git a/include/linux/dma-contiguous.h b/include/linux/dma-contiguous.h
+> index 772eab5..dfb1dc9 100644
+> --- a/include/linux/dma-contiguous.h
+> +++ b/include/linux/dma-contiguous.h
+> @@ -63,7 +63,7 @@ struct device;
+>   * There is always at least global CMA area and a few optional device
+>   * private areas configured in kernel .config.
+>   */
+> -#define MAX_CMA_AREAS	(1 + CONFIG_CMA_AREAS)
+> +#define MAX_DMA_CMA_AREAS  (1 + CONFIG_DMA_CMA_AREAS)
+>
+>  extern struct cma *dma_contiguous_default_area;
+>
+> @@ -123,7 +123,7 @@ bool dma_release_from_contiguous(struct device *dev, struct page *pages,
+>
+>  #else
+>
+> -#define MAX_CMA_AREAS	(0)
+> +#define MAX_DMA_CMA_AREAS	(0)
+>
+>  static inline struct cma *dev_get_cma_area(struct device *dev)
+>  {
+> diff --git a/mm/Kconfig b/mm/Kconfig
+> index 7511b4a..0877ddc 100644
+> --- a/mm/Kconfig
+> +++ b/mm/Kconfig
+> @@ -515,6 +515,17 @@ config CMA_DEBUG
+>  	  processing calls such as dma_alloc_from_contiguous().
+>  	  This option does not affect warning and error messages.
+>
+> +config CMA_AREAS
+> +	int "Maximum count of the CMA areas"
+> +	depends on CMA
+> +	default 7
+> +	help
+> +	  CMA allows to create CMA areas for particular purpose, mainly,
+> +	  used as device private area. This parameter sets the maximum
+> +	  number of CMA area in the system.
+> +
+> +	  If unsure, leave the default value "7".
+> +
+
+If we have 7 declare continugous request, a kvm cma allocation request will fail ?
+
+>  config ZBUD
+>  	tristate
+>  	default n
+> diff --git a/mm/Makefile b/mm/Makefile
+> index 1eaa70b..bc0422b 100644
+> --- a/mm/Makefile
+> +++ b/mm/Makefile
+> @@ -62,3 +62,4 @@ obj-$(CONFIG_MEMORY_ISOLATION) += page_isolation.o
+>  obj-$(CONFIG_ZBUD)	+= zbud.o
+>  obj-$(CONFIG_ZSMALLOC)	+= zsmalloc.o
+>  obj-$(CONFIG_GENERIC_EARLY_IOREMAP) += early_ioremap.o
+> +obj-$(CONFIG_CMA)	+= cma.o
+> diff --git a/mm/cma.c b/mm/cma.c
+> new file mode 100644
+> index 0000000..0dae88d
+> --- /dev/null
+> +++ b/mm/cma.c
+> @@ -0,0 +1,329 @@
+> +/*
+> + * Contiguous Memory Allocator
+> + *
+> + * Copyright (c) 2010-2011 by Samsung Electronics.
+> + * Copyright IBM Corporation, 2013
+> + * Copyright LG Electronics Inc., 2014
+> + * Written by:
+> + *	Marek Szyprowski <m.szyprowski@samsung.com>
+> + *	Michal Nazarewicz <mina86@mina86.com>
+> + *	Aneesh Kumar K.V <aneesh.kumar@linux.vnet.ibm.com>
+> + *	Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of the
+> + * License or (at your optional) any later version of the license.
+> + */
+> +
+> +#define pr_fmt(fmt) "cma: " fmt
+> +
+> +#ifdef CONFIG_CMA_DEBUG
+> +#ifndef DEBUG
+> +#  define DEBUG
+> +#endif
+> +#endif
+> +
+> +#include <linux/memblock.h>
+> +#include <linux/err.h>
+> +#include <linux/mm.h>
+> +#include <linux/mutex.h>
+> +#include <linux/sizes.h>
+> +#include <linux/slab.h>
+> +
+> +struct cma {
+> +	unsigned long	base_pfn;
+> +	unsigned long	count;
+> +	unsigned long	*bitmap;
+> +	unsigned long	bitmap_shift;
+
+I guess this is added to accommodate the kvm specific alloc chunks. May
+be you should do this as a patch against kvm implementation and then
+move the code to generic ?
+
+> +	struct mutex	lock;
+> +};
+> +
+
+-aneesh
