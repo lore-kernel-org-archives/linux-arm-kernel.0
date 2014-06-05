@@ -1,50 +1,53 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 5 Jun 2014 16:41:34 +0100
-Subject: [PATCH 7/7] OF/ACPI/I2C: Add generic match function for the
- aforementioned systems
-In-Reply-To: <20140605103709.GE19550@lee--X1>
-References: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
- <1401883796-17841-8-git-send-email-lee.jones@linaro.org>
- <20140605103009.85BE4C40A4D@trevor.secretlab.ca>
- <20140605103709.GE19550@lee--X1>
-Message-ID: <CACxGe6vLuKygv0E7yq42qe-Lh+nMZ1wrL7PW_TAeoz55wz9q8A@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
+Date: Thu,  5 Jun 2014 17:48:37 +0200
+Subject: [PATCH 0/9] ARM: Berlin: USB support
+Message-ID: <1401983326-19205-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 5, 2014 at 11:37 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Thu, 05 Jun 2014, Grant Likely wrote:
->
->> On Wed,  4 Jun 2014 13:09:56 +0100, Lee Jones <lee.jones@linaro.org> wrote:
->> > Currently this is a helper function for the I2C subsystem to aid the
->> > matching of non-standard compatible strings and devices which use DT
->> > and/or ACPI, but do not supply any nodes (see: [1] Method 4).  However,
->> > it has been made more generic as it can be used to only make one call
->> > for drivers which support any mixture of OF, ACPI and/or I2C matching.
->> >
->> > The initial aim is for of_match_device() to be replaced by this call
->> > in all I2C device drivers.
->> >
->> > [1] Documentation/i2c/instantiating-devices
->> >
->> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>
->> I don't like this. It drops all type safety on the match entry
->> and the caller has no idea what it got back.
->
-> Okay, so what's the best way forward?
->
-> Introduce a i2c_of_match_device() call instead?
+This series adds the support for the Marvell Berlin USB controllers,
+the USB PHYs and also adds a reset controller.
 
-I still think the way to do it is to emulate the missing i2c_device_id
-when calling the drivers .probe() hook by having a temporary copy on
-the stack and filling it with data from the OF or ACPI table....
-Actually I would completely skip trying to get the data from ACPI.
-Since all of this is to continue supporting instantiating devices from
-sysfs, having a fallback to the OF table completely solves that use
-case.
+The reset controller is used by the USB PHY driver and shares the
+existing chip controller node with the clocks and one pin controller.
 
-Anticipating an objection of: "what do we do with drivers that are
-ACPI only?"... That will be an incredibly rare case. If that ever does
-happen then we'll solve it by simply adding an of_device_id table.
+The Marvell Berlin USB controllers are host only on the BG2Q and are
+compatible with USB ChipIdea. We here add a glue to use the available
+common functions for this kind of controllers. A USB PHY driver is also
+added to control the PHY.
 
-g.
+Antoine T?nart (9):
+  reset: add the Berlin reset controller driver
+  ARM: Berlin: select the reset controller
+  ARM: dts: berlin: add a required reset property in the chip controller
+    node
+  usb: phy: add the Berlin USB PHY driver
+  Documentation: bindings: add doc for the Berlin USB PHY
+  usb: chipidea: add Berlin USB support
+  Documentation: bindings: add doc for the Berlin ChipIdea USB driver
+  ARM: dts: berlin: add BG2Q nodes for USB support
+  ARM: dts: Berlin: enable USB on the BG2Q DMP
+
+ .../devicetree/bindings/usb/berlin-usbphy.txt      |  18 ++
+ .../devicetree/bindings/usb/ci-hdrc-berlin.txt     |  18 ++
+ arch/arm/boot/dts/berlin2.dtsi                     |   1 +
+ arch/arm/boot/dts/berlin2cd.dtsi                   |   1 +
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |  20 ++
+ arch/arm/boot/dts/berlin2q.dtsi                    |  52 +++++
+ arch/arm/mach-berlin/Kconfig                       |   2 +
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/reset-berlin.c                       | 113 +++++++++++
+ drivers/usb/chipidea/Makefile                      |   1 +
+ drivers/usb/chipidea/ci_hdrc_berlin.c              | 108 ++++++++++
+ drivers/usb/phy/Kconfig                            |   9 +
+ drivers/usb/phy/Makefile                           |   1 +
+ drivers/usb/phy/phy-berlin-usb.c                   | 223 +++++++++++++++++++++
+ 14 files changed, 568 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/berlin-usbphy.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/ci-hdrc-berlin.txt
+ create mode 100644 drivers/reset/reset-berlin.c
+ create mode 100644 drivers/usb/chipidea/ci_hdrc_berlin.c
+ create mode 100644 drivers/usb/phy/phy-berlin-usb.c
+
+-- 
+1.9.1
