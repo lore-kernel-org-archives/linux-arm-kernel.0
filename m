@@ -1,35 +1,36 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 05 Jun 2014 14:10:04 +0200
-Subject: [PATCH 3/3] cpufreq: Enable big.LITTLE cpufreq driver on arm64
-In-Reply-To: <20140605100416.GB27946@arm.com>
-References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
- <3610030.uyJEv7eFhP@vostro.rjw.lan> <20140605100416.GB27946@arm.com>
-Message-ID: <20323352.3KEVHO00Qv@vostro.rjw.lan>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Jun 2014 12:51:16 +0100
+Subject: [RFC v3 1/9] arm: fiq: arbitrary mappings from IRQ to FIQ virqs
+In-Reply-To: <1401961994-18033-2-git-send-email-daniel.thompson@linaro.org>
+References: <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
+ <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
+ <1401961994-18033-2-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <20140605115116.GE23430@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 05, 2014 11:04:16 AM Catalin Marinas wrote:
-> Hi Rafael,
-> 
-> On Tue, May 20, 2014 at 12:36:56AM +0100, Rafael J. Wysocki wrote:
-> > On Tuesday, May 20, 2014 12:07:29 AM Mark Brown wrote:
-> > > 
-> > > --MAH+hnPXVZWQ5cD/
-> > > Content-Type: text/plain; charset=us-ascii
-> > > Content-Disposition: inline
-> > > 
-> > > On Tue, May 20, 2014 at 01:19:03AM +0200, Rafael J. Wysocki wrote:
-> > > 
-> > > > I've queued this one up for 3.16, thanks!
-> > > 
-> > > This will fail to build without patch 1 - it uses the stubs added there.
-> > 
-> > OK, dropping then.
-> 
-> This patch still made it as commit 4920ab84979d (cpufreq: Enable
-> big.LITTLE cpufreq driver on arm64) and fails to build on arm64. Could
-> you please revert it?
+On Thu, Jun 05, 2014 at 10:53:06AM +0100, Daniel Thompson wrote:
+>  static int fiq_def_op(void *ref, int relinquish)
+>  {
+> -	if (!relinquish)
+> +	if (!relinquish) {
+> +		unsigned offset = FIQ_OFFSET;
+> +		no_fiq_insn = *(unsigned long *)(0xffff0000 + offset);
+>  		set_fiq_handler(&no_fiq_insn, sizeof(no_fiq_insn));
+> +	}
+...
+>  void __init init_FIQ(int start)
+>  {
+> -	unsigned offset = FIQ_OFFSET;
+> -	no_fiq_insn = *(unsigned long *)(0xffff0000 + offset);
+>  	fiq_start = start;
+>  }
 
-I will.
+This is wrong - when the default handler is "reinstalled", this change has
+the effect that we read the first instruction of the existing handler, and
+then write that same instruction back, rather than replacing the first
+instruction with the value that was there at boot.
 
-Rafael
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
