@@ -1,348 +1,172 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu,  5 Jun 2014 10:53:12 +0100
-Subject: [RFC v3 7/9] ARM: Add KGDB/KDB FIQ debugger generic code
+Date: Thu,  5 Jun 2014 10:53:13 +0100
+Subject: [RFC v3 8/9] serial: amba-pl011: Pass on FIQ information to KGDB.
 In-Reply-To: <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
 References: <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
  <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1401961994-18033-8-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1401961994-18033-9-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anton Vorontsov <anton.vorontsov@linaro.org>
+If the AMBA bus has provided the pl011 with a FIQ resource (i.e. a
+second IRQ) then speculatively register it with KGDB when the polling
+driver is initialized.
 
-The FIQ debugger may be used to debug situations when the kernel stuck
-in uninterruptable sections, e.g. the kernel infinitely loops or
-deadlocked in an interrupt or with interrupts disabled.
+By providing this information to KGDB the serial driver offers
+"permission" for KGDB to route the UART interrupt signal from the
+drivers own handler to KGDBs FIQ handler (which will eventually use the
+UART's polled I/O callbacks to interact with the user). This permission
+also implies the amba-pl011 driver has already unmasked RX interrupts
+(otherwise the FIQ handler will never trigger).
 
-By default KGDB FIQ is disabled in runtime, but can be enabled with
-kgdb_fiq.enable=1 kernel command line option.
-
-Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
-Signed-off-by: John Stultz <john.stultz@linaro.org>
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Ben Dooks <ben.dooks@codethink.co.uk>
-Cc: Dave Martin <Dave.Martin@arm.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Jiri Slaby <jslaby@suse.cz>
+Cc: linux-serial at vger.kernel.org
 ---
- arch/arm/Kconfig                 |   2 +
- arch/arm/Kconfig.debug           |  18 ++++++
- arch/arm/include/asm/kgdb.h      |   7 +++
- arch/arm/kernel/Makefile         |   1 +
- arch/arm/kernel/kgdb_fiq.c       | 124 +++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/kgdb_fiq_entry.S |  87 +++++++++++++++++++++++++++
- 6 files changed, 239 insertions(+)
- create mode 100644 arch/arm/kernel/kgdb_fiq.c
- create mode 100644 arch/arm/kernel/kgdb_fiq_entry.S
+ drivers/tty/serial/amba-pl011.c | 99 ++++++++++++++++++++++++-----------------
+ 1 file changed, 58 insertions(+), 41 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index db3c541..419fd0a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -307,6 +307,7 @@ choice
- config ARCH_MULTIPLATFORM
- 	bool "Allow multiple platforms to be selected"
- 	depends on MMU
-+	select ARCH_MIGHT_HAVE_KGDB_FIQ
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_HAS_SG_CHAIN
- 	select ARM_PATCH_PHYS_VIRT
-@@ -356,6 +357,7 @@ config ARCH_REALVIEW
- 
- config ARCH_VERSATILE
- 	bool "ARM Ltd. Versatile family"
-+	select ARCH_MIGHT_HAVE_KGDB_FIQ
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_AMBA
- 	select ARM_TIMER_SP804
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 6a2bcfd..1f1bec1 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -2,6 +2,24 @@ menu "Kernel hacking"
- 
- source "lib/Kconfig.debug"
- 
-+config ARCH_MIGHT_HAVE_KGDB_FIQ
-+	bool
-+
-+config KGDB_FIQ
-+	bool "KGDB FIQ support"
-+	depends on KGDB_KDB && ARCH_MIGHT_HAVE_KGDB_FIQ && !THUMB2_KERNEL
-+	select FIQ
-+	help
-+	  The FIQ debugger may be used to debug situations when the
-+	  kernel stuck in uninterruptable sections, e.g. the kernel
-+	  infinitely loops or deadlocked in an interrupt or with
-+	  interrupts disabled.
-+
-+	  By default KGDB FIQ is disabled at runtime, but can be
-+	  enabled with kgdb_fiq.enable=1 kernel command line option.
-+
-+	  If unsure, say N.
-+
- config ARM_PTDUMP
- 	bool "Export kernel pagetable layout to userspace via debugfs"
- 	depends on DEBUG_KERNEL
-diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
-index 0a9d5dd..5de21f01 100644
---- a/arch/arm/include/asm/kgdb.h
-+++ b/arch/arm/include/asm/kgdb.h
-@@ -11,7 +11,9 @@
- #define __ARM_KGDB_H__
- 
- #include <linux/ptrace.h>
-+#include <linux/linkage.h>
- #include <asm/opcodes.h>
-+#include <asm/exception.h>
- 
- /*
-  * GDB assumes that we're a user process being debugged, so
-@@ -48,6 +50,11 @@ static inline void arch_kgdb_breakpoint(void)
- extern void kgdb_handle_bus_error(void);
- extern int kgdb_fault_expected;
- 
-+extern char kgdb_fiq_handler;
-+extern char kgdb_fiq_handler_end;
-+asmlinkage void __exception_irq_entry kgdb_fiq_do_handle(struct pt_regs *regs);
-+extern int kgdb_register_fiq(unsigned int fiq);
-+
- #endif /* !__ASSEMBLY__ */
- 
- /*
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 040619c..251f651 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -67,6 +67,7 @@ endif
- obj-$(CONFIG_OABI_COMPAT)	+= sys_oabi-compat.o
- obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
- obj-$(CONFIG_KGDB)		+= kgdb.o
-+obj-$(CONFIG_KGDB_FIQ)		+= kgdb_fiq_entry.o kgdb_fiq.o
- obj-$(CONFIG_ARM_UNWIND)	+= unwind.o
- obj-$(CONFIG_HAVE_TCM)		+= tcm.o
- obj-$(CONFIG_OF)		+= devtree.o
-diff --git a/arch/arm/kernel/kgdb_fiq.c b/arch/arm/kernel/kgdb_fiq.c
-new file mode 100644
-index 0000000..45f2a79
---- /dev/null
-+++ b/arch/arm/kernel/kgdb_fiq.c
-@@ -0,0 +1,124 @@
-+/*
-+ * KGDB FIQ
-+ *
-+ * Copyright 2010 Google, Inc.
-+ *		  Arve Hj?nnev?g <arve@android.com>
-+ *		  Colin Cross <ccross@android.com>
-+ * Copyright 2012 Linaro Ltd.
-+ *		  Anton Vorontsov <anton.vorontsov@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published
-+ * by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/slab.h>
-+#include <linux/errno.h>
-+#include <linux/hardirq.h>
-+#include <linux/atomic.h>
-+#include <linux/kdb.h>
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index dacf0a0..778fd38 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -58,6 +58,7 @@
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/sizes.h>
+ #include <linux/io.h>
 +#include <linux/kgdb.h>
-+#include <asm/fiq.h>
-+#include <asm/exception.h>
-+
-+static int kgdb_fiq_enabled;
-+module_param_named(enable, kgdb_fiq_enabled, int, 0600);
-+MODULE_PARM_DESC(enable, "set to 1 to enable FIQ KGDB");
-+
-+static unsigned int kgdb_fiq;
-+
-+asmlinkage void __exception_irq_entry kgdb_fiq_do_handle(struct pt_regs *regs)
+ 
+ #define UART_NR			14
+ 
+@@ -1416,8 +1417,63 @@ static void pl011_break_ctl(struct uart_port *port, int break_state)
+ 	spin_unlock_irqrestore(&uap->port.lock, flags);
+ }
+ 
++static int pl011_hwinit(struct uart_port *port)
 +{
-+	if (kgdb_nmi_poll_knock()) {
-+		nmi_enter();
-+		kgdb_handle_exception(1, 0, 0, regs);
-+		nmi_exit();
++	struct uart_amba_port *uap = (struct uart_amba_port *)port;
++	int retval;
++
++	/* Optionaly enable pins to be muxed in and configured */
++	pinctrl_pm_select_default_state(port->dev);
++
++	/*
++	 * Try to enable the clock producer.
++	 */
++	retval = clk_prepare_enable(uap->clk);
++	if (retval)
++		goto out;
++
++	uap->port.uartclk = clk_get_rate(uap->clk);
++
++	/* Clear pending error and receive interrupts */
++	writew(UART011_OEIS | UART011_BEIS | UART011_PEIS | UART011_FEIS |
++	       UART011_RTIS | UART011_RXIS, uap->port.membase + UART011_ICR);
++
++	/*
++	 * Save interrupts enable mask, and enable RX interrupts in case if
++	 * the interrupt is used for NMI entry.
++	 */
++	uap->im = readw(uap->port.membase + UART011_IMSC);
++	writew(UART011_RTIM | UART011_RXIM, uap->port.membase + UART011_IMSC);
++
++	if (dev_get_platdata(uap->port.dev)) {
++		struct amba_pl011_data *plat;
++
++		plat = dev_get_platdata(uap->port.dev);
++		if (plat->init)
++			plat->init();
 +	}
-+
-+	eoi_fiq(kgdb_fiq);
-+}
-+
-+static struct fiq_handler kgdb_fiq_desc = {
-+	.name = "kgdb",
-+};
-+
-+static long kgdb_fiq_setup_stack(void *info)
-+{
-+	struct pt_regs regs;
-+
-+	regs.ARM_sp = __get_free_pages(GFP_KERNEL, THREAD_SIZE_ORDER) +
-+			THREAD_START_SP;
-+	WARN_ON(!regs.ARM_sp);
-+
-+	set_fiq_regs(&regs);
 +	return 0;
++ out:
++	return retval;
 +}
 +
-+/**
-+ * kgdb_fiq_enable_nmi - Manage NMI-triggered entry to KGDB
-+ * @on: Flag to either enable or disable an NMI
-+ *
-+ * This function manages NMIs that usually cause KGDB to enter. That is, not
-+ * all NMIs should be enabled or disabled, but only those that issue
-+ * kgdb_handle_exception().
-+ *
-+ * The call counts disable requests, and thus allows to nest disables. But
-+ * trying to enable already enabled NMI is an error.
-+ */
-+static void kgdb_fiq_enable_nmi(bool on)
+ #ifdef CONFIG_CONSOLE_POLL
+ 
++static int pl011_poll_init(struct uart_port *port)
 +{
-+	static atomic_t cnt;
-+	int ret;
++	struct uart_amba_port *uap = (struct uart_amba_port *)port;
++	int retval;
 +
-+	ret = atomic_add_return(on ? 1 : -1, &cnt);
-+	if (ret > 1 && on) {
-+		/*
-+		 * There should be only one instance that calls this function
-+		 * in "enable, disable" order. All other users must call
-+		 * disable first, then enable. If not, something is wrong.
-+		 */
-+		WARN_ON(1);
-+		return;
-+	}
++	retval = pl011_hwinit(port);
 +
-+	if (ret > 0)
-+		enable_fiq(kgdb_fiq);
-+	else
-+		disable_fiq(kgdb_fiq);
++#ifdef CONFIG_KGDB_FIQ
++	if (retval == 0)
++		kgdb_register_fiq(uap->port.irq);
++#endif
++
++	return retval;
 +}
 +
-+int kgdb_register_fiq(unsigned int fiq)
-+{
-+	int err;
-+	int cpu;
+ static void pl011_quiesce_irqs(struct uart_port *port)
+ {
+ 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
+@@ -1471,46 +1527,6 @@ static void pl011_put_poll_char(struct uart_port *port,
+ 
+ #endif /* CONFIG_CONSOLE_POLL */
+ 
+-static int pl011_hwinit(struct uart_port *port)
+-{
+-	struct uart_amba_port *uap = (struct uart_amba_port *)port;
+-	int retval;
+-
+-	/* Optionaly enable pins to be muxed in and configured */
+-	pinctrl_pm_select_default_state(port->dev);
+-
+-	/*
+-	 * Try to enable the clock producer.
+-	 */
+-	retval = clk_prepare_enable(uap->clk);
+-	if (retval)
+-		goto out;
+-
+-	uap->port.uartclk = clk_get_rate(uap->clk);
+-
+-	/* Clear pending error and receive interrupts */
+-	writew(UART011_OEIS | UART011_BEIS | UART011_PEIS | UART011_FEIS |
+-	       UART011_RTIS | UART011_RXIS, uap->port.membase + UART011_ICR);
+-
+-	/*
+-	 * Save interrupts enable mask, and enable RX interrupts in case if
+-	 * the interrupt is used for NMI entry.
+-	 */
+-	uap->im = readw(uap->port.membase + UART011_IMSC);
+-	writew(UART011_RTIM | UART011_RXIM, uap->port.membase + UART011_IMSC);
+-
+-	if (dev_get_platdata(uap->port.dev)) {
+-		struct amba_pl011_data *plat;
+-
+-		plat = dev_get_platdata(uap->port.dev);
+-		if (plat->init)
+-			plat->init();
+-	}
+-	return 0;
+- out:
+-	return retval;
+-}
+-
+ static void pl011_write_lcr_h(struct uart_amba_port *uap, unsigned int lcr_h)
+ {
+ 	writew(lcr_h, uap->port.membase + uap->lcrh_rx);
+@@ -1890,7 +1906,7 @@ static struct uart_ops amba_pl011_pops = {
+ 	.config_port	= pl011_config_port,
+ 	.verify_port	= pl011_verify_port,
+ #ifdef CONFIG_CONSOLE_POLL
+-	.poll_init     = pl011_hwinit,
++	.poll_init     = pl011_poll_init,
+ 	.poll_get_char = pl011_get_poll_char,
+ 	.poll_put_char = pl011_put_poll_char,
+ #endif
+@@ -2169,6 +2185,7 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 		uart_unregister_driver(&amba_reg);
+ 		pl011_dma_remove(uap);
+ 	}
 +
-+	if (!kgdb_fiq_enabled)
-+		return -ENODEV;
-+
-+	if (!lookup_fiq_irq_data(fiq)) {
-+		pr_warn(
-+		    "%s: Cannot register %u (no FIQ with this number)\n",
-+		    __func__, fiq);
-+		return -ENODEV;
-+	}
-+
-+	kgdb_fiq = fiq;
-+
-+	err = claim_fiq(&kgdb_fiq_desc);
-+	if (err) {
-+		pr_warn("%s: unable to claim fiq", __func__);
-+		return err;
-+	}
-+
-+	for_each_possible_cpu(cpu)
-+		work_on_cpu(cpu, kgdb_fiq_setup_stack, NULL);
-+
-+	set_fiq_handler(&kgdb_fiq_handler,
-+			&kgdb_fiq_handler_end - &kgdb_fiq_handler);
-+
-+	arch_kgdb_ops.enable_nmi = kgdb_fiq_enable_nmi;
-+	return 0;
-+}
-diff --git a/arch/arm/kernel/kgdb_fiq_entry.S b/arch/arm/kernel/kgdb_fiq_entry.S
-new file mode 100644
-index 0000000..d6becca
---- /dev/null
-+++ b/arch/arm/kernel/kgdb_fiq_entry.S
-@@ -0,0 +1,87 @@
-+/*
-+ * KGDB FIQ entry
-+ *
-+ * Copyright 1996,1997,1998 Russell King.
-+ * Copyright 2012 Linaro Ltd.
-+ *		  Anton Vorontsov <anton.vorontsov@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published
-+ * by the Free Software Foundation.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <asm/memory.h>
-+#include <asm/unwind.h>
-+#include "entry-header.S"
-+
-+	.text
-+
-+@ This is needed for usr_entry/alignment_trap
-+.LCcralign:
-+	.long	cr_alignment
-+.LCdohandle:
-+	.long	kgdb_fiq_do_handle
-+
-+	.macro	fiq_handler
-+	ldr	r1, =.LCdohandle
-+	mov	r0, sp
-+	adr	lr, BSYM(9997f)
-+	ldr	pc, [r1]
-+9997:
-+	.endm
-+
-+	.align	5
-+__fiq_svc:
-+	svc_entry
-+	fiq_handler
-+	mov	r0, sp
-+	ldmib	r0, {r1 - r14}
-+	msr	cpsr_c, #FIQ_MODE | PSR_I_BIT | PSR_F_BIT
-+	add	r8, r0, #S_PC
-+	ldr	r9, [r0, #S_PSR]
-+	msr	spsr_cxsf, r9
-+	ldr	r0, [r0, #S_R0]
-+	ldmia	r8, {pc}^
-+
-+ UNWIND(.fnend		)
-+ENDPROC(__fiq_svc)
-+	.ltorg
-+
-+	.align	5
-+__fiq_usr:
-+	usr_entry
-+	kuser_cmpxchg_check
-+	fiq_handler
-+	get_thread_info tsk
-+	mov	why, #0
-+	b	ret_to_user_from_irq
-+ UNWIND(.fnend		)
-+ENDPROC(__fiq_usr)
-+	.ltorg
-+
-+	.global kgdb_fiq_handler
-+kgdb_fiq_handler:
-+
-+	vector_stub	fiq, FIQ_MODE, 4
-+
-+	.long	__fiq_usr			@  0  (USR_26 / USR_32)
-+	.long	__fiq_svc			@  1  (FIQ_26 / FIQ_32)
-+	.long	__fiq_svc			@  2  (IRQ_26 / IRQ_32)
-+	.long	__fiq_svc			@  3  (SVC_26 / SVC_32)
-+	.long	__fiq_svc			@  4
-+	.long	__fiq_svc			@  5
-+	.long	__fiq_svc			@  6
-+	.long	__fiq_svc			@  7
-+	.long	__fiq_svc			@  8
-+	.long	__fiq_svc			@  9
-+	.long	__fiq_svc			@  a
-+	.long	__fiq_svc			@  b
-+	.long	__fiq_svc			@  c
-+	.long	__fiq_svc			@  d
-+	.long	__fiq_svc			@  e
-+	.long	__fiq_svc			@  f
-+
-+	.global kgdb_fiq_handler_end
-+kgdb_fiq_handler_end:
+  out:
+ 	return ret;
+ }
 -- 
 1.9.0
