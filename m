@@ -1,51 +1,148 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 5 Jun 2014 10:14:05 -0700
-Subject: [PATCH 2/3] clocksource: exynos_mct: cache mct upper count
-In-Reply-To: <CAKfTPtBeYMW7kOrAhVrqoWhTHfLAtcMeY9FXxZpm7CNAM7NdaA@mail.gmail.com>
-References: <1401903034-20074-1-git-send-email-dianders@chromium.org>
- <1401903034-20074-2-git-send-email-dianders@chromium.org>
- <CAKfTPtBeYMW7kOrAhVrqoWhTHfLAtcMeY9FXxZpm7CNAM7NdaA@mail.gmail.com>
-Message-ID: <CAD=FV=Xy84f=KFO4SLmW27=ztt_hxSiBMJSMAwhw9RxKAaFU-Q@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu,  5 Jun 2014 19:26:14 +0200
+Subject: [PATCH v7 0/7] arm: Add basic support for Mediatek Cortex-A7 SoCs
+Message-ID: <1401989181-4712-1-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vincent,
+Seventh round for the Mediatek basic support patches.
 
-On Thu, Jun 5, 2014 at 12:55 AM, Vincent Guittot
-<vincent.guittot@linaro.org> wrote:
-> On 4 June 2014 19:30, Doug Anderson <dianders@chromium.org> wrote:
->> From: Mandeep Singh Baines <msb@chromium.org>
->>
->> Saves one register read.  Note that the upper count only changes every
->> ~178 seconds with a 24MHz source clock, so it's likely it hasn't
->> changed from call to call.
->
-> Hi Doug,
->
-> Have you checked that the time saved in using a 32bits counter instead
-> of a 64bits one is not lost in the handle of the wrap of sched_clock
-> which occurs every 178s instead of never ?
->
-> sched_clock_poll function will be called every 178s
+Due to the discussion about the need of request the memory needed by a
+device [0], I implemented the function of_io_request_and_map.
+The clocksource drivers uses proper error handling and keep on booting
+the device instead of calling panic.
 
-Probably should move this to the discussion in the other patch where
-we're talking about moving to 32-bits?
+[0] http://www.spinics.net/lists/arm-kernel/msg336924.html
 
-...but in general I have no benchmarks at all that how much the
-scheduler is affected by this change.  All of my benchmarks are based
-on gettimeofday(), where the improvement is clear.  Do you have a
-suggested way to check?
+---
+This patch set adds basic support for the Mediatek Cortex-A7 SoCs.
+Support is quite basic, as the only component working up to now are the
+timers.
 
-I think that it's pretty clear that we'll want to take either the
-32-bit conversion or the 64-bit optimizations I sent out.  If you take
-out gettimeofday() overhead, I believe that the actual read of the MCT
-(exynos_frc_read) took about:
-* ~800ns per call with the original 64-bit code
-* ~500ns per call with the optimized 64-bit code (both patch 2 and 3)
-* ~500ns per call with the 32-bit code
+The patch series is build against torvalds/master tree.
 
-The 32-bit code is slightly faster but not significantly (like 530ns
-vs 500ns).  ...but it is definitely simpler.
+Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-If we find that the schedule clock wrap overhead is real then that
-would be a good reason to take the 64-bit version.
+
+Changes for v7:
+1. OF address
+- add of_io_request_and_map
+
+2. Clocksource timer
+- use pr_warnings and error handling instead of panic
+- fix macro parentheses
+- use of_io_request_and_map
+
+3. Others
+- rename SoC DT bindings to mediatek.txt
+- fixed typos
+
+
+Changes for v6:
+- fix compatible string of the timer
+- encapsulate timer setup in function
+- add more information to the timer commit message
+- add address in timer DTS bindings documentation
+
+
+Changes for v5:
+1. Clocksource timer
+- Change the compatible string to mt6577
+
+2. Timer DT bindings
+- Change compatible string to mt6577
+
+
+Changes for v4:
+1. Clocksource timer
+- use cpu_possible_mask
+
+2. Timer DT bindings
+- Delete comments about the frequency of the clocks
+- Add clock-names for the input clocks
+
+3. Basic SoC support
+- add clock-names for the timer
+- rename the label of the clocks nodes
+
+
+Changes for v3:
+1. Clocksource timer
+- Set cpu_mask_all and irq in clock_event_device
+- Use device private structure for driver specific values
+
+2. Timer DT bindings
+- Define order of the clock phandles
+- Fix typos
+
+3. Basic SoC support
+- DTS: set gic to a15-gic
+- DTS: order by physical address
+- Remove call to dt_init function
+
+
+Changes for v2:
+1. Clocksource timer
+- Delete unused parts for sched_clock_source
+- Use irq_request instead of setup_irq
+- Remove unused SMP parts
+- Fix some style issues
+- use of_address_to resource and request_mem_region
+- delete use of named clock
+- select CLKSRC_MMIO in driver Kconfig
+
+2. DT bindings
+- delete named clock bindings
+
+3. Basic SoC support
+- Clean-up Kconfig
+- Add documentation of the SoC compatible property 
+- DTS: rename SoC file to mt6589.dts
+- DTS: Delete not present cache controller
+- DTS: Add missing GICv2 properties
+- DTS: Change clock names
+- DTS: Add Aquaris5 board
+
+4. Add earlyprintk
+- patch droped until serial driver is available
+
+5. Add support for Aquaris5 mobile phone
+
+
+
+Matthias Brugger (7):
+  of: Provide function to request and map memory
+  clocksource: Add support for the Mediatek SoCs
+  dt-bindings: add mtk-timer bindings
+  vendor-prefixes: add prefix for Mediaktek Inc.
+  arm: add basic support for Mediatek MT6589 boards
+  dt-bindings: add documentation for Mediatek SoC
+  arm: mediatek: add dts for Aquaris5 mobile phone
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |    8 +
+ .../bindings/timer/mediatek,mtk-timer.txt          |   18 ++
+ .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+ arch/arm/Kconfig                                   |    2 +
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/boot/dts/mt6589-aquaris5.dts              |   25 ++
+ arch/arm/boot/dts/mt6589.dtsi                      |   94 +++++++
+ arch/arm/mach-mediatek/Kconfig                     |    6 +
+ arch/arm/mach-mediatek/Makefile                    |    1 +
+ arch/arm/mach-mediatek/mediatek.c                  |   27 ++
+ drivers/clocksource/Kconfig                        |    5 +
+ drivers/clocksource/Makefile                       |    1 +
+ drivers/clocksource/mtk_timer.c                    |  260 ++++++++++++++++++++
+ drivers/of/address.c                               |   28 +++
+ include/linux/of_address.h                         |    8 +
+ 15 files changed, 485 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+ create mode 100644 arch/arm/boot/dts/mt6589-aquaris5.dts
+ create mode 100644 arch/arm/boot/dts/mt6589.dtsi
+ create mode 100644 arch/arm/mach-mediatek/Kconfig
+ create mode 100644 arch/arm/mach-mediatek/Makefile
+ create mode 100644 arch/arm/mach-mediatek/mediatek.c
+ create mode 100644 drivers/clocksource/mtk_timer.c
+
+-- 
+1.7.9.5
