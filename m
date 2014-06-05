@@ -1,142 +1,131 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Jun 2014 16:26:51 +0100
-Subject: [PATCH RFC v1 1/2] documentation/iommu: Add description of
- Hisilicon System MMU binding
-In-Reply-To: <1401975430-2648-2-git-send-email-thunder.leizhen@huawei.com>
-References: <1401975430-2648-1-git-send-email-thunder.leizhen@huawei.com>
- <1401975430-2648-2-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <20140605152651.GB31564@leverpostej>
+Date: Thu, 5 Jun 2014 16:33:53 +0100
+Subject: [PATCH] ARM64:DMI: Add smbios/dmi support on arm64
+In-Reply-To: <538F34D0.5090905@linaro.org>
+References: <1401811033-16478-1-git-send-email-yi.li@linaro.org>
+ <20140604133200.GA4329@leverpostej> <538F34D0.5090905@linaro.org>
+Message-ID: <20140605153353.GC31564@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jun 04, 2014 at 04:01:36PM +0100, Yi Li wrote:
+> Hi Mark,
+> 
+>      Please see the comments below:
+> 
+> On Wednesday, June 04, 2014 09:32 PM, Mark Rutland wrote:
+> > On Tue, Jun 03, 2014 at 04:57:13PM +0100, Yi Li wrote:
+> >> Add smbios/dmi support on arm64 system, it depends on
+> >> EFI boot.
+> > And what exactly does this provide us with?
+> >
+> > What is exposed through SMBIOS/DMI, and why would I want to enable it?
+> Yi: SMBIOS/DMI is one basic spec/feature for server product(like x86 and 
+> IA64).
+>       Many OEMs/ODMs hope to use ARM64 as server's processor.
+>       So we need to support SMBIOS on ARM64.
+> 
+>      SMBIOS mainly describes some hardware and software information for 
+> the system, like BIOS information
+>      CPU information,  Memory information ,and so on. please refer to 
+> http://www.dmtf.org/standards/smbios
 
-On Thu, Jun 05, 2014 at 02:37:09PM +0100, Zhen Lei wrote:
-> This patch adds a description of the device tree binding for the Hisilicon
-> System MMU architecture.
+What information does it provide that is useful that we cannot get from
+elsewhere?
 
-Similarly to my comments regarding the code, if this is a variant of the
-ARM SMMU architecture, then it almost certainly makes sense to express
-this as a delta againsts the ARM SMMU binding.
+What use case is enabled by having this support, other than being able
+to tick a box that we have a feature we might not even need?
 
 > 
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
->  .../devicetree/bindings/iommu/hisilicon,smmu.txt   | 70 ++++++++++++++++++++++
->  1 file changed, 70 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iommu/hisilicon,smmu.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/iommu/hisilicon,smmu.txt b/Documentation/devicetree/bindings/iommu/hisilicon,smmu.txt
-> new file mode 100644
-> index 0000000..a2b2f23
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iommu/hisilicon,smmu.txt
-> @@ -0,0 +1,70 @@
-> +* Hisilicon System MMU Architecture Implementation
-> +
-> +Hisilicon SoCs may contain an implementation of the Hisilicon System Memory
-> +Management Unit Architecture, which can be used to provide 1 or 2 stages
-> +of address translation to bus masters external to the CPU.
-> +
-> +The SMMU may also raise interrupts in response to various fault
-> +conditions.
-> +
-> +** System MMU required properties:
-> +
-> +- compatible    : Should be one of:
-> +
-> +                        "hisilicon,smmu-v1"
-> +
-> +                  depending on the particular implementation and/or the
-> +                  version of the architecture implemented.
+> >
+> >> Signed-off-by: Yi Li <yi.li@linaro.org>
+> >> ---
+> >>
+> >> Changes since v1:
+> >>    -Followed Ard Biesheuvel's suggestion to rebase the patch on
+> >>     Matt Fleming's arm64-efi branch.
+> >>
+> >>   arch/arm64/Kconfig           |   10 ++++++++++
+> >>   arch/arm64/include/asm/dmi.h |   28 ++++++++++++++++++++++++++++
+> >>   arch/arm64/kernel/setup.c    |    2 ++
+> >>   3 files changed, 40 insertions(+)
+> >>   create mode 100644 arch/arm64/include/asm/dmi.h
+> >>
+> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> >> index 6c71f12..13ee261 100644
+> >> --- a/arch/arm64/Kconfig
+> >> +++ b/arch/arm64/Kconfig
+> >> @@ -294,6 +294,16 @@ config EFI
+> >>   	  allow the kernel to be booted as an EFI application. This
+> >>   	  is only useful on systems that have UEFI firmware.
+> >>   
+> >> +config DMI
+> >> +	bool "Enable support for SMBIOS (DMI) tables"
+> >> +	depends on EFI
+> >> +	default y
+> >> +	help
+> >> +	  This enables SMBIOS/DMI feature for systems.
+> >> +
+> >> +	  This option is only useful on systems that have UEFI firmware.
+> >> +	  However, even with this option, the resultant kernel should
+> >> +	  continue to boot on existing non-UEFI platforms.
+> >>   endmenu
+> >>   
+> >>   menu "Userspace binary formats"
+> >> diff --git a/arch/arm64/include/asm/dmi.h b/arch/arm64/include/asm/dmi.h
+> >> new file mode 100644
+> >> index 0000000..f2198bf
+> >> --- /dev/null
+> >> +++ b/arch/arm64/include/asm/dmi.h
+> >> @@ -0,0 +1,28 @@
+> >> +/*
+> >> + * arch/arm64/include/asm/dmi.h
+> >> + *
+> >> + * Copyright (C) 2013 Linaro Limited.
+> >> + * Written by: Yi Li (yi.li at linaro.org)
+> >> + *
+> >> + * based on arch/ia64/include/asm/dmi.h
+> >> + *
+> >> + * This file is subject to the terms and conditions of the GNU General Public
+> >> + * License.  See the file "COPYING" in the main directory of this archive
+> >> + * for more details.
+> >> + */
+> >> +
+> >> +
+> >> +#ifndef _ASM_DMI_H
+> >> +#define _ASM_DMI_H 1
+> >> +
+> >> +#include <linux/slab.h>
+> >> +#include <asm/io.h>
+> > Shouldn't that be linux/efi.h?
+> >
+> > Why do we need asm/io.h?
+>      Yi: porting it from IA64 , so the io.h is not needed exactly!
+>           but slab.h is must included ,not efi.h (tested by compiling)
 
-One of one possibilities?
+Below you refer to efi_lookup_mapped_addr, which (as far as I can tell)
+is defined in efi.h. You might be getting lucky with users of
+dmi_early_remap and dmi_remap having already incldued efi.h, but you
+shouldn't rely on it.
 
-Are we expecting further variants?
-
-> +
-> +- reg           : Base address and size of the SMMU.
-> +
-> +- #global-interrupts : The number of global interrupts exposed by the
-> +                       device.
-> +
-> +- interrupts    : Interrupt list, with the first #global-irqs entries
-> +                  corresponding to the global interrupts and exactly one
-> +                  following entry corresponding to context interrupt.
-> +
-> +- smmu-masters  : A list of phandles to device nodes representing bus
-> +                  masters for which the SMMU can provide a translation
-> +                  and their corresponding StreamIDs (see example below).
-> +
-> +** System MMU optional properties:
-> +
-> +- smmu-cb-memtype   : A list of StreamIDs which not translate address but
-> +                  translate attributes. The StreamIDs list here can not be
-> +                  used for map(translation) mode again.
-> +                  StreamID first, then the type list below:
-> +                  1, cahceable, WBRAWA, Normal outer and inner write-back
-> +                  2, non-cacheable, Normal outer and inner non-cacheable
-> +                  3, device, nGnRE
-> +                  others, bypass
-
-This sounds like configuration rather than device description.
-
-What is this for?
-
-Why is this necessary?
-
-> +
-> +- smmu-bypass-vmid  : Specify which context bank is used for bypass mode.
-> +                  If omit, vmid=255 is default.
-
-Likewise, for all the points against smmu-cb-memtype.
-
-> +
-> +Example:
-> +
-> +        smmu {
-
-Nit: missing unit-address;
-
-> +                compatible = "hisilicon,smmu-v1";
-> +                reg = <0x40040000 0x1000>;
-> +                #global-interrupts = <1>;
-> +
-> +                /*
-> +                 * Global and context faults may use the same interrupt, if
-> +                 * only one exist.
-> +                 */
-
-That comment sounds like it should be in the description of the
-interrupts property, not the example.
-
-> +                interrupts = <0 188 4>,
-> +                             <0 188 4>; /* The last is the context interrupt */
-> +
-> +                /*
-> +                 * StreamID = 0 is bypass and force cacheable(WBRAWA).
-> +                 */
-> +                smmu-cb-memtype = <0x0 1>;
-
-Why?
+If you make use of something, you should include the header that defines
+it.
 
 Cheers,
 Mark.
 
-> +
-> +                /*
-> +                 * Two DMA controllers, each with exactly one StreamID.
-> +                 */
-> +                smmu-masters = <&dma0 0x0001>,
-> +                               <&dma1 0x0002>;
-> +        };
-> --
-> 1.8.0
+> >> +
+> >> +/* Use efi mappings for DMI */
+> >> +#define dmi_early_remap(x, l)	efi_lookup_mapped_addr(x)
+> >> +#define dmi_early_unmap(x, l)
+> >> +#define dmi_remap(x, l)			efi_lookup_mapped_addr(x)
+> >> +#define dmi_unmap(x)
+> >> +#define dmi_alloc(l)			kzalloc(l, GFP_ATOMIC)
+> >> +
+> >> +#endif
+> > None of these seem to use anything from io.h directly.
+>      Yi: You are right , io.h doesn't need.
+> > Cheers,
+> > Mark.
 > 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
