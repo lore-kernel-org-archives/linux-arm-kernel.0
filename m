@@ -1,131 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Jun 2014 16:33:53 +0100
-Subject: [PATCH] ARM64:DMI: Add smbios/dmi support on arm64
-In-Reply-To: <538F34D0.5090905@linaro.org>
-References: <1401811033-16478-1-git-send-email-yi.li@linaro.org>
- <20140604133200.GA4329@leverpostej> <538F34D0.5090905@linaro.org>
-Message-ID: <20140605153353.GC31564@leverpostej>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Thu, 5 Jun 2014 16:41:34 +0100
+Subject: [PATCH 7/7] OF/ACPI/I2C: Add generic match function for the
+ aforementioned systems
+In-Reply-To: <20140605103709.GE19550@lee--X1>
+References: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
+ <1401883796-17841-8-git-send-email-lee.jones@linaro.org>
+ <20140605103009.85BE4C40A4D@trevor.secretlab.ca>
+ <20140605103709.GE19550@lee--X1>
+Message-ID: <CACxGe6vLuKygv0E7yq42qe-Lh+nMZ1wrL7PW_TAeoz55wz9q8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 04, 2014 at 04:01:36PM +0100, Yi Li wrote:
-> Hi Mark,
-> 
->      Please see the comments below:
-> 
-> On Wednesday, June 04, 2014 09:32 PM, Mark Rutland wrote:
-> > On Tue, Jun 03, 2014 at 04:57:13PM +0100, Yi Li wrote:
-> >> Add smbios/dmi support on arm64 system, it depends on
-> >> EFI boot.
-> > And what exactly does this provide us with?
-> >
-> > What is exposed through SMBIOS/DMI, and why would I want to enable it?
-> Yi: SMBIOS/DMI is one basic spec/feature for server product(like x86 and 
-> IA64).
->       Many OEMs/ODMs hope to use ARM64 as server's processor.
->       So we need to support SMBIOS on ARM64.
-> 
->      SMBIOS mainly describes some hardware and software information for 
-> the system, like BIOS information
->      CPU information,  Memory information ,and so on. please refer to 
-> http://www.dmtf.org/standards/smbios
+On Thu, Jun 5, 2014 at 11:37 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 05 Jun 2014, Grant Likely wrote:
+>
+>> On Wed,  4 Jun 2014 13:09:56 +0100, Lee Jones <lee.jones@linaro.org> wrote:
+>> > Currently this is a helper function for the I2C subsystem to aid the
+>> > matching of non-standard compatible strings and devices which use DT
+>> > and/or ACPI, but do not supply any nodes (see: [1] Method 4).  However,
+>> > it has been made more generic as it can be used to only make one call
+>> > for drivers which support any mixture of OF, ACPI and/or I2C matching.
+>> >
+>> > The initial aim is for of_match_device() to be replaced by this call
+>> > in all I2C device drivers.
+>> >
+>> > [1] Documentation/i2c/instantiating-devices
+>> >
+>> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>
+>> I don't like this. It drops all type safety on the match entry
+>> and the caller has no idea what it got back.
+>
+> Okay, so what's the best way forward?
+>
+> Introduce a i2c_of_match_device() call instead?
 
-What information does it provide that is useful that we cannot get from
-elsewhere?
+I still think the way to do it is to emulate the missing i2c_device_id
+when calling the drivers .probe() hook by having a temporary copy on
+the stack and filling it with data from the OF or ACPI table....
+Actually I would completely skip trying to get the data from ACPI.
+Since all of this is to continue supporting instantiating devices from
+sysfs, having a fallback to the OF table completely solves that use
+case.
 
-What use case is enabled by having this support, other than being able
-to tick a box that we have a feature we might not even need?
+Anticipating an objection of: "what do we do with drivers that are
+ACPI only?"... That will be an incredibly rare case. If that ever does
+happen then we'll solve it by simply adding an of_device_id table.
 
-> 
-> >
-> >> Signed-off-by: Yi Li <yi.li@linaro.org>
-> >> ---
-> >>
-> >> Changes since v1:
-> >>    -Followed Ard Biesheuvel's suggestion to rebase the patch on
-> >>     Matt Fleming's arm64-efi branch.
-> >>
-> >>   arch/arm64/Kconfig           |   10 ++++++++++
-> >>   arch/arm64/include/asm/dmi.h |   28 ++++++++++++++++++++++++++++
-> >>   arch/arm64/kernel/setup.c    |    2 ++
-> >>   3 files changed, 40 insertions(+)
-> >>   create mode 100644 arch/arm64/include/asm/dmi.h
-> >>
-> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> >> index 6c71f12..13ee261 100644
-> >> --- a/arch/arm64/Kconfig
-> >> +++ b/arch/arm64/Kconfig
-> >> @@ -294,6 +294,16 @@ config EFI
-> >>   	  allow the kernel to be booted as an EFI application. This
-> >>   	  is only useful on systems that have UEFI firmware.
-> >>   
-> >> +config DMI
-> >> +	bool "Enable support for SMBIOS (DMI) tables"
-> >> +	depends on EFI
-> >> +	default y
-> >> +	help
-> >> +	  This enables SMBIOS/DMI feature for systems.
-> >> +
-> >> +	  This option is only useful on systems that have UEFI firmware.
-> >> +	  However, even with this option, the resultant kernel should
-> >> +	  continue to boot on existing non-UEFI platforms.
-> >>   endmenu
-> >>   
-> >>   menu "Userspace binary formats"
-> >> diff --git a/arch/arm64/include/asm/dmi.h b/arch/arm64/include/asm/dmi.h
-> >> new file mode 100644
-> >> index 0000000..f2198bf
-> >> --- /dev/null
-> >> +++ b/arch/arm64/include/asm/dmi.h
-> >> @@ -0,0 +1,28 @@
-> >> +/*
-> >> + * arch/arm64/include/asm/dmi.h
-> >> + *
-> >> + * Copyright (C) 2013 Linaro Limited.
-> >> + * Written by: Yi Li (yi.li at linaro.org)
-> >> + *
-> >> + * based on arch/ia64/include/asm/dmi.h
-> >> + *
-> >> + * This file is subject to the terms and conditions of the GNU General Public
-> >> + * License.  See the file "COPYING" in the main directory of this archive
-> >> + * for more details.
-> >> + */
-> >> +
-> >> +
-> >> +#ifndef _ASM_DMI_H
-> >> +#define _ASM_DMI_H 1
-> >> +
-> >> +#include <linux/slab.h>
-> >> +#include <asm/io.h>
-> > Shouldn't that be linux/efi.h?
-> >
-> > Why do we need asm/io.h?
->      Yi: porting it from IA64 , so the io.h is not needed exactly!
->           but slab.h is must included ,not efi.h (tested by compiling)
-
-Below you refer to efi_lookup_mapped_addr, which (as far as I can tell)
-is defined in efi.h. You might be getting lucky with users of
-dmi_early_remap and dmi_remap having already incldued efi.h, but you
-shouldn't rely on it.
-
-If you make use of something, you should include the header that defines
-it.
-
-Cheers,
-Mark.
-
-> >> +
-> >> +/* Use efi mappings for DMI */
-> >> +#define dmi_early_remap(x, l)	efi_lookup_mapped_addr(x)
-> >> +#define dmi_early_unmap(x, l)
-> >> +#define dmi_remap(x, l)			efi_lookup_mapped_addr(x)
-> >> +#define dmi_unmap(x)
-> >> +#define dmi_alloc(l)			kzalloc(l, GFP_ATOMIC)
-> >> +
-> >> +#endif
-> > None of these seem to use anything from io.h directly.
->      Yi: You are right , io.h doesn't need.
-> > Cheers,
-> > Mark.
-> 
-> 
+g.
