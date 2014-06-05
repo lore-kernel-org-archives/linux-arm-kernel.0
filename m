@@ -1,36 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Jun 2014 12:51:16 +0100
-Subject: [RFC v3 1/9] arm: fiq: arbitrary mappings from IRQ to FIQ virqs
-In-Reply-To: <1401961994-18033-2-git-send-email-daniel.thompson@linaro.org>
-References: <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
- <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
- <1401961994-18033-2-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20140605115116.GE23430@n2100.arm.linux.org.uk>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 5 Jun 2014 12:57:14 +0100
+Subject: [STLinux Kernel] [PATCH RESEND 05/12] drivers: clk: st: STiH407:
+ Support for clockgenA0
+In-Reply-To: <1401892320-18211-6-git-send-email-gabriel.fernandez@linaro.org>
+References: <1401892320-18211-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1401892320-18211-6-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <20140605115714.GA2294@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 05, 2014 at 10:53:06AM +0100, Daniel Thompson wrote:
->  static int fiq_def_op(void *ref, int relinquish)
->  {
-> -	if (!relinquish)
-> +	if (!relinquish) {
-> +		unsigned offset = FIQ_OFFSET;
-> +		no_fiq_insn = *(unsigned long *)(0xffff0000 + offset);
->  		set_fiq_handler(&no_fiq_insn, sizeof(no_fiq_insn));
-> +	}
-...
->  void __init init_FIQ(int start)
->  {
-> -	unsigned offset = FIQ_OFFSET;
-> -	no_fiq_insn = *(unsigned long *)(0xffff0000 + offset);
->  	fiq_start = start;
->  }
+Hi Gabi,
 
-This is wrong - when the default handler is "reinstalled", this change has
-the effect that we read the first instruction of the existing handler, and
-then write that same instruction back, rather than replacing the first
-instruction with the value that was there at boot.
+On Wed, 04 Jun 2014, Gabriel FERNANDEZ wrote:
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> The patch added support for DT registration of ClockGenA0
+> It includes c32 type PLL.
+> 
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
+> ---
+>  drivers/clk/st/clkgen-pll.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/drivers/clk/st/clkgen-pll.c b/drivers/clk/st/clkgen-pll.c
+> index d8b9b1a..6916cfa 100644
+> --- a/drivers/clk/st/clkgen-pll.c
+> +++ b/drivers/clk/st/clkgen-pll.c
+> @@ -180,6 +180,18 @@ static struct clkgen_pll_data st_pll1200c32_gpu_416 = {
+>  	.ops		= &st_pll1200c32_ops,
+>  };
+>  
+> +static struct clkgen_pll_data st_pll3200c32_407_a0 = {
+> +	/* 407 A0 */
+> +	.pdn_status	= CLKGEN_FIELD(0x2a0,	0x1,			8),
+> +	.locked_status	= CLKGEN_FIELD(0x2a0,	0x1,			24),
+> +	.ndiv		= CLKGEN_FIELD(0x2a4,	C32_NDIV_MASK,		16),
+> +	.idf		= CLKGEN_FIELD(0x2a4,	C32_IDF_MASK,		0x0),
+> +	.num_odfs = 1,
+> +	.odf		= { CLKGEN_FIELD(0x2b4, C32_ODF_MASK,		0) },
+> +	.odf_gate	= { CLKGEN_FIELD(0x2b4,	0x1,			6) },
+> +	.ops		= &stm_pll3200c32_ops,
+> +};
+> +
+>  /**
+I think these could be 'static const' as well, with some fixups in the function protoypes 
+which use it.
+
+Apart from that : -
+ Acked-by: Peter Griffin <peter.griffin@linaro.org>
+
+Regards,
+
+Peter
