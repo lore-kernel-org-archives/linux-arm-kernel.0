@@ -1,50 +1,70 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 5 Jun 2014 15:50:12 -0400 (EDT)
-Subject: [RFC v3 3/9] irqchip: gic: Provide support for interrupt grouping
-In-Reply-To: <1401961994-18033-4-git-send-email-daniel.thompson@linaro.org>
-References: <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
- <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
- <1401961994-18033-4-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <alpine.LFD.2.11.1406051545380.25775@knanqh.ubzr>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 5 Jun 2014 13:10:46 -0700
+Subject: [PATCH v2] clk: exynos5420: Keep aclk66_peric enabled during boot
+In-Reply-To: <5390C5A9.5070900@gmail.com>
+References: <1401398496-4624-1-git-send-email-dianders@chromium.org>
+ <1401467562-5585-1-git-send-email-dianders@chromium.org>
+ <CAD=FV=W8-M5iOMDG190WGaeSySTd=qcp30k-H8DMUs_C5Pdwog@mail.gmail.com>
+ <5390C19A.9060201@gmail.com>
+ <CAD=FV=UZsEh+bOQxc8CP+yG5a5Sbp2eTyq8B_iq9u5io5G0B6A@mail.gmail.com>
+ <5390C5A9.5070900@gmail.com>
+Message-ID: <CAD=FV=Ucn20GDib=t=OOT+8YjGuk6uoWrP1qourY=YfrLJj1WA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Jun 2014, Daniel Thompson wrote:
+Tomasz,
 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 57d165e..aa8efe4 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -408,13 +408,27 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
->  		writel_relaxed(0xa0a0a0a0, base + GIC_DIST_PRI + i * 4 / 4);
->  
->  	/*
-> +	 * Set all global interrupts to be group 1.
-> +	 *
-> +	 * If grouping is not available (not implemented or prohibited by
-> +	 * security mode) these registers a read-as-zero/write-ignored.
-> +	 */
-> +	for (i = 32; i < gic_irqs; i += 32)
-> +		writel_relaxed(0xffffffff, base + GIC_DIST_IGROUP + i * 4 / 32);
-> +
-> +	/*
->  	 * Disable all interrupts.  Leave the PPI and SGIs alone
->  	 * as these enables are banked registers.
->  	 */
->  	for (i = 32; i < gic_irqs; i += 32)
->  		writel_relaxed(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
->  
-> -	writel_relaxed(1, base + GIC_DIST_CTRL);
-> +	/*
-> +	 * Set EnableGrp1/EnableGrp0 (bit 1 and 0) or EnableGrp (bit 0 only,
-> +	 * bit 1 ignored)
-> +	 */
-> +	writel_relaxed(GIC_DIST_CTRL_ENABLE_GRP0_BIT |
-> +		       GIC_DIST_CTRL_ENABLE_GRP1_BIT, base + GIC_DIST_CTRL);
+On Thu, Jun 5, 2014 at 12:31 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> One more question that just came to my mind: Why it is just the
+> aclk66_peri and not its children related to UARTs?
 
-Could there be more meaningful defines than GIC_DIST_CTRL_ENABLE_GRP0_BIT
-and GIC_DIST_CTRL_ENABLE_GRP1_BIT for those bits?  Otherwise the code 
-would look just as clear and possibly cleaner by simply using 0x3.
+Can you re-read out the original patch description and see if it
+answers that?  Basically: the UART was left on by the bootloader and
+that's a requirement of earlyprintk but the common clock framework is
+messing with aclk66_peric which is what's killing us.
 
 
-Nicolas
+> Exynos5420 clock driver still needs a little clean-up, so I'm okay with
+> any fix for now and changing this later if needed, but is this gate
+> clock for ACLK66_PERIC even needed? It seems to be marked with
+> CLK_IGNORE_UNUSED which suggests that it is not needed in this driver at
+> all, along with other similar clocks. AFAIK for power management
+> purposes our fine-grained approach is fine and we shouldn't need to use
+> the big gates.
+
+Right, another option is to remove this gate from the clock tree (and
+reparent all children on the gate's parent) and that would also fix
+us.  The main advantages of the "big gate" as I see it:
+
+1. There's a reasonable chance that our clock tree description is not
+complete.  Patches to add previously undocumented clocks seems to be a
+relatively common occurrence.  If one of those undocumented clocks
+happens to be a child of aclk66_peric then we'll no longer be gating
+it.
+
+2. There might be a small amount of power saved by gating the clock
+higher in the tree.
+
+3. Having a more complete description of the clock tree is nice in
+case someone outside the kernel does something.  If a stray pointer
+(or a nonstandard bootloader) gates the clock then our tree won't show
+problems, but the clock will still be gated.
+
+
+Of course as soon as the first child of aclk66_peric is activated then
+points #1 and #2 are invalid.  ...and #3 is a bit bogus because there
+are A LOT of gates that we already don't model.
+
+
+Also: the CLK_IGNORE_UNUSED is a bit bogus here.  That's not really a
+useful flag in the case that you've got children that are enabled and
+disabled.  Once your first child is enabled and disabled you'll be
+disabled!
+
+---
+
+Hmmm, I think I've convinced myself that your suggestion of just
+removing this gate from the table is the right thing to do.  Patch
+will be coming up soon.
+
+-Doug
