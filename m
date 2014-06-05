@@ -1,31 +1,37 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  5 Jun 2014 16:06:59 +0100
-Subject: [PATCH 6/6] ARM: multi_v7_defconfig: Configure in ST's Thermal
- Controller
-In-Reply-To: <1401980819-19962-1-git-send-email-lee.jones@linaro.org>
-References: <1401980819-19962-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1401980819-19962-7-git-send-email-lee.jones@linaro.org>
+Date: Thu, 5 Jun 2014 16:09:47 +0100
+Subject: [RESEND 0/4] phy: Introduce support for MiPHY365x
+In-Reply-To: <1400766819-22286-1-git-send-email-lee.jones@linaro.org>
+References: <1400766819-22286-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140605150947.GG24240@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ajit Pal Singh <ajitpal.singh@st.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/configs/multi_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+> Hi Kishon,
+> 
+> As requested, please find the patches to be applied to your v3.16
+> pull-request.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index d4e8a47..dcc4e3e 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -204,6 +204,8 @@ CONFIG_SENSORS_LM90=y
- CONFIG_THERMAL=y
- CONFIG_DOVE_THERMAL=y
- CONFIG_ARMADA_THERMAL=y
-+CONFIG_ST_THERMAL_SYSCFG=y
-+CONFIG_ST_THERMAL_MEMMAP=y
- CONFIG_WATCHDOG=y
- CONFIG_ORION_WATCHDOG=y
- CONFIG_MFD_AS3722=y
+I guess this is not going to make v3.16 now. :(
+
+Kishon can you make sure you queue for v3.17 ASAP please?
+
+> Kind regards,
+> Lee
+> 
+>  Documentation/devicetree/bindings/phy/phy-miphy365x.txt |  62 +++++++++++
+>  arch/arm/boot/dts/stih416-b2020-revE.dts                |   6 +-
+>  arch/arm/boot/dts/stih416-b2020.dts                     |   6 ++
+>  arch/arm/boot/dts/stih416.dtsi                          |  14 +++
+>  drivers/phy/Kconfig                                     |  10 ++
+>  drivers/phy/Makefile                                    |   1 +
+>  drivers/phy/phy-miphy365x.c                             | 630 ++++++++++++++++++++++
+>  include/dt-bindings/phy/phy-miphy365x.h                 |  25 +++++
+>  8 files changed, 753 insertions(+), 1 deletion(-)
+> 
+
 -- 
-1.8.3.2
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
