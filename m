@@ -1,34 +1,26 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 05 Jun 2014 12:06:23 -0600
-Subject: [PATCH v7 1/5] ARM: tegra: export apb dma readl/writel
-In-Reply-To: <5390AF88.9050007@wwwdotorg.org>
+Date: Thu, 05 Jun 2014 12:09:36 -0600
+Subject: [PATCH v7 3/5] misc: fuse: Add efuse driver for Tegra
+In-Reply-To: <1401973754-19701-4-git-send-email-pdeschrijver@nvidia.com>
 References: <1401973754-19701-1-git-send-email-pdeschrijver@nvidia.com>
- <1401973754-19701-2-git-send-email-pdeschrijver@nvidia.com>
- <5390AF88.9050007@wwwdotorg.org>
-Message-ID: <5390B19F.7090008@wwwdotorg.org>
+ <1401973754-19701-4-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <5390B260.2010801@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2014 11:57 AM, Stephen Warren wrote:
-> On 06/05/2014 07:09 AM, Peter De Schrijver wrote:
->> Export APB DMA readl and writel. These are needed because we can't access
->> the fuses directly on Tegra20 without potentially causing a system hang.
->> Also have the APB DMA readl and writel return an error in case of a read
->> failure instead of just returning zero or ignore write failures.
-> 
->> diff --git a/include/linux/tegra-soc.h b/include/linux/tegra-soc.h
-> 
->> +int tegra_apb_readl_using_dma(unsigned long offset, u32 *value);
->> +int tegra_apb_writel_using_dma(u32 value, unsigned long offset);
-> 
-> Hmm. I wonder why we're exporting those low-level internal functions
-> rather than the higher-level tegra_apb_readl()/writel() wrappers that
-> "clients" are supposed to be using.
+On 06/05/2014 07:09 AM, Peter De Schrijver wrote:
+> Implement fuse driver for Tegra20, Tegra30, Tegra114 and Tegra124.
 
-Oh, I suppose this is just for rivers/misc/fuse/tegra/fuse-tegra20.c to
-use it, not for arbitrary clients, so this is probably OK.
+This series isn't bisectable; building at either patch 3 or patch 4 yields:
 
-Any reason not to move all the DMA-related fuse-reading code into
-fuse-tegra20.c instead? After this series, is there code left in
-arch/arm/mach-tegra which will still need to call into the fuse-reading
-code and hence requires tegra_apb_readl_using_dma() to exist?
+> In file included from arch/arm/mach-tegra/fuse.c:28:0:
+> arch/arm/mach-tegra/fuse.h:40:5: error: conflicting types for ?tegra_fuse_readl?
+> In file included from arch/arm/mach-tegra/fuse.c:26:0:
+> include/linux/tegra-soc.h:43:5: note: previous declaration of ?tegra_fuse_readl? was here
+> arch/arm/mach-tegra/fuse.c:98:5: error: conflicting types for ?tegra_fuse_readl?
+> In file included from arch/arm/mach-tegra/fuse.c:26:0:
+> include/linux/tegra-soc.h:43:5: note: previous declaration of ?tegra_fuse_readl? was here
+> make[1]: *** [arch/arm/mach-tegra/fuse.o] Error 1
+> make[1]: *** Waiting for unfinished jobs....
+> make: *** [arch/arm/mach-tegra] Error 2
+> make: *** Waiting for unfinished jobs....
