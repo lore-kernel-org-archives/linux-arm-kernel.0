@@ -1,47 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 5 Jun 2014 15:21:03 -0700
-Subject: MMC is *still* broken...
-In-Reply-To: <86oay7noer.fsf@void.printf.net>
-References: <20140605183615.GG23430@n2100.arm.linux.org.uk>
- <86oay7noer.fsf@void.printf.net>
-Message-ID: <CAOesGMgp+r3TTuhctqxVxW8abj467UpPwch3iN=e8rsXeF1p-A@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 06 Jun 2014 00:26:31 +0200
+Subject: [PATCH v3] clk: exynos5420: Remove aclk66_peric from the clock
+ tree description
+In-Reply-To: <1402000514-30752-1-git-send-email-dianders@chromium.org>
+References: <1401467562-5585-1-git-send-email-dianders@chromium.org>
+ <1402000514-30752-1-git-send-email-dianders@chromium.org>
+Message-ID: <5390EE97.9020702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding Hans]
+On 05.06.2014 22:35, Doug Anderson wrote:
+> The "aclk66_peric" clock is a gate clock with a whole bunch of gates
+> underneath it.  This big gate isn't very useful to include in our
+> clock tree.  If any of the children need to be turned on then the big
+> gate will need to be on anyway.  ...and there are plenty of other "big
+> gates" that aren't described in our clock tree, some of which shut off
+> collections of clocks that have no relationship in the hierarchy so
+> are hard to model.
+> 
+> "aclk66_peric" is causing earlyprintk problems since it gets disabled
+> as part of the boot process, so let's just remove it.
+> 
+> Strangely (and for no good reason) this clock is exported as part of
+> the common clock bindings.  Remove it since there are no in-kernel
+> device trees using it and no reason anyone out of tree should refer to
+> it either.
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+> Changes in v3:
+> - Now just remove aclk66_peric from the tree as suggested by Tomasz.
+> 
+> Changes in v2:
+> - Use GATE_A and clk_get().  Save the clock for putting later.
+> - Return 0 from exynos5420_clk_late_init().
+> 
+>  drivers/clk/samsung/clk-exynos5420.c   | 85 ++++++++++++++++++++++------------
+>  include/dt-bindings/clock/exynos5420.h |  1 -
+>  2 files changed, 55 insertions(+), 31 deletions(-)
+> 
 
-On Thu, Jun 5, 2014 at 12:31 PM, Chris Ball <chris@printf.net> wrote:
-> Hi Russell, adding Ulf and Olof,
->
-> On Thu, Jun 05 2014, Russell King - ARM Linux wrote:
->> drivers/mmc/core/core.c: In function 'mmc_card_power_up':
->> drivers/mmc/core/core.c:1517:4: error: implicit declaration of
->> function 'gpiod_set_value'
->>
->> I reported this back in April, and it's still present.  This makes me
->> wonder if MMC is maintained.... and makes me wonder what the point
->> of reporting bugs is if they just get ignored.
->
-> I don't recall your report.  I might have just failed to read it, but
-> doing a quick mail search only finds "Subject: randconfig failures -
-> MMC + trusted foundations" -- which was sent to linux-arm-kernel@, but
-> not CC'd to linux-mmc@ or to me.
->
-> Furthermore, this error does not exist in mmc-next or linux-next,
-> so it's unclear why or how the MMC maintainers would fix it.
-> drivers/mmc/core/core.c does not use gpiod_set_value() in these trees.
->
-> Presumably you're testing Olof's unmerged patch "mmc: add support for
-> power-on sequencing through DT".  If it needs to include more gpio
-> headers, that should be reported to Olof for a respin.
->
-> The patch has not been merged because we're still discussing the best
-> way forward on linux-mmc@, in the thread "RFC: representing sdio
-> devices oob interrupt, clks, etc. in device tree".  The most recent
-> message in the thread is from yesterday.
+Mike, I can take this patch to my tree as a fix for 3.16-rc, or if still
+possible and you don't mind, feel free to apply it directly with my ACK:
 
-Right, Hans has taken over the patch set and he should revise it as
-needed. Hans?
+Acked-by: Tomasz Figa <t.figa@samsung.com>
 
-
--Olof
+Best regards,
+Tomasz
