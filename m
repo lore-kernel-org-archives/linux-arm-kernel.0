@@ -1,32 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 05 Jun 2014 22:54:27 +0200
-Subject: [PATCH] serial: lpc32xx uart module can't do console
-In-Reply-To: <4618166.h1v6p4h6Yh@wuerfel>
-References: <4618166.h1v6p4h6Yh@wuerfel>
-Message-ID: <6303174.SjjSrHKhU6@wuerfel>
+Date: Thu,  5 Jun 2014 23:05:46 +0200
+Subject: [PATCH 0/3] pcmcia randconfig fixes
+Message-ID: <1402002349-1984057-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Every uart driver that provides a console driver needs to
-be built-in for the console code to work, we get a build
-error for modular console drivers.
+Here are three small bug fixes for ancient build bugs from
+my randconfig queue. No urgency here, but I'm unsure who would
+pick them up these days, since there doesn't seem to be anyone
+left sending pull requests for pcmcia.
 
-This changes the SERIAL_HS_LPC32XX_CONSOLE symbol to depend
-on the SERIAL_HS_LPC32XX driver being built-in, just like
-we do for all the other uart drivers.
+Arnd Bergmann (3):
+  pcmcia: journada720: use sa1100 pin interfaces correctly
+  pcmcia: pxa2xx: fix logic for lubbock
+  pcmcia: sa1100: H3100 and H3600 share a driver
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+ drivers/pcmcia/Kconfig             |  2 +-
+ drivers/pcmcia/Makefile            |  1 +
+ drivers/pcmcia/sa1111_jornada720.c | 10 ++++++----
+ 3 files changed, 8 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index fb57159..b0ddd6c 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -774,7 +774,7 @@ config SERIAL_HS_LPC32XX
- 
- config SERIAL_HS_LPC32XX_CONSOLE
- 	bool "Enable LPC32XX high speed UART serial console"
--	depends on SERIAL_HS_LPC32XX
-+	depends on SERIAL_HS_LPC32XX=y
- 	select SERIAL_CORE_CONSOLE
- 	help
- 	  If you would like to be able to use one of the high speed serial
+-- 
+1.8.3.2
