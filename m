@@ -1,25 +1,15 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 05 Jun 2014 15:20:50 +0200
-Subject: [PATCH 1/2] [RFC] ASoC: samsung: move s3c24xx over to dmaengine
-Message-ID: <6123933.aGtaUr149J@wuerfel>
+Date: Thu, 05 Jun 2014 15:23:57 +0200
+Subject: [PATCH 2/2] [RFC] ASoC: samsung: remove unused DMA data
+In-Reply-To: <6123933.aGtaUr149J@wuerfel>
+References: <6123933.aGtaUr149J@wuerfel>
+Message-ID: <11571253.s6mM2aGoFR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The s3c24xx sound support keeps giving randconfig build errors, this
-is a new attempt to solve it by moving the driver over to use dmaengine
-exclusively.
-
-The removal of the legacy DMA support and the addition of the
-s3c24xx_dma_filter pointer are fairly obvious here. The part I'm not
-completely sure about is the removal of the s3c2410_dma_ctrl(...,
-S3C2410_DMAOP_STARTED) and dma_data->ops->started() calls. My understanding
-is that these are only required for drivers that do not support cyclic
-transfers, which the new dma engine driver now does, so we can simply
-remove them. This would also fix at least one bug in the ac97 driver
-on newer machines, which currently gives us a NULL pointer dereference
-from trying to call dma_data->ops->started().
-
-Any insights about this, or testing would be very welcome.
+The s3c_dma_client structures and the 'ch' and 'ops' members in
+s3c_dma_params were only used by the legacy DMA driver and serve
+no function any more. This removes any reference to them.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Cc: Heiko Stuebner <heiko@sntech.de>
@@ -28,628 +18,239 @@ Cc: Ben Dooks <ben-linux@fluff.org>
 Cc: Kukjin Kim <kgene.kim@samsung.com>
 Cc: linux-samsung-soc at vger.kernel.org
 ---
- sound/soc/samsung/Kconfig       |  13 --
- sound/soc/samsung/Makefile      |   4 +-
- sound/soc/samsung/ac97.c        |  16 --
- sound/soc/samsung/dma.c         | 454 ------------------------------------
- sound/soc/samsung/dmaengine.c   |   3 +
- sound/soc/samsung/s3c24xx-i2s.c |   1 -
- 6 files changed, 4 insertions(+), 487 deletions(-)
+ sound/soc/samsung/ac97.c        | 15 ---------------
+ sound/soc/samsung/dma.h         |  7 -------
+ sound/soc/samsung/i2s.c         |  6 ------
+ sound/soc/samsung/pcm.c         | 12 ------------
+ sound/soc/samsung/s3c-i2s-v2.c  | 10 ----------
+ sound/soc/samsung/s3c2412-i2s.c | 10 ----------
+ sound/soc/samsung/s3c24xx-i2s.c | 10 ----------
+ sound/soc/samsung/spdif.c       |  5 -----
+ 8 files changed, 75 deletions(-)
 
-
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index 7745629..32bfcf1 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -1,25 +1,15 @@
- config SND_SOC_SAMSUNG
- 	tristate "ASoC support for Samsung"
- 	depends on PLAT_SAMSUNG
--	select S3C2410_DMA if ARCH_S3C24XX
- 	select S3C64XX_PL080 if ARCH_S3C64XX
--	select SND_S3C_DMA if !ARCH_S3C24XX
--	select SND_S3C_DMA_LEGACY if ARCH_S3C24XX
- 	select SND_SOC_GENERIC_DMAENGINE_PCM if !ARCH_S3C24XX
- 	help
- 	  Say Y or M if you want to add support for codecs attached to
- 	  the Samsung SoCs' Audio interfaces. You will also need to
- 	  select the audio interfaces to support below.
- 
--config SND_S3C_DMA
--	tristate
--
--config SND_S3C_DMA_LEGACY
--	tristate
--
- config SND_S3C24XX_I2S
- 	tristate
--	select S3C24XX_DMA
- 
- config SND_S3C_I2SV2_SOC
- 	tristate
-@@ -27,7 +17,6 @@ config SND_S3C_I2SV2_SOC
- config SND_S3C2412_SOC_I2S
- 	tristate
- 	select SND_S3C_I2SV2_SOC
--	select S3C2410_DMA
- 
- config SND_SAMSUNG_PCM
- 	tristate
-@@ -83,7 +72,6 @@ config SND_SOC_SAMSUNG_SMDK_WM8994
- config SND_SOC_SAMSUNG_SMDK2443_WM9710
- 	tristate "SoC AC97 Audio support for SMDK2443 - WM9710"
- 	depends on SND_SOC_SAMSUNG && MACH_SMDK2443
--	select S3C2410_DMA
- 	select AC97_BUS
- 	select SND_SOC_AC97_CODEC
- 	select SND_SAMSUNG_AC97
-@@ -94,7 +82,6 @@ config SND_SOC_SAMSUNG_SMDK2443_WM9710
- config SND_SOC_SAMSUNG_LN2440SBC_ALC650
- 	tristate "SoC AC97 Audio support for LN2440SBC - ALC650"
- 	depends on SND_SOC_SAMSUNG && ARCH_S3C24XX
--	select S3C2410_DMA
- 	select AC97_BUS
- 	select SND_SOC_AC97_CODEC
- 	select SND_SAMSUNG_AC97
-diff --git a/sound/soc/samsung/Makefile b/sound/soc/samsung/Makefile
-index 6d0212b..f69f490 100644
---- a/sound/soc/samsung/Makefile
-+++ b/sound/soc/samsung/Makefile
-@@ -1,6 +1,5 @@
- # S3c24XX Platform Support
- snd-soc-s3c-dma-objs := dmaengine.o
--snd-soc-s3c-dma-legacy-objs := dma.o
- snd-soc-idma-objs := idma.o
- snd-soc-s3c24xx-i2s-objs := s3c24xx-i2s.o
- snd-soc-s3c2412-i2s-objs := s3c2412-i2s.o
-@@ -10,8 +9,7 @@ snd-soc-samsung-spdif-objs := spdif.o
- snd-soc-pcm-objs := pcm.o
- snd-soc-i2s-objs := i2s.o
- 
--obj-$(CONFIG_SND_S3C_DMA) += snd-soc-s3c-dma.o
--obj-$(CONFIG_SND_S3C_DMA_LEGACY) += snd-soc-s3c-dma-legacy.o
-+obj-$(CONFIG_SND_SOC_SAMSUNG) += snd-soc-s3c-dma.o
- obj-$(CONFIG_SND_S3C24XX_I2S) += snd-soc-s3c24xx-i2s.o
- obj-$(CONFIG_SND_SAMSUNG_AC97) += snd-soc-ac97.o
- obj-$(CONFIG_SND_S3C2412_SOC_I2S) += snd-soc-s3c2412-i2s.o
 diff --git a/sound/soc/samsung/ac97.c b/sound/soc/samsung/ac97.c
-index 68d9303..a674827 100644
+index a674827..c96babc 100644
 --- a/sound/soc/samsung/ac97.c
 +++ b/sound/soc/samsung/ac97.c
-@@ -225,9 +225,6 @@ static int s3c_ac97_trigger(struct snd_pcm_substream *substream, int cmd,
- 				struct snd_soc_dai *dai)
- {
- 	u32 ac_glbctrl;
--	struct snd_soc_pcm_runtime *rtd = substream->private_data;
--	struct s3c_dma_params *dma_data =
--		snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
+@@ -39,30 +39,15 @@ struct s3c_ac97_info {
+ };
+ static struct s3c_ac97_info s3c_ac97;
  
- 	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
- 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-@@ -253,11 +250,6 @@ static int s3c_ac97_trigger(struct snd_pcm_substream *substream, int cmd,
- 
- 	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
- 
--	if (!dma_data->ops)
--		dma_data->ops = samsung_dma_get_ops();
+-static struct s3c_dma_client s3c_dma_client_out = {
+-	.name = "AC97 PCMOut"
+-};
 -
--	dma_data->ops->started(dma_data->channel);
+-static struct s3c_dma_client s3c_dma_client_in = {
+-	.name = "AC97 PCMIn"
+-};
 -
- 	return 0;
- }
+-static struct s3c_dma_client s3c_dma_client_micin = {
+-	.name = "AC97 MicIn"
+-};
+-
+ static struct s3c_dma_params s3c_ac97_pcm_out = {
+-	.client		= &s3c_dma_client_out,
+ 	.dma_size	= 4,
+ };
  
-@@ -265,9 +257,6 @@ static int s3c_ac97_mic_trigger(struct snd_pcm_substream *substream,
- 				    int cmd, struct snd_soc_dai *dai)
- {
- 	u32 ac_glbctrl;
--	struct snd_soc_pcm_runtime *rtd = substream->private_data;
--	struct s3c_dma_params *dma_data =
--		snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
+ static struct s3c_dma_params s3c_ac97_pcm_in = {
+-	.client		= &s3c_dma_client_in,
+ 	.dma_size	= 4,
+ };
  
- 	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
- 	ac_glbctrl &= ~S3C_AC97_GLBCTRL_MICINTM_MASK;
-@@ -287,11 +276,6 @@ static int s3c_ac97_mic_trigger(struct snd_pcm_substream *substream,
+ static struct s3c_dma_params s3c_ac97_mic_in = {
+-	.client		= &s3c_dma_client_micin,
+ 	.dma_size	= 4,
+ };
  
- 	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+diff --git a/sound/soc/samsung/dma.h b/sound/soc/samsung/dma.h
+index 070ab0f..0e85dcf 100644
+--- a/sound/soc/samsung/dma.h
++++ b/sound/soc/samsung/dma.h
+@@ -14,17 +14,10 @@
  
--	if (!dma_data->ops)
--		dma_data->ops = samsung_dma_get_ops();
--
--	dma_data->ops->started(dma_data->channel);
--
- 	return 0;
- }
+ #include <sound/dmaengine_pcm.h>
  
-diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
-deleted file mode 100644
-index d9dc7bc..0000000
---- a/sound/soc/samsung/dma.c
-+++ /dev/null
-@@ -1,454 +0,0 @@
--/*
-- * dma.c  --  ALSA Soc Audio Layer
-- *
-- * (c) 2006 Wolfson Microelectronics PLC.
-- * Graeme Gregory graeme.gregory at wolfsonmicro.com or linux at wolfsonmicro.com
-- *
-- * Copyright 2004-2005 Simtec Electronics
-- *	http://armlinux.simtec.co.uk/
-- *	Ben Dooks <ben@simtec.co.uk>
-- *
-- *  This program is free software; you can redistribute  it and/or modify it
-- *  under  the terms of  the GNU General  Public License as published by the
-- *  Free Software Foundation;  either version 2 of the  License, or (at your
-- *  option) any later version.
-- */
+-struct s3c_dma_client {
+-	char *name;
+-};
 -
--#include <linux/slab.h>
--#include <linux/dma-mapping.h>
--#include <linux/module.h>
+ struct s3c_dma_params {
+-	struct s3c_dma_client *client;	/* stream identifier */
+ 	int channel;				/* Channel ID */
+ 	dma_addr_t dma_addr;
+ 	int dma_size;			/* Size of the DMA transfer */
+-	unsigned ch;
+-	struct samsung_dma_ops *ops;
+ 	char *ch_name;
+ 	struct snd_dmaengine_dai_dma_data dma_data;
+ };
+diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+index 2ac76fa..6b9de74 100644
+--- a/sound/soc/samsung/i2s.c
++++ b/sound/soc/samsung/i2s.c
+@@ -1216,11 +1216,7 @@ static int samsung_i2s_probe(struct platform_device *pdev)
+ 
+ 	pri_dai->dma_playback.dma_addr = regs_base + I2STXD;
+ 	pri_dai->dma_capture.dma_addr = regs_base + I2SRXD;
+-	pri_dai->dma_playback.client =
+-		(struct s3c_dma_client *)&pri_dai->dma_playback;
+ 	pri_dai->dma_playback.ch_name = "tx";
+-	pri_dai->dma_capture.client =
+-		(struct s3c_dma_client *)&pri_dai->dma_capture;
+ 	pri_dai->dma_capture.ch_name = "rx";
+ 	pri_dai->dma_playback.dma_size = 4;
+ 	pri_dai->dma_capture.dma_size = 4;
+@@ -1238,8 +1234,6 @@ static int samsung_i2s_probe(struct platform_device *pdev)
+ 			goto err;
+ 		}
+ 		sec_dai->dma_playback.dma_addr = regs_base + I2STXDS;
+-		sec_dai->dma_playback.client =
+-			(struct s3c_dma_client *)&sec_dai->dma_playback;
+ 		sec_dai->dma_playback.ch_name = "tx-sec";
+ 
+ 		if (!np) {
+diff --git a/sound/soc/samsung/pcm.c b/sound/soc/samsung/pcm.c
+index 4c5f97f..bac034b 100644
+--- a/sound/soc/samsung/pcm.c
++++ b/sound/soc/samsung/pcm.c
+@@ -131,32 +131,20 @@ struct s3c_pcm_info {
+ 	struct s3c_dma_params	*dma_capture;
+ };
+ 
+-static struct s3c_dma_client s3c_pcm_dma_client_out = {
+-	.name		= "PCM Stereo out"
+-};
 -
--#include <sound/soc.h>
--#include <sound/pcm_params.h>
+-static struct s3c_dma_client s3c_pcm_dma_client_in = {
+-	.name		= "PCM Stereo in"
+-};
 -
--#include <asm/dma.h>
--#include <mach/hardware.h>
+ static struct s3c_dma_params s3c_pcm_stereo_out[] = {
+ 	[0] = {
+-		.client		= &s3c_pcm_dma_client_out,
+ 		.dma_size	= 4,
+ 	},
+ 	[1] = {
+-		.client		= &s3c_pcm_dma_client_out,
+ 		.dma_size	= 4,
+ 	},
+ };
+ 
+ static struct s3c_dma_params s3c_pcm_stereo_in[] = {
+ 	[0] = {
+-		.client		= &s3c_pcm_dma_client_in,
+ 		.dma_size	= 4,
+ 	},
+ 	[1] = {
+-		.client		= &s3c_pcm_dma_client_in,
+ 		.dma_size	= 4,
+ 	},
+ };
+diff --git a/sound/soc/samsung/s3c-i2s-v2.c b/sound/soc/samsung/s3c-i2s-v2.c
+index 0ff4bbe..113e5cb 100644
+--- a/sound/soc/samsung/s3c-i2s-v2.c
++++ b/sound/soc/samsung/s3c-i2s-v2.c
+@@ -22,8 +22,6 @@
+ #include <sound/soc.h>
+ #include <sound/pcm_params.h>
+ 
 -#include <mach/dma.h>
 -
--#include "dma.h"
--
--#define ST_RUNNING		(1<<0)
--#define ST_OPENED		(1<<1)
--
--static const struct snd_pcm_hardware dma_hardware = {
--	.info			= SNDRV_PCM_INFO_INTERLEAVED |
--				    SNDRV_PCM_INFO_BLOCK_TRANSFER |
--				    SNDRV_PCM_INFO_MMAP |
--				    SNDRV_PCM_INFO_MMAP_VALID,
--	.buffer_bytes_max	= 128*1024,
--	.period_bytes_min	= PAGE_SIZE,
--	.period_bytes_max	= PAGE_SIZE*2,
--	.periods_min		= 2,
--	.periods_max		= 128,
--	.fifo_size		= 32,
--};
--
--struct runtime_data {
--	spinlock_t lock;
--	int state;
--	unsigned int dma_loaded;
--	unsigned int dma_period;
--	dma_addr_t dma_start;
--	dma_addr_t dma_pos;
--	dma_addr_t dma_end;
--	struct s3c_dma_params *params;
--};
--
--static void audio_buffdone(void *data);
--
--/* dma_enqueue
-- *
-- * place a dma buffer onto the queue for the dma system
-- * to handle.
-- */
--static void dma_enqueue(struct snd_pcm_substream *substream)
--{
--	struct runtime_data *prtd = substream->runtime->private_data;
--	dma_addr_t pos = prtd->dma_pos;
--	unsigned int limit;
--	struct samsung_dma_prep dma_info;
--
--	pr_debug("Entered %s\n", __func__);
--
--	limit = (prtd->dma_end - prtd->dma_start) / prtd->dma_period;
--
--	pr_debug("%s: loaded %d, limit %d\n",
--				__func__, prtd->dma_loaded, limit);
--
--	dma_info.cap = (samsung_dma_has_circular() ? DMA_CYCLIC : DMA_SLAVE);
--	dma_info.direction =
--		(substream->stream == SNDRV_PCM_STREAM_PLAYBACK
--		? DMA_MEM_TO_DEV : DMA_DEV_TO_MEM);
--	dma_info.fp = audio_buffdone;
--	dma_info.fp_param = substream;
--	dma_info.period = prtd->dma_period;
--	dma_info.len = prtd->dma_period*limit;
--
--	if (dma_info.cap == DMA_CYCLIC) {
--		dma_info.buf = pos;
--		prtd->params->ops->prepare(prtd->params->ch, &dma_info);
--		prtd->dma_loaded += limit;
--		return;
--	}
--
--	while (prtd->dma_loaded < limit) {
--		pr_debug("dma_loaded: %d\n", prtd->dma_loaded);
--
--		if ((pos + dma_info.period) > prtd->dma_end) {
--			dma_info.period  = prtd->dma_end - pos;
--			pr_debug("%s: corrected dma len %ld\n",
--					__func__, dma_info.period);
--		}
--
--		dma_info.buf = pos;
--		prtd->params->ops->prepare(prtd->params->ch, &dma_info);
--
--		prtd->dma_loaded++;
--		pos += prtd->dma_period;
--		if (pos >= prtd->dma_end)
--			pos = prtd->dma_start;
--	}
--
--	prtd->dma_pos = pos;
--}
--
--static void audio_buffdone(void *data)
--{
--	struct snd_pcm_substream *substream = data;
--	struct runtime_data *prtd = substream->runtime->private_data;
--
--	pr_debug("Entered %s\n", __func__);
--
--	if (prtd->state & ST_RUNNING) {
--		prtd->dma_pos += prtd->dma_period;
--		if (prtd->dma_pos >= prtd->dma_end)
--			prtd->dma_pos = prtd->dma_start;
--
--		if (substream)
--			snd_pcm_period_elapsed(substream);
--
--		spin_lock(&prtd->lock);
--		if (!samsung_dma_has_circular()) {
--			prtd->dma_loaded--;
--			dma_enqueue(substream);
--		}
--		spin_unlock(&prtd->lock);
--	}
--}
--
--static int dma_hw_params(struct snd_pcm_substream *substream,
--	struct snd_pcm_hw_params *params)
--{
--	struct snd_pcm_runtime *runtime = substream->runtime;
--	struct runtime_data *prtd = runtime->private_data;
--	struct snd_soc_pcm_runtime *rtd = substream->private_data;
--	unsigned long totbytes = params_buffer_bytes(params);
--	struct s3c_dma_params *dma =
--		snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
--	struct samsung_dma_req req;
--	struct samsung_dma_config config;
--
--	pr_debug("Entered %s\n", __func__);
--
--	/* return if this is a bufferless transfer e.g.
--	 * codec <--> BT codec or GSM modem -- lg FIXME */
--	if (!dma)
--		return 0;
--
--	/* this may get called several times by oss emulation
--	 * with different params -HW */
--	if (prtd->params == NULL) {
--		/* prepare DMA */
--		prtd->params = dma;
--
--		pr_debug("params %p, client %p, channel %d\n", prtd->params,
--			prtd->params->client, prtd->params->channel);
--
--		prtd->params->ops = samsung_dma_get_ops();
--
--		req.cap = (samsung_dma_has_circular() ?
--			DMA_CYCLIC : DMA_SLAVE);
--		req.client = prtd->params->client;
--		config.direction =
--			(substream->stream == SNDRV_PCM_STREAM_PLAYBACK
--			? DMA_MEM_TO_DEV : DMA_DEV_TO_MEM);
--		config.width = prtd->params->dma_size;
--		config.fifo = prtd->params->dma_addr;
--		prtd->params->ch = prtd->params->ops->request(
--				prtd->params->channel, &req, rtd->cpu_dai->dev,
--				prtd->params->ch_name);
--		if (!prtd->params->ch) {
--			pr_err("Failed to allocate DMA channel\n");
--			return -ENXIO;
--		}
--		prtd->params->ops->config(prtd->params->ch, &config);
--	}
--
--	snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
--
--	runtime->dma_bytes = totbytes;
--
--	spin_lock_irq(&prtd->lock);
--	prtd->dma_loaded = 0;
--	prtd->dma_period = params_period_bytes(params);
--	prtd->dma_start = runtime->dma_addr;
--	prtd->dma_pos = prtd->dma_start;
--	prtd->dma_end = prtd->dma_start + totbytes;
--	spin_unlock_irq(&prtd->lock);
--
--	return 0;
--}
--
--static int dma_hw_free(struct snd_pcm_substream *substream)
--{
--	struct runtime_data *prtd = substream->runtime->private_data;
--
--	pr_debug("Entered %s\n", __func__);
--
--	snd_pcm_set_runtime_buffer(substream, NULL);
--
--	if (prtd->params) {
--		prtd->params->ops->flush(prtd->params->ch);
--		prtd->params->ops->release(prtd->params->ch,
--					prtd->params->client);
--		prtd->params = NULL;
--	}
--
--	return 0;
--}
--
--static int dma_prepare(struct snd_pcm_substream *substream)
--{
--	struct runtime_data *prtd = substream->runtime->private_data;
--	int ret = 0;
--
--	pr_debug("Entered %s\n", __func__);
--
--	/* return if this is a bufferless transfer e.g.
--	 * codec <--> BT codec or GSM modem -- lg FIXME */
--	if (!prtd->params)
--		return 0;
--
--	/* flush the DMA channel */
--	prtd->params->ops->flush(prtd->params->ch);
--
--	prtd->dma_loaded = 0;
--	prtd->dma_pos = prtd->dma_start;
--
--	/* enqueue dma buffers */
--	dma_enqueue(substream);
--
--	return ret;
--}
--
--static int dma_trigger(struct snd_pcm_substream *substream, int cmd)
--{
--	struct runtime_data *prtd = substream->runtime->private_data;
--	int ret = 0;
--
--	pr_debug("Entered %s\n", __func__);
--
--	spin_lock(&prtd->lock);
--
--	switch (cmd) {
--	case SNDRV_PCM_TRIGGER_START:
--		prtd->state |= ST_RUNNING;
--		prtd->params->ops->trigger(prtd->params->ch);
--		break;
--
--	case SNDRV_PCM_TRIGGER_STOP:
--		prtd->state &= ~ST_RUNNING;
--		prtd->params->ops->stop(prtd->params->ch);
--		break;
--
--	default:
--		ret = -EINVAL;
--		break;
--	}
--
--	spin_unlock(&prtd->lock);
--
--	return ret;
--}
--
--static snd_pcm_uframes_t
--dma_pointer(struct snd_pcm_substream *substream)
--{
--	struct snd_pcm_runtime *runtime = substream->runtime;
--	struct runtime_data *prtd = runtime->private_data;
--	unsigned long res;
--
--	pr_debug("Entered %s\n", __func__);
--
--	res = prtd->dma_pos - prtd->dma_start;
--
--	pr_debug("Pointer offset: %lu\n", res);
--
--	/* we seem to be getting the odd error from the pcm library due
--	 * to out-of-bounds pointers. this is maybe due to the dma engine
--	 * not having loaded the new values for the channel before being
--	 * called... (todo - fix )
--	 */
--
--	if (res >= snd_pcm_lib_buffer_bytes(substream)) {
--		if (res == snd_pcm_lib_buffer_bytes(substream))
--			res = 0;
--	}
--
--	return bytes_to_frames(substream->runtime, res);
--}
--
--static int dma_open(struct snd_pcm_substream *substream)
--{
--	struct snd_pcm_runtime *runtime = substream->runtime;
--	struct runtime_data *prtd;
--
--	pr_debug("Entered %s\n", __func__);
--
--	snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS);
--	snd_soc_set_runtime_hwparams(substream, &dma_hardware);
--
--	prtd = kzalloc(sizeof(struct runtime_data), GFP_KERNEL);
--	if (prtd == NULL)
--		return -ENOMEM;
--
--	spin_lock_init(&prtd->lock);
--
--	runtime->private_data = prtd;
--	return 0;
--}
--
--static int dma_close(struct snd_pcm_substream *substream)
--{
--	struct snd_pcm_runtime *runtime = substream->runtime;
--	struct runtime_data *prtd = runtime->private_data;
--
--	pr_debug("Entered %s\n", __func__);
--
--	if (!prtd)
--		pr_debug("dma_close called with prtd == NULL\n");
--
--	kfree(prtd);
--
--	return 0;
--}
--
--static int dma_mmap(struct snd_pcm_substream *substream,
--	struct vm_area_struct *vma)
--{
--	struct snd_pcm_runtime *runtime = substream->runtime;
--
--	pr_debug("Entered %s\n", __func__);
--
--	return dma_mmap_writecombine(substream->pcm->card->dev, vma,
--				     runtime->dma_area,
--				     runtime->dma_addr,
--				     runtime->dma_bytes);
--}
--
--static struct snd_pcm_ops dma_ops = {
--	.open		= dma_open,
--	.close		= dma_close,
--	.ioctl		= snd_pcm_lib_ioctl,
--	.hw_params	= dma_hw_params,
--	.hw_free	= dma_hw_free,
--	.prepare	= dma_prepare,
--	.trigger	= dma_trigger,
--	.pointer	= dma_pointer,
--	.mmap		= dma_mmap,
--};
--
--static int preallocate_dma_buffer(struct snd_pcm *pcm, int stream)
--{
--	struct snd_pcm_substream *substream = pcm->streams[stream].substream;
--	struct snd_dma_buffer *buf = &substream->dma_buffer;
--	size_t size = dma_hardware.buffer_bytes_max;
--
--	pr_debug("Entered %s\n", __func__);
--
--	buf->dev.type = SNDRV_DMA_TYPE_DEV;
--	buf->dev.dev = pcm->card->dev;
--	buf->private_data = NULL;
--	buf->area = dma_alloc_writecombine(pcm->card->dev, size,
--					   &buf->addr, GFP_KERNEL);
--	if (!buf->area)
--		return -ENOMEM;
--	buf->bytes = size;
--	return 0;
--}
--
--static void dma_free_dma_buffers(struct snd_pcm *pcm)
--{
--	struct snd_pcm_substream *substream;
--	struct snd_dma_buffer *buf;
--	int stream;
--
--	pr_debug("Entered %s\n", __func__);
--
--	for (stream = 0; stream < 2; stream++) {
--		substream = pcm->streams[stream].substream;
--		if (!substream)
--			continue;
--
--		buf = &substream->dma_buffer;
--		if (!buf->area)
--			continue;
--
--		dma_free_writecombine(pcm->card->dev, buf->bytes,
--				      buf->area, buf->addr);
--		buf->area = NULL;
--	}
--}
--
--static int dma_new(struct snd_soc_pcm_runtime *rtd)
--{
--	struct snd_card *card = rtd->card->snd_card;
--	struct snd_pcm *pcm = rtd->pcm;
--	int ret;
--
--	pr_debug("Entered %s\n", __func__);
--
--	ret = dma_coerce_mask_and_coherent(card->dev, DMA_BIT_MASK(32));
--	if (ret)
--		return ret;
--
--	if (pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream) {
--		ret = preallocate_dma_buffer(pcm,
--			SNDRV_PCM_STREAM_PLAYBACK);
--		if (ret)
--			goto out;
--	}
--
--	if (pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream) {
--		ret = preallocate_dma_buffer(pcm,
--			SNDRV_PCM_STREAM_CAPTURE);
--		if (ret)
--			goto out;
--	}
--out:
--	return ret;
--}
--
--static struct snd_soc_platform_driver samsung_asoc_platform = {
--	.ops		= &dma_ops,
--	.pcm_new	= dma_new,
--	.pcm_free	= dma_free_dma_buffers,
--};
--
--void samsung_asoc_init_dma_data(struct snd_soc_dai *dai,
--				struct s3c_dma_params *playback,
--				struct s3c_dma_params *capture)
--{
--	snd_soc_dai_init_dma_data(dai, playback, capture);
--}
--EXPORT_SYMBOL_GPL(samsung_asoc_init_dma_data);
--
--int samsung_asoc_dma_platform_register(struct device *dev)
--{
--	return devm_snd_soc_register_platform(dev, &samsung_asoc_platform);
--}
--EXPORT_SYMBOL_GPL(samsung_asoc_dma_platform_register);
--
--MODULE_AUTHOR("Ben Dooks, <ben@simtec.co.uk>");
--MODULE_DESCRIPTION("Samsung ASoC DMA Driver");
--MODULE_LICENSE("GPL");
-diff --git a/sound/soc/samsung/dmaengine.c b/sound/soc/samsung/dmaengine.c
-index a0e4e79..506f5bf 100644
---- a/sound/soc/samsung/dmaengine.c
-+++ b/sound/soc/samsung/dmaengine.c
-@@ -17,6 +17,7 @@
+ #include "regs-i2s-v2.h"
+ #include "s3c-i2s-v2.h"
+ #include "dma.h"
+@@ -423,14 +421,6 @@ static int s3c2412_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
+ 			s3c2412_snd_txctrl(i2s, 1);
  
- #include <linux/module.h>
- #include <linux/amba/pl08x.h>
-+#include <linux/platform_data/dma-s3c24xx.h>
+ 		local_irq_restore(irqs);
+-
+-		/*
+-		 * Load the next buffer to DMA to meet the reqirement
+-		 * of the auto reload mechanism of S3C24XX.
+-		 * This call won't bother S3C64XX.
+-		 */
+-		s3c2410_dma_ctrl(dma_data->channel, S3C2410_DMAOP_STARTED);
+-
+ 		break;
  
- #include <sound/core.h>
- #include <sound/pcm.h>
-@@ -29,6 +30,8 @@
+ 	case SNDRV_PCM_TRIGGER_STOP:
+diff --git a/sound/soc/samsung/s3c2412-i2s.c b/sound/soc/samsung/s3c2412-i2s.c
+index 08c059b..c8d2421 100644
+--- a/sound/soc/samsung/s3c2412-i2s.c
++++ b/sound/soc/samsung/s3c2412-i2s.c
+@@ -33,23 +33,13 @@
+ #include "regs-i2s-v2.h"
+ #include "s3c2412-i2s.h"
  
- #ifdef CONFIG_ARCH_S3C64XX
- #define filter_fn pl08x_filter_id
-+#elif defined(CONFIG_ARCH_S3C24XX)
-+#define filter_fn s3c24xx_dma_filter
- #else
- #define filter_fn NULL
- #endif
+-static struct s3c_dma_client s3c2412_dma_client_out = {
+-	.name		= "I2S PCM Stereo out"
+-};
+-
+-static struct s3c_dma_client s3c2412_dma_client_in = {
+-	.name		= "I2S PCM Stereo in"
+-};
+-
+ static struct s3c_dma_params s3c2412_i2s_pcm_stereo_out = {
+-	.client		= &s3c2412_dma_client_out,
+ 	.channel	= DMACH_I2S_OUT,
+ 	.dma_addr	= S3C2410_PA_IIS + S3C2412_IISTXD,
+ 	.dma_size	= 4,
+ };
+ 
+ static struct s3c_dma_params s3c2412_i2s_pcm_stereo_in = {
+-	.client		= &s3c2412_dma_client_in,
+ 	.channel	= DMACH_I2S_IN,
+ 	.dma_addr	= S3C2410_PA_IIS + S3C2412_IISRXD,
+ 	.dma_size	= 4,
 diff --git a/sound/soc/samsung/s3c24xx-i2s.c b/sound/soc/samsung/s3c24xx-i2s.c
-index 9aba9fb..890d241 100644
+index 890d241..2d8203f 100644
 --- a/sound/soc/samsung/s3c24xx-i2s.c
 +++ b/sound/soc/samsung/s3c24xx-i2s.c
-@@ -290,7 +290,6 @@ static int s3c24xx_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
- 		else
- 			s3c24xx_snd_txctrl(1);
+@@ -31,23 +31,13 @@
+ #include "dma.h"
+ #include "s3c24xx-i2s.h"
  
--		s3c2410_dma_ctrl(dma_data->channel, S3C2410_DMAOP_STARTED);
- 		break;
- 	case SNDRV_PCM_TRIGGER_STOP:
- 	case SNDRV_PCM_TRIGGER_SUSPEND:
+-static struct s3c_dma_client s3c24xx_dma_client_out = {
+-	.name = "I2S PCM Stereo out"
+-};
+-
+-static struct s3c_dma_client s3c24xx_dma_client_in = {
+-	.name = "I2S PCM Stereo in"
+-};
+-
+ static struct s3c_dma_params s3c24xx_i2s_pcm_stereo_out = {
+-	.client		= &s3c24xx_dma_client_out,
+ 	.channel	= DMACH_I2S_OUT,
+ 	.dma_addr	= S3C2410_PA_IIS + S3C2410_IISFIFO,
+ 	.dma_size	= 2,
+ };
+ 
+ static struct s3c_dma_params s3c24xx_i2s_pcm_stereo_in = {
+-	.client		= &s3c24xx_dma_client_in,
+ 	.channel	= DMACH_I2S_IN,
+ 	.dma_addr	= S3C2410_PA_IIS + S3C2410_IISFIFO,
+ 	.dma_size	= 2,
+diff --git a/sound/soc/samsung/spdif.c b/sound/soc/samsung/spdif.c
+index d9ffc48..d7d2e20 100644
+--- a/sound/soc/samsung/spdif.c
++++ b/sound/soc/samsung/spdif.c
+@@ -93,10 +93,6 @@ struct samsung_spdif_info {
+ 	struct s3c_dma_params	*dma_playback;
+ };
+ 
+-static struct s3c_dma_client spdif_dma_client_out = {
+-	.name		= "S/PDIF Stereo out",
+-};
+-
+ static struct s3c_dma_params spdif_stereo_out;
+ static struct samsung_spdif_info spdif_info;
+ 
+@@ -435,7 +431,6 @@ static int spdif_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	spdif_stereo_out.dma_size = 2;
+-	spdif_stereo_out.client = &spdif_dma_client_out;
+ 	spdif_stereo_out.dma_addr = mem_res->start + DATA_OUTBUF;
+ 	spdif_stereo_out.channel = dma_res->start;
+ 
