@@ -1,45 +1,69 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Thu, 5 Jun 2014 18:44:26 +0200
-Subject: [PATCH 3/9] ARM: dts: berlin: add a required reset property in
- the chip controller node
-In-Reply-To: <1401986347.4103.11.camel@paszta.hi.pengutronix.de>
-References: <1401983326-19205-1-git-send-email-antoine.tenart@free-electrons.com>
- <1401983326-19205-4-git-send-email-antoine.tenart@free-electrons.com>
- <1401986347.4103.11.camel@paszta.hi.pengutronix.de>
-Message-ID: <20140605164426.GA21960@kwain>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 05 Jun 2014 10:47:45 -0600
+Subject: [PATCH 2/4] of: Add NVIDIA Tegra XUSB pad controller binding
+In-Reply-To: <1401894990-30092-2-git-send-email-thierry.reding@gmail.com>
+References: <1401894990-30092-1-git-send-email-thierry.reding@gmail.com>
+ <1401894990-30092-2-git-send-email-thierry.reding@gmail.com>
+Message-ID: <53909F31.4050603@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 05, 2014 at 06:39:07PM +0200, Philipp Zabel wrote:
-> Am Donnerstag, den 05.06.2014, 17:48 +0200 schrieb Antoine T?nart:
-> > The chip controller node now also describes the Marvell Berlin reset
-> > controller. Add the required 'reset-cells' property.
-> > 
-> > Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/berlin2.dtsi   | 1 +
-> >  arch/arm/boot/dts/berlin2cd.dtsi | 1 +
-> >  arch/arm/boot/dts/berlin2q.dtsi  | 1 +
-> >  3 files changed, 3 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-> > index 2477dac4d643..379ff1a38377 100644
-> > --- a/arch/arm/boot/dts/berlin2.dtsi
-> > +++ b/arch/arm/boot/dts/berlin2.dtsi
-> > @@ -243,6 +243,7 @@
-> >  		chip: chip-control at ea0000 {
-> >  			compatible = "marvell,berlin2-chip-ctrl";
-> >  			#clock-cells = <1>;
-> > +			#reset-cells = <1>;
+On 06/04/2014 09:16 AM, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
 > 
-> Are the marvell,berlin2q-chip-ctrl bindings already documented? This
-> should also be added to the documentation.
+> This patch adds the device tree binding documentation for the XUSB pad
+> controller found on NVIDIA Tegra SoCs. It exposes both pinmuxing and PHY
+> capabilities.
 
-It is, I'll add information about its reset function.
+> diff --git a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
 
-Antoine
+> +- #phy-cells: Should be 1. The specifier is the index of the PHY to reference.
+> +  Possible values are:
+> +  - 0: PCIe
+> +  - 1: SATA
 
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Those values are defined in
+include/dt-bindings/pinctrl/pinctrl-tegra-xusb.h. I personally consider
+the <dt-bindings/> header files to be part of the binding itself, rather
+than being derived from the binding. As such, I'd suggest the following
+changes:
+
+* Make this patch 1 not patch 2
+* Move pinctrl-tegra-xusb.h into this patch.
+* Remove the list of values above, and replace it with the text "See
+<dt-bindings/pinctrl/pinctrl-tegra-xusb.h> for the set of valid values".
+
+We'll need to make sure this patch is applied to a topic branch that can
+be merged into the pinctrl tree and the Tegra tree for 3.17, assuming
+that you'll be sending patches for 3.17 that use pinctrl-tegra-xusb.h.
+
+> +Example:
+> +========
+> +
+> +SoC file extract:
+> +-----------------
+> +
+> +	padctl at 0,7009f000 {
+> +		compatible = "nvidia,tegra124-xusb-padctl";
+> +		reg = <0x0 0x7009f000 0x0 0x1000>;
+> +		resets = <&tegra_car 142>;
+> +		reset-names = "padctl";
+> +
+> +		#address-cells = <0>;
+> +		#size-cells = <0>;
+
+Why are those two properties required? Yes, this node has sub-nodes, but
+those sub-nodes don't have a reg property or unit address. The main
+Tegra pinctrl nodes don't have #address/size-cells.
+
+> +Board file extract:
+> +-------------------
+
+> +	padctl: padctl at 0,7009f000 {
+> +		pinmux {
+> +			pinctrl-0 = <&padctl_default>;
+> +			pinctrl-names = "default";
+
+Isn't there one extra level of nodes here. In the DT patches later in
+this series, pinctrl-0/pinctrl-names are directly inside the top-level
+padctl node.
