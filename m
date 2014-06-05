@@ -1,51 +1,110 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  5 Jun 2014 15:26:01 +0200
-Subject: [PATCH v3 2/5] pinctrl: sunxi: Add macro definition for pinctrl with
- more than one interrupt
+Date: Thu,  5 Jun 2014 15:26:02 +0200
+Subject: [PATCH v3 3/5] pinctrl: sunxi: Declare the number of interrupt banks
+ in the descriptor
 In-Reply-To: <1401974765-14417-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1401974765-14417-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1401974765-14417-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1401974765-14417-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31 and A23, unlike the other Allwinner SoCs, have several interrupts banks
-and parent interrupts, while the other only have up to 32 interrupts in a
-single bank and a single parent interrupt.
-
-Start supporting it by introducing a function macro to declare irq functions
-and their banks.
+Declare in the description structure associated to the compatible the number of
+interrupt banks the device has. For now, we're not doing anything with it.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/pinctrl/sunxi/pinctrl-sunxi.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c   | 1 +
+ drivers/pinctrl/sunxi/pinctrl-sun5i-a10s.c  | 1 +
+ drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c   | 1 +
+ drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c | 1 +
+ drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c   | 1 +
+ drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c   | 1 +
+ drivers/pinctrl/sunxi/pinctrl-sunxi.h       | 1 +
+ 7 files changed, 7 insertions(+)
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-index 8169ba598876..cb87e15b1b3c 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-@@ -77,6 +77,7 @@
- struct sunxi_desc_function {
- 	const char	*name;
- 	u8		muxval;
-+	u8		irqbank;
- 	u8		irqnum;
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
+index fa1ff7c7e357..86b608bedca6 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
+@@ -1010,6 +1010,7 @@ static const struct sunxi_desc_pin sun4i_a10_pins[] = {
+ static const struct sunxi_pinctrl_desc sun4i_a10_pinctrl_data = {
+ 	.pins = sun4i_a10_pins,
+ 	.npins = ARRAY_SIZE(sun4i_a10_pins),
++	.irq_banks = 1,
  };
  
-@@ -139,6 +140,14 @@ struct sunxi_pinctrl {
- 		.irqnum = _irq,					\
- 	}
+ static int sun4i_a10_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun5i-a10s.c b/drivers/pinctrl/sunxi/pinctrl-sun5i-a10s.c
+index 164d743f526c..2fa7430cabaf 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun5i-a10s.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun5i-a10s.c
+@@ -661,6 +661,7 @@ static const struct sunxi_desc_pin sun5i_a10s_pins[] = {
+ static const struct sunxi_pinctrl_desc sun5i_a10s_pinctrl_data = {
+ 	.pins = sun5i_a10s_pins,
+ 	.npins = ARRAY_SIZE(sun5i_a10s_pins),
++	.irq_banks = 1,
+ };
  
-+#define SUNXI_FUNCTION_IRQ_BANK(_val, _bank, _irq)		\
-+	{							\
-+		.name = "irq",					\
-+		.muxval = _val,					\
-+		.irqbank = _bank,				\
-+		.irqnum = _irq,					\
-+	}
-+
- /*
-  * The sunXi PIO registers are organized as is:
-  * 0x00 - 0x0c	Muxing values.
+ static int sun5i_a10s_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c b/drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c
+index 1188a2b7b988..29c734a60b51 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c
+@@ -382,6 +382,7 @@ static const struct sunxi_desc_pin sun5i_a13_pins[] = {
+ static const struct sunxi_pinctrl_desc sun5i_a13_pinctrl_data = {
+ 	.pins = sun5i_a13_pins,
+ 	.npins = ARRAY_SIZE(sun5i_a13_pins),
++	.irq_banks = 1,
+ };
+ 
+ static int sun5i_a13_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c
+index 8fcba48e0a42..9a2517b65113 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c
+@@ -93,6 +93,7 @@ static const struct sunxi_pinctrl_desc sun6i_a31_r_pinctrl_data = {
+ 	.pins = sun6i_a31_r_pins,
+ 	.npins = ARRAY_SIZE(sun6i_a31_r_pins),
+ 	.pin_base = PL_BASE,
++	.irq_banks = 2,
+ };
+ 
+ static int sun6i_a31_r_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
+index 8dea5856458b..7adc4888eb27 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
+@@ -836,6 +836,7 @@ static const struct sunxi_desc_pin sun6i_a31_pins[] = {
+ static const struct sunxi_pinctrl_desc sun6i_a31_pinctrl_data = {
+ 	.pins = sun6i_a31_pins,
+ 	.npins = ARRAY_SIZE(sun6i_a31_pins),
++	.irq_banks = 4,
+ };
+ 
+ static int sun6i_a31_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c b/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
+index d8577ce5f1a4..dac99e02bfdb 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
+@@ -1036,6 +1036,7 @@ static const struct sunxi_desc_pin sun7i_a20_pins[] = {
+ static const struct sunxi_pinctrl_desc sun7i_a20_pinctrl_data = {
+ 	.pins = sun7i_a20_pins,
+ 	.npins = ARRAY_SIZE(sun7i_a20_pins),
++	.irq_banks = 1,
+ };
+ 
+ static int sun7i_a20_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+index cb87e15b1b3c..7ddcce0f3c27 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+@@ -90,6 +90,7 @@ struct sunxi_pinctrl_desc {
+ 	const struct sunxi_desc_pin	*pins;
+ 	int				npins;
+ 	unsigned			pin_base;
++	unsigned			irq_banks;
+ };
+ 
+ struct sunxi_pinctrl_function {
 -- 
 2.0.0
