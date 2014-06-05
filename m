@@ -1,37 +1,57 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 05 Jun 2014 16:55:22 -0600
-Subject: [PATCH v7 4/5] ARM: tegra: Add efuse and apbmisc bindings
-In-Reply-To: <20140605221301.GQ5961@tbergstrom-lnx.Nvidia.com>
-References: <1401973754-19701-1-git-send-email-pdeschrijver@nvidia.com>
- <1401973754-19701-5-git-send-email-pdeschrijver@nvidia.com>
- <5390B9F3.8030108@wwwdotorg.org>
- <20140605221301.GQ5961@tbergstrom-lnx.Nvidia.com>
-Message-ID: <5390F55A.8090207@wwwdotorg.org>
+Date: Thu, 05 Jun 2014 16:57:11 -0600
+Subject: [PATCH 2/4] of: Add NVIDIA Tegra XUSB pad controller binding
+In-Reply-To: <20140605220833.GA28817@ulmo>
+References: <1401894990-30092-1-git-send-email-thierry.reding@gmail.com>
+ <1401894990-30092-2-git-send-email-thierry.reding@gmail.com>
+ <53909F31.4050603@wwwdotorg.org> <20140605220833.GA28817@ulmo>
+Message-ID: <5390F5C7.5070301@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2014 04:13 PM, Peter De Schrijver wrote:
-> On Thu, Jun 05, 2014 at 08:41:55PM +0200, Stephen Warren wrote:
->> On 06/05/2014 07:09 AM, Peter De Schrijver wrote:
->>> Add efuse and apbmisc bindings for Tegra20, Tegra30, Tegra114 and Tegra124.
+On 06/05/2014 04:08 PM, Thierry Reding wrote:
+> On Thu, Jun 05, 2014 at 10:47:45AM -0600, Stephen Warren wrote:
+>> On 06/04/2014 09:16 AM, Thierry Reding wrote:
+>>> From: Thierry Reding <treding@nvidia.com>
+>>>
+>>> This patch adds the device tree binding documentation for the XUSB pad
+>>> controller found on NVIDIA Tegra SoCs. It exposes both pinmuxing and PHY
+>>> capabilities.
 >>
->>> diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+>>> diff --git a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
 >>
->>> +	apbmisc at 70000800 {
->>> +		compatible = "nvidia,tegra114-apbmisc", "nvidia,tegra20-apbmisc";
+>>> +- #phy-cells: Should be 1. The specifier is the index of the PHY to reference.
+>>> +  Possible values are:
+>>> +  - 0: PCIe
+>>> +  - 1: SATA
 >>
->> Is the Tegra114 APBMISC register layout 100% a backwards-compatible
->> superset of that in Tegra20? For both registers the code currently uses
->> *and* all possible registers the code could ever use? Since the APB MISC
->> is a bit of a dumping ground for random registers, that feels unlikely,
->> but perhaps it's possible.
+>> Those values are defined in
+>> include/dt-bindings/pinctrl/pinctrl-tegra-xusb.h. I personally consider
+>> the <dt-bindings/> header files to be part of the binding itself, rather
+>> than being derived from the binding. As such, I'd suggest the following
+>> changes:
+>>
+>> * Make this patch 1 not patch 2
+>> * Move pinctrl-tegra-xusb.h into this patch.
+>> * Remove the list of values above, and replace it with the text "See
+>> <dt-bindings/pinctrl/pinctrl-tegra-xusb.h> for the set of valid values".
 > 
-> For all I can see it is. At least for the registers the kernel is likely to
-> use.
+> I remember discussions where people explicitly said that relying on the
+> symbolic names in the DT bindings was a mistake because it would mean
+> that everyone would need to have access to a mechanism similar to what
+> we have in the Linux kernel (and that the header files would always need
+> to be shipped with the DT bindings).
 
-But that's ("At least for the registers the kernel is likely to  use")
-not how compatible values are defined. We need to explicitly look at all
-the registers and actively decide that it really is compatible in order
-to mark it so. If we don't want to do that, it's best just to use a
-separate compatible value for each SoC, and add a couple more entries
-into the match table.
+The entire point of the headers is so that the binding definitions and
+code using them can't get out of sync. In my opinion, the headers *are*
+part of the bindings, so of course anyone either reading DT bindings, or
+parsing DT, must have the headers, and hence the headers must be bundled
+with the DT files or with the bindings wherever they go.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140605/2628de6b/attachment.sig>
