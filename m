@@ -1,23 +1,58 @@
-From: andrew.ruder@elecsyscorp.com (Andrew Ruder)
-Date: Thu,  5 Jun 2014 14:19:44 -0500
-Subject: [PATCH 0/6] miscellaneous pxa dt fixes
-Message-ID: <cover.1401995177.git.andrew.ruder@elecsyscorp.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 5 Jun 2014 12:22:27 -0700
+Subject: [PATCH v2] clk: exynos5420: Keep aclk66_peric enabled during boot
+In-Reply-To: <5390C19A.9060201@gmail.com>
+References: <1401398496-4624-1-git-send-email-dianders@chromium.org>
+ <1401467562-5585-1-git-send-email-dianders@chromium.org>
+ <CAD=FV=W8-M5iOMDG190WGaeSySTd=qcp30k-H8DMUs_C5Pdwog@mail.gmail.com>
+ <5390C19A.9060201@gmail.com>
+Message-ID: <CAD=FV=UZsEh+bOQxc8CP+yG5a5Sbp2eTyq8B_iq9u5io5G0B6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew Ruder (6):
-  arm: pxa2xx.dtsi: compatible tags for usb, mmc
-  pxa-usb: devicetree bindings docs update
-  arm: pxa27x.dtsi: header typo - wrong file
-  arm: pxa2xx.dtsi: disable RTC by default
-  arm: pxa27x.dtsi: add pwri2c definition
-  arm: pxa{27x,3xx}.dtsi: gpio cleanups
+Tomasz,
 
- Documentation/devicetree/bindings/usb/pxa-usb.txt |  5 +++--
- arch/arm/boot/dts/pxa27x.dtsi                     | 14 +++++++++++++-
- arch/arm/boot/dts/pxa2xx.dtsi                     |  9 +++++----
- arch/arm/boot/dts/pxa3xx.dtsi                     |  7 -------
- 4 files changed, 21 insertions(+), 14 deletions(-)
+On Thu, Jun 5, 2014 at 12:14 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> On 05.06.2014 20:48, Doug Anderson wrote:
+>> Tomasz / Mike,
+>>
+>> On Fri, May 30, 2014 at 9:32 AM, Doug Anderson <dianders@chromium.org> wrote:
+>>> Right now if you've got earlyprintk enabled on exynos5420-peach-pit
+>>> then you'll get a hang on boot.  Here's why:
+>>>
+>>> 1. The i2c-s3c2410 driver will probe at subsys_initcall.  It will
+>>>    enable its clock and disable it.  This is the clock "i2c2".
+>>> 2. The act of disabling "i2c2" will disable its parents.  In this case
+>>>    the parent is "aclk66_peric".  There are no other children of
+>>>    "aclk66_peric" officially enabled, so "aclk66_peric" will be turned
+>>>    off (despite being CLK_IGNORE_UNUSED, but that's by design).
+>>> 3. The next time you try to earlyprintk you'll do so without the UART
+>>>    clock enabled.  That's because the UART clocks are also children of
+>>>    "aclk66_peric".  You'll hang.
+>>>
+>>> There's no good place to put a clock enable for earlyprintk, which is
+>>> handled by a bunch of assembly code.  The best we can do is to handle
+>>> this in the clock driver.
+>>>
+>>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>>> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>>> ---
+>>> Changes in v2:
+>>> - Use GATE_A and clk_get().  Save the clock for putting later.
+>>> - Return 0 from exynos5420_clk_late_init().
+>>>
+>>>  drivers/clk/samsung/clk-exynos5420.c | 33 +++++++++++++++++++++++++++++++--
+>>>  1 file changed, 31 insertions(+), 2 deletions(-)
+>>
+>> Are there other changes you'd like me to make to this?  It would be
+>> really nice to get this in for 3.16 so the system doesn't just
+>> mysteriously hang when you use earlyprintk.
+>
+> We can probably take this as an -rc fix, so it should be fine.
+>
+> However I still don't see the point of exporting this clock and
+> polluting the global clkdev namespace. Even the diffstat looks better in v1.
 
--- 
-1.9.0.rc3.12.gbc97e2d
+OK, I'm happy to go back to v1 with the addition of the "return 0".
+
+Mike: are you OK with that?
