@@ -1,26 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 5 Jun 2014 12:42:07 +0100
-Subject: mainline boot: 37 passed 4 failed
- (mainline/v3.15-rc8-4569-g3de0ef8) (palmas regression uEVM)
-In-Reply-To: <20140604193431.GB4858@kahuna>
-References: <538e6a20.0168440a.7895.422b@mx.google.com>
- <CAOesGMg4ESoPVvCc4is7wpA8PVOOSDzh5=VZZ67NnJjD3jUzmw@mail.gmail.com>
- <20140604090111.GE2520@sirena.org.uk>
- <20140604193431.GB4858@kahuna>
-Message-ID: <20140605114207.GW2520@sirena.org.uk>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 05 Jun 2014 14:10:04 +0200
+Subject: [PATCH 3/3] cpufreq: Enable big.LITTLE cpufreq driver on arm64
+In-Reply-To: <20140605100416.GB27946@arm.com>
+References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
+ <3610030.uyJEv7eFhP@vostro.rjw.lan> <20140605100416.GB27946@arm.com>
+Message-ID: <20323352.3KEVHO00Qv@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 04, 2014 at 02:34:31PM -0500, Nishanth Menon wrote:
+On Thursday, June 05, 2014 11:04:16 AM Catalin Marinas wrote:
+> Hi Rafael,
+> 
+> On Tue, May 20, 2014 at 12:36:56AM +0100, Rafael J. Wysocki wrote:
+> > On Tuesday, May 20, 2014 12:07:29 AM Mark Brown wrote:
+> > > 
+> > > --MAH+hnPXVZWQ5cD/
+> > > Content-Type: text/plain; charset=us-ascii
+> > > Content-Disposition: inline
+> > > 
+> > > On Tue, May 20, 2014 at 01:19:03AM +0200, Rafael J. Wysocki wrote:
+> > > 
+> > > > I've queued this one up for 3.16, thanks!
+> > > 
+> > > This will fail to build without patch 1 - it uses the stubs added there.
+> > 
+> > OK, dropping then.
+> 
+> This patch still made it as commit 4920ab84979d (cpufreq: Enable
+> big.LITTLE cpufreq driver on arm64) and fails to build on arm64. Could
+> you please revert it?
 
-> Seems to help my OMAP5uevm.
-> If this makes sense, I will repost it as a formal patch.
+I will.
 
-Actually I just went ahead and applied this - thanks!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140605/0a723184/attachment.sig>
+Rafael
