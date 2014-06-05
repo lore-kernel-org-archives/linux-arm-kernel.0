@@ -1,24 +1,51 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 05 Jun 2014 11:57:28 -0600
-Subject: [PATCH v7 1/5] ARM: tegra: export apb dma readl/writel
-In-Reply-To: <1401973754-19701-2-git-send-email-pdeschrijver@nvidia.com>
-References: <1401973754-19701-1-git-send-email-pdeschrijver@nvidia.com>
- <1401973754-19701-2-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <5390AF88.9050007@wwwdotorg.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 5 Jun 2014 11:05:24 -0700
+Subject: [PATCH 3.10 005/103] irqchip: Gic: Support forced affinity setting
+In-Reply-To: <20140605160500.GD31564@leverpostej>
+References: <20140604232546.704156131@linuxfoundation.org>
+ <20140604232547.006861681@linuxfoundation.org>
+ <20140605160500.GD31564@leverpostej>
+Message-ID: <20140605180524.GC4121@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2014 07:09 AM, Peter De Schrijver wrote:
-> Export APB DMA readl and writel. These are needed because we can't access
-> the fuses directly on Tegra20 without potentially causing a system hang.
-> Also have the APB DMA readl and writel return an error in case of a read
-> failure instead of just returning zero or ignore write failures.
+On Thu, Jun 05, 2014 at 05:05:00PM +0100, Mark Rutland wrote:
+> Hi Greg,
+> 
+> On Thu, Jun 05, 2014 at 12:24:28AM +0100, Greg Kroah-Hartman wrote:
+> > 3.10-stable review patch.  If anyone has any objections, please let me know.
+> > 
+> > ------------------
+> > 
+> > From: Thomas Gleixner <tglx@linutronix.de>
+> > 
+> > commit ffde1de64012c406dfdda8690918248b472f24e4 upstream.
+> > 
+> > To support the affinity setting of per cpu timers in the early startup
+> > of a not yet online cpu, implement the force logic, which disables the
+> > cpu online check.
+> > 
+> > Tagged for stable to allow a simple fix of the affected SoC clock
+> > event drivers.
+> 
+> This patch alone has the possiblity of breaking CPU hotplug on arm and
+> arm64 (specifically it breaks hot unplugging CPU0 where interrupts may
+> be left targetting the offline CPU).
+> 
+> For arm64 [1] that's fixed by commit 601c942176d8 (arm64: use
+> cpu_online_mask when using forced irq_set_affinity).
 
-> diff --git a/include/linux/tegra-soc.h b/include/linux/tegra-soc.h
+Thanks, I'll apply that to the 3.14-stable tree, but, it doesn't seem
+relevant at all for 3.10-stable as arch/arm64/kernel/irq.c doesn't do
+anything with cpumask or set_affinity.  If it's relevant for 3.10,
+please provide a backported version.
 
-> +int tegra_apb_readl_using_dma(unsigned long offset, u32 *value);
-> +int tegra_apb_writel_using_dma(u32 value, unsigned long offset);
+> Unfortunately there is not an equivalent fix for arm - Russell objected
+> to the approach [2,3,4], and that's not yet settled.
 
-Hmm. I wonder why we're exporting those low-level internal functions
-rather than the higher-level tegra_apb_readl()/writel() wrappers that
-"clients" are supposed to be using.
+Ok, be sure to cc: stable on the patch when it goes into the tree and
+I'll pick it up then.
+
+thanks,
+
+greg k-h
