@@ -1,16 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  5 Jun 2014 23:24:14 +0200
-Subject: [PATCH 3/3] mfd: STw481x: allow modular build
+Date: Thu,  5 Jun 2014 23:24:12 +0200
+Subject: [PATCH 1/3] mfd: UCB1x00: enable modular build
 In-Reply-To: <1402003454-1989084-1-git-send-email-arnd@arndb.de>
 References: <1402003454-1989084-1-git-send-email-arnd@arndb.de>
-Message-ID: <1402003454-1989084-4-git-send-email-arnd@arndb.de>
+Message-ID: <1402003454-1989084-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver depends on I2C, which may be a loadable module.
-While you'd probably want both to be built-in in practice,
-allowing a modular build avoids possible randconfig link
-errors.
+The UCB1200 / UCB1300 driver uses the MCP_SA11X0 driver, which
+can be a loadable module, but this results in a link error
+when UCB1200 itself is built-in:
+
+drivers/built-in.o: In function `ucb1x00_io_set_dir':
+:(.text+0x4a364): undefined reference to `mcp_reg_write'
+drivers/built-in.o: In function `ucb1x00_io_write':
+:(.text+0x4a3dc): undefined reference to `mcp_reg_write'
+drivers/built-in.o: In function `ucb1x00_io_read':
+:(.text+0x4a400): undefined reference to `mcp_reg_read'
+drivers/built-in.o: In function `ucb1x00_adc_enable':
+:(.text+0x4a460): undefined reference to `mcp_enable'
+...
+
+This can easily be resolved by making CONFIG_MCP_UCB1200 itself
+a tristate option, since that causes Kconfig to track the
+dependency correctly.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
@@ -18,17 +31,17 @@ Signed-off-by: Arnd Bergmann <arnd@arndb.de>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 2dd838f..6cc4b6a 100644
+index ee8204c..4370692 100644
 --- a/drivers/mfd/Kconfig
 +++ b/drivers/mfd/Kconfig
-@@ -1226,7 +1226,7 @@ config MFD_WM8994
- 	  functionaltiy of the device other drivers must be enabled.
+@@ -1248,7 +1248,7 @@ config MCP_SA11X0
  
- config MFD_STW481X
--	bool "Support for ST Microelectronics STw481x"
-+	tristate "Support for ST Microelectronics STw481x"
- 	depends on I2C && ARCH_NOMADIK
- 	select REGMAP_I2C
- 	select MFD_CORE
+ # Chip drivers
+ config MCP_UCB1200
+-	bool "Support for UCB1200 / UCB1300"
++	tristate "Support for UCB1200 / UCB1300"
+ 	depends on MCP_SA11X0
+ 	select MCP
+ 
 -- 
 1.8.3.2
