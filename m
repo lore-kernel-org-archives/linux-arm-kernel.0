@@ -1,30 +1,33 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 5 Jun 2014 08:45:16 +0100
-Subject: [STLinux Kernel] [PATCH RESEND 06/12] drivers: clk: st: Add
- polarity bit indication
-In-Reply-To: <1401892320-18211-7-git-send-email-gabriel.fernandez@linaro.org>
-References: <1401892320-18211-1-git-send-email-gabriel.fernandez@linaro.org>
- <1401892320-18211-7-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <20140605074516.GA3865@griffinp-ThinkPad-X1-Carbon-2nd>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 05 Jun 2014 00:45:55 -0700 (PDT)
+Subject: [PATCH v5 4/4] drivers: net: Add APM X-Gene SoC ethernet
+ driver support.
+In-Reply-To: <1401737954-26152-5-git-send-email-isubramanian@apm.com>
+References: <1401737954-26152-1-git-send-email-isubramanian@apm.com>
+ <1401737954-26152-5-git-send-email-isubramanian@apm.com>
+Message-ID: <20140605.004555.658378024391856482.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabi,
+From: Iyappan Subramanian <isubramanian@apm.com>
+Date: Mon,  2 Jun 2014 12:39:14 -0700
 
-On Wed, 04 Jun 2014, Gabriel FERNANDEZ wrote:
+> +	netdev_err(ndev, "LERR: %d ring_num: %d ", status, ring->num);
+> +	switch (status) {
+> +	case HBF_READ_DATA:
+> +		netdev_err(ndev, "HBF read data error\n");
+> +		break;
 
-> This patch introduces polarity indication for pll power up bit
-> and for standby bit in order to have same code between Orly 2
-> and CAN.
+This is not really appropriate.
 
-I think it would be better to refer to the SoC's by there numeric
-name stih416 and stih407, as people unfamiliar with ST SoC names
-reading the commit message are unlikely to know what Orly2 or CAN 
-mean.
+We have statistics like the ones you are incrementing in this
+function as the mechanism people can use to learn what events
+happened on an interface, and how many times they happened.
 
-Once fixed you can add my:
-Acked-by: Peter Griffin <peter.griffin@linaro.org>
+Therefore, emitting a log message for each one of those events too is
+not necessary.
 
-regards,
+We don't emit a netdev_err() for every packet that the IPv4 stack
+drops due to a bad checksum, for example.
 
-Peter.
+Please get rid of this.
